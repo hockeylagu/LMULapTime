@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { HashRouter } from 'react-router';
 import App from '../src/App.js';
+import { aggregateTrackSummaries } from '../shared/domain/trackSummaryUtils.js';
 import { prefetchRoutePages } from '../src/routePages.js';
 
 function mockApi() {
@@ -10,6 +11,16 @@ function mockApi() {
     if (url.includes('/api/status')) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ resultsExist: true, replaysExist: true, sessionsCount: 0 }) });
     }
+    if (url.startsWith('/api/tracks')) return Promise.resolve({ok:true,json:()=>Promise.resolve({tracks:Object.values(aggregateTrackSummaries([]))})});
+      if (url.startsWith('/api/dashboard')) return Promise.resolve({ok:true,json:()=>Promise.resolve({
+        revision:'test:1',sessions:[],total:1,page:1,pageSize:25,tracks:['Spa'],emptyCount:0,replayCount:0,
+        metrics:{sessionsCount:1,totalLaps:5,cleanLaps:5,cleanLapsPercentage:100,totalDistanceKm:35,totalDrivingSeconds:600,
+          maxTopSpeed:0,maxTopSpeedTrack:'',averageBenchmarkPacePercentage:100.1,averageBenchmarkPaceCategory:'Alien',
+          practiceSessionsCount:1,qualifyingSessionsCount:0,raceSessionsCount:0,raceWinsCount:0,racePodiumsCount:0,totalPitStops:0,
+          rankedTracks:[{track:'Spa',laps:5,km:35}],rankedCars:[{car:'Ferrari 499P',laps:5,km:35}],bestTrackRefLaps:[]},
+        trends:{hasData:false,driverName:'Player',latestOuting:null,todayActivity:null,recentPaceTrend:[],paceDelta:null,
+          paceTrendDirection:'none',paceTrendClass:null,recentCleanRate:null,recentConsistency:null,recentNetPositions:0}
+      })});
     if (url.includes('/api/session-snapshot')) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ sessions: [], progression: [] }) });
     }

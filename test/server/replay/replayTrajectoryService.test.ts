@@ -2,12 +2,13 @@ vi.mock('../../../server/plugins/dataPlugin.js', async (importOriginal) => {
   const actual=await importOriginal<typeof import('../../../server/plugins/dataPlugin.js')>();
   const {syntheticTrack}=await import('../../helpers/syntheticTrack.js');
   return {...actual,dataPlugin:{status:actual.dataPlugin.status,
+    trackGeometry:(key:string)=>['monza_gp','daytona_road_course'].includes(key)?syntheticTrack(key):null,
     track:(key:string)=>['monza_gp','daytona_road_course'].includes(key)?{geometry:syntheticTrack(key),display:null}:null,
     vehicle:()=>null,vehicles:()=>[]}};
 });
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionDatabase } from '../../../server/core/db.js';
-import { ReplayCacheService } from '../../../server/replay/replayCacheService.js';
+import { ReplayRecordingService } from '../../../server/replay/replayRecordingService.js';
 import { ReplayTelemetryService } from '../../../server/replay/replayTelemetryService.js';
 import { ReplayTrajectoryService } from '../../../server/replay/replayTrajectoryService.js';
 import { ReplayDriverNotFoundError } from '../../../server/replay/replayServiceTypes.js';
@@ -21,7 +22,7 @@ import type {
 
 describe('ReplayTrajectoryService', () => {
   let db: SessionDatabase;
-  let replayCache: ReplayCacheService;
+  let replayRecordings: ReplayRecordingService;
   let telemetryService: ReplayTelemetryService;
   let trajectoryService: ReplayTrajectoryService;
   let sessions: DetailedSession[];
@@ -58,22 +59,21 @@ describe('ReplayTrajectoryService', () => {
 
   beforeEach(() => {
     db = new SessionDatabase(':memory:');
-    replayCache = new ReplayCacheService(db);
+    replayRecordings = new ReplayRecordingService(db);
     telemetryService = new ReplayTelemetryService(db);
     sessions = [];
 
     trajectoryService = new ReplayTrajectoryService(
       '/mock/replays',
-      replayCache,
+      replayRecordings,
       { configuredPlayerName: 'Samuel Lague' },
-      () => sessions,
       telemetryService
     );
   });
 
   it('retrieves full trajectory and downsamples to requested maxPoints', async () => {
-    vi.spyOn(replayCache, 'getFullTrajectory').mockResolvedValue(mockFullTrajectory);
-    vi.spyOn(replayCache, 'getMetadata').mockReturnValue(mockMetadata);
+    vi.spyOn(replayRecordings, 'getFullTrajectory').mockResolvedValue(mockFullTrajectory);
+    vi.spyOn(replayRecordings, 'getMetadata').mockReturnValue(mockMetadata);
 
     const traj = await trajectoryService.getTrajectory({
       replayName: 'Daytona.Vcr',
@@ -90,8 +90,8 @@ describe('ReplayTrajectoryService', () => {
   });
 
   it('serves one point per pointSpacingM metres of the lap instead of maxPoints when asked', async () => {
-    vi.spyOn(replayCache, 'getFullTrajectory').mockResolvedValue(mockFullTrajectory);
-    vi.spyOn(replayCache, 'getMetadata').mockReturnValue(mockMetadata);
+    vi.spyOn(replayRecordings, 'getFullTrajectory').mockResolvedValue(mockFullTrajectory);
+    vi.spyOn(replayRecordings, 'getMetadata').mockReturnValue(mockMetadata);
 
     // Spaced over the Daytona road course's length (5748 m): 2000 m spacing is 3 points, whatever
     // maxPoints says (0 = full resolution).
@@ -113,14 +113,14 @@ describe('ReplayTrajectoryService', () => {
       return { x, y: 0, z, timeSec: 100 + i * 0.1, speedKmh: 250 };
     };
     const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, k) => at(from + k));
-    vi.spyOn(replayCache, 'getFullTrajectory').mockResolvedValue({
+    vi.spyOn(replayRecordings, 'getFullTrajectory').mockResolvedValue({
       ...mockFullTrajectory,
       replayName: 'Monza.Vcr',
       points: range(3, 60),
       leadInPoints: range(-6, 2),
       leadOutPoints: range(61, 64),
     });
-    vi.spyOn(replayCache, 'getMetadata').mockReturnValue({
+    vi.spyOn(replayRecordings, 'getMetadata').mockReturnValue({
       ...mockMetadata,
       filename: 'Monza.Vcr',
       trackVenue: 'Autodromo Nazionale Monza',
@@ -138,13 +138,13 @@ describe('ReplayTrajectoryService', () => {
   });
 
   it('resolves driver slot from driverName parameter', async () => {
-    vi.spyOn(replayCache, 'resolveDriverSlot').mockReturnValue(1);
-    const getFullTrajSpy = vi.spyOn(replayCache, 'getFullTrajectory').mockResolvedValue({
+    vi.spyOn(replayRecordings, 'resolveDriverSlot').mockReturnValue(1);
+    const getFullTrajSpy = vi.spyOn(replayRecordings, 'getFullTrajectory').mockResolvedValue({
       ...mockFullTrajectory,
       driverSlot: 1,
       driverName: 'Other Driver',
     });
-    vi.spyOn(replayCache, 'getMetadata').mockReturnValue(mockMetadata);
+    vi.spyOn(replayRecordings, 'getMetadata').mockReturnValue(mockMetadata);
 
     const traj = await trajectoryService.getTrajectory({
       replayName: 'Daytona.Vcr',
@@ -153,7 +153,7 @@ describe('ReplayTrajectoryService', () => {
       allowDuckDb: false,
     });
 
-    expect(replayCache.resolveDriverSlot).toHaveBeenCalledWith(
+    expect(replayRecordings.resolveDriverSlot).toHaveBeenCalledWith(
       expect.stringContaining('Daytona.Vcr'),
       'Daytona.Vcr',
       'Other Driver',
@@ -168,27 +168,28 @@ describe('ReplayTrajectoryService', () => {
   });
 
   it('applies official lap validation when matched session exists', async () => {
-    vi.spyOn(replayCache, 'getFullTrajectory').mockResolvedValue(mockFullTrajectory);
-    vi.spyOn(replayCache, 'getMetadata').mockReturnValue(mockMetadata);
+    vi.spyOn(replayRecordings, 'getFullTrajectory').mockResolvedValue(mockFullTrajectory);
+    vi.spyOn(replayRecordings, 'getMetadata').mockReturnValue(mockMetadata);
 
+    const player = { name: 'Samuel Lague', driverName: 'Samuel Lague', bestLapTime: 95.8,
+      laps: [{ lapNum: 1, lapTime: 95.8, s1: 29.9, s2: 35.9, s3: 30.0, isValid: true }] } as unknown as DriverData;
     const session = {
       id: 'daytona-session-1',
       matchingReplayFile: { name: 'Daytona.Vcr' },
       trackVenue: 'Daytona International Speedway',
       trackCourse: 'Daytona International Speedway Road Course',
       sessionType: 'Race',
-      playerDriver: {
-        name: 'Samuel Lague',
-        bestLapTime: 95.8,
-        laps: [{ lapNum: 1, lapTime: 95.8, s1: 29.9, s2: 35.9, s3: 30.0, isValid: true }],
-      } as unknown as DriverData,
-      drivers: [],
+      playerDriver: player,
+      drivers: [player],
     } as unknown as DetailedSession;
 
     sessions.push(session);
 
     const traj = await trajectoryService.getTrajectory({
       replayName: 'Daytona.Vcr',
+      session,
+      driverOrdinal: 0,
+      lapOrdinal: 0,
       driverSlot: 0,
       maxPoints: 4,
       allowDuckDb: false,
@@ -202,8 +203,8 @@ describe('ReplayTrajectoryService', () => {
   });
 
   it('standardizes layoutKey from circuitSpec when geometry lookup completes', async () => {
-    vi.spyOn(replayCache, 'getFullTrajectory').mockResolvedValue(mockFullTrajectory);
-    vi.spyOn(replayCache, 'getMetadata').mockReturnValue(mockMetadata);
+    vi.spyOn(replayRecordings, 'getFullTrajectory').mockResolvedValue(mockFullTrajectory);
+    vi.spyOn(replayRecordings, 'getMetadata').mockReturnValue(mockMetadata);
 
     const traj = await trajectoryService.getTrajectory({
       replayName: 'Daytona.Vcr',
@@ -216,8 +217,8 @@ describe('ReplayTrajectoryService', () => {
   });
 
   it('rejects a named driver who is not in the replay instead of falling back to the player', async () => {
-    const fullTrajectorySpy = vi.spyOn(replayCache, 'getFullTrajectory').mockResolvedValue(mockFullTrajectory);
-    vi.spyOn(replayCache, 'getMetadata').mockReturnValue(mockMetadata);
+    const fullTrajectorySpy = vi.spyOn(replayRecordings, 'getFullTrajectory').mockResolvedValue(mockFullTrajectory);
+    vi.spyOn(replayRecordings, 'getMetadata').mockReturnValue(mockMetadata);
 
     await expect(trajectoryService.getTrajectory({
       replayName: 'Daytona.Vcr',
@@ -230,8 +231,8 @@ describe('ReplayTrajectoryService', () => {
   });
 
   it('resolves a named non-player driver present in the replay to their slot', async () => {
-    const fullTrajectorySpy = vi.spyOn(replayCache, 'getFullTrajectory').mockResolvedValue(mockFullTrajectory);
-    vi.spyOn(replayCache, 'getMetadata').mockReturnValue(mockMetadata);
+    const fullTrajectorySpy = vi.spyOn(replayRecordings, 'getFullTrajectory').mockResolvedValue(mockFullTrajectory);
+    vi.spyOn(replayRecordings, 'getMetadata').mockReturnValue(mockMetadata);
 
     await trajectoryService.getTrajectory({
       replayName: 'Daytona.Vcr',
@@ -246,16 +247,17 @@ describe('ReplayTrajectoryService', () => {
     const player = { name: 'Ann Smith', laps: [{ lapNum: 1, lapTime: 96, isValid: true }] } as unknown as DriverData;
     const other = { name: 'Ann Smithson', laps: [{ lapNum: 1, lapTime: 100, isValid: true }] } as unknown as DriverData;
     const metadata = { ...mockMetadata, drivers: [{ slot: 0, name: other.name, isPlayer: false }, { slot: 1, name: player.name, isPlayer: true }] };
-    vi.spyOn(replayCache, 'getMetadata').mockReturnValue(metadata);
-    vi.spyOn(replayCache, 'getFullTrajectory').mockResolvedValue({ ...mockFullTrajectory, driverSlot: 1, driverName: player.name });
+    vi.spyOn(replayRecordings, 'getMetadata').mockReturnValue(metadata);
+    vi.spyOn(replayRecordings, 'getFullTrajectory').mockResolvedValue({ ...mockFullTrajectory, driverSlot: 1, driverName: player.name });
     const telemetry = vi.spyOn(telemetryService, 'enrichWithTelemetry').mockImplementation(async input => ({ trajectory: input.currentTrajectory, fused: false }));
-    sessions.push({ id: 'exact', matchingReplayFile: { name: 'Daytona.Vcr' }, trackVenue: 'Daytona', trackCourse: 'Road Course',
-      drivers: [other, player], playerDriver: player } as unknown as DetailedSession);
-    const service = new ReplayTrajectoryService('/mock/replays', replayCache, { configuredPlayerName: player.name }, () => sessions, telemetryService);
-    const result = await service.getTrajectory({ replayName: 'Daytona.Vcr', driverName: player.name, allowDuckDb: true, maxPoints: 0 });
+    const session = { id: 'exact', matchingReplayFile: { name: 'Daytona.Vcr' }, trackVenue: 'Daytona', trackCourse: 'Road Course',
+      drivers: [other, player], playerDriver: player } as unknown as DetailedSession;
+    sessions.push(session);
+    const service = new ReplayTrajectoryService('/mock/replays', replayRecordings, { configuredPlayerName: player.name }, telemetryService);
+    const result = await service.getTrajectory({ replayName: 'Daytona.Vcr', session, driverOrdinal: 1, lapOrdinal: 0, allowDuckDb: true, maxPoints: 0 });
     expect(result.validation?.driverName).toBe(player.name);
     expect(telemetry.mock.calls[0][0].isPlayer).toBe(true);
-    await service.getTrajectory({ replayName: 'Daytona.Vcr', driverName: other.name, allowDuckDb: true, maxPoints: 0 });
+    await service.getTrajectory({ replayName: 'Daytona.Vcr', session, driverOrdinal: 0, lapOrdinal: 0, allowDuckDb: true, maxPoints: 0 });
     expect(telemetry.mock.calls[1][0].isPlayer).toBe(false);
   });
 });

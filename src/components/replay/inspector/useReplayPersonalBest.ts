@@ -27,7 +27,9 @@ export function useReplayPersonalBest(metadata?: ReplayMetadata | null, trajecto
   }, [layoutKey, carClass, key]);
   const lap = record?.key === key ? record.lap : null;
   return {
-    isPersonalBest: Boolean(driver?.isPlayer && lap && lap.replayName === trajectory?.replayName && lap.lapNum === trajectory?.currentLap),
+    isPersonalBest: Boolean(driver?.isPlayer && lap && trajectory?.sessionId &&
+      lap.sessionId === trajectory.sessionId && lap.driverOrdinal === trajectory.driverOrdinal &&
+      lap.lapOrdinal === trajectory.lapOrdinal),
     error: record?.key === key ? record.error : undefined,
   };
 }

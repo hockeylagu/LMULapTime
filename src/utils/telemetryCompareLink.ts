@@ -1,12 +1,13 @@
-/** A lap as the telemetry view opens it: the replay that recorded it, the driver and the lap number. */
+/** A lap as the telemetry view opens it: session plus stable source-order driver/lap locators. */
 export interface TelemetryLapRef {
-  replayName: string;
+  sessionId: string;
+  driverOrdinal: number;
+  lapOrdinal: number;
   driverName?: string;
   lapNum?: number;
-  sessionId?: string;
 }
 
-const BASELINE_PARAMS = ['baselineReplay', 'compareSessionId', 'compareDriver', 'compareLapNum'];
+const BASELINE_PARAMS = ['baselineSessionId', 'baselineDriverOrdinal', 'baselineLapOrdinal', 'compareDriver'];
 
 /**
  * The /telemetry path that shows `target`, against `baseline` when there is one. Other parameters
@@ -20,15 +21,15 @@ export function buildTelemetryComparePath(
   corner?: number
 ): string {
   const params = new URLSearchParams(current);
-  params.set('replayName', target.replayName);
-  params.set('lap', String(target.lapNum ?? 1));
-  if (target.driverName) params.set('driverName', target.driverName);
+  params.set('sessionId', target.sessionId);
+  params.set('driverOrdinal', String(target.driverOrdinal));
+  params.set('lapOrdinal', String(target.lapOrdinal));
   BASELINE_PARAMS.forEach((key) => params.delete(key));
   if (baseline) {
-    params.set('baselineReplay', baseline.replayName);
-    if (baseline.sessionId) params.set('compareSessionId', baseline.sessionId);
+    params.set('baselineSessionId', baseline.sessionId);
+    params.set('baselineDriverOrdinal', String(baseline.driverOrdinal));
+    params.set('baselineLapOrdinal', String(baseline.lapOrdinal));
     if (baseline.driverName) params.set('compareDriver', baseline.driverName);
-    if (baseline.lapNum !== undefined) params.set('compareLapNum', String(baseline.lapNum));
   }
   if (corner !== undefined) params.set('corner', String(corner));
   else params.delete('corner');

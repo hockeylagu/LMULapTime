@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { SessionList } from '../session-list/SessionList.js';
 import { SessionViewModeToggle } from '../session-list/SessionListHeader.js';
 import { updateSearchParams } from '../../utils/urlParams.js';
-import { getBestLapNumber } from '../../../shared/domain/formatters.js';
 import { CircuitsSummaryCard } from './CircuitsSummaryCard.js';
 import { CarsSummaryCard } from './CarsSummaryCard.js';
 import { BenchmarkLapsSummaryCard } from './BenchmarkLapsSummaryCard.js';
@@ -14,11 +13,14 @@ import { useDashboardMetrics } from './useDashboardMetrics.js';
 import { SessionSummary } from './dashboardTypes.js';
 import { useSessionViewMode } from '../session-list/useSessionViewMode.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
+import { useDashboardData } from './useDashboardData.js';
+import type { DashboardTrends } from '../../../shared/types/dashboard.js';
 
 export type { DashboardSortOption, SessionSummary };
 
 export interface DashboardProps {
-  sessions: SessionSummary[];
+  sessions?: SessionSummary[];
+  dataRevision?: string;
   onSelectSession: (id: string) => void;
   selectedTrack?: string;
   setSelectedTrack?: (track: string) => void;
@@ -31,11 +33,12 @@ export interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
-  sessions,
+  sessions: legacySessions,
+  dataRevision = '',
   onSelectSession,
   selectedTrack: initialSelectedTrack = 'All',
   setSelectedTrack: legacySetSelectedTrack,
-  selectedCarClass,
+  selectedCarClass: initialSelectedCarClass,
   setSelectedCarClass,
   filterType: initialFilterType = 'All',
   setFilterType: legacySetFilterType,
@@ -46,13 +49,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { viewMode: sessionViewMode, setViewMode: setSessionListViewMode } = useSessionViewMode();
-  const handleOpenReplay = (id: string, targetLap?: number) => {
-    const session = sessions.find(item => item.id === id);
-    if (!session?.matchingReplayFile) return;
+  const dashboardState = useDashboardData(dataRevision, !legacySessions);
+  const dashboardData = dashboardState.data;
+  const sessions = legacySessions ?? [];
+  const selectedCarClass = searchParams.get('carClass') || initialSelectedCarClass;
+  const handleOpenReplay = (id: string) => {
+    const session = sessions.find(item => item.id === id) ?? dashboardData?.sessions.find(item => item.id === id);
+    const outing = dashboardData?.trends.latestOuting?.id === id ? dashboardData.trends.latestOuting : null;
+    const driverOrdinal = session?.playerDriver?.driverOrdinal ?? outing?.driverOrdinal;
+    const lapOrdinal = session?.playerDriver?.bestLapOrdinal ?? outing?.bestLapOrdinal;
+    if (!(session?.matchingReplayFile || outing?.hasReplay) || !Number.isInteger(driverOrdinal) || !Number.isInteger(lapOrdinal)) return;
     const replayParams = new URLSearchParams(searchParams);
-    replayParams.set('replayName', session.matchingReplayFile.name);
-    const resolvedLap = targetLap || getBestLapNumber(session.playerDriver);
-    replayParams.set('lap', String(resolvedLap));
+    replayParams.set('sessionId', id);
+    replayParams.set('driverOrdinal', String(driverOrdinal));
+    replayParams.set('lapOrdinal', String(lapOrdinal));
     navigate(`/telemetry?${replayParams.toString()}`);
   };
   const selectedTrack = searchParams.get('track') || initialSelectedTrack;
@@ -62,6 +72,11 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const setSelectedTrack = (track: string) => {
     legacySetSelectedTrack?.(track);
     updateSearchParams(searchParams, setSearchParams, { track });
+  };
+
+  const setCarClass = (carClass: string) => {
+    setSelectedCarClass(carClass);
+    updateSearchParams(searchParams, setSearchParams, { carClass: carClass === 'All' ? null : carClass });
   };
 
   const setFilterType = (type: string) => {
@@ -105,9 +120,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     emptyCount,
     replayCount,
     sortedSessions,
-    visibleTracks,
-    visibleCars,
-    visibleRefLaps,
     totalLaps,
     cleanLaps,
     cleanLapsPercentage,
@@ -142,7 +154,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // One URL update: separate setters would each start from the same params and undo one another.
   const resetFilters = isFiltered
     ? () => {
-        setSelectedCarClass('All');
+    setCarClass('All');
         legacySetSelectedTrack?.('All');
         legacySetFilterType?.('All');
         legacySetSearchQuery?.('');
@@ -150,43 +162,57 @@ export const Dashboard: React.FC<DashboardProps> = ({
       }
     : undefined;
 
+  const sessionCards = dashboardData?.sessions ?? sortedSessions;
+  const displayTracks = dashboardData?.tracks ?? tracks;
+  const displayEmptyCount = dashboardData?.emptyCount ?? emptyCount;
+  const displayReplayCount = dashboardData?.replayCount ?? replayCount;
+  const displayMetrics = dashboardData?.metrics;
+  const displayTrends = dashboardData?.trends as DashboardTrends | undefined;
+  const dashboardHasSessions = (displayMetrics?.sessionsCount ?? sessions.length) > 0;
+  const expandSummaries = isExpanded;
+  const displayRankedTracks = displayMetrics?.rankedTracks ?? rankedTracks;
+  const displayRankedCars = displayMetrics?.rankedCars ?? rankedCars;
+  const displayBestRefLaps = displayMetrics?.bestTrackRefLaps ?? bestTrackRefLaps;
+
   return (
     <div className="space-y-6">
+      {dashboardState.error && !legacySessions && <div role="alert" className="rounded-xl border border-lmu-loss/40 bg-lmu-loss/10 p-3 text-sm text-lmu-loss">{dashboardState.error}</div>}
       {/* Driver Command Center: Welcome & Latest Outing Spotlight */}
       <DashboardHero
         sessions={sessions}
+        trends={displayTrends}
         onSelectSession={onSelectSession}
         onOpenReplay={handleOpenReplay}
       />
 
       {/* Top Aggregations & Overview Section (4 cards in the same row) */}
-      {sessions.length > 0 && (
+      {dashboardHasSessions && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           <CircuitsSummaryCard
-            rankedTracks={rankedTracks} visibleTracks={visibleTracks}
+            rankedTracks={displayRankedTracks} visibleTracks={expandSummaries ? displayRankedTracks : displayRankedTracks.slice(0, 3)}
             showMoreTracks={isExpanded} setShowMoreTracks={toggleExpanded}
             selectedCarClass={selectedCarClass}
           />
           <CarsSummaryCard
-            rankedCars={rankedCars} visibleCars={visibleCars}
+            rankedCars={displayRankedCars} visibleCars={expandSummaries ? displayRankedCars : displayRankedCars.slice(0, 3)}
             showMoreCars={isExpanded} setShowMoreCars={toggleExpanded}
             onSelectCar={(car) => setSearchQuery(car)}
           />
           <BenchmarkLapsSummaryCard
-            rankedRefLaps={bestTrackRefLaps} visibleRefLaps={visibleRefLaps}
+            rankedRefLaps={displayBestRefLaps} visibleRefLaps={expandSummaries ? displayBestRefLaps : displayBestRefLaps.slice(0, 3)}
             showMoreBenchmarks={isExpanded} setShowMoreBenchmarks={toggleExpanded}
             onSelectSession={onSelectSession}
           />
           <DrivingOverviewCard
-            sessionsCount={sessions.length} totalLaps={totalLaps}
-            cleanLaps={cleanLaps} cleanLapsPercentage={cleanLapsPercentage}
-            totalDistanceKm={totalDistanceKm} totalDrivingSeconds={totalDrivingSeconds}
-            maxTopSpeed={maxTopSpeed} maxTopSpeedTrack={maxTopSpeedTrack}
-            averageBenchmarkPacePercentage={averageBenchmarkPacePercentage}
-            averageBenchmarkPaceCategory={averageBenchmarkPaceCategory}
-            practiceSessionsCount={practiceSessionsCount} qualifyingSessionsCount={qualifyingSessionsCount}
-            raceSessionsCount={raceSessionsCount} raceWinsCount={raceWinsCount}
-            racePodiumsCount={racePodiumsCount} totalPitStops={totalPitStops}
+            sessionsCount={displayMetrics?.sessionsCount ?? sessions.length} totalLaps={displayMetrics?.totalLaps ?? totalLaps}
+            cleanLaps={displayMetrics?.cleanLaps ?? cleanLaps} cleanLapsPercentage={displayMetrics?.cleanLapsPercentage ?? cleanLapsPercentage}
+            totalDistanceKm={displayMetrics?.totalDistanceKm ?? totalDistanceKm} totalDrivingSeconds={displayMetrics?.totalDrivingSeconds ?? totalDrivingSeconds}
+            maxTopSpeed={displayMetrics?.maxTopSpeed ?? maxTopSpeed} maxTopSpeedTrack={displayMetrics?.maxTopSpeedTrack ?? maxTopSpeedTrack}
+            averageBenchmarkPacePercentage={displayMetrics?.averageBenchmarkPacePercentage ?? averageBenchmarkPacePercentage}
+            averageBenchmarkPaceCategory={displayMetrics?.averageBenchmarkPaceCategory ?? averageBenchmarkPaceCategory}
+            practiceSessionsCount={displayMetrics?.practiceSessionsCount ?? practiceSessionsCount} qualifyingSessionsCount={displayMetrics?.qualifyingSessionsCount ?? qualifyingSessionsCount}
+            raceSessionsCount={displayMetrics?.raceSessionsCount ?? raceSessionsCount} raceWinsCount={displayMetrics?.raceWinsCount ?? raceWinsCount}
+            racePodiumsCount={displayMetrics?.racePodiumsCount ?? racePodiumsCount} totalPitStops={displayMetrics?.totalPitStops ?? totalPitStops}
             showMore={isExpanded} setShowMore={toggleExpanded}
           />
         </div>
@@ -196,21 +222,21 @@ export const Dashboard: React.FC<DashboardProps> = ({
       <div className="space-y-4">
         <div className="bg-lmu-card border border-lmu-border rounded-2xl overflow-hidden">
           <DashboardFilterBar
-            tracks={tracks}
+            tracks={displayTracks}
             selectedTrack={selectedTrack}
             setSelectedTrack={setSelectedTrack}
             selectedCarClass={selectedCarClass}
-            setSelectedCarClass={setSelectedCarClass}
+            setSelectedCarClass={setCarClass}
             filterType={filterType}
             setFilterType={setFilterType}
             searchQuery={searchQuery}
             setSearchQuery={setSearchQuery}
             hideEmpty={hideEmpty}
             setHideEmpty={setHideEmpty}
-            emptyCount={emptyCount}
+            emptyCount={displayEmptyCount}
             hasReplay={hasReplay}
             setHasReplay={setHasReplay}
-            replayCount={replayCount}
+            replayCount={displayReplayCount}
             sortBy={sortBy}
             setSortBy={setSortBy}
             embedded
@@ -218,18 +244,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
             onClearFilters={resetFilters}
           />
           <SessionList
-            sessions={sortedSessions}
+            sessions={sessionCards}
             onSelectSession={onSelectSession}
             onOpenReplay={handleOpenReplay}
             showTrackColumn={true}
             viewMode={sessionViewMode}
             onViewModeChange={setSessionListViewMode}
             hideHeader
+            serverPaginated={Boolean(dashboardData)}
+            totalCount={dashboardData?.total}
             className="p-5"
             onResetFilters={resetFilters}
-            hideEmptyNotice={hideEmpty && emptyCount > 0 ? (
+            hideEmptyNotice={hideEmpty && displayEmptyCount > 0 ? (
               <span>
-                Note: {emptyCount} empty session{emptyCount > 1 ? 's are' : ' is'} hidden. <button onClick={() => setHideEmpty(false)} className={`text-lmu-accent-text underline hover:text-white ${FOCUS_RING}`}>Click here to show empty results</button>.
+                Note: {displayEmptyCount} empty session{displayEmptyCount > 1 ? 's are' : ' is'} hidden. <button onClick={() => setHideEmpty(false)} className={`text-lmu-accent-text underline hover:text-white ${FOCUS_RING}`}>Click here to show empty results</button>.
               </span>
             ) : undefined}
           />

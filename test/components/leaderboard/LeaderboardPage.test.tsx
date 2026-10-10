@@ -12,7 +12,6 @@ const layout = (layoutKey: string, trackName: string, lastDriven: number, classe
   countryCode: 'IT',
   flagEmoji: '🇮🇹',
   lastDriven,
-  outlinePath: 'M10 10L90 10L90 90Z',
   lastCarClass: classes[0][0],
   classes: classes.map(([carClass, rank]) => ({
     carClass,
@@ -99,6 +98,18 @@ describe('LeaderboardPage', () => {
     expect(urlParams().get('sessionId')).toBe('s1');
   });
 
+  it('uses the bundled layout SVG and falls back if it cannot load', async () => {
+    window.location.hash = '#/leaderboard?track=Autodromo%20Nazionale%20Monza&carClass=LMGT3';
+    render(<LeaderboardPage sessions={[]} />);
+    const monza = await screen.findByRole('link', { name: /Monza layout/ });
+    const thumbnail = monza.querySelector('img');
+    expect(thumbnail).toHaveAttribute('src', '/track-outlines/monza_gp.svg');
+    expect(thumbnail).toHaveAttribute('alt', '');
+    fireEvent.error(thumbnail!);
+    expect(monza.querySelector('img')).toBeNull();
+    expect(monza).toHaveAttribute('aria-current', 'true');
+  });
+
   it('switches track and class from the ribbon, dropping the lap the link asked for', async () => {
     window.location.hash = '#/leaderboard?track=Autodromo%20Nazionale%20Monza&carClass=LMGT3&sessionId=s1&lapNum=4';
     render(<LeaderboardPage sessions={[]} />);
@@ -141,8 +152,12 @@ describe('LeaderboardPage', () => {
 
     fireEvent.click(screen.getByRole('link', { name: 'Telemetry against Driver 1' }));
     await waitFor(() => expect(window.location.hash).toMatch(/^#\/telemetry\?/));
-    expect(urlParams().get('replayName')).toBe('Me.Vcr');
-    expect(urlParams().get('baselineReplay')).toBe('Driver 1.Vcr');
+    expect(urlParams().get('sessionId')).toBe('s-Me');
+    expect(urlParams().get('driverOrdinal')).toBe('2');
+    expect(urlParams().get('lapOrdinal')).toBe('4');
+    expect(urlParams().get('baselineSessionId')).toBe('s-Driver 1');
+    expect(urlParams().get('baselineDriverOrdinal')).toBe('2');
+    expect(urlParams().get('baselineLapOrdinal')).toBe('4');
   });
 
   it("opens the player's own lap in telemetry, alone, and its session", async () => {
@@ -162,9 +177,10 @@ describe('LeaderboardPage', () => {
 
     fireEvent.click(screen.getByRole('link', { name: 'Telemetry of your best lap' }));
     await waitFor(() => expect(window.location.hash).toMatch(/^#\/telemetry\?/));
-    expect(urlParams().get('replayName')).toBe('Me.Vcr');
-    expect(urlParams().get('lap')).toBe('3');
-    expect(urlParams().has('baselineReplay')).toBe(false);
+    expect(urlParams().get('sessionId')).toBe('s-Me');
+    expect(urlParams().get('driverOrdinal')).toBe('2');
+    expect(urlParams().get('lapOrdinal')).toBe('4');
+    expect(urlParams().has('baselineSessionId')).toBe(false);
   });
 
   it('compares two drivers picked on the board, neither of them the player', async () => {

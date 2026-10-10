@@ -57,10 +57,12 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
     sortBy,
     setSortBy,
     handleOpenReplay,
+    progressionPage,
+    setProgressionPage,
   } = useTrackDetailState(trackName, selectedCarClass);
 
   const selectedClass = selectedCarClass;
-  const setSelectedClass = setSelectedCarClass;
+  const setSelectedClass = (carClass: string) => setSelectedCarClass(carClass);
 
   if (loading) {
     return (
@@ -89,36 +91,18 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
     );
   }
 
-  const availableCarModels = Array.from(
-    new Set(
-      data.sessions
-        .filter((s) => matchesSessionCarClass(s, selectedClass))
-        .map((s) => s.playerDriver?.carType)
-        .filter(Boolean)
-    )
-  ).sort() as string[];
-
-  const classTrackSessions = data.sessions.filter((s) => {
-    const matchesClass = matchesSessionCarClass(s, selectedClass);
-    const matchesModel = selectedCarModel === 'All' || s.playerDriver?.carType === selectedCarModel;
-    return matchesClass && matchesModel;
-  });
-
-  const emptyCount = classTrackSessions.filter((s) => isSessionEmpty(s)).length;
-  const replayCount = data.sessions.filter((s) => Boolean(s.matchingReplayFile)).length;
-
-  const filteredSessions = classTrackSessions.filter((s) => {
-    const matchesType = matchesSessionType(s.sessionType, s.sessionName, filterType);
-    const matchesSearch =
-      searchQuery === '' ||
-      s.playerDriver?.carType.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.filename.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.playerDriver?.name?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesEmpty = !hideEmpty || !isSessionEmpty(s);
-    const matchesReplay = !hasReplay || Boolean(s.matchingReplayFile);
-    return matchesType && matchesSearch && matchesEmpty && matchesReplay;
-  });
-
+  const hasServerContract = Boolean(data.filters);
+  const availableCarModels = data.filters?.carModels ?? [...new Set(data.sessions.filter(session => matchesSessionCarClass(session, selectedClass))
+    .map(session => session.playerDriver?.carType).filter((car): car is string => Boolean(car)))].sort();
+  const classTrackSessions = data.sessions.filter(session => matchesSessionCarClass(session, selectedClass) &&
+    (selectedCarModel === 'All' || session.playerDriver?.carType === selectedCarModel));
+  const emptyCount = data.filters?.emptyCount ?? classTrackSessions.filter(isSessionEmpty).length;
+  const replayCount = data.filters?.replayCount ?? classTrackSessions.filter(session => Boolean(session.matchingReplayFile)).length;
+  const filteredSessions = hasServerContract ? data.sessions : classTrackSessions.filter(session =>
+    matchesSessionType(session.sessionType, session.sessionName, filterType) &&
+    (!searchQuery || session.playerDriver?.carType.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      session.filename.toLowerCase().includes(searchQuery.toLowerCase()) || session.playerDriver?.name?.toLowerCase().includes(searchQuery.toLowerCase())) &&
+    (!hideEmpty || !isSessionEmpty(session)) && (!hasReplay || Boolean(session.matchingReplayFile)));
   const findBenchmarkForClass = (carClass?: string, carType?: string): ReferenceLaptimeEntry | null => {
     if (!carClass && !carType) return null;
     const sessionClass = normalizeCarClass(carClass, carType);
@@ -128,47 +112,26 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
         matchesCarClass(sessionClass, sessionClass, benchmark.carClass)
     ) || null;
   };
+  const sortedSessions = hasServerContract ? filteredSessions : [...filteredSessions].sort((a, b) => compareSessionsBySortOption(a, b, sortBy, {
+    getPacePercentage: session => getSessionBestLapPace(session.playerDriver, findBenchmarkForClass(session.playerDriver?.carClass, session.playerDriver?.carType))?.percentage,
+  }));
 
   const latestSession = [...classTrackSessions].sort((a, b) => compareSessions(a, b, 'desc'))[0];
   const currentBenchmark = selectedClass && selectedClass !== 'All'
     ? data.benchmarks.find((benchmark) => matchesCarClass(benchmark.carClass, benchmark.carClass, selectedClass)) || null
-    : findBenchmarkForClass(latestSession?.playerDriver?.carClass, latestSession?.playerDriver?.carType);
-
-  const bestLapSession = classTrackSessions.reduce<SessionMeta | null>((best, session) => {
-    const lapTime = session.playerDriver?.bestLapTime;
-    if (!lapTime || !Number.isFinite(lapTime) || lapTime <= 0 || (best?.playerDriver?.bestLapTime && best.playerDriver.bestLapTime <= lapTime)) return best;
-    return session;
+    : findBenchmarkForClass(data.latestSession?.carClass ?? latestSession?.playerDriver?.carClass ?? data.summary?.bestLapClass,
+      data.latestSession?.carType ?? latestSession?.playerDriver?.carType ?? data.summary?.bestLapCar);
+  const fallbackBest = classTrackSessions.reduce<SessionMeta | null>((best, session) => {
+    const time = session.playerDriver?.bestLapTime;
+    return time && (!best?.playerDriver?.bestLapTime || time < best.playerDriver.bestLapTime) ? session : best;
   }, null);
-  const bestLapBenchmark = findBenchmarkForClass(
-    bestLapSession?.playerDriver?.carClass,
-    bestLapSession?.playerDriver?.carType
-  );
-
-  const averagePosition = (sessions: SessionMeta[]): number | null => {
-    const positions = sessions
-      .map((session) => session.playerDriver?.position)
-      .filter((position): position is number => typeof position === 'number' && Number.isFinite(position) && position > 0);
-    return positions.length > 0
-      ? positions.reduce((total, position) => total + position, 0) / positions.length
-      : null;
+  const averagePosition = (kind: string) => {
+    const positions = classTrackSessions.filter(session => matchesSessionType(session.sessionType, session.sessionName, kind))
+      .map(session => session.playerDriver?.position).filter((position): position is number => typeof position === 'number' && position > 0);
+    return positions.length ? positions.reduce((sum, position) => sum + position, 0) / positions.length : null;
   };
-  const qualifyingSessions = classTrackSessions.filter((session) =>
-    matchesSessionType(session.sessionType, session.sessionName, 'Qualifying')
-  );
-  const raceSessions = classTrackSessions.filter((session) =>
-    matchesSessionType(session.sessionType, session.sessionName, 'Race')
-  );
-  const qualifyingAveragePosition = averagePosition(qualifyingSessions);
-  const finishAveragePosition = averagePosition(raceSessions);
-
-  const sortedSessions = [...filteredSessions].sort((a, b) =>
-    compareSessionsBySortOption(a, b, sortBy, {
-      getPacePercentage: (s) =>
-        getSessionBestLapPace(s.playerDriver, findBenchmarkForClass(s.playerDriver?.carClass, s.playerDriver?.carType))?.percentage,
-    })
-  );
-
-  const trackProgression = buildTrackProgression(filteredSessions, data.sessions, progression).map((point) => {
+  const fallbackProgression = buildTrackProgression(filteredSessions, data.sessions, progression);
+  const trackProgression = (data.progression?.points ?? fallbackProgression).map((point) => {
     const paceInfo = point.bestLapWet ? null : getPaceCategoryForLap(
       point.bestLapTime,
       findBenchmarkForClass(point.carClass, point.carType)
@@ -181,9 +144,13 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
     };
   });
 
-  const bestLapSec = bestLapSession?.playerDriver?.bestLapTime || null;
-
-  const paceInfo = getSessionBestLapPace(bestLapSession?.playerDriver, bestLapBenchmark);
+  const bestLapSec = data.summary?.bestLapTime ?? fallbackBest?.playerDriver?.bestLapTime ?? null;
+  const bestLapCar = data.summary?.bestLapCar ?? fallbackBest?.playerDriver?.carType;
+  const bestLapClass = data.summary?.bestLapClass ?? fallbackBest?.playerDriver?.carClass;
+  const paceInfo = data.summary?.bestLapWet ?? fallbackBest?.playerDriver?.bestLapWet
+    ? null : getPaceCategoryForLap(bestLapSec, findBenchmarkForClass(bestLapClass, bestLapCar));
+  const qualifyingAveragePosition = data.positions?.qualifyingAveragePosition ?? averagePosition('Qualifying');
+  const finishAveragePosition = data.positions?.finishAveragePosition ?? averagePosition('Race');
   const currentClassDriverStats = {
     bestTimeStr: bestLapSec ? formatTime(bestLapSec) : '--:--.---',
     bestPaceCat: paceInfo?.category || null,
@@ -200,8 +167,8 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
       )}
       <TrackDetailHeader
         trackName={trackName}
-        trackCourse={data.sessions[0]?.trackCourse}
-        sessionsCount={filteredSessions.length}
+        trackCourse={data.latestSession?.trackCourse ?? data.sessions[0]?.trackCourse}
+        sessionsCount={data.total ?? data.sessionsCount}
         onBack={onBack}
         selectedClass={selectedClass}
         setSelectedClass={setSelectedClass}
@@ -209,9 +176,9 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
         setSelectedCarModel={setSelectedCarModel}
         availableCarModels={availableCarModels}
         currentBenchmark={currentBenchmark}
-        bestLapTimeString={bestLapSession?.playerDriver?.bestLapTimeString}
-        bestLapCar={bestLapSession?.playerDriver?.carType}
-        xmlTrackLengthMeters={data.sessions[0]?.trackLengthMeters}
+        bestLapTimeString={bestLapSec ? formatTime(bestLapSec) : null}
+        bestLapCar={bestLapCar}
+        xmlTrackLengthMeters={data.latestSession?.trackLengthMeters ?? data.sessions[0]?.trackLengthMeters}
         trackGeometry={trackGeometry}
       />
 
@@ -240,7 +207,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
       <TrackSessionsCard
         trackName={trackName}
         sortedSessions={sortedSessions}
-        totalSessionsCount={classTrackSessions.length}
+        totalSessionsCount={data.total ?? filteredSessions.length}
         emptyCount={emptyCount}
         hideEmpty={hideEmpty}
         setHideEmpty={setHideEmpty}
@@ -262,6 +229,8 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
         }
         viewMode={sessionViewMode}
         onViewModeChange={setSessionListViewMode}
+        serverPaginated
+        totalCount={data.total ?? filteredSessions.length}
         onClearFilters={selectedCarModel !== 'All' || filterType !== 'All' || searchQuery !== '' || hasReplay ? () => resetSessionFilters() : undefined}
         onResetFilters={
           selectedCarModel !== 'All' || filterType !== 'All' || searchQuery !== '' || hasReplay || (hideEmpty && emptyCount > 0)
@@ -269,6 +238,13 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
             : undefined
         }
       />
+      {data.progression && data.progression.total > data.progression.pageSize && (
+        <div className="flex items-center justify-center gap-3 text-xs text-lmu-muted">
+          <button type="button" disabled={progressionPage <= 1} onClick={() => setProgressionPage(progressionPage - 1)} className="rounded-lg border border-lmu-border px-3 py-1.5 disabled:opacity-40">Older points</button>
+          <span>Progression page {data.progression.page} of {Math.max(1, Math.ceil(data.progression.total / data.progression.pageSize))} · {data.progression.total} sessions</span>
+          <button type="button" disabled={progressionPage >= Math.ceil(data.progression.total / data.progression.pageSize)} onClick={() => setProgressionPage(progressionPage + 1)} className="rounded-lg border border-lmu-border px-3 py-1.5 disabled:opacity-40">Newer points</button>
+        </div>
+      )}
     </div>
   );
 };

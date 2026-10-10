@@ -5,7 +5,10 @@ import type { TelemetryLapRef } from '../../../utils/telemetryCompareLink.js';
 
 /** The id the server gives a driver's best board lap (session, driver, lap number). */
 export function boardLapId(entry: LeaderboardEntry): string {
-  return `${entry.bestLap.sessionId}_${entry.driverName}_lap_${entry.bestLap.lapNum}`;
+  const lap = entry.bestLap;
+  return Number.isInteger(lap.driverOrdinal) && Number.isInteger(lap.lapOrdinal)
+    ? `${lap.sessionId}_driver_${lap.driverOrdinal}_lap_${lap.lapOrdinal}`
+    : `${lap.sessionId}_${entry.driverName}_lap_${lap.lapNum}`;
 }
 
 /**
@@ -17,6 +20,8 @@ export function boardLapToComparable(entry: LeaderboardEntry, carClass: string, 
   return {
     id: boardLapId(entry),
     sessionId: lap.sessionId,
+    ...(lap.driverOrdinal === undefined ? {} : { driverOrdinal: lap.driverOrdinal }),
+    ...(lap.lapOrdinal === undefined ? {} : { lapOrdinal: lap.lapOrdinal }),
     sessionName: lap.sessionName,
     sessionType: lap.sessionType,
     timestamp: lap.timestamp,
@@ -35,14 +40,19 @@ export function boardLapToComparable(entry: LeaderboardEntry, carClass: string, 
     topSpeed: null,
     isValid: true,
     isPlayer: entry.isPlayer,
-    matchingReplayFile: lap.replayName ?? undefined,
     tag,
   };
 }
 
-/** The lap as the telemetry view opens it; null without the replay that recorded it. */
+/** The lap as the telemetry view opens it; null unless its source-order locator is available. */
 export function boardLapTelemetryRef(entry: LeaderboardEntry): TelemetryLapRef | null {
   const lap = entry.bestLap;
-  if (!lap.replayName) return null;
-  return { replayName: lap.replayName, sessionId: lap.sessionId, driverName: entry.driverName, lapNum: lap.lapNum };
+  if (!Number.isInteger(lap.driverOrdinal) || !Number.isInteger(lap.lapOrdinal)) return null;
+  return {
+    sessionId: lap.sessionId,
+    driverOrdinal: lap.driverOrdinal as number,
+    lapOrdinal: lap.lapOrdinal as number,
+    driverName: entry.driverName,
+    lapNum: lap.lapNum,
+  };
 }

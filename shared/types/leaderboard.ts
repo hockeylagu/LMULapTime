@@ -6,14 +6,18 @@ export interface LeaderboardLap {
   sessionName: string;
   sessionType: string;
   timestamp: number;
+  /** Zero-based position in the session's source driver list, when hydrated. */
+  driverOrdinal?: number;
+  /** Zero-based position in that driver's source lap list, when hydrated. */
+  lapOrdinal?: number;
   lapNum: number;
   lapTime: number;
   s1: number | null;
   s2: number | null;
   s3: number | null;
   carType: string;
-  /** The replay recording the lap's session, when there is one: telemetry needs it. */
-  replayName: string | null;
+  /** Whether this session currently has a recording available for telemetry. */
+  telemetryAvailable: boolean;
 }
 
 /** One driver's standing on a layout, in one car class (or one car). */
@@ -80,8 +84,6 @@ export interface LeaderboardLayout {
   countryCode: string;
   flagEmoji: string;
   lastDriven: number;
-  /** A thumbnail SVG path of the layout in a 100 x 100 box; null when its geometry is not known. */
-  outlinePath?: string | null;
   /** The class the player drove last here. */
   lastCarClass: string;
   classes: LeaderboardLayoutClass[];

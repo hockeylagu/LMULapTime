@@ -85,7 +85,7 @@ export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
 
   const { entry } = row;
   const vsYou = player && !entry.isPlayer ? entry.bestLap.lapTime - player.bestLap.lapTime : null;
-  const hasTelemetry = Boolean(entry.bestLap.replayName && player?.bestLap.replayName);
+  const hasTelemetry = Boolean(entry.bestLap.telemetryAvailable && player?.bestLap.telemetryAvailable);
   const canPin = Boolean(onPin && !isRival && vsYou !== null && vsYou < 0);
   const pace = benchmarkPace(entry.bestLap.lapTime, benchmark);
   const [searchParams] = useSearchParams();

@@ -24,8 +24,10 @@ describe('CompareLaps component', () => {
   ];
 
   const lap = (lapNum: number, lapTime: number, lapTimeString: string, sectors: [number, number, number]) => ({
-    id: `sess1_Sim Driver_lap_${lapNum}`,
+    id: `sess1_driver_0_lap_${lapNum - 1}`,
     sessionId: 'sess1',
+    driverOrdinal: 0,
+    lapOrdinal: lapNum - 1,
     sessionName: 'P1',
     sessionType: 'Practice',
     dateString: '2026/05/28 14:00',
@@ -128,8 +130,8 @@ describe('CompareLaps component', () => {
   });
 
   it('works out where the time is on its own when the page asks to analyse the pair', async () => {
-    const rivalLap = { ...lap(3, 121.0, '2:01.000', [30.0, 45.0, 46.0]), id: 'board_Rival_lap', driverName: 'Rival', isPlayer: false } as ComparableLap;
-    const mine = { ...lap(2, 121.8, '2:01.800', [30.2, 45.1, 46.5]), isPlayer: true } as ComparableLap;
+    const rivalLap = { ...lap(3, 121.0, '2:01.000', [30.0, 45.0, 46.0]), id: 'board_Rival_lap', driverName: 'Rival', isPlayer: false, driverOrdinal: undefined, lapOrdinal: undefined } as ComparableLap;
+    const mine = { ...lap(2, 121.8, '2:01.800', [30.2, 45.1, 46.5]), isPlayer: true, driverOrdinal: undefined, lapOrdinal: undefined } as ComparableLap;
     render(
       <CompareLaps
         sessions={mockSessions}
@@ -138,12 +140,12 @@ describe('CompareLaps component', () => {
         compareRequest={{ key: 1, lap: mine, reference: rivalLap, analyse: true }}
       />
     );
-    expect(await screen.findByRole('alert')).toHaveTextContent('has no replay to compare with');
+    expect(await screen.findByRole('alert')).toHaveTextContent('has no session telemetry locator');
   });
 
   it('analyses the requested pair once: putting it back after removing a lap waits for the click', async () => {
-    const rivalLap = { ...lap(3, 121.0, '2:01.000', [30.0, 45.0, 46.0]), id: 'board_Rival_lap', driverName: 'Rival', isPlayer: false } as ComparableLap;
-    const mine = { ...lap(2, 121.8, '2:01.800', [30.2, 45.1, 46.5]), isPlayer: true } as ComparableLap;
+    const rivalLap = { ...lap(3, 121.0, '2:01.000', [30.0, 45.0, 46.0]), id: 'board_Rival_lap', driverName: 'Rival', isPlayer: false, driverOrdinal: undefined, lapOrdinal: undefined } as ComparableLap;
+    const mine = { ...lap(2, 121.8, '2:01.800', [30.2, 45.1, 46.5]), isPlayer: true, driverOrdinal: undefined, lapOrdinal: undefined } as ComparableLap;
     render(
       <CompareLaps
         sessions={mockSessions}
@@ -153,7 +155,7 @@ describe('CompareLaps component', () => {
         compareRequest={{ key: 1, lap: mine, reference: rivalLap, analyse: true }}
       />
     );
-    expect(await screen.findByRole('alert')).toHaveTextContent('has no replay to compare with');
+    expect(await screen.findByRole('alert')).toHaveTextContent('has no session telemetry locator');
 
     fireEvent.click(within(screen.getByTestId('compare-baseline')).getByTitle('Remove from comparison'));
     fireEvent.click(await screen.findByRole('button', { name: /\+ Rival/ }));
@@ -228,62 +230,46 @@ describe('CompareLaps component', () => {
   it('reports the laps compared to the page', async () => {
     const onComparedLapsChange = vi.fn();
     render(<CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="LMGT3" onComparedLapsChange={onComparedLapsChange} />);
-    await waitFor(() => expect(onComparedLapsChange).toHaveBeenLastCalledWith(['sess1_Sim Driver_lap_2']));
+    await waitFor(() => expect(onComparedLapsChange).toHaveBeenLastCalledWith(['sess1_driver_0_lap_1']));
   });
 
-  it('renders Compare Telemetry button when 2 laps are selected and navigates to telemetry', async () => {
-    const sessionsWithReplay = [
-      { ...mockSessions[0], matchingReplayFile: { name: 'spa_p1.vcr', path: 'C:\\spa_p1.vcr', sizeBytes: 1024 } },
-    ];
+  it('renders Compare Telemetry button when 2 located laps are selected and navigates by session locators', async () => {
     render(
-      <CompareLaps sessions={sessionsWithReplay} initialTrack="Spa GP" initialCarClass="LMGT3" initialSessionId="sess1" initialLapNum={1} />
+      <CompareLaps sessions={mockSessions} initialTrack="Spa GP" initialCarClass="LMGT3" initialSessionId="sess1" initialLapNum={1} />
     );
     await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(2));
 
-    const compareTelemetryButtons = screen.getAllByRole('link', { name: /Compare Telemetry/i });
-    expect(compareTelemetryButtons).toHaveLength(1);
-    fireEvent.click(compareTelemetryButtons[0]);
+    fireEvent.click(screen.getByRole('link', { name: /Compare Telemetry/i }));
 
     await waitFor(() => {
       expect(window.location.hash).toContain('/telemetry?');
-      expect(window.location.hash).toContain('replayName=spa_p1.vcr');
-      expect(window.location.hash).toContain('compareSessionId=');
-      expect(window.location.hash).toContain('compareLapNum=');
+      expect(window.location.hash).toContain('sessionId=sess1');
+      expect(window.location.hash).toContain('driverOrdinal=0');
+      expect(window.location.hash).toContain('lapOrdinal=');
     });
   });
 
-  it('displays error banner when replay files cannot be located for telemetry comparison', async () => {
-    global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/api/replays')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(mockCompareData) });
-    });
+  it('retains a test that the old replay discovery flow is gone', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(mockCompareData) });
+    global.fetch = fetchMock;
     render(
       <CompareLaps sessions={mockSessions} initialTrack="Spa GP" initialCarClass="LMGT3" initialSessionId="sess1" initialLapNum={1} />
     );
     await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(2));
 
-    fireEvent.click(screen.getByRole('button', { name: /Compare Telemetry/i }));
+    fireEvent.click(screen.getByRole('link', { name: /Compare Telemetry/i }));
     await waitFor(() => {
-      expect(screen.getByText(/Unable to locate replay recording \(\.vcr\) for:/i)).toBeInTheDocument();
+      expect(window.location.hash).toContain('/telemetry?sessionId=sess1');
     });
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/api/replays'))).toBe(false);
   });
 
-  it('locates replay recordings dynamically via /api/replays when session does not have matchingReplayFile', async () => {
-    global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/api/replays')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve([{ name: 'dyn_spa.vcr', matchedSessionId: 'sess1' }]) });
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(mockCompareData) });
-    });
-    render(
-      <CompareLaps sessions={mockSessions} initialTrack="Spa GP" initialCarClass="LMGT3" initialSessionId="sess1" initialLapNum={1} />
-    );
+  it('restores a locator deep link without searching recording endpoints', async () => {
+    const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
+    render(<CompareLaps sessions={mockSessions} initialTrack="Spa GP" initialCarClass="LMGT3" initialSessionId="sess1" initialLapNum={1} />);
     await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(2));
-
-    fireEvent.click(screen.getByRole('button', { name: /Compare Telemetry/i }));
-    await waitFor(() => expect(window.location.hash).toContain('replayName=dyn_spa.vcr'));
+    expect(window.location.hash).not.toContain('replayName=');
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/api/replays'))).toBe(false);
   });
 });
 

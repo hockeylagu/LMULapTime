@@ -5,6 +5,7 @@ import { TelemetryLinks } from '../telemetry/telemetryLinks.js';
 import { fuseDuckDbWithVcrTrajectory } from '../telemetry/telemetryFusion.js';
 
 export interface TelemetryEnrichmentInput {
+  sessionId?: string;
   replayName: string;
   filePath: string;
   isPlayer: boolean;
@@ -92,19 +93,22 @@ export class ReplayTelemetryService {
     let duckdbUnavailableReason: string | undefined;
     let fused = false;
 
-    if (!input.isPlayer || !input.allowDuckDb || !input.metadata) {
+    if (!input.isPlayer || !input.allowDuckDb || !input.metadata || !input.matchedSession ||
+      (input.sessionId !== undefined && input.matchedSession?.id !== input.sessionId)) {
       return { trajectory, fused };
     }
 
     try {
-      // The stored matches only (see telemetry/telemetryLinks): the session's files, else the replay's.
-      const links = TelemetryLinks.load(this.sessionDb);
-      const files = links.filesForReplay(input.replayName, input.matchedSession)
-        .map(filename => links.row(filename))
-        .filter((row): row is TelemetryMetadataRecord => Boolean(row));
+      // DuckDB ownership is session scoped; replay-owned/unmatched files never serve a session request.
+      const links = TelemetryLinks.load(this.sessionDb, input.matchedSession?.id);
+      const session = input.matchedSession;
+      const files = session
+        ? links.filesForSession(session).map(filename => links.row(filename))
+          .filter((row): row is TelemetryMetadataRecord => Boolean(row))
+        : [];
 
       if (files.length > 0) {
-        trajectory.duckdbFilename = links.forReplay(input.replayName, input.matchedSession);
+        trajectory.duckdbFilename = links.forSession(session!);
 
         const chosenLapNum = trajectory.currentLap || input.lapNumber || 1;
         const targetLapTimeSec = trajectory.laps?.find(lap => lap.lapNumber === chosenLapNum)?.lapTimeSec;

@@ -3,16 +3,15 @@ import path from 'path';
 import { Database as DatabaseType } from 'better-sqlite3';
 import { DetailedSession } from './types.js';
 import { SyncResult, SessionSyncProgress } from './dbSchema.js';
-import { StoredReplayFileInfo } from './replay/dbReplayMetadataStore.js';
 import type { ReplayFileEntry } from '../sessions/sessionXmlTypes.js';
-import { replayIndexEntryFromStored } from '../sessions/replayMatching.js';
+import type { ReplayMatchTarget } from '../sessions/replayMatching.js';
 import { rateDriversPace } from '../sessions/sessionPaceRating.js';
 
 /** Bumping this re-parses every stored session from its XML. */
 export const DB_PARSER_VERSION = '2.19_race_only_traffic';
 
 export interface SessionXmlSyncParser {
-  addReplayEntry(entry: ReplayFileEntry): void;
+  setReplayLookup(lookup: (target: ReplayMatchTarget) => ReplayFileEntry[]): void;
   parseSessionXml(filePath: string): DetailedSession | null;
   parseSessionXmlAsync?(filePath: string): Promise<DetailedSession | null>;
 }
@@ -22,14 +21,15 @@ export interface SessionSyncHost {
   getMetadata(key: string): string | null;
   setMetadata(key: string, value: string): void;
   getSessionsCount(): number;
-  getAllStoredReplayFiles(): Array<StoredReplayFileInfo & { filename: string }>;
+  getReplayMatchingEntries(target?: ReplayMatchTarget): ReplayFileEntry[];
   upsertSession(session: DetailedSession, filePath: string, mtime: number, size: number): void;
+  restoreStoredSessionLinks(session: DetailedSession): void;
   classifySessionConditions(session: DetailedSession): void;
   reclassifyStoredSessions(which: { ids: string[] }): void;
   recordIngestError(sourceType: string, sourcePath: string, error: unknown): void;
   clearIngestError(sourceType: string, sourcePath: string): void;
   getIngestErrors(): Array<{ sourceType: string; sourcePath: string }>;
-  invalidateSessionCache(): void;
+  markSessionDataChanged(): void;
 }
 
 export function *syncSessionsIterator(
@@ -50,28 +50,21 @@ export function *syncSessionsIterator(
   const cachedVersion = host.getMetadata('parser_version');
   const versionMismatch = cachedVersion !== DB_PARSER_VERSION;
 
-  // Get existing cached session file info
+  // Results XMLs are write-once: a stored path is enough to skip an ordinary scan.
+  // Only parser upgrades, explicit reparses and failed reads revisit existing files.
   const db = host.getDb();
-  const existingRows = (db.prepare('SELECT id, file_path, file_mtime, file_size FROM sessions').all() as {
+  const existingRows = (db.prepare('SELECT id, file_path FROM sessions').all() as {
     id: string;
     file_path: string;
-    file_mtime: number;
-    file_size: number;
   }[]);
-
-  const cacheMap = new Map<string, { id: string; file_mtime: number; file_size: number }>();
-  for (const row of existingRows) {
-    cacheMap.set(path.normalize(row.file_path).toLowerCase(), row);
-  }
+  const cachedPaths = new Set(existingRows.map(row => path.normalize(row.file_path).toLowerCase()));
   // Files the last scan could not read are read again even when unchanged: one that failed during a
   // parser upgrade would otherwise keep the older parse for good (the version is committed regardless).
   const unread = new Set(host.getIngestErrors()
     .filter(entry => entry.sourceType === 'xml')
     .map(entry => path.normalize(entry.sourcePath).toLowerCase()));
 
-  // Seed parser's replay index with stored DB replays so deleted VCR files still match
-  const storedReplays = host.getAllStoredReplayFiles();
-  for (const r of storedReplays) parser.addReplayEntry(replayIndexEntryFromStored(r));
+  parser.setReplayLookup(target => host.getReplayMatchingEntries(target));
 
   const files = fs.readdirSync(resultsDir).filter(f => f.toLowerCase().endsWith('.xml'));
   let added = 0;
@@ -91,6 +84,7 @@ export function *syncSessionsIterator(
       });
       // A session parsed with its replay already linked gets that replay's rain now; one linked
       // later gets it when the link is stored (SessionDatabase.updateSessionMatchingReplay).
+      host.restoreStoredSessionLinks(item.session);
       host.classifySessionConditions(item.session);
       host.upsertSession(item.session, item.filePath, item.mtime, item.size);
     }
@@ -103,19 +97,25 @@ export function *syncSessionsIterator(
     const f = files[i];
     const filePath = path.join(resultsDir, f);
     try {
-      const stats = fs.statSync(filePath);
       const normalizedPath = path.normalize(filePath).toLowerCase();
-      const cached = cacheMap.get(normalizedPath);
+      const cached = cachedPaths.has(normalizedPath);
 
-      // Check if file is already cached and unmodified
-      if (!reparseAll && cached && !unread.has(normalizedPath) && cached.file_mtime === Math.floor(stats.mtimeMs) && cached.file_size === stats.size) {
+      if (!reparseAll && cached && !unread.has(normalizedPath)) {
         yield { processed: i + 1, total: files.length, currentFile: f, stage: 'Checking XML session log' };
         continue;
       }
 
-      // Parse new or modified XML file
+      // File attributes are recorded for new files and deliberate reparses only.
+      const stats = fs.statSync(filePath);
       const asyncParsed = yield { processed: i, total: files.length, currentFile: f, stage: 'Reading XML session log', filePercent: 5 };
       const parsed = asyncParsed === undefined ? parser.parseSessionXml(filePath) : asyncParsed;
+      // Write-once only holds for a finished file, and a stored path is never read again: a file
+      // LMU was still writing during the read is not stored, and the failure makes the next scan retry it.
+      const after = fs.statSync(filePath);
+      if (after.size !== stats.size || after.mtimeMs !== stats.mtimeMs) {
+        host.recordIngestError('xml', filePath, new Error('The XML changed while it was read; it is read again on the next scan'));
+        continue;
+      }
       if (parsed) {
         parsedIds.add(parsed.id);
         pendingInserts.push({
@@ -155,7 +155,7 @@ export function *syncSessionsIterator(
       // Rows whose XML is gone are kept and reclassified: they are the only remaining copy.
       host.reclassifyStoredSessions({ ids: existingRows.map(row => row.id).filter(id => !parsedIds.has(id)) });
       host.setMetadata('parser_version', DB_PARSER_VERSION);
-      host.invalidateSessionCache();
+      host.markSessionDataChanged();
     })();
   }
   yield { processed: files.length, total: files.length, currentFile: '' };

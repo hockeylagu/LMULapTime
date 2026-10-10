@@ -18,7 +18,7 @@ export interface ReplayAsyncSyncOptions {
   /** Decode again the drivers that failed MAX_DECODE_ATTEMPTS times (a manual refresh). */
   retryFailed?: boolean;
   /** Called after all metadata is discovered, before any trajectory decode. */
-  onMetadataReady?: () => Set<string>;
+  onMetadataReady?: () => Set<string> | Promise<Set<string>>;
   onReplayState?: (job: ReplayIngestJob) => void;
 }
 
@@ -329,7 +329,7 @@ export async function* syncReplaysAsyncIterator(
     }
   }
 
-  const associated = options.onMetadataReady?.();
+  const associated = await options.onMetadataReady?.();
   // Newest first: the replay of the session just driven is ready before older ones are retried.
   const candidates = (associated ? discovered.filter(file => associated.has(file.filename)) : discovered)
     .sort((a, b) => b.mtime - a.mtime);

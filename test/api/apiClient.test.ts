@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, apiErrorMessage, fetchJson, isAbortError, postJson } from '../../src/api/apiClient.js';
-import { replayTrajectoryPath } from '../../src/api/replayApi.js';
+import { sessionTelemetryPath } from '../../src/api/replayApi.js';
 import { invalidateReferenceLaptimes, loadReferenceLaptimes, peekReferenceLaptimes } from '../../src/api/referenceApi.js';
 
 const stubFetch = () => {
@@ -61,13 +61,12 @@ describe('apiClient', () => {
   });
 });
 
-describe('replayTrajectoryPath', () => {
+describe('sessionTelemetryPath', () => {
   it('builds a relative path with only the parameters given', () => {
-    expect(replayTrajectoryPath('Spa R1 #3.Vcr')).toBe('/api/replays/Spa%20R1%20%233.Vcr/trajectory');
-    expect(replayTrajectoryPath('a.Vcr', {
-      resolutionQuery: 'pointSpacingM=2', lap: 4, driverSlot: 0, driverName: 'Other Driver', source: 'vcr',
-    })).toBe('/api/replays/a.Vcr/trajectory?pointSpacingM=2&lap=4&driverSlot=0&driverName=Other%20Driver&source=vcr');
-    expect(replayTrajectoryPath('a.Vcr', { lap: 0, driverSlot: null, driverName: null })).toBe('/api/replays/a.Vcr/trajectory');
+    expect(sessionTelemetryPath('session 42', { driverOrdinal: 0, lapOrdinal: 2 })).toBe('/api/session/session%2042/telemetry?driverOrdinal=0&lapOrdinal=2');
+    expect(sessionTelemetryPath('session-1', {
+      resolutionQuery: 'pointSpacingM=2', lapOrdinal: 4, driverOrdinal: 3, source: 'vcr',
+    })).toBe('/api/session/session-1/telemetry?driverOrdinal=3&lapOrdinal=4&pointSpacingM=2&source=vcr');
   });
 });
 

@@ -12,7 +12,7 @@ export interface PaceTrack {
 /**
  * Rates every valid lap and each driver's best lap against the current benchmark targets. A lap
  * whose layout and class have no target loses any rating it carried. The parser runs it once; it
- * runs again on stored sessions when the targets change (dbSessionPace.ts). classifySessionLaps
+ * is reused for read-time detail/card ratings. classifySessionLaps
  * then decides whether the best lap keeps its rating (a wet best lap does not).
  */
 export function rateDriversPace(drivers: RatedDriver[], track: PaceTrack): void {

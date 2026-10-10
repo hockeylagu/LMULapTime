@@ -12,6 +12,9 @@ function lapSummary(lapNumber: number, lapTimeSec: number, options: { isValid?: 
 function trajectory(currentLap: number, laps: ReplayTrajectoryData['laps'] = []): ReplayTrajectoryData {
   return {
     replayName: 'Consistency_Test_P1.Vcr',
+    sessionId: 'consistency-session',
+    driverOrdinal: 0,
+    lapOrdinal: Math.max(0, (laps ?? []).findIndex(lap => lap.lapNumber === currentLap)),
     pointsCount: 2,
     currentLap,
     laps,
@@ -22,6 +25,16 @@ function trajectory(currentLap: number, laps: ReplayTrajectoryData['laps'] = [])
     maxPoints: 400,
     isFullResolution: false,
     bounds,
+  };
+}
+
+function metadataFor(laps: ReplayTrajectoryData['laps'], slot = 1): ReplayMetadata {
+  const sessionLapOrdinals: Record<string, number> = {};
+  (laps ?? []).forEach((lap, ordinal) => { sessionLapOrdinals[String(lap.lapNumber)] = ordinal; });
+  return {
+    filename: 'Consistency_Test_P1.Vcr', filePath: 'Consistency_Test_P1.Vcr', fileSizeBytes: 1, mtimeMs: 1,
+    trackName: 'Spa', sessionType: 'Practice', timeSliceCount: 1, totalEvents: 0, durationSec: 100,
+    drivers: [{ slot, name: 'Driver', sessionDriverOrdinal: 0, sessionLapOrdinals }],
   };
 }
 
@@ -73,18 +86,18 @@ describe('useCornerConsistency', () => {
       lapSummary(5, 98, { isOutlap: true }),
     ]);
 
-    const { result } = renderHook(() => useCornerConsistency(true, 'valid-consistency.vcr', null, 1, current));
+    const { result } = renderHook(() => useCornerConsistency(true, 'valid-session', metadataFor(current.laps), 1, current));
     await waitFor(() => expect(result.current.isLoading).toBe(false));
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][0]).toContain('lap=2');
+    expect(fetchMock.mock.calls[0][0]).toContain('lapOrdinal=0');
     expect(result.current.lapsSampled).toBe(2);
   });
 
   it('handles failed comparison fetches without rejecting the hook', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('offline'));
     const current = trajectory(2, [lapSummary(1, 100, { isValid: true })]);
-    const { result } = renderHook(() => useCornerConsistency(true, 'failed-consistency.vcr', null, null, current));
+    const { result } = renderHook(() => useCornerConsistency(true, 'failed-session', metadataFor(current.laps), 1, current));
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
     expect(result.current.lapsSampled).toBe(1);
@@ -94,7 +107,7 @@ describe('useCornerConsistency', () => {
   it('does not sample an invalid current lap when no other valid laps exist', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch');
     fetchMock.mockClear();
-    const metadata = { laps: [{ lapNumber: 7, lapTimeSec: 100, isValid: false }] } as ReplayMetadata;
+    const metadata = { ...metadataFor([lapSummary(7, 100, { isValid: false })]), laps: [{ lapNumber: 7, lapTimeSec: 100, isValid: false }] } as ReplayMetadata;
     const current = trajectory(7, [lapSummary(7, 100, { isValid: false })]);
     const { result } = renderHook(() => useCornerConsistency(true, 'invalid-current.vcr', metadata, 2, current));
 
@@ -109,14 +122,15 @@ describe('useCornerConsistency', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ points: [{ x: 1, y: 0, z: 0, speedKmh: 110, timeSec: 0.5 }] }), { status: 200 }))
       .mockImplementationOnce(() => new Promise(resolve => { resolveFresh = resolve; }));
     const current = { ...trajectory(1, [lapSummary(1, 100, { isValid: true }), lapSummary(2, 101)]), source: 'vcr' as const };
-    const first = renderHook(() => useCornerConsistency(true, 'cached-consistency.vcr', null, 3, current));
+    const meta = metadataFor(current.laps, 3);
+    const first = renderHook(() => useCornerConsistency(true, 'cached-session', meta, 3, current));
     await waitFor(() => expect(first.result.current.isLoading).toBe(false));
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0][0])).toContain('source=vcr');
     first.unmount();
 
     expect(first.result.current.lapsSampled).toBe(2);
-    const second = renderHook(() => useCornerConsistency(true, 'cached-consistency.vcr', null, 3, current));
+    const second = renderHook(() => useCornerConsistency(true, 'cached-session', meta, 3, current));
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(second.result.current).toEqual({ cornerStats: [], isLoading: true, lapsSampled: 0 });
     await act(async () => resolveFresh(new Response(JSON.stringify({ points: [] }), { status: 200 })));
@@ -131,11 +145,13 @@ describe('useCornerConsistency', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ points: [{ x: 1, y: 0, z: 0, speedKmh: 110, timeSec: 0.5 }] }), { status: 200 }));
     const oldTrajectory: ReplayTrajectoryData = { ...trajectory(1, [lapSummary(1, 100), lapSummary(2, 101)]), source: 'vcr' };
     const newTrajectory: ReplayTrajectoryData = { ...trajectory(1, [lapSummary(1, 100), lapSummary(3, 99)]), source: 'duckdb' };
-    const hook = renderHook(({ data }) => useCornerConsistency(true, 'changing.vcr', null, 3, data), { initialProps: { data: oldTrajectory } });
+    const oldMetadata = metadataFor(oldTrajectory.laps, 3);
+    const newMetadata = metadataFor(newTrajectory.laps, 3);
+    const hook = renderHook(({ data }) => useCornerConsistency(true, 'changing-session', data.source === 'vcr' ? oldMetadata : newMetadata, 3, data), { initialProps: { data: oldTrajectory } });
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     hook.rerender({ data: newTrajectory });
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    expect(String(fetchMock.mock.calls[1][0])).toContain('lap=3');
+    expect(String(fetchMock.mock.calls[1][0])).toContain('lapOrdinal=1');
     expect(String(fetchMock.mock.calls[1][0])).toContain('source=duckdb');
     await waitFor(() => expect(hook.result.current.isLoading).toBe(false));
     expect(fetchMock.mock.calls[0][1]?.signal?.aborted).toBe(true);
@@ -147,7 +163,7 @@ describe('useCornerConsistency', () => {
     let resolvePending!: (response: Response) => void;
     vi.spyOn(globalThis, 'fetch').mockImplementation(() => new Promise(resolve => { resolvePending = resolve; }));
     const current = trajectory(1, [lapSummary(1, 100), lapSummary(2, 101)]);
-    const hook = renderHook(({ enabled }) => useCornerConsistency(enabled, 'pending.vcr', null, 3, current), { initialProps: { enabled: true } });
+    const hook = renderHook(({ enabled }) => useCornerConsistency(enabled, 'pending-session', metadataFor(current.laps, 3), 3, current), { initialProps: { enabled: true } });
     await waitFor(() => expect(resolvePending).toBeDefined());
     hook.rerender({ enabled: false });
     expect(hook.result.current).toEqual({ cornerStats: [], isLoading: false, lapsSampled: 0 });

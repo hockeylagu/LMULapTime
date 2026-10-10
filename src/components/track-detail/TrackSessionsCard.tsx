@@ -28,6 +28,8 @@ export interface TrackSessionsCardProps {
   onClearFilters?: () => void;
   viewMode: 'grid' | 'table';
   onViewModeChange: (mode: 'grid' | 'table') => void;
+  serverPaginated?: boolean;
+  totalCount?: number;
 }
 
 export const TrackSessionsCard: React.FC<TrackSessionsCardProps> = ({
@@ -53,6 +55,8 @@ export const TrackSessionsCard: React.FC<TrackSessionsCardProps> = ({
   onClearFilters,
   viewMode,
   onViewModeChange,
+  serverPaginated = false,
+  totalCount,
 }) => {
   return (
     <div className="bg-lmu-card border border-lmu-border p-6 rounded-2xl">
@@ -80,6 +84,8 @@ export const TrackSessionsCard: React.FC<TrackSessionsCardProps> = ({
         viewMode={viewMode}
         onViewModeChange={onViewModeChange}
         hideHeader
+        serverPaginated={serverPaginated}
+        totalCount={totalCount}
         getPaceBadge={getPaceBadge}
         onResetFilters={onResetFilters}
         hideEmptyNotice={

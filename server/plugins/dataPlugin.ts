@@ -91,6 +91,13 @@ export function parseVehicleLogos(value: unknown): Record<string, string> {
   return result;
 }
 
+/** Shared internal geometry is immutable at every nested array/object boundary. */
+function freezeGeometry(value: unknown): void {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return;
+  for (const child of Object.values(value)) freezeGeometry(child);
+  Object.freeze(value);
+}
+
 /** A fully validated startup snapshot. Package files are never served directly. */
 export class DataPlugin {
   public readonly status: DataPluginStatus;
@@ -130,6 +137,7 @@ export class DataPlugin {
           let display: TrackMapDisplay|null=null;
           const displayPath=`tracks-display/${key}.json`;
           if (fs.existsSync(path.join(base,displayPath))) {const sidecar=object(read(displayPath));keys(sidecar,['layoutKey','surfaces','brakeMarkers','sourceRevision']);display=parseTrackMapDisplay(sidecar,key,geometry.geometryRevision);}
+          freezeGeometry(geometry);
           this.tracks.set(key,{geometry,display});
         }
       }
@@ -147,6 +155,8 @@ export class DataPlugin {
     } catch {this.tracks.clear(); this.records.length=0; this.logoRecords.clear(); /* Generic status never discloses local paths. */}
   }
   public track(key:string) {const row=this.tracks.get(key);return row?structuredClone(row):null;}
+  /** Internal immutable geometry view; API callers use the defensive track() snapshot. */
+  public trackGeometry(key: string): TrackBoundaryGeometry | null { return this.tracks.get(key)?.geometry ?? null; }
   public vehicles(): VehicleDataRecord[] {return structuredClone(this.records);}
   public logos(): Record<string, string> {return Object.fromEntries(this.logoRecords);}
   public logo(brand: string): string|null {return this.logoRecords.get(brand) ?? null;}

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vite
 import { act, renderHook } from '@testing-library/react';
 import { serverRetryDelay, useAppData } from '../../src/api/useAppData.js';
 import type { ScanStatus } from '../../shared/types/index.js';
+import { getCachedVehicleLogos, setCachedVehicleLogos } from '../../src/api/vehicleLogosApi.js';
 
 const idle = (revision = 'server:0'): ScanStatus => ({ running: false, processed: 0, total: 0, currentFile: null,
   startedAt: null, finishedAt: null, result: null, error: null, dataRevision: revision,
@@ -12,14 +13,13 @@ const reply = (body: unknown) => Promise.resolve({ ok: true, json: () => Promise
 describe('app scan freshness', () => {
   let scan: ScanStatus;
   let count: number;
-  let lap: number;
+
   let fetchMock: Mock<(url: string) => Promise<unknown>>;
   beforeEach(() => {
-    vi.useFakeTimers(); scan = idle(); count = 0; lap = 120;
+    vi.useFakeTimers(); scan = idle(); count = 0;
     fetchMock = vi.fn((url: string) => {
       if (url === '/api/scan/status') return reply(structuredClone(scan));
-      if (url === '/api/status') return reply({ sessionsCount: 999 });
-      if (url === '/api/session-snapshot') return reply({ sessions: Array.from({ length: count }, (_, i) => ({ id: String(i) })), progression: [{ bestLapTime: lap }] });
+      if (url === '/api/status') return reply({ sessionsCount: count });
       return reply([]);
     });
     global.fetch = fetchMock as unknown as typeof fetch;
@@ -37,11 +37,11 @@ describe('app scan freshness', () => {
     const { result } = await mount();
     expect(result.current.loading).toBe(false);
     count = 10; scan.dataRevision = 'server:10'; await poll();
-    expect(result.current.sessions).toHaveLength(10);
+    expect(result.current.status?.sessionsCount).toBe(10);
     expect(result.current.status?.sessionsCount).toBe(10);
     scan.sessionScan.running = false; scan.sessionScan.finishedAt = 'xml-done'; scan.running = true;
     count = 12; scan.dataRevision = 'server:12'; await poll();
-    expect(result.current.sessions).toHaveLength(12);
+    expect(result.current.status?.sessionsCount).toBe(12);
     expect(result.current.loading).toBe(false);
     scan.running = false; scan.finishedAt = 'replay-done'; await poll();
     const calls = fetchMock.mock.calls.length; await poll(); expect(fetchMock).toHaveBeenCalledTimes(calls);
@@ -71,41 +71,63 @@ describe('app scan freshness', () => {
       return answer(url);
     });
     await act(async () => { await result.current.fetchData(true); });
-    expect(result.current.sessions).toHaveLength(2);
+    expect(result.current.status?.sessionsCount).toBe(2);
     expect(result.current.status?.sessionsCount).toBe(2);
   });
 
-  it('updates progression when replay conditions change without adding a session', async () => {
+  it('publishes a new revision when replay conditions change without adding a session', async () => {
     count = 1; scan.running = true;
     const { result } = await mount();
-    lap = 125; scan.dataRevision = 'server:rain'; await poll();
-    expect(result.current.sessions).toHaveLength(1);
-    expect(result.current.progression[0].bestLapTime).toBe(125);
+    const initialRevision=result.current.revision; scan.dataRevision = 'server:rain'; await poll();
+    expect(result.current.status?.sessionsCount).toBe(1);
+    expect(result.current.revision).toBeGreaterThan(initialRevision);
   });
 
-  it('ignores an old snapshot that resolves after Refresh has loaded new data', async () => {
+  it('clears the browser logo cache when the server or data package changes', async () => {
+    scan.running = true;
+    let serverInstanceId = 'server-a';
+    let packageRevision = 'package-a';
+    fetchMock.mockImplementation((url: string) => url === '/api/status'
+      ? reply({ serverInstanceId, dataPlugin: { revision: packageRevision }, sessionsCount: 1 })
+      : url === '/api/scan/status' ? reply(structuredClone(scan)) : reply([]));
+    const { unmount } = await mount();
+    setCachedVehicleLogos({ Ferrari: '<svg/>' });
+    expect(getCachedVehicleLogos()).toEqual({ Ferrari: '<svg/>' });
+    serverInstanceId = 'server-b';
+    scan.dataRevision = 'server-b:1';
+    await poll();
+    expect(getCachedVehicleLogos()).toBeNull();
+    setCachedVehicleLogos({ Audi: '<svg/>' });
+    packageRevision = 'package-b';
+    scan.dataRevision = 'server-b:2';
+    await poll();
+    expect(getCachedVehicleLogos()).toBeNull();
+    unmount();
+  });
+
+  it('ignores an old status response that resolves after Refresh has loaded new data', async () => {
     let resolveOld: ((value: unknown) => void) | undefined;
     const answer = fetchMock.getMockImplementation()!;
-    let snapshots = 0;
-    fetchMock.mockImplementation((url: string) => url === '/api/session-snapshot' && ++snapshots === 1
+    let responses = 0;
+    fetchMock.mockImplementation((url: string) => url === '/api/status' && ++responses === 1
       ? new Promise(resolve => { resolveOld = resolve; }) : answer(url));
     const { result } = await mount();
     count = 3;
     await act(async () => { await result.current.fetchData(true); });
-    expect(result.current.sessions).toHaveLength(3);
-    await act(async () => { resolveOld?.({ ok: true, json: () => Promise.resolve({ sessions: [], progression: [] }) }); });
-    expect(result.current.sessions).toHaveLength(3);
+    expect(result.current.status?.sessionsCount).toBe(3);
+    await act(async () => { resolveOld?.({ ok: true, json: () => Promise.resolve({ sessionsCount:0 }) }); });
+    expect(result.current.status?.sessionsCount).toBe(3);
   });
 
-  it('retries a failed snapshot without marking its revision as loaded', async () => {
+  it('retries a failed status response without marking its revision as loaded', async () => {
     count = 1; scan.running = true;
     const { result } = await mount();
     const answer = fetchMock.getMockImplementation()!;
     let fail = true; scan.dataRevision = 'server:changed'; count = 2;
-    fetchMock.mockImplementation((url: string) => url === '/api/session-snapshot' && fail ? Promise.reject(new Error('offline')) : answer(url));
-    await poll(); expect(result.current.sessions).toHaveLength(1); expect(result.current.error).toBe('offline');
+    fetchMock.mockImplementation((url: string) => url === '/api/status' && fail ? Promise.reject(new Error('offline')) : answer(url));
+    await poll(); expect(result.current.status?.sessionsCount).toBe(1); expect(result.current.error).toBe('offline');
     fail = false; await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
-    expect(result.current.sessions).toHaveLength(2); expect(result.current.error).toBeNull();
+    expect(result.current.status?.sessionsCount).toBe(2); expect(result.current.error).toBeNull();
   });
 
   it('retries a Refresh request when the server is briefly unavailable', async () => {
@@ -122,7 +144,7 @@ describe('app scan freshness', () => {
     await act(async () => { await result.current.fetchData(true); });
     expect(result.current.error).toBe('Server restarting');
     await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
-    expect(attempts).toBe(2); expect(result.current.sessions).toHaveLength(2);
+    expect(attempts).toBe(2); expect(result.current.status?.sessionsCount).toBe(2);
     expect(result.current.error).toBeNull();
   });
 
@@ -133,7 +155,6 @@ describe('app scan freshness', () => {
       if (url === '/api/scan/status') return failStatus ? Promise.reject(new Error('transient status error')) : reply(idle());
       if (url === '/api/scan') return failRefresh ? Promise.reject(new Error('refresh data error')) : reply({ success: true });
       if (url === '/api/status') return reply({ sessionsCount: 1 });
-      if (url === '/api/session-snapshot') return reply({ sessions: [{ id: 'A' }], progression: [] });
       return reply([]);
     });
     const { result } = await mount();

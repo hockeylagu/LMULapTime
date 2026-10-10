@@ -52,15 +52,15 @@ describe('replay rain on the laps of a linked session', () => {
     expect(replayRainOverLap(rawDb(db), 'Other.Vcr')).toBeUndefined();
   });
 
-  it('tags the rain laps when the replay is linked, in the stored row and the loaded session', () => {
-    const loaded = db.getAllSessions()[0];
+  it('tags the retained row and leaves an already read detail independent', () => {
+    const loaded = Array.from(db.iterateDetailedSessions())[0];
 
     db.updateSessionMatchingReplay(session.id, replayLink);
 
     const expected = [null, null, null, 18, 18, 18];
-    expect(rainByLap(loaded)).toEqual(expected);
-    expect(loaded.playerDriver?.laps[4].conditions).toEqual({ rain: 18 });
-    db.invalidateSessionCache();
+    expect(rainByLap(loaded)).toEqual([null,null,null,null,null,null]);
+    expect(db.getSessionById(session.id)?.playerDriver?.laps[4].conditions).toEqual({ rain: 18 });
+    db.markSessionDataChanged();
     expect(rainByLap(db.getSessionById(session.id))).toEqual(expected);
   });
 
@@ -71,10 +71,23 @@ describe('replay rain on the laps of a linked session', () => {
     expect(laps.map((l) => l.nonRepresentativeReason ?? null)).toEqual([null, null, null, null, null, null]);
   });
 
+  it('refreshes shared session facts when replay rain changes lap classification', () => {
+    db.reclassifyStoredSessions({ ids: [session.id] });
+    const read = () => rawDb(db).prepare('SELECT clean_laps_count,driving_time_sum,distance_km FROM session_summary_facts WHERE session_id=?').get(session.id);
+    const before = read();
+    db.updateSessionMatchingReplay(session.id, replayLink);
+    const after = read();
+    expect(after).not.toEqual(before);
+    const projected = rawDb(db).prepare('SELECT clean_laps_count,driving_time_sum FROM session_drivers WHERE session_id=? AND is_player_driver=1').get(session.id);
+    expect(after).toMatchObject(projected as { clean_laps_count: number; driving_time_sum: number });
+    db.rejectSessionReplayLink(session.id, replayLink, 'layout');
+    expect(read()).toEqual(before);
+  });
+
   it('drops the rain again when the link is withdrawn', () => {
     db.updateSessionMatchingReplay(session.id, replayLink);
     db.rejectSessionReplayLink(session.id, replayLink, 'time-window');
-    db.invalidateSessionCache();
+    db.markSessionDataChanged();
     expect(rainByLap(db.getSessionById(session.id))).toEqual([null, null, null, null, null, null]);
   });
 
@@ -91,7 +104,7 @@ describe('replay rain on the laps of a linked session', () => {
     db.replaceReplayDriverLaps(decodedName, `C:\\replays\\${decodedName}`, 1, 1, 0, decoded, true);
 
     // Lap 5 runs from 480 s to 610 s, into the rain from 600 s.
-    expect(rainByLap(db.getAllSessions()[0])).toEqual([null, null, null, null, 16, 16]);
+    expect(rainByLap(Array.from(db.iterateDetailedSessions())[0])).toEqual([null, null, null, null, 16, 16]);
   });
 
   it('tags the sessions linked to a replay once its conditions are stored', () => {
@@ -103,14 +116,14 @@ describe('replay rain on the laps of a linked session', () => {
 
     db.reclassifyStoredSessions({ replayName: 'Later.Vcr' });
 
-    db.invalidateSessionCache();
+    db.markSessionDataChanged();
     expect(rainByLap(db.getSessionById(session.id))).toEqual([20, 20, 20, 20, 20, 20]);
   });
 
   it('takes the session weather from every stored condition, not the sampled header scan', () => {
     db.updateSessionMatchingReplay(session.id, { ...replayLink, hasRain: true, maxRainIntensity: 5, weatherCondition: 'Dynamic Weather' });
 
-    db.invalidateSessionCache();
+    db.markSessionDataChanged();
     const link = db.getSessionById(session.id)?.matchingReplayFile;
     expect(link).toMatchObject({ hasRain: true, maxRainIntensity: 18, weatherCondition: 'Wet' });
   });
@@ -124,14 +137,14 @@ describe('replay rain on the laps of a linked session', () => {
     db.upsertSession(rated, 'C:\\results\\17R1.xml', 1, 1);
 
     db.updateSessionMatchingReplay(session.id, replayLink);
-    db.invalidateSessionCache();
+    db.markSessionDataChanged();
     const wet = db.getSessionById(session.id);
     expect(wet?.playerDriver).toMatchObject({ bestLapWet: true });
     expect(wet?.playerDriver?.bestLapPaceCategory).toBeUndefined();
     expect(wet?.playerDriver?.bestLapPacePercentage).toBeUndefined();
 
     db.rejectSessionReplayLink(session.id, replayLink, 'time-window');
-    db.invalidateSessionCache();
+    db.markSessionDataChanged();
     const dry = db.getSessionById(session.id)?.playerDriver;
     expect(dry?.bestLapWet).toBeUndefined();
     expect(dry).toMatchObject({ bestLapPaceCategory: 'Good', bestLapPacePercentage: 103 });

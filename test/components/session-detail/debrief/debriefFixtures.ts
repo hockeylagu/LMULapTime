@@ -41,7 +41,7 @@ export const session = {
 } as unknown as DetailedSession;
 
 export const referenceLap = {
-  id: 'ref', sessionId: 'Q1', sessionType: 'Qualifying', dateString: '2026/08/05 13:23:53', driverName: 'Davide Catani',
+  id: 'ref', sessionId: 'Q1', driverOrdinal: 0, lapOrdinal: 0, sessionType: 'Qualifying', dateString: '2026/08/05 13:23:53', driverName: 'Davide Catani',
   carType: 'Peugeot 9x8', carClass: 'Hyper', lapNum: 3, lapTime: 93.974, lapTimeString: '1:33.974',
   s1: null, s2: null, s3: null, topSpeed: null, isValid: true, matchingReplayFile: REF_REPLAY,
 } as ComparableLap;
@@ -51,15 +51,15 @@ export const referenceLap = {
  * It is 0.24 s faster than the analysed lap through the corner; Catani's lap is 0.4 s faster.
  */
 export const realisticLap = {
-  ...referenceLap, id: 'near', driverName: 'Near Rival', lapNum: 5, lapTime: 95.41, lapTimeString: '1:35.410',
+  ...referenceLap, id: 'near', lapOrdinal: 1, driverName: 'Near Rival', lapNum: 5, lapTime: 95.41, lapTimeString: '1:35.410',
 } as ComparableLap;
 
 const NO_TRAFFIC: ReplayTrafficResponse = { available: false, reason: 'This layout has no track centreline to place the cars on.', laps: [] };
 
-/** Serves the compare-laps list, each lap's trajectory (the analysed lap 0.4 s down in the corner) and the replay's traffic. */
+/** Serves comparable laps, session-addressed telemetry, and session traffic. */
 export function mockDebriefServer(compareLaps: ComparableLap[] = [referenceLap], traffic: ReplayTrafficResponse = NO_TRAFFIC) {
-  const stepByLap: Record<string, number> = {
-    [`${MY_REPLAY}|20`]: 0.35, [`${MY_REPLAY}|16`]: 0.34, [`${MY_REPLAY}|18`]: 0.3, [`${REF_REPLAY}|3`]: 0.3, [`${REF_REPLAY}|5`]: 0.32,
+  const stepByLocator: Record<string, number> = {
+    'R1|3': 0.35, 'R1|1': 0.34, 'R1|2': 0.3, 'Q1|0': 0.3, 'Q1|1': 0.32,
   };
   const fetchMock = vi.fn((input: string) => {
     const url = decodeURIComponent(String(input));
@@ -69,10 +69,14 @@ export function mockDebriefServer(compareLaps: ComparableLap[] = [referenceLap],
     if (url.includes('/traffic?')) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve(traffic) });
     }
-    const match = /\/api\/replays\/(.+?)\/trajectory\?.*lap=(\d+)/.exec(url);
-    const step = match ? stepByLap[`${match[1]}|${match[2]}`] : undefined;
+    const match = /\/api\/session\/([^/]+)\/telemetry\?/.exec(url);
+    const params = new URLSearchParams(url.split('?')[1]);
+    const sessionId = match?.[1];
+    const lapOrdinal = params.get('lapOrdinal');
+    const step = sessionId && lapOrdinal ? stepByLocator[`${sessionId}|${lapOrdinal}`] : undefined;
     if (step === undefined) return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({ error: 'Lap not found' }) });
-    return Promise.resolve({ ok: true, json: () => Promise.resolve({ replayName: match![1], currentLap: Number(match![2]), points: cornerLap(step) }) });
+    const lapNumber = sessionId === 'R1' ? [1, 16, 18, 20][Number(lapOrdinal)] : [3, 5][Number(lapOrdinal)];
+    return Promise.resolve({ ok: true, json: () => Promise.resolve({ sessionId, driverOrdinal: Number(params.get('driverOrdinal')), lapOrdinal: Number(lapOrdinal), replayName: sessionId === 'R1' ? MY_REPLAY : REF_REPLAY, currentLap: lapNumber, points: cornerLap(step) }) });
   });
   global.fetch = fetchMock as unknown as typeof fetch;
   return fetchMock;

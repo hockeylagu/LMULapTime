@@ -21,6 +21,7 @@ const cacheStats = {
 
 function fakeContext(dir: string) {
   return {
+    serverInstanceId: 'instance-test',
     resultsDir: path.join(dir, 'results'),
     replaysDir: path.join(dir, 'missing-replays'),
     telemetryDir: path.join(dir, 'telemetry'),
@@ -32,6 +33,7 @@ function fakeContext(dir: string) {
     ]),
     sessionDb: {
       getCacheStats: vi.fn(() => cacheStats),
+      getSessionCatalogStats: vi.fn(() => ({ sessionsCount: 3, tracksCount: 2, summariesReadyCount: 3 })),
       getIngestErrors: vi.fn(() => [{ filePath: 'bad.xml', error: 'truncated' }]),
       clearCache: vi.fn(),
     },
@@ -42,6 +44,7 @@ function fakeContext(dir: string) {
     hasActiveFileScan: vi.fn(() => false),
     configureDirectories: vi.fn(() => true),
     runSessionSyncInBackground: vi.fn(() => true),
+    requestSessionRefresh: vi.fn(),
     runTelemetryScanInBackground: vi.fn(),
     getScanStatus: vi.fn(() => ({ running: false, allComplete: true })),
   };
@@ -70,11 +73,13 @@ describe('system routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body).toMatchObject({
+        serverInstanceId: 'instance-test', dataPlugin: { revision: expect.any(String) },
         resultsExist: true, replaysExist: false, telemetryExist: true,
         playerName: 'Test Player', sessionsCount: 3, tracksCount: 2,
         referenceLaptimes: { lastUpdated: null, entriesCount: 0, lastUpdateDiff: null },
         sqliteCache: { sessionsCount: 3, replaysCount: 1, telemetryCatalog: { running: false }, ingestErrors: [{ filePath: 'bad.xml' }] },
       });
+      expect(context.loadSessions).not.toHaveBeenCalled();
     });
 
     it('reports the downloaded benchmark table', async () => {
@@ -162,6 +167,7 @@ describe('system routes', () => {
       expect(context.telemetryCatalog.clear).toHaveBeenCalled();
       expect(context.runTelemetryScanInBackground).not.toHaveBeenCalledWith(false, true);
       expect(context.runSessionSyncInBackground).toHaveBeenCalled();
+      expect(context.loadSessions).not.toHaveBeenCalled();
     });
 
     it('refuses to change folders while a scan is running, and starts nothing', async () => {
@@ -190,7 +196,7 @@ describe('system routes', () => {
       const res = await request(app).post('/api/scan').send({});
 
       expect(res.status).toBe(200);
-      expect(context.loadSessions).toHaveBeenCalledWith(true);
+      expect(context.requestSessionRefresh).toHaveBeenCalledWith();
       expect(context.telemetryCatalog.clear).not.toHaveBeenCalled();
       expect(context.runTelemetryScanInBackground).not.toHaveBeenCalled();
     });

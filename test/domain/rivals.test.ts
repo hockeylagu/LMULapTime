@@ -11,7 +11,7 @@ import {
 import type { Leaderboard, LeaderboardEntry, RivalTarget } from '../../shared/types/leaderboard.js';
 
 /** A board of drivers at the given lap times; 'Me' is the player. */
-function board(times: Record<string, number>, noReplay: string[] = []): Leaderboard {
+function board(times: Record<string, number>, noTelemetry: string[] = []): Leaderboard {
   const entries = Object.entries(times)
     .sort((a, b) => a[1] - b[1])
     .map(([driverName, lapTime], i): LeaderboardEntry => ({
@@ -20,7 +20,7 @@ function board(times: Record<string, number>, noReplay: string[] = []): Leaderbo
       rank: i + 1,
       bestLap: {
         sessionId: `s-${driverName}`, sessionName: 'R1', sessionType: 'Race', timestamp: 1000, lapNum: 2, lapTime,
-        s1: null, s2: null, s3: null, carType: 'Car', replayName: noReplay.includes(driverName) ? null : `${driverName}.Vcr`,
+        s1: null, s2: null, s3: null, carType: 'Car', telemetryAvailable: !noTelemetry.includes(driverName),
       },
       bestS1: null, bestS2: null, bestS3: null, s1Rank: null, s2Rank: null, s3Rank: null,
       theoreticalBest: driverName === 'Me' ? lapTime - 0.3 : lapTime,

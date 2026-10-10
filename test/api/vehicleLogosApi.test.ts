@@ -48,4 +48,17 @@ describe('vehicleLogosApi', () => {
     expect(await fetchVehicleLogos()).toEqual({});
     expect(mocked).toHaveBeenCalledTimes(2);
   });
+
+  it('does not let an old in-flight response repopulate a cleared cache', async () => {
+    let resolveOld: ((value: { packageRevision: string; logos: Record<string, string> }) => void) | undefined;
+    mocked.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve; }));
+    const oldRequest = fetchVehicleLogos();
+    clearCachedVehicleLogos();
+    mocked.mockResolvedValueOnce({ packageRevision: 'new', logos: { Audi: '<svg/>' } });
+    expect(await fetchVehicleLogos()).toEqual({ Audi: '<svg/>' });
+    resolveOld?.({ packageRevision: 'old', logos: { Ferrari: '<svg/>' } });
+    await oldRequest;
+    expect(getCachedVehicleLogos()).toEqual({ Audi: '<svg/>' });
+    expect(mocked).toHaveBeenCalledTimes(2);
+  });
 });

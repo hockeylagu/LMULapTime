@@ -1,5 +1,8 @@
 import { Database as DatabaseType } from 'better-sqlite3';
 import zlib from 'zlib';
+import { initSessionSummarySchema } from './sessionSummaries/schema.js';
+import { initSessionRowsSchema } from './sessionRows/schema.js';
+import { initReplayMatchingSchema } from './replay/dbReplayMatchingStore.js';
 
 // Bumping REPLAY_CACHE_VERSION makes every replay on disk be decoded again (once per driver),
 // and replays LMU has since deleted can never be: their rows are the only copy left. Only bump
@@ -412,4 +415,7 @@ export function initDbSchema(db: DatabaseType): void {
     // exited with the server) may not be the file's fault: each gets one more decode.
     db.exec("DELETE FROM replay_ingest_drivers WHERE status = 'failed'");
   }
+  initSessionSummarySchema(db);
+  initSessionRowsSchema(db);
+  initReplayMatchingSchema(db);
 }

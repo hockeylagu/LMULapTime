@@ -1,3 +1,4 @@
+import { querySessionPage } from '../../../server/core/sessionSummaries/pageQueries.js';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import path from 'path';
 import fs from 'fs';
@@ -41,12 +42,12 @@ describe('SessionDatabase (SQLite Cache)', () => {
     expect(stats.lastSyncedAt).toBe(syncRes.lastSyncedAt);
 
     // Verify session data can be retrieved
-    const sessions = db.getAllSessions();
+    const sessions = Array.from(db.iterateDetailedSessions());
     expect(sessions.length).toBe(syncRes.total);
     expect(sessions[0]).toHaveProperty('trackVenue');
     expect(sessions[0]).toHaveProperty('drivers');
 
-    const summaries = db.getAllSessionSummaries();
+    const summaries = querySessionPage(db.getDb(), { page: 1, pageSize: db.getSessionsCount() }).sessions;
     expect(summaries.length).toBe(syncRes.total);
     expect(summaries[0]).toHaveProperty('trackVenue');
     // Summaries do not include full drivers list
@@ -70,7 +71,7 @@ describe('SessionDatabase (SQLite Cache)', () => {
 
   it('preserves the previous session cache until a parser-version replacement is committed', () => {
     const initialSync = db.syncSessionsFromDir(resultsDir, parser);
-    const cachedSessions = db.getAllSessions();
+    const cachedSessions = Array.from(db.iterateDetailedSessions());
     db.setMetadata('parser_version', 'outdated-parser-version');
 
     const iterator = db.syncSessionsIterator(resultsDir, parser);
@@ -78,7 +79,7 @@ describe('SessionDatabase (SQLite Cache)', () => {
 
     expect(firstStep.done).toBe(false);
     expect(db.getSessionsCount()).toBe(initialSync.total);
-    expect(db.getAllSessions()).toEqual(cachedSessions);
+    expect(Array.from(db.iterateDetailedSessions())).toEqual(cachedSessions);
     iterator.return(undefined as never);
     expect(db.getSessionsCount()).toBe(initialSync.total);
     expect(db.getMetadata('parser_version')).toBe('outdated-parser-version');
@@ -121,7 +122,7 @@ describe('SessionDatabase (SQLite Cache)', () => {
 
   it('retrieves single session by id or returns null if missing', () => {
     db.syncSessionsFromDir(resultsDir, parser);
-    const sessions = db.getAllSessions();
+    const sessions = Array.from(db.iterateDetailedSessions());
     const id = sessions[0].id;
 
     const found = db.getSessionById(id);
@@ -141,7 +142,7 @@ describe('SessionDatabase (SQLite Cache)', () => {
     const stats = db.getCacheStats();
     expect(stats.sessionsCount).toBe(0);
     expect(stats.lastSyncedAt).toBeNull();
-    expect(db.getAllSessions().length).toBe(0);
+    expect(Array.from(db.iterateDetailedSessions()).length).toBe(0);
   });
 });
 
@@ -776,4 +777,3 @@ describe('DuckDB telemetry caching in SessionDatabase', () => {
     expect(db.getReplayMetadataRevision()).toBe(start + 2);
   });
 });
-

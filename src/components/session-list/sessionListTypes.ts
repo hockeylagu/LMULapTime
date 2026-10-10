@@ -22,6 +22,8 @@ export interface SessionListItem {
     duckdbFilename?: string;
   };
   playerDriver?: {
+    driverOrdinal?: number;
+    bestLapOrdinal?: number | null;
     name?: string;
     carType: string;
     carClass?: string;
@@ -54,4 +56,7 @@ export interface SessionListProps {
   onViewModeChange?: (mode: 'grid' | 'table') => void;
   hideHeader?: boolean;
   className?: string;
+  /** Server already returned the URL-selected page. */
+  serverPaginated?: boolean;
+  totalCount?: number;
 }

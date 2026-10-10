@@ -4,7 +4,7 @@ import {
   DebriefUnavailableError,
   loadSessionDebrief,
 } from '../../../../src/components/session-detail/debrief/loadSessionDebrief.js';
-import { me, mockDebriefServer, MY_REPLAY, realisticLap, REF_REPLAY, referenceLap, session } from './debriefFixtures.js';
+import { me, mockDebriefServer, realisticLap, referenceLap, session } from './debriefFixtures.js';
 
 describe('loadSessionDebrief', () => {
   it('ranks the best lap corners against the fastest same-car lap, with how often each is lost', async () => {
@@ -38,13 +38,13 @@ describe('loadSessionDebrief', () => {
     const params = new URLSearchParams(debriefCornerLink(debrief, 1).split('?')[1]);
 
     expect(Object.fromEntries(params)).toMatchObject({
-      replayName: MY_REPLAY,
-      lap: '20',
-      driverName: 'Samuel Lague',
-      baselineReplay: REF_REPLAY,
+      sessionId: 'R1',
+      driverOrdinal: '0',
+      lapOrdinal: '3',
+      baselineSessionId: 'Q1',
+      baselineDriverOrdinal: '0',
+      baselineLapOrdinal: '0',
       compareDriver: 'Davide Catani',
-      compareLapNum: '3',
-      compareSessionId: 'Q1',
       corner: '1',
     });
   });

@@ -6,6 +6,7 @@ import { upgradeStoredReplayMetadata } from './replayTrajectoryCodec.js';
 import { ReplayDriverIngestStatus, settledReplayFailure } from './dbReplayIngestStore.js';
 import { resolveRosterVehicles } from '../../../shared/domain/vehicleMapping.js';
 import { REPLAY_CACHE_VERSION, compressJson, decompressJson, isCompatibleReplayCacheVersion } from '../dbSchema.js';
+import { writeReplayMatchingFacts } from './dbReplayMatchingStore.js';
 
 // Replay metadata rows, one per .Vcr file. They outlive the file: LMU deletes old replays, and
 // the stored row is then the only copy of the metadata.
@@ -72,6 +73,7 @@ export function getAllStoredReplayFiles(db: DatabaseType): Array<StoredReplayFil
 }
 
 export function upsertReplayMetadataCache(db: DatabaseType, filename: string, filePath: string, mtime: number, size: number, metadata: ReplayMetadata): void {
+  db.transaction(() => {
   db.prepare(`
     INSERT INTO replay_metadata (filename, file_path, file_mtime, file_size, parser_version, metadata_br, updated_at)
     VALUES (@filename, @filePath, @mtime, @size, @parserVersion, @metadataBr, @updatedAt)
@@ -91,6 +93,8 @@ export function upsertReplayMetadataCache(db: DatabaseType, filename: string, fi
     metadataBr: compressJson(metadata),
     updatedAt: Date.now(),
   });
+  writeReplayMatchingFacts(db, filename, filePath, mtime, size, metadata);
+  })();
 }
 
 export function getReplaysCount(db: DatabaseType): number {

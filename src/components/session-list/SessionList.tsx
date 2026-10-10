@@ -26,10 +26,13 @@ export const SessionList: React.FC<SessionListProps> = ({
   onViewModeChange,
   hideHeader = false,
   className = '',
+  serverPaginated = false,
+  totalCount,
 }) => {
   const { viewMode, setViewMode: handleSetViewMode } = useSessionViewMode(controlledViewMode, onViewModeChange);
-  const { page, pageCount, setPage, start, end } = useSessionPage(sessions.length);
-  const pageSessions = sessions.slice(start, end);
+  const total = totalCount ?? sessions.length;
+  const { page, pageCount, setPage, start, end } = useSessionPage(total);
+  const pageSessions = serverPaginated ? sessions : sessions.slice(start, end);
   const listTopRef = useRef<HTMLDivElement>(null);
 
   const changePage = (next: number) => {
@@ -66,7 +69,7 @@ export const SessionList: React.FC<SessionListProps> = ({
         />
       )}
 
-      {sessions.length === 0 ? (
+      {total === 0 ? (
         <SessionEmptyState
           emptyMessage={emptyMessage}
           onResetFilters={onResetFilters}
@@ -90,8 +93,8 @@ export const SessionList: React.FC<SessionListProps> = ({
         />
       )}
 
-      {sessions.length > 0 && (
-        <SessionPagination page={page} pageCount={pageCount} start={start} end={end} total={sessions.length} onPageChange={changePage} />
+      {total > 0 && (
+        <SessionPagination page={page} pageCount={pageCount} start={start} end={end} total={total} onPageChange={changePage} />
       )}
     </div>
   );

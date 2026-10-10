@@ -16,14 +16,16 @@ import { useConsistencyLapSelection } from './useConsistencyLapSelection.js';
 export interface ReplayInspectorContentProps {
   isOpen: boolean;
   onClose: () => void;
-  replayName: string | null;
+  sessionId: string | null;
+  initialDriverOrdinal?: number;
+  initialLapOrdinal?: number;
   initialLapNumber?: number;
   initialDriverName?: string | null;
-  onLapChange?: (lapNumber: number) => void;
+  onLocatorChange?: (driverOrdinal: number, lapOrdinal: number) => void;
   initialCompareMode?: boolean;
-  initialBaselineReplayName?: string | null;
-  initialBaselineLapNumber?: number | null;
-  initialBaselineDriverName?: string | null;
+  initialBaselineSessionId?: string | null;
+  initialBaselineDriverOrdinal?: number;
+  initialBaselineLapOrdinal?: number | null;
   /** A corner to open on the Corners tab once the lap (and its comparison lap) are loaded. */
   initialCornerNumber?: number | null;
 }
@@ -31,14 +33,14 @@ export interface ReplayInspectorContentProps {
 export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
   isOpen,
   onClose,
-  replayName,
-  initialLapNumber,
-  initialDriverName,
-  onLapChange,
+  sessionId,
+  initialDriverOrdinal,
+  initialLapOrdinal,
+  onLocatorChange,
   initialCompareMode,
-  initialBaselineReplayName,
-  initialBaselineLapNumber,
-  initialBaselineDriverName,
+  initialBaselineSessionId,
+  initialBaselineDriverOrdinal,
+  initialBaselineLapOrdinal,
   initialCornerNumber,
 }) => {
   const {
@@ -90,14 +92,14 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     duckdbUnavailableReason,
   } = useReplayInspectorData({
     isOpen,
-    replayName,
-    initialLapNumber,
-    initialDriverName,
-    onLapChange,
+    sessionId,
+    initialDriverOrdinal,
+    initialLapOrdinal,
+    onLocatorChange,
     initialCompareMode,
-    initialBaselineReplayName,
-    initialBaselineLapNumber,
-    initialBaselineDriverName,
+    initialBaselineSessionId,
+    initialBaselineDriverOrdinal,
+    initialBaselineLapOrdinal,
   });
 
   const [activeTab, setActiveTab] = useState<'map' | 'corners' | 'ai-report'>('map');
@@ -201,8 +203,8 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     <ReplayPlaybackCursorContext.Provider value={playbackCursor}>
     <ReplayInspectorModalBody
       onClose={onClose}
-      activeReplayName={activeReplayName}
-      replayName={replayName}
+      activeReplayName={metadata?.filename ?? trajectory?.replayName ?? activeReplayName}
+      replayName={metadata?.filename ?? sessionId}
       metadata={metadata}
       trajectory={trajectory}
       currentIndex={currentIndex}
@@ -217,7 +219,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
       handleRetryBaseline={handleRetryBaseline}
       isCompareMode={isCompareMode}
       handleToggleCompare={handleToggleCompare}
-      baselineReplayName={baselineReplayName}
+      baselineReplayName={baselineTrajectory?.replayName ?? baselineReplayName}
       baselineLapNumber={baselineLapNumber}
       baselineDriverName={baselineDriverName}
       isComparePickerOpen={isComparePickerOpen}

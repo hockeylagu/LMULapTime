@@ -1,5 +1,7 @@
 import { Database as DatabaseType } from 'better-sqlite3';
 import { RejectedReplayLink, ReplayLinkRejectionReason, SessionMetadata } from '../types.js';
+import { writeAndVerifySessionRows } from '../sessionRows/verify.js';
+import { loadSession, writeSessionJson } from '../sessionRows/access.js';
 
 // Withdrawn session -> replay links (see rejected_replay_links in dbSchema.ts).
 
@@ -17,15 +19,13 @@ export function rejectSessionReplayLink(
 ): RejectedReplayLink | null {
   const rejectedAt = Date.now();
   const withdraw = db.transaction((): boolean => {
-    const row = db.prepare('SELECT metadata_json, data_json FROM sessions WHERE id = ?').get(sessionId) as
-      { metadata_json: string; data_json: string } | undefined;
-    if (!row) return false;
-    const meta = JSON.parse(row.metadata_json) as SessionMetadata;
-    const data = JSON.parse(row.data_json) as SessionMetadata;
-    delete meta.matchingReplayFile;
+    const data = loadSession(db, sessionId);
+    if (!data) return false;
     delete data.matchingReplayFile;
-    db.prepare('UPDATE sessions SET metadata_json = ?, data_json = ?, updated_at = ? WHERE id = ?')
-      .run(JSON.stringify(meta), JSON.stringify(data), rejectedAt, sessionId);
+    writeSessionJson(db, data, rejectedAt);
+    // The withdrawal does not rebuild summaries, but the normalized rows must lose the link too.
+    writeAndVerifySessionRows(db, data);
+    db.prepare('UPDATE sessions SET recording_name = NULL WHERE id = ?').run(sessionId);
     db.prepare(`
       INSERT INTO rejected_replay_links (session_id, replay_filename, reason, previous_link_json, rejected_at)
       VALUES (?, ?, ?, ?, ?)
@@ -40,10 +40,12 @@ export function rejectSessionReplayLink(
 }
 
 /** Every withdrawal per session, oldest first. */
-export function getRejectedReplayLinks(db: DatabaseType): Map<string, RejectedReplayLink[]> {
+export function getRejectedReplayLinks(db: DatabaseType, sessionIds?: readonly string[]): Map<string, RejectedReplayLink[]> {
+  if (sessionIds?.length === 0) return new Map();
+  const scope = sessionIds ? ` WHERE session_id IN (${sessionIds.map(() => '?').join(',')})` : '';
   const rows = db.prepare(
-    'SELECT session_id, replay_filename, reason, rejected_at FROM rejected_replay_links ORDER BY rejected_at ASC'
-  ).all() as Array<{ session_id: string; replay_filename: string; reason: ReplayLinkRejectionReason; rejected_at: number }>;
+    `SELECT session_id, replay_filename, reason, rejected_at FROM rejected_replay_links${scope} ORDER BY rejected_at ASC`
+  ).all(...(sessionIds ?? [])) as Array<{ session_id: string; replay_filename: string; reason: ReplayLinkRejectionReason; rejected_at: number }>;
   const bySession = new Map<string, RejectedReplayLink[]>();
   for (const row of rows) {
     const withdrawals = bySession.get(row.session_id) ?? [];

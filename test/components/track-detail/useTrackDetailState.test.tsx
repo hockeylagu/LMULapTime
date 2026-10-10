@@ -42,6 +42,7 @@ describe('useTrackDetailState', () => {
           sizeBytes: 1000,
           modifiedMs: 12345,
         },
+        playerDriver: { driverOrdinal: 1, bestLapOrdinal: 3 },
       },
       {
         id: 'sess-2',
@@ -78,7 +79,7 @@ describe('useTrackDetailState', () => {
 
     expect(result.current.data?.trackName).toBe('Autodromo Nazionale Monza');
     expect(fetchSpy).toHaveBeenCalledWith(
-      '/api/track/Monza',
+      '/api/track/Monza?carClass=Hypercar&car=All&pageSize=25&hideEmpty=true',
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
 
@@ -104,8 +105,9 @@ describe('useTrackDetailState', () => {
     });
     const replayUrl = new URL(mockNavigate.mock.calls[0][0], 'http://localhost');
     expect(replayUrl.pathname).toBe('/telemetry');
-    expect(replayUrl.searchParams.get('replayName')).toBe('Monza_2026.Vcr');
-    expect(replayUrl.searchParams.get('lap')).toBe('1');
+    expect(replayUrl.searchParams.get('sessionId')).toBe('sess-1');
+    expect(replayUrl.searchParams.get('driverOrdinal')).toBe('1');
+    expect(replayUrl.searchParams.get('lapOrdinal')).toBe('3');
     expect(replayUrl.searchParams.get('q')).toBe('Ferrari');
 
     // Opening session without replay does nothing
@@ -270,4 +272,3 @@ describe('useTrackDetailState', () => {
     expect(result.current.selectedCarModel).toBe('All');
   });
 });
-

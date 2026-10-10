@@ -7,6 +7,8 @@ import { CarClassBadge } from '../../common/CarClassBadge.js';
 import { carClassLabel, formatDrivenAgo } from '../board/leaderboardFormat.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 import { linkClickHandler } from '../../../utils/linkClick.js';
+import { getTrackOutlineUrl } from '../../../api/trackGeometryApi.js';
+import { getCircuitSpecification } from '../../../../shared/domain/circuitSpecs.js';
 
 export interface TrackRibbonCardProps {
   layout: LeaderboardLayout;
@@ -19,6 +21,9 @@ export const TrackRibbonCard: React.FC<TrackRibbonCardProps> = ({ layout, select
   const latest = layout.classes.find((c) => c.carClass === layout.lastCarClass) ?? layout.classes[0];
   const carClass = layout.lastCarClass || latest?.carClass || 'LMGT3';
   const targetUrl = `/leaderboard?track=${encodeURIComponent(layout.trackName)}&carClass=${encodeURIComponent(carClass)}`;
+  const spec = getCircuitSpecification(layout.trackName, null, null, null, layout.layoutKey);
+  const [failedOutline, setFailedOutline] = React.useState<string | null>(null);
+  const showOutline = spec.layoutKey !== 'unknown' && failedOutline !== spec.layoutKey;
 
   return (
     <Link
@@ -33,16 +38,13 @@ export const TrackRibbonCard: React.FC<TrackRibbonCardProps> = ({ layout, select
       } ${FOCUS_RING}`}
     >
       <div className="flex items-start justify-between gap-2">
-        {layout.outlinePath ? (
-          <svg viewBox="0 0 100 100" className="w-14 h-14 shrink-0" aria-hidden="true">
-            <path
-              d={layout.outlinePath}
-              fill="none"
-              strokeWidth={4}
-              strokeLinejoin="round"
-              className={selected ? 'stroke-lmu-text-soft' : 'stroke-lmu-faint'}
-            />
-          </svg>
+        {showOutline ? (
+          <img
+            src={getTrackOutlineUrl(spec.layoutKey)}
+            alt=""
+            className="w-14 h-14 shrink-0 object-contain"
+            onError={() => setFailedOutline(spec.layoutKey)}
+          />
         ) : (
           <div className="w-14 h-14 shrink-0 rounded-lg bg-lmu-card border border-lmu-border flex items-center justify-center text-2xl" aria-hidden="true">
             {layout.flagEmoji || <MapPin className="w-5 h-5 text-lmu-muted" />}

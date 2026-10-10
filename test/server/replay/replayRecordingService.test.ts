@@ -2,19 +2,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import { SessionDatabase } from '../../../server/core/db.js';
-import { ReplayCacheService } from '../../../server/replay/replayCacheService.js';
+import { ReplayRecordingService } from '../../../server/replay/replayRecordingService.js';
 import { ReplayDriverNotFoundError, ReplayDriverNotRecordedError } from '../../../server/replay/replayServiceTypes.js';
 import { createSliceVcrBuffer } from '../../utils/mockVcr.js';
 import { MAX_DECODE_ATTEMPTS } from '../../../server/core/replay/dbReplayIngestStore.js';
 
-describe('ReplayCacheService', () => {
+describe('ReplayRecordingService', () => {
   let db: SessionDatabase;
-  let service: ReplayCacheService;
+  let service: ReplayRecordingService;
   let tempDir: string;
 
   beforeEach(() => {
     db = new SessionDatabase(':memory:');
-    service = new ReplayCacheService(db);
+    service = new ReplayRecordingService(db);
     tempDir = fs.mkdtempSync(path.join(process.cwd(), 'test', 'fixtures', 'replay-cache-'));
   });
 

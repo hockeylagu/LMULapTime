@@ -20,6 +20,8 @@ describe('TrackDetail component', () => {
         driversCount: 1,
         matchingReplayFile: { name: 'spa_p1.vcr', path: 'C:\\spa_p1.vcr' },
         playerDriver: {
+          driverOrdinal: 0,
+          bestLapOrdinal: 0,
           name: 'Player',
           carType: 'Ferrari 499P',
           carClass: 'LMH',
@@ -697,6 +699,3 @@ describe('TrackDetail component', () => {
     });
   });
 });
-
-
-

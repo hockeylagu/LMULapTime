@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import App from '../src/App.js';
 import { prefetchRoutePages } from '../src/routePages.js';
+import { aggregateTrackSummaries } from '../shared/domain/trackSummaryUtils.js';
 
 describe('App component', () => {
   // Pages load lazily; resolve their modules once so the first render of each is not a cold transform.
@@ -60,6 +61,16 @@ describe('App component', () => {
       if (url.includes('/api/status')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockStatus) });
       }
+      if (url.startsWith('/api/dashboard')) return Promise.resolve({ok:true,json:()=>Promise.resolve({
+        revision:'test:1',sessions:mockSessions,total:1,page:1,pageSize:25,tracks:['Spa'],emptyCount:0,replayCount:0,
+        metrics:{sessionsCount:1,totalLaps:5,cleanLaps:5,cleanLapsPercentage:100,totalDistanceKm:35,totalDrivingSeconds:600,
+          maxTopSpeed:0,maxTopSpeedTrack:'',averageBenchmarkPacePercentage:100.1,averageBenchmarkPaceCategory:'Alien',
+          practiceSessionsCount:1,qualifyingSessionsCount:0,raceSessionsCount:0,raceWinsCount:0,racePodiumsCount:0,totalPitStops:0,
+          rankedTracks:[{track:'Spa',laps:5,km:35}],rankedCars:[{car:'Ferrari 499P',laps:5,km:35}],bestTrackRefLaps:[]},
+        trends:{hasData:false,driverName:'Player',latestOuting:null,todayActivity:null,recentPaceTrend:[],paceDelta:null,
+          paceTrendDirection:'none',paceTrendClass:null,recentCleanRate:null,recentConsistency:null,recentNetPositions:0}
+      })});
+      if (url.startsWith('/api/tracks')) return Promise.resolve({ok:true,json:()=>Promise.resolve({tracks:Object.values(aggregateTrackSummaries(mockSessions))})});
       if (url.includes('/api/session-snapshot')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ sessions: mockSessions, progression: [] }) });
       }
@@ -130,7 +141,7 @@ describe('App component', () => {
     const defaultAnswer = answer.getMockImplementation() as ((url: string) => unknown) | undefined;
     let sessionAttempts = 0;
     answer.mockImplementation((url: string) => {
-      if (url.includes('/api/session-snapshot') && ++sessionAttempts === 1) return Promise.reject(new TypeError('Failed to fetch'));
+      if (url.includes('/api/status') && ++sessionAttempts === 1) return Promise.reject(new TypeError('Failed to fetch'));
       return defaultAnswer?.(url);
     });
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
@@ -205,6 +216,7 @@ describe('App component', () => {
       expect(screen.getByText(/Back to Sessions/i)).toBeInTheDocument();
     });
 
+    expect((global.fetch as ReturnType<typeof vi.fn>).mock.calls.some(([url])=>String(url).includes('/session-snapshot') || String(url)==='/api/sessions' || String(url)==='/api/progression')).toBe(false);
     const backBtn = screen.getByRole('link', { name: /Back to Sessions/i });
     fireEvent.click(backBtn);
 
@@ -301,6 +313,6 @@ describe('App component', () => {
     expect(screen.getByRole('link', { name: /Review in Settings/i })).toHaveAttribute('href', '/settings?section=reference-benchmarks');
     fireEvent.click(screen.getByRole('button', { name: /Dismiss reference lap time update notification/i }));
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
-    await screen.findByTestId(/track-circuit-layout/);
+    await screen.findByText('Totals');
   });
 });

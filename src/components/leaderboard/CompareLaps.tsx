@@ -5,8 +5,7 @@ import { CompareLapsHeader } from './CompareLapsHeader.js';
 import { CompareLapsDeck } from './CompareLapsDeck.js';
 import { CompareSectorChart } from './CompareSectorChart.js';
 import { useCompareLapsData, CompareRequest, CompareLapsSessionItem } from './useCompareLapsData.js';
-import { ComparableLap, ReplaySummary } from '../../../shared/types/index.js';
-import { fetchJson } from '../../api/apiClient.js';
+import { ComparableLap } from '../../../shared/types/index.js';
 import { COMPARE_LAP_COLORS } from '../../utils/themeColors.js';
 import { buildTelemetryComparePath } from '../../utils/telemetryCompareLink.js';
 import { LapDebriefPanel } from './debrief/LapDebriefPanel.js';
@@ -14,11 +13,12 @@ import { loadLapPairDebrief, LapDebriefUnavailableError } from './debrief/loadLa
 import { SectorGapSummary } from './debrief/SectorGapSummary.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import { CompareLapPicker } from './picker/CompareLapPicker.js';
+import type { TelemetryLapRef } from '../../utils/telemetryCompareLink.js';
 
 export type { CompareLapsSessionItem };
 
 export interface CompareLapsProps {
-  sessions: CompareLapsSessionItem[];
+  sessions?: CompareLapsSessionItem[];
   initialTrack?: string;
   initialCarClass?: string;
   initialSessionId?: string;
@@ -83,24 +83,9 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
     onComparedLapsChange?.(comparedKey ? comparedKey.split('|') : []);
   }, [comparedKey, onComparedLapsChange]);
 
-  const findReplayForLap = async (lap: ComparableLap): Promise<string | null> => {
-    if (lap.matchingReplayFile) {
-      return lap.matchingReplayFile;
-    }
-    const sess = sessions.find((s) => s.id === lap.sessionId);
-    if (sess?.matchingReplayFile?.name) {
-      return sess.matchingReplayFile.name;
-    }
-    // Only the replay linked to the lap's own session records it: another replay of the track is
-    // another session (or layout), and would show someone else's lap.
-    try {
-      const replays = await fetchJson<ReplaySummary[]>('/api/replays');
-      const match = replays.find((r) => r.matchedSessionId === lap.sessionId);
-      if (match?.name) return match.name;
-    } catch (err) {
-      console.error('Failed to locate replay for lap:', err);
-    }
-    return null;
+  const telemetryRef = (lap: ComparableLap): TelemetryLapRef | null => {
+    if (!lap.sessionId || !Number.isInteger(lap.driverOrdinal) || !Number.isInteger(lap.lapOrdinal)) return null;
+    return { sessionId: lap.sessionId, driverOrdinal: lap.driverOrdinal!, lapOrdinal: lap.lapOrdinal!, driverName: lap.driverName, lapNum: lap.lapNum };
   };
 
   const handleCompareTelemetry = async () => {
@@ -108,26 +93,20 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
     setTelemetryError(null);
     const { target: targetLap, base: baseLap } = telemetryPair(selectedLaps, baselineLap);
 
-    const [targetReplay, baseReplay] = await Promise.all([
-      findReplayForLap(targetLap),
-      findReplayForLap(baseLap),
-    ]);
+    const targetRef = telemetryRef(targetLap);
+    const baseRef = telemetryRef(baseLap);
 
-    if (!targetReplay || !baseReplay) {
+    if (!targetRef || !baseRef) {
       const missing: string[] = [];
-      if (!baseReplay) missing.push(`Baseline (${baseLap.driverName} Lap ${baseLap.lapNum || '-'})`);
-      if (!targetReplay) missing.push(`Target (${targetLap.driverName} Lap ${targetLap.lapNum || '-'})`);
+      if (!baseRef) missing.push(`Baseline (${baseLap.driverName} Lap ${baseLap.lapNum || '-'})`);
+      if (!targetRef) missing.push(`Target (${targetLap.driverName} Lap ${targetLap.lapNum || '-'})`);
       setTelemetryError(
-        `Unable to locate replay recording (.vcr) for: ${missing.join(', ')}. Telemetry comparison requires recorded replay telemetry.`
+        `Session lap locators are unavailable for: ${missing.join(', ')}. Refresh the comparison data and try again.`
       );
       return;
     }
 
-    navigate(buildTelemetryComparePath(
-      searchParams,
-      { replayName: targetReplay, driverName: targetLap.driverName, lapNum: targetLap.lapNum },
-      { replayName: baseReplay, sessionId: baseLap.sessionId, driverName: baseLap.driverName, lapNum: baseLap.lapNum },
-    ));
+    navigate(buildTelemetryComparePath(searchParams, targetRef, baseRef));
   };
 
   const swapBaseline = () => {
@@ -153,34 +132,21 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
   const analyseRequested = analyseMatches && !analyseRun.spent;
   const loadDebrief = async (signal: AbortSignal) => {
     const { target, base } = debriefPair!;
-    const [targetReplay, baseReplay] = await Promise.all([findReplayForLap(target), findReplayForLap(base)]);
-    if (!targetReplay || !baseReplay) {
-      const lap = !targetReplay ? target : base;
-      throw new LapDebriefUnavailableError(`${lap.driverName}'s lap ${lap.lapNum ?? '-'} has no replay to compare with.`);
+    const targetRef = telemetryRef(target);
+    const baseRef = telemetryRef(base);
+    if (!targetRef || !baseRef) {
+      const lap = !targetRef ? target : base;
+      throw new LapDebriefUnavailableError(`${lap.driverName}'s lap ${lap.lapNum ?? '-'} has no session telemetry locator.`);
     }
-    return loadLapPairDebrief(
-      { replayName: targetReplay, driverName: target.driverName, lapNum: target.lapNum },
-      { replayName: baseReplay, sessionId: base.sessionId, driverName: base.driverName, lapNum: base.lapNum },
-      signal,
-    );
+    return loadLapPairDebrief(targetRef, baseRef, signal);
   };
 
   const compareTelemetryUrl = React.useMemo(() => {
     if (selectedLaps.length !== 2) return undefined;
     const { target: targetLap, base: baseLap } = telemetryPair(selectedLaps, baselineLap);
-    const getReplaySync = (lap: ComparableLap): string | null => {
-      if (lap.matchingReplayFile) return lap.matchingReplayFile;
-      const sess = sessions.find((s) => s.id === lap.sessionId);
-      return sess?.matchingReplayFile?.name ?? null;
-    };
-    const targetReplay = getReplaySync(targetLap);
-    const baseReplay = getReplaySync(baseLap);
-    if (!targetReplay || !baseReplay) return undefined;
-    return buildTelemetryComparePath(
-      searchParams,
-      { replayName: targetReplay, driverName: targetLap.driverName, lapNum: targetLap.lapNum },
-      { replayName: baseReplay, sessionId: baseLap.sessionId, driverName: baseLap.driverName, lapNum: baseLap.lapNum },
-    );
+    const targetRef = telemetryRef(targetLap);
+    const baseRef = telemetryRef(baseLap);
+    return targetRef && baseRef ? buildTelemetryComparePath(searchParams, targetRef, baseRef) : undefined;
   }, [selectedLaps, baselineLap, sessions, searchParams]);
 
   return (
@@ -243,7 +209,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
 
       {data.pickerTarget && (
         <CompareLapPicker
-          laps={data.apiData.laps}
+          laps={data.pickerLaps}
           anchor={data.pickerAnchor}
           replacing={data.pickerReplacing}
           comparedIds={selectedLaps.map((l) => l.id)}
@@ -251,6 +217,14 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
           onPick={data.handlePickLap}
           onClose={() => data.setPickerTarget(null)}
         />
+      )}
+
+      {data.pageCount > 1 && (
+        <nav aria-label="Compare lap pages" className="flex items-center justify-center gap-3 text-xs text-lmu-muted">
+          <button type="button" disabled={data.page <= 1} onClick={() => data.changePage(data.page - 1)} className="px-3 py-1.5 rounded-lg border border-lmu-border disabled:opacity-40">Previous</button>
+          <span>Page {data.page} of {data.pageCount}</span>
+          <button type="button" disabled={data.page >= data.pageCount} onClick={() => data.changePage(data.page + 1)} className="px-3 py-1.5 rounded-lg border border-lmu-border disabled:opacity-40">Next</button>
+        </nav>
       )}
 
       {debriefPair && (

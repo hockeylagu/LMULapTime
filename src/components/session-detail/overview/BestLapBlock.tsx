@@ -37,7 +37,7 @@ export const BestLapBlock: React.FC<BestLapBlockProps> = ({
   const hasReplay = Boolean(session.matchingReplayFile);
 
   const targetUrl = session.matchingReplayFile
-    ? sessionTelemetryPath(searchParams, session.matchingReplayFile.name, selectedDriver.name, bestLapNum)
+    ? sessionTelemetryPath(searchParams, session, selectedDriver, bestLapNum) ?? sessionLapComparePath(session, selectedDriver, bestLapNum)
     : sessionLapComparePath(session, selectedDriver, bestLapNum);
 
   return (

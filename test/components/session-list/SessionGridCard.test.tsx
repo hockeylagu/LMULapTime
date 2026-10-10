@@ -13,7 +13,7 @@ const session: SessionListItem = {
   matchingReplayFile: { name: 'Monza.Vcr', path: 'C:/LMU/Replays/Monza.Vcr' },
   playerDriver: {
     name: 'Player Driver', carType: 'Porsche 963', carClass: 'Hypercar', lapsCount: 15, bestLapTime: 95.123,
-    bestLapTimeString: '1:35.123', position: 1, gridPosition: 3, positionGain: 2, bestLapNum: 4,
+    bestLapTimeString: '1:35.123', position: 1, gridPosition: 3, positionGain: 2, bestLapNum: 4, driverOrdinal: 0, bestLapOrdinal: 3,
   },
 } as SessionListItem;
 
@@ -49,8 +49,10 @@ describe('SessionGridCard links', () => {
   it('links the replay indicator to the best lap and opens it once without selecting the card', () => {
     const { onSelectSession, onOpenReplay } = setup();
     const replayLink = screen.getByRole('link', { name: /Open replay telemetry/ });
-    expect(replayLink).toHaveAttribute('href', expect.stringContaining('lap=4'));
-    expect(replayLink).toHaveAttribute('href', expect.stringContaining('replayName=Monza.Vcr'));
+    expect(replayLink).toHaveAttribute('href', expect.stringContaining('sessionId=session-race-1'));
+    expect(replayLink).toHaveAttribute('href', expect.stringContaining('driverOrdinal=0'));
+    expect(replayLink).toHaveAttribute('href', expect.stringContaining('lapOrdinal=3'));
+    expect(replayLink).not.toHaveAttribute('href', expect.stringContaining('replayName='));
     fireEvent.click(replayLink);
     expect(onOpenReplay).toHaveBeenCalledTimes(1);
     expect(onOpenReplay).toHaveBeenCalledWith('session-race-1');

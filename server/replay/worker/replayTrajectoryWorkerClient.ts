@@ -95,7 +95,9 @@ export async function* extractReplayTrajectoryInWorker(
       while (messages.length === 0 && !workerError) {
         await new Promise<void>((resolve) => { notify = resolve; });
       }
-      if (workerError) throw workerError;
+      // A worker can post its decoder error and exit before this consumer resumes.
+      // Drain posted messages first so a rejected recording keeps its decoder failure classification.
+      if (messages.length === 0 && workerError) throw workerError;
 
       const message = messages.shift()!;
       if (message.type === 'progress') {

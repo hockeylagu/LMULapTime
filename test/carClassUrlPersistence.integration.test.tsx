@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { HashRouter } from 'react-router';
 import App from '../src/App.js';
+import { aggregateTrackSummaries } from '../shared/domain/trackSummaryUtils.js';
 import { prefetchRoutePages } from '../src/routePages.js';
 
 const session = {
@@ -45,6 +46,7 @@ function mockApi() {
     if (url.includes('/api/status')) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ resultsExist: true, replaysExist: true, sessionsCount: 1 }) });
     }
+    if (url.startsWith('/api/tracks')) return Promise.resolve({ok:true,json:()=>Promise.resolve({tracks:Object.values(aggregateTrackSummaries([session]))})});
     if (url.includes('/api/session-snapshot')) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ sessions: [session], progression: [] }) });
     }

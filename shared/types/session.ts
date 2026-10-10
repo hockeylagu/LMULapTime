@@ -52,6 +52,8 @@ export interface LapPenalty {
 }
 
 export interface LapData {
+  /** Zero-based position in the source driver's lap list, when hydrated from a compact index. */
+  lapOrdinal?: number;
   lapNum: number;
   position: number;
   lapTime: number | null; // seconds, null if incomplete/invalid
@@ -116,6 +118,8 @@ export interface ReplayCacheSummary {
 }
 
 export interface DriverData {
+  /** Zero-based position in the source session's driver list, when hydrated from a compact index. */
+  driverOrdinal?: number;
   name: string;
   carType: string;
   carClass: string;
@@ -309,6 +313,8 @@ export interface FuelStrategyData {
 export interface ComparableLap {
   id: string;
   sessionId?: string;
+  driverOrdinal?: number;
+  lapOrdinal?: number;
   sessionName?: string;
   sessionType?: string;
   dateString?: string;

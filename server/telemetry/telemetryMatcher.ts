@@ -20,13 +20,6 @@ export interface DuckDbFileInfo {
   enrichmentError?: string;
 }
 
-const duckDbMetadataCache = new Map<string, {
-  trackName?: string;
-  sessionType?: string;
-  driverName?: string;
-  recordingTimeEpochMs?: number;
-}>();
-
 export function parseDuckDbFilename(filename: string): {
   trackName: string;
   sessionType: string;
@@ -96,17 +89,15 @@ export function scanDuckDbDirectory(telemetryDir: string): DuckDbFileInfo[] {
         const stats = fs.statSync(filePath);
         const parsed = parseDuckDbFilename(f);
         if (parsed) {
-          const cachedMetadata = duckDbMetadataCache.get(filePath);
           entries.push({
             filename: f,
             filePath,
             fileMtimeMs: Math.floor(stats.mtimeMs),
             fileSizeBytes: stats.size,
-            trackName: cachedMetadata?.trackName || parsed.trackName,
-            sessionType: cachedMetadata?.sessionType || parsed.sessionType,
+            trackName: parsed.trackName,
+            sessionType: parsed.sessionType,
             timestampStr: parsed.timestampStr,
-            timestampEpochMs: cachedMetadata?.recordingTimeEpochMs || parsed.timestampEpochMs || Math.floor(stats.mtimeMs),
-            driverName: cachedMetadata?.driverName,
+            timestampEpochMs: parsed.timestampEpochMs || Math.floor(stats.mtimeMs),
           });
         }
       } catch (err) {
@@ -317,13 +308,6 @@ export async function enrichDuckDbFileInfo(duck: DuckDbFileInfo): Promise<DuckDb
     const recordingTimeEpochMs = meta.RecordingTime
       ? new Date(meta.RecordingTime.replace(/_/g, ':')).getTime()
       : undefined;
-    duckDbMetadataCache.set(duck.filePath, {
-      trackName: meta.trackName,
-      sessionType: meta.sessionType,
-      driverName: meta.driverName,
-      recordingTimeEpochMs: recordingTimeEpochMs && !isNaN(recordingTimeEpochMs) ? recordingTimeEpochMs : undefined,
-    });
-
     const validLaps = laps.filter((l) => l.lapTimeSec > 30);
     const bestLapTime = validLaps.length > 0 ? Math.min(...validLaps.map((l) => l.lapTimeSec)) : undefined;
 

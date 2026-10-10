@@ -80,10 +80,14 @@ export function getTelemetryFiles(db: DatabaseType): DuckDbFileInfo[] {
   return rows.map((r) => JSON.parse(r.metadata_json) as DuckDbFileInfo);
 }
 
-export function getTelemetryMetadata(db: DatabaseType): TelemetryMetadataRecord[] {
+export function getTelemetryFilesCount(db: DatabaseType): number {
+  return (db.prepare('SELECT count(*) count FROM telemetry_metadata').get() as { count: number }).count;
+}
+
+export function getTelemetryMetadata(db: DatabaseType, sessionId?: string): TelemetryMetadataRecord[] {
   const rows = db.prepare(
-    'SELECT filename, file_path, matched_session_id, matched_replay_filename, laps_count FROM telemetry_metadata'
-  ).all() as Array<{
+    `SELECT filename, file_path, matched_session_id, matched_replay_filename, laps_count FROM telemetry_metadata${sessionId === undefined ? '' : ' WHERE matched_session_id=?'}`
+  ).all(...(sessionId === undefined ? [] : [sessionId])) as Array<{
     filename: string;
     file_path: string;
     matched_session_id: string | null;
@@ -153,8 +157,10 @@ export function clearTelemetryLinks(db: DatabaseType): void {
 }
 
 /** The telemetry files with at least one lap cached, at any version. */
-export function getTelemetryLapCacheFilenames(db: DatabaseType): Set<string> {
-  const rows = db.prepare('SELECT DISTINCT filename FROM telemetry_lap_cache').all() as Array<{ filename: string }>;
+export function getTelemetryLapCacheFilenames(db: DatabaseType, sessionId?: string): Set<string> {
+  const rows = db.prepare(sessionId === undefined ? 'SELECT DISTINCT filename FROM telemetry_lap_cache' :
+    'SELECT DISTINCT l.filename FROM telemetry_metadata t JOIN telemetry_lap_cache l ON l.filename=t.filename WHERE t.matched_session_id=?')
+    .all(...(sessionId === undefined ? [] : [sessionId])) as Array<{ filename: string }>;
   return new Set(rows.map(row => row.filename));
 }
 

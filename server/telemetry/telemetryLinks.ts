@@ -30,6 +30,36 @@ const DEFAULT_SESSION_MS = 3600_000;
 /** Any time distance: the span check below decides the timing, the matcher only track, type and driver. */
 const ANY_DELTA_SEC = Number.MAX_SAFE_INTEGER;
 
+/** The longest session a file may sit in: a 24-hour race with its formation and the XML save. */
+const LONGEST_SESSION_MS = 26 * 3600_000;
+/** Files decided together share one candidate window; a wider spread starts a new chunk. */
+const CHUNK_SPREAD_MS = 6 * 3600_000;
+const CHUNK_FILES = 10;
+
+/**
+ * Where the owner of a file recorded between fromMs and toMs can be (ownerAt's spans): sessions
+ * that started up to the longest session before it, replays whose recording overlaps it.
+ */
+export function telemetryCandidateWindow(fromMs: number, toMs: number) {
+  return {
+    sessionsFromMs: fromMs - LONGEST_SESSION_MS - SLACK_MS, sessionsToMs: toMs + SLACK_MS,
+    replaysFromMs: fromMs - SLACK_MS, replaysToMs: toMs + SLACK_MS,
+  };
+}
+
+/** Time-ordered files in chunks small and close enough that their candidate windows stay bounded. */
+export function *telemetryFileChunks(files: DuckDbFileInfo[]): Generator<DuckDbFileInfo[]> {
+  let chunk: DuckDbFileInfo[] = [];
+  for (const file of files) {
+    if (chunk.length === CHUNK_FILES || (chunk.length > 0 && file.timestampEpochMs - chunk[0].timestampEpochMs > CHUNK_SPREAD_MS)) {
+      yield chunk;
+      chunk = [];
+    }
+    chunk.push(file);
+  }
+  if (chunk.length > 0) yield chunk;
+}
+
 export interface TelemetryLinkInput {
   /** Every catalogued file, including files no longer on disk. */
   files: DuckDbFileInfo[];
@@ -39,6 +69,8 @@ export interface TelemetryLinkInput {
   loadReplayMetadata: (replayName: string) => ReplayMetadata | null;
   /** When the session ended (its results XML was written), if known. */
   sessionEndMs?: (session: DetailedSession) => number | undefined;
+  /** Replay name -> its linked session id, for replays whose session is not among the sessions given. */
+  replayOwnerByName?: ReadonlyMap<string, string>;
 }
 
 interface Span<T> {
@@ -100,9 +132,9 @@ export function decideTelemetryLinks(input: TelemetryLinkInput): TelemetryLink[]
     startMs: replay.durationSec && replay.durationSec > 0 ? replay.mtime - Math.round(replay.durationSec * 1000) : replay.mtime,
     endMs: replay.mtime,
   }));
-  const ownerOfReplay = new Map<string, DetailedSession>();
+  const ownerOfReplay = new Map<string, string>(input.replayOwnerByName ?? []);
   for (const session of input.sessions) {
-    if (session.matchingReplayFile) ownerOfReplay.set(session.matchingReplayFile.name, session);
+    if (session.matchingReplayFile) ownerOfReplay.set(session.matchingReplayFile.name, session.id);
   }
   const metadataCache = new Map<string, ReplayMetadata | null>();
   const metadataOf = (name: string) => {
@@ -120,22 +152,22 @@ export function decideTelemetryLinks(input: TelemetryLinkInput): TelemetryLink[]
     }
     const replay = ownerAt(file, replaySpans, owner => {
       const owningSession = ownerOfReplay.get(owner.name);
-      if (owningSession && sessionsWithFiles.has(owningSession.id)) return false;
+      if (owningSession && sessionsWithFiles.has(owningSession)) return false;
       const metadata = metadataOf(owner.name);
       return metadata !== null && findDuckDbForReplay([file], metadata, owner.mtime, ANY_DELTA_SEC) !== null;
     });
     if (replay) {
       const owningSession = ownerOfReplay.get(replay.name);
-      links.push({ filename: file.filename, sessionId: owningSession?.id ?? null, replayName: replay.name });
-      if (owningSession) sessionsWithFiles.add(owningSession.id);
+      links.push({ filename: file.filename, sessionId: owningSession ?? null, replayName: replay.name });
+      if (owningSession) sessionsWithFiles.add(owningSession);
     }
   }
   return links;
 }
 
 export interface TelemetryLinkSource {
-  getTelemetryMetadata(): TelemetryMetadataRecord[];
-  getTelemetryLapCacheFilenames(): Set<string>;
+  getTelemetryMetadata(sessionId?: string): TelemetryMetadataRecord[];
+  getTelemetryLapCacheFilenames(sessionId?: string): Set<string>;
 }
 
 /**
@@ -152,26 +184,24 @@ export class TelemetryLinks {
     private readonly cachedFilenames: Set<string>
   ) {}
 
-  public static load(source: TelemetryLinkSource): TelemetryLinks {
+  public static load(source: TelemetryLinkSource, sessionId?: string): TelemetryLinks {
     const rows = new Map<string, TelemetryMetadataRecord>();
     const bySession = new Map<string, string[]>();
     const byReplay = new Map<string, string[]>();
     const add = (map: Map<string, string[]>, key: string, filename: string) => map.set(key, [...(map.get(key) ?? []), filename]);
-    for (const row of source.getTelemetryMetadata()) {
+    for (const row of source.getTelemetryMetadata(sessionId)) {
       rows.set(row.filename, row);
       if (row.matchedSessionId) add(bySession, row.matchedSessionId, row.filename);
       if (row.matchedReplayFilename) add(byReplay, row.matchedReplayFilename, row.filename);
     }
     // File names end with the recording time: sorting them puts a session's files in order.
     for (const files of [...bySession.values(), ...byReplay.values()]) files.sort();
-    return new TelemetryLinks(rows, bySession, byReplay, source.getTelemetryLapCacheFilenames());
+    return new TelemetryLinks(rows, bySession, byReplay, source.getTelemetryLapCacheFilenames(sessionId));
   }
 
-  /** The session's files, else its replay's files, in recording order. */
-  public filesForSession(session: Pick<DetailedSession, 'id' | 'matchingReplayFile'>): string[] {
-    const replayName = session.matchingReplayFile?.name;
-    const own = this.availableOf(this.bySession.get(session.id));
-    return own.length > 0 ? own : this.availableOf(replayName ? this.byReplay.get(replayName) : undefined);
+  /** The files explicitly attached to this session, in recording order. */
+  public filesForSession(session: Pick<DetailedSession, 'id'>): string[] {
+    return this.availableOf(this.bySession.get(session.id));
   }
 
   /** The files of the session the replay belongs to, else the replay's own files, in recording order. */
@@ -181,7 +211,7 @@ export class TelemetryLinks {
   }
 
   /** The session's main file (the one with the most laps), shown as its telemetry source. */
-  public forSession(session: Pick<DetailedSession, 'id' | 'matchingReplayFile'>): string | undefined {
+  public forSession(session: Pick<DetailedSession, 'id'>): string | undefined {
     return this.main(this.filesForSession(session));
   }
 

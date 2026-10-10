@@ -36,7 +36,7 @@ export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, 
 
   const { rival: target, rivalEntry, gap, progress } = status;
   const percent = (gap / target.targetTime) * 100;
-  const telemetryReady = Boolean(rivalEntry?.bestLap.replayName && player.bestLap.replayName);
+  const telemetryReady = Boolean(rivalEntry?.bestLap.telemetryAvailable && player.bestLap.telemetryAvailable);
   const closed = progress !== null ? Math.round(progress * 100) : null;
   const [searchParams] = useSearchParams();
   const telemetryPath = React.useMemo(() => {

@@ -64,7 +64,15 @@ describe('local data plugin snapshot',()=>{
     expect(plugin.track(geometry.layoutKey)).toBeNull();
   });
   it('feeds the same metric geometry into banking and kerb enrichment while missing profiles remain null',()=>{
-    const {dir}=fixture();const p=new DataPlugin(dir),store=new TrackGeometryStore(key=>p.track(key)?.geometry??null),definition=store.get('monza_gp')!;
+    const {dir}=fixture();const p=new DataPlugin(dir),store=new TrackGeometryStore(key=>p.trackGeometry(key)),definition=store.get('monza_gp')!;
+    const shared = p.trackGeometry('monza_gp')!;
+    expect(definition.centerline).toBe(shared.centerline);
+    expect(definition.surfaceProfile).toBe(shared.surfaceProfile);
+    expect(Object.isFrozen(shared.centerline[0])).toBe(true);
+    expect(() => { shared.centerline[0][0] = 42; }).toThrow(TypeError);
+    const publicCopy = p.track('monza_gp')!;
+    publicCopy.geometry.centerline[0][0] = 42;
+    expect(shared.centerline[0][0]).not.toBe(42);
     const trajectory:ReplayTrajectoryData={replayName:'Test.Vcr',pointsCount:2,points:definition.centerline.slice(2,4).map(([x,z],i)=>({x,y:0,z,timeSec:i})),bounds:definition.bounds};
     applyCanonicalProjection(trajectory,definition);expect(trajectory.stationSource).toBe('track');expect(trajectory.points[0].roadBankDeg).toBe(3);expect(trajectory.points[0].leftKerbWidthM).toBe(1);expect(trajectory.points[0].rightKerbWidthM).toBeNull();
     const without=enrichTrajectoryWithTrackGeometry(trajectory,'Unknown','Unknown');expect(without.stationSource).toBe('odometer');expect(without.points[0].roadBankDeg).toBeUndefined();expect(without.points[0].leftRoadDistanceM).toBeUndefined();

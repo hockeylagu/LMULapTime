@@ -9,11 +9,8 @@ import { lapEdgesFromNeighbours } from './decode/replayLapPoints.js';
 import { ReplayDriverNotRecordedError } from './replayServiceTypes.js';
 import { ReplayMetadata, ReplayTrajectoryData } from '../core/types.js';
 
-export interface ReplayCacheServiceOptions {
-  playerName?: string;
-}
-
-export class ReplayCacheService {
+/** Serves retained replay recordings from SQLite, decoding missing drivers in a worker. */
+export class ReplayRecordingService {
   // Decodes in flight, by replay, driver and file version (see decodeDriver).
   private readonly pendingDecodes = new Map<string, Promise<ReplayTrajectoryData>>();
 

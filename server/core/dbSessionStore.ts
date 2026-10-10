@@ -1,15 +1,15 @@
 import { Database as DatabaseType } from 'better-sqlite3';
 import { DetailedSession, SessionMetadata } from './types.js';
 import { isReplayLinkWithdrawn } from './replay/dbReplayLinkStore.js';
+import { persistSessionProjection } from './sessionSummaries/store.js';
+import { NORMALIZED_SESSION_VERSION, SESSION_DICTIONARY_TABLES, SESSION_ROW_TABLES } from './sessionRows/schema.js';
+import { loadSession, readStoredLinkState, sameReplayLink, writeSessionJson } from './sessionRows/access.js';
 
-export function getAllSessions(db: DatabaseType): DetailedSession[] {
-  const rows = db.prepare('SELECT data_json FROM sessions ORDER BY timestamp ASC').all() as { data_json: string }[];
-  return rows.map(r => JSON.parse(r.data_json) as DetailedSession);
-}
-
-export function getAllSessionSummaries(db: DatabaseType): SessionMetadata[] {
-  const rows = db.prepare('SELECT metadata_json FROM sessions ORDER BY timestamp ASC').all() as { metadata_json: string }[];
-  return rows.map(r => JSON.parse(r.metadata_json) as SessionMetadata);
+/** Ingestion's persisted XML end timestamp; a different path must not reuse it. */
+export function getSessionXmlMtime(db: DatabaseType, sessionId: string, filePath: string): number | undefined {
+  const row = db.prepare('SELECT file_mtime FROM sessions WHERE id=? AND file_path=?')
+    .get(sessionId, filePath) as { file_mtime: number } | undefined;
+  return row && Number.isFinite(row.file_mtime) && row.file_mtime > 0 ? row.file_mtime : undefined;
 }
 
 export function getSessionById(db: DatabaseType, id: string): DetailedSession | null {
@@ -17,11 +17,24 @@ export function getSessionById(db: DatabaseType, id: string): DetailedSession | 
   const withXml = `${cleanId}.xml`;
 
   const row = db.prepare(
-    'SELECT data_json FROM sessions WHERE id = ? OR id = ? OR id = ? OR filename = ? OR filename = ? LIMIT 1'
-  ).get(id, cleanId, withXml, withXml, id) as { data_json: string } | undefined;
-  if (!row) return null;
+    'SELECT id FROM sessions WHERE id = ? OR id = ? OR id = ? OR filename = ? OR filename = ? LIMIT 1'
+  ).get(id, cleanId, withXml, withXml, id) as { id: string } | undefined;
+  return row ? loadSession(db, row.id) : null;
+}
 
-  return JSON.parse(row.data_json) as DetailedSession;
+/**
+ * A reparse reads the XML alone, while the replay link and the DuckDB attachment were decided
+ * against other files. They carry over (a withdrawn link never does) and replay reconciliation
+ * re-checks the link, since the reparsed row counts as changed.
+ */
+export function restoreStoredSessionLinks(db: DatabaseType, session: DetailedSession): void {
+  const stored = readStoredLinkState(db, session.id);
+  if (!stored) return;
+  if (!session.matchingReplayFile && stored.link && !isReplayLinkWithdrawn(db, session.id, stored.link.name)) session.matchingReplayFile = stored.link;
+  if (!session.duckdbFilename && stored.duckdbFilename) {
+    session.duckdbFilename = stored.duckdbFilename;
+    session.hasDuckDbTelemetry = true;
+  }
 }
 
 export function upsertSession(
@@ -76,6 +89,7 @@ export function upsertSession(
       updated_at = excluded.updated_at
   `);
 
+  const write = db.transaction(() => {
   stmt.run({
     id: session.id,
     filename: session.filename,
@@ -97,6 +111,9 @@ export function upsertSession(
     dataJson,
     updatedAt: now,
   });
+  persistSessionProjection(db, session);
+  });
+  write();
 }
 
 export function updateSessionMatchingReplay(
@@ -104,25 +121,63 @@ export function updateSessionMatchingReplay(
   sessionId: string,
   matchingReplayFile: NonNullable<SessionMetadata['matchingReplayFile']>
 ): { updated: boolean; session?: DetailedSession; metadata?: SessionMetadata } {
-  const metaRow = db.prepare('SELECT metadata_json FROM sessions WHERE id = ?').get(sessionId) as { metadata_json: string } | undefined;
-  if (!metaRow) return { updated: false };
   try {
-    const meta = JSON.parse(metaRow.metadata_json) as SessionMetadata;
-    // Enrichment re-asserts every match on each session list request: skip identical rewrites.
-    if (JSON.stringify(meta.matchingReplayFile) === JSON.stringify(matchingReplayFile)) {
+    const stored = readStoredLinkState(db, sessionId);
+    if (!stored) return { updated: false };
+    matchingReplayFile = withSessionTelemetry(matchingReplayFile, stored.duckdbFilename);
+    // Reconciliation re-asserts matches: skip identical rewrites.
+    if (stored.link && sameReplayLink(stored.link, matchingReplayFile)) {
       return { updated: false };
     }
-    const row = db.prepare('SELECT data_json FROM sessions WHERE id = ?').get(sessionId) as { data_json: string };
-    const data = JSON.parse(row.data_json) as DetailedSession;
-    meta.matchingReplayFile = matchingReplayFile;
+    const data = loadSession(db, sessionId);
+    if (!data) return { updated: false };
     data.matchingReplayFile = matchingReplayFile;
-    db.prepare('UPDATE sessions SET metadata_json = ?, data_json = ?, updated_at = ? WHERE id = ?')
-      .run(JSON.stringify(meta), JSON.stringify(data), Date.now(), sessionId);
-    return { updated: true, session: data, metadata: meta };
+    db.transaction(() => {
+      writeSessionJson(db, data, Date.now());
+      persistSessionProjection(db, data);
+    })();
+    const { drivers: _drivers, ...metadata } = data;
+    return { updated: true, session: data, metadata };
   } catch (err) {
     console.warn('[SessionDb] Failed to update session matching replay:', err);
     return { updated: false };
   }
+}
+
+type ReplayLink = NonNullable<SessionMetadata['matchingReplayFile']>;
+
+/** A replay link carries its session's DuckDB attachment, whichever of the two was decided first. */
+function withSessionTelemetry(link: ReplayLink, duckdbFilename: string | undefined): ReplayLink {
+  const { hasDuckDbTelemetry: _flag, duckdbFilename: _file, ...rest } = link;
+  return duckdbFilename ? { ...rest, hasDuckDbTelemetry: true, duckdbFilename } : rest;
+}
+
+/**
+ * Stores the session's main DuckDB file (TelemetryLinks.forSession) on its row, its replay link
+ * and its card, when ownership is decided. Reads then serve it without consulting the catalog.
+ * Returns whether anything changed.
+ */
+export function updateSessionTelemetryFile(db: DatabaseType, sessionId: string, duckdbFilename: string | undefined): boolean {
+  const state = db.prepare('SELECT normalized_version AS version, has_duckdb_telemetry AS flag, duckdb_filename AS file FROM sessions WHERE id = ?')
+    .get(sessionId) as { version: number; flag: number | null; file: string | null } | undefined;
+  if (!state) return false;
+  // Verified rows mirror the session's attachment onto the link, so the session columns decide.
+  if (state.version === NORMALIZED_SESSION_VERSION && (state.file ?? undefined) === duckdbFilename && Boolean(state.flag) === Boolean(duckdbFilename)) return false;
+  const session = loadSession(db, sessionId);
+  if (!session) return false;
+  const linkCurrent = !session.matchingReplayFile ||
+    sameReplayLink(session.matchingReplayFile, withSessionTelemetry(session.matchingReplayFile, duckdbFilename));
+  if (session.duckdbFilename === duckdbFilename && Boolean(session.hasDuckDbTelemetry) === Boolean(duckdbFilename) && linkCurrent) return false;
+  session.hasDuckDbTelemetry = Boolean(duckdbFilename);
+  if (duckdbFilename) session.duckdbFilename = duckdbFilename;
+  else delete session.duckdbFilename;
+  if (session.matchingReplayFile) session.matchingReplayFile = withSessionTelemetry(session.matchingReplayFile, duckdbFilename);
+  // updated_at stays: it marks changes the replay links must re-check, and this is not one.
+  db.transaction(() => {
+    writeSessionJson(db, session);
+    persistSessionProjection(db, session);
+  })();
+  return true;
 }
 
 export function getSessionsCount(db: DatabaseType): number {
@@ -131,5 +186,9 @@ export function getSessionsCount(db: DatabaseType): number {
 }
 
 export function clearSessionCache(db: DatabaseType): void {
-  db.exec("DELETE FROM sessions; DELETE FROM cache_metadata WHERE key NOT LIKE 'reference_%';");
+  db.transaction(() => {
+    db.exec('DELETE FROM session_driver_condition_summaries; DELETE FROM session_summary_facts;');
+    for (const table of [...SESSION_ROW_TABLES, ...SESSION_DICTIONARY_TABLES]) db.exec(`DELETE FROM ${table}`);
+    db.exec("DELETE FROM sessions; DELETE FROM cache_metadata WHERE key NOT LIKE 'reference_%' AND key != 'session_data_revision';");
+  })();
 }

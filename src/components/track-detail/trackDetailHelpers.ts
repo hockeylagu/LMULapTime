@@ -19,6 +19,8 @@ export interface SessionMeta {
     path: string;
   };
   playerDriver?: {
+    driverOrdinal?: number;
+    bestLapOrdinal?: number | null;
     name: string;
     carType: string;
     carClass: string;

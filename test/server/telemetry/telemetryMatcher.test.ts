@@ -398,7 +398,7 @@ describe('telemetryMatcher', () => {
       });
     });
 
-    it('takes the track, session, driver and recording time from inside the file, and remembers them', async () => {
+    it('reads recording metadata and reuses it through the version-checked catalog', async () => {
       fs.writeFileSync(path.join(dir, spaName), '');
       duckdb.metadata = { trackName: 'Circuit de Spa-Francorchamps', sessionType: 'Q', driverName: 'Test Driver', carName: 'Porsche 963', RecordingTime: '2026-09-13T19_30_00Z' };
       duckdb.laps = [{ lapTimeSec: 12 }, { lapTimeSec: 139.4 }, { lapTimeSec: 137.9 }];
@@ -411,8 +411,19 @@ describe('telemetryMatcher', () => {
         timestampEpochMs: Date.parse('2026-09-13T19:30:00Z'), lapsCount: 3, bestLapTime: 137.9,
       });
       expect(duckdb.opened[0].closed).toBe(true);
-      // A later folder scan keeps what the file said instead of re-reading the filename.
-      expect(scanDuckDbDirectory(dir)[0]).toMatchObject({ trackName: 'Circuit de Spa-Francorchamps', sessionType: 'Q', driverName: 'Test Driver' });
+      const cachedFiles = new Map([[enriched.filePath, enriched]]);
+      const [reused] = await enrichDuckDbDirectory(dir, { cachedFiles });
+      expect(reused).toBe(enriched);
+      expect(duckdb.opened).toHaveLength(1);
+
+      // Replacing a file must not leave the old metadata in a process-wide path cache,
+      // including when reading its replacement fails.
+      fs.writeFileSync(enriched.filePath, 'replacement');
+      duckdb.openError = new Error('database is locked');
+      vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const [replacement] = await enrichDuckDbDirectory(dir, { cachedFiles });
+      expect(replacement).toMatchObject({ trackName: 'Spa', sessionType: 'P', enrichmentError: 'database is locked' });
+      expect(replacement.driverName).toBeUndefined();
     });
 
     it('keeps the filename values and records the error when the file cannot be read', async () => {

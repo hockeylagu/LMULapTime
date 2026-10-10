@@ -6,7 +6,7 @@ import { SessionDatabase } from '../../../server/core/db.js';
 import { ServerContext } from '../../../server/core/serverContext.js';
 import { LmuParser } from '../../../server/sessions/parser.js';
 import { TelemetryCatalog } from '../../../server/telemetry/telemetryCatalog.js';
-import { ReplayCacheService } from '../../../server/replay/replayCacheService.js';
+import { ReplayRecordingService } from '../../../server/replay/replayRecordingService.js';
 import { FileIngestWorker } from '../../../server/core/ingest/fileIngestWorkerClient.js';
 import { parseReferenceCsv } from '../../../server/benchmarks/referenceLaptimes.js';
 import type { ReplayIngestJob } from '../../../shared/types/index.js';
@@ -24,10 +24,10 @@ describe('XML-first startup pipeline', () => {
     const iterator = db.syncSessionsIterator(dir, new LmuParser(undefined, undefined, { detectPlayer: false }));
     let step = iterator.next();
     while (!step.done && step.value.stage !== 'Published XML sessions') step = iterator.next();
-    expect(step.done).toBe(false); expect(db.getAllSessions()).toHaveLength(10);
+    expect(step.done).toBe(false); expect(Array.from(db.iterateDetailedSessions())).toHaveLength(10);
     expect(db.getMetadata('parser_version')).toBeNull();
     iterator.return(undefined as never);
-    expect(db.getAllSessions()).toHaveLength(10);
+    expect(Array.from(db.iterateDetailedSessions())).toHaveLength(10);
     expect(db.syncSessionsFromDir(dir, new LmuParser(undefined, undefined, { detectPlayer: false })).total).toBe(12);
   });
 
@@ -90,7 +90,11 @@ describe('XML-first startup pipeline', () => {
     const jobs: ReplayIngestJob[] = [];
     const run = async () => {
       const iterator = db.syncReplaysAsyncIterator(dir, { playerName: 'Player',
-        onMetadataReady: () => { expect(db.getReplaysCount()).toBe(2); expect(db.getCacheStats().replayTrajectoriesCount).toBe(0); return new Set(['associated.Vcr']); },
+        onMetadataReady: async () => {
+          expect(db.getReplaysCount()).toBe(2); expect(db.getCacheStats().replayTrajectoriesCount).toBe(0);
+          await new Promise<void>(resolve => setImmediate(resolve));
+          return new Set(['associated.Vcr']);
+        },
         onReplayState: job => jobs.push(job) });
       let step = await iterator.next(); while (!step.done) step = await iterator.next(); return step.value;
     };
@@ -107,10 +111,57 @@ describe('XML-first startup pipeline', () => {
 
   it('changes the data revision when session data changes and on a server restart', () => {
     const context = () => new ServerContext({ resultsDir: dir, replaysDir: dir, telemetryDir: dir, parser: new LmuParser(),
-      sessionDb: db, telemetryCatalog: new TelemetryCatalog(db), replayCache: new ReplayCacheService(db) });
+      sessionDb: db, telemetryCatalog: new TelemetryCatalog(db), replayRecordings: new ReplayRecordingService(db) });
     const first = context(); const old = first.getScanStatus().dataRevision;
-    db.invalidateSessionCache(); expect(first.getScanStatus().dataRevision).not.toBe(old);
+    db.markSessionDataChanged(); expect(first.getScanStatus().dataRevision).not.toBe(old);
     expect(context().getScanStatus().dataRevision).not.toBe(first.getScanStatus().dataRevision);
+  });
+
+  it('yields while reconciling stored replay links and keeps scan status incomplete', async () => {
+    const metadata = new Map<string, string>();
+    const sessionDb = {
+      getAllStoredReplayFiles: () => [],
+      getMetadata: (key: string) => metadata.get(key) ?? null,
+      setMetadata: (key: string, value: string) => { metadata.set(key, value); },
+      getReplayReconciliationCandidateIds: vi.fn(() => Array.from({ length: 25 }, (_, index) => `stored-${index}`)),
+      getSessionsByIds: (ids: string[]) => ids.map((id, index) => ({
+        id, filename: `${id}.xml`, filePath: '', timestamp: index,
+        trackVenue: '', trackCourse: '', trackLengthMeters: null, sessionType: 'Race', sessionName: 'R1', drivers: [],
+      } as unknown as import('../../../shared/types/index.js').DetailedSession)),
+    } as unknown as SessionDatabase;
+    const context = new ServerContext({ resultsDir: dir, replaysDir: dir, telemetryDir: dir, parser: new LmuParser(),
+      sessionDb, telemetryCatalog: new TelemetryCatalog(sessionDb), replayRecordings: new ReplayRecordingService(sessionDb) });
+    const reconciliation = context.reconcileSessionReplayLinks();
+    await new Promise<void>(resolve => setImmediate(() => {
+      expect(context.getScanStatus().allComplete).toBe(false);
+      resolve();
+    }));
+    await reconciliation;
+    expect(context.getScanStatus().allComplete).toBe(true);
+    // The next run only looks at what changed since this one.
+    await context.reconcileSessionReplayLinks();
+    const calls = vi.mocked(sessionDb.getReplayReconciliationCandidateIds).mock.calls;
+    expect(calls[0][0]).toBe(0);
+    expect(calls[1][0]).toBeGreaterThan(0);
+  });
+
+  it('runs a replay sync asked for during link reconciliation once it ends', async () => {
+    const sessionDb = {
+      getAllStoredReplayFiles: () => [],
+      getMetadata: () => null,
+      setMetadata: () => undefined,
+      getReplayReconciliationCandidateIds: () => [],
+      getSessionsByIds: () => [],
+      syncReplaysAsyncIterator: vi.fn(async function* () { return { total: 0, added: 0, updated: 0, skipped: 0 }; }),
+    } as unknown as SessionDatabase;
+    const context = new ServerContext({ resultsDir: dir, replaysDir: dir, telemetryDir: dir, parser: new LmuParser(),
+      sessionDb, telemetryCatalog: new TelemetryCatalog(sessionDb), replayRecordings: new ReplayRecordingService(sessionDb) });
+    const reconciliation = context.reconcileSessionReplayLinks();
+
+    expect(context.runReplaySyncInBackground()).toBe(false);
+    expect(sessionDb.syncReplaysAsyncIterator).not.toHaveBeenCalled();
+    await reconciliation;
+    expect(sessionDb.syncReplaysAsyncIterator).toHaveBeenCalledTimes(1);
   });
 
   it('only counts new or unparsed replays in progress total instead of all on disk', async () => {

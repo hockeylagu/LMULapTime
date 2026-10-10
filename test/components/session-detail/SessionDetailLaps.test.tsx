@@ -173,7 +173,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
 
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/api/session/2026_05_28_R1')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(raceSession) });
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({...raceSession,historyContext:{personalBests:[],relatedSessions:[{type:"qualifying",target:qualiSummary}]}}) });
       }
       if (url.includes('/api/sessions')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve([qualiSummary, raceSession]) });
@@ -202,7 +202,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
 
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/api/session/2026_05_28_Q1')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(qualiSession) });
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({...qualiSession,historyContext:{personalBests:[],relatedSessions:[{type:"race",target:raceSession}]}}) });
       }
       if (url.includes('/api/sessions')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve([qualiSession, raceSession]) });
@@ -753,9 +753,9 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     // Click replay for Lap 2
     fireEvent.click(replayButtons[1]);
 
-    expect(window.location.hash).toContain('lap=2');
-
-    expect(window.location.hash).toContain('replayName=spa_replay.vcr');
+    expect(window.location.hash).toContain('sessionId=sess123');
+    expect(window.location.hash).toContain('driverOrdinal=0');
+    expect(window.location.hash).toContain('lapOrdinal=1');
   });
 
   it('does not open replay UI from legacy session URL parameters', async () => {
@@ -840,7 +840,8 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     // 2. Click the best lap time in the summary (best lap is Lap 2 with time 122.0)
     fireEvent.click(screen.getByTitle('Open telemetry for Lap 2'));
 
-    expect(window.location.hash).toContain('lap=2');
-    expect(window.location.hash).toContain('replayName=spa_replay.vcr');
+    expect(window.location.hash).toContain('sessionId=sess123');
+    expect(window.location.hash).toContain('driverOrdinal=0');
+    expect(window.location.hash).toContain('lapOrdinal=1');
   });
 });

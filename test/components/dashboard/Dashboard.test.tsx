@@ -787,6 +787,8 @@ describe('Dashboard component', () => {
           bestLapTime: 121.5,
           bestLapTimeString: '2:01.500',
           bestLapNum: 3,
+          driverOrdinal: 0,
+          bestLapOrdinal: 2,
           bestS1: 34.0,
           bestS2: 41.5,
           bestS3: 46.0,
@@ -818,8 +820,8 @@ describe('Dashboard component', () => {
     fireEvent.click(replayBtn);
 
     expect(window.location.hash).toContain('/telemetry?');
-    expect(window.location.hash).toContain('replayName=spa_hero.vcr');
-    expect(window.location.hash).toContain('lap=3');
+    expect(window.location.hash).toContain('sessionId=sess-hero-replay');
+    expect(window.location.hash).toContain('driverOrdinal=0');
+    expect(window.location.hash).toContain('lapOrdinal=2');
   });
 });
-

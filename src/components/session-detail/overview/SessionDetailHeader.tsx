@@ -8,7 +8,7 @@ import { SessionRulesModal } from '../standings/SessionRulesModal.js';
 import { getSessionTypeStyle } from '../../common/sessionTypeStyles.js';
 import { ReplayLaunchButton } from '../../common/replay/ReplayLaunchButton.js';
 import { BenchmarkLadder } from '../../common/BenchmarkLadder.js';
-import { WeekendSessionLink, WeekendSessionType } from '../sessionDetailHelpers.js';
+import { WeekendSessionLink, WeekendSessionType, sessionLapComparePath } from '../sessionDetailHelpers.js';
 import { TrackCircuitLayout } from '../../track-detail/TrackCircuitLayout.js';
 import { SessionConditions, hasSessionConditions } from './SessionConditions.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
@@ -56,8 +56,8 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
     navigate(telemetryPath(targetLap));
   };
   const telemetryPath = (targetLap?: number): string => sessionTelemetryPath(
-    searchParams, session.matchingReplayFile?.name || '', selectedDriver?.name, targetLap || selectedDriver?.bestLapNum || 1
-  );
+    searchParams, session, selectedDriver, targetLap || selectedDriver?.bestLapNum || 1
+  ) ?? sessionLapComparePath(session, selectedDriver, targetLap || selectedDriver?.bestLapNum || 1);
 
   const [showRulesModal, setShowRulesModal] = React.useState(false);
   const settings = session.settings;

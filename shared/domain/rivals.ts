@@ -16,7 +16,7 @@ export const RIVAL_MIN_STEP = 0.1;
 export const RIVAL_MAX_STEP = 0.6;
 export const GHOST_STEP = 0.2;
 /** A lap without a replay counts as this much further from the ideal step. */
-const NO_REPLAY_PENALTY = 0.1;
+const NO_TELEMETRY_PENALTY = 0.1;
 
 /** The driver to chase next, or null when nobody ahead is within the window. */
 export function pickRivalEntry(board: Leaderboard, exclude: ReadonlySet<string> = new Set()): LeaderboardEntry | null {
@@ -29,7 +29,7 @@ export function pickRivalEntry(board: Leaderboard, exclude: ReadonlySet<string> 
     if (entry.isPlayer || exclude.has(entry.driverName)) continue;
     const step = best - entry.bestLap.lapTime;
     if (step < RIVAL_MIN_STEP || step > RIVAL_MAX_STEP) continue;
-    const score = Math.abs(step - RIVAL_TARGET_STEP) + (entry.bestLap.replayName ? 0 : NO_REPLAY_PENALTY);
+    const score = Math.abs(step - RIVAL_TARGET_STEP) + (entry.bestLap.telemetryAvailable ? 0 : NO_TELEMETRY_PENALTY);
     if (score < pickScore) {
       pick = entry;
       pickScore = score;

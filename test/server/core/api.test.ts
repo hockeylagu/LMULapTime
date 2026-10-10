@@ -40,9 +40,7 @@ describe('Server API wiring', () => {
     ['session', '/api/compare/laps?track=Spa'],
     ['reference', '/api/reference-laptimes'],
     ['leaderboard', '/api/leaderboard/layouts'],
-    ['replay', '/api/replays'],
     ['replay', '/api/replays/cache'],
-    ['replay', '/api/telemetry'],
     ['ai', '/api/ai/reports'],
   ])('mounts the %s router: GET %s answers 200', async (_router, url) => {
     const res = await request(app).get(url);
@@ -65,9 +63,8 @@ describe('Server API wiring', () => {
     expect(missing.status).toBe(404);
     expect(missing.body).toEqual({ error: 'Session not found' });
 
-    const unsafe = await request(app).get('/api/replays/%2E%2E%2Fsecret.vcr/metadata');
-    expect(unsafe.status).toBe(400);
-    expect(unsafe.body).toHaveProperty('error');
+    const removedReplayUrl = await request(app).get('/api/replays/%2E%2E%2Fsecret.vcr/metadata');
+    expect(removedReplayUrl.status).toBe(404);
   });
 
   it('reads the fixture sessions from the results folder at start-up', async () => {
@@ -92,7 +89,7 @@ describe('Server API wiring', () => {
     await request(app).post('/api/scan').send(fixtureFolders);
   });
 
-  it('caches replay metadata and trajectory in SQLite after a scan and reuses it on request', async () => {
+  it('keeps replay cache maintenance available without exposing replay-name telemetry URLs', async () => {
     const tempReplaysDir = path.join(process.cwd(), 'test', 'fixtures', 'replays_api_temp');
     fs.mkdirSync(tempReplaysDir, { recursive: true });
     fs.writeFileSync(
@@ -135,15 +132,10 @@ describe('Server API wiring', () => {
       expect(cached.driversCount).toBe(1);
 
       const metadataRes = await request(app).get('/api/replays/Api_Cache_Test_P1.Vcr/metadata');
-      expect(metadataRes.status).toBe(200);
-      expect(metadataRes.body.drivers?.[0]?.name).toBe('Api Test Driver');
-
+      expect(metadataRes.status).toBe(404);
       const trajectoryRes = await request(app)
         .get('/api/replays/Api_Cache_Test_P1.Vcr/trajectory?driverSlot=1&source=vcr&maxPoints=10');
-      expect(trajectoryRes.status).toBe(200);
-      expect(trajectoryRes.body.source).toBe('vcr');
-      expect(Array.isArray(trajectoryRes.body.points)).toBe(true);
-      expect(trajectoryRes.body.points.length).toBeGreaterThan(0);
+      expect(trajectoryRes.status).toBe(404);
     } finally {
       // Restore the default fixtures replays dir so later test runs aren't affected
       await request(app)

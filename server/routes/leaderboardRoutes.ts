@@ -1,13 +1,13 @@
 import { Response, Router } from 'express';
-import { buildLeaderboard, LeaderboardQuery, listLeaderboardLayouts, playerSessionBests } from '../../shared/domain/leaderboard.js';
+import { LeaderboardQuery } from '../../shared/domain/leaderboard.js';
 import { describeRival, pinnedTarget, resolveRival } from '../../shared/domain/rivals.js';
-import type { Leaderboard, LeaderboardLayout, RivalStatus } from '../../shared/types/leaderboard.js';
+import type { Leaderboard, RivalStatus } from '../../shared/types/leaderboard.js';
 import { loadReferenceLaptimesFromCache } from '../benchmarks/referenceLaptimes.js';
 import type { RivalScope } from '../core/dbRivalStore.js';
 import { ServerContext } from '../core/serverContext.js';
-import { DetailedSession } from '../core/types.js';
-import { getTrackOutlinePath } from '../tracks/trackOutline.js';
+import { queryCompactLeaderboard, queryCompactLeaderboardLayouts, queryCompactPlayerSessionBests } from '../core/sessionSummaries/leaderboardQueries.js';
 import { queryString } from './queryParams.js';
+import { requireSessionSummaries } from './summaryReadiness.js';
 
 /** The board a request names, from the query (GET) or the JSON body (POST); null when incomplete. */
 function readBoardQuery(source: Record<string, unknown>): LeaderboardQuery | null {
@@ -20,11 +20,9 @@ function readBoardQuery(source: Record<string, unknown>): LeaderboardQuery | nul
 /** /api/leaderboard/* and /api/rivals/*: where the player stands among the real drivers met on each layout. */
 export function createLeaderboardRouter(context: ServerContext): Router {
   const router = Router();
-  // loadSessions returns the same array until the sessions change: the ribbon is built once per list.
-  let layoutsFor: { sessions: DetailedSession[]; layouts: LeaderboardLayout[] } | null = null;
-
+  router.use(['/leaderboard', '/rivals'], requireSessionSummaries(context));
   const boardFor = (query: LeaderboardQuery): Leaderboard =>
-    buildLeaderboard(context.loadSessions(), query, loadReferenceLaptimesFromCache()?.entries ?? []);
+    queryCompactLeaderboard(context.sessionDb.getDb(), query, loadReferenceLaptimesFromCache()?.entries ?? []);
 
   const scopeOf = (board: Leaderboard, query: LeaderboardQuery): RivalScope => ({
     layoutKey: board.layoutKey,
@@ -39,7 +37,7 @@ export function createLeaderboardRouter(context: ServerContext): Router {
     const db = context.sessionDb;
     const resolution = resolveRival(board, db.getActiveRival(scope), Date.now());
     if (resolution.beaten || resolution.retimed || resolution.created) db.applyRivalResolution(scope, resolution);
-    return describeRival(board, db.getActiveRival(scope), db.getBeatenRivals(scope), playerSessionBests(context.loadSessions(), query));
+    return describeRival(board, db.getActiveRival(scope), db.getBeatenRivals(scope), queryCompactPlayerSessionBests(db.getDb(), query));
   };
 
   const withBoardQuery = (source: Record<string, unknown>, res: Response) => {
@@ -49,15 +47,7 @@ export function createLeaderboardRouter(context: ServerContext): Router {
   };
 
   router.get('/leaderboard/layouts', (_req, res) => {
-    const sessions = context.loadSessions();
-    if (layoutsFor?.sessions !== sessions) {
-      const layouts = listLeaderboardLayouts(sessions).map((layout) => ({
-        ...layout,
-        outlinePath: getTrackOutlinePath(layout.layoutKey),
-      }));
-      layoutsFor = { sessions, layouts };
-    }
-    res.json(layoutsFor.layouts);
+    res.json(queryCompactLeaderboardLayouts(context.sessionDb.getDb()));
   });
 
   router.get('/leaderboard', (req, res) => {

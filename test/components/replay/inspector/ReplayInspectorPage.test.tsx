@@ -4,88 +4,78 @@ import type { ReactNode } from 'react';
 import { ReplayInspectorPage } from '../../../../src/components/replay/ReplayInspectorPage.js';
 
 interface MockInspectorProps {
-  replayName: string;
-  initialLapNumber?: number;
-  initialDriverName: string | null;
+  sessionId: string;
+  initialDriverOrdinal?: number;
+  initialLapOrdinal?: number;
   initialCompareMode: boolean;
-  initialBaselineReplayName: string | null;
-  initialBaselineLapNumber?: number;
-  initialBaselineDriverName: string | null;
+  initialBaselineSessionId: string | null;
+  initialBaselineDriverOrdinal?: number;
+  initialBaselineLapOrdinal?: number | null;
   initialCornerNumber?: number;
   onClose: () => void;
-  onLapChange: (lapNumber: number) => void;
+  onLocatorChange: (driverOrdinal: number, lapOrdinal: number) => void;
 }
 
 vi.mock('../../../../src/components/replay/inspector/ReplayInspectorContent.js', () => ({
   ReplayInspectorContent: (props: MockInspectorProps): ReactNode => (
     <div data-testid="mock-inspector">
-      <span>{props.replayName}</span>
-      <span data-testid="initial-lap">{props.initialLapNumber ?? 'none'}</span>
-      <span data-testid="driver-name">{props.initialDriverName ?? 'none'}</span>
+      <span data-testid="session-id">{props.sessionId}</span>
+      <span data-testid="driver-ordinal">{props.initialDriverOrdinal}</span>
+      <span data-testid="lap-ordinal">{props.initialLapOrdinal}</span>
       <span data-testid="compare-mode">{String(props.initialCompareMode)}</span>
-      <span data-testid="baseline-replay">{props.initialBaselineReplayName ?? 'none'}</span>
-      <span data-testid="baseline-lap">{props.initialBaselineLapNumber ?? 'none'}</span>
-      <span data-testid="baseline-driver">{props.initialBaselineDriverName ?? 'none'}</span>
-      <span data-testid="initial-corner">{props.initialCornerNumber ?? 'none'}</span>
-      <button type="button" onClick={() => props.onLapChange(8)}>Change lap</button>
+      <span data-testid="baseline-session">{props.initialBaselineSessionId ?? 'none'}</span>
+      <span data-testid="baseline-driver">{props.initialBaselineDriverOrdinal}</span>
+      <span data-testid="baseline-lap">{props.initialBaselineLapOrdinal ?? 'none'}</span>
+      <span data-testid="corner">{props.initialCornerNumber ?? 'none'}</span>
+      <button type="button" onClick={() => props.onLocatorChange(2, 8)}>Change locator</button>
       <button type="button" onClick={props.onClose}>Close</button>
     </div>
   ),
 }));
 
 describe('ReplayInspectorPage', () => {
-  beforeEach(() => {
-    window.location.hash = '#/replay';
-  });
+  beforeEach(() => { window.location.hash = '#/replay'; });
 
-  it('redirects to the dashboard when no replay is selected', async () => {
+  it('redirects to the dashboard when no session is selected', async () => {
     render(<ReplayInspectorPage />);
-
     await waitFor(() => expect(window.location.hash).toContain('/dashboard'));
     expect(screen.queryByTestId('mock-inspector')).not.toBeInTheDocument();
   });
 
-  it('forwards replay query parameters and updates the lap query', async () => {
-    window.location.hash = '#/replay?replayName=Spa_R1.vcr&lap=5&driverName=Samuel%20Lague&baselineReplay=Spa_Q1.vcr&compareLapNum=3&compareDriver=Rival';
+  it('forwards session locators and updates only the locator query fields', async () => {
+    window.location.hash = '#/replay?sessionId=session%2F1&driverOrdinal=1&lapOrdinal=4&corner=5&keep=here';
     render(<ReplayInspectorPage />);
 
-    expect(screen.getByTestId('mock-inspector')).toBeInTheDocument();
-    expect(screen.getByText('Spa_R1.vcr')).toBeInTheDocument();
-    expect(screen.getByTestId('initial-lap')).toHaveTextContent('5');
-    expect(screen.getByTestId('driver-name')).toHaveTextContent('Samuel Lague');
-    expect(screen.getByTestId('compare-mode')).toHaveTextContent('true');
-    expect(screen.getByTestId('baseline-replay')).toHaveTextContent('Spa_Q1.vcr');
-    expect(screen.getByTestId('baseline-lap')).toHaveTextContent('3');
-    expect(screen.getByTestId('baseline-driver')).toHaveTextContent('Rival');
+    expect(screen.getByTestId('session-id')).toHaveTextContent('session/1');
+    expect(screen.getByTestId('driver-ordinal')).toHaveTextContent('1');
+    expect(screen.getByTestId('lap-ordinal')).toHaveTextContent('4');
+    expect(screen.getByTestId('corner')).toHaveTextContent('5');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Change lap' }));
-    await waitFor(() => expect(window.location.hash).toContain('lap=8'));
+    fireEvent.click(screen.getByRole('button', { name: 'Change locator' }));
+    await waitFor(() => {
+      const params = new URLSearchParams(window.location.hash.split('?')[1]);
+      expect(params.get('driverOrdinal')).toBe('2');
+      expect(params.get('lapOrdinal')).toBe('8');
+      expect(params.get('sessionId')).toBe('session/1');
+      expect(params.get('keep')).toBe('here');
+    });
+  });
+
+  it('forwards baseline session locators and the linked corner', () => {
+    window.location.hash = '#/telemetry?sessionId=primary&driverOrdinal=0&lapOrdinal=3&baselineSessionId=baseline&baselineDriverOrdinal=2&baselineLapOrdinal=5&corner=7';
+    render(<ReplayInspectorPage />);
+
+    expect(screen.getByTestId('compare-mode')).toHaveTextContent('true');
+    expect(screen.getByTestId('baseline-session')).toHaveTextContent('baseline');
+    expect(screen.getByTestId('baseline-driver')).toHaveTextContent('2');
+    expect(screen.getByTestId('baseline-lap')).toHaveTextContent('5');
+    expect(screen.getByTestId('corner')).toHaveTextContent('7');
   });
 
   it('navigates back when the inspector closes', async () => {
-    window.location.hash = '#/replay?replayName=Spa_R1.vcr';
+    window.location.hash = '#/replay?sessionId=session-1';
     render(<ReplayInspectorPage />);
-
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(window.location.hash).toContain('/'));
-  });
-
-  it('forwards compare lap and baseline replay when present in URL parameters', () => {
-    window.location.hash = '#/telemetry?replayName=Daytona+International+Speedway+Road+Course+R1+8.Vcr&lap=11&baselineReplay=Daytona+International+Speedway+Road+Course+Q1+8.Vcr&compareSessionId=2026_08_27_13_39_52-32Q1&compareDriver=Samuel+Lague&compareLapNum=5';
-    render(<ReplayInspectorPage />);
-
-    expect(screen.getByTestId('mock-inspector')).toBeInTheDocument();
-    expect(screen.getByTestId('initial-lap')).toHaveTextContent('11');
-    expect(screen.getByTestId('compare-mode')).toHaveTextContent('true');
-    expect(screen.getByTestId('baseline-replay')).toHaveTextContent('Daytona International Speedway Road Course Q1 8.Vcr');
-    expect(screen.getByTestId('baseline-lap')).toHaveTextContent('5');
-    expect(screen.getByTestId('baseline-driver')).toHaveTextContent('Samuel Lague');
-  });
-
-  it('forwards the corner the session debrief links to', () => {
-    window.location.hash = '#/telemetry?replayName=Daytona_R1.Vcr&lap=20&baselineReplay=Daytona_Q1.Vcr&compareLapNum=3&compareDriver=Davide+Catani&corner=5';
-    render(<ReplayInspectorPage />);
-
-    expect(screen.getByTestId('initial-corner')).toHaveTextContent('5');
   });
 });

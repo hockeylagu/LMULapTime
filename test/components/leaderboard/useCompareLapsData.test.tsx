@@ -108,6 +108,26 @@ describe('useCompareLapsData selection fallbacks', () => {
     });
   });
 
+  it('fetches an exact session/driver/lap deep link with one-row pagination even without a lap number', async () => {
+    const urls: string[] = [];
+    vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
+      urls.push(String(input));
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({
+        laps, allTimeBestLap: null, playerBestLap: null, overallTrackBestLap: null,
+        bestS1: 28, bestS2: 33, bestS3: 37, theoreticalBestSec: 98, benchmarks: [],
+      }) });
+    }));
+    const { result } = renderHook(
+      () => useCompareLapsData({ sessions: [{ id: 'session-1', trackVenue: 'Spa', trackCourse: 'GP' }] }),
+      { wrapper }
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    act(() => navigateTo('/compare?sessionId=session-1&driverOrdinal=0&lapOrdinal=1'));
+    await waitFor(() => expect(urls.some(url => url.includes('driverOrdinal=0') && url.includes('lapOrdinal=1') && url.includes('pageSize=1'))).toBe(true));
+    expect(urls.some(url => url.includes('sessionId=session-1') && url.includes('driverOrdinal=0') && url.includes('lapOrdinal=1') && !url.includes('lapNum='))).toBe(true);
+    vi.unstubAllGlobals();
+  });
+
   it("drops the previous track's laps and reports the error when the next track fails to load", async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     vi.stubGlobal('fetch', vi.fn((url: string) => Promise.resolve(url.includes('track=Monza')

@@ -5,18 +5,26 @@ import type { ReplayIngestJob } from './types.js';
 import path from 'path';
 import { LmuParser } from '../sessions/parser.js';
 import type { ReplayFileEntry } from '../sessions/sessionXmlTypes.js';
-import { replayIndexEntryFromStored } from '../sessions/replayMatching.js';
+
 import { SessionReplayLinks } from '../sessions/sessionReplayLinks.js';
 import { DetailedSession, ReferenceBenchmarkDiff, ReferenceLaptimeRefreshStatus, ReplayScanStatus, ScanStatus, SessionScanStatus, TelemetryScanStatus } from './types.js';
 
 import { SessionDatabase } from './db.js';
-import { decideTelemetryLinks, TELEMETRY_LINK_RULE, TelemetryLinks } from '../telemetry/telemetryLinks.js';
+import {
+  decideTelemetryLinks, TELEMETRY_LINK_RULE, TelemetryLinks, telemetryCandidateWindow, telemetryFileChunks, type TelemetryLinkInput,
+} from '../telemetry/telemetryLinks.js';
+import type { TelemetryLink } from './dbTelemetryStore.js';
 import { TelemetryCatalog } from '../telemetry/telemetryCatalog.js';
-import { ReplayCacheService } from '../replay/replayCacheService.js';
+import { ReplayRecordingService } from '../replay/replayRecordingService.js';
 import { ReplayUpgradeRunner } from '../replay/replayUpgradeRunner.js';
 import { pumpScanInBackground, startedScanStatus } from './backgroundScan.js';
-import { loadReferenceLaptimesFromCache, replaceCachedLastUpdateDiff } from '../benchmarks/referenceLaptimes.js';
-import { BENCHMARK_IMPACT_RULE, enrichBenchmarkDiffWithImpact } from '../benchmarks/benchmarkImpact.js';
+import { replaceCachedLastUpdateDiff } from '../benchmarks/referenceLaptimes.js';
+import { BENCHMARK_IMPACT_RULE, enrichBenchmarkDiffWithCompactImpact } from '../benchmarks/benchmarkImpact.js';
+
+/** When the replay links were last reconciled (cache_metadata): later changes are the next candidates. */
+const REPLAY_LINKS_RECONCILED_AT = 'replay_links_reconciled_at';
+
+const yieldToEventLoop = () => new Promise<void>(resolve => setImmediate(resolve));
 
 export interface ServerContextOptions {
   resultsDir: string;
@@ -25,7 +33,7 @@ export interface ServerContextOptions {
   parser: LmuParser;
   sessionDb: SessionDatabase;
   telemetryCatalog: TelemetryCatalog;
-  replayCache: ReplayCacheService;
+  replayRecordings: ReplayRecordingService;
 }
 
 export class ServerContext {
@@ -36,13 +44,20 @@ export class ServerContext {
   private readonly replayJobs = new Map<string, ReplayIngestJob>();
   private pendingSessionRefresh = false;
   private pendingForcedSessionReparse = false;
+  private pendingPostSessionDiscovery = false;
+  // A replay sync asked for while the replay links were being reconciled.
+  private pendingReplaySync = false;
+  private sessionReplayReconciliationRunning = false;
+  private telemetryOwnershipReconciliationRunning = false;
+  private sessionReplayReconciliation: Promise<void> | null = null;
+  private telemetryOwnershipReconciliation: Promise<void> | null = null;
+  private projectionBackfillStarted = false;
+  private normalizedBackfillStarted = false;
+  private sessionProjectionBackfill = { running: false, processed: 0, total: 0, failed: 0, currentSessionId: null as string | null, startedAt: null as string | null, finishedAt: null as string | null, error: null as string | null };
   // A manual refresh asked the next replay sync to try again the replays that failed MAX_DECODE_ATTEMPTS times.
   private retryFailedReplays = false;
   private readonly instanceId = randomUUID();
-  // What the cached session list was last enriched against (see loadSessions).
-  private enrichedInputs: unknown[] | null = null;
-  // The parser and replay_metadata revision the replay index was last loaded for.
-  private replayIndexLoadedFor: [LmuParser, number] | null = null;
+
   private replayUpgradeRunner: ReplayUpgradeRunner | null = null;
   private readonly replayLinks: SessionReplayLinks;
   private replayScanStatus: ReplayScanStatus = {
@@ -83,12 +98,12 @@ export class ServerContext {
     this.currentTelemetryDir = options.telemetryDir;
     this.parser = options.parser;
     this.replayLinks = new SessionReplayLinks(options.sessionDb);
-    this.populateReplayIndexFromDb();
+    this.configureReplayLookup();
   }
 
   public get sessionDb(): SessionDatabase { return this.options.sessionDb; }
   public get telemetryCatalog(): TelemetryCatalog { return this.options.telemetryCatalog; }
-  public get replayCache(): ReplayCacheService { return this.options.replayCache; }
+  public get replayRecordings(): ReplayRecordingService { return this.options.replayRecordings; }
   public get resultsDir(): string { return this.currentResultsDir; }
   public get replaysDir(): string { return this.currentReplaysDir; }
   public get telemetryDir(): string { return this.currentTelemetryDir; }
@@ -130,7 +145,7 @@ export class ServerContext {
     if (typeof values.playerName === 'string' && values.playerName.trim()) {
       this.parser.configuredPlayerName = values.playerName.trim();
     }
-    this.populateReplayIndexFromDb();
+    this.configureReplayLookup();
     return true;
   }
 
@@ -138,115 +153,191 @@ export class ServerContext {
     const telemetryRunning = typeof this.telemetryCatalog?.getScanStatus === 'function'
       ? this.telemetryCatalog.getScanStatus().running
       : false;
-    return this.sessionScanStatus.running || this.replayScanStatus.running || telemetryRunning;
+    return this.sessionScanStatus.running || this.replayScanStatus.running || telemetryRunning ||
+      this.sessionReplayReconciliationRunning || this.telemetryOwnershipReconciliationRunning;
   }
 
-  public populateReplayIndexFromDb(): void {
-    // Reading the stored replays decompresses every one's metadata (~20 ms for 325 replays), and
-    // every session list, metadata and trajectory request asks: reload only when rows changed.
-    const revision = typeof this.sessionDb.getReplayMetadataRevision === 'function' ? this.sessionDb.getReplayMetadataRevision() : NaN;
-    if (this.replayIndexLoadedFor?.[0] === this.parser && this.replayIndexLoadedFor[1] === revision) return;
-    try {
-      const stored = this.sessionDb.getAllStoredReplayFiles();
-      for (const r of stored) this.parser.addReplayEntry(replayIndexEntryFromStored(r));
-      this.replayIndexLoadedFor = [this.parser, revision];
-    } catch (err) {
-      console.warn('[ServerContext] Error populating replay index from DB:', err);
+  private configureReplayLookup(): void {
+    if (typeof this.sessionDb.getReplayMatchingEntries === 'function') {
+      this.parser.setReplayLookup(target => this.sessionDb.getReplayMatchingEntries(target));
     }
   }
 
+  public get serverInstanceId(): string { return this.instanceId; }
+
+  private replayByName() {
+    return { get: (name: string) => typeof this.sessionDb.getReplayMatchingEntry === 'function'
+      ? this.sessionDb.getReplayMatchingEntry(name) : this.parser.getReplaysList().find(replay => replay.name === name) };
+  }
+
+  /**
+   * Links the replays and decides the DuckDB owners of `sessions`, then stores each one's main
+   * file on its row (applySessionTelemetry), so reads never consult the telemetry catalog.
+   */
   public enrichSessionsWithTelemetry(sessions: DetailedSession[]): void {
     try {
-      this.populateReplayIndexFromDb();
-      const replaysByName = new Map(this.parser.getReplaysList().map(r => [r.name, r] as const));
-      this.replayLinks.linkSessions(sessions, this.parser, replaysByName);
-
-      this.storeNewTelemetryLinks(sessions, [...replaysByName.values()]);
-      const links = TelemetryLinks.load(this.sessionDb);
-      for (const session of sessions) {
-        const filename = links.forSession(session);
-        session.hasDuckDbTelemetry = Boolean(filename);
-        if (filename) session.duckdbFilename = filename;
-        else delete session.duckdbFilename;
-        const replayLink = session.matchingReplayFile;
-        if (!replayLink) continue;
-        const changed = Boolean(replayLink.hasDuckDbTelemetry) !== Boolean(filename) || replayLink.duckdbFilename !== filename;
-        replayLink.hasDuckDbTelemetry = Boolean(filename);
-        if (filename) replayLink.duckdbFilename = filename;
-        else delete replayLink.duckdbFilename;
-        if (changed) this.sessionDb.updateSessionMatchingReplay(session.id, replayLink);
-      }
+      this.configureReplayLookup();
+      this.replayLinks.linkSessions(sessions, this.parser, this.replayByName());
+      this.resetTelemetryLinksIfRuleChanged();
+      const catalog = { files: this.sessionDb.getTelemetryFiles(), stored: this.sessionDb.getTelemetryMetadata() };
+      this.storeNewTelemetryLinks(sessions, this.sessionDb.getReplayMatchingEntries?.() ?? this.parser.getReplaysList(), catalog);
+      for (const session of sessions) this.applySessionTelemetry(session);
     } catch (error) {
       console.warn('[Telemetry Matcher] Error enriching sessions with DuckDB telemetry:', error);
     }
   }
 
-  /**
-   * Decides the DuckDB matches of files, sessions and replays that have none yet and stores them.
-   * Matches are decided once: a stored match is only read afterwards.
-   */
-  private storeNewTelemetryLinks(sessions: DetailedSession[], replays: ReplayFileEntry[]): void {
+  /** Sets the session's main DuckDB file from the stored ownership, and stores it when it changed. */
+  private applySessionTelemetry(session: DetailedSession): void {
+    const filename = TelemetryLinks.load(this.sessionDb, session.id).forSession(session);
+    session.hasDuckDbTelemetry = Boolean(filename);
+    if (filename) session.duckdbFilename = filename;
+    else delete session.duckdbFilename;
+    const replayLink = session.matchingReplayFile;
+    if (replayLink) {
+      replayLink.hasDuckDbTelemetry = Boolean(filename);
+      if (filename) replayLink.duckdbFilename = filename;
+      else delete replayLink.duckdbFilename;
+    }
+    if (typeof this.sessionDb.updateSessionTelemetryFile === 'function') this.sessionDb.updateSessionTelemetryFile(session.id, filename);
+  }
+
+  private resetTelemetryLinksIfRuleChanged(): void {
     if (this.sessionDb.resetTelemetryLinksForRule(TELEMETRY_LINK_RULE)) {
       console.log('[Telemetry Matcher] Stored telemetry matches cleared to be decided again: each file goes to the session it was recorded in');
     }
-    this.sessionDb.linkTelemetryFiles(decideTelemetryLinks({
+  }
+
+  /**
+   * Decides the DuckDB matches of `catalog.files` that have none yet and stores them. Matches are
+   * decided once: a stored match is only read afterwards. `catalog.stored` is updated in place so
+   * later decisions in the same run see the ownership just committed.
+   */
+  private storeNewTelemetryLinks(sessions: DetailedSession[], replays: ReplayFileEntry[],
+    catalog: Pick<TelemetryLinkInput, 'files' | 'stored'>, replayOwnerByName?: ReadonlyMap<string, string>): TelemetryLink[] {
+    const links = decideTelemetryLinks({
       sessionEndMs: session => this.replayLinks.xmlMtime(session),
-      files: this.sessionDb.getTelemetryFiles(),
-      stored: this.sessionDb.getTelemetryMetadata(),
+      ...catalog,
       sessions,
       replays,
+      replayOwnerByName,
       loadReplayMetadata: replayName => this.sessionDb.getStoredReplayMetadata(replayName),
-    }));
-  }
-
-  public loadSessions(forceRefresh = false, forceReparse = false): DetailedSession[] {
-    if (forceRefresh) {
-      const started = this.runSessionSyncInBackground(forceReparse);
-      if (!started) {
-        this.pendingSessionRefresh = true;
-        this.pendingForcedSessionReparse ||= forceReparse;
-      }
-      // Associated replay and DuckDB discovery starts only after XML has been published.
+    });
+    this.sessionDb.linkTelemetryFiles(links);
+    const storedByName = new Map(catalog.stored.map(row => [row.filename, row] as const));
+    for (const link of links) {
+      const row = storedByName.get(link.filename);
+      if (row) { row.matchedSessionId = link.sessionId; row.matchedReplayFilename = link.replayName; }
     }
-    const sessions = this.sessionDb.getAllSessions();
-    // getAllSessions returns the same cached objects until sessions change, and enrichment writes
-    // its results into them: it only needs to run again when one of its inputs changed. It cost
-    // ~340 ms, paid by every session list, metadata and trajectory request.
-    this.populateReplayIndexFromDb();
-    const inputs = this.enrichmentInputs(sessions);
-    if (this.enrichedInputs && inputs.every((input, i) => input === this.enrichedInputs?.[i])) return sessions;
-    this.enrichSessionsWithTelemetry(sessions);
-    // Enrichment itself records the matches it finds; key on the state it leaves behind.
-    this.enrichedInputs = this.enrichmentInputs(sessions);
-    return sessions;
+    return links;
   }
 
-  private enrichmentInputs(sessions: DetailedSession[]): unknown[] {
-    return [
-      sessions,
-      this.sessionDb.getSessionRevision?.(),
-      this.parser,
-      typeof this.parser.getReplayIndexRevision === 'function' ? this.parser.getReplayIndexRevision() : NaN,
-      typeof this.telemetryCatalog?.getFiles === 'function' ? this.telemetryCatalog.getFiles() : NaN,
-      typeof this.sessionDb.getTelemetryMetadataRevision === 'function' ? this.sessionDb.getTelemetryMetadataRevision() : NaN,
-    ];
+  public requestSessionRefresh(forceReparse = false): void {
+    const started = this.runSessionSyncInBackground(forceReparse);
+    if (!started) {
+      this.pendingSessionRefresh = true;
+      this.pendingForcedSessionReparse ||= forceReparse;
+    }
   }
 
-  public parseAndCacheFile(filePath: string): DetailedSession | null {
-    const parsed = this.parser.parseSessionXml(filePath);
-    if (parsed) {
+  private startSessionProjectionBackfill(): void {
+    if (this.projectionBackfillStarted || typeof this.sessionDb.backfillSessionSummaryBatch !== 'function' || typeof this.sessionDb.getSessionsCount !== 'function') return;
+    this.projectionBackfillStarted = true;
+    const status = this.sessionProjectionBackfill;
+    status.running = true;
+    status.startedAt = new Date().toISOString();
+    status.total = this.sessionDb.getSessionsCount();
+    const finish = (error?: unknown) => {
+      status.running = false;
+      status.currentSessionId = null;
+      status.finishedAt = new Date().toISOString();
+      if (error !== undefined) status.error = error instanceof Error ? error.message : String(error);
+      if (this.pendingPostSessionDiscovery) {
+        this.pendingPostSessionDiscovery = false;
+        this.runReplaySyncInBackground();
+        this.runTelemetryScanInBackground();
+      }
+    };
+    const runBatch = () => {
       try {
-        const stats = fs.statSync(filePath);
-        this.sessionDb.upsertSession(parsed, filePath, Math.floor(stats.mtimeMs), stats.size);
-      } catch {
-        // Ignore cache persistence failures for a direct session fallback.
+        const batch = this.sessionDb.backfillSessionSummaryBatch(10);
+        status.processed += batch.processed;
+        status.failed += batch.failed.length;
+        // A session that cannot be summarized is left out of history views (projection_error), not retried here.
+        for (const failure of batch.failed) console.warn(`[Session Summaries] ${failure.id} left out of history views:`, failure.error);
+        if (batch.processed === 10) {
+          setImmediate(runBatch);
+          return;
+        }
+        finish();
+        this.startNormalizedSessionBackfill();
+      } catch (error: unknown) {
+        finish(error);
       }
-    }
-    return parsed;
+    };
+    setImmediate(runBatch);
+  }
+
+  /**
+   * Writes the normalized rows of stored sessions (NORMALIZED_SESSION_VERSION), ten at a time with the
+   * event loop free in between. JSON stays the source of truth: a session whose rows do not read back
+   * as it keeps its JSON and is reported here. Nothing waits for this step.
+   */
+  private startNormalizedSessionBackfill(): void {
+    if (this.normalizedBackfillStarted || typeof this.sessionDb.backfillNormalizedSessionBatch !== 'function') return;
+    this.normalizedBackfillStarted = true;
+    const runBatch = () => {
+      try {
+        const batch = this.sessionDb.backfillNormalizedSessionBatch(10);
+        for (const failure of batch.failed) console.warn(`[Normalized Sessions] ${failure.id} stays on JSON:`, failure.error ?? failure.mismatches.slice(0, 3));
+        if (batch.processed > 0) setImmediate(runBatch);
+      } catch (error: unknown) {
+        console.warn('[Normalized Sessions] Backfill stopped:', error);
+      }
+    };
+    setImmediate(runBatch);
+  }
+
+  /**
+   * Links and re-checks the replay links of the sessions a scan could have changed: rows written
+   * and replays stored since the last reconciliation (dbReconciliationStore), ten at a time. The
+   * first run after an upgrade or a cache clear has no stamp and checks every session once.
+   */
+  public reconcileSessionReplayLinks(): Promise<void> {
+    if (typeof this.sessionDb.getReplayReconciliationCandidateIds !== 'function') return Promise.resolve();
+    if (this.sessionReplayReconciliation) return this.sessionReplayReconciliation;
+    this.sessionReplayReconciliationRunning = true;
+    const task = (async () => {
+      const startedAt = Date.now();
+      const since = Number(this.sessionDb.getMetadata(REPLAY_LINKS_RECONCILED_AT) ?? 0);
+      this.configureReplayLookup();
+      const replaysByName = this.replayByName();
+      const ids = this.sessionDb.getReplayReconciliationCandidateIds(since);
+      for (let i = 0; i < ids.length; i += 10) {
+        this.replayLinks.linkSessions(this.sessionDb.getSessionsByIds(ids.slice(i, i + 10)), this.parser, replaysByName);
+        await yieldToEventLoop();
+      }
+      // Rows written during this run carry a later stamp and are checked again next time.
+      this.sessionDb.setMetadata(REPLAY_LINKS_RECONCILED_AT, String(startedAt));
+    })().finally(() => {
+      this.sessionReplayReconciliationRunning = false;
+      this.sessionReplayReconciliation = null;
+      if (this.pendingReplaySync) {
+        this.pendingReplaySync = false;
+        this.runReplaySyncInBackground();
+      }
+    });
+    this.sessionReplayReconciliation = task;
+    return task;
   }
 
   public runReplaySyncInBackground(): boolean {
     if (this.replayScanStatus.running) return false;
+    if (this.sessionReplayReconciliationRunning) {
+      // Runs when the reconciliation ends: a session scan finishing meanwhile must not lose it.
+      this.pendingReplaySync = true;
+      return false;
+    }
     const retryFailed = this.retryFailedReplays;
     this.retryFailedReplays = false;
     this.replayUpgrade?.stop();
@@ -256,29 +347,28 @@ export class ServerContext {
     const iterator = this.sessionDb.syncReplaysAsyncIterator(replaysDir, {
       playerName: this.parser.configuredPlayerName,
       retryFailed,
-      onMetadataReady: () => {
-        const sessions = this.loadSessions();
-        const associated = new Set(sessions.flatMap(session => session.matchingReplayFile ? [session.matchingReplayFile.name] : []));
-        return associated;
+      onMetadataReady: async () => {
+        await this.reconcileSessionReplayLinks();
+        return typeof this.sessionDb.getStoredRecordingNames === 'function' ? this.sessionDb.getStoredRecordingNames() : new Set<string>();
       },
       onReplayState: job => { this.replayJobs.set(job.name, job); },
     });
     pumpScanInBackground(iterator, this.replayScanStatus, outcome => {
-      if ('result' in outcome) {
-        const { total, added, updated, skipped } = outcome.result;
-        console.log(`[SQLite Cache] Cached ${total} replays (${added} new, ${updated} updated, ${skipped} skipped) from ${replaysDir}`);
-        try {
-          if (typeof this.sessionDb?.getAllSessions === 'function') {
-            this.enrichSessionsWithTelemetry(this.sessionDb.getAllSessions());
+      void (async () => {
+        if ('result' in outcome) {
+          const { total, added, updated, skipped } = outcome.result;
+          console.log(`[SQLite Cache] Cached ${total} replays (${added} new, ${updated} updated, ${skipped} skipped) from ${replaysDir}`);
+          try {
+            await this.reconcileSessionReplayLinks();
+          } catch (err) {
+            console.warn('[ServerContext] Error enriching sessions after replay sync:', err);
           }
-        } catch (err) {
-          console.warn('[ServerContext] Error enriching sessions after replay sync:', err);
+        } else {
+          console.warn('[SQLite Cache] Replay sync warning:', outcome.error);
         }
-      } else {
-        console.warn('[SQLite Cache] Replay sync warning:', outcome.error);
-      }
-      this.runPendingSessionRefresh();
-      this.startReplayUpgradeWhenIdle();
+        this.runPendingSessionRefresh();
+        this.startReplayUpgradeWhenIdle();
+      })();
     });
     return true;
   }
@@ -314,9 +404,9 @@ export class ServerContext {
     const parser = this.parser;
     const worker = new FileIngestWorker();
     const iterator = this.sessionDb.syncSessionsAsyncIterator(resultsDir, {
-      addReplayEntry: entry => parser.addReplayEntry(entry),
+      setReplayLookup: lookup => parser.setReplayLookup(lookup),
       parseSessionXml: filePath => parser.parseSessionXml(filePath),
-      parseSessionXmlAsync: filePath => worker.parseXml(filePath, parser.configuredPlayerName, parser.getReplaysList(), this.sessionDb.getReferenceLaptimesCache?.() ?? null),
+      parseSessionXmlAsync: filePath => worker.parseXml(filePath, parser.configuredPlayerName, [], this.sessionDb.getReferenceLaptimesCache?.() ?? null),
     }, forceReparse);
     pumpScanInBackground(iterator, status, outcome => {
       void worker.close();
@@ -328,8 +418,8 @@ export class ServerContext {
       }
       // Replays are matched against the sessions: their sync always follows.
       if (!this.runPendingSessionRefresh()) {
-        this.runReplaySyncInBackground();
-        this.runTelemetryScanInBackground();
+        if (this.sessionProjectionBackfill.running) this.pendingPostSessionDiscovery = true;
+        else { this.runReplaySyncInBackground(); this.runTelemetryScanInBackground(); }
       }
     });
     return true;
@@ -342,9 +432,9 @@ export class ServerContext {
   public runTelemetryScanInBackground(): void {
     if (typeof this.telemetryCatalog?.refresh !== 'function') return;
     const telemetryDir = this.currentTelemetryDir;
-    void this.telemetryCatalog.refresh(telemetryDir).then((count) => {
+    void this.telemetryCatalog.refresh(telemetryDir).then(async (count) => {
       console.log(`[SQLite Cache] Found ${count} DuckDB telemetry files from ${telemetryDir}`);
-      this.enrichSessionsWithTelemetry(this.sessionDb.getAllSessions());
+      await this.reconcileTelemetryOwnership();
     }).catch((error: unknown) => {
       // The catalog records the failure as an ingest error.
       console.warn('[SQLite Cache] Telemetry scan warning:', error);
@@ -355,6 +445,7 @@ export class ServerContext {
   }
 
   public runInitialSessionSyncInBackground(): void {
+    this.startSessionProjectionBackfill();
     this.runSessionSyncInBackground();
   }
 
@@ -386,7 +477,6 @@ export class ServerContext {
         })
         .finally(() => {
           // Before completion is published, so the clients' refetch sees the new ratings.
-          this.rerateSessionPace();
           this.refreshBenchmarkDiffImpacts();
           this.referenceLaptimeRefreshStatus.running = false;
           this.referenceLaptimeRefreshStatus.checked = true;
@@ -395,16 +485,41 @@ export class ServerContext {
     });
   }
 
-  /** Rates stored sessions again against the current benchmark targets, if they changed since. */
-  public rerateSessionPace(): void {
-    const version = loadReferenceLaptimesFromCache()?.lastUpdated;
-    if (!version || typeof this.sessionDb.rerateSessionPace !== 'function') return;
-    try {
-      const changed = this.sessionDb.rerateSessionPace(version);
-      if (changed > 0) console.log(`[Reference Laptimes] Re-rated pace of ${changed} stored sessions`);
-    } catch (error: unknown) {
-      console.warn('[Reference Laptimes] Unable to re-rate stored sessions:', error);
-    }
+  /**
+   * Decides the owners of DuckDB files that have none, from the sessions and replays recorded
+   * around each file (indexed time windows), never from the whole history. Files are taken in
+   * time order, in small chunks loaded with every candidate their files could belong to; then the
+   * sessions that gained files store their main file. A file without a recording time has no
+   * window and stays unattached.
+   */
+  private reconcileTelemetryOwnership(): Promise<void> {
+    if (this.telemetryOwnershipReconciliation) return this.telemetryOwnershipReconciliation;
+    this.telemetryOwnershipReconciliationRunning = true;
+    const task = (async () => {
+      this.resetTelemetryLinksIfRuleChanged();
+      const catalog = { files: this.sessionDb.getTelemetryFiles(), stored: this.sessionDb.getTelemetryMetadata() };
+      const claimed = new Set(catalog.stored.filter(row => row.matchedSessionId || row.matchedReplayFilename).map(row => row.filename));
+      const pending = catalog.files.filter(file => !claimed.has(file.filename) && file.timestampEpochMs > 0)
+        .sort((a, b) => a.timestampEpochMs - b.timestampEpochMs);
+      const owners = new Set<string>();
+      for (const chunk of telemetryFileChunks(pending)) {
+        const window = telemetryCandidateWindow(chunk[0].timestampEpochMs, chunk[chunk.length - 1].timestampEpochMs);
+        const sessions = this.sessionDb.getSessionsStartingBetween(window.sessionsFromMs, window.sessionsToMs);
+        const replays = this.sessionDb.getReplayMatchingEntriesOverlapping(window.replaysFromMs, window.replaysToMs);
+        const links = this.storeNewTelemetryLinks(sessions, replays, { files: chunk, stored: catalog.stored },
+          this.sessionDb.getRecordingOwners(replays.map(replay => replay.name)));
+        for (const link of links) if (link.sessionId) owners.add(link.sessionId);
+        await yieldToEventLoop();
+      }
+      // Rows stored before the attachment was persisted on them.
+      for (const id of this.sessionDb.getTelemetryOwnersWithoutFile()) owners.add(id);
+      for (const session of this.sessionDb.getSessionsByIds([...owners])) this.applySessionTelemetry(session);
+    })().finally(() => {
+      this.telemetryOwnershipReconciliationRunning = false;
+      this.telemetryOwnershipReconciliation = null;
+    });
+    this.telemetryOwnershipReconciliation = task;
+    return task;
   }
 
   /**
@@ -416,11 +531,11 @@ export class ServerContext {
     try {
       const ids = this.sessionDb.getBenchmarkDiffIdsWithImpactRuleOtherThan(BENCHMARK_IMPACT_RULE);
       if (ids.length === 0) return;
-      const sessions = this.loadSessions(false, false);
       for (const id of ids) {
         const diff = this.sessionDb.getBenchmarkDiffById(id);
         if (!diff) continue;
-        const enriched = { ...enrichBenchmarkDiffWithImpact(diff, sessions), id };
+        if (typeof this.sessionDb.getDb !== 'function') continue;
+        const enriched = { ...enrichBenchmarkDiffWithCompactImpact(diff, this.sessionDb.getDb()), id };
         this.sessionDb.updateBenchmarkDiffImpact(id, enriched);
         replaceCachedLastUpdateDiff(enriched);
       }
@@ -445,7 +560,9 @@ export class ServerContext {
     const telemetryScan = typeof this.telemetryCatalog?.getScanStatus === 'function'
       ? this.telemetryCatalog.getScanStatus()
       : defaultTelemetryScan;
-    const allComplete = !this.pendingSessionRefresh && !this.replayScanStatus.running && !this.sessionScanStatus.running && !telemetryScan.running;
+    const allComplete = !this.pendingSessionRefresh && !this.replayScanStatus.running && !this.sessionScanStatus.running &&
+      !telemetryScan.running && !this.sessionProjectionBackfill.running && !this.sessionReplayReconciliationRunning &&
+      !this.telemetryOwnershipReconciliationRunning;
     const allCached = Boolean(
       allComplete && ![...this.replayJobs.values()].some(job => job.status === 'failed') && !this.replayScanStatus.error && !this.sessionScanStatus.error && !telemetryScan.error &&
       (this.replayScanStatus.result?.added === 0 && this.replayScanStatus.result?.updated === 0) &&
@@ -461,6 +578,7 @@ export class ServerContext {
       replayJobs: [...this.replayJobs.values()],
       refreshQueued: this.pendingSessionRefresh,
       sessionScan: this.sessionScanStatus,
+      sessionProjectionBackfill: this.sessionProjectionBackfill,
       replayUpgrade: this.replayUpgrade?.getStatus(),
       telemetryScan,
       referenceLaptimes: this.referenceLaptimeRefreshStatus,

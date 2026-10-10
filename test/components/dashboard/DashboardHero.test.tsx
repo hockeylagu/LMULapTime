@@ -64,6 +64,8 @@ describe('DashboardHero', () => {
         carType: 'Chevrolet Corvette Z06 LMGT3.R',
         carClass: 'LMGT3',
         bestLapTime: 240.47,
+        driverOrdinal: 0,
+        bestLapOrdinal: 1,
         bestLapTimeString: '4:00.470',
         bestS1: 70,
         bestS2: 90,

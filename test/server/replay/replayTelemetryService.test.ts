@@ -81,7 +81,10 @@ describe('ReplayTelemetryService', () => {
     return { ...file, filePath };
   };
 
+  const session = { id: 'session-456', trackVenue: 'Daytona International Speedway', trackCourse: 'Road Course' } as DetailedSession;
+
   const request = (overrides: Partial<Parameters<ReplayTelemetryService['enrichWithTelemetry']>[0]> = {}) => service.enrichWithTelemetry({
+    sessionId: session.id,
     replayName: 'Daytona.Vcr',
     filePath: '/replays/Daytona.Vcr',
     isPlayer: true,
@@ -90,12 +93,10 @@ describe('ReplayTelemetryService', () => {
     fullTrajectory: mockVcrTraj,
     // The service writes into the trajectory it is given.
     currentTrajectory: { ...mockVcrTraj },
+    matchedSession: session,
     lapNumber: 1,
     ...overrides,
   });
-
-  const session = { id: 'session-456', trackVenue: 'Daytona International Speedway', trackCourse: 'Road Course' } as DetailedSession;
-
 
   it('skips DuckDB telemetry fusion when not player or allowDuckDb is false', async () => {
     const notPlayer = await service.enrichWithTelemetry({
@@ -134,14 +135,14 @@ describe('ReplayTelemetryService', () => {
     expect(result.trajectory.duckdbFilename).toBe(mockDuckFile.filename);
   });
 
-  it('fuses the lap of the file stored for a replay with no session', async () => {
+  it('does not read replay-owned files when the session has no attached file', async () => {
     db.upsertTelemetryMetadata(mockDuckFile, undefined, 'Daytona.Vcr');
     db.upsertTelemetryLapCache(mockDuckFile.filename, 1, mockDuckLap);
 
     const result = await request();
 
-    expect(result.fused).toBe(true);
-    expect(result.trajectory.duckdbFilename).toBe(mockDuckFile.filename);
+    expect(result.fused).toBe(false);
+    expect(result.trajectory.duckdbFilename).toBeUndefined();
   });
 
   it('reads the file of the session before the file of the replay', async () => {
@@ -266,10 +267,12 @@ describe('ReplayTelemetryService', () => {
       ...mockDuckLap,
       lapTimeSec: 10.0, // Expected is 96.0s
     };
-    db.upsertTelemetryMetadata(mockDuckFile, undefined, 'Daytona.Vcr');
+    db.upsertTelemetryMetadata(mockDuckFile, 'session-456');
     db.upsertTelemetryLapCache(mockDuckFile.filename, 1, incompleteLap);
 
     const result = await service.enrichWithTelemetry({
+      sessionId: session.id,
+      matchedSession: session,
       replayName: 'Daytona.Vcr',
       filePath: '/replays/Daytona.Vcr',
       isPlayer: true,
@@ -288,7 +291,7 @@ describe('ReplayTelemetryService', () => {
 
   it('logs ingest error and leaves source as vcr when DuckDbReader throws', async () => {
     const file = onDisk(mockDuckFile);
-    db.upsertTelemetryMetadata(file, undefined, 'Daytona.Vcr');
+    db.upsertTelemetryMetadata(file, 'session-456');
     vi.spyOn(DuckDbReader.prototype, 'open').mockRejectedValueOnce(new Error('DuckDB parse error'));
     const ingestSpy = vi.spyOn(db, 'recordIngestError');
 

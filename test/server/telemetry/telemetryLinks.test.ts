@@ -179,16 +179,23 @@ describe('TelemetryLinks', () => {
     return { ...file, filePath };
   };
 
-  it('reads the session file first, then the file of its replay', () => {
+  it('serves only session-owned files while retaining replay ownership for maintenance', () => {
     db.upsertTelemetryMetadata(onDisk(duck('session.duckdb', '2026-09-14T18:00:00Z')), 's');
     db.upsertTelemetryMetadata(onDisk(duck('replay.duckdb', '2026-09-14T18:00:00Z')), undefined, 'P1 48.Vcr');
     const links = TelemetryLinks.load(db);
 
     expect(links.forSession(session('s', '2026-09-14T18:00:00Z', 'P1 48.Vcr'))).toBe('session.duckdb');
-    expect(links.forSession(session('t', '2026-09-14T18:00:00Z', 'P1 48.Vcr'))).toBe('replay.duckdb');
+    expect(links.forSession(session('t', '2026-09-14T18:00:00Z', 'P1 48.Vcr'))).toBeUndefined();
     expect(links.forReplay('P1 48.Vcr', { id: 's' })).toBe('session.duckdb');
     expect(links.forReplay('P1 48.Vcr')).toBe('replay.duckdb');
     expect(links.forReplay('P1 49.Vcr')).toBeUndefined();
+    db.upsertTelemetryLapCache('session.duckdb', 1, lap);
+    db.upsertTelemetryLapCache('replay.duckdb', 1, lap);
+    expect(db.getTelemetryMetadata('s').map(row => row.filename)).toEqual(['session.duckdb']);
+    expect([...db.getTelemetryLapCacheFilenames('s')]).toEqual(['session.duckdb']);
+    const scoped = TelemetryLinks.load(db, 's');
+    expect(scoped.filesForSession({ id: 's' })).toEqual(['session.duckdb']);
+    expect(scoped.row('replay.duckdb')).toBeUndefined();
   });
 
   it('lists every file of a session in recording order and shows the one with the most laps', () => {

@@ -1,15 +1,17 @@
-import fs from 'fs';
-import path from 'path';
 import { Router } from 'express';
-import { computeProgression, extractComparableLaps } from '../sessions/sessionAnalytics.js';
-import { findMatchingTrackBenchmarkEntries, matchesTrack, matchesSessionCarClass } from '../../shared/domain/paceCategory.js';
-import { matchesSessionType, isSessionEmpty } from '../../shared/domain/formatters.js';
+import { findMatchingTrackBenchmarkEntries } from '../../shared/domain/paceCategory.js';
 import { loadReferenceLaptimesFromCache } from '../benchmarks/referenceLaptimes.js';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { ServerContext } from '../core/serverContext.js';
-import { DetailedSession } from '../core/types.js';
 import { queryString } from './queryParams.js';
+import { requireSessionSummaries } from './summaryReadiness.js';
 import { attachPitServices } from '../sessions/sessionPitStops.js';
+import { querySessionPage, queryProgression, type SessionQuery } from '../core/sessionSummaries/pageQueries.js';
+import { queryCompactComparableLaps } from '../core/sessionSummaries/comparisonQueries.js';
+import { queryTrackDetailFilters, queryTrackDetailSummary, queryTrackLatestSessionContext, queryTrackPositionAverages, queryTrackSummaries } from '../core/sessionSummaries/trackQueries.js';
+import { rateSessionDetail } from '../core/sessionSummaries/readTimePace.js';
+import { querySessionContext } from '../core/sessionSummaries/contextQueries.js';
+import { queryCompactDashboard } from '../core/sessionSummaries/dashboardQueries.js';
 
 export interface SessionFilterOptions {
   track?: string;
@@ -31,133 +33,75 @@ export function parseSessionFilters(query: Record<string, unknown>): SessionFilt
   };
 }
 
-export function filterSessions(sessions: DetailedSession[], options: SessionFilterOptions): DetailedSession[] {
-  let filtered = sessions;
-
-  if (options.hideEmpty) {
-    filtered = filtered.filter(session => !isSessionEmpty(session));
-  }
-  if (options.track && options.track !== 'All') {
-    filtered = filtered.filter(session => matchesTrack(options.track, session.trackVenue, session.trackCourse));
-  }
-  if (options.sessionType && options.sessionType !== 'All') {
-    filtered = filtered.filter(session => matchesSessionType(session.sessionType, session.sessionName, options.sessionType));
-  }
-  if (options.carClass && options.carClass !== 'All') {
-    filtered = filtered.filter(session => matchesSessionCarClass(session, options.carClass));
-  }
-  if (options.driver && options.driver !== 'All') {
-    const driverLower = options.driver.toLowerCase();
-    filtered = filtered.filter(session =>
-      (session.playerDriver?.name && session.playerDriver.name.toLowerCase().includes(driverLower)) ||
-      session.drivers.some(driverData => driverData.name.toLowerCase().includes(driverLower))
-    );
-  }
-  if (options.car && options.car !== 'All') {
-    const carLower = options.car.toLowerCase();
-    filtered = filtered.filter(session =>
-      session.drivers.some(driverData => driverData.carType.toLowerCase().includes(carLower))
-    );
-  }
-
-  return filtered;
-}
-
-/**
- * A session as the list sends it: no other drivers, and no lap stewards or traffic records, which only the session
- * page reads (from GET /session/:id). They were over 40% of the list payload. Copies: the cached session is shared.
- */
-export function toSessionListEntry(session: DetailedSession): Omit<DetailedSession, 'drivers'> {
-  const { drivers: _drivers, ...metadata } = session;
-  const player = metadata.playerDriver;
-  if (!player) return metadata;
-  const { incidents: _incidents, trackLimits: _trackLimits, ...playerSummary } = player;
-  const laps = player.laps?.map(({ traffic: _traffic, incidents: _lapIncidents, trackLimits: _lapTrackLimits, ...lap }) => lap);
-  return { ...metadata, playerDriver: { ...playerSummary, ...(laps ? { laps } : {}) } };
+function pageNumber(value: unknown, fallback: number, max = 500): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 1 ? Math.min(max, Math.floor(parsed)) : fallback;
 }
 
 export function createSessionRouter(context: ServerContext): Router {
   const router = Router();
-
-  /** Telemetry links and pit details are worked out on every read, on the (cached) session object. */
-  const withReadTimeDetails = (session: DetailedSession): DetailedSession => {
-    context.enrichSessionsWithTelemetry([session]);
-    attachPitServices(context.sessionDb.getDb(), session);
-    return session;
-  };
-
-  // One request owns the session/progression snapshot, so a scan commit cannot split them.
-  router.get('/session-snapshot', (_req, res) => {
-    res.setHeader('Cache-Control', 'no-store');
-    const sessions = context.loadSessions();
-    res.json({ sessions: sessions.map(toSessionListEntry), progression: computeProgression(sessions),
-      revision: context.getScanStatus().dataRevision });
+  const db = context.sessionDb.getDb();
+  const options = (query: Record<string, unknown>): SessionQuery => ({
+    ...parseSessionFilters(query), search: queryString(query.q), hasReplay: query.hasReplay === 'true',
+    sessionType: queryString(query.type) ?? queryString(query.sessionType), sort: queryString(query.sort),
+    page: pageNumber(query.page, 1, 1000000), pageSize: pageNumber(query.pageSize, 25, 100),
+    from: query.from === undefined ? undefined : Number(query.from), to: query.to === undefined ? undefined : Number(query.to),
   });
-
-  router.get('/sessions', (req, res) => {
-    const filters = parseSessionFilters(req.query as Record<string, unknown>);
-    const sessions = filterSessions(context.loadSessions(), filters);
-
-    res.json(sessions.map(toSessionListEntry));
-  });
-
+  const revision = () => context.getScanStatus().dataRevision;
+  router.use(['/sessions', '/dashboard', '/progression', '/tracks', '/track', '/compare'], requireSessionSummaries(context));
+  router.get('/sessions', (req, res) => res.json({...querySessionPage(db,options(req.query)),revision:revision()}));
+  router.get('/dashboard',(req,res)=>res.json(queryCompactDashboard(db,{...options(req.query),revision:revision(),referenceEntries:loadReferenceLaptimesFromCache()?.entries ?? {}})));
   router.get('/session/:id', (req, res) => {
-    const { id } = req.params;
     res.setHeader('Cache-Control', 'no-store');
-
-    const singleFilePath = path.join(context.resultsDir, id.endsWith('.xml') ? id : `${id}.xml`);
-    const session = context.sessionDb.getSessionById(id)
-      ?? (fs.existsSync(singleFilePath) ? context.parseAndCacheFile(singleFilePath) : null);
-    if (!session) return res.status(404).json({ error: 'Session not found' });
-    return res.json(withReadTimeDetails(session));
+    const session=context.sessionDb.getSessionById(req.params.id);
+    if (!session) return res.status(404).json({error:'Session not found'});
+    attachPitServices(db,session);
+    return res.json({...rateSessionDetail(session),historyContext:querySessionContext(db,session),revision:revision()});
   });
-
-  router.get('/progression', (req, res) => {
-    const filters = parseSessionFilters(req.query as Record<string, unknown>);
-    // In progression, driver is the focal driver for progression points rather than a session exclusion filter
-    const sessions = filterSessions(context.loadSessions(), { ...filters, driver: undefined });
-
-    res.json(computeProgression(sessions, filters.driver));
+  router.get('/progression', (req,res) => res.json({...queryProgression(db,{...options(req.query),pageSize:pageNumber(req.query.pageSize,200)}),revision:revision()}));
+  router.get('/tracks', (req,res) => res.json({tracks:queryTrackSummaries(db,queryString(req.query.carClass)),revision:revision()}));
+  router.get('/track/:trackName', (req,res) => {
+    const selected={...options(req.query),track:req.params.trackName,playerCar:queryString(req.query.car)};
+    const page=querySessionPage(db,selected);
+    const latestSession=queryTrackLatestSessionContext(db,req.params.trackName,selected.carClass,queryString(req.query.car));
+    const course=latestSession.trackCourse ?? page.sessions[0]?.trackCourse ?? '';
+    const references=loadReferenceLaptimesFromCache();
+    const progressionPage = pageNumber(req.query.progressionPage,1,1000000);
+    const progression=queryProgression(db,{...selected,page:progressionPage,pageSize:200});
+    const filters=queryTrackDetailFilters(db,req.params.trackName,selected.carClass,queryString(req.query.car));
+    res.json({...page, sessionsCount:page.total, trackName:req.params.trackName,
+      normalizedTrackName:getCircuitSpecification(req.params.trackName,course).benchmarkName,
+      summary:queryTrackDetailSummary(db,req.params.trackName,selected.carClass,queryString(req.query.car)),
+      filters,
+      latestSession,
+      positions:queryTrackPositionAverages(db,req.params.trackName,selected.carClass,queryString(req.query.car)),
+      progression,
+      benchmarks:references ? findMatchingTrackBenchmarkEntries(references.entries,req.params.trackName,course) : [],revision:revision()});
   });
-
-  router.get('/track/:trackName', (req, res) => {
-    // Express has already decoded the path parameter; decoding it again breaks a name with '%'.
-    const decoded = req.params.trackName;
-    const allSessions = context.loadSessions();
-    const trackSessions = allSessions.filter(session => matchesTrack(decoded, session.trackVenue, session.trackCourse));
-    const sampleCourse = trackSessions.length > 0 ? trackSessions[0].trackCourse : '';
-    const refCache = loadReferenceLaptimesFromCache();
-
-    res.json({
-      trackName: decoded,
-      normalizedTrackName: getCircuitSpecification(decoded, sampleCourse).benchmarkName,
-      sessionsCount: trackSessions.length,
-      sessions: trackSessions.map(session => {
-        const { drivers, ...metadata } = session;
-        return metadata;
-      }),
-      benchmarks: refCache ? findMatchingTrackBenchmarkEntries(refCache.entries, decoded, sampleCourse) : [],
-    });
+  router.get('/compare/laps',(req,res) => {
+    const ordinal = (name: 'driverOrdinal' | 'lapOrdinal' | 'lapNum', max: number): number | undefined => {
+      const value = req.query[name];
+      if (value === undefined) return undefined;
+      if (typeof value !== 'string' || !/^\d+$/.test(value) || Number(value) > max) {
+        res.status(400).json({ error: `${name} must be a non-negative integer` });
+        return undefined;
+      }
+      return Number(value);
+    };
+    const driverOrdinal = ordinal('driverOrdinal', 1000000);
+    if (res.headersSent) return;
+    const lapOrdinal = ordinal('lapOrdinal', 10000000);
+    if (res.headersSent) return;
+    const lapNum = ordinal('lapNum', 10000000);
+    if (res.headersSent) return;
+    const track=queryString(req.query.track); const references=loadReferenceLaptimesFromCache();
+    const result=queryCompactComparableLaps(db,id=>context.sessionDb.getSessionById(id),{
+      trackName:track,carClass:queryString(req.query.carClass),carModel:queryString(req.query.carModel),
+      driverName:queryString(req.query.driver),sessionId:queryString(req.query.sessionId),
+      driverOrdinal, lapOrdinal, lapNum,
+      playerOnly:req.query.playerOnly !== 'false',humansOnly:req.query.humansOnly === 'true',
+    },{page:pageNumber(req.query.page,1,1000000),pageSize:pageNumber(req.query.pageSize,50,100)});
+    res.json({...result,benchmarks:references && track ? findMatchingTrackBenchmarkEntries(references.entries,track,'') : [],revision:revision()});
   });
-
-  router.get('/compare/laps', (req, res) => {
-    const track = queryString(req.query.track);
-    const refCache = loadReferenceLaptimesFromCache();
-    const comparisonData = extractComparableLaps(context.loadSessions(), {
-      trackName: track,
-      carClass: queryString(req.query.carClass),
-      carModel: queryString(req.query.carModel),
-      driverName: queryString(req.query.driver),
-      sessionId: queryString(req.query.sessionId),
-      playerOnly: req.query.playerOnly !== 'false',
-      humansOnly: req.query.humansOnly === 'true',
-    });
-
-    res.json({
-      ...comparisonData,
-      benchmarks: refCache && track ? findMatchingTrackBenchmarkEntries(refCache.entries, track, '') : [],
-    });
-  });
-
   return router;
 }

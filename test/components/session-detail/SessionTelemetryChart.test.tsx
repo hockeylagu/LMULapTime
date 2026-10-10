@@ -61,7 +61,7 @@ describe('SessionTelemetryChart navigation', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Select lap 2' }));
 
-    expect(window.location.hash).toBe('#/telemetry?replayName=spa_replay.vcr&lap=2&driverName=Sim+Driver');
+    expect(window.location.hash).toBe('#/telemetry?sessionId=sess123&driverOrdinal=0&lapOrdinal=1');
   });
 
   it('opens lap comparison with the session context when no replay is available', () => {
@@ -69,6 +69,6 @@ describe('SessionTelemetryChart navigation', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Select lap 2' }));
 
-    expect(window.location.hash).toBe('#/leaderboard?track=Spa&carClass=LMH&sessionId=sess123&lapNum=2');
+    expect(window.location.hash).toBe('#/leaderboard?track=Spa&carClass=LMH&sessionId=sess123&lapNum=2&driverOrdinal=0&lapOrdinal=1');
   });
 });

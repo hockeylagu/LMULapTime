@@ -7,7 +7,7 @@ import {
 } from '../../shared/domain/paceCategory.js';
 import { isMainThread } from 'node:worker_threads';
 import { getSessionDatabase } from '../core/db.js';
-import { enrichBenchmarkDiffWithImpact } from './benchmarkImpact.js';
+import { enrichBenchmarkDiffWithCompactImpact } from './benchmarkImpact.js';
 
 const PUBLISHED_SPREADSHEET_CSV_URL =
   'https://docs.google.com/spreadsheets/d/e/2PACX-1vTN03UvJDm99byA6vQPZHKOCYVvfxLu1zkJAzdaKyROykzEKY2-Xl1rl1q5znZEf36m88dxMKsY2eaO/pub?output=csv&gid=1766901750';
@@ -231,8 +231,7 @@ export async function fetchAndCacheReferenceLaptimes(): Promise<ReferenceLaptime
 
   try {
     const db = getSessionDatabase();
-    const sessions = db.getAllSessions();
-    diff = enrichBenchmarkDiffWithImpact(diff, sessions);
+    diff = enrichBenchmarkDiffWithCompactImpact(diff, db.getDb());
   } catch (err) {
     console.warn('[Benchmark Impact] Unable to compute session impact for diff:', err);
   }

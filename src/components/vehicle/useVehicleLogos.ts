@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { fetchVehicleLogos, getCachedVehicleLogos } from '../../api/vehicleLogosApi.js';
+import { fetchVehicleLogos, getCachedVehicleLogos, getVehicleLogoCacheGeneration, subscribeVehicleLogos } from '../../api/vehicleLogosApi.js';
 import { resolveCarManufacturer } from '../../../shared/domain/vehicleMapping.js';
 
 export function useVehicleLogos(): {
@@ -7,6 +7,17 @@ export function useVehicleLogos(): {
   getLogoSvg: (carTypeOrModel?: string | null) => { brand: string; svg: string } | null;
 } {
   const [logos, setLogos] = useState<Record<string, string> | null>(() => getCachedVehicleLogos());
+  const [generation, setGeneration] = useState(() => getVehicleLogoCacheGeneration());
+
+  useEffect(() => {
+    const unsubscribe = subscribeVehicleLogos(nextGeneration => {
+      setGeneration(nextGeneration);
+      setLogos(getCachedVehicleLogos());
+    });
+    setGeneration(getVehicleLogoCacheGeneration());
+    setLogos(getCachedVehicleLogos());
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -20,7 +31,7 @@ export function useVehicleLogos(): {
     return () => {
       active = false;
     };
-  }, [logos]);
+  }, [logos, generation]);
 
   const getLogoSvg = (carTypeOrModel?: string | null): { brand: string; svg: string } | null => {
     if (!carTypeOrModel) return null;

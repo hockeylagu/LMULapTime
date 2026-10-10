@@ -8,12 +8,12 @@ import { SessionDatabase } from '../../../server/core/db.js';
 import { ServerContext } from '../../../server/core/serverContext.js';
 import { LmuParser } from '../../../server/sessions/parser.js';
 import { TelemetryCatalog } from '../../../server/telemetry/telemetryCatalog.js';
-import { ReplayCacheService } from '../../../server/replay/replayCacheService.js';
+import { ReplayRecordingService } from '../../../server/replay/replayRecordingService.js';
 import type { Worker } from 'node:worker_threads';
 import { FileIngestWorker } from '../../../server/core/ingest/fileIngestWorkerClient.js';
 import { createSessionRouter } from '../../../server/routes/sessionRoutes.js';
 
-// What the web app shows: /api/session-snapshot, reloaded once the session scan finishes (useAppData).
+// What the web app shows: /api/sessions, reloaded once the session scan finishes (useAppData).
 const fixture = fs.readFileSync(path.join(process.cwd(), 'test', 'fixtures', 'results', '2026_05_28_P1.xml'));
 
 describe('sessions on the web after a server start', () => {
@@ -31,7 +31,7 @@ describe('sessions on the web after a server start', () => {
     context = new ServerContext({
       resultsDir, replaysDir: path.join(root, 'Replays'), telemetryDir: path.join(root, 'Telemetry'),
       parser: new LmuParser(undefined, undefined, { detectPlayer: false }),
-      sessionDb: db, telemetryCatalog: new TelemetryCatalog(db), replayCache: new ReplayCacheService(db),
+      sessionDb: db, telemetryCatalog: new TelemetryCatalog(db), replayRecordings: new ReplayRecordingService(db),
     });
     app = express();
     app.use('/api', createSessionRouter(context));
@@ -46,7 +46,7 @@ describe('sessions on the web after a server start', () => {
 
   const writeSession = (name: string, content: Buffer = fixture) => fs.writeFileSync(path.join(resultsDir, name), content);
   const shownSessions = async (): Promise<string[]> =>
-    ((await request(app).get('/api/session-snapshot').expect(200)).body as { sessions: Array<{ filename: string }> }).sessions.map(s => s.filename).sort();
+    ((await request(app).get('/api/sessions').expect(200)).body as { sessions: Array<{ filename: string }> }).sessions.map(s => s.filename).sort();
   const scanFinished = () => vi.waitFor(() => expect(context.getScanStatus().allComplete).toBe(true), { timeout: 10_000 });
 
   it('shows every session that is new since the last run once the startup scan finishes', async () => {

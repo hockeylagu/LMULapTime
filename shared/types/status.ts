@@ -1,6 +1,9 @@
 import type { ReferenceBenchmarkDiff } from './reference.js';
 
 export interface AppStatus {
+  /** Unique for one server process; changes when the local server restarts. */
+  serverInstanceId?: string;
+  dataPlugin?: { revision: string };
   resultsDir: string;
   resultsExist: boolean;
   replaysDir: string;
@@ -24,6 +27,7 @@ export interface AppStatus {
     replaysCount?: number;
     replayTrajectoriesCount?: number;
     telemetryFilesCount?: number;
+    sessionSummariesReadyCount?: number;
   };
 }
 
@@ -107,6 +111,7 @@ export interface ScanStatus extends ReplayScanStatus {
   /** Changes when session data, replay metadata or telemetry links change, including on restart. */
   dataRevision?: string;
   sessionScan: SessionScanStatus;
+  sessionProjectionBackfill?: { running: boolean; processed: number; failed: number; total: number; currentSessionId: string | null; startedAt: string | null; finishedAt: string | null; error: string | null };
   replayUpgrade?: ReplayUpgradeStatus;
   telemetryScan?: TelemetryScanStatus;
   referenceLaptimes: ReferenceLaptimeRefreshStatus;

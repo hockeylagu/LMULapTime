@@ -4,6 +4,8 @@ import { getReplayConditions } from './replay/dbReplayLapStore.js';
 import { classifySessionLaps } from '../sessions/sessionLapClassification.js';
 import { replayWeatherCondition, type RainOverLap } from '../../shared/domain/lapConditions.js';
 import type { ReplayConditionFact } from '../replay/decode/replayFacts.js';
+import { persistSessionProjection } from './sessionSummaries/store.js';
+import { loadSession, writeSessionJson } from './sessionRows/access.js';
 
 /** The rainy spans of a replay's stored conditions; undefined when it has none stored yet. */
 function storedRainSpans(db: DatabaseType, replayName: string | undefined): ReplayConditionFact[] | undefined {
@@ -54,7 +56,7 @@ export function classifySessionConditions(db: DatabaseType, session: DetailedSes
   classifySessionLaps(session.drivers ?? [], replayRainOverLap(db, session.matchingReplayFile?.name));
   applyStoredReplayWeather(db, session);
   if (session.playerDriver) {
-    const player = session.drivers?.find(d => d.name === session.playerDriver?.name);
+    const player = session.drivers?.find(d => d.isPlayer) ?? session.drivers?.find(d => d.name === session.playerDriver?.name);
     if (player) session.playerDriver = player;
   }
 }
@@ -64,17 +66,19 @@ export function classifySessionConditions(db: DatabaseType, session: DetailedSes
  * sessions linked to a replay whose conditions were just stored. Returns the sessions rewritten.
  */
 export function reclassifyStoredSessions(db: DatabaseType, which: { ids: string[] } | { replayName: string }): DetailedSession[] {
-  const rows = 'ids' in which
-    ? which.ids.map(id => db.prepare('SELECT id, data_json FROM sessions WHERE id = ?').get(id) as { id: string; data_json: string } | undefined)
-      .filter((row): row is { id: string; data_json: string } => row !== undefined)
-    : db.prepare("SELECT id, data_json FROM sessions WHERE json_extract(metadata_json, '$.matchingReplayFile.name') = ?")
-      .all(which.replayName) as Array<{ id: string; data_json: string }>;
-  const update = db.prepare('UPDATE sessions SET metadata_json = ?, data_json = ?, updated_at = ? WHERE id = ?');
-  return rows.map((row) => {
-    const session = JSON.parse(row.data_json) as DetailedSession;
+  const ids = 'ids' in which
+    ? which.ids
+    : (db.prepare('SELECT id FROM sessions WHERE recording_name = ?').all(which.replayName) as Array<{ id: string }>).map(row => row.id);
+  // The rows are rewritten whole: classification can change lap conditions and reasons, the link's
+  // weather and the best-lap flags, and the derived lap columns and summaries follow from them.
+  return ids.flatMap((id) => {
+    const session = loadSession(db, id);
+    if (!session) return [];
     classifySessionConditions(db, session);
-    const { drivers: _drivers, ...meta } = session;
-    update.run(JSON.stringify(meta), JSON.stringify(session), Date.now(), row.id);
-    return session;
+    db.transaction(() => {
+      writeSessionJson(db, session, Date.now());
+      persistSessionProjection(db, session);
+    })();
+    return [session];
   });
 }

@@ -37,13 +37,16 @@ describe('ReplayInspectorModal', () => {
     totalEvents: 70000,
     durationSec: 500,
     drivers: [
-      { slot: 1, name: 'Samuel Lague', carModel: 'Ferrari 296 GT3', team: 'Vista AF Corsa', carNumber: '21', isPlayer: true },
-      { slot: 2, name: 'Rival Racer', carModel: 'BMW M4 GT3', team: 'Team WRT', carNumber: '32', isPlayer: false },
+      { slot: 1, name: 'Samuel Lague', carModel: 'Ferrari 296 GT3', team: 'Vista AF Corsa', carNumber: '21', isPlayer: true, sessionDriverOrdinal: 0, sessionLapOrdinals: { '1': 0, '2': 1, '3': 2 } },
+      { slot: 2, name: 'Rival Racer', carModel: 'BMW M4 GT3', team: 'Team WRT', carNumber: '32', isPlayer: false, sessionDriverOrdinal: 1, sessionLapOrdinals: { '1': 0, '2': 1, '3': 2 } },
     ],
   };
 
   const mockTraj = {
     replayName: 'Test_Replay.vcr',
+    sessionId: 'session-1',
+    driverOrdinal: 0,
+    lapOrdinal: 0,
     driverSlot: 1,
     pointsCount: 3,
     bounds: { minX: 100, maxX: 200, minZ: 200, maxZ: 240, spanX: 100, spanZ: 40 },
@@ -56,16 +59,16 @@ describe('ReplayInspectorModal', () => {
 
   it('renders nothing when isOpen is false', () => {
     const { container } = render(
-      <ReplayInspectorModal isOpen={false} onClose={vi.fn()} replayName="Test_Replay.vcr" />
+      <ReplayInspectorModal isOpen={false} onClose={vi.fn()} sessionId="session-1" />
     );
     expect(container.firstChild).toBeNull();
   });
 
   it('plays with Space from the chart, pauses on manual seek and leaves native controls alone', async () => {
     global.fetch = vi.fn().mockImplementation((url: string) => Promise.resolve({ ok: true,
-      json: () => Promise.resolve(url.includes('/metadata') ? mockMeta : url.includes('/trajectory') ? mockTraj : { laps: [] }),
+      json: () => Promise.resolve(url.includes('/metadata') ? mockMeta : url.includes('/telemetry?') ? mockTraj : { laps: [] }),
     }));
-    render(<ReplayInspectorModal isOpen onClose={vi.fn()} replayName="Test_Replay.vcr" />);
+    render(<ReplayInspectorModal isOpen onClose={vi.fn()} sessionId="session-1" />);
     const chart = await screen.findByLabelText('Telemetry charts');
     fireEvent.keyDown(chart, { key: ' ' });
     expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
@@ -80,14 +83,14 @@ describe('ReplayInspectorModal', () => {
       if (url.includes('/metadata')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
-      if (url.includes('/trajectory')) {
+      if (url.includes('/telemetry?')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockTraj) });
       }
       return Promise.reject(new Error('Unknown URL'));
     });
 
     render(
-      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} replayName="Test_Replay.vcr" />
+      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />
     );
 
     await waitFor(() => {
@@ -120,14 +123,14 @@ describe('ReplayInspectorModal', () => {
       if (url.includes('/metadata')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
-      if (url.includes('/trajectory')) {
+      if (url.includes('/telemetry?')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockTraj) });
       }
       return Promise.reject(new Error('Unknown URL'));
     });
 
     render(
-      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} replayName="Test_Replay.vcr" />
+      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />
     );
 
     await waitFor(() => {
@@ -148,7 +151,7 @@ describe('ReplayInspectorModal', () => {
       if (url.includes('/metadata')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
-      if (url.includes('driverSlot=2')) {
+      if (url.includes('driverOrdinal=1')) {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({
@@ -158,14 +161,14 @@ describe('ReplayInspectorModal', () => {
           }),
         });
       }
-      if (url.includes('/trajectory')) {
+      if (url.includes('/telemetry?')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockTraj) });
       }
       return Promise.reject(new Error('Unknown URL'));
     });
 
     render(
-      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} replayName="Test_Replay.vcr" />
+      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />
     );
 
     await waitFor(() => {
@@ -175,7 +178,7 @@ describe('ReplayInspectorModal', () => {
     fireEvent.change(screen.getByLabelText(/Select Driver/i), { target: { value: '2' } });
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('driverSlot=2'), expect.objectContaining({ signal: expect.any(AbortSignal) }));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('driverOrdinal=1'), expect.objectContaining({ signal: expect.any(AbortSignal) }));
     });
   });
 
@@ -185,14 +188,14 @@ describe('ReplayInspectorModal', () => {
       if (url.includes('/metadata')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
-      if (url.includes('/trajectory')) {
+      if (url.includes('/telemetry?')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockTraj) });
       }
       return Promise.reject(new Error('Unknown URL'));
     });
 
     render(
-      <ReplayInspectorModal isOpen={true} onClose={handleClose} replayName="Test_Replay.vcr" />
+      <ReplayInspectorModal isOpen={true} onClose={handleClose} sessionId="session-1" />
     );
 
     await waitFor(() => {
@@ -210,7 +213,7 @@ describe('ReplayInspectorModal', () => {
       if (url.includes('/metadata')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
-      if (url.includes('driverSlot=2')) {
+      if (url.includes('driverOrdinal=1')) {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({
@@ -220,14 +223,14 @@ describe('ReplayInspectorModal', () => {
           }),
         });
       }
-      if (url.includes('/trajectory')) {
+      if (url.includes('/telemetry?')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockTraj) });
       }
       return Promise.reject(new Error('Unknown URL'));
     });
 
     render(
-      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} replayName="Test_Replay.vcr" />
+      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />
     );
 
     await waitFor(() => {
@@ -238,9 +241,9 @@ describe('ReplayInspectorModal', () => {
     expect(driverSelect).toHaveValue('1');
     fireEvent.change(driverSelect, { target: { value: '2' } });
 
-    // Verify it called trajectory fetch with driverSlot=2
+    // Verify it called trajectory fetch with driverOrdinal=1
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('driverSlot=2'), expect.objectContaining({ signal: expect.any(AbortSignal) }));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('driverOrdinal=1'), expect.objectContaining({ signal: expect.any(AbortSignal) }));
     });
   });
 
@@ -258,19 +261,19 @@ describe('ReplayInspectorModal', () => {
       if (url.includes('/metadata')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
-      if (url.includes('/replays') && !url.includes('/trajectory') && !url.includes('/metadata')) {
+      if (url.includes('/replays') && !url.includes('/telemetry?') && !url.includes('/metadata')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve([
           { name: 'Other_Spa_Replay.vcr', trackName: 'Spa-Francorchamps', eventTitle: 'LMGT3 Fixed' }
         ]) });
       }
-      if (url.includes('/trajectory')) {
+      if (url.includes('/telemetry?')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockTrajWithLaps) });
       }
       return Promise.reject(new Error('Unknown URL'));
     });
 
     render(
-      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} replayName="Test_Replay.vcr" />
+      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />
     );
 
     await waitFor(() => {
@@ -287,7 +290,7 @@ describe('ReplayInspectorModal', () => {
     });
 
     // Verify it requested the baseline trajectory
-    expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/trajectory'), expect.anything());
+    expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('/compare/laps'), expect.anything());
   });
 
   it('renders playback speed options 0.5x, 1x, and 2x while omitting 5x', async () => {
@@ -295,14 +298,14 @@ describe('ReplayInspectorModal', () => {
       if (url.includes('/metadata')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
-      if (url.includes('/trajectory')) {
+      if (url.includes('/telemetry?')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockTraj) });
       }
       return Promise.reject(new Error('Unknown URL'));
     });
 
     render(
-      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} replayName="Test_Replay.vcr" />
+      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />
     );
 
     await waitFor(() => {
@@ -337,14 +340,14 @@ describe('ReplayInspectorModal', () => {
       if (url.includes('/metadata')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
-      if (url.includes('/trajectory')) {
+      if (url.includes('/telemetry?')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(trajWithBestLap) });
       }
       return Promise.reject(new Error('Unknown URL'));
     });
 
     render(
-      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} replayName="Test_Replay.vcr" />
+      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />
     );
 
     await waitFor(() => {
@@ -355,10 +358,10 @@ describe('ReplayInspectorModal', () => {
   });
 
   it.each([
-    ['matching personal record', 'Test_Replay.vcr', 1, true, 'Personal best · Replay GPS lap time', 'text-lmu-personal-best'],
-    ['different replay', 'Other_Replay.vcr', 1, true, 'Session best · Replay GPS lap time', 'text-lmu-session-best'],
-    ['different lap', 'Test_Replay.vcr', 2, false, 'Replay GPS lap time', 'text-white'],
-  ])('colors the lap time for %s', async (_label, replayName, lapNum, isBest, title, color) => {
+    ['matching session locator', 'session-1', 0, true, 'Personal best · Replay GPS lap time', 'text-lmu-personal-best'],
+    ['different session', 'other-session', 0, true, 'Session best · Replay GPS lap time', 'text-lmu-session-best'],
+    ['different lap locator', 'session-1', 1, false, 'Replay GPS lap time', 'text-white'],
+  ])('colors the lap time for %s', async (_label, sessionId, lapOrdinal, isBest, title, color) => {
     const traj = { ...mockTraj, layoutKey: 'spa_gp', currentLap: 1,
       laps: [{ lapNumber: 1, lapTimeSec: 135.5, s1Sec: 40, s2Sec: 50, s3Sec: 45.5, isBest }],
     };
@@ -366,11 +369,11 @@ describe('ReplayInspectorModal', () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
       requests.push(url);
       const data = url.includes('/metadata') ? mockMeta
-        : url.includes('/trajectory') ? traj
-        : url.includes('/leaderboard') ? { player: { bestLap: { replayName, lapNum } } } : null;
+        : url.includes('/telemetry?') ? traj
+        : url.includes('/leaderboard') ? { player: { bestLap: { sessionId, driverOrdinal: 0, lapOrdinal } } } : null;
       return data ? Promise.resolve({ ok: true, json: () => Promise.resolve(data) }) : Promise.reject(new Error('Unknown URL'));
     });
-    render(<ReplayInspectorModal isOpen={true} onClose={vi.fn()} replayName="Test_Replay.vcr" />);
+    render(<ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />);
     await waitFor(() => {
       expect(requests.some(url => url.includes('/leaderboard') && url.includes('layout=spa_gp') && url.includes('carClass=LMGT3'))).toBe(true);
       expect(screen.getByTitle(title)).toHaveClass(color);
@@ -441,8 +444,8 @@ describe('ReplayInspectorModal', () => {
       if (url.includes('/metadata')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
-      if (url.includes('/trajectory')) {
-        const lapMatch = url.match(/lap=(\d+)/);
+      if (url.includes('/telemetry?')) {
+        const lapMatch = url.match(/lapOrdinal=(\d+)/);
         const requestedLap = lapMatch ? parseInt(lapMatch[1], 10) : 1;
         return Promise.resolve({
           ok: true,
@@ -459,9 +462,9 @@ describe('ReplayInspectorModal', () => {
       <ReplayInspectorModal
         isOpen={true}
         onClose={vi.fn()}
-        replayName="Test_Replay.vcr"
+        sessionId="session-1"
         initialCompareMode={true}
-        initialBaselineLapNumber={2}
+        initialBaselineLapOrdinal={2}
       />
     );
 
@@ -475,7 +478,7 @@ describe('ReplayInspectorModal', () => {
 
     // After swap, baseline loading should request the other lap.
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('lap=1'), expect.objectContaining({ signal: expect.any(AbortSignal) }));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('lapOrdinal=0'), expect.objectContaining({ signal: expect.any(AbortSignal) }));
     });
   });
 
@@ -494,7 +497,7 @@ describe('ReplayInspectorModal', () => {
       if (url.includes('/metadata')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
-      if (url.includes('/trajectory')) {
+      if (url.includes('/telemetry?')) {
         const lapMatch = url.match(/lap=(\d+)/);
         const requestedLap = lapMatch ? parseInt(lapMatch[1], 10) : 1;
         return Promise.resolve({
@@ -512,9 +515,9 @@ describe('ReplayInspectorModal', () => {
       <ReplayInspectorModal
         isOpen={true}
         onClose={vi.fn()}
-        replayName="Test_Replay.vcr"
+        sessionId="session-1"
         initialCompareMode={true}
-        initialBaselineLapNumber={2}
+        initialBaselineLapOrdinal={2}
       />
     );
 
@@ -528,7 +531,7 @@ describe('ReplayInspectorModal', () => {
 
     // Baseline should still request Lap 2 and compare mode must remain active.
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('lap=2'), expect.objectContaining({ signal: expect.any(AbortSignal) }));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('lapOrdinal=2'), expect.objectContaining({ signal: expect.any(AbortSignal) }));
     });
   });
 
@@ -543,7 +546,7 @@ describe('ReplayInspectorModal', () => {
     };
 
     const otherTraj = {
-      replayName: 'Other_Spa_Replay.vcr',
+      sessionId: 'Other_Spa_Replay.vcr',
       driverSlot: 1,
       currentLap: 8,
       pointsCount: 2,
@@ -558,13 +561,13 @@ describe('ReplayInspectorModal', () => {
       if (url.includes('Other_Spa_Replay.vcr') && url.includes('/metadata')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(otherMeta) });
       }
-      if (url.includes('Other_Spa_Replay.vcr') && url.includes('/trajectory')) {
+      if (url.includes('Other_Spa_Replay.vcr') && url.includes('/telemetry?')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(otherTraj) });
       }
       if (url.includes('/metadata')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
       }
-      if (url.includes('/replays') && !url.includes('/trajectory') && !url.includes('/metadata')) {
+      if (url.includes('/replays') && !url.includes('/telemetry?') && !url.includes('/metadata')) {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve([
@@ -595,7 +598,7 @@ describe('ReplayInspectorModal', () => {
           }),
         });
       }
-      if (url.includes('/trajectory')) {
+      if (url.includes('/telemetry?')) {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({
@@ -612,7 +615,7 @@ describe('ReplayInspectorModal', () => {
       <ReplayInspectorModal
         isOpen={true}
         onClose={vi.fn()}
-        replayName="Test_Replay.vcr"
+        sessionId="session-1"
         initialCompareMode={true}
       />
     );
@@ -641,7 +644,7 @@ describe('ReplayInspectorModal', () => {
           }),
         });
       }
-      if (url.includes('/trajectory')) {
+      if (url.includes('/telemetry?')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockTraj) });
       }
       if (url.includes('compare/laps')) {
@@ -658,7 +661,7 @@ describe('ReplayInspectorModal', () => {
       <ReplayInspectorModal
         isOpen={true}
         onClose={vi.fn()}
-        replayName="Bahrain Outer Circuit R1 11.vcr"
+        sessionId="Bahrain Outer Circuit R1 11.vcr"
         initialCompareMode={true}
       />
     );
@@ -675,6 +678,8 @@ describe('ReplayInspectorModal', () => {
     const comparisonLap = {
       id: 'comparison-lap',
       sessionId: 'comparison-session',
+      driverOrdinal: 1,
+      lapOrdinal: 7,
       sessionName: 'Q1',
       sessionType: 'Qualifying',
       dateString: '2026/06/01 12:00',
@@ -694,14 +699,14 @@ describe('ReplayInspectorModal', () => {
       if (url.includes('compare/laps')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ laps: [comparisonLap] }) });
       }
-      if (url.includes('/trajectory')) {
+      if (url.includes('/telemetry?')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockTraj) });
       }
       return Promise.reject(new Error('Unknown URL'));
     });
 
     render(
-      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} replayName="Test_Replay.vcr" />
+      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />
     );
 
     await waitFor(() => {
@@ -716,22 +721,25 @@ describe('ReplayInspectorModal', () => {
 
     await waitFor(() => {
       const params = new URLSearchParams(window.location.hash.split('?')[1]);
-      expect(params.get('compareSessionId')).toBe('comparison-session');
+      expect(params.get('baselineSessionId')).toBe('comparison-session');
       expect(params.get('compareDriver')).toBe('Rival Racer');
-      expect(params.get('compareLapNum')).toBe('8');
+      expect(params.get('baselineDriverOrdinal')).toBe('1');
+      expect(params.get('baselineLapOrdinal')).toBe('7');
     });
 
     fireEvent.click(screen.getByRole('button', { name: /Remove comparison lap/i }));
     const params = new URLSearchParams(window.location.hash.split('?')[1]);
-    expect(params.has('compareSessionId')).toBe(false);
+    expect(params.has('baselineSessionId')).toBe(false);
     expect(params.has('compareDriver')).toBe(false);
-    expect(params.has('compareLapNum')).toBe(false);
+    expect(params.has('baselineLapOrdinal')).toBe(false);
   });
 
   it('selects the exact chosen lap number when comparing against another driver whose lap count differs from player', async () => {
     const rivalLap12 = {
       id: 'rival-lap-12',
       sessionId: 'session-1',
+      driverOrdinal: 1,
+      lapOrdinal: 11,
       sessionName: 'R1',
       sessionType: 'Race',
       dateString: '2026/08/08 20:16:41',
@@ -765,15 +773,16 @@ describe('ReplayInspectorModal', () => {
       if (url.includes('compare/laps')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ laps: [rivalLap12] }) });
       }
-      if (url.includes('/trajectory')) {
-        const lapMatch = url.match(/lap=(\d+)/);
-        const lap = lapMatch ? parseInt(lapMatch[1], 10) : 1;
+      if (url.includes('/telemetry?')) {
+        const lapMatch = url.match(/lapOrdinal=(\d+)/);
+        const lapOrdinal = lapMatch ? parseInt(lapMatch[1], 10) : 0;
+        const lap = lapOrdinal + 1;
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve({
             ...mockTraj,
             currentLap: lap,
-            driverName: url.includes('Pithivier') ? 'Pithivier Patate' : 'Test Driver',
+            driverName: url.includes('driverOrdinal=1') ? 'Pithivier Patate' : 'Test Driver',
             laps: [
               { lapNumber: lap, lapTimeSec: lap === 12 ? 72.484 : 73.209, isBest: true },
             ],
@@ -784,7 +793,7 @@ describe('ReplayInspectorModal', () => {
     });
 
     render(
-      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} replayName="Test_Replay.vcr" />
+      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />
     );
 
     await waitFor(() => {
@@ -799,7 +808,7 @@ describe('ReplayInspectorModal', () => {
     fireEvent.click(screen.getByText('Pithivier Patate'));
 
     await waitFor(() => {
-      expect(requestedUrls.some(u => u.includes('lap=12') && u.includes('Pithivier'))).toBe(true);
+      expect(requestedUrls.some(u => u.includes('driverOrdinal=1') && u.includes('lapOrdinal=11'))).toBe(true);
     });
 
     // Check that the baseline compare pill displays L12 and 1:12.484 instead of Lap 11
@@ -822,7 +831,7 @@ describe('ReplayInspectorModal', () => {
       if (url.includes('/metadata')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(metaWithDuck) });
       }
-      if (url.includes('/trajectory')) {
+      if (url.includes('/telemetry?')) {
         const isVcr = url.includes('source=vcr');
         return Promise.resolve({
           ok: true,
@@ -837,7 +846,7 @@ describe('ReplayInspectorModal', () => {
     });
 
     render(
-      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} replayName="Test_Replay.vcr" />
+      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />
     );
 
     await waitFor(() => {
@@ -874,26 +883,4 @@ describe('ReplayInspectorModal', () => {
     });
   });
 
-  it('opens the corner a deep link asks for once the lap is loaded', async () => {
-    // One real corner: 200 km/h down to 100 at 70 m and back up (entry 30 m, exit 110 m).
-    const speeds = [100, 150, 200, 200, 180, 150, 100, 100, 150, 180, 200, 200, 180, 150, 100];
-    const cornerLap = {
-      ...mockTraj,
-      pointsCount: speeds.length,
-      currentLap: 20,
-      points: speeds.map((speedKmh, i) => ({ x: i * 10, y: 0, z: 0, speedKmh, throttle: 0, brake: 0, steerYaw: 0, timeSec: i * 0.3 })),
-    };
-    global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/metadata')) return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
-      if (url.includes('/trajectory')) return Promise.resolve({ ok: true, json: () => Promise.resolve(cornerLap) });
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ laps: [] }) });
-    });
-
-    render(<ReplayInspectorModal isOpen={true} onClose={vi.fn()} replayName="Test_Replay.vcr" initialLapNumber={20} initialCornerNumber={1} />);
-
-    await waitFor(() => {
-      const row = screen.getAllByText('T1').map(el => el.closest('tr')).find(Boolean);
-      expect(row).toHaveClass('bg-lmu-raised/60');
-    });
-  });
 });

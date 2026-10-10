@@ -15,18 +15,18 @@ import {
   preloadRoutePage,
 } from './routePages.js';
 import { updateSearchParams } from './utils/urlParams';
-import type { DetailedSession, SessionProgressionPoint } from '../shared/types/index.js';
+
 import { useAppData } from './api/useAppData.js';
 import { SessionDataContext } from './api/sessionDataContext.js';
 
 interface SessionRouteProps {
   onBack: () => void;
   onSelectSession: (id: string) => void;
-  progression: SessionProgressionPoint[];
-  sessions: DetailedSession[];
+
+
 }
 
-function SessionRoute({ onBack, onSelectSession, progression, sessions }: SessionRouteProps) {
+function SessionRoute({ onBack, onSelectSession }: SessionRouteProps) {
   const { sessionId } = useParams();
   if (!sessionId) return <Navigate to="/dashboard" replace />;
   return (
@@ -34,8 +34,8 @@ function SessionRoute({ onBack, onSelectSession, progression, sessions }: Sessio
       sessionId={sessionId}
       onBack={onBack}
       onSelectSession={onSelectSession}
-      progression={progression}
-      sessions={sessions}
+
+
     />
   );
 }
@@ -44,20 +44,20 @@ interface TrackRouteProps {
   onSelectSession: (id: string) => void;
   selectedCarClass: string;
   setSelectedCarClass: (carClass: string) => void;
-  progression: SessionProgressionPoint[];
+
 }
 
 interface DashboardRouteProps {
-  sessions: DetailedSession[];
+
   onSelectSession: (id: string) => void;
   selectedCarClass: string;
   setSelectedCarClass: (carClass: string) => void;
 }
 
-function DashboardRoute({ sessions, onSelectSession, selectedCarClass, setSelectedCarClass }: DashboardRouteProps) {
+function DashboardRoute({ onSelectSession, selectedCarClass, setSelectedCarClass }: DashboardRouteProps) {
   return (
     <Dashboard
-      sessions={sessions}
+
       onSelectSession={onSelectSession}
       selectedCarClass={selectedCarClass}
       setSelectedCarClass={setSelectedCarClass}
@@ -66,7 +66,7 @@ function DashboardRoute({ sessions, onSelectSession, selectedCarClass, setSelect
 }
 
 interface LeaderboardRouteProps {
-  sessions: DetailedSession[];
+
   onSelectSession: (id: string) => void;
 }
 
@@ -76,11 +76,11 @@ function CompareRedirect() {
   return <Navigate to={{ pathname: '/leaderboard', search }} replace />;
 }
 
-function LeaderboardRoute({ sessions, onSelectSession }: LeaderboardRouteProps) {
+function LeaderboardRoute({ onSelectSession }: LeaderboardRouteProps) {
   const [searchParams] = useSearchParams();
   return (
     <LeaderboardPage
-      sessions={sessions}
+
       onSelectSession={onSelectSession}
       initialTrack={searchParams.get('track') || undefined}
       initialCarClass={searchParams.get('carClass') || undefined}
@@ -93,7 +93,7 @@ function LeaderboardRoute({ sessions, onSelectSession }: LeaderboardRouteProps) 
   );
 }
 
-function TrackRoute({ onSelectSession, selectedCarClass, setSelectedCarClass, progression }: TrackRouteProps) {
+function TrackRoute({ onSelectSession, selectedCarClass, setSelectedCarClass }: TrackRouteProps) {
   const { trackName } = useParams();
   const navigate = useNavigate();
   if (!trackName) return <Navigate to="/tracks" replace />;
@@ -104,7 +104,7 @@ function TrackRoute({ onSelectSession, selectedCarClass, setSelectedCarClass, pr
       onSelectSession={onSelectSession}
       selectedCarClass={selectedCarClass}
       setSelectedCarClass={setSelectedCarClass}
-      progression={progression}
+
     />
   );
 }
@@ -117,7 +117,7 @@ export default function App() {
   // Global Filter States
   const [selectedCarClass, setSelectedCarClassState] = useState<string>('All');
 
-  const { status, sessions, progression, loading, isRefreshing, replayScanStatus,
+  const { status, loading, isRefreshing, replayScanStatus,
     referenceUpdateCount, setReferenceUpdateCount, revision, error, fetchData,
     refreshReplayScanStatus } = useAppData();
 
@@ -183,7 +183,7 @@ export default function App() {
           <Routes>
             <Route path="/dashboard" element={
               <DashboardRoute
-                sessions={sessions}
+
                 onSelectSession={handleSelectSession}
                 selectedCarClass={selectedCarClass}
                 setSelectedCarClass={setSelectedCarClass}
@@ -191,7 +191,7 @@ export default function App() {
             } />
             <Route path="/tracks" element={
               <TrackSummaries
-                sessions={sessions}
+
                 onSelectTrack={handleSelectTrack}
                 selectedCarClass={selectedCarClass}
                 setSelectedCarClass={setSelectedCarClass}
@@ -199,7 +199,7 @@ export default function App() {
             } />
             <Route path="/leaderboard" element={
               <LeaderboardRoute
-                sessions={sessions}
+
                 onSelectSession={handleSelectSession}
               />
             } />
@@ -212,9 +212,9 @@ export default function App() {
                 onReplayScanTriggered={refreshReplayScanStatus}
               />
             } />
-            <Route path="/session/:sessionId" element={<SessionRoute onBack={handleBackToSessions} onSelectSession={handleSelectSession} progression={progression} sessions={sessions} />} />
+            <Route path="/session/:sessionId" element={<SessionRoute onBack={handleBackToSessions} onSelectSession={handleSelectSession} />} />
             <Route path="/telemetry" element={<ReplayInspectorPage />} />
-            <Route path="/track/:trackName" element={<TrackRoute onSelectSession={handleSelectSession} selectedCarClass={selectedCarClass} setSelectedCarClass={setSelectedCarClass} progression={progression} />} />
+            <Route path="/track/:trackName" element={<TrackRoute onSelectSession={handleSelectSession} selectedCarClass={selectedCarClass} setSelectedCarClass={setSelectedCarClass} />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         )}

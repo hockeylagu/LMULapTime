@@ -112,7 +112,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
     : 'Incomplete Lap (lap not finished or missing sector timing)';
 
   const telemetryUrl = session.matchingReplayFile
-    ? sessionTelemetryPath(searchParams, session.matchingReplayFile.name, selectedDriver?.name, l.lapNum)
+    ? sessionTelemetryPath(searchParams, session, selectedDriver, l) ?? sessionLapComparePath(session, selectedDriver, l.lapNum)
     : sessionLapComparePath(session, selectedDriver, l.lapNum);
 
   const handleOpenTelemetry = () => {

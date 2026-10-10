@@ -56,14 +56,14 @@ describe('SessionLapTableRow expansion and actions', () => {
   it('opens telemetry once through its action without expanding the row', () => {
     const row = renderTable();
     fireEvent.click(within(row).getByRole('link', { name: 'Telemetry for lap 3' }));
-    expect(navigateMock).toHaveBeenCalledExactlyOnceWith('/telemetry?replayName=spa_replay.vcr&lap=3&driverName=Sim+Driver');
+    expect(navigateMock).toHaveBeenCalledExactlyOnceWith('/telemetry?sessionId=sess123&driverOrdinal=0&lapOrdinal=2');
     expect(screen.queryByTestId('lap-details-3')).not.toBeInTheDocument();
   });
 
   it('keeps comparison on its dedicated link without expanding the row', () => {
     const row = renderTable();
     const link = within(row).getByRole('link', { name: 'Compare lap 3' });
-    expect(link).toHaveAttribute('href', '/leaderboard?track=Spa&carClass=LMH&sessionId=sess123&lapNum=3');
+    expect(link).toHaveAttribute('href', '/leaderboard?track=Spa&carClass=LMH&sessionId=sess123&lapNum=3&driverOrdinal=0&lapOrdinal=2');
     fireEvent.click(link);
     expect(screen.queryByTestId('lap-details-3')).not.toBeInTheDocument();
   });
@@ -86,7 +86,7 @@ describe('SessionLapTableRow expansion and actions', () => {
     render(<SessionLapTable session={session} selectedDriver={other} isMultiClass={false}
       hasTireWearData={false} hasFuelData={false} hasVirtualEnergyData={false} isCurrentSessionAllTimePB={false} />);
     fireEvent.click(screen.getByRole('link', { name: 'Telemetry for lap 1' }));
-    expect(navigateMock).toHaveBeenCalledWith('/telemetry?replayName=spa_replay.vcr&lap=1&driverName=AI+Driver+2');
+    expect(navigateMock).toHaveBeenCalledWith('/telemetry?sessionId=sess123&driverOrdinal=1&lapOrdinal=0');
   });
 });
 

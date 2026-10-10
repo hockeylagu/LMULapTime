@@ -13,9 +13,11 @@ import { getSessionTypeStyle } from '../common/sessionTypeStyles.js';
 import type { SessionSummary } from './dashboardTypes.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import { linkClickHandler } from '../../utils/linkClick.js';
+import type { DashboardTrends } from '../../../shared/types/dashboard.js';
 
 export interface DashboardHeroProps {
   sessions: SessionSummary[];
+  trends?: DashboardTrends;
   onSelectSession: (id: string) => void;
   onOpenReplay?: (id: string, targetLap?: number) => void;
   trackGeometry?: TrackBoundaryGeometry | null;
@@ -24,11 +26,13 @@ export interface DashboardHeroProps {
 
 export const DashboardHero: React.FC<DashboardHeroProps> = ({
   sessions,
+  trends: serverTrends,
   onSelectSession,
   onOpenReplay,
   trackGeometry,
   className = '',
 }) => {
+  const localTrends = useDashboardTrends(sessions);
   const {
     hasData,
     driverName,
@@ -41,7 +45,7 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
     recentCleanRate,
     recentConsistency,
     recentNetPositions,
-  } = useDashboardTrends(sessions);
+  } = serverTrends ?? localTrends;
 
   if (!hasData || !latestOuting) {
     return null;
@@ -172,11 +176,10 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
 
           {/* Action Buttons */}
           <div className="flex items-center gap-3 mt-5">
-            {latestOuting.hasReplay && onOpenReplay && (
+            {latestOuting.hasReplay && onOpenReplay && Number.isInteger(latestOuting.driverOrdinal) && Number.isInteger(latestOuting.bestLapOrdinal) && (
               <ReplayLaunchButton
                 hasDuckDb={Boolean(latestOuting.hasDuckDbTelemetry)}
-                replayName={latestOuting.replayName}
-                to={`/telemetry?replayName=${encodeURIComponent(latestOuting.replayName || '')}&session=${encodeURIComponent(latestOuting.id)}${latestOuting.bestLapNum ? `&lap=${latestOuting.bestLapNum}` : ''}`}
+                to={`/telemetry?sessionId=${encodeURIComponent(latestOuting.id)}&driverOrdinal=${latestOuting.driverOrdinal}&lapOrdinal=${latestOuting.bestLapOrdinal}`}
                 onClick={() => onOpenReplay(latestOuting.id, latestOuting.bestLapNum ?? undefined)}
                 data-testid="hero-launch-replay-btn"
                 title={latestOuting.bestLapNum ? `Open telemetry for Best Lap (Lap ${latestOuting.bestLapNum})` : 'Open telemetry'}

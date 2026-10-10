@@ -3,20 +3,21 @@ import { renderHook, waitFor, act } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useReplayInspectorData } from '../../../../src/components/replay/inspector/useReplayInspectorData.js';
-import { ComparableLap, ReplayMetadata, ReplayTrajectoryData } from '../../../../server/core/types.js';
+import type { ComparableLap, ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 
 const metadata: ReplayMetadata = {
   filename: 'Inspector_Test_P1.Vcr', filePath: '/tmp/Inspector_Test_P1.Vcr', fileSizeBytes: 1,
   mtimeMs: 1, trackName: 'Spa', displayTrack: 'Spa', trackCourse: 'Grand Prix', sessionType: 'Practice',
   timeSliceCount: 2, totalEvents: 1, durationSec: 2,
   drivers: [
-    { slot: 2, name: 'Player Driver', isPlayer: true, vehicleId: '21_26_AFCO95641716' },
-    { slot: 3, name: 'Other Driver', vehicleId: '21_26_AFCO95641716' },
+    { slot: 2, name: 'Player Driver', isPlayer: true, vehicleId: '21_26_AFCO95641716', sessionDriverOrdinal: 0, sessionLapOrdinals: { '2': 0 } },
+    { slot: 3, name: 'Other Driver', vehicleId: '21_26_AFCO95641716', sessionDriverOrdinal: 1, sessionLapOrdinals: { '2': 0 } },
   ],
 };
 
 const trajectory: ReplayTrajectoryData = {
-  replayName: 'Inspector_Test_P1.Vcr', pointsCount: 2, driverSlot: 2, driverName: 'Player Driver', currentLap: 2,
+  replayName: 'Inspector_Test_P1.Vcr', sessionId: 'session-1', driverOrdinal: 0, lapOrdinal: 0,
+  pointsCount: 2, driverSlot: 2, driverName: 'Player Driver', currentLap: 2,
   points: [
     { x: 0, y: 0, z: 0, speedKmh: 100, timeSec: 0 },
     { x: 10, y: 0, z: 0, speedKmh: 180, timeSec: 1 },
@@ -27,460 +28,93 @@ const trajectory: ReplayTrajectoryData = {
 };
 
 function response(value: unknown, ok = true): Response {
-  return { ok, json: async () => value } as Response;
+  return { ok, status: ok ? 200 : 404, json: async () => value } as Response;
 }
 
 let observedSearch = '';
-
 function SearchObserver({ children }: { children: React.ReactNode }) {
-  const location = useLocation();
-  observedSearch = location.search;
+  observedSearch = useLocation().search;
   return React.createElement(React.Fragment, null, children);
 }
 
 function wrapper({ children }: { children: React.ReactNode }) {
-  return React.createElement(
-    MemoryRouter,
-    { initialEntries: ['/replay'] },
-    React.createElement(SearchObserver, null, children),
-  );
+  return React.createElement(MemoryRouter, { initialEntries: ['/replay'] },
+    React.createElement(SearchObserver, null, children));
 }
 
-describe('useReplayInspectorData', () => {
+describe('useReplayInspectorData session locators', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it('rolls back a failed driver selection and retries the requested driver', async () => {
-    let fail = true;
+  it('loads metadata and telemetry by session ID and keeps driver/lap ordinals in the request', async () => {
+    const urls: string[] = [];
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = String(input);
-      if (url.includes('/metadata')) return response(metadata);
+      urls.push(url);
+      if (url.endsWith('/telemetry/metadata')) return response(metadata);
       if (url.includes('/compare/laps')) return response({ laps: [] });
-      if (url.includes('driverSlot=3')) {
-        if (fail) throw new Error('Telemetry file is busy');
-        return response({ ...trajectory, driverSlot: 3, driverName: 'Other Driver' });
-      }
       return response(trajectory);
     });
-    const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, replayName: metadata.filename }), { wrapper });
+
+    const { result } = renderHook(() => useReplayInspectorData({
+      isOpen: true, sessionId: 'session-1', initialDriverOrdinal: 0, initialLapOrdinal: 0,
+    }), { wrapper });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    act(() => result.current.handleSelectDriver(3));
-    await waitFor(() => expect(result.current.error).toContain('Telemetry file is busy'));
-    expect(result.current.selectedDriverSlot).toBe(2);
-    expect(result.current.trajectory?.driverName).toBe('Player Driver');
-    fail = false;
-    act(() => result.current.handleRetryLoad());
-    await waitFor(() => expect(result.current.trajectory?.driverName).toBe('Other Driver'));
-    expect(result.current.selectedDriverSlot).toBe(3);
-    expect(result.current.error).toBeNull();
+
+    expect(result.current.trajectory?.sessionId).toBe('session-1');
+    expect(urls).toContain('/api/session/session-1/telemetry/metadata');
+    expect(urls.some(url => url.startsWith('/api/session/session-1/telemetry?') &&
+      url.includes('driverOrdinal=0') && url.includes('lapOrdinal=0'))).toBe(true);
+    expect(urls.some(url => url.includes('Inspector_Test_P1.Vcr/trajectory'))).toBe(false);
   });
 
-  it("keeps another replay's comparison lap when only its metadata fails to load", async () => {
+  it('changes the selected driver using its session ordinal and updates route locators', async () => {
+    const urls: string[] = [];
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = String(input);
-      if (url.includes('Other_Q1.Vcr/metadata')) return response({ error: 'Metadata unavailable' }, false);
-      if (url.includes('/metadata')) return response(metadata);
+      urls.push(url);
+      if (url.endsWith('/telemetry/metadata')) return response(metadata);
       if (url.includes('/compare/laps')) return response({ laps: [] });
-      if (url.includes('Other_Q1.Vcr')) return response({ ...trajectory, replayName: 'Other_Q1.Vcr', currentLap: 4 });
-      return response(trajectory);
-    });
-    const { result } = renderHook(() => useReplayInspectorData({
-      isOpen: true, replayName: metadata.filename,
-      initialCompareMode: true, initialBaselineReplayName: 'Other_Q1.Vcr', initialBaselineLapNumber: 4,
-    }), { wrapper });
-    await waitFor(() => expect(result.current.baselineTrajectory?.currentLap).toBe(4));
-    expect(result.current.baselineError).toBeNull();
-    expect(result.current.baselineMetadata).toBeNull();
-  });
-
-  it('clears the previous baseline while loading and retries a failed replacement', async () => {
-    let releaseReplacement: (value: Response) => void = () => undefined;
-    const replacement = new Promise<Response>(resolve => { releaseReplacement = resolve; });
-    let fail = true;
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
-      const url = String(input);
-      if (url.includes('/metadata')) return response(metadata);
-      if (url.includes('/compare/laps')) return response({ laps: [] });
-      const lap = Number(new URL(url, 'http://localhost').searchParams.get('lap') ?? 2);
-      if (lap === 4 && fail) return replacement;
-      return response({ ...trajectory, currentLap: lap });
-    });
-    const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, replayName: metadata.filename }), { wrapper });
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-    act(() => result.current.handleSelectBaselineLap(3));
-    await waitFor(() => expect(result.current.baselineTrajectory?.currentLap).toBe(3));
-    act(() => result.current.handleSelectBaselineLap(4));
-    expect(result.current.isBaselineLoading).toBe(true);
-    expect(result.current.baselineTrajectory).toBeNull();
-    await act(async () => releaseReplacement(response({ error: 'Lap unavailable' }, false)));
-    await waitFor(() => expect(result.current.baselineError).toBe('Lap unavailable'));
-    fail = false;
-    act(() => result.current.handleRetryBaseline());
-    await waitFor(() => expect(result.current.baselineTrajectory?.currentLap).toBe(4));
-    expect(result.current.baselineError).toBeNull();
-    act(() => result.current.handleRemoveCompare());
-    expect(result.current.isBaselineLoading).toBe(false);
-  });
-
-  it('reports comparison candidate failures and ignores a superseded filter response', async () => {
-    let releaseOld: (value: Response) => void = () => undefined;
-    const oldResponse = new Promise<Response>(resolve => { releaseOld = resolve; });
-    let candidateRequests = 0;
-    const staleLap: ComparableLap = { id: 'stale', driverName: 'Player Driver', carType: 'GT3', carClass: 'LMGT3', lapTime: 98, lapTimeString: '1:38.000', s1: 30, s2: 34, s3: 34, topSpeed: 200, isValid: true, isPitStop: false, matchingReplayFile: metadata.filename };
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
-      const url = String(input);
-      if (url.includes('/metadata')) return response(metadata);
-      if (url.includes('/compare/laps')) {
-        candidateRequests++;
-        if (candidateRequests === 1) return oldResponse;
-        if (candidateRequests === 2) throw new Error('Comparison cache unavailable');
-        return response({ laps: [] });
-      }
-      return response(trajectory);
-    });
-    const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, replayName: metadata.filename }), { wrapper });
-    await waitFor(() => expect(candidateRequests).toBe(1));
-    act(() => result.current.setCompareLapFilter('all'));
-    await waitFor(() => expect(result.current.compareLapsError).toBe('Comparison cache unavailable'));
-    await act(async () => releaseOld(response({ laps: [staleLap] })));
-    expect(result.current.availableCompareLaps).toEqual([]);
-    expect(result.current.compareLapsError).toBe('Comparison cache unavailable');
-    act(() => result.current.handleRetryCompareLaps());
-    await waitFor(() => expect(result.current.isCompareLapsLoading).toBe(false));
-    expect(result.current.compareLapsError).toBeNull();
-  });
-
-  it('does not restore telemetry after closing with a driver request pending', async () => {
-    let releaseDriver: (value: Response) => void = () => undefined;
-    const pending = new Promise<Response>(resolve => { releaseDriver = resolve; });
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
-      const url = String(input);
-      if (url.includes('/metadata')) return response(metadata);
-      if (url.includes('/compare/laps')) return response({ laps: [] });
-      if (url.includes('driverSlot=3')) return pending;
-      return response(trajectory);
-    });
-    const { result, rerender } = renderHook((props: { isOpen: boolean }) => useReplayInspectorData({ ...props, replayName: metadata.filename }), { wrapper, initialProps: { isOpen: true } });
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-    act(() => result.current.handleSelectDriver(3));
-    rerender({ isOpen: false });
-    await act(async () => releaseDriver(response({ ...trajectory, driverSlot: 3 })));
-    expect(result.current.trajectory).toBeNull();
-    expect(result.current.isTrajLoading).toBe(false);
-  });
-
-  it('loads metadata and trajectory, resolves the player driver, and exposes lap metrics', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-      const url = String(input);
-      if (url.includes('/metadata')) return response(metadata);
-      if (url.includes('/compare/laps')) return response({ laps: [] });
-      return response(trajectory);
-    });
-    const onLapChange = vi.fn();
-    const { result } = renderHook(() => useReplayInspectorData({
-      isOpen: true, replayName: metadata.filename, onLapChange,
-    }), { wrapper });
-
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.error).toBeNull();
-    expect(result.current.selectedDriverSlot).toBe(2);
-    expect(result.current.selectedDriver?.name).toBe('Player Driver');
-    // Speed smoothing is a centred time window, so the recording's end samples keep their values.
-    expect(result.current.currentPoint?.speedKmh).toBe(100);
-    expect(Math.max(...(result.current.trajectory?.points ?? []).map(p => p.speedKmh ?? 0))).toBe(180);
-    expect(result.current.currentLapSummary?.lapTimeSec).toBe(100);
-    expect(onLapChange).toHaveBeenCalledWith(2);
-    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/metadata'), expect.anything());
-  });
-
-  it('asks for one point every 2 m by default, and every sample at full resolution', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-      const url = String(input);
-      if (url.includes('/metadata')) return response(metadata);
-      if (url.includes('/compare/laps')) return response({ laps: [] });
-      return response(trajectory);
-    });
-    const trajectoryUrls = () => fetchMock.mock.calls.map(([input]) => String(input)).filter(url => url.includes('/trajectory?'));
-    const lastTrajectoryUrl = () => trajectoryUrls()[trajectoryUrls().length - 1];
-    const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, replayName: metadata.filename }), { wrapper });
-
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.telemetryResolution).toBe('high');
-    expect(trajectoryUrls()[0]).toContain('trajectory?pointSpacingM=2&');
-
-    act(() => result.current.handleChangeResolution('full'));
-    await waitFor(() => expect(lastTrajectoryUrl()).toContain('trajectory?maxPoints=0&'));
-    act(() => result.current.handleChangeResolution('standard'));
-    await waitFor(() => expect(lastTrajectoryUrl()).toContain('trajectory?pointSpacingM=4&'));
-  });
-
-  it('finishes opening when a lap is picked before the replay has loaded', async () => {
-    let releaseOpening: () => void = () => undefined;
-    const opening = new Promise<void>(resolve => { releaseOpening = resolve; });
-    let trajectoryRequests = 0;
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-      const url = String(input);
-      if (url.includes('/compare/laps')) return response({ laps: [] });
-      if (url.includes('/metadata')) { await opening; return response(metadata); }
-      // The opening request waits; the lap picked meanwhile answers at once.
-      if (++trajectoryRequests === 1) { await opening; return response(trajectory); }
-      return response({ ...trajectory, currentLap: 3 });
-    });
-    const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, replayName: metadata.filename }), { wrapper });
-
-    act(() => result.current.handleSelectLap(3));
-    await waitFor(() => expect(result.current.trajectory?.currentLap).toBe(3));
-    await act(async () => releaseOpening());
-
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.metadata?.filename).toBe(metadata.filename);
-    expect(result.current.trajectory?.currentLap).toBe(3);
-  });
-
-  it('reports metadata load failures and resets data when closed', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(response(null, false));
-    const { result, rerender } = renderHook(
-      (props: { isOpen: boolean }) => useReplayInspectorData({ isOpen: props.isOpen, replayName: 'Failure_P1.Vcr' }),
-      { initialProps: { isOpen: true }, wrapper }
-    );
-
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(result.current.error).toContain('Could not load metadata');
-
-    rerender({ isOpen: false });
-    await waitFor(() => expect(result.current.metadata).toBeNull());
-    expect(result.current.trajectory).toBeNull();
-    expect(result.current.activeReplayName).toBe('Failure_P1.Vcr');
-  });
-
-  it('filters comparison laps and updates comparison state and URL parameters', async () => {
-    observedSearch = '';
-    const comparisonLap: ComparableLap = {
-      id: 'baseline-1', lapNum: 4, lapTime: 98, lapTimeString: '1:38.000',
-      s1: 30, s2: 34, s3: 34, topSpeed: 250, isValid: true, isPitStop: false, isOutLap: false,
-      matchingReplayFile: 'Baseline_Q1.Vcr', sessionId: 'session-42', driverName: 'Baseline Driver',
-      carType: 'Test Car', carClass: 'LMGT3',
-    };
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-      const url = String(input);
-      if (url.includes('/metadata')) return response(metadata);
-      if (url.includes('/compare/laps')) return response({ laps: [comparisonLap, { ...comparisonLap, lapTime: 0 }] });
-      return response(trajectory);
-    });
-    const { result } = renderHook(() => useReplayInspectorData({
-      isOpen: true, replayName: metadata.filename,
-    }), { wrapper });
-
-    await waitFor(() => expect(result.current.availableCompareLaps).toHaveLength(1));
-    act(() => result.current.handleSelectCompareLap(comparisonLap));
-    expect(result.current.isCompareMode).toBe(true);
-    expect(result.current.baselineReplayName).toBe('Baseline_Q1.Vcr');
-    expect(result.current.baselineLapNumber).toBe(4);
-    await waitFor(() => expect(observedSearch).toContain('compareSessionId=session-42'));
-    await waitFor(() => expect(result.current.isBaselineLoading).toBe(false));
-
-    act(() => result.current.handleRemoveCompare());
-    expect(result.current.isCompareMode).toBe(false);
-    expect(result.current.baselineReplayName).toBeNull();
-  });
-
-  it("offers comparison laps of the inspected driver's car class, not the replay player's", async () => {
-    const multiclass: ReplayMetadata = {
-      ...metadata,
-      carClass: 'Hyper',
-      drivers: [
-        { slot: 2, name: 'Player Driver', isPlayer: true, vehicleId: '93_26_PEUG27100541', carModel: 'Peugeot 9X8', carClass: 'LMH' },
-        { slot: 3, name: 'GT3 Driver', vehicleId: '92_25_MANT9651C55B', carModel: 'Porsche 911 GT3 R', carClass: 'LMGT3' },
-      ],
-    };
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-      const url = String(input);
-      if (url.includes('/metadata')) return response(multiclass);
-      if (url.includes('/compare/laps')) return response({ laps: [] });
-      return response(trajectory);
-    });
-    const compareClasses = () => fetchMock.mock.calls
-      .map(([input]) => String(input))
-      .filter(url => url.includes('/compare/laps'))
-      .map(url => new URL(url, 'http://localhost').searchParams.get('carClass'));
-
-    const { result } = renderHook(() => useReplayInspectorData({
-      isOpen: true, replayName: multiclass.filename,
-    }), { wrapper });
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-    await waitFor(() => expect(compareClasses().slice(-1)[0]).toBe('LMH'));
-
-    act(() => result.current.handleSelectDriver(3));
-    await waitFor(() => expect(compareClasses().slice(-1)[0]).toBe('LMGT3'));
-  });
-
-  it('never compares against a lap of another car class', async () => {
-    const multiclass: ReplayMetadata = {
-      ...metadata,
-      drivers: [
-        { slot: 2, name: 'Player Driver', isPlayer: true, vehicleId: '93_26_PEUG27100541', carModel: 'Peugeot 9X8', carClass: 'LMH' },
-        { slot: 3, name: 'Other Hypercar', vehicleId: '397_26_VLMDH', carModel: 'Cadillac V-Series.R', carClass: 'LMH' },
-        { slot: 4, name: 'GT3 Driver', vehicleId: '92_25_MANT9651C55B', carModel: 'Porsche 911 GT3 R', carClass: 'LMGT3' },
-      ],
-    };
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-      const url = String(input);
-      if (url.includes('/metadata')) return response(multiclass);
-      if (url.includes('/compare/laps')) return response({ laps: [] });
-      if (url.includes('driverName=Other')) return response({ ...trajectory, driverName: 'Other Hypercar', driverSlot: 3 });
-      if (url.includes('driverSlot=4')) return response({ ...trajectory, driverName: 'GT3 Driver', driverSlot: 4 });
-      return response(trajectory);
-    });
-
-    const { result } = renderHook(() => useReplayInspectorData({
-      isOpen: true,
-      replayName: multiclass.filename,
-      initialCompareMode: true,
-      initialBaselineReplayName: multiclass.filename,
-      initialBaselineLapNumber: 2,
-      initialBaselineDriverName: 'Other Hypercar',
-    }), { wrapper });
-    await waitFor(() => expect(result.current.baselineTrajectory?.driverName).toBe('Other Hypercar'));
-    expect(result.current.baselineError).toBeNull();
-
-    act(() => result.current.handleSelectDriver(4));
-    await waitFor(() => expect(result.current.baselineTrajectory).toBeNull());
-    expect(result.current.baselineError).toContain('same car class');
-    expect(result.current.lapDeltas).toBeNull();
-
-    act(() => result.current.handleSelectDriver(2));
-    await waitFor(() => expect(result.current.baselineTrajectory?.driverName).toBe('Other Hypercar'));
-    expect(result.current.baselineError).toBeNull();
-  });
-
-  it('opens a comparison from the same replay with one request each, the baseline asked with its driver', async () => {
-    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-      const url = String(input);
-      if (url.includes('/metadata')) return response(metadata);
-      if (url.includes('/compare/laps')) return response({ laps: [] });
-      return response({ ...trajectory, currentLap: Number(new URL(url, 'http://localhost').searchParams.get('lap')) });
-    });
-    fetchMock.mockClear();
-    const urls = () => fetchMock.mock.calls.map(([input]) => String(input));
-    const { result } = renderHook(() => useReplayInspectorData({
-      isOpen: true,
-      replayName: metadata.filename,
-      initialLapNumber: 2,
-      initialCompareMode: true,
-      initialBaselineReplayName: metadata.filename,
-      initialBaselineLapNumber: 1,
-      initialBaselineDriverName: 'Other Driver',
-    }), { wrapper });
-
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
-    await waitFor(() => expect(result.current.isBaselineLoading).toBe(false));
-    await waitFor(() => expect(urls().filter(url => url.includes('/compare/laps')).length).toBeGreaterThan(0));
-
-    expect(urls().filter(url => url.includes('/compare/laps'))).toHaveLength(1);
-    expect(urls().filter(url => url.includes('/metadata'))).toHaveLength(1);
-    const baselineUrls = urls().filter(url => url.includes('&lap=1'));
-    expect(baselineUrls).toHaveLength(1);
-    expect(baselineUrls[0]).toContain('driverName=Other%20Driver');
-    expect(new URL(urls().find(url => url.includes('/compare/laps')) ?? '', 'http://localhost').searchParams.get('carClass')).toBeTruthy();
-  });
-
-  it('initializes baseline replay, lap, and driver directly from comparison props', async () => {
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-      const url = String(input);
-      if (url.includes('/metadata')) return response(metadata);
-      if (url.includes('/compare/laps')) return response({ laps: [] });
-      if (url.includes('&lap=5')) return response({ ...trajectory, currentLap: 5 });
-      return response(trajectory);
-    });
-
-    const { result } = renderHook(() => useReplayInspectorData({
-      isOpen: true,
-      replayName: metadata.filename,
-      initialCompareMode: true,
-      initialBaselineReplayName: 'Daytona_Q1.Vcr',
-      initialBaselineLapNumber: 5,
-      initialBaselineDriverName: 'Samuel Lague',
-    }), { wrapper });
-
-    expect(result.current.isCompareMode).toBe(true);
-    expect(result.current.baselineReplayName).toBe('Daytona_Q1.Vcr');
-    expect(result.current.baselineLapNumber).toBe(5);
-    expect(result.current.baselineDriverName).toBe('Samuel Lague');
-    await waitFor(() => expect(result.current.isBaselineLoading).toBe(false));
-  });
-
-  describe('comparing laps of the same replay and playback', () => {
-    /** Serves the replay; each trajectory is the lap it was asked for, or `failLap`'s server error. */
-    function serveReplay(failLap?: number, points = trajectory.points) {
-      return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-        const url = String(input);
-        if (url.includes('/metadata')) return response(metadata);
-        if (url.includes('/compare/laps')) return response({ laps: [] });
-        const lap = Number(new URL(url, 'http://localhost').searchParams.get('lap') ?? 2);
-        if (lap === failLap) return { ok: false, status: 500, json: async () => ({ error: 'lap 3 is not in the replay cache' }) } as Response;
-        return response({ ...trajectory, points, currentLap: lap });
+      if (url.includes('driverOrdinal=1')) return response({
+        ...trajectory, driverOrdinal: 1, driverSlot: 3, driverName: 'Other Driver',
       });
-    }
-
-    it("opens another lap of the inspected driver as the baseline, and puts it in the URL", async () => {
-      serveReplay();
-      const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, replayName: metadata.filename }), { wrapper });
-      await waitFor(() => expect(result.current.isLoading).toBe(false));
-
-      act(() => result.current.handleSelectBaselineLap(3));
-
-      expect(result.current).toMatchObject({ isCompareMode: true, baselineReplayName: metadata.filename, baselineLapNumber: 3, baselineDriverName: 'Player Driver' });
-      await waitFor(() => expect(result.current.baselineTrajectory?.currentLap).toBe(3));
-      const params = new URLSearchParams(observedSearch);
-      expect(params.get('baselineReplay')).toBe(metadata.filename);
-      expect(params.get('compareLapNum')).toBe('3');
-      expect(params.get('compareDriver')).toBe('Player Driver');
+      return response(trajectory);
     });
 
-    it("shows the server's reason when the baseline lap cannot be loaded", async () => {
-      serveReplay(3);
-      const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, replayName: metadata.filename }), { wrapper });
-      await waitFor(() => expect(result.current.isLoading).toBe(false));
+    const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, sessionId: 'session-1' }), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    act(() => result.current.handleSelectDriver(3));
+    await waitFor(() => expect(result.current.trajectory?.driverOrdinal).toBe(1));
 
-      act(() => result.current.handleSelectBaselineLap(3));
+    expect(result.current.trajectory?.driverName).toBe('Other Driver');
+    expect(urls.some(url => url.includes('driverOrdinal=1') && url.includes('lapOrdinal=0'))).toBe(true);
+  });
 
-      await waitFor(() => expect(result.current.baselineError).toBe('lap 3 is not in the replay cache'));
-      expect(result.current.baselineTrajectory).toBeNull();
-      expect(result.current.isBaselineLoading).toBe(false);
+  it('selects comparison candidates with session and ordinal locators in the URL', async () => {
+    const candidate: ComparableLap = {
+      id: 'other-session-lap', sessionId: 'session-2', driverOrdinal: 2, lapOrdinal: 4,
+      driverName: 'Baseline Driver', carType: 'GT3', carClass: 'LMGT3', lapTime: 98,
+      lapTimeString: '1:38.000', s1: 30, s2: 34, s3: 34, topSpeed: 200,
+      isValid: true, isPitStop: false, matchingReplayFile: 'Baseline_Q1.Vcr',
+    };
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = String(input);
+      if (url.endsWith('/telemetry/metadata')) return response(metadata);
+      if (url.includes('/compare/laps')) return response({ laps: [candidate] });
+      if (url.startsWith('/api/session/session-2/telemetry/metadata')) return response(metadata);
+      if (url.startsWith('/api/session/session-2/telemetry?')) return response({
+        ...trajectory, sessionId: 'session-2', driverOrdinal: 2, lapOrdinal: 4, driverName: 'Baseline Driver',
+      });
+      return response(trajectory);
     });
 
-    it('swaps the inspected lap and the baseline lap', async () => {
-      serveReplay();
-      const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, replayName: metadata.filename, initialLapNumber: 2 }), { wrapper });
-      await waitFor(() => expect(result.current.isLoading).toBe(false));
-      act(() => result.current.handleSelectBaselineLap(3));
-      await waitFor(() => expect(result.current.baselineTrajectory?.currentLap).toBe(3));
+    const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, sessionId: 'session-1' }), { wrapper });
+    await waitFor(() => expect(result.current.availableCompareLaps).toHaveLength(1));
+    act(() => result.current.handleSelectCompareLap(candidate));
+    await waitFor(() => expect(result.current.baselineTrajectory?.sessionId).toBe('session-2'));
 
-      act(() => result.current.handleSwapBaseline());
-
-      await waitFor(() => expect(result.current.trajectory?.currentLap).toBe(3));
-      await waitFor(() => expect(result.current.baselineTrajectory?.currentLap).toBe(2));
-      const params = new URLSearchParams(observedSearch);
-      expect(params.get('lap')).toBe('3');
-      expect(params.get('compareLapNum')).toBe('2');
-    });
-
-    it('plays the lap on its own clock and stops at the end, back on the first sample', async () => {
-      vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => setTimeout(() => callback(performance.now()), 5) as unknown as number);
-      vi.stubGlobal('cancelAnimationFrame', (handle: number) => clearTimeout(handle));
-      serveReplay(undefined, [
-        { x: 0, y: 0, z: 0, speedKmh: 100, timeSec: 0 },
-        { x: 5, y: 0, z: 0, speedKmh: 120, timeSec: 0.02 },
-        { x: 10, y: 0, z: 0, speedKmh: 140, timeSec: 0.2 },
-      ]);
-      const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, replayName: metadata.filename }), { wrapper });
-      await waitFor(() => expect(result.current.isLoading).toBe(false));
-
-      act(() => result.current.setIsPlaying(true));
-
-      await waitFor(() => expect(result.current.currentIndex).toBeGreaterThan(0));
-      await waitFor(() => expect(result.current.isPlaying).toBe(false), { timeout: 2000 });
-      expect(result.current.currentIndex).toBe(0);
-      vi.unstubAllGlobals();
-    });
+    const params = new URLSearchParams(observedSearch);
+    expect(params.get('baselineSessionId')).toBe('session-2');
+    expect(params.get('baselineDriverOrdinal')).toBe('2');
+    expect(params.get('baselineLapOrdinal')).toBe('4');
   });
 });

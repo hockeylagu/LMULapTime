@@ -2,6 +2,11 @@ import { DetailedSession, DriverData, ReplayDriverEntry, ReplayTrajectoryData } 
 import type { TelemetryLinks } from '../telemetry/telemetryLinks.js';
 
 export interface ReplayTrajectoryRequest {
+  sessionId?: string;
+  session?: DetailedSession;
+  driverOrdinal?: number;
+  lapOrdinal?: number;
+  /** Resolved from the requested session's stored link inside the server. */
   replayName: string;
   driverSlot?: number;
   driverName?: string;
@@ -13,6 +18,8 @@ export interface ReplayTrajectoryRequest {
 }
 
 export interface ReplayMetadataRequest {
+  sessionId: string;
+  /** Resolved from the requested session's stored link inside the server. */
   replayName: string;
   playerName?: string;
 }

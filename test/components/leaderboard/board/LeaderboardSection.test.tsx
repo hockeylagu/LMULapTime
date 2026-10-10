@@ -76,7 +76,7 @@ describe('LeaderboardSection', () => {
 
   it('greys out the telemetry of a lap without a replay', () => {
     const b = board(5, 5);
-    b.entries[1] = { ...b.entries[1], bestLap: { ...b.entries[1].bestLap, replayName: null } };
+    b.entries[1] = { ...b.entries[1], bestLap: { ...b.entries[1].bestLap, telemetryAvailable: false } };
     renderSection({ board: b });
     expect(screen.getByRole('button', { name: 'Telemetry against Driver 2' })).toBeDisabled();
     expect(screen.getByRole('link', { name: 'Telemetry against Driver 1' })).toBeInTheDocument();

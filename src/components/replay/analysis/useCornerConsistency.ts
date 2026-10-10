@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { computeCornerConsistencyStats, CornerConsistencyLapInput, CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
 import { applyTelemetryPostProcessing } from '../../../utils/telemetryPostProcessing.js';
-import { fetchReplayTrajectory } from '../../../api/replayApi.js';
+import { fetchSessionTelemetry } from '../../../api/replayApi.js';
 
 // Kept small since these laps are only used for corner-window timing, not full detail rendering.
 const CONSISTENCY_MAX_POINTS = 400;
@@ -17,7 +17,7 @@ export interface UseCornerConsistencyResult {
 }
 
 /**
- * Fetches every other valid lap of the current replay/driver (lazily - only when `enabled`)
+ * Fetches every other valid lap of the current session driver (lazily - only when `enabled`)
  * and times each one through the same corner windows as the currently displayed lap, to
  * surface which corners are driven consistently vs. which vary lap to lap. Results live only
  * for this mounted selection and are recomputed from the current trajectory inputs.
@@ -74,12 +74,20 @@ export function useCornerConsistency(
     setLapsSampled(0);
     setIsLoading(true);
 
+    const driver = metadata?.drivers.find(item => item.slot === selectedDriverSlot);
+    const driverOrdinal = trajectory?.driverOrdinal ?? driver?.sessionDriverOrdinal;
+    if (driverOrdinal === undefined) {
+      setIsLoading(false);
+      return;
+    }
     Promise.all(
-      otherLaps.map(l =>
-        fetchReplayTrajectory(activeReplayName, { resolutionQuery: `maxPoints=${CONSISTENCY_MAX_POINTS}`, lap: l.lapNumber, driverSlot: selectedDriverSlot, source }, { signal: controller.signal })
+      otherLaps.map(l => {
+        const lapOrdinal = driver?.sessionLapOrdinals?.[String(l.lapNumber)];
+        if (lapOrdinal === undefined) return Promise.resolve({ lapNumber: l.lapNumber, points: [] });
+        return fetchSessionTelemetry(activeReplayName, { resolutionQuery: `maxPoints=${CONSISTENCY_MAX_POINTS}`, lapOrdinal, driverOrdinal, source }, { signal: controller.signal })
           .then((data: ReplayTrajectoryData | null): CornerConsistencyLapInput => ({ lapNumber: l.lapNumber, points: data && hasCompatibleTrackStations({stationSource,geometryRevision}, data) ? applyTelemetryPostProcessing(data.points || []) : [] }))
           .catch((): CornerConsistencyLapInput => ({ lapNumber: l.lapNumber, points: [] }))
-      )
+      })
     ).then(results => {
       if (!isCurrent || controller.signal.aborted) return;
       const laps: CornerConsistencyLapInput[] = [

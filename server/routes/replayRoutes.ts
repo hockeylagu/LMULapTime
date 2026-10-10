@@ -1,9 +1,8 @@
-import fs from 'fs';
 import path from 'path';
 import { Router } from 'express';
 import { REPLAY_CACHE_VERSION } from '../core/dbSchema.js';
 import { ServerContext } from '../core/serverContext.js';
-import { buildReplayListSummaries, composeReplayMetadata } from '../replay/replayMetadataService.js';
+import { composeReplayMetadata } from '../replay/replayMetadataService.js';
 import { ReplayTelemetryService } from '../replay/replayTelemetryService.js';
 import { ReplayTrajectoryService } from '../replay/replayTrajectoryService.js';
 import { ReplayDriverNotFoundError } from '../replay/replayServiceTypes.js';
@@ -11,18 +10,13 @@ import { TelemetryLinks } from '../telemetry/telemetryLinks.js';
 import { RaceTrafficService } from '../traffic/raceTrafficService.js';
 import { parseBoundedInteger, queryString } from './queryParams.js';
 
-function isSafeFileName(value: string): boolean {
-  return value.length > 0 && value !== '.' && value !== '..' && path.basename(value) === value && !value.includes('\0');
-}
-
 export function createReplayRouter(context: ServerContext): Router {
   const router = Router();
   const telemetryService = new ReplayTelemetryService(context.sessionDb);
   const trajectoryService = new ReplayTrajectoryService(
     context.replaysDir,
-    context.replayCache,
+    context.replayRecordings,
     context.currentParser,
-    () => context.loadSessions(),
     telemetryService
   );
   const trafficService = new RaceTrafficService(context.sessionDb);
@@ -61,169 +55,112 @@ export function createReplayRouter(context: ServerContext): Router {
     res.json({ status: upgrade.getStatus() });
   });
 
-  router.get('/replays', (_req, res) => {
-    try {
-      const diskFiles = (fs.existsSync(context.replaysDir) ? fs.readdirSync(context.replaysDir) : [])
-        .filter(file => file.toLowerCase().endsWith('.vcr'));
-      const storedReplays = context.sessionDb.getAllStoredReplayFiles();
-      const sessions = context.loadSessions();
-
-      const summaries = buildReplayListSummaries({
-        diskFiles,
-        storedReplays,
-        replaysDir: context.replaysDir,
-        sessions,
-        telemetryLinks: TelemetryLinks.load(context.sessionDb),
-        getMetadata: (filePath, filename) => context.replayCache.getMetadata(filePath, filename),
-      });
-
-      res.json(summaries);
-    } catch (error: unknown) {
-      console.error('Failed to list replays:', error);
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to list replays' });
-    }
-  });
-
   router.get('/telemetry', (_req, res) => res.json(context.telemetryCatalog.getFiles()));
 
-  router.get('/replays/:name/metadata', async (req, res) => {
+  router.get('/session/:sessionId/telemetry/metadata', (req, res) => {
     try {
-      const replayName = req.params.name;
-      if (!isSafeFileName(replayName) || !replayName.toLowerCase().endsWith('.vcr')) {
-        return res.status(400).json({ error: 'Invalid replay filename' });
-      }
+      const session = context.sessionDb.getSessionById(req.params.sessionId);
+      const replayName = session?.matchingReplayFile?.name;
+      if (!session || !replayName) return res.status(404).json({ error: 'Session replay is unavailable' });
       const filePath = path.join(context.replaysDir, replayName);
-      if (!fs.existsSync(filePath) && !context.sessionDb.getStoredReplayMetadata(replayName)) {
-        return res.status(404).json({ error: `Replay file "${replayName}" not found` });
-      }
-
-      const rawMetadata = context.replayCache.getMetadata(filePath, replayName, context.currentParser.configuredPlayerName);
-      const sessions = context.loadSessions();
-      const matchedSession = sessions.find(session => session.matchingReplayFile?.name === replayName);
-
-      // Metadata without laps borrows them from the player's trajectory (decoded in the worker if needed).
-      const fallbackLaps = rawMetadata.laps?.length
-        ? undefined
-        : await context.replayCache.getFullTrajectory(filePath, replayName, { playerName: context.currentParser.configuredPlayerName })
-          .then(trajectory => trajectory.laps)
-          .catch(() => undefined);
-
-      const metadata = composeReplayMetadata({
-        metadata: rawMetadata,
+      const metadata = context.replayRecordings.getMetadata(filePath, replayName, context.currentParser.configuredPlayerName);
+      const composed = composeReplayMetadata({
+        metadata,
         replayName,
-        matchedSession,
-        fallbackTrajectoryLaps: () => fallbackLaps,
-        duckdbFilename: TelemetryLinks.load(context.sessionDb).forReplay(replayName, matchedSession),
+        matchedSession: session,
+        duckdbFilename: TelemetryLinks.load(context.sessionDb, session.id).forSession(session),
       });
-
-      res.json(metadata);
+      for (const driver of composed.drivers) {
+        const ordinal = session.drivers.findIndex(item =>
+          (item.driverName || item.name).trim().toLowerCase() === driver.name.trim().toLowerCase()
+        );
+        if (ordinal < 0) continue;
+        driver.sessionDriverOrdinal = ordinal;
+        const sessionLapOrdinals: Record<string, number> = {};
+        session.drivers[ordinal].laps.forEach((lap, lapOrdinal) => {
+          sessionLapOrdinals[String(lap.lapNum)] = lapOrdinal;
+        });
+        driver.sessionLapOrdinals = sessionLapOrdinals;
+      }
+      res.json(composed);
     } catch (error: unknown) {
-      console.error(`Failed to parse replay metadata for ${req.params.name}:`, error);
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to parse replay metadata' });
+      res.status(404).json({ error: error instanceof Error ? error.message : 'Session telemetry metadata unavailable' });
     }
   });
 
-  router.get('/replays/:name/trajectory', async (req, res) => {
+  router.get('/session/:sessionId/telemetry', async (req, res) => {
+    const session = context.sessionDb.getSessionById(req.params.sessionId);
+    if (!session) return res.status(404).json({ error: 'Session not found' });
+    let driverOrdinal: number;
+    let lapOrdinal: number;
     try {
-      const replayName = req.params.name;
-      if (!isSafeFileName(replayName) || !replayName.toLowerCase().endsWith('.vcr')) {
-        return res.status(400).json({ error: 'Invalid replay filename' });
+      const parsedDriverOrdinal = parseBoundedInteger(req.query.driverOrdinal, 'driverOrdinal', 0, 128);
+      const parsedLapOrdinal = parseBoundedInteger(req.query.lapOrdinal, 'lapOrdinal', 0, 100000);
+      if (parsedDriverOrdinal === undefined || parsedLapOrdinal === undefined) {
+        return res.status(400).json({ error: 'driverOrdinal and lapOrdinal are required' });
       }
-      const filePath = path.join(context.replaysDir, replayName);
-      let requestedDriverSlot: number;
-      let requestedLapKey: number;
-      try {
-        requestedDriverSlot = parseBoundedInteger(req.query.driverSlot, 'driverSlot', 0, 128) ?? -1;
-        requestedLapKey = parseBoundedInteger(req.query.lap, 'lap', 0, 100000) ?? -1;
-      } catch (error: unknown) {
-        return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid trajectory parameters' });
-      }
-
-      const maxPointsParam = queryString(req.query.maxPoints);
-      let maxPoints = 1200;
-      try {
-        if (maxPointsParam !== undefined) {
-          maxPoints = maxPointsParam === '0' || maxPointsParam.toLowerCase() === 'raw'
-            ? 0
-            : parseBoundedInteger(maxPointsParam, 'maxPoints', 1, 100000) ?? 1200;
-        }
-      } catch (error: unknown) {
-        return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid maxPoints' });
-      }
-      // One point per this many metres of the lap; takes precedence over maxPoints.
-      const pointSpacingParam = req.query.pointSpacingM;
-      let pointSpacingM: number | undefined;
-      if (pointSpacingParam !== undefined) {
-        pointSpacingM = typeof pointSpacingParam === 'string' && /^\d+(\.\d+)?$/.test(pointSpacingParam) ? Number(pointSpacingParam) : NaN;
-        if (!(pointSpacingM >= 0.25 && pointSpacingM <= 100)) return res.status(400).json({ error: 'Invalid pointSpacingM' });
-      }
-
-      if (
-        !fs.existsSync(filePath) &&
-        !context.sessionDb.getStoredReplayTrajectory(replayName, requestedDriverSlot, requestedLapKey, { allowFallback: true }) &&
-        !context.sessionDb.getStoredReplayMetadata(replayName)
-      ) {
-        return res.status(404).json({ error: `Replay file "${replayName}" not found` });
-      }
-
-      const driverSlot = requestedDriverSlot >= 0 ? requestedDriverSlot : undefined;
-      const driverName = queryString(req.query.driverName) || (!req.query.driverSlot ? context.currentParser.configuredPlayerName : undefined);
-      const lapNumber = requestedLapKey >= 0 ? requestedLapKey : undefined;
-      const allowDuckDb = queryString(req.query.source)?.toLowerCase() !== 'vcr';
-
+      driverOrdinal = parsedDriverOrdinal;
+      lapOrdinal = parsedLapOrdinal;
+    } catch (error: unknown) {
+      return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid telemetry locator' });
+    }
+    let maxPoints = 1200;
+    try {
+      const value = queryString(req.query.maxPoints);
+      if (value !== undefined) maxPoints = value === '0' || value.toLowerCase() === 'raw'
+        ? 0 : parseBoundedInteger(value, 'maxPoints', 1, 100000) ?? 1200;
+    } catch (error: unknown) {
+      return res.status(400).json({ error: error instanceof Error ? error.message : 'Invalid maxPoints' });
+    }
+    let pointSpacingM: number | undefined;
+    const spacing = queryString(req.query.pointSpacingM);
+    if (spacing !== undefined) {
+      pointSpacingM = /^\d+(\.\d+)?$/.test(spacing) ? Number(spacing) : NaN;
+      if (!(pointSpacingM >= 0.25 && pointSpacingM <= 100)) return res.status(400).json({ error: 'Invalid pointSpacingM' });
+    }
+    try {
       const trajectory = await trajectoryService.getTrajectory({
-        replayName,
-        driverSlot,
-        driverName,
-        lapNumber,
+        sessionId: session.id,
+        session,
+        driverOrdinal,
+        lapOrdinal,
+        replayName: session.matchingReplayFile?.name ?? '',
+        driverSlot: undefined,
+        lapNumber: undefined,
         maxPoints,
         pointSpacingM,
-        allowDuckDb,
+        allowDuckDb: queryString(req.query.source)?.toLowerCase() !== 'vcr',
       });
-
       res.json(trajectory);
     } catch (error: unknown) {
-      if (error instanceof ReplayDriverNotFoundError) {
-        return res.status(404).json({ error: error.message });
-      }
-      console.error(`Failed to extract replay trajectory for ${req.params.name}:`, error);
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to extract replay trajectory' });
+      if (error instanceof ReplayDriverNotFoundError) return res.status(404).json({ error: error.message });
+      res.status(404).json({ error: error instanceof Error ? error.message : 'Session telemetry unavailable' });
     }
   });
 
-  // Who was close to a driver on the road, lap by lap. The first request for a replay builds its
-  // positions index on a worker thread (seconds); later ones read the stored index.
-  router.get('/replays/:name/traffic', async (req, res) => {
+  router.get('/session/:sessionId/traffic', async (req, res) => {
     try {
-      const replayName = req.params.name;
-      if (!isSafeFileName(replayName) || !replayName.toLowerCase().endsWith('.vcr')) {
-        return res.status(400).json({ error: 'Invalid replay filename' });
-      }
+      const session = context.sessionDb.getSessionById(req.params.sessionId);
+      const replayName = session?.matchingReplayFile?.name;
+      if (!session || !replayName) return res.status(404).json({ error: 'Session replay is unavailable' });
       const filePath = path.join(context.replaysDir, replayName);
       const playerName = context.currentParser.configuredPlayerName;
-      if (!fs.existsSync(filePath) && !context.sessionDb.getStoredReplayMetadata(replayName)) {
-        return res.status(404).json({ error: `Replay file "${replayName}" not found` });
-      }
       const driverName = queryString(req.query.driverName) || playerName;
-      const driverSlot = context.replayCache.resolveDriverSlot(filePath, replayName, driverName, playerName);
-      if (driverSlot === undefined) {
-        return res.status(404).json({ error: `Driver "${driverName}" is not in replay "${replayName}"` });
-      }
-      const metadata = context.replayCache.getMetadata(filePath, replayName, playerName);
-      const session = context.loadSessions().find(s => s.matchingReplayFile?.name === replayName);
-
+      const driverSlot = context.replayRecordings.resolveDriverSlot(filePath, replayName, driverName, playerName);
+      if (driverSlot === undefined) return res.status(404).json({ error: `Driver "${driverName}" is not in this session replay` });
+      const metadata = context.replayRecordings.getMetadata(filePath, replayName, playerName);
       res.json(await trafficService.getDriverTraffic({
         replayName,
         driverSlot,
-        replayDrivers: metadata.drivers.flatMap(d => (typeof d.slot === 'number' ? [{ slot: d.slot, name: d.name, carClass: d.carClass }] : [])),
+        replayDrivers: metadata.drivers.flatMap(driver => typeof driver.slot === 'number'
+          ? [{ slot: driver.slot, name: driver.name, carClass: driver.carClass }] : []),
         session,
         sceneDesc: metadata.sceneDesc,
         trackVenue: metadata.trackName,
         trackCourse: metadata.trackCourse,
       }));
     } catch (error: unknown) {
-      console.error(`Failed to find traffic for ${req.params.name}:`, error);
-      res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to find traffic' });
+      res.status(404).json({ error: error instanceof Error ? error.message : 'Session traffic unavailable' });
     }
   });
 

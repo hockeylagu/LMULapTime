@@ -6,7 +6,7 @@ import { LmuParser } from './sessions/parser.js';
 import { fetchAndCacheReferenceLaptimes, isReferenceLaptimesCacheFresh, loadReferenceLaptimesFromCache } from './benchmarks/referenceLaptimes.js';
 import { getSessionDatabase } from './core/db.js';
 import { TelemetryCatalog } from './telemetry/telemetryCatalog.js';
-import { ReplayCacheService } from './replay/replayCacheService.js';
+import { ReplayRecordingService } from './replay/replayRecordingService.js';
 import { ServerContext } from './core/serverContext.js';
 import { createAiRouter } from './routes/aiRoutes.js';
 import { createLeaderboardRouter } from './routes/leaderboardRoutes.js';
@@ -42,7 +42,7 @@ const defaultTelemetryDir = process.env.NODE_ENV === 'test'
 
 const sessionDb = getSessionDatabase();
 const telemetryCatalog = new TelemetryCatalog(sessionDb);
-const replayCache = new ReplayCacheService(sessionDb);
+const replayRecordings = new ReplayRecordingService(sessionDb);
 const serverContext = new ServerContext({
   resultsDir: defaultResultsDir,
   replaysDir: defaultReplaysDir,
@@ -50,7 +50,7 @@ const serverContext = new ServerContext({
   parser: new LmuParser(defaultReplaysDir, defaultResultsDir, { indexReplays: false, readReplayMetadata: false }),
   sessionDb,
   telemetryCatalog,
-  replayCache,
+  replayRecordings,
 });
 
 const startReferenceLaptimeRefresh = (): void => {
@@ -88,7 +88,4 @@ if (process.env.NODE_ENV !== 'test') {
   });
 }
 
-const loadSessions = (forceRefresh = false, forceReparse = false) =>
-  serverContext.loadSessions(forceRefresh, forceReparse);
-
-export { app, loadSessions, sessionDb };
+export { app, sessionDb };

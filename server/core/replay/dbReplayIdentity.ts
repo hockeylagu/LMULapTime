@@ -1,8 +1,10 @@
 import path from 'path';
 import { Database as DatabaseType } from 'better-sqlite3';
-import { ReplayMetadata, SessionMetadata } from '../types.js';
+import { ReplayMetadata } from '../types.js';
 import { getStoredReplayFileInfo, StoredReplayFileInfo } from './dbReplayMetadataStore.js';
 import { renameReplayFacts } from './dbReplayLapStore.js';
+import { persistSessionProjection } from '../sessionSummaries/store.js';
+import { loadSession, writeSessionJson } from '../sessionRows/access.js';
 
 // A replay's rows are keyed by its filename, but a filename does not name one recording: LMU can
 // write a new recording under a name already in the cache (a restarted practice keeps its file, a
@@ -72,16 +74,14 @@ function renameStoredReplay(db: DatabaseType, filename: string, storedPath: stri
 
     // The sessions matched to the stored recording keep it under its new name.
     const linked = db.prepare(
-      "SELECT id, metadata_json, data_json FROM sessions WHERE json_extract(metadata_json, '$.matchingReplayFile.name') = ?"
-    ).all(filename) as Array<{ id: string; metadata_json: string; data_json: string }>;
-    const update = db.prepare('UPDATE sessions SET metadata_json = ?, data_json = ?, updated_at = ? WHERE id = ?');
-    for (const row of linked) {
-      const meta = JSON.parse(row.metadata_json) as SessionMetadata;
-      const data = JSON.parse(row.data_json) as SessionMetadata;
-      for (const session of [meta, data]) {
-        if (session.matchingReplayFile) session.matchingReplayFile = { ...session.matchingReplayFile, name: newName, path: newPath };
-      }
-      update.run(JSON.stringify(meta), JSON.stringify(data), Date.now(), row.id);
+      'SELECT id FROM sessions WHERE recording_name = ?'
+    ).all(filename) as Array<{ id: string }>;
+    for (const { id } of linked) {
+      const data = loadSession(db, id);
+      if (!data) continue;
+      if (data.matchingReplayFile) data.matchingReplayFile = { ...data.matchingReplayFile, name: newName, path: newPath };
+      writeSessionJson(db, data, Date.now());
+      persistSessionProjection(db, data);
     }
   })();
 }

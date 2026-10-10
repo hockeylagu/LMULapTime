@@ -66,13 +66,11 @@ export function createReferenceRouter(context: ServerContext): Router {
   router.post('/reference-laptimes/refresh', async (_req, res) => {
     try {
       const updatedCache = await fetchAndCacheReferenceLaptimes();
-      context.rerateSessionPace();
-      const sessions = context.loadSessions(true, true);
       res.json({
         success: true,
         lastUpdated: updatedCache.lastUpdated,
         entriesCount: updatedCache.entriesCount,
-        sessionsCount: sessions.length,
+        sessionsCount: context.sessionDb.getSessionsCount(),
         diff: updatedCache.lastUpdateDiff || null,
       });
     } catch (error: unknown) {

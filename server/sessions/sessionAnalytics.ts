@@ -38,9 +38,13 @@ export function toComparableLap(
   const replayFile = typeof session.matchingReplayFile === 'string'
     ? session.matchingReplayFile
     : session.matchingReplayFile?.name;
+  const driverOrdinal = driver.driverOrdinal ?? session.drivers.indexOf(driver);
+  const lapOrdinal = lap.lapOrdinal ?? driver.laps.indexOf(lap);
 
   return {
-    id: `${session.id}_${driver.name}_lap_${lap.lapNum}`,
+    id: driverOrdinal >= 0 && lapOrdinal >= 0
+      ? `${session.id}_driver_${driverOrdinal}_lap_${lapOrdinal}`
+      : `${session.id}_${driver.name}_lap_${lap.lapNum}`,
     sessionId: session.id,
     sessionName: session.sessionName,
     sessionType: session.sessionType,
@@ -84,6 +88,8 @@ export function toComparableLap(
     matchingReplayFile: replayFile,
     hasRain: typeof session.matchingReplayFile === 'object' ? session.matchingReplayFile?.hasRain : undefined,
     weatherCondition: typeof session.matchingReplayFile === 'object' ? session.matchingReplayFile?.weatherCondition : undefined,
+    ...(driverOrdinal >= 0 ? { driverOrdinal } : {}),
+    ...(lapOrdinal >= 0 ? { lapOrdinal } : {}),
     ...overrides,
   };
 }

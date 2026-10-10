@@ -2,6 +2,7 @@ vi.mock('../../../server/plugins/dataPlugin.js', async (importOriginal) => {
   const actual=await importOriginal<typeof import('../../../server/plugins/dataPlugin.js')>();
   const {syntheticTrack}=await import('../../helpers/syntheticTrack.js');
   return {...actual,dataPlugin:{status:actual.dataPlugin.status,
+    trackGeometry:(key:string)=>['monza_gp','daytona_road_course'].includes(key)?syntheticTrack(key):null,
     track:(key:string)=>['monza_gp','daytona_road_course'].includes(key)?{geometry:syntheticTrack(key),display:null}:null,
     vehicle:()=>null,vehicles:()=>[]}};
 });
@@ -14,7 +15,7 @@ import type { ReplayTrajectoryData } from '../../../shared/types/replay.js';
 import { TrackGeometryStore } from '../../../server/tracks/trackGeometryStore.js';
 import { applyCanonicalProjection, enrichTrajectoryWithTrackGeometry } from '../../../server/tracks/serverTrackSync.js';
 import { SessionDatabase } from '../../../server/core/db.js';
-import { ReplayCacheService } from '../../../server/replay/replayCacheService.js';
+import { ReplayRecordingService } from '../../../server/replay/replayRecordingService.js';
 import { ReplayTelemetryService } from '../../../server/replay/replayTelemetryService.js';
 import { ReplayTrajectoryService } from '../../../server/replay/replayTrajectoryService.js';
 
@@ -84,8 +85,8 @@ describe('geometry revision migration', () => {
       });
       db.upsertReplayTrajectoryCache(lap.replayName, 0, 1, 1, 100, lap, sourcePath);
       const retained = db.getStoredReplayTrajectory(lap.replayName, 0, 1);
-      const service = new ReplayTrajectoryService(directory, new ReplayCacheService(db),
-        { configuredPlayerName: 'Archived Driver' }, () => [], new ReplayTelemetryService(db));
+      const service = new ReplayTrajectoryService(directory, new ReplayRecordingService(db),
+        { configuredPlayerName: 'Archived Driver' }, new ReplayTelemetryService(db));
       const served = await service.getTrajectory({ replayName: lap.replayName, driverSlot: 0,
         lapNumber: 1, maxPoints: 0, allowDuckDb: false });
       expect(fs.existsSync(sourcePath)).toBe(false);

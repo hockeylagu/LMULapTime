@@ -27,6 +27,8 @@ export interface LatestOutingInfo {
   bestLapTimeString: string;
   bestLapTime: number | null;
   bestLapNum?: number | null;
+  driverOrdinal?: number;
+  bestLapOrdinal?: number | null;
   pacePercentage?: number | null;
   paceCategory?: PaceCategory | null;
   bestLapWet?: boolean;
@@ -191,6 +193,8 @@ export function useDashboardTrends(sessions: SessionSummary[]): DashboardTrendsR
         bestLapTimeString: p.bestLapTimeString,
         bestLapTime: p.bestLapTime,
         bestLapNum: getBestLapNumber(p),
+        driverOrdinal: p.driverOrdinal,
+        bestLapOrdinal: p.bestLapOrdinal,
         pacePercentage: p.bestLapPacePercentage,
         paceCategory: p.bestLapPaceCategory,
         bestLapWet: p.bestLapWet,

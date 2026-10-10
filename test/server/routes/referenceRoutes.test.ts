@@ -15,7 +15,8 @@ import type { ServerContext } from '../../../server/core/serverContext.js';
 describe('Reference laptime routes', () => {
   const loadSessions = vi.fn();
   const rerateSessionPace = vi.fn();
-  const context = { loadSessions, rerateSessionPace } as unknown as ServerContext;
+  const getSessionsCount = vi.fn(() => 1);
+  const context = { loadSessions, rerateSessionPace, sessionDb: { getSessionsCount } } as unknown as ServerContext;
   const app = express();
 
   beforeEach(() => {
@@ -30,15 +31,14 @@ describe('Reference laptime routes', () => {
       entriesCount: 4,
       lastUpdateDiff: { updatedCount: 1 },
     });
-    loadSessions.mockReturnValue([{ id: 'session-1' }]);
-
     const cached = await request(app).get('/api/reference-laptimes');
     const refreshed = await request(app).post('/api/reference-laptimes/refresh');
 
     expect(cached.body).toEqual({ lastUpdated: null, entriesCount: 0, entries: {} });
     expect(refreshed.body).toMatchObject({ success: true, entriesCount: 4, sessionsCount: 1, diff: { updatedCount: 1 } });
-    expect(loadSessions).toHaveBeenCalledWith(true, true);
-    expect(rerateSessionPace).toHaveBeenCalledTimes(1);
+    expect(getSessionsCount).toHaveBeenCalledTimes(1);
+    expect(loadSessions).not.toHaveBeenCalled();
+    expect(rerateSessionPace).not.toHaveBeenCalled();
   });
 
   it('returns the refresh error without attempting a session reparse', async () => {

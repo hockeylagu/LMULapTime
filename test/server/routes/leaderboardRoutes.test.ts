@@ -27,16 +27,26 @@ describe('leaderboardRoutes', () => {
   beforeEach(() => {
     loadSessions.mockClear();
     sessionDb = new SessionDatabase(':memory:');
+    for (const value of sessions) sessionDb.upsertSession(value, value.filename || `${value.id}.xml`, value.timestamp, 1);
     referenceCache.load.mockReturnValue({
       entries: { Monza_LMGT3: { key: 'Monza_LMGT3', trackName: 'Monza', carClass: 'LMGT3', target100Sec: 106 } },
     });
+  });
+
+  it('answers 503 for boards while summaries rebuild, leaving later /api routers alone', async () => {
+    const shared = express();
+    shared.use('/api', createLeaderboardRouter({ loadSessions, get sessionDb() { return sessionDb; } } as unknown as ServerContext));
+    shared.get('/api/session/:id/telemetry', (_req, res) => { res.json({ ok: true }); });
+    sessionDb.getDb().prepare('UPDATE sessions SET projection_version=0').run();
+    expect((await request(shared).get('/api/leaderboard/layouts')).status).toBe(503);
+    expect((await request(shared).get('/api/session/r1/telemetry')).status).toBe(200);
   });
 
   it('lists the layouts the player drove, the same on every call', async () => {
     const first = await request(app).get('/api/leaderboard/layouts');
     expect(first.status).toBe(200);
     expect(first.body).toMatchObject([{ layoutKey: 'monza_gp', lastCarClass: 'LMGT3', classes: [{ playerRank: 2, fieldSize: 2 }] }]);
-    expect(first.body[0].outlinePath).toMatch(/^M.+Z$/);
+    expect(first.body[0]).not.toHaveProperty('outlinePath');
     const second = await request(app).get('/api/leaderboard/layouts');
     expect(second.body).toEqual(first.body);
   });

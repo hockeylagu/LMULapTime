@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SessionDatabase } from '../../../../server/core/db.js';
 import { archivedReplayName } from '../../../../server/core/replay/dbReplayIdentity.js';
+import { readCompactSession } from '../../../../server/core/sessionSummaries/store.js';
 import { getReplayFactsVersion, getReplayLaps, replaceReplayDriverLapFacts, replaceReplayWideFacts } from '../../../../server/core/replay/dbReplayLapStore.js';
 import { emptyLapFact } from '../../../../server/replay/decode/replayFacts.js';
 import type { DetailedSession, ReplayMetadata, ReplayTrajectoryData } from '../../../../server/core/types.js';
@@ -88,6 +89,9 @@ describe('replay identity', () => {
     expect(getReplayFactsVersion(db.getDb(), archivedName)).toBe('v7');
     expect(getReplayLaps(db.getDb(), name)).toEqual([]);
     expect(db.getSessionById('owner')?.matchingReplayFile).toMatchObject({ name: archivedName, path: `C:\\replays\\${archivedName}` });
+    expect(readCompactSession(db.getDb(), 'owner')?.matchingReplayFile?.name).toBe(archivedName);
+    expect(db.getDb().prepare('SELECT recording_name, source_revision, projection_revision FROM sessions WHERE id=?').get('owner'))
+      .toMatchObject({ recording_name: archivedName, source_revision: 2, projection_revision: 2 });
     expect(db.getRejectedReplayLinks().get('withdrawn')?.[0].replayName).toBe(archivedName);
     expect(db.getTelemetryMetadata()[0].matchedReplayFilename).toBe(archivedName);
     expect(db.getAiReportsList()[0]).toMatchObject({ replayName: archivedName, baselineReplayName: archivedName });

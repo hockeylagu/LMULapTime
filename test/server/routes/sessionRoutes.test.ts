@@ -1,6 +1,4 @@
-import fs from 'fs';
-import os from 'os';
-import path from 'path';
+import { querySessionPage, type SessionQuery } from '../../../server/core/sessionSummaries/pageQueries.js';
 import express from 'express';
 import request from 'supertest';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -13,13 +11,23 @@ vi.mock('../../../server/benchmarks/referenceLaptimes.js', async importOriginal 
 
 import {
   createSessionRouter,
-  filterSessions,
   parseSessionFilters,
-  toSessionListEntry,
 } from '../../../server/routes/sessionRoutes.js';
 import { DetailedSession, ReferenceLaptimeEntry } from '../../../server/core/types.js';
 import { ServerContext } from '../../../server/core/serverContext.js';
+import { SessionDatabase } from '../../../server/core/db.js';
 
+function createSessionDb(sessions: DetailedSession[] = []): SessionDatabase {
+  const db = new SessionDatabase(':memory:');
+  for (const session of sessions) db.upsertSession(structuredClone(session), session.filePath ?? `${session.id}.xml`, session.timestamp, 1);
+  return db;
+}
+
+function filterSessions(sessions: DetailedSession[], options: SessionQuery) {
+  const db = createSessionDb(sessions);
+  try { return querySessionPage(db.getDb(), { ...options, pageSize: 100 }).sessions; }
+  finally { db.close(); }
+}
 describe('sessionRoutes and filterSessions', () => {
   const mockSessions: DetailedSession[] = [
     {
@@ -212,31 +220,37 @@ describe('sessionRoutes and filterSessions', () => {
 
   describe('createSessionRouter integration', () => {
     let app: express.Express;
+    let sessionDb: SessionDatabase;
 
     beforeEach(() => {
       referenceCache.load.mockReturnValue(null);
+      sessionDb = createSessionDb(mockSessions);
       const context = {
-        loadSessions: () => mockSessions,
+        sessionDb,
         getScanStatus: () => ({ dataRevision: 'test:1' }),
       } as unknown as ServerContext;
 
       app = express();
       app.use('/api', createSessionRouter(context));
     });
+    afterEach(() => sessionDb.close());
 
-    it('serves sessions and progression from one snapshot without browser caching', async () => {
+    it('has removed the combined snapshot endpoint', async () => {
       const res = await request(app).get('/api/session-snapshot');
-      expect(res.status).toBe(200); expect(res.headers['cache-control']).toBe('no-store');
-      expect(res.body.sessions).toHaveLength(3); expect(res.body.progression).toBeInstanceOf(Array);
-      expect(res.body.revision).toBe('test:1'); expect(res.body.sessions[0]).not.toHaveProperty('drivers');
+      expect(res.status).toBe(404);
     });
 
-    it('GET /api/sessions returns filtered sessions metadata without drivers payload', async () => {
-      const res = await request(app).get('/api/sessions?track=Spa');
+    it('GET /api/sessions returns a compact filtered page and total count', async () => {
+      const res = await request(app).get('/api/sessions?track=Spa&page=1&pageSize=1');
       expect(res.status).toBe(200);
-      expect(res.body).toHaveLength(1);
-      expect(res.body[0].id).toBe('sess_1');
-      expect(res.body[0].drivers).toBeUndefined();
+      expect(res.body.total).toBe(1);
+      expect(res.body.sessions).toHaveLength(1);
+      expect(res.body.sessions[0].id).toBe('sess_1');
+      expect(res.body.sessions[0].drivers).toBeUndefined();
+      expect(res.body.sessions[0].playerDriver).not.toHaveProperty('laps');
+      expect(res.body.sessions[0].playerDriver).toHaveProperty('completedLapsCount');
+      expect(res.body.page).toBe(1);
+      expect(res.body.pageSize).toBe(1);
     });
 
     it('GET /api/sessions leaves out lap stewards and traffic records without touching the cached session', () => {
@@ -247,22 +261,23 @@ describe('sessionRoutes and filterSessions', () => {
       player.incidents = lapRecords.incidents as unknown as typeof player.incidents;
       player.trackLimits = lapRecords.trackLimits as unknown as typeof player.trackLimits;
 
-      const entry = toSessionListEntry(session);
+      const entry = filterSessions([session], {})[0];
 
       expect(entry).not.toHaveProperty('drivers');
       expect(entry.playerDriver).not.toHaveProperty('incidents');
       expect(entry.playerDriver).not.toHaveProperty('trackLimits');
-      expect(entry.playerDriver?.laps[0]).toEqual(session.drivers[0].laps[0]);
+      expect(entry.playerDriver).not.toHaveProperty('laps');
       expect(entry.playerDriver?.bestLapTimeString).toBe('2:00.000');
       expect(player.laps[0].traffic).toBeDefined();
       expect(player.incidents).toHaveLength(1);
       expect(session.drivers).toHaveLength(1);
     });
 
-    it('GET /api/sessions answers a repeated filter instead of failing', async () => {
+    it('GET /api/sessions safely ignores repeated filters', async () => {
       const res = await request(app).get('/api/sessions?track=Spa&track=Monza&driver=Alpha&driver=Beta');
       expect(res.status).toBe(200);
-      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.sessions).toHaveLength(3);
+      expect(res.body.total).toBe(3);
     });
 
     it('GET /api/track/:trackName reads a name containing % as sent', async () => {
@@ -274,80 +289,56 @@ describe('sessionRoutes and filterSessions', () => {
     it('GET /api/progression applies shared session filters and computes progression', async () => {
       const res = await request(app).get('/api/progression?track=Spa&driver=Driver Alpha');
       expect(res.status).toBe(200);
-      expect(res.body).toHaveLength(1);
-      expect(res.body[0].sessionId).toBe('sess_1');
-      expect(res.body[0].driverName).toBe('Driver Alpha');
+      expect(res.body.points).toHaveLength(1);
+      expect(res.body.total).toBe(1);
+      expect(res.body.points[0].sessionId).toBe('sess_1');
+      expect(res.body.points[0].driverName).toBe('Driver Alpha');
     });
   });
 
   describe('GET /api/session/:id', () => {
-    let resultsDir: string;
-    const sessionDb = { getSessionById: vi.fn(), getDb: vi.fn() };
-    const enrichSessionsWithTelemetry = vi.fn();
-    const parseAndCacheFile = vi.fn();
-
-    function sessionApp(): express.Express {
-      const context = { sessionDb, enrichSessionsWithTelemetry, parseAndCacheFile, resultsDir } as unknown as ServerContext;
-      const app = express();
-      app.use('/api', createSessionRouter(context));
-      return app;
-    }
-
-    beforeEach(() => {
-      vi.clearAllMocks();
-      resultsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lmu-session-route-'));
+    let sessionDb:SessionDatabase;
+    let app:express.Express;
+    beforeEach(()=>{
+      sessionDb=createSessionDb(mockSessions);
+      app=express();
+      app.use('/api',createSessionRouter({sessionDb,getScanStatus:()=>({dataRevision:'test:1'})} as unknown as ServerContext));
     });
-    afterEach(() => fs.rmSync(resultsDir, { recursive: true, force: true }));
-
-    it('answers from the cache, with telemetry links, without reading the results folder', async () => {
-      sessionDb.getSessionById.mockReturnValue(mockSessions[0]);
-
-      const res = await request(sessionApp()).get('/api/session/sess_1');
-
-      expect(res.status).toBe(200);
-      expect(res.body.id).toBe('sess_1');
-      expect(res.body.drivers).toHaveLength(1);
-      expect(res.headers['cache-control']).toBe('no-store');
-      expect(enrichSessionsWithTelemetry).toHaveBeenCalledWith([expect.objectContaining({ id: 'sess_1' })]);
-      expect(parseAndCacheFile).not.toHaveBeenCalled();
+    afterEach(()=>sessionDb.close());
+    it('reads one retained detail without discovering files or rematching recordings',async()=>{
+      const response=await request(app).get('/api/session/sess_1');
+      expect(response.status).toBe(200);
+      expect(response.body.id).toBe('sess_1');
+      expect(response.body.drivers).toHaveLength(1);
+      expect(response.body.historyContext.personalBests).toEqual([{driverOrdinal:0,bestLapTime:120}]);
+      expect(response.headers['cache-control']).toBe('no-store');
     });
-
-    it('parses a results file the cache does not know yet, with or without the .xml suffix', async () => {
-      sessionDb.getSessionById.mockReturnValue(undefined);
-      fs.writeFileSync(path.join(resultsDir, 'sess_new.xml'), '<rFactorXML/>');
-      parseAndCacheFile.mockReturnValue({ ...mockSessions[1], id: 'sess_new' });
-
-      const bare = await request(sessionApp()).get('/api/session/sess_new');
-      const suffixed = await request(sessionApp()).get('/api/session/sess_new.xml');
-
-      expect(bare.status).toBe(200);
-      expect(bare.body.id).toBe('sess_new');
-      expect(suffixed.status).toBe(200);
-      expect(parseAndCacheFile).toHaveBeenNthCalledWith(1, path.join(resultsDir, 'sess_new.xml'));
-      expect(parseAndCacheFile).toHaveBeenNthCalledWith(2, path.join(resultsDir, 'sess_new.xml'));
+    it('returns 404 for a source not yet ingested',async()=>{
+      expect((await request(app).get('/api/session/sess_new')).status).toBe(404);
     });
-
-    it('answers 404 when the session is neither cached nor on disk, or its file does not parse', async () => {
-      sessionDb.getSessionById.mockReturnValue(undefined);
-      fs.writeFileSync(path.join(resultsDir, 'broken.xml'), 'not xml');
-      parseAndCacheFile.mockReturnValue(null);
-
-      const missing = await request(sessionApp()).get('/api/session/nope');
-      const broken = await request(sessionApp()).get('/api/session/broken');
-
-      expect(missing.status).toBe(404);
-      expect(missing.body).toEqual({ error: 'Session not found' });
-      expect(broken.status).toBe(404);
-      expect(enrichSessionsWithTelemetry).not.toHaveBeenCalled();
+    it('does not report incomplete summaries as complete totals',async()=>{
+      sessionDb.getDb().prepare('UPDATE sessions SET projection_version=0 WHERE id=?').run('sess_1');
+      expect((await request(app).get('/api/sessions')).status).toBe(503);
+      expect((await request(app).get('/api/session/sess_1')).status).toBe(200);
+    });
+    it('holds only its history reads while summaries rebuild, not routers mounted after it',async()=>{
+      // Routers share the /api prefix: session telemetry and replay routes come after this one.
+      app.get('/api/session/:id/telemetry',(_req,res)=>{ res.json({ok:true}); });
+      app.get('/api/tracksheet',(_req,res)=>{ res.json({ok:true}); });
+      sessionDb.getDb().prepare('UPDATE sessions SET projection_version=0 WHERE id=?').run('sess_1');
+      expect((await request(app).get('/api/track/Monza')).status).toBe(503);
+      expect((await request(app).get('/api/session/sess_1/telemetry')).status).toBe(200);
+      expect((await request(app).get('/api/tracksheet')).status).toBe(200);
     });
   });
-
   describe('track and comparison routes', () => {
     const benchmark = (trackName: string, carClass: string): ReferenceLaptimeEntry => ({
       key: `${trackName}_${carClass}`, trackName, carClass, patch: '1.4+', target100Sec: 100,
       targets: { alienSec: 100, competitiveSec: 101, goodSec: 102, goodMidpackSec: 103, midpackSec: 104, midpackTailSec: 105, tailEnderSec: 106, offlineSec: 107 },
     });
     let app: express.Express;
+    let sessionDb:SessionDatabase;
+    afterEach(()=>sessionDb.close());
 
     beforeEach(() => {
       referenceCache.load.mockReturnValue({
@@ -356,7 +347,8 @@ describe('sessionRoutes and filterSessions', () => {
         entries: [benchmark('Monza', 'Hypercar'), benchmark('Monza (curvagrande)', 'Hypercar'), benchmark('Spa', 'Hypercar')],
       });
       app = express();
-      app.use('/api', createSessionRouter({ loadSessions: () => mockSessions } as unknown as ServerContext));
+      sessionDb=createSessionDb(mockSessions);
+      app.use('/api', createSessionRouter({ sessionDb,getScanStatus:()=>({dataRevision:'test:1'}) } as unknown as ServerContext));
     });
 
     it("GET /api/track/:trackName lists that layout's sessions without drivers and only its own benchmarks", async () => {
@@ -384,6 +376,12 @@ describe('sessionRoutes and filterSessions', () => {
       expect(playerOnly.body.laps).toEqual([]);
       expect(everyone.body.laps.map((l: { driverName: string }) => l.driverName)).toEqual(['Driver Beta']);
       expect(everyone.body.benchmarks.map((b: ReferenceLaptimeEntry) => b.trackName)).toEqual(['Monza']);
+    });
+
+    it.each(['-1', '1.5', 'NaN', ''])('GET /api/compare/laps rejects invalid driver ordinals (%s)', async ordinal => {
+      const response = await request(app).get(`/api/compare/laps?driverOrdinal=${encodeURIComponent(ordinal)}`);
+      expect(response.status).toBe(400);
+      expect(response.body.error).toMatch(/driverOrdinal/);
     });
 
     it('GET /api/compare/laps without a track has no benchmarks', async () => {

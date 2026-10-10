@@ -11,7 +11,6 @@ export interface TelemetryCatalogStatus {
 }
 
 export class TelemetryCatalog {
-  private files: DuckDbFileInfo[] = [];
   private directory = '';
   private updatedAt: string | null = null;
   private refreshPromise: Promise<number> | null = null;
@@ -32,28 +31,17 @@ export class TelemetryCatalog {
   public constructor(
     private readonly sessionDb: SessionDatabase,
     private readonly enrichDirectory: EnrichDuckDbDirectory = enrichDuckDbDirectory
-  ) {
-    try {
-      if (typeof this.sessionDb.getTelemetryFiles === 'function') {
-        this.files = this.sessionDb.getTelemetryFiles();
-        if (this.files.length > 0) {
-          this.updatedAt = new Date().toISOString();
-        }
-      }
-    } catch {
-      // In-memory or initial db setup
-    }
-  }
+  ) {}
 
   public getFiles(): DuckDbFileInfo[] {
-    return this.files;
+    return this.sessionDb.getTelemetryFiles();
   }
 
   public getStatus(currentDirectory: string): TelemetryCatalogStatus {
     return {
       directory: this.directory || currentDirectory,
       updatedAt: this.updatedAt,
-      filesCount: this.files.length,
+      filesCount: this.sessionDb.getTelemetryFilesCount(),
     };
   }
 
@@ -65,7 +53,6 @@ export class TelemetryCatalog {
     this.refreshGeneration++;
     this.refreshPromise = null;
     this.refreshDirectory = null;
-    this.files = [];
     this.directory = '';
     this.updatedAt = null;
     this.scanStatus = {
@@ -98,7 +85,8 @@ export class TelemetryCatalog {
     };
 
     const cachedMap = new Map<string, DuckDbFileInfo>();
-    for (const f of this.files) {
+    // The file-version lookup belongs only to this scan; SQLite owns completed metadata.
+    for (const f of this.sessionDb.getTelemetryFiles()) {
       cachedMap.set(f.filePath, f);
     }
 
@@ -110,7 +98,6 @@ export class TelemetryCatalog {
       if (!previous || previous.fileMtimeMs !== file.fileMtimeMs || previous.fileSizeBytes !== file.fileSizeBytes || previous.enrichmentError) {
         this.sessionDb.upsertTelemetryMetadata?.(file);
       }
-      this.files = [...this.files.filter(item => item.filePath !== file.filePath), file];
     };
     let cachedCount = 0;
     let addedCount = 0;
@@ -128,7 +115,6 @@ export class TelemetryCatalog {
     })
       .then((files) => {
         if (generation !== this.refreshGeneration) return files.length;
-        this.files = files;
         this.directory = directory;
         this.updatedAt = new Date().toISOString();
         for (const file of files) {
@@ -142,6 +128,7 @@ export class TelemetryCatalog {
           } else {
             cachedCount++;
           }
+          publish(file);
           if (file.enrichmentError) {
             if (typeof this.sessionDb?.recordIngestError === 'function') {
               this.sessionDb.recordIngestError('duckdb', file.filePath, file.enrichmentError);

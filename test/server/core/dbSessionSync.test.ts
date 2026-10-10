@@ -18,6 +18,51 @@ describe('session parser-version migration writes', () => {
     vi.restoreAllMocks();
   });
 
+  it('skips stored write-once XMLs without stat or parsing, but supports an explicit reparse', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lmu-session-immutable-'));
+    tempDir = dir;
+    const database = new SessionDatabase(':memory:');
+    db = database;
+    const fixture = path.join(process.cwd(), 'test', 'fixtures', 'results', '2026_05_28_P1.xml');
+    const filePath = path.join(dir, 'immutable.xml');
+    fs.copyFileSync(fixture, filePath);
+    const parser = new LmuParser(undefined, undefined, { detectPlayer: false });
+    database.syncSessionsFromDir(dir, parser);
+
+    // Ordinary scans trust the stored path even if an external tool touches the file.
+    fs.appendFileSync(filePath, '\n');
+    const stat = vi.spyOn(fs, 'statSync');
+    const parse = vi.spyOn(parser, 'parseSessionXml');
+    expect(database.syncSessionsFromDir(dir, parser)).toMatchObject({ added: 0, updated: 0, total: 1 });
+    expect(stat).not.toHaveBeenCalled();
+    expect(parse).not.toHaveBeenCalled();
+
+    expect(database.syncSessionsFromDir(dir, parser, true)).toMatchObject({ added: 0, updated: 1, total: 1 });
+    expect(parse).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not store an XML that changed while it was read, and reads it again on the next scan', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lmu-session-growing-'));
+    tempDir = dir;
+    const database = new SessionDatabase(':memory:');
+    db = database;
+    const filePath = path.join(dir, 'growing.xml');
+    fs.copyFileSync(path.join(process.cwd(), 'test', 'fixtures', 'results', '2026_05_28_P1.xml'), filePath);
+    const parser = new LmuParser(undefined, undefined, { detectPlayer: false });
+    const parse = parser.parseSessionXml.bind(parser);
+    // LMU appends to the file during the read.
+    vi.spyOn(parser, 'parseSessionXml').mockImplementationOnce(file => {
+      const parsed = parse(file);
+      fs.appendFileSync(filePath, '\n');
+      return parsed;
+    });
+
+    expect(database.syncSessionsFromDir(dir, parser)).toMatchObject({ added: 0, total: 0 });
+    expect(database.getIngestErrors()).toMatchObject([{ sourceType: 'xml', sourcePath: filePath }]);
+    expect(database.syncSessionsFromDir(dir, parser)).toMatchObject({ added: 1, total: 1 });
+    expect(database.getIngestErrors()).toEqual([]);
+  });
+
   it('keeps the old version on a failed batch and reparses every file on the next ordinary scan', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lmu-session-batch-retry-'));
     const database = new SessionDatabase(':memory:');
@@ -30,7 +75,7 @@ describe('session parser-version migration writes', () => {
     }
     const parser = new LmuParser(undefined, undefined, { detectPlayer: false });
     database.syncSessionsFromDir(dir, parser);
-    const originalSessions = database.getAllSessions();
+    const originalSessions = Array.from(database.iterateDetailedSessions());
     expect(originalSessions).toHaveLength(10);
     database.setMetadata('parser_version', 'older-parser-version');
 
@@ -40,7 +85,7 @@ describe('session parser-version migration writes', () => {
     expect(() => database.syncSessionsFromDir(dir, parser)).toThrow('temporary write failure');
     expect(writeSpy).toHaveBeenCalledTimes(1);
     expect(database.getMetadata('parser_version')).toBe('older-parser-version');
-    expect(database.getAllSessions()).toEqual(originalSessions);
+    expect(Array.from(database.iterateDetailedSessions())).toEqual(originalSessions);
 
     writeSpy.mockRestore();
     const parseSpy = vi.spyOn(parser, 'parseSessionXml');
@@ -49,7 +94,7 @@ describe('session parser-version migration writes', () => {
     expect(parseSpy).toHaveBeenCalledTimes(10);
     expect(retry).toMatchObject({ added: 0, updated: 10, total: 10 });
     expect(database.getMetadata('parser_version')).toBe(DB_PARSER_VERSION);
-    expect(database.getAllSessions()).toHaveLength(10);
+    expect(Array.from(database.iterateDetailedSessions())).toHaveLength(10);
   });
 });
 
@@ -109,7 +154,7 @@ describe('session sync with the XML worker', () => {
     const parser = new LmuParser(undefined, undefined, { detectPlayer: false });
 
     const iterator = db.syncSessionsAsyncIterator(dir, {
-      addReplayEntry: entry => parser.addReplayEntry(entry),
+      setReplayLookup: lookup => parser.setReplayLookup(lookup),
       parseSessionXml: filePath => parser.parseSessionXml(filePath),
       parseSessionXmlAsync: () => Promise.reject(new Error('File ingest worker exited with code 1')),
     });
@@ -117,6 +162,6 @@ describe('session sync with the XML worker', () => {
     while (!step.done) step = await iterator.next();
 
     expect(step.value).toMatchObject({ added: 1, total: 1 });
-    expect(db.getAllSessions()).toHaveLength(1);
+    expect(Array.from(db.iterateDetailedSessions())).toHaveLength(1);
   });
 });

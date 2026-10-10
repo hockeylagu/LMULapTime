@@ -25,6 +25,8 @@ describe('SessionList component', () => {
         bestLapPaceCategory: 'Alien',
         bestLapPacePercentage: 100.2,
         lapsCount: 15,
+        driverOrdinal: 0,
+        bestLapOrdinal: 3,
         position: 2,
         gridPosition: 5,
         positionGain: 3,

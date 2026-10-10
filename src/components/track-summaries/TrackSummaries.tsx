@@ -5,7 +5,8 @@ import { aggregateTrackSummaries, TrackSessionSummary } from '../../../shared/do
 import { ReferenceLaptimeEntry, PaceCategory, ReferenceLaptimesCache, TrackSummary } from '../../../shared/types/index.js';
 import { TrackSummariesHeader, TracksSortOption } from './TrackSummariesHeader.js';
 import { loadReferenceLaptimes, peekReferenceLaptimes } from '../../api/referenceApi.js';
-import { apiErrorMessage, isAbortError } from '../../api/apiClient.js';
+import { apiErrorMessage, isAbortError, fetchJson } from '../../api/apiClient.js';
+import { useSessionDataContext } from '../../api/sessionDataContext.js';
 import { TrackSummaryCard, TrackSummaryItem } from './TrackSummaryCard.js';
 
 export type { TracksSortOption, TrackSessionSummary };
@@ -19,16 +20,27 @@ export interface TrackSummariesProps {
 }
 
 export const TrackSummaries: React.FC<TrackSummariesProps> = ({
-  sessions = [],
+  sessions,
   onSelectTrack,
   selectedCarClass,
   setSelectedCarClass,
 }) => {
+  const { revision } = useSessionDataContext();
+  const [storedTracks,setStoredTracks]=useState<TrackSummary[]>([]);
+  const [trackError,setTrackError]=useState<string|null>(null);
   const [refCache, setRefCache] = useState<ReferenceLaptimesCache | null>(peekReferenceLaptimes);
   const [benchmarkState, setBenchmarkState] = useState<'loading' | 'error' | 'ready'>(() => peekReferenceLaptimes() ? 'ready' : 'loading');
   const [benchmarkError, setBenchmarkError] = useState('');
   const [retryCount, setRetryCount] = useState(0);
   const [sortBy, setSortBy] = useState<TracksSortOption>('name-asc');
+  useEffect(()=>{
+    if(sessions!==undefined)return;
+    const controller=new AbortController();
+    setTrackError(null);
+    fetchJson<{tracks:TrackSummary[]}>(`/api/tracks?carClass=${encodeURIComponent(selectedCarClass)}`,{signal:controller.signal})
+      .then(data=>setStoredTracks(data.tracks)).catch((err:unknown)=>{if(!isAbortError(err))setTrackError(apiErrorMessage(err,'Unable to load circuits.'));});
+    return ()=>controller.abort();
+  },[sessions,selectedCarClass,revision]);
 
   useEffect(() => {
     let active = true;
@@ -50,7 +62,8 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
   }, [retryCount]);
 
   const trackList: TrackSummaryItem[] = useMemo(() => {
-    if (!sessions || sessions.length === 0) {
+    if (sessions===undefined) return storedTracks;
+    if (sessions.length === 0) {
       return [];
     }
 
@@ -60,7 +73,7 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
     });
 
     return Object.values(aggregated).sort((a, b) => a.trackVenue.localeCompare(b.trackVenue));
-  }, [sessions, selectedCarClass]);
+  }, [sessions, selectedCarClass,storedTracks]);
 
   const getRefEntryForTrack = (trackName: string, carType?: string, carClass?: string): ReferenceLaptimeEntry | null => {
     if (!refCache?.entries) return null;
@@ -109,6 +122,7 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
 
   return (
     <div className="space-y-6">
+      {trackError && <p role="alert" className="text-lmu-warn">{trackError}</p>}
       <TrackSummariesHeader
         totalTracks={sortedTrackList.length}
         benchmarkSortAvailable={benchmarkSortAvailable}
@@ -118,7 +132,7 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
         onSelectCarClass={setSelectedCarClass}
       />
 
-      {(benchmarkState === 'loading' || (benchmarkState === 'ready' && !benchmarkSortAvailable && sessions.length > 0)) && (
+      {(benchmarkState === 'loading' || (benchmarkState === 'ready' && !benchmarkSortAvailable && trackList.length > 0)) && (
         <div role="status" aria-live="polite" className="text-xs text-lmu-muted">
           {benchmarkState === 'loading' ? 'Loading benchmark targets…' : (
             <p>No matching benchmark targets. <Link className="underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-lmu-accent-text" to="/settings">Review benchmarks in Settings</Link>.</p>

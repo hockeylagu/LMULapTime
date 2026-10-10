@@ -1,9 +1,9 @@
 import fs from 'fs';
 import { Router } from 'express';
 import { folderPathProblem, normalizeFolderPath } from '../../shared/domain/folderPath.js';
-import { getDisplayTrackName } from '../../shared/domain/formatters.js';
 import { loadReferenceLaptimesFromCache } from '../benchmarks/referenceLaptimes.js';
 import { ServerContext } from '../core/serverContext.js';
+import { dataPlugin } from '../plugins/dataPlugin.js';
 
 const FOLDER_FIELDS = [
   { field: 'resultsDir', label: 'results folder' },
@@ -20,11 +20,13 @@ export function createSystemRouter(context: ServerContext): Router {
     const resultsExist = fs.existsSync(context.resultsDir);
     const replaysExist = fs.existsSync(context.replaysDir);
     const telemetryExist = fs.existsSync(context.telemetryDir);
-    const sessions = context.loadSessions();
+    const catalog = context.sessionDb.getSessionCatalogStats();
     const refCache = loadReferenceLaptimesFromCache();
     const cacheStats = context.sessionDb.getCacheStats();
 
     res.json({
+      serverInstanceId: context.serverInstanceId,
+      dataPlugin: { revision: dataPlugin.status.revision },
       resultsDir: context.resultsDir,
       resultsExist,
       replaysDir: context.replaysDir,
@@ -32,9 +34,9 @@ export function createSystemRouter(context: ServerContext): Router {
       telemetryDir: context.telemetryDir,
       telemetryExist,
       playerName: context.currentParser.configuredPlayerName,
-      sessionsCount: sessions.length,
+      sessionsCount: catalog.sessionsCount,
       replaysCount: cacheStats.replaysCount,
-      tracksCount: new Set(sessions.map((s) => getDisplayTrackName(s.trackVenue, s.trackCourse)).filter(Boolean)).size,
+      tracksCount: catalog.tracksCount,
       referenceLaptimes: {
         lastUpdated: refCache?.lastUpdated || null,
         entriesCount: refCache?.entriesCount || 0,
@@ -49,6 +51,7 @@ export function createSystemRouter(context: ServerContext): Router {
         replaysCount: cacheStats.replaysCount,
         replayTrajectoriesCount: cacheStats.replayTrajectoriesCount,
         telemetryFilesCount: cacheStats.telemetryFilesCount,
+        sessionSummariesReadyCount: catalog.summariesReadyCount,
         telemetryCatalog: context.telemetryCatalog.getStatus(context.telemetryDir),
         ingestErrors: context.sessionDb.getIngestErrors(),
       },
@@ -99,10 +102,8 @@ export function createSystemRouter(context: ServerContext): Router {
     if (hasConfig) context.telemetryCatalog.clear();
     // A manual refresh: replays that failed every attempt are decoded once more.
     const sessionScanStarted = context.runSessionSyncInBackground(false, true);
-    if (!sessionScanStarted && !hasConfig) {
-      context.loadSessions(true);
-    }
-    const sessions = context.loadSessions();
+    if (!sessionScanStarted && !hasConfig) context.requestSessionRefresh();
+    const catalog = context.sessionDb.getSessionCatalogStats();
 
     res.json({
       success: true,
@@ -111,7 +112,7 @@ export function createSystemRouter(context: ServerContext): Router {
       telemetryDir: context.telemetryDir,
       telemetryExist: fs.existsSync(context.telemetryDir),
       playerName: context.currentParser.configuredPlayerName,
-      sessionsCount: sessions.length,
+      sessionsCount: catalog.sessionsCount,
       sessionScanStarted: sessionScanStarted || !hasConfig,
       replayScanStarted: true,
       telemetryScanStarted: true,

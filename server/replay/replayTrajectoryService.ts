@@ -1,7 +1,7 @@
 import path from 'path';
 import { dataPlugin } from '../plugins/dataPlugin.js';
 import { DetailedSession, DriverData, ReplayMetadata, ReplayTrajectoryData } from '../core/types.js';
-import { ReplayCacheService } from './replayCacheService.js';
+import { ReplayRecordingService } from './replayRecordingService.js';
 import { ReplayTelemetryService } from './replayTelemetryService.js';
 import { ReplayDriverNotFoundError, ReplayTrajectoryRequest } from './replayServiceTypes.js';
 import { composeReplayMetadata } from './replayMetadataService.js';
@@ -17,20 +17,38 @@ import { pointBudgetForSpacing } from './decode/trajectoryDownsampler.js';
 export class ReplayTrajectoryService {
   public constructor(
     private readonly replaysDir: string,
-    private readonly replayCache: ReplayCacheService,
+    private readonly replayRecordings: ReplayRecordingService,
     private readonly currentParser: { configuredPlayerName: string },
-    private readonly loadSessions: () => DetailedSession[],
     private readonly telemetryService: ReplayTelemetryService
   ) {}
 
   public async getTrajectory(request: ReplayTrajectoryRequest): Promise<ReplayTrajectoryData> {
+    const matchedSession = request.session;
+    let sessionDriverForLocator: DriverData | undefined;
+    if (matchedSession && request.driverOrdinal !== undefined && request.lapOrdinal !== undefined) {
+      request.sessionId = matchedSession.id;
+    }
+    if (matchedSession) {
+      const replayName = matchedSession.matchingReplayFile?.name;
+      if (!replayName) throw new Error(`Session "${request.sessionId}" has no linked replay`);
+      const recordingDriver = request.driverOrdinal === undefined ? undefined : matchedSession.drivers[request.driverOrdinal];
+      const recordingLap = request.lapOrdinal === undefined ? undefined : recordingDriver?.laps[request.lapOrdinal];
+      if (!recordingDriver || !recordingLap) throw new Error('Invalid session driver or lap locator');
+      sessionDriverForLocator = recordingDriver;
+      request = {
+        ...request,
+        replayName,
+        driverName: recordingDriver.driverName || recordingDriver.name,
+        lapNumber: recordingLap.lapNum,
+      };
+    }
     const filePath = path.join(this.replaysDir, request.replayName);
     let driverSlot = request.driverSlot;
     const configuredPlayer = this.currentParser.configuredPlayerName;
     const driverName = request.driverName || (request.driverSlot === undefined ? configuredPlayer : undefined);
 
     if (driverSlot === undefined && driverName) {
-      driverSlot = this.replayCache.resolveDriverSlot(filePath, request.replayName, driverName, configuredPlayer);
+      driverSlot = this.replayRecordings.resolveDriverSlot(filePath, request.replayName, driverName, configuredPlayer);
       // An explicitly named driver who is not in this replay must not silently fall back to the
       // player's car: the caller would render someone else's lap under that driver's name.
       const isOtherDriver = Boolean(request.driverName) &&
@@ -40,24 +58,23 @@ export class ReplayTrajectoryService {
       }
     }
 
-    let matchedSession: DetailedSession | undefined;
+    let resolvedSession: DetailedSession | undefined = matchedSession;
     let matchedDriver: DriverData | undefined;
     try {
-      matchedSession = this.loadSessions().find(session => session.matchingReplayFile?.name === request.replayName);
-      if (matchedSession) {
-        matchedDriver = driverName
-          ? matchedSession.drivers.find(driver =>
+      if (resolvedSession) {
+        matchedDriver = sessionDriverForLocator ?? (driverName
+          ? resolvedSession.drivers.find(driver =>
               (driver.driverName || driver.name || '').trim().toLowerCase() === driverName.trim().toLowerCase()
             )
-          : undefined;
+          : undefined);
 
         if (!matchedDriver && typeof driverSlot === 'number') {
-          const replayDriver = this.replayCache
+          const replayDriver = this.replayRecordings
             .getMetadata(filePath, request.replayName, configuredPlayer)
             .drivers.find(driver => driver.slot === driverSlot);
 
           if (replayDriver) {
-            matchedDriver = matchedSession.drivers.find(
+            matchedDriver = resolvedSession.drivers.find(
               driver =>
                 (driver.driverName || driver.name || '').toLowerCase() === replayDriver.name.toLowerCase() ||
                 (replayDriver.carNumber !== undefined && driver.carNumber === replayDriver.carNumber)
@@ -66,14 +83,14 @@ export class ReplayTrajectoryService {
         }
 
         if (!matchedDriver && !request.driverName) {
-          matchedDriver = matchedSession.playerDriver || matchedSession.drivers[0];
+          matchedDriver = resolvedSession.playerDriver || resolvedSession.drivers[0];
         }
       }
     } catch {
       // Ignore session lookup errors
     }
 
-    const fullTrajectory = await this.replayCache.getFullTrajectory(filePath, request.replayName, {
+    const fullTrajectory = await this.replayRecordings.getFullTrajectory(filePath, request.replayName, {
       driverSlot,
       driverName,
       lapNumber: request.lapNumber,
@@ -90,7 +107,7 @@ export class ReplayTrajectoryService {
 
     let metadata: ReplayMetadata | undefined;
     try {
-      const rawMetadata = this.replayCache.getMetadata(filePath, request.replayName, configuredPlayer);
+      const rawMetadata = this.replayRecordings.getMetadata(filePath, request.replayName, configuredPlayer);
       metadata = composeReplayMetadata({
         metadata: rawMetadata,
         replayName: request.replayName,
@@ -107,6 +124,7 @@ export class ReplayTrajectoryService {
         : Boolean(driverName && configuredPlayer && driverName.trim().toLowerCase() === configuredPlayer.trim().toLowerCase()));
 
     const telemetryResult = await this.telemetryService.enrichWithTelemetry({
+      sessionId: request.sessionId,
       replayName: request.replayName,
       filePath,
       isPlayer: Boolean(isPlayer),
@@ -119,12 +137,12 @@ export class ReplayTrajectoryService {
     });
     trajectory = telemetryResult.trajectory;
 
-    trajectory = applyPureOfficialLapValidation(trajectory, matchedSession, matchedDriver);
+    trajectory = applyPureOfficialLapValidation(trajectory, resolvedSession, matchedDriver);
 
-    const venue = matchedSession?.trackVenue || metadata?.trackVenue;
-    const course = matchedSession?.trackCourse || metadata?.trackCourse;
+    const venue = resolvedSession?.trackVenue || metadata?.trackVenue;
+    const course = resolvedSession?.trackCourse || metadata?.trackCourse;
     const sceneDesc = metadata?.sceneDesc;
-    const trackLengthMeters = matchedSession?.trackLengthMeters;
+    const trackLengthMeters = resolvedSession?.trackLengthMeters;
 
     try {
       trajectory = enrichTrajectoryGeometryResponse(
@@ -158,6 +176,11 @@ export class ReplayTrajectoryService {
     trajectory.vehicleIdentity=selectedDriver ? {vehicleId:selectedDriver.vehicleId,carModel:selectedDriver.carModel,carClass:selectedDriver.carClass}:undefined;
     trajectory.vehicleData=selectedDriver ? dataPlugin.vehicle(selectedDriver) ?? undefined : undefined;
     trajectory.dataPluginRevision=dataPlugin.status.revision;
+    if (matchedSession && request.driverOrdinal !== undefined && request.lapOrdinal !== undefined) {
+      trajectory.sessionId = matchedSession.id;
+      trajectory.driverOrdinal = request.driverOrdinal;
+      trajectory.lapOrdinal = request.lapOrdinal;
+    }
     return trajectory;
   }
 }

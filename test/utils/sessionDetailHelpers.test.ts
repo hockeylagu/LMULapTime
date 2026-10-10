@@ -5,7 +5,7 @@ import {
   WeekendSessionLink,
   sessionLapComparePath,
 } from '../../src/components/session-detail/sessionDetailHelpers';
-import { DetailedSession } from '../../server/core/types';
+import { DetailedSession, DriverData } from '../../server/core/types';
 
 describe('sessionDetailHelpers', () => {
   describe('findWeekendSessions', () => {
@@ -135,13 +135,17 @@ describe('sessionDetailHelpers', () => {
 
   describe('sessionLapComparePath', () => {
     it("opens the lap on the leaderboard under the board's class, not the results file's", () => {
-      const session = { id: 'race 1', trackVenue: 'Bahrain International Circuit', trackCourse: 'Bahrain International Circuit' };
-      const path = sessionLapComparePath(session, { carClass: 'GT3', carType: 'Ferrari 296 GT3' }, 3);
+      const driver = { name: 'Driver', carType: 'Ferrari 296 GT3', carClass: 'GT3', carNumber: '1', isPlayer: true,
+        laps: [{ lapNum: 3, lapTime: 100, s1: 30, s2: 35, s3: 35 }] } as unknown as DriverData;
+      const session = { id: 'race 1', trackVenue: 'Bahrain International Circuit', trackCourse: 'Bahrain International Circuit', drivers: [driver] } as unknown as DetailedSession;
+      const path = sessionLapComparePath(session, driver, 3);
       const params = new URLSearchParams(path.split('?')[1]);
       expect(path.startsWith('/leaderboard?')).toBe(true);
       expect(params.get('carClass')).toBe('LMGT3');
       expect(params.get('sessionId')).toBe('race 1');
       expect(params.get('lapNum')).toBe('3');
+      expect(params.get('driverOrdinal')).toBe('0');
+      expect(params.get('lapOrdinal')).toBe('0');
       expect(new URLSearchParams(sessionLapComparePath(session, undefined, null).split('?')[1]).has('lapNum')).toBe(false);
     });
   });

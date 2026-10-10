@@ -73,18 +73,22 @@ interface DriverAccumulator {
 
 function toLeaderboardLap(session: DetailedSession, driver: DriverData, lap: LapData): LeaderboardLap {
   const replay = session.matchingReplayFile;
+  const driverOrdinal = driver.driverOrdinal ?? session.drivers.indexOf(driver);
+  const lapOrdinal = lap.lapOrdinal ?? driver.laps.indexOf(lap);
   return {
     sessionId: session.id,
     sessionName: session.sessionName,
     sessionType: session.sessionType,
     timestamp: session.timestamp,
+    ...(driverOrdinal >= 0 ? { driverOrdinal } : {}),
+    ...(lapOrdinal >= 0 ? { lapOrdinal } : {}),
     lapNum: lap.lapNum,
     lapTime: lap.lapTime as number,
     s1: lap.s1,
     s2: lap.s2,
     s3: lap.s3,
     carType: driver.carType,
-    replayName: (typeof replay === 'string' ? replay : replay?.name) || null,
+    telemetryAvailable: Boolean(typeof replay === 'string' ? replay : replay?.name),
   };
 }
 

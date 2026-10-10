@@ -3,7 +3,7 @@ import { useSessionDataContext } from '../../api/sessionDataContext.js';
 import type { LegendPayload } from 'recharts';
 import { DetailedSession, SessionProgressionPoint, ReferenceLaptimesCache } from '../../../shared/types/index.js';
 import { matchesTrack, matchesCarClass, findReferenceEntry } from '../../../shared/domain/paceCategory.js';
-import { findWeekendSessions, CandidateRelatedSession } from './sessionDetailHelpers.js';
+import { findWeekendSessions, CandidateRelatedSession, type WeekendSessionLink } from './sessionDetailHelpers.js';
 import { ApiError, apiErrorMessage, fetchJson, isAbortError } from '../../api/apiClient.js';
 import { loadReferenceLaptimes, peekReferenceLaptimes } from '../../api/referenceApi.js';
 
@@ -24,15 +24,16 @@ export function useSessionDetailData({
   const [loadedSession, setLoadedSession] = useState<{ sessionId: string; data: DetailedSession } | null>(null);
   const session = loadedSession?.sessionId === sessionId ? loadedSession.data : null;
   const [refCache, setRefCache] = useState<ReferenceLaptimesCache | null>(peekReferenceLaptimes);
-  // Progression and the session list come from the parent when it has them, else are fetched here.
+  // Injected history supports isolated views; ordinary navigation reads compact context with the detail.
   // Read from props, never copied into state: a parent passing a new array on each render must not
   // restart loading (it re-rendered forever).
   const hasInitialProgression = initialProgression !== undefined;
   const hasInitialSessions = initialSessions !== undefined;
-  const [fetchedProgression, setFetchedProgression] = useState<SessionProgressionPoint[]>([]);
-  const [fetchedSessions, setFetchedSessions] = useState<DetailedSession[]>([]);
-  const progression = hasInitialProgression && initialProgression ? initialProgression : fetchedProgression;
-  const allSessions = hasInitialSessions && initialSessions ? initialSessions : fetchedSessions;
+  const [personalBests, setPersonalBests] = useState<Array<{driverOrdinal:number;bestLapTime:number|null}>>([]);
+  const [historyReady, setHistoryReady] = useState(false);
+  const [fetchedRelated, setFetchedRelated] = useState<WeekendSessionLink<CandidateRelatedSession>[]>([]);
+  const progression = hasInitialProgression && initialProgression ? initialProgression : [];
+  const allSessions = hasInitialSessions && initialSessions ? initialSessions : [];
   const [settledSessionId, setSettledSessionId] = useState<string | null>(null);
   const loading = !session && settledSessionId !== sessionId;
   // Why the session could not be loaded; null while loading, when loaded, or when the server has no such session.
@@ -64,10 +65,13 @@ export function useSessionDetailData({
     setLoadError(null);
 
     // 1. Fetch Session Telemetry Data (primary critical path)
-    fetchJson<DetailedSession>(`/api/session/${encodeURIComponent(sessionId)}`, { signal })
+    fetchJson<DetailedSession & {historyContext?:{ready?:boolean;relatedSessions:WeekendSessionLink<CandidateRelatedSession>[];personalBests:Array<{driverOrdinal:number;bestLapTime:number|null}>}}>(`/api/session/${encodeURIComponent(sessionId)}`, { signal })
       .then((sessionData) => {
         if (!isCurrent) return;
         setLoadedSession({ sessionId, data: sessionData });
+        setFetchedRelated(sessionData.historyContext?.relatedSessions ?? []);
+        setPersonalBests(sessionData.historyContext?.personalBests ?? []);
+        setHistoryReady(sessionData.historyContext?.ready !== false);
         if (!existingSession && sessionData.playerDriver) {
           setSelectedDriverName(sessionData.playerDriver.name);
         } else if (!existingSession && sessionData.drivers && sessionData.drivers.length > 0) {
@@ -93,43 +97,6 @@ export function useSessionDetailData({
     loadReferenceLaptimes()
       .then((refData) => { if (isCurrent) setRefCache(refData); })
       .catch(() => null);
-
-    // 3. Fetch Progression in background (if not supplied via props)
-    if (!hasInitialProgression) {
-      fetchJson<SessionProgressionPoint[]>('/api/progression', { signal })
-        .then((progData) => {
-          if (!isCurrent) return;
-          if (Array.isArray(progData)) {
-            setFetchedProgression(progData);
-          }
-        })
-        .catch(() => null);
-    }
-
-    // 4. Fetch session candidates in background (if not supplied via props)
-    // Strip heavy driver arrays, lap logs, and setups to minimize heap memory retention
-    if (!hasInitialSessions) {
-      fetchJson<DetailedSession[]>('/api/sessions', { signal })
-        .then((allSessionsData) => {
-          if (!isCurrent) return;
-          if (Array.isArray(allSessionsData)) {
-            const stripped = allSessionsData.map((s) => ({
-              id: s.id,
-              sessionType: s.sessionType,
-              sessionName: s.sessionName,
-              trackVenue: s.trackVenue,
-              trackCourse: s.trackCourse,
-              trackEvent: s.trackEvent,
-              timeString: s.timeString,
-              timestamp: s.timestamp,
-              settings: s.settings ? { serverName: s.settings.serverName, modeSetting: s.settings.modeSetting } : undefined,
-              playerDriver: s.playerDriver ? { carClass: s.playerDriver.carClass } : undefined,
-            }));
-            setFetchedSessions(stripped as unknown as DetailedSession[]);
-          }
-        })
-        .catch(() => null);
-    }
 
     return () => {
       isCurrent = false;
@@ -185,7 +152,9 @@ export function useSessionDetailData({
       : chartMetric;
 
   const allTimeCategoryTrackPB = useMemo(() => {
-    if (!session || !selectedDriver || progression.length === 0) return null;
+    if (!session || !selectedDriver) return null;
+    if (!hasInitialProgression) return historyReady ? personalBests.find(best=>best.driverOrdinal===session.drivers.indexOf(selectedDriver))?.bestLapTime ?? selectedDriver.bestLapTime : null;
+    if (progression.length===0) return null;
     const driverClass = selectedDriver.carClass || selectedDriver.carType || '';
     const driverNorm = (selectedDriver.name || '').toLowerCase().trim();
 
@@ -207,7 +176,7 @@ export function useSessionDetailData({
       .map((p) => p.bestLapTime as number);
 
     return matchingLapTimes.length > 0 ? Math.min(...matchingLapTimes) : selectedDriver.bestLapTime;
-  }, [session, selectedDriver, progression]);
+  }, [session, selectedDriver, progression, hasInitialProgression, personalBests, historyReady]);
 
   const isCurrentSessionAllTimePB =
     selectedDriver?.bestLapTime !== null &&
@@ -268,8 +237,8 @@ export function useSessionDetailData({
 
   const candidatePool: CandidateRelatedSession[] = allSessions.length > 0 ? allSessions : progression;
   const relatedSessions = useMemo(() => {
-    return findWeekendSessions(session, candidatePool);
-  }, [session, candidatePool]);
+    return hasInitialSessions ? findWeekendSessions(session, candidatePool) : fetchedRelated;
+  }, [session, candidatePool, hasInitialSessions, fetchedRelated]);
 
   const handleNavigateToSession = (targetId: string) => {
     if (onSelectSession) {

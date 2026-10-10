@@ -93,6 +93,7 @@ import type { NewRivalTarget, RivalResolution } from '../../shared/domain/rivals
 import {
   upsertTelemetryMetadata,
   getTelemetryFiles,
+  getTelemetryFilesCount,
   getTelemetryMetadata,
   getTelemetryLapCache,
   upsertTelemetryLapCache,
@@ -116,19 +117,32 @@ import {
   updateBenchmarkDiffImpact,
 } from './dbReferenceLaptimeStore.js';
 import {
-  getAllSessions as fetchAllSessions,
-  getAllSessionSummaries as fetchAllSessionSummaries,
   getSessionById as fetchSessionById,
   upsertSession as insertOrUpdateSession,
   updateSessionMatchingReplay as modifySessionMatchingReplay,
   getSessionsCount as fetchSessionsCount,
+  getSessionXmlMtime,
+  restoreStoredSessionLinks,
+  updateSessionTelemetryFile,
   clearSessionCache,
 } from './dbSessionStore.js';
 import { getRejectedReplayLinks, rejectSessionReplayLink } from './replay/dbReplayLinkStore.js';
 import { archiveReplacedRecording } from './replay/dbReplayIdentity.js';
+import { getReplayMatchingEntries, getReplayMatchingEntriesOverlapping, getReplayMatchingEntry } from './replay/dbReplayMatchingStore.js';
+import {
+  getRecordingOwners, getReplayReconciliationCandidateIds, getSessionsByIds, getSessionsStartingBetween, getTelemetryOwnersWithoutFile,
+} from './dbReconciliationStore.js';
+import type { ReplayMatchTarget } from '../sessions/replayMatching.js';
 import { storeDecodedReplayFacts } from './replay/dbReplayLapStore.js';
+import { backfillNormalizedSessions, type NormalizedBackfillBatch } from './sessionRows/verify.js';
+import { loadSessions } from './sessionRows/access.js';
 import { classifySessionConditions, reclassifyStoredSessions } from './dbSessionConditions.js';
-import { rerateStoredSessionPace } from './dbSessionPace.js';
+import {
+  backfillSessionSummaries, countReadySessionSummaries, isSessionSummaryReady, iterateStoredSessions, projectionState,
+  readCompactSession, type SessionSummaryBackfillBatch,
+} from './sessionSummaries/store.js';
+import type { SessionCard, SessionProjectionState } from '../../shared/types/sessionSummaries.js';
+import { getDisplayTrackName } from '../../shared/domain/formatters.js';
 import {
   listReplayUpgradeBacklog,
   upgradeReplaysAsyncIterator as runUpgradeReplaysAsyncIterator,
@@ -163,10 +177,9 @@ export type {
 export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayUpgradeHost {
   private db: DatabaseType;
   private dbPath: string;
-  private sessionRevision = 0;
+
   private replayMetadataRevision = 0;
   private telemetryMetadataRevision = 0;
-  private allSessionsCache: DetailedSession[] | null = null;
 
   constructor(customPath?: string) {
     if (customPath) {
@@ -274,6 +287,9 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     return this.replayMetadataRevision;
   }
 
+  public getReplayMatchingEntries(target?: ReplayMatchTarget) { return getReplayMatchingEntries(this.db, target); }
+  public getReplayMatchingEntry(filename: string) { return getReplayMatchingEntry(this.db, filename); }
+
   /**
    * Stores `filename` as the recording described here. When the stored rows under that name hold a
    * different recording, they are renamed first (see dbReplayIdentity), never overwritten.
@@ -282,7 +298,7 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     const archivedAs = archiveReplacedRecording(this.db, filename, { mtime, size, metadata });
     if (archivedAs) {
       console.log(`[SQLite Cache] ${filename} now holds another recording; the stored one is kept as ${archivedAs}`);
-      this.invalidateSessionCache();
+      this.markSessionDataChanged();
       this.telemetryMetadataRevision++;
     }
     upsertReplayMetadataCache(this.db, filename, filePath, mtime, size, metadata);
@@ -437,8 +453,14 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     return getTelemetryFiles(this.db);
   }
 
-  public getTelemetryMetadata(): TelemetryMetadataRecord[] {
-    return getTelemetryMetadata(this.db);
+  public getTelemetryFilesCount(): number { return getTelemetryFilesCount(this.db); }
+
+  public getSessionXmlMtime(sessionId: string, filePath: string): number | undefined {
+    return getSessionXmlMtime(this.db, sessionId, filePath);
+  }
+
+  public getTelemetryMetadata(sessionId?: string): TelemetryMetadataRecord[] {
+    return getTelemetryMetadata(this.db, sessionId);
   }
 
   public getTelemetryLapCache(filename: string, lapNumber: number, options: { anyVersion?: boolean } = {}): DuckDbLapTelemetry | null {
@@ -471,8 +493,8 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     return true;
   }
 
-  public getTelemetryLapCacheFilenames(): Set<string> {
-    return getTelemetryLapCacheFilenames(this.db);
+  public getTelemetryLapCacheFilenames(sessionId?: string): Set<string> {
+    return getTelemetryLapCacheFilenames(this.db, sessionId);
   }
 
   public clearTelemetryCache(): void {
@@ -482,47 +504,72 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
 
   // --- Sessions Cache & Sync ---
 
-  public getSessionRevision(): number { return this.sessionRevision; }
+  public getSessionRevision(): number { return Number(this.getMetadata('session_data_revision') ?? 0); }
 
-  public invalidateSessionCache(): void {
-    this.allSessionsCache = null;
-    this.sessionRevision++;
+  public markSessionDataChanged(): void {
+    this.db.prepare("INSERT INTO cache_metadata(key,value) VALUES('session_data_revision','1') ON CONFLICT(key) DO UPDATE SET value=CAST(CAST(value AS INTEGER)+1 AS TEXT)").run();
   }
 
-  public getAllSessions(): DetailedSession[] {
-    if (this.allSessionsCache) return this.allSessionsCache;
-    const sessions = fetchAllSessions(this.db);
-    this.allSessionsCache = sessions;
-    return sessions;
-  }
+  public getCompactSession(id: string): SessionCard | null { return readCompactSession(this.db, id); }
 
-  public getAllSessionSummaries(): SessionMetadata[] {
-    return fetchAllSessionSummaries(this.db);
+
+  public getSessionProjectionState(id: string): SessionProjectionState | null { return projectionState(this.db, id); }
+
+  public backfillSessionSummaryBatch(batchSize = 10): SessionSummaryBackfillBatch { return backfillSessionSummaries(this.db, batchSize); }
+
+  /** Writes and verifies the normalized rows of the next sessions that lack them, from their stored JSON. */
+  public backfillNormalizedSessionBatch(batchSize = 10): NormalizedBackfillBatch { return backfillNormalizedSessions(this.db, batchSize); }
+
+  /** Whether history reads can be served: no session waits for its summaries. */
+  public isSessionSummaryReady(): boolean { return isSessionSummaryReady(this.db); }
+
+  public *iterateDetailedSessions(batchSize = 10): Generator<DetailedSession> { yield* iterateStoredSessions(this.db, batchSize); }
+
+  // --- Ingestion reconciliation (see dbReconciliationStore) ---
+
+  public getReplayReconciliationCandidateIds(sinceMs: number): string[] { return getReplayReconciliationCandidateIds(this.db, sinceMs); }
+  public getSessionsByIds(ids: readonly string[]): DetailedSession[] { return getSessionsByIds(this.db, ids); }
+  public getSessionsStartingBetween(fromMs: number, toMs: number): DetailedSession[] { return getSessionsStartingBetween(this.db, fromMs, toMs); }
+  public getReplayMatchingEntriesOverlapping(fromMs: number, toMs: number) { return getReplayMatchingEntriesOverlapping(this.db, fromMs, toMs); }
+  public getRecordingOwners(names: readonly string[]): Map<string, string> { return getRecordingOwners(this.db, names); }
+  public getTelemetryOwnersWithoutFile(): string[] { return getTelemetryOwnersWithoutFile(this.db); }
+
+  /** Stores the session's main DuckDB file on its row and card (see dbSessionStore). */
+  public updateSessionTelemetryFile(sessionId: string, duckdbFilename: string | undefined): boolean {
+    return updateSessionTelemetryFile(this.db, sessionId, duckdbFilename);
   }
 
   public getSessionById(id: string): DetailedSession | null {
-    const cleanId = id.endsWith('.xml') ? id.replace(/\.xml$/, '') : id;
-    const withXml = `${cleanId}.xml`;
-
-    if (this.allSessionsCache) {
-      const found = this.allSessionsCache.find(s =>
-        s.id === id || s.id === cleanId || s.id === withXml || s.filename === id || s.filename === withXml
-      );
-      if (found) return found;
-    }
-
     return fetchSessionById(this.db, id);
+  }
+
+  public getSessionsLinkedToRecording(recordingName: string): DetailedSession[] {
+    const rows = this.db.prepare('SELECT id FROM sessions WHERE recording_name = ?').all(recordingName) as Array<{ id: string }>;
+    return loadSessions(this.db, rows.map(row => row.id));
+  }
+
+  public getStoredRecordingNames(): Set<string> {
+    const rows = this.db.prepare('SELECT DISTINCT recording_name FROM sessions WHERE recording_name IS NOT NULL').all() as Array<{ recording_name: string }>;
+    return new Set(rows.map(row => row.recording_name));
+  }
+
+  public getSessionCatalogStats(): { sessionsCount: number; tracksCount: number; summariesReadyCount: number } {
+    const sessionsCount = this.getSessionsCount();
+    const rows = this.db.prepare('SELECT DISTINCT track_venue, track_course FROM sessions').all() as Array<{ track_venue: string; track_course: string }>;
+    const summariesReadyCount = countReadySessionSummaries(this.db);
+    return { sessionsCount, tracksCount: new Set(rows.map(row => getDisplayTrackName(row.track_venue, row.track_course)).filter(Boolean)).size, summariesReadyCount };
   }
 
   public upsertSession(session: DetailedSession, filePath: string, mtime: number, size: number): void {
     insertOrUpdateSession(this.db, session, filePath, mtime, size);
-    this.invalidateSessionCache();
   }
 
   /** Links a replay to the session, whose laps then get that replay's conditions. */
   public updateSessionMatchingReplay(sessionId: string, matchingReplayFile: NonNullable<SessionMetadata['matchingReplayFile']>): void {
-    const result = modifySessionMatchingReplay(this.db, sessionId, matchingReplayFile);
-    if (result.updated) this.reclassifyStoredSessions({ ids: [sessionId] });
+    this.db.transaction(() => {
+      const result = modifySessionMatchingReplay(this.db, sessionId, matchingReplayFile);
+      if (result.updated) this.reclassifyStoredSessions({ ids: [sessionId] });
+    })();
   }
 
   /** Withdraws the session's replay link (see dbReplayLinkStore); its laps lose that replay's conditions. */
@@ -531,9 +578,16 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     link: NonNullable<SessionMetadata['matchingReplayFile']>,
     reason: ReplayLinkRejectionReason
   ): RejectedReplayLink | null {
-    const rejected = rejectSessionReplayLink(this.db, sessionId, link, reason);
-    if (rejected) this.reclassifyStoredSessions({ ids: [sessionId] });
-    return rejected;
+    return this.db.transaction(() => {
+      const rejected = rejectSessionReplayLink(this.db, sessionId, link, reason);
+      if (rejected) this.reclassifyStoredSessions({ ids: [sessionId] });
+      return rejected;
+    })();
+  }
+
+  /** Carries a reparsed session's stored replay link and DuckDB attachment over (see dbSessionStore). */
+  public restoreStoredSessionLinks(session: DetailedSession): void {
+    restoreStoredSessionLinks(this.db, session);
   }
 
   /** Classifies a parsed session's laps with its linked replay's rain, before it is stored. */
@@ -542,36 +596,14 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
   }
 
   /**
-   * Classifies stored sessions again (see dbSessionConditions). Loaded sessions are updated in
-   * place: callers such as the replay links hold on to them.
+   * Classifies stored sessions again and atomically refreshes their persisted summaries.
    */
   public reclassifyStoredSessions(which: { ids: string[] } | { replayName: string }): void {
-    const updated = reclassifyStoredSessions(this.db, which);
-    if (updated.length > 0) this.sessionRevision++;
-    for (const session of updated) {
-      const cached = this.allSessionsCache?.find(s => s.id === session.id);
-      if (!cached) continue;
-      Object.assign(cached, session);
-      if (!session.matchingReplayFile) delete cached.matchingReplayFile;
-    }
+    reclassifyStoredSessions(this.db, which);
   }
 
-  /**
-   * Rates the stored sessions' pace again when the benchmark targets changed (see dbSessionPace).
-   * Loaded sessions are updated in place, like reclassifyStoredSessions. Returns how many changed.
-   */
-  public rerateSessionPace(referenceVersion: string): number {
-    const updated = rerateStoredSessionPace(this.db, referenceVersion);
-    if (updated.length > 0) this.sessionRevision++;
-    for (const session of updated) {
-      const cached = this.allSessionsCache?.find(s => s.id === session.id);
-      if (cached) Object.assign(cached, session);
-    }
-    return updated.length;
-  }
-
-  public getRejectedReplayLinks(): Map<string, RejectedReplayLink[]> {
-    return getRejectedReplayLinks(this.db);
+  public getRejectedReplayLinks(sessionIds?: readonly string[]): Map<string, RejectedReplayLink[]> {
+    return getRejectedReplayLinks(this.db, sessionIds);
   }
 
   public *syncSessionsIterator(
@@ -604,7 +636,7 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
   }
 
   public clearCache(): void {
-    this.invalidateSessionCache();
+    this.markSessionDataChanged();
     clearSessionCache(this.db);
   }
 

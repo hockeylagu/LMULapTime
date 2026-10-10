@@ -22,6 +22,8 @@ export interface SessionSummary {
     bestLapTime: number | null;
     bestLapTimeString: string;
     bestLapNum?: number | null;
+    driverOrdinal?: number;
+    bestLapOrdinal?: number | null;
     bestS1: number | null;
     bestS2: number | null;
     bestS3: number | null;

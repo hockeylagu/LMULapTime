@@ -2,12 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import Database from 'better-sqlite3';
+import { initDbSchema } from '../../../server/core/dbSchema.js';
 import { SessionDatabase } from '../../../server/core/db.js';
 import { ServerContext } from '../../../server/core/serverContext.js';
 import type { DetailedSession, ReferenceBenchmarkDiff } from '../../../server/core/types.js';
-import { ReplayCacheService } from '../../../server/replay/replayCacheService.js';
+import { ReplayRecordingService } from '../../../server/replay/replayRecordingService.js';
 import { LmuParser } from '../../../server/sessions/parser.js';
 import { TelemetryCatalog } from '../../../server/telemetry/telemetryCatalog.js';
+import { replayIndexEntryFromStored } from '../../../server/sessions/replayMatching.js';
 
 const benchmarkDiff: ReferenceBenchmarkDiff = {
   timestamp: '2026-09-23T00:00:00.000Z',
@@ -41,7 +44,7 @@ function createContext(sessionDb: SessionDatabase = {
     parser: new LmuParser(),
     sessionDb,
     telemetryCatalog: {} as TelemetryCatalog,
-    replayCache: {} as ReplayCacheService,
+    replayRecordings: {} as ReplayRecordingService,
   });
 }
 
@@ -118,7 +121,7 @@ describe('ServerContext background session sync', () => {
     const events: string[] = [];
     let scans = 0;
     const sessionDb = {
-      getAllStoredReplayFiles: vi.fn(() => []), getAllSessions: vi.fn(() => []),
+      getAllStoredReplayFiles: vi.fn(() => []),
       syncSessionsAsyncIterator: vi.fn(() => (async function* () {
         events.push('xml');
         if (++scans === 1) await new Promise<void>(resolve => { releaseXml = resolve; });
@@ -139,13 +142,13 @@ describe('ServerContext background session sync', () => {
       }),
     } as unknown as TelemetryCatalog;
     const context = new ServerContext({ resultsDir: '', replaysDir: '', telemetryDir: '', parser: new LmuParser(),
-      sessionDb, telemetryCatalog, replayCache: {} as ReplayCacheService });
+      sessionDb, telemetryCatalog, replayRecordings: {} as ReplayRecordingService });
     vi.spyOn(context, 'enrichSessionsWithTelemetry').mockImplementation(() => undefined);
     context.runInitialSessionSyncInBackground(); await vi.runOnlyPendingTimersAsync();
     expect(events).toEqual(['xml']);
     releaseXml?.(); await vi.runOnlyPendingTimersAsync();
     expect(events).toContain('replay'); expect(events).toContain('duckdb');
-    context.loadSessions(true); context.loadSessions(true);
+    context.requestSessionRefresh(); context.requestSessionRefresh();
     expect(context.getScanStatus().refreshQueued).toBe(true);
     releaseReplay?.(); await vi.runOnlyPendingTimersAsync();
     expect(sessionDb.syncSessionsAsyncIterator).toHaveBeenCalledTimes(1);
@@ -269,25 +272,33 @@ describe('ServerContext background session sync', () => {
   it('routes forced reparsing through the guarded background iterator', () => {
     const sessionDb = {
       getAllStoredReplayFiles: vi.fn(() => []),
-      getAllSessions: vi.fn(() => []),
+
+      getSessionsCount: vi.fn(() => 0),
       getTelemetryMetadata: vi.fn(() => []),
       syncSessionsFromDir: vi.fn(),
       syncSessionsAsyncIterator: vi.fn(createCompletedSessionIterator),
     } as unknown as SessionDatabase;
     const context = createContext(sessionDb);
 
-    expect(context.loadSessions(true, true)).toEqual([]);
+    context.requestSessionRefresh(true);
 
     expect(sessionDb.syncSessionsFromDir).not.toHaveBeenCalled();
     expect(sessionDb.syncSessionsAsyncIterator).toHaveBeenCalledWith('', expect.objectContaining({ parseSessionXmlAsync: expect.any(Function) }), true);
   });
 
   it('rescans the DuckDB folder on Refresh and matches the new files to the sessions', async () => {
+    const recordedAt = Date.parse('2026-09-14T18:37:49Z');
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     const sessionDb = {
       ...storedTelemetryLinks,
       getAllStoredReplayFiles: vi.fn(() => []),
-      getAllSessions: vi.fn(() => []),
+      getTelemetryFiles: vi.fn(() => [{ filename: 'Spa_P_2026-09-14T18_37_49Z.duckdb', timestampEpochMs: recordedAt }]),
+      getSessionsCount: vi.fn(() => 0),
+      getSessionsStartingBetween: vi.fn(() => []),
+      getReplayMatchingEntriesOverlapping: vi.fn(() => []),
+      getRecordingOwners: vi.fn(() => new Map()),
+      getTelemetryOwnersWithoutFile: vi.fn(() => []),
+      getSessionsByIds: vi.fn(() => []),
       getTelemetryMetadata: vi.fn(() => []),
       syncSessionsAsyncIterator: vi.fn(createCompletedSessionIterator),
       syncReplaysAsyncIterator: vi.fn(createCompletedReplayIterator),
@@ -298,18 +309,20 @@ describe('ServerContext background session sync', () => {
     } as unknown as TelemetryCatalog;
     const context = new ServerContext({
       resultsDir: '', replaysDir: '', telemetryDir: 'C:/lmu/telemetry', parser: new LmuParser(),
-      sessionDb, telemetryCatalog, replayCache: {} as ReplayCacheService,
+      sessionDb, telemetryCatalog, replayRecordings: {} as ReplayRecordingService,
     });
 
-    context.loadSessions();
-    expect(telemetryCatalog.refresh).not.toHaveBeenCalled();
-
-    context.loadSessions(true);
+    context.requestSessionRefresh();
     expect(telemetryCatalog.refresh).not.toHaveBeenCalled();
     await vi.runAllTimersAsync();
     expect(telemetryCatalog.refresh).toHaveBeenCalledWith('C:/lmu/telemetry');
     expect(log).toHaveBeenCalledWith('[SQLite Cache] Found 1 DuckDB telemetry files from C:/lmu/telemetry');
     expect(storedTelemetryLinks.linkTelemetryFiles).toHaveBeenCalled();
+    // Candidates come from the file's time window, never from walking every stored session.
+    const [from, to] = vi.mocked(sessionDb.getSessionsStartingBetween).mock.calls[0];
+    expect(from).toBeLessThan(recordedAt);
+    expect(recordedAt - from).toBeLessThanOrEqual(27 * 3600_000);
+    expect(to - recordedAt).toBeLessThanOrEqual(120_000);
   });
 
   it('only warns when the DuckDB rescan fails in the background', async () => {
@@ -317,7 +330,7 @@ describe('ServerContext background session sync', () => {
     const telemetryCatalog = { refresh: vi.fn(() => Promise.reject(new Error('folder gone'))) } as unknown as TelemetryCatalog;
     const context = new ServerContext({
       resultsDir: '', replaysDir: '', telemetryDir: 'C:/lmu/telemetry', parser: new LmuParser(),
-      sessionDb: { getAllStoredReplayFiles: vi.fn(() => []) } as unknown as SessionDatabase, telemetryCatalog, replayCache: {} as ReplayCacheService,
+      sessionDb: { getAllStoredReplayFiles: vi.fn(() => []) } as unknown as SessionDatabase, telemetryCatalog, replayRecordings: {} as ReplayRecordingService,
     });
 
     context.runTelemetryScanInBackground();
@@ -329,7 +342,7 @@ describe('ServerContext background session sync', () => {
   it('queues a forced session reparse until replay indexing finishes', async () => {
     const sessionDb = {
       getAllStoredReplayFiles: vi.fn(() => []),
-      getAllSessions: vi.fn(() => []),
+
       getTelemetryMetadata: vi.fn(() => []),
       syncReplaysAsyncIterator: vi.fn(createProgressingReplayIterator),
       syncSessionsAsyncIterator: vi.fn(createCompletedSessionIterator),
@@ -337,7 +350,7 @@ describe('ServerContext background session sync', () => {
     const context = createContext(sessionDb);
 
     expect(context.runReplaySyncInBackground()).toBe(true);
-    context.loadSessions(true, true);
+    context.requestSessionRefresh(true);
     expect(sessionDb.syncSessionsAsyncIterator).not.toHaveBeenCalled();
 
     await vi.runAllTimersAsync();
@@ -348,62 +361,19 @@ describe('ServerContext background session sync', () => {
 });
 
 describe('ServerContext configuration and telemetry enrichment', () => {
-  it('enriches the cached session list again only when one of its inputs changed', () => {
-    const sessions: DetailedSession[] = [];
-    let telemetryRevision = 0;
-    let files: unknown[] = [];
+  it('queries replay candidates on demand without hydrating the full replay history', () => {
     const sessionDb = {
       getAllStoredReplayFiles: vi.fn(() => []),
-      getAllSessions: vi.fn(() => sessions),
-      getTelemetryMetadata: vi.fn(() => []),
-      getTelemetryMetadataRevision: vi.fn(() => telemetryRevision),
-    } as unknown as SessionDatabase;
-    const context = new ServerContext({
-      resultsDir: '', replaysDir: '', telemetryDir: '', parser: new LmuParser(), sessionDb,
-      telemetryCatalog: { getFiles: vi.fn(() => files) } as unknown as TelemetryCatalog,
-      replayCache: {} as ReplayCacheService,
-    });
-    const enrich = vi.spyOn(context, 'enrichSessionsWithTelemetry');
-
-    context.loadSessions();
-    context.loadSessions();
-    expect(enrich).toHaveBeenCalledTimes(1);
-
-    telemetryRevision++;
-    context.loadSessions();
-    files = [];
-    context.loadSessions();
-    context.currentParser.addReplayEntry({ name: 'Spa P1.Vcr', path: 'C:\replays\Spa P1.Vcr', sizeBytes: 1, sessionCode: 'P1', trackName: 'Spa', mtime: 1 });
-    context.loadSessions();
-    expect(enrich).toHaveBeenCalledTimes(4);
-    context.loadSessions();
-    expect(enrich).toHaveBeenCalledTimes(4);
-  });
-
-  it('reloads the replay index from the database only when replay rows changed', () => {
-    let replayRevision = 0;
-    const sessionDb = {
-      getAllStoredReplayFiles: vi.fn(() => []),
-      getAllSessions: vi.fn(() => []),
-      getTelemetryMetadata: vi.fn(() => []),
-      getReplayMetadataRevision: vi.fn(() => replayRevision),
+      getReplayMatchingEntries: vi.fn(() => []),
     } as unknown as SessionDatabase;
     const context = createContext(sessionDb);
-    const reads = vi.mocked(sessionDb.getAllStoredReplayFiles);
-    expect(reads).toHaveBeenCalledTimes(1);
-
-    context.loadSessions();
-    context.loadSessions();
-    expect(reads).toHaveBeenCalledTimes(1);
-
-    replayRevision++;
-    context.loadSessions();
-    context.loadSessions();
-    expect(reads).toHaveBeenCalledTimes(2);
-
-    // A new parser (directories reconfigured) starts from an empty index.
+    expect(sessionDb.getAllStoredReplayFiles).not.toHaveBeenCalled();
+    expect(sessionDb.getReplayMatchingEntries).not.toHaveBeenCalled();
+    context.currentParser.findMatchingReplay('Monza', 'GP', 'R1', 1000, 2000);
+    expect(sessionDb.getReplayMatchingEntries).toHaveBeenCalledWith(expect.objectContaining({ sessionTimestampMs: 1000, xmlFileMtimeMs: 2000 }));
     context.configureDirectories({});
-    expect(reads).toHaveBeenCalledTimes(3);
+    expect(sessionDb.getAllStoredReplayFiles).not.toHaveBeenCalled();
+    expect(context.currentParser.getReplaysList()).toEqual([]);
   });
 
   it('uses valid configured directories and persists the telemetry directory', () => {
@@ -427,7 +397,7 @@ describe('ServerContext configuration and telemetry enrichment', () => {
       parser: new LmuParser(),
       sessionDb,
       telemetryCatalog,
-      replayCache: {} as ReplayCacheService,
+      replayRecordings: {} as ReplayRecordingService,
     });
 
     try {
@@ -469,7 +439,7 @@ describe('ServerContext configuration and telemetry enrichment', () => {
       parser: new LmuParser(),
       sessionDb,
       telemetryCatalog,
-      replayCache: {} as ReplayCacheService,
+      replayRecordings: {} as ReplayRecordingService,
     });
     vi.spyOn(context.currentParser, 'findMatchingReplay').mockReturnValue({
       name: 'Spa P1.Vcr',
@@ -490,9 +460,10 @@ describe('ServerContext configuration and telemetry enrichment', () => {
 
     context.enrichSessionsWithTelemetry([session]);
 
-    expect(session.matchingReplayFile).toMatchObject({ name: 'Spa P1.Vcr', hasDuckDbTelemetry: true });
-    expect(session.duckdbFilename).toBe('Spa_P1.duckdb');
-    expect(sessionDb.updateSessionMatchingReplay).toHaveBeenCalledTimes(2);
+    // A replay filename association does not grant DuckDB ownership to the session.
+    expect(session.matchingReplayFile).toMatchObject({ name: 'Spa P1.Vcr', hasDuckDbTelemetry: false });
+    expect(session.duckdbFilename).toBeUndefined();
+    expect(sessionDb.updateSessionMatchingReplay).toHaveBeenCalledTimes(1);
   });
 
   it('removes stale telemetry links when the active directory has no match', () => {
@@ -510,7 +481,7 @@ describe('ServerContext configuration and telemetry enrichment', () => {
       parser: new LmuParser(),
       sessionDb,
       telemetryCatalog,
-      replayCache: {} as ReplayCacheService,
+      replayRecordings: {} as ReplayRecordingService,
     });
     const session = {
       id: 'session-1',
@@ -576,6 +547,51 @@ describe('ServerContext configuration and telemetry enrichment', () => {
   });
 });
 
+describe('telemetry ownership catalog lifetime', () => {
+  it('decides new files from their time windows only, reading the catalog once', async () => {
+    const db = new SessionDatabase(':memory:');
+    const telemetryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'lmu-telemetry-windows-'));
+    try {
+      const start = Date.parse('2026-10-01T12:00:00Z');
+      for (let index = 0; index < 25; index++) {
+        const timestamp = start + index * 7200_000;
+        const session = { id: `batch-${index}`, filename: `batch-${index}.xml`, filePath: `missing-${index}.xml`,
+          timestamp, trackVenue: 'Monza', trackCourse: 'GP', sessionType: 'Practice', sessionName: 'P1', drivers: [],
+          driversCount: 0 } as unknown as DetailedSession;
+        db.upsertSession(session, session.filePath, timestamp + 1800_000, 1);
+      }
+      for (const index of [0, 24]) {
+        const timestampEpochMs = start + index * 7200_000 + 300_000;
+        const filePath = path.join(telemetryDir, `batch-${index}.duckdb`);
+        fs.writeFileSync(filePath, '');
+        db.upsertTelemetryMetadata({ filename: `batch-${index}.duckdb`, filePath,
+          fileMtimeMs: timestampEpochMs, fileSizeBytes: 100, trackName: 'Monza', sessionType: 'P', timestampStr: '', timestampEpochMs });
+      }
+      const files = vi.spyOn(db, 'getTelemetryFiles');
+      const metadata = vi.spyOn(db, 'getTelemetryMetadata');
+      const candidates = vi.spyOn(db, 'getSessionsStartingBetween');
+      const context = new ServerContext({ resultsDir: '', replaysDir: '', telemetryDir: '',
+        parser: new LmuParser(undefined, undefined, { detectPlayer: false }), sessionDb: db,
+        telemetryCatalog: { refresh: async () => 2 } as unknown as TelemetryCatalog,
+        replayRecordings: {} as ReplayRecordingService });
+      context.runTelemetryScanInBackground();
+      await vi.waitFor(() => expect(db.getSessionById('batch-24')?.duckdbFilename).toBe('batch-24.duckdb'));
+      await vi.waitFor(() => expect(context.getScanStatus().allComplete).toBe(true));
+      expect(files).toHaveBeenCalledTimes(1);
+      expect(metadata.mock.calls.filter(args => args[0] === undefined)).toHaveLength(1);
+      // Two files two days apart: two windows, neither holding the whole history.
+      expect(candidates).toHaveBeenCalledTimes(2);
+      for (const result of candidates.mock.results) expect((result.value as DetailedSession[]).length).toBeLessThan(25);
+      expect(db.getTelemetryMetadata().map(row => [row.filename, row.matchedSessionId])).toEqual([
+        ['batch-0.duckdb', 'batch-0'], ['batch-24.duckdb', 'batch-24'],
+      ]);
+      // The owners store their file, so reads need no catalog.
+      expect(db.getSessionById('batch-0')).toMatchObject({ hasDuckDbTelemetry: true, duckdbFilename: 'batch-0.duckdb' });
+      expect(db.getCompactSession('batch-0')).toMatchObject({ hasDuckDbTelemetry: true });
+      expect(db.getSessionById('batch-12')?.hasDuckDbTelemetry).toBeUndefined();
+    } finally { db.close(); fs.rmSync(telemetryDir, { recursive: true, force: true }); }
+  });
+});
 describe('ServerContext reference laptime refresh', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -616,20 +632,22 @@ describe('ServerContext reference laptime refresh', () => {
 
   it('recounts stored benchmark updates counted with an older rule, on your laps only', () => {
     const stale: ReferenceBenchmarkDiff = { ...benchmarkDiff, id: 7, totalAffectedSessions: 35, totalCategoryShifts: 70 };
+    const db = new Database(':memory:');
+    initDbSchema(db);
     const sessionDb = {
       getAllStoredReplayFiles: vi.fn(() => []),
       getBenchmarkDiffIdsWithImpactRuleOtherThan: vi.fn(() => [7]),
       getBenchmarkDiffById: vi.fn(() => stale),
       updateBenchmarkDiffImpact: vi.fn(),
+      getDb: vi.fn(() => db),
     } as unknown as SessionDatabase;
     const context = createContext(sessionDb);
-    vi.spyOn(context, 'loadSessions').mockReturnValue([]);
-
     context.refreshBenchmarkDiffImpacts();
 
     expect(sessionDb.updateBenchmarkDiffImpact).toHaveBeenCalledWith(7, expect.objectContaining({
       id: 7, totalAffectedSessions: 0, totalCategoryShifts: 0, impactRule: expect.any(Number),
     }));
+    db.close();
   });
 
   it('records a refresh failure without leaving the scan running', async () => {
@@ -700,7 +718,9 @@ describe('ServerContext replay scan progress', () => {
     function setup(storedReplays: ReturnType<typeof replayRow>[], linkedReplay: string) {
       vi.spyOn(fs, 'statSync').mockReturnValue({ mtimeMs: xmlMtimeMs } as unknown as fs.Stats);
       const sessionDb = {
-        getAllStoredReplayFiles: vi.fn(() => storedReplays),
+        getReplayMatchingEntries: vi.fn(() => storedReplays.map(row => replayIndexEntryFromStored({...row, metadata: row.metadata as import('../../../server/core/types.js').ReplayMetadata}))),
+        getReplayMatchingEntry: vi.fn((name: string) => { const row = storedReplays.find(row => row.filename === name); return row ? replayIndexEntryFromStored({...row, metadata: row.metadata as import('../../../server/core/types.js').ReplayMetadata}) : undefined; }),
+        ...storedTelemetryLinks,
         getTelemetryMetadata: vi.fn(() => []),
         updateSessionMatchingReplay: vi.fn(),
         rejectSessionReplayLink: vi.fn((_id: string, link: { name: string }, reason: string) => ({ replayName: link.name, reason, rejectedAt: 1 })),
@@ -713,7 +733,7 @@ describe('ServerContext replay scan progress', () => {
         parser: new LmuParser(),
         sessionDb,
         telemetryCatalog: { getFiles: vi.fn(() => []) } as unknown as TelemetryCatalog,
-        replayCache: {} as ReplayCacheService,
+        replayRecordings: {} as ReplayRecordingService,
       });
       const session = {
         id: '2026_09_03_14_41_14-69R1',

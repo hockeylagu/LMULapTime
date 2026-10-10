@@ -33,7 +33,7 @@ import { applyLapTiming } from './sessionLapTiming.js';
 import { isRacingLap } from '../../shared/domain/lapComparison.js';
 import { annotateLapTraffic, isNonRaceSession } from '../../shared/domain/raceTraffic.js';
 import { classifySessionLaps } from './sessionLapClassification.js';
-import { findMatchingReplay } from './replayMatching.js';
+import { findMatchingReplay, type ReplayMatchTarget } from './replayMatching.js';
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -46,6 +46,7 @@ const xmlParser = new XMLParser({
 const updateMinTime = minValidTime;
 
 export class LmuParser {
+  private replayLookup: ((target: ReplayMatchTarget) => ReplayFileEntry[]) | null = null;
   private replaysMap: ReplayFileEntry[] = [];
   // Bumped whenever a replay is added or its timing metadata changes, so callers can tell
   // when previously computed session -> replay matches deserve a second look.
@@ -63,6 +64,12 @@ export class LmuParser {
 
   public getReplaysList(): ReplayFileEntry[] {
     return [...this.replaysMap];
+  }
+
+  /** Server ingestion queries SQLite candidates; standalone parsers may use their local file index. */
+  public setReplayLookup(lookup: (target: ReplayMatchTarget) => ReplayFileEntry[]): void {
+    this.replaysMap = [];
+    this.replayLookup = lookup;
   }
 
   public detectPlayerName(baseDir?: string) {
@@ -731,8 +738,8 @@ export class LmuParser {
     sessionTimestampMs: number,
     xmlFileMtimeMs: number
   ): ReplayFileEntry | undefined {
-    if (this.replaysMap.length === 0) return undefined;
-    return findMatchingReplay(this.replaysMap, { trackVenue, trackCourse, sessionCode, sessionTimestampMs, xmlFileMtimeMs });
+    const target = { trackVenue, trackCourse, sessionCode, sessionTimestampMs, xmlFileMtimeMs };
+    return findMatchingReplay(this.replayLookup ? this.replayLookup(target) : this.replaysMap, target);
   }
 
   private parseStreamEvents(streamNode: RawStreamXmlNode, drivers: DriverData[]) {

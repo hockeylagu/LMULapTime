@@ -12,6 +12,7 @@ describe('SessionTableRow', () => {
     timeString: '2026-07-20 15:30',
     trackVenue: 'Autodromo Nazionale Monza',
     trackCourse: 'Grand Prix',
+    matchingReplayFile: { name: 'Monza.Vcr', path: 'C:/LMU/Replays/Monza.Vcr' },
     playerDriver: {
       name: 'Player Driver',
       carType: 'Porsche 963',
@@ -22,6 +23,8 @@ describe('SessionTableRow', () => {
       position: 1,
       gridPosition: 3,
       positionGain: 2,
+      driverOrdinal: 0,
+      bestLapOrdinal: 3,
     },
   };
 
@@ -81,6 +84,8 @@ describe('SessionTableRow', () => {
         bestLapTime: 94.8,
         bestLapTimeString: '1:34.800',
         position: 2,
+        driverOrdinal: 0,
+        bestLapOrdinal: 0,
       },
       matchingReplayFile: {
         name: 'Monza_Quali_2026.Vcr',
@@ -205,7 +210,10 @@ describe('SessionTableRow', () => {
     it('opens the replay once on a plain click, and the link carries the best lap', () => {
       const { onSelectSession, onOpenReplay } = setup();
       const link = screen.getByRole('link', { name: /Open replay telemetry/ });
-      expect(link).toHaveAttribute('href', expect.stringContaining('lap=4'));
+      expect(link).toHaveAttribute('href', expect.stringContaining('sessionId=session-race-1'));
+      expect(link).toHaveAttribute('href', expect.stringContaining('driverOrdinal=0'));
+      expect(link).toHaveAttribute('href', expect.stringContaining('lapOrdinal=3'));
+      expect(link).not.toHaveAttribute('href', expect.stringContaining('replayName='));
       fireEvent.click(link);
       expect(onOpenReplay).toHaveBeenCalledTimes(1);
       expect(onSelectSession).not.toHaveBeenCalled();

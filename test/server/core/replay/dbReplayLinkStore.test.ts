@@ -1,3 +1,4 @@
+import { querySessionPage } from '../../../../server/core/sessionSummaries/pageQueries.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionDatabase } from '../../../../server/core/db.js';
 import type { DetailedSession } from '../../../../server/core/types.js';
@@ -35,15 +36,12 @@ describe('rejected replay links', () => {
   });
 
   it('removes the link from the session row and records what it held', () => {
-    const cached = db.getAllSessions()[0];
-
     const rejected = db.rejectSessionReplayLink(session.id, replayLink, 'time-window');
 
     expect(rejected).toEqual({ replayName: replayLink.name, reason: 'time-window', rejectedAt: expect.any(Number) });
-    expect(cached.matchingReplayFile).toBeUndefined();
-    db.invalidateSessionCache();
+    db.markSessionDataChanged();
     expect(db.getSessionById(session.id)?.matchingReplayFile).toBeUndefined();
-    expect(db.getAllSessionSummaries()[0].matchingReplayFile).toBeUndefined();
+    expect(querySessionPage(db.getDb(), { page: 1, pageSize: db.getSessionsCount() }).sessions[0].matchingReplayFile).toBeUndefined();
     expect(db.getRejectedReplayLinks().get(session.id)).toEqual([rejected]);
   });
 
@@ -62,9 +60,9 @@ describe('rejected replay links', () => {
     db.upsertSession(reparsed, 'C:\\results\\2026_06_28_18_29_32-98P1.xml', 2, 1);
 
     expect(reparsed.matchingReplayFile).toBeUndefined();
-    db.invalidateSessionCache();
+    db.markSessionDataChanged();
     expect(db.getSessionById(session.id)?.matchingReplayFile).toBeUndefined();
-    expect(db.getAllSessionSummaries()[0].matchingReplayFile).toBeUndefined();
+    expect(querySessionPage(db.getDb(), { page: 1, pageSize: db.getSessionsCount() }).sessions[0].matchingReplayFile).toBeUndefined();
   });
 
   it('stores a different replay matched by a later parse', () => {
@@ -73,7 +71,7 @@ describe('rejected replay links', () => {
 
     db.upsertSession({ ...session, matchingReplayFile: other } as DetailedSession, 'C:\\results\\2026_06_28_18_29_32-98P1.xml', 2, 1);
 
-    db.invalidateSessionCache();
+    db.markSessionDataChanged();
     expect(db.getSessionById(session.id)?.matchingReplayFile?.name).toBe(other.name);
   });
 
@@ -98,15 +96,12 @@ describe('stored replay links', () => {
     db.close();
   });
 
-  it('stores a new link in the session row and in the loaded session list', () => {
-    const loaded = db.getAllSessions()[0];
-
+  it('stores a new link in the source row and compact card', () => {
     db.updateSessionMatchingReplay(session.id, replayLink);
 
-    expect(loaded.matchingReplayFile).toEqual(replayLink);
-    db.invalidateSessionCache();
+    db.markSessionDataChanged();
     expect(db.getSessionById(session.id)?.matchingReplayFile).toEqual(replayLink);
-    expect(db.getAllSessionSummaries()[0].matchingReplayFile).toEqual(replayLink);
+    expect(querySessionPage(db.getDb(), { page: 1, pageSize: db.getSessionsCount() }).sessions[0].matchingReplayFile).toEqual(replayLink);
   });
 
   it('does not rewrite the row when the same link is stored again', () => {
@@ -125,11 +120,11 @@ describe('stored replay links', () => {
 
     db.updateSessionMatchingReplay(session.id, replayLink);
     db.rejectSessionReplayLink(session.id, replayLink, 'time-window');
-    db.invalidateSessionCache();
+    db.markSessionDataChanged();
     expect(db.getSessionById(session.id)?.matchingReplayFile).toBeUndefined();
 
     db.updateSessionMatchingReplay(session.id, other);
-    db.invalidateSessionCache();
+    db.markSessionDataChanged();
     expect(db.getSessionById(session.id)?.matchingReplayFile?.name).toBe(other.name);
     expect(db.getRejectedReplayLinks().get(session.id)?.map(link => link.replayName)).toEqual([replayLink.name]);
   });

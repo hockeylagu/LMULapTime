@@ -15,6 +15,8 @@ export interface ReplayEventInfo {
 
 export interface ReplayDriverEntry {
   slot?: number;
+  sessionDriverOrdinal?: number;
+  sessionLapOrdinals?: Record<string, number>;
   name: string;
   vehicleId?: string;
   carModel?: string;
@@ -258,6 +260,9 @@ export interface ReplayTrajectoryValidation {
 export type LapEndCut = 'line' | 'extrapolated' | 'none';
 
 export interface ReplayTrajectoryData {
+  sessionId?: string;
+  driverOrdinal?: number;
+  lapOrdinal?: number;
   vehicleIdentity?: { vehicleId?:string; carModel?:string; carClass?:string };
   vehicleData?: VehicleDataRecord;
   dataPluginRevision?: string;

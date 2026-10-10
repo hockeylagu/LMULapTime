@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef, startTransition } from 'react';
-import type { AppStatus, DetailedSession, ScanStatus, SessionProgressionPoint } from '../../shared/types/index.js';
+import type { AppStatus, ScanStatus } from '../../shared/types/index.js';
 import { fetchJson, postJson, isAbortError, apiErrorMessage } from './apiClient.js';
 import { invalidateReferenceLaptimes } from './referenceApi.js';
+import { setVehicleLogoSource } from './vehicleLogosApi.js';
 
 const SERVER_RETRY_MS = 2000;
 /** An unreachable server is asked less and less often, down to once every 15 seconds. */
@@ -26,13 +27,11 @@ export function serverRetryDelay(failures: number): number {
 function snapshotKey(scan: ScanStatus): string {
   return JSON.stringify([scan.dataRevision, scan.finishedAt, scan.sessionScan?.finishedAt,
     scan.telemetryScan?.finishedAt, scan.replayUpgrade?.finishedAt,
-    scan.replayUpgrade?.driversDone, scan.referenceLaptimes?.completedAt]);
+    scan.replayUpgrade?.driversDone, scan.referenceLaptimes?.completedAt, scan.sessionProjectionBackfill?.finishedAt]);
 }
 
 export function useAppData() {
   const [status, setStatus] = useState<AppStatus | null>(null);
-  const [sessions, setSessions] = useState<DetailedSession[]>([]);
-  const [progression, setProgression] = useState<SessionProgressionPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [replayScanStatus, setReplayScanStatus] = useState<ScanStatus | null>(null);
@@ -56,14 +55,11 @@ export function useAppData() {
     const controller = new AbortController();
     dataAbort.current = controller;
     try {
-      const [statusData, snapshot] = await Promise.all([
-        fetchJson<AppStatus>('/api/status', { signal: controller.signal }),
-        fetchJson<{ sessions: DetailedSession[]; progression: SessionProgressionPoint[]; revision?: string }>('/api/session-snapshot', { signal: controller.signal }),
-      ]);
+      const statusData = await fetchJson<AppStatus>('/api/status', { signal: controller.signal });
       if (!mounted.current || controller.signal.aborted) return false;
-      setStatus({ ...statusData, sessionsCount: snapshot.sessions.length });
-      setSessions(snapshot.sessions);
-      setProgression(snapshot.progression);
+      const nextLogoSource = `${statusData.serverInstanceId ?? ''}:${statusData.dataPlugin?.revision ?? ''}`;
+      setVehicleLogoSource(nextLogoSource);
+      setStatus(statusData);
       setRevision(value => value + 1);
       setDataError(null);
       loaded.current = true;
@@ -110,7 +106,7 @@ export function useAppData() {
           else retry = true;
         }
         const active = scan.refreshQueued || scan.running || scan.sessionScan?.running || scan.telemetryScan?.running ||
-          scan.replayUpgrade?.running || (reference?.started && !reference.checked);
+          scan.replayUpgrade?.running || scan.sessionProjectionBackfill?.running || scan.allComplete === false || (reference?.started && !reference.checked);
         if (active || retry) pollTimer.current = setTimeout(() => { void poll(); }, retry ? SERVER_RETRY_MS : 1000);
       } catch (err: unknown) {
         if (!mounted.current || generation !== pollGeneration.current || isAbortError(err)) return;
@@ -164,7 +160,7 @@ export function useAppData() {
     };
   }, [startScanPolling]);
 
-  return { status, sessions, progression, loading, isRefreshing, replayScanStatus,
+  return { status, loading, isRefreshing, replayScanStatus,
     referenceUpdateCount, setReferenceUpdateCount, revision, error: statusError ?? dataError,
     fetchData: refresh, refreshReplayScanStatus: startScanPolling };
 }

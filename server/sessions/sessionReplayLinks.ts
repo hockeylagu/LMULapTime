@@ -6,7 +6,7 @@ import type { SessionDatabase } from '../core/db.js';
 import { DetailedSession, RejectedReplayLink, ReplayLinkRejectionReason } from '../core/types.js';
 
 type ReplayLinkStore = Pick<SessionDatabase, 'updateSessionMatchingReplay' | 'rejectSessionReplayLink'> &
-  Partial<Pick<SessionDatabase, 'getRejectedReplayLinks'>>;
+  Partial<Pick<SessionDatabase, 'getRejectedReplayLinks' | 'getSessionsLinkedToRecording' | 'getSessionXmlMtime'>>;
 
 /**
  * Keeps each session's replay link true to the matching rules (replayMatching.ts): links sessions
@@ -14,23 +14,12 @@ type ReplayLinkStore = Pick<SessionDatabase, 'updateSessionMatchingReplay' | 're
  * rejected_replay_links, never relinked) and gives a replay to one session only.
  */
 export class SessionReplayLinks {
-  // Session id -> replay index revision at which its stored replay match was last re-checked.
-  private readonly replayMatchCheckedAt = new Map<string, number>();
-  // The parser whose revisions replayMatchCheckedAt holds: a new parser counts from scratch.
-  private checkedParser: LmuParser | null = null;
-  // Results XML path -> mtime; XMLs are written once, so one stat per process is enough.
-  private readonly xmlMtimeCache = new Map<string, number | null>();
-
   public constructor(private readonly db: ReplayLinkStore) {}
 
   /** Links, re-checks and de-duplicates the replay links of `sessions` against the parser's replay index. */
-  public linkSessions(sessions: DetailedSession[], parser: LmuParser, replaysByName: Map<string, ReplayFileEntry>): void {
-    if (this.checkedParser !== parser) {
-      this.replayMatchCheckedAt.clear();
-      this.checkedParser = parser;
-    }
+  public linkSessions(sessions: DetailedSession[], parser: LmuParser, replaysByName: Pick<ReadonlyMap<string, ReplayFileEntry>, 'get'>): void {
     const rejectedLinks = typeof this.db.getRejectedReplayLinks === 'function'
-      ? this.db.getRejectedReplayLinks()
+      ? this.db.getRejectedReplayLinks(sessions.map(session => session.id))
       : new Map<string, RejectedReplayLink[]>();
 
     for (const session of sessions) {
@@ -58,19 +47,16 @@ export class SessionReplayLinks {
     this.enforceOneSessionPerReplay(sessions, replaysByName);
   }
 
-  /** The results XML mtime: when LMU wrote the session, at its end. */
+  /** Write-once XML end time comes from ingestion; missing stored values fall back to disk and retry failures. */
   public xmlMtime(session: DetailedSession): number | undefined {
+    const stored = this.db.getSessionXmlMtime?.(session.id, session.filePath);
+    if (stored !== undefined) return stored;
     if (!session.filePath) return undefined;
-    let mtime = this.xmlMtimeCache.get(session.filePath);
-    if (mtime === undefined) {
-      try {
-        mtime = fs.statSync(session.filePath).mtimeMs;
-      } catch {
-        mtime = null;
-      }
-      this.xmlMtimeCache.set(session.filePath, mtime);
+    try {
+      return fs.statSync(session.filePath).mtimeMs;
+    } catch {
+      return undefined;
     }
-    return mtime ?? undefined;
   }
 
   private estimateSessionEndMs(session: DetailedSession): number {
@@ -116,14 +102,10 @@ export class SessionReplayLinks {
    * within SAME_SAVE_WINDOW_MS of the XML: LMU saves both within about a second at session end, and
    * the stored match can predate that replay being cached (the replay sync runs after the session sync).
    */
-  private recheckStoredReplayMatch(session: DetailedSession, parser: LmuParser, replaysByName: Map<string, ReplayFileEntry>): void {
+  private recheckStoredReplayMatch(session: DetailedSession, parser: LmuParser, replaysByName: Pick<ReadonlyMap<string, ReplayFileEntry>, 'get'>): void {
     const SAME_SAVE_WINDOW_MS = 60_000;
     const stored = session.matchingReplayFile;
     if (!stored) return;
-    const revision = parser.getReplayIndexRevision();
-    if (this.replayMatchCheckedAt.get(session.id) === revision) return;
-    this.replayMatchCheckedAt.set(session.id, revision);
-
     // Without the replay's timing or the XML's mtime the match cannot be judged: keep it.
     const current = replaysByName.get(stored.name);
     const xmlMtime = this.xmlMtime(session);
@@ -168,7 +150,7 @@ export class SessionReplayLinks {
    * practice keeps the file), so several sessions can each pass the matching rules against it: the
    * closest one keeps it and the others lose it. A replay the index does not know cannot be judged.
    */
-  private enforceOneSessionPerReplay(sessions: DetailedSession[], replaysByName: Map<string, ReplayFileEntry>): void {
+  private enforceOneSessionPerReplay(sessions: DetailedSession[], replaysByName: Pick<ReadonlyMap<string, ReplayFileEntry>, 'get'>): void {
     const claimsByReplay = new Map<string, DetailedSession[]>();
     for (const session of sessions) {
       const name = session.matchingReplayFile?.name;
@@ -176,6 +158,11 @@ export class SessionReplayLinks {
       const claims = claimsByReplay.get(name) ?? [];
       claims.push(session);
       claimsByReplay.set(name, claims);
+    }
+    for (const [name, claims] of claimsByReplay) {
+      const byId = new Map((this.db.getSessionsLinkedToRecording?.(name) ?? []).map(session => [session.id, session] as const));
+      for (const session of claims) byId.set(session.id, session);
+      claimsByReplay.set(name, [...byId.values()]);
     }
     for (const [name, claims] of claimsByReplay) {
       const replay = replaysByName.get(name);

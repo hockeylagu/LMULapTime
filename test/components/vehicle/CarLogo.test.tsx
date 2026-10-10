@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { CarLogo } from '../../../src/components/vehicle/CarLogo.js';
+import { useVehicleLogos } from '../../../src/components/vehicle/useVehicleLogos.js';
 import * as vehicleLogosApi from '../../../src/api/vehicleLogosApi.js';
 
 describe('CarLogo component', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
     vehicleLogosApi.clearCachedVehicleLogos();
   });
 
@@ -61,5 +63,26 @@ describe('CarLogo component', () => {
       expect(img.className).toContain('w-7 h-7');
       expect(img.className).toContain('custom-test');
     });
+  });
+
+  it('retries a pending logo request after invalidation while the hook still has null logos', async () => {
+    let resolveOld: ((response: Response) => void) | undefined;
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve; }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ packageRevision: 'new', logos: { Audi: '<svg/>' } })));
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useVehicleLogos());
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    act(() => vehicleLogosApi.clearCachedVehicleLogos());
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(result.current.logos).toEqual({ Audi: '<svg/>' }));
+
+    await act(async () => {
+      resolveOld?.(new Response(JSON.stringify({ packageRevision: 'old', logos: { Ferrari: '<svg/>' } })));
+      await Promise.resolve();
+    });
+    expect(result.current.logos).toEqual({ Audi: '<svg/>' });
+    vi.unstubAllGlobals();
   });
 });

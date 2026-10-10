@@ -1,6 +1,6 @@
 import {hasCompatibleTrackStations} from '../../../../shared/domain/trackGeometry.js';
 import { getCircuitSpecification } from '../../../../shared/domain/circuitSpecs.js';
-import { fetchReplayTrajectory } from '../../../api/replayApi.js';
+import { fetchSessionTelemetry } from '../../../api/replayApi.js';
 import { computeLapSegmentComparisons } from '../../../utils/cornerAnalysis/index.js';
 import { comparisonConfidence, DebriefCorner, rankDebriefCorners } from '../../../utils/sessionDebrief.js';
 import { applyTelemetryPostProcessingToTrajectory } from '../../../utils/telemetryPostProcessing.js';
@@ -28,7 +28,7 @@ export class LapDebriefUnavailableError extends Error {}
 export async function loadLapPairDebrief(yours: TelemetryLapRef, theirs: TelemetryLapRef, signal?: AbortSignal): Promise<LapDebrief> {
   const resolutionQuery = trajectoryResolutionQuery(DEFAULT_TELEMETRY_RESOLUTION);
   const load = (ref: TelemetryLapRef) =>
-    fetchReplayTrajectory(ref.replayName, { resolutionQuery, lap: ref.lapNum, driverName: ref.driverName }, { signal })
+    fetchSessionTelemetry(ref.sessionId, { resolutionQuery, driverOrdinal: ref.driverOrdinal, lapOrdinal: ref.lapOrdinal }, { signal })
       .then(applyTelemetryPostProcessingToTrajectory);
   const [target, reference] = await Promise.all([load(yours), load(theirs)]);
   if (!target.points?.length || !reference.points?.length) {

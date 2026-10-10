@@ -7,7 +7,7 @@ import { TrackGeometryStore, type CachedTrackDefinition } from './trackGeometryS
 
 import { dataPlugin } from '../plugins/dataPlugin.js';
 
-const trackStore = new TrackGeometryStore(key=>dataPlugin.track(key)?.geometry??null);
+const trackStore = new TrackGeometryStore(key=>dataPlugin.trackGeometry(key));
 
 /**
  * Loads and caches a track definition and its pre-computed spatial index by layoutKey.
