@@ -1,7 +1,7 @@
 # 🏎️ Le Mans Ultimate Lap Time Analyzer
 
 [![License: MPL 2.0](https://img.shields.io/badge/License-MPL_2.0-brightgreen.svg)](https://opensource.org/licenses/MPL-2.0)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-7.x-blue.svg)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-61dafb.svg)](https://react.dev/)
 [![Vite](https://img.shields.io/badge/Vite-8-646cff.svg)](https://vitejs.dev/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL%20Mode-003B57.svg)](https://sqlite.org/)
@@ -18,7 +18,7 @@ Telemetry analytics and lap comparison for **Le Mans Ultimate (LMU)**. It decode
 
 ### 🗺️ Replay & Telemetry Studio
 - **100 Hz columnar DuckDB telemetry**: Ingests native telemetry at microsecond precision, smoothly interpolated across the start/finish timing loop.
-- **2D track map with 1:1 boundaries**: Physical road edges and limit corridors for all 32 driven layouts in exact Cartesian coordinates ($x, z$), with color-coded speed, pedal zones, and live telemetry cursor.
+- **2D track map**: Recorded trajectories with color-coded speed, pedal zones and a live telemetry cursor. Bundled SVGs cover 32 layouts; calibrated road boundaries and physical profiles require an optional local data package.
 - **Synchronized multi-channel traces**: Speed, lap delta, throttle & brake (with ABS/TC events), stepped gear changes, steering angle with real-time understeer/oversteer/scrub balance indicators, G-forces, dampers, tire temperatures & pressures, and Hypercar hybrid energy (SoC, Virtual Energy, Regen).
 - **Three-phase corner breakdown**: Micro-splits deconstructing every turn into Entry (braking point, trail brake decay), Rotation (apex minimum speed, yaw rate), and Exit (throttle pick-up timing, traction).
 
@@ -54,6 +54,9 @@ Telemetry analytics and lap comparison for **Le Mans Ultimate (LMU)**. It decode
 
 ## 🛠️ Documentation
 
+- [`docs/README.md`](docs/README.md): documentation guide.
+- [`docs/plans/README.md`](docs/plans/README.md): completed work, active branch work and remaining priorities.
+- [`docs/CODE_MAP.md`](docs/CODE_MAP.md): implementation, routes, storage and cache versions.
 - [`docs/PLUGINS.md`](docs/PLUGINS.md): optional local data packages, setup and fallback.
 - [`docs/TELEMETRY_FORMAT.md`](docs/TELEMETRY_FORMAT.md): LMU 100 Hz DuckDB telemetry tables and channels.
 - [`docs/VCR_FORMAT.md`](docs/VCR_FORMAT.md) / [`docs/VCR_ANALYSIS.md`](docs/VCR_ANALYSIS.md): the reverse-engineered binary replay format (`gMb1.002f`) and its accuracy.
@@ -65,7 +68,7 @@ Telemetry analytics and lap comparison for **Le Mans Ultimate (LMU)**. It decode
 ## 🚀 Quick Start
 
 ### Prerequisites
-- [Node.js](https://nodejs.org/) (v18.0 or newer)
+- [Node.js](https://nodejs.org/) 24.15+ on the 24.x line (also supported by the installed stack: 22.22.2+ on 22.x, or 26+)
 - [Le Mans Ultimate](https://lemansultimate.com/) installed on your PC
 - *(Optional)* Google Gemini API key for AI Race Engineer post-stint debriefs
 
@@ -83,10 +86,11 @@ Telemetry analytics and lap comparison for **Le Mans Ultimate (LMU)**. It decode
    ```
 
 3. **Configure Environment (Optional)**:
-   Create a `.env` file in the project root if you want to enable Gemini AI coaching debriefs:
+   Create an ignored `.env.local` file in the project root if you want to enable Gemini AI coaching debriefs; `dev:server` loads this file:
    ```env
    GEMINI_API_KEY=your_gemini_api_key_here
    ```
+   Optional detailed track/vehicle data uses `LMU_PLUGIN_ROOT` in the same file; see [local package setup](docs/PLUGINS.md).
 
 4. **Launch the application**:
    ```bash
@@ -123,13 +127,14 @@ To adjust your paths or driver profile:
 | `npm run dev:server` | Starts the backend server using `tsx watch`. |
 | `npm run dev:client` | Starts the Vite development server. |
 | `npm run build` | Validates TypeScript types and compiles the production client bundle. |
-| `npm test` | Runs the Vitest suite (1,700+ tests across 200+ files). |
+| `npm test` | Runs the complete Vitest suite; latest verification is recorded in [CODE_MAP](docs/CODE_MAP.md). |
 | `npm run test:watch` | Runs Vitest in interactive watch mode. |
 | `npm run test:coverage` | Runs the test suite and generates V8 code coverage reports. |
 | `npm run telemetry:probe` | Probes live memory-mapped telemetry structures via .NET 8 tool. |
 | `npm run telemetry:record`| Records live session telemetry to disk via .NET 8 tool. |
 | `npm run vcr:correlate` | Runs offline correlation between XML results and binary replay streams. |
-| `npm run vehicles:catalog` | Rebuilds the vehicle catalog. |
+| `npm run check:local-data` | Checks release inputs for forbidden detailed local data. |
+| `npm run screenshots` | Captures application screenshots with the configured tooling. |
 
 ---
 

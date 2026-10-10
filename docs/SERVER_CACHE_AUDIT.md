@@ -1,9 +1,9 @@
 # Server cache audit
 
-Reviewed 2026-10-10. Scope: server caches, shared server-side indexes, and their SQLite alternatives.
+Reviewed 2026-10-10. Current follow-ups are indexed in [plans/README.md](plans/README.md). Historical measurements were not rerun in the documentation review. Scope: server caches, shared server-side indexes, and their SQLite alternatives.
 Client loader/hook state, SQLite's own page cache and transient per-calculation maps are excluded.
 
-## Read-only local measurements
+## Historical read-only local measurements (before normalized session storage)
 
 Five sequential runs per operation with `better-sqlite3`, median wall time. No scans, migrations,
 writes or network requests. OS/SQLite pages warm during runs. These are query/materialization
@@ -19,7 +19,7 @@ timings, not end-to-end startup or memory measurements.
 | Telemetry metadata rows | 153 | 7.42 |
 | Benchmark rows without JSON reconstruction | 198 | 0.32 |
 
-Sessions are plain JSON; replay metadata and trajectories are compressed. SQLite reads can be
+At measurement time, sessions were plain JSON; current sessions use normalized rows and the legacy JSON columns have been removed. Replay metadata and trajectories remain compressed. SQLite reads can be
 fast while materializing whole histories is expensive. Simply deleting the session memory cache
 would have repeated ~747 ms of work with the previous APIs. The implemented compact projections,
 indexed detail reads and SQL aggregates remove that whole-history dependency. Benchmark timing
@@ -91,7 +91,7 @@ metadata/trajectories live in SQLite, including recordings LMU has deleted.
 | Group | Why retain it |
 |---|---|
 | Sessions | Parsed XML history and classifications; deleted XML history survives. `sessionSummaries` adds compact card metadata, per-driver/per-condition aggregates and lap facts, maintained in the same transaction as source writes. |
-| Shared session aggregates | `session_summary_facts` stores one compact row per session/current player, reusing classified driver/lap projections. Dashboard sums and ranks these scalar facts directly; no process-wide result cache. Projection version 3 backfills retained source JSON in bounded batches. |
+| Shared session aggregates | `session_summary_facts` stores one compact row per session/current player, reusing classified driver/lap projections. Dashboard sums and ranks these scalar facts directly; no process-wide result cache. Current projection version 4 rebuilds from retained normalized rows in bounded batches. |
 | Replay metadata/trajectories/facts/laps/conditions/events/order/positions | Avoids huge VCR reads/decodes and may be the only remaining copy. Identity/file/decoder-version checks remain mandatory. |
 | Telemetry metadata and laps | Ownership and expensive DuckDB reads; file/cache versions govern reuse. |
 | Benchmarks and update history | Offline targets and their history; explicit/stale-startup refresh updates them. |
@@ -112,16 +112,16 @@ Next useful optimization: migrate any future session consumer to compact pages o
 Startup telemetry ownership reconciliation is already bounded to ten detailed sessions at a time. Measure
 package validation separately. Do not infer end-to-end startup wins from query timings alone.
 
-The implementation and measurements are detailed in [Persisted session summaries](plans/PERSISTED_SESSION_SUMMARIES.md).
+The implementation and measurements are detailed in [Persisted session summaries](plans/archive/PERSISTED_SESSION_SUMMARIES.md).
 
-## Second pass after the session-summary migration
+## Historical second pass after the session-summary migration
 
 Rechecked declarations, readers and invalidation on 2026-10-10. This pass also includes shared
 browser caches; ordinary component state and `useMemo` calculations are not retained-history caches.
 Findings below are source observations, not new memory or startup measurements. The subsequent
 user-authorized removal of four caches is recorded above; the original findings below explain why.
 
-### Highest-value simplifications
+### Original simplification findings (all five implemented)
 
 1. **XML end timestamps can come from SQLite.** `SessionReplayLinks.xmlMtimeCache` grows with
    successful paths and repeats filesystem reads after every restart, although ingestion already
@@ -205,7 +205,7 @@ the measured dashboard/comparison SQL bottlenecks.
   in-flight responses. This also works across app-hook remounts and while a previous load is pending.
 
 The original second-pass findings above are historical rationale; these three cleanup items are
-implemented. Dashboard/comparison aggregation remains per-request SQL and is a separate performance task.
+implemented. Dashboard aggregation subsequently moved to persisted session contributions (below); comparison count/best-candidate work remains a profiling target.
 
 The subsequent shared-session aggregate change moves dashboard contributions into
 `session_summary_facts` at ingestion/update time. Global sums/ranking remain SQL over compact rows;

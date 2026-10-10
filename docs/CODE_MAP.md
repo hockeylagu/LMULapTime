@@ -4,8 +4,9 @@ A fast index for new sessions: find the right file without searching. `AGENTS.md
 this file holds the **routes through the code**. Keep it current (see "Keeping this file current" at the end).
 
 Last checked 2026-10-10: 494 TypeScript source files in src/server/shared, 287 test files,
-2498 tests (2442 passed, 56 skipped). Production build passes. Coverage: 94.30% lines, 91.99% statements,
-92.26% functions and 83.20% branches (two workers).
+2498 tests (2442 passed, 56 skipped). Full tests and production build rechecked during documentation cleanup.
+Last recorded coverage (not rerun for this docs-only change): 94.30% lines, 91.99% statements,
+92.26% functions and 83.20% branches (two workers). Branch/worktree results are separate; see [plans](plans/README.md).
 
 ---
 
@@ -22,7 +23,7 @@ Other tables: `reference_laptimes` (benchmarks), `ai_reports`, `rival_targets` (
 DDL is coordinated by `server/core/dbSchema.ts`; additive session projection tables and indexes
 live in `server/core/sessionSummaries/schema.ts` and `aggregateStore.ts`, and replay matching columns/indexes in
 `server/core/replay/dbReplayMatchingStore.ts`.
-Normalized session rows (`server/core/sessionRows/`, completed plan [NORMALIZED_SESSION_STORAGE](plans/NORMALIZED_SESSION_STORAGE.md)) are the
+Normalized session rows (`server/core/sessionRows/`, completed plan [NORMALIZED_SESSION_STORAGE](plans/archive/NORMALIZED_SESSION_STORAGE.md)) are the
 stored session. JSON columns, temporary conversion tools, verification backfill and its startup gate have been removed.
 `specs.ts` declares every stored column once (`fields.ts` helpers); `schema.ts` holds the DDL, extra session scalars and derived-column lists.
 `writer.ts` (`writeSessionRows`, `updateDerivedColumns`) writes or updates rows with their projection; `dictionaries.ts` resolves driver names, vehicles and teams.
@@ -183,7 +184,7 @@ index their explicitly supplied replay directory locally.
    condition (the header scan samples 30 windows and can miss the peak).
    Pace is rated during XML parsing; startup benchmark refresh no longer rewrites all detailed session JSON.
 4. **Serve**: `GET /api/session/:id` (`server/routes/sessionRoutes.ts`) adds, per request and not stored:
-   - telemetry links from stored ownership (`context.enrichSessionsWithTelemetry`);
+   - current benchmark pace via `rateSessionDetail` and bounded history context via `querySessionContext`; stored telemetry attachments are already read from normalized session rows;
    - pit stop details from replay events (`attachPitServices`, `server/sessions/sessionPitStops.ts`, maths in `shared/domain/pitStops.ts`).
 5. **Load in the client**: `src/components/session-detail/useSessionDetailData.ts` (`fetchJson('/api/session/…')`).
 6. **Show**: `src/components/session-detail/SessionDetail.tsx`, then:
@@ -226,7 +227,7 @@ index their explicitly supplied replay directory locally.
   `useTrackBoundaryGeometry.ts` from `/api/data-plugin/tracks/:layoutKey`; optional `mapSurfaces` road/kerb/runoff (plus optional apron, gravel and grass) polygons are drawn by
   `scene/GpsTrackSurfaceLayers.tsx` as compound paths preserving holes. Coordinates are local x/z meters; these
   display layers leave centerline projection and timing gates unchanged. `map/display/` owns persistent Layers
-  preferences, optional revision-matched `/tracks-display/<layoutKey>.json` assets, quiet active-route backgrounds,
+  preferences, optional revision-matched display assets from `/api/data-plugin/tracks/:layoutKey`, quiet active-route backgrounds,
   fitting controls, a metric scale bar and `GpsBrakeMarkers.tsx` for optional world-position braking boards (faded by
   zoom level; boards without a station fall back to their order along the lap). Their
   labels report printed board distances; unknown distances use a generic brake label.
@@ -270,7 +271,7 @@ index their explicitly supplied replay directory locally.
 | Feature | Server | Shared domain | Client |
 |---|---|---|---|
 | Dashboard | `/api/dashboard` (`sessionSummaries/dashboardQueries.ts`: complete-history grouped metrics, current-benchmark ratings and recent trend candidates; paginated session cards) | `trackSummaryUtils.ts`, `paceCategory.ts` | `components/dashboard/` (`useDashboardData.ts` loads the bounded page and persisted aggregates; `Dashboard.tsx` uses server ranked track/car/pace cards; legacy metrics hooks remain for injected sessions/tests) |
-| Session list (dashboard + track detail) | `/api/sessions` (list entries: no drivers, and the player's laps without traffic or steward records, `toSessionListEntry` in `sessionRoutes.ts`); `/api/track/:trackName` returns the server page consumed by the same list | | `components/session-list/` (`SessionList.tsx`; 25 per page via `useSessionPage.ts` + `SessionPagination.tsx`, `?page=` reset by `updateSearchParams` on any other filter change; `SessionFilterParts.tsx` two-row toolbar with Clear filters, used by `dashboard/DashboardFilterBar.tsx` and `track-detail/TrackSessionsToolbar.tsx`; row chips in `SessionRowParts.tsx`) |
+| Session list (dashboard + track detail) | `/api/sessions` (compact `SessionCard` rows from `sessionSummaries/pageQueries.ts` and `cards.ts`, without detailed driver/lap arrays); `/api/track/:trackName` returns the server page consumed by the same list | | `components/session-list/` (`SessionList.tsx`; 25 per page via `useSessionPage.ts` + `SessionPagination.tsx`, `?page=` reset by `updateSearchParams` on any other filter change; `SessionFilterParts.tsx` two-row toolbar with Clear filters, used by `dashboard/DashboardFilterBar.tsx` and `track-detail/TrackSessionsToolbar.tsx`; row chips in `SessionRowParts.tsx`) |
 | Tracks | `/api/tracks`; `/api/track/:trackName` (scoped history aggregate, compact filter options, server-paged cards, explicit `progressionPage` points and full-history position averages via `sessionSummaries/trackQueries.ts`) | `circuitSpecs.ts`, `circuitDefinitions.ts` | `components/track-summaries/` (native card links preserve class context; benchmark status/retry, unavailable pace sorting, explicit missing-record states; session-style PaceBadge and Last driven date), `components/track-detail/` (`useTrackDetailState.ts` drives server filters/pages; `TrackSurfaceProfiles.tsx` local road elevation/grade/bank traces) |
 | Leaderboard & rivals | `leaderboardRoutes.ts` (`/leaderboard/layouts`, `/leaderboard`, `/rivals`, `/rivals/pin`), `dbRivalStore.ts` | `leaderboard.ts`, `rivals.ts`, `sessionRivals.ts` | `src/api/leaderboardApi.ts`, `components/leaderboard/` (`board/`, `ribbon/`, `rivals/`, `debrief/`, 2-lap compare; DTO telemetry availability is boolean and navigation uses session+ordinal locators; `picker/` pages compact lap candidates and fetches exact deep-linked laps separately) |
 | Lap comparison | `/api/compare/laps` (`sessionSummaries/comparisonQueries.ts`: compact fact paging/aggregates and session+driver+lap ordinal hydration) | `lapComparison.ts` | `src/components/leaderboard/` (50-row numbered pages, one-row exact deep-link fetch, picker); `src/utils/telemetryCompareLink.ts` (session-scoped telemetry locators) |
@@ -281,7 +282,7 @@ index their explicitly supplied replay directory locally.
 Client routes (`src/App.tsx`): `/dashboard`, `/tracks`, `/track/:trackName`, `/leaderboard`, `/session/:sessionId`,
 `/telemetry`, `/settings` (`/compare` redirects). Pages load on demand from `src/routePages.ts` (the current route's
 page with the session data, the rest when idle; never import a page from the components barrel in `App.tsx`, and keep
-recharts out of the entry: chunk groups in `vite.config.ts`). All server calls go through `src/api/apiClient.ts` (static track JSON via `src/api/trackGeometryApi.ts`).
+recharts out of the entry: chunk groups in `vite.config.ts`). All server calls go through `src/api/apiClient.ts` (local-package geometry/display via `src/api/trackGeometryApi.ts`).
 
 Types: canonical in `shared/types/` (`index.ts` is the barrel; `session.ts` laps/drivers/sessions, `reference.ts` benchmarks, `status.ts` scan/system, `replay.ts` replay; `leaderboard.ts`, `pitStops.ts`, `raceTraffic.ts`, `aiReport.ts`).
 `server/core/types.ts` re-exports them for server code; client and shared code import from `shared/types/index.ts`.
@@ -308,8 +309,9 @@ with laps and finishing position grouped on the left and, on the dashboard, car 
 visible, with replay controls independently focusable beneath the session badge.
 `TrackCircuitLayout.tsx` uses lightweight white `/track-outlines/<layoutKey>.svg` outlines at every size,
 falling back to an inline SVG fitted to the active centerline if an asset is unavailable. It never renders
-detailed map surfaces; the information modal still loads physical profiles independently. Static geometry,
-display assets and outlines are served from their public directories (or dist equivalents) by `server/index.ts`.
+detailed map surfaces; the information modal still loads physical profiles independently. Only basic
+SVG outlines are served statically from public/dist by `server/index.ts`; metric geometry and display
+assets are validated local-package resources served through `/api/data-plugin/tracks/:layoutKey`.
 `src/api/trackGeometryApi.ts` loads/validates display assets against layout identity and `geometryRevision`;
 stale assets are ignored while generation replaces files. The optional display contract is `TrackMapDisplay`
 in `shared/types/trackGeometry.ts`, validated by `parseTrackMapDisplay` in `shared/domain/trackGeometry.ts`.
@@ -370,6 +372,10 @@ Anything computed per request (pit stop details, telemetry links, everything in 
 
 ## 8. Other docs
 
+Start with [docs/README.md](README.md) for the documentation guide and [plans/README.md](plans/README.md)
+for active proposals, remaining work and completed-plan history. Archived plans preserve historical
+measurements and schemas; they are not current execution instructions.
+
 `docs/XML_FORMAT.md`, `docs/VCR_FORMAT.md` (incl. pit event codes), `docs/VCR_ANALYSIS.md`, `docs/TELEMETRY_FORMAT.md`
 (incl. the sign conventions: ISO 8855 vehicle axes, so steering, yaw rate, lateral G and lateral offset are positive left;
 LMU's swapped `G Force Lat`/`Long` labels; unmarked cached rows flipped on read),
@@ -379,24 +385,34 @@ LMU's swapped `G Force Lat`/`Long` labels; unmarked cached rows flipped on read)
 
 ## 9. Smells that need attention
 
-UI color cleanup: component SVG colors and handling bands consume `src/utils/themeColors.ts`, including the racing-line speed gradient stops and brake-board tick colors. Scrollbars resolve the existing `lmu` Tailwind palette, and telemetry cursor badges share `shadow-marker-lift` in `src/index.css`; color opacity remains separate from SVG fill tokens.
+**UI follow-ups**
 
-Fullscreen GPS map hardening: `map/useMapFullscreenFocus.ts` isolates the in-place expanded map, locks scrolling and restores focus while allowing body-portaled shortcut help. W/A/S/D pan the camera without scrubbing. The fullscreen turn picker was removed at the user's request because turn selection exits fullscreen; map corner markers remain. `map/display/telemetryReadouts.ts` keeps absent/non-finite channels unavailable, preserves neutral/reverse gears and avoids assuming pit speed or penalty validity. `GpsMapExpandedOverlays.tsx` separates fullscreen controls/readouts from the track scene. Line-fade and HUD-collapse states are exposed; the friction panel suppresses unavailable acceleration and honors explicitly missing aligned baselines. HUD/marker annotations meet the 10px floor, assist badges occupy the caption row, and numeric readouts use tabular figures and the established Consolas family. Primary/Baseline labels identify the inspected and reference laps without assuming player/rival identity; fade controls name their action and delta help distinguishes time difference from racing-line separation. Overlay surfaces, labels and signals use semantic tokens; shortcut help shares the red focus ring. Below 1536px the friction panel sits above the HUD, and the layers menu scrolls within a viewport-relative height limit. Audit findings 1, 3–8 and 10 are addressed; finding 2 retains keyboard pan but no fullscreen keyboard turn picker. Broader constrained desktop layout/zoom validation remains a follow-up. Evidence and priorities are in [fullscreen-gps-map-audit.md](fullscreen-gps-map-audit.md).
+- Session standings emphasize class position while sorting and gains use overall results. Reconcile
+  the intended meaning and cover differing class/overall gains in `SessionRaceStandings.tsx` and `SessionRaceStandingsRow.tsx`.
+- Complete real-recording keyboard navigation, focus containment/restoration and nested Escape
+  validation for session detail and the fullscreen map at the normal desktop viewport. 200% browser
+  zoom validation is deferred by user decision (2026-10-10), not a current completion gate.
+  HUD/friction separation and menu bounds are implemented. The fullscreen turn selector was removed by user request;
+  keyboard pan remains. Entry points: `SessionRulesModal.tsx`, `useMapFullscreenFocus.ts` and `ReplayShortcutHelp.tsx`.
+- Main's corner comparisons still depend on the primary speed trace and sample baseline speed at
+  its apex. The separate `corner-map` branch has mapped/hybrid implementations and open acceptance
+  gates; see [the current handoff summary](plans/CORNER_COMPARISON_REWORK.md). Do not restart its completed phases.
 
-Session-detail accessibility hardening: `SessionRulesModal` portals into the body, isolates background content with `inert`, traps focus and restores the trigger and scrolling on close. Circuit navigation is a React Router link; chart legend visibility uses native toggle buttons. Debrief status/errors are announced through status/alert regions. See `session-detail-audit.md` for the remaining findings.
-
-Found while writing this map. Remove an item when it is fixed; add new ones as they are noticed. The fix plan is `docs/plans/SMELLS_CLEANUP.md`.
+Remove an item when it is fixed; add new ones as they are noticed. Current follow-ups are in
+[plans/README.md](plans/README.md). [SMELLS_CLEANUP.md](plans/archive/SMELLS_CLEANUP.md) records
+the completed 2026-09-29 cleanup and does not describe all remaining findings.
 
 **Size limits close to the edge**
-- Files near the 1,000-line limit: `shared/domain/circuitDefinitions.ts` (775, a data file: one entry per layout).
-- Folders near 20 files: `src/components/common/` (19 with `index.ts`; the replay action already lives in `common/replay/`), `test/utils/` (17);
-  `src/components/replay/inspector/` is at 17 (comparison picker split into `compare/`) and `test/components/replay/telemetry/` at 17.
-- Components near the 300-line limit: `DashboardHero.tsx` (282), `ReplayInspectorContent.tsx` (280), `SessionTelemetryChart.tsx` (271).
+- Largest source files (checked 2026-10-10): `shared/domain/circuitDefinitions.ts` (774, a data file: one entry per layout)
+  and `server/telemetry/duckdbReader.ts` (773); both remain below the 1,000-line limit.
+- Folders near 20 files (direct files, checked 2026-10-10): `shared/domain/`, `src/components/settings/`, `test/domain/` (19 each);
+  `src/components/common/`, `src/utils/`, `test/utils/`, `test/components/replay/telemetry/` (18 each);
+  `src/components/replay/inspector/` (17; comparison picker split into `compare/`).
+- Components near the 300-line limit: `ReplayCompareLapPicker.tsx` (292), `ReplayInspectorContent.tsx` (290),
+  `GpsTrackMapScene.tsx` (289), `ReplayInspectorModalBody.tsx` (276), `TelemetryPresetModal.tsx` (273), `GpsMapTelemetryHud.tsx` (272).
 
 **Logic in the wrong place / duplicated**
-- `GET /session/:id` mutates the cached session object that `getAllSessions` also hands out; the pit details are recomputed on every request.
-- Version constants are spread across five files; the table in section 5 is the index.
-- `lapClassPosition` (`shared/domain/lapPlaces.ts`) matches car classes by lowercased name instead of `mapVehicleIdToClass`.
+- `lapClassPosition` and the indexed `lapClassPositions` (`shared/domain/lapPlaces.ts`) match car classes by lowercased name instead of canonical class resolution.
 - The improvement chart keeps its own `SessionProgressionPoint` (`improvementChartTypes.ts`), a copy of the shared one plus the
   benchmark pace fields.
 

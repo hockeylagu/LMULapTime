@@ -1,7 +1,10 @@
 # Smells cleanup — execution plan
 
-Status: **done** (2026-09-29, branch `smells-cleanup`, not pushed). Skipped: 5.3 (no obvious semantic group for the 17-file folders); 3.5 only marked the near-limit data file and offline tool as watched. This plan fixes the smells listed in `docs/CODE_MAP.md` section 9.
-It is written so that one session can run it from start to finish without other context.
+> Archived completed plan. Reviewed 2026-10-10. The steps, paths, schema snapshots and measurements
+> below are historical; do not rerun them as a migration guide. See the [current work queue](../README.md)
+> and [code map](../../CODE_MAP.md) for current status.
+
+Status: **completed** on 2026-09-29. Skipped: 5.3 (no obvious semantic group for the 17-file folders); 3.5 kept near-limit files under observation. This records the smells present at that date; it is not the current backlog for CODE_MAP section 9. Branch/push notes and execution instructions below are historical.
 
 ## Ground rules (read first)
 

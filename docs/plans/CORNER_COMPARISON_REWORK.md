@@ -1,15 +1,54 @@
 # Corner comparison rework
 
-Status: plan, 2026-10-02, cleaned up before implementation. Supersedes the stale `corners-definitions` branch
+Status: **in progress on the separate `corner-map` branch; not integrated into `main`**.
+Designed 2026-10-02; main and worktree status reviewed 2026-10-10. See the [current work queue](README.md).
+The original proposal below superseded the stale `corners-definitions` branch
 (216f40e, hand-written corners for 6 layouts), which stays as prior art only.
 
 Every decision taken so far is written into the text where it applies, and listed once in §15. Questions that still
 need an answer before or during the work are in §17.
 
+## Current implementation review — 2026-10-10
+
+On `main`, the primary-speed-trace engine in `src/utils/cornerAnalysis/segmentComparisons.ts`
+remains active and its baseline minimum is still sampled at the primary apex. Geometry compatibility
+checks and text `gameVersion` are implemented. The mapped comparison modules are absent from main.
+
+Substantial work already exists in `C:/Documents/LMULapTime/.claude/worktrees/corner-map`, branch
+`corner-map`, inspected at commit `9a11f3fa`. Its `docs/plans/CORNER_COMPARISON_REWORK.md` contains the
+authoritative implementation handoff dated 2026-10-08. Read that document before any continuation;
+the original physics-only proposal retained below is historical where the hybrid handoff supersedes it.
+Do not restart the implementation from this older proposal or merge the branch as part of a docs cleanup.
+
+| Phase / work | Worktree status recorded in its handoff |
+|---|---|
+| 0, R, 1a–1d, 2, 3a–3c, 3f | Implementations exist: invariants, geometry, class profiles, model maps, validation, measurements, core/line/pedal metrics and sequences |
+| Hybrid M1 | Six reviewed hybrid action maps accepted as v1; contract, structural gate, offline proposals and loader implemented |
+| Hybrid M2 | Timing/events and opt-in worker service implemented; independent events, shared cuts/IDs and additive symmetric accounting; action-window metric/sequence revalidation remains |
+| Hybrid M3 | Inspector acceptance not started; primary/baseline swap, action highlights and loss/sequence readings need validation |
+| 3b / 3c / 3f acceptance | User visual and sequence/sacrifice gates remain open; an implementation is not sign-off |
+| 3d / 3e / 1e / 4 / 5 / 6 | Coaching, progress, quick references, consumer migration, final UI acceptance and documentation remain incomplete |
+
+The branch handoff records 2,779 passed / 56 skipped and a clean build at M2 delivery; those branch
+checks were not rerun here. It also records one unresolved private wet/dry monotonicity regression
+at `sarthe_mulsanne`, LMP2 WEC; preserve its tolerance and separate physics diagnostics from hybrid timing.
+The main verification totals in CODE_MAP apply to main only.
+
+Next: continue M2 action-window metric/sequence validation, then M3 inspector acceptance using the
+accepted maps and existing engines. Preserve the branch's identity guards and worker-result race fix;
+integrate only after its remaining gates and compatibility with newer main storage changes are verified.
+Revisit open questions in §17 against the newer handoff rather than treating them all as unanswered.
+
+## Original proposal (2026-10-02)
+
+The sections below preserve the original rationale, formulas and acceptance criteria. Hybrid
+segmentation in the worktree handoff replaces physics-only authority over canonical cuts; it retains
+existing measurement phases and diagnostics. Historical line counts and sample sizes are dated evidence.
+
 ## 1. What we have today
 
 Entry point: `computeLapSegmentComparisons(primary, baseline)` in `src/utils/cornerAnalysis/segmentComparisons.ts`
-(529 lines). It is used by the inspector (`ReplayInspectorContent.tsx`), the session debrief
+(the current engine). It is used by the inspector (`ReplayInspectorContent.tsx`), the session debrief
 (`loadSessionDebrief.ts`), the leaderboard/rival debrief (`loadLapDebrief.ts`), corner consistency
 (`cornerConsistency.ts`) and the AI payload.
 
@@ -741,7 +780,7 @@ this release is correct. The catalogue in §9 is not a checklist for that releas
      map fingerprints.
    - 1d the validation gate in `measureCornerMaps.ts`, golden maps for every layout with geometry, the breach warning
      in Settings.
-   - 1e (after the first release) quick-lap references per major patch, RPM per car model: `gameVersion` kept as text (parser fix, `DB_PARSER_VERSION` bump), the
+   - 1e (after the first release) quick-lap references per major patch, RPM per car model: preserve the existing text `gameVersion` (bump `DB_PARSER_VERSION` only for changed parsing rules), the
      worker job, the `corner_references` table and store, provenance.
    - Gate: the validation gate passes, and the user signs off the C segments for two classes on the 4 sign-off
      tracks (§15 row 18).

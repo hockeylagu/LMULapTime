@@ -60,15 +60,17 @@ Geometry-dependent corner results, road/kerb distances and road banking are unav
 The GPS map uses labeled approximate class-size bodies until suitable local vehicle
 footprints are available. Missing data never selects another layout or invents flat roads.
 
-The local API exposes `/api/data-plugin/status`, `/vehicles` and
-`/tracks/:layoutKey` (geometry and optional display together). It serves validated
+The local API exposes `/api/data-plugin/status`, `/api/data-plugin/vehicles`,
+`/api/data-plugin/vehicles/logos` and `/api/data-plugin/tracks/:layoutKey`
+(geometry and optional display together). Manufacturer SVG logos are optional vehicle-catalog
+assets, loaded through their own endpoint rather than included in the vehicle list. It serves validated
 responses, not arbitrary package files. Status contains availability and a content revision.
 The browser can inspect the local data it displays. Cloud AI remains available regardless
 of package availability. Reports use the normal analysis evidence, including available derived
 measurements; missing details reduce the report's specificity rather than disabling it.
 Raw package files and geometry arrays are not uploaded by the report evidence builder.
 
-No scripts, downloads, registry, logos, settings manager or automatic extraction are part
+No executable package scripts, downloads, registry, settings manager or automatic extraction are part
 of this version. Packages are supplied separately and excluded from static builds.
 `npm run build` checks inputs and output for forbidden detailed assets; basic SVGs are allowed.
 

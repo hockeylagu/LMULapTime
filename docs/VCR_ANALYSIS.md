@@ -28,7 +28,7 @@ cross-referencing against the rF2 shared memory plugin, which LMU ships and enab
 | Capture live telemetry | same | `npm run telemetry:record` |
 | Diagnose an empty/odd buffer | same | `lmu-telemetry-recorder.exe dump` |
 | Sweep VCR bytes vs telemetry | `tools/analysis/correlateVcr.ts` | `npx tsx tools/analysis/correlateVcr.ts --vcr <f.Vcr> --telemetry <f.jsonl>` |
-| Cross-validate a field, no ground truth needed | `tools/analysis/verifyRpm.ts` | `npx tsx tools/analysis/verifyRpm.ts <f.Vcr> ...` |
+| Cross-validate a field, no ground truth needed | Historical `verifyRpm.ts` experiment (not shipped in the current tree) | See §2.1 for the recorded method/results; there is no current command for this removed tool |
 
 The recorder writes JSONL with `tel` records (~50 Hz: position, orientation matrix, rpm, fuel,
 pedals, hybrid/boost, per-wheel temps/wear/terrain) and `sco` records (5 Hz: `lapDist`,
@@ -631,7 +631,9 @@ taken. Values 4, 8, 13, 16, 64, 128 differ per stop; their meaning is open.
 *Side finding:* the replay roster labels the Monza LMP3 cars `Oreca 07 LMP2` (`4_25_DKR_…`) or
 leaves them unresolved (`46_25_ADES…`, `12_25_WTM_…`, `11_25_EURO…`): a vehicle-mapping bug in
 `shared/domain/vehicleMapping.ts`, not a VCR issue. Fixed: vehicle ids now resolve through a
-catalog built from the results logs (`shared/domain/vehicleCatalog.ts`, `npm run vehicles:catalog`).
+catalog built from the results logs at the time of that fix. Current exact aliases and vehicle
+records are supplied by an optional local package through `server/plugins/`; the generated
+`vehicleCatalog.ts` and `vehicles:catalog` command are no longer shipped. See [PLUGINS.md](PLUGINS.md).
 
 #### B. Ambient temperature: `°C = byte38 / 8 + 5.9`
 

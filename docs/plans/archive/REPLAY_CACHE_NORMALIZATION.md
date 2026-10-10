@@ -1,7 +1,10 @@
 # Replay cache normalization — migration plan
 
-Status: **done: stage A (steps 0-5) and stage B (steps 6-8); the real cache is migrated** (written 2026-09-27). Work on a new branch off `main`
-(suggested name `replay-cache-normalization`), in a branch. One step per commit.
+> Archived completed plan. Reviewed 2026-10-10. The steps, paths, schema snapshots and measurements
+> below are historical; do not rerun them as a migration guide. See the [current work queue](../README.md)
+> and [code map](../../CODE_MAP.md) for current status.
+
+Status: **completed: stage A (steps 0–5) and stage B (steps 6–8); the real cache was migrated on 2026-09-27**. Lap conditions shipped on 2026-09-28 (section 6). The following migration design and execution sequence are retained as historical evidence.
 
 Stage A as built:
 

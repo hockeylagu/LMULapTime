@@ -1,6 +1,10 @@
 # Normalized session storage
 
-Status: completed, including local conversion of all 992 sessions and removal of temporary conversion code on 2026-10-10. Earlier phase notes below are historical; the current implementation is in [CODE_MAP.md](../CODE_MAP.md). Follows [PERSISTED_SESSION_SUMMARIES.md](PERSISTED_SESSION_SUMMARIES.md), which
+> Archived completed plan. Reviewed 2026-10-10. The steps, paths, schema snapshots and measurements
+> below are historical; do not rerun them as a migration guide. See the [current work queue](../README.md)
+> and [code map](../../CODE_MAP.md) for current status.
+
+Status: completed, including local conversion of all 992 sessions and removal of temporary conversion code on 2026-10-10. Earlier phase notes below are historical; the current implementation is in [CODE_MAP.md](../../CODE_MAP.md). Follows [PERSISTED_SESSION_SUMMARIES.md](PERSISTED_SESSION_SUMMARIES.md), which
 computes per-session facts at ingestion but still keeps the session itself, its card and a second copy
 as JSON on the `sessions` row.
 

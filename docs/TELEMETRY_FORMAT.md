@@ -70,7 +70,13 @@ Do not infer a DuckDB schema from another telemetry schema. Record the database 
 
 For continuous channels without `ts`, use `GPS Time` as the master 100 Hz timeline when present. Lower-frequency channels are aligned by sample order and their declared frequency; do not manufacture a timestamp by multiplying a row number until the channel frequency and session start are known. Timestamped tables should be joined by nearest `ts` at the required tolerance.
 
-If telemetry is normalized into the application's cache, the recommended logical model is:
+### Historical storage proposal (not the implemented schema)
+
+The application currently stores recording metadata in `telemetry_metadata` and processed lap
+channels in `telemetry_lap_cache`; ownership and source-file versions govern reuse. Sessions use
+normalized session rows, and a session can own multiple DuckDB files. See [CODE_MAP.md](CODE_MAP.md)
+for the implemented stores and invalidation rules. The following channel-row model is an earlier
+proposal, retained for context; it is not a migration instruction or a description of existing tables:
 
 - `sessions`: one row per recording/session and source metadata.
 - `telemetry_samples`: one row per channel and sample index or timestamp.
@@ -161,4 +167,4 @@ References:
 
 - [DuckDB documentation](https://duckdb.org/docs/)
 - [DuckDB information schema](https://duckdb.org/docs/stable/sql/meta/information_schema)
-- [LMU telemetry configuration](../../Program%20Files%20(x86)%5CSteam%5Csteamapps%5Ccommon%5CLe%20Mans%20Ultimate%5CUserData%5CTelemetry%5Cconfig.json)
+- Local source evidence: `UserData/Telemetry/config.json` in the inspected LMU installation (not bundled in this repository).

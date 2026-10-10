@@ -1,6 +1,10 @@
 # Persisted session summaries and bounded history reads
 
-Status: implemented and verified, 2026-10-10. Full suite: 2375 passed, 56 skipped;
+> Archived completed plan. Reviewed 2026-10-10. The steps, paths, schema snapshots and measurements
+> below are historical; do not rerun them as a migration guide. See the [current work queue](../README.md)
+> and [code map](../../CODE_MAP.md) for current status.
+
+Status: **completed**, 2026-10-10. Subsequent normalized-row storage supersedes the JSON-backed design below; see [NORMALIZED_SESSION_STORAGE.md](NORMALIZED_SESSION_STORAGE.md). Verification recorded at delivery: Full suite: 2375 passed, 56 skipped;
 production build passes without warnings. Coverage passes unchanged thresholds with two workers:
 94.00% lines, 91.64% statements, 91.84% functions and 82.81% branches. The default parallel
 coverage run exceeded an existing track-enrichment timing assertion; reducing worker contention

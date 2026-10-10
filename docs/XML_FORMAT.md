@@ -277,7 +277,7 @@ The `<Stream>` container chronological logs discrete on-track events with an `@_
 
 ## 6. Current Parser Implementation
 
-The application's parser is implemented in [`server/parser.ts`](../server/parser.ts) using `fast-xml-parser`.
+The application's parser is implemented in [`server/sessions/parser.ts`](../server/sessions/parser.ts) using `fast-xml-parser`.
 
 ### 6.1 Parsing Pipeline
 ```mermaid
@@ -295,11 +295,11 @@ graph TD
 ```
 
 ### 6.2 Key Derived Metrics
-1. **Out-Lap Identification**: Automatically flags any lap immediately succeeding a pit in-lap as an out-lap (`isOutLap = true`), excluding it from clean flying averages.
+1. **Out-Lap Identification**: The parser's ordered timing pass in `server/sessions/sessionLapTiming.ts` marks out-laps (`isOutLap = true`) using `isCompletedPitStop` from `shared/domain/lapComparison.ts`. Views consume the stored classification and do not independently infer it from neighboring laps.
 2. **Lap Time Inference**: For laps missing `#text` body times due to track limits or session termination, the parser reconstructs elapsed lap times from $S1 + S2 + S3$ or delta elapsed times ($\Delta et$), keeping leaderboards clean while retaining telemetry data.
 3. **Pit Loss Calculation**: Computes time lost in pit lane relative to the driver's clean reference lap time.
 4. **Virtual Energy & Fuel Burn Averages**: Calculates clean-lap consumption rates and projected stint lengths in laps.
-5. **Layout-Specific Replay Correlation**: Passes both `trackVenue` and `trackCourse` to [`matchesTrack`](../src/utils/paceCategory.ts) to match only the corresponding `.Vcr` file without cross-layout leakage.
+5. **Layout-Specific Replay Correlation**: [`replayMatching.ts`](../server/sessions/replayMatching.ts) resolves canonical layout identity through `getCircuitSpecification` and enforces driver/time/session constraints. [`sessionReplayLinks.ts`](../server/sessions/sessionReplayLinks.ts) reconciles stored links and withdraws invalid matches; differing layouts never share a replay by venue name alone.
 
 ---
 
