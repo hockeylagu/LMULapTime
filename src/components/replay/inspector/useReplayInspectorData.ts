@@ -96,6 +96,10 @@ export function useReplayInspectorData({
   const trajectoryRequestIdRef = useRef(0);
   const trajectoryControllerRef = useRef<AbortController | null>(null);
   const lastTrajectoryRequestRef = useRef<{ lap: number; slot: number | null; resolution: TelemetryResolution; source: 'duckdb' | 'vcr' } | null>(null);
+  // Requests can finish after navigation. Report their lap using the current route callback,
+  // so its query parameters retain the swapped replay, driver and comparison selection.
+  const onLapChangeRef = useRef(onLapChange);
+  onLapChangeRef.current = onLapChange;
 
   useEffect(() => {
     setActiveReplayName(replayName);
@@ -181,7 +185,7 @@ export function useReplayInspectorData({
             duckdbRawPointsCount: trajData.duckdbRawPointsCount ?? previous?.duckdbRawPointsCount,
             duckdbRawSampleRateHz: trajData.duckdbRawSampleRateHz ?? previous?.duckdbRawSampleRateHz,
           }));
-          if (trajData.currentLap) onLapChange?.(trajData.currentLap);
+          if (trajData.currentLap) onLapChangeRef.current?.(trajData.currentLap);
           const pendingDriver = requestedDriverName ? metaData?.drivers?.find((d: ReplayDriverEntry) => d.name.toLowerCase() === requestedDriverName.toLowerCase()) : undefined;
           const defaultSlot = pendingDriver?.slot ?? trajData.driverSlot ??
             metaData?.drivers?.find((d: ReplayDriverEntry) => d.isPlayer)?.slot ??
@@ -376,7 +380,10 @@ export function useReplayInspectorData({
 
   // Handle external lap changes
   useEffect(() => {
-    if (isOpen && initialLapNumber && trajectory && trajectory.currentLap !== initialLapNumber) {
+    // A replay swap changes the URL before the new trajectory arrives. Its initial loader
+    // already requests the exact lap/driver; never apply the new lap to the previous replay.
+    if (isOpen && initialLapNumber && trajectory && trajectory.replayName === activeReplayName &&
+      activeReplayName === replayName && trajectory.currentLap !== initialLapNumber) {
       handleSelectLap(initialLapNumber);
     }
   }, [isOpen, initialLapNumber]);
@@ -412,7 +419,7 @@ export function useReplayInspectorData({
           duckdbRawPointsCount: trajData.duckdbRawPointsCount ?? previous?.duckdbRawPointsCount,
           duckdbRawSampleRateHz: trajData.duckdbRawSampleRateHz ?? previous?.duckdbRawSampleRateHz,
         }));
-        if (trajData.currentLap) onLapChange?.(trajData.currentLap);
+        if (trajData.currentLap) onLapChangeRef.current?.(trajData.currentLap);
         setSelectedDriverSlot(trajData.driverSlot ?? targetSlot);
         setIsTrajLoading(false);
       })

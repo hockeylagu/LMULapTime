@@ -156,6 +156,8 @@ retries settled failures; a server start leaves them alone. Recordings are decod
   `ReplayInspectorTitle.tsx` keeps weather, rain intensity and air/track temperatures visible beneath the circuit name;
   its two-line header keeps event/split and replay file details in Info. Lap conditions take precedence over replay metadata when present.
   The comparison picker defaults to Same condition (Dry, Wet or Dynamic Weather), with explicit condition and All conditions
+  Swaps keep replay, driver and lap together through URL updates: external lap changes only apply to the
+  loaded active replay, and completed requests use the current lap-change callback to preserve route parameters.
   overrides; it uses the inspected trajectory's weather before replay metadata and never guesses from another driver's lap.
   Telemetry channels: `telemetry/TelemetryStaticTrace.tsx` reserves a 24px title row above the plot, whose SVG viewBox and
   tick positions cover the same scale; live readings appear only on the scrub cursor, at a fixed height through the lap.
