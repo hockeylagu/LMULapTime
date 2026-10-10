@@ -4,9 +4,7 @@ import type { SessionSummaryProjection, SessionProjectionState, SessionCard } fr
 import { buildSessionSummaryProjection } from '../../../shared/domain/sessionSummaries/index.js';
 import { SESSION_SUMMARY_PROJECTION_VERSION } from '../../../shared/types/sessionSummaries.js';
 import { persistSessionAggregate } from './aggregateStore.js';
-import { writeAndVerifySessionRows } from '../sessionRows/verify.js';
-import { clearDerivedColumns } from '../sessionRows/writer.js';
-import { NORMALIZED_SESSION_VERSION } from '../sessionRows/schema.js';
+import { writeSessionRows, clearDerivedColumns } from '../sessionRows/writer.js';
 import { loadSession } from '../sessionRows/access.js';
 import { readSessionCards } from './cards.js';
 const insertCondition = `INSERT INTO session_driver_condition_summaries VALUES (
@@ -28,7 +26,7 @@ export function persistSessionProjection(db: DatabaseType, session: DetailedSess
     for (const value of projection.conditions) conditionStmt.run(value);
     persistSessionAggregate(db, session, projection);
     // The normalized rows carry the per-driver and per-lap derived columns, so they are written with the projection.
-    writeAndVerifySessionRows(db, session, projection);
+    writeSessionRows(db, session, projection);
     db.prepare(`UPDATE sessions SET layout_key=?, session_kind=?, primary_driver_ordinal=?, is_empty=?,
       source_revision=?, projection_revision=?, projection_version=? WHERE id=?`)
       .run(projection.layoutKey, projection.sessionKind, projection.primaryDriverOrdinal, Number(projection.isEmpty), revision, revision, projection.projectionVersion, session.id);
@@ -55,12 +53,12 @@ export function readCompactSession(db: DatabaseType, sessionId: string): Session
 const STALE_PROJECTION = 'projection_version != ? OR projection_revision != source_revision';
 
 /**
- * True when no session waits for its summaries or its normalized rows (a negative version was attempted
- * and counts as done, like a failed projection). Reads only the covering idx_sessions_ready index.
+ * True when no session waits for its derived summaries. Stored rows have no conversion gate.
+ * Reads only the covering idx_sessions_ready index.
  */
 export function isSessionSummaryReady(db: DatabaseType): boolean {
-  return !db.prepare(`SELECT 1 FROM sessions WHERE ${STALE_PROJECTION} OR normalized_version NOT IN (?, ?) LIMIT 1`)
-    .get(SESSION_SUMMARY_PROJECTION_VERSION, NORMALIZED_SESSION_VERSION, -NORMALIZED_SESSION_VERSION);
+  return !db.prepare(`SELECT 1 FROM sessions WHERE ${STALE_PROJECTION} LIMIT 1`)
+    .get(SESSION_SUMMARY_PROJECTION_VERSION);
 }
 
 export function countReadySessionSummaries(db: DatabaseType): number {

@@ -28,7 +28,6 @@ export interface UseTrackBoundaryGeometryOptions {
   packageRevision?: string;
   trackVenue?: string | null;
   trackCourse?: string | null;
-  replayName?: string | null;
 }
 
 export function useTrackBoundaryGeometry(options: UseTrackBoundaryGeometryOptions) {
@@ -36,7 +35,7 @@ export function useTrackBoundaryGeometry(options: UseTrackBoundaryGeometryOption
     options.trackVenue,
     options.trackCourse,
     null,
-    options.replayName,
+    null,
     options.layoutKey
   );
   const resolvedKey = spec.layoutKey !== 'unknown' ? spec.layoutKey : null;

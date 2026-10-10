@@ -100,6 +100,7 @@ export function createSessionRouter(context: ServerContext): Router {
       driverName:queryString(req.query.driver),sessionId:queryString(req.query.sessionId),
       driverOrdinal, lapOrdinal, lapNum,
       playerOnly:req.query.playerOnly !== 'false',humansOnly:req.query.humansOnly === 'true',
+      telemetryOnly:req.query.telemetryOnly === 'true',
     },{page:pageNumber(req.query.page,1,1000000),pageSize:pageNumber(req.query.pageSize,50,100)});
     res.json({...result,benchmarks:references && track ? findMatchingTrackBenchmarkEntries(references.entries,track,'') : [],revision:revision()});
   });

@@ -37,7 +37,7 @@ describe('ReplayCompareLapRow', () => {
     expect(screen.getByText('Robert Kubica')).toBeInTheDocument();
     expect(screen.getByText('Ferrari 499P')).toBeInTheDocument();
     expect(screen.getByText('Feature Race (Race)')).toBeInTheDocument();
-    expect(screen.getByText(/Monza_R1\.Vcr/)).toBeInTheDocument();
+    expect(screen.queryByText(/Monza_R1\.Vcr/)).not.toBeInTheDocument();
     expect(screen.getByText('L14')).toBeInTheDocument();
     expect(screen.getByText('1:48.452')).toBeInTheDocument();
   });

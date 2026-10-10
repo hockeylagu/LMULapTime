@@ -222,11 +222,6 @@ export function writeSessionRows(db: DatabaseType, session: DetailedSession, pro
   })();
 }
 
-/** Deletes a session's normalized rows (the `sessions` row stays; the dictionaries are shared and stay). */
-export function deleteSessionRows(db: DatabaseType, sessionId: string): void {
-  for (const table of SESSION_ROW_TABLES) db.prepare(`DELETE FROM ${table} WHERE session_id = ?`).run(sessionId);
-}
-
 /** Empties the derived columns of a session's rows: a session whose summaries could not be built contributes to no aggregate. */
 export function clearDerivedColumns(db: DatabaseType, sessionId: string): void {
   db.prepare(`UPDATE session_drivers SET ${derivedNames(DRIVER_DERIVED_DEFS).map(column => `${column} = NULL`).join(', ')} WHERE session_id = ?`).run(sessionId);

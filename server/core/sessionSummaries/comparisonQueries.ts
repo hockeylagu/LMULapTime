@@ -9,7 +9,7 @@ import { rateSessionDetail } from './readTimePace.js';
 export interface CompactCompareFilters {
   trackName?: string; carClass?: string; carModel?: string; driverName?: string; sessionId?: string;
   driverOrdinal?: number; lapOrdinal?: number; lapNum?: number;
-  playerOnly?: boolean; humansOnly?: boolean;
+  playerOnly?: boolean; humansOnly?: boolean; telemetryOnly?: boolean;
 }
 export interface CompactComparePage { page?: number; pageSize?: number; }
 export interface CompactCompareResult extends ComparableLapsResult { page: number; pageSize: number; total: number; }
@@ -96,12 +96,14 @@ export function queryCompactComparableLaps(
   const humanParts = filters.humansOnly ? { where: ['d.is_human=1'], args: [] } : { where: [], args: [] };
   let broad = append(append(trackParts, classParts), humanParts);
   if (model && model !== 'all') broad = append(broad, { where: ['lower(trim(v.car_type))=?'], args: [model] });
+  if (filters.telemetryOnly) broad.where.push('s.recording_name IS NOT NULL');
   const display = { ...broad, where: [...broad.where], args: [...broad.args] };
   if (filters.playerOnly) display.where.push('d.is_player_driver=1');
   const driverName = filters.driverName?.trim().toLowerCase() ?? '';
   if (driverName && driverName !== 'all') { display.where.push('lower(dn.name) LIKE ? ESCAPE \'\\\''); display.args.push(`%${escapeLike(driverName)}%`); }
   if (filters.sessionId) { display.where.push('s.id=?'); display.args.push(filters.sessionId); }
   const selected = { ...display, where: [...display.where], args: [...display.args] };
+  if (filters.telemetryOnly) selected.where.push('l.is_valid=1', 'coalesce(l.is_pit_stop,0)=0', 'coalesce(l.is_out_lap,0)=0', 'l.lap_time>0');
   if (filters.driverOrdinal !== undefined) { selected.where.push('d.driver_ordinal=?'); selected.args.push(filters.driverOrdinal); }
   if (filters.lapOrdinal !== undefined) { selected.where.push('l.lap_ordinal=?'); selected.args.push(filters.lapOrdinal); }
   if (filters.lapNum !== undefined) { selected.where.push('l.lap_num=?'); selected.args.push(filters.lapNum); }

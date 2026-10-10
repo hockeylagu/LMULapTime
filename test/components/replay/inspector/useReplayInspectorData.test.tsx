@@ -43,6 +43,36 @@ function wrapper({ children }: { children: React.ReactNode }) {
 }
 
 describe('useReplayInspectorData session locators', () => {
+  it('pages comparison laps and scopes same-session requests while excluding missing replay links', async () => {
+    const urls: URLSearchParams[] = [];
+    const candidate = { id: 'first', sessionId: 'session-1', matchingReplayFile: metadata.filename,
+      driverOrdinal: 0, lapOrdinal: 0, driverName: 'Player Driver', lapNum: 2, lapTime: 100,
+      isValid: true, isPitStop: false, isOutLap: false } as ComparableLap;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = String(input);
+      if (url.endsWith('/telemetry/metadata')) return response(metadata);
+      if (url.includes('/compare/laps')) {
+        const params = new URL(url, 'http://localhost').searchParams;
+        urls.push(params);
+        const id = params.get('page') === '2' ? 'later' : 'first';
+        return response({ laps: [{ ...candidate, id }, { ...candidate, id: 'unavailable', matchingReplayFile: undefined }], total: 51 });
+      }
+      return response(trajectory);
+    });
+    const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, sessionId: 'session-1' }), { wrapper });
+    await waitFor(() => expect(result.current.availableCompareLaps.map(lap => lap.id)).toEqual(['first']));
+    expect(urls[urls.length - 1]?.get('telemetryOnly')).toBe('true');
+    act(() => result.current.comparePagination.onPageChange(2));
+    await waitFor(() => expect(result.current.availableCompareLaps.map(lap => lap.id)).toEqual(['later']));
+    expect(result.current.comparePagination.total).toBe(51);
+    act(() => result.current.setCompareLapFilter('same-sessions'));
+    await waitFor(() => {
+      expect(urls[urls.length - 1]?.get('sessionId')).toBe('session-1');
+      expect(urls[urls.length - 1]?.get('page')).toBe('1');
+      expect(result.current.availableCompareLaps.map(lap => lap.id)).toEqual(['first']);
+    });
+  });
+
   afterEach(() => vi.restoreAllMocks());
 
   it('loads metadata and telemetry by session ID and keeps driver/lap ordinals in the request', async () => {

@@ -24,7 +24,7 @@ export interface UseCornerConsistencyResult {
  */
 export function useCornerConsistency(
   enabled: boolean,
-  activeReplayName: string | null,
+  activeSessionId: string | null,
   metadata: ReplayMetadata | null,
   selectedDriverSlot: number | null,
   trajectory: ReplayTrajectoryData | null
@@ -41,7 +41,7 @@ export function useCornerConsistency(
   const geometryRevision = trajectory?.geometryRevision;
 
   useEffect(() => {
-    if (!enabled || !activeReplayName || !points?.length || stationSource === 'odometer') {
+    if (!enabled || !activeSessionId || !points?.length || stationSource === 'odometer') {
       setCornerStats([]);
       setLapsSampled(0);
       setIsLoading(false);
@@ -84,7 +84,7 @@ export function useCornerConsistency(
       otherLaps.map(l => {
         const lapOrdinal = driver?.sessionLapOrdinals?.[String(l.lapNumber)];
         if (lapOrdinal === undefined) return Promise.resolve({ lapNumber: l.lapNumber, points: [] });
-        return fetchSessionTelemetry(activeReplayName, { resolutionQuery: `maxPoints=${CONSISTENCY_MAX_POINTS}`, lapOrdinal, driverOrdinal, source }, { signal: controller.signal })
+        return fetchSessionTelemetry(activeSessionId, { resolutionQuery: `maxPoints=${CONSISTENCY_MAX_POINTS}`, lapOrdinal, driverOrdinal, source }, { signal: controller.signal })
           .then((data: ReplayTrajectoryData | null): CornerConsistencyLapInput => ({ lapNumber: l.lapNumber, points: data && hasCompatibleTrackStations({stationSource,geometryRevision}, data) ? applyTelemetryPostProcessing(data.points || []) : [] }))
           .catch((): CornerConsistencyLapInput => ({ lapNumber: l.lapNumber, points: [] }))
       })
@@ -104,7 +104,7 @@ export function useCornerConsistency(
       isCurrent = false;
       controller.abort();
     };
-  }, [enabled, activeReplayName, selectedDriverSlot, currentLap, points, trackLengthM, lapSummaries, source, stationSource, geometryRevision]);
+  }, [enabled, activeSessionId, selectedDriverSlot, currentLap, points, trackLengthM, lapSummaries, source, stationSource, geometryRevision]);
 
 
   return { cornerStats, isLoading, lapsSampled };

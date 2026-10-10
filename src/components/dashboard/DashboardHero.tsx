@@ -178,6 +178,7 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
           <div className="flex items-center gap-3 mt-5">
             {latestOuting.hasReplay && onOpenReplay && Number.isInteger(latestOuting.driverOrdinal) && Number.isInteger(latestOuting.bestLapOrdinal) && (
               <ReplayLaunchButton
+                sessionId={latestOuting.id}
                 hasDuckDb={Boolean(latestOuting.hasDuckDbTelemetry)}
                 to={`/telemetry?sessionId=${encodeURIComponent(latestOuting.id)}&driverOrdinal=${latestOuting.driverOrdinal}&lapOrdinal=${latestOuting.bestLapOrdinal}`}
                 onClick={() => onOpenReplay(latestOuting.id, latestOuting.bestLapNum ?? undefined)}

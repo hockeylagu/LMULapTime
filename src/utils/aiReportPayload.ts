@@ -17,6 +17,13 @@ export interface BuildAiLapEvidenceOptions {
   priorities?: DebriefCorner[];
 }
 
+function lapLocator(trajectory: ReplayTrajectoryData) {
+  if (!trajectory.sessionId || !Number.isInteger(trajectory.driverOrdinal) || !Number.isInteger(trajectory.lapOrdinal) || trajectory.driverOrdinal! < 0 || trajectory.lapOrdinal! < 0) {
+    throw new Error('A session, driver and lap are required for AI analysis.');
+  }
+  return { sessionId: trajectory.sessionId, driverOrdinal: trajectory.driverOrdinal!, lapOrdinal: trajectory.lapOrdinal! };
+}
+
 export function buildAiLapEvidence({
   trajectory,
   baselineTrajectory,
@@ -130,7 +137,7 @@ export function buildAiLapEvidence({
 
   const evidence: AiLapEvidence = {
     lap: {
-      replayName: trajectory.replayName,
+      ...lapLocator(trajectory),
       lapNumber: lap.lapNumber,
       driverName: trajectory.driverName,
       carClass,
@@ -158,7 +165,7 @@ export function buildAiLapEvidence({
 
   if (baselineTrajectory && baselineLapSummary) {
     evidence.baseline = {
-      replayName: baselineTrajectory.replayName,
+      ...lapLocator(baselineTrajectory),
       lapNumber: baselineLapSummary.lapNumber,
       driverName: baselineTrajectory.driverName,
       lapTimeSec: round(baselineLapSummary.lapTimeSec),

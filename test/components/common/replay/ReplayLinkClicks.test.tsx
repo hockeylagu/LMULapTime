@@ -12,15 +12,15 @@ function modifierClick(el: HTMLElement, init: { ctrlKey?: boolean; metaKey?: boo
 }
 
 const scanWith = (status: 'queued' | 'processing' | 'failed'): ScanStatus =>
-  ({ running: false, replayJobs: [{ name: 'x.Vcr', status }] }) as ScanStatus;
+  ({ running: false, sessionReplayJobs: [{ sessionId: 'session-1', status }] }) as ScanStatus;
 
 describe('ReplayLaunchButton link clicks', () => {
   it('runs onClick once on a plain click and cancels the Link navigation', () => {
     const onClick = vi.fn();
-    render(<ReplayLaunchButton hasDuckDb={false} replayName="x.Vcr" to="/telemetry?replayName=x.Vcr" onClick={onClick} data-testid="launch" />);
+    render(<ReplayLaunchButton hasDuckDb={false} sessionId="session-1" to="/telemetry?sessionId=example&driverOrdinal=0&lapOrdinal=0" onClick={onClick} data-testid="launch" />);
     const link = screen.getByTestId('launch');
     expect(link.tagName).toBe('A');
-    expect(link).toHaveAttribute('href', '/telemetry?replayName=x.Vcr');
+    expect(link).toHaveAttribute('href', '/telemetry?sessionId=example&driverOrdinal=0&lapOrdinal=0');
     const notCancelled = fireEvent.click(link);
     expect(notCancelled).toBe(false);
     expect(onClick).toHaveBeenCalledTimes(1);
@@ -29,7 +29,7 @@ describe('ReplayLaunchButton link clicks', () => {
 
   it('leaves ctrl and meta clicks to the browser without calling onClick', () => {
     const onClick = vi.fn();
-    render(<ReplayLaunchButton hasDuckDb replayName="x.Vcr" to="/telemetry" onClick={onClick} data-testid="launch" />);
+    render(<ReplayLaunchButton hasDuckDb sessionId="session-1" to="/telemetry" onClick={onClick} data-testid="launch" />);
     modifierClick(screen.getByTestId('launch'), { ctrlKey: true });
     modifierClick(screen.getByTestId('launch'), { metaKey: true });
     expect(onClick).not.toHaveBeenCalled();
@@ -40,7 +40,7 @@ describe('ReplayLaunchButton link clicks', () => {
     const onClick = vi.fn();
     render(
       <SessionDataContext.Provider value={{ revision: 0, scan: scanWith('queued') }}>
-        <ReplayLaunchButton hasDuckDb={false} replayName="x.Vcr" to="/telemetry" onClick={onClick} data-testid="launch" />
+        <ReplayLaunchButton hasDuckDb={false} sessionId="session-1" to="/telemetry" onClick={onClick} data-testid="launch" />
       </SessionDataContext.Provider>
     );
     const button = screen.getByTestId('launch');
@@ -55,7 +55,7 @@ describe('ReplayLaunchButton link clicks', () => {
 describe('ReplayIndicator link clicks', () => {
   const renderLink = (onClick: () => void, onParentClick: () => void) => render(
     <div onClick={onParentClick}>
-      <ReplayIndicator replay={{ name: 'x.Vcr' }} to="/telemetry?replayName=x.Vcr" onClick={onClick} />
+      <ReplayIndicator sessionId="session-1" hasReplay to="/telemetry?sessionId=example&driverOrdinal=0&lapOrdinal=0" onClick={onClick} />
     </div>
   );
 
@@ -64,7 +64,7 @@ describe('ReplayIndicator link clicks', () => {
     const onParentClick = vi.fn();
     renderLink(onClick, onParentClick);
     const link = screen.getByRole('link', { name: 'Open replay telemetry' });
-    expect(link).toHaveAttribute('href', '/telemetry?replayName=x.Vcr');
+    expect(link).toHaveAttribute('href', '/telemetry?sessionId=example&driverOrdinal=0&lapOrdinal=0');
     expect(fireEvent.click(link)).toBe(false);
     expect(onClick).toHaveBeenCalledTimes(1);
     expect(onParentClick).not.toHaveBeenCalled();

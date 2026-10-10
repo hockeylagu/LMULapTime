@@ -105,7 +105,15 @@ export interface ReplayIngestJob {
   playable?: boolean;
 }
 
+/** Session-facing recording status; filenames remain in the ingestion diagnostics only. */
+export interface SessionReplayJob extends Omit<ReplayIngestJob, 'name'> {
+  sessionId: string;
+  stage?: string | null;
+  filePercent?: number | null;
+}
+
 export interface ScanStatus extends ReplayScanStatus {
+  sessionReplayJobs?: SessionReplayJob[];
   replayJobs?: ReplayIngestJob[];
   refreshQueued?: boolean;
   /** Changes when session data, replay metadata or telemetry links change, including on restart. */

@@ -62,7 +62,7 @@ export const AIReportTab: React.FC<AIReportTabProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const requestAbortRef = useRef<AbortController | null>(null);
-  const contextKey = `${trajectory?.replayName ?? ''}|${trajectory?.currentLap ?? ''}|${baselineTrajectory?.replayName ?? ''}|${baselineLapNumber ?? ''}`;
+  const contextKey = `${trajectory?.sessionId ?? ''}|${trajectory?.driverOrdinal ?? ''}|${trajectory?.lapOrdinal ?? ''}|${baselineTrajectory?.sessionId ?? ''}|${baselineTrajectory?.driverOrdinal ?? ''}|${baselineTrajectory?.lapOrdinal ?? baselineLapNumber ?? ''}`;
 
   const evidence = useMemo(() => {
     if (!trajectory) return null;

@@ -34,7 +34,7 @@ describe('paged session queries', () => {
       fallback.drivers[0].lapsCount = 7;
       fallback.drivers[0].avgLapTime = 92;
       for (const session of [full, empty, fallback]) upsertSession(db, session, session.filePath, 1, 1);
-      const legacy = computeProgression([full, empty, fallback]).map(({ matchingReplayFile: _recording, ...point }) => ({
+      const legacy = computeProgression([full, empty, fallback]).map(point => ({
         ...point, carClass: point.carClass === 'General' ? 'General' : normalizeCarClass(point.carClass),
       }));
       const first = queryProgression(db, { pageSize: 1 });

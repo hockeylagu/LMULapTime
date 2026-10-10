@@ -6,8 +6,6 @@ import { fuseDuckDbWithVcrTrajectory } from '../telemetry/telemetryFusion.js';
 
 export interface TelemetryEnrichmentInput {
   sessionId?: string;
-  replayName: string;
-  filePath: string;
   isPlayer: boolean;
   allowDuckDb: boolean;
   metadata?: ReplayMetadata;
@@ -153,7 +151,7 @@ export class ReplayTelemetryService {
         }
       }
     } catch (error) {
-      console.warn(`[DuckDB] Error fusing DuckDB telemetry for ${input.replayName}:`, error);
+      console.warn(`[DuckDB] Error fusing DuckDB telemetry for session ${input.matchedSession?.id}:`, error);
     }
 
     if (duckdbUnavailableReason) {

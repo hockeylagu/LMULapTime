@@ -39,7 +39,7 @@ export const ReplayCompareLapRow: React.FC<ReplayCompareLapRowProps> = React.mem
           )}
         </span>
         <span className="block truncate text-[11px] text-lmu-muted">
-          {lap.dateString} | {lap.matchingReplayFile}
+          {lap.dateString}
         </span>
       </span>
       <span className="min-w-0">

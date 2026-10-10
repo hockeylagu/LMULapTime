@@ -42,6 +42,12 @@ describe('suggestReferenceLap', () => {
     expect(suggestReferenceLap(myLaps, RACE, ME, 20, 95.894)?.id).toBe(`${PRACTICE}_24`);
   });
 
+  it('uses session identity when recording filenames differ from session IDs', () => {
+    const candidates = myLaps.map(lap => ({ ...lap, matchingReplayFile: 'reused-recording.Vcr' }));
+    expect(suggestReferenceLap(candidates, RACE, ME, 20, 95.894)?.id).toBe(`${PRACTICE}_24`);
+    expect(suggestReferenceLap(candidates, 'reused-recording.Vcr', ME, 20, 95.894)).toBeNull();
+  });
+
   it('suggests nothing when the lap on screen is already the best', () => {
     expect(suggestReferenceLap(myLaps, PRACTICE, ME, 24, 95.658)).toBeNull();
   });

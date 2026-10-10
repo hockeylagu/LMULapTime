@@ -8,7 +8,7 @@ import { ReplayGlyph, REPLAY_ACTION, REPLAY_BUSY, REPLAY_LABELLED, REPLAY_TELEME
 export interface ReplayLaunchButtonProps {
   /** "Replay + telemetry" with the car's own DuckDB telemetry, "Replay" with the replay only. */
   hasDuckDb: boolean;
-  replayName?: string;
+  sessionId?: string;
   to?: string;
   onClick?: () => void;
   title?: string;
@@ -16,11 +16,10 @@ export interface ReplayLaunchButtonProps {
 }
 
 /** The labelled replay button that opens a session's replay and telemetry (dashboard hero, session header). */
-export const ReplayLaunchButton: React.FC<ReplayLaunchButtonProps> = ({ hasDuckDb, replayName, to, onClick, title, 'data-testid': testId }) => {
+export const ReplayLaunchButton: React.FC<ReplayLaunchButtonProps> = ({ hasDuckDb, sessionId, to, onClick, title, 'data-testid': testId }) => {
   const { scan } = useSessionDataContext();
-  const job = scan?.replayJobs?.find(item => item.name === replayName);
-  const processing = Boolean(replayName && ((scan?.running && scan.currentFile === replayName) ||
-    (scan?.replayUpgrade?.running && scan.replayUpgrade.currentFile === replayName))) || job?.status === 'processing';
+  const job = scan?.sessionReplayJobs?.find(item => item.sessionId === sessionId);
+  const processing = job?.status === 'processing';
   const failed = job?.status === 'failed';
   const usableDespiteFailure = failed && Boolean(job?.playable || hasDuckDb);
   // A queued replay waits for its turn even with 100Hz telemetry; one left queued for a retry

@@ -7,7 +7,6 @@ import { CarIdentity } from '../../vehicle/CarIdentity.js';
 
 export interface ReplayInspectorTitleProps {
   onClose: () => void;
-  replayName: string | null;
   metadata: ReplayMetadata | null;
   trajectory: ReplayTrajectoryData | null;
   selectedDriver?: ReplayDriverEntry | null;
@@ -19,7 +18,7 @@ const formatBytes = (b: number): string => b < 1048576 ? `${(b / 1024).toFixed(1
 const formatDuration = (s: number): string => `${Math.floor(s / 60)}m ${String(Math.floor(s % 60)).padStart(2, '0')}s`;
 
 /** Track context stays visible; replay metadata is available in a keyboard-accessible disclosure. */
-export const ReplayInspectorTitle: React.FC<ReplayInspectorTitleProps> = ({ onClose, replayName, metadata, trajectory, selectedDriver }) => {
+export const ReplayInspectorTitle: React.FC<ReplayInspectorTitleProps> = ({ onClose, metadata, trajectory, selectedDriver }) => {
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const summaryRef = useRef<HTMLElement>(null);
   const track = metadata?.displayTrack || metadata?.trackCourse || metadata?.trackName || 'Telemetry';
@@ -92,7 +91,6 @@ export const ReplayInspectorTitle: React.FC<ReplayInspectorTitleProps> = ({ onCl
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-lmu-text-soft">
             {eventTitle && <><dt className="text-lmu-muted">Event</dt><dd>{eventTitle}</dd></>}
             {typeof metadata?.eventInfo?.splitNo === 'number' && <><dt className="text-lmu-muted">Split</dt><dd className="font-mono">Split {metadata.eventInfo.splitNo}</dd></>}
-            <dt className="text-lmu-muted">File</dt><dd className="break-all">{replayName || metadata?.filename || 'Loading…'}</dd>
             {metadata && <>
               <dt className="text-lmu-muted">Duration</dt><dd className="font-mono">{formatDuration(metadata.durationSec)}</dd>
               <dt className="text-lmu-muted">File size</dt><dd className="font-mono">{formatBytes(metadata.fileSizeBytes)}</dd>

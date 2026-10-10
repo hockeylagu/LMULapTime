@@ -105,6 +105,20 @@ function createProgressingSessionIterator() {
 }
 
 describe('ServerContext background session sync', () => {
+  it('publishes recording progress under its session ID, excluding unowned recordings', () => {
+    const sessionDb = { getRecordingOwners: vi.fn(() => new Map([['linked.Vcr', 'session-42']])) } as unknown as SessionDatabase;
+    const context = createContext(sessionDb);
+    Object.assign(context, { replayJobs: new Map([
+      ['linked.Vcr', { name: 'linked.Vcr', status: 'failed', playable: true }],
+      ['unowned.Vcr', { name: 'unowned.Vcr', status: 'queued' }],
+    ]), replayScanStatus: { ...context.getReplayScanStatus(), running: true, currentFile: 'linked.Vcr', currentStage: 'Decoding', filePercent: 40 } });
+    expect(context.getScanStatus().sessionReplayJobs).toEqual([
+      { sessionId: 'session-42', status: 'processing', playable: true, stage: 'Decoding', filePercent: 40 },
+    ]);
+    Object.assign(context, { replayUpgradeRunner: { getStatus: () => ({ running: true, currentFile: 'linked.Vcr', currentStage: 'Upgrading', filePercent: 75 }) } });
+    expect(context.getScanStatus().sessionReplayJobs?.[0]).toMatchObject({ sessionId: 'session-42', stage: 'Upgrading', filePercent: 75 });
+  });
+
   beforeEach(() => {
     vi.useFakeTimers();
   });

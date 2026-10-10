@@ -85,8 +85,6 @@ describe('ReplayTelemetryService', () => {
 
   const request = (overrides: Partial<Parameters<ReplayTelemetryService['enrichWithTelemetry']>[0]> = {}) => service.enrichWithTelemetry({
     sessionId: session.id,
-    replayName: 'Daytona.Vcr',
-    filePath: '/replays/Daytona.Vcr',
     isPlayer: true,
     allowDuckDb: true,
     metadata: mockMetadata,
@@ -100,8 +98,6 @@ describe('ReplayTelemetryService', () => {
 
   it('skips DuckDB telemetry fusion when not player or allowDuckDb is false', async () => {
     const notPlayer = await service.enrichWithTelemetry({
-      replayName: 'Daytona.Vcr',
-      filePath: '/replays/Daytona.Vcr',
       isPlayer: false,
       allowDuckDb: true,
       metadata: mockMetadata,
@@ -112,8 +108,6 @@ describe('ReplayTelemetryService', () => {
     expect(notPlayer.trajectory.source).toBe('vcr');
 
     const disallowed = await service.enrichWithTelemetry({
-      replayName: 'Daytona.Vcr',
-      filePath: '/replays/Daytona.Vcr',
       isPlayer: true,
       allowDuckDb: false,
       metadata: mockMetadata,
@@ -273,8 +267,6 @@ describe('ReplayTelemetryService', () => {
     const result = await service.enrichWithTelemetry({
       sessionId: session.id,
       matchedSession: session,
-      replayName: 'Daytona.Vcr',
-      filePath: '/replays/Daytona.Vcr',
       isPlayer: true,
       allowDuckDb: true,
       metadata: mockMetadata,

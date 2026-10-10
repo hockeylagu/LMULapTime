@@ -6,10 +6,10 @@ import { TELEMETRY_COLORS } from '../../../../src/utils/themeColors.js';
 vi.mock('../../../../src/components/replay/inspector/ReplayInspectorTitle.js', () => ({ ReplayInspectorTitle: () => null }));
 
 const props: ReplayInspectorHeaderProps = {
-  onClose: vi.fn(), replayName: 'Spa_R1.Vcr', metadata: null, trajectory: null,
+  onClose: vi.fn(), sessionId: 'spa-session', metadata: null, trajectory: null,
   onSelectLap: vi.fn(), drivers: [{ slot: 14, name: 'Driver with a very long name '.repeat(5), carNumber: '14', isPlayer: true }],
   selectedDriverSlot: 14, onSelectDriver: vi.fn(), isCompareMode: true, onToggleCompare: vi.fn(),
-  onRemoveCompare: vi.fn(), baselineReplayName: 'Spa_R1.Vcr', baselineLapNumber: 3,
+  onRemoveCompare: vi.fn(), baselineSessionId: 'spa-session', baselineLapNumber: 3,
   baselineDriverName: 'Compared Driver', isComparePickerOpen: false, onCloseComparePicker: vi.fn(),
   availableCompareLaps: [], compareLapFilter: 'player', isCompareLapsLoading: false,
   onChangeCompareLapFilter: vi.fn(), onSelectCompareLap: vi.fn(), isBaselineLoading: false,

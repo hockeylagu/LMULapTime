@@ -5,7 +5,7 @@ import type { CornerSegmentComparison } from '../../src/utils/cornerAnalysis/ind
 import type { DebriefCorner } from '../../src/utils/sessionDebrief.js';
 
 const trajectory: ReplayTrajectoryData = {
-  replayName: 'primary.Vcr',
+  replayName: 'primary.Vcr', sessionId: 'primary-session', driverOrdinal: 0, lapOrdinal: 0,
   driverName: 'Player',
   pointsCount: 0,
   currentLap: 5,
@@ -15,6 +15,16 @@ const trajectory: ReplayTrajectoryData = {
 };
 
 describe('buildAiLapEvidence', () => {
+  it('uses session locators and excludes recording filenames from the evidence', () => {
+    const evidence = buildAiLapEvidence({ trajectory, baselineTrajectory: { ...trajectory, sessionId: 'baseline-session', driverOrdinal: 2 },
+      baselineLapSummary: trajectory.laps?.[0], segments: [] });
+    expect(evidence.lap).toMatchObject({ sessionId: 'primary-session', driverOrdinal: 0, lapOrdinal: 0 });
+    expect(evidence.baseline).toMatchObject({ sessionId: 'baseline-session', driverOrdinal: 2, lapOrdinal: 0 });
+    expect(JSON.stringify(evidence)).not.toContain('.Vcr');
+    expect(() => buildAiLapEvidence({ trajectory: { ...trajectory, sessionId: undefined }, segments: [] }))
+      .toThrow('A session, driver and lap are required');
+  });
+
   it('selects and rounds the eight most meaningful segments', () => {
     const segments = Array.from({ length: 10 }, (_, index) => ({
       type: 'corner' as const,
@@ -111,7 +121,7 @@ describe('buildAiLapEvidence', () => {
     // Nine corners losing more than corner 1; the app still ranks corner 1 first (it is lost every lap).
     const segments = [corner(1, 0.06), ...Array.from({ length: 9 }, (_, i) => corner(i + 2, 0.2 + i / 10))];
     const ranked = [{ cornerNumber: 1, timeLossSec: 0.06, lapsLosing: 22, lapsSampled: 22, confidence: 1 }] as DebriefCorner[];
-    const baseline = { ...trajectory, replayName: 'baseline.Vcr' };
+    const baseline = { ...trajectory, replayName: 'baseline.Vcr', sessionId: 'baseline-session' };
 
     const evidence = buildAiLapEvidence({
       trajectory, baselineTrajectory: baseline, baselineLapSummary: baseline.laps![0], segments, priorities: ranked,

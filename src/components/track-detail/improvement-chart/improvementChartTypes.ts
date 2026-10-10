@@ -28,7 +28,6 @@ export interface SessionProgressionPoint {
   top3AvgLapTime?: number | null;
   consistencyScore?: number | null;
   theoreticalGap?: number | null;
-  matchingReplayFile?: string;
 }
 
 export interface ImprovementChartPoint {
@@ -61,7 +60,6 @@ export interface ImprovementChartPoint {
   theoreticalStr: string;
   avgLapStr: string;
   cleanLaps: number;
-  replay?: string;
 }
 
 export interface ImprovementTooltipPayloadEntry {

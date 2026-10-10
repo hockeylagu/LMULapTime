@@ -5,12 +5,6 @@ import {
   SESSION_FIELDS, SETTINGS_FIELDS, TIRE_WEAR_FIELDS, WEATHER_FIELDS,
 } from './specs.js';
 
-/**
- * Version of the normalized rows. Bump it when a table, a column or an assembly rule changes: every
- * session whose rows carry another version is written and verified again by the backfill.
- */
-export const NORMALIZED_SESSION_VERSION = 2;
-
 /** Columns added to `sessions` for the session's own scalars (the others already existed). */
 export const SESSION_ROW_FIELDS: readonly Field[] = [
   ...SESSION_FIELDS, ...WEATHER_FIELDS, ...SETTINGS_FIELDS, ...BEST_SESSION_LAP_FIELDS,
@@ -45,27 +39,12 @@ export const LAP_DERIVED_COLUMNS = LAP_DERIVED_DEFS.join(', ');
 /** The column names of a list of definitions. */
 export const derivedNames = (defs: readonly string[]): string[] => defs.map(def => def.split(' ')[0]);
 
-/**
- * Tables of the layout before dictionaries and merged summaries (normalized version 1). They hold only
- * rows rebuilt from the session JSON, so they are dropped and the backfill writes them again.
- */
-function dropVersionOneLayout(db: DatabaseType): void {
-  const driverColumns = db.prepare('PRAGMA table_info(session_drivers)').all() as Array<{ name: string }>;
-  if (driverColumns.length > 0 && !driverColumns.some(column => column.name === 'driver_id')) {
-    for (const table of SESSION_ROW_TABLES) db.exec(`DROP TABLE IF EXISTS ${table}`);
-    db.exec('UPDATE sessions SET normalized_version = 0 WHERE normalized_version != 0');
-  }
-  db.exec('DROP TABLE IF EXISTS session_driver_summaries; DROP TABLE IF EXISTS session_lap_index;');
-}
-
 /** Creates the normalized session tables and the new `sessions` columns. Safe to run on every start. */
 export function initSessionRowsSchema(db: DatabaseType): void {
   const columns = db.prepare('PRAGMA table_info(sessions)').all() as Array<{ name: string }>;
   const addColumn = (name: string, type: string) => { if (!columns.some(column => column.name === name)) db.exec(`ALTER TABLE sessions ADD COLUMN ${name} ${type}`); };
   for (const field of SESSION_ROW_FIELDS) addColumn(field.col, field.kind === 'text' ? 'TEXT' : field.kind === 'real' ? 'REAL' : 'INTEGER');
   addColumn('player_driver_ordinal', 'INTEGER');
-  addColumn('normalized_version', 'INTEGER NOT NULL DEFAULT 0');
-  dropVersionOneLayout(db);
 
   db.exec(`
     CREATE TABLE IF NOT EXISTS session_recordings (
@@ -111,8 +90,6 @@ export function initSessionRowsSchema(db: DatabaseType): void {
       PRIMARY KEY(session_id, driver_ordinal, seq)
     ) WITHOUT ROWID;
     -- Covering index of the readiness gate (isSessionSummaryReady): it never reads a session row.
-    DROP INDEX IF EXISTS idx_sessions_projection;
-    DROP INDEX IF EXISTS idx_sessions_normalized;
-    CREATE INDEX IF NOT EXISTS idx_sessions_ready ON sessions(projection_version, projection_revision, source_revision, normalized_version);
+    CREATE INDEX IF NOT EXISTS idx_sessions_ready ON sessions(projection_version, projection_revision, source_revision);
   `);
 }

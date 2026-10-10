@@ -9,6 +9,7 @@ import {
   setSessionApiKey,
   setSessionModel,
   toAiError,
+  validateEvidence,
 } from '../ai/aiReport.js';
 import { SessionDatabase } from '../core/db.js';
 import { AiAnalyzeRequest, AiAnalyzeResponse } from '../core/types.js';
@@ -47,6 +48,9 @@ export function createAiRouter(sessionDb: SessionDatabase): Router {
     const serializedSize = Buffer.byteLength(JSON.stringify(body.evidence), 'utf8');
     if (serializedSize > 64 * 1024) {
       return res.status(413).json({ error: 'Lap evidence is too large.', errorCode: 'payload_too_large' });
+    }
+    if (!validateEvidence(body.evidence)) {
+      return res.status(400).json({ error: 'The lap evidence is invalid.', errorCode: 'invalid_request' });
     }
     const settings = getAiSettings();
     if (!settings.configured) {

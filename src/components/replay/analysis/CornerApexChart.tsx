@@ -20,7 +20,6 @@ export interface CornerApexChartProps {
   trackVenue?: string;
   trackCourse?: string;
   layoutKey?: string;
-  replayName?: string;
   trackGeometry?: TrackBoundaryGeometry | null;
   onOpenCornersTab?: () => void;
   onClose?: () => void;

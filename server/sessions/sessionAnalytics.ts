@@ -168,7 +168,6 @@ export function computeProgression(sessions: DetailedSession[], targetDriverName
       top3AvgLapTime,
       theoreticalGap,
       consistencyScore,
-      matchingReplayFile: s.matchingReplayFile?.name,
       settings: s.settings?.serverName || s.settings?.modeSetting
         ? { serverName: s.settings?.serverName, modeSetting: s.settings?.modeSetting }
         : undefined,

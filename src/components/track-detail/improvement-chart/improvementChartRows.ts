@@ -60,7 +60,6 @@ export function buildImprovementChartRows(trackData: SessionProgressionPoint[], 
       theoreticalStr: formatTime(p.theoreticalBest),
       avgLapStr: formatTime(p.avgLapTime),
       cleanLaps: p.cleanLapsCount,
-      replay: p.matchingReplayFile,
     };
   });
 }

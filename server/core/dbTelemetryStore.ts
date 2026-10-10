@@ -154,6 +154,12 @@ export function linkTelemetryFiles(db: DatabaseType, links: readonly TelemetryLi
 
 export function clearTelemetryLinks(db: DatabaseType): void {
   db.exec('UPDATE telemetry_metadata SET matched_session_id = NULL, matched_replay_filename = NULL');
+  clearSessionTelemetryAttachments(db);
+}
+
+/** Session attachments are derived from ownership and must be invalidated with it. */
+function clearSessionTelemetryAttachments(db: DatabaseType): void {
+  db.prepare('UPDATE sessions SET duckdb_filename=NULL, has_duckdb_telemetry=0 WHERE duckdb_filename IS NOT NULL OR has_duckdb_telemetry=1').run();
 }
 
 /** The telemetry files with at least one lap cached, at any version. */
@@ -191,5 +197,8 @@ export function pruneTelemetryLapCache(
 }
 
 export function clearTelemetryCache(db: DatabaseType): void {
-  db.exec('DELETE FROM telemetry_metadata; DELETE FROM telemetry_lap_cache;');
+  db.transaction(() => {
+    db.exec('DELETE FROM telemetry_metadata; DELETE FROM telemetry_lap_cache;');
+    clearSessionTelemetryAttachments(db);
+  })();
 }

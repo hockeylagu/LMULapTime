@@ -18,8 +18,8 @@ vi.mock('@google/genai', () => ({
 }));
 
 const evidence: AiLapEvidence = {
-  lap: { replayName: 'primary.Vcr', lapNumber: 5, lapTimeSec: 100, isValid: true },
-  baseline: { replayName: 'baseline.Vcr', lapNumber: 5, lapTimeSec: 99 },
+  lap: { sessionId: 'primary-session', driverOrdinal: 0, lapOrdinal: 1, lapNumber: 5, lapTimeSec: 100, isValid: true },
+  baseline: { sessionId: 'baseline-session', driverOrdinal: 0, lapOrdinal: 1, lapNumber: 5, lapTimeSec: 99 },
   segments: [{ segmentIndex: 1, type: 'corner', cornerNumber: 3, timeDeltaSec: 1, minSpeedDeltaKmh: -5 }],
   consistency: { lapCount: 3, stats: [] },
   trackLimits: { available: false, incidents: [] },

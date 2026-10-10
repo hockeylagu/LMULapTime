@@ -38,7 +38,6 @@ export interface LatestOutingInfo {
   lapsCount: number;
   hasReplay: boolean;
   hasDuckDbTelemetry?: boolean;
-  replayName?: string;
 }
 
 export interface TodayActivityInfo {
@@ -207,7 +206,6 @@ export function useDashboardTrends(sessions: SessionSummary[]): DashboardTrendsR
           latestRaw.hasDuckDbTelemetry ||
           latestRaw.matchingReplayFile?.hasDuckDbTelemetry
         ),
-        replayName: latestRaw.matchingReplayFile?.name,
       };
     }
 

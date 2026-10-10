@@ -115,10 +115,16 @@ export function parseAiJsonContent(content: unknown): unknown {
   return JSON.parse(content);
 }
 
+function hasLapLocator(lap: AiLapEvidence['lap'] | AiLapEvidence['baseline']): boolean {
+  return Boolean(lap && typeof lap.sessionId === 'string' && lap.sessionId.trim() &&
+    Number.isInteger(lap.driverOrdinal) && lap.driverOrdinal >= 0 &&
+    Number.isInteger(lap.lapOrdinal) && lap.lapOrdinal >= 0);
+}
+
 export function validateEvidence(evidence: unknown): evidence is AiLapEvidence {
   if (!evidence || typeof evidence !== 'object') return false;
   const candidate = evidence as AiLapEvidence;
-  if (!candidate.lap || typeof candidate.lap.replayName !== 'string' || !Number.isInteger(candidate.lap.lapNumber) || !isFiniteNumber(candidate.lap.lapTimeSec)) return false;
+  if (!candidate.lap || !hasLapLocator(candidate.lap) || !Number.isInteger(candidate.lap.lapNumber) || !isFiniteNumber(candidate.lap.lapTimeSec)) return false;
   if (!Array.isArray(candidate.segments) || candidate.segments.length > 8) return false;
   for (const segment of candidate.segments) {
     if (!segment || !Number.isInteger(segment.segmentIndex) || !['corner', 'straight'].includes(segment.type)) return false;
@@ -126,7 +132,7 @@ export function validateEvidence(evidence: unknown): evidence is AiLapEvidence {
       if (value !== null && typeof value === 'number' && !Number.isFinite(value)) return false;
     }
   }
-  if (candidate.baseline && (typeof candidate.baseline.replayName !== 'string' || !Number.isInteger(candidate.baseline.lapNumber) || !isFiniteNumber(candidate.baseline.lapTimeSec))) return false;
+  if (candidate.baseline && (!hasLapLocator(candidate.baseline) || !Number.isInteger(candidate.baseline.lapNumber) || !isFiniteNumber(candidate.baseline.lapTimeSec))) return false;
   if (candidate.priorities !== undefined) {
     if (!Array.isArray(candidate.priorities) || candidate.priorities.length > 4) return false;
     for (const priority of candidate.priorities) {
@@ -311,9 +317,13 @@ export function toAiError(cause: unknown): { code: AiErrorCode; message: string;
 export function createAiReportRecord(evidence: AiLapEvidence, result: AiAnalyzeResponse): AiReportRecord {
   return {
     cacheKey: getAiCacheKey(evidence),
-    replayName: evidence.lap.replayName,
+    sessionId: evidence.lap.sessionId,
+    driverOrdinal: evidence.lap.driverOrdinal,
+    lapOrdinal: evidence.lap.lapOrdinal,
     lapNumber: evidence.lap.lapNumber,
-    baselineReplayName: evidence.baseline?.replayName,
+    baselineSessionId: evidence.baseline?.sessionId,
+    baselineDriverOrdinal: evidence.baseline?.driverOrdinal,
+    baselineLapOrdinal: evidence.baseline?.lapOrdinal,
     baselineLapNumber: evidence.baseline?.lapNumber,
     model: sessionModel,
     promptVersion: PROMPT_VERSION,

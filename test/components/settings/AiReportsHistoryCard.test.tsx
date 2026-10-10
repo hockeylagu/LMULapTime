@@ -24,7 +24,7 @@ describe('AiReportsHistoryCard', () => {
       json: () => Promise.resolve([
         {
           cacheKey: 'key-1',
-          replayName: 'Spa_R1.Vcr',
+          sessionId: 'spa-session', driverOrdinal: 0, lapOrdinal: 4,
           lapNumber: 5,
           model: 'gemini-3.7-flash',
           overallSummary: 'Brake later into Eau Rouge.',
@@ -37,7 +37,7 @@ describe('AiReportsHistoryCard', () => {
     render(<AiReportsHistoryCard />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Spa_R1\.Vcr · Lap 5/)).toBeInTheDocument();
+      expect(screen.getByText(/spa-session · Lap 5/)).toBeInTheDocument();
     });
     expect(screen.getByText('Brake later into Eau Rouge.')).toBeInTheDocument();
     expect(screen.getByText('gemini-3.7-flash')).toBeInTheDocument();

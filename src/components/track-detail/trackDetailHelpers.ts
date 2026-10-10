@@ -94,7 +94,6 @@ export function buildTrackProgression(
           top3AvgLapTime,
           theoreticalGap,
           consistencyScore,
-          matchingReplayFile: s.matchingReplayFile?.name,
         };
       })
       .sort((a, b) => {

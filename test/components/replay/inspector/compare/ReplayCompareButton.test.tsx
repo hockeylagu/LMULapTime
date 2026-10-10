@@ -11,6 +11,7 @@ const ME = 'Samuel Lague';
 function lap(replay: string, lapNum: number, lapTime: number, extra: Partial<ComparableLap> = {}): ComparableLap {
   return {
     id: `${replay}_${lapNum}`,
+    sessionId: replay,
     driverName: ME,
     carType: 'Peugeot 9x8',
     carClass: 'Hyper',
@@ -43,7 +44,7 @@ describe('ReplayCompareButton', () => {
 
     render(
       <ReplayCompareButton
-        replayName={RACE}
+        sessionId={RACE}
         driverName={ME}
         trajectory={trajectory}
         availableCompareLaps={laps}

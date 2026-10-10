@@ -1,11 +1,11 @@
 # Normalized session storage
 
-Status: phases 0, 1, 2, and 3a implemented 2026-10-10 (`server/core/sessionRows/`, `server/core/sessionSummaries/cards.ts`); phase 3a done (targeted updates in `sessionRows/targeted.ts`), phase 3b (conversion) and 3c planned. Follows [PERSISTED_SESSION_SUMMARIES.md](PERSISTED_SESSION_SUMMARIES.md), which
+Status: completed, including local conversion of all 992 sessions and removal of temporary conversion code on 2026-10-10. Earlier phase notes below are historical; the current implementation is in [CODE_MAP.md](../CODE_MAP.md). Follows [PERSISTED_SESSION_SUMMARIES.md](PERSISTED_SESSION_SUMMARIES.md), which
 computes per-session facts at ingestion but still keeps the session itself, its card and a second copy
 as JSON on the `sessions` row.
 
 
-## Why
+## Original rationale (before conversion)
 
 Every session is stored three times as JSON on one row:
 
@@ -20,7 +20,7 @@ Measured read-only on the local cache (992 sessions): `data_json` averages 149 K
 the JSON and driver/lap event lists 27%. Across the library, 99.7% of a driver's events are also stored
 on their lap; no lap event is missing from its driver's list; 2,360 driver events have no lap number.
 
-Current JSON access (inventory, 2026-10-10): 9 `json_extract` calls (`$.weatherInfo`, `$.settings`,
+Pre-conversion JSON access (inventory, 2026-10-10): 9 `json_extract` calls (`$.weatherInfo`, `$.settings`,
 `$.playerDriver.name/.position/.bestLapTime` on `summary_json`; `$.matchingReplayFile`, `$.duckdbFilename`
 on `metadata_json`), and about 15 functions that parse a whole column to change or read one field
 (`dbSessionStore`, `dbSessionConditions`, `dbReplayIdentity`, `dbReplayLinkStore`, `dbReconciliationStore`,
@@ -77,7 +77,7 @@ Assembly rules:
   indexed range reads). Used by the session page, reclassification and reconciliation.
 - Cards and history queries select columns directly; `summary_json` and every `json_extract` go.
 
-## Phases
+## Historical implementation phases
 
 Each phase lands green (`npm test`, `npm run build`, zero warnings) and can stop there.
 
@@ -97,7 +97,7 @@ Each phase lands green (`npm test`, `npm run build`, zero warnings) and can stop
    without them only when every row is verified (SQLite drops columns by copying the table; a one-time
    step logged in Settings). Sessions whose XML LMU deleted
    only survive in these rows, so no row is dropped unverified.
-   Detailed steps: "Phase 3 in detail" below.
+   Completion and cleanup are recorded below.
 
 ## Risks
 
@@ -141,82 +141,24 @@ Each phase lands green (`npm test`, `npm run build`, zero warnings) and can stop
   The layout list, track summaries and progression take 120-240 ms on the real cache because they read `sessions` columns stored after `data_json`; phase 3 removes the cause.
 - Query plans checked: cards read driver rows by primary key; comparison walks laps through `idx_session_lap_number` and the key; boards start from `idx_sessions_layout_timestamp`.
 
-## Phase 3 in detail
+## Phase 3 completion and cleanup
 
-Not started. This is the only phase that cannot be undone with a code revert, so it is written out before any code.
+Completed 2026-10-10. Targeted updates modify only the affected replay link, recording name, DuckDB attachment or conditions rows;
+full XML ingestion writes the complete normalized session in the source/projection transaction.
 
-### What changes for good
+The one-time conversion backed up the JSON and rebuilt `sessions` without `data_json`, `metadata_json` or `summary_json`.
+A read-only check confirmed all 992 sessions were converted and verified at row version 2, with 58 scalar columns remaining.
+The personal database and its backup files are preserved.
 
-After phase 3, the normalized rows are the only copy of a session. That matters most for sessions whose XML LMU has since deleted:
-they cannot be parsed again. Three consequences follow, and the steps below are built around them.
+After conversion, the temporary conversion/restore module and tests, offline JSON comparison scripts,
+legacy layout teardown, normalized-row version constant, verification writer and background row backfill were removed.
+Readers and writers use normalized rows directly. Database write errors propagate and roll back the transaction.
+Round-trip, targeted-update and query regression tests remain; there is no runtime comparison against deleted JSON.
+The derived summary projection still has its own version and bounded rebuild from stored rows.
+Future schema migrations will be implemented when a concrete schema change requires one.
 
-- **Verification moves to ingestion.** Today a session whose rows do not verify falls back to its JSON. Afterwards there is no
-  fallback. A parsed session whose rows do not read back equal is not stored: the transaction rolls back and the file is recorded as an
-  ingest error, retried like any failed read. The XML still exists at that point, so nothing is lost; storing it lossy would be.
-- **Row format changes become migrations.** Today a `NORMALIZED_SESSION_VERSION` bump rebuilds rows from `data_json`. Afterwards a
-  bump must carry a migration in `sessionRows/migrations.ts` (SQL, or read with the old reader and write with the new writer). Sessions
-  whose XML still exists may be re-parsed instead; sessions without XML only ever migrate. A parser field added later needs a column
-  and a migration, and the round-trip test fails until it has both (already listed under Risks).
-- **Rollback means restoring a copy.** Old code reads `data_json`, so after the rebuild a code revert alone breaks the app. Step 3b keeps
-  a copy of the JSON so a rollback stays possible.
-
-### 3a. Targeted updates (reversible, JSON still written)
-
-Done 2026-10-10 (`server/core/sessionRows/targeted.ts`, tested in `test/server/core/sessionRows/targetedUpdates.test.ts`).
-Updates stop rewriting the whole session. Each writes the rows and columns it changes, bumps `updated_at`, and runs the projection only
-when derived figures depend on the change.
-
-| Update | Status / After 3a |
-|---|---|
-| Replay link set / withdrawn (`dbReplayLinkStore`, `sessionReplayLinks`, `dbSessionStore`) | upsert or delete the `session_recordings` row, set `sessions.recording_name` via `upsertTargetedReplayLink` / `deleteTargetedReplayLink` |
-| Replay rename (`dbReplayIdentity`) | update `session_recordings.recording_name`, `path` and `sessions.recording_name`, incrementing revisions via `renameTargetedReplay` |
-| DuckDB file attached (`updateSessionTelemetryFile`) | set `duckdb_filename`, `has_duckdb_telemetry` via `updateTargetedTelemetry` |
-| Conditions reclassification (`dbSessionConditions`) | update `session_recordings`, `session_drivers` and `session_laps` condition columns, then update derived projection columns in place via `updateTargetedConditions` / `updateDerivedColumns` |
-| Reparse (`upsertSession`) | whole session, unchanged |
-
-The JSON copy is refreshed in 3a by `patchSessionJson` called after each targeted write, so rolling back stays a code revert until 3b removes the columns.
-Each targeted update path is tested and verifies that normalized rows read back equal to their canonical form without calling `writeSessionRows`.
-
-
-### 3b. Conversion (one time, irreversible)
-
-Implemented in `server/core/sessionRows/conversion.ts` and tested in `test/server/core/sessionRows/conversion.test.ts`:
-- **Prerequisite validation**: `canConvertSessions(db)` blocks rebuild if any session has `normalized_version !== NORMALIZED_SESSION_VERSION` (unverified or negative).
-- **Sidecar JSON safety copy**: `backupSessionsJsonToSidecar(db, sidecarPath)` uses `ATTACH DATABASE` to replicate `(id, data_json, metadata_json)` into `sidecar.sessions_json` (~150 MB), ensuring full rollback capability without whole-database copies.
-- **Atomic table rebuild**: `rebuildSessionsTableWithoutJson(db)` creates `sessions_new` placing hot history columns first, drops `metadata_json`, `data_json`, and `summary_json`, copies all 58 retained scalar columns, swaps the table via `ALTER TABLE ... RENAME`, recreates all 9 indexes, and records `session_json_removed_at` in `cache_metadata`.
-- **Atomic rollback on failure**: An error before commit cleanly rolls back the transaction, keeping the existing `sessions` table and schema untouched.
-- **Rollback tooling**: `restoreSessionsJsonFromSidecar(db, sidecarPath)` restores JSON columns and clears `session_json_removed_at`.
-- **Dual-path adapter**: Until 3c removes the legacy JSON paths, writes (`upsertSession`, `insertSessionRow`, `patchSessionJson`, `writeSessionJson`, `persistSessionProjection`, `markProjectionFailed`) and reads/backfills (`loadSession`, `readStoredLinkState`, `backfillNormalizedSessions`) check `isSessionJsonRemoved(db)` so converted and unconverted databases operate seamlessly.
-- **No automatic `VACUUM`**: Reused pages are preserved without blocking event loops.
-
-### 3c. Remove the JSON paths (after 3b has run on the local cache)
-
-Done 2026-10-10:
-- `loadSession` and `readStoredLinkState` read rows only. The JSON branch, `writeSessionJson`, and `patchSessionJson` are removed.
-- `upsertSession` and `stub.ts` stop inserting JSON (`metadata_json` and `data_json` dropped from base `sessions` DDL in `dbSchema.ts`).
-- `persistSessionProjection` and `updateTargetedConditions` stop writing `summary_json` (`summary_json` dropped from DDL in `sessionSummaries/schema.ts`).
-- `markProjectionFailed` writes only `projection_error` (`cards.ts` already builds failed cards directly from columns).
-- `backfillNormalizedSessions` guards against absent `data_json` column and runs safely.
-- Offline tools `checkNormalizedRoundTrip.ts` and `checkNormalizedCards.ts` gracefully detect absence of `data_json` on converted caches and exit 0.
-- `dualWrite.test.ts` deleted; fallback cases in `rowReads.test.ts` removed; `scaleQueries.test.ts`, `comparisonQueries.test.ts`, `store.test.ts`, and `db.test.ts` updated to operate without JSON columns.
-- All test suites (283 files, 2,437 tests) and build typecheck pass with zero errors and zero warnings.
-
-### Checks
-
-- Before 3b on a **copy** of the real cache: the conversion completes, the round trip and card checks still pass from rows, and
-  re-running the conversion does nothing.
-- After: layouts, track summaries and progression measured again. Today they take 120–240 ms because they walk `data_json`
-  pages; the target is under 30 ms. Dashboard, first page and board must not get slower.
-- A crash during 3b, simulated by throwing between `INSERT ... SELECT` and `RENAME` in a test, leaves the old table and a
-  readable cache.
-- Rollback rehearsal: restore `data_json` from the sidecar into a converted copy and start the phase 2 code on it.
-
-### Before running it on the real cache
-
-The user backs up `server/lmu_cache.db` (or at least confirms the sidecar was written). Phase 3 needs an explicit go, and 3b
-runs only after 3a and 3c pass review.
+Old code that expects JSON requires restoring a compatible database backup as well as reverting the code.
 
 ## Delivery
 
-Phases 0 and 1 by a Sonnet agent, reviewed here before phase 2; mechanical fixture moves by Haiku.
-Update `CODE_MAP.md` (tables, recipes, cache versions) in each phase.
+Update `CODE_MAP.md` (tables, recipes, cache versions) when changing these paths.

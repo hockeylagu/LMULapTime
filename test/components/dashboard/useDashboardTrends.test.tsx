@@ -94,7 +94,6 @@ describe('useDashboardTrends', () => {
     expect(result.current.latestOuting?.position).toBe(8);
     expect(result.current.latestOuting?.positionGain).toBe(7);
     expect(result.current.latestOuting?.hasReplay).toBe(true);
-    expect(result.current.latestOuting?.replayName).toBe('le_mans_gt3_100hz.Vcr');
     expect(result.current.latestOuting?.bestLapNum).toBe(2);
 
     // Pace trend: 103.5% down to 102.4% -> +1.1% gain (improving)

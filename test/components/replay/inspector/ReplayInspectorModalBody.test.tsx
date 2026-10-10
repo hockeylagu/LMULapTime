@@ -5,8 +5,8 @@ import { ReplayInspectorModalBody } from '../../../../src/components/replay/insp
 import { LapSegmentComparison } from '../../../../src/utils/cornerAnalysis/index.js';
 
 vi.mock('../../../../src/components/replay/inspector/ReplayInspectorHeader', () => ({
-  ReplayInspectorHeader: (props: { replayName?: string | null }) => (
-    <div data-testid="mock-header">Header: {props.replayName}</div>
+  ReplayInspectorHeader: (props: { sessionId?: string | null }) => (
+    <div data-testid="mock-header">Header: {props.sessionId}</div>
   ),
 }));
 
@@ -49,8 +49,7 @@ describe('ReplayInspectorModalBody', () => {
     render(
       <ReplayInspectorModalBody
         onClose={vi.fn()}
-        activeReplayName="Monza_Race.Vcr"
-        replayName="Monza_Race.Vcr"
+        sessionId="monza-session"
         metadata={null}
         trajectory={null}
         currentIndex={0}
@@ -61,7 +60,7 @@ describe('ReplayInspectorModalBody', () => {
         error={null}
         isCompareMode={false}
         handleToggleCompare={vi.fn()}
-        baselineReplayName={null}
+        baselineSessionId={null}
         baselineLapNumber={null}
         baselineDriverName={null}
         isComparePickerOpen={false}
@@ -119,7 +118,7 @@ describe('ReplayInspectorModalBody', () => {
       />
     );
 
-    expect(screen.getByTestId('mock-header')).toHaveTextContent('Header: Monza_Race.Vcr');
+    expect(screen.getByTestId('mock-header')).toHaveTextContent('Header: monza-session');
     expect(screen.getByTestId('mock-charts')).toBeInTheDocument();
     expect(screen.getByTestId('has-straight')).toBeInTheDocument();
     expect(screen.getByTestId('mock-sidebar')).toHaveTextContent('Sidebar tab: map');
@@ -129,8 +128,7 @@ describe('ReplayInspectorModalBody', () => {
     render(
       <ReplayInspectorModalBody
         onClose={vi.fn()}
-        activeReplayName={null}
-        replayName="Fallback.Vcr"
+        sessionId="fallback-session"
         metadata={null}
         trajectory={null}
         currentIndex={0}
@@ -141,7 +139,7 @@ describe('ReplayInspectorModalBody', () => {
         error={null}
         isCompareMode={false}
         handleToggleCompare={vi.fn()}
-        baselineReplayName={null}
+        baselineSessionId={null}
         baselineLapNumber={null}
         baselineDriverName={null}
         isComparePickerOpen={false}
@@ -199,7 +197,7 @@ describe('ReplayInspectorModalBody', () => {
       />
     );
 
-    expect(screen.getByTestId('mock-header')).toHaveTextContent('Header: Fallback.Vcr');
+    expect(screen.getByTestId('mock-header')).toHaveTextContent('Header: fallback-session');
     expect(screen.queryByTestId('has-straight')).not.toBeInTheDocument();
     expect(screen.getByTestId('mock-sidebar')).toHaveTextContent('Sidebar tab: corners');
   });

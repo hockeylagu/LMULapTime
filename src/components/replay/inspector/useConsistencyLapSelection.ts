@@ -16,7 +16,7 @@ export interface ConsistencyLapSelection {
 export function useConsistencyLapSelection(
   trajectory: ReplayTrajectoryData | null,
   metadata: ReplayMetadata | null,
-  activeReplayName: string | null,
+  activeSessionId: string | null,
   selectedDriverSlot: number | null
 ): ConsistencyLapSelection {
   const [excludedConsistencyLaps, setExcludedConsistencyLaps] = useState<Set<number>>(new Set());
@@ -44,15 +44,15 @@ export function useConsistencyLapSelection(
 
   const initializedExclusionKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!activeReplayName || availableConsistencyLaps.length === 0) return;
-    const key = `${activeReplayName}|${selectedDriverSlot ?? 'x'}`;
+    if (!activeSessionId || availableConsistencyLaps.length === 0) return;
+    const key = `${activeSessionId}|${selectedDriverSlot ?? 'x'}`;
     if (initializedExclusionKeyRef.current === key) return;
     initializedExclusionKeyRef.current = key;
     const excludedByDefault = availableConsistencyLaps
       .filter(l => !l.isValid || l.nonRepresentativeReason)
       .map(l => l.lapNumber);
     setExcludedConsistencyLaps(new Set(excludedByDefault));
-  }, [activeReplayName, selectedDriverSlot, availableConsistencyLaps]);
+  }, [activeSessionId, selectedDriverSlot, availableConsistencyLaps]);
 
   return { availableConsistencyLaps, excludedConsistencyLaps, toggleConsistencyLap };
 }

@@ -29,7 +29,6 @@ describe('ReplayInspectorTitle', () => {
     render(
       <ReplayInspectorTitle
         onClose={vi.fn()}
-        replayName="RoadAtlanta_R1.Vcr"
         metadata={baseMetadata}
         trajectory={null}
       />
@@ -51,7 +50,6 @@ describe('ReplayInspectorTitle', () => {
     render(
       <ReplayInspectorTitle
         onClose={vi.fn()}
-        replayName="RoadAtlanta_R1.Vcr"
         metadata={baseMetadata}
         trajectory={null}
         selectedDriver={selectedDriver}
@@ -84,7 +82,6 @@ describe('ReplayInspectorTitle', () => {
     render(
       <ReplayInspectorTitle
         onClose={vi.fn()}
-        replayName="LeMans.Vcr"
         metadata={{ ...baseMetadata, displayTrack: 'Circuit de la Sarthe' }}
         trajectory={trajectory}
       />
@@ -101,7 +98,7 @@ describe('ReplayInspectorTitle', () => {
       drivers: [{ slot: 0, name: 'Leader', carModel: 'Ferrari 499P', carClass: 'Hypercar' }, selectedDriver],
     };
 
-    render(<ReplayInspectorTitle onClose={vi.fn()} replayName="Multi.Vcr" metadata={metadata} trajectory={null} selectedDriver={selectedDriver} />);
+    render(<ReplayInspectorTitle onClose={vi.fn()} metadata={metadata} trajectory={null} selectedDriver={selectedDriver} />);
 
     expect(screen.getByText('Porsche 911 GT3 R LMGT3')).toBeInTheDocument();
     expect(screen.getByTestId('car-class-badge')).toHaveTextContent('GT3');
@@ -111,7 +108,6 @@ describe('ReplayInspectorTitle', () => {
     render(
       <ReplayInspectorTitle
         onClose={vi.fn()}
-        replayName="RoadAtlanta_R1.Vcr"
         metadata={baseMetadata}
         trajectory={null}
       />
@@ -127,7 +123,6 @@ describe('ReplayInspectorTitle', () => {
     render(
       <ReplayInspectorTitle
         onClose={onClose}
-        replayName="RoadAtlanta_R1.Vcr"
         metadata={baseMetadata}
         trajectory={null}
       />

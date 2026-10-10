@@ -52,7 +52,6 @@ export class ServerContext {
   private sessionReplayReconciliation: Promise<void> | null = null;
   private telemetryOwnershipReconciliation: Promise<void> | null = null;
   private projectionBackfillStarted = false;
-  private normalizedBackfillStarted = false;
   private sessionProjectionBackfill = { running: false, processed: 0, total: 0, failed: 0, currentSessionId: null as string | null, startedAt: null as string | null, finishedAt: null as string | null, error: null as string | null };
   // A manual refresh asked the next replay sync to try again the replays that failed MAX_DECODE_ATTEMPTS times.
   private retryFailedReplays = false;
@@ -270,29 +269,8 @@ export class ServerContext {
           return;
         }
         finish();
-        this.startNormalizedSessionBackfill();
       } catch (error: unknown) {
         finish(error);
-      }
-    };
-    setImmediate(runBatch);
-  }
-
-  /**
-   * Writes the normalized rows of stored sessions (NORMALIZED_SESSION_VERSION), ten at a time with the
-   * event loop free in between. JSON stays the source of truth: a session whose rows do not read back
-   * as it keeps its JSON and is reported here. Nothing waits for this step.
-   */
-  private startNormalizedSessionBackfill(): void {
-    if (this.normalizedBackfillStarted || typeof this.sessionDb.backfillNormalizedSessionBatch !== 'function') return;
-    this.normalizedBackfillStarted = true;
-    const runBatch = () => {
-      try {
-        const batch = this.sessionDb.backfillNormalizedSessionBatch(10);
-        for (const failure of batch.failed) console.warn(`[Normalized Sessions] ${failure.id} stays on JSON:`, failure.error ?? failure.mismatches.slice(0, 3));
-        if (batch.processed > 0) setImmediate(runBatch);
-      } catch (error: unknown) {
-        console.warn('[Normalized Sessions] Backfill stopped:', error);
       }
     };
     setImmediate(runBatch);
@@ -569,6 +547,19 @@ export class ServerContext {
       (this.sessionScanStatus.result?.added === 0 && this.sessionScanStatus.result?.updated === 0)
     );
 
+    const replayUpgrade = this.replayUpgrade?.getStatus();
+    const jobs = new Map(this.replayJobs);
+    const activeFile = replayUpgrade?.running ? replayUpgrade.currentFile : this.replayScanStatus.running ? this.replayScanStatus.currentFile : null;
+    if (activeFile) jobs.set(activeFile, { ...jobs.get(activeFile), name: activeFile, status: 'processing' });
+    const owners = this.sessionDb.getRecordingOwners?.([...jobs.keys()]) ?? new Map<string, string>();
+    const sessionReplayJobs = [...jobs.values()].flatMap(({ name, ...job }) => {
+      const sessionId = owners.get(name);
+      if (!sessionId) return [];
+      const progress = replayUpgrade?.running && replayUpgrade.currentFile === name ? replayUpgrade : this.replayScanStatus;
+      return [{ ...job, sessionId, stage: progress.currentFile === name ? progress.currentStage : null,
+        filePercent: progress.currentFile === name ? progress.filePercent : null }];
+    });
+
     return {
       // Includes the process identity: a restarted server cannot reuse the previous revision.
       dataRevision: [this.instanceId, this.sessionDb.getSessionRevision?.() ?? 0,
@@ -576,10 +567,11 @@ export class ServerContext {
         this.sessionDb.getTelemetryMetadataRevision?.() ?? 0].join(':'),
       ...this.replayScanStatus,
       replayJobs: [...this.replayJobs.values()],
+      sessionReplayJobs,
       refreshQueued: this.pendingSessionRefresh,
       sessionScan: this.sessionScanStatus,
       sessionProjectionBackfill: this.sessionProjectionBackfill,
-      replayUpgrade: this.replayUpgrade?.getStatus(),
+      replayUpgrade,
       telemetryScan,
       referenceLaptimes: this.referenceLaptimeRefreshStatus,
       allComplete,

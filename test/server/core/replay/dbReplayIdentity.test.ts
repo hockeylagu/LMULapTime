@@ -72,7 +72,7 @@ describe('replay identity', () => {
     db.upsertSession(session('withdrawn'), 'C:\\results\\withdrawn.xml', 1, 1);
     db.rejectSessionReplayLink('withdrawn', { name, path: replayPath, sizeBytes: 6863306 }, 'owned-by-other-session');
     db.upsertTelemetryMetadata({ filename: 'Bahrain_P.duckdb', filePath: 'C:\\t\\Bahrain_P.duckdb', fileMtimeMs: 1, fileSizeBytes: 1, trackName: 'Bahrain', sessionType: 'P', timestampStr: '', timestampEpochMs: 0 } as DuckDbFileInfo, 'owner', name);
-    db.saveAiReport({ cacheKey: 'k', replayName: name, lapNumber: 2, baselineReplayName: name, baselineLapNumber: 1, model: 'm', promptVersion: 1, report: { overallSummary: '', improvements: [] }, generatedAt: 1 });
+    db.saveAiReport({ cacheKey: 'k', sessionId: 'owner', driverOrdinal: 0, lapOrdinal: 1, lapNumber: 2, baselineSessionId: 'owner', baselineDriverOrdinal: 0, baselineLapOrdinal: 0, baselineLapNumber: 1, model: 'm', promptVersion: 1, report: { overallSummary: '', improvements: [] }, generatedAt: 1 });
 
     // Three hours later LMU writes another recording under the same name.
     db.upsertReplayMetadataCache(name, replayPath, savedAt + 3 * 3600_000, 7000000, metadata(400));
@@ -94,7 +94,7 @@ describe('replay identity', () => {
       .toMatchObject({ recording_name: archivedName, source_revision: 2, projection_revision: 2 });
     expect(db.getRejectedReplayLinks().get('withdrawn')?.[0].replayName).toBe(archivedName);
     expect(db.getTelemetryMetadata()[0].matchedReplayFilename).toBe(archivedName);
-    expect(db.getAiReportsList()[0]).toMatchObject({ replayName: archivedName, baselineReplayName: archivedName });
+    expect(db.getAiReportsList()[0]).toMatchObject({ sessionId: 'owner', baselineSessionId: 'owner' });
   });
 
   it('updates in place when the same recording is saved again', () => {

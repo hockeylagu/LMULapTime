@@ -77,7 +77,6 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
 
   const hasConditions = hasSessionConditions(session.matchingReplayFile);
   const hasDuckDb = Boolean(session.hasDuckDbTelemetry || session.matchingReplayFile?.hasDuckDbTelemetry);
-  const duckFilename = session.duckdbFilename || session.matchingReplayFile?.duckdbFilename;
 
   // The course and event lines often just repeat the display name; keep only what adds to it.
   const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
@@ -103,14 +102,10 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
           {session.matchingReplayFile && (
             <ReplayLaunchButton
               hasDuckDb={hasDuckDb}
-              replayName={session.matchingReplayFile.name}
+              sessionId={session.id}
               to={telemetryPath()}
               onClick={() => handleOpenReplay()}
-              title={`Replay: ${session.matchingReplayFile.name}${
-                hasDuckDb ? `
-Telemetry: ${duckFilename || 'active'}` : ''
-              }
-Click to inspect trajectory and telemetry`}
+              title={hasDuckDb ? 'Open session replay and telemetry' : 'Open session replay'}
             />
           )}
 

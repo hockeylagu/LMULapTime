@@ -1,53 +1,14 @@
-import { DetailedSession, DriverData, ReplayDriverEntry, ReplayTrajectoryData } from '../core/types.js';
+import { DetailedSession } from '../core/types.js';
 import type { TelemetryLinks } from '../telemetry/telemetryLinks.js';
 
 export interface ReplayTrajectoryRequest {
-  sessionId?: string;
-  session?: DetailedSession;
-  driverOrdinal?: number;
-  lapOrdinal?: number;
-  /** Resolved from the requested session's stored link inside the server. */
-  replayName: string;
-  driverSlot?: number;
-  driverName?: string;
-  lapNumber?: number;
+  session: DetailedSession;
+  driverOrdinal: number;
+  lapOrdinal: number;
   maxPoints: number;
   /** When set, the lap is served at one point per this many metres instead of `maxPoints`. */
   pointSpacingM?: number;
   allowDuckDb: boolean;
-}
-
-export interface ReplayMetadataRequest {
-  sessionId: string;
-  /** Resolved from the requested session's stored link inside the server. */
-  replayName: string;
-  playerName?: string;
-}
-
-export interface ReplayDriverMatchResult {
-  driverSlot?: number;
-  driverName?: string;
-  isPlayer: boolean;
-  matchedSession?: DetailedSession;
-  matchedDriver?: DriverData;
-  replayDriver?: ReplayDriverEntry;
-}
-
-export interface ReplayTelemetryEnrichmentOptions {
-  replayName: string;
-  filePath: string;
-  driverSlot?: number;
-  driverName?: string;
-  lapNumber?: number;
-  allowDuckDb: boolean;
-  matchedSession?: DetailedSession;
-  fullTrajectory: ReplayTrajectoryData;
-}
-
-export interface ReplayTelemetryEnrichmentResult {
-  trajectory: ReplayTrajectoryData;
-  fused: boolean;
-  duckdbUnavailableReason?: string;
 }
 
 export interface ReplaySummarySourceData {

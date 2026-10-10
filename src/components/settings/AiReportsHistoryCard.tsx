@@ -72,8 +72,8 @@ export const AiReportsHistoryCard: React.FC = () => {
           {shown.map(r => (
             <li key={r.cacheKey} className="px-3 py-2.5 space-y-1">
               <div className="flex items-center justify-between gap-2">
-                <span className="min-w-0 text-xs font-semibold text-lmu-text truncate" title={r.replayName}>
-                  {r.replayName} · Lap {r.lapNumber}
+                <span className="min-w-0 text-xs font-semibold text-lmu-text truncate" title={r.sessionId ?? 'Previous report'}>
+                  {r.sessionId ?? 'Previous report'} · Lap {r.lapNumber}
                 </span>
                 <span className="text-[11px] text-lmu-muted font-mono shrink-0">
                   {formatDateTime(r.generatedAt)}
@@ -84,7 +84,7 @@ export const AiReportsHistoryCard: React.FC = () => {
               )}
               <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-lmu-muted font-mono">
                 <span>{r.model}</span>
-                {r.baselineReplayName && <span className="min-w-0 break-words">vs {r.baselineReplayName} Lap {r.baselineLapNumber}</span>}
+                {r.baselineSessionId && <span className="min-w-0 break-words">vs {r.baselineSessionId} Lap {r.baselineLapNumber}</span>}
                 {typeof r.tokensUsed?.total === 'number' && <span>{pluralize(r.tokensUsed.total, 'token')}</span>}
               </div>
             </li>

@@ -4,7 +4,7 @@ import { AIReportTab } from '../../../../src/components/replay/analysis/AIReport
 import type { ReplayTrajectoryData } from '../../../../server/core/types.js';
 
 const trajectory = {
-  replayName: 'Test_Replay.vcr',
+  replayName: 'Test_Replay.vcr', sessionId: 'primary-session', driverOrdinal: 0, lapOrdinal: 0,
   driverName: 'Test Driver',
   driverSlot: 1,
   currentLap: 1,

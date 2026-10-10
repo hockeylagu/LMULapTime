@@ -125,7 +125,7 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
       isCompareMode={isCompareMode}
       baselineTrajectory={baselineTrajectory}
       primaryCarClass={resolveDriverCarClass(drivers.find(driver => driver.slot === selectedDriverSlot))}
-      baselineCarClass={baselineTrajectory?.replayName === trajectory?.replayName
+      baselineCarClass={baselineTrajectory?.sessionId === trajectory?.sessionId
         ? resolveDriverCarClass(drivers.find(driver => driver.slot === baselineTrajectory?.driverSlot)) : undefined}
       currentPoint={currentPoint}
       corners={cornerSegments}
@@ -232,7 +232,6 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
                       trackVenue={trackVenue}
                       trackCourse={trackCourse}
                       layoutKey={layoutKey}
-                      replayName={trajectory.replayName}
                       onClose={() => handleSelectCorner(null)}
                       className="shrink-0"
                     />

@@ -92,6 +92,42 @@ export interface ReplaySyncResult {
   interrupted: boolean;
 }
 
+const AI_REPORT_SCHEMA = `
+CREATE TABLE IF NOT EXISTS ai_reports (
+      cache_key TEXT PRIMARY KEY,
+      session_id TEXT,
+      driver_ordinal INTEGER,
+      lap_ordinal INTEGER,
+      lap_number INTEGER NOT NULL,
+      baseline_session_id TEXT,
+      baseline_driver_ordinal INTEGER,
+      baseline_lap_ordinal INTEGER,
+      baseline_lap_number INTEGER,
+      model TEXT NOT NULL,
+      prompt_version INTEGER NOT NULL,
+      report_json TEXT NOT NULL,
+      prompt_tokens INTEGER,
+      completion_tokens INTEGER,
+      total_tokens INTEGER,
+      generated_at INTEGER NOT NULL
+    );
+`;
+
+/** Keep existing reports without guessing a driver/lap from their old recording filenames. */
+function migrateAiReportIdentity(db: DatabaseType): void {
+  const columns = db.prepare('PRAGMA table_info(ai_reports)').all() as Array<{ name: string }>;
+  if (!columns.some(column => column.name === 'replay_name')) return;
+  db.transaction(() => {
+    db.exec('ALTER TABLE ai_reports RENAME TO ai_reports_previous');
+    db.exec(AI_REPORT_SCHEMA);
+    db.exec(`INSERT INTO ai_reports (cache_key, lap_number, baseline_lap_number, model, prompt_version,
+      report_json, prompt_tokens, completion_tokens, total_tokens, generated_at)
+      SELECT cache_key, lap_number, baseline_lap_number, model, prompt_version,
+        report_json, prompt_tokens, completion_tokens, total_tokens, generated_at FROM ai_reports_previous;
+      DROP TABLE ai_reports_previous;`);
+  })();
+}
+
 export function initDbSchema(db: DatabaseType): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS sessions (
@@ -160,20 +196,7 @@ export function initDbSchema(db: DatabaseType): void {
       value TEXT
     );
 
-    CREATE TABLE IF NOT EXISTS ai_reports (
-      cache_key TEXT PRIMARY KEY,
-      replay_name TEXT NOT NULL,
-      lap_number INTEGER NOT NULL,
-      baseline_replay_name TEXT,
-      baseline_lap_number INTEGER,
-      model TEXT NOT NULL,
-      prompt_version INTEGER NOT NULL,
-      report_json TEXT NOT NULL,
-      prompt_tokens INTEGER,
-      completion_tokens INTEGER,
-      total_tokens INTEGER,
-      generated_at INTEGER NOT NULL
-    );
+    ${AI_REPORT_SCHEMA}
 
     -- The player's rival on a layout, per class (car_type '' ) or per car: a real driver about
     -- 0.3 s ahead, or a ghost time. A target stays until it is beaten or replaced, so the
@@ -413,6 +436,7 @@ export function initDbSchema(db: DatabaseType): void {
     // exited with the server) may not be the file's fault: each gets one more decode.
     db.exec("DELETE FROM replay_ingest_drivers WHERE status = 'failed'");
   }
+  migrateAiReportIdentity(db);
   initSessionSummarySchema(db);
   initSessionRowsSchema(db);
   initReplayMatchingSchema(db);

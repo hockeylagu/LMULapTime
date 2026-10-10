@@ -9,8 +9,8 @@ describe('ReplayIndicator', () => {
   it('shows queued, processing and failure states without launching an unfinished replay', () => {
     const onClick = vi.fn();
     const display = (status: 'queued' | 'processing' | 'ready' | 'failed') => (
-      <SessionDataContext.Provider value={{ revision: 0, scan: { running: false, replayJobs: [{ name: 'x.Vcr', status }] } as ScanStatus }}>
-        <ReplayIndicator replay={{ name: 'x.Vcr' }} onClick={onClick} />
+      <SessionDataContext.Provider value={{ revision: 0, scan: { running: false, sessionReplayJobs: [{ sessionId: 'session-1', status }] } as ScanStatus }}>
+        <ReplayIndicator sessionId="session-1" hasReplay onClick={onClick} />
       </SessionDataContext.Provider>
     );
     const { rerender } = render(display('queued'));
@@ -25,11 +25,11 @@ describe('ReplayIndicator', () => {
   });
   it('opens a replay left queued for a retry when its own laps are stored, and blocks it otherwise', () => {
     const onClick = vi.fn();
-    const scan = (playable: boolean) => ({ running: false, replayJobs: [{ name: 'x.Vcr', status: 'queued', playable }] }) as ScanStatus;
+    const scan = (playable: boolean) => ({ running: false, sessionReplayJobs: [{ sessionId: 'session-1', status: 'queued', playable }] }) as ScanStatus;
     const { rerender } = render(
       <SessionDataContext.Provider value={{ revision: 0, scan: scan(true) }}>
-        <ReplayIndicator replay={{ name: 'x.Vcr' }} onClick={onClick} />
-        <ReplayLaunchButton replayName="x.Vcr" hasDuckDb={false} onClick={onClick} />
+        <ReplayIndicator sessionId="session-1" hasReplay onClick={onClick} />
+        <ReplayLaunchButton sessionId="session-1" hasDuckDb={false} onClick={onClick} />
       </SessionDataContext.Provider>
     );
     fireEvent.click(screen.getByRole('button', { name: 'Open replay telemetry' }));
@@ -38,43 +38,37 @@ describe('ReplayIndicator', () => {
 
     rerender(
       <SessionDataContext.Provider value={{ revision: 0, scan: scan(false) }}>
-        <ReplayIndicator replay={{ name: 'x.Vcr' }} onClick={onClick} />
-        <ReplayLaunchButton replayName="x.Vcr" hasDuckDb={false} onClick={onClick} />
+        <ReplayIndicator sessionId="session-1" hasReplay onClick={onClick} />
+        <ReplayLaunchButton sessionId="session-1" hasDuckDb={false} onClick={onClick} />
       </SessionDataContext.Provider>
     );
     expect(screen.getByRole('status', { name: 'Replay queued' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Replay queued/ })).toBeDisabled();
   });
   it('shows a queued replay as queued even when the session has 100Hz telemetry', () => {
-    const scan = { running: false, replayJobs: [{ name: 'x.Vcr', status: 'queued' }] } as ScanStatus;
+    const scan = { running: false, sessionReplayJobs: [{ sessionId: 'session-1', status: 'queued' }] } as ScanStatus;
     render(
       <SessionDataContext.Provider value={{ revision: 0, scan }}>
-        <ReplayIndicator replay={{ name: 'x.Vcr', hasDuckDbTelemetry: true }} onClick={vi.fn()} />
-        <ReplayLaunchButton replayName="x.Vcr" hasDuckDb onClick={vi.fn()} />
+        <ReplayIndicator sessionId="session-1" hasReplay hasDuckDbTelemetry={true} onClick={vi.fn()} />
+        <ReplayLaunchButton sessionId="session-1" hasDuckDb onClick={vi.fn()} />
       </SessionDataContext.Provider>
     );
     expect(screen.getByRole('status', { name: 'Replay queued' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Replay queued/ })).toBeDisabled();
   });
   it('renders nothing or dash when replay is not provided', () => {
-    const { container, rerender } = render(<ReplayIndicator replay={null} />);
+    const { container, rerender } = render(<ReplayIndicator hasReplay={false} />);
     expect(screen.getByText('-')).toBeInTheDocument();
 
-    rerender(<ReplayIndicator replay={null} hideIfEmpty />);
+    rerender(<ReplayIndicator hasReplay={false} hideIfEmpty />);
     expect(container.firstChild).toBeNull();
   });
 
   it('renders the plain replay glyph on a neutral surface, unaltered when raining', () => {
-    const wetReplay = {
-      name: 'Spa_Race_Replay.Vcr',
-      hasRain: true,
-      weatherCondition: 'Wet' as const,
-      maxRainIntensity: 18,
-    };
 
-    const { container } = render(<ReplayIndicator replay={wetReplay} />);
+    const { container } = render(<ReplayIndicator sessionId="session-1" hasReplay />);
 
-    const indicator = screen.getByTitle('Replay: Spa_Race_Replay.Vcr');
+    const indicator = screen.getByTitle('Replay');
     expect(indicator).toBeInTheDocument();
     expect(indicator.className).toContain('text-lmu-text');
 
@@ -86,17 +80,10 @@ describe('ReplayIndicator', () => {
   });
 
   it('renders the green telemetry glyph when the session has DuckDB telemetry, unaltered when raining', () => {
-    const wetDuckDbReplay = {
-      name: 'Monza_Practice.Vcr',
-      hasDuckDbTelemetry: true,
-      hasRain: true,
-      weatherCondition: 'Wet' as const,
-      maxRainIntensity: 25,
-    };
 
-    const { container } = render(<ReplayIndicator replay={wetDuckDbReplay} />);
+    const { container } = render(<ReplayIndicator sessionId="session-1" hasReplay hasDuckDbTelemetry />);
 
-    expect(screen.getByTitle('Replay + telemetry: Monza_Practice.Vcr')).toBeInTheDocument();
+    expect(screen.getByTitle('Replay + telemetry')).toBeInTheDocument();
 
     const svgs = container.querySelectorAll('svg');
     expect(svgs).toHaveLength(1);
@@ -106,13 +93,8 @@ describe('ReplayIndicator', () => {
 
   it('renders interactive button and handles onClick unaltered by rain', () => {
     const onClick = vi.fn();
-    const wetReplay = {
-      name: 'LeMans_Quali.Vcr',
-      hasRain: true,
-      weatherCondition: 'Dynamic Weather' as const,
-    };
 
-    const { container } = render(<ReplayIndicator replay={wetReplay} onClick={onClick} />);
+    const { container } = render(<ReplayIndicator sessionId="session-1" hasReplay onClick={onClick} />);
 
     const button = screen.getByRole('button', { name: /Open replay telemetry/i });
     expect(button).toBeInTheDocument();
@@ -129,8 +111,8 @@ describe('ReplayIndicator', () => {
   it('keeps a playable partial replay open and reports missing driver data', () => {
     const onClick = vi.fn();
     render(
-      <SessionDataContext.Provider value={{ revision: 0, scan: { running: false, replayJobs: [{ name: 'partial.Vcr', status: 'failed', playable: true, error: 'secondary driver failed' }] } as ScanStatus }}>
-        <ReplayIndicator replay={{ name: 'partial.Vcr' }} onClick={onClick} />
+      <SessionDataContext.Provider value={{ revision: 0, scan: { running: false, sessionReplayJobs: [{ sessionId: 'session-1', status: 'failed', playable: true, error: 'secondary driver failed' }] } as ScanStatus }}>
+        <ReplayIndicator sessionId="session-1" hasReplay onClick={onClick} />
       </SessionDataContext.Provider>
     );
     const button = screen.getByRole('button', { name: /some replay drivers are unavailable/i });
@@ -141,8 +123,8 @@ describe('ReplayIndicator', () => {
 
   it('blocks an unusable failed replay but allows DuckDB fallback with a warning', () => {
     const display = (hasDuckDb: boolean) => (
-      <SessionDataContext.Provider value={{ revision: 0, scan: { running: false, replayJobs: [{ name: 'failed.Vcr', status: 'failed', playable: false, error: 'primary decode failed' }] } as ScanStatus }}>
-        <ReplayIndicator replay={{ name: 'failed.Vcr', hasDuckDbTelemetry: hasDuckDb }} onClick={vi.fn()} />
+      <SessionDataContext.Provider value={{ revision: 0, scan: { running: false, sessionReplayJobs: [{ sessionId: 'session-1', status: 'failed', playable: false, error: 'primary decode failed' }] } as ScanStatus }}>
+        <ReplayIndicator sessionId="session-1" hasReplay hasDuckDbTelemetry={hasDuckDb} onClick={vi.fn()} />
       </SessionDataContext.Provider>
     );
     const { rerender } = render(display(false));
@@ -155,8 +137,8 @@ describe('ReplayIndicator', () => {
   it('keeps launch enabled for cached player data or DuckDB after a secondary failure', () => {
     const onClick = vi.fn();
     const button = (playable: boolean, hasDuckDb: boolean) => (
-      <SessionDataContext.Provider value={{ revision: 0, scan: { running: false, replayJobs: [{ name: 'partial.Vcr', status: 'failed', playable, error: 'secondary driver failed' }] } as ScanStatus }}>
-        <ReplayLaunchButton replayName="partial.Vcr" hasDuckDb={hasDuckDb} onClick={onClick} />
+      <SessionDataContext.Provider value={{ revision: 0, scan: { running: false, sessionReplayJobs: [{ sessionId: 'session-1', status: 'failed', playable, error: 'secondary driver failed' }] } as ScanStatus }}>
+        <ReplayLaunchButton sessionId="session-1" hasDuckDb={hasDuckDb} onClick={onClick} />
       </SessionDataContext.Provider>
     );
     const { rerender } = render(button(true, false));

@@ -2,9 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SessionDatabase } from '../../../../server/core/db.js';
 import type { DetailedSession } from '../../../../server/core/types.js';
 import { canonicalSession } from '../../../../server/core/sessionRows/canonical.js';
-import { NORMALIZED_SESSION_VERSION } from '../../../../server/core/sessionRows/schema.js';
 import { readSessionCards } from '../../../../server/core/sessionSummaries/cards.js';
-import { isSessionSummaryReady } from '../../../../server/core/sessionSummaries/store.js';
 import { restoreStoredSessionLinks } from '../../../../server/core/dbSessionStore.js';
 import { driver, lap, session } from './builders.js';
 
@@ -25,6 +23,23 @@ describe('reads from the normalized rows', () => {
 
   beforeEach(() => { db = new SessionDatabase(':memory:'); });
   afterEach(() => { db.close(); });
+
+  it.each(['clear', 'rule reset'] as const)('invalidates persisted session and card attachments on telemetry %s', action => {
+    db.upsertSession(newSession('a', { matchingReplayFile: link }), 'a.xml', 1, 10);
+    db.updateSessionTelemetryFile('a', 'old.duckdb');
+    expect(readSessionCards(raw(), ['a'])[0].matchingReplayFile?.duckdbFilename).toBe('old.duckdb');
+    const revision = db.getTelemetryMetadataRevision();
+    if (action === 'clear') db.clearTelemetryCache();
+    else expect(db.resetTelemetryLinksForRule('new-rule')).toBe(true);
+    expect(db.getTelemetryMetadataRevision()).toBeGreaterThan(revision);
+    expect(db.getSessionById('a')).toMatchObject({ hasDuckDbTelemetry: false });
+    expect(db.getSessionById('a')?.duckdbFilename).toBeUndefined();
+    expect(db.getSessionById('a')?.matchingReplayFile?.duckdbFilename).toBeUndefined();
+    expect(readSessionCards(raw(), ['a'])[0].hasDuckDbTelemetry).toBe(false);
+    db.updateSessionTelemetryFile('a', 'new.duckdb');
+    if (action === 'rule reset') expect(db.resetTelemetryLinksForRule('new-rule')).toBe(false);
+    expect(db.getSessionById('a')?.duckdbFilename).toBe('new.duckdb');
+  });
 
   it('serves sessions, links, ids, windows and recording owners from the rows', () => {
     db.upsertSession(newSession('a', { matchingReplayFile: link }), 'a.xml', 1, 10);
@@ -64,20 +79,10 @@ describe('reads from the normalized rows', () => {
     expect(raw().prepare('SELECT recording_name FROM sessions WHERE id = ?').get('a')).toEqual({ recording_name: null });
   });
 
-  it('waits for the normalized rows before history reads are ready', () => {
-    db.upsertSession(newSession('a'), 'a.xml', 1, 10);
-    expect(isSessionSummaryReady(raw())).toBe(true);
-    raw().exec('UPDATE sessions SET normalized_version = 0');
-    expect(isSessionSummaryReady(raw())).toBe(false);
-    raw().exec(`UPDATE sessions SET normalized_version = ${-NORMALIZED_SESSION_VERSION}`);
-    expect(isSessionSummaryReady(raw())).toBe(true);
-  });
-
   it('lifts a DuckDB file that only the link carried onto the session', () => {
     const legacy = newSession('a', { matchingReplayFile: { ...link, hasDuckDbTelemetry: true, duckdbFilename: 'old.duckdb' } });
     db.upsertSession(legacy, 'a.xml', 1, 10);
     expect(raw().prepare('SELECT has_duckdb_telemetry AS flag, duckdb_filename AS file FROM sessions WHERE id = ?').get('a')).toEqual({ flag: 1, file: 'old.duckdb' });
-    expect(raw().prepare('SELECT normalized_version AS v FROM sessions WHERE id = ?').get('a')).toEqual({ v: NORMALIZED_SESSION_VERSION });
     expect(db.getSessionById('a')).toMatchObject({ duckdbFilename: 'old.duckdb', hasDuckDbTelemetry: true, matchingReplayFile: { duckdbFilename: 'old.duckdb' } });
     expect(raw().prepare('PRAGMA table_info(session_recordings)').all().map(column => (column as { name: string }).name)).not.toContain('duckdb_filename');
   });

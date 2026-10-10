@@ -111,9 +111,9 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
         <div className="inline-flex items-center justify-end gap-2.5">
           {s.matchingReplayFile && (
             <ReplayIndicator
-              replay={s.matchingReplayFile}
-              hasDuckDbTelemetry={s.hasDuckDbTelemetry}
-              duckdbFilename={s.duckdbFilename}
+              sessionId={s.id}
+              hasReplay={Boolean(s.matchingReplayFile)}
+              hasDuckDbTelemetry={s.hasDuckDbTelemetry || s.matchingReplayFile?.hasDuckDbTelemetry}
               hideIfEmpty
               to={replayUrl}
               onClick={onOpenReplay ? () => onOpenReplay(s.id) : undefined}

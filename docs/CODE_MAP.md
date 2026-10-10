@@ -3,9 +3,9 @@
 A fast index for new sessions: find the right file without searching. `AGENTS.md` holds the rules;
 this file holds the **routes through the code**. Keep it current (see "Keeping this file current" at the end).
 
-Last checked 2026-10-10: 482 TypeScript source files in src/server/shared, 287 test files,
-2488 tests (2432 passed, 56 skipped). Production build passes. Coverage (not rerun for phase 2): 94.12% lines,
-91.77% statements, 91.94% functions and 82.97% branches (two workers).
+Last checked 2026-10-10: 494 TypeScript source files in src/server/shared, 287 test files,
+2498 tests (2442 passed, 56 skipped). Production build passes. Coverage: 94.30% lines, 91.99% statements,
+92.26% functions and 83.20% branches (two workers).
 
 ---
 
@@ -22,39 +22,43 @@ Other tables: `reference_laptimes` (benchmarks), `ai_reports`, `rival_targets` (
 DDL is coordinated by `server/core/dbSchema.ts`; additive session projection tables and indexes
 live in `server/core/sessionSummaries/schema.ts` and `aggregateStore.ts`, and replay matching columns/indexes in
 `server/core/replay/dbReplayMatchingStore.ts`.
-Normalized session rows (`server/core/sessionRows/`, plan [NORMALIZED_SESSION_STORAGE](plans/NORMALIZED_SESSION_STORAGE.md), phase 3c) are the
-stored session; reads come from them, and the JSON columns are only still written so that rolling back is a code revert (phase 3b removes them).
-`specs.ts` declares every stored column once (`fields.ts` helpers); `schema.ts` holds the DDL, the extra `sessions` columns (weather, `settings_*`, best session
-lap, game version, DuckDB flag and file, `player_driver_ordinal`, `normalized_version`), the derived-column lists and `NORMALIZED_SESSION_VERSION`
-(it also drops the version-one layout: the two merged summary tables and the old row tables); `writer.ts` (`writeSessionRows`, `updateDerivedColumns`) writes
-or updates a session's rows and takes the session's projection for the derived columns; `dictionaries.ts` does the get-or-insert of driver names, vehicles and teams;
-`reader.ts` (`readSession`, `sessionScalars`, `driverScalars`, `recordingLink`) assembles the `DetailedSession`; `access.ts` is what other code calls: `loadSession`
-(rows, or the JSON of a session whose `normalized_version` is not current), `readStoredLinkState` (link and DuckDB file from two small row reads),
-`sameReplayLink`, `writeSessionJson` (keeps the JSON copies in step); `targeted.ts` (`upsertTargetedReplayLink`, `deleteTargetedReplayLink`, `renameTargetedReplay`,
-`updateTargetedTelemetry`, `updateTargetedConditions`, `patchSessionJson`) implements phase 3a granular updates; `canonical.ts` (`canonicalSession`, `diffValues`, `sessionTelemetry`,
-`withSessionTelemetry`) is the form that must round-trip; `verify.ts` writes and verifies (`writeAndVerifySessionRows`) and backfills (`backfillNormalizedSessions`);
-`stub.ts` inserts a bare `sessions` row for tests and tools. Ingestion (`upsertSession`) calls `writeAndVerifySessionRows` in its transaction; targeted updates
-(link update, withdrawal, telemetry file, reclassification, replay rename) modify only their specific rows and update derived metrics in place, with `patchSessionJson`
-maintaining the JSON copy until phase 3b.
+Normalized session rows (`server/core/sessionRows/`, completed plan [NORMALIZED_SESSION_STORAGE](plans/NORMALIZED_SESSION_STORAGE.md)) are the
+stored session. JSON columns, temporary conversion tools, verification backfill and its startup gate have been removed.
+`specs.ts` declares every stored column once (`fields.ts` helpers); `schema.ts` holds the DDL, extra session scalars and derived-column lists.
+`writer.ts` (`writeSessionRows`, `updateDerivedColumns`) writes or updates rows with their projection; `dictionaries.ts` resolves driver names, vehicles and teams.
+`reader.ts` (`readSession`, `sessionScalars`, `driverScalars`, `recordingLink`) assembles the `DetailedSession`;
+`access.ts` exposes `loadSession`, `readStoredLinkState` (link and DuckDB file from two small row reads), and `sameReplayLink`.
+`targeted.ts` implements granular replay link, rename, telemetry and conditions updates. Ingestion writes rows transactionally with the source and aggregates;
+write failures propagate so the transaction rolls back. `canonical.ts` defines round-trip expectations for regression tests and the shared
+`sessionTelemetry` / `withSessionTelemetry` attachment helpers; `stub.ts` inserts a bare session for tests and tools.
+Future table schema changes receive a migration when needed; there is no row-version rebuild from deleted JSON.
 
-`normalized_version` is the current version only when the rows read back as the session; its negative marks an attempt that did not match (readers keep to the
-JSON; the rows stay because their derived columns feed history reads; not retried until the version changes). **Dictionaries**: `drivers` is keyed by the exact name (never
-merged by case or spacing; a name is not a person, so the player and human flags stay on the session's driver row), `vehicles` by the raw XML car type and class,
-`teams` by name; an absent value is a NULL id. They are emptied with the session cache and never pruned. **Derived columns** of the projection live on the rows they
-describe (`session_drivers`: `is_human`, `is_player_driver`, `driver_class`, `completed_laps_count`, `clean_laps_count`, `driving_time_sum`, `pit_count`,
-`max_speed`, best lap ordinal/number, `clean_average_lap_time`, `top_three_average`, `consistency_score`, `best_lap_is_wet`; `session_laps`: `condition_group`, `is_clean`,
-`is_representative`, `is_human`, `leaderboard_eligible`, with the partial `idx_session_lap_*` indexes). The raw columns keep the XML values (`laps_count` is the declared count,
-`lap_num`, `is_pit_stop`). **DuckDB file**: the session's main file lives only on `sessions` (`has_duckdb_telemetry`, `duckdb_filename`); the reader mirrors it onto the replay
-link. Rows stored before the session carried it (116 in the local cache) held it on the link only; `sessionTelemetry` lifts the link's values onto the session when the session has
-none, in the writer and in the canonical form. A driver's events are rows once: a lap event is the row of the driver entry it equals (`lap_ordinal`, `lap_seq`);
-`lists_mask` records which event arrays exist (an empty array is not an absent one). `ServerContext.startNormalizedSessionBackfill` runs after the summary backfill.
-Check a real cache read-only with `npx tsx tools/analysis/checkNormalizedRoundTrip.ts server/lmu_cache.db` (rows) and `checkNormalizedCards.ts` (cards from columns against `summary_json`).
+**Dictionaries**: `drivers` is keyed by the exact name (never merged by case or spacing; player and human flags belong to the session's driver row),
+`vehicles` by raw XML car type and class, `teams` by name; an absent value is a NULL id. They are emptied with the session cache and never pruned.
+**Derived columns** live on `session_drivers` (human/player/class flags, completed/clean laps, driving time, pits, speed, best lap, averages,
+consistency, wet best-lap flag) and `session_laps` (condition group, clean/representative/human/leaderboard flags, with partial indexes).
+Raw columns retain XML values such as declared `laps_count`, `lap_num`, and `is_pit_stop`.
+**DuckDB file**: the main attachment lives on `sessions` (`has_duckdb_telemetry`, `duckdb_filename`); the reader mirrors it onto the replay link.
+`sessionTelemetry` accepts the attachment on either input object. A driver's events are stored once: a lap event references the matching driver event
+(`lap_ordinal`, `lap_seq`); `lists_mask` distinguishes an empty event array from an absent one.
+
+The telemetry comparison picker requests `telemetryOnly=true` on `/api/compare/laps`: linked replay and flying-lap filters run before pagination.
+Inspector state, comparison selection and reference suggestions use session IDs exclusively; recording filenames never substitute for session identity.
+`ReplayTrajectoryService` accepts a session plus driver/lap ordinals and resolves its recording internally; legacy filename/slot request parameters and unused request types are removed.
+Map geometry and session thumbnails resolve from canonical layout/venue/course without filename hints.
+Session views no longer display recording filenames, and improvement-chart rows no longer carry them.
+`/scan/status.sessionReplayJobs` maps ingestion/upgrade work to stored session owners on the server;
+launch buttons and indicators use only session IDs. File-based diagnostics remain in Settings.
+AI evidence and `ai_reports` identify both laps by session ID and driver/lap ordinals. The schema migration
+preserves older reports with null locators and removes their filename columns; history labels these as previous reports.
+Same-session tabs send `sessionId`; the picker loads 50 laps per page, with `compare/CompareLapPagination.tsx` exposing previous/next navigation.
+DuckDB cache clearing and ownership-rule resets invalidate the session attachment columns transactionally, so sessions that lose ownership stop advertising old files.
 
 Session-scoped telemetry reads use `idx_telemetry_session` and load only that owner's metadata and cached filenames.
 
 Session list projections are maintained transactionally by `server/core/sessionSummaries/store.ts`:
 a session card (`SessionCard`) is built from columns by `cards.ts` (`readSessionCards`: the `sessions` row, the replay link, the player's driver row with its dictionaries; no JSON,
-no `json_extract`); `sessions.summary_json` is still written, for rollback only. `session_driver_condition_summaries` contains per-driver aggregates and the per-driver/per-lap
+no `json_extract`); `session_driver_condition_summaries` contains per-driver aggregates and the per-driver/per-lap
 derived facts are columns of `session_drivers` / `session_laps` (see above); `session_summary_facts` holds one compact scalar row per session with the current player's
 completed/declared/clean laps, driving time, distance, pit count, speed, position, pace inputs,
 and session date/layout. `buildSessionAggregate.ts` reuses the driver/lap projections; it does not
@@ -68,8 +72,8 @@ through `loadSession` in bounded batches (`backfillSessionSummaries`); never loa
 `persistSessionProjection` is the only writer of the derived columns (cards are built directly from columns), so a current projection always has its card.
 A session whose summaries cannot be built is marked done with `projection_error`, its condition summaries and derived columns cleared, and a
 card without player figures, so one bad row never holds the rebuild. Readiness (`isSessionSummaryReady`)
-reads the covering `idx_sessions_ready` index (projection version/revisions and `normalized_version`): hot columns sit first in `sessions_new`.
-While summaries or rows rebuild, `server/routes/summaryReadiness.ts` answers 503 on history paths only
+reads the covering `idx_sessions_ready` index (projection version and source/projection revisions).
+While derived summaries rebuild, `server/routes/summaryReadiness.ts` answers 503 on history paths only
 (lists, dashboard, tracks, boards, comparisons); routers share `/api`, so it is mounted per path, never router-wide.
 Projection version 4 (`shared/types/sessionSummaries.ts`) rebuilds these shared facts onto the merged tables from the stored
 rows in bounded batches. Source updates and replay
@@ -78,7 +82,7 @@ separate from completed lap count. Partial valid/eligible lap-time indexes suppo
 comparison personal-best lookups. Bump the projection version when changing stored aggregate rules.
 Do not add an index that leads with `driver_class` or `driver_id` on `session_drivers`: the planner then starts the leaderboard from every driver of the
 class (measured 520 ms against 5 ms starting from the layout). The sessions of a layout are found through `idx_sessions_layout_timestamp`, then their drivers by primary key.
-Historical JSON columns (`data_json`, `metadata_json`, `summary_json`) were dropped in Phase 3b/3c; all 58 scalar columns live directly in `sessions`, placing hot history columns first.
+Historical JSON columns (`data_json`, `metadata_json`, `summary_json`) were dropped in Phase 3b/3c. Converted caches may retain the unused `normalized_version` column; fresh databases omit it.
 
 **Replays are the source of truth once cached**: LMU deletes old `.Vcr` files, and their rows are the only copy. Never write
 code that drops replay rows because the file is gone.
@@ -316,8 +320,7 @@ Leaderboard navigation resolves missing or `All` classes from the selected layou
 | Constant | File | Bump when | Effect |
 |---|---|---|---|
 | `DB_PARSER_VERSION` | `server/core/dbSessionSync.ts` (exported const) | a parser/lap classification rule changes | every stored session re-parsed from XML |
-| `NORMALIZED_SESSION_VERSION` | `server/core/sessionRows/schema.ts` | a normalized table, column or assembly rule changes (now 2: dictionaries, merged summary columns) | bounded rewrite and verification of every session's rows from retained session JSON (ten per batch), without XML reads |
-| `SESSION_SUMMARY_PROJECTION_VERSION` | `shared/types/sessionSummaries.ts` | persisted summary or lap-fact rules change (now 4: derived facts on the row tables) | bounded rebuild from the stored rows (JSON for sessions not yet normalized), without XML reads |
+| `SESSION_SUMMARY_PROJECTION_VERSION` | `shared/types/sessionSummaries.ts` | persisted summary or lap-fact rules change (now 4: derived facts on the row tables) | bounded rebuild from the stored rows, without XML reads |
 | `REPLAY_MATCHING_PROJECTION_VERSION` | `server/core/replay/dbReplayMatchingStore.ts` | persisted replay matching facts change | one-time rebuild from retained metadata, without VCR reads |
 | `REPLAY_CACHE_VERSION` | `server/core/dbSchema.ts` | decoded replay rows change | on-disk replays decoded again in the background (deleted ones kept as they are) |
 | `DUCKDB_TELEMETRY_CACHE_VERSION` | `server/core/dbSchema.ts` | DuckDB lap cache shape changes | lap cache rebuilt |
@@ -337,7 +340,7 @@ Anything computed per request (pit stop details, telemetry links, everything in 
   `SessionDatabase(':memory:')` and `replaceReplayWideFacts` / `replaceReplayDriverLapFacts` (see `test/server/sessions/sessionPitStops.test.ts`).
 - **New line in the expanded lap row**: `src/components/session-detail/table/lapDetailSections.ts` (add to the context in `lapPlaces.ts`
   when it needs other laps); tests in `test/components/session-detail/lapDetailSections.test.ts`. `SessionLapTableRow.tsx` renders the timing row, including separate best/optimal deltas; keep it under 300 lines.
-- **New session scalar or driver/lap column**: declare it once in `server/core/sessionRows/specs.ts` (a driver's name, car or team goes to the dictionaries, see `DRIVER_DICTIONARY_FIELDS`) → bump `NORMALIZED_SESSION_VERSION` → the round-trip tests (`test/server/core/sessionRows/`) fail until the writer, reader and canonical form agree → check a real cache with `tools/analysis/checkNormalizedRoundTrip.ts`. A derived fact: add it to the projection (`shared/domain/sessionSummaries/`), to `DRIVER_DERIVED_DEFS` / `LAP_DERIVED_DEFS` and to `writer.ts`, bump both versions, and add it to `cards.ts` when the card shows it.
+- **New session scalar or driver/lap column**: declare it in `server/core/sessionRows/specs.ts` (driver name, car and team use dictionaries), update the writer/reader and round-trip tests, and migrate existing tables as needed. For a derived fact, update the projection (`shared/domain/sessionSummaries/`), the derived column definitions and `writer.ts`, bump `SESSION_SUMMARY_PROJECTION_VERSION`, and update `cards.ts` if shown on cards.
 - **New endpoint**: `server/routes/<domain>Routes.ts` (query helpers `queryParams.ts`) → mount in `server/index.ts` only for a new router →
   supertest in `test/server/routes/` → client loader in `src/api/`.
 - **New table/store**: DDL in `dbSchema.ts` → functions taking the `better-sqlite3` `Database` in `server/core/db<Name>Store.ts`

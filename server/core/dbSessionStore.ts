@@ -2,7 +2,7 @@ import { Database as DatabaseType } from 'better-sqlite3';
 import { DetailedSession, SessionMetadata } from './types.js';
 import { isReplayLinkWithdrawn } from './replay/dbReplayLinkStore.js';
 import { persistSessionProjection } from './sessionSummaries/store.js';
-import { NORMALIZED_SESSION_VERSION, SESSION_DICTIONARY_TABLES, SESSION_ROW_TABLES } from './sessionRows/schema.js';
+import { SESSION_DICTIONARY_TABLES, SESSION_ROW_TABLES } from './sessionRows/schema.js';
 import { loadSession, readStoredLinkState, sameReplayLink } from './sessionRows/access.js';
 
 import { upsertTargetedReplayLink, updateTargetedTelemetry } from './sessionRows/targeted.js';
@@ -142,11 +142,11 @@ export function updateSessionMatchingReplay(
  * Returns whether anything changed.
  */
 export function updateSessionTelemetryFile(db: DatabaseType, sessionId: string, duckdbFilename: string | undefined): boolean {
-  const state = db.prepare('SELECT normalized_version AS version, has_duckdb_telemetry AS flag, duckdb_filename AS file FROM sessions WHERE id = ?')
-    .get(sessionId) as { version: number; flag: number | null; file: string | null } | undefined;
+  const state = db.prepare('SELECT has_duckdb_telemetry AS flag, duckdb_filename AS file FROM sessions WHERE id = ?')
+    .get(sessionId) as { flag: number | null; file: string | null } | undefined;
   if (!state) return false;
-  // Verified rows mirror the session's attachment onto the link, so the session columns decide.
-  if (state.version === NORMALIZED_SESSION_VERSION && (state.file ?? undefined) === duckdbFilename && Boolean(state.flag) === Boolean(duckdbFilename)) return false;
+  // The reader mirrors the session's attachment onto the link, so the session columns decide.
+  if ((state.file ?? undefined) === duckdbFilename && Boolean(state.flag) === Boolean(duckdbFilename)) return false;
   updateTargetedTelemetry(db, sessionId, duckdbFilename);
   return true;
 }

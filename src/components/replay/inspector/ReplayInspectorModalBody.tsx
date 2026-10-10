@@ -1,4 +1,5 @@
 import React from 'react';
+import type { CompareLapPagination } from './compare/CompareLapPagination.js';
 import { ReplayDriverEntry, ReplayLapSummary, ReplayMetadata, ReplayTrajectoryData, ReplayTrajectoryPoint, ComparableLap } from '../../../../shared/types/index.js';
 import { CornerSegmentComparison, LapSegmentComparison } from '../../../utils/cornerAnalysis/index.js';
 import { CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
@@ -14,8 +15,7 @@ import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface ReplayInspectorModalBodyProps {
   onClose: () => void;
-  activeReplayName: string | null;
-  replayName: string | null;
+  sessionId: string | null;
   metadata: ReplayMetadata | null;
   trajectory: ReplayTrajectoryData | null;
   currentIndex: number;
@@ -25,12 +25,13 @@ export interface ReplayInspectorModalBodyProps {
   isTrajLoading: boolean;
   error: string | null;
   handleRetryLoad?: () => void;
+  comparePagination?: CompareLapPagination;
   compareLapsError?: string | null;
   handleRetryCompareLaps?: () => void;
   handleRetryBaseline?: () => void;
   isCompareMode: boolean;
   handleToggleCompare: () => void;
-  baselineReplayName: string | null;
+  baselineSessionId: string | null;
   baselineLapNumber: number | null;
   baselineDriverName: string | null;
   isComparePickerOpen: boolean;
@@ -90,8 +91,7 @@ export interface ReplayInspectorModalBodyProps {
 
 export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> = ({
   onClose,
-  activeReplayName,
-  replayName,
+  sessionId,
   metadata,
   trajectory,
   currentIndex,
@@ -100,10 +100,10 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
   isLoading,
   isTrajLoading,
   error,
-  handleRetryLoad, compareLapsError, handleRetryCompareLaps, handleRetryBaseline,
+  handleRetryLoad, comparePagination, compareLapsError, handleRetryCompareLaps, handleRetryBaseline,
   isCompareMode,
   handleToggleCompare,
-  baselineReplayName,
+  baselineSessionId,
   baselineLapNumber,
   baselineDriverName,
   isComparePickerOpen,
@@ -162,7 +162,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
     <main className="h-dvh min-h-0 flex flex-col bg-lmu-dark text-white w-full overflow-hidden select-none overscroll-none animate-fade-in">
       <ReplayInspectorHeader
         onClose={onClose}
-        replayName={activeReplayName || replayName}
+        sessionId={sessionId}
         metadata={metadata}
         trajectory={trajectory}
         onSelectLap={handleSelectLap}
@@ -173,7 +173,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
         onToggleCompare={handleToggleCompare}
         onSwapBaseline={handleSwapBaseline}
         onRemoveCompare={handleRemoveCompare}
-        baselineReplayName={baselineReplayName}
+        baselineSessionId={baselineSessionId}
         baselineLapNumber={baselineLapNumber}
         baselineDriverName={baselineDriverName}
         baselineTrajectory={baselineTrajectory ?? null}
@@ -188,6 +188,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
         baselineError={baselineError}
         isTrajLoading={isTrajLoading}
         isLoading={isLoading}
+        comparePagination={comparePagination}
         compareLapsError={compareLapsError}
         onRetryCompareLaps={handleRetryCompareLaps}
         onRetryBaseline={handleRetryBaseline}

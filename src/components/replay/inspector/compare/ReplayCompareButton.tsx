@@ -6,7 +6,7 @@ import { TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 
 export interface ReplayCompareButtonProps {
-  replayName: string | null;
+  sessionId: string | null;
   driverName: string | null;
   trajectory: ReplayTrajectoryData | null;
   availableCompareLaps: ComparableLap[];
@@ -18,14 +18,14 @@ export interface ReplayCompareButtonProps {
 
 /** The Compare button, with a one-click "vs your best" when a faster lap of the driver exists. */
 export const ReplayCompareButton: React.FC<ReplayCompareButtonProps> = ({
-  replayName, driverName, trajectory, availableCompareLaps, onToggleCompare, onSelectCompareLap, formatLapTime, disabled = false,
+  sessionId, driverName, trajectory, availableCompareLaps, onToggleCompare, onSelectCompareLap, formatLapTime, disabled = false,
 }) => {
   const currentLap = trajectory?.currentLap;
   const summary = trajectory?.laps?.find(l => l.lapNumber === currentLap);
   const currentLapTime = summary?.validatedTimeSec ?? summary?.lapTimeSec;
   const suggestion = useMemo(
-    () => suggestReferenceLap(availableCompareLaps, replayName, driverName, currentLap, currentLapTime),
-    [availableCompareLaps, replayName, driverName, currentLap, currentLapTime]
+    () => suggestReferenceLap(availableCompareLaps, sessionId, driverName, currentLap, currentLapTime),
+    [availableCompareLaps, sessionId, driverName, currentLap, currentLapTime]
   );
 
   return (

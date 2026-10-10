@@ -70,7 +70,9 @@ export interface AiEvidenceSegment {
 
 export interface AiLapEvidence {
   lap: {
-    replayName: string;
+    sessionId: string;
+    driverOrdinal: number;
+    lapOrdinal: number;
     lapNumber: number;
     driverName?: string;
     carClass?: string;
@@ -83,7 +85,9 @@ export interface AiLapEvidence {
     isOutlap?: boolean;
   };
   baseline?: {
-    replayName: string;
+    sessionId: string;
+    driverOrdinal: number;
+    lapOrdinal: number;
     lapNumber: number;
     driverName?: string;
     carClass?: string;
@@ -143,9 +147,13 @@ export interface AiAnalyzeResponse {
 
 export interface AiReportRecord {
   cacheKey: string;
-  replayName: string;
+  sessionId: string | null;
+  driverOrdinal: number | null;
+  lapOrdinal: number | null;
   lapNumber: number;
-  baselineReplayName?: string | null;
+  baselineSessionId?: string | null;
+  baselineDriverOrdinal?: number | null;
+  baselineLapOrdinal?: number | null;
   baselineLapNumber?: number | null;
   model: string;
   promptVersion: number;
@@ -158,9 +166,13 @@ export interface AiReportRecord {
 
 export interface AiReportHistoryEntry {
   cacheKey: string;
-  replayName: string;
+  sessionId: string | null;
+  driverOrdinal: number | null;
+  lapOrdinal: number | null;
   lapNumber: number;
-  baselineReplayName?: string | null;
+  baselineSessionId?: string | null;
+  baselineDriverOrdinal?: number | null;
+  baselineLapOrdinal?: number | null;
   baselineLapNumber?: number | null;
   model: string;
   overallSummary?: string;

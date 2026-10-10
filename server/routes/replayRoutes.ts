@@ -120,13 +120,9 @@ export function createReplayRouter(context: ServerContext): Router {
     }
     try {
       const trajectory = await trajectoryService.getTrajectory({
-        sessionId: session.id,
         session,
         driverOrdinal,
         lapOrdinal,
-        replayName: session.matchingReplayFile?.name ?? '',
-        driverSlot: undefined,
-        lapNumber: undefined,
         maxPoints,
         pointSpacingM,
         allowDuckDb: queryString(req.query.source)?.toLowerCase() !== 'vcr',

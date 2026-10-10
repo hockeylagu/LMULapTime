@@ -50,10 +50,10 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     isLoading,
     isTrajLoading,
     error,
-    handleRetryLoad, compareLapsError, handleRetryCompareLaps, handleRetryBaseline,
+    handleRetryLoad, comparePagination, compareLapsError, handleRetryCompareLaps, handleRetryBaseline,
     isCompareMode,
     handleToggleCompare,
-    baselineReplayName,
+    baselineSessionId,
     baselineLapNumber,
     baselineDriverName,
     isComparePickerOpen,
@@ -84,7 +84,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     lapDeltas,
     handleSwapBaseline,
     handleRemoveCompare,
-    activeReplayName,
+    activeSessionId,
     handleSelectBaselineLap,
     selectedSource,
     handleSelectSource,
@@ -107,7 +107,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
   const [colorBy, setColorBy] = useState<MapColorMode>('pedal');
   const [selectedCornerNumber, setSelectedCornerNumber] = useState<number | null>(null);
   const { availableConsistencyLaps, excludedConsistencyLaps, toggleConsistencyLap } =
-    useConsistencyLapSelection(trajectory, metadata, activeReplayName, selectedDriverSlot);
+    useConsistencyLapSelection(trajectory, metadata, activeSessionId, selectedDriverSlot);
   // A corner asked for in the URL (the session debrief links to one) opens once the laps it
   // belongs to are loaded; corner numbers come from the lap and its comparison.
   const pendingCornerRef = useRef<number | null>(initialCornerNumber ?? null);
@@ -137,7 +137,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
   const { cornerStats: rawCornerConsistencyStats, isLoading: isCornerConsistencyLoading } =
     useCornerConsistency(
       (activeTab === 'corners' && cornerSubView === 'consistency') || (activeTab === 'ai-report' && isCompareMode),
-      activeReplayName, metadata, selectedDriverSlot, trajectory
+      activeSessionId, metadata, selectedDriverSlot, trajectory
     );
 
   const cornerConsistencyStats = useMemo(
@@ -203,8 +203,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     <ReplayPlaybackCursorContext.Provider value={playbackCursor}>
     <ReplayInspectorModalBody
       onClose={onClose}
-      activeReplayName={metadata?.filename ?? trajectory?.replayName ?? activeReplayName}
-      replayName={metadata?.filename ?? sessionId}
+      sessionId={activeSessionId}
       metadata={metadata}
       trajectory={trajectory}
       currentIndex={currentIndex}
@@ -214,12 +213,13 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
       isTrajLoading={isTrajLoading}
       error={error}
       handleRetryLoad={handleRetryLoad}
+      comparePagination={comparePagination}
       compareLapsError={compareLapsError}
       handleRetryCompareLaps={handleRetryCompareLaps}
       handleRetryBaseline={handleRetryBaseline}
       isCompareMode={isCompareMode}
       handleToggleCompare={handleToggleCompare}
-      baselineReplayName={baselineTrajectory?.replayName ?? baselineReplayName}
+      baselineSessionId={baselineSessionId}
       baselineLapNumber={baselineLapNumber}
       baselineDriverName={baselineDriverName}
       isComparePickerOpen={isComparePickerOpen}

@@ -39,7 +39,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
     corners, selectedCornerNumber, onSelectCornerNumber, primaryOpacity = 1, baselineOpacity = 1,
     pedalMarkers, showPedalMarkers = false, showMinimap = true, showLegend = true, showControls = true, controlsOrientation,
     highlightDistRange, dimNonSelectedTrack = false, showCornerFlags = true, trackVenue, trackCourse, layoutKey,
-    replayName, dataPluginRevision, trackGeometry, trackLengthM, mapDisplay, isPlaying, onTogglePlay,
+    dataPluginRevision, trackGeometry, trackLengthM, mapDisplay, isPlaying, onTogglePlay,
     onChangeColorBy, onTogglePedalMarkers, fadedLine, onToggleFadedLine, showFrictionCircle, onToggleFrictionCircle,
   } = props;
   const [isExpanded, setIsExpanded] = useState(false);
@@ -53,7 +53,6 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
     layoutKey: trackGeometry === undefined ? layoutKey : null,
     trackVenue: trackGeometry === undefined ? trackVenue : null,
     trackCourse: trackGeometry === undefined ? trackCourse : null,
-    replayName: trackGeometry === undefined ? replayName : null,
   });
   const effectiveGeometry = trackGeometry !== undefined ? trackGeometry : fetchedGeometry;
   const { display, error: displayError } = useMapDisplay(effectiveGeometry, mapDisplay);

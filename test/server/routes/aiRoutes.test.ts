@@ -7,8 +7,8 @@ import * as aiReport from '../../../server/ai/aiReport.js';
 import { AiAnalyzeResponse, AiLapEvidence } from '../../../server/core/types.js';
 
 const evidence: AiLapEvidence = {
-  lap: { replayName: 'Route_Test_P1.Vcr', lapNumber: 2, lapTimeSec: 100 },
-  baseline: { replayName: 'Baseline_P1.Vcr', lapNumber: 2, lapTimeSec: 101 },
+  lap: { sessionId: 'Route_Test_P1-session', driverOrdinal: 0, lapOrdinal: 1, lapNumber: 2, lapTimeSec: 100 },
+  baseline: { sessionId: 'Baseline_P1-session', driverOrdinal: 0, lapOrdinal: 1, lapNumber: 2, lapTimeSec: 101 },
   segments: [],
 };
 
@@ -76,6 +76,18 @@ describe('AI routes', () => {
     const unconfigured = await request(app).post('/api/ai/analyze-lap').send({ evidence });
     expect(unconfigured.status).toBe(400);
     expect(unconfigured.body.errorCode).toBe('not_configured');
+  });
+
+  it('rejects filename-only or invalid session locators before reading the report cache', async () => {
+    aiReport.setSessionApiKey('session-key');
+    const cache = vi.spyOn(db, 'getAiReport');
+    for (const lap of [{ replayName: 'old.Vcr', lapNumber: 1, lapTimeSec: 100 },
+      { ...evidence.lap, driverOrdinal: -1 }, { ...evidence.lap, lapOrdinal: 0.5 }]) {
+      const result = await request(app).post('/api/ai/analyze-lap').send({ evidence: { ...evidence, lap } });
+      expect(result.status).toBe(400);
+      expect(result.body.errorCode).toBe('invalid_request');
+    }
+    expect(cache).not.toHaveBeenCalled();
   });
 
   it('returns cached reports and saves generated reports', async () => {

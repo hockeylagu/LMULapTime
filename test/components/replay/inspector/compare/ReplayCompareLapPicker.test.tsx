@@ -108,10 +108,30 @@ describe('ReplayCompareLapPicker', () => {
     { ...mockLaps[2], weatherCondition: 'Dynamic Weather', hasRain: true },
   ];
   const conditionProps = {
-    laps: conditionLaps, selectedReplayName: null, selectedLapNumber: null,
-    currentReplayName: 'Bahrain_Q1_7.Vcr', currentLapNumber: 4, currentDriverName: 'Samuel Lague',
+    laps: conditionLaps, selectedSessionId: null, selectedLapNumber: null,
+    currentSessionId: 'session-1', currentLapNumber: 4, currentDriverName: 'Samuel Lague',
     filter: 'all' as const, isLoading: false, onChangeFilter: vi.fn(), onClose: vi.fn(), onSelectLap: vi.fn(),
   };
+
+  it('does not treat sessions sharing a recording filename as the same session', () => {
+    render(<ReplayCompareLapPicker {...conditionProps}
+      laps={[conditionLaps[0], { ...conditionLaps[1], sessionId: 'another-session', weatherCondition: 'Dry' }]}
+      currentSessionId="session-1" currentLapNumber={99} currentWeatherCondition="Dry" filter="same-sessions" />);
+    expect(screen.getByText('1:59.500')).toBeInTheDocument();
+    expect(screen.queryByText('1:59.100')).not.toBeInTheDocument();
+  });
+
+  it('uses session identity for same-session filtering and exposes every server page', () => {
+    const onPageChange = vi.fn();
+    render(<ReplayCompareLapPicker {...conditionProps}
+      laps={[{ ...conditionLaps[0], sessionId: 'current-session' }]}
+      filter="same-sessions" currentSessionId="current-session"
+      currentWeatherCondition="Dry" pagination={{ page: 1, pageSize: 50, total: 51, onPageChange }} />);
+    expect(screen.getByText('1:59.500')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Previous laps' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Next laps' }));
+    expect(onPageChange).toHaveBeenCalledWith(2);
+  });
 
   it('defaults to the exact current lap condition and allows all or specific conditions', () => {
     render(<ReplayCompareLapPicker {...conditionProps} />);
@@ -155,9 +175,9 @@ describe('ReplayCompareLapPicker', () => {
     render(
       <ReplayCompareLapPicker
         laps={mockLaps}
-        selectedReplayName="Bahrain_Q1_7.Vcr"
+        selectedSessionId="session-1"
         selectedLapNumber={2}
-        currentReplayName="Bahrain_Q1_7.Vcr"
+        currentSessionId="session-1"
         currentLapNumber={4}
         currentDriverName="Samuel Lague"
         filter="player"
@@ -178,9 +198,9 @@ describe('ReplayCompareLapPicker', () => {
     render(
       <ReplayCompareLapPicker
         laps={mockLaps}
-        selectedReplayName="Bahrain_Q1_7.Vcr"
+        selectedSessionId="session-1"
         selectedLapNumber={2}
-        currentReplayName="Bahrain_Q1_7.Vcr"
+        currentSessionId="session-1"
         currentLapNumber={4}
         currentDriverName="Samuel Lague"
         filter="same-session-lap"
@@ -204,9 +224,9 @@ describe('ReplayCompareLapPicker', () => {
     render(
       <ReplayCompareLapPicker
         laps={mockLaps}
-        selectedReplayName="Bahrain_Q1_7.Vcr"
+        selectedSessionId="session-1"
         selectedLapNumber={2}
-        currentReplayName="Bahrain_Q1_7.Vcr"
+        currentSessionId="session-1"
         currentLapNumber={4}
         currentDriverName="Samuel Lague"
         filter="player"
@@ -228,9 +248,9 @@ describe('ReplayCompareLapPicker', () => {
     render(
       <ReplayCompareLapPicker
         laps={mockLaps}
-        selectedReplayName="Bahrain_Q1_7.Vcr"
+        selectedSessionId="session-1"
         selectedLapNumber={2}
-        currentReplayName="Bahrain_Q1_7.Vcr"
+        currentSessionId="session-1"
         currentLapNumber={4}
         currentDriverName="Samuel Lague"
         filter="same-sessions"
@@ -253,9 +273,9 @@ describe('ReplayCompareLapPicker', () => {
     render(
       <ReplayCompareLapPicker
         laps={mockLaps}
-        selectedReplayName="Bahrain_Q1_7.Vcr"
+        selectedSessionId="session-1"
         selectedLapNumber={2}
-        currentReplayName="Bahrain_Q1_7.Vcr"
+        currentSessionId="session-1"
         currentLapNumber={4}
         currentDriverName="Samuel Lague"
         filter="all"
@@ -277,9 +297,9 @@ describe('ReplayCompareLapPicker', () => {
     render(
       <ReplayCompareLapPicker
         laps={mockLaps}
-        selectedReplayName="Bahrain_Q1_7.Vcr"
+        selectedSessionId="session-1"
         selectedLapNumber={2}
-        currentReplayName="Bahrain_Q1_7.Vcr"
+        currentSessionId="session-1"
         currentLapNumber={4}
         currentDriverName="Samuel Lague"
         filter="same-session-lap"
@@ -299,9 +319,9 @@ describe('ReplayCompareLapPicker', () => {
     render(
       <ReplayCompareLapPicker
         laps={mockLaps}
-        selectedReplayName="Bahrain_Q1_7.Vcr"
+        selectedSessionId="session-1"
         selectedLapNumber={2}
-        currentReplayName="Bahrain_Q1_7.Vcr"
+        currentSessionId="session-1"
         filter="player"
         isLoading={false}
         onChangeFilter={onChangeFilter}
@@ -326,9 +346,9 @@ describe('ReplayCompareLapPicker', () => {
     render(
       <ReplayCompareLapPicker
         laps={mockLaps}
-        selectedReplayName="Bahrain_Q1_7.Vcr"
+        selectedSessionId="session-1"
         selectedLapNumber={2}
-        currentReplayName="Bahrain_Q1_7.Vcr"
+        currentSessionId="session-1"
         filter="all"
         isLoading={false}
         onChangeFilter={vi.fn()}
@@ -346,9 +366,9 @@ describe('ReplayCompareLapPicker', () => {
     render(
       <ReplayCompareLapPicker
         laps={mockLaps}
-        selectedReplayName="Bahrain_Q1_7.Vcr"
+        selectedSessionId="session-1"
         selectedLapNumber={2}
-        currentReplayName="Bahrain_Q1_7.Vcr"
+        currentSessionId="session-1"
         filter="all"
         isLoading={false}
         onChangeFilter={vi.fn()}
@@ -370,9 +390,9 @@ describe('ReplayCompareLapPicker', () => {
     render(
       <ReplayCompareLapPicker
         laps={mockLaps}
-        selectedReplayName="Bahrain_Q1_7.Vcr"
+        selectedSessionId="session-1"
         selectedLapNumber={2}
-        currentReplayName="Bahrain_Q1_7.Vcr"
+        currentSessionId="session-1"
         filter="all"
         isLoading={false}
         onChangeFilter={vi.fn()}
@@ -401,9 +421,9 @@ describe('ReplayCompareLapPicker', () => {
     render(
       <ReplayCompareLapPicker
         laps={mockLaps}
-        selectedReplayName="Bahrain_Q1_7.Vcr"
+        selectedSessionId="session-1"
         selectedLapNumber={2}
-        currentReplayName="Bahrain_Q1_7.Vcr"
+        currentSessionId="session-1"
         filter="all"
         isLoading={false}
         onChangeFilter={vi.fn()}
@@ -421,9 +441,9 @@ describe('ReplayCompareLapPicker', () => {
     render(
       <ReplayCompareLapPicker
         laps={mockLaps}
-        selectedReplayName="Bahrain_Q1_7.Vcr"
+        selectedSessionId="session-1"
         selectedLapNumber={2}
-        currentReplayName="Bahrain_Q1_7.Vcr"
+        currentSessionId="session-1"
         currentLapNumber={2}
         currentDriverName="Samuel Lague"
         filter="all"
@@ -443,9 +463,9 @@ describe('ReplayCompareLapPicker', () => {
     render(
       <ReplayCompareLapPicker
         laps={mockLaps}
-        selectedReplayName="Bahrain_Q1_7.Vcr"
+        selectedSessionId="session-1"
         selectedLapNumber={2}
-        currentReplayName="Bahrain_Q1_7.Vcr"
+        currentSessionId="session-1"
         currentLapNumber={2}
         filter="all"
         isLoading={false}
@@ -465,9 +485,9 @@ describe('ReplayCompareLapPicker', () => {
     render(
       <ReplayCompareLapPicker
         laps={mockLaps}
-        selectedReplayName="Bahrain_Q1_7.Vcr"
+        selectedSessionId="session-1"
         selectedLapNumber={2}
-        currentReplayName="Bahrain_Q1_7.Vcr"
+        currentSessionId="session-1"
         currentCarType="Ferrari 296 LMGT3"
         currentRaceType="race"
         filter="all"
@@ -486,9 +506,9 @@ describe('ReplayCompareLapPicker', () => {
     render(
       <ReplayCompareLapPicker
         laps={mockLaps}
-        selectedReplayName="Bahrain_Q1_7.Vcr"
+        selectedSessionId="session-1"
         selectedLapNumber={2}
-        currentReplayName="Bahrain_Q1_7.Vcr"
+        currentSessionId="session-1"
         filter="all"
         isLoading={false}
         onChangeFilter={vi.fn()}
@@ -514,9 +534,9 @@ describe('ReplayCompareLapPicker', () => {
     render(
       <ReplayCompareLapPicker
         laps={mockLaps}
-        selectedReplayName="Bahrain_Q1_7.Vcr"
+        selectedSessionId="session-1"
         selectedLapNumber={2}
-        currentReplayName="Bahrain_Q1_7.Vcr"
+        currentSessionId="session-1"
         filter="all"
         isLoading={false}
         onChangeFilter={vi.fn()}
@@ -542,7 +562,7 @@ describe('ReplayCompareLapPicker', () => {
     render(
       <ReplayCompareLapPicker
         laps={[]}
-        selectedReplayName={null}
+        selectedSessionId={null}
         selectedLapNumber={null}
         filter="all"
         isLoading={true}
@@ -559,7 +579,7 @@ describe('ReplayCompareLapPicker', () => {
     render(
       <ReplayCompareLapPicker
         laps={[]}
-        selectedReplayName={null}
+        selectedSessionId={null}
         selectedLapNumber={null}
         filter="same-session-lap"
         isLoading={false}

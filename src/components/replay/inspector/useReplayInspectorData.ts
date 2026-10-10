@@ -37,7 +37,7 @@ export function useReplayInspectorData({
   initialBaselineLapOrdinal,
 }: UseReplayInspectorDataProps) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeReplayName, setActiveReplayName] = useState<string | null>(sessionId);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(sessionId);
   const [metadata, setMetadata] = useState<ReplayMetadata | null>(null);
   const [trajectory, setTrajectory] = useState<ReplayTrajectoryData | null>(null);
   const [selectedDriverSlot, setSelectedDriverSlot] = useState<number | null>(null);
@@ -46,7 +46,7 @@ export function useReplayInspectorData({
   const [error, setError] = useState<string | null>(null);
   const [isCompareMode, setIsCompareMode] = useState<boolean>(initialCompareMode ?? false);
   const [isComparePickerOpen, setIsComparePickerOpen] = useState<boolean>(false);
-  const [baselineReplayName, setBaselineReplayName] = useState<string | null>(initialBaselineSessionId ?? null);
+  const [baselineSessionId, setBaselineSessionId] = useState<string | null>(initialBaselineSessionId ?? null);
   const [baselineLapNumber, setBaselineLapNumber] = useState<number | null>(null);
   const [baselineLapOrdinal, setBaselineLapOrdinal] = useState<number | null>(initialBaselineLapOrdinal ?? null);
   const [selectedDriverOrdinal, setSelectedDriverOrdinal] = useState<number>(initialDriverOrdinal ?? 0);
@@ -57,6 +57,8 @@ export function useReplayInspectorData({
   const [isBaselineLoading, setIsBaselineLoading] = useState<boolean>(false);
   const [baselineError, setBaselineError] = useState<string | null>(null);
   const [availableCompareLaps, setAvailableCompareLaps] = useState<ComparableLap[]>([]);
+  const [comparePage, setComparePage] = useState(1);
+  const [compareTotal, setCompareTotal] = useState(0);
   const [compareLapFilter, setCompareLapFilter] = useState<CompareLapFilter>('player');
   const [isCompareLapsLoading, setIsCompareLapsLoading] = useState(false);
   const [compareLapsError, setCompareLapsError] = useState<string | null>(null);
@@ -99,12 +101,12 @@ export function useReplayInspectorData({
   const trajectoryControllerRef = useRef<AbortController | null>(null);
   const lastTrajectoryRequestRef = useRef<{ lap: number; slot: number | null; resolution: TelemetryResolution; source: 'duckdb' | 'vcr' } | null>(null);
   // Requests can finish after navigation. Report their lap using the current route callback,
-  // so its query parameters retain the swapped replay, driver and comparison selection.
+  // so its query parameters retain the swapped session, driver and comparison selection.
   const onLocatorChangeRef = useRef(onLocatorChange);
   onLocatorChangeRef.current = onLocatorChange;
 
   useEffect(() => {
-    setActiveReplayName(sessionId);
+    setActiveSessionId(sessionId);
     setSelectedDriverOrdinal(initialDriverOrdinal ?? 0);
     setSelectedLapOrdinal(initialLapOrdinal ?? 0);
   }, [sessionId]);
@@ -121,10 +123,10 @@ export function useReplayInspectorData({
   useEffect(() => {
     trajectoryControllerRef.current?.abort();
     trajectoryRequestIdRef.current++;
-    if (!isOpen || !activeReplayName) {
+    if (!isOpen || !activeSessionId) {
       hasInitializedRef.current = false;
       setMetadata(null); setTrajectory(null); setSelectedDriverSlot(null); setCurrentIndex(0);
-      setIsPlaying(false); setIsCompareMode(false); setIsComparePickerOpen(false); setBaselineReplayName(null); setBaselineLapNumber(null);
+      setIsPlaying(false); setIsCompareMode(false); setIsComparePickerOpen(false); setBaselineSessionId(null); setBaselineLapNumber(null);
       setBaselineTrajectory(null); setBaselineMetadata(null); setChartZoomRange(null); setBaselineLapOrdinal(null);
       setAvailableCompareLaps([]); setBaselineDriverName(null);
       setIsLoading(false); setIsTrajLoading(false); setIsBaselineLoading(false);
@@ -135,7 +137,7 @@ export function useReplayInspectorData({
       hasInitializedRef.current = true;
       setIsCompareMode(initialCompareMode ?? false);
       setIsComparePickerOpen(false);
-      setBaselineReplayName(initialBaselineSessionId ?? (initialCompareMode ? activeReplayName : null));
+      setBaselineSessionId(initialBaselineSessionId ?? (initialCompareMode ? activeSessionId : null));
       setBaselineLapNumber(null);
       setBaselineLapOrdinal(initialBaselineLapOrdinal ?? null);
       setBaselineDriverOrdinal(initialBaselineDriverOrdinal ?? 0);
@@ -143,7 +145,7 @@ export function useReplayInspectorData({
 
     let isMounted = true;
     const requestId = ++trajectoryRequestIdRef.current;
-    // Another replay's metadata and lap must not stay on screen under this replay's name.
+    // Clear the previous session while the newly selected session loads.
     setMetadata(null);
     setTrajectory(null);
     setSelectedDriverSlot(null);
@@ -157,12 +159,12 @@ export function useReplayInspectorData({
     let trajectoryError: string | null = null;
 
     Promise.all([
-      fetchSessionTelemetryMetadata(activeReplayName).catch((err: unknown) => {
-        metadataError = `Could not load metadata for replay ${activeReplayName}: ${apiErrorMessage(err, 'request failed')}`;
+      fetchSessionTelemetryMetadata(activeSessionId).catch((err: unknown) => {
+        metadataError = `Could not load metadata for session ${activeSessionId}: ${apiErrorMessage(err, 'request failed')}`;
         return null;
       }),
       // Without a trajectory the inspector still opens on the metadata (its driver list).
-      fetchSessionTelemetry(activeReplayName, {
+      fetchSessionTelemetry(activeSessionId, {
         resolutionQuery: trajectoryResolutionQuery(telemetryResolution),
         lapOrdinal: requestedLap,
         driverOrdinal: requestedDriver,
@@ -211,14 +213,14 @@ export function useReplayInspectorData({
       trajectoryRequestIdRef.current++;
       trajectoryControllerRef.current?.abort();
     };
-  }, [isOpen, activeReplayName, replayLoadVersion, selectedDriverOrdinal, selectedLapOrdinal]);
+  }, [isOpen, activeSessionId, replayLoadVersion, selectedDriverOrdinal, selectedLapOrdinal]);
+
+  useEffect(() => { setComparePage(1); }, [metadata, activeSessionId, selectedDriverSlot, compareLapFilter]);
 
   // Fetch replay-backed comparison laps. Player laps are the safe default; the
   // all-driver view exposes the same candidate pool as Compare Laps.
   useEffect(() => {
-    const filenameMatch = activeReplayName ? activeReplayName.match(/^(.+?)\s+([PQR]\d+)\b/i) : null;
-    const filenameTrack = filenameMatch ? filenameMatch[1].trim() : null;
-    const trackToQuery = metadata?.displayTrack || metadata?.trackCourse || filenameTrack || metadata?.trackName;
+    const trackToQuery = metadata?.displayTrack || metadata?.trackCourse || metadata?.trackName;
     // Wait for the metadata: before it the inspected driver's car class is unknown, and the
     // request would be repeated with it (laps are only compared within one car class).
     if (!isOpen || !metadata || !trackToQuery) {
@@ -239,15 +241,18 @@ export function useReplayInspectorData({
     const query = new URLSearchParams({
       track: trackToQuery,
       playerOnly: String(!needsAllDrivers),
+      telemetryOnly: 'true', page: String(comparePage), pageSize: '50',
     });
     if (carClass) query.set('carClass', carClass);
+    if (compareLapFilter === 'same-session-lap' || compareLapFilter === 'same-sessions') query.set('sessionId', activeSessionId!);
 
-    fetchJson<{ laps?: ComparableLap[] }>(`/api/compare/laps?${query.toString()}`, { signal: controller.signal })
+    fetchJson<{ laps?: ComparableLap[]; total?: number }>(`/api/compare/laps?${query.toString()}`, { signal: controller.signal })
       .then(data => {
         if (!isCurrent) return;
         const laps = Array.isArray(data?.laps) ? data.laps : [];
+        setCompareTotal(data.total ?? laps.length);
         setAvailableCompareLaps(laps.filter((lap: ComparableLap) =>
-          Boolean(lap.sessionId) && isRacingLap(lap) &&
+          Boolean(lap.matchingReplayFile) && isRacingLap(lap) &&
           typeof lap.lapTime === 'number' && lap.lapTime > 0
         ));
         setIsCompareLapsLoading(false);
@@ -259,7 +264,7 @@ export function useReplayInspectorData({
         setIsCompareLapsLoading(false);
       });
     return () => { isCurrent = false; controller.abort(); };
-  }, [isOpen, metadata, activeReplayName, selectedDriverSlot, compareLapFilter, compareLoadVersion]);
+  }, [isOpen, metadata, activeSessionId, selectedDriverSlot, compareLapFilter, compareLoadVersion, comparePage]);
 
   // Open the comparison lap picker. Comparison stays active until explicitly removed.
   const handleToggleCompare = () => {
@@ -271,7 +276,7 @@ export function useReplayInspectorData({
   const handleRemoveCompare = () => {
     setIsCompareMode(false);
     setIsComparePickerOpen(false);
-    setBaselineReplayName(null);
+    setBaselineSessionId(null);
     setBaselineLapNumber(null);
     setBaselineLapOrdinal(null);
     setBaselineDriverName(null);
@@ -292,11 +297,11 @@ export function useReplayInspectorData({
     const curPrimaryLapOrdinal = trajectory?.lapOrdinal ?? initialLapOrdinal ?? 0;
     const curBaseLap = baselineLapNumber ?? 1;
     const curBaseLapOrdinal = baselineLapOrdinal ?? 0;
-    const curPrimaryReplay = activeReplayName;
-    const curBaseReplay = baselineReplayName || activeReplayName;
+    const curPrimarySessionId = activeSessionId;
+    const curBaseSessionId = baselineSessionId || activeSessionId;
     const curPrimaryDriver = selectedDriver?.name || trajectory?.driverName || null;
 
-    if (curBaseReplay === curPrimaryReplay) {
+    if (curBaseSessionId === curPrimarySessionId) {
       const baseSlot = metadata?.drivers?.find(d => d.sessionDriverOrdinal === baselineDriverOrdinal)?.slot;
       setBaselineDriverName(curPrimaryDriver);
       setBaselineLapNumber(curPrimaryLap);
@@ -311,7 +316,7 @@ export function useReplayInspectorData({
         handleSelectLap(curBaseLap);
       }
     } else {
-      setBaselineReplayName(curPrimaryReplay);
+      setBaselineSessionId(curPrimarySessionId);
       setBaselineDriverName(curPrimaryDriver);
       setBaselineLapNumber(curPrimaryLap);
       setBaselineLapOrdinal(curPrimaryLapOrdinal);
@@ -319,16 +324,16 @@ export function useReplayInspectorData({
       setSelectedDriverOrdinal(baselineDriverOrdinal);
       setSelectedLapOrdinal(curBaseLapOrdinal);
       setSelectedDriverSlot(null);
-      setActiveReplayName(curBaseReplay);
+      setActiveSessionId(curBaseSessionId);
       setIsPlaying(false);
       setCurrentIndex(0);
       setChartZoomRange(null);
     }
     updateSearchParams(searchParams, setSearchParams, {
-      sessionId: curBaseReplay,
+      sessionId: curBaseSessionId,
       driverOrdinal: String(baselineDriverOrdinal),
       lapOrdinal: String(curBaseLapOrdinal),
-      baselineSessionId: curPrimaryReplay,
+      baselineSessionId: curPrimarySessionId,
       baselineDriverOrdinal: String(selectedDriverOrdinal),
       baselineLapOrdinal: String(curPrimaryLapOrdinal),
       compareDriver: curPrimaryDriver,
@@ -337,7 +342,7 @@ export function useReplayInspectorData({
 
   // Load baseline trajectory
   useEffect(() => {
-    if (!isOpen || !isCompareMode || !baselineReplayName) {
+    if (!isOpen || !isCompareMode || !baselineSessionId) {
       setBaselineTrajectory(null); setBaselineMetadata(null); setBaselineError(null); setIsBaselineLoading(false); return;
     }
     let isMounted = true;
@@ -346,20 +351,20 @@ export function useReplayInspectorData({
     setBaselineMetadata(null);
     setIsBaselineLoading(true);
     setBaselineError(null);
-    const targetReplay = baselineReplayName;
+    const targetSessionId = baselineSessionId;
     const targetLap = baselineLapNumber ?? 1;
     const targetLapOrdinal = baselineLapOrdinal ?? 0;
 
-    // A baseline from the inspected replay uses its metadata; only another replay's is fetched.
-    const fetchMeta = targetReplay === activeReplayName
+    // A baseline from the inspected session uses its metadata; only another session's is fetched.
+    const fetchMeta = targetSessionId === activeSessionId
       ? Promise.resolve(null)
       // Its metadata only labels the lap: a failed fetch must not drop a lap that loaded.
-      : fetchSessionTelemetryMetadata(targetReplay, { signal: controller.signal }).catch((err: unknown) => {
+      : fetchSessionTelemetryMetadata(targetSessionId, { signal: controller.signal }).catch((err: unknown) => {
         if (isAbortError(err)) throw err;
         return null;
       });
 
-    const fetchTraj = fetchSessionTelemetry(targetReplay, {
+    const fetchTraj = fetchSessionTelemetry(targetSessionId, {
       resolutionQuery: trajectoryResolutionQuery(telemetryResolution),
       driverOrdinal: baselineDriverOrdinal,
       lapOrdinal: targetLapOrdinal,
@@ -369,7 +374,7 @@ export function useReplayInspectorData({
     Promise.all([fetchMeta, fetchTraj])
       .then(([meta, rawTraj]: [ReplayMetadata | null, ReplayTrajectoryData | null]) => {
         if (!isMounted) return;
-        if (targetReplay !== activeReplayName && meta) setBaselineMetadata(meta);
+        if (targetSessionId !== activeSessionId && meta) setBaselineMetadata(meta);
         const traj = applyTelemetryPostProcessingToTrajectory(rawTraj);
         if (!traj?.points.length) throw new Error('Comparison lap has no telemetry samples');
         setBaselineTrajectory(traj);
@@ -387,7 +392,7 @@ export function useReplayInspectorData({
       });
 
     return () => { isMounted = false; controller.abort(); };
-  }, [isOpen, isCompareMode, baselineReplayName, baselineLapNumber, baselineLapOrdinal, baselineDriverOrdinal, activeReplayName, telemetryResolution, selectedSource, baselineLoadVersion]);
+  }, [isOpen, isCompareMode, baselineSessionId, baselineLapNumber, baselineLapOrdinal, baselineDriverOrdinal, activeSessionId, telemetryResolution, selectedSource, baselineLoadVersion]);
 
   const fetchTrajectory = (
     lapNum?: number,
@@ -395,7 +400,7 @@ export function useReplayInspectorData({
     res: TelemetryResolution = telemetryResolution,
     src: 'duckdb' | 'vcr' = selectedSource
   ) => {
-    if (!activeReplayName) return;
+    if (!activeSessionId) return;
     trajectoryControllerRef.current?.abort();
     const controller = new AbortController();
     trajectoryControllerRef.current = controller;
@@ -415,7 +420,7 @@ export function useReplayInspectorData({
     }
     lastTrajectoryRequestRef.current = { lap: targetLap, slot: targetSlot, resolution: res, source: src };
     setError(null);
-    fetchSessionTelemetry(activeReplayName, {
+    fetchSessionTelemetry(activeSessionId, {
       resolutionQuery: trajectoryResolutionQuery(res),
       lapOrdinal,
       driverOrdinal,
@@ -477,7 +482,7 @@ export function useReplayInspectorData({
   const handleSelectCompareLap = (lap: ComparableLap) => {
     if (!lap.sessionId || lap.driverOrdinal === undefined || lap.lapOrdinal === undefined) return;
     setIsCompareMode(true);
-    setBaselineReplayName(lap.sessionId);
+    setBaselineSessionId(lap.sessionId);
     setBaselineLapNumber(lap.lapNum ?? 1);
     setBaselineLapOrdinal(lap.lapOrdinal);
     setBaselineDriverOrdinal(lap.driverOrdinal);
@@ -494,18 +499,18 @@ export function useReplayInspectorData({
   // Opens a lap from this same replay/driver as the comparison baseline (e.g. from the
   // consistency chart's per-lap bars), rather than picking a lap from another session.
   const handleSelectBaselineLap = (lapNumber: number) => {
-    if (!activeReplayName) return;
+    if (!activeSessionId) return;
     const driverName = selectedDriver?.name || trajectory?.driverName || null;
     const lapOrdinal = metadata?.drivers.find(driver => driver.slot === selectedDriverSlot)?.sessionLapOrdinals?.[String(lapNumber)];
     if (lapOrdinal === undefined) return;
     setIsCompareMode(true);
-    setBaselineReplayName(activeReplayName);
+    setBaselineSessionId(activeSessionId);
     setBaselineLapNumber(lapNumber);
     setBaselineLapOrdinal(lapOrdinal);
     setBaselineDriverOrdinal(selectedDriverOrdinal);
     setBaselineDriverName(driverName);
     updateSearchParams(searchParams, setSearchParams, {
-      baselineSessionId: activeReplayName,
+      baselineSessionId: activeSessionId,
       baselineDriverOrdinal: String(selectedDriverOrdinal),
       baselineLapOrdinal: String(lapOrdinal),
       compareDriver: driverName,
@@ -559,11 +564,11 @@ export function useReplayInspectorData({
   // is withheld and reported instead of being compared.
   const inspectedCarClass = resolveDriverCarClass(selectedDriver ?? playerDriver);
   const baselineCarClass = useMemo(() => {
-    if (!baselineReplayName) return '';
-    const meta = baselineReplayName === activeReplayName ? metadata : baselineMetadata;
+    if (!baselineSessionId) return '';
+    const meta = baselineSessionId === activeSessionId ? metadata : baselineMetadata;
     const name = (baselineDriverName || baselineTrajectory?.driverName || '').toLowerCase();
     return resolveDriverCarClass(meta?.drivers?.find(d => (name ? d.name.toLowerCase() === name : d.isPlayer)));
-  }, [baselineReplayName, activeReplayName, metadata, baselineMetadata, baselineDriverName, baselineTrajectory?.driverName]);
+  }, [baselineSessionId, activeSessionId, metadata, baselineMetadata, baselineDriverName, baselineTrajectory?.driverName]);
   const isBaselineClassMismatch = Boolean(baselineTrajectory) && !areComparableCarClasses(inspectedCarClass, baselineCarClass);
   const comparableBaselineTrajectory = isBaselineClassMismatch ? null : baselineTrajectory;
   const comparableBaselineError = isBaselineClassMismatch
@@ -591,14 +596,15 @@ export function useReplayInspectorData({
   return {
     metadata, trajectory, selectedDriverSlot, selectedDriver, playerDriver,
     isLoading, isTrajLoading, error, handleRetryLoad, isCompareMode, handleToggleCompare,
-    handleSwapBaseline, handleRemoveCompare, handleCloseComparePicker, isComparePickerOpen, baselineReplayName, setBaselineReplayName,
+    handleSwapBaseline, handleRemoveCompare, handleCloseComparePicker, isComparePickerOpen, baselineSessionId, setBaselineSessionId,
     baselineLapNumber, setBaselineLapNumber, baselineDriverName, setBaselineDriverName,
     baselineTrajectory: comparableBaselineTrajectory, baselineMetadata, availableCompareLaps, compareLapFilter,
     isCompareLapsLoading, compareLapsError, handleRetryCompareLaps, handleRetryBaseline, setCompareLapFilter, handleSelectCompareLap,
+    comparePagination: { page: comparePage, pageSize: 50, total: compareTotal, onPageChange: setComparePage },
     isBaselineLoading, baselineError: comparableBaselineError, currentIndex, setCurrentIndex, isPlaying, setIsPlaying,
     playbackSpeed, setPlaybackSpeed, playbackCursor, chartZoomRange, setChartZoomRange,
     handleSelectDriver, handleSelectLap, telemetryResolution, handleChangeResolution,
-    currentPoint, currentLapSummary, lapDeltas, activeReplayName,
+    currentPoint, currentLapSummary, lapDeltas, activeSessionId,
     handleSelectBaselineLap,
     selectedSource,
     handleSelectSource,

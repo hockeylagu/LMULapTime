@@ -68,8 +68,6 @@ function renameStoredReplay(db: DatabaseType, filename: string, storedPath: stri
     db.prepare('UPDATE replay_ingest_drivers SET filename = ? WHERE filename = ?').run(newName, filename);
     renameReplayFacts(db, filename, newName);
     db.prepare('UPDATE telemetry_metadata SET matched_replay_filename = ? WHERE matched_replay_filename = ?').run(newName, filename);
-    db.prepare('UPDATE ai_reports SET replay_name = ? WHERE replay_name = ?').run(newName, filename);
-    db.prepare('UPDATE ai_reports SET baseline_replay_name = ? WHERE baseline_replay_name = ?').run(newName, filename);
     db.prepare('UPDATE rejected_replay_links SET replay_filename = ? WHERE replay_filename = ?').run(newName, filename);
 
     // The sessions matched to the stored recording keep it under its new name.

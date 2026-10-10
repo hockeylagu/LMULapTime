@@ -19,7 +19,6 @@ import { describeComparisonCaveats } from '../../replay/inspector/ComparisonAccu
 const REPEATABILITY_LAP_MAX_POINTS = 400;
 
 export interface SessionDebrief {
-  replayName: string;
   sessionId: string;
   driverOrdinal: number;
   lapOrdinal: number;
@@ -82,8 +81,7 @@ function repeatabilityLaps(laps: LapData[], trafficKnown: boolean): LapData[] {
  * are timed through the same corners for repeatability, leaving out passes with traffic.
  */
 export async function loadSessionDebrief(session: DetailedSession, driver: DriverData, signal?: AbortSignal): Promise<SessionDebrief> {
-  const replayName = session.matchingReplayFile?.name;
-  if (!replayName) throw new DebriefUnavailableError('This session has no replay to analyse.');
+  if (!session.matchingReplayFile) throw new DebriefUnavailableError('This session has no replay to analyse.');
   const lapNumber = getBestLapNumber(driver);
   const lap = driver.laps?.find(l => l.lapNum === lapNumber);
   if (!lap || !lap.lapTime) throw new DebriefUnavailableError('No timed lap to analyse in this session.');
@@ -154,7 +152,6 @@ export async function loadSessionDebrief(session: DetailedSession, driver: Drive
 
   const confidence = comparisonConfidence(target, referenceTrajectory);
   return {
-    replayName,
     sessionId: session.id,
     driverOrdinal,
     lapOrdinal,

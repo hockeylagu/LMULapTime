@@ -1,8 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SessionDatabase } from '../../../../server/core/db.js';
-import { initDbSchema } from '../../../../server/core/dbSchema.js';
 import { readSession } from '../../../../server/core/sessionRows/reader.js';
-import { NORMALIZED_SESSION_VERSION } from '../../../../server/core/sessionRows/schema.js';
 import { driver, lap, session } from './builders.js';
 import type { DetailedSession } from '../../../../server/core/types.js';
 
@@ -67,17 +65,5 @@ describe('session dictionaries', () => {
     expect(plan).toContain('idx_drivers_normalized_name');
     db.clearCache();
     for (const table of ['drivers', 'vehicles', 'teams']) expect(rows(`SELECT count(*) AS n FROM ${table}`)).toEqual([{ n: 0 }]);
-  });
-
-  it('rebuilds the version-one layout: old tables go, rows are marked for a new backfill', () => {
-    db.upsertSession(sessionWith('a', ['Alex', 'Ai One']), 'a.xml', 1, 10);
-    raw().exec(`DROP TABLE session_drivers; CREATE TABLE session_drivers (session_id TEXT NOT NULL, driver_ordinal INTEGER NOT NULL, name TEXT, PRIMARY KEY(session_id, driver_ordinal));
-      CREATE TABLE session_driver_summaries (session_id TEXT); CREATE TABLE session_lap_index (session_id TEXT);
-      UPDATE sessions SET normalized_version = 1;`);
-    initDbSchema(raw());
-    expect(rows("SELECT name FROM sqlite_master WHERE name IN ('session_driver_summaries', 'session_lap_index')")).toEqual([]);
-    expect(rows('SELECT count(*) AS n FROM session_drivers')).toEqual([{ n: 0 }]);
-    expect(rows('SELECT normalized_version AS v FROM sessions')).toEqual([{ v: 0 }]);
-    expect(NORMALIZED_SESSION_VERSION).toBeGreaterThan(1);
   });
 });

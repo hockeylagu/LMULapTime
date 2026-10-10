@@ -34,7 +34,7 @@ function addSession(db: Database.Database, session: DetailedSession): void {
   db.prepare(`INSERT INTO sessions (id,filename,file_path,file_mtime,file_size,timestamp,track_venue,track_course,
     session_type,session_name,updated_at,layout_key,recording_name,session_kind,is_empty)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(session.id, session.filename, session.filePath, session.timestamp, 1,
-    session.timestamp, venue, course, 'Race', 'R1', session.timestamp, layout, null, 'race', 0);
+    session.timestamp, venue, course, 'Race', 'R1', session.timestamp, layout, session.matchingReplayFile?.name ?? null, 'race', 0);
   // The rows and their derived columns come from the writer, as in ingestion.
   writeSessionRows(db, session);
 }
@@ -45,6 +45,33 @@ const lap = (lapNum: number, lapTime: number, conditions?: LapData['conditions']
 } as LapData);
 
 describe('SQL comparison query', () => {
+  it('paginates available flying telemetry laps after filtering unavailable sessions and scopes the current session first', () => {
+    const db = new Database(':memory:');
+    initDbSchema(db);
+    const older = fixture('unavailable', 100, 'Spa', [{ name: 'Player', player: true, laps: Array.from({ length: 60 }, (_, i) => lap(i + 1, 100)) }]);
+    const linked = fixture('linked', 200, 'Spa', [{ name: 'Player', player: true, laps: [
+      { ...lap(1, 100), isValid: false }, { ...lap(2, 100), isPitStop: true }, { ...lap(3, 100), isOutLap: true },
+      ...Array.from({ length: 52 }, (_, i) => lap(i + 4, 100)),
+    ] }]);
+    const newest = fixture('newest', 300, 'Spa', [{ name: 'Player', player: true, laps: [lap(1, 99)] }]);
+    linked.matchingReplayFile = { name: 'linked.Vcr', path: 'linked.Vcr', sizeBytes: 1 };
+    newest.matchingReplayFile = { name: 'newest.Vcr', path: 'newest.Vcr', sizeBytes: 1 };
+    const sessions = [older, linked, newest];
+    sessions.forEach(session => addSession(db, session));
+    const read = (id: string) => sessions.find(session => session.id === id) ?? null;
+    const filters = { trackName: 'Spa', playerOnly: true, telemetryOnly: true };
+    const first = queryCompactComparableLaps(db, read, filters, { pageSize: 50 });
+    expect(first.total).toBe(53);
+    expect(first.laps).toHaveLength(50);
+    expect(first.laps.every(item => item.sessionId === 'linked' && (item.lapNum ?? 0) >= 4)).toBe(true);
+    const second = queryCompactComparableLaps(db, read, filters, { page: 2, pageSize: 50 });
+    expect(second.laps.map(item => item.sessionId)).toEqual(['linked', 'linked', 'newest']);
+    const scoped = queryCompactComparableLaps(db, read, { ...filters, sessionId: 'newest' }, { pageSize: 50 });
+    expect(scoped.total).toBe(1);
+    expect(scoped.laps[0].sessionId).toBe('newest');
+    db.close();
+  });
+
   it('matches the extraction oracle across layouts, duplicate names, wet laps and selected locators while hydrating only the page and best rows', () => {
     const db = new Database(':memory:');
     initDbSchema(db);

@@ -105,8 +105,8 @@ describe('session summary persistence', () => {
   it('answers readiness from the projection index, without reading session JSON', () => {
     const db = new Database(':memory:');
     initDbSchema(db);
-    const plan = db.prepare('EXPLAIN QUERY PLAN SELECT 1 FROM sessions WHERE projection_version != ? OR projection_revision != source_revision OR normalized_version NOT IN (?, ?) LIMIT 1')
-      .all(1, 1, -1) as Array<{ detail: string }>;
+    const plan = db.prepare('EXPLAIN QUERY PLAN SELECT 1 FROM sessions WHERE projection_version != ? OR projection_revision != source_revision LIMIT 1')
+      .all(1) as Array<{ detail: string }>;
     expect(plan.map(row => row.detail).join(' ')).toContain('COVERING INDEX idx_sessions_ready');
     db.close();
   });

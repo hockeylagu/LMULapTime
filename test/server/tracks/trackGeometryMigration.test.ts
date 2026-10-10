@@ -11,6 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { TrackBoundaryGeometry } from '../../../shared/types/trackGeometry.js';
+import type { DetailedSession, DriverData } from '../../../shared/types/index.js';
 import type { ReplayTrajectoryData } from '../../../shared/types/replay.js';
 import { TrackGeometryStore } from '../../../server/tracks/trackGeometryStore.js';
 import { applyCanonicalProjection, enrichTrajectoryWithTrackGeometry } from '../../../server/tracks/serverTrackSync.js';
@@ -87,8 +88,10 @@ describe('geometry revision migration', () => {
       const retained = db.getStoredReplayTrajectory(lap.replayName, 0, 1);
       const service = new ReplayTrajectoryService(directory, new ReplayRecordingService(db),
         { configuredPlayerName: 'Archived Driver' }, new ReplayTelemetryService(db));
-      const served = await service.getTrajectory({ replayName: lap.replayName, driverSlot: 0,
-        lapNumber: 1, maxPoints: 0, allowDuckDb: false });
+      const served = await service.getTrajectory({ session: {
+        id: 'archived-session', trackVenue: 'Autodromo Nazionale Monza', trackCourse: 'Monza GP', matchingReplayFile: { name: lap.replayName },
+        drivers: [{ name: 'Archived Driver', laps: [{ lapNum: 1 }] } as DriverData],
+      } as DetailedSession, driverOrdinal: 0, lapOrdinal: 0, maxPoints: 0, allowDuckDb: false });
       expect(fs.existsSync(sourcePath)).toBe(false);
       expect(served.points.map(point => [point.x, point.y, point.z, point.timeSec, point.tireTemps, point.brakeTemps]))
         .toEqual(lap.points.map(point => [point.x, point.y, point.z, point.timeSec, point.tireTemps, point.brakeTemps]));
@@ -98,7 +101,7 @@ describe('geometry revision migration', () => {
       expect(served.projectionRevision).toEqual(expect.any(String));
       expect(served.geometryRevision).not.toBe(lap.geometryRevision);
       expect(served.projectionRevision).not.toBe(lap.projectionRevision);
-      expect(served.laps).toEqual(lap.laps);
+      expect(served.laps).toEqual(lap.laps?.map(summary => expect.objectContaining(summary)));
       expect(db.getStoredReplayTrajectory(lap.replayName, 0, 1)).toEqual(retained);
     } finally {
       db.close();

@@ -8,7 +8,6 @@ import { queryCompactDashboard } from '../../../../server/core/sessionSummaries/
 import { persistSessionAggregate } from '../../../../server/core/sessionSummaries/aggregateStore.js';
 import { buildSessionSummaryProjection } from '../../../../shared/domain/sessionSummaries/index.js';
 import { SESSION_SUMMARY_PROJECTION_VERSION } from '../../../../shared/types/sessionSummaries.js';
-import { NORMALIZED_SESSION_VERSION } from '../../../../server/core/sessionRows/schema.js';
 import { writeSessionRows } from '../../../../server/core/sessionRows/writer.js';
 import { queryCompactLeaderboard, queryCompactLeaderboardLayouts } from '../../../../server/core/sessionSummaries/leaderboardQueries.js';
 import { querySessionPage } from '../../../../server/core/sessionSummaries/pageQueries.js';
@@ -82,7 +81,6 @@ function insertScaleFixture(db: Database.Database): number {
       writeSessionRows(db, detailed, projection);
       persistSessionAggregate(db, detailed, projection);
     }
-    db.prepare('UPDATE sessions SET normalized_version = ?').run(NORMALIZED_SESSION_VERSION);
   })();
   return sourceBytes;
 }

@@ -277,7 +277,6 @@ export interface SessionProgressionPoint {
   top3AvgLapTime?: number | null;
   consistencyScore?: number | null;
   theoreticalGap?: number | null;
-  matchingReplayFile?: string;
   settings?: { serverName?: string; modeSetting?: string };
 }
 

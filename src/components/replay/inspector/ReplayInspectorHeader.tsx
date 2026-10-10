@@ -1,4 +1,5 @@
 import React from 'react';
+import type { CompareLapPagination } from './compare/CompareLapPagination.js';
 import { X, Play, Pause, RotateCcw, Flag, ArrowLeftRight, Users, ChevronDown, LoaderCircle } from 'lucide-react';
 import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ComparableLap } from '../../../../shared/types/index.js';
 import { CompareLapFilter, ReplayCompareLapPicker } from './compare/ReplayCompareLapPicker.js';
@@ -9,7 +10,7 @@ import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface ReplayInspectorHeaderProps {
   onClose: () => void;
-  replayName: string | null;
+  sessionId: string | null;
   metadata: ReplayMetadata | null;
   trajectory: ReplayTrajectoryData | null;
   onSelectLap: (lapNum: number) => void;
@@ -20,7 +21,7 @@ export interface ReplayInspectorHeaderProps {
   onToggleCompare: () => void;
   onSwapBaseline?: () => void;
   onRemoveCompare: () => void;
-  baselineReplayName: string | null;
+  baselineSessionId: string | null;
   baselineLapNumber: number | null;
   baselineDriverName?: string | null;
   baselineTrajectory?: ReplayTrajectoryData | null;
@@ -29,6 +30,7 @@ export interface ReplayInspectorHeaderProps {
   availableCompareLaps: ComparableLap[];
   compareLapFilter: CompareLapFilter;
   isCompareLapsLoading: boolean;
+  comparePagination?: CompareLapPagination;
   compareLapsError?: string | null;
   onRetryCompareLaps?: () => void;
   onRetryBaseline?: () => void;
@@ -47,11 +49,11 @@ export interface ReplayInspectorHeaderProps {
 }
 
 export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React.memo(({
-  onClose, replayName, metadata, trajectory, onSelectLap,
+  onClose, sessionId, metadata, trajectory, onSelectLap,
   drivers, selectedDriverSlot, onSelectDriver,
   isCompareMode, onToggleCompare, onSwapBaseline, onRemoveCompare,
-  baselineReplayName, baselineLapNumber, baselineDriverName, baselineTrajectory, isComparePickerOpen, onCloseComparePicker, availableCompareLaps, compareLapFilter,
-  isCompareLapsLoading, compareLapsError, onRetryCompareLaps, onRetryBaseline, onChangeCompareLapFilter, onSelectCompareLap,
+  baselineSessionId, baselineLapNumber, baselineDriverName, baselineTrajectory, isComparePickerOpen, onCloseComparePicker, availableCompareLaps, compareLapFilter,
+  isCompareLapsLoading, comparePagination, compareLapsError, onRetryCompareLaps, onRetryBaseline, onChangeCompareLapFilter, onSelectCompareLap,
   isBaselineLoading, baselineError, isTrajLoading, isLoading = false,
   isPlaying, onTogglePlay, onRewind, playbackSpeed, onSelectPlaybackSpeed, formatLapTime,
 }) => {
@@ -65,7 +67,6 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
       {/* Left: Back button + Title & Info */}
       <ReplayInspectorTitle
         onClose={onClose}
-        replayName={replayName}
         metadata={metadata}
         trajectory={trajectory}
         selectedDriver={selectedDriver}
@@ -133,7 +134,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
 
         {!isCompareMode ? (
           <ReplayCompareButton
-            replayName={replayName}
+            sessionId={sessionId}
             driverName={drivers.find(d => d.slot === selectedDriverSlot)?.name ?? trajectory?.driverName ?? null}
             trajectory={trajectory}
             availableCompareLaps={availableCompareLaps}
@@ -185,15 +186,16 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
         {isComparePickerOpen && (
           <ReplayCompareLapPicker
             laps={availableCompareLaps}
-            selectedReplayName={baselineReplayName}
+            selectedSessionId={baselineSessionId}
             selectedLapNumber={baselineLapNumber}
             selectedDriverName={baselineDriverName}
-            currentReplayName={replayName || metadata?.filename || null}
             currentLapNumber={trajectory?.currentLap ?? null}
             currentDriverName={drivers.find(d => d.slot === selectedDriverSlot)?.name || trajectory?.driverName || null}
             currentWeatherCondition={trajectory?.weatherCondition ?? metadata?.weatherCondition}
             filter={compareLapFilter}
             isLoading={isCompareLapsLoading}
+            pagination={comparePagination}
+            currentSessionId={sessionId}
             error={compareLapsError}
             onRetry={onRetryCompareLaps}
             onChangeFilter={onChangeCompareLapFilter}

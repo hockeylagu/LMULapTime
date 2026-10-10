@@ -53,7 +53,6 @@ export interface GpsTrackMapProps {
   trackCourse?: string;
   layoutKey?: string;
   dataPluginRevision?: string;
-  replayName?: string;
   trackGeometry?: TrackBoundaryGeometry | null;
   mapDisplay?: TrackMapDisplay | null;
   // Length of the track the trajectories' stations are measured on (trajectory.trackLengthM):

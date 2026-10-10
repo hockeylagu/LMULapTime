@@ -31,7 +31,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
   const empty = isSessionEmpty(s);
   const displayTrack = s.trackVenue ? getDisplayTrackName(s.trackVenue, s.trackCourse) : '';
   const { layoutKey } = getCircuitSpecification(
-    s.trackVenue, s.trackCourse, null, s.matchingReplayFile?.name, null, s.trackLengthMeters,
+    s.trackVenue, s.trackCourse, null, null, null, s.trackLengthMeters,
   );
   const [failedOutlineKey, setFailedOutlineKey] = React.useState<string | null>(null);
   const showOutline = Boolean(CIRCUIT_SPECIFICATIONS[layoutKey]) && failedOutlineKey !== layoutKey;
@@ -93,9 +93,9 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
           <SessionTypeChip session={s} />
           <span className="relative z-10">
             <ReplayIndicator
-              replay={s.matchingReplayFile}
-              hasDuckDbTelemetry={s.hasDuckDbTelemetry}
-              duckdbFilename={s.duckdbFilename}
+              sessionId={s.id}
+              hasReplay={Boolean(s.matchingReplayFile)}
+              hasDuckDbTelemetry={s.hasDuckDbTelemetry || s.matchingReplayFile?.hasDuckDbTelemetry}
               hideIfEmpty={true}
               to={replayUrl}
               onClick={onOpenReplay ? () => onOpenReplay(s.id) : undefined}

@@ -3,6 +3,7 @@ import { LoaderCircle, X } from 'lucide-react';
 import { ComparableLap } from '../../../../../shared/types/index.js';
 import { ReplayCompareLapRow } from './ReplayCompareLapRow.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
+import { CompareLapPaginationControls, type CompareLapPagination } from './CompareLapPagination.js';
 
 export type CompareLapFilter = 'same-session-lap' | 'player' | 'same-sessions' | 'all';
 export type RaceTypeFilter = 'all' | 'practice' | 'quali' | 'race';
@@ -10,11 +11,11 @@ type WeatherCondition = NonNullable<ComparableLap['weatherCondition']>;
 type ConditionFilter = 'same' | 'all' | WeatherCondition;
 
 export interface ReplayCompareLapPickerProps {
+  pagination?: CompareLapPagination;
   laps: ComparableLap[];
-  selectedReplayName: string | null;
+  selectedSessionId: string | null;
   selectedLapNumber: number | null;
   selectedDriverName?: string | null;
-  currentReplayName?: string | null;
   currentLapNumber?: number | null;
   currentDriverName?: string | null;
   currentSessionId?: string | null;
@@ -37,8 +38,8 @@ const FILTER_OPTIONS: Array<{ key: CompareLapFilter; label: string; title: strin
   { key: 'all', label: 'All Drivers', title: 'All drivers across all sessions' },
 ];
 
-function detectRaceType(lap: { sessionType?: string | null; sessionName?: string | null; matchingReplayFile?: string | null }): RaceTypeFilter | null {
-  const combined = `${lap.sessionType || ''} ${lap.sessionName || ''} ${lap.matchingReplayFile || ''}`.toLowerCase();
+function detectRaceType(lap: { sessionType?: string | null; sessionName?: string | null }): RaceTypeFilter | null {
+  const combined = `${lap.sessionType || ''} ${lap.sessionName || ''}`.toLowerCase();
   if (/quali|qualification|\bq\d\b/i.test(combined)) return 'quali';
   if (/race|\br\d\b/i.test(combined)) return 'race';
   if (/practice|test|warmup|fp\d|\bp\d\b/i.test(combined)) return 'practice';
@@ -52,10 +53,10 @@ function matchesRaceType(lap: ComparableLap, type: RaceTypeFilter): boolean {
 
 export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
   laps,
-  selectedReplayName,
+  pagination,
+  selectedSessionId,
   selectedLapNumber,
   selectedDriverName,
-  currentReplayName,
   currentLapNumber,
   currentDriverName,
   currentSessionId,
@@ -75,26 +76,27 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
   const [selectedRaceType, setSelectedRaceType] = useState<RaceTypeFilter>('all');
   const [selectedCondition, setSelectedCondition] = useState<ConditionFilter>('same');
 
-  const normalize = (val?: string | null) => (val || '').toLowerCase().trim().replace(/\\/g, '/').split('/').pop() || '';
-  const effectiveReplayName = currentReplayName || selectedReplayName || null;
+  const normalize = (val?: string | null) => (val || '').toLowerCase().trim();
+  const effectiveSessionId = currentSessionId || selectedSessionId || null;
+  const matchesIdentity = (lap: ComparableLap, identity: string | null | undefined) => Boolean(identity &&
+    lap.sessionId === identity);
 
   const currentLap = useMemo(() => {
-    if (!effectiveReplayName) return null;
+    if (!effectiveSessionId) return null;
     return (
       laps.find(lap => {
-        const matchesReplay = lap.matchingReplayFile && normalize(lap.matchingReplayFile) === normalize(effectiveReplayName);
-        if (!matchesReplay) return false;
+        const matchesSession = matchesIdentity(lap, effectiveSessionId);
+        if (!matchesSession) return false;
         const matchesDriver = !currentDriverName || normalize(lap.driverName) === normalize(currentDriverName);
         if (!matchesDriver) return false;
         return currentLapNumber != null ? lap.lapNum === currentLapNumber : true;
       }) ||
-      laps.find(lap => Boolean(lap.matchingReplayFile && normalize(lap.matchingReplayFile) === normalize(effectiveReplayName))) ||
+      laps.find(lap => matchesIdentity(lap, effectiveSessionId)) ||
       null
     );
-  }, [laps, effectiveReplayName, currentDriverName, currentLapNumber]);
+  }, [laps, effectiveSessionId, currentDriverName, currentLapNumber]);
 
-  const exactCurrentLap = laps.find(lap => normalize(lap.matchingReplayFile) === normalize(effectiveReplayName)
-    && Boolean(effectiveReplayName) && lap.lapNum === currentLapNumber
+  const exactCurrentLap = laps.find(lap => matchesIdentity(lap, effectiveSessionId) && lap.lapNum === currentLapNumber
     && (!currentDriverName || lap.driverName.toLowerCase() === currentDriverName.toLowerCase()));
   const currentCondition = currentWeatherCondition ?? (exactCurrentLap
     ? exactCurrentLap.weatherCondition ?? (exactCurrentLap.hasRain ? 'Wet' : 'Dry') : null);
@@ -117,11 +119,7 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
 
   const filteredLaps = useMemo(() => {
     return laps.filter(lap => {
-      const normReplay = normalize(lap.matchingReplayFile);
-      const isSameSession = Boolean(
-        (effectiveReplayName && normReplay && normReplay === normalize(effectiveReplayName)) ||
-        (currentSessionId && lap.sessionId && lap.sessionId === currentSessionId)
-      );
+      const isSameSession = Boolean(currentSessionId && lap.sessionId === currentSessionId);
       const normDriver = normalize(lap.driverName);
       const isPlayer = lap.isPlayer !== false || Boolean(currentDriverName && normDriver && normDriver === normalize(currentDriverName));
 
@@ -133,7 +131,7 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
         && (lap.weatherCondition ?? (lap.hasRain ? 'Wet' : 'Dry')) !== conditionToMatch) return false;
       return matchesRaceType(lap, selectedRaceType);
     });
-  }, [laps, filter, effectiveReplayName, currentSessionId, currentDriverName, selectedCar, selectedRaceType, conditionToMatch]);
+  }, [laps, filter, currentSessionId, currentDriverName, selectedCar, selectedRaceType, conditionToMatch]);
 
   const orderedLaps = useMemo(() => {
     const sorted = [...filteredLaps].sort((a, b) => {
@@ -141,8 +139,8 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
       if (order === 'driver-asc') return a.driverName.localeCompare(b.driverName) || (a.lapTime || 999999) - (b.lapTime || 999999);
       return (a.lapTime || 999999) - (b.lapTime || 999999);
     });
-    return sorted.slice(0, filter === 'all' ? 80 : 120);
-  }, [filteredLaps, order, filter]);
+    return pagination ? sorted : sorted.slice(0, filter === 'all' ? 80 : 120);
+  }, [filteredLaps, order, filter, pagination]);
 
   return (
     <div role="dialog" aria-modal="true" aria-label="Choose comparison lap"
@@ -263,12 +261,11 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
           ) : (
             <div className="space-y-1">
               {orderedLaps.map(lap => {
-                const isSelected = lap.matchingReplayFile === selectedReplayName &&
+                const isSelected = matchesIdentity(lap, selectedSessionId) &&
                   lap.lapNum === selectedLapNumber &&
                   (!selectedDriverName || lap.driverName === selectedDriverName);
                 const isCurrentLap = Boolean(
-                  effectiveReplayName && lap.matchingReplayFile &&
-                  normalize(lap.matchingReplayFile) === normalize(effectiveReplayName) &&
+                  matchesIdentity(lap, effectiveSessionId) &&
                   (currentLapNumber == null || lap.lapNum === currentLapNumber) &&
                   (!currentDriverName || normalize(lap.driverName) === normalize(currentDriverName))
                 );
@@ -288,6 +285,7 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
             </div>
           )}
         </div>
+        {pagination && <CompareLapPaginationControls pagination={pagination} loading={isLoading} />}
       </div>
     </div>
   );
