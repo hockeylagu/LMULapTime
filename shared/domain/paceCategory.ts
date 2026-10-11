@@ -154,15 +154,22 @@ export function findMatchingTrackBenchmarkEntries(
   trackLengthMeters?: number | null
 ): ReferenceLaptimeEntry[] {
   const entryList: ReferenceLaptimeEntry[] = Array.isArray(entries) ? entries : Object.values(entries || {});
+  return matchingTrackEntries(entryList, trackVenue, course, trackLengthMeters);
+}
+
+function matchingTrackEntries(
+  entryList: ReferenceLaptimeEntry[], trackVenue: string, course: string, trackLengthMeters?: number | null,
+  layouts?: ReadonlyMap<string, string>
+): ReferenceLaptimeEntry[] {
   if (entryList.length === 0) return [];
 
   const targetSpec = getCircuitSpecification(trackVenue, course, null, null, null, trackLengthMeters);
 
   // 1. Exact match on resolved benchmark circuit and layout
   let matches = entryList.filter(e => {
-    const eSpec = getCircuitSpecification(e.trackName);
-    if (targetSpec.layoutKey !== 'unknown' && eSpec.layoutKey !== 'unknown') {
-      return eSpec.layoutKey === targetSpec.layoutKey;
+    const layoutKey = layouts?.get(e.trackName) ?? getCircuitSpecification(e.trackName).layoutKey;
+    if (targetSpec.layoutKey !== 'unknown' && layoutKey !== 'unknown') {
+      return layoutKey === targetSpec.layoutKey;
     }
     return false;
   });
@@ -200,6 +207,10 @@ export function findReferenceEntry(
   trackLengthMeters?: number | null
 ): ReferenceLaptimeEntry | null {
   const trackMatches = findMatchingTrackBenchmarkEntries(entries, venue, course, trackLengthMeters);
+  return selectReferenceEntry(trackMatches, carClass, carType);
+}
+
+function selectReferenceEntry(trackMatches: ReferenceLaptimeEntry[], carClass: string, carType: string): ReferenceLaptimeEntry | null {
   if (trackMatches.length === 0) return null;
 
   const targetClass = carClass || carType || '';
@@ -212,4 +223,20 @@ export function findReferenceEntry(
   }
 
   return trackMatches[0];
+}
+
+/** One batch's benchmark snapshot: resolve each benchmark layout once, preserving matching order and fallbacks. */
+export function createBenchmarkLookup(entries: Record<string, ReferenceLaptimeEntry> | ReferenceLaptimeEntry[]) {
+  const entryList = Array.isArray(entries) ? entries : Object.values(entries);
+  const layouts = new Map<string, string>();
+  for (const entry of entryList) {
+    if (!layouts.has(entry.trackName)) layouts.set(entry.trackName, getCircuitSpecification(entry.trackName).layoutKey);
+  }
+  const findTrackEntries = (venue: string, course = '', trackLengthMeters?: number | null) =>
+    matchingTrackEntries(entryList, venue, course, trackLengthMeters, layouts);
+  return {
+    findTrackEntries,
+    findReferenceEntry: (venue: string, course = '', carClass = '', carType = '', trackLengthMeters?: number | null) =>
+      selectReferenceEntry(findTrackEntries(venue, course, trackLengthMeters), carClass, carType),
+  };
 }

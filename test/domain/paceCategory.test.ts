@@ -9,6 +9,7 @@ import {
   getPaceCategoryFromPercentage,
   findMatchingTrackBenchmarkEntries,
   findReferenceEntry,
+  createBenchmarkLookup,
   VEHICLE_CLASS_OPTIONS,
 } from '../../shared/domain/paceCategory.js';
 
@@ -277,6 +278,17 @@ describe('paceCategory utility', () => {
     it('returns null when no track matches', () => {
       const entry = findReferenceEntry(mockEntries, 'Unknown Track', '', 'LMH', '');
       expect(entry).toBeNull();
+    });
+    it('batch lookup preserves layout, class, custom-track fallbacks and input ordering', () => {
+      const entries = [...mockEntries,
+        { trackName: 'My Custom Track', carClass: 'LMH', target100Sec: 90 } as ReferenceLaptimeEntry];
+      const lookup = createBenchmarkLookup(entries);
+      for (const [venue, course] of [['Spa', 'GP'], ['Sebring', 'School'], ['Silverstone', 'National'], ['My Custom', ''], ['Missing', '']]) {
+        expect(lookup.findTrackEntries(venue, course)).toEqual(findMatchingTrackBenchmarkEntries(entries, venue, course));
+        for (const carClass of ['LMH', 'LMGT3', 'Unknown', 'All']) {
+          expect(lookup.findReferenceEntry(venue, course, carClass, 'Ferrari')).toEqual(findReferenceEntry(entries, venue, course, carClass, 'Ferrari'));
+        }
+      }
     });
   });
 });

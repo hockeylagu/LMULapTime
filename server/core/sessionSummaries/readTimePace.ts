@@ -1,10 +1,10 @@
 import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
 import type { DetailedSession } from '../types.js';
-import { calculatePaceCategory } from '../../benchmarks/referenceLaptimes.js';
+import { createPaceCalculator, type PaceCalculator } from '../../benchmarks/referenceLaptimes.js';
 import { rateDriversPace } from '../../sessions/sessionPaceRating.js';
 
 /** Benchmark-dependent values belong to the requested DTO, never a history-wide JSON rewrite. */
-export function rateSessionCard(card: SessionCard): SessionCard {
+export function rateSessionCard(card: SessionCard, calculatePaceCategory: PaceCalculator = createPaceCalculator()): SessionCard {
   const player = card.playerDriver;
   if (!player) return card;
   const pace = player.bestLapWet ? null : calculatePaceCategory(player.bestLapTime, card.trackVenue,

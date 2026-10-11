@@ -3,7 +3,8 @@ import type { ReferenceLaptimeEntry } from '../types.js';
 import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
 import type { DashboardData, DashboardMetrics, DashboardTrends } from '../../../shared/types/dashboard.js';
 import { getDisplayTrackName, matchesSessionType } from '../../../shared/domain/formatters.js';
-import { getPaceCategoryFromPercentage, normalizeCarClass } from '../../../shared/domain/paceCategory.js';
+import { createBenchmarkLookup, getPaceCategoryFromPercentage, normalizeCarClass } from '../../../shared/domain/paceCategory.js';
+import { createPaceCalculator } from '../../benchmarks/referenceLaptimes.js';
 import { findLayoutBenchmark } from '../../../shared/domain/leaderboard.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { querySessionPage, type SessionQuery } from './pageQueries.js';
@@ -23,10 +24,10 @@ function emptyTrends(): DashboardTrends {
     paceTrendDirection: 'none', paceTrendClass: null, recentCleanRate: null, recentConsistency: null, recentNetPositions: 0 };
 }
 
-function paceFor(row: DashboardSummaryRow, entries: Record<string, ReferenceLaptimeEntry>): { percentage: number; category: ReturnType<typeof getPaceCategoryFromPercentage> } | null {
+function paceFor(row: DashboardSummaryRow, entries: Record<string, ReferenceLaptimeEntry>, findTrackEntries: ReturnType<typeof createBenchmarkLookup>['findTrackEntries']): { percentage: number; category: ReturnType<typeof getPaceCategoryFromPercentage> } | null {
   if (row.best_lap_wet || !row.best_lap_time || row.best_lap_time <= 0) return null;
   const spec = getCircuitSpecification(row.track_venue, row.track_course, null, null, null, row.track_length);
-  const target = findLayoutBenchmark(entries, spec.layoutKey, row.car_class);
+  const target = findLayoutBenchmark(entries, spec.layoutKey, row.car_class, findTrackEntries);
   if (!target?.target100Sec) return null;
   const percentage = Number(((row.best_lap_time / target.target100Sec) * 100).toFixed(2));
   return { percentage, category: getPaceCategoryFromPercentage(percentage) };
@@ -116,6 +117,8 @@ function dashboardMetrics(db: DatabaseType, entries: Record<string, ReferenceLap
 }
 
 function dashboardTrends(db: DatabaseType, entries: Record<string, ReferenceLaptimeEntry>): DashboardTrends {
+  const calculatePace = createPaceCalculator(entries);
+  const { findTrackEntries } = createBenchmarkLookup(entries);
   const order = `s.timestamp DESC,CASE s.session_type WHEN 'Race' THEN 3 WHEN 'Qualifying' THEN 2 WHEN 'Practice' THEN 1 ELSE 0 END DESC,s.rowid DESC`;
   const driverName = (db.prepare(`SELECT s.driver_name FROM session_summary_facts s
     WHERE trim(s.driver_name)<>'' ORDER BY ${order} LIMIT 1`).get() as { driver_name: string } | undefined)?.driver_name ?? 'Driver';
@@ -123,7 +126,7 @@ function dashboardTrends(db: DatabaseType, entries: Record<string, ReferenceLapt
     (trim(coalesce(s.best_lap_time_string,''))<>'' AND s.best_lap_time_string<>'--:--.---'))`;
   const hydrate = (id: string): (SessionCard & { isEmpty: boolean }) | null => {
     const card = readSessionCards(db, [id])[0];
-    return card ? rateSessionCard(card) : null;
+    return card ? rateSessionCard(card, calculatePace) : null;
   };
   const validRows = db.prepare(`SELECT s.session_id id,s.timestamp,s.time_string time_string FROM session_summary_facts s WHERE ${validWhere} ORDER BY ${order} LIMIT 5`)
     .all() as Array<{ id: string; timestamp: number; time_string: string }>;
@@ -179,7 +182,7 @@ function dashboardTrends(db: DatabaseType, entries: Record<string, ReferenceLapt
     WHERE s.has_player=1 AND s.car_class=? AND s.best_lap_wet=0 AND s.best_lap_time>0 ORDER BY ${order}`)
     .iterate(trendClass) as IterableIterator<DashboardSummaryRow>;
   for (const row of trendRows) {
-    const pace = paceFor(row, entries); if (!pace) continue;
+    const pace = paceFor(row, entries, findTrackEntries); if (!pace) continue;
     recentPaceTrend.push({ id: row.id, trackName: getDisplayTrackName(row.track_venue, row.track_course), carName: row.car_type,
       timeString: row.time_string, bestLapTimeString: row.best_lap_time_string, pacePercentage: pace.percentage, paceCategory: pace.category });
     if (recentPaceTrend.length === 6) break;
@@ -222,6 +225,6 @@ export function queryCompactDashboard(db: DatabaseType, options: DashboardQueryO
   const emptyCount = (db.prepare('SELECT count(*) count FROM sessions WHERE is_empty=1').get() as { count: number }).count;
   const replayCount = (db.prepare('SELECT count(*) count FROM sessions WHERE recording_name IS NOT NULL').get() as { count: number }).count;
   return { revision: options.revision ?? '', metrics, trends, tracks: trackNames, emptyCount, replayCount,
-    sessions: sessions.sessions.map(rateSessionCard), total: sessions.total, page: sessions.page, pageSize: sessions.pageSize };
+    sessions: sessions.sessions, total: sessions.total, page: sessions.page, pageSize: sessions.pageSize };
 }
 

@@ -2,7 +2,7 @@ import { ReferenceLaptimeEntry, ReferenceLaptimesCache, ReferenceBenchmarkDiff, 
 import { parseTimeStringToSeconds, formatTime } from '../../shared/domain/formatters.js';
 import {
   getPaceCategoryFromPercentage,
-  findReferenceEntry,
+  createBenchmarkLookup,
   normalizeCarClass,
 } from '../../shared/domain/paceCategory.js';
 import { isMainThread } from 'node:worker_threads';
@@ -254,18 +254,19 @@ export async function fetchAndCacheReferenceLaptimes(): Promise<ReferenceLaptime
 
 
 // Find reference entry
-function getReferenceEntry(
-  venue: string,
-  course: string,
-  carClass: string,
-  carType: string,
-  trackLengthMeters?: number | null
-): ReferenceLaptimeEntry | null {
-  const cache = loadReferenceLaptimesFromCache();
-  if (!cache) return null;
+export type PaceCalculator = typeof calculatePaceCategory;
 
-  const normClass = normalizeCarClass(carClass, carType);
-  return findReferenceEntry(cache.entries, venue, course, normClass, carType, trackLengthMeters);
+/** Reuse target matching within a request or ingestion batch; a new calculator sees refreshed benchmarks. */
+export function createPaceCalculator(entries = loadReferenceLaptimesFromCache()?.entries ?? {}): PaceCalculator {
+  const lookup = createBenchmarkLookup(entries);
+  const targets = new Map<string, ReferenceLaptimeEntry | null>();
+  return (lapTimeSec, venue, course, carClass, carType, trackLengthMeters) => {
+    if (!lapTimeSec || lapTimeSec <= 0) return null;
+    const normClass = normalizeCarClass(carClass, carType);
+    const key = JSON.stringify([venue, course, normClass, carType, trackLengthMeters]);
+    if (!targets.has(key)) targets.set(key, lookup.findReferenceEntry(venue, course, normClass, carType, trackLengthMeters));
+    return paceFromReference(lapTimeSec, targets.get(key) ?? null);
+  };
 }
 
 // Calculate Pace Category for a Lap Time
@@ -279,7 +280,10 @@ export function calculatePaceCategory(
 ): PaceCategoryInfo | null {
   if (!lapTimeSec || lapTimeSec <= 0) return null;
 
-  const ref = getReferenceEntry(venue, course, carClass, carType, trackLengthMeters);
+  return createPaceCalculator()(lapTimeSec, venue, course, carClass, carType, trackLengthMeters);
+}
+
+function paceFromReference(lapTimeSec: number, ref: ReferenceLaptimeEntry | null): PaceCategoryInfo | null {
   if (!ref || !ref.target100Sec) return null;
 
   const percentage = parseFloat(((lapTimeSec / ref.target100Sec) * 100).toFixed(2));

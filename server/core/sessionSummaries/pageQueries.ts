@@ -4,6 +4,7 @@ import { CIRCUIT_SPECIFICATIONS, getCircuitSpecification } from '../../../shared
 import { computeTheoreticalBest, computeTheoreticalGap, getDisplayTrackName } from '../../../shared/domain/formatters.js';
 import { normalizeCarClass } from '../../../shared/domain/paceCategory.js';
 import { rateSessionCard } from './readTimePace.js';
+import { createPaceCalculator } from '../../benchmarks/referenceLaptimes.js';
 import { readSessionCards } from './cards.js';
 import { SETTINGS_FIELDS } from '../sessionRows/specs.js';
 import { group } from '../sessionRows/reader.js';
@@ -78,7 +79,8 @@ export function querySessionPage(db: Database, options: SessionQuery) {
     const total = (db.prepare(`SELECT count(*) n FROM sessions s ${where.sql}`).get(...where.values) as { n: number }).n;
     const rows = db.prepare(`${targetCte} SELECT s.id FROM sessions s ${paceJoin} ${positionJoin} ${where.sql} ORDER BY ${finalOrder} LIMIT ? OFFSET ?`)
       .all(...targetValues,...where.values,pageSize,(page-1)*pageSize) as Array<{id: string}>;
-    return { sessions: readSessionCards(db, rows.map(row => row.id)).map(rateSessionCard), total, page, pageSize };
+    const calculatePace = createPaceCalculator();
+    return { sessions: readSessionCards(db, rows.map(row => row.id)).map(card => rateSessionCard(card, calculatePace)), total, page, pageSize };
   })();
 }
 

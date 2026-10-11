@@ -196,9 +196,10 @@ function toEntries(acc: Map<string, DriverAccumulator>): LeaderboardEntry[] {
 export function findLayoutBenchmark(
   entries: Record<string, ReferenceLaptimeEntry> | ReferenceLaptimeEntry[],
   layoutKey: string,
-  carClass: string
+  carClass: string,
+  findTrackEntries = (venue: string) => findMatchingTrackBenchmarkEntries(entries, venue)
 ): ReferenceLaptimeEntry | null {
-  const onLayout = findMatchingTrackBenchmarkEntries(entries, layoutKey);
+  const onLayout = findTrackEntries(layoutKey);
   return onLayout.find((e) => matchesCarClass(e.carClass, '', carClass) && matchesCarClass(carClass, '', e.carClass)) ?? null;
 }
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router';
-import { findReferenceEntry, getPaceCategoryFromPercentage } from '../../../shared/domain/paceCategory.js';
+import { createBenchmarkLookup, getPaceCategoryFromPercentage } from '../../../shared/domain/paceCategory.js';
 import { aggregateTrackSummaries, TrackSessionSummary } from '../../../shared/domain/trackSummaryUtils.js';
 import { ReferenceLaptimeEntry, PaceCategory, ReferenceLaptimesCache, TrackSummary } from '../../../shared/types/index.js';
 import { TrackSummariesHeader, TracksSortOption } from './TrackSummariesHeader.js';
@@ -75,12 +75,6 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
     return Object.values(aggregated).sort((a, b) => a.trackVenue.localeCompare(b.trackVenue));
   }, [sessions, selectedCarClass,storedTracks]);
 
-  const getRefEntryForTrack = (trackName: string, carType?: string, carClass?: string): ReferenceLaptimeEntry | null => {
-    if (!refCache?.entries) return null;
-    const targetClass = selectedCarClass !== 'All' ? selectedCarClass : carClass || carType || '';
-    return findReferenceEntry(refCache.entries, trackName, '', targetClass, carType || '');
-  };
-
   const getPaceCategoryForLap = (lapTime: number | null, refEntry: ReferenceLaptimeEntry | null): { category: PaceCategory; pct: number } | null => {
     if (!lapTime || !Number.isFinite(lapTime) || lapTime <= 0 || !refEntry || !Number.isFinite(refEntry.target100Sec) || refEntry.target100Sec <= 0) return null;
     const pct = (lapTime / refEntry.target100Sec) * 100;
@@ -88,9 +82,15 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
     return { category: getPaceCategoryFromPercentage(pct) as PaceCategory, pct };
   };
 
-  const benchmarkSortAvailable = benchmarkState === 'ready' && trackList.some(track =>
-    getPaceCategoryForLap(track.bestLapWet ? null : track.bestLapTime, getRefEntryForTrack(track.trackVenue, track.bestLapCar, track.bestLapClass)) !== null
-  );
+  const paceByTrack = useMemo(() => {
+    const lookup = createBenchmarkLookup(refCache?.entries ?? {});
+    return new Map(trackList.map(track => {
+      const targetClass = selectedCarClass !== 'All' ? selectedCarClass : track.bestLapClass || track.bestLapCar || '';
+      const ref = lookup.findReferenceEntry(track.trackVenue, '', targetClass, track.bestLapCar || '');
+      return [track, getPaceCategoryForLap(track.bestLapWet ? null : track.bestLapTime, ref)] as const;
+    }));
+  }, [trackList, refCache, selectedCarClass]);
+  const benchmarkSortAvailable = benchmarkState === 'ready' && [...paceByTrack.values()].some(pace => pace !== null);
 
   useEffect(() => {
     if (!benchmarkSortAvailable && sortBy === 'pace-asc') setSortBy('name-asc');
@@ -110,15 +110,13 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
         return lastB - lastA;
       }
       if (sortBy === 'pace-asc') {
-        const refA = getRefEntryForTrack(a.trackVenue, a.bestLapCar, a.bestLapClass);
-        const refB = getRefEntryForTrack(b.trackVenue, b.bestLapCar, b.bestLapClass);
-        const paceA = getPaceCategoryForLap(a.bestLapWet ? null : a.bestLapTime, refA)?.pct ?? 999;
-        const paceB = getPaceCategoryForLap(b.bestLapWet ? null : b.bestLapTime, refB)?.pct ?? 999;
+        const paceA = paceByTrack.get(a)?.pct ?? 999;
+        const paceB = paceByTrack.get(b)?.pct ?? 999;
         return paceA - paceB;
       }
       return 0;
     });
-  }, [trackList, sortBy, refCache, selectedCarClass]);
+  }, [trackList, sortBy, paceByTrack]);
 
   return (
     <div className="space-y-6">
@@ -155,8 +153,7 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
       {/* Grid of Tracks */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {sortedTrackList.map(t => {
-          const refEntry = getRefEntryForTrack(t.trackVenue, t.bestLapCar, t.bestLapClass);
-          const paceInfo = getPaceCategoryForLap(t.bestLapWet ? null : t.bestLapTime, refEntry);
+          const paceInfo = paceByTrack.get(t) ?? null;
 
           return (
             <TrackSummaryCard

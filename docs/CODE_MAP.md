@@ -36,6 +36,12 @@ Future table schema changes receive a migration when needed; there is no row-ver
 
 **Dictionaries**: `drivers` is keyed by the exact name (never merged by case or spacing; player and human flags belong to the session's driver row),
 `vehicles` by raw XML car type and class, `teams` by name; an absent value is a NULL id. They are emptied with the session cache and never pruned.
+
+Benchmark rating uses `createBenchmarkLookup` (`shared/domain/paceCategory.ts`) to resolve benchmark layouts once per batch,
+and `createPaceCalculator` (`server/benchmarks/referenceLaptimes.ts`) to reuse target matches within a request or ingestion batch.
+Session lap rating and paginated cards share these batch lookups; dashboard trends use the same indexed snapshot while retaining
+strict class matching, and dashboard cards are rated once. Track cards compute pace once per card and reuse it for sorting and rendering.
+These lookups are scoped to the batch/view inputs and recreated with refreshed benchmarks; no persistent target cache or cache-version bump is needed.
 **Derived columns** live on `session_drivers` (human/player/class flags, completed/clean laps, driving time, pits, speed, best lap, averages,
 consistency, wet best-lap flag) and `session_laps` (condition group, clean/representative/human/leaderboard flags, with partial indexes).
 Raw columns retain XML values such as declared `laps_count`, `lap_num`, and `is_pit_stop`.

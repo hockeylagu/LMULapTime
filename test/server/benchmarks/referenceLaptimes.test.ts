@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   parseReferenceCsv,
   calculatePaceCategory,
+  createPaceCalculator,
   loadReferenceLaptimesFromCache,
   isReferenceLaptimesCacheFresh,
   fetchAndCacheReferenceLaptimes,
@@ -11,6 +12,8 @@ import {
 import { getSessionDatabase, resetSessionDatabaseForTest } from '../../../server/core/db.js';
 import { ReferenceLaptimeEntry } from '../../../server/core/types.js';
 import { normalizeCarClass } from '../../../shared/domain/paceCategory.js';
+import { rateDriversPace } from '../../../server/sessions/sessionPaceRating.js';
+import { mockDetailedSession } from '../../components/session-detail/mockSessionDetail.js';
 
 describe('referenceLaptimes server module', () => {
   const sampleCsv = `Key,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest Car,Record,Diff,Diff%,Class
@@ -55,6 +58,28 @@ HeaderRow,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest,Rec
   });
 
   describe('calculatePaceCategory', () => {
+    it('rates a batch identically, preserves rounding, and uses refreshed targets in the next batch', () => {
+      const cache = parseReferenceCsv(sampleCsv);
+      getSessionDatabase().saveReferenceLaptimes(cache);
+      resetCachedReferenceLaptimes();
+      const rate = createPaceCalculator();
+      for (const time of [null, 0, -1, 120.605, 121.805, 124.205, 130]) {
+        expect(rate(time, 'Spa', 'GP', 'Hypercar', 'Ferrari')).toEqual(calculatePaceCategory(time, 'Spa', 'GP', 'Hypercar', 'Ferrari'));
+      }
+      const drivers: Parameters<typeof rateDriversPace>[0] = structuredClone(mockDetailedSession.drivers);
+      rateDriversPace(drivers, { venue: 'Spa', course: 'GP' });
+      for (const driver of drivers) {
+        expect(driver.bestLapPacePercentage).toBe(rate(driver.bestLapTime, 'Spa', 'GP', driver.carClass, driver.carType)?.percentage);
+        for (const lap of driver.laps) {
+          expect(lap.pacePercentage).toBe(lap.isValid && lap.lapTime ? rate(lap.lapTime, 'Spa', 'GP', driver.carClass, driver.carType)?.percentage : undefined);
+        }
+      }
+      const updated = structuredClone(cache.entries);
+      updated.spa_lmh.target100Sec = 100;
+      expect(createPaceCalculator(updated)(120, 'Spa', 'GP', 'LMH', 'Ferrari')?.percentage).toBe(120);
+      expect(rate(120, 'Spa', 'GP', 'LMH', 'Ferrari')?.percentage).toBe(100);
+      expect(createPaceCalculator({})(120, 'Spa', 'GP', 'LMH', 'Ferrari')).toBeNull();
+    });
     it('returns null for null, 0, or negative lap times', () => {
       expect(calculatePaceCategory(null, 'Spa', 'GP', 'LMH', 'Ferrari')).toBeNull();
       expect(calculatePaceCategory(0, 'Spa', 'GP', 'LMH', 'Ferrari')).toBeNull();

@@ -1,5 +1,5 @@
 import type { DriverData } from '../core/types.js';
-import { calculatePaceCategory } from '../benchmarks/referenceLaptimes.js';
+import { createPaceCalculator } from '../benchmarks/referenceLaptimes.js';
 
 type RatedDriver = Pick<DriverData, 'laps' | 'carClass' | 'carType' | 'bestLapTime' | 'bestLapPaceCategory' | 'bestLapPacePercentage'>;
 
@@ -16,6 +16,7 @@ export interface PaceTrack {
  * then decides whether the best lap keeps its rating (a wet best lap does not).
  */
 export function rateDriversPace(drivers: RatedDriver[], track: PaceTrack): void {
+  const calculatePaceCategory = createPaceCalculator();
   const rate = (lapTime: number | null, driver: RatedDriver) =>
     calculatePaceCategory(lapTime, track.venue, track.course, driver.carClass, driver.carType, track.trackLengthMeters);
   for (const driver of drivers) {
