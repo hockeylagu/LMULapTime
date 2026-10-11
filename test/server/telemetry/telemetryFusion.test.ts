@@ -3,6 +3,20 @@ import { fuseDuckDbWithVcrTrajectory } from '../../../server/telemetry/telemetry
 import { DuckDbLapTelemetry, ReplayTrajectoryData } from '../../../server/core/types.js';
 
 describe('telemetryFusion', () => {
+  it.each([false, true])('copies native samples without a replay, with annotations=%s', annotated => {
+    const point = { x: 1, y: 2, z: 3, timeSec: 0, ...(annotated ? { stationM: undefined } : {}) };
+    const duck: DuckDbLapTelemetry = { lapNumber: 1, lapTimeSec: 1, pointsCount: 1,
+      sampleRateHz: 100, points: [point] };
+    const vcr: ReplayTrajectoryData = { replayName: 'Empty.Vcr', pointsCount: 0, points: [],
+      bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 } };
+    const fused = fuseDuckDbWithVcrTrajectory(duck, vcr);
+    expect(fused.points[0]).not.toBe(point);
+    expect('stationM' in fused.points[0]).toBe(false);
+    fused.points[0].x = 99;
+    expect(point.x).toBe(1);
+    expect('stationM' in point).toBe(annotated);
+  });
+
   it('preserves replay status throughout a fused lap and changes it at recorded frame boundaries', () => {
     const vcr: ReplayTrajectoryData = {
       replayName: 'Status.Vcr', timeReference: 'session', lapStartTimeSec: 10, pointsCount: 3,

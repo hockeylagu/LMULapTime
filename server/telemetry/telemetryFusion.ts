@@ -8,6 +8,8 @@ const POINT_GEOMETRY_FIELDS = [
 
 /** New fused samples need their own projection; source annotations describe different points. */
 function withoutPointGeometry(point: ReplayTrajectoryPoint): ReplayTrajectoryPoint {
+  // Most native samples have no annotations. The caller already creates the fused object.
+  if (!POINT_GEOMETRY_FIELDS.some(key => key in point)) return point;
   const copy = { ...point };
   for (const key of POINT_GEOMETRY_FIELDS) delete copy[key];
   return copy;
@@ -67,7 +69,7 @@ export function fuseDuckDbWithVcrTrajectory(
       ...source,
       source: 'duckdb',
       duckdbFilename,
-      points: duckLap.points.map(withoutPointGeometry),
+      points: duckLap.points.map(point => ({ ...withoutPointGeometry(point) })),
       pointsCount: duckLap.points.length,
       leadInPoints: undefined,
       leadOutPoints: undefined,

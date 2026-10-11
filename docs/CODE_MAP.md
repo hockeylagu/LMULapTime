@@ -219,6 +219,14 @@ index their explicitly supplied replay directory locally.
 - Normalised facts (pure): `replayFacts.ts` → written by `server/core/replay/dbReplayLapStore.ts`
   (`replaceReplayDriverLapFacts`, `replaceReplayWideFacts`; read with `getReplayLaps`, `getReplayConditions`, `getLapConditions`).
 - Trajectory blobs: `dbReplayTrajectoryStore.ts` + codec `replayTrajectoryCodec.ts`; downsampling `trajectoryDownsampler.ts`.
+  Columnar decoding walks each channel once when rebuilding sample objects. Fusion skips its intermediate
+  geometry-clearing copy for unannotated native samples; it still creates independent output points.
+  Geometry copying checks only the seven wheel-array channels, with a type-checked exhaustive channel map,
+  rather than enumerating every scalar on every sample. Stored formats and response resolution are unchanged.
+- Geometry preparation copies point scalars and wheel-channel arrays directly, deep-cloning only the smaller metadata tree;
+  child laps and timing-line context remain isolated from retained inputs. `trackProjection.ts` reuses a candidate during segment
+  searches instead of allocating one per segment. Projection scores, timing-line cuts and point resolution are unchanged.
+- Unused API routes were removed: the telemetry file list, standalone progression and rival reads, plugin status/vehicle lists, and the manual replay-upgrade POST. Their benchmark cases and exclusive helpers were removed too. Track detail still uses `queryProgression`, leaderboard/pin responses still resolve rivals, the internal catalog still owns telemetry scans/status, the vehicle catalog still resolves cars, and automatic replay upgrades still run and expose GET status.
 - Serving: `GET /api/session/:id/telemetry?driverOrdinal=&lapOrdinal=` (`replayRoutes.ts`) resolves one retained session and follows its stored replay link → `ReplayTrajectoryService` → `ReplayTelemetryService`
   (DuckDB reads only `TelemetryLinks.filesForSession`; replay-owned/unmatched recordings never serve a session request)
   (fuses DuckDB channels, `server/telemetry/telemetryFusion.ts`; native status/weather values take precedence,

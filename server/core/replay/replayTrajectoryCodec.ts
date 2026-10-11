@@ -66,19 +66,20 @@ export function fromColumnarTrajectory(stored: StoredTrajectory): ReplayTrajecto
   if (!isColumnar(stored)) return stored;
 
   const { pointsFormat: _format, pointsLength, constants, columns, ...rest } = stored;
-  const columnKeys = Object.keys(columns);
-  const points: ReplayTrajectoryPoint[] = new Array(pointsLength);
+  const points: Record<string, PointValue>[] = new Array(pointsLength);
 
   for (let index = 0; index < pointsLength; index++) {
-    const point: Record<string, PointValue> = { ...constants };
-    for (const key of columnKeys) {
-      const value = columns[key][index];
-      if (value !== null) point[key] = value;
+    points[index] = { ...constants };
+  }
+  // Walk each channel once rather than looking up its column again for every sample.
+  for (const [key, column] of Object.entries(columns)) {
+    for (let index = 0; index < pointsLength; index++) {
+      const value = column[index];
+      if (value !== null) points[index][key] = value;
     }
-    points[index] = point as unknown as ReplayTrajectoryPoint;
   }
 
-  return { ...rest, points };
+  return { ...rest, points: points as unknown as ReplayTrajectoryPoint[] };
 }
 
 export function isColumnar(stored: StoredTrajectory): stored is Omit<ReplayTrajectoryData, 'points'> & ColumnarPoints {

@@ -197,6 +197,25 @@ describe('geometry revision migration', () => {
     expect(input.points[0].tireTemps![0]).toBe(71);
   });
 
+  it('isolates every wheel channel, child lap and nested metadata when projecting a response', () => {
+    const channels = ['tireTemps', 'tireWear', 'tirePressures', 'rideHeight', 'wheelSpeeds', 'brakeTemps', 'tireCompoundIndices'] as const;
+    const input = archivedLap();
+    for (const channel of channels) input.points[0][channel] = [1, 2, 3, 4];
+    input.allLapsData = [structuredClone(input)];
+    const snapshot = structuredClone(input);
+    const response = enrichTrajectoryWithTrackGeometry(input, 'Autodromo Nazionale Monza', 'Monza GP');
+    expect(input).toEqual(snapshot);
+    for (const lap of [response, ...response.allLapsData ?? []]) {
+      for (const channel of channels) {
+        expect(lap.points[0][channel]).toEqual([1, 2, 3, 4]);
+        lap.points[0][channel]![0] = 99;
+      }
+      lap.bounds.minX = 99;
+      lap.sectors!.s1Frame = 99;
+    }
+    expect(input).toEqual(snapshot);
+  });
+
   it('removes stale physical measurements when a legacy geometry has no profile', () => {
     const geometry = fixture();
     delete geometry.surfaceProfile;

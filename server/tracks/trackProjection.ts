@@ -117,12 +117,14 @@ export function projectTrajectoryToCenterline(
   const stations: number[] = [];
   const lateralOffsets: number[] = [];
 
+  // Reuse one candidate across segment searches; only winning candidates need a copy.
+  const candidate = { distSq: 0, s: 0, lateralOffset: 0 };
   // Helper to project point P onto segment k
   const projectOntoSegment = (
     px: number,
     pz: number,
     k: number
-  ): { distSq: number; s: number; lateralOffset: number; t: number } => {
+  ): typeof candidate => {
     const p1 = index.points[k];
     const len = index.segmentLengths[k];
     const tx = index.tangents[k].x;
@@ -144,7 +146,10 @@ export function projectTrajectoryToCenterline(
     const station = index.cumulativeStations[k] + t;
     const lateralOffset = wx * nx + wz * nz;
 
-    return { distSq, s: station, lateralOffset, t: t / len };
+    candidate.distSq = distSq;
+    candidate.s = station;
+    candidate.lateralOffset = lateralOffset;
+    return candidate;
   };
 
   let lastBestK = 0;
@@ -189,7 +194,7 @@ export function projectTrajectoryToCenterline(
 
   for (let i = 0; i < points.length; i++) {
     const pt = points[i];
-    let bestProj: { distSq: number; s: number; lateralOffset: number; t: number } | null = null;
+    let bestProj: typeof candidate | null = null;
     let bestK = lastBestK;
 
     // Determine instantaneous heading from trajectory if available

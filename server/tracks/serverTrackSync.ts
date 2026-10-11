@@ -9,6 +9,35 @@ import { dataPlugin } from '../plugins/dataPlugin.js';
 
 const trackStore = new TrackGeometryStore(key=>dataPlugin.trackGeometry(key));
 
+// Adding an array channel to the contract requires adding it here, so copies stay isolated.
+const POINT_ARRAY_CHANNELS: {
+  [Key in keyof ReplayTrajectoryPoint as NonNullable<ReplayTrajectoryPoint[Key]> extends readonly unknown[] ? Key : never]-?: true
+} = {
+  tireTemps: true, tireWear: true, tirePressures: true, rideHeight: true,
+  wheelSpeeds: true, brakeTemps: true, tireCompoundIndices: true,
+};
+const pointArrayKeys = Object.keys(POINT_ARRAY_CHANNELS) as Array<keyof typeof POINT_ARRAY_CHANNELS>;
+
+/** Point channels are scalars or flat four-wheel arrays; only the arrays need a deeper copy. */
+function copyPoint(point: ReplayTrajectoryPoint): ReplayTrajectoryPoint {
+  const copy = { ...point };
+  for (const key of pointArrayKeys) {
+    const value = point[key];
+    if (value) copy[key] = [...value];
+  }
+  return copy;
+}
+
+/** Copy the large sample arrays directly and use structuredClone for the smaller metadata tree. */
+function copyTrajectory(trajectory: ReplayTrajectoryData): ReplayTrajectoryData {
+  const { points, leadInPoints, leadOutPoints, allLapsData, ...metadata } = trajectory;
+  const copy: ReplayTrajectoryData = { ...structuredClone(metadata), points: points.map(copyPoint) };
+  if (leadInPoints) copy.leadInPoints = leadInPoints.map(copyPoint);
+  if (leadOutPoints) copy.leadOutPoints = leadOutPoints.map(copyPoint);
+  if (allLapsData) copy.allLapsData = allLapsData.map(copyTrajectory);
+  return copy;
+}
+
 /**
  * Loads and caches a track definition and its pre-computed spatial index by layoutKey.
  */
@@ -36,7 +65,7 @@ export function enrichTrajectoryWithTrackGeometry(
   }
 
   // Serving must never rewrite retained samples, child laps, or four-corner channel arrays.
-  trajectory = structuredClone(trajectory);
+  trajectory = copyTrajectory(trajectory);
 
   const spec = getCircuitSpecification(venue, course, sceneDesc, replayName, null, trackLengthMeters);
   const resolvedKey = spec.layoutKey !== 'unknown' ? spec.layoutKey : null;
