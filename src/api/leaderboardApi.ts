@@ -1,4 +1,4 @@
-import type { Leaderboard, LeaderboardLayout, RivalStatus } from '../../shared/types/leaderboard.js';
+import type { Leaderboard, LeaderboardLayout, LeaderboardWithRival, RivalStatus } from '../../shared/types/leaderboard.js';
 import { fetchJson, postJson } from './apiClient.js';
 
 export interface LeaderboardRequest {
@@ -19,10 +19,11 @@ const boardBody = (request: LeaderboardRequest) => ({
   ...(request.carType ? { carType: request.carType } : {}),
 });
 
-/** The player's rival on a board, set or moved on by the server as laps come in. */
-export function loadRival(request: LeaderboardRequest, signal?: AbortSignal): Promise<RivalStatus> {
+/** Load standings and the rival from one calculation of the selected board. */
+export function loadLeaderboardWithRival(request: LeaderboardRequest, signal?: AbortSignal): Promise<LeaderboardWithRival> {
   const query = new URLSearchParams(boardBody(request));
-  return fetchJson<RivalStatus>(`/api/rivals?${query.toString()}`, { signal });
+  query.set('includeRival', 'true');
+  return fetchJson<LeaderboardWithRival>(`/api/leaderboard?${query.toString()}`, { signal });
 }
 
 /** Makes a driver ahead the player's rival. */

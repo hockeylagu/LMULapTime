@@ -62,6 +62,11 @@ export interface Leaderboard {
   benchmark: ReferenceLaptimeEntry | null;
 }
 
+/** One board snapshot shared by standings and the rival card. */
+export interface LeaderboardWithRival extends Leaderboard {
+  rivalStatus: RivalStatus;
+}
+
 /** A class the player drove on a layout, as the track ribbon shows it. */
 export interface LeaderboardLayoutClass {
   carClass: string;

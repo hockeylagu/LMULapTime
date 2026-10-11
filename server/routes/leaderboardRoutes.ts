@@ -31,8 +31,7 @@ export function createLeaderboardRouter(context: ServerContext): Router {
   });
 
   /** Brings the stored rival up to date with the board, and describes the chase. */
-  const rivalStatus = (query: LeaderboardQuery): RivalStatus => {
-    const board = boardFor(query);
+  const rivalStatus = (query: LeaderboardQuery, board = boardFor(query)): RivalStatus => {
     const scope = scopeOf(board, query);
     const db = context.sessionDb;
     const resolution = resolveRival(board, db.getActiveRival(scope), Date.now());
@@ -52,12 +51,9 @@ export function createLeaderboardRouter(context: ServerContext): Router {
 
   router.get('/leaderboard', (req, res) => {
     const query = withBoardQuery(req.query, res);
-    if (query) res.json(boardFor(query));
-  });
-
-  router.get('/rivals', (req, res) => {
-    const query = withBoardQuery(req.query, res);
-    if (query) res.json(rivalStatus(query));
+    if (!query) return;
+    const board = boardFor(query);
+    res.json(req.query.includeRival === 'true' ? { ...board, rivalStatus: rivalStatus(query, board) } : board);
   });
 
   // The player picks their rival: any driver ahead on the board.
@@ -72,7 +68,7 @@ export function createLeaderboardRouter(context: ServerContext): Router {
       return;
     }
     context.sessionDb.pinRival(scopeOf(board, query), target);
-    res.json(rivalStatus(query));
+    res.json(rivalStatus(query, board));
   });
 
   return router;

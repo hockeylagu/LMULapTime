@@ -34,20 +34,19 @@ function queryBoardDriverFacts(db: DatabaseType, query: LeaderboardQuery): Drive
         d.driver_ordinal,coalesce(n.name,'') driver_name,d.is_player_driver is_player,coalesce(v.car_type,'') car_type,c.best_lap_ordinal lap_ordinal,
         l.lap_num lap_number,c.best_lap_time lap_time,l.s1,l.s2,l.s3,
         row_number() OVER (PARTITION BY coalesce(n.name,'') ORDER BY c.best_lap_time,s.timestamp,s.id,d.driver_ordinal,c.best_lap_ordinal) best_rank
-      FROM session_driver_condition_summaries c JOIN session_drivers d
-        ON d.session_id=c.session_id AND d.driver_ordinal=c.driver_ordinal
+      -- Keep the layout's sessions first even when a legacy driver-class index exists.
+      FROM sessions s CROSS JOIN session_drivers d ON d.session_id=s.id
+      JOIN session_driver_condition_summaries c ON c.session_id=d.session_id AND c.driver_ordinal=d.driver_ordinal
       LEFT JOIN drivers n ON n.driver_id=d.driver_id LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id
-      JOIN sessions s ON s.id=d.session_id
       LEFT JOIN session_laps l ON l.session_id=c.session_id AND l.driver_ordinal=c.driver_ordinal AND l.lap_ordinal=c.best_lap_ordinal
       WHERE ${scopeSql} AND c.condition_group='dry' AND c.best_lap_time IS NOT NULL AND d.is_human=1
     ) SELECT * FROM ranked WHERE best_rank=1`).all(...params) as SummaryRow[];
-  const facts = db.prepare(`WITH eligible AS (
+  const facts = db.prepare(`WITH eligible AS MATERIALIZED (
       SELECT s.id,s.timestamp,d.driver_ordinal,coalesce(n.name,'') driver_name,d.is_player_driver is_player,c.clean_count,c.best_s1,c.best_s2,c.best_s3,
         c.fastest_three_count,c.fastest_three_time_sum,c.best_lap_time
-      FROM session_driver_condition_summaries c JOIN session_drivers d
-        ON d.session_id=c.session_id AND d.driver_ordinal=c.driver_ordinal
+      FROM sessions s CROSS JOIN session_drivers d ON d.session_id=s.id
+      JOIN session_driver_condition_summaries c ON c.session_id=d.session_id AND c.driver_ordinal=d.driver_ordinal
       LEFT JOIN drivers n ON n.driver_id=d.driver_id LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id
-      JOIN sessions s ON s.id=d.session_id
       WHERE ${scopeSql} AND c.condition_group='dry' AND c.best_lap_time IS NOT NULL AND d.is_human=1
     ), top3 AS (
       SELECT driver_name,min(fastest_three_time_sum/3.0) average FROM eligible WHERE fastest_three_count=3 GROUP BY driver_name
@@ -149,7 +148,7 @@ export function queryCompactPlayerSessionBests(db: DatabaseType, query: Leaderbo
   if (query.layoutKey === 'unknown') return [];
   const carType = query.carType?.trim().toLowerCase() ?? '';
   return db.prepare(`SELECT s.id sessionId,s.session_name sessionName,s.timestamp,c.best_lap_time best
-    FROM sessions s JOIN session_drivers d ON d.session_id=s.id LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id
+    FROM sessions s CROSS JOIN session_drivers d ON d.session_id=s.id LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id
     JOIN session_driver_condition_summaries c ON c.session_id=d.session_id AND c.driver_ordinal=d.driver_ordinal
     WHERE s.layout_key=? AND d.driver_class=? AND d.is_player_driver=1 AND (?='' OR lower(trim(v.car_type))=?)
       AND c.condition_group='dry' AND c.best_lap_time IS NOT NULL

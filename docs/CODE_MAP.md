@@ -324,6 +324,15 @@ assets are validated local-package resources served through `/api/data-plugin/tr
 stale assets are ignored while generation replaces files. The optional display contract is `TrackMapDisplay`
 in `shared/types/trackGeometry.ts`, validated by `parseTrackMapDisplay` in `shared/domain/trackGeometry.ts`.
 Leaderboard navigation resolves missing or `All` classes from the selected layout's last-driven class (or first available class), while preserving a valid specific class deep link.
+The page's `rivals/useRival.ts` owns standings and rival state together: `/leaderboard?includeRival=true`
+returns `LeaderboardWithRival`, computing the board once; the separate `board/useLeaderboard.ts` hook is removed.
+Replay personal-best reads still request the plain board. The page supplies its track list to `CompareLaps`,
+so the comparison does not request `/leaderboard/layouts` again. Standalone comparisons retain their own loader.
+Leaderboard SQL starts from layout-scoped sessions before drivers, and reuses materialized eligible contributions.
+Session schema initialization drops the legacy `idx_session_drivers_class` index. Track summaries materialize
+their compact base to reuse class checks across aggregate expressions. Read-only warm measurements on
+992 sessions: LMGT3 tracks about 46 → 14 ms, Hypercar tracks 104–153 → 32 ms, Road Atlanta LMGT3
+standings 43 → 1.5 ms and player history 6.6 → 0.2 ms. These exclude HTTP and browser rendering.
 
 ## 5. Cache versions: what to bump
 

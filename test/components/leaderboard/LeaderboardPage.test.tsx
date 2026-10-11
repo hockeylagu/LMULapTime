@@ -34,6 +34,10 @@ const EMPTY_LAPS = {
   bestS1: null, bestS2: null, bestS3: null, theoreticalBestSec: null, benchmarks: [],
 };
 
+const EMPTY_RIVAL = {
+  rival: null, rivalEntry: null, gap: null, progress: null, theoreticalGap: null, beaten: [], nextUp: [], trend: [],
+};
+
 const urlParams = () => new URLSearchParams(window.location.hash.split('?')[1] ?? '');
 
 describe('LeaderboardPage', () => {
@@ -42,16 +46,12 @@ describe('LeaderboardPage', () => {
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.startsWith('/api/leaderboard/layouts')) return Promise.resolve({ ok: true, json: () => Promise.resolve(LAYOUTS) });
       if (url.startsWith('/api/compare/laps')) return Promise.resolve({ ok: true, json: () => Promise.resolve(EMPTY_LAPS) });
-      if (url.startsWith('/api/rivals?')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({
-          rival: null, rivalEntry: null, gap: null, progress: null, theoreticalGap: null, beaten: [], nextUp: [], trend: [],
-        }) });
-      }
       if (url.startsWith('/api/leaderboard?')) {
         const query = new URLSearchParams(url.split('?')[1]);
         return Promise.resolve({ ok: true, json: () => Promise.resolve({
           layoutKey: query.get('layout'), layoutName: '', carClass: query.get('carClass'), scope: 'class', carType: null,
           entries: [], player: null, benchmark: null,
+          rivalStatus: EMPTY_RIVAL,
         }) });
       }
       return Promise.reject(new Error(`Unexpected ${url}`));
@@ -71,7 +71,9 @@ describe('LeaderboardPage', () => {
     expect(screen.getByRole('button', { name: /Hypercar\s*P7\/20/ })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /^GT3\s*P12\/20/ })).toHaveAttribute('aria-pressed', 'false');
     expect(await screen.findByRole('heading', { name: /Hypercar board/ })).toBeInTheDocument();
-    expect(global.fetch).toHaveBeenCalledWith('/api/leaderboard?layout=daytona_road_course&carClass=LMH', expect.anything());
+    expect(global.fetch).toHaveBeenCalledWith('/api/leaderboard?layout=daytona_road_course&carClass=LMH&includeRival=true', expect.anything());
+    expect(vi.mocked(global.fetch).mock.calls.filter(([url]) => String(url).startsWith('/api/leaderboard/layouts'))).toHaveLength(1);
+    expect(vi.mocked(global.fetch).mock.calls.some(([url]) => String(url).startsWith('/api/rivals?'))).toBe(false);
   });
 
   it.each(['', '&carClass=All'])('selects the chosen track default class when the class is missing or All (%s)', async classQuery => {
@@ -81,7 +83,7 @@ describe('LeaderboardPage', () => {
     expect(await screen.findByRole('heading', { name: /LMP3 board/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /LMP3\s*P2\/20/ })).toHaveAttribute('aria-pressed', 'true');
     await waitFor(() => expect(urlParams().get('carClass')).toBe('LMP3'));
-    expect(global.fetch).toHaveBeenCalledWith('/api/leaderboard?layout=bahrain_gp&carClass=LMP3', expect.anything());
+    expect(global.fetch).toHaveBeenCalledWith('/api/leaderboard?layout=bahrain_gp&carClass=LMP3&includeRival=true', expect.anything());
   });
 
   it('defaults an explicit All track sentinel and preserves a valid track/class deep link', async () => {
@@ -214,7 +216,7 @@ describe('LeaderboardPage', () => {
     const defaultFetch = fetchMock.getMockImplementation() as (url: string, init?: RequestInit) => Promise<Response>;
     fetchMock.mockImplementation((input, init) => {
       const url = String(input);
-      if (url.startsWith('/api/leaderboard?')) return Promise.resolve({ ok: true, json: () => Promise.resolve(b) } as Response);
+      if (url.startsWith('/api/leaderboard?')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ ...b, rivalStatus }) } as Response);
       if (url.startsWith('/api/rivals')) return Promise.resolve({ ok: true, json: () => Promise.resolve(rivalStatus) } as Response);
       return defaultFetch(url, init);
     });
@@ -232,6 +234,25 @@ describe('LeaderboardPage', () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: false, status: 500, json: () => Promise.resolve({ error: 'Database is locked' }) });
     render(<LeaderboardPage sessions={[]} />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Database is locked');
+  });
+
+  it('shows one error for a failed board snapshot and retries without reloading the track list', async () => {
+    const fetchMock = vi.mocked(global.fetch);
+    const defaultFetch = fetchMock.getMockImplementation() as (url: string) => Promise<Response>;
+    let failed = true;
+    fetchMock.mockImplementation(input => {
+      const url = String(input);
+      if (url.startsWith('/api/leaderboard?') && failed) {
+        return Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({ error: 'Board unavailable' }) } as Response);
+      }
+      return defaultFetch(url);
+    });
+    render(<LeaderboardPage sessions={[]} />);
+    expect(await screen.findByRole('alert')).toHaveTextContent('Board unavailable');
+    failed = false;
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api/leaderboard/layouts'))).toHaveLength(1);
   });
 });
 

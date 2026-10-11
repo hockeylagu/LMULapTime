@@ -8,6 +8,14 @@ import { queryCompactLeaderboard, queryCompactLeaderboardLayouts, queryCompactPl
 import { driver, lap, session } from '../../../domain/leaderboardFixtures.js';
 
 describe('compact leaderboard queries', () => {
+  it('removes the legacy class-first index when an existing database opens', () => {
+    const db = new Database(':memory:');
+    initDbSchema(db);
+    db.exec('CREATE INDEX idx_session_drivers_class ON session_drivers(driver_class, vehicle_id)');
+    initDbSchema(db);
+    expect(db.prepare("SELECT 1 FROM sqlite_master WHERE name='idx_session_drivers_class'").get()).toBeUndefined();
+    db.close();
+  });
   it('matches deterministic board, layout and player-session results across grouped history', () => {
     const db = new Database(':memory:');
     initDbSchema(db);

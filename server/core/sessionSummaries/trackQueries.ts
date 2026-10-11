@@ -78,7 +78,7 @@ function aggregateScopeSql(trackName: string, carClass?: string, carModel?: stri
 }
 
 function trackBaseCte(carClass?: string, carModel?: string, layoutKey?: string, trackName?: string): SqlFragment {
-  const classMatch = carClassMatch(carClass);
+  const classMatch = sessionClassMatch(carClass);
   const clauses: string[] = [];
   const values: (string | number)[] = [...classMatch.values];
   if (carModel && carModel !== 'All') { clauses.push('s.player_car_type=?'); values.push(carModel); }
@@ -89,11 +89,12 @@ function trackBaseCte(carClass?: string, carModel?: string, layoutKey?: string, 
     values.push(...track.values);
   }
   const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
-  return { sql: `WITH base AS (
+  // Reuse each session's class check across aggregates and best-lap selection.
+  return { sql: `WITH base AS MATERIALIZED (
       SELECT s.id,s.track_venue,s.track_course,s.layout_key,s.timestamp,s.session_name,
         s.player_driver_name,s.player_car_type,s.player_car_class,s.player_best_lap_time,s.player_laps_count,
         a.event_timestamp,
-        CASE WHEN ${sessionClassMatch(carClass).sql} THEN 1 ELSE 0 END class_match,
+        CASE WHEN ${classMatch.sql} THEN 1 ELSE 0 END class_match,
         a.best_s1,a.best_s2,a.best_s3,a.best_lap_wet
       FROM sessions s JOIN session_summary_facts a ON a.session_id=s.id
       ${where}

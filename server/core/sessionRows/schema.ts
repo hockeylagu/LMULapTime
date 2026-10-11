@@ -47,6 +47,8 @@ export function initSessionRowsSchema(db: DatabaseType): void {
   addColumn('player_driver_ordinal', 'INTEGER');
 
   db.exec(`
+    -- Legacy class-first indexes make layout-scoped boards traverse unrelated sessions.
+    DROP INDEX IF EXISTS idx_session_drivers_class;
     CREATE TABLE IF NOT EXISTS session_recordings (
       session_id TEXT NOT NULL PRIMARY KEY, ${columnDefinitions(RECORDING_FIELDS)}
     ) WITHOUT ROWID;

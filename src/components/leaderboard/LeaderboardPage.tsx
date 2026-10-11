@@ -9,7 +9,6 @@ import { TrackRibbon } from './ribbon/TrackRibbon.js';
 import { LayoutClassPills } from './ribbon/LayoutClassPills.js';
 import { useLeaderboardLayouts } from './ribbon/useLeaderboardLayouts.js';
 import { LeaderboardSection } from './board/LeaderboardSection.js';
-import { useLeaderboard } from './board/useLeaderboard.js';
 import { useBoardActions, boardLapTag } from './board/useBoardActions.js';
 import { boardLapToComparable } from './board/leaderboardLaps.js';
 import { RivalCard } from './rivals/RivalCard.js';
@@ -54,12 +53,12 @@ export const LeaderboardPage: React.FC<CompareLapsProps> = (props) => {
   const layoutKey = selectedLayout?.layoutKey ?? (track ? getCircuitSpecification(track).layoutKey : null);
   const scope: LeaderboardScope = searchParams.get('scope') === 'car' ? 'car' : 'class';
   const playerCarType = selectedLayout?.classes.find((c) => c.carClass === carClass)?.lastCarType || null;
-  const leaderboard = useLeaderboard(layoutKey, carClass, scope === 'car' ? playerCarType : null);
+  const leaderboard = useRival(layoutKey && carClass ? { layoutKey, carClass, carType: scope === 'car' ? playerCarType : null } : null);
   const { compareRequest, compareRef, scrollToCompare, onPick, onCompare, onAnalyse, onTelemetry } = useBoardActions(leaderboard.board, carClass);
   const [comparedLapIds, setComparedLapIds] = useState<string[]>([]);
-  const rival = useRival(layoutKey && carClass ? { layoutKey, carClass, carType: scope === 'car' ? playerCarType : null } : null);
-  const rivalName = rival.status?.rival?.kind === 'driver' ? rival.status.rival.driverName : null;
-  const rivalEntry = rival.status?.rivalEntry ?? null;
+  const rivalName = leaderboard.status?.rival?.kind === 'driver' ? leaderboard.status.rival.driverName : null;
+  const rivalEntry = leaderboard.status?.rivalEntry ?? null;
+  const availableTracks = useMemo(() => [...new Set(layouts.map(layout => layout.trackName))].sort(), [layouts]);
   const rivalLap = useMemo(
     () => (rivalEntry && carClass ? boardLapToComparable(rivalEntry, carClass, boardLapTag(rivalEntry)) : null),
     [rivalEntry, carClass]
@@ -121,13 +120,13 @@ export const LeaderboardPage: React.FC<CompareLapsProps> = (props) => {
         )}
       </section>
 
-      <RivalCard rival={rival} player={leaderboard.board?.player ?? null} onCompare={onAnalyse} onTelemetry={onTelemetry} />
+      {!leaderboard.error && <RivalCard rival={leaderboard} player={leaderboard.board?.player ?? null} onCompare={onAnalyse} onTelemetry={onTelemetry} />}
 
       {layoutKey && carClass && (
         <LeaderboardSection
           {...leaderboard}
           rivalName={rivalName}
-          onPin={rival.pin}
+          onPin={leaderboard.pin}
           carClass={carClass}
           scope={scope}
           playerCarType={playerCarType}
@@ -143,7 +142,7 @@ export const LeaderboardPage: React.FC<CompareLapsProps> = (props) => {
 
       {track && (
         <div ref={compareRef} className="scroll-mt-4">
-          <CompareLaps {...props} compareRequest={compareRequest} onComparedLapsChange={setComparedLapIds} rivalLap={rivalLap} />
+          <CompareLaps {...props} availableTracks={availableTracks} compareRequest={compareRequest} onComparedLapsChange={setComparedLapIds} rivalLap={rivalLap} />
         </div>
       )}
     </div>

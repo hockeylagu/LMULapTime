@@ -18,6 +18,7 @@ import type { TelemetryLapRef } from '../../utils/telemetryCompareLink.js';
 export type { CompareLapsSessionItem };
 
 export interface CompareLapsProps {
+  availableTracks?: string[];
   sessions?: CompareLapsSessionItem[];
   initialTrack?: string;
   initialCarClass?: string;
@@ -47,6 +48,7 @@ export function telemetryPair(laps: ComparableLap[], baseline: ComparableLap | n
 }
 
 export const CompareLaps: React.FC<CompareLapsProps> = ({
+  availableTracks,
   sessions = [],
   initialTrack,
   initialCarClass,
@@ -63,6 +65,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const data = useCompareLapsData({
+    availableTracks,
     sessions,
     initialTrack,
     initialCarClass,

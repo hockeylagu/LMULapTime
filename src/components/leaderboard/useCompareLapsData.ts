@@ -37,6 +37,7 @@ export type CompareLapsSessionItem = DetailedSession | (Omit<Partial<DetailedSes
 });
 
 export interface UseCompareLapsParams {
+  availableTracks?: string[];
   sessions?: CompareLapsSessionItem[];
   initialTrack?: string;
   initialCarClass?: string;
@@ -114,6 +115,7 @@ const NO_COMPARE_LAPS: CompareLapsApiData = {
 };
 
 export function useCompareLapsData({
+  availableTracks: suppliedTracks,
   sessions = [],
   initialTrack,
   initialCarClass,
@@ -141,13 +143,13 @@ export function useCompareLapsData({
   }, [sessions]);
 
   useEffect(() => {
-    if (sessions.length > 0) return;
+    if (suppliedTracks !== undefined || sessions.length > 0) return;
     const controller = new AbortController();
     loadLeaderboardLayouts(controller.signal)
       .then((layouts: LeaderboardLayout[]) => setLayoutTracks([...new Set(layouts.map((item) => item.trackName).filter(Boolean))].sort()))
       .catch((error: unknown) => { if (!isAbortError(error)) setLayoutTracks([]); });
     return () => controller.abort();
-  }, [sessions.length]);
+  }, [sessions.length, suppliedTracks]);
 
   const selectedTrack = searchParams.get('track') || initialTrack || (availableTracks.length > 0 ? availableTracks[0] : layoutTracks[0] || 'Bahrain');
   const selectedCarClass = searchParams.get('carClass') || initialCarClass || 'LMGT3';
@@ -471,7 +473,7 @@ export function useCompareLapsData({
   }, [comparedLaps, baselineLap]);
 
   return {
-    availableTracks: availableTracks.length > 0 ? availableTracks : layoutTracks,
+    availableTracks: suppliedTracks ?? (availableTracks.length > 0 ? availableTracks : layoutTracks),
     selectedTrack,
     selectedCarClass,
     loading,

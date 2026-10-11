@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { RivalStatus } from '../../../../shared/types/leaderboard.js';
+import type { Leaderboard, RivalStatus } from '../../../../shared/types/leaderboard.js';
 import { apiErrorMessage, isAbortError } from '../../../api/apiClient.js';
-import { LeaderboardRequest, loadRival, pinRival } from '../../../api/leaderboardApi.js';
+import { LeaderboardRequest, loadLeaderboardWithRival, pinRival } from '../../../api/leaderboardApi.js';
 
 export interface RivalState {
   status: RivalStatus | null;
@@ -18,8 +18,9 @@ export interface RivalState {
   retry: () => void;
 }
 
-/** The player's rival on the selected board; null request while no board is selected. */
-export function useRival(request: LeaderboardRequest | null): RivalState {
+/** Standings and rival share one request and selection lifecycle. */
+export function useRival(request: LeaderboardRequest | null): RivalState & { board: Leaderboard | null } {
+  const [board, setBoard] = useState<Leaderboard | null>(null);
   const [status, setStatus] = useState<RivalStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,18 +36,25 @@ export function useRival(request: LeaderboardRequest | null): RivalState {
 
   useEffect(() => {
     boardKeyRef.current = boardKey;
+    setBoard(null);
     setStatus(null);
     setError(null);
     setActionError(null);
     setPending(false);
+    setLoading(false);
     if (!layoutKey || !carClass) return;
     const controller = new AbortController();
     setLoading(true);
-    loadRival({ layoutKey, carClass, carType }, controller.signal)
-      .then((next) => { setStatus(next); setLoading(false); })
+    loadLeaderboardWithRival({ layoutKey, carClass, carType }, controller.signal)
+      .then((next) => {
+        if (controller.signal.aborted) return;
+        setBoard(next);
+        setStatus(next.rivalStatus);
+        setLoading(false);
+      })
       .catch((err) => {
-        if (isAbortError(err)) return;
-        setError(apiErrorMessage(err, 'Your rival could not be loaded.'));
+        if (controller.signal.aborted || isAbortError(err)) return;
+        setError(apiErrorMessage(err, 'The leaderboard could not be loaded.'));
         setLoading(false);
       });
     return () => controller.abort();
@@ -72,5 +80,5 @@ export function useRival(request: LeaderboardRequest | null): RivalState {
   const pin = useCallback((driverName: string) => act((r) => pinRival(r, driverName)), [act]);
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
-  return { status, loading, error, actionError, pending, pin, retry };
+  return { board, status, loading, error, actionError, pending, pin, retry };
 }
