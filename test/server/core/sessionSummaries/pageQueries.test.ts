@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { initDbSchema } from '../../../../server/core/dbSchema.js';
 import { upsertSession } from '../../../../server/core/dbSessionStore.js';
 import { queryProgression, querySessionPage } from '../../../../server/core/sessionSummaries/pageQueries.js';
-import { querySessionContext } from '../../../../server/core/sessionSummaries/contextQueries.js';
+import { querySessionContext, querySessionPersonalBest, querySessionPersonalBestById } from '../../../../server/core/sessionSummaries/contextQueries.js';
 import { computeProgression } from '../../../../server/sessions/sessionAnalytics.js';
 import { normalizeCarClass } from '../../../../shared/domain/paceCategory.js';
 import type { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
@@ -68,6 +68,42 @@ describe('paged session queries', () => {
       expect(querySessionContext(db, session)).toMatchObject({ ready: true, personalBests: [{ driverOrdinal: 0, bestLapTime: 90 }] });
       db.prepare('UPDATE sessions SET projection_revision=projection_revision-1').run();
       expect(querySessionContext(db, session)).toEqual({ ready: false, relatedSessions: [], personalBests: [] });
+    } finally { db.close(); }
+  });
+
+  it('loads only the initial driver PB and resolves another driver on demand within the layout', () => {
+    const db = new Database(':memory:');
+    try {
+      initDbSchema(db);
+      const session = fixture('current', 1);
+      session.drivers.unshift({ ...session.drivers[0], name: 'Opponent', isPlayer: false });
+      const otherLayout = fixture('other-layout', 2);
+      otherLayout.trackCourse = 'Curva Grande';
+      otherLayout.trackLengthMeters = 5700;
+      otherLayout.drivers[0].bestLapTime = 80;
+      for (const value of [session, otherLayout]) upsertSession(db, value, value.filePath, 1, 1);
+      expect(querySessionContext(db, session).personalBests).toEqual([{ driverOrdinal: 1, bestLapTime: 90 }]);
+      expect(querySessionPersonalBest(db, session, 0)).toEqual({ driverOrdinal: 0, bestLapTime: 90, ready: true });
+      expect(querySessionPersonalBestById(db, session.id, 0)).toEqual(querySessionPersonalBest(db, session, 0));
+      session.playerDriver = undefined;
+      expect(querySessionContext(db, session).personalBests).toEqual([{ driverOrdinal: 0, bestLapTime: 90 }]);
+    } finally { db.close(); }
+  });
+
+  it('keeps unknown-layout PBs scoped to the exact venue and course', () => {
+    const db = new Database(':memory:');
+    try {
+      initDbSchema(db);
+      const session = fixture('unknown-a', 1);
+      session.trackVenue = 'Unmapped Venue';
+      session.trackCourse = 'Layout A';
+      const otherCourse = fixture('unknown-b', 2);
+      otherCourse.trackVenue = session.trackVenue;
+      otherCourse.trackCourse = 'Layout B';
+      otherCourse.drivers[0].bestLapTime = 80;
+      for (const value of [session, otherCourse]) upsertSession(db, value, value.filePath, 1, 1);
+      expect(querySessionPersonalBestById(db, session.id, 0)).toEqual({ driverOrdinal: 0, bestLapTime: 90, ready: true });
+      expect(querySessionPersonalBestById(db, session.id, 1)).toBeNull();
     } finally { db.close(); }
   });
 });

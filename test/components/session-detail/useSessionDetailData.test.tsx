@@ -25,6 +25,32 @@ describe('SessionDetail loading', () => {
   beforeEach(() => invalidateReferenceLaptimes());
   afterEach(() => vi.unstubAllGlobals());
 
+  it('loads opponents PB only on selection, hides stale PBs, and fetches again after switching back', async () => {
+    const session = { ...mockDetailedSession, historyContext: {
+      ready: true, relatedSessions: [], personalBests: [{ driverOrdinal: 0, bestLapTime: 122 }],
+    } };
+    let resolveOpponent: ((value: { ok: boolean; status: number; json: () => Promise<unknown> }) => void) | undefined;
+    const fetchMock = vi.fn((url: string) => {
+      if (url.endsWith('/personal-best/1')) return new Promise(resolve => { resolveOpponent = resolve; });
+      const body = url.endsWith('/personal-best/0') ? { ready: true, bestLapTime: 121 } : url.startsWith('/api/session/') ? session : [];
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(body) });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const hook = renderHook(() => useSessionDetailData({ sessionId: session.id }));
+    await waitFor(() => expect(hook.result.current.allTimeCategoryTrackPB).toBe(122));
+    expect(fetchMock.mock.calls.filter(([url]) => url.includes('/personal-best/'))).toHaveLength(0);
+    act(() => hook.result.current.setSelectedDriverName('AI Driver 2'));
+    expect(hook.result.current.allTimeCategoryTrackPB).toBeNull();
+    expect(hook.result.current.isCurrentSessionAllTimePB).toBe(false);
+    await act(async () => resolveOpponent?.({ ok: true, status: 200, json: () => Promise.resolve({ ready: true, bestLapTime: 120 }) }));
+    await waitFor(() => expect(hook.result.current.allTimeCategoryTrackPB).toBe(120));
+    act(() => hook.result.current.setSelectedDriverName('Sim Driver'));
+    await waitFor(() => expect(hook.result.current.allTimeCategoryTrackPB).toBe(121));
+    act(() => hook.result.current.setSelectedDriverName('AI Driver 2'));
+    expect(fetchMock.mock.calls.filter(([url]) => url.endsWith('/personal-best/1'))).toHaveLength(2);
+    hook.unmount();
+  });
+
   it('says why the session could not be loaded when the server fails', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     serve({ '/api/session/': { status: 500, body: { error: 'database is locked' } } });

@@ -31,6 +31,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
     session,
     loading,
     loadError,
+    personalBestError,
     selectedDriver,
     selectedDriverName,
     setSelectedDriverName,
@@ -85,6 +86,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
   return (
     <div className="space-y-6">
       {loadError && <p role="alert" className="text-sm text-lmu-loss">Session refresh failed: {loadError}</p>}
+      {personalBestError && <p role="alert" className="text-sm text-lmu-loss">Personal best unavailable: {personalBestError}</p>}
       <SessionDetailHeader
         session={session}
         selectedDriver={selectedDriver}

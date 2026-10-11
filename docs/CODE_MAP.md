@@ -3,8 +3,8 @@
 A fast index for new sessions: find the right file without searching. `AGENTS.md` holds the rules;
 this file holds the **routes through the code**. Keep it current (see "Keeping this file current" at the end).
 
-Last checked 2026-10-10: 494 TypeScript source files in src/server/shared, 287 test files,
-2498 tests (2442 passed, 56 skipped). Full tests and production build rechecked during documentation cleanup.
+Last checked 2026-10-10: 495 TypeScript source files in src/server/shared, 289 test files,
+2523 tests (2467 passed, 56 skipped). Full tests and production build rechecked after batching comparison PB lookups.
 Last recorded coverage (not rerun for this docs-only change): 94.30% lines, 91.99% statements,
 92.26% functions and 83.20% branches (two workers). Branch/worktree results are separate; see [plans](plans/README.md).
 
@@ -50,6 +50,17 @@ Raw columns retain XML values such as declared `laps_count`, `lap_num`, and `is_
 (`lap_ordinal`, `lap_seq`); `lists_mask` distinguishes an empty event array from an absent one.
 
 The telemetry comparison picker requests `telemetryOnly=true` on `/api/compare/laps`: linked replay and flying-lap filters run before pagination.
+That request uses `queryTelemetryComparableLaps` in `comparisonQueries.ts`: direct SQL reads of the visible lap rows,
+identity/display fields and best-lap badges, without full session hydration, benchmark rating or unused summary aggregates.
+The general leaderboard comparison response retains its summaries. Both paths share filter and personal-best scope rules.
+`comparisonLapRows.ts` reads the general response's selected page and up to three best-lap locators in one query,
+deduplicates those locators, and rates only those laps against current benchmarks. It never hydrates full sessions,
+driver histories or events. Equivalent representative/player-best queries share their result when the scopes match.
+Read-only checks on 2026-10-10 matched all response fields across 12 saved cases (three layouts, player/all-driver scopes,
+two pages). Bahrain LMP3's first 50 player laps read 52 lap rows instead of 1,032 laps across 11 sessions;
+warm backend time fell from 36.7 to 17.1 ms, and Road Atlanta LMGT3 from 17.5 to 8.3 ms.
+On 2026-10-10 the Road Atlanta GT3 default picker measured about 4 ms versus 19 ms previously (992 stored sessions),
+with zero full session reads and a 32 KB response instead of 58 KB; these are local backend measurements.
 Inspector state, comparison selection and reference suggestions use session IDs exclusively; recording filenames never substitute for session identity.
 `ReplayTrajectoryService` accepts session context plus driver/lap ordinals and resolves its recording internally; legacy filename/slot request parameters and unused request types are removed.
 `server/core/sessionRows/replayContext.ts` reads only the roster, replay link and compact official timing fields:
@@ -202,7 +213,7 @@ index their explicitly supplied replay directory locally.
    condition (the header scan samples 30 windows and can miss the peak).
    Pace is rated during XML parsing; startup benchmark refresh no longer rewrites all detailed session JSON.
 4. **Serve**: `GET /api/session/:id` (`server/routes/sessionRoutes.ts`) adds, per request and not stored:
-   - current benchmark pace via `rateSessionDetail` and bounded history context via `querySessionContext`; stored telemetry attachments are already read from normalized session rows;
+   - current benchmark pace via `rateSessionDetail` and bounded history context via `querySessionContext`; history initially queries only the player's personal best (first driver when no player exists). Selecting another driver loads `/api/session/:id/personal-best/:driverOrdinal` through `querySessionPersonalBestById`, reading layout and one driver's identity/class without hydrating the session and retaining only the active result without a per-driver cache. Both PB paths share a layout-first SQL query and strict unknown-layout venue/course scope. Stored telemetry attachments are already read from normalized session rows;
    - pit stop details from replay events (`attachPitServices`, `server/sessions/sessionPitStops.ts`, maths in `shared/domain/pitStops.ts`).
 5. **Load in the client**: `src/components/session-detail/useSessionDetailData.ts` (`fetchJson('/api/session/…')`).
 6. **Show**: `src/components/session-detail/SessionDetail.tsx`, then:
@@ -299,8 +310,8 @@ index their explicitly supplied replay directory locally.
 | Dashboard | `/api/dashboard` (`sessionSummaries/dashboardQueries.ts`: complete-history grouped metrics, current-benchmark ratings and recent trend candidates; paginated session cards) | `trackSummaryUtils.ts`, `paceCategory.ts` | `components/dashboard/` (`useDashboardData.ts` loads the bounded page and persisted aggregates; `Dashboard.tsx` uses server ranked track/car/pace cards; legacy metrics hooks remain for injected sessions/tests) |
 | Session list (dashboard + track detail) | `/api/sessions` (compact `SessionCard` rows from `sessionSummaries/pageQueries.ts` and `cards.ts`, without detailed driver/lap arrays); `/api/track/:trackName` returns the server page consumed by the same list | | `components/session-list/` (`SessionList.tsx`; 25 per page via `useSessionPage.ts` + `SessionPagination.tsx`, `?page=` reset by `updateSearchParams` on any other filter change; `SessionFilterParts.tsx` two-row toolbar with Clear filters, used by `dashboard/DashboardFilterBar.tsx` and `track-detail/TrackSessionsToolbar.tsx`; row chips in `SessionRowParts.tsx`) |
 | Tracks | `/api/tracks`; `/api/track/:trackName` (scoped history aggregate, compact filter options, server-paged cards, explicit `progressionPage` points and full-history position averages via `sessionSummaries/trackQueries.ts`) | `circuitSpecs.ts`, `circuitDefinitions.ts` | `components/track-summaries/` (native card links preserve class context; benchmark status/retry, unavailable pace sorting, explicit missing-record states; session-style PaceBadge and Last driven date), `components/track-detail/` (`useTrackDetailState.ts` drives server filters/pages; `TrackSurfaceProfiles.tsx` local road elevation/grade/bank traces) |
-| Leaderboard & rivals | `leaderboardRoutes.ts` (`/leaderboard/layouts`, `/leaderboard`, `/rivals`, `/rivals/pin`), `dbRivalStore.ts` | `leaderboard.ts`, `rivals.ts`, `sessionRivals.ts` | `src/api/leaderboardApi.ts`, `components/leaderboard/` (`board/`, `ribbon/`, `rivals/`, `debrief/`, 2-lap compare; DTO telemetry availability is boolean and navigation uses session+ordinal locators; `picker/` pages compact lap candidates and fetches exact deep-linked laps separately) |
-| Lap comparison | `/api/compare/laps` (`sessionSummaries/comparisonQueries.ts`: compact fact paging/aggregates and session+driver+lap ordinal hydration) | `lapComparison.ts` | `src/components/leaderboard/` (50-row numbered pages, one-row exact deep-link fetch, picker); `src/utils/telemetryCompareLink.ts` (session-scoped telemetry locators) |
+| Leaderboard & rivals | `leaderboardRoutes.ts` (`/leaderboard/layouts`, `/leaderboard` (optional rival status), `/rivals/pin`), `dbRivalStore.ts` | `leaderboard.ts`, `rivals.ts`, `sessionRivals.ts` | `src/api/leaderboardApi.ts`, `components/leaderboard/` (`board/`, `ribbon/`, `rivals/`, `debrief/`, 2-lap compare; DTO telemetry availability is boolean and navigation uses session+ordinal locators; `picker/` pages compact lap candidates and fetches exact deep-linked laps separately) |
+| Lap comparison | `/api/compare/laps` (`sessionSummaries/comparisonQueries.ts`: compact fact paging/aggregates; `comparisonLapRows.ts`: selected normalized lap DTOs) | `lapComparison.ts` | `src/components/leaderboard/` (50-row numbered pages, one-row exact deep-link fetch, picker); `src/utils/telemetryCompareLink.ts` (session-scoped telemetry locators) |
 | Benchmarks | `referenceRoutes.ts`, `server/benchmarks/referenceLaptimes.ts`, `server/benchmarks/benchmarkImpact.ts` (player laps only; `BENCHMARK_IMPACT_RULE` stamped on each diff, stored diffs from an older rule are recounted by `context.refreshBenchmarkDiffImpacts` after the startup refresh and on read; the status reads the latest update from its history row), `dbReferenceLaptimeStore.ts` (`benchmark_diff_history`) | `paceCategory.ts` | `src/api/referenceApi.ts`, `common/BenchmarkLadder.tsx` (the one benchmark display, session and track header cards), `settings/ReferenceChangesList.tsx` |
 | AI engineer | `aiRoutes.ts`, `server/ai/aiReport.ts` (`PROMPT_VERSION`), `dbAiReportStore.ts` | `shared/types/aiReport.ts` | `src/utils/aiReportPayload.ts`, `replay/analysis/AIReportTab.tsx` |
 | Settings & scans | `systemRoutes.ts` (`/status`, `/scan`, `/scan/status`, `/cache/clear`), `/replays/cache`, `/replays/upgrade` | | `components/settings/` (`SettingsPanel` panel + `FeedbackMessage`, `settingsFormat` numbers/plurals/bytes/dates with fallbacks, `aiKey` (clean and redact the Gemini key), `labelStyles.ts` (`READOUT_LABEL` / `FIELD_LABEL` shared label classes), `shared/domain/folderPath.ts` (`normalizeFolderPath` / `folderPathProblem`, used by the form and by `POST /scan`, which answers 400 `{error, field}`), `useSettingsScrollspy` TOC highlight, `PathField`, `OverviewCard` (the one status card: folders, sessions, replays, AI state, database size, telemetry files count, last sync, plus the scoped Clear parsed sessions action; section order is Overview, Reference Benchmarks, AI reports, AI history, Cached Replays, Folder Paths; `resolveSectionId` validates `?section=`), `ReferenceLaptimesCard` + `ReferenceChangesList` (purpose, pace categories, one status line, collapsed update history), `controls/InlineConfirm` + `useInlineConfirm` (focus returns to the trigger or the section heading), `hooks/` (`useAiSettings`, `useDeepLinkAlign`), `replays/` (cached-replay list model, `useReplayCache`, filters, table, progress; the table draws 200 rows at a time with "Show N more"; `replayView` / `replayFilter` / `replaySort` params beside `?section=`); `/replays/upgrade` also reports `currentVersion`, the version an on-disk replay must be at) |
@@ -312,6 +323,12 @@ recharts out of the entry: chunk groups in `vite.config.ts`). All server calls g
 
 Types: canonical in `shared/types/` (`index.ts` is the barrel; `session.ts` laps/drivers/sessions, `reference.ts` benchmarks, `status.ts` scan/system, `replay.ts` replay; `leaderboard.ts`, `pitStops.ts`, `raceTraffic.ts`, `aiReport.ts`).
 `server/core/types.ts` re-exports them for server code; client and shared code import from `shared/types/index.ts`.
+
+Comparison PB badges (`comparisonQueries.ts`, both leaderboard and telemetry picker) rank matching
+history once for the distinct drivers on the requested page, instead of running one history query per
+driver. Layout/class/driver/session scope and valid positive lap rules are preserved; exact lap locators
+and pagination do not narrow PB history. Ties keep lap time, timestamp, session rowid, driver ordinal
+and lap ordinal order. Empty pages skip the PB query. This is request-time SQL with no extra cache or migration.
 
 Track geometry: `shared/types/trackGeometry.ts` defines local-meter map polygons, station-indexed nullable physical
 profiles, quality flags and independent geometry/projection revisions. `shared/domain/trackGeometry.ts` validates
@@ -447,6 +464,7 @@ the completed 2026-09-29 cleanup and does not describe all remaining findings.
   `GpsTrackMapScene.tsx` (289), `ReplayInspectorModalBody.tsx` (276), `TelemetryPresetModal.tsx` (273), `GpsMapTelemetryHud.tsx` (272).
 
 **Logic in the wrong place / duplicated**
+- Comparison profiling (read-only, 2026-10-10): selected normalized lap reads and shared equivalent best-lap queries removed full-session overfetch. All-driver pages still run personal-best lookups for each distinct visible driver; Spa LMP3's first all-driver page measured about 127 ms warm after the change. Investigate those SQL scopes and query plans if optimizing further; this is a backend observation, not a browser measurement.
 - `lapClassPosition` and the indexed `lapClassPositions` (`shared/domain/lapPlaces.ts`) match car classes by lowercased name instead of canonical class resolution.
 - The improvement chart keeps its own `SessionProgressionPoint` (`improvementChartTypes.ts`), a copy of the shared one plus the
   benchmark pace fields.
@@ -483,8 +501,8 @@ use model shapes when available, with approximate placement until a replay-origi
 `server/plugins/dataPlugin.ts` loads one validated startup snapshot from backend-only
 `LMU_PLUGIN_ROOT`; `trackPackage.ts` verifies canonical revisions and the allowlist,
 rejects degenerate closed routes, and checks declared length against the measured route within 0.01 m.
-`server/routes/dataPluginRoutes.ts` exposes status, tracks (geometry/display pair),
-vehicles (without logos), and optional manufacturer logos (`GET /api/data-plugin/vehicles/logos`; a malformed logo
+`server/routes/dataPluginRoutes.ts` exposes tracks (geometry/display pair)
+and optional manufacturer logos (`GET /api/data-plugin/vehicles/logos`; a malformed logo
 entry is skipped, not fatal), with the same server access behavior as the rest of the API. There is no static package mount.
 `resolveCarManufacturer` (`shared/domain/vehicleMapping.ts`) matches car names against a word-bounded rule table.
 The client loads logos via `src/api/vehicleLogosApi.ts` (one shared request; a failure is cached for

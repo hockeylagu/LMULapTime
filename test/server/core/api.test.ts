@@ -35,7 +35,6 @@ describe('Server API wiring', () => {
     ['system', '/api/status'],
     ['system', '/api/scan/status'],
     ['session', '/api/sessions'],
-    ['session', '/api/progression'],
     ['session', '/api/track/Spa'],
     ['session', '/api/compare/laps?track=Spa'],
     ['reference', '/api/reference-laptimes'],

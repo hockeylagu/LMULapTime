@@ -14,7 +14,6 @@ import { querySessionPage } from '../../../../server/core/sessionSummaries/pageQ
 import { queryCompactComparableLaps } from '../../../../server/core/sessionSummaries/comparisonQueries.js';
 import { DRIVER_WITH_DICTIONARIES } from '../../../../server/core/sessionRows/reader.js';
 import { queryTrackDetailSummary } from '../../../../server/core/sessionSummaries/trackQueries.js';
-import { loadSession } from '../../../../server/core/sessionRows/access.js';
 
 const SESSION_COUNT = 10_000;
 const LAPS_PER_SESSION = 20;
@@ -103,11 +102,7 @@ describe('10k session query scale fixture', () => {
     const board = measure(() => queryCompactLeaderboard(db, { layoutKey: 'monza_gp', carClass: 'LMH' }));
     const layouts = measure(() => queryCompactLeaderboardLayouts(db));
     const track = measure(() => queryTrackDetailSummary(db, 'Monza', 'LMH'));
-    const hydratedIds: string[] = [];
-    const compare = measure(() => queryCompactComparableLaps(db, id => {
-      hydratedIds.push(id);
-      return loadSession(db, id);
-    }, { trackName: 'Monza', playerOnly: false }, { page: 2, pageSize: 5 }));
+    const compare = measure(() => queryCompactComparableLaps(db, { trackName: 'Monza', playerOnly: false }, { page: 2, pageSize: 5 }));
     const totalStorageBytes = pageStorageBytes(db);
     const pagePlan = db.prepare(`EXPLAIN QUERY PLAN SELECT id FROM sessions
       WHERE layout_key=? ORDER BY timestamp DESC,id DESC LIMIT 25`).all('monza_gp') as Array<{ detail: string }>;
@@ -129,7 +124,7 @@ describe('10k session query scale fixture', () => {
       boardMs: Number(board.elapsedMs.toFixed(1)), boardPayloadBytes: JSON.stringify(board.value).length,
       layoutsMs: Number(layouts.elapsedMs.toFixed(1)), trackMs: Number(track.elapsedMs.toFixed(1)),
       compareMs: Number(compare.elapsedMs.toFixed(1)), comparePayloadBytes: JSON.stringify(compare.value).length,
-      comparePageCount: compare.value.laps.length, compareTotal: compare.value.total, compareHydratedSessions: hydratedIds.length,
+      comparePageCount: compare.value.laps.length, compareTotal: compare.value.total,
       pagePlan: pagePlan.map(row => row.detail), boardPlan: boardPlan.map(row => row.detail), cardDriversPlan, comparePlan,
     };
     console.info(`10k session SQLite scale: ${JSON.stringify(report)}`);
@@ -148,8 +143,6 @@ describe('10k session query scale fixture', () => {
     expect(track.value?.totalLaps).toBe(SESSION_COUNT * LAPS_PER_SESSION);
     expect(compare.value.total).toBe(SESSION_COUNT * LAPS_PER_SESSION);
     expect(compare.value.laps).toHaveLength(5);
-    expect(new Set(hydratedIds).size).toBe(hydratedIds.length);
-    expect(hydratedIds.length).toBeLessThanOrEqual(5 + 3);
     expect(pagePlan.some(row => row.detail.includes('idx_sessions_layout_timestamp'))).toBe(true);
     expect(boardPlan.some(row => row.detail.includes('session_driver_condition_summaries'))).toBe(true);
     expect(totalStorageBytes).toBeGreaterThan(sourceBytes);

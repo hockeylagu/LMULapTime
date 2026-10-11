@@ -6,9 +6,7 @@ export function createDataPluginRouter(provider:DataPlugin=dataPlugin):Router {
   router.use((_req,res,next)=>{
     res.setHeader('Cache-Control','no-store'); next();
   });
-  router.get('/status',(_req,res)=>res.json(provider.status));
-  // Logos are large SVGs: they have their own endpoint and are never bundled into the vehicle list.
-  router.get('/vehicles',(_req,res)=>res.json({packageRevision:provider.status.revision,vehicles:provider.vehicles()}));
+  // Logos are large SVGs, loaded separately from telemetry's resolved vehicle records.
   router.get('/vehicles/logos',(_req,res)=>res.json({packageRevision:provider.status.revision,logos:provider.logos()}));
   router.get('/tracks/:layoutKey', (req,res)=>{
     const record=provider.track(req.params.layoutKey);

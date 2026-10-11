@@ -79,10 +79,9 @@ describe('local data plugin snapshot',()=>{
   });
   it('serves validated payloads without a local caller restriction and does not expose package files',async()=>{
     const {dir}=fixture();const app=express();app.use('/api/data-plugin',createDataPluginRouter(new DataPlugin(dir)));
-    expect((await request(app).get('/api/data-plugin/status')).body.state).toBe('ready');
     expect((await request(app).get('/api/data-plugin/tracks/monza_gp')).body.geometry.layoutKey).toBe('monza_gp');
-    expect((await request(app).get('/api/data-plugin/status').set('Host','app.example')).status).toBe(200);
-    expect((await request(app).get('/api/data-plugin/status').set('Origin','https://app.example')).status).toBe(200);
+    expect((await request(app).get('/api/data-plugin/tracks/monza_gp').set('Host','app.example')).status).toBe(200);
+    expect((await request(app).get('/api/data-plugin/tracks/monza_gp').set('Origin','https://app.example')).status).toBe(200);
     expect((await request(app).get('/api/data-plugin/manifest.json')).status).toBe(404);
     expect((await request(app).get('/api/data-plugin/tracks/unknown')).status).toBe(404);
   });
@@ -102,12 +101,6 @@ describe('local data plugin snapshot',()=>{
     const res = await request(app).get('/api/data-plugin/vehicles/logos');
     expect(res.status).toBe(200);
     expect(res.body.logos.Ferrari).toBe(svgContent);
-    // The vehicle list does not carry the logos.
-    const list = await request(app).get('/api/data-plugin/vehicles');
-    expect(list.status).toBe(200);
-    expect(list.body).not.toHaveProperty('logos');
-    expect(list.body.vehicles).toBeDefined();
-
     // Invalid entries are skipped, never thrown
     expect(parseVehicleLogos({ schemaVersion: 1, logos: { Ferrari: 'not an svg', Audi: svgContent } })).toEqual({ Audi: svgContent });
     expect(parseVehicleLogos({ schemaVersion: 2, logos: {} })).toEqual({});

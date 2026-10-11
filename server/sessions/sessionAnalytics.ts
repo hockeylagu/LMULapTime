@@ -30,16 +30,16 @@ export const computeAverageLapTime = (laps: LapData[]): number | null => {
  * Projects raw session, driver, and lap data into a standardized ComparableLap domain model.
  */
 export function toComparableLap(
-  session: DetailedSession,
-  driver: DriverData,
+  session: Pick<DetailedSession, 'id' | 'sessionName' | 'sessionType' | 'timeString' | 'timestamp' | 'matchingReplayFile'> & Partial<Pick<DetailedSession, 'drivers'>>,
+  driver: Pick<DriverData, 'name' | 'carType' | 'carClass' | 'driverOrdinal'> & Partial<Pick<DriverData, 'laps'>>,
   lap: LapData,
   overrides?: Partial<ComparableLap>
 ): ComparableLap {
   const replayFile = typeof session.matchingReplayFile === 'string'
     ? session.matchingReplayFile
     : session.matchingReplayFile?.name;
-  const driverOrdinal = driver.driverOrdinal ?? session.drivers.indexOf(driver);
-  const lapOrdinal = lap.lapOrdinal ?? driver.laps.indexOf(lap);
+  const driverOrdinal = driver.driverOrdinal ?? session.drivers?.findIndex(candidate => candidate === driver) ?? -1;
+  const lapOrdinal = lap.lapOrdinal ?? driver.laps?.indexOf(lap) ?? -1;
 
   return {
     id: driverOrdinal >= 0 && lapOrdinal >= 0

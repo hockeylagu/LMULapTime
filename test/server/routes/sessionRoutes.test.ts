@@ -286,14 +286,6 @@ describe('sessionRoutes and filterSessions', () => {
       expect(res.body.trackName).toBe('Spa 100%');
     });
 
-    it('GET /api/progression applies shared session filters and computes progression', async () => {
-      const res = await request(app).get('/api/progression?track=Spa&driver=Driver Alpha');
-      expect(res.status).toBe(200);
-      expect(res.body.points).toHaveLength(1);
-      expect(res.body.total).toBe(1);
-      expect(res.body.points[0].sessionId).toBe('sess_1');
-      expect(res.body.points[0].driverName).toBe('Driver Alpha');
-    });
   });
 
   describe('GET /api/session/:id', () => {
@@ -315,6 +307,24 @@ describe('sessionRoutes and filterSessions', () => {
     });
     it('returns 404 for a source not yet ingested',async()=>{
       expect((await request(app).get('/api/session/sess_new')).status).toBe(404);
+    });
+    it('loads a driver PB on demand and validates its session and ordinal', async () => {
+      const response = await request(app).get('/api/session/sess_1/personal-best/0');
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({ driverOrdinal: 0, bestLapTime: 120, ready: true });
+      expect(response.headers['cache-control']).toBe('no-store');
+      const hydrateSession = vi.spyOn(sessionDb, 'getSessionById');
+      const aliasResponse = await request(app).get('/api/session/sess_1.xml/personal-best/0');
+      expect(aliasResponse.status).toBe(200);
+      expect(aliasResponse.body).toEqual(response.body);
+      expect(hydrateSession).not.toHaveBeenCalled();
+      for (const ordinal of ['-1', '1', '1.5', 'abc']) {
+        expect((await request(app).get(`/api/session/sess_1/personal-best/${ordinal}`)).status).toBe(400);
+      }
+      expect((await request(app).get('/api/session/missing/personal-best/0')).status).toBe(404);
+      expect((await request(app).get('/api/session/missing/personal-best/abc')).status).toBe(404);
+      sessionDb.getDb().prepare('UPDATE sessions SET projection_version=0').run();
+      expect((await request(app).get('/api/session/sess_1/personal-best/0')).body.ready).toBe(false);
     });
     it('does not report incomplete summaries as complete totals',async()=>{
       sessionDb.getDb().prepare('UPDATE sessions SET projection_version=0 WHERE id=?').run('sess_1');
@@ -382,6 +392,18 @@ describe('sessionRoutes and filterSessions', () => {
       const response = await request(app).get(`/api/compare/laps?driverOrdinal=${encodeURIComponent(ordinal)}`);
       expect(response.status).toBe(400);
       expect(response.body.error).toMatch(/driverOrdinal/);
+    });
+
+    it('GET /api/compare/laps telemetry picker returns only its page without loading sessions or benchmarks', async () => {
+      referenceCache.load.mockClear();
+      const readSession = vi.spyOn(sessionDb, 'getSessionById');
+      const response = await request(app).get('/api/compare/laps?track=Spa&telemetryOnly=true');
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ laps: [], total: 0, page: 1, pageSize: 50 });
+      expect(response.body).not.toHaveProperty('allTimeBestLap');
+      expect(response.body).not.toHaveProperty('benchmarks');
+      expect(referenceCache.load).not.toHaveBeenCalled();
+      expect(readSession).not.toHaveBeenCalled();
     });
 
     it('GET /api/compare/laps without a track has no benchmarks', async () => {

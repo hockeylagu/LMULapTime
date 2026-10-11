@@ -29,8 +29,10 @@ export function useSessionDetailData({
   // restart loading (it re-rendered forever).
   const hasInitialProgression = initialProgression !== undefined;
   const hasInitialSessions = initialSessions !== undefined;
-  const [personalBests, setPersonalBests] = useState<Array<{driverOrdinal:number;bestLapTime:number|null}>>([]);
-  const [historyReady, setHistoryReady] = useState(false);
+  const [personalBest, setPersonalBest] = useState<{
+    session: DetailedSession; driverOrdinal: number; bestLapTime: number | null;
+  } | null>(null);
+  const [personalBestError, setPersonalBestError] = useState<string | null>(null);
   const [fetchedRelated, setFetchedRelated] = useState<WeekendSessionLink<CandidateRelatedSession>[]>([]);
   const progression = hasInitialProgression && initialProgression ? initialProgression : [];
   const allSessions = hasInitialSessions && initialSessions ? initialSessions : [];
@@ -70,8 +72,10 @@ export function useSessionDetailData({
         if (!isCurrent) return;
         setLoadedSession({ sessionId, data: sessionData });
         setFetchedRelated(sessionData.historyContext?.relatedSessions ?? []);
-        setPersonalBests(sessionData.historyContext?.personalBests ?? []);
-        setHistoryReady(sessionData.historyContext?.ready !== false);
+        const initialDriver = sessionData.drivers.findIndex(driver => driver.name === sessionData.playerDriver?.name);
+        const driverOrdinal = initialDriver >= 0 ? initialDriver : 0;
+        const best = sessionData.historyContext?.personalBests?.find(item => item.driverOrdinal === driverOrdinal);
+        setPersonalBest({ session: sessionData, driverOrdinal, bestLapTime: sessionData.historyContext?.ready === false ? null : best?.bestLapTime ?? null });
         if (!existingSession && sessionData.playerDriver) {
           setSelectedDriverName(sessionData.playerDriver.name);
         } else if (!existingSession && sessionData.drivers && sessionData.drivers.length > 0) {
@@ -110,6 +114,24 @@ export function useSessionDetailData({
       ? session.drivers.find((d) => d.name === selectedDriverName) || session.drivers[0]
       : undefined;
   }, [session, selectedDriverName]);
+
+  useEffect(() => {
+    setPersonalBestError(null);
+    if (hasInitialProgression || !session || !selectedDriver) return;
+    const driverOrdinal = session.drivers.indexOf(selectedDriver);
+    if (personalBest?.session === session && personalBest.driverOrdinal === driverOrdinal) return;
+    const controller = new AbortController();
+    fetchJson<{ bestLapTime: number | null; ready: boolean }>(
+      `/api/session/${encodeURIComponent(session.id)}/personal-best/${driverOrdinal}`, { signal: controller.signal }
+    ).then(result => {
+      if (!controller.signal.aborted) setPersonalBest({ session, driverOrdinal, bestLapTime: result.ready ? result.bestLapTime : null });
+    }).catch((error: unknown) => {
+      if (!controller.signal.aborted && !isAbortError(error)) {
+        setPersonalBestError(apiErrorMessage(error, 'Could not load the driver personal best.'));
+      }
+    });
+    return () => controller.abort();
+  }, [session, selectedDriver, hasInitialProgression, personalBest]);
 
   const hasTireWearData = useMemo(() => {
     return (
@@ -153,7 +175,7 @@ export function useSessionDetailData({
 
   const allTimeCategoryTrackPB = useMemo(() => {
     if (!session || !selectedDriver) return null;
-    if (!hasInitialProgression) return historyReady ? personalBests.find(best=>best.driverOrdinal===session.drivers.indexOf(selectedDriver))?.bestLapTime ?? selectedDriver.bestLapTime : null;
+    if (!hasInitialProgression) return personalBest?.session === session && personalBest.driverOrdinal === session.drivers.indexOf(selectedDriver) ? personalBest.bestLapTime : null;
     if (progression.length===0) return null;
     const driverClass = selectedDriver.carClass || selectedDriver.carType || '';
     const driverNorm = (selectedDriver.name || '').toLowerCase().trim();
@@ -176,7 +198,7 @@ export function useSessionDetailData({
       .map((p) => p.bestLapTime as number);
 
     return matchingLapTimes.length > 0 ? Math.min(...matchingLapTimes) : selectedDriver.bestLapTime;
-  }, [session, selectedDriver, progression, hasInitialProgression, personalBests, historyReady]);
+  }, [session, selectedDriver, progression, hasInitialProgression, personalBest]);
 
   const isCurrentSessionAllTimePB =
     selectedDriver?.bestLapTime !== null &&
@@ -250,6 +272,7 @@ export function useSessionDetailData({
     session,
     loading,
     loadError,
+    personalBestError,
     selectedDriver,
     selectedDriverName,
     setSelectedDriverName,

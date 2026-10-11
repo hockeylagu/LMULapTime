@@ -77,9 +77,6 @@ describe('App component', () => {
       if (url.includes('/api/sessions')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(mockSessions) });
       }
-      if (url.includes('/api/progression')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
-      }
       if (url.includes('/api/track/')) {
         return Promise.resolve({
           ok: true,
