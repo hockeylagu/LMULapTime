@@ -23,6 +23,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "benchmark:endpoints": "tsx --env-file-if-exists=.env.local tools/benchmarks/benchmarkEndpoints.ts",
     "telemetry:probe": "dotnet run -c Release --project tools/telemetry-recorder -- probe",
     "telemetry:record": "dotnet run -c Release --project tools/telemetry-recorder -- record",
     "vcr:correlate": "tsx tools/analysis/correlateVcr.ts",

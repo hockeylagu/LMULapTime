@@ -418,6 +418,11 @@ Anything computed per request (pit stop details, telemetry links, everything in 
 ## 7. Tests and checks
 
 - `npm test` (all), `npx vitest run <path>` (one file), `npm run build` (types + bundle, zero warnings).
+- `npm run benchmark:endpoints`: real local HTTP through production routers on a temporary SQLite snapshot,
+  fixed request cohort, ranked first/warm median/p95 timings and local JSON/Markdown history. New GETs and unclassified
+  mutation routes fail inventory coverage. HTTP failures preserve status and error text even for HTML error pages.
+  Tools live in `tools/benchmarks/`, tests in `test/tools/benchmarks/`.
+  Run before/after API-affecting features and optimizations; weekly check uses the same runner. See [ENDPOINT_BENCHMARKS.md](ENDPOINT_BENCHMARKS.md).
 - Tests mirror the source tree: `test/server/<domain>/`, `test/domain/`, `test/utils/`, `test/components/<feature>/`.
 - Fixtures: `test/fixtures/{results,replays,telemetry}`; synthetic VCR with `test/utils/mockVcr.ts`; leaderboard fixtures `test/domain/leaderboardFixtures.ts`.
 - The user runs the dev server (UI 5173, API 3001). Session JSON: `GET http://localhost:3001/api/session/<id>`.
