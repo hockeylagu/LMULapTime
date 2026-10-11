@@ -2,7 +2,6 @@ import fs from 'fs';
 import { dataPlugin } from '../plugins/dataPlugin.js';
 import path from 'path';
 import {
-  DetailedSession,
   ReplayDriverEntry,
   ReplayLapSummary,
   ReplayMetadata,
@@ -11,6 +10,7 @@ import {
 import { getDisplayTrackName } from '../../shared/domain/formatters.js';
 import { resolveRosterVehicles } from '../../shared/domain/vehicleMapping.js';
 import { ReplaySummarySourceData } from './replayServiceTypes.js';
+import type { ReplaySessionContext } from './replayServiceTypes.js';
 
 export function cloneReplayMetadata(metadata: ReplayMetadata): ReplayMetadata {
   return {
@@ -28,7 +28,7 @@ export function cloneReplayMetadata(metadata: ReplayMetadata): ReplayMetadata {
 export interface ComposeReplayMetadataOptions {
   metadata: ReplayMetadata;
   replayName: string;
-  matchedSession?: DetailedSession;
+  matchedSession?: ReplaySessionContext;
   fallbackTrajectoryLaps?: () => ReplayLapSummary[] | undefined;
   /** The stored DuckDB match of the replay (TelemetryLinks.forReplay). */
   duckdbFilename?: string;

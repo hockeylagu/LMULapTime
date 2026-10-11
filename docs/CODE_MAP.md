@@ -51,7 +51,17 @@ Raw columns retain XML values such as declared `laps_count`, `lap_num`, and `is_
 
 The telemetry comparison picker requests `telemetryOnly=true` on `/api/compare/laps`: linked replay and flying-lap filters run before pagination.
 Inspector state, comparison selection and reference suggestions use session IDs exclusively; recording filenames never substitute for session identity.
-`ReplayTrajectoryService` accepts a session plus driver/lap ordinals and resolves its recording internally; legacy filename/slot request parameters and unused request types are removed.
+`ReplayTrajectoryService` accepts session context plus driver/lap ordinals and resolves its recording internally; legacy filename/slot request parameters and unused request types are removed.
+`server/core/sessionRows/replayContext.ts` reads only the roster, replay link and compact official timing fields:
+metadata requests include every lap's source ordinal; trajectories include the selected and primary driver's timing histories;
+traffic requests include no XML laps. `ReplaySessionContext` / `ReplayContextDriver` / `ReplayTimingLap` in
+`replayServiceTypes.ts` define those inputs without full session, event or pass hydration. Official validation output stays unchanged.
+`dbSessionStore.resolveSessionId` shares the existing session/filename alias resolution with these reads and the PB endpoint.
+Replay-link updates return only whether they changed; the necessary conditions reclassification performs the single session read.
+The 2026-10-10 endpoint sweep (same snapshot/cohort/environment, 20 warm HTTP samples) measured player PB
+5.70 → 1.56 ms, replay metadata 5.81 → 2.45 ms, fused telemetry 189.64 → 161.75 ms and traffic
+172.66 → 155.65 ms. Response sizes matched; the final sweep had no failures/skips or flagged regressions.
+Local reports live under `.cache/endpoint-benchmarks/`; these timings exclude browser rendering and live ingestion.
 Map geometry and session thumbnails resolve from canonical layout/venue/course without filename hints.
 Session views no longer display recording filenames, and improvement-chart rows no longer carry them.
 `/scan/status.sessionReplayJobs` maps ingestion/upgrade work to stored session owners on the server;

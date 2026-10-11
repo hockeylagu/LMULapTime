@@ -16,14 +16,19 @@ export function getSessionXmlMtime(db: DatabaseType, sessionId: string, filePath
   return row && Number.isFinite(row.file_mtime) && row.file_mtime > 0 ? row.file_mtime : undefined;
 }
 
-export function getSessionById(db: DatabaseType, id: string): DetailedSession | null {
+export function resolveSessionId(db: DatabaseType, id: string): string | null {
   const cleanId = id.endsWith('.xml') ? id.replace(/\.xml$/, '') : id;
   const withXml = `${cleanId}.xml`;
 
   const row = db.prepare(
     'SELECT id FROM sessions WHERE id = ? OR id = ? OR id = ? OR filename = ? OR filename = ? LIMIT 1'
   ).get(id, cleanId, withXml, withXml, id) as { id: string } | undefined;
-  return row ? loadSession(db, row.id) : null;
+  return row?.id ?? null;
+}
+
+export function getSessionById(db: DatabaseType, id: string): DetailedSession | null {
+  const sessionId = resolveSessionId(db, id);
+  return sessionId ? loadSession(db, sessionId) : null;
 }
 
 /**
@@ -115,7 +120,7 @@ export function updateSessionMatchingReplay(
   db: DatabaseType,
   sessionId: string,
   matchingReplayFile: NonNullable<SessionMetadata['matchingReplayFile']>
-): { updated: boolean; session?: DetailedSession; metadata?: SessionMetadata } {
+): { updated: boolean } {
   try {
     const stored = readStoredLinkState(db, sessionId);
     if (!stored) return { updated: false };
@@ -126,10 +131,7 @@ export function updateSessionMatchingReplay(
     }
     const updatedAt = Date.now();
     upsertTargetedReplayLink(db, sessionId, matchingReplayFile, updatedAt);
-    const data = loadSession(db, sessionId);
-    if (!data) return { updated: true };
-    const { drivers: _drivers, ...metadata } = data;
-    return { updated: true, session: data, metadata };
+    return { updated: true };
   } catch (err) {
     console.warn('[SessionDb] Failed to update session matching replay:', err);
     return { updated: false };

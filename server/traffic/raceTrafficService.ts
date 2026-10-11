@@ -1,4 +1,4 @@
-import type { DetailedSession, ReplayTrafficResponse } from '../../shared/types/index.js';
+import type { DetailedSession, DriverData, ReplayTrafficResponse } from '../../shared/types/index.js';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { isNonRaceSession } from '../../shared/domain/raceTraffic.js';
 import { getTrackDefinition } from '../tracks/serverTrackSync.js';
@@ -21,7 +21,9 @@ export interface RaceTrafficRequest {
   replayName: string;
   driverSlot: number;
   replayDrivers: Array<{ slot: number; name: string; carClass?: string }>;
-  session?: Pick<DetailedSession, 'trackVenue' | 'trackCourse' | 'trackLengthMeters' | 'drivers' | 'sessionType'>;
+  session?: Pick<DetailedSession, 'trackVenue' | 'trackCourse' | 'trackLengthMeters' | 'sessionType'> & {
+    drivers: Pick<DriverData, 'name' | 'carClass'>[];
+  };
   sceneDesc?: string;
   trackVenue?: string;
   trackCourse?: string;

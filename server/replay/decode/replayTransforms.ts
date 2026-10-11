@@ -1,10 +1,8 @@
 import {
-  DetailedSession,
-  DriverData,
-  LapData,
   ReplayLapSummary,
   ReplayTrajectoryData,
 } from '../../core/types.js';
+import type { ReplaySessionContext, ReplayContextDriver, ReplayTimingLap } from '../replayServiceTypes.js';
 import { downsampleReplayTrajectory } from './replayParser.js';
 import { enrichTrajectoryWithTrackGeometry } from '../../tracks/serverTrackSync.js';
 import { getDisplayTrackName } from '../../../shared/domain/formatters.js';
@@ -36,14 +34,14 @@ export function enrichTrajectoryGeometryResponse(
 
 export function applyPureOfficialLapValidation(
   trajectory: ReplayTrajectoryData,
-  matchedSession?: DetailedSession,
-  matchedDriver?: DriverData
+  matchedSession?: ReplaySessionContext,
+  matchedDriver?: ReplayContextDriver
 ): ReplayTrajectoryData {
   if (!matchedSession || !matchedDriver?.laps?.length) {
     return trajectory;
   }
 
-  const officialLaps = matchedDriver.laps.map((lap: LapData) => ({
+  const officialLaps = matchedDriver.laps.map((lap: ReplayTimingLap) => ({
     lapNumber: lap.lapNum,
     lapTimeSec: lap.lapTime,
     s1Sec: lap.s1,

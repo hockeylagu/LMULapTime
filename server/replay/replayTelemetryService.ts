@@ -1,4 +1,5 @@
-import { DetailedSession, DuckDbLapTelemetry, ReplayMetadata, ReplayTrajectoryData } from '../core/types.js';
+import { DuckDbLapTelemetry, ReplayMetadata, ReplayTrajectoryData } from '../core/types.js';
+import type { ReplaySessionContext } from './replayServiceTypes.js';
 import { SessionDatabase, TelemetryMetadataRecord } from '../core/db.js';
 import { DuckDbReader } from '../telemetry/duckdbReader.js';
 import { TelemetryLinks } from '../telemetry/telemetryLinks.js';
@@ -9,7 +10,7 @@ export interface TelemetryEnrichmentInput {
   isPlayer: boolean;
   allowDuckDb: boolean;
   metadata?: ReplayMetadata;
-  matchedSession?: DetailedSession;
+  matchedSession?: Pick<ReplaySessionContext, 'id'>;
   fullTrajectory: ReplayTrajectoryData;
   currentTrajectory: ReplayTrajectoryData;
   lapNumber?: number;

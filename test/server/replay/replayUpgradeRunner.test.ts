@@ -41,7 +41,7 @@ describe('ReplayUpgradeRunner', () => {
 
   it('does not start once turned off, and the switch is remembered', () => {
     const { db, runs } = fakeDb(3);
-    new ReplayUpgradeRunner(db).setEnabled(false);
+    db.setMetadata('replay_upgrade_enabled', 'false');
     const runner = new ReplayUpgradeRunner(db);
 
     expect(runner.getStatus().enabled).toBe(false);

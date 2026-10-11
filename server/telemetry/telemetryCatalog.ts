@@ -33,10 +33,6 @@ export class TelemetryCatalog {
     private readonly enrichDirectory: EnrichDuckDbDirectory = enrichDuckDbDirectory
   ) {}
 
-  public getFiles(): DuckDbFileInfo[] {
-    return this.sessionDb.getTelemetryFiles();
-  }
-
   public getStatus(currentDirectory: string): TelemetryCatalogStatus {
     return {
       directory: this.directory || currentDirectory,

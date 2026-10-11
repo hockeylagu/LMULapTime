@@ -1,6 +1,7 @@
 import { querySessionPage } from '../../../../server/core/sessionSummaries/pageQueries.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionDatabase } from '../../../../server/core/db.js';
+import { updateSessionMatchingReplay } from '../../../../server/core/dbSessionStore.js';
 import type { DetailedSession } from '../../../../server/core/types.js';
 
 const replayLink = {
@@ -102,6 +103,13 @@ describe('stored replay links', () => {
     db.markSessionDataChanged();
     expect(db.getSessionById(session.id)?.matchingReplayFile).toEqual(replayLink);
     expect(querySessionPage(db.getDb(), { page: 1, pageSize: db.getSessionsCount() }).sessions[0].matchingReplayFile).toEqual(replayLink);
+  });
+
+  it('returns only whether the targeted replay link changed', () => {
+    const prepare = vi.spyOn(db.getDb(), 'prepare');
+    expect(updateSessionMatchingReplay(db.getDb(), session.id, replayLink)).toEqual({ updated: true });
+    expect(updateSessionMatchingReplay(db.getDb(), session.id, { ...replayLink })).toEqual({ updated: false });
+    expect(prepare.mock.calls.some(([sql]) => /session_laps|session_events|session_lap_passes/.test(sql))).toBe(false);
   });
 
   it('does not rewrite the row when the same link is stored again', () => {

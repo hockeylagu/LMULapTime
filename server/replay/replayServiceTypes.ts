@@ -1,8 +1,19 @@
-import { DetailedSession } from '../core/types.js';
+import { DetailedSession, DriverData, LapData } from '../core/types.js';
 import type { TelemetryLinks } from '../telemetry/telemetryLinks.js';
 
+/** Official timing fields used by replay metadata and lap validation, without events or passes. */
+export type ReplayTimingLap = Pick<LapData, 'lapNum' | 'lapTime' | 's1' | 's2' | 's3' |
+  'isValid' | 'isPitStop' | 'isOutLap' | 'nonRepresentativeReason' | 'lapOrdinal'>;
+export type ReplayContextDriver = Pick<DriverData, 'name' | 'driverName' | 'carType' | 'carClass' |
+  'bestLapTime' | 'isPlayer' | 'driverOrdinal'> & { laps: ReplayTimingLap[] };
+export type ReplaySessionContext = Pick<DetailedSession, 'id' | 'trackVenue' | 'trackCourse' |
+  'trackLengthMeters' | 'sessionType' | 'totalLapsCount' | 'matchingReplayFile'> & {
+  drivers: ReplayContextDriver[];
+  playerDriver?: ReplayContextDriver;
+};
+
 export interface ReplayTrajectoryRequest {
-  session: DetailedSession;
+  session: ReplaySessionContext;
   driverOrdinal: number;
   lapOrdinal: number;
   maxPoints: number;

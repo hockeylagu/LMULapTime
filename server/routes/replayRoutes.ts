@@ -9,6 +9,8 @@ import { ReplayDriverNotFoundError } from '../replay/replayServiceTypes.js';
 import { TelemetryLinks } from '../telemetry/telemetryLinks.js';
 import { RaceTrafficService } from '../traffic/raceTrafficService.js';
 import { parseBoundedInteger, queryString } from './queryParams.js';
+import { readReplaySessionContext } from '../core/sessionRows/replayContext.js';
+import { resolveSessionId } from '../core/dbSessionStore.js';
 
 export function createReplayRouter(context: ServerContext): Router {
   const router = Router();
@@ -45,21 +47,9 @@ export function createReplayRouter(context: ServerContext): Router {
     });
   });
 
-  router.post('/replays/upgrade', (req, res) => {
-    const upgrade = context.replayUpgrade;
-    if (!upgrade) return res.status(503).json({ error: 'Replay upgrade unavailable' });
-    const enabled: unknown = req.body?.enabled;
-    if (typeof enabled !== 'boolean') return res.status(400).json({ error: 'Expected { enabled: boolean }' });
-    upgrade.setEnabled(enabled);
-    if (enabled) context.startReplayUpgradeWhenIdle();
-    res.json({ status: upgrade.getStatus() });
-  });
-
-  router.get('/telemetry', (_req, res) => res.json(context.telemetryCatalog.getFiles()));
-
   router.get('/session/:sessionId/telemetry/metadata', (req, res) => {
     try {
-      const session = context.sessionDb.getSessionById(req.params.sessionId);
+      const session = readReplaySessionContext(context.sessionDb.getDb(), req.params.sessionId, 'all');
       const replayName = session?.matchingReplayFile?.name;
       if (!session || !replayName) return res.status(404).json({ error: 'Session replay is unavailable' });
       const filePath = path.join(context.replaysDir, replayName);
@@ -75,10 +65,10 @@ export function createReplayRouter(context: ServerContext): Router {
           (item.driverName || item.name).trim().toLowerCase() === driver.name.trim().toLowerCase()
         );
         if (ordinal < 0) continue;
-        driver.sessionDriverOrdinal = ordinal;
+        driver.sessionDriverOrdinal = session.drivers[ordinal].driverOrdinal ?? ordinal;
         const sessionLapOrdinals: Record<string, number> = {};
         session.drivers[ordinal].laps.forEach((lap, lapOrdinal) => {
-          sessionLapOrdinals[String(lap.lapNum)] = lapOrdinal;
+          sessionLapOrdinals[String(lap.lapNum)] = lap.lapOrdinal ?? lapOrdinal;
         });
         driver.sessionLapOrdinals = sessionLapOrdinals;
       }
@@ -89,8 +79,8 @@ export function createReplayRouter(context: ServerContext): Router {
   });
 
   router.get('/session/:sessionId/telemetry', async (req, res) => {
-    const session = context.sessionDb.getSessionById(req.params.sessionId);
-    if (!session) return res.status(404).json({ error: 'Session not found' });
+    const sessionId = resolveSessionId(context.sessionDb.getDb(), req.params.sessionId);
+    if (!sessionId) return res.status(404).json({ error: 'Session not found' });
     let driverOrdinal: number;
     let lapOrdinal: number;
     try {
@@ -119,8 +109,10 @@ export function createReplayRouter(context: ServerContext): Router {
       if (!(pointSpacingM >= 0.25 && pointSpacingM <= 100)) return res.status(400).json({ error: 'Invalid pointSpacingM' });
     }
     try {
+      const trajectorySession = readReplaySessionContext(context.sessionDb.getDb(), sessionId, driverOrdinal);
+      if (!trajectorySession) return res.status(404).json({ error: 'Session not found' });
       const trajectory = await trajectoryService.getTrajectory({
-        session,
+        session: trajectorySession,
         driverOrdinal,
         lapOrdinal,
         maxPoints,
@@ -136,7 +128,7 @@ export function createReplayRouter(context: ServerContext): Router {
 
   router.get('/session/:sessionId/traffic', async (req, res) => {
     try {
-      const session = context.sessionDb.getSessionById(req.params.sessionId);
+      const session = readReplaySessionContext(context.sessionDb.getDb(), req.params.sessionId, 'none');
       const replayName = session?.matchingReplayFile?.name;
       if (!session || !replayName) return res.status(404).json({ error: 'Session replay is unavailable' });
       const filePath = path.join(context.replaysDir, replayName);

@@ -39,12 +39,6 @@ export class ReplayUpgradeRunner {
     return this.sessionDb.getMetadata(ENABLED_KEY) !== 'false';
   }
 
-  public setEnabled(enabled: boolean): void {
-    this.sessionDb.setMetadata(ENABLED_KEY, String(enabled));
-    this.status.enabled = enabled;
-    if (!enabled) this.stop();
-  }
-
   public getStatus(): ReplayUpgradeStatus {
     return this.status;
   }

@@ -24,10 +24,10 @@ describe('TelemetryCatalog', () => {
     expect(catalog.getStatus('C:\\fake').filesCount).toBe(0);
     expect(read).not.toHaveBeenCalled();
     db.upsertTelemetryMetadata(file());
-    expect(catalog.getFiles()).toEqual([file()]);
+    expect(db.getTelemetryFiles()).toEqual([file()]);
     expect(catalog.getStatus('C:\\fake').filesCount).toBe(1);
     db.clearTelemetryCache();
-    expect(catalog.getFiles()).toEqual([]);
+    expect(db.getTelemetryFiles()).toEqual([]);
   });
 
   it('clears only scan state; SQLite owns retained metadata', () => {
@@ -35,7 +35,7 @@ describe('TelemetryCatalog', () => {
     db.upsertTelemetryMetadata(file());
     const catalog = new TelemetryCatalog(db);
     catalog.clear();
-    expect(catalog.getFiles()).toEqual([file()]);
+    expect(db.getTelemetryFiles()).toEqual([file()]);
     expect(catalog.getScanStatus()).toMatchObject({ running: false, result: null, error: null });
   });
 
@@ -46,7 +46,7 @@ describe('TelemetryCatalog', () => {
     expect(await catalog.refresh('C:\\non_existent_telemetry_directory_xyz')).toBe(0);
     expect(catalog.getScanStatus()).toMatchObject({ running: false, result: { total: 0, added: 0, updated: 0, cached: 0 }, error: null });
     expect(catalog.getScanStatus().finishedAt).not.toBeNull();
-    expect(catalog.getFiles()).toEqual([file()]);
+    expect(db.getTelemetryFiles()).toEqual([file()]);
   });
 
   it('uses SQLite file versions for each scan, retries failures and publishes partial progress', async () => {
@@ -88,7 +88,7 @@ describe('TelemetryCatalog', () => {
     await newRefresh;
     resolvers.get(oldDirectory)?.([oldFile]);
     await oldRefresh;
-    expect(catalog.getFiles()).toEqual([newFile]);
+    expect(db.getTelemetryFiles()).toEqual([newFile]);
     expect(catalog.getStatus(newDirectory).directory).toBe(newDirectory);
   });
 });
