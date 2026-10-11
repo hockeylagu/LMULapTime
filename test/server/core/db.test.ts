@@ -218,6 +218,33 @@ describe('SessionDatabase replay cache', () => {
     expect(db.getStoredReplayTrajectory('Deleted_Replay_P1.Vcr', -1, -1)?.points).toHaveLength(3);
   });
 
+  it('repairs cached player ownership by exact configured name without decoding the replay', () => {
+    const metadata = buildMetadata({
+      carModel: 'Joann car', carClass: 'GT3',
+      laps: [{ lapNumber: 1, lapTimeSec: 100, s1Sec: 34, s2Sec: 33, s3Sec: 33 }],
+      drivers: [
+        { slot: 1, name: 'Joann', isPlayer: true, carModel: 'Joann car', carClass: 'GT3' },
+        { slot: 2, name: 'Ann', isPlayer: false, carModel: 'Ann car', carClass: 'Hyper' },
+      ],
+    });
+    db.upsertReplayMetadataCache('Legacy_Player.Vcr', metadata.filePath, 1000, 12345, metadata);
+
+    const repaired = db.getStoredReplayMetadata('Legacy_Player.Vcr', 'Ann');
+
+    expect(repaired?.drivers.map(driver => [driver.name, driver.isPlayer])).toEqual([
+      ['Joann', false], ['Ann', true],
+    ]);
+    expect(repaired?.carModel).toBe('Ann car');
+    expect(repaired?.carClass).toBe('Hyper');
+    expect(repaired?.laps).toBeUndefined();
+    // The lifecycle rewrite is persisted, so unconfigured consumers do not see the old flag.
+    expect(db.getStoredReplayMetadata('Legacy_Player.Vcr')?.drivers.find(driver => driver.name === 'Joann')?.isPlayer).toBe(false);
+    const persisted = db.getDb().prepare('SELECT metadata_br FROM replay_metadata WHERE filename=?').get('Legacy_Player.Vcr') as { metadata_br: Buffer };
+    db.getStoredReplayMetadata('Legacy_Player.Vcr', 'Ann');
+    const afterRead = db.getDb().prepare('SELECT metadata_br FROM replay_metadata WHERE filename=?').get('Legacy_Player.Vcr') as { metadata_br: Buffer };
+    expect(afterRead.metadata_br.equals(persisted.metadata_br)).toBe(true);
+  });
+
   it('falls back to the same driver\'s default lap when the requested lap is missing if allowFallback is enabled', () => {
     const trajectory = buildTrajectory();
     db.upsertReplayTrajectoryCache('Fallback_Replay_P1.Vcr', 2, -1, 1000, 12345, trajectory);

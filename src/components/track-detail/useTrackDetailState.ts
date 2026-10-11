@@ -23,7 +23,7 @@ export interface TrackDetailData {
   filters?: { carModels: string[]; sessionTypes: string[]; emptyCount: number; replayCount: number };
   progression?: { points: SessionProgressionPoint[]; total: number; page: number; pageSize: number };
   positions?: { qualifyingAveragePosition: number | null; finishAveragePosition: number | null };
-  latestSession?: { trackCourse?: string; trackLengthMeters?: number | null; carClass?: string; carType?: string };
+  latestSession?: { trackVenue?: string; trackCourse?: string; trackLengthMeters?: number | null; carClass?: string; carType?: string };
   page?: number;
   pageSize?: number;
   total?: number;

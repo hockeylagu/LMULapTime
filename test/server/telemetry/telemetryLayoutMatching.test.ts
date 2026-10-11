@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { matchDuckDbToReplay, matchDuckDbToSession, type DuckDbFileInfo, type TelemetrySessionCandidate } from '../../../server/telemetry/telemetryMatcher.js';
+import { findDuckDbForReplay, findDuckDbForSession, type DuckDbFileInfo, type TelemetrySessionCandidate } from '../../../server/telemetry/telemetryMatcher.js';
 import type { ReplayMetadata } from '../../../server/core/types.js';
 
 const start = Date.parse('2026-10-11T00:08:19Z');
@@ -13,32 +13,32 @@ const file: DuckDbFileInfo = {
 const session: TelemetrySessionCandidate = {
   id: 'paddock', filePath: 'session.xml', timestamp: start,
   trackVenue: 'Bahrain International Circuit', trackCourse: 'Bahrain Paddock Circuit',
-  sessionType: 'Practice', sessionName: 'P1', drivers: [{ name: 'Samuel Lague' }],
+  sessionType: 'Practice', sessionName: 'P1', drivers: [{ name: 'Samuel Lague' }], playerDriverName: 'Samuel Lague',
 };
 const replay = {
   trackName: 'BahrainWEC_2023', trackCourse: 'Bahrain Paddock Circuit',
   sceneDesc: 'BAHRAINWEC_PADDOCK', sessionType: 'P', durationSec: 555,
-  drivers: [{ name: 'Samuel Lague' }],
+  drivers: [{ name: 'Samuel Lague', isPlayer: true }],
 } as ReplayMetadata;
 
 describe('telemetry layout evidence', () => {
   it('uses the session course and replay scene for venue-only telemetry', () => {
-    expect(matchDuckDbToSession([file], session)).toBe(file);
-    expect(matchDuckDbToReplay([file], replay, start + 555000)).toBe(file);
-    expect(matchDuckDbToReplay([file], { ...replay, trackCourse: undefined }, start + 555000)).toBe(file);
+    expect(findDuckDbForSession([file], session)?.file).toBe(file);
+    expect(findDuckDbForReplay([file], replay, start + 555000)?.file).toBe(file);
+    expect(findDuckDbForReplay([file], { ...replay, trackCourse: undefined }, start + 555000)?.file).toBe(file);
   });
 
   it.each(['Bahrain Outer Circuit', 'bahrain_wec', 'BAHRAINWEC', 'Monza'])('rejects conflicting explicit telemetry track %s', trackName => {
     const explicit = { ...file, trackName };
-    expect(matchDuckDbToSession([explicit], session)).toBeNull();
-    expect(matchDuckDbToReplay([explicit], replay, start + 555000)).toBeNull();
+    expect(findDuckDbForSession([explicit], session)).toBeNull();
+    expect(findDuckDbForReplay([explicit], replay, start + 555000)).toBeNull();
   });
 
   it('accepts an explicit matching layout and rejects a different venue', () => {
     const explicit = { ...file, trackName: 'Bahrain Paddock Circuit' };
-    expect(matchDuckDbToSession([explicit], session)).toBe(explicit);
-    expect(matchDuckDbToReplay([explicit], replay, start + 555000)).toBe(explicit);
-    expect(matchDuckDbToSession([file], { ...session, trackVenue: 'Monza', trackCourse: 'Grand Prix' })).toBeNull();
+    expect(findDuckDbForSession([explicit], session)?.file).toBe(explicit);
+    expect(findDuckDbForReplay([explicit], replay, start + 555000)?.file).toBe(explicit);
+    expect(findDuckDbForSession([file], { ...session, trackVenue: 'Monza', trackCourse: 'Grand Prix' })).toBeNull();
   });
 
   it('preserves driver, session type and timestamp rejection for a generic venue', () => {
@@ -46,8 +46,8 @@ describe('telemetry layout evidence', () => {
       { ...file, driverName: 'Other Driver' }, { ...file, sessionType: 'R' },
       { ...file, timestampEpochMs: start + 7200000 },
     ]) {
-      expect(matchDuckDbToSession([rejected], session)).toBeNull();
-      expect(matchDuckDbToReplay([rejected], replay, start + 555000)).toBeNull();
+      expect(findDuckDbForSession([rejected], session)).toBeNull();
+      expect(findDuckDbForReplay([rejected], replay, start + 555000)).toBeNull();
     }
   });
 });

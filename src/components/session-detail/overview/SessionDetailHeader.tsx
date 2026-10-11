@@ -28,8 +28,8 @@ const WEEKEND_BUTTONS: Record<WeekendSessionType, { style: string; word: string;
 export interface SessionDetailHeaderProps {
   session: DetailedSession;
   selectedDriver?: DriverData;
-  selectedDriverName: string;
-  setSelectedDriverName: (name: string) => void;
+  selectedDriverOrdinal: number | null;
+  setSelectedDriverOrdinal: (ordinal: number | null) => void;
   onBack: () => void;
   /** The other sessions of the weekend: a jump button each. */
   relatedSessions?: WeekendSessionLink[];
@@ -41,8 +41,8 @@ export interface SessionDetailHeaderProps {
 export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
   session,
   selectedDriver,
-  selectedDriverName,
-  setSelectedDriverName,
+  selectedDriverOrdinal,
+  setSelectedDriverOrdinal,
   onBack,
   relatedSessions = [],
   handleNavigateToSession,
@@ -79,6 +79,8 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
 
   // The course and event lines often just repeat the display name; keep only what adds to it.
   const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
+  const trackParams = new URLSearchParams({ trackVenue: session.trackVenue, trackCourse: session.trackCourse });
+  if (session.playerDriver?.carClass) trackParams.set('carClass', session.playerDriver.carClass);
   const squash = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, '');
   const subtitle = [...new Set([session.trackCourse, session.trackEvent].filter((t): t is string => Boolean(t)))]
     .filter((part) => !squash(trackName).includes(squash(part)))
@@ -155,7 +157,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
                 )}
               </div>
               <h2 className="mt-1.5 text-2xl font-extrabold text-white max-w-full min-w-0">
-                <Link to={`/track/${encodeURIComponent(trackName)}${(session.playerDriver?.carClass ?? '') ? `?carClass=${encodeURIComponent((session.playerDriver?.carClass ?? ''))}` : ''}`}
+                <Link to={`/track/${encodeURIComponent(trackName)}?${trackParams}`}
                   className="inline-flex items-center gap-2 group max-w-full min-w-0 rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent"
                   title={`View ${trackName} Track Details`}>
                   <span className="truncate">{trackName}</span>
@@ -181,12 +183,13 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
               <label className="inline-flex items-center gap-2 h-8 pl-3 pr-1 rounded-lg bg-lmu-bg border border-lmu-border hover:border-lmu-rule focus-within:border-lmu-accent transition-colors shrink-0 has-[select:focus-visible]:outline-2 has-[select:focus-visible]:outline-offset-2 has-[select:focus-visible]:outline-lmu-accent-text">
                 <span className="text-[10px] font-semibold text-lmu-muted uppercase tracking-wider shrink-0">Driver</span>
                 <select
-                  value={selectedDriverName}
-                  onChange={(e) => setSelectedDriverName(e.target.value)}
+                  value={selectedDriverOrdinal === null ? '' : String(selectedDriverOrdinal)}
+                  onChange={(e) => setSelectedDriverOrdinal(e.target.value === '' ? null : Number(e.target.value))}
                   className="h-full bg-transparent pr-1 text-sm text-white font-semibold outline-none cursor-pointer"
                 >
+                  <option value="" className="bg-lmu-card text-lmu-muted">Select a driver</option>
                   {(session.drivers || []).map((d) => (
-                    <option key={d.name} value={d.name} className="bg-lmu-card text-white">
+                    <option key={d.driverOrdinal} value={String(d.driverOrdinal)} className="bg-lmu-card text-white">
                       {d.isPlayer ? '⭐ ' : ''}
                       {d.name} ({d.carType})
                     </option>

@@ -77,7 +77,7 @@ describe('TrackSummaries component', () => {
     expect(spaCard).not.toBeNull();
     if (spaCard) {
       fireEvent.click(spaCard);
-      expect(onSelectTrack).toHaveBeenCalledWith('Spa');
+      expect(onSelectTrack).toHaveBeenCalledWith(expect.objectContaining({ trackVenue: 'Spa', identityVenue: 'Spa', trackCourse: '' }));
     }
   });
 
@@ -220,10 +220,10 @@ describe('TrackSummaries component', () => {
     render(<TrackSummaries sessions={mockSessions} onSelectTrack={onSelectTrack} selectedCarClass="GT3" setSelectedCarClass={vi.fn()} />);
     await waitFor(() => expect(screen.queryByText('Loading benchmark targets…')).not.toBeInTheDocument());
     const link = screen.getByRole('link', { name: 'View Monza records' });
-    expect(link).toHaveAttribute('href', '/track/Monza?carClass=GT3');
+    expect(link).toHaveAttribute('href', '/track/Monza?trackVenue=Monza&trackCourse=&carClass=GT3');
     link.focus();
     await user.keyboard('{Enter}');
-    expect(onSelectTrack).toHaveBeenCalledWith('Monza');
+    expect(onSelectTrack).toHaveBeenCalledWith(expect.objectContaining({ identityVenue: 'Monza', trackCourse: '' }));
     onSelectTrack.mockClear();
     // jsdom cannot open another tab; cancel only the simulated browser default.
     document.addEventListener('click', event => event.preventDefault(), { once: true });
@@ -279,7 +279,20 @@ describe('TrackSummaries component', () => {
     render(<TrackSummaries sessions={[{ ...mockSessions[0], trackVenue: name }]} onSelectTrack={vi.fn()} selectedCarClass="All" setSelectedCarClass={vi.fn()} />);
     await waitFor(() => expect(screen.queryByText('Loading benchmark targets…')).not.toBeInTheDocument());
     expect(screen.getByRole('heading', { name })).toHaveAttribute('dir', 'auto');
-    expect(screen.getByRole('link', { name: `View ${name} records` })).toHaveAttribute('href', `/track/${encodeURIComponent(name)}`);
+    expect(screen.getByRole('link', { name: `View ${name} records` })).toHaveAttribute('href', `/track/${encodeURIComponent(name)}?${new URLSearchParams({ trackVenue: name, trackCourse: '' })}`);
+  });
+
+  it('keeps custom courses separate in both ordinary and native navigation', async () => {
+    const onSelectTrack = vi.fn();
+    render(<TrackSummaries sessions={['Short', 'Long'].map(trackCourse => ({ ...mockSessions[0], trackVenue: 'Custom Ring', trackCourse }))}
+      onSelectTrack={onSelectTrack} selectedCarClass="Hyper" setSelectedCarClass={vi.fn()} />);
+    await waitFor(() => expect(screen.queryByText('Loading benchmark targets…')).not.toBeInTheDocument());
+    const short = screen.getByRole('link', { name: 'View Custom Ring (Short) records' });
+    expect(short).toHaveAttribute('href', '/track/Custom%20Ring%20(Short)?trackVenue=Custom+Ring&trackCourse=Short&carClass=Hyper');
+    expect(screen.getByRole('link', { name: 'View Custom Ring (Long) records' })).toHaveAttribute('href',
+      '/track/Custom%20Ring%20(Long)?trackVenue=Custom+Ring&trackCourse=Long&carClass=Hyper');
+    fireEvent.click(short);
+    expect(onSelectTrack).toHaveBeenCalledWith(expect.objectContaining({ identityVenue: 'Custom Ring', trackCourse: 'Short' }));
   });
 
   it('qualifies a sector sum slower than the recorded best', async () => {

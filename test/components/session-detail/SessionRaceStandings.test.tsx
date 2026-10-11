@@ -56,7 +56,7 @@ const makeSession = (drivers: DriverData[]): DetailedSession => ({
   sessionType: 'Race',
   sessionName: 'R1',
   driversCount: drivers.length,
-  drivers,
+  drivers: drivers.map((driver, driverOrdinal) => ({ ...driver, driverOrdinal })),
 });
 
 const getDriverRows = () => screen.getAllByRole('row').slice(1);
@@ -67,8 +67,8 @@ describe('SessionRaceStandings', () => {
       makeDriver({ name: 'Hypercar driver', carClass: 'Hyper', position: 2, classPosition: 2 }),
       makeDriver({ name: 'GT3 driver', carClass: 'GT3', position: 12, classPosition: 1 }),
     ];
-    render(<SessionRaceStandings session={makeSession(drivers)} selectedDriverName="GT3 driver"
-      setSelectedDriverName={vi.fn()} isMultiClass />);
+    render(<SessionRaceStandings session={makeSession(drivers)} selectedDriverOrdinal={1}
+      setSelectedDriverOrdinal={vi.fn()} isMultiClass />);
     for (const driver of drivers) {
       const row = screen.getByText(driver.name).closest('tr')!;
       const position = within(row).getAllByRole('cell')[0];
@@ -89,8 +89,8 @@ describe('SessionRaceStandings', () => {
     render(
       <SessionRaceStandings
         session={makeSession([selectedDriver, otherDriver])}
-        selectedDriverName="Selected Driver"
-        setSelectedDriverName={vi.fn()}
+        selectedDriverOrdinal={0}
+        setSelectedDriverOrdinal={vi.fn()}
         isMultiClass={false}
       />,
     );
@@ -103,8 +103,8 @@ describe('SessionRaceStandings', () => {
     render(
       <SessionRaceStandings
         session={makeSession([makeDriver({ name: 'Alpha' }), makeDriver({ name: 'Bravo', position: 2 })])}
-        selectedDriverName=""
-        setSelectedDriverName={vi.fn()}
+        selectedDriverOrdinal={null}
+        setSelectedDriverOrdinal={vi.fn()}
         isMultiClass={false}
       />,
     );
@@ -118,7 +118,7 @@ describe('SessionRaceStandings', () => {
       trackLimits: [{ description: 'No Further Action', warningPoints: 0 }] });
     render(
       <SessionRaceStandings session={makeSession([driver, makeDriver({ name: 'Bravo', position: 2 })])}
-        selectedDriverName="Alpha" setSelectedDriverName={vi.fn()} isMultiClass={false} />,
+        selectedDriverOrdinal={0} setSelectedDriverOrdinal={vi.fn()} isMultiClass={false} />,
     );
     const row = screen.getByRole('row', { name: 'P1 Alpha: show their laps' });
     expect(within(row).getByRole('img', { name: '2 contacts / incidents' })).toHaveClass('text-lmu-warn-soft');
@@ -133,8 +133,8 @@ describe('SessionRaceStandings', () => {
     const serious = makeDriver({ name: 'Serious', position: 2, totalTrackLimits: 1,
       trackLimits: [{ description: 'Track limit violation', warningPoints: 0.75 }] });
     render(
-      <SessionRaceStandings session={makeSession([warning, serious])} selectedDriverName=""
-        setSelectedDriverName={vi.fn()} isMultiClass={false} />,
+      <SessionRaceStandings session={makeSession([warning, serious])} selectedDriverOrdinal={null}
+        setSelectedDriverOrdinal={vi.fn()} isMultiClass={false} />,
     );
     expect(screen.getByRole('img', { name: '12 track limits, warning' })).toHaveClass('text-lmu-warn-soft');
     expect(screen.getByRole('img', { name: '1 track limits, serious' })).toHaveClass('text-lmu-loss-soft');
@@ -150,8 +150,8 @@ describe('SessionRaceStandings', () => {
     render(
       <SessionRaceStandings
         session={makeSession(drivers)}
-        selectedDriverName=""
-        setSelectedDriverName={vi.fn()}
+        selectedDriverOrdinal={null}
+        setSelectedDriverOrdinal={vi.fn()}
         isMultiClass={false}
       />,
     );
@@ -181,8 +181,8 @@ describe('SessionRaceStandings outside a race', () => {
           makeDriver({ name: 'Alpha', bestLapTime: 100 }),
           makeDriver({ name: 'Bravo', position: 2, classPosition: 2, bestLapTime: 100.456 }),
         ])}
-        selectedDriverName=""
-        setSelectedDriverName={vi.fn()}
+        selectedDriverOrdinal={null}
+        setSelectedDriverOrdinal={vi.fn()}
         isMultiClass={false}
       />,
     );
@@ -200,8 +200,8 @@ describe('SessionRaceStandings outside a race', () => {
     render(
       <SessionRaceStandings
         session={qualifying([makeDriver({ name: 'Alpha' }), makeDriver({ name: 'Bravo', position: 2 })])}
-        selectedDriverName="Alpha"
-        setSelectedDriverName={select}
+        selectedDriverOrdinal={0}
+        setSelectedDriverOrdinal={select}
         isMultiClass={false}
       />,
     );
@@ -209,7 +209,7 @@ describe('SessionRaceStandings outside a race', () => {
     const bravo = screen.getByText('Bravo').closest('tr') as HTMLElement;
     expect(bravo).toHaveAttribute('tabindex', '0');
     fireEvent.keyDown(bravo, { key: 'Enter' });
-    expect(select).toHaveBeenCalledWith('Bravo');
+    expect(select).toHaveBeenCalledWith(1);
     expect(screen.getByText('Alpha').closest('tr')).toHaveAttribute('aria-current', 'true');
   });
 });

@@ -280,9 +280,23 @@ export function resolveRosterVehicles<T extends { drivers?: RosterVehicle[]; car
   sessionDrivers?: ReadonlyArray<{ name: string; carType?: string; carClass?: string }>,
 ): T {
   const drivers = metadata.drivers ?? [];
-  const byName = new Map((sessionDrivers ?? []).map(driver => [driver.name.trim().toLowerCase(), driver]));
+  const sessionRoster = sessionDrivers ?? [];
+  const sessionNameCounts = new Map<string, number>();
+  for (const driver of sessionRoster) {
+    const key = driver.name.trim().toLowerCase();
+    if (key) sessionNameCounts.set(key, (sessionNameCounts.get(key) ?? 0) + 1);
+  }
+  const byName = new Map(sessionRoster
+    .filter(driver => driver.name.trim() && sessionNameCounts.get(driver.name.trim().toLowerCase()) === 1)
+    .map(driver => [driver.name.trim().toLowerCase(), driver]));
+  const replayNameCounts = new Map<string, number>();
   for (const driver of drivers) {
-    const logged = byName.get(driver.name.trim().toLowerCase());
+    const key = driver.name.trim().toLowerCase();
+    if (key) replayNameCounts.set(key, (replayNameCounts.get(key) ?? 0) + 1);
+  }
+  for (const driver of drivers) {
+    const key = driver.name.trim().toLowerCase();
+    const logged = key && replayNameCounts.get(key) === 1 ? byName.get(key) : undefined;
     if (logged?.carType && logged.carType !== 'Unknown Car' && logged.carClass && logged.carClass !== 'General') {
       driver.carModel = normalizeLmuCarType(logged.carType);
       driver.carClass = logged.carClass;
@@ -291,7 +305,8 @@ export function resolveRosterVehicles<T extends { drivers?: RosterVehicle[]; car
       driver.carClass = mapVehicleIdToClass(driver.vehicleId, driver.carModel) || undefined;
     }
   }
-  const player = drivers.find(driver => driver.isPlayer) ?? drivers[0];
+  const markedPlayers = drivers.filter(driver => driver.isPlayer);
+  const player = markedPlayers.length === 1 ? markedPlayers[0] : undefined;
   if (player?.carModel) metadata.carModel = player.carModel;
   if (player?.carClass) metadata.carClass = player.carClass;
   return metadata;

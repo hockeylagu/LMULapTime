@@ -97,7 +97,7 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
     });
 
     fireEvent.click(screen.getByRole('link', { name: 'Spa' }));
-    expect(window.location.hash).toBe('#/track/Spa?carClass=Hyper');
+    expect(window.location.hash).toBe('#/track/Spa?trackVenue=Spa&trackCourse=GP&carClass=Hyper');
   });
 
   it('keeps race-only metrics out of practice when optional race fields are absent', async () => {

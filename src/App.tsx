@@ -18,6 +18,7 @@ import { updateSearchParams } from './utils/urlParams';
 
 import { useAppData } from './api/useAppData.js';
 import { SessionDataContext } from './api/sessionDataContext.js';
+import type { TrackSummary } from '../shared/types/index.js';
 
 interface SessionRouteProps {
   onBack: () => void;
@@ -150,9 +151,10 @@ export default function App() {
     navigate('/dashboard', { replace: true });
   };
 
-  const handleSelectTrack = (trackName: string) => {
-    const suffix = selectedCarClass !== 'All' ? `?carClass=${encodeURIComponent(selectedCarClass)}` : '';
-    navigate(`/track/${encodeURIComponent(trackName)}${suffix}`);
+  const handleSelectTrack = (track: TrackSummary) => {
+    const params = new URLSearchParams({ trackVenue: track.identityVenue, trackCourse: track.trackCourse });
+    if (selectedCarClass !== 'All') params.set('carClass', selectedCarClass);
+    navigate(`/track/${encodeURIComponent(track.trackVenue)}?${params}`);
   };
 
   return (

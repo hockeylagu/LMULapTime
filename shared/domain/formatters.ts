@@ -124,29 +124,12 @@ export function getDisplayTrackName(venue: string = '', course: string = ''): st
   return cleanCourse ? `${venue} (${cleanCourse})` : venue;
 }
 
-export function matchesSessionType(sessionType: string = '', sessionName: string = '', filterType: string = 'All'): boolean {
-  if (!filterType || filterType === 'All') return true;
-  const f = filterType.toLowerCase().trim();
-  const t = (sessionType || '').toLowerCase().trim();
-  const n = (sessionName || '').toLowerCase().trim();
-
-  switch (f) {
-    case 'practice':
-      return t === 'practice' || n.startsWith('p') || n.includes('practice');
-    case 'qualifying':
-      return t === 'qualifying' || t === 'qualify' || n.startsWith('q') || n.includes('qual');
-    case 'race':
-      return t === 'race' || n.startsWith('r') || n.includes('race');
-    default:
-      return t === f || n === f || n.includes(f) || t.includes(f);
-  }
-}
-
 // Priority order for sorts that group by session importance: Race, then Qualifying, then Practice.
-export function getSessionTypeSortRank(sessionType: string = '', sessionName: string = ''): number {
-  if (matchesSessionType(sessionType, sessionName, 'Race')) return 0;
-  if (matchesSessionType(sessionType, sessionName, 'Qualifying')) return 1;
-  return 2;
+export function getSessionTypeSortRank(sessionType: string = ''): number {
+  if (sessionType === 'Race') return 0;
+  if (sessionType === 'Qualifying') return 1;
+  if (sessionType === 'Practice') return 2;
+  return 3;
 }
 
 export function parseDateStringToTimestamp(dateStr?: string): number {
@@ -191,32 +174,11 @@ export function minValidTime(current: number | null, next: number | null | undef
  * Higher weight means later in the weekend / newer.
  */
 export function getSessionTypeWeight(sessionType?: string, sessionName?: string): number {
-  const type = (sessionType || '').toLowerCase();
-  const name = (sessionName || '').toLowerCase();
-
-  // Practice: 100 - 199
-  if (type.includes('practice') || name.startsWith('p') || name.startsWith('fp')) {
-    const num = parseInt(name.replace(/\D/g, ''), 10);
-    return 100 + (isNaN(num) ? 1 : Math.min(num, 99));
-  }
-
-  // Qualifying: 200 - 299
-  if (type.includes('qualif') || name.startsWith('q') || name.includes('hyperpole')) {
-    const num = parseInt(name.replace(/\D/g, ''), 10);
-    return 200 + (isNaN(num) ? 1 : Math.min(num, 99));
-  }
-
-  // Warmup: 250
-  if (type.includes('warmup') || name.startsWith('w')) {
-    return 250;
-  }
-
-  // Race: 300 - 399
-  if (type.includes('race') || name.startsWith('r')) {
-    const num = parseInt(name.replace(/\D/g, ''), 10);
-    return 300 + (isNaN(num) ? 1 : Math.min(num, 99));
-  }
-
+  const ordinal = Math.min(Number(sessionName?.match(/\d+/)?.[0] ?? 1), 99);
+  if (sessionType === 'Practice') return 100 + ordinal;
+  if (sessionType === 'Qualifying') return 200 + ordinal;
+  if (sessionType === 'Warmup') return 250;
+  if (sessionType === 'Race') return 300 + ordinal;
   return 0;
 }
 
@@ -287,8 +249,8 @@ export function compareSessionsBySortOption<T extends SessionComparable>(
   }
 
   if (sortBy === 'pos-asc') {
-    const typeRankA = getSessionTypeSortRank(a.sessionType, a.sessionName);
-    const typeRankB = getSessionTypeSortRank(b.sessionType, b.sessionName);
+    const typeRankA = getSessionTypeSortRank(a.sessionType);
+    const typeRankB = getSessionTypeSortRank(b.sessionType);
     if (typeRankA !== typeRankB) return typeRankA - typeRankB;
 
     const rawPosA = selectors?.getPosition

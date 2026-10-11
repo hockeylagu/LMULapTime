@@ -4,12 +4,14 @@ import { SessionDetail } from '../../../src/components/session-detail/index.js';
 import { DriverData } from '../../../server/core/types.js';
 import { mockDetailedSession } from './mockSessionDetail.js';
 
+function responseFor(url: string, fallback: unknown): Response {
+  const body = url.includes('/personal-best/') ? { ready: true, bestLapTime: null } : fallback;
+  return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+}
+
 describe('SessionDetail component - standings, laps & navigation', () => {
   beforeEach(() => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve(mockDetailedSession),
-    });
+    global.fetch = vi.fn((input: RequestInfo | URL) => Promise.resolve(responseFor(String(input), mockDetailedSession)));
   });
 
   it('renders race standings, position deltas, and multi-driver classification for race sessions', async () => {
@@ -42,6 +44,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
           pitStopsCount: 1,
         },
         {
+          driverOrdinal: 1,
           name: 'AI Driver 2',
           carType: 'Porsche 963',
           carClass: 'Hyper',
@@ -74,7 +77,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     };
 
     (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
-      if (url.includes('/api/session/sess123')) {
+      if (url === '/api/session/sess123') {
         return Promise.resolve({
           ok: true,
           json: () => Promise.resolve(mockRaceSession),
@@ -172,7 +175,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     };
 
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/api/session/2026_05_28_R1')) {
+      if (url === '/api/session/2026_05_28_R1') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({...raceSession,historyContext:{personalBests:[],relatedSessions:[{type:"qualifying",target:qualiSummary}]}}) });
       }
       if (url.includes('/api/sessions')) {
@@ -201,7 +204,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     };
 
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/api/session/2026_05_28_Q1')) {
+      if (url === '/api/session/2026_05_28_Q1') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({...qualiSession,historyContext:{personalBests:[],relatedSessions:[{type:"race",target:raceSession}]}}) });
       }
       if (url.includes('/api/sessions')) {
@@ -228,6 +231,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
       sessionType: 'Race',
       drivers: [
         {
+          driverOrdinal: 0,
           name: 'Hypercar Leader',
           carType: 'Ferrari 499P',
           carClass: 'Hyper',
@@ -240,6 +244,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
           laps: [{ lapNum: 1, position: 1, lapTime: 95.0, isValid: true }],
         },
         {
+          driverOrdinal: 1,
           name: 'GT3 Leader',
           carType: 'Porsche 911 GT3 R',
           carClass: 'GT3',
@@ -252,6 +257,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
           laps: [{ lapNum: 1, position: 15, lapTime: 120.0, isValid: true }],
         },
         {
+          driverOrdinal: 2,
           name: 'Test Driver',
           carType: 'Aston Martin Vantage GT3',
           carClass: 'GT3',
@@ -267,10 +273,10 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     };
 
     (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
-      if (url.includes('/api/session/test-session-1')) {
+      if (url === '/api/session/test-session-1') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(multiClassSession) });
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      return Promise.resolve(responseFor(url, []));
     });
 
     render(<SessionDetail sessionId="test-session-1" onBack={vi.fn()} />);
@@ -289,6 +295,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
       sessionType: 'Practice',
       drivers: [
         {
+          driverOrdinal: 0,
           name: 'Test Driver',
           carType: 'Porsche 911 GT3 R',
           carClass: 'GT3',
@@ -324,10 +331,10 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     };
 
     (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
-      if (url.includes('/api/session/test-session-1')) {
+      if (url === '/api/session/test-session-1') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(practiceSession) });
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      return Promise.resolve(responseFor(url, []));
     });
 
     render(<SessionDetail sessionId="test-session-1" onBack={vi.fn()} />);
@@ -346,6 +353,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
       ...mockDetailedSession,
       drivers: [
         {
+          driverOrdinal: 0,
           name: 'Test Driver',
           carType: 'Porsche 911 GT3 R',
           carClass: 'GT3',
@@ -365,10 +373,10 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     };
 
     (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
-      if (url.includes('/api/session/test-session-1')) {
+      if (url === '/api/session/test-session-1') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(sessionWithInvalidLap) });
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      return Promise.resolve(responseFor(url, []));
     });
 
     render(<SessionDetail sessionId="test-session-1" onBack={vi.fn()} />);
@@ -388,6 +396,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
       sessionName: 'Q1',
       drivers: [
         {
+          driverOrdinal: 0,
           name: 'Quali Driver',
           carType: 'Ferrari 499P',
           carClass: 'Hyper',
@@ -423,10 +432,10 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     };
 
     (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
-      if (url.includes('/api/session/test-session-1')) {
+      if (url === '/api/session/test-session-1') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(qualiSession) });
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      return Promise.resolve(responseFor(url, []));
     });
 
     render(<SessionDetail sessionId="test-session-1" onBack={vi.fn()} />);
@@ -453,6 +462,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
       sessionName: 'R1',
       driversCount: 1,
       playerDriver: {
+        driverOrdinal: 0,
         name: 'Sim Racer',
         carType: 'Ferrari 499P',
         carClass: 'Hyper',
@@ -572,10 +582,10 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     incidentSession.drivers = [incidentSession.playerDriver as unknown as DriverData];
 
     (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
-      if (url.includes('/api/session/test-session-incidents')) {
+      if (url === '/api/session/test-session-incidents') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(incidentSession) });
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      return Promise.resolve(responseFor(url, []));
     });
 
     render(<SessionDetail sessionId="test-session-incidents" onBack={vi.fn()} />);
@@ -619,6 +629,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
       trackCourse: 'Grand Prix',
       timestamp: '2026-06-01T12:00:00Z',
       playerDriver: {
+        driverOrdinal: 0,
         name: 'Color Test Driver',
         isPlayer: true,
         carType: 'Ferrari 499P',
@@ -691,10 +702,10 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     sessionWithVariedLimits.drivers = [sessionWithVariedLimits.playerDriver as unknown as DriverData];
 
     (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
-      if (url.includes('/api/session/test-session-tl-colors')) {
+      if (url === '/api/session/test-session-tl-colors') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(sessionWithVariedLimits) });
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      return Promise.resolve(responseFor(url, []));
     });
 
     render(<SessionDetail sessionId="test-session-tl-colors" onBack={vi.fn()} />);
@@ -738,7 +749,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
           }),
         });
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(mockDetailedSession) });
+      return Promise.resolve(responseFor(url, mockDetailedSession));
     });
 
     render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
@@ -783,7 +794,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
           }),
         });
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(mockDetailedSession) });
+      return Promise.resolve(responseFor(url, mockDetailedSession));
     });
 
     render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
@@ -822,7 +833,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
           }),
         });
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(mockDetailedSession) });
+      return Promise.resolve(responseFor(url, mockDetailedSession));
     });
 
     render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);

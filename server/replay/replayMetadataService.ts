@@ -45,18 +45,23 @@ export function composeReplayMetadata(options: ComposeReplayMetadataOptions): Re
     metadata.trackName = metadata.displayTrack;
 
     resolveRosterVehicles(metadata, matchedSession.drivers);
-    const driver = matchedSession.playerDriver || matchedSession.drivers[0];
+    const driver = matchedSession.playerDriver;
+    const exactName = driver?.name.trim().toLowerCase();
+    const matchingSessionDrivers = exactName
+      ? matchedSession.drivers.filter(item => item.name.trim().toLowerCase() === exactName) : [];
+    const matchingReplayDrivers = exactName
+      ? metadata.drivers.filter(item => item.name.trim().toLowerCase() === exactName) : [];
+    const linkedPlayer = matchingSessionDrivers.length === 1 && matchingReplayDrivers.length === 1
+      ? matchingReplayDrivers[0] : undefined;
     if (driver?.carClass) {
       metadata.carClass = driver.carClass;
-      const player = metadata.drivers?.find(item => item.isPlayer) || metadata.drivers?.[0];
-      if (player && !player.carClass) player.carClass = driver.carClass;
+      if (linkedPlayer && !linkedPlayer.carClass) linkedPlayer.carClass = driver.carClass;
     }
     if (driver?.carType) {
       metadata.carModel = driver.carType;
-      const player = metadata.drivers?.find(item => item.isPlayer) || metadata.drivers?.[0];
-      if (player && !player.carModel) player.carModel = driver.carType;
+      if (linkedPlayer && !linkedPlayer.carModel) linkedPlayer.carModel = driver.carType;
     }
-    if (driver?.laps?.length) {
+    if (driver?.laps?.length && linkedPlayer) {
       metadata.laps = driver.laps
         .filter(lap => typeof lap.lapTime === 'number' && lap.lapTime > 0)
         .map(lap => ({
@@ -147,7 +152,8 @@ export function buildReplayListSummaries(input: ReplaySummarySourceData): Replay
       if (!metadata) continue;
 
       const matched = input.sessions.find(session => session.matchingReplayFile?.name === filename);
-      const playerDriver = metadata.drivers?.find((driver: ReplayDriverEntry) => driver.isPlayer) || metadata.drivers?.[0];
+      const markedPlayers = metadata.drivers?.filter((driver: ReplayDriverEntry) => driver.isPlayer) ?? [];
+      const playerDriver = markedPlayers.length === 1 ? markedPlayers[0] : undefined;
       const carClass = matched?.playerDriver?.carClass || playerDriver?.carClass || metadata.carClass;
       const carModel = matched?.playerDriver?.carType || playerDriver?.carModel || metadata.carModel;
       const carClasses = Array.from(new Set([

@@ -5,7 +5,6 @@ import {
   parseTimeStringToSeconds,
   isSessionEmpty,
   getDisplayTrackName,
-  matchesSessionType,
   parseDateStringToTimestamp,
   computeTheoreticalBest,
   computeTheoreticalGap,
@@ -149,38 +148,6 @@ describe('formatters utility', () => {
     });
   });
 
-  describe('matchesSessionType', () => {
-    it('matches all types when filter is All or empty', () => {
-      expect(matchesSessionType('Practice', 'P1', 'All')).toBe(true);
-      expect(matchesSessionType('Qualifying', 'Q1', '')).toBe(true);
-    });
-
-    it('matches Practice sessions accurately', () => {
-      expect(matchesSessionType('Practice', 'P1', 'practice')).toBe(true);
-      expect(matchesSessionType('', 'Practice 1', 'Practice')).toBe(true);
-      expect(matchesSessionType('Unknown', 'P2', 'Practice')).toBe(true);
-      expect(matchesSessionType('Race', 'R1', 'Practice')).toBe(false);
-    });
-
-    it('matches Qualifying sessions accurately', () => {
-      expect(matchesSessionType('Qualifying', 'Q1', 'Qualifying')).toBe(true);
-      expect(matchesSessionType('Qualify', '', 'Qualifying')).toBe(true);
-      expect(matchesSessionType('', 'Qualifying Session', 'Qualifying')).toBe(true);
-      expect(matchesSessionType('Practice', 'P1', 'Qualifying')).toBe(false);
-    });
-
-    it('matches Race sessions accurately', () => {
-      expect(matchesSessionType('Race', 'R1', 'Race')).toBe(true);
-      expect(matchesSessionType('', 'R1', 'Race')).toBe(true);
-      expect(matchesSessionType('Practice', 'P1', 'Race')).toBe(false);
-    });
-
-    it('matches custom fallback filter strings', () => {
-      expect(matchesSessionType('Special Event', 'Session 1', 'Special')).toBe(true);
-      expect(matchesSessionType('Warmup', 'W1', 'Warmup')).toBe(true);
-    });
-  });
-
   describe('parseDateStringToTimestamp', () => {
     it('returns 0 for empty or undefined strings', () => {
       expect(parseDateStringToTimestamp('')).toBe(0);
@@ -251,6 +218,12 @@ describe('formatters utility', () => {
 
       expect(practiceWeight).toBeLessThan(qualiWeight);
       expect(qualiWeight).toBeLessThan(raceWeight);
+    });
+
+    it('keeps unknown types unknown even when their display names resemble a category', () => {
+      expect(getSessionTypeWeight('Unknown', 'Race preparation')).toBe(0);
+      expect(getSessionTypeWeight('Practice', 'Race preparation')).toBe(101);
+      expect(getSessionTypeWeight('Practice', 'P2')).toBe(102);
     });
 
     it('orders Race after Qualifying in chronological ascending order, and before in descending order', () => {

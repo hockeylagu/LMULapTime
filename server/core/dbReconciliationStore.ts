@@ -48,11 +48,12 @@ interface TelemetryCandidateRow {
   recording_name: string | null;
   driver_ordinal: number | null;
   driver_name: string | null;
+  player_driver_ordinal: number | null;
 }
 
 /** Reads only session matching fields and the small driver-name roster, without laps or events. */
 function readTelemetryCandidates(db: DatabaseType, whereSql: string, params: Array<string | number> = []): TelemetrySessionCandidate[] {
-  const rows = db.prepare(`SELECT s.id, s.file_path, s.timestamp, s.track_venue, s.track_course,
+  const rows = db.prepare(`SELECT s.id, s.file_path, s.timestamp, s.track_venue, s.track_course, s.player_driver_ordinal,
       s.session_type, s.session_name, r.recording_name AS recording_name, d.driver_ordinal, n.name AS driver_name
     FROM sessions s
     LEFT JOIN session_recordings r ON r.session_id = s.id
@@ -79,6 +80,7 @@ function readTelemetryCandidates(db: DatabaseType, whereSql: string, params: Arr
       candidates.set(row.id, candidate);
     }
     if (row.driver_ordinal !== null) candidate.drivers.push({ name: row.driver_name ?? '' });
+    if (row.driver_ordinal === row.player_driver_ordinal && row.driver_name) candidate.playerDriverName = row.driver_name;
   }
   return [...candidates.values()];
 }

@@ -17,7 +17,7 @@ import type { Database as DatabaseType } from 'better-sqlite3';
 const MAX_STORED_SAMPLE_SHIFTS = 25;
 
 /** Bump when the impact rule changes: stored diffs computed with an older rule are recomputed. 2: player laps only. 3: the driver's own name on each changed lap. */
-export const BENCHMARK_IMPACT_RULE = 3;
+export const BENCHMARK_IMPACT_RULE = 4;
 
 /**
  * Computes the impact of a single changed benchmark entry across all stored sessions.

@@ -38,18 +38,8 @@ const FILTER_OPTIONS: Array<{ key: CompareLapFilter; label: string; title: strin
   { key: 'all', label: 'All Drivers', title: 'All drivers across all sessions' },
 ];
 
-function detectRaceType(lap: { sessionType?: string | null; sessionName?: string | null }): RaceTypeFilter | null {
-  const combined = `${lap.sessionType || ''} ${lap.sessionName || ''}`.toLowerCase();
-  if (/quali|qualification|\bq\d\b/i.test(combined)) return 'quali';
-  if (/race|\br\d\b/i.test(combined)) return 'race';
-  if (/practice|test|warmup|fp\d|\bp\d\b/i.test(combined)) return 'practice';
-  return null;
-}
-
-function matchesRaceType(lap: ComparableLap, type: RaceTypeFilter): boolean {
-  if (type === 'all') return true;
-  return detectRaceType(lap) === type;
-}
+const raceType = (sessionType?: string | null): RaceTypeFilter | null =>
+  sessionType === 'Practice' ? 'practice' : sessionType === 'Qualifying' ? 'quali' : sessionType === 'Race' ? 'race' : null;
 
 export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
   laps,
@@ -108,9 +98,9 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
     if (currentRaceType) {
       return (currentRaceType === 'practice' || currentRaceType === 'quali' || currentRaceType === 'race')
         ? (currentRaceType as RaceTypeFilter)
-        : detectRaceType({ sessionType: currentRaceType });
+        : raceType(currentRaceType);
     }
-    return currentLap ? detectRaceType(currentLap) : null;
+    return currentLap ? raceType(currentLap.sessionType) : null;
   }, [currentRaceType, currentLap]);
 
   const availableCars = useMemo(() => (
@@ -129,7 +119,7 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
       if (selectedCar !== 'all' && lap.carType !== selectedCar) return false;
       if (conditionToMatch && conditionToMatch !== 'all'
         && (lap.weatherCondition ?? (lap.hasRain ? 'Wet' : 'Dry')) !== conditionToMatch) return false;
-      return matchesRaceType(lap, selectedRaceType);
+      return selectedRaceType === 'all' || raceType(lap.sessionType) === selectedRaceType;
     });
   }, [laps, filter, currentSessionId, currentDriverName, selectedCar, selectedRaceType, conditionToMatch]);
 

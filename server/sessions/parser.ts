@@ -242,21 +242,17 @@ export class LmuParser {
       if (!isNonRaceSession(sessionType)) annotateLapTraffic(drivers);
       classifySessionLaps(drivers);
 
-      // Identify Player driver dynamically
-      const targetName = this.configuredPlayerName.toLowerCase().trim();
-      let mainPlayerDriver = targetName
-        ? drivers.find(d => d.name.toLowerCase().includes(targetName) || targetName.includes(d.name.toLowerCase()))
-        : undefined;
-
-      if (!mainPlayerDriver) {
-        mainPlayerDriver = drivers.find(d => d.isPlayer) || drivers[0];
-      }
-
-      if (mainPlayerDriver) {
-        drivers.forEach(d => {
-          d.isPlayer = (d.name === mainPlayerDriver.name);
-        });
-      }
+      // A single source player flag is authoritative. When absent or conflicting, configured
+      // identity may select one unique exact roster entry; otherwise player ownership is unknown.
+      const flaggedPlayers = drivers.filter(driver => driver.isPlayer);
+      const configuredName = this.configuredPlayerName.trim().toLowerCase();
+      const configuredMatches = configuredName
+        ? drivers.filter(driver => driver.name.trim().toLowerCase() === configuredName)
+        : [];
+      const mainPlayerDriver = flaggedPlayers.length === 1
+        ? flaggedPlayers[0]
+        : flaggedPlayers.length === 0 && configuredMatches.length === 1 ? configuredMatches[0] : undefined;
+      drivers.forEach(driver => { driver.isPlayer = driver === mainPlayerDriver; });
 
       const playerDriver = mainPlayerDriver;
 

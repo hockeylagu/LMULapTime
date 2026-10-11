@@ -5,11 +5,12 @@ import { SessionFilterRows, SessionSearchField } from '../session-list/SessionFi
 import { DASHBOARD_SORT_OPTIONS } from './dashboardSortOptions.js';
 import type { DashboardSortOption } from './dashboardSortOptions.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
+import type { DashboardTrackFilter } from '../../../shared/types/dashboard.js';
 
 export type { DashboardSortOption };
 
 export interface DashboardFilterBarProps {
-  tracks: string[];
+  tracks: DashboardTrackFilter[];
   selectedTrack: string;
   setSelectedTrack: (track: string) => void;
   selectedCarClass: string;
@@ -84,8 +85,8 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
                 All Tracks ({tracks.length})
               </option>
               {tracks.map((t) => (
-                <option key={t} value={t} className="bg-lmu-card text-white">
-                  {t}
+                <option key={JSON.stringify([t.trackVenue, t.trackCourse])} value={JSON.stringify([t.trackVenue, t.trackCourse])} className="bg-lmu-card text-white">
+                  {t.track}
                 </option>
               ))}
             </select>

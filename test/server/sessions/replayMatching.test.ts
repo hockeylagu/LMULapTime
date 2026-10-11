@@ -178,8 +178,8 @@ describe('candidate rules', () => {
 
   it('compares names only when neither layout is known', () => {
     const unknownSession = target({ trackVenue: 'Fantasy Ring', trackCourse: '' });
-    expect(replayLinkRejection(spaReplay('P1', saved, { trackName: 'Fantasy Ring' }), unknownSession)).toBeNull();
-    expect(replayLinkRejection(spaReplay('P1', saved, { trackName: 'Other Place' }), unknownSession)).toBe('layout');
+    expect(replayLinkRejection(spaReplay('P1', saved, { trackName: 'Fantasy Ring', trackVenue: 'Fantasy Ring', sceneDesc: undefined }), unknownSession)).toBeNull();
+    expect(replayLinkRejection(spaReplay('P1', saved, { trackName: 'Other Place', trackVenue: 'Other Place', sceneDesc: undefined }), unknownSession)).toBe('layout');
     // A known layout never matches an unknown one by a loose name comparison.
     expect(replayLinkRejection(spaReplay('P1', saved), unknownSession)).toBe('layout');
   });

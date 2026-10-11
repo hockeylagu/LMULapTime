@@ -67,6 +67,7 @@ import {
   upsertReplayMetadataCache,
   getReplaysCount,
   getReplayCacheList,
+  reconcileReplayPlayerOwnership,
 } from './replay/dbReplayMetadataStore.js';
 import {
   getMetadata,
@@ -263,13 +264,17 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
 
   // --- Replays & Trajectories ---
 
-  public getReplayMetadataCache(filename: string, mtime: number, size: number, filePath?: string): ReplayMetadata | null {
-    return getReplayMetadataCache(this.db, filename, mtime, size, filePath);
+  public reconcileReplayPlayerOwnership(playerName: string): void {
+    if (reconcileReplayPlayerOwnership(this.db, playerName)) this.replayMetadataRevision++;
+  }
+
+  public getReplayMetadataCache(filename: string, mtime: number, size: number, filePath?: string, playerName?: string): ReplayMetadata | null {
+    return getReplayMetadataCache(this.db, filename, mtime, size, filePath, playerName);
   }
 
   /** Returns stored metadata even when LMU has deleted the source .Vcr. */
-  public getStoredReplayMetadata(filename: string): ReplayMetadata | null {
-    return getStoredReplayMetadata(this.db, filename);
+  public getStoredReplayMetadata(filename: string, playerName?: string): ReplayMetadata | null {
+    return getStoredReplayMetadata(this.db, filename, playerName);
   }
 
   /** Returns stored file attributes and metadata for a cached replay file. */
@@ -346,6 +351,14 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
 
   public setReplayTrajectoryDefaults(filename: string, driverSlot: number, defaultLapKey: number | null, resolvedDriverSlot?: number | null): void {
     setTrajectoryDefaults(this.db, filename, driverSlot, defaultLapKey, resolvedDriverSlot);
+  }
+
+  /** Drops only legacy player-alias pointers; explicit slot trajectories remain intact. */
+  public invalidateUnresolvedReplayDefaults(): void {
+    this.db.transaction(() => {
+      this.db.prepare('DELETE FROM replay_trajectory_defaults WHERE driver_slot = -1').run();
+      this.db.prepare('DELETE FROM replay_trajectories WHERE driver_slot = -1').run();
+    })();
   }
 
   /**

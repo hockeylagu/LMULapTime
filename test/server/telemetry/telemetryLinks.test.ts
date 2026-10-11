@@ -66,8 +66,8 @@ describe('decideTelemetryLinks', () => {
     const paddock = {
       ...session('paddock', '2026-10-11T00:08:19.101Z', 'Paddock.Vcr'),
       trackVenue: 'Bahrain International Circuit', trackCourse: 'Bahrain Paddock Circuit',
-      drivers: [{ name: 'Samuel Lague' }],
-    } as DetailedSession;
+      drivers: [{ name: 'Samuel Lague' }], playerDriverName: 'Samuel Lague',
+    } as unknown as TelemetrySessionCandidate;
     const links = decideTelemetryLinks({
       ...none, files, sessions: [paddock], sessionEndMs: endsAt({ paddock: '2026-10-11T00:17:46Z' }),
     });
@@ -172,6 +172,31 @@ describe('decideTelemetryLinks', () => {
     expect(links).toEqual([{ filename: file.filename, sessionId: null, replayName: 'P1 48.Vcr' }]);
     // Replays not recording when the file started are not even loaded.
     expect(loaded).toEqual(['P1 48.Vcr']);
+  });
+
+  it('leaves venue-only telemetry unmatched when eligible sessions span Fuji layouts', () => {
+    const file = { ...duck('Fuji_P1.duckdb', '2026-10-11T00:08:00Z'), trackName: 'Fuji Speedway' };
+    const sessions = [
+      { ...session('fuji-gp', '2026-10-11T00:00:00Z'), trackVenue: 'Fuji Speedway', trackCourse: 'Grand Prix Circuit (with Dunlop Chicane)' },
+      { ...session('fuji-classic', '2026-10-11T00:00:00Z'), trackVenue: 'Fuji Speedway', trackCourse: 'Classic Circuit (without Dunlop Chicane)' },
+    ];
+    expect(decideTelemetryLinks({
+      ...none, files: [file], sessions,
+      sessionEndMs: endsAt({ 'fuji-gp': '2026-10-11T01:00:00Z', 'fuji-classic': '2026-10-11T01:00:00Z' }),
+    })).toEqual([]);
+  });
+
+  it('leaves venue-only telemetry unmatched when eligible replay owners name different layouts', () => {
+    const file = { ...duck('Fuji_P1.duckdb', '2026-10-11T00:08:00Z'), trackName: 'Fuji Speedway' };
+    const replays = [replay('Fuji P1 GP.Vcr', '2026-10-11T00:10:00Z'), replay('Fuji P1 Classic.Vcr', '2026-10-11T00:10:00Z')];
+    const metadataByName: Record<string, ReplayMetadata> = {
+      'Fuji P1 GP.Vcr': { ...replayMetadata, trackVenue: 'Fuji Speedway', trackCourse: 'Grand Prix Circuit (with Dunlop Chicane)' },
+      'Fuji P1 Classic.Vcr': { ...replayMetadata, trackVenue: 'Fuji Speedway', trackCourse: 'Classic Circuit (without Dunlop Chicane)' },
+    };
+    expect(decideTelemetryLinks({
+      files: [file], stored: [], sessions: [], replays,
+      loadReplayMetadata: name => metadataByName[name] ?? null,
+    })).toEqual([]);
   });
 });
 

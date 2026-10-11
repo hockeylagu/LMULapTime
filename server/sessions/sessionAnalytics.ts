@@ -117,13 +117,9 @@ export function computeProgression(sessions: DetailedSession[], targetDriverName
   const sorted = [...sessions].sort((a, b) => compareSessions(a, b, 'asc'));
 
   return sorted.map(s => {
-    let driver = targetDriverName
+    const driver = targetDriverName
       ? s.drivers.find(d => d.name.toLowerCase() === targetDriverName.toLowerCase())
-      : s.playerDriver || s.drivers[0];
-
-    if (!driver && s.drivers.length > 0) {
-      driver = s.drivers[0];
-    }
+      : s.playerDriver;
 
     const cleanLaps = driver?.laps && driver.laps.length > 0
       ? selectCleanLapCandidates(driver.laps)
@@ -217,7 +213,8 @@ export function extractComparableLaps(
 
     // Check all drivers in matching sessions to determine overall track record without driver restriction
     (s.drivers || []).forEach(d => {
-      const isPlayerDriver = Boolean(d.isPlayer || s.playerDriver?.name === d.name);
+      const isPlayerDriver = Boolean(d.isPlayer ||
+        (typeof s.playerDriver?.driverOrdinal === 'number' && d.driverOrdinal === s.playerDriver.driverOrdinal));
       // The personal best comes from the same laps as the best sectors, so the theoretical best never exceeds it.
       const leaderboardLaps = isPlayerDriver ? new Set(selectLeaderboardLaps(d.laps || [])) : null;
       if (filters.humansOnly && !isHumanDriver(s, d)) return;

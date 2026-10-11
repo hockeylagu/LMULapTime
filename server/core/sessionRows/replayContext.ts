@@ -1,6 +1,5 @@
 import type { Database } from 'better-sqlite3';
 import type { ReplayContextDriver, ReplaySessionContext, ReplayTimingLap } from '../../replay/replayServiceTypes.js';
-import { resolveSessionId } from '../dbSessionStore.js';
 import { unpackFields, type Row } from './fields.js';
 import { recordingLink } from './reader.js';
 import { DRIVER_DICTIONARY_FIELDS, DRIVER_FIELDS, LAP_FIELDS } from './specs.js';
@@ -17,10 +16,10 @@ const lapFields = LAP_FIELDS.filter(field => ['lapNum', 'lapTime', 's1', 's2', '
 export function readReplaySessionContext(
   db: Database, requestedId: string, laps: 'all' | 'none' | number,
 ): ReplaySessionContext | null {
-  const id = resolveSessionId(db, requestedId);
-  if (!id) return null;
+  const id = requestedId;
   const row = db.prepare(`SELECT id,track_venue,track_course,track_length_meters,session_type,total_laps_count,
-    player_driver_ordinal,has_duckdb_telemetry,duckdb_filename FROM sessions WHERE id=?`).get(id) as Row;
+    player_driver_ordinal,has_duckdb_telemetry,duckdb_filename FROM sessions WHERE id=?`).get(id) as Row | undefined;
+  if (!row) return null;
   const drivers = (db.prepare(`SELECT d.driver_ordinal,d.driver_name,d.best_lap_time,d.is_player,
       n.name,v.car_type,v.car_class
     FROM session_drivers d LEFT JOIN drivers n ON n.driver_id=d.driver_id
@@ -31,7 +30,7 @@ export function readReplaySessionContext(
   const playerOrdinal = typeof row.player_driver_ordinal === 'number' ? row.player_driver_ordinal : undefined;
   const playerDriver = playerOrdinal === undefined ? undefined : drivers.find(driver => driver.driverOrdinal === playerOrdinal);
   if (laps !== 'none' && drivers.length) {
-    const ordinals = laps === 'all' ? null : [...new Set([laps, playerDriver?.driverOrdinal ?? drivers[0].driverOrdinal])];
+    const ordinals = laps === 'all' ? null : [...new Set([laps, ...(playerDriver ? [playerDriver.driverOrdinal] : [])])];
     const lapRows = db.prepare(`SELECT driver_ordinal,lap_ordinal,${lapFields.map(field => field.col).join(',')}
       FROM session_laps WHERE session_id=? ${ordinals ? 'AND driver_ordinal IN (SELECT value FROM json_each(?))' : ''}
       ORDER BY driver_ordinal,lap_ordinal`).all(...(ordinals ? [id, JSON.stringify(ordinals)] : [id])) as Row[];

@@ -7,8 +7,8 @@ import { formatElapsedSeconds, formatTime } from '../../../../shared/domain/form
 export interface SessionRaceStandingsRowProps {
   driver: DriverData;
   session: DetailedSession;
-  selectedDriverName: string;
-  setSelectedDriverName: (name: string) => void;
+  selectedDriverOrdinal: number | null;
+  setSelectedDriverOrdinal: (ordinal: number | null) => void;
   isMultiClass: boolean;
   sessionBestSectors: { s1: number | null; s2: number | null; s3: number | null };
   leaderFinishTime?: number | null;
@@ -26,8 +26,8 @@ function getBestLap(driver: DriverData) {
 export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = ({
   driver: d,
   session,
-  selectedDriverName,
-  setSelectedDriverName,
+  selectedDriverOrdinal,
+  setSelectedDriverOrdinal,
   isMultiClass,
   sessionBestSectors,
   leaderFinishTime,
@@ -35,8 +35,8 @@ export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = (
   isRace,
   fastestInClass,
 }) => {
-  const isPlayer = Boolean(d.isPlayer || (session.playerDriver && d.name === session.playerDriver.name));
-  const isSelected = d.name === selectedDriverName;
+  const isPlayer = Boolean(d.isPlayer || (session.playerDriver && d.driverOrdinal === session.playerDriver.driverOrdinal));
+  const isSelected = d.driverOrdinal === selectedDriverOrdinal;
   const bestLap = getBestLap(d);
   const isBestS1 = bestLap?.s1 === sessionBestSectors.s1;
   const isBestS2 = bestLap?.s2 === sessionBestSectors.s2;
@@ -60,7 +60,7 @@ export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = (
     ? d.bestLapTime - fastestInClass < 0.0005 ? 'Fastest' : `+${(d.bestLapTime - fastestInClass).toFixed(3)}s`
     : 'No time';
   const timeOrGap = isRace ? raceTimeOrGap : lapGap;
-  const select = () => setSelectedDriverName(d.name);
+  const select = () => setSelectedDriverOrdinal(d.driverOrdinal ?? null);
 
   return (
     <tr

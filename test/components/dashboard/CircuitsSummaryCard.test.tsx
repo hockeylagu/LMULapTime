@@ -67,7 +67,7 @@ describe('CircuitsSummaryCard', () => {
 
     fireEvent.click(screen.getByText('Fuji Speedway'));
 
-    expect(window.location.hash).toBe('#/track/Fuji%20Speedway?carClass=Hyper');
+    expect(window.location.hash).toBe('#/track/Fuji%20Speedway?carClass=Hyper&trackVenue=Fuji+Speedway&trackCourse=');
   });
 
   it('navigates without a carClass param when no filter is selected', () => {
@@ -82,7 +82,7 @@ describe('CircuitsSummaryCard', () => {
 
     fireEvent.click(screen.getByText('Fuji Speedway'));
 
-    expect(window.location.hash).toBe('#/track/Fuji%20Speedway');
+    expect(window.location.hash).toBe('#/track/Fuji%20Speedway?trackVenue=Fuji+Speedway&trackCourse=');
   });
 
   it('reorders rows by distance when the Km toggle is active', () => {

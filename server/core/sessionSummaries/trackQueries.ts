@@ -3,7 +3,6 @@ import type { TrackSummary } from '../../../shared/types/index.js';
 import { computeTheoreticalBest, getDisplayTrackName, minValidTime } from '../../../shared/domain/formatters.js';
 import { sessionWhere, carClassMatch, type SessionQuery, type SqlFragment } from './pageQueries.js';
 import { CIRCUIT_SPECIFICATIONS, getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
-import { matchesTrack } from '../../../shared/domain/paceCategory.js';
 
 export interface TrackDetailFilterOptions {
   carModels: string[];
@@ -13,7 +12,7 @@ export interface TrackDetailFilterOptions {
 }
 
 export interface TrackPositionAverages { qualifyingAveragePosition: number | null; finishAveragePosition: number | null; }
-export interface TrackLatestSessionContext { trackCourse?: string; trackLengthMeters?: number | null; carClass?: string; carType?: string; }
+export interface TrackLatestSessionContext { trackVenue?: string; trackCourse?: string; trackLengthMeters?: number | null; carClass?: string; carType?: string; }
 
 interface TrackAggregateRow {
   track_venue: string; track_course: string; layout_key: string; raw_latest: number;
@@ -23,9 +22,8 @@ interface TrackAggregateRow {
   best_timestamp: number | null; best_id: string | null;
 }
 
-function customTrackScope(trackName: string): SqlFragment {
-  return { sql: "(s.track_venue=? OR trim(s.track_venue || ' - ' || s.track_course)=? OR s.track_venue || ' (' || s.track_course || ')'=?)",
-    values: [trackName, trackName, trackName] };
+function customTrackScope(trackVenue: string, trackCourse: string): SqlFragment {
+  return { sql: "s.layout_key='unknown' AND s.track_venue=? AND s.track_course=?", values: [trackVenue, trackCourse] };
 }
 
 function sessionClassMatch(targetClass?: string): SqlFragment {
@@ -34,14 +32,14 @@ function sessionClassMatch(targetClass?: string): SqlFragment {
   return { sql: `EXISTS (SELECT 1 FROM session_drivers f WHERE f.session_id=s.id AND (f.is_player_driver=1 OR (s.player_driver_name IS NULL AND f.driver_ordinal=coalesce(s.primary_driver_ordinal,0))) AND ${match.sql})`, values: match.values };
 }
 
-function aggregateScopeSql(trackName: string, carClass?: string, carModel?: string): SqlFragment {
-  const spec = getCircuitSpecification(trackName);
+function aggregateScopeSql(trackVenue: string, trackCourse = '', carClass?: string, carModel?: string): SqlFragment {
+  const spec = getCircuitSpecification(trackVenue, trackCourse);
   const canonicalLayout = Object.prototype.hasOwnProperty.call(CIRCUIT_SPECIFICATIONS, spec.layoutKey);
   const clauses: string[] = [];
   const values: (string | number)[] = [];
   if (canonicalLayout) { clauses.push('s.layout_key=?'); values.push(spec.layoutKey); }
   else {
-    const track = customTrackScope(trackName);
+    const track = customTrackScope(trackVenue, trackCourse);
     clauses.push(track.sql);
     values.push(...track.values);
   }
@@ -54,14 +52,14 @@ function aggregateScopeSql(trackName: string, carClass?: string, carModel?: stri
   return { sql: clauses.join(' AND '), values };
 }
 
-function trackBaseCte(carClass?: string, carModel?: string, layoutKey?: string, trackName?: string): SqlFragment {
+function trackBaseCte(carClass?: string, carModel?: string, layoutKey?: string, trackVenue?: string, trackCourse = ''): SqlFragment {
   const classMatch = sessionClassMatch(carClass);
   const clauses: string[] = [];
   const values: (string | number)[] = [...classMatch.values];
   if (carModel && carModel !== 'All') { clauses.push('s.player_car_type=?'); values.push(carModel); }
   if (layoutKey) { clauses.push('s.layout_key=?'); values.push(layoutKey); }
-  if (trackName) {
-    const track = customTrackScope(trackName);
+  if (trackVenue) {
+    const track = customTrackScope(trackVenue, trackCourse);
     clauses.push(track.sql);
     values.push(...track.values);
   }
@@ -78,8 +76,8 @@ function trackBaseCte(carClass?: string, carModel?: string, layoutKey?: string, 
     )`, values };
 }
 
-function queryAggregatedTrackSummaries(db: Database, carClass?: string, carModel?: string, layoutKey?: string, trackName?: string): Map<string, TrackSummary> {
-  const cte = trackBaseCte(carClass, carModel, layoutKey, trackName);
+function queryAggregatedTrackSummaries(db: Database, carClass?: string, carModel?: string, layoutKey?: string, trackName?: string, trackCourse = ''): Map<string, TrackSummary> {
+  const cte = trackBaseCte(carClass, carModel, layoutKey, trackName, trackCourse);
   const rows = db.prepare(`${cte.sql}, aggregates AS (
       SELECT track_venue,track_course,layout_key,MAX(event_timestamp) raw_latest,
         SUM(class_match) sessions_count,
@@ -103,11 +101,12 @@ function queryAggregatedTrackSummaries(db: Database, carClass?: string, carModel
   for (const row of rows) {
     const displayTrack = getDisplayTrackName(row.track_venue, row.track_course);
     if (!displayTrack) continue;
-    let summary = summaries.get(displayTrack);
+    const identity = JSON.stringify([row.track_venue, row.track_course, row.layout_key]);
+    let summary = summaries.get(identity);
     if (!summary) {
-      summary = { trackVenue: displayTrack, sessionsCount: 0, totalLaps: 0, bestLapTime: null, bestLapDriver: '', bestLapCar: '',
+      summary = { trackVenue: displayTrack, trackCourse: row.track_course, identityVenue: row.track_venue, layoutKey: row.layout_key, sessionsCount: 0, totalLaps: 0, bestLapTime: null, bestLapDriver: '', bestLapCar: '',
         bestLapClass: '', bestS1: null, bestS2: null, bestS3: null, theoreticalBest: null, carsUsed: [], lastSessionTimestamp: 0 };
-      summaries.set(displayTrack, summary);
+      summaries.set(identity, summary);
     }
     summary.sessionsCount += row.sessions_count;
     summary.totalLaps += row.total_laps;
@@ -118,14 +117,14 @@ function queryAggregatedTrackSummaries(db: Database, carClass?: string, carModel
     summary.theoreticalBest = computeTheoreticalBest(summary.bestS1, summary.bestS2, summary.bestS3);
     const time = row.best_lap_time;
     if (time !== null) {
-      const previous = bestOrder.get(displayTrack);
+      const previous = bestOrder.get(identity);
       const timestamp = row.best_timestamp ?? 0;
       const id = row.best_id ?? '';
       if (!previous || time < previous.time || (time === previous.time && (timestamp > previous.timestamp || (timestamp === previous.timestamp && id > previous.id)))) {
         summary.bestLapTime = time; summary.bestLapDriver = row.best_lap_driver ?? '';
         summary.bestLapCar = row.best_lap_car ?? ''; summary.bestLapClass = row.best_lap_class ?? '';
         summary.bestLapWet = row.best_lap_wet ? true : undefined;
-        bestOrder.set(displayTrack, { time, timestamp, id });
+        bestOrder.set(identity, { time, timestamp, id });
       }
     }
   }
@@ -136,26 +135,27 @@ function queryAggregatedTrackSummaries(db: Database, carClass?: string, carModel
     ) SELECT track_venue,track_course,player_car_type FROM ranked_cars WHERE car_rank=1
       ORDER BY event_timestamp DESC,id DESC`).all(...cte.values) as Array<{ track_venue: string; track_course: string; player_car_type: string }>;
   for (const row of carRows) {
-    const summary = summaries.get(getDisplayTrackName(row.track_venue, row.track_course));
+    const summary = summaries.get(JSON.stringify([row.track_venue, row.track_course,
+      getCircuitSpecification(row.track_venue, row.track_course).layoutKey]));
     if (summary && !summary.carsUsed.includes(row.player_car_type)) summary.carsUsed.push(row.player_car_type);
   }
   return summaries;
 }
 
-export function queryTrackLatestSessionContext(db: Database, trackName: string, carClass?: string, carModel?: string): TrackLatestSessionContext {
-  const where = sessionWhere({ ...trackScope(trackName, { carClass }), playerCar: carModel && carModel !== 'All' ? carModel : undefined });
-  const row = db.prepare(`SELECT s.track_course,a.track_length,
+export function queryTrackLatestSessionContext(db: Database, trackName: string, carClass?: string, carModel?: string, trackCourse = ''): TrackLatestSessionContext {
+  const where = sessionWhere({ ...trackScope(trackName, { carClass }, trackCourse), playerCar: carModel && carModel !== 'All' ? carModel : undefined });
+  const row = db.prepare(`SELECT s.track_venue,s.track_course,a.track_length,
       d.driver_class car_class,v.car_type FROM sessions s LEFT JOIN session_drivers d ON d.session_id=s.id AND d.is_player_driver=1
       LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id
       JOIN session_summary_facts a ON a.session_id=s.id
       ${where.sql} ORDER BY s.timestamp DESC,s.id DESC LIMIT 1`).get(...where.values) as
-    { track_course: string | null; track_length: number | null; car_class: string | null; car_type: string | null } | undefined;
-  return row ? { trackCourse: row.track_course ?? undefined, trackLengthMeters: row.track_length,
+    { track_venue: string; track_course: string | null; track_length: number | null; car_class: string | null; car_type: string | null } | undefined;
+  return row ? { trackVenue: row.track_venue, trackCourse: row.track_course ?? undefined, trackLengthMeters: row.track_length,
     carClass: row.car_class ?? undefined, carType: row.car_type ?? undefined } : {};
 }
 
-export function queryTrackPositionAverages(db: Database, trackName: string, carClass?: string, carModel?: string): TrackPositionAverages {
-  const scope = aggregateScopeSql(trackName, carClass, carModel);
+export function queryTrackPositionAverages(db: Database, trackName: string, carClass?: string, carModel?: string, trackCourse = ''): TrackPositionAverages {
+  const scope = aggregateScopeSql(trackName, trackCourse, carClass, carModel);
   const row = db.prepare(`SELECT avg(CASE WHEN s.session_kind='qualifying' AND d.position>0 THEN d.position END) qualifying_average,
       avg(CASE WHEN s.session_kind='race' AND d.position>0 THEN d.position END) finish_average
     FROM sessions s LEFT JOIN session_drivers d ON d.session_id=s.id AND d.driver_ordinal=s.primary_driver_ordinal
@@ -164,26 +164,26 @@ export function queryTrackPositionAverages(db: Database, trackName: string, carC
   return { qualifyingAveragePosition: row.qualifying_average, finishAveragePosition: row.finish_average };
 }
 
-function trackScope(trackName: string, options: SessionQuery): SessionQuery {
-  return { ...options, track: trackName, search: undefined, sessionType: undefined, hideEmpty: false, hasReplay: false, from: undefined, to: undefined };
+function trackScope(trackName: string, options: SessionQuery, trackCourse = ''): SessionQuery {
+  return { ...options, track: trackName, trackVenue: trackName, trackCourse, search: undefined, sessionType: undefined, hideEmpty: false, hasReplay: false, from: undefined, to: undefined };
 }
 
 /** Query a compact, SQL-aggregated track summary for the selected canonical layout/class/model. */
-export function queryTrackDetailSummary(db: Database, trackName: string, carClass?: string, carModel?: string): TrackSummary | undefined {
-  const spec = getCircuitSpecification(trackName);
+export function queryTrackDetailSummary(db: Database, trackName: string, carClass?: string, carModel?: string, trackCourse = ''): TrackSummary | undefined {
+  const spec = getCircuitSpecification(trackName, trackCourse);
   const canonicalLayout = Object.prototype.hasOwnProperty.call(CIRCUIT_SPECIFICATIONS, spec.layoutKey);
   const summaries = queryAggregatedTrackSummaries(db, carClass, carModel,
     canonicalLayout ? spec.layoutKey : undefined,
-    canonicalLayout ? undefined : trackName);
+    canonicalLayout ? undefined : trackName, trackCourse);
   const summary = [...summaries.values()].find(item => !canonicalLayout
-    ? matchesTrack(trackName, item.trackVenue)
-    : getCircuitSpecification(item.trackVenue).layoutKey === spec.layoutKey);
+    ? item.identityVenue === trackName && item.trackCourse === trackCourse
+    : item.layoutKey === spec.layoutKey);
   return summary && summary.sessionsCount > 0 ? summary : undefined;
 }
 
 /** Small, scoped option lists and counts for controls; never derived from the current page. */
-export function queryTrackDetailFilters(db: Database, trackName: string, carClass?: string, carModel?: string): TrackDetailFilterOptions {
-  const base = sessionWhere(trackScope(trackName, { carClass }));
+export function queryTrackDetailFilters(db: Database, trackName: string, carClass?: string, carModel?: string, trackCourse = ''): TrackDetailFilterOptions {
+  const base = sessionWhere(trackScope(trackName, { carClass }, trackCourse));
   const rows = db.prepare(`SELECT DISTINCT v.car_type FROM sessions s JOIN session_drivers d
     ON d.session_id=s.id AND d.is_player_driver=1 JOIN vehicles v ON v.vehicle_id=d.vehicle_id ${base.sql} ORDER BY v.car_type`)
     .all(...base.values) as Array<{ car_type: string }>;

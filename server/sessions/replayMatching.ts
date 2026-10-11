@@ -1,5 +1,4 @@
-import { matchesTrack } from '../../shared/domain/paceCategory.js';
-import { getCircuitSpecification, type CircuitSpecification } from '../../shared/domain/circuitSpecs.js';
+import { CIRCUIT_SPECIFICATIONS, getCircuitSpecification, type CircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import type { ReplayLinkRejectionReason } from '../../shared/types/index.js';
 import type { StoredReplayFileInfo } from '../core/replay/dbReplayMetadataStore.js';
 import { ReplayFileEntry } from './sessionXmlTypes.js';
@@ -44,11 +43,10 @@ export function replayTimeDistanceMs(replay: ReplayFileEntry, target: ReplayMatc
 
 /** The replay's layout: its recorded engine scene when known (ground truth), else its filename's track. */
 function replayLayoutSpec(replay: ReplayFileEntry): CircuitSpecification {
-  if (replay.sceneDesc) {
-    const byScene = getCircuitSpecification(undefined, undefined, replay.sceneDesc);
-    if (byScene.layoutKey !== 'unknown') return byScene;
-  }
-  return getCircuitSpecification(replay.trackName);
+  const sceneSpec = getCircuitSpecification(undefined, undefined, replay.sceneDesc);
+  if (Object.prototype.hasOwnProperty.call(CIRCUIT_SPECIFICATIONS, sceneSpec.layoutKey)) return sceneSpec;
+  const venue = replay.trackVenue || replay.trackName;
+  return getCircuitSpecification(venue, replay.trackCourse);
 }
 
 /**
@@ -59,27 +57,26 @@ function replayLayoutSpec(replay: ReplayFileEntry): CircuitSpecification {
 function isSameLayout(replay: ReplayFileEntry, target: ReplayMatchTarget): boolean {
   const replaySpec = replayLayoutSpec(replay);
   const sessionSpec = getCircuitSpecification(target.trackVenue, target.trackCourse);
-  if (replaySpec.layoutKey !== 'unknown' && sessionSpec.layoutKey !== 'unknown') {
+  const replayKnown = Object.prototype.hasOwnProperty.call(CIRCUIT_SPECIFICATIONS, replaySpec.layoutKey);
+  const sessionKnown = Object.prototype.hasOwnProperty.call(CIRCUIT_SPECIFICATIONS, sessionSpec.layoutKey);
+  if (replayKnown && sessionKnown) {
     return replaySpec.layoutKey === sessionSpec.layoutKey;
   }
-  if (matchesTrack(replay.trackName, target.trackVenue, target.trackCourse)) return true;
-  if (replaySpec.layoutKey !== 'unknown' || sessionSpec.layoutKey !== 'unknown') return false;
+  return !replayKnown && !sessionKnown && Boolean(replay.trackVenue) && replay.trackVenue === target.trackVenue
+    && (replay.trackCourse ?? '') === (target.trackCourse ?? '');
+}
 
-  const normVcrTrack = replay.trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const normXmlCourse = (target.trackCourse || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const normXmlVenue = target.trackVenue.toLowerCase().replace(/[^a-z0-9]/g, '');
-  return Boolean(
-    (normXmlCourse && (normXmlCourse.includes(normVcrTrack) || normVcrTrack.includes(normXmlCourse))) ||
-    (!target.trackCourse && (normXmlVenue.includes(normVcrTrack) || normVcrTrack.includes(normXmlVenue)))
-  );
+/** Identity constraints that remain judgeable when the source XML has no stored mtime. */
+export function replayLinkIdentityRejection(replay: ReplayFileEntry, target: ReplayMatchTarget): ReplayLinkRejectionReason | null {
+  if (!matchesSessionCode(replay.sessionCode, target.sessionCode || '')) return 'session-type';
+  return isSameLayout(replay, target) ? null : 'layout';
 }
 
 /** Why `replay` cannot be the recording of the target session, or null when it can. */
 export function replayLinkRejection(replay: ReplayFileEntry, target: ReplayMatchTarget): ReplayLinkRejectionReason | null {
   if (!matchesSessionCode(replay.sessionCode, target.sessionCode || '')) return 'session-type';
   if (replayTimeDistanceMs(replay, target) > REPLAY_MATCH_WINDOW_MS) return 'time-window';
-  if (!isSameLayout(replay, target)) return 'layout';
-  return null;
+  return isSameLayout(replay, target) ? null : 'layout';
 }
 
 /** The replay recorded for the target session: same layout, exact session code first, then the closest in time. */
@@ -104,6 +101,8 @@ export function replayIndexEntryFromStored(stored: StoredReplayFileInfo & { file
     path: stored.file_path,
     sizeBytes: stored.file_size,
     trackName: match ? match[1].trim() : (metadata.trackVenue || metadata.trackCourse || metadata.trackName || stored.filename.replace(/\.vcr$/i, '')),
+    trackVenue: metadata.trackVenue,
+    trackCourse: metadata.trackCourse,
     sessionCode: match ? match[2].toUpperCase() : (metadata.sessionType || ''),
     mtime: stored.file_mtime,
     eventTitle: metadata.eventInfo?.eventTitle,

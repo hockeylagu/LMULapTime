@@ -3,30 +3,13 @@ import { Link } from 'react-router';
 import { formatTime } from '../../../shared/domain/formatters.js';
 import { PaceBadge, SectorSplitsRow } from '../common';
 import { CarIdentity, CarLogo } from '../vehicle/index.js';
-import { PaceCategory } from '../../../shared/types/index.js';
+import { PaceCategory, TrackSummary } from '../../../shared/types/index.js';
 import { TrackCircuitLayout } from '../track-detail/TrackCircuitLayout.js';
 
-export interface TrackSummaryItem {
-  trackVenue: string;
-  sessionsCount: number;
-  totalLaps: number;
-  bestLapTime: number | null;
-  bestLapDriver: string;
-  bestLapCar: string;
-  bestLapClass?: string;
-  bestLapWet?: boolean;
-  bestS1: number | null;
-  bestS2: number | null;
-  bestS3: number | null;
-  theoreticalBest: number | null;
-  carsUsed: string[];
-  lastSessionTimestamp?: number;
-}
-
 interface TrackSummaryCardProps {
-  track: TrackSummaryItem;
+  track: TrackSummary;
   paceInfo: { category: PaceCategory; pct: number } | null;
-  onSelectTrack: (trackName: string) => void;
+  onSelectTrack: (track: TrackSummary) => void;
   selectedCarClass: string;
   benchmarkState: 'loading' | 'error' | 'ready';
 }
@@ -43,15 +26,16 @@ export const TrackSummaryCard: React.FC<TrackSummaryCardProps> = ({
   const lastDriven = t.lastSessionTimestamp && Number.isFinite(t.lastSessionTimestamp) && t.lastSessionTimestamp > 0
     ? new Date(t.lastSessionTimestamp) : null;
   const validLastDriven = lastDriven && Number.isFinite(lastDriven.getTime()) ? lastDriven : null;
-  const suffix = selectedCarClass !== 'All' ? `?carClass=${encodeURIComponent(selectedCarClass)}` : '';
+  const params = new URLSearchParams({ trackVenue: t.identityVenue, trackCourse: t.trackCourse });
+  if (selectedCarClass !== 'All') params.set('carClass', selectedCarClass);
   return (
     <Link
-      to={`/track/${encodeURIComponent(t.trackVenue)}${suffix}`}
+      to={`/track/${encodeURIComponent(t.trackVenue)}?${params}`}
       aria-label={`View ${t.trackVenue} records`}
       onClick={event => {
         if (event.button === 0 && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) {
           event.preventDefault();
-          onSelectTrack(t.trackVenue);
+          onSelectTrack(t);
         }
       }}
       className="min-w-0 bg-lmu-card border border-lmu-border transition-colors duration-200 hover:bg-lmu-cardHover hover:border-lmu-rule p-5 rounded-2xl cursor-pointer space-y-4 flex flex-col justify-between focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-4"

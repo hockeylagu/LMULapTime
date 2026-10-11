@@ -37,6 +37,7 @@ export const mockDetailedSession = {
     createdDateFormatted: '2026/05/28 14:30',
   },
   playerDriver: {
+    driverOrdinal: 0,
     name: 'Sim Driver',
     carType: 'Ferrari 499P',
     carClass: 'Hyper',
@@ -136,6 +137,7 @@ export const mockDetailedSession = {
   },
   drivers: [
     {
+      driverOrdinal: 0,
       name: 'Sim Driver',
       carType: 'Ferrari 499P',
       carClass: 'Hyper',
@@ -232,6 +234,7 @@ export const mockDetailedSession = {
       ],
     },
     {
+      driverOrdinal: 1,
       name: 'AI Driver 2',
       carType: 'Porsche 963',
       carClass: 'Hyper',

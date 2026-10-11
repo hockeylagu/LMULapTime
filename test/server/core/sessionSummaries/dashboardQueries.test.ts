@@ -17,6 +17,29 @@ const makeSession = (id: string, timestamp: number, lapTime: number): DetailedSe
 };
 
 describe('compact dashboard queries', () => {
+  it('preserves unknown venue/course pairs in filter options and dashboard page scope', () => {
+    const db = new Database(':memory:');
+    initDbSchema(db);
+    const short = makeSession('short-course', 1, 95);
+    short.trackVenue = 'Mod Circuit';
+    short.trackCourse = 'Short Course';
+    const long = makeSession('long-course', 2, 90);
+    long.trackVenue = 'Mod Circuit';
+    long.trackCourse = 'Long Course';
+    upsertSession(db, short, 'short-course.xml', 1, 10);
+    upsertSession(db, long, 'long-course.xml', 2, 10);
+
+    const result = queryCompactDashboard(db, { track: 'Mod Circuit', trackVenue: 'Mod Circuit', trackCourse: 'Short Course' });
+
+    expect(result.total).toBe(1);
+    expect(result.sessions.map(session => session.id)).toEqual(['short-course']);
+    expect(result.tracks).toEqual([
+      { track: 'Mod Circuit (Long Course)', trackVenue: 'Mod Circuit', trackCourse: 'Long Course' },
+      { track: 'Mod Circuit (Short Course)', trackVenue: 'Mod Circuit', trackCourse: 'Short Course' },
+    ]);
+    db.close();
+  });
+
   it('aggregates the complete history while returning only the requested compact page and current-target pace order', () => {
     const db = new Database(':memory:');
     initDbSchema(db);
@@ -46,7 +69,7 @@ describe('compact dashboard queries', () => {
     expect(result.trends.hasData).toBe(true);
     expect(result.trends.latestOuting?.id).toBe('faster');
     expect(result.trends.latestOuting?.driverOrdinal).toBe(0);
-    expect(result.tracks).toContain('Monza');
+    expect(result.tracks).toContainEqual({ track: 'Monza', trackVenue: 'Monza', trackCourse: 'GP' });
     db.close();
   });
 

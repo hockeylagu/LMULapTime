@@ -21,7 +21,7 @@ describe('targeted replay session reads', () => {
     try {
       const { stored } = roundTrip(fixture(), db);
       const prepare = vi.spyOn(db, 'prepare');
-      const context = readReplaySessionContext(db, 'session-a.xml', 'all')!;
+      const context = readReplaySessionContext(db, 'session-a', 'all')!;
       expect(context.drivers.map(item => item.driverOrdinal)).toEqual([0, 1, 2]);
       expect(context.drivers[0].laps.map(item => [item.lapNum, item.lapOrdinal])).toEqual([[7, 0], [8, 1]]);
       expect(context.playerDriver).toBe(context.drivers[1]);
@@ -60,7 +60,7 @@ describe('targeted replay session reads', () => {
       expect(context.playerDriver).toBeUndefined();
       expect(prepare.mock.calls.some(([sql]) => /session_laps|session_events|session_lap_passes/.test(sql))).toBe(false);
       expect(readReplaySessionContext(db, 'missing', 'all')).toBeNull();
-      expect(readReplaySessionContext(db, 'session-a', 99)?.drivers[0].laps).toHaveLength(1);
+      expect(readReplaySessionContext(db, 'session-a', 99)?.drivers[0].laps).toHaveLength(0);
     } finally { db.close(); }
   });
 });

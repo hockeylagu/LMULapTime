@@ -49,7 +49,8 @@ describe('track detail summary queries', () => {
     const expected = aggregateTrackSummaries(sessions, { carClass: 'Hyper', includeEmptyVenues: true });
     const actual = queryTrackSummaries(db, 'Hyper');
     expect(actual).toHaveLength(Object.keys(expected).length);
-    for (const summary of actual) expect(summary).toEqual(expected[summary.trackVenue]);
+    for (const summary of actual) expect(summary).toEqual(Object.values(expected).find(item =>
+      item.identityVenue === summary.identityVenue && item.trackCourse === summary.trackCourse));
     expect(queryTrackDetailSummary(db, 'Monza', 'Hyper', 'Porsche 911 GT3')).toBeUndefined();
     expect(queryTrackDetailSummary(db, 'Monza', 'GT3')?.sessionsCount).toBe(1);
     db.close();
@@ -63,7 +64,7 @@ describe('track detail summary queries', () => {
     upsertSession(db, first, 'mod-a.xml', 1, 10);
     upsertSession(db, second, 'mod-b.xml', 2, 10);
 
-    expect(queryTrackDetailSummary(db, 'Mod Circuit Alpha (Short)', 'LMP2_ELMS'))
+    expect(queryTrackDetailSummary(db, 'Mod Circuit Alpha', 'LMP2_ELMS', undefined, 'Short'))
       .toMatchObject({ trackVenue: 'Mod Circuit Alpha (Short)', sessionsCount: 1, bestLapTime: 99 });
     db.close();
   });

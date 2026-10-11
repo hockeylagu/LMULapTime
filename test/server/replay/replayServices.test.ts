@@ -63,21 +63,22 @@ describe('Replay domain services and transforms', () => {
         drivers: [{ slot: 1, name: 'Original Player', isPlayer: true }],
       };
 
+      const ann = {
+        name: 'Original Player',
+        carClass: 'Hyper',
+        carType: 'Toyota GR010',
+        bestLapTime: 91.2,
+        laps: [
+          { lapNum: 1, lapTime: 91.2, lapTimeString: '1:31.200', s1: 30.1, s2: 30.2, s3: 30.9, isValid: true },
+        ],
+      };
       const session = {
         id: 'session-monza',
         trackVenue: 'Autodromo Nazionale Monza',
         trackCourse: 'Grand Prix',
         sessionType: 'Practice',
-        drivers: [],
-        playerDriver: {
-          name: 'Original Player',
-          carClass: 'Hyper',
-          carType: 'Toyota GR010',
-          bestLapTime: 91.2,
-          laps: [
-            { lapNum: 1, lapTime: 91.2, lapTimeString: '1:31.200', s1: 30.1, s2: 30.2, s3: 30.9, isValid: true },
-          ],
-        },
+        drivers: [ann],
+        playerDriver: ann,
       } as unknown as DetailedSession;
 
       const composed = composeReplayMetadata({
@@ -130,6 +131,34 @@ describe('Replay domain services and transforms', () => {
         ['Duqueine D09 P3', 'LMP3'],
       ]);
       expect(original.drivers[0].carClass).toBe('LMP2');
+    });
+
+    it('composes player metadata only from the uniquely marked configured participant', () => {
+      const metadata: ReplayMetadata = {
+        filename: 'Practice.Vcr', filePath: '/replays/Practice.Vcr', fileSizeBytes: 2000, mtimeMs: 5000,
+        timeSliceCount: 50, totalEvents: 2, durationSec: 60,
+        carModel: 'Joann car', carClass: 'GT3',
+        drivers: [
+          { slot: 1, name: 'Joann', carModel: 'Joann car', carClass: 'GT3', isPlayer: false },
+          { slot: 2, name: 'Ann', carModel: 'Ann car', carClass: 'Hyper', isPlayer: true },
+        ],
+      };
+      const session = {
+        id: 'session-ann', trackVenue: 'Spa', trackCourse: 'Grand Prix', sessionType: 'Practice',
+        drivers: [{ name: 'Ann', carType: 'Ann car', carClass: 'Hyper', bestLapTime: 90, laps: [
+          { lapNum: 1, lapTime: 90, s1: 30, s2: 30, s3: 30, isValid: true },
+        ] }],
+        playerDriver: { name: 'Ann', carType: 'Ann car', carClass: 'Hyper', bestLapTime: 90, laps: [
+          { lapNum: 1, lapTime: 90, s1: 30, s2: 30, s3: 30, isValid: true },
+        ] },
+      } as unknown as DetailedSession;
+
+      const composed = composeReplayMetadata({ metadata, replayName: metadata.filename, matchedSession: session });
+
+      expect(composed.carModel).toBe('Ann car');
+      expect(composed.carClass).toBe('Hyper');
+      expect(composed.laps?.map(lap => lap.lapNumber)).toEqual([1]);
+      expect(metadata.carModel).toBe('Joann car');
     });
 
     it('falls back to filename track tokens when no matched session exists', () => {

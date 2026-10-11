@@ -131,6 +131,8 @@ export interface ReplayFileEntry {
   path: string;
   sizeBytes: number;
   trackName: string;
+  trackVenue?: string;
+  trackCourse?: string;
   sessionCode: string; // e.g. P1, Q1, R1
   mtime: number;
   eventTitle?: string;

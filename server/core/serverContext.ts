@@ -24,6 +24,9 @@ import { BENCHMARK_IMPACT_RULE, enrichBenchmarkDiffWithCompactImpact } from '../
 
 /** When the replay links were last reconciled (cache_metadata): later changes are the next candidates. */
 const REPLAY_LINKS_RECONCILED_AT = 'replay_links_reconciled_at';
+const REPLAY_LINKS_RULE_VERSION = 'replay_links_rule_version';
+const REPLAY_LINKS_RULE = 'exact-layout-type-time-v2';
+const REPLAY_DEFAULTS_RULE_VERSION = 'replay_default_owner_rule_version';
 
 const yieldToEventLoop = () => new Promise<void>(resolve => setImmediate(resolve));
 
@@ -98,6 +101,11 @@ export class ServerContext {
     this.currentTelemetryDir = options.telemetryDir;
     this.parser = options.parser;
     this.replayLinks = new SessionReplayLinks(options.sessionDb);
+    options.sessionDb.reconcileReplayPlayerOwnership(this.parser.configuredPlayerName);
+    if (options.sessionDb.getMetadata(REPLAY_DEFAULTS_RULE_VERSION) !== 'exact-player-slot-v1') {
+      options.sessionDb.invalidateUnresolvedReplayDefaults();
+      options.sessionDb.setMetadata(REPLAY_DEFAULTS_RULE_VERSION, 'exact-player-slot-v1');
+    }
     this.configureReplayLookup();
   }
 
@@ -145,6 +153,7 @@ export class ServerContext {
     if (typeof values.playerName === 'string' && values.playerName.trim()) {
       this.parser.configuredPlayerName = values.playerName.trim();
     }
+    this.sessionDb.reconcileReplayPlayerOwnership(this.parser.configuredPlayerName);
     this.configureReplayLookup();
     return true;
   }
@@ -294,7 +303,9 @@ export class ServerContext {
     this.sessionReplayReconciliationRunning = true;
     const task = (async () => {
       const startedAt = Date.now();
-      const since = Number(this.sessionDb.getMetadata(REPLAY_LINKS_RECONCILED_AT) ?? 0);
+      const priorRule = this.sessionDb.getMetadata(REPLAY_LINKS_RULE_VERSION);
+      const since = priorRule === REPLAY_LINKS_RULE
+        ? Number(this.sessionDb.getMetadata(REPLAY_LINKS_RECONCILED_AT) ?? 0) : 0;
       this.configureReplayLookup();
       const replaysByName = this.replayByName();
       const ids = this.sessionDb.getReplayReconciliationCandidateIds(since);
@@ -304,6 +315,7 @@ export class ServerContext {
       }
       // Rows written during this run carry a later stamp and are checked again next time.
       this.sessionDb.setMetadata(REPLAY_LINKS_RECONCILED_AT, String(startedAt));
+      this.sessionDb.setMetadata(REPLAY_LINKS_RULE_VERSION, REPLAY_LINKS_RULE);
     })().finally(() => {
       this.sessionReplayReconciliationRunning = false;
       this.sessionReplayReconciliation = null;

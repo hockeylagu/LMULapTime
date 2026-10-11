@@ -5,8 +5,8 @@ import { SessionRaceStandingsRow } from './SessionRaceStandingsRow.js';
 
 export interface SessionRaceStandingsProps {
   session: DetailedSession;
-  selectedDriverName: string;
-  setSelectedDriverName: (name: string) => void;
+  selectedDriverOrdinal: number | null;
+  setSelectedDriverOrdinal: (ordinal: number | null) => void;
   isMultiClass: boolean;
 }
 
@@ -33,8 +33,8 @@ function getSortValue(driver: DriverData, column: SortableColumn): number | null
 
 export const SessionRaceStandings: React.FC<SessionRaceStandingsProps> = ({
   session,
-  selectedDriverName,
-  setSelectedDriverName,
+  selectedDriverOrdinal,
+  setSelectedDriverOrdinal,
   isMultiClass,
 }) => {
   const [sortColumn, setSortColumn] = React.useState<SortableColumn>('position');
@@ -168,8 +168,8 @@ export const SessionRaceStandings: React.FC<SessionRaceStandingsProps> = ({
                 key={d.name}
                 driver={d}
                 session={session}
-                selectedDriverName={selectedDriverName}
-                setSelectedDriverName={setSelectedDriverName}
+                selectedDriverOrdinal={selectedDriverOrdinal}
+                setSelectedDriverOrdinal={setSelectedDriverOrdinal}
                 isMultiClass={isMultiClass}
                 sessionBestSectors={sessionBestSectors}
                 leaderFinishTime={leaderFinishTime}

@@ -18,13 +18,13 @@ export class ReplayRecordingService {
 
   public getMetadata(filePath: string, replayName: string, playerName?: string): ReplayMetadata {
     if (!fs.existsSync(filePath)) {
-      const stored = this.sessionDb.getStoredReplayMetadata(replayName);
+      const stored = this.sessionDb.getStoredReplayMetadata(replayName, playerName);
       if (stored) return stored;
       throw new Error(`Replay file and cached metadata not found: ${replayName}`);
     }
     const stat = fs.statSync(filePath);
     const mtime = Math.floor(stat.mtimeMs);
-    const cached = this.sessionDb.getReplayMetadataCache(replayName, mtime, stat.size, filePath);
+    const cached = this.sessionDb.getReplayMetadataCache(replayName, mtime, stat.size, filePath, playerName);
     if (cached) return cached;
     const metadata = decodeOrThrow(() => parseReplayMetadata(filePath, { playerName }));
     this.sessionDb.upsertReplayMetadataCache(replayName, filePath, mtime, stat.size, metadata);
@@ -42,13 +42,24 @@ export class ReplayRecordingService {
       const metadata = this.getMetadata(filePath, replayName, playerName);
       const target = driverName.trim().toLowerCase();
       if (!target) return undefined;
-      const exact = metadata.drivers.filter(driver => driver.name.trim().toLowerCase() === target);
-      const candidates = exact.length ? exact : metadata.drivers.filter(driver => {
-        const name = driver.name.trim().toLowerCase();
-        return name.length > 0 && (name.includes(target) || target.includes(name));
-      });
-      const match = candidates.length === 1 ? candidates[0] : undefined;
+      const matches = metadata.drivers.filter(driver => driver.name.trim().toLowerCase() === target);
+      const match = matches.length === 1 ? matches[0] : undefined;
       return typeof match?.slot === 'number' ? match.slot : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private resolvePlayerSlot(filePath: string, replayName: string, playerName?: string): number | undefined {
+    try {
+      const drivers = this.getMetadata(filePath, replayName, playerName).drivers;
+      if (playerName?.trim()) {
+        const name = playerName.trim().toLowerCase();
+        const matches = drivers.filter(driver => driver.name.trim().toLowerCase() === name);
+        return matches.length === 1 ? matches[0].slot : undefined;
+      }
+      const players = drivers.filter(driver => driver.isPlayer);
+      return players.length === 1 ? players[0].slot : undefined;
     } catch {
       return undefined;
     }
@@ -59,14 +70,37 @@ export class ReplayRecordingService {
     replayName: string,
     options: { driverSlot?: number; driverName?: string; lapNumber?: number; playerName?: string }
   ): Promise<ReplayTrajectoryData> {
+    if (options.driverName !== undefined && !options.driverName.trim()) {
+      throw new ReplayDriverNotRecordedError(-1, replayName);
+    }
+    const explicitDriver = typeof options.driverSlot === 'number' || Boolean(options.driverName?.trim());
+    if (!explicitDriver && !fs.existsSync(filePath) && !this.sessionDb.getStoredReplayMetadata(replayName, options.playerName)) {
+      throw new Error(`Replay file and cached trajectory not found: ${replayName}`);
+    }
     const resolvedSlot = typeof options.driverSlot === 'number'
       ? options.driverSlot
-      : this.resolveDriverSlot(filePath, replayName, options.driverName, options.playerName);
-    const driverSlotKey = typeof resolvedSlot === 'number' ? resolvedSlot : -1;
+      : options.driverName?.trim()
+        ? this.resolveDriverSlot(filePath, replayName, options.driverName, options.playerName)
+        : this.resolvePlayerSlot(filePath, replayName, options.playerName);
+    if (resolvedSlot === undefined) {
+      throw new ReplayDriverNotRecordedError(-1, replayName);
+    }
+    const driverSlotKey = resolvedSlot;
+    if (typeof options.driverSlot === 'number') {
+      let metadata: ReplayMetadata | null = null;
+      try {
+        metadata = fs.existsSync(filePath)
+          ? this.getMetadata(filePath, replayName, options.playerName)
+        : this.sessionDb.getStoredReplayMetadata(replayName, options.playerName);
+      } catch { /* The worker records corrupt-file failures below. */ }
+      if (metadata && !metadata.drivers.some(driver => driver.slot === driverSlotKey)) {
+        throw new ReplayDriverNotRecordedError(driverSlotKey, replayName);
+      }
+    }
     const lapKey = typeof options.lapNumber === 'number' ? options.lapNumber : -1;
 
     if (!fs.existsSync(filePath)) {
-      const stored = this.sessionDb.getStoredReplayTrajectory(replayName, driverSlotKey, lapKey, { allowFallback: true });
+      const stored = this.sessionDb.getStoredReplayTrajectory(replayName, driverSlotKey, lapKey, { allowFallback: !explicitDriver });
       if (stored) return this.withLapEdges(replayName, stored);
       if (driverSlotKey !== -1 && this.sessionDb.getStoredReplayMetadata(replayName)) {
         throw new ReplayDriverNotRecordedError(driverSlotKey, replayName);
@@ -115,7 +149,7 @@ export class ReplayRecordingService {
       // its name, those are renamed out of the way before the decoded laps take the name.
       this.getMetadata(filePath, replayName, playerName);
       const extraction = extractReplayTrajectoryInWorker(filePath, {
-        ...(driverSlotKey === -1 ? {} : { driverSlot: driverSlotKey }),
+        driverSlot: driverSlotKey,
         playerName,
         maxPoints: 0,
         allLaps: true,
@@ -123,10 +157,7 @@ export class ReplayRecordingService {
       let step = await extraction.next();
       while (!step.done) step = await extraction.next();
       const trajectory = step.value;
-      // No driver asked for: the decode picked the player, whose laps are also the default.
-      const isPrimary = driverSlotKey === -1;
-      const slotKey = isPrimary && typeof trajectory.driverSlot === 'number' ? trajectory.driverSlot : driverSlotKey;
-      this.sessionDb.replaceReplayDriverLaps(replayName, filePath, mtime, size, slotKey, trajectory, isPrimary);
+      this.sessionDb.replaceReplayDriverLaps(replayName, filePath, mtime, size, driverSlotKey, trajectory, false);
       return trajectory;
     })();
     this.pendingDecodes.set(key, decode);

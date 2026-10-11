@@ -185,8 +185,9 @@ describe('Dashboard component', () => {
 
     const comboboxes = screen.getAllByRole('combobox');
     const trackSelect = comboboxes[0];
-    fireEvent.change(trackSelect, { target: { value: 'Spa' } });
-    expect(setSelectedTrack).toHaveBeenCalledWith('Spa');
+    const spaIdentity = JSON.stringify(['Spa', '']);
+    fireEvent.change(trackSelect, { target: { value: spaIdentity } });
+    expect(setSelectedTrack).toHaveBeenCalledWith(spaIdentity);
 
     const searchInput = screen.getByPlaceholderText(/search track, car, file/i);
     fireEvent.change(searchInput, { target: { value: 'Porsche' } });

@@ -18,27 +18,29 @@ function sessionScope(db: Database, session: DetailedSession): PersonalBestScope
   return personalBestScope(source.layout_key,session.trackVenue,session.trackCourse);
 }
 
-function queryPersonalBest(db: Database, scope: PersonalBestScope, carClass: string, driverName: string): number | null {
+function queryPersonalBest(db: Database, scope: PersonalBestScope, carClass: string, driverId: number): number | null {
   const best = db.prepare(`SELECT min(d.best_lap_time) best FROM sessions s
     CROSS JOIN session_drivers d ON d.session_id=s.id
-    JOIN drivers n ON n.driver_id=d.driver_id
-    WHERE ${scope.where} AND d.driver_class=? AND lower(n.name)=lower(?) AND d.best_lap_time>0`);
-  return (best.get(...scope.args,carClass,driverName) as { best: number | null }).best;
+    WHERE ${scope.where} AND d.driver_class=? AND d.driver_id=? AND d.best_lap_time>0`);
+  return (best.get(...scope.args,carClass,driverId) as { best: number | null }).best;
 }
 
 export function querySessionPersonalBest(db: Database, session: DetailedSession, driverOrdinal: number) {
   if (!isSessionSummaryReady(db)) return { driverOrdinal, bestLapTime: null, ready: false };
+  const driverId = (db.prepare('SELECT driver_id FROM session_drivers WHERE session_id=? AND driver_ordinal=?')
+    .get(session.id, driverOrdinal) as { driver_id: number } | undefined)?.driver_id;
+  if (driverId === undefined) return { driverOrdinal, bestLapTime: null, ready: true };
   const driver = session.drivers[driverOrdinal];
-  return { driverOrdinal, bestLapTime: queryPersonalBest(db, sessionScope(db, session), driver.carClass, driver.name), ready: true };
+  if (!driver) return { driverOrdinal, bestLapTime: null, ready: true };
+  return { driverOrdinal, bestLapTime: queryPersonalBest(db, sessionScope(db, session), driver.carClass, driverId), ready: true };
 }
 
 /** Reads only the selected driver's identity and session layout for the on-demand PB endpoint. */
 export function querySessionPersonalBestById(db: Database, sessionId: string, driverOrdinal: number) {
-  const target = db.prepare(`SELECT s.layout_key,s.track_venue,s.track_course,n.name,d.driver_class
+  const target = db.prepare(`SELECT s.layout_key,s.track_venue,s.track_course,d.driver_id,d.driver_class
     FROM sessions s JOIN session_drivers d ON d.session_id=s.id AND d.driver_ordinal=?
-    LEFT JOIN drivers n ON n.driver_id=d.driver_id
     WHERE s.id=?`).get(driverOrdinal, sessionId) as {
-      layout_key: string; track_venue: string; track_course: string; name: string | null;
+      layout_key: string; track_venue: string; track_course: string; driver_id: number;
       driver_class: string;
     } | undefined;
   if (!target) return null;
@@ -48,7 +50,7 @@ export function querySessionPersonalBestById(db: Database, sessionId: string, dr
   const carClass = target.driver_class;
   return {
     driverOrdinal,
-    bestLapTime: queryPersonalBest(db,scope,carClass,target.name ?? ''),
+    bestLapTime: queryPersonalBest(db,scope,carClass,target.driver_id),
     ready: true,
   };
 }
@@ -61,9 +63,12 @@ export function querySessionContext(db: Database, session: DetailedSession) {
     .all(...scope.args,session.timestamp-bounds,session.timestamp+bounds) as Array<{id:string}>).map(row=>row.id);
   const candidates:Iterable<SessionCard>=readSessionCards(db,ids);
   const relatedSessions=findWeekendSessions(session,candidates);
-  const playerOrdinal = session.drivers.findIndex(driver => driver.name === session.playerDriver?.name);
-  const driverOrdinal = playerOrdinal >= 0 ? playerOrdinal : 0;
-  const result = session.drivers[driverOrdinal] ? querySessionPersonalBest(db, session, driverOrdinal) : null;
+  const markedPlayers = session.drivers.filter(driver => driver.isPlayer);
+  const playerOrdinal = typeof session.playerDriver?.driverOrdinal === 'number'
+    ? session.playerDriver.driverOrdinal
+    : markedPlayers.length === 1 ? session.drivers.indexOf(markedPlayers[0]) : undefined;
+  const driverOrdinal = playerOrdinal;
+  const result = typeof driverOrdinal === 'number' ? querySessionPersonalBest(db, session, driverOrdinal) : null;
   const personalBests = result ? [{ driverOrdinal, bestLapTime: result.bestLapTime }] : [];
   return {relatedSessions,personalBests,ready:true};
 }

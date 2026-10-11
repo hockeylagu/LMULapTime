@@ -6,8 +6,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { SessionDatabase } from '../../../server/core/db.js';
 import { endpointInventory, coverageErrors } from '../../../tools/benchmarks/endpointInventory.js';
 import { benchmarkCases, discoverCohort } from '../../../tools/benchmarks/endpointCases.js';
-import { snapshotDatabase, measureRequest } from '../../../tools/benchmarks/endpointHarness.js';
+import { snapshotDatabase, startBenchmarkServer, measureRequest } from '../../../tools/benchmarks/endpointHarness.js';
 import { summarize, timingDelta, comparisonReasons, renderReport, type BenchmarkRun } from '../../../tools/benchmarks/endpointReport.js';
+import { SESSION_SUMMARY_PROJECTION_VERSION } from '../../../shared/types/sessionSummaries.js';
+import { driver, lap, session } from '../../server/core/sessionRows/builders.js';
 
 function run(): BenchmarkRun {
   return { schemaVersion: 1, timestamp: '2026-10-10T12:00:00.000Z', datasetHash: 'dataset', cohortHash: 'cohort', samples: 20,
@@ -83,6 +85,40 @@ describe('endpoint benchmark coverage and comparisons', () => {
       } finally { snapshot.close(); }
       await expect(snapshotDatabase(sourcePath, sourcePath)).rejects.toThrow('new, separate file');
     } finally {
+      source.close();
+      for (const file of fs.readdirSync(directory)) fs.unlinkSync(path.join(directory, file));
+      fs.rmdirSync(directory);
+    }
+  });
+
+  it('rebuilds an outdated snapshot before serving HTTP and leaves the source database unchanged', async () => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'endpoint-benchmark-rebuild-test-'));
+    const sourcePath = path.join(directory, 'source.db');
+    const snapshotPath = path.join(directory, 'snapshot.db');
+    const source = new SessionDatabase(sourcePath);
+    let server: Awaited<ReturnType<typeof startBenchmarkServer>> | undefined;
+    const player = driver('Benchmark Driver', [lap(1)], { isPlayer: true });
+    const fixture = session([player], { id: 'benchmark-rebuild-session' });
+    try {
+      source.upsertSession(fixture, fixture.filePath, 1, 1);
+      source.getDb().prepare('UPDATE sessions SET projection_version = ? WHERE id = ?').run(0, fixture.id);
+      expect(source.isSessionSummaryReady()).toBe(false);
+      const sourceProjection = source.getDb().prepare('SELECT projection_version FROM sessions WHERE id = ?').get(fixture.id);
+
+      await snapshotDatabase(sourcePath, snapshotPath);
+      server = await startBenchmarkServer(snapshotPath);
+
+      expect(server.store.isSessionSummaryReady()).toBe(true);
+      expect(server.store.getDb().prepare('SELECT projection_version FROM sessions WHERE id = ?').get(fixture.id))
+        .toEqual({ projection_version: SESSION_SUMMARY_PROJECTION_VERSION });
+      const response = await measureRequest(server.baseUrl, '/api/sessions?page=1&pageSize=5');
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ sessions: [{ id: fixture.id }] });
+      expect(source.getDb().prepare('SELECT projection_version FROM sessions WHERE id = ?').get(fixture.id))
+        .toEqual(sourceProjection);
+      expect(source.isSessionSummaryReady()).toBe(false);
+    } finally {
+      if (server) await server.close();
       source.close();
       for (const file of fs.readdirSync(directory)) fs.unlinkSync(path.join(directory, file));
       fs.rmdirSync(directory);

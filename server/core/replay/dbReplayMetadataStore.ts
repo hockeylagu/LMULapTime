@@ -7,6 +7,7 @@ import { ReplayDriverIngestStatus, settledReplayFailure } from './dbReplayIngest
 import { resolveRosterVehicles } from '../../../shared/domain/vehicleMapping.js';
 import { REPLAY_CACHE_VERSION, compressJson, decompressJson, isCompatibleReplayCacheVersion } from '../dbSchema.js';
 import { writeReplayMatchingFacts } from './dbReplayMatchingStore.js';
+import { getMetadata, setMetadata } from '../dbMetadataStore.js';
 
 // Replay metadata rows, one per .Vcr file. They outlive the file: LMU deletes old replays, and
 // the stored row is then the only copy of the metadata.
@@ -18,6 +19,46 @@ function readMetadataRow(row: { parser_version: string; metadata_br: Buffer }): 
   return resolveRosterVehicles(upgradeStoredReplayMetadata(decompressJson<ReplayMetadata>(row.metadata_br), row.parser_version));
 }
 
+function applyConfiguredPlayer(metadata: ReplayMetadata, playerName?: string): ReplayMetadata {
+  if (playerName === undefined) return metadata;
+  const target = playerName.trim().toLowerCase();
+  const matches = target ? metadata.drivers.filter(driver => driver.name.trim().toLowerCase() === target) : [];
+  const player = matches.length === 1 ? matches[0] : undefined;
+  const previousPlayers = metadata.drivers.filter(driver => driver.isPlayer);
+  const ownershipChanged = !player || previousPlayers.length !== 1 || previousPlayers[0] !== player;
+  for (const driver of metadata.drivers) driver.isPlayer = driver === player;
+  if (ownershipChanged) delete metadata.laps;
+  delete metadata.carModel;
+  delete metadata.carClass;
+  return resolveRosterVehicles(metadata);
+}
+
+function persistConfiguredPlayer(db: DatabaseType, filename: string, metadata: ReplayMetadata, before: string): void {
+  if (before !== JSON.stringify(metadata)) {
+    db.prepare('UPDATE replay_metadata SET metadata_br=?,updated_at=? WHERE filename=?')
+      .run(compressJson(metadata), Date.now(), filename);
+  }
+}
+
+/** Repair retained ownership once per configured identity, including list and telemetry reads. */
+export function reconcileReplayPlayerOwnership(db: DatabaseType, playerName: string): boolean {
+  const rule = JSON.stringify(['exact-player-v1', playerName.trim().toLowerCase()]);
+  if (getMetadata(db, 'replay_player_ownership_rule') === rule) return false;
+  db.transaction(() => {
+    const files = db.prepare('SELECT filename FROM replay_metadata').all() as Array<{ filename: string }>;
+    const read = db.prepare('SELECT parser_version,metadata_br FROM replay_metadata WHERE filename=?');
+    for (const { filename } of files) {
+      const row = read.get(filename) as { parser_version: string; metadata_br: Buffer };
+      const metadata = readMetadataRow(row);
+      const before = JSON.stringify(metadata);
+      applyConfiguredPlayer(metadata, playerName);
+      persistConfiguredPlayer(db, filename, metadata, before);
+    }
+    setMetadata(db, 'replay_player_ownership_rule', rule);
+  })();
+  return true;
+}
+
 export interface StoredReplayFileInfo {
   file_path: string;
   file_mtime: number;
@@ -25,23 +66,31 @@ export interface StoredReplayFileInfo {
   metadata: ReplayMetadata;
 }
 
-export function getReplayMetadataCache(db: DatabaseType, filename: string, mtime: number, size: number, filePath?: string): ReplayMetadata | null {
+export function getReplayMetadataCache(db: DatabaseType, filename: string, mtime: number, size: number, filePath?: string, playerName?: string): ReplayMetadata | null {
   const row = db.prepare(
     'SELECT file_path, file_mtime, file_size, parser_version, metadata_br FROM replay_metadata WHERE filename = ?'
   ).get(filename) as { file_path: string; file_mtime: number; file_size: number; parser_version: string; metadata_br: Buffer } | undefined;
   if (!row || row.file_mtime !== mtime || row.file_size !== size || !isCompatibleReplayCacheVersion(row.parser_version) || (filePath && row.file_path !== filePath)) {
     return null;
   }
-  return readMetadataRow(row);
+  const metadata = readMetadataRow(row);
+  const before = JSON.stringify(metadata);
+  applyConfiguredPlayer(metadata, playerName);
+  if (playerName !== undefined) persistConfiguredPlayer(db, filename, metadata, before);
+  return metadata;
 }
 
 /** Returns stored metadata even when LMU has deleted the source .Vcr. */
-export function getStoredReplayMetadata(db: DatabaseType, filename: string): ReplayMetadata | null {
+export function getStoredReplayMetadata(db: DatabaseType, filename: string, playerName?: string): ReplayMetadata | null {
   const row = db.prepare(
     'SELECT parser_version, metadata_br FROM replay_metadata WHERE filename = ?'
   ).get(filename) as { parser_version: string; metadata_br: Buffer } | undefined;
   if (!row) return null;
-  return readMetadataRow(row);
+  const metadata = readMetadataRow(row);
+  const before = JSON.stringify(metadata);
+  applyConfiguredPlayer(metadata, playerName);
+  if (playerName !== undefined) persistConfiguredPlayer(db, filename, metadata, before);
+  return metadata;
 }
 
 /** Returns stored file attributes and metadata for a cached replay file. */

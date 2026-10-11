@@ -3,10 +3,10 @@
 A fast index for new sessions: find the right file without searching. `AGENTS.md` holds the rules;
 this file holds the **routes through the code**. Keep it current (see "Keeping this file current" at the end).
 
-Last checked 2026-10-10: 495 TypeScript source files in src/server/shared, 289 test files,
-2523 tests (2467 passed, 56 skipped). Full tests and production build rechecked after batching comparison PB lookups.
-Last recorded coverage (not rerun for this docs-only change): 94.30% lines, 91.99% statements,
-92.26% functions and 83.20% branches (two workers). Branch/worktree results are separate; see [plans](plans/README.md).
+Last checked 2026-10-11: 495 TypeScript source files in src/server/shared, 292 test files,
+2540 tests (2484 passed, 56 skipped). Full tests and production build rechecked after exact identity cleanup.
+Coverage rechecked during this cleanup: 94.84% lines, 92.53% statements,
+92.78% functions and 83.66% branches. Branch/worktree results are separate; see [plans](plans/README.md).
 
 ---
 
@@ -67,7 +67,13 @@ Inspector state, comparison selection and reference suggestions use session IDs 
 metadata requests include every lap's source ordinal; trajectories include the selected and primary driver's timing histories;
 traffic requests include no XML laps. `ReplaySessionContext` / `ReplayContextDriver` / `ReplayTimingLap` in
 `replayServiceTypes.ts` define those inputs without full session, event or pass hydration. Official validation output stays unchanged.
-`dbSessionStore.resolveSessionId` shares the existing session/filename alias resolution with these reads and the PB endpoint.
+Session detail and PB reads use exact stored session IDs; filenames remain file metadata and are never aliases.
+Session detail selects drivers by source ordinal; replay requests require an explicit recorded slot or a
+unique exact roster mapping. Unresolved requests never select the first driver. The PB endpoint uses
+the selected row's exact dictionary identity rather than reconstructing ownership from history names.
+Canonical session types control filtering and weekend grouping; display names do not override them.
+Known layouts compare canonical keys, while custom layouts retain exact venue/course pairs through
+filters, track links and comparison requests. Benchmark matching has no substring fallback.
 Replay-link updates return only whether they changed; the necessary conditions reclassification performs the single session read.
 The 2026-10-10 endpoint sweep (same snapshot/cohort/environment, 20 warm HTTP samples) measured player PB
 5.70 → 1.56 ms, replay metadata 5.81 → 2.45 ms, fused telemetry 189.64 → 161.75 ms and traffic
@@ -117,7 +123,7 @@ Historical JSON columns (`data_json`, `metadata_json`, `summary_json`) were drop
 **Replays are the source of truth once cached**: LMU deletes old `.Vcr` files, and their rows are the only copy. Never write
 code that drops replay rows because the file is gone.
 
-DuckDB ownership (`server/telemetry/telemetryLinks.ts`, `TELEMETRY_LINK_RULE = session-span-v3`) uses
+DuckDB ownership (`server/telemetry/telemetryLinks.ts`, `TELEMETRY_LINK_RULE = session-span-exact-identity-player-v5`) uses
 session spans. Restarted offline races can share their XML start timestamp; ties go to the earliest
 session still running when recording begins, before end-time slack, so the empty attempt does not
 claim the restarted race's files. Changing this rule recalculates stored links once, retaining telemetry caches.
@@ -125,6 +131,10 @@ An exact official venue name in native telemetry is layout-unspecified: ownershi
 course or the replay's course/native scene, together with the existing driver, type and time checks.
 Explicit telemetry layout names/keys/scenes must match the owner's layout; different venues never match.
 The Bahrain Paddock regression covers both recordings from a session whose DuckDB names contain only the venue.
+Venue-only telemetry is left unmatched when eligible owners disagree on layout. Named recordings
+require a unique exact trusted player match. Replay ownership is repaired from retained metadata once
+per configured player identity; explicit slot trajectories survive, while legacy unresolved defaults
+are invalidated once. Replay matching facts version 2 retains the custom venue/course tuple.
 
 The route loader keeps its suspended component separate from the preloaded fast path, so resolving a page chunk never skips a previously suspended `use()` call.
 
@@ -219,7 +229,7 @@ index their explicitly supplied replay directory locally.
    condition (the header scan samples 30 windows and can miss the peak).
    Pace is rated during XML parsing; startup benchmark refresh no longer rewrites all detailed session JSON.
 4. **Serve**: `GET /api/session/:id` (`server/routes/sessionRoutes.ts`) adds, per request and not stored:
-   - current benchmark pace via `rateSessionDetail` and bounded history context via `querySessionContext`; history initially queries only the player's personal best (first driver when no player exists). Selecting another driver loads `/api/session/:id/personal-best/:driverOrdinal` through `querySessionPersonalBestById`, reading layout and one driver's identity/class without hydrating the session and retaining only the active result without a per-driver cache. Both PB paths share a layout-first SQL query and strict unknown-layout venue/course scope. Stored telemetry attachments are already read from normalized session rows;
+   - current benchmark pace via `rateSessionDetail` and bounded history context via `querySessionContext`; history queries a personal best only for a uniquely identified session player. Selecting another driver loads `/api/session/:id/personal-best/:driverOrdinal` through `querySessionPersonalBestById`, reading layout and one driver's identity/class without hydrating the session and retaining only the active result without a per-driver cache. Both PB paths share a layout-first SQL query and strict unknown-layout venue/course scope. Stored telemetry attachments are already read from normalized session rows;
    - pit stop details from replay events (`attachPitServices`, `server/sessions/sessionPitStops.ts`, maths in `shared/domain/pitStops.ts`).
 5. **Load in the client**: `src/components/session-detail/useSessionDetailData.ts` (`fetchJson('/api/session/…')`).
 6. **Show**: `src/components/session-detail/SessionDetail.tsx`, then:

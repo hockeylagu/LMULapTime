@@ -39,14 +39,14 @@ describe('SessionDetail loading', () => {
     const hook = renderHook(() => useSessionDetailData({ sessionId: session.id }));
     await waitFor(() => expect(hook.result.current.allTimeCategoryTrackPB).toBe(122));
     expect(fetchMock.mock.calls.filter(([url]) => url.includes('/personal-best/'))).toHaveLength(0);
-    act(() => hook.result.current.setSelectedDriverName('AI Driver 2'));
+    act(() => hook.result.current.setSelectedDriverOrdinal(1));
     expect(hook.result.current.allTimeCategoryTrackPB).toBeNull();
     expect(hook.result.current.isCurrentSessionAllTimePB).toBe(false);
     await act(async () => resolveOpponent?.({ ok: true, status: 200, json: () => Promise.resolve({ ready: true, bestLapTime: 120 }) }));
     await waitFor(() => expect(hook.result.current.allTimeCategoryTrackPB).toBe(120));
-    act(() => hook.result.current.setSelectedDriverName('Sim Driver'));
+    act(() => hook.result.current.setSelectedDriverOrdinal(0));
     await waitFor(() => expect(hook.result.current.allTimeCategoryTrackPB).toBe(121));
-    act(() => hook.result.current.setSelectedDriverName('AI Driver 2'));
+    act(() => hook.result.current.setSelectedDriverOrdinal(1));
     expect(fetchMock.mock.calls.filter(([url]) => url.endsWith('/personal-best/1'))).toHaveLength(2);
     hook.unmount();
   });
@@ -87,12 +87,15 @@ describe('useSessionDetailData', () => {
     drivers: [{ ...simDriver, ...overrides }, ...mockDetailedSession.drivers.slice(1)],
   }) as unknown as DetailedSession;
 
-  async function loaded(session: DetailedSession, sessionId: string, initialProgression?: SessionProgressionPoint[]) {
-    serve({ '/api/session/': { status: 200, body: session } });
+  async function loaded(session: DetailedSession, sessionId: string, initialProgression?: SessionProgressionPoint[], personalBest?: unknown) {
+    const replies: Record<string, Reply> = {};
+    if (personalBest !== undefined) replies[`/api/session/${session.id}/personal-best/0`] = { status: 200, body: personalBest };
+    replies['/api/session/'] = { status: 200, body: session };
+    const fetchMock = serve(replies);
     const initialSessions = [session];
     const hook = renderHook(() => useSessionDetailData({ sessionId, initialProgression, initialSessions }));
     await waitFor(() => expect(hook.result.current.loading).toBe(false));
-    return hook;
+    return { ...hook, fetchMock };
   }
 
   beforeEach(() => invalidateReferenceLaptimes());
@@ -122,21 +125,24 @@ describe('useSessionDetailData', () => {
     expect(fuelOnly.result.current.fuelStrategy).toMatchObject({ limiter: null, optimalRatio: null, zeroWasteFuelPct: null });
   });
 
-  it('takes the all-time PB from earlier sessions at this track in this class only', async () => {
+  it('loads the selected driver PB from the server endpoint instead of filtering preloaded progression', async () => {
     const point = (bestLapTime: number, overrides: Partial<SessionProgressionPoint> = {}): SessionProgressionPoint => ({
       sessionId: 'old', timestamp: 0, dateString: '', sessionType: 'Practice', trackVenue: 'Spa', trackCourse: 'GP',
       carType: 'Ferrari 499P', carClass: 'Hyper', driverName: 'Sim Driver', bestLapTime, bestS1: null, bestS2: null, bestS3: null,
       ...overrides,
     } as SessionProgressionPoint);
 
-    const { result } = await loaded(mockDetailedSession as unknown as DetailedSession, 'pb', [
+    const { result, fetchMock } = await loaded(mockDetailedSession as unknown as DetailedSession, 'pb', [
       point(121.5),
       point(119, { carClass: 'GT3', carType: 'Porsche 911 GT3 R' }),
       point(118, { trackVenue: 'Monza', trackCourse: 'GP' }),
-    ]);
+    ], { ready: true, bestLapTime: 121.5 });
 
-    expect(result.current.allTimeCategoryTrackPB).toBe(121.5);
+    expect(result.current.selectedDriver?.driverOrdinal).toBe(0);
+    expect(fetchMock.mock.calls.map(([url]) => String(url))).toEqual(expect.arrayContaining(['/api/session/sess123/personal-best/0']));
+    await waitFor(() => expect(result.current.allTimeCategoryTrackPB).toBe(121.5));
     expect(result.current.isCurrentSessionAllTimePB).toBe(false);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/personal-best/0'))).toBe(true);
   });
 
   it('fetches again after unmounting and remounting the same session', async () => {
@@ -161,7 +167,7 @@ describe('useSessionDetailData', () => {
     await act(async () => resolveRemount?.({ ok: true, status: 200, json: () => Promise.resolve(second) }));
 
     await waitFor(() => expect(secondMount.result.current.selectedDriver?.bestLapTime).toBe(121));
-    expect(fetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api/session/'))).toHaveLength(2);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api/session/revisited'))).toHaveLength(2);
   });
 
   it('keeps the mounted session and selected driver during a revision refresh, then uses the updated response', async () => {
@@ -182,16 +188,16 @@ describe('useSessionDetailData', () => {
     );
     const hook = renderHook(() => useSessionDetailData({ sessionId: 'revision', initialSessions: [] }), { wrapper });
     await waitFor(() => expect(hook.result.current.loading).toBe(false));
-    act(() => hook.result.current.setSelectedDriverName('AI Driver 2'));
+    act(() => hook.result.current.setSelectedDriverOrdinal(1));
     revision = 1;
     hook.rerender();
 
     expect(hook.result.current.loading).toBe(false);
     expect(hook.result.current.session?.id).toBe(mockDetailedSession.id);
-    expect(hook.result.current.selectedDriverName).toBe('AI Driver 2');
+    expect(hook.result.current.selectedDriverOrdinal).toBe(1);
     await act(async () => resolveRefresh?.({ ok: true, status: 200, json: () => Promise.resolve(updated) }));
     await waitFor(() => expect(hook.result.current.selectedDriver?.bestLapTime).toBe(120));
-    expect(hook.result.current.selectedDriverName).toBe('AI Driver 2');
+    expect(hook.result.current.selectedDriverOrdinal).toBe(1);
   });
 
   it('clears the mounted session when a revision refresh returns 404', async () => {
@@ -267,7 +273,7 @@ describe('useSessionDetailData', () => {
     let revision = 0;
     let sessionRequests = 0;
     const fetchMock = vi.fn((url: string) => {
-      const failed = url.startsWith('/api/session/') && ++sessionRequests > 1;
+      const failed = url === '/api/session/retry' && ++sessionRequests > 1;
       return Promise.resolve({
         ok: !failed,
         status: failed ? 500 : 200,
@@ -316,7 +322,7 @@ describe('useSessionDetailData props', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     await new Promise(resolve => setTimeout(resolve, 50));
     expect(renders).toBeLessThan(20);
-    expect(fetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api/session/'))).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url) === '/api/session/inline-props')).toHaveLength(1);
     expect(fetchMock.mock.calls.some(([url]) => url === '/api/progression' || url === '/api/sessions')).toBe(false);
   });
 });

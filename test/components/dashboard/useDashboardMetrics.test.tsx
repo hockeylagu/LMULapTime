@@ -53,7 +53,7 @@ describe('useDashboardMetrics', () => {
     );
 
     expect(result.current.rankedTracks).toEqual([
-      { track: 'Algarve International Circuit', laps: 3, km: (4653 / 1000) * 3 },
+      { track: 'Algarve International Circuit', trackVenue: 'Algarve International Circuit', trackCourse: '', laps: 3, km: (4653 / 1000) * 3 },
     ]);
     expect(result.current.rankedCars).toEqual([
       { car: 'Ferrari 499P', laps: 3, km: (4653 / 1000) * 3 },

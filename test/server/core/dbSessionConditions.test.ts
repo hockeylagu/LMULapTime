@@ -134,6 +134,7 @@ describe('replay rain on the laps of a linked session', () => {
     player.laps.forEach((l) => Object.assign(l, { paceCategory: 'Offline', pacePercentage: l.lapTime === 130 ? 110 : 101.5 }));
     Object.assign(player.laps[4], { paceCategory: 'Good', pacePercentage: 103 });
     Object.assign(player, { bestLapNum: 5, bestLapTime: 130, bestLapPaceCategory: 'Good', bestLapPacePercentage: 103 });
+    rated.playerDriver = player;
     db.upsertSession(rated, 'C:\\results\\17R1.xml', 1, 1);
 
     db.updateSessionMatchingReplay(session.id, replayLink);

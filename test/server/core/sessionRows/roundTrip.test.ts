@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { DetailedSession, LapData } from '../../../../server/core/types.js';
 import { canonicalSession } from '../../../../server/core/sessionRows/canonical.js';
 import { readSession } from '../../../../server/core/sessionRows/reader.js';
-import { writeSessionRows } from '../../../../server/core/sessionRows/writer.js';
+import { playerDriverOrdinal, writeSessionRows } from '../../../../server/core/sessionRows/writer.js';
 import { LmuParser } from '../../../../server/sessions/parser.js';
 import { driver, lap, memoryDb, roundTrip, session } from './builders.js';
 
@@ -17,6 +17,16 @@ function expectRoundTrip(input: DetailedSession): ReturnType<typeof roundTrip> {
 }
 
 describe('normalized session rows: round trip', () => {
+  it('does not replace a mismatched or ambiguous player copy with the first matching name', () => {
+    const first = driver('Same Name', [lap(1)], { isPlayer: true });
+    const input = session([first, { ...first }]);
+    input.playerDriver = { ...first };
+    expect(playerDriverOrdinal(input)).toBeNull();
+    input.playerDriver = { ...first, carNumber: '99' };
+    expect(playerDriverOrdinal(input)).toBeNull();
+    input.playerDriver = input.drivers[1];
+    expect(playerDriverOrdinal(input)).toBe(1);
+  });
   it('reads a parsed results XML back as its canonical form, with and without a player', () => {
     const parse = (player?: string) => {
       const parser = new LmuParser(undefined, undefined, { detectPlayer: false });

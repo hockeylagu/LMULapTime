@@ -75,7 +75,8 @@ function insertScaleFixture(db: Database.Database): number {
         lapTimes.reduce((sum, time) => sum + time * time, 0), 0, lapTimes[0], 30, 40, 30, 3,
         lapTimes.slice(0, 3).reduce((sum, time) => sum + time, 0));
       const card = JSON.parse(cardFor(index)) as DetailedSession;
-      const detailed: DetailedSession = { ...card, drivers: [{ ...card.playerDriver!, laps: lapFacts }] };
+      const player = { ...card.playerDriver!, laps: lapFacts };
+      const detailed: DetailedSession = { ...card, drivers: [player], playerDriver: player };
       const projection = buildSessionSummaryProjection(detailed, 1);
       writeSessionRows(db, detailed, projection);
       persistSessionAggregate(db, detailed, projection);

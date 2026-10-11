@@ -33,11 +33,29 @@ const storedTelemetryLinks = {
   getTelemetryLapCacheFilenames: vi.fn(() => new Set<string>()),
 };
 
+function createServerContext(options: ConstructorParameters<typeof ServerContext>[0]): ServerContext {
+  const metadata = new Map<string, string>();
+  const sessionDb = options.sessionDb as unknown as Record<string, unknown>;
+  if (typeof sessionDb.getMetadata !== 'function') {
+    sessionDb.getMetadata = vi.fn((key: string) => metadata.get(key) ?? null);
+  }
+  if (typeof sessionDb.setMetadata !== 'function') {
+    sessionDb.setMetadata = vi.fn((key: string, value: string) => { metadata.set(key, value); });
+  }
+  if (typeof sessionDb.invalidateUnresolvedReplayDefaults !== 'function') {
+    sessionDb.invalidateUnresolvedReplayDefaults = vi.fn();
+  }
+  if (typeof sessionDb.reconcileReplayPlayerOwnership !== 'function') {
+    sessionDb.reconcileReplayPlayerOwnership = vi.fn();
+  }
+  return new ServerContext({ ...options, sessionDb: sessionDb as unknown as SessionDatabase });
+}
+
 function createContext(sessionDb: SessionDatabase = {
     getAllStoredReplayFiles: vi.fn(() => []),
   } as unknown as SessionDatabase): ServerContext {
 
-  return new ServerContext({
+  return createServerContext({
     resultsDir: '',
     replaysDir: '',
     telemetryDir: '',
@@ -158,7 +176,7 @@ describe('ServerContext background session sync', () => {
         return new Promise<number>(resolve => { releaseTelemetry = () => { telemetryRunning = false; resolve(0); }; });
       }),
     } as unknown as TelemetryCatalog;
-    const context = new ServerContext({ resultsDir: '', replaysDir: '', telemetryDir: '', parser: new LmuParser(),
+    const context = createServerContext({ resultsDir: '', replaysDir: '', telemetryDir: '', parser: new LmuParser(),
       sessionDb, telemetryCatalog, replayRecordings: {} as ReplayRecordingService });
     vi.spyOn(context, 'enrichSessionsWithTelemetry').mockImplementation(() => undefined);
     context.runInitialSessionSyncInBackground(); await vi.runOnlyPendingTimersAsync();
@@ -309,7 +327,10 @@ describe('ServerContext background session sync', () => {
     const sessionDb = {
       ...storedTelemetryLinks,
       getAllStoredReplayFiles: vi.fn(() => []),
-      getTelemetryFiles: vi.fn(() => [{ filename: 'Spa_P_2026-09-14T18_37_49Z.duckdb', timestampEpochMs: recordedAt }]),
+      getTelemetryFiles: vi.fn(() => [{
+        filename: 'Spa_P_2026-09-14T18_37_49Z.duckdb', filePath: 'Spa_P_2026-09-14T18_37_49Z.duckdb',
+        fileMtimeMs: recordedAt, fileSizeBytes: 100, trackName: 'Spa', sessionType: 'P', timestampStr: '', timestampEpochMs: recordedAt,
+      }]),
       getSessionsCount: vi.fn(() => 0),
       getTelemetrySessionCandidatesStartingBetween: vi.fn(() => []),
       getReplayMatchingEntriesOverlapping: vi.fn(() => []),
@@ -324,7 +345,7 @@ describe('ServerContext background session sync', () => {
       getFiles: vi.fn(() => []),
       refresh: vi.fn(() => Promise.resolve(1)),
     } as unknown as TelemetryCatalog;
-    const context = new ServerContext({
+    const context = createServerContext({
       resultsDir: '', replaysDir: '', telemetryDir: 'C:/lmu/telemetry', parser: new LmuParser(),
       sessionDb, telemetryCatalog, replayRecordings: {} as ReplayRecordingService,
     });
@@ -334,6 +355,7 @@ describe('ServerContext background session sync', () => {
     await vi.runAllTimersAsync();
     expect(telemetryCatalog.refresh).toHaveBeenCalledWith('C:/lmu/telemetry');
     expect(log).toHaveBeenCalledWith('[SQLite Cache] Found 1 DuckDB telemetry files from C:/lmu/telemetry');
+    await vi.waitFor(() => expect(storedTelemetryLinks.linkTelemetryFiles).toHaveBeenCalled());
     expect(storedTelemetryLinks.linkTelemetryFiles).toHaveBeenCalled();
     // Candidates come from the file's time window, never from walking every stored session.
     const [from, to] = vi.mocked(sessionDb.getTelemetrySessionCandidatesStartingBetween).mock.calls[0];
@@ -345,7 +367,7 @@ describe('ServerContext background session sync', () => {
   it('only warns when the DuckDB rescan fails in the background', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const telemetryCatalog = { refresh: vi.fn(() => Promise.reject(new Error('folder gone'))) } as unknown as TelemetryCatalog;
-    const context = new ServerContext({
+    const context = createServerContext({
       resultsDir: '', replaysDir: '', telemetryDir: 'C:/lmu/telemetry', parser: new LmuParser(),
       sessionDb: { getAllStoredReplayFiles: vi.fn(() => []) } as unknown as SessionDatabase, telemetryCatalog, replayRecordings: {} as ReplayRecordingService,
     });
@@ -407,7 +429,7 @@ describe('ServerContext configuration and telemetry enrichment', () => {
       clearTelemetryCache: vi.fn(),
     } as unknown as SessionDatabase;
     const telemetryCatalog = { clear: vi.fn() } as unknown as TelemetryCatalog;
-    const context = new ServerContext({
+    const context = createServerContext({
       resultsDir: '',
       replaysDir: '',
       telemetryDir: '',
@@ -449,7 +471,7 @@ describe('ServerContext configuration and telemetry enrichment', () => {
     const telemetryCatalog = {
       getFiles: vi.fn(() => []),
     } as unknown as TelemetryCatalog;
-    const context = new ServerContext({
+    const context = createServerContext({
       resultsDir: '',
       replaysDir: '',
       telemetryDir: '',
@@ -491,7 +513,7 @@ describe('ServerContext configuration and telemetry enrichment', () => {
       updateSessionMatchingReplay: vi.fn(),
     } as unknown as SessionDatabase;
     const telemetryCatalog = { getFiles: vi.fn(() => []) } as unknown as TelemetryCatalog;
-    const context = new ServerContext({
+    const context = createServerContext({
       resultsDir: '',
       replaysDir: '',
       telemetryDir: '',
@@ -589,7 +611,7 @@ describe('telemetry ownership catalog lifetime', () => {
       const candidates = vi.spyOn(db, 'getTelemetrySessionCandidatesStartingBetween');
       const fullSessionsByWindow = vi.spyOn(db, 'getSessionsStartingBetween');
       const fullSessionsById = vi.spyOn(db, 'getSessionsByIds');
-      const context = new ServerContext({ resultsDir: '', replaysDir: '', telemetryDir: '',
+      const context = createServerContext({ resultsDir: '', replaysDir: '', telemetryDir: '',
         parser: new LmuParser(undefined, undefined, { detectPlayer: false }), sessionDb: db,
         telemetryCatalog: { refresh: async () => 2 } as unknown as TelemetryCatalog,
         replayRecordings: {} as ReplayRecordingService });
@@ -747,7 +769,7 @@ describe('ServerContext replay scan progress', () => {
         rejectSessionReplayLink: vi.fn((_id: string, link: { name: string }, reason: string) => ({ replayName: link.name, reason, rejectedAt: 1 })),
         getRejectedReplayLinks: vi.fn(() => new Map()),
       } as unknown as SessionDatabase;
-      const context = new ServerContext({
+      const context = createServerContext({
         resultsDir: '',
         replaysDir: '',
         telemetryDir: '',

@@ -5,7 +5,7 @@ import { CIRCUIT_SPECIFICATIONS, getCircuitSpecification } from '../circuitSpecs
 import { lapConditionGroup } from '../lapConditions.js';
 import { computeConsistencyRating, computeTopNLapAverage, selectCleanLapCandidates } from '../lapComparison.js';
 import { isOnlineSession } from '../leaderboard.js';
-import { isSessionEmpty, matchesSessionType } from '../formatters.js';
+import { isSessionEmpty } from '../formatters.js';
 import { buildSessionAggregate } from './buildSessionAggregate.js';
 
 function projectDriver(session: DetailedSession, driver: DriverData, driverOrdinal: number, playerOrdinal: number): { driver: SessionDriverProjection; laps: SessionLapProjection[]; conditions: SessionConditionProjection[] } {
@@ -54,16 +54,16 @@ function projectDriver(session: DetailedSession, driver: DriverData, driverOrdin
 }
 
 export function buildSessionSummaryProjection(session: DetailedSession, sourceRevision: number): SessionSummaryProjection {
-  const playerMarkedOrdinal = session.drivers.findIndex(driver => driver.isPlayer);
-  const namedPlayerOrdinal = session.playerDriver ? session.drivers.findIndex(driver => driver.name === session.playerDriver?.name) : -1;
-  const playerOrdinal = playerMarkedOrdinal >= 0 ? playerMarkedOrdinal : namedPlayerOrdinal;
+  const markedPlayers = session.drivers.flatMap((driver, ordinal) => driver.isPlayer ? [ordinal] : []);
+  const playerOrdinal = markedPlayers.length === 1 ? markedPlayers[0] : -1;
   const primary = playerOrdinal >= 0 ? playerOrdinal : session.drivers.length ? 0 : -1;
   const drivers = session.drivers.map((driver, ordinal) => projectDriver(session, driver, ordinal, playerOrdinal));
   const recordingName = typeof session.matchingReplayFile === 'string' ? session.matchingReplayFile : session.matchingReplayFile?.name ?? null;
   const layout = getCircuitSpecification(session.trackVenue, session.trackCourse, null, recordingName, null, session.trackLengthMeters);
   return { sessionId: session.id, sourceRevision, projectionVersion: SESSION_SUMMARY_PROJECTION_VERSION,
     layoutKey: Object.prototype.hasOwnProperty.call(CIRCUIT_SPECIFICATIONS, layout.layoutKey) ? layout.layoutKey : 'unknown',
-    sessionKind: ['Practice', 'Qualifying', 'Race'].find(kind => matchesSessionType(session.sessionType, session.sessionName, kind))?.toLowerCase() ?? 'unknown', isEmpty: isSessionEmpty(session),
+    sessionKind: session.sessionType === 'Practice' || session.sessionType === 'Qualifying' || session.sessionType === 'Race'
+      ? session.sessionType.toLowerCase() : 'unknown', isEmpty: isSessionEmpty(session),
     primaryDriverOrdinal: primary >= 0 ? primary : null, recordingName,
     drivers: drivers.map(value => value.driver), conditions: drivers.flatMap(value => value.conditions), laps: drivers.flatMap(value => value.laps),
     aggregate: buildSessionAggregate(session, drivers.map(value => value.driver), drivers.flatMap(value => value.laps), primary) };

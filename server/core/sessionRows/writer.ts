@@ -35,10 +35,12 @@ export function stableKey(value: unknown): string {
 export function playerDriverOrdinal(session: DetailedSession): number | null {
   const player = session.playerDriver;
   if (!player) return null;
-  const sameName = session.drivers.map((driver, index) => ({ driver, index })).filter(({ driver }) => driver.name === player.name);
-  if (sameName.length === 0) return null;
+  const referenceIndex = session.drivers.indexOf(player);
+  if (referenceIndex !== -1) return referenceIndex;
   const key = stableKey(player);
-  return (sameName.find(({ driver }) => stableKey(driver) === key) ?? sameName.find(({ driver }) => driver.isPlayer) ?? sameName[0]).index;
+  const matches = session.drivers.map((driver, index) => ({ driver, index }))
+    .filter(({ driver }) => stableKey(driver) === key);
+  return matches.length === 1 ? matches[0].index : null;
 }
 
 function listsMask(source: DriverData | LapData): number | null {

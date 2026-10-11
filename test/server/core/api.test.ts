@@ -67,7 +67,7 @@ describe('Server API wiring', () => {
   });
 
   it('reads the fixture sessions from the results folder at start-up', async () => {
-    const res = await request(app).get('/api/session/2026_05_28_P1.xml');
+    const res = await request(app).get('/api/session/2026_05_28_P1');
     expect(res.status).toBe(200);
     expect(res.body.trackVenue).toBe('Spa');
     expect(res.body.drivers.length).toBeGreaterThan(0);

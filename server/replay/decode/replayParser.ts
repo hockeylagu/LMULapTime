@@ -313,12 +313,7 @@ export function parseReplayMetadata(
           const entryTime = isFinite(rawEntry) && rawEntry >= 0 && rawEntry < 1e8 ? Number(rawEntry.toFixed(2)) : undefined;
           const exitTime = isFinite(rawExit) && rawExit >= 0 && rawExit < 1e8 ? Number(rawExit.toFixed(2)) : undefined;
 
-          const isPlayer = Boolean(
-            effectivePlayerName && (
-              sName.str.toLowerCase() === effectivePlayerName.toLowerCase() ||
-              sName.str.toLowerCase().includes(effectivePlayerName.toLowerCase())
-            )
-          );
+          const isPlayer = false;
 
           const carModel = mapVehicleIdToModel(sVeh.str);
           const carClass = mapVehicleIdToClass(sVeh.str, carModel);
@@ -388,12 +383,7 @@ export function parseReplayMetadata(
                 const sTeam = readPStr(driverRegion, np); np = sTeam.nextOffset;
                 const sCarNum = readPStr(driverRegion, np); np = sCarNum.nextOffset;
 
-                const isPlayer = Boolean(
-                  effectivePlayerName && (
-                    str.toLowerCase() === effectivePlayerName.toLowerCase() ||
-                    str.toLowerCase().includes(effectivePlayerName.toLowerCase())
-                  )
-                );
+                const isPlayer = false;
 
                 const carModel = mapVehicleIdToModel(sVehicle.str);
                 const carClass = mapVehicleIdToClass(sVehicle.str, carModel);
@@ -416,35 +406,10 @@ export function parseReplayMetadata(
       }
     }
 
-    if (effectivePlayerName && drivers.length > 0) {
-      const explicitName = options?.playerName?.trim().toLowerCase();
-      // Reuse the cached detectedName instead of re-reading settings.json from disk
-      const profileName = !explicitName ? detectedName?.trim().toLowerCase() : undefined;
-      const targetLower = explicitName || profileName || effectivePlayerName.trim().toLowerCase();
-
-      // 1. Exact match with target name
-      let bestMatch = drivers.find(d => d.name.toLowerCase() === targetLower);
-
-      // 2. Substring match with target name
-      if (!bestMatch) {
-        const matched = drivers.filter(d => d.name.toLowerCase().includes(targetLower));
-        if (matched.length > 0) {
-          // If multiple candidates match (e.g. "Samuel Dominguez" vs "Samuel Lague" with target "samuel"),
-          // check if settings profileName matches one of them (reuse cached detectedName)
-          const envProfile = detectedName?.trim().toLowerCase();
-          bestMatch = matched.find(d => envProfile && d.name.toLowerCase() === envProfile)
-            || matched.find(d => envProfile && d.name.toLowerCase().includes(envProfile))
-            || matched.find(d => new RegExp(`\\b${targetLower}\\b`, 'i').test(d.name))
-            || matched[0];
-        }
-      }
-
-      drivers.forEach(d => {
-        d.isPlayer = Boolean(bestMatch && d.slot === bestMatch.slot && d.name === bestMatch.name);
-      });
-    }
-
-    const playerDriver = drivers.find(d => d.isPlayer) || drivers[0];
+    const targetLower = effectivePlayerName?.trim().toLowerCase() ?? '';
+    const playerMatches = targetLower ? drivers.filter(d => d.name.trim().toLowerCase() === targetLower) : [];
+    const playerDriver = playerMatches.length === 1 ? playerMatches[0] : undefined;
+    drivers.forEach(driver => { driver.isPlayer = driver === playerDriver; });
     const replayCarClass = playerDriver?.carClass;
     const replayCarModel = playerDriver?.carModel;
 

@@ -19,7 +19,12 @@ import { SessionDatabase } from '../../../server/core/db.js';
 
 function createSessionDb(sessions: DetailedSession[] = []): SessionDatabase {
   const db = new SessionDatabase(':memory:');
-  for (const session of sessions) db.upsertSession(structuredClone(session), session.filePath ?? `${session.id}.xml`, session.timestamp, 1);
+  for (const session of sessions) {
+    const stored = structuredClone(session);
+    const playerOrdinal = stored.drivers.findIndex(driver => driver.isPlayer);
+    if (playerOrdinal >= 0) stored.playerDriver = stored.drivers[playerOrdinal];
+    db.upsertSession(stored, session.filePath ?? `${session.id}.xml`, session.timestamp, 1);
+  }
   return db;
 }
 
@@ -315,8 +320,7 @@ describe('sessionRoutes and filterSessions', () => {
       expect(response.headers['cache-control']).toBe('no-store');
       const hydrateSession = vi.spyOn(sessionDb, 'getSessionById');
       const aliasResponse = await request(app).get('/api/session/sess_1.xml/personal-best/0');
-      expect(aliasResponse.status).toBe(200);
-      expect(aliasResponse.body).toEqual(response.body);
+      expect(aliasResponse.status).toBe(404);
       expect(hydrateSession).not.toHaveBeenCalled();
       for (const ordinal of ['-1', '1', '1.5', 'abc']) {
         expect((await request(app).get(`/api/session/sess_1/personal-best/${ordinal}`)).status).toBe(400);

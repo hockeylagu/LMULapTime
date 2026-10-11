@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { matchesSessionType, compareSessions } from '../../../../shared/domain/formatters.js';
+import { compareSessions } from '../../../../shared/domain/formatters.js';
 import { matchesTrack } from '../../../../shared/domain/paceCategory.js';
 import { PaceCategory } from '../../../../shared/types/index.js';
 import { ImprovementHeader } from './ImprovementHeader.js';
@@ -19,6 +19,8 @@ export type { SessionProgressionPoint };
 export interface ImprovementChartProps {
   progression: SessionProgressionPoint[];
   selectedTrack: string;
+  trackVenue?: string;
+  trackCourse?: string;
   setSelectedTrack: (track: string) => void;
   selectedCarClass: string;
   setSelectedCarClass: (carClass: string) => void;
@@ -44,6 +46,8 @@ export interface ImprovementChartProps {
 export const ImprovementChart: React.FC<ImprovementChartProps> = ({
   progression,
   selectedTrack,
+  trackVenue,
+  trackCourse = '',
   setSelectedTrack,
   selectedCarClass,
   setSelectedCarClass,
@@ -69,11 +73,11 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
 
   const activeTrack = selectedTrack === 'All' && tracks.length > 0 ? tracks[0] : selectedTrack;
   const rawTrackData = progression.filter((p) => {
-    const isTrackMatch = matchesTrack(activeTrack, p.trackVenue, p.trackCourse);
+    const isTrackMatch = matchesTrack(trackVenue || activeTrack, p.trackVenue, p.trackCourse, trackVenue ? trackCourse : '');
 
     const matchesClass = !selectedCarClass || selectedCarClass === 'All' || p.carClass === selectedCarClass;
     const matchesModel = !selectedCarModel || selectedCarModel === 'All' || p.carType === selectedCarModel;
-    const matchesType = matchesSessionType(p.sessionType, p.sessionName, filterType);
+    const matchesType = filterType === 'All' || p.sessionType === filterType;
 
     const q = (searchQuery || '').toLowerCase().trim();
     const matchesSearch =

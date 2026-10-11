@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSessionDataContext } from '../../api/sessionDataContext.js';
 import type { LegendPayload } from 'recharts';
 import { DetailedSession, SessionProgressionPoint, ReferenceLaptimesCache } from '../../../shared/types/index.js';
-import { matchesTrack, findReferenceEntry } from '../../../shared/domain/paceCategory.js';
+import { findReferenceEntry } from '../../../shared/domain/paceCategory.js';
 import { findWeekendSessions, CandidateRelatedSession, type WeekendSessionLink } from './sessionDetailHelpers.js';
 import { ApiError, apiErrorMessage, fetchJson, isAbortError } from '../../api/apiClient.js';
 import { loadReferenceLaptimes, peekReferenceLaptimes } from '../../api/referenceApi.js';
@@ -40,7 +40,7 @@ export function useSessionDetailData({
   const loading = !session && settledSessionId !== sessionId;
   // Why the session could not be loaded; null while loading, when loaded, or when the server has no such session.
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [selectedDriverName, setSelectedDriverName] = useState<string>('');
+  const [selectedDriverOrdinal, setSelectedDriverOrdinal] = useState<number | null>(null);
   const [chartMetric, setChartMetric] = useState<'lapTime' | 'sectors' | 'topSpeed' | 'tireWear' | 'fuelEnergy' | 'positions'>('lapTime');
   const [hiddenSeries, setHiddenSeries] = useState<Record<string, boolean>>({});
 
@@ -62,7 +62,7 @@ export function useSessionDetailData({
     if (!existingSession) {
       setLoadedSession(null);
       setSettledSessionId(null);
-      setSelectedDriverName('');
+      setSelectedDriverOrdinal(null);
     }
     setLoadError(null);
 
@@ -72,14 +72,13 @@ export function useSessionDetailData({
         if (!isCurrent) return;
         setLoadedSession({ sessionId, data: sessionData });
         setFetchedRelated(sessionData.historyContext?.relatedSessions ?? []);
-        const initialDriver = sessionData.drivers.findIndex(driver => driver.name === sessionData.playerDriver?.name);
-        const driverOrdinal = initialDriver >= 0 ? initialDriver : 0;
+        const driverOrdinal = sessionData.playerDriver?.driverOrdinal;
         const best = sessionData.historyContext?.personalBests?.find(item => item.driverOrdinal === driverOrdinal);
-        setPersonalBest({ session: sessionData, driverOrdinal, bestLapTime: sessionData.historyContext?.ready === false ? null : best?.bestLapTime ?? null });
+        if (driverOrdinal !== undefined && (best || sessionData.historyContext?.ready === false)) {
+          setPersonalBest({ session: sessionData, driverOrdinal, bestLapTime: sessionData.historyContext?.ready === false ? null : best?.bestLapTime ?? null });
+        }
         if (!existingSession && sessionData.playerDriver) {
-          setSelectedDriverName(sessionData.playerDriver.name);
-        } else if (!existingSession && sessionData.drivers && sessionData.drivers.length > 0) {
-          setSelectedDriverName(sessionData.drivers[0].name);
+          setSelectedDriverOrdinal(sessionData.playerDriver.driverOrdinal ?? null);
         }
         setLoadError(null);
         setSettledSessionId(sessionId);
@@ -89,7 +88,7 @@ export function useSessionDetailData({
         console.error('Failed to load session detail data:', err);
         if (err instanceof ApiError && err.status === 404) {
           setLoadedSession((current) => current?.sessionId === sessionId ? null : current);
-          setSelectedDriverName('');
+          setSelectedDriverOrdinal(null);
           setLoadError(null);
         } else {
           setLoadError(apiErrorMessage(err, 'The session could not be loaded.'));
@@ -110,15 +109,14 @@ export function useSessionDetailData({
 
   const selectedDriver = useMemo(() => {
     if (!session) return undefined;
-    return session.drivers
-      ? session.drivers.find((d) => d.name === selectedDriverName) || session.drivers[0]
-      : undefined;
-  }, [session, selectedDriverName]);
+    if (!session.drivers || selectedDriverOrdinal === null) return undefined;
+    return session.drivers.find(driver => driver.driverOrdinal === selectedDriverOrdinal);
+  }, [session, selectedDriverOrdinal]);
 
   useEffect(() => {
     setPersonalBestError(null);
-    if (hasInitialProgression || !session || !selectedDriver) return;
-    const driverOrdinal = session.drivers.indexOf(selectedDriver);
+    if (!session || !selectedDriver || selectedDriver.driverOrdinal === undefined) return;
+    const driverOrdinal = selectedDriver.driverOrdinal;
     if (personalBest?.session === session && personalBest.driverOrdinal === driverOrdinal) return;
     const controller = new AbortController();
     fetchJson<{ bestLapTime: number | null; ready: boolean }>(
@@ -131,7 +129,7 @@ export function useSessionDetailData({
       }
     });
     return () => controller.abort();
-  }, [session, selectedDriver, hasInitialProgression, personalBest]);
+  }, [session, selectedDriver, personalBest]);
 
   const hasTireWearData = useMemo(() => {
     return (
@@ -175,29 +173,10 @@ export function useSessionDetailData({
 
   const allTimeCategoryTrackPB = useMemo(() => {
     if (!session || !selectedDriver) return null;
-    if (!hasInitialProgression) return personalBest?.session === session && personalBest.driverOrdinal === session.drivers.indexOf(selectedDriver) ? personalBest.bestLapTime : null;
-    if (progression.length===0) return null;
-    const driverClass = selectedDriver.carClass;
-    const driverNorm = (selectedDriver.name || '').toLowerCase().trim();
-
-    const matchingLapTimes = progression
-      .filter((p) => {
-        const isTrack =
-          matchesTrack(session.trackVenue, p.trackVenue, p.trackCourse) ||
-          matchesTrack(p.displayTrack || p.trackVenue, session.trackVenue, session.trackCourse);
-        const isClass =
-          p.carClass === driverClass;
-        const isDriver =
-          !driverNorm ||
-          (p.driverName || '').toLowerCase().trim() === driverNorm ||
-          (p.driverName || '').toLowerCase().includes(driverNorm) ||
-          driverNorm.includes((p.driverName || '').toLowerCase());
-        return isTrack && isClass && isDriver && p.bestLapTime !== null && p.bestLapTime > 0;
-      })
-      .map((p) => p.bestLapTime as number);
-
-    return matchingLapTimes.length > 0 ? Math.min(...matchingLapTimes) : selectedDriver.bestLapTime;
-  }, [session, selectedDriver, progression, hasInitialProgression, personalBest]);
+    if (selectedDriver.driverOrdinal === undefined) return null;
+    return personalBest?.session === session && personalBest.driverOrdinal === selectedDriver.driverOrdinal
+      ? personalBest.bestLapTime : null;
+  }, [session, selectedDriver, personalBest]);
 
   const isCurrentSessionAllTimePB =
     selectedDriver?.bestLapTime !== null &&
@@ -272,8 +251,8 @@ export function useSessionDetailData({
     loadError,
     personalBestError,
     selectedDriver,
-    selectedDriverName,
-    setSelectedDriverName,
+    selectedDriverOrdinal,
+    setSelectedDriverOrdinal,
     chartMetric,
     setChartMetric,
     hiddenSeries,

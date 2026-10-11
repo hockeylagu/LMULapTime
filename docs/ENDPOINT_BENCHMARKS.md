@@ -1,5 +1,29 @@
 # Endpoint performance history
 
+## Exact identity cleanup — 2026-10-11
+
+Baseline `2026-10-11T05-22-40.838Z.json` and final `2026-10-11T06-11-12.384Z.json`
+use the same source snapshot hash (`329dd3acf8ea923c8bc2ae0270715675d77579077b9c8ed1d07d815a2741d9df`),
+fixed cohort, runtime/plugins and 20 warm samples. The isolated snapshot's versioned summaries are
+rebuilt before timing. All measured requests succeeded, none were skipped, and no material
+regression met the harness threshold. An intermediate run overlapping the full test suite was
+excluded from the comparison.
+
+| Request | Baseline median (ms) | Final median (ms) |
+|---|---:|---:|
+| Dashboard | 12.61 | 12.16 |
+| Track summaries | 9.36 | 8.73 |
+| Comparison, player / all | 20.35 / 21.20 | 19.42 / 20.48 |
+| Telemetry picker, player / all | 5.39 / 5.15 | 5.17 / 5.17 |
+| Large session details | 85.70 / 70.91 | 81.26 / 62.99 |
+| Automatic telemetry | 162.91 | 168.99 |
+| Replay telemetry | 95.55 | 87.92 |
+| Traffic | 162.08 | 146.10 |
+
+Track/dashboard payloads now include explicit venue/course identity; comparison, session-detail and
+telemetry payload sizes are unchanged. These are cached-data HTTP timings, not live-game/browser
+or concurrent-ingestion measurements. Full reports remain in the ignored local history folder.
+
 Run `npm run benchmark:endpoints` before and after features or optimizations that affect API queries,
 processing or payloads. The purpose is to identify the slowest responses and detect when new work
 makes an existing endpoint slower. The weekly Codex check uses the same command (Sunday, 9 a.m.
@@ -24,6 +48,9 @@ failed HTTP requests are errors, not successful timing samples. Traffic's first 
 worker-based index. The snapshot allows ordinary GET-side cache writes and rival updates without
 changing the user's records. Telemetry serves retained recordings, without decoding live VCR files.
 This is a controlled cached-data benchmark, not a measurement under ingestion or concurrent load.
+
+Versioned session summaries are rebuilt on the isolated copy before timing ready-state responses;
+rebuild failures stop the run instead of recording misleading 503 timings.
 
 The source database is opened read-only; snapshot creation is outside the timed requests. Allow
 temporary free disk space approximately equal to the database size. The snapshot and its journal

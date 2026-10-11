@@ -4,7 +4,7 @@ import type { ReplayFileEntry } from '../../sessions/sessionXmlTypes.js';
 import { replayIndexEntryFromStored, REPLAY_MATCH_WINDOW_MS, type ReplayMatchTarget } from '../../sessions/replayMatching.js';
 import { getStoredReplayFileInfo } from './dbReplayMetadataStore.js';
 
-export const REPLAY_MATCHING_PROJECTION_VERSION = 1;
+export const REPLAY_MATCHING_PROJECTION_VERSION = 2;
 
 /** Compact persistent matching facts avoid hydrating every compressed replay roster at startup. */
 export function writeReplayMatchingFacts(db: Database, filename: string, filePath: string, mtime: number, size: number, metadata: ReplayMetadata): void {

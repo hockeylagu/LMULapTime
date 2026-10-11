@@ -33,8 +33,8 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
     loadError,
     personalBestError,
     selectedDriver,
-    selectedDriverName,
-    setSelectedDriverName,
+    selectedDriverOrdinal,
+    setSelectedDriverOrdinal,
     chartMetric,
     setChartMetric,
     hiddenSeries,
@@ -90,8 +90,8 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
       <SessionDetailHeader
         session={session}
         selectedDriver={selectedDriver}
-        selectedDriverName={selectedDriverName}
-        setSelectedDriverName={setSelectedDriverName}
+        selectedDriverOrdinal={selectedDriverOrdinal}
+        setSelectedDriverOrdinal={setSelectedDriverOrdinal}
         onBack={onBack}
         relatedSessions={relatedSessions}
         handleNavigateToSession={handleNavigateToSession}
@@ -139,8 +139,8 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
 
       <SessionRaceStandings
         session={session}
-        selectedDriverName={selectedDriverName}
-        setSelectedDriverName={setSelectedDriverName}
+        selectedDriverOrdinal={selectedDriverOrdinal}
+        setSelectedDriverOrdinal={setSelectedDriverOrdinal}
         isMultiClass={isMultiClass}
       />
     </div>

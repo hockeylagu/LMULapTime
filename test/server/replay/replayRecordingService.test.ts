@@ -38,7 +38,7 @@ describe('ReplayRecordingService', () => {
     expect(service.getMetadata(filePath, replayName)).toEqual(metadata);
   });
 
-  it('resolves driver slots by exact and partial names', () => {
+  it('resolves driver slots by exact unique names only', () => {
     const replayName = 'Driver_Match_P1.Vcr';
     const filePath = path.join(tempDir, replayName);
     fs.writeFileSync(filePath, createSliceVcrBuffer({
@@ -46,7 +46,7 @@ describe('ReplayRecordingService', () => {
     }));
 
     expect(service.resolveDriverSlot(filePath, replayName, 'Cache Driver')).toBe(1);
-    expect(service.resolveDriverSlot(filePath, replayName, 'Driver')).toBe(1);
+    expect(service.resolveDriverSlot(filePath, replayName, 'Driver')).toBeUndefined();
     expect(service.resolveDriverSlot(filePath, replayName, 'Unknown Driver')).toBeUndefined();
     expect(service.resolveDriverSlot(filePath, replayName)).toBeUndefined();
   });
@@ -82,6 +82,35 @@ describe('ReplayRecordingService', () => {
     fs.rmSync(filePath);
 
     expect(await service.getFullTrajectory(filePath, replayName, { driverSlot: 1 })).toEqual(trajectory);
+  });
+
+  it('invalidates legacy default-slot blobs and pointers while preserving explicit slot trajectories', async () => {
+    const trajectory = {
+      replayName: 'Legacy_P1.Vcr', driverSlot: -1, currentLap: 1,
+      bounds: { minX: 0, maxX: 1, minZ: 0, maxZ: 1, spanX: 1, spanZ: 1 },
+      points: [{ x: 0, y: 0, z: 0, timeSec: 0 }, { x: 1, y: 0, z: 1, timeSec: 1 }],
+    } as const;
+    db.upsertReplayTrajectoryCache('Legacy_P1.Vcr', -1, -1, 100, 200, trajectory as never);
+    db.upsertReplayTrajectoryCache('Legacy_P1.Vcr', 1, -1, 100, 200, { ...trajectory, driverSlot: 1 } as never);
+    db.upsertReplayMetadataCache('Legacy_P1.Vcr', 'C:/replays/Legacy_P1.Vcr', 100, 200, {
+      filename: 'Legacy_P1.Vcr', filePath: 'C:/replays/Legacy_P1.Vcr', fileSizeBytes: 200, mtimeMs: 100,
+      timeSliceCount: 2, totalEvents: 1, durationSec: 1, drivers: [{ slot: 1, name: 'Player', isPlayer: true }],
+    } as never);
+    db.setReplayTrajectoryDefaults('Legacy_P1.Vcr', -1, 1, 1);
+
+    db.invalidateUnresolvedReplayDefaults();
+
+    expect(db.getReplayTrajectoryCache('Legacy_P1.Vcr', -1, -1, 100, 200)).toBeNull();
+    expect(db.getReplayTrajectoryCache('Legacy_P1.Vcr', 1, -1, 100, 200)?.driverSlot).toBe(1);
+    await expect(service.getFullTrajectory('C:/missing/Legacy_P1.Vcr', 'Legacy_P1.Vcr', {}).then(result => result.driverSlot))
+      .resolves.toBe(1);
+  });
+
+  it('does not treat an empty explicit driver name as a default-player request', async () => {
+    const filePath = path.join(tempDir, 'Empty_Name_P1.Vcr');
+    fs.writeFileSync(filePath, createSliceVcrBuffer({ drivers: [{ name: 'Cache Driver', vehicleId: '21_26_AFCO95641716', team: 'Test Team', carNumber: '21' }] }));
+    await expect(service.getFullTrajectory(filePath, 'Empty_Name_P1.Vcr', { driverName: '  ' }))
+      .rejects.toThrow(ReplayDriverNotRecordedError);
   });
 
   it('reports a driver with no stored laps once the replay is deleted, instead of serving the player\'s lap', async () => {
@@ -192,7 +221,7 @@ describe('ReplayRecordingService', () => {
 
       await service.getFullTrajectory(filePath, replayName, { playerName: 'Cache Driver' });
 
-      expect(db.getReplayTrajectoryCache(replayName, -1, -1, mtime, size)?.driverSlot).toBe(1);
+      expect(db.getReplayTrajectoryCache(replayName, 1, -1, mtime, size)?.driverSlot).toBe(1);
     });
 
     it('is decoded once for requests made while it decodes', async () => {

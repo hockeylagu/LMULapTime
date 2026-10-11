@@ -178,7 +178,7 @@ describe('parser server module - stream events and timing timestamps', () => {
       expect(driver?.estVeStintLaps).toBeNull();
     });
 
-    it('auto-detects player driver when isPlayer tag is omitted', () => {
+    it('does not infer player ownership when isPlayer tag is omitted', () => {
       const xmlNoPlayerTag = `<?xml version="1.0" encoding="utf-8"?>
 <rFactorXML version="1.0">
   <RaceResults>
@@ -199,8 +199,9 @@ describe('parser server module - stream events and timing timestamps', () => {
 
       const session = parser.parseSessionXml('no_player_tag.xml');
       expect(session).not.toBeNull();
-      expect(session?.playerDriver?.name).toBe('Solo Driver');
-      expect(session?.playerDriver?.bestLapTime).toBe(108.0);
+      expect(session?.playerDriver).toBeUndefined();
+      expect(session?.drivers[0].name).toBe('Solo Driver');
+      expect(session?.drivers[0].bestLapTime).toBe(108.0);
     });
 
     it('infers lap time and missing sector from session elapsed time for incomplete laps', () => {

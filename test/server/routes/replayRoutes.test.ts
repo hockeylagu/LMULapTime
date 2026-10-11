@@ -111,7 +111,9 @@ describe('session telemetry routes', () => {
       .mockResolvedValue({ points: [], pointsCount: 0 } as unknown as ReplayTrajectoryData);
     const traffic = vi.spyOn(RaceTrafficService.prototype, 'getDriverTraffic')
       .mockResolvedValue({ available: true, laps: [] });
-    const trajectory = await request(app).get('/api/session/session-1.xml/telemetry?driverOrdinal=0&lapOrdinal=0&source=vcr');
+    const alias = await request(app).get('/api/session/session-1.xml/telemetry?driverOrdinal=0&lapOrdinal=0&source=vcr');
+    expect(alias.status).toBe(404);
+    const trajectory = await request(app).get('/api/session/session-1/telemetry?driverOrdinal=0&lapOrdinal=0&source=vcr');
     expect(trajectory.status).toBe(200);
     expect(getTrajectory.mock.calls[0][0]).toMatchObject({ driverOrdinal: 0, lapOrdinal: 0, allowDuckDb: false,
       session: { id: 'session-1', drivers: [{ name: 'Route Driver', laps: [{ lapNum: 1, lapOrdinal: 0 }] }] } });

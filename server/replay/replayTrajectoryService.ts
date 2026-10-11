@@ -33,7 +33,7 @@ export class ReplayTrajectoryService {
     const configuredPlayer = this.currentParser.configuredPlayerName;
     const driverName = matchedDriver.driverName || matchedDriver.name;
     const driverSlot = this.replayRecordings.resolveDriverSlot(filePath, replayName, driverName, configuredPlayer);
-    if (driverSlot === undefined && driverName.trim().toLowerCase() !== configuredPlayer.trim().toLowerCase()) {
+    if (driverSlot === undefined) {
       throw new ReplayDriverNotFoundError(driverName, replayName);
     }
 
@@ -64,11 +64,9 @@ export class ReplayTrajectoryService {
       // Ignore metadata read failure
     }
 
-    const isPlayer =
-      (driverSlot === undefined && !driverName) ||
-      (typeof driverSlot === 'number'
-        ? metadata?.drivers?.find(driver => driver.slot === driverSlot)?.isPlayer
-        : Boolean(driverName && configuredPlayer && driverName.trim().toLowerCase() === configuredPlayer.trim().toLowerCase()));
+    const isPlayer = typeof driverSlot === 'number'
+      ? metadata?.drivers?.find(driver => driver.slot === driverSlot)?.isPlayer
+      : false;
 
     const telemetryResult = await this.telemetryService.enrichWithTelemetry({
       sessionId: matchedSession.id,
@@ -116,8 +114,7 @@ export class ReplayTrajectoryService {
     }
 
     const selectedSlot=trajectory.driverSlot ?? driverSlot;
-    const selectedDriver=selectedSlot !== undefined ? metadata?.drivers.find(d=>d.slot===selectedSlot)
-      : metadata?.drivers.find(d=>d.name===trajectory.driverName);
+    const selectedDriver=selectedSlot !== undefined ? metadata?.drivers.find(d=>d.slot===selectedSlot) : undefined;
     trajectory.vehicleIdentity=selectedDriver ? {vehicleId:selectedDriver.vehicleId,carModel:selectedDriver.carModel,carClass:selectedDriver.carClass}:undefined;
     trajectory.vehicleData=selectedDriver ? dataPlugin.vehicle(selectedDriver) ?? undefined : undefined;
     trajectory.dataPluginRevision=dataPlugin.status.revision;

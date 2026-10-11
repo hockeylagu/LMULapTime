@@ -105,6 +105,14 @@ describe('paceCategory utility', () => {
       expect(matchesTrack('Spa', 'Autodromo Nazionale Monza', '')).toBe(false);
       expect(matchesTrack('Silverstone', 'Circuit de la Sarthe', '')).toBe(false);
     });
+
+    it('matches unknown layouts by their explicit venue and course pair only', () => {
+      expect(matchesTrack('Custom Venue', 'Custom Venue', 'Short Course', 'Short Course')).toBe(true);
+      expect(matchesTrack('Custom Venue', 'Custom Venue', 'Long Course', 'Short Course')).toBe(false);
+      expect(matchesTrack('Custom Venue', 'Custom Venue', '', 'Short Course')).toBe(false);
+      expect(matchesTrack('Custom Venue (Short Course)', 'Custom Venue', 'Short Course')).toBe(false);
+      expect(matchesTrack('Custom Venue', '', 'Short Course', 'Short Course')).toBe(false);
+    });
   });
 
   describe('getPaceCategoryFromPercentage', () => {

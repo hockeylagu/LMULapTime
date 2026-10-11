@@ -286,7 +286,11 @@ export interface SessionProgressionPoint {
 }
 
 export interface TrackSummary {
+  /** Display label; identity is carried by the separate fields below. */
   trackVenue: string;
+  identityVenue: string;
+  trackCourse: string;
+  layoutKey?: string;
   sessionsCount: number;
   totalLaps: number;
   bestLapTime: number | null;

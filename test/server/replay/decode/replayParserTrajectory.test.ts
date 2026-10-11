@@ -244,7 +244,7 @@ describe('replayParser - trajectory & timing', () => {
 
     });
 
-    it('handles non-existent driver slot gracefully without crashing', () => {
+    it('reports an unavailable explicit driver slot without falling back to another driver', () => {
       const sliceVcrPath = path.join(tempDir, 'slot_fallback.vcr');
       fs.writeFileSync(sliceVcrPath, createSliceVcrBuffer({
         slices: [
@@ -252,12 +252,8 @@ describe('replayParser - trajectory & timing', () => {
         ],
       }));
 
-      const traj = extractReplayTrajectory(sliceVcrPath, { driverSlot: 99 });
-      expect(traj.driverSlot).toBe(99);
-      expect(traj.pointsCount).toBe(0);
-      expect(traj.points).toEqual([]);
-      expect(traj.laps?.length).toBe(1);
-      expect(traj.laps?.[0].isBest).toBeFalsy();
+      expect(() => extractReplayTrajectory(sliceVcrPath, { driverSlot: 99 }))
+        .toThrow('Replay driver slot 99 is unavailable');
 
     });
 

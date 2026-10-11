@@ -10,6 +10,7 @@ import { group } from '../sessionRows/reader.js';
 
 export interface SessionQuery {
   track?: string; car?: string; carClass?: string; driver?: string; sessionType?: string;
+  trackVenue?: string; trackCourse?: string;
   hideEmpty?: boolean; hasReplay?: boolean; search?: string; sort?: string;
   page?: number; pageSize?: number; from?: number; to?: number;
   playerCar?: string;
@@ -25,18 +26,16 @@ export function carClassMatch(targetClass?: string): SqlFragment {
 /** All values are parameters; only fixed SQL fragments enter the query. */
 export function sessionWhere(options: SessionQuery): { sql: string; values: (string | number)[] } {
   const parts: string[] = []; const values: (string | number)[] = [];
-  if (options.track && options.track !== 'All') {
-    const layout = getCircuitSpecification(options.track).layoutKey;
+  if ((options.trackVenue && options.trackVenue !== 'All') || (options.track && options.track !== 'All')) {
+    const venue = options.trackVenue && options.trackVenue !== 'All' ? options.trackVenue : options.track!;
+    const course = options.trackVenue && options.trackVenue !== 'All' ? (options.trackCourse ?? '') : '';
+    const layout = getCircuitSpecification(venue, course).layoutKey;
     if (Object.prototype.hasOwnProperty.call(CIRCUIT_SPECIFICATIONS, layout)) { parts.push('s.layout_key = ?'); values.push(layout); }
-    else { parts.push('(s.track_venue = ? OR trim(s.track_venue || \' - \' || s.track_course) = ? OR s.track_venue || \' (\' || s.track_course || \')\' = ?)'); values.push(options.track, options.track, options.track); }
+    else { parts.push("s.layout_key='unknown' AND s.track_venue = ? AND s.track_course = ?"); values.push(venue, course); }
   }
   if (options.sessionType && options.sessionType !== 'All') {
-    const kind = options.sessionType.toLowerCase().trim();
-    const namePrefix = kind === 'practice' ? 'p%' : kind === 'qualifying' ? 'q%' : kind === 'race' ? 'r%' : `${kind}%`;
-    const nameContains = kind === 'practice' ? '%practice%' : kind === 'qualifying' ? '%qual%' : kind === 'race' ? '%race%' : `%${kind}%`;
-    const typeValues = kind === 'qualifying' ? ['qualifying','qualify'] : [kind];
-    parts.push(`(lower(s.session_type) IN (${typeValues.map(() => '?').join(',')}) OR lower(s.session_name) LIKE ? OR lower(s.session_name) LIKE ?)`);
-    values.push(...typeValues, namePrefix, nameContains);
+    parts.push('s.session_type = ?');
+    values.push(options.sessionType);
   }
   if (options.hideEmpty) parts.push('s.is_empty = 0');
   if (options.hasReplay) parts.push('s.recording_name IS NOT NULL');

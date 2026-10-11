@@ -6,7 +6,7 @@ import type { ComparableLapsResult } from '../../sessions/sessionAnalytics.js';
 import { comparisonLapKey, readComparisonLapRows } from './comparisonLapRows.js';
 
 export interface CompactCompareFilters {
-  trackName?: string; carClass?: string; carModel?: string; driverName?: string; sessionId?: string;
+  trackName?: string; trackVenue?: string; trackCourse?: string; carClass?: string; carModel?: string; driverName?: string; sessionId?: string;
   driverOrdinal?: number; lapOrdinal?: number; lapNum?: number;
   playerOnly?: boolean; humansOnly?: boolean; telemetryOnly?: boolean;
 }
@@ -25,18 +25,12 @@ interface QueryParts { where: string[]; args: Array<string | number>; }
 interface SectorFact { s1: number | null; s2: number | null; s3: number | null; }
 interface CountFact { total: number; }
 
-function escapeLike(value: string): string { return value.replace(/[\\%_]/g, '\\$&'); }
-function normalizedSql(expression: string): string {
-  return `lower(replace(replace(replace(replace(replace(replace(replace(replace(${expression},' ',''),'-',''), '_',''),'.',''),':',''),'/',''),'(',''),')',''))`;
-}
-function trackWhere(track: string): QueryParts {
-  if (!track || track.toLowerCase() === 'all') return { where: [], args: [] };
-  const spec = getCircuitSpecification(track);
+function trackWhere(track: string, trackVenue?: string, trackCourse = ''): QueryParts {
+  if ((!track || track.toLowerCase() === 'all') && !trackVenue) return { where: [], args: [] };
+  const venue = trackVenue || track;
+  const spec = getCircuitSpecification(venue, trackVenue ? trackCourse : '');
   if (Object.prototype.hasOwnProperty.call(CIRCUIT_SPECIFICATIONS, spec.layoutKey)) return { where: ['s.layout_key=?'], args: [spec.layoutKey] };
-  const q = escapeLike(track.toLowerCase().replace(/[^a-z0-9]/g, ''));
-  const combined = normalizedSql("s.track_venue || ' ' || s.track_course");
-  const venue = normalizedSql('s.track_venue');
-  return { where: [`s.layout_key='unknown' AND (${combined} LIKE '%'||?||'%' ESCAPE '\\' OR ? LIKE '%'||${combined}||'%' ESCAPE '\\' OR ${venue} LIKE '%'||?||'%' ESCAPE '\\')`], args: [q, q, q] };
+  return { where: ["s.layout_key='unknown' AND s.track_venue=? AND s.track_course=?"] , args: [venue, trackVenue ? trackCourse : ''] };
 }
 function classWhere(carClass: string): QueryParts {
   const target = carClass.trim();
@@ -55,7 +49,7 @@ function lapJoinWhere(parts: QueryParts): string {
 
 function comparisonScope(filters: CompactCompareFilters) {
   const track = filters.trackName?.trim() ?? '';
-  const trackParts = trackWhere(track);
+  const trackParts = trackWhere(track, filters.trackVenue, filters.trackCourse);
   const classParts = classWhere(filters.carClass ?? '');
   const model = filters.carModel?.trim().toLowerCase() ?? '';
   const humanParts = filters.humansOnly ? { where: ['d.is_human=1'], args: [] } : { where: [], args: [] };
@@ -65,7 +59,7 @@ function comparisonScope(filters: CompactCompareFilters) {
   const display = { ...broad, where: [...broad.where], args: [...broad.args] };
   if (filters.playerOnly) display.where.push('d.is_player_driver=1');
   const driverName = filters.driverName?.trim().toLowerCase() ?? '';
-  if (driverName && driverName !== 'all') { display.where.push('lower(dn.name) LIKE ? ESCAPE \'\\\''); display.args.push(`%${escapeLike(driverName)}%`); }
+  if (driverName && driverName !== 'all') { display.where.push('instr(lower(dn.name),?)>0'); display.args.push(driverName); }
   if (filters.sessionId) { display.where.push('s.id=?'); display.args.push(filters.sessionId); }
   const selected = { ...display, where: [...display.where], args: [...display.args] };
   if (filters.telemetryOnly) selected.where.push('l.is_valid=1', 'coalesce(l.is_pit_stop,0)=0', 'coalesce(l.is_out_lap,0)=0', 'l.lap_time>0');

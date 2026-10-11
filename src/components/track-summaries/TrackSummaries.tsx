@@ -7,14 +7,14 @@ import { TrackSummariesHeader, TracksSortOption } from './TrackSummariesHeader.j
 import { loadReferenceLaptimes, peekReferenceLaptimes } from '../../api/referenceApi.js';
 import { apiErrorMessage, isAbortError, fetchJson } from '../../api/apiClient.js';
 import { useSessionDataContext } from '../../api/sessionDataContext.js';
-import { TrackSummaryCard, TrackSummaryItem } from './TrackSummaryCard.js';
+import { TrackSummaryCard } from './TrackSummaryCard.js';
 
 export type { TracksSortOption, TrackSessionSummary };
 export type TrackSummaryData = TrackSummary;
 
 export interface TrackSummariesProps {
   sessions?: TrackSessionSummary[];
-  onSelectTrack: (trackName: string) => void;
+  onSelectTrack: (track: TrackSummary) => void;
   selectedCarClass: string;
   setSelectedCarClass: (carClass: string) => void;
 }
@@ -61,7 +61,7 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
     return () => { active = false; };
   }, [retryCount]);
 
-  const trackList: TrackSummaryItem[] = useMemo(() => {
+  const trackList: TrackSummary[] = useMemo(() => {
     if (sessions===undefined) return storedTracks;
     if (sessions.length === 0) {
       return [];
@@ -86,7 +86,7 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
     const lookup = createBenchmarkLookup(refCache?.entries ?? {});
     return new Map(trackList.map(track => {
       const targetClass = selectedCarClass !== 'All' ? selectedCarClass : track.bestLapClass || '';
-      const ref = lookup.findReferenceEntry(track.trackVenue, '', targetClass);
+      const ref = lookup.findReferenceEntry(track.identityVenue, track.trackCourse, targetClass);
       return [track, getPaceCategoryForLap(track.bestLapWet ? null : track.bestLapTime, ref)] as const;
     }));
   }, [trackList, refCache, selectedCarClass]);

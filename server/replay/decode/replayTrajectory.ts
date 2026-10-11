@@ -141,31 +141,19 @@ export function extractReplayTrajectory(
     // Target slot determination
     let targetSlot = options.driverSlot;
     if (targetSlot === undefined && options.driverName) {
-      const match = meta.drivers.find(d => d.name.toLowerCase() === options.driverName?.toLowerCase());
-      if (match && typeof match.slot === 'number') {
-        targetSlot = match.slot;
-      }
+      const target = options.driverName.trim().toLowerCase();
+      const matches = meta.drivers.filter(d => d.name.trim().toLowerCase() === target);
+      if (matches.length === 1 && typeof matches[0].slot === 'number') targetSlot = matches[0].slot;
     }
 
-    // Default to player driver (priority 1)
-    if (targetSlot === undefined) {
-      let player = meta.drivers.find(d => d.isPlayer);
-      if (!player && effectivePlayerName) {
-        player = meta.drivers.find(d => d.name.toLowerCase() === effectivePlayerName.toLowerCase());
-      }
-      if (!player) {
-        player = meta.drivers.find(d =>
-          (effectivePlayerName && d.name.toLowerCase().includes(effectivePlayerName.toLowerCase())) ||
-          (options.driverName && d.name.toLowerCase().includes(options.driverName.toLowerCase()))
-        );
-      }
-      if (player && typeof player.slot === 'number') {
-        targetSlot = player.slot;
-      }
+    // Default requests can use a uniquely marked player; explicit unresolved requests stay empty.
+    if (targetSlot === undefined && options.driverSlot === undefined && !options.driverName) {
+      const players = meta.drivers.filter(d => d.isPlayer);
+      if (players.length === 1 && typeof players[0].slot === 'number') targetSlot = players[0].slot;
     }
-
-    if (targetSlot === undefined && meta.drivers.length > 0 && typeof meta.drivers[0].slot === 'number') {
-      targetSlot = meta.drivers[0].slot;
+    if (options.driverName && targetSlot === undefined) throw new Error(`Replay driver "${options.driverName}" is unavailable`);
+    if (options.driverSlot !== undefined && !meta.drivers.some(driver => driver.slot === options.driverSlot)) {
+      throw new Error(`Replay driver slot ${options.driverSlot} is unavailable`);
     }
 
     const matchedDriver = meta.drivers.find(d => d.slot === targetSlot);
@@ -566,9 +554,6 @@ export function extractReplayTrajectory(
     }
 
     if (rawPts.length === 0 && targetSlot !== undefined && driverPoints.has(targetSlot)) {
-      rawPts.push(...driverPoints.get(targetSlot)!);
-    } else if (rawPts.length === 0 && targetSlot === undefined && driverPoints.size > 0) {
-      targetSlot = Array.from(driverPoints.keys())[0];
       rawPts.push(...driverPoints.get(targetSlot)!);
     }
 

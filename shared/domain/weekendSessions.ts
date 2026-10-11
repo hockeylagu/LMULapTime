@@ -1,6 +1,6 @@
-import { parseDateStringToTimestamp, matchesSessionType } from './formatters.js';
+import { parseDateStringToTimestamp } from './formatters.js';
 import { isOnlineSession } from './leaderboard.js';
-import { getCircuitSpecification } from './circuitSpecs.js';
+import { CIRCUIT_SPECIFICATIONS, getCircuitSpecification } from './circuitSpecs.js';
 export interface CandidateRelatedSession {
   id?: string;
   sessionId?: string;
@@ -36,10 +36,12 @@ export function areSameTrackLayout(venueA?: string, courseA?: string, venueB?: s
   if (!venueA || !venueB) return false;
   const specA = getCircuitSpecification(venueA, courseA);
   const specB = getCircuitSpecification(venueB, courseB);
-  if (specA.layoutKey !== 'unknown' && specB.layoutKey !== 'unknown') {
+  const knownA = Object.prototype.hasOwnProperty.call(CIRCUIT_SPECIFICATIONS, specA.layoutKey);
+  const knownB = Object.prototype.hasOwnProperty.call(CIRCUIT_SPECIFICATIONS, specB.layoutKey);
+  if (knownA && knownB) {
     return specA.layoutKey === specB.layoutKey;
   }
-  return squash(`${venueA} ${courseA || ''}`) === squash(`${venueB} ${courseB || ''}`);
+  return !knownA && !knownB && venueA === venueB && (courseA ?? '') === (courseB ?? '');
 }
 
 /** Start of the session; the parser's timestamp carries the type weight (practice < qualifying < race). */
@@ -87,9 +89,9 @@ export function isSameWeekendSession(current: CandidateRelatedSession, candidate
 const WEEKEND_ORDER: Record<WeekendSessionType, number> = { practice: 0, qualifying: 1, race: 2 };
 
 function weekendSessionType(s: CandidateRelatedSession): WeekendSessionType | null {
-  if (matchesSessionType(s.sessionType, s.sessionName, 'Practice')) return 'practice';
-  if (matchesSessionType(s.sessionType, s.sessionName, 'Qualifying')) return 'qualifying';
-  if (matchesSessionType(s.sessionType, s.sessionName, 'Race')) return 'race';
+  if (s.sessionType === 'Practice') return 'practice';
+  if (s.sessionType === 'Qualifying') return 'qualifying';
+  if (s.sessionType === 'Race') return 'race';
   return null;
 }
 

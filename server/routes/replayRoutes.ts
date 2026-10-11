@@ -10,7 +10,6 @@ import { TelemetryLinks } from '../telemetry/telemetryLinks.js';
 import { RaceTrafficService } from '../traffic/raceTrafficService.js';
 import { parseBoundedInteger, queryString } from './queryParams.js';
 import { readReplaySessionContext } from '../core/sessionRows/replayContext.js';
-import { resolveSessionId } from '../core/dbSessionStore.js';
 
 export function createReplayRouter(context: ServerContext): Router {
   const router = Router();
@@ -60,11 +59,18 @@ export function createReplayRouter(context: ServerContext): Router {
         matchedSession: session,
         duckdbFilename: TelemetryLinks.load(context.sessionDb, session.id).forSession(session),
       });
+      const replayNameCounts = new Map<string, number>();
       for (const driver of composed.drivers) {
-        const ordinal = session.drivers.findIndex(item =>
-          (item.driverName || item.name).trim().toLowerCase() === driver.name.trim().toLowerCase()
-        );
-        if (ordinal < 0) continue;
+        const key = driver.name.trim().toLowerCase();
+        if (key) replayNameCounts.set(key, (replayNameCounts.get(key) ?? 0) + 1);
+      }
+      for (const driver of composed.drivers) {
+        const key = driver.name.trim().toLowerCase();
+        const matches = key && replayNameCounts.get(key) === 1
+          ? session.drivers.flatMap((item, ordinal) => (item.driverName || item.name).trim().toLowerCase() === key ? [ordinal] : [])
+          : [];
+        if (matches.length !== 1) continue;
+        const ordinal = matches[0];
         driver.sessionDriverOrdinal = session.drivers[ordinal].driverOrdinal ?? ordinal;
         const sessionLapOrdinals: Record<string, number> = {};
         session.drivers[ordinal].laps.forEach((lap, lapOrdinal) => {
@@ -79,8 +85,10 @@ export function createReplayRouter(context: ServerContext): Router {
   });
 
   router.get('/session/:sessionId/telemetry', async (req, res) => {
-    const sessionId = resolveSessionId(context.sessionDb.getDb(), req.params.sessionId);
-    if (!sessionId) return res.status(404).json({ error: 'Session not found' });
+    const sessionId = req.params.sessionId;
+    if (!context.sessionDb.getDb().prepare('SELECT 1 FROM sessions WHERE id = ?').get(sessionId)) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
     let driverOrdinal: number;
     let lapOrdinal: number;
     try {

@@ -123,6 +123,8 @@ describe('XML-first startup pipeline', () => {
       getAllStoredReplayFiles: () => [],
       getMetadata: (key: string) => metadata.get(key) ?? null,
       setMetadata: (key: string, value: string) => { metadata.set(key, value); },
+      reconcileReplayPlayerOwnership: vi.fn(),
+      invalidateUnresolvedReplayDefaults: vi.fn(),
       getReplayReconciliationCandidateIds: vi.fn(() => Array.from({ length: 25 }, (_, index) => `stored-${index}`)),
       getSessionsByIds: (ids: string[]) => ids.map((id, index) => ({
         id, filename: `${id}.xml`, filePath: '', timestamp: index,
@@ -150,6 +152,8 @@ describe('XML-first startup pipeline', () => {
       getAllStoredReplayFiles: () => [],
       getMetadata: () => null,
       setMetadata: () => undefined,
+      reconcileReplayPlayerOwnership: vi.fn(),
+      invalidateUnresolvedReplayDefaults: vi.fn(),
       getReplayReconciliationCandidateIds: () => [],
       getSessionsByIds: () => [],
       syncReplaysAsyncIterator: vi.fn(async function* () { return { total: 0, added: 0, updated: 0, skipped: 0 }; }),

@@ -6,6 +6,7 @@ import {
   minValidTime,
 } from './formatters.js';
 import { matchesSessionCarClass } from './vehicleMapping.js';
+import { getCircuitSpecification } from './circuitSpecs.js';
 
 export interface TrackSessionSummary {
   id?: string;
@@ -49,6 +50,8 @@ export interface AggregateTrackSummariesOptions {
   includeEmptyVenues?: boolean;
 }
 
+const summaryKey = (venue: string, course?: string) => JSON.stringify([venue, course ?? '']);
+
 /**
  * Aggregates summary statistics per track venue from session logs.
  * Preserves all capabilities: car class filtering, sector bests, theoretical best,
@@ -66,9 +69,13 @@ export function aggregateTrackSummaries<T extends TrackSessionSummary>(
     sessions.forEach(s => {
       const venue = getDisplayTrackName(s.trackVenue, s.trackCourse);
       if (!venue) return;
-      if (!map[venue]) {
-        map[venue] = {
+      const key = summaryKey(s.trackVenue, s.trackCourse);
+      if (!map[key]) {
+        map[key] = {
           trackVenue: venue,
+          identityVenue: s.trackVenue,
+          trackCourse: s.trackCourse ?? '',
+          layoutKey: getCircuitSpecification(s.trackVenue, s.trackCourse).layoutKey,
           sessionsCount: 0,
           totalLaps: 0,
           bestLapTime: null,
@@ -90,9 +97,13 @@ export function aggregateTrackSummaries<T extends TrackSessionSummary>(
     const venue = getDisplayTrackName(s.trackVenue, s.trackCourse);
     if (!venue) return;
 
-    if (!map[venue]) {
-      map[venue] = {
+    const key = summaryKey(s.trackVenue, s.trackCourse);
+    if (!map[key]) {
+      map[key] = {
         trackVenue: venue,
+        identityVenue: s.trackVenue,
+        trackCourse: s.trackCourse ?? '',
+        layoutKey: getCircuitSpecification(s.trackVenue, s.trackCourse).layoutKey,
         sessionsCount: 0,
         totalLaps: 0,
         bestLapTime: null,
@@ -112,7 +123,7 @@ export function aggregateTrackSummaries<T extends TrackSessionSummary>(
       return;
     }
 
-    const summary = map[venue];
+    const summary = map[summaryKey(s.trackVenue, s.trackCourse)];
     summary.sessionsCount += 1;
 
     const timestamp = typeof s.timestamp === 'number' && s.timestamp > 0

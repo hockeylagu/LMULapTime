@@ -1,7 +1,7 @@
 import fs from 'fs';
 import type { LmuParser } from './parser.js';
 import type { ReplayFileEntry } from './sessionXmlTypes.js';
-import { pickReplayOwner, replayLinkRejection, ReplayMatchTarget } from './replayMatching.js';
+import { pickReplayOwner, replayLinkIdentityRejection, replayLinkRejection, ReplayMatchTarget } from './replayMatching.js';
 import type { SessionDatabase } from '../core/db.js';
 import { DetailedSession, RejectedReplayLink, ReplayLinkRejectionReason } from '../core/types.js';
 
@@ -106,10 +106,15 @@ export class SessionReplayLinks {
     const SAME_SAVE_WINDOW_MS = 60_000;
     const stored = session.matchingReplayFile;
     if (!stored) return;
-    // Without the replay's timing or the XML's mtime the match cannot be judged: keep it.
     const current = replaysByName.get(stored.name);
     const xmlMtime = this.xmlMtime(session);
-    if (!current || xmlMtime === undefined) return;
+    if (!current) return;
+    if (xmlMtime === undefined) {
+      const identityRejection = replayLinkIdentityRejection(current, this.matchTarget(session, 0));
+      if (identityRejection) this.withdrawReplayLink(session, identityRejection);
+      // Missing timing remains unjudgeable; the link survives only when type and layout agree.
+      return;
+    }
 
     const target = this.matchTarget(session, xmlMtime);
     const rejection = replayLinkRejection(current, target);

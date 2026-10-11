@@ -3,8 +3,8 @@ import { MapPin } from 'lucide-react';
 import { SummaryCard, UnitToggle, RankedList, shareOf } from './DashboardSummaryParts.js';
 
 export interface CircuitsSummaryCardProps {
-  rankedTracks: { track: string; laps: number; km: number }[];
-  visibleTracks?: { track: string; laps: number; km: number }[];
+  rankedTracks: { track: string; trackVenue?: string; trackCourse?: string; laps: number; km: number }[];
+  visibleTracks?: { track: string; trackVenue?: string; trackCourse?: string; laps: number; km: number }[];
   showMoreTracks: boolean;
   setShowMoreTracks: (val: boolean | ((prev: boolean) => boolean)) => void;
   selectedCarClass?: string;
@@ -27,7 +27,6 @@ export const CircuitsSummaryCard: React.FC<CircuitsSummaryCardProps> = ({
 
   const total = sourceTracks.reduce((sum, item) => sum + (unit === 'km' ? item.km : item.laps), 0);
   const displayTracks = showMoreTracks ? sortedTracks : sortedTracks.slice(0, 3);
-  const suffix = selectedCarClass !== 'All' ? `?carClass=${encodeURIComponent(selectedCarClass)}` : '';
 
   return (
     <SummaryCard
@@ -46,7 +45,11 @@ export const CircuitsSummaryCard: React.FC<CircuitsSummaryCardProps> = ({
           unit: unit === 'km' ? 'km' : 'laps',
           detail: i === 0 ? shareOf(unit === 'km' ? item.km : item.laps, total, unit === 'km' ? 'distance' : 'laps') : undefined,
           title: `View ${item.track} Track Details`,
-          to: `/track/${encodeURIComponent(item.track)}${suffix}`,
+          to: `/track/${encodeURIComponent(item.track)}?${new URLSearchParams({
+            ...(selectedCarClass !== 'All' ? { carClass: selectedCarClass } : {}),
+            trackVenue: item.trackVenue ?? item.track,
+            trackCourse: item.trackCourse ?? '',
+          }).toString()}`,
         }))}
       />
     </SummaryCard>

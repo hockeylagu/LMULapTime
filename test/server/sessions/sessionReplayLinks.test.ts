@@ -52,19 +52,36 @@ describe('SessionReplayLinks', () => {
     expect(stat).toHaveBeenCalledTimes(3);
   });
 
-  it('retries validation after a failed timestamp read with the same parser revision', () => {
+  it('keeps an identity-valid link while timing is unavailable, then retries timestamp validation', () => {
     vi.spyOn(fs, 'statSync').mockImplementationOnce(() => { throw new Error('locked'); })
       .mockReturnValue({ mtimeMs: xmlMtimeMs } as unknown as fs.Stats);
     const db = { updateSessionMatchingReplay: vi.fn(), rejectSessionReplayLink: vi.fn() };
     const links = new SessionReplayLinks(db);
-    const session = practiceSession('Spa R1.Vcr');
-    const replay = { name: 'Spa R1.Vcr', trackName: 'Spa', sessionCode: 'R1', mtime: xmlMtimeMs } as ReplayFileEntry;
+    const session = practiceSession('Spa P1.Vcr');
+    const replay = { name: 'Spa P1.Vcr', trackName: 'Spa', sessionCode: 'P1', mtime: xmlMtimeMs } as ReplayFileEntry;
     const parser = parserAt(1);
     const index = new Map([[replay.name, replay]]);
     links.linkSessions([session], parser, index);
     expect(session.matchingReplayFile).toBeDefined();
     links.linkSessions([session], parser, index);
-    expect(db.rejectSessionReplayLink).toHaveBeenCalledWith(session.id, expect.anything(), 'session-type');
+    expect(db.rejectSessionReplayLink).not.toHaveBeenCalled();
+  });
+
+  it('withdraws a known layout contradiction when the stored XML timestamp is missing', () => {
+    vi.spyOn(fs, 'statSync').mockImplementation(() => { throw new Error('XML deleted'); });
+    const db = { updateSessionMatchingReplay: vi.fn(), rejectSessionReplayLink: vi.fn(), getSessionXmlMtime: () => undefined };
+    const links = new SessionReplayLinks(db);
+    const session = practiceSession('Spa P1.Vcr');
+    session.trackVenue = 'Fuji Speedway';
+    session.trackCourse = 'Grand Prix Circuit (with Dunlop Chicane)';
+    const replay = {
+      name: 'Spa P1.Vcr', trackName: 'Spa', sceneDesc: 'spawec', sessionCode: 'P1', mtime: xmlMtimeMs,
+    } as ReplayFileEntry;
+
+    links.linkSessions([session], parserAt(1), new Map([[replay.name, replay]]));
+
+    expect(db.rejectSessionReplayLink).toHaveBeenCalledWith(session.id, expect.objectContaining({ name: replay.name }), 'layout');
+    expect(session.matchingReplayFile).toBeUndefined();
   });
 
   it('revalidates reparsed session metadata at the same replay revision', () => {

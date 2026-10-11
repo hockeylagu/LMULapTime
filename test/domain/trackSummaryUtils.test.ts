@@ -76,7 +76,7 @@ describe('trackSummaryUtils', () => {
   it('aggregates all sessions across tracks when carClass is All or omitted', () => {
     const result = aggregateTrackSummaries(sampleSessions);
 
-    const spa = result['Spa-Francorchamps'];
+    const spa = Object.values(result).find(track => track.trackVenue === 'Spa-Francorchamps')!;
     expect(spa).toBeDefined();
     expect(spa.sessionsCount).toBe(3);
     expect(spa.totalLaps).toBe(30);
@@ -90,7 +90,7 @@ describe('trackSummaryUtils', () => {
     expect(spa.carsUsed).toEqual(['Ferrari 499P', 'Porsche 963', 'Porsche 911 GT3 R LMGT3']);
     expect(spa.lastSessionTimestamp).toBe(1718190000000);
 
-    const monza = result['Autodromo Nazionale Monza'];
+    const monza = Object.values(result).find(track => track.trackVenue === 'Autodromo Nazionale Monza')!;
     expect(monza).toBeDefined();
     expect(monza.sessionsCount).toBe(1);
     expect(monza.totalLaps).toBe(15);
@@ -102,7 +102,7 @@ describe('trackSummaryUtils', () => {
   it('filters sessions by carClass accurately', () => {
     const lmgt3Only = aggregateTrackSummaries(sampleSessions, { carClass: 'GT3' });
 
-    const spa = lmgt3Only['Spa-Francorchamps'];
+    const spa = Object.values(lmgt3Only).find(track => track.trackVenue === 'Spa-Francorchamps')!;
     expect(spa).toBeDefined();
     expect(spa.sessionsCount).toBe(1);
     expect(spa.totalLaps).toBe(12);
@@ -111,7 +111,7 @@ describe('trackSummaryUtils', () => {
     expect(spa.bestLapClass).toBe('GT3');
     expect(spa.carsUsed).toEqual(['Porsche 911 GT3 R LMGT3']);
 
-    const monza = lmgt3Only['Autodromo Nazionale Monza'];
+    const monza = Object.values(lmgt3Only).find(track => track.trackVenue === 'Autodromo Nazionale Monza')!;
     expect(monza).toBeDefined();
     expect(monza.sessionsCount).toBe(1);
     expect(monza.totalLaps).toBe(15);
@@ -124,11 +124,11 @@ describe('trackSummaryUtils', () => {
       includeEmptyVenues: true,
     });
 
-    const spa = hypercarOnly['Spa-Francorchamps'];
+    const spa = Object.values(hypercarOnly).find(track => track.trackVenue === 'Spa-Francorchamps')!;
     expect(spa.sessionsCount).toBe(2);
     expect(spa.totalLaps).toBe(18);
 
-    const monza = hypercarOnly['Autodromo Nazionale Monza'];
+    const monza = Object.values(hypercarOnly).find(track => track.trackVenue === 'Autodromo Nazionale Monza')!;
     expect(monza).toBeDefined();
     expect(monza.sessionsCount).toBe(0);
     expect(monza.totalLaps).toBe(0);
@@ -155,7 +155,7 @@ describe('trackSummaryUtils', () => {
     ];
 
     const result = aggregateTrackSummaries(sessionWithoutTimestamp);
-    const sebring = result['Sebring'];
+    const sebring = Object.values(result).find(track => track.trackVenue === 'Sebring')!;
     expect(sebring).toBeDefined();
     expect(sebring.lastSessionTimestamp).toBeGreaterThan(0);
     expect(sebring.sessionsCount).toBe(1);

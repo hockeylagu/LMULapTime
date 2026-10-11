@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import { matchesTrack } from '../../shared/domain/paceCategory.js';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { DuckDbReader } from './duckdbReader.js';
 import { ReplayMetadata } from '../core/types.js';
@@ -11,6 +10,7 @@ export interface DuckDbFileInfo {
   fileMtimeMs: number;
   fileSizeBytes: number;
   trackName: string;
+  trackCourse?: string;
   sessionType: string;
   timestampStr: string;
   timestampEpochMs: number;
@@ -31,6 +31,7 @@ export interface TelemetrySessionCandidate {
   sessionType: string;
   sessionName: string;
   drivers: Array<{ name: string }>;
+  playerDriverName?: string;
   matchingReplayFile?: { name: string };
 }
 
@@ -168,14 +169,6 @@ export function sessionEpochMs(session: Pick<TelemetrySessionCandidate, 'timesta
   return 0;
 }
 
-export function matchDuckDbToSession(
-  duckdbFiles: DuckDbFileInfo[],
-  session: TelemetrySessionCandidate,
-  maxTimeDeltaSec = 3600
-): DuckDbFileInfo | null {
-  return findDuckDbForSession(duckdbFiles, session, maxTimeDeltaSec)?.file ?? null;
-}
-
 export function findDuckDbForSession(
   duckdbFiles: DuckDbFileInfo[],
   session: TelemetrySessionCandidate,
@@ -183,7 +176,7 @@ export function findDuckDbForSession(
 ): DuckDbMatch | null {
   if (duckdbFiles.length === 0) return null;
 
-  const sessionTypeNorm = normalizeSessionType(session.sessionType || session.sessionName);
+  const sessionTypeNorm = normalizeSessionType(session.sessionType);
   const sessionStartMs = sessionEpochMs(session);
   const sessionCircuit = getCircuitSpecification(session.trackVenue, session.trackCourse);
 
@@ -200,11 +193,13 @@ export function findDuckDbForSession(
     const venueOnly = duck.trackName.trim().toLowerCase() === duckCircuit.officialName.toLowerCase();
     if (duckCircuit.officialLengthMeters > 0 && sessionCircuit.officialLengthMeters > 0) {
       if (venueOnly ? duckCircuit.circuitId !== sessionCircuit.circuitId : duckCircuit.layoutKey !== sessionCircuit.layoutKey) continue;
-    } else if (!matchesTrack(duck.trackName, session.trackVenue, session.trackCourse)) continue;
+    } else if (duck.trackName !== session.trackVenue || (duck.trackCourse ?? '') !== session.trackCourse) continue;
 
-    if (duck.driverName && session.drivers.length > 0) {
-      const duckDriver = duck.driverName.toLowerCase();
-      if (!session.drivers.some((driver) => (driver.name || '').toLowerCase().includes(duckDriver) || duckDriver.includes((driver.name || '').toLowerCase()))) {
+    if (duck.driverName !== undefined) {
+      const duckDriver = duck.driverName.trim().toLowerCase();
+      const matchingDrivers = session.drivers.filter(driver => driver.name.trim().toLowerCase() === duckDriver);
+      const matchingPlayer = session.playerDriverName?.trim().toLowerCase() === duckDriver;
+      if (!duckDriver || matchingDrivers.length !== 1 || !matchingPlayer) {
         continue;
       }
     }
@@ -244,15 +239,6 @@ export function findDuckDbForSession(
   return bestMatch ? { file: bestMatch, deltaSec: Number.isFinite(smallestTimeDelta) ? smallestTimeDelta : Infinity } : null;
 }
 
-export function matchDuckDbToReplay(
-  duckdbFiles: DuckDbFileInfo[],
-  replay: ReplayMetadata,
-  replayMtimeMs?: number,
-  maxTimeDeltaSec = 300
-): DuckDbFileInfo | null {
-  return findDuckDbForReplay(duckdbFiles, replay, replayMtimeMs, maxTimeDeltaSec)?.file ?? null;
-}
-
 export function findDuckDbForReplay(
   duckdbFiles: DuckDbFileInfo[],
   replay: ReplayMetadata,
@@ -275,11 +261,12 @@ export function findDuckDbForReplay(
     const venueOnly = duck.trackName.trim().toLowerCase() === duckCircuit.officialName.toLowerCase();
     if (duckCircuit.officialLengthMeters > 0 && replayCircuit.officialLengthMeters > 0) {
       if (venueOnly ? duckCircuit.circuitId !== replayCircuit.circuitId : duckCircuit.layoutKey !== replayCircuit.layoutKey) continue;
-    } else if (!matchesTrack(duck.trackName, replay.trackName || replay.eventInfo?.sceneDesc || '', replay.trackCourse)) continue;
+    } else if (duck.trackName !== (replay.trackVenue || replay.trackName) || (duck.trackCourse ?? '') !== (replay.trackCourse ?? '')) continue;
 
-    if (duck.driverName && replay.drivers.length > 0) {
-      const duckDriver = duck.driverName.toLowerCase();
-      if (!replay.drivers.some((driver) => driver.name.toLowerCase().includes(duckDriver) || duckDriver.includes(driver.name.toLowerCase()))) {
+    if (duck.driverName !== undefined) {
+      const duckDriver = duck.driverName.trim().toLowerCase();
+      const matchingPlayers = replay.drivers.filter(driver => driver.isPlayer && driver.name.trim().toLowerCase() === duckDriver);
+      if (!duckDriver || matchingPlayers.length !== 1) {
         continue;
       }
     }
@@ -340,6 +327,7 @@ export async function enrichDuckDbFileInfo(duck: DuckDbFileInfo): Promise<DuckDb
     return {
       ...duck,
       trackName: meta.trackName || duck.trackName,
+      trackCourse: meta.trackCourse || duck.trackCourse,
       sessionType: meta.sessionType || duck.sessionType,
       timestampEpochMs: recordingTimeEpochMs && !isNaN(recordingTimeEpochMs) ? recordingTimeEpochMs : duck.timestampEpochMs,
       driverName: meta.driverName || duck.driverName,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router';
-import { formatTime, matchesSessionType, compareSessions, compareSessionsBySortOption, isSessionEmpty } from '../../../shared/domain/formatters.js';
+import { formatTime, compareSessions, compareSessionsBySortOption, isSessionEmpty } from '../../../shared/domain/formatters.js';
 import { matchesSessionCarClass } from '../../../shared/domain/vehicleMapping.js';
 import { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 import { ImprovementChart, SessionProgressionPoint } from './improvement-chart/index.js';
@@ -99,7 +99,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   const emptyCount = data.filters?.emptyCount ?? classTrackSessions.filter(isSessionEmpty).length;
   const replayCount = data.filters?.replayCount ?? classTrackSessions.filter(session => Boolean(session.matchingReplayFile)).length;
   const filteredSessions = hasServerContract ? data.sessions : classTrackSessions.filter(session =>
-    matchesSessionType(session.sessionType, session.sessionName, filterType) &&
+    (filterType === 'All' || session.sessionType === filterType) &&
     (!searchQuery || session.playerDriver?.carType.toLowerCase().includes(searchQuery.toLowerCase()) ||
       session.filename.toLowerCase().includes(searchQuery.toLowerCase()) || session.playerDriver?.name?.toLowerCase().includes(searchQuery.toLowerCase())) &&
     (!hideEmpty || !isSessionEmpty(session)) && (!hasReplay || Boolean(session.matchingReplayFile)));
@@ -120,7 +120,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
     return time && (!best?.playerDriver?.bestLapTime || time < best.playerDriver.bestLapTime) ? session : best;
   }, null);
   const averagePosition = (kind: string) => {
-    const positions = classTrackSessions.filter(session => matchesSessionType(session.sessionType, session.sessionName, kind))
+    const positions = classTrackSessions.filter(session => session.sessionType === kind)
       .map(session => session.playerDriver?.position).filter((position): position is number => typeof position === 'number' && position > 0);
     return positions.length ? positions.reduce((sum, position) => sum + position, 0) / positions.length : null;
   };
@@ -179,6 +179,8 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
       <ImprovementChart
         progression={trackProgression}
         selectedTrack={trackName}
+        trackVenue={data.summary?.identityVenue ?? data.latestSession?.trackVenue}
+        trackCourse={data.summary?.trackCourse ?? data.latestSession?.trackCourse}
         setSelectedTrack={() => {}}
         selectedCarClass={selectedCarClass}
         setSelectedCarClass={setSelectedCarClass}

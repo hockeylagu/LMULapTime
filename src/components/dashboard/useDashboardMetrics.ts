@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { isSessionEmpty, getDisplayTrackName, matchesSessionType, compareSessionsBySortOption } from '../../../shared/domain/formatters.js';
+import { isSessionEmpty, getDisplayTrackName, compareSessionsBySortOption } from '../../../shared/domain/formatters.js';
 import { matchesTrack, getPaceCategoryFromPercentage } from '../../../shared/domain/paceCategory.js';
 import { matchesSessionCarClass } from '../../../shared/domain/vehicleMapping.js';
 import { selectCleanLapCandidates } from '../../../shared/domain/lapComparison.js';
@@ -7,12 +7,15 @@ import { DetailedSession } from '../../../shared/types/index.js';
 import { BestRefLapInfo } from './BenchmarkLapsSummaryCard.js';
 import { DashboardSortOption } from './DashboardFilterBar.js';
 import { SessionSummary } from './dashboardTypes.js';
+import type { DashboardTrackFilter } from '../../../shared/types/dashboard.js';
 
 export type DashboardSessionItem = SessionSummary | DetailedSession;
 
 export interface UseDashboardMetricsParams {
   sessions: DashboardSessionItem[];
   selectedTrack: string;
+  selectedTrackVenue?: string;
+  selectedTrackCourse?: string;
   selectedCarClass: string;
   filterType: string;
   searchQuery: string;
@@ -28,6 +31,8 @@ export interface UseDashboardMetricsParams {
 export function useDashboardMetrics({
   sessions,
   selectedTrack,
+  selectedTrackVenue,
+  selectedTrackCourse = '',
   selectedCarClass,
   filterType,
   searchQuery,
@@ -40,9 +45,14 @@ export function useDashboardMetrics({
   isExpanded,
 }: UseDashboardMetricsParams) {
   const tracks = useMemo(() => {
-    return Array.from(new Set(sessions.map((s) => getDisplayTrackName(s.trackVenue, s.trackCourse))))
-      .filter(Boolean)
-      .sort((a, b) => a.localeCompare(b));
+    const options = new Map<string, DashboardTrackFilter>();
+    for (const session of sessions) {
+      const track = getDisplayTrackName(session.trackVenue, session.trackCourse);
+      if (track) options.set(JSON.stringify([session.trackVenue, session.trackCourse]), {
+        track, trackVenue: session.trackVenue, trackCourse: session.trackCourse ?? '',
+      });
+    }
+    return [...options.values()].sort((a, b) => a.track.localeCompare(b.track) || a.trackVenue.localeCompare(b.trackVenue) || a.trackCourse.localeCompare(b.trackCourse));
   }, [sessions]);
 
   const emptyCount = useMemo(() => sessions.filter((s) => isSessionEmpty(s)).length, [sessions]);
@@ -51,8 +61,9 @@ export function useDashboardMetrics({
   const filteredSessions = useMemo(() => {
     return sessions.filter((s) => {
       const displayTrack = getDisplayTrackName(s.trackVenue, s.trackCourse);
-      const isTrackMatch = matchesTrack(selectedTrack, s.trackVenue, s.trackCourse);
-      const matchesType = matchesSessionType(s.sessionType, s.sessionName, filterType);
+      const isTrackMatch = matchesTrack(selectedTrackVenue || selectedTrack, s.trackVenue, s.trackCourse,
+        selectedTrackVenue ? selectedTrackCourse : '');
+      const matchesType = filterType === 'All' || s.sessionType === filterType;
       const isMatchingCarClass = matchesSessionCarClass(s, selectedCarClass);
       const matchesSearch =
         searchQuery === '' ||
@@ -64,7 +75,7 @@ export function useDashboardMetrics({
       const matchesReplay = !hasReplay || Boolean(s.matchingReplayFile);
       return isTrackMatch && matchesType && isMatchingCarClass && matchesSearch && matchesEmpty && matchesReplay;
     });
-  }, [sessions, selectedTrack, filterType, selectedCarClass, searchQuery, hideEmpty, hasReplay]);
+  }, [sessions, selectedTrack, selectedTrackVenue, selectedTrackCourse, filterType, selectedCarClass, searchQuery, hideEmpty, hasReplay]);
 
   const sortedSessions = useMemo(() => {
     return [...filteredSessions].sort((a, b) => compareSessionsBySortOption(a, b, sortBy));
@@ -85,14 +96,14 @@ export function useDashboardMetrics({
     let totalPitStops = 0;
     let benchmarkPaceSum = 0;
     let benchmarkPaceCount = 0;
-    const trackLapsMap: Record<string, number> = {};
+    const trackLapsMap: Record<string, { track: string; trackVenue: string; trackCourse: string; laps: number }> = {};
     const trackKmMap: Record<string, number> = {};
     const carLapsMap: Record<string, number> = {};
     const carKmMap: Record<string, number> = {};
     const uniqueTrackRefLapsMap: Record<string, BestRefLapInfo> = {};
 
     for (const s of sessions) {
-      if (matchesSessionType(s.sessionType, s.sessionName, 'Race')) {
+      if (s.sessionType === 'Race') {
         raceSessionsCount++;
         if (s.playerDriver?.position === 1) {
           raceWinsCount++;
@@ -100,9 +111,9 @@ export function useDashboardMetrics({
         if (s.playerDriver?.position && s.playerDriver.position <= 3 && s.playerDriver.position > 0) {
           racePodiumsCount++;
         }
-      } else if (matchesSessionType(s.sessionType, s.sessionName, 'Qualifying')) {
+      } else if (s.sessionType === 'Qualifying') {
         qualifyingSessionsCount++;
-      } else {
+      } else if (s.sessionType === 'Practice') {
         practiceSessionsCount++;
       }
 
@@ -119,6 +130,7 @@ export function useDashboardMetrics({
       const trackMeters = s.trackLengthMeters || 5000;
       totalDistanceKm += (trackMeters / 1000) * completedLapsCount;
       const displayTrack = getDisplayTrackName(s.trackVenue, s.trackCourse);
+      const trackIdentity = JSON.stringify([s.trackVenue, s.trackCourse]);
 
       if (p.laps && p.laps.length > 0) {
         for (const lap of p.laps) {
@@ -142,8 +154,9 @@ export function useDashboardMetrics({
       const sessionDistanceKm = (trackMeters / 1000) * completedLapsCount;
 
       if (displayTrack && completedLapsCount > 0) {
-        trackLapsMap[displayTrack] = (trackLapsMap[displayTrack] || 0) + completedLapsCount;
-        trackKmMap[displayTrack] = (trackKmMap[displayTrack] || 0) + sessionDistanceKm;
+        const entry = trackLapsMap[trackIdentity] ??= { track: displayTrack, trackVenue: s.trackVenue, trackCourse: s.trackCourse ?? '', laps: 0 };
+        entry.laps += completedLapsCount;
+        trackKmMap[trackIdentity] = (trackKmMap[trackIdentity] || 0) + sessionDistanceKm;
       }
 
       if (p.carType && completedLapsCount > 0) {
@@ -155,9 +168,9 @@ export function useDashboardMetrics({
         benchmarkPaceSum += p.bestLapPacePercentage;
         benchmarkPaceCount++;
 
-        const currentBest = uniqueTrackRefLapsMap[displayTrack];
+        const currentBest = uniqueTrackRefLapsMap[trackIdentity];
         if (!currentBest || p.bestLapPacePercentage < currentBest.percentage) {
-          uniqueTrackRefLapsMap[displayTrack] = {
+          uniqueTrackRefLapsMap[trackIdentity] = {
             sessionId: s.id,
             percentage: p.bestLapPacePercentage,
             category: p.bestLapPaceCategory,
@@ -178,7 +191,7 @@ export function useDashboardMetrics({
       : null;
 
     const rankedTracks = Object.entries(trackLapsMap)
-      .map(([track, laps]) => ({ track, laps, km: trackKmMap[track] || 0 }))
+      .map(([identity, track]) => ({ ...track, km: trackKmMap[identity] || 0 }))
       .sort((a, b) => b.laps - a.laps);
 
     const rankedCars = Object.entries(carLapsMap)

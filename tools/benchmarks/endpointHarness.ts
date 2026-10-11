@@ -32,6 +32,14 @@ export async function snapshotDatabase(sourcePath: string, destination: string):
 /** Production routers and services, without index.ts's scans or external benchmark refresh. */
 export async function startBenchmarkServer(snapshot: string) {
   const store = resetSessionDatabaseForTest(snapshot);
+  // Rebuild versioned summaries on the isolated copy before measuring ready-state requests.
+  while (!store.isSessionSummaryReady()) {
+    const batch = store.backfillSessionSummaryBatch(25);
+    if (batch.failed.length || batch.processed === 0) {
+      store.close();
+      throw new Error('Cannot benchmark: isolated session-summary rebuild failed.');
+    }
+  }
   resetCachedReferenceLaptimes();
   // Retained recordings only; benchmark requests must never decode a live VCR file.
   const absent = path.join(path.dirname(snapshot), 'no-live-recordings');

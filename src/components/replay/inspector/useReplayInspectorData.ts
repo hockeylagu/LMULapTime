@@ -191,15 +191,15 @@ export function useReplayInspectorData({
           }));
           if (trajData.currentLap) onLocatorChangeRef.current?.(trajData.driverOrdinal ?? requestedDriver, trajData.lapOrdinal ?? requestedLap);
           const pendingDriver = metaData?.drivers?.find((d: ReplayDriverEntry) => d.sessionDriverOrdinal === requestedDriver);
+          const markedPlayers = metaData?.drivers?.filter((d: ReplayDriverEntry) => d.isPlayer) ?? [];
           const defaultSlot = pendingDriver?.slot ?? trajData.driverSlot ??
-            metaData?.drivers?.find((d: ReplayDriverEntry) => d.isPlayer)?.slot ??
-            metaData?.drivers?.[0]?.slot ?? null;
+            (markedPlayers.length === 1 ? markedPlayers[0].slot : null) ?? null;
           setSelectedDriverSlot(defaultSlot);
           setSelectedDriverOrdinal(trajData.driverOrdinal ?? pendingDriver?.sessionDriverOrdinal ?? requestedDriver);
           setSelectedLapOrdinal(trajData.lapOrdinal ?? requestedLap);
         } else if (metaData?.drivers?.length) {
-          const player = metaData.drivers.find((d: ReplayDriverEntry) => d.isPlayer) || metaData.drivers[0];
-          if (player && typeof player.slot === 'number') setSelectedDriverSlot(player.slot);
+          const players = metaData.drivers.filter((d: ReplayDriverEntry) => d.isPlayer);
+          if (players.length === 1 && typeof players[0].slot === 'number') setSelectedDriverSlot(players[0].slot);
         }
       })
       .catch((err: unknown) => {
@@ -220,7 +220,7 @@ export function useReplayInspectorData({
   // Fetch replay-backed comparison laps. Player laps are the safe default; the
   // all-driver view exposes the same candidate pool as Compare Laps.
   useEffect(() => {
-    const trackToQuery = metadata?.displayTrack || metadata?.trackCourse || metadata?.trackName;
+    const trackToQuery = metadata?.trackVenue || metadata?.displayTrack || metadata?.trackCourse || metadata?.trackName;
     // Wait for the metadata: before it the inspected driver's car class is unknown, and the
     // request would be repeated with it (laps are only compared within one car class).
     if (!isOpen || !metadata || !trackToQuery) {
@@ -233,13 +233,16 @@ export function useReplayInspectorData({
     setAvailableCompareLaps([]);
     setCompareLapsError(null);
     setIsCompareLapsLoading(true);
-    const activeDriver = metadata?.drivers?.find(d => d.slot === selectedDriverSlot) || metadata?.drivers?.find(d => d.isPlayer) || metadata?.drivers?.[0];
+    const markedPlayers = metadata.drivers.filter(d => d.isPlayer);
+    const activeDriver = metadata.drivers.find(d => d.slot === selectedDriverSlot) ||
+      (markedPlayers.length === 1 ? markedPlayers[0] : undefined);
     // Laps are only compared within one car class: the INSPECTED driver's, which in a multiclass
     // replay may differ from the replay's own (player's) class in metadata.carClass.
-    const carClass = resolveDriverCarClass(activeDriver) || metadata?.carClass;
+    const carClass = resolveDriverCarClass(activeDriver);
     const needsAllDrivers = compareLapFilter === 'all' || compareLapFilter === 'same-sessions';
     const query = new URLSearchParams({
       track: trackToQuery,
+      ...(metadata.trackVenue ? { trackVenue: metadata.trackVenue, trackCourse: metadata.trackCourse ?? '' } : {}),
       playerOnly: String(!needsAllDrivers),
       telemetryOnly: 'true', page: String(comparePage), pageSize: '50',
     });

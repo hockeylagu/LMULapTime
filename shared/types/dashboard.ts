@@ -1,9 +1,10 @@
 import type { PaceCategory } from './reference.js';
 import type { SessionCard } from './sessionSummaries.js';
 
-export interface DashboardRankedTrack { track: string; laps: number; km: number; }
+export interface DashboardRankedTrack { track: string; trackVenue?: string; trackCourse?: string; laps: number; km: number; }
+export interface DashboardTrackFilter { track: string; trackVenue: string; trackCourse: string; }
 export interface DashboardRankedCar { car: string; laps: number; km: number; }
-export interface DashboardBestPaceLap { sessionId?: string; percentage: number; category: PaceCategory; lapTimeString: string; track: string; car: string; }
+export interface DashboardBestPaceLap { sessionId?: string; percentage: number; category: PaceCategory; lapTimeString: string; track: string; trackVenue?: string; trackCourse?: string; car: string; }
 
 export interface DashboardMetrics {
   sessionsCount: number; totalLaps: number; cleanLaps: number; cleanLapsPercentage: number; totalDistanceKm: number; totalDrivingSeconds: number;
@@ -36,6 +37,6 @@ export interface DashboardTrends {
 }
 
 export interface DashboardData {
-  revision: string; metrics: DashboardMetrics; trends: DashboardTrends; tracks: string[];
+  revision: string; metrics: DashboardMetrics; trends: DashboardTrends; tracks: DashboardTrackFilter[];
   emptyCount: number; replayCount: number; sessions: SessionCard[]; total: number; page: number; pageSize: number;
 }

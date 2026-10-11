@@ -2,6 +2,7 @@ import fs from 'fs';
 import type { DetailedSession, ReplayMetadata } from '../core/types.js';
 import type { TelemetryLink, TelemetryMetadataRecord } from '../core/dbTelemetryStore.js';
 import type { ReplayFileEntry } from '../sessions/sessionXmlTypes.js';
+import { CIRCUIT_SPECIFICATIONS, getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import {
   DuckDbFileInfo,
   findDuckDbForReplay,
@@ -22,7 +23,7 @@ import {
  * The matching rule the stored matches were decided under. Changing it clears the stored matches
  * once so they are decided again (SessionDatabase.resetTelemetryLinksForRule).
  */
-export const TELEMETRY_LINK_RULE = 'session-span-v3';
+export const TELEMETRY_LINK_RULE = 'session-span-exact-identity-player-v5';
 
 /** Clock slack between the file name's timestamp and the session or replay times. */
 const SLACK_MS = 120_000;
@@ -143,15 +144,55 @@ export function decideTelemetryLinks(input: TelemetryLinkInput): TelemetryLink[]
     return metadataCache.get(name) ?? null;
   };
 
+  const spanEligible = <T>(file: DuckDbFileInfo, span: Span<T>) => file.timestampEpochMs <= 0
+    ? true
+    : span.startMs > 0 && file.timestampEpochMs >= span.startMs - SLACK_MS && file.timestampEpochMs <= span.endMs + SLACK_MS;
+  const layoutIdentity = (venue: string, course: string, sceneDesc?: string) => {
+    const spec = getCircuitSpecification(venue, course, sceneDesc);
+    return Object.prototype.hasOwnProperty.call(CIRCUIT_SPECIFICATIONS, spec.layoutKey)
+      ? spec.layoutKey : JSON.stringify([venue, course]);
+  };
+
   for (const file of input.files) {
     if (claimed.has(file.filename)) continue;
-    const session = ownerAt(file, sessionSpans, owner => findDuckDbForSession([file], owner, ANY_DELTA_SEC) !== null);
+    const fileCircuit = getCircuitSpecification(file.trackName, undefined, file.trackName);
+    const venueOnly = file.trackName.trim().toLowerCase() === fileCircuit.officialName.toLowerCase();
+    let sessionCandidates = sessionSpans;
+    let replayCandidates = replaySpans;
+    if (venueOnly) {
+      const eligibleSessions = sessionSpans.filter(span => spanEligible(file, span)
+        && findDuckDbForSession([file], span.owner, ANY_DELTA_SEC) !== null);
+      const eligibleReplays = replaySpans.filter(span => {
+        if (!spanEligible(file, span)) return false;
+        const owner = span.owner;
+        const owningSession = ownerOfReplay.get(owner.name);
+        if (owningSession && sessionsWithFiles.has(owningSession)) return false;
+        const metadata = metadataOf(owner.name);
+        return metadata !== null && findDuckDbForReplay([file], metadata, owner.mtime, ANY_DELTA_SEC) !== null;
+      });
+      const replayLayouts = new Set(eligibleReplays.map(span => {
+        const metadata = metadataOf(span.owner.name);
+        return metadata ? layoutIdentity(metadata.trackVenue || metadata.trackName || '', metadata.trackCourse ?? '', metadata.sceneDesc || metadata.eventInfo?.sceneDesc) : '';
+      }));
+      const sessionLayouts = new Set(eligibleSessions.map(span => layoutIdentity(span.owner.trackVenue, span.owner.trackCourse)));
+      if (replayLayouts.size === 1) {
+        const trustedReplayLayout = [...replayLayouts][0];
+        sessionCandidates = eligibleSessions.filter(span => layoutIdentity(span.owner.trackVenue, span.owner.trackCourse) === trustedReplayLayout);
+        replayCandidates = eligibleReplays.filter(span => {
+          const metadata = metadataOf(span.owner.name);
+          return metadata && layoutIdentity(metadata.trackVenue || metadata.trackName || '', metadata.trackCourse ?? '', metadata.sceneDesc || metadata.eventInfo?.sceneDesc) === trustedReplayLayout;
+        });
+      } else if (sessionLayouts.size > 1 || replayLayouts.size > 1 || (sessionLayouts.size && replayLayouts.size && [...sessionLayouts].some(layout => !replayLayouts.has(layout)))) {
+        continue;
+      }
+    }
+    const session = ownerAt(file, sessionCandidates, owner => findDuckDbForSession([file], owner, ANY_DELTA_SEC) !== null);
     if (session) {
       links.push({ filename: file.filename, sessionId: session.id, replayName: session.matchingReplayFile?.name ?? null });
       sessionsWithFiles.add(session.id);
       continue;
     }
-    const replay = ownerAt(file, replaySpans, owner => {
+    const replay = ownerAt(file, replayCandidates, owner => {
       const owningSession = ownerOfReplay.get(owner.name);
       if (owningSession && sessionsWithFiles.has(owningSession)) return false;
       const metadata = metadataOf(owner.name);

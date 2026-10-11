@@ -2,7 +2,7 @@ import type { Database as DatabaseType } from 'better-sqlite3';
 import type { ReferenceLaptimeEntry } from '../types.js';
 import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
 import type { DashboardData, DashboardMetrics, DashboardTrends } from '../../../shared/types/dashboard.js';
-import { getDisplayTrackName, matchesSessionType } from '../../../shared/domain/formatters.js';
+import { getDisplayTrackName } from '../../../shared/domain/formatters.js';
 import { createBenchmarkLookup, getPaceCategoryFromPercentage } from '../../../shared/domain/paceCategory.js';
 import { createPaceCalculator } from '../../benchmarks/referenceLaptimes.js';
 import { findLayoutBenchmark } from '../../../shared/domain/leaderboard.js';
@@ -63,9 +63,10 @@ function benchmarkMetrics(db: DatabaseType, entries: Record<string, ReferenceLap
   const best = new Map<string, DashboardMetrics['bestTrackRefLaps'][number]>();
   for (const row of rows) {
     const track = getDisplayTrackName(row.track_venue,row.track_course);
-    if (!best.has(track) || row.percentage < best.get(track)!.percentage) best.set(track, {
+    const identity = JSON.stringify([row.track_venue,row.track_course]);
+    if (!best.has(identity) || row.percentage < best.get(identity)!.percentage) best.set(identity, {
       sessionId:row.id,percentage:row.percentage,category:getPaceCategoryFromPercentage(row.percentage),
-      lapTimeString:row.lap_string,track,car:row.car_type,
+      lapTimeString:row.lap_string,track,trackVenue:row.track_venue,trackCourse:row.track_course,car:row.car_type,
     });
   }
   return {...totals,best:[...best.values()].sort((a,b)=>a.percentage-b.percentage)};
@@ -82,10 +83,12 @@ function dashboardMetrics(db: DatabaseType, entries: Record<string, ReferenceLap
       coalesce(sum(s.distance_km),0) km
     FROM session_summary_facts s GROUP BY s.track_venue,s.track_course`)
     .all() as Array<{ track_venue: string; track_course: string; laps: number; km: number }>;
-  const trackMap = new Map<string, { track: string; laps: number; km: number }>();
+  const trackMap = new Map<string, { track: string; trackVenue: string; trackCourse: string; laps: number; km: number }>();
   for (const row of trackRows) {
     const track = getDisplayTrackName(row.track_venue, row.track_course); if (!track) continue;
-    const item = trackMap.get(track) ?? { track, laps: 0, km: 0 }; item.laps += row.laps; item.km += row.km; trackMap.set(track, item);
+    const identity = JSON.stringify([row.track_venue,row.track_course]);
+    const item = trackMap.get(identity) ?? { track, trackVenue: row.track_venue, trackCourse: row.track_course, laps: 0, km: 0 };
+    item.laps += row.laps; item.km += row.km; trackMap.set(identity, item);
   }
   const carRows = db.prepare(`SELECT s.car_type car,coalesce(sum(s.laps_count),0) laps,
       coalesce(sum(s.distance_km),0) km
@@ -98,9 +101,9 @@ function dashboardMetrics(db: DatabaseType, entries: Record<string, ReferenceLap
   const typeRows = db.prepare(`SELECT s.session_type,s.session_name,s.position,count(*) n FROM session_summary_facts s GROUP BY s.session_type,s.session_name,s.position`).iterate() as IterableIterator<{ session_type: string; session_name: string; position: number | null; n:number }>;
   let practiceSessionsCount = 0; let qualifyingSessionsCount = 0; let raceSessionsCount = 0; let raceWinsCount = 0; let racePodiumsCount = 0;
   for (const row of typeRows) {
-    if (matchesSessionType(row.session_type, row.session_name, 'Race')) { raceSessionsCount+=row.n; if (row.position === 1) raceWinsCount+=row.n; if (row.position !== null && row.position > 0 && row.position <= 3) racePodiumsCount+=row.n; }
-    else if (matchesSessionType(row.session_type, row.session_name, 'Qualifying')) qualifyingSessionsCount+=row.n;
-    else practiceSessionsCount+=row.n;
+    if (row.session_type === 'Race') { raceSessionsCount+=row.n; if (row.position === 1) raceWinsCount+=row.n; if (row.position !== null && row.position > 0 && row.position <= 3) racePodiumsCount+=row.n; }
+    else if (row.session_type === 'Qualifying') qualifyingSessionsCount+=row.n;
+    else if (row.session_type === 'Practice') practiceSessionsCount+=row.n;
   }
   const benchmark = benchmarkMetrics(db,entries);
   const cleanPercentage = totals.total_laps > 0 ? Math.round((totals.clean_laps / totals.total_laps) * 1000) / 10 : 0;
@@ -221,10 +224,14 @@ export function queryCompactDashboard(db: DatabaseType, options: DashboardQueryO
   const trends = dashboardTrends(db, entries);
   const tracks = db.prepare('SELECT DISTINCT track_venue,track_course FROM sessions ORDER BY track_venue,track_course')
     .all() as Array<{ track_venue: string; track_course: string }>;
-  const trackNames = [...new Set(tracks.map(row => getDisplayTrackName(row.track_venue, row.track_course)).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const trackOptions = tracks.map(row => ({
+    track: getDisplayTrackName(row.track_venue, row.track_course),
+    trackVenue: row.track_venue,
+    trackCourse: row.track_course,
+  })).filter(option => option.track).sort((a, b) => a.track.localeCompare(b.track) || a.trackVenue.localeCompare(b.trackVenue) || a.trackCourse.localeCompare(b.trackCourse));
   const emptyCount = (db.prepare('SELECT count(*) count FROM sessions WHERE is_empty=1').get() as { count: number }).count;
   const replayCount = (db.prepare('SELECT count(*) count FROM sessions WHERE recording_name IS NOT NULL').get() as { count: number }).count;
-  return { revision: options.revision ?? '', metrics, trends, tracks: trackNames, emptyCount, replayCount,
+  return { revision: options.revision ?? '', metrics, trends, tracks: trackOptions, emptyCount, replayCount,
     sessions: sessions.sessions, total: sessions.total, page: sessions.page, pageSize: sessions.pageSize };
 }
 

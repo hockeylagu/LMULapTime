@@ -1,6 +1,5 @@
 import { PaceCategory, ReferenceLaptimeEntry } from '../types/index.js';
-import { getDisplayTrackName } from './formatters.js';
-import { getCircuitSpecification } from './circuitSpecs.js';
+import { CIRCUIT_SPECIFICATIONS, getCircuitSpecification } from './circuitSpecs.js';
 
 export function getPaceCategoryFromPercentage(percentage: number): PaceCategory {
   if (percentage <= 100.5) return 'Alien';
@@ -20,36 +19,24 @@ export function formatPacePercentage(percentage?: number | null): string {
 
 
 
-/**
- * Robust track matching comparing any query track against a session venue and course.
- */
+/** A filter scope: known layouts compare keys; unknown layouts compare explicit venue/course pairs. */
 export function matchesTrack(
   queryTrack: string = '',
   venue: string = '',
-  course: string = ''
+  course: string = '',
+  queryCourse: string = ''
 ): boolean {
   if (!queryTrack || queryTrack === 'All' || queryTrack.trim() === '') return true;
 
-  const qSpec = getCircuitSpecification(queryTrack);
+  const qSpec = getCircuitSpecification(queryTrack, queryCourse);
   const sSpec = getCircuitSpecification(venue, course);
 
-  // If both are known standard circuits:
-  if (qSpec.layoutKey !== 'unknown' && sSpec.layoutKey !== 'unknown') {
+  const queryKnown = Object.prototype.hasOwnProperty.call(CIRCUIT_SPECIFICATIONS, qSpec.layoutKey);
+  const sessionKnown = Object.prototype.hasOwnProperty.call(CIRCUIT_SPECIFICATIONS, sSpec.layoutKey);
+  if (queryKnown && sessionKnown) {
     return qSpec.layoutKey === sSpec.layoutKey;
   }
-
-  // Fallback for custom / mod tracks:
-  const qClean = queryTrack.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const sClean = `${venue} ${course}`.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const vClean = (venue || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const displayClean = getDisplayTrackName(venue, course).toLowerCase().replace(/[^a-z0-9]/g, '');
-
-  if (qClean === sClean || qClean === vClean || qClean === displayClean) return true;
-  if (sClean.includes(qClean) || qClean.includes(sClean) || displayClean.includes(qClean) || qClean.includes(displayClean)) {
-    return true;
-  }
-
-  return false;
+  return !queryKnown && !sessionKnown && Boolean(queryTrack) && queryTrack === venue && queryCourse === course;
 }
 
 /**
@@ -73,34 +60,8 @@ function matchingTrackEntries(
 
   const targetSpec = getCircuitSpecification(trackVenue, course, null, null, null, trackLengthMeters);
 
-  // 1. Exact match on resolved benchmark circuit and layout
-  let matches = entryList.filter(e => {
-    const layoutKey = layouts?.get(e.trackName) ?? getCircuitSpecification(e.trackName).layoutKey;
-    if (targetSpec.layoutKey !== 'unknown' && layoutKey !== 'unknown') {
-      return layoutKey === targetSpec.layoutKey;
-    }
-    return false;
-  });
-
-  // 2. Direct string equality match on cleaned name
-  if (matches.length === 0 && targetSpec.benchmarkName) {
-    const cleanTarget = targetSpec.benchmarkName.toLowerCase().replace(/[^a-z0-9]/g, '');
-    matches = entryList.filter(e => {
-      const cleanE = (e.trackName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      return cleanE === cleanTarget;
-    });
-  }
-
-  // 3. Fallback for custom / mod tracks
-  if (matches.length === 0 && targetSpec.layoutKey === 'unknown') {
-    const cleanVenue = trackVenue.toLowerCase().replace(/[^a-z0-9]/g, '');
-    matches = entryList.filter(e => {
-      const cleanE = (e.trackName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      return cleanE.includes(cleanVenue) || cleanVenue.includes(cleanE);
-    });
-  }
-
-  return matches;
+  if (!Object.prototype.hasOwnProperty.call(CIRCUIT_SPECIFICATIONS, targetSpec.layoutKey)) return [];
+  return entryList.filter(entry => (layouts?.get(entry.trackName) ?? getCircuitSpecification(entry.trackName).layoutKey) === targetSpec.layoutKey);
 }
 
 /**

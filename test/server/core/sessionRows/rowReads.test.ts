@@ -49,13 +49,13 @@ describe('reads from the normalized rows', () => {
     const expected = canonicalSession(db.getSessionById('a') as DetailedSession);
 
     expect(db.getSessionById('a')).toEqual(expected);
-    expect(db.getSessionById('a.xml')?.id).toBe('a');
+    expect(db.getSessionById('a.xml')).toBeNull();
     expect(db.getSessionsByIds(['b', 'a']).map(item => item.id)).toEqual(['b', 'a']);
     expect(db.getSessionsStartingBetween(1_780_000_000_000, 1_780_000_950_000).map(item => item.id)).toEqual(['a', 'b']);
     const telemetryCandidates = getTelemetrySessionCandidatesStartingBetween(raw(), 1_780_000_000_000, 1_780_000_950_000);
     expect(telemetryCandidates).toEqual([
       expect.objectContaining({ id: 'a', trackVenue: 'Spa', sessionType: 'Race', sessionName: 'R1',
-        matchingReplayFile: { name: 'Spa.Vcr' }, drivers: [{ name: 'P' }, { name: 'Q' }] }),
+        matchingReplayFile: { name: 'Spa.Vcr' }, drivers: [{ name: 'P' }, { name: 'Q' }], playerDriverName: 'P' }),
       expect.objectContaining({ id: 'b', drivers: [{ name: 'P' }, { name: 'Q' }] }),
     ]);
     expect(telemetryCandidates[0]).not.toHaveProperty('laps');
@@ -79,6 +79,18 @@ describe('reads from the normalized rows', () => {
     const candidates = getTelemetrySessionCandidatesStartingBetween(raw(), 1_780_000_000_000, 1_780_000_950_000);
     expect(candidates.find(item => item.id === 'unnamed')?.drivers).toEqual([{ name: '' }]);
     expect(candidates.find(item => item.id === 'empty')?.drivers).toEqual([]);
+  });
+
+  it('uses exact session ids even when filenames collide or ids end in .xml', () => {
+    const insert = (id: string, filename: string) => db.upsertSession(newSession(id, { filename }), filename, 1, 10);
+    insert('target', 'other-session.xml');
+    insert('other-session', 'target.xml');
+    insert('literal.xml', 'literal.xml');
+    expect(db.getSessionById('target')?.id).toBe('target');
+    expect(db.getSessionById('other-session')?.id).toBe('other-session');
+    expect(db.getSessionById('literal.xml')?.id).toBe('literal.xml');
+    expect(db.getSessionById('target.xml')).toBeNull();
+    expect(db.getSessionById('missing')).toBeNull();
   });
 
   it('changes a link or the telemetry file and reclassifies from the rows alone', () => {

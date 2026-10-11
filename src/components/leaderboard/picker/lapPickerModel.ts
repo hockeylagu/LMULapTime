@@ -1,5 +1,4 @@
 import type { ComparableLap } from '../../../../shared/types/index.js';
-import { matchesSessionType } from '../../../../shared/domain/formatters.js';
 import { selectCleanLapCandidates } from '../../../../shared/domain/lapComparison.js';
 
 export type SessionKind = 'practice' | 'quali' | 'race';
@@ -36,11 +35,11 @@ export interface LapQuickPick {
   lap: ComparableLap;
 }
 
-/** Practice, qualifying or race, from the session's type or name. */
+/** Practice, qualifying or race, from the canonical session type. */
 export function lapSessionKind(lap: Pick<ComparableLap, 'sessionType' | 'sessionName'>): SessionKind | null {
-  if (matchesSessionType(lap.sessionType, lap.sessionName, 'Qualifying')) return 'quali';
-  if (matchesSessionType(lap.sessionType, lap.sessionName, 'Race')) return 'race';
-  if (matchesSessionType(lap.sessionType, lap.sessionName, 'Practice')) return 'practice';
+  if (lap.sessionType === 'Qualifying') return 'quali';
+  if (lap.sessionType === 'Race') return 'race';
+  if (lap.sessionType === 'Practice') return 'practice';
   return null;
 }
 

@@ -14,6 +14,19 @@ import { MockSlice, createSliceVcrBuffer } from '../../../utils/mockVcr.js';
 
 const runRealReplayTests = process.env.RUN_REAL_REPLAY_TESTS === '1';
 
+function structuredDriverRoster(slot = 1): Buffer[] {
+  const pascal = (value: string) => {
+    const text = Buffer.from(value, 'utf8');
+    return Buffer.concat([Buffer.from([text.length]), text]);
+  };
+  const count = Buffer.alloc(4);
+  count.writeInt32LE(1, 0);
+  return [
+    Buffer.alloc(69), count, Buffer.from([slot]), pascal('Player Driver'),
+    pascal('21_26_AFCO95641716'), pascal(''), pascal('Ferrari Team'), pascal('21'), Buffer.alloc(24),
+  ];
+}
+
 describe('replayParser - extended format & pit info', () => {
   // A fresh folder per run, outside the repository, removed once at the end (see
   // replayParserTrajectory.test.ts: deleting each file right after its test failed at random).
@@ -224,7 +237,7 @@ describe('replayParser - extended format & pit info', () => {
           makeStr4('1.0'),
           makeStr4('mod'),
           makeStr4('path'),
-          Buffer.from([1, 'Player Driver\0', '21_26_AFCO95641716\0', 'Ferrari Team\0', '21\0'].join(''), 'utf8'),
+          ...structuredDriverRoster(),
         ];
         const trailer = Buffer.alloc(28);
         trailer.writeUInt32LE(10, 4);
@@ -319,7 +332,7 @@ describe('replayParser - extended format & pit info', () => {
           makeStr4('1.0'),
           makeStr4('mod'),
           makeStr4('path'),
-          Buffer.from([1, 'Player Driver\0', '21_26_AFCO95641716\0', 'Ferrari Team\0', '21\0'].join(''), 'utf8'),
+          ...structuredDriverRoster(),
         ];
         const trailer = Buffer.alloc(28);
         metaParts.push(trailer);
@@ -382,7 +395,7 @@ describe('replayParser - extended format & pit info', () => {
           makeStr4('1.0'),
           makeStr4('mod'),
           makeStr4('path'),
-          Buffer.from([1, 'Player Driver\0', '21_26_AFCO95641716\0', 'Ferrari Team\0', '21\0'].join(''), 'utf8'),
+          ...structuredDriverRoster(),
         ];
         const trailer = Buffer.alloc(28);
         metaParts.push(trailer);

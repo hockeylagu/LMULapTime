@@ -1,7 +1,7 @@
 import type { LapConditionGroup } from '../domain/lapConditions.js';
 import type { SessionMetadata, DriverData } from './session.js';
 
-export const SESSION_SUMMARY_PROJECTION_VERSION = 4;
+export const SESSION_SUMMARY_PROJECTION_VERSION = 5;
 
 export interface SessionLapProjection {
   sessionId: string; driverOrdinal: number; lapOrdinal: number; lapNumber: number;

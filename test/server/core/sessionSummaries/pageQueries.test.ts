@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import { initDbSchema } from '../../../../server/core/dbSchema.js';
 import { upsertSession } from '../../../../server/core/dbSessionStore.js';
-import { queryProgression, querySessionPage } from '../../../../server/core/sessionSummaries/pageQueries.js';
+import { queryProgression, querySessionPage, sessionWhere } from '../../../../server/core/sessionSummaries/pageQueries.js';
 import { querySessionContext, querySessionPersonalBest, querySessionPersonalBestById } from '../../../../server/core/sessionSummaries/contextQueries.js';
 import { computeProgression } from '../../../../server/sessions/sessionAnalytics.js';
 import { normalizeCarClass } from '../../../../shared/domain/vehicleMapping.js';
@@ -21,6 +21,11 @@ function fixture(id: string, timestamp: number): DetailedSession {
 }
 
 describe('paged session queries', () => {
+  it('scopes an unknown populated course by its exact venue and course fields', () => {
+    const exact = sessionWhere({ trackVenue: 'Mod Ring', trackCourse: 'Short Course' });
+    expect(exact.sql).toContain("s.layout_key='unknown' AND s.track_venue = ? AND s.track_course = ?");
+    expect(exact.values).toEqual(['Mod Ring', 'Short Course']);
+  });
   it('preserves progression metrics and includes empty sessions across explicit pages', () => {
     const db = new Database(':memory:');
     try {
@@ -86,7 +91,7 @@ describe('paged session queries', () => {
       expect(querySessionPersonalBest(db, session, 0)).toEqual({ driverOrdinal: 0, bestLapTime: 90, ready: true });
       expect(querySessionPersonalBestById(db, session.id, 0)).toEqual(querySessionPersonalBest(db, session, 0));
       session.playerDriver = undefined;
-      expect(querySessionContext(db, session).personalBests).toEqual([{ driverOrdinal: 0, bestLapTime: 90 }]);
+      expect(querySessionContext(db, session).personalBests).toEqual([{ driverOrdinal: 1, bestLapTime: 90 }]);
     } finally { db.close(); }
   });
 
