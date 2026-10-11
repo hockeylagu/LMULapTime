@@ -1,5 +1,6 @@
 import type { Database as DatabaseType } from 'better-sqlite3';
 import type { DetailedSession } from './types.js';
+import type { TelemetrySessionCandidate } from '../telemetry/telemetryMatcher.js';
 import { REPLAY_MATCH_WINDOW_MS } from '../sessions/replayMatching.js';
 import { loadSessions } from './sessionRows/access.js';
 
@@ -34,6 +35,61 @@ export function getSessionsStartingBetween(db: DatabaseType, fromMs: number, toM
   const rows = db.prepare('SELECT id FROM sessions WHERE timestamp BETWEEN ? AND ? ORDER BY timestamp, id')
     .all(fromMs, toMs) as Array<{ id: string }>;
   return loadSessions(db, rows.map(row => row.id));
+}
+
+interface TelemetryCandidateRow {
+  id: string;
+  file_path: string;
+  timestamp: number;
+  track_venue: string;
+  track_course: string;
+  session_type: string;
+  session_name: string;
+  recording_name: string | null;
+  driver_ordinal: number | null;
+  driver_name: string | null;
+}
+
+/** Reads only session matching fields and the small driver-name roster, without laps or events. */
+function readTelemetryCandidates(db: DatabaseType, whereSql: string, params: Array<string | number> = []): TelemetrySessionCandidate[] {
+  const rows = db.prepare(`SELECT s.id, s.file_path, s.timestamp, s.track_venue, s.track_course,
+      s.session_type, s.session_name, r.recording_name AS recording_name, d.driver_ordinal, n.name AS driver_name
+    FROM sessions s
+    LEFT JOIN session_recordings r ON r.session_id = s.id
+    LEFT JOIN session_drivers d ON d.session_id = s.id
+    LEFT JOIN drivers n ON n.driver_id = d.driver_id
+    WHERE ${whereSql}
+    ORDER BY s.timestamp, s.id, d.driver_ordinal`)
+    .all(...params) as TelemetryCandidateRow[];
+  const candidates = new Map<string, TelemetrySessionCandidate>();
+  for (const row of rows) {
+    let candidate = candidates.get(row.id);
+    if (!candidate) {
+      candidate = {
+        id: row.id,
+        filePath: row.file_path,
+        timestamp: row.timestamp,
+        trackVenue: row.track_venue,
+        trackCourse: row.track_course,
+        sessionType: row.session_type,
+        sessionName: row.session_name,
+        drivers: [],
+      };
+      if (row.recording_name) candidate.matchingReplayFile = { name: row.recording_name };
+      candidates.set(row.id, candidate);
+    }
+    if (row.driver_ordinal !== null) candidate.drivers.push({ name: row.driver_name ?? '' });
+  }
+  return [...candidates.values()];
+}
+
+/** Telemetry ownership candidates in a timestamp window, with only matching metadata and names. */
+export function getTelemetrySessionCandidatesStartingBetween(
+  db: DatabaseType,
+  fromMs: number,
+  toMs: number
+): TelemetrySessionCandidate[] {
+  return readTelemetryCandidates(db, 's.timestamp BETWEEN ? AND ?', [fromMs, toMs]);
 }
 
 /** Recording name -> the session linked to it, for the given recordings. */

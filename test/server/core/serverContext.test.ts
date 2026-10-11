@@ -308,7 +308,7 @@ describe('ServerContext background session sync', () => {
       getAllStoredReplayFiles: vi.fn(() => []),
       getTelemetryFiles: vi.fn(() => [{ filename: 'Spa_P_2026-09-14T18_37_49Z.duckdb', timestampEpochMs: recordedAt }]),
       getSessionsCount: vi.fn(() => 0),
-      getSessionsStartingBetween: vi.fn(() => []),
+      getTelemetrySessionCandidatesStartingBetween: vi.fn(() => []),
       getReplayMatchingEntriesOverlapping: vi.fn(() => []),
       getRecordingOwners: vi.fn(() => new Map()),
       getTelemetryOwnersWithoutFile: vi.fn(() => []),
@@ -333,7 +333,7 @@ describe('ServerContext background session sync', () => {
     expect(log).toHaveBeenCalledWith('[SQLite Cache] Found 1 DuckDB telemetry files from C:/lmu/telemetry');
     expect(storedTelemetryLinks.linkTelemetryFiles).toHaveBeenCalled();
     // Candidates come from the file's time window, never from walking every stored session.
-    const [from, to] = vi.mocked(sessionDb.getSessionsStartingBetween).mock.calls[0];
+    const [from, to] = vi.mocked(sessionDb.getTelemetrySessionCandidatesStartingBetween).mock.calls[0];
     expect(from).toBeLessThan(recordedAt);
     expect(recordedAt - from).toBeLessThanOrEqual(27 * 3600_000);
     expect(to - recordedAt).toBeLessThanOrEqual(120_000);
@@ -583,7 +583,9 @@ describe('telemetry ownership catalog lifetime', () => {
       }
       const files = vi.spyOn(db, 'getTelemetryFiles');
       const metadata = vi.spyOn(db, 'getTelemetryMetadata');
-      const candidates = vi.spyOn(db, 'getSessionsStartingBetween');
+      const candidates = vi.spyOn(db, 'getTelemetrySessionCandidatesStartingBetween');
+      const fullSessionsByWindow = vi.spyOn(db, 'getSessionsStartingBetween');
+      const fullSessionsById = vi.spyOn(db, 'getSessionsByIds');
       const context = new ServerContext({ resultsDir: '', replaysDir: '', telemetryDir: '',
         parser: new LmuParser(undefined, undefined, { detectPlayer: false }), sessionDb: db,
         telemetryCatalog: { refresh: async () => 2 } as unknown as TelemetryCatalog,
@@ -595,7 +597,9 @@ describe('telemetry ownership catalog lifetime', () => {
       expect(metadata.mock.calls.filter(args => args[0] === undefined)).toHaveLength(1);
       // Two files two days apart: two windows, neither holding the whole history.
       expect(candidates).toHaveBeenCalledTimes(2);
-      for (const result of candidates.mock.results) expect((result.value as DetailedSession[]).length).toBeLessThan(25);
+      for (const result of candidates.mock.results) expect(result.value.length).toBeLessThan(25);
+      expect(fullSessionsByWindow).not.toHaveBeenCalled();
+      expect(fullSessionsById).not.toHaveBeenCalled();
       expect(db.getTelemetryMetadata().map(row => [row.filename, row.matchedSessionId])).toEqual([
         ['batch-0.duckdb', 'batch-0'], ['batch-24.duckdb', 'batch-24'],
       ]);

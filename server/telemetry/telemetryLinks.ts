@@ -7,6 +7,7 @@ import {
   findDuckDbForReplay,
   findDuckDbForSession,
   sessionEpochMs,
+  type TelemetrySessionCandidate,
 } from './telemetryMatcher.js';
 
 // Which session or replay a DuckDB file records is decided once and stored in telemetry_metadata.
@@ -64,11 +65,11 @@ export interface TelemetryLinkInput {
   /** Every catalogued file, including files no longer on disk. */
   files: DuckDbFileInfo[];
   stored: TelemetryMetadataRecord[];
-  sessions: DetailedSession[];
+  sessions: TelemetrySessionCandidate[];
   replays: ReplayFileEntry[];
   loadReplayMetadata: (replayName: string) => ReplayMetadata | null;
   /** When the session ended (its results XML was written), if known. */
-  sessionEndMs?: (session: DetailedSession) => number | undefined;
+  sessionEndMs?: (session: TelemetrySessionCandidate) => number | undefined;
   /** Replay name -> its linked session id, for replays whose session is not among the sessions given. */
   replayOwnerByName?: ReadonlyMap<string, string>;
 }
@@ -122,7 +123,7 @@ export function decideTelemetryLinks(input: TelemetryLinkInput): TelemetryLink[]
   const sessionsWithFiles = new Set(input.stored.map(row => row.matchedSessionId).filter((id): id is string => Boolean(id)));
   const links: TelemetryLink[] = [];
 
-  const sessionSpans: Span<DetailedSession>[] = input.sessions.map(session => {
+  const sessionSpans: Span<TelemetrySessionCandidate>[] = input.sessions.map(session => {
     const startMs = sessionEpochMs(session);
     const endMs = input.sessionEndMs?.(session) ?? startMs + DEFAULT_SESSION_MS;
     return { owner: session, startMs, endMs: Math.max(endMs, startMs) };

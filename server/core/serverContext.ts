@@ -13,6 +13,7 @@ import { SessionDatabase } from './db.js';
 import {
   decideTelemetryLinks, TELEMETRY_LINK_RULE, TelemetryLinks, telemetryCandidateWindow, telemetryFileChunks, type TelemetryLinkInput,
 } from '../telemetry/telemetryLinks.js';
+import type { TelemetrySessionCandidate } from '../telemetry/telemetryMatcher.js';
 import type { TelemetryLink } from './dbTelemetryStore.js';
 import { TelemetryCatalog } from '../telemetry/telemetryCatalog.js';
 import { ReplayRecordingService } from '../replay/replayRecordingService.js';
@@ -201,6 +202,12 @@ export class ServerContext {
     if (typeof this.sessionDb.updateSessionTelemetryFile === 'function') this.sessionDb.updateSessionTelemetryFile(session.id, filename);
   }
 
+  /** Persist the main file for an owner without hydrating its laps, events, or driver history. */
+  private applySessionTelemetryById(sessionId: string): void {
+    const filename = TelemetryLinks.load(this.sessionDb, sessionId).forSession({ id: sessionId });
+    if (typeof this.sessionDb.updateSessionTelemetryFile === 'function') this.sessionDb.updateSessionTelemetryFile(sessionId, filename);
+  }
+
   private resetTelemetryLinksIfRuleChanged(): void {
     if (this.sessionDb.resetTelemetryLinksForRule(TELEMETRY_LINK_RULE)) {
       console.log('[Telemetry Matcher] Stored telemetry matches cleared to be decided again: each file goes to the session it was recorded in');
@@ -212,7 +219,7 @@ export class ServerContext {
    * decided once: a stored match is only read afterwards. `catalog.stored` is updated in place so
    * later decisions in the same run see the ownership just committed.
    */
-  private storeNewTelemetryLinks(sessions: DetailedSession[], replays: ReplayFileEntry[],
+  private storeNewTelemetryLinks(sessions: TelemetrySessionCandidate[], replays: ReplayFileEntry[],
     catalog: Pick<TelemetryLinkInput, 'files' | 'stored'>, replayOwnerByName?: ReadonlyMap<string, string>): TelemetryLink[] {
     const links = decideTelemetryLinks({
       sessionEndMs: session => this.replayLinks.xmlMtime(session),
@@ -482,7 +489,7 @@ export class ServerContext {
       const owners = new Set<string>();
       for (const chunk of telemetryFileChunks(pending)) {
         const window = telemetryCandidateWindow(chunk[0].timestampEpochMs, chunk[chunk.length - 1].timestampEpochMs);
-        const sessions = this.sessionDb.getSessionsStartingBetween(window.sessionsFromMs, window.sessionsToMs);
+        const sessions = this.sessionDb.getTelemetrySessionCandidatesStartingBetween(window.sessionsFromMs, window.sessionsToMs);
         const replays = this.sessionDb.getReplayMatchingEntriesOverlapping(window.replaysFromMs, window.replaysToMs);
         const links = this.storeNewTelemetryLinks(sessions, replays, { files: chunk, stored: catalog.stored },
           this.sessionDb.getRecordingOwners(replays.map(replay => replay.name)));
@@ -491,7 +498,7 @@ export class ServerContext {
       }
       // Rows stored before the attachment was persisted on them.
       for (const id of this.sessionDb.getTelemetryOwnersWithoutFile()) owners.add(id);
-      for (const session of this.sessionDb.getSessionsByIds([...owners])) this.applySessionTelemetry(session);
+      for (const id of owners) this.applySessionTelemetryById(id);
     })().finally(() => {
       this.telemetryOwnershipReconciliationRunning = false;
       this.telemetryOwnershipReconciliation = null;

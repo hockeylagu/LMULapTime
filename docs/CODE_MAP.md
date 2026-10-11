@@ -130,8 +130,10 @@ Replay discovery finishes and reconciles links in ten-session batches, yielding 
 `setImmediate` and keeping `/scan/status` incomplete through replay-link and DuckDB ownership
 reconciliation, before decoding associated recordings. Reconciliation is bounded by change stamps
 (`server/core/dbReconciliationStore.ts`): replay links re-check sessions written, or near replays stored,
-since `replay_links_reconciled_at`; DuckDB ownership loads only the sessions and replays in each new file's
-time window and stores the owner's main file on its row and card. A replay sync asked for while links reconcile
+since `replay_links_reconciled_at`; DuckDB ownership loads only matching session scalars, driver names and replay names
+through `dbReconciliationStore.getTelemetrySessionCandidatesStartingBetween`, plus replays in each new file's
+time window, and stores the owner's main file by session ID without hydrating its history. XML end time still uses
+`SessionReplayLinks.xmlMtime` (persisted ingestion time, disk fallback). A replay sync asked for while links reconcile
 runs once they finish; per-replay
 jobs expose queued/processing/ready/failed states and whether a failed decode still has a playable primary trajectory. Launch actions remain available for playable cached data or DuckDB telemetry and report partial failures.
 Async replay scans and upgrades use `server/core/replay/replayFileProgress.ts` to report one file percentage

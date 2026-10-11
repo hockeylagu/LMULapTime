@@ -48,7 +48,7 @@ export class SessionReplayLinks {
   }
 
   /** Write-once XML end time comes from ingestion; missing stored values fall back to disk and retry failures. */
-  public xmlMtime(session: DetailedSession): number | undefined {
+  public xmlMtime(session: Pick<DetailedSession, 'id' | 'filePath'>): number | undefined {
     const stored = this.db.getSessionXmlMtime?.(session.id, session.filePath);
     if (stored !== undefined) return stored;
     if (!session.filePath) return undefined;

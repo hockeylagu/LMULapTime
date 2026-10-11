@@ -7,6 +7,7 @@ import type { TelemetryMetadataRecord } from '../../../server/core/dbTelemetrySt
 import type { ReplayFileEntry } from '../../../server/sessions/sessionXmlTypes.js';
 import type { DuckDbFileInfo } from '../../../server/telemetry/telemetryMatcher.js';
 import { decideTelemetryLinks, TELEMETRY_LINK_RULE, TelemetryLinks } from '../../../server/telemetry/telemetryLinks.js';
+import type { TelemetrySessionCandidate } from '../../../server/telemetry/telemetryMatcher.js';
 
 const at = (iso: string) => Date.parse(iso);
 
@@ -55,7 +56,7 @@ const stored = (filename: string, matchedSessionId: string | null, matchedReplay
 
 describe('decideTelemetryLinks', () => {
   const none = { stored: [], replays: [], loadReplayMetadata: () => null };
-  const endsAt = (ends: Record<string, string>) => (s: DetailedSession) => (ends[s.id] ? at(ends[s.id]) : undefined);
+  const endsAt = (ends: Record<string, string>) => (s: TelemetrySessionCandidate) => (ends[s.id] ? at(ends[s.id]) : undefined);
 
   it('gives a file to the session it was recorded in, not to the empty sessions LMU saves after it', () => {
     // Le Mans, 2026-09-14: the practice (3 laps, 18:37-18:46) and two 0-lap sessions saved after it.

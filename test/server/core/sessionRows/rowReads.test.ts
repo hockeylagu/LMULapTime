@@ -4,6 +4,7 @@ import type { DetailedSession } from '../../../../server/core/types.js';
 import { canonicalSession } from '../../../../server/core/sessionRows/canonical.js';
 import { readSessionCards } from '../../../../server/core/sessionSummaries/cards.js';
 import { restoreStoredSessionLinks } from '../../../../server/core/dbSessionStore.js';
+import { getTelemetrySessionCandidatesStartingBetween } from '../../../../server/core/dbReconciliationStore.js';
 import { driver, lap, session } from './builders.js';
 
 const link = { name: 'Spa.Vcr', path: 'C:/Replays/Spa.Vcr', sizeBytes: 10, eventTitle: 'Spa', durationSec: 300, hasRain: true, maxRainIntensity: 30 };
@@ -51,6 +52,13 @@ describe('reads from the normalized rows', () => {
     expect(db.getSessionById('a.xml')?.id).toBe('a');
     expect(db.getSessionsByIds(['b', 'a']).map(item => item.id)).toEqual(['b', 'a']);
     expect(db.getSessionsStartingBetween(1_780_000_000_000, 1_780_000_950_000).map(item => item.id)).toEqual(['a', 'b']);
+    const telemetryCandidates = getTelemetrySessionCandidatesStartingBetween(raw(), 1_780_000_000_000, 1_780_000_950_000);
+    expect(telemetryCandidates).toEqual([
+      expect.objectContaining({ id: 'a', trackVenue: 'Spa', sessionType: 'Race', sessionName: 'R1',
+        matchingReplayFile: { name: 'Spa.Vcr' }, drivers: [{ name: 'P' }, { name: 'Q' }] }),
+      expect.objectContaining({ id: 'b', drivers: [{ name: 'P' }, { name: 'Q' }] }),
+    ]);
+    expect(telemetryCandidates[0]).not.toHaveProperty('laps');
     expect(db.getSessionsLinkedToRecording('Spa.Vcr').map(item => item.id)).toEqual(['a']);
     expect(Array.from(db.iterateDetailedSessions()).map(item => item.id)).toEqual(['a', 'b']);
     expect(db.getTelemetryOwnersWithoutFile()).toEqual([]);
@@ -65,6 +73,12 @@ describe('reads from the normalized rows', () => {
     expect(db.updateSessionTelemetryFile('a', 'spa.duckdb')).toBe(false);
     db.updateSessionMatchingReplay('a', { name: 'Spa.Vcr', path: link.path, sizeBytes: 10, eventTitle: 'Spa', durationSec: 300, maxRainIntensity: 30, hasRain: true });
     expect(stamp()).toEqual(before);
+    // Keep unnamed entries (the matcher handles them), without inventing a driver for empty sessions.
+    db.upsertSession(newSession('unnamed', { drivers: [driver('', [lap(1)])], playerDriver: undefined, driversCount: 1 }), 'unnamed.xml', 1, 10);
+    db.upsertSession(newSession('empty', { drivers: [], playerDriver: undefined, driversCount: 0 }), 'empty.xml', 1, 10);
+    const candidates = getTelemetrySessionCandidatesStartingBetween(raw(), 1_780_000_000_000, 1_780_000_950_000);
+    expect(candidates.find(item => item.id === 'unnamed')?.drivers).toEqual([{ name: '' }]);
+    expect(candidates.find(item => item.id === 'empty')?.drivers).toEqual([]);
   });
 
   it('changes a link or the telemetry file and reclassifies from the rows alone', () => {

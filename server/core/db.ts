@@ -131,6 +131,7 @@ import { archiveReplacedRecording } from './replay/dbReplayIdentity.js';
 import { getReplayMatchingEntries, getReplayMatchingEntriesOverlapping, getReplayMatchingEntry } from './replay/dbReplayMatchingStore.js';
 import {
   getRecordingOwners, getReplayReconciliationCandidateIds, getSessionsByIds, getSessionsStartingBetween, getTelemetryOwnersWithoutFile,
+  getTelemetrySessionCandidatesStartingBetween,
 } from './dbReconciliationStore.js';
 import type { ReplayMatchTarget } from '../sessions/replayMatching.js';
 import { storeDecodedReplayFacts } from './replay/dbReplayLapStore.js';
@@ -526,6 +527,9 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
   public getReplayReconciliationCandidateIds(sinceMs: number): string[] { return getReplayReconciliationCandidateIds(this.db, sinceMs); }
   public getSessionsByIds(ids: readonly string[]): DetailedSession[] { return getSessionsByIds(this.db, ids); }
   public getSessionsStartingBetween(fromMs: number, toMs: number): DetailedSession[] { return getSessionsStartingBetween(this.db, fromMs, toMs); }
+  public getTelemetrySessionCandidatesStartingBetween(fromMs: number, toMs: number) {
+    return getTelemetrySessionCandidatesStartingBetween(this.db, fromMs, toMs);
+  }
   public getReplayMatchingEntriesOverlapping(fromMs: number, toMs: number) { return getReplayMatchingEntriesOverlapping(this.db, fromMs, toMs); }
   public getRecordingOwners(names: readonly string[]): Map<string, string> { return getRecordingOwners(this.db, names); }
   public getTelemetryOwnersWithoutFile(): string[] { return getTelemetryOwnersWithoutFile(this.db); }

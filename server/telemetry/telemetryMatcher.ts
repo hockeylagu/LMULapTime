@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { matchesTrack } from '../../shared/domain/paceCategory.js';
 import { DuckDbReader } from './duckdbReader.js';
-import { DetailedSession, ReplayMetadata } from '../core/types.js';
+import { ReplayMetadata } from '../core/types.js';
 
 export interface DuckDbFileInfo {
   filename: string;
@@ -18,6 +18,19 @@ export interface DuckDbFileInfo {
   lapsCount?: number;
   bestLapTime?: number;
   enrichmentError?: string;
+}
+
+/** The normalized session data needed to decide telemetry ownership. */
+export interface TelemetrySessionCandidate {
+  id: string;
+  filePath: string;
+  timestamp: number;
+  trackVenue: string;
+  trackCourse: string;
+  sessionType: string;
+  sessionName: string;
+  drivers: Array<{ name: string }>;
+  matchingReplayFile?: { name: string };
 }
 
 export function parseDuckDbFilename(filename: string): {
@@ -145,7 +158,7 @@ export interface DuckDbMatch {
 }
 
 /** The session's start in epoch ms, or 0 when its timestamp can't be read. */
-export function sessionEpochMs(session: DetailedSession): number {
+export function sessionEpochMs(session: Pick<TelemetrySessionCandidate, 'timestamp'>): number {
   if (!session.timestamp) return 0;
   const d = new Date(session.timestamp);
   if (!isNaN(d.getTime())) return d.getTime();
@@ -156,7 +169,7 @@ export function sessionEpochMs(session: DetailedSession): number {
 
 export function matchDuckDbToSession(
   duckdbFiles: DuckDbFileInfo[],
-  session: DetailedSession,
+  session: TelemetrySessionCandidate,
   maxTimeDeltaSec = 3600
 ): DuckDbFileInfo | null {
   return findDuckDbForSession(duckdbFiles, session, maxTimeDeltaSec)?.file ?? null;
@@ -164,7 +177,7 @@ export function matchDuckDbToSession(
 
 export function findDuckDbForSession(
   duckdbFiles: DuckDbFileInfo[],
-  session: DetailedSession,
+  session: TelemetrySessionCandidate,
   maxTimeDeltaSec = 3600
 ): DuckDbMatch | null {
   if (duckdbFiles.length === 0) return null;
