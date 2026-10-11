@@ -16,7 +16,7 @@ import {
   computeConsistencyRating,
   selectCleanLapCandidates,
 } from '../../shared/domain/lapComparison.js';
-import { matchesTrack, matchesCarClass } from '../../shared/domain/paceCategory.js';
+import { matchesTrack } from '../../shared/domain/paceCategory.js';
 import { isHumanDriver, selectLeaderboardLaps } from '../../shared/domain/leaderboard.js';
 
 export const computeAverageLapTime = (laps: LapData[]): number | null => {
@@ -221,7 +221,7 @@ export function extractComparableLaps(
       // The personal best comes from the same laps as the best sectors, so the theoretical best never exceeds it.
       const leaderboardLaps = isPlayerDriver ? new Set(selectLeaderboardLaps(d.laps || [])) : null;
       if (filters.humansOnly && !isHumanDriver(s, d)) return;
-      if (targetClass && targetClass !== 'All' && !matchesCarClass(d.carClass || '', d.carType || '', targetClass)) {
+      if (targetClass && targetClass !== 'All' && d.carClass !== targetClass) {
         return;
       }
 
@@ -259,7 +259,7 @@ export function extractComparableLaps(
         return;
       }
 
-      if (targetClass && targetClass !== 'All' && !matchesCarClass(d.carClass || '', d.carType || '', targetClass)) {
+      if (targetClass && targetClass !== 'All' && d.carClass !== targetClass) {
         return;
       }
 

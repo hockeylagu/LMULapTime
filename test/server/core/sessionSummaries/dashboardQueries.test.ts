@@ -8,7 +8,7 @@ import { queryCompactDashboard } from '../../../../server/core/sessionSummaries/
 const makeSession = (id: string, timestamp: number, lapTime: number): DetailedSession => {
   const lap: LapData = { lapNum: 1, position: 1, lapTime, lapTimeString: `${lapTime}`, s1: 30, s2: 30, s3: lapTime - 60,
     topSpeed: 250, fCompound: 'Dry', rCompound: 'Dry', isPitStop: false, isValid: true };
-  const driver = { name: 'Player', carType: 'Ferrari 499P', carClass: 'Hypercar', carNumber: '1', teamName: '', isPlayer: true,
+  const driver = { name: 'Player', carType: 'Ferrari 499P', carClass: 'Hyper', carNumber: '1', teamName: '', isPlayer: true,
     position: 1, classPosition: 1, bestLapTime: lapTime, bestLapTimeString: `${lapTime}`, bestLapNum: 1, bestS1: 30, bestS2: 30,
     bestS3: lapTime - 60, theoreticalBest: lapTime, theoreticalBestString: `${lapTime}`, lapsCount: 1, laps: [lap] };
   return { id, filename: `${id}.xml`, filePath: `${id}.xml`, trackVenue: 'Monza', trackCourse: 'GP', trackEvent: '',
@@ -22,7 +22,7 @@ describe('compact dashboard queries', () => {
     initDbSchema(db);
     upsertSession(db, makeSession('slower', 1, 95), 'slower.xml', 1, 10);
     upsertSession(db, makeSession('faster', 2, 90), 'faster.xml', 2, 10);
-    const benchmark = { key: 'Monza_HY', trackName: 'Monza', carClass: 'Hypercar', patch: 'test', target100Sec: 90,
+    const benchmark = { key: 'Monza_HY', trackName: 'Monza', carClass: 'Hyper', patch: 'test', target100Sec: 90,
       targets: { alienSec: 90, competitiveSec: 90, goodSec: 90, goodMidpackSec: 90, midpackSec: 90, midpackTailSec: 90, tailEnderSec: 90, offlineSec: 90 } };
     db.prepare(`INSERT INTO reference_laptimes (key,track_name,car_class,patch,target100_sec,alien_sec,competitive_sec,good_sec,
       good_midpack_sec,midpack_sec,midpack_tail_sec,tail_ender_sec,offline_sec,data_json,updated_at)

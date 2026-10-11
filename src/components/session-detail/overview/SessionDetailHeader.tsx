@@ -3,7 +3,6 @@ import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ArrowLeft, ChevronRight, Sliders } from 'lucide-react';
 import { DetailedSession, DriverData, ReferenceLaptimeEntry } from '../../../../shared/types/index.js';
 import { getDisplayTrackName } from '../../../../shared/domain/formatters.js';
-import { normalizeCarClass } from '../../../../shared/domain/paceCategory.js';
 import { SessionRulesModal } from '../standings/SessionRulesModal.js';
 import { getSessionTypeStyle } from '../../common/sessionTypeStyles.js';
 import { ReplayLaunchButton } from '../../common/replay/ReplayLaunchButton.js';
@@ -156,7 +155,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
                 )}
               </div>
               <h2 className="mt-1.5 text-2xl font-extrabold text-white max-w-full min-w-0">
-                <Link to={`/track/${encodeURIComponent(trackName)}${normalizeCarClass(session.playerDriver?.carClass, session.playerDriver?.carType) ? `?carClass=${encodeURIComponent(normalizeCarClass(session.playerDriver?.carClass, session.playerDriver?.carType))}` : ''}`}
+                <Link to={`/track/${encodeURIComponent(trackName)}${(session.playerDriver?.carClass ?? '') ? `?carClass=${encodeURIComponent((session.playerDriver?.carClass ?? ''))}` : ''}`}
                   className="inline-flex items-center gap-2 group max-w-full min-w-0 rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent"
                   title={`View ${trackName} Track Details`}>
                   <span className="truncate">{trackName}</span>

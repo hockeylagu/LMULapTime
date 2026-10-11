@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { getDisplayTrackName, isSessionEmpty, getBestLapNumber } from '../../../shared/domain/formatters.js';
 import { computeConsistencyRating } from '../../../shared/domain/lapComparison.js';
-import { normalizeCarClass } from '../../../shared/domain/paceCategory.js';
 import { PaceCategory } from '../../../shared/types/index.js';
 import type { SessionSummary } from './dashboardTypes.js';
 
@@ -188,7 +187,7 @@ export function useDashboardTrends(sessions: SessionSummary[]): DashboardTrendsR
         sessionType: latestRaw.sessionType,
         timeString: latestRaw.timeString,
         carName: p.carType,
-        carClass: p.carClass,
+        carClass: p.carClass ? p.carClass : undefined,
         bestLapTimeString: p.bestLapTimeString,
         bestLapTime: p.bestLapTime,
         bestLapNum: getBestLapNumber(p),
@@ -237,11 +236,11 @@ export function useDashboardTrends(sessions: SessionSummary[]): DashboardTrendsR
     // Recent pace progression points (chronological order: oldest -> newest, max 6 points), in the
     // latest outing's car class only: a GT3 lap and a Hypercar lap are not one progression.
     const trendClass = latestRaw?.playerDriver
-      ? normalizeCarClass(latestRaw.playerDriver.carClass, latestRaw.playerDriver.carType)
+      ? latestRaw.playerDriver.carClass
       : '';
     const recentWithPace: RecentPacePoint[] = [];
     for (const s of sorted) {
-      const inTrendClass = !trendClass || normalizeCarClass(s.playerDriver?.carClass, s.playerDriver?.carType) === trendClass;
+      const inTrendClass = !trendClass || (s.playerDriver?.carClass ?? '') === trendClass;
       if (inTrendClass && s.playerDriver?.bestLapPacePercentage && s.playerDriver.bestLapPacePercentage > 0) {
         recentWithPace.push({
           id: s.id,

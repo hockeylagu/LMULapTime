@@ -122,7 +122,7 @@ describe('useReplayInspectorData session locators', () => {
   it('selects comparison candidates with session and ordinal locators in the URL', async () => {
     const candidate: ComparableLap = {
       id: 'other-session-lap', sessionId: 'session-2', driverOrdinal: 2, lapOrdinal: 4,
-      driverName: 'Baseline Driver', carType: 'GT3', carClass: 'LMGT3', lapTime: 98,
+      driverName: 'Baseline Driver', carType: 'GT3', carClass: 'GT3', lapTime: 98,
       lapTimeString: '1:38.000', s1: 30, s2: 34, s3: 34, topSpeed: 200,
       isValid: true, isPitStop: false, matchingReplayFile: 'Baseline_Q1.Vcr',
     };

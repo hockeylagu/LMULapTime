@@ -46,7 +46,7 @@ describe('Replay domain services and transforms', () => {
 
       // Mutating clone does not affect original
       cloned.trackVenue = 'Mutated Venue';
-      cloned.drivers[0].carClass = 'Hypercar';
+      cloned.drivers[0].carClass = 'Hyper';
       expect(original.trackVenue).toBeUndefined();
       expect(original.drivers[0].carClass).toBe('GTE');
     });
@@ -71,7 +71,7 @@ describe('Replay domain services and transforms', () => {
         drivers: [],
         playerDriver: {
           name: 'Original Player',
-          carClass: 'Hypercar',
+          carClass: 'Hyper',
           carType: 'Toyota GR010',
           bestLapTime: 91.2,
           laps: [
@@ -87,7 +87,7 @@ describe('Replay domain services and transforms', () => {
       });
 
       expect(composed.displayTrack).toBe('Autodromo Nazionale Monza');
-      expect(composed.carClass).toBe('Hypercar');
+      expect(composed.carClass).toBe('Hyper');
       expect(composed.carModel).toBe('Toyota GR010');
       expect(composed.laps).toHaveLength(1);
       expect(composed.laps?.[0].isBest).toBe(true);
@@ -172,7 +172,7 @@ describe('Replay domain services and transforms', () => {
               totalEvents: 1,
               durationSec: 10,
               trackName: 'Test Track',
-              drivers: [{ slot: 1, name: 'Driver A', isPlayer: true, carClass: 'LMGT3', carModel: 'Aston Martin' }],
+              drivers: [{ slot: 1, name: 'Driver A', isPlayer: true, carClass: 'GT3', carModel: 'Aston Martin' }],
             },
           },
           {
@@ -202,7 +202,7 @@ describe('Replay domain services and transforms', () => {
       // Sorted by mtime descending
       expect(summaries[0].name).toBe('Archived_B.Vcr');
       expect(summaries[1].name).toBe('Replay_A.Vcr');
-      expect(summaries[1].carClass).toBe('LMGT3');
+      expect(summaries[1].carClass).toBe('GT3');
       expect(summaries[1].carModel).toBe('Aston Martin');
     });
   });

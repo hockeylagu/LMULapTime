@@ -17,23 +17,16 @@ export interface CarClassBadgeConfig {
 
 export function getCarClassBadgeConfig(
   carClass?: string | null,
-  carType?: string | null,
   category?: string | null,
   isElmsOverride?: boolean,
   hasOrangeCornerOverride?: boolean
 ): CarClassBadgeConfig | null {
-  if (!carClass && !carType && !category) return null;
+  if (!carClass) return null;
 
-  const raw = `${carClass || ''} ${carType || ''} ${category || ''}`.trim();
-  const lower = raw.toLowerCase();
-
-  const isElms =
-    isElmsOverride ??
-    (/elms|lmp2_elms|gt3_elms/.test(lower) ||
-      (typeof category === 'string' && /elms/i.test(category)));
+  const isElms = isElmsOverride ?? (carClass === 'LMP2_ELMS' || /elms/i.test(category ?? ''));
 
   // 1. Hypercar (HY) - Red
-  if (/hyper|lmh|lmdh|\bhy\b/.test(lower)) {
+  if (carClass === 'Hyper') {
     return {
       badgeType: 'HY',
       label: 'HY',
@@ -48,7 +41,7 @@ export function getCarClassBadgeConfig(
   }
 
   // 2. LMP2 - Blue (WEC: plain blue, ELMS: blue with orange corner)
-  if (lower.includes('lmp2')) {
+  if (carClass === 'LMP2' || carClass === 'LMP2_ELMS') {
     const hasCorner = hasOrangeCornerOverride ?? isElms;
     return {
       badgeType: 'LMP2',
@@ -64,7 +57,7 @@ export function getCarClassBadgeConfig(
   }
 
   // 3. LMP3 - Purple
-  if (lower.includes('lmp3')) {
+  if (carClass === 'LMP3') {
     return {
       badgeType: 'LMP3',
       label: 'LMP3',
@@ -78,13 +71,9 @@ export function getCarClassBadgeConfig(
     };
   }
 
-  // 4. GT3 / LMGT3 - Green (WEC: plain green, ELMS / orange corner: green with orange corner)
-  if (/gt3|lmgt3/.test(lower)) {
-    const hasCorner =
-      hasOrangeCornerOverride ??
-      (isElms ||
-        lower.includes('orange') ||
-        (typeof carClass === 'string' && /orange/i.test(carClass)));
+  // 4. GT3 - Green (WEC: plain green, ELMS / orange corner: green with orange corner)
+  if (carClass === 'GT3') {
+    const hasCorner = hasOrangeCornerOverride ?? isElms;
     return {
       badgeType: 'GT3',
       label: 'GT3',
@@ -99,7 +88,7 @@ export function getCarClassBadgeConfig(
   }
 
   // 5. GTE - Orange
-  if (lower.includes('gte')) {
+  if (carClass === 'GTE') {
     return {
       badgeType: 'GTE',
       label: 'GTE',
@@ -114,7 +103,7 @@ export function getCarClassBadgeConfig(
   }
 
   // Fallback for custom or unknown classes
-  const fallbackLabel = (carClass || carType || '').toUpperCase().slice(0, 5);
+  const fallbackLabel = carClass.toUpperCase().slice(0, 5);
   return {
     badgeType: 'OTHER',
     label: fallbackLabel,
@@ -123,7 +112,7 @@ export function getCarClassBadgeConfig(
     bgClass: 'bg-lmu-card/60',
     fadedClass: 'border-lmu-border text-lmu-faint bg-transparent hover:border-lmu-rule hover:text-lmu-text-soft',
     hasOrangeCorner: false,
-    title: carClass || carType || '',
+    title: carClass,
   };
 }
 
@@ -147,7 +136,6 @@ export interface CarClassBadgeProps {
 
 export const CarClassBadge: React.FC<CarClassBadgeProps> = ({
   carClass,
-  carType,
   category,
   isElms,
   hasOrangeCorner,
@@ -162,7 +150,7 @@ export const CarClassBadge: React.FC<CarClassBadgeProps> = ({
   selectable,
   onClick,
 }) => {
-  const config = getCarClassBadgeConfig(carClass, carType, category, isElms, hasOrangeCorner);
+  const config = getCarClassBadgeConfig(carClass, category, isElms, hasOrangeCorner);
   if (!config) return null;
 
   const isHidden = ariaHidden || ariaHiddenProp === true || ariaHiddenProp === 'true';

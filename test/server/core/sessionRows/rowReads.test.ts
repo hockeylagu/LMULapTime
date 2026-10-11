@@ -12,7 +12,7 @@ const link = { name: 'Spa.Vcr', path: 'C:/Replays/Spa.Vcr', sizeBytes: 10, event
 function newSession(id: string, overrides: Partial<DetailedSession> = {}): DetailedSession {
   const player = driver('P', [lap(1), lap(2, { conditions: { wetTyres: true } }), lap(3, { isPitStop: true })], { isPlayer: true, bestLapNum: 1, avgLapTime: 101.5,
     incidents: [{ type: 'contact', description: 'hit', lapNum: 2 }], totalIncidents: 1, pitStopsCount: 1 });
-  return session([player, driver('Q', [lap(1)], { position: 2, classPosition: 2, carClass: 'LMGT3', carType: 'Porsche 911 GT3 R' })], {
+  return session([player, driver('Q', [lap(1)], { position: 2, classPosition: 2, carClass: 'GT3', carType: 'Porsche 911 GT3 R' })], {
     id, filename: `${id}.xml`, filePath: `${id}.xml`, timestamp: 1_780_000_000_000, weatherInfo: 'Sunny',
     weather: { condition: 'Dry', timeOfDay: 'Daytime', weatherString: 'Clear' }, settings: { modeSetting: 'Multiplayer', fuelMultiplier: 1, tireWarmers: true },
     bestSessionLap: { driverName: 'P', carType: 'Ferrari 499P', lapTime: 101, lapTimeString: '1:41.000' }, ...overrides });

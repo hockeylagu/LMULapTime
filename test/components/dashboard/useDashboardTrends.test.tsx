@@ -27,7 +27,7 @@ describe('useDashboardTrends', () => {
         playerDriver: {
           name: 'Samuel Lague',
           carType: 'BMW M4 LMGT3',
-          carClass: 'LMGT3',
+          carClass: 'GT3',
           bestLapTime: 138.5,
           bestLapTimeString: '2:18.500',
           bestS1: 40,
@@ -60,7 +60,7 @@ describe('useDashboardTrends', () => {
         playerDriver: {
           name: 'Samuel Lague',
           carType: 'Chevrolet Corvette Z06 LMGT3.R',
-          carClass: 'LMGT3',
+          carClass: 'GT3',
           bestLapTime: 240.47,
           bestLapTimeString: '4:00.470',
           bestS1: 70,
@@ -122,7 +122,7 @@ describe('useDashboardTrends', () => {
         playerDriver: {
           name: 'Samuel Lague',
           carType: 'BMW M4 LMGT3',
-          carClass: 'LMGT3',
+          carClass: 'GT3',
           bestLapTime: null, // Empty: 0 timed laps!
           bestLapTimeString: '',
           bestS1: null,
@@ -144,7 +144,7 @@ describe('useDashboardTrends', () => {
         playerDriver: {
           name: 'Samuel Lague',
           carType: 'BMW M4 LMGT3',
-          carClass: 'LMGT3',
+          carClass: 'GT3',
           bestLapTime: 245.0,
           bestLapTimeString: '4:05.000',
           bestS1: 72,
@@ -166,7 +166,7 @@ describe('useDashboardTrends', () => {
         playerDriver: {
           name: 'Samuel Lague',
           carType: 'Chevrolet Corvette Z06 LMGT3.R',
-          carClass: 'LMGT3',
+          carClass: 'GT3',
           bestLapTime: 240.47,
           bestLapTimeString: '4:00.470',
           bestS1: 70,
@@ -206,7 +206,7 @@ describe('useDashboardTrends', () => {
         playerDriver: {
           name: 'Player',
           carType: 'Ferrari 499P',
-          carClass: 'LMH',
+          carClass: 'Hyper',
           bestLapTime: 96.5,
           bestLapTimeString: '1:36.500',
           bestS1: 30,
@@ -229,7 +229,7 @@ describe('useDashboardTrends', () => {
         playerDriver: {
           name: 'Player',
           carType: 'Ferrari 499P',
-          carClass: 'LMH',
+          carClass: 'Hyper',
           bestLapTime: 95.8,
           bestLapTimeString: '1:35.800',
           bestS1: 29.5,
@@ -253,7 +253,7 @@ describe('useDashboardTrends', () => {
         playerDriver: {
           name: 'Player',
           carType: 'Ferrari 499P',
-          carClass: 'LMH',
+          carClass: 'Hyper',
           bestLapTime: 95.5,
           bestLapTimeString: '1:35.500',
           bestS1: 29.5,
@@ -298,14 +298,14 @@ describe('useDashboardTrends', () => {
 
   it('draws the pace trend in the latest outing car class only', () => {
     const sessions = [
-      session('hy-old', '2026/09/20 10:00:00', 'Peugeot 9x8', 'Hypercar', 104.0),
-      session('gt3-mid', '2026/09/22 10:00:00', 'BMW M4 LMGT3', 'LMGT3', 101.0),
-      session('hy-new', '2026/09/25 10:00:00', 'Peugeot 9x8', 'Hypercar', 103.4),
+      session('hy-old', '2026/09/20 10:00:00', 'Peugeot 9x8', 'Hyper', 104.0),
+      session('gt3-mid', '2026/09/22 10:00:00', 'BMW M4 LMGT3', 'GT3', 101.0),
+      session('hy-new', '2026/09/25 10:00:00', 'Peugeot 9x8', 'Hyper', 103.4),
     ];
 
     const { result } = renderHook(() => useDashboardTrends(sessions));
 
-    expect(result.current.paceTrendClass).toBe('LMH');
+    expect(result.current.paceTrendClass).toBe('Hyper');
     expect(result.current.recentPaceTrend.map(p => p.id)).toEqual(['hy-old', 'hy-new']);
     // 104.0% down to 103.4%: faster, with the GT3 101.0% left out of the comparison.
     expect(result.current.paceDelta).toBe(0.6);
@@ -314,8 +314,8 @@ describe('useDashboardTrends', () => {
 
   it('calls a pace change under 0.3% steady, not a trend', () => {
     const sessions = [
-      session('old', '2026/09/20 10:00:00', 'Peugeot 9x8', 'Hypercar', 103.14),
-      session('new', '2026/09/25 10:00:00', 'Peugeot 9x8', 'Hypercar', 103.4),
+      session('old', '2026/09/20 10:00:00', 'Peugeot 9x8', 'Hyper', 103.14),
+      session('new', '2026/09/25 10:00:00', 'Peugeot 9x8', 'Hyper', 103.4),
     ];
     const { result } = renderHook(() => useDashboardTrends(sessions));
     expect(result.current.paceDelta).toBe(-0.26);

@@ -5,7 +5,7 @@ import {
   parseDateStringToTimestamp,
   minValidTime,
 } from './formatters.js';
-import { matchesSessionCarClass } from './paceCategory.js';
+import { matchesSessionCarClass } from './vehicleMapping.js';
 
 export interface TrackSessionSummary {
   id?: string;
@@ -133,7 +133,7 @@ export function aggregateTrackSummaries<T extends TrackSessionSummary>(
         summary.bestLapTime = p.bestLapTime;
         summary.bestLapDriver = p.name;
         summary.bestLapCar = p.carType;
-        summary.bestLapClass = p.carClass || '';
+        summary.bestLapClass = p.carClass;
         summary.bestLapWet = 'bestLapWet' in p && p.bestLapWet ? true : undefined;
       }
       summary.bestS1 = minValidTime(summary.bestS1, p.bestS1);

@@ -20,7 +20,7 @@ const mockLaps: ComparableLap[] = [
     s3: 44.2,
     topSpeed: 280,
     carType: 'BMW M4 LMGT3',
-    carClass: 'LMGT3',
+    carClass: 'GT3',
     isValid: true,
   },
   {
@@ -39,7 +39,7 @@ const mockLaps: ComparableLap[] = [
     s3: 44.1,
     topSpeed: 281,
     carType: 'BMW M4 LMGT3',
-    carClass: 'LMGT3',
+    carClass: 'GT3',
     isValid: true,
   },
   {
@@ -58,7 +58,7 @@ const mockLaps: ComparableLap[] = [
     s3: 44.0,
     topSpeed: 280,
     carType: 'Ferrari 296 LMGT3',
-    carClass: 'LMGT3',
+    carClass: 'GT3',
     isValid: true,
   },
   {
@@ -77,7 +77,7 @@ const mockLaps: ComparableLap[] = [
     s3: 44.0,
     topSpeed: 282,
     carType: 'BMW M4 LMGT3',
-    carClass: 'LMGT3',
+    carClass: 'GT3',
     isValid: true,
   },
   {
@@ -96,7 +96,7 @@ const mockLaps: ComparableLap[] = [
     s3: 44.1,
     topSpeed: 279,
     carType: 'Porsche 911 GT3 R',
-    carClass: 'LMGT3',
+    carClass: 'GT3',
     isValid: true,
   },
 ];

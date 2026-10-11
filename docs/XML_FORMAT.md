@@ -125,6 +125,16 @@ Container attributes and children:
 Each vehicle participant is logged in a `<Driver>` block within the session container.
 
 ### 3.1 Driver Identifiers & Classification
+
+The parser converts external car class labels once with `normalizeCarClass` to
+`Hyper`, `GT3`, `LMP2`, `LMP2_ELMS`, `LMP3`, or `GTE`.
+Benchmark CSV ingestion uses the same conversion. Stored sessions, projections,
+API filters, route parameters, comparisons and badges use exact canonical class
+values; they do not infer class from car models or accept aliases during matching.
+An unavailable class benchmark returns no pace rating. `All` is a filter sentinel.
+`matchesSessionCarClass` selects the player's class, or participating drivers when
+there is no player. A parser version bump reparses existing results into this contract.
+
 ```xml
 <Driver>
   <Name>Samuel Lague</Name>

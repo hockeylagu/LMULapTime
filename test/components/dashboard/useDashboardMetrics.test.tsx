@@ -17,7 +17,7 @@ function makeSession(overrides: Partial<DashboardSessionItem> = {}): DashboardSe
     playerDriver: {
       name: 'Player',
       carType: 'Ferrari 499P',
-      carClass: 'Hypercar',
+      carClass: 'Hyper',
       bestLapTime: 100,
       bestLapTimeString: '1:40.000',
       bestS1: 30,

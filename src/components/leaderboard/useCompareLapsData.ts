@@ -4,7 +4,6 @@ import { updateSearchParams } from '../../utils/urlParams.js';
 import { ReferenceLaptimeEntry, PaceCategory, DetailedSession, ComparableLap } from '../../../shared/types/index.js';
 import { getDisplayTrackName } from '../../../shared/domain/formatters.js';
 import {
-  matchesCarClass,
   getPaceCategoryFromPercentage,
 } from '../../../shared/domain/paceCategory.js';
 import { createTheoreticalBestLap } from '../../../shared/domain/lapComparison.js';
@@ -153,7 +152,8 @@ export function useCompareLapsData({
   }, [sessions.length, suppliedTracks]);
 
   const selectedTrack = searchParams.get('track') || initialTrack || (availableTracks.length > 0 ? availableTracks[0] : layoutTracks[0] || 'Bahrain');
-  const selectedCarClass = searchParams.get('carClass') || initialCarClass || 'GT3';
+  const rawCarClass = searchParams.get('carClass') || initialCarClass || 'GT3';
+  const selectedCarClass = rawCarClass;
   const [loading, setLoading] = useState<boolean>(false);
 
   const [apiData, setApiData] = useState<CompareLapsApiData>(NO_COMPARE_LAPS);
@@ -394,7 +394,7 @@ export function useCompareLapsData({
   const handleAddTheoreticalBest = () => {
     if (!apiData.bestS1 || !apiData.bestS2 || !apiData.bestS3) return;
     const theoTime = apiData.bestS1 + apiData.bestS2 + apiData.bestS3;
-    const matchingRef = apiData.benchmarks.find((b) => matchesCarClass(b.carClass, '', selectedCarClass)) || apiData.benchmarks[0];
+    const matchingRef = apiData.benchmarks.find((b) => (b.carClass === selectedCarClass));
 
     let pacePercentage: number | null = null;
     let paceCategory: PaceCategory | null = null;

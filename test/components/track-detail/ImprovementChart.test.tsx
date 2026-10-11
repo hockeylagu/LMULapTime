@@ -22,7 +22,7 @@ describe('ImprovementChart component', () => {
       trackVenue: 'Spa',
       displayTrack: 'Spa',
       carType: 'Ferrari 499P',
-      carClass: 'LMH',
+      carClass: 'Hyper',
       driverName: 'Player',
       bestLapTime: 122.0,
       bestS1: 34.0,
@@ -42,7 +42,7 @@ describe('ImprovementChart component', () => {
       trackVenue: 'Spa',
       displayTrack: 'Spa',
       carType: 'Ferrari 499P',
-      carClass: 'LMH',
+      carClass: 'Hyper',
       driverName: 'Player',
       bestLapTime: 121.0,
       bestS1: 33.5,
@@ -65,7 +65,7 @@ describe('ImprovementChart component', () => {
         tracks={['Spa']}
         selectedTrack="Spa"
         setSelectedTrack={setSelectedTrack}
-        selectedCarClass="LMH"
+        selectedCarClass="Hyper"
         setSelectedCarClass={setSelectedCarClass}
       />
     );
@@ -96,7 +96,7 @@ describe('ImprovementChart component', () => {
         tracks={['Spa']}
         selectedTrack="Spa"
         setSelectedTrack={vi.fn()}
-        selectedCarClass="LMH"
+        selectedCarClass="Hyper"
         setSelectedCarClass={vi.fn()}
       />
     );
@@ -133,7 +133,7 @@ describe('ImprovementChart component', () => {
         tracks={['Spa']}
         selectedTrack="Spa"
         setSelectedTrack={vi.fn()}
-        selectedCarClass="LMH"
+        selectedCarClass="Hyper"
         setSelectedCarClass={vi.fn()}
       />
     );
@@ -168,7 +168,7 @@ describe('ImprovementChart component', () => {
         tracks={['Spa']}
         selectedTrack="Spa"
         setSelectedTrack={vi.fn()}
-        selectedCarClass="LMH"
+        selectedCarClass="Hyper"
         setSelectedCarClass={vi.fn()}
       />
     );
@@ -194,7 +194,7 @@ describe('ImprovementChart component', () => {
         tracks={['Spa']}
         selectedTrack="Spa"
         setSelectedTrack={vi.fn()}
-        selectedCarClass="LMH"
+        selectedCarClass="Hyper"
         setSelectedCarClass={vi.fn()}
         selectedCarModel="Ferrari 499P"
       />
@@ -225,7 +225,7 @@ describe('ImprovementChart component', () => {
         tracks={['Spa']}
         selectedTrack="Spa"
         setSelectedTrack={vi.fn()}
-        selectedCarClass="LMH"
+        selectedCarClass="Hyper"
         setSelectedCarClass={vi.fn()}
       />
     );

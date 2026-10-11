@@ -1,5 +1,4 @@
 import { parseDateStringToTimestamp, matchesSessionType } from './formatters.js';
-import { normalizeCarClass } from './paceCategory.js';
 import { isOnlineSession } from './leaderboard.js';
 import { getCircuitSpecification } from './circuitSpecs.js';
 export interface CandidateRelatedSession {
@@ -76,7 +75,7 @@ export function isSameWeekendSession(current: CandidateRelatedSession, candidate
 
   const classA = current.playerDriver?.carClass || current.carClass;
   const classB = candidate.playerDriver?.carClass || candidate.carClass;
-  if (classA && classB && normalizeCarClass(classA) !== normalizeCarClass(classB)) return false;
+  if (classA && classB && classA !== classB) return false;
 
   if (current.trackEvent && candidate.trackEvent && squash(current.trackEvent) !== squash(candidate.trackEvent)) {
     return false;

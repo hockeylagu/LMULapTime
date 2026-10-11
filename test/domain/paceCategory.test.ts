@@ -2,15 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { ReferenceLaptimeEntry } from '../../server/core/types.js';
 import {
   formatPacePercentage,
-  normalizeCarClass,
-  matchesCarClass,
-  matchesSessionCarClass,
   matchesTrack,
   getPaceCategoryFromPercentage,
   findMatchingTrackBenchmarkEntries,
   findReferenceEntry,
   createBenchmarkLookup,
-  VEHICLE_CLASS_OPTIONS,
 } from '../../shared/domain/paceCategory.js';
 
 describe('paceCategory utility', () => {
@@ -25,93 +21,6 @@ describe('paceCategory utility', () => {
       expect(formatPacePercentage(null)).toBe('--%');
       expect(formatPacePercentage(undefined)).toBe('--%');
       expect(formatPacePercentage(NaN)).toBe('--%');
-    });
-  });
-
-  describe('normalizeCarClass', () => {
-    it('distinguishes LMP2elms and LMP2wec and returns canonical class', () => {
-      expect(normalizeCarClass('Hypercar', '')).toBe('LMH');
-      expect(normalizeCarClass('GT3', 'Porsche 911 GT3 R')).toBe('LMGT3');
-      expect(normalizeCarClass('LMP2', 'ELMS')).toBe('LMP2elms');
-      expect(normalizeCarClass('LMP2', 'WEC')).toBe('LMP2wec');
-      expect(normalizeCarClass('LMP3', 'Ligier JS P320')).toBe('LMP3');
-      expect(normalizeCarClass('GTE', 'Ferrari 488 GTE')).toBe('GTE');
-      expect(normalizeCarClass('UnknownClass')).toBe('UnknownClass');
-    });
-  });
-
-  describe('matchesCarClass', () => {
-    it('returns true when targetClass is All or empty', () => {
-      expect(matchesCarClass('LMGT3', 'Porsche', 'All')).toBe(true);
-      expect(matchesCarClass('LMH', 'Toyota', '')).toBe(true);
-    });
-
-    it('matches LMH / Hypercar variants', () => {
-      expect(matchesCarClass('LMH', '', 'LMH')).toBe(true);
-      expect(matchesCarClass('Hypercar', '', 'LMH')).toBe(true);
-      expect(matchesCarClass('', 'LMDh Cadillac', 'LMH')).toBe(true);
-      expect(matchesCarClass('LMGT3', '', 'LMH')).toBe(false);
-    });
-
-    it('matches LMGT3 variants', () => {
-      expect(matchesCarClass('LMGT3', '', 'LMGT3')).toBe(true);
-      expect(matchesCarClass('GT3', 'Corvette', 'LMGT3')).toBe(true);
-      expect(matchesCarClass('LMH', '', 'LMGT3')).toBe(false);
-    });
-
-    it('matches LMP2 ELMS vs WEC properly', () => {
-      expect(matchesCarClass('LMP2_ELMS', 'Oreca', 'LMP2elms')).toBe(true);
-      expect(matchesCarClass('LMP2 (ELMS)', 'Oreca', 'LMP2elms')).toBe(true);
-      expect(matchesCarClass('LMP2', 'Oreca ELMS', 'LMP2elms')).toBe(true);
-      expect(matchesCarClass('LMP2', 'Oreca WEC', 'LMP2wec')).toBe(true);
-      expect(matchesCarClass('LMP2', 'Oreca', 'LMP2wec')).toBe(true);
-      expect(matchesCarClass('LMP2_ELMS', 'Oreca', 'LMP2wec')).toBe(false);
-    });
-
-    it('matches LMP3 and GTE', () => {
-      expect(matchesCarClass('LMP3', '', 'LMP3')).toBe(true);
-      expect(matchesCarClass('GTE', 'Ferrari', 'GTE')).toBe(true);
-      expect(matchesCarClass('LMP2', '', 'LMP3')).toBe(false);
-    });
-
-    it('matches custom fallback classes', () => {
-      expect(matchesCarClass('Formula', 'Spec', 'formula')).toBe(true);
-    });
-  });
-
-  describe('matchesSessionCarClass', () => {
-    it('returns true when targetClass is All or empty', () => {
-      expect(matchesSessionCarClass({}, 'All')).toBe(true);
-      expect(matchesSessionCarClass({}, '')).toBe(true);
-    });
-
-    it('matches session via playerDriver carClass or carType', () => {
-      const session = {
-        playerDriver: { carClass: 'Hypercar', carType: 'Ferrari 499P' },
-      };
-      expect(matchesSessionCarClass(session, 'LMH')).toBe(true);
-      expect(matchesSessionCarClass(session, 'LMGT3')).toBe(false);
-    });
-
-    it('matches session via drivers array when playerDriver does not match or is absent', () => {
-      const session = {
-        playerDriver: null,
-        drivers: [
-          { carClass: 'LMGT3', carType: 'Aston Martin Vantage' },
-          { carClass: 'LMH', carType: 'Porsche 963' },
-        ],
-      };
-      expect(matchesSessionCarClass(session, 'LMGT3')).toBe(true);
-      expect(matchesSessionCarClass(session, 'LMH')).toBe(true);
-      expect(matchesSessionCarClass(session, 'LMP2')).toBe(false);
-    });
-
-    it('returns false when neither playerDriver nor any drivers match', () => {
-      const session = {
-        playerDriver: { carClass: 'LMP2', carType: 'Oreca 07' },
-        drivers: [{ carClass: 'LMP2', carType: 'Oreca 07' }],
-      };
-      expect(matchesSessionCarClass(session, 'LMGT3')).toBe(false);
     });
   });
 
@@ -198,19 +107,6 @@ describe('paceCategory utility', () => {
     });
   });
 
-  describe('VEHICLE_CLASS_OPTIONS', () => {
-    it('contains all standard LM classes', () => {
-      const ids = VEHICLE_CLASS_OPTIONS.map(opt => opt.id);
-      expect(ids).toContain('All');
-      expect(ids).toContain('LMGT3');
-      expect(ids).toContain('LMH');
-      expect(ids).toContain('LMP3');
-      expect(ids).toContain('LMP2elms');
-      expect(ids).toContain('LMP2wec');
-      expect(ids).toContain('GTE');
-    });
-  });
-
   describe('getPaceCategoryFromPercentage', () => {
     it('categorizes percentage correctly', () => {
       expect(getPaceCategoryFromPercentage(100.2)).toBe('Alien');
@@ -224,13 +120,13 @@ describe('paceCategory utility', () => {
 
   describe('findMatchingTrackBenchmarkEntries and findReferenceEntry', () => {
     const mockEntries = [
-      { trackName: 'Spa', carClass: 'LMH', target100Sec: 120.0 },
-      { trackName: 'Spa', carClass: 'LMGT3', target100Sec: 135.0 },
-      { trackName: 'Monza', carClass: 'LMH', target100Sec: 95.0 },
-      { trackName: 'Sebring', carClass: 'LMGT3', target100Sec: 120.23 },
-      { trackName: 'Sebring (school)', carClass: 'LMGT3', target100Sec: 62.90 },
-      { trackName: 'Silverstone (GP)', carClass: 'LMH', target100Sec: 100.0 },
-      { trackName: 'Silverstone (National)', carClass: 'LMH', target100Sec: 55.0 },
+      { trackName: 'Spa', carClass: 'Hyper', target100Sec: 120.0 },
+      { trackName: 'Spa', carClass: 'GT3', target100Sec: 135.0 },
+      { trackName: 'Monza', carClass: 'Hyper', target100Sec: 95.0 },
+      { trackName: 'Sebring', carClass: 'GT3', target100Sec: 120.23 },
+      { trackName: 'Sebring (school)', carClass: 'GT3', target100Sec: 62.90 },
+      { trackName: 'Silverstone (GP)', carClass: 'Hyper', target100Sec: 100.0 },
+      { trackName: 'Silverstone (National)', carClass: 'Hyper', target100Sec: 55.0 },
     ] as unknown as ReferenceLaptimeEntry[];
 
     it('finds track benchmark entries matching track name', () => {
@@ -264,29 +160,35 @@ describe('paceCategory utility', () => {
     });
 
     it('finds specific reference entry by track and class', () => {
-      const entry = findReferenceEntry(mockEntries, 'Spa', 'GP', 'LMGT3', 'Porsche 911');
-      expect(entry?.carClass).toBe('LMGT3');
+      const entry = findReferenceEntry(mockEntries, 'Spa', 'GP', 'GT3');
+      expect(entry?.carClass).toBe('GT3');
       expect(entry?.target100Sec).toBe(135.0);
 
-      const sebringRef = findReferenceEntry(mockEntries, 'Sebring International Raceway', '12h', 'LMGT3', 'Porsche');
+      const sebringRef = findReferenceEntry(mockEntries, 'Sebring International Raceway', '12h', 'GT3');
       expect(sebringRef?.target100Sec).toBe(120.23);
 
-      const schoolRef = findReferenceEntry(mockEntries, 'Sebring International Raceway', 'School', 'LMGT3', 'Porsche');
+      const schoolRef = findReferenceEntry(mockEntries, 'Sebring International Raceway', 'School', 'GT3');
       expect(schoolRef?.target100Sec).toBe(62.90);
     });
 
+    it('requires an exact canonical class and never selects another class benchmark', () => {
+      expect(findReferenceEntry(mockEntries, 'Spa', 'GP', 'LMP3')).toBeNull();
+      expect(findReferenceEntry(mockEntries, 'Spa', 'GP', 'LMH')).toBeNull();
+      expect(findReferenceEntry(mockEntries, 'Spa', 'GP', '')).toBeNull();
+    });
+
     it('returns null when no track matches', () => {
-      const entry = findReferenceEntry(mockEntries, 'Unknown Track', '', 'LMH', '');
+      const entry = findReferenceEntry(mockEntries, 'Unknown Track', '', 'Hyper');
       expect(entry).toBeNull();
     });
     it('batch lookup preserves layout, class, custom-track fallbacks and input ordering', () => {
       const entries = [...mockEntries,
-        { trackName: 'My Custom Track', carClass: 'LMH', target100Sec: 90 } as ReferenceLaptimeEntry];
+        { trackName: 'My Custom Track', carClass: 'Hyper', target100Sec: 90 } as ReferenceLaptimeEntry];
       const lookup = createBenchmarkLookup(entries);
       for (const [venue, course] of [['Spa', 'GP'], ['Sebring', 'School'], ['Silverstone', 'National'], ['My Custom', ''], ['Missing', '']]) {
         expect(lookup.findTrackEntries(venue, course)).toEqual(findMatchingTrackBenchmarkEntries(entries, venue, course));
-        for (const carClass of ['LMH', 'LMGT3', 'Unknown', 'All']) {
-          expect(lookup.findReferenceEntry(venue, course, carClass, 'Ferrari')).toEqual(findReferenceEntry(entries, venue, course, carClass, 'Ferrari'));
+        for (const carClass of ['Hyper', 'GT3', 'Unknown', 'All']) {
+          expect(lookup.findReferenceEntry(venue, course, carClass)).toEqual(findReferenceEntry(entries, venue, course, carClass));
         }
       }
     });

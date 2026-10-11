@@ -5,7 +5,7 @@ import { driver, lap, session } from './builders.js';
 import type { DetailedSession } from '../../../../server/core/types.js';
 
 function sessionWith(id: string, names: string[], overrides: Partial<DetailedSession> = {}): DetailedSession {
-  const drivers = names.map((name, index) => driver(name, [lap(1)], { isPlayer: index === 0, carClass: index === 0 ? 'Hypercar' : 'LMGT3',
+  const drivers = names.map((name, index) => driver(name, [lap(1)], { isPlayer: index === 0, carClass: index === 0 ? 'Hyper' : 'GT3',
     carType: index === 0 ? 'Ferrari 499P' : 'Porsche 911 GT3 R', teamName: index === 0 ? 'Team A' : 'Team B' }));
   return session(drivers, { id, filename: `${id}.xml`, filePath: `${id}.xml`, timestamp: 1_780_000_000_000, ...overrides });
 }
@@ -35,7 +35,7 @@ describe('session dictionaries', () => {
     db.upsertSession(sessionWith('a', ['Alex', 'Ai One']), 'a.xml', 1, 10);
     db.upsertSession(sessionWith('b', ['Alex', 'Ai One'], { timestamp: 1_780_000_100_000 }), 'b.xml', 1, 10);
     expect(rows('SELECT car_type, car_class FROM vehicles ORDER BY car_type')).toEqual([
-      { car_type: 'Ferrari 499P', car_class: 'Hypercar' }, { car_type: 'Porsche 911 GT3 R', car_class: 'LMGT3' },
+      { car_type: 'Ferrari 499P', car_class: 'Hyper' }, { car_type: 'Porsche 911 GT3 R', car_class: 'GT3' },
     ]);
     expect(rows('SELECT name FROM teams ORDER BY name')).toEqual([{ name: 'Team A' }, { name: 'Team B' }]);
     expect(rows('SELECT count(*) AS n FROM drivers')).toEqual([{ n: 2 }]);

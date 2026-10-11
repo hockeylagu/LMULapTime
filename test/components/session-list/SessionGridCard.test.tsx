@@ -12,7 +12,7 @@ const session: SessionListItem = {
   trackCourse: 'Grand Prix',
   matchingReplayFile: { name: 'Monza.Vcr', path: 'C:/LMU/Replays/Monza.Vcr' },
   playerDriver: {
-    name: 'Player Driver', carType: 'Porsche 963', carClass: 'Hypercar', lapsCount: 15, bestLapTime: 95.123,
+    name: 'Player Driver', carType: 'Porsche 963', carClass: 'Hyper', lapsCount: 15, bestLapTime: 95.123,
     bestLapTimeString: '1:35.123', position: 1, gridPosition: 3, positionGain: 2, bestLapNum: 4, driverOrdinal: 0, bestLapOrdinal: 3,
   },
 } as SessionListItem;

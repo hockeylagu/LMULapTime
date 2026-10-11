@@ -14,7 +14,7 @@ import {trackRevisions} from '../../../server/plugins/trackPackage.js';
 
 const directories:string[]=[];
 afterEach(()=>{for(const dir of directories.splice(0))fs.rmSync(dir,{recursive:true,force:true,maxRetries:5,retryDelay:50});});
-const catalog={schemaVersion:1,coordinates:'local-xz-metres-forward-minus-z',vehicles:[{id:'synthetic',model:'Test Car',carClass:'LMH',vehicleIds:['TEST_CAR'],dimensions:{lengthM:5,widthM:2},outlineXZ:[[-1,-2.5],[1,-2.5],[1,2.5],[-1,2.5]],replayOriginOffsetXZ:[0,0]}]};
+const catalog={schemaVersion:1,coordinates:'local-xz-metres-forward-minus-z',vehicles:[{id:'synthetic',model:'Test Car',carClass:'Hyper',vehicleIds:['TEST_CAR'],dimensions:{lengthM:5,widthM:2},outlineXZ:[[-1,-2.5],[1,-2.5],[1,2.5],[-1,2.5]],replayOriginOffsetXZ:[0,0]}]};
 function fixture(kind:'vehicles'|'tracks'|'both'='both') {
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'lmu-plugin-'));directories.push(dir);
   const write=(file:string,value:unknown)=>{fs.mkdirSync(path.dirname(path.join(dir,file)),{recursive:true});fs.writeFileSync(path.join(dir,file),JSON.stringify(value));};

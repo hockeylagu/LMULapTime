@@ -24,9 +24,9 @@ const layout = (layoutKey: string, trackName: string, lastDriven: number, classe
 });
 
 const LAYOUTS = [
-  layout('daytona_road_course', 'Daytona International Speedway (Road Course)', 3000, [['LMH', 7], ['LMGT3', 12]]),
-  layout('monza_gp', 'Autodromo Nazionale Monza', 2000, [['LMGT3', 3]]),
-  layout('bahrain_gp', 'Bahrain International Circuit', 1000, [['LMP3', 2], ['LMH', 5]]),
+  layout('daytona_road_course', 'Daytona International Speedway (Road Course)', 3000, [['Hyper', 7], ['GT3', 12]]),
+  layout('monza_gp', 'Autodromo Nazionale Monza', 2000, [['GT3', 3]]),
+  layout('bahrain_gp', 'Bahrain International Circuit', 1000, [['LMP3', 2], ['Hyper', 5]]),
 ];
 
 const EMPTY_LAPS = {
@@ -62,7 +62,7 @@ describe('LeaderboardPage', () => {
     render(<LeaderboardPage sessions={[]} />);
 
     await waitFor(() => expect(urlParams().get('track')).toBe('Daytona International Speedway (Road Course)'));
-    expect(urlParams().get('carClass')).toBe('LMH');
+    expect(urlParams().get('carClass')).toBe('Hyper');
     const ribbonCard = screen.getByRole('link', { name: /Daytona International Speedway \(Road Course\)/ });
     expect(ribbonCard).toHaveAttribute('aria-current', 'true');
     // The circuit, then the layout: never the layout twice, nor a flag.
@@ -71,7 +71,7 @@ describe('LeaderboardPage', () => {
     expect(screen.getByRole('button', { name: /Hypercar\s*P7\/20/ })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: /^GT3\s*P12\/20/ })).toHaveAttribute('aria-pressed', 'false');
     expect(await screen.findByRole('heading', { name: /Hypercar board/ })).toBeInTheDocument();
-    expect(global.fetch).toHaveBeenCalledWith('/api/leaderboard?layout=daytona_road_course&carClass=LMH&includeRival=true', expect.anything());
+    expect(global.fetch).toHaveBeenCalledWith('/api/leaderboard?layout=daytona_road_course&carClass=Hyper&includeRival=true', expect.anything());
     expect(vi.mocked(global.fetch).mock.calls.filter(([url]) => String(url).startsWith('/api/leaderboard/layouts'))).toHaveLength(1);
     expect(vi.mocked(global.fetch).mock.calls.some(([url]) => String(url).startsWith('/api/rivals?'))).toBe(false);
   });
@@ -90,18 +90,18 @@ describe('LeaderboardPage', () => {
     window.location.hash = '#/leaderboard?track=All';
     const { unmount } = render(<LeaderboardPage sessions={[]} />);
     await waitFor(() => expect(urlParams().get('track')).toBe(LAYOUTS[0].trackName));
-    expect(urlParams().get('carClass')).toBe('LMH');
+    expect(urlParams().get('carClass')).toBe('Hyper');
     unmount();
 
-    window.location.hash = '#/leaderboard?track=Bahrain%20International%20Circuit&carClass=LMH&sessionId=s1';
+    window.location.hash = '#/leaderboard?track=Bahrain%20International%20Circuit&carClass=Hyper&sessionId=s1';
     render(<LeaderboardPage sessions={[]} />);
     expect(await screen.findByRole('heading', { name: /Hypercar board/ })).toBeInTheDocument();
-    expect(urlParams().get('carClass')).toBe('LMH');
+    expect(urlParams().get('carClass')).toBe('Hyper');
     expect(urlParams().get('sessionId')).toBe('s1');
   });
 
   it('uses the bundled layout SVG and falls back if it cannot load', async () => {
-    window.location.hash = '#/leaderboard?track=Autodromo%20Nazionale%20Monza&carClass=LMGT3';
+    window.location.hash = '#/leaderboard?track=Autodromo%20Nazionale%20Monza&carClass=GT3';
     render(<LeaderboardPage sessions={[]} />);
     const monza = await screen.findByRole('link', { name: /Monza layout/ });
     const thumbnail = monza.querySelector('img');
@@ -113,7 +113,7 @@ describe('LeaderboardPage', () => {
   });
 
   it('switches track and class from the ribbon, dropping the lap the link asked for', async () => {
-    window.location.hash = '#/leaderboard?track=Autodromo%20Nazionale%20Monza&carClass=LMGT3&sessionId=s1&lapNum=4';
+    window.location.hash = '#/leaderboard?track=Autodromo%20Nazionale%20Monza&carClass=GT3&sessionId=s1&lapNum=4';
     render(<LeaderboardPage sessions={[]} />);
 
     const daytona = await screen.findByRole('link', { name: /Daytona International Speedway \(Road Course\)/ });
@@ -123,12 +123,12 @@ describe('LeaderboardPage', () => {
 
     fireEvent.click(daytona);
     await waitFor(() => expect(urlParams().get('track')).toBe('Daytona International Speedway (Road Course)'));
-    expect(urlParams().get('carClass')).toBe('LMH');
+    expect(urlParams().get('carClass')).toBe('Hyper');
     expect(urlParams().get('sessionId')).toBeNull();
     expect(urlParams().get('lapNum')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: /^GT3\s*P12\/20/ }));
-    await waitFor(() => expect(urlParams().get('carClass')).toBe('LMGT3'));
+    await waitFor(() => expect(urlParams().get('carClass')).toBe('GT3'));
   });
 
   it('compares the player best lap with a driver of the board, here or in telemetry', async () => {
@@ -227,7 +227,7 @@ describe('LeaderboardPage', () => {
     fireEvent.click(within(rivalCard).getByRole('button', { name: 'Make Driver 3 your rival' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/rivals/pin', expect.objectContaining({ method: 'POST' })));
     const pinCall = fetchMock.mock.calls.find(([u]) => u === '/api/rivals/pin');
-    expect(JSON.parse(String(pinCall?.[1]?.body))).toEqual({ layout: 'daytona_road_course', carClass: 'LMH', driverName: 'Driver 3' });
+    expect(JSON.parse(String(pinCall?.[1]?.body))).toEqual({ layout: 'daytona_road_course', carClass: 'Hyper', driverName: 'Driver 3' });
   });
 
   it('says why when the tracks cannot be loaded', async () => {

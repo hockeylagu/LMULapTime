@@ -8,7 +8,7 @@ import {
 import type { ReferenceLaptimeEntry } from '../../shared/types/index.js';
 import { driver, lap, MONZA_CURVA_GRANDE, session } from './leaderboardFixtures.js';
 
-const MONZA = { layoutKey: 'monza_gp', carClass: 'LMGT3' };
+const MONZA = { layoutKey: 'monza_gp', carClass: 'GT3' };
 
 const names = (sessions: Parameters<typeof buildLeaderboard>[0], query = MONZA) =>
   buildLeaderboard(sessions, query).entries.map((e) => e.driverName);
@@ -55,11 +55,11 @@ describe('buildLeaderboard', () => {
       session('r1', [
         driver('Me', [lap(2, 108)], { isPlayer: true }),
         driver('Porsche', [lap(2, 107)], { carType: 'Porsche 911 GT3 R LMGT3' }),
-        driver('Hyper', [lap(2, 95)], { carType: 'Ferrari 499P', carClass: 'Hypercar' }),
+        driver('Hyper', [lap(2, 95)], { carType: 'Ferrari 499P', carClass: 'Hyper' }),
       ]),
     ];
     expect(names(sessions)).toEqual(['Porsche', 'Me']);
-    expect(names(sessions, { ...MONZA, carClass: 'LMH' })).toEqual(['Hyper']);
+    expect(names(sessions, { ...MONZA, carClass: 'Hyper' })).toEqual(['Hyper']);
     const carBoard = buildLeaderboard(sessions, { ...MONZA, carType: 'ferrari 296 lmgt3' });
     expect(carBoard.scope).toBe('car');
     expect(carBoard.entries.map((e) => e.driverName)).toEqual(['Me']);
@@ -119,9 +119,9 @@ describe('findLayoutBenchmark', () => {
   } as ReferenceLaptimeEntry);
 
   it('takes the target of the layout and class, and never another class', () => {
-    const entries = [entry('Monza', 'Hypercar'), entry('Monza', 'LMGT3')];
-    expect(findLayoutBenchmark(entries, 'monza_gp', 'LMGT3')?.carClass).toBe('LMGT3');
-    expect(findLayoutBenchmark([entries[0]], 'monza_gp', 'LMGT3')).toBeNull();
+    const entries = [entry('Monza', 'Hyper'), entry('Monza', 'GT3')];
+    expect(findLayoutBenchmark(entries, 'monza_gp', 'GT3')?.carClass).toBe('GT3');
+    expect(findLayoutBenchmark([entries[0]], 'monza_gp', 'GT3')).toBeNull();
   });
 });
 
@@ -129,7 +129,7 @@ describe('listLeaderboardLayouts', () => {
   it('lists the layouts the player drove, newest first, with the class driven last and the rank per class', () => {
     const layouts = listLeaderboardLayouts([
       session('old', [driver('Me', [lap(2, 108)], { isPlayer: true }), driver('Fast', [lap(2, 107)])], { timestamp: 1000 }),
-      session('new', [driver('Me', [lap(2, 95)], { isPlayer: true, carType: 'Ferrari 499P', carClass: 'Hypercar' })], {
+      session('new', [driver('Me', [lap(2, 95)], { isPlayer: true, carType: 'Ferrari 499P', carClass: 'Hyper' })], {
         timestamp: 3000,
       }),
       session('cg', [driver('Me', [lap(2, 90)], { isPlayer: true })], { trackCourse: MONZA_CURVA_GRANDE, timestamp: 2000 }),
@@ -138,12 +138,12 @@ describe('listLeaderboardLayouts', () => {
 
     expect(layouts.map((l) => l.layoutKey)).toEqual(['monza_gp', 'monza_curvagrande']);
     const gp = layouts[0];
-    expect(gp).toMatchObject({ lastDriven: 3000, lastCarClass: 'LMH', trackName: 'Autodromo Nazionale Monza', circuitName: 'Autodromo Nazionale Monza' });
+    expect(gp).toMatchObject({ lastDriven: 3000, lastCarClass: 'Hyper', trackName: 'Autodromo Nazionale Monza', circuitName: 'Autodromo Nazionale Monza' });
     // The circuit name never repeats the layout: that is the layout name's job.
     expect(layouts[1]).toMatchObject({ circuitName: 'Autodromo Nazionale Monza', layoutName: 'Curva Grande Circuit' });
     expect(gp.classes.map((c) => [c.carClass, c.playerRank, c.fieldSize, c.lastCarType])).toEqual([
-      ['LMH', 1, 1, 'Ferrari 499P'],
-      ['LMGT3', 2, 2, 'Ferrari 296 LMGT3'],
+      ['Hyper', 1, 1, 'Ferrari 499P'],
+      ['GT3', 2, 2, 'Ferrari 296 LMGT3'],
     ]);
   });
 });

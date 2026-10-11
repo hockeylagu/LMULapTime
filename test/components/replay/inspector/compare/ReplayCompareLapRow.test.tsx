@@ -19,7 +19,7 @@ const mockLap: ComparableLap = {
   s3: 41.152,
   topSpeed: 312.4,
   carType: 'Ferrari 499P',
-  carClass: 'Hypercar',
+  carClass: 'Hyper',
   isValid: true,
 };
 

@@ -61,13 +61,13 @@ describe('CircuitsSummaryCard', () => {
         visibleTracks={rankedTracks}
         showMoreTracks={false}
         setShowMoreTracks={vi.fn()}
-        selectedCarClass="LMH"
+        selectedCarClass="Hyper"
       />
     );
 
     fireEvent.click(screen.getByText('Fuji Speedway'));
 
-    expect(window.location.hash).toBe('#/track/Fuji%20Speedway?carClass=LMH');
+    expect(window.location.hash).toBe('#/track/Fuji%20Speedway?carClass=Hyper');
   });
 
   it('navigates without a carClass param when no filter is selected', () => {

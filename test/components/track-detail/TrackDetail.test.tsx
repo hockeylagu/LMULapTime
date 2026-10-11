@@ -24,7 +24,7 @@ describe('TrackDetail component', () => {
           bestLapOrdinal: 0,
           name: 'Player',
           carType: 'Ferrari 499P',
-          carClass: 'LMH',
+          carClass: 'Hyper',
           bestLapTime: 122.0,
           bestLapTimeString: '2:02.000',
           bestS1: 35.0,
@@ -48,7 +48,7 @@ describe('TrackDetail component', () => {
         playerDriver: {
           name: 'Player',
           carType: 'Porsche 911 GT3',
-          carClass: 'LMGT3',
+          carClass: 'GT3',
           bestLapTime: 138.0,
           bestLapTimeString: '2:18.000',
           bestS1: 40.0,
@@ -65,7 +65,7 @@ describe('TrackDetail component', () => {
       {
         key: 'spa_lmh',
         trackName: 'Spa',
-        carClass: 'LMH',
+        carClass: 'Hyper',
         patch: '1.4+',
         target100Sec: 120.0,
         targets: {
@@ -82,7 +82,7 @@ describe('TrackDetail component', () => {
       {
         key: 'spa_lmgt3',
         trackName: 'Spa',
-        carClass: 'LMGT3',
+        carClass: 'GT3',
         patch: '1.4+',
         target100Sec: 135.0,
         targets: {
@@ -164,7 +164,7 @@ describe('TrackDetail component', () => {
         trackName="Spa"
         onBack={onBack}
         onSelectSession={onSelectSession}
-        selectedCarClass="LMH"
+        selectedCarClass="Hyper"
         setSelectedCarClass={setSelectedCarClass}
       />
     );
@@ -192,7 +192,7 @@ describe('TrackDetail component', () => {
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockTrackDataWithMultipleClasses) } as Response);
     const content = () => (
       <SessionDataContext.Provider value={{ revision, scan: null }}>
-        <TrackDetail trackName="Spa" onBack={vi.fn()} onSelectSession={vi.fn()} selectedCarClass="LMH" setSelectedCarClass={vi.fn()} trackGeometry={null} />
+        <TrackDetail trackName="Spa" onBack={vi.fn()} onSelectSession={vi.fn()} selectedCarClass="Hyper" setSelectedCarClass={vi.fn()} trackGeometry={null} />
       </SessionDataContext.Provider>
     );
     const view = render(content());
@@ -243,7 +243,7 @@ describe('TrackDetail component', () => {
         trackName="Spa"
         onBack={vi.fn()}
         onSelectSession={vi.fn()}
-        selectedCarClass="LMH"
+        selectedCarClass="Hyper"
         setSelectedCarClass={vi.fn()}
       />
     );
@@ -265,7 +265,7 @@ describe('TrackDetail component', () => {
         onBack={vi.fn()}
         onSelectSession={vi.fn()}
         onOpenReplay={onOpenReplay}
-        selectedCarClass="LMH"
+        selectedCarClass="Hyper"
         setSelectedCarClass={vi.fn()}
       />
     );
@@ -287,7 +287,7 @@ describe('TrackDetail component', () => {
         trackName="Spa"
         onBack={vi.fn()}
         onSelectSession={vi.fn()}
-        selectedCarClass="LMH"
+        selectedCarClass="Hyper"
         setSelectedCarClass={setSelectedCarClass}
       />
     );
@@ -305,7 +305,7 @@ describe('TrackDetail component', () => {
         trackName="Spa"
         onBack={vi.fn()}
         onSelectSession={vi.fn()}
-        selectedCarClass="LMGT3"
+        selectedCarClass="GT3"
         setSelectedCarClass={setSelectedCarClass}
       />
     );
@@ -341,13 +341,13 @@ describe('TrackDetail component', () => {
         progression={[
           {
             sessionId: 'sess-hypercar-1', timestamp: 1, dateString: '2026/05/28', sessionType: 'Practice',
-            sessionName: 'P1', trackVenue: 'Spa', trackCourse: 'GP', carType: 'Ferrari 499P', carClass: 'LMH',
+            sessionName: 'P1', trackVenue: 'Spa', trackCourse: 'GP', carType: 'Ferrari 499P', carClass: 'Hyper',
             driverName: 'Player', bestLapTime: 122, bestS1: 35, bestS2: 42, bestS3: 45, theoreticalBest: 122,
             cleanLapsCount: 5, totalLapsCount: 5, avgLapTime: 122,
           },
           {
             sessionId: 'sess-gt3-1', timestamp: 2, dateString: '2026/05/29', sessionType: 'Qualifying',
-            sessionName: 'Q1', trackVenue: 'Spa', trackCourse: 'GP', carType: 'Porsche 911 GT3', carClass: 'LMGT3',
+            sessionName: 'Q1', trackVenue: 'Spa', trackCourse: 'GP', carType: 'Porsche 911 GT3', carClass: 'GT3',
             driverName: 'Player', bestLapTime: 138, bestS1: 40, bestS2: 48, bestS3: 50, theoreticalBest: 138,
             cleanLapsCount: 4, totalLapsCount: 4, avgLapTime: 138,
           },
@@ -365,7 +365,7 @@ describe('TrackDetail component', () => {
     const lmp2Benchmark = {
       ...mockTrackDataWithMultipleClasses.benchmarks[0],
       key: 'spa_lmp2_elms',
-      carClass: 'LMP2elms',
+      carClass: 'LMP2_ELMS',
       targets: {
         ...mockTrackDataWithMultipleClasses.benchmarks[0].targets,
         alienSec: 90,
@@ -374,7 +374,7 @@ describe('TrackDetail component', () => {
     const wecBenchmark = {
       ...lmp2Benchmark,
       key: 'spa_lmp2_wec',
-      carClass: 'LMP2wec',
+      carClass: 'LMP2',
       targets: {
         ...lmp2Benchmark.targets,
         alienSec: 120,
@@ -389,7 +389,7 @@ describe('TrackDetail component', () => {
           playerDriver: {
             ...mockTrackDataNoBenchmarks.sessions[0].playerDriver,
             carType: 'Oreca 07',
-            carClass: 'LMP2elms',
+            carClass: 'LMP2_ELMS',
             bestLapTime: 100,
             bestLapTimeString: '1:40.000',
           },
@@ -463,7 +463,7 @@ describe('TrackDetail component', () => {
         trackName="Spa"
         onBack={vi.fn()}
         onSelectSession={vi.fn()}
-        selectedCarClass="LMH"
+        selectedCarClass="Hyper"
         setSelectedCarClass={setSelectedCarClass}
       />
     );
@@ -479,7 +479,7 @@ describe('TrackDetail component', () => {
     // Switch car class
     const lmgt3Btn = screen.getByRole('button', { name: 'GT3' });
     fireEvent.click(lmgt3Btn);
-    expect(setSelectedCarClass).toHaveBeenCalledWith('LMGT3');
+    expect(setSelectedCarClass).toHaveBeenCalledWith('GT3');
   });
 
   it('toggles between Cards view and Table view in TrackDetail', async () => {
@@ -489,7 +489,7 @@ describe('TrackDetail component', () => {
         trackName="Spa"
         onBack={vi.fn()}
         onSelectSession={onSelectSession}
-        selectedCarClass="LMH"
+        selectedCarClass="Hyper"
         setSelectedCarClass={vi.fn()}
       />
     );
@@ -576,17 +576,17 @@ describe('TrackDetail component', () => {
           {
             id: 'sess-practice-p1', filename: 'practice.xml', trackVenue: 'Spa', trackCourse: 'GP',
             timeString: '2026/05/28 14:00', sessionType: 'Practice', sessionName: 'P1', driversCount: 1,
-            playerDriver: { name: 'Player', carType: 'Ferrari 499P', carClass: 'LMH', bestLapTime: 122.0, bestLapTimeString: '2:02.000', bestS1: 35, bestS2: 42, bestS3: 45, theoreticalBest: 122.0, lapsCount: 5, position: 1 },
+            playerDriver: { name: 'Player', carType: 'Ferrari 499P', carClass: 'Hyper', bestLapTime: 122.0, bestLapTimeString: '2:02.000', bestS1: 35, bestS2: 42, bestS3: 45, theoreticalBest: 122.0, lapsCount: 5, position: 1 },
           },
           {
             id: 'sess-qualifying-p2', filename: 'qualifying.xml', trackVenue: 'Spa', trackCourse: 'GP',
             timeString: '2026/05/29 14:00', sessionType: 'Qualifying', sessionName: 'Q1', driversCount: 1,
-            playerDriver: { name: 'Player', carType: 'Ferrari 499P', carClass: 'LMH', bestLapTime: 121.0, bestLapTimeString: '2:01.000', bestS1: 35, bestS2: 41, bestS3: 45, theoreticalBest: 121.0, lapsCount: 4, position: 2 },
+            playerDriver: { name: 'Player', carType: 'Ferrari 499P', carClass: 'Hyper', bestLapTime: 121.0, bestLapTimeString: '2:01.000', bestS1: 35, bestS2: 41, bestS3: 45, theoreticalBest: 121.0, lapsCount: 4, position: 2 },
           },
           {
             id: 'sess-race-p5', filename: 'race.xml', trackVenue: 'Spa', trackCourse: 'GP',
             timeString: '2026/05/30 14:00', sessionType: 'Race', sessionName: 'R1', driversCount: 1,
-            playerDriver: { name: 'Player', carType: 'Ferrari 499P', carClass: 'LMH', bestLapTime: 120.0, bestLapTimeString: '2:00.000', bestS1: 34, bestS2: 41, bestS3: 45, theoreticalBest: 120.0, lapsCount: 20, position: 5 },
+            playerDriver: { name: 'Player', carType: 'Ferrari 499P', carClass: 'Hyper', bestLapTime: 120.0, bestLapTimeString: '2:00.000', bestS1: 34, bestS2: 41, bestS3: 45, theoreticalBest: 120.0, lapsCount: 20, position: 5 },
           },
         ],
         benchmarks: [],

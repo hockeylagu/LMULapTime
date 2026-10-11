@@ -31,7 +31,7 @@ function customTrackScope(trackName: string): SqlFragment {
 function sessionClassMatch(targetClass?: string): SqlFragment {
   const match = carClassMatch(targetClass);
   if (match.sql === '1=1') return match;
-  return { sql: `EXISTS (SELECT 1 FROM session_drivers f LEFT JOIN vehicles fv ON fv.vehicle_id=f.vehicle_id WHERE f.session_id=s.id AND (f.is_player_driver=1 OR (s.player_driver_name IS NULL AND f.driver_ordinal=coalesce(s.primary_driver_ordinal,0))) AND ${match.sql})`, values: match.values };
+  return { sql: `EXISTS (SELECT 1 FROM session_drivers f WHERE f.session_id=s.id AND (f.is_player_driver=1 OR (s.player_driver_name IS NULL AND f.driver_ordinal=coalesce(s.primary_driver_ordinal,0))) AND ${match.sql})`, values: match.values };
 }
 
 function aggregateScopeSql(trackName: string, carClass?: string, carModel?: string): SqlFragment {

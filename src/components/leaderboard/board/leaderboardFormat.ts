@@ -1,5 +1,6 @@
 import type { PaceCategory, ReferenceLaptimeEntry } from '../../../../shared/types/index.js';
-import { getPaceCategoryFromPercentage, VEHICLE_CLASS_OPTIONS } from '../../../../shared/domain/paceCategory.js';
+import { getPaceCategoryFromPercentage } from '../../../../shared/domain/paceCategory.js';
+import { VEHICLE_CLASS_OPTIONS } from '../../../../shared/domain/vehicleMapping.js';
 
 /** Session timestamps are stored in seconds or milliseconds; this reads either as milliseconds. */
 export function toEpochMs(timestamp: number): number {
@@ -23,7 +24,7 @@ export function formatGap(seconds: number): string {
   return `${seconds > 0 ? '+' : '-'}${Math.abs(seconds).toFixed(3)}`;
 }
 
-/** The class name as the class pills show it (LMH -> Hypercar). */
+/** The class name as the class pills show it (Hyper -> Hypercar, GT3 -> GT3). */
 export function carClassLabel(carClass: string): string {
   return VEHICLE_CLASS_OPTIONS.find((o) => o.id === carClass)?.label ?? carClass;
 }

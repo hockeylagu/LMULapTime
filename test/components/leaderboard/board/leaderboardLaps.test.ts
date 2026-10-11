@@ -4,11 +4,11 @@ import { entry } from './leaderboardFixtures.js';
 
 describe('boardLapToComparable', () => {
   it('gives the board lap the id the server gives the same locator, with its times', () => {
-    const lap = boardLapToComparable(entry(2, 'Rival', 100.5), 'LMGT3', 'P2 Rival');
+    const lap = boardLapToComparable(entry(2, 'Rival', 100.5), 'GT3', 'P2 Rival');
     expect(lap).toMatchObject({
       id: 's-Rival_driver_2_lap_4',
       driverName: 'Rival',
-      carClass: 'LMGT3',
+      carClass: 'GT3',
       lapNum: 3,
       lapTime: 100.5,
       lapTimeString: '1:40.500',

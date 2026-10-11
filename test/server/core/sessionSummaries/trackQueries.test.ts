@@ -21,13 +21,13 @@ describe('track detail summary queries', () => {
   it('aggregates the selected class and car across history and returns scoped option counts', () => {
     const db = new Database(':memory:');
     initDbSchema(db);
-    upsertSession(db, makeSession('hypercar', 1, 'Ferrari 499P', 'Hypercar', 90), 'hypercar.xml', 1, 10);
-    upsertSession(db, makeSession('hypercar-later', 3, 'Ferrari 499P', 'Hypercar', 91), 'hypercar-later.xml', 3, 10);
-    upsertSession(db, makeSession('gt3', 2, 'Porsche 911 GT3', 'LMGT3', 100), 'gt3.xml', 2, 10);
+    upsertSession(db, makeSession('hypercar', 1, 'Ferrari 499P', 'Hyper', 90), 'hypercar.xml', 1, 10);
+    upsertSession(db, makeSession('hypercar-later', 3, 'Ferrari 499P', 'Hyper', 91), 'hypercar-later.xml', 3, 10);
+    upsertSession(db, makeSession('gt3', 2, 'Porsche 911 GT3', 'GT3', 100), 'gt3.xml', 2, 10);
     db.prepare('UPDATE sessions SET is_empty=1 WHERE id=?').run('gt3');
-    const summary = queryTrackDetailSummary(db, 'Monza', 'LMH', 'Ferrari 499P');
+    const summary = queryTrackDetailSummary(db, 'Monza', 'Hyper', 'Ferrari 499P');
     expect(summary).toMatchObject({ sessionsCount: 2, totalLaps: 2, bestLapTime: 90, bestLapCar: 'Ferrari 499P' });
-    const filters = queryTrackDetailFilters(db, 'Monza', 'LMH');
+    const filters = queryTrackDetailFilters(db, 'Monza', 'Hyper');
     expect(filters.carModels).toEqual(['Ferrari 499P']);
     expect(filters.sessionTypes).toEqual(['qualifying', 'race']);
     expect(filters.emptyCount).toBe(0);
@@ -39,18 +39,18 @@ describe('track detail summary queries', () => {
     const db = new Database(':memory:');
     initDbSchema(db);
     const sessions = [
-      makeSession('hypercar', 1, 'Ferrari 499P', 'Hypercar', 90),
-      makeSession('hypercar-later', 3, 'Ferrari 499P', 'Hypercar', 91),
-      makeSession('gt3', 2, 'Porsche 911 GT3', 'LMGT3', 100),
-      { ...makeSession('other-layout', 4, 'Oreca 07', 'LMP2 (ELMS)', 99), trackVenue: 'Le Mans', trackCourse: '24 Hours' },
+      makeSession('hypercar', 1, 'Ferrari 499P', 'Hyper', 90),
+      makeSession('hypercar-later', 3, 'Ferrari 499P', 'Hyper', 91),
+      makeSession('gt3', 2, 'Porsche 911 GT3', 'GT3', 100),
+      { ...makeSession('other-layout', 4, 'Oreca 07', 'LMP2_ELMS', 99), trackVenue: 'Le Mans', trackCourse: '24 Hours' },
     ];
     for (const session of sessions) upsertSession(db, session, `${session.id}.xml`, session.timestamp ?? 0, 10);
 
-    const expected = aggregateTrackSummaries(sessions, { carClass: 'LMH', includeEmptyVenues: true });
-    const actual = queryTrackSummaries(db, 'LMH');
+    const expected = aggregateTrackSummaries(sessions, { carClass: 'Hyper', includeEmptyVenues: true });
+    const actual = queryTrackSummaries(db, 'Hyper');
     expect(actual).toHaveLength(Object.keys(expected).length);
     for (const summary of actual) expect(summary).toEqual(expected[summary.trackVenue]);
-    expect(queryTrackDetailSummary(db, 'Monza', 'LMH', 'Porsche 911 GT3')).toBeUndefined();
+    expect(queryTrackDetailSummary(db, 'Monza', 'Hyper', 'Porsche 911 GT3')).toBeUndefined();
     expect(queryTrackDetailSummary(db, 'Monza', 'GT3')?.sessionsCount).toBe(1);
     db.close();
   });
@@ -58,12 +58,12 @@ describe('track detail summary queries', () => {
   it('keeps unknown layouts isolated by venue and course', () => {
     const db = new Database(':memory:');
     initDbSchema(db);
-    const first = { ...makeSession('mod-a', 1, 'Oreca 07', 'LMP2 (ELMS)', 99), trackVenue: 'Mod Circuit Alpha', trackCourse: 'Short' };
-    const second = { ...makeSession('mod-b', 2, 'Oreca 07', 'LMP2 (ELMS)', 98), trackVenue: 'Mod Circuit Beta', trackCourse: 'Short' };
+    const first = { ...makeSession('mod-a', 1, 'Oreca 07', 'LMP2_ELMS', 99), trackVenue: 'Mod Circuit Alpha', trackCourse: 'Short' };
+    const second = { ...makeSession('mod-b', 2, 'Oreca 07', 'LMP2_ELMS', 98), trackVenue: 'Mod Circuit Beta', trackCourse: 'Short' };
     upsertSession(db, first, 'mod-a.xml', 1, 10);
     upsertSession(db, second, 'mod-b.xml', 2, 10);
 
-    expect(queryTrackDetailSummary(db, 'Mod Circuit Alpha (Short)', 'LMP2elms'))
+    expect(queryTrackDetailSummary(db, 'Mod Circuit Alpha (Short)', 'LMP2_ELMS'))
       .toMatchObject({ trackVenue: 'Mod Circuit Alpha (Short)', sessionsCount: 1, bestLapTime: 99 });
     db.close();
   });

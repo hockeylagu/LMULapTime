@@ -3,8 +3,8 @@ import { parseTimeStringToSeconds, formatTime } from '../../shared/domain/format
 import {
   getPaceCategoryFromPercentage,
   createBenchmarkLookup,
-  normalizeCarClass,
 } from '../../shared/domain/paceCategory.js';
+import { normalizeCarClass } from '../../shared/domain/vehicleMapping.js';
 import { isMainThread } from 'node:worker_threads';
 import { getSessionDatabase } from '../core/db.js';
 import { enrichBenchmarkDiffWithCompactImpact } from './benchmarkImpact.js';
@@ -137,7 +137,8 @@ export function parseReferenceCsv(csvText: string): ReferenceLaptimesCache {
     // Filter out header or invalid rows
     if (!trackName || !target100Sec || target100Str === '~100%' || target100Str === 'calculated:') continue;
 
-    const carClass = cols[16] || (rawKey.replace(trackName, '') || 'General');
+    const rawClass = cols[16] || (rawKey.replace(trackName, '') || 'General');
+    const carClass = normalizeCarClass(rawClass);
 
     const getTarget = (colIdx: number, multiplier: number) =>
       parseTimeStringToSeconds(cols[colIdx]) || target100Sec * multiplier;
@@ -260,11 +261,10 @@ export type PaceCalculator = typeof calculatePaceCategory;
 export function createPaceCalculator(entries = loadReferenceLaptimesFromCache()?.entries ?? {}): PaceCalculator {
   const lookup = createBenchmarkLookup(entries);
   const targets = new Map<string, ReferenceLaptimeEntry | null>();
-  return (lapTimeSec, venue, course, carClass, carType, trackLengthMeters) => {
+  return (lapTimeSec, venue, course, carClass, _carType, trackLengthMeters) => {
     if (!lapTimeSec || lapTimeSec <= 0) return null;
-    const normClass = normalizeCarClass(carClass, carType);
-    const key = JSON.stringify([venue, course, normClass, carType, trackLengthMeters]);
-    if (!targets.has(key)) targets.set(key, lookup.findReferenceEntry(venue, course, normClass, carType, trackLengthMeters));
+    const key = JSON.stringify([venue, course, carClass, trackLengthMeters]);
+    if (!targets.has(key)) targets.set(key, lookup.findReferenceEntry(venue, course, carClass, trackLengthMeters));
     return paceFromReference(lapTimeSec, targets.get(key) ?? null);
   };
 }

@@ -30,7 +30,7 @@ describe('leaderboardRoutes', () => {
     sessionDb = new SessionDatabase(':memory:');
     for (const value of sessions) sessionDb.upsertSession(value, value.filename || `${value.id}.xml`, value.timestamp, 1);
     referenceCache.load.mockReturnValue({
-      entries: { Monza_LMGT3: { key: 'Monza_LMGT3', trackName: 'Monza', carClass: 'LMGT3', target100Sec: 106 } },
+      entries: { Monza_LMGT3: { key: 'Monza_LMGT3', trackName: 'Monza', carClass: 'GT3', target100Sec: 106 } },
     });
   });
 
@@ -46,41 +46,41 @@ describe('leaderboardRoutes', () => {
   it('lists the layouts the player drove, the same on every call', async () => {
     const first = await request(app).get('/api/leaderboard/layouts');
     expect(first.status).toBe(200);
-    expect(first.body).toMatchObject([{ layoutKey: 'monza_gp', lastCarClass: 'LMGT3', classes: [{ playerRank: 2, fieldSize: 2 }] }]);
+    expect(first.body).toMatchObject([{ layoutKey: 'monza_gp', lastCarClass: 'GT3', classes: [{ playerRank: 2, fieldSize: 2 }] }]);
     expect(first.body[0]).not.toHaveProperty('outlinePath');
     const second = await request(app).get('/api/leaderboard/layouts');
     expect(second.body).toEqual(first.body);
   });
 
   it('answers the board of a layout and class, with its benchmark', async () => {
-    const res = await request(app).get('/api/leaderboard?layout=monza_gp&carClass=LMGT3');
+    const res = await request(app).get('/api/leaderboard?layout=monza_gp&carClass=GT3');
     expect(res.status).toBe(200);
     expect(res.body.entries.map((e: { driverName: string }) => e.driverName)).toEqual(['Rival', 'Me']);
     expect(res.body.player).toMatchObject({ rank: 2, gapToLeader: 0.3 });
-    expect(res.body.benchmark).toMatchObject({ carClass: 'LMGT3', target100Sec: 106 });
+    expect(res.body.benchmark).toMatchObject({ carClass: 'GT3', target100Sec: 106 });
   });
 
   it('refuses a board without a layout or a class', async () => {
     const res = await request(app).get('/api/leaderboard?layout=monza_gp');
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/required/);
-    expect((await request(app).get('/api/leaderboard?carClass=LMGT3&includeRival=true')).status).toBe(400);
+    expect((await request(app).get('/api/leaderboard?carClass=GT3&includeRival=true')).status).toBe(400);
   });
 
   it('returns one consistent board and rival snapshot when requested', async () => {
-    const res = await request(app).get('/api/leaderboard?layout=monza_gp&carClass=LMGT3&includeRival=true');
+    const res = await request(app).get('/api/leaderboard?layout=monza_gp&carClass=GT3&includeRival=true');
     expect(res.status).toBe(200);
     expect(res.body.player).toMatchObject({ driverName: 'Me', rank: 2 });
     expect(res.body.rivalStatus).toMatchObject({ rivalEntry: res.body.entries[0], gap: 0.3 });
     expect(referenceCache.load).toHaveBeenCalledTimes(1);
-    expect((await request(app).get('/api/leaderboard?layout=monza_gp&carClass=LMGT3')).body).not.toHaveProperty('rivalStatus');
+    expect((await request(app).get('/api/leaderboard?layout=monza_gp&carClass=GT3')).body).not.toHaveProperty('rivalStatus');
   });
 
   describe('rivals', () => {
-    const BOARD = { layout: 'monza_gp', carClass: 'LMGT3' };
+    const BOARD = { layout: 'monza_gp', carClass: 'GT3' };
 
     it('sets the driver about 0.3 s ahead as the rival, and keeps it on the next visit', async () => {
-      const first = await request(app).get('/api/leaderboard?layout=monza_gp&carClass=LMGT3&includeRival=true');
+      const first = await request(app).get('/api/leaderboard?layout=monza_gp&carClass=GT3&includeRival=true');
       expect(first.status).toBe(200);
       expect(first.body.rivalStatus).toMatchObject({
         rival: { kind: 'driver', driverName: 'Rival', targetTime: 107.7, startTime: 108, status: 'active' },
@@ -90,7 +90,7 @@ describe('leaderboardRoutes', () => {
         beaten: [],
         trend: [{ sessionId: 'r1', best: 108, gap: 0.3 }],
       });
-      const again = await request(app).get('/api/leaderboard?layout=monza_gp&carClass=LMGT3&includeRival=true');
+      const again = await request(app).get('/api/leaderboard?layout=monza_gp&carClass=GT3&includeRival=true');
       expect(again.body.rivalStatus.rival.id).toBe(first.body.rivalStatus.rival.id);
     });
 

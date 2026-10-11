@@ -16,99 +16,6 @@ export function formatPacePercentage(percentage?: number | null): string {
   return `${percentage.toFixed(1)}%`;
 }
 
-// Car Class Normalization Helper
-export function normalizeCarClass(carClass?: string, carType: string = ''): string {
-  const combined = `${carClass || ''} ${carType || ''}`.toLowerCase();
-
-  if (/hyper|lmh|lmdh/.test(combined)) return 'LMH';
-  if (/gt3|lmgt3/.test(combined)) return 'LMGT3';
-  if (combined.includes('gte')) return 'GTE';
-  if (combined.includes('lmp3')) return 'LMP3';
-  if (combined.includes('lmp2')) {
-    return /elms|lmp2_elms/.test(combined) ? 'LMP2elms' : 'LMP2wec';
-  }
-
-  return carClass || '';
-}
-
-export interface CarClassOption {
-  id: string;
-  label: string;
-}
-
-export const VEHICLE_CLASS_OPTIONS: CarClassOption[] = [
-  { id: 'All', label: 'All Classes' },
-  { id: 'LMGT3', label: 'GT3' },
-  { id: 'LMH', label: 'Hypercar' },
-  { id: 'LMP3', label: 'LMP3' },
-  { id: 'LMP2elms', label: 'LMP2 (ELMS)' },
-  { id: 'LMP2wec', label: 'LMP2 (WEC)' },
-  { id: 'GTE', label: 'GTE' },
-];
-
-export function matchesCarClass(carClass: string = '', carType: string = '', targetClass: string = 'All'): boolean {
-  if (!targetClass || targetClass === 'All') return true;
-
-  const combined = `${carClass} ${carType}`.toLowerCase();
-  const target = targetClass.toLowerCase();
-
-  switch (target) {
-    case 'lmh':
-    case 'hypercar':
-    case 'hyper':
-    case 'lmdh':
-      return /hyper|lmh|lmdh/.test(combined);
-    case 'lmgt3':
-    case 'gt3':
-      return /gt3|lmgt3/.test(combined);
-    case 'lmp2elms':
-    case 'lmp2 (elms)':
-    case 'lmp2_elms':
-    case 'elms':
-      return /elms|lmp2_elms/.test(combined);
-    case 'lmp2wec':
-    case 'lmp2 (wec)':
-    case 'lmp2':
-    case 'wec':
-      return combined.includes('lmp2') && !combined.includes('elms');
-    case 'lmp3':
-      return combined.includes('lmp3');
-    case 'gte':
-      return combined.includes('gte');
-    default:
-      return combined.includes(target);
-  }
-}
-
-/**
- * Checks if a session matches a target car class by evaluating playerDriver,
- * or fallback to any participating driver in the session if playerDriver is absent.
- */
-export function matchesSessionCarClass(
-  session: {
-    playerDriver?: { carClass?: string | null; carType?: string | null } | null;
-    drivers?: Array<{ carClass?: string | null; carType?: string | null }> | null;
-  },
-  targetClass: string = 'All'
-): boolean {
-  if (!targetClass || targetClass === 'All') return true;
-
-  if (session.playerDriver) {
-    return matchesCarClass(
-      session.playerDriver.carClass || '',
-      session.playerDriver.carType || '',
-      targetClass
-    );
-  }
-
-  if (session.drivers && session.drivers.length > 0) {
-    return session.drivers.some(d =>
-      matchesCarClass(d.carClass || '', d.carType || '', targetClass)
-    );
-  }
-
-  return false;
-}
 
 
 
@@ -197,36 +104,20 @@ function matchingTrackEntries(
 }
 
 /**
- * Finds the single best matching benchmark entry for a track and car class/type.
+ * Finds the single best matching benchmark entry for a track and canonical car class.
  */
 export function findReferenceEntry(
   entries: Record<string, ReferenceLaptimeEntry> | ReferenceLaptimeEntry[],
   venue: string = '',
   course: string = '',
   carClass: string = '',
-  carType: string = '',
   trackLengthMeters?: number | null
 ): ReferenceLaptimeEntry | null {
   const trackMatches = findMatchingTrackBenchmarkEntries(entries, venue, course, trackLengthMeters);
-  return selectReferenceEntry(trackMatches, carClass, carType);
+  return trackMatches.find(entry => entry.carClass === carClass) ?? null;
 }
 
-function selectReferenceEntry(trackMatches: ReferenceLaptimeEntry[], carClass: string, carType: string): ReferenceLaptimeEntry | null {
-  if (trackMatches.length === 0) return null;
-
-  const targetClass = carClass || carType || '';
-  if (targetClass && targetClass !== 'All') {
-    const classMatch = trackMatches.find(e =>
-      matchesCarClass(e.carClass, e.carClass, targetClass) ||
-      matchesCarClass(targetClass, carType, e.carClass)
-    );
-    if (classMatch) return classMatch;
-  }
-
-  return trackMatches[0];
-}
-
-/** One batch's benchmark snapshot: resolve each benchmark layout once, preserving matching order and fallbacks. */
+/** One batch's benchmark snapshot: resolve each benchmark layout once, preserving track matching order. */
 export function createBenchmarkLookup(entries: Record<string, ReferenceLaptimeEntry> | ReferenceLaptimeEntry[]) {
   const entryList = Array.isArray(entries) ? entries : Object.values(entries);
   const layouts = new Map<string, string>();
@@ -237,7 +128,7 @@ export function createBenchmarkLookup(entries: Record<string, ReferenceLaptimeEn
     matchingTrackEntries(entryList, venue, course, trackLengthMeters, layouts);
   return {
     findTrackEntries,
-    findReferenceEntry: (venue: string, course = '', carClass = '', carType = '', trackLengthMeters?: number | null) =>
-      selectReferenceEntry(findTrackEntries(venue, course, trackLengthMeters), carClass, carType),
+    findReferenceEntry: (venue: string, course = '', carClass = '', trackLengthMeters?: number | null) =>
+      findTrackEntries(venue, course, trackLengthMeters).find(entry => entry.carClass === carClass) ?? null,
   };
 }

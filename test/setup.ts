@@ -40,6 +40,8 @@ const ChartSeriesContext = React.createContext<{
 }>({ register: () => {}, entries: [] });
 
 vi.mock('recharts', () => {
+  const htmlOverlay = (content: React.ReactNode) => React.createElement('svg', null,
+    React.createElement('foreignObject', null, content));
   const ChartContainer: React.FC<{
     children?: React.ReactNode;
     data?: unknown[];
@@ -64,7 +66,7 @@ vi.mock('recharts', () => {
           'data-testid': 'recharts-click-trigger',
           onClick: () => onClick?.({ activeLabel: 2, activePayload: firstItem ? [{ payload: firstItem }] : undefined }),
         }),
-        children,
+        React.createElement('svg', null, children),
       ),
     );
   };
@@ -89,8 +91,8 @@ vi.mock('recharts', () => {
     XAxis: () => null,
     YAxis: () => null,
     Tooltip: ({ content }: { content?: React.ReactNode | ((props: unknown) => React.ReactNode) }) => {
-      if (React.isValidElement(content)) return content;
-      if (typeof content === 'function') return (content as (props: unknown) => React.ReactNode)({});
+      if (React.isValidElement(content)) return htmlOverlay(content);
+      if (typeof content === 'function') return htmlOverlay((content as (props: unknown) => React.ReactNode)({}));
       return null;
     },
     CartesianGrid: () => null,
@@ -122,17 +124,13 @@ vi.mock('recharts', () => {
           : defaultPayload;
 
       if (React.isValidElement(content)) {
-        return React.cloneElement(content as React.ReactElement<{ payload?: unknown[] }>, { payload: effectivePayload });
+        return htmlOverlay(React.cloneElement(content as React.ReactElement<{ payload?: unknown[] }>, { payload: effectivePayload }));
       }
       if (typeof content === 'function') {
-        return (content as (props: { payload?: unknown[] }) => React.ReactNode)({ payload: effectivePayload });
+        return htmlOverlay((content as (props: { payload?: unknown[] }) => React.ReactNode)({ payload: effectivePayload }));
       }
       if (typeof formatter === 'function') {
-        return React.createElement(
-          'div',
-          null,
-          formatter('Sim Driver', { dataKey: 'Sim Driver', value: 'Sim Driver', color: '#fff', type: 'line' }),
-        );
+        return htmlOverlay(formatter('Sim Driver', { dataKey: 'Sim Driver', value: 'Sim Driver', color: '#fff', type: 'line' }));
       }
       return null;
     },

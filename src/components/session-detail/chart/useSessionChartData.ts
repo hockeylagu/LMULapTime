@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
 import { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
 import { formatTime } from '../../../../shared/domain/formatters.js';
-import { matchesCarClass } from '../../../../shared/domain/paceCategory.js';
 import { selectCleanLapCandidates } from '../../../../shared/domain/lapComparison.js';
 
 export type SessionPositionChartPoint = Record<string, string | number | boolean | null | undefined>;
@@ -15,7 +14,7 @@ export interface UseSessionChartDataParams {
 export function useSessionChartData({ session, selectedDriver, isMultiClass }: UseSessionChartDataParams) {
   const classDrivers = useMemo(() => {
     return (session.drivers || []).filter((d) =>
-      matchesCarClass(d.carClass || '', d.carType || '', selectedDriver.carClass || selectedDriver.carType || '')
+      d.carClass === selectedDriver.carClass
     );
   }, [session.drivers, selectedDriver]);
 

@@ -3,7 +3,7 @@ import { Replace, Target, Trash2 } from 'lucide-react';
 import { computeLapDeltas } from '../../../shared/domain/lapComparison.js';
 import { ReferenceLaptimeEntry, ComparableLap } from '../../../shared/types/index.js';
 import { formatTime } from '../../../shared/domain/formatters.js';
-import { matchesCarClass, getPaceCategoryFromPercentage } from '../../../shared/domain/paceCategory.js';
+import { getPaceCategoryFromPercentage } from '../../../shared/domain/paceCategory.js';
 import { PaceBadge, LapStatusBadge } from '../common';
 import { CarIdentity } from '../vehicle/index.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
@@ -41,14 +41,13 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
   onSelectSession,
   benchmarks,
   allLaps,
-  selectedCarClass,
 }) => {
   let cat = lap.paceCategory;
   let pct = lap.pacePercentage;
 
   if (!cat && lap.lapTime && lap.lapTime > 0) {
     const matchingRef =
-      benchmarks.find((b) => matchesCarClass(b.carClass, '', selectedCarClass)) || benchmarks[0];
+      benchmarks.find((b) => (b.carClass === lap.carClass));
 
     if (matchingRef?.target100Sec) {
       pct = parseFloat(((lap.lapTime / matchingRef.target100Sec) * 100).toFixed(2));

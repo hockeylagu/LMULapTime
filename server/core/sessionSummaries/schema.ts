@@ -30,6 +30,7 @@ export function initSessionSummarySchema(db: DatabaseType): void {
       fastest_three_count INTEGER NOT NULL, fastest_three_time_sum REAL NOT NULL,
       PRIMARY KEY(session_id, driver_ordinal, condition_group)
     );
+    CREATE INDEX IF NOT EXISTS idx_sessions_player_car_class ON sessions(player_car_class);
     -- Reclassify Fuji Speedway GP sessions (which were misclassified as fuji_classic due to length threshold)
     UPDATE sessions SET layout_key = 'fuji_chicane'
     WHERE track_venue = 'Fuji Speedway' AND (track_course = 'Fuji Speedway' OR track_course = 'Fuji' OR track_course = '') AND layout_key = 'fuji_classic';

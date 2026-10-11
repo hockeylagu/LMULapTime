@@ -85,8 +85,8 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
   const paceByTrack = useMemo(() => {
     const lookup = createBenchmarkLookup(refCache?.entries ?? {});
     return new Map(trackList.map(track => {
-      const targetClass = selectedCarClass !== 'All' ? selectedCarClass : track.bestLapClass || track.bestLapCar || '';
-      const ref = lookup.findReferenceEntry(track.trackVenue, '', targetClass, track.bestLapCar || '');
+      const targetClass = selectedCarClass !== 'All' ? selectedCarClass : track.bestLapClass || '';
+      const ref = lookup.findReferenceEntry(track.trackVenue, '', targetClass);
       return [track, getPaceCategoryForLap(track.bestLapWet ? null : track.bestLapTime, ref)] as const;
     }));
   }, [trackList, refCache, selectedCarClass]);

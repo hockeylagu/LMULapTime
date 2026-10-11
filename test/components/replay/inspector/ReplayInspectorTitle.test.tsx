@@ -95,7 +95,7 @@ describe('ReplayInspectorTitle', () => {
     const selectedDriver: ReplayDriverEntry = { slot: 3, name: 'GT3 Driver', vehicleId: 'PORSCHE_911_GT3_R', carModel: 'Porsche 911 GT3 R LMGT3' };
     const metadata: ReplayMetadata = {
       ...baseMetadata,
-      drivers: [{ slot: 0, name: 'Leader', carModel: 'Ferrari 499P', carClass: 'Hypercar' }, selectedDriver],
+      drivers: [{ slot: 0, name: 'Leader', carModel: 'Ferrari 499P', carClass: 'Hyper' }, selectedDriver],
     };
 
     render(<ReplayInspectorTitle onClose={vi.fn()} metadata={metadata} trajectory={null} selectedDriver={selectedDriver} />);

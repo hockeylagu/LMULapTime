@@ -14,15 +14,15 @@ import type { ComparableLap } from '../../../shared/types/index.js';
 const laps = [
   {
     id: 'slow-player', sessionId: 'session-1', driverName: 'Player', lapNum: 2, lapTime: 101,
-    s1: 30, s2: 34, s3: 37, isPlayer: true, isValid: true, carClass: 'LMGT3', pacePercentage: 101,
+    s1: 30, s2: 34, s3: 37, isPlayer: true, isValid: true, carClass: 'GT3', pacePercentage: 101,
   },
   {
     id: 'fast-player', sessionId: 'session-1', driverName: 'Player', lapNum: 3, lapTime: 99,
-    s1: 29, s2: 33, s3: 37, isPlayer: true, isValid: true, carClass: 'LMGT3', pacePercentage: 99,
+    s1: 29, s2: 33, s3: 37, isPlayer: true, isValid: true, carClass: 'GT3', pacePercentage: 99,
   },
   {
     id: 'overall', sessionId: 'session-2', driverName: 'Rival', lapNum: 1, lapTime: 98,
-    s1: 28, s2: 33, s3: 37, isPlayer: false, isValid: true, carClass: 'LMGT3', pacePercentage: 98,
+    s1: 28, s2: 33, s3: 37, isPlayer: false, isValid: true, carClass: 'GT3', pacePercentage: 98,
   },
 ];
 
@@ -53,7 +53,7 @@ describe('useCompareLapsData selection fallbacks', () => {
         bestS2: 33,
         bestS3: 37,
         theoreticalBestSec: 98,
-        benchmarks: [{ carClass: 'LMGT3', target100Sec: 97 }],
+        benchmarks: [{ carClass: 'GT3', target100Sec: 97 }],
       }),
     });
 
@@ -141,7 +141,7 @@ describe('useCompareLapsData selection fallbacks', () => {
     await waitFor(() => expect(result.current.apiData.laps).toHaveLength(3));
     expect(result.current.loadError).toBeNull();
 
-    act(() => navigateTo('/compare?track=Monza&carClass=LMGT3'));
+    act(() => navigateTo('/compare?track=Monza&carClass=GT3'));
 
     await waitFor(() => expect(result.current.loadError).toBe('database is locked'));
     expect(result.current.loading).toBe(false);
@@ -162,7 +162,7 @@ describe('useCompareLapsData selection fallbacks', () => {
     );
     await waitFor(() => expect(result.current.selectedLaps.map(lap => lap.id)).toEqual(['fast-player']));
 
-    act(() => navigateTo('/compare?track=Monza&carClass=LMGT3'));
+    act(() => navigateTo('/compare?track=Monza&carClass=GT3'));
 
     await waitFor(() => expect(result.current.apiData.laps.map(lap => lap.id)).toEqual(['monza-player']));
     expect(result.current.selectedLaps.map(lap => lap.id)).toEqual(['monza-player']);

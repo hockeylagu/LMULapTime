@@ -111,7 +111,7 @@ describe('AIReportTab', () => {
         baselineTrajectory={null}
         baselineLapNumber={null}
         segments={[]}
-        carClass="LMGT3"
+        carClass="GT3"
         carModel="Ferrari 296 GT3"
       />
     );

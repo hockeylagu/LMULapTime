@@ -20,6 +20,7 @@ import {
   getSessionTypeWeight,
   minValidTime,
 } from '../../shared/domain/formatters.js';
+import { normalizeCarClass } from '../../shared/domain/vehicleMapping.js';
 import { rateDriversPace } from './sessionPaceRating.js';
 import {
   RawLapXmlNode,
@@ -483,7 +484,7 @@ export class LmuParser {
   private parseDriver(d: RawDriverXmlNode): DriverData {
     const name = String(d.Name || 'Unknown Driver');
     const carType = String(d.CarType || d.VehName || 'Unknown Car');
-    const carClass = String(d.CarClass || 'General');
+    const carClass = normalizeCarClass(String(d.CarClass || 'General'));
     const carNumber = String(d.CarNumber || '');
     const teamName = String(d.TeamName || '');
     const isPlayer = String(d.isPlayer) === '1' || d.isPlayer === true;

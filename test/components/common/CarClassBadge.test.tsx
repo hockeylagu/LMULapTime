@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { CarClassBadge, getCarClassBadgeConfig } from '../../../src/components/common/CarClassBadge.js';
-import { VehicleClassPills } from '../../../src/components/common/VehicleClassPills.js';
 
 describe('CarClassBadge', () => {
   it('renders Hypercar (HY) in red', () => {
@@ -96,35 +95,10 @@ describe('CarClassBadge', () => {
     expect(screen.getByTestId('badge-orange-corner').querySelector('polygon')).toHaveClass('fill-lmu-warn-faded');
   });
 
-  it('renders VehicleClassPills without duplicating text next to badges', () => {
-    const onSelect = vi.fn();
-    render(<VehicleClassPills selectedClass="LMGT3" onSelectClass={onSelect} />);
-
-    // ALL button is present
-    const allBtn = screen.getByRole('button', { name: 'All' });
-    expect(allBtn).toBeInTheDocument();
-    expect(allBtn).toHaveTextContent('ALL');
-
-    // The LMGT3 class reads GT3, by aria-label and visible text
-    const gt3Btn = screen.getByRole('button', { name: 'GT3' });
-    expect(gt3Btn).toBeInTheDocument();
-    expect(gt3Btn).toHaveTextContent('GT3');
-    // Ensure there is no duplicated 'LMGT3' text node alongside GT3
-    expect(gt3Btn.textContent).toBe('GT3');
-
-    // Hypercar button has HY visible text without duplicated 'Hypercar' text
-    const hyBtn = screen.getByRole('button', { name: 'Hypercar' });
-    expect(hyBtn).toHaveTextContent('HY');
-    expect(hyBtn.textContent).toBe('HY');
-
-    fireEvent.click(hyBtn);
-    expect(onSelect).toHaveBeenCalledWith('LMH');
-  });
-
   it('correctly resolves configurations in getCarClassBadgeConfig', () => {
-    expect(getCarClassBadgeConfig('LMH')?.badgeType).toBe('HY');
-    expect(getCarClassBadgeConfig('LMDh')?.badgeType).toBe('HY');
-    expect(getCarClassBadgeConfig('LMP2elms')?.hasOrangeCorner).toBe(true);
-    expect(getCarClassBadgeConfig('LMP2wec')?.hasOrangeCorner).toBe(false);
+    expect(getCarClassBadgeConfig('Hyper')?.badgeType).toBe('HY');
+    expect(getCarClassBadgeConfig('LMH')?.badgeType).toBe('OTHER');
+    expect(getCarClassBadgeConfig('LMP2_ELMS')?.hasOrangeCorner).toBe(true);
+    expect(getCarClassBadgeConfig('LMP2')?.hasOrangeCorner).toBe(false);
   });
 });

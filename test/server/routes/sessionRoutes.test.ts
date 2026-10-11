@@ -48,7 +48,7 @@ describe('sessionRoutes and filterSessions', () => {
           name: 'Driver Alpha',
           isPlayer: true,
           carType: 'Ferrari 499P',
-          carClass: 'Hypercar',
+          carClass: 'Hyper',
           carNumber: '50',
           teamName: 'AF',
           position: 1,
@@ -70,7 +70,7 @@ describe('sessionRoutes and filterSessions', () => {
         name: 'Driver Alpha',
         isPlayer: true,
         carType: 'Ferrari 499P',
-        carClass: 'Hypercar',
+        carClass: 'Hyper',
         carNumber: '50',
         teamName: 'AF',
         position: 1,
@@ -104,7 +104,7 @@ describe('sessionRoutes and filterSessions', () => {
           name: 'Driver Beta',
           isPlayer: false,
           carType: 'Porsche 963',
-          carClass: 'Hypercar',
+          carClass: 'Hyper',
           carNumber: '5',
           teamName: 'Penske',
           position: 1,
@@ -147,7 +147,7 @@ describe('sessionRoutes and filterSessions', () => {
       const filters = parseSessionFilters({
         track: 'Spa',
         car: 'Ferrari',
-        carClass: 'Hypercar',
+        carClass: 'Hyper',
         driver: 'Alpha',
         sessionType: 'Practice',
         hideEmpty: 'true',
@@ -155,17 +155,17 @@ describe('sessionRoutes and filterSessions', () => {
 
       expect(filters.track).toBe('Spa');
       expect(filters.car).toBe('Ferrari');
-      expect(filters.carClass).toBe('Hypercar');
+      expect(filters.carClass).toBe('Hyper');
       expect(filters.driver).toBe('Alpha');
       expect(filters.sessionType).toBe('Practice');
       expect(filters.hideEmpty).toBe(true);
     });
 
     it('treats a repeated or nested parameter as absent', () => {
-      const filters = parseSessionFilters({ track: ['Spa', 'Monza'], driver: { name: 'Alpha' }, carClass: 'Hypercar' });
+      const filters = parseSessionFilters({ track: ['Spa', 'Monza'], driver: { name: 'Alpha' }, carClass: 'Hyper' });
       expect(filters.track).toBeUndefined();
       expect(filters.driver).toBeUndefined();
-      expect(filters.carClass).toBe('Hypercar');
+      expect(filters.carClass).toBe('Hyper');
     });
 
     it('handles filterEmpty alias and undefined fields', () => {
@@ -354,7 +354,7 @@ describe('sessionRoutes and filterSessions', () => {
       referenceCache.load.mockReturnValue({
         lastUpdated: '2026-09-20T00:00:00.000Z',
         entriesCount: 3,
-        entries: [benchmark('Monza', 'Hypercar'), benchmark('Monza (curvagrande)', 'Hypercar'), benchmark('Spa', 'Hypercar')],
+        entries: [benchmark('Monza', 'Hyper'), benchmark('Monza (curvagrande)', 'Hyper'), benchmark('Spa', 'Hyper')],
       });
       app = express();
       sessionDb=createSessionDb(mockSessions);

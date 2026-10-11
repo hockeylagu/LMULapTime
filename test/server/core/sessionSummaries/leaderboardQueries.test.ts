@@ -26,7 +26,7 @@ describe('compact leaderboard queries', () => {
         driver('Other', [lap(2, 109), lap(3, 110), lap(4, 111)])], { timestamp: 2000 }),
     ];
     sessions.forEach(value => upsertSession(db, value, value.filename, value.timestamp, 1));
-    const query = { layoutKey: 'monza_gp', carClass: 'LMGT3' };
+    const query = { layoutKey: 'monza_gp', carClass: 'GT3' };
     expect(queryCompactLeaderboard(db, query)).toEqual(buildLeaderboard(sessions, query));
     expect(queryCompactLeaderboardLayouts(db)).toEqual(listLeaderboardLayouts(sessions));
     expect(queryCompactPlayerSessionBests(db, query)).toEqual(playerSessionBests(sessions, query));
@@ -41,7 +41,7 @@ describe('compact leaderboard queries', () => {
       session('three-laps', [driver('Me', [lap(2, 102), lap(3, 103), lap(4, 104)], { isPlayer: true })], { timestamp: 2000 }),
     ];
     sessions.forEach(value => upsertSession(db, value, value.filename, value.timestamp, 1));
-    expect(queryCompactLeaderboard(db, { layoutKey: 'monza_gp', carClass: 'LMGT3' }).player?.top3Average).toBe(103);
+    expect(queryCompactLeaderboard(db, { layoutKey: 'monza_gp', carClass: 'GT3' }).player?.top3Average).toBe(103);
     db.close();
   });
 
@@ -53,7 +53,7 @@ describe('compact leaderboard queries', () => {
       driver('Same Name', [lap(2, 102), lap(3, 103)]),
     ]);
     upsertSession(db, value, value.filename, value.timestamp, 1);
-    const entry = queryCompactLeaderboard(db, { layoutKey: 'monza_gp', carClass: 'LMGT3' }).entries[0];
+    const entry = queryCompactLeaderboard(db, { layoutKey: 'monza_gp', carClass: 'GT3' }).entries[0];
     expect(entry.representativeLaps).toBe(4);
     expect(entry.sessions).toBe(1);
     expect(entry.top3Average).toBeNull();
@@ -69,7 +69,7 @@ describe('compact leaderboard queries', () => {
       driver('Third', [lap(2, 105, { s1: 31, s2: 41, s3: 31 }), lap(3, 106), lap(4, 107)]),
     ]);
     upsertSession(db, value, value.filename, value.timestamp, 1);
-    const board = queryCompactLeaderboard(db, { layoutKey: 'monza_gp', carClass: 'LMGT3' });
+    const board = queryCompactLeaderboard(db, { layoutKey: 'monza_gp', carClass: 'GT3' });
     const entries = Object.fromEntries(board.entries.map(entry => [entry.driverName, entry]));
     expect(entries.Me?.s1Rank).toBe(1);
     expect(entries.Rival?.s1Rank).toBe(1);
@@ -77,7 +77,7 @@ describe('compact leaderboard queries', () => {
     expect(entries.Me?.top3AverageRank).toBe(1);
     expect(entries.Rival?.top3AverageRank).toBe(1);
     expect(entries.Third?.top3AverageRank).toBe(3);
-    expect(board).toEqual(buildLeaderboard([value], { layoutKey: 'monza_gp', carClass: 'LMGT3' }));
+    expect(board).toEqual(buildLeaderboard([value], { layoutKey: 'monza_gp', carClass: 'GT3' }));
     expect(queryCompactLeaderboardLayouts(db)).toEqual(listLeaderboardLayouts([value]));
     expect(queryCompactLeaderboardLayouts(db)[0].classes[0].playerRank).toBe(1);
     db.close();

@@ -39,23 +39,9 @@ function trackWhere(track: string): QueryParts {
   return { where: [`s.layout_key='unknown' AND (${combined} LIKE '%'||?||'%' ESCAPE '\\' OR ? LIKE '%'||${combined}||'%' ESCAPE '\\' OR ${venue} LIKE '%'||?||'%' ESCAPE '\\')`], args: [q, q, q] };
 }
 function classWhere(carClass: string): QueryParts {
-  const target = carClass.trim().toLowerCase();
-  if (!target || target === 'all') return { where: [], args: [] };
-  const combined = "lower(coalesce(d.driver_class,'') || ' ' || coalesce(v.car_type,''))";
-  const includes = (_part: string) => `${combined} LIKE ?`;
-  switch (target) {
-    case 'lmh': case 'hypercar': case 'hyper': case 'lmdh':
-      return { where: [`(${includes('hyper')} OR ${includes('lmh')} OR ${includes('lmdh')})`], args: ['%hyper%', '%lmh%', '%lmdh%'] };
-    case 'lmgt3': case 'gt3':
-      return { where: [`(${includes('gt3')} OR ${includes('lmgt3')})`], args: ['%gt3%', '%lmgt3%'] };
-    case 'lmp2elms': case 'lmp2 (elms)': case 'lmp2_elms': case 'elms':
-      return { where: [`(${includes('elms')} OR ${includes('lmp2_elms')})`], args: ['%elms%', '%lmp2_elms%'] };
-    case 'lmp2wec': case 'lmp2 (wec)': case 'lmp2': case 'wec':
-      return { where: [`${includes('lmp2')} AND ${combined} NOT LIKE ?`], args: ['%lmp2%', '%elms%'] };
-    case 'lmp3': return { where: [includes('lmp3')], args: ['%lmp3%'] };
-    case 'gte': return { where: [includes('gte')], args: ['%gte%'] };
-    default: return { where: [includes(target)], args: [`%${escapeLike(target)}%`] };
-  }
+  const target = carClass.trim();
+  if (!target || target.toLowerCase() === 'all') return { where: [], args: [] };
+  return { where: ['d.driver_class = ?'], args: [target] };
 }
 function append(parts: QueryParts, extra: QueryParts): QueryParts {
   return { where: [...parts.where, ...extra.where], args: [...parts.args, ...extra.args] };

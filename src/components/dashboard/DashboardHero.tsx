@@ -8,7 +8,7 @@ import type { TrackBoundaryGeometry } from '../replay/map/index.js';
 import { PaceBadge } from '../common/PaceBadge.js';
 import { CarIdentity } from '../vehicle/index.js';
 import { ReplayLaunchButton } from '../common/replay/ReplayLaunchButton.js';
-import { VEHICLE_CLASS_OPTIONS } from '../../../shared/domain/paceCategory.js';
+import { VEHICLE_CLASS_OPTIONS } from '../../../shared/domain/vehicleMapping.js';
 import { getSessionTypeStyle } from '../common/sessionTypeStyles.js';
 import type { SessionSummary } from './dashboardTypes.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';

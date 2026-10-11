@@ -12,7 +12,7 @@ describe('trackSummaryUtils', () => {
       playerDriver: {
         name: 'Sim Driver',
         carType: 'Ferrari 499P',
-        carClass: 'Hypercar',
+        carClass: 'Hyper',
         bestLapTime: 122.5,
         bestS1: 34.0,
         bestS2: 42.0,
@@ -29,7 +29,7 @@ describe('trackSummaryUtils', () => {
       playerDriver: {
         name: 'Sim Driver',
         carType: 'Porsche 963',
-        carClass: 'Hypercar',
+        carClass: 'Hyper',
         bestLapTime: 121.8,
         bestS1: 33.8,
         bestS2: 41.9,
@@ -46,7 +46,7 @@ describe('trackSummaryUtils', () => {
       playerDriver: {
         name: 'Sim Driver',
         carType: 'Porsche 911 GT3 R LMGT3',
-        carClass: 'LMGT3',
+        carClass: 'GT3',
         bestLapTime: 135.2,
         bestS1: 38.0,
         bestS2: 46.0,
@@ -63,7 +63,7 @@ describe('trackSummaryUtils', () => {
       playerDriver: {
         name: 'Sim Driver',
         carType: 'Aston Martin Vantage GT3',
-        carClass: 'LMGT3',
+        carClass: 'GT3',
         bestLapTime: 108.5,
         bestS1: 27.5,
         bestS2: 38.5,
@@ -82,7 +82,7 @@ describe('trackSummaryUtils', () => {
     expect(spa.totalLaps).toBe(30);
     expect(spa.bestLapTime).toBe(121.8);
     expect(spa.bestLapCar).toBe('Porsche 963');
-    expect(spa.bestLapClass).toBe('Hypercar');
+    expect(spa.bestLapClass).toBe('Hyper');
     expect(spa.bestS1).toBe(33.8);
     expect(spa.bestS2).toBe(41.9);
     expect(spa.bestS3).toBe(46.1);
@@ -96,11 +96,11 @@ describe('trackSummaryUtils', () => {
     expect(monza.totalLaps).toBe(15);
     expect(monza.bestLapTime).toBe(108.5);
     expect(monza.bestLapCar).toBe('Aston Martin Vantage GT3');
-    expect(monza.bestLapClass).toBe('LMGT3');
+    expect(monza.bestLapClass).toBe('GT3');
   });
 
   it('filters sessions by carClass accurately', () => {
-    const lmgt3Only = aggregateTrackSummaries(sampleSessions, { carClass: 'LMGT3' });
+    const lmgt3Only = aggregateTrackSummaries(sampleSessions, { carClass: 'GT3' });
 
     const spa = lmgt3Only['Spa-Francorchamps'];
     expect(spa).toBeDefined();
@@ -108,7 +108,7 @@ describe('trackSummaryUtils', () => {
     expect(spa.totalLaps).toBe(12);
     expect(spa.bestLapTime).toBe(135.2);
     expect(spa.bestLapCar).toBe('Porsche 911 GT3 R LMGT3');
-    expect(spa.bestLapClass).toBe('LMGT3');
+    expect(spa.bestLapClass).toBe('GT3');
     expect(spa.carsUsed).toEqual(['Porsche 911 GT3 R LMGT3']);
 
     const monza = lmgt3Only['Autodromo Nazionale Monza'];
@@ -120,7 +120,7 @@ describe('trackSummaryUtils', () => {
   it('retains empty venues with 0 stats when includeEmptyVenues is true', () => {
     // Monza has no Hypercar sessions
     const hypercarOnly = aggregateTrackSummaries(sampleSessions, {
-      carClass: 'Hypercar',
+      carClass: 'Hyper',
       includeEmptyVenues: true,
     });
 

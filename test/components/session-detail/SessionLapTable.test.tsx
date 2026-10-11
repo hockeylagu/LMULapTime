@@ -23,7 +23,7 @@ describe('SessionLapTable optimal delta', () => {
   });
   it('sorts multiclass laps by the class position shown rather than overall position', () => {
     const base = mockDetailedSession.playerDriver;
-    const selectedDriver = { ...base, carClass: 'LMGT3', laps: [
+    const selectedDriver = { ...base, carClass: 'GT3', laps: [
       { ...base.laps[0], lapNum: 1, position: 11 },
       { ...base.laps[1], lapNum: 2, position: 12 },
     ] } as unknown as DriverData;

@@ -3,7 +3,6 @@ import type { Leaderboard, LeaderboardEntry, LeaderboardLap, LeaderboardLayout, 
 import type { ReferenceLaptimeEntry } from '../types.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { getDisplayTrackName } from '../../../shared/domain/formatters.js';
-import { normalizeCarClass } from '../../../shared/domain/paceCategory.js';
 import { findLayoutBenchmark, type LeaderboardQuery } from '../../../shared/domain/leaderboard.js';
 
 interface SummaryRow {
@@ -24,7 +23,7 @@ function rankValues<T>(items: T[], get: (item: T) => number | null): Array<numbe
 }
 
 function queryBoardDriverFacts(db: DatabaseType, query: LeaderboardQuery): DriverFact[] {
-  const className = normalizeCarClass(query.carClass);
+  const className = query.carClass;
   const carType = query.carType?.trim().toLowerCase() ?? '';
   const params = [query.layoutKey, className, carType, carType];
   // The window sees one per-session best contribution, not every lap. It only exists to choose a
@@ -85,7 +84,7 @@ function entriesFromFacts(facts: DriverFact[]): LeaderboardEntry[] {
 }
 
 export function queryCompactLeaderboard(db: DatabaseType, query: LeaderboardQuery, benchmarks: Record<string, ReferenceLaptimeEntry> | ReferenceLaptimeEntry[] = []): Leaderboard {
-  const carClass = normalizeCarClass(query.carClass);
+  const carClass = query.carClass;
   const carType = query.carType?.trim() || null;
   const entries = query.layoutKey === 'unknown' ? [] : entriesFromFacts(queryBoardDriverFacts(db, query));
   const spec = getCircuitSpecification(query.layoutKey);
@@ -152,5 +151,5 @@ export function queryCompactPlayerSessionBests(db: DatabaseType, query: Leaderbo
     JOIN session_driver_condition_summaries c ON c.session_id=d.session_id AND c.driver_ordinal=d.driver_ordinal
     WHERE s.layout_key=? AND d.driver_class=? AND d.is_player_driver=1 AND (?='' OR lower(trim(v.car_type))=?)
       AND c.condition_group='dry' AND c.best_lap_time IS NOT NULL
-    ORDER BY s.timestamp ASC,s.id ASC`).all(query.layoutKey, normalizeCarClass(query.carClass), carType, carType) as Array<{ sessionId: string; sessionName: string; timestamp: number; best: number }>;
+    ORDER BY s.timestamp ASC,s.id ASC`).all(query.layoutKey, query.carClass, carType, carType) as Array<{ sessionId: string; sessionName: string; timestamp: number; best: number }>;
 }

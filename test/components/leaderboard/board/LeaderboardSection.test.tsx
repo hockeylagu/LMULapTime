@@ -12,7 +12,7 @@ const renderSection = (props: Partial<LeaderboardSectionProps> = {}) => {
       board={board(40, 30, BENCHMARK)}
       loading={false}
       error={null}
-      carClass="LMGT3"
+      carClass="GT3"
       scope="class"
       playerCarType="Ferrari 296 LMGT3"
       {...handlers}
@@ -133,12 +133,12 @@ describe('LeaderboardSection compare bar', () => {
     const player = fixture.entries.find((e) => e.isPlayer)!;
     const onGoToCompare = vi.fn();
     const { rerender } = render(
-      <LeaderboardSection board={fixture} loading={false} error={null} carClass="LMGT3" scope="class" playerCarType="Ferrari 296 LMGT3"
+      <LeaderboardSection board={fixture} loading={false} error={null} carClass="GT3" scope="class" playerCarType="Ferrari 296 LMGT3"
         onScopeChange={vi.fn()} onCompare={vi.fn()} onGoToCompare={onGoToCompare} comparedLapIds={[boardLapId(player)]} />
     );
     expect(screen.queryByRole('button', { name: /Go to compare/ })).not.toBeInTheDocument();
     rerender(
-      <LeaderboardSection board={fixture} loading={false} error={null} carClass="LMGT3" scope="class" playerCarType="Ferrari 296 LMGT3"
+      <LeaderboardSection board={fixture} loading={false} error={null} carClass="GT3" scope="class" playerCarType="Ferrari 296 LMGT3"
         onScopeChange={vi.fn()} onCompare={vi.fn()} onGoToCompare={onGoToCompare} comparedLapIds={[boardLapId(player), boardLapId(other)]} />
     );
     expect(screen.getByRole('status')).toHaveTextContent('1 lap from the board in the comparison');

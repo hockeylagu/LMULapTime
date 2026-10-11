@@ -37,7 +37,7 @@ const makeDriver = (overrides: Partial<DriverData> = {}): DriverData => {
   return {
     name: 'Selected Driver',
     carType: 'Prototype',
-    carClass: 'LMH',
+    carClass: 'Hyper',
     carNumber: '50',
     teamName: 'Team',
     isPlayer: true,

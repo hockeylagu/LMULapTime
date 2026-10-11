@@ -114,6 +114,7 @@ describe('parser server module', () => {
       expect(session?.bestSessionLap?.lapTimeString).toBe('2:02.000');
       expect(session?.playerDriver?.name).toBe('Sim Racer');
       expect(session?.playerDriver?.isPlayer).toBe(true);
+      expect(session?.playerDriver?.carClass).toBe('Hyper');
       expect(session?.playerDriver?.laps.length).toBe(3);
       expect(session?.playerDriver?.bestLapTime).toBe(122.000);
       expect(session?.playerDriver?.bestLapNum).toBe(2);

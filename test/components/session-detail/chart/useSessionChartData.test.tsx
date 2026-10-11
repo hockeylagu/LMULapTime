@@ -13,7 +13,7 @@ function lap(lapNum: number, lapTime: number | null, flags: Partial<LapData> = {
 }
 
 function driver(name: string, carClass: string, laps: LapData[], isPlayer = false): DriverData {
-  return { name, carClass, carType: carClass === 'LMGT3' ? 'Porsche 911 GT3 R' : 'Ferrari 499P', isPlayer, laps } as DriverData;
+  return { name, carClass, carType: carClass === 'GT3' ? 'Porsche 911 GT3 R' : 'Ferrari 499P', isPlayer, laps } as DriverData;
 }
 
 const session = (drivers: DriverData[]) => ({ drivers }) as unknown as DetailedSession;
@@ -56,7 +56,7 @@ describe('useSessionChartData', () => {
 
   it("ranks the selected driver's class on its own in a multi-class session", () => {
     const hyper1 = driver('Hyper One', 'Hypercar', [lap(1, 100, { position: 1 }), lap(2, 100, { position: 2 })], true);
-    const gt3 = driver('GT3 Car', 'LMGT3', [lap(1, 120, { position: 2 }), lap(2, 120, { position: 3 })]);
+    const gt3 = driver('GT3 Car', 'GT3', [lap(1, 120, { position: 2 }), lap(2, 120, { position: 3 })]);
     const hyper2 = driver('Hyper Two', 'Hypercar', [lap(1, 101, { position: 3 }), lap(2, 99, { position: 1 })]);
 
     const { result } = renderHook(() => useSessionChartData({ session: session([hyper1, gt3, hyper2]), selectedDriver: hyper1, isMultiClass: true }));

@@ -376,7 +376,7 @@ describe('ReplayInspectorModal', () => {
     });
     render(<ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />);
     await waitFor(() => {
-      expect(requests.some(url => url.includes('/leaderboard') && url.includes('layout=spa_gp') && url.includes('carClass=LMGT3'))).toBe(true);
+      expect(requests.some(url => url.includes('/leaderboard') && url.includes('layout=spa_gp') && url.includes('carClass=GT3'))).toBe(true);
       expect(screen.getByTitle(title)).toHaveClass(color);
     });
     expect(screen.queryByText(/Fastest Lap/i)).not.toBeInTheDocument();
@@ -588,7 +588,7 @@ describe('ReplayInspectorModal', () => {
               dateString: '2026/06/01 12:00',
               driverName: 'Rival Racer',
               carType: 'BMW M4 GT3',
-              carClass: 'LMGT3',
+              carClass: 'GT3',
               lapNum: lap.lapNumber,
               lapTime: lap.lapTimeSec,
               lapTimeString: `2:${lap.lapTimeSec.toFixed(3)}`,
@@ -686,7 +686,7 @@ describe('ReplayInspectorModal', () => {
       dateString: '2026/06/01 12:00',
       driverName: 'Rival Racer',
       carType: 'BMW M4 GT3',
-      carClass: 'LMGT3',
+      carClass: 'GT3',
       lapNum: 8,
       lapTime: 133.2,
       lapTimeString: '2:13.200',
@@ -746,7 +746,7 @@ describe('ReplayInspectorModal', () => {
       dateString: '2026/08/08 20:16:41',
       driverName: 'Pithivier Patate',
       carType: 'Ferrari 296 LMGT3 Evo',
-      carClass: 'LMGT3',
+      carClass: 'GT3',
       lapNum: 12,
       lapTime: 72.484,
       lapTimeString: '1:12.484',

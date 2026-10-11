@@ -3,7 +3,7 @@ import { SessionDatabase } from '../../../server/core/db.js';
 import type { RivalScope } from '../../../server/core/dbRivalStore.js';
 import type { NewRivalTarget } from '../../../shared/domain/rivals.js';
 
-const GT3: RivalScope = { layoutKey: 'monza_gp', carClass: 'LMGT3', carType: '' };
+const GT3: RivalScope = { layoutKey: 'monza_gp', carClass: 'GT3', carType: '' };
 const MY_CAR: RivalScope = { ...GT3, carType: 'Ferrari 296 LMGT3' };
 
 const driverTarget = (driverName: string, targetTime: number, setAt = 1): NewRivalTarget => ({

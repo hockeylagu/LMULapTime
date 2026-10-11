@@ -57,7 +57,6 @@ export function attachPitServices(db: DatabaseType, session: DetailedSession): v
   for (const lap of getReplayLaps(db, replayName)) {
     if (lap.startSec !== null) lapStarts.set(lap.driverSlot, [...(lapStarts.get(lap.driverSlot) ?? []), lap.startSec]);
   }
-  const classOf = (driver: DriverData) => (driver.carClass || '').toLowerCase();
   const playerName = session.playerDriver?.name;
 
   for (const driver of drivers) {
@@ -67,7 +66,7 @@ export function attachPitServices(db: DatabaseType, session: DetailedSession): v
       const lap = inLapOf(driver, stop);
       if (!lap) continue;
       const otherServices = drivers
-        .filter((other) => classOf(other) === classOf(driver))
+        .filter((other) => other.carClass === driver.carClass)
         .flatMap((other) => (stopsOf.get(other.name)?.stops ?? []).filter((s) => s !== stop).map(serviceSeconds))
         .filter((sec): sec is number => sec !== null);
       const end = stop.exitSec ?? Infinity;

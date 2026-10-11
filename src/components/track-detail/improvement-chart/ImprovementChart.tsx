@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { matchesSessionType, compareSessions } from '../../../../shared/domain/formatters.js';
-import { matchesCarClass, matchesTrack } from '../../../../shared/domain/paceCategory.js';
+import { matchesTrack } from '../../../../shared/domain/paceCategory.js';
 import { PaceCategory } from '../../../../shared/types/index.js';
 import { ImprovementHeader } from './ImprovementHeader.js';
 import { ImprovementStatsBanner } from './ImprovementStatsBanner.js';
@@ -71,7 +71,7 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
   const rawTrackData = progression.filter((p) => {
     const isTrackMatch = matchesTrack(activeTrack, p.trackVenue, p.trackCourse);
 
-    const matchesClass = matchesCarClass(p.carClass, p.carType, selectedCarClass);
+    const matchesClass = !selectedCarClass || selectedCarClass === 'All' || p.carClass === selectedCarClass;
     const matchesModel = !selectedCarModel || selectedCarModel === 'All' || p.carType === selectedCarModel;
     const matchesType = matchesSessionType(p.sessionType, p.sessionName, filterType);
 

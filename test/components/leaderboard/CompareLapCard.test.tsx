@@ -24,7 +24,7 @@ describe('CompareLapCard', () => {
     virtualEnergy: 78.5,
     virtualEnergyUsed: 3.4,
     carType: 'Ferrari 499P',
-    carClass: 'Hypercar',
+    carClass: 'Hyper',
     driverName: 'Antonio Fuoco',
     sessionName: 'Qualifying',
     sessionType: 'Qualifying',
@@ -43,7 +43,7 @@ describe('CompareLapCard', () => {
     {
       key: 'Monza_Hypercar',
       trackName: 'Autodromo Nazionale Monza',
-      carClass: 'Hypercar',
+      carClass: 'Hyper',
       patch: '1.4+',
       target100Sec: 94.5,
       targets: {
@@ -73,7 +73,7 @@ describe('CompareLapCard', () => {
         onRemoveLap={onRemoveLap}
         benchmarks={mockBenchmarks}
         allLaps={[baseLap]}
-        selectedCarClass="Hypercar"
+        selectedCarClass="Hyper"
       />
     );
 
@@ -129,7 +129,7 @@ describe('CompareLapCard', () => {
         onSelectSession={onSelectSession}
         benchmarks={mockBenchmarks}
         allLaps={[baseLap]}
-        selectedCarClass="Hypercar"
+        selectedCarClass="Hyper"
       />
     );
 
@@ -171,7 +171,7 @@ describe('CompareLapCard', () => {
         onRemoveLap={vi.fn()}
         benchmarks={mockBenchmarks}
         allLaps={[unratedLap]}
-        selectedCarClass="Hypercar"
+        selectedCarClass="Hyper"
       />
     );
 
@@ -203,7 +203,7 @@ describe('CompareLapCard', () => {
         onRemoveLap={vi.fn()}
         benchmarks={[]}
         allLaps={[sampleLap, unratedLap]}
-        selectedCarClass="Hypercar"
+        selectedCarClass="Hyper"
       />
     );
 
@@ -231,7 +231,7 @@ describe('CompareLapCard', () => {
         onRemoveLap={vi.fn()}
         benchmarks={mockBenchmarks}
         allLaps={[pitLap]}
-        selectedCarClass="Hypercar"
+        selectedCarClass="Hyper"
       />
     );
 

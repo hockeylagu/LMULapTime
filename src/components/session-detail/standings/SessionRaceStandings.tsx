@@ -106,7 +106,7 @@ export const SessionRaceStandings: React.FC<SessionRaceStandingsProps> = ({
   // A race is classified by the finish; practice and qualifying by the best lap, so no grid gain or race time.
   const isRace = session.sessionType === 'Race';
   const fastestByClass = session.drivers.reduce<Record<string, number>>((fastest, driver) => {
-    const key = isMultiClass ? driver.carClass.trim().toLowerCase() : '';
+    const key = isMultiClass ? driver.carClass : '';
     if (driver.bestLapTime !== null && driver.bestLapTime > 0) {
       fastest[key] = Math.min(fastest[key] ?? Number.POSITIVE_INFINITY, driver.bestLapTime);
     }
@@ -175,7 +175,7 @@ export const SessionRaceStandings: React.FC<SessionRaceStandingsProps> = ({
                 leaderFinishTime={leaderFinishTime}
                 leaderLaps={leaderLaps}
                 isRace={isRace}
-                fastestInClass={fastestByClass[isMultiClass ? d.carClass.trim().toLowerCase() : ''] ?? null}
+                fastestInClass={fastestByClass[isMultiClass ? d.carClass : ''] ?? null}
               />
             ))}
           </tbody>

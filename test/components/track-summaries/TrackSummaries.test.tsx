@@ -27,7 +27,7 @@ describe('TrackSummaries component', () => {
       playerDriver: {
         name: 'Player',
         carType: 'Ferrari 499P',
-        carClass: 'LMH',
+        carClass: 'Hyper',
         bestLapTime: 122.0,
         bestLapTimeString: '2:02.000',
         bestS1: 34.0,
@@ -43,7 +43,7 @@ describe('TrackSummaries component', () => {
       playerDriver: {
         name: 'Player',
         carType: 'Porsche 911 GT3',
-        carClass: 'LMGT3',
+        carClass: 'GT3',
         bestLapTime: 108.0,
         bestLapTimeString: '1:48.000',
         bestS1: 28.0,
@@ -99,7 +99,7 @@ describe('TrackSummaries component', () => {
 
     const lmgt3Btn = screen.getByRole('button', { name: 'GT3' });
     fireEvent.click(lmgt3Btn);
-    expect(setSelectedCarClass).toHaveBeenCalledWith('LMGT3');
+    expect(setSelectedCarClass).toHaveBeenCalledWith('GT3');
 
     const sortSelect = screen.getByRole('combobox');
     fireEvent.change(sortSelect, { target: { value: 'name-desc' } });
@@ -119,7 +119,7 @@ describe('TrackSummaries component', () => {
         sessionName: 'P1',
         driversCount: 1,
         playerDriver: {
-          name: 'LMH Driver', carType: 'Ferrari 499P', carClass: 'LMH',
+          name: 'LMH Driver', carType: 'Ferrari 499P', carClass: 'Hyper',
           bestLapTime: 130, bestLapTimeString: '2:10.000',
           bestS1: 40, bestS2: 45, bestS3: 45, lapsCount: 8,
         },
@@ -134,7 +134,7 @@ describe('TrackSummaries component', () => {
         sessionName: 'P2',
         driversCount: 1,
         playerDriver: {
-          name: 'GT3 Driver', carType: 'Porsche 911 GT3', carClass: 'LMGT3',
+          name: 'GT3 Driver', carType: 'Porsche 911 GT3', carClass: 'GT3',
           bestLapTime: 140, bestLapTimeString: '2:20.000',
           bestS1: 43, bestS2: 48, bestS3: 49, lapsCount: 4,
         },
@@ -157,7 +157,7 @@ describe('TrackSummaries component', () => {
       <TrackSummaries
         sessions={sessions}
         onSelectTrack={onSelectTrack}
-        selectedCarClass="LMGT3"
+        selectedCarClass="GT3"
         setSelectedCarClass={vi.fn()}
       />
     );
@@ -177,7 +177,7 @@ describe('TrackSummaries component', () => {
       sessionName: `P${index + 1}`,
       driversCount: 1,
       playerDriver: {
-        name: 'Player', carType: 'Ferrari 499P', carClass: 'LMH',
+        name: 'Player', carType: 'Ferrari 499P', carClass: 'Hyper',
         bestLapTime: 130 + index, bestLapTimeString: '2:10.000',
         bestS1: 40, bestS2: 45, bestS3: 45, lapsCount: 1,
       },
@@ -217,10 +217,10 @@ describe('TrackSummaries component', () => {
   it('opens a track with Enter and retains class context in native links', async () => {
     const user = userEvent.setup();
     const onSelectTrack = vi.fn();
-    render(<TrackSummaries sessions={mockSessions} onSelectTrack={onSelectTrack} selectedCarClass="LMGT3" setSelectedCarClass={vi.fn()} />);
+    render(<TrackSummaries sessions={mockSessions} onSelectTrack={onSelectTrack} selectedCarClass="GT3" setSelectedCarClass={vi.fn()} />);
     await waitFor(() => expect(screen.queryByText('Loading benchmark targets…')).not.toBeInTheDocument());
     const link = screen.getByRole('link', { name: 'View Monza records' });
-    expect(link).toHaveAttribute('href', '/track/Monza?carClass=LMGT3');
+    expect(link).toHaveAttribute('href', '/track/Monza?carClass=GT3');
     link.focus();
     await user.keyboard('{Enter}');
     expect(onSelectTrack).toHaveBeenCalledWith('Monza');
@@ -262,7 +262,7 @@ describe('TrackSummaries component', () => {
     render(<TrackSummaries sessions={mockSessions} onSelectTrack={vi.fn()} selectedCarClass="All" setSelectedCarClass={vi.fn()} />);
     expect(screen.getByRole('status')).toHaveTextContent('Loading benchmark targets');
     expect(screen.getByRole('option', { name: 'Pace / Benchmark (Best First)' })).toBeDisabled();
-    finish?.({ ok: true, json: () => Promise.resolve({ entries: { monza: { trackName: 'Monza', carClass: 'LMGT3', target100Sec: 100 } } }) });
+    finish?.({ ok: true, json: () => Promise.resolve({ entries: { monza: { trackName: 'Monza', carClass: 'GT3', target100Sec: 100 } } }) });
     await waitFor(() => expect(screen.getByRole('option', { name: 'Pace / Benchmark (Best First)' })).toBeEnabled());
   });
 

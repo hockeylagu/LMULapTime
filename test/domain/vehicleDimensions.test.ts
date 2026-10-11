@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { defaultVehicleSize, DEFAULT_CLASS_VEHICLE_SIZES, UNKNOWN_VEHICLE_SIZE } from '../../shared/domain/vehicleDimensions.js';
-import { VEHICLE_CLASS_OPTIONS } from '../../shared/domain/paceCategory.js';
+import { VEHICLE_CLASS_OPTIONS } from '../../shared/domain/vehicleMapping.js';
 
 describe('approximate vehicle class sizes', () => {
   it('covers every selectable racing class', () => {
@@ -9,11 +9,9 @@ describe('approximate vehicle class sizes', () => {
       expect(defaultVehicleSize(option.id).lengthM).toBeGreaterThan(defaultVehicleSize(option.id).widthM);
     }
   });
-  it('uses existing class aliases and a neutral fallback for unknown identity', () => {
-    expect(defaultVehicleSize('Hyper')).toEqual(defaultVehicleSize('LMH'));
-    expect(defaultVehicleSize('LMDh')).toEqual(defaultVehicleSize('LMH'));
-    expect(defaultVehicleSize('GT3')).toEqual(defaultVehicleSize('LMGT3'));
-    expect(defaultVehicleSize('LMP2_ELMS')).toEqual(defaultVehicleSize('LMP2elms'));
+  it('uses canonical classes and a neutral size for unknown identity', () => {
+    expect(defaultVehicleSize('Hyper')).toEqual(DEFAULT_CLASS_VEHICLE_SIZES.Hyper);
+    expect(defaultVehicleSize('LMH')).toEqual(UNKNOWN_VEHICLE_SIZE);
     expect(defaultVehicleSize()).toEqual(UNKNOWN_VEHICLE_SIZE);
     expect(defaultVehicleSize('Unrecognised')).toEqual(UNKNOWN_VEHICLE_SIZE);
   });

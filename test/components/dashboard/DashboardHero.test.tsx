@@ -30,7 +30,7 @@ describe('DashboardHero', () => {
       playerDriver: {
         name: 'Samuel Lague',
         carType: 'BMW M4 LMGT3',
-        carClass: 'LMGT3',
+        carClass: 'GT3',
         bestLapTime: 138.5,
         bestLapTimeString: '2:18.500',
         bestS1: 40,
@@ -62,7 +62,7 @@ describe('DashboardHero', () => {
       playerDriver: {
         name: 'Samuel Lague',
         carType: 'Chevrolet Corvette Z06 LMGT3.R',
-        carClass: 'LMGT3',
+        carClass: 'GT3',
         bestLapTime: 240.47,
         driverOrdinal: 0,
         bestLapOrdinal: 1,

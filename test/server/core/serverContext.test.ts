@@ -135,6 +135,9 @@ describe('ServerContext background session sync', () => {
     const events: string[] = [];
     let scans = 0;
     const sessionDb = {
+      ...storedTelemetryLinks,
+      getTelemetryMetadata: vi.fn(() => []),
+      getTelemetryOwnersWithoutFile: vi.fn(() => []),
       getAllStoredReplayFiles: vi.fn(() => []),
       syncSessionsAsyncIterator: vi.fn(() => (async function* () {
         events.push('xml');

@@ -3,7 +3,7 @@ import type { ReferenceLaptimeEntry } from '../types.js';
 import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
 import type { DashboardData, DashboardMetrics, DashboardTrends } from '../../../shared/types/dashboard.js';
 import { getDisplayTrackName, matchesSessionType } from '../../../shared/domain/formatters.js';
-import { createBenchmarkLookup, getPaceCategoryFromPercentage, normalizeCarClass } from '../../../shared/domain/paceCategory.js';
+import { createBenchmarkLookup, getPaceCategoryFromPercentage } from '../../../shared/domain/paceCategory.js';
 import { createPaceCalculator } from '../../benchmarks/referenceLaptimes.js';
 import { findLayoutBenchmark } from '../../../shared/domain/leaderboard.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
@@ -38,7 +38,7 @@ function benchmarkMetrics(db: DatabaseType, entries: Record<string, ReferenceLap
   const targets = new Map<string, [string, string, number]>();
   for (const entry of Object.values(entries)) {
     const layout = getCircuitSpecification(entry.trackName).layoutKey;
-    const carClass = normalizeCarClass(entry.carClass);
+    const carClass = entry.carClass;
     const key = `${layout}:${carClass}`;
     if (!targets.has(key) && entry.target100Sec > 0) targets.set(key, [layout, carClass, entry.target100Sec]);
   }
@@ -174,7 +174,7 @@ function dashboardTrends(db: DatabaseType, entries: Record<string, ReferenceLapt
     lapsCount: player.lapsCount, hasReplay: Boolean(latest.matchingReplayFile),
     hasDuckDbTelemetry: Boolean(latest.hasDuckDbTelemetry || latest.matchingReplayFile?.hasDuckDbTelemetry),
   };
-  const trendClass = normalizeCarClass(player.carClass, player.carType);
+  const trendClass = player.carClass;
   const recentPaceTrend: DashboardTrends['recentPaceTrend'] = [];
   const trendRows = db.prepare(`SELECT s.session_id id,s.track_venue,s.track_course,s.track_length,
       s.car_type,s.car_class,s.best_lap_time,s.best_lap_wet,s.best_lap_time_string,s.time_string

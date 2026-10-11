@@ -39,7 +39,7 @@ export const mockDetailedSession = {
   playerDriver: {
     name: 'Sim Driver',
     carType: 'Ferrari 499P',
-    carClass: 'LMH',
+    carClass: 'Hyper',
     carNumber: '50',
     teamName: 'AF Corse',
     isPlayer: true,
@@ -138,7 +138,7 @@ export const mockDetailedSession = {
     {
       name: 'Sim Driver',
       carType: 'Ferrari 499P',
-      carClass: 'LMH',
+      carClass: 'Hyper',
       carNumber: '50',
       teamName: 'AF Corse',
       isPlayer: true,
@@ -234,7 +234,7 @@ export const mockDetailedSession = {
     {
       name: 'AI Driver 2',
       carType: 'Porsche 963',
-      carClass: 'LMH',
+      carClass: 'Hyper',
       carNumber: '5',
       teamName: 'Penske',
       isPlayer: false,

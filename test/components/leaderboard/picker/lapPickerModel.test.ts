@@ -24,7 +24,7 @@ function lap(sessionId: string, sessionType: string, lapNum: number, lapTime: nu
     dateString: `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')} 12:00`,
     driverName: 'Me',
     carType: 'Ferrari 296 GT3',
-    carClass: 'LMGT3',
+    carClass: 'GT3',
     lapNum,
     lapTime,
     lapTimeString: lapTime.toFixed(3),

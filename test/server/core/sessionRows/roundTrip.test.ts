@@ -33,18 +33,18 @@ describe('normalized session rows: round trip', () => {
   });
 
   it('keeps multiclass drivers and duplicate driver names apart by ordinal', () => {
-    const twin = (position: number, bestLap: number) => driver('Same Name', [lap(1, { lapTime: bestLap })], { position, bestLapTime: bestLap, carClass: 'LMGT3', isPlayer: position === 2 });
+    const twin = (position: number, bestLap: number) => driver('Same Name', [lap(1, { lapTime: bestLap })], { position, bestLapTime: bestLap, carClass: 'GT3', isPlayer: position === 2 });
     const input = session([driver('Leader', [lap(1), lap(2)]), twin(2, 105), twin(3, 109)]);
     const { stored } = expectRoundTrip(input);
-    expect(stored?.drivers.map(candidate => candidate.carClass)).toEqual(['Hypercar', 'LMGT3', 'LMGT3']);
+    expect(stored?.drivers.map(candidate => candidate.carClass)).toEqual(['Hyper', 'GT3', 'GT3']);
     expect(stored?.playerDriver?.bestLapTime).toBe(105);
   });
 
   it('keeps traffic with passes, following and pressured flags and absent neighbours', () => {
     const traffic: LapData['traffic'] = {
-      ahead: { car: { name: 'Ahead', carClass: 'Hypercar', sameClass: true }, gapSec: 1.25 }, behind: null, following: true, pressured: false,
-      passed: [{ name: 'A', carClass: 'LMGT3', sameClass: false }, { name: 'B', carClass: 'Hypercar', sameClass: true }],
-      passedBy: [{ name: 'C', carClass: 'Hypercar', sameClass: true }],
+      ahead: { car: { name: 'Ahead', carClass: 'Hyper', sameClass: true }, gapSec: 1.25 }, behind: null, following: true, pressured: false,
+      passed: [{ name: 'A', carClass: 'GT3', sameClass: false }, { name: 'B', carClass: 'Hyper', sameClass: true }],
+      passedBy: [{ name: 'C', carClass: 'Hyper', sameClass: true }],
     };
     const legacy: LapData['traffic'] = { ahead: null, behind: { car: { name: 'Back', carClass: 'LMP2', sameClass: false }, gapSec: 0.4 }, following: false, passed: [], passedBy: [] };
     expectRoundTrip(session([driver('P', [lap(1, { traffic }), lap(2, { traffic: legacy }), lap(3)], { isPlayer: true })]));

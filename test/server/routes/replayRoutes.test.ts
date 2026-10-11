@@ -43,12 +43,12 @@ describe('session telemetry routes', () => {
       drivers: [{
         name: 'Route Driver',
         driverName: 'Route Driver',
-        carClass: 'LMGT3',
+        carClass: 'GT3',
         carType: 'Test Car',
         laps: [{ lapNum: 1, lapTime: 99.123, lapTimeString: '1:39.123', s1: 30.111, s2: 34.222, s3: 34.79, isValid: true }],
       }],
       playerDriver: {
-        name: 'Route Driver', driverName: 'Route Driver', carClass: 'LMGT3', carType: 'Test Car',
+        name: 'Route Driver', driverName: 'Route Driver', carClass: 'GT3', carType: 'Test Car',
         bestLapTime: 99.123,
         laps: [{ lapNum: 1, lapTime: 99.123, lapTimeString: '1:39.123', s1: 30.111, s2: 34.222, s3: 34.79, isValid: true }],
       },
@@ -118,7 +118,7 @@ describe('session telemetry routes', () => {
     expect(getTrajectory.mock.calls[0][0].session.drivers[0].laps[0]).not.toHaveProperty('topSpeed');
     const response = await request(app).get('/api/session/session-1/traffic');
     expect(response.status).toBe(200);
-    expect(traffic.mock.calls[0][0].session?.drivers[0]).toMatchObject({ name: 'Route Driver', carClass: 'LMGT3', laps: [] });
+    expect(traffic.mock.calls[0][0].session?.drivers[0]).toMatchObject({ name: 'Route Driver', carClass: 'GT3', laps: [] });
     expect(db.getSessionById).not.toHaveBeenCalled();
   });
 

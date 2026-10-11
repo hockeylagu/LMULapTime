@@ -1,6 +1,5 @@
 import { DetailedSession, DriverData, LapData } from '../../../shared/types/index.js';
 import { getDisplayTrackName } from '../../../shared/domain/formatters.js';
-import { normalizeCarClass } from '../../../shared/domain/paceCategory.js';
 
 
 import { buildTelemetryComparePath } from '../../utils/telemetryCompareLink.js';
@@ -42,7 +41,7 @@ function sourceDriverOrdinal(session: { drivers?: DriverData[] }, driver: Partia
 
 /**
  * The leaderboard's compare card opened on one lap of the session. The class is the leaderboard's
- * (LMGT3, not the results file's GT3), so the lap is found on its board.
+ * canonical car class, so the lap is found on its board.
  */
 export function sessionLapComparePath(
   session: Pick<DetailedSession, 'id' | 'trackVenue' | 'trackCourse'> & { drivers?: DetailedSession['drivers'] },
@@ -51,7 +50,7 @@ export function sessionLapComparePath(
 ): string {
   const params = new URLSearchParams({
     track: getDisplayTrackName(session.trackVenue, session.trackCourse),
-    carClass: normalizeCarClass(driver?.carClass, driver?.carType) || 'LMGT3',
+    carClass: driver?.carClass ?? '',
     sessionId: session.id,
   });
   if (lapNum) params.set('lapNum', String(lapNum));

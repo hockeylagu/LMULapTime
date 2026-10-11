@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ReferenceLaptimesCard } from '../../../src/components/settings/ReferenceLaptimesCard.js';
 import type { AppStatus, ReferenceBenchmarkDiff, BenchmarkDiffSummary } from '../../../shared/types/index.js';
 
@@ -31,7 +31,7 @@ describe('ReferenceLaptimesCard component', () => {
       {
         key: 'cota_gt3',
         trackName: 'Circuit of the Americas',
-        carClass: 'LMGT3',
+        carClass: 'GT3',
         patch: '1.4+',
         type: 'added',
         newAlienSec: 125.0,
@@ -48,7 +48,7 @@ describe('ReferenceLaptimesCard component', () => {
       {
         key: 'bahrain_gt3',
         trackName: 'Bahrain',
-        carClass: 'LMGT3',
+        carClass: 'GT3',
         patch: '1.4+',
         oldPatch: '1.3',
         newPatch: '1.4+',
@@ -95,7 +95,7 @@ describe('ReferenceLaptimesCard component', () => {
       {
         key: 'spa_hyper',
         trackName: 'Spa-Francorchamps',
-        carClass: 'LMH',
+        carClass: 'Hyper',
         patch: '1.3',
         type: 'updated',
         oldAlienSec: 118.0,
@@ -169,7 +169,7 @@ describe('ReferenceLaptimesCard component', () => {
   };
 
   it('explains the purpose, the pace categories and the status in one line', async () => {
-    renderCard();
+    await act(async () => { renderCard(); });
 
     expect(screen.getByRole('heading', { name: 'Reference Benchmarks' })).toBeInTheDocument();
     expect(screen.getByText(/community target lap times/i)).toBeInTheDocument();

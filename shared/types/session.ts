@@ -2,6 +2,10 @@ import type { PaceCategory } from './reference.js';
 import type { LapTraffic } from './raceTraffic.js';
 import type { PitService } from './pitStops.js';
 
+/** Canonical car classes as defined by LMU vehicle XML source of truth. */
+export type CanonicalCarClass = 'Hyper' | 'GT3' | 'LMP2' | 'LMP2_ELMS' | 'LMP3' | 'GTE';
+export const CANONICAL_CAR_CLASSES = ['Hyper', 'GT3', 'LMP2', 'LMP2_ELMS', 'LMP3', 'GTE'] as const;
+
 export interface TireWear {
   fl: number; // Front Left tire wear % remaining (0-100)
   fr: number; // Front Right tire wear % remaining (0-100)
@@ -122,6 +126,7 @@ export interface DriverData {
   driverOrdinal?: number;
   name: string;
   carType: string;
+  /** Canonical class: Hyper, GT3, LMP2, LMP2_ELMS, LMP3 or GTE (unknown source labels are preserved). */
   carClass: string;
   carNumber: string;
   teamName: string;

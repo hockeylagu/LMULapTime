@@ -28,7 +28,7 @@ describe('benchmarkImpact engine', () => {
         {
           name: 'Driver GT3',
           isPlayer: true,
-          carClass: 'LMGT3',
+          carClass: 'GT3',
           carType: 'Aston Martin Vantage LMGT3',
           laps: [
             {
@@ -57,7 +57,7 @@ describe('benchmarkImpact engine', () => {
         {
           name: 'Rival GT3',
           isPlayer: false,
-          carClass: 'LMGT3',
+          carClass: 'GT3',
           carType: 'Aston Martin Vantage LMGT3',
           laps: [{ lapNum: 1, lapNumber: 1, lapTime: 120.6, isValid: true, isPitStop: false }],
         },
@@ -72,7 +72,7 @@ describe('benchmarkImpact engine', () => {
         {
           name: 'Driver Monza',
           isPlayer: true,
-          carClass: 'LMGT3',
+          carClass: 'GT3',
           laps: [{ lapNumber: 1, lapTime: 110.0, isValid: true }],
         },
       ],
@@ -86,7 +86,7 @@ describe('benchmarkImpact engine', () => {
         {
           name: 'Driver Hyper',
           isPlayer: true,
-          carClass: 'LMH',
+          carClass: 'Hyper',
           laps: [{ lapNumber: 1, lapTime: 98.0, isValid: true }],
         },
       ],
@@ -97,7 +97,7 @@ describe('benchmarkImpact engine', () => {
     const database = new SessionDatabase(':memory:');
     database.upsertSession(mockSessions[0], `${mockSessions[0].id}.xml`, 1, 1);
     const item: ReferenceBenchmarkDiffItem = {
-      key: 'bahrain_lmgt3', trackName: 'Bahrain', carClass: 'LMGT3', patch: '1.0', type: 'updated',
+      key: 'bahrain_lmgt3', trackName: 'Bahrain', carClass: 'GT3', patch: '1.0', type: 'updated',
       oldAlienSec: 121, newAlienSec: 120,
     };
     const expected = computeBenchmarkItemImpact(item, [mockSessions[0]]);
@@ -124,7 +124,7 @@ describe('benchmarkImpact engine', () => {
     database.upsertSession(many, 'many-laps.xml', 1, 1);
     database.upsertSession(noLaps, 'player-no-laps.xml', 2, 1);
     const item: ReferenceBenchmarkDiffItem = {
-      key: 'bahrain_lmgt3', trackName: 'Bahrain', carClass: 'LMGT3', patch: '1.0', type: 'updated',
+      key: 'bahrain_lmgt3', trackName: 'Bahrain', carClass: 'GT3', patch: '1.0', type: 'updated',
       oldAlienSec: 120, newAlienSec: 118,
     };
     const diff: ReferenceBenchmarkDiff = {
@@ -147,7 +147,7 @@ describe('benchmarkImpact engine', () => {
     const item: ReferenceBenchmarkDiffItem = {
       key: 'bahrain_lmgt3',
       trackName: 'Bahrain',
-      carClass: 'LMGT3',
+      carClass: 'GT3',
       patch: '1.4+',
       type: 'updated',
       oldAlienSec: 120.0,
@@ -183,7 +183,7 @@ describe('benchmarkImpact engine', () => {
     const item: ReferenceBenchmarkDiffItem = {
       key: 'spa_lmgt3',
       trackName: 'Circuit de Spa-Francorchamps',
-      carClass: 'LMGT3',
+      carClass: 'GT3',
       patch: '1.4+',
       type: 'updated',
       oldAlienSec: 135.0,
@@ -210,7 +210,7 @@ describe('benchmarkImpact engine', () => {
         {
           key: 'bahrain_lmgt3',
           trackName: 'Bahrain',
-          carClass: 'LMGT3',
+          carClass: 'GT3',
           patch: '1.4+',
           type: 'updated',
           oldAlienSec: 120.0,
@@ -219,7 +219,7 @@ describe('benchmarkImpact engine', () => {
         {
           key: 'monza_lmgt3',
           trackName: 'Monza',
-          carClass: 'LMGT3',
+          carClass: 'GT3',
           patch: '1.4+',
           type: 'updated',
           oldAlienSec: 110.0,
@@ -242,7 +242,7 @@ describe('benchmarkImpact engine', () => {
 
   it('counts only the player laps, never the other drivers', () => {
     const item: ReferenceBenchmarkDiffItem = {
-      key: 'bahrain_lmgt3', trackName: 'Bahrain', carClass: 'LMGT3', patch: '1.4+', type: 'updated',
+      key: 'bahrain_lmgt3', trackName: 'Bahrain', carClass: 'GT3', patch: '1.4+', type: 'updated',
       oldAlienSec: 120.0, newAlienSec: 118.0,
     };
     const impact = computeBenchmarkItemImpact(item, mockSessions);

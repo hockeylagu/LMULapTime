@@ -11,7 +11,7 @@ import { getCircuitSpecification } from './circuitSpecs.js';
 import { getDisplayTrackName } from './formatters.js';
 import { selectCleanLapCandidates } from './lapComparison.js';
 import { lapConditionGroup } from './lapConditions.js';
-import { findMatchingTrackBenchmarkEntries, matchesCarClass, normalizeCarClass } from './paceCategory.js';
+import { findMatchingTrackBenchmarkEntries } from './paceCategory.js';
 
 /**
  * Leaderboards of the drivers met on a layout, one car class at a time.
@@ -54,10 +54,6 @@ export function selectLeaderboardLaps(laps: LapData[]): LapData[] {
 
 export function sessionLayoutKey(session: DetailedSession): string {
   return getCircuitSpecification(session.trackVenue, session.trackCourse, null, null, null, session.trackLengthMeters).layoutKey;
-}
-
-export function driverClass(driver: DriverData): string {
-  return normalizeCarClass(driver.carClass, driver.carType);
 }
 
 const sameCar = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
@@ -110,7 +106,7 @@ function forEachRankedDriver(
       const laps = selectLeaderboardLaps(driver.laps ?? []);
       if (laps.length === 0) continue;
       layoutKey ??= sessionLayoutKey(session);
-      visit(session, driver, layoutKey, driverClass(driver), laps);
+      visit(session, driver, layoutKey, driver.carClass, laps);
     }
   }
 }
@@ -200,7 +196,7 @@ export function findLayoutBenchmark(
   findTrackEntries = (venue: string) => findMatchingTrackBenchmarkEntries(entries, venue)
 ): ReferenceLaptimeEntry | null {
   const onLayout = findTrackEntries(layoutKey);
-  return onLayout.find((e) => matchesCarClass(e.carClass, '', carClass) && matchesCarClass(carClass, '', e.carClass)) ?? null;
+  return onLayout.find((e) => e.carClass === carClass) ?? null;
 }
 
 export function buildLeaderboard(
@@ -208,7 +204,7 @@ export function buildLeaderboard(
   query: LeaderboardQuery,
   benchmarks: Record<string, ReferenceLaptimeEntry> | ReferenceLaptimeEntry[] = []
 ): Leaderboard {
-  const carClass = normalizeCarClass(query.carClass);
+  const carClass = query.carClass;
   const carType = query.carType?.trim() || null;
   const acc = new Map<string, DriverAccumulator>();
   forEachRankedDriver(sessions, (session, driver, layoutKey, cls, laps) => {
@@ -237,7 +233,7 @@ export function playerSessionBests(
   sessions: DetailedSession[],
   query: LeaderboardQuery
 ): Array<{ sessionId: string; sessionName: string; timestamp: number; best: number }> {
-  const carClass = normalizeCarClass(query.carClass);
+  const carClass = query.carClass;
   const carType = query.carType?.trim() || null;
   const bests: Array<{ sessionId: string; sessionName: string; timestamp: number; best: number }> = [];
   forEachRankedDriver(sessions, (session, driver, layoutKey, cls, laps) => {

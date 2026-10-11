@@ -6,9 +6,9 @@ export function lapClassPositions(session: DetailedSession, driver: DriverData |
   const laps = driver?.laps ?? [];
   const peers = new Map<number, number[]>();
   if (isMultiClass) {
-    const carClass = (driver?.carClass || '').toLowerCase();
+    const carClass = driver?.carClass ?? '';
     for (const other of session.drivers || []) {
-      if (other.name === driver?.name || (other.carClass || '').toLowerCase() !== carClass) continue;
+      if (other.name === driver?.name || other.carClass !== carClass) continue;
       const seen = new Set<number>();
       for (const lap of other.laps || []) {
         if (seen.has(lap.lapNum)) continue;
@@ -33,9 +33,9 @@ export function lapClassPositions(session: DetailedSession, driver: DriverData |
  */
 export function lapClassPosition(session: DetailedSession, driver: DriverData | undefined, lap: LapData, isMultiClass: boolean): number {
   if (!isMultiClass || lap.position <= 0) return lap.position;
-  const carClass = (driver?.carClass || '').toLowerCase();
+  const carClass = driver?.carClass ?? '';
   return 1 + (session.drivers || [])
-    .filter((d) => d.name !== driver?.name && (d.carClass || '').toLowerCase() === carClass)
+    .filter((d) => d.name !== driver?.name && d.carClass === carClass)
     .filter((d) => {
       const otherLap = d.laps?.find((ol) => ol.lapNum === lap.lapNum);
       return otherLap && otherLap.position > 0 && otherLap.position < lap.position;

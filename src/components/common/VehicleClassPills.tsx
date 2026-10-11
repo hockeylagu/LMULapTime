@@ -1,5 +1,4 @@
-import React from 'react';
-import { VEHICLE_CLASS_OPTIONS } from '../../../shared/domain/paceCategory.js';
+import { VEHICLE_CLASS_OPTIONS } from '../../../shared/domain/vehicleMapping.js';
 import { CarClassBadge } from './CarClassBadge.js';
 import { SEGMENT_RESTING } from './SessionTypePills.js';
 
@@ -46,8 +45,8 @@ export const VehicleClassPills: React.FC<VehicleClassPillsProps> = ({
           <CarClassBadge
             key={cls.id}
             carClass={cls.id}
-            isElms={cls.id === 'LMP2elms'}
-            hasOrangeCorner={cls.id === 'LMP2elms'}
+            isElms={cls.id === 'LMP2_ELMS'}
+            hasOrangeCorner={cls.id === 'LMP2_ELMS'}
             size={size}
             title={cls.label}
             aria-label={cls.label}

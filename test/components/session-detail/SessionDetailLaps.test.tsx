@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { SessionDetail } from '../../../src/components/session-detail/index.js';
 import { DriverData } from '../../../server/core/types.js';
 import { mockDetailedSession } from './mockSessionDetail.js';
@@ -44,7 +44,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
         {
           name: 'AI Driver 2',
           carType: 'Porsche 963',
-          carClass: 'LMH',
+          carClass: 'Hyper',
           carNumber: '5',
           teamName: 'Porsche Penske',
           isPlayer: false,
@@ -115,7 +115,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     // Selecting another driver must not add (You) to that opponent
     // The same-car card names this driver too; the row to click is in the standings table.
     const opponentRow = screen.getAllByText('AI Driver 2').find(el => !el.closest('[data-testid="sectors-metric"]'))!;
-    fireEvent.click(opponentRow);
+    await act(async () => { fireEvent.click(opponentRow); });
     expect(screen.queryByText(/AI Driver 2\s*\(You\)/i)).not.toBeInTheDocument();
   });
 
@@ -230,7 +230,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
         {
           name: 'Hypercar Leader',
           carType: 'Ferrari 499P',
-          carClass: 'Hypercar',
+          carClass: 'Hyper',
           carNumber: '50',
           isPlayer: false,
           position: 1,
@@ -242,7 +242,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
         {
           name: 'GT3 Leader',
           carType: 'Porsche 911 GT3 R',
-          carClass: 'LMGT3',
+          carClass: 'GT3',
           carNumber: '92',
           isPlayer: false,
           position: 15,
@@ -254,7 +254,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
         {
           name: 'Test Driver',
           carType: 'Aston Martin Vantage GT3',
-          carClass: 'LMGT3',
+          carClass: 'GT3',
           carNumber: '77',
           isPlayer: true,
           position: 18,
@@ -291,7 +291,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
         {
           name: 'Test Driver',
           carType: 'Porsche 911 GT3 R',
-          carClass: 'LMGT3',
+          carClass: 'GT3',
           carNumber: '92',
           isPlayer: true,
           position: 1,
@@ -348,7 +348,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
         {
           name: 'Test Driver',
           carType: 'Porsche 911 GT3 R',
-          carClass: 'LMGT3',
+          carClass: 'GT3',
           carNumber: '92',
           isPlayer: true,
           position: 1,
@@ -390,7 +390,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
         {
           name: 'Quali Driver',
           carType: 'Ferrari 499P',
-          carClass: 'Hypercar',
+          carClass: 'Hyper',
           carNumber: '50',
           isPlayer: true,
           position: 1,
@@ -455,7 +455,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
       playerDriver: {
         name: 'Sim Racer',
         carType: 'Ferrari 499P',
-        carClass: 'Hypercar',
+        carClass: 'Hyper',
         carNumber: '50',
         teamName: 'AF Corse',
         isPlayer: true,
@@ -622,7 +622,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
         name: 'Color Test Driver',
         isPlayer: true,
         carType: 'Ferrari 499P',
-        carClass: 'Hypercar',
+        carClass: 'Hyper',
         totalTrackLimits: 2,
         trackLimits: [
           {

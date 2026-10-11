@@ -1,6 +1,5 @@
 import { PaceCategory, ReferenceLaptimeEntry, ComparableLap, NonRepresentativeReason, LapConditions } from '../types/index.js';
 import { formatTime, computeTheoreticalBest } from './formatters.js';
-import { matchesCarClass } from './paceCategory.js';
 import { LapConditionGroup, lapConditionGroup } from './lapConditions.js';
 import type { ReplayLapSummary } from '../types/index.js';
 
@@ -267,7 +266,7 @@ export function filterLapsByCarCategory(
   if (!targetCarClass || targetCarClass === 'All') return laps;
 
   return laps.filter(lap => {
-    const classMatches = matchesCarClass(lap.carClass, lap.carType, targetCarClass);
+    const classMatches = lap.carClass === targetCarClass;
     if (!classMatches) return false;
 
     if (targetCarModel && targetCarModel !== 'All') {

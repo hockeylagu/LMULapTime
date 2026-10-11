@@ -12,7 +12,7 @@ describe('TrackSessionsCard', () => {
     playerDriver: {
       name: 'Player',
       carType: 'Ferrari 499P',
-      carClass: 'Hypercar',
+      carClass: 'Hyper',
       lapsCount: 10,
       bestLapTime: 95.5,
       bestLapTimeString: '1:35.500',

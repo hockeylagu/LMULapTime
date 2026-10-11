@@ -2,8 +2,6 @@ import type { Database } from 'better-sqlite3';
 import type { DetailedSession } from '../types.js';
 import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
 import { findWeekendSessions } from '../../../shared/domain/weekendSessions.js';
-import { driverClass } from '../../../shared/domain/leaderboard.js';
-import { normalizeCarClass } from '../../../shared/domain/paceCategory.js';
 import { isSessionSummaryReady } from './store.js';
 import { readSessionCards } from './cards.js';
 
@@ -31,23 +29,23 @@ function queryPersonalBest(db: Database, scope: PersonalBestScope, carClass: str
 export function querySessionPersonalBest(db: Database, session: DetailedSession, driverOrdinal: number) {
   if (!isSessionSummaryReady(db)) return { driverOrdinal, bestLapTime: null, ready: false };
   const driver = session.drivers[driverOrdinal];
-  return { driverOrdinal, bestLapTime: queryPersonalBest(db, sessionScope(db, session), driverClass(driver), driver.name), ready: true };
+  return { driverOrdinal, bestLapTime: queryPersonalBest(db, sessionScope(db, session), driver.carClass, driver.name), ready: true };
 }
 
 /** Reads only the selected driver's identity and session layout for the on-demand PB endpoint. */
 export function querySessionPersonalBestById(db: Database, sessionId: string, driverOrdinal: number) {
-  const target = db.prepare(`SELECT s.layout_key,s.track_venue,s.track_course,n.name,v.car_type,v.car_class,d.driver_class
+  const target = db.prepare(`SELECT s.layout_key,s.track_venue,s.track_course,n.name,d.driver_class
     FROM sessions s JOIN session_drivers d ON d.session_id=s.id AND d.driver_ordinal=?
-    LEFT JOIN drivers n ON n.driver_id=d.driver_id LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id
+    LEFT JOIN drivers n ON n.driver_id=d.driver_id
     WHERE s.id=?`).get(driverOrdinal, sessionId) as {
       layout_key: string; track_venue: string; track_course: string; name: string | null;
-      car_type: string | null; car_class: string | null; driver_class: string | null;
+      driver_class: string;
     } | undefined;
   if (!target) return null;
   if (!isSessionSummaryReady(db)) return { driverOrdinal, bestLapTime: null, ready: false };
 
   const scope = personalBestScope(target.layout_key,target.track_venue,target.track_course);
-  const carClass = target.driver_class ?? normalizeCarClass(target.car_class ?? '', target.car_type ?? '');
+  const carClass = target.driver_class;
   return {
     driverOrdinal,
     bestLapTime: queryPersonalBest(db,scope,carClass,target.name ?? ''),

@@ -52,7 +52,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const dashboardState = useDashboardData(dataRevision, !legacySessions);
   const dashboardData = dashboardState.data;
   const sessions = legacySessions ?? [];
-  const selectedCarClass = searchParams.get('carClass') || initialSelectedCarClass;
+  const rawCarClass = searchParams.get('carClass') || initialSelectedCarClass;
+  const selectedCarClass = rawCarClass;
   const handleOpenReplay = (id: string) => {
     const session = sessions.find(item => item.id === id) ?? dashboardData?.sessions.find(item => item.id === id);
     const outing = dashboardData?.trends.latestOuting?.id === id ? dashboardData.trends.latestOuting : null;

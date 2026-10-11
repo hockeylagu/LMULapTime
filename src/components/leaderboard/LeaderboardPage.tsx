@@ -45,14 +45,10 @@ export const LeaderboardPage: React.FC<CompareLapsProps> = (props) => {
   const requestedCarClass = searchParams.get('carClass') || props.initialCarClass || null;
   const selectedLayout = useMemo(() => findLayoutForTrack(layouts, track), [layouts, track]);
   const layoutDefaultClass = selectedLayout?.lastCarClass || selectedLayout?.classes[0]?.carClass || null;
-  const requestedClassIsAvailable = Boolean(requestedCarClass && requestedCarClass !== 'All' &&
-    selectedLayout?.classes.some(item => item.carClass === requestedCarClass));
-  const carClass = selectedLayout
-    ? requestedClassIsAvailable ? requestedCarClass : layoutDefaultClass
-    : requestedCarClass === 'All' ? null : requestedCarClass;
+  const carClass = requestedCarClass && requestedCarClass !== 'All' ? requestedCarClass : layoutDefaultClass;
   const layoutKey = selectedLayout?.layoutKey ?? (track ? getCircuitSpecification(track).layoutKey : null);
   const scope: LeaderboardScope = searchParams.get('scope') === 'car' ? 'car' : 'class';
-  const playerCarType = selectedLayout?.classes.find((c) => c.carClass === carClass)?.lastCarType || null;
+  const playerCarType = carClass ? selectedLayout?.classes.find((c) => (c.carClass === carClass))?.lastCarType || null : null;
   const leaderboard = useRival(layoutKey && carClass ? { layoutKey, carClass, carType: scope === 'car' ? playerCarType : null } : null);
   const { compareRequest, compareRef, scrollToCompare, onPick, onCompare, onAnalyse, onTelemetry } = useBoardActions(leaderboard.board, carClass);
   const [comparedLapIds, setComparedLapIds] = useState<string[]>([]);
@@ -69,10 +65,9 @@ export const LeaderboardPage: React.FC<CompareLapsProps> = (props) => {
     if (layouts.length === 0) return;
     if (!track) {
       const layout = layouts[0];
-      const keepRequested = requestedCarClass && requestedCarClass !== 'All' && layout.classes.some(item => item.carClass === requestedCarClass);
       updateSearchParams(searchParams, setSearchParams, {
         track: layout.trackName,
-        carClass: keepRequested ? requestedCarClass : layout.lastCarClass || layout.classes[0]?.carClass,
+        carClass: requestedCarClass && requestedCarClass !== 'All' ? requestedCarClass : layout.lastCarClass,
       });
       return;
     }

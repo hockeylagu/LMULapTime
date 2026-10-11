@@ -39,8 +39,8 @@ it.each([false, true])('swaps exact session and lap locators through route updat
         trackName: 'Spa', displayTrack: 'Spa', sessionType: 'Practice',
         timeSliceCount: 2, totalEvents: 1, durationSec: 100,
         drivers: [
-          { slot: 2, name: 'Player', isPlayer: true, carClass: 'LMGT3', sessionDriverOrdinal: 0, sessionLapOrdinals: { '3': 2 } },
-          { slot: 3, name: 'Rival', carClass: 'LMGT3', sessionDriverOrdinal: 1, sessionLapOrdinals: { '5': 4 } },
+          { slot: 2, name: 'Player', isPlayer: true, carClass: 'GT3', sessionDriverOrdinal: 0, sessionLapOrdinals: { '3': 2 } },
+          { slot: 3, name: 'Rival', carClass: 'GT3', sessionDriverOrdinal: 1, sessionLapOrdinals: { '5': 4 } },
         ],
       };
       return Response.json(metadata);

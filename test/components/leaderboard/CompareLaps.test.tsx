@@ -33,7 +33,7 @@ describe('CompareLaps component', () => {
     dateString: '2026/05/28 14:00',
     driverName: 'Sim Driver',
     carType: 'Ferrari 296 GT3',
-    carClass: 'LMGT3',
+    carClass: 'GT3',
     lapNum,
     lapTime,
     lapTimeString,
@@ -61,7 +61,7 @@ describe('CompareLaps component', () => {
       {
         key: 'Spa_LMGT3',
         trackName: 'Spa',
-        carClass: 'LMGT3',
+        carClass: 'GT3',
         patch: '1.4+',
         target100Sec: 120.0,
         targets: {
@@ -92,7 +92,7 @@ describe('CompareLaps component', () => {
   });
 
   it('opens on the personal best, in one card without the lap table or its filters', async () => {
-    render(<CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="LMGT3" />);
+    render(<CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="GT3" />);
 
     await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(1));
     expect(screen.getAllByRole('region', { name: 'Compare laps' })).toHaveLength(1);
@@ -101,7 +101,7 @@ describe('CompareLaps component', () => {
   });
 
   it('allows adding theoretical optimal and all-time track best laps on demand', async () => {
-    render(<CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="LMGT3" />);
+    render(<CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="GT3" />);
     await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(1));
 
     fireEvent.click(screen.getByRole('button', { name: /\+ Theoretical Best/i }));
@@ -120,7 +120,7 @@ describe('CompareLaps component', () => {
       driverName: 'Rival',
       isPlayer: false,
     } as ComparableLap;
-    render(<CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="LMGT3" rivalLap={rivalLap} />);
+    render(<CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="GT3" rivalLap={rivalLap} />);
     await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(1));
 
     fireEvent.click(screen.getByRole('button', { name: /\+ Rival \(2:01\.000\)/ }));
@@ -136,7 +136,7 @@ describe('CompareLaps component', () => {
       <CompareLaps
         sessions={mockSessions}
         initialTrack="Spa"
-        initialCarClass="LMGT3"
+        initialCarClass="GT3"
         compareRequest={{ key: 1, lap: mine, reference: rivalLap, analyse: true }}
       />
     );
@@ -150,7 +150,7 @@ describe('CompareLaps component', () => {
       <CompareLaps
         sessions={mockSessions}
         initialTrack="Spa"
-        initialCarClass="LMGT3"
+        initialCarClass="GT3"
         rivalLap={rivalLap}
         compareRequest={{ key: 1, lap: mine, reference: rivalLap, analyse: true }}
       />
@@ -164,7 +164,7 @@ describe('CompareLaps component', () => {
   });
 
   it('clears the comparison and says how to pick laps', async () => {
-    render(<CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="LMGT3" />);
+    render(<CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="GT3" />);
     await waitFor(() => expect(screen.getByText('Clear')).toBeInTheDocument());
 
     fireEvent.click(screen.getByText('Clear'));
@@ -174,7 +174,7 @@ describe('CompareLaps component', () => {
 
   it('shows the lap time delta against the baseline, and swaps the baseline', async () => {
     render(
-      <CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="LMGT3" initialSessionId="sess1" initialLapNum={1} />
+      <CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="GT3" initialSessionId="sess1" initialLapNum={1} />
     );
     await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(2));
     expect(screen.getByTestId('compare-baseline')).toHaveTextContent(/Sim Driver.*2:02\.500/);
@@ -187,7 +187,7 @@ describe('CompareLaps component', () => {
 
   it('loads both the requested session lap and personal best, and provides quick-add button when removed', async () => {
     render(
-      <CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="LMGT3" initialSessionId="sess1" initialLapNum={1} />
+      <CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="GT3" initialSessionId="sess1" initialLapNum={1} />
     );
     await waitFor(() => {
       expect(screen.getAllByText('2:02.500').length).toBeGreaterThan(0);
@@ -213,7 +213,7 @@ describe('CompareLaps component', () => {
       <CompareLaps
         sessions={mockSessions}
         initialTrack="Spa"
-        initialCarClass="LMGT3"
+        initialCarClass="GT3"
         initialSessionId="sess1"
         initialLapNum={1}
         initialCompareSessionId="sess1"
@@ -229,13 +229,13 @@ describe('CompareLaps component', () => {
 
   it('reports the laps compared to the page', async () => {
     const onComparedLapsChange = vi.fn();
-    render(<CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="LMGT3" onComparedLapsChange={onComparedLapsChange} />);
+    render(<CompareLaps sessions={mockSessions} initialTrack="Spa" initialCarClass="GT3" onComparedLapsChange={onComparedLapsChange} />);
     await waitFor(() => expect(onComparedLapsChange).toHaveBeenLastCalledWith(['sess1_driver_0_lap_1']));
   });
 
   it('renders Compare Telemetry button when 2 located laps are selected and navigates by session locators', async () => {
     render(
-      <CompareLaps sessions={mockSessions} initialTrack="Spa GP" initialCarClass="LMGT3" initialSessionId="sess1" initialLapNum={1} />
+      <CompareLaps sessions={mockSessions} initialTrack="Spa GP" initialCarClass="GT3" initialSessionId="sess1" initialLapNum={1} />
     );
     await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(2));
 
@@ -253,7 +253,7 @@ describe('CompareLaps component', () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(mockCompareData) });
     global.fetch = fetchMock;
     render(
-      <CompareLaps sessions={mockSessions} initialTrack="Spa GP" initialCarClass="LMGT3" initialSessionId="sess1" initialLapNum={1} />
+      <CompareLaps sessions={mockSessions} initialTrack="Spa GP" initialCarClass="GT3" initialSessionId="sess1" initialLapNum={1} />
     );
     await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(2));
 
@@ -266,7 +266,7 @@ describe('CompareLaps component', () => {
 
   it('restores a locator deep link without searching recording endpoints', async () => {
     const fetchMock = global.fetch as ReturnType<typeof vi.fn>;
-    render(<CompareLaps sessions={mockSessions} initialTrack="Spa GP" initialCarClass="LMGT3" initialSessionId="sess1" initialLapNum={1} />);
+    render(<CompareLaps sessions={mockSessions} initialTrack="Spa GP" initialCarClass="GT3" initialSessionId="sess1" initialLapNum={1} />);
     await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(2));
     expect(window.location.hash).not.toContain('replayName=');
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/api/replays'))).toBe(false);

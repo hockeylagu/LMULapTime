@@ -12,7 +12,7 @@ const lap = (sessionId: string, sessionType: string, hour: number, lapNum: numbe
   dateString: `2026/09/20 ${hour}:00`,
   driverName: 'Me',
   carType: 'Ferrari 296 GT3',
-  carClass: 'LMGT3',
+  carClass: 'GT3',
   lapNum,
   lapTime,
   lapTimeString,
@@ -51,7 +51,7 @@ describe('CompareLapPicker in the compare card', () => {
   });
 
   it('opens on a session lap with the picker, and puts the event’s qualifying best in place of the personal best', async () => {
-    render(<CompareLaps sessions={sessions} initialTrack="Spa" initialCarClass="LMGT3" initialSessionId="race" initialLapNum={3} />);
+    render(<CompareLaps sessions={sessions} initialTrack="Spa" initialCarClass="GT3" initialSessionId="race" initialLapNum={3} />);
 
     const picker = await screen.findByRole('region', { name: 'Choose a lap' });
     expect(within(picker).getByRole('heading', { name: /Replace Personal best 1:59\.800/ })).toBeInTheDocument();
@@ -66,7 +66,7 @@ describe('CompareLapPicker in the compare card', () => {
   });
 
   it("picks a session's best lap from the best column", async () => {
-    render(<CompareLaps sessions={sessions} initialTrack="Spa" initialCarClass="LMGT3" initialSessionId="race" initialLapNum={3} />);
+    render(<CompareLaps sessions={sessions} initialTrack="Spa" initialCarClass="GT3" initialSessionId="race" initialLapNum={3} />);
     const picker = await screen.findByRole('region', { name: 'Choose a lap' });
     fireEvent.click(within(picker).getByRole('button', { name: /Best lap 2 2:00\.400, -1\.200/ }));
 
@@ -76,7 +76,7 @@ describe('CompareLapPicker in the compare card', () => {
   });
 
   it('changes one compared lap for any lap of a session, and fills the empty slot', async () => {
-    render(<CompareLaps sessions={sessions} initialTrack="Spa" initialCarClass="LMGT3" initialSessionId="race" initialLapNum={3} />);
+    render(<CompareLaps sessions={sessions} initialTrack="Spa" initialCarClass="GT3" initialSessionId="race" initialLapNum={3} />);
     const picker = await screen.findByRole('region', { name: 'Choose a lap' });
     fireEvent.click(within(picker).getByRole('button', { name: 'Close the lap picker' }));
 

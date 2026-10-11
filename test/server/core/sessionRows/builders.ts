@@ -22,7 +22,7 @@ export function lap(lapNum: number, overrides: Partial<LapData> = {}): LapData {
 
 export function driver(name: string, laps: LapData[], overrides: Partial<DriverData> = {}): DriverData {
   return {
-    name, carType: 'Ferrari 499P', carClass: 'Hypercar', carNumber: '51', teamName: 'Team', isPlayer: false, position: 1, classPosition: 1,
+    name, carType: 'Ferrari 499P', carClass: 'Hyper', carNumber: '51', teamName: 'Team', isPlayer: false, position: 1, classPosition: 1,
     bestLapTime: 101, bestLapTimeString: '1:41.000', bestS1: 30, bestS2: 35, bestS3: 36, theoreticalBest: 100.5,
     theoreticalBestString: '1:40.500', lapsCount: laps.length, laps, ...overrides,
   };

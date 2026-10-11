@@ -24,7 +24,7 @@ const makeLap = (overrides: Partial<LapData> = {}): LapData => ({
 const makeDriver = (overrides: Partial<DriverData> = {}): DriverData => ({
   name: 'Driver',
   carType: 'Prototype',
-  carClass: 'LMH',
+  carClass: 'Hyper',
   carNumber: '1',
   teamName: 'Team',
   isPlayer: false,
@@ -64,8 +64,8 @@ const getDriverRows = () => screen.getAllByRole('row').slice(1);
 describe('SessionRaceStandings', () => {
   it('leads with class position for both GT3 and Hypercar, keeping overall secondary', () => {
     const drivers = [
-      makeDriver({ name: 'Hypercar driver', carClass: 'LMH', position: 2, classPosition: 2 }),
-      makeDriver({ name: 'GT3 driver', carClass: 'LMGT3', position: 12, classPosition: 1 }),
+      makeDriver({ name: 'Hypercar driver', carClass: 'Hyper', position: 2, classPosition: 2 }),
+      makeDriver({ name: 'GT3 driver', carClass: 'GT3', position: 12, classPosition: 1 }),
     ];
     render(<SessionRaceStandings session={makeSession(drivers)} selectedDriverName="GT3 driver"
       setSelectedDriverName={vi.fn()} isMultiClass />);

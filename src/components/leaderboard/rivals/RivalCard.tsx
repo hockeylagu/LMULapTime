@@ -31,6 +31,7 @@ const action = 'px-2.5 py-1 rounded-lg border border-lmu-border text-xs font-bol
  */
 export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, onTelemetry }) => {
   const { status, error } = rival;
+  const [searchParams] = useSearchParams();
   if (error) return <LoadError message={error} onRetry={rival.retry} />;
   if (!status?.rival || !player || status.gap === null) return null;
 
@@ -38,13 +39,12 @@ export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, 
   const percent = (gap / target.targetTime) * 100;
   const telemetryReady = Boolean(rivalEntry?.bestLap.telemetryAvailable && player.bestLap.telemetryAvailable);
   const closed = progress !== null ? Math.round(progress * 100) : null;
-  const [searchParams] = useSearchParams();
-  const telemetryPath = React.useMemo(() => {
+  const telemetryPath = (() => {
     if (!telemetryReady || !player || !rivalEntry) return null;
     const yours = boardLapTelemetryRef(player);
     const theirs = boardLapTelemetryRef(rivalEntry);
     return yours && theirs ? buildTelemetryComparePath(searchParams, yours, theirs) : null;
-  }, [telemetryReady, player, rivalEntry, searchParams]);
+  })();
 
   return (
     <section aria-label="Your rival" className="bg-lmu-card border border-lmu-warn-strong/30 p-6 rounded-2xl space-y-4">

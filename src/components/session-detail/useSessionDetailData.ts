@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSessionDataContext } from '../../api/sessionDataContext.js';
 import type { LegendPayload } from 'recharts';
 import { DetailedSession, SessionProgressionPoint, ReferenceLaptimesCache } from '../../../shared/types/index.js';
-import { matchesTrack, matchesCarClass, findReferenceEntry } from '../../../shared/domain/paceCategory.js';
+import { matchesTrack, findReferenceEntry } from '../../../shared/domain/paceCategory.js';
 import { findWeekendSessions, CandidateRelatedSession, type WeekendSessionLink } from './sessionDetailHelpers.js';
 import { ApiError, apiErrorMessage, fetchJson, isAbortError } from '../../api/apiClient.js';
 import { loadReferenceLaptimes, peekReferenceLaptimes } from '../../api/referenceApi.js';
@@ -163,7 +163,7 @@ export function useSessionDetailData({
   const isMultiClass = useMemo(() => {
     if (!session?.drivers) return false;
     const uniqueClasses = new Set(
-      session.drivers.map((d) => (d.carClass || '').trim().toLowerCase()).filter(Boolean)
+      session.drivers.map((d) => d.carClass).filter(Boolean)
     );
     return uniqueClasses.size > 1;
   }, [session]);
@@ -177,7 +177,7 @@ export function useSessionDetailData({
     if (!session || !selectedDriver) return null;
     if (!hasInitialProgression) return personalBest?.session === session && personalBest.driverOrdinal === session.drivers.indexOf(selectedDriver) ? personalBest.bestLapTime : null;
     if (progression.length===0) return null;
-    const driverClass = selectedDriver.carClass || selectedDriver.carType || '';
+    const driverClass = selectedDriver.carClass;
     const driverNorm = (selectedDriver.name || '').toLowerCase().trim();
 
     const matchingLapTimes = progression
@@ -186,8 +186,7 @@ export function useSessionDetailData({
           matchesTrack(session.trackVenue, p.trackVenue, p.trackCourse) ||
           matchesTrack(p.displayTrack || p.trackVenue, session.trackVenue, session.trackCourse);
         const isClass =
-          matchesCarClass(p.carClass, p.carType, driverClass) ||
-          matchesCarClass(driverClass, selectedDriver.carType, p.carClass);
+          p.carClass === driverClass;
         const isDriver =
           !driverNorm ||
           (p.driverName || '').toLowerCase().trim() === driverNorm ||
@@ -211,8 +210,7 @@ export function useSessionDetailData({
           refCache.entries,
           session.trackVenue,
           session.trackCourse || '',
-          selectedDriver.carClass || selectedDriver.carType,
-          selectedDriver.carType
+          selectedDriver.carClass
         )
       : null;
   }, [refCache, session, selectedDriver]);

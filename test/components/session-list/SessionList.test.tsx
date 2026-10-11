@@ -19,7 +19,7 @@ describe('SessionList component', () => {
       playerDriver: {
         name: 'Player 1',
         carType: 'Ferrari 499P',
-        carClass: 'LMH',
+        carClass: 'Hyper',
         bestLapTime: 122.345,
         bestLapTimeString: '2:02.345',
         bestLapPaceCategory: 'Alien',
@@ -44,7 +44,7 @@ describe('SessionList component', () => {
       playerDriver: {
         name: 'Player 1',
         carType: 'Porsche 911 GT3',
-        carClass: 'LMGT3',
+        carClass: 'GT3',
         bestLapTime: 235.123,
         bestLapTimeString: '3:55.123',
         bestLapPaceCategory: 'Competitive',

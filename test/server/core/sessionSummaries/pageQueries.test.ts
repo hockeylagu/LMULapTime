@@ -5,14 +5,14 @@ import { upsertSession } from '../../../../server/core/dbSessionStore.js';
 import { queryProgression, querySessionPage } from '../../../../server/core/sessionSummaries/pageQueries.js';
 import { querySessionContext, querySessionPersonalBest, querySessionPersonalBestById } from '../../../../server/core/sessionSummaries/contextQueries.js';
 import { computeProgression } from '../../../../server/sessions/sessionAnalytics.js';
-import { normalizeCarClass } from '../../../../shared/domain/paceCategory.js';
+import { normalizeCarClass } from '../../../../shared/domain/vehicleMapping.js';
 import type { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
 
 function fixture(id: string, timestamp: number): DetailedSession {
   const laps: LapData[] = [90, 91, 92].map((lapTime, ordinal) => ({ lapNum: ordinal + 2, position: 1,
     lapTime, lapTimeString: `${lapTime}`, s1: 30, s2: 30, s3: lapTime - 60, topSpeed: 250,
     fCompound: 'Dry', rCompound: 'Dry', isPitStop: false, isValid: true }));
-  const driver: DriverData = { name: 'Player', carType: 'Ferrari 499P', carClass: 'Hypercar', carNumber: '1', teamName: '',
+  const driver: DriverData = { name: 'Player', carType: 'Ferrari 499P', carClass: 'Hyper', carNumber: '1', teamName: '',
     isPlayer: true, position: 1, classPosition: 1, bestLapTime: 90, bestLapTimeString: '90', bestLapNum: 2,
     bestS1: 30, bestS2: 30, bestS3: 30, theoreticalBest: 90, theoreticalBestString: '90', lapsCount: 3, laps };
   return { id, filename: `${id}.xml`, filePath: `${id}.xml`, trackVenue: 'Monza', trackCourse: 'GP', trackEvent: '',
@@ -52,7 +52,7 @@ describe('paged session queries', () => {
       initDbSchema(db);
       const session = fixture('one', 1);
       upsertSession(db, session, session.filePath, 1, 1);
-      const page = querySessionPage(db, { carClass: 'Hypercar', sort: 'pace-asc', from: Number.NaN });
+      const page = querySessionPage(db, { carClass: 'Hyper', sort: 'pace-asc', from: Number.NaN });
       expect(page.total).toBe(1);
       expect(page.sessions[0].playerDriver).not.toHaveProperty('laps');
       expect(page.sessions[0].playerDriver).toMatchObject({ driverOrdinal: 0, bestLapOrdinal: 0 });

@@ -15,7 +15,7 @@ vi.mock('../../../../server/benchmarks/referenceLaptimes.js', () => ({
 
 function fixture(id: string, timestamp: number, track: string, drivers: Array<{name: string; player: boolean; laps: LapData[]}>): DetailedSession {
   const mapped = drivers.map((source, driverOrdinal) => ({
-    name: source.name, driverName: source.name, carType: 'Ferrari 499P', carClass: 'LMH', carNumber: `${driverOrdinal + 1}`,
+    name: source.name, driverName: source.name, carType: 'Ferrari 499P', carClass: 'Hyper', carNumber: `${driverOrdinal + 1}`,
     teamName: 'Test Team', isPlayer: source.player, driverOrdinal, position: driverOrdinal + 1,
     classPosition: driverOrdinal + 1, bestLapTime: Math.min(...source.laps.map(lap => lap.lapTime ?? Infinity)),
     bestLapTimeString: '', bestLapNum: source.laps.find(lap => lap.isValid)?.lapNum, lapsCount: source.laps.length,
@@ -66,7 +66,7 @@ describe('SQL comparison query', () => {
         session.matchingReplayFile = { name: `${session.id}.Vcr`, path: 'retained', sizeBytes: 1 };
         addSession(db, session);
       }
-      const filters = { trackName: 'Spa', carClass: 'Hypercar' };
+      const filters = { trackName: 'Spa', carClass: 'Hyper' };
       const pbIds = (laps: Array<{ id: string; isAllTimePB?: boolean }>) => laps.filter(item => item.isAllTimePB).map(item => item.id);
       expect(pbIds(queryCompactComparableLaps(db, filters).laps)).toEqual([
         'z-first_driver_0_lap_0', 'z-first_driver_2_lap_0', 'a-second_driver_1_lap_0',
@@ -173,7 +173,7 @@ describe('SQL comparison query', () => {
       session.timeString = `Date ${session.id}`;
       addSession(db, session);
     }
-    const filters = { trackName: 'Spa', carClass: 'Hypercar', playerOnly: false, telemetryOnly: true };
+    const filters = { trackName: 'Spa', carClass: 'Hyper', playerOnly: false, telemetryOnly: true };
     const legacy = queryCompactComparableLaps(db, filters);
     const picker = queryTelemetryComparableLaps(db, filters);
     expect(picker.total).toBe(4);

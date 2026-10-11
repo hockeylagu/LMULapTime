@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { isSessionEmpty, getDisplayTrackName, matchesSessionType, compareSessionsBySortOption } from '../../../shared/domain/formatters.js';
-import { matchesSessionCarClass, matchesTrack, getPaceCategoryFromPercentage } from '../../../shared/domain/paceCategory.js';
+import { matchesTrack, getPaceCategoryFromPercentage } from '../../../shared/domain/paceCategory.js';
+import { matchesSessionCarClass } from '../../../shared/domain/vehicleMapping.js';
 import { selectCleanLapCandidates } from '../../../shared/domain/lapComparison.js';
 import { DetailedSession } from '../../../shared/types/index.js';
 import { BestRefLapInfo } from './BenchmarkLapsSummaryCard.js';

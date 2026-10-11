@@ -41,7 +41,7 @@ function insertScaleFixture(db: Database.Database): number {
     const timeString = new Date(timestamp).toISOString().replace('T', ' ').slice(0, 19);
     return JSON.stringify({ id, filename: `${id}.xml`, filePath: `${id}.xml`, trackVenue: venue, trackCourse: course,
       trackLengthMeters: 5793, timeString, timestamp, sessionType: 'Race', sessionName: 'R1', driversCount: 1, isEmpty: false,
-      playerDriver: { name: driverName, carType, carClass: 'LMH', carNumber: '1', isPlayer: true,
+      playerDriver: { name: driverName, carType, carClass: 'Hyper', carNumber: '1', isPlayer: true,
         bestLapTime: 100 + (index % 50) / 100, bestLapTimeString: '1:40.000', bestLapNum: 1, bestLapOrdinal: 0, driverOrdinal: 0,
         bestS1: 30, bestS2: 40, bestS3: 30, theoreticalBest: 100, theoreticalBestString: '1:40.000',
         position: 1, gridPosition: 1, positionGain: 0, lapsCount: LAPS_PER_SESSION, completedLapsCount: LAPS_PER_SESSION,
@@ -62,7 +62,7 @@ function insertScaleFixture(db: Database.Database): number {
       const timestamp = 1_700_000_000_000 + index * 60_000;
       const bestLap = 100 + (index % 50) / 100;
       insertSession.run(id, `${id}.xml`, `${id}.xml`, timestamp, 1, timestamp, venue, course, 'Race', 'R1',
-        driverName, 'LMH', carType, bestLap, LAPS_PER_SESSION, 1, timestamp,
+        driverName, 'Hyper', carType, bestLap, LAPS_PER_SESSION, 1, timestamp,
         'monza_gp', 1, 1, SESSION_SUMMARY_PROJECTION_VERSION, null, 'race', 0, 0);
     }
   })();
@@ -89,7 +89,7 @@ describe('10k session query scale fixture', () => {
     const db = new Database(':memory:');
     initDbSchema(db);
     const sourceBytes = insertScaleFixture(db);
-    const benchmark = { key: 'Monza_LMH', trackName: 'Monza', carClass: 'LMH', patch: 'scale', target100Sec: 100,
+    const benchmark = { key: 'Monza_LMH', trackName: 'Monza', carClass: 'Hyper', patch: 'scale', target100Sec: 100,
       targets: { alienSec: 100, competitiveSec: 101, goodSec: 102, goodMidpackSec: 103, midpackSec: 104,
         midpackTailSec: 105, tailEnderSec: 106, offlineSec: 107 } } as ReferenceLaptimeEntry;
 
@@ -99,9 +99,9 @@ describe('10k session query scale fixture', () => {
     const page = measure(() => querySessionPage(db, { page: 1, pageSize: 25 }));
     const pageWarm = Math.min(...Array.from({ length: 5 }, () => measure(() => querySessionPage(db, { page: 1, pageSize: 25 })).elapsedMs));
     const dashboard = measure(() => queryCompactDashboard(db, { page: 1, pageSize: 25, referenceEntries: { [benchmark.key]: benchmark } }));
-    const board = measure(() => queryCompactLeaderboard(db, { layoutKey: 'monza_gp', carClass: 'LMH' }));
+    const board = measure(() => queryCompactLeaderboard(db, { layoutKey: 'monza_gp', carClass: 'Hyper' }));
     const layouts = measure(() => queryCompactLeaderboardLayouts(db));
-    const track = measure(() => queryTrackDetailSummary(db, 'Monza', 'LMH'));
+    const track = measure(() => queryTrackDetailSummary(db, 'Monza', 'Hyper'));
     const compare = measure(() => queryCompactComparableLaps(db, { trackName: 'Monza', playerOnly: false }, { page: 2, pageSize: 5 }));
     const totalStorageBytes = pageStorageBytes(db);
     const pagePlan = db.prepare(`EXPLAIN QUERY PLAN SELECT id FROM sessions
@@ -109,7 +109,7 @@ describe('10k session query scale fixture', () => {
     const boardPlan = db.prepare(`EXPLAIN QUERY PLAN SELECT s.id,c.best_lap_time FROM session_driver_condition_summaries c
       JOIN session_drivers d ON d.session_id=c.session_id AND d.driver_ordinal=c.driver_ordinal
       JOIN sessions s ON s.id=d.session_id WHERE s.layout_key=? AND d.driver_class=? AND c.condition_group='dry' AND d.is_human=1`)
-      .all('monza_gp', 'LMH') as Array<{ detail: string }>;
+      .all('monza_gp', 'Hyper') as Array<{ detail: string }>;
     const planOf = (sql: string, ...args: unknown[]) => (db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...args) as Array<{ detail: string }>).map(row => row.detail);
     const cardDriversPlan = planOf(`${DRIVER_WITH_DICTIONARIES} WHERE d.session_id IN (?,?) AND (d.is_player_driver = 1
       OR d.driver_ordinal = (SELECT player_driver_ordinal FROM sessions WHERE id = d.session_id))`, 'scale-00001', 'scale-00002');

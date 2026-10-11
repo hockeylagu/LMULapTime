@@ -39,7 +39,7 @@ describe('dbReferenceLaptimeStore', () => {
         {
           key: 'cota_gt3',
           trackName: 'Circuit of the Americas',
-          carClass: 'LMGT3',
+          carClass: 'GT3',
           patch: '1.4+',
           type: 'added',
           newAlienSec: 125.0,
@@ -100,7 +100,7 @@ describe('dbReferenceLaptimeStore', () => {
         bahrain_gt3: {
           key: 'bahrain_gt3',
           trackName: 'Bahrain',
-          carClass: 'LMGT3',
+          carClass: 'GT3',
           patch: '1.4+',
           target100Sec: 120.0,
           targets: {
@@ -149,7 +149,7 @@ describe('dbReferenceLaptimeStore', () => {
       totalEntries: 1, totalAffectedSessions: 35, totalCategoryShifts: 70, added: [], updated: [], removed: [],
     };
     const entry: ReferenceLaptimeEntry = {
-      key: 'bahrain_gt3', trackName: 'Bahrain', carClass: 'LMGT3', patch: '1.4+', target100Sec: 120,
+      key: 'bahrain_gt3', trackName: 'Bahrain', carClass: 'GT3', patch: '1.4+', target100Sec: 120,
       targets: { alienSec: 120, competitiveSec: 121, goodSec: 122, goodMidpackSec: 123, midpackSec: 124, midpackTailSec: 125, tailEnderSec: 126, offlineSec: 127 },
     };
     saveReferenceLaptimes(db, { lastUpdated: diff.timestamp, sourceUrl: '', entriesCount: 1, entries: { [entry.key]: entry }, lastUpdateDiff: diff }, (key, value) => {

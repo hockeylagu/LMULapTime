@@ -27,7 +27,7 @@ function board(times: Record<string, number>, noTelemetry: string[] = []): Leade
       top3Average: null, top3AverageRank: null, gapToLeader: 0, representativeLaps: 3, sessions: 1, lastDriven: 1000,
     }));
   return {
-    layoutKey: 'monza_gp', layoutName: '', carClass: 'LMGT3', scope: 'class', carType: null,
+    layoutKey: 'monza_gp', layoutName: '', carClass: 'GT3', scope: 'class', carType: null,
     entries, player: entries.find((e) => e.isPlayer) ?? null, benchmark: null,
   };
 }

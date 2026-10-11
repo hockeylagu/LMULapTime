@@ -7,7 +7,6 @@ import {
 } from '../core/types.js';
 import {
   matchesTrack,
-  matchesCarClass,
   getPaceCategoryFromPercentage,
 } from '../../shared/domain/paceCategory.js';
 import { formatTime } from '../../shared/domain/formatters.js';
@@ -43,8 +42,7 @@ export function computeBenchmarkItemImpact(
     // Only the player's laps: the impact is about your own pace ratings.
     for (const driver of session.drivers || []) {
       if (!driver.isPlayer) continue;
-      const driverClass = driver.carClass || driver.carType || '';
-      if (!matchesCarClass(driverClass, driver.carType || '', item.carClass)) {
+      if (driver.carClass !== item.carClass) {
         continue;
       }
 
@@ -127,7 +125,7 @@ export function enrichBenchmarkDiffWithImpact(
       (item) =>
         matchesTrack(item.trackName, session.trackVenue, session.trackCourse) &&
         (session.drivers || []).some((d) => d.isPlayer &&
-          matchesCarClass(d.carClass || d.carType || '', d.carType || '', item.carClass)
+          d.carClass === item.carClass
         )
     );
     if (isAffected) totalAffectedSessions++;
@@ -151,20 +149,7 @@ interface CompactImpactLap {
 interface ImpactSql { sql: string; values: (string | number)[]; }
 
 function sqlCarClassMatch(carClass: string): ImpactSql {
-  const combined = "lower(coalesce(d.driver_class,'') || ' ' || coalesce(v.car_type,''))";
-  switch (carClass.toLowerCase()) {
-    case 'lmh': case 'hypercar': case 'hyper': case 'lmdh':
-      return { sql: `(${combined} LIKE '%hyper%' OR ${combined} LIKE '%lmh%' OR ${combined} LIKE '%lmdh%')`, values: [] };
-    case 'lmgt3': case 'gt3':
-      return { sql: `(${combined} LIKE '%gt3%' OR ${combined} LIKE '%lmgt3%')`, values: [] };
-    case 'lmp2elms': case 'lmp2 (elms)': case 'lmp2_elms': case 'elms':
-      return { sql: `(${combined} LIKE '%elms%' OR ${combined} LIKE '%lmp2_elms%')`, values: [] };
-    case 'lmp2wec': case 'lmp2 (wec)': case 'lmp2': case 'wec':
-      return { sql: `(${combined} LIKE '%lmp2%' AND ${combined} NOT LIKE '%elms%')`, values: [] };
-    case 'lmp3': return { sql: `${combined} LIKE '%lmp3%'`, values: [] };
-    case 'gte': return { sql: `${combined} LIKE '%gte%'`, values: [] };
-    default: return { sql: `instr(${combined},?)>0`, values: [carClass.toLowerCase()] };
-  }
+  return { sql: 'd.driver_class = ?', values: [carClass] };
 }
 
 function benchmarkTrackScope(item: ReferenceBenchmarkDiffItem): ImpactSql {

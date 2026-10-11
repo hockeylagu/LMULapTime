@@ -220,7 +220,7 @@ describe('Settings component', () => {
             {
               key: 'cota_lmgt3',
               trackName: 'Circuit of the Americas',
-              carClass: 'LMGT3',
+              carClass: 'GT3',
               patch: '1.4+',
               type: 'added' as const,
               newAlienSec: 125.4,
@@ -231,7 +231,7 @@ describe('Settings component', () => {
             {
               key: 'bahrain_lmgt3',
               trackName: 'Bahrain',
-              carClass: 'LMGT3',
+              carClass: 'GT3',
               patch: '1.4+',
               oldPatch: '1.3',
               newPatch: '1.4+',

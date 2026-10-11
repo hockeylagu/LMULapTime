@@ -141,7 +141,7 @@ describe('sessionDetailHelpers', () => {
       const path = sessionLapComparePath(session, driver, 3);
       const params = new URLSearchParams(path.split('?')[1]);
       expect(path.startsWith('/leaderboard?')).toBe(true);
-      expect(params.get('carClass')).toBe('LMGT3');
+      expect(params.get('carClass')).toBe('GT3');
       expect(params.get('sessionId')).toBe('race 1');
       expect(params.get('lapNum')).toBe('3');
       expect(params.get('driverOrdinal')).toBe('0');

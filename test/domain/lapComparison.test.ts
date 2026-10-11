@@ -15,7 +15,7 @@ describe('lapComparison utility', () => {
     id: 'lap_1',
     driverName: 'Driver A',
     carType: 'Ferrari 296 GT3',
-    carClass: 'LMGT3',
+    carClass: 'GT3',
     lapNum: 1,
     lapTime: 120.5,
     lapTimeString: '2:00.500',
@@ -103,7 +103,7 @@ describe('lapComparison utility', () => {
 
   describe('createTheoreticalBestLap', () => {
     it('creates a valid theoretical lap from valid sectors', () => {
-      const theo = createTheoreticalBestLap(29.5, 44.2, 45.1, 'Theoretical Best', 'LMGT3', 'Optimal Sectors');
+      const theo = createTheoreticalBestLap(29.5, 44.2, 45.1, 'Theoretical Best', 'GT3', 'Optimal Sectors');
       expect(theo.lapTime).toBe(118.8);
       expect(theo.lapTimeString).toBe('1:58.800');
       expect(theo.s1).toBe(29.5);
@@ -134,7 +134,7 @@ describe('lapComparison utility', () => {
         44.2,
         45.1,
         'Theoretical Optimal',
-        'LMGT3',
+        'GT3',
         'Porsche 911 GT3 R',
         'Theoretical Best',
         'Competitive',
@@ -151,7 +151,7 @@ describe('lapComparison utility', () => {
       const refEntry: ReferenceLaptimeEntry = {
         key: 'Bahrain_LMGT3',
         trackName: 'Bahrain',
-        carClass: 'LMGT3',
+        carClass: 'GT3',
         patch: '1.4+',
         target100Sec: 120.0,
         targets: {
@@ -179,9 +179,9 @@ describe('lapComparison utility', () => {
 
   describe('filterLapsByCarCategory', () => {
     const mixedLaps: ComparableLap[] = [
-      { ...baseLap, id: '1', carClass: 'LMGT3', carType: 'Ferrari 296 GT3' },
-      { ...baseLap, id: '2', carClass: 'LMGT3', carType: 'BMW M4 GT3' },
-      { ...baseLap, id: '3', carClass: 'LMH', carType: 'Ferrari 499P' },
+      { ...baseLap, id: '1', carClass: 'GT3', carType: 'Ferrari 296 GT3' },
+      { ...baseLap, id: '2', carClass: 'GT3', carType: 'BMW M4 GT3' },
+      { ...baseLap, id: '3', carClass: 'Hyper', carType: 'Ferrari 499P' },
       { ...baseLap, id: '4', carClass: 'LMP2', carType: 'Oreca 07' },
     ];
 
@@ -191,13 +191,13 @@ describe('lapComparison utility', () => {
     });
 
     it('filters strictly by carClass', () => {
-      const result = filterLapsByCarCategory(mixedLaps, 'LMGT3');
+      const result = filterLapsByCarCategory(mixedLaps, 'GT3');
       expect(result.length).toBe(2);
-      expect(result.every(l => l.carClass === 'LMGT3')).toBe(true);
+      expect(result.every(l => l.carClass === 'GT3')).toBe(true);
     });
 
     it('filters by both carClass and specific carModel', () => {
-      const result = filterLapsByCarCategory(mixedLaps, 'LMGT3', 'BMW M4 GT3');
+      const result = filterLapsByCarCategory(mixedLaps, 'GT3', 'BMW M4 GT3');
       expect(result.length).toBe(1);
       expect(result[0].carType).toBe('BMW M4 GT3');
     });

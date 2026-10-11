@@ -1,6 +1,3 @@
-import { matchesCarClass } from './paceCategory.js';
-
-
 const VEHICLE_FILES = new Map<string, { model: string; carClass: string }>();
 
 /** Local provider identity aliases; generic app builds contain no generated livery catalog. */
@@ -29,17 +26,64 @@ const LMU_CAR_TYPE_MODELS: Readonly<Record<string, string>> = {
   'Toyota TR010': 'Toyota GR010 Hybrid',
 };
 
-// LMU results-log <CarClass> names that differ from the app's class ids.
-const LMU_CAR_CLASS_IDS: Readonly<Record<string, string>> = { GT3: 'LMGT3', Hyper: 'LMH', LMP2_ELMS: 'LMP2elms' };
-
 /** A results-log <CarType> as the model name the app shows. */
 export function normalizeLmuCarType(carType: string): string {
   return LMU_CAR_TYPE_MODELS[carType.trim()] ?? carType.trim();
 }
 
-/** A results-log <CarClass> as the app's class id. */
-export function normalizeLmuCarClass(carClass: string): string {
-  return LMU_CAR_CLASS_IDS[carClass.trim()] ?? carClass.trim();
+/** Converts external XML/benchmark class labels once at ingestion. Internal data uses exact equality. */
+export function normalizeCarClass(carClass?: string | null): string {
+  const value = carClass?.trim() ?? '';
+  switch (value.toLowerCase()) {
+    case 'hyper': case 'hypercar': case 'lmh': case 'lmdh': return 'Hyper';
+    case 'gt3': case 'lmgt3': case 'gt3_elms': return 'GT3';
+    case 'lmp2': case 'lmp2wec': case 'lmp2 (wec)': return 'LMP2';
+    case 'lmp2_elms': case 'lmp2elms': case 'lmp2 (elms)': return 'LMP2_ELMS';
+    case 'lmp3': return 'LMP3';
+    case 'gte': return 'GTE';
+    default: return value;
+  }
+}
+
+export interface CarClassOption {
+  id: string;
+  label: string;
+}
+
+export const VEHICLE_CLASS_OPTIONS: CarClassOption[] = [
+  { id: 'All', label: 'All Classes' },
+  { id: 'Hyper', label: 'Hypercar' },
+  { id: 'GT3', label: 'GT3' },
+  { id: 'LMP2', label: 'LMP2 (WEC)' },
+  { id: 'LMP2_ELMS', label: 'LMP2 (ELMS)' },
+  { id: 'LMP3', label: 'LMP3' },
+  { id: 'GTE', label: 'GTE' },
+];
+
+/**
+ * Checks if a session matches a target car class by evaluating playerDriver,
+ * or fallback to any participating driver in the session if playerDriver is absent.
+ */
+export function matchesSessionCarClass(
+  session: {
+    playerDriver?: { carClass?: string | null; carType?: string | null } | null;
+    drivers?: Array<{ carClass?: string | null; carType?: string | null }> | null;
+  },
+  targetClass: string = 'All'
+): boolean {
+  if (!targetClass || targetClass === 'All') return true;
+
+  if (session.playerDriver) {
+    return session.playerDriver.carClass === targetClass;
+  }
+
+  if (session.drivers && session.drivers.length > 0) {
+    return session.drivers.some(d =>
+      d.carClass === targetClass
+    );
+  }
+
+  return false;
 }
 
 /** The car a vehicle file is, from the configured local alias catalog. */
@@ -102,7 +146,7 @@ export function mapVehicleIdToModel(vehicleId?: string): string {
 }
 
 /**
- * Maps vehicle model or vehicle ID string to standardized LMU car class (LMGT3, LMH, LMP2, LMP2elms, GTE, LMP3).
+ * Maps vehicle model or vehicle ID string to canonical LMU car class (GT3, Hyper, LMP2, LMP2_ELMS, GTE, LMP3).
  */
 export function mapVehicleIdToClass(vehicleId?: string, carModel?: string): string {
   const known = lookupVehicleFile(vehicleId);
@@ -145,7 +189,7 @@ export function mapVehicleIdToClass(vehicleId?: string, carModel?: string): stri
     combined.includes('AKKO') ||
     combined.includes('AMG')
   ) {
-    return 'LMGT3';
+    return 'GT3';
   }
 
   // Hypercar / LMH / LMDh
@@ -181,7 +225,7 @@ export function mapVehicleIdToClass(vehicleId?: string, carModel?: string): stri
     combined.includes('LMH') ||
     combined.includes('LMDH')
   ) {
-    return 'LMH';
+    return 'Hyper';
   }
 
   // LMP3
@@ -207,7 +251,7 @@ export function mapVehicleIdToClass(vehicleId?: string, carModel?: string): stri
     combined.includes('LMP2') ||
     combined.includes('VECTOR')
   ) {
-    return combined.includes('ELMS') ? 'LMP2elms' : 'LMP2';
+    return combined.includes('ELMS') ? 'LMP2_ELMS' : 'LMP2';
   }
 
   if (combined.includes('992S') || combined.includes('SAFETY')) {
@@ -241,7 +285,7 @@ export function resolveRosterVehicles<T extends { drivers?: RosterVehicle[]; car
     const logged = byName.get(driver.name.trim().toLowerCase());
     if (logged?.carType && logged.carType !== 'Unknown Car' && logged.carClass && logged.carClass !== 'General') {
       driver.carModel = normalizeLmuCarType(logged.carType);
-      driver.carClass = normalizeLmuCarClass(logged.carClass);
+      driver.carClass = logged.carClass;
     } else if (driver.vehicleId) {
       driver.carModel = mapVehicleIdToModel(driver.vehicleId);
       driver.carClass = mapVehicleIdToClass(driver.vehicleId, driver.carModel) || undefined;
@@ -264,12 +308,12 @@ export function resolveDriverCarClass(driver?: { carClass?: string; vehicleId?: 
 
 /**
  * Whether two laps may be compared: laps are only ever compared within one car class.
- * Class names are matched through their aliases (Hyper/LMH/LMDh, GT3/LMGT3, ...). An unknown
+ * Uses canonical class equality. An unknown
  * class ('') cannot be checked and does not block the comparison.
  */
 export function areComparableCarClasses(a?: string, b?: string): boolean {
   if (!a || !b) return true;
-  return matchesCarClass(a, '', b) && matchesCarClass(b, '', a);
+  return a === b;
 }
 
 interface ManufacturerRule {

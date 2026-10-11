@@ -16,7 +16,7 @@ describe('SessionTableRow', () => {
     playerDriver: {
       name: 'Player Driver',
       carType: 'Porsche 963',
-      carClass: 'Hypercar',
+      carClass: 'Hyper',
       lapsCount: 15,
       bestLapTime: 95.123,
       bestLapTimeString: '1:35.123',
@@ -79,7 +79,7 @@ describe('SessionTableRow', () => {
       playerDriver: {
         name: 'Player Driver',
         carType: 'BMW M Hybrid V8',
-        carClass: 'Hypercar',
+        carClass: 'Hyper',
         lapsCount: 6,
         bestLapTime: 94.8,
         bestLapTimeString: '1:34.800',

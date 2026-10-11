@@ -28,7 +28,7 @@ const request: RaceTrafficRequest = {
   replayName: REPLAY,
   driverSlot: 0,
   // The replay lists the rival as LMGT3: the session's class wins.
-  replayDrivers: [{ slot: 0, name: 'Me', carClass: 'LMH' }, { slot: 1, name: 'Rival', carClass: 'LMGT3' }],
+  replayDrivers: [{ slot: 0, name: 'Me', carClass: 'Hyper' }, { slot: 1, name: 'Rival', carClass: 'GT3' }],
   session,
 };
 

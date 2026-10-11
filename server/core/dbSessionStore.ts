@@ -104,7 +104,7 @@ export function upsertSession(
       sessionType: session.sessionType,
       sessionName: session.sessionName,
       playerDriverName: session.playerDriver?.name || null,
-      playerCarClass: session.playerDriver?.carClass || null,
+      playerCarClass: session.playerDriver ? session.playerDriver.carClass : null,
       playerCarType: session.playerDriver?.carType || null,
       playerBestLapTime: session.playerDriver?.bestLapTime ?? null,
       playerLapsCount: session.playerDriver?.lapsCount ?? 0,

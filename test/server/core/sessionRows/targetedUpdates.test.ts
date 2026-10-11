@@ -47,7 +47,7 @@ function buildTestSession(id: string, overrides: Partial<DetailedSession> = {}):
   // Lap 1 is a race start lap (excluded from clean average), so average of laps 2 & 3 = (102 + 101) / 2 = 101.5
   const player = driver('Player Driver', pLaps, {
     isPlayer: true,
-    carClass: 'Hypercar',
+    carClass: 'Hyper',
     carType: 'Ferrari 499P',
     bestLapNum: 1,
     bestLapTime: 100,
@@ -62,7 +62,7 @@ function buildTestSession(id: string, overrides: Partial<DetailedSession> = {}):
   // Lap 1 is excluded from clean average, lap 2 = 106
   const ai = driver('AI Rival', aiLaps, {
     isPlayer: false,
-    carClass: 'Hypercar',
+    carClass: 'Hyper',
     carType: 'Toyota GR010',
     bestLapNum: 1,
     bestLapTime: 105,

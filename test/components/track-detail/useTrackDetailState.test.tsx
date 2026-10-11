@@ -67,7 +67,7 @@ describe('useTrackDetailState', () => {
       ({ carClass }) => useTrackDetailState('Monza', carClass),
       {
         wrapper: Wrapper,
-        initialProps: { carClass: 'Hypercar' },
+        initialProps: { carClass: 'Hyper' },
       }
     );
 
@@ -79,7 +79,7 @@ describe('useTrackDetailState', () => {
 
     expect(result.current.data?.trackName).toBe('Autodromo Nazionale Monza');
     expect(fetchSpy).toHaveBeenCalledWith(
-      '/api/track/Monza?carClass=Hypercar&car=All&pageSize=25&hideEmpty=true',
+      '/api/track/Monza?carClass=Hyper&car=All&pageSize=25&hideEmpty=true',
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
 
@@ -96,7 +96,7 @@ describe('useTrackDetailState', () => {
     await waitFor(() => expect(result.current.selectedCarModel).toBe('Ferrari 499P'));
 
     // Changing selectedCarClass resets selectedCarModel to 'All'
-    rerender({ carClass: 'LMGT3' });
+    rerender({ carClass: 'GT3' });
     expect(result.current.selectedCarModel).toBe('All');
 
     // Test handleOpenReplay
@@ -258,7 +258,7 @@ describe('useTrackDetailState', () => {
       ({ carClass }) => useTrackDetailState('Monza', carClass),
       {
         wrapper: DeepLinkWrapper,
-        initialProps: { carClass: 'Hypercar' },
+        initialProps: { carClass: 'Hyper' },
       }
     );
 
@@ -268,7 +268,7 @@ describe('useTrackDetailState', () => {
     expect(result.current.selectedCarModel).toBe('Ferrari 499P');
 
     // Changing car class resets selectedCarModel to 'All'
-    rerender({ carClass: 'LMGT3' });
+    rerender({ carClass: 'GT3' });
     expect(result.current.selectedCarModel).toBe('All');
   });
 });

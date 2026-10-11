@@ -209,10 +209,10 @@ describe('replayParser - metadata, player detection & downsampling', () => {
       const samuel = meta.drivers.find(d => d.name === 'Samuel Lague');
       expect(samuel).toBeDefined();
       expect(samuel?.carModel).toBe('Ferrari 296 GT3');
-      expect(samuel?.carClass).toBe('LMGT3');
+      expect(samuel?.carClass).toBe('GT3');
       expect(samuel?.team).toBe('Vista AF Corsa');
       expect(samuel?.carNumber).toBe('21');
-      expect(meta.carClass).toBe('LMGT3');
+      expect(meta.carClass).toBe('GT3');
       expect(meta.carModel).toBe('Ferrari 296 GT3');
     });
 

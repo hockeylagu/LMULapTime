@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import App from '../src/App.js';
 import { prefetchRoutePages } from '../src/routePages.js';
 import { aggregateTrackSummaries } from '../shared/domain/trackSummaryUtils.js';
@@ -249,15 +249,15 @@ describe('App component', () => {
 
     // Select track filter
     const comboboxes = screen.getAllByRole('combobox');
-    fireEvent.change(comboboxes[0], { target: { value: 'Spa' } });
+    await act(async () => { fireEvent.change(comboboxes[0], { target: { value: 'Spa' } }); });
 
     // Select car class filter
     const hypercarBtn = screen.getByRole('button', { name: /Hypercar/i });
-    fireEvent.click(hypercarBtn);
+    await act(async () => { fireEvent.click(hypercarBtn); });
 
     // Search query
     const searchInput = screen.getByPlaceholderText(/search track, car, file/i);
-    fireEvent.change(searchInput, { target: { value: 'Ferrari' } });
+    await act(async () => { fireEvent.change(searchInput, { target: { value: 'Ferrari' } }); });
 
     // Select session card
     const dateMatches = screen.getAllByText('2026/05/28 14:00');

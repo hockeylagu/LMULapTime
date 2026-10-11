@@ -6,7 +6,7 @@ import { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 const benchmark: ReferenceLaptimeEntry = {
   key: 'Spa-Francorchamps_LMH',
   trackName: 'Spa-Francorchamps',
-  carClass: 'LMH',
+  carClass: 'Hyper',
   patch: '1.4+',
   target100Sec: 120.0,
   targets: {

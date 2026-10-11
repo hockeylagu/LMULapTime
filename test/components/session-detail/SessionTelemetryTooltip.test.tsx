@@ -11,7 +11,7 @@ describe('SessionTelemetryTooltip component', () => {
   const mockDriver = {
     name: 'Samuel Lague',
     carType: 'Ferrari 499P',
-    carClass: 'LMH',
+    carClass: 'Hyper',
     carNumber: '50',
     teamName: 'AF Corse',
     isPlayer: true,
@@ -22,7 +22,7 @@ describe('SessionTelemetryTooltip component', () => {
   const mockDriver2 = {
     name: 'Rival Driver',
     carType: 'Toyota GR010',
-    carClass: 'LMH',
+    carClass: 'Hyper',
     carNumber: '7',
     teamName: 'Toyota Gazoo',
     isPlayer: false,
@@ -124,7 +124,7 @@ describe('SessionTelemetryTooltip component', () => {
 
   it('renders positions standings metric with player highlighting and pit indicators', () => {
     render(<SessionTelemetryTooltip {...defaultProps} activeChartMetric="positions" />);
-    expect(screen.getByText('LMH Standings')).toBeInTheDocument();
+    expect(screen.getByText('Hyper Standings')).toBeInTheDocument();
     expect(screen.getByText('Samuel Lague')).toBeInTheDocument();
     expect(screen.getByText('Rival Driver')).toBeInTheDocument();
     expect(screen.getByText('P1')).toBeInTheDocument();

@@ -18,7 +18,7 @@ describe('Dashboard component', () => {
       playerDriver: {
         name: 'Player',
         carType: 'Ferrari 499P',
-        carClass: 'LMH',
+        carClass: 'Hyper',
         bestLapTime: 122.0,
         bestLapTimeString: '2:02.000',
         bestS1: 34.0,
@@ -42,7 +42,7 @@ describe('Dashboard component', () => {
       playerDriver: {
         name: 'Player',
         carType: 'Porsche 911 GT3',
-        carClass: 'LMGT3',
+        carClass: 'GT3',
         bestLapTime: 108.0,
         bestLapTimeString: '1:48.000',
         bestS1: 28.0,
@@ -90,7 +90,7 @@ describe('Dashboard component', () => {
       playerDriver: {
         name: 'Player',
         carType: 'Cadillac V-Series.R',
-        carClass: 'LMH',
+        carClass: 'Hyper',
         bestLapTime: 200.0,
         bestLapTimeString: '3:20.000',
         bestS1: 50.0,
@@ -114,7 +114,7 @@ describe('Dashboard component', () => {
       playerDriver: {
         name: 'Player',
         carType: 'Ferrari 499P',
-        carClass: 'LMH',
+        carClass: 'Hyper',
         bestLapTime: null,
         bestLapTimeString: '--:--.---',
         bestS1: null,
@@ -404,7 +404,7 @@ describe('Dashboard component', () => {
         playerDriver: {
           name: 'Player',
           carType: 'Ferrari 499P',
-          carClass: 'LMH',
+          carClass: 'Hyper',
           bestLapTime: 122.0,
           bestLapTimeString: '2:02.000',
           bestS1: 34.0,
@@ -456,7 +456,7 @@ describe('Dashboard component', () => {
         onSelectSession={vi.fn()}
         selectedTrack="Spa"
         setSelectedTrack={setSelectedTrack}
-        selectedCarClass="LMGT3"
+        selectedCarClass="GT3"
         setSelectedCarClass={setSelectedCarClass}
         filterType="Race"
         setFilterType={setFilterType}
@@ -675,7 +675,7 @@ describe('Dashboard component', () => {
         playerDriver: {
           name: 'Player',
           carType: 'BMW M4 LMGT3',
-          carClass: 'LMGT3',
+          carClass: 'GT3',
           bestLapTime: 100.0,
           bestLapTimeString: '1:40.000',
           bestS1: 25.0,
@@ -783,7 +783,7 @@ describe('Dashboard component', () => {
         playerDriver: {
           name: 'Player',
           carType: 'Ferrari 499P',
-          carClass: 'LMH',
+          carClass: 'Hyper',
           bestLapTime: 121.5,
           bestLapTimeString: '2:01.500',
           bestLapNum: 3,

@@ -56,7 +56,7 @@ describe('targeted replay session reads', () => {
       roundTrip(session([driver('Rival', [lap(1)])]), db);
       const prepare = vi.spyOn(db, 'prepare');
       const context = readReplaySessionContext(db, 'session-a', 'none')!;
-      expect(context.drivers[0]).toMatchObject({ name: 'Rival', carClass: 'Hypercar', laps: [] });
+      expect(context.drivers[0]).toMatchObject({ name: 'Rival', carClass: 'Hyper', laps: [] });
       expect(context.playerDriver).toBeUndefined();
       expect(prepare.mock.calls.some(([sql]) => /session_laps|session_events|session_lap_passes/.test(sql))).toBe(false);
       expect(readReplaySessionContext(db, 'missing', 'all')).toBeNull();

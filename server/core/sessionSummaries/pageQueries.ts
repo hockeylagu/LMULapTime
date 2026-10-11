@@ -2,7 +2,6 @@ import type { Database } from 'better-sqlite3';
 import type { SessionProgressionPoint } from '../../../shared/types/index.js';
 import { CIRCUIT_SPECIFICATIONS, getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { computeTheoreticalBest, computeTheoreticalGap, getDisplayTrackName } from '../../../shared/domain/formatters.js';
-import { normalizeCarClass } from '../../../shared/domain/paceCategory.js';
 import { rateSessionCard } from './readTimePace.js';
 import { createPaceCalculator } from '../../benchmarks/referenceLaptimes.js';
 import { readSessionCards } from './cards.js';
@@ -20,23 +19,7 @@ export interface SqlFragment { sql: string; values: (string | number)[]; }
 
 export function carClassMatch(targetClass?: string): SqlFragment {
   if (!targetClass || targetClass === 'All') return { sql: '1=1', values: [] };
-  const combined = "lower(coalesce(f.driver_class,'') || ' ' || coalesce(fv.car_type,''))";
-  switch (targetClass.toLowerCase()) {
-    case 'lmh': case 'hypercar': case 'hyper': case 'lmdh':
-      return { sql: `(${combined} LIKE '%hyper%' OR ${combined} LIKE '%lmh%' OR ${combined} LIKE '%lmdh%')`, values: [] };
-    case 'lmgt3': case 'gt3':
-      return { sql: `(${combined} LIKE '%gt3%' OR ${combined} LIKE '%lmgt3%')`, values: [] };
-    case 'lmp2elms': case 'lmp2 (elms)': case 'lmp2_elms': case 'elms':
-      return { sql: `(${combined} LIKE '%elms%' OR ${combined} LIKE '%lmp2_elms%')`, values: [] };
-    case 'lmp2wec': case 'lmp2 (wec)': case 'lmp2': case 'wec':
-      return { sql: `(${combined} LIKE '%lmp2%' AND ${combined} NOT LIKE '%elms%')`, values: [] };
-    case 'lmp3':
-      return { sql: `${combined} LIKE '%lmp3%'`, values: [] };
-    case 'gte':
-      return { sql: `${combined} LIKE '%gte%'`, values: [] };
-    default:
-      return { sql: `instr(${combined},?)>0`, values: [targetClass.toLowerCase()] };
-  }
+  return { sql: 'f.driver_class = ?', values: [targetClass] };
 }
 
 /** All values are parameters; only fixed SQL fragments enter the query. */
@@ -63,7 +46,7 @@ export function sessionWhere(options: SessionQuery): { sql: string; values: (str
       const driverClause = options.driver && options.driver !== 'All'
         ? 'f.driver_id IN (SELECT driver_id FROM drivers WHERE instr(lower(name),lower(?))>0)'
         : '(f.is_player_driver=1 OR (s.player_driver_name IS NULL AND f.driver_ordinal=coalesce(s.primary_driver_ordinal,0)))';
-      parts.push(`EXISTS (SELECT 1 FROM session_drivers f LEFT JOIN vehicles fv ON fv.vehicle_id=f.vehicle_id WHERE f.session_id=s.id AND ${driverClause} AND ${classMatch.sql})`);
+      parts.push(`EXISTS (SELECT 1 FROM session_drivers f WHERE f.session_id=s.id AND ${driverClause} AND ${classMatch.sql})`);
       if (options.driver && options.driver !== 'All') {
         values.push(options.driver);
       }
@@ -104,7 +87,7 @@ export function querySessionPage(db: Database, options: SessionQuery) {
       const layoutKey = getCircuitSpecification(ref.track_name).layoutKey;
       const entry = JSON.parse(ref.data_json) as { target100Sec?: number };
       if (layoutKey !== 'unknown' && entry.target100Sec && entry.target100Sec > 0) {
-        targets.push({ layout_key: layoutKey, car_class: normalizeCarClass(ref.car_class), target100_sec: entry.target100Sec });
+        targets.push({ layout_key: layoutKey, car_class: ref.car_class, target100_sec: entry.target100Sec });
       }
     }
   }

@@ -28,7 +28,7 @@ export function driver(name: string, laps: LapData[], extra: Partial<DriverData>
   return {
     name,
     carType: 'Ferrari 296 LMGT3',
-    carClass: 'LMGT3',
+    carClass: 'GT3',
     carNumber: '1',
     teamName: '',
     isPlayer: false,

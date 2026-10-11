@@ -48,7 +48,7 @@ describe('sessionAnalytics server module', () => {
               name: 'Player',
               isPlayer: true,
               carType: 'Ferrari 499P',
-              carClass: 'LMH',
+              carClass: 'Hyper',
               carNumber: '50',
               teamName: 'AF',
               position: 1,
@@ -87,7 +87,7 @@ describe('sessionAnalytics server module', () => {
               name: 'Player',
               isPlayer: true,
               carType: 'Ferrari 499P',
-              carClass: 'LMH',
+              carClass: 'Hyper',
               carNumber: '50',
               teamName: 'AF',
               position: 1,
@@ -142,7 +142,7 @@ describe('sessionAnalytics server module', () => {
             name: 'Player',
             isPlayer: true,
             carType: 'Ferrari 499P',
-            carClass: 'LMH',
+            carClass: 'Hyper',
             carNumber: '50',
             teamName: 'AF',
             position: 1,
@@ -187,7 +187,7 @@ describe('sessionAnalytics server module', () => {
               name: 'Driver 1',
               isPlayer: true,
               carType: 'Porsche 911 GT3 R',
-              carClass: 'LMGT3',
+              carClass: 'GT3',
               bestLapTime: 121.5,
               laps: [
                 { lapNum: 1, lapTime: 121.5, s1: 30.0, s2: 45.0, s3: 46.5, isValid: true, isPitStop: false },
@@ -206,7 +206,7 @@ describe('sessionAnalytics server module', () => {
               name: 'Driver 1',
               isPlayer: true,
               carType: 'Porsche 911 GT3 R',
-              carClass: 'LMGT3',
+              carClass: 'GT3',
               bestLapTime: 63.2,
               laps: [
                 { lapNum: 1, lapTime: 63.2, s1: 15.0, s2: 24.0, s3: 24.2, isValid: true, isPitStop: false },
@@ -249,7 +249,7 @@ describe('sessionAnalytics server module', () => {
           name: 'Player Driver',
           isPlayer: true,
           carType: 'Porsche 911 GT3 R',
-          carClass: 'LMGT3',
+          carClass: 'GT3',
           carNumber: '92',
           teamName: 'Manthey',
           position: 2,
@@ -269,7 +269,7 @@ describe('sessionAnalytics server module', () => {
             name: 'Player Driver',
             isPlayer: true,
             carType: 'Porsche 911 GT3 R',
-            carClass: 'LMGT3',
+            carClass: 'GT3',
             carNumber: '92',
             teamName: 'Manthey',
             position: 2,
@@ -286,7 +286,7 @@ describe('sessionAnalytics server module', () => {
             name: 'Alien AI Opponent',
             isPlayer: false,
             carType: 'Ferrari 296 GT3',
-            carClass: 'LMGT3',
+            carClass: 'GT3',
             carNumber: '55',
             teamName: 'AF Corse',
             position: 1,
@@ -306,7 +306,7 @@ describe('sessionAnalytics server module', () => {
     it('extracts comparable laps and finds personal best and overall track best without driver restriction', () => {
       const result = extractComparableLaps(mockSessions, {
         trackName: 'Spa',
-        carClass: 'LMGT3',
+        carClass: 'GT3',
         playerOnly: true,
       });
 
@@ -334,7 +334,7 @@ describe('sessionAnalytics server module', () => {
     it('takes the best sectors only from the laps a leaderboard counts', () => {
       const sessions = structuredClone(mockSessions);
       sessions[0].drivers[0].laps[0].s1 = 29.0; // the start lap
-      const result = extractComparableLaps(sessions, { trackName: 'Spa', carClass: 'LMGT3', playerOnly: true });
+      const result = extractComparableLaps(sessions, { trackName: 'Spa', carClass: 'GT3', playerOnly: true });
       expect(result.bestS1).toBe(30.5);
       expect(result.theoreticalBestSec).toBe(122.5);
     });
@@ -342,7 +342,7 @@ describe('sessionAnalytics server module', () => {
     it('takes the personal best from the same laps, so the theoretical best is never slower', () => {
       const sessions = structuredClone(mockSessions);
       Object.assign(sessions[0].drivers[0].laps[0], { lapTime: 121.0, s1: 30.0, s2: 45.0, s3: 46.0 }); // the start lap
-      const result = extractComparableLaps(sessions, { trackName: 'Spa', carClass: 'LMGT3', playerOnly: true });
+      const result = extractComparableLaps(sessions, { trackName: 'Spa', carClass: 'GT3', playerOnly: true });
       expect(result.playerBestLap?.lapTime).toBe(122.5);
       expect(result.allTimeBestLap?.lapTime).toBe(122.5);
       expect(result.theoreticalBestSec).toBe(122.5);
@@ -351,7 +351,7 @@ describe('sessionAnalytics server module', () => {
     it('filters strictly by carClass and returns empty when class does not match', () => {
       const result = extractComparableLaps(mockSessions, {
         trackName: 'Spa',
-        carClass: 'Hypercar',
+        carClass: 'Hyper',
       });
 
       expect(result.laps.length).toBe(0);
@@ -375,7 +375,7 @@ describe('sessionAnalytics server module', () => {
             },
             {
               name: 'ELMS Driver',
-              carClass: 'LMP2',
+              carClass: 'LMP2_ELMS',
               carType: 'Oreca 07 ELMS',
               laps: [{ lapNum: 1, lapTime: 125.0, lapTimeString: '2:05.000', isValid: true }],
             },
@@ -398,14 +398,14 @@ describe('sessionAnalytics server module', () => {
 
       const elmsResult = extractComparableLaps(multiClassSessions, {
         trackName: 'Spa',
-        carClass: 'LMP2elms',
+        carClass: 'LMP2_ELMS',
       });
       expect(elmsResult.laps.length).toBe(1);
       expect(elmsResult.laps[0].driverName).toBe('ELMS Driver');
 
       const wecResult = extractComparableLaps(multiClassSessions, {
         trackName: 'Spa',
-        carClass: 'LMP2wec',
+        carClass: 'LMP2',
       });
       expect(wecResult.laps.length).toBe(1);
       expect(wecResult.laps[0].driverName).toBe('WEC Driver');
@@ -435,7 +435,7 @@ describe('sessionAnalytics server module', () => {
         name: 'Test Pilot',
         isPlayer: true,
         carType: 'Ferrari 499P',
-        carClass: 'Hypercar',
+        carClass: 'Hyper',
         carNumber: '51',
         teamName: 'AF Corse',
         position: 1,
@@ -477,7 +477,7 @@ describe('sessionAnalytics server module', () => {
       expect(projected.sessionId).toBe('sess_1');
       expect(projected.driverName).toBe('Test Pilot');
       expect(projected.carType).toBe('Ferrari 499P');
-      expect(projected.carClass).toBe('Hypercar');
+      expect(projected.carClass).toBe('Hyper');
       expect(projected.lapNum).toBe(4);
       expect(projected.lapTime).toBe(96.425);
       expect(projected.matchingReplayFile).toBe('Monza_P1.Vcr');

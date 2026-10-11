@@ -50,7 +50,7 @@ export function board(count: number, playerRank: number | null, benchmark: Refer
   return {
     layoutKey: 'monza_gp',
     layoutName: 'Grand Prix Circuit',
-    carClass: 'LMGT3',
+    carClass: 'GT3',
     scope: 'class',
     carType: null,
     entries,
@@ -62,7 +62,7 @@ export function board(count: number, playerRank: number | null, benchmark: Refer
 export const BENCHMARK = {
   key: 'Monza_LMGT3',
   trackName: 'Monza',
-  carClass: 'LMGT3',
+  carClass: 'GT3',
   patch: '1.4',
   target100Sec: 100.05,
   targets: {

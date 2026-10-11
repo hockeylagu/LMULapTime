@@ -125,13 +125,13 @@ describe('useSessionDetailData', () => {
   it('takes the all-time PB from earlier sessions at this track in this class only', async () => {
     const point = (bestLapTime: number, overrides: Partial<SessionProgressionPoint> = {}): SessionProgressionPoint => ({
       sessionId: 'old', timestamp: 0, dateString: '', sessionType: 'Practice', trackVenue: 'Spa', trackCourse: 'GP',
-      carType: 'Ferrari 499P', carClass: 'LMH', driverName: 'Sim Driver', bestLapTime, bestS1: null, bestS2: null, bestS3: null,
+      carType: 'Ferrari 499P', carClass: 'Hyper', driverName: 'Sim Driver', bestLapTime, bestS1: null, bestS2: null, bestS3: null,
       ...overrides,
     } as SessionProgressionPoint);
 
     const { result } = await loaded(mockDetailedSession as unknown as DetailedSession, 'pb', [
       point(121.5),
-      point(119, { carClass: 'LMGT3', carType: 'Porsche 911 GT3 R' }),
+      point(119, { carClass: 'GT3', carType: 'Porsche 911 GT3 R' }),
       point(118, { trackVenue: 'Monza', trackCourse: 'GP' }),
     ]);
 

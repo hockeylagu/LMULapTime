@@ -17,7 +17,7 @@ export interface LayoutClassPillsProps {
 export const LayoutClassPills: React.FC<LayoutClassPillsProps> = ({ layout, selectedCarClass, onSelect }) => (
   <div role="group" aria-label="Car class" className="flex flex-wrap items-center gap-2">
     {layout.classes.map((c) => {
-      const selected = c.carClass === selectedCarClass;
+      const selected = (c.carClass === selectedCarClass);
       const badge = getCarClassBadgeConfig(c.carClass);
       return (
         <button

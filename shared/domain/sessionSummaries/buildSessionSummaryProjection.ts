@@ -4,7 +4,7 @@ import { SESSION_SUMMARY_PROJECTION_VERSION } from '../../types/sessionSummaries
 import { CIRCUIT_SPECIFICATIONS, getCircuitSpecification } from '../circuitSpecs.js';
 import { lapConditionGroup } from '../lapConditions.js';
 import { computeConsistencyRating, computeTopNLapAverage, selectCleanLapCandidates } from '../lapComparison.js';
-import { driverClass, isOnlineSession } from '../leaderboard.js';
+import { isOnlineSession } from '../leaderboard.js';
 import { isSessionEmpty, matchesSessionType } from '../formatters.js';
 import { buildSessionAggregate } from './buildSessionAggregate.js';
 
@@ -41,7 +41,7 @@ function projectDriver(session: DetailedSession, driver: DriverData, driverOrdin
   }).filter(group => group.cleanCount > 0);
   const driverName = driver.name ?? '';
   return { driver: { sessionId: session.id, driverOrdinal, driverName, normalizedName: driverName.trim().toLowerCase(),
-    isPlayer, isHuman, carClass: driverClass(driver) ?? '', carType: driver.carType ?? '',
+    isPlayer, isHuman, carClass: driver.carClass ?? '', carType: driver.carType ?? '',
     position: driver.position ?? 0, lapsCount: completedCount, declaredLapsCount: lapsCount, cleanLapsCount: cleanCount,
     drivingTimeSum: hasLaps ? driverLaps.reduce((sum, lap) => sum + (lap.lapTime && lap.lapTime > 0 ? lap.lapTime : 0), 0) : (driver.avgLapTime ?? 0) * completedCount,
     pitCount: hasLaps ? driverLaps.filter(lap => lap.isPitStop).length : 0,
