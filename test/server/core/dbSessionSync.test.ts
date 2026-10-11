@@ -5,6 +5,7 @@ import path from 'node:path';
 import { SessionDatabase } from '../../../server/core/db.js';
 import { DB_PARSER_VERSION } from '../../../server/core/dbSessionSync.js';
 import { LmuParser } from '../../../server/sessions/parser.js';
+import { initDbSchema } from '../../../server/core/dbSchema.js';
 
 describe('session parser-version migration writes', () => {
   let tempDir: string | null = null;
@@ -39,6 +40,54 @@ describe('session parser-version migration writes', () => {
 
     expect(database.syncSessionsFromDir(dir, parser, true)).toMatchObject({ added: 0, updated: 1, total: 1 });
     expect(parse).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([true, false])('repairs Fuji layouts and preserves them across startup (XML retained: %s)', (keepXml) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lmu-fuji-repair-'));
+    tempDir = dir;
+    const database = new SessionDatabase(':memory:');
+    db = database;
+    const xml = fs.readFileSync(path.join(process.cwd(), 'test', 'fixtures', 'results', '2026_05_28_P1.xml'), 'utf8');
+    const cases = [
+      { name: 'classic', course: '', length: 4502, key: 'fuji_classic' },
+      { name: 'chicane', course: '', length: 4535.8, key: 'fuji_chicane' },
+      { name: 'grand-prix', course: 'Grand Prix', length: 4535.8, key: 'fuji_chicane' },
+    ];
+    for (const item of cases) {
+      fs.writeFileSync(path.join(dir, `${item.name}.xml`), xml
+        .replace('<TrackVenue>Spa</TrackVenue>', '<TrackVenue>Fuji Speedway</TrackVenue>')
+        .replace('<TrackCourse>Grand Prix</TrackCourse>', `<TrackCourse>${item.course}</TrackCourse>`)
+        .replace('<TrackLength>7004.0</TrackLength>', `<TrackLength>${item.length}</TrackLength>`));
+    }
+    const parser = new LmuParser(undefined, undefined, { detectPlayer: false });
+    database.syncSessionsFromDir(dir, parser);
+    const sql = database.getDb();
+    const layouts = () => sql.prepare(`SELECT s.filename,s.layout_key,a.layout_key AS fact_layout_key
+      FROM sessions s JOIN session_summary_facts a ON a.session_id=s.id ORDER BY s.filename`).all();
+    const expected = cases.map(item => ({ filename: `${item.name}.xml`, layout_key: item.key, fact_layout_key: item.key }))
+      .sort((left, right) => left.filename.localeCompare(right.filename));
+    expect(layouts()).toEqual(expected);
+    // Starting the schema repeatedly must preserve the correctly classified Classic session.
+    initDbSchema(sql);
+    expect(layouts()).toEqual(expected);
+
+    // Simulate the historical threshold error and the unsafe migration's Classic overwrite.
+    sql.exec(`UPDATE sessions SET layout_key=CASE WHEN filename='classic.xml' THEN 'fuji_chicane' ELSE 'fuji_classic' END;
+      UPDATE session_summary_facts SET layout_key=(SELECT layout_key FROM sessions WHERE id=session_id)`);
+    database.setMetadata('parser_version', '2.20_canonical_car_classes');
+    if (!keepXml) for (const item of cases) fs.unlinkSync(path.join(dir, `${item.name}.xml`));
+    const parse = vi.spyOn(parser, 'parseSessionXml');
+    const result = database.syncSessionsFromDir(dir, parser);
+    expect(result).toMatchObject({ added: 0, updated: keepXml ? 3 : 0, total: 3 });
+    expect(parse).toHaveBeenCalledTimes(keepXml ? 3 : 0);
+    expect(database.getMetadata('parser_version')).toBe(DB_PARSER_VERSION);
+    expect(layouts()).toEqual(expected);
+    initDbSchema(sql);
+    expect(layouts()).toEqual(expected);
+    parse.mockClear();
+    database.syncSessionsFromDir(dir, parser);
+    expect(parse).not.toHaveBeenCalled();
+    expect(layouts()).toEqual(expected);
   });
 
   it('does not store an XML that changed while it was read, and reads it again on the next scan', () => {

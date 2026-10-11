@@ -89,6 +89,7 @@ Telemetry analytics, lap comparison, and race intelligence hub for **Le Mans Ult
 ### Database Patterns (`server/core/db.ts` & Modular Stores)
 - Use **Better-SQLite3** with synchronous prepared statements and mandatory **WAL mode** (`PRAGMA journal_mode = WAL;`).
 - **Modular Stores**: One store module per table group in `server/core/` (`db<Name>Store.ts`) and `server/core/replay/`. Schema DDL in `dbSchema.ts`.
+- **Data Repairs**: Keep domain data rewrites out of schema initialization. Use versioned reparses or projection rebuilds with canonical domain logic; preserve sessions whose source files were deleted. Remove obsolete one-off migration scripts when the versioned path supersedes them, and review migration code whenever its schema changes.
 - Use columnar tables for high-frequency telemetry. Parameterize all queries (`stmt.run(arg)`). Wrap bulk operations in `db.transaction(...)`.
 
 ### UI & Styling

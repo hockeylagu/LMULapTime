@@ -8,7 +8,7 @@ import type { ReplayMatchTarget } from '../sessions/replayMatching.js';
 import { rateDriversPace } from '../sessions/sessionPaceRating.js';
 
 /** Bumping this re-parses every stored session from its XML. */
-export const DB_PARSER_VERSION = '2.20_canonical_car_classes';
+export const DB_PARSER_VERSION = '2.21_fuji_layout_repair';
 
 export interface SessionXmlSyncParser {
   setReplayLookup(lookup: (target: ReplayMatchTarget) => ReplayFileEntry[]): void;

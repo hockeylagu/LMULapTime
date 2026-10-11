@@ -17,6 +17,13 @@ already stored in SQLite without statting, fingerprinting or parsing them again.
 previously failed reads are ingested; a parser-version change or explicit force reparse revisits
 stored files still on disk. Sessions whose XML was deleted remain in SQLite.
 
+Parser version `2.21_fuji_layout_repair` also repairs Fuji layout keys left by the old
+startup migration. Reparsed sessions and retained sessions without XML rebuild their
+layout through `getCircuitSpecification`, using stored track length and replay identity.
+Schema initialization must not rewrite these keys: a name-only update can turn valid
+Classic sessions into Chicane sessions again. The redundant manual car-class migration
+script was removed; data repairs use the versioned reparse/rebuild path.
+
 Replay matching reads ingestion's persisted XML modification time from SQLite as the session end
 timestamp. Only missing stored values fall back to disk; failed timestamp reads are retried. This assumption is specific
 to results XMLs: replays can reuse filenames and DuckDB recordings can change while recording, so
