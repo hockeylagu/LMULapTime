@@ -113,21 +113,6 @@ CREATE TABLE IF NOT EXISTS ai_reports (
     );
 `;
 
-/** Keep existing reports without guessing a driver/lap from their old recording filenames. */
-function migrateAiReportIdentity(db: DatabaseType): void {
-  const columns = db.prepare('PRAGMA table_info(ai_reports)').all() as Array<{ name: string }>;
-  if (!columns.some(column => column.name === 'replay_name')) return;
-  db.transaction(() => {
-    db.exec('ALTER TABLE ai_reports RENAME TO ai_reports_previous');
-    db.exec(AI_REPORT_SCHEMA);
-    db.exec(`INSERT INTO ai_reports (cache_key, lap_number, baseline_lap_number, model, prompt_version,
-      report_json, prompt_tokens, completion_tokens, total_tokens, generated_at)
-      SELECT cache_key, lap_number, baseline_lap_number, model, prompt_version,
-        report_json, prompt_tokens, completion_tokens, total_tokens, generated_at FROM ai_reports_previous;
-      DROP TABLE ai_reports_previous;`);
-  })();
-}
-
 export function initDbSchema(db: DatabaseType): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS sessions (
@@ -420,23 +405,6 @@ export function initDbSchema(db: DatabaseType): void {
     );
   `);
 
-  const telemetryCacheColumns = db.prepare('PRAGMA table_info(telemetry_lap_cache)').all() as Array<{ name: string }>;
-  if (!telemetryCacheColumns.some(column => column.name === 'cache_version')) {
-    db.exec("ALTER TABLE telemetry_lap_cache ADD COLUMN cache_version TEXT NOT NULL DEFAULT 'v1'");
-  }
-  const trajectoryColumns = db.prepare('PRAGMA table_info(replay_trajectories)').all() as Array<{ name: string }>;
-  if (!trajectoryColumns.some(column => column.name === 'source_path')) {
-    db.exec('ALTER TABLE replay_trajectories ADD COLUMN source_path TEXT');
-  }
-
-  const ingestColumns = db.prepare('PRAGMA table_info(replay_ingest_drivers)').all() as Array<{ name: string }>;
-  if (!ingestColumns.some(column => column.name === 'attempts')) {
-    db.exec('ALTER TABLE replay_ingest_drivers ADD COLUMN attempts INTEGER NOT NULL DEFAULT 1');
-    // Failures stored before decode errors were told apart from interrupted decodes (a worker that
-    // exited with the server) may not be the file's fault: each gets one more decode.
-    db.exec("DELETE FROM replay_ingest_drivers WHERE status = 'failed'");
-  }
-  migrateAiReportIdentity(db);
   initSessionSummarySchema(db);
   initSessionRowsSchema(db);
   initReplayMatchingSchema(db);

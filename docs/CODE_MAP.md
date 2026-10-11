@@ -77,8 +77,10 @@ Map geometry and session thumbnails resolve from canonical layout/venue/course w
 Session views no longer display recording filenames, and improvement-chart rows no longer carry them.
 `/scan/status.sessionReplayJobs` maps ingestion/upgrade work to stored session owners on the server;
 launch buttons and indicators use only session IDs. File-based diagnostics remain in Settings.
-AI evidence and `ai_reports` identify both laps by session ID and driver/lap ordinals. The schema migration
-preserves older reports with null locators and removes their filename columns; history labels these as previous reports.
+AI evidence and `ai_reports` identify both laps by session ID and driver/lap ordinals.
+`dbSchema.ts` defines the current local cache structure directly; obsolete AI-report, telemetry-cache,
+trajectory-source and decode-attempt schema upgrades have been removed after verifying the LMU cache.
+Reports already retained with null locators remain readable; history labels these as previous reports.
 Same-session tabs send `sessionId`; the picker loads 50 laps per page, with `compare/CompareLapPagination.tsx` exposing previous/next navigation.
 DuckDB cache clearing and ownership-rule resets invalidate the session attachment columns transactionally, so sessions that lose ownership stop advertising old files.
 

@@ -606,24 +606,14 @@ describe('SessionDatabase AI report history', () => {
     ...overrides,
   });
 
-  it('migrates old AI report history without retaining filenames or inventing session locators', () => {
+  it('preserves current AI report history when the schema initializes repeatedly', () => {
     const sql = db.getDb();
-    sql.exec(`DROP TABLE ai_reports;
-      CREATE TABLE ai_reports (cache_key TEXT PRIMARY KEY, replay_name TEXT NOT NULL, lap_number INTEGER NOT NULL,
-        baseline_replay_name TEXT, baseline_lap_number INTEGER, model TEXT NOT NULL, prompt_version INTEGER NOT NULL,
-        report_json TEXT NOT NULL, prompt_tokens INTEGER, completion_tokens INTEGER, total_tokens INTEGER, generated_at INTEGER NOT NULL);`);
-    const report = { overallSummary: 'Preserved old report.', improvements: [] };
-    sql.prepare('INSERT INTO ai_reports VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
-      .run('old-key', 'reused.Vcr', 3, 'baseline.Vcr', 2, 'model', 1, JSON.stringify(report), 10, 5, 15, 1000);
-    initDbSchema(sql);
-    initDbSchema(sql);
-    const columns = sql.prepare('PRAGMA table_info(ai_reports)').all() as Array<{ name: string }>;
-    expect(columns.map(column => column.name)).not.toContain('replay_name');
-    expect(columns.map(column => column.name)).not.toContain('baseline_replay_name');
-    expect(db.getAiReport('old-key')).toMatchObject({ sessionId: null, driverOrdinal: null, lapOrdinal: null,
-      baselineSessionId: null, lapNumber: 3, baselineLapNumber: 2, report, totalTokens: 15, generatedAt: 1000 });
     db.saveAiReport(buildReport());
-    expect(db.getAiReport('key-1')).toMatchObject({ sessionId: 'test-session', driverOrdinal: 0, lapOrdinal: 2 });
+    const saved = db.getAiReport('key-1');
+    initDbSchema(sql);
+    initDbSchema(sql);
+    expect(db.getAiReport('key-1')).toEqual(saved);
+    db.saveAiReport(buildReport({ cacheKey: 'key-2' }));
     expect(db.getAiReportsList()).toHaveLength(2);
   });
 
