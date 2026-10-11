@@ -82,8 +82,10 @@ describe('CircuitSpecification resolution & LMU ground truth mapping', () => {
     expect(resolveKey('Circuit of the Americas', '', null, null, null, 3702)).toBe('cota_national');
     expect(resolveKey('Circuit of the Americas', '', null, null, null, 5513)).toBe('cota_gp');
 
-    // Fuji: Classic (~4526m) vs Chicane (~4563m)
+    // Fuji: Classic (~4502m in LMU / ~4526m official) vs Chicane (~4535.8m in LMU / ~4563m official)
+    expect(resolveKey('Fuji Speedway', '', null, null, null, 4502)).toBe('fuji_classic');
     expect(resolveKey('Fuji Speedway', '', null, null, null, 4526)).toBe('fuji_classic');
+    expect(resolveKey('Fuji Speedway', '', null, null, null, 4535.8)).toBe('fuji_chicane');
     expect(resolveKey('Fuji Speedway', '', null, null, null, 4563)).toBe('fuji_chicane');
   });
 

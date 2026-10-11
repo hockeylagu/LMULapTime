@@ -1,7 +1,7 @@
 import type { Database } from 'better-sqlite3';
 import type { TrackSummary } from '../../../shared/types/index.js';
 import { computeTheoreticalBest, getDisplayTrackName, minValidTime } from '../../../shared/domain/formatters.js';
-import { sessionWhere, type SessionQuery } from './pageQueries.js';
+import { sessionWhere, carClassMatch, type SessionQuery, type SqlFragment } from './pageQueries.js';
 import { CIRCUIT_SPECIFICATIONS, getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { matchesTrack } from '../../../shared/domain/paceCategory.js';
 
@@ -23,38 +23,15 @@ interface TrackAggregateRow {
   best_timestamp: number | null; best_id: string | null;
 }
 
-interface SqlFragment { sql: string; values: (string | number)[]; }
-
 function customTrackScope(trackName: string): SqlFragment {
   return { sql: "(s.track_venue=? OR trim(s.track_venue || ' - ' || s.track_course)=? OR s.track_venue || ' (' || s.track_course || ')'=?)",
     values: [trackName, trackName, trackName] };
 }
 
-function carClassMatch(targetClass?: string): SqlFragment {
-  if (!targetClass || targetClass === 'All') return { sql: '1=1', values: [] };
-  const combined = "lower(coalesce(f.driver_class,'') || ' ' || coalesce(fv.car_type,''))";
-  switch (targetClass.toLowerCase()) {
-    case 'lmh': case 'hypercar': case 'hyper': case 'lmdh':
-      return { sql: `(${combined} LIKE '%hyper%' OR ${combined} LIKE '%lmh%' OR ${combined} LIKE '%lmdh%')`, values: [] };
-    case 'lmgt3': case 'gt3':
-      return { sql: `(${combined} LIKE '%gt3%' OR ${combined} LIKE '%lmgt3%')`, values: [] };
-    case 'lmp2elms': case 'lmp2 (elms)': case 'lmp2_elms': case 'elms':
-      return { sql: `(${combined} LIKE '%elms%' OR ${combined} LIKE '%lmp2_elms%')`, values: [] };
-    case 'lmp2wec': case 'lmp2 (wec)': case 'lmp2': case 'wec':
-      return { sql: `(${combined} LIKE '%lmp2%' AND ${combined} NOT LIKE '%elms%')`, values: [] };
-    case 'lmp3':
-      return { sql: `${combined} LIKE '%lmp3%'`, values: [] };
-    case 'gte':
-      return { sql: `${combined} LIKE '%gte%'`, values: [] };
-    default:
-      return { sql: `instr(${combined},?)>0`, values: [targetClass.toLowerCase()] };
-  }
-}
-
 function sessionClassMatch(targetClass?: string): SqlFragment {
   const match = carClassMatch(targetClass);
   if (match.sql === '1=1') return match;
-  return { sql: `EXISTS (SELECT 1 FROM session_drivers f LEFT JOIN vehicles fv ON fv.vehicle_id=f.vehicle_id WHERE f.session_id=s.id AND ${match.sql})`, values: match.values };
+  return { sql: `EXISTS (SELECT 1 FROM session_drivers f LEFT JOIN vehicles fv ON fv.vehicle_id=f.vehicle_id WHERE f.session_id=s.id AND (f.is_player_driver=1 OR (s.player_driver_name IS NULL AND f.driver_ordinal=coalesce(s.primary_driver_ordinal,0))) AND ${match.sql})`, values: match.values };
 }
 
 function aggregateScopeSql(trackName: string, carClass?: string, carModel?: string): SqlFragment {

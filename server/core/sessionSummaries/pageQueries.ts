@@ -16,6 +16,29 @@ export interface SessionQuery {
   playerCar?: string;
 }
 
+export interface SqlFragment { sql: string; values: (string | number)[]; }
+
+export function carClassMatch(targetClass?: string): SqlFragment {
+  if (!targetClass || targetClass === 'All') return { sql: '1=1', values: [] };
+  const combined = "lower(coalesce(f.driver_class,'') || ' ' || coalesce(fv.car_type,''))";
+  switch (targetClass.toLowerCase()) {
+    case 'lmh': case 'hypercar': case 'hyper': case 'lmdh':
+      return { sql: `(${combined} LIKE '%hyper%' OR ${combined} LIKE '%lmh%' OR ${combined} LIKE '%lmdh%')`, values: [] };
+    case 'lmgt3': case 'gt3':
+      return { sql: `(${combined} LIKE '%gt3%' OR ${combined} LIKE '%lmgt3%')`, values: [] };
+    case 'lmp2elms': case 'lmp2 (elms)': case 'lmp2_elms': case 'elms':
+      return { sql: `(${combined} LIKE '%elms%' OR ${combined} LIKE '%lmp2_elms%')`, values: [] };
+    case 'lmp2wec': case 'lmp2 (wec)': case 'lmp2': case 'wec':
+      return { sql: `(${combined} LIKE '%lmp2%' AND ${combined} NOT LIKE '%elms%')`, values: [] };
+    case 'lmp3':
+      return { sql: `${combined} LIKE '%lmp3%'`, values: [] };
+    case 'gte':
+      return { sql: `${combined} LIKE '%gte%'`, values: [] };
+    default:
+      return { sql: `instr(${combined},?)>0`, values: [targetClass.toLowerCase()] };
+  }
+}
+
 /** All values are parameters; only fixed SQL fragments enter the query. */
 export function sessionWhere(options: SessionQuery): { sql: string; values: (string | number)[] } {
   const parts: string[] = []; const values: (string | number)[] = [];
@@ -34,8 +57,29 @@ export function sessionWhere(options: SessionQuery): { sql: string; values: (str
   }
   if (options.hideEmpty) parts.push('s.is_empty = 0');
   if (options.hasReplay) parts.push('s.recording_name IS NOT NULL');
-  if (options.carClass && options.carClass !== 'All') { parts.push('EXISTS (SELECT 1 FROM session_drivers f WHERE f.session_id=s.id AND f.driver_class=?)'); values.push(normalizeCarClass(options.carClass)); }
-  if (options.car && options.car !== 'All') { parts.push('EXISTS (SELECT 1 FROM session_drivers f WHERE f.session_id=s.id AND f.vehicle_id IN (SELECT vehicle_id FROM vehicles WHERE instr(lower(car_type),lower(?))>0))'); values.push(options.car); }
+  if (options.carClass && options.carClass !== 'All') {
+    const classMatch = carClassMatch(options.carClass);
+    if (classMatch.sql !== '1=1') {
+      const driverClause = options.driver && options.driver !== 'All'
+        ? 'f.driver_id IN (SELECT driver_id FROM drivers WHERE instr(lower(name),lower(?))>0)'
+        : '(f.is_player_driver=1 OR (s.player_driver_name IS NULL AND f.driver_ordinal=coalesce(s.primary_driver_ordinal,0)))';
+      parts.push(`EXISTS (SELECT 1 FROM session_drivers f LEFT JOIN vehicles fv ON fv.vehicle_id=f.vehicle_id WHERE f.session_id=s.id AND ${driverClause} AND ${classMatch.sql})`);
+      if (options.driver && options.driver !== 'All') {
+        values.push(options.driver);
+      }
+      values.push(...classMatch.values);
+    }
+  }
+  if (options.car && options.car !== 'All') {
+    const driverClause = options.driver && options.driver !== 'All'
+      ? 'f.driver_id IN (SELECT driver_id FROM drivers WHERE instr(lower(name),lower(?))>0)'
+      : '(f.is_player_driver=1 OR (s.player_driver_name IS NULL AND f.driver_ordinal=coalesce(s.primary_driver_ordinal,0)))';
+    parts.push(`EXISTS (SELECT 1 FROM session_drivers f WHERE f.session_id=s.id AND ${driverClause} AND f.vehicle_id IN (SELECT vehicle_id FROM vehicles WHERE instr(lower(car_type),lower(?))>0))`);
+    if (options.driver && options.driver !== 'All') {
+      values.push(options.driver);
+    }
+    values.push(options.car);
+  }
   if (options.playerCar && options.playerCar !== 'All') { parts.push('s.player_car_type=?'); values.push(options.playerCar); }
   if (options.driver && options.driver !== 'All') { parts.push('EXISTS (SELECT 1 FROM session_drivers f WHERE f.session_id=s.id AND f.driver_id IN (SELECT driver_id FROM drivers WHERE instr(lower(name),lower(?))>0))'); values.push(options.driver); }
   if (options.search?.trim()) {

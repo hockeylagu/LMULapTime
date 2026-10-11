@@ -110,7 +110,8 @@ export function getCircuitSpecification(
       return trackLengthMeters < 4500 ? CIRCUIT_SPECIFICATIONS.cota_national : CIRCUIT_SPECIFICATIONS.cota_gp;
     }
     if (combined.includes('fuji')) {
-      return trackLengthMeters < 4545 ? CIRCUIT_SPECIFICATIONS.fuji_classic : CIRCUIT_SPECIFICATIONS.fuji_chicane;
+      if (/\b(classic|old)\b/.test(combined)) return CIRCUIT_SPECIFICATIONS.fuji_classic;
+      return trackLengthMeters < 4530 ? CIRCUIT_SPECIFICATIONS.fuji_classic : CIRCUIT_SPECIFICATIONS.fuji_chicane;
     }
   }
 

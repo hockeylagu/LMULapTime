@@ -81,8 +81,8 @@ export function matchesCarClass(carClass: string = '', carType: string = '', tar
 }
 
 /**
- * Checks if a session matches a target car class by evaluating either playerDriver
- * or any participating driver in the session.
+ * Checks if a session matches a target car class by evaluating playerDriver,
+ * or fallback to any participating driver in the session if playerDriver is absent.
  */
 export function matchesSessionCarClass(
   session: {
@@ -93,11 +93,12 @@ export function matchesSessionCarClass(
 ): boolean {
   if (!targetClass || targetClass === 'All') return true;
 
-  if (
-    session.playerDriver &&
-    matchesCarClass(session.playerDriver.carClass || '', session.playerDriver.carType || '', targetClass)
-  ) {
-    return true;
+  if (session.playerDriver) {
+    return matchesCarClass(
+      session.playerDriver.carClass || '',
+      session.playerDriver.carType || '',
+      targetClass
+    );
   }
 
   if (session.drivers && session.drivers.length > 0) {
