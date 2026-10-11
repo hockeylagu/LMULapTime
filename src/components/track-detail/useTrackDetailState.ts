@@ -116,7 +116,9 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
     if (prevCarClassRef.current !== selectedCarClass) {
       prevCarClassRef.current = selectedCarClass;
       setSelectedCarModelState('All');
-      updateSearchParams(searchParams, setSearchParams, { model: null, page: null, progressionPage: null });
+      if (searchParams.has('model') || searchParams.has('page') || searchParams.has('progressionPage')) {
+        updateSearchParams(searchParams, setSearchParams, { model: null, page: null, progressionPage: null });
+      }
     }
   }, [selectedCarClass, searchParams, setSearchParams]);
 

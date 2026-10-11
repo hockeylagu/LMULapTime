@@ -1,6 +1,6 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { fireEvent, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { HashRouter } from 'react-router';
 import App from '../src/App.js';
 import { aggregateTrackSummaries } from '../shared/domain/trackSummaryUtils.js';
@@ -121,21 +121,57 @@ describe('carClass URL persistence across track navigation', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Hypercar' }));
 
     await waitFor(() => {
-      expect(window.location.hash).toContain('carClass=LMH');
+      expect(window.location.hash).toContain('carClass=Hyper');
     });
 
     fireEvent.click(screen.getByText('Algarve International Circuit'));
 
     await waitFor(() => {
       expect(window.location.hash).toContain('/track/Algarve%20International%20Circuit');
-      expect(window.location.hash).toContain('carClass=LMH');
+      expect(window.location.hash).toContain('carClass=Hyper');
     });
 
     fireEvent.click(await screen.findByRole('link', { name: /back to tracks/i }));
 
     await waitFor(() => {
       expect(window.location.hash).toContain('#/tracks');
-      expect(window.location.hash).toContain('carClass=LMH');
+      expect(window.location.hash).toContain('carClass=Hyper');
+    });
+  });
+
+  it('updates URL in a single click when toggling car class filter on track detail page', async () => {
+    window.location.hash = '#/track/Algarve%20International%20Circuit?carClass=Hyper';
+    host = document.createElement('div');
+    document.body.appendChild(host);
+    root = createRoot(host);
+
+    await act(async () => {
+      root?.render(
+        <HashRouter>
+          <App />
+        </HashRouter>,
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 2, name: 'Algarve International Circuit' })).toBeInTheDocument();
+    });
+
+    // Single click on 'All' removes carClass from the URL immediately
+    const classGroup = screen.getByRole('group', { name: 'Filter by vehicle class' });
+    const allBtn = within(classGroup).getByRole('button', { name: 'All' });
+    fireEvent.click(allBtn);
+
+    await waitFor(() => {
+      expect(window.location.hash).not.toContain('carClass');
+    });
+
+    // Single click on 'GT3' sets carClass=GT3 in the URL immediately
+    const gt3Btn = within(classGroup).getByRole('button', { name: 'GT3' });
+    fireEvent.click(gt3Btn);
+
+    await waitFor(() => {
+      expect(window.location.hash).toContain('carClass=GT3');
     });
   });
 });

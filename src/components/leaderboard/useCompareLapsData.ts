@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router';
+import { updateSearchParams } from '../../utils/urlParams.js';
 import { ReferenceLaptimeEntry, PaceCategory, DetailedSession, ComparableLap } from '../../../shared/types/index.js';
 import { getDisplayTrackName } from '../../../shared/domain/formatters.js';
 import {
@@ -152,7 +153,7 @@ export function useCompareLapsData({
   }, [sessions.length, suppliedTracks]);
 
   const selectedTrack = searchParams.get('track') || initialTrack || (availableTracks.length > 0 ? availableTracks[0] : layoutTracks[0] || 'Bahrain');
-  const selectedCarClass = searchParams.get('carClass') || initialCarClass || 'LMGT3';
+  const selectedCarClass = searchParams.get('carClass') || initialCarClass || 'GT3';
   const [loading, setLoading] = useState<boolean>(false);
 
   const [apiData, setApiData] = useState<CompareLapsApiData>(NO_COMPARE_LAPS);
@@ -445,9 +446,7 @@ export function useCompareLapsData({
 
   const deckLaps = useMemo(() => deckOrder(selectedLaps), [selectedLaps]);
   const changePage = (nextPage: number) => {
-    const params = new URLSearchParams(searchParams);
-    if (nextPage <= 1) params.delete('page'); else params.set('page', String(nextPage));
-    setSearchParams(params);
+    updateSearchParams(searchParams, setSearchParams, { page: nextPage <= 1 ? null : String(nextPage) });
   };
 
   const comparedLaps = useMemo(() => {

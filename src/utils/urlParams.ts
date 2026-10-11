@@ -1,10 +1,9 @@
 import type { SetURLSearchParams } from 'react-router';
 
-export function updateSearchParams(
+export function applySearchParamUpdates(
   currentParams: URLSearchParams,
-  setSearchParams: SetURLSearchParams,
   updates: Record<string, string | boolean | null | undefined>
-): void {
+): URLSearchParams {
   const params = new URLSearchParams(currentParams);
   // A changed filter, sort or search reshapes the list, so a paged session list starts again from page 1.
   if (Object.keys(updates).some(key => key !== 'page' && key !== 'view')) params.delete('page');
@@ -20,5 +19,13 @@ export function updateSearchParams(
     }
   }
 
-  setSearchParams(params, { replace: true });
+  return params;
+}
+
+export function updateSearchParams(
+  currentParams: URLSearchParams,
+  setSearchParams: SetURLSearchParams,
+  updates: Record<string, string | boolean | null | undefined>
+): void {
+  setSearchParams((prev) => applySearchParamUpdates(prev || currentParams, updates), { replace: true });
 }

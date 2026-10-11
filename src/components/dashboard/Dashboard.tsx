@@ -76,7 +76,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   const setCarClass = (carClass: string) => {
     setSelectedCarClass(carClass);
-    updateSearchParams(searchParams, setSearchParams, { carClass: carClass === 'All' ? null : carClass });
   };
 
   const setFilterType = (type: string) => {
