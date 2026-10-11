@@ -58,6 +58,22 @@ describe('decideTelemetryLinks', () => {
   const none = { stored: [], replays: [], loadReplayMetadata: () => null };
   const endsAt = (ends: Record<string, string>) => (s: TelemetrySessionCandidate) => (ends[s.id] ? at(ends[s.id]) : undefined);
 
+  it('attaches both venue-only Bahrain recordings to the Paddock session in their time span', () => {
+    const files = ['00:08:31', '00:12:57'].map(time => ({
+      ...duck(`Bahrain International Circuit_P_${time}.duckdb`, `2026-10-11T${time}Z`),
+      trackName: 'Bahrain International Circuit', driverName: 'Samuel Lague',
+    }));
+    const paddock = {
+      ...session('paddock', '2026-10-11T00:08:19.101Z', 'Paddock.Vcr'),
+      trackVenue: 'Bahrain International Circuit', trackCourse: 'Bahrain Paddock Circuit',
+      drivers: [{ name: 'Samuel Lague' }],
+    } as DetailedSession;
+    const links = decideTelemetryLinks({
+      ...none, files, sessions: [paddock], sessionEndMs: endsAt({ paddock: '2026-10-11T00:17:46Z' }),
+    });
+    expect(links).toEqual(files.map(file => ({ filename: file.filename, sessionId: 'paddock', replayName: 'Paddock.Vcr' })));
+  });
+
   it('gives a file to the session it was recorded in, not to the empty sessions LMU saves after it', () => {
     // Le Mans, 2026-09-14: the practice (3 laps, 18:37-18:46) and two 0-lap sessions saved after it.
     const file = duck('Circuit de la Sarthe_P_2026-09-14T18_37_49Z.duckdb', '2026-09-14T18:37:49Z');

@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { matchesTrack } from '../../shared/domain/paceCategory.js';
+import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { DuckDbReader } from './duckdbReader.js';
 import { ReplayMetadata } from '../core/types.js';
 
@@ -184,6 +185,7 @@ export function findDuckDbForSession(
 
   const sessionTypeNorm = normalizeSessionType(session.sessionType || session.sessionName);
   const sessionStartMs = sessionEpochMs(session);
+  const sessionCircuit = getCircuitSpecification(session.trackVenue, session.trackCourse);
 
   let bestMatch: DuckDbFileInfo | null = null;
   let smallestTimeDelta = Infinity;
@@ -192,7 +194,13 @@ export function findDuckDbForSession(
 
   for (const duck of duckdbFiles) {
     // 1. Check track match
-    if (!matchesTrack(duck.trackName, session.trackVenue, session.trackCourse)) continue;
+    const duckCircuit = getCircuitSpecification(duck.trackName, undefined, duck.trackName);
+    // Native telemetry records the venue without a layout. Only an exact official venue
+    // name is unspecified; explicit layout names/keys must still agree with the owner.
+    const venueOnly = duck.trackName.trim().toLowerCase() === duckCircuit.officialName.toLowerCase();
+    if (duckCircuit.officialLengthMeters > 0 && sessionCircuit.officialLengthMeters > 0) {
+      if (venueOnly ? duckCircuit.circuitId !== sessionCircuit.circuitId : duckCircuit.layoutKey !== sessionCircuit.layoutKey) continue;
+    } else if (!matchesTrack(duck.trackName, session.trackVenue, session.trackCourse)) continue;
 
     if (duck.driverName && session.drivers.length > 0) {
       const duckDriver = duck.driverName.toLowerCase();
@@ -254,6 +262,7 @@ export function findDuckDbForReplay(
   if (duckdbFiles.length === 0) return null;
 
   const replayTypeNorm = normalizeSessionType(replay.sessionType || replay.eventInfo?.session || '');
+  const replayCircuit = getCircuitSpecification(replay.trackName, replay.trackCourse, replay.sceneDesc || replay.eventInfo?.sceneDesc);
 
   let bestMatch: DuckDbFileInfo | null = null;
   let smallestTimeDelta = Infinity;
@@ -262,7 +271,11 @@ export function findDuckDbForReplay(
 
   for (const duck of duckdbFiles) {
     // 1. Check track match
-    if (!matchesTrack(duck.trackName, replay.trackName || replay.eventInfo?.sceneDesc || '', '')) continue;
+    const duckCircuit = getCircuitSpecification(duck.trackName, undefined, duck.trackName);
+    const venueOnly = duck.trackName.trim().toLowerCase() === duckCircuit.officialName.toLowerCase();
+    if (duckCircuit.officialLengthMeters > 0 && replayCircuit.officialLengthMeters > 0) {
+      if (venueOnly ? duckCircuit.circuitId !== replayCircuit.circuitId : duckCircuit.layoutKey !== replayCircuit.layoutKey) continue;
+    } else if (!matchesTrack(duck.trackName, replay.trackName || replay.eventInfo?.sceneDesc || '', replay.trackCourse)) continue;
 
     if (duck.driverName && replay.drivers.length > 0) {
       const duckDriver = duck.driverName.toLowerCase();

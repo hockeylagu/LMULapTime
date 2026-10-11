@@ -22,7 +22,7 @@ import {
  * The matching rule the stored matches were decided under. Changing it clears the stored matches
  * once so they are decided again (SessionDatabase.resetTelemetryLinksForRule).
  */
-export const TELEMETRY_LINK_RULE = 'session-span-v2';
+export const TELEMETRY_LINK_RULE = 'session-span-v3';
 
 /** Clock slack between the file name's timestamp and the session or replay times. */
 const SLACK_MS = 120_000;
