@@ -507,10 +507,9 @@ the completed 2026-09-29 cleanup and does not describe all remaining findings.
   `GpsTrackMapScene.tsx` (289), `ReplayInspectorModalBody.tsx` (276), `TelemetryPresetModal.tsx` (273), `GpsMapTelemetryHud.tsx` (272).
 
 **Logic in the wrong place / duplicated**
+- [Frontend simplification audit](SRC_SIMPLIFICATION_AUDIT.md) (2026-10-12): removed 23 frontend export barrels, consolidated six wheel-channel SVG renderers and rules-dialog focus handling, extended the canonical progression type, removed a route forwarder, parsed dashboard dates once per session, and accumulated wheel-chart extrema in one pass per lap. Follow-up commits also reuse geometry-owned display payloads and remove remaining named re-exports, the phase-card barrel, and the map forwarder. Remaining state-sharing candidates and their constraints are documented in the audit.
 - [Server repeated-work audit](SERVER_SMELLS_AUDIT.md): the 2026-10-12 first pass fixed XML event ownership, moved four superseded analytics implementations to `test/helpers/legacySessionAnalytics.ts` and `legacyBenchmarkImpact.ts` for parity checks, and made JavaScript/benchmark SQL use canonical `PACE_CATEGORY_BANDS`. Replay-related findings (decode coordination, neighboring-lap overfetch, metadata/DuckDB/weather preparation) are deferred by user request while separate replay ingestion optimization proceeds; the original audit is historical evidence for those paths.
 - Comparison queries now mark page PBs with one window query for the visible drivers (`markPagePersonalBests`), rather than one query per driver. The older 2026-10-10 ~127 ms all-driver measurement predates that implementation and was not rerun in this audit; profile current query plans before optimizing further.
-- The improvement chart keeps its own `SessionProgressionPoint` (`improvementChartTypes.ts`), a copy of the shared one plus the
-  benchmark pace fields.
 
 **Rule exceptions**
 - `server/core/types.ts` is a re-export barrel: server code imports types through it, so the same types have two import paths.
