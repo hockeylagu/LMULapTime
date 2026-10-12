@@ -90,6 +90,49 @@ describe('session parser-version migration writes', () => {
     expect(layouts()).toEqual(expected);
   });
 
+  it('reparses old stream event ownership while preserving sessions whose XML was deleted', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lmu-stream-identity-'));
+    tempDir = dir;
+    const database = new SessionDatabase(':memory:');
+    db = database;
+    const xml = `<rFactorXML><RaceResults><TrackVenue>Spa</TrackVenue><Race>
+      <Stream><TrackLimits Driver="Ann Smith" Lap="1" et="150">Warning</TrackLimits></Stream>
+      ${['Ann Smithson', 'Ann Smith'].map(name => `<Driver><Name>${name}</Name>
+        <CarType>Test Car</CarType><CarClass>GT3</CarClass>
+        <Lap num="1" et="120">120</Lap><Lap num="2" et="240">120</Lap>
+      </Driver>`).join('')}
+      </Race></RaceResults></rFactorXML>`;
+    const parser = new LmuParser(undefined, undefined, { detectPlayer: false });
+    for (const name of ['available.xml', 'deleted.xml']) fs.writeFileSync(path.join(dir, name), xml);
+    database.syncSessionsFromDir(dir, parser);
+
+    // Model the old substring matcher assigning the exact driver's event to the earlier prefix.
+    for (const session of database.iterateDetailedSessions()) {
+      const [prefix, exact] = session.drivers;
+      prefix.trackLimits = exact.trackLimits;
+      prefix.totalTrackLimits = exact.totalTrackLimits;
+      prefix.laps[1].trackLimits = exact.laps[1].trackLimits;
+      prefix.laps[1].trackLimitCount = exact.laps[1].trackLimitCount;
+      delete exact.trackLimits;
+      exact.totalTrackLimits = 0;
+      delete exact.laps[1].trackLimits;
+      delete exact.laps[1].trackLimitCount;
+      database.upsertSession(session, path.join(dir, session.filename), 1, 1);
+    }
+    database.setMetadata('parser_version', '2.22_fuji_layout_repair_exact_player_identity');
+    fs.rmSync(path.join(dir, 'deleted.xml'));
+    const archived = Array.from(database.iterateDetailedSessions()).find(s => s.filename === 'deleted.xml');
+
+    expect(database.syncSessionsFromDir(dir, parser)).toMatchObject({ updated: 1, total: 2 });
+    const sessions = Array.from(database.iterateDetailedSessions());
+    const repaired = sessions.find(s => s.filename === 'available.xml');
+    expect(repaired?.drivers.map(d => d.totalTrackLimits)).toEqual([0, 1]);
+    expect(repaired?.drivers[1].laps[1].trackLimits).toHaveLength(1);
+    expect(sessions.find(s => s.filename === 'deleted.xml')).toEqual(archived);
+    expect(database.getMetadata('parser_version')).toBe(DB_PARSER_VERSION);
+    expect(database.syncSessionsFromDir(dir, parser)).toMatchObject({ updated: 0, total: 2 });
+  });
+
   it('does not store an XML that changed while it was read, and reads it again on the next scan', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lmu-session-growing-'));
     tempDir = dir;

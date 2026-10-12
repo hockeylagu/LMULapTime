@@ -236,6 +236,14 @@ Each completed or attempted lap by a driver is recorded as a `<Lap>` element wit
 
 The `<Stream>` container chronological logs discrete on-track events with an `@_et` (elapsed time in session seconds) timestamp.
 
+Stream events match a unique exact normalized driver name after removing numeric stream
+decorations (`#12`, `(2)`), trimming surrounding whitespace and folding case. Partial names,
+empty names and duplicate normalized roster names do not select a driver. This rule applies to
+contacts, damage, track limits and penalties; roster order never decides event ownership.
+Parser version `2.23_exact_stream_event_identity` reparses available XMLs to correct earlier
+substring-based attribution. Deleted-source sessions retain their stored events because the
+original identity evidence is no longer available.
+
 ### 5.1 Collisions & Contacts (`<Incident>`)
 ```xml
 <Incident et="158.4">Samuel Lague(0) reported contact (1250.40) with another vehicle Ferrari 499P #51(1)</Incident>

@@ -223,7 +223,7 @@ index their explicitly supplied replay directory locally.
 ## 2. Life of a session (XML → screen)
 
 1. **Parse** (`server/sessions/parser.ts`, `parseSessionXml`), in order:
-   - raw XML shapes: `sessionXmlTypes.ts`; streaming events (incidents, track limits, penalties, damage): `sessionXmlStream.ts` / `parseStreamEvents`;
+   - raw XML shapes: `sessionXmlTypes.ts`; streaming events (incidents, track limits, penalties, damage): `sessionXmlStream.ts` / `parseStreamEvents`; roster-scoped unique exact normalized names reject partial/ambiguous event owners. Parser version `2.23_exact_stream_event_identity` reparses available XMLs and preserves deleted-source sessions;
    - `parseDriver` → per lap `parseLap`; then `applyLapTiming` (`sessionLapTiming.ts`), in one ordered pass: missing lap times inferred
      (`isInferred`), out-laps marked (`isOutLap`, rule `isCompletedPitStop` in `shared/domain/lapComparison.ts`), pit loss on the in-lap
      (`pitStopDuration`, spans in-lap + out-lap);
@@ -499,7 +499,8 @@ the completed 2026-09-29 cleanup and does not describe all remaining findings.
   `GpsTrackMapScene.tsx` (289), `ReplayInspectorModalBody.tsx` (276), `TelemetryPresetModal.tsx` (273), `GpsMapTelemetryHud.tsx` (272).
 
 **Logic in the wrong place / duplicated**
-- Comparison profiling (read-only, 2026-10-10): selected normalized lap reads and shared equivalent best-lap queries removed full-session overfetch. All-driver pages still run personal-best lookups for each distinct visible driver; Spa LMP3's first all-driver page measured about 127 ms warm after the change. Investigate those SQL scopes and query plans if optimizing further; this is a backend observation, not a browser measurement.
+- [Server repeated-work audit](SERVER_SMELLS_AUDIT.md): the 2026-10-12 first pass fixed XML event ownership, moved four superseded analytics implementations to `test/helpers/legacySessionAnalytics.ts` and `legacyBenchmarkImpact.ts` for parity checks, and made JavaScript/benchmark SQL use canonical `PACE_CATEGORY_BANDS`. Replay-related findings (decode coordination, neighboring-lap overfetch, metadata/DuckDB/weather preparation) are deferred by user request while separate replay ingestion optimization proceeds; the original audit is historical evidence for those paths.
+- Comparison queries now mark page PBs with one window query for the visible drivers (`markPagePersonalBests`), rather than one query per driver. The older 2026-10-10 ~127 ms all-driver measurement predates that implementation and was not rerun in this audit; profile current query plans before optimizing further.
 - The improvement chart keeps its own `SessionProgressionPoint` (`improvementChartTypes.ts`), a copy of the shared one plus the
   benchmark pace fields.
 

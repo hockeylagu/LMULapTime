@@ -2,13 +2,21 @@ import { PaceCategory, ReferenceLaptimeEntry } from '../types/index.js';
 import { CIRCUIT_SPECIFICATIONS } from './circuitDefinitions.js';
 import { getCircuitSpecification } from './circuitSpecs.js';
 
+/** Ordered upper bounds used by both JavaScript pace ratings and persisted queries. */
+export const PACE_CATEGORY_BANDS = [
+  { category: 'Alien', maxPercentage: 100.5 },
+  { category: 'Competitive', maxPercentage: 101.5 },
+  { category: 'Good', maxPercentage: 103.5 },
+  { category: 'Midpack', maxPercentage: 105.5 },
+  { category: 'Tail-ender', maxPercentage: 107.0 },
+  { category: 'Offline', maxPercentage: Number.POSITIVE_INFINITY },
+] as const satisfies readonly { category: PaceCategory; maxPercentage: number }[];
+
 export function getPaceCategoryFromPercentage(percentage: number): PaceCategory {
-  if (percentage <= 100.5) return 'Alien';
-  if (percentage <= 101.5) return 'Competitive';
-  if (percentage <= 103.5) return 'Good';
-  if (percentage <= 105.5) return 'Midpack';
-  if (percentage <= 107.0) return 'Tail-ender';
-  return 'Offline';
+  for (const band of PACE_CATEGORY_BANDS) {
+    if (percentage <= band.maxPercentage) return band.category;
+  }
+  return PACE_CATEGORY_BANDS[PACE_CATEGORY_BANDS.length - 1].category;
 }
 
 export function formatPacePercentage(percentage?: number | null): string {

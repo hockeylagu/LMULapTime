@@ -25,18 +25,17 @@ export function parseStreamEvents(streamNode: RawStreamXmlNode, drivers: DriverD
       .toLowerCase();
   };
 
-  const driversWithClean = drivers.map(d => ({
-    driver: d,
-    clean: cleanDriverName(d.name),
-  }));
+  // A duplicate normalized name is ambiguous; roster order must never decide event ownership.
+  const driversByName = new Map<string, DriverData | null>();
+  for (const driver of drivers) {
+    const name = cleanDriverName(driver.name);
+    if (name) driversByName.set(name, driversByName.has(name) ? null : driver);
+  }
 
   const matchDriver = (rawName?: string): DriverData | undefined => {
     const clean = cleanDriverName(rawName);
     if (!clean) return undefined;
-    const found = driversWithClean.find(({ clean: dClean }) =>
-      dClean === clean || dClean.includes(clean) || clean.includes(dClean)
-    );
-    return found?.driver;
+    return driversByName.get(clean) ?? undefined;
   };
 
   const matchLapForDriver = (driver: DriverData, et?: number, explicitLapNum?: number): LapData | undefined => {

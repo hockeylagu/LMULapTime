@@ -1,10 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
-  computeBenchmarkItemImpact,
-  enrichBenchmarkDiffWithImpact,
   enrichBenchmarkDiffWithCompactImpact,
   BENCHMARK_IMPACT_RULE,
 } from '../../../server/benchmarks/benchmarkImpact.js';
+import { computeBenchmarkItemImpact, enrichBenchmarkDiffWithImpact } from '../../helpers/legacyBenchmarkImpact.js';
 import type {
   DetailedSession,
   ReferenceBenchmarkDiff,
@@ -108,6 +107,41 @@ describe('benchmarkImpact engine', () => {
     const actual = enrichBenchmarkDiffWithCompactImpact(diff, database.getDb()).updated[0].impact;
     expect(actual).toEqual(expected);
     database.close();
+  });
+
+  it('keeps compact SQL category shifts aligned with JavaScript at every pace band edge', () => {
+    const database = new SessionDatabase(':memory:');
+    try {
+      const cutoffs = [100.5, 101.5, 103.5, 105.5, 107.0];
+      const lapTimes = cutoffs.flatMap(cutoff => [cutoff - 0.000001, cutoff, cutoff + 0.000001]);
+      const source = mockSessions[0];
+      const player = source.drivers?.find(driver => driver.isPlayer);
+      if (!player) throw new Error('Expected player fixture');
+      const boundarySession = {
+        ...source,
+        id: 'pace-band-boundaries',
+        drivers: [{ ...player, laps: lapTimes.map((lapTime, index) => ({
+          lapNum: index + 1, lapTime, isValid: true, isPitStop: false,
+        })) }],
+      } as unknown as DetailedSession;
+      database.upsertSession(boundarySession, 'pace-band-boundaries.xml', 1, 1);
+
+      const item: ReferenceBenchmarkDiffItem = {
+        key: 'bahrain_lmgt3', trackName: 'Bahrain', carClass: 'GT3', patch: '1.0', type: 'updated',
+        oldAlienSec: 100, newAlienSec: 100.1,
+      };
+      const expected = computeBenchmarkItemImpact(item, [boundarySession]);
+      const diff: ReferenceBenchmarkDiff = {
+        timestamp: new Date(0).toISOString(), hasChanges: true, addedCount: 0, updatedCount: 1, removedCount: 0,
+        totalEntries: 1, added: [], updated: [{ ...item }], removed: [],
+      };
+
+      const actual = enrichBenchmarkDiffWithCompactImpact(diff, database.getDb()).updated[0].impact;
+      expect(actual).toEqual(expected);
+      expect(actual?.affectedLapsCount).toBe(lapTimes.length);
+    } finally {
+      database.close();
+    }
   });
 
   it('aggregates full counts in SQL while returning only a bounded sample and retaining zero-lap sessions', () => {

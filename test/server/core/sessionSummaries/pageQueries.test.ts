@@ -4,7 +4,7 @@ import { initDbSchema } from '../../../../server/core/dbSchema.js';
 import { upsertSession } from '../../../../server/core/dbSessionStore.js';
 import { queryProgression, querySessionPage, sessionWhere } from '../../../../server/core/sessionSummaries/pageQueries.js';
 import { querySessionContext, querySessionPersonalBest, querySessionPersonalBestById } from '../../../../server/core/sessionSummaries/contextQueries.js';
-import { computeProgression } from '../../../../server/sessions/sessionAnalytics.js';
+import { computeProgression } from '../../../helpers/legacySessionAnalytics.js';
 import { normalizeCarClass } from '../../../../shared/domain/vehicleMapping.js';
 import { DRIVER_WITH_DICTIONARIES } from '../../../../server/core/sessionRows/reader.js';
 import type { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';

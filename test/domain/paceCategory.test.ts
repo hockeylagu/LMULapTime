@@ -24,6 +24,23 @@ describe('paceCategory utility', () => {
     });
   });
 
+  describe('getPaceCategoryFromPercentage', () => {
+    it('uses inclusive upper bounds and classifies NaN and positive infinity as Offline', () => {
+      expect(getPaceCategoryFromPercentage(100.5)).toBe('Alien');
+      expect(getPaceCategoryFromPercentage(100.500001)).toBe('Competitive');
+      expect(getPaceCategoryFromPercentage(101.5)).toBe('Competitive');
+      expect(getPaceCategoryFromPercentage(101.500001)).toBe('Good');
+      expect(getPaceCategoryFromPercentage(103.5)).toBe('Good');
+      expect(getPaceCategoryFromPercentage(103.500001)).toBe('Midpack');
+      expect(getPaceCategoryFromPercentage(105.5)).toBe('Midpack');
+      expect(getPaceCategoryFromPercentage(105.500001)).toBe('Tail-ender');
+      expect(getPaceCategoryFromPercentage(107)).toBe('Tail-ender');
+      expect(getPaceCategoryFromPercentage(107.000001)).toBe('Offline');
+      expect(getPaceCategoryFromPercentage(NaN)).toBe('Offline');
+      expect(getPaceCategoryFromPercentage(Number.POSITIVE_INFINITY)).toBe('Offline');
+    });
+  });
+
   describe('matchesTrack - Comprehensive Track Matching', () => {
     it('strictly isolates track layouts (Monza Curva Grande, Bahrain Outer/Paddock, Paul Ricard Short)', () => {
       const replayTrackNames = [

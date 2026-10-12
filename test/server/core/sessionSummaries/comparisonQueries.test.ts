@@ -4,7 +4,8 @@ import type { DetailedSession, DriverData, LapData } from '../../../../shared/ty
 import { initDbSchema } from '../../../../server/core/dbSchema.js';
 import { persistSessionProjection } from '../../../../server/core/sessionSummaries/store.js';
 import { queryCompactComparableLaps, queryTelemetryComparableLaps } from '../../../../server/core/sessionSummaries/comparisonQueries.js';
-import { extractComparableLaps, toComparableLap } from '../../../../server/sessions/sessionAnalytics.js';
+import { extractComparableLaps } from '../../../helpers/legacySessionAnalytics.js';
+import { toComparableLap } from '../../../../server/sessions/sessionAnalytics.js';
 import * as comparisonRows from '../../../../server/core/sessionSummaries/comparisonLapRows.js';
 import { readSession } from '../../../../server/core/sessionRows/reader.js';
 

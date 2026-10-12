@@ -2,9 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   computeProgression,
   extractComparableLaps,
-  computeAverageLapTime,
-  toComparableLap,
-} from '../../../server/sessions/sessionAnalytics.js';
+} from '../../helpers/legacySessionAnalytics.js';
+import { computeAverageLapTime, toComparableLap } from '../../../server/sessions/sessionAnalytics.js';
 import { DetailedSession, DriverData, LapData } from '../../../server/core/types.js';
 import { driver, lap, session } from '../../domain/leaderboardFixtures.js';
 
