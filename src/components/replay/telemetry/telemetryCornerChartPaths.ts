@@ -36,107 +36,69 @@ export function computeCornerExtrema(
   pointComparisons: PointComparison[],
   maxSpd: number
 ): CornerExtrema {
-  const rawMaxBrakeTemp = Math.max(
-    600,
-    ...points.map(p => p.brakeTemps ? Math.max(...p.brakeTemps) : 0),
-    ...(pointComparisons.map(c => c.baseline.brakeTemps ? Math.max(...c.baseline.brakeTemps) : 0))
-  );
-  const maxBrakeTemp = Math.ceil(rawMaxBrakeTemp / 100) * 100;
-  const hasBrakeTemps = points.some(p => p.brakeTemps !== undefined);
+  let rawMaxBrakeTemp = 600;
+  let rawMaxSusp = 30;
+  let rawMaxWheelSpeed = maxSpd;
+  let hasBrakeTemps = false;
+  let hasSuspPos = false;
+  let hasWheelSpeeds = false;
+  let pressureMin = Infinity;
+  let pressureMax = -Infinity;
+  let wearMin = Infinity;
+  let tireTempMin = Infinity;
+  let tireTempMax = -Infinity;
 
-  // 4-Corner Suspension Deflection / Travel
-  const rawMaxSusp = Math.max(
-    30,
-    ...points.map(p => p.rideHeight ? Math.max(...p.rideHeight) : 0),
-    ...(pointComparisons.map(c => c.baseline.rideHeight ? Math.max(...c.baseline.rideHeight) : 0))
-  );
-  const minSuspPos = 0;
-  const maxSuspPos = Math.ceil(rawMaxSusp / 10) * 10;
-  const hasSuspPos = points.some(p => p.rideHeight !== undefined);
+  // Scan each lap once. Avoid temporary channel arrays and spreading a whole lap into
+  // Math.min/max: full-resolution four-wheel streams can exceed the argument limit.
+  const observe = (point: Pick<ReplayTrajectoryPoint,
+    'brakeTemps' | 'rideHeight' | 'wheelSpeeds' | 'tirePressures' | 'tireWear' | 'tireTemps'>) => {
+    rawMaxBrakeTemp = Math.max(rawMaxBrakeTemp, point.brakeTemps ? Math.max(...point.brakeTemps) : 0);
+    rawMaxSusp = Math.max(rawMaxSusp, point.rideHeight ? Math.max(...point.rideHeight) : 0);
+    rawMaxWheelSpeed = Math.max(rawMaxWheelSpeed, point.wheelSpeeds ? Math.max(...point.wheelSpeeds) : 0);
+    for (const value of point.tirePressures ?? []) {
+      if (value > 50 && value < 400) {
+        pressureMin = Math.min(pressureMin, value);
+        pressureMax = Math.max(pressureMax, value);
+      }
+    }
+    for (const value of point.tireWear ?? []) {
+      if (value >= 0 && value <= 100) wearMin = Math.min(wearMin, value);
+    }
+    for (const value of point.tireTemps ?? []) {
+      if (value > 10 && value < 200) {
+        tireTempMin = Math.min(tireTempMin, value);
+        tireTempMax = Math.max(tireTempMax, value);
+      }
+    }
+  };
+  for (const point of points) {
+    // These three channels are available only when present on the primary lap.
+    hasBrakeTemps ||= point.brakeTemps !== undefined;
+    hasSuspPos ||= point.rideHeight !== undefined;
+    hasWheelSpeeds ||= point.wheelSpeeds !== undefined;
+    observe(point);
+  }
+  for (const comparison of pointComparisons) observe(comparison.baseline);
 
-  // 4-Corner Wheel Speeds
-  const rawMaxWheelSpeed = Math.max(
-    maxSpd,
-    ...points.map(p => p.wheelSpeeds ? Math.max(...p.wheelSpeeds) : 0),
-    ...(pointComparisons.map(c => c.baseline.wheelSpeeds ? Math.max(...c.baseline.wheelSpeeds) : 0))
-  );
-  const maxWheelSpeed = Math.ceil(rawMaxWheelSpeed / 10) * 10;
-  const hasWheelSpeeds = points.some(p => p.wheelSpeeds !== undefined);
-
-  // 4-Corner Tire Inflation Pressures
-  const allPressures: number[] = [];
-  for (const p of points) {
-    if (p.tirePressures) {
-      allPressures.push(...p.tirePressures.filter((v: number) => v > 50 && v < 400));
-    }
-  }
-  for (const c of pointComparisons) {
-    if (c.baseline.tirePressures) {
-      allPressures.push(...c.baseline.tirePressures.filter((v: number) => v > 50 && v < 400));
-    }
-  }
-  const hasTirePressures = allPressures.length > 0;
-  const minTirePressure = hasTirePressures
-    ? Math.max(50, Math.floor(Math.min(...allPressures) / 10) * 10 - 10)
-    : 150;
-  const maxTirePressure = hasTirePressures
-    ? Math.ceil(Math.max(...allPressures) / 10) * 10 + 10
-    : 220;
-
-  // 4-Corner Tire Tread Wear / Condition
-  const allWear: number[] = [];
-  for (const p of points) {
-    if (p.tireWear) {
-      allWear.push(...p.tireWear.filter((v: number) => v >= 0 && v <= 100));
-    }
-  }
-  for (const c of pointComparisons) {
-    if (c.baseline.tireWear) {
-      allWear.push(...c.baseline.tireWear.filter((v: number) => v >= 0 && v <= 100));
-    }
-  }
-  const hasTireWear = allWear.length > 0;
-  const minTireWear = hasTireWear
-    ? Math.max(0, Math.floor(Math.min(...allWear) / 5) * 5)
-    : 80;
-  const maxTireWear = 100;
-
-  // 4-Corner Tire Carcass / Inner Bulk Temperatures
-  const allTireTemps: number[] = [];
-  for (const p of points) {
-    if (p.tireTemps) {
-      allTireTemps.push(...p.tireTemps.filter((v: number) => v > 10 && v < 200));
-    }
-  }
-  for (const c of pointComparisons) {
-    if (c.baseline.tireTemps) {
-      allTireTemps.push(...c.baseline.tireTemps.filter((v: number) => v > 10 && v < 200));
-    }
-  }
-  const hasTireTemps = allTireTemps.length > 0;
-  const minTireTemp = hasTireTemps
-    ? Math.max(20, Math.floor(Math.min(...allTireTemps) / 10) * 10 - 10)
-    : 40;
-  const maxTireTemp = hasTireTemps
-    ? Math.max(100, Math.ceil(Math.max(...allTireTemps) / 10) * 10 + 10)
-    : 120;
-
+  const hasTirePressures = pressureMin !== Infinity;
+  const hasTireWear = wearMin !== Infinity;
+  const hasTireTemps = tireTempMin !== Infinity;
   return {
-    maxBrakeTemp,
+    maxBrakeTemp: Math.ceil(rawMaxBrakeTemp / 100) * 100,
     hasBrakeTemps,
-    minSuspPos,
-    maxSuspPos,
+    minSuspPos: 0,
+    maxSuspPos: Math.ceil(rawMaxSusp / 10) * 10,
     hasSuspPos,
-    maxWheelSpeed,
+    maxWheelSpeed: Math.ceil(rawMaxWheelSpeed / 10) * 10,
     hasWheelSpeeds,
-    minTirePressure,
-    maxTirePressure,
+    minTirePressure: hasTirePressures ? Math.max(50, Math.floor(pressureMin / 10) * 10 - 10) : 150,
+    maxTirePressure: hasTirePressures ? Math.ceil(pressureMax / 10) * 10 + 10 : 220,
     hasTirePressures,
-    minTireWear,
-    maxTireWear,
+    minTireWear: hasTireWear ? Math.max(0, Math.floor(wearMin / 5) * 5) : 80,
+    maxTireWear: 100,
     hasTireWear,
-    minTireTemp,
-    maxTireTemp,
+    minTireTemp: hasTireTemps ? Math.max(20, Math.floor(tireTempMin / 10) * 10 - 10) : 40,
+    maxTireTemp: hasTireTemps ? Math.max(100, Math.ceil(tireTempMax / 10) * 10 + 10) : 120,
     hasTireTemps,
   };
 }
