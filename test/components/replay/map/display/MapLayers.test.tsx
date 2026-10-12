@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { GpsTrackMap } from '../../../../../src/components/replay/map/GpsTrackMap.js';
+import { GpsTrackMapScene } from '../../../../../src/components/replay/map/scene/GpsTrackMapScene.js';
 import { MAP_LAYERS_STORAGE_KEY } from '../../../../../src/components/replay/map/display/mapLayers.js';
 import type { TrackBoundaryGeometry, TrackMapDisplay, TrackSurfacePolygon } from '../../../../../shared/types/trackGeometry.js';
 import { mockBounds, mockPoints } from '../gpsTrackMapFixtures.js';
@@ -36,7 +36,7 @@ const displayWithBrakeMarkers: TrackMapDisplay = {
 };
 
 function renderMap(display = mapDisplay()) {
-  return render(<GpsTrackMap points={mockPoints} bounds={mockBounds} currentIndex={0} trackGeometry={geometry} mapDisplay={display} />);
+  return render(<GpsTrackMapScene points={mockPoints} bounds={mockBounds} currentIndex={0} trackGeometry={geometry} mapDisplay={display} />);
 }
 
 function openLayers() {
@@ -173,7 +173,7 @@ describe('GPS map display layers', () => {
     expect(container.querySelectorAll('[data-testid="gps-brake-markers"] rect')).toHaveLength(2);
     expect(container.querySelectorAll('[data-testid="gps-brake-markers"] circle')).toHaveLength(0);
 
-    rerender(<GpsTrackMap points={mockPoints} bounds={mockBounds} currentIndex={0} trackGeometry={geometry} mapDisplay={mapDisplay()} />);
+    rerender(<GpsTrackMapScene points={mockPoints} bounds={mockBounds} currentIndex={0} trackGeometry={geometry} mapDisplay={mapDisplay()} />);
     expect(screen.getByRole('checkbox', { name: 'Braking markers' })).toBeDisabled();
     expect(container.querySelector('[data-testid="gps-brake-markers"]')).toBeNull();
   });

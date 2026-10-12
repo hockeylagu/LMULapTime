@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { CircleDot, Disc } from 'lucide-react';
 import { ReplayTelemetryPoint, ReplayTrajectoryData } from '../../../../shared/types/index.js';
-import { GpsTrackMap } from './GpsTrackMap.js';
+import { GpsTrackMapScene } from './scene/GpsTrackMapScene.js';
 import { ReplayTelemetryHud } from '../inspector/ReplayTelemetryHud.js';
 import { MapColorMode } from './replayMapUtils.js';
 import { CornerSegmentComparison } from '../../../utils/cornerAnalysis/types.js';
@@ -186,7 +186,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
       {/* SINGLE UNIFIED MAP PANE */}
       <div className="flex flex-col gap-0 flex-1 min-h-0 h-full">
         <div className="flex-1 min-h-0 bg-lmu-deep p-0 flex items-center justify-center relative overflow-hidden">
-          <GpsTrackMap
+          <GpsTrackMapScene
             points={trajectory.points}
             bounds={trajectory.bounds}
             currentIndex={currentIndex}

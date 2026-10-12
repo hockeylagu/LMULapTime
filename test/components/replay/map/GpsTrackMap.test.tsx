@@ -1,15 +1,15 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { GpsTrackMap } from '../../../../src/components/replay/map/GpsTrackMap.js';
+import { GpsTrackMapScene } from '../../../../src/components/replay/map/scene/GpsTrackMapScene.js';
 import { projectTrajectoryPoints } from '../../../../src/components/replay/map/replayMapUtils.js';
 import { computeCumulativeDistances } from '../../../../src/utils/lapAlignment.js';
 import { ReplayTrajectoryPoint } from '../../../../server/core/types.js';
 import { mockPoints, mockBounds } from './gpsTrackMapFixtures.js';
 
-describe('GpsTrackMap', () => {
+describe('GpsTrackMapScene', () => {
   it('renders SVG track map and perpendicular start/finish line with start label beside the line', () => {
     const { container } = render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -23,7 +23,7 @@ describe('GpsTrackMap', () => {
 
   it('keeps the heatmap legend on the circuit map and does not render speed, throttle, or brake overlays', () => {
     render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={1}
@@ -42,7 +42,7 @@ describe('GpsTrackMap', () => {
 
   it('handles empty points gracefully', () => {
     render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={[]}
         bounds={{ minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 }}
         currentIndex={0}
@@ -62,7 +62,7 @@ describe('GpsTrackMap', () => {
     ];
 
     const { container } = render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={pointsWithJump}
         bounds={{ minX: 100, maxX: 200, minZ: 200, maxZ: 300, spanX: 100, spanZ: 100 }}
         currentIndex={0}
@@ -87,7 +87,7 @@ describe('GpsTrackMap', () => {
       { x: 102, y: 10, z: 202, rotY: 0, speedKmh: 170, throttle: 80, brake: 0, timeSec: 0.2 },
     ];
     const { container } = render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={continuousPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -109,7 +109,7 @@ describe('GpsTrackMap', () => {
       { x: 102, y: 10, z: 202, rotY: 0, speedKmh: 170, throttle: 80, brake: 0, timeSec: 0.2 },
     ];
     const { container } = render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={continuousPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -133,7 +133,7 @@ describe('GpsTrackMap', () => {
 
   it('renders a T# marker for each detected corner, matching the corner analysis table', () => {
     render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -159,7 +159,7 @@ describe('GpsTrackMap', () => {
     const cornerDist = computeCumulativeDistances(cornerPoints)[3];
 
     render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={cornerPoints}
         bounds={bounds}
         currentIndex={0}
@@ -184,7 +184,7 @@ describe('GpsTrackMap', () => {
     const onSelectCornerNumber = vi.fn();
     const onSelectIndex = vi.fn();
     render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -207,7 +207,7 @@ describe('GpsTrackMap', () => {
 
   it('renders unselected corner markers with the default (non-highlighted) style and clear 13.5px radius', () => {
     render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -223,7 +223,7 @@ describe('GpsTrackMap', () => {
 
   it('maintains safe clearance from the racing line when zoomed in and does not collapse onto apex', () => {
     render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -261,7 +261,7 @@ describe('GpsTrackMap', () => {
 
   it('keeps fixed dimensions on zoom buttons and zoom display so toolbar does not shift when zoom expands', () => {
     render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -297,7 +297,7 @@ describe('GpsTrackMap', () => {
 
   it('zooms in where the cursor is when double clicking on the map container', () => {
     const { container } = render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -322,7 +322,7 @@ describe('GpsTrackMap', () => {
 
   it('keeps follow car mode active when clicking plus and minus zoom buttons', () => {
     const { getByRole, getByText } = render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -366,7 +366,7 @@ describe('GpsTrackMap', () => {
     const onSelectIndex = vi.fn();
 
     render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -383,7 +383,7 @@ describe('GpsTrackMap', () => {
   it('shows play/pause button in full screen map and handles toggling playback', () => {
     const onTogglePlay = vi.fn();
     const { container, rerender } = render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -411,7 +411,7 @@ describe('GpsTrackMap', () => {
 
     // When playing in full screen, pause button is visible
     rerender(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -430,7 +430,7 @@ describe('GpsTrackMap', () => {
     const onSelectIndex = vi.fn();
     const onTogglePlay = vi.fn();
     render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={1}

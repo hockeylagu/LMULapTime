@@ -1,14 +1,14 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { GpsTrackMap } from '../../../../src/components/replay/map/GpsTrackMap.js';
+import { GpsTrackMapScene } from '../../../../src/components/replay/map/scene/GpsTrackMapScene.js';
 import { projectTrajectoryPoints } from '../../../../src/components/replay/map/replayMapUtils.js';
 import { ReplayTrajectoryPoint } from '../../../../server/core/types.js';
 import { mockPoints, mockBounds, mockGeometry } from './gpsTrackMapFixtures.js';
 
-describe('GpsTrackMap overlays and geometry', () => {
+describe('GpsTrackMapScene overlays and geometry', () => {
   it('keeps fullscreen scrub and pan operable without a turn selector', () => {
     const onSelectIndex = vi.fn(), onSelectCornerNumber = vi.fn();
-    render(<GpsTrackMap points={mockPoints} bounds={mockBounds} currentIndex={0}
+    render(<GpsTrackMapScene points={mockPoints} bounds={mockBounds} currentIndex={0}
       trackGeometry={null} mapDisplay={null} corners={[{ cornerNumber: 1, minDistM: 0 }]}
       onSelectIndex={onSelectIndex} onSelectCornerNumber={onSelectCornerNumber} />);
     fireEvent.click(screen.getByRole('button', { name: 'Full screen map' }));
@@ -28,7 +28,7 @@ describe('GpsTrackMap overlays and geometry', () => {
 
   it('renders perpendicular pedal marker lines and outside badges when showPedalMarkers is true', () => {
     const { container } = render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -56,7 +56,7 @@ describe('GpsTrackMap overlays and geometry', () => {
 
   it('does not render pedal markers when showPedalMarkers is false', () => {
     const { container } = render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -74,7 +74,7 @@ describe('GpsTrackMap overlays and geometry', () => {
 
   it('renders baseline pedal points with dashed amber styling and staggers overlapping markers', () => {
     const { container } = render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -108,7 +108,7 @@ describe('GpsTrackMap overlays and geometry', () => {
 
   it('renders baseline throttle markers with green-tinted styling (#4ade80) and larger badge', () => {
     const { container } = render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         baselinePoints={mockPoints}
         bounds={mockBounds}
@@ -137,7 +137,7 @@ describe('GpsTrackMap overlays and geometry', () => {
 
   it('centers the corner marker text inside the indicator circle', () => {
     render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -155,7 +155,7 @@ describe('GpsTrackMap overlays and geometry', () => {
   it('disperses close chicane corner markers so they do not overlap each other', () => {
     // Two chicane corners closely placed at 0m and 8m
     render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -183,7 +183,7 @@ describe('GpsTrackMap overlays and geometry', () => {
 
   it('renders the fixed circuit minimap in the top-left corner by default and honors showMinimap=false', () => {
     const { rerender } = render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -198,7 +198,7 @@ describe('GpsTrackMap overlays and geometry', () => {
     expect(minimap.className).toContain('left-2.5');
 
     rerender(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -212,7 +212,7 @@ describe('GpsTrackMap overlays and geometry', () => {
 
   it('anchors zoom to the mouse cursor position on wheel scroll', () => {
     const { container } = render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -261,7 +261,7 @@ describe('GpsTrackMap overlays and geometry', () => {
 
   it('automatically zooms and centers on a corner when selected and resets on deselect', () => {
     const { container, rerender } = render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -277,7 +277,7 @@ describe('GpsTrackMap overlays and geometry', () => {
 
     // Select Corner 1
     rerender(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -296,7 +296,7 @@ describe('GpsTrackMap overlays and geometry', () => {
 
     // Deselect corner
     rerender(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -318,7 +318,7 @@ describe('GpsTrackMap overlays and geometry', () => {
     ];
 
     render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         baselinePoints={baselinePoints}
         bounds={mockBounds}
@@ -345,7 +345,7 @@ describe('GpsTrackMap overlays and geometry', () => {
 
   it('ensures corner indicators and nearby pedal marker badges do not overlap', () => {
     render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -399,7 +399,7 @@ describe('GpsTrackMap overlays and geometry', () => {
     };
 
     render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -419,7 +419,7 @@ describe('GpsTrackMap overlays and geometry', () => {
 
   it('renders circuit minimap using track layout geometry when available', () => {
     render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -461,7 +461,7 @@ describe('GpsTrackMap overlays and geometry', () => {
     };
 
     render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -515,7 +515,7 @@ describe('GpsTrackMap overlays and geometry', () => {
     };
 
     const { container } = render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={primaryPoints}
         bounds={mockBounds}
         currentIndex={0}
@@ -553,7 +553,7 @@ describe('GpsTrackMap overlays and geometry', () => {
       }));
     const bounds = { minX: 0, maxX: 100, spanX: 100, minZ: 0, maxZ: 100, spanZ: 100 };
     const { container } = render(
-      <GpsTrackMap
+      <GpsTrackMapScene
         points={line(0, 1)}
         baselinePoints={line(11, 1.05)}
         bounds={bounds}

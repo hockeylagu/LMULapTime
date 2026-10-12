@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { GpsSceneCarMarkers, replayBodyHeading } from '../../../../../src/components/replay/map/scene/GpsSceneCarMarkers.js';
-import { GpsTrackMap } from '../../../../../src/components/replay/map/GpsTrackMap.js';
+import { GpsTrackMapScene } from '../../../../../src/components/replay/map/scene/GpsTrackMapScene.js';
 import { ReplayTrajectoryPoint } from '../../../../../server/core/types.js';
 
 const points: ReplayTrajectoryPoint[] = [
@@ -13,7 +13,7 @@ const bounds = { minX: 100, maxX: 200, minZ: 200, maxZ: 240, spanX: 100, spanZ: 
 
 describe('GpsSceneCarMarkers', () => {
   it('draws the car and the ghost in their own layer over the scene, not among the racing lines', () => {
-    const { container } = render(<GpsTrackMap points={points} bounds={bounds} currentIndex={1} baselinePoints={points} />);
+    const { container } = render(<GpsTrackMapScene points={points} bounds={bounds} currentIndex={1} baselinePoints={points} />);
     const overlay = screen.getByTestId('gps-car-markers');
     const scene = container.querySelector('[data-track-line="primary"]')?.closest('svg');
 
@@ -26,10 +26,10 @@ describe('GpsSceneCarMarkers', () => {
   });
 
   it('follows the scrub cursor', () => {
-    const { rerender } = render(<GpsTrackMap points={points} bounds={bounds} currentIndex={0} />);
+    const { rerender } = render(<GpsTrackMapScene points={points} bounds={bounds} currentIndex={0} />);
     const carTransform = () => screen.getByTestId('gps-car-markers').querySelector('g')?.getAttribute('transform');
     const before = carTransform();
-    rerender(<GpsTrackMap points={points} bounds={bounds} currentIndex={2} />);
+    rerender(<GpsTrackMapScene points={points} bounds={bounds} currentIndex={2} />);
     expect(carTransform()).not.toBe(before);
   });
 });
@@ -62,10 +62,10 @@ describe('class size preview', () => {
 
   it('draws replay body orientation independently of the path and uses a dot without it', () => {
     const sliding = points.map(p => ({...p, rotY:Math.PI/2}));
-    const {rerender} = render(<GpsTrackMap points={sliding} bounds={bounds} currentIndex={1} baselinePoints={points.map(p=>({...p,rotY:Math.PI}))} />);
+    const {rerender} = render(<GpsTrackMapScene points={sliding} bounds={bounds} currentIndex={1} baselinePoints={points.map(p=>({...p,rotY:Math.PI}))} />);
     expect(Number(screen.getByTestId('gps-car-footprint').parentElement?.getAttribute('transform')?.slice(7,-1))).toBeCloseTo(-90);
     expect(Number(screen.getByTestId('gps-ghost-footprint').parentElement?.getAttribute('transform')?.match(/rotate\((.*)\)/)?.[1])).toBeCloseTo(0);
-    rerender(<GpsTrackMap points={points.map(({rotY,...p})=>p)} bounds={bounds} currentIndex={1} />);
+    rerender(<GpsTrackMapScene points={points.map(({rotY,...p})=>p)} bounds={bounds} currentIndex={1} />);
     expect(screen.queryByTestId('gps-car-footprint')).toBeNull();
   });
 });
