@@ -242,16 +242,16 @@ export class LmuParser {
       if (!isNonRaceSession(sessionType)) annotateLapTraffic(drivers);
       classifySessionLaps(drivers);
 
-      // A single source player flag is authoritative. When absent or conflicting, configured
-      // identity may select one unique exact roster entry; otherwise player ownership is unknown.
+      // Multiplayer XML marks remote humans too. The unique configured identity selects the
+      // local driver; a single source flag can identify a player when no exact name is available.
       const flaggedPlayers = drivers.filter(driver => driver.isPlayer);
       const configuredName = this.configuredPlayerName.trim().toLowerCase();
       const configuredMatches = configuredName
         ? drivers.filter(driver => driver.name.trim().toLowerCase() === configuredName)
         : [];
-      const mainPlayerDriver = flaggedPlayers.length === 1
-        ? flaggedPlayers[0]
-        : flaggedPlayers.length === 0 && configuredMatches.length === 1 ? configuredMatches[0] : undefined;
+      const mainPlayerDriver = configuredMatches.length === 1
+        ? configuredMatches[0]
+        : configuredMatches.length === 0 && flaggedPlayers.length === 1 ? flaggedPlayers[0] : undefined;
       drivers.forEach(driver => { driver.isPlayer = driver === mainPlayerDriver; });
 
       const playerDriver = mainPlayerDriver;

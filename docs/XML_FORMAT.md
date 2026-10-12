@@ -172,7 +172,7 @@ there is no player. A parser version bump reparses existing results into this co
 | Field | Type | Description |
 | :--- | :--- | :--- |
 | `<Name>` | String | Driver name. |
-| `<isPlayer>` | Integer | `1` for the local human player; `0` for AI or remote multiplayer drivers. |
+| `<isPlayer>` | Integer | Human-driver flag: multiplayer logs can mark remote humans as `1` too. Resolve the local player by a unique exact configured profile name; the flag alone does not identify the local player in a multiplayer roster. |
 | `<CarType>` | String | Vehicle model description (e.g. `Ferrari 499P`, `Porsche 911 GT3 R`). |
 | `<CarClass>` | String | Standard WEC class code (`Hypercar`, `LMP2`, `LMGT3`, `GTE`). |
 | `<CarNumber>` | String | Vehicle competition race number (e.g. `50`, `83`, `911`). |
