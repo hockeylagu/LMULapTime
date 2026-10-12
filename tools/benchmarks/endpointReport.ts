@@ -2,7 +2,7 @@ import type { BenchmarkCase, Endpoint } from './endpointInventory.js';
 
 export interface Measurement extends BenchmarkCase {
   firstMs?: number; samplesMs?: number[]; medianMs?: number; p95Ms?: number; minMs?: number; maxMs?: number;
-  bytes?: number; status?: number; error?: string; source?: string; pointsCount?: number;
+  bytes?: number; status?: number; error?: string; source?: string; pointsCount?: number; resultCount?: number;
 }
 export interface BenchmarkRun {
   schemaVersion: 1; timestamp: string; datasetHash: string; cohortHash: string;

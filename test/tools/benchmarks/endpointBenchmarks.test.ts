@@ -10,6 +10,7 @@ import { snapshotDatabase, startBenchmarkServer, measureRequest } from '../../..
 import { summarize, timingDelta, comparisonReasons, renderReport, type BenchmarkRun } from '../../../tools/benchmarks/endpointReport.js';
 import { SESSION_SUMMARY_PROJECTION_VERSION } from '../../../shared/types/sessionSummaries.js';
 import { driver, lap, session } from '../../server/core/sessionRows/builders.js';
+import { validateBenchmarkResponse } from '../../../tools/benchmarks/endpointValidation.js';
 
 function run(): BenchmarkRun {
   return { schemaVersion: 1, timestamp: '2026-10-10T12:00:00.000Z', datasetHash: 'dataset', cohortHash: 'cohort', samples: 20,
@@ -18,6 +19,42 @@ function run(): BenchmarkRun {
 }
 
 describe('endpoint benchmark coverage and comparisons', () => {
+  it('rejects empty or malformed representative responses instead of timing stale class identities', () => {
+    for (const requiredCollection of ['entries', 'sessions', 'laps'] as const) {
+      const item = { id: 'fixed-cohort', route: '/api/example', requiredCollection };
+      expect(validateBenchmarkResponse(item, { [requiredCollection]: [{ id: 'result' }] })).toBe(1);
+      for (const body of [null, {}, { [requiredCollection]: [] }, { [requiredCollection]: 'wrong' }]) {
+        expect(() => validateBenchmarkResponse(item, body)).toThrow('check the fixed cohort');
+      }
+    }
+    expect(validateBenchmarkResponse({ id: 'status', route: '/api/status' }, {})).toBeUndefined();
+  });
+
+  it('uses exact GT3 cohort identities and requires populated board, track and comparison results', () => {
+    const db = new SessionDatabase(':memory:');
+    try {
+      const cases = benchmarkCases({ boards: [{ layout: 'spa_gp', carClass: 'GT3' }], sessions: [] }, db);
+      for (const id of ['board-0', 'track-0', 'board-with-rival', 'compare-player', 'compare-all', 'picker-player', 'picker-all']) {
+        const item = cases.find(candidate => candidate.id === id)!;
+        expect(new URL(item.url!, 'http://localhost').searchParams.get('carClass')).toBe('GT3');
+        expect(item.requiredCollection).toBeDefined();
+      }
+    } finally { db.close(); }
+  });
+
+  it('keeps the fixed player PB locator when the XML did not mark isPlayer', () => {
+    const db = new SessionDatabase(':memory:');
+    try {
+      const fixture = session([driver('Opponent', [lap(1)]), driver('Player', [lap(1)])]);
+      db.upsertSession(fixture, fixture.filePath, 1, 1);
+      const cases = benchmarkCases({ boards: [], sessions: [], telemetry: {
+        sessionId: fixture.id, driverOrdinal: 1, lapOrdinal: 0, driverName: 'Player',
+      } }, db);
+      expect(cases.find(item => item.id === 'personal-best-player')?.url).toBe(`/api/session/${fixture.id}/personal-best/1`);
+      expect(cases.find(item => item.id === 'personal-best-opponent')?.url).toBe(`/api/session/${fixture.id}/personal-best/0`);
+    } finally { db.close(); }
+  });
+
   it('preserves HTTP failures when Express returns an HTML error page', async () => {
     const fetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(
       '<!DOCTYPE html><html><body><pre>SqliteError: no such column: undefined</pre></body></html>',

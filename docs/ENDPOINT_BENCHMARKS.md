@@ -1,5 +1,21 @@
 # Endpoint performance history
 
+## Fixed class identity correction — 2026-10-11
+
+The fixed Spa/Fuji cohort's class was explicitly updated from legacy `LMGT3` to the stored `GT3`
+identity, preserving its layouts, session IDs and telemetry locator. This changes the cohort fingerprint;
+the first corrected run is a new baseline and must not claim a speed change against the old requests.
+Legacy-cohort leaderboard, track and comparison timings after exact class matching was introduced
+were measuring empty results, including the corresponding rows in the identity-cleanup table below.
+Do not use those rows as performance evidence. Other request timings are unaffected by this correction.
+
+Representative board, track and comparison cases now require non-empty `entries`, `sessions` or
+`laps` in every response. Missing, malformed or empty collections fail the case rather than report a
+fast success. JSON history records the first response's result count. When an identity changes again,
+review and explicitly edit the fixed cohort; do not silently normalize API classes or rediscover a faster cohort.
+The player PB request uses the saved telemetry driver ordinal, so missing raw XML `isPlayer` flags
+do not silently remove that case from subsequent sweeps.
+
 ## Exact identity cleanup — 2026-10-11
 
 Baseline `2026-10-11T05-22-40.838Z.json` and final `2026-10-11T06-11-12.384Z.json`
@@ -105,6 +121,6 @@ rival pin, AI configuration and AI generation. Repeating these changes the workl
 services, so they do not produce comparable site-read response times. AI generation needs a separate
 controlled model/network/cost benchmark rather than a fake validation-error timing.
 
-Implementation: `tools/benchmarks/{benchmarkEndpoints,endpointHarness,endpointInventory,endpointCases,endpointReport}.ts`.
+Implementation: `tools/benchmarks/{benchmarkEndpoints,endpointHarness,endpointInventory,endpointCases,endpointReport,endpointValidation}.ts`.
 Tests: `test/tools/benchmarks/endpointBenchmarks.test.ts`. The benchmark tools are included in the
 TypeScript build; runtime reports and private identifiers are not committed.

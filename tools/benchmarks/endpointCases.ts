@@ -47,7 +47,12 @@ export function discoverCohort(store: SessionDatabase): BenchmarkCohort {
 
 export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase): BenchmarkCase[] {
   const cases: BenchmarkCase[] = [];
-  const add = (id: string, route: string, url?: string, skip = 'No matching data in this cohort.') => cases.push({ id, route, ...(url ? { url } : { skip }) });
+  const collections: Record<string, BenchmarkCase['requiredCollection']> = {
+    '/api/leaderboard': 'entries', '/api/track/:trackName': 'sessions', '/api/compare/laps': 'laps',
+  };
+  const add = (id: string, route: string, url?: string, skip = 'No matching data in this cohort.') => cases.push({
+    id, route, ...(url ? { url } : { skip }), ...(collections[route] ? { requiredCollection: collections[route] } : {}),
+  });
   for (const [id, url] of Object.entries({
     status: '/api/status', scan: '/api/scan/status', 'ai-settings': '/api/ai/settings', 'ai-reports': '/api/ai/reports?limit=50',
     logos: '/api/data-plugin/vehicles/logos',
@@ -79,8 +84,10 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
   for (const [index, id] of cohort.sessions.entries()) add(`session-${index}`, '/api/session/:id', `/api/session/${encodeURIComponent(id)}`);
   const sessionId = cohort.telemetry?.sessionId ?? cohort.sessions[0];
   const session = sessionId ? store.getSessionById(sessionId) : null;
-  const player = session?.drivers.findIndex(driver => driver.isPlayer) ?? -1;
-  add('personal-best-player', '/api/session/:id/personal-best/:driverOrdinal', session && player >= 0 ? `/api/session/${encodeURIComponent(session.id)}/personal-best/${player}` : undefined);
+  // Discovery saved the player's ordinal; preserve it even when raw XML flags omit isPlayer.
+  const player = cohort.telemetry?.driverOrdinal ?? (session?.playerDriver
+    ? session.drivers.indexOf(session.playerDriver) : session?.drivers.findIndex(driver => driver.isPlayer) ?? -1);
+  add('personal-best-player', '/api/session/:id/personal-best/:driverOrdinal', session?.drivers[player] ? `/api/session/${encodeURIComponent(session.id)}/personal-best/${player}` : undefined);
   const opponent = session?.drivers.findIndex((_driver, index) => index !== player) ?? -1;
   if (session && opponent >= 0) add('personal-best-opponent', '/api/session/:id/personal-best/:driverOrdinal', `/api/session/${encodeURIComponent(session.id)}/personal-best/${opponent}`);
   if (!cohort.sessions.length) add('session', '/api/session/:id');

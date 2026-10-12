@@ -9,6 +9,7 @@ import { discoverCohort, benchmarkCases, type BenchmarkCohort } from './endpoint
 import { endpointInventory, coverageErrors } from './endpointInventory.js';
 import { summarize, renderReport, type BenchmarkRun, type Measurement } from './endpointReport.js';
 import { dataPlugin } from '../../server/plugins/dataPlugin.js';
+import { validateBenchmarkResponse } from './endpointValidation.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const hash = (value: string | Buffer) => createHash('sha256').update(value).digest('hex');
@@ -83,10 +84,12 @@ async function main() {
             console.log(`${item.id}: unavailable (${measurement.skip})`); continue;
           }
         }
+        measurement.resultCount = validateBenchmarkResponse(item, first.body);
         const timings: number[] = [];
         for (let index = 0; index < samples; index++) {
           const sample = await measureRequest(server.baseUrl, item.url);
           if (sample.status !== first.status) throw new Error(`HTTP status changed to ${sample.status}`);
+          validateBenchmarkResponse(item, sample.body);
           timings.push(sample.ms);
         }
         Object.assign(measurement, summarize(timings), { samplesMs: timings });

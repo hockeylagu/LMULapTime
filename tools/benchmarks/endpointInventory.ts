@@ -2,7 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export interface Endpoint { method: string; route: string; exclusion?: string; }
-export interface BenchmarkCase { id: string; route: string; url?: string; skip?: string; }
+export interface BenchmarkCase {
+  id: string; route: string; url?: string; skip?: string;
+  requiredCollection?: 'entries' | 'sessions' | 'laps';
+}
 
 const prefixes: Record<string, string> = { aiRoutes: '/api/ai', dataPluginRoutes: '/api/data-plugin' };
 const exclusions: Record<string, string> = {

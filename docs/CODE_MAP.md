@@ -4,7 +4,7 @@ A fast index for new sessions: find the right file without searching. `AGENTS.md
 this file holds the **routes through the code**. Keep it current (see "Keeping this file current" at the end).
 
 Last checked 2026-10-11: 495 TypeScript source files in src/server/shared, 292 test files,
-2540 tests (2484 passed, 56 skipped). Full tests and production build rechecked after exact identity cleanup.
+2543 tests (2487 passed, 56 skipped). Full tests and production build rechecked after the benchmark GT3 identity correction, fixed player locator and non-empty response checks.
 Coverage rechecked during this cleanup: 94.84% lines, 92.53% statements,
 92.78% functions and 83.66% branches. Branch/worktree results are separate; see [plans](plans/README.md).
 
@@ -437,6 +437,9 @@ Anything computed per request (pit stop details, telemetry links, everything in 
 - `npm run benchmark:endpoints`: real local HTTP through production routers on a temporary SQLite snapshot,
   fixed request cohort, ranked first/warm median/p95 timings and local JSON/Markdown history. New GETs and unclassified
   mutation routes fail inventory coverage. HTTP failures preserve status and error text even for HTML error pages.
+  `endpointValidation.ts` rejects empty/malformed board, track and comparison collections; local history retains result counts.
+  The fixed cohort uses exact stored `GT3` identity; the legacy `LMGT3` cohort's empty-result timings are invalid.
+  Player PB requests preserve the cohort's saved telemetry driver ordinal rather than depending on raw XML player flags.
   Tools live in `tools/benchmarks/`, tests in `test/tools/benchmarks/`.
   Run before/after API-affecting features and optimizations; weekly check uses the same runner. See [ENDPOINT_BENCHMARKS.md](ENDPOINT_BENCHMARKS.md).
 - Tests mirror the source tree: `test/server/<domain>/`, `test/domain/`, `test/utils/`, `test/components/<feature>/`.
