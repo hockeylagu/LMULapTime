@@ -24,7 +24,6 @@ interface SessionRouteProps {
   onBack: () => void;
   onSelectSession: (id: string) => void;
 
-
 }
 
 function SessionRoute({ onBack, onSelectSession }: SessionRouteProps) {
@@ -36,7 +35,6 @@ function SessionRoute({ onBack, onSelectSession }: SessionRouteProps) {
       onBack={onBack}
       onSelectSession={onSelectSession}
 
-
     />
   );
 }
@@ -46,24 +44,6 @@ interface TrackRouteProps {
   selectedCarClass: string;
   setSelectedCarClass: (carClass: string) => void;
 
-}
-
-interface DashboardRouteProps {
-
-  onSelectSession: (id: string) => void;
-  selectedCarClass: string;
-  setSelectedCarClass: (carClass: string) => void;
-}
-
-function DashboardRoute({ onSelectSession, selectedCarClass, setSelectedCarClass }: DashboardRouteProps) {
-  return (
-    <Dashboard
-
-      onSelectSession={onSelectSession}
-      selectedCarClass={selectedCarClass}
-      setSelectedCarClass={setSelectedCarClass}
-    />
-  );
 }
 
 interface LeaderboardRouteProps {
@@ -184,7 +164,7 @@ export default function App() {
         ) : (
           <Routes>
             <Route path="/dashboard" element={
-              <DashboardRoute
+              <Dashboard
 
                 onSelectSession={handleSelectSession}
                 selectedCarClass={selectedCarClass}
