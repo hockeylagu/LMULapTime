@@ -1,4 +1,4 @@
-import { ReplayTrajectoryPoint } from '../core/types.js';
+import { ReplayTrajectoryPoint } from '../../shared/types/index.js';
 
 /** A station this far behind the previous one is a projection glitch, not centreline noise. */
 export const STATION_BACKWARD_TOLERANCE_M = 1;

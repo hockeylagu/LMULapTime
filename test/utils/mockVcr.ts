@@ -1,4 +1,4 @@
-import { ReplayEventInfo } from '../../server/core/types.js';
+import { ReplayEventInfo } from '../../shared/types/index.js';
 
 export interface MockSlice {
   sTime: number;

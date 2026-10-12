@@ -11,11 +11,11 @@ import {
   isRunInViewBox,
   isPointInViewBox,
 } from '../../src/components/replay/map/replayMapUtils.js';
-import type { ReplayTelemetryPoint } from '../../server/core/types.js';
+import type { ReplayTrajectoryPoint } from '../../shared/types/index.js';
 import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../src/utils/lapAlignment.js';
 
 describe('replayMapUtils', () => {
-  const mockPoints: ReplayTelemetryPoint[] = [
+  const mockPoints: ReplayTrajectoryPoint[] = [
     { x: 10, y: 0, z: 20, speedKmh: 80, throttle: 0, brake: 100 },
     { x: 20, y: 0, z: 30, speedKmh: 140, throttle: 50, brake: 0 },
     { x: 30, y: 0, z: 40, speedKmh: 200, throttle: 100, brake: 0 },
@@ -143,13 +143,13 @@ describe('replayMapUtils', () => {
       expect(ghost?.point.x).toBeCloseTo(2.5);
     });
     it('aligns ghost position side-by-side using canonical station rather than divergent odometer distances', () => {
-      const primary: ReplayTelemetryPoint[] = [
+      const primary: ReplayTrajectoryPoint[] = [
         { x: -111.03, y: 0, z: -36.83, stationM: 1.36, distM: 0, timeSec: 0, speedKmh: 320 },
         { x: -113.13, y: 0, z: -39.70, stationM: 4.91, distM: 3.56, timeSec: 0.04, speedKmh: 320 },
       ];
       // Baseline sliced 8 m downstream, shifted laterally across the track width, and extended back
       // to the line by the server (its first sample, station 0).
-      const baseline: ReplayTelemetryPoint[] = [
+      const baseline: ReplayTrajectoryPoint[] = [
         { x: -111.07, y: 0, z: -35.11, stationM: 0, distM: 0, timeSec: 375.12, speedKmh: 320 },
         { x: -115.95, y: 0, z: -41.52, stationM: 8.04, distM: 8.06, timeSec: 375.21, speedKmh: 320 },
         { x: -117.03, y: 0, z: -42.94, stationM: 9.82, distM: 9.84, timeSec: 375.23, speedKmh: 321 },

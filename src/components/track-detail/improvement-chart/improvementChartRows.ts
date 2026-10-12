@@ -1,6 +1,6 @@
 import { formatTime } from '../../../../shared/domain/formatters.js';
 import { PaceCategory } from '../../../../shared/types/index.js';
-import type { SessionProgressionPoint } from './improvementChartTypes.js';
+import type { SessionProgressionPoint } from '../../../../shared/types/index.js';
 import type { ImprovementMetric } from './ImprovementChartControls.js';
 import { calculateLapPrDelta, formatSessionAxisLabel } from './improvementChartUtils.js';
 
@@ -18,7 +18,7 @@ export function buildImprovementChartRows(trackData: SessionProgressionPoint[], 
     }
 
     const shortSession = p.sessionName || p.sessionType.slice(0, 4);
-    const dateFormatted = p.dateString.split(' ')[0] || p.dateString;
+    const dateFormatted = p.timeString.split(' ')[0] || p.timeString;
     const uniqueKey = `${dateFormatted} ${shortSession} #${index + 1}`;
     const personalBestImproved =
       p.bestLapTime !== null &&
@@ -33,8 +33,8 @@ export function buildImprovementChartRows(trackData: SessionProgressionPoint[], 
     return {
       chartKey: uniqueKey,
       shortSession,
-      axisLabel: formatSessionAxisLabel(p.dateString, shortSession),
-      fullDate: p.dateString,
+      axisLabel: formatSessionAxisLabel(p.timeString, shortSession),
+      fullDate: p.timeString,
       sessionId: p.sessionId,
       session: p.sessionName ? `${p.sessionType} (${p.sessionName})` : p.sessionType,
       car: p.carType,

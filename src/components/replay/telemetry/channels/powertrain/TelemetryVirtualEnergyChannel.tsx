@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { TelemetryStaticTrace } from '../../TelemetryStaticTrace.js';
 import { Zap } from 'lucide-react';
-import { ReplayTelemetryPoint } from '../../../../../../shared/types/index.js';
+import { ReplayTrajectoryPoint } from '../../../../../../shared/types/index.js';
 import { PointComparison } from '../../../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS, WHEEL_CORNER_COLORS } from '../../../../../utils/themeColors.js';
 
@@ -9,7 +9,7 @@ export interface TelemetryVirtualEnergyChannelProps {
   virtualEnergyPath: string;
   virtualEnergyArea?: string;
   baselineVirtualEnergyPath?: string;
-  currentPoint?: ReplayTelemetryPoint;
+  currentPoint?: ReplayTrajectoryPoint;
   currentComparison?: PointComparison | null;
   isCursorInView: boolean;
   cursorPct: number;

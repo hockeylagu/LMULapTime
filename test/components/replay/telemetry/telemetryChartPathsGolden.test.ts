@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { describe, it, expect } from 'vitest';
 import { computeTelemetryChartPaths } from '../../../../src/components/replay/telemetry/telemetryChartPaths.js';
-import { ReplayTrajectoryPoint } from '../../../../server/core/types.js';
+import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { BaselineChartSample, InterpolatedPoint, PointComparison } from '../../../../src/utils/replayComparison.js';
 import { getTrajectoryDistances } from '../../../../src/utils/lapAlignment.js';
 

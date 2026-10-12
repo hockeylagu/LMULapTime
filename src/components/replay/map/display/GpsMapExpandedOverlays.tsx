@@ -1,14 +1,14 @@
-import type { ReplayTelemetryPoint } from '../../../../../shared/types/index.js';
+import type { ReplayTrajectoryPoint } from '../../../../../shared/types/index.js';
 import { GpsMapTelemetryHud } from './GpsMapTelemetryHud.js';
 import { GpsMapModeBar, type GpsMapModeBarProps } from './GpsMapModeBar.js';
 import { ReplayFrictionCircle } from '../ReplayFrictionCircle.js';
 
 interface Props extends GpsMapModeBarProps {
-  points: ReplayTelemetryPoint[];
+  points: ReplayTrajectoryPoint[];
   currentIndex: number;
-  primaryPoint?: ReplayTelemetryPoint;
-  baselinePoint?: ReplayTelemetryPoint | null;
-  baselinePoints: ReplayTelemetryPoint[];
+  primaryPoint?: ReplayTrajectoryPoint;
+  baselinePoint?: ReplayTrajectoryPoint | null;
+  baselinePoints: ReplayTrajectoryPoint[];
   deltaTimeSec?: number | null;
   lineDistanceM?: number | null;
 }

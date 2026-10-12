@@ -10,6 +10,7 @@ import {
   useCompareLapsData,
 } from '../../../src/components/leaderboard/useCompareLapsData.js';
 import type { ComparableLap } from '../../../shared/types/index.js';
+import { makeSessionCard } from '../../helpers/sessionCardFixture.js';
 
 const laps = [
   {
@@ -58,7 +59,7 @@ describe('useCompareLapsData selection fallbacks', () => {
     });
 
     const { result } = renderHook(
-      () => useCompareLapsData({ sessions: [{ id: 'session-1', trackVenue: 'Spa', trackCourse: 'GP' }] }),
+      () => useCompareLapsData({ sessions: [makeSessionCard({ id: 'session-1', trackVenue: 'Spa', trackCourse: 'GP' })] }),
       { wrapper }
     );
 
@@ -95,7 +96,7 @@ describe('useCompareLapsData selection fallbacks', () => {
     });
 
     const { result } = renderHook(
-      () => useCompareLapsData({ sessions: [{ id: 'session-1', trackVenue: 'Spa', trackCourse: 'GP' }] }),
+      () => useCompareLapsData({ sessions: [makeSessionCard({ id: 'session-1', trackVenue: 'Spa', trackCourse: 'GP' })] }),
       { wrapper }
     );
 
@@ -118,7 +119,7 @@ describe('useCompareLapsData selection fallbacks', () => {
       }) });
     }));
     const { result } = renderHook(
-      () => useCompareLapsData({ sessions: [{ id: 'session-1', trackVenue: 'Spa', trackCourse: 'GP' }] }),
+      () => useCompareLapsData({ sessions: [makeSessionCard({ id: 'session-1', trackVenue: 'Spa', trackCourse: 'GP' })] }),
       { wrapper }
     );
     await waitFor(() => expect(result.current.loading).toBe(false));
@@ -135,7 +136,7 @@ describe('useCompareLapsData selection fallbacks', () => {
       : { ok: true, status: 200, json: () => Promise.resolve({ laps, allTimeBestLap: null, overallTrackBestLap: laps[2], bestS1: 28, bestS2: 33, bestS3: 37, theoreticalBestSec: 98, benchmarks: [] }) })));
 
     const { result } = renderHook(
-      () => useCompareLapsData({ sessions: [{ id: 'session-1', trackVenue: 'Spa', trackCourse: 'GP' }] }),
+      () => useCompareLapsData({ sessions: [makeSessionCard({ id: 'session-1', trackVenue: 'Spa', trackCourse: 'GP' })] }),
       { wrapper }
     );
     await waitFor(() => expect(result.current.apiData.laps).toHaveLength(3));
@@ -157,7 +158,7 @@ describe('useCompareLapsData selection fallbacks', () => {
       : reply({ laps, allTimeBestLap: null, playerBestLap: laps[1], benchmarks: [] })));
 
     const { result } = renderHook(
-      () => useCompareLapsData({ sessions: [{ id: 'session-1', trackVenue: 'Spa', trackCourse: 'GP' }] }),
+      () => useCompareLapsData({ sessions: [makeSessionCard({ id: 'session-1', trackVenue: 'Spa', trackCourse: 'GP' })] }),
       { wrapper }
     );
     await waitFor(() => expect(result.current.selectedLaps.map(lap => lap.id)).toEqual(['fast-player']));
@@ -197,7 +198,7 @@ describe('the laps compared', () => {
     });
     let compareRequest: CompareRequest | null = null;
     const { result, rerender } = renderHook(
-      () => useCompareLapsData({ sessions: [{ id: 'session-1', trackVenue: 'Spa', trackCourse: 'GP' }], compareRequest }),
+      () => useCompareLapsData({ sessions: [makeSessionCard({ id: 'session-1', trackVenue: 'Spa', trackCourse: 'GP' })], compareRequest }),
       { wrapper }
     );
     await waitFor(() => expect(ids(result.current.selectedLaps)).toEqual(['fast-player']));

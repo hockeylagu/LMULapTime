@@ -1,5 +1,5 @@
 import zlib from 'zlib';
-import { ReplayPitEvent } from '../core/types.js';
+import { ReplayPitEvent } from '../../shared/types/index.js';
 import { garageSpells, garageState } from '../replay/decode/garageState.js';
 import { buildCenterlineSpatialIndex } from '../tracks/trackProjection.js';
 import { buildDriverPositions, LapSamples, POSITION_SAMPLE_HZ, RACE_POSITIONS_VERSION, RacePositions } from './racePositions.js';

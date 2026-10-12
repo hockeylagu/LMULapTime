@@ -1,5 +1,5 @@
 import fs from 'fs';
-import type { DetailedSession, ReplayMetadata } from '../core/types.js';
+import type { DetailedSession, ReplayMetadata } from '../../shared/types/index.js';
 import type { TelemetryLink, TelemetryMetadataRecord } from '../core/dbTelemetryStore.js';
 import type { ReplayFileEntry } from '../sessions/sessionXmlTypes.js';
 import { CIRCUIT_SPECIFICATIONS } from '../../shared/domain/circuitDefinitions.js';

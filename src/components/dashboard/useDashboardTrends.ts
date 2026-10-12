@@ -1,67 +1,11 @@
 import { useMemo } from 'react';
 import { getDisplayTrackName, isSessionEmpty, getBestLapNumber } from '../../../shared/domain/formatters.js';
 import { computeConsistencyRating } from '../../../shared/domain/lapComparison.js';
-import { PaceCategory } from '../../../shared/types/index.js';
-import type { SessionSummary } from './dashboardTypes.js';
+import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
+import type { DetailedSession } from '../../../shared/types/session.js';
+import type { DashboardLatestOuting, DashboardRecentPacePoint, DashboardTrends } from '../../../shared/types/dashboard.js';
 
-export interface RecentPacePoint {
-  id: string;
-  trackName: string;
-  carName: string;
-  timeString: string;
-  bestLapTimeString: string;
-  pacePercentage: number;
-  paceCategory?: PaceCategory | null;
-}
-
-export interface LatestOutingInfo {
-  id: string;
-  trackName: string;
-  trackVenue: string;
-  trackCourse?: string;
-  sessionType: 'Practice' | 'Qualifying' | 'Race' | 'Unknown';
-  timeString: string;
-  carName: string;
-  carClass?: string;
-  bestLapTimeString: string;
-  bestLapTime: number | null;
-  bestLapNum?: number | null;
-  driverOrdinal?: number;
-  bestLapOrdinal?: number | null;
-  pacePercentage?: number | null;
-  paceCategory?: PaceCategory | null;
-  bestLapWet?: boolean;
-  position?: number;
-  gridPosition?: number | null;
-  positionGain?: number | null;
-  lapsCount: number;
-  hasReplay: boolean;
-  hasDuckDbTelemetry?: boolean;
-}
-
-export interface TodayActivityInfo {
-  dateString: string;
-  sessionsCount: number;
-  lapsCount: number;
-  distanceKm: number;
-}
-
-export interface DashboardTrendsResult {
-  hasData: boolean;
-  driverName: string;
-  latestOuting: LatestOutingInfo | null;
-  todayActivity: TodayActivityInfo | null;
-  recentPaceTrend: RecentPacePoint[];
-  paceDelta: number | null;
-  paceTrendDirection: 'improving' | 'declining' | 'steady' | 'none';
-  // The car class the pace trend is drawn in (the latest outing's), e.g. 'LMH'.
-  paceTrendClass: string | null;
-  recentCleanRate: number | null;
-  recentConsistency: number | null;
-  recentNetPositions: number;
-}
-
-export function useDashboardTrends(sessions: SessionSummary[]): DashboardTrendsResult {
+export function useDashboardTrends(sessions: (SessionCard | DetailedSession)[]): DashboardTrends {
   return useMemo(() => {
     if (!sessions || sessions.length === 0) {
       return {
@@ -137,7 +81,7 @@ export function useDashboardTrends(sessions: SessionSummary[]): DashboardTrendsR
 
     // Find the latest outing:
     // Never pick an empty session, and prefer Race sessions over Practice/Qualifying
-    let latestRaw: SessionSummary | undefined;
+    let latestRaw: SessionCard | DetailedSession | undefined;
 
     if (validSessions.length > 0) {
       const newestValid = validSessions[0];
@@ -177,7 +121,7 @@ export function useDashboardTrends(sessions: SessionSummary[]): DashboardTrendsR
         sorted.find(s => Boolean(s.playerDriver));
     }
 
-    let latestOuting: LatestOutingInfo | null = null;
+    let latestOuting: DashboardLatestOuting | null = null;
     if (latestRaw && latestRaw.playerDriver) {
       const p = latestRaw.playerDriver;
       const trackName = getDisplayTrackName(latestRaw.trackVenue, latestRaw.trackCourse);
@@ -188,19 +132,19 @@ export function useDashboardTrends(sessions: SessionSummary[]): DashboardTrendsR
         trackCourse: latestRaw.trackCourse,
         sessionType: latestRaw.sessionType,
         timeString: latestRaw.timeString,
-        carName: p.carType,
+        carType: p.carType,
         carClass: p.carClass ? p.carClass : undefined,
         bestLapTimeString: p.bestLapTimeString,
         bestLapTime: p.bestLapTime,
         bestLapNum: getBestLapNumber(p),
         driverOrdinal: p.driverOrdinal,
-        bestLapOrdinal: p.bestLapOrdinal,
+        bestLapOrdinal: 'bestLapOrdinal' in p ? p.bestLapOrdinal : null,
         pacePercentage: p.bestLapPacePercentage,
         paceCategory: p.bestLapPaceCategory,
         bestLapWet: p.bestLapWet,
         position: p.position,
-        gridPosition: (p as { gridPosition?: number | null }).gridPosition,
-        positionGain: (p as { positionGain?: number | null }).positionGain,
+        gridPosition: 'gridPosition' in p ? p.gridPosition : null,
+        positionGain: 'positionGain' in p ? p.positionGain : null,
         lapsCount: p.lapsCount || 0,
         hasReplay: Boolean(latestRaw.matchingReplayFile),
         hasDuckDbTelemetry: Boolean(
@@ -211,7 +155,7 @@ export function useDashboardTrends(sessions: SessionSummary[]): DashboardTrendsR
     }
 
     // Activity on the latest outing's calendar day
-    let todayActivity: TodayActivityInfo | null = null;
+    let todayActivity: DashboardTrends['todayActivity'] = null;
     if (latestOuting && latestOuting.timeString) {
       const latestDateStr = latestOuting.timeString.split(' ')[0] || '';
       if (latestDateStr) {
@@ -240,14 +184,14 @@ export function useDashboardTrends(sessions: SessionSummary[]): DashboardTrendsR
     const trendClass = latestRaw?.playerDriver
       ? latestRaw.playerDriver.carClass
       : '';
-    const recentWithPace: RecentPacePoint[] = [];
+    const recentWithPace: DashboardRecentPacePoint[] = [];
     for (const s of sorted) {
       const inTrendClass = !trendClass || (s.playerDriver?.carClass ?? '') === trendClass;
       if (inTrendClass && s.playerDriver?.bestLapPacePercentage && s.playerDriver.bestLapPacePercentage > 0) {
         recentWithPace.push({
           id: s.id,
           trackName: getDisplayTrackName(s.trackVenue, s.trackCourse),
-          carName: s.playerDriver.carType,
+          carType: s.playerDriver.carType,
           timeString: s.timeString,
           bestLapTimeString: s.playerDriver.bestLapTimeString,
           pacePercentage: Number(s.playerDriver.bestLapPacePercentage.toFixed(2)),
@@ -280,17 +224,18 @@ export function useDashboardTrends(sessions: SessionSummary[]): DashboardTrendsR
     const consistencyScores: number[] = [];
 
     for (const s of recentWindow) {
-      if (s.playerDriver?.laps && s.playerDriver.laps.length > 0) {
-        for (const lap of s.playerDriver.laps) {
+      const laps = s.playerDriver && 'laps' in s.playerDriver ? s.playerDriver.laps : undefined;
+      if (laps && laps.length > 0) {
+        for (const lap of laps) {
           totalLaps++;
           if (lap.isValid) cleanLaps++;
         }
-        const rating = computeConsistencyRating(s.playerDriver.laps);
+        const rating = computeConsistencyRating(laps);
         if (rating.consistencyScore !== null) {
           consistencyScores.push(rating.consistencyScore);
         }
       }
-      const gain = (s.playerDriver as { positionGain?: number | null })?.positionGain;
+      const gain = s.playerDriver && 'positionGain' in s.playerDriver ? s.playerDriver.positionGain : null;
       if (gain !== null && gain !== undefined) {
         recentNetPositions += gain;
       }

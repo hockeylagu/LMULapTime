@@ -9,7 +9,7 @@ import {
   AiReportRecord,
   AiReportSection,
   AiTokenUsage,
-} from '../core/types.js';
+} from '../../shared/types/index.js';
 
 export const AI_MODELS = ['gemini-3.7-flash', 'gemini-3.8-flash'] as const;
 export type AiModel = typeof AI_MODELS[number];

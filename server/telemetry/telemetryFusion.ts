@@ -1,4 +1,5 @@
-import { DuckDbLapTelemetry, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../core/types.js';
+import type { DuckDbLapTelemetry } from './duckdbTypes.js';
+import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../shared/types/index.js';
 
 const POINT_GEOMETRY_FIELDS = [
   'stationM', 'lateralOffsetM', 'leftRoadDistanceM', 'rightRoadDistanceM',

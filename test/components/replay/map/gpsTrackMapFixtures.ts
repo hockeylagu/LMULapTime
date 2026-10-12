@@ -1,4 +1,4 @@
-import { ReplayTrajectoryPoint } from '../../../../server/core/types.js';
+import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 
 export const mockPoints: ReplayTrajectoryPoint[] = [
   { x: 100, y: 10, z: 200, rotY: 0, speedKmh: 150, throttle: 80, brake: 0, inPit: false, timeSec: 0.0 },

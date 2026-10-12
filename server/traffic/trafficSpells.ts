@@ -94,7 +94,7 @@ export function findTrafficSpells(
       const kind = classify(positions, driver, other.positions, { driver: driver.distances[i], other: otherDistance }, time, other.sameClass);
       if (direction === 'behind' && kind !== 'battle' && kind !== 'beingLapped') continue;
       open.set(key, {
-        carName: other.info?.name ?? `Car ${other.positions.slot}`,
+        driverName: other.info?.name ?? `Car ${other.positions.slot}`,
         ...(other.info?.carClass ? { carClass: other.info.carClass } : {}),
         kind,
         direction,

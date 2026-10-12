@@ -34,7 +34,7 @@ import {
   enrichDuckDbDirectory,
   DuckDbFileInfo,
 } from '../../../server/telemetry/telemetryMatcher.js';
-import { DetailedSession, ReplayMetadata } from '../../../server/core/types.js';
+import { DetailedSession, ReplayMetadata } from '../../../shared/types/index.js';
 
 describe('telemetryMatcher', () => {
   it('parses typical DuckDB telemetry filenames accurately', () => {

@@ -4,10 +4,11 @@ import { formatTime } from '../../../../shared/domain/formatters.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 import { SessionTypeChip } from '../../session-list/SessionRowParts.js';
 import { formatGap } from '../board/leaderboardFormat.js';
-import type { LapCondition, LapPickerSession } from './lapPickerModel.js';
+import type { WeatherCondition } from '../../../../shared/types/index.js';
+import type { LapPickerSession } from './lapPickerModel.js';
 
 /** Conditions as quiet text, with a hue only when the track was not dry (as on the session header). */
-export const CONDITION_TEXT: Record<LapCondition, string> = {
+export const CONDITION_TEXT: Record<WeatherCondition, string> = {
   Dry: 'text-lmu-text-soft',
   Wet: 'text-lmu-azure',
   'Dynamic Weather': 'text-lmu-aqua',

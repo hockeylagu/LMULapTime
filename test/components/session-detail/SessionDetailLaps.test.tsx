@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { SessionDetail } from '../../../src/components/session-detail/SessionDetail.js';
-import { DriverData } from '../../../server/core/types.js';
+import { DriverData } from '../../../shared/types/index.js';
 import { mockDetailedSession } from './mockSessionDetail.js';
 
 function responseFor(url: string, fallback: unknown): Response {

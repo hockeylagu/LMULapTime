@@ -5,10 +5,11 @@ import { formatTime, compareSessions, compareSessionsBySortOption, isSessionEmpt
 import { matchesSessionCarClass } from '../../../shared/domain/vehicleMapping.js';
 import { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 import { ImprovementChart } from './improvement-chart/ImprovementChart.js';
-import { SessionProgressionPoint } from './improvement-chart/improvementChartTypes.js';
+import type { SessionProgressionPoint } from '../../../shared/types/index.js';
 import { TrackDetailHeader } from './TrackDetailHeader.js';
 import { TrackSessionsCard } from './TrackSessionsCard.js';
-import { SessionMeta, getPaceCategoryForLap, getSessionBestLapPace, buildTrackProgression } from './trackDetailHelpers.js';
+import { getPaceCategoryForLap, getSessionBestLapPace, buildTrackProgression } from './trackDetailHelpers.js';
+import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
 import { useTrackDetailState } from './useTrackDetailState.js';
 import { useSessionViewMode } from '../session-list/useSessionViewMode.js';
 import { LoadingState } from '../common/LoadingState.js';
@@ -114,7 +115,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   const currentBenchmark = selectedClass && selectedClass !== 'All'
     ? data.benchmarks.find((benchmark) => (benchmark.carClass === selectedClass)) || null
     : findBenchmarkForClass(data.latestSession?.carClass ?? latestSession?.playerDriver?.carClass ?? data.summary?.bestLapClass);
-  const fallbackBest = classTrackSessions.reduce<SessionMeta | null>((best, session) => {
+  const fallbackBest = classTrackSessions.reduce<SessionCard | null>((best, session) => {
     const time = session.playerDriver?.bestLapTime;
     return time && (!best?.playerDriver?.bestLapTime || time < best.playerDriver.bestLapTime) ? session : best;
   }, null);

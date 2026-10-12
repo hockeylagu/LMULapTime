@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { Database as DatabaseType } from 'better-sqlite3';
-import { DetailedSession } from './types.js';
+import { DetailedSession } from '../../shared/types/index.js';
 import { SyncResult, SessionSyncProgress } from './dbSchema.js';
 import type { ReplayFileEntry } from '../sessions/sessionXmlTypes.js';
 import type { ReplayMatchTarget } from '../sessions/replayMatching.js';

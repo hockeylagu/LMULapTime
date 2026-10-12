@@ -1,5 +1,5 @@
 import { Database as DatabaseType } from 'better-sqlite3';
-import type { DetailedSession, DriverData, LapData } from '../core/types.js';
+import type { DetailedSession, DriverData, LapData } from '../../shared/types/index.js';
 import { getDriverEvents, getReplayLaps } from '../core/replay/dbReplayLapStore.js';
 import { getStoredReplayTrajectory } from '../core/replay/dbReplayTrajectoryStore.js';
 import {

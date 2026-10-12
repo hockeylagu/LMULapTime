@@ -36,7 +36,7 @@ export function useConsistencyLapSelection(
       .map(l => ({
         lapNumber: l.lapNumber,
         lapTimeSec: l.lapTimeSec,
-        isValid: l.isValid !== false && !l.isOutlap,
+        isValid: l.isValid !== false && !l.isOutLap,
         nonRepresentativeReason: l.nonRepresentativeReason,
       }))
       .sort((a, b) => a.lapNumber - b.lapNumber);

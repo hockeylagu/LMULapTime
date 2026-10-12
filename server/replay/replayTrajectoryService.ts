@@ -1,6 +1,6 @@
 import path from 'path';
 import { dataPlugin } from '../plugins/dataPlugin.js';
-import { ReplayMetadata, ReplayTrajectoryData } from '../core/types.js';
+import { ReplayMetadata, ReplayTrajectoryData } from '../../shared/types/index.js';
 import { ReplayRecordingService } from './replayRecordingService.js';
 import { ReplayTelemetryService } from './replayTelemetryService.js';
 import { ReplayDriverNotFoundError, ReplayTrajectoryRequest } from './replayServiceTypes.js';
@@ -31,7 +31,7 @@ export class ReplayTrajectoryService {
     if (!matchedDriver || !recordingLap) throw new Error('Invalid session driver or lap locator');
     const filePath = path.join(this.replaysDir, replayName);
     const configuredPlayer = this.currentParser.configuredPlayerName;
-    const driverName = matchedDriver.driverName || matchedDriver.name;
+    const driverName = matchedDriver.name;
     let rawMetadata: ReplayMetadata;
     try { rawMetadata = this.replayRecordings.getMetadata(filePath, replayName, configuredPlayer); }
     catch { throw new ReplayDriverNotFoundError(driverName, replayName); }

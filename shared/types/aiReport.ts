@@ -82,7 +82,7 @@ export interface AiLapEvidence {
     s2Sec?: number;
     s3Sec?: number;
     isValid?: boolean;
-    isOutlap?: boolean;
+    isOutLap?: boolean;
   };
   baseline?: {
     sessionId: string;

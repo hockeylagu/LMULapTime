@@ -2,7 +2,7 @@ import { Worker } from 'node:worker_threads';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ReplayMetadata, ReplayTrajectoryData } from '../../core/types.js';
+import { ReplayMetadata, ReplayTrajectoryData } from '../../../shared/types/index.js';
 import { ExtractReplayTrajectoryOptions, extractReplayTrajectory, extractReplayDriverTrajectories } from '../decode/replayTrajectory.js';
 import { ReplayStreamProgress } from '../replayProgress.js';
 import { ReplayDecodeError } from '../decode/replayDecodeError.js';

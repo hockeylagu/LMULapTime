@@ -1,6 +1,6 @@
 import React from 'react';
 import { SessionList } from '../session-list/SessionList.js';
-import { SessionListItem } from '../session-list/sessionListTypes.js';
+import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
 import { SessionViewModeToggle } from '../session-list/SessionListHeader.js';
 import { TrackSessionsToolbar } from './TrackSessionsToolbar.js';
 import { TrackDetailSortOption } from './trackDetailSortOptions.js';
@@ -8,7 +8,7 @@ import type { PaceBadgeValue } from '../common/PaceBadge.js';
 
 export interface TrackSessionsCardProps {
   trackName: string;
-  sortedSessions: SessionListItem[];
+  sortedSessions: SessionCard[];
   totalSessionsCount: number;
   emptyCount: number;
   hideEmpty: boolean;
@@ -24,7 +24,7 @@ export interface TrackSessionsCardProps {
   setSearchQuery: (val: string) => void;
   sortBy: TrackDetailSortOption;
   setSortBy: (val: TrackDetailSortOption) => void;
-  getPaceBadge: (s: SessionListItem) => PaceBadgeValue | null;
+  getPaceBadge: (s: SessionCard | import('../../../shared/types/session.js').DetailedSession) => PaceBadgeValue | null;
   onResetFilters?: () => void;
   /** Present while a filter narrows the list; shows the toolbar's Clear filters action. */
   onClearFilters?: () => void;

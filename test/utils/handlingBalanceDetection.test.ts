@@ -3,7 +3,7 @@ import {
   detectHandlingBalanceEvents,
   computeVisibleHandlingBands,
 } from '../../src/utils/handlingBalanceDetection.js';
-import { ReplayTrajectoryPoint } from '../../server/core/types.js';
+import { ReplayTrajectoryPoint } from '../../shared/types/index.js';
 import { CornerSegmentComparison } from '../../src/utils/cornerAnalysis/types.js';
 
 function makePoint(overrides: Partial<ReplayTrajectoryPoint>): ReplayTrajectoryPoint {

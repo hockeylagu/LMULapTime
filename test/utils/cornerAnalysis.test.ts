@@ -7,7 +7,7 @@ import {
 } from '../../src/utils/cornerConsistency.js';
 import fs from 'fs';
 import path from 'path';
-import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../server/core/types.js';
+import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../shared/types/index.js';
 import { enrichTrajectoryWithTrackGeometry } from '../../server/tracks/serverTrackSync.js';
 import { toIso8855Steering } from '../../server/core/replay/replayTrajectoryCodec.js';
 

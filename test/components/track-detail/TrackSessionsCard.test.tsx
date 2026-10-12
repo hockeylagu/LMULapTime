@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { TrackSessionsCard } from '../../../src/components/track-detail/TrackSessionsCard';
-import { SessionListItem } from '../../../src/components/session-list/sessionListTypes.js';
+import { makeSessionCard } from '../../helpers/sessionCardFixture.js';
 
 describe('TrackSessionsCard', () => {
-  const baseSession: SessionListItem = {
+  const baseSession = makeSessionCard({
     id: 's-1',
     sessionType: 'Race',
     sessionName: 'Race 1',
@@ -17,7 +17,7 @@ describe('TrackSessionsCard', () => {
       bestLapTime: 95.5,
       bestLapTimeString: '1:35.500',
     },
-  };
+  });
 
   it('renders the session controls without a results heading or subtitle', () => {
     render(

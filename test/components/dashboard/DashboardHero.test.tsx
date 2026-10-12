@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { DashboardHero } from '../../../src/components/dashboard/DashboardHero.js';
 import type { TrackBoundaryGeometry } from '../../../shared/types/trackGeometry.js';
-import type { SessionSummary } from '../../../src/components/dashboard/dashboardTypes.js';
+import { makeDetailedSession } from '../../helpers/sessionCardFixture.js';
 
 describe('DashboardHero', () => {
   const mockGeometry: TrackBoundaryGeometry = {
@@ -18,7 +18,7 @@ describe('DashboardHero', () => {
     centerline: [[110, 100], [510, 800], [510, 100]],
     startFinish: [110, 100],
   };
-  const mockSessions: SessionSummary[] = [
+  const mockSessions = [
     {
       id: 'session-old',
       filename: 'old.xml',
@@ -84,7 +84,7 @@ describe('DashboardHero', () => {
         ],
       },
     },
-  ];
+  ].map(session => makeDetailedSession(session));
 
   it('renders welcome back greeting with driver name', () => {
     const onSelectSession = vi.fn();

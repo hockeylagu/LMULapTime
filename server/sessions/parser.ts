@@ -9,7 +9,7 @@ import {
   SessionSettings,
   SessionWeather,
   TireWear,
-} from '../core/types.js';
+} from '../../shared/types/index.js';
 import { parseReplayMetadata, detectPlayerName } from '../replay/decode/replayParser.js';
 import {
   formatTime,

@@ -1,8 +1,8 @@
 import fs from 'fs';
 import { FileIngestWorker } from '../ingest/fileIngestWorkerClient.js';
-import type { ReplayIngestJob } from '../types.js';
+import type { ReplayIngestJob } from '../../../shared/types/index.js';
 import path from 'path';
-import { ReplayMetadata, ReplayTrajectoryData } from '../types.js';
+import { ReplayMetadata, ReplayTrajectoryData } from '../../../shared/types/index.js';
 import { ReplaySyncProgress, ReplaySyncResult } from '../dbSchema.js';
 import { parseReplayMetadata, resolveReplayPrimarySlot } from '../../replay/decode/replayParser.js';
 import { extractReplayTrajectory } from '../../replay/decode/replayTrajectory.js';

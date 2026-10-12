@@ -2,10 +2,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SessionList } from '../../../src/components/session-list/SessionList.js';
-import { SessionListItem } from '../../../src/components/session-list/sessionListTypes.js';
+import { makeSessionCard } from '../../helpers/sessionCardFixture.js';
 
 describe('SessionList component', () => {
-  const mockSessions: SessionListItem[] = [
+  const mockSessions = [
     {
       id: 'sess-1',
       filename: 'spa_1.xml',
@@ -69,7 +69,7 @@ describe('SessionList component', () => {
         lapsCount: 0,
       },
     },
-  ];
+  ].map(session => makeSessionCard(session));
 
   it('opens a card once from the keyboard through its labelled link', async () => {
     const user = userEvent.setup();
@@ -265,11 +265,11 @@ describe('SessionList component', () => {
   });
 
   it('shows a wet best lap as Wet instead of a rating against the dry benchmark', () => {
-    const wet: SessionListItem = {
+    const wet = makeSessionCard({
       ...mockSessions[0],
       id: 'sess-wet',
       playerDriver: { ...mockSessions[0].playerDriver!, bestLapPaceCategory: undefined, bestLapPacePercentage: undefined, bestLapWet: true },
-    };
+    });
 
     render(<SessionList sessions={[wet]} onSelectSession={vi.fn()} viewMode="table" />);
 

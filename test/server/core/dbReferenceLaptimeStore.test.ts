@@ -11,7 +11,7 @@ import {
   updateBenchmarkDiffImpact,
   getReferenceLaptimesCache,
 } from '../../../server/core/dbReferenceLaptimeStore.js';
-import type { ReferenceBenchmarkDiff, ReferenceLaptimeEntry, ReferenceLaptimesCache } from '../../../server/core/types.js';
+import type { ReferenceBenchmarkDiff, ReferenceLaptimeEntry, ReferenceLaptimesCache } from '../../../shared/types/index.js';
 
 describe('dbReferenceLaptimeStore', () => {
   let db: InstanceType<typeof Database>;

@@ -1,4 +1,4 @@
-import { ReplayUpgradeStatus } from '../core/types.js';
+import { ReplayUpgradeStatus } from '../../shared/types/index.js';
 import type { SessionDatabase, ReplayUpgradeCandidate } from '../core/db.js';
 
 // Runs the replay upgrade (see dbReplayUpgrade) in the background. It is the lowest-priority work:

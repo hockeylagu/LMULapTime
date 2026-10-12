@@ -1,4 +1,4 @@
-import { ReplayTrajectoryPoint } from '../core/types.js';
+import { ReplayTrajectoryPoint } from '../../shared/types/index.js';
 
 export interface CenterlineSpatialIndex {
   points: Array<[number, number]>;

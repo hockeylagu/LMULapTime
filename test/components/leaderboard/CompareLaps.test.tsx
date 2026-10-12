@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { CompareLaps, telemetryPair } from '../../../src/components/leaderboard/CompareLaps.js';
 import type { ComparableLap } from '../../../shared/types/index.js';
+import { makeSessionCard } from '../../helpers/sessionCardFixture.js';
 
 describe('CompareLaps component', () => {
   const mockSessions = [
@@ -21,7 +22,7 @@ describe('CompareLaps component', () => {
       sessionType: 'Qualifying',
       sessionName: 'Q1',
     },
-  ];
+  ].map(session => makeSessionCard(session));
 
   const lap = (lapNum: number, lapTime: number, lapTimeString: string, sectors: [number, number, number]) => ({
     id: `sess1_driver_0_lap_${lapNum - 1}`,

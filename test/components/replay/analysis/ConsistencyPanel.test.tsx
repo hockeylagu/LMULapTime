@@ -207,7 +207,7 @@ describe('ConsistencyPanel', () => {
         excludedLaps={new Set()}
         onToggleLapExclusion={onToggleLapExclusion}
         currentLapNumber={1}
-        trackPoints={[{ x: 0, z: 0, speedKmh: 100, distM: 120 } as unknown as import('../../../../server/core/types').ReplayTrajectoryPoint]}
+        trackPoints={[{ x: 0, z: 0, speedKmh: 100, distM: 120 } as unknown as import('../../../../shared/types/index').ReplayTrajectoryPoint]}
         trackBounds={{ minX: -100, maxX: 100, minZ: -100, maxZ: 100, spanX: 200, spanZ: 200 }}
       />
     );

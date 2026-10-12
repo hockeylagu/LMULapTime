@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { SessionLapStewardsLine } from '../../../src/components/session-detail/table/SessionLapStewardsLine.js';
-import { DriverData, LapData, LapTrackLimit } from '../../../server/core/types.js';
+import { DriverData, LapData, LapTrackLimit } from '../../../shared/types/index.js';
 
 const makeTrackLimit = (lapNum: number, elapsedSeconds: number, warningPoints = 0): LapTrackLimit => ({
   description: warningPoints > 0 ? `Track limits violation (+${warningPoints} pts)` : 'Track limits review (No Further Action)',

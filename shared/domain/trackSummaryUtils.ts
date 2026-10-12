@@ -1,4 +1,5 @@
 import { TrackSummary } from '../types/index.js';
+import type { DriverData, SessionMetadata } from '../types/session.js';
 import {
   getDisplayTrackName,
   computeTheoreticalBest,
@@ -8,42 +9,16 @@ import {
 import { matchesSessionCarClass } from './vehicleMapping.js';
 import { getCircuitSpecification } from './circuitSpecs.js';
 
-export interface TrackSessionSummary {
-  id?: string;
-  filename?: string;
-  trackVenue: string;
-  trackCourse?: string;
-  timeString: string;
-  timestamp?: number;
-  sessionType?: 'Practice' | 'Qualifying' | 'Race' | 'Unknown' | string;
-  sessionName?: string;
-  driversCount?: number;
-  playerDriver?: {
-    name: string;
-    carType: string;
-    carClass?: string;
-    bestLapTime: number | null;
-    bestLapTimeString?: string;
-    bestS1: number | null;
-    bestS2: number | null;
-    bestS3: number | null;
-    bestLapWet?: boolean;
-    lapsCount?: number;
-    isPlayer?: boolean;
-  } | null;
-  drivers?: Array<{
-    name: string;
-    carType: string;
-    carClass?: string;
-    bestLapTime: number | null;
-    bestLapTimeString?: string;
-    bestS1: number | null;
-    bestS2: number | null;
-    bestS3: number | null;
-    lapsCount?: number;
-    isPlayer?: boolean;
-  }>;
-}
+type TrackSummaryDriver = Pick<DriverData, 'name' | 'carType' | 'bestLapTime' | 'bestS1' | 'bestS2' | 'bestS3'> &
+  Partial<Pick<DriverData, 'carClass' | 'bestLapTimeString' | 'bestLapWet' | 'lapsCount' | 'isPlayer'>>;
+
+/** Minimal input contract for track aggregation, including the detailed-session drivers fallback. */
+export type TrackSessionSummary = Pick<SessionMetadata, 'trackVenue' | 'timeString'> &
+  Partial<Pick<SessionMetadata, 'id' | 'filename' | 'trackCourse' | 'timestamp' | 'sessionName' | 'driversCount'>> & {
+    sessionType?: string;
+    playerDriver?: TrackSummaryDriver | null;
+    drivers?: TrackSummaryDriver[];
+  };
 
 export interface AggregateTrackSummariesOptions {
   carClass?: string;

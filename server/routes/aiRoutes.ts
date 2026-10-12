@@ -12,7 +12,7 @@ import {
   validateEvidence,
 } from '../ai/aiReport.js';
 import { SessionDatabase } from '../core/db.js';
-import { AiAnalyzeRequest, AiAnalyzeResponse } from '../core/types.js';
+import { AiAnalyzeRequest, AiAnalyzeResponse } from '../../shared/types/index.js';
 import { queryString } from './queryParams.js';
 
 export function createAiRouter(sessionDb: SessionDatabase): Router {

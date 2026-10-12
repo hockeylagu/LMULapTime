@@ -15,7 +15,7 @@ import { TelemetryTireTempsChannel } from '../../../../src/components/replay/tel
 import { TelemetryAccelLatChannel } from '../../../../src/components/replay/telemetry/channels/dynamics/TelemetryAccelLatChannel.js';
 import { TelemetryAccelLonChannel } from '../../../../src/components/replay/telemetry/channels/dynamics/TelemetryAccelLonChannel.js';
 import { TelemetryAccelTotalChannel } from '../../../../src/components/replay/telemetry/channels/dynamics/TelemetryAccelTotalChannel.js';
-import { ReplayTrajectoryPoint } from '../../../../server/core/types.js';
+import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { computeTelemetryChartPaths } from '../../../../src/components/replay/telemetry/telemetryChartPaths.js';
 import { TelemetryChannelRenderer } from '../../../../src/components/replay/telemetry/TelemetryChannelRenderer.js';
 import { TELEMETRY_COLORS } from '../../../../src/utils/themeColors.js';

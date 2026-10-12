@@ -8,7 +8,7 @@ import type {
   DetailedSession,
   ReferenceBenchmarkDiff,
   ReferenceBenchmarkDiffItem,
-} from '../../../server/core/types.js';
+} from '../../../shared/types/index.js';
 import { SessionDatabase } from '../../../server/core/db.js';
 
 describe('benchmarkImpact engine', () => {

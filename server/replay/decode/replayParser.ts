@@ -5,7 +5,8 @@ import {
   ReplayDriverEntry,
   ReplayEventInfo,
   ReplayTrajectoryData,
-} from '../../core/types.js';
+  WeatherCondition,
+} from '../../../shared/types/index.js';
 import {
   mapVehicleIdToModel,
   mapVehicleIdToClass,
@@ -87,7 +88,7 @@ export function resolveReplayPrimarySlot(metadata: Pick<ReplayMetadata, 'drivers
 export function scanReplayWeather(fd: number, frameStreamEnd: number): {
   hasRain: boolean;
   maxRainIntensity: number;
-  weatherCondition: 'Dry' | 'Wet' | 'Dynamic Weather';
+  weatherCondition: WeatherCondition;
   ambientTemp?: number;
   trackTemp?: number;
 } {

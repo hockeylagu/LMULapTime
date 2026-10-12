@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { GpsTrackMapScene } from '../../../../src/components/replay/map/scene/GpsTrackMapScene.js';
 import { projectTrajectoryPoints } from '../../../../src/components/replay/map/replayMapUtils.js';
 import { computeCumulativeDistances } from '../../../../src/utils/lapAlignment.js';
-import { ReplayTrajectoryPoint } from '../../../../server/core/types.js';
+import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { mockPoints, mockBounds } from './gpsTrackMapFixtures.js';
 
 describe('GpsTrackMapScene', () => {

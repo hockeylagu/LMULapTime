@@ -3,7 +3,7 @@ import type { Database as DatabaseType } from 'better-sqlite3';
 import { SessionDatabase } from '../../../server/core/db.js';
 import { replaceReplayWideFacts } from '../../../server/core/replay/dbReplayLapStore.js';
 import { replayRainOverLap, reclassifyStoredSessions } from '../../../server/core/dbSessionConditions.js';
-import type { DetailedSession, DriverData, LapData, ReplayTrajectoryData } from '../../../server/core/types.js';
+import type { DetailedSession, DriverData, LapData, ReplayTrajectoryData } from '../../../shared/types/index.js';
 
 const replayName = 'Sebring International Raceway R1 17.Vcr';
 const replayLink = { name: replayName, path: `C:\\replays\\${replayName}`, sizeBytes: 1 };

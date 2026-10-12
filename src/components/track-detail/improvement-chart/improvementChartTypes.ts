@@ -1,11 +1,4 @@
-import type { PaceCategory, SessionProgressionPoint as BaseSessionProgressionPoint } from '../../../../shared/types/index.js';
-
-/** One session on the improvement chart: the server's progression point plus its benchmark pace category. */
-export interface SessionProgressionPoint extends BaseSessionProgressionPoint {
-  bestLapWet?: boolean; // The best lap was wet: no rating against the dry benchmark
-  benchmarkCategory?: PaceCategory | null;
-  benchmarkPercentage?: number | null;
-}
+import type { PaceCategory } from '../../../../shared/types/index.js';
 
 export interface ImprovementChartPoint {
   chartKey: string;

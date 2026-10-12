@@ -4,7 +4,7 @@ import {
   LapIncident,
   LapPenalty,
   LapTrackLimit,
-} from '../core/types.js';
+} from '../../shared/types/index.js';
 import {
   RawStreamIncidentNode,
   RawStreamPenaltyNode,

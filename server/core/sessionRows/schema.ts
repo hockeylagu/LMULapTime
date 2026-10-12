@@ -66,6 +66,7 @@ export function initSessionRowsSchema(db: DatabaseType): void {
     );
     CREATE TABLE IF NOT EXISTS session_drivers (
       session_id TEXT NOT NULL, driver_ordinal INTEGER NOT NULL, driver_id INTEGER, vehicle_id INTEGER, team_id INTEGER,
+      driver_name TEXT, -- Legacy compatibility column; DriverData.name is the canonical name.
       ${columnDefinitions(DRIVER_FIELDS)}, lists_mask INTEGER, ${DRIVER_DERIVED_COLUMNS},
       PRIMARY KEY(session_id, driver_ordinal)
     ) WITHOUT ROWID;

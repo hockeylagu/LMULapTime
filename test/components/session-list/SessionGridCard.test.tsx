@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SessionGridCard } from '../../../src/components/session-list/SessionGridCard.js';
-import type { SessionListItem } from '../../../src/components/session-list/sessionListTypes.js';
+import { makeSessionCard } from '../../helpers/sessionCardFixture.js';
 
-const session: SessionListItem = {
+const session = makeSessionCard({
   id: 'session-race-1',
   sessionType: 'Race',
   sessionName: 'Race 1',
@@ -15,7 +15,7 @@ const session: SessionListItem = {
     name: 'Player Driver', carType: 'Porsche 963', carClass: 'Hyper', lapsCount: 15, bestLapTime: 95.123,
     bestLapTimeString: '1:35.123', position: 1, gridPosition: 3, positionGain: 2, bestLapNum: 4, driverOrdinal: 0, bestLapOrdinal: 3,
   },
-} as SessionListItem;
+});
 
 /** jsdom cannot open a new tab: swallow the browser default after React has seen the click. */
 function modifierClick(el: HTMLElement, init: { ctrlKey?: boolean; metaKey?: boolean }): void {

@@ -13,7 +13,7 @@ import {
   DriverData,
   ReplayMetadata,
   ReplayTrajectoryData,
-} from '../../../server/core/types.js';
+} from '../../../shared/types/index.js';
 import { computeLapConsistencyStats } from '../../../src/utils/lapConsistency.js';
 
 describe('Replay domain services and transforms', () => {
@@ -280,7 +280,7 @@ describe('Replay domain services and transforms', () => {
       } as unknown as DetailedSession;
 
       const driver = {
-        driverName: 'Official Driver',
+        name: 'Official Driver',
         bestLapTime: 89.5,
         laps: [{ lapNum: 1, lapTime: 89.5, s1: 29.8, s2: 30.0, s3: 29.7, isValid: true }],
       } as unknown as DriverData;
@@ -308,7 +308,7 @@ describe('Replay domain services and transforms', () => {
       ] } as unknown as DriverData;
       const result = applyPureOfficialLapValidation(original, { id: 'official', trackVenue: 'Monza', trackCourse: 'GP' } as DetailedSession, driver);
       expect(result.laps?.[0]).toMatchObject({ isPitStop: true, isBest: false });
-      expect(result.laps?.[1].isOutlap).toBe(true);
+      expect(result.laps?.[1].isOutLap).toBe(true);
       expect(result.laps?.[2].isValid).toBe(false);
       expect(computeLapConsistencyStats(result.laps).lapCount).toBe(1);
       expect(original.laps?.[0].isPitStop).toBeUndefined();

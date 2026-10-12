@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { ReplayMetadata, ReplayTrajectoryData } from '../../../../server/core/types.js';
+import type { ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { readReplaySessionContext } from '../../../../server/core/sessionRows/replayContext.js';
 import { composeReplayMetadata } from '../../../../server/replay/replayMetadataService.js';
 import { applyPureOfficialLapValidation } from '../../../../server/replay/decode/replayTransforms.js';

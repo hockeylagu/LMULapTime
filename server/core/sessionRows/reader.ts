@@ -1,5 +1,5 @@
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { DetailedSession, DriverData, LapData } from '../types.js';
+import type { DetailedSession, DriverData, LapData } from '../../../shared/types/index.js';
 import type { TrafficGap, LapTraffic } from '../../../shared/types/raceTraffic.js';
 import { anyPresent, unpackFields, type Field, type Row } from './fields.js';
 import {

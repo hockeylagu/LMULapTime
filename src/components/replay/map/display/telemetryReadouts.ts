@@ -1,4 +1,4 @@
-import type { ReplayTelemetryPoint } from '../../../../../shared/types/index.js';
+import type { ReplayTrajectoryPoint } from '../../../../../shared/types/index.js';
 import { formatRain } from '../../../../../shared/domain/lapConditions.js';
 
 export function hasReading(value: number | null | undefined): value is number {
@@ -14,12 +14,12 @@ export function formatGear(gear: number | undefined): string {
   return gear === -1 ? 'R' : gear === 0 ? 'N' : String(gear);
 }
 
-export function totalAcceleration(point?: ReplayTelemetryPoint | null): number | undefined {
+export function totalAcceleration(point?: ReplayTrajectoryPoint | null): number | undefined {
   return hasReading(point?.accelLatG) && hasReading(point?.accelLonG)
     ? Math.hypot(point.accelLatG, point.accelLonG) : undefined;
 }
 
-export function getStatusLabel(point?: ReplayTelemetryPoint | null): string {
+export function getStatusLabel(point?: ReplayTrajectoryPoint | null): string {
   if (point?.pitLimiter) return 'LIMITER';
   if (point?.isOffTrack) return 'OFF TRACK';
   if (hasReading(point?.rainIntensity) && point.rainIntensity > 0) return `WET (${formatRain(point.rainIntensity)})`;
@@ -27,7 +27,7 @@ export function getStatusLabel(point?: ReplayTelemetryPoint | null): string {
   return point?.inPit === false && point.isOffTrack === false ? 'ON TRACK' : 'UNKNOWN';
 }
 
-export function getStatusSubtext(point?: ReplayTelemetryPoint | null): string {
+export function getStatusSubtext(point?: ReplayTrajectoryPoint | null): string {
   if (point?.pitLimiter) return 'enabled';
   if (point?.isOffTrack) return 'outside road';
   if (hasReading(point?.ambientTemp)) return `air ${point.ambientTemp.toFixed(1)}°C`;

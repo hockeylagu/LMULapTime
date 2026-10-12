@@ -1,5 +1,5 @@
 import type { Database } from 'better-sqlite3';
-import type { ReplayMetadata } from '../types.js';
+import type { ReplayMetadata } from '../../../shared/types/index.js';
 import type { ReplayFileEntry } from '../../sessions/sessionXmlTypes.js';
 import { replayIndexEntryFromStored, REPLAY_MATCH_WINDOW_MS, type ReplayMatchTarget } from '../../sessions/replayMatching.js';
 import { getStoredReplayFileInfo } from './dbReplayMetadataStore.js';

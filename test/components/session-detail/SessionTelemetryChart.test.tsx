@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { LegendPayload } from 'recharts';
-import type { DetailedSession, DriverData } from '../../../server/core/types.js';
+import type { DetailedSession, DriverData } from '../../../shared/types/index.js';
 import { SessionTelemetryChart } from '../../../src/components/session-detail/chart/SessionTelemetryChart.js';
 import { mockDetailedSession } from './mockSessionDetail.js';
 

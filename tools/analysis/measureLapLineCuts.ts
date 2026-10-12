@@ -48,7 +48,7 @@ function endStatus(neighbour: ReplayTrajectoryData | null, edge: ReplayTrajector
 
 function lapKind(lap: ReplayTrajectoryData, lapKey: number, minKey: number, maxKey: number): LapKind {
   const summary = lap.laps?.find(l => l.lapNumber === lapKey);
-  if (summary?.isOutlap) return 'out-lap';
+  if (summary?.isOutLap) return 'out-lap';
   if (lap.points.some(p => p.inPit)) return 'pit';
   if (lapKey === minKey) return 'first of recording';
   if (lapKey === maxKey) return 'last of recording';

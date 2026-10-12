@@ -1,5 +1,5 @@
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { DetailedSession } from './types.js';
+import type { DetailedSession } from '../../shared/types/index.js';
 import type { TelemetrySessionCandidate } from '../telemetry/telemetryMatcher.js';
 import { REPLAY_MATCH_WINDOW_MS } from '../sessions/replayMatching.js';
 import { loadSessions } from './sessionRows/access.js';

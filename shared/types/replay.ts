@@ -1,6 +1,7 @@
 import type { NonRepresentativeReason } from './session.js';
 import type { VehicleDataRecord } from './dataPlugin.js';
-import type { TrackKerbType } from './trackGeometry.js';
+import type { TrackKerbType, TrackTimingGates } from './trackGeometry.js';
+import type { WeatherCondition } from './session.js';
 
 export interface ReplayEventInfo {
   eventId?: string;
@@ -61,23 +62,28 @@ export interface ReplayMetadata {
   duckdbFilename?: string;
   hasRain?: boolean;
   maxRainIntensity?: number;
-  weatherCondition?: 'Dry' | 'Wet' | 'Dynamic Weather';
+  weatherCondition?: WeatherCondition;
   ambientTemp?: number;
   trackTemp?: number;
 }
 
-export interface TimingGateGeometry {
-  name: string;
-  center: [number, number];
-  left: [number, number];
-  right: [number, number];
-  stationM: number;
-}
-
-export interface TrackTimingGates {
-  startFinish: TimingGateGeometry;
-  sector1?: TimingGateGeometry;
-  sector2?: TimingGateGeometry;
+export interface ReplayCacheSummary {
+  filename: string;
+  fileSizeBytes: number;
+  compressedSizeBytes: number;
+  updatedAt: number;
+  // The .Vcr file's on-disk modification time - the closest proxy we have for when the
+  // replay/session actually took place, as opposed to `updatedAt` (when it was cached).
+  replayDateMs: number;
+  trackName?: string;
+  driversCount: number;
+  durationSec?: number;
+  eventTitle?: string;
+  trajectoriesCached: number;
+  parserVersion?: string;
+  replayVersion?: string;
+  isOnDisk?: boolean;
+  error?: string | null;
 }
 
 export interface ReplayTrajectoryPoint {
@@ -206,7 +212,6 @@ export interface ReplayStandingsSnapshot {
   order: number[];
 }
 
-export type ReplayTelemetryPoint = ReplayTrajectoryPoint;
 
 export interface ReplayLapSummary {
   lapNumber: number;
@@ -215,7 +220,7 @@ export interface ReplayLapSummary {
   s1Sec: number;
   s2Sec: number;
   s3Sec: number;
-  isOutlap?: boolean;
+  isOutLap?: boolean;
   /** Completed lap containing pit-lane entry; excluded from flying-lap consistency. */
   isPitStop?: boolean;
   isBest?: boolean;
@@ -308,7 +313,7 @@ export interface ReplayTrajectoryData {
   sessionRunningOrder?: number[];
   flagEvents?: ReplayFlagEvent[];
   weatherEvents?: ReplayWeatherEvent[];
-  weatherCondition?: 'Dry' | 'Wet' | 'Dynamic Weather';
+  weatherCondition?: WeatherCondition;
   maxRainIntensity?: number;
   ambientTemp?: number;
   trackTemp?: number;
@@ -348,10 +353,8 @@ export interface ReplayTrajectoryData {
 export interface ReplaySummary {
   name: string;
   path: string;
-  sizeBytes: number;
-  fileSizeBytes?: number;
-  mtime: number;
-  mtimeMs?: number;
+  fileSizeBytes: number;
+  mtimeMs: number;
   trackName?: string;
   trackVenue?: string;
   trackCourse?: string;
@@ -370,7 +373,7 @@ export interface ReplaySummary {
   duckdbFilename?: string;
   hasRain?: boolean;
   maxRainIntensity?: number;
-  weatherCondition?: 'Dry' | 'Wet' | 'Dynamic Weather';
+  weatherCondition?: WeatherCondition;
   ambientTemp?: number;
   trackTemp?: number;
 }

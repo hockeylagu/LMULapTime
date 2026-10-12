@@ -1,5 +1,5 @@
 import { Database as DatabaseType } from 'better-sqlite3';
-import { DetailedSession, SessionMetadata } from './types.js';
+import { DetailedSession, SessionMetadata } from '../../shared/types/index.js';
 import { isReplayLinkWithdrawn } from './replay/dbReplayLinkStore.js';
 import { persistSessionProjection } from './sessionSummaries/store.js';
 import { SESSION_DICTIONARY_TABLES, SESSION_ROW_TABLES } from './sessionRows/schema.js';

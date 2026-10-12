@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { DashboardPaceSparkline } from '../../../src/components/dashboard/DashboardPaceSparkline.js';
-import type { RecentPacePoint } from '../../../src/components/dashboard/useDashboardTrends.js';
+import type { DashboardRecentPacePoint } from '../../../shared/types/dashboard.js';
 
 describe('DashboardPaceSparkline component', () => {
   it('renders fallback message when fewer than 2 pace points exist', () => {
@@ -10,11 +10,11 @@ describe('DashboardPaceSparkline component', () => {
     );
     expect(container).toHaveTextContent(/Complete more timed sessions to track pace progression/i);
 
-    const singlePoint: RecentPacePoint[] = [
+    const singlePoint: DashboardRecentPacePoint[] = [
       {
         id: 'sess-1',
         trackName: 'Spa',
-        carName: 'BMW M4',
+        carType: 'BMW M4',
         timeString: '2026/09/20 14:00',
         bestLapTimeString: '2:18.500',
         pacePercentage: 103.5,
@@ -27,11 +27,11 @@ describe('DashboardPaceSparkline component', () => {
   });
 
   it('renders pace trajectory and data points with aspect-square circular markers', () => {
-    const points: RecentPacePoint[] = [
+    const points: DashboardRecentPacePoint[] = [
       {
         id: 'sess-1',
         trackName: 'Spa',
-        carName: 'BMW M4',
+        carType: 'BMW M4',
         timeString: '2026/09/20 14:00',
         bestLapTimeString: '2:18.500',
         pacePercentage: 103.5,
@@ -39,7 +39,7 @@ describe('DashboardPaceSparkline component', () => {
       {
         id: 'sess-2',
         trackName: 'Monza',
-        carName: 'BMW M4',
+        carType: 'BMW M4',
         timeString: '2026/09/22 14:00',
         bestLapTimeString: '1:48.200',
         pacePercentage: 102.8,
@@ -47,7 +47,7 @@ describe('DashboardPaceSparkline component', () => {
       {
         id: 'sess-3',
         trackName: 'Le Mans',
-        carName: 'Corvette Z06',
+        carType: 'Corvette Z06',
         timeString: '2026/09/23 22:30',
         bestLapTimeString: '4:00.470',
         pacePercentage: 102.4,
@@ -88,9 +88,9 @@ describe('DashboardPaceSparkline component', () => {
   });
 
   it('renders declining and steady badges correctly based on trend direction', () => {
-    const points: RecentPacePoint[] = [
-      { id: '1', trackName: 'Spa', carName: 'BMW', timeString: '2026/09/20', bestLapTimeString: '2:00', pacePercentage: 102.0 },
-      { id: '2', trackName: 'Spa', carName: 'BMW', timeString: '2026/09/21', bestLapTimeString: '2:02', pacePercentage: 103.5 },
+    const points: DashboardRecentPacePoint[] = [
+      { id: '1', trackName: 'Spa', carType: 'BMW', timeString: '2026/09/20', bestLapTimeString: '2:00', pacePercentage: 102.0 },
+      { id: '2', trackName: 'Spa', carType: 'BMW', timeString: '2026/09/21', bestLapTimeString: '2:02', pacePercentage: 103.5 },
     ];
 
     const { rerender } = render(
@@ -106,9 +106,9 @@ describe('DashboardPaceSparkline component', () => {
   });
 
   it('keeps small changes small', () => {
-    const points: RecentPacePoint[] = [
-      { id: '1', trackName: 'Spa', carName: 'BMW', timeString: '2026/09/20', bestLapTimeString: '2:00', pacePercentage: 110.0 },
-      { id: '2', trackName: 'Spa', carName: 'BMW', timeString: '2026/09/21', bestLapTimeString: '2:00', pacePercentage: 110.2 },
+    const points: DashboardRecentPacePoint[] = [
+      { id: '1', trackName: 'Spa', carType: 'BMW', timeString: '2026/09/20', bestLapTimeString: '2:00', pacePercentage: 110.0 },
+      { id: '2', trackName: 'Spa', carType: 'BMW', timeString: '2026/09/21', bestLapTimeString: '2:00', pacePercentage: 110.2 },
     ];
     const { container } = render(<DashboardPaceSparkline points={points} paceDelta={-0.2} paceTrendDirection="steady" />);
 

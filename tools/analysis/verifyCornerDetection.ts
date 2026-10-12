@@ -19,7 +19,7 @@ import { interpolatePointAtDistance } from '../../src/utils/replayComparison.js'
 import { computeCumulativeDistances } from '../../src/utils/lapAlignment.js';
 import { computeLapSegmentComparisons } from '../../src/utils/cornerAnalysis/segmentComparisons.js';
 import { extractReplayTrajectory } from '../../server/replay/decode/replayTrajectory.js';
-import { ReplayTrajectoryPoint } from '../../server/core/types.js';
+import { ReplayTrajectoryPoint } from '../../shared/types/index.js';
 
 interface TelRecord {
   t: string;

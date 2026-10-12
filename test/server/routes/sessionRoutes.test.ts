@@ -13,7 +13,7 @@ import {
   createSessionRouter,
   parseSessionFilters,
 } from '../../../server/routes/sessionRoutes.js';
-import { DetailedSession, ReferenceLaptimeEntry } from '../../../server/core/types.js';
+import { DetailedSession, ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 import { ServerContext } from '../../../server/core/serverContext.js';
 import { SessionDatabase } from '../../../server/core/db.js';
 

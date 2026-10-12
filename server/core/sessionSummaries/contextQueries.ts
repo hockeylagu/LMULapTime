@@ -1,5 +1,5 @@
 import type { Database } from 'better-sqlite3';
-import type { DetailedSession } from '../types.js';
+import type { DetailedSession } from '../../../shared/types/index.js';
 import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
 import { findWeekendSessions } from '../../../shared/domain/weekendSessions.js';
 import { isSessionSummaryReady } from './store.js';

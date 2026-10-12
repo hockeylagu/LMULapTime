@@ -1,5 +1,5 @@
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { DetailedSession } from '../types.js';
+import type { DetailedSession } from '../../../shared/types/index.js';
 
 /**
  * Inserts the `sessions` row a session's rows hang from, with the columns the session itself carries

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { TelemetryStaticTrace } from '../../TelemetryStaticTrace.js';
 import { Layers } from 'lucide-react';
-import { ReplayTelemetryPoint } from '../../../../../../shared/types/index.js';
+import { ReplayTrajectoryPoint } from '../../../../../../shared/types/index.js';
 import { PointComparison } from '../../../../../utils/replayComparison.js';
 import { CornerPaths } from '../../telemetryCornerChartPaths.js';
 import { TelemetryWheelTrace } from '../TelemetryWheelTrace.js';
@@ -11,7 +11,7 @@ export interface TelemetryTireWearChannelProps {
   baselineTireWearPaths?: CornerPaths;
   minTireWear: number;
   maxTireWear: number;
-  currentPoint?: ReplayTelemetryPoint;
+  currentPoint?: ReplayTrajectoryPoint;
   currentComparison?: PointComparison | null;
   isCursorInView: boolean;
   cursorPct: number;

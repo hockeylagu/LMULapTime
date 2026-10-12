@@ -1,5 +1,5 @@
 import React from 'react';
-import { ReplayTrajectoryPoint, ReplayTelemetryPoint } from '../../../../shared/types/index.js';
+import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { CornerSegmentComparison } from '../../../utils/cornerAnalysis/types.js';
 import { TelemetryChartPathsResult } from './telemetryChartPaths.js';
@@ -31,7 +31,7 @@ import { TelemetryRegenRateChannel } from './channels/powertrain/TelemetryRegenR
 
 export interface TelemetryChannelRendererProps {
   channelId: TelemetryChannelId;
-  currentPoint?: ReplayTelemetryPoint;
+  currentPoint?: ReplayTrajectoryPoint;
   currentComparison?: PointComparison | null;
   pointComparisons: PointComparison[];
   paths: TelemetryChartPathsResult;

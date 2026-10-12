@@ -12,7 +12,7 @@ import {
   ReplayStandingsSnapshot,
   ReplayLapSummary,
   ReplayWeatherEvent,
-} from '../../core/types.js';
+} from '../../../shared/types/index.js';
 import { detectPlayerName, parseReplayMetadata, resolveReplayPrimarySlot } from './replayParser.js';
 import {
   RawTrajectoryPoint,

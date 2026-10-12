@@ -5,7 +5,7 @@ import { replaceReplayDriverLapFacts, replaceReplayWideFacts } from '../../../se
 import { emptyLapFact } from '../../../server/replay/decode/replayFacts.js';
 import { attachPitServices } from '../../../server/sessions/sessionPitStops.js';
 import type { ReplayDriverEventFact } from '../../../server/replay/decode/replayFacts.js';
-import type { DetailedSession, DriverData, LapData } from '../../../server/core/types.js';
+import type { DetailedSession, DriverData, LapData } from '../../../shared/types/index.js';
 
 const replayName = 'Daytona R1 6.Vcr';
 

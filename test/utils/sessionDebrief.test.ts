@@ -111,7 +111,7 @@ describe('rankDebriefCorners', () => {
     // Corner 1 runs 1000-1200 m. Laps 2-5 are timed there; lap 3 had a car in front through it,
     // lap 4 only after it. The analysed lap 20 had one at the corner entry.
     const spell = (startStationM: number, endStationM: number) => ({
-      carName: 'Rui Paiva', carClass: 'GT3', kind: 'multiclass' as const, direction: 'ahead' as const,
+      driverName: 'Rui Paiva', carClass: 'GT3', kind: 'multiclass' as const, direction: 'ahead' as const,
       startSec: 0, endSec: 4, startStationM, endStationM, closestGapSec: 0.3,
     });
     const traffic = new Map([[3, [spell(1150, 1400)]], [4, [spell(1300, 1500)]], [20, [spell(900, 1010)]]]);
@@ -122,14 +122,14 @@ describe('rankDebriefCorners', () => {
 
     expect(clean).toMatchObject({ lapsSampled: 3, lapsLosing: 2, lapsInTraffic: 1, confidence: 1, traffic: null });
     expect(inTraffic.confidence).toBe(0.5);
-    expect(inTraffic.traffic?.carName).toBe('Rui Paiva');
+    expect(inTraffic.traffic?.driverName).toBe('Rui Paiva');
     expect(inTraffic.priority).toBeCloseTo(clean.priority / 2, 3);
   });
 });
 
 describe('spellCoversCorner', () => {
   const spell = (startStationM: number, endStationM: number) => ({
-    carName: 'A', kind: 'battle' as const, direction: 'ahead' as const, startSec: 0, endSec: 3, startStationM, endStationM, closestGapSec: 0.5,
+    driverName: 'A', kind: 'battle' as const, direction: 'ahead' as const, startSec: 0, endSec: 3, startStationM, endStationM, closestGapSec: 0.5,
   });
 
   it('matches a spell overlapping any part of the corner window', () => {

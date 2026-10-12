@@ -1,5 +1,5 @@
 import { Database as DatabaseType } from 'better-sqlite3';
-import { RejectedReplayLink, ReplayLinkRejectionReason, SessionMetadata } from '../types.js';
+import { RejectedReplayLink, ReplayLinkRejectionReason, SessionMetadata } from '../../../shared/types/index.js';
 import { deleteTargetedReplayLink } from '../sessionRows/targeted.js';
 
 // Withdrawn session -> replay links (see rejected_replay_links in dbSchema.ts).

@@ -1,10 +1,10 @@
 import React from 'react';
-import { ReplayTelemetryPoint } from '../../../../shared/types/index.js';
+import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { getSteerPercent } from '../../../../shared/domain/formatters.js';
 import { formatRain } from '../../../../shared/domain/lapConditions.js';
 
 export interface ReplayTelemetryHudProps {
-  currentPoint?: ReplayTelemetryPoint | null;
+  currentPoint?: ReplayTrajectoryPoint | null;
 }
 
 export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(({ currentPoint }) => {

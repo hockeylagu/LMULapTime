@@ -6,7 +6,7 @@ import { SessionTableView } from './SessionTableView.js';
 import { useSessionViewMode } from './useSessionViewMode.js';
 import { useSessionPage } from './useSessionPage.js';
 import { SessionPagination } from './SessionPagination.js';
-import { SessionListItem, SessionListProps } from './sessionListTypes.js';
+import type { SessionListProps } from './sessionListTypes.js';
 
 export const SessionList: React.FC<SessionListProps> = ({
   sessions,
@@ -40,7 +40,7 @@ export const SessionList: React.FC<SessionListProps> = ({
     if (top !== undefined && top < 0) listTopRef.current?.scrollIntoView({ block: 'start' });
   };
 
-  const resolvePaceBadge = (s: SessionListItem) => {
+  const resolvePaceBadge = (s: SessionListProps['sessions'][number]) => {
     if (getPaceBadge) {
       return getPaceBadge(s);
     }

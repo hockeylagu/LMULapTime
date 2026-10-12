@@ -1,4 +1,4 @@
-import { ReplayTelemetryPoint } from '../../../../shared/types/index.js';
+import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { interpolatePointAtDistance } from '../../../utils/replayComparison.js';
 import { findIndexAtDistance } from '../../../utils/lapAlignment.js';
 import { TrackBoundaryGeometry } from '../../../../shared/types/trackGeometry.js';
@@ -45,7 +45,7 @@ const DELTA_NEUTRAL_COLOR = TELEMETRY_COLORS.neutral;
  * used when colorBy === 'delta' and must be supplied by the caller (requires a baseline lap).
  */
 export function getHeatmapColor(
-  p: ReplayTelemetryPoint,
+  p: ReplayTrajectoryPoint,
   colorBy: MapColorMode = 'pedal',
   deltaTimeSec?: number
 ): string {
@@ -84,14 +84,14 @@ export function getHeatmapColor(
   return sampleGradient(SPEED_GRADIENT_STOPS, spd / MAX_SPEED_KMH);
 }
 
-export interface ProjectedPoint extends ReplayTelemetryPoint {
+export interface ProjectedPoint extends ReplayTrajectoryPoint {
   sx: number;
   sy: number;
   idx: number;
 }
 
 export function projectTrajectoryPoints(
-  points: ReplayTelemetryPoint[],
+  points: ReplayTrajectoryPoint[],
   bounds: { minX: number; spanX: number; minZ: number; spanZ: number },
   viewBoxSize: number,
   padding: number
@@ -332,7 +332,7 @@ export function computeTrackBoundaryPathD(
 export function computeGhostPosition(
   primaryDists: number[],
   baselineDists: number[],
-  baselinePoints: ReplayTelemetryPoint[],
+  baselinePoints: ReplayTrajectoryPoint[],
   currentIndex: number,
   bounds: { minX: number; spanX: number; minZ: number; spanZ: number },
   viewBoxSize: number,
@@ -393,7 +393,7 @@ export function computePedalMarkerPoints(
   baselineDists: number[],
   svgPoints: ProjectedPoint[],
   baselineSvgPoints: ProjectedPoint[],
-  baselinePoints?: ReplayTelemetryPoint[]
+  baselinePoints?: ReplayTrajectoryPoint[]
 ): MappedPedalMarker[] {
   if (!showPedalMarkers || !pedalMarkers || pedalMarkers.length === 0 || svgPoints.length === 0) return [];
   const mapped: MappedPedalMarker[] = pedalMarkers

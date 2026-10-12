@@ -27,7 +27,7 @@ export type TrafficSpellKind = 'battle' | 'lapping' | 'beingLapped' | 'multiclas
  * from the timing line), so it lines up with the corners of the driver's lap.
  */
 export interface TrafficSpell {
-  carName: string;
+  driverName: string;
   carClass?: string;
   kind: TrafficSpellKind;
   direction: 'ahead' | 'behind';

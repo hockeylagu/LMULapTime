@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { TelemetryStripCharts } from '../../../../src/components/replay/telemetry/TelemetryStripCharts.js';
-import { ReplayTrajectoryPoint } from '../../../../server/core/types.js';
+import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 
 describe('TelemetryStripCharts', () => {
   const mockPoints: ReplayTrajectoryPoint[] = [

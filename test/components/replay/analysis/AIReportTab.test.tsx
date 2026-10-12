@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { AIReportTab } from '../../../../src/components/replay/analysis/AIReportTab.js';
-import type { ReplayTrajectoryData } from '../../../../server/core/types.js';
+import type { ReplayTrajectoryData } from '../../../../shared/types/index.js';
 
 const trajectory = {
   replayName: 'Test_Replay.vcr', sessionId: 'primary-session', driverOrdinal: 0, lapOrdinal: 0,

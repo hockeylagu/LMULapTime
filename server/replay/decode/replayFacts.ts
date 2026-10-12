@@ -5,7 +5,7 @@ import {
   ReplayTrajectoryData,
   ReplayTrajectoryPoint,
   ReplayWeatherEvent,
-} from '../../core/types.js';
+} from '../../../shared/types/index.js';
 
 // Turns a decoded trajectory into the rows of the normalized replay tables (dbSchema.ts): each
 // fact once, at its own level. Every lap blob of a replay holds the same replay-wide arrays (the
@@ -21,7 +21,7 @@ export interface ReplayLapFact {
   s2Sec: number | null;
   s3Sec: number | null;
   lapDistM: number | null;
-  isOutlap: boolean | null;
+  isOutLap: boolean | null;
   isValid: boolean | null;
   isBest: boolean | null;
   startFrame: number | null;
@@ -85,7 +85,7 @@ const orNull = <T>(value: T | undefined): T | null => (value === undefined ? nul
 export function emptyLapFact(lapNumber: number, span: LapSpan | null = null): ReplayLapFact {
   return {
     lapNumber, startSec: span?.startSec ?? null, endSec: span?.endSec ?? null, lapTimeSec: null, s1Sec: null, s2Sec: null, s3Sec: null,
-    lapDistM: null, isOutlap: null, isValid: null, isBest: null, startFrame: null, endFrame: null,
+    lapDistM: null, isOutLap: null, isValid: null, isBest: null, startFrame: null, endFrame: null,
   };
 }
 
@@ -106,7 +106,7 @@ export function lapFactsFrom(laps: ReadonlyArray<ReplayLapSummary>, spans: Reado
       s2Sec: orNull(lap.s2Sec),
       s3Sec: orNull(lap.s3Sec),
       lapDistM: orNull(lap.lapDistMeters),
-      isOutlap: orNull(lap.isOutlap),
+      isOutLap: orNull(lap.isOutLap),
       isValid: orNull(lap.isValid),
       isBest: orNull(lap.isBest),
       startFrame: orNull(lap.startFrame),
@@ -125,7 +125,7 @@ export function lapSummariesFrom(facts: ReadonlyArray<ReplayLapFact>): ReplayLap
   return facts.filter(f => f.lapTimeSec !== null).map((f) => {
     const lap: ReplayLapSummary = { lapNumber: f.lapNumber, lapTimeSec: f.lapTimeSec ?? 0, s1Sec: f.s1Sec ?? 0, s2Sec: f.s2Sec ?? 0, s3Sec: f.s3Sec ?? 0 };
     if (f.lapDistM !== null) lap.lapDistMeters = f.lapDistM;
-    if (f.isOutlap !== null) lap.isOutlap = f.isOutlap;
+    if (f.isOutLap !== null) lap.isOutLap = f.isOutLap;
     if (f.isBest !== null) lap.isBest = f.isBest;
     if (f.isValid !== null) lap.isValid = f.isValid;
     if (f.startFrame !== null) lap.startFrame = f.startFrame;

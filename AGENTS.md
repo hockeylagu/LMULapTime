@@ -77,7 +77,7 @@ Telemetry analytics, lap comparison, and race intelligence hub for **Le Mans Ult
 
 ### TypeScript & Modules
 - **ESM**: Module type `"type": "module"`. Include `.js` extensions on relative imports in Node/ESM contexts (`server/`, `shared/`, `test/`).
-- **Zero-`any`**: Forbidden everywhere (`src/`, `server/`, `test/`). Use explicit models from `server/core/types.ts`, strict interfaces, or `unknown` with type narrowing.
+- **Zero-`any`**: Forbidden everywhere (`src/`, `server/`, `test/`). Use canonical models from `shared/types/`, telemetry reader contracts from `server/telemetry/duckdbTypes.ts`, strict interfaces, or `unknown` with type narrowing.
 - **Zero Warnings Standard**: Production builds (`npm run build`) and test runs (`npm test`) must finish with **zero warnings and zero errors** (no rollup chunk warnings, unhandled React `act(...)` warnings, or unused variables).
 - **Strict File Size Limits**:
   - Max **1,000 lines** for any `.ts` / `.tsx` source or test file.

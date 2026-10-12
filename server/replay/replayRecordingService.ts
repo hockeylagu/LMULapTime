@@ -6,7 +6,7 @@ import { settledReplayFailure } from '../core/replay/dbReplayIngestStore.js';
 import { recordDriverFailure } from '../core/replay/dbReplaySync.js';
 import { decodeOrThrow } from './decode/replayDecodeError.js';
 import { ReplayDriverNotRecordedError } from './replayServiceTypes.js';
-import { ReplayMetadata, ReplayTrajectoryData } from '../core/types.js';
+import { ReplayMetadata, ReplayTrajectoryData } from '../../shared/types/index.js';
 
 /** Serves retained replay recordings from SQLite, decoding missing drivers in a worker. */
 export class ReplayRecordingService {

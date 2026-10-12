@@ -1,5 +1,5 @@
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { DetailedSession, SessionMetadata } from '../types.js';
+import type { DetailedSession, SessionMetadata } from '../../../shared/types/index.js';
 import type { Row } from './fields.js';
 import { recordingLink, readSession } from './reader.js';
 import { stableKey } from './writer.js';

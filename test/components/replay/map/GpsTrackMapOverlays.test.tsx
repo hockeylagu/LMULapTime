@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { GpsTrackMapScene } from '../../../../src/components/replay/map/scene/GpsTrackMapScene.js';
 import { projectTrajectoryPoints } from '../../../../src/components/replay/map/replayMapUtils.js';
-import { ReplayTrajectoryPoint } from '../../../../server/core/types.js';
+import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { mockPoints, mockBounds, mockGeometry } from './gpsTrackMapFixtures.js';
 
 describe('GpsTrackMapScene overlays and geometry', () => {

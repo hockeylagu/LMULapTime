@@ -1,4 +1,4 @@
-import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../core/types.js';
+import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../shared/types/index.js';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { sampleTrackSurfaceProfile } from '../../shared/domain/trackGeometry.js';
 import { projectTrajectoryToCenterline } from './trackProjection.js';

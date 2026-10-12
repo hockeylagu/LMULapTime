@@ -1,4 +1,4 @@
-import { ReplayPitEvent, ReplayTrajectoryPoint } from '../../core/types.js';
+import { ReplayPitEvent, ReplayTrajectoryPoint } from '../../../shared/types/index.js';
 import { applyGarageState } from './garageState.js';
 import { RawTrajectoryPoint, isTimeInIntervals } from './replayLapBuilder.js';
 

@@ -1,4 +1,4 @@
-import type { ReplayTelemetryPoint } from '../../../../../shared/types/index.js';
+import type { ReplayTrajectoryPoint } from '../../../../../shared/types/index.js';
 
 export interface TrajectorySample {
   speedKmh?: number;
@@ -98,7 +98,7 @@ export function resolveCarAcceleration(
  * Interpolates the primary car's spatial position and telemetry values at the current
  * playback fraction so HUD metrics and line separation match the continuous visual car.
  */
-export function interpolatePrimaryPoint<T extends ReplayTelemetryPoint>(
+export function interpolatePrimaryPoint<T extends ReplayTrajectoryPoint>(
   points: T[],
   index: number,
   fraction = 0

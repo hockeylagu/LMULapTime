@@ -5,7 +5,7 @@ import { recordingLink } from './reader.js';
 import { DRIVER_DICTIONARY_FIELDS, DRIVER_FIELDS, LAP_FIELDS } from './specs.js';
 
 const driverFields = [...DRIVER_DICTIONARY_FIELDS, ...DRIVER_FIELDS].filter(field =>
-  ['name', 'driverName', 'carType', 'carClass', 'bestLapTime', 'isPlayer'].includes(field.prop));
+  ['name', 'carType', 'carClass', 'bestLapTime', 'isPlayer'].includes(field.prop));
 const lapFields = LAP_FIELDS.filter(field => ['lapNum', 'lapTime', 's1', 's2', 's3',
   'isValid', 'isPitStop', 'isOutLap', 'nonRepresentativeReason'].includes(field.prop));
 
@@ -20,7 +20,7 @@ export function readReplaySessionContext(
   const row = db.prepare(`SELECT id,track_venue,track_course,track_length_meters,session_type,total_laps_count,
     player_driver_ordinal,has_duckdb_telemetry,duckdb_filename FROM sessions WHERE id=?`).get(id) as Row | undefined;
   if (!row) return null;
-  const drivers = (db.prepare(`SELECT d.driver_ordinal,d.driver_name,d.best_lap_time,d.is_player,
+  const drivers = (db.prepare(`SELECT d.driver_ordinal,d.best_lap_time,d.is_player,
       n.name,v.car_type,v.car_class
     FROM session_drivers d LEFT JOIN drivers n ON n.driver_id=d.driver_id
     LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id WHERE d.session_id=? ORDER BY d.driver_ordinal`)

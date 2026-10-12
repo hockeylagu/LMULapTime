@@ -1,4 +1,4 @@
-import type { LapData } from '../core/types.js';
+import type { LapData } from '../../shared/types/index.js';
 import { isCompletedPitStop } from '../../shared/domain/lapComparison.js';
 import { formatTime } from '../../shared/domain/formatters.js';
 import { computeAverageLapTime } from './sessionAnalytics.js';

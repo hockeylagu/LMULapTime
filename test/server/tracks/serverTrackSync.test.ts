@@ -9,7 +9,7 @@ vi.mock('../../../server/plugins/dataPlugin.js', async (importOriginal) => {
 import { vi } from 'vitest';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { enrichTrajectoryWithTrackGeometry, clearTrackDefinitionCache, getTrackDefinition } from '../../../server/tracks/serverTrackSync.js';
-import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../server/core/types.js';
+import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../shared/types/index.js';
 
 describe('serverTrackSync', () => {
   beforeEach(() => {

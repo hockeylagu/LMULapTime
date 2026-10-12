@@ -10,8 +10,6 @@ import { apiErrorMessage, isAbortError, fetchJson } from '../../api/apiClient.js
 import { useSessionDataContext } from '../../api/sessionDataContext.js';
 import { TrackSummaryCard } from './TrackSummaryCard.js';
 
-export type TrackSummaryData = TrackSummary;
-
 export interface TrackSummariesProps {
   sessions?: TrackSessionSummary[];
   onSelectTrack: (track: TrackSummary) => void;

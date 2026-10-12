@@ -1,11 +1,11 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useCornerConsistency } from '../../../../src/components/replay/analysis/useCornerConsistency.js';
-import type { ReplayMetadata, ReplayTrajectoryData } from '../../../../server/core/types.js';
+import type { ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 
 const bounds = { minX: 0, maxX: 10, minZ: 0, maxZ: 0, spanX: 10, spanZ: 0 };
 
-function lapSummary(lapNumber: number, lapTimeSec: number, options: { isValid?: boolean; isOutlap?: boolean; isPitStop?: boolean } = {}) {
+function lapSummary(lapNumber: number, lapTimeSec: number, options: { isValid?: boolean; isOutLap?: boolean; isPitStop?: boolean } = {}) {
   return { lapNumber, lapTimeSec, s1Sec: 0, s2Sec: 0, s3Sec: 0, ...options };
 }
 
@@ -86,7 +86,7 @@ describe('useCornerConsistency', () => {
       lapSummary(2, 101, { isValid: true }),
       lapSummary(3, 100, { isValid: true }),
       lapSummary(4, 99, { isValid: false }),
-      lapSummary(5, 98, { isOutlap: true }),
+      lapSummary(5, 98, { isOutLap: true }),
     ]);
 
     const { result } = renderHook(() => useCornerConsistency(true, 'valid-session', metadataFor(current.laps), 1, current));

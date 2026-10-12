@@ -8,12 +8,12 @@ import { SessionDatabase } from '../../../server/core/db.js';
 import { createReplayRouter } from '../../../server/routes/replayRoutes.js';
 import { ServerContext } from '../../../server/core/serverContext.js';
 import { TelemetryCatalog } from '../../../server/telemetry/telemetryCatalog.js';
-import type { DetailedSession } from '../../../server/core/types.js';
+import type { DetailedSession } from '../../../shared/types/index.js';
 import { createSliceVcrBuffer } from '../../utils/mockVcr.js';
 import { session as sessionFixture, driver, lap } from '../core/sessionRows/builders.js';
 import { ReplayTrajectoryService } from '../../../server/replay/replayTrajectoryService.js';
 import { RaceTrafficService } from '../../../server/traffic/raceTrafficService.js';
-import type { ReplayTrajectoryData } from '../../../server/core/types.js';
+import type { ReplayTrajectoryData } from '../../../shared/types/index.js';
 
 describe('session telemetry routes', () => {
   let db: SessionDatabase;

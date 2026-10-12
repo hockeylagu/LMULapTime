@@ -7,7 +7,7 @@ import {
   detectPlayerName,
   downsampleReplayTrajectory,
 } from '../../../../server/replay/decode/replayParser.js';
-import { ReplayEventInfo, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../server/core/types.js';
+import { ReplayEventInfo, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { createMockVcrBuffer, createSliceVcrBuffer } from '../../../utils/mockVcr.js';
 
 /**

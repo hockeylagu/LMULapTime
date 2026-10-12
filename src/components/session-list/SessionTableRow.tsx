@@ -5,7 +5,8 @@ import { isSessionEmpty, getDisplayTrackName } from '../../../shared/domain/form
 import { PaceBadge } from '../common/PaceBadge.js';
 import { ReplayIndicator } from '../common/replay/ReplayIndicator.js';
 import { CarIdentity } from '../vehicle/CarIdentity.js';
-import { SessionListItem } from './sessionListTypes.js';
+import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
+import type { DetailedSession } from '../../../shared/types/session.js';
 import { sessionReplayUrl } from './sessionReplayUrl.js';
 import { SessionTypeChip, FinishPosition, EmptyChip } from './SessionRowParts.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
@@ -13,7 +14,7 @@ import { linkClickHandler } from '../../utils/linkClick.js';
 import type { PaceBadgeValue } from '../common/PaceBadge.js';
 
 export interface SessionTableRowProps {
-  session: SessionListItem;
+  session: SessionCard | DetailedSession;
   onSelectSession: (sessionId: string) => void;
   onOpenReplay?: (sessionId: string) => void;
   showTrackColumn?: boolean;

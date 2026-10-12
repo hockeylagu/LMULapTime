@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { cutLapAtLine } from '../../../server/tracks/lapLineCut.js';
 import { projectTrajectoryToCenterline } from '../../../server/tracks/trackProjection.js';
-import { ReplayTrajectoryPoint } from '../../../server/core/types.js';
+import { ReplayTrajectoryPoint } from '../../../shared/types/index.js';
 
 // A 200 m square loop; station 0 (the start/finish line) is at (0, 0), halfway along the
 // bottom straight, driven towards +x.

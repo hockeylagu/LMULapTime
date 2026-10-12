@@ -1,4 +1,4 @@
-import type { DetailedSession } from '../types.js';
+import type { DetailedSession } from '../../../shared/types/index.js';
 import type { Field, Row } from './fields.js';
 import {
   BEST_SESSION_LAP_FIELDS, CONDITION_FIELDS, DRIVER_ALL_FIELDS, EVENT_LISTS, LAP_FIELDS, READ_TIME_DRIVER_PROPS, READ_TIME_LAP_PROPS,
@@ -39,6 +39,7 @@ function canonicalEvents(owner: Row): void {
 function canonicalDriver(driver: Row): void {
   for (const prop of READ_TIME_DRIVER_PROPS) delete driver[prop];
   delete driver.driverOrdinal;
+  delete driver.driverName;
   dropNulls(driver, DRIVER_ALL_FIELDS);
   canonicalEvents(driver);
   const laps = driver.laps;

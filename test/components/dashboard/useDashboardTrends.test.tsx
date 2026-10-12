@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useDashboardTrends } from '../../../src/components/dashboard/useDashboardTrends.js';
-import type { SessionSummary } from '../../../src/components/dashboard/dashboardTypes.js';
+import { makeDetailedSession } from '../../helpers/sessionCardFixture.js';
 
 describe('useDashboardTrends', () => {
   it('returns safe defaults for empty sessions', () => {
@@ -15,7 +15,7 @@ describe('useDashboardTrends', () => {
   });
 
   it('detects driver name, latest outing, and calculates improving pace trend', () => {
-    const mockSessions: SessionSummary[] = [
+    const mockSessions = [
       {
         id: 'session-old',
         filename: 'old.xml',
@@ -80,7 +80,7 @@ describe('useDashboardTrends', () => {
           ],
         },
       },
-    ];
+    ].map(session => makeDetailedSession(session));
 
     const { result } = renderHook(() => useDashboardTrends(mockSessions));
     expect(result.current.hasData).toBe(true);
@@ -89,7 +89,7 @@ describe('useDashboardTrends', () => {
     // Latest outing should be the newest session (Circuit de la Sarthe)
     expect(result.current.latestOuting?.id).toBe('session-new');
     expect(result.current.latestOuting?.trackName).toBe('Circuit de la Sarthe');
-    expect(result.current.latestOuting?.carName).toBe('Chevrolet Corvette Z06 LMGT3.R');
+    expect(result.current.latestOuting?.carType).toBe('Chevrolet Corvette Z06 LMGT3.R');
     expect(result.current.latestOuting?.bestLapTimeString).toBe('4:00.470');
     expect(result.current.latestOuting?.position).toBe(8);
     expect(result.current.latestOuting?.positionGain).toBe(7);
@@ -110,7 +110,7 @@ describe('useDashboardTrends', () => {
   });
 
   it('filters out empty sessions and prefers Race session over Practice on the same day', () => {
-    const sessionsWithEmptyAndPractice: SessionSummary[] = [
+    const sessionsWithEmptyAndPractice = [
       {
         id: 'sess-empty-practice',
         filename: 'practice_empty.xml',
@@ -179,7 +179,7 @@ describe('useDashboardTrends', () => {
           lapsCount: 6,
         },
       },
-    ];
+    ].map(session => makeDetailedSession(session));
 
     const { result } = renderHook(() => useDashboardTrends(sessionsWithEmptyAndPractice));
     expect(result.current.hasData).toBe(true);
@@ -193,7 +193,7 @@ describe('useDashboardTrends', () => {
   });
 
   it('prefers Race session when tied on timeString with Qualifying and Practice', () => {
-    const tiedSessions: SessionSummary[] = [
+    const tiedSessions = [
       {
         id: 'sess-p1',
         filename: 'p1.xml',
@@ -265,14 +265,14 @@ describe('useDashboardTrends', () => {
           lapsCount: 20,
         },
       },
-    ];
+    ].map(session => makeDetailedSession(session));
 
     const { result } = renderHook(() => useDashboardTrends(tiedSessions));
     expect(result.current.latestOuting?.id).toBe('sess-r1');
     expect(result.current.latestOuting?.sessionType).toBe('Race');
   });
 
-  const session = (id: string, timeString: string, carType: string, carClass: string, pace: number): SessionSummary => ({
+  const session = (id: string, timeString: string, carType: string, carClass: string, pace: number) => makeDetailedSession({
     id,
     filename: `${id}.xml`,
     trackVenue: 'Bahrain International Circuit',

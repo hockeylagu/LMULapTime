@@ -67,7 +67,7 @@ export function createReplayRouter(context: ServerContext): Router {
       for (const driver of composed.drivers) {
         const key = driver.name.trim().toLowerCase();
         const matches = key && replayNameCounts.get(key) === 1
-          ? session.drivers.flatMap((item, ordinal) => (item.driverName || item.name).trim().toLowerCase() === key ? [ordinal] : [])
+          ? session.drivers.flatMap((item, ordinal) => item.name.trim().toLowerCase() === key ? [ordinal] : [])
           : [];
         if (matches.length !== 1) continue;
         const ordinal = matches[0];

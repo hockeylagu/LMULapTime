@@ -1,4 +1,5 @@
-import { DuckDbLapTelemetry, ReplayMetadata, ReplayTrajectoryData } from '../core/types.js';
+import type { DuckDbLapTelemetry } from '../telemetry/duckdbTypes.js';
+import { ReplayMetadata, ReplayTrajectoryData } from '../../shared/types/index.js';
 import type { ReplaySessionContext } from './replayServiceTypes.js';
 import { SessionDatabase, TelemetryMetadataRecord } from '../core/db.js';
 import { DuckDbReader } from '../telemetry/duckdbReader.js';

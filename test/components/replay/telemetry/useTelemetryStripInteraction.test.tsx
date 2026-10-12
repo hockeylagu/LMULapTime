@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useTelemetryStripInteraction } from '../../../../src/components/replay/telemetry/useTelemetryStripInteraction.js';
-import { ReplayTrajectoryPoint } from '../../../../server/core/types.js';
+import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 
 function makePoints(count: number): ReplayTrajectoryPoint[] {
   const pts: ReplayTrajectoryPoint[] = [];

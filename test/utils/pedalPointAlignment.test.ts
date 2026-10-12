@@ -6,7 +6,7 @@ import {
   computePedalMarkerPoints,
   projectTrajectoryPoints,
 } from '../../src/components/replay/map/replayMapUtils.js';
-import { ReplayTrajectoryPoint } from '../../server/core/types.js';
+import { ReplayTrajectoryPoint } from '../../shared/types/index.js';
 
 // Straight road along +x where track station == x. Speed peaks at station 200 (corner entry),
 // bottoms out at 300 (apex) and peaks again at 400 (exit).

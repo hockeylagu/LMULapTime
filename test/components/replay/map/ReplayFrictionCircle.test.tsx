@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ReplayFrictionCircle } from '../../../../src/components/replay/map/ReplayFrictionCircle.js';
-import type { ReplayTelemetryPoint } from '../../../../shared/types/index.js';
+import type { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 
 describe('ReplayFrictionCircle', () => {
   it('does not infer grip or draw a dot from absent or non-finite acceleration', () => {
@@ -20,7 +20,7 @@ describe('ReplayFrictionCircle', () => {
     expect(screen.queryByTestId('friction-circle-baseline-dot')).not.toBeInTheDocument();
     expect(screen.getByTestId('friction-circle-dot')).toBeInTheDocument();
   });
-  const basePoint: ReplayTelemetryPoint = {
+  const basePoint: ReplayTrajectoryPoint = {
     x: 0,
     y: 0,
     z: 0,

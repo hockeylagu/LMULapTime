@@ -117,7 +117,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
             >
               {trajectory.laps.map(l => (
                 <option key={l.lapNumber} value={l.lapNumber} className="bg-lmu-bg text-white">
-                  Lap {l.lapNumber} ({formatLapTime(l.lapTimeSec)}){l.isBest ? ' ★' : l.isOutlap ? ' • Out' : ''}
+                  Lap {l.lapNumber} ({formatLapTime(l.lapTimeSec)}){l.isBest ? ' ★' : l.isOutLap ? ' • Out' : ''}
                 </option>
               ))}
             </select>

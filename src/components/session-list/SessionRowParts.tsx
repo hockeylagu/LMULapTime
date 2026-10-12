@@ -1,13 +1,14 @@
 import React from 'react';
 import { AlertCircle } from 'lucide-react';
-import { SessionListItem } from './sessionListTypes.js';
+import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
+import type { DetailedSession } from '../../../shared/types/session.js';
 import { getSessionTypeStyle } from '../common/sessionTypeStyles.js';
 
 /**
  * Session name (R1, Q1, P2) in its session type's hue (`SESSION_TYPE_STYLES`), at a fixed minimum
  * width so the names line up down the column. Other types (warm-up) stay neutral.
  */
-export const SessionTypeChip: React.FC<{ session: Pick<SessionListItem, 'sessionType' | 'sessionName'>; className?: string }> = ({ session, className = '' }) => {
+export const SessionTypeChip: React.FC<{ session: { sessionType: string; sessionName?: string }; className?: string }> = ({ session, className = '' }) => {
   const style = getSessionTypeStyle(session.sessionType, session.sessionName);
   return (
     <span
@@ -21,10 +22,10 @@ export const SessionTypeChip: React.FC<{ session: Pick<SessionListItem, 'session
   );
 };
 
-const isQualifying = (s: SessionListItem) => s.sessionType === 'Qualifying' || Boolean(s.sessionName?.toLowerCase().includes('quali'));
+const isQualifying = (s: Pick<SessionCard, 'sessionType' | 'sessionName'>) => s.sessionType === 'Qualifying' || Boolean(s.sessionName?.toLowerCase().includes('quali'));
 
 /** Race finish (with places gained or lost) or qualifying position; P1 in gold, the one best there is. */
-export const FinishPosition: React.FC<{ session: SessionListItem; label?: boolean }> = ({ session: s, label = false }) => {
+export const FinishPosition: React.FC<{ session: SessionCard | DetailedSession; label?: boolean }> = ({ session: s, label = false }) => {
   const p = s.playerDriver;
   if (!p?.position) return null;
   const isRace = s.sessionType === 'Race';

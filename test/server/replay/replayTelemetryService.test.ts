@@ -7,10 +7,10 @@ import { DuckDbReader } from '../../../server/telemetry/duckdbReader.js';
 import type { DuckDbFileInfo } from '../../../server/telemetry/telemetryMatcher.js';
 import type {
   DetailedSession,
-  DuckDbLapTelemetry,
   ReplayMetadata,
   ReplayTrajectoryData,
-} from '../../../server/core/types.js';
+} from '../../../shared/types/index.js';
+import type { DuckDbLapTelemetry } from '../../../server/telemetry/duckdbTypes.js';
 
 describe('ReplayTelemetryService', () => {
   let db: SessionDatabase;

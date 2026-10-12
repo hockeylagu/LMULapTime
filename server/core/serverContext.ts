@@ -1,13 +1,13 @@
 import fs from 'fs';
 import { randomUUID } from 'node:crypto';
 import { FileIngestWorker } from './ingest/fileIngestWorkerClient.js';
-import type { ReplayIngestJob } from './types.js';
+import type { ReplayIngestJob } from '../../shared/types/index.js';
 import path from 'path';
 import { LmuParser } from '../sessions/parser.js';
 import type { ReplayFileEntry } from '../sessions/sessionXmlTypes.js';
 
 import { SessionReplayLinks } from '../sessions/sessionReplayLinks.js';
-import { DetailedSession, ReferenceBenchmarkDiff, ReferenceLaptimeRefreshStatus, ReplayScanStatus, ScanStatus, SessionScanStatus, TelemetryScanStatus } from './types.js';
+import { DetailedSession, ReferenceBenchmarkDiff, ReferenceLaptimeRefreshStatus, ReplayScanStatus, ScanStatus, SessionScanStatus, TelemetryScanStatus } from '../../shared/types/index.js';
 
 import { SessionDatabase } from './db.js';
 import {

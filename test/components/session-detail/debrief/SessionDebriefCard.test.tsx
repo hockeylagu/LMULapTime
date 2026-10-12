@@ -64,7 +64,7 @@ describe('SessionDebriefCard', () => {
     mockDebriefServer([referenceLap, realisticLap], {
       available: true,
       laps: [{ lapNumber: 20, spells: [{
-        carName: 'Rui Paiva', carClass: 'GT3', kind: 'multiclass', direction: 'ahead',
+        driverName: 'Rui Paiva', carClass: 'GT3', kind: 'multiclass', direction: 'ahead',
         startSec: 10, endSec: 14, startStationM: 40, endStationM: 90, closestGapSec: 0.4,
       }] }],
     });

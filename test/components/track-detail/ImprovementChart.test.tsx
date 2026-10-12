@@ -17,7 +17,7 @@ describe('ImprovementChart component', () => {
     {
       sessionId: 'sess1',
       timestamp: Date.now() - 100000,
-      dateString: '2026/05/28 14:00',
+      timeString: '2026/05/28 14:00',
       sessionType: 'Practice',
       sessionName: 'P1',
       trackVenue: 'Spa',
@@ -37,7 +37,7 @@ describe('ImprovementChart component', () => {
     {
       sessionId: 'sess2',
       timestamp: Date.now(),
-      dateString: '2026/05/29 16:00',
+      timeString: '2026/05/29 16:00',
       sessionType: 'Practice',
       sessionName: 'P2',
       trackVenue: 'Spa',
@@ -150,7 +150,7 @@ describe('ImprovementChart component', () => {
         sessionId: 'sess-r1-a',
         sessionName: 'R1',
         sessionType: 'Race',
-        dateString: '2026/09/02 12:00:00',
+        timeString: '2026/09/02 12:00:00',
         bestLapTime: 106.446,
       },
       {
@@ -158,7 +158,7 @@ describe('ImprovementChart component', () => {
         sessionId: 'sess-r1-b',
         sessionName: 'R1',
         sessionType: 'Race',
-        dateString: '2026/09/02 13:33:01',
+        timeString: '2026/09/02 13:33:01',
         bestLapTime: 105.123,
       },
     ];

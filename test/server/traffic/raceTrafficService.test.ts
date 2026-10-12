@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionDatabase } from '../../../server/core/db.js';
 import { RaceTrafficRequest, RaceTrafficService } from '../../../server/traffic/raceTrafficService.js';
 import { buildRacePositions, StoredLapBlob } from '../../../server/traffic/lapSamples.js';
-import type { DetailedSession, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../server/core/types.js';
+import type { DetailedSession, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../shared/types/index.js';
 import { circleCenterline, pointAt } from './circleTrack.js';
 
 const REPLAY = 'Daytona International Speedway Road Course R1 1.Vcr';
@@ -60,7 +60,7 @@ describe('RaceTrafficService', () => {
     expect(later).toEqual(first);
     expect(first.available).toBe(true);
     expect(first.laps.map(l => l.lapNumber)).toEqual([1, 2]);
-    expect(first.laps[0].spells).toMatchObject([{ carName: 'Rival', carClass: 'Hyper', kind: 'battle', direction: 'ahead' }]);
+    expect(first.laps[0].spells).toMatchObject([{ driverName: 'Rival', carClass: 'Hyper', kind: 'battle', direction: 'ahead' }]);
   });
 
   it('rebuilds the index when the replay laps it came from change', async () => {

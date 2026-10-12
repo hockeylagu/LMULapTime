@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ReferenceLaptimeEntry } from '../../server/core/types.js';
+import { ReferenceLaptimeEntry } from '../../shared/types/index.js';
 import {
   formatPacePercentage,
   matchesTrack,

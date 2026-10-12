@@ -4,7 +4,7 @@ import {
   extractComparableLaps,
 } from '../../helpers/legacySessionAnalytics.js';
 import { computeAverageLapTime, toComparableLap } from '../../../server/sessions/sessionAnalytics.js';
-import { DetailedSession, DriverData, LapData } from '../../../server/core/types.js';
+import { DetailedSession, DriverData, LapData } from '../../../shared/types/index.js';
 import { driver, lap, session } from '../../domain/leaderboardFixtures.js';
 
 describe('sessionAnalytics server module', () => {

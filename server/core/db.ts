@@ -16,8 +16,8 @@ import {
   AiReportHistoryEntry,
   RejectedReplayLink,
   ReplayLinkRejectionReason,
-  DuckDbLapTelemetry,
-} from './types.js';
+} from '../../shared/types/index.js';
+import type { DuckDbLapTelemetry } from '../telemetry/duckdbTypes.js';
 import { DuckDbFileInfo } from '../telemetry/telemetryMatcher.js';
 import {
   initDbSchema,

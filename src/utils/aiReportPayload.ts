@@ -147,7 +147,7 @@ export function buildAiLapEvidence({
       s2Sec: optionalRound(lap.s2Sec),
       s3Sec: optionalRound(lap.s3Sec),
       isValid: lap.isValid,
-      isOutlap: lap.isOutlap,
+      isOutLap: lap.isOutLap,
     },
     segments: notable,
   };

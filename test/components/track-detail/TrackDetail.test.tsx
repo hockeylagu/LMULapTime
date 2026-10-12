@@ -340,13 +340,13 @@ describe('TrackDetail component', () => {
         setSelectedCarClass={vi.fn()}
         progression={[
           {
-            sessionId: 'sess-hypercar-1', timestamp: 1, dateString: '2026/05/28', sessionType: 'Practice',
+            sessionId: 'sess-hypercar-1', timestamp: 1, timeString: '2026/05/28', sessionType: 'Practice',
             sessionName: 'P1', trackVenue: 'Spa', trackCourse: 'GP', carType: 'Ferrari 499P', carClass: 'Hyper',
             driverName: 'Player', bestLapTime: 122, bestS1: 35, bestS2: 42, bestS3: 45, theoreticalBest: 122,
             cleanLapsCount: 5, totalLapsCount: 5, avgLapTime: 122,
           },
           {
-            sessionId: 'sess-gt3-1', timestamp: 2, dateString: '2026/05/29', sessionType: 'Qualifying',
+            sessionId: 'sess-gt3-1', timestamp: 2, timeString: '2026/05/29', sessionType: 'Qualifying',
             sessionName: 'Q1', trackVenue: 'Spa', trackCourse: 'GP', carType: 'Porsche 911 GT3', carClass: 'GT3',
             driverName: 'Player', bestLapTime: 138, bestS1: 40, bestS2: 48, bestS3: 50, theoreticalBest: 138,
             cleanLapsCount: 4, totalLapsCount: 4, avgLapTime: 138,

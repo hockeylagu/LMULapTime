@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { DetailedSession, DriverData, LapData } from '../../../../server/core/types.js';
+import type { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
 import { initDbSchema } from '../../../../server/core/dbSchema.js';
 import { canonicalSession, diffValues } from '../../../../server/core/sessionRows/canonical.js';
 import { readSession } from '../../../../server/core/sessionRows/reader.js';

@@ -3,7 +3,7 @@ import {
   DriverData,
   ComparableLap,
   LapData,
-} from '../core/types.js';
+} from '../../shared/types/index.js';
 import { formatTime } from '../../shared/domain/formatters.js';
 import { selectCleanLapCandidates } from '../../shared/domain/lapComparison.js';
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import type { DetailedSession } from '../../../server/core/types.js';
+import type { DetailedSession } from '../../../shared/types/index.js';
 import { SessionLapTable } from '../../../src/components/session-detail/table/SessionLapTable.js';
 import { mockDetailedSession } from './mockSessionDetail.js';
 

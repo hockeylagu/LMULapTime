@@ -26,9 +26,9 @@ describe('session summary projection', () => {
     const driver = projected.drivers[0];
     const clean = selectCleanLapCandidates(session.drivers[0].laps);
     expect(driver.cleanLapsCount).toBe(clean.length);
-    expect(driver.topThreeAverage).toBe(computeTopNLapAverage(session.drivers[0].laps, 3));
+    expect(driver.top3Average).toBe(computeTopNLapAverage(session.drivers[0].laps, 3));
     expect(driver.lapsCount).toBe(3);
-    expect(driver.pitCount).toBe(0);
+    expect(driver.pitStopsCount).toBe(0);
     expect(driver.consistencyScore).toBe(computeConsistencyRating(session.drivers[0].laps).consistencyScore);
     expect(projected.laps.map(item => item.isClean)).toEqual(session.drivers[0].laps.map(item => clean.includes(item)));
     expect(projected.conditions.map(item => item.conditionGroup)).toEqual(['dry', 'wet']);
@@ -40,11 +40,11 @@ describe('session summary projection', () => {
     const driver = session.drivers[0];
     const withNoCleanLaps = [lap(1, 90), lap(2, 100, { isValid: false })];
     const projectedEmpty = buildSessionSummaryProjection({ ...session, drivers: [{ ...driver, laps: withNoCleanLaps }] }, 1).drivers[0];
-    expect(projectedEmpty).toMatchObject({ cleanLapsCount: 0, averageLapTime: null, topThreeAverage: null, consistencyScore: null });
+    expect(projectedEmpty).toMatchObject({ cleanLapsCount: 0, averageLapTime: null, top3Average: null, consistencyScore: null });
 
     const loneStartNumberedLap = [lap(1, 90)];
     const projectedSingle = buildSessionSummaryProjection({ ...session, drivers: [{ ...driver, laps: loneStartNumberedLap }] }, 1).drivers[0];
-    expect(projectedSingle).toMatchObject({ cleanLapsCount: 1, averageLapTime: 90, topThreeAverage: 90, consistencyScore: 100 });
+    expect(projectedSingle).toMatchObject({ cleanLapsCount: 1, averageLapTime: 90, top3Average: 90, consistencyScore: 100 });
   });
 
   it('preserves primary-driver ordinal identity and the no-lap progression fallback', () => {
@@ -55,8 +55,8 @@ describe('session summary projection', () => {
     const projected = buildSessionSummaryProjection(duplicate, 1);
     expect(projected.drivers.map(driver => driver.isPlayer)).toEqual([true, false]);
     expect(projected.drivers.map(driver => driver.isHuman)).toEqual([true, false]);
-    expect(projected.drivers[1]).toMatchObject({ lapsCount: 7, cleanLapsCount: 7, drivingTimeSum: 644, averageLapTime: 92 });
-    expect(projected.drivers[1].topThreeAverage).toBeNull();
+    expect(projected.drivers[1]).toMatchObject({ lapsCount: 7, cleanLapsCount: 7, drivingTimeSeconds: 644, averageLapTime: 92 });
+    expect(projected.drivers[1].top3Average).toBeNull();
     expect(projected.isEmpty).toBe(false);
     const empty = buildSessionSummaryProjection({ ...duplicate, playerDriver: { ...duplicate.playerDriver!, bestLapTime: null, lapsCount: 0 }, driversCount: 0 }, 2);
     expect(empty.isEmpty).toBe(true);

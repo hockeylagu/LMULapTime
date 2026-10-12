@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { Dashboard } from '../../../src/components/dashboard/Dashboard.js';
+import { makeDetailedSession, makeSessionCard } from '../../helpers/sessionCardFixture.js';
 
 vi.mock('../../../src/components/track-detail/TrackCircuitLayout.js', () => ({ TrackCircuitLayout: () => null }));
 
@@ -127,7 +128,7 @@ describe('Dashboard component - Metrics, Views & Aggregations', () => {
         lapsCount: 0,
       },
     },
-  ];
+  ].map(session => makeSessionCard(session));
 
   it('accurately displays Driving Overview aggregated metrics', () => {
     render(
@@ -184,7 +185,7 @@ describe('Dashboard component - Metrics, Views & Aggregations', () => {
           ],
         },
       },
-    ];
+    ].map(session => makeDetailedSession(session));
 
     render(
       <Dashboard
@@ -340,7 +341,7 @@ describe('Dashboard component - Metrics, Views & Aggregations', () => {
         id: 'sess-p1',
         playerDriver: { ...mockSessions[1].playerDriver, position: 1 },
       },
-    ];
+    ].map(session => makeSessionCard(session));
 
     render(
       <Dashboard
@@ -391,7 +392,7 @@ describe('Dashboard component - Metrics, Views & Aggregations', () => {
           bestLapTimeString: '1:45.000',
         },
       },
-    ];
+    ].map(session => makeSessionCard(session));
 
     render(
       <Dashboard
@@ -475,7 +476,7 @@ describe('Dashboard component - Metrics, Views & Aggregations', () => {
           ],
         },
       },
-    ];
+    ].map(session => makeSessionCard(session));
 
     render(
       <Dashboard
@@ -550,7 +551,7 @@ describe('Dashboard component - Metrics, Views & Aggregations', () => {
           ],
         },
       },
-    ];
+    ].map(session => makeSessionCard(session));
 
     render(
       <Dashboard

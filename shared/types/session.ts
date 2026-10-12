@@ -2,6 +2,8 @@ import type { PaceCategory } from './reference.js';
 import type { LapTraffic } from './raceTraffic.js';
 import type { PitService } from './pitStops.js';
 
+export type WeatherCondition = 'Dry' | 'Wet' | 'Dynamic Weather';
+
 /** Canonical car classes as defined by LMU vehicle XML source of truth. */
 export type CanonicalCarClass = 'Hyper' | 'GT3' | 'LMP2' | 'LMP2_ELMS' | 'LMP3' | 'GTE';
 export const CANONICAL_CAR_CLASSES = ['Hyper', 'GT3', 'LMP2', 'LMP2_ELMS', 'LMP3', 'GTE'] as const;
@@ -102,25 +104,6 @@ export interface LapData {
   penaltyCount?: number;
 }
 
-export interface ReplayCacheSummary {
-  filename: string;
-  fileSizeBytes: number;
-  compressedSizeBytes: number;
-  updatedAt: number;
-  // The .Vcr file's on-disk modification time - the closest proxy we have for when the
-  // replay/session actually took place, as opposed to `updatedAt` (when it was cached).
-  replayDateMs: number;
-  trackName?: string;
-  driversCount: number;
-  durationSec?: number;
-  eventTitle?: string;
-  trajectoriesCached: number;
-  parserVersion?: string;
-  replayVersion?: string;
-  isOnDisk?: boolean;
-  error?: string | null;
-}
-
 export interface DriverData {
   /** Zero-based position in the source session's driver list, when hydrated from a compact index. */
   driverOrdinal?: number;
@@ -136,7 +119,6 @@ export interface DriverData {
   bestLapTime: number | null;
   bestLapTimeString: string;
   bestLapNum?: number | null;
-  driverName?: string;
   bestS1: number | null;
   bestS2: number | null;
   bestS3: number | null;
@@ -233,7 +215,7 @@ export interface SessionMetadata {
     duckdbFilename?: string;
     hasRain?: boolean;
     maxRainIntensity?: number;
-    weatherCondition?: 'Dry' | 'Wet' | 'Dynamic Weather';
+    weatherCondition?: WeatherCondition;
     ambientTemp?: number;
     trackTemp?: number;
   };
@@ -261,7 +243,7 @@ export interface DetailedSession extends SessionMetadata {
 export interface SessionProgressionPoint {
   sessionId: string;
   timestamp: number;
-  dateString: string;
+  timeString: string;
   sessionType: string;
   sessionName?: string;
   trackVenue: string;
@@ -283,6 +265,9 @@ export interface SessionProgressionPoint {
   consistencyScore?: number | null;
   theoreticalGap?: number | null;
   settings?: { serverName?: string; modeSetting?: string };
+  bestLapWet?: boolean;
+  benchmarkCategory?: PaceCategory | null;
+  benchmarkPercentage?: number | null;
 }
 
 export interface TrackSummary {
@@ -372,5 +357,5 @@ export interface ComparableLap {
   tag?: string;
   matchingReplayFile?: string;
   hasRain?: boolean;
-  weatherCondition?: 'Dry' | 'Wet' | 'Dynamic Weather';
+  weatherCondition?: WeatherCondition;
 }

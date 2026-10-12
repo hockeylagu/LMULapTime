@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildAiLapEvidence } from '../../src/utils/aiReportPayload.js';
-import { ReplayTrajectoryData } from '../../server/core/types.js';
+import { ReplayTrajectoryData } from '../../shared/types/index.js';
 import type { CornerSegmentComparison } from '../../src/utils/cornerAnalysis/types.js';
 import type { DebriefCorner } from '../../src/utils/sessionDebrief.js';
 

@@ -8,10 +8,10 @@ import { TelemetrySlipAngleChannel } from '../../../../../src/components/replay/
 import { TelemetryUndersteerChannel } from '../../../../../src/components/replay/telemetry/channels/dynamics/TelemetryUndersteerChannel';
 import { TelemetryYawRateChannel } from '../../../../../src/components/replay/telemetry/channels/dynamics/TelemetryYawRateChannel';
 import type { PointComparison } from '../../../../../src/utils/replayComparison';
-import type { ReplayTelemetryPoint } from '../../../../../server/core/types';
+import type { ReplayTrajectoryPoint } from '../../../../../shared/types/index';
 
-const point = (values: Partial<ReplayTelemetryPoint>) => values as ReplayTelemetryPoint;
-const baseline = (values: Partial<ReplayTelemetryPoint>) => ({ baseline: values }) as unknown as PointComparison;
+const point = (values: Partial<ReplayTrajectoryPoint>) => values as ReplayTrajectoryPoint;
+const baseline = (values: Partial<ReplayTrajectoryPoint>) => ({ baseline: values }) as unknown as PointComparison;
 const cursor = { isCursorInView: false, cursorPct: 50 };
 
 // Each computed dynamics channel, rendered with no trace yet.

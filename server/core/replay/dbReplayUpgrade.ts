@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { Database as DatabaseType } from 'better-sqlite3';
-import { ReplayMetadata, ReplayTrajectoryData } from '../types.js';
+import { ReplayMetadata, ReplayTrajectoryData } from '../../../shared/types/index.js';
 import { REPLAY_CACHE_VERSION, ReplaySyncProgress } from '../dbSchema.js';
 import { getReplayDriverIngest, isReplayDriverSettled, ReplayDriverIngestStatus, type ReplayDriverIngest } from './dbReplayIngestStore.js';
 import { recordDriverFailure } from './dbReplaySync.js';

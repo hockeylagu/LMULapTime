@@ -11,7 +11,7 @@ import {
   getMonotonicStations,
   interpolateScalarAtDistance,
 } from '../../src/utils/lapAlignment.js';
-import { ReplayTrajectoryPoint } from '../../server/core/types.js';
+import { ReplayTrajectoryPoint } from '../../shared/types/index.js';
 
 describe('replayComparison utility', () => {
   const mockPoints: ReplayTrajectoryPoint[] = [

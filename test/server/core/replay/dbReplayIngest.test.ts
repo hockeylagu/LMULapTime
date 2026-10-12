@@ -7,7 +7,7 @@ import { getReplayConditions, getReplayLaps } from '../../../../server/core/repl
 import { upsertReplayMetadataCache } from '../../../../server/core/replay/dbReplayMetadataStore.js';
 import { MAX_DECODE_ATTEMPTS } from '../../../../server/core/replay/dbReplayIngestStore.js';
 import { decompressTrajectory } from '../../../../server/core/replay/replayTrajectoryCodec.js';
-import type { ReplayTrajectoryData } from '../../../../server/core/types.js';
+import type { ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { createSliceVcrBuffer } from '../../../utils/mockVcr.js';
 import * as replayWorker from '../../../../server/replay/worker/replayTrajectoryWorkerClient.js';
 

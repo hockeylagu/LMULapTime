@@ -1,5 +1,5 @@
 import type { Database } from 'better-sqlite3';
-import type { ComparableLap, DetailedSession, LapData } from '../types.js';
+import type { ComparableLap, DetailedSession, LapData } from '../../../shared/types/index.js';
 import { unpackFields, type Row } from '../sessionRows/fields.js';
 import { LAP_FIELDS, TIRE_WEAR_FIELDS } from '../sessionRows/specs.js';
 import { group } from '../sessionRows/reader.js';

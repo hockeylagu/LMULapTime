@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { Compass } from 'lucide-react';
-import { ReplayTrajectoryPoint, ReplayTelemetryPoint } from '../../../../../../shared/types/index.js';
+import { ReplayTrajectoryPoint } from '../../../../../../shared/types/index.js';
 import { PointComparison } from '../../../../../utils/replayComparison.js';
 import { CornerSegmentComparison } from '../../../../../utils/cornerAnalysis/types.js';
 import { getSteerPercent } from '../../../../../../shared/domain/formatters.js';
@@ -21,7 +21,7 @@ const steerGridLines = (range: number): readonly TelemetryGridLine[] => [
 export interface TelemetrySteerChannelProps {
   steerPath: string;
   baselineSteerPath?: string;
-  currentPoint?: ReplayTelemetryPoint;
+  currentPoint?: ReplayTrajectoryPoint;
   currentComparison?: PointComparison | null;
   isCursorInView: boolean;
   cursorPct: number;

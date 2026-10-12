@@ -1,6 +1,6 @@
 import { Worker } from 'node:worker_threads';
 import { findWorkerBootstrap, isWorkerMessage } from '../../replay/worker/replayTrajectoryWorkerClient.js';
-import type { DetailedSession, ReplayMetadata } from '../types.js';
+import type { DetailedSession, ReplayMetadata } from '../../../shared/types/index.js';
 import type { ReplayFileEntry } from '../../sessions/sessionXmlTypes.js';
 
 type IngestRequest = { kind: 'xml' | 'replay'; filePath: string; playerName?: string; replays?: ReplayFileEntry[] };

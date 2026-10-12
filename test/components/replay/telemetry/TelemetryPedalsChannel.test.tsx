@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { TelemetryPedalsChannel, TelemetryPedalsChannelProps } from '../../../../src/components/replay/telemetry/channels/inputs/TelemetryPedalsChannel.js';
-import { ReplayTelemetryPoint } from '../../../../server/core/types.js';
+import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { PointComparison } from '../../../../src/utils/replayComparison.js';
 
 describe('TelemetryPedalsChannel component', () => {
-  const mockPoint: ReplayTelemetryPoint = {
+  const mockPoint: ReplayTrajectoryPoint = {
     x: 10,
     y: 0,
     z: 20,
@@ -72,7 +72,7 @@ describe('TelemetryPedalsChannel component', () => {
   });
 
   it('renders cursor indicator at cursorPct with TC and ABS badges when active', () => {
-    const activePedalsPoint: ReplayTelemetryPoint = {
+    const activePedalsPoint: ReplayTrajectoryPoint = {
       ...mockPoint,
       throttle: 100,
       brake: 80,

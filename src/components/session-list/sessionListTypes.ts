@@ -1,51 +1,14 @@
 import React from 'react';
-import { PaceCategory } from '../../../shared/types/index.js';
 import type { PaceBadgeValue } from '../common/PaceBadge.js';
-
-export interface SessionListItem {
-  id: string;
-  filename?: string;
-  trackVenue?: string;
-  trackCourse?: string;
-  trackLengthMeters?: number | null;
-  timeString: string;
-  sessionType: string;
-  sessionName?: string;
-  weatherInfo?: string;
-  driversCount?: number;
-  hasDuckDbTelemetry?: boolean;
-  duckdbFilename?: string;
-  matchingReplayFile?: {
-    name: string;
-    path: string;
-    hasDuckDbTelemetry?: boolean;
-    duckdbFilename?: string;
-  };
-  playerDriver?: {
-    driverOrdinal?: number;
-    bestLapOrdinal?: number | null;
-    name?: string;
-    carType: string;
-    carClass?: string;
-    bestLapNum?: number | null;
-    bestLapTime: number | null;
-    bestLapTimeString: string;
-    bestLapPaceCategory?: PaceCategory | null;
-    bestLapPacePercentage?: number | null;
-    bestLapWet?: boolean;
-    position?: number;
-    gridPosition?: number | null;
-    positionGain?: number | null;
-    lapsCount: number;
-  };
-}
+import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
+import type { DetailedSession } from '../../../shared/types/session.js';
 
 export interface SessionListProps {
-  sessions: SessionListItem[];
+  sessions: (SessionCard | DetailedSession)[];
   onSelectSession: (sessionId: string) => void;
   onOpenReplay?: (sessionId: string) => void;
   showTrackColumn?: boolean;
-  getPaceBadge?: (session: SessionListItem) => PaceBadgeValue | null;
+  getPaceBadge?: (session: SessionCard | DetailedSession) => PaceBadgeValue | null;
   emptyMessage?: string;
   onResetFilters?: () => void;
   hideEmptyNotice?: React.ReactNode;

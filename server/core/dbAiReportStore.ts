@@ -1,5 +1,5 @@
 import { Database as DatabaseType } from 'better-sqlite3';
-import { AiReportRecord, AiReportHistoryEntry, AiLapReport } from './types.js';
+import { AiReportRecord, AiReportHistoryEntry, AiLapReport } from '../../shared/types/index.js';
 
 export function getAiReport(db: DatabaseType, cacheKey: string): AiReportRecord | null {
   const row = db.prepare('SELECT * FROM ai_reports WHERE cache_key = ?').get(cacheKey) as {

@@ -1,14 +1,15 @@
 import React from 'react';
-import { SessionListItem } from './sessionListTypes.js';
+import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
+import type { DetailedSession } from '../../../shared/types/session.js';
 import { SessionTableRow } from './SessionTableRow';
 import type { PaceBadgeValue } from '../common/PaceBadge.js';
 
 export interface SessionTableViewProps {
-  sessions: SessionListItem[];
+  sessions: (SessionCard | DetailedSession)[];
   onSelectSession: (sessionId: string) => void;
   onOpenReplay?: (sessionId: string) => void;
   showTrackColumn?: boolean;
-  resolvePaceBadge: (session: SessionListItem) => PaceBadgeValue | null;
+  resolvePaceBadge: (session: SessionCard | DetailedSession) => PaceBadgeValue | null;
 }
 
 export const SessionTableView: React.FC<SessionTableViewProps> = ({

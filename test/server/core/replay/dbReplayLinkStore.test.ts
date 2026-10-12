@@ -2,7 +2,7 @@ import { querySessionPage } from '../../../../server/core/sessionSummaries/pageQ
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionDatabase } from '../../../../server/core/db.js';
 import { updateSessionMatchingReplay } from '../../../../server/core/dbSessionStore.js';
-import type { DetailedSession } from '../../../../server/core/types.js';
+import type { DetailedSession } from '../../../../shared/types/index.js';
 
 const replayLink = {
   name: 'Bahrain Paddock Circuit P1 18.Vcr',

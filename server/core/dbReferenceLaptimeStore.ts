@@ -4,7 +4,7 @@ import {
   ReferenceLaptimesCache,
   ReferenceBenchmarkDiff,
   BenchmarkDiffSummary,
-} from './types.js';
+} from '../../shared/types/index.js';
 import { getMetadata, setMetadata } from './dbMetadataStore.js';
 
 /** The latest update, copied out of `benchmark_diff_history` for the status route. */

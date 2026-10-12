@@ -125,9 +125,9 @@ export function describeNonRepresentative(reason: NonRepresentativeReason, traff
 /** A traffic spell from the replay in words, e.g. "Attacking Vinicius Ares" or "Behind Rui Paiva (GT3)". */
 export function describeTrafficSpell(spell: TrafficSpell): string {
   switch (spell.kind) {
-    case 'battle': return spell.direction === 'ahead' ? `Attacking ${spell.carName}` : `Defending from ${spell.carName}`;
-    case 'lapping': return `Lapping ${spell.carName}`;
-    case 'beingLapped': return `Being lapped by ${spell.carName}`;
-    case 'multiclass': return `Behind ${spell.carName}${spell.carClass ? ` (${spell.carClass})` : ''}`;
+    case 'battle': return spell.direction === 'ahead' ? `Attacking ${spell.driverName}` : `Defending from ${spell.driverName}`;
+    case 'lapping': return `Lapping ${spell.driverName}`;
+    case 'beingLapped': return `Being lapped by ${spell.driverName}`;
+    case 'multiclass': return `Behind ${spell.driverName}${spell.carClass ? ` (${spell.carClass})` : ''}`;
   }
 }

@@ -1,4 +1,4 @@
-import type { DriverData } from '../core/types.js';
+import type { DriverData } from '../../shared/types/index.js';
 import { createPaceCalculator } from '../benchmarks/referenceLaptimes.js';
 
 type RatedDriver = Pick<DriverData, 'laps' | 'carClass' | 'carType' | 'bestLapTime' | 'bestLapPaceCategory' | 'bestLapPacePercentage'>;

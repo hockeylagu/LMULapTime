@@ -27,10 +27,10 @@ import { useTrackBoundaryGeometry } from '../useTrackBoundaryGeometry.js';
 import { usePlaybackPosition } from '../../inspector/replayPlaybackCursor.js';
 import { useGpsMapShortcuts } from '../useGpsMapShortcuts.js';
 import { useStableCullViewBox } from '../useStableCullViewBox.js';
-import type { GpsTrackMapSceneProps } from '../gpsTrackMapTypes.js';
+import type { GpsTrackMapProps } from '../gpsTrackMapTypes.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 
-export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
+export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
   const {
     points, bounds, currentIndex, onSelectIndex, colorBy = 'pedal', className = '',
     baselinePoints, primaryCarClass, baselineCarClass, primaryVehicleData, baselineVehicleData,

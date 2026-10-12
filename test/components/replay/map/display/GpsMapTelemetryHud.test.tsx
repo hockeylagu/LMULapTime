@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { GpsMapTelemetryHud } from '../../../../../src/components/replay/map/display/GpsMapTelemetryHud.js';
-import type { ReplayTelemetryPoint } from '../../../../../shared/types/index.js';
+import type { ReplayTrajectoryPoint } from '../../../../../shared/types/index.js';
 
 describe('GpsMapTelemetryHud', () => {
-  const mockPrimary: ReplayTelemetryPoint = {
+  const mockPrimary: ReplayTrajectoryPoint = {
     x: 100,
     y: 0,
     z: 200,
@@ -18,7 +18,7 @@ describe('GpsMapTelemetryHud', () => {
     isOffTrack: false,
   };
 
-  const mockBaseline: ReplayTelemetryPoint = {
+  const mockBaseline: ReplayTrajectoryPoint = {
     x: 105,
     y: 0,
     z: 198,
@@ -50,7 +50,7 @@ describe('GpsMapTelemetryHud', () => {
   });
 
   it('renders TC and ABS badges when active on primary car', () => {
-    const activeAssists: ReplayTelemetryPoint = {
+    const activeAssists: ReplayTrajectoryPoint = {
       ...mockPrimary,
       tcActive: true,
       absActive: true,
@@ -202,7 +202,7 @@ describe('GpsMapTelemetryHud', () => {
   });
 
   it('renders dedicated G-FORCE column and keeps status clean', () => {
-    const gPoint: ReplayTelemetryPoint = {
+    const gPoint: ReplayTrajectoryPoint = {
       ...mockPrimary,
       accelLatG: 1.82,
       accelLonG: -0.65,

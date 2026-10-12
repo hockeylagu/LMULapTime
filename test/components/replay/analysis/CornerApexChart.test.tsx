@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { CornerApexChart } from '../../../../src/components/replay/analysis/CornerApexChart.js';
 import { CornerSegmentComparison } from '../../../../src/utils/cornerAnalysis/types.js';
-import { ReplayTrajectoryPoint } from '../../../../server/core/types.js';
+import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 
 describe('CornerApexChart', () => {
   const corner: CornerSegmentComparison = {

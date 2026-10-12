@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyLapTiming } from '../../../server/sessions/sessionLapTiming.js';
-import type { LapData } from '../../../server/core/types.js';
+import type { LapData } from '../../../shared/types/index.js';
 
 const lap = (lapNum: number, lapTime: number | null, extra: Partial<LapData> = {}): LapData => ({
   lapNum, position: 1, lapTime, lapTimeString: '', s1: null, s2: null, s3: null, topSpeed: null,

@@ -1,5 +1,5 @@
 import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
-import type { DetailedSession } from '../types.js';
+import type { DetailedSession } from '../../../shared/types/index.js';
 import { createPaceCalculator, type PaceCalculator } from '../../benchmarks/referenceLaptimes.js';
 import { rateDriversPace } from '../../sessions/sessionPaceRating.js';
 

@@ -1,4 +1,4 @@
-import type { ReplayLapSummary, ReplayTrajectoryData } from '../../core/types.js';
+import type { ReplayLapSummary, ReplayTrajectoryData } from '../../../shared/types/index.js';
 import { buildPitIntervals } from './replayLapBuilder.js';
 
 /** Recover pit flags from retained replay evidence without rewriting the recording or cache. */
@@ -18,11 +18,11 @@ export function classifyRetainedReplayLaps(
     const startedInPit = span && intervals.some(interval => interval.start <= span.startSec && interval.end > span.startSec);
     const isPitStop = Boolean(lap.isPitStop || enteredPit
       || (current && trajectory.points.some(point => point.inPit || point.pitLimiter)));
-    const isOutlap = Boolean(lap.isOutlap || startedInPit || start?.inPit || start?.pitLimiter);
-    return { ...lap, ...(isPitStop ? { isPitStop: true, isBest: false } : {}), ...(isOutlap ? { isOutlap: true } : {}) };
+    const isOutLap = Boolean(lap.isOutLap || startedInPit || start?.inPit || start?.pitLimiter);
+    return { ...lap, ...(isPitStop ? { isPitStop: true, isBest: false } : {}), ...(isOutLap ? { isOutLap: true } : {}) };
   });
   if (laps && trajectory.laps?.some(lap => lap.isBest) && !laps.some(lap => lap.isBest)) {
-    const best = laps.filter(lap => lap.isValid !== false && !lap.isOutlap && !lap.isPitStop && lap.lapTimeSec > 0)
+    const best = laps.filter(lap => lap.isValid !== false && !lap.isOutLap && !lap.isPitStop && lap.lapTimeSec > 0)
       .reduce<ReplayLapSummary | undefined>((fastest, lap) => !fastest || lap.lapTimeSec < fastest.lapTimeSec ? lap : fastest, undefined);
     if (best) best.isBest = true;
   }

@@ -1,5 +1,5 @@
 import { Database as DatabaseType } from 'better-sqlite3';
-import { DuckDbLapTelemetry } from './types.js';
+import type { DuckDbLapTelemetry } from '../telemetry/duckdbTypes.js';
 import { DuckDbFileInfo } from '../telemetry/telemetryMatcher.js';
 import {
   DUCKDB_TELEMETRY_CACHE_VERSION,

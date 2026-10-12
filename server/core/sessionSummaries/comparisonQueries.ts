@@ -1,5 +1,5 @@
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { ComparableLap } from '../types.js';
+import type { ComparableLap } from '../../../shared/types/index.js';
 import { CIRCUIT_SPECIFICATIONS } from '../../../shared/domain/circuitDefinitions.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { formatTime } from '../../../shared/domain/formatters.js';
@@ -19,7 +19,7 @@ interface LapFact {
   session_id: string; timestamp: number; track_venue: string; track_course: string; session_name: string;
   driver_ordinal: number; driver_name: string; car_class: string; car_type: string; is_player: number;
   lap_ordinal: number; lap_number: number; lap_time: number | null; s1: number | null; s2: number | null; s3: number | null;
-  is_valid: number; is_inferred: number; is_pit_lap: number; is_out_lap: number; is_representative: number;
+  is_valid: number; is_inferred: number; is_pit_stop: number; is_out_lap: number; is_representative: number;
   leaderboard_eligible: number; non_representative_reason: string | null; is_all_time_pb: number;
 }
 interface QueryParts { where: string[]; args: Array<string | number>; }
@@ -145,17 +145,17 @@ export function queryCompactComparableLaps(
   const sessionsCount = (db.prepare(`SELECT count(DISTINCT s.id) total FROM sessions s WHERE ${whereSql(trackParts)}`).get(...trackParts.args) as CountFact).total;
   const baseSql = lapJoinWhere(broad);
   const overallFact = db.prepare(`SELECT s.id session_id,s.timestamp,s.track_venue,s.track_course,s.session_name,d.driver_ordinal,coalesce(dn.name,'') driver_name,d.driver_class car_class,coalesce(v.car_type,'') car_type,d.is_player_driver is_player,
-      l.lap_ordinal,l.lap_num lap_number,l.lap_time,l.s1,l.s2,l.s3,l.is_valid,l.is_inferred,l.is_pit_stop is_pit_lap,l.is_out_lap,l.is_representative,l.leaderboard_eligible,l.non_representative_reason,0 is_all_time_pb
+      l.lap_ordinal,l.lap_num lap_number,l.lap_time,l.s1,l.s2,l.s3,l.is_valid,l.is_inferred,l.is_pit_stop,l.is_out_lap,l.is_representative,l.leaderboard_eligible,l.non_representative_reason,0 is_all_time_pb
     ${baseSql} AND l.is_valid=1 AND l.lap_time>0 ORDER BY l.lap_time,s.timestamp,s.rowid,d.driver_ordinal,l.lap_ordinal LIMIT 1`).get(...broad.args) as LapFact | undefined ?? null;
   const representativeBest = db.prepare(`SELECT s.id session_id,s.timestamp,s.track_venue,s.track_course,s.session_name,d.driver_ordinal,coalesce(dn.name,'') driver_name,d.driver_class car_class,coalesce(v.car_type,'') car_type,d.is_player_driver is_player,
-      l.lap_ordinal,l.lap_num lap_number,l.lap_time,l.s1,l.s2,l.s3,l.is_valid,l.is_inferred,l.is_pit_stop is_pit_lap,l.is_out_lap,l.is_representative,l.leaderboard_eligible,l.non_representative_reason,0 is_all_time_pb
+      l.lap_ordinal,l.lap_num lap_number,l.lap_time,l.s1,l.s2,l.s3,l.is_valid,l.is_inferred,l.is_pit_stop,l.is_out_lap,l.is_representative,l.leaderboard_eligible,l.non_representative_reason,0 is_all_time_pb
     FROM sessions s JOIN session_drivers d ON d.session_id=s.id LEFT JOIN drivers dn ON dn.driver_id=d.driver_id LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id
       JOIN session_driver_condition_summaries c ON c.session_id=d.session_id AND c.driver_ordinal=d.driver_ordinal AND c.condition_group='dry'
       JOIN session_laps l ON l.session_id=c.session_id AND l.driver_ordinal=c.driver_ordinal AND l.lap_ordinal=c.best_lap_ordinal
     WHERE ${whereSql(display)} AND c.best_lap_time>0 ORDER BY c.best_lap_time,s.timestamp,s.rowid,d.driver_ordinal,l.lap_ordinal LIMIT 1`).get(...display.args) as LapFact | undefined ?? null;
   const playerScopeMatches = filters.playerOnly && !filters.sessionId && (!filters.driverName?.trim() || filters.driverName.trim().toLowerCase() === 'all');
   const playerBest = playerScopeMatches ? representativeBest : db.prepare(`SELECT s.id session_id,s.timestamp,s.track_venue,s.track_course,s.session_name,d.driver_ordinal,coalesce(dn.name,'') driver_name,d.driver_class car_class,coalesce(v.car_type,'') car_type,d.is_player_driver is_player,
-      l.lap_ordinal,l.lap_num lap_number,l.lap_time,l.s1,l.s2,l.s3,l.is_valid,l.is_inferred,l.is_pit_stop is_pit_lap,l.is_out_lap,l.is_representative,l.leaderboard_eligible,l.non_representative_reason,0 is_all_time_pb
+      l.lap_ordinal,l.lap_num lap_number,l.lap_time,l.s1,l.s2,l.s3,l.is_valid,l.is_inferred,l.is_pit_stop,l.is_out_lap,l.is_representative,l.leaderboard_eligible,l.non_representative_reason,0 is_all_time_pb
     FROM sessions s JOIN session_drivers d ON d.session_id=s.id LEFT JOIN drivers dn ON dn.driver_id=d.driver_id LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id
       JOIN session_driver_condition_summaries c ON c.session_id=d.session_id AND c.driver_ordinal=d.driver_ordinal AND c.condition_group='dry'
       JOIN session_laps l ON l.session_id=c.session_id AND l.driver_ordinal=c.driver_ordinal AND l.lap_ordinal=c.best_lap_ordinal
@@ -166,7 +166,7 @@ export function queryCompactComparableLaps(
     WHERE ${whereSql(display)}`).get(...display.args) as SectorFact;
 
   const rows = db.prepare(`SELECT s.id session_id,s.timestamp,s.track_venue,s.track_course,s.session_name,d.driver_ordinal,coalesce(dn.name,'') driver_name,d.driver_class car_class,coalesce(v.car_type,'') car_type,d.is_player_driver is_player,
-      l.lap_ordinal,l.lap_num lap_number,l.lap_time,l.s1,l.s2,l.s3,l.is_valid,l.is_inferred,l.is_pit_stop is_pit_lap,l.is_out_lap,l.is_representative,l.leaderboard_eligible,l.non_representative_reason,
+      l.lap_ordinal,l.lap_num lap_number,l.lap_time,l.s1,l.s2,l.s3,l.is_valid,l.is_inferred,l.is_pit_stop,l.is_out_lap,l.is_representative,l.leaderboard_eligible,l.non_representative_reason,
       0 is_all_time_pb
     ${lapJoinWhere(selected)} ORDER BY s.timestamp,s.rowid,d.driver_ordinal,l.lap_ordinal LIMIT ? OFFSET ?`)
     .all(...selected.args, pageSize, offset) as LapFact[];

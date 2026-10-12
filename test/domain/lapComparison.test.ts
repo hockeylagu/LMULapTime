@@ -8,7 +8,7 @@ import {
   computeConsistencyRating,
   selectCleanLapCandidates,
 } from '../../shared/domain/lapComparison.js';
-import { ReferenceLaptimeEntry, ComparableLap } from '../../server/core/types.js';
+import { ReferenceLaptimeEntry, ComparableLap } from '../../shared/types/index.js';
 
 describe('lapComparison utility', () => {
   const baseLap: ComparableLap = {

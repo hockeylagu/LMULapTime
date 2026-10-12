@@ -1,5 +1,5 @@
 import { CenterlineSpatialIndex, projectTrajectoryToCenterline } from '../tracks/trackProjection.js';
-import type { ReplayTrajectoryPoint } from '../core/types.js';
+import type { ReplayTrajectoryPoint } from '../../shared/types/index.js';
 
 /**
  * Every car's place on the track through a replay, at a low rate: enough to tell who was right

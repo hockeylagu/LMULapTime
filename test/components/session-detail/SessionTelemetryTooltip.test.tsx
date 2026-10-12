@@ -5,7 +5,7 @@ import {
   SessionTelemetryTooltipProps,
   SessionTelemetryTooltipEntry,
 } from '../../../src/components/session-detail/chart/SessionTelemetryTooltip.js';
-import { DetailedSession, DriverData } from '../../../server/core/types.js';
+import { DetailedSession, DriverData } from '../../../shared/types/index.js';
 
 describe('SessionTelemetryTooltip component', () => {
   const mockDriver = {

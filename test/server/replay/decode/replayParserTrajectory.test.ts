@@ -661,11 +661,11 @@ describe('replayParser - trajectory & timing', () => {
           const laps = traj.laps!;
           expect(laps.length).toBe(5);
           // Lap 1 is outlap from pit lane
-          expect(laps[0].isOutlap).toBe(true);
+          expect(laps[0].isOutLap).toBe(true);
           expect(laps[0].lapTimeSec).toBeGreaterThan(120);
 
           // Autonomous flying laps are ~1:47 - 1:48 (107s - 109s), matching official timing without relying on XML
-          expect(laps[1].isOutlap).toBe(false);
+          expect(laps[1].isOutLap).toBe(false);
           expect(laps[1].lapTimeSec).toBeCloseTo(108.9, 0); // ~1:48.9
           expect(laps[2].lapTimeSec).toBeCloseTo(108.0, 0); // ~1:48.0
           expect(laps[3].lapTimeSec).toBeCloseTo(107.3, 0); // ~1:47.3
@@ -721,7 +721,7 @@ describe('replayParser - trajectory & timing', () => {
           expect(traj.driverName).toContain('Samuel Lague');
           const laps = traj.laps!;
           expect(laps.length).toBeGreaterThanOrEqual(14);
-          expect(laps[0].isOutlap).toBe(true);
+          expect(laps[0].isOutLap).toBe(true);
           // Racing laps are ~2:09 - 2:22 (129s - 142s)
           expect(laps[1].lapTimeSec).toBeCloseTo(134.0, 0);
           expect(laps[2].lapTimeSec).toBeCloseTo(138.4, 0);

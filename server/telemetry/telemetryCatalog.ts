@@ -1,5 +1,5 @@
 import { SessionDatabase } from '../core/db.js';
-import { TelemetryScanStatus } from '../core/types.js';
+import { TelemetryScanStatus } from '../../shared/types/index.js';
 import { DuckDbFileInfo, enrichDuckDbDirectory } from './telemetryMatcher.js';
 
 type EnrichDuckDbDirectory = typeof enrichDuckDbDirectory;

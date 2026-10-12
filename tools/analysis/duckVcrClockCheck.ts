@@ -1,4 +1,4 @@
-import { ReplayTrajectoryPoint } from '../../server/core/types.js';
+import { ReplayTrajectoryPoint } from '../../shared/types/index.js';
 
 /** Clock offsets searched between the DuckDB and the VCR recording of a lap, either way. */
 export const MAX_CLOCK_OFFSET_SEC = 1;

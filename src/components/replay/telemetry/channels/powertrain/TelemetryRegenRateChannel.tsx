@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { TelemetryStaticTrace } from '../../TelemetryStaticTrace.js';
 import { Activity } from 'lucide-react';
-import { ReplayTelemetryPoint } from '../../../../../../shared/types/index.js';
+import { ReplayTrajectoryPoint } from '../../../../../../shared/types/index.js';
 import { PointComparison } from '../../../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS } from '../../../../../utils/themeColors.js';
 
@@ -10,7 +10,7 @@ export interface TelemetryRegenRateChannelProps {
   regenRateArea?: string;
   baselineRegenRatePath?: string;
   maxRegen: number;
-  currentPoint?: ReplayTelemetryPoint;
+  currentPoint?: ReplayTrajectoryPoint;
   currentComparison?: PointComparison | null;
   isCursorInView: boolean;
   cursorPct: number;

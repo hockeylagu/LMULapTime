@@ -1,9 +1,7 @@
-import type { ComparableLap } from '../../../../shared/types/index.js';
+import type { ComparableLap, WeatherCondition } from '../../../../shared/types/index.js';
 import { selectCleanLapCandidates } from '../../../../shared/domain/lapComparison.js';
 
 export type SessionKind = 'practice' | 'quali' | 'race';
-export type LapCondition = NonNullable<ComparableLap['weatherCondition']>;
-
 export interface LapPickerFilters {
   kind: SessionKind | 'all';
   /** 'same' keeps the anchor lap's condition; without an anchor it keeps every condition. */
@@ -20,7 +18,7 @@ export interface LapPickerSession {
   kind: SessionKind | null;
   dateString?: string;
   timestamp: number;
-  condition: LapCondition;
+  condition: WeatherCondition;
   /** The session's laps in lap order, after the filters. */
   laps: ComparableLap[];
   /** The fastest clean lap of the session, when it has one. */
@@ -43,7 +41,7 @@ export function lapSessionKind(lap: Pick<ComparableLap, 'sessionType' | 'session
   return null;
 }
 
-export function lapCondition(lap: Pick<ComparableLap, 'weatherCondition' | 'hasRain'>): LapCondition {
+export function lapCondition(lap: Pick<ComparableLap, 'weatherCondition' | 'hasRain'>): WeatherCondition {
   return lap.weatherCondition ?? (lap.hasRain ? 'Wet' : 'Dry');
 }
 

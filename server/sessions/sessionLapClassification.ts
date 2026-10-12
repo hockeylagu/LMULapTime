@@ -1,4 +1,4 @@
-import type { DriverData } from '../core/types.js';
+import type { DriverData } from '../../shared/types/index.js';
 import { annotateLapConditions, RainOverLap } from '../../shared/domain/lapConditions.js';
 import { markNonRepresentativeLaps } from '../../shared/domain/lapRepresentativeness.js';
 import { formatTime } from '../../shared/domain/formatters.js';

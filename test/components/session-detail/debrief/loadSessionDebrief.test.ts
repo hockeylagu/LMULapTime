@@ -97,7 +97,7 @@ describe('loadSessionDebrief', () => {
 
   it('leaves out the corner passes run in traffic, times laps flagged for traffic, and ranks a corner of this lap in traffic lower', async () => {
     const spell = (startStationM: number, endStationM: number) => ({
-      carName: 'Vinicius Ares', carClass: 'Hyper', kind: 'battle' as const, direction: 'ahead' as const,
+      driverName: 'Vinicius Ares', carClass: 'Hyper', kind: 'battle' as const, direction: 'ahead' as const,
       startSec: 0, endSec: 5, startStationM, endStationM, closestGapSec: 0.4,
     });
     mockDebriefServer([referenceLap], {
@@ -116,7 +116,7 @@ describe('loadSessionDebrief', () => {
     expect(debrief.lapsTimed).toBe(3);
     // Lap 20 (analysed) and 16 ran the corner in traffic: only lap 18 is left, too few to sample.
     expect(debrief.corners[0]).toMatchObject({ lapsInTraffic: 2, lapsSampled: null, confidence: 0.4 });
-    expect(debrief.corners[0].traffic?.carName).toBe('Vinicius Ares');
+    expect(debrief.corners[0].traffic?.driverName).toBe('Vinicius Ares');
     expect(debrief.caveats.some(c => c.includes('run in traffic'))).toBe(false);
   });
 

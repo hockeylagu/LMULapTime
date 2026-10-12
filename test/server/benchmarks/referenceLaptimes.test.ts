@@ -9,7 +9,7 @@ import {
   resetCachedReferenceLaptimes,
 } from '../../../server/benchmarks/referenceLaptimes.js';
 import { getSessionDatabase, resetSessionDatabaseForTest } from '../../../server/core/db.js';
-import { ReferenceLaptimeEntry } from '../../../server/core/types.js';
+import { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 import { rateDriversPace } from '../../../server/sessions/sessionPaceRating.js';
 import { mockDetailedSession } from '../../components/session-detail/mockSessionDetail.js';
 

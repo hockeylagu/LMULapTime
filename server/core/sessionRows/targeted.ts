@@ -1,5 +1,5 @@
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { DetailedSession, SessionMetadata } from '../types.js';
+import type { DetailedSession, SessionMetadata } from '../../../shared/types/index.js';
 import { RECORDING_FIELDS } from './specs.js';
 import { packFields, type Row, type SqlValue } from './fields.js';
 import { buildSessionSummaryProjection } from '../../../shared/domain/sessionSummaries/buildSessionSummaryProjection.js';

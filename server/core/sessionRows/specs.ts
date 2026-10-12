@@ -88,7 +88,6 @@ export const DRIVER_FIELDS: readonly Field[] = [
   orNull(real('bestLapTime', 'best_lap_time')),
   text('bestLapTimeString', 'best_lap_time_string'),
   int('bestLapNum', 'best_lap_num'),
-  text('driverName', 'driver_name'),
   orNull(real('bestS1', 'best_s1')),
   orNull(real('bestS2', 'best_s2')),
   orNull(real('bestS3', 'best_s3')),

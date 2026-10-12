@@ -4,7 +4,7 @@ import { archivedReplayName } from '../../../../server/core/replay/dbReplayIdent
 import { readCompactSession } from '../../../../server/core/sessionSummaries/store.js';
 import { getReplayFactsVersion, getReplayLaps, replaceReplayDriverLapFacts, replaceReplayWideFacts } from '../../../../server/core/replay/dbReplayLapStore.js';
 import { emptyLapFact } from '../../../../server/replay/decode/replayFacts.js';
-import type { DetailedSession, ReplayMetadata, ReplayTrajectoryData } from '../../../../server/core/types.js';
+import type { DetailedSession, ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import type { DuckDbFileInfo } from '../../../../server/telemetry/telemetryMatcher.js';
 
 const name = 'Bahrain Paddock Circuit P1 18.Vcr';

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { countStationGlitches } from '../../../server/tracks/stationGlitches.js';
-import { ReplayTrajectoryPoint } from '../../../server/core/types.js';
+import { ReplayTrajectoryPoint } from '../../../shared/types/index.js';
 
 const L = 1000;
 // A car driving along x one metre per sample, with the station the projection gave each sample.

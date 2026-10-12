@@ -3,7 +3,7 @@ import {
   buildCenterlineSpatialIndex,
   projectTrajectoryToCenterline,
 } from '../../../server/tracks/trackProjection.js';
-import { ReplayTrajectoryPoint } from '../../../server/core/types.js';
+import { ReplayTrajectoryPoint } from '../../../shared/types/index.js';
 
 describe('trackProjection utility', () => {
   // Simple rectangular circuit:

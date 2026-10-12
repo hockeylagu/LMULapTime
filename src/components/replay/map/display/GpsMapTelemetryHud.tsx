@@ -1,13 +1,13 @@
 import React, { useId, useState } from 'react';
-import type { ReplayTelemetryPoint } from '../../../../../shared/types/index.js';
+import type { ReplayTrajectoryPoint } from '../../../../../shared/types/index.js';
 import { getSteerPercent } from '../../../../../shared/domain/formatters.js';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 import { formatGear, formatReading, getStatusLabel, getStatusSubtext, hasReading, totalAcceleration } from './telemetryReadouts.js';
 
 export interface GpsMapTelemetryHudProps {
-  primaryPoint?: ReplayTelemetryPoint | null;
-  baselinePoint?: ReplayTelemetryPoint | null;
+  primaryPoint?: ReplayTrajectoryPoint | null;
+  baselinePoint?: ReplayTrajectoryPoint | null;
   deltaTimeSec?: number | null;
   lineDistanceM?: number | null;
   className?: string;
@@ -47,7 +47,7 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
     ? 'behind'
     : 'even';
 
-  const renderCells = (p?: ReplayTelemetryPoint | null, isGhost = false) => {
+  const renderCells = (p?: ReplayTrajectoryPoint | null, isGhost = false) => {
     const gear = formatGear(p?.gear);
     const steerDeg = p?.steerYaw;
     const steering = hasReading(steerDeg)

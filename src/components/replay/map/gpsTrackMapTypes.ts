@@ -59,5 +59,3 @@ export interface GpsTrackMapProps {
   // the map aligns laps with it exactly as the telemetry channels and corner analysis do.
   trackLengthM?: number;
 }
-
-export type GpsTrackMapSceneProps = GpsTrackMapProps;

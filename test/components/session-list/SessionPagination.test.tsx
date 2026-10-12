@@ -2,12 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { useSearchParams } from 'react-router';
 import { SessionList } from '../../../src/components/session-list/SessionList.js';
-import { SessionListItem } from '../../../src/components/session-list/sessionListTypes.js';
+import { makeSessionCard } from '../../helpers/sessionCardFixture.js';
 import { pageWindow } from '../../../src/components/session-list/SessionPagination.js';
 import { updateSearchParams } from '../../../src/utils/urlParams.js';
 
-const makeSessions = (count: number): SessionListItem[] =>
-  Array.from({ length: count }, (_, i) => ({
+const makeSessions = (count: number) =>
+  Array.from({ length: count }, (_, i) => makeSessionCard({
     id: `s-${i + 1}`,
     trackVenue: `Track ${i + 1}`,
     timeString: '2026/09/01 12:00',

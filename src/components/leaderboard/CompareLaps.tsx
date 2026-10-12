@@ -4,8 +4,9 @@ import { AlertCircle, X } from 'lucide-react';
 import { CompareLapsHeader } from './CompareLapsHeader.js';
 import { CompareLapsDeck } from './CompareLapsDeck.js';
 import { CompareSectorChart } from './CompareSectorChart.js';
-import { useCompareLapsData, CompareRequest, CompareLapsSessionItem } from './useCompareLapsData.js';
-import { ComparableLap } from '../../../shared/types/index.js';
+import { useCompareLapsData, CompareRequest } from './useCompareLapsData.js';
+import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
+import { ComparableLap, DetailedSession } from '../../../shared/types/index.js';
 import { COMPARE_LAP_COLORS } from '../../utils/themeColors.js';
 import { buildTelemetryComparePath } from '../../utils/telemetryCompareLink.js';
 import { LapDebriefPanel } from './debrief/LapDebriefPanel.js';
@@ -17,7 +18,7 @@ import type { TelemetryLapRef } from '../../utils/telemetryCompareLink.js';
 
 export interface CompareLapsProps {
   availableTracks?: string[];
-  sessions?: CompareLapsSessionItem[];
+  sessions?: (SessionCard | DetailedSession)[];
   initialTrack?: string;
   initialCarClass?: string;
   initialSessionId?: string;

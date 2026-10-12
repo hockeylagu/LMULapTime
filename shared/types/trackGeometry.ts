@@ -6,6 +6,12 @@ export interface TimingGateGeometry {
   stationM: number;
 }
 
+export interface TrackTimingGates {
+  startFinish: TimingGateGeometry;
+  sector1?: TimingGateGeometry;
+  sector2?: TimingGateGeometry;
+}
+
 /** Each polygon contains an exterior ring followed by any holes, in local x/z meters. */
 export type TrackSurfacePolygon = Array<Array<[number, number]>>;
 
@@ -111,11 +117,7 @@ export interface TrackBoundaryGeometry {
   /** Display surfaces only; timing and lap projection continue to use the centerline. */
   mapSurfaces?: TrackMapSurfaces;
   startFinish?: [number, number];
-  timingGates?: {
-    startFinish: TimingGateGeometry;
-    sector1?: TimingGateGeometry;
-    sector2?: TimingGateGeometry;
-  };
+  timingGates?: TrackTimingGates;
   elevationProfile?: number[];
   pitLane?: {
     centerline: Array<[number, number]>;

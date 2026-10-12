@@ -5,7 +5,7 @@ import {
   computeLineSeparation,
   interpolateDeltaTime,
 } from '../../../../../src/components/replay/map/scene/gpsCarDynamicsHelpers.js';
-import type { ReplayTelemetryPoint } from '../../../../../shared/types/index.js';
+import type { ReplayTrajectoryPoint } from '../../../../../shared/types/index.js';
 
 describe('resolveCarAcceleration', () => {
   it('returns undefined for empty points array', () => {
@@ -85,8 +85,8 @@ describe('resolveCarAcceleration', () => {
 });
 
 describe('interpolatePrimaryPoint', () => {
-  const p0: ReplayTelemetryPoint = { x: 10, y: 1, z: 20, speedKmh: 100, throttle: 50, brake: 0 };
-  const p1: ReplayTelemetryPoint = { x: 20, y: 3, z: 40, speedKmh: 120, throttle: 100, brake: 20 };
+  const p0: ReplayTrajectoryPoint = { x: 10, y: 1, z: 20, speedKmh: 100, throttle: 50, brake: 0 };
+  const p1: ReplayTrajectoryPoint = { x: 20, y: 3, z: 40, speedKmh: 120, throttle: 100, brake: 20 };
 
   it('returns p0 when fraction is 0', () => {
     expect(interpolatePrimaryPoint([p0, p1], 0, 0)).toEqual(p0);

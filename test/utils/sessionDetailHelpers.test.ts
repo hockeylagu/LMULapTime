@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { findWeekendSessions, CandidateRelatedSession, WeekendSessionLink } from '../../shared/domain/weekendSessions.js';
 import { sessionLapComparePath } from '../../src/components/session-detail/sessionDetailHelpers.js';
-import { DetailedSession, DriverData } from '../../server/core/types';
+import { DetailedSession, DriverData } from '../../shared/types/index';
 
 describe('sessionDetailHelpers', () => {
   describe('findWeekendSessions', () => {

@@ -1,4 +1,4 @@
-import { LapEndCut, ReplayTrajectoryPoint } from '../core/types.js';
+import { LapEndCut, ReplayTrajectoryPoint } from '../../shared/types/index.js';
 import { interpolateAngle } from '../telemetry/telemetryFusion.js';
 
 /**

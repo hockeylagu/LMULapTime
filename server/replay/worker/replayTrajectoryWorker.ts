@@ -1,5 +1,5 @@
 import { parentPort, workerData } from 'node:worker_threads';
-import { ReplayTrajectoryData } from '../../core/types.js';
+import { ReplayTrajectoryData } from '../../../shared/types/index.js';
 import { ExtractReplayTrajectoryOptions, extractReplayTrajectory, extractReplayDriverTrajectories } from '../decode/replayTrajectory.js';
 import { ReplayStreamProgress } from '../replayProgress.js';
 import Database from 'better-sqlite3';

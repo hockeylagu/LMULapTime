@@ -28,7 +28,7 @@ function projectDriver(session: DetailedSession, driver: DriverData, driverOrdin
     const eligible = isClean && lap.isValid && conditionGroup === 'dry';
     return { sessionId: session.id, driverOrdinal, lapOrdinal, lapNumber: lap.lapNum, lapTime: lap.lapTime,
       s1: lap.s1, s2: lap.s2, s3: lap.s3, conditionGroup, isValid: lap.isValid,
-      isInferred: Boolean(lap.isInferred), isPitLap: lap.isPitStop, isOutLap: Boolean(lap.isOutLap), isClean,
+      isInferred: Boolean(lap.isInferred), isPitStop: lap.isPitStop, isOutLap: Boolean(lap.isOutLap), isClean,
       isRepresentative: !lap.nonRepresentativeReason, isHuman, leaderboardEligible: eligible,
       nonRepresentativeReason: lap.nonRepresentativeReason ?? null };
   });
@@ -46,13 +46,13 @@ function projectDriver(session: DetailedSession, driver: DriverData, driverOrdin
   return { driver: { sessionId: session.id, driverOrdinal, driverName, normalizedName: driverName.trim().toLowerCase(),
     isPlayer, isHuman, carClass: driver.carClass ?? '', carType: driver.carType ?? '',
     position: driver.position ?? 0, lapsCount: completedCount, declaredLapsCount: lapsCount, cleanLapsCount: cleanCount,
-    drivingTimeSum: hasLaps ? driverLaps.reduce((sum, lap) => sum + (lap.lapTime && lap.lapTime > 0 ? lap.lapTime : 0), 0) : (driver.avgLapTime ?? 0) * completedCount,
-    pitCount: hasLaps ? driverLaps.filter(lap => lap.isPitStop).length : 0,
-    maxSpeed: driverLaps.reduce<number | null>((value, lap) => lap.topSpeed !== null && (value === null || lap.topSpeed > value) ? lap.topSpeed : value, null),
+    drivingTimeSeconds: hasLaps ? driverLaps.reduce((sum, lap) => sum + (lap.lapTime && lap.lapTime > 0 ? lap.lapTime : 0), 0) : (driver.avgLapTime ?? 0) * completedCount,
+    pitStopsCount: hasLaps ? driverLaps.filter(lap => lap.isPitStop).length : 0,
+    maxTopSpeed: driverLaps.reduce<number | null>((value, lap) => lap.topSpeed !== null && (value === null || lap.topSpeed > value) ? lap.topSpeed : value, null),
     bestLapOrdinal: bestOrdinal(best), bestLapNumber: best?.lapNum ?? null, bestLapTime: driver.bestLapTime ?? null,
     bestS1: driver.bestS1, bestS2: driver.bestS2, bestS3: driver.bestS3,
     averageLapTime: hasLaps ? consistency.avgLapTime : (driver.avgLapTime ?? null),
-    topThreeAverage: computeTopNLapAverage(driverLaps, 3, clean), consistencyScore: consistency.consistencyScore,
+    top3Average: computeTopNLapAverage(driverLaps, 3, clean), consistencyScore: consistency.consistencyScore,
     bestLapWet: Boolean(driver.bestLapWet ?? best?.conditions) }, laps, conditions };
 }
 

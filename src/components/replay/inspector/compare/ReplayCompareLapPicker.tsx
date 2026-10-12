@@ -1,13 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { LoaderCircle, X } from 'lucide-react';
-import { ComparableLap } from '../../../../../shared/types/index.js';
+import type { ComparableLap, WeatherCondition } from '../../../../../shared/types/index.js';
 import { ReplayCompareLapRow } from './ReplayCompareLapRow.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 import { CompareLapPaginationControls, type CompareLapPagination } from './CompareLapPagination.js';
 
 export type CompareLapFilter = 'same-session-lap' | 'player' | 'same-sessions' | 'all';
 export type RaceTypeFilter = 'all' | 'practice' | 'quali' | 'race';
-type WeatherCondition = NonNullable<ComparableLap['weatherCondition']>;
 type ConditionFilter = 'same' | 'all' | WeatherCondition;
 
 export interface ReplayCompareLapPickerProps {

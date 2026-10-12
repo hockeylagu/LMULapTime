@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { findDuckDbForReplay, findDuckDbForSession, type DuckDbFileInfo, type TelemetrySessionCandidate } from '../../../server/telemetry/telemetryMatcher.js';
-import type { ReplayMetadata } from '../../../server/core/types.js';
+import type { ReplayMetadata } from '../../../shared/types/index.js';
 
 const start = Date.parse('2026-10-11T00:08:19Z');
 const file: DuckDbFileInfo = {

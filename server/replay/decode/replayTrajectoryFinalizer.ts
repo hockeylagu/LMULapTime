@@ -1,4 +1,4 @@
-import type { ReplayTrajectoryData } from '../../core/types.js';
+import type { ReplayTrajectoryData } from '../../../shared/types/index.js';
 import { type RawTrajectoryPoint, type VcrTimingEvent, type DetectedLapInternal, detectLapsFromTelemetry } from './replayLapBuilder.js';
 import { buildTrajectoryPoints } from './replayLapPoints.js';
 import { replayWeatherCondition } from '../../../shared/domain/lapConditions.js';
@@ -35,8 +35,8 @@ export function finalizeReplayDriver(
   const targetPitEvents = targetSlot !== undefined ? replayPitEvents.filter(e => e.driverSlot === targetSlot) : [];
 
   if (!options.silent) {
-    const cleanFlying = detectedLaps.filter(l => l.isValid && !l.isOutlap && !l.isPitStop);
-    const outLaps = detectedLaps.filter(l => l.isOutlap);
+    const cleanFlying = detectedLaps.filter(l => l.isValid && !l.isOutLap && !l.isPitStop);
+    const outLaps = detectedLaps.filter(l => l.isOutLap);
     const best = detectedLaps.find(l => l.isBest);
     const bestStr = best
       ? `Best: Lap ${best.lapNumber} (${best.lapTimeSec.toFixed(3)}s [S1: ${best.s1Sec}s, S2: ${best.s2Sec}s, S3: ${best.s3Sec}s])`

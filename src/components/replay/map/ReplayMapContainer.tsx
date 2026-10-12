@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { CircleDot, Disc } from 'lucide-react';
-import { ReplayTelemetryPoint, ReplayTrajectoryData } from '../../../../shared/types/index.js';
+import { ReplayTrajectoryPoint, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { GpsTrackMapScene } from './scene/GpsTrackMapScene.js';
 import { ReplayTelemetryHud } from '../inspector/ReplayTelemetryHud.js';
 import { MapColorMode } from './replayMapUtils.js';
@@ -20,7 +20,7 @@ export interface ReplayMapContainerProps {
   baselineTrajectory?: ReplayTrajectoryData | null;
   primaryCarClass?: string;
   baselineCarClass?: string;
-  currentPoint?: ReplayTelemetryPoint | null;
+  currentPoint?: ReplayTrajectoryPoint | null;
   corners?: CornerSegmentComparison[];
   selectedCornerNumber?: number | null;
   onSelectCornerNumber?: (cornerNumber: number | null) => void;

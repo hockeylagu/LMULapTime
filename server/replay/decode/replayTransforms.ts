@@ -1,7 +1,7 @@
 import {
   ReplayLapSummary,
   ReplayTrajectoryData,
-} from '../../core/types.js';
+} from '../../../shared/types/index.js';
 import type { ReplaySessionContext, ReplayContextDriver, ReplayTimingLap } from '../replayServiceTypes.js';
 import { downsampleReplayTrajectory } from './replayParser.js';
 import { enrichTrajectoryWithTrackGeometry } from '../../tracks/serverTrackSync.js';
@@ -61,7 +61,7 @@ export function applyPureOfficialLapValidation(
             ...lap,
             isValid: match.isValid,
             isPitStop: Boolean(match.isPitStop),
-            isOutlap: Boolean(match.isOutLap),
+            isOutLap: Boolean(match.isOutLap),
             isBest: match.isPitStop || match.isOutLap || !match.isValid ? false : lap.isBest,
             nonRepresentativeReason: match.nonRepresentativeReason,
             ...(typeof match.lapTimeSec === 'number' && match.lapTimeSec > 0 ? {
@@ -84,7 +84,7 @@ export function applyPureOfficialLapValidation(
       matchedSessionId: matchedSession.id,
       sessionType: matchedSession.sessionType,
       trackName: getDisplayTrackName(matchedSession.trackVenue, matchedSession.trackCourse),
-      driverName: matchedDriver.driverName || matchedDriver.name,
+      driverName: matchedDriver.name,
       totalSessionLaps: matchedSession.totalLapsCount || officialLaps.length,
       officialBestLapTime: matchedDriver.bestLapTime,
       officialLaps,

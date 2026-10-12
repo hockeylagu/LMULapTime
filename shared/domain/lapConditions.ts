@@ -1,4 +1,5 @@
 import type { LapConditions } from '../types/index.js';
+import type { WeatherCondition } from '../types/session.js';
 
 /**
  * Peak rain (raw replay value, 0-255: the engine's `raining` × 255) from which a lap counts as run in the rain. Measured over 929
@@ -8,7 +9,7 @@ import type { LapConditions } from '../types/index.js';
 export const RAIN_WET_MIN = 13;
 
 /** The weather of a replay from its peak rain (raw 0-255), as the replay list and sessions show it. */
-export function replayWeatherCondition(maxRain: number): 'Dry' | 'Wet' | 'Dynamic Weather' {
+export function replayWeatherCondition(maxRain: number): WeatherCondition {
   return maxRain > 16 ? 'Wet' : maxRain > 0 ? 'Dynamic Weather' : 'Dry';
 }
 

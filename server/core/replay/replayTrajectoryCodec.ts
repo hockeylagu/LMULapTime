@@ -1,4 +1,4 @@
-import { ReplayMetadata, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../types.js';
+import { ReplayMetadata, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../shared/types/index.js';
 import { compressJson, decompressJson } from '../dbSchema.js';
 import { applyGarageState, garageSpells, garageState } from '../../replay/decode/garageState.js';
 import { LAP_EDGE_PADDING_SEC } from '../../replay/decode/replayLapPoints.js';
@@ -167,6 +167,21 @@ export function recalibrateLegacyAmbientTemp(legacy: number): number {
 // Rows written before v6 stored Virtual Energy as fuel and used the old ambient scale.
 const PRE_V6_REPLAY_CACHE_VERSIONS: ReadonlySet<string> = new Set(['v3', 'v4', 'v5']);
 
+/** Old trajectory JSON used `isOutlap`; normalize that wire spelling on read, even for v6/v7 rows. */
+function normalizeLegacyOutLapSpelling(value: unknown): void {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return;
+  const fields = value as Record<string, unknown>;
+  if (typeof fields.isOutLap !== 'boolean' && typeof fields.isOutlap === 'boolean') {
+    fields.isOutLap = fields.isOutlap;
+  }
+  delete fields.isOutlap;
+}
+
+function normalizeTrajectoryLapSpelling(trajectory: ReplayTrajectoryData): void {
+  for (const lap of trajectory.laps ?? []) normalizeLegacyOutLapSpelling(lap);
+  for (const lap of trajectory.allLapsData ?? []) normalizeTrajectoryLapSpelling(lap);
+}
+
 /**
  * Brings a row written by an older compatible parser version up to what the current one would
  * store, on read: the samples are never rewritten (for deleted replays they are the only copy).
@@ -174,6 +189,7 @@ const PRE_V6_REPLAY_CACHE_VERSIONS: ReadonlySet<string> = new Set(['v3', 'v4', '
  * and track temperature came from a constant byte.
  */
 export function upgradeStoredTrajectory(trajectory: ReplayTrajectoryData, parserVersion: string): ReplayTrajectoryData {
+  normalizeTrajectoryLapSpelling(trajectory);
   if (!PRE_V6_REPLAY_CACHE_VERSIONS.has(parserVersion)) return trajectory;
   delete trajectory.trackTemp;
   if (typeof trajectory.ambientTemp === 'number') trajectory.ambientTemp = recalibrateLegacyAmbientTemp(trajectory.ambientTemp);
@@ -194,6 +210,7 @@ export function upgradeStoredTrajectory(trajectory: ReplayTrajectoryData, parser
 
 /** Same as upgradeStoredTrajectory for the replay metadata row. */
 export function upgradeStoredReplayMetadata(metadata: ReplayMetadata, parserVersion: string): ReplayMetadata {
+  for (const lap of metadata.laps ?? []) normalizeLegacyOutLapSpelling(lap);
   if (!PRE_V6_REPLAY_CACHE_VERSIONS.has(parserVersion)) return metadata;
   delete metadata.trackTemp;
   if (typeof metadata.ambientTemp === 'number') metadata.ambientTemp = recalibrateLegacyAmbientTemp(metadata.ambientTemp);

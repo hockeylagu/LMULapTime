@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 import { MiniCornerMap } from '../../../../src/components/replay/map/MiniCornerMap.js';
 import { projectTrajectoryPoints } from '../../../../src/components/replay/map/replayMapUtils.js';
-import { ReplayTrajectoryPoint } from '../../../../server/core/types.js';
+import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 
 describe('MiniCornerMap component', () => {
   const bounds = { minX: 0, maxX: 100, minZ: 0, maxZ: 100, spanX: 100, spanZ: 100 };

@@ -21,7 +21,7 @@ function bySession(rows: Row[]): Map<string, Row[]> {
 
 /** The player's figures the card adds to the driver: clean laps, driving time, pit stops, top speed. */
 function playerExtras(summary: Row | undefined): Pick<CardPlayer, 'driverOrdinal' | 'bestLapOrdinal' | 'completedLapsCount' | 'cleanLapsCount'
-  | 'drivingTimeSeconds' | 'pitStopsCount' | 'maxTopSpeed' | 'consistencyScore' | 'topThreeAverage'> {
+  | 'drivingTimeSeconds' | 'pitStopsCount' | 'maxTopSpeed' | 'consistencyScore' | 'top3Average'> {
   return {
     driverOrdinal: summary?.driver_ordinal as number | undefined,
     bestLapOrdinal: (summary?.best_lap_ordinal as number | null | undefined) ?? null,
@@ -31,7 +31,7 @@ function playerExtras(summary: Row | undefined): Pick<CardPlayer, 'driverOrdinal
     pitStopsCount: (summary?.pit_count as number | null | undefined) ?? 0,
     maxTopSpeed: (summary?.max_speed as number | null | undefined) ?? null,
     consistencyScore: (summary?.consistency_score as number | null | undefined) ?? null,
-    topThreeAverage: (summary?.top_three_average as number | null | undefined) ?? null,
+    top3Average: (summary?.top_three_average as number | null | undefined) ?? null,
   };
 }
 

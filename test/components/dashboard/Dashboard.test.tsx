@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { Dashboard } from '../../../src/components/dashboard/Dashboard.js';
+import { makeSessionCard } from '../../helpers/sessionCardFixture.js';
 
 vi.mock('../../../src/components/track-detail/TrackCircuitLayout.js', () => ({ TrackCircuitLayout: () => null }));
 
@@ -125,7 +126,7 @@ describe('Dashboard component', () => {
         lapsCount: 0,
       },
     },
-  ];
+  ].map(session => makeSessionCard(session));
 
   it('renders summary cards, session cards, and allows selecting session', () => {
     const onSelectSession = vi.fn();

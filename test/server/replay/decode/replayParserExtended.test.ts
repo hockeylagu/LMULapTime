@@ -587,7 +587,7 @@ describe('replayParser - extended format & pit info', () => {
           const laps = extractReplayLapSummaries(spaR1_File, { playerName: 'Samuel' });
           console.log('Spa extracted summaries:', laps.length);
           expect(laps.length).toBeGreaterThanOrEqual(14);
-          expect(laps[0].isOutlap).toBe(true);
+          expect(laps[0].isOutLap).toBe(true);
           // Valid flying racing lap
           const best = laps.find(l => l.isBest);
           expect(best).toBeDefined();

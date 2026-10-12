@@ -1,5 +1,5 @@
 import { Database as DatabaseType } from 'better-sqlite3';
-import { ReplayTrajectoryData } from '../types.js';
+import { ReplayTrajectoryData } from '../../../shared/types/index.js';
 import { REPLAY_CACHE_VERSION, isCompatibleReplayCacheVersion } from '../dbSchema.js';
 import { compressTrajectory, decompressTrajectory, decompressTrajectoryEdge, upgradeStoredTrajectory, withGarageState } from './replayTrajectoryCodec.js';
 import { lapEdgesFromNeighbours } from '../../replay/decode/replayLapPoints.js';

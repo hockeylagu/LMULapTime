@@ -64,7 +64,7 @@ describe('describeNonRepresentative', () => {
 
 describe('describeTrafficSpell', () => {
   const spell = (kind: TrafficSpell['kind'], direction: TrafficSpell['direction'], carClass?: string): TrafficSpell => ({
-    carName: 'Vinicius Ares', carClass, kind, direction, startSec: 0, endSec: 3, startStationM: 0, endStationM: 100, closestGapSec: 0.4,
+    driverName: 'Vinicius Ares', carClass, kind, direction, startSec: 0, endSec: 3, startStationM: 0, endStationM: 100, closestGapSec: 0.4,
   });
 
   it('says what the other car was to the driver', () => {

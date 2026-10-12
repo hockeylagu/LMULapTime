@@ -10,6 +10,7 @@ import { createTheoreticalBestLap } from '../../../shared/domain/lapComparison.j
 import { apiErrorMessage, fetchJson, isAbortError } from '../../api/apiClient.js';
 import { loadLeaderboardLayouts } from '../../api/leaderboardApi.js';
 import type { LeaderboardLayout } from '../../../shared/types/leaderboard.js';
+import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
 
 /** The /api/compare/laps response. */
 interface CompareLapsApiData {
@@ -27,18 +28,9 @@ interface CompareLapsApiData {
   total?: number;
 }
 
-export type CompareLapsSessionItem = DetailedSession | (Omit<Partial<DetailedSession>, 'sessionType'> & {
-  id: string;
-  trackVenue: string;
-  trackCourse?: string;
-  timeString?: string;
-  sessionType?: string;
-  sessionName?: string;
-});
-
 export interface UseCompareLapsParams {
   availableTracks?: string[];
-  sessions?: CompareLapsSessionItem[];
+  sessions?: (SessionCard | DetailedSession)[];
   initialTrack?: string;
   initialCarClass?: string;
   initialSessionId?: string;

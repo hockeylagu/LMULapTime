@@ -18,7 +18,7 @@ import type {
   DriverData,
   ReplayMetadata,
   ReplayTrajectoryData,
-} from '../../../server/core/types.js';
+} from '../../../shared/types/index.js';
 
 describe('ReplayTrajectoryService', () => {
   let db: SessionDatabase;
@@ -28,7 +28,7 @@ describe('ReplayTrajectoryService', () => {
   let sessions: DetailedSession[];
 
   const sessionFor = (recordingFilename = 'Daytona.Vcr', driverName = 'Samuel Lague'): DetailedSession => {
-    const driver = { name: driverName, driverName, laps: [{ lapNum: 1, lapTime: 96, isValid: true }] } as DriverData;
+    const driver = { name: driverName, laps: [{ lapNum: 1, lapTime: 96, isValid: true }] } as DriverData;
     return { id: 'selected-session', matchingReplayFile: { name: recordingFilename }, drivers: [driver],
       playerDriver: driverName === 'Samuel Lague' ? driver : undefined } as DetailedSession;
   };

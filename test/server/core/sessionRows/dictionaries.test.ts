@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SessionDatabase } from '../../../../server/core/db.js';
 import { readSession } from '../../../../server/core/sessionRows/reader.js';
 import { driver, lap, session } from './builders.js';
-import type { DetailedSession } from '../../../../server/core/types.js';
+import type { DetailedSession } from '../../../../shared/types/index.js';
 
 function sessionWith(id: string, names: string[], overrides: Partial<DetailedSession> = {}): DetailedSession {
   const drivers = names.map((name, index) => driver(name, [lap(1)], { isPlayer: index === 0, carClass: index === 0 ? 'Hyper' : 'GT3',

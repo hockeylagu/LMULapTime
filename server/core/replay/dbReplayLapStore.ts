@@ -1,5 +1,5 @@
 import { Database as DatabaseType } from 'better-sqlite3';
-import { ReplayTrajectoryData } from '../types.js';
+import { ReplayTrajectoryData } from '../../../shared/types/index.js';
 import {
   ReplayConditionFact,
   ReplayDriverEventFact,
@@ -50,7 +50,7 @@ export function replaceReplayDriverLapFacts(db: DatabaseType, filename: string, 
   `);
   for (const lap of laps) {
     insert.run(filename, driverSlot, lap.lapNumber, lap.startSec, lap.endSec, lap.lapTimeSec, lap.s1Sec, lap.s2Sec, lap.s3Sec,
-      lap.lapDistM, toInt(lap.isOutlap), toInt(lap.isValid), toInt(lap.isBest), lap.startFrame, lap.endFrame, sourceVersion);
+      lap.lapDistM, toInt(lap.isOutLap), toInt(lap.isValid), toInt(lap.isBest), lap.startFrame, lap.endFrame, sourceVersion);
   }
 }
 
@@ -100,7 +100,7 @@ export function getReplayLaps(db: DatabaseType, filename: string, driverSlot?: n
     s2Sec: r.s2_sec,
     s3Sec: r.s3_sec,
     lapDistM: r.lap_dist_m,
-    isOutlap: toBool(r.is_outlap),
+    isOutLap: toBool(r.is_outlap),
     isValid: toBool(r.is_valid),
     isBest: toBool(r.is_best),
     startFrame: r.start_frame,

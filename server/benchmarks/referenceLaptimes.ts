@@ -1,4 +1,4 @@
-import { ReferenceLaptimeEntry, ReferenceLaptimesCache, ReferenceBenchmarkDiff, ReferenceBenchmarkDiffItem, PaceCategoryInfo } from '../core/types.js';
+import { ReferenceLaptimeEntry, ReferenceLaptimesCache, ReferenceBenchmarkDiff, ReferenceBenchmarkDiffItem, PaceCategoryInfo } from '../../shared/types/index.js';
 import { parseTimeStringToSeconds, formatTime } from '../../shared/domain/formatters.js';
 import {
   calculateBenchmarkPace,

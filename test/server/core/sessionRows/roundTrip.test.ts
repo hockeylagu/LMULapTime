@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import path from 'node:path';
-import type { DetailedSession, LapData } from '../../../../server/core/types.js';
+import type { DetailedSession, LapData } from '../../../../shared/types/index.js';
 import { canonicalSession } from '../../../../server/core/sessionRows/canonical.js';
 import { readSession } from '../../../../server/core/sessionRows/reader.js';
 import { playerDriverOrdinal, writeSessionRows } from '../../../../server/core/sessionRows/writer.js';
@@ -17,6 +17,20 @@ function expectRoundTrip(input: DetailedSession): ReturnType<typeof roundTrip> {
 }
 
 describe('normalized session rows: round trip', () => {
+  it('ignores legacy duplicate driver-name storage while keeping the SQLite column readable', () => {
+    const input = session([driver('P', [lap(1)])]);
+    (input.drivers[0] as unknown as Record<string, unknown>).driverName = 'Legacy duplicate';
+    const db = memoryDb();
+    roundTrip(input, db);
+    db.prepare('UPDATE session_drivers SET driver_name=? WHERE session_id=?').run('Legacy duplicate', input.id);
+
+    const stored = readSession(db, input.id);
+    expect(stored?.drivers[0]).not.toHaveProperty('driverName');
+    expect(db.prepare('SELECT driver_name FROM session_drivers WHERE session_id=?').get(input.id)).toEqual({ driver_name: 'Legacy duplicate' });
+    const columns = db.prepare('PRAGMA table_info(session_drivers)').all() as Array<{ name: string }>;
+    expect(columns.map(column => column.name)).toContain('driver_name');
+  });
+
   it('does not replace a mismatched or ambiguous player copy with the first matching name', () => {
     const first = driver('Same Name', [lap(1)], { isPlayer: true });
     const input = session([first, { ...first }]);

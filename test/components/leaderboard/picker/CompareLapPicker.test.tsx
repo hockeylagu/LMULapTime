@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { CompareLaps } from '../../../../src/components/leaderboard/CompareLaps.js';
 import type { ComparableLap } from '../../../../shared/types/index.js';
+import { makeSessionCard } from '../../../helpers/sessionCardFixture.js';
 
 const lap = (sessionId: string, sessionType: string, hour: number, lapNum: number, lapTime: number, lapTimeString: string): ComparableLap => ({
   id: `${sessionId}_Me_lap_${lapNum}`,
@@ -30,7 +31,7 @@ const laps = [
   lap('race', 'Race', 16, 3, 121.6, '2:01.600'),
   lap('old', 'Practice', 9, 2, 119.8, '1:59.800'),
 ];
-const sessions = [{ id: 'race', trackVenue: 'Spa', trackCourse: 'GP', sessionType: 'Race', sessionName: 'Race' }];
+const sessions = [makeSessionCard({ id: 'race', trackVenue: 'Spa', trackCourse: 'GP', sessionType: 'Race', sessionName: 'Race' })];
 
 describe('CompareLapPicker in the compare card', () => {
   beforeEach(() => {

@@ -5,10 +5,10 @@ import { updateSearchParams } from '../../utils/urlParams.js';
 import { fetchJson, isAbortError } from '../../api/apiClient.js';
 import { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 import { TrackDetailSortOption } from './trackDetailSortOptions.js';
-import { SessionMeta } from './trackDetailHelpers.js';
+import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
 import { TRACK_DETAIL_SORT_OPTIONS } from './trackDetailSortOptions.js';
 import type { TrackSummary } from '../../../shared/types/index.js';
-import type { SessionProgressionPoint } from './improvement-chart/improvementChartTypes.js';
+import type { SessionProgressionPoint } from '../../../shared/types/index.js';
 
 const readSort = (value: string | null): TrackDetailSortOption =>
   TRACK_DETAIL_SORT_OPTIONS.find(option => option.value === value)?.value ?? 'date-desc';
@@ -17,7 +17,7 @@ export interface TrackDetailData {
   trackName: string;
   normalizedTrackName: string;
   sessionsCount: number;
-  sessions: SessionMeta[];
+  sessions: SessionCard[];
   benchmarks: ReferenceLaptimeEntry[];
   summary?: TrackSummary;
   filters?: { carModels: string[]; sessionTypes: string[]; emptyCount: number; replayCount: number };

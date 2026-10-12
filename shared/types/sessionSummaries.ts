@@ -6,7 +6,7 @@ export const SESSION_SUMMARY_PROJECTION_VERSION = 5;
 export interface SessionLapProjection {
   sessionId: string; driverOrdinal: number; lapOrdinal: number; lapNumber: number;
   lapTime: number | null; s1: number | null; s2: number | null; s3: number | null;
-  conditionGroup: LapConditionGroup; isValid: boolean; isInferred: boolean; isPitLap: boolean;
+  conditionGroup: LapConditionGroup; isValid: boolean; isInferred: boolean; isPitStop: boolean;
   isOutLap: boolean; isClean: boolean; isRepresentative: boolean; isHuman: boolean;
   leaderboardEligible: boolean; nonRepresentativeReason: string | null;
 }
@@ -22,12 +22,12 @@ export interface SessionConditionProjection {
 export interface SessionDriverProjection {
   sessionId: string; driverOrdinal: number; driverName: string; normalizedName: string;
   isPlayer: boolean; isHuman: boolean; carClass: string; carType: string;
-  position: number; lapsCount: number; cleanLapsCount: number; drivingTimeSum: number;
-  pitCount: number; maxSpeed: number | null; bestLapOrdinal: number | null;
+  position: number; lapsCount: number; cleanLapsCount: number; drivingTimeSeconds: number;
+  pitStopsCount: number; maxTopSpeed: number | null; bestLapOrdinal: number | null;
   declaredLapsCount: number;
   bestLapNumber: number | null; bestLapTime: number | null; bestS1: number | null;
   bestS2: number | null; bestS3: number | null; averageLapTime: number | null;
-  topThreeAverage: number | null; consistencyScore: number | null; bestLapWet: boolean;
+  top3Average: number | null; consistencyScore: number | null; bestLapWet: boolean;
 }
 
 export interface SessionSummaryProjection {
@@ -54,6 +54,6 @@ export type SessionCard = Omit<SessionMetadata, 'playerDriver'> & {
     bestLapOrdinal: number | null;
     completedLapsCount: number; cleanLapsCount: number; drivingTimeSeconds: number;
     pitStopsCount: number; maxTopSpeed: number | null; consistencyScore: number | null;
-    topThreeAverage: number | null;
+    top3Average: number | null;
   };
 };

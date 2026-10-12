@@ -9,7 +9,7 @@ import { ImprovementPaceChart } from './ImprovementPaceChart.js';
 
 import { buildPersonalBestSeries } from './improvementChartUtils.js';
 import { buildImprovementChartRows, getImprovementAxisBounds } from './improvementChartRows.js';
-import type { SessionProgressionPoint } from './improvementChartTypes.js';
+import type { SessionProgressionPoint } from '../../../../shared/types/index.js';
 
 export interface ImprovementChartProps {
   progression: SessionProgressionPoint[];

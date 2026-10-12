@@ -6,7 +6,7 @@ import {
   ReplayLapSummary,
   ReplayMetadata,
   ReplaySummary,
-} from '../core/types.js';
+} from '../../shared/types/index.js';
 import { getDisplayTrackName } from '../../shared/domain/formatters.js';
 import { resolveRosterVehicles } from '../../shared/domain/vehicleMapping.js';
 import { ReplaySummarySourceData } from './replayServiceTypes.js';
@@ -73,7 +73,7 @@ export function composeReplayMetadata(options: ComposeReplayMetadataOptions): Re
           isBest: Boolean(driver.bestLapTime && lap.lapTime === driver.bestLapTime),
           isValid: lap.isValid,
           isPitStop: lap.isPitStop,
-          isOutlap: lap.isOutLap,
+          isOutLap: lap.isOutLap,
           nonRepresentativeReason: lap.nonRepresentativeReason,
         }));
     }
@@ -123,15 +123,15 @@ export function buildReplayListSummaries(input: ReplaySummarySourceData): Replay
       : path.join(input.replaysDir, filename);
 
     try {
-      let mtime = stored?.file_mtime || 0;
-      let sizeBytes = stored?.file_size || 0;
+      let mtimeMs = stored?.file_mtime || 0;
+      let fileSizeBytes = stored?.file_size || 0;
       let fileOnDisk = false;
 
       if (fs.existsSync(filePath)) {
         try {
           const stat = fs.statSync(filePath);
-          mtime = stat.mtime.getTime();
-          sizeBytes = stat.size;
+          mtimeMs = stat.mtime.getTime();
+          fileSizeBytes = stat.size;
           fileOnDisk = true;
         } catch {
           // Ignore stat error
@@ -172,8 +172,8 @@ export function buildReplayListSummaries(input: ReplaySummarySourceData): Replay
       summaries.push({
         name: filename,
         path: filePath,
-        sizeBytes,
-        mtime,
+        fileSizeBytes,
+        mtimeMs,
         trackName: displayTrack,
         trackVenue: matched?.trackVenue || metadata.trackVenue,
         trackCourse: matched?.trackCourse || metadata.trackCourse || filenameTrack || undefined,
@@ -200,6 +200,6 @@ export function buildReplayListSummaries(input: ReplaySummarySourceData): Replay
     }
   }
 
-  summaries.sort((left, right) => right.mtime - left.mtime);
+  summaries.sort((left, right) => right.mtimeMs - left.mtimeMs);
   return summaries;
 }

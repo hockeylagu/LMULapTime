@@ -7,7 +7,7 @@ import { SessionDatabase } from '../../../server/core/db.js';
 import { initDbSchema, REPLAY_CACHE_VERSION } from '../../../server/core/dbSchema.js';
 import { LmuParser } from '../../../server/sessions/parser.js';
 import { parseReplayMetadata } from '../../../server/replay/decode/replayParser.js';
-import { ReplayMetadata, ReplayTrajectoryData, AiReportRecord } from '../../../server/core/types.js';
+import { ReplayMetadata, ReplayTrajectoryData, AiReportRecord } from '../../../shared/types/index.js';
 import { createSliceVcrBuffer } from '../../utils/mockVcr.js';
 import { writeSessionRows } from '../../../server/core/sessionRows/writer.js';
 

@@ -138,7 +138,7 @@ export function queryProgression(db: Database, options: SessionQuery) {
     ORDER BY s.timestamp ASC,s.id ASC LIMIT ? OFFSET ?`).all(driver,driver,...where.values,pageSize,(page-1)*pageSize) as Array<ProgressionRow & Record<string, unknown>>;
   const points: SessionProgressionPoint[] = rows.map(r => {
     const theoreticalBest=computeTheoreticalBest(r.best_s1,r.best_s2,r.best_s3);
-    return {sessionId:r.id,timestamp:r.timestamp,dateString:r.time_string,sessionType:r.session_type,sessionName:r.session_name,
+    return {sessionId:r.id,timestamp:r.timestamp,timeString:r.time_string,sessionType:r.session_type,sessionName:r.session_name,
       trackVenue:r.track_venue,trackCourse:r.track_course,displayTrack:getDisplayTrackName(r.track_venue,r.track_course),
       weatherInfo:r.weather_info ?? undefined, settings:group(r,SETTINGS_FIELDS) as SessionProgressionPoint['settings'] | undefined,
       carType:r.car_type || 'Unknown Car',carClass:r.car_class || 'General',driverName:r.driver_name || 'Unknown',bestLapTime:r.best_lap_time ?? null,bestS1:r.best_s1 ?? null,bestS2:r.best_s2 ?? null,bestS3:r.best_s3 ?? null,

@@ -9,9 +9,9 @@ import { TelemetryTireSlipChannel } from '../../../../src/components/replay/tele
 import { TelemetryYawRateChannel } from '../../../../src/components/replay/telemetry/channels/dynamics/TelemetryYawRateChannel.js';
 import { TelemetryPresetChannelRow } from '../../../../src/components/replay/telemetry/presets/TelemetryPresetChannelRow.js';
 import { AVAILABLE_TELEMETRY_CHANNELS } from '../../../../src/components/replay/telemetry/presets/telemetryPresets.js';
-import { ReplayTelemetryPoint } from '../../../../server/core/types.js';
+import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 
-const mockPoint: ReplayTelemetryPoint = {
+const mockPoint: ReplayTrajectoryPoint = {
   x: 100,
   y: 10,
   z: 200,
@@ -128,7 +128,7 @@ describe('Computed Telemetry UI Channels', () => {
   });
 
   it('renders TelemetryTireSlipChannel with LOCKUP warning on non-ABS lockup', () => {
-    const lockedPoint: ReplayTelemetryPoint = {
+    const lockedPoint: ReplayTrajectoryPoint = {
       ...mockPoint,
       brake: 90,
       tireSlipPct: 94,

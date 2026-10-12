@@ -1,4 +1,4 @@
-import { ReplayLapSummary, ReplayPitEvent } from '../../core/types.js';
+import { ReplayLapSummary, ReplayPitEvent } from '../../../shared/types/index.js';
 
 export interface RawTrajectoryPoint {
   sTime: number;
@@ -48,7 +48,7 @@ export interface DetectedLapInternal {
   s3Sec: number;
   s1Idx: number;
   s2Idx: number;
-  isOutlap: boolean;
+  isOutLap: boolean;
   isPitStop?: boolean;
   isBest: boolean;
   isValid?: boolean;
@@ -187,7 +187,7 @@ export function detectLapsFromTelemetry(
       }
 
       const isValid = ft.splitSec > 0;
-      const isOutlap = i === 0 || Boolean(rawPts[startIdx]?.pitLimiter || rawPts[startIdx]?.inPit)
+      const isOutLap = i === 0 || Boolean(rawPts[startIdx]?.pitLimiter || rawPts[startIdx]?.inPit)
         || isTimeInIntervals(startTime, pitIntervals);
       const isPitStop = targetPitEvents.some(event => event.code === 34 && event.timeSec >= startTime && event.timeSec < finishTime)
         || rawPts.slice(startIdx, endIdx + 1).some(point => point.inPit || point.pitLimiter);
@@ -204,7 +204,7 @@ export function detectLapsFromTelemetry(
         s3Sec,
         s1Idx,
         s2Idx,
-        isOutlap,
+        isOutLap,
         isPitStop,
         isBest: false,
         isValid,
@@ -267,7 +267,7 @@ export function detectLapsFromTelemetry(
           s3Sec,
           s1Idx,
           s2Idx,
-          isOutlap: Boolean(rawPts[lastStartIdx]?.pitLimiter || rawPts[lastStartIdx]?.inPit),
+          isOutLap: Boolean(rawPts[lastStartIdx]?.pitLimiter || rawPts[lastStartIdx]?.inPit),
           isBest: false,
           isValid: false,
         });
@@ -299,7 +299,7 @@ export function detectLapsFromTelemetry(
       s3Sec: rawPts.length > 0 ? Number((rawPts[endIdx].sTime - rawPts[s2Idx].sTime).toFixed(3)) : 0,
       s1Idx,
       s2Idx,
-      isOutlap: false,
+      isOutLap: false,
       isBest: false,
     }];
   }
@@ -314,10 +314,10 @@ export function detectLapsFromTelemetry(
       s1Sec: l.s1Sec,
       s2Sec: l.s2Sec,
       s3Sec: l.s3Sec,
-      isOutlap: l.isOutlap,
+      isOutLap: l.isOutLap,
       isPitStop: l.isPitStop,
       isBest: l.isBest,
-      isValid: l.isValid ?? !l.isOutlap,
+      isValid: l.isValid ?? !l.isOutLap,
       startFrame: 0,
       endFrame: frameCount,
     };
@@ -332,9 +332,9 @@ export function detectLapsFromTelemetry(
 }
 
 /** Selects the clean flying pool, falling back to valid laps when none are flying. */
-function markBestReplayLap<T extends Pick<DetectedLapInternal, 'isValid' | 'isPitStop' | 'isOutlap' | 'lapTimeSec' | 'lapNumber' | 'isBest'>>(laps: T[]): void {
+function markBestReplayLap<T extends Pick<DetectedLapInternal, 'isValid' | 'isPitStop' | 'isOutLap' | 'lapTimeSec' | 'lapNumber' | 'isBest'>>(laps: T[]): void {
   const validLaps = laps.filter(l => l.isValid && !l.isPitStop && l.lapTimeSec > 30);
-  const validFlying = validLaps.filter(l => !l.isOutlap);
+  const validFlying = validLaps.filter(l => !l.isOutLap);
   const pool = validFlying.length > 0 ? validFlying : validLaps;
   let minTime = Infinity;
   let bestLapNum = pool[0]?.lapNumber;

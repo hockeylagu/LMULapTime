@@ -6,7 +6,7 @@ import Database from 'better-sqlite3';
 import { initDbSchema } from '../../../server/core/dbSchema.js';
 import { SessionDatabase } from '../../../server/core/db.js';
 import { ServerContext } from '../../../server/core/serverContext.js';
-import type { DetailedSession, ReferenceBenchmarkDiff } from '../../../server/core/types.js';
+import type { DetailedSession, ReferenceBenchmarkDiff } from '../../../shared/types/index.js';
 import { ReplayRecordingService } from '../../../server/replay/replayRecordingService.js';
 import { LmuParser } from '../../../server/sessions/parser.js';
 import { TelemetryCatalog } from '../../../server/telemetry/telemetryCatalog.js';
@@ -761,8 +761,8 @@ describe('ServerContext replay scan progress', () => {
     function setup(storedReplays: ReturnType<typeof replayRow>[], linkedReplay: string) {
       vi.spyOn(fs, 'statSync').mockReturnValue({ mtimeMs: xmlMtimeMs } as unknown as fs.Stats);
       const sessionDb = {
-        getReplayMatchingEntries: vi.fn(() => storedReplays.map(row => replayIndexEntryFromStored({...row, metadata: row.metadata as import('../../../server/core/types.js').ReplayMetadata}))),
-        getReplayMatchingEntry: vi.fn((name: string) => { const row = storedReplays.find(row => row.filename === name); return row ? replayIndexEntryFromStored({...row, metadata: row.metadata as import('../../../server/core/types.js').ReplayMetadata}) : undefined; }),
+        getReplayMatchingEntries: vi.fn(() => storedReplays.map(row => replayIndexEntryFromStored({...row, metadata: row.metadata as import('../../../shared/types/index.js').ReplayMetadata}))),
+        getReplayMatchingEntry: vi.fn((name: string) => { const row = storedReplays.find(row => row.filename === name); return row ? replayIndexEntryFromStored({...row, metadata: row.metadata as import('../../../shared/types/index.js').ReplayMetadata}) : undefined; }),
         ...storedTelemetryLinks,
         getTelemetryMetadata: vi.fn(() => []),
         updateSessionMatchingReplay: vi.fn(),

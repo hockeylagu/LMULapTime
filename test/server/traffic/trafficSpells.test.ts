@@ -36,7 +36,7 @@ describe('findTrafficSpells', () => {
     const spells = spellsAgainst(car(1, (t) => 50 * t + 30));
 
     expect(spells).toHaveLength(1);
-    expect(spells[0]).toMatchObject({ carName: 'Other', carClass: 'Hyper', kind: 'battle', direction: 'ahead', closestGapSec: 0.6 });
+    expect(spells[0]).toMatchObject({ driverName: 'Other', carClass: 'Hyper', kind: 'battle', direction: 'ahead', closestGapSec: 0.6 });
     expect(spells[0].endSec - spells[0].startSec).toBeCloseTo(19.8, 5);
   });
 

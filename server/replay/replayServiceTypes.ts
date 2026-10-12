@@ -1,10 +1,10 @@
-import { DetailedSession, DriverData, LapData } from '../core/types.js';
+import { DetailedSession, DriverData, LapData } from '../../shared/types/index.js';
 import type { TelemetryLinks } from '../telemetry/telemetryLinks.js';
 
 /** Official timing fields used by replay metadata and lap validation, without events or passes. */
 export type ReplayTimingLap = Pick<LapData, 'lapNum' | 'lapTime' | 's1' | 's2' | 's3' |
   'isValid' | 'isPitStop' | 'isOutLap' | 'nonRepresentativeReason' | 'lapOrdinal'>;
-export type ReplayContextDriver = Pick<DriverData, 'name' | 'driverName' | 'carType' | 'carClass' |
+export type ReplayContextDriver = Pick<DriverData, 'name' | 'carType' | 'carClass' |
   'bestLapTime' | 'isPlayer' | 'driverOrdinal'> & { laps: ReplayTimingLap[] };
 export type ReplaySessionContext = Pick<DetailedSession, 'id' | 'trackVenue' | 'trackCourse' |
   'trackLengthMeters' | 'sessionType' | 'totalLapsCount' | 'matchingReplayFile'> & {
@@ -29,13 +29,13 @@ export interface ReplaySummarySourceData {
     file_path?: string;
     file_mtime?: number;
     file_size?: number;
-    metadata?: import('../core/types.js').ReplayMetadata | null;
+    metadata?: import('../../shared/types/index.js').ReplayMetadata | null;
   }>;
   replaysDir: string;
   sessions: DetailedSession[];
   /** The stored DuckDB matches (TelemetryLinks). */
   telemetryLinks: Pick<TelemetryLinks, 'forReplay'>;
-  getMetadata: (filePath: string, filename: string) => import('../core/types.js').ReplayMetadata | null;
+  getMetadata: (filePath: string, filename: string) => import('../../shared/types/index.js').ReplayMetadata | null;
 }
 
 /** Thrown when a trajectory is requested for a named driver who is not in the replay. */

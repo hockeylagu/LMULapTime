@@ -1,16 +1,16 @@
 import React, { useMemo } from 'react';
 import { X } from 'lucide-react';
-import { ReplayTelemetryPoint } from '../../../../shared/types/index.js';
+import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { CHART_COLORS, MAP_COLORS, TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 import { formatReading, hasReading } from './display/telemetryReadouts.js';
 
 export interface ReplayFrictionCircleProps {
-  points: ReplayTelemetryPoint[];
+  points: ReplayTrajectoryPoint[];
   currentIndex: number;
-  primaryPoint?: ReplayTelemetryPoint | null;
-  baselinePoints?: ReplayTelemetryPoint[];
-  baselinePoint?: ReplayTelemetryPoint | null;
+  primaryPoint?: ReplayTrajectoryPoint | null;
+  baselinePoints?: ReplayTrajectoryPoint[];
+  baselinePoint?: ReplayTrajectoryPoint | null;
   className?: string;
   onClose?: () => void;
 }
@@ -19,7 +19,7 @@ const CENTER = 64;
 const ENVELOPE_RADIUS = 47;
 const MAX_DISPLAY_RATIO = 1.2;
 
-function getGripState(point?: ReplayTelemetryPoint) {
+function getGripState(point?: ReplayTrajectoryPoint) {
   if (!hasReading(point?.accelLatG) || !hasReading(point?.accelLonG)) {
     return { label: 'UNAVAILABLE', detail: 'Acceleration channels unavailable', color: MAP_COLORS.markerMuted, utilization: null };
   }
@@ -43,7 +43,7 @@ function getGripState(point?: ReplayTelemetryPoint) {
   return { label: 'RESERVE', detail: 'Grip available', color: MAP_COLORS.markerMuted, utilization };
 }
 
-function projectPoint(point: ReplayTelemetryPoint): { x: number; y: number } | null {
+function projectPoint(point: ReplayTrajectoryPoint): { x: number; y: number } | null {
   if (!hasReading(point.accelLatG) || !hasReading(point.accelLonG)) return null;
   // Inertial load transfer (where the weight goes):
   // - Turning right (accelLatG < 0) transfers load to outside left tires (x < CENTER, 'L')
@@ -59,15 +59,15 @@ function projectPoint(point: ReplayTelemetryPoint): { x: number; y: number } | n
 }
 
 function resolveBaselinePoint(
-  primaryPt?: ReplayTelemetryPoint,
-  baselinePoint?: ReplayTelemetryPoint | null,
-  baselinePoints?: ReplayTelemetryPoint[]
-): ReplayTelemetryPoint | undefined {
+  primaryPt?: ReplayTrajectoryPoint,
+  baselinePoint?: ReplayTrajectoryPoint | null,
+  baselinePoints?: ReplayTrajectoryPoint[]
+): ReplayTrajectoryPoint | undefined {
   if (baselinePoint !== undefined) return baselinePoint ?? undefined;
   if (!baselinePoints || baselinePoints.length === 0 || !primaryPt) return undefined;
   const targetDist = primaryPt.distM ?? primaryPt.stationM;
   if (targetDist !== undefined) {
-    let closest: ReplayTelemetryPoint | undefined;
+    let closest: ReplayTrajectoryPoint | undefined;
     let minDiff = Infinity;
     for (let i = 0; i < baselinePoints.length; i++) {
       const bp = baselinePoints[i];

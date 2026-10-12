@@ -10,7 +10,7 @@ import {
 } from '../../../../server/core/replay/dbReplayTrajectoryStore.js';
 import { replaceReplayDriverLapFacts } from '../../../../server/core/replay/dbReplayLapStore.js';
 import { lapFactsFrom } from '../../../../server/replay/decode/replayFacts.js';
-import { ReplayTrajectoryData } from '../../../../server/core/types.js';
+import { ReplayTrajectoryData } from '../../../../shared/types/index.js';
 
 const lap = (lapNumber: number): ReplayTrajectoryData => ({
   replayName: 'Spa_R1.Vcr',
@@ -49,7 +49,7 @@ describe('dbReplayTrajectoryStore', () => {
       const before = db.prepare('SELECT trajectory_br FROM replay_trajectories').get() as { trajectory_br: Buffer };
       const retained = getStoredReplayTrajectory(db, 'Spa_R1.Vcr', 3, 2)!;
       expect(retained.laps?.[0]).toMatchObject({ isPitStop: true, isBest: false });
-      expect(retained.laps?.[1].isOutlap).toBe(true);
+      expect(retained.laps?.[1].isOutLap).toBe(true);
       expect(retained.laps?.[2].isBest).toBe(true);
       const after = db.prepare('SELECT trajectory_br FROM replay_trajectories').get() as { trajectory_br: Buffer };
       expect(after.trajectory_br.equals(before.trajectory_br)).toBe(true);

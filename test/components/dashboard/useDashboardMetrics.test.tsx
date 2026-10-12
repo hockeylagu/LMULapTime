@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useDashboardMetrics } from '../../../src/components/dashboard/useDashboardMetrics.js';
-import { DashboardSessionItem } from '../../../src/components/dashboard/useDashboardMetrics.js';
-import type { LapData } from '../../../server/core/types.js';
+import type { DetailedSession } from '../../../shared/types/session.js';
+import { makeDetailedSession } from '../../helpers/sessionCardFixture.js';
 
-function makeSession(overrides: Partial<DashboardSessionItem> = {}): DashboardSessionItem {
-  return {
+function makeSession(overrides: Parameters<typeof makeDetailedSession>[0] = {}): DetailedSession {
+  return makeDetailedSession({
     id: 's-1',
     filename: 'session.xml',
     trackVenue: 'Algarve International Circuit',
@@ -33,7 +33,7 @@ function makeSession(overrides: Partial<DashboardSessionItem> = {}): DashboardSe
       ],
     },
     ...overrides,
-  } as unknown as DashboardSessionItem;
+  });
 }
 
 describe('useDashboardMetrics', () => {
@@ -72,7 +72,7 @@ describe('useDashboardMetrics', () => {
           laps: [
             { lapNum: 1, lapTime: 95, isValid: true, isPitStop: false, topSpeed: 285 },
             { lapNum: 2, lapTime: 96, isValid: true, isPitStop: false, topSpeed: 286 },
-          ] as unknown as LapData[],
+          ],
         },
       }),
     ];
@@ -191,7 +191,7 @@ describe('useDashboardMetrics', () => {
             { lapNum: 4, lapTime: 130, isValid: true, isPitStop: true },  // in-lap / pit stop excluded
             { lapNum: 5, lapTime: 140, isValid: true, isOutLap: true },   // out-lap excluded
             { lapNum: 6, lapTime: 102, isValid: true, isPitStop: false }, // clean flying lap 3
-          ] as unknown as LapData[],
+          ],
         },
       }),
     ];

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import zlib from 'node:zlib';
 import Database from 'better-sqlite3';
-import { ReplayTrajectoryData } from '../../../../server/core/types.js';
+import { ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import {
   compressTrajectory,
   decompressTrajectory,

@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import { enrichTrajectoryWithTrackGeometry, getTrackDefinition } from '../../../server/tracks/serverTrackSync.js';
 import { computeLapComparisons } from '../../../src/utils/replayComparison.js';
 import { computeLapSegmentComparisons } from '../../../src/utils/cornerAnalysis/segmentComparisons.js';
-import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../server/core/types.js';
+import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../shared/types/index.js';
 
 describe('Baseline Comparison & Reference Change Invariance', () => {
   // Generate points exactly following Monza centerline geometry with normal lateral offset

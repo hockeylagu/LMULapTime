@@ -2,10 +2,10 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SessionTableRow } from '../../../src/components/session-list/SessionTableRow';
-import { SessionListItem } from '../../../src/components/session-list/sessionListTypes.js';
+import { makeSessionCard } from '../../helpers/sessionCardFixture.js';
 
 describe('SessionTableRow', () => {
-  const baseSession: SessionListItem = {
+  const baseSession = makeSessionCard({
     id: 'session-race-1',
     sessionType: 'Race',
     sessionName: 'Race 1',
@@ -26,7 +26,7 @@ describe('SessionTableRow', () => {
       driverOrdinal: 0,
       bestLapOrdinal: 3,
     },
-  };
+  });
 
   it('renders race session row with position gain, pace badge, and handles row and button clicks', () => {
     const onSelectSession = vi.fn();
@@ -71,7 +71,7 @@ describe('SessionTableRow', () => {
     const onSelectSession = vi.fn();
     const onOpenReplay = vi.fn();
 
-    const qualiSession: SessionListItem = {
+    const qualiSession = makeSessionCard({
       ...baseSession,
       id: 'session-quali-1',
       sessionType: 'Qualifying',
@@ -91,7 +91,7 @@ describe('SessionTableRow', () => {
         name: 'Monza_Quali_2026.Vcr',
         path: 'C:/LMU/Replays/Monza_Quali_2026.Vcr',
       },
-    };
+    });
 
     render(
       <table>
@@ -119,7 +119,7 @@ describe('SessionTableRow', () => {
   });
 
   it('renders empty session badge and negative position gain', () => {
-    const emptySession: SessionListItem = {
+    const emptySession = makeSessionCard({
       id: 'empty-sess',
       sessionType: 'Race',
       sessionName: 'Race 2',
@@ -135,7 +135,7 @@ describe('SessionTableRow', () => {
         position: 10,
         positionGain: -4,
       },
-    };
+    });
 
     render(
       <table>
@@ -173,11 +173,11 @@ describe('SessionTableRow', () => {
   });
 
   describe('link clicks', () => {
-    const withReplay: SessionListItem = {
+    const withReplay = makeSessionCard({
       ...baseSession,
       matchingReplayFile: { name: 'Monza.Vcr', path: 'C:/LMU/Replays/Monza.Vcr' },
-      playerDriver: { ...baseSession.playerDriver!, bestLapNum: 4 } as SessionListItem['playerDriver'],
-    };
+      playerDriver: { ...baseSession.playerDriver!, bestLapNum: 4 },
+    });
     const setup = () => {
       const onSelectSession = vi.fn();
       const onOpenReplay = vi.fn();

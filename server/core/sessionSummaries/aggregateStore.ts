@@ -1,5 +1,5 @@
 import type { Database } from 'better-sqlite3';
-import type { DetailedSession } from '../types.js';
+import type { DetailedSession } from '../../../shared/types/index.js';
 import type { SessionSummaryProjection } from '../../../shared/types/sessionSummaries.js';
 
 /** Compact one-row-per-session facts keep history scans away from source/card JSON. */
@@ -36,9 +36,9 @@ export function persistSessionAggregate(db: Database, session: DetailedSession, 
     is_empty: Number(projection.isEmpty), has_player: Number(Boolean(player)), driver_name: player?.driverName ?? '',
     car_type: player?.carType ?? '', car_class: (player?.carClass ?? ''), position: player?.position ?? null,
     position_gain: facts.positionGain, laps_count: player?.lapsCount ?? 0, declared_laps_count: player?.declaredLapsCount ?? 0,
-    clean_laps_count: player?.cleanLapsCount ?? 0, driving_time_sum: player?.drivingTimeSum ?? 0,
-    pit_count: player?.pitCount ?? 0, distance_km: facts.distanceKm, activity_distance_km: facts.activityDistanceKm,
-    max_speed: player?.maxSpeed ?? null, best_lap_time: player?.bestLapTime ?? null,
+    clean_laps_count: player?.cleanLapsCount ?? 0, driving_time_sum: player?.drivingTimeSeconds ?? 0,
+    pit_count: player?.pitStopsCount ?? 0, distance_km: facts.distanceKm, activity_distance_km: facts.activityDistanceKm,
+    max_speed: player?.maxTopSpeed ?? null, best_lap_time: player?.bestLapTime ?? null,
     best_lap_time_string: facts.bestLapTimeString, best_lap_wet: Number(player?.bestLapWet ?? false),
     best_lap_number: player?.bestLapNumber ?? null, best_s1: player?.bestS1 ?? null,
     best_s2: player?.bestS2 ?? null, best_s3: player?.bestS3 ?? null, consistency_score: player?.consistencyScore ?? null,

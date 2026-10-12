@@ -86,7 +86,7 @@ export async function loadSessionDebrief(session: DetailedSession, driver: Drive
   const lap = driver.laps?.find(l => l.lapNum === lapNumber);
   if (!lap || !lap.lapTime) throw new DebriefUnavailableError('No timed lap to analyse in this session.');
   const driverOrdinal = session.drivers.findIndex(item => item === driver ||
-    (item.driverName || item.name).trim().toLowerCase() === (driver.driverName || driver.name).trim().toLowerCase());
+    item.name.trim().toLowerCase() === driver.name.trim().toLowerCase());
   const lapOrdinal = driverOrdinal >= 0 ? session.drivers[driverOrdinal].laps.findIndex(item => item.lapNum === lapNumber) : -1;
   if (driverOrdinal < 0 || lapOrdinal < 0) throw new DebriefUnavailableError('The selected driver or lap is unavailable in this session.');
   // Started first: the first request for a race builds its positions index, the slowest step.

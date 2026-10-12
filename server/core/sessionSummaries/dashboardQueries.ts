@@ -1,5 +1,5 @@
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { ReferenceLaptimeEntry } from '../types.js';
+import type { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
 import type { DashboardData, DashboardMetrics, DashboardTrends } from '../../../shared/types/dashboard.js';
 import { getDisplayTrackName } from '../../../shared/domain/formatters.js';
@@ -167,7 +167,7 @@ function dashboardTrends(db: DatabaseType, entries: Record<string, ReferenceLapt
   const trackName = getDisplayTrackName(latest.trackVenue, latest.trackCourse);
   const latestOuting: DashboardTrends['latestOuting'] = {
     id: latest.id, trackName, trackVenue: latest.trackVenue, trackCourse: latest.trackCourse,
-    sessionType: latest.sessionType, timeString: latest.timeString, carName: player.carType, carClass: player.carClass,
+    sessionType: latest.sessionType, timeString: latest.timeString, carType: player.carType, carClass: player.carClass,
     bestLapTimeString: player.bestLapTimeString, bestLapTime: player.bestLapTime,
     bestLapNum: player.bestLapNum, pacePercentage: player.bestLapPacePercentage, paceCategory: player.bestLapPaceCategory,
     bestLapWet: player.bestLapWet, position: player.position, gridPosition: player.gridPosition, positionGain: player.positionGain,
@@ -184,7 +184,7 @@ function dashboardTrends(db: DatabaseType, entries: Record<string, ReferenceLapt
     .iterate(trendClass) as IterableIterator<DashboardSummaryRow>;
   for (const row of trendRows) {
     const pace = paceFor(row, entries, findTrackEntries); if (!pace) continue;
-    recentPaceTrend.push({ id: row.id, trackName: getDisplayTrackName(row.track_venue, row.track_course), carName: row.car_type,
+    recentPaceTrend.push({ id: row.id, trackName: getDisplayTrackName(row.track_venue, row.track_course), carType: row.car_type,
       timeString: row.time_string, bestLapTimeString: row.best_lap_time_string, pacePercentage: pace.percentage, paceCategory: pace.category });
     if (recentPaceTrend.length === 6) break;
   }

@@ -1,5 +1,5 @@
 /** Test-only parity oracle for the paged progression and comparable-lap queries. */
-import type { DetailedSession, ComparableLap, SessionProgressionPoint } from '../../server/core/types.js';
+import type { DetailedSession, ComparableLap, SessionProgressionPoint } from '../../shared/types/index.js';
 import { formatTime, compareSessions, computeTheoreticalGap, getDisplayTrackName } from '../../shared/domain/formatters.js';
 import { computeTopNLapAverage, computeConsistencyRating, selectCleanLapCandidates } from '../../shared/domain/lapComparison.js';
 import { matchesTrack } from '../../shared/domain/paceCategory.js';
@@ -40,7 +40,7 @@ export function computeProgression(sessions: DetailedSession[], targetDriverName
     return {
       sessionId: s.id,
       timestamp: s.timestamp,
-      dateString: s.timeString,
+      timeString: s.timeString,
       sessionType: s.sessionType,
       sessionName: s.sessionName,
       trackVenue: s.trackVenue,

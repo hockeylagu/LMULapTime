@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { fuseDuckDbWithVcrTrajectory } from '../../../server/telemetry/telemetryFusion.js';
-import { DuckDbLapTelemetry, ReplayTrajectoryData } from '../../../server/core/types.js';
+import { ReplayTrajectoryData } from '../../../shared/types/index.js';
+import type { DuckDbLapTelemetry } from '../../../server/telemetry/duckdbTypes.js';
 
 describe('telemetryFusion', () => {
   it.each([false, true])('copies native samples without a replay, with annotations=%s', annotated => {

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SessionRulesModal } from '../../../src/components/session-detail/standings/SessionRulesModal.js';
-import type { SessionSettings } from '../../../server/core/types.js';
+import type { SessionSettings } from '../../../shared/types/index.js';
 
 describe('SessionRulesModal', () => {
   const baseSettings: SessionSettings = {

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { SessionRaceStandings } from '../../../src/components/session-detail/standings/SessionRaceStandings.js';
-import { DetailedSession, DriverData, LapData } from '../../../server/core/types.js';
+import { DetailedSession, DriverData, LapData } from '../../../shared/types/index.js';
 
 const makeLap = (overrides: Partial<LapData> = {}): LapData => ({
   lapNum: 1,

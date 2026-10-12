@@ -15,13 +15,13 @@ export interface DashboardMetrics {
 }
 
 export interface DashboardRecentPacePoint {
-  id: string; trackName: string; carName: string; timeString: string; bestLapTimeString: string;
+  id: string; trackName: string; carType: string; timeString: string; bestLapTimeString: string;
   pacePercentage: number; paceCategory?: PaceCategory | null;
 }
 
 export interface DashboardLatestOuting {
   id: string; trackName: string; trackVenue: string; trackCourse?: string;
-  sessionType: 'Practice' | 'Qualifying' | 'Race' | 'Unknown'; timeString: string; carName: string;
+  sessionType: 'Practice' | 'Qualifying' | 'Race' | 'Unknown'; timeString: string; carType: string;
   carClass?: string; bestLapTimeString: string; bestLapTime: number | null; bestLapNum?: number | null;
   pacePercentage?: number | null; paceCategory?: PaceCategory | null; bestLapWet?: boolean;
   position?: number; gridPosition?: number | null; positionGain?: number | null; lapsCount: number;

@@ -11,7 +11,7 @@ vi.mock('../../../server/benchmarks/referenceLaptimes.js', async importOriginal 
 import { createLeaderboardRouter } from '../../../server/routes/leaderboardRoutes.js';
 import { ServerContext } from '../../../server/core/serverContext.js';
 import { SessionDatabase } from '../../../server/core/db.js';
-import { DetailedSession } from '../../../server/core/types.js';
+import { DetailedSession } from '../../../shared/types/index.js';
 import { driver, lap, session } from '../../domain/leaderboardFixtures.js';
 
 describe('leaderboardRoutes', () => {

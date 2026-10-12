@@ -28,7 +28,7 @@ describe('detectLapsFromTelemetry: the lap still running when the replay ends', 
   it('excludes a completed pit in-lap from best flying lap and consistency', () => {
     const result = detectLapsFromTelemetry(drive(190), twoLaps, SLOT,
       [{ driverSlot: SLOT, timeSec: 150, code: 34, action: 'Pit entry' }], 2000);
-    expect(result.lapsSummary[1]).toMatchObject({ isValid: true, isOutlap: false, isPitStop: true, isBest: false });
+    expect(result.lapsSummary[1]).toMatchObject({ isValid: true, isOutLap: false, isPitStop: true, isBest: false });
     expect(computeLapConsistencyStats(result.lapsSummary).lapCount).toBe(0);
   });
 
@@ -36,7 +36,7 @@ describe('detectLapsFromTelemetry: the lap still running when the replay ends', 
     const result = detectLapsFromTelemetry(drive(290, sTime => ({ inPit: sTime >= 150 && sTime <= 205 })),
       [...twoLaps, finish(2, 290, 100)], SLOT, [], 2000);
     expect(result.lapsSummary[1].isPitStop).toBe(true);
-    expect(result.lapsSummary[2].isOutlap).toBe(true);
+    expect(result.lapsSummary[2].isOutLap).toBe(true);
     expect(computeLapConsistencyStats(result.lapsSummary).lapCount).toBe(0);
   });
 
@@ -68,7 +68,7 @@ describe('detectLapsFromTelemetry: the lap still running when the replay ends', 
 
   it('is an out-lap when it started in the pit lane', () => {
     const [, , partial] = detect(drive(230, sTime => ({ inPit: sTime >= 188 && sTime <= 192 })), twoLaps);
-    expect(partial.isOutlap).toBe(true);
+    expect(partial.isOutLap).toBe(true);
   });
 
   it('is not added for a short run after the last line crossing (the car stopped or the replay was saved)', () => {

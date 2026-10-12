@@ -1,5 +1,5 @@
 import { Database as DatabaseType } from 'better-sqlite3';
-import { DetailedSession } from './types.js';
+import { DetailedSession } from '../../shared/types/index.js';
 import { getReplayConditions } from './replay/dbReplayLapStore.js';
 import { classifySessionLaps } from '../sessions/sessionLapClassification.js';
 import { replayWeatherCondition, type RainOverLap } from '../../shared/domain/lapConditions.js';

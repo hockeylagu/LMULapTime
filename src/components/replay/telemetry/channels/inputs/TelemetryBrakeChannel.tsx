@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Zap } from 'lucide-react';
-import { ReplayTelemetryPoint } from '../../../../../../shared/types/index.js';
+import { ReplayTrajectoryPoint } from '../../../../../../shared/types/index.js';
 import { PointComparison } from '../../../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS } from '../../../../../utils/themeColors.js';
 import { TelemetryGridLine, TelemetryStaticTrace } from '../../TelemetryStaticTrace.js';
@@ -15,7 +15,7 @@ export interface TelemetryBrakeChannelProps {
   brakePath: string;
   brakeArea?: string;
   baselineBrakePath?: string;
-  currentPoint?: ReplayTelemetryPoint;
+  currentPoint?: ReplayTrajectoryPoint;
   currentComparison?: PointComparison | null;
   isCursorInView: boolean;
   cursorPct: number;

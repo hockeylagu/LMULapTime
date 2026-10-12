@@ -1,5 +1,5 @@
 import type { Database as DatabaseType, Statement } from 'better-sqlite3';
-import type { DetailedSession, DriverData, LapData } from '../types.js';
+import type { DetailedSession, DriverData, LapData } from '../../../shared/types/index.js';
 import type { TrafficCar, TrafficGap } from '../../../shared/types/raceTraffic.js';
 import type { SessionDriverProjection, SessionLapProjection, SessionSummaryProjection } from '../../../shared/types/sessionSummaries.js';
 import { buildSessionSummaryProjection } from '../../../shared/domain/sessionSummaries/buildSessionSummaryProjection.js';
@@ -62,10 +62,10 @@ function driverDerived(derived: SessionDriverProjection | undefined): Params {
   return {
     is_human: derived ? flag(derived.isHuman) : null, is_player_driver: derived ? flag(derived.isPlayer) : null,
     driver_class: derived?.carClass ?? null, completed_laps_count: derived?.lapsCount ?? null,
-    clean_laps_count: derived?.cleanLapsCount ?? null, driving_time_sum: derived?.drivingTimeSum ?? null,
-    pit_count: derived?.pitCount ?? null, max_speed: derived?.maxSpeed ?? null, best_lap_ordinal: derived?.bestLapOrdinal ?? null,
+    clean_laps_count: derived?.cleanLapsCount ?? null, driving_time_sum: derived?.drivingTimeSeconds ?? null,
+    pit_count: derived?.pitStopsCount ?? null, max_speed: derived?.maxTopSpeed ?? null, best_lap_ordinal: derived?.bestLapOrdinal ?? null,
     best_lap_number: derived?.bestLapNumber ?? null, clean_average_lap_time: derived?.averageLapTime ?? null,
-    top_three_average: derived?.topThreeAverage ?? null, consistency_score: derived?.consistencyScore ?? null,
+    top_three_average: derived?.top3Average ?? null, consistency_score: derived?.consistencyScore ?? null,
     best_lap_is_wet: derived ? flag(derived.bestLapWet) : null,
   };
 }

@@ -1,7 +1,7 @@
 import {
   ReferenceBenchmarkDiff,
   ReferenceBenchmarkDiffItem,
-} from '../core/types.js';
+} from '../../shared/types/index.js';
 import {
   PACE_CATEGORY_BANDS,
 } from '../../shared/domain/paceCategory.js';

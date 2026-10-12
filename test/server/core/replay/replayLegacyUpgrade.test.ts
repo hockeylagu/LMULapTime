@@ -9,7 +9,7 @@ import {
 } from '../../../../server/core/replay/replayTrajectoryCodec.js';
 import { getStoredReplayTrajectory } from '../../../../server/core/replay/dbReplayTrajectoryStore.js';
 import { getStoredReplayMetadata } from '../../../../server/core/replay/dbReplayMetadataStore.js';
-import { ReplayMetadata, ReplayTrajectoryData } from '../../../../server/core/types.js';
+import { ReplayLapSummary, ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 
 const legacyTrajectory = (): ReplayTrajectoryData => ({
   replayName: 'Lost.Vcr',
@@ -57,6 +57,36 @@ describe('legacy replay rows are corrected on read, never rewritten', () => {
     expect(upgradeStoredReplayMetadata(meta, REPLAY_CACHE_VERSION).ambientTemp).toBe(25);
   });
 
+  it('normalizes cached out-lap spelling at the read boundary for current and v6 rows', () => {
+    const trajectory = legacyTrajectory();
+    const legacyLap: ReplayLapSummary = { lapNumber: 1, lapTimeSec: 90, s1Sec: 30, s2Sec: 30, s3Sec: 30 };
+    Object.assign(legacyLap, { isOutlap: true });
+    const canonicalFalse: ReplayLapSummary = { lapNumber: 2, lapTimeSec: 91, s1Sec: 30, s2Sec: 30, s3Sec: 31, isOutLap: false };
+    Object.assign(canonicalFalse, { isOutlap: true });
+    const nested = legacyTrajectory();
+    const nestedLap: ReplayLapSummary = { lapNumber: 3, lapTimeSec: 92, s1Sec: 30, s2Sec: 31, s3Sec: 31 };
+    Object.assign(nestedLap, { isOutlap: false });
+    nested.laps = [nestedLap];
+    trajectory.laps = [legacyLap, canonicalFalse];
+    trajectory.allLapsData = [nested];
+
+    const upgraded = upgradeStoredTrajectory(trajectory, REPLAY_CACHE_VERSION);
+    expect(upgraded.laps?.map(lap => lap.isOutLap)).toEqual([true, false]);
+    expect(upgraded.laps?.every(lap => !Object.prototype.hasOwnProperty.call(lap, 'isOutlap'))).toBe(true);
+    expect(upgraded.allLapsData?.[0].laps?.[0].isOutLap).toBe(false);
+    expect(upgraded.allLapsData?.[0].laps?.[0]).not.toHaveProperty('isOutlap');
+
+    const metadataLap: ReplayLapSummary = { lapNumber: 4, lapTimeSec: 90, s1Sec: 30, s2Sec: 30, s3Sec: 30 };
+    Object.assign(metadataLap, { isOutlap: true });
+    const metadata: ReplayMetadata = {
+      filename: 'Lost.Vcr', filePath: 'C:/gone/Lost.Vcr', fileSizeBytes: 1, mtimeMs: 1,
+      timeSliceCount: 0, totalEvents: 0, durationSec: 0, drivers: [], laps: [metadataLap],
+    };
+    const upgradedMetadata = upgradeStoredReplayMetadata(metadata, 'v6');
+    expect(upgradedMetadata.laps?.[0].isOutLap).toBe(true);
+    expect(upgradedMetadata.laps?.[0]).not.toHaveProperty('isOutlap');
+  });
+
   it('leaves v6 rows alone: they already use the calibrated ambient scale and Virtual Energy', () => {
     expect(upgradeStoredTrajectory(legacyTrajectory(), 'v6')).toEqual(legacyTrajectory());
     const meta = { ambientTemp: 25, replayName: 'x' } as unknown as ReplayMetadata;
@@ -83,6 +113,58 @@ describe('legacy replay rows are corrected on read, never rewritten', () => {
     const row = db.prepare("SELECT parser_version, trajectory_br FROM replay_trajectories WHERE filename = 'Lost.Vcr'").get() as { parser_version: string; trajectory_br: Buffer };
     expect(row.parser_version).toBe('v5');
     expect(row.trajectory_br.equals(trajectoryBlob)).toBe(true);
+    db.close();
+  });
+
+  it('normalizes v7 cached lap spellings for deleted replays without rewriting either blob', () => {
+    const db = new Database(':memory:');
+    initDbSchema(db);
+    const trueLap: ReplayLapSummary = { lapNumber: 1, lapTimeSec: 90, s1Sec: 30, s2Sec: 30, s3Sec: 30 };
+    Object.assign(trueLap, { isOutlap: true });
+    const falseLap: ReplayLapSummary = {
+      lapNumber: 2, lapTimeSec: 91, s1Sec: 30, s2Sec: 30, s3Sec: 31, isOutLap: false,
+    };
+    Object.assign(falseLap, { isOutlap: true });
+    const nestedLap: ReplayLapSummary = { lapNumber: 3, lapTimeSec: 92, s1Sec: 30, s2Sec: 31, s3Sec: 31 };
+    Object.assign(nestedLap, { isOutlap: true });
+    const trajectory = legacyTrajectory();
+    trajectory.laps = [trueLap, falseLap];
+    const nested = legacyTrajectory();
+    nested.laps = [nestedLap];
+    trajectory.allLapsData = [nested];
+    const metadataLap: ReplayLapSummary = { lapNumber: 1, lapTimeSec: 90, s1Sec: 30, s2Sec: 30, s3Sec: 30 };
+    Object.assign(metadataLap, { isOutlap: true });
+    const metadataFalseLap: ReplayLapSummary = {
+      lapNumber: 2, lapTimeSec: 91, s1Sec: 30, s2Sec: 30, s3Sec: 31, isOutLap: false,
+    };
+    Object.assign(metadataFalseLap, { isOutlap: true });
+    const metadata: ReplayMetadata = {
+      filename: 'Lost.Vcr', filePath: 'C:/gone/Lost.Vcr', fileSizeBytes: 1, mtimeMs: 1,
+      timeSliceCount: 0, totalEvents: 0, durationSec: 0, drivers: [], laps: [metadataLap, metadataFalseLap],
+    };
+    const trajectoryBlob = compressTrajectory(trajectory);
+    const metadataBlob = compressJson(metadata);
+    db.prepare(`INSERT INTO replay_metadata (filename, file_path, file_mtime, file_size, parser_version, metadata_br, updated_at)
+      VALUES ('Lost.Vcr', 'C:/gone/Lost.Vcr', 1, 1, 'v7', ?, 1)`).run(metadataBlob);
+    db.prepare(`INSERT INTO replay_trajectories (filename, source_path, driver_slot, lap_key, file_mtime, file_size, parser_version, points_count, trajectory_br, updated_at)
+      VALUES ('Lost.Vcr', 'C:/gone/Lost.Vcr', 1, 3, 1, 1, 'v7', 2, ?, 1)`).run(trajectoryBlob);
+
+    const readTrajectory = getStoredReplayTrajectory(db, 'Lost.Vcr', 1, 3);
+    expect(readTrajectory?.laps?.map(lap => lap.isOutLap)).toEqual([true, false]);
+    expect(readTrajectory?.allLapsData?.[0].laps?.[0].isOutLap).toBe(true);
+    expect(readTrajectory?.laps?.every(lap => !Object.prototype.hasOwnProperty.call(lap, 'isOutlap'))).toBe(true);
+    const readMetadata = getStoredReplayMetadata(db, 'Lost.Vcr');
+    expect(readMetadata?.laps?.map(lap => lap.isOutLap)).toEqual([true, false]);
+    expect(readMetadata?.laps?.every(lap => !Object.prototype.hasOwnProperty.call(lap, 'isOutlap'))).toBe(true);
+
+    const storedTrajectory = db.prepare("SELECT parser_version, trajectory_br FROM replay_trajectories WHERE filename = 'Lost.Vcr'")
+      .get() as { parser_version: string; trajectory_br: Buffer };
+    const storedMetadata = db.prepare("SELECT parser_version, metadata_br FROM replay_metadata WHERE filename = 'Lost.Vcr'")
+      .get() as { parser_version: string; metadata_br: Buffer };
+    expect(storedTrajectory.parser_version).toBe('v7');
+    expect(storedTrajectory.trajectory_br.equals(trajectoryBlob)).toBe(true);
+    expect(storedMetadata.parser_version).toBe('v7');
+    expect(storedMetadata.metadata_br.equals(metadataBlob)).toBe(true);
     db.close();
   });
 });

@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SessionReplayLinks } from '../../../server/sessions/sessionReplayLinks.js';
 import type { LmuParser } from '../../../server/sessions/parser.js';
 import type { ReplayFileEntry } from '../../../server/sessions/sessionXmlTypes.js';
-import type { DetailedSession } from '../../../server/core/types.js';
+import type { DetailedSession } from '../../../shared/types/index.js';
 import { SessionDatabase } from '../../../server/core/db.js';
 
 const xmlMtimeMs = Date.parse('2026-09-20T18:00:00Z');

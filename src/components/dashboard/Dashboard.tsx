@@ -11,14 +11,15 @@ import { DashboardHero } from './DashboardHero.js';
 import { DashboardFilterBar } from './DashboardFilterBar.js';
 import { DashboardSortOption } from './dashboardSortOptions.js';
 import { useDashboardMetrics } from './useDashboardMetrics.js';
-import { SessionSummary } from './dashboardTypes.js';
+import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
+import type { DetailedSession } from '../../../shared/types/session.js';
 import { useSessionViewMode } from '../session-list/useSessionViewMode.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import { useDashboardData } from './useDashboardData.js';
 import type { DashboardTrends } from '../../../shared/types/dashboard.js';
 
 export interface DashboardProps {
-  sessions?: SessionSummary[];
+  sessions?: (SessionCard | DetailedSession)[];
   dataRevision?: string;
   onSelectSession: (id: string) => void;
   selectedTrack?: string;
@@ -57,7 +58,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
     const session = sessions.find(item => item.id === id) ?? dashboardData?.sessions.find(item => item.id === id);
     const outing = dashboardData?.trends.latestOuting?.id === id ? dashboardData.trends.latestOuting : null;
     const driverOrdinal = session?.playerDriver?.driverOrdinal ?? outing?.driverOrdinal;
-    const lapOrdinal = session?.playerDriver?.bestLapOrdinal ?? outing?.bestLapOrdinal;
+    const lapOrdinal = session?.playerDriver && 'bestLapOrdinal' in session.playerDriver
+      ? session.playerDriver.bestLapOrdinal ?? outing?.bestLapOrdinal
+      : outing?.bestLapOrdinal;
     if (!(session?.matchingReplayFile || outing?.hasReplay) || !Number.isInteger(driverOrdinal) || !Number.isInteger(lapOrdinal)) return;
     const replayParams = new URLSearchParams(searchParams);
     replayParams.set('sessionId', id);

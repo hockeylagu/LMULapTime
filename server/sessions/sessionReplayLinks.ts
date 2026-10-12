@@ -3,7 +3,7 @@ import type { LmuParser } from './parser.js';
 import type { ReplayFileEntry } from './sessionXmlTypes.js';
 import { pickReplayOwner, replayLinkIdentityRejection, replayLinkRejection, ReplayMatchTarget } from './replayMatching.js';
 import type { SessionDatabase } from '../core/db.js';
-import { DetailedSession, RejectedReplayLink, ReplayLinkRejectionReason } from '../core/types.js';
+import { DetailedSession, RejectedReplayLink, ReplayLinkRejectionReason } from '../../shared/types/index.js';
 
 type ReplayLinkStore = Pick<SessionDatabase, 'updateSessionMatchingReplay' | 'rejectSessionReplayLink'> &
   Partial<Pick<SessionDatabase, 'getRejectedReplayLinks' | 'getSessionsLinkedToRecording' | 'getSessionXmlMtime'>>;

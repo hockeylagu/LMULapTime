@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ReplayFlagEvent, ReplayTrajectoryData, ReplayWeatherEvent } from '../../../../server/core/types.js';
+import type { ReplayFlagEvent, ReplayTrajectoryData, ReplayWeatherEvent } from '../../../../shared/types/index.js';
 import {
   conditionsFrom,
   driverEventsFrom,
@@ -126,7 +126,7 @@ describe('replay facts', () => {
 
     it('gives every listed lap a row, timed when its row is stored, and rebuilds the list', () => {
       const laps = [
-        { lapNumber: 1, lapTimeSec: 100, s1Sec: 30, s2Sec: 40, s3Sec: 30, isOutlap: true, isValid: true, startFrame: 0, endFrame: 99 },
+        { lapNumber: 1, lapTimeSec: 100, s1Sec: 30, s2Sec: 40, s3Sec: 30, isOutLap: true, isValid: true, startFrame: 0, endFrame: 99 },
         { lapNumber: 2, lapTimeSec: 90, s1Sec: 30, s2Sec: 30, s3Sec: 30, isBest: true, lapDistMeters: 4000 },
       ];
       const facts = lapFactsFrom(laps, new Map([[2, { startSec: 100, endSec: 190 }], [3, { startSec: 190, endSec: 200 }]]));

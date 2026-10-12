@@ -4,15 +4,13 @@ import { matchesTrack, getPaceCategoryFromPercentage } from '../../../shared/dom
 import { matchesSessionCarClass } from '../../../shared/domain/vehicleMapping.js';
 import { selectCleanLapCandidates } from '../../../shared/domain/lapComparison.js';
 import { DetailedSession } from '../../../shared/types/index.js';
+import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
 import { BestRefLapInfo } from './BenchmarkLapsSummaryCard.js';
 import { DashboardSortOption } from './dashboardSortOptions.js';
-import { SessionSummary } from './dashboardTypes.js';
 import type { DashboardTrackFilter } from '../../../shared/types/dashboard.js';
 
-export type DashboardSessionItem = SessionSummary | DetailedSession;
-
 export interface UseDashboardMetricsParams {
-  sessions: DashboardSessionItem[];
+  sessions: (SessionCard | DetailedSession)[];
   selectedTrack: string;
   selectedTrackVenue?: string;
   selectedTrackCourse?: string;
@@ -120,9 +118,10 @@ export function useDashboardMetrics({
       const p = s.playerDriver;
       if (!p) continue;
 
+      const laps = 'laps' in p ? p.laps : undefined;
       const completedLapsCount =
-        p.laps && p.laps.length > 0
-          ? p.laps.filter((l) => l.lapTime !== null && l.lapTime > 0).length
+        laps && laps.length > 0
+          ? laps.filter((l) => l.lapTime !== null && l.lapTime > 0).length
           : p.lapsCount || 0;
 
       totalLaps += completedLapsCount;
@@ -132,8 +131,8 @@ export function useDashboardMetrics({
       const displayTrack = getDisplayTrackName(s.trackVenue, s.trackCourse);
       const trackIdentity = JSON.stringify([s.trackVenue, s.trackCourse]);
 
-      if (p.laps && p.laps.length > 0) {
-        for (const lap of p.laps) {
+      if (laps && laps.length > 0) {
+        for (const lap of laps) {
           if (lap.lapTime && lap.lapTime > 0) {
             totalDrivingSeconds += lap.lapTime;
           }
@@ -145,7 +144,7 @@ export function useDashboardMetrics({
             maxTopSpeedTrack = displayTrack;
           }
         }
-        cleanLaps += selectCleanLapCandidates(p.laps).length;
+        cleanLaps += selectCleanLapCandidates(laps).length;
       } else if (p.avgLapTime && completedLapsCount > 0) {
         totalDrivingSeconds += p.avgLapTime * completedLapsCount;
         cleanLaps += completedLapsCount;

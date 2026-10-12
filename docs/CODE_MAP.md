@@ -3,10 +3,15 @@
 A fast index for new sessions: find the right file without searching. `AGENTS.md` holds the rules;
 this file holds the **routes through the code**. Keep it current (see "Keeping this file current" at the end).
 
-Last checked 2026-10-11: 494 TypeScript source files in src/server/shared, 295 test suites,
-2559 tests (2503 passed, 56 skipped). Full tests and production build rechecked after the shared-domain cleanup and ranking/weekend follow-up review.
-Previous coverage measurement (not rerun for the shared-domain cleanup): 94.84% lines, 92.53% statements,
-92.78% functions and 83.66% branches. Branch/worktree results are separate; see [plans](plans/README.md).
+Canonical domain contracts live in `shared/types/`; `shared/types/index.ts` is the approved barrel.
+Import server telemetry reader contracts directly from `server/telemetry/duckdbTypes.ts`.
+The type cleanup is tracked in [TYPE_REFACTORING_PLAN.md](TYPE_REFACTORING_PLAN.md), including
+consumer updates and compatibility checks for names stored in replay caches.
+
+Last checked 2026-10-12 after the type refactoring: 472 TypeScript source files in src/server/shared,
+303 test suites (298 passed, 5 skipped), 2643 tests (2587 passed, 56 skipped). The full coverage suite
+and production build passed without warnings or errors. Coverage: 94.68% lines, 92.41% statements,
+92.64% functions and 83.77% branches. Branch/worktree results are separate; see [plans](plans/README.md).
 
 ---
 
@@ -372,7 +377,19 @@ page with the session data, the rest when idle; never import a page from the com
 recharts out of the entry: chunk groups in `vite.config.ts`). All server calls go through `src/api/apiClient.ts` (local-package geometry/display via `src/api/trackGeometryApi.ts`).
 
 Types: canonical in `shared/types/` (`index.ts` is the barrel; `session.ts` laps/drivers/sessions, `reference.ts` benchmarks, `status.ts` scan/system, `replay.ts` replay; `leaderboard.ts`, `pitStops.ts`, `raceTraffic.ts`, `aiReport.ts`).
-`server/core/types.ts` re-exports them for server code; client and shared code import from `shared/types/index.ts`.
+Server, client and shared code import these contracts directly from their defining modules or `shared/types/index.ts`.
+DuckDB reader contracts stay in `server/telemetry/duckdbTypes.ts`.
+Compact session views share `SessionCard` (`shared/types/sessionSummaries.ts`); views that also accept
+full lap histories use an explicit `SessionCard | DetailedSession` union. Track aggregation derives its
+minimal input from canonical session and driver contracts. Dashboard trends use `shared/types/dashboard.ts`
+directly, and chart progression uses `SessionProgressionPoint` from `shared/types/session.ts`.
+Replay samples use `ReplayTrajectoryPoint`, weather summaries use `WeatherCondition`, and timing gates
+use the geometry-owned `TimingGateGeometry` / `TrackTimingGates` contracts.
+Runtime summaries consistently use `isOutLap`, `isPitStop`, `drivingTimeSeconds`, `pitStopsCount`,
+`maxTopSpeed` and `top3Average`; progression timestamps use `timeString`, and replay file metrics use
+`fileSizeBytes` / `mtimeMs`. SQLite column names stay stable. Replay cache readers normalize the old
+JSON `isOutlap` key, including nested laps, while retaining the stored blobs and deleted-source data.
+The legacy nullable `session_drivers.driver_name` column is retained but no longer projected into `DriverData`.
 
 Comparison PB badges (`comparisonQueries.ts`, both leaderboard and telemetry picker) rank matching
 history once for the distinct drivers on the requested page, instead of running one history query per
@@ -525,9 +542,6 @@ the completed 2026-09-29 cleanup and does not describe all remaining findings.
 - [Completed frontend simplification audit](plans/archive/SRC_SIMPLIFICATION_AUDIT.md) (2026-10-12): removed 23 frontend export barrels, consolidated six wheel-channel SVG renderers and rules-dialog focus handling, extended the canonical progression type, removed a route forwarder, parsed dashboard dates once per session, and accumulated wheel-chart extrema in one pass per lap. Follow-up commits also reuse geometry-owned display payloads and remove remaining named re-exports, the phase-card barrel, and the map forwarder. Reviewed candidates retained by design and their constraints are recorded in the archived audit.
 - [Server repeated-work audit](plans/archive/SERVER_SMELLS_AUDIT.md): the 2026-10-12 passes fixed XML event ownership, moved superseded analytics to test helpers, centralized pace bands/read-time ratings, and rechecked replay work after ingestion optimization. Replay fixes cover worker coordination, bounded neighbor objects, one metadata snapshot, shared DuckDB preparation and batch weather reads. GPS boundary scanning now stays inside DuckDB with lap-scoped result transfer. Further whole-blob changes are out of scope.
 - Comparison queries now mark page PBs with one window query for the visible drivers (`markPagePersonalBests`), rather than one query per driver. The older 2026-10-10 ~127 ms all-driver measurement predates that implementation and was not rerun in this audit; profile current query plans before optimizing further.
-
-**Rule exceptions**
-- `server/core/types.ts` is a re-export barrel: server code imports types through it, so the same types have two import paths.
 
 **Known data limits (not code bugs)**
 - Pit repairs are a guess: neither the VCR nor the XML has repair or damage state. Validating against the LMU REST API is deferred.

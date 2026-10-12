@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { DuckDbReader } from './duckdbReader.js';
-import { ReplayMetadata } from '../core/types.js';
+import { ReplayMetadata } from '../../shared/types/index.js';
 
 export interface DuckDbFileInfo {
   filename: string;

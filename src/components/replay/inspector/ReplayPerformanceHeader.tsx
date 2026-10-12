@@ -49,7 +49,7 @@ export const ReplayPerformanceHeader: React.FC<ReplayPerformanceHeaderProps> = R
           <Flag className="w-3.5 h-3.5 text-lmu-accent-text" />
           Lap {currentLap}
         </span>
-        {currentLapSummary.isOutlap && (
+        {currentLapSummary.isOutLap && (
           <span className="px-2 py-0.5 rounded-full bg-lmu-warn-strong/20 border border-lmu-warn-strong/40 text-lmu-warn-soft font-bold text-[10px]">
             Outlap
           </span>

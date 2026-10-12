@@ -256,8 +256,8 @@ describe('ReplayInspectorModal', () => {
       ...mockTraj,
       currentLap: 1,
       laps: [
-        { lapNumber: 1, lapTimeSec: 100.5, isBest: false, isOutlap: false, s1Sec: 30.2, s2Sec: 40.1, s3Sec: 30.2 },
-        { lapNumber: 2, lapTimeSec: 99.8, isBest: true, isOutlap: false, s1Sec: 30.0, s2Sec: 39.8, s3Sec: 30.0 },
+        { lapNumber: 1, lapTimeSec: 100.5, isBest: false, isOutLap: false, s1Sec: 30.2, s2Sec: 40.1, s3Sec: 30.2 },
+        { lapNumber: 2, lapTimeSec: 99.8, isBest: true, isOutLap: false, s1Sec: 30.0, s2Sec: 39.8, s3Sec: 30.0 },
       ],
     };
 

@@ -4,7 +4,7 @@ import { buildRacePositionsInWorker } from '../../../server/traffic/racePosition
 import { compressTrajectory } from '../../../server/core/replay/replayTrajectoryCodec.js';
 import { compressJson } from '../../../server/core/dbSchema.js';
 import { distanceAt, RACE_POSITIONS_VERSION } from '../../../server/traffic/racePositions.js';
-import type { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../server/core/types.js';
+import type { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../shared/types/index.js';
 import { circleCenterline, pointAt } from './circleTrack.js';
 
 /** A stored lap at 50 Hz: 50 m/s from `startM`, `durationSec` long, starting at `startSec`. */

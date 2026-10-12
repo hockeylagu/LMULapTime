@@ -1,3 +1,5 @@
+import type { WeatherCondition } from '../../shared/types/session.js';
+
 export interface RawLapXmlNode {
   '@_num'?: string | number;
   '@_p'?: string | number;
@@ -143,7 +145,7 @@ export interface ReplayFileEntry {
   sceneDesc?: string;
   hasRain?: boolean;
   maxRainIntensity?: number;
-  weatherCondition?: 'Dry' | 'Wet' | 'Dynamic Weather';
+  weatherCondition?: WeatherCondition;
   ambientTemp?: number;
   trackTemp?: number;
 }

@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { SessionDatabase } from '../../../../server/core/db.js';
-import type { ReplayIngestJob } from '../../../../server/core/types.js';
+import type { ReplayIngestJob } from '../../../../shared/types/index.js';
 import { createSliceVcrBuffer } from '../../../utils/mockVcr.js';
 
 describe('Replay startup sync pipeline', () => {

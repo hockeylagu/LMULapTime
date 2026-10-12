@@ -10,13 +10,14 @@ import { CarIdentity } from '../vehicle/CarIdentity.js';
 import { ReplayLaunchButton } from '../common/replay/ReplayLaunchButton.js';
 import { VEHICLE_CLASS_OPTIONS } from '../../../shared/domain/vehicleMapping.js';
 import { getSessionTypeStyle } from '../common/sessionTypeStyles.js';
-import type { SessionSummary } from './dashboardTypes.js';
+import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
+import type { DetailedSession } from '../../../shared/types/session.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import { linkClickHandler } from '../../utils/linkClick.js';
 import type { DashboardTrends } from '../../../shared/types/dashboard.js';
 
 export interface DashboardHeroProps {
-  sessions: SessionSummary[];
+  sessions: (SessionCard | DetailedSession)[];
   trends?: DashboardTrends;
   onSelectSession: (id: string) => void;
   onOpenReplay?: (id: string, targetLap?: number) => void;
@@ -116,7 +117,7 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
                       {latestOuting.sessionType}
                     </span>
                   </div>
-                  <CarIdentity carType={latestOuting.carName} carClass={latestOuting.carClass} className="text-sm text-lmu-muted mt-1.5" />
+                  <CarIdentity carType={latestOuting.carType} carClass={latestOuting.carClass} className="text-sm text-lmu-muted mt-1.5" />
                 </div>
               </div>
             </div>

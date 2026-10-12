@@ -1,8 +1,8 @@
 import React from 'react';
-import type { RecentPacePoint } from './useDashboardTrends.js';
+import type { DashboardRecentPacePoint } from '../../../shared/types/dashboard.js';
 
 export interface DashboardPaceSparklineProps {
-  points: RecentPacePoint[];
+  points: DashboardRecentPacePoint[];
   paceDelta: number | null;
   paceTrendDirection: 'improving' | 'declining' | 'steady' | 'none';
   className?: string;

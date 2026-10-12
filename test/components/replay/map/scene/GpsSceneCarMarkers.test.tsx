@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { GpsSceneCarMarkers, replayBodyHeading } from '../../../../../src/components/replay/map/scene/GpsSceneCarMarkers.js';
 import { GpsTrackMapScene } from '../../../../../src/components/replay/map/scene/GpsTrackMapScene.js';
-import { ReplayTrajectoryPoint } from '../../../../../server/core/types.js';
+import { ReplayTrajectoryPoint } from '../../../../../shared/types/index.js';
 
 const points: ReplayTrajectoryPoint[] = [
   { x: 100, y: 10, z: 200, rotY: 0, speedKmh: 150, throttle: 80, brake: 0, timeSec: 0.0 },

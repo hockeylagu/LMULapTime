@@ -1,6 +1,6 @@
 import type { Database as DatabaseType } from 'better-sqlite3';
 import type { Leaderboard, LeaderboardEntry, LeaderboardLap, LeaderboardLayout, LeaderboardLayoutClass } from '../../../shared/types/leaderboard.js';
-import type { ReferenceLaptimeEntry } from '../types.js';
+import type { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { getDisplayTrackName } from '../../../shared/domain/formatters.js';
 import { findLayoutBenchmark, type LeaderboardQuery } from '../../../shared/domain/leaderboard.js';

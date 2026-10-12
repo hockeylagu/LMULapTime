@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAiRouter } from '../../../server/routes/aiRoutes.js';
 import { SessionDatabase } from '../../../server/core/db.js';
 import * as aiReport from '../../../server/ai/aiReport.js';
-import { AiAnalyzeResponse, AiLapEvidence } from '../../../server/core/types.js';
+import { AiAnalyzeResponse, AiLapEvidence } from '../../../shared/types/index.js';
 
 const evidence: AiLapEvidence = {
   lap: { sessionId: 'Route_Test_P1-session', driverOrdinal: 0, lapOrdinal: 1, lapNumber: 2, lapTimeSec: 100 },

@@ -12,7 +12,6 @@ export interface CornerMarkerPoint {
   actualSy: number;
 }
 
-export type SceneCornerMarker = CornerMarkerPoint;
 
 export interface PedalMarkerPoint {
   cornerNumber: number;
@@ -28,7 +27,7 @@ export interface PedalMarkerPoint {
 
 export interface GpsSceneMarkersProps {
   cornerMarkers?: CornerMarkerPoint[];
-  markers?: SceneCornerMarker[];
+  markers?: CornerMarkerPoint[];
   selectedCornerNumber?: number | null;
   onSelectCornerNumber?: (cornerNumber: number) => void;
   onSelectIndex?: (index: number) => void;
