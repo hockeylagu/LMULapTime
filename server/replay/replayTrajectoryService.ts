@@ -32,7 +32,10 @@ export class ReplayTrajectoryService {
     const filePath = path.join(this.replaysDir, replayName);
     const configuredPlayer = this.currentParser.configuredPlayerName;
     const driverName = matchedDriver.driverName || matchedDriver.name;
-    const driverSlot = this.replayRecordings.resolveDriverSlot(filePath, replayName, driverName, configuredPlayer);
+    let rawMetadata: ReplayMetadata;
+    try { rawMetadata = this.replayRecordings.getMetadata(filePath, replayName, configuredPlayer); }
+    catch { throw new ReplayDriverNotFoundError(driverName, replayName); }
+    const driverSlot = this.replayRecordings.resolveDriverSlot(filePath, replayName, driverName, configuredPlayer, rawMetadata);
     if (driverSlot === undefined) {
       throw new ReplayDriverNotFoundError(driverName, replayName);
     }
@@ -42,6 +45,7 @@ export class ReplayTrajectoryService {
       driverName,
       lapNumber: recordingLap.lapNum,
       playerName: configuredPlayer,
+      metadata: rawMetadata,
     });
 
     // Kept at full resolution until the lap has been projected on the track and cut at the line.
@@ -52,17 +56,11 @@ export class ReplayTrajectoryService {
       vcrRawSampleRateHz: fullTrajectory.rawSampleRateHz,
     };
 
-    let metadata: ReplayMetadata | undefined;
-    try {
-      const rawMetadata = this.replayRecordings.getMetadata(filePath, replayName, configuredPlayer);
-      metadata = composeReplayMetadata({
-        metadata: rawMetadata,
-        replayName,
-        matchedSession,
-      });
-    } catch {
-      // Ignore metadata read failure
-    }
+    const metadata = composeReplayMetadata({
+      metadata: rawMetadata,
+      replayName,
+      matchedSession,
+    });
 
     const isPlayer = typeof driverSlot === 'number'
       ? metadata?.drivers?.find(driver => driver.slot === driverSlot)?.isPlayer

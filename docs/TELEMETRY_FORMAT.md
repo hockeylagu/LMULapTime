@@ -70,6 +70,16 @@ Do not infer a DuckDB schema from another telemetry schema. Record the database 
 
 For continuous channels without `ts`, use `GPS Time` as the master 100 Hz timeline when present. Lower-frequency channels are aligned by sample order and their declared frequency; do not manufacture a timestamp by multiplying a row number until the channel frequency and session start are known. Timestamped tables should be joined by nearest `ts` at the required tolerance.
 
+Lap extraction finds the first insertion-order GPS sample at or after each boundary inside DuckDB,
+then returns only that inclusive timestamp window to JavaScript. `row_number() OVER ()` captures
+the same insertion order as continuous channel reads; see [DuckDB order preservation](https://duckdb.org/docs/current/sql/dialect/order_preservation).
+This avoids assuming timestamps are monotonic or physical row IDs are contiguous. Missing starts
+fall back to index zero; missing ends use the last sample. Missing/empty GPS tables retain the
+declared-frequency fallback. Duplicate/regressing timestamps, null/NaN handling, lower-frequency
+channel offsets and preceding event state preserve the former full-timeline extraction semantics.
+The bounds aggregate still scans the GPS column internally; only result transfer/object allocation
+is restricted to the lap window. No exporter file, stored cache shape or cache version changes.
+
 ### Historical storage proposal (not the implemented schema)
 
 The application currently stores recording metadata in `telemetry_metadata` and processed lap

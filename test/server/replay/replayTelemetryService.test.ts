@@ -210,6 +210,65 @@ describe('ReplayTelemetryService', () => {
     expect(open).not.toHaveBeenCalled();
   });
 
+  it('reuses and closes the same reader for duration fallback after numbered selection misses', async () => {
+    const file = onDisk(mockDuckFile);
+    db.upsertTelemetryMetadata(file, session.id);
+    const open = vi.spyOn(DuckDbReader.prototype, 'open').mockResolvedValue();
+    const close = vi.spyOn(DuckDbReader.prototype, 'close').mockResolvedValue();
+    vi.spyOn(DuckDbReader.prototype, 'getLapList').mockResolvedValue([{ lapNumber: 9, lapTimeSec: 96, startTs: 0, endTs: 96 }]);
+    const read = vi.spyOn(DuckDbReader.prototype, 'getLapTelemetry').mockResolvedValue(mockDuckLap);
+
+    expect((await request()).fused).toBe(true);
+    expect(read).toHaveBeenCalledExactlyOnceWith(1, 96);
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledTimes(1);
+  });
+
+  it('shares simultaneous cold reads and permits retry after a missing lap', async () => {
+    const file = onDisk(mockDuckFile);
+    db.upsertTelemetryMetadata(file, session.id);
+    const open = vi.spyOn(DuckDbReader.prototype, 'open').mockResolvedValue();
+    const close = vi.spyOn(DuckDbReader.prototype, 'close').mockResolvedValue();
+    vi.spyOn(DuckDbReader.prototype, 'getLapList').mockResolvedValue([{ lapNumber: 9, lapTimeSec: 96, startTs: 0, endTs: 96 }]);
+    let finish: ((lap: DuckDbLapTelemetry | null) => void) | undefined;
+    const pending = new Promise<DuckDbLapTelemetry | null>(resolve => { finish = resolve; });
+    const read = vi.spyOn(DuckDbReader.prototype, 'getLapTelemetry').mockReturnValueOnce(pending).mockResolvedValue(mockDuckLap);
+    const cacheWrite = vi.spyOn(db, 'upsertTelemetryLapCache');
+    const first = request();
+    const second = request();
+    await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(1));
+    finish?.(null);
+    expect((await Promise.all([first, second])).map(result => result.fused)).toEqual([false, false]);
+    expect(open).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledTimes(1);
+
+    const successful = await Promise.all([request(), request()]);
+    expect(successful.map(result => result.fused)).toEqual([true, true]);
+    expect(successful[0].trajectory.points).not.toBe(successful[1].trajectory.points);
+    expect(cacheWrite).toHaveBeenCalledTimes(1);
+    expect(read).toHaveBeenCalledTimes(2);
+    expect(close).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not share an in-flight read after the source file version changes', async () => {
+    const file = onDisk(mockDuckFile);
+    db.upsertTelemetryMetadata(file, session.id);
+    vi.spyOn(DuckDbReader.prototype, 'open').mockResolvedValue();
+    const close = vi.spyOn(DuckDbReader.prototype, 'close').mockResolvedValue();
+    vi.spyOn(DuckDbReader.prototype, 'getLapList').mockResolvedValue([{ lapNumber: 1, lapTimeSec: 96, startTs: 0, endTs: 96 }]);
+    let finish: ((lap: DuckDbLapTelemetry | null) => void) | undefined;
+    const pending = new Promise<DuckDbLapTelemetry | null>(resolve => { finish = resolve; });
+    const read = vi.spyOn(DuckDbReader.prototype, 'getLapTelemetry').mockReturnValueOnce(pending).mockResolvedValue(mockDuckLap);
+    const first = request();
+    await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(1));
+    fs.writeFileSync(file.filePath, 'replaced source');
+    expect((await request()).fused).toBe(true);
+    expect(read).toHaveBeenCalledTimes(2);
+    finish?.(null);
+    await first;
+    expect(close).toHaveBeenCalledTimes(2);
+  });
+
   describe('a lap cached by an older reader', () => {
     const ageCachedLaps = () => (db as unknown as { db: { exec(sql: string): void } }).db.exec("UPDATE telemetry_lap_cache SET cache_version = 'v9'");
 

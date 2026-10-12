@@ -33,6 +33,7 @@ export interface ReplaySyncHost {
   /** Replaces a driver's whole lap set in one transaction and records it as stored. */
   replaceReplayDriverLaps(filename: string, filePath: string, mtime: number, size: number, driverSlotKey: number, trajectory: ReplayTrajectoryData, isPrimary: boolean): void;
   getReplayDriverIngest(filename: string, driverSlot: number): ReplayDriverIngest | null;
+  getReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): ReplayTrajectoryData | null;
   recordReplayDriverIngest(filename: string, driverSlot: number, mtime: number, size: number, status: ReplayDriverIngestStatus, error?: string | null): void;
 }
 

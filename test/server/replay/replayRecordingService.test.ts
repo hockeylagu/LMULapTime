@@ -76,12 +76,30 @@ describe('ReplayRecordingService', () => {
       ],
     }));
 
+    const readMetadata = vi.spyOn(service, 'getMetadata');
     const trajectory = await service.getFullTrajectory(filePath, replayName, { driverName: 'Cache Driver' });
     expect(trajectory.points.length).toBeGreaterThan(0);
+    expect(readMetadata).toHaveBeenCalledTimes(1);
+    readMetadata.mockClear();
+    await service.getFullTrajectory(filePath, replayName, { driverName: 'Cache Driver' });
+    expect(readMetadata).toHaveBeenCalledTimes(1);
 
     fs.rmSync(filePath);
 
     expect(await service.getFullTrajectory(filePath, replayName, { driverSlot: 1 })).toEqual(trajectory);
+  });
+
+  it('rejects a metadata snapshot superseded by a replaced source file', async () => {
+    const replayName = 'Snapshot_P1.Vcr';
+    const filePath = path.join(tempDir, replayName);
+    fs.writeFileSync(filePath, createSliceVcrBuffer({ drivers: [
+      { name: 'Cache Driver', vehicleId: 'A', team: 'Test', carNumber: '1' },
+    ] }));
+    const metadata = service.getMetadata(filePath, replayName);
+    fs.utimesSync(filePath, (metadata.mtimeMs + 10_000) / 1000, (metadata.mtimeMs + 10_000) / 1000);
+    await expect(service.getFullTrajectory(filePath, replayName, { driverSlot: 1, metadata }))
+      .rejects.toThrow('Replay source changed');
+    expect(db.getStoredReplayTrajectory(replayName, 1, -1)).toBeNull();
   });
 
   it('invalidates legacy default-slot blobs and pointers while preserving explicit slot trajectories', async () => {

@@ -43,6 +43,8 @@ export interface ReplayUpgradeResult {
 export interface ReplayUpgradeHost {
   getDbPath(): string;
   getReplayDriverIngest(filename: string, driverSlot: number): ReplayDriverIngest | null;
+  getReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): ReplayTrajectoryData | null;
+  hasValidReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): boolean;
   listReplayUpgradeBacklog(replaysDir: string): ReplayUpgradeCandidate[];
   upsertReplayMetadataCache(filename: string, filePath: string, mtime: number, size: number, metadata: ReplayMetadata): void;
   replaceReplayDriverLaps(filename: string, filePath: string, mtime: number, size: number, driverSlotKey: number, trajectory: ReplayTrajectoryData, isPrimary: boolean): void;

@@ -1,7 +1,8 @@
 import { Database as DatabaseType } from 'better-sqlite3';
 import { ReplayTrajectoryData } from '../types.js';
 import { REPLAY_CACHE_VERSION, isCompatibleReplayCacheVersion } from '../dbSchema.js';
-import { compressTrajectory, decompressTrajectory, upgradeStoredTrajectory, withGarageState } from './replayTrajectoryCodec.js';
+import { compressTrajectory, decompressTrajectory, decompressTrajectoryEdge, upgradeStoredTrajectory, withGarageState } from './replayTrajectoryCodec.js';
+import { lapEdgesFromNeighbours } from '../../replay/decode/replayLapPoints.js';
 import { getReplayLaps } from './dbReplayLapStore.js';
 import { lapSummariesFrom } from '../../replay/decode/replayFacts.js';
 import { classifyRetainedReplayLaps } from '../../replay/decode/replayLapClassification.js';
@@ -168,21 +169,25 @@ export function getStoredReplayTrajectory(
  * rows only: a lap row is the one place the recording either side of a lap survives once LMU has
  * deleted the replay. Rows from another version of the file (different mtime or size) are ignored.
  */
-export function getAdjacentLapTrajectories(
+export function getReplayLapEdges(
   db: DatabaseType,
   filename: string,
   driverSlot: number,
-  lapKey: number
-): { previous: ReplayTrajectoryData | null; next: ReplayTrajectoryData | null } {
-  const lap = selectTrajectoryRow(db, filename, driverSlot, lapKey);
-  if (!lap) return { previous: null, next: null };
-  const neighbour = (key: number): ReplayTrajectoryData | null => {
+  lapKey: number,
+  points: ReplayTrajectoryData['points'],
+): { leadIn: ReplayTrajectoryData['points']; leadOut: ReplayTrajectoryData['points'] } {
+  const lap = db.prepare('SELECT file_mtime, file_size, source_path FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key = ?')
+    .get(filename, driverSlot, lapKey) as Pick<TrajectoryRow, 'file_mtime' | 'file_size' | 'source_path'> | undefined;
+  const first = points[0]?.timeSec;
+  const last = points[points.length - 1]?.timeSec;
+  if (!lap || first === undefined || last === undefined) return { leadIn: [], leadOut: [] };
+  const neighbour = (key: number, boundary: number, direction: 'previous' | 'next'): ReplayTrajectoryData['points'] | undefined => {
     const row = selectTrajectoryRow(db, filename, driverSlot, key);
-    return row && row.file_mtime === lap.file_mtime && row.file_size === lap.file_size
-      ? readTrajectoryRow(db, row)
-      : null;
+    return row && row.file_mtime === lap.file_mtime && row.file_size === lap.file_size && row.source_path === lap.source_path
+      ? decompressTrajectoryEdge(row.trajectory_br, row.parser_version, boundary, direction)
+      : undefined;
   };
-  return { previous: neighbour(lapKey - 1), next: neighbour(lapKey + 1) };
+  return lapEdgesFromNeighbours(points, neighbour(lapKey - 1, first, 'previous'), neighbour(lapKey + 1, last, 'next'));
 }
 
 // Same validity check as getReplayTrajectoryCache but never decompresses the (multi-MB) blob.

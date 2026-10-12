@@ -72,6 +72,13 @@ The working-space tradeoff is explicit: 441,024,512 bytes of allocated SQLite
 TEMP pages in this recording, outside the application database. Chunks are
 deleted as drivers are consumed; SQLite releases the temporary file on worker
 close or termination. It does not shrink the allocated file after every driver.
+The staging table must remain a real SQLite TEMP table rather than a named scratch database.
+The bundled SQLite opens its spill file with DELETEONCLOSE (Windows
+`FILE_FLAG_DELETE_ON_CLOSE`; Unix unlinks the open file), so abrupt process termination does
+not depend on JavaScript shutdown handlers. A one-off forced-kill check confirmed no staging
+files remained; this dependency guarantee does not need a permanent application test.
+The persistent cache's `-wal`/`-shm` files are SQLite recovery state and must not be swept as
+orphan staging files; completed driver transactions remain retained after an interrupted import.
 Peak RSS increased by about 195 MiB in the first comparison. Packet staging is
 bounded per driver, but finalization still materializes one driver's samples.
 

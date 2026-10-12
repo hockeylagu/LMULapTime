@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import duckdb from 'duckdb';
 import path from 'path';
 import fs from 'fs';
@@ -163,6 +163,7 @@ describe('DuckDbReader', () => {
   it('extracts lap list and slices lap telemetry', async () => {
     const reader = new DuckDbReader(testDbPath);
     await reader.open();
+    const queryAll = vi.spyOn(reader, 'queryAll');
 
     const laps = await reader.getLapList();
     expect(laps.length).toBeGreaterThanOrEqual(1);
@@ -173,6 +174,7 @@ describe('DuckDbReader', () => {
     expect(lapTelemetry).not.toBeNull();
     expect(lapTelemetry!.lapNumber).toBe(1);
     expect(lapTelemetry!.points.length).toBeGreaterThan(0);
+    expect(queryAll.mock.calls.filter(([sql]) => sql === 'SELECT ts, value FROM "Lap" ORDER BY ts ASC')).toHaveLength(1);
 
     // Verify channel fidelity
     const p0 = lapTelemetry!.points[0];
@@ -197,6 +199,49 @@ describe('DuckDbReader', () => {
     expect(p0.regenRate).toBeCloseTo(120.0, 1);
 
     await reader.close();
+  });
+
+  it('retries a lap list query after a transient failure', async () => {
+    const reader = new DuckDbReader(testDbPath);
+    await reader.open();
+    const queryAll = reader.queryAll.bind(reader);
+    let failLapQuery = true;
+    vi.spyOn(reader, 'queryAll').mockImplementation(async <T>(sql: string, params: unknown[] = []) => {
+      if (sql === 'SELECT ts, value FROM "Lap" ORDER BY ts ASC' && failLapQuery) {
+        failLapQuery = false;
+        throw new Error('transient DuckDB read failure');
+      }
+      return queryAll<T>(sql, params);
+    });
+
+    await expect(reader.getLapList()).rejects.toThrow('transient DuckDB read failure');
+    expect(await reader.getLapList()).toHaveLength(1);
+
+    await reader.close();
+  });
+
+  it('preserves overlapping sector windows, first transitions and missing sectors across laps', async () => {
+    const reader = new DuckDbReader('unused.duckdb');
+    vi.spyOn(reader, 'hasTable').mockImplementation(async name => name === 'Lap' || name === 'Current Sector');
+    vi.spyOn(reader, 'queryAll')
+      .mockResolvedValueOnce([
+        { ts: 0, value: 1 }, { ts: 5, value: 1 }, { ts: 10, value: 2 },
+        { ts: 20, value: 3 }, { ts: 30, value: 4 }, { ts: 40, value: 5 },
+      ])
+      .mockResolvedValueOnce([
+        { ts: -1, value: 2 }, { ts: 0, value: 2 },
+        { ts: 3, value: 2 }, { ts: 4, value: 2 },
+        { ts: 10.02, value: 2 }, { ts: 10.04, value: 3 },
+        { ts: 25, value: 3 },
+        { ts: 33, value: 2 }, { ts: 37, value: 3 },
+      ]);
+    expect(await reader.getLapList()).toEqual([
+      { lapNumber: 1, startTs: 0, endTs: 10, lapTimeSec: 10, s1Sec: 3, s2Sec: 7.04, s3Sec: -0.04 },
+      { lapNumber: 2, startTs: 10, endTs: 20, lapTimeSec: 10, s1Sec: 0.02, s2Sec: 0.02, s3Sec: 9.96 },
+      { lapNumber: 3, startTs: 20, endTs: 30, lapTimeSec: 10, s1Sec: undefined, s2Sec: undefined, s3Sec: undefined },
+      { lapNumber: 4, startTs: 30, endTs: 40, lapTimeSec: 10, s1Sec: 3, s2Sec: 4, s3Sec: 3 },
+    ]);
+    vi.restoreAllMocks();
   });
 
   it('supports continuous TC channel, hasColumn detection, and lap time alignment', async () => {
@@ -353,6 +398,63 @@ describe('DuckDbReader', () => {
     expect(points[100].absActive).toBe(false);
     expect(points[499].gear).toBe(7);
     expect(points[501].gear).toBe(6);
+  });
+
+  it.each([
+    { name: 'duplicate and regressing timestamps', gps: [0, 10, 10, 9, 15, 20, 12, 25], start: 10,
+      indices: [1, 2, 3, 4, 5], times: [0, 0, 0, 5, 10] },
+    { name: 'truncated timeline', gps: [0, 10, 10, 9, 15], start: 10,
+      indices: [1, 2, 3, 4], times: [0, 0, 0, 5] },
+    { name: 'unreachable start', gps: [0, 1, 2], start: 10,
+      indices: [0, 1, 2], times: [0, 0, 0] },
+    { name: 'null timestamp at zero', gps: [null, 10, 20], start: 0,
+      indices: [0, 1, 2], times: [0, 10, 20] },
+    { name: 'NaN inside the lap', gps: [10, NaN, 20], start: 10,
+      indices: [0, 1, 2], times: [0, NaN, 10] },
+    { name: 'missing timeline', gps: null, start: 10,
+      indices: Array.from({ length: 101 }, (_, i) => 100 + i), times: Array.from({ length: 101 }, (_, i) => i / 10) },
+    { name: 'empty timeline', gps: [], start: 10,
+      indices: Array.from({ length: 101 }, (_, i) => 100 + i), times: Array.from({ length: 101 }, (_, i) => i / 10) },
+  ])('preserves channel indices with $name', async ({ name, gps, start, indices, times }) => {
+    const filePath = path.join(testDbDir, `${name}.duckdb`);
+    const db = new duckdb.Database(filePath);
+    const timelineSql = gps === null ? '' : `CREATE TABLE "GPS Time" (value FLOAT); ${gps.length
+      ? `INSERT INTO "GPS Time" VALUES ${gps.map(value => `(${value === null ? 'NULL' : Number.isNaN(value) ? "'NaN'::FLOAT" : value})`).join(',')};` : ''}`;
+    try {
+      await new Promise<void>((resolve, reject) => db.exec(`
+        CREATE TABLE channelsList (channelName VARCHAR, frequency INTEGER, unit VARCHAR);
+        INSERT INTO channelsList VALUES ('Ground Speed', 10, 'km/h'), ('Wheel Speed', 5, 'km/h');
+        CREATE TABLE "Ground Speed" AS SELECT (100 + i)::FLOAT AS value FROM range(300) t(i);
+        CREATE TABLE "Wheel Speed" AS SELECT (10 + i)::FLOAT AS value1, (20 + i)::FLOAT AS value2,
+          (30 + i)::FLOAT AS value3, (40 + i)::FLOAT AS value4 FROM range(150) t(i);
+        CREATE TABLE "Lap" (ts DOUBLE, value INTEGER);
+        INSERT INTO "Lap" VALUES (${start}, 1), (20, 2);
+        CREATE TABLE "Gear" (ts DOUBLE, value INTEGER);
+        INSERT INTO "Gear" VALUES (-10, 7), (12, 6);
+        ${timelineSql}
+      `, error => error ? reject(error) : resolve()));
+    } finally {
+      await new Promise<void>((resolve, reject) => db.close(error => error ? reject(error) : resolve()));
+    }
+    const reader = new DuckDbReader(filePath);
+    try {
+      const actualQuery = reader.queryAll.bind(reader);
+      let returnedGpsRows = 0;
+      vi.spyOn(reader, 'queryAll').mockImplementation(async <T>(sql: string, params: unknown[] = []) => {
+        const rows = await actualQuery<T>(sql, params);
+        if (sql.includes('FROM "GPS Time"')) returnedGpsRows += rows.length;
+        return rows;
+      });
+      const lap = await reader.getLapTelemetry(1);
+      expect(lap?.points.map(point => point.speedKmh)).toEqual(indices.map(i => 100 + i));
+      expect(lap?.points.map(point => point.timeSec)).toEqual(times);
+      expect(lap?.points.map(point => point.wheelSpeeds)).toEqual(indices.map((_, i) => {
+        const offset = Math.floor(indices[0] / 2) + Math.floor(i / 2);
+        return [10 + offset, 20 + offset, 30 + offset, 40 + offset];
+      }));
+      expect(lap?.points[0].gear).toBe(7);
+      expect(returnedGpsRows).toBeLessThanOrEqual(indices.length + 2);
+    } finally { await reader.close(); }
   });
 
   afterAll(() => removeQuietly(testDbDir));

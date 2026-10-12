@@ -22,6 +22,10 @@ export default defineConfig({
   // LMU_UI_PORT / LMU_API_PORT let a second checkout (a worktree) run beside the main one.
   server: {
     port: Number(process.env.LMU_UI_PORT) || 5173,
+    watch: {
+      // Temporary test databases can be exclusively locked by DuckDB on Windows.
+      ignored: ['**/.tmp/**'],
+    },
     proxy: {
       '/api': {
         target: `http://localhost:${process.env.LMU_API_PORT || 3001}`,

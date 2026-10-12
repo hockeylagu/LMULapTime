@@ -15,26 +15,30 @@ import { getMetadata, setMetadata } from '../dbMetadataStore.js';
 
 // Each driver's car is re-derived from its vehicle id on read, so a corrected vehicle mapping
 // reaches every stored row, including replays LMU has deleted, without a cache version bump.
-function readMetadataRow(row: { parser_version: string; metadata_br: Buffer }): ReplayMetadata {
-  return resolveRosterVehicles(upgradeStoredReplayMetadata(decompressJson<ReplayMetadata>(row.metadata_br), row.parser_version));
+function readMetadataRow(row: { parser_version: string; metadata_br: Buffer }, playerName?: string): { metadata: ReplayMetadata; ownershipChanged: boolean } {
+  const metadata = upgradeStoredReplayMetadata(decompressJson<ReplayMetadata>(row.metadata_br), row.parser_version);
+  const ownershipChanged = applyConfiguredPlayer(metadata, playerName);
+  return { metadata: resolveRosterVehicles(metadata), ownershipChanged };
 }
 
-function applyConfiguredPlayer(metadata: ReplayMetadata, playerName?: string): ReplayMetadata {
-  if (playerName === undefined) return metadata;
+function applyConfiguredPlayer(metadata: ReplayMetadata, playerName?: string): boolean {
+  if (playerName === undefined) return false;
   const target = playerName.trim().toLowerCase();
   const matches = target ? metadata.drivers.filter(driver => driver.name.trim().toLowerCase() === target) : [];
   const player = matches.length === 1 ? matches[0] : undefined;
   const previousPlayers = metadata.drivers.filter(driver => driver.isPlayer);
   const ownershipChanged = !player || previousPlayers.length !== 1 || previousPlayers[0] !== player;
+  const changed = metadata.drivers.some(driver => driver.isPlayer !== (driver === player))
+    || ownershipChanged && metadata.laps !== undefined;
   for (const driver of metadata.drivers) driver.isPlayer = driver === player;
   if (ownershipChanged) delete metadata.laps;
   delete metadata.carModel;
   delete metadata.carClass;
-  return resolveRosterVehicles(metadata);
+  return changed;
 }
 
-function persistConfiguredPlayer(db: DatabaseType, filename: string, metadata: ReplayMetadata, before: string): void {
-  if (before !== JSON.stringify(metadata)) {
+function persistConfiguredPlayer(db: DatabaseType, filename: string, metadata: ReplayMetadata, ownershipChanged: boolean): void {
+  if (ownershipChanged) {
     db.prepare('UPDATE replay_metadata SET metadata_br=?,updated_at=? WHERE filename=?')
       .run(compressJson(metadata), Date.now(), filename);
   }
@@ -49,10 +53,8 @@ export function reconcileReplayPlayerOwnership(db: DatabaseType, playerName: str
     const read = db.prepare('SELECT parser_version,metadata_br FROM replay_metadata WHERE filename=?');
     for (const { filename } of files) {
       const row = read.get(filename) as { parser_version: string; metadata_br: Buffer };
-      const metadata = readMetadataRow(row);
-      const before = JSON.stringify(metadata);
-      applyConfiguredPlayer(metadata, playerName);
-      persistConfiguredPlayer(db, filename, metadata, before);
+      const { metadata, ownershipChanged } = readMetadataRow(row, playerName);
+      persistConfiguredPlayer(db, filename, metadata, ownershipChanged);
     }
     setMetadata(db, 'replay_player_ownership_rule', rule);
   })();
@@ -73,10 +75,8 @@ export function getReplayMetadataCache(db: DatabaseType, filename: string, mtime
   if (!row || row.file_mtime !== mtime || row.file_size !== size || !isCompatibleReplayCacheVersion(row.parser_version) || (filePath && row.file_path !== filePath)) {
     return null;
   }
-  const metadata = readMetadataRow(row);
-  const before = JSON.stringify(metadata);
-  applyConfiguredPlayer(metadata, playerName);
-  if (playerName !== undefined) persistConfiguredPlayer(db, filename, metadata, before);
+  const { metadata, ownershipChanged } = readMetadataRow(row, playerName);
+  persistConfiguredPlayer(db, filename, metadata, ownershipChanged);
   return metadata;
 }
 
@@ -86,10 +86,8 @@ export function getStoredReplayMetadata(db: DatabaseType, filename: string, play
     'SELECT parser_version, metadata_br FROM replay_metadata WHERE filename = ?'
   ).get(filename) as { parser_version: string; metadata_br: Buffer } | undefined;
   if (!row) return null;
-  const metadata = readMetadataRow(row);
-  const before = JSON.stringify(metadata);
-  applyConfiguredPlayer(metadata, playerName);
-  if (playerName !== undefined) persistConfiguredPlayer(db, filename, metadata, before);
+  const { metadata, ownershipChanged } = readMetadataRow(row, playerName);
+  persistConfiguredPlayer(db, filename, metadata, ownershipChanged);
   return metadata;
 }
 
@@ -103,7 +101,7 @@ export function getStoredReplayFileInfo(db: DatabaseType, filename: string): Sto
     file_path: row.file_path,
     file_mtime: row.file_mtime,
     file_size: row.file_size,
-    metadata: readMetadataRow(row),
+    metadata: readMetadataRow(row).metadata,
   };
 }
 
@@ -117,7 +115,7 @@ export function getAllStoredReplayFiles(db: DatabaseType): Array<StoredReplayFil
     file_path: row.file_path,
     file_mtime: row.file_mtime,
     file_size: row.file_size,
-    metadata: readMetadataRow(row),
+    metadata: readMetadataRow(row).metadata,
   }));
 }
 
@@ -190,7 +188,7 @@ export function getReplayCacheList(db: DatabaseType, replaysDir?: string): Repla
   }
 
   const list: ReplayCacheSummary[] = rows.map(row => {
-    const meta = readMetadataRow(row);
+    const meta = readMetadataRow(row).metadata;
     const onDisk = Boolean(
       (row.file_path && fs.existsSync(row.file_path)) ||
       (replaysDir && fs.existsSync(path.join(replaysDir, row.filename)))

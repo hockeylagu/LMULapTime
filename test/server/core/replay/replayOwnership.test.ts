@@ -35,6 +35,9 @@ describe('retained replay identity reconciliation', () => {
     const changes = db.getDb().prepare('SELECT total_changes() AS count').get();
     const revision = db.getReplayMetadataRevision();
     db.reconcileReplayPlayerOwnership('Ann');
+    expect(db.getStoredReplayMetadata(meta.filename, 'Ann')?.drivers.map(driver => driver.isPlayer)).toEqual([false, true]);
+    expect(db.getReplayMetadataCache(meta.filename, meta.mtimeMs, meta.fileSizeBytes, meta.filePath, 'Ann')?.laps).toBeUndefined();
+    db.getStoredReplayMetadata(meta.filename);
     expect(db.getDb().prepare('SELECT total_changes() AS count').get()).toEqual(changes);
     expect(db.getReplayMetadataRevision()).toBe(revision);
     db.reconcileReplayPlayerOwnership('Joann');

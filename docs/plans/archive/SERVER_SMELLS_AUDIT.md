@@ -1,5 +1,12 @@
 # Server repeated-work and code-smells audit
 
+Completed scoped cleanup, 2026-10-12. Findings 1, 2, 4–8 are addressed; finding 3's
+bounded hydration improvement is retained, while further neighboring-blob/storage work is
+explicitly out of scope. Final verification passed; this record is archived.
+An unresolved native primary without a valid stored alias can still require a second serialized
+decode; ownership must not be guessed. DuckDB still scans GPS timestamps internally, but only
+lap-local timestamps cross into JavaScript. These limits are documented below.
+
 Reviewed 2026-10-11 against the current working tree after the shared-domain cleanup.
 Initial status: findings only. Existing uncommitted replay, traffic, test and Vite changes
 were preserved and included as current source where relevant.
@@ -10,23 +17,30 @@ Their evidence below describes the original audit snapshot, not a fresh review o
 work. This pass changes XML event identity, production analytics ownership and canonical pace
 bands; it does not edit replay code, DuckDB preparation, traffic or replay-weather handling.
 
+Replay recheck, 2026-10-12, after `a1c59459`: worker persistence already validates the source
+and metadata identity inside its immediate transaction. The original stale-save finding is
+superseded. This pass fixes overlapping worker coordination and redundant edge, metadata,
+lap-list and rain preparation. The original observations below remain historical evidence;
+see the replay recheck notes for current limitations.
+
 Scope: inventory of 112 server TypeScript files, with focused call-path review of session
 ingestion/classification, normalized storage and summary queries, replay serving/scans/upgrades,
 DuckDB preparation, and traffic workers. This is not exhaustive runtime profiling.
-No server TypeScript file exceeds 1,000 lines; the largest is `duckdbReader.ts` at 773.
+At the initial audit, no server TypeScript file exceeded 1,000 lines; the largest was
+`duckdbReader.ts` at 773.
 
 ## Priorities
 
 | Order | Finding | Main benefit | Evidence |
 |---|---|---|---|
 | 1 | Fixed: XML stream identity requires a unique exact normalized name | Safer | Regression and parser-version migration tests |
-| 2 | Replay request, scan and upgrade decodes have separate lifecycles | Safer, less duplicate work | Source-confirmed coordination and file-check differences |
-| 3 | Boundary samples require full neighboring-lap reads | Faster | Synthetic query/materialization counts |
-| 4 | One trajectory request repeatedly reads and normalizes replay metadata | Simpler, faster | Source-confirmed three warm-path reads |
-| 5 | Cold DuckDB lap preparation repeats session-wide work | Faster | Source-confirmed duplicate lap-list and full-channel reads |
+| 2 | Fixed: replay saves coordinate overlapping requests, scans and upgrades | Safer, less duplicate work | Worker overlap, failure handoff and cancellation regressions; primary-selection limit below |
+| 3 | Bounded hydration implemented; further blob/storage changes out of scope | Faster | Synthetic query/materialization counts and compatibility regressions |
+| 4 | Fixed: trajectory requests use one replay metadata snapshot | Simpler, faster | Snapshot, ownership and source-identity regressions |
+| 5 | Fixed: DuckDB preparation is shared and timestamp transfer is lap-scoped | Faster | Real DuckDB fixtures and identical real-recording output hashes |
 | 6 | Fixed: superseded analytics moved to test parity helpers | Simpler | Production caller search and parity suites |
 | 7 | Fixed: benchmark-impact SQL consumes canonical pace bands | Safer | SQL/JavaScript cutoff parity tests |
-| 8 | Conditions classification loads the same replay weather twice | Simpler, faster | Synthetic SQL count |
+| 8 | Fixed: one batch-local replay conditions snapshot | Simpler, faster | SQL-count and dry/missing-weather regressions |
 
 ## 1. XML event identity can select the wrong driver
 
@@ -55,6 +69,16 @@ and decorated names. Changing stored event ownership/classification requires a
 
 ## 2. Replay decode orchestration is duplicated and its safety checks differ
 
+Rechecked: save eligibility is already enforced by `dbReplayDriverStore.ts`. The worker client
+now serializes file-backed saves by database, source path, filename, file tuple and parser version.
+After waiting, callers reuse committed driver rows or the preceding failure rather than spawning
+the same worker again. Cancellation releases queued/granted leases. Caller progress and retry
+policies remain separate. Tests cover request/batch overlap, cancellation and failed owners.
+An unresolved primary without a valid stored alias can still need a second, serialized decode:
+the native header selection must not be guessed from roster/configured names. Coordination is
+process-local; SQLite still enforces commit eligibility across workers. No schema change is needed.
+The old suggestion about clearing replay rows does not apply to the current session-only cache clear.
+
 The request path (`replayRecordingService.ts:137`), background scan
 (`dbReplaySync.ts:371`, `:418`) and upgrade (`dbReplayUpgrade.ts:141`) each start workers,
 consume progress, persist lap sets and record failures. The request service's `pendingDecodes`
@@ -78,6 +102,13 @@ clear during decoding cannot accept the old completion. These concurrency cases 
 from source, not reproduced against a live changing recording.
 
 ## 3. Lap edges trigger full neighboring-lap hydration
+
+Fixed for current columnar blobs: `getReplayLapEdges` reads the selected row's identity columns
+and materializes only neighboring boundary samples, without reconstructing neighbor lap facts.
+The same synthetic case now creates 6,200 point objects, selects three trajectory blobs and
+loads driver lap facts once. Garage phase still uses the full time/speed/pit columns. Brotli/JSON
+parsing remains whole-blob work; legacy formats still fully decode for compatibility semantics.
+Deleted recordings, source-version checks, missing-time barriers and wheel channels are preserved.
 
 `ReplayRecordingService.withLapEdges` (`:177`) only needs up to two seconds on either side of
 the selected lap. `getAdjacentLapTrajectories` (`dbReplayTrajectoryStore.ts:171`) fetches the
@@ -103,6 +134,12 @@ that slicing point objects solves all of it. Preserve deleted recordings and tim
 
 ## 4. Replay metadata is repeatedly loaded within one request
 
+Fixed: trajectory operations share one request-local metadata snapshot through resolution,
+validation and response composition. A changed live source rejects the snapshot before decode.
+Vehicle normalization runs once per metadata read; ownership changes are detected from fields
+instead of serializing entire metadata twice. Configured-player updates and retained records remain
+supported, including persistence when ownership changes. There is no process-wide metadata cache.
+
 On a warm on-disk trajectory request, metadata is read by slot resolution
 (`replayRecordingService.ts:42`), explicit-slot validation (`:93`), and response composition
 (`replayTrajectoryService.ts:57`). Each read performs filesystem checks, SQL/blob decoding,
@@ -120,6 +157,19 @@ explicit at ingestion/configuration boundaries where possible. Retain configured
 and collision checks; do not add an unversioned process-wide metadata cache.
 
 ## 5. DuckDB preparation repeats work before extracting one lap
+
+Fixed preparation duplication: an open reader shares its lap-list promise across selection/extraction,
+invalidates it on close and permits retry after a failed query. Ordered sector lookup advances through
+lap windows, preserving overlapping 50 ms boundaries, first transitions and missing-sector behavior.
+Numbered selection and duration fallback reuse readers, closing all opened connections in `finally`.
+Simultaneous cold reads share one operation keyed by session, ordered file paths/versions, requested
+lap/time and reader cache version; completed/missing/failed operations leave the in-flight map.
+The shared operation persists a successful lap once; each response still gets independent fused points.
+Multi-file precedence and deleted-file fallback remain unchanged. Tables already have connection-scoped
+caching; channel descriptors and percent-scale queries already run once per extraction. GPS boundary
+indices are now computed inside DuckDB, and only the selected inclusive timeline window becomes JS
+objects. The database still scans its GPS column; sample order/alignment and fallback semantics remain
+unchanged. Six first/middle/last laps across two real recordings produced identical complete-output hashes.
 
 `ReplayTelemetryService.readLap` (`:48`) calls `reader.getLapList`, then
 `reader.getLapTelemetry`, which calls `getLapList` again (`duckdbReader.ts:240`). If the numbered
@@ -181,6 +231,10 @@ review and the existing recomputation path.
 
 ## 8. Replay rain is loaded twice per classification
 
+Fixed: one ordered snapshot supplies lap rain and session peak, reused by replay within a single
+reclassification batch. Dry conditions need one query as well; absent conditions stay undefined.
+Regression tests cover both distinctions and batch read counts. No persistent weather cache added.
+
 `classifySessionConditions` (`dbSessionConditions.ts:56`) loads conditions through
 `replayRainOverLap`, then loads them again through `applyStoredReplayWeather`.
 An in-memory check with a stored rainy span recorded two `replay_conditions` reads for one call.
@@ -202,14 +256,76 @@ search further if measurements justify it; do not add a second persistent weathe
   dashboard trends. The dashboard's SQL history selection/ranking remains unchanged.
 - Ordinary per-call maps, retained-data compatibility adapters and geometry cloning are not
   redundant merely because they repeat work. They preserve ownership and deleted recordings.
-- Background decoding scans the replay stream separately for each driver. A batched decode may
-  reduce I/O, but requires memory/progress/retry measurements before expanding this audit into a
-  decoder rewrite, particularly with the current uncommitted stream-boundary changes.
+- The initial per-driver stream scan observation was superseded by `a1c59459`, which batches
+  ingestion drivers in one scan. This cleanup coordinates overlapping callers around that work;
+  it does not introduce another decoder or storage rewrite.
 - The old CODE_MAP statement about one PB query per visible driver is outdated:
   `markPagePersonalBests` now uses one page-scoped window query. Its query-plan cost still needs
   measurement; the old timing is not evidence for the current implementation.
 
 ## Verification and suggested delivery order
+
+### Final review and closeout — 2026-10-12
+
+Final review fixed failure propagation through three or more queued callers, including an
+intervening caller canceled after receiving its lease. Failure handoff now lives in the lease
+release path. Regressions verify later callers receive the original failure without decoding
+the failed slot again. Metadata ownership, source snapshots and persisted formats were rechecked.
+Full tests passed: 2,572 tests, 56 skipped across 303 suites. The separate production build
+completed with zero warnings/errors. Endpoint before/after measurements and their limits are
+recorded below and in the active performance history. The Vite watcher excludes temporary
+DuckDB test directories to avoid locked-file watcher failures on Windows.
+
+All in-scope findings are complete. Further neighboring-blob/storage work remains excluded;
+unresolved native primary selection and cross-process coordination retain the constraints in
+finding 2. The historical implementation notes below preserve earlier verification results.
+
+### DuckDB preparation follow-up — 2026-10-12
+
+Sector lookup, connection reuse across selection passes and version-scoped cold-read sharing
+are implemented. Tests preserve sector overlap/first-transition/missing-sector behavior, multi-file
+numbered precedence and deleted-source fallback, and verify connection cleanup, retry, file-version
+isolation and one cache write for simultaneous successful requests. Full tests passed: 2,563 tests,
+56 skipped across 303 suites; the production build passed without warnings/errors.
+The before/after endpoint runs used identical dataset/cohort with five warm samples and showed no
+regression above the harness threshold. These retained-cache requests do not measure cold DuckDB
+extraction, so no latency claim is made for the new preparation path. The subsequent GPS profiling
+pass below addresses timeline result transfer. Finding 3 is out of scope at the user's request.
+
+### GPS timeline transfer follow-up — 2026-10-12
+
+The former full-channel transfer spent 187–234 ms per tested lap returning roughly 378,000 GPS rows.
+The replacement aggregates first qualifying insertion indices inside DuckDB and returns only the
+selected lap's inclusive timestamps. It preserves the former first-match behavior even for duplicate,
+regressing, null or NaN timestamps; it does not estimate indices from time/frequency or physical row IDs.
+Declared-frequency fallback, missing boundary behavior, four-wheel/multi-rate offsets and preceding
+event states have regression coverage. No stored-format/cache-version change is needed.
+
+A one-off read-only sweep of six laps (first/middle/last across two Road Atlanta race recordings)
+produced identical complete-output hashes. GPS rows crossing into JavaScript fell from 2,271,537 to
+83,129 (including bounds/first-time rows). GPS query times fell to 14–28 ms; total extraction across
+the sweep fell from 3,152 to 1,878 ms. This is one sequential sweep, not a sustained or cold-disk
+benchmark. The bounds aggregate still scans inside DuckDB. Local scripts/results are under
+`.cache/profile-gps.mjs` and `.cache/gps-profile-{before,after}.json`; the source recordings and
+application database were opened read-only. Full verification passed: 2,570 tests, 56 skipped,
+and a warning-free production build.
+
+### Replay recheck implementation — 2026-10-12
+
+Independent Luna review checked bounded edges, legacy/garage behavior, metadata ownership,
+DuckDB preparation and worker overlap. Parent review added cancellation cleanup and failure
+sharing regressions, removed non-transactional alias repair, and added live-source snapshot
+validation. Metadata failure remains fatal before an uncached decode, because loading identity
+is required to preserve recordings when filenames are reused. Cached/retained explicit slots
+continue to work. No parser/cache version or persisted format changes were needed.
+
+Full verification passed: 2,554 tests, 56 skipped across 303 suites, and a warning-free production
+build. The final ownership regression additionally confirms repeated configured/unconfigured
+metadata reads do not rewrite unchanged ownership. Endpoint runs used the same dataset/cohort;
+the isolated final repeat showed no regression over the harness threshold. See
+[endpoint measurements](../../ENDPOINT_BENCHMARKS.md) for timing limits and synthetic work counts.
+Unrelated traffic, frontend and Vite edits were preserved; this checkout was not clean at the
+start and concurrent work added further changes during verification.
 
 ### Second implementation pass — benchmark pace at read time
 

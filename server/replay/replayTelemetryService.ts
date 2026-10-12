@@ -4,6 +4,8 @@ import { SessionDatabase, TelemetryMetadataRecord } from '../core/db.js';
 import { DuckDbReader } from '../telemetry/duckdbReader.js';
 import { TelemetryLinks } from '../telemetry/telemetryLinks.js';
 import { fuseDuckDbWithVcrTrajectory } from '../telemetry/telemetryFusion.js';
+import fs from 'node:fs';
+import { DUCKDB_TELEMETRY_CACHE_VERSION } from '../core/dbSchema.js';
 
 export interface TelemetryEnrichmentInput {
   sessionId?: string;
@@ -28,6 +30,8 @@ interface FoundLap {
 }
 
 export class ReplayTelemetryService {
+  private readonly pendingLaps = new Map<string, Promise<FoundLap | null>>();
+
   public constructor(private readonly sessionDb: SessionDatabase) {}
 
   /** A lap cached from any of the session's files (by an older reader too, with `anyVersion`). */
@@ -45,43 +49,72 @@ export class ReplayTelemetryService {
    * this time (the single-file rule of DuckDbReader.getLapTelemetry). DuckDB counts the out-lap as
    * lap 0, one below the replay's numbering, so either number is accepted.
    */
-  private async readLap(files: TelemetryMetadataRecord[], lapNumber: number, lapTimeSec?: number): Promise<FoundLap | null> {
+  private readLap(sessionId: string, files: TelemetryMetadataRecord[], lapNumber: number, lapTimeSec?: number): Promise<FoundLap | null> {
+    let key: string;
+    try {
+      key = JSON.stringify([sessionId, lapNumber, lapTimeSec, DUCKDB_TELEMETRY_CACHE_VERSION,
+        files.map(file => {
+          const stat = fs.statSync(file.filePath);
+          return [file.filename, file.filePath, stat.mtimeMs, stat.size];
+        })]);
+    } catch {
+      // Let the ordinary read path report disappearing/unreadable files and try the next file.
+      return this.readLapFromFiles(files, lapNumber, lapTimeSec);
+    }
+    const pending = this.pendingLaps.get(key);
+    if (pending) return pending;
+    const read = this.readLapFromFiles(files, lapNumber, lapTimeSec)
+      .finally(() => this.pendingLaps.delete(key));
+    this.pendingLaps.set(key, read);
+    return read;
+  }
+
+  private async readLapFromFiles(files: TelemetryMetadataRecord[], lapNumber: number, lapTimeSec?: number): Promise<FoundLap | null> {
     // A file that fails to open is reported once, not once per pass.
     const failed = new Set<string>();
-    const exact = await this.firstLap(files, failed, async reader => {
-      const laps = await reader.getLapList();
-      const gap = (lap: { lapTimeSec: number }) => (lapTimeSec ? Math.abs(lap.lapTimeSec - lapTimeSec) : 0);
-      // The closer lap time wins when both numbers qualify (two laps within 0.5 s of each other).
-      const numbered = laps
-        .filter(lap => (lap.lapNumber === lapNumber || lap.lapNumber === lapNumber - 1) && gap(lap) <= 0.5)
-        .sort((left, right) => gap(left) - gap(right) || right.lapNumber - left.lapNumber)[0];
-      return numbered ? reader.getLapTelemetry(numbered.lapNumber) : null;
-    });
-    return exact ?? this.firstLap(files, failed, reader => reader.getLapTelemetry(lapNumber, lapTimeSec));
+    const readers = new Map<string, DuckDbReader>();
+    try {
+      const exact = await this.firstLap(files, failed, readers, async reader => {
+        const laps = await reader.getLapList();
+        const gap = (lap: { lapTimeSec: number }) => (lapTimeSec ? Math.abs(lap.lapTimeSec - lapTimeSec) : 0);
+        // The closer lap time wins when both numbers qualify (two laps within 0.5 s of each other).
+        const numbered = laps
+          .filter(lap => (lap.lapNumber === lapNumber || lap.lapNumber === lapNumber - 1) && gap(lap) <= 0.5)
+          .sort((left, right) => gap(left) - gap(right) || right.lapNumber - left.lapNumber)[0];
+        return numbered ? reader.getLapTelemetry(numbered.lapNumber) : null;
+      });
+      const found = exact ?? await this.firstLap(files, failed, readers, reader => reader.getLapTelemetry(lapNumber, lapTimeSec));
+      if (found) this.sessionDb.upsertTelemetryLapCache(found.file.filename, lapNumber, found.lap);
+      return found;
+    } finally {
+      for (const [filename, reader] of readers) {
+        try { await reader.close(); }
+        catch (error) { console.warn(`[DuckDB] Failed to close ${filename}:`, error); }
+      }
+    }
   }
 
   private async firstLap(
     files: TelemetryMetadataRecord[],
     failed: Set<string>,
+    readers: Map<string, DuckDbReader>,
     read: (reader: DuckDbReader) => Promise<DuckDbLapTelemetry | null>
   ): Promise<FoundLap | null> {
     for (const file of files) {
       if (failed.has(file.filename)) continue;
-      const reader = new DuckDbReader(file.filePath);
+      let reader = readers.get(file.filename);
       try {
-        await reader.open();
+        if (!reader) {
+          reader = new DuckDbReader(file.filePath);
+          readers.set(file.filename, reader);
+          await reader.open();
+        }
         const lap = await read(reader);
         if (lap) return { file, lap };
       } catch (error) {
         failed.add(file.filename);
         console.warn(`[DuckDB] Failed to read ${file.filename}:`, error);
         this.sessionDb.recordIngestError('duckdb', file.filePath, error);
-      } finally {
-        try {
-          await reader.close();
-        } catch (error) {
-          console.warn(`[DuckDB] Failed to close ${file.filename}:`, error);
-        }
       }
     }
     return null;
@@ -116,8 +149,7 @@ export class ReplayTelemetryService {
         if (!found) {
           const onDisk = files.filter(file => links.isOnDisk(file.filename));
           if (onDisk.length > 0) {
-            found = await this.readLap(onDisk, chosenLapNum, targetLapTimeSec);
-            if (found) this.sessionDb.upsertTelemetryLapCache(found.file.filename, chosenLapNum, found.lap);
+            found = await this.readLap(session.id, onDisk, chosenLapNum, targetLapTimeSec);
           }
           // A lap cached by an older reader is the only copy left once its file is deleted.
           found ??= this.cachedLap(files.filter(file => !links.isOnDisk(file.filename)), chosenLapNum, true);

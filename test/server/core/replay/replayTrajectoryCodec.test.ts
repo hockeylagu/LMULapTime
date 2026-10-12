@@ -7,9 +7,13 @@ import {
   decompressTrajectory,
   toColumnarTrajectory,
   isColumnar,
+  decompressTrajectoryEdge,
+  upgradeStoredTrajectory,
+  withGarageState,
 } from '../../../../server/core/replay/replayTrajectoryCodec.js';
 import { compressJson, initDbSchema } from '../../../../server/core/dbSchema.js';
 import { getTelemetryLapCache, upsertTelemetryLapCache } from '../../../../server/core/dbTelemetryStore.js';
+import { lapEdgesFromNeighbours } from '../../../../server/replay/decode/replayLapPoints.js';
 
 function buildTrajectory(points: ReplayTrajectoryData['points']): ReplayTrajectoryData {
   return {
@@ -24,6 +28,42 @@ function buildTrajectory(points: ReplayTrajectoryData['points']): ReplayTrajecto
 }
 
 describe('replay trajectory columnar codec', () => {
+  it('decodes bounded edges with identical garage phases, sign conversion and four-wheel channels', () => {
+    const points = Array.from({ length: 1000 }, (_, i) => ({
+      x: i * 0.1, y: 0, z: 0, timeSec: i * 0.02, speedKmh: i < 10 ? 0 : i < 500 ? 120 : 20,
+      steerYaw: 0.25, inPit: false, brakeTemps: [1, 2, 3, 4] as [number, number, number, number],
+    }));
+    const trajectory = { ...buildTrajectory(points), pitEvents: [{ driverSlot: 3, timeSec: 0, code: 21, action: 'Garage' }] };
+    const buffer = compressTrajectory(trajectory);
+    const full = withGarageState(decompressTrajectory(buffer));
+    for (const direction of ['previous', 'next'] as const) {
+      const boundary = direction === 'previous' ? 20 : 18;
+      const edge = decompressTrajectoryEdge(buffer, 'v7', boundary, direction);
+      expect(edge).toEqual(full.points.filter(point => direction === 'previous'
+        ? point.timeSec! >= 18 : point.timeSec! > 18));
+      expect(edge.length).toBeLessThanOrEqual(100);
+      // Racing earlier in the lap ends the garage spell even when the edge has slowed down.
+      expect(edge.every(point => point.inGarage === false && point.inPit === false)).toBe(true);
+    }
+  });
+
+  it('preserves legacy energy conversion and continuity barriers when decoding edges', () => {
+    const previous = buildTrajectory([
+      { x: 0, y: 0, z: 0, timeSec: 0, fuel: 50, steerYaw: 1 },
+      { x: 10, y: 0, z: 0, timeSec: 9, fuel: 0, steerYaw: 1 },
+      { x: 11, y: 0, z: 0, fuel: 0 },
+      { x: 12, y: 0, z: 0, timeSec: 9.9, fuel: 0, steerYaw: 1 },
+    ]);
+    // Legacy object blobs have neither columnar encoding nor a steering convention marker.
+    const buffer = compressJson(previous);
+    const full = withGarageState(upgradeStoredTrajectory(decompressTrajectory(buffer), 'v5'));
+    const lap = [{ x: 13, y: 0, z: 0, timeSec: 10 }];
+    const bounded = decompressTrajectoryEdge(buffer, 'v5', 10, 'previous');
+    expect(lapEdgesFromNeighbours(lap, bounded, undefined))
+      .toEqual(lapEdgesFromNeighbours(lap, full.points, undefined));
+    expect(bounded[bounded.length - 1]).toMatchObject({ virtualEnergy: 0, steerYaw: -1 });
+  });
+
   it('round-trips points losslessly through compression', () => {
     const trajectory = buildTrajectory([
       { x: 1.25, y: -0.5, z: 3.75, speedKmh: 120, throttle: 0.5123456789, brake: 0, gear: 4, inPit: false, brakeTemps: [1.5, 2.5, 3.5, 4.5] },

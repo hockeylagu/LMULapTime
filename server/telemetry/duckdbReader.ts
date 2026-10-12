@@ -40,6 +40,8 @@ export class DuckDbReader {
   private db: duckdb.Database | null = null;
   private filePath: string;
   private cachedTables: string[] | null = null;
+  private cachedLapList: Promise<DuckDbLapSummary[]> | null = null;
+  private connectionGeneration = 0;
 
   constructor(filePath: string) {
     this.filePath = filePath;
@@ -57,10 +59,15 @@ export class DuckDbReader {
 
   public async close(): Promise<void> {
     if (!this.db) return;
+    this.connectionGeneration++;
+    this.cachedTables = null;
+    this.cachedLapList = null;
     await new Promise<void>((resolve, reject) => {
       this.db!.close((err) => {
         this.db = null;
+        this.connectionGeneration++;
         this.cachedTables = null;
+        this.cachedLapList = null;
         if (err) reject(err);
         else resolve();
       });
@@ -84,11 +91,14 @@ export class DuckDbReader {
 
   public async getTables(): Promise<string[]> {
     if (this.cachedTables) return this.cachedTables;
+    await this.open();
+    const generation = this.connectionGeneration;
     const rows = await this.queryAll<{ table_name: string }>(
       `SELECT table_name FROM information_schema.tables WHERE table_schema = 'main'`
     );
-    this.cachedTables = rows.map((r) => r.table_name);
-    return this.cachedTables;
+    const tables = rows.map((r) => r.table_name);
+    if (generation === this.connectionGeneration) this.cachedTables = tables;
+    return tables;
   }
 
   public async hasTable(tableName: string): Promise<boolean> {
@@ -144,6 +154,23 @@ export class DuckDbReader {
   }
 
   public async getLapList(): Promise<DuckDbLapSummary[]> {
+    // A telemetry read often resolves a lap number first, then reads its samples. Both steps need
+    // the same lap boundaries, so keep the parsed list for this connection instead of querying and
+    // rebuilding it a second time.
+    if (!this.cachedLapList) {
+      let pending: Promise<DuckDbLapSummary[]>;
+      pending = this.loadLapList().catch((error: unknown) => {
+        // A transient query failure must not make every later read on this connection fail too.
+        // The identity check keeps an older request from clearing a newer connection's cache.
+        if (this.cachedLapList === pending) this.cachedLapList = null;
+        throw error;
+      });
+      this.cachedLapList = pending;
+    }
+    return this.cachedLapList;
+  }
+
+  private async loadLapList(): Promise<DuckDbLapSummary[]> {
     if (!(await this.hasTable('Lap'))) {
       return [];
     }
@@ -184,6 +211,7 @@ export class DuckDbReader {
     }
 
     const summaries: DuckDbLapSummary[] = [];
+    let sectorStart = 0;
 
     for (let i = 0; i < distinctEvents.length - 1; i++) {
       const current = distinctEvents[i];
@@ -194,10 +222,19 @@ export class DuckDbReader {
       const lapTimeSec = parseFloat((endTs - startTs).toFixed(3));
       if (lapTimeSec <= 0) continue;
 
-      // Extract sectors for this lap window
-      const lapSectors = sectorEvents.filter((s) => s.ts >= startTs - 0.05 && s.ts <= endTs + 0.05);
-      const s2Event = lapSectors.find((s) => s.value === 2 && s.ts > startTs);
-      const s3Event = lapSectors.find((s) => s.value === 3 && s.ts > (s2Event?.ts || startTs));
+      // Both streams are ordered. Advance past earlier laps, retaining the 50 ms overlap
+      // at boundaries, then search only this window instead of filtering the entire session.
+      while (sectorStart < sectorEvents.length && sectorEvents[sectorStart].ts < startTs - 0.05) sectorStart++;
+      let s2Event: { ts: number; value: number } | undefined;
+      let s3Event: { ts: number; value: number } | undefined;
+      for (let j = sectorStart; j < sectorEvents.length && sectorEvents[j].ts <= endTs + 0.05; j++) {
+        const event = sectorEvents[j];
+        if (event.value === 2 && event.ts > startTs) { s2Event = event; break; }
+      }
+      for (let j = sectorStart; j < sectorEvents.length && sectorEvents[j].ts <= endTs + 0.05; j++) {
+        const event = sectorEvents[j];
+        if (event.value === 3 && event.ts > (s2Event?.ts || startTs)) { s3Event = event; break; }
+      }
 
       let s1Sec: number | undefined;
       let s2Sec: number | undefined;
@@ -273,28 +310,29 @@ export class DuckDbReader {
     const declaredHz = speedChannel?.frequency || 100;
 
     const hasGpsTime = await this.hasTable('GPS Time');
-    let gpsTimes: number[] = [];
+    // Keep insertion-order indices, including duplicate/regressing timestamps. DuckDB scans
+    // the column for bounds, but only the selected lap's timestamps cross into JavaScript.
+    let startIdx = Math.max(0, Math.floor(startTs * declaredHz));
+    let endIdx = Math.max(startIdx, Math.floor(endTs * declaredHz));
+    let gpsCount = 0;
     if (hasGpsTime) {
-      const rows = await this.queryAll<{ value: number }>('SELECT value FROM "GPS Time"');
-      gpsTimes = rows.map((r) => r.value);
-    }
-
-    // Determine index range [startIdx, endIdx]
-    let startIdx = 0;
-    let endIdx = 0;
-
-    if (gpsTimes.length > 0) {
-      startIdx = gpsTimes.findIndex((t) => t >= startTs);
-      if (startIdx === -1) startIdx = 0;
-      endIdx = gpsTimes.findIndex((t) => t >= endTs);
-      if (endIdx === -1) endIdx = gpsTimes.length - 1;
-    } else {
-      startIdx = Math.max(0, Math.floor(startTs * declaredHz));
-      endIdx = Math.max(startIdx, Math.floor(endTs * declaredHz));
+      const [bounds] = await this.queryAll<{ sampleCount: number; startIdx: number | null; endIdx: number | null }>(`
+        SELECT COUNT(*)::DOUBLE AS sampleCount,
+          (MIN(sample_index) FILTER (WHERE COALESCE(value, 0) >= ? AND NOT isnan(COALESCE(value, 0))))::DOUBLE AS startIdx,
+          (MIN(sample_index) FILTER (WHERE COALESCE(value, 0) >= ? AND NOT isnan(COALESCE(value, 0))))::DOUBLE AS endIdx
+        FROM (SELECT row_number() OVER () - 1 AS sample_index, value FROM "GPS Time")`, [startTs, endTs]);
+      gpsCount = bounds.sampleCount;
+      if (gpsCount > 0) {
+        startIdx = bounds.startIdx ?? 0;
+        endIdx = bounds.endIdx ?? gpsCount - 1;
+      }
     }
 
     const rowCount = endIdx - startIdx + 1;
     if (rowCount <= 0) return null;
+    const gpsTimes = gpsCount > 0
+      ? (await this.queryAll<{ value: number }>('SELECT value FROM "GPS Time" LIMIT ? OFFSET ?', [rowCount, startIdx])).map(row => row.value)
+      : [];
 
     // Detect continuous channel tables
     const speedTable = (await this.hasTable('Ground Speed'))
@@ -593,8 +631,7 @@ export class DuckDbReader {
     const wearPercent = (value: number) => parseFloat((value * tireWearScale).toFixed(1));
 
     for (let i = 0; i < rowCount; i++) {
-      const globalIdx = startIdx + i;
-      const pointTime = gpsTimes.length > globalIdx ? gpsTimes[globalIdx] : startTs + i * dt;
+      const pointTime = i < gpsTimes.length ? gpsTimes[i] : startTs + i * dt;
       const lapElapsedSec = Math.max(0, pointTime - startTs);
 
       // Advance discrete event states or read continuous channels

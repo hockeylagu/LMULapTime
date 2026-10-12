@@ -7,6 +7,9 @@ import { ExtractReplayTrajectoryOptions, extractReplayTrajectory, extractReplayD
 import { ReplayStreamProgress } from '../replayProgress.js';
 import { ReplayDecodeError } from '../decode/replayDecodeError.js';
 import type { ReplayDriverSave } from '../../core/replay/dbReplayDriverStore.js';
+import { REPLAY_CACHE_VERSION } from '../../core/dbSchema.js';
+import type { ReplayDriverIngest } from '../../core/replay/dbReplayIngestStore.js';
+import { isReplayDriverSettled } from '../../core/replay/dbReplayIngestStore.js';
 
 export interface StoredReplayDriver {
   driverSlot?: number;
@@ -28,6 +31,94 @@ export interface ReplayDriversSave extends Omit<ReplayDriverSave, 'filePath' | '
 interface ReplaySaveHost {
   getDbPath(): string;
   replaceReplayDriverLaps(filename: string, filePath: string, mtime: number, size: number, driverSlotKey: number, trajectory: ReplayTrajectoryData, isPrimary: boolean): void;
+  getReplayDriverIngest(filename: string, driverSlot: number): ReplayDriverIngest | null;
+  hasValidReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): boolean;
+  getReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): ReplayTrajectoryData | null;
+}
+
+interface ReplaySaveQueue {
+  locked: boolean;
+  waiting: Array<ReplaySaveWaiter>;
+}
+
+interface ReplaySaveFailure { message: string; code?: string }
+interface ReplaySaveWaiter {
+  granted: boolean;
+  resolve: () => void;
+  canceled: boolean;
+  previousFailures?: Map<number, ReplaySaveFailure>;
+}
+interface ReplaySaveLease {
+  release: (failures?: Map<number, ReplaySaveFailure>) => void;
+  waited: boolean;
+  previousFailures?: Map<number, ReplaySaveFailure>;
+}
+
+const replaySaveQueues = new Map<string, ReplaySaveQueue>();
+
+/** Serialize file-backed saves for one recording version so a request and scan cannot race a slot replacement. */
+async function* acquireReplaySaveLease(key: string): AsyncGenerator<ReplayStreamProgress, ReplaySaveLease, void> {
+  let queue = replaySaveQueues.get(key);
+  if (!queue) {
+    queue = { locked: false, waiting: [] };
+    replaySaveQueues.set(key, queue);
+  }
+  const owner: ReplaySaveWaiter = { granted: !queue.locked, resolve: (): void => undefined, canceled: false };
+  const waited = !owner.granted;
+  if (!owner.granted) {
+    owner.resolve = () => { owner.granted = true; };
+    queue.waiting.push(owner);
+  } else {
+    queue.locked = true;
+  }
+  const release = (failures?: Map<number, ReplaySaveFailure>): void => {
+    if (!owner.granted) {
+      owner.canceled = true;
+      queue!.waiting = queue!.waiting.filter(waiter => waiter !== owner);
+      if (!queue!.locked && queue!.waiting.length === 0) replaySaveQueues.delete(key);
+      return;
+    }
+    let granted = queue!.waiting.shift();
+    while (granted?.canceled) granted = queue!.waiting.shift();
+    if (granted) {
+      granted.previousFailures = new Map([...(owner.previousFailures ?? []), ...(failures ?? [])]);
+      granted.resolve();
+    }
+    else {
+      queue!.locked = false;
+      replaySaveQueues.delete(key);
+    }
+  };
+  let handedOff = false;
+  try {
+    while (!owner.granted) {
+      await Promise.race([new Promise<void>(resolve => { owner.resolve = () => { owner.granted = true; resolve(); }; }), new Promise<void>(resolve => setTimeout(resolve, 100))]);
+      if (!owner.granted) yield { stage: 'caching', stageDescription: 'Waiting for another decode of this replay', percent: 0 };
+    }
+    handedOff = true;
+    return { release, waited, previousFailures: owner.previousFailures };
+  } finally {
+    if (!handedOff) release();
+  }
+}
+
+function replaySaveKey(dbPath: string, filePath: string, filename: string, mtime: number, size: number): string {
+  return `${path.resolve(dbPath)}\0${path.resolve(filePath)}\0${filename}\0${mtime}\0${size}\0${REPLAY_CACHE_VERSION}`;
+}
+
+function storedDriver(host: ReplaySaveHost, filename: string, filePath: string, driverSlot: number, mtime: number, size: number): boolean {
+  const ingest = host.getReplayDriverIngest(filename, driverSlot);
+  return ingest?.status === 'stored' && ingest.fileMtime === mtime && ingest.fileSize === size &&
+    ingest.parserVersion === REPLAY_CACHE_VERSION && host.hasValidReplayTrajectoryCache(filename, driverSlot, -1, mtime, size, filePath);
+}
+
+function saveFailure(error: unknown): ReplaySaveFailure {
+  const code = (error as NodeJS.ErrnoException)?.code;
+  return { message: error instanceof Error ? error.message : String(error), ...(typeof code === 'string' ? { code } : {}) };
+}
+
+function failureError(failure: ReplaySaveFailure): Error {
+  return failure.code ? Object.assign(new Error(failure.message), { code: failure.code }) : new ReplayDecodeError(failure.message);
 }
 
 type WorkerMessage =
@@ -112,9 +203,40 @@ export async function* storeReplayTrajectoryInWorker(
     host.replaceReplayDriverLaps(save.filename, filePath, save.mtime, save.size, save.driverSlotKey ?? trajectory.driverSlot ?? -1, trajectory, save.isPrimary);
     return { driverSlot: trajectory.driverSlot, currentLap: trajectory.currentLap };
   }
-  const result = yield* runReplayWorker(filePath, fullResolution, {}, { ...save, filePath, dbPath: path.resolve(dbPath) });
-  if ('points' in result || 'drivers' in result) throw new Error('Replay worker returned an unexpected save result');
-  return result;
+  const lease = yield* acquireReplaySaveLease(replaySaveKey(dbPath, filePath, save.filename, save.mtime, save.size));
+  const leaseFailures = new Map<number, ReplaySaveFailure>();
+  try {
+    const slot = save.driverSlotKey ?? options.driverSlot ?? -1;
+    const previousFailure = lease.previousFailures?.get(slot);
+    if (lease.waited && previousFailure) {
+      leaseFailures.set(slot, previousFailure);
+      throw failureError(previousFailure);
+    }
+    if (lease.waited) {
+      const attempt = host.getReplayDriverIngest(save.filename, slot);
+      if (storedDriver(host, save.filename, filePath, slot, save.mtime, save.size)) {
+        const cached = host.getReplayTrajectoryCache(save.filename, slot, -1, save.mtime, save.size, filePath);
+        return { driverSlot: cached?.driverSlot ?? (slot >= 0 ? slot : undefined), currentLap: cached?.currentLap };
+      }
+      if (attempt && isReplayDriverSettled(attempt, save.mtime, save.size) && attempt.status !== 'stored') {
+        const failure = attempt.status === 'failed'
+          ? new ReplayDecodeError(attempt.error ?? `Replay driver ${slot} could not be decoded`)
+          : Object.assign(new Error(attempt.error ?? `Replay driver ${slot} save was interrupted`), { code: 'REPLAY_SAVE_FAILED' });
+        leaseFailures.set(slot, saveFailure(failure));
+        throw failure;
+      }
+    }
+    try {
+      const result = yield* runReplayWorker(filePath, fullResolution, {}, { ...save, filePath, dbPath: path.resolve(dbPath) });
+      if ('points' in result || 'drivers' in result) throw new Error('Replay worker returned an unexpected save result');
+      return result;
+    } catch (error) {
+      leaseFailures.set(slot, saveFailure(error));
+      throw error;
+    }
+  } finally {
+    lease.release(leaseFailures);
+  }
 }
 
 export async function* storeReplayDriversInWorker(
@@ -157,10 +279,58 @@ export async function* storeReplayDriversInWorker(
     }
     return summary;
   }
-  const result = yield* runReplayWorker(filePath, { ...options, driverSlot: save.primarySlot, maxPoints: 0, allLaps: true }, {}, undefined,
-    { ...save, filePath, dbPath: path.resolve(host.getDbPath()) });
-  if (!('drivers' in result)) throw new Error('Replay worker did not return a replay-wide save');
-  return result;
+  const dbPath = host.getDbPath();
+  const lease = yield* acquireReplaySaveLease(replaySaveKey(dbPath, filePath, save.filename, save.mtime, save.size));
+  const leaseFailures = new Map<number, ReplaySaveFailure>();
+  try {
+    const priorFailures = [...(lease.previousFailures ?? [])].filter(([slot]) => save.driverSlots.includes(slot) || slot === -1 && save.includePrimary);
+    for (const [slot, failure] of priorFailures) leaseFailures.set(slot, failure);
+    const alias = lease.waited ? host.getReplayTrajectoryCache(save.filename, -1, -1, save.mtime, save.size, filePath) : null;
+    const aliasAttempt = host.getReplayDriverIngest(save.filename, -1);
+    const aliasReady = lease.waited && aliasAttempt?.status === 'stored' && aliasAttempt.fileMtime === save.mtime && aliasAttempt.fileSize === save.size &&
+      aliasAttempt.parserVersion === REPLAY_CACHE_VERSION && host.hasValidReplayTrajectoryCache(save.filename, -1, -1, save.mtime, save.size, filePath);
+    const knownPrimary = save.primarySlot ?? (typeof alias?.driverSlot === 'number' ? alias.driverSlot : undefined);
+    const primaryReady = lease.waited && knownPrimary !== undefined && storedDriver(host, save.filename, filePath, knownPrimary, save.mtime, save.size);
+    const primaryCanBeSkipped = save.includePrimary && primaryReady && aliasReady;
+    const skipPrimary = primaryCanBeSkipped ? knownPrimary : undefined;
+    const failedSlots = new Set(priorFailures.map(([slot]) => slot));
+    const skippedSlots = lease.waited ? [...new Set(save.driverSlots)].filter(slot => slot !== skipPrimary && !failedSlots.has(slot) && storedDriver(host, save.filename, filePath, slot, save.mtime, save.size)) : [];
+    const driverSlots = [...new Set(save.driverSlots)].filter(slot => slot !== skipPrimary && !failedSlots.has(slot) && (!lease.waited || !storedDriver(host, save.filename, filePath, slot, save.mtime, save.size)));
+    const primaryPreviouslyFailed = failedSlots.has(save.primarySlot ?? -1);
+    const includePrimary = save.includePrimary && !primaryCanBeSkipped && !primaryPreviouslyFailed;
+    if (driverSlots.length === 0 && !includePrimary) {
+      const drivers = [...new Set([...skippedSlots, ...(skipPrimary !== undefined ? [skipPrimary] : [])])];
+      return { drivers: drivers.map(driverSlotKey => ({ driverSlotKey, isPrimary: driverSlotKey === knownPrimary,
+        driverSlot: driverSlotKey >= 0 ? driverSlotKey : undefined,
+        currentLap: host.getReplayTrajectoryCache(save.filename, driverSlotKey, -1, save.mtime, save.size, filePath)?.currentLap })),
+        failures: priorFailures.map(([driverSlotKey, failure]) => ({ driverSlotKey, isPrimary: driverSlotKey === knownPrimary, ...failure })) };
+    }
+    let result: StoredReplayDrivers;
+    try {
+      const workerResult = yield* runReplayWorker(filePath, { ...options, driverSlot: save.primarySlot, maxPoints: 0, allLaps: true }, {}, undefined,
+        { ...save, driverSlots, includePrimary, filePath, dbPath: path.resolve(dbPath) });
+      if (!('drivers' in workerResult)) throw new Error('Replay worker did not return a replay-wide save');
+      result = workerResult;
+      for (const failure of result.failures) leaseFailures.set(failure.driverSlotKey, { message: failure.message, ...(failure.code ? { code: failure.code } : {}) });
+    } catch (error) {
+      const failure = saveFailure(error);
+      for (const slot of [...driverSlots, ...(includePrimary ? [save.primarySlot ?? -1] : [])]) leaseFailures.set(slot, failure);
+      throw error;
+    }
+    for (const driverSlotKey of [...skippedSlots, ...(skipPrimary !== undefined ? [skipPrimary] : [])]) {
+      if (result.drivers.some(driver => driver.driverSlotKey === driverSlotKey)) continue;
+      result.drivers.push({ driverSlotKey, isPrimary: driverSlotKey === knownPrimary,
+        driverSlot: driverSlotKey >= 0 ? driverSlotKey : undefined,
+        currentLap: host.getReplayTrajectoryCache(save.filename, driverSlotKey, -1, save.mtime, save.size, filePath)?.currentLap });
+    }
+    for (const [driverSlotKey, failure] of priorFailures) {
+      if (result.failures.some(existing => existing.driverSlotKey === driverSlotKey)) continue;
+      result.failures.push({ driverSlotKey, isPrimary: driverSlotKey === knownPrimary, ...failure });
+    }
+    return result;
+  } finally {
+    lease.release(leaseFailures);
+  }
 }
 
 async function* runReplayWorker(

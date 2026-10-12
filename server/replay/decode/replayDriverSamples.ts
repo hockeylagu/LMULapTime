@@ -24,6 +24,9 @@ export class ReplayDriverSamples {
   private readonly insert;
 
   public constructor() {
+    // Keep staging in a genuine TEMP database: SQLite opens spill files DELETEONCLOSE
+    // (Windows FILE_FLAG_DELETE_ON_CLOSE / Unix unlink), including when the process is killed.
+    // A named staging database would require a separate crash-recovery cleanup policy.
     this.db.pragma('temp_store = FILE');
     this.db.exec('CREATE TEMP TABLE samples (id INTEGER PRIMARY KEY, driver_slot INTEGER, data BLOB)');
     this.insert = this.db.prepare('INSERT INTO samples (driver_slot, data) VALUES (?, ?)');

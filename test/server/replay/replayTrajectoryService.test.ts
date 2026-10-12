@@ -94,8 +94,8 @@ describe('ReplayTrajectoryService', () => {
   });
 
   it('retrieves full trajectory and downsamples to requested maxPoints', async () => {
-    vi.spyOn(replayRecordings, 'getFullTrajectory').mockResolvedValue(mockFullTrajectory);
-    vi.spyOn(replayRecordings, 'getMetadata').mockReturnValue(mockMetadata);
+    const readTrajectory = vi.spyOn(replayRecordings, 'getFullTrajectory').mockResolvedValue(mockFullTrajectory);
+    const readMetadata = vi.spyOn(replayRecordings, 'getMetadata').mockReturnValue(mockMetadata);
 
     const traj = await trajectoryService.getTrajectory({ session: sessionFor('Daytona.Vcr', 'Samuel Lague'), driverOrdinal: 0, lapOrdinal: 0,
       maxPoints: 2,
@@ -107,6 +107,8 @@ describe('ReplayTrajectoryService', () => {
     expect(traj.rawPointsCount).toBe(4);
     expect(traj.driverSlot).toBe(0);
     expect(traj.driverName).toBe('Samuel Lague');
+    expect(readMetadata).toHaveBeenCalledTimes(1);
+    expect(readTrajectory).toHaveBeenCalledWith(expect.any(String), 'Daytona.Vcr', expect.objectContaining({ metadata: mockMetadata }));
   });
 
   it('serves one point per pointSpacingM metres of the lap instead of maxPoints when asked', async () => {
@@ -175,7 +177,8 @@ describe('ReplayTrajectoryService', () => {
       expect.stringContaining('Daytona.Vcr'),
       'Daytona.Vcr',
       'Other Driver',
-      'Samuel Lague'
+      'Samuel Lague',
+      mockMetadata,
     );
     expect(getFullTrajSpy).toHaveBeenCalledWith(
       expect.any(String),

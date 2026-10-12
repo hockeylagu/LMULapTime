@@ -1,5 +1,40 @@
 # Endpoint performance history
 
+## GPS timeline result transfer — 2026-10-12
+
+Five-sample before/after endpoint sweeps used identical dataset/cohort and showed no regression
+above the >20% and >5 ms threshold. These cached requests do not exercise the changed cold reader.
+A separate read-only six-lap extraction sweep across two real recordings returned identical complete
+output hashes, with GPS rows transferred into JavaScript falling from 2,271,537 to 83,129 and total
+extraction from 3,152 to 1,878 ms. This single sequential sweep is not a cold-disk or sustained-load
+measurement. DuckDB still scans GPS internally for insertion-order boundary indices; only the lap
+timestamp window is returned. See [reader details and verification](plans/archive/SERVER_SMELLS_AUDIT.md).
+Local outputs are `.cache/gps-endpoints-{before,after}/` and `.cache/gps-profile-{before,after}.json`.
+
+## DuckDB preparation cleanup — 2026-10-12
+
+Before/after sweeps used the same snapshot/cohort with five warm samples per case. No endpoint
+crossed the >20% and >5 ms regression threshold. Fused telemetry was effectively unchanged
+(172.03 → 172.13 ms median). These requests serve retained lap caches and do not exercise cold
+DuckDB extraction, so they cannot measure the benefit of sector lookup, reader reuse or shared
+cold operations. Correctness tests cover those paths and one cache write for simultaneous reads.
+Local results are `.cache/duckdb-cleanup-before/` and `.cache/duckdb-cleanup-after/`.
+
+## Replay repeated-work recheck — 2026-10-12
+
+The before run used five warm samples; the final after run used 20, with identical cohort
+and database snapshot (`fd7875490434`). No endpoint crossed the >20% and >5 ms regression
+threshold in the final run. Native replay telemetry median was 88.89 ms versus 93.96 ms;
+fused telemetry was 170.41 ms versus 187.83 ms. Replay-cache listing was effectively unchanged
+(219.51 ms versus 220.20 ms). Small sample counts and unrelated concurrent checkout edits
+limit attribution; these timings do not measure live ingestion or cold DuckDB reads.
+
+An initial five-sample after run showed slower comparison endpoints; an isolated 20-sample
+repeat returned 23.24/28.35 ms versus the original 23.60/27.72 ms, so that regression did not
+reproduce. Local outputs are `.cache/replay-smells-before/` and `.cache/replay-smells-after/`.
+Synthetic edge tests independently verify fewer point objects (18,000 → 6,200), blob selects
+(four → three) and lap-fact reads (three → one), with compatibility semantics preserved.
+
 ## One replay source scan, unchanged storage — 2026-10-12
 
 The endpoint sweep passed with 20 warm samples per case on the same fixed cohort

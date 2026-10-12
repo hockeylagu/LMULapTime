@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import { SessionDatabase } from '../../../server/core/db.js';
 import { replaceReplayWideFacts } from '../../../server/core/replay/dbReplayLapStore.js';
-import { replayRainOverLap } from '../../../server/core/dbSessionConditions.js';
+import { replayRainOverLap, reclassifyStoredSessions } from '../../../server/core/dbSessionConditions.js';
 import type { DetailedSession, DriverData, LapData, ReplayTrajectoryData } from '../../../server/core/types.js';
 
 const replayName = 'Sebring International Raceway R1 17.Vcr';
@@ -118,6 +118,29 @@ describe('replay rain on the laps of a linked session', () => {
 
     db.markSessionDataChanged();
     expect(rainByLap(db.getSessionById(session.id))).toEqual([20, 20, 20, 20, 20, 20]);
+  });
+
+  it('reads replay conditions once while reclassifying several linked sessions', () => {
+    const second = { ...JSON.parse(JSON.stringify(session)) as DetailedSession, id: 'second-session' };
+    db.upsertSession(second, 'C:\\results\\second.xml', 1, 1);
+    db.updateSessionMatchingReplay(session.id, replayLink);
+    db.updateSessionMatchingReplay(second.id, replayLink);
+
+    const conditionReads: string[] = [];
+    const actualDb = rawDb(db);
+    const countedDb = new Proxy(actualDb, {
+      get(target, property) {
+        if (property === 'prepare') return (sql: string) => {
+          if (/FROM replay_conditions WHERE filename = \? ORDER BY start_sec/i.test(sql)) conditionReads.push(sql);
+          return target.prepare(sql);
+        };
+        const value: unknown = Reflect.get(target, property, target);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    }) as DatabaseType;
+    reclassifyStoredSessions(countedDb, { replayName });
+
+    expect(conditionReads).toHaveLength(1);
   });
 
   it('takes the session weather from every stored condition, not the sampled header scan', () => {

@@ -43,7 +43,7 @@ import {
 import {
   getReplayTrajectoryCache,
   getStoredReplayTrajectory,
-  getAdjacentLapTrajectories,
+  getReplayLapEdges,
   hasValidReplayTrajectoryCache,
   setTrajectoryDefaults,
   upsertReplayTrajectoryCache,
@@ -317,8 +317,8 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
   }
 
   /** The stored rows of the laps either side of a lap of the same recording (see dbReplayTrajectoryStore). */
-  public getAdjacentLapTrajectories(filename: string, driverSlot: number, lapKey: number): { previous: ReplayTrajectoryData | null; next: ReplayTrajectoryData | null } {
-    return getAdjacentLapTrajectories(this.db, filename, driverSlot, lapKey);
+  public getReplayLapEdges(filename: string, driverSlot: number, lapKey: number, points: ReplayTrajectoryData['points']): { leadIn: ReplayTrajectoryData['points']; leadOut: ReplayTrajectoryData['points'] } {
+    return getReplayLapEdges(this.db, filename, driverSlot, lapKey, points);
   }
 
   public hasValidReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): boolean {

@@ -1,6 +1,7 @@
 import { ReplayMetadata, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../types.js';
 import { compressJson, decompressJson } from '../dbSchema.js';
-import { applyGarageState } from '../../replay/decode/garageState.js';
+import { applyGarageState, garageSpells, garageState } from '../../replay/decode/garageState.js';
+import { LAP_EDGE_PADDING_SEC } from '../../replay/decode/replayLapPoints.js';
 
 /**
  * Trajectory blobs are stored column-per-channel instead of one object per point: the channel
@@ -62,19 +63,20 @@ export function toColumnarTrajectory(trajectory: ReplayTrajectoryData): StoredTr
   return { ...rest, pointsFormat: 'columnar', pointsLength: points.length, constants, columns };
 }
 
-export function fromColumnarTrajectory(stored: StoredTrajectory): ReplayTrajectoryData {
+export function fromColumnarTrajectory(stored: StoredTrajectory, indices?: number[]): ReplayTrajectoryData {
   if (!isColumnar(stored)) return stored;
 
   const { pointsFormat: _format, pointsLength, constants, columns, ...rest } = stored;
-  const points: Record<string, PointValue>[] = new Array(pointsLength);
+  const length = indices?.length ?? pointsLength;
+  const points: Record<string, PointValue>[] = new Array(length);
 
-  for (let index = 0; index < pointsLength; index++) {
+  for (let index = 0; index < length; index++) {
     points[index] = { ...constants };
   }
   // Walk each channel once rather than looking up its column again for every sample.
   for (const [key, column] of Object.entries(columns)) {
-    for (let index = 0; index < pointsLength; index++) {
-      const value = column[index];
+    for (let index = 0; index < length; index++) {
+      const value = column[indices?.[index] ?? index];
       if (value !== null) points[index][key] = value;
     }
   }
@@ -111,6 +113,49 @@ export function compressTrajectory(trajectory: ReplayTrajectoryData): Buffer {
 
 export function decompressTrajectory(buffer: Buffer): ReplayTrajectoryData {
   return toIso8855Steering(fromColumnarTrajectory(decompressJson<StoredTrajectory>(buffer)));
+}
+
+/** Decode only edge point objects; compressed columns still need a full JSON parse. */
+export function decompressTrajectoryEdge(
+  buffer: Buffer, parserVersion: string, boundarySec: number, direction: 'previous' | 'next',
+): ReplayTrajectoryPoint[] {
+  const stored = decompressJson<StoredTrajectory>(buffer);
+  const indices: number[] = [];
+  const select = (length: number, time: (i: number) => number | undefined): void => {
+    for (let i = direction === 'previous' ? length - 1 : 0; i >= 0 && i < length; i += direction === 'previous' ? -1 : 1) {
+      const t = time(i);
+      if (t !== undefined && (direction === 'previous' ? t >= boundarySec : t <= boundarySec)) continue;
+      if (t !== undefined && Math.abs(t - boundarySec) > LAP_EDGE_PADDING_SEC) break;
+      indices.push(i);
+      // Missing time breaks continuity. Keep the sample so the canonical edge selector sees it.
+      if (t === undefined) break;
+    }
+    if (direction === 'previous') indices.reverse();
+  };
+  // Legacy adapters depend on the complete lap (e.g. whether fuel was actually Virtual Energy).
+  if (!isColumnar(stored) || PRE_V6_REPLAY_CACHE_VERSIONS.has(parserVersion)) {
+    const full = withGarageState(upgradeStoredTrajectory(toIso8855Steering(fromColumnarTrajectory(stored)), parserVersion));
+    select(full.points.length, i => full.points[i].timeSec);
+    return indices.map(i => full.points[i]);
+  }
+  const value = (key: string, i: number): PointValue | null | undefined => stored.constants[key] ?? stored.columns[key]?.[i];
+  const number = (key: string, i: number): number | undefined => {
+    const v = value(key, i);
+    return typeof v === 'number' ? v : undefined;
+  };
+  select(stored.pointsLength, i => number('timeSec', i));
+  if (indices.length === 0) return [];
+  // Garage phases can start before the requested window: inspect cheap column samples for the
+  // whole lap, rather than restarting the phase at the edge and misclassifying a slowing car.
+  const state = garageState({ length: stored.pointsLength,
+    timeSec: i => number('timeSec', i), speedKmh: i => number('speedKmh', i), inPit: i => value('inPit', i) === true,
+  }, garageSpells((stored.pitEvents ?? []).filter(event => event.driverSlot === stored.driverSlot)));
+  const trajectory = toIso8855Steering(fromColumnarTrajectory(stored, indices));
+  trajectory.points.forEach((point, i) => {
+    point.inGarage = state.inGarage[indices[i]];
+    if (state.leavingGarage[indices[i]]) point.inPit = true;
+  });
+  return trajectory.points;
 }
 
 /** Ambient °C written by builds before v6 (`25 - (146 - raw) * 0.176`), recomputed as `raw / 8 + 5.9`. */

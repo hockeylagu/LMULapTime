@@ -275,6 +275,17 @@ index their explicitly supplied replay directory locally.
 - Normalised facts (pure): `replayFacts.ts` → written by `server/core/replay/dbReplayLapStore.ts`
   (`replaceReplayDriverLapFacts`, `replaceReplayWideFacts`; read with `getReplayLaps`, `getReplayConditions`, `getLapConditions`).
 - Trajectory blobs: `dbReplayTrajectoryStore.ts` + codec `replayTrajectoryCodec.ts`; downsampling `trajectoryDownsampler.ts`.
+  `getReplayLapEdges` reads only selected-row identity and bounded neighbor point objects; modern columnar
+  blobs retain full-column garage phase checks, while older blobs keep full compatibility decoding.
+  Trajectory operations share one metadata snapshot. Worker saves coordinate per recording version
+  across requests/scans/upgrades and recheck stored results after waiting; write eligibility remains transactional.
+  An open DuckDB reader shares its lap list, and a session reclassification batch shares replay rain snapshots.
+  DuckDB sector lookup advances through ordered lap windows. Numbered/duration selection shares readers
+  within one operation; simultaneous cold reads share an in-flight operation by session/file version/lap.
+  Connections close after either pass, and completed operations are removed; SQLite remains the lap cache.
+  GPS boundary indices are aggregated inside DuckDB using insertion order, followed by a lap-scoped
+  timestamp read. Continuous-channel offsets and event-state lookup retain the full-timeline semantics;
+  DuckDB still scans for bounds, but JavaScript no longer hydrates every session timestamp.
   Columnar decoding walks each channel once when rebuilding sample objects. Fusion skips its intermediate
   geometry-clearing copy for unannotated native samples; it still creates independent output points.
   Geometry copying checks only the seven wheel-array channels, with a type-checked exhaustive channel map,
@@ -508,7 +519,7 @@ the completed 2026-09-29 cleanup and does not describe all remaining findings.
 
 **Logic in the wrong place / duplicated**
 - [Completed frontend simplification audit](plans/archive/SRC_SIMPLIFICATION_AUDIT.md) (2026-10-12): removed 23 frontend export barrels, consolidated six wheel-channel SVG renderers and rules-dialog focus handling, extended the canonical progression type, removed a route forwarder, parsed dashboard dates once per session, and accumulated wheel-chart extrema in one pass per lap. Follow-up commits also reuse geometry-owned display payloads and remove remaining named re-exports, the phase-card barrel, and the map forwarder. Reviewed candidates retained by design and their constraints are recorded in the archived audit.
-- [Server repeated-work audit](SERVER_SMELLS_AUDIT.md): the 2026-10-12 first pass fixed XML event ownership, moved four superseded analytics implementations to `test/helpers/legacySessionAnalytics.ts` and `legacyBenchmarkImpact.ts` for parity checks, and made JavaScript/benchmark SQL use canonical `PACE_CATEGORY_BANDS`. Replay-related findings (decode coordination, neighboring-lap overfetch, metadata/DuckDB/weather preparation) are deferred by user request while separate replay ingestion optimization proceeds; the original audit is historical evidence for those paths.
+- [Server repeated-work audit](plans/archive/SERVER_SMELLS_AUDIT.md): the 2026-10-12 passes fixed XML event ownership, moved superseded analytics to test helpers, centralized pace bands/read-time ratings, and rechecked replay work after ingestion optimization. Replay fixes cover worker coordination, bounded neighbor objects, one metadata snapshot, shared DuckDB preparation and batch weather reads. GPS boundary scanning now stays inside DuckDB with lap-scoped result transfer. Further whole-blob changes are out of scope.
 - Comparison queries now mark page PBs with one window query for the visible drivers (`markPagePersonalBests`), rather than one query per driver. The older 2026-10-10 ~127 ms all-driver measurement predates that implementation and was not rerun in this audit; profile current query plans before optimizing further.
 
 **Rule exceptions**

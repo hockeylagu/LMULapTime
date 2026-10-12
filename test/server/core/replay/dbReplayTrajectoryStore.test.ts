@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Database, { Database as DatabaseType } from 'better-sqlite3';
 import { initDbSchema, REPLAY_CACHE_VERSION } from '../../../../server/core/dbSchema.js';
 import {
-  getAdjacentLapTrajectories,
+  getReplayLapEdges,
   getReplayTrajectoryCache,
   getStoredReplayTrajectory,
   hasValidReplayTrajectoryCache,
@@ -89,25 +89,51 @@ describe('dbReplayTrajectoryStore', () => {
     });
   });
 
-  describe('getAdjacentLapTrajectories', () => {
+  describe('getReplayLapEdges', () => {
+    it('reads only neighbour blobs and does not rebuild their driver lap summaries', () => {
+      db.close();
+      const queries: string[] = [];
+      db = new Database(':memory:', { verbose: sql => { if (typeof sql === 'string') queries.push(sql); } });
+      initDbSchema(db);
+      for (const n of [1, 2, 3]) {
+        const points = Array.from({ length: 6000 }, (_, i) => {
+          const timeSec = (n - 1) * 120 + i * 0.02;
+          return { x: timeSec, y: 0, z: 0, timeSec, speedKmh: 180, brakeTemps: [1, 2, 3, 4] as [number, number, number, number] };
+        });
+        upsertReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, n, 1000, 5000, { ...lap(n), driverSlot: 3, points, pointsCount: points.length });
+      }
+      queries.length = 0;
+      const current = getReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 2, 1000, 5000)!;
+      const { leadIn, leadOut } = getReplayLapEdges(db, 'Spa_R1.Vcr', 3, 2, current.points);
+      expect(leadIn).toHaveLength(100);
+      expect(leadOut).toHaveLength(100);
+      expect(leadIn[0].brakeTemps).toEqual([1, 2, 3, 4]);
+      expect(queries.filter(sql => sql.startsWith('SELECT') && sql.includes('trajectory_br'))).toHaveLength(3);
+      expect(queries.filter(sql => sql.startsWith('SELECT') && sql.includes('FROM replay_laps'))).toHaveLength(1);
+    });
+
     it('returns the stored laps either side of a lap, whatever their version (the replay may be deleted)', () => {
       for (const n of [3, 4, 5]) upsertReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, n, 1000, 5000, lap(n));
+      const previous = { ...lap(3), points: [{ x: 399, y: 0, z: 0, timeSec: 399 }] };
+      const next = { ...lap(5), points: [{ x: 451, y: 0, z: 0, timeSec: 451 }] };
+      upsertReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 3, 1000, 5000, previous);
+      upsertReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 5, 1000, 5000, next);
       setVersion('v2');
-      const { previous, next } = getAdjacentLapTrajectories(db, 'Spa_R1.Vcr', 3, 4);
-      expect(previous?.currentLap).toBe(3);
-      expect(next?.currentLap).toBe(5);
+      const edges = getReplayLapEdges(db, 'Spa_R1.Vcr', 3, 4, lap(4).points);
+      expect(edges.leadIn).toEqual([{ ...previous.points[0], inGarage: false }]);
+      expect(edges.leadOut).toEqual([{ ...next.points[0], inGarage: false }]);
     });
 
     it('only uses laps of the same driver and the same recording', () => {
       upsertReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000, lap(4));
       upsertReplayTrajectoryCache(db, 'Spa_R1.Vcr', 7, 3, 1000, 5000, lap(3));
       upsertReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 5, 2000, 5000, lap(5));
-      expect(getAdjacentLapTrajectories(db, 'Spa_R1.Vcr', 3, 4)).toEqual({ previous: null, next: null });
+      expect(getReplayLapEdges(db, 'Spa_R1.Vcr', 3, 4, lap(4).points)).toEqual({ leadIn: [], leadOut: [] });
     });
 
     it('returns nothing for a lap that is not stored', () => {
       upsertReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 3, 1000, 5000, lap(3));
-      expect(getAdjacentLapTrajectories(db, 'Spa_R1.Vcr', 3, 4)).toEqual({ previous: null, next: null });
+      expect(getReplayLapEdges(db, 'Spa_R1.Vcr', 3, 4, lap(4).points)).toEqual({ leadIn: [], leadOut: [] });
     });
   });
 });
