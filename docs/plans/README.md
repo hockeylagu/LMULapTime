@@ -33,7 +33,7 @@ with its own verification. Historical timings below identify candidates; remeasu
 | 2 | Validate keyboard, focus and Escape in session detail and fullscreen map | `src/components/session-detail/standings/SessionRulesModal.tsx`, `src/components/replay/map/useMapFullscreenFocus.ts`, `src/components/replay/ReplayShortcutHelp.tsx` | Real recordings pass keyboard navigation, focus containment/restoration and nested Escape checks at the normal desktop viewport; record evidence |
 | 3 | Continue and validate the corner-map branch | [Current branch/main status](CORNER_COMPARISON_REWORK.md#current-implementation-review--2026-10-10) and its worktree handoff | Complete M2/M3 and the remaining visual/consumer gates; verify compatibility with newer main storage before integration |
 | 4 | Profile and improve comparison candidate queries | [Archived summary measurements](archive/PERSISTED_SESSION_SUMMARIES.md#implementation-verification), [normalized storage results](archive/NORMALIZED_SESSION_STORAGE.md#status-of-phase-2); `server/core/sessionSummaries/comparisonQueries.ts` | Repeatable before/after measurements and query plans show less broad count/best-lap work while preserving deterministic results and bounded hydration |
-| 5 | Consolidate progression contracts and class identity rules | [CODE_MAP smells](../CODE_MAP.md#9-smells-that-need-attention); `improvementChartTypes.ts`, `shared/domain/lapPlaces.ts` | One canonical progression contract with a deliberate view extension; class grouping follows canonical resolution with parity tests |
+| 5 | Review class identity rules | `shared/domain/lapPlaces.ts`; progression contract consolidation is [completed](archive/SRC_SIMPLIFICATION_AUDIT.md) | Class grouping follows canonical resolution with parity tests |
 | 6 | Measure remaining startup and telemetry preparation costs | [Cache audit](../SERVER_CACHE_AUDIT.md); package validation and telemetry preparation | Separate cold/warm startup, package validation and trajectory preparation measurements identify a concrete bottleneck before changing retention or loading |
 
 200% browser zoom validation is deferred by user decision on 2026-10-10; it is not required to complete item 2.
@@ -47,6 +47,7 @@ File and folder size limits are ongoing checks; split only along meaningful resp
 
 | Record | Outcome | Historical completion |
 |---|---|---|
+| [Frontend simplification audit](archive/SRC_SIMPLIFICATION_AUDIT.md) | Ten fixes committed separately: direct imports, shared wheel rendering and modal focus, canonical progression type, fewer repeated calculations and requests, and removed forwarders; full tests/build passed | 2026-10-12 |
 | [Shared domain cleanup](archive/SHARED_DOMAIN_CLEANUP.md) | Eight audit findings fixed by Luna; independent review, 1,500-case parity, full tests/build and matching-dataset endpoint benchmarks passed | 2026-10-11 |
 | [Session reload recovery](archive/SESSION_RELOAD_RECOVERY.md) | Multiplayer player selection fixed; offline repair restored 739 sessions and canonicalized 132 benchmark entries while preserving retained data | 2026-10-11 |
 | [Exact identity matching cleanup](archive/EXACT_IDENTITY_MATCHING_CLEANUP.md) | Exact session IDs/types/layouts/drivers, versioned retained ownership reconciliation; full tests/build/coverage and same-dataset benchmark validated | 2026-10-11 |

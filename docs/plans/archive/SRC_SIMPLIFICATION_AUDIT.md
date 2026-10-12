@@ -1,6 +1,8 @@
 # Frontend duplication and repeated-work audit
 
 Reviewed 2026-10-12. Scope: `src/`, with test/tool import updates where needed.
+Status: **Completed** on 2026-10-12. All ten selected fixes are committed and validated.
+Archived as delivery evidence; file counts and test totals below describe that validation snapshot.
 Existing backend and Vite changes in the working tree were preserved.
 
 ## Overview scan
@@ -46,7 +48,10 @@ passes and constant accumulator storage. No browser latency improvement is claim
 The resulting tree has 324 TypeScript files, including the shared wheel renderer.
 Most changed files contain only direct-import updates.
 
-## Deeper findings retained for focused follow-up
+## Reviewed candidates retained by design
+
+These candidates were reviewed and deliberately left separate. They are not incomplete
+fixes or completion gates for this audit; revisit only with new requirements or evidence.
 
 | Candidate | Evidence and decision |
 |---|---|
