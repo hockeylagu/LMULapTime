@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { ReplayInspectorModal } from '../../../../src/components/replay/index.js';
+import { ReplayInspectorModal } from '../../../../src/components/replay/inspector/ReplayInspectorContent.js';
 
 vi.mock('recharts', () => ({
   BarChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,

@@ -1,7 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
-import { CornerSegmentComparison } from '../../../utils/cornerAnalysis/index.js';
+import { CornerSegmentComparison } from '../../../utils/cornerAnalysis/types.js';
 import { CornerTechniqueDeck } from './CornerTechniqueDeck.js';
 import { CornerSpeedGraph } from './CornerSpeedGraph.js';
 import { TrackBoundaryGeometry } from '../map/useTrackBoundaryGeometry.js';

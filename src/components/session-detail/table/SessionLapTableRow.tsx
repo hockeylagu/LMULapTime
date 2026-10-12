@@ -4,7 +4,7 @@ import { ChevronRight } from 'lucide-react';
 import { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
 import { formatTime, computeTheoreticalGap } from '../../../../shared/domain/formatters.js';
 import { isRacingLap } from '../../../../shared/domain/lapComparison.js';
-import { PaceBadge } from '../../common';
+import { PaceBadge } from '../../common/PaceBadge.js';
 import { SessionLapStatusBadge } from './SessionLapStatusBadge.js';
 import { CompoundCell, FuelCell, TireWearCell } from './SessionLapResourceCells.js';
 import { SessionLapTableActions } from './SessionLapTableActions.js';

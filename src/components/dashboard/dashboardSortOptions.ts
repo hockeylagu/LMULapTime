@@ -1,4 +1,4 @@
-import { SortOption } from '../common';
+import { SortOption } from '../common/SortDropdown.js';
 
 export type DashboardSortOption = 'date-desc' | 'date-asc' | 'pos-asc' | 'pace-asc' | 'pace-desc';
 

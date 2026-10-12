@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { SessionList, SessionListItem } from '../../../src/components/session-list/index.js';
+import { SessionList } from '../../../src/components/session-list/SessionList.js';
+import { SessionListItem } from '../../../src/components/session-list/sessionListTypes.js';
 
 describe('SessionList component', () => {
   const mockSessions: SessionListItem[] = [

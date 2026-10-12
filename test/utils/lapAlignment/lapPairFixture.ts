@@ -11,11 +11,8 @@ import {
   getDistancesInReferenceFrame,
   getTrajectoryDistances,
 } from '../../../src/utils/lapAlignment.js';
-import {
-  computeLapSegmentComparisons,
-  CornerSegmentComparison,
-  LapSegmentComparison,
-} from '../../../src/utils/cornerAnalysis/index.js';
+import { computeLapSegmentComparisons } from '../../../src/utils/cornerAnalysis/segmentComparisons.js';
+import { CornerSegmentComparison, LapSegmentComparison } from '../../../src/utils/cornerAnalysis/types.js';
 import { computeCornerConsistencyStats } from '../../../src/utils/cornerConsistency.js';
 import {
   computeBaselineDeltaByIdx,

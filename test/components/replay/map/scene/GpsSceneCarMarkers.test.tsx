@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { GpsSceneCarMarkers, replayBodyHeading } from '../../../../../src/components/replay/map/scene/GpsSceneCarMarkers.js';
-import { GpsTrackMap } from '../../../../../src/components/replay/index.js';
+import { GpsTrackMap } from '../../../../../src/components/replay/map/GpsTrackMap.js';
 import { ReplayTrajectoryPoint } from '../../../../../server/core/types.js';
 
 const points: ReplayTrajectoryPoint[] = [

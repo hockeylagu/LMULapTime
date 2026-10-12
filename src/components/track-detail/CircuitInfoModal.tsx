@@ -13,7 +13,8 @@ import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js'
 import { TrackCircuitLayout } from './TrackCircuitLayout.js';
 import { TrackSurfaceProfiles } from './TrackSurfaceProfiles.js';
 import { useModalFocus } from '../common/useModalFocus.js';
-import { useTrackBoundaryGeometry, TrackBoundaryGeometry } from '../replay/map/index.js';
+import { useTrackBoundaryGeometry } from '../replay/map/useTrackBoundaryGeometry.js';
+import { TrackBoundaryGeometry } from '../../../shared/types/trackGeometry.js';
 
 export interface CircuitInfoModalProps {
   isOpen: boolean;

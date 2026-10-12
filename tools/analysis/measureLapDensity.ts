@@ -17,7 +17,8 @@ import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { selectFeatureSamples } from '../../server/replay/decode/trajectoryDownsampler.js';
 import { applyTelemetryPostProcessing } from '../../src/utils/telemetryPostProcessing.js';
 import { computeLapComparisons } from '../../src/utils/replayComparison.js';
-import { computeLapSegmentComparisons, CornerSegmentComparison, LapSegmentComparison } from '../../src/utils/cornerAnalysis/index.js';
+import { computeLapSegmentComparisons } from '../../src/utils/cornerAnalysis/segmentComparisons.js';
+import { CornerSegmentComparison, LapSegmentComparison } from '../../src/utils/cornerAnalysis/types.js';
 
 const API = 'http://localhost:3001/api/replays';
 

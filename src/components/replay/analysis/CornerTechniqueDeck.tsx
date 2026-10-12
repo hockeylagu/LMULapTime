@@ -1,5 +1,5 @@
 import React from 'react';
-import { CornerSegmentComparison } from '../../../utils/cornerAnalysis/index.js';
+import { CornerSegmentComparison } from '../../../utils/cornerAnalysis/types.js';
 import {
   EntryPhaseCard,
   RotationPhaseCard,

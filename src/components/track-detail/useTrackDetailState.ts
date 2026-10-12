@@ -8,7 +8,7 @@ import { TrackDetailSortOption } from './TrackSessionsToolbar.js';
 import { SessionMeta } from './trackDetailHelpers.js';
 import { TRACK_DETAIL_SORT_OPTIONS } from './trackDetailSortOptions.js';
 import type { TrackSummary } from '../../../shared/types/index.js';
-import type { SessionProgressionPoint } from './improvement-chart/index.js';
+import type { SessionProgressionPoint } from './improvement-chart/improvementChartTypes.js';
 
 const readSort = (value: string | null): TrackDetailSortOption =>
   TRACK_DETAIL_SORT_OPTIONS.find(option => option.value === value)?.value ?? 'date-desc';

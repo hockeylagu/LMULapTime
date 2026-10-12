@@ -3,7 +3,7 @@ import { interpolatePointAtDistance } from '../../../utils/replayComparison.js';
 import { findIndexAtDistance } from '../../../utils/lapAlignment.js';
 import { TrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
 import { SPEED_GRADIENT_STOPS, TELEMETRY_COLORS } from '../../../utils/themeColors.js';
-import { BRAKE_ON_THRESHOLD_PCT } from '../../../utils/cornerAnalysis/index.js';
+import { BRAKE_ON_THRESHOLD_PCT } from '../../../utils/cornerAnalysis/helpers.js';
 
 export type MapColorMode = 'speed' | 'pedal' | 'delta' | 'default';
 

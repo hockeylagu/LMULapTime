@@ -1,4 +1,4 @@
-import { SortOption } from '../common';
+import { SortOption } from '../common/SortDropdown.js';
 
 export type TracksSortOption = 'name-asc' | 'name-desc' | 'pace-asc' | 'last-session-desc';
 

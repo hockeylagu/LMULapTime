@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import { Settings } from '../../../src/components/settings/index.js';
+import { Settings } from '../../../src/components/settings/Settings.js';
 import { ReferenceLaptimesCard } from '../../../src/components/settings/ReferenceLaptimesCard.js';
 import { AiReportsHistoryCard } from '../../../src/components/settings/AiReportsHistoryCard.js';
 import { SETTINGS_SECTIONS } from '../../../src/components/settings/settingsSections.js';

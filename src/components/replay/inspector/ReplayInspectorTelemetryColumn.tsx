@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { ReplayLapSummary, ReplayTrajectoryData, ReplayMetadata } from '../../../../shared/types/index.js';
-import { CornerSegmentComparison, LapSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis/index.js';
+import { CornerSegmentComparison, LapSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis/types.js';
 import { ReplayPerformanceHeader } from './ReplayPerformanceHeader.js';
 import { TelemetryStripCharts } from '../telemetry/TelemetryStripCharts.js';
 import { TelemetryResolution } from '../telemetry/telemetryResolution.js';

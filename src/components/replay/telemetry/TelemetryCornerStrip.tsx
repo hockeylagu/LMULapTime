@@ -1,5 +1,5 @@
 import React from 'react';
-import { CornerSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis/index.js';
+import { CornerSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis/types.js';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { findIndexAtDistance } from '../../../utils/lapAlignment.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';

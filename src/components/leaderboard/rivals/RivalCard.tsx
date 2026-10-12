@@ -11,7 +11,7 @@ import { RivalLadder } from './RivalLadder.js';
 import { SectorGapSummary } from '../debrief/SectorGapSummary.js';
 import { LoadError } from '../LoadError.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
-import { CarLogo } from '../../vehicle/index.js';
+import { CarLogo } from '../../vehicle/CarLogo.js';
 import { linkClickHandler } from '../../../utils/linkClick.js';
 
 export interface RivalCardProps {

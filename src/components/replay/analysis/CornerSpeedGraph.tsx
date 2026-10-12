@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { findIndexAtDistance } from '../../../utils/lapAlignment.js';
-import { CornerSegmentComparison } from '../../../utils/cornerAnalysis/index.js';
+import { CornerSegmentComparison } from '../../../utils/cornerAnalysis/types.js';
 import {
   detectHandlingBalanceEvents,
 } from '../../../utils/handlingBalanceDetection.js';

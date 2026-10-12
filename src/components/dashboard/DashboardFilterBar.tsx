@@ -1,6 +1,10 @@
 import React, { useRef } from 'react';
 import { MapPin, X, ChevronDown } from 'lucide-react';
-import { VehicleClassPills, SessionTypePills, HideEmptyToggle, HasReplayToggle, SortDropdown } from '../common';
+import { VehicleClassPills } from '../common/VehicleClassPills.js';
+import { SessionTypePills } from '../common/SessionTypePills.js';
+import { HideEmptyToggle } from '../common/HideEmptyToggle.js';
+import { HasReplayToggle } from '../common/HasReplayToggle.js';
+import { SortDropdown } from '../common/SortDropdown.js';
 import { SessionFilterRows, SessionSearchField } from '../session-list/SessionFilterParts.js';
 import { DASHBOARD_SORT_OPTIONS } from './dashboardSortOptions.js';
 import type { DashboardSortOption } from './dashboardSortOptions.js';

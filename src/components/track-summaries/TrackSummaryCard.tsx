@@ -1,8 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router';
 import { formatTime } from '../../../shared/domain/formatters.js';
-import { PaceBadge, SectorSplitsRow } from '../common';
-import { CarIdentity, CarLogo } from '../vehicle/index.js';
+import { PaceBadge } from '../common/PaceBadge.js';
+import { SectorSplitsRow } from '../common/SectorSplitsRow.js';
+import { CarIdentity } from '../vehicle/CarIdentity.js';
+import { CarLogo } from '../vehicle/CarLogo.js';
 import { PaceCategory, TrackSummary } from '../../../shared/types/index.js';
 import { TrackCircuitLayout } from '../track-detail/TrackCircuitLayout.js';
 

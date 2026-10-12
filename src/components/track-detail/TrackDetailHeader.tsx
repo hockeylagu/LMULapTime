@@ -1,3 +1,4 @@
+import type { TrackBoundaryGeometry } from '../../../shared/types/trackGeometry.js';
 import React, { useState } from 'react';
 import { Link } from 'react-router';
 import { ArrowLeft, ArrowLeftRight, Car, Info } from 'lucide-react';
@@ -5,7 +6,7 @@ import { TrackCircuitLayout } from './TrackCircuitLayout.js';
 import { VehicleClassPills } from '../common/VehicleClassPills.js';
 import { BenchmarkLadder } from '../common/BenchmarkLadder.js';
 import { CircuitInfoModal } from './CircuitInfoModal.js';
-import { CarLogo } from '../vehicle/index.js';
+import { CarLogo } from '../vehicle/CarLogo.js';
 import { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 import { linkClickHandler } from '../../utils/linkClick.js';
 
@@ -23,7 +24,7 @@ export interface TrackDetailHeaderProps {
   bestLapTimeString?: string | null;
   bestLapCar?: string | null;
   xmlTrackLengthMeters?: number | null;
-  trackGeometry?: import('../replay/map/index.js').TrackBoundaryGeometry | null;
+  trackGeometry?: TrackBoundaryGeometry | null;
 }
 
 export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({

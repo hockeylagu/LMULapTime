@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { useSearchParams } from 'react-router';
-import { SessionList, SessionListItem, pageWindow } from '../../../src/components/session-list/index.js';
+import { SessionList } from '../../../src/components/session-list/SessionList.js';
+import { SessionListItem } from '../../../src/components/session-list/sessionListTypes.js';
+import { pageWindow } from '../../../src/components/session-list/SessionPagination.js';
 import { updateSearchParams } from '../../../src/utils/urlParams.js';
 
 const makeSessions = (count: number): SessionListItem[] =>

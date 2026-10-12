@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { SessionDetail } from '../../../src/components/session-detail/index.js';
+import { SessionDetail } from '../../../src/components/session-detail/SessionDetail.js';
 import { mockDetailedSession } from './mockSessionDetail.js';
 
 describe('SessionDetail component - overview, telemetry & settings', () => {

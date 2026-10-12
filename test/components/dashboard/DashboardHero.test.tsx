@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { DashboardHero } from '../../../src/components/dashboard/DashboardHero.js';
-import type { TrackBoundaryGeometry } from '../../../src/components/replay/map/index.js';
+import type { TrackBoundaryGeometry } from '../../../shared/types/trackGeometry.js';
 import type { SessionSummary } from '../../../src/components/dashboard/Dashboard.js';
 
 describe('DashboardHero', () => {

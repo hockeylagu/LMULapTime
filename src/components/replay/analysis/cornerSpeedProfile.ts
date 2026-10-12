@@ -1,6 +1,6 @@
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { interpolatePointAtDistance } from '../../../utils/replayComparison.js';
-import { CornerSegmentComparison } from '../../../utils/cornerAnalysis/index.js';
+import { CornerSegmentComparison } from '../../../utils/cornerAnalysis/types.js';
 import { HandlingBalanceEvent } from '../../../utils/handlingBalanceDetection.js';
 
 export interface CornerHandlingBand {

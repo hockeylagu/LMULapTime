@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import {
-  computeLapSegmentComparisons,
-  CornerSegmentComparison,
-} from '../../src/utils/cornerAnalysis/index.js';
+import { computeLapSegmentComparisons } from '../../src/utils/cornerAnalysis/segmentComparisons.js';
+import { CornerSegmentComparison } from '../../src/utils/cornerAnalysis/types.js';
 import {
   computeCornerConsistencyStats,
   filterCornerConsistencyStats,

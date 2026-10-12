@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import { LeaderboardPage, findLayoutForTrack } from '../../../src/components/leaderboard/index.js';
+import { LeaderboardPage, findLayoutForTrack } from '../../../src/components/leaderboard/LeaderboardPage.js';
 import type { LeaderboardLayout } from '../../../shared/types/leaderboard.js';
 import { board } from './board/leaderboardFixtures.js';
 

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Car } from 'lucide-react';
 import { SummaryCard, UnitToggle, RankedList, shareOf } from './DashboardSummaryParts.js';
-import { CarLogo } from '../vehicle/index.js';
+import { CarLogo } from '../vehicle/CarLogo.js';
 
 export interface CarsSummaryCardProps {
   rankedCars: { car: string; laps: number; km: number }[];

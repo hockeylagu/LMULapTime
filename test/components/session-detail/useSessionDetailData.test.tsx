@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { SessionDetail } from '../../../src/components/session-detail/index.js';
+import { SessionDetail } from '../../../src/components/session-detail/SessionDetail.js';
 import { useSessionDetailData } from '../../../src/components/session-detail/useSessionDetailData.js';
 import { invalidateReferenceLaptimes } from '../../../src/api/referenceApi.js';
 import { SessionDataContext } from '../../../src/api/sessionDataContext.js';

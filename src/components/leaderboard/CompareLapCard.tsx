@@ -4,8 +4,9 @@ import { computeLapDeltas } from '../../../shared/domain/lapComparison.js';
 import { ReferenceLaptimeEntry, ComparableLap } from '../../../shared/types/index.js';
 import { formatTime } from '../../../shared/domain/formatters.js';
 import { getPaceCategoryFromPercentage } from '../../../shared/domain/paceCategory.js';
-import { PaceBadge, LapStatusBadge } from '../common';
-import { CarIdentity } from '../vehicle/index.js';
+import { PaceBadge } from '../common/PaceBadge.js';
+import { LapStatusBadge } from '../common/LapStatusBadge.js';
+import { CarIdentity } from '../vehicle/CarIdentity.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import { SessionTypeChip } from '../session-list/SessionRowParts.js';
 

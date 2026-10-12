@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { CornerApexChart } from '../../../../src/components/replay/index.js';
-import { CornerSegmentComparison } from '../../../../src/utils/cornerAnalysis/index.js';
+import { CornerApexChart } from '../../../../src/components/replay/analysis/CornerApexChart.js';
+import { CornerSegmentComparison } from '../../../../src/utils/cornerAnalysis/types.js';
 import { ReplayTrajectoryPoint } from '../../../../server/core/types.js';
 
 describe('CornerApexChart', () => {

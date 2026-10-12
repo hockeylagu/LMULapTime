@@ -4,7 +4,8 @@ import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router';
 import userEvent from '@testing-library/user-event';
 import { invalidateReferenceLaptimes } from '../../../src/api/referenceApi.js';
-import { TrackSummaries, TrackSessionSummary } from '../../../src/components/track-summaries/index.js';
+import { TrackSummaries } from '../../../src/components/track-summaries/TrackSummaries.js';
+import { TrackSessionSummary } from '../../../shared/domain/trackSummaryUtils.js';
 
 const render = (ui: ReactNode) => renderComponent(ui, { wrapper: MemoryRouter });
 

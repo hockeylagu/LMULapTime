@@ -1,22 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import {
-  TelemetryRpmChannel,
-  TelemetryLateralOffsetChannel,
-  TelemetryGearChannel,
-  TelemetryThrottleChannel,
-  TelemetryBrakeChannel,
-  TelemetrySteerChannel,
-  TelemetryBrakeTempsChannel,
-  TelemetrySuspPosChannel,
-  TelemetryWheelSpeedsChannel,
-  TelemetryTirePressuresChannel,
-  TelemetryTireWearChannel,
-  TelemetryTireTempsChannel,
-  TelemetryAccelLatChannel,
-  TelemetryAccelLonChannel,
-  TelemetryAccelTotalChannel,
-} from '../../../../src/components/replay/telemetry/index.js';
+import { TelemetryRpmChannel } from '../../../../src/components/replay/telemetry/channels/powertrain/TelemetryRpmChannel.js';
+import { TelemetryLateralOffsetChannel } from '../../../../src/components/replay/telemetry/channels/dynamics/TelemetryLateralOffsetChannel.js';
+import { TelemetryGearChannel } from '../../../../src/components/replay/telemetry/channels/inputs/TelemetryGearChannel.js';
+import { TelemetryThrottleChannel } from '../../../../src/components/replay/telemetry/channels/inputs/TelemetryThrottleChannel.js';
+import { TelemetryBrakeChannel } from '../../../../src/components/replay/telemetry/channels/inputs/TelemetryBrakeChannel.js';
+import { TelemetrySteerChannel } from '../../../../src/components/replay/telemetry/channels/inputs/TelemetrySteerChannel.js';
+import { TelemetryBrakeTempsChannel } from '../../../../src/components/replay/telemetry/channels/tires/TelemetryBrakeTempsChannel.js';
+import { TelemetrySuspPosChannel } from '../../../../src/components/replay/telemetry/channels/dynamics/TelemetrySuspPosChannel.js';
+import { TelemetryWheelSpeedsChannel } from '../../../../src/components/replay/telemetry/channels/tires/TelemetryWheelSpeedsChannel.js';
+import { TelemetryTirePressuresChannel } from '../../../../src/components/replay/telemetry/channels/tires/TelemetryTirePressuresChannel.js';
+import { TelemetryTireWearChannel } from '../../../../src/components/replay/telemetry/channels/tires/TelemetryTireWearChannel.js';
+import { TelemetryTireTempsChannel } from '../../../../src/components/replay/telemetry/channels/tires/TelemetryTireTempsChannel.js';
+import { TelemetryAccelLatChannel } from '../../../../src/components/replay/telemetry/channels/dynamics/TelemetryAccelLatChannel.js';
+import { TelemetryAccelLonChannel } from '../../../../src/components/replay/telemetry/channels/dynamics/TelemetryAccelLonChannel.js';
+import { TelemetryAccelTotalChannel } from '../../../../src/components/replay/telemetry/channels/dynamics/TelemetryAccelTotalChannel.js';
 import { ReplayTrajectoryPoint } from '../../../../server/core/types.js';
 import { computeTelemetryChartPaths } from '../../../../src/components/replay/telemetry/telemetryChartPaths.js';
 import { TelemetryChannelRenderer } from '../../../../src/components/replay/telemetry/TelemetryChannelRenderer.js';

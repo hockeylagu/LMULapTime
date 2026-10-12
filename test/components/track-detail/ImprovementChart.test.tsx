@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { buildPersonalBestSeries, calculateLapPrDelta, ImprovementChart } from '../../../src/components/track-detail/improvement-chart/index.js';
+import { buildPersonalBestSeries, calculateLapPrDelta } from '../../../src/components/track-detail/improvement-chart/improvementChartUtils.js';
+import { ImprovementChart } from '../../../src/components/track-detail/improvement-chart/ImprovementChart.js';
 
 describe('ImprovementChart component', () => {
   it('builds a personal-best series that never increases over time', () => {

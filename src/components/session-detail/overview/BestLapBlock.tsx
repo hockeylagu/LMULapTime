@@ -3,7 +3,7 @@ import { ChevronRight } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router';
 import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import { formatTime } from '../../../../shared/domain/formatters.js';
-import { PaceBadge } from '../../common/index.js';
+import { PaceBadge } from '../../common/PaceBadge.js';
 import { sessionLapComparePath, sessionTelemetryPath } from '../sessionDetailHelpers.js';
 
 export interface BestLapBlockProps {

@@ -1,5 +1,8 @@
 import React from 'react';
-import { SessionTypePills, HideEmptyToggle, HasReplayToggle, SortDropdown } from '../common';
+import { SessionTypePills } from '../common/SessionTypePills.js';
+import { HideEmptyToggle } from '../common/HideEmptyToggle.js';
+import { HasReplayToggle } from '../common/HasReplayToggle.js';
+import { SortDropdown } from '../common/SortDropdown.js';
 import { SessionFilterRows, SessionSearchField } from '../session-list/SessionFilterParts.js';
 import { TRACK_DETAIL_SORT_OPTIONS } from './trackDetailSortOptions.js';
 import type { TrackDetailSortOption } from './trackDetailSortOptions.js';

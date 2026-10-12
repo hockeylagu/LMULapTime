@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { ReplayInspectorModal, ConsistencyPanel } from '../../../../src/components/replay/index.js';
+import { ReplayInspectorModal } from '../../../../src/components/replay/inspector/ReplayInspectorContent.js';
+import { ConsistencyPanel } from '../../../../src/components/replay/analysis/ConsistencyPanel.js';
 
 vi.mock('recharts', () => {
   return {

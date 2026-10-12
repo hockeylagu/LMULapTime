@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { Navbar } from '../../../src/components/navbar/index.js';
+import { Navbar } from '../../../src/components/navbar/Navbar.js';
 
 describe('Navbar component', () => {
   it('shows replay and DuckDB progress together while keeping the session count visible', () => {

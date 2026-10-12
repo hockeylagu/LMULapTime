@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeTelemetryChartPaths, DeltaGradientStop } from '../../../../src/components/replay/index.js';
+import { computeTelemetryChartPaths, DeltaGradientStop } from '../../../../src/components/replay/telemetry/telemetryChartPaths.js';
 import { ReplayTrajectoryPoint } from '../../../../server/core/types.js';
 import { PointComparison } from '../../../../src/utils/replayComparison.js';
 import { getTrajectoryDistances } from '../../../../src/utils/lapAlignment.js';

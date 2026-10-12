@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ImprovementPaceChart, ImprovementChartPoint } from '../../../src/components/track-detail/improvement-chart/index.js';
+import { ImprovementPaceChart } from '../../../src/components/track-detail/improvement-chart/ImprovementPaceChart.js';
+import { ImprovementChartPoint } from '../../../src/components/track-detail/improvement-chart/improvementChartTypes.js';
 
 describe('ImprovementPaceChart legend toggle', () => {
   const samplePoints: ImprovementChartPoint[] = [

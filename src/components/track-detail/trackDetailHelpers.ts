@@ -1,7 +1,7 @@
 import { ReferenceLaptimeEntry, PaceCategory } from '../../../shared/types/index.js';
 import { getPaceCategoryFromPercentage } from '../../../shared/domain/paceCategory.js';
 import { parseDateStringToTimestamp, computeTheoreticalGap } from '../../../shared/domain/formatters.js';
-import { SessionProgressionPoint } from './improvement-chart/index.js';
+import { SessionProgressionPoint } from './improvement-chart/improvementChartTypes.js';
 
 export interface SessionMeta {
   id: string;

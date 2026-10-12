@@ -1,7 +1,7 @@
 import React from 'react';
 import { Check, CloudRain } from 'lucide-react';
 import { ComparableLap } from '../../../../../shared/types/index.js';
-import { CarIdentity } from '../../../vehicle/index.js';
+import { CarIdentity } from '../../../vehicle/CarIdentity.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 
 export interface ReplayCompareLapRowProps {

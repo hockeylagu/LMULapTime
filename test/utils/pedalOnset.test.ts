@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import {
-  findThresholdCrossingDistM,
-  THROTTLE_ON_MIN_HOLD_SEC,
-  THROTTLE_ON_THRESHOLD_PCT,
-} from '../../src/utils/cornerAnalysis/index.js';
+import { findThresholdCrossingDistM, THROTTLE_ON_MIN_HOLD_SEC, THROTTLE_ON_THRESHOLD_PCT } from '../../src/utils/cornerAnalysis/helpers.js';
 import { ReplayTrajectoryPoint } from '../../server/core/types.js';
 
 // A lap at a steady 20 m/s sampled every dtSec: distance = 20 * time.

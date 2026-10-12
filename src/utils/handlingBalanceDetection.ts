@@ -1,5 +1,5 @@
 import { ReplayTrajectoryPoint } from '../../shared/types/index.js';
-import { CornerSegmentComparison } from './cornerAnalysis/index.js';
+import { CornerSegmentComparison } from './cornerAnalysis/types.js';
 import { PointComparison } from './replayComparison.js';
 import { getTrajectoryDistances } from './lapAlignment.js';
 import { evaluateHandlingEvidence, handlingAdvice, SIGNIFICANT_HANDLING_LOSS_SEC } from './handlingBalance/evidence.js';

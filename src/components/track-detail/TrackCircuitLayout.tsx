@@ -1,10 +1,7 @@
 import React, { useMemo } from 'react';
-import {
-  useTrackBoundaryGeometry,
-  projectBoundaryPoints,
-  computeTrackBoundaryPathD,
-  TrackBoundaryGeometry,
-} from '../replay/map/index.js';
+import { useTrackBoundaryGeometry } from '../replay/map/useTrackBoundaryGeometry.js';
+import { projectBoundaryPoints, computeTrackBoundaryPathD } from '../replay/map/replayMapUtils.js';
+import { TrackBoundaryGeometry } from '../../../shared/types/trackGeometry.js';
 import { CIRCUIT_SPECIFICATIONS } from '../../../shared/domain/circuitDefinitions.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';

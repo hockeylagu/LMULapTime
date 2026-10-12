@@ -2,7 +2,7 @@ import { afterEach, describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { TrackCircuitLayout } from '../../../src/components/track-detail/TrackCircuitLayout.js';
 import { TrackDetailHeader } from '../../../src/components/track-detail/TrackDetailHeader.js';
-import { TrackBoundaryGeometry } from '../../../src/components/replay/map/index.js';
+import { TrackBoundaryGeometry } from '../../../shared/types/trackGeometry.js';
 import * as trackGeometryApi from '../../../src/api/trackGeometryApi.js';
 
 describe('TrackCircuitLayout', () => {

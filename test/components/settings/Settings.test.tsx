@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import { Settings } from '../../../src/components/settings/index.js';
+import { Settings } from '../../../src/components/settings/Settings.js';
 import type { ScanStatus } from '../../../server/core/types.js';
 
 /** The replay list has loaded once the status strip shows its replay figure. */

@@ -1,8 +1,9 @@
 import React from 'react';
 import { Link } from 'react-router';
 import { isSessionEmpty, getDisplayTrackName } from '../../../shared/domain/formatters.js';
-import { PaceBadge, ReplayIndicator } from '../common/index.js';
-import { CarIdentity } from '../vehicle/index.js';
+import { PaceBadge } from '../common/PaceBadge.js';
+import { ReplayIndicator } from '../common/replay/ReplayIndicator.js';
+import { CarIdentity } from '../vehicle/CarIdentity.js';
 import { SessionListItem } from './sessionListTypes.js';
 import { sessionReplayUrl } from './sessionReplayUrl.js';
 import { SessionTypeChip, FinishPosition, EmptyChip } from './SessionRowParts.js';

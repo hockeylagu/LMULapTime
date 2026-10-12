@@ -1,7 +1,7 @@
 import React from 'react';
 import { DriverSafetySummary } from './DriverSafetySummary.js';
 import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
-import { CarIdentity } from '../../vehicle/index.js';
+import { CarIdentity } from '../../vehicle/CarIdentity.js';
 import { formatElapsedSeconds, formatTime } from '../../../../shared/domain/formatters.js';
 
 export interface SessionRaceStandingsRowProps {

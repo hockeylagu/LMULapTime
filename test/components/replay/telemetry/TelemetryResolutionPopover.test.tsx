@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { TelemetryResolutionPopover } from '../../../../src/components/replay/index.js';
+import { TelemetryResolutionPopover } from '../../../../src/components/replay/telemetry/TelemetryResolutionPopover.js';
 
 describe('TelemetryResolutionPopover', () => {
   it('does not render when isOpen is false', () => {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
-import { LapStatusBadge } from '../../common/index.js';
+import { LapStatusBadge } from '../../common/LapStatusBadge.js';
 import { LMU_COLORS, SECTOR_COLORS, TELEMETRY_COLORS, WHEEL_CORNER_COLORS } from '../../../utils/themeColors.js';
 
 /** The series' line color as a short stroke before its value; the text stays white so it reads on the dark card. */

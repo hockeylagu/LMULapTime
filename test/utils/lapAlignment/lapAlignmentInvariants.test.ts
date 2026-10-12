@@ -11,7 +11,8 @@ import {
   getTrajectoryDistances,
   interpolateScalarAtDistance,
 } from '../../../src/utils/lapAlignment.js';
-import { BRAKE_ON_THRESHOLD_PCT, CornerSegmentComparison, LapSegmentComparison } from '../../../src/utils/cornerAnalysis/index.js';
+import { BRAKE_ON_THRESHOLD_PCT } from '../../../src/utils/cornerAnalysis/helpers.js';
+import { CornerSegmentComparison, LapSegmentComparison } from '../../../src/utils/cornerAnalysis/types.js';
 import { projectTrajectoryPoints } from '../../../src/components/replay/map/replayMapUtils.js';
 import { cutLapAtLine } from '../../../server/tracks/lapLineCut.js';
 import {

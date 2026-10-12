@@ -6,17 +6,9 @@ import {
   getDistancesInReferenceFrame,
 } from './lapAlignment.js';
 import { unwrapAngle } from './computedTelemetry.js';
-import {
-  computeLapSegmentComparisons,
-  CornerSegmentComparison,
-  findThresholdCrossingDistM,
-  getHeadingAtDistance,
-  BRAKE_ON_THRESHOLD_PCT,
-  BRAKE_ONSET_LOOKBACK_M,
-  THROTTLE_ON_THRESHOLD_PCT,
-  THROTTLE_ON_MIN_HOLD_SEC,
-  throttleOnsetLookbackM,
-} from './cornerAnalysis/index.js';
+import { computeLapSegmentComparisons } from './cornerAnalysis/segmentComparisons.js';
+import { CornerSegmentComparison } from './cornerAnalysis/types.js';
+import { findThresholdCrossingDistM, getHeadingAtDistance, BRAKE_ON_THRESHOLD_PCT, BRAKE_ONSET_LOOKBACK_M, THROTTLE_ON_THRESHOLD_PCT, THROTTLE_ON_MIN_HOLD_SEC, throttleOnsetLookbackM } from './cornerAnalysis/helpers.js';
 
 export interface LapMetricSample {
   lapNumber: number;

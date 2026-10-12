@@ -5,7 +5,7 @@ import type { ReferenceLaptimeEntry } from '../../../../shared/types/index.js';
 import type { LeaderboardEntry } from '../../../../shared/types/leaderboard.js';
 import { formatTime } from '../../../../shared/domain/formatters.js';
 import { PaceBadge } from '../../common/PaceBadge.js';
-import { CarLogo } from '../../vehicle/index.js';
+import { CarLogo } from '../../vehicle/CarLogo.js';
 import type { LeaderboardRow as Row } from './leaderboardRows.js';
 import { benchmarkPace, formatDrivenAgo, formatGap } from './leaderboardFormat.js';
 import { boardLapTelemetryRef } from './leaderboardLaps.js';

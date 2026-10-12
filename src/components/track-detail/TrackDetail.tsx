@@ -1,16 +1,18 @@
+import type { TrackBoundaryGeometry } from '../../../shared/types/trackGeometry.js';
 import React from 'react';
 import { Link } from 'react-router';
 import { formatTime, compareSessions, compareSessionsBySortOption, isSessionEmpty } from '../../../shared/domain/formatters.js';
 import { matchesSessionCarClass } from '../../../shared/domain/vehicleMapping.js';
 import { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
-import { ImprovementChart, SessionProgressionPoint } from './improvement-chart/index.js';
+import { ImprovementChart } from './improvement-chart/ImprovementChart.js';
+import { SessionProgressionPoint } from './improvement-chart/improvementChartTypes.js';
 import { TrackDetailHeader } from './TrackDetailHeader.js';
 import { TrackSessionsCard } from './TrackSessionsCard.js';
 import { TrackDetailSortOption } from './TrackSessionsToolbar.js';
 import { SessionMeta, getPaceCategoryForLap, getSessionBestLapPace, buildTrackProgression } from './trackDetailHelpers.js';
 import { useTrackDetailState } from './useTrackDetailState.js';
 import { useSessionViewMode } from '../session-list/useSessionViewMode.js';
-import { LoadingState } from '../common/index.js';
+import { LoadingState } from '../common/LoadingState.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import { linkClickHandler } from '../../utils/linkClick.js';
 
@@ -24,7 +26,7 @@ export interface TrackDetailProps {
   selectedCarClass: string;
   setSelectedCarClass: (carClass: string) => void;
   progression?: SessionProgressionPoint[];
-  trackGeometry?: import('../replay/map/index.js').TrackBoundaryGeometry | null;
+  trackGeometry?: TrackBoundaryGeometry | null;
 }
 
 export const TrackDetail: React.FC<TrackDetailProps> = ({

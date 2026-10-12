@@ -1,7 +1,7 @@
 import React from 'react';
 import type { CompareLapPagination } from './compare/CompareLapPagination.js';
 import { ReplayDriverEntry, ReplayLapSummary, ReplayMetadata, ReplayTrajectoryData, ReplayTrajectoryPoint, ComparableLap } from '../../../../shared/types/index.js';
-import { CornerSegmentComparison, LapSegmentComparison } from '../../../utils/cornerAnalysis/index.js';
+import { CornerSegmentComparison, LapSegmentComparison } from '../../../utils/cornerAnalysis/types.js';
 import { CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
 import { LapConsistencyStats } from '../../../utils/lapConsistency.js';
 import type { LapConsistencyOption } from '../analysis/LapSelectorDropdown.js';

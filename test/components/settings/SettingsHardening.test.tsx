@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
-import { Settings } from '../../../src/components/settings/index.js';
+import { Settings } from '../../../src/components/settings/Settings.js';
 import { OverviewCard } from '../../../src/components/settings/OverviewCard.js';
 import { FeedbackMessage } from '../../../src/components/settings/SettingsPanel.js';
 import type { AppStatus, ScanStatus } from '../../../shared/types/index.js';

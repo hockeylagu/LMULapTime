@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
-import { Settings } from '../../../src/components/settings/index.js';
+import { Settings } from '../../../src/components/settings/Settings.js';
 import { SETTINGS_SECTIONS } from '../../../src/components/settings/settingsSections.js';
 import type { AppStatus } from '../../../shared/types/index.js';
 
