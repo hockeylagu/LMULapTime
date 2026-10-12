@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { SessionDatabase } from '../../../../server/core/db.js';
 import { getReplayConditions, getReplayLaps } from '../../../../server/core/replay/dbReplayLapStore.js';
-import { replayFailureStatus } from '../../../../server/core/replay/dbReplayIngestStore.js';
+import { MAX_DECODE_ATTEMPTS, replayFailureStatus } from '../../../../server/core/replay/dbReplayIngestStore.js';
 import { storeReplayTrajectoryInWorker, storeReplayDriversInWorker } from '../../../../server/replay/worker/replayTrajectoryWorkerClient.js';
 import { extractReplayTrajectory } from '../../../../server/replay/decode/replayTrajectory.js';
 import { parseReplayMetadata } from '../../../../server/replay/decode/replayParser.js';
@@ -114,6 +114,103 @@ describe('worker SQLite persistence', () => {
     expect(singleResult.driverSlot).toBe(1);
   });
 
+  it('promotes an explicit request result to primary without another decode or blob write', async () => {
+    const owner = storeReplayTrajectoryInWorker(db, filePath, { driverSlot: 1 }, {
+      filename, mtime, size, driverSlotKey: 1, isPrimary: false,
+    });
+    const ownerFirst = await owner.next();
+    const batch = storeReplayDriversInWorker(db, filePath, { playerName: 'Samuel Lague' }, {
+      filename, mtime, size, driverSlots: [1], includePrimary: true,
+    });
+    const batchFirst = await batch.next();
+    await drain(owner, ownerFirst, []);
+    const rows = () => db.getDb().prepare('SELECT * FROM replay_trajectories WHERE filename = ? ORDER BY driver_slot, lap_key').all(filename);
+    const before = rows();
+    const progress: string[] = [];
+    const result = await drain(batch, batchFirst, progress);
+    expect(result.drivers).toEqual([expect.objectContaining({ driverSlotKey: 1, isPrimary: true })]);
+    expect(progress).not.toContain('Initializing binary frame stream');
+    expect(rows()).toEqual(before);
+    expect(db.getStoredReplayTrajectory(filename, -1, -1)?.driverSlot).toBe(1);
+    expect(db.getReplayDriverIngest(filename, -1)?.status).toBe('stored');
+  });
+
+  it('reuses an already cached primary before starting a worker', async () => {
+    await store(db, filePath, mtime, size);
+    db.getDb().exec('DELETE FROM replay_trajectory_defaults WHERE driver_slot = -1; DELETE FROM replay_ingest_drivers WHERE driver_slot = -1');
+    const batch = storeReplayDriversInWorker(db, filePath, { playerName: 'Samuel Lague' }, {
+      filename, mtime, size, driverSlots: [1], includePrimary: true,
+    });
+    const progress: string[] = [];
+    const result = await drain(batch, await batch.next(), progress);
+    expect(progress).not.toContain('Initializing binary frame stream');
+    expect(result.drivers).toEqual([expect.objectContaining({ driverSlotKey: 1, isPrimary: true })]);
+    expect(db.getStoredReplayTrajectory(filename, -1, -1)?.driverSlot).toBe(1);
+  });
+
+  it.each(['stored', 'failed'] as const)('switches a settled %s primary alias to the configured cached driver without decoding', async (status) => {
+    const first = db.syncReplaysAsyncIterator(directory, { playerName: 'Samuel Lague' });
+    let step = await first.next();
+    while (!step.done) step = await first.next();
+    expect(db.getStoredReplayTrajectory(filename, -1, -1)?.driverSlot).toBe(1);
+    const playerName = db.getStoredReplayMetadata(filename)?.drivers.find(driver => driver.slot === 2)?.name;
+    expect(playerName).toBeDefined();
+    if (status === 'failed') {
+      for (let attempt = 0; attempt < MAX_DECODE_ATTEMPTS; attempt++) db.recordReplayDriverIngest(filename, -1, mtime, size, 'failed', 'Old player failure');
+    }
+    const rows = () => db.getDb().prepare('SELECT * FROM replay_trajectories WHERE filename = ? ORDER BY driver_slot, lap_key').all(filename);
+    const before = rows();
+    const next = db.syncReplaysAsyncIterator(directory, { playerName });
+    let switched = await next.next();
+    while (!switched.done) switched = await next.next();
+    expect(switched.value.updated).toBe(1);
+    expect(rows()).toEqual(before);
+    expect(db.getStoredReplayTrajectory(filename, -1, -1)?.driverSlot).toBe(2);
+    expect(db.getReplayDriverIngest(filename, -1)?.status).toBe('stored');
+  });
+
+  it('ingests explicit drivers with no guessed primary and does not queue them again', async () => {
+    const sync = db.syncReplaysAsyncIterator(directory, { playerName: 'Missing Player' });
+    let synced = await sync.next();
+    while (!synced.done) synced = await sync.next();
+    expect(db.getStoredReplayTrajectory(filename, 1, -1)).not.toBeNull();
+    expect(db.getStoredReplayTrajectory(filename, -1, -1)).toBeNull();
+    expect(db.getReplayDriverIngest(filename, -1)).toBeNull();
+    const repeat = db.syncReplaysAsyncIterator(directory, { playerName: 'Missing Player' });
+    let step = await repeat.next();
+    const stages: string[] = [];
+    while (!step.done) { stages.push(step.value.stage ?? ''); step = await repeat.next(); }
+    expect(stages).not.toContain('Verifying trajectory cache');
+    expect(step.value).toMatchObject({ added: 0, updated: 0 });
+    await expect(new ReplayRecordingService(db).getFullTrajectory(filePath, filename, { playerName: 'Missing Player' }))
+      .rejects.toThrow('no recorded laps');
+  });
+
+  it.each(['source', 'metadata'])('rejects primary promotion after the %s version changes', async (changed) => {
+    await store(db, filePath, mtime, size);
+    db.getDb().exec('DELETE FROM replay_trajectory_defaults WHERE driver_slot = -1; DELETE FROM replay_ingest_drivers WHERE driver_slot = -1');
+    if (changed === 'source') fs.appendFileSync(filePath, Buffer.alloc(1));
+    else db.getDb().prepare('UPDATE replay_metadata SET file_size = file_size + 1 WHERE filename = ?').run(filename);
+    expect(() => db.promoteReplayPrimary(filename, filePath, mtime, size, 1)).toThrow('Replay source changed');
+    expect(db.getStoredReplayTrajectory(filename, -1, -1)).toBeNull();
+    expect(db.getStoredReplayTrajectory(filename, 1, -1)).not.toBeNull();
+  });
+
+  it('requires the current decoder version and rolls back failed alias publication', async () => {
+    await store(db, filePath, mtime, size);
+    db.getDb().exec(`DELETE FROM replay_trajectory_defaults WHERE driver_slot = -1;
+      DELETE FROM replay_ingest_drivers WHERE driver_slot = -1;
+      UPDATE replay_trajectories SET parser_version = 'v4'`);
+    expect(db.promoteReplayPrimary(filename, filePath, mtime, size, 1)).toBe(false);
+    db.getDb().prepare('UPDATE replay_trajectories SET parser_version = ?').run(REPLAY_CACHE_VERSION);
+    db.getDb().exec(`CREATE TRIGGER reject_primary BEFORE INSERT ON replay_ingest_drivers
+      WHEN NEW.driver_slot = -1 BEGIN SELECT RAISE(ABORT, 'injected alias failure'); END`);
+    expect(() => db.promoteReplayPrimary(filename, filePath, mtime, size, 1)).toThrow('injected alias failure');
+    expect(db.getStoredReplayTrajectory(filename, -1, -1)).toBeNull();
+    expect(db.getReplayDriverIngest(filename, -1)).toBeNull();
+    expect(db.getStoredReplayTrajectory(filename, 1, -1)).not.toBeNull();
+  });
+
   it('releases a waiter canceled just after its owner grants the file lease', async () => {
     const owner = storeReplayTrajectoryInWorker(db, filePath, { driverSlot: 1 }, {
       filename, mtime, size, driverSlotKey: 1, isPrimary: false,
@@ -163,6 +260,24 @@ describe('worker SQLite persistence', () => {
     expect(ownerProgress.filter(stage => stage === 'Initializing binary frame stream')).toHaveLength(1);
     expect(waiterProgress.filter(stage => stage === 'Initializing binary frame stream')).toHaveLength(0);
     db.getDb().exec('DROP TRIGGER reject_concurrent_save');
+  });
+
+  it('shares a failed explicit driver with a primary-only waiter', async () => {
+    db.getDb().exec(`CREATE TRIGGER reject_primary_slot BEFORE INSERT ON replay_trajectories
+      WHEN NEW.driver_slot = 1 BEGIN SELECT RAISE(ABORT, 'injected primary failure'); END`);
+    const owner = storeReplayTrajectoryInWorker(db, filePath, { driverSlot: 1 }, {
+      filename, mtime, size, driverSlotKey: 1, isPrimary: false,
+    });
+    const ownerFirst = await owner.next();
+    const batch = storeReplayDriversInWorker(db, filePath, { playerName: 'Samuel Lague' }, {
+      filename, mtime, size, driverSlots: [], includePrimary: true,
+    });
+    const batchFirst = await batch.next();
+    await expect(drain(owner, ownerFirst, [])).rejects.toThrow('injected primary failure');
+    const progress: string[] = [];
+    const result = await drain(batch, batchFirst, progress);
+    expect(progress).not.toContain('Initializing binary frame stream');
+    expect(result).toMatchObject({ drivers: [], failures: [{ driverSlotKey: 1, isPrimary: true, message: 'injected primary failure' }] });
   });
 
   it.each([false, true])('preserves a failed slot across an unrelated waiter (canceled: %s)', async (cancelUnrelated) => {

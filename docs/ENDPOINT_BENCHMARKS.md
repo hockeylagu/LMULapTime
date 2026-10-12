@@ -1,5 +1,15 @@
 # Endpoint performance history
 
+## Primary-driver resolution and cached promotion — 2026-10-12
+
+Five-sample before/after sweeps used the same dataset (`fd7875490434`) and cohort. The first
+after run flagged one session-detail median (+20.4%, +17.94 ms); a second isolated sweep did
+not reproduce any regression against the original baseline above the >20% and >5 ms threshold.
+These cached endpoints do not exercise missing-primary ingestion. Worker regressions verify
+that an existing explicit driver is promoted to primary without another stream scan or lap-blob
+rewrite, including a configured-player change. No cached-endpoint latency improvement is claimed.
+Local baseline and both follow-ups are retained in `.cache/primary-before/history/`.
+
 ## GPS timeline result transfer — 2026-10-12
 
 Five-sample before/after endpoint sweeps used identical dataset/cohort and showed no regression

@@ -42,6 +42,8 @@ export interface ReplayUpgradeResult {
 
 export interface ReplayUpgradeHost {
   getDbPath(): string;
+  getReplayMetadataCache(filename: string, mtime: number, size: number, filePath?: string): ReplayMetadata | null;
+  promoteReplayPrimary(filename: string, filePath: string, mtime: number, size: number, driverSlotKey: number): boolean;
   getReplayDriverIngest(filename: string, driverSlot: number): ReplayDriverIngest | null;
   getReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): ReplayTrajectoryData | null;
   hasValidReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): boolean;

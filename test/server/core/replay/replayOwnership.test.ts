@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { SessionDatabase } from '../../../../server/core/db.js';
 import { initReplayMatchingSchema } from '../../../../server/core/replay/dbReplayMatchingStore.js';
 import type { ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
+import { resolveReplayPrimarySlot } from '../../../../server/replay/decode/replayParser.js';
 
 const databases: SessionDatabase[] = [];
 afterEach(() => { for (const db of databases.splice(0)) db.close(); });
@@ -20,6 +21,17 @@ function metadata(): ReplayMetadata {
 }
 
 describe('retained replay identity reconciliation', () => {
+  it('resolves only a unique primary and never falls back from an explicit unmatched name', () => {
+    const meta = metadata();
+    expect(resolveReplayPrimarySlot(meta)).toBe(1);
+    expect(resolveReplayPrimarySlot(meta, ' ANN ')).toBe(2);
+    expect(resolveReplayPrimarySlot(meta, 'Missing')).toBeUndefined();
+    expect(resolveReplayPrimarySlot(meta, '')).toBeUndefined();
+    meta.drivers.push({ name: 'Ann', slot: 3 });
+    expect(resolveReplayPrimarySlot(meta, 'Ann')).toBeUndefined();
+    meta.drivers[1].isPlayer = true;
+    expect(resolveReplayPrimarySlot(meta)).toBeUndefined();
+  });
   it('repairs list ownership before on-demand reads and preserves explicit driver recordings', () => {
     const db = database();
     const meta = metadata();

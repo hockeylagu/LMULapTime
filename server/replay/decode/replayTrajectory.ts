@@ -13,7 +13,7 @@ import {
   ReplayLapSummary,
   ReplayWeatherEvent,
 } from '../../core/types.js';
-import { detectPlayerName, parseReplayMetadata } from './replayParser.js';
+import { detectPlayerName, parseReplayMetadata, resolveReplayPrimarySlot } from './replayParser.js';
 import {
   RawTrajectoryPoint,
   VcrTimingEvent,
@@ -140,12 +140,14 @@ export function* extractReplayDriverTrajectories(
       if (matches.length === 1 && typeof matches[0].slot === 'number') targetSlot = matches[0].slot;
     }
 
-    // Default requests can use a uniquely marked player; explicit unresolved requests stay empty.
+    // Resolve a default from unique player identity; explicit requests retain their own slot/name.
     if (targetSlot === undefined && options.driverSlot === undefined && !options.driverName) {
-      const players = meta.drivers.filter(d => d.isPlayer);
-      if (players.length === 1 && typeof players[0].slot === 'number') targetSlot = players[0].slot;
+      targetSlot = resolveReplayPrimarySlot(meta, effectivePlayerName);
     }
     if (options.driverName && targetSlot === undefined) throw new Error(`Replay driver "${options.driverName}" is unavailable`);
+    if (targetSlot === undefined && (!options.driverSlots || options.includePrimary)) {
+      throw new Error('Replay primary driver is unavailable; select an explicit driver');
+    }
     if (!options.driverSlots && options.driverSlot !== undefined && !meta.drivers.some(driver => driver.slot === options.driverSlot)) {
       throw new Error(`Replay driver slot ${options.driverSlot} is unavailable`);
     }

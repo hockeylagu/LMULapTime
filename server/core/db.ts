@@ -132,7 +132,7 @@ import {
   getTelemetrySessionCandidatesStartingBetween,
 } from './dbReconciliationStore.js';
 import type { ReplayMatchTarget } from '../sessions/replayMatching.js';
-import { replaceReplayDriverLaps } from './replay/dbReplayDriverStore.js';
+import { promoteReplayPrimary, replaceReplayDriverLaps } from './replay/dbReplayDriverStore.js';
 import { loadSessions } from './sessionRows/access.js';
 import { classifySessionConditions, reclassifyStoredSessions } from './dbSessionConditions.js';
 import {
@@ -321,8 +321,8 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     return getReplayLapEdges(this.db, filename, driverSlot, lapKey, points);
   }
 
-  public hasValidReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): boolean {
-    return hasValidReplayTrajectoryCache(this.db, filename, driverSlot, lapKey, mtime, size, filePath);
+  public hasValidReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string, expectedDriverSlot?: number): boolean {
+    return hasValidReplayTrajectoryCache(this.db, filename, driverSlot, lapKey, mtime, size, filePath, expectedDriverSlot);
   }
 
   /** Which stored laps a replay's race positions index is built from (see dbRacePositionStore). */
@@ -377,6 +377,10 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
 
   public getReplayDriverIngest(filename: string, driverSlot: number): ReplayDriverIngest | null {
     return getReplayDriverIngest(this.db, filename, driverSlot);
+  }
+
+  public promoteReplayPrimary(filename: string, filePath: string, mtime: number, size: number, driverSlotKey: number): boolean {
+    return promoteReplayPrimary(this.db, { filename, filePath, mtime, size, driverSlotKey });
   }
 
   public recordReplayDriverIngest(filename: string, driverSlot: number, mtime: number, size: number, status: ReplayDriverIngestStatus, error?: string | null): void {

@@ -71,6 +71,15 @@ export interface ParseReplayMetadataOptions {
   scanWeather?: boolean;
 }
 
+/** Use a unique configured name, or one marked player when no name was supplied. */
+export function resolveReplayPrimarySlot(metadata: Pick<ReplayMetadata, 'drivers'>, playerName?: string): number | undefined {
+  const target = playerName?.trim().toLowerCase();
+  const matches = playerName !== undefined
+    ? metadata.drivers.filter(driver => Boolean(target) && driver.name.trim().toLowerCase() === target)
+    : metadata.drivers.filter(driver => driver.isPlayer);
+  return matches.length === 1 && typeof matches[0].slot === 'number' && matches[0].slot >= 0 ? matches[0].slot : undefined;
+}
+
 /**
  * Fast sampling scan for track meteorology & surface wetness across the replay frame stream.
  * Samples ~30 windows across the stream to detect rain conditions in <25ms.

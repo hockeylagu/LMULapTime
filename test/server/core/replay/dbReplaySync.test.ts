@@ -35,7 +35,7 @@ describe('Replay startup sync pipeline', () => {
     });
     const jobs: ReplayIngestJob[] = [];
     const run = async () => {
-      const iterator = db.syncReplaysAsyncIterator(dir, { retryFailed: true, onReplayState: (job) => jobs.push(job) });
+      const iterator = db.syncReplaysAsyncIterator(dir, { playerName: 'Player', retryFailed: true, onReplayState: (job) => jobs.push(job) });
       let step = await iterator.next();
       while (!step.done) step = await iterator.next();
     };

@@ -198,8 +198,11 @@ export function hasValidReplayTrajectoryCache(
   lapKey: number,
   mtime: number,
   size: number,
-  filePath?: string
+  filePath?: string,
+  expectedDriverSlot?: number,
 ): boolean {
+  if (expectedDriverSlot !== undefined && driverSlot === -1 &&
+      resolveTrajectoryKey(db, filename, driverSlot, lapKey)?.driverSlot !== expectedDriverSlot) return false;
   const literal = db.prepare(
     'SELECT file_mtime, file_size, source_path, parser_version FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key = ?'
   ).get(filename, driverSlot, lapKey) as Omit<TrajectoryRow, 'trajectory_br'> | undefined;

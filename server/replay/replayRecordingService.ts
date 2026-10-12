@@ -1,6 +1,6 @@
 import fs from 'fs';
 import { SessionDatabase } from '../core/db.js';
-import { parseReplayMetadata } from './decode/replayParser.js';
+import { parseReplayMetadata, resolveReplayPrimarySlot } from './decode/replayParser.js';
 import { storeReplayTrajectoryInWorker } from './worker/replayTrajectoryWorkerClient.js';
 import { settledReplayFailure } from '../core/replay/dbReplayIngestStore.js';
 import { recordDriverFailure } from '../core/replay/dbReplaySync.js';
@@ -50,21 +50,6 @@ export class ReplayRecordingService {
     }
   }
 
-  private resolvePlayerSlot(filePath: string, replayName: string, playerName?: string, snapshot?: ReplayMetadata): number | undefined {
-    try {
-      const drivers = (snapshot ?? this.getMetadata(filePath, replayName, playerName)).drivers;
-      if (playerName?.trim()) {
-        const name = playerName.trim().toLowerCase();
-        const matches = drivers.filter(driver => driver.name.trim().toLowerCase() === name);
-        return matches.length === 1 ? matches[0].slot : undefined;
-      }
-      const players = drivers.filter(driver => driver.isPlayer);
-      return players.length === 1 ? players[0].slot : undefined;
-    } catch {
-      return undefined;
-    }
-  }
-
   public async getFullTrajectory(
     filePath: string,
     replayName: string,
@@ -87,7 +72,7 @@ export class ReplayRecordingService {
       ? options.driverSlot
       : options.driverName?.trim()
         ? metadata && this.resolveDriverSlot(filePath, replayName, options.driverName, options.playerName, metadata)
-        : metadata && this.resolvePlayerSlot(filePath, replayName, options.playerName, metadata);
+        : metadata && resolveReplayPrimarySlot(metadata, options.playerName);
     if (resolvedSlot === undefined) {
       throw new ReplayDriverNotRecordedError(-1, replayName);
     }

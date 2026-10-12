@@ -4,7 +4,7 @@ import type { ReplayIngestJob } from '../types.js';
 import path from 'path';
 import { ReplayMetadata, ReplayTrajectoryData } from '../types.js';
 import { ReplaySyncProgress, ReplaySyncResult } from '../dbSchema.js';
-import { parseReplayMetadata } from '../../replay/decode/replayParser.js';
+import { parseReplayMetadata, resolveReplayPrimarySlot } from '../../replay/decode/replayParser.js';
 import { extractReplayTrajectory } from '../../replay/decode/replayTrajectory.js';
 import { storeReplayDriversInWorker } from '../../replay/worker/replayTrajectoryWorkerClient.js';
 import { isReplayDriverSettled, ReplayDriverIngest, ReplayDriverIngestStatus, replayErrorMessage, replayFailureStatus, settledReplayFailure } from './dbReplayIngestStore.js';
@@ -27,12 +27,13 @@ export interface ReplaySyncHost {
   getReplaysCount(): number;
   getReplayMetadataCache(filename: string, mtime: number, size: number, filePath?: string): ReplayMetadata | null;
   upsertReplayMetadataCache(filename: string, filePath: string, mtime: number, size: number, metadata: ReplayMetadata): void;
-  hasValidReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): boolean;
+  hasValidReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string, expectedDriverSlot?: number): boolean;
   recordIngestError(sourceType: string, sourcePath: string, error: unknown): void;
   clearIngestError(sourceType: string, sourcePath: string): void;
   /** Replaces a driver's whole lap set in one transaction and records it as stored. */
   replaceReplayDriverLaps(filename: string, filePath: string, mtime: number, size: number, driverSlotKey: number, trajectory: ReplayTrajectoryData, isPrimary: boolean): void;
   getReplayDriverIngest(filename: string, driverSlot: number): ReplayDriverIngest | null;
+  promoteReplayPrimary(filename: string, filePath: string, mtime: number, size: number, driverSlotKey: number): boolean;
   getReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): ReplayTrajectoryData | null;
   recordReplayDriverIngest(filename: string, driverSlot: number, mtime: number, size: number, status: ReplayDriverIngestStatus, error?: string | null): void;
 }
@@ -40,8 +41,7 @@ export interface ReplaySyncHost {
 /**
  * Whether a driver still has to be decoded for this file version: not when this build already stored it
  * or it failed too often (see isReplayDriverSettled; retried after a parser version change or an explicit
- * retry), nor when compatible rows are already stored. Slot -1 stands for the player's decode, which picks
- * the slot itself.
+ * retry), nor when compatible rows are already stored. Slot -1 stands for the primary alias.
  */
 function driverNeedsDecode(host: ReplaySyncHost, filename: string, driverSlot: number, mtime: number, size: number, filePath: string, retryFailed = false): boolean {
   const previous = host.getReplayDriverIngest(filename, driverSlot);
@@ -49,13 +49,22 @@ function driverNeedsDecode(host: ReplaySyncHost, filename: string, driverSlot: n
   return !host.hasValidReplayTrajectoryCache(filename, driverSlot, -1, mtime, size, filePath);
 }
 
+/** An alias for another player must not settle this player's work or block cached-driver promotion. */
+function primaryNeedsDecode(host: ReplaySyncHost, filename: string, slot: number, mtime: number, size: number, filePath: string, retryFailed = false): boolean {
+  if (host.hasValidReplayTrajectoryCache(filename, -1, -1, mtime, size, filePath, slot)) return false;
+  const attempt = host.getReplayDriverIngest(filename, slot);
+  return retryFailed || !isReplayDriverSettled(attempt, mtime, size) || attempt?.status === 'stored';
+}
+
 /** Whether the player's decode or any driver of this replay still has to be decoded for this file version (see driverNeedsDecode). */
 function replayNeedsDecode(
   host: ReplaySyncHost,
   file: { filename: string; filePath: string; mtime: number; size: number; metadata: ReplayMetadata },
-  retryFailed = false
+  retryFailed = false,
+  playerName?: string,
 ): boolean {
-  if (driverNeedsDecode(host, file.filename, -1, file.mtime, file.size, file.filePath, retryFailed)) {
+  const primarySlot = resolveReplayPrimarySlot(file.metadata, playerName);
+  if (primarySlot !== undefined && primaryNeedsDecode(host, file.filename, primarySlot, file.mtime, file.size, file.filePath, retryFailed)) {
     return true;
   }
   for (const driver of file.metadata.drivers) {
@@ -67,8 +76,8 @@ function replayNeedsDecode(
 }
 
 /** The error of the first driver of this replay that failed too often to be tried again, or null. */
-function settledReplayError(host: ReplaySyncHost, filename: string, metadata: ReplayMetadata, mtime: number, size: number): string | null {
-  return [-1, ...metadata.drivers.flatMap(driver => typeof driver.slot === 'number' ? [driver.slot] : [])]
+function settledReplayError(host: ReplaySyncHost, filename: string, metadata: ReplayMetadata, mtime: number, size: number, playerName?: string): string | null {
+  return [...(resolveReplayPrimarySlot(metadata, playerName) !== undefined ? [-1] : []), ...metadata.drivers.flatMap(driver => typeof driver.slot === 'number' ? [driver.slot] : [])]
     .map(slot => settledReplayFailure(host.getReplayDriverIngest(filename, slot), mtime, size))
     .find(error => error !== null) ?? null;
 }
@@ -114,7 +123,7 @@ export function* syncReplaysIterator(
       const stat = fs.statSync(filePath);
       const mtime = Math.floor(stat.mtimeMs);
       const metadata = host.getReplayMetadataCache(f, mtime, stat.size, filePath);
-      return !metadata || replayNeedsDecode(host, { filename: f, filePath, mtime, size: stat.size, metadata });
+      return !metadata || replayNeedsDecode(host, { filename: f, filePath, mtime, size: stat.size, metadata }, false, options.playerName);
     } catch {
       return true; // reported by the loop below
     }
@@ -149,23 +158,26 @@ export function* syncReplaysIterator(
 
       let anyTrajectoryNewlyCached = false;
 
+      const primarySlot = resolveReplayPrimarySlot(metadata, options.playerName);
       let defaultDriverSlot: number | undefined;
-      if (driverNeedsDecode(host, f, -1, mtime, size, filePath)) {
+      if (primarySlot !== undefined && primaryNeedsDecode(host, f, primarySlot, mtime, size, filePath)) {
         try {
-          const trajectory = decodeOrThrow(() => extractReplayTrajectory(filePath, {
-            playerName: options.playerName,
-            maxPoints: 0,
-            allLaps: true,
-            onProgress: (_prog) => {
-              // Yield sub-file progress if desired or track stage
-            },
-          }));
-          defaultDriverSlot = trajectory.driverSlot;
-          const primarySlot = typeof defaultDriverSlot === 'number' ? defaultDriverSlot : -1;
-          host.replaceReplayDriverLaps(f, filePath, mtime, size, primarySlot, trajectory, true);
-          anyTrajectoryNewlyCached = true;
-          const totalLaps = trajectory.allLapsData?.length || trajectory.laps?.length || 1;
-          console.log(`[SQLite Cache] [7/7] Cached ${totalLaps} laps for primary driver (${trajectory.driverName || 'Player'}) in ${f}`);
+          if (host.promoteReplayPrimary(f, filePath, mtime, size, primarySlot)) {
+            defaultDriverSlot = primarySlot;
+            anyTrajectoryNewlyCached = true;
+          } else {
+            const trajectory = decodeOrThrow(() => extractReplayTrajectory(filePath, {
+              driverSlot: primarySlot,
+              playerName: options.playerName,
+              maxPoints: 0,
+              allLaps: true,
+            }));
+            defaultDriverSlot = primarySlot;
+            host.replaceReplayDriverLaps(f, filePath, mtime, size, primarySlot, trajectory, true);
+            anyTrajectoryNewlyCached = true;
+            const totalLaps = trajectory.allLapsData?.length || trajectory.laps?.length || 1;
+            console.log(`[SQLite Cache] [7/7] Cached ${totalLaps} laps for primary driver (${trajectory.driverName || 'Player'}) in ${f}`);
+          }
         } catch (err) {
           recordDriverFailure(host, f, filePath, -1, mtime, size, err);
         }
@@ -293,13 +305,13 @@ export async function* syncReplaysAsyncIterator(
   // Newest first: the replay of the session just driven is ready before older ones are retried.
   const candidates = (associated ? discovered.filter(file => associated.has(file.filename)) : discovered)
     .sort((a, b) => b.mtime - a.mtime);
-  const queue = candidates.filter(file => replayNeedsDecode(host, file, options.retryFailed));
+  const queue = candidates.filter(file => replayNeedsDecode(host, file, options.retryFailed, options.playerName));
 
   // Replays with nothing left to decode stay out of the progress count, but one that failed too often
   // still reports it, so its button keeps saying Refresh to retry.
   for (const file of candidates) {
     if (queue.includes(file)) continue;
-    const error = settledReplayError(host, file.filename, file.metadata, file.mtime, file.size);
+    const error = settledReplayError(host, file.filename, file.metadata, file.mtime, file.size, options.playerName);
     if (error) {
       options.onReplayState?.({ name: file.filename, status: 'failed', error,
         playable: host.hasValidReplayTrajectoryCache(file.filename, -1, -1, file.mtime, file.size, file.filePath) });
@@ -313,7 +325,8 @@ export async function* syncReplaysAsyncIterator(
       break;
     }
     const { filename, filePath, mtime, size, metadata, isNewMetadata } = queue[index];
-    const primaryPending = driverNeedsDecode(host, filename, -1, mtime, size, filePath, options.retryFailed);
+    const primarySlot = resolveReplayPrimarySlot(metadata, options.playerName);
+    const primaryPending = primarySlot !== undefined && primaryNeedsDecode(host, filename, primarySlot, mtime, size, filePath, options.retryFailed);
     const pendingSlots = new Set(metadata.drivers.flatMap(driver =>
       typeof driver.slot === 'number' && driverNeedsDecode(host, filename, driver.slot, mtime, size, filePath, options.retryFailed)
         ? [driver.slot] : []));
@@ -323,7 +336,7 @@ export async function* syncReplaysAsyncIterator(
     try {
       let trajectoryCached = false;
       const extraction = storeReplayDriversInWorker(host, filePath, { playerName: options.playerName }, {
-        filename, mtime, size, driverSlots: [...pendingSlots], includePrimary: primaryPending,
+        filename, mtime, size, driverSlots: [...pendingSlots], includePrimary: primaryPending, primarySlot,
       });
       let step = await extraction.next();
       let filePercent = 5;
@@ -366,7 +379,7 @@ export async function* syncReplaysAsyncIterator(
       retrying = true;
     } finally {
       processedCount = index + 1;
-      const jobError = settledReplayError(host, filename, metadata, mtime, size) ?? undefined;
+      const jobError = settledReplayError(host, filename, metadata, mtime, size, options.playerName) ?? undefined;
       options.onReplayState?.({
         name: filename,
         status: jobError ? 'failed' : interrupted || retrying ? 'queued' : 'ready',

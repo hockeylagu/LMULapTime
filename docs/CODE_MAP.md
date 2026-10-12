@@ -279,6 +279,10 @@ index their explicitly supplied replay directory locally.
   blobs retain full-column garage phase checks, while older blobs keep full compatibility decoding.
   Trajectory operations share one metadata snapshot. Worker saves coordinate per recording version
   across requests/scans/upgrades and recheck stored results after waiting; write eligibility remains transactional.
+  Primary selection uses `resolveReplayPrimarySlot` before decoding. A current cached driver can
+  become the primary through a source-validated transaction that only updates the alias/ingest state.
+  Missing or ambiguous player matches remain unresolved; explicit driver ingestion still proceeds.
+  Upgrades preserve an existing resolved primary slot rather than choosing today's configured player.
   An open DuckDB reader shares its lap list, and a session reclassification batch shares replay rain snapshots.
   DuckDB sector lookup advances through ordered lap windows. Numbered/duration selection shares readers
   within one operation; simultaneous cold reads share an in-flight operation by session/file version/lap.

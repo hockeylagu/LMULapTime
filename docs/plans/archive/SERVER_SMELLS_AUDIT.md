@@ -3,8 +3,10 @@
 Completed scoped cleanup, 2026-10-12. Findings 1, 2, 4–8 are addressed; finding 3's
 bounded hydration improvement is retained, while further neighboring-blob/storage work is
 explicitly out of scope. Final verification passed; this record is archived.
-An unresolved native primary without a valid stored alias can still require a second serialized
-decode; ownership must not be guessed. DuckDB still scans GPS timestamps internally, but only
+Primary follow-up: unique player identity is now resolved from metadata before decoding; a current
+cached driver is promoted transactionally without another scan. Missing/ambiguous matches stay
+unresolved. The earlier native-header limitation description was incorrect and is corrected below.
+DuckDB still scans GPS timestamps internally, but only
 lap-local timestamps cross into JavaScript. These limits are documented below.
 
 Reviewed 2026-10-11 against the current working tree after the shared-domain cleanup.
@@ -74,9 +76,14 @@ now serializes file-backed saves by database, source path, filename, file tuple 
 After waiting, callers reuse committed driver rows or the preceding failure rather than spawning
 the same worker again. Cancellation releases queued/granted leases. Caller progress and retry
 policies remain separate. Tests cover request/batch overlap, cancellation and failed owners.
-An unresolved primary without a valid stored alias can still need a second, serialized decode:
-the native header selection must not be guessed from roster/configured names. Coordination is
-process-local; SQLite still enforces commit eligibility across workers. No schema change is needed.
+Primary follow-up: `resolveReplayPrimarySlot` selects only a unique configured-name match or,
+without a supplied name, one marked player. Requests, scans and decoding consume this rule;
+upgrades retain an existing resolved primary. A source/version-validated transaction publishes
+the alias to an already cached current driver without rewriting lap blobs or decoding again.
+An unknown primary does not launch a default decode or keep explicit-driver ingestion queued.
+The previous description of native-header selection was incorrect: no such identity is decoded
+later in the stream. Coordination remains process-local; SQLite enforces commit eligibility.
+No schema or cache-version change is needed.
 The old suggestion about clearing replay rows does not apply to the current session-only cache clear.
 
 The request path (`replayRecordingService.ts:137`), background scan
@@ -265,6 +272,20 @@ search further if measurements justify it; do not add a second persistent weathe
 
 ## Verification and suggested delivery order
 
+### Primary-driver follow-up — 2026-10-12
+
+Primary identity now resolves before decoding. A request's completed driver can become primary
+through an immediate source/version-checked transaction that updates only the alias and ingest
+state. Missing/duplicate player matches remain unresolved while explicit drivers are ingested.
+Upgrades preserve an existing resolved primary. Final review also found and fixed settled alias
+state blocking a configured-player change: the validity check now compares the resolved slot,
+and retry policy consults that driver's outcome. Regressions cover cached reuse, player switching,
+failure sharing, source/metadata replacement, decoder versions and transactional rollback.
+The endpoint baseline and two follow-ups used identical dataset/cohort; an initial session-detail
+timing flag did not reproduce. See the active endpoint history for measurement limits.
+The final full suite passed: 2,583 tests, 56 skipped across 303 suites; the production build
+completed with zero warnings/errors. Independent review confirmed the alias-switch correction.
+
 ### Final review and closeout — 2026-10-12
 
 Final review fixed failure propagation through three or more queued callers, including an
@@ -277,8 +298,8 @@ recorded below and in the active performance history. The Vite watcher excludes 
 DuckDB test directories to avoid locked-file watcher failures on Windows.
 
 All in-scope findings are complete. Further neighboring-blob/storage work remains excluded;
-unresolved native primary selection and cross-process coordination retain the constraints in
-finding 2. The historical implementation notes below preserve earlier verification results.
+missing/ambiguous primary identity remains unresolved, and cross-process coordination retains
+the constraints in finding 2. The historical notes below preserve earlier verification results.
 
 ### DuckDB preparation follow-up — 2026-10-12
 

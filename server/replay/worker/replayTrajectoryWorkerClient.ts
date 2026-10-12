@@ -2,7 +2,7 @@ import { Worker } from 'node:worker_threads';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ReplayTrajectoryData } from '../../core/types.js';
+import { ReplayMetadata, ReplayTrajectoryData } from '../../core/types.js';
 import { ExtractReplayTrajectoryOptions, extractReplayTrajectory, extractReplayDriverTrajectories } from '../decode/replayTrajectory.js';
 import { ReplayStreamProgress } from '../replayProgress.js';
 import { ReplayDecodeError } from '../decode/replayDecodeError.js';
@@ -10,6 +10,7 @@ import type { ReplayDriverSave } from '../../core/replay/dbReplayDriverStore.js'
 import { REPLAY_CACHE_VERSION } from '../../core/dbSchema.js';
 import type { ReplayDriverIngest } from '../../core/replay/dbReplayIngestStore.js';
 import { isReplayDriverSettled } from '../../core/replay/dbReplayIngestStore.js';
+import { resolveReplayPrimarySlot } from '../decode/replayParser.js';
 
 export interface StoredReplayDriver {
   driverSlot?: number;
@@ -34,6 +35,8 @@ interface ReplaySaveHost {
   getReplayDriverIngest(filename: string, driverSlot: number): ReplayDriverIngest | null;
   hasValidReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): boolean;
   getReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): ReplayTrajectoryData | null;
+  getReplayMetadataCache(filename: string, mtime: number, size: number, filePath?: string): ReplayMetadata | null;
+  promoteReplayPrimary(filename: string, filePath: string, mtime: number, size: number, driverSlotKey: number): boolean;
 }
 
 interface ReplaySaveQueue {
@@ -214,7 +217,8 @@ export async function* storeReplayTrajectoryInWorker(
     }
     if (lease.waited) {
       const attempt = host.getReplayDriverIngest(save.filename, slot);
-      if (storedDriver(host, save.filename, filePath, slot, save.mtime, save.size)) {
+      if (storedDriver(host, save.filename, filePath, slot, save.mtime, save.size) &&
+          (!save.isPrimary || host.promoteReplayPrimary(save.filename, filePath, save.mtime, save.size, slot))) {
         const cached = host.getReplayTrajectoryCache(save.filename, slot, -1, save.mtime, save.size, filePath);
         return { driverSlot: cached?.driverSlot ?? (slot >= 0 ? slot : undefined), currentLap: cached?.currentLap };
       }
@@ -245,8 +249,21 @@ export async function* storeReplayDriversInWorker(
   options: Pick<ExtractReplayTrajectoryOptions, 'playerName'>,
   save: ReplayDriversSave,
 ): AsyncGenerator<ReplayStreamProgress, StoredReplayDrivers, void> {
+  if (save.includePrimary && save.primarySlot === undefined) {
+    const metadata = host.getReplayMetadataCache(save.filename, save.mtime, save.size, filePath);
+    const primarySlot = metadata ? resolveReplayPrimarySlot(metadata, options.playerName) : undefined;
+    save = { ...save, primarySlot, includePrimary: primarySlot !== undefined };
+  }
+  if (!save.includePrimary && save.driverSlots.length === 0) return { drivers: [], failures: [] };
   if (host.getDbPath() === ':memory:') {
     const summary: StoredReplayDrivers = { drivers: [], failures: [] };
+    if (save.includePrimary && save.primarySlot !== undefined &&
+        host.promoteReplayPrimary(save.filename, filePath, save.mtime, save.size, save.primarySlot)) {
+      summary.drivers.push({ driverSlotKey: save.primarySlot, driverSlot: save.primarySlot, isPrimary: true,
+        currentLap: host.getReplayTrajectoryCache(save.filename, save.primarySlot, -1, save.mtime, save.size, filePath)?.currentLap });
+      save = { ...save, includePrimary: false, driverSlots: save.driverSlots.filter(slot => slot !== save.primarySlot) };
+      if (save.driverSlots.length === 0) return summary;
+    }
     const progressList: ReplayStreamProgress[] = [];
     let first = true;
     const extraction = extractReplayDriverTrajectories(filePath, {
@@ -283,15 +300,11 @@ export async function* storeReplayDriversInWorker(
   const lease = yield* acquireReplaySaveLease(replaySaveKey(dbPath, filePath, save.filename, save.mtime, save.size));
   const leaseFailures = new Map<number, ReplaySaveFailure>();
   try {
-    const priorFailures = [...(lease.previousFailures ?? [])].filter(([slot]) => save.driverSlots.includes(slot) || slot === -1 && save.includePrimary);
+    const priorFailures = [...(lease.previousFailures ?? [])].filter(([slot]) => save.driverSlots.includes(slot) || save.includePrimary && slot === save.primarySlot);
     for (const [slot, failure] of priorFailures) leaseFailures.set(slot, failure);
-    const alias = lease.waited ? host.getReplayTrajectoryCache(save.filename, -1, -1, save.mtime, save.size, filePath) : null;
-    const aliasAttempt = host.getReplayDriverIngest(save.filename, -1);
-    const aliasReady = lease.waited && aliasAttempt?.status === 'stored' && aliasAttempt.fileMtime === save.mtime && aliasAttempt.fileSize === save.size &&
-      aliasAttempt.parserVersion === REPLAY_CACHE_VERSION && host.hasValidReplayTrajectoryCache(save.filename, -1, -1, save.mtime, save.size, filePath);
-    const knownPrimary = save.primarySlot ?? (typeof alias?.driverSlot === 'number' ? alias.driverSlot : undefined);
-    const primaryReady = lease.waited && knownPrimary !== undefined && storedDriver(host, save.filename, filePath, knownPrimary, save.mtime, save.size);
-    const primaryCanBeSkipped = save.includePrimary && primaryReady && aliasReady;
+    const knownPrimary = save.primarySlot;
+    const primaryCanBeSkipped = save.includePrimary && knownPrimary !== undefined && !leaseFailures.has(knownPrimary) &&
+      host.promoteReplayPrimary(save.filename, filePath, save.mtime, save.size, knownPrimary);
     const skipPrimary = primaryCanBeSkipped ? knownPrimary : undefined;
     const failedSlots = new Set(priorFailures.map(([slot]) => slot));
     const skippedSlots = lease.waited ? [...new Set(save.driverSlots)].filter(slot => slot !== skipPrimary && !failedSlots.has(slot) && storedDriver(host, save.filename, filePath, slot, save.mtime, save.size)) : [];

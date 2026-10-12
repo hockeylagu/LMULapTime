@@ -54,6 +54,15 @@ describe('replayParser - trajectory & timing', () => {
       expect(traj.currentLap).toBe(1);
     });
 
+    it('rejects an unresolved primary before scanning and still permits an explicit driver', () => {
+      const stages: string[] = [];
+      expect(() => extractReplayTrajectory(tempVcrPath, {
+        playerName: 'Missing Player', silent: true, onProgress: progress => stages.push(progress.stage),
+      })).toThrow('select an explicit driver');
+      expect(stages).not.toContain('stream_init');
+      expect(extractReplayTrajectory(tempVcrPath, { playerName: 'Missing Player', driverSlot: 1, silent: true }).driverSlot).toBe(1);
+    });
+
     it('ensures each driver has a unique slot and flags player driver', () => {
       const meta = parseReplayMetadata(tempVcrPath);
       const slots = meta.drivers.map(d => d.slot);
