@@ -5,7 +5,6 @@ import {
 import {
   PACE_CATEGORY_BANDS,
 } from '../../shared/domain/paceCategory.js';
-import { formatTime } from '../../shared/domain/formatters.js';
 import { CIRCUIT_SPECIFICATIONS } from '../../shared/domain/circuitDefinitions.js';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import type { PaceCategory } from '../../shared/types/index.js';
@@ -63,11 +62,11 @@ export function enrichBenchmarkDiffWithCompactImpact(diff: ReferenceBenchmarkDif
     const newCategory = paceCategorySql(item.newAlienSec);
     const rows = db.prepare(`WITH scope AS (
         SELECT s.id session_id,s.session_name,s.session_type,s.timestamp,s.rowid session_order,d.driver_ordinal,coalesce(n.name,'') driver_name
-        FROM sessions s JOIN session_drivers d ON d.session_id=s.id AND d.is_player_driver=1
+        FROM sessions s JOIN session_drivers d ON d.session_id=s.id AND d.is_player=1
         LEFT JOIN drivers n ON n.driver_id=d.driver_id LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id
         WHERE ${scope.sql}
       ), rated AS (
-        SELECT scope.*,l.lap_num lap_number,l.lap_ordinal,l.lap_time,${oldCategory} old_category,${newCategory} new_category
+        SELECT scope.*,l.lap_number lap_number,l.lap_ordinal,l.lap_time,${oldCategory} old_category,${newCategory} new_category
         FROM scope JOIN session_laps l ON l.session_id=scope.session_id AND l.driver_ordinal=scope.driver_ordinal
         WHERE l.is_valid=1 AND l.lap_time>0
       ), stats AS (
@@ -84,7 +83,7 @@ export function enrichBenchmarkDiffWithCompactImpact(diff: ReferenceBenchmarkDif
       .all(...scope.values, MAX_STORED_SAMPLE_SHIFTS) as CompactImpactLap[];
     const stats = rows[0];
     const categoryShifts = rows.filter(row => row.session_id !== null).map(row => ({
-      driverName: row.driver_name || 'Driver', lapTimeSec: row.lap_time ?? 0, lapTimeString: formatTime(row.lap_time ?? 0),
+      driverName: row.driver_name || 'Driver', lapTimeSec: row.lap_time ?? 0,
       sessionId: row.session_id ?? '', sessionName: row.session_name || row.session_type || 'Session',
       lapNumber: row.lap_number ?? 0, oldCategory: row.old_category as PaceCategory, newCategory: row.new_category as PaceCategory,
     }));
@@ -97,7 +96,7 @@ export function enrichBenchmarkDiffWithCompactImpact(diff: ReferenceBenchmarkDif
     const tracks = items.map(benchmarkTrackScope);
     const classes = items.map(item => sqlCarClassMatch(item.carClass));
     const where = tracks.map((track, index) => `(${track.sql} AND EXISTS (
-      SELECT 1 FROM session_drivers d LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id WHERE d.session_id=s.id AND d.is_player_driver=1 AND ${classes[index].sql}
+      SELECT 1 FROM session_drivers d LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id WHERE d.session_id=s.id AND d.is_player=1 AND ${classes[index].sql}
     ))`).join(' OR ');
     const values = tracks.flatMap((track, index) => [...track.values, ...classes[index].values]);
     totalAffectedSessions = (db.prepare(`SELECT count(*) affected FROM sessions s WHERE ${where}`).get(...values) as { affected: number }).affected;

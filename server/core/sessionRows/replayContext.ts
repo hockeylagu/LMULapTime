@@ -1,12 +1,11 @@
 import type { Database } from 'better-sqlite3';
 import type { ReplayContextDriver, ReplaySessionContext, ReplayTimingLap } from '../../replay/replayServiceTypes.js';
 import { unpackFields, type Row } from './fields.js';
-import { recordingLink } from './reader.js';
-import { DRIVER_DICTIONARY_FIELDS, DRIVER_FIELDS, LAP_FIELDS } from './specs.js';
+import { DRIVER_DICTIONARY_FIELDS, DRIVER_FIELDS, LAP_FIELDS, RECORDING_FIELDS } from './specs.js';
 
 const driverFields = [...DRIVER_DICTIONARY_FIELDS, ...DRIVER_FIELDS].filter(field =>
   ['name', 'carType', 'carClass', 'bestLapTime', 'isPlayer'].includes(field.prop));
-const lapFields = LAP_FIELDS.filter(field => ['lapNum', 'lapTime', 's1', 's2', 's3',
+const lapFields = LAP_FIELDS.filter(field => ['lapNumber', 'lapTime', 's1', 's2', 's3',
   'isValid', 'isPitStop', 'isOutLap', 'nonRepresentativeReason'].includes(field.prop));
 
 /**
@@ -18,7 +17,7 @@ export function readReplaySessionContext(
 ): ReplaySessionContext | null {
   const id = requestedId;
   const row = db.prepare(`SELECT id,track_venue,track_course,track_length_meters,session_type,total_laps_count,
-    player_driver_ordinal,has_duckdb_telemetry,duckdb_filename FROM sessions WHERE id=?`).get(id) as Row | undefined;
+    player_driver_ordinal FROM sessions WHERE id=?`).get(id) as Row | undefined;
   if (!row) return null;
   const drivers = (db.prepare(`SELECT d.driver_ordinal,d.best_lap_time,d.is_player,
       n.name,v.car_type,v.car_class
@@ -44,6 +43,6 @@ export function readReplaySessionContext(
     id, trackVenue: row.track_venue as string, trackCourse: row.track_course as string,
     trackLengthMeters: row.track_length_meters as number | null, sessionType: row.session_type as ReplaySessionContext['sessionType'],
     totalLapsCount: row.total_laps_count as number, drivers, playerDriver,
-    matchingReplayFile: recording ? recordingLink(recording, row) as ReplaySessionContext['matchingReplayFile'] : undefined,
+    matchingReplayFile: recording ? unpackFields(recording, RECORDING_FIELDS) as ReplaySessionContext['matchingReplayFile'] : undefined,
   };
 }

@@ -12,7 +12,7 @@ export const isNonRaceSession = (sessionType: string | undefined): boolean =>
 export const FOLLOW_GAP_SEC = 1.0;
 
 interface TrafficLap {
-  lapNum: number;
+  lapNumber: number;
   lapTime: number | null;
   elapsedSeconds?: number | null;
   isPitStop: boolean;
@@ -56,16 +56,16 @@ const positive = (value: number | null | undefined): value is number => typeof v
 function lineLaps(driver: TrafficDriver): DriverLine {
   const timed = driver.laps
     .filter((lap) => positive(lap.elapsedSeconds))
-    .sort((a, b) => a.lapNum - b.lapNum);
-  const pitLaps = new Set(driver.laps.filter((lap) => lap.isPitStop).map((lap) => lap.lapNum));
+    .sort((a, b) => a.lapNumber - b.lapNumber);
+  const pitLaps = new Set(driver.laps.filter((lap) => lap.isPitStop).map((lap) => lap.lapNumber));
   const laps: LineLap[] = [];
   timed.forEach((lap, index) => {
     const start = lap.elapsedSeconds as number;
     const next = timed[index + 1];
-    const finish = next && next.lapNum === lap.lapNum + 1
+    const finish = next && next.lapNumber === lap.lapNumber + 1
       ? next.elapsedSeconds as number
       : !next && positive(lap.lapTime) ? start + lap.lapTime : null;
-    const nearPits = lap.isPitStop || lap.isOutLap === true || pitLaps.has(lap.lapNum + 1);
+    const nearPits = lap.isPitStop || lap.isOutLap === true || pitLaps.has(lap.lapNumber + 1);
     if (finish !== null && finish > start) laps.push({ start, finish, lap, nearPits });
   });
   const crossings = [...new Set([...timed.map((lap) => lap.elapsedSeconds as number), ...laps.map((l) => l.finish)])]

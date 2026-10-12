@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { getDisplayTrackName, isSessionEmpty, getBestLapNumber } from '../../../shared/domain/formatters.js';
+import { driverLapsCount, getDisplayTrackName, isSessionEmpty, getBestLapNumber } from '../../../shared/domain/formatters.js';
 import { computeConsistencyRating } from '../../../shared/domain/lapComparison.js';
 import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
 import type { DetailedSession } from '../../../shared/types/session.js';
@@ -66,15 +66,10 @@ export function useDashboardTrends(sessions: (SessionCard | DetailedSession)[]):
     // Exclude sessions with 0 laps, null best lap times, or incomplete driver stints
     const validSessions = sorted.filter(s => {
       if (!s.playerDriver) return false;
-      const laps = s.playerDriver.lapsCount ?? 0;
+      const laps = driverLapsCount(s.playerDriver);
       if (laps <= 0) return false;
       const hasNumericBest = typeof s.playerDriver.bestLapTime === 'number' && s.playerDriver.bestLapTime > 0;
-      const hasStringBest = Boolean(
-        s.playerDriver.bestLapTimeString &&
-        s.playerDriver.bestLapTimeString.trim() !== '' &&
-        s.playerDriver.bestLapTimeString !== '--:--.---'
-      );
-      if (!hasNumericBest && !hasStringBest) return false;
+      if (!hasNumericBest) return false;
       if (isSessionEmpty(s)) return false;
       return true;
     });
@@ -113,10 +108,10 @@ export function useDashboardTrends(sessions: (SessionCard | DetailedSession)[]):
           s =>
             s.sessionType === 'Race' &&
             s.playerDriver &&
-            (s.playerDriver.lapsCount > 0 || Boolean(s.playerDriver.bestLapTimeString))
+            (driverLapsCount(s.playerDriver) > 0 || (s.playerDriver.bestLapTime ?? 0) > 0)
         ) ||
         sorted.find(
-          s => s.playerDriver && (s.playerDriver.lapsCount > 0 || Boolean(s.playerDriver.bestLapTimeString))
+          s => s.playerDriver && (driverLapsCount(s.playerDriver) > 0 || (s.playerDriver.bestLapTime ?? 0) > 0)
         ) ||
         sorted.find(s => Boolean(s.playerDriver));
     }
@@ -134,9 +129,8 @@ export function useDashboardTrends(sessions: (SessionCard | DetailedSession)[]):
         timeString: latestRaw.timeString,
         carType: p.carType,
         carClass: p.carClass ? p.carClass : undefined,
-        bestLapTimeString: p.bestLapTimeString,
         bestLapTime: p.bestLapTime,
-        bestLapNum: getBestLapNumber(p),
+        bestLapNumber: getBestLapNumber(p),
         driverOrdinal: p.driverOrdinal,
         bestLapOrdinal: 'bestLapOrdinal' in p ? p.bestLapOrdinal : null,
         pacePercentage: p.bestLapPacePercentage,
@@ -145,12 +139,9 @@ export function useDashboardTrends(sessions: (SessionCard | DetailedSession)[]):
         position: p.position,
         gridPosition: 'gridPosition' in p ? p.gridPosition : null,
         positionGain: 'positionGain' in p ? p.positionGain : null,
-        lapsCount: p.lapsCount || 0,
+        lapsCount: driverLapsCount(p),
         hasReplay: Boolean(latestRaw.matchingReplayFile),
-        hasDuckDbTelemetry: Boolean(
-          latestRaw.hasDuckDbTelemetry ||
-          latestRaw.matchingReplayFile?.hasDuckDbTelemetry
-        ),
+        hasDuckDbTelemetry: Boolean(latestRaw.duckdbFilename),
       };
     }
 
@@ -164,14 +155,14 @@ export function useDashboardTrends(sessions: (SessionCard | DetailedSession)[]):
         let distanceKm = 0;
 
         for (const s of sameDaySessions) {
-          const lCount = s.playerDriver?.lapsCount ?? 0;
+          const lCount = s.playerDriver ? driverLapsCount(s.playerDriver) : 0;
           lapsCount += lCount;
           const trackLen = s.trackLengthMeters ? s.trackLengthMeters / 1000 : 4.5;
           distanceKm += lCount * trackLen;
         }
 
         todayActivity = {
-          dateString: latestDateStr,
+          sessionDay: latestDateStr,
           sessionsCount: sameDaySessions.length,
           lapsCount,
           distanceKm: Number(distanceKm.toFixed(1)),
@@ -193,7 +184,7 @@ export function useDashboardTrends(sessions: (SessionCard | DetailedSession)[]):
           trackName: getDisplayTrackName(s.trackVenue, s.trackCourse),
           carType: s.playerDriver.carType,
           timeString: s.timeString,
-          bestLapTimeString: s.playerDriver.bestLapTimeString,
+          bestLapTime: s.playerDriver.bestLapTime,
           pacePercentage: Number(s.playerDriver.bestLapPacePercentage.toFixed(2)),
           paceCategory: s.playerDriver.bestLapPaceCategory,
         });

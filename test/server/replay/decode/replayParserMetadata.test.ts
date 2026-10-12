@@ -195,7 +195,6 @@ describe('replayParser - metadata, player detection & downsampling', () => {
         eventTitle: 'LMGT3 Fixed',
         eventType: 'daily',
         splitNo: 2,
-        session: 'PRACTICE',
       });
       expect(meta.scn).toBe('MOCK.SCN');
       expect(meta.aiw).toBe('MOCK.AIW');
@@ -208,12 +207,12 @@ describe('replayParser - metadata, player detection & downsampling', () => {
 
       const samuel = meta.drivers.find(d => d.name === 'Samuel Lague');
       expect(samuel).toBeDefined();
-      expect(samuel?.carModel).toBe('Ferrari 296 GT3');
+      expect(samuel?.carType).toBe('Ferrari 296 GT3');
       expect(samuel?.carClass).toBe('GT3');
       expect(samuel?.team).toBe('Vista AF Corsa');
       expect(samuel?.carNumber).toBe('21');
       expect(meta.carClass).toBe('GT3');
-      expect(meta.carModel).toBe('Ferrari 296 GT3');
+      expect(meta.carType).toBe('Ferrari 296 GT3');
     });
 
     it('throws error for invalid files', () => {
@@ -274,7 +273,7 @@ describe('replayParser - metadata, player detection & downsampling', () => {
       const lewis = meta.drivers.find(d => d.name === 'Lewis Hamilton');
       expect(max).toBeDefined();
       expect(max?.slot).toBe(5);
-      expect(max?.carModel).toBe('Ferrari 296 GT3');
+      expect(max?.carType).toBe('Ferrari 296 GT3');
       expect(max?.team).toBe('Oracle Red Bull');
       expect(max?.carNumber).toBe('1');
 

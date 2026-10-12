@@ -1,3 +1,4 @@
+import { lapEvents } from '../../../shared/domain/lapComparison.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LmuParser } from '../../../server/sessions/parser.js';
 import fs from 'fs';
@@ -47,19 +48,16 @@ describe('parser server module - stream events and timing timestamps', () => {
 
       // Leader checks
       expect(leader?.laps[0].elapsedSeconds).toBe(122.0);
-      expect(leader?.laps[0].elapsedTimeString).toBe('2:02.0');
-      expect(leader?.laps[0].gapToLeaderString).toBe('LEADER');
-      expect(leader?.laps[1].gapToLeaderString).toBe('LEADER');
+      expect(leader?.laps[0].gapToLeader).toBe(0);
+      expect(leader?.laps[1].gapToLeader).toBe(0);
 
       // Chaser checks
       expect(chaser?.laps[0].elapsedSeconds).toBe(123.5);
       expect(chaser?.laps[0].gapToLeader).toBe(1.5);
-      expect(chaser?.laps[0].gapToLeaderString).toBe('+1.500s');
 
       // Pit Stop duration check
       expect(chaser?.laps[1].isPitStop).toBe(true);
       expect(chaser?.laps[1].pitStopDuration).toBeGreaterThan(0);
-      expect(chaser?.laps[1].pitStopDurationString).toMatch(/\+\d+(\.\d+)?s/);
     });
 
     it('counts the in-lap and the out-lap in the pit loss: a stop spans both', () => {
@@ -105,13 +103,11 @@ describe('parser server module - stream events and timing timestamps', () => {
       expect(laps[0].lapTime).toBeNull();
       expect(laps[0].isValid).toBe(false);
       expect(laps[0].elapsedSeconds).toBe(130.5);
-      expect(laps[0].elapsedTimeString).toBe('2:10.5');
       // Lap 2 elapsed time delta (240.2 - 130.5 = 109.7s) is inferred, but marked invalid/incomplete
       expect(laps[1].lapTime).toBe(109.7);
       expect(laps[1].isInferred).toBe(true);
       expect(laps[1].isValid).toBe(false);
       expect(laps[1].elapsedSeconds).toBe(240.2);
-      expect(laps[1].elapsedTimeString).toBe('4:00.2');
     });
 
     it('does not fabricate valid laps from incomplete outlaps or unverified BestLapTime XML tag', () => {
@@ -143,7 +139,6 @@ describe('parser server module - stream events and timing timestamps', () => {
       expect(driver?.laps[0].isValid).toBe(false);
       expect(driver?.laps[0].lapTime).toBeNull();
       expect(driver?.bestLapTime).toBeNull();
-      expect(driver?.bestLapTimeString).toBe('--:--.---');
       expect(driver?.bestLapPaceCategory).toBeUndefined();
       expect(driver?.bestLapPacePercentage).toBeUndefined();
     });
@@ -242,14 +237,12 @@ describe('parser server module - stream events and timing timestamps', () => {
 
       // Lap 2: Incomplete lap (--.----) with et=410.500 vs prev et=200.000 -> inferred = 210.500s
       expect(laps[1].lapTime).toBe(210.5);
-      expect(laps[1].lapTimeString).toBe('3:30.500');
       expect(laps[1].isInferred).toBe(true);
       expect(laps[1].isValid).toBe(false);
       expect(laps[1].s3).toBe(94.5);
 
       // Lap 4: Incomplete lap with et=2000.000 (1380s delta - 23 minutes in garage) -> does NOT make sense to infer
       expect(laps[3].lapTime).toBeNull();
-      expect(laps[3].lapTimeString).toBe('--:--.---');
       expect(laps[3].isInferred).toBeUndefined();
 
       expect(driver?.bestLapTime).toBe(210.0);
@@ -292,12 +285,12 @@ describe('parser server module - stream events and timing timestamps', () => {
       expect(laps.length).toBe(2);
 
       // Lap 1 is practice start from pit lane / garage without completed lap time
-      expect(laps[0].lapNum).toBe(1);
+      expect(laps[0].lapNumber).toBe(1);
       expect(laps[0].lapTime).toBeNull();
       expect(laps[0].isPitStop).toBe(false);
 
       // Lap 2 is the first full flying lap: should be VALID and NOT an out lap
-      expect(laps[1].lapNum).toBe(2);
+      expect(laps[1].lapNumber).toBe(2);
       expect(laps[1].lapTime).toBe(215.585);
       expect(laps[1].isValid).toBe(true);
       expect(laps[1].isOutLap).toBeUndefined();
@@ -374,12 +367,12 @@ describe('parser server module - stream events and timing timestamps', () => {
       expect(laps.length).toBe(2);
 
       // Lap 1 is untimed session start lap
-      expect(laps[0].lapNum).toBe(1);
+      expect(laps[0].lapNumber).toBe(1);
       expect(laps[0].lapTime).toBeNull();
       expect(laps[0].isPitStop).toBe(false);
 
       // Lap 2 is valid flying lap and not an out-lap
-      expect(laps[1].lapNum).toBe(2);
+      expect(laps[1].lapNumber).toBe(2);
       expect(laps[1].lapTime).toBe(120.5);
       expect(laps[1].isValid).toBe(true);
       expect(laps[1].isOutLap).toBeUndefined();
@@ -438,42 +431,42 @@ describe('parser server module - stream events and timing timestamps', () => {
         expect(rival).toBeDefined();
 
         // Check Player totals
-        expect(player?.totalIncidents).toBe(3);
-        expect(player?.totalTrackLimits).toBe(2);
-        expect(player?.totalPenalties).toBe(0);
+        expect(player?.incidents).toHaveLength(3);
+        expect(player?.trackLimits).toHaveLength(2);
+        expect(player?.penalties).toHaveLength(0);
 
         // Check Player Lap 1 events (et between 100.0 and 222.0)
-        const pLap1 = player?.laps[0];
-        expect(pLap1?.incidentCount).toBe(1);
+        const pLap1 = player ? lapEvents(player, 1) : undefined;
+        expect(pLap1?.incidents).toHaveLength(1);
         expect(pLap1?.incidents?.[0].type).toBe('contact');
         expect(pLap1?.incidents?.[0].otherVehicle).toBe('AI Rival');
         expect(pLap1?.incidents?.[0].force).toBe(750.25);
         expect(pLap1?.incidents?.[0].isWallImpact).toBe(false);
 
-        expect(pLap1?.trackLimitCount).toBe(1);
+        expect(pLap1?.trackLimits).toHaveLength(1);
         expect(pLap1?.trackLimits?.[0].warningPoints).toBe(0.25);
         expect(pLap1?.trackLimits?.[0].action).toBe('Warning');
 
         // Check Player Lap 2 events (et between 222.0 and 353.0)
-        const pLap2 = player?.laps[1];
-        expect(pLap2?.incidentCount).toBe(2);
+        const pLap2 = player ? lapEvents(player, 2) : undefined;
+        expect(pLap2?.incidents).toHaveLength(2);
         expect(pLap2?.incidents?.[0].type).toBe('contact');
         expect(pLap2?.incidents?.[0].isWallImpact).toBe(true);
         expect(pLap2?.incidents?.[0].force).toBe(4500);
         expect(pLap2?.incidents?.[1].type).toBe('damage');
         expect(pLap2?.incidents?.[1].description).toContain('suspension damage');
 
-        expect(pLap2?.trackLimitCount).toBe(1);
+        expect(pLap2?.trackLimits).toHaveLength(1);
         expect(pLap2?.trackLimits?.[0].action).toBe('No Further Action');
 
         // Check AI Rival penalties and incidents
-        expect(rival?.totalPenalties).toBe(1);
+        expect(rival?.penalties).toHaveLength(1);
         expect(rival?.penalties?.[0].penalty).toBe('Drive Thru');
         expect(rival?.penalties?.[0].reason).toBe('Speeding');
-        expect(rival?.laps[0].penaltyCount).toBe(1);
+        expect(rival ? lapEvents(rival, 1).penalties : []).toHaveLength(1);
 
-        expect(rival?.totalIncidents).toBe(1);
-        expect(rival?.laps[0].incidents?.[0].otherVehicle).toBe('Player Driver');
+        expect(rival?.incidents).toHaveLength(1);
+        expect(rival ? lapEvents(rival, 1).incidents[0].otherVehicle : undefined).toBe('Player Driver');
       } finally {
         readSpy.mockRestore();
         statSpy.mockRestore();
@@ -513,7 +506,7 @@ describe('Non-representative laps', () => {
         const session = parser.parseSessionXml('non_representative.xml');
         const player = session?.drivers.find(d => d.name === 'Player Driver');
 
-        expect(player?.laps[4].incidentCount).toBe(1);
+        expect(player ? lapEvents(player, 5).incidents : []).toHaveLength(1);
         expect(player?.laps[4].nonRepresentativeReason).toBe('contact');
         expect(player?.laps.filter(l => l.nonRepresentativeReason)).toHaveLength(1);
         // Laps 2, 3, 4 and 6: lap 1 is the start lap and lap 5 had contact.

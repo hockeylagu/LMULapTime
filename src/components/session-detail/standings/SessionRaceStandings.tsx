@@ -15,7 +15,7 @@ const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus
 type SortableColumn = 'position' | 'gain' | 'number' | 'bestLap' | 's1' | 's2' | 's3';
 
 function getBestLap(driver: DriverData) {
-  return driver.laps.find((lap) => lap.lapNum === driver.bestLapNum) || driver.laps.find((lap) => lap.lapTime === driver.bestLapTime);
+  return driver.laps.find((lap) => lap.lapNumber === driver.bestLapNumber) || driver.laps.find((lap) => lap.lapTime === driver.bestLapTime);
 }
 
 function getSortValue(driver: DriverData, column: SortableColumn): number | null {
@@ -117,7 +117,7 @@ export const SessionRaceStandings: React.FC<SessionRaceStandingsProps> = ({
     ? [...overallWinner.laps].reverse().find((lap) => typeof lap.elapsedSeconds === 'number')
     : undefined;
   const leaderFinishTime = leaderFinishLap?.elapsedSeconds;
-  const leaderLaps = overallWinner?.lapsCount ?? 0;
+  const leaderLaps = overallWinner?.declaredLapsCount ?? 0;
   const sessionBestSectors = session.drivers.reduce(
     (best, driver) => {
       const bestLap = getBestLap(driver);

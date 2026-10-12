@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, Layers, Sparkles } from 'lucide-react';
 import { READOUT_LABEL } from './labelStyles.js';
 import { BenchmarkItemImpact } from '../../../shared/types/index.js';
+import { formatTime } from '../../../shared/domain/formatters.js';
 
 export interface BenchmarkImpactBadgeProps {
   impact?: BenchmarkItemImpact;
@@ -81,7 +82,7 @@ export const BenchmarkImpactBadge: React.FC<BenchmarkImpactBadgeProps> = ({ impa
                 <div className="min-w-0 truncate text-lmu-text">
                   <span className="font-semibold text-lmu-text-soft">{shift.driverName}</span>{' '}
                   <span className="text-lmu-muted text-[11px]">Lap {shift.lapNumber}</span>
-                  <span className="text-lmu-muted text-[11px] ml-1.5">({shift.lapTimeString})</span>
+                  <span className="text-lmu-muted text-[11px] ml-1.5">({formatTime(shift.lapTimeSec)})</span>
                 </div>
                 <div className="shrink-0 flex items-center gap-1 text-[11px] font-bold">
                   <span className="text-lmu-muted line-through">{shift.oldCategory}</span>

@@ -38,8 +38,6 @@ export interface TelemetryStripViewProps {
   hasBaseline: boolean;
   telemetryResolution?: TelemetryResolution;
   onChangeResolution?: (res: TelemetryResolution) => void;
-  rawPointsCount?: number;
-  rawSampleRateHz?: number;
   vcrRawPointsCount?: number;
   vcrRawSampleRateHz?: number;
   duckdbRawPointsCount?: number;
@@ -73,8 +71,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
   currentComparison, pointComparisons, paths, sectors, cornerSegments, initialStraight,
   selectedCornerNumber, onSelectCorner, onJumpToDistance, cumDists, currentDistM,
   selectedCornerMarkers, interactionMode, setInteractionMode, isZoomed, onResetZoom,
-  onStepIndex, hasBaseline, telemetryResolution, onChangeResolution, rawPointsCount, rawSampleRateHz,
-  isFullResolution, currentTimeSec, totalFrames, headerContent, dragSelection, markerPcts,
+  onStepIndex, hasBaseline, telemetryResolution, onChangeResolution, isFullResolution, currentTimeSec, totalFrames, headerContent, dragSelection, markerPcts,
   vcrRawPointsCount, vcrRawSampleRateHz, duckdbRawPointsCount, duckdbRawSampleRateHz,
   activeChannels = ['speed', 'delta', 'throttle', 'brake', 'steer', 'gear'],
   presets, activePresetId, onSelectPreset, onOpenManageModal, source, duckdbFilename,
@@ -96,8 +93,6 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
         telemetryResolution={telemetryResolution}
         onChangeResolution={onChangeResolution}
         pointsCount={points.length}
-        rawPointsCount={rawPointsCount}
-        rawSampleRateHz={rawSampleRateHz}
         vcrRawPointsCount={vcrRawPointsCount}
         vcrRawSampleRateHz={vcrRawSampleRateHz}
         duckdbRawPointsCount={duckdbRawPointsCount}

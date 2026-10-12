@@ -5,12 +5,11 @@ export const MONZA_GP = 'Autodromo Nazionale Monza';
 export const MONZA_CURVA_GRANDE = 'Monza Curva Grande Circuit';
 
 /** A flying lap; sectors split the time 30/40/30 unless given. */
-export function lap(lapNum: number, lapTime: number, extra: Partial<LapData> = {}): LapData {
+export function lap(lapNumber: number, lapTime: number, extra: Partial<LapData> = {}): LapData {
   return {
-    lapNum,
+    lapNumber,
     position: 1,
     lapTime,
-    lapTimeString: '',
     s1: Number((lapTime * 0.3).toFixed(3)),
     s2: Number((lapTime * 0.4).toFixed(3)),
     s3: Number((lapTime * 0.3).toFixed(3)),
@@ -35,12 +34,10 @@ export function driver(name: string, laps: LapData[], extra: Partial<DriverData>
     position: 1,
     classPosition: 1,
     bestLapTime: null,
-    bestLapTimeString: '',
     bestS1: null,
     bestS2: null,
     bestS3: null,
     theoreticalBest: null,
-    theoreticalBestString: '',
     laps: [lap(1, 200), ...laps],
     ...extra,
   } as DriverData;

@@ -4,6 +4,8 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { LapData, NonRepresentativeReason } from '../../../../shared/types/index.js';
+import type { LapEvents } from '../../../../shared/domain/lapComparison.js';
+import { formatPitStopDuration } from '../../../../shared/domain/formatters.js';
 import { resolveLapStatus } from '../../common/lapStatus.js';
 import { getWorstTrackLimitSeverity, getTrackLimitBadgeClasses } from '../../../utils/trackLimits.js';
 import { NON_REPRESENTATIVE_LABELS, describeNonRepresentative } from '../../../utils/lapTrafficText.js';
@@ -11,6 +13,7 @@ import { CONDITIONS_NOTE, describeRain } from './lapDetailSections.js';
 
 export interface SessionLapStatusBadgeProps {
   lap: LapData;
+  events: LapEvents;
   isPitStop: boolean;
   isOutLap: boolean;
   isRaceSession: boolean;
@@ -53,6 +56,7 @@ const badge = 'px-1 py-0.5 rounded border';
  */
 export const SessionLapStatusBadge: React.FC<SessionLapStatusBadgeProps> = ({
   lap: l,
+  events,
   isPitStop,
   isOutLap,
   isRaceSession,
@@ -63,7 +67,7 @@ export const SessionLapStatusBadge: React.FC<SessionLapStatusBadgeProps> = ({
     ? 'pit'
     : isOutLap
     ? 'outlap'
-    : l.lapNum === 1
+    : l.lapNumber === 1
     ? 'start'
     : resolveLapStatus({ isValid: l.isValid, isInferred: isInferredLap });
   const reason = l.nonRepresentativeReason;
@@ -72,7 +76,7 @@ export const SessionLapStatusBadge: React.FC<SessionLapStatusBadgeProps> = ({
     <div className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap">
       {status === 'pit' && (
         <StatusIcon icon={Wrench} label="Pit Stop" className="text-lmu-text-soft"
-          title={l.pitStopDurationString ? `Estimated pit loss: ${l.pitStopDurationString}` : 'Pit stop'} />
+          title={l.pitStopDuration ? `Estimated pit loss: ${formatPitStopDuration(l.pitStopDuration)}` : 'Pit stop'} />
       )}
       {status === 'outlap' && (
         <StatusIcon icon={LogOut} label="Out Lap" className="text-lmu-text-soft"
@@ -99,20 +103,20 @@ export const SessionLapStatusBadge: React.FC<SessionLapStatusBadgeProps> = ({
           className={`${badge} bg-lmu-warn-strong/15 text-lmu-warn-soft border-lmu-warn-strong/40`}
           title={`${describeNonRepresentative(reason, l.traffic)}: left out of the average and consistency`} />
       )}
-      {Boolean(l.incidentCount) && (
-        <StatusIcon icon={ShieldAlert} label="Incidents" count={l.incidentCount}
+      {events.incidents.length > 0 && (
+        <StatusIcon icon={ShieldAlert} label="Incidents" count={events.incidents.length}
           className={`${badge} bg-lmu-loss-strong/20 text-lmu-loss-soft border-lmu-loss-strong/40`}
-          title={l.incidents?.map((i) => i.description).join('\n') ?? 'Incidents'} />
+          title={events.incidents.map((i) => i.description).join('\n')} />
       )}
-      {Boolean(l.trackLimitCount) && (
-        <StatusIcon icon={AlertTriangle} label="Track limits" count={l.trackLimitCount}
-          className={`${badge} ${getTrackLimitBadgeClasses(getWorstTrackLimitSeverity(l.trackLimits))}`}
-          title={l.trackLimits?.map((tl) => tl.description).join('\n') ?? 'Track limits'} />
+      {events.trackLimits.length > 0 && (
+        <StatusIcon icon={AlertTriangle} label="Track limits" count={events.trackLimits.length}
+          className={`${badge} ${getTrackLimitBadgeClasses(getWorstTrackLimitSeverity(events.trackLimits))}`}
+          title={events.trackLimits.map((tl) => tl.description).join('\n')} />
       )}
-      {Boolean(l.penaltyCount) && (
-        <StatusIcon icon={Ban} label={l.penalties?.[0]?.penalty || 'Penalty'}
+      {events.penalties.length > 0 && (
+        <StatusIcon icon={Ban} label={events.penalties[0].penalty || 'Penalty'}
           className={`${badge} bg-lmu-loss-strong/20 text-lmu-loss-soft border-lmu-loss-strong/40`}
-          title={l.penalties?.map((p) => p.description).join('\n') ?? 'Penalty'} />
+          title={events.penalties.map((p) => p.description).join('\n')} />
       )}
     </div>
   );

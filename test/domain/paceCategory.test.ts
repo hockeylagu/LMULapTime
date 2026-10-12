@@ -155,13 +155,13 @@ describe('paceCategory utility', () => {
 
   describe('findMatchingTrackBenchmarkEntries and findReferenceEntry', () => {
     const mockEntries = [
-      { trackName: 'Spa', carClass: 'Hyper', target100Sec: 120.0 },
-      { trackName: 'Spa', carClass: 'GT3', target100Sec: 135.0 },
-      { trackName: 'Monza', carClass: 'Hyper', target100Sec: 95.0 },
-      { trackName: 'Sebring', carClass: 'GT3', target100Sec: 120.23 },
-      { trackName: 'Sebring (school)', carClass: 'GT3', target100Sec: 62.90 },
-      { trackName: 'Silverstone (GP)', carClass: 'Hyper', target100Sec: 100.0 },
-      { trackName: 'Silverstone (National)', carClass: 'Hyper', target100Sec: 55.0 },
+      { trackName: 'Spa', carClass: 'Hyper', targets: { alienSec: 120.0 } },
+      { trackName: 'Spa', carClass: 'GT3', targets: { alienSec: 135.0 } },
+      { trackName: 'Monza', carClass: 'Hyper', targets: { alienSec: 95.0 } },
+      { trackName: 'Sebring', carClass: 'GT3', targets: { alienSec: 120.23 } },
+      { trackName: 'Sebring (school)', carClass: 'GT3', targets: { alienSec: 62.90 } },
+      { trackName: 'Silverstone (GP)', carClass: 'Hyper', targets: { alienSec: 100.0 } },
+      { trackName: 'Silverstone (National)', carClass: 'Hyper', targets: { alienSec: 55.0 } },
     ] as unknown as ReferenceLaptimeEntry[];
 
     it('finds track benchmark entries matching track name', () => {
@@ -172,21 +172,21 @@ describe('paceCategory utility', () => {
     it('accurately isolates Sebring Full vs Sebring School benchmarks', () => {
       const sebringFull = findMatchingTrackBenchmarkEntries(mockEntries, 'Sebring International Raceway', '12h');
       expect(sebringFull.length).toBe(1);
-      expect(sebringFull[0].target100Sec).toBe(120.23);
+      expect(sebringFull[0].targets.alienSec).toBe(120.23);
 
       const sebringSchool = findMatchingTrackBenchmarkEntries(mockEntries, 'Sebring International Raceway', 'School');
       expect(sebringSchool.length).toBe(1);
-      expect(sebringSchool[0].target100Sec).toBe(62.90);
+      expect(sebringSchool[0].targets.alienSec).toBe(62.90);
     });
 
     it('accurately isolates Silverstone layout benchmarks', () => {
       const gp = findMatchingTrackBenchmarkEntries(mockEntries, 'Silverstone Circuit', 'GP');
       expect(gp.length).toBe(1);
-      expect(gp[0].target100Sec).toBe(100.0);
+      expect(gp[0].targets.alienSec).toBe(100.0);
 
       const nat = findMatchingTrackBenchmarkEntries(mockEntries, 'Silverstone Circuit', 'National');
       expect(nat.length).toBe(1);
-      expect(nat[0].target100Sec).toBe(55.0);
+      expect(nat[0].targets.alienSec).toBe(55.0);
     });
 
     it('returns empty array when no track matches', () => {
@@ -197,13 +197,13 @@ describe('paceCategory utility', () => {
     it('finds specific reference entry by track and class', () => {
       const entry = findReferenceEntry(mockEntries, 'Spa', 'GP', 'GT3');
       expect(entry?.carClass).toBe('GT3');
-      expect(entry?.target100Sec).toBe(135.0);
+      expect(entry?.targets.alienSec).toBe(135.0);
 
       const sebringRef = findReferenceEntry(mockEntries, 'Sebring International Raceway', '12h', 'GT3');
-      expect(sebringRef?.target100Sec).toBe(120.23);
+      expect(sebringRef?.targets.alienSec).toBe(120.23);
 
       const schoolRef = findReferenceEntry(mockEntries, 'Sebring International Raceway', 'School', 'GT3');
-      expect(schoolRef?.target100Sec).toBe(62.90);
+      expect(schoolRef?.targets.alienSec).toBe(62.90);
     });
 
     it('requires an exact canonical class and never selects another class benchmark', () => {
@@ -218,7 +218,7 @@ describe('paceCategory utility', () => {
     });
     it('batch lookup preserves layout, class, custom-track fallbacks and input ordering', () => {
       const entries = [...mockEntries,
-        { trackName: 'My Custom Track', carClass: 'Hyper', target100Sec: 90 } as ReferenceLaptimeEntry];
+        { trackName: 'My Custom Track', carClass: 'Hyper', targets: { alienSec: 90 } } as ReferenceLaptimeEntry];
       const lookup = createBenchmarkLookup(entries);
       for (const [venue, course] of [['Spa', 'GP'], ['Sebring', 'School'], ['Silverstone', 'National'], ['My Custom', ''], ['Missing', '']]) {
         expect(lookup.findTrackEntries(venue, course)).toEqual(findMatchingTrackBenchmarkEntries(entries, venue, course));

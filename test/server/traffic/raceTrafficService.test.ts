@@ -15,7 +15,7 @@ function lap(lapNumber: number, aheadM: number): ReplayTrajectoryData {
     const time = startSec + i / 5;
     points.push({ ...pointAt((lapNumber - 1) * 1000 + aheadM + 50 * (time - startSec)), y: 0, timeSec: time });
   }
-  return { replayName: REPLAY, pointsCount: points.length, rawSampleRateHz: 5, currentLap: lapNumber, bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 }, points };
+  return { replayName: REPLAY, pointsCount: points.length, vcrRawSampleRateHz: 5, currentLap: lapNumber, bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 }, points };
 }
 
 const session = {

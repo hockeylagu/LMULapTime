@@ -70,7 +70,7 @@ describe('summarisePitService', () => {
 });
 
 describe('pitLossPerLap', () => {
-  const lap = (lapNum: number, lapTime: number, pitStopDuration?: number) => ({ lapNum, lapTime, pitStopDuration } as LapData);
+  const lap = (lapNumber: number, lapTime: number, pitStopDuration?: number) => ({ lapNumber, lapTime, pitStopDuration } as LapData);
 
   it('splits the stop between the in-lap and the out-lap around an average lap', () => {
     const losses = pitLossPerLap(lap(1, 122.366, 113.1), lap(2, 210.933));

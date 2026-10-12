@@ -19,8 +19,8 @@ export type ReplayDriverIngestStatus = 'stored' | 'failed' | 'interrupted';
 export const MAX_DECODE_ATTEMPTS = 3;
 
 export interface ReplayDriverIngest {
-  fileMtime: number;
-  fileSize: number;
+  mtimeMs: number;
+  fileSizeBytes: number;
   parserVersion: string;
   status: ReplayDriverIngestStatus;
   error: string | null;
@@ -30,10 +30,10 @@ export interface ReplayDriverIngest {
 
 export function getReplayDriverIngest(db: DatabaseType, filename: string, driverSlot: number): ReplayDriverIngest | null {
   const row = db.prepare(
-    'SELECT file_mtime, file_size, parser_version, status, error, attempts FROM replay_ingest_drivers WHERE filename = ? AND driver_slot = ?'
-  ).get(filename, driverSlot) as { file_mtime: number; file_size: number; parser_version: string; status: ReplayDriverIngestStatus; error: string | null; attempts: number } | undefined;
+    'SELECT file_mtime_ms, file_size_bytes, parser_version, status, error, attempts FROM replay_ingest_drivers WHERE filename = ? AND driver_slot = ?'
+  ).get(filename, driverSlot) as { file_mtime_ms: number; file_size_bytes: number; parser_version: string; status: ReplayDriverIngestStatus; error: string | null; attempts: number } | undefined;
   if (!row) return null;
-  return { fileMtime: row.file_mtime, fileSize: row.file_size, parserVersion: row.parser_version, status: row.status, error: row.error, attempts: row.attempts };
+  return { mtimeMs: row.file_mtime_ms, fileSizeBytes: row.file_size_bytes, parserVersion: row.parser_version, status: row.status, error: row.error, attempts: row.attempts };
 }
 
 /**
@@ -44,28 +44,28 @@ export function recordReplayDriverIngest(
   db: DatabaseType,
   filename: string,
   driverSlot: number,
-  fileMtime: number,
-  fileSize: number,
+  mtimeMs: number,
+  fileSizeBytes: number,
   status: ReplayDriverIngestStatus,
   error: string | null = null
 ): void {
   db.prepare(`
-    INSERT INTO replay_ingest_drivers (filename, driver_slot, file_mtime, file_size, parser_version, status, error, attempted_at, attempts)
+    INSERT INTO replay_ingest_drivers (filename, driver_slot, file_mtime_ms, file_size_bytes, parser_version, status, error, attempted_at, attempts)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
     ON CONFLICT(filename, driver_slot) DO UPDATE SET
       attempts = CASE
-        WHEN replay_ingest_drivers.file_mtime = excluded.file_mtime
-          AND replay_ingest_drivers.file_size = excluded.file_size
+        WHEN replay_ingest_drivers.file_mtime_ms = excluded.file_mtime_ms
+          AND replay_ingest_drivers.file_size_bytes = excluded.file_size_bytes
           AND replay_ingest_drivers.parser_version = excluded.parser_version
           AND replay_ingest_drivers.status = excluded.status
         THEN replay_ingest_drivers.attempts + 1 ELSE 1 END,
-      file_mtime = excluded.file_mtime,
-      file_size = excluded.file_size,
+      file_mtime_ms = excluded.file_mtime_ms,
+      file_size_bytes = excluded.file_size_bytes,
       parser_version = excluded.parser_version,
       status = excluded.status,
       error = excluded.error,
       attempted_at = excluded.attempted_at
-  `).run(filename, driverSlot, fileMtime, fileSize, REPLAY_CACHE_VERSION, status, error, Date.now());
+  `).run(filename, driverSlot, mtimeMs, fileSizeBytes, REPLAY_CACHE_VERSION, status, error, Date.now());
 }
 
 /** How a decode that threw is recorded: only the decoder rejecting the file settles it. */
@@ -82,14 +82,14 @@ export function replayErrorMessage(error: unknown): string {
  * True when this build stored this driver of this file version, or its decode failed MAX_DECODE_ATTEMPTS
  * times in a row: it is not decoded again until the file or the parser version changes.
  */
-export function isReplayDriverSettled(attempt: ReplayDriverIngest | null, fileMtime: number, fileSize: number): boolean {
-  if (!attempt || attempt.fileMtime !== fileMtime || attempt.fileSize !== fileSize || attempt.parserVersion !== REPLAY_CACHE_VERSION) return false;
+export function isReplayDriverSettled(attempt: ReplayDriverIngest | null, mtimeMs: number, fileSizeBytes: number): boolean {
+  if (!attempt || attempt.mtimeMs !== mtimeMs || attempt.fileSizeBytes !== fileSizeBytes || attempt.parserVersion !== REPLAY_CACHE_VERSION) return false;
   return attempt.status === 'stored' || attempt.attempts >= MAX_DECODE_ATTEMPTS;
 }
 
 /** A settled attempt that did not store the driver: the error to show for it. */
-export function settledReplayFailure(attempt: ReplayDriverIngest | null, fileMtime: number, fileSize: number): string | null {
-  if (!attempt || attempt.status === 'stored' || !isReplayDriverSettled(attempt, fileMtime, fileSize)) return null;
+export function settledReplayFailure(attempt: ReplayDriverIngest | null, mtimeMs: number, fileSizeBytes: number): string | null {
+  if (!attempt || attempt.status === 'stored' || !isReplayDriverSettled(attempt, mtimeMs, fileSizeBytes)) return null;
   return attempt.error ?? 'Replay could not be decoded';
 }
 

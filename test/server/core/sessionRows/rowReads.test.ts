@@ -7,15 +7,15 @@ import { restoreStoredSessionLinks } from '../../../../server/core/dbSessionStor
 import { getTelemetrySessionCandidatesStartingBetween } from '../../../../server/core/dbReconciliationStore.js';
 import { driver, lap, session } from './builders.js';
 
-const link = { name: 'Spa.Vcr', path: 'C:/Replays/Spa.Vcr', sizeBytes: 10, eventTitle: 'Spa', durationSec: 300, hasRain: true, maxRainIntensity: 30 };
+const link = { name: 'Spa.Vcr', path: 'C:/Replays/Spa.Vcr', fileSizeBytes: 10, eventTitle: 'Spa', durationSec: 300, hasRain: true, maxRainIntensity: 30 };
 
 function newSession(id: string, overrides: Partial<DetailedSession> = {}): DetailedSession {
-  const player = driver('P', [lap(1), lap(2, { conditions: { wetTyres: true } }), lap(3, { isPitStop: true })], { isPlayer: true, bestLapNum: 1, avgLapTime: 101.5,
-    incidents: [{ type: 'contact', description: 'hit', lapNum: 2 }], totalIncidents: 1, pitStopsCount: 1 });
+  const player = driver('P', [lap(1), lap(2, { conditions: { wetTyres: true } }), lap(3, { isPitStop: true })], { isPlayer: true, bestLapNumber: 1, avgLapTime: 101.5,
+    incidents: [{ type: 'contact', description: 'hit', lapNumber: 2 }], declaredPitStopsCount: 1 });
   return session([player, driver('Q', [lap(1)], { position: 2, classPosition: 2, carClass: 'GT3', carType: 'Porsche 911 GT3 R' })], {
-    id, filename: `${id}.xml`, filePath: `${id}.xml`, timestamp: 1_780_000_000_000, weatherInfo: 'Sunny',
+    id, filename: `${id}.xml`, filePath: `${id}.xml`, timestamp: 1_780_000_000_000,
     weather: { condition: 'Dry', timeOfDay: 'Daytime', weatherString: 'Clear' }, settings: { modeSetting: 'Multiplayer', fuelMultiplier: 1, tireWarmers: true },
-    bestSessionLap: { driverName: 'P', carType: 'Ferrari 499P', lapTime: 101, lapTimeString: '1:41.000' }, ...overrides });
+    bestSessionLap: { driverName: 'P', carType: 'Ferrari 499P', lapTime: 101 }, ...overrides });
 }
 
 describe('reads from the normalized rows', () => {
@@ -28,18 +28,24 @@ describe('reads from the normalized rows', () => {
   it.each(['clear', 'rule reset'] as const)('invalidates persisted session and card attachments on telemetry %s', action => {
     db.upsertSession(newSession('a', { matchingReplayFile: link }), 'a.xml', 1, 10);
     db.updateSessionTelemetryFile('a', 'old.duckdb');
-    expect(readSessionCards(raw(), ['a'])[0].matchingReplayFile?.duckdbFilename).toBe('old.duckdb');
+    expect(readSessionCards(raw(), ['a'])[0].duckdbFilename).toBe('old.duckdb');
     const revision = db.getTelemetryMetadataRevision();
     if (action === 'clear') db.clearTelemetryCache();
     else expect(db.resetTelemetryLinksForRule('new-rule')).toBe(true);
     expect(db.getTelemetryMetadataRevision()).toBeGreaterThan(revision);
-    expect(db.getSessionById('a')).toMatchObject({ hasDuckDbTelemetry: false });
     expect(db.getSessionById('a')?.duckdbFilename).toBeUndefined();
-    expect(db.getSessionById('a')?.matchingReplayFile?.duckdbFilename).toBeUndefined();
-    expect(readSessionCards(raw(), ['a'])[0].hasDuckDbTelemetry).toBe(false);
+    expect(readSessionCards(raw(), ['a'])[0].duckdbFilename).toBeUndefined();
     db.updateSessionTelemetryFile('a', 'new.duckdb');
     if (action === 'rule reset') expect(db.resetTelemetryLinksForRule('new-rule')).toBe(false);
     expect(db.getSessionById('a')?.duckdbFilename).toBe('new.duckdb');
+  });
+
+  it('hydrates driver and lap ordinals from their stored positions, including on the player', () => {
+    db.upsertSession(session([driver('Q', [lap(1)]), driver('P', [lap(1), lap(2), lap(3)], { isPlayer: true })], { id: 'o' }), 'o.xml', 1, 10);
+    const read = db.getSessionById('o') as DetailedSession;
+    expect(read.drivers.map(item => item.driverOrdinal)).toEqual([0, 1]);
+    expect(read.drivers[1].laps.map(item => item.lapOrdinal)).toEqual([0, 1, 2]);
+    expect(read.playerDriver?.driverOrdinal).toBe(1);
   });
 
   it('serves sessions, links, ids, windows and recording owners from the rows', () => {
@@ -65,13 +71,13 @@ describe('reads from the normalized rows', () => {
 
     const reparsed = newSession('a');
     restoreStoredSessionLinks(raw(), reparsed);
-    expect(reparsed.matchingReplayFile).toMatchObject({ name: 'Spa.Vcr', hasDuckDbTelemetry: true, duckdbFilename: 'spa.duckdb' });
-    expect(reparsed).toMatchObject({ duckdbFilename: 'spa.duckdb', hasDuckDbTelemetry: true });
+    expect(reparsed.matchingReplayFile).toMatchObject({ name: 'Spa.Vcr' });
+    expect(reparsed).toMatchObject({ duckdbFilename: 'spa.duckdb' });
     // Nothing changes, so nothing is rewritten.
     const stamp = () => raw().prepare('SELECT updated_at, source_revision FROM sessions WHERE id = ?').get('a');
     const before = stamp();
     expect(db.updateSessionTelemetryFile('a', 'spa.duckdb')).toBe(false);
-    db.updateSessionMatchingReplay('a', { name: 'Spa.Vcr', path: link.path, sizeBytes: 10, eventTitle: 'Spa', durationSec: 300, maxRainIntensity: 30, hasRain: true });
+    db.updateSessionMatchingReplay('a', { name: 'Spa.Vcr', path: link.path, fileSizeBytes: 10, eventTitle: 'Spa', durationSec: 300, maxRainIntensity: 30, hasRain: true });
     expect(stamp()).toEqual(before);
     // Keep unnamed entries (the matcher handles them), without inventing a driver for empty sessions.
     db.upsertSession(newSession('unnamed', { drivers: [driver('', [lap(1)])], playerDriver: undefined, driversCount: 1 }), 'unnamed.xml', 1, 10);
@@ -99,17 +105,18 @@ describe('reads from the normalized rows', () => {
     expect(db.getSessionById('a')?.matchingReplayFile?.name).toBe('Spa.Vcr');
     expect(db.updateSessionTelemetryFile('a', 'spa.duckdb')).toBe(true);
     db.reclassifyStoredSessions({ ids: ['a'] });
-    expect(db.getSessionById('a')?.matchingReplayFile).toMatchObject({ name: 'Spa.Vcr', duckdbFilename: 'spa.duckdb' });
+    expect(db.getSessionById('a')?.matchingReplayFile).toMatchObject({ name: 'Spa.Vcr' });
+    expect(db.getSessionById('a')?.duckdbFilename).toBe('spa.duckdb');
     expect(db.rejectSessionReplayLink('a', link, 'layout')).not.toBeNull();
     expect(db.getSessionById('a')?.matchingReplayFile).toBeUndefined();
     expect(raw().prepare('SELECT recording_name FROM sessions WHERE id = ?').get('a')).toEqual({ recording_name: null });
   });
 
-  it('lifts a DuckDB file that only the link carried onto the session', () => {
-    const legacy = newSession('a', { matchingReplayFile: { ...link, hasDuckDbTelemetry: true, duckdbFilename: 'old.duckdb' } });
-    db.upsertSession(legacy, 'a.xml', 1, 10);
-    expect(raw().prepare('SELECT has_duckdb_telemetry AS flag, duckdb_filename AS file FROM sessions WHERE id = ?').get('a')).toEqual({ flag: 1, file: 'old.duckdb' });
-    expect(db.getSessionById('a')).toMatchObject({ duckdbFilename: 'old.duckdb', hasDuckDbTelemetry: true, matchingReplayFile: { duckdbFilename: 'old.duckdb' } });
+  it('keeps the DuckDB file on the session only, not on the replay link', () => {
+    db.upsertSession(newSession('a', { matchingReplayFile: link, duckdbFilename: 'old.duckdb' }), 'a.xml', 1, 10);
+    expect(raw().prepare('SELECT duckdb_filename AS file FROM sessions WHERE id = ?').get('a')).toEqual({ file: 'old.duckdb' });
+    expect(db.getSessionById('a')).toMatchObject({ duckdbFilename: 'old.duckdb' });
+    expect(db.getSessionById('a')?.matchingReplayFile).not.toHaveProperty('duckdbFilename');
     expect(raw().prepare('PRAGMA table_info(session_recordings)').all().map(column => (column as { name: string }).name)).not.toContain('duckdb_filename');
   });
 });
@@ -120,14 +127,14 @@ describe('session cards built from columns', () => {
   afterEach(() => { db.close(); });
 
   it('equal the card JSON the projection writes, for players, links, telemetry and a missing player', () => {
-    db.upsertSession(newSession('a', { matchingReplayFile: { ...link, hasDuckDbTelemetry: true, duckdbFilename: 'spa.duckdb' }, duckdbFilename: 'spa.duckdb', hasDuckDbTelemetry: true }), 'a.xml', 1, 10);
+    db.upsertSession(newSession('a', { matchingReplayFile: link, duckdbFilename: 'spa.duckdb' }), 'a.xml', 1, 10);
     db.upsertSession(newSession('b', { timestamp: 1_780_000_100_000 }), 'b.xml', 1, 10);
     const noPlayer = session([driver('Q', [lap(1)]), driver('R', [lap(1)])], { id: 'c', filename: 'c.xml', filePath: 'c.xml', timestamp: 1_780_000_200_000 });
     db.upsertSession(noPlayer, 'c.xml', 1, 10);
     const cards = readSessionCards(db.getDb(), ['c', 'a', 'missing', 'b']);
     expect(cards.map(card => card.id)).toEqual(['c', 'a', 'b']);
     const sessionMap: Record<string, DetailedSession> = {
-      a: newSession('a', { matchingReplayFile: { ...link, hasDuckDbTelemetry: true, duckdbFilename: 'spa.duckdb' }, duckdbFilename: 'spa.duckdb', hasDuckDbTelemetry: true }),
+      a: newSession('a', { matchingReplayFile: link, duckdbFilename: 'spa.duckdb' }),
       b: newSession('b', { timestamp: 1_780_000_100_000 }),
       c: noPlayer,
     };
@@ -137,7 +144,7 @@ describe('session cards built from columns', () => {
       expect(card.trackVenue).toBe(sess.trackVenue);
       expect(card.trackCourse).toBe(sess.trackCourse);
     }
-    expect(cards[1].playerDriver).toMatchObject({ completedLapsCount: 3, cleanLapsCount: expect.any(Number), pitStopsCount: 1 });
+    expect(cards[1].playerDriver).toMatchObject({ lapsCount: 3, cleanLapsCount: expect.any(Number), pitStopsCount: 1 });
     expect(cards[1].playerDriver).not.toHaveProperty('laps');
     expect(cards[1].playerDriver).not.toHaveProperty('incidents');
     expect(cards[0].playerDriver).toBeUndefined();

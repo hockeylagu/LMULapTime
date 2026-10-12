@@ -6,14 +6,13 @@ import { SESSION_DICTIONARY_TABLES, SESSION_ROW_TABLES } from './sessionRows/sch
 import { loadSession, readStoredLinkState, sameReplayLink } from './sessionRows/access.js';
 
 import { upsertTargetedReplayLink, updateTargetedTelemetry } from './sessionRows/targeted.js';
-import { withSessionTelemetry } from './sessionRows/canonical.js';
 
 
 /** Ingestion's persisted XML end timestamp; a different path must not reuse it. */
 export function getSessionXmlMtime(db: DatabaseType, sessionId: string, filePath: string): number | undefined {
-  const row = db.prepare('SELECT file_mtime FROM sessions WHERE id=? AND file_path=?')
-    .get(sessionId, filePath) as { file_mtime: number } | undefined;
-  return row && Number.isFinite(row.file_mtime) && row.file_mtime > 0 ? row.file_mtime : undefined;
+  const row = db.prepare('SELECT file_mtime_ms FROM sessions WHERE id=? AND file_path=?')
+    .get(sessionId, filePath) as { file_mtime_ms: number } | undefined;
+  return row && Number.isFinite(row.file_mtime_ms) && row.file_mtime_ms > 0 ? row.file_mtime_ms : undefined;
 }
 
 export function getSessionById(db: DatabaseType, id: string): DetailedSession | null {
@@ -29,18 +28,15 @@ export function restoreStoredSessionLinks(db: DatabaseType, session: DetailedSes
   const stored = readStoredLinkState(db, session.id);
   if (!stored) return;
   if (!session.matchingReplayFile && stored.link && !isReplayLinkWithdrawn(db, session.id, stored.link.name)) session.matchingReplayFile = stored.link;
-  if (!session.duckdbFilename && stored.duckdbFilename) {
-    session.duckdbFilename = stored.duckdbFilename;
-    session.hasDuckDbTelemetry = true;
-  }
+  if (!session.duckdbFilename && stored.duckdbFilename) session.duckdbFilename = stored.duckdbFilename;
 }
 
 export function upsertSession(
   db: DatabaseType,
   session: DetailedSession,
   filePath: string,
-  mtime: number,
-  size: number
+  mtimeMs: number,
+  fileSizeBytes: number
 ): void {
   // A (re)parse matches the replay again from the XML alone. A replay withdrawn from the session
   // stays withdrawn, so it is dropped here instead of being stored and withdrawn again.
@@ -52,13 +48,13 @@ export function upsertSession(
   const write = db.transaction(() => {
     db.prepare(`
       INSERT INTO sessions (
-        id, filename, file_path, file_mtime, file_size, timestamp,
+        id, filename, file_path, file_mtime_ms, file_size_bytes, timestamp,
         track_venue, track_course, session_type, session_name,
         player_driver_name, player_car_class, player_car_type,
         player_best_lap_time, player_laps_count, drivers_count,
         updated_at
       ) VALUES (
-        @id, @filename, @filePath, @fileMtime, @fileSize, @timestamp,
+        @id, @filename, @filePath, @mtimeMs, @fileSizeBytes, @timestamp,
         @trackVenue, @trackCourse, @sessionType, @sessionName,
         @playerDriverName, @playerCarClass, @playerCarType,
         @playerBestLapTime, @playerLapsCount, @driversCount,
@@ -67,8 +63,8 @@ export function upsertSession(
       ON CONFLICT(id) DO UPDATE SET
         filename = excluded.filename,
         file_path = excluded.file_path,
-        file_mtime = excluded.file_mtime,
-        file_size = excluded.file_size,
+        file_mtime_ms = excluded.file_mtime_ms,
+        file_size_bytes = excluded.file_size_bytes,
         timestamp = excluded.timestamp,
         track_venue = excluded.track_venue,
         track_course = excluded.track_course,
@@ -85,8 +81,8 @@ export function upsertSession(
       id: session.id,
       filename: session.filename,
       filePath,
-      fileMtime: mtime,
-      fileSize: size,
+      mtimeMs,
+      fileSizeBytes,
       timestamp: session.timestamp,
       trackVenue: session.trackVenue,
       trackCourse: session.trackCourse,
@@ -96,7 +92,7 @@ export function upsertSession(
       playerCarClass: session.playerDriver ? session.playerDriver.carClass : null,
       playerCarType: session.playerDriver?.carType || null,
       playerBestLapTime: session.playerDriver?.bestLapTime ?? null,
-      playerLapsCount: session.playerDriver?.lapsCount ?? 0,
+      playerLapsCount: session.playerDriver?.declaredLapsCount ?? 0,
       driversCount: session.driversCount,
       updatedAt: now,
     });
@@ -113,7 +109,6 @@ export function updateSessionMatchingReplay(
   try {
     const stored = readStoredLinkState(db, sessionId);
     if (!stored) return { updated: false };
-    matchingReplayFile = withSessionTelemetry(matchingReplayFile, stored.duckdbFilename);
     // Reconciliation re-asserts matches: skip identical rewrites.
     if (stored.link && sameReplayLink(stored.link, matchingReplayFile)) {
       return { updated: false };
@@ -133,11 +128,9 @@ export function updateSessionMatchingReplay(
  * Returns whether anything changed.
  */
 export function updateSessionTelemetryFile(db: DatabaseType, sessionId: string, duckdbFilename: string | undefined): boolean {
-  const state = db.prepare('SELECT has_duckdb_telemetry AS flag, duckdb_filename AS file FROM sessions WHERE id = ?')
-    .get(sessionId) as { flag: number | null; file: string | null } | undefined;
+  const state = db.prepare('SELECT duckdb_filename AS file FROM sessions WHERE id = ?').get(sessionId) as { file: string | null } | undefined;
   if (!state) return false;
-  // The reader mirrors the session's attachment onto the link, so the session columns decide.
-  if ((state.file ?? undefined) === duckdbFilename && Boolean(state.flag) === Boolean(duckdbFilename)) return false;
+  if ((state.file ?? undefined) === duckdbFilename) return false;
   updateTargetedTelemetry(db, sessionId, duckdbFilename);
   return true;
 }

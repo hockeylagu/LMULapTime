@@ -5,6 +5,7 @@ import path from 'path';
 import { SessionDatabase } from '../../../../server/core/db.js';
 import { getReplayConditions, getReplayLaps } from '../../../../server/core/replay/dbReplayLapStore.js';
 import { upsertReplayMetadataCache } from '../../../../server/core/replay/dbReplayMetadataStore.js';
+import { replaceReplayDriverLaps, type EncodedReplayLap } from '../../../../server/core/replay/dbReplayDriverStore.js';
 import { MAX_DECODE_ATTEMPTS } from '../../../../server/core/replay/dbReplayIngestStore.js';
 import { decompressTrajectory } from '../../../../server/core/replay/replayTrajectoryCodec.js';
 import type { ReplayTrajectoryData } from '../../../../shared/types/index.js';
@@ -21,6 +22,8 @@ const decoded = (lapNumbers: number[]): ReplayTrajectoryData => {
 
 describe('replay ingest', () => {
   let db: SessionDatabase;
+  const saveWith = (trajectory: ReplayTrajectoryData, prepared: EncodedReplayLap[]): void =>
+    replaceReplayDriverLaps(db.getDb(), { filename: name, filePath: 'C:\\r\\' + name, mtimeMs: 1, fileSizeBytes: 1, driverSlotKey: 2, isPrimary: false }, trajectory, false, prepared);
 
   beforeEach(() => {
     db = new SessionDatabase(':memory:');
@@ -50,13 +53,31 @@ describe('replay ingest', () => {
       expect([1, 2, 3].map(n => db.getStoredReplayTrajectory(name, 2, n)?.currentLap)).toEqual([1, 2, 3]);
       expect(db.getStoredReplayTrajectory(name, 2, 4)).toBeNull();
       expect(getReplayLaps(db.getDb(), name, 2).map(l => l.lapNumber)).toEqual([1, 2, 3]);
-      expect(db.getReplayDriverIngest(name, 2)?.fileMtime).toBe(1);
+      expect(db.getReplayDriverIngest(name, 2)?.mtimeMs).toBe(1);
+    });
+
+    it('never stores the trimmed points of a worker-prepared decode as a lap', () => {
+      const trimmed = { ...decoded([1]), points: [{ x: 1, y: 0, z: 0 }, { x: 2, y: 0, z: 0 }], allLapsData: undefined };
+      const prepared = [{ lapKey: 7, pointsCount: 500, blob: Buffer.from('x') }];
+      saveWith(trimmed, prepared);
+
+      expect(db.getDb().prepare('SELECT lap_key FROM replay_trajectories WHERE filename = ? AND driver_slot = 2').all(name))
+        .toEqual([{ lap_key: 7 }]);
+    });
+
+    it('stores one whole-trajectory row when the prepared rows already hold lap key -1', () => {
+      const unnumbered = { ...decoded([1]), currentLap: undefined, allLapsData: undefined };
+      const prepared = [{ lapKey: -1, pointsCount: 500, blob: Buffer.from('x') }];
+      expect(() => saveWith(unnumbered, prepared)).not.toThrow();
+
+      expect(db.getDb().prepare('SELECT lap_key, points_count FROM replay_trajectories WHERE filename = ? AND driver_slot = 2').all(name))
+        .toEqual([{ lap_key: -1, points_count: 500 }]);
     });
 
     it('records the driver as stored for this file version and parser version', () => {
       db.replaceReplayDriverLaps(name, 'C:\\r\\' + name, 10, 20, 2, decoded([1]), true);
 
-      expect(db.getReplayDriverIngest(name, 2)).toMatchObject({ fileMtime: 10, fileSize: 20, status: 'stored' });
+      expect(db.getReplayDriverIngest(name, 2)).toMatchObject({ mtimeMs: 10, fileSizeBytes: 20, status: 'stored' });
       // The player's decode also settles the "no driver requested" alias.
       expect(db.getReplayDriverIngest(name, -1)).toMatchObject({ status: 'stored' });
     });
@@ -133,12 +154,12 @@ describe('replay ingest', () => {
 
     const fileVersion = () => {
       const stat = fs.statSync(path.join(dir, name));
-      return { mtime: Math.floor(stat.mtimeMs), size: stat.size };
+      return { mtimeMs: Math.floor(stat.mtimeMs), fileSizeBytes: stat.size };
     };
 
     it('does not decode again a driver that failed MAX_DECODE_ATTEMPTS times for this file and parser version', () => {
-      const { mtime, size } = fileVersion();
-      for (let i = 0; i < MAX_DECODE_ATTEMPTS; i++) db.recordReplayDriverIngest(name, 2, mtime, size, 'failed', 'bad stream');
+      const { mtimeMs, fileSizeBytes } = fileVersion();
+      for (let i = 0; i < MAX_DECODE_ATTEMPTS; i++) db.recordReplayDriverIngest(name, 2, mtimeMs, fileSizeBytes, 'failed', 'bad stream');
 
       db.syncReplaysFromDir(dir, { playerName: 'Player Driver' });
 
@@ -148,8 +169,8 @@ describe('replay ingest', () => {
     });
 
     it('decodes an interrupted driver again (a worker that exited with the server)', () => {
-      const { mtime, size } = fileVersion();
-      db.recordReplayDriverIngest(name, 2, mtime, size, 'interrupted', 'Replay trajectory worker exited with code 1 before returning a result');
+      const { mtimeMs, fileSizeBytes } = fileVersion();
+      db.recordReplayDriverIngest(name, 2, mtimeMs, fileSizeBytes, 'interrupted', 'Replay trajectory worker exited with code 1 before returning a result');
 
       db.syncReplaysFromDir(dir, { playerName: 'Player Driver' });
 
@@ -158,8 +179,8 @@ describe('replay ingest', () => {
     });
 
     it('leaves a driver alone once its decode was interrupted MAX_DECODE_ATTEMPTS times', () => {
-      const { mtime, size } = fileVersion();
-      for (let i = 0; i < MAX_DECODE_ATTEMPTS; i++) db.recordReplayDriverIngest(name, 2, mtime, size, 'interrupted', 'out of memory');
+      const { mtimeMs, fileSizeBytes } = fileVersion();
+      for (let i = 0; i < MAX_DECODE_ATTEMPTS; i++) db.recordReplayDriverIngest(name, 2, mtimeMs, fileSizeBytes, 'interrupted', 'out of memory');
       expect(db.getReplayDriverIngest(name, 2)?.attempts).toBe(MAX_DECODE_ATTEMPTS);
 
       db.syncReplaysFromDir(dir, { playerName: 'Player Driver' });
@@ -178,8 +199,8 @@ describe('replay ingest', () => {
     });
 
     it('tries a failed driver again once the parser version changes', () => {
-      const { mtime, size } = fileVersion();
-      db.recordReplayDriverIngest(name, 2, mtime, size, 'failed', 'bad stream');
+      const { mtimeMs, fileSizeBytes } = fileVersion();
+      db.recordReplayDriverIngest(name, 2, mtimeMs, fileSizeBytes, 'failed', 'bad stream');
       (db as unknown as { db: { prepare(sql: string): { run(): void } } }).db
         .prepare("UPDATE replay_ingest_drivers SET parser_version = 'v4'").run();
 
@@ -238,7 +259,7 @@ describe('replay ingest', () => {
     it('preserves a committed primary when the shared worker crashes on a later driver', async () => {
       const worker = vi.spyOn(replayWorker, 'storeReplayDriversInWorker').mockImplementation(async function* (_host, filePath, _options, save) {
         const primary = { ...decoded([1]), driverSlot: 1 };
-        db.replaceReplayDriverLaps(name, filePath, save.mtime, save.size, 1, primary, true);
+        db.replaceReplayDriverLaps(name, filePath, save.mtimeMs, save.fileSizeBytes, 1, primary, true);
         yield { stage: 'caching', stageDescription: 'Saved driver trajectory cache', percent: 100, driverStored: true, driverSlot: 1 };
         throw new Error('worker stopped');
       });

@@ -3,7 +3,7 @@ import { annotateLapTraffic, hadTraffic } from '../../shared/domain/raceTraffic.
 import type { LapTraffic } from '../../shared/types/index.js';
 
 interface TestLap {
-  lapNum: number;
+  lapNumber: number;
   lapTime: number | null;
   elapsedSeconds: number | null;
   isPitStop: boolean;
@@ -17,7 +17,7 @@ interface TestLap {
  */
 function driver(name: string, carClass: string, starts: number[], lastLapTime = 100) {
   const laps: TestLap[] = starts.map((start, i) => ({
-    lapNum: i + 1,
+    lapNumber: i + 1,
     lapTime: i + 1 < starts.length ? starts[i + 1] - start : lastLapTime,
     elapsedSeconds: start,
     isPitStop: false,
@@ -25,7 +25,7 @@ function driver(name: string, carClass: string, starts: number[], lastLapTime = 
   return { name, carClass, laps };
 }
 
-const lap = (d: { laps: TestLap[] }, lapNum: number) => d.laps.find(l => l.lapNum === lapNum)?.traffic;
+const lap = (d: { laps: TestLap[] }, lapNumber: number) => d.laps.find(l => l.lapNumber === lapNumber)?.traffic;
 
 describe('annotateLapTraffic', () => {
   it('measures the nearest cars on the road when each lap starts', () => {
@@ -119,7 +119,7 @@ describe('annotateLapTraffic', () => {
 
   it('leaves laps without line times unannotated and replaces older results', () => {
     const me = driver('Me', 'Hyper', [100, 200]);
-    me.laps.push({ lapNum: 3, lapTime: null, elapsedSeconds: null, isPitStop: false, traffic: { ahead: null, behind: null, following: true, passed: [], passedBy: [] } });
+    me.laps.push({ lapNumber: 3, lapTime: null, elapsedSeconds: null, isPitStop: false, traffic: { ahead: null, behind: null, following: true, passed: [], passedBy: [] } });
 
     annotateLapTraffic([me]);
 

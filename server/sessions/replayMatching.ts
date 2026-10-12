@@ -4,7 +4,7 @@ import type { ReplayLinkRejectionReason } from '../../shared/types/index.js';
 import type { StoredReplayFileInfo } from '../core/replay/dbReplayMetadataStore.js';
 import { ReplayFileEntry } from './sessionXmlTypes.js';
 
-/** The session a replay is matched against: its XML start timestamp and the XML file's mtime (session end). */
+/** The session a replay is matched against: its XML start timestamp and the XML file's mtimeMs (session end). */
 export interface ReplayMatchTarget {
   trackVenue: string;
   trackCourse: string;
@@ -27,18 +27,18 @@ function matchesSessionCode(replayCodeRaw: string, sessionCodeRaw: string): bool
 }
 
 /**
- * How far apart the replay and the session are in time. A replay's mtime is when the VCR was saved,
- * i.e. the END of the recorded session, so it is compared with the XML mtime (also written at session
+ * How far apart the replay and the session are in time. A replay's mtimeMs is when the VCR was saved,
+ * i.e. the END of the recorded session, so it is compared with the XML mtimeMs (also written at session
  * end); start-to-start uses the replay duration. Comparing replay end with session start is only a
  * fallback for replays without a known duration: in back-to-back races it lands on the PREVIOUS
  * race's replay, which ends minutes before the next race starts.
  */
 export function replayTimeDistanceMs(replay: ReplayFileEntry, target: ReplayMatchTarget): number {
-  const diffEnd = Math.abs(replay.mtime - target.xmlFileMtimeMs);
+  const diffEnd = Math.abs(replay.mtimeMs - target.xmlFileMtimeMs);
   if (!replay.durationSec) {
-    return Math.min(diffEnd, Math.abs(replay.mtime - target.sessionTimestampMs));
+    return Math.min(diffEnd, Math.abs(replay.mtimeMs - target.sessionTimestampMs));
   }
-  const replayStart = replay.mtime - Math.round(replay.durationSec * 1000);
+  const replayStart = replay.mtimeMs - Math.round(replay.durationSec * 1000);
   return Math.min(diffEnd, Math.abs(replayStart - target.sessionTimestampMs));
 }
 
@@ -67,7 +67,7 @@ function isSameLayout(replay: ReplayFileEntry, target: ReplayMatchTarget): boole
     && (replay.trackCourse ?? '') === (target.trackCourse ?? '');
 }
 
-/** Identity constraints that remain judgeable when the source XML has no stored mtime. */
+/** Identity constraints that remain judgeable when the source XML has no stored mtimeMs. */
 export function replayLinkIdentityRejection(replay: ReplayFileEntry, target: ReplayMatchTarget): ReplayLinkRejectionReason | null {
   if (!matchesSessionCode(replay.sessionCode, target.sessionCode || '')) return 'session-type';
   return isSameLayout(replay, target) ? null : 'layout';
@@ -100,17 +100,17 @@ export function replayIndexEntryFromStored(stored: StoredReplayFileInfo & { file
   return {
     name: stored.filename,
     path: stored.file_path,
-    sizeBytes: stored.file_size,
+    fileSizeBytes: stored.file_size_bytes,
     trackName: match ? match[1].trim() : (metadata.trackVenue || metadata.trackCourse || metadata.trackName || stored.filename.replace(/\.vcr$/i, '')),
     trackVenue: metadata.trackVenue,
     trackCourse: metadata.trackCourse,
     sessionCode: match ? match[2].toUpperCase() : (metadata.sessionType || ''),
-    mtime: stored.file_mtime,
+    mtimeMs: stored.file_mtime_ms,
     eventTitle: metadata.eventInfo?.eventTitle,
     splitNo: metadata.eventInfo?.splitNo,
     eventType: metadata.eventInfo?.eventType,
     durationSec: metadata.durationSec,
-    sceneDesc: metadata.sceneDesc || metadata.eventInfo?.sceneDesc || undefined,
+    sceneDesc: metadata.sceneDesc || undefined,
     hasRain: metadata.hasRain,
     maxRainIntensity: metadata.maxRainIntensity,
     weatherCondition: metadata.weatherCondition,

@@ -1,9 +1,11 @@
-import type { LapData, PitService } from '../../../../shared/types/index.js';
+import type { DriverData, LapData, PitService } from '../../../../shared/types/index.js';
+import { lapEvents } from '../../../../shared/domain/lapComparison.js';
 import { pitLossPerLap } from '../../../../shared/domain/pitStops.js';
+import { formatPitStopDuration } from '../../../../shared/domain/formatters.js';
 
 /** Damage the driver reported on the laps since their previous stop, up to this in-lap. */
 export interface EarlierDamage {
-  lapNum: number;
+  lapNumber: number;
   description: string;
 }
 
@@ -19,11 +21,12 @@ export interface LapPitStop {
 }
 
 /** The last damage reported between the driver's previous pit lap and this one, if any. */
-export function damageBeforeStop(laps: LapData[], inLap: LapData): EarlierDamage | undefined {
-  const previousStop = laps.filter((l) => l.isPitStop && l.lapNum < inLap.lapNum).reduce((max, l) => Math.max(max, l.lapNum), 0);
+export function damageBeforeStop(driver: Pick<DriverData, 'laps' | 'incidents'>, inLap: LapData): EarlierDamage | undefined {
+  const laps = driver.laps;
+  const previousStop = laps.filter((l) => l.isPitStop && l.lapNumber < inLap.lapNumber).reduce((max, l) => Math.max(max, l.lapNumber), 0);
   const damaged = laps
-    .filter((l) => l.lapNum > previousStop && l.lapNum <= inLap.lapNum)
-    .flatMap((l) => (l.incidents ?? []).filter((i) => i.type === 'damage').map((i) => ({ lapNum: l.lapNum, description: i.description })));
+    .filter((l) => l.lapNumber > previousStop && l.lapNumber <= inLap.lapNumber)
+    .flatMap((l) => lapEvents(driver, l.lapNumber).incidents.filter((i) => i.type === 'damage').map((i) => ({ lapNumber: l.lapNumber, description: i.description })));
   return damaged[damaged.length - 1];
 }
 
@@ -56,7 +59,7 @@ export function describePitService(service: PitService, damage?: EarlierDamage):
   }
   if (service.penaltyServed) lines.push('Penalty: served during the stop');
   if (service.unexplainedSec !== undefined) {
-    const after = damage ? `, after the ${damageName(damage.description)} on lap ${damage.lapNum}` : '';
+    const after = damage ? `, after the ${damageName(damage.description)} on lap ${damage.lapNumber}` : '';
     const normal = service.refillSec !== undefined ? "the refill and your class's usual stop" : "your class's usual stop";
     lines.push(`Likely repairs: ${secs(service.unexplainedSec)} longer than ${normal}${after}`);
   }
@@ -83,10 +86,10 @@ export function describePitStopLap({ inLap, outLap, damageBefore, onOutLap }: La
   }
   const lapLoss = onOutLap ? losses?.outLap : losses?.inLap;
   if (lapLoss !== undefined && outLap) lines.push(`Time lost on this lap: ${loss(lapLoss)}`);
-  if (inLap.pitStopDurationString && (onOutLap || !outLap)) {
+  if (inLap.pitStopDuration && (onOutLap || !outLap)) {
     lines.push(outLap
-      ? `Whole stop: ${inLap.pitStopDurationString} over laps ${inLap.lapNum} and ${outLap.lapNum}`
-      : `Estimated pit loss: ${inLap.pitStopDurationString}`);
+      ? `Whole stop: ${formatPitStopDuration(inLap.pitStopDuration)} over laps ${inLap.lapNumber} and ${outLap.lapNumber}`
+      : `Estimated pit loss: ${formatPitStopDuration(inLap.pitStopDuration)}`);
   }
   return lines;
 }

@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
-import { formatTime } from '../../../../shared/domain/formatters.js';
 import { selectCleanLapCandidates } from '../../../../shared/domain/lapComparison.js';
 
 export type SessionPositionChartPoint = Record<string, string | number | boolean | null | undefined>;
@@ -72,14 +71,14 @@ export function useSessionChartData({ session, selectedDriver, isMultiClass }: U
 
   const positionChartData = useMemo(() => {
     return Array.from({ length: maxClassLaps }, (_, i) => {
-      const lapNum = i + 1;
-      const point: SessionPositionChartPoint = { lapNum: `Lap ${lapNum}`, lapNumber: lapNum };
+      const lapNumber = i + 1;
+      const point: SessionPositionChartPoint = { lapLabel: `Lap ${lapNumber}`, lapNumber };
 
       const driversOnLap = driversToPlot
         .map((d) => ({
           driver: d,
-          lap: d.laps?.find((l) => l.lapNum === lapNum),
-          overallPos: d.laps?.find((l) => l.lapNum === lapNum && l.position > 0)?.position ?? null,
+          lap: d.laps?.find((l) => l.lapNumber === lapNumber),
+          overallPos: d.laps?.find((l) => l.lapNumber === lapNumber && l.position > 0)?.position ?? null,
         }))
         .filter((item): item is { driver: DriverData; lap: LapData; overallPos: number } => item.overallPos !== null);
 
@@ -91,7 +90,7 @@ export function useSessionChartData({ session, selectedDriver, isMultiClass }: U
         point[item.driver.name] = classPos;
         point[`${item.driver.name}_isPit`] = item.lap.isPitStop;
         point[`${item.driver.name}_isOutLap`] = isOutLap;
-        point[`${item.driver.name}_lapTime`] = item.lap.lapTimeString;
+        point[`${item.driver.name}_lapTime`] = item.lap.lapTime;
         point[`${item.driver.name}_isPlayer`] = item.driver.isPlayer;
         point[`${item.driver.name}_overallPos`] = item.overallPos;
       });
@@ -105,29 +104,20 @@ export function useSessionChartData({ session, selectedDriver, isMultiClass }: U
       // The parser infers a missing lap time from the elapsed time and marks out-laps.
       const isOutLap = Boolean(l.isOutLap);
       const resolvedLapTime = l.lapTime;
-      const resolvedLapTimeString = l.lapTimeString;
       const isInferred = Boolean(l.isInferred);
 
       return {
-        lapNum: `Lap ${l.lapNum}`,
-        lapNumber: l.lapNum,
+        lapLabel: `Lap ${l.lapNumber}`,
+        lapNumber: l.lapNumber,
         lapTime: resolvedLapTime && resolvedLapTime > 0 ? resolvedLapTime : null,
-        lapTimeString: resolvedLapTimeString,
         isInferred,
         avgLapTime,
-        avgLapTimeString: formatTime(avgLapTime),
         s1: l.s1 && l.s1 > 0 ? l.s1 : null,
         s2: l.s2 && l.s2 > 0 ? l.s2 : null,
         s3: l.s3 && l.s3 > 0 ? l.s3 : null,
         avgS1,
         avgS2,
         avgS3,
-        s1String: formatTime(l.s1),
-        s2String: formatTime(l.s2),
-        s3String: formatTime(l.s3),
-        avgS1String: formatTime(avgS1),
-        avgS2String: formatTime(avgS2),
-        avgS3String: formatTime(avgS3),
         topSpeed: l.topSpeed || null,
         twFL: l.tireWear?.fl ?? null,
         twFR: l.tireWear?.fr ?? null,

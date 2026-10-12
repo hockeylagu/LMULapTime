@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router';
 import { ChevronRight } from 'lucide-react';
-import { isSessionEmpty, getDisplayTrackName } from '../../../shared/domain/formatters.js';
+import { driverLapsCount, isSessionEmpty, getDisplayTrackName, formatTime } from '../../../shared/domain/formatters.js';
 import { PaceBadge } from '../common/PaceBadge.js';
 import { ReplayIndicator } from '../common/replay/ReplayIndicator.js';
 import { CarIdentity } from '../vehicle/CarIdentity.js';
@@ -85,12 +85,12 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
 
       {/* Laps */}
       <td className="px-3.5 py-3 text-center font-mono text-lmu-text-soft tabular-nums">
-        {p ? p.lapsCount : 0}
+        {p ? driverLapsCount(p) : 0}
       </td>
 
       {/* Best Lap */}
       <td className="px-3.5 py-3 text-right font-mono font-bold text-sm text-white tabular-nums">
-        {p?.bestLapTimeString || '--:--.---'}
+        {formatTime(p?.bestLapTime)}
       </td>
 
       {/* Benchmark Pace */}
@@ -115,7 +115,7 @@ export const SessionTableRow: React.FC<SessionTableRowProps> = ({
             <ReplayIndicator
               sessionId={s.id}
               hasReplay={Boolean(s.matchingReplayFile)}
-              hasDuckDbTelemetry={s.hasDuckDbTelemetry || s.matchingReplayFile?.hasDuckDbTelemetry}
+              hasDuckDbTelemetry={Boolean(s.duckdbFilename)}
               hideIfEmpty
               to={replayUrl}
               onClick={onOpenReplay ? () => onOpenReplay(s.id) : undefined}

@@ -17,9 +17,9 @@ export interface ImprovementChartPoint {
   bestPr: number | null;
   lapPrDelta: number | null;
   personalBestImproved: boolean;
-  benchmarkCategory?: PaceCategory | null;
+  paceCategory?: PaceCategory | null;
   personalBestBenchmarkCategory?: PaceCategory | null;
-  benchmarkPercentage: number | null;
+  pacePercentage: number | null;
   theoretical: number | null;
   theoreticalGap: number | null;
   consistencyScore: number | null;

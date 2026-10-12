@@ -2,7 +2,7 @@ import React from 'react';
 import { Replace, Target, Trash2 } from 'lucide-react';
 import { computeLapDeltas } from '../../../shared/domain/lapComparison.js';
 import { ReferenceLaptimeEntry, ComparableLap } from '../../../shared/types/index.js';
-import { formatTime } from '../../../shared/domain/formatters.js';
+import { formatTime, formatPitStopDuration } from '../../../shared/domain/formatters.js';
 import { getPaceCategoryFromPercentage } from '../../../shared/domain/paceCategory.js';
 import { PaceBadge } from '../common/PaceBadge.js';
 import { LapStatusBadge } from '../common/LapStatusBadge.js';
@@ -50,8 +50,8 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
     const matchingRef =
       benchmarks.find((b) => (b.carClass === lap.carClass));
 
-    if (matchingRef?.target100Sec) {
-      pct = parseFloat(((lap.lapTime / matchingRef.target100Sec) * 100).toFixed(2));
+    if (matchingRef?.targets.alienSec) {
+      pct = parseFloat(((lap.lapTime / matchingRef.targets.alienSec) * 100).toFixed(2));
       cat = getPaceCategoryFromPercentage(pct);
     } else {
       const sampleLap = allLaps.find((l) => l.isValid && l.lapTime && l.pacePercentage);
@@ -80,7 +80,7 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
                 lap.isAllTimePB ? 'text-lmu-personal-best' : lap.isSessionBest ? 'text-lmu-session-best' : 'text-white'
               }`}
             >
-              {plainTag(lap.tag) || `Lap ${lap.lapNum || '-'}`}
+              {plainTag(lap.tag) || `Lap ${lap.lapNumber || '-'}`}
             </span>
             {isRival && (
               <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-lmu-warn-soft shrink-0">
@@ -138,7 +138,7 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
           {(lap.sessionName || lap.sessionType) && (
             <p className="flex items-center gap-2 mt-1.5 text-[11px] text-lmu-muted min-w-0">
               <SessionTypeChip session={{ sessionType: lap.sessionType ?? '', sessionName: lap.sessionName }} />
-              {lap.dateString && <span className="font-mono truncate">{lap.dateString.slice(0, 16)}</span>}
+              {lap.timeString && <span className="font-mono truncate">{lap.timeString.slice(0, 16)}</span>}
             </p>
           )}
           <div className="flex items-baseline gap-2 mt-0.5">
@@ -147,7 +147,7 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
                 lap.isAllTimePB ? 'text-lmu-personal-best' : lap.isSessionBest ? 'text-lmu-session-best' : 'text-white'
               }`}
             >
-              {lap.lapTimeString}
+              {formatTime(lap.lapTime)}
             </h4>
             {deltas && !isBaseline && deltas.lapTimeDelta !== null && (
               <span className={`text-sm font-mono ${deltas.lapTimeDeltaClass}`} data-testid="lap-time-delta">
@@ -172,7 +172,7 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
                   isOutLap={lap.isOutLap}
                   isValid={lap.isValid}
                   isInferred={lap.isInferred}
-                  pitTooltip={lap.pitStopDurationString ? `Estimated pit loss: ${lap.pitStopDurationString}` : undefined}
+                  pitTooltip={lap.pitStopDuration ? `Estimated pit loss: ${formatPitStopDuration(lap.pitStopDuration)}` : undefined}
                   size="xs"
                 />
               )}
@@ -183,9 +183,9 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
         {/* Sector Breakdown */}
         <div className="mt-3 space-y-2 text-xs font-mono">
           {([
-            { label: 'S1', time: lap.s1String || formatTime(lap.s1), delta: deltas?.s1DeltaFormatted, cls: deltas?.s1DeltaClass },
-            { label: 'S2', time: lap.s2String || formatTime(lap.s2), delta: deltas?.s2DeltaFormatted, cls: deltas?.s2DeltaClass },
-            { label: 'S3', time: lap.s3String || formatTime(lap.s3), delta: deltas?.s3DeltaFormatted, cls: deltas?.s3DeltaClass },
+            { label: 'S1', time: formatTime(lap.s1), delta: deltas?.s1DeltaFormatted, cls: deltas?.s1DeltaClass },
+            { label: 'S2', time: formatTime(lap.s2), delta: deltas?.s2DeltaFormatted, cls: deltas?.s2DeltaClass },
+            { label: 'S3', time: formatTime(lap.s3), delta: deltas?.s3DeltaFormatted, cls: deltas?.s3DeltaClass },
           ]).map((sector) => (
             <div key={sector.label} className="flex items-center justify-between p-2 rounded-lg bg-lmu-bg/40 border border-lmu-border/40">
               <span className="text-white font-sans font-semibold">{sector.label}</span>

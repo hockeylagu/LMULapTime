@@ -24,8 +24,8 @@ describe('LapDebriefPanel', () => {
       corners: [corner(5, 0.21), corner(1, 0.08)],
       confidence: 1,
       caveats: ['One lap was recorded at a lower rate.'],
-      yours: { driverName: 'Me', lapNum: 3, sessionId: 's-Me', driverOrdinal: 0, lapOrdinal: 2 },
-      theirs: { driverName: 'Rival', lapNum: 3, sessionId: 's-Rival', driverOrdinal: 1, lapOrdinal: 2 },
+      yours: { driverName: 'Me', lapNumber: 3, sessionId: 's-Me', driverOrdinal: 0, lapOrdinal: 2 },
+      theirs: { driverName: 'Rival', lapNumber: 3, sessionId: 's-Rival', driverOrdinal: 1, lapOrdinal: 2 },
     });
     renderPanel();
     expect(loader.load).not.toHaveBeenCalled();
@@ -48,8 +48,8 @@ describe('LapDebriefPanel', () => {
   it('builds the debrief straight away when asked to', async () => {
     loader.load.mockResolvedValue({
       corners: [corner(2, 0.1)], confidence: 1, caveats: [],
-      yours: { driverName: 'Me', lapNum: 3, sessionId: 's-Me', driverOrdinal: 0, lapOrdinal: 2 },
-      theirs: { driverName: 'Rival', lapNum: 3, sessionId: 's-Rival', driverOrdinal: 1, lapOrdinal: 2 },
+      yours: { driverName: 'Me', lapNumber: 3, sessionId: 's-Me', driverOrdinal: 0, lapOrdinal: 2 },
+      theirs: { driverName: 'Rival', lapNumber: 3, sessionId: 's-Rival', driverOrdinal: 1, lapOrdinal: 2 },
     });
     render(<LapDebriefPanel pairKey="me|rival" againstLabel="Rival" load={loader.load} autoStart />);
     expect(await screen.findByTestId('debrief-corner-2')).toBeInTheDocument();

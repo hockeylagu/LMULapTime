@@ -26,8 +26,8 @@ export function buildImprovementChartRows(trackData: SessionProgressionPoint[], 
       p.bestLapTime === personalBestSeries[index] &&
       (index === 0 || personalBestSeries[index - 1] !== personalBestSeries[index]);
 
-    if (personalBestImproved && p.benchmarkCategory) {
-      personalBestBenchmarkCategory = p.benchmarkCategory;
+    if (personalBestImproved && p.paceCategory) {
+      personalBestBenchmarkCategory = p.paceCategory;
     }
 
     return {
@@ -38,17 +38,17 @@ export function buildImprovementChartRows(trackData: SessionProgressionPoint[], 
       sessionId: p.sessionId,
       session: p.sessionName ? `${p.sessionType} (${p.sessionName})` : p.sessionType,
       car: p.carType,
-      weather: p.weatherInfo,
+      weather: p.weather?.weatherString,
       bestLap: p.bestLapTime,
-      top3Avg: p.top3AvgLapTime ?? null,
-      top3AvgStr: p.top3AvgLapTime ? formatTime(p.top3AvgLapTime) : null,
+      top3Avg: p.top3Average ?? null,
+      top3AvgStr: p.top3Average ? formatTime(p.top3Average) : null,
       movingAvg,
       avgLap: p.avgLapTime,
       bestPr: personalBestSeries[index],
       lapPrDelta: calculateLapPrDelta(p.bestLapTime, index > 0 ? personalBestSeries[index - 1] : null),
       personalBestImproved,
-      benchmarkCategory: p.benchmarkCategory ?? null,
-      benchmarkPercentage: p.benchmarkPercentage ?? null,
+      paceCategory: p.paceCategory ?? null,
+      pacePercentage: p.pacePercentage ?? null,
       personalBestBenchmarkCategory,
       theoretical: p.theoreticalBest,
       theoreticalGap: p.theoreticalGap ?? null,
@@ -79,7 +79,7 @@ export function getImprovementAxisBounds(
       ? chartData.map((c) => c.bestPr)
       : metric === 'consistency'
       ? chartData.map((c) => c.consistencyScore).filter((c): c is number => c !== null && c > 0)
-      : [...trackData.flatMap((p) => [p.bestLapTime, p.avgLapTime, p.top3AvgLapTime]), ...chartData.map((c) => c.movingAvg)]
+      : [...trackData.flatMap((p) => [p.bestLapTime, p.avgLapTime, p.top3Average]), ...chartData.map((c) => c.movingAvg)]
   ).filter((t): t is number => t !== null && t !== undefined && !isNaN(t) && t > 0);
 
   const minTime =

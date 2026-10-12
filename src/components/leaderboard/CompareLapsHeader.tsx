@@ -102,7 +102,7 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
       {rivalLap && onAddRival && (
         <button type="button" onClick={onAddRival} className={preset} title={`Add ${rivalLap.driverName}'s best lap, your rival`}>
           <Crosshair className="w-3.5 h-3.5 text-lmu-warn-soft" />
-          + Rival ({rivalLap.lapTimeString})
+          + Rival ({formatTime(rivalLap.lapTime)})
         </button>
       )}
       {allTimePBObject && !isPBInComparison && allTimePBObject.id !== overallTrackBestObject?.id && (
@@ -124,10 +124,10 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
           type="button"
           onClick={onAddOverallTrackBest}
           className={preset}
-          title={`Add the fastest lap on ${selectedTrack} by ${overallTrackBestObject.driverName} (${overallTrackBestObject.lapTimeString}) across all drivers`}
+          title={`Add the fastest lap on ${selectedTrack} by ${overallTrackBestObject.driverName} (${formatTime(overallTrackBestObject.lapTime)}) across all drivers`}
         >
           <Award className="w-3.5 h-3.5 text-lmu-muted" />
-          + All-Time Best ({overallTrackBestObject.lapTimeString})
+          + All-Time Best ({formatTime(overallTrackBestObject.lapTime)})
         </button>
       )}
 

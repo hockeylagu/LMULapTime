@@ -1,3 +1,4 @@
+import { playerEntry } from '../../../../shared/domain/leaderboard.js';
 import { useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import type { Leaderboard, LeaderboardEntry } from '../../../../shared/types/leaderboard.js';
@@ -47,7 +48,7 @@ export function useBoardActions(board: Leaderboard | null, carClass: string | nu
     }));
   };
 
-  const player = board.player;
+  const player = playerEntry(board);
   if (!player) return { compareRequest, compareRef, scrollToCompare, onPick };
 
   const compare = (entry: LeaderboardEntry, analyse: boolean) => {

@@ -21,7 +21,7 @@ export interface SessionSyncHost {
   setMetadata(key: string, value: string): void;
   getSessionsCount(): number;
   getReplayMatchingEntries(target?: ReplayMatchTarget): ReplayFileEntry[];
-  upsertSession(session: DetailedSession, filePath: string, mtime: number, size: number): void;
+  upsertSession(session: DetailedSession, filePath: string, mtimeMs: number, fileSizeBytes: number): void;
   restoreStoredSessionLinks(session: DetailedSession): void;
   classifySessionConditions(session: DetailedSession): void;
   reclassifyStoredSessions(which: { ids: string[] }): void;
@@ -73,18 +73,18 @@ export function *syncSessionsIterator(
   // The parser version is committed only once the whole scan finishes.
   // Rows whose XML is gone are kept as they are: they are the only copy of that session left.
   const reparseAll = forceReparse || versionMismatch;
-  const persistTransaction = db.transaction((sessionsToInsert: { session: DetailedSession; filePath: string; mtime: number; size: number }[]) => {
+  const persistTransaction = db.transaction((sessionsToInsert: { session: DetailedSession; filePath: string; mtimeMs: number; fileSizeBytes: number }[]) => {
     for (const item of sessionsToInsert) {
       // A session parsed with its replay already linked gets that replay's rain now; one linked
       // later gets it when the link is stored (SessionDatabase.updateSessionMatchingReplay).
       host.restoreStoredSessionLinks(item.session);
       host.classifySessionConditions(item.session);
-      host.upsertSession(item.session, item.filePath, item.mtime, item.size);
+      host.upsertSession(item.session, item.filePath, item.mtimeMs, item.fileSizeBytes);
     }
   });
 
   const parsedIds = new Set<string>();
-  const pendingInserts: { session: DetailedSession; filePath: string; mtime: number; size: number }[] = [];
+  const pendingInserts: { session: DetailedSession; filePath: string; mtimeMs: number; fileSizeBytes: number }[] = [];
 
   for (let i = 0; i < files.length; i++) {
     const f = files[i];
@@ -114,8 +114,8 @@ export function *syncSessionsIterator(
         pendingInserts.push({
           session: parsed,
           filePath,
-          mtime: Math.floor(stats.mtimeMs),
-          size: stats.size,
+          mtimeMs: Math.floor(stats.mtimeMs),
+          fileSizeBytes: stats.size,
         });
 
         if (cached) {

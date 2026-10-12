@@ -42,7 +42,7 @@ const session = (id: string): DetailedSession => ({
   sessionName: 'P1',
   driversCount: 0,
   drivers: [],
-  matchingReplayFile: { name, path: replayPath, sizeBytes: 6863306 },
+  matchingReplayFile: { name, path: replayPath, fileSizeBytes: 6863306 },
 } as unknown as DetailedSession);
 
 describe('replay identity', () => {
@@ -70,20 +70,20 @@ describe('replay identity', () => {
     replaceReplayWideFacts(db.getDb(), name, { endSec: 1, sessionRunningOrder: null, conditions: [], runningOrder: [], driverEvents: [] }, 'v7');
     db.upsertSession(session('owner'), 'C:\\results\\owner.xml', 1, 1);
     db.upsertSession(session('withdrawn'), 'C:\\results\\withdrawn.xml', 1, 1);
-    db.rejectSessionReplayLink('withdrawn', { name, path: replayPath, sizeBytes: 6863306 }, 'owned-by-other-session');
-    db.upsertTelemetryMetadata({ filename: 'Bahrain_P.duckdb', filePath: 'C:\\t\\Bahrain_P.duckdb', fileMtimeMs: 1, fileSizeBytes: 1, trackName: 'Bahrain', sessionType: 'P', timestampStr: '', timestampEpochMs: 0 } as DuckDbFileInfo, 'owner', name);
+    db.rejectSessionReplayLink('withdrawn', { name, path: replayPath, fileSizeBytes: 6863306 }, 'owned-by-other-session');
+    db.upsertTelemetryMetadata({ filename: 'Bahrain_P.duckdb', filePath: 'C:\\t\\Bahrain_P.duckdb', mtimeMs: 1, fileSizeBytes: 1, trackName: 'Bahrain', sessionType: 'P', timestampStr: '', timestampEpochMs: 0 } as DuckDbFileInfo, 'owner', name);
     db.saveAiReport({ cacheKey: 'k', sessionId: 'owner', driverOrdinal: 0, lapOrdinal: 1, lapNumber: 2, baselineSessionId: 'owner', baselineDriverOrdinal: 0, baselineLapOrdinal: 0, baselineLapNumber: 1, model: 'm', promptVersion: 1, report: { overallSummary: '', improvements: [] }, generatedAt: 1 });
 
     // Three hours later LMU writes another recording under the same name.
     db.upsertReplayMetadataCache(name, replayPath, savedAt + 3 * 3600_000, 7000000, metadata(400));
 
     const archived = db.getStoredReplayFileInfo(archivedName);
-    expect(archived).toMatchObject({ file_mtime: savedAt, file_size: 6863306, file_path: `C:\\replays\\${archivedName}` });
-    expect(db.getStoredReplayFileInfo(name)?.file_mtime).toBe(savedAt + 3 * 3600_000);
+    expect(archived).toMatchObject({ file_mtime_ms: savedAt, file_size_bytes: 6863306, file_path: `C:\\replays\\${archivedName}` });
+    expect(db.getStoredReplayFileInfo(name)?.file_mtime_ms).toBe(savedAt + 3 * 3600_000);
     expect(db.getStoredReplayTrajectory(archivedName, 0, 2)?.points[0].x).toBe(2);
     expect(db.getStoredReplayTrajectory(archivedName, -1, -1)?.currentLap).toBe(2);
     expect(db.getStoredReplayTrajectory(name, 0, 2)).toBeNull();
-    expect(db.getReplayDriverIngest(archivedName, 0)?.fileMtime).toBe(savedAt);
+    expect(db.getReplayDriverIngest(archivedName, 0)?.mtimeMs).toBe(savedAt);
     expect(db.getReplayDriverIngest(name, 0)).toBeNull();
     expect(getReplayLaps(db.getDb(), archivedName).map(l => l.lapNumber)).toEqual([1, 2]);
     expect(getReplayFactsVersion(db.getDb(), archivedName)).toBe('v7');
@@ -102,7 +102,7 @@ describe('replay identity', () => {
     db.upsertReplayMetadataCache(name, replayPath, savedAt + 40_000, 7000000, metadata(380));
 
     expect(db.getReplaysCount()).toBe(1);
-    expect(db.getStoredReplayFileInfo(name)?.file_mtime).toBe(savedAt + 40_000);
+    expect(db.getStoredReplayFileInfo(name)?.file_mtime_ms).toBe(savedAt + 40_000);
   });
 
   it('treats another track scene as another recording even at the same time', () => {
@@ -117,7 +117,7 @@ describe('replay identity', () => {
 
     db.upsertReplayMetadataCache(name, replayPath, savedAt + 3 * 3600_000, 7000000, metadata(400));
 
-    expect(db.getStoredReplayFileInfo('Bahrain Paddock Circuit P1 18 @2026-06-28T23-44-43Z (2).Vcr')?.file_mtime).toBe(savedAt);
-    expect(db.getStoredReplayFileInfo(archivedName)?.file_mtime).toBe(1);
+    expect(db.getStoredReplayFileInfo('Bahrain Paddock Circuit P1 18 @2026-06-28T23-44-43Z (2).Vcr')?.file_mtime_ms).toBe(savedAt);
+    expect(db.getStoredReplayFileInfo(archivedName)?.file_mtime_ms).toBe(1);
   });
 });

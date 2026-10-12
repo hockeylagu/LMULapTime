@@ -93,9 +93,10 @@ export function useAppData() {
         if (reference?.checked && reference.completedAt && reference.completedAt !== referenceHandled.current) {
           referenceHandled.current = reference.completedAt;
           if (reference.refreshed) invalidateReferenceLaptimes();
-          if (reference.updatedCount > 0 && readSeenReference() !== reference.completedAt) {
+          const updatedCount = reference.diff?.updated.length ?? 0;
+          if (updatedCount > 0 && readSeenReference() !== reference.completedAt) {
             writeSeenReference(reference.completedAt);
-            setReferenceUpdateCount(reference.updatedCount);
+            setReferenceUpdateCount(updatedCount);
           }
         }
         const key = snapshotKey(scan);

@@ -27,9 +27,9 @@ export const SESSION_DICTIONARY_TABLES = ['drivers', 'vehicles', 'teams'] as con
  * projection. A driver row carries its clean-lap figures, a lap row its eligibility flags.
  */
 export const DRIVER_DERIVED_DEFS = [
-  'is_human INTEGER', 'is_player_driver INTEGER', 'driver_class TEXT', 'completed_laps_count INTEGER', 'clean_laps_count INTEGER',
-  'driving_time_sum REAL', 'pit_count INTEGER', 'max_speed REAL', 'best_lap_ordinal INTEGER', 'best_lap_number INTEGER',
-  'clean_average_lap_time REAL', 'top_three_average REAL', 'consistency_score REAL', 'best_lap_is_wet INTEGER',
+  'is_human INTEGER', 'driver_class TEXT', 'laps_count INTEGER', 'clean_laps_count INTEGER',
+  'driving_time_seconds REAL', 'pit_stops_count INTEGER', 'max_top_speed REAL', 'best_lap_ordinal INTEGER',
+  'top3_average REAL', 'consistency_score REAL',
 ] as const;
 export const LAP_DERIVED_DEFS = [
   'condition_group TEXT', 'is_clean INTEGER', 'is_representative INTEGER', 'is_human INTEGER', 'leaderboard_eligible INTEGER',
@@ -66,14 +66,13 @@ export function initSessionRowsSchema(db: DatabaseType): void {
     );
     CREATE TABLE IF NOT EXISTS session_drivers (
       session_id TEXT NOT NULL, driver_ordinal INTEGER NOT NULL, driver_id INTEGER, vehicle_id INTEGER, team_id INTEGER,
-      driver_name TEXT, -- Legacy compatibility column; DriverData.name is the canonical name.
       ${columnDefinitions(DRIVER_FIELDS)}, lists_mask INTEGER, ${DRIVER_DERIVED_COLUMNS},
       PRIMARY KEY(session_id, driver_ordinal)
     ) WITHOUT ROWID;
     CREATE TABLE IF NOT EXISTS session_laps (
       session_id TEXT NOT NULL, driver_ordinal INTEGER NOT NULL, lap_ordinal INTEGER NOT NULL,
       ${columnDefinitions(LAP_FIELDS)}, ${columnDefinitions(TIRE_WEAR_FIELDS)}, ${columnDefinitions(CONDITION_FIELDS)},
-      ${TRAFFIC_COLUMNS}, lists_mask INTEGER, ${LAP_DERIVED_COLUMNS},
+      ${TRAFFIC_COLUMNS}, ${LAP_DERIVED_COLUMNS},
       PRIMARY KEY(session_id, driver_ordinal, lap_ordinal)
     ) WITHOUT ROWID;
     CREATE INDEX IF NOT EXISTS idx_session_lap_board ON session_laps(condition_group, leaderboard_eligible, lap_time);
@@ -81,15 +80,15 @@ export function initSessionRowsSchema(db: DatabaseType): void {
       WHERE is_valid=1 AND lap_time>0;
     CREATE INDEX IF NOT EXISTS idx_session_lap_board_best ON session_laps(lap_time, session_id, driver_ordinal, lap_ordinal)
       WHERE leaderboard_eligible=1 AND lap_time>0;
-    CREATE INDEX IF NOT EXISTS idx_session_lap_number ON session_laps(session_id, driver_ordinal, lap_num);
+    CREATE INDEX IF NOT EXISTS idx_session_lap_number ON session_laps(session_id, driver_ordinal, lap_number);
     CREATE TABLE IF NOT EXISTS session_lap_passes (
       session_id TEXT NOT NULL, driver_ordinal INTEGER NOT NULL, lap_ordinal INTEGER NOT NULL,
       direction TEXT NOT NULL, seq INTEGER NOT NULL, name TEXT, car_class TEXT, same_class INTEGER,
       PRIMARY KEY(session_id, driver_ordinal, lap_ordinal, direction, seq)
     ) WITHOUT ROWID;
     CREATE TABLE IF NOT EXISTS session_events (
-      session_id TEXT NOT NULL, driver_ordinal INTEGER NOT NULL, seq INTEGER NOT NULL, kind TEXT NOT NULL,
-      driver_seq INTEGER, lap_ordinal INTEGER, lap_seq INTEGER, ${columnDefinitions(EVENT_COLUMNS)},
+      session_id TEXT NOT NULL, driver_ordinal INTEGER NOT NULL, seq INTEGER NOT NULL,
+      kind TEXT NOT NULL, ${columnDefinitions(EVENT_COLUMNS)},
       PRIMARY KEY(session_id, driver_ordinal, seq)
     ) WITHOUT ROWID;
     -- Covering index of the readiness gate (isSessionSummaryReady): it never reads a session row.

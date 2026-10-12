@@ -22,10 +22,10 @@ export interface CompareLapsProps {
   initialTrack?: string;
   initialCarClass?: string;
   initialSessionId?: string;
-  initialLapNum?: number;
+  initialLapNumber?: number;
   initialCompareSessionId?: string;
   initialCompareDriver?: string;
-  initialCompareLapNum?: number;
+  initialCompareLapNumber?: number;
   onSelectSession?: (sessionId: string) => void;
   /** Laps the page asks to compare now (from the leaderboard). */
   compareRequest?: CompareRequest | null;
@@ -52,10 +52,10 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
   initialTrack,
   initialCarClass,
   initialSessionId,
-  initialLapNum,
+  initialLapNumber,
   initialCompareSessionId,
   initialCompareDriver,
-  initialCompareLapNum,
+  initialCompareLapNumber,
   onSelectSession,
   compareRequest,
   onComparedLapsChange,
@@ -69,10 +69,10 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
     initialTrack,
     initialCarClass,
     initialSessionId,
-    initialLapNum,
+    initialLapNumber,
     initialCompareSessionId,
     initialCompareDriver,
-    initialCompareLapNum,
+    initialCompareLapNumber,
     compareRequest,
   });
   const { selectedLaps, baselineLap, setBaselineLapId } = data;
@@ -87,7 +87,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
 
   const telemetryRef = (lap: ComparableLap): TelemetryLapRef | null => {
     if (!lap.sessionId || !Number.isInteger(lap.driverOrdinal) || !Number.isInteger(lap.lapOrdinal)) return null;
-    return { sessionId: lap.sessionId, driverOrdinal: lap.driverOrdinal!, lapOrdinal: lap.lapOrdinal!, driverName: lap.driverName, lapNum: lap.lapNum };
+    return { sessionId: lap.sessionId, driverOrdinal: lap.driverOrdinal!, lapOrdinal: lap.lapOrdinal!, driverName: lap.driverName, lapNumber: lap.lapNumber };
   };
 
   const handleCompareTelemetry = async () => {
@@ -100,8 +100,8 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
 
     if (!targetRef || !baseRef) {
       const missing: string[] = [];
-      if (!baseRef) missing.push(`Baseline (${baseLap.driverName} Lap ${baseLap.lapNum || '-'})`);
-      if (!targetRef) missing.push(`Target (${targetLap.driverName} Lap ${targetLap.lapNum || '-'})`);
+      if (!baseRef) missing.push(`Baseline (${baseLap.driverName} Lap ${baseLap.lapNumber || '-'})`);
+      if (!targetRef) missing.push(`Target (${targetLap.driverName} Lap ${targetLap.lapNumber || '-'})`);
       setTelemetryError(
         `Session lap locators are unavailable for: ${missing.join(', ')}. Refresh the comparison data and try again.`
       );
@@ -138,7 +138,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
     const baseRef = telemetryRef(base);
     if (!targetRef || !baseRef) {
       const lap = !targetRef ? target : base;
-      throw new LapDebriefUnavailableError(`${lap.driverName}'s lap ${lap.lapNum ?? '-'} has no session telemetry locator.`);
+      throw new LapDebriefUnavailableError(`${lap.driverName}'s lap ${lap.lapNumber ?? '-'} has no session telemetry locator.`);
     }
     return loadLapPairDebrief(targetRef, baseRef, signal);
   };
@@ -245,7 +245,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
             againstLabel={
               debriefPair.base.driverName !== debriefPair.target.driverName
                 ? debriefPair.base.driverName
-                : debriefPair.base.tag || `Lap ${debriefPair.base.lapNum ?? '-'}`
+                : debriefPair.base.tag || `Lap ${debriefPair.base.lapNumber ?? '-'}`
             }
             load={loadDebrief}
             autoStart={analyseRequested}

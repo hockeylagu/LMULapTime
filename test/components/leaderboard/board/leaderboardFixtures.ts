@@ -14,7 +14,7 @@ export function entry(rank: number, driverName: string, lapTime: number, extra: 
       timestamp: 1_700_000_000,
       driverOrdinal: 2,
       lapOrdinal: 4,
-      lapNum: 3,
+      lapNumber: 3,
       lapTime,
       s1: lapTime * 0.3,
       s2: lapTime * 0.4,
@@ -54,7 +54,6 @@ export function board(count: number, playerRank: number | null, benchmark: Refer
     scope: 'class',
     carType: null,
     entries,
-    player: entries.find((e) => e.isPlayer) ?? null,
     benchmark,
   };
 }
@@ -64,7 +63,6 @@ export const BENCHMARK = {
   trackName: 'Monza',
   carClass: 'GT3',
   patch: '1.4',
-  target100Sec: 100.05,
   targets: {
     alienSec: 100.05,
     competitiveSec: 100.25,

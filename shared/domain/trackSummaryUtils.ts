@@ -10,7 +10,7 @@ import { matchesSessionCarClass } from './vehicleMapping.js';
 import { getCircuitSpecification } from './circuitSpecs.js';
 
 type TrackSummaryDriver = Pick<DriverData, 'name' | 'carType' | 'bestLapTime' | 'bestS1' | 'bestS2' | 'bestS3'> &
-  Partial<Pick<DriverData, 'carClass' | 'bestLapTimeString' | 'bestLapWet' | 'lapsCount' | 'isPlayer'>>;
+  Partial<Pick<DriverData, 'carClass' | 'bestLapWet' | 'declaredLapsCount' | 'isPlayer'>>;
 
 /** Minimal input contract for track aggregation, including the detailed-session drivers fallback. */
 export type TrackSessionSummary = Pick<SessionMetadata, 'trackVenue' | 'timeString'> &
@@ -82,7 +82,7 @@ export function aggregateTrackSummaries<T extends TrackSessionSummary>(
 
     const p = s.playerDriver || s.drivers?.find(d => d.isPlayer);
     if (p) {
-      summary.totalLaps += p.lapsCount || 0;
+      summary.totalLaps += p.declaredLapsCount || 0;
       if (p.carType && !summary.carsUsed.includes(p.carType)) {
         summary.carsUsed.push(p.carType);
       }

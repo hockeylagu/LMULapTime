@@ -11,7 +11,7 @@ import { buildSessionAggregate } from './buildSessionAggregate.js';
 
 function projectDriver(session: DetailedSession, driver: DriverData, driverOrdinal: number, playerOrdinal: number): { driver: SessionDriverProjection; laps: SessionLapProjection[]; conditions: SessionConditionProjection[] } {
   const driverLaps = driver.laps ?? [];
-  const lapsCount = driver.lapsCount ?? 0;
+  const lapsCount = driver.declaredLapsCount ?? 0;
   const hasLaps = driverLaps.length > 0;
   const completedCount = hasLaps ? driverLaps.filter(lap => lap.lapTime !== null && lap.lapTime > 0).length : lapsCount;
   const clean = hasLaps ? selectCleanLapCandidates(driverLaps) : [];
@@ -19,14 +19,14 @@ function projectDriver(session: DetailedSession, driver: DriverData, driverOrdin
   const isPlayer = driverOrdinal === playerOrdinal;
   const isHuman = isOnlineSession(session) || isPlayer;
   const bestOrdinal = (lap: LapData | undefined) => lap ? driverLaps.indexOf(lap) : null;
-  const best = driverLaps.find(l => l.lapNum === driver.bestLapNum) ?? (driver.bestLapTime ? driverLaps.find(l => l.lapTime === driver.bestLapTime) : undefined);
+  const best = driverLaps.find(l => l.lapNumber === driver.bestLapNumber) ?? (driver.bestLapTime ? driverLaps.find(l => l.lapTime === driver.bestLapTime) : undefined);
   const cleanSet = new Set(clean);
   const consistency = computeConsistencyRating(driverLaps, clean);
   const laps = driverLaps.map((lap, lapOrdinal): SessionLapProjection => {
     const isClean = cleanSet.has(lap);
     const conditionGroup = lapConditionGroup(lap);
     const eligible = isClean && lap.isValid && conditionGroup === 'dry';
-    return { sessionId: session.id, driverOrdinal, lapOrdinal, lapNumber: lap.lapNum, lapTime: lap.lapTime,
+    return { sessionId: session.id, driverOrdinal, lapOrdinal, lapNumber: lap.lapNumber, lapTime: lap.lapTime,
       s1: lap.s1, s2: lap.s2, s3: lap.s3, conditionGroup, isValid: lap.isValid,
       isInferred: Boolean(lap.isInferred), isPitStop: lap.isPitStop, isOutLap: Boolean(lap.isOutLap), isClean,
       isRepresentative: !lap.nonRepresentativeReason, isHuman, leaderboardEligible: eligible,
@@ -49,9 +49,9 @@ function projectDriver(session: DetailedSession, driver: DriverData, driverOrdin
     drivingTimeSeconds: hasLaps ? driverLaps.reduce((sum, lap) => sum + (lap.lapTime && lap.lapTime > 0 ? lap.lapTime : 0), 0) : (driver.avgLapTime ?? 0) * completedCount,
     pitStopsCount: hasLaps ? driverLaps.filter(lap => lap.isPitStop).length : 0,
     maxTopSpeed: driverLaps.reduce<number | null>((value, lap) => lap.topSpeed !== null && (value === null || lap.topSpeed > value) ? lap.topSpeed : value, null),
-    bestLapOrdinal: bestOrdinal(best), bestLapNumber: best?.lapNum ?? null, bestLapTime: driver.bestLapTime ?? null,
+    bestLapOrdinal: bestOrdinal(best), bestLapNumber: best?.lapNumber ?? null, bestLapTime: driver.bestLapTime ?? null,
     bestS1: driver.bestS1, bestS2: driver.bestS2, bestS3: driver.bestS3,
-    averageLapTime: hasLaps ? consistency.avgLapTime : (driver.avgLapTime ?? null),
+    avgLapTime: hasLaps ? consistency.avgLapTime : (driver.avgLapTime ?? null),
     top3Average: computeTopNLapAverage(driverLaps, 3, clean), consistencyScore: consistency.consistencyScore,
     bestLapWet: Boolean(driver.bestLapWet ?? best?.conditions) }, laps, conditions };
 }

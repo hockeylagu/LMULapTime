@@ -63,7 +63,7 @@ describe('SessionLapTableRow expansion and actions', () => {
   it('keeps comparison on its dedicated link without expanding the row', () => {
     const row = renderTable();
     const link = within(row).getByRole('link', { name: 'Compare lap 3' });
-    expect(link).toHaveAttribute('href', '/leaderboard?track=Spa&carClass=Hyper&sessionId=sess123&lapNum=3&driverOrdinal=0&lapOrdinal=2');
+    expect(link).toHaveAttribute('href', '/leaderboard?track=Spa&carClass=Hyper&sessionId=sess123&lapNumber=3&driverOrdinal=0&lapOrdinal=2');
     fireEvent.click(link);
     expect(screen.queryByTestId('lap-details-3')).not.toBeInTheDocument();
   });

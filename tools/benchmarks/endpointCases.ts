@@ -14,14 +14,14 @@ export function discoverCohort(store: SessionDatabase): BenchmarkCohort {
   const db = store.getDb();
   const boards = db.prepare(`SELECT s.layout_key layout,d.driver_class carClass,count(*) n
     FROM sessions s JOIN session_drivers d ON d.session_id=s.id
-    WHERE s.layout_key!='unknown' AND d.is_player_driver=1 AND d.driver_class IS NOT NULL
+    WHERE s.layout_key!='unknown' AND d.is_player=1 AND d.driver_class IS NOT NULL
     GROUP BY s.layout_key,d.driver_class ORDER BY n DESC,s.layout_key,d.driver_class LIMIT 2`).all() as BenchmarkCohort['boards'];
   const sessions = db.prepare(`SELECT s.id,count(l.lap_ordinal) n FROM sessions s
     JOIN session_laps l ON l.session_id=s.id GROUP BY s.id ORDER BY n DESC,s.id LIMIT 2`).all() as Array<{ id: string }>;
   const candidates = db.prepare(`SELECT s.id,s.recording_name,d.driver_ordinal,coalesce(n.name,'') driver_name
     FROM sessions s JOIN session_drivers d ON d.session_id=s.id LEFT JOIN drivers n ON n.driver_id=d.driver_id
-    WHERE d.is_player_driver=1 AND s.recording_name IS NOT NULL
-    ORDER BY s.has_duckdb_telemetry DESC,s.timestamp DESC,s.id LIMIT 100`).all() as Array<{
+    WHERE d.is_player=1 AND s.recording_name IS NOT NULL
+    ORDER BY (s.duckdb_filename IS NOT NULL) DESC,s.timestamp DESC,s.id LIMIT 100`).all() as Array<{
       id: string; recording_name: string; driver_ordinal: number; driver_name: string;
     }>;
   let telemetry: BenchmarkCohort['telemetry'];
@@ -30,11 +30,11 @@ export function discoverCohort(store: SessionDatabase): BenchmarkCohort {
     const driver = metadata?.drivers.find(item => item.name.trim().toLowerCase() === candidate.driver_name.trim().toLowerCase());
     if (driver?.slot === undefined) continue;
     const lap = db.prepare(`SELECT l.lap_ordinal FROM session_laps l
-      JOIN replay_trajectories r ON r.filename=? AND r.driver_slot=? AND r.lap_key=l.lap_num
+      JOIN replay_trajectories r ON r.filename=? AND r.driver_slot=? AND r.lap_key=l.lap_number
       WHERE l.session_id=? AND l.driver_ordinal=? AND l.is_valid=1 AND l.lap_time>0
         AND coalesce(l.is_pit_stop,0)=0 AND coalesce(l.is_out_lap,0)=0
       ORDER BY EXISTS(SELECT 1 FROM telemetry_lap_cache c JOIN telemetry_metadata t ON t.filename=c.filename
-        WHERE t.matched_session_id=l.session_id AND c.lap_number=l.lap_num) DESC,l.lap_time,l.lap_ordinal LIMIT 1`)
+        WHERE t.matched_session_id=l.session_id AND c.lap_number=l.lap_number) DESC,l.lap_time,l.lap_ordinal LIMIT 1`)
       .get(candidate.recording_name, driver.slot, candidate.id, candidate.driver_ordinal) as { lap_ordinal: number } | undefined;
     if (lap) {
       telemetry = { sessionId: candidate.id, driverOrdinal: candidate.driver_ordinal, lapOrdinal: lap.lap_ordinal, driverName: candidate.driver_name };

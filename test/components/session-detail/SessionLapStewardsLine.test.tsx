@@ -3,32 +3,28 @@ import { describe, expect, it } from 'vitest';
 import { SessionLapStewardsLine } from '../../../src/components/session-detail/table/SessionLapStewardsLine.js';
 import { DriverData, LapData, LapTrackLimit } from '../../../shared/types/index.js';
 
-const makeTrackLimit = (lapNum: number, elapsedSeconds: number, warningPoints = 0): LapTrackLimit => ({
+const makeTrackLimit = (lapNumber: number, elapsedSeconds: number, warningPoints = 0): LapTrackLimit => ({
   description: warningPoints > 0 ? `Track limits violation (+${warningPoints} pts)` : 'Track limits review (No Further Action)',
-  lapNum,
+  lapNumber,
   elapsedSeconds,
   warningPoints,
   currentPoints: warningPoints,
   action: warningPoints > 0 ? 'Warning' : 'No Further Action',
 });
 
-const makeLap = (lapNum: number, trackLimits: LapTrackLimit[]): LapData => ({
-  lapNum,
+const makeLap = (lapNumber: number): LapData => ({
+  lapNumber,
   position: 1,
   lapTime: 120,
-  lapTimeString: '2:00.000',
   s1: 40,
   s2: 40,
   s3: 40,
   topSpeed: 250,
   fCompound: 'Soft',
   rCompound: 'Soft',
-  elapsedSeconds: lapNum * 120,
-  elapsedTimeString: '2:00.000',
+  elapsedSeconds: lapNumber * 120,
   isPitStop: false,
   isValid: true,
-  trackLimits,
-  trackLimitCount: trackLimits.length,
 });
 
 const makeDriver = (overrides: Partial<DriverData> = {}): DriverData => {
@@ -44,19 +40,13 @@ const makeDriver = (overrides: Partial<DriverData> = {}): DriverData => {
     position: 1,
     classPosition: 1,
     bestLapTime: 120,
-    bestLapTimeString: '2:00.000',
     bestS1: 40,
     bestS2: 40,
     bestS3: 40,
     theoreticalBest: 120,
-    theoreticalBestString: '2:00.000',
-    lapsCount: 2,
-    totalIncidents: 0,
-    totalTrackLimits: 2,
-    totalPenalties: 0,
-    // The cache stores the driver's copy and the lap's copy of the same event separately.
-    trackLimits: [{ ...first }, { ...second }],
-    laps: [makeLap(1, [first]), makeLap(2, [second])],
+    declaredLapsCount: 2,
+    trackLimits: [first, second],
+    laps: [makeLap(1), makeLap(2)],
     ...overrides,
   };
 };
@@ -73,7 +63,6 @@ describe('SessionLapStewardsLine', () => {
   it('lists the events no lap holds', () => {
     const driver = makeDriver();
     driver.trackLimits = [...(driver.trackLimits ?? []), makeTrackLimit(9, 1500)];
-    driver.totalTrackLimits = 3;
     render(<SessionLapStewardsLine driver={driver} />);
 
     expect(screen.getByText(/Not on a lap/)).toBeInTheDocument();
@@ -82,7 +71,7 @@ describe('SessionLapStewardsLine', () => {
 
   it('renders nothing for a clean driver', () => {
     const { container } = render(
-      <SessionLapStewardsLine driver={makeDriver({ totalTrackLimits: 0, trackLimits: [], laps: [] })} />,
+      <SessionLapStewardsLine driver={makeDriver({ trackLimits: [], laps: [] })} />,
     );
     expect(container).toBeEmptyDOMElement();
   });

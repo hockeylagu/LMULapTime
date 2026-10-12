@@ -39,8 +39,8 @@ describe('session dictionaries', () => {
     ]);
     expect(rows('SELECT name FROM teams ORDER BY name')).toEqual([{ name: 'Team A' }, { name: 'Team B' }]);
     expect(rows('SELECT count(*) AS n FROM drivers')).toEqual([{ n: 2 }]);
-    expect(rows('SELECT session_id, is_player, is_player_driver FROM session_drivers WHERE driver_ordinal = 0 ORDER BY session_id'))
-      .toEqual([{ session_id: 'a', is_player: 1, is_player_driver: 1 }, { session_id: 'b', is_player: 1, is_player_driver: 1 }]);
+    expect(rows('SELECT session_id, is_player FROM session_drivers WHERE driver_ordinal = 0 ORDER BY session_id'))
+      .toEqual([{ session_id: 'a', is_player: 1 }, { session_id: 'b', is_player: 1 }]);
   });
 
   it('keeps absent car type, class and team as absent, and one vehicle row per pair', () => {

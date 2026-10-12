@@ -74,7 +74,7 @@ export function createReplayRouter(context: ServerContext): Router {
         driver.sessionDriverOrdinal = session.drivers[ordinal].driverOrdinal ?? ordinal;
         const sessionLapOrdinals: Record<string, number> = {};
         session.drivers[ordinal].laps.forEach((lap, lapOrdinal) => {
-          sessionLapOrdinals[String(lap.lapNum)] = lap.lapOrdinal ?? lapOrdinal;
+          sessionLapOrdinals[String(lap.lapNumber)] = lap.lapOrdinal ?? lapOrdinal;
         });
         driver.sessionLapOrdinals = sessionLapOrdinals;
       }

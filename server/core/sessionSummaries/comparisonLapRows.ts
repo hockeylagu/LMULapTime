@@ -16,7 +16,7 @@ interface ComparisonLapRow extends Row, ComparisonLapLocator {
   session_name: string; session_type: DetailedSession['sessionType']; time_string: string; timestamp: number;
   track_venue: string; track_course: string; track_length_meters: number | null;
   driver_name: string; car_type: string; car_class: string; best_lap_time: number | null; is_player: number;
-  recording_name: string | null; path: string | null; size_bytes: number | null;
+  recording_name: string | null; path: string | null; file_size_bytes: number | null;
   has_rain: number | null; weather_condition: NonNullable<DetailedSession['matchingReplayFile']>['weatherCondition'] | null;
 }
 
@@ -32,8 +32,8 @@ export function readComparisonLapRows(db: Database, locators: ComparisonLapLocat
       ${[...LAP_FIELDS, ...TIRE_WEAR_FIELDS].map(field => `l.${field.col}`).join(',')},
       s.session_name,s.session_type,s.time_string,s.timestamp,
       s.track_venue,s.track_course,s.track_length_meters,
-      dn.name driver_name,v.car_type,v.car_class,d.best_lap_time,d.is_player_driver is_player,
-      r.recording_name,r.path,r.size_bytes,r.has_rain,r.weather_condition
+      dn.name driver_name,v.car_type,v.car_class,d.best_lap_time,d.is_player,
+      r.recording_name,r.path,r.file_size_bytes,r.has_rain,r.weather_condition
     FROM json_each(?) picked
     JOIN session_laps l ON l.session_id=json_extract(picked.value,'$.session_id')
       AND l.driver_ordinal=json_extract(picked.value,'$.driver_ordinal')
@@ -56,7 +56,7 @@ export function readComparisonLapRows(db: Database, locators: ComparisonLapLocat
       id: row.session_id, sessionName: row.session_name, sessionType: row.session_type,
       timeString: row.time_string, timestamp: row.timestamp,
       matchingReplayFile: row.recording_name === null ? undefined : {
-        name: row.recording_name, path: row.path ?? '', sizeBytes: row.size_bytes ?? 0,
+        name: row.recording_name, path: row.path ?? '', fileSizeBytes: row.file_size_bytes ?? 0,
         hasRain: row.has_rain === null ? undefined : Boolean(row.has_rain),
         weatherCondition: row.weather_condition ?? undefined,
       },

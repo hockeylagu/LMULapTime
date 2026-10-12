@@ -9,8 +9,6 @@ export interface TelemetryResolutionPopoverProps {
   telemetryResolution: TelemetryResolution;
   onChangeResolution: (res: TelemetryResolution) => void;
   pointsCount: number;
-  rawPointsCount?: number;
-  rawSampleRateHz?: number;
   vcrRawPointsCount?: number;
   vcrRawSampleRateHz?: number;
   duckdbRawPointsCount?: number;
@@ -31,8 +29,6 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
   telemetryResolution,
   onChangeResolution,
   pointsCount,
-  rawPointsCount,
-  rawSampleRateHz,
   vcrRawPointsCount,
   vcrRawSampleRateHz,
   duckdbRawPointsCount,
@@ -62,6 +58,9 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
   if (!isOpen) return null;
 
   const hasSourceSelector = Boolean((hasDuckDb || duckdbFilename) && onSelectSource);
+  const servedDuckDb = source === 'duckdb';
+  const rawPointsCount = servedDuckDb ? duckdbRawPointsCount : vcrRawPointsCount;
+  const rawSampleRateHz = servedDuckDb ? duckdbRawSampleRateHz : vcrRawSampleRateHz;
   const effectiveRaw = rawPointsCount ?? pointsCount;
   const downsampleRatio = effectiveRaw > 0 && pointsCount > 0 ? (effectiveRaw / pointsCount).toFixed(1) : '1.0';
   const vcrResolutionLabel = `${(vcrRawPointsCount ?? effectiveRaw).toLocaleString()} pts${vcrRawSampleRateHz ? ` @ ${vcrRawSampleRateHz} Hz` : ''}`;

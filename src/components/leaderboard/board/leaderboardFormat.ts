@@ -34,7 +34,7 @@ export function benchmarkPace(
   lapTime: number,
   benchmark: ReferenceLaptimeEntry | null
 ): { category: PaceCategory; percentage: number } | null {
-  const target = benchmark?.target100Sec || benchmark?.targets.alienSec;
+  const target = benchmark?.targets.alienSec;
   if (!target || lapTime <= 0) return null;
   const percentage = parseFloat(((lapTime / target) * 100).toFixed(2));
   return { category: getPaceCategoryFromPercentage(percentage), percentage };

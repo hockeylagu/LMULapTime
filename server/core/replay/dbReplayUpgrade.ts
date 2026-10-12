@@ -6,7 +6,7 @@ import { REPLAY_CACHE_VERSION, ReplaySyncProgress } from '../dbSchema.js';
 import { getReplayDriverIngest, isReplayDriverSettled, ReplayDriverIngestStatus, type ReplayDriverIngest } from './dbReplayIngestStore.js';
 import { recordDriverFailure } from './dbReplaySync.js';
 import { ReplayDecodeError } from '../../replay/decode/replayDecodeError.js';
-import { parseReplayMetadata } from '../../replay/decode/replayParser.js';
+import { effectiveReplayPlayerName, parseReplayMetadata } from '../../replay/decode/replayParser.js';
 import { storeReplayDriversInWorker } from '../../replay/worker/replayTrajectoryWorkerClient.js';
 
 // Rows written by an older, still compatible parser version are served as they are, but while LMU
@@ -18,8 +18,8 @@ import { storeReplayDriversInWorker } from '../../replay/worker/replayTrajectory
 export interface ReplayUpgradeCandidate {
   filename: string;
   filePath: string;
-  mtime: number;
-  size: number;
+  mtimeMs: number;
+  fileSizeBytes: number;
   /** The metadata row was written by an older parser version. */
   metadataOutdated: boolean;
   /** Driver slots with rows from an older parser version, not yet settled at this version. */
@@ -42,15 +42,15 @@ export interface ReplayUpgradeResult {
 
 export interface ReplayUpgradeHost {
   getDbPath(): string;
-  getReplayMetadataCache(filename: string, mtime: number, size: number, filePath?: string): ReplayMetadata | null;
-  promoteReplayPrimary(filename: string, filePath: string, mtime: number, size: number, driverSlotKey: number): boolean;
+  getReplayMetadataCache(filename: string, mtimeMs: number, fileSizeBytes: number, filePath?: string): ReplayMetadata | null;
+  promoteReplayPrimary(filename: string, filePath: string, mtimeMs: number, fileSizeBytes: number, driverSlotKey: number): boolean;
   getReplayDriverIngest(filename: string, driverSlot: number): ReplayDriverIngest | null;
-  getReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): ReplayTrajectoryData | null;
-  hasValidReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): boolean;
+  getReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtimeMs: number, fileSizeBytes: number, filePath?: string): ReplayTrajectoryData | null;
+  hasValidReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtimeMs: number, fileSizeBytes: number, filePath?: string): boolean;
   listReplayUpgradeBacklog(replaysDir: string): ReplayUpgradeCandidate[];
-  upsertReplayMetadataCache(filename: string, filePath: string, mtime: number, size: number, metadata: ReplayMetadata): void;
-  replaceReplayDriverLaps(filename: string, filePath: string, mtime: number, size: number, driverSlotKey: number, trajectory: ReplayTrajectoryData, isPrimary: boolean): void;
-  recordReplayDriverIngest(filename: string, driverSlot: number, mtime: number, size: number, status: ReplayDriverIngestStatus, error?: string | null): void;
+  upsertReplayMetadataCache(filename: string, filePath: string, mtimeMs: number, fileSizeBytes: number, metadata: ReplayMetadata): void;
+  replaceReplayDriverLaps(filename: string, filePath: string, mtimeMs: number, fileSizeBytes: number, driverSlotKey: number, trajectory: ReplayTrajectoryData, isPrimary: boolean): void;
+  recordReplayDriverIngest(filename: string, driverSlot: number, mtimeMs: number, fileSizeBytes: number, status: ReplayDriverIngestStatus, error?: string | null): void;
   recordIngestError(sourceType: string, sourcePath: string, error: unknown): void;
 }
 
@@ -58,8 +58,8 @@ export interface ReplayUpgradeHost {
 export function listReplayUpgradeBacklog(db: DatabaseType, replaysDir: string): ReplayUpgradeCandidate[] {
   if (!fs.existsSync(replaysDir)) return [];
   const replays = db.prepare(
-    'SELECT filename, file_path, file_mtime, file_size, parser_version FROM replay_metadata ORDER BY file_mtime DESC'
-  ).all() as Array<{ filename: string; file_path: string; file_mtime: number; file_size: number; parser_version: string }>;
+    'SELECT filename, file_path, file_mtime_ms, file_size_bytes, parser_version FROM replay_metadata ORDER BY file_mtime_ms DESC'
+  ).all() as Array<{ filename: string; file_path: string; file_mtime_ms: number; file_size_bytes: number; parser_version: string }>;
   const outdatedSlots = db.prepare(
     'SELECT DISTINCT driver_slot FROM replay_trajectories WHERE filename = ? AND parser_version != ? ORDER BY driver_slot'
   );
@@ -78,19 +78,19 @@ export function listReplayUpgradeBacklog(db: DatabaseType, replaysDir: string): 
     } catch {
       continue;
     }
-    if (Math.floor(stat.mtimeMs) !== row.file_mtime || stat.size !== row.file_size) continue;
+    if (Math.floor(stat.mtimeMs) !== row.file_mtime_ms || stat.size !== row.file_size_bytes) continue;
 
     const driverSlots = (outdatedSlots.all(row.filename, REPLAY_CACHE_VERSION) as Array<{ driver_slot: number }>)
       .map(r => r.driver_slot)
-      .filter(slot => !isReplayDriverSettled(getReplayDriverIngest(db, row.filename, slot), row.file_mtime, row.file_size));
+      .filter(slot => !isReplayDriverSettled(getReplayDriverIngest(db, row.filename, slot), row.file_mtime_ms, row.file_size_bytes));
     const metadataOutdated = row.parser_version !== REPLAY_CACHE_VERSION;
     if (driverSlots.length === 0 && !metadataOutdated) continue;
     const alias = primary.get(row.filename) as { resolved_driver_slot: number | null } | undefined;
     backlog.push({
       filename: row.filename,
       filePath,
-      mtime: row.file_mtime,
-      size: row.file_size,
+      mtimeMs: row.file_mtime_ms,
+      fileSizeBytes: row.file_size_bytes,
       metadataOutdated,
       driverSlots,
       primarySlot: alias?.resolved_driver_slot ?? null,
@@ -102,7 +102,7 @@ export function listReplayUpgradeBacklog(db: DatabaseType, replaysDir: string): 
 function isFileUnchanged(candidate: ReplayUpgradeCandidate): boolean {
   try {
     const stat = fs.statSync(candidate.filePath);
-    return Math.floor(stat.mtimeMs) === candidate.mtime && stat.size === candidate.size;
+    return Math.floor(stat.mtimeMs) === candidate.mtimeMs && stat.size === candidate.fileSizeBytes;
   } catch {
     return false;
   }
@@ -123,13 +123,13 @@ export async function* upgradeReplaysAsyncIterator(
 
   for (let index = 0; index < backlog.length && !interrupted; index++) {
     const candidate = backlog[index];
-    const { filename, filePath, mtime, size } = candidate;
+    const { filename, filePath, mtimeMs, fileSizeBytes } = candidate;
     if (!isFileUnchanged(candidate)) continue;
 
     if (candidate.metadataOutdated) {
       yield progress({ processed: index, total: backlog.length, currentFile: filename, stage: 'Upgrading metadata', filePercent: 0 });
       try {
-        host.upsertReplayMetadataCache(filename, filePath, mtime, size, parseReplayMetadata(filePath, { playerName: options.playerName }));
+        host.upsertReplayMetadataCache(filename, filePath, mtimeMs, fileSizeBytes, parseReplayMetadata(filePath, { playerName: options.playerName }));
       } catch (error) {
         // The stored metadata stays; it is still readable.
         host.recordIngestError('vcr', filePath, error);
@@ -144,8 +144,8 @@ export async function* upgradeReplaysAsyncIterator(
     const includePrimary = candidate.driverSlots.includes(-1)
       || candidate.primarySlot !== null && candidate.driverSlots.includes(candidate.primarySlot);
     try {
-      const extraction = storeReplayDriversInWorker(host, filePath, { playerName: options.playerName }, {
-        filename, mtime, size, driverSlots: candidate.driverSlots.filter(slot => slot !== -1), includePrimary,
+      const extraction = storeReplayDriversInWorker(host, filePath, { playerName: effectiveReplayPlayerName(filePath, options.playerName) }, {
+        filename, mtimeMs, fileSizeBytes, driverSlots: candidate.driverSlots.filter(slot => slot !== -1), includePrimary,
         ...(includePrimary && candidate.primarySlot !== null && candidate.primarySlot >= 0 ? { primarySlot: candidate.primarySlot } : {}),
       });
       let step = await extraction.next();
@@ -176,7 +176,7 @@ export async function* upgradeReplaysAsyncIterator(
             failed++;
             const failure = step.value.failures.find(match);
             const error = failure?.code ? Object.assign(new Error(failure.message), { code: failure.code }) : new ReplayDecodeError(failure?.message ?? 'Replay driver produced no trajectory');
-            recordDriverFailure(host, filename, filePath, slot, mtime, size, error);
+            recordDriverFailure(host, filename, filePath, slot, mtimeMs, fileSizeBytes, error);
           }
         }
         yield progress({ processed: index, total: backlog.length, currentFile: filename, stage: 'Finished replay drivers', filePercent: 100 });
@@ -184,18 +184,18 @@ export async function* upgradeReplaysAsyncIterator(
         // Cancellation may arrive after a transaction commits but before the batch summary.
         for (const slot of candidate.driverSlots) {
           const attempt = host.getReplayDriverIngest(filename, slot);
-          if (attempt?.status === 'stored' && isReplayDriverSettled(attempt, mtime, size)) upgraded++;
+          if (attempt?.status === 'stored' && isReplayDriverSettled(attempt, mtimeMs, fileSizeBytes)) upgraded++;
         }
       }
     } catch (error) {
       for (const slot of candidate.driverSlots) {
         const attempt = host.getReplayDriverIngest(filename, slot);
-        if (attempt?.status === 'stored' && isReplayDriverSettled(attempt, mtime, size)) {
+        if (attempt?.status === 'stored' && isReplayDriverSettled(attempt, mtimeMs, fileSizeBytes)) {
           upgraded++;
           continue;
         }
         failed++;
-        recordDriverFailure(host, filename, filePath, slot, mtime, size, error);
+        recordDriverFailure(host, filename, filePath, slot, mtimeMs, fileSizeBytes, error);
       }
     }
   }

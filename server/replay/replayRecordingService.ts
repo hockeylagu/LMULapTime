@@ -22,11 +22,11 @@ export class ReplayRecordingService {
       throw new Error(`Replay file and cached metadata not found: ${replayName}`);
     }
     const stat = fs.statSync(filePath);
-    const mtime = Math.floor(stat.mtimeMs);
-    const cached = this.sessionDb.getReplayMetadataCache(replayName, mtime, stat.size, filePath, playerName);
+    const mtimeMs = Math.floor(stat.mtimeMs);
+    const cached = this.sessionDb.getReplayMetadataCache(replayName, mtimeMs, stat.size, filePath, playerName);
     if (cached) return cached;
     const metadata = decodeOrThrow(() => parseReplayMetadata(filePath, { playerName }));
-    this.sessionDb.upsertReplayMetadataCache(replayName, filePath, mtime, stat.size, metadata);
+    this.sessionDb.upsertReplayMetadataCache(replayName, filePath, mtimeMs, stat.size, metadata);
     return metadata;
   }
 
@@ -94,29 +94,29 @@ export class ReplayRecordingService {
     }
 
     const stat = fs.statSync(filePath);
-    const mtime = Math.floor(stat.mtimeMs);
+    const mtimeMs = Math.floor(stat.mtimeMs);
     // Metadata stores Date's millisecond precision; stat.mtimeMs can retain sub-millisecond digits.
     if (metadata && (Math.abs(metadata.mtimeMs - stat.mtimeMs) > 1 || metadata.fileSizeBytes !== stat.size)) {
       throw new Error('Replay source changed after its metadata was read');
     }
-    const cached = this.sessionDb.getReplayTrajectoryCache(replayName, driverSlotKey, lapKey, mtime, stat.size, filePath);
+    const cached = this.sessionDb.getReplayTrajectoryCache(replayName, driverSlotKey, lapKey, mtimeMs, stat.size, filePath);
     if (cached) return this.withLapEdges(replayName, cached);
 
     // A file version the decoder rejected would be rejected again, as would one whose decode was
     // interrupted too many times (see dbReplayIngestStore): retried once the file or parser version changes.
-    const settledError = settledReplayFailure(this.sessionDb.getReplayDriverIngest(replayName, driverSlotKey), mtime, stat.size);
+    const settledError = settledReplayFailure(this.sessionDb.getReplayDriverIngest(replayName, driverSlotKey), mtimeMs, stat.size);
     if (settledError !== null) {
       throw new Error(`Replay ${replayName} could not be decoded for driver ${driverSlotKey}: ${settledError}`);
     }
 
     if (metadataError !== undefined) {
-      recordDriverFailure(this.sessionDb, replayName, filePath, driverSlotKey, mtime, stat.size, metadataError);
+      recordDriverFailure(this.sessionDb, replayName, filePath, driverSlotKey, mtimeMs, stat.size, metadataError);
       throw metadataError;
     }
 
-    await this.decodeDriver(filePath, replayName, driverSlotKey, mtime, stat.size, options.playerName);
-    const chosen = this.sessionDb.getReplayTrajectoryCache(replayName, driverSlotKey, lapKey, mtime, stat.size, filePath)
-      ?? this.sessionDb.getReplayTrajectoryCache(replayName, driverSlotKey, -1, mtime, stat.size, filePath);
+    await this.decodeDriver(filePath, replayName, driverSlotKey, mtimeMs, stat.size, options.playerName);
+    const chosen = this.sessionDb.getReplayTrajectoryCache(replayName, driverSlotKey, lapKey, mtimeMs, stat.size, filePath)
+      ?? this.sessionDb.getReplayTrajectoryCache(replayName, driverSlotKey, -1, mtimeMs, stat.size, filePath);
     if (!chosen) throw new Error('Replay cache changed before the requested lap could be read');
     return this.withLapEdges(replayName, chosen);
   }
@@ -130,11 +130,11 @@ export class ReplayRecordingService {
     filePath: string,
     replayName: string,
     driverSlotKey: number,
-    mtime: number,
-    size: number,
+    mtimeMs: number,
+    fileSizeBytes: number,
     playerName?: string
   ): Promise<void> {
-    const key = `${replayName}\0${driverSlotKey}\0${mtime}\0${size}`;
+    const key = `${replayName}\0${driverSlotKey}\0${mtimeMs}\0${fileSizeBytes}`;
     const pending = this.pendingDecodes.get(key);
     if (pending) return pending;
 
@@ -146,14 +146,14 @@ export class ReplayRecordingService {
         playerName,
         maxPoints: 0,
         allLaps: true,
-      }, { filename: replayName, mtime, size, driverSlotKey, isPrimary: false });
+      }, { filename: replayName, mtimeMs, fileSizeBytes, driverSlotKey, isPrimary: false });
       let step = await extraction.next();
       while (!step.done) step = await extraction.next();
     })();
     this.pendingDecodes.set(key, decode);
     return decode
       .catch((error: unknown) => {
-        recordDriverFailure(this.sessionDb, replayName, filePath, driverSlotKey, mtime, size, error);
+        recordDriverFailure(this.sessionDb, replayName, filePath, driverSlotKey, mtimeMs, fileSizeBytes, error);
         throw error;
       })
       .finally(() => this.pendingDecodes.delete(key));

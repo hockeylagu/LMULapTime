@@ -14,15 +14,15 @@ import { makeSessionCard } from '../../helpers/sessionCardFixture.js';
 
 const laps = [
   {
-    id: 'slow-player', sessionId: 'session-1', driverName: 'Player', lapNum: 2, lapTime: 101,
+    id: 'slow-player', sessionId: 'session-1', driverName: 'Player', lapNumber: 2, lapTime: 101,
     s1: 30, s2: 34, s3: 37, isPlayer: true, isValid: true, carClass: 'GT3', pacePercentage: 101,
   },
   {
-    id: 'fast-player', sessionId: 'session-1', driverName: 'Player', lapNum: 3, lapTime: 99,
+    id: 'fast-player', sessionId: 'session-1', driverName: 'Player', lapNumber: 3, lapTime: 99,
     s1: 29, s2: 33, s3: 37, isPlayer: true, isValid: true, carClass: 'GT3', pacePercentage: 99,
   },
   {
-    id: 'overall', sessionId: 'session-2', driverName: 'Rival', lapNum: 1, lapTime: 98,
+    id: 'overall', sessionId: 'session-2', driverName: 'Rival', lapNumber: 1, lapTime: 98,
     s1: 28, s2: 33, s3: 37, isPlayer: false, isValid: true, carClass: 'GT3', pacePercentage: 98,
   },
 ];
@@ -54,7 +54,7 @@ describe('useCompareLapsData selection fallbacks', () => {
         bestS2: 33,
         bestS3: 37,
         theoreticalBestSec: 98,
-        benchmarks: [{ carClass: 'GT3', target100Sec: 97 }],
+        benchmarks: [{ carClass: 'GT3', targets: { alienSec: 97 } }],
       }),
     });
 
@@ -125,7 +125,7 @@ describe('useCompareLapsData selection fallbacks', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     act(() => navigateTo('/compare?sessionId=session-1&driverOrdinal=0&lapOrdinal=1'));
     await waitFor(() => expect(urls.some(url => url.includes('driverOrdinal=0') && url.includes('lapOrdinal=1') && url.includes('pageSize=1'))).toBe(true));
-    expect(urls.some(url => url.includes('sessionId=session-1') && url.includes('driverOrdinal=0') && url.includes('lapOrdinal=1') && !url.includes('lapNum='))).toBe(true);
+    expect(urls.some(url => url.includes('sessionId=session-1') && url.includes('driverOrdinal=0') && url.includes('lapOrdinal=1') && !url.includes('lapNumber='))).toBe(true);
     vi.unstubAllGlobals();
   });
 

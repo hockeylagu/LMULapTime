@@ -15,7 +15,7 @@ function storedLap(lapNumber: number, startSec: number, durationSec: number, sta
     points.push({ ...pointAt(startM + 50 * (time - startSec)), y: 0, timeSec: time, inPit: pitFrom !== undefined && time >= pitFrom, speedKmh: 180 });
   }
   return {
-    replayName: 'Circle_R1.Vcr', pointsCount: points.length, rawSampleRateHz: 50, currentLap: lapNumber,
+    replayName: 'Circle_R1.Vcr', pointsCount: points.length, vcrRawSampleRateHz: 50, currentLap: lapNumber,
     bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 }, points,
   };
 }

@@ -4,7 +4,7 @@ import type { LapData } from '../../../shared/types/index.js';
 import { lapEventTime } from '../../../src/components/session-detail/table/SessionLapDetailsRow.js';
 
 const lap = (overrides: Partial<LapData>): LapData => ({
-  lapNum: 9, position: 5, lapTime: 100.358, lapTimeString: '1:40.358', s1: null, s2: null, s3: null, topSpeed: null,
+  lapNumber: 9, position: 5, lapTime: 100.358, s1: null, s2: null, s3: null, topSpeed: null,
   fCompound: 'Soft', rCompound: 'Soft', isPitStop: false, isValid: true, ...overrides,
 } as LapData);
 
@@ -31,9 +31,12 @@ describe('lapDetailSections', () => {
     const sections = lapDetailSections(lap({
       nonRepresentativeReason: 'contact',
       traffic: { ahead: null, behind: null, following: false, passed: [{ name: 'Rui Paiva', carClass: 'GT3', sameClass: false }], passedBy: [] },
-      incidents: [{ type: 'contact', description: 'Contact with another car (326N)' }],
-      trackLimits: [{ description: 'Track limits violation (+0.25 pts)' }],
-    } as Partial<LapData>));
+    } as Partial<LapData>), {
+      events: {
+        incidents: [{ type: 'contact', description: 'Contact with another car (326N)' }],
+        trackLimits: [{ description: 'Track limits violation (+0.25 pts)' }], penalties: [],
+      },
+    });
 
     expect(sections.map((s) => s.label)).toEqual(['Left out of average', 'Around you', 'Incidents', 'Track limits']);
     expect(sections[0].lines).toEqual(['Slower than your median lap, with contact or damage']);
@@ -54,11 +57,11 @@ describe('lapDetailSections', () => {
   it('splits a stop between its in-lap and its out-lap at the timing line', () => {
     // The 08/27 Daytona stop: the line runs through the pit lane 13 s after the entry, before the box.
     const inLap = lap({
-      lapNum: 14, lapTime: 122.366, isPitStop: true, pitStopDuration: 113.1, pitStopDurationString: '+113.1s',
+      lapNumber: 14, lapTime: 122.366, isPitStop: true, pitStopDuration: 113.1,
       pitService: { ...pitService, laneBeforeLineSec: 13.4, serviceAfterLine: true },
     });
-    const outLap = lap({ lapNum: 15, lapTime: 210.933, isOutLap: true });
-    const stop = { inLap, outLap, damageBefore: { lapNum: 11, description: 'New suspension damage reported' } };
+    const outLap = lap({ lapNumber: 15, lapTime: 210.933, isOutLap: true });
+    const stop = { inLap, outLap, damageBefore: { lapNumber: 11, description: 'New suspension damage reported' } };
 
     expect(lapDetailSections(inLap, { pitStop: { ...stop, onOutLap: false } })).toEqual([{ label: 'Pit stop', lines: [
       'Pit entry: into the pit lane 13 s before the line',
@@ -74,7 +77,7 @@ describe('lapDetailSections', () => {
   });
 
   it('keeps a stop the line does not cut on the in-lap', () => {
-    const inLap = lap({ lapNum: 5, isPitStop: true, pitStopDuration: 30, pitStopDurationString: '+30.0s', pitService });
+    const inLap = lap({ lapNumber: 5, isPitStop: true, pitStopDuration: 30, pitService });
     expect(lapDetailSections(inLap)).toEqual([{ label: 'Pit stop', lines: [
       'Pit lane: 123 s',
       'In the box: 73 s (usual for your class: 29 s)',
@@ -84,7 +87,7 @@ describe('lapDetailSections', () => {
   });
 
   it('adds the pit loss on a pit lap and nothing on a quiet lap', () => {
-    expect(lapDetailSections(lap({ isPitStop: true, pitStopDurationString: '+13.0s' }))).toEqual([
+    expect(lapDetailSections(lap({ isPitStop: true, pitStopDuration: 13 }))).toEqual([
       { label: 'Pit stop', lines: ['Estimated pit loss: +13.0s'] },
     ]);
     expect(lapDetailSections(lap({}))).toEqual([]);
@@ -93,12 +96,12 @@ describe('lapDetailSections', () => {
 
 describe('lapEventsTooltip', () => {
   it('lists incidents, track limits and penalties without emoji', () => {
-    const tooltip = lapEventsTooltip(lap({
-      incidentCount: 1, incidents: [{ type: 'contact', description: 'Contact with Immovable (4522N)' }],
-      penaltyCount: 1, penalties: [{ description: 'Drive Thru for speeding in pit lane', penalty: 'Drive Thru' }],
-    } as Partial<LapData>));
+    const tooltip = lapEventsTooltip({
+      incidents: [{ type: 'contact', description: 'Contact with Immovable (4522N)' }], trackLimits: [],
+      penalties: [{ description: 'Drive Thru for speeding in pit lane', penalty: 'Drive Thru', reason: 'Speeding' }],
+    });
 
     expect(tooltip).toBe('Incidents (1):\n  • Contact with Immovable (4522N)\n\nPenalties (1):\n  • Drive Thru for speeding in pit lane');
-    expect(lapEventsTooltip(lap({}))).toBeUndefined();
+    expect(lapEventsTooltip({ incidents: [], trackLimits: [], penalties: [] })).toBeUndefined();
   });
 });

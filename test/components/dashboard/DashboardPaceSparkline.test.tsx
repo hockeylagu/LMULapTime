@@ -16,7 +16,7 @@ describe('DashboardPaceSparkline component', () => {
         trackName: 'Spa',
         carType: 'BMW M4',
         timeString: '2026/09/20 14:00',
-        bestLapTimeString: '2:18.500',
+        bestLapTime: 138.5,
         pacePercentage: 103.5,
       },
     ];
@@ -33,7 +33,7 @@ describe('DashboardPaceSparkline component', () => {
         trackName: 'Spa',
         carType: 'BMW M4',
         timeString: '2026/09/20 14:00',
-        bestLapTimeString: '2:18.500',
+        bestLapTime: 138.5,
         pacePercentage: 103.5,
       },
       {
@@ -41,7 +41,7 @@ describe('DashboardPaceSparkline component', () => {
         trackName: 'Monza',
         carType: 'BMW M4',
         timeString: '2026/09/22 14:00',
-        bestLapTimeString: '1:48.200',
+        bestLapTime: 108.2,
         pacePercentage: 102.8,
       },
       {
@@ -49,7 +49,7 @@ describe('DashboardPaceSparkline component', () => {
         trackName: 'Le Mans',
         carType: 'Corvette Z06',
         timeString: '2026/09/23 22:30',
-        bestLapTimeString: '4:00.470',
+        bestLapTime: 240.47,
         pacePercentage: 102.4,
       },
     ];
@@ -89,8 +89,8 @@ describe('DashboardPaceSparkline component', () => {
 
   it('renders declining and steady badges correctly based on trend direction', () => {
     const points: DashboardRecentPacePoint[] = [
-      { id: '1', trackName: 'Spa', carType: 'BMW', timeString: '2026/09/20', bestLapTimeString: '2:00', pacePercentage: 102.0 },
-      { id: '2', trackName: 'Spa', carType: 'BMW', timeString: '2026/09/21', bestLapTimeString: '2:02', pacePercentage: 103.5 },
+      { id: '1', trackName: 'Spa', carType: 'BMW', timeString: '2026/09/20', bestLapTime: 120, pacePercentage: 102.0 },
+      { id: '2', trackName: 'Spa', carType: 'BMW', timeString: '2026/09/21', bestLapTime: 122, pacePercentage: 103.5 },
     ];
 
     const { rerender } = render(
@@ -107,8 +107,8 @@ describe('DashboardPaceSparkline component', () => {
 
   it('keeps small changes small', () => {
     const points: DashboardRecentPacePoint[] = [
-      { id: '1', trackName: 'Spa', carType: 'BMW', timeString: '2026/09/20', bestLapTimeString: '2:00', pacePercentage: 110.0 },
-      { id: '2', trackName: 'Spa', carType: 'BMW', timeString: '2026/09/21', bestLapTimeString: '2:00', pacePercentage: 110.2 },
+      { id: '1', trackName: 'Spa', carType: 'BMW', timeString: '2026/09/20', bestLapTime: 120, pacePercentage: 110.0 },
+      { id: '2', trackName: 'Spa', carType: 'BMW', timeString: '2026/09/21', bestLapTime: 120, pacePercentage: 110.2 },
     ];
     const { container } = render(<DashboardPaceSparkline points={points} paceDelta={-0.2} paceTrendDirection="steady" />);
 

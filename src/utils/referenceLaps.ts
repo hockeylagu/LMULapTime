@@ -24,7 +24,7 @@ export function suggestReferenceLap(
   let best: ComparableLap | null = null;
   for (const lap of driversLaps) {
     if (!sameCar(lap.carType, carType) || lap.nonRepresentativeReason) continue;
-    if (lap.sessionId === sessionId && lap.lapNum === currentLapNumber) continue;
+    if (lap.sessionId === sessionId && lap.lapNumber === currentLapNumber) continue;
     if (typeof lap.lapTime !== 'number' || lap.lapTime <= 0) continue;
     if (!best || lap.lapTime < (best.lapTime as number)) best = lap;
   }
@@ -37,7 +37,7 @@ export function suggestReferenceLap(
 export interface AnalysedLap {
   sessionId: string;
   driverName: string;
-  lapNum: number;
+  lapNumber: number;
   carType: string;
 }
 
@@ -53,7 +53,7 @@ function sameCarCandidates(laps: ComparableLap[], analysed: AnalysedLap): Array<
     if (!lap.matchingReplayFile || !sameCar(lap.carType, analysed.carType)) return false;
     if (!lap.isValid || lap.isPitStop || lap.isOutLap || lap.nonRepresentativeReason) return false;
     if (typeof lap.lapTime !== 'number' || lap.lapTime <= 0) return false;
-    return !(lap.sessionId === analysed.sessionId && lap.driverName === analysed.driverName && lap.lapNum === analysed.lapNum);
+    return !(lap.sessionId === analysed.sessionId && lap.driverName === analysed.driverName && lap.lapNumber === analysed.lapNumber);
   });
 }
 

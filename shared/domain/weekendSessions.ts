@@ -11,7 +11,6 @@ export interface CandidateRelatedSession {
   trackCourse?: string;
   trackEvent?: string;
   timeString?: string;
-  dateString?: string;
   timestamp?: number;
   settings?: { serverName?: string; modeSetting?: string };
   playerDriver?: { carClass?: string };
@@ -74,7 +73,7 @@ function weekendContext(session: CandidateRelatedSession): WeekendContext {
     id: session.id || session.sessionId,
     online: isOnlineSession(session),
     time: sessionTime(session),
-    eventStart: (session.timeString || session.dateString || '').trim(),
+    eventStart: (session.timeString || '').trim(),
     carClass: session.playerDriver?.carClass || session.carClass,
     event: session.trackEvent ? squash(session.trackEvent) : undefined,
   };
@@ -82,7 +81,7 @@ function weekendContext(session: CandidateRelatedSession): WeekendContext {
 
 /** Start of the session; the parser's timestamp carries the type weight (practice < qualifying < race). */
 function sessionTime(s: CandidateRelatedSession): number {
-  return s.timestamp || parseDateStringToTimestamp(s.timeString || s.dateString);
+  return s.timestamp || parseDateStringToTimestamp(s.timeString);
 }
 
 /**

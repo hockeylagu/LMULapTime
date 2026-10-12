@@ -11,7 +11,7 @@ export interface DuckDbSessionMetadata {
   trackName?: string;
   sessionType?: string;
   driverName?: string;
-  carName?: string;
+  carType?: string;
   startTime?: string;
   [key: string]: string | undefined;
 }
@@ -129,7 +129,7 @@ export class DuckDbReader {
       if (lowerKey.includes('track')) result.trackName = r.value;
       if (lowerKey.includes('session')) result.sessionType = r.value;
       if (lowerKey.includes('driver')) result.driverName = r.value;
-      if (lowerKey.includes('car')) result.carName = r.value;
+      if (lowerKey.includes('car')) result.carType = r.value;
       if (lowerKey.includes('start') || lowerKey.includes('time')) result.startTime = r.value;
     }
     return result;

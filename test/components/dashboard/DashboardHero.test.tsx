@@ -32,18 +32,16 @@ describe('DashboardHero', () => {
         carType: 'BMW M4 LMGT3',
         carClass: 'GT3',
         bestLapTime: 138.5,
-        bestLapTimeString: '2:18.500',
         bestS1: 40,
         bestS2: 50,
         bestS3: 48.5,
         theoreticalBest: 138.5,
-        theoreticalBestString: '2:18.500',
         bestLapPacePercentage: 103.5,
         bestLapPaceCategory: 'Good',
         position: 10,
         lapsCount: 8,
         laps: [
-          { lapNum: 1, position: 12, lapTime: 140, lapTimeString: '2:20.000', s1: null, s2: null, s3: null, topSpeed: 280, fCompound: 'M', rCompound: 'M', isPitStop: false, isValid: true },
+          { lapNumber: 1, position: 12, lapTime: 140, s1: null, s2: null, s3: null, topSpeed: 280, fCompound: 'M', rCompound: 'M', isPitStop: false, isValid: true },
         ],
       },
     },
@@ -66,12 +64,10 @@ describe('DashboardHero', () => {
         bestLapTime: 240.47,
         driverOrdinal: 0,
         bestLapOrdinal: 1,
-        bestLapTimeString: '4:00.470',
         bestS1: 70,
         bestS2: 90,
         bestS3: 80.47,
         theoreticalBest: 240.47,
-        theoreticalBestString: '4:00.470',
         bestLapPacePercentage: 102.4,
         bestLapPaceCategory: 'Good',
         position: 8,
@@ -79,8 +75,8 @@ describe('DashboardHero', () => {
         gridPosition: 15,
         positionGain: 7,
         laps: [
-          { lapNum: 1, position: 15, lapTime: 245, lapTimeString: '4:05.000', s1: null, s2: null, s3: null, topSpeed: 295, fCompound: 'M', rCompound: 'M', isPitStop: false, isValid: true },
-          { lapNum: 2, position: 8, lapTime: 240.47, lapTimeString: '4:00.470', s1: null, s2: null, s3: null, topSpeed: 298, fCompound: 'M', rCompound: 'M', isPitStop: false, isValid: true },
+          { lapNumber: 1, position: 15, lapTime: 245, s1: null, s2: null, s3: null, topSpeed: 295, fCompound: 'M', rCompound: 'M', isPitStop: false, isValid: true },
+          { lapNumber: 2, position: 8, lapTime: 240.47, s1: null, s2: null, s3: null, topSpeed: 298, fCompound: 'M', rCompound: 'M', isPitStop: false, isValid: true },
         ],
       },
     },
@@ -152,7 +148,7 @@ describe('DashboardHero', () => {
     const duckSessions = [
       {
         ...mockSessions[1],
-        hasDuckDbTelemetry: true,
+        duckdbFilename: 'spa.duckdb',
       },
     ];
 

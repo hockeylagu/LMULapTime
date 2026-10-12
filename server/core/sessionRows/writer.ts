@@ -10,7 +10,6 @@ import {
   SESSION_FIELDS, SETTINGS_FIELDS, TIRE_WEAR_FIELDS, WEATHER_FIELDS,
 } from './specs.js';
 import { Dictionaries } from './dictionaries.js';
-import { sessionTelemetry } from './canonical.js';
 
 type Params = Record<string, SqlValue>;
 
@@ -43,7 +42,7 @@ export function playerDriverOrdinal(session: DetailedSession): number | null {
   return matches.length === 1 ? matches[0].index : null;
 }
 
-function listsMask(source: DriverData | LapData): number | null {
+function listsMask(source: DriverData): number | null {
   let mask = 0;
   for (const list of EVENT_LISTS) if (Array.isArray(source[list.prop])) mask |= list.bit;
   return mask === 0 ? null : mask;
@@ -60,13 +59,11 @@ function carParams(prefix: string, gap: TrafficGap | null | undefined): Params {
 /** The clean-lap figures a driver row carries; NULL for a driver the projection does not know. */
 function driverDerived(derived: SessionDriverProjection | undefined): Params {
   return {
-    is_human: derived ? flag(derived.isHuman) : null, is_player_driver: derived ? flag(derived.isPlayer) : null,
-    driver_class: derived?.carClass ?? null, completed_laps_count: derived?.lapsCount ?? null,
-    clean_laps_count: derived?.cleanLapsCount ?? null, driving_time_sum: derived?.drivingTimeSeconds ?? null,
-    pit_count: derived?.pitStopsCount ?? null, max_speed: derived?.maxTopSpeed ?? null, best_lap_ordinal: derived?.bestLapOrdinal ?? null,
-    best_lap_number: derived?.bestLapNumber ?? null, clean_average_lap_time: derived?.averageLapTime ?? null,
-    top_three_average: derived?.top3Average ?? null, consistency_score: derived?.consistencyScore ?? null,
-    best_lap_is_wet: derived ? flag(derived.bestLapWet) : null,
+    is_human: derived ? flag(derived.isHuman) : null,
+    driver_class: derived?.carClass ?? null, laps_count: derived?.lapsCount ?? null,
+    clean_laps_count: derived?.cleanLapsCount ?? null, driving_time_seconds: derived?.drivingTimeSeconds ?? null,
+    pit_stops_count: derived?.pitStopsCount ?? null, max_top_speed: derived?.maxTopSpeed ?? null, best_lap_ordinal: derived?.bestLapOrdinal ?? null,
+    top3_average: derived?.top3Average ?? null, consistency_score: derived?.consistencyScore ?? null,
   };
 }
 
@@ -88,7 +85,6 @@ function lapParams(base: Params, lap: LapData, derived: SessionLapProjection | u
   base.traffic_following = typeof traffic?.following === 'boolean' ? Number(traffic.following) : null;
   base.traffic_pressured = typeof traffic?.pressured === 'boolean' ? Number(traffic.pressured) : null;
   Object.assign(base, carParams('ahead', traffic?.ahead), carParams('behind', traffic?.behind));
-  base.lists_mask = listsMask(lap);
   Object.assign(base, lapDerived(derived));
   return base;
 }
@@ -108,9 +104,9 @@ function prepare(db: DatabaseType): Statements {
     driver: db.prepare(insertSql('session_drivers', ['session_id', 'driver_ordinal', 'driver_id', 'vehicle_id', 'team_id',
       ...columnsOf(DRIVER_FIELDS), 'lists_mask', ...derivedNames(DRIVER_DERIVED_DEFS)])),
     lap: db.prepare(insertSql('session_laps', ['session_id', 'driver_ordinal', 'lap_ordinal', ...columnsOf(LAP_FIELDS),
-      ...columnsOf(TIRE_WEAR_FIELDS), ...columnsOf(CONDITION_FIELDS), ...trafficColumns, 'lists_mask', ...derivedNames(LAP_DERIVED_DEFS)])),
+      ...columnsOf(TIRE_WEAR_FIELDS), ...columnsOf(CONDITION_FIELDS), ...trafficColumns, ...derivedNames(LAP_DERIVED_DEFS)])),
     pass: db.prepare(insertSql('session_lap_passes', ['session_id', 'driver_ordinal', 'lap_ordinal', 'direction', 'seq', 'name', 'car_class', 'same_class'])),
-    event: db.prepare(insertSql('session_events', ['session_id', 'driver_ordinal', 'seq', 'kind', 'driver_seq', 'lap_ordinal', 'lap_seq', ...columnsOf(EVENT_COLUMNS)])),
+    event: db.prepare(insertSql('session_events', ['session_id', 'driver_ordinal', 'seq', 'kind', ...columnsOf(EVENT_COLUMNS)])),
     dictionaries: new Dictionaries(db),
   };
 }
@@ -125,45 +121,17 @@ function writePasses(statements: Statements, sessionId: string, driverOrdinal: n
   }
 }
 
-/**
- * A driver's events once: every entry of the driver lists is a row; a lap event is the row of the
- * driver entry it equals, so it only adds its place in the lap's list. A lap event with no equal
- * driver entry gets a row of its own (driver_seq NULL).
- */
+/** A driver's events: one row each, numbered through the three lists in order (the lap an event fell on is its lap_number). */
 function writeEvents(statements: Statements, sessionId: string, driverOrdinal: number, driver: DriverData): void {
   const blank: Params = Object.fromEntries(EVENT_COLUMNS.map(field => [field.col, null]));
   let seq = 0;
-  const unclaimed = new Map<string, Array<{ row: Params }>>();
-  const rows: Params[] = [];
-  const addRow = (kind: string, event: Row, fields: readonly Field[], driverSeq: number | null): Params => {
-    const row: Params = { ...blank, session_id: sessionId, driver_ordinal: driverOrdinal, seq: seq++, kind, driver_seq: driverSeq, lap_ordinal: null, lap_seq: null };
-    packFields(row, event, fields);
-    rows.push(row);
-    return row;
-  };
   for (const list of EVENT_LISTS) {
-    const events = driver[list.prop];
-    if (!Array.isArray(events)) continue;
-    events.forEach((event, index) => {
-      const row = addRow(list.kind, event as unknown as Row, list.fields, index);
-      const key = `${list.kind}|${stableKey(event)}`;
-      const queue = unclaimed.get(key);
-      if (queue) queue.push({ row }); else unclaimed.set(key, [{ row }]);
-    });
-  }
-  driver.laps.forEach((lap, lapOrdinal) => {
-    for (const list of EVENT_LISTS) {
-      const events = lap[list.prop];
-      if (!Array.isArray(events)) continue;
-      events.forEach((event, lapSeq) => {
-        const claimed = unclaimed.get(`${list.kind}|${stableKey(event)}`)?.shift();
-        const row = claimed?.row ?? addRow(list.kind, event as unknown as Row, list.fields, null);
-        row.lap_ordinal = lapOrdinal;
-        row.lap_seq = lapSeq;
-      });
+    for (const event of driver[list.prop] ?? []) {
+      const row: Params = { ...blank, session_id: sessionId, driver_ordinal: driverOrdinal, seq: seq++, kind: list.kind };
+      packFields(row, event as unknown as Row, list.fields);
+      statements.event.run(row);
     }
-  });
-  for (const row of rows) statements.event.run(row);
+  }
 }
 
 /** The projection's laps by driver, each list indexed by lap ordinal. */
@@ -190,9 +158,6 @@ export function writeSessionRows(db: DatabaseType, session: DetailedSession, pro
 
     const params: Params = { id: session.id };
     packFields(params, session as unknown as Row, SESSION_FIELDS);
-    const telemetry = sessionTelemetry(session);
-    params.has_duckdb_telemetry = telemetry.hasDuckDbTelemetry === undefined ? null : Number(telemetry.hasDuckDbTelemetry);
-    params.duckdb_filename = telemetry.duckdbFilename ?? null;
     packFields(params, session.weather as unknown as Row | undefined, WEATHER_FIELDS);
     packFields(params, session.settings as unknown as Row | undefined, SETTINGS_FIELDS);
     packFields(params, session.bestSessionLap as unknown as Row | undefined, BEST_SESSION_LAP_FIELDS);

@@ -10,12 +10,12 @@ export function buildSessionAggregate(session: DetailedSession, drivers: Session
   const fallbackTimestamp = Date.parse(timeString.replace(/\//g, '-') + (timeString ? 'Z' : ''));
   const primaryLaps = laps.filter(lap => lap.driverOrdinal === primary);
   return {
-    player, timeString, sessionDay: timeString.split(' ')[0], trackLengthMeters,
+    sessionDay: timeString.split(' ')[0],
     eventTimestamp: session.timestamp > 0 ? session.timestamp : Number.isFinite(fallbackTimestamp) ? fallbackTimestamp : 0,
     distanceKm: (trackLengthMeters ?? 5000) * (player?.lapsCount ?? 0) / 1000,
     // Preserve the activity card's historical 4.5 km estimate when track length is absent.
     activityDistanceKm: (trackLengthMeters ?? 4500) * (player?.lapsCount ?? 0) / 1000,
-    positionGain: source?.positionGain ?? null, bestLapTimeString: source?.bestLapTimeString ?? '',
+    positionGain: source?.positionGain ?? null,
     primaryLapCount: primaryLaps.length, primaryValidLapCount: primaryLaps.filter(lap => lap.isValid).length,
   };
 }

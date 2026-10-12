@@ -22,7 +22,7 @@ export function initSessionSummarySchema(db: DatabaseType): void {
     CREATE INDEX IF NOT EXISTS idx_sessions_track_course ON sessions(track_venue, track_course);
     -- Reconciliation candidates (dbReconciliationStore): changed rows and XML end times near a replay.
     CREATE INDEX IF NOT EXISTS idx_sessions_updated ON sessions(updated_at);
-    CREATE INDEX IF NOT EXISTS idx_sessions_file_mtime ON sessions(file_mtime);
+    CREATE INDEX IF NOT EXISTS idx_sessions_file_mtime ON sessions(file_mtime_ms);
     CREATE TABLE IF NOT EXISTS session_driver_condition_summaries (
       session_id TEXT NOT NULL, driver_ordinal INTEGER NOT NULL, condition_group TEXT NOT NULL,
       clean_count INTEGER NOT NULL, clean_time_sum REAL NOT NULL, clean_time_square_sum REAL NOT NULL,

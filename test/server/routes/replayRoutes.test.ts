@@ -45,16 +45,16 @@ describe('session telemetry routes', () => {
         driverName: 'Route Driver',
         carClass: 'GT3',
         carType: 'Test Car',
-        laps: [{ lapNum: 1, lapTime: 99.123, lapTimeString: '1:39.123', s1: 30.111, s2: 34.222, s3: 34.79, isValid: true }],
+        laps: [{ lapNumber: 1, lapTime: 99.123, s1: 30.111, s2: 34.222, s3: 34.79, isValid: true }],
       }],
       playerDriver: {
         name: 'Route Driver', driverName: 'Route Driver', carClass: 'GT3', carType: 'Test Car',
         bestLapTime: 99.123,
-        laps: [{ lapNum: 1, lapTime: 99.123, lapTimeString: '1:39.123', s1: 30.111, s2: 34.222, s3: 34.79, isValid: true }],
+        laps: [{ lapNumber: 1, lapTime: 99.123, s1: 30.111, s2: 34.222, s3: 34.79, isValid: true }],
       },
     } as unknown as DetailedSession;
     session = sessionFixture(session.drivers.map(item => driver(item.name,
-      item.laps.map(itemLap => lap(itemLap.lapNum, itemLap)), item)), session);
+      item.laps.map(itemLap => lap(itemLap.lapNumber, itemLap)), item)), session);
     db.upsertSession(session, 'session-1.xml', 1, 1);
     vi.spyOn(db, 'getSessionById');
 
@@ -116,7 +116,7 @@ describe('session telemetry routes', () => {
     const trajectory = await request(app).get('/api/session/session-1/telemetry?driverOrdinal=0&lapOrdinal=0&source=vcr');
     expect(trajectory.status).toBe(200);
     expect(getTrajectory.mock.calls[0][0]).toMatchObject({ driverOrdinal: 0, lapOrdinal: 0, allowDuckDb: false,
-      session: { id: 'session-1', drivers: [{ name: 'Route Driver', laps: [{ lapNum: 1, lapOrdinal: 0 }] }] } });
+      session: { id: 'session-1', drivers: [{ name: 'Route Driver', laps: [{ lapNumber: 1, lapOrdinal: 0 }] }] } });
     expect(getTrajectory.mock.calls[0][0].session.drivers[0].laps[0]).not.toHaveProperty('topSpeed');
     const response = await request(app).get('/api/session/session-1/traffic');
     expect(response.status).toBe(200);

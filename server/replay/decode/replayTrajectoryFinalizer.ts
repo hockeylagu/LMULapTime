@@ -87,8 +87,8 @@ export function finalizeReplayDriver(
       driverSlot: targetSlot,
       driverName,
       pointsCount: finalPoints.length,
-      rawPointsCount,
-      rawSampleRateHz,
+      vcrRawPointsCount: rawPointsCount,
+      vcrRawSampleRateHz: rawSampleRateHz,
       maxPoints: options.maxPoints,
       isFullResolution: finalPoints.length >= rawPointsCount,
       currentLap: chosenLap.lapNumber,
@@ -144,7 +144,7 @@ export function finalizeReplayDriver(
     const wheels = result.wheelTelemetryAvailable ? 'yes' : 'no';
     const energy = result.energyTelemetryAvailable ? 'yes' : 'no';
     console.log(
-      `[VCR Parser] [6/6] Finalized: Lap ${result.currentLap} downsampled to ${result.pointsCount} pts (raw: ${result.rawPointsCount} @ ${result.rawSampleRateHz}Hz) | Bounds: ${result.bounds.spanX}m x ${result.bounds.spanZ}m | Telemetry: wheels=${wheels}, energy=${energy} (${elapsedMs}ms)`
+      `[VCR Parser] [6/6] Finalized: Lap ${result.currentLap} downsampled to ${result.pointsCount} pts (raw: ${result.vcrRawPointsCount} @ ${result.vcrRawSampleRateHz}Hz) | Bounds: ${result.bounds.spanX}m x ${result.bounds.spanZ}m | Telemetry: wheels=${wheels}, energy=${energy} (${elapsedMs}ms)`
     );
   }
 

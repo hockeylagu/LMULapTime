@@ -7,9 +7,7 @@ export interface ReplayEventInfo {
   eventId?: string;
   eventTitle?: string;
   eventType?: string;
-  sceneDesc?: string;
   seriesId?: string;
-  session?: string;
   splitNo?: number;
   [key: string]: unknown;
 }
@@ -20,7 +18,7 @@ export interface ReplayDriverEntry {
   sessionLapOrdinals?: Record<string, number>;
   name: string;
   vehicleId?: string;
-  carModel?: string;
+  carType?: string;
   carClass?: string;
   team?: string;
   carNumber?: string;
@@ -36,10 +34,10 @@ export interface ReplayMetadata {
   fileSizeBytes: number;
   mtimeMs: number;
   eventInfo?: ReplayEventInfo | null;
-  eventTitle?: string;
   sessionType?: string;
   privateSession?: boolean;
   scn?: string;
+  /** The engine scene (scn without its extension): names the exact layout. */
   sceneDesc?: string;
   aiw?: string;
   trackName?: string;
@@ -57,8 +55,7 @@ export interface ReplayMetadata {
   drivers: ReplayDriverEntry[];
   laps?: ReplayLapSummary[];
   carClass?: string;
-  carModel?: string;
-  hasDuckDbTelemetry?: boolean;
+  carType?: string;
   duckdbFilename?: string;
   hasRain?: boolean;
   maxRainIntensity?: number;
@@ -268,15 +265,16 @@ export interface ReplayTrajectoryData {
   sessionId?: string;
   driverOrdinal?: number;
   lapOrdinal?: number;
-  vehicleIdentity?: { vehicleId?:string; carModel?:string; carClass?:string };
+  vehicleIdentity?: { vehicleId?:string; carType?:string; carClass?:string };
   vehicleData?: VehicleDataRecord;
   dataPluginRevision?: string;
   replayName: string;
   driverSlot?: number;
   driverName?: string;
   pointsCount: number;
-  rawPointsCount?: number;
-  rawSampleRateHz?: number;
+  /** Samples the VCR recorded for this lap before any downsampling. */
+  vcrRawPointsCount?: number;
+  vcrRawSampleRateHz?: number;
   maxPoints?: number;
   isFullResolution?: boolean;
   currentLap?: number;
@@ -341,8 +339,6 @@ export interface ReplayTrajectoryData {
   duckdbFilename?: string;
   duckdbAvailable?: boolean;
   duckdbUnavailableReason?: string;
-  vcrRawPointsCount?: number;
-  vcrRawSampleRateHz?: number;
   duckdbRawPointsCount?: number;
   duckdbRawSampleRateHz?: number;
   // Present only when the trajectory was extracted with `allLaps: true` - one fully
@@ -355,7 +351,6 @@ export interface ReplaySummary {
   path: string;
   fileSizeBytes: number;
   mtimeMs: number;
-  trackName?: string;
   trackVenue?: string;
   trackCourse?: string;
   displayTrack?: string;
@@ -367,9 +362,8 @@ export interface ReplaySummary {
   driversCount?: number;
   matchedSessionId?: string;
   carClass?: string;
-  carModel?: string;
+  carType?: string;
   carClasses?: string[];
-  hasDuckDbTelemetry?: boolean;
   duckdbFilename?: string;
   hasRain?: boolean;
   maxRainIntensity?: number;

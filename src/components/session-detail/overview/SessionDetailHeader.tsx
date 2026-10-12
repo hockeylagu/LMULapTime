@@ -56,8 +56,8 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
     navigate(telemetryPath(targetLap));
   };
   const telemetryPath = (targetLap?: number): string => sessionTelemetryPath(
-    searchParams, session, selectedDriver, targetLap || selectedDriver?.bestLapNum || 1
-  ) ?? sessionLapComparePath(session, selectedDriver, targetLap || selectedDriver?.bestLapNum || 1);
+    searchParams, session, selectedDriver, targetLap || selectedDriver?.bestLapNumber || 1
+  ) ?? sessionLapComparePath(session, selectedDriver, targetLap || selectedDriver?.bestLapNumber || 1);
 
   const [showRulesModal, setShowRulesModal] = React.useState(false);
   const settings = session.settings;
@@ -76,7 +76,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
     : settings?.raceLaps && settings.raceLaps > 0 && settings.raceLaps < 2147483640 ? `${settings.raceLaps} Laps` : undefined;
 
   const hasConditions = hasSessionConditions(session.matchingReplayFile);
-  const hasDuckDb = Boolean(session.hasDuckDbTelemetry || session.matchingReplayFile?.hasDuckDbTelemetry);
+  const hasDuckDb = Boolean(session.duckdbFilename);
 
   // The course and event lines often just repeat the display name; keep only what adds to it.
   const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);

@@ -4,19 +4,18 @@ import { CompareLaps } from '../../../../src/components/leaderboard/CompareLaps.
 import type { ComparableLap } from '../../../../shared/types/index.js';
 import { makeSessionCard } from '../../../helpers/sessionCardFixture.js';
 
-const lap = (sessionId: string, sessionType: string, hour: number, lapNum: number, lapTime: number, lapTimeString: string): ComparableLap => ({
-  id: `${sessionId}_Me_lap_${lapNum}`,
+const lap = (sessionId: string, sessionType: string, hour: number, lapNumber: number, lapTime: number): ComparableLap => ({
+  id: `${sessionId}_Me_lap_${lapNumber}`,
   sessionId,
   sessionName: sessionType,
   sessionType,
   timestamp: Date.parse(`2026-09-20T${String(hour).padStart(2, '0')}:00:00`),
-  dateString: `2026/09/20 ${hour}:00`,
+  timeString: `2026/09/20 ${hour}:00`,
   driverName: 'Me',
   carType: 'Ferrari 296 GT3',
   carClass: 'GT3',
-  lapNum,
+  lapNumber,
   lapTime,
-  lapTimeString,
   s1: 30, s2: 45, s3: lapTime - 75,
   topSpeed: null,
   isValid: true,
@@ -24,12 +23,12 @@ const lap = (sessionId: string, sessionType: string, hour: number, lapNum: numbe
 });
 
 const laps = [
-  lap('quali', 'Qualifying', 14, 1, 125, '2:05.000'),
-  lap('quali', 'Qualifying', 14, 2, 120.4, '2:00.400'),
-  lap('race', 'Race', 16, 1, 126, '2:06.000'),
-  lap('race', 'Race', 16, 2, 121.9, '2:01.900'),
-  lap('race', 'Race', 16, 3, 121.6, '2:01.600'),
-  lap('old', 'Practice', 9, 2, 119.8, '1:59.800'),
+  lap('quali', 'Qualifying', 14, 1, 125),
+  lap('quali', 'Qualifying', 14, 2, 120.4),
+  lap('race', 'Race', 16, 1, 126),
+  lap('race', 'Race', 16, 2, 121.9),
+  lap('race', 'Race', 16, 3, 121.6),
+  lap('old', 'Practice', 9, 2, 119.8),
 ];
 const sessions = [makeSessionCard({ id: 'race', trackVenue: 'Spa', trackCourse: 'GP', sessionType: 'Race', sessionName: 'Race' })];
 
@@ -52,7 +51,7 @@ describe('CompareLapPicker in the compare card', () => {
   });
 
   it('opens on a session lap with the picker, and puts the event’s qualifying best in place of the personal best', async () => {
-    render(<CompareLaps sessions={sessions} initialTrack="Spa" initialCarClass="GT3" initialSessionId="race" initialLapNum={3} />);
+    render(<CompareLaps sessions={sessions} initialTrack="Spa" initialCarClass="GT3" initialSessionId="race" initialLapNumber={3} />);
 
     const picker = await screen.findByRole('region', { name: 'Choose a lap' });
     expect(within(picker).getByRole('heading', { name: /Replace Personal best 1:59\.800/ })).toBeInTheDocument();
@@ -67,7 +66,7 @@ describe('CompareLapPicker in the compare card', () => {
   });
 
   it("picks a session's best lap from the best column", async () => {
-    render(<CompareLaps sessions={sessions} initialTrack="Spa" initialCarClass="GT3" initialSessionId="race" initialLapNum={3} />);
+    render(<CompareLaps sessions={sessions} initialTrack="Spa" initialCarClass="GT3" initialSessionId="race" initialLapNumber={3} />);
     const picker = await screen.findByRole('region', { name: 'Choose a lap' });
     fireEvent.click(within(picker).getByRole('button', { name: /Best lap 2 2:00\.400, -1\.200/ }));
 
@@ -77,7 +76,7 @@ describe('CompareLapPicker in the compare card', () => {
   });
 
   it('changes one compared lap for any lap of a session, and fills the empty slot', async () => {
-    render(<CompareLaps sessions={sessions} initialTrack="Spa" initialCarClass="GT3" initialSessionId="race" initialLapNum={3} />);
+    render(<CompareLaps sessions={sessions} initialTrack="Spa" initialCarClass="GT3" initialSessionId="race" initialLapNumber={3} />);
     const picker = await screen.findByRole('region', { name: 'Choose a lap' });
     fireEvent.click(within(picker).getByRole('button', { name: 'Close the lap picker' }));
 

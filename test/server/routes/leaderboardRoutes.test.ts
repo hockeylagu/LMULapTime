@@ -30,7 +30,7 @@ describe('leaderboardRoutes', () => {
     sessionDb = new SessionDatabase(':memory:');
     for (const value of sessions) sessionDb.upsertSession(value, value.filename || `${value.id}.xml`, value.timestamp, 1);
     referenceCache.load.mockReturnValue({
-      entries: { Monza_LMGT3: { key: 'Monza_LMGT3', trackName: 'Monza', carClass: 'GT3', target100Sec: 106 } },
+      entries: { Monza_LMGT3: { key: 'Monza_LMGT3', trackName: 'Monza', carClass: 'GT3', targets: { alienSec: 106 } } },
     });
   });
 
@@ -56,8 +56,9 @@ describe('leaderboardRoutes', () => {
     const res = await request(app).get('/api/leaderboard?layout=monza_gp&carClass=GT3');
     expect(res.status).toBe(200);
     expect(res.body.entries.map((e: { driverName: string }) => e.driverName)).toEqual(['Rival', 'Me']);
-    expect(res.body.player).toMatchObject({ rank: 2, gapToLeader: 0.3 });
-    expect(res.body.benchmark).toMatchObject({ carClass: 'GT3', target100Sec: 106 });
+    expect(res.body.entries.find((e: { isPlayer: boolean }) => e.isPlayer)).toMatchObject({ rank: 2, gapToLeader: 0.3 });
+    expect(res.body).not.toHaveProperty('player');
+    expect(res.body.benchmark).toMatchObject({ carClass: 'GT3', targets: { alienSec: 106 } });
   });
 
   it('refuses a board without a layout or a class', async () => {
@@ -70,8 +71,9 @@ describe('leaderboardRoutes', () => {
   it('returns one consistent board and rival snapshot when requested', async () => {
     const res = await request(app).get('/api/leaderboard?layout=monza_gp&carClass=GT3&includeRival=true');
     expect(res.status).toBe(200);
-    expect(res.body.player).toMatchObject({ driverName: 'Me', rank: 2 });
-    expect(res.body.rivalStatus).toMatchObject({ rivalEntry: res.body.entries[0], gap: 0.3 });
+    expect(res.body.entries[1]).toMatchObject({ driverName: 'Me', rank: 2, isPlayer: true });
+    expect(res.body.rivalStatus).toMatchObject({ gap: 0.3 });
+    expect(res.body.rivalStatus).not.toHaveProperty('rivalEntry');
     expect(referenceCache.load).toHaveBeenCalledTimes(1);
     expect((await request(app).get('/api/leaderboard?layout=monza_gp&carClass=GT3')).body).not.toHaveProperty('rivalStatus');
   });
@@ -84,7 +86,6 @@ describe('leaderboardRoutes', () => {
       expect(first.status).toBe(200);
       expect(first.body.rivalStatus).toMatchObject({
         rival: { kind: 'driver', driverName: 'Rival', targetTime: 107.7, startTime: 108, status: 'active' },
-        rivalEntry: { driverName: 'Rival', rank: 1 },
         gap: 0.3,
         progress: 0,
         beaten: [],

@@ -11,7 +11,7 @@ function database(): SessionDatabase {
   return db;
 }
 function file(directory = 'C:\\fake', filename = 'Spa_P.duckdb'): DuckDbFileInfo {
-  return { filename, filePath: `${directory}\\${filename}`, fileMtimeMs: 1000, fileSizeBytes: 2048,
+  return { filename, filePath: `${directory}\\${filename}`, mtimeMs: 1000, fileSizeBytes: 2048,
     trackName: 'Spa', sessionType: 'P', timestampStr: '', timestampEpochMs: 0 };
 }
 

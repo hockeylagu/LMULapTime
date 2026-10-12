@@ -8,16 +8,15 @@ const QUALI = 'Daytona International Speedway Road Course Q1 9.Vcr';
 const OTHER_QUALI = 'Daytona International Speedway Road Course Q1 7.Vcr';
 const ME = 'Samuel Lague';
 
-function lap(replay: string, lapNum: number, lapTime: number, extra: Partial<ComparableLap> = {}): ComparableLap {
+function lap(replay: string, lapNumber: number, lapTime: number, extra: Partial<ComparableLap> = {}): ComparableLap {
   return {
-    id: `${replay}_${lapNum}`,
+    id: `${replay}_${lapNumber}`,
     sessionId: replay,
     driverName: ME,
     carType: 'Peugeot 9x8',
     carClass: 'Hyper',
-    lapNum,
+    lapNumber,
     lapTime,
-    lapTimeString: '',
     s1: null,
     s2: null,
     s3: null,
@@ -63,7 +62,7 @@ describe('suggestReferenceLap', () => {
 });
 
 describe('pickFastestSameCarLap', () => {
-  const analysed = { sessionId: RACE, driverName: ME, lapNum: 20, carType: 'Peugeot 9x8' };
+  const analysed = { sessionId: RACE, driverName: ME, lapNumber: 20, carType: 'Peugeot 9x8' };
   const everyone = [
     ...myLaps,
     lap(OTHER_QUALI, 3, 93.974, { driverName: 'Davide Catani' }),
@@ -76,7 +75,7 @@ describe('pickFastestSameCarLap', () => {
   });
 
   it('takes the next fastest when the analysed lap is the fastest there is', () => {
-    const fastest = { sessionId: OTHER_QUALI, driverName: 'Davide Catani', lapNum: 3, carType: 'Peugeot 9x8' };
+    const fastest = { sessionId: OTHER_QUALI, driverName: 'Davide Catani', lapNumber: 3, carType: 'Peugeot 9x8' };
     expect(pickFastestSameCarLap(everyone, fastest)?.id).toBe(`${PRACTICE}_24`);
   });
 
@@ -97,7 +96,7 @@ describe('pickFastestSameCarLap', () => {
 
 describe('pickAttainableSameCarLap', () => {
   // 95.894 x 0.995 = 95.415: the target.
-  const analysed = { sessionId: RACE, driverName: ME, lapNum: 20, carType: 'Peugeot 9x8', lapTime: 95.894 };
+  const analysed = { sessionId: RACE, driverName: ME, lapNumber: 20, carType: 'Peugeot 9x8', lapTime: 95.894 };
 
   it('picks the same-car lap closest to 0.5% faster than the analysed lap, not the fastest', () => {
     const laps = [
@@ -121,6 +120,6 @@ describe('pickAttainableSameCarLap', () => {
       lap(OTHER_QUALI, 2, 95.42, { driverName: 'X', carType: 'Porsche 963' }),
       lap(OTHER_QUALI, 3, 95.6, { driverName: 'X' }),
     ];
-    expect(pickAttainableSameCarLap(laps, analysed)?.lapNum).toBe(3);
+    expect(pickAttainableSameCarLap(laps, analysed)?.lapNumber).toBe(3);
   });
 });

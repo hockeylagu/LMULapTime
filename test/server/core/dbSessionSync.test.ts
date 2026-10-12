@@ -1,3 +1,4 @@
+import { lapEvents } from '../../../shared/domain/lapComparison.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -110,13 +111,7 @@ describe('session parser-version migration writes', () => {
     for (const session of database.iterateDetailedSessions()) {
       const [prefix, exact] = session.drivers;
       prefix.trackLimits = exact.trackLimits;
-      prefix.totalTrackLimits = exact.totalTrackLimits;
-      prefix.laps[1].trackLimits = exact.laps[1].trackLimits;
-      prefix.laps[1].trackLimitCount = exact.laps[1].trackLimitCount;
       delete exact.trackLimits;
-      exact.totalTrackLimits = 0;
-      delete exact.laps[1].trackLimits;
-      delete exact.laps[1].trackLimitCount;
       database.upsertSession(session, path.join(dir, session.filename), 1, 1);
     }
     database.setMetadata('parser_version', '2.22_fuji_layout_repair_exact_player_identity');
@@ -126,8 +121,8 @@ describe('session parser-version migration writes', () => {
     expect(database.syncSessionsFromDir(dir, parser)).toMatchObject({ updated: 1, total: 2 });
     const sessions = Array.from(database.iterateDetailedSessions());
     const repaired = sessions.find(s => s.filename === 'available.xml');
-    expect(repaired?.drivers.map(d => d.totalTrackLimits)).toEqual([0, 1]);
-    expect(repaired?.drivers[1].laps[1].trackLimits).toHaveLength(1);
+    expect(repaired?.drivers.map(d => d.trackLimits?.length ?? 0)).toEqual([0, 1]);
+    expect(lapEvents(repaired!.drivers[1], 2).trackLimits).toHaveLength(1);
     expect(sessions.find(s => s.filename === 'deleted.xml')).toEqual(archived);
     expect(database.getMetadata('parser_version')).toBe(DB_PARSER_VERSION);
     expect(database.syncSessionsFromDir(dir, parser)).toMatchObject({ updated: 0, total: 2 });

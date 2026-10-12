@@ -398,7 +398,7 @@ export function useReplayInspectorData({
   }, [isOpen, isCompareMode, baselineSessionId, baselineLapNumber, baselineLapOrdinal, baselineDriverOrdinal, activeSessionId, telemetryResolution, selectedSource, baselineLoadVersion]);
 
   const fetchTrajectory = (
-    lapNum?: number,
+    lapNumber?: number,
     slot?: number | null,
     res: TelemetryResolution = telemetryResolution,
     src: 'duckdb' | 'vcr' = selectedSource
@@ -412,7 +412,7 @@ export function useReplayInspectorData({
     const targetSlot = slot !== undefined ? slot : selectedDriverSlot;
     const driverEntry = metadata?.drivers.find(driver => driver.slot === targetSlot) ?? metadata?.drivers.find(driver => driver.sessionDriverOrdinal === selectedDriverOrdinal);
     const driverOrdinal = driverEntry?.sessionDriverOrdinal ?? selectedDriverOrdinal;
-    const targetLap = lapNum ?? trajectory?.currentLap ?? 1;
+    const targetLap = lapNumber ?? trajectory?.currentLap ?? 1;
     const lapOrdinal = driverEntry?.sessionLapOrdinals?.[String(targetLap)] ??
       (trajectory?.currentLap === targetLap ? trajectory.lapOrdinal : undefined) ??
       (trajectory ? undefined : initialLapOrdinal ?? 0);
@@ -473,9 +473,9 @@ export function useReplayInspectorData({
     fetchTrajectory(trajectory?.currentLap, slot);
   };
 
-  const handleSelectLap = (lapNum: number) => {
+  const handleSelectLap = (lapNumber: number) => {
     setIsPlaying(false); setCurrentIndex(0); setChartZoomRange(null);
-    fetchTrajectory(lapNum, selectedDriverSlot);
+    fetchTrajectory(lapNumber, selectedDriverSlot);
   };
 
   const handleChangeResolution = (res: TelemetryResolution) => {
@@ -486,7 +486,7 @@ export function useReplayInspectorData({
     if (!lap.sessionId || lap.driverOrdinal === undefined || lap.lapOrdinal === undefined) return;
     setIsCompareMode(true);
     setBaselineSessionId(lap.sessionId);
-    setBaselineLapNumber(lap.lapNum ?? 1);
+    setBaselineLapNumber(lap.lapNumber ?? 1);
     setBaselineLapOrdinal(lap.lapOrdinal);
     setBaselineDriverOrdinal(lap.driverOrdinal);
     setBaselineDriverName(lap.driverName || null);
@@ -611,7 +611,7 @@ export function useReplayInspectorData({
     handleSelectBaselineLap,
     selectedSource,
     handleSelectSource,
-    hasDuckDbTelemetry: Boolean(metadata?.hasDuckDbTelemetry || trajectory?.duckdbFilename || trajectory?.source === 'duckdb'),
+    hasDuckDbTelemetry: Boolean(metadata?.duckdbFilename || trajectory?.duckdbFilename || trajectory?.source === 'duckdb'),
     duckdbUnavailableReason: trajectory?.duckdbUnavailableReason,
   };
 }

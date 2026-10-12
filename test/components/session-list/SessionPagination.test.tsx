@@ -13,7 +13,7 @@ const makeSessions = (count: number) =>
     timeString: '2026/09/01 12:00',
     sessionType: 'Practice',
     sessionName: 'P1',
-    playerDriver: { carType: 'Porsche 963', bestLapTime: 100, bestLapTimeString: '1:40.000', lapsCount: 5 },
+    playerDriver: { carType: 'Porsche 963', bestLapTime: 100, lapsCount: 5 },
   }));
 
 /** A filter control beside the list, so a test can change the URL the way the toolbars do. */

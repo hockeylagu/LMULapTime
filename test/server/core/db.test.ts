@@ -220,11 +220,11 @@ describe('SessionDatabase replay cache', () => {
 
   it('repairs cached player ownership by exact configured name without decoding the replay', () => {
     const metadata = buildMetadata({
-      carModel: 'Joann car', carClass: 'GT3',
+      carType: 'Joann car', carClass: 'GT3',
       laps: [{ lapNumber: 1, lapTimeSec: 100, s1Sec: 34, s2Sec: 33, s3Sec: 33 }],
       drivers: [
-        { slot: 1, name: 'Joann', isPlayer: true, carModel: 'Joann car', carClass: 'GT3' },
-        { slot: 2, name: 'Ann', isPlayer: false, carModel: 'Ann car', carClass: 'Hyper' },
+        { slot: 1, name: 'Joann', isPlayer: true, carType: 'Joann car', carClass: 'GT3' },
+        { slot: 2, name: 'Ann', isPlayer: false, carType: 'Ann car', carClass: 'Hyper' },
       ],
     });
     db.upsertReplayMetadataCache('Legacy_Player.Vcr', metadata.filePath, 1000, 12345, metadata);
@@ -234,7 +234,7 @@ describe('SessionDatabase replay cache', () => {
     expect(repaired?.drivers.map(driver => [driver.name, driver.isPlayer])).toEqual([
       ['Joann', false], ['Ann', true],
     ]);
-    expect(repaired?.carModel).toBe('Ann car');
+    expect(repaired?.carType).toBe('Ann car');
     expect(repaired?.carClass).toBe('Hyper');
     expect(repaired?.laps).toBeUndefined();
     // The lifecycle rewrite is persisted, so unconfigured consumers do not see the old flag.
@@ -262,7 +262,7 @@ describe('SessionDatabase replay cache', () => {
     expect(db.getStoredReplayTrajectory('Fallback_Replay_P1.Vcr', 2, -1, { allowFallback: true })).toBeNull();
   });
 
-  it('invalidates replay metadata cache when mtime or size changes', () => {
+  it('invalidates replay metadata cache when mtimeMs or size changes', () => {
     const metadata = buildMetadata();
     db.upsertReplayMetadataCache('Test_Replay_P1.Vcr', metadata.filePath, 1000, 12345, metadata);
 
@@ -306,7 +306,7 @@ describe('SessionDatabase replay cache', () => {
 
     expect(db.hasValidReplayTrajectoryCache('Test_Replay_P1.Vcr', -1, -1, 1000, 12345)).toBe(true);
     expect(db.hasValidReplayTrajectoryCache('Test_Replay_P1.Vcr', 2, -1, 1000, 12345)).toBe(false);
-    // Stale mtime/size must invalidate the same as the decompressing lookup does
+    // Stale mtimeMs/size must invalidate the same as the decompressing lookup does
     expect(db.hasValidReplayTrajectoryCache('Test_Replay_P1.Vcr', -1, -1, 2000, 12345)).toBe(false);
   });
 
@@ -327,7 +327,7 @@ describe('SessionDatabase replay cache', () => {
 
     const list = db.getReplayCacheList();
     expect(list).toHaveLength(2);
-    // Ordered by replay date (file mtime) descending, not insertion/cache order.
+    // Ordered by replay date (file mtimeMs) descending, not insertion/cache order.
     expect(list.map(r => r.filename)).toEqual(['Other_Replay_P2.Vcr', 'Test_Replay_P1.Vcr']);
 
     const primary = list.find(r => r.filename === 'Test_Replay_P1.Vcr');
@@ -410,14 +410,14 @@ describe('SessionDatabase replay cache', () => {
     }
 
     const stat = fs.statSync(filePath);
-    const mtime = Math.floor(stat.mtimeMs);
+    const mtimeMs = Math.floor(stat.mtimeMs);
     expect(step.value).toMatchObject({ added: 1, skipped: 0, interrupted: false });
     expect(progress.filter(item => item.stage === 'Decoding telemetry and events')).toHaveLength(1);
     expect(progress.filter(item => item.stage === 'Saved driver trajectory cache')).toHaveLength(2);
     const percents = progress.flatMap(item => item.filePercent === undefined ? [] : [item.filePercent]);
     expect(percents).toEqual([...percents].sort((a, b) => a - b));
     expect(percents.filter(percent => percent === 100)).toHaveLength(1);
-    expect(db.getReplayTrajectoryCache(filename, -1, -1, mtime, stat.size)).not.toBeNull();
+    expect(db.getReplayTrajectoryCache(filename, -1, -1, mtimeMs, stat.size)).not.toBeNull();
   });
 
   it('caches a full-resolution trajectory for every driver in the replay, not just the default one', () => {
@@ -439,14 +439,14 @@ describe('SessionDatabase replay cache', () => {
 
     const filePath = path.join(tempDir, 'Multi_Driver_P1.Vcr');
     const stat = fs.statSync(filePath);
-    const mtime = Math.floor(stat.mtimeMs);
-    const cachedDefault = db.getReplayTrajectoryCache('Multi_Driver_P1.Vcr', -1, -1, mtime, stat.size);
-    const cachedSlot1 = db.getReplayTrajectoryCache('Multi_Driver_P1.Vcr', 1, -1, mtime, stat.size);
-    const cachedSlot2 = db.getReplayTrajectoryCache('Multi_Driver_P1.Vcr', 2, -1, mtime, stat.size);
+    const mtimeMs = Math.floor(stat.mtimeMs);
+    const cachedDefault = db.getReplayTrajectoryCache('Multi_Driver_P1.Vcr', -1, -1, mtimeMs, stat.size);
+    const cachedSlot1 = db.getReplayTrajectoryCache('Multi_Driver_P1.Vcr', 1, -1, mtimeMs, stat.size);
+    const cachedSlot2 = db.getReplayTrajectoryCache('Multi_Driver_P1.Vcr', 2, -1, mtimeMs, stat.size);
     // Every detected lap is also cached under its own explicit lap number (here just lap 1,
     // since this minimal fixture has no timing packets to detect more than one lap).
-    const cachedDefaultLap1 = db.getReplayTrajectoryCache('Multi_Driver_P1.Vcr', -1, 1, mtime, stat.size);
-    const cachedSlot2Lap1 = db.getReplayTrajectoryCache('Multi_Driver_P1.Vcr', 2, 1, mtime, stat.size);
+    const cachedDefaultLap1 = db.getReplayTrajectoryCache('Multi_Driver_P1.Vcr', -1, 1, mtimeMs, stat.size);
+    const cachedSlot2Lap1 = db.getReplayTrajectoryCache('Multi_Driver_P1.Vcr', 2, 1, mtimeMs, stat.size);
 
     expect(cachedDefault).not.toBeNull();
     expect(cachedSlot2).not.toBeNull();
@@ -478,12 +478,12 @@ describe('SessionDatabase replay cache', () => {
 
     const filePath = path.join(tempDir, 'Dedup_P1.Vcr');
     const stat = fs.statSync(filePath);
-    const mtime = Math.floor(stat.mtimeMs);
+    const mtimeMs = Math.floor(stat.mtimeMs);
 
-    expect(db.getReplayTrajectoryCache('Dedup_P1.Vcr', -1, -1, mtime, stat.size)?.driverSlot).toBe(1);
+    expect(db.getReplayTrajectoryCache('Dedup_P1.Vcr', -1, -1, mtimeMs, stat.size)?.driverSlot).toBe(1);
     expect(db.getStoredReplayTrajectory('Dedup_P1.Vcr', -1, -1)?.driverSlot).toBe(1);
-    expect(db.hasValidReplayTrajectoryCache('Dedup_P1.Vcr', -1, -1, mtime, stat.size)).toBe(true);
-    expect(db.getReplayTrajectoryCache('Dedup_P1.Vcr', 1, -1, mtime, stat.size)?.driverSlot).toBe(1);
+    expect(db.hasValidReplayTrajectoryCache('Dedup_P1.Vcr', -1, -1, mtimeMs, stat.size)).toBe(true);
+    expect(db.getReplayTrajectoryCache('Dedup_P1.Vcr', 1, -1, mtimeMs, stat.size)?.driverSlot).toBe(1);
 
     const summary = db.getReplayCacheList().find(entry => entry.filename === 'Dedup_P1.Vcr');
     expect(summary?.trajectoriesCached).toBe(1);
@@ -509,8 +509,8 @@ describe('SessionDatabase replay cache', () => {
     // or a prior sync where trajectory extraction failed) - no rows in replay_trajectories.
     const metadata = parseReplayMetadata(filePath, { playerName: 'Player Driver' });
     const stat = fs.statSync(filePath);
-    const mtime = Math.floor(stat.mtimeMs);
-    db.upsertReplayMetadataCache('Partial_Cache_P1.Vcr', filePath, mtime, stat.size, metadata);
+    const mtimeMs = Math.floor(stat.mtimeMs);
+    db.upsertReplayMetadataCache('Partial_Cache_P1.Vcr', filePath, mtimeMs, stat.size, metadata);
     expect(db.getReplayCacheList()[0].trajectoriesCached).toBe(0);
 
     const result = db.syncReplaysFromDir(tempDir, { playerName: 'Player Driver' });
@@ -519,8 +519,8 @@ describe('SessionDatabase replay cache', () => {
     // but the missing trajectories must still get filled in as an "updated" replay.
     expect(result.added).toBe(0);
     expect(result.updated).toBe(1);
-    expect(db.getReplayTrajectoryCache('Partial_Cache_P1.Vcr', -1, -1, mtime, stat.size)).not.toBeNull();
-    expect(db.getReplayTrajectoryCache('Partial_Cache_P1.Vcr', 2, -1, mtime, stat.size)).not.toBeNull();
+    expect(db.getReplayTrajectoryCache('Partial_Cache_P1.Vcr', -1, -1, mtimeMs, stat.size)).not.toBeNull();
+    expect(db.getReplayTrajectoryCache('Partial_Cache_P1.Vcr', 2, -1, mtimeMs, stat.size)).not.toBeNull();
   });
 
   it('stops gracefully mid-directory when shouldStop fires, then resumes and finishes on the next sync', () => {
@@ -557,8 +557,8 @@ describe('SessionDatabase replay cache', () => {
 
     for (const name of ['Interrupt_A_P1.Vcr', 'Interrupt_B_P1.Vcr', 'Interrupt_C_P1.Vcr']) {
       const stat = fs.statSync(path.join(tempDir, name));
-      const mtime = Math.floor(stat.mtimeMs);
-      expect(db.getReplayTrajectoryCache(name, -1, -1, mtime, stat.size)).not.toBeNull();
+      const mtimeMs = Math.floor(stat.mtimeMs);
+      expect(db.getReplayTrajectoryCache(name, -1, -1, mtimeMs, stat.size)).not.toBeNull();
     }
   });
 
@@ -581,10 +581,10 @@ describe('SessionDatabase replay cache', () => {
 
     const filePath = path.join(tempDir, 'Multi_Lap_P1.Vcr');
     const stat = fs.statSync(filePath);
-    const mtime = Math.floor(stat.mtimeMs);
+    const mtimeMs = Math.floor(stat.mtimeMs);
 
-    const lap1 = db.getReplayTrajectoryCache('Multi_Lap_P1.Vcr', -1, 1, mtime, stat.size);
-    const lap2 = db.getReplayTrajectoryCache('Multi_Lap_P1.Vcr', -1, 2, mtime, stat.size);
+    const lap1 = db.getReplayTrajectoryCache('Multi_Lap_P1.Vcr', -1, 1, mtimeMs, stat.size);
+    const lap2 = db.getReplayTrajectoryCache('Multi_Lap_P1.Vcr', -1, 2, mtimeMs, stat.size);
 
     expect(lap1).not.toBeNull();
     expect(lap2).not.toBeNull();
@@ -687,7 +687,7 @@ describe('DuckDB telemetry caching in SessionDatabase', () => {
     const fileInfo = {
       filename: 'Bahrain_Test_P.duckdb',
       filePath: 'C:\\Telemetry\\Bahrain_Test_P.duckdb',
-      fileMtimeMs: 1773000000000,
+      mtimeMs: 1773000000000,
       fileSizeBytes: 2048,
       trackName: 'Bahrain International Circuit',
       sessionType: 'P',
@@ -757,7 +757,7 @@ describe('DuckDB telemetry caching in SessionDatabase', () => {
     const staleFile = {
       filename: 'Daytona_Stale.duckdb',
       filePath: 'C:\\Telemetry\\Daytona_Stale.duckdb',
-      fileMtimeMs: 1000,
+      mtimeMs: 1000,
       fileSizeBytes: 1024,
       trackName: 'Daytona International Speedway',
       sessionType: 'R',
@@ -768,7 +768,7 @@ describe('DuckDB telemetry caching in SessionDatabase', () => {
       ...staleFile,
       filename: 'Daytona_Current.duckdb',
       filePath: 'C:\\Telemetry\\Daytona_Current.duckdb',
-      fileMtimeMs: 2000,
+      mtimeMs: 2000,
       timestampStr: '2026-09-02T00:00:00Z',
       timestampEpochMs: 2000,
     };
@@ -784,7 +784,7 @@ describe('DuckDB telemetry caching in SessionDatabase', () => {
 
   it('skips rewriting an unchanged telemetry row and counts the rows that do change', () => {
     const file = {
-      filename: 'Spa_R.duckdb', filePath: 'C:\Telemetry\Spa_R.duckdb', fileMtimeMs: 1000, fileSizeBytes: 1024,
+      filename: 'Spa_R.duckdb', filePath: 'C:\Telemetry\Spa_R.duckdb', mtimeMs: 1000, fileSizeBytes: 1024,
       trackName: 'Spa', sessionType: 'R', timestampStr: '2026-09-01T00:00:00Z', timestampEpochMs: 1000,
     };
     const other = { ...file, filename: 'Spa_Q.duckdb', filePath: 'C:\Telemetry\Spa_Q.duckdb' };
@@ -802,7 +802,7 @@ describe('DuckDB telemetry caching in SessionDatabase', () => {
     expect(db.getTelemetryMetadataRevision()).toBe(start + 2);
     expect(db.getTelemetryMetadata().filter(item => item.matchedSessionId === 'session-spa').map(item => item.filename).sort()).toEqual([other.filename, file.filename]);
 
-    db.upsertTelemetryMetadata({ ...file, fileMtimeMs: 2000 });
+    db.upsertTelemetryMetadata({ ...file, mtimeMs: 2000 });
     expect(db.getTelemetryMetadataRevision()).toBe(start + 3);
     db.clearTelemetryCache();
     expect(db.getTelemetryMetadataRevision()).toBe(start + 4);

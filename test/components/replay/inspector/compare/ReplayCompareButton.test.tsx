@@ -8,16 +8,15 @@ const PRACTICE = 'Daytona International Speedway Road Course P1 20.Vcr';
 const QUALI = 'Daytona International Speedway Road Course Q1 9.Vcr';
 const ME = 'Samuel Lague';
 
-function lap(replay: string, lapNum: number, lapTime: number, extra: Partial<ComparableLap> = {}): ComparableLap {
+function lap(replay: string, lapNumber: number, lapTime: number, extra: Partial<ComparableLap> = {}): ComparableLap {
   return {
-    id: `${replay}_${lapNum}`,
+    id: `${replay}_${lapNumber}`,
     sessionId: replay,
     driverName: ME,
     carType: 'Peugeot 9x8',
     carClass: 'Hyper',
-    lapNum,
+    lapNumber,
     lapTime,
-    lapTimeString: '',
     s1: null,
     s2: null,
     s3: null,
@@ -55,6 +54,6 @@ describe('ReplayCompareButton', () => {
     );
 
     fireEvent.click(screen.getByText('vs your best 95.658'));
-    expect(onSelectCompareLap).toHaveBeenCalledWith(expect.objectContaining({ lapNum: 24, matchingReplayFile: PRACTICE }));
+    expect(onSelectCompareLap).toHaveBeenCalledWith(expect.objectContaining({ lapNumber: 24, matchingReplayFile: PRACTICE }));
   });
 });

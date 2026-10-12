@@ -131,12 +131,12 @@ export interface RawSessionXmlNode {
 export interface ReplayFileEntry {
   name: string;
   path: string;
-  sizeBytes: number;
+  fileSizeBytes: number;
   trackName: string;
   trackVenue?: string;
   trackCourse?: string;
   sessionCode: string; // e.g. P1, Q1, R1
-  mtime: number;
+  mtimeMs: number;
   eventTitle?: string;
   splitNo?: number;
   eventType?: string;

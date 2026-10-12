@@ -1,3 +1,4 @@
+import { lapEvents } from '../../../../shared/domain/lapComparison.js';
 import { describe, expect, it } from 'vitest';
 import path from 'node:path';
 import type { DetailedSession, LapData } from '../../../../shared/types/index.js';
@@ -17,18 +18,16 @@ function expectRoundTrip(input: DetailedSession): ReturnType<typeof roundTrip> {
 }
 
 describe('normalized session rows: round trip', () => {
-  it('ignores legacy duplicate driver-name storage while keeping the SQLite column readable', () => {
+  it('ignores a duplicate driver-name property and stores no duplicate column', () => {
     const input = session([driver('P', [lap(1)])]);
-    (input.drivers[0] as unknown as Record<string, unknown>).driverName = 'Legacy duplicate';
+    (input.drivers[0] as unknown as Record<string, unknown>).driverName = 'Duplicate';
     const db = memoryDb();
     roundTrip(input, db);
-    db.prepare('UPDATE session_drivers SET driver_name=? WHERE session_id=?').run('Legacy duplicate', input.id);
 
     const stored = readSession(db, input.id);
     expect(stored?.drivers[0]).not.toHaveProperty('driverName');
-    expect(db.prepare('SELECT driver_name FROM session_drivers WHERE session_id=?').get(input.id)).toEqual({ driver_name: 'Legacy duplicate' });
     const columns = db.prepare('PRAGMA table_info(session_drivers)').all() as Array<{ name: string }>;
-    expect(columns.map(column => column.name)).toContain('driver_name');
+    expect(columns.map(column => column.name)).not.toContain('driver_name');
   });
 
   it('does not replace a mismatched or ambiguous player copy with the first matching name', () => {
@@ -74,43 +73,38 @@ describe('normalized session rows: round trip', () => {
     expectRoundTrip(session([driver('P', [lap(1, { traffic }), lap(2, { traffic: legacy }), lap(3)], { isPlayer: true })]));
   });
 
-  it('stores an event once: lap events are driver events, events without a lap stay on the driver, orders are kept', () => {
-    const e1 = { type: 'contact' as const, description: 'Contact with X', lapNum: 2, elapsedSeconds: 200, force: 3.5, otherVehicle: 'X', isWallImpact: false };
-    const e2 = { type: 'damage' as const, description: 'Damage', details: 'front', lapNum: 3, elapsedSeconds: 300, isWallImpact: true };
+  it('stores an event once on its driver, with the lap it fell on; events without a lap stay on the driver, orders are kept', () => {
+    const e1 = { type: 'contact' as const, description: 'Contact with X', lapNumber: 2, elapsedSeconds: 200, force: 3.5, otherVehicle: 'X', isWallImpact: false };
+    const e2 = { type: 'damage' as const, description: 'Damage', details: 'front', lapNumber: 3, elapsedSeconds: 300, isWallImpact: true };
     const noLap = { type: 'other' as const, description: 'Unlocated' };
-    const limit = { description: 'Cut', lapNum: 2, elapsedSeconds: 190, warningPoints: 1, currentPoints: 1, action: 'Warning' };
-    const penalty = { penalty: 'Drive Thru', reason: 'Speeding', lapNum: 3, elapsedSeconds: 310, description: 'Speeding in pit' };
+    const limit = { description: 'Cut', lapNumber: 2, elapsedSeconds: 190, warningPoints: 1, currentPoints: 1, action: 'Warning' };
+    const penalty = { penalty: 'Drive Thru', reason: 'Speeding', lapNumber: 3, elapsedSeconds: 310, description: 'Speeding in pit' };
     const unlocatedLimit = { description: 'Cut somewhere' };
-    const input = session([driver('P', [
-      lap(1),
-      // The lap list holds the driver's events in the opposite order.
-      lap(2, { incidents: [e1], trackLimits: [limit], incidentCount: 1, trackLimitCount: 1 }),
-      lap(3, { incidents: [e2], penalties: [penalty], penaltyCount: 1 }),
-    ], { isPlayer: true, incidents: [noLap, e2, e1], trackLimits: [unlocatedLimit, limit], penalties: [penalty], totalIncidents: 3 })]);
+    const input = session([driver('P', [lap(1), lap(2), lap(3)],
+      { isPlayer: true, incidents: [noLap, e2, e1], trackLimits: [unlocatedLimit, limit], penalties: [penalty] })]);
     const db = memoryDb();
     const { stored } = roundTrip(input, db);
     expect(stored?.drivers[0].incidents).toEqual([noLap, e2, e1]);
-    expect(stored?.drivers[0].laps[1].incidents).toEqual([e1]);
+    expect(lapEvents(stored!.drivers[0], 2).incidents).toEqual([e1]);
     expect(db.prepare('SELECT COUNT(*) AS count FROM session_events').get()).toEqual({ count: 6 });
-    expect(db.prepare('SELECT COUNT(*) AS count FROM session_events WHERE lap_ordinal IS NULL').get()).toEqual({ count: 2 });
+    expect(db.prepare('SELECT COUNT(*) AS count FROM session_events WHERE lap_number IS NULL').get()).toEqual({ count: 2 });
   });
 
-  it('keeps a lap event that the driver list lacks and empty event lists', () => {
-    const stray = { description: 'Only on the lap', lapNum: 1 };
-    expectRoundTrip(session([driver('P', [lap(1, { trackLimits: [stray], incidents: [] }), lap(2)], { isPlayer: true, penalties: [] })]));
+  it('keeps empty event lists', () => {
+    expectRoundTrip(session([driver('P', [lap(1), lap(2)], { isPlayer: true, incidents: [], penalties: [] })]));
   });
 
   it('keeps wet laps with conditions, inferred laps, tyre wear and out-lap flags', () => {
     const laps = [
       lap(1, { conditions: { wetTyres: true, rain: 40 }, fCompound: 'Wet', rCompound: 'Wet', nonRepresentativeReason: 'offPace' }),
       lap(2, { conditions: { wetTyres: false } }),
-      lap(3, { isInferred: true, lapTime: null, s1: null, s2: null, s3: null, topSpeed: null, isValid: false, lapTimeString: '--' }),
-      lap(4, { isOutLap: false, isPitStop: true, pitStopDuration: 31.5, pitStopDurationString: '31.5s', elapsedSeconds: 412.5, elapsedTimeString: '06:52',
-        gapToLeader: null, gapToLeaderString: '+4.215s', fuel: 55.5, fuelUsed: 3.2, virtualEnergy: null, virtualEnergyUsed: 2.1,
+      lap(3, { isInferred: true, lapTime: null, s1: null, s2: null, s3: null, topSpeed: null, isValid: false }),
+      lap(4, { isOutLap: false, isPitStop: true, pitStopDuration: 31.5, elapsedSeconds: 412.5, 
+        gapToLeader: null, fuel: 55.5, fuelUsed: 3.2, virtualEnergy: null, virtualEnergyUsed: 2.1,
         flCompound: 'Soft', frCompound: 'Soft', rlCompound: 'Medium', rrCompound: 'Medium', tireWear: { fl: 90, fr: 89, rl: 92, rr: 91, avg: 90.5 } }),
       lap(5, { isOutLap: true }),
     ];
-    const { stored } = expectRoundTrip(session([driver('P', laps, { isPlayer: true, bestLapWet: true, bestLapNum: null })]));
+    const { stored } = expectRoundTrip(session([driver('P', laps, { isPlayer: true, bestLapWet: true, bestLapNumber: null })]));
     expect(stored?.drivers[0].laps[2].lapTime).toBeNull();
     expect(stored?.drivers[0].laps[1].conditions).toEqual({ wetTyres: false });
     expect(stored?.drivers[0].laps[0].isOutLap).toBeUndefined();
@@ -129,10 +123,10 @@ describe('normalized session rows: round trip', () => {
 
   it('keeps weather, settings, best session lap, game version and the track length null', () => {
     const input = session([driver('P', [lap(1)], { isPlayer: true })], {
-      trackLengthMeters: null, weatherInfo: 'Clear', weather: { condition: 'Wet', timeOfDay: 'Night', weatherString: 'Rain' }, gameVersion: '1.3',
+      trackLengthMeters: null, weather: { condition: 'Wet', timeOfDay: 'Night', weatherString: 'Rain' }, gameVersion: '1.3',
       settings: { modeSetting: 'Multiplayer', serverName: 'Srv', damageMultiplier: 50, fuelMultiplier: 1, tireMultiplier: 2, tireWarmers: false, fixedSetups: true,
         freeSettings: 63, fixedUpgrades: false, parcFerme: 3, mechFailRate: 1, durationMinutes: 60, raceLaps: 20, raceTimeMinutes: 45, vehiclesAllowed: 'A,B,' },
-      bestSessionLap: { driverName: 'P', carType: 'Ferrari 499P', lapTime: 101.5, lapTimeString: '1:41.500' }, totalLapsCount: 1,
+      bestSessionLap: { driverName: 'P', carType: 'Ferrari 499P', lapTime: 101.5 }, totalLapsCount: 1,
     });
     const { stored } = expectRoundTrip(input);
     expect(stored?.trackLengthMeters).toBeNull();
@@ -146,19 +140,18 @@ describe('normalized session rows: round trip', () => {
     expect(canonicalSession(input).gameVersion).toBe('1.3');
   });
 
-  it('keeps a replay link with every field and a DuckDB file on the link and the session', () => {
+  it('keeps a replay link with every field and the DuckDB file on the session', () => {
     const input = session([driver('P', [lap(1)], { isPlayer: true })], {
-      matchingReplayFile: { name: 'Replay_1', path: 'C:/Replays/Replay_1.Vcr', sizeBytes: 123456789, eventTitle: 'Spa', splitNo: 2, eventType: 'Race', durationSec: 3600.5,
-        hasDuckDbTelemetry: true, duckdbFilename: 'spa.duckdb', hasRain: true, maxRainIntensity: 0.8, weatherCondition: 'Dynamic Weather', ambientTemp: 21.5, trackTemp: 30.25 },
-      hasDuckDbTelemetry: true, duckdbFilename: 'spa.duckdb',
+      matchingReplayFile: { name: 'Replay_1', path: 'C:/Replays/Replay_1.Vcr', fileSizeBytes: 123456789, eventTitle: 'Spa', splitNo: 2, eventType: 'Race', durationSec: 3600.5,
+        hasRain: true, maxRainIntensity: 0.8, weatherCondition: 'Dynamic Weather', ambientTemp: 21.5, trackTemp: 30.25 },
+      duckdbFilename: 'spa.duckdb',
     });
     const { stored } = expectRoundTrip(input);
     expect(stored?.matchingReplayFile).toEqual(input.matchingReplayFile);
   });
 
-  it('keeps a link whose DuckDB file the session does not carry yet, and a session whose flag is false', () => {
-    expectRoundTrip(session([driver('P', [lap(1)])], { matchingReplayFile: { name: 'R', path: 'p', sizeBytes: 1, hasDuckDbTelemetry: true, duckdbFilename: 'a.duckdb' } }));
-    expectRoundTrip(session([driver('P', [lap(1)])], { hasDuckDbTelemetry: false }));
+  it('keeps a link and a session without a DuckDB file', () => {
+    expectRoundTrip(session([driver('P', [lap(1)])], { matchingReplayFile: { name: 'R', path: 'p', fileSizeBytes: 1 } }));
   });
 
   it('records a stored player driver that matches no driver as a mismatch instead of inventing one', () => {
@@ -177,7 +170,7 @@ describe('normalized session rows: round trip', () => {
 
   it('replaces the rows of a session on every write and leaves other sessions alone', () => {
     const db = memoryDb();
-    const first = session([driver('P', [lap(1), lap(2)], { isPlayer: true, incidents: [{ type: 'contact', description: 'x', lapNum: 1 }] })]);
+    const first = session([driver('P', [lap(1), lap(2)], { isPlayer: true, incidents: [{ type: 'contact', description: 'x', lapNumber: 1 }] })]);
     const other = session([driver('Q', [lap(1)])], { id: 'session-b' });
     roundTrip(first, db);
     roundTrip(other, db);

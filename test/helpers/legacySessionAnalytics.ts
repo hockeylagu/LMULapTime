@@ -1,6 +1,6 @@
 /** Test-only parity oracle for the paged progression and comparable-lap queries. */
 import type { DetailedSession, ComparableLap, SessionProgressionPoint } from '../../shared/types/index.js';
-import { formatTime, compareSessions, computeTheoreticalGap, getDisplayTrackName } from '../../shared/domain/formatters.js';
+import { compareSessions, computeTheoreticalGap, getDisplayTrackName } from '../../shared/domain/formatters.js';
 import { computeTopNLapAverage, computeConsistencyRating, selectCleanLapCandidates } from '../../shared/domain/lapComparison.js';
 import { matchesTrack } from '../../shared/domain/paceCategory.js';
 import { isHumanDriver, selectLeaderboardLaps } from '../../shared/domain/leaderboard.js';
@@ -23,12 +23,12 @@ export function computeProgression(sessions: DetailedSession[], targetDriverName
       : [];
     const cleanLapsCount = driver?.laps && driver.laps.length > 0
       ? cleanLaps.length
-      : (driver?.avgLapTime && (driver?.lapsCount || 0) > 0 ? (driver.lapsCount || 0) : 0);
-    const totalLapsCount = driver?.lapsCount || 0;
+      : (driver?.avgLapTime && (driver?.declaredLapsCount || 0) > 0 ? (driver.declaredLapsCount || 0) : 0);
+    const declaredLapsCount = driver?.declaredLapsCount || 0;
     const avgLapTime = driver?.laps ? computeAverageLapTime(driver.laps) : null;
 
     // Top 3 Clean Lap Average (filters out lap 1, pit stops, and out-laps after valid pit stops)
-    const top3AvgLapTime = computeTopNLapAverage(driver?.laps || [], 3);
+    const top3Average = computeTopNLapAverage(driver?.laps || [], 3);
 
     // Theoretical Gap (Execution gap: Actual Best - Theoretical Best)
     const theoreticalGap = computeTheoreticalGap(driver?.bestLapTime, driver?.theoreticalBest);
@@ -46,7 +46,7 @@ export function computeProgression(sessions: DetailedSession[], targetDriverName
       trackVenue: s.trackVenue,
       trackCourse: s.trackCourse,
       displayTrack: getDisplayTrackName(s.trackVenue, s.trackCourse),
-      weatherInfo: s.weatherInfo,
+      weather: s.weather,
       carType: driver?.carType || 'Unknown Car',
       carClass: driver?.carClass || 'General',
       driverName: driver?.name || 'Unknown',
@@ -56,9 +56,9 @@ export function computeProgression(sessions: DetailedSession[], targetDriverName
       bestS3: driver?.bestS3 || null,
       theoreticalBest: driver?.theoreticalBest || null,
       cleanLapsCount,
-      totalLapsCount,
+      declaredLapsCount,
       avgLapTime,
-      top3AvgLapTime,
+      top3Average,
       theoreticalGap,
       consistencyScore,
       settings: s.settings?.serverName || s.settings?.modeSetting
@@ -77,7 +77,7 @@ export function extractComparableLaps(
   filters: {
     trackName?: string;
     carClass?: string;
-    carModel?: string;
+    carType?: string;
     driverName?: string;
     sessionId?: string;
     playerOnly?: boolean;
@@ -87,7 +87,7 @@ export function extractComparableLaps(
 ): ComparableLapsResult {
   const normTrack = (filters.trackName || '').toLowerCase().trim();
   const targetClass = (filters.carClass || '').trim();
-  const targetModel = (filters.carModel || '').toLowerCase().trim();
+  const targetModel = (filters.carType || '').toLowerCase().trim();
   const targetDriver = (filters.driverName || '').toLowerCase().trim();
 
   const matchingSessions = sessions.filter(s => {
@@ -219,11 +219,7 @@ export function extractComparableLaps(
     bestS1,
     bestS2,
     bestS3,
-    bestS1String: formatTime(bestS1),
-    bestS2String: formatTime(bestS2),
-    bestS3String: formatTime(bestS3),
     theoreticalBestSec,
-    theoreticalBestString: formatTime(theoreticalBestSec),
     sessionsCount: matchingSessions.length,
   };
 }

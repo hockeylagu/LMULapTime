@@ -36,12 +36,10 @@ describe('App component', () => {
         carType: 'Ferrari 499P',
         carClass: 'LMH',
         bestLapTime: 122.0,
-        bestLapTimeString: '2:02.000',
         bestS1: 34.0,
         bestS2: 42.0,
         bestS3: 46.0,
         theoreticalBest: 122.0,
-        theoreticalBestString: '2:02.000',
         bestLapPaceCategory: 'Alien',
         bestLapPacePercentage: 100.1,
         lapsCount: 5,
@@ -55,7 +53,7 @@ describe('App component', () => {
     startupScanStatus = {
       running: false,
       sessionScan: { running: false },
-      referenceLaptimes: { started: true, running: false, checked: true, updatedCount: 0 },
+      referenceLaptimes: { started: true, running: false, checked: true },
     };
     global.fetch = vi.fn().mockImplementation((url: string) => {
       if (url.includes('/api/status')) {
@@ -297,7 +295,13 @@ describe('App component', () => {
         checked: true,
         completedAt: '2026-09-18T12:00:00.000Z',
         refreshed: true,
-        updatedCount: 3,
+        diff: {
+          timestamp: '2026-09-18T12:00:00.000Z',
+          totalEntries: 3,
+          added: [],
+          removed: [],
+          updated: [1, 2, 3].map((n) => ({ key: `k${n}`, trackName: 'Spa', carClass: 'Hyper', patch: '1.4', type: 'updated' as const, oldAlienSec: 120, newAlienSec: 119 })),
+        },
       },
     };
 

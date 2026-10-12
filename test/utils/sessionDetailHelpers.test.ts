@@ -152,17 +152,17 @@ describe('sessionDetailHelpers', () => {
   describe('sessionLapComparePath', () => {
     it("opens the lap on the leaderboard under the board's class, not the results file's", () => {
       const driver = { name: 'Driver', carType: 'Ferrari 296 GT3', carClass: 'GT3', carNumber: '1', isPlayer: true,
-        laps: [{ lapNum: 3, lapTime: 100, s1: 30, s2: 35, s3: 35 }] } as unknown as DriverData;
+        laps: [{ lapNumber: 3, lapTime: 100, s1: 30, s2: 35, s3: 35 }] } as unknown as DriverData;
       const session = { id: 'race 1', trackVenue: 'Bahrain International Circuit', trackCourse: 'Bahrain International Circuit', drivers: [driver] } as unknown as DetailedSession;
       const path = sessionLapComparePath(session, driver, 3);
       const params = new URLSearchParams(path.split('?')[1]);
       expect(path.startsWith('/leaderboard?')).toBe(true);
       expect(params.get('carClass')).toBe('GT3');
       expect(params.get('sessionId')).toBe('race 1');
-      expect(params.get('lapNum')).toBe('3');
+      expect(params.get('lapNumber')).toBe('3');
       expect(params.get('driverOrdinal')).toBe('0');
       expect(params.get('lapOrdinal')).toBe('0');
-      expect(new URLSearchParams(sessionLapComparePath(session, undefined, null).split('?')[1]).has('lapNum')).toBe(false);
+      expect(new URLSearchParams(sessionLapComparePath(session, undefined, null).split('?')[1]).has('lapNumber')).toBe(false);
     });
   });
 });

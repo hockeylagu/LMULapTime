@@ -38,8 +38,8 @@ describe('ReplayInspectorModal', () => {
     totalEvents: 70000,
     durationSec: 500,
     drivers: [
-      { slot: 1, name: 'Samuel Lague', carModel: 'Ferrari 296 GT3', team: 'Vista AF Corsa', carNumber: '21', isPlayer: true, sessionDriverOrdinal: 0, sessionLapOrdinals: { '1': 0, '2': 1, '3': 2 } },
-      { slot: 2, name: 'Rival Racer', carModel: 'BMW M4 GT3', team: 'Team WRT', carNumber: '32', isPlayer: false, sessionDriverOrdinal: 1, sessionLapOrdinals: { '1': 0, '2': 1, '3': 2 } },
+      { slot: 1, name: 'Samuel Lague', carType: 'Ferrari 296 GT3', team: 'Vista AF Corsa', carNumber: '21', isPlayer: true, sessionDriverOrdinal: 0, sessionLapOrdinals: { '1': 0, '2': 1, '3': 2 } },
+      { slot: 2, name: 'Rival Racer', carType: 'BMW M4 GT3', team: 'Team WRT', carNumber: '32', isPlayer: false, sessionDriverOrdinal: 1, sessionLapOrdinals: { '1': 0, '2': 1, '3': 2 } },
     ],
   };
 
@@ -374,7 +374,7 @@ describe('ReplayInspectorModal', () => {
       requests.push(url);
       const data = url.includes('/metadata') ? mockMeta
         : url.includes('/telemetry?') ? traj
-        : url.includes('/leaderboard') ? { player: { bestLap: { sessionId, driverOrdinal: 0, lapOrdinal } } } : null;
+        : url.includes('/leaderboard') ? { entries: [{ isPlayer: true, bestLap: { sessionId, driverOrdinal: 0, lapOrdinal } }] } : null;
       return data ? Promise.resolve({ ok: true, json: () => Promise.resolve(data) }) : Promise.reject(new Error('Unknown URL'));
     });
     render(<ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />);

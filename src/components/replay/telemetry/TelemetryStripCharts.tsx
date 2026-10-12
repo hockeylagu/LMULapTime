@@ -38,8 +38,6 @@ export interface TelemetryStripChartsProps {
   onZoomRangeChange?: (range: { start: number; end: number } | null) => void;
   telemetryResolution?: TelemetryResolution;
   onChangeResolution?: (res: TelemetryResolution) => void;
-  rawPointsCount?: number;
-  rawSampleRateHz?: number;
   vcrRawPointsCount?: number;
   vcrRawSampleRateHz?: number;
   duckdbRawPointsCount?: number;
@@ -58,7 +56,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   points, currentIndex, onSelectIndex, sectors, cornerSegments, initialStraight,
   selectedCornerNumber, onSelectCorner, className = '', isLoading = false, headerContent,
   baselinePoints, zoomRange, onZoomRangeChange, telemetryResolution, onChangeResolution,
-  rawPointsCount, rawSampleRateHz, vcrRawPointsCount, vcrRawSampleRateHz, duckdbRawPointsCount, duckdbRawSampleRateHz, isFullResolution, selectedCornerMarkers, source, duckdbFilename,
+  vcrRawPointsCount, vcrRawSampleRateHz, duckdbRawPointsCount, duckdbRawSampleRateHz, isFullResolution, selectedCornerMarkers, source, duckdbFilename,
   hasDuckDb, duckdbUnavailableReason, onSelectSource, trackLengthM,
 }) => {
   const {
@@ -206,8 +204,6 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
         hasBaseline={Boolean(baselinePoints && baselinePoints.length > 0)}
         telemetryResolution={telemetryResolution}
         onChangeResolution={onChangeResolution}
-        rawPointsCount={rawPointsCount}
-        rawSampleRateHz={rawSampleRateHz}
         vcrRawPointsCount={vcrRawPointsCount}
         vcrRawSampleRateHz={vcrRawSampleRateHz}
         duckdbRawPointsCount={duckdbRawPointsCount}

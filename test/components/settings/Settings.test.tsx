@@ -224,7 +224,6 @@ describe('Settings component', () => {
               patch: '1.4+',
               type: 'added' as const,
               newAlienSec: 125.4,
-              newAlienTimeString: '2:05.400',
             },
           ],
           updated: [
@@ -238,8 +237,6 @@ describe('Settings component', () => {
               type: 'updated' as const,
               oldAlienSec: 120.0,
               newAlienSec: 119.5,
-              oldAlienTimeString: '2:00.000',
-              newAlienTimeString: '1:59.500',
               diffSec: -0.5,
             },
           ],

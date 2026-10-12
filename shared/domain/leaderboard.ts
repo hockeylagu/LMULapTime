@@ -8,7 +8,7 @@ import type {
   LeaderboardScope,
 } from '../types/leaderboard.js';
 import { getCircuitSpecification } from './circuitSpecs.js';
-import { getDisplayTrackName } from './formatters.js';
+import { computeTheoreticalBest, getDisplayTrackName } from './formatters.js';
 import { selectCleanLapCandidates } from './lapComparison.js';
 import { lapConditionGroup } from './lapConditions.js';
 import { findMatchingTrackBenchmarkEntries } from './paceCategory.js';
@@ -32,6 +32,11 @@ export interface LeaderboardQuery {
 
 const isPlayerDriver = (session: DetailedSession, driver: DriverData) =>
   Boolean(driver.isPlayer || (session.playerDriver && session.playerDriver.name === driver.name));
+
+/** The player's line on a board, when the player has a representative lap there. */
+export function playerEntry(board: Pick<Leaderboard, 'entries'>): LeaderboardEntry | null {
+  return board.entries.find((entry) => entry.isPlayer) ?? null;
+}
 
 /** A multiplayer session: its mode says so, or it names the server it ran on. */
 export const isOnlineSession = (session: { settings?: { modeSetting?: string; serverName?: string } }): boolean =>
@@ -74,7 +79,7 @@ function toLeaderboardLap(session: DetailedSession, driver: DriverData, lap: Lap
     timestamp: session.timestamp,
     ...(driverOrdinal >= 0 ? { driverOrdinal } : {}),
     ...(lapOrdinal >= 0 ? { lapOrdinal } : {}),
-    lapNum: lap.lapNum,
+    lapNumber: lap.lapNumber,
     lapTime: lap.lapTime as number,
     s1: lap.s1,
     s2: lap.s2,
@@ -158,7 +163,7 @@ function toEntries(acc: Map<string, DriverAccumulator>): LeaderboardEntry[] {
       s1Rank: null,
       s2Rank: null,
       s3Rank: null,
-      theoreticalBest: bestS1 !== null && bestS2 !== null && bestS3 !== null ? Number((bestS1 + bestS2 + bestS3).toFixed(3)) : null,
+      theoreticalBest: computeTheoreticalBest(bestS1, bestS2, bestS3),
       top3Average: driver.top3Average === null ? null : Number(driver.top3Average.toFixed(3)),
       top3AverageRank: null,
       gapToLeader: 0,
@@ -223,7 +228,6 @@ export function buildLeaderboard(
     scope,
     carType,
     entries,
-    player: entries.find((e) => e.isPlayer) ?? null,
     benchmark: findLayoutBenchmark(benchmarks, query.layoutKey, carClass),
   };
 }

@@ -172,8 +172,9 @@ describe('AI report history', () => {
 
 describe('Plurals and dates in the benchmark card', () => {
   const diff = (extra: Partial<ReferenceBenchmarkDiff>): ReferenceBenchmarkDiff => ({
-    id: 1, timestamp: 'garbage', hasChanges: true, addedCount: 0, updatedCount: 1, removedCount: 0, totalEntries: 1,
-    totalAffectedSessions: 1, totalCategoryShifts: 1, added: [], updated: [], removed: [], ...extra,
+    id: 1, timestamp: 'garbage', totalEntries: 1,
+    totalAffectedSessions: 1, totalCategoryShifts: 1, added: [], removed: [], ...extra,
+    updated: [{ key: 'k', trackName: 'Spa', carClass: 'Hyper', patch: '1.4', type: 'updated', oldAlienSec: 120, newAlienSec: 119 }],
   } as unknown as ReferenceBenchmarkDiff);
 
   it('says "1 lap changed pace category" and "1 of your session", then the plural forms', () => {

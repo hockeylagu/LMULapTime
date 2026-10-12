@@ -7,11 +7,11 @@ import { queryTrackDetailFilters, queryTrackDetailSummary, queryTrackSummaries }
 import { aggregateTrackSummaries } from '../../../../shared/domain/trackSummaryUtils.js';
 
 function makeSession(id: string, time: number, carType: string, carClass: string, lapTime: number): DetailedSession {
-  const lap: LapData = { lapNum: 1, position: 1, lapTime, lapTimeString: `${lapTime}`, s1: 30, s2: 30, s3: lapTime - 60,
+  const lap: LapData = { lapNumber: 1, position: 1, lapTime, s1: 30, s2: 30, s3: lapTime - 60,
     topSpeed: 250, fCompound: 'Dry', rCompound: 'Dry', isPitStop: false, isValid: true };
   const driver = { name: 'Driver', carType, carClass, carNumber: '1', teamName: '', isPlayer: true, position: 1, classPosition: 1,
-    bestLapTime: lapTime, bestLapTimeString: `${lapTime}`, bestLapNum: 1, bestS1: 30, bestS2: 30, bestS3: lapTime - 60,
-    theoreticalBest: lapTime, theoreticalBestString: `${lapTime}`, lapsCount: 1, laps: [lap] };
+    bestLapTime: lapTime, bestLapNumber: 1, bestS1: 30, bestS2: 30, bestS3: lapTime - 60,
+    theoreticalBest: lapTime, declaredLapsCount: 1, laps: [lap] };
   return { id, filename: `${id}.xml`, filePath: `${id}.xml`, trackVenue: 'Monza', trackCourse: 'GP', trackEvent: '',
     trackLengthMeters: 5793, timeString: `2026/06/01 12:0${time}`, timestamp: time, sessionType: time === 1 ? 'Race' : 'Qualifying',
     sessionName: 'Session', driversCount: 1, playerDriver: driver, drivers: [driver] };
@@ -28,7 +28,7 @@ describe('track detail summary queries', () => {
     const summary = queryTrackDetailSummary(db, 'Monza', 'Hyper', 'Ferrari 499P');
     expect(summary).toMatchObject({ sessionsCount: 2, totalLaps: 2, bestLapTime: 90, bestLapCar: 'Ferrari 499P' });
     const filters = queryTrackDetailFilters(db, 'Monza', 'Hyper');
-    expect(filters.carModels).toEqual(['Ferrari 499P']);
+    expect(filters.carTypes).toEqual(['Ferrari 499P']);
     expect(filters.sessionTypes).toEqual(['qualifying', 'race']);
     expect(filters.emptyCount).toBe(0);
     expect(filters.replayCount).toBe(0);

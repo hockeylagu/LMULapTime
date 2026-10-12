@@ -92,7 +92,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   }
 
   const hasServerContract = Boolean(data.filters);
-  const availableCarModels = data.filters?.carModels ?? [...new Set(data.sessions.filter(session => matchesSessionCarClass(session, selectedClass))
+  const availableCarTypes = data.filters?.carTypes ?? [...new Set(data.sessions.filter(session => matchesSessionCarClass(session, selectedClass))
     .map(session => session.playerDriver?.carType).filter((car): car is string => Boolean(car)))].sort();
   const classTrackSessions = data.sessions.filter(session => matchesSessionCarClass(session, selectedClass) &&
     (selectedCarModel === 'All' || session.playerDriver?.carType === selectedCarModel));
@@ -133,8 +133,8 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
 
     return {
       ...point,
-      benchmarkCategory: paceInfo?.category ?? null,
-      benchmarkPercentage: paceInfo?.percentage ?? null,
+      paceCategory: paceInfo?.category ?? null,
+      pacePercentage: paceInfo?.percentage ?? null,
     };
   });
 
@@ -168,9 +168,8 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
         setSelectedClass={setSelectedClass}
         selectedCarModel={selectedCarModel}
         setSelectedCarModel={setSelectedCarModel}
-        availableCarModels={availableCarModels}
+        availableCarTypes={availableCarTypes}
         currentBenchmark={currentBenchmark}
-        bestLapTimeString={bestLapSec ? formatTime(bestLapSec) : null}
         bestLapCar={bestLapCar}
         xmlTrackLengthMeters={data.latestSession?.trackLengthMeters ?? data.sessions[0]?.trackLengthMeters}
         trackGeometry={trackGeometry}

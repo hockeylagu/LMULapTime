@@ -15,7 +15,7 @@ describe('loadSessionDebrief', () => {
     // The reference comes from the same car on this layout, any driver.
     const compareCall = fetchMock.mock.calls.map(([url]) => String(url)).find(url => url.startsWith('/api/compare/laps'));
     const compareQuery = new URLSearchParams(String(compareCall).split('?')[1]);
-    expect(compareQuery.get('carModel')).toBe('Peugeot 9x8');
+    expect(compareQuery.get('carType')).toBe('Peugeot 9x8');
     expect(compareQuery.get('carClass')).toBe('Hyper');
     expect(compareQuery.get('playerOnly')).toBe('false');
     expect(debrief.reference.driverName).toBe('Davide Catani');
@@ -68,8 +68,8 @@ describe('loadSessionDebrief', () => {
     const inTraffic = {
       ...me,
       laps: me.laps.map(l => {
-        if (l.lapNum === 20) return { ...l, traffic: { ahead: null, behind: null, following: false, passed: [gt3], passedBy: [] } };
-        if (l.lapNum === 16) return { ...l, nonRepresentativeReason: 'traffic' as const };
+        if (l.lapNumber === 20) return { ...l, traffic: { ahead: null, behind: null, following: false, passed: [gt3], passedBy: [] } };
+        if (l.lapNumber === 16) return { ...l, nonRepresentativeReason: 'traffic' as const };
         return l;
       }),
     };
@@ -108,7 +108,7 @@ describe('loadSessionDebrief', () => {
         { lapNumber: 20, spells: [spell(100, 20)] }, // across the line and into the corner
       ],
     });
-    const flagged = { ...me, laps: me.laps.map(l => (l.lapNum === 18 ? { ...l, nonRepresentativeReason: 'traffic' as const } : l)) };
+    const flagged = { ...me, laps: me.laps.map(l => (l.lapNumber === 18 ? { ...l, nonRepresentativeReason: 'traffic' as const } : l)) };
 
     const debrief = await loadSessionDebrief(session, flagged);
 
@@ -122,7 +122,7 @@ describe('loadSessionDebrief', () => {
 
   it('still ranks the corners when the other laps cannot be loaded', async () => {
     mockDebriefServer([{ ...referenceLap }]);
-    const onlyBestLap = { ...me, laps: me.laps.filter(l => l.lapNum === 20 || l.lapNum === 1).concat([{ ...me.laps[1], lapNum: 99 }]) };
+    const onlyBestLap = { ...me, laps: me.laps.filter(l => l.lapNumber === 20 || l.lapNumber === 1).concat([{ ...me.laps[1], lapNumber: 99 }]) };
 
     const debrief = await loadSessionDebrief(session, onlyBestLap);
 

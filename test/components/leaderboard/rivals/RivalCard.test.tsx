@@ -19,7 +19,6 @@ const target = (extra: Partial<RivalTarget> = {}): RivalTarget => ({
 
 const status = (extra: Partial<RivalStatus> = {}): RivalStatus => ({
   rival: target(),
-  rivalEntry,
   gap: 0.3,
   progress: 0.4,
   theoreticalGap: 0.1,
@@ -39,7 +38,7 @@ const rivalState = (extra: Partial<RivalState> = {}): RivalState => ({
 const renderCard = (s: RivalStatus | null, error: string | null = null, extra: Partial<RivalState> = {}) => {
   const rival = rivalState({ status: s, error, ...extra });
   const handlers = { onCompare: vi.fn(), onTelemetry: vi.fn() };
-  render(<RivalCard rival={rival} player={player} {...handlers} />);
+  render(<RivalCard rival={rival} player={player} rivalEntry={s?.rival?.kind === 'driver' ? rivalEntry : null} {...handlers} />);
   return { rival, ...handlers };
 };
 
@@ -66,15 +65,15 @@ describe('RivalCard', () => {
   });
 
   it('shows a ghost target when nobody is within reach', () => {
-    renderCard(status({ rival: target({ kind: 'ghost', driverName: null, targetTime: 99.8 }), rivalEntry: null }));
+    renderCard(status({ rival: target({ kind: 'ghost', driverName: null, targetTime: 99.8 }) }));
     expect(screen.getByText('Ghost target')).toBeInTheDocument();
     expect(screen.getByText('Your best, 0.2 s faster')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Analyse/ })).not.toBeInTheDocument();
   });
 
   it('leaves out the sector row when a ghost target has nothing to show in it', () => {
-    const ghost = status({ rival: target({ kind: 'ghost', driverName: null, targetTime: 99.8 }), rivalEntry: null, theoreticalGap: null, trend: [] });
-    const { container } = render(<RivalCard rival={rivalState({ status: ghost })} player={{ ...player, theoreticalBest: null }} />);
+    const ghost = status({ rival: target({ kind: 'ghost', driverName: null, targetTime: 99.8 }), theoreticalGap: null, trend: [] });
+    const { container } = render(<RivalCard rival={rivalState({ status: ghost })} player={{ ...player, theoreticalBest: null }} rivalEntry={null} />);
     expect(container.querySelector('.space-y-2')).toBeNull();
   });
 
@@ -103,7 +102,7 @@ describe('RivalCard', () => {
   });
 
   it('shows nothing without a rival, and the error when it could not be loaded', () => {
-    const { unmount } = render(<RivalCard rival={rivalState()} player={player} />);
+    const { unmount } = render(<RivalCard rival={rivalState()} player={player} rivalEntry={null} />);
     expect(screen.queryByLabelText('Your rival')).not.toBeInTheDocument();
     unmount();
     const { rival } = renderCard(null, 'Database is locked');

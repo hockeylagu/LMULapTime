@@ -7,7 +7,7 @@ import type { DetailedSession, DriverData, LapData } from '../../shared/types/in
 
 const drivers = Array.from({ length: 60 }, (_, i) => ({
   name: `Driver ${i}`, carClass: i % 2 ? 'GT3' : 'Hyper',
-  laps: Array.from({ length: 180 }, (_, j) => ({ lapNum: j + 1, position: (i + j) % 60 + 1 } as LapData)),
+  laps: Array.from({ length: 180 }, (_, j) => ({ lapNumber: j + 1, position: (i + j) % 60 + 1 } as LapData)),
 } as DriverData));
 const session = { drivers } as DetailedSession;
 const selected = drivers[1];

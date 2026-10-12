@@ -1,3 +1,5 @@
+import { playerEntry } from '../../../shared/domain/leaderboard.js';
+import { rivalEntryOf } from '../../../shared/domain/rivals.js';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { Trophy } from 'lucide-react';
@@ -18,10 +20,10 @@ import { useRival } from './rivals/useRival.js';
 const CLEARED_LAP_PARAMS = {
   model: null,
   sessionId: null,
-  lapNum: null,
+  lapNumber: null,
   compareSessionId: null,
   compareDriver: null,
-  compareLapNum: null,
+  compareLapNumber: null,
 };
 
 /** The ribbon layout a track name (from the URL or a link) refers to. */
@@ -53,7 +55,7 @@ export const LeaderboardPage: React.FC<CompareLapsProps> = (props) => {
   const { compareRequest, compareRef, scrollToCompare, onPick, onCompare, onAnalyse, onTelemetry } = useBoardActions(leaderboard.board, carClass);
   const [comparedLapIds, setComparedLapIds] = useState<string[]>([]);
   const rivalName = leaderboard.status?.rival?.kind === 'driver' ? leaderboard.status.rival.driverName : null;
-  const rivalEntry = leaderboard.status?.rivalEntry ?? null;
+  const rivalEntry = leaderboard.board ? rivalEntryOf(leaderboard.board, leaderboard.status?.rival ?? null) : null;
   const availableTracks = useMemo(() => [...new Set(layouts.map(layout => layout.trackName))].sort(), [layouts]);
   const rivalLap = useMemo(
     () => (rivalEntry && carClass ? boardLapToComparable(rivalEntry, carClass, boardLapTag(rivalEntry)) : null),
@@ -115,7 +117,7 @@ export const LeaderboardPage: React.FC<CompareLapsProps> = (props) => {
         )}
       </section>
 
-      {!leaderboard.error && <RivalCard rival={leaderboard} player={leaderboard.board?.player ?? null} onCompare={onAnalyse} onTelemetry={onTelemetry} />}
+      {!leaderboard.error && <RivalCard rival={leaderboard} player={leaderboard.board ? playerEntry(leaderboard.board) : null} rivalEntry={rivalEntry} onCompare={onAnalyse} onTelemetry={onTelemetry} />}
 
       {layoutKey && carClass && (
         <LeaderboardSection

@@ -13,12 +13,10 @@ function driver(name: string, carType: string, carClass: string, s1: number, s2:
     position: 1,
     classPosition: 1,
     bestLapTime: lap,
-    bestLapTimeString: '',
     bestS1: s1,
     bestS2: s2,
     bestS3: s3,
     theoreticalBest: null,
-    theoreticalBestString: '',
     laps: [],
   } as unknown as DriverData;
 }

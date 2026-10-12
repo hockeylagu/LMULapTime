@@ -175,7 +175,7 @@ describe('replayParser - extended format & pit info', () => {
 
         expect(meta.drivers.length).toBe(2);
         expect(meta.drivers[0].name).toBe('Douglas Riviera');
-        expect(meta.drivers[0].carModel).toBe('BMW M4 GT3');
+        expect(meta.drivers[0].carType).toBe('BMW M4 GT3');
         expect(meta.drivers[0].entryTime).toBe(10.5);
         expect(meta.drivers[0].exitTime).toBe(120.0);
 
@@ -746,7 +746,7 @@ describe('replayParser - extended format & pit info', () => {
             // Cross-validate each valid flying lap with the corresponding XML lap
             const validXmlLaps = (player?.laps || []).filter(l => l.isValid && l.lapTime && l.lapTime > 0);
             for (const xl of validXmlLaps) {
-              const vl = vcrLaps.find(l => l.lapNumber === xl.lapNum);
+              const vl = vcrLaps.find(l => l.lapNumber === xl.lapNumber);
               if (vl && vl.isValid && vl.lapTimeSec) {
                 expect(vl.lapTimeSec).toBeCloseTo(xl.lapTime!, 1);
                 if (xl.s1 && vl.s1Sec) expect(Math.abs(vl.s1Sec - xl.s1)).toBeLessThan(3.0);

@@ -4,6 +4,7 @@ import { ReferenceBenchmarkDiff } from '../../../shared/types/index.js';
 import { CarClassBadge } from '../common/CarClassBadge.js';
 import { BenchmarkImpactBadge } from './BenchmarkImpactBadge.js';
 import { formatDateTime, formatNumber } from './settingsFormat.js';
+import { formatTime } from '../../../shared/domain/formatters.js';
 
 export interface ChangeCountsProps {
   addedCount: number;
@@ -26,6 +27,11 @@ export const ChangeCounts: React.FC<ChangeCountsProps> = ({ addedCount, updatedC
   );
 };
 
+/** Whether an update added, changed or removed any target. */
+export function diffHasChanges(diff: Pick<ReferenceBenchmarkDiff, 'added' | 'updated' | 'removed'>): boolean {
+  return diff.added.length + diff.updated.length + diff.removed.length > 0;
+}
+
 export interface ReferenceChangesListProps {
   updateDiff: ReferenceBenchmarkDiff;
 }
@@ -34,6 +40,7 @@ export interface ReferenceChangesListProps {
 export const ReferenceChangesList: React.FC<ReferenceChangesListProps> = ({ updateDiff }) => {
   const driven = updateDiff.totalAffectedSessions ?? 0;
   const shifted = updateDiff.totalCategoryShifts ?? 0;
+  const hasChanges = diffHasChanges(updateDiff);
   return (
     <div className="space-y-3" data-testid="benchmark-diff-section">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -43,16 +50,16 @@ export const ReferenceChangesList: React.FC<ReferenceChangesListProps> = ({ upda
           <span className="text-[11px] text-lmu-muted font-mono">{formatDateTime(updateDiff.timestamp)}</span>
         </div>
 
-        {updateDiff.hasChanges && (
+        {hasChanges && (
           <p className="text-[11px] text-lmu-muted">
-            <ChangeCounts addedCount={updateDiff.addedCount} updatedCount={updateDiff.updatedCount} removedCount={updateDiff.removedCount} />
+            <ChangeCounts addedCount={updateDiff.added.length} updatedCount={updateDiff.updated.length} removedCount={updateDiff.removed.length} />
             {driven > 0 && <> · <span className="font-mono">{formatNumber(driven)}</span> of your session{driven === 1 ? '' : 's'} on these layouts</>}
             {shifted > 0 && <> · <span className="font-mono">{formatNumber(shifted)}</span> {shifted === 1 ? 'lap' : 'laps'} changed pace category</>}
           </p>
         )}
       </div>
 
-      {updateDiff.hasChanges ? (
+      {hasChanges ? (
         <div className="relative max-h-96 overflow-y-auto overflow-x-hidden border-y border-lmu-border/70 divide-y divide-lmu-border/70">
           {/* Added items */}
           {updateDiff.added.map((item) => (
@@ -69,7 +76,7 @@ export const ReferenceChangesList: React.FC<ReferenceChangesListProps> = ({ upda
                   <CarClassBadge carClass={item.carClass} size="xs" />
                 </div>
                 <div className="flex items-center gap-3 font-mono">
-                  <span className="text-lmu-gain-soft font-bold">Alien target {item.newAlienTimeString}</span>
+                  <span className="text-lmu-gain-soft font-bold">Alien target {formatTime(item.newAlienSec)}</span>
                   {item.patch && (
                     <span className="text-[10px] text-lmu-muted font-sans">
                       {item.patch}
@@ -97,17 +104,17 @@ export const ReferenceChangesList: React.FC<ReferenceChangesListProps> = ({ upda
                 </div>
                 <div className="flex items-center gap-3 font-mono">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-lmu-muted line-through text-[11px]">{item.oldAlienTimeString}</span>
+                    <span className="text-lmu-muted line-through text-[11px]">{formatTime(item.oldAlienSec)}</span>
                     <span className="text-lmu-muted">&rarr;</span>
-                    <span className="text-lmu-text font-bold">{item.newAlienTimeString}</span>
-                    {item.diffSec !== undefined && item.diffSec !== 0 && (
+                    <span className="text-lmu-text font-bold">{formatTime(item.newAlienSec)}</span>
+                    {item.newAlienSec !== undefined && item.oldAlienSec !== undefined && item.newAlienSec !== item.oldAlienSec && (
                       <span
                         className={`text-[11px] font-bold ${
-                          item.diffSec < 0 ? 'text-lmu-gain' : 'text-lmu-loss'
+                          item.newAlienSec < item.oldAlienSec ? 'text-lmu-gain' : 'text-lmu-loss'
                         }`}
                       >
-                        ({item.diffSec > 0 ? '+' : ''}
-                        {item.diffSec.toFixed(3)}s)
+                        ({item.newAlienSec > item.oldAlienSec ? '+' : ''}
+                        {(item.newAlienSec - item.oldAlienSec).toFixed(3)}s)
                       </span>
                     )}
                   </div>
@@ -137,7 +144,7 @@ export const ReferenceChangesList: React.FC<ReferenceChangesListProps> = ({ upda
                   <CarClassBadge carClass={item.carClass} size="xs" />
                 </div>
                 <div className="font-mono text-lmu-loss-soft line-through">
-                  Alien target {item.oldAlienTimeString}
+                  Alien target {formatTime(item.oldAlienSec)}
                 </div>
               </div>
               <BenchmarkImpactBadge impact={item.impact} />

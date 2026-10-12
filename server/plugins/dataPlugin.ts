@@ -160,10 +160,10 @@ export class DataPlugin {
   public vehicles(): VehicleDataRecord[] {return structuredClone(this.records);}
   public logos(): Record<string, string> {return Object.fromEntries(this.logoRecords);}
   public logo(brand: string): string|null {return this.logoRecords.get(brand) ?? null;}
-  public vehicle(identity: {vehicleId?:string;carModel?:string;carClass?:string}): VehicleDataRecord|null {
+  public vehicle(identity: {vehicleId?:string;carType?:string;carClass?:string}): VehicleDataRecord|null {
     const alias=identity.vehicleId?.trim().replace(/\.veh$/i,'').toUpperCase();
     if (alias) {const match=this.records.find(r=>r.vehicleIds.includes(alias));if(match)return structuredClone(match);}
-    const matches=this.records.filter(r=>r.model===identity.carModel && (!identity.carClass || r.carClass===identity.carClass));
+    const matches=this.records.filter(r=>r.model===identity.carType && (!identity.carClass || r.carClass===identity.carClass));
     return matches.length===1?structuredClone(matches[0]):null;
   }
 }

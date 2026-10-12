@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { lapPitStop, lapPlaces } from '../../../src/components/session-detail/table/lapPlaces.js';
 import type { DetailedSession, DriverData, LapData } from '../../../shared/types/index.js';
 
-const lap = (lapNum: number, position: number) => ({ lapNum, position } as LapData);
+const lap = (lapNumber: number, position: number) => ({ lapNumber, position } as LapData);
 const driver = (name: string, carClass: string, positions: number[]) =>
   ({ name, carClass, laps: positions.map((position, i) => lap(i + 1, position)) } as DriverData);
 
@@ -25,21 +25,22 @@ describe('lapPlaces', () => {
 
 describe('lapPitStop', () => {
   const laps = [
-    { lapNum: 11, incidents: [{ type: 'damage', description: 'New suspension damage reported' }] },
-    { lapNum: 12 },
-    { lapNum: 13, isPitStop: true, pitService: { pitLaneSec: 120, serviceSec: 70, classMedianServiceSec: 30 } },
-    { lapNum: 14, isOutLap: true },
-    { lapNum: 15 },
+    { lapNumber: 11 },
+    { lapNumber: 12 },
+    { lapNumber: 13, isPitStop: true, pitService: { pitLaneSec: 120, serviceSec: 70, classMedianServiceSec: 30 } },
+    { lapNumber: 14, isOutLap: true },
+    { lapNumber: 15 },
   ] as LapData[];
+  const driver = { laps, incidents: [{ type: 'damage' as const, description: 'New suspension damage reported', lapNumber: 11 }] };
 
   it('ties the in-lap and its out-lap to the same stop', () => {
-    const stop = { inLap: laps[2], outLap: laps[3], damageBefore: { lapNum: 11, description: 'New suspension damage reported' } };
-    expect(lapPitStop(laps, laps[2], laps[1])).toEqual({ ...stop, onOutLap: false });
-    expect(lapPitStop(laps, laps[3], laps[2])).toEqual({ ...stop, onOutLap: true });
+    const stop = { inLap: laps[2], outLap: laps[3], damageBefore: { lapNumber: 11, description: 'New suspension damage reported' } };
+    expect(lapPitStop(driver, laps[2], laps[1])).toEqual({ ...stop, onOutLap: false });
+    expect(lapPitStop(driver, laps[3], laps[2])).toEqual({ ...stop, onOutLap: true });
   });
 
   it('has no stop on other laps', () => {
-    expect(lapPitStop(laps, laps[4], laps[3])).toBeUndefined();
-    expect(lapPitStop(laps, laps[1], laps[0])).toBeUndefined();
+    expect(lapPitStop(driver, laps[4], laps[3])).toBeUndefined();
+    expect(lapPitStop(driver, laps[1], laps[0])).toBeUndefined();
   });
 });

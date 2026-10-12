@@ -162,7 +162,7 @@ export function* extractReplayDriverTrajectories(
     const matchedDriver = meta.drivers.find(d => d.slot === targetSlot);
     tracker.report('metadata', 10, { driverSlot: targetSlot });
     const driverName = matchedDriver?.name || (targetSlot !== undefined ? `Driver ${targetSlot}` : undefined);
-    const carDesc = matchedDriver?.carModel || matchedDriver?.vehicleId || 'Unknown Car';
+    const carDesc = matchedDriver?.carType || matchedDriver?.vehicleId || 'Unknown Car';
 
     if (!options.silent) {
       const displayTrack = meta.displayTrack || meta.trackName || 'Unknown Track';

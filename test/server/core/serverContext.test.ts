@@ -14,10 +14,6 @@ import { replayIndexEntryFromStored } from '../../../server/sessions/replayMatch
 
 const benchmarkDiff: ReferenceBenchmarkDiff = {
   timestamp: '2026-09-23T00:00:00.000Z',
-  hasChanges: true,
-  addedCount: 0,
-  updatedCount: 2,
-  removedCount: 0,
   totalEntries: 12,
   added: [],
   updated: [],
@@ -329,7 +325,7 @@ describe('ServerContext background session sync', () => {
       getAllStoredReplayFiles: vi.fn(() => []),
       getTelemetryFiles: vi.fn(() => [{
         filename: 'Spa_P_2026-09-14T18_37_49Z.duckdb', filePath: 'Spa_P_2026-09-14T18_37_49Z.duckdb',
-        fileMtimeMs: recordedAt, fileSizeBytes: 100, trackName: 'Spa', sessionType: 'P', timestampStr: '', timestampEpochMs: recordedAt,
+        mtimeMs: recordedAt, fileSizeBytes: 100, trackName: 'Spa', sessionType: 'P', timestampStr: '', timestampEpochMs: recordedAt,
       }]),
       getSessionsCount: vi.fn(() => 0),
       getTelemetrySessionCandidatesStartingBetween: vi.fn(() => []),
@@ -483,10 +479,10 @@ describe('ServerContext configuration and telemetry enrichment', () => {
     vi.spyOn(context.currentParser, 'findMatchingReplay').mockReturnValue({
       name: 'Spa P1.Vcr',
       path: 'C:\\replays\\Spa P1.Vcr',
-      sizeBytes: 200,
+      fileSizeBytes: 200,
       sessionCode: 'P1',
       trackName: 'Spa',
-      mtime: 1,
+      mtimeMs: 1,
     });
     const session = {
       id: 'session-1',
@@ -500,7 +496,7 @@ describe('ServerContext configuration and telemetry enrichment', () => {
     context.enrichSessionsWithTelemetry([session]);
 
     // A replay filename association does not grant DuckDB ownership to the session.
-    expect(session.matchingReplayFile).toMatchObject({ name: 'Spa P1.Vcr', hasDuckDbTelemetry: false });
+    expect(session.matchingReplayFile).toMatchObject({ name: 'Spa P1.Vcr' });
     expect(session.duckdbFilename).toBeUndefined();
     expect(sessionDb.updateSessionMatchingReplay).toHaveBeenCalledTimes(1);
   });
@@ -529,23 +525,17 @@ describe('ServerContext configuration and telemetry enrichment', () => {
       trackCourse: 'GP',
       sessionType: 'Practice',
       drivers: [],
-      hasDuckDbTelemetry: true,
       duckdbFilename: 'old-directory.duckdb',
       matchingReplayFile: {
         name: 'Spa P1.Vcr',
         path: 'C:\\replays\\Spa P1.Vcr',
-        sizeBytes: 200,
-        hasDuckDbTelemetry: true,
-        duckdbFilename: 'old-directory.duckdb',
+        fileSizeBytes: 200,
       },
     } as unknown as DetailedSession;
 
     context.enrichSessionsWithTelemetry([session]);
 
-    expect(session.hasDuckDbTelemetry).toBe(false);
     expect(session.duckdbFilename).toBeUndefined();
-    expect(session.matchingReplayFile).toMatchObject({ hasDuckDbTelemetry: false });
-    expect(session.matchingReplayFile?.duckdbFilename).toBeUndefined();
   });
 
   it('stores one session per DuckDB file and shows its telemetry on that session only', () => {
@@ -557,7 +547,7 @@ describe('ServerContext configuration and telemetry enrichment', () => {
       fs.writeFileSync(filePath, '');
       const recordedAt = Date.parse('2026-09-14T18:37:49Z');
       sessionDb.upsertTelemetryMetadata({
-        filename, filePath, fileMtimeMs: recordedAt, fileSizeBytes: 1024, trackName: 'Circuit de la Sarthe',
+        filename, filePath, mtimeMs: recordedAt, fileSizeBytes: 1024, trackName: 'Circuit de la Sarthe',
         sessionType: 'P', timestampStr: '2026-09-14T18:37:49Z', timestampEpochMs: recordedAt,
       });
       const context = createContext(sessionDb);
@@ -571,13 +561,13 @@ describe('ServerContext configuration and telemetry enrichment', () => {
 
       context.enrichSessionsWithTelemetry([empty, recorded]);
 
-      expect(recorded).toMatchObject({ hasDuckDbTelemetry: true, duckdbFilename: filename });
-      expect(empty.hasDuckDbTelemetry).toBe(false);
+      expect(recorded).toMatchObject({ duckdbFilename: filename });
+      expect(empty.duckdbFilename).toBeUndefined();
       expect(sessionDb.getTelemetryMetadata()[0].matchedSessionId).toBe('14_46_14-22P1');
 
       // Decided once: reading again with the sessions in another order changes nothing.
       context.enrichSessionsWithTelemetry([recorded, empty]);
-      expect(empty.hasDuckDbTelemetry).toBe(false);
+      expect(empty.duckdbFilename).toBeUndefined();
       expect(sessionDb.getTelemetryMetadata()[0].matchedSessionId).toBe('14_46_14-22P1');
     } finally {
       sessionDb.close();
@@ -604,7 +594,7 @@ describe('telemetry ownership catalog lifetime', () => {
         const filePath = path.join(telemetryDir, `batch-${index}.duckdb`);
         fs.writeFileSync(filePath, '');
         db.upsertTelemetryMetadata({ filename: `batch-${index}.duckdb`, filePath,
-          fileMtimeMs: timestampEpochMs, fileSizeBytes: 100, trackName: 'Monza', sessionType: 'P', timestampStr: '', timestampEpochMs });
+          mtimeMs: timestampEpochMs, fileSizeBytes: 100, trackName: 'Monza', sessionType: 'P', timestampStr: '', timestampEpochMs });
       }
       const files = vi.spyOn(db, 'getTelemetryFiles');
       const metadata = vi.spyOn(db, 'getTelemetryMetadata');
@@ -629,9 +619,9 @@ describe('telemetry ownership catalog lifetime', () => {
         ['batch-0.duckdb', 'batch-0'], ['batch-24.duckdb', 'batch-24'],
       ]);
       // The owners store their file, so reads need no catalog.
-      expect(db.getSessionById('batch-0')).toMatchObject({ hasDuckDbTelemetry: true, duckdbFilename: 'batch-0.duckdb' });
-      expect(db.getCompactSession('batch-0')).toMatchObject({ hasDuckDbTelemetry: true });
-      expect(db.getSessionById('batch-12')?.hasDuckDbTelemetry).toBeUndefined();
+      expect(db.getSessionById('batch-0')).toMatchObject({ duckdbFilename: 'batch-0.duckdb' });
+      expect(db.getCompactSession('batch-0')).toMatchObject({ duckdbFilename: 'batch-0.duckdb' });
+      expect(db.getSessionById('batch-12')?.duckdbFilename).toBeUndefined();
     } finally { db.close(); fs.rmSync(telemetryDir, { recursive: true, force: true }); }
   });
 });
@@ -666,7 +656,6 @@ describe('ServerContext reference laptime refresh', () => {
       running: false,
       checked: true,
       refreshed: true,
-      updatedCount: 2,
       diff: benchmarkDiff,
       error: null,
     });
@@ -706,7 +695,6 @@ describe('ServerContext reference laptime refresh', () => {
       running: false,
       checked: true,
       refreshed: false,
-      updatedCount: 0,
       diff: null,
       error: 'Google Sheets unavailable',
     });
@@ -748,11 +736,11 @@ describe('ServerContext replay scan progress', () => {
 
   describe('stored replay match re-check', () => {
     const xmlMtimeMs = Date.parse('2026-09-03T18:41:14.451Z');
-    const replayRow = (filename: string, mtime: number, durationSec: number) => ({
+    const replayRow = (filename: string, mtimeMs: number, durationSec: number) => ({
       filename,
       file_path: 'C:\\replays\\' + filename,
-      file_size: 100,
-      file_mtime: mtime,
+      file_size_bytes: 100,
+      file_mtime_ms: mtimeMs,
       metadata: { durationSec },
     });
     const previousRace = replayRow('Circuit de la Sarthe R1 27.Vcr', Date.parse('2026-09-03T17:41:39.560Z'), 2206);
@@ -787,7 +775,7 @@ describe('ServerContext replay scan progress', () => {
         sessionType: 'Race',
         sessionName: 'R1',
         drivers: [],
-        matchingReplayFile: { name: linkedReplay, path: 'C:\\replays\\' + linkedReplay, sizeBytes: 100 },
+        matchingReplayFile: { name: linkedReplay, path: 'C:\\replays\\' + linkedReplay, fileSizeBytes: 100 },
       } as unknown as DetailedSession;
       return { context, sessionDb, session };
     }
@@ -872,7 +860,7 @@ describe('ServerContext replay scan progress', () => {
       expect(sessionDb.updateSessionMatchingReplay).not.toHaveBeenCalled();
     });
 
-    it('links an unmatched session once the replay sync has cached its replay, using the XML mtime', () => {
+    it('links an unmatched session once the replay sync has cached its replay, using the XML mtimeMs', () => {
       // Session sync runs first: the new VCR is not cached yet, so the session stays unlinked.
       const storedReplays = [previousRace];
       const { context, sessionDb, session } = setup(storedReplays, '');

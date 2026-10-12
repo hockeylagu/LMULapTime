@@ -1,6 +1,5 @@
 import type { LapData } from '../../shared/types/index.js';
 import { isCompletedPitStop } from '../../shared/domain/lapComparison.js';
-import { formatTime } from '../../shared/domain/formatters.js';
 import { computeAverageLapTime } from './sessionAnalytics.js';
 
 /**
@@ -60,7 +59,6 @@ function inferMissingLapTimes(laps: LapData[], bestLapTime: number | null): void
 
     if (inferredTime !== null && inferredTime > 0) {
       curLap.lapTime = inferredTime;
-      curLap.lapTimeString = formatTime(inferredTime);
       curLap.isInferred = true;
     }
   }
@@ -87,7 +85,6 @@ function applyPitLoss(laps: LapData[], bestLapTime: number | null): void {
       const pitLoss = parseFloat((stopTime - normalTime).toFixed(1));
       if (pitLoss > 0) {
         lap.pitStopDuration = pitLoss;
-        lap.pitStopDurationString = `+${pitLoss}s`;
       }
     }
   });

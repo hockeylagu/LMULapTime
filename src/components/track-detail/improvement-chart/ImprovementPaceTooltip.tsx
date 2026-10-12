@@ -68,7 +68,7 @@ export const ImprovementPaceTooltip: React.FC<ImprovementPaceTooltipProps> = ({
         {metric === 'bestPr' ? (
           <>
             <span>
-              Benchmark: <strong className="text-lmu-gain-soft font-mono">{data.benchmarkPercentage !== null ? `${data.benchmarkPercentage.toFixed(1)}%` : '--'}</strong>
+              Benchmark: <strong className="text-lmu-gain-soft font-mono">{data.pacePercentage !== null ? `${data.pacePercentage.toFixed(1)}%` : '--'}</strong>
             </span>
             <span>
               From Lap PR:{' '}

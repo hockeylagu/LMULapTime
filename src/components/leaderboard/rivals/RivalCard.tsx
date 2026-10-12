@@ -17,6 +17,8 @@ import { linkClickHandler } from '../../../utils/linkClick.js';
 export interface RivalCardProps {
   rival: RivalState;
   player: LeaderboardEntry | null;
+  /** The rival driver's line on the board; null for a ghost. */
+  rivalEntry: LeaderboardEntry | null;
   /** Puts the player's best and the rival's in the comparison below, and works out where the time is. */
   onCompare?: (entry: LeaderboardEntry) => void;
   /** Opens the telemetry of the two laps. */
@@ -29,13 +31,13 @@ const action = 'px-2.5 py-1 rounded-lg border border-lmu-border text-xs font-bol
  * The next small step: a rival about 0.3 s ahead (or a ghost time), the time still to find, how
  * much of it is closed and the sectors it is in. The corners it is in are the comparison's job.
  */
-export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, onCompare, onTelemetry }) => {
+export const RivalCard: React.FC<RivalCardProps> = ({ rival, player, rivalEntry, onCompare, onTelemetry }) => {
   const { status, error } = rival;
   const [searchParams] = useSearchParams();
   if (error) return <LoadError message={error} onRetry={rival.retry} />;
   if (!status?.rival || !player || status.gap === null) return null;
 
-  const { rival: target, rivalEntry, gap, progress } = status;
+  const { rival: target, gap, progress } = status;
   const percent = (gap / target.targetTime) * 100;
   const telemetryReady = Boolean(rivalEntry?.bestLap.telemetryAvailable && player.bestLap.telemetryAvailable);
   const closed = progress !== null ? Math.round(progress * 100) : null;

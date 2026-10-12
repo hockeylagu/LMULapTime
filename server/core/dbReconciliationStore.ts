@@ -17,10 +17,10 @@ export function getReplayReconciliationCandidateIds(db: DatabaseType, sinceMs: n
     SELECT id FROM sessions WHERE updated_at >= @since
     UNION SELECT s.id FROM replay_metadata r JOIN sessions s ON s.recording_name = r.filename WHERE r.updated_at >= @since
     UNION SELECT s.id FROM replay_metadata r JOIN sessions s
-      ON s.file_mtime BETWEEN r.file_mtime - @window AND r.file_mtime + @window
+      ON s.file_mtime_ms BETWEEN r.file_mtime_ms - @window AND r.file_mtime_ms + @window
       WHERE r.updated_at >= @since
     UNION SELECT s.id FROM replay_metadata r JOIN sessions s
-      ON s.timestamp BETWEEN coalesce(r.recording_start_ms, r.file_mtime) - @window AND coalesce(r.recording_start_ms, r.file_mtime) + @window
+      ON s.timestamp BETWEEN coalesce(r.recording_start_ms, r.file_mtime_ms) - @window AND coalesce(r.recording_start_ms, r.file_mtime_ms) + @window
       WHERE r.updated_at >= @since`)
     .all({ since: sinceMs, window: REPLAY_MATCH_WINDOW_MS }) as Array<{ id: string }>;
   return rows.map(row => row.id);

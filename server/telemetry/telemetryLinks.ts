@@ -132,8 +132,8 @@ export function decideTelemetryLinks(input: TelemetryLinkInput): TelemetryLink[]
   });
   const replaySpans: Span<ReplayFileEntry>[] = input.replays.map(replay => ({
     owner: replay,
-    startMs: replay.durationSec && replay.durationSec > 0 ? replay.mtime - Math.round(replay.durationSec * 1000) : replay.mtime,
-    endMs: replay.mtime,
+    startMs: replay.durationSec && replay.durationSec > 0 ? replay.mtimeMs - Math.round(replay.durationSec * 1000) : replay.mtimeMs,
+    endMs: replay.mtimeMs,
   }));
   const ownerOfReplay = new Map<string, string>(input.replayOwnerByName ?? []);
   for (const session of input.sessions) {
@@ -169,11 +169,11 @@ export function decideTelemetryLinks(input: TelemetryLinkInput): TelemetryLink[]
         const owningSession = ownerOfReplay.get(owner.name);
         if (owningSession && sessionsWithFiles.has(owningSession)) return false;
         const metadata = metadataOf(owner.name);
-        return metadata !== null && findDuckDbForReplay([file], metadata, owner.mtime, ANY_DELTA_SEC) !== null;
+        return metadata !== null && findDuckDbForReplay([file], metadata, owner.mtimeMs, ANY_DELTA_SEC) !== null;
       });
       const replayLayouts = new Set(eligibleReplays.map(span => {
         const metadata = metadataOf(span.owner.name);
-        return metadata ? layoutIdentity(metadata.trackVenue || metadata.trackName || '', metadata.trackCourse ?? '', metadata.sceneDesc || metadata.eventInfo?.sceneDesc) : '';
+        return metadata ? layoutIdentity(metadata.trackVenue || metadata.trackName || '', metadata.trackCourse ?? '', metadata.sceneDesc) : '';
       }));
       const sessionLayouts = new Set(eligibleSessions.map(span => layoutIdentity(span.owner.trackVenue, span.owner.trackCourse)));
       if (replayLayouts.size === 1) {
@@ -181,7 +181,7 @@ export function decideTelemetryLinks(input: TelemetryLinkInput): TelemetryLink[]
         sessionCandidates = eligibleSessions.filter(span => layoutIdentity(span.owner.trackVenue, span.owner.trackCourse) === trustedReplayLayout);
         replayCandidates = eligibleReplays.filter(span => {
           const metadata = metadataOf(span.owner.name);
-          return metadata && layoutIdentity(metadata.trackVenue || metadata.trackName || '', metadata.trackCourse ?? '', metadata.sceneDesc || metadata.eventInfo?.sceneDesc) === trustedReplayLayout;
+          return metadata && layoutIdentity(metadata.trackVenue || metadata.trackName || '', metadata.trackCourse ?? '', metadata.sceneDesc) === trustedReplayLayout;
         });
       } else if (sessionLayouts.size > 1 || replayLayouts.size > 1 || (sessionLayouts.size && replayLayouts.size && [...sessionLayouts].some(layout => !replayLayouts.has(layout)))) {
         continue;
@@ -197,7 +197,7 @@ export function decideTelemetryLinks(input: TelemetryLinkInput): TelemetryLink[]
       const owningSession = ownerOfReplay.get(owner.name);
       if (owningSession && sessionsWithFiles.has(owningSession)) return false;
       const metadata = metadataOf(owner.name);
-      return metadata !== null && findDuckDbForReplay([file], metadata, owner.mtime, ANY_DELTA_SEC) !== null;
+      return metadata !== null && findDuckDbForReplay([file], metadata, owner.mtimeMs, ANY_DELTA_SEC) !== null;
     });
     if (replay) {
       const owningSession = ownerOfReplay.get(replay.name);

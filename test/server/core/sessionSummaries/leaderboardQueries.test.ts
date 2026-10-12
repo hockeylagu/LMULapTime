@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
 import type { DetailedSession } from '../../../../shared/types/index.js';
-import { buildLeaderboard, listLeaderboardLayouts, playerSessionBests } from '../../../../shared/domain/leaderboard.js';
+import { buildLeaderboard, listLeaderboardLayouts, playerEntry, playerSessionBests } from '../../../../shared/domain/leaderboard.js';
 import { initDbSchema } from '../../../../server/core/dbSchema.js';
 import { upsertSession } from '../../../../server/core/dbSessionStore.js';
 import { queryCompactLeaderboard, queryCompactLeaderboardLayouts, queryCompactPlayerSessionBests } from '../../../../server/core/sessionSummaries/leaderboardQueries.js';
@@ -41,7 +41,7 @@ describe('compact leaderboard queries', () => {
       session('three-laps', [driver('Me', [lap(2, 102), lap(3, 103), lap(4, 104)], { isPlayer: true })], { timestamp: 2000 }),
     ];
     sessions.forEach(value => upsertSession(db, value, value.filename, value.timestamp, 1));
-    expect(queryCompactLeaderboard(db, { layoutKey: 'monza_gp', carClass: 'GT3' }).player?.top3Average).toBe(103);
+    expect(playerEntry(queryCompactLeaderboard(db, { layoutKey: 'monza_gp', carClass: 'GT3' }))?.top3Average).toBe(103);
     db.close();
   });
 

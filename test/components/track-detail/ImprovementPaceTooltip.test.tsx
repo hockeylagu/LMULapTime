@@ -12,7 +12,7 @@ describe('ImprovementPaceTooltip component', () => {
     fullDate: 'May 28, 2026 14:00',
     car: 'Ferrari 499P #50',
     weather: '☀️ 24°C Dry',
-    benchmarkPercentage: 101.5,
+    pacePercentage: 101.5,
     lapPrDelta: -0.325,
     top3AvgStr: '1:42.500',
     theoreticalGap: 0.150,
@@ -96,7 +96,7 @@ describe('ImprovementPaceTooltip component', () => {
     expect(screen.getAllByText('94.2%')).toHaveLength(2);
   });
 
-  it('handles null values for benchmarkPercentage and positive lapPrDelta', () => {
+  it('handles null values for pacePercentage and positive lapPrDelta', () => {
     const nullPropsPayload: ImprovementTooltipPayloadEntry[] = [
       {
         name: 'Lap Time',
@@ -105,7 +105,7 @@ describe('ImprovementPaceTooltip component', () => {
         payload: {
           ...basePointData,
           weather: undefined,
-          benchmarkPercentage: null,
+          pacePercentage: null,
           lapPrDelta: 0.5,
         } as unknown as ImprovementChartPoint,
       },

@@ -127,7 +127,7 @@ describe('useSessionDetailData', () => {
 
   it('loads the selected driver PB from the server endpoint instead of filtering preloaded progression', async () => {
     const point = (bestLapTime: number, overrides: Partial<SessionProgressionPoint> = {}): SessionProgressionPoint => ({
-      sessionId: 'old', timestamp: 0, dateString: '', sessionType: 'Practice', trackVenue: 'Spa', trackCourse: 'GP',
+      sessionId: 'old', timestamp: 0, timeString: '', sessionType: 'Practice', trackVenue: 'Spa', trackCourse: 'GP',
       carType: 'Ferrari 499P', carClass: 'Hyper', driverName: 'Sim Driver', bestLapTime, bestS1: null, bestS2: null, bestS3: null,
       ...overrides,
     } as SessionProgressionPoint);

@@ -48,6 +48,26 @@ describe('Replay startup sync pipeline', () => {
     expect(db.getStoredReplayTrajectory('retry.Vcr', -1, -1)).not.toBeNull();
   });
 
+  it('stores the primary alias when the configured player name is blank by using the profile player', async () => {
+    const userData = path.join(dir, 'UserData');
+    const replays = path.join(userData, 'Replays');
+    fs.mkdirSync(path.join(userData, 'player'), { recursive: true });
+    fs.mkdirSync(replays);
+    fs.writeFileSync(path.join(userData, 'player', 'settings.json'), JSON.stringify({ DRIVER: { 'Player Name': 'Player' } }));
+    fs.writeFileSync(path.join(replays, 'blank.Vcr'), createSliceVcrBuffer({
+      drivers: [{ name: 'Player', vehicleId: '21_26_AFCO95641716', team: 'A', carNumber: '21' }],
+      slices: [
+        { sTime: 0, driverSlot: 1, x: 0, y: 0, z: 0 },
+        { sTime: 1, driverSlot: 1, x: 10, y: 0, z: 10 },
+      ],
+    }));
+    const iterator = db.syncReplaysAsyncIterator(replays, { playerName: '' });
+    let step = await iterator.next();
+    while (!step.done) step = await iterator.next();
+    expect(db.getReplayDriverIngest('blank.Vcr', -1)).toMatchObject({ status: 'stored' });
+    expect(db.getStoredReplayTrajectory('blank.Vcr', -1, -1)).not.toBeNull();
+  });
+
   it('decodes the newest replay first, whatever the filenames', async () => {
     const bytes = createSliceVcrBuffer({
       drivers: [{ name: 'Player', vehicleId: '21_26_AFCO95641716', team: 'A', carNumber: '21' }],

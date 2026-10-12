@@ -11,8 +11,8 @@ describe('TelemetryResolutionPopover', () => {
         telemetryResolution="high"
         onChangeResolution={vi.fn()}
         pointsCount={2400}
-        rawPointsCount={7200}
-        rawSampleRateHz={60}
+        vcrRawPointsCount={7200}
+        vcrRawSampleRateHz={60}
       />
     );
 
@@ -27,8 +27,8 @@ describe('TelemetryResolutionPopover', () => {
         telemetryResolution="high"
         onChangeResolution={vi.fn()}
         pointsCount={2400}
-        rawPointsCount={7200}
-        rawSampleRateHz={60}
+        vcrRawPointsCount={7200}
+        vcrRawSampleRateHz={60}
       />
     );
 
@@ -47,8 +47,6 @@ describe('TelemetryResolutionPopover', () => {
         telemetryResolution="high"
         onChangeResolution={vi.fn()}
         pointsCount={2400}
-        rawPointsCount={7200}
-        rawSampleRateHz={100}
         vcrRawPointsCount={1800}
         vcrRawSampleRateHz={30}
         duckdbRawPointsCount={9600}
@@ -101,8 +99,8 @@ describe('TelemetryResolutionPopover', () => {
         telemetryResolution="high"
         onChangeResolution={handleChangeResolution}
         pointsCount={2400}
-        rawPointsCount={7200}
-        rawSampleRateHz={60}
+        vcrRawPointsCount={7200}
+        vcrRawSampleRateHz={60}
       />
     );
 

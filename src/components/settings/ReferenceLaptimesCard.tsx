@@ -5,7 +5,7 @@ import {
   BenchmarkDiffSummary,
   AppStatus,
 } from '../../../shared/types/index.js';
-import { ChangeCounts, ReferenceChangesList } from './ReferenceChangesList.js';
+import { ChangeCounts, ReferenceChangesList, diffHasChanges } from './ReferenceChangesList.js';
 import { fetchBenchmarkDiffHistory, fetchBenchmarkDiffById } from '../../api/referenceApi.js';
 import { apiErrorMessage, isAbortError } from '../../api/apiClient.js';
 import { FOCUS_RING, SECONDARY_BUTTON } from '../common/buttonStyles.js';
@@ -63,8 +63,9 @@ export const ReferenceLaptimesCard: React.FC<ReferenceLaptimesCardProps> = ({
 
   const entriesCount = status?.referenceLaptimes?.entriesCount;
   const lastUpdated = status?.referenceLaptimes?.lastUpdated;
-  const latest: { addedCount: number; updatedCount: number; removedCount: number; hasChanges: boolean } | null =
-    updateDiff ?? history[0] ?? null;
+  const latest: { addedCount: number; updatedCount: number; removedCount: number; hasChanges: boolean } | null = updateDiff
+    ? { addedCount: updateDiff.added.length, updatedCount: updateDiff.updated.length, removedCount: updateDiff.removed.length, hasChanges: diffHasChanges(updateDiff) }
+    : history[0] ?? null;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -88,7 +89,7 @@ export const ReferenceLaptimesCard: React.FC<ReferenceLaptimesCardProps> = ({
   // An update the reader just asked for shows what it changed.
   const wasUpdating = useRef(isUpdatingLaptimes);
   useEffect(() => {
-    if (wasUpdating.current && !isUpdatingLaptimes && updateDiff?.hasChanges) setIsOpen(true);
+    if (wasUpdating.current && !isUpdatingLaptimes && updateDiff && diffHasChanges(updateDiff)) setIsOpen(true);
     wasUpdating.current = isUpdatingLaptimes;
   }, [isUpdatingLaptimes, updateDiff]);
 

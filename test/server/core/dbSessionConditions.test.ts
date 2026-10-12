@@ -6,13 +6,13 @@ import { replayRainOverLap, reclassifyStoredSessions } from '../../../server/cor
 import type { DetailedSession, DriverData, LapData, ReplayTrajectoryData } from '../../../shared/types/index.js';
 
 const replayName = 'Sebring International Raceway R1 17.Vcr';
-const replayLink = { name: replayName, path: `C:\\replays\\${replayName}`, sizeBytes: 1 };
+const replayLink = { name: replayName, path: `C:\\replays\\${replayName}`, fileSizeBytes: 1 };
 
 /** Six 120 s laps on Mediums from et 0; the replay rains from 400 s. */
-function lap(lapNum: number): LapData {
+function lap(lapNumber: number): LapData {
   return {
-    lapNum, position: 1, lapTime: lapNum >= 5 ? 130 : 120, lapTimeString: '', s1: null, s2: null, s3: null, topSpeed: null,
-    fCompound: 'Medium', rCompound: 'Medium', elapsedSeconds: (lapNum - 1) * 120, isPitStop: false, isValid: true,
+    lapNumber, position: 1, lapTime: lapNumber >= 5 ? 130 : 120, s1: null, s2: null, s3: null, topSpeed: null,
+    fCompound: 'Medium', rCompound: 'Medium', elapsedSeconds: (lapNumber - 1) * 120, isPitStop: false, isValid: true,
   } as LapData;
 }
 
@@ -73,13 +73,13 @@ describe('replay rain on the laps of a linked session', () => {
 
   it('refreshes shared session facts when replay rain changes lap classification', () => {
     db.reclassifyStoredSessions({ ids: [session.id] });
-    const read = () => rawDb(db).prepare('SELECT clean_laps_count,driving_time_sum,distance_km FROM session_summary_facts WHERE session_id=?').get(session.id);
+    const read = () => rawDb(db).prepare('SELECT clean_laps_count,driving_time_seconds,distance_km FROM session_summary_facts WHERE session_id=?').get(session.id);
     const before = read();
     db.updateSessionMatchingReplay(session.id, replayLink);
     const after = read();
     expect(after).not.toEqual(before);
-    const projected = rawDb(db).prepare('SELECT clean_laps_count,driving_time_sum FROM session_drivers WHERE session_id=? AND is_player_driver=1').get(session.id);
-    expect(after).toMatchObject(projected as { clean_laps_count: number; driving_time_sum: number });
+    const projected = rawDb(db).prepare('SELECT clean_laps_count,driving_time_seconds FROM session_drivers WHERE session_id=? AND is_player=1').get(session.id);
+    expect(after).toMatchObject(projected as { clean_laps_count: number; driving_time_seconds: number });
     db.rejectSessionReplayLink(session.id, replayLink, 'layout');
     expect(read()).toEqual(before);
   });
@@ -156,7 +156,7 @@ describe('replay rain on the laps of a linked session', () => {
     const player = rated.drivers[0];
     player.laps.forEach((l) => Object.assign(l, { paceCategory: 'Offline', pacePercentage: l.lapTime === 130 ? 110 : 101.5 }));
     Object.assign(player.laps[4], { paceCategory: 'Good', pacePercentage: 103 });
-    Object.assign(player, { bestLapNum: 5, bestLapTime: 130, bestLapPaceCategory: 'Good', bestLapPacePercentage: 103 });
+    Object.assign(player, { bestLapNumber: 5, bestLapTime: 130, bestLapPaceCategory: 'Good', bestLapPacePercentage: 103 });
     rated.playerDriver = player;
     db.upsertSession(rated, 'C:\\results\\17R1.xml', 1, 1);
 

@@ -3,12 +3,13 @@ import { Zap } from 'lucide-react';
 import { SummaryCard, RankedList } from './DashboardSummaryParts.js';
 import { getPaceCategoryStyle } from '../../utils/paceCategoryStyles.js';
 import { PaceCategory } from '../../../shared/types/index.js';
+import { formatTime } from '../../../shared/domain/formatters.js';
 
 export interface BestRefLapInfo {
   sessionId?: string;
   percentage: number;
   category: PaceCategory;
-  lapTimeString: string;
+  lapTime: number;
   track: string;
   car: string;
 }
@@ -42,7 +43,7 @@ export const BenchmarkLapsSummaryCard: React.FC<BenchmarkLapsSummaryCardProps> =
         return {
           key: item.sessionId || item.track,
           name: item.track,
-          detail: `${item.car} · ${item.lapTimeString}`,
+          detail: `${item.car} · ${formatTime(item.lapTime)}`,
           value: `${item.percentage.toFixed(1)}%`,
           marker: { className: pace.textClass, label: pace.label },
           title: `Open session details for ${item.track}`,

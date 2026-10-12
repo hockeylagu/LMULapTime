@@ -2,6 +2,7 @@ import React from 'react';
 import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import { LapStatusBadge } from '../../common/LapStatusBadge.js';
 import { LMU_COLORS, SECTOR_COLORS, TELEMETRY_COLORS, WHEEL_CORNER_COLORS } from '../../../utils/themeColors.js';
+import { formatTime } from '../../../../shared/domain/formatters.js';
 
 /** The series' line color as a short stroke before its value; the text stays white so it reads on the dark card. */
 const Swatch: React.FC<{ color: string; dashed?: boolean }> = ({ color, dashed }) => (
@@ -13,17 +14,16 @@ const Swatch: React.FC<{ color: string; dashed?: boolean }> = ({ color, dashed }
 );
 
 export interface SessionTelemetryPointData {
-  lapNum?: string;
+  lapLabel?: string;
   isPitStop?: boolean;
   isOutLap?: boolean;
   isValid?: boolean;
   isInferred?: boolean;
-  lapTimeString?: string;
+  lapTime?: number | null;
   avgLapTime?: number;
-  avgLapTimeString?: string;
-  s1String?: string;
-  s2String?: string;
-  s3String?: string;
+  s1?: number | null;
+  s2?: number | null;
+  s3?: number | null;
   topSpeed?: number | null;
   twFL?: number | null;
   twFR?: number | null;
@@ -72,7 +72,7 @@ export const SessionTelemetryTooltip: React.FC<SessionTelemetryTooltipProps> = (
         isPlayer: Boolean(d.isPlayer || (session.playerDriver && d.name === session.playerDriver.name)),
         isPit: Boolean(data[`${d.name}_isPit`]),
         isOutLap: Boolean(data[`${d.name}_isOutLap`]),
-        lapTime: data[`${d.name}_lapTime`] as string | undefined,
+        lapTime: data[`${d.name}_lapTime`] as number | null | undefined,
       }))
       .filter((d) => d.pos !== undefined && d.pos > 0)
       .sort((a, b) => (a.pos || 999) - (b.pos || 999));
@@ -80,7 +80,7 @@ export const SessionTelemetryTooltip: React.FC<SessionTelemetryTooltipProps> = (
     return (
       <div className="bg-lmu-card/95 backdrop-blur border border-lmu-border p-3 rounded-xl shadow-xl text-xs space-y-2 font-mono min-w-[240px]">
         <div className="font-bold text-white flex items-center justify-between border-b border-lmu-border/60 pb-1 font-sans">
-          <span>{data.lapNum}</span>
+          <span>{data.lapLabel}</span>
           <span className="text-[10px] text-lmu-muted uppercase tracking-wider font-semibold">
             {selectedDriver.carClass || 'Class'} Standings
           </span>
@@ -105,7 +105,7 @@ export const SessionTelemetryTooltip: React.FC<SessionTelemetryTooltipProps> = (
                 ) : d.isOutLap ? (
                   <LapStatusBadge isOutLap size="xs" />
                 ) : (
-                  <span>{d.lapTime || '-'}</span>
+                  <span>{d.lapTime ? formatTime(d.lapTime) : '-'}</span>
                 )}
               </div>
             </div>
@@ -118,7 +118,7 @@ export const SessionTelemetryTooltip: React.FC<SessionTelemetryTooltipProps> = (
   return (
     <div className="bg-lmu-card/95 backdrop-blur border border-lmu-border p-3 rounded-xl shadow-xl text-xs space-y-1 font-mono">
       <p className="font-bold text-white border-b border-lmu-border/60 pb-1 flex items-center justify-between gap-3 font-sans">
-        <span>{data.lapNum}</span>
+        <span>{data.lapLabel}</span>
         {data.isPitStop ? (
           <LapStatusBadge isPitStop size="xs" />
         ) : data.isOutLap ? (
@@ -130,17 +130,17 @@ export const SessionTelemetryTooltip: React.FC<SessionTelemetryTooltipProps> = (
       {activeChartMetric === 'lapTime' && (
         <>
           <p className="text-white font-bold">
-            <Swatch color={LMU_COLORS.accent} />Lap Time: {data.lapTimeString || '--:--.---'}
+            <Swatch color={LMU_COLORS.accent} />Lap Time: {formatTime(data.lapTime)}
             {data.isInferred && <span className="text-lmu-warn-soft font-normal ml-1">(est)</span>}
           </p>
-          {data.avgLapTime && <p className="text-lmu-text-soft"><Swatch color={LMU_COLORS.muted} dashed />Session Avg: {data.avgLapTimeString}</p>}
+          {data.avgLapTime && <p className="text-lmu-text-soft"><Swatch color={LMU_COLORS.muted} dashed />Session Avg: {formatTime(data.avgLapTime)}</p>}
         </>
       )}
       {activeChartMetric === 'sectors' && (
         <>
-          <p className="text-white"><Swatch color={SECTOR_COLORS.s1} />S1: {data.s1String}</p>
-          <p className="text-white"><Swatch color={SECTOR_COLORS.s2} />S2: {data.s2String}</p>
-          <p className="text-white"><Swatch color={SECTOR_COLORS.s3} />S3: {data.s3String}</p>
+          <p className="text-white"><Swatch color={SECTOR_COLORS.s1} />S1: {formatTime(data.s1)}</p>
+          <p className="text-white"><Swatch color={SECTOR_COLORS.s2} />S2: {formatTime(data.s2)}</p>
+          <p className="text-white"><Swatch color={SECTOR_COLORS.s3} />S3: {formatTime(data.s3)}</p>
         </>
       )}
       {activeChartMetric === 'topSpeed' && (

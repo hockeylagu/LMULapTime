@@ -176,7 +176,7 @@ describe('TrackCircuitLayout', () => {
         setSelectedClass={setSelectedClass}
         selectedCarModel="All"
         setSelectedCarModel={setSelectedCarModel}
-        availableCarModels={['Ferrari 499P']}
+        availableCarTypes={['Ferrari 499P']}
       />
     );
 

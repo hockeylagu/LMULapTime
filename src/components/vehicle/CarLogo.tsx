@@ -5,7 +5,6 @@ export type CarLogoSize = 'xs' | 'sm' | 'md' | 'lg';
 
 export interface CarLogoProps {
   carType?: string | null;
-  carModel?: string | null;
   size?: CarLogoSize;
   className?: string;
   title?: string;
@@ -23,14 +22,13 @@ const SIZE_CLASSES: Record<CarLogoSize, string> = {
 
 export const CarLogo: React.FC<CarLogoProps> = ({
   carType,
-  carModel,
   size = 'sm',
   className = '',
   title,
   fallback,
   decorative = false,
 }) => {
-  const target = carType || carModel;
+  const target = carType;
   const { getLogoSvg } = useVehicleLogos();
   const match = getLogoSvg(target);
 

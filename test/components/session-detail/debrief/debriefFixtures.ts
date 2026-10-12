@@ -19,15 +19,15 @@ export function cornerLap(stepSecInCorner: number): ReplayTrajectoryPoint[] {
   });
 }
 
-function lap(lapNum: number, lapTime: number) {
-  return { lapNum, lapTime, lapTimeString: '', position: 3, s1: null, s2: null, s3: null, topSpeed: null, fCompound: '', rCompound: '', isPitStop: false, isValid: true };
+function lap(lapNumber: number, lapTime: number) {
+  return { lapNumber, lapTime, position: 3, s1: null, s2: null, s3: null, topSpeed: null, fCompound: '', rCompound: '', isPitStop: false, isValid: true };
 }
 
 export const me = {
   name: ME,
   carType: 'Peugeot 9x8',
   carClass: 'Hyper',
-  bestLapNum: 20,
+  bestLapNumber: 20,
   bestLapTime: 95.894,
   laps: [lap(1, 106.0), lap(16, 95.961), lap(18, 96.088), lap(20, 95.894)],
 } as unknown as DriverData;
@@ -36,13 +36,13 @@ export const session = {
   id: 'R1',
   trackVenue: 'Daytona International Speedway',
   trackCourse: 'Road Course',
-  matchingReplayFile: { name: MY_REPLAY, path: '', sizeBytes: 0 },
+  matchingReplayFile: { name: MY_REPLAY, path: '', fileSizeBytes: 0 },
   drivers: [me],
 } as unknown as DetailedSession;
 
 export const referenceLap = {
-  id: 'ref', sessionId: 'Q1', driverOrdinal: 0, lapOrdinal: 0, sessionType: 'Qualifying', dateString: '2026/08/05 13:23:53', driverName: 'Davide Catani',
-  carType: 'Peugeot 9x8', carClass: 'Hyper', lapNum: 3, lapTime: 93.974, lapTimeString: '1:33.974',
+  id: 'ref', sessionId: 'Q1', driverOrdinal: 0, lapOrdinal: 0, sessionType: 'Qualifying', timeString: '2026/08/05 13:23:53', driverName: 'Davide Catani',
+  carType: 'Peugeot 9x8', carClass: 'Hyper', lapNumber: 3, lapTime: 93.974, 
   s1: null, s2: null, s3: null, topSpeed: null, isValid: true, matchingReplayFile: REF_REPLAY,
 } as ComparableLap;
 
@@ -51,7 +51,7 @@ export const referenceLap = {
  * It is 0.24 s faster than the analysed lap through the corner; Catani's lap is 0.4 s faster.
  */
 export const realisticLap = {
-  ...referenceLap, id: 'near', lapOrdinal: 1, driverName: 'Near Rival', lapNum: 5, lapTime: 95.41, lapTimeString: '1:35.410',
+  ...referenceLap, id: 'near', lapOrdinal: 1, driverName: 'Near Rival', lapNumber: 5, lapTime: 95.41, 
 } as ComparableLap;
 
 const NO_TRAFFIC: ReplayTrafficResponse = { available: false, reason: 'This layout has no track centreline to place the cars on.', laps: [] };

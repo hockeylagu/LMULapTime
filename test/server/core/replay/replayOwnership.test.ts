@@ -26,7 +26,9 @@ describe('retained replay identity reconciliation', () => {
     expect(resolveReplayPrimarySlot(meta)).toBe(1);
     expect(resolveReplayPrimarySlot(meta, ' ANN ')).toBe(2);
     expect(resolveReplayPrimarySlot(meta, 'Missing')).toBeUndefined();
-    expect(resolveReplayPrimarySlot(meta, '')).toBeUndefined();
+    // A blank configured name is no name: the marked player is used.
+    expect(resolveReplayPrimarySlot(meta, '')).toBe(1);
+    expect(resolveReplayPrimarySlot(meta, '  ')).toBe(1);
     meta.drivers.push({ name: 'Ann', slot: 3 });
     expect(resolveReplayPrimarySlot(meta, 'Ann')).toBeUndefined();
     meta.drivers[1].isPlayer = true;

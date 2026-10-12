@@ -1,3 +1,4 @@
+import { playerEntry } from '../../../../shared/domain/leaderboard.js';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { LeaderboardSection, LeaderboardSectionProps } from '../../../../src/components/leaderboard/board/LeaderboardSection.js';
@@ -38,6 +39,7 @@ describe('LeaderboardSection', () => {
     expect(within(table).queryByText('Driver 20')).not.toBeInTheDocument();
     expect(within(table).getByText('Me')).toBeInTheDocument();
     expect(within(table).getByText('100% Alien')).toBeInTheDocument();
+    expect(within(table).getByRole('row', { name: /Alien pace, 100%/ })).toBeInTheDocument();
   });
 
   it('shows everyone on demand when expanded', () => {
@@ -96,7 +98,7 @@ describe('LeaderboardSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Best S2' }));
     expect(screen.getByRole('columnheader', { name: /Best S2/ })).toHaveAttribute('aria-sort', 'ascending');
     expect(screen.getByRole('columnheader', { name: /Best Lap/ })).not.toHaveAttribute('aria-sort');
-    expect(within(screen.getByRole('table')).queryByText(/Alien pace/)).not.toBeInTheDocument();
+    expect(within(screen.getByRole('table')).queryByRole('row', { name: /Alien pace/ })).not.toBeInTheDocument();
   });
 
   it('rates every best lap against the benchmark, and marks the best sectors in their sector colours', () => {
@@ -127,8 +129,8 @@ describe('LeaderboardSection', () => {
 describe('rankForTime', () => {
   it('ranks a time among the other drivers', () => {
     const b = board(10, 8);
-    expect(rankForTime(b, 100.25, b.player!)).toBe(4);
-    expect(rankForTime(b, 99, b.player!)).toBe(1);
+    expect(rankForTime(b, 100.25, playerEntry(b)!)).toBe(4);
+    expect(rankForTime(b, 99, playerEntry(b)!)).toBe(1);
   });
 });
 

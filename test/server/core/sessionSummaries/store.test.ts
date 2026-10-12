@@ -7,16 +7,16 @@ import { restoreStoredSessionLinks, upsertSession } from '../../../../server/cor
 import { backfillSessionSummaries, isSessionSummaryReady, persistSessionProjection, readCompactSession } from '../../../../server/core/sessionSummaries/store.js';
 import { SESSION_SUMMARY_PROJECTION_VERSION } from '../../../../shared/types/sessionSummaries.js';
 
-const lap: LapData = { lapNum: 1, position: 1, lapTime: 90, lapTimeString: '1:30', s1: 30, s2: 30, s3: 30,
+const lap: LapData = { lapNumber: 1, position: 1, lapTime: 90, s1: 30, s2: 30, s3: 30,
   topSpeed: 250, fCompound: 'Dry', rCompound: 'Dry', isPitStop: false, isValid: true };
 const session: DetailedSession = { id: 'one', filename: 'one.xml', filePath: 'one.xml', trackVenue: 'Monza', trackCourse: 'GP',
   trackEvent: '', trackLengthMeters: 5793, timeString: 'date', timestamp: 1, sessionType: 'Race', sessionName: 'R1', driversCount: 1,
   playerDriver: { name: 'Driver', carType: 'Car', carClass: 'GT3', carNumber: '1', teamName: '', isPlayer: true, position: 1,
-    classPosition: 1, bestLapTime: 90, bestLapTimeString: '1:30', bestLapNum: 1, bestS1: 30, bestS2: 30, bestS3: 30,
-    theoreticalBest: 90, theoreticalBestString: '1:30', lapsCount: 1, laps: [lap] },
+    classPosition: 1, bestLapTime: 90, bestLapNumber: 1, bestS1: 30, bestS2: 30, bestS3: 30,
+    theoreticalBest: 90, declaredLapsCount: 1, laps: [lap] },
   drivers: [{ name: 'Driver', carType: 'Car', carClass: 'GT3', carNumber: '1', teamName: '', isPlayer: true, position: 1,
-    classPosition: 1, bestLapTime: 90, bestLapTimeString: '1:30', bestLapNum: 1, bestS1: 30, bestS2: 30, bestS3: 30,
-    theoreticalBest: 90, theoreticalBestString: '1:30', lapsCount: 1, laps: [lap] }] };
+    classPosition: 1, bestLapTime: 90, bestLapNumber: 1, bestS1: 30, bestS2: 30, bestS3: 30,
+    theoreticalBest: 90, declaredLapsCount: 1, laps: [lap] }] };
 
 describe('session summary persistence', () => {
   it('writes source and projection atomically and serves a compact page without nested laps', () => {
@@ -24,7 +24,7 @@ describe('session summary persistence', () => {
     initDbSchema(db);
     upsertSession(db, session, 'one.xml', 1, 10);
     const compact = readCompactSession(db, 'one');
-    expect(compact?.playerDriver).toMatchObject({ cleanLapsCount: 1, completedLapsCount: 1 });
+    expect(compact?.playerDriver).toMatchObject({ cleanLapsCount: 1, lapsCount: 1 });
     expect(compact?.playerDriver).not.toHaveProperty('laps');
     expect(db.prepare('SELECT COUNT(*) AS count FROM session_laps WHERE leaderboard_eligible = 1').get()).toMatchObject({ count: 1 });
     expect(querySessionPage(db, { page: 1, pageSize: 10, track: 'monza_gp' }).total).toBe(1);
@@ -126,8 +126,8 @@ describe('session summary persistence', () => {
       expect(isSessionSummaryReady(db)).toBe(true);
       expect(db.prepare('SELECT id,source_revision FROM sessions ORDER BY id').all()).toEqual(source);
       expect(db.prepare('SELECT projection_version FROM sessions WHERE id=?').get('one')).toEqual({ projection_version: SESSION_SUMMARY_PROJECTION_VERSION });
-      expect(db.prepare('SELECT laps_count,distance_km,driving_time_sum FROM session_summary_facts WHERE session_id=?').get('one'))
-        .toEqual({ laps_count: 1, distance_km: 5.793, driving_time_sum: 90 });
+      expect(db.prepare('SELECT laps_count,distance_km,driving_time_seconds FROM session_summary_facts WHERE session_id=?').get('one'))
+        .toEqual({ laps_count: 1, distance_km: 5.793, driving_time_seconds: 90 });
     } finally { db.close(); }
   });
 
@@ -143,21 +143,21 @@ describe('session summary persistence', () => {
       db.exec("CREATE TRIGGER reject_aggregate BEFORE INSERT ON session_summary_facts BEGIN SELECT RAISE(ABORT,'aggregate rejected'); END;");
       expect(() => upsertSession(db, session, 'one.xml', 3, 1)).toThrow('aggregate rejected');
       expect(db.prepare('SELECT distance_km FROM session_summary_facts').get()).toEqual({ distance_km: 6 });
-      expect(db.prepare('SELECT file_mtime FROM sessions').get()).toEqual({ file_mtime: 2 });
+      expect(db.prepare('SELECT file_mtime_ms FROM sessions').get()).toEqual({ file_mtime_ms: 2 });
     } finally { db.close(); }
   });
 
   it('keeps the stored replay link and DuckDB file when a session is parsed again', () => {
     const db = new Database(':memory:');
     initDbSchema(db);
-    const link = { name: 'Monza R1.Vcr', path: 'Monza R1.Vcr', sizeBytes: 1 };
-    upsertSession(db, { ...session, matchingReplayFile: link, duckdbFilename: 'monza.duckdb', hasDuckDbTelemetry: true }, 'one.xml', 1, 1);
+    const link = { name: 'Monza R1.Vcr', path: 'Monza R1.Vcr', fileSizeBytes: 1 };
+    upsertSession(db, { ...session, matchingReplayFile: link, duckdbFilename: 'monza.duckdb' }, 'one.xml', 1, 1);
     const reparsed: DetailedSession = { ...session };
 
     restoreStoredSessionLinks(db, reparsed);
 
     expect(reparsed.matchingReplayFile).toMatchObject(link);
-    expect(reparsed).toMatchObject({ duckdbFilename: 'monza.duckdb', hasDuckDbTelemetry: true });
+    expect(reparsed).toMatchObject({ duckdbFilename: 'monza.duckdb' });
     db.close();
   });
 });

@@ -23,9 +23,9 @@ export const DriverRaceStandingsRow: React.FC<DriverRaceStandingsRowProps> = ({ 
   const grid = isMultiClass && d.classGridPosition ? d.classGridPosition : d.gridPosition;
   const delta =
     isMultiClass && d.classGridPosition && d.classPosition ? d.classGridPosition - d.classPosition : d.positionGain;
-  const incidents = d.totalIncidents ?? 0;
-  const penalties = d.totalPenalties ?? 0;
-  const trackLimits = d.totalTrackLimits ?? 0;
+  const incidents = d.incidents?.length ?? 0;
+  const penalties = d.penalties?.length ?? 0;
+  const trackLimits = d.trackLimits?.length ?? 0;
   const lapsLed = d.lapsLedCount ?? 0;
 
   return (
@@ -45,7 +45,7 @@ export const DriverRaceStandingsRow: React.FC<DriverRaceStandingsRowProps> = ({ 
         />
         <SummaryStat label="Peak" value={d.highestPosition ? `P${d.highestPosition}` : '-'} hint="best position" />
         <SummaryStat label="Laps led" value={lapsLed} valueClass={lapsLed > 0 ? 'text-lmu-gold' : 'text-white'} />
-        <SummaryStat label="Pit stops" value={d.pitStopsCount ?? 0} />
+        <SummaryStat label="Pit stops" value={d.declaredPitStopsCount ?? 0} />
         <SummaryStat
           label="Incidents"
           value={incidents}

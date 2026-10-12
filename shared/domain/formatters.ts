@@ -71,12 +71,17 @@ export function parseTimeStringToSeconds(timeStr: string | number): number | nul
   return isNaN(val) || val <= 0 ? null : val;
 }
 
+/** A player's laps: the completed laps of a session card, the declared laps of a detailed session's driver. */
+export function driverLapsCount(driver: { lapsCount: number } | { declaredLapsCount: number }): number {
+  return 'lapsCount' in driver ? driver.lapsCount : driver.declaredLapsCount;
+}
+
 export function isSessionEmpty(session: {
-  playerDriver?: { lapsCount?: number; bestLapTime?: number | null };
+  playerDriver?: ({ lapsCount: number } | { declaredLapsCount: number }) & { bestLapTime?: number | null };
   driversCount?: number;
 }): boolean {
   if (!session.playerDriver) return (session.driversCount ?? 0) === 0;
-  return (session.playerDriver.lapsCount ?? 0) === 0 || session.playerDriver.bestLapTime === null;
+  return driverLapsCount(session.playerDriver) === 0 || session.playerDriver.bestLapTime === null;
 }
 
 export function getDisplayTrackName(venue: string = '', course: string = ''): string {
@@ -184,7 +189,6 @@ export function getSessionTypeWeight(sessionType?: string, sessionName?: string)
 
 interface SessionComparable {
   timeString?: string;
-  dateString?: string;
   timestamp?: number;
   sessionType?: string;
   sessionName?: string;
@@ -200,8 +204,8 @@ export function compareSessions(
   b: SessionComparable,
   direction: 'desc' | 'asc' = 'desc'
 ): number {
-  const timeA = a.timestamp || parseDateStringToTimestamp(a.timeString || a.dateString);
-  const timeB = b.timestamp || parseDateStringToTimestamp(b.timeString || b.dateString);
+  const timeA = a.timestamp || parseDateStringToTimestamp(a.timeString);
+  const timeB = b.timestamp || parseDateStringToTimestamp(b.timeString);
 
   // If timestamps differ by more than 1 second, sort by timestamp
   if (Math.abs(timeA - timeB) >= 1000) {
@@ -300,47 +304,51 @@ export function compareSessionsBySortOption<T extends SessionComparable>(
 }
 
 export interface DriverLapReference {
-  lapNum: number;
+  lapNumber: number;
   lapTime: number | null;
   isValid?: boolean;
 }
 
 export interface DriverLapSummary {
-  bestLapNum?: number | null;
+  bestLapNumber?: number | null;
   bestLapTime?: number | null;
   laps?: DriverLapReference[];
 }
 
 /**
  * Resolves the best lap number for a driver profile or session summary.
- * Prioritizes explicitly known bestLapNum, then the fastest valid lap,
+ * Prioritizes explicitly known bestLapNumber, then the fastest valid lap,
  * then any completed lap, and finally defaults to 1.
  */
 export function getBestLapNumber(driver?: DriverLapSummary | null): number {
   if (!driver) return 1;
-  if (typeof driver.bestLapNum === 'number' && driver.bestLapNum > 0) {
-    return driver.bestLapNum;
+  if (typeof driver.bestLapNumber === 'number' && driver.bestLapNumber > 0) {
+    return driver.bestLapNumber;
   }
   const laps = driver.laps;
   if (laps && laps.length > 0) {
     if (typeof driver.bestLapTime === 'number' && driver.bestLapTime > 0) {
       const matchValid = laps.find(l => l.isValid && l.lapTime === driver.bestLapTime);
-      if (matchValid) return matchValid.lapNum;
+      if (matchValid) return matchValid.lapNumber;
       const matchAny = laps.find(l => l.lapTime === driver.bestLapTime);
-      if (matchAny) return matchAny.lapNum;
+      if (matchAny) return matchAny.lapNumber;
     }
     const validLaps = laps.filter(l => l.isValid && typeof l.lapTime === 'number' && l.lapTime > 0);
     if (validLaps.length > 0) {
       const best = validLaps.reduce((min, cur) => ((cur.lapTime as number) < (min.lapTime as number) ? cur : min));
-      return best.lapNum;
+      return best.lapNumber;
     }
     const completedLaps = laps.filter(l => typeof l.lapTime === 'number' && l.lapTime > 0);
     if (completedLaps.length > 0) {
       const best = completedLaps.reduce((min, cur) => ((cur.lapTime as number) < (min.lapTime as number) ? cur : min));
-      return best.lapNum;
+      return best.lapNumber;
     }
-    return laps[0].lapNum || 1;
+    return laps[0].lapNumber || 1;
   }
   return 1;
 }
 
+/** The time a pit stop cost against the driver's clean lap pace, e.g. "+13.4s". */
+export function formatPitStopDuration(seconds: number): string {
+  return `+${seconds.toFixed(1)}s`;
+}

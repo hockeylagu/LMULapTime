@@ -66,10 +66,10 @@ function LeaderboardRoute({ onSelectSession }: LeaderboardRouteProps) {
       initialTrack={searchParams.get('track') || undefined}
       initialCarClass={searchParams.get('carClass') || undefined}
       initialSessionId={searchParams.get('sessionId') || undefined}
-      initialLapNum={searchParams.get('lapNum') ? parseInt(searchParams.get('lapNum')!, 10) : undefined}
+      initialLapNumber={searchParams.get('lapNumber') ? parseInt(searchParams.get('lapNumber')!, 10) : undefined}
       initialCompareSessionId={searchParams.get('compareSessionId') || undefined}
       initialCompareDriver={searchParams.get('compareDriver') || undefined}
-      initialCompareLapNum={searchParams.get('compareLapNum') ? parseInt(searchParams.get('compareLapNum')!, 10) : undefined}
+      initialCompareLapNumber={searchParams.get('compareLapNumber') ? parseInt(searchParams.get('compareLapNumber')!, 10) : undefined}
     />
   );
 }

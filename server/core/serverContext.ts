@@ -90,7 +90,6 @@ export class ServerContext {
     checked: false,
     completedAt: null,
     refreshed: false,
-    updatedCount: 0,
     diff: null,
     error: null,
   };
@@ -199,15 +198,8 @@ export class ServerContext {
   /** Sets the session's main DuckDB file from the stored ownership, and stores it when it changed. */
   private applySessionTelemetry(session: DetailedSession): void {
     const filename = TelemetryLinks.load(this.sessionDb, session.id).forSession(session);
-    session.hasDuckDbTelemetry = Boolean(filename);
     if (filename) session.duckdbFilename = filename;
     else delete session.duckdbFilename;
-    const replayLink = session.matchingReplayFile;
-    if (replayLink) {
-      replayLink.hasDuckDbTelemetry = Boolean(filename);
-      if (filename) replayLink.duckdbFilename = filename;
-      else delete replayLink.duckdbFilename;
-    }
     if (typeof this.sessionDb.updateSessionTelemetryFile === 'function') this.sessionDb.updateSessionTelemetryFile(session.id, filename);
   }
 
@@ -456,7 +448,6 @@ export class ServerContext {
       checked: false,
       completedAt: null,
       refreshed: false,
-      updatedCount: 0,
       diff: null,
       error: null,
     };
@@ -466,7 +457,6 @@ export class ServerContext {
         .then((result) => {
           this.referenceLaptimeRefreshStatus.refreshed = result.refreshed;
           this.referenceLaptimeRefreshStatus.diff = result.diff;
-          this.referenceLaptimeRefreshStatus.updatedCount = result.diff?.updatedCount || 0;
         })
         .catch((error: unknown) => {
           this.referenceLaptimeRefreshStatus.error = error instanceof Error ? error.message : String(error);

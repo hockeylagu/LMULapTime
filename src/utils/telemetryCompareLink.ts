@@ -4,7 +4,7 @@ export interface TelemetryLapRef {
   driverOrdinal: number;
   lapOrdinal: number;
   driverName?: string;
-  lapNum?: number;
+  lapNumber?: number;
 }
 
 const BASELINE_PARAMS = ['baselineSessionId', 'baselineDriverOrdinal', 'baselineLapOrdinal', 'compareDriver'];

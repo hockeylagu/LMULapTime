@@ -1,4 +1,5 @@
 import type { Leaderboard, LeaderboardEntry, RivalKind, RivalStatus, RivalTarget } from '../types/leaderboard.js';
+import { playerEntry } from './leaderboard.js';
 
 /**
  * The rival system: a small, attainable step at a time. The rival is the real driver ahead whose
@@ -20,7 +21,7 @@ const NO_TELEMETRY_PENALTY = 0.1;
 
 /** The driver to chase next, or null when nobody ahead is within the window. */
 export function pickRivalEntry(board: Leaderboard, exclude: ReadonlySet<string> = new Set()): LeaderboardEntry | null {
-  const player = board.player;
+  const player = playerEntry(board);
   if (!player) return null;
   const best = player.bestLap.lapTime;
   let pick: LeaderboardEntry | null = null;
@@ -67,7 +68,7 @@ export interface RivalResolution {
 }
 
 function newTarget(board: Leaderboard, exclude: ReadonlySet<string>, now: number): NewRivalTarget | null {
-  const player = board.player;
+  const player = playerEntry(board);
   if (!player) return null;
   const entry = pickRivalEntry(board, exclude);
   const startTime = player.bestLap.lapTime;
@@ -96,7 +97,7 @@ export function resolveRival(
   now: number
 ): RivalResolution {
   const resolution: RivalResolution = { beaten: null, retimed: null, replaced: null, created: null, active };
-  const player = board.player;
+  const player = playerEntry(board);
   if (!player) return resolution;
 
   let current = active;
@@ -139,7 +140,7 @@ export function resolveRival(
 
 /** A target on a driver the player chose, when that driver is ahead; null otherwise. */
 export function pinnedTarget(board: Leaderboard, driverName: string, now: number): NewRivalTarget | null {
-  const player = board.player;
+  const player = playerEntry(board);
   const entry = board.entries.find((e) => e.driverName === driverName && !e.isPlayer);
   if (!player || !entry || entry.bestLap.lapTime >= player.bestLap.lapTime) return null;
   return {
@@ -163,6 +164,11 @@ export function rivalProgress(target: RivalTarget, playerBest: number): { gap: n
 /** Sessions shown in the gap trend. */
 export const RIVAL_TREND_SESSIONS = 6;
 
+/** The rival driver's line on the board (their lap, replay and sectors); null for a ghost or a driver off the board. */
+export function rivalEntryOf(board: Pick<Leaderboard, 'entries'>, rival: RivalTarget | null): LeaderboardEntry | null {
+  return rival?.kind === 'driver' ? board.entries.find((entry) => entry.driverName === rival.driverName) ?? null : null;
+}
+
 /** The rival status the page shows, from the resolved target and the player's history here. */
 export function describeRival(
   board: Leaderboard,
@@ -170,15 +176,13 @@ export function describeRival(
   beaten: RivalTarget[],
   sessionBests: Array<{ sessionId: string; sessionName: string; timestamp: number; best: number }>
 ): RivalStatus {
-  const player = board.player;
+  const player = playerEntry(board);
   if (!player || !active) {
-    return { rival: active, rivalEntry: null, gap: null, progress: null, theoreticalGap: null, beaten, nextUp: [], trend: [] };
+    return { rival: active, gap: null, progress: null, theoreticalGap: null, beaten, nextUp: [], trend: [] };
   }
   const { gap, progress } = rivalProgress(active, player.bestLap.lapTime);
-  const rivalEntry = active.kind === 'driver' ? board.entries.find((e) => e.driverName === active.driverName) ?? null : null;
   return {
     rival: active,
-    rivalEntry,
     gap,
     progress,
     theoreticalGap: player.theoreticalBest !== null ? Number((player.theoreticalBest - active.targetTime).toFixed(3)) : null,

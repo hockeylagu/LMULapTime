@@ -12,7 +12,7 @@ import { driver, lap, session } from './builders.js';
 const initialLink = {
   name: 'Spa_R1.Vcr',
   path: 'C:/Replays/Spa_R1.Vcr',
-  sizeBytes: 1234567,
+  fileSizeBytes: 1234567,
   eventTitle: 'Spa 6h',
   splitNo: 1,
   eventType: 'Race',
@@ -49,10 +49,9 @@ function buildTestSession(id: string, overrides: Partial<DetailedSession> = {}):
     isPlayer: true,
     carClass: 'Hyper',
     carType: 'Ferrari 499P',
-    bestLapNum: 1,
+    bestLapNumber: 1,
     bestLapTime: 100,
     avgLapTime: 101.5,
-    avgLapTimeString: '1:41.500',
   });
 
   const aiLaps = [
@@ -64,10 +63,9 @@ function buildTestSession(id: string, overrides: Partial<DetailedSession> = {}):
     isPlayer: false,
     carClass: 'Hyper',
     carType: 'Toyota GR010',
-    bestLapNum: 1,
+    bestLapNumber: 1,
     bestLapTime: 105,
     avgLapTime: 106,
-    avgLapTimeString: '1:46.000',
   });
 
   return session([player, ai], {
@@ -162,8 +160,8 @@ describe('Phase 3a targeted updates', () => {
     const writeSpy = vi.spyOn(writer, 'writeSessionRows');
 
     const archivedName = archiveReplacedRecording(raw(), initialLink.name, {
-      mtime: 1_780_000_500_000,
-      size: 9999999,
+      mtimeMs: 1_780_000_500_000,
+      fileSizeBytes: 9999999,
       metadata: makeReplayMetadata(1800),
     });
 
@@ -193,26 +191,19 @@ describe('Phase 3a targeted updates', () => {
 
     expect(writeSpy).not.toHaveBeenCalled();
 
-    // Both session and link reflect telemetry attachment
+    // The session carries the attachment; the link does not repeat it
     const loaded = db.getSessionById(s.id);
-    expect(loaded?.hasDuckDbTelemetry).toBe(true);
     expect(loaded?.duckdbFilename).toBe('spa_telemetry.duckdb');
-    expect(loaded?.matchingReplayFile?.hasDuckDbTelemetry).toBe(true);
-    expect(loaded?.matchingReplayFile?.duckdbFilename).toBe('spa_telemetry.duckdb');
+    expect(loaded?.matchingReplayFile).not.toHaveProperty('duckdbFilename');
 
     // Cards reflect it
     const cards = readSessionCards(raw(), [s.id]);
-    expect(cards[0]?.hasDuckDbTelemetry).toBe(true);
     expect(cards[0]?.duckdbFilename).toBe('spa_telemetry.duckdb');
-    expect(cards[0]?.matchingReplayFile?.hasDuckDbTelemetry).toBe(true);
-    expect(cards[0]?.matchingReplayFile?.duckdbFilename).toBe('spa_telemetry.duckdb');
 
     // Detach
     expect(db.updateSessionTelemetryFile(s.id, undefined)).toBe(true);
     const detached = db.getSessionById(s.id);
-    expect(detached?.hasDuckDbTelemetry).toBe(false);
     expect(detached?.duckdbFilename).toBeUndefined();
-    expect(detached?.matchingReplayFile?.hasDuckDbTelemetry).toBeUndefined();
   });
 
   it('updates conditions and derived projection metrics via targeted update', () => {
@@ -243,6 +234,6 @@ describe('Phase 3a targeted updates', () => {
 
     // Clean lap figures on session_drivers are preserved/recalculated
     const playerDriverRow = raw().prepare('SELECT * FROM session_drivers WHERE session_id = ? AND driver_ordinal = 0').get(s.id) as Record<string, unknown>;
-    expect(playerDriverRow.completed_laps_count).toBe(3);
+    expect(playerDriverRow.laps_count).toBe(3);
   });
 });

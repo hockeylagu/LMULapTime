@@ -29,7 +29,7 @@ HeaderRow,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest,Rec
       const entry = cache.entries['bahrainwec_gt3'];
       expect(entry.trackName).toBe('Bahrain (wec)');
       expect(entry.carClass).toBe('GT3');
-      expect(entry.target100Sec).toBeCloseTo(118.91);
+      expect(entry.targets.alienSec).toBeCloseTo(118.91);
       expect(entry.targets.competitiveSec).toBeCloseTo(120.10);
       expect(entry.fastestCar).toBe('Porsche 911 GT3');
       expect(entry.recordLaptimeSec).toBeCloseTo(118.85);
@@ -60,7 +60,7 @@ HeaderRow,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest,Rec
         }
       }
       const updated = structuredClone(cache.entries);
-      updated.spa_hyper.target100Sec = 100;
+      updated.spa_hyper.targets.alienSec = 100;
       expect(createPaceCalculator(updated)(120, 'Spa', 'GP', 'Hyper', 'Ferrari')?.percentage).toBe(120);
       expect(rate(120, 'Spa', 'GP', 'Hyper', 'Ferrari')?.percentage).toBe(100);
       expect(createPaceCalculator({})(120, 'Spa', 'GP', 'Hyper', 'Ferrari')).toBeNull();
@@ -133,7 +133,7 @@ HeaderRow,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest,Rec
       const retrieved = db.getReferenceLaptimesCache();
       expect(retrieved).not.toBeNull();
       expect(retrieved?.entriesCount).toBe(3);
-      expect(retrieved?.entries['bahrainwec_gt3']?.target100Sec).toBeCloseTo(118.91);
+      expect(retrieved?.entries['bahrainwec_gt3']?.targets.alienSec).toBeCloseTo(118.91);
 
       // Direct lookup from SQLite table
       const single = db.getReferenceLaptimeEntry('bahrainwec_gt3');
@@ -201,7 +201,6 @@ HeaderRow,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest,Rec
         trackName: 'Bahrain',
         carClass: 'GT3',
         patch: '1.3',
-        target100Sec: 120.0,
         targets: { alienSec: 120.0, competitiveSec: 121.2, goodSec: 122.4, goodMidpackSec: 123.6, midpackSec: 124.8, midpackTailSec: 126.0, tailEnderSec: 127.2, offlineSec: 128.4 },
       },
       spa_lmh: {
@@ -209,7 +208,6 @@ HeaderRow,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest,Rec
         trackName: 'Spa',
         carClass: 'Hyper',
         patch: '1.4',
-        target100Sec: 122.0,
         targets: { alienSec: 122.0, competitiveSec: 123.2, goodSec: 124.4, goodMidpackSec: 125.6, midpackSec: 126.8, midpackTailSec: 128.0, tailEnderSec: 129.2, offlineSec: 130.4 },
       },
       monza_lmp2: {
@@ -217,7 +215,6 @@ HeaderRow,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest,Rec
         trackName: 'Monza',
         carClass: 'LMP2',
         patch: '1.4',
-        target100Sec: 95.0,
         targets: { alienSec: 95.0, competitiveSec: 95.95, goodSec: 96.9, goodMidpackSec: 97.85, midpackSec: 98.8, midpackTailSec: 99.75, tailEnderSec: 100.7, offlineSec: 101.65 },
       },
     };
@@ -228,7 +225,6 @@ HeaderRow,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest,Rec
         bahrain_lmgt3: {
           ...oldEntries.bahrain_lmgt3,
           patch: '1.4+',
-          target100Sec: 119.5,
           targets: { ...oldEntries.bahrain_lmgt3.targets, alienSec: 119.5 },
         },
         // spa_lmh: unchanged -> NO CHANGE
@@ -240,26 +236,21 @@ HeaderRow,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest,Rec
           trackName: 'Le Mans',
           carClass: 'Hyper',
           patch: '1.4+',
-          target100Sec: 205.0,
           targets: { alienSec: 205.0, competitiveSec: 207.0, goodSec: 209.0, goodMidpackSec: 211.0, midpackSec: 213.0, midpackTailSec: 215.0, tailEnderSec: 217.0, offlineSec: 219.0 },
         },
       };
 
       const diff = computeReferenceBenchmarkDiff(oldEntries, newEntries);
-      expect(diff.hasChanges).toBe(true);
-      expect(diff.addedCount).toBe(1);
-      expect(diff.updatedCount).toBe(1);
-      expect(diff.removedCount).toBe(1);
+      expect([diff.added.length, diff.updated.length, diff.removed.length]).toEqual([1, 1, 1]);
 
       // Added checks
       expect(diff.added[0].trackName).toBe('Le Mans');
-      expect(diff.added[0].newAlienTimeString).toBe('3:25.000');
+      expect(diff.added[0].newAlienSec).toBe(205);
 
       // Updated checks
       expect(diff.updated[0].trackName).toBe('Bahrain');
-      expect(diff.updated[0].oldAlienTimeString).toBe('2:00.000');
-      expect(diff.updated[0].newAlienTimeString).toBe('1:59.500');
-      expect(diff.updated[0].diffSec).toBe(-0.5);
+      expect(diff.updated[0].oldAlienSec).toBe(120);
+      expect(diff.updated[0].newAlienSec).toBe(119.5);
       expect(diff.updated[0].oldPatch).toBe('1.3');
       expect(diff.updated[0].newPatch).toBe('1.4+');
 
@@ -267,12 +258,9 @@ HeaderRow,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest,Rec
       expect(diff.removed[0].trackName).toBe('Monza');
     });
 
-    it('returns hasChanges: false when benchmarks are identical', () => {
+    it('reports no added, updated or removed entries when benchmarks are identical', () => {
       const diff = computeReferenceBenchmarkDiff(oldEntries, { ...oldEntries });
-      expect(diff.hasChanges).toBe(false);
-      expect(diff.addedCount).toBe(0);
-      expect(diff.updatedCount).toBe(0);
-      expect(diff.removedCount).toBe(0);
+      expect([diff.added.length, diff.updated.length, diff.removed.length]).toEqual([0, 0, 0]);
     });
   });
 });

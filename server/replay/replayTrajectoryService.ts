@@ -43,7 +43,7 @@ export class ReplayTrajectoryService {
     const fullTrajectory = await this.replayRecordings.getFullTrajectory(filePath, replayName, {
       driverSlot,
       driverName,
-      lapNumber: recordingLap.lapNum,
+      lapNumber: recordingLap.lapNumber,
       playerName: configuredPlayer,
       metadata: rawMetadata,
     });
@@ -52,8 +52,6 @@ export class ReplayTrajectoryService {
     let trajectory: ReplayTrajectoryData = {
       ...fullTrajectory,
       source: 'vcr',
-      vcrRawPointsCount: fullTrajectory.rawPointsCount ?? fullTrajectory.points.length,
-      vcrRawSampleRateHz: fullTrajectory.rawSampleRateHz,
     };
 
     const metadata = composeReplayMetadata({
@@ -74,7 +72,7 @@ export class ReplayTrajectoryService {
       matchedSession,
       fullTrajectory,
       currentTrajectory: trajectory,
-      lapNumber: recordingLap.lapNum,
+      lapNumber: recordingLap.lapNumber,
     });
     trajectory = telemetryResult.trajectory;
 
@@ -113,7 +111,7 @@ export class ReplayTrajectoryService {
 
     const selectedSlot=trajectory.driverSlot ?? driverSlot;
     const selectedDriver=selectedSlot !== undefined ? metadata?.drivers.find(d=>d.slot===selectedSlot) : undefined;
-    trajectory.vehicleIdentity=selectedDriver ? {vehicleId:selectedDriver.vehicleId,carModel:selectedDriver.carModel,carClass:selectedDriver.carClass}:undefined;
+    trajectory.vehicleIdentity=selectedDriver ? {vehicleId:selectedDriver.vehicleId,carType:selectedDriver.carType,carClass:selectedDriver.carClass}:undefined;
     trajectory.vehicleData=selectedDriver ? dataPlugin.vehicle(selectedDriver) ?? undefined : undefined;
     trajectory.dataPluginRevision=dataPlugin.status.revision;
     trajectory.sessionId = matchedSession.id;

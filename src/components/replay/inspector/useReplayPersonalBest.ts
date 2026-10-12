@@ -1,3 +1,4 @@
+import { playerEntry } from '../../../../shared/domain/leaderboard.js';
 import { useEffect, useState } from 'react';
 import type { ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import type { LeaderboardLap } from '../../../../shared/types/leaderboard.js';
@@ -17,7 +18,7 @@ export function useReplayPersonalBest(metadata?: ReplayMetadata | null, trajecto
     if (!layoutKey || !carClass) return;
     const controller = new AbortController();
     loadLeaderboard({ layoutKey, carClass }, controller.signal).then(board => {
-      if (!controller.signal.aborted) setRecord({ key, lap: board.player?.bestLap ?? null });
+      if (!controller.signal.aborted) setRecord({ key, lap: playerEntry(board)?.bestLap ?? null });
     }).catch((error: unknown) => {
       if (!controller.signal.aborted && !isAbortError(error)) {
         setRecord({ key, lap: null, error: error instanceof Error ? error.message : 'Personal best unavailable' });

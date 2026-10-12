@@ -7,7 +7,7 @@ import type { DetailedSession } from '../../../../shared/types/index.js';
 const replayLink = {
   name: 'Bahrain Paddock Circuit P1 18.Vcr',
   path: 'C:\\replays\\Bahrain Paddock Circuit P1 18.Vcr',
-  sizeBytes: 6863306,
+  fileSizeBytes: 6863306,
   durationSec: 340.635,
 };
 

@@ -15,6 +15,7 @@ import type { DetailedSession } from '../../../shared/types/session.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import { linkClickHandler } from '../../utils/linkClick.js';
 import type { DashboardTrends } from '../../../shared/types/dashboard.js';
+import { formatTime } from '../../../shared/domain/formatters.js';
 
 export interface DashboardHeroProps {
   sessions: (SessionCard | DetailedSession)[];
@@ -65,7 +66,7 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
         </h2>
         {todayActivity && (
           <p className="text-xs text-lmu-muted shrink-0">
-            Last on track <span className="font-mono text-lmu-text-soft">{todayActivity.dateString}</span>
+            Last on track <span className="font-mono text-lmu-text-soft">{todayActivity.sessionDay}</span>
             {' · '}
             <span className="font-mono font-bold text-white">{todayActivity.sessionsCount}</span>{' '}
             {todayActivity.sessionsCount === 1 ? 'session' : 'sessions'}
@@ -127,7 +128,7 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
               <div className="flex flex-col">
                 <span className="text-[10px] uppercase tracking-wider text-lmu-muted">Best Lap</span>
                 <span className="text-[28px] leading-8 font-extrabold text-white tabular-nums mt-0.5">
-                  {latestOuting.bestLapTimeString || '--:--.---'}
+                  {formatTime(latestOuting.bestLapTime)}
                 </span>
               </div>
 
@@ -182,9 +183,9 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
                 sessionId={latestOuting.id}
                 hasDuckDb={Boolean(latestOuting.hasDuckDbTelemetry)}
                 to={`/telemetry?sessionId=${encodeURIComponent(latestOuting.id)}&driverOrdinal=${latestOuting.driverOrdinal}&lapOrdinal=${latestOuting.bestLapOrdinal}`}
-                onClick={() => onOpenReplay(latestOuting.id, latestOuting.bestLapNum ?? undefined)}
+                onClick={() => onOpenReplay(latestOuting.id, latestOuting.bestLapNumber ?? undefined)}
                 data-testid="hero-launch-replay-btn"
-                title={latestOuting.bestLapNum ? `Open telemetry for Best Lap (Lap ${latestOuting.bestLapNum})` : 'Open telemetry'}
+                title={latestOuting.bestLapNumber ? `Open telemetry for Best Lap (Lap ${latestOuting.bestLapNumber})` : 'Open telemetry'}
               />
             )}
             <Link

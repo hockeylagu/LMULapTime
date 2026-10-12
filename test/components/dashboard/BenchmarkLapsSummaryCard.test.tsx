@@ -8,25 +8,25 @@ describe('BenchmarkLapsSummaryCard', () => {
       sessionId: 's-1',
       percentage: 100.5,
       category: 'Alien',
-      lapTimeString: '1:30.500',
       track: 'Spa Francorchamps',
       car: 'Porsche 963',
+      lapTime: 90.5,
     },
     {
       sessionId: 's-2',
       percentage: 101.8,
       category: 'Competitive',
-      lapTimeString: '1:31.700',
       track: 'Monza',
       car: 'Ferrari 499P',
+      lapTime: 91.7,
     },
     {
       sessionId: 's-3',
       percentage: 103.2,
       category: 'Good',
-      lapTimeString: '1:33.000',
       track: 'Le Mans',
       car: 'Toyota GR010',
+      lapTime: 93,
     },
   ];
 

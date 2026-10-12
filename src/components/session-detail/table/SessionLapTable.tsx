@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { ArrowDown, ArrowLeftRight, ArrowUp, ChevronsDownUp, ChevronsUpDown, Clock } from 'lucide-react';
 import { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
 import { computeTheoreticalGap, formatTime } from '../../../../shared/domain/formatters.js';
-import { isRacingLap } from '../../../../shared/domain/lapComparison.js';
+import { isRacingLap, lapEvents, type LapEvents } from '../../../../shared/domain/lapComparison.js';
 import { lapClassPositions } from '../../../../shared/domain/lapPlaces.js';
 import { SessionLapTableRow } from './SessionLapTableRow.js';
 import { lapDetailSections, type LapDetailSection } from './lapDetailSections.js';
@@ -21,12 +21,13 @@ interface LapTableEntry {
   lap: LapData;
   position: number;
   detailSections: LapDetailSection[];
+  events: LapEvents;
   originalIndex: number;
 }
 
 function getLapSortValue(entry: LapTableEntry, column: SortableLapColumn, bestLap: number | null, theoBest: number | null, position: number): number | null {
   const displayLapTime = entry.lap.lapTime !== null && entry.lap.lapTime > 0 ? entry.lap.lapTime : null;
-  if (column === 'lap') return entry.lap.lapNum;
+  if (column === 'lap') return entry.lap.lapNumber;
   if (column === 'position') return position > 0 ? position : null;
   if (column === 'lapTime') return displayLapTime;
   if (column === 'delta') return displayLapTime !== null && bestLap !== null ? displayLapTime - bestLap : null;
@@ -64,12 +65,16 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
   const theoBest = selectedDriver?.theoreticalBest ?? null;
   const lapEntries = React.useMemo(() => {
     const positions = lapClassPositions(session, selectedDriver, isMultiClass);
-    return (selectedDriver?.laps || []).map((lap, index, laps): LapTableEntry => ({
-      lap,
-      position: positions.get(lap) ?? lap.position,
-      detailSections: lapDetailSections(lap, lapDetailContext(session, selectedDriver, lap, index > 0 ? laps[index - 1] : null, isMultiClass, positions)),
-      originalIndex: index,
-    }));
+    return (selectedDriver?.laps || []).map((lap, index, laps): LapTableEntry => {
+      const context = lapDetailContext(session, selectedDriver, lap, index > 0 ? laps[index - 1] : null, isMultiClass, positions);
+      return {
+        lap,
+        position: positions.get(lap) ?? lap.position,
+        detailSections: lapDetailSections(lap, context),
+        events: context.events ?? lapEvents({}, lap.lapNumber),
+        originalIndex: index,
+      };
+    });
   }, [session, selectedDriver, isMultiClass]);
   const displayLapEntries = React.useMemo(() => [...lapEntries].sort((firstEntry, secondEntry) => {
     const firstValue = getLapSortValue(firstEntry, sortColumn, bestLap, theoBest, firstEntry.position);
@@ -85,12 +90,12 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
       : result;
   }), [lapEntries, sortColumn, sortDescending, bestLap, theoBest]);
   const [expandedLaps, setExpandedLaps] = React.useState<ReadonlySet<number>>(() => new Set());
-  const lapsWithDetails = React.useMemo(() => lapEntries.filter(({ detailSections }) => detailSections.length > 0).map(({ lap }) => lap.lapNum), [lapEntries]);
-  const allExpanded = lapsWithDetails.length > 0 && lapsWithDetails.every((lapNum) => expandedLaps.has(lapNum));
-  const toggleLap = (lapNum: number) => setExpandedLaps((current) => {
+  const lapsWithDetails = React.useMemo(() => lapEntries.filter(({ detailSections }) => detailSections.length > 0).map(({ lap }) => lap.lapNumber), [lapEntries]);
+  const allExpanded = lapsWithDetails.length > 0 && lapsWithDetails.every((lapNumber) => expandedLaps.has(lapNumber));
+  const toggleLap = (lapNumber: number) => setExpandedLaps((current) => {
     const next = new Set(current);
-    if (next.has(lapNum)) next.delete(lapNum);
-    else next.add(lapNum);
+    if (next.has(lapNumber)) next.delete(lapNumber);
+    else next.add(lapNumber);
     return next;
   });
   const columnCount = 12 + (hasTireWearData ? 1 : 0) + (hasFuelData ? 1 : 0);
@@ -152,7 +157,7 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
             </button>
           )}
           {(() => {
-            const compareUrl = sessionLapComparePath(session, selectedDriver, selectedDriver?.bestLapNum);
+            const compareUrl = sessionLapComparePath(session, selectedDriver, selectedDriver?.bestLapNumber);
             return (
               <Link
                 to={compareUrl}
@@ -198,14 +203,15 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
             </tr>
           </thead>
           <tbody className="divide-y divide-lmu-border/50 font-mono">
-            {displayLapEntries.map(({ lap: l, position, detailSections }) => (
+            {displayLapEntries.map(({ lap: l, position, detailSections, events }) => (
               <SessionLapTableRow
-                key={l.lapNum}
+                key={l.lapNumber}
                 session={session}
                 selectedDriver={selectedDriver}
                 lap={l}
                 lapClassPos={position}
                 detailSections={detailSections}
+                events={events}
                 bestLap={bestLap}
                 bestS1={bestS1}
                 bestS2={bestS2}
@@ -215,7 +221,7 @@ export const SessionLapTable: React.FC<SessionLapTableProps> = ({
                 isMultiClass={isMultiClass}
                 hasTireWearData={hasTireWearData}
                 hasFuelData={hasFuelData}
-                isExpanded={expandedLaps.has(l.lapNum)}
+                isExpanded={expandedLaps.has(l.lapNumber)}
                 onToggleExpanded={toggleLap}
                 columnCount={columnCount}
               />

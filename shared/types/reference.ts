@@ -12,7 +12,6 @@ export interface ReferenceLaptimeEntry {
   trackName: string;        // e.g. "Bahrain (wec)"
   carClass: string;         // e.g. "LMGT3"
   patch: string;            // e.g. "1.4+"
-  target100Sec: number;     // ~100% reference time in seconds
   targets: {
     alienSec: number;       // ~100%
     competitiveSec: number; // 101%
@@ -30,7 +29,6 @@ export interface ReferenceLaptimeEntry {
 export interface LapCategoryShift {
   driverName: string;
   lapTimeSec: number;
-  lapTimeString: string;
   sessionId: string;
   sessionName: string;
   lapNumber: number;
@@ -53,9 +51,6 @@ export interface ReferenceBenchmarkDiffItem {
   type: 'added' | 'updated' | 'removed';
   oldAlienSec?: number;
   newAlienSec?: number;
-  oldAlienTimeString?: string;
-  newAlienTimeString?: string;
-  diffSec?: number;
   oldPatch?: string;
   newPatch?: string;
   impact?: BenchmarkItemImpact;
@@ -64,10 +59,6 @@ export interface ReferenceBenchmarkDiffItem {
 export interface ReferenceBenchmarkDiff {
   id?: number;
   timestamp: string;
-  hasChanges: boolean;
-  addedCount: number;
-  updatedCount: number;
-  removedCount: number;
   totalEntries: number;
   totalAffectedSessions?: number;
   totalCategoryShifts?: number;

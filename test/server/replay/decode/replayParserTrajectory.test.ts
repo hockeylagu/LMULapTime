@@ -199,7 +199,7 @@ describe('replayParser - trajectory & timing', () => {
 
     });
 
-    it('calculates rawSampleRateHz and supports uncompressed full raw trajectory (maxPoints: 0)', () => {
+    it('calculates vcrRawSampleRateHz and supports uncompressed full raw trajectory (maxPoints: 0)', () => {
       const resVcrPath = path.join(tempDir, 'resolution_test.vcr');
       const buf = createSliceVcrBuffer({
         slices: [
@@ -213,15 +213,15 @@ describe('replayParser - trajectory & timing', () => {
 
       // Downsampled extraction
       const downsampleTraj = extractReplayTrajectory(resVcrPath, { driverSlot: 1, maxPoints: 2 });
-      expect(downsampleTraj.rawPointsCount).toBe(4);
-      expect(downsampleTraj.rawSampleRateHz).toBe(20);
+      expect(downsampleTraj.vcrRawPointsCount).toBe(4);
+      expect(downsampleTraj.vcrRawSampleRateHz).toBe(20);
       expect(downsampleTraj.isFullResolution).toBe(false);
       expect(downsampleTraj.points.length).toBe(2);
 
       // Uncompressed raw extraction (maxPoints: 0)
       const rawTraj = extractReplayTrajectory(resVcrPath, { driverSlot: 1, maxPoints: 0 });
-      expect(rawTraj.rawPointsCount).toBe(4);
-      expect(rawTraj.rawSampleRateHz).toBe(20);
+      expect(rawTraj.vcrRawPointsCount).toBe(4);
+      expect(rawTraj.vcrRawSampleRateHz).toBe(20);
       expect(rawTraj.isFullResolution).toBe(true);
       expect(rawTraj.points.length).toBe(4);
 
@@ -551,7 +551,7 @@ describe('replayParser - trajectory & timing', () => {
 
         expect(elapsed).toBeLessThan(50);
         expect(meta.trackName).toBe('LagunaSeca_2026');
-        expect(meta.eventInfo?.session).toBe('RACE');
+        expect(meta.sessionType).toBe('RACE');
         expect(meta.drivers.length).toBeGreaterThan(0);
       });
 
@@ -625,7 +625,7 @@ describe('replayParser - trajectory & timing', () => {
             for (let i = 0; i < 16; i++) {
               const attrs = lapMatches[i][1];
               const text = lapMatches[i][2].trim();
-              const xmlLapNum = parseInt(attrs.match(/num="(\d+)"/)?.[1] || '0', 10);
+              const xmlLapNumber = parseInt(attrs.match(/num="(\d+)"/)?.[1] || '0', 10);
               const xmlLapTime = text !== '--.----' && text !== '' ? parseFloat(text) : null;
               const xmlS1 = parseFloat(attrs.match(/s1="([\d\.]+)"/)?.[1] || '0');
               const xmlS2 = parseFloat(attrs.match(/s2="([\d\.]+)"/)?.[1] || '0');
@@ -633,7 +633,7 @@ describe('replayParser - trajectory & timing', () => {
               const xmlS3 = s3Match ? parseFloat(s3Match[1]) : null;
 
               const vcrLap = traj.laps?.[i];
-              expect(vcrLap?.lapNumber).toBe(xmlLapNum);
+              expect(vcrLap?.lapNumber).toBe(xmlLapNumber);
 
               if (xmlLapTime !== null && vcrLap?.lapTimeSec) {
                 expect(vcrLap.lapTimeSec).toBeCloseTo(xmlLapTime, 1);

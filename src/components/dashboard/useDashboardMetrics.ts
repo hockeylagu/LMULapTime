@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { isSessionEmpty, getDisplayTrackName, compareSessionsBySortOption } from '../../../shared/domain/formatters.js';
+import { driverLapsCount, isSessionEmpty, getDisplayTrackName, compareSessionsBySortOption } from '../../../shared/domain/formatters.js';
 import { matchesTrack, getPaceCategoryFromPercentage } from '../../../shared/domain/paceCategory.js';
 import { matchesSessionCarClass } from '../../../shared/domain/vehicleMapping.js';
 import { selectCleanLapCandidates } from '../../../shared/domain/lapComparison.js';
@@ -122,7 +122,7 @@ export function useDashboardMetrics({
       const completedLapsCount =
         laps && laps.length > 0
           ? laps.filter((l) => l.lapTime !== null && l.lapTime > 0).length
-          : p.lapsCount || 0;
+          : driverLapsCount(p);
 
       totalLaps += completedLapsCount;
 
@@ -163,7 +163,7 @@ export function useDashboardMetrics({
         carKmMap[p.carType] = (carKmMap[p.carType] || 0) + sessionDistanceKm;
       }
 
-      if (p.bestLapPacePercentage && p.bestLapPaceCategory && p.bestLapTimeString) {
+      if (p.bestLapPacePercentage && p.bestLapPaceCategory && p.bestLapTime) {
         benchmarkPaceSum += p.bestLapPacePercentage;
         benchmarkPaceCount++;
 
@@ -173,7 +173,7 @@ export function useDashboardMetrics({
             sessionId: s.id,
             percentage: p.bestLapPacePercentage,
             category: p.bestLapPaceCategory,
-            lapTimeString: p.bestLapTimeString,
+            lapTime: p.bestLapTime,
             track: displayTrack,
             car: p.carType,
           };

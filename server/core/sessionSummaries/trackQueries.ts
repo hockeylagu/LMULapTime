@@ -6,7 +6,7 @@ import { CIRCUIT_SPECIFICATIONS } from '../../../shared/domain/circuitDefinition
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 
 export interface TrackDetailFilterOptions {
-  carModels: string[];
+  carTypes: string[];
   sessionTypes: string[];
   emptyCount: number;
   replayCount: number;
@@ -30,10 +30,10 @@ function customTrackScope(trackVenue: string, trackCourse: string): SqlFragment 
 function sessionClassMatch(targetClass?: string): SqlFragment {
   const match = carClassMatch(targetClass);
   if (match.sql === '1=1') return match;
-  return { sql: `EXISTS (SELECT 1 FROM session_drivers f WHERE f.session_id=s.id AND (f.is_player_driver=1 OR (s.player_driver_name IS NULL AND f.driver_ordinal=coalesce(s.primary_driver_ordinal,0))) AND ${match.sql})`, values: match.values };
+  return { sql: `EXISTS (SELECT 1 FROM session_drivers f WHERE f.session_id=s.id AND (f.is_player=1 OR (s.player_driver_name IS NULL AND f.driver_ordinal=coalesce(s.primary_driver_ordinal,0))) AND ${match.sql})`, values: match.values };
 }
 
-function aggregateScopeSql(trackVenue: string, trackCourse = '', carClass?: string, carModel?: string): SqlFragment {
+function aggregateScopeSql(trackVenue: string, trackCourse = '', carClass?: string, carType?: string): SqlFragment {
   const spec = getCircuitSpecification(trackVenue, trackCourse);
   const canonicalLayout = Object.prototype.hasOwnProperty.call(CIRCUIT_SPECIFICATIONS, spec.layoutKey);
   const clauses: string[] = [];
@@ -44,7 +44,7 @@ function aggregateScopeSql(trackVenue: string, trackCourse = '', carClass?: stri
     clauses.push(track.sql);
     values.push(...track.values);
   }
-  if (carModel && carModel !== 'All') { clauses.push('s.player_car_type=?'); values.push(carModel); }
+  if (carType && carType !== 'All') { clauses.push('s.player_car_type=?'); values.push(carType); }
   if (carClass && carClass !== 'All') {
     const match = sessionClassMatch(carClass);
     clauses.push(match.sql);
@@ -53,11 +53,11 @@ function aggregateScopeSql(trackVenue: string, trackCourse = '', carClass?: stri
   return { sql: clauses.join(' AND '), values };
 }
 
-function trackBaseCte(carClass?: string, carModel?: string, layoutKey?: string, trackVenue?: string, trackCourse = ''): SqlFragment {
+function trackBaseCte(carClass?: string, carType?: string, layoutKey?: string, trackVenue?: string, trackCourse = ''): SqlFragment {
   const classMatch = sessionClassMatch(carClass);
   const clauses: string[] = [];
   const values: (string | number)[] = [...classMatch.values];
-  if (carModel && carModel !== 'All') { clauses.push('s.player_car_type=?'); values.push(carModel); }
+  if (carType && carType !== 'All') { clauses.push('s.player_car_type=?'); values.push(carType); }
   if (layoutKey) { clauses.push('s.layout_key=?'); values.push(layoutKey); }
   if (trackVenue) {
     const track = customTrackScope(trackVenue, trackCourse);
@@ -77,8 +77,8 @@ function trackBaseCte(carClass?: string, carModel?: string, layoutKey?: string, 
     )`, values };
 }
 
-function queryAggregatedTrackSummaries(db: Database, carClass?: string, carModel?: string, layoutKey?: string, trackName?: string, trackCourse = ''): Map<string, TrackSummary> {
-  const cte = trackBaseCte(carClass, carModel, layoutKey, trackName, trackCourse);
+function queryAggregatedTrackSummaries(db: Database, carClass?: string, carType?: string, layoutKey?: string, trackName?: string, trackCourse = ''): Map<string, TrackSummary> {
+  const cte = trackBaseCte(carClass, carType, layoutKey, trackName, trackCourse);
   const rows = db.prepare(`${cte.sql}, aggregates AS (
       SELECT track_venue,track_course,layout_key,MAX(event_timestamp) raw_latest,
         SUM(class_match) sessions_count,
@@ -143,10 +143,10 @@ function queryAggregatedTrackSummaries(db: Database, carClass?: string, carModel
   return summaries;
 }
 
-export function queryTrackLatestSessionContext(db: Database, trackName: string, carClass?: string, carModel?: string, trackCourse = ''): TrackLatestSessionContext {
-  const where = sessionWhere({ ...trackScope(trackName, { carClass }, trackCourse), playerCar: carModel && carModel !== 'All' ? carModel : undefined });
+export function queryTrackLatestSessionContext(db: Database, trackName: string, carClass?: string, carType?: string, trackCourse = ''): TrackLatestSessionContext {
+  const where = sessionWhere({ ...trackScope(trackName, { carClass }, trackCourse), playerCar: carType && carType !== 'All' ? carType : undefined });
   const row = db.prepare(`SELECT s.track_venue,s.track_course,a.track_length,
-      d.driver_class car_class,v.car_type FROM sessions s LEFT JOIN session_drivers d ON d.session_id=s.id AND d.is_player_driver=1
+      d.driver_class car_class,v.car_type FROM sessions s LEFT JOIN session_drivers d ON d.session_id=s.id AND d.is_player=1
       LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id
       JOIN session_summary_facts a ON a.session_id=s.id
       ${where.sql} ORDER BY s.timestamp DESC,s.id DESC LIMIT 1`).get(...where.values) as
@@ -155,8 +155,8 @@ export function queryTrackLatestSessionContext(db: Database, trackName: string, 
     carClass: row.car_class ?? undefined, carType: row.car_type ?? undefined } : {};
 }
 
-export function queryTrackPositionAverages(db: Database, trackName: string, carClass?: string, carModel?: string, trackCourse = ''): TrackPositionAverages {
-  const scope = aggregateScopeSql(trackName, trackCourse, carClass, carModel);
+export function queryTrackPositionAverages(db: Database, trackName: string, carClass?: string, carType?: string, trackCourse = ''): TrackPositionAverages {
+  const scope = aggregateScopeSql(trackName, trackCourse, carClass, carType);
   const row = db.prepare(`SELECT avg(CASE WHEN s.session_kind='qualifying' AND d.position>0 THEN d.position END) qualifying_average,
       avg(CASE WHEN s.session_kind='race' AND d.position>0 THEN d.position END) finish_average
     FROM sessions s LEFT JOIN session_drivers d ON d.session_id=s.id AND d.driver_ordinal=s.primary_driver_ordinal
@@ -170,10 +170,10 @@ function trackScope(trackName: string, options: SessionQuery, trackCourse = ''):
 }
 
 /** Query a compact, SQL-aggregated track summary for the selected canonical layout/class/model. */
-export function queryTrackDetailSummary(db: Database, trackName: string, carClass?: string, carModel?: string, trackCourse = ''): TrackSummary | undefined {
+export function queryTrackDetailSummary(db: Database, trackName: string, carClass?: string, carType?: string, trackCourse = ''): TrackSummary | undefined {
   const spec = getCircuitSpecification(trackName, trackCourse);
   const canonicalLayout = Object.prototype.hasOwnProperty.call(CIRCUIT_SPECIFICATIONS, spec.layoutKey);
-  const summaries = queryAggregatedTrackSummaries(db, carClass, carModel,
+  const summaries = queryAggregatedTrackSummaries(db, carClass, carType,
     canonicalLayout ? spec.layoutKey : undefined,
     canonicalLayout ? undefined : trackName, trackCourse);
   const summary = [...summaries.values()].find(item => !canonicalLayout
@@ -183,18 +183,18 @@ export function queryTrackDetailSummary(db: Database, trackName: string, carClas
 }
 
 /** Small, scoped option lists and counts for controls; never derived from the current page. */
-export function queryTrackDetailFilters(db: Database, trackName: string, carClass?: string, carModel?: string, trackCourse = ''): TrackDetailFilterOptions {
+export function queryTrackDetailFilters(db: Database, trackName: string, carClass?: string, carType?: string, trackCourse = ''): TrackDetailFilterOptions {
   const base = sessionWhere(trackScope(trackName, { carClass }, trackCourse));
   const rows = db.prepare(`SELECT DISTINCT v.car_type FROM sessions s JOIN session_drivers d
-    ON d.session_id=s.id AND d.is_player_driver=1 JOIN vehicles v ON v.vehicle_id=d.vehicle_id ${base.sql} ORDER BY v.car_type`)
+    ON d.session_id=s.id AND d.is_player=1 JOIN vehicles v ON v.vehicle_id=d.vehicle_id ${base.sql} ORDER BY v.car_type`)
     .all(...base.values) as Array<{ car_type: string }>;
   const types = db.prepare(`SELECT DISTINCT s.session_kind FROM sessions s ${base.sql} ORDER BY s.session_kind`)
     .all(...base.values) as Array<{ session_kind: string }>;
-  const modelFilter = carModel && carModel !== 'All' ? ' AND s.player_car_type=?' : '';
-  const modelValues = carModel && carModel !== 'All' ? [carModel] : [];
+  const modelFilter = carType && carType !== 'All' ? ' AND s.player_car_type=?' : '';
+  const modelValues = carType && carType !== 'All' ? [carType] : [];
   const countRow = db.prepare(`SELECT sum(s.is_empty) empty_count,sum(CASE WHEN s.recording_name IS NOT NULL THEN 1 ELSE 0 END) replay_count
     FROM sessions s ${base.sql}${modelFilter}`).get(...base.values, ...modelValues) as { empty_count: number | null; replay_count: number | null };
-  return { carModels: rows.map(row => row.car_type).filter(Boolean), sessionTypes: types.map(row => row.session_kind),
+  return { carTypes: rows.map(row => row.car_type).filter(Boolean), sessionTypes: types.map(row => row.session_kind),
     emptyCount: countRow.empty_count ?? 0, replayCount: countRow.replay_count ?? 0 };
 }
 

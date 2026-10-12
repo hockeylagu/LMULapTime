@@ -6,10 +6,10 @@ import type { RawStreamXmlNode } from '../../../server/sessions/sessionXmlTypes.
 function driver(name: string): DriverData {
   return {
     name, carType: 'Test Car', carClass: 'GT3', carNumber: '1', teamName: 'Test Team', isPlayer: false,
-    position: 1, classPosition: 1, bestLapTime: 120, bestLapTimeString: '2:00.000',
-    bestS1: 40, bestS2: 40, bestS3: 40, theoreticalBest: 120, theoreticalBestString: '2:00.000',
-    lapsCount: 1,
-    laps: [{ lapNum: 2, position: 1, lapTime: 120, lapTimeString: '2:00.000',
+    position: 1, classPosition: 1, bestLapTime: 120, 
+    bestS1: 40, bestS2: 40, bestS3: 40, theoreticalBest: 120, 
+    declaredLapsCount: 1,
+    laps: [{ lapNumber: 2, position: 1, lapTime: 120, 
       s1: 40, s2: 40, s3: 40, topSpeed: null, fCompound: 'Medium', rCompound: 'Medium',
       isPitStop: false, isValid: true, elapsedSeconds: 120 }],
   };
@@ -31,11 +31,11 @@ describe('XML stream event driver identity', () => {
     const drivers = [driver('Ann Smithson'), driver('Ann Smith')];
     parseStreamEvents(stream, drivers);
     expect(drivers.map(count)).toEqual([0, 1]);
-    const lap = drivers[1].laps[0];
-    expect((lap.incidents ?? lap.trackLimits ?? lap.penalties)?.[0].lapNum).toBe(2);
-    expect(drivers[0].laps[0].incidents).toBeUndefined();
-    expect(drivers[0].laps[0].trackLimits).toBeUndefined();
-    expect(drivers[0].laps[0].penalties).toBeUndefined();
+    const owned = drivers[1];
+    expect((owned.incidents?.length ? owned.incidents : owned.trackLimits?.length ? owned.trackLimits : owned.penalties)?.[0].lapNumber).toBe(2);
+    expect(drivers[0].incidents).toBeUndefined();
+    expect(drivers[0].trackLimits).toBeUndefined();
+    expect(drivers[0].penalties).toBeUndefined();
   });
 
   it.each(events)('leaves $kind unattributed for duplicate normalized names', ({ stream, count }) => {
@@ -47,13 +47,13 @@ describe('XML stream event driver identity', () => {
   it.each(['Ann', 'Ann Smithson', '', '   ', 'Unknown Driver'])('does not guess an owner for "%s"', name => {
     const drivers = [driver(''), driver('Ann Smith')];
     parseStreamEvents({ TrackLimits: { '@_Driver': name, '@_Lap': 1, '#text': 'Warning' } }, drivers);
-    expect(drivers.map(d => d.totalTrackLimits)).toEqual([0, 0]);
+    expect(drivers.map(d => d.trackLimits?.length ?? 0)).toEqual([0, 0]);
   });
 
   it('matches case, surrounding whitespace and stream decorations without changing display names', () => {
     const drivers = [driver('Ann Smith')];
     parseStreamEvents({ TrackLimits: { '@_Driver': ' ann SMITH#12(2) ', '@_Lap': 1, '#text': 'Warning' } }, drivers);
-    expect(drivers[0].totalTrackLimits).toBe(1);
+    expect(drivers[0].trackLimits).toHaveLength(1);
     expect(drivers[0].name).toBe('Ann Smith');
   });
 });

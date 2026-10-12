@@ -11,23 +11,22 @@ import { placeComparedLap } from '../../../../src/components/leaderboard/useComp
 
 const DAY = Date.parse('2026-09-20T12:00:00');
 
-function lap(sessionId: string, sessionType: string, lapNum: number, lapTime: number, extra: Partial<ComparableLap> = {}): ComparableLap {
+function lap(sessionId: string, sessionType: string, lapNumber: number, lapTime: number, extra: Partial<ComparableLap> = {}): ComparableLap {
   const offset = { p: 0, q: 1, r: 2, old: -86_400_000 * 7 }[sessionId] ?? 0;
   const timestamp = sessionId === 'old' ? DAY + offset : DAY + offset * 3_600_000;
   const date = new Date(timestamp);
   return {
-    id: `${sessionId}_Me_lap_${lapNum}`,
+    id: `${sessionId}_Me_lap_${lapNumber}`,
     sessionId,
     sessionName: sessionType,
     sessionType,
     timestamp,
-    dateString: `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')} 12:00`,
+    timeString: `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')} 12:00`,
     driverName: 'Me',
     carType: 'Ferrari 296 GT3',
     carClass: 'GT3',
-    lapNum,
+    lapNumber,
     lapTime,
-    lapTimeString: lapTime.toFixed(3),
     s1: null,
     s2: null,
     s3: null,
@@ -51,22 +50,22 @@ describe('lap picker model', () => {
     expect(lapSessionKind({ sessionType: 'Qualifying', sessionName: 'Q1' })).toBe('quali');
     expect(lapSessionKind({ sessionType: 'Race', sessionName: 'R1' })).toBe('race');
     expect(lapSessionKind({ sessionType: 'Practice', sessionName: 'P1' })).toBe('practice');
-    expect(lapEventDay({ dateString: '2026/09/20 14:00' })).toBe('2026/09/20');
+    expect(lapEventDay({ timeString: '2026/09/20 14:00' })).toBe('2026/09/20');
   });
 
   it('groups the laps by session, newest first, keeping the clean laps by default', () => {
     const sessions = groupPickerSessions(laps, DEFAULT_PICKER_FILTERS, raceLap);
     expect(sessions.map((s) => s.sessionId)).toEqual(['r', 'q', 'p', 'old']);
     // The start lap, the pit lap and the invalid lap are not clean.
-    expect(sessions[0].laps.map((l) => l.lapNum)).toEqual([2, 4]);
-    expect(sessions[1].laps.map((l) => l.lapNum)).toEqual([2]);
+    expect(sessions[0].laps.map((l) => l.lapNumber)).toEqual([2, 4]);
+    expect(sessions[1].laps.map((l) => l.lapNumber)).toEqual([2]);
     expect(sessions[1].bestLapId).toBe('q_Me_lap_2');
   });
 
   it('filters by session type, and shows every lap when clean only is off', () => {
     const quali = groupPickerSessions(laps, { ...DEFAULT_PICKER_FILTERS, kind: 'quali', cleanOnly: false }, raceLap);
     expect(quali).toHaveLength(1);
-    expect(quali[0].laps.map((l) => l.lapNum)).toEqual([1, 2, 3]);
+    expect(quali[0].laps.map((l) => l.lapNumber)).toEqual([1, 2, 3]);
   });
 
   it('keeps the anchor lap’s conditions unless all conditions are asked for', () => {

@@ -27,7 +27,7 @@ export function buildTrackProgression(
       .map((s) => {
         const p = s.playerDriver;
         const matchingPoint = progression.find((pt) => pt.sessionId === s.id);
-        const top3AvgLapTime = matchingPoint?.top3AvgLapTime ?? null;
+        const top3Average = matchingPoint?.top3Average ?? null;
         const consistencyScore = matchingPoint?.consistencyScore ?? null;
         const theoreticalGap =
           matchingPoint?.theoreticalGap ??
@@ -42,7 +42,7 @@ export function buildTrackProgression(
           trackVenue: s.trackVenue,
           trackCourse: s.trackCourse,
           displayTrack: s.trackVenue,
-          weatherInfo: s.weatherInfo,
+          weather: s.weather,
           carType: p?.carType || 'Unknown Car',
           carClass: p?.carClass || 'General',
           driverName: p?.name || 'Driver',
@@ -52,10 +52,10 @@ export function buildTrackProgression(
           bestS2: p?.bestS2 || null,
           bestS3: p?.bestS3 || null,
           theoreticalBest: p?.theoreticalBest || null,
-          cleanLapsCount: matchingPoint?.cleanLapsCount ?? (p?.avgLapTime && (p?.lapsCount || 0) > 0 ? (p.lapsCount || 0) : 0),
-          totalLapsCount: matchingPoint?.totalLapsCount ?? (p?.lapsCount || 0),
+          cleanLapsCount: matchingPoint?.cleanLapsCount ?? (p?.avgLapTime && (p?.declaredLapsCount || 0) > 0 ? (p.declaredLapsCount || 0) : 0),
+          declaredLapsCount: matchingPoint?.declaredLapsCount ?? (p?.declaredLapsCount || 0),
           avgLapTime: p?.avgLapTime ?? null,
-          top3AvgLapTime,
+          top3Average,
           theoreticalGap,
           consistencyScore,
         };

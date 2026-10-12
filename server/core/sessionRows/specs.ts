@@ -5,10 +5,8 @@ export const SESSION_FIELDS: readonly Field[] = [
   text('trackEvent', 'track_event'),
   orNull(real('trackLengthMeters', 'track_length_meters')),
   text('timeString', 'time_string'),
-  text('weatherInfo', 'weather_info'),
   text('gameVersion', 'game_version'),
   int('totalLapsCount', 'total_laps_count'),
-  bool('hasDuckDbTelemetry', 'has_duckdb_telemetry'),
   text('duckdbFilename', 'duckdb_filename'),
 ];
 
@@ -40,17 +38,13 @@ export const BEST_SESSION_LAP_FIELDS: readonly Field[] = [
   text('driverName', 'best_session_lap_driver'),
   text('carType', 'best_session_lap_car_type'),
   real('lapTime', 'best_session_lap_time'),
-  text('lapTimeString', 'best_session_lap_time_string'),
 ];
 
-/**
- * The replay link. Its DuckDB flag and file are not stored here: the session's main file lives on
- * `sessions` (has_duckdb_telemetry, duckdb_filename) and the reader puts it back on the link.
- */
+/** The replay link. The session's DuckDB file lives on `sessions` (duckdb_filename), not on the link. */
 export const RECORDING_FIELDS: readonly Field[] = [
   text('name', 'recording_name'),
   text('path', 'path'),
-  real('sizeBytes', 'size_bytes'),
+  real('fileSizeBytes', 'file_size_bytes'),
   text('eventTitle', 'event_title'),
   int('splitNo', 'split_no'),
   text('eventType', 'event_type'),
@@ -66,12 +60,6 @@ export const RECORDING_FIELDS: readonly Field[] = [
  * Driver text kept once in a dictionary (drivers, vehicles, teams) and referenced by id; a NULL id is
  * an absent property. Names are exact: a name is a dictionary key, never a person.
  */
-/** The two link properties that mirror the session's DuckDB attachment (not columns of session_recordings). */
-export const LINK_TELEMETRY_FIELDS: readonly Field[] = [
-  bool('hasDuckDbTelemetry', 'has_duckdb_telemetry'),
-  text('duckdbFilename', 'duckdb_filename'),
-];
-
 export const DRIVER_DICTIONARY_FIELDS: readonly Field[] = [
   text('name', 'name'),
   text('carType', 'car_type'),
@@ -86,16 +74,13 @@ export const DRIVER_FIELDS: readonly Field[] = [
   int('position', 'position'),
   int('classPosition', 'class_position'),
   orNull(real('bestLapTime', 'best_lap_time')),
-  text('bestLapTimeString', 'best_lap_time_string'),
-  int('bestLapNum', 'best_lap_num'),
+  int('bestLapNumber', 'best_lap_number'),
   orNull(real('bestS1', 'best_s1')),
   orNull(real('bestS2', 'best_s2')),
   orNull(real('bestS3', 'best_s3')),
   orNull(real('theoreticalBest', 'theoretical_best')),
-  text('theoreticalBestString', 'theoretical_best_string'),
   bool('bestLapWet', 'best_lap_wet'),
   real('avgLapTime', 'avg_lap_time'),
-  text('avgLapTimeString', 'avg_lap_time_string'),
   real('avgFuelPerLap', 'avg_fuel_per_lap'),
   real('estFuelStintLaps', 'est_fuel_stint_laps'),
   real('avgVePerLap', 'avg_ve_per_lap'),
@@ -106,16 +91,12 @@ export const DRIVER_FIELDS: readonly Field[] = [
   int('classPositionGain', 'class_position_gain'),
   text('finishStatus', 'finish_status'),
   text('dnfReason', 'dnf_reason'),
-  int('pitStopsCount', 'pit_stops_count'),
+  int('declaredPitStopsCount', 'declared_pit_stops_count'),
   int('lapsLedCount', 'laps_led_count'),
   int('highestPosition', 'highest_position'),
   int('lowestPosition', 'lowest_position'),
-  text('finishGapToLeaderString', 'finish_gap_to_leader_string'),
   int('top3LapsCount', 'top3_laps_count'),
-  int('lapsCount', 'laps_count'),
-  int('totalIncidents', 'total_incidents'),
-  int('totalTrackLimits', 'total_track_limits'),
-  int('totalPenalties', 'total_penalties'),
+  int('declaredLapsCount', 'declared_laps_count'),
 ];
 
 /** Every scalar of a driver, for the canonical form. */
@@ -135,10 +116,9 @@ export const CONDITION_FIELDS: readonly Field[] = [
 ];
 
 export const LAP_FIELDS: readonly Field[] = [
-  int('lapNum', 'lap_num'),
+  int('lapNumber', 'lap_number'),
   int('position', 'position'),
   orNull(real('lapTime', 'lap_time')),
-  text('lapTimeString', 'lap_time_string'),
   orNull(real('s1', 's1')),
   orNull(real('s2', 's2')),
   orNull(real('s3', 's3')),
@@ -154,19 +134,13 @@ export const LAP_FIELDS: readonly Field[] = [
   real('virtualEnergy', 'virtual_energy'),
   real('virtualEnergyUsed', 'virtual_energy_used'),
   real('elapsedSeconds', 'elapsed_seconds'),
-  text('elapsedTimeString', 'elapsed_time_string'),
   real('pitStopDuration', 'pit_stop_duration'),
-  text('pitStopDurationString', 'pit_stop_duration_string'),
   real('gapToLeader', 'gap_to_leader'),
-  text('gapToLeaderString', 'gap_to_leader_string'),
   bool('isPitStop', 'is_pit_stop'),
   bool('isOutLap', 'is_out_lap'),
   text('nonRepresentativeReason', 'non_representative_reason'),
   bool('isValid', 'is_valid'),
   bool('isInferred', 'is_inferred'),
-  int('incidentCount', 'incident_count'),
-  int('trackLimitCount', 'track_limit_count'),
-  int('penaltyCount', 'penalty_count'),
 ];
 
 /** Properties of a lap and of a driver that are not stored: filled at read time. */
@@ -177,19 +151,19 @@ export type EventKind = 'incident' | 'trackLimit' | 'penalty';
 export interface EventListSpec { kind: EventKind; prop: 'incidents' | 'trackLimits' | 'penalties'; bit: number; fields: readonly Field[] }
 
 const incidentFields: readonly Field[] = [
-  text('type', 'incident_type'), text('description', 'description'), text('details', 'details'), int('lapNum', 'lap_num'),
+  text('type', 'incident_type'), text('description', 'description'), text('details', 'details'), int('lapNumber', 'lap_number'),
   real('elapsedSeconds', 'elapsed_seconds'), real('force', 'force'), text('otherVehicle', 'other_vehicle'), bool('isWallImpact', 'is_wall_impact'),
 ];
 const trackLimitFields: readonly Field[] = [
-  text('description', 'description'), int('lapNum', 'lap_num'), real('elapsedSeconds', 'elapsed_seconds'),
+  text('description', 'description'), int('lapNumber', 'lap_number'), real('elapsedSeconds', 'elapsed_seconds'),
   real('warningPoints', 'warning_points'), real('currentPoints', 'current_points'), text('action', 'limit_action'),
 ];
 const penaltyFields: readonly Field[] = [
-  text('penalty', 'penalty_name'), text('reason', 'penalty_reason'), int('lapNum', 'lap_num'),
+  text('penalty', 'penalty_name'), text('reason', 'penalty_reason'), int('lapNumber', 'lap_number'),
   real('elapsedSeconds', 'elapsed_seconds'), text('description', 'description'),
 ];
 
-/** The three event lists of a driver (and of a lap), in the order their rows are numbered. */
+/** The three event lists of a driver, in the order their rows are numbered. */
 export const EVENT_LISTS: readonly EventListSpec[] = [
   { kind: 'incident', prop: 'incidents', bit: 1, fields: incidentFields },
   { kind: 'trackLimit', prop: 'trackLimits', bit: 2, fields: trackLimitFields },

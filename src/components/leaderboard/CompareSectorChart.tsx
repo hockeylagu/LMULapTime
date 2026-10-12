@@ -70,7 +70,7 @@ export const CompareSectorTooltip: React.FC<CompareSectorTooltipProps> = ({
       <div className="flex items-center justify-between gap-4 border-b border-lmu-border/60 pb-1 mb-1 font-sans">
         <p className="font-bold text-white">{label} Delta vs Baseline</p>
         <span className="text-[10px] text-lmu-gold">
-          Base: {plainTag(baselineLap.tag) || `Lap ${baselineLap.lapNum || '-'}`}
+          Base: {plainTag(baselineLap.tag) || `Lap ${baselineLap.lapNumber || '-'}`}
         </span>
       </div>
       {uniquePayload.map((p) => {
@@ -167,7 +167,7 @@ export const CompareSectorChart: React.FC<CompareSectorChartProps> = ({
             />
             <Tooltip cursor={{ fill: CHART_COLORS.hoverBand }} content={<CompareSectorTooltip chartData={chartData} selectedLaps={selectedLaps} baselineLap={baselineLap} />} />
             {comparedLaps.filter((lap) => lap.id !== baselineLap.id).map((lap) => (
-              <Bar key={lap.id} dataKey={lap.id} name={plainTag(lap.tag) || `Lap ${lap.lapNum || '-'}`} radius={[4, 4, 0, 0]}>
+              <Bar key={lap.id} dataKey={lap.id} name={plainTag(lap.tag) || `Lap ${lap.lapNumber || '-'}`} radius={[4, 4, 0, 0]}>
                 {chartData.map((entry, entryIndex) => {
                   const val = Number(entry[lap.id] || 0);
                   const cellColor =

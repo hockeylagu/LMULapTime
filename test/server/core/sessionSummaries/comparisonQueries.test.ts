@@ -19,7 +19,7 @@ function fixture(id: string, timestamp: number, track: string, drivers: Array<{n
     name: source.name, driverName: source.name, carType: 'Ferrari 499P', carClass: 'Hyper', carNumber: `${driverOrdinal + 1}`,
     teamName: 'Test Team', isPlayer: source.player, driverOrdinal, position: driverOrdinal + 1,
     classPosition: driverOrdinal + 1, bestLapTime: Math.min(...source.laps.map(lap => lap.lapTime ?? Infinity)),
-    bestLapTimeString: '', bestLapNum: source.laps.find(lap => lap.isValid)?.lapNum, lapsCount: source.laps.length,
+ bestLapNumber: source.laps.find(lap => lap.isValid)?.lapNumber, lapsCount: source.laps.length,
     cleanLapsCount: source.laps.length, laps: source.laps.map((lap, lapOrdinal) => ({ ...lap, lapOrdinal })),
   } as unknown as DriverData));
   return { id, filename: `${id}.xml`, filePath: `${id}.xml`, timeString: '', timestamp, trackVenue: track,
@@ -32,7 +32,7 @@ function addSession(db: Database.Database, session: DetailedSession): void {
   const venue = session.trackVenue;
   const course = session.trackCourse;
   const layout = venue === 'Spa' ? 'spa_gp' : 'silverstone_national';
-  db.prepare(`INSERT INTO sessions (id,filename,file_path,file_mtime,file_size,timestamp,track_venue,track_course,
+  db.prepare(`INSERT INTO sessions (id,filename,file_path,file_mtime_ms,file_size_bytes,timestamp,track_venue,track_course,
     session_type,session_name,updated_at,layout_key,recording_name,session_kind,is_empty)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(session.id, session.filename, session.filePath, session.timestamp, 1,
     session.timestamp, venue, course, 'Race', 'R1', session.timestamp, layout, session.matchingReplayFile?.name ?? null, 'race', 0);
@@ -40,8 +40,8 @@ function addSession(db: Database.Database, session: DetailedSession): void {
   persistSessionProjection(db, session);
 }
 
-const lap = (lapNum: number, lapTime: number, conditions?: LapData['conditions']): LapData => ({
-  lapNum, lapTime, lapTimeString: `${lapTime}`, position: 1, s1: 30, s2: 40, s3: lapTime - 70,
+const lap = (lapNumber: number, lapTime: number, conditions?: LapData['conditions']): LapData => ({
+  lapNumber, lapTime, position: 1, s1: 30, s2: 40, s3: lapTime - 70,
   isValid: true, isInferred: false, isOutLap: false, isPitStop: false, conditions,
 } as LapData);
 
@@ -64,7 +64,7 @@ describe('SQL comparison query', () => {
         fixture('other-layout', 50, 'Silverstone', [{ name: 'alice', player: true, laps: [lap(1, 80)] }]),
       ];
       for (const session of sessions) {
-        session.matchingReplayFile = { name: `${session.id}.Vcr`, path: 'retained', sizeBytes: 1 };
+        session.matchingReplayFile = { name: `${session.id}.Vcr`, path: 'retained', fileSizeBytes: 1 };
         addSession(db, session);
       }
       const filters = { trackName: 'Spa', carClass: 'Hyper' };
@@ -94,7 +94,7 @@ describe('SQL comparison query', () => {
     const result = queryCompactComparableLaps(db, { trackName: 'Spa', playerOnly: true }, { pageSize: 50 });
     expect(result.total).toBe(1000);
     expect(result.laps).toHaveLength(50);
-    expect(result.playerBestLap?.lapNum).toBe(1000);
+    expect(result.playerBestLap?.lapNumber).toBe(1000);
     expect(reads).toHaveBeenCalledTimes(1);
     expect(reads.mock.results[0].value.size).toBe(51);
     expect(queries.mock.calls.some(([sql]) => sql.includes('session_events') || sql.includes('session_lap_passes'))).toBe(false);
@@ -110,10 +110,10 @@ describe('SQL comparison query', () => {
       ...lap(1, 100), s1: null, s2: 40, s3: null, isInferred: true, isOutLap: true, isPitStop: true,
       fCompound: 'Soft', rCompound: 'Medium', flCompound: 'FL', frCompound: 'FR', rlCompound: 'RL', rrCompound: 'RR',
       tireWear: { fl: 0.9, fr: 0.8, rl: 0.7, rr: 0.6, avg: 0.75 }, fuel: 20, fuelUsed: 2,
-      virtualEnergy: 40, virtualEnergyUsed: 3, elapsedSeconds: 100, elapsedTimeString: '1:40',
-      pitStopDurationString: '0:20', gapToLeaderString: '+1.0',
+      virtualEnergy: 40, virtualEnergyUsed: 3, elapsedSeconds: 100, 
+ 
     }, { ...lap(2, 0), lapTime: null, isValid: false }] }]);
-    source.matchingReplayFile = { name: 'archived.Vcr', path: 'missing', sizeBytes: 1, hasRain: true, weatherCondition: 'Wet' };
+    source.matchingReplayFile = { name: 'archived.Vcr', path: 'missing', fileSizeBytes: 1, hasRain: true, weatherCondition: 'Wet' };
     addSession(db, source);
     const rows = comparisonRows.readComparisonLapRows(db, [0, 1].map(lapOrdinal => ({ session_id: source.id, driver_ordinal: 0, lap_ordinal: lapOrdinal })));
     const stored = readSession(db, source.id)!;
@@ -133,15 +133,15 @@ describe('SQL comparison query', () => {
       ...Array.from({ length: 52 }, (_, i) => lap(i + 4, 100)),
     ] }]);
     const newest = fixture('newest', 300, 'Spa', [{ name: 'Player', player: true, laps: [lap(1, 99)] }]);
-    linked.matchingReplayFile = { name: 'linked.Vcr', path: 'linked.Vcr', sizeBytes: 1 };
-    newest.matchingReplayFile = { name: 'newest.Vcr', path: 'newest.Vcr', sizeBytes: 1 };
+    linked.matchingReplayFile = { name: 'linked.Vcr', path: 'linked.Vcr', fileSizeBytes: 1 };
+    newest.matchingReplayFile = { name: 'newest.Vcr', path: 'newest.Vcr', fileSizeBytes: 1 };
     const sessions = [older, linked, newest];
     sessions.forEach(session => addSession(db, session));
     const filters = { trackName: 'Spa', playerOnly: true, telemetryOnly: true };
     const first = queryCompactComparableLaps(db, filters, { pageSize: 50 });
     expect(first.total).toBe(53);
     expect(first.laps).toHaveLength(50);
-    expect(first.laps.every(item => item.sessionId === 'linked' && (item.lapNum ?? 0) >= 4)).toBe(true);
+    expect(first.laps.every(item => item.sessionId === 'linked' && (item.lapNumber ?? 0) >= 4)).toBe(true);
     const second = queryCompactComparableLaps(db, filters, { page: 2, pageSize: 50 });
     expect(second.laps.map(item => item.sessionId)).toEqual(['linked', 'linked', 'newest']);
     const scoped = queryCompactComparableLaps(db, { ...filters, sessionId: 'newest' }, { pageSize: 50 });
@@ -169,7 +169,7 @@ describe('SQL comparison query', () => {
       fixture('wrong-layout', 300, 'Silverstone', [{ name: 'Player', player: true, laps: [lap(1, 80)] }]),
     ];
     for (const session of sessions) {
-      session.matchingReplayFile = { name: `${session.id}.Vcr`, path: 'retained', sizeBytes: 1,
+      session.matchingReplayFile = { name: `${session.id}.Vcr`, path: 'retained', fileSizeBytes: 1,
         hasRain: true, weatherCondition: 'Dynamic Weather' };
       session.timeString = `Date ${session.id}`;
       addSession(db, session);
@@ -183,7 +183,7 @@ describe('SQL comparison query', () => {
       expect(row).toMatchObject({
         sessionId: expected?.sessionId, driverOrdinal: expected?.driverOrdinal, lapOrdinal: expected?.lapOrdinal,
         driverName: expected?.driverName, carType: expected?.carType, carClass: expected?.carClass,
-        lapTime: expected?.lapTime, lapTimeString: expected?.lapTimeString, dateString: expected?.dateString,
+        lapTime: expected?.lapTime, timeString: expected?.timeString,
         matchingReplayFile: expected?.matchingReplayFile, isAllTimePB: expected?.isAllTimePB,
         isSessionBest: expected?.isSessionBest, isPlayer: expected?.isPlayer,
         hasRain: true, weatherCondition: 'Dynamic Weather', isValid: true, isOutLap: false, isPitStop: false,
@@ -191,7 +191,7 @@ describe('SQL comparison query', () => {
       expect(row).not.toHaveProperty('pacePercentage');
     }
     expect(queryTelemetryComparableLaps(db, { ...filters, playerOnly: true }).total).toBe(3);
-    expect(queryTelemetryComparableLaps(db, { ...filters, sessionId: 'current', driverOrdinal: 1, lapNum: 1 }).laps[0])
+    expect(queryTelemetryComparableLaps(db, { ...filters, sessionId: 'current', driverOrdinal: 1, lapNumber: 1 }).laps[0])
       .toMatchObject({ driverName: 'Rival', isPlayer: false, lapOrdinal: 0 });
     expect(queryTelemetryComparableLaps(db, { ...filters, carClass: 'GT3' }).total).toBe(0);
     db.close();

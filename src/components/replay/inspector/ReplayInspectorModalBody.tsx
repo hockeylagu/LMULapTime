@@ -53,7 +53,7 @@ export interface ReplayInspectorModalBodyProps {
   telemetryResolution: TelemetryResolution;
   handleChangeResolution: (res: TelemetryResolution) => void;
   handleSelectDriver: (slot: number) => void;
-  handleSelectLap: (lapNum: number) => void;
+  handleSelectLap: (lapNumber: number) => void;
   currentPoint: ReplayTrajectoryPoint | undefined;
   currentLapSummary: ReplayLapSummary | null | undefined;
   lapDeltas: { lapDelta: number | null; s1Delta: number | null; s2Delta: number | null; s3Delta: number | null } | null;

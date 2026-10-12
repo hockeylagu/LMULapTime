@@ -58,14 +58,14 @@ export function composeReplayMetadata(options: ComposeReplayMetadataOptions): Re
       if (linkedPlayer && !linkedPlayer.carClass) linkedPlayer.carClass = driver.carClass;
     }
     if (driver?.carType) {
-      metadata.carModel = driver.carType;
-      if (linkedPlayer && !linkedPlayer.carModel) linkedPlayer.carModel = driver.carType;
+      metadata.carType = driver.carType;
+      if (linkedPlayer && !linkedPlayer.carType) linkedPlayer.carType = driver.carType;
     }
     if (driver?.laps?.length && linkedPlayer) {
       metadata.laps = driver.laps
         .filter(lap => typeof lap.lapTime === 'number' && lap.lapTime > 0)
         .map(lap => ({
-          lapNumber: lap.lapNum,
+          lapNumber: lap.lapNumber,
           lapTimeSec: lap.lapTime as number,
           s1Sec: lap.s1 || 0,
           s2Sec: lap.s2 || 0,
@@ -98,14 +98,11 @@ export function composeReplayMetadata(options: ComposeReplayMetadataOptions): Re
     }
   }
 
-  if (options.duckdbFilename) {
-    metadata.hasDuckDbTelemetry = true;
-    metadata.duckdbFilename = options.duckdbFilename;
-  }
+  if (options.duckdbFilename) metadata.duckdbFilename = options.duckdbFilename;
 
   for (const entry of metadata.drivers) {
     const vehicle=dataPlugin.vehicle(entry);
-    if(vehicle){entry.carModel=vehicle.model;entry.carClass=vehicle.carClass;}
+    if(vehicle){entry.carType=vehicle.model;entry.carClass=vehicle.carClass;}
   }
   return metadata;
 }
@@ -123,8 +120,8 @@ export function buildReplayListSummaries(input: ReplaySummarySourceData): Replay
       : path.join(input.replaysDir, filename);
 
     try {
-      let mtimeMs = stored?.file_mtime || 0;
-      let fileSizeBytes = stored?.file_size || 0;
+      let mtimeMs = stored?.file_mtime_ms || 0;
+      let fileSizeBytes = stored?.file_size_bytes || 0;
       let fileOnDisk = false;
 
       if (fs.existsSync(filePath)) {
@@ -155,7 +152,7 @@ export function buildReplayListSummaries(input: ReplaySummarySourceData): Replay
       const markedPlayers = metadata.drivers?.filter((driver: ReplayDriverEntry) => driver.isPlayer) ?? [];
       const playerDriver = markedPlayers.length === 1 ? markedPlayers[0] : undefined;
       const carClass = matched?.playerDriver?.carClass || playerDriver?.carClass || metadata.carClass;
-      const carModel = matched?.playerDriver?.carType || playerDriver?.carModel || metadata.carModel;
+      const carType = matched?.playerDriver?.carType || playerDriver?.carType || metadata.carType;
       const carClasses = Array.from(new Set([
         ...(metadata.drivers?.map(driver => driver.carClass).filter((value): value is string => Boolean(value)) || []),
         ...(matched?.drivers?.map(driver => driver.carClass).filter((value): value is string => Boolean(value)) || []),
@@ -174,7 +171,6 @@ export function buildReplayListSummaries(input: ReplaySummarySourceData): Replay
         path: filePath,
         fileSizeBytes,
         mtimeMs,
-        trackName: displayTrack,
         trackVenue: matched?.trackVenue || metadata.trackVenue,
         trackCourse: matched?.trackCourse || metadata.trackCourse || filenameTrack || undefined,
         displayTrack,
@@ -185,9 +181,8 @@ export function buildReplayListSummaries(input: ReplaySummarySourceData): Replay
         driversCount: metadata.drivers?.length,
         matchedSessionId: matched?.id,
         carClass: carClass || undefined,
-        carModel: carModel || undefined,
+        carType: carType || undefined,
         carClasses: carClasses.length > 0 ? carClasses : undefined,
-        hasDuckDbTelemetry: Boolean(matchedDuckFilename),
         duckdbFilename: matchedDuckFilename,
         hasRain: metadata.hasRain,
         maxRainIntensity: metadata.maxRainIntensity,

@@ -1,13 +1,16 @@
 import React from 'react';
 import { ArrowDownRight, ArrowUpRight, Ban, Car, CloudRain, Flag, Shield, ShieldAlert, Swords, Wrench, type LucideIcon } from 'lucide-react';
 import type { LapData } from '../../../../shared/types/index.js';
+import type { LapEvents } from '../../../../shared/domain/lapComparison.js';
 import { formatElapsedSeconds } from '../../../../shared/domain/formatters.js';
 import { getTrackLimitSeverity } from '../../../utils/trackLimits.js';
 import type { LapDetailSection } from './lapDetailSections.js';
 
 export interface SessionLapDetailsRowProps {
-  lapNum: number;
+  lapNumber: number;
   lap?: LapData;
+  /** The events that fell on the lap. */
+  lapEvents?: LapEvents;
   sections: LapDetailSection[];
   columnCount: number;
 }
@@ -42,14 +45,14 @@ export function lapEventTime(lap: LapData | undefined, elapsed: number | undefin
   return `Session ${formatElapsedSeconds(elapsed)}`;
 }
 
-function eventElapsed(lap: LapData | undefined, label: string, index: number): number | undefined {
-  if (label === 'Incidents') return lap?.incidents?.[index]?.elapsedSeconds;
-  if (label === 'Track limits') return lap?.trackLimits?.[index]?.elapsedSeconds;
-  if (label === 'Penalties') return lap?.penalties?.[index]?.elapsedSeconds;
+function eventElapsed(events: LapEvents | undefined, label: string, index: number): number | undefined {
+  if (label === 'Incidents') return events?.incidents[index]?.elapsedSeconds;
+  if (label === 'Track limits') return events?.trackLimits[index]?.elapsedSeconds;
+  if (label === 'Penalties') return events?.penalties[index]?.elapsedSeconds;
   return undefined;
 }
 
-const DetailLine: React.FC<{ line: string; section: string; lap?: LapData; index: number }> = ({ line, section, lap, index }) => {
+const DetailLine: React.FC<{ line: string; section: string; lap?: LapData; events?: LapEvents; index: number }> = ({ line, section, lap, events, index }) => {
   const colon = line.indexOf(': ');
   const prefix = colon < 0 ? undefined : line.slice(0, colon);
   let { color } = sectionStyle(section);
@@ -60,12 +63,12 @@ const DetailLine: React.FC<{ line: string; section: string; lap?: LapData; index
     else if (prefix === 'Defending') Icon = Shield;
     else Icon = Car;
   }
-  if (section === 'Track limits' && lap?.trackLimits?.[index]) {
-    const severity = getTrackLimitSeverity(lap.trackLimits[index]);
+  if (section === 'Track limits' && events?.trackLimits[index]) {
+    const severity = getTrackLimitSeverity(events.trackLimits[index]);
     color = severity === 'serious' ? LOSS : severity === 'warning' ? WARN : NEUTRAL;
     if (severity !== 'cleared') Icon = Flag;
   }
-  const time = lapEventTime(lap, eventElapsed(lap, section, index));
+  const time = lapEventTime(lap, eventElapsed(events, section, index));
   return (
     <div className="flex items-start gap-2.5">
       {Icon && <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${color}`} aria-hidden="true" />}
@@ -80,16 +83,16 @@ const DetailLine: React.FC<{ line: string; section: string; lap?: LapData; index
 };
 
 /** A quiet lap debrief: neutral prose, small severity cues, and emphasis on places gained. */
-export const SessionLapDetailsRow: React.FC<SessionLapDetailsRowProps> = ({ lapNum, lap, sections, columnCount }) => {
+export const SessionLapDetailsRow: React.FC<SessionLapDetailsRowProps> = ({ lapNumber, lap, lapEvents, sections, columnCount }) => {
   const context = sections.filter(section => section.label === 'Left out of average' || section.label === 'Conditions');
   const events = sections.filter(section => !context.includes(section));
   const priority = (label: string) => label.startsWith('Position ') ? 0 : label === 'Pit stop' ? 1 : 2;
   const orderedEvents = [...events].sort((a, b) => priority(a.label) - priority(b.label));
   const compact = events.length === 1;
   return (
-  <tr className="bg-lmu-bg/60" data-testid={`lap-details-${lapNum}`}>
+  <tr className="bg-lmu-bg/60" data-testid={`lap-details-${lapNumber}`}>
     <td colSpan={columnCount} className="px-6 py-4 pl-10">
-      <dl aria-label={`What happened on lap ${lapNum}`} className="grid max-w-[1200px] grid-cols-2 gap-x-12 gap-y-4 font-sans">
+      <dl aria-label={`What happened on lap ${lapNumber}`} className="grid max-w-[1200px] grid-cols-2 gap-x-12 gap-y-4 font-sans">
         {orderedEvents.map((section) => {
           const { Icon, color } = sectionStyle(section.label);
           return (
@@ -99,7 +102,7 @@ export const SessionLapDetailsRow: React.FC<SessionLapDetailsRowProps> = ({ lapN
                 {section.label}
               </dt>
               <dd className={`space-y-1.5 ${compact ? '' : 'pl-6'}`}>
-                {section.lines.map((line, index) => <DetailLine key={`${index}-${line}`} line={line} section={section.label} lap={lap} index={index} />)}
+                {section.lines.map((line, index) => <DetailLine key={`${index}-${line}`} line={line} section={section.label} lap={lap} events={lapEvents} index={index} />)}
               </dd>
             </div>
           );

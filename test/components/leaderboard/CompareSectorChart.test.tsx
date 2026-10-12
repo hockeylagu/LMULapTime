@@ -11,9 +11,8 @@ import { ComparableLap } from '../../../shared/types/index.js';
 const baseline: ComparableLap = {
   id: 'baseline',
   tag: 'Baseline',
-  lapNum: 1,
+  lapNumber: 1,
   lapTime: 100,
-  lapTimeString: '1:40.000',
   s1: 30,
   s2: 35,
   s3: 35,
@@ -22,9 +21,8 @@ const baseline: ComparableLap = {
 const target: ComparableLap = {
   id: 'target',
   tag: 'Target',
-  lapNum: 2,
+  lapNumber: 2,
   lapTime: 101,
-  lapTimeString: '1:41.000',
   s1: 31,
   s2: 34.5,
   s3: 35.5,
@@ -97,9 +95,8 @@ describe('CompareSectorTooltip component', () => {
     const fasterLap: ComparableLap = {
       id: 'target_faster',
       tag: 'Faster Lap',
-      lapNum: 3,
+      lapNumber: 3,
       lapTime: 99.5,
-      lapTimeString: '1:39.500',
       s1: 29.5,
       s2: 35,
       s3: 35,
@@ -108,9 +105,8 @@ describe('CompareSectorTooltip component', () => {
     const evenLap: ComparableLap = {
       id: 'target_even',
       tag: 'Even Lap',
-      lapNum: 4,
+      lapNumber: 4,
       lapTime: 100,
-      lapTimeString: '1:40.000',
       s1: 30,
       s2: 35,
       s3: 35,

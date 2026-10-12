@@ -75,7 +75,7 @@ describe('telemetryMatcher', () => {
       {
         filename: 'Bahrain International Circuit_P_2026-09-13T20_33_32Z.duckdb',
         filePath: 'C:\\fake\\Bahrain.duckdb',
-        fileMtimeMs: 1773606812000,
+        mtimeMs: 1773606812000,
         fileSizeBytes: 1024,
         trackName: 'Bahrain International Circuit',
         sessionType: 'P',
@@ -85,7 +85,7 @@ describe('telemetryMatcher', () => {
       {
         filename: 'Autodromo Nazionale Monza_R_2026-09-08T09_13_20Z.duckdb',
         filePath: 'C:\\fake\\Monza.duckdb',
-        fileMtimeMs: 1773134000000,
+        mtimeMs: 1773134000000,
         fileSizeBytes: 1024,
         trackName: 'Autodromo Nazionale Monza',
         sessionType: 'R',
@@ -114,7 +114,7 @@ describe('telemetryMatcher', () => {
       {
         filename: 'Circuit de la Sarthe_R_2026-09-14T18_58_09Z.duckdb',
         filePath: 'C:\\fake\\lemans-old.duckdb',
-        fileMtimeMs: 0,
+        mtimeMs: 0,
         fileSizeBytes: 1024,
         trackName: 'Circuit de la Sarthe',
         sessionType: 'R',
@@ -124,7 +124,7 @@ describe('telemetryMatcher', () => {
       {
         filename: 'Circuit de la Sarthe_R_2026-09-14T19_42_54Z.duckdb',
         filePath: 'C:\\fake\\lemans-last.duckdb',
-        fileMtimeMs: 0,
+        mtimeMs: 0,
         fileSizeBytes: 1024,
         trackName: 'Circuit de la Sarthe',
         sessionType: 'R',
@@ -151,7 +151,7 @@ describe('telemetryMatcher', () => {
     const duckFile: DuckDbFileInfo = {
       filename: 'Circuit de la Sarthe_R_2026-09-14T18_58_09Z.duckdb',
       filePath: 'C:\\fake\\lemans.duckdb',
-      fileMtimeMs: 0,
+      mtimeMs: 0,
       fileSizeBytes: 1024,
       trackName: 'Circuit de la Sarthe',
       sessionType: 'R',
@@ -174,7 +174,7 @@ describe('telemetryMatcher', () => {
     const partial: DuckDbFileInfo = {
       filename: 'Circuit de la Sarthe_R_partial.duckdb',
       filePath: 'C:\\fake\\partial.duckdb',
-      fileMtimeMs: 0,
+      mtimeMs: 0,
       fileSizeBytes: 1024,
       trackName: 'Circuit de la Sarthe',
       sessionType: 'R',
@@ -205,7 +205,7 @@ describe('telemetryMatcher', () => {
       {
         filename: 'Bahrain International Circuit_P_2026-09-13T20_33_32Z.duckdb',
         filePath: 'C:\\fake\\Bahrain.duckdb',
-        fileMtimeMs: 1773606812000,
+        mtimeMs: 1773606812000,
         fileSizeBytes: 1024,
         trackName: 'Bahrain International Circuit',
         sessionType: 'P',
@@ -236,7 +236,7 @@ describe('telemetryMatcher', () => {
     const first = {
       filename: 'Spa_P_2026-09-14T10_00_00Z.duckdb',
       filePath: 'C:\\fake\\spa-first.duckdb',
-      fileMtimeMs: 0,
+      mtimeMs: 0,
       fileSizeBytes: 1024,
       trackName: 'Spa-Francorchamps',
       sessionType: 'P',
@@ -269,7 +269,7 @@ describe('telemetryMatcher', () => {
     expect(findDuckDbForSession([], session)).toBeNull();
 
     const wrongTrack: DuckDbFileInfo = {
-      filename: 'Bahrain_R_2026-09-14T10_00_00Z.duckdb', filePath: 'wrong', fileMtimeMs: 0,
+      filename: 'Bahrain_R_2026-09-14T10_00_00Z.duckdb', filePath: 'wrong', mtimeMs: 0,
       fileSizeBytes: 1, trackName: 'Bahrain', sessionType: 'R', timestampStr: '', timestampEpochMs: 0,
     };
     const wrongType = { ...wrongTrack, trackName: 'Spa-Francorchamps', sessionType: 'P' };
@@ -283,7 +283,7 @@ describe('telemetryMatcher', () => {
       durationSec: 1, drivers: [],
     };
     const candidate: DuckDbFileInfo = {
-      filename: 'Spa_P_partial.duckdb', filePath: 'single', fileMtimeMs: 0, fileSizeBytes: 1,
+      filename: 'Spa_P_partial.duckdb', filePath: 'single', mtimeMs: 0, fileSizeBytes: 1,
       trackName: 'Spa-Francorchamps', sessionType: 'P', timestampStr: '', timestampEpochMs: 0,
     };
     expect(findDuckDbForReplay([candidate], replay)?.file).toBe(candidate);
@@ -297,7 +297,7 @@ describe('telemetryMatcher', () => {
       drivers: [{ name: 'Ann' }, { name: 'Joann' }], playerDriverName: 'Ann',
     };
     const file: DuckDbFileInfo = {
-      filename: 'Monza_P.duckdb', filePath: 'Monza_P.duckdb', fileMtimeMs: 0, fileSizeBytes: 1,
+      filename: 'Monza_P.duckdb', filePath: 'Monza_P.duckdb', mtimeMs: 0, fileSizeBytes: 1,
       trackName: 'Autodromo Nazionale Monza', sessionType: 'P', timestampStr: '', timestampEpochMs: 0,
       driverName: 'Joann',
     };
@@ -317,7 +317,7 @@ describe('telemetryMatcher', () => {
       ],
     };
     const file: DuckDbFileInfo = {
-      filename: 'Monza_P.duckdb', filePath: 'Monza_P.duckdb', fileMtimeMs: 0, fileSizeBytes: 1,
+      filename: 'Monza_P.duckdb', filePath: 'Monza_P.duckdb', mtimeMs: 0, fileSizeBytes: 1,
       trackName: 'Autodromo Nazionale Monza', sessionType: 'P', timestampStr: '', timestampEpochMs: 0,
       driverName: 'Joann',
     };
@@ -333,7 +333,7 @@ describe('telemetryMatcher', () => {
       durationSec: 1, drivers: [{ slot: 1, name: 'Samuel', carNumber: '1', vehicleId: 'car' }],
     };
     const candidate: DuckDbFileInfo = {
-      filename: 'Spa_P_2026.duckdb', filePath: 'candidate', fileMtimeMs: 0, fileSizeBytes: 1,
+      filename: 'Spa_P_2026.duckdb', filePath: 'candidate', mtimeMs: 0, fileSizeBytes: 1,
       trackName: 'Spa-Francorchamps', sessionType: 'P', timestampStr: '', timestampEpochMs: 2_000_000,
       driverName: 'Other Driver',
     };
@@ -347,7 +347,7 @@ describe('telemetryMatcher', () => {
       durationSec: 1, drivers: [],
     };
     const makeCandidate = (name: string, timestampEpochMs: number): DuckDbFileInfo => ({
-      filename: name, filePath: name, fileMtimeMs: 0, fileSizeBytes: 1,
+      filename: name, filePath: name, mtimeMs: 0, fileSizeBytes: 1,
       trackName: 'Spa-Francorchamps', sessionType: 'P', timestampStr: '', timestampEpochMs,
     });
     const nearest = makeCandidate('nearest.duckdb', 105_000);
@@ -355,7 +355,7 @@ describe('telemetryMatcher', () => {
     expect(findDuckDbForReplay([distant, nearest], replay, 100_000)?.file.filename).toBe('nearest.duckdb');
   });
 
-  it('matches replay to DuckDB using durationSec when replay file mtime was recorded at session end', () => {
+  it('matches replay to DuckDB using durationSec when replay file mtimeMs was recorded at session end', () => {
     const replay: ReplayMetadata = {
       filename: 'Daytona_R1.Vcr',
       filePath: 'C:\\fake\\Daytona_R1.Vcr',
@@ -371,7 +371,7 @@ describe('telemetryMatcher', () => {
     const candidate: DuckDbFileInfo = {
       filename: 'Daytona_R_session_start.duckdb',
       filePath: 'C:\\fake\\Daytona.duckdb',
-      fileMtimeMs: 0,
+      mtimeMs: 0,
       fileSizeBytes: 1000,
       trackName: 'Daytona International Speedway',
       sessionType: 'R',
@@ -397,7 +397,7 @@ describe('telemetryMatcher', () => {
 
   it('rejects a low-margin replay match instead of silently choosing one candidate', () => {
     const at = (filename: string, iso: string): DuckDbFileInfo => ({
-      filename, filePath: `C:\\fake\\${filename}`, fileMtimeMs: 0, fileSizeBytes: 1024,
+      filename, filePath: `C:\\fake\\${filename}`, mtimeMs: 0, fileSizeBytes: 1024,
       trackName: 'Spa', sessionType: 'R', timestampStr: iso, timestampEpochMs: Date.parse(iso),
     });
     const replay = { filename: 'Spa R1.Vcr', trackName: 'Spa', sessionType: 'Race', drivers: [] } as unknown as ReplayMetadata;
@@ -436,14 +436,14 @@ describe('telemetryMatcher', () => {
 
     it('reads recording metadata and reuses it through the version-checked catalog', async () => {
       fs.writeFileSync(path.join(dir, spaName), '');
-      duckdb.metadata = { trackName: 'Circuit de Spa-Francorchamps', sessionType: 'Q', driverName: 'Test Driver', carName: 'Porsche 963', RecordingTime: '2026-09-13T19_30_00Z' };
+      duckdb.metadata = { trackName: 'Circuit de Spa-Francorchamps', sessionType: 'Q', driverName: 'Test Driver', carType: 'Porsche 963', RecordingTime: '2026-09-13T19_30_00Z' };
       duckdb.laps = [{ lapTimeSec: 12 }, { lapTimeSec: 139.4 }, { lapTimeSec: 137.9 }];
 
       const [listed] = scanDuckDbDirectory(dir);
       const enriched = await enrichDuckDbFileInfo(listed);
 
       expect(enriched).toMatchObject({
-        trackName: 'Circuit de Spa-Francorchamps', sessionType: 'Q', driverName: 'Test Driver', carName: 'Porsche 963',
+        trackName: 'Circuit de Spa-Francorchamps', sessionType: 'Q', driverName: 'Test Driver', carType: 'Porsche 963',
         timestampEpochMs: Date.parse('2026-09-13T19:30:00Z'), lapsCount: 3, bestLapTime: 137.9,
       });
       expect(duckdb.opened[0].closed).toBe(true);

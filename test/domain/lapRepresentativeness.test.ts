@@ -4,18 +4,19 @@ import { selectCleanLapCandidates } from '../../shared/domain/lapComparison.js';
 import type { LapIncident, LapTraffic, NonRepresentativeReason, TrafficCar } from '../../shared/types/index.js';
 
 interface TestLap {
-  lapNum: number;
+  lapNumber: number;
   lapTime: number | null;
   isValid: boolean;
   isPitStop: boolean;
   isOutLap?: boolean;
-  incidents?: LapIncident[];
   traffic?: LapTraffic;
   nonRepresentativeReason?: NonRepresentativeReason;
 }
 
 const contact: LapIncident = { type: 'contact', description: 'Contact with another car (326N)' };
 const damage: LapIncident = { type: 'damage', description: 'New front wing damage reported' };
+/** An event of the driver's log on a lap. */
+const on = (lapNumber: number, event: LapIncident): LapIncident => ({ ...event, lapNumber });
 const gt3: TrafficCar = { name: 'Rui Paiva', carClass: 'GT3', sameClass: false };
 
 const trafficWith = (traffic: Partial<LapTraffic>): LapTraffic => ({
@@ -29,36 +30,31 @@ const daytonaTimes = [
 ];
 
 function lapsFrom(times: Array<number | null>): TestLap[] {
-  return times.map((lapTime, i) => ({ lapNum: i + 1, lapTime, isValid: true, isPitStop: false }));
+  return times.map((lapTime, i) => ({ lapNumber: i + 1, lapTime, isValid: true, isPitStop: false }));
 }
 
 describe('markNonRepresentativeLaps', () => {
   it('marks the slow laps that had contact and leaves the rest of a race alone', () => {
     const laps = lapsFrom(daytonaTimes);
-    laps[8].incidents = [contact];
-    laps[14].incidents = [contact];
+    const incidents = [on(9, contact), on(15, contact)];
 
-    markNonRepresentativeLaps(laps);
+    markNonRepresentativeLaps(laps, incidents);
 
-    const marked = laps.filter(l => l.nonRepresentativeReason).map(l => [l.lapNum, l.nonRepresentativeReason]);
+    const marked = laps.filter(l => l.nonRepresentativeReason).map(l => [l.lapNumber, l.nonRepresentativeReason]);
     // Lap 1, the standing start, is already out of flying pace and is not marked.
     expect(marked).toEqual([[9, 'contact'], [15, 'contact']]);
   });
 
   it('keeps a lap with contact that was still faster than the median', () => {
     const laps = lapsFrom([96.0, 96.0, 96.4, 95.8, 96.2, 96.1]);
-    laps[3].incidents = [contact];
-
-    markNonRepresentativeLaps(laps);
+    markNonRepresentativeLaps(laps, [on(4, contact)]);
 
     expect(laps[3].nonRepresentativeReason).toBeUndefined();
   });
 
   it('treats reported damage like contact', () => {
     const laps = lapsFrom([96.0, 96.0, 96.4, 96.9, 96.2, 96.1]);
-    laps[3].incidents = [damage];
-
-    markNonRepresentativeLaps(laps);
+    markNonRepresentativeLaps(laps, [on(4, damage)]);
 
     expect(laps[3].nonRepresentativeReason).toBe('contact');
   });
@@ -108,10 +104,9 @@ describe('markNonRepresentativeLaps', () => {
 
   it('calls a slow lap with contact contact even when there was traffic too', () => {
     const laps = lapsFrom([100, 100, 100, 100, 104]);
-    laps[4].incidents = [contact];
     laps[4].traffic = trafficWith({ passedBy: [gt3] });
 
-    markNonRepresentativeLaps(laps);
+    markNonRepresentativeLaps(laps, [on(5, contact)]);
 
     expect(laps[4].nonRepresentativeReason).toBe('contact');
   });
@@ -138,11 +133,10 @@ describe('markNonRepresentativeLaps', () => {
 describe('selectCleanLapCandidates with non-representative laps', () => {
   it('leaves out the laps the parser marked', () => {
     const laps = lapsFrom(daytonaTimes);
-    laps[8].incidents = [contact];
-    laps[14].incidents = [contact];
-    markNonRepresentativeLaps(laps);
+    const incidents = [on(9, contact), on(15, contact)];
+    markNonRepresentativeLaps(laps, incidents);
 
-    const clean = selectCleanLapCandidates(laps).map(l => l.lapNum);
+    const clean = selectCleanLapCandidates(laps).map(l => l.lapNumber);
 
     expect(clean).not.toContain(9);
     expect(clean).not.toContain(15);

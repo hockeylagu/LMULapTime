@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router';
-import { isSessionEmpty, getDisplayTrackName } from '../../../shared/domain/formatters.js';
+import { driverLapsCount, isSessionEmpty, getDisplayTrackName, formatTime } from '../../../shared/domain/formatters.js';
 import { PaceBadge } from '../common/PaceBadge.js';
 import { ReplayIndicator } from '../common/replay/ReplayIndicator.js';
 import { CarIdentity } from '../vehicle/CarIdentity.js';
@@ -98,7 +98,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
             <ReplayIndicator
               sessionId={s.id}
               hasReplay={Boolean(s.matchingReplayFile)}
-              hasDuckDbTelemetry={s.hasDuckDbTelemetry || s.matchingReplayFile?.hasDuckDbTelemetry}
+              hasDuckDbTelemetry={Boolean(s.duckdbFilename)}
               hideIfEmpty={true}
               to={replayUrl}
               onClick={onOpenReplay ? () => onOpenReplay(s.id) : undefined}
@@ -114,7 +114,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
             <p className="text-[10px] font-semibold text-lmu-muted uppercase tracking-wider">Best lap</p>
             <div className="h-7 flex items-center mt-0.5">
               <span className="font-mono font-bold text-lg text-lmu-text tabular-nums">
-                {p?.bestLapTimeString || '--:--.---'}
+                {formatTime(p?.bestLapTime)}
               </span>
             </div>
           </div>
@@ -138,7 +138,7 @@ export const SessionGridCard: React.FC<SessionGridCardProps> = ({
         <div className="flex items-center justify-between gap-3">
           <div className="flex shrink-0 items-center gap-2 whitespace-nowrap">
             <span className="text-lmu-muted">
-              Laps: <strong className="text-lmu-text-soft font-mono tabular-nums">{p ? p.lapsCount : 0}</strong>
+              Laps: <strong className="text-lmu-text-soft font-mono tabular-nums">{p ? driverLapsCount(p) : 0}</strong>
             </span>
             <FinishPosition session={s} label />
           </div>

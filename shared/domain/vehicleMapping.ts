@@ -148,10 +148,10 @@ export function mapVehicleIdToModel(vehicleId?: string): string {
 /**
  * Maps vehicle model or vehicle ID string to canonical LMU car class (GT3, Hyper, LMP2, LMP2_ELMS, GTE, LMP3).
  */
-export function mapVehicleIdToClass(vehicleId?: string, carModel?: string): string {
+export function mapVehicleIdToClass(vehicleId?: string, carType?: string): string {
   const known = lookupVehicleFile(vehicleId);
   if (known) return known.carClass;
-  const model = carModel || mapVehicleIdToModel(vehicleId);
+  const model = carType || mapVehicleIdToModel(vehicleId);
   const combined = `${vehicleId || ''} ${model}`.toUpperCase();
 
   // GTE
@@ -264,7 +264,7 @@ export function mapVehicleIdToClass(vehicleId?: string, carModel?: string): stri
 interface RosterVehicle {
   name: string;
   vehicleId?: string;
-  carModel?: string;
+  carType?: string;
   carClass?: string;
   isPlayer?: boolean;
 }
@@ -275,7 +275,7 @@ interface RosterVehicle {
  * the current catalog and rules, so rosters stored by an older build are corrected on read.
  * The replay's own car follows its player. Returns the same object.
  */
-export function resolveRosterVehicles<T extends { drivers?: RosterVehicle[]; carModel?: string; carClass?: string }>(
+export function resolveRosterVehicles<T extends { drivers?: RosterVehicle[]; carType?: string; carClass?: string }>(
   metadata: T,
   sessionDrivers?: ReadonlyArray<{ name: string; carType?: string; carClass?: string }>,
 ): T {
@@ -298,16 +298,16 @@ export function resolveRosterVehicles<T extends { drivers?: RosterVehicle[]; car
     const key = driver.name.trim().toLowerCase();
     const logged = key && replayNameCounts.get(key) === 1 ? byName.get(key) : undefined;
     if (logged?.carType && logged.carType !== 'Unknown Car' && logged.carClass && logged.carClass !== 'General') {
-      driver.carModel = normalizeLmuCarType(logged.carType);
+      driver.carType = normalizeLmuCarType(logged.carType);
       driver.carClass = logged.carClass;
     } else if (driver.vehicleId) {
-      driver.carModel = mapVehicleIdToModel(driver.vehicleId);
-      driver.carClass = mapVehicleIdToClass(driver.vehicleId, driver.carModel) || undefined;
+      driver.carType = mapVehicleIdToModel(driver.vehicleId);
+      driver.carClass = mapVehicleIdToClass(driver.vehicleId, driver.carType) || undefined;
     }
   }
   const markedPlayers = drivers.filter(driver => driver.isPlayer);
   const player = markedPlayers.length === 1 ? markedPlayers[0] : undefined;
-  if (player?.carModel) metadata.carModel = player.carModel;
+  if (player?.carType) metadata.carType = player.carType;
   if (player?.carClass) metadata.carClass = player.carClass;
   return metadata;
 }
@@ -316,9 +316,9 @@ export function resolveRosterVehicles<T extends { drivers?: RosterVehicle[]; car
  * A driver's car class: the class recorded for the entry, else derived from its vehicle.
  * Returns '' when the car is not recognised (e.g. an unknown mod).
  */
-export function resolveDriverCarClass(driver?: { carClass?: string; vehicleId?: string; carModel?: string } | null): string {
+export function resolveDriverCarClass(driver?: { carClass?: string; vehicleId?: string; carType?: string } | null): string {
   if (!driver) return '';
-  return driver.carClass || mapVehicleIdToClass(driver.vehicleId, driver.carModel);
+  return driver.carClass || mapVehicleIdToClass(driver.vehicleId, driver.carType);
 }
 
 /**

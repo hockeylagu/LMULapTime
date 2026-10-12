@@ -7,9 +7,9 @@ import { getStoredReplayFileInfo } from './dbReplayMetadataStore.js';
 export const REPLAY_MATCHING_PROJECTION_VERSION = 2;
 
 /** Compact persistent matching facts avoid hydrating every compressed replay roster at startup. */
-export function writeReplayMatchingFacts(db: Database, filename: string, filePath: string, mtime: number, size: number, metadata: ReplayMetadata): void {
-  const entry = replayIndexEntryFromStored({ filename, file_path: filePath, file_mtime: mtime, file_size: size, metadata });
-  const start = mtime - Math.round((entry.durationSec || 0) * 1000);
+export function writeReplayMatchingFacts(db: Database, filename: string, filePath: string, mtimeMs: number, fileSizeBytes: number, metadata: ReplayMetadata): void {
+  const entry = replayIndexEntryFromStored({ filename, file_path: filePath, file_mtime_ms: mtimeMs, file_size_bytes: fileSizeBytes, metadata });
+  const start = mtimeMs - Math.round((entry.durationSec || 0) * 1000);
   db.prepare('UPDATE replay_metadata SET matching_json=?,recording_start_ms=?,matching_version=? WHERE filename=?')
     .run(JSON.stringify(entry), start, REPLAY_MATCHING_PROJECTION_VERSION, filename);
 }
@@ -19,7 +19,7 @@ export function initReplayMatchingSchema(db: Database): void {
   if (!columns.some(column => column.name === 'matching_json')) db.exec('ALTER TABLE replay_metadata ADD COLUMN matching_json TEXT');
   if (!columns.some(column => column.name === 'recording_start_ms')) db.exec('ALTER TABLE replay_metadata ADD COLUMN recording_start_ms INTEGER');
   if (!columns.some(column => column.name === 'matching_version')) db.exec('ALTER TABLE replay_metadata ADD COLUMN matching_version INTEGER NOT NULL DEFAULT 0');
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_replay_matching_end ON replay_metadata(file_mtime);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_replay_matching_end ON replay_metadata(file_mtime_ms);
     CREATE INDEX IF NOT EXISTS idx_replay_matching_start ON replay_metadata(recording_start_ms);
     CREATE INDEX IF NOT EXISTS idx_replay_metadata_updated ON replay_metadata(updated_at);`);
   // One-time additive migration from authoritative retained metadata, never the source VCR.
@@ -30,19 +30,19 @@ export function initReplayMatchingSchema(db: Database): void {
     db.transaction(() => {
       for (const { filename } of batch) {
         const stored = getStoredReplayFileInfo(db, filename)!;
-        writeReplayMatchingFacts(db, filename, stored.file_path, stored.file_mtime, stored.file_size, stored.metadata);
+        writeReplayMatchingFacts(db, filename, stored.file_path, stored.file_mtime_ms, stored.file_size_bytes, stored.metadata);
       }
     })();
   }
 }
 
-interface MatchingRow { filename: string; file_path: string; file_mtime: number; file_size: number; matching_json: string; }
+interface MatchingRow { filename: string; file_path: string; file_mtime_ms: number; file_size_bytes: number; matching_json: string; }
 function entry(row: MatchingRow): ReplayFileEntry {
   // Archive renames update authoritative identity columns; compact facts need no blob rewrite.
   return { ...JSON.parse(row.matching_json) as ReplayFileEntry, name: row.filename, path: row.file_path,
-    mtime: row.file_mtime, sizeBytes: row.file_size };
+    mtimeMs: row.file_mtime_ms, fileSizeBytes: row.file_size_bytes };
 }
-const columns = 'filename,file_path,file_mtime,file_size,matching_json';
+const columns = 'filename,file_path,file_mtime_ms,file_size_bytes,matching_json';
 
 export function getReplayMatchingEntry(db: Database, filename: string): ReplayFileEntry | undefined {
   const row = db.prepare(`SELECT ${columns} FROM replay_metadata WHERE filename=?`).get(filename) as MatchingRow | undefined;
@@ -52,15 +52,15 @@ export function getReplayMatchingEntry(db: Database, filename: string): ReplayFi
 /** Replays whose recording span [start, end] overlaps [fromMs, toMs]. */
 export function getReplayMatchingEntriesOverlapping(db: Database, fromMs: number, toMs: number): ReplayFileEntry[] {
   const rows = db.prepare(`SELECT ${columns} FROM replay_metadata
-    WHERE file_mtime >= ? AND coalesce(recording_start_ms, file_mtime) <= ? ORDER BY file_mtime DESC,rowid`).all(fromMs, toMs);
+    WHERE file_mtime_ms >= ? AND coalesce(recording_start_ms, file_mtime_ms) <= ? ORDER BY file_mtime_ms DESC,rowid`).all(fromMs, toMs);
   return (rows as MatchingRow[]).map(entry);
 }
 
 export function getReplayMatchingEntries(db: Database, target?: ReplayMatchTarget): ReplayFileEntry[] {
   const rows = target ? db.prepare(`SELECT ${columns} FROM replay_metadata
-    WHERE file_mtime BETWEEN ? AND ? OR recording_start_ms BETWEEN ? AND ? ORDER BY file_mtime DESC,rowid`)
+    WHERE file_mtime_ms BETWEEN ? AND ? OR recording_start_ms BETWEEN ? AND ? ORDER BY file_mtime_ms DESC,rowid`)
     .all(target.xmlFileMtimeMs - REPLAY_MATCH_WINDOW_MS, target.xmlFileMtimeMs + REPLAY_MATCH_WINDOW_MS,
       target.sessionTimestampMs - REPLAY_MATCH_WINDOW_MS, target.sessionTimestampMs + REPLAY_MATCH_WINDOW_MS) :
-    db.prepare(`SELECT ${columns} FROM replay_metadata ORDER BY file_mtime DESC,rowid`).all();
+    db.prepare(`SELECT ${columns} FROM replay_metadata ORDER BY file_mtime_ms DESC,rowid`).all();
   return (rows as MatchingRow[]).map(entry);
 }

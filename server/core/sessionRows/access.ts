@@ -1,7 +1,9 @@
 import type { Database as DatabaseType } from 'better-sqlite3';
 import type { DetailedSession, SessionMetadata } from '../../../shared/types/index.js';
 import type { Row } from './fields.js';
-import { recordingLink, readSession } from './reader.js';
+import { unpackFields } from './fields.js';
+import { readSession } from './reader.js';
+import { RECORDING_FIELDS } from './specs.js';
 import { stableKey } from './writer.js';
 
 type ReplayLink = NonNullable<SessionMetadata['matchingReplayFile']>;
@@ -33,11 +35,11 @@ export interface StoredLinkState { link: ReplayLink | undefined; duckdbFilename:
  * A session's replay link and main DuckDB file without assembling the session: two small row reads.
  */
 export function readStoredLinkState(db: DatabaseType, id: string): StoredLinkState | undefined {
-  const session = db.prepare('SELECT has_duckdb_telemetry, duckdb_filename FROM sessions WHERE id = ?').get(id) as Row | undefined;
+  const session = db.prepare('SELECT duckdb_filename FROM sessions WHERE id = ?').get(id) as Row | undefined;
   if (!session) return undefined;
   const recording = db.prepare('SELECT * FROM session_recordings WHERE session_id = ?').get(id) as Row | undefined;
   return {
-    link: recording ? recordingLink(recording, session) as unknown as ReplayLink : undefined,
+    link: recording ? unpackFields(recording, RECORDING_FIELDS) as unknown as ReplayLink : undefined,
     duckdbFilename: typeof session.duckdb_filename === 'string' ? session.duckdb_filename : undefined,
   };
 }

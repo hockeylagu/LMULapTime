@@ -31,21 +31,18 @@ describe('benchmarkImpact engine', () => {
           carType: 'Aston Martin Vantage LMGT3',
           laps: [
             {
-              lapNum: 1,
               lapNumber: 1,
               lapTime: 120.5,
               isValid: true,
               isPitStop: false,
             },
             {
-              lapNum: 2,
               lapNumber: 2,
               lapTime: 121.5,
               isValid: true,
               isPitStop: false,
             },
             {
-              lapNum: 3,
               lapNumber: 3,
               lapTime: 0, // invalid / out lap
               isValid: false,
@@ -58,7 +55,7 @@ describe('benchmarkImpact engine', () => {
           isPlayer: false,
           carClass: 'GT3',
           carType: 'Aston Martin Vantage LMGT3',
-          laps: [{ lapNum: 1, lapNumber: 1, lapTime: 120.6, isValid: true, isPitStop: false }],
+          laps: [{ lapNumber: 1, lapTime: 120.6, isValid: true, isPitStop: false }],
         },
       ],
     } as unknown as DetailedSession,
@@ -101,7 +98,7 @@ describe('benchmarkImpact engine', () => {
     };
     const expected = computeBenchmarkItemImpact(item, [mockSessions[0]]);
     const diff: ReferenceBenchmarkDiff = {
-      timestamp: new Date(0).toISOString(), hasChanges: true, addedCount: 0, updatedCount: 1, removedCount: 0,
+      timestamp: new Date(0).toISOString(),
       totalEntries: 1, added: [], updated: [{ ...item }], removed: [],
     };
     const actual = enrichBenchmarkDiffWithCompactImpact(diff, database.getDb()).updated[0].impact;
@@ -121,7 +118,7 @@ describe('benchmarkImpact engine', () => {
         ...source,
         id: 'pace-band-boundaries',
         drivers: [{ ...player, laps: lapTimes.map((lapTime, index) => ({
-          lapNum: index + 1, lapTime, isValid: true, isPitStop: false,
+          lapNumber: index + 1, lapTime, isValid: true, isPitStop: false,
         })) }],
       } as unknown as DetailedSession;
       database.upsertSession(boundarySession, 'pace-band-boundaries.xml', 1, 1);
@@ -132,7 +129,7 @@ describe('benchmarkImpact engine', () => {
       };
       const expected = computeBenchmarkItemImpact(item, [boundarySession]);
       const diff: ReferenceBenchmarkDiff = {
-        timestamp: new Date(0).toISOString(), hasChanges: true, addedCount: 0, updatedCount: 1, removedCount: 0,
+        timestamp: new Date(0).toISOString(),
         totalEntries: 1, added: [], updated: [{ ...item }], removed: [],
       };
 
@@ -152,7 +149,7 @@ describe('benchmarkImpact engine', () => {
     const sourceLap = sourcePlayer.laps?.[0];
     if (!sourceLap) throw new Error('Expected player lap fixture');
     const many = { ...source, id: 'many-laps', drivers: [{ ...sourcePlayer, laps: Array.from({ length: 40 }, (_, index) => ({
-      ...sourceLap, lapNum: index + 1, lapNumber: index + 1, lapTime: 120.5, isValid: true,
+      ...sourceLap, lapNumber: index + 1, lapTime: 120.5, isValid: true,
     })) }] } as unknown as DetailedSession;
     const noLaps = { ...source, id: 'player-no-laps', drivers: [{ ...sourcePlayer, laps: [] }] } as unknown as DetailedSession;
     database.upsertSession(many, 'many-laps.xml', 1, 1);
@@ -162,7 +159,7 @@ describe('benchmarkImpact engine', () => {
       oldAlienSec: 120, newAlienSec: 118,
     };
     const diff: ReferenceBenchmarkDiff = {
-      timestamp: new Date(0).toISOString(), hasChanges: true, addedCount: 0, updatedCount: 1, removedCount: 0,
+      timestamp: new Date(0).toISOString(),
       totalEntries: 1, added: [], updated: [{ ...item }], removed: [],
     };
 
@@ -234,10 +231,6 @@ describe('benchmarkImpact engine', () => {
   it('enriches a full benchmark diff with aggregate statistics', () => {
     const diff: ReferenceBenchmarkDiff = {
       timestamp: '2026-10-01T12:00:00Z',
-      hasChanges: true,
-      addedCount: 0,
-      updatedCount: 2,
-      removedCount: 0,
       totalEntries: 2,
       added: [],
       updated: [
@@ -286,7 +279,7 @@ describe('benchmarkImpact engine', () => {
 
   it('marks an enriched diff with the current impact rule', () => {
     const diff: ReferenceBenchmarkDiff = {
-      timestamp: '2026-10-01T12:00:00Z', hasChanges: false, addedCount: 0, updatedCount: 0, removedCount: 0,
+      timestamp: '2026-10-01T12:00:00Z',
       totalEntries: 0, added: [], updated: [], removed: [],
     };
     expect(enrichBenchmarkDiffWithImpact(diff, mockSessions).impactRule).toBe(BENCHMARK_IMPACT_RULE);

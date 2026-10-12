@@ -4,10 +4,9 @@ import { SessionRaceStandings } from '../../../src/components/session-detail/sta
 import { DetailedSession, DriverData, LapData } from '../../../shared/types/index.js';
 
 const makeLap = (overrides: Partial<LapData> = {}): LapData => ({
-  lapNum: 1,
+  lapNumber: 1,
   position: 1,
   lapTime: 100,
-  lapTimeString: '1:40.000',
   s1: 30,
   s2: 35,
   s3: 35,
@@ -15,7 +14,6 @@ const makeLap = (overrides: Partial<LapData> = {}): LapData => ({
   fCompound: 'Soft',
   rCompound: 'Soft',
   elapsedSeconds: 100,
-  elapsedTimeString: '1:40.000',
   isPitStop: false,
   isValid: true,
   ...overrides,
@@ -31,14 +29,12 @@ const makeDriver = (overrides: Partial<DriverData> = {}): DriverData => ({
   position: 1,
   classPosition: 1,
   bestLapTime: 100,
-  bestLapTimeString: '1:40.000',
-  bestLapNum: 1,
+  bestLapNumber: 1,
   bestS1: 30,
   bestS2: 35,
   bestS3: 35,
   theoreticalBest: 100,
-  theoreticalBestString: '1:40.000',
-  lapsCount: 1,
+  declaredLapsCount: 1,
   laps: [makeLap()],
   ...overrides,
 });
@@ -114,8 +110,10 @@ describe('SessionRaceStandings', () => {
   });
 
   it('shows all safety signals together, including cleared limits when a penalty exists', () => {
-    const driver = makeDriver({ name: 'Alpha', totalIncidents: 2, totalTrackLimits: 3, totalPenalties: 1,
-      trackLimits: [{ description: 'No Further Action', warningPoints: 0 }] });
+    const driver = makeDriver({ name: 'Alpha',
+      incidents: [{ type: 'contact', description: 'Contact' }, { type: 'contact', description: 'Contact' }],
+      penalties: [{ penalty: 'Drive Thru', reason: 'Speeding', description: 'Drive Thru' }],
+      trackLimits: Array.from({ length: 3 }, () => ({ description: 'No Further Action', warningPoints: 0 })) });
     render(
       <SessionRaceStandings session={makeSession([driver, makeDriver({ name: 'Bravo', position: 2 })])}
         selectedDriverOrdinal={0} setSelectedDriverOrdinal={vi.fn()} isMultiClass={false} />,
@@ -128,9 +126,9 @@ describe('SessionRaceStandings', () => {
   });
 
   it('uses the existing warning and serious track-limit severity instead of the count', () => {
-    const warning = makeDriver({ name: 'Warning', totalTrackLimits: 12,
-      trackLimits: [{ description: 'Track limit warning', warningPoints: 0.25 }] });
-    const serious = makeDriver({ name: 'Serious', position: 2, totalTrackLimits: 1,
+    const warning = makeDriver({ name: 'Warning',
+      trackLimits: Array.from({ length: 12 }, () => ({ description: 'Track limit warning', warningPoints: 0.25 })) });
+    const serious = makeDriver({ name: 'Serious', position: 2,
       trackLimits: [{ description: 'Track limit violation', warningPoints: 0.75 }] });
     render(
       <SessionRaceStandings session={makeSession([warning, serious])} selectedDriverOrdinal={null}

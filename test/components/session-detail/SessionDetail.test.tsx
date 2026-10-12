@@ -23,6 +23,11 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
     expect(screen.getByText('Sector 1')).toBeInTheDocument();
     expect(screen.queryByText('Δ Prev')).not.toBeInTheDocument();
 
+    // Metric buttons on telemetry chart
+    act(() => { fireEvent.click(screen.getByRole('button', { name: /^sectors$/i })); });
+    act(() => { fireEvent.click(screen.getAllByRole('button', { name: /^top speed$/i })[0]); });
+    act(() => { fireEvent.click(screen.getByRole('button', { name: /^lap pace$/i })); });
+
     // Verify track link and back navigation
     expect(screen.getByRole('link', { name: 'Spa' })).toHaveAttribute('href', expect.stringContaining('/track/Spa'));
     const backBtn = screen.getByRole('link', { name: /back to sessions/i });
@@ -103,7 +108,7 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
     // Verify hash changed to full comparison studio with session & lap parameters
     expect(window.location.hash).toContain('#/leaderboard?');
     expect(window.location.hash).toContain('sessionId=sess123');
-    expect(window.location.hash).toContain('lapNum=1');
+    expect(window.location.hash).toContain('lapNumber=1');
 
     // Click Compare Laps in the header: it should target the driver's best lap of this
     // session, not an arbitrary lap.
@@ -111,7 +116,7 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
     fireEvent.click(openStudioBtn);
     expect(window.location.hash).toContain('#/leaderboard?');
     expect(window.location.hash).toContain('sessionId=sess123');
-    expect(window.location.hash).toContain('lapNum=2');
+    expect(window.location.hash).toContain('lapNumber=2');
   });
 
   it('switches to Tire Wear chart metric and displays tire wear in table', async () => {
@@ -212,10 +217,9 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
       estVeStintLaps: null,
       laps: [
         {
-          lapNum: 1,
+          lapNumber: 1,
           position: 1,
           lapTime: 122.0,
-          lapTimeString: '2:02.000',
           s1: 34.0,
           s2: 42.0,
           s3: 46.0,

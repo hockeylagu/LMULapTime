@@ -28,10 +28,6 @@ describe('dbReferenceLaptimeStore', () => {
   it('records benchmark diffs and retrieves history summaries and single diff by id', () => {
     const diff1: ReferenceBenchmarkDiff = {
       timestamp: '2026-09-01T10:00:00Z',
-      hasChanges: true,
-      addedCount: 1,
-      updatedCount: 2,
-      removedCount: 0,
       totalEntries: 180,
       totalAffectedSessions: 5,
       totalCategoryShifts: 3,
@@ -51,10 +47,6 @@ describe('dbReferenceLaptimeStore', () => {
 
     const diff2: ReferenceBenchmarkDiff = {
       timestamp: '2026-10-01T10:00:00Z',
-      hasChanges: false,
-      addedCount: 0,
-      updatedCount: 0,
-      removedCount: 0,
       totalEntries: 180,
       totalAffectedSessions: 0,
       totalCategoryShifts: 0,
@@ -102,7 +94,6 @@ describe('dbReferenceLaptimeStore', () => {
           trackName: 'Bahrain',
           carClass: 'GT3',
           patch: '1.4+',
-          target100Sec: 120.0,
           targets: {
             alienSec: 120.0,
             competitiveSec: 121.2,
@@ -117,14 +108,10 @@ describe('dbReferenceLaptimeStore', () => {
       },
       lastUpdateDiff: {
         timestamp: '2026-10-01T12:00:00Z',
-        hasChanges: true,
-        addedCount: 1,
-        updatedCount: 0,
-        removedCount: 0,
         totalEntries: 1,
         totalAffectedSessions: 1,
         totalCategoryShifts: 0,
-        added: [],
+        added: [{ key: 'k', trackName: 'Spa', carClass: 'GT3', patch: '1.4', type: 'added', newAlienSec: 120 }],
         updated: [],
         removed: [],
       },
@@ -145,11 +132,11 @@ describe('dbReferenceLaptimeStore', () => {
       (db.prepare("SELECT value FROM cache_metadata WHERE key = 'reference_laptimes_last_diff'").get() as { value: string }).value,
     ) as ReferenceBenchmarkDiff;
     const diff: ReferenceBenchmarkDiff = {
-      timestamp: '2026-10-01T12:00:00Z', hasChanges: true, addedCount: 0, updatedCount: 1, removedCount: 0,
+      timestamp: '2026-10-01T12:00:00Z',
       totalEntries: 1, totalAffectedSessions: 35, totalCategoryShifts: 70, added: [], updated: [], removed: [],
     };
     const entry: ReferenceLaptimeEntry = {
-      key: 'bahrain_gt3', trackName: 'Bahrain', carClass: 'GT3', patch: '1.4+', target100Sec: 120,
+      key: 'bahrain_gt3', trackName: 'Bahrain', carClass: 'GT3', patch: '1.4+', 
       targets: { alienSec: 120, competitiveSec: 121, goodSec: 122, goodMidpackSec: 123, midpackSec: 124, midpackTailSec: 125, tailEnderSec: 126, offlineSec: 127 },
     };
     saveReferenceLaptimes(db, { lastUpdated: diff.timestamp, sourceUrl: '', entriesCount: 1, entries: { [entry.key]: entry }, lastUpdateDiff: diff }, (key, value) => {

@@ -221,25 +221,25 @@ describe('ReplayRecordingService', () => {
         ],
       }));
       const stat = fs.statSync(filePath);
-      return { filePath, mtime: Math.floor(stat.mtimeMs), size: stat.size };
+      return { filePath, mtimeMs: Math.floor(stat.mtimeMs), fileSizeBytes: stat.size };
     };
 
     it('is decoded in the worker thread and stored as the whole set of the driver', async () => {
-      const { filePath, mtime, size } = writeReplay();
+      const { filePath, mtimeMs, fileSizeBytes } = writeReplay();
 
       const trajectory = await service.getFullTrajectory(filePath, replayName, { driverSlot: 2 });
 
       expect(trajectory.points[0].x).toBe(50);
-      expect(db.getReplayTrajectoryCache(replayName, 2, 1, mtime, size)).not.toBeNull();
-      expect(db.getReplayDriverIngest(replayName, 2)).toMatchObject({ status: 'stored', fileMtime: mtime });
+      expect(db.getReplayTrajectoryCache(replayName, 2, 1, mtimeMs, fileSizeBytes)).not.toBeNull();
+      expect(db.getReplayDriverIngest(replayName, 2)).toMatchObject({ status: 'stored', mtimeMs });
     });
 
     it('sets the default driver when no driver is asked for', async () => {
-      const { filePath, mtime, size } = writeReplay();
+      const { filePath, mtimeMs, fileSizeBytes } = writeReplay();
 
       await service.getFullTrajectory(filePath, replayName, { playerName: 'Cache Driver' });
 
-      expect(db.getReplayTrajectoryCache(replayName, 1, -1, mtime, size)?.driverSlot).toBe(1);
+      expect(db.getReplayTrajectoryCache(replayName, 1, -1, mtimeMs, fileSizeBytes)?.driverSlot).toBe(1);
     });
 
     it('is decoded once for requests made while it decodes', async () => {
@@ -256,8 +256,8 @@ describe('ReplayRecordingService', () => {
     });
 
     it('is not decoded again after it failed MAX_DECODE_ATTEMPTS times for this file and parser version', async () => {
-      const { filePath, mtime, size } = writeReplay();
-      for (let i = 0; i < MAX_DECODE_ATTEMPTS; i++) db.recordReplayDriverIngest(replayName, 2, mtime, size, 'failed', 'bad stream');
+      const { filePath, mtimeMs, fileSizeBytes } = writeReplay();
+      for (let i = 0; i < MAX_DECODE_ATTEMPTS; i++) db.recordReplayDriverIngest(replayName, 2, mtimeMs, fileSizeBytes, 'failed', 'bad stream');
       const replace = vi.spyOn(db, 'replaceReplayDriverLaps');
 
       await expect(service.getFullTrajectory(filePath, replayName, { driverSlot: 2 })).rejects.toThrow('bad stream');
@@ -265,8 +265,8 @@ describe('ReplayRecordingService', () => {
     });
 
     it('is decoded on demand after an interrupted decode (the server stopped mid-decode)', async () => {
-      const { filePath, mtime, size } = writeReplay();
-      db.recordReplayDriverIngest(replayName, 2, mtime, size, 'interrupted', 'Replay trajectory worker exited with code 1 before returning a result');
+      const { filePath, mtimeMs, fileSizeBytes } = writeReplay();
+      db.recordReplayDriverIngest(replayName, 2, mtimeMs, fileSizeBytes, 'interrupted', 'Replay trajectory worker exited with code 1 before returning a result');
       const replace = vi.spyOn(db, 'replaceReplayDriverLaps');
 
       const trajectory = await service.getFullTrajectory(filePath, replayName, { driverSlot: 2 });

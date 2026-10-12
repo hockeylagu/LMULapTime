@@ -19,17 +19,15 @@ function makeSession(overrides: Parameters<typeof makeDetailedSession>[0] = {}):
       carType: 'Ferrari 499P',
       carClass: 'Hyper',
       bestLapTime: 100,
-      bestLapTimeString: '1:40.000',
       bestS1: 30,
       bestS2: 35,
       bestS3: 35,
       theoreticalBest: 100,
-      theoreticalBestString: '1:40.000',
-      lapsCount: 3,
+      declaredLapsCount: 3,
       laps: [
-        { lapNum: 1, lapTime: 100, isValid: true, isPitStop: false, topSpeed: 280 },
-        { lapNum: 2, lapTime: 101, isValid: true, isPitStop: false, topSpeed: 281 },
-        { lapNum: 3, lapTime: 102, isValid: true, isPitStop: false, topSpeed: 279 },
+        { lapNumber: 1, lapTime: 100, isValid: true, isPitStop: false, topSpeed: 280 },
+        { lapNumber: 2, lapTime: 101, isValid: true, isPitStop: false, topSpeed: 281 },
+        { lapNumber: 3, lapTime: 102, isValid: true, isPitStop: false, topSpeed: 279 },
       ],
     },
     ...overrides,
@@ -68,10 +66,10 @@ describe('useDashboardMetrics', () => {
         trackLengthMeters: 4653,
         playerDriver: {
           ...makeSession().playerDriver!,
-          lapsCount: 2,
+          declaredLapsCount: 2,
           laps: [
-            { lapNum: 1, lapTime: 95, isValid: true, isPitStop: false, topSpeed: 285 },
-            { lapNum: 2, lapTime: 96, isValid: true, isPitStop: false, topSpeed: 286 },
+            { lapNumber: 1, lapTime: 95, isValid: true, isPitStop: false, topSpeed: 285 },
+            { lapNumber: 2, lapTime: 96, isValid: true, isPitStop: false, topSpeed: 286 },
           ],
         },
       }),
@@ -183,14 +181,14 @@ describe('useDashboardMetrics', () => {
         id: 's-clean-test',
         playerDriver: {
           ...makeSession().playerDriver!,
-          lapsCount: 6,
+          declaredLapsCount: 6,
           laps: [
-            { lapNum: 1, lapTime: 105, isValid: true, isPitStop: false }, // start lap excluded
-            { lapNum: 2, lapTime: 100, isValid: true, isPitStop: false }, // clean flying lap 1
-            { lapNum: 3, lapTime: 101, isValid: true, isPitStop: false }, // clean flying lap 2
-            { lapNum: 4, lapTime: 130, isValid: true, isPitStop: true },  // in-lap / pit stop excluded
-            { lapNum: 5, lapTime: 140, isValid: true, isOutLap: true },   // out-lap excluded
-            { lapNum: 6, lapTime: 102, isValid: true, isPitStop: false }, // clean flying lap 3
+            { lapNumber: 1, lapTime: 105, isValid: true, isPitStop: false }, // start lap excluded
+            { lapNumber: 2, lapTime: 100, isValid: true, isPitStop: false }, // clean flying lap 1
+            { lapNumber: 3, lapTime: 101, isValid: true, isPitStop: false }, // clean flying lap 2
+            { lapNumber: 4, lapTime: 130, isValid: true, isPitStop: true },  // in-lap / pit stop excluded
+            { lapNumber: 5, lapTime: 140, isValid: true, isOutLap: true },   // out-lap excluded
+            { lapNumber: 6, lapTime: 102, isValid: true, isPitStop: false }, // clean flying lap 3
           ],
         },
       }),
@@ -221,7 +219,7 @@ describe('useDashboardMetrics', () => {
         id: 's-no-laps-array',
         playerDriver: {
           ...makeSession().playerDriver!,
-          lapsCount: 4,
+          declaredLapsCount: 4,
           avgLapTime: 101.5,
           laps: undefined,
         },

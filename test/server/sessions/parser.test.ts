@@ -111,13 +111,13 @@ describe('parser server module', () => {
       expect(session?.sessionName).toBe('P1');
       expect(session?.trackVenue).toBe('Circuit de Spa-Francorchamps');
       expect(session?.driversCount).toBe(2);
-      expect(session?.bestSessionLap?.lapTimeString).toBe('2:02.000');
+      expect(session?.bestSessionLap?.lapTime).toBe(122);
       expect(session?.playerDriver?.name).toBe('Sim Racer');
       expect(session?.playerDriver?.isPlayer).toBe(true);
       expect(session?.playerDriver?.carClass).toBe('Hyper');
       expect(session?.playerDriver?.laps.length).toBe(3);
       expect(session?.playerDriver?.bestLapTime).toBe(122.000);
-      expect(session?.playerDriver?.bestLapNum).toBe(2);
+      expect(session?.playerDriver?.bestLapNumber).toBe(2);
       expect(session?.playerDriver?.bestS1).toBe(34.900);
       expect(session?.playerDriver?.theoreticalBest).toBe(122.000);
       expect(session?.playerDriver?.laps[2].isPitStop).toBe(true);
@@ -359,20 +359,20 @@ describe('parser server module', () => {
     const previousRace = {
       name: 'Circuit de la Sarthe R1 27.Vcr',
       path: '/replays/Circuit de la Sarthe R1 27.Vcr',
-      sizeBytes: 100,
+      fileSizeBytes: 100,
       trackName: 'Circuit de la Sarthe',
       sessionCode: 'R1',
-      mtime: Date.parse('2026-09-03T17:41:39.560Z'),
+      mtimeMs: Date.parse('2026-09-03T17:41:39.560Z'),
       durationSec: 2206,
       splitNo: 5,
     };
     const ownRace = {
       name: 'Circuit de la Sarthe R1 28.Vcr',
       path: '/replays/Circuit de la Sarthe R1 28.Vcr',
-      sizeBytes: 100,
+      fileSizeBytes: 100,
       trackName: 'Circuit de la Sarthe',
       sessionCode: 'R1',
-      mtime: Date.parse('2026-09-03T18:41:14.416Z'),
+      mtimeMs: Date.parse('2026-09-03T18:41:14.416Z'),
       durationSec: 2166,
     };
 

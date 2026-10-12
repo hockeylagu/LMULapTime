@@ -66,7 +66,7 @@ export const CompareLapPickerSession: React.FC<CompareLapPickerSessionProps> = (
       <div className="flex items-center gap-2 min-w-0 h-8">
         <SessionTypeChip session={{ sessionType: session.sessionType ?? '', sessionName: session.sessionName }} />
         <div className="min-w-0 leading-tight">
-          <p className="font-mono text-xs text-lmu-text-soft truncate">{session.dateString?.slice(0, 16) ?? '—'}</p>
+          <p className="font-mono text-xs text-lmu-text-soft truncate">{session.timeString?.slice(0, 16) ?? '—'}</p>
           {session.condition !== 'Dry' && <p className={`text-[11px] ${CONDITION_TEXT[session.condition]}`}>{session.condition}</p>}
         </div>
       </div>
@@ -77,15 +77,15 @@ export const CompareLapPickerSession: React.FC<CompareLapPickerSessionProps> = (
             type="button"
             disabled={bestCompared}
             onClick={() => onPick(best)}
-            title={bestCompared ? 'Already in the comparison' : `Pick lap ${best.lapNum ?? '-'}, the session's best · ${describe(best, true)}`}
-            aria-label={`Best lap ${best.lapNum ?? '-'} ${best.lapTimeString}${bestGap !== null ? `, ${formatGap(bestGap)} to the lap kept` : ''}${bestCompared ? ', compared' : ''}`}
+            title={bestCompared ? 'Already in the comparison' : `Pick lap ${best.lapNumber ?? '-'}, the session's best · ${describe(best, true)}`}
+            aria-label={`Best lap ${best.lapNumber ?? '-'} ${formatTime(best.lapTime)}${bestGap !== null ? `, ${formatGap(bestGap)} to the lap kept` : ''}${bestCompared ? ', compared' : ''}`}
             className={`-ml-2 inline-flex items-center gap-2 h-8 px-2 rounded-md border transition-colors ${FOCUS_RING} ${
               bestCompared
                 ? 'border-dashed border-lmu-rule cursor-default'
                 : 'border-transparent hover:bg-lmu-card hover:border-lmu-rule-strong cursor-pointer'
             }`}
           >
-            <span className={`font-mono text-sm font-bold ${bestCompared ? 'text-lmu-muted' : best.id === personalBestId ? 'text-lmu-personal-best' : 'text-lmu-text'}`}>{best.lapTimeString}</span>
+            <span className={`font-mono text-sm font-bold ${bestCompared ? 'text-lmu-muted' : best.id === personalBestId ? 'text-lmu-personal-best' : 'text-lmu-text'}`}>{formatTime(best.lapTime)}</span>
             {bestGap !== null && <span className={`font-mono text-[11px] font-bold ${gapTone(bestGap)}`}>{formatGap(bestGap)}</span>}
           </button>
         ) : (
@@ -93,7 +93,7 @@ export const CompareLapPickerSession: React.FC<CompareLapPickerSessionProps> = (
         )}
       </div>
 
-      <ul aria-label={`Laps of ${session.sessionName || 'session'} ${session.dateString || ''}`.trim()} className="flex flex-wrap gap-1.5">
+      <ul aria-label={`Laps of ${session.sessionName || 'session'} ${session.timeString || ''}`.trim()} className="flex flex-wrap gap-1.5">
         {session.laps.map((lap) => {
           const compared = comparedIds.includes(lap.id);
           const personalBest = lap.id === personalBestId;
@@ -108,15 +108,15 @@ export const CompareLapPickerSession: React.FC<CompareLapPickerSessionProps> = (
                 disabled={compared}
                 onClick={() => onPick(lap)}
                 title={compared ? 'Already in the comparison' : describe(lap, clean)}
-                aria-label={`Lap ${lap.lapNum ?? '-'} ${lap.lapTimeString}${mark}${status ? `, ${status.toLowerCase()}` : ''}${compared ? ', compared' : ''}`}
+                aria-label={`Lap ${lap.lapNumber ?? '-'} ${formatTime(lap.lapTime)}${mark}${status ? `, ${status.toLowerCase()}` : ''}${compared ? ', compared' : ''}`}
                 className={`inline-flex items-center gap-2 h-8 w-[112px] px-2 rounded-md border font-mono transition-colors ${FOCUS_RING} ${
                   compared
                     ? 'border-dashed border-lmu-rule bg-transparent cursor-default'
                     : 'border-lmu-border bg-lmu-card hover:bg-lmu-card-hover hover:border-lmu-rule-strong cursor-pointer'
                 }`}
               >
-                <span className="w-6 text-right text-[11px] text-lmu-muted shrink-0">L{lap.lapNum ?? '-'}</span>
-                <span className={`text-xs font-bold ${compared ? 'text-lmu-muted' : timeTone(personalBest, sessionBest, clean)}`}>{lap.lapTimeString}</span>
+                <span className="w-6 text-right text-[11px] text-lmu-muted shrink-0">L{lap.lapNumber ?? '-'}</span>
+                <span className={`text-xs font-bold ${compared ? 'text-lmu-muted' : timeTone(personalBest, sessionBest, clean)}`}>{formatTime(lap.lapTime)}</span>
               </button>
             </li>
           );

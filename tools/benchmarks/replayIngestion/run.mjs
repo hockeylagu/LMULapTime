@@ -30,13 +30,13 @@ if (!Number.isInteger(count) || count < 1 || count > allSlots.length) throw new 
 const slots = allSlots.slice(0, count);
 const filename = path.basename(filePath);
 const stat = fs.statSync(filePath);
-const mtime = Math.floor(stat.mtimeMs), size = stat.size;
+const mtimeMs = Math.floor(stat.mtimeMs), fileSizeBytes = stat.size;
 fs.mkdirSync(path.dirname(prefix), { recursive: true });
 const db = new SessionDatabase(databasePath);
 let timer;
 let result;
 try {
-  db.upsertReplayMetadataCache(filename, filePath, mtime, size, metadata);
+  db.upsertReplayMetadataCache(filename, filePath, mtimeMs, fileSizeBytes, metadata);
   const delays = [], phases = [], batches = [];
   let temporaryBytes = 0, firstDriverStoredMs;
   let last = performance.now();
@@ -49,7 +49,7 @@ try {
   for (const group of mode === 'once' ? [slots] : slots.map(slot => [slot])) {
     const slot = group[0], start = performance.now();
     const options = { driverSlot: slot, playerName, allLaps: true, maxPoints: 0 };
-    const save = { filename, mtime, size, driverSlotKey: slot, isPrimary: slot === primarySlot };
+    const save = { filename, mtimeMs, fileSizeBytes, driverSlotKey: slot, isPrimary: slot === primarySlot };
     const extraction = mode === 'once'
       ? storeReplayDriversInWorker(db, filePath, { playerName }, { ...save, driverSlots: group, includePrimary: true, primarySlot })
       : mode === 'direct' ? storeReplayTrajectoryInWorker(db, filePath, options, save)
@@ -62,7 +62,7 @@ try {
       step = await extraction.next();
     }
     if (mode === 'once' && step.value.failures.length) throw new Error(JSON.stringify(step.value.failures));
-    if (mode === 'raw') db.replaceReplayDriverLaps(filename, filePath, mtime, size, slot, step.value, save.isPrimary);
+    if (mode === 'raw') db.replaceReplayDriverLaps(filename, filePath, mtimeMs, fileSizeBytes, slot, step.value, save.isPrimary);
     firstDriverStoredMs ??= performance.now() - started;
     batches.push({ slot, ms: performance.now() - start });
     await new Promise(resolve => setImmediate(resolve));
@@ -73,7 +73,7 @@ try {
   const integrity = db.getDb().pragma('integrity_check', { simple: true });
   if (integrity !== 'ok') throw new Error(`SQLite integrity check: ${integrity}`);
   delays.sort((a, b) => a - b);
-  result = { mode, filePath, size, slots, pipelineMs, batches, rows, integrity, temporaryBytes, firstDriverStoredMs, phases,
+  result = { mode, filePath, fileSizeBytes, slots, pipelineMs, batches, rows, integrity, temporaryBytes, firstDriverStoredMs, phases,
     peakRssMiB: process.resourceUsage().maxRSS / 1024,
     eventLoop: { samples: delays.length, p95DelayMs: delays[Math.floor(delays.length * 0.95)], maxDelayMs: delays.at(-1) } };
   db.getDb().pragma('wal_checkpoint(TRUNCATE)');

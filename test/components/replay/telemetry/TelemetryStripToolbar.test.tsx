@@ -46,8 +46,8 @@ describe('TelemetryStripToolbar', () => {
         telemetryResolution="high"
         onChangeResolution={handleChangeResolution}
         pointsCount={2400}
-        rawPointsCount={7200}
-        rawSampleRateHz={60}
+        vcrRawPointsCount={7200}
+        vcrRawSampleRateHz={60}
       />
     );
 
@@ -73,8 +73,8 @@ describe('TelemetryStripToolbar', () => {
         telemetryResolution="full"
         onChangeResolution={vi.fn()}
         pointsCount={7200}
-        rawPointsCount={7200}
-        rawSampleRateHz={60}
+        vcrRawPointsCount={7200}
+        vcrRawSampleRateHz={60}
         isFullResolution={true}
       />
     );
@@ -99,7 +99,7 @@ describe('TelemetryStripToolbar', () => {
         onChangeResolution={vi.fn()}
         telemetryResolution="high"
         pointsCount={2400}
-        rawSampleRateHz={100}
+        duckdbRawSampleRateHz={100}
       />
     );
 

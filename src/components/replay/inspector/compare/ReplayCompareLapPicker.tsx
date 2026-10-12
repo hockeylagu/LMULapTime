@@ -78,14 +78,14 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
         if (!matchesSession) return false;
         const matchesDriver = !currentDriverName || normalize(lap.driverName) === normalize(currentDriverName);
         if (!matchesDriver) return false;
-        return currentLapNumber != null ? lap.lapNum === currentLapNumber : true;
+        return currentLapNumber != null ? lap.lapNumber === currentLapNumber : true;
       }) ||
       laps.find(lap => matchesIdentity(lap, effectiveSessionId)) ||
       null
     );
   }, [laps, effectiveSessionId, currentDriverName, currentLapNumber]);
 
-  const exactCurrentLap = laps.find(lap => matchesIdentity(lap, effectiveSessionId) && lap.lapNum === currentLapNumber
+  const exactCurrentLap = laps.find(lap => matchesIdentity(lap, effectiveSessionId) && lap.lapNumber === currentLapNumber
     && (!currentDriverName || lap.driverName.toLowerCase() === currentDriverName.toLowerCase()));
   const currentCondition = currentWeatherCondition ?? (exactCurrentLap
     ? exactCurrentLap.weatherCondition ?? (exactCurrentLap.hasRain ? 'Wet' : 'Dry') : null);
@@ -124,7 +124,7 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
 
   const orderedLaps = useMemo(() => {
     const sorted = [...filteredLaps].sort((a, b) => {
-      if (order === 'date-desc') return (b.dateString || '').localeCompare(a.dateString || '');
+      if (order === 'date-desc') return (b.timeString || '').localeCompare(a.timeString || '');
       if (order === 'driver-asc') return a.driverName.localeCompare(b.driverName) || (a.lapTime || 999999) - (b.lapTime || 999999);
       return (a.lapTime || 999999) - (b.lapTime || 999999);
     });
@@ -251,11 +251,11 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
             <div className="space-y-1">
               {orderedLaps.map(lap => {
                 const isSelected = matchesIdentity(lap, selectedSessionId) &&
-                  lap.lapNum === selectedLapNumber &&
+                  lap.lapNumber === selectedLapNumber &&
                   (!selectedDriverName || lap.driverName === selectedDriverName);
                 const isCurrentLap = Boolean(
                   matchesIdentity(lap, effectiveSessionId) &&
-                  (currentLapNumber == null || lap.lapNum === currentLapNumber) &&
+                  (currentLapNumber == null || lap.lapNumber === currentLapNumber) &&
                   (!currentDriverName || normalize(lap.driverName) === normalize(currentDriverName))
                 );
                 return (

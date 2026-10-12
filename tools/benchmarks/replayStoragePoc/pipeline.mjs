@@ -39,7 +39,7 @@ export function attachEdges(lap, previous, next) {
 export function geometry(lap, config) {
   const driver = config.session?.drivers.find(row => (row.driverName || row.name).trim().toLowerCase() === lap.driverName?.trim().toLowerCase());
   let result = applyPureOfficialLapValidation({ ...lap, source: 'vcr',
-    vcrRawPointsCount: lap.rawPointsCount ?? lap.points.length, vcrRawSampleRateHz: lap.rawSampleRateHz }, config.session, driver);
+    vcrRawPointsCount: lap.vcrRawPointsCount ?? lap.points.length, vcrRawSampleRateHz: lap.vcrRawSampleRateHz }, config.session, driver);
   result = enrichTrajectoryWithTrackGeometry(result, config.venue, config.course, config.filename, config.sceneDesc, config.trackLength);
   stripLapEdgeSamples(result);
   return result;

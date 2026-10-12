@@ -74,8 +74,8 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
   }, [sessions, selectedCarClass,storedTracks]);
 
   const getPaceCategoryForLap = (lapTime: number | null, refEntry: ReferenceLaptimeEntry | null): { category: PaceCategory; pct: number } | null => {
-    if (!lapTime || !Number.isFinite(lapTime) || lapTime <= 0 || !refEntry || !Number.isFinite(refEntry.target100Sec) || refEntry.target100Sec <= 0) return null;
-    const pct = (lapTime / refEntry.target100Sec) * 100;
+    if (!lapTime || !Number.isFinite(lapTime) || lapTime <= 0 || !refEntry || !Number.isFinite(refEntry.targets.alienSec) || refEntry.targets.alienSec <= 0) return null;
+    const pct = (lapTime / refEntry.targets.alienSec) * 100;
     if (!Number.isFinite(pct)) return null;
     return { category: getPaceCategoryFromPercentage(pct) as PaceCategory, pct };
   };

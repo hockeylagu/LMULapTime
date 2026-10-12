@@ -16,7 +16,7 @@ function practiceSession(replayName: string): DetailedSession {
   return {
     id: 'practice-1', filename: 'practice-1.xml', filePath: 'C:/results/practice-1.xml', sessionName: 'P1', sessionType: 'Practice',
     trackVenue: 'Spa', trackCourse: 'Grand Prix', timestamp: xmlMtimeMs - 3_600_000, drivers: [],
-    matchingReplayFile: { name: replayName, path: `C:/replays/${replayName}`, sizeBytes: 1 },
+    matchingReplayFile: { name: replayName, path: `C:/replays/${replayName}`, fileSizeBytes: 1 },
   } as unknown as DetailedSession;
 }
 
@@ -58,7 +58,7 @@ describe('SessionReplayLinks', () => {
     const db = { updateSessionMatchingReplay: vi.fn(), rejectSessionReplayLink: vi.fn() };
     const links = new SessionReplayLinks(db);
     const session = practiceSession('Spa P1.Vcr');
-    const replay = { name: 'Spa P1.Vcr', trackName: 'Spa', sessionCode: 'P1', mtime: xmlMtimeMs } as ReplayFileEntry;
+    const replay = { name: 'Spa P1.Vcr', trackName: 'Spa', sessionCode: 'P1', mtimeMs: xmlMtimeMs } as ReplayFileEntry;
     const parser = parserAt(1);
     const index = new Map([[replay.name, replay]]);
     links.linkSessions([session], parser, index);
@@ -75,7 +75,7 @@ describe('SessionReplayLinks', () => {
     session.trackVenue = 'Fuji Speedway';
     session.trackCourse = 'Grand Prix Circuit (with Dunlop Chicane)';
     const replay = {
-      name: 'Spa P1.Vcr', trackName: 'Spa', sceneDesc: 'spawec', sessionCode: 'P1', mtime: xmlMtimeMs,
+      name: 'Spa P1.Vcr', trackName: 'Spa', sceneDesc: 'spawec', sessionCode: 'P1', mtimeMs: xmlMtimeMs,
     } as ReplayFileEntry;
 
     links.linkSessions([session], parserAt(1), new Map([[replay.name, replay]]));
@@ -88,7 +88,7 @@ describe('SessionReplayLinks', () => {
     const db = { updateSessionMatchingReplay: vi.fn(), rejectSessionReplayLink: vi.fn(), getSessionXmlMtime: () => xmlMtimeMs };
     const links = new SessionReplayLinks(db);
     const session = practiceSession('Spa P1.Vcr');
-    const replay = { name: 'Spa P1.Vcr', trackName: 'Spa', sessionCode: 'P1', mtime: xmlMtimeMs } as ReplayFileEntry;
+    const replay = { name: 'Spa P1.Vcr', trackName: 'Spa', sessionCode: 'P1', mtimeMs: xmlMtimeMs } as ReplayFileEntry;
     const parser = parserAt(1);
     const index = new Map([[replay.name, replay]]);
     links.linkSessions([session], parser, index);
@@ -104,7 +104,7 @@ describe('SessionReplayLinks', () => {
     const db = { updateSessionMatchingReplay: vi.fn(), rejectSessionReplayLink: vi.fn(), getRejectedReplayLinks: () => new Map() };
     const links = new SessionReplayLinks(db);
     const session = practiceSession('Spa R1 1.Vcr');
-    const raceReplay = { name: 'Spa R1 1.Vcr', path: '', sizeBytes: 1, trackName: 'Spa', sessionCode: 'R1', mtime: xmlMtimeMs } as ReplayFileEntry;
+    const raceReplay = { name: 'Spa R1 1.Vcr', path: '', fileSizeBytes: 1, trackName: 'Spa', sessionCode: 'R1', mtimeMs: xmlMtimeMs } as ReplayFileEntry;
 
     // The first parser does not know the replay yet: the link cannot be judged, and is kept.
     links.linkSessions([session], parserAt(1), new Map());

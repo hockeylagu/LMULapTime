@@ -35,8 +35,8 @@ describe('ReplayInspectorModal - Comparison & Source Modes', () => {
     totalEvents: 70000,
     durationSec: 500,
     drivers: [
-      { slot: 1, name: 'Samuel Lague', carModel: 'Ferrari 296 GT3', team: 'Vista AF Corsa', carNumber: '21', isPlayer: true, sessionDriverOrdinal: 0, sessionLapOrdinals: { '1': 0, '2': 1, '3': 2 } },
-      { slot: 2, name: 'Rival Racer', carModel: 'BMW M4 GT3', team: 'Team WRT', carNumber: '32', isPlayer: false, sessionDriverOrdinal: 1, sessionLapOrdinals: { '1': 0, '2': 1, '3': 2 } },
+      { slot: 1, name: 'Samuel Lague', carType: 'Ferrari 296 GT3', team: 'Vista AF Corsa', carNumber: '21', isPlayer: true, sessionDriverOrdinal: 0, sessionLapOrdinals: { '1': 0, '2': 1, '3': 2 } },
+      { slot: 2, name: 'Rival Racer', carType: 'BMW M4 GT3', team: 'Team WRT', carNumber: '32', isPlayer: false, sessionDriverOrdinal: 1, sessionLapOrdinals: { '1': 0, '2': 1, '3': 2 } },
     ],
   };
 
@@ -159,13 +159,12 @@ describe('ReplayInspectorModal - Comparison & Source Modes', () => {
               sessionId: 'other-session',
               sessionName: 'Q1',
               sessionType: 'Qualifying',
-              dateString: '2026/06/01 12:00',
+              timeString: '2026/06/01 12:00',
               driverName: 'Rival Racer',
               carType: 'BMW M4 GT3',
               carClass: 'GT3',
-              lapNum: lap.lapNumber,
+              lapNumber: lap.lapNumber,
               lapTime: lap.lapTimeSec,
-              lapTimeString: `2:${lap.lapTimeSec.toFixed(3)}`,
               isBest: lap.isBest,
               isValid: true,
               matchingReplayFile: 'Other_Spa_Replay.vcr',
@@ -257,13 +256,12 @@ describe('ReplayInspectorModal - Comparison & Source Modes', () => {
       lapOrdinal: 7,
       sessionName: 'Q1',
       sessionType: 'Qualifying',
-      dateString: '2026/06/01 12:00',
+      timeString: '2026/06/01 12:00',
       driverName: 'Rival Racer',
       carType: 'BMW M4 GT3',
       carClass: 'GT3',
-      lapNum: 8,
+      lapNumber: 8,
       lapTime: 133.2,
-      lapTimeString: '2:13.200',
       isValid: true,
       matchingReplayFile: 'Other_Spa_Replay.vcr',
     };
@@ -317,13 +315,12 @@ describe('ReplayInspectorModal - Comparison & Source Modes', () => {
       lapOrdinal: 11,
       sessionName: 'R1',
       sessionType: 'Race',
-      dateString: '2026/08/08 20:16:41',
+      timeString: '2026/08/08 20:16:41',
       driverName: 'Pithivier Patate',
       carType: 'Ferrari 296 LMGT3 Evo',
       carClass: 'GT3',
-      lapNum: 12,
+      lapNumber: 12,
       lapTime: 72.484,
-      lapTimeString: '1:12.484',
       isValid: true,
       matchingReplayFile: 'Test_Replay.vcr',
     };
@@ -395,7 +392,6 @@ describe('ReplayInspectorModal - Comparison & Source Modes', () => {
     const requestedUrls: string[] = [];
     const metaWithDuck = {
       ...mockMeta,
-      hasDuckDbTelemetry: true,
       duckdbFilename: 'Test_Duck.duckdb',
     };
 

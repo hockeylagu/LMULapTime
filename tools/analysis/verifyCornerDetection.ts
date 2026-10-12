@@ -59,8 +59,8 @@ function pickLongestCompleteLap(records: TelRecord[]): TelRecord[] {
   // Drop lap 0 (usually an out-lap from the recorder starting mid-session) and pick the
   // longest remaining lap by sample count as the most likely complete flying lap.
   let best: TelRecord[] = [];
-  for (const [lapNum, recs] of byLap) {
-    if (lapNum === 0) continue;
+  for (const [lapNumber, recs] of byLap) {
+    if (lapNumber === 0) continue;
     if (recs.length > best.length) best = recs;
   }
   return best.length > 0 ? best : [...byLap.values()][0] || [];

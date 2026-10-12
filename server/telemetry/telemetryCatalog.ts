@@ -91,7 +91,7 @@ export class TelemetryCatalog {
       if (generation !== this.refreshGeneration || published.has(file.filePath)) return;
       published.add(file.filePath);
       const previous = cachedMap.get(file.filePath);
-      if (!previous || previous.fileMtimeMs !== file.fileMtimeMs || previous.fileSizeBytes !== file.fileSizeBytes || previous.enrichmentError) {
+      if (!previous || previous.mtimeMs !== file.mtimeMs || previous.fileSizeBytes !== file.fileSizeBytes || previous.enrichmentError) {
         this.sessionDb.upsertTelemetryMetadata?.(file);
       }
     };
@@ -118,7 +118,7 @@ export class TelemetryCatalog {
           if (!prev) {
             addedCount++;
             publish(file);
-          } else if (prev.fileMtimeMs !== file.fileMtimeMs || prev.fileSizeBytes !== file.fileSizeBytes) {
+          } else if (prev.mtimeMs !== file.mtimeMs || prev.fileSizeBytes !== file.fileSizeBytes) {
             updatedCount++;
             publish(file);
           } else {

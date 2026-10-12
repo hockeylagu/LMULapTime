@@ -16,7 +16,7 @@ export interface LapPickerSession {
   sessionName?: string;
   sessionType?: string;
   kind: SessionKind | null;
-  dateString?: string;
+  timeString?: string;
   timestamp: number;
   condition: WeatherCondition;
   /** The session's laps in lap order, after the filters. */
@@ -46,8 +46,8 @@ export function lapCondition(lap: Pick<ComparableLap, 'weatherCondition' | 'hasR
 }
 
 /** The calendar day of the lap's session: the sessions of one day on a layout are one event. */
-export function lapEventDay(lap: Pick<ComparableLap, 'dateString' | 'timestamp'>): string | null {
-  const fromString = lap.dateString?.split(' ')[0];
+export function lapEventDay(lap: Pick<ComparableLap, 'timeString' | 'timestamp'>): string | null {
+  const fromString = lap.timeString?.split(' ')[0];
   if (fromString) return fromString.replace(/-/g, '/');
   if (!lap.timestamp) return null;
   const date = new Date(lap.timestamp);
@@ -68,7 +68,7 @@ function sessionsOf(laps: ComparableLap[]): Array<{ laps: ComparableLap[]; clean
   }
   return [...groups.values()]
     .map(list => {
-      const sorted = [...list].sort((a, b) => (a.lapNum ?? 0) - (b.lapNum ?? 0));
+      const sorted = [...list].sort((a, b) => (a.lapNumber ?? 0) - (b.lapNumber ?? 0));
       return { laps: sorted, clean: selectCleanLapCandidates(sorted) };
     })
     .sort((a, b) => (b.laps[0].timestamp ?? 0) - (a.laps[0].timestamp ?? 0));
@@ -93,7 +93,7 @@ export function groupPickerSessions(laps: ComparableLap[], filters: LapPickerFil
       sessionName: first.sessionName,
       sessionType: first.sessionType,
       kind: lapSessionKind(first),
-      dateString: first.dateString,
+      timeString: first.timeString,
       timestamp: first.timestamp ?? 0,
       condition: lapCondition(first),
       laps: kept,

@@ -1,10 +1,9 @@
 import type { DriverData } from '../../shared/types/index.js';
 import { annotateLapConditions, RainOverLap } from '../../shared/domain/lapConditions.js';
 import { markNonRepresentativeLaps } from '../../shared/domain/lapRepresentativeness.js';
-import { formatTime } from '../../shared/domain/formatters.js';
 import { computeAverageLapTime } from './sessionAnalytics.js';
 
-type ClassifiedDriver = Pick<DriverData, 'laps' | 'avgLapTime' | 'avgLapTimeString' | 'bestLapNum' | 'bestLapTime'
+type ClassifiedDriver = Pick<DriverData, 'laps' | 'incidents' | 'avgLapTime' | 'bestLapNumber' | 'bestLapTime'
   | 'bestLapPaceCategory' | 'bestLapPacePercentage' | 'bestLapWet'>;
 
 /**
@@ -12,7 +11,7 @@ type ClassifiedDriver = Pick<DriverData, 'laps' | 'avgLapTime' | 'avgLapTimeStri
  * calculate ratings: they depend on the current benchmark snapshot, not on the parsed XML.
  */
 function markBestLapConditions(driver: ClassifiedDriver): void {
-  const best = driver.laps.find(l => l.lapNum === driver.bestLapNum)
+  const best = driver.laps.find(l => l.lapNumber === driver.bestLapNumber)
     ?? (driver.bestLapTime ? driver.laps.find(l => l.lapTime === driver.bestLapTime) : undefined);
   if (!best) return;
   if (best.conditions) {
@@ -34,9 +33,8 @@ function markBestLapConditions(driver: ClassifiedDriver): void {
 export function classifySessionLaps(drivers: ClassifiedDriver[], rainOverLap?: RainOverLap): void {
   for (const driver of drivers) {
     annotateLapConditions(driver.laps, rainOverLap);
-    markNonRepresentativeLaps(driver.laps);
+    markNonRepresentativeLaps(driver.laps, driver.incidents);
     driver.avgLapTime = computeAverageLapTime(driver.laps);
-    driver.avgLapTimeString = formatTime(driver.avgLapTime);
     markBestLapConditions(driver);
   }
 }

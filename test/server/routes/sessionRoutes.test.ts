@@ -59,15 +59,13 @@ describe('sessionRoutes and filterSessions', () => {
           position: 1,
           classPosition: 1,
           bestLapTime: 120.0,
-          bestLapTimeString: '2:00.000',
           bestS1: 30,
           bestS2: 45,
           bestS3: 45,
           theoreticalBest: 120.0,
-          theoreticalBestString: '2:00.000',
-          lapsCount: 2,
+          declaredLapsCount: 2,
           laps: [
-            { lapNum: 1, position: 1, lapTime: 120.0, lapTimeString: '2:00.000', s1: 30, s2: 45, s3: 45, topSpeed: 300, fCompound: 'Hard', rCompound: 'Hard', isValid: true, isPitStop: false },
+            { lapNumber: 1, position: 1, lapTime: 120.0, s1: 30, s2: 45, s3: 45, topSpeed: 300, fCompound: 'Hard', rCompound: 'Hard', isValid: true, isPitStop: false },
           ],
         },
       ],
@@ -81,13 +79,11 @@ describe('sessionRoutes and filterSessions', () => {
         position: 1,
         classPosition: 1,
         bestLapTime: 120.0,
-        bestLapTimeString: '2:00.000',
         bestS1: 30,
         bestS2: 45,
         bestS3: 45,
         theoreticalBest: 120.0,
-        theoreticalBestString: '2:00.000',
-        lapsCount: 2,
+        declaredLapsCount: 2,
         laps: [],
       },
     },
@@ -115,15 +111,13 @@ describe('sessionRoutes and filterSessions', () => {
           position: 1,
           classPosition: 1,
           bestLapTime: 96.0,
-          bestLapTimeString: '1:36.000',
           bestS1: 27,
           bestS2: 38,
           bestS3: 31,
           theoreticalBest: 96.0,
-          theoreticalBestString: '1:36.000',
-          lapsCount: 3,
+          declaredLapsCount: 3,
           laps: [
-            { lapNum: 1, position: 1, lapTime: 96.0, lapTimeString: '1:36.000', s1: 27, s2: 38, s3: 31, topSpeed: 330, fCompound: 'Medium', rCompound: 'Medium', isValid: true, isPitStop: false },
+            { lapNumber: 1, position: 1, lapTime: 96.0, s1: 27, s2: 38, s3: 31, topSpeed: 330, fCompound: 'Medium', rCompound: 'Medium', isValid: true, isPitStop: false },
           ],
         },
       ],
@@ -253,7 +247,7 @@ describe('sessionRoutes and filterSessions', () => {
       expect(res.body.sessions[0].id).toBe('sess_1');
       expect(res.body.sessions[0].drivers).toBeUndefined();
       expect(res.body.sessions[0].playerDriver).not.toHaveProperty('laps');
-      expect(res.body.sessions[0].playerDriver).toHaveProperty('completedLapsCount');
+      expect(res.body.sessions[0].playerDriver).toHaveProperty('lapsCount');
       expect(res.body.page).toBe(1);
       expect(res.body.pageSize).toBe(1);
     });
@@ -272,7 +266,7 @@ describe('sessionRoutes and filterSessions', () => {
       expect(entry.playerDriver).not.toHaveProperty('incidents');
       expect(entry.playerDriver).not.toHaveProperty('trackLimits');
       expect(entry.playerDriver).not.toHaveProperty('laps');
-      expect(entry.playerDriver?.bestLapTimeString).toBe('2:00.000');
+      expect(entry.playerDriver?.bestLapTime).toBe(120);
       expect(player.laps[0].traffic).toBeDefined();
       expect(player.incidents).toHaveLength(1);
       expect(session.drivers).toHaveLength(1);
@@ -307,6 +301,9 @@ describe('sessionRoutes and filterSessions', () => {
       expect(response.status).toBe(200);
       expect(response.body.id).toBe('sess_1');
       expect(response.body.drivers).toHaveLength(1);
+      expect(response.body.playerDriver?.driverOrdinal).toBe(0);
+      expect(response.body.drivers[0].driverOrdinal).toBe(0);
+      expect(response.body.drivers[0].laps[0].lapOrdinal).toBe(0);
       expect(response.body.historyContext.personalBests).toEqual([{driverOrdinal:0,bestLapTime:120}]);
       expect(response.headers['cache-control']).toBe('no-store');
     });
@@ -347,7 +344,7 @@ describe('sessionRoutes and filterSessions', () => {
   });
   describe('track and comparison routes', () => {
     const benchmark = (trackName: string, carClass: string): ReferenceLaptimeEntry => ({
-      key: `${trackName}_${carClass}`, trackName, carClass, patch: '1.4+', target100Sec: 100,
+      key: `${trackName}_${carClass}`, trackName, carClass, patch: '1.4+',
       targets: { alienSec: 100, competitiveSec: 101, goodSec: 102, goodMidpackSec: 103, midpackSec: 104, midpackTailSec: 105, tailEnderSec: 106, offlineSec: 107 },
     });
     let app: express.Express;

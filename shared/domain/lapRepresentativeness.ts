@@ -15,12 +15,11 @@ export const OFF_PACE_RATIO = 1.02;
 const MIN_LAPS_FOR_MEDIAN = 3;
 
 interface ClassifiableLap {
-  lapNum: number;
+  lapNumber: number;
   lapTime: number | null;
   isValid: boolean;
   isPitStop: boolean;
   isOutLap?: boolean;
-  incidents?: LapIncident[];
   traffic?: LapTraffic;
   conditions?: LapConditions;
   nonRepresentativeReason?: NonRepresentativeReason;
@@ -36,7 +35,7 @@ function median(values: number[]): number {
  * Marks the racing laps that do not show the driver's pace, so averages and consistency leave
  * them out. A lap is only marked when it is slower than the driver's median racing lap and it
  * had contact or damage, was spent overtaking, being overtaken or following another car, or was
- * more than OFF_PACE_RATIO off that median. A rub or a pass on a fast lap cost nothing, so that
+ * more than OFF_PACE_RATIO off that median. The driver's incidents say which laps had contact or damage (by lap number). A rub or a pass on a fast lap cost nothing, so that
  * lap stays in.
  *
  * The median is taken within the lap's conditions (lapConditions.ts): a wet lap is compared with
@@ -47,10 +46,11 @@ function median(values: number[]): number {
  * Runs in the session classification (sessionLapClassification.ts), after lap times are inferred
  * and incidents, traffic and conditions are attached.
  */
-export function markNonRepresentativeLaps(laps: ClassifiableLap[]): void {
+export function markNonRepresentativeLaps(laps: ClassifiableLap[], incidents: readonly LapIncident[] = []): void {
+  const contactLaps = new Set(incidents.filter((incident) => incident.type === 'contact' || incident.type === 'damage').map((incident) => incident.lapNumber));
   // The start lap (lap 1) is already left out of flying pace, so it is not a pace reference either.
   const racing = laps.filter((lap) =>
-    isRacingLap(lap) && lap.lapNum > 1 && typeof lap.lapTime === 'number' && lap.lapTime > 0
+    isRacingLap(lap) && lap.lapNumber > 1 && typeof lap.lapTime === 'number' && lap.lapTime > 0
   );
   laps.forEach((lap) => { delete lap.nonRepresentativeReason; });
   if (racing.length < MIN_LAPS_FOR_MEDIAN) return;
@@ -66,7 +66,7 @@ export function markNonRepresentativeLaps(laps: ClassifiableLap[]): void {
     const lapTime = lap.lapTime as number;
     const medianLapTime = groupMedian.get(lapConditionGroup(lap)) ?? null;
     if (medianLapTime === null || lapTime <= medianLapTime) return;
-    if (lap.incidents?.some((incident) => incident.type === 'contact' || incident.type === 'damage')) {
+    if (contactLaps.has(lap.lapNumber)) {
       lap.nonRepresentativeReason = 'contact';
     } else if (hadTraffic(lap.traffic)) {
       lap.nonRepresentativeReason = 'traffic';

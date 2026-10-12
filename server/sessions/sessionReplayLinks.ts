@@ -27,7 +27,7 @@ export class SessionReplayLinks {
         this.recheckStoredReplayMatch(session, parser, replaysByName);
       } else {
         // Sessions parsed before their replay was cached (the replay sync runs after the
-        // session sync) are linked here. The XML mtime is the real session end; the last-lap
+        // session sync) are linked here. The XML mtimeMs is the real session end; the last-lap
         // estimate can be 15+ minutes early (post-race cool-down), outside the match window.
         const matchedReplay = parser.findMatchingReplay(
           session.trackVenue,
@@ -75,7 +75,7 @@ export class SessionReplayLinks {
     return {
       name: replay.name,
       path: replay.path,
-      sizeBytes: replay.sizeBytes,
+      fileSizeBytes: replay.fileSizeBytes,
       eventTitle: replay.eventTitle,
       splitNo: replay.splitNo,
       eventType: replay.eventType,
@@ -118,13 +118,13 @@ export class SessionReplayLinks {
 
     const target = this.matchTarget(session, xmlMtime);
     const rejection = replayLinkRejection(current, target);
-    if (!rejection && Math.abs(current.mtime - xmlMtime) <= SAME_SAVE_WINDOW_MS) return;
+    if (!rejection && Math.abs(current.mtimeMs - xmlMtime) <= SAME_SAVE_WINDOW_MS) return;
 
     const candidate = parser.findMatchingReplay(
       target.trackVenue, target.trackCourse, target.sessionCode, target.sessionTimestampMs, target.xmlFileMtimeMs
     );
     const isOwnReplay = candidate && candidate.name !== stored.name &&
-      (rejection || Math.abs(candidate.mtime - xmlMtime) <= SAME_SAVE_WINDOW_MS);
+      (rejection || Math.abs(candidate.mtimeMs - xmlMtime) <= SAME_SAVE_WINDOW_MS);
     if (candidate && isOwnReplay) {
       this.relinkSession(session, candidate);
       return;

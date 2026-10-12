@@ -9,8 +9,8 @@ afterEach(() => { for (const db of databases.splice(0)) db.close(); });
 function database(): SessionDatabase { const db = new SessionDatabase(':memory:'); databases.push(db); return db; }
 const end = Date.parse('2026-10-10T12:00:00Z');
 const target: ReplayMatchTarget = { trackVenue: 'Monza', trackCourse: 'GP', sessionCode: 'R1', sessionTimestampMs: end - 3600_000, xmlFileMtimeMs: end };
-function save(db: SessionDatabase, name: string, mtime = end, duration = 3600, sceneDesc = 'Monza Grand Prix') {
-  db.upsertReplayMetadataCache(name, `C:/replays/${name}`, mtime, 100, { durationSec: duration, sceneDesc } as ReplayMetadata);
+function save(db: SessionDatabase, name: string, mtimeMs = end, duration = 3600, sceneDesc = 'Monza Grand Prix') {
+  db.upsertReplayMetadataCache(name, `C:/replays/${name}`, mtimeMs, 100, { durationSec: duration, sceneDesc } as ReplayMetadata);
 }
 
 describe('persistent replay matching facts', () => {
@@ -26,7 +26,7 @@ describe('persistent replay matching facts', () => {
     const all = db.getAllStoredReplayFiles().map(replayIndexEntryFromStored);
     expect(findMatchingReplay(candidates, target)).toEqual(findMatchingReplay(all, target));
     const plan = db.getDb().prepare(`EXPLAIN QUERY PLAN SELECT filename FROM replay_metadata
-      WHERE file_mtime BETWEEN ? AND ? OR recording_start_ms BETWEEN ? AND ?`).all(0, 1, 0, 1) as Array<{ detail: string }>;
+      WHERE file_mtime_ms BETWEEN ? AND ? OR recording_start_ms BETWEEN ? AND ?`).all(0, 1, 0, 1) as Array<{ detail: string }>;
     expect(plan.some(row => row.detail.includes('idx_replay_matching_end'))).toBe(true);
     expect(plan.some(row => row.detail.includes('idx_replay_matching_start'))).toBe(true);
   });

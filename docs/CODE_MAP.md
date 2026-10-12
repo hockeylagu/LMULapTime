@@ -5,8 +5,8 @@ this file holds the **routes through the code**. Keep it current (see "Keeping t
 
 Canonical domain contracts live in `shared/types/`; `shared/types/index.ts` is the approved barrel.
 Import server telemetry reader contracts directly from `server/telemetry/duckdbTypes.ts`.
-The type cleanup is tracked in [TYPE_REFACTORING_PLAN.md](TYPE_REFACTORING_PLAN.md), including
-consumer updates and compatibility checks for names stored in replay caches.
+The type cleanup is tracked in [TYPE_REFACTORING_PLAN.md](TYPE_REFACTORING_PLAN.md), and its
+Phase 6 naming table.
 
 Last checked 2026-10-12 after the type refactoring: 472 TypeScript source files in src/server/shared,
 303 test suites (298 passed, 5 skipped), 2643 tests (2587 passed, 56 skipped). The full coverage suite
@@ -50,12 +50,16 @@ calculation and ranking, using the same two-decimal percentage and shared catego
 Session lap rating and paginated cards share these batch lookups; dashboard trends use the same indexed snapshot while retaining
 strict class matching, and dashboard cards are rated once. Track cards compute pace once per card and reuse it for sorting and rendering.
 These lookups are scoped to the batch/view inputs and recreated with refreshed benchmarks; no persistent target cache or cache-version bump is needed.
-**Derived columns** live on `session_drivers` (human/player/class flags, completed/clean laps, driving time, pits, speed, best lap, averages,
-consistency, wet best-lap flag) and `session_laps` (condition group, clean/representative/human/leaderboard flags, with partial indexes).
-Raw columns retain XML values such as declared `laps_count`, `lap_num`, and `is_pit_stop`.
-**DuckDB file**: the main attachment lives on `sessions` (`has_duckdb_telemetry`, `duckdb_filename`); the reader mirrors it onto the replay link.
-`sessionTelemetry` accepts the attachment on either input object. A driver's events are stored once: a lap event references the matching driver event
-(`lap_ordinal`, `lap_seq`); `lists_mask` distinguishes an empty event array from an absent one.
+**Derived columns** live on `session_drivers` (`is_human`, `driver_class`, counted `laps_count` / `pit_stops_count`, `clean_laps_count`,
+`driving_time_seconds`, `max_top_speed`, `best_lap_ordinal`, `top3_average`, `consistency_score`) and `session_laps` (condition group,
+clean/representative/human/leaderboard flags, with partial indexes). The derived columns repeat no raw fact: `is_player`, `best_lap_number`,
+`best_lap_wet` (NULL is not wet) and `avg_lap_time` exist once, and XML-declared figures are `declared_laps_count` / `declared_pit_stops_count`.
+Raw columns retain XML values such as `lap_number` and `is_pit_stop`. Files carry `file_mtime_ms` and `file_size_bytes` on every table.
+**DuckDB file**: the main attachment lives on `sessions.duckdb_filename` only (there is no `has_duckdb_telemetry` flag or replay-link mirror).
+A driver's events are stored once, on the driver (`session_events`, one row per event, each with its `lap_number`); a lap's events are derived with
+`lapEvents(driver, lapNumber)` (`shared/domain/lapComparison.ts`), and the incident / track-limit / penalty counts are the list lengths.
+`session_drivers.lists_mask` distinguishes an empty event array from an absent one. Times are stored as numbers only; the UI formats them
+with `shared/domain/formatters.ts` (`formatTime`, `formatElapsedSeconds`, `formatPitStopDuration`).
 
 The telemetry comparison picker requests `telemetryOnly=true` on `/api/compare/laps`: linked replay and flying-lap filters run before pagination.
 That request uses `queryTelemetryComparableLaps` in `comparisonQueries.ts`: direct SQL reads of the visible lap rows,
@@ -137,7 +141,7 @@ separate from completed lap count. Partial valid/eligible lap-time indexes suppo
 comparison personal-best lookups. Bump the projection version when changing stored aggregate rules.
 Do not add an index that leads with `driver_class` or `driver_id` on `session_drivers`: the planner then starts the leaderboard from every driver of the
 class (measured 520 ms against 5 ms starting from the layout). The sessions of a layout are found through `idx_sessions_layout_timestamp`, then their drivers by primary key.
-Historical JSON columns (`data_json`, `metadata_json`, `summary_json`) were dropped in Phase 3b/3c. Converted caches may retain the unused `normalized_version` column; fresh databases omit it.
+Historical JSON columns (`data_json`, `metadata_json`, `summary_json`) were dropped in Phase 3b/3c. Fresh and rewritten databases have no `normalized_version` column.
 
 **Replays are the source of truth once cached**: LMU deletes old `.Vcr` files, and their rows are the only copy. Never write
 code that drops replay rows because the file is gone.
@@ -178,7 +182,7 @@ XML publishes ten-session transactions before proceeding; cached sessions whose 
 Results XMLs are assumed write-once at their paths (`XML_FORMAT.md`): ordinary scans skip stored
 successful paths before stat/parsing. A new file that changed while it was read is not stored and is retried
 as a failed read. A reparse keeps the stored replay link and DuckDB file (`restoreStoredSessionLinks`). Parser upgrades, explicit force reparses and failed reads
-are the exceptions. Replay matching reads stored XML mtimes from SQLite; missing values fall back
+are the exceptions. Replay matching reads stored XML `mtimeMs` values from SQLite; missing values fall back
 to disk and failed reads retry. Validation runs during reconciliation without a per-session memo.
 Each batch reapplies lap conditions before persistence. Benchmark pace is calculated only at read time,
 so delayed worker results cannot restore obsolete ratings; stored best-lap conditions exclude wet bests.
@@ -385,11 +389,15 @@ minimal input from canonical session and driver contracts. Dashboard trends use 
 directly, and chart progression uses `SessionProgressionPoint` from `shared/types/session.ts`.
 Replay samples use `ReplayTrajectoryPoint`, weather summaries use `WeatherCondition`, and timing gates
 use the geometry-owned `TimingGateGeometry` / `TrackTimingGates` contracts.
-Runtime summaries consistently use `isOutLap`, `isPitStop`, `drivingTimeSeconds`, `pitStopsCount`,
-`maxTopSpeed` and `top3Average`; progression timestamps use `timeString`, and replay file metrics use
-`fileSizeBytes` / `mtimeMs`. SQLite column names stay stable. Replay cache readers normalize the old
-JSON `isOutlap` key, including nested laps, while retaining the stored blobs and deleted-source data.
-The legacy nullable `session_drivers.driver_name` column is retained but no longer projected into `DriverData`.
+One name per fact, in TypeScript and SQL (the table is in [TYPE_REFACTORING_PLAN.md](TYPE_REFACTORING_PLAN.md)):
+`lapNumber` (`lap_number`; URL parameters `lapNumber` / `compareLapNumber`), `bestLapNumber`, `isOutLap`, `isPitStop`,
+`carType` (replay and telemetry metadata included), `avgLapTime`, `top3Average`, `paceCategory` / `pacePercentage`,
+`timeString` (the full session label; `sessionDay` is the day), `mtimeMs` / `fileSizeBytes` (`file_mtime_ms` / `file_size_bytes`).
+`lapsCount` and `pitStopsCount` are counted from laps; the XML-declared figures are `declaredLapsCount` /
+`declaredPitStopsCount`. `driverLapsCount` (`shared/domain/formatters.ts`) reads a player's laps from a card or a detailed driver.
+`DriverData.name` is the one driver name; there is no `driver_name` column on `session_drivers`.
+The app has no compatibility reads for retired names: a database written by an older build is rewritten once by an
+offline script before the renamed app opens it, and `test/domain/retiredNames.test.ts` keeps retired property names out of `shared/types`.
 
 Comparison PB badges (`comparisonQueries.ts`, both leaderboard and telemetry picker) rank matching
 history once for the distinct drivers on the requested page, instead of running one history query per

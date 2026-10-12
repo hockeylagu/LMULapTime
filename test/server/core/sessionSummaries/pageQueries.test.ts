@@ -10,15 +10,15 @@ import { DRIVER_WITH_DICTIONARIES } from '../../../../server/core/sessionRows/re
 import type { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
 
 function fixture(id: string, timestamp: number): DetailedSession {
-  const laps: LapData[] = [90, 91, 92].map((lapTime, ordinal) => ({ lapNum: ordinal + 2, position: 1,
-    lapTime, lapTimeString: `${lapTime}`, s1: 30, s2: 30, s3: lapTime - 60, topSpeed: 250,
+  const laps: LapData[] = [90, 91, 92].map((lapTime, ordinal) => ({ lapNumber: ordinal + 2, position: 1,
+    lapTime, s1: 30, s2: 30, s3: lapTime - 60, topSpeed: 250,
     fCompound: 'Dry', rCompound: 'Dry', isPitStop: false, isValid: true }));
   const driver: DriverData = { name: 'Player', carType: 'Ferrari 499P', carClass: 'Hyper', carNumber: '1', teamName: '',
-    isPlayer: true, position: 1, classPosition: 1, bestLapTime: 90, bestLapTimeString: '90', bestLapNum: 2,
-    bestS1: 30, bestS2: 30, bestS3: 30, theoreticalBest: 90, theoreticalBestString: '90', lapsCount: 3, laps };
+    isPlayer: true, position: 1, classPosition: 1, bestLapTime: 90, bestLapNumber: 2,
+    bestS1: 30, bestS2: 30, bestS3: 30, theoreticalBest: 90, declaredLapsCount: 3, avgLapTime: 91, laps };
   return { id, filename: `${id}.xml`, filePath: `${id}.xml`, trackVenue: 'Monza', trackCourse: 'GP', trackEvent: '',
     trackLengthMeters: 5793, timeString: '2026/10/10 12:00', timestamp, sessionType: 'Race', sessionName: 'R1',
-    driversCount: 1, playerDriver: driver, drivers: [driver], weatherInfo: 'Sunny' };
+    driversCount: 1, playerDriver: driver, drivers: [driver], weather: { condition: 'Dry', timeOfDay: 'Daytime', weatherString: 'Sunny' } };
 }
 
 describe('paged session queries', () => {
@@ -32,12 +32,12 @@ describe('paged session queries', () => {
     try {
       initDbSchema(db);
       const full = fixture('full', 1);
-      full.drivers[0].laps.push({ ...full.drivers[0].laps[0], lapNum: 5, lapTime: null, isValid: false });
-      full.drivers[0].lapsCount = 4;
+      full.drivers[0].laps.push({ ...full.drivers[0].laps[0], lapNumber: 5, lapTime: null, isValid: false });
+      full.drivers[0].declaredLapsCount = 4;
       const empty: DetailedSession = { ...fixture('empty', 2), playerDriver: undefined, drivers: [], driversCount: 0 };
       const fallback = fixture('fallback', 3);
       fallback.drivers[0].laps = [];
-      fallback.drivers[0].lapsCount = 7;
+      fallback.drivers[0].declaredLapsCount = 7;
       fallback.drivers[0].avgLapTime = 92;
       for (const session of [full, empty, fallback]) upsertSession(db, session, session.filePath, 1, 1);
       const legacy = computeProgression([full, empty, fallback]).map(point => ({
@@ -122,7 +122,7 @@ describe('paged session queries', () => {
       const pagePlan = db.prepare(`EXPLAIN QUERY PLAN SELECT id FROM sessions
         WHERE layout_key=? ORDER BY timestamp DESC,id DESC LIMIT 25`).all('monza_gp') as Array<{ detail: string }>;
       expect(pagePlan.some(row => row.detail.includes('idx_sessions_layout_timestamp'))).toBe(true);
-      const cardDriversPlan = (db.prepare(`EXPLAIN QUERY PLAN ${DRIVER_WITH_DICTIONARIES} WHERE d.session_id IN (?) AND (d.is_player_driver = 1
+      const cardDriversPlan = (db.prepare(`EXPLAIN QUERY PLAN ${DRIVER_WITH_DICTIONARIES} WHERE d.session_id IN (?) AND (d.is_player = 1
         OR d.driver_ordinal = (SELECT player_driver_ordinal FROM sessions WHERE id = d.session_id))`).all('one') as Array<{ detail: string }>).map(r => r.detail);
       expect(cardDriversPlan.some(detail => detail.includes('PRIMARY KEY'))).toBe(true);
     } finally { db.close(); }

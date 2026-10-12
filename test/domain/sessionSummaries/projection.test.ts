@@ -3,20 +3,20 @@ import type { DetailedSession, LapData } from '../../../shared/types/index.js';
 import { buildSessionSummaryProjection } from '../../../shared/domain/sessionSummaries/buildSessionSummaryProjection.js';
 import { selectCleanLapCandidates, computeTopNLapAverage, computeConsistencyRating } from '../../../shared/domain/lapComparison.js';
 
-function lap(lapNum: number, lapTime: number | null, changes: Partial<LapData> = {}): LapData {
-  return { lapNum, position: 1, lapTime, lapTimeString: '', s1: lapTime, s2: lapTime, s3: lapTime,
-    topSpeed: 250 + lapNum, fCompound: 'Dry', rCompound: 'Dry', isPitStop: false, isValid: true, ...changes };
+function lap(lapNumber: number, lapTime: number | null, changes: Partial<LapData> = {}): LapData {
+  return { lapNumber, position: 1, lapTime, s1: lapTime, s2: lapTime, s3: lapTime,
+    topSpeed: 250 + lapNumber, fCompound: 'Dry', rCompound: 'Dry', isPitStop: false, isValid: true, ...changes };
 }
 
 const session: DetailedSession = {
   id: 's1', filename: 's1.xml', filePath: 's1.xml', trackVenue: 'Monza', trackCourse: 'GP', trackEvent: '', trackLengthMeters: 5793,
   timeString: 'date', timestamp: 10, sessionType: 'Race', sessionName: 'R1', driversCount: 1,
   playerDriver: { name: 'Driver', carType: 'Car', carClass: 'GT3', carNumber: '1', teamName: '', isPlayer: true, position: 1,
-    classPosition: 1, bestLapTime: 91, bestLapTimeString: '', bestLapNum: 2, bestS1: 91, bestS2: 91, bestS3: 91,
-    theoreticalBest: 273, theoreticalBestString: '', lapsCount: 4, laps: [] },
+    classPosition: 1, bestLapTime: 91, bestLapNumber: 2, bestS1: 91, bestS2: 91, bestS3: 91,
+    theoreticalBest: 273, declaredLapsCount: 4, laps: [] },
   drivers: [{ name: 'Driver', carType: 'Car', carClass: 'GT3', carNumber: '1', teamName: '', isPlayer: true, position: 1,
-    classPosition: 1, bestLapTime: 91, bestLapTimeString: '', bestLapNum: 2, bestS1: 91, bestS2: 91, bestS3: 91,
-    theoreticalBest: 273, theoreticalBestString: '', lapsCount: 4,
+    classPosition: 1, bestLapTime: 91, bestLapNumber: 2, bestS1: 91, bestS2: 91, bestS3: 91,
+    theoreticalBest: 273, declaredLapsCount: 4,
     laps: [lap(1, 90), lap(2, 91), lap(3, 92, { conditions: { wetTyres: true } }), lap(4, null, { isValid: false, isInferred: true })] }],
 };
 
@@ -40,38 +40,40 @@ describe('session summary projection', () => {
     const driver = session.drivers[0];
     const withNoCleanLaps = [lap(1, 90), lap(2, 100, { isValid: false })];
     const projectedEmpty = buildSessionSummaryProjection({ ...session, drivers: [{ ...driver, laps: withNoCleanLaps }] }, 1).drivers[0];
-    expect(projectedEmpty).toMatchObject({ cleanLapsCount: 0, averageLapTime: null, top3Average: null, consistencyScore: null });
+    expect(projectedEmpty).toMatchObject({ cleanLapsCount: 0, avgLapTime: null, top3Average: null, consistencyScore: null });
 
     const loneStartNumberedLap = [lap(1, 90)];
     const projectedSingle = buildSessionSummaryProjection({ ...session, drivers: [{ ...driver, laps: loneStartNumberedLap }] }, 1).drivers[0];
-    expect(projectedSingle).toMatchObject({ cleanLapsCount: 1, averageLapTime: 90, top3Average: 90, consistencyScore: 100 });
+    expect(projectedSingle).toMatchObject({ cleanLapsCount: 1, avgLapTime: 90, top3Average: 90, consistencyScore: 100 });
   });
 
   it('preserves primary-driver ordinal identity and the no-lap progression fallback', () => {
     const duplicate = { ...session, playerDriver: { ...session.playerDriver!, laps: [] }, drivers: [
       { ...session.drivers[0], isPlayer: true, laps: [] },
-      { ...session.drivers[0], isPlayer: false, laps: [], avgLapTime: 92, lapsCount: 7 },
+      { ...session.drivers[0], isPlayer: false, laps: [], avgLapTime: 92, declaredLapsCount: 7 },
     ] };
     const projected = buildSessionSummaryProjection(duplicate, 1);
     expect(projected.drivers.map(driver => driver.isPlayer)).toEqual([true, false]);
     expect(projected.drivers.map(driver => driver.isHuman)).toEqual([true, false]);
-    expect(projected.drivers[1]).toMatchObject({ lapsCount: 7, cleanLapsCount: 7, drivingTimeSeconds: 644, averageLapTime: 92 });
+    expect(projected.drivers[1]).toMatchObject({ lapsCount: 7, cleanLapsCount: 7, drivingTimeSeconds: 644, avgLapTime: 92 });
     expect(projected.drivers[1].top3Average).toBeNull();
     expect(projected.isEmpty).toBe(false);
-    const empty = buildSessionSummaryProjection({ ...duplicate, playerDriver: { ...duplicate.playerDriver!, bestLapTime: null, lapsCount: 0 }, driversCount: 0 }, 2);
+    const empty = buildSessionSummaryProjection({ ...duplicate, playerDriver: { ...duplicate.playerDriver!, bestLapTime: null, declaredLapsCount: 0 }, driversCount: 0 }, 2);
     expect(empty.isEmpty).toBe(true);
   });
 
   it('uses the selected player contribution and keeps non-player laps out of session totals', () => {
     const player = { ...session.drivers[0], positionGain: 3 };
     const projected = buildSessionSummaryProjection({ ...session, playerDriver: player, drivers: [
-      { ...player, name: 'AI', isPlayer: false, lapsCount: 100, laps: [lap(1, 10)] }, player,
+      { ...player, name: 'AI', isPlayer: false, declaredLapsCount: 100, laps: [lap(1, 10)] }, player,
     ] }, 1);
-    expect(projected.aggregate).toMatchObject({ player: { driverOrdinal: 1, lapsCount: 3, declaredLapsCount: 4 },
+    expect(projected.drivers.find(driver => driver.isPlayer)).toMatchObject({ driverOrdinal: 1, lapsCount: 3, declaredLapsCount: 4 });
+    expect(projected.aggregate).not.toHaveProperty('player');
+    expect(projected.aggregate).toMatchObject({
       positionGain: 3, distanceKm: 17.379, primaryLapCount: 4, primaryValidLapCount: 3 });
     const withoutPlayer = buildSessionSummaryProjection({ ...session, playerDriver: undefined,
       drivers: [{ ...player, isPlayer: false }] }, 1);
-    expect(withoutPlayer.aggregate).toMatchObject({ player: null, distanceKm: 0, primaryLapCount: 4 });
+    expect(withoutPlayer.aggregate).toMatchObject({ distanceKm: 0, primaryLapCount: 4 });
   });
 
   it('persists legacy distance estimates and a timezone-independent date fallback once', () => {

@@ -2,6 +2,7 @@ import type { DetailedSession, DriverData, LapData } from '../../../../shared/ty
 import type { LapPlaces } from '../../../utils/lapTrafficText.js';
 import type { LapDetailContext } from './lapDetailSections.js';
 import { lapClassPosition } from '../../../../shared/domain/lapPlaces.js';
+import { lapEvents, type LapEvents } from '../../../../shared/domain/lapComparison.js';
 import { damageBeforeStop, type LapPitStop } from './pitStopText.js';
 
 /** The driver's place at the end of the previous lap and of this one, when both are known. */
@@ -18,14 +19,15 @@ export function lapPlaces(
 }
 
 /** The stop a lap is part of: its own when it is the in-lap, the previous lap's when it is the out-lap. */
-export function lapPitStop(laps: LapData[], lap: LapData, prevLap: LapData | null): LapPitStop | undefined {
+export function lapPitStop(driver: Pick<DriverData, 'laps' | 'incidents'>, lap: LapData, prevLap: LapData | null): LapPitStop | undefined {
+  const laps = driver.laps;
   const inLap = lap.isPitStop ? lap : lap.isOutLap && prevLap?.isPitStop ? prevLap : undefined;
   if (!inLap) return undefined;
   const onOutLap = inLap !== lap;
   return {
     inLap,
-    outLap: onOutLap ? lap : laps.find((l) => l.lapNum === lap.lapNum + 1 && l.isOutLap),
-    damageBefore: inLap.pitService ? damageBeforeStop(laps, inLap) : undefined,
+    outLap: onOutLap ? lap : laps.find((l) => l.lapNumber === lap.lapNumber + 1 && l.isOutLap),
+    damageBefore: inLap.pitService ? damageBeforeStop(driver, inLap) : undefined,
     onOutLap,
   };
 }
@@ -34,9 +36,10 @@ export function lapPitStop(laps: LapData[], lap: LapData, prevLap: LapData | nul
 export function lapDetailContext(
   session: DetailedSession, driver: DriverData | undefined, lap: LapData, prevLap: LapData | null, isMultiClass: boolean,
   positions?: ReadonlyMap<LapData, number>
-): LapDetailContext {
+): LapDetailContext & { events: LapEvents } {
   return {
     places: lapPlaces(session, driver, lap, prevLap, isMultiClass, positions),
-    pitStop: lapPitStop(driver?.laps ?? [], lap, prevLap),
+    pitStop: driver ? lapPitStop(driver, lap, prevLap) : undefined,
+    events: lapEvents(driver ?? {}, lap.lapNumber),
   };
 }

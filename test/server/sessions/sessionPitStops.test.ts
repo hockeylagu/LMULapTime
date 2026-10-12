@@ -10,9 +10,9 @@ import type { DetailedSession, DriverData, LapData } from '../../../shared/types
 const replayName = 'Daytona R1 6.Vcr';
 
 /** Four 100 s laps from et 0; lap 2 is the in-lap. */
-const laps = (): LapData[] => [1, 2, 3, 4].map((lapNum) => ({
-  lapNum, position: 1, lapTime: 100, lapTimeString: '', s1: null, s2: null, s3: null, topSpeed: null,
-  fCompound: 'Medium', rCompound: 'Medium', elapsedSeconds: (lapNum - 1) * 100, isPitStop: lapNum === 2, isValid: true,
+const laps = (): LapData[] => [1, 2, 3, 4].map((lapNumber) => ({
+  lapNumber, position: 1, lapTime: 100, s1: null, s2: null, s3: null, topSpeed: null,
+  fCompound: 'Medium', rCompound: 'Medium', elapsedSeconds: (lapNumber - 1) * 100, isPitStop: lapNumber === 2, isValid: true,
 } as LapData));
 
 const driver = (name: string, carClass = 'GT3') => ({ name, carClass, laps: laps() } as unknown as DriverData);
@@ -49,7 +49,7 @@ describe('attachPitServices', () => {
   it('puts each stop on its in-lap with the class usual stop, and guesses repairs on a long one', () => {
     const me = driver('Me');
     const session = {
-      id: 's', matchingReplayFile: { name: replayName, path: replayName, sizeBytes: 1 },
+      id: 's', matchingReplayFile: { name: replayName, path: replayName, fileSizeBytes: 1 },
       drivers: [me, driver('A'), driver('B'), driver('C'), driver('Hyper', 'Hyper')], playerDriver: me,
     } as unknown as DetailedSession;
 
@@ -58,7 +58,7 @@ describe('attachPitServices', () => {
     expect(session.playerDriver?.laps[1].pitService).toEqual({
       pitLaneSec: 115, serviceSec: 75, classMedianServiceSec: 30, unexplainedSec: 45,
     });
-    expect(session.playerDriver?.laps.filter((l) => l.pitService).map((l) => l.lapNum)).toEqual([2]);
+    expect(session.playerDriver?.laps.filter((l) => l.pitService).map((l) => l.lapNumber)).toEqual([2]);
     // The other class is not part of the GT3 usual stop, and a penalty served explains a stop.
     expect(session.drivers[3].laps[1].pitService?.penaltyServed).toBe(true);
     expect(session.drivers[4].laps[1].pitService?.classMedianServiceSec).toBeNull();
@@ -69,7 +69,7 @@ describe('attachPitServices', () => {
     const lapFact = (lapNumber: number, startSec: number) => ({ ...emptyLapFact(lapNumber), startSec, endSec: startSec + 100 });
     replaceReplayDriverLapFacts(rawDb(db), replayName, 0, [lapFact(2, 95), lapFact(3, 195)], 'v7');
     const me = driver('Me');
-    const session = { id: 's', matchingReplayFile: { name: replayName, path: replayName, sizeBytes: 1 }, drivers: [me] } as unknown as DetailedSession;
+    const session = { id: 's', matchingReplayFile: { name: replayName, path: replayName, fileSizeBytes: 1 }, drivers: [me] } as unknown as DetailedSession;
 
     attachPitServices(rawDb(db), session);
 
@@ -78,7 +78,7 @@ describe('attachPitServices', () => {
 
   it('clears the pit details when the session loses its replay', () => {
     const me = driver('Me');
-    const session = { id: 's', matchingReplayFile: { name: replayName, path: replayName, sizeBytes: 1 }, drivers: [me], playerDriver: me } as unknown as DetailedSession;
+    const session = { id: 's', matchingReplayFile: { name: replayName, path: replayName, fileSizeBytes: 1 }, drivers: [me], playerDriver: me } as unknown as DetailedSession;
     attachPitServices(rawDb(db), session);
     expect(me.laps[1].pitService).toBeDefined();
 

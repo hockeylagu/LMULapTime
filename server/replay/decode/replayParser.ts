@@ -72,11 +72,16 @@ export interface ParseReplayMetadataOptions {
   scanWeather?: boolean;
 }
 
+/** The configured player name, or the one the LMU profile next to this replay names; undefined when neither exists. */
+export function effectiveReplayPlayerName(filePath: string, playerName?: string): string | undefined {
+  return playerName?.trim() || detectPlayerName(filePath);
+}
+
 /** Use a unique configured name, or one marked player when no name was supplied. */
 export function resolveReplayPrimarySlot(metadata: Pick<ReplayMetadata, 'drivers'>, playerName?: string): number | undefined {
   const target = playerName?.trim().toLowerCase();
-  const matches = playerName !== undefined
-    ? metadata.drivers.filter(driver => Boolean(target) && driver.name.trim().toLowerCase() === target)
+  const matches = target
+    ? metadata.drivers.filter(driver => driver.name.trim().toLowerCase() === target)
     : metadata.drivers.filter(driver => driver.isPlayer);
   return matches.length === 1 && typeof matches[0].slot === 'number' && matches[0].slot >= 0 ? matches[0].slot : undefined;
 }
@@ -216,9 +221,16 @@ export function parseReplayMetadata(
     // Read header strings
     const eventJsonStr = readStr4();
     let eventInfo: ReplayEventInfo | null = null;
+    let eventScene: string | undefined;
     if (eventJsonStr) {
       try {
         eventInfo = JSON.parse(eventJsonStr);
+        // The scene and session live once, as `sceneDesc` and `sessionType` on the metadata.
+        if (eventInfo) {
+          if (typeof eventInfo.sceneDesc === 'string') eventScene = eventInfo.sceneDesc;
+          delete eventInfo.sceneDesc;
+          delete eventInfo.session;
+        }
       } catch {
         eventInfo = { eventTitle: eventJsonStr };
       }
@@ -325,14 +337,14 @@ export function parseReplayMetadata(
 
           const isPlayer = false;
 
-          const carModel = mapVehicleIdToModel(sVeh.str);
-          const carClass = mapVehicleIdToClass(sVeh.str, carModel);
+          const carType = mapVehicleIdToModel(sVeh.str);
+          const carClass = mapVehicleIdToClass(sVeh.str, carType);
 
           structDrivers.push({
             slot: curSlot,
             name: sName.str,
             vehicleId: sVeh.str || undefined,
-            carModel,
+            carType,
             carClass: carClass || undefined,
             livery: sLiv.str || undefined,
             team: sTeam.str || undefined,
@@ -395,14 +407,14 @@ export function parseReplayMetadata(
 
                 const isPlayer = false;
 
-                const carModel = mapVehicleIdToModel(sVehicle.str);
-                const carClass = mapVehicleIdToClass(sVehicle.str, carModel);
+                const carType = mapVehicleIdToModel(sVehicle.str);
+                const carClass = mapVehicleIdToClass(sVehicle.str, carType);
 
                 drivers.push({
                   slot,
                   name: str,
                   vehicleId: sVehicle.str || undefined,
-                  carModel,
+                  carType,
                   carClass: carClass || undefined,
                   livery: sLivery.str || undefined,
                   team: sTeam.str || undefined,
@@ -421,7 +433,7 @@ export function parseReplayMetadata(
     const playerDriver = playerMatches.length === 1 ? playerMatches[0] : undefined;
     drivers.forEach(driver => { driver.isPlayer = driver === playerDriver; });
     const replayCarClass = playerDriver?.carClass;
-    const replayCarModel = playerDriver?.carModel;
+    const replayCarType = playerDriver?.carType;
 
     const baseName = path.basename(filePath);
     const filenameMatch = baseName.match(/^(.+?)\s+([PQR]\d+)\b/i);
@@ -438,7 +450,7 @@ export function parseReplayMetadata(
       sessionType,
       privateSession,
       scn: scn || undefined,
-      sceneDesc: scn ? scn.replace(/\.scn$/i, '').trim() : undefined,
+      sceneDesc: scn ? scn.replace(/\.scn$/i, '').trim() : eventScene,
       aiw: aiw || undefined,
       trackName: trackName || undefined,
       trackCourse: filenameTrack || undefined,
@@ -453,7 +465,7 @@ export function parseReplayMetadata(
       endTimeSec,
       drivers,
       carClass: replayCarClass,
-      carModel: replayCarModel,
+      carType: replayCarType,
       hasRain: weather?.hasRain,
       maxRainIntensity: weather?.hasRain ? weather.maxRainIntensity : undefined,
       weatherCondition: weather?.weatherCondition,
@@ -497,7 +509,7 @@ export function downsampleReplayTrajectory(full: ReplayTrajectoryData, maxPoints
     ...full,
     points: sampled,
     pointsCount: sampled.length,
-    rawPointsCount: full.rawPointsCount || full.points.length,
+    vcrRawPointsCount: full.vcrRawPointsCount || full.points.length,
     maxPoints,
     isFullResolution: false,
     sectors: full.sectors

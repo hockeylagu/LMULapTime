@@ -6,11 +6,11 @@ import { upsertSession } from '../../../../server/core/dbSessionStore.js';
 import { queryCompactDashboard } from '../../../../server/core/sessionSummaries/dashboardQueries.js';
 
 const makeSession = (id: string, timestamp: number, lapTime: number): DetailedSession => {
-  const lap: LapData = { lapNum: 1, position: 1, lapTime, lapTimeString: `${lapTime}`, s1: 30, s2: 30, s3: lapTime - 60,
+  const lap: LapData = { lapNumber: 1, position: 1, lapTime, s1: 30, s2: 30, s3: lapTime - 60,
     topSpeed: 250, fCompound: 'Dry', rCompound: 'Dry', isPitStop: false, isValid: true };
   const driver = { name: 'Player', carType: 'Ferrari 499P', carClass: 'Hyper', carNumber: '1', teamName: '', isPlayer: true,
-    position: 1, classPosition: 1, bestLapTime: lapTime, bestLapTimeString: `${lapTime}`, bestLapNum: 1, bestS1: 30, bestS2: 30,
-    bestS3: lapTime - 60, theoreticalBest: lapTime, theoreticalBestString: `${lapTime}`, lapsCount: 1, laps: [lap] };
+    position: 1, classPosition: 1, bestLapTime: lapTime, bestLapNumber: 1, bestS1: 30, bestS2: 30,
+    bestS3: lapTime - 60, theoreticalBest: lapTime, declaredLapsCount: 1, laps: [lap] };
   return { id, filename: `${id}.xml`, filePath: `${id}.xml`, trackVenue: 'Monza', trackCourse: 'GP', trackEvent: '',
     trackLengthMeters: 5793, timeString: `2026/06/01 12:0${timestamp}`, timestamp, sessionType: 'Race', sessionName: 'R1', driversCount: 1,
     playerDriver: driver, drivers: [driver] };
@@ -22,7 +22,7 @@ describe('compact dashboard queries', () => {
     try {
       initDbSchema(db);
       const benchmark = (trackName: string, carClass: string, target100Sec: number): ReferenceLaptimeEntry => ({
-        key: `${trackName}_${carClass}`, trackName, carClass, patch: 'test', target100Sec,
+        key: `${trackName}_${carClass}`, trackName, carClass, patch: 'test',
         targets: { alienSec: target100Sec, competitiveSec: target100Sec, goodSec: target100Sec,
           goodMidpackSec: target100Sec, midpackSec: target100Sec, midpackTailSec: target100Sec,
           tailEnderSec: target100Sec, offlineSec: target100Sec },
@@ -53,7 +53,7 @@ describe('compact dashboard queries', () => {
       expect(first.metrics.averageBenchmarkPacePercentage).toBe(102);
       expect(first.trends.recentPaceTrend.map(point => point.id)).not.toContain('wet');
       // A slower raw lap can have the best benchmark pace for its class after a target refresh.
-      gt3.target100Sec = 102;
+      gt3.targets.alienSec = 102;
       expect(read().metrics.bestTrackRefLaps).toMatchObject([
         { sessionId: 'gt3', percentage: 100, category: 'Alien' },
         { sessionId: 'short', percentage: 105, category: 'Midpack' },
@@ -105,12 +105,10 @@ describe('compact dashboard queries', () => {
     initDbSchema(db);
     upsertSession(db, makeSession('slower', 1, 95), 'slower.xml', 1, 10);
     upsertSession(db, makeSession('faster', 2, 90), 'faster.xml', 2, 10);
-    const benchmark = { key: 'Monza_HY', trackName: 'Monza', carClass: 'Hyper', patch: 'test', target100Sec: 90,
+    const benchmark = { key: 'Monza_HY', trackName: 'Monza', carClass: 'Hyper', patch: 'test',
       targets: { alienSec: 90, competitiveSec: 90, goodSec: 90, goodMidpackSec: 90, midpackSec: 90, midpackTailSec: 90, tailEnderSec: 90, offlineSec: 90 } };
-    db.prepare(`INSERT INTO reference_laptimes (key,track_name,car_class,patch,target100_sec,alien_sec,competitive_sec,good_sec,
-      good_midpack_sec,midpack_sec,midpack_tail_sec,tail_ender_sec,offline_sec,data_json,updated_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(benchmark.key, benchmark.trackName, benchmark.carClass, benchmark.patch,
-      benchmark.target100Sec, 90, 90, 90, 90, 90, 90, 90, 90, JSON.stringify(benchmark), 1);
+    db.prepare(`INSERT INTO reference_laptimes (key,track_name,car_class,data_json,updated_at) VALUES (?,?,?,?,?)`)
+      .run(benchmark.key, benchmark.trackName, benchmark.carClass, JSON.stringify(benchmark), 1);
 
     const result = queryCompactDashboard(db, { sort: 'pace-asc', page: 1, pageSize: 1, referenceEntries: { [benchmark.key]: benchmark } });
     expect(result.sessions).toHaveLength(1);
@@ -124,7 +122,7 @@ describe('compact dashboard queries', () => {
       averageBenchmarkPacePercentage: 102.8, averageBenchmarkPaceCategory: 'Good', totalPitStops: 0,
       rankedTracks: [{ track: 'Monza', laps: 2, km: 11.586 }],
       rankedCars: [{ car: 'Ferrari 499P', laps: 2, km: 11.586 }],
-      bestTrackRefLaps: [{ sessionId: 'faster', percentage: 100, category: 'Alien', lapTimeString: '90', track: 'Monza', car: 'Ferrari 499P' }],
+      bestTrackRefLaps: [{ sessionId: 'faster', percentage: 100, category: 'Alien', track: 'Monza', car: 'Ferrari 499P' }],
     });
     expect(result.trends.hasData).toBe(true);
     expect(result.trends.latestOuting?.id).toBe('faster');

@@ -14,7 +14,7 @@ export interface StoredLapBlob {
 type Column = Array<number | boolean | null>;
 
 interface StoredLapColumns {
-  rawSampleRateHz?: number;
+  vcrRawSampleRateHz?: number;
   driverSlot?: number;
   pitEvents?: ReplayPitEvent[];
   pointsLength?: number;
@@ -56,7 +56,7 @@ export function readLapSamples(lapNumber: number, blob: Uint8Array): LapSamples 
     speedKmh: i => (typeof speed[i] === 'number' ? speed[i] as number : undefined),
     inPit: i => inPit[i] === true,
   }, garageSpells((stored.pitEvents ?? []).filter(e => e.driverSlot === stored.driverSlot)));
-  const step = Math.max(1, Math.round((stored.rawSampleRateHz || 50) / POSITION_SAMPLE_HZ));
+  const step = Math.max(1, Math.round((stored.vcrRawSampleRateHz || 50) / POSITION_SAMPLE_HZ));
 
   const samples: LapSamples = { lapNumber, times: [], x: [], z: [], onTrack: [] };
   for (let i = 0; i < length; i += step) {

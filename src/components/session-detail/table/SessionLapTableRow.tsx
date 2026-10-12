@@ -2,8 +2,8 @@ import React from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { ChevronRight } from 'lucide-react';
 import { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
-import { formatTime, computeTheoreticalGap } from '../../../../shared/domain/formatters.js';
-import { isRacingLap } from '../../../../shared/domain/lapComparison.js';
+import { formatTime, computeTheoreticalGap, formatElapsedSeconds } from '../../../../shared/domain/formatters.js';
+import { isRacingLap, type LapEvents } from '../../../../shared/domain/lapComparison.js';
 import { PaceBadge } from '../../common/PaceBadge.js';
 import { SessionLapStatusBadge } from './SessionLapStatusBadge.js';
 import { CompoundCell, FuelCell, TireWearCell } from './SessionLapResourceCells.js';
@@ -32,6 +32,7 @@ export interface SessionLapTableRowProps {
   lap: LapData;
   lapClassPos: number;
   detailSections: LapDetailSection[];
+  events: LapEvents;
   bestLap: number | null;
   bestS1: number | null;
   bestS2: number | null;
@@ -42,7 +43,7 @@ export interface SessionLapTableRowProps {
   hasTireWearData: boolean;
   hasFuelData: boolean;
   isExpanded: boolean;
-  onToggleExpanded: (lapNum: number) => void;
+  onToggleExpanded: (lapNumber: number) => void;
   /** The table's column count, for the expanded row to span. */
   columnCount: number;
 }
@@ -53,6 +54,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
   lap: l,
   lapClassPos,
   detailSections,
+  events,
   bestLap,
   bestS1,
   bestS2,
@@ -70,7 +72,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
   const [searchParams] = useSearchParams();
   // The parser infers a missing lap time from the elapsed time and marks out-laps (isOutLap).
   const displayLapTime = l.lapTime;
-  const displayLapTimeString = l.lapTimeString;
+  const displayLapTimeString = formatTime(l.lapTime);
   const isInferredLap = Boolean(l.isInferred);
   const isOutLap = Boolean(l.isOutLap);
   const isRacing = isRacingLap(l);
@@ -101,10 +103,10 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
   const isS2Best = l.s2 !== null && bestS2 !== null && Math.abs(l.s2 - bestS2) < 0.0005;
   const isS3Best = l.s3 !== null && bestS3 !== null && Math.abs(l.s3 - bestS3) < 0.0005;
 
-  const eventsTooltip = lapEventsTooltip(l);
+  const eventsTooltip = lapEventsTooltip(events);
   const hasDetails = detailSections.length > 0;
   const handleToggleExpanded = () => {
-    if (hasDetails) onToggleExpanded(l.lapNum);
+    if (hasDetails) onToggleExpanded(l.lapNumber);
   };
 
   const incompleteTooltip = eventsTooltip
@@ -112,8 +114,8 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
     : 'Incomplete Lap (lap not finished or missing sector timing)';
 
   const telemetryUrl = session.matchingReplayFile
-    ? sessionTelemetryPath(searchParams, session, selectedDriver, l) ?? sessionLapComparePath(session, selectedDriver, l.lapNum)
-    : sessionLapComparePath(session, selectedDriver, l.lapNum);
+    ? sessionTelemetryPath(searchParams, session, selectedDriver, l) ?? sessionLapComparePath(session, selectedDriver, l.lapNumber)
+    : sessionLapComparePath(session, selectedDriver, l.lapNumber);
 
   const handleOpenTelemetry = () => {
     navigate(telemetryUrl);
@@ -130,24 +132,24 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
       }}
       tabIndex={hasDetails ? 0 : undefined}
       aria-expanded={hasDetails ? isExpanded : undefined}
-      aria-label={`Lap ${l.lapNum}, ${isInferredLap ? `about ${displayLapTimeString}` : displayLapTimeString}: ${hasDetails ? 'show or hide lap details' : 'no lap events'}`}
+      aria-label={`Lap ${l.lapNumber}, ${isInferredLap ? `about ${displayLapTimeString}` : displayLapTimeString}: ${hasDetails ? 'show or hide lap details' : 'no lap events'}`}
       className={`transition-colors ${hasDetails ? 'cursor-pointer' : ''} group ${FOCUS_ROW} ${
         isLapAllTimePB ? 'bg-lmu-personal-best/8 hover:bg-lmu-personal-best/12' : isSessionBest ? 'bg-lmu-session-best-strong/10 hover:bg-lmu-session-best-strong/15' : 'hover:bg-lmu-cardHover'
       } ${FOCUS_RING}`}
-      title={`Details for Lap ${l.lapNum}`}
+      title={`Details for Lap ${l.lapNumber}`}
     >
       <td
         className="px-3 py-2.5 font-semibold text-lmu-text-soft whitespace-nowrap"
-        title={l.elapsedTimeString ? `Session Time: ${l.elapsedTimeString}` : undefined}
+        title={l.elapsedSeconds != null && l.elapsedSeconds >= 0 ? `Session Time: ${formatElapsedSeconds(l.elapsedSeconds)}` : undefined}
       >
         <span className="inline-flex items-center gap-1.5">
           {detailSections.length > 0 ? (
             <button
               type="button"
-              onClick={(event) => { event.stopPropagation(); onToggleExpanded(l.lapNum); }}
+              onClick={(event) => { event.stopPropagation(); onToggleExpanded(l.lapNumber); }}
               className={`w-6 h-6 inline-flex items-center justify-center rounded text-lmu-muted hover:text-white hover:bg-white/10 ${FOCUS_RING}`}
               aria-expanded={isExpanded}
-              aria-label={`${isExpanded ? 'Hide' : 'Show'} what happened on lap ${l.lapNum}`}
+              aria-label={`${isExpanded ? 'Hide' : 'Show'} what happened on lap ${l.lapNumber}`}
               title={`${isExpanded ? 'Hide' : 'Show'} what happened on this lap`}
             >
               <ChevronRight className={`w-3.5 h-3.5 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
@@ -155,7 +157,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
           ) : (
             <span className="w-5" aria-hidden="true" />
           )}
-          <span>{l.lapNum}</span>
+          <span>{l.lapNumber}</span>
         </span>
       </td>
       <td
@@ -211,6 +213,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
       <td className="px-3 py-2.5 text-left font-sans">
         <SessionLapStatusBadge
           lap={l}
+          events={events}
           isPitStop={l.isPitStop}
           isOutLap={isOutLap}
           isRaceSession={session.sessionType === 'Race'}
@@ -221,7 +224,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
       <td className="px-2 py-2 text-center font-sans">
         <SessionLapTableActions
           session={session}
-          lapNum={l.lapNum}
+          lapNumber={l.lapNumber}
           selectedDriver={selectedDriver}
           telemetryUrl={telemetryUrl}
           onOpenTelemetry={handleOpenTelemetry}
@@ -229,7 +232,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
       </td>
     </tr>
     {isExpanded && detailSections.length > 0 && (
-      <SessionLapDetailsRow lapNum={l.lapNum} lap={l} sections={detailSections} columnCount={columnCount} />
+      <SessionLapDetailsRow lapNumber={l.lapNumber} lap={l} lapEvents={events} sections={detailSections} columnCount={columnCount} />
     )}
     </>
   );

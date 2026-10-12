@@ -11,7 +11,7 @@ describe('CarLogo component', () => {
     vehicleLogosApi.clearCachedVehicleLogos();
   });
 
-  it('renders null when no carType or carModel is provided', async () => {
+  it('renders null when no carType or carType is provided', async () => {
     vi.spyOn(vehicleLogosApi, 'fetchVehicleLogos').mockResolvedValue({});
     const { container } = render(<CarLogo />);
     await waitFor(() => {
@@ -56,7 +56,7 @@ describe('CarLogo component', () => {
       Porsche: fakeSvg,
     });
 
-    render(<CarLogo carModel="Porsche 911 GT3 R" size="lg" className="custom-test" />);
+    render(<CarLogo carType="Porsche 911 GT3 R" size="lg" className="custom-test" />);
 
     await waitFor(() => {
       const img = screen.getByTestId('car-logo');

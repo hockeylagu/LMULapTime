@@ -20,10 +20,6 @@ describe('ReferenceLaptimesCard component', () => {
   const mockDiffWithImpact: ReferenceBenchmarkDiff = {
     id: 10,
     timestamp: '2026-10-01T10:00:00Z',
-    hasChanges: true,
-    addedCount: 1,
-    updatedCount: 1,
-    removedCount: 0,
     totalEntries: 187,
     totalAffectedSessions: 3,
     totalCategoryShifts: 1,
@@ -35,7 +31,6 @@ describe('ReferenceLaptimesCard component', () => {
         patch: '1.4+',
         type: 'added',
         newAlienSec: 125.0,
-        newAlienTimeString: '2:05.000',
         impact: {
           affectedSessionsCount: 0,
           affectedLapsCount: 0,
@@ -55,9 +50,6 @@ describe('ReferenceLaptimesCard component', () => {
         type: 'updated',
         oldAlienSec: 120.0,
         newAlienSec: 118.5,
-        oldAlienTimeString: '2:00.000',
-        newAlienTimeString: '1:58.500',
-        diffSec: -1.5,
         impact: {
           affectedSessionsCount: 3,
           affectedLapsCount: 8,
@@ -67,7 +59,6 @@ describe('ReferenceLaptimesCard component', () => {
               driverName: 'ProDriver',
               lapNumber: 4,
               lapTimeSec: 119.2,
-              lapTimeString: '1:59.200',
               sessionId: 'session-bahrain-1',
               sessionName: 'FP1 Bahrain',
               oldCategory: 'Alien',
@@ -83,10 +74,6 @@ describe('ReferenceLaptimesCard component', () => {
   const mockOlderDiff: ReferenceBenchmarkDiff = {
     id: 9,
     timestamp: '2026-09-15T08:00:00Z',
-    hasChanges: true,
-    addedCount: 0,
-    updatedCount: 1,
-    removedCount: 0,
     totalEntries: 186,
     totalAffectedSessions: 1,
     totalCategoryShifts: 0,
@@ -100,9 +87,6 @@ describe('ReferenceLaptimesCard component', () => {
         type: 'updated',
         oldAlienSec: 118.0,
         newAlienSec: 117.0,
-        oldAlienTimeString: '1:58.000',
-        newAlienTimeString: '1:57.000',
-        diffSec: -1.0,
         impact: {
           affectedSessionsCount: 1,
           affectedLapsCount: 4,
@@ -185,7 +169,7 @@ describe('ReferenceLaptimesCard component', () => {
   });
 
   it('says "no changes" once when the latest update changed nothing', async () => {
-    renderCard({ ...mockDiffWithImpact, hasChanges: false, addedCount: 0, updatedCount: 0, added: [], updated: [], totalAffectedSessions: 0, totalCategoryShifts: 0 });
+    renderCard({ ...mockDiffWithImpact, added: [], updated: [], totalAffectedSessions: 0, totalCategoryShifts: 0 });
     expect(screen.getAllByText(/no changes/i)).toHaveLength(1);
     fireEvent.click(await screen.findByRole('button', { name: /update history/i }));
     expect(screen.getByText((_, el) => el?.tagName === 'SPAN' && el.textContent === 'All 187 targets matched the sheet.')).toBeInTheDocument();

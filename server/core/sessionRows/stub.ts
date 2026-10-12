@@ -6,7 +6,7 @@ import type { DetailedSession } from '../../../shared/types/index.js';
  * and no JSON. For tests and offline checks; ingestion creates the row in upsertSession.
  */
 export function insertSessionRow(db: DatabaseType, session: DetailedSession): void {
-  db.prepare(`INSERT OR REPLACE INTO sessions (id, filename, file_path, file_mtime, file_size, timestamp, track_venue, track_course,
+  db.prepare(`INSERT OR REPLACE INTO sessions (id, filename, file_path, file_mtime_ms, file_size_bytes, timestamp, track_venue, track_course,
     session_type, session_name, drivers_count, updated_at)
     VALUES (@id, @filename, @filePath, 0, 0, @timestamp, @trackVenue, @trackCourse, @sessionType, @sessionName, @driversCount, 0)`)
     .run({ id: session.id, filename: session.filename, filePath: session.filePath, timestamp: session.timestamp, trackVenue: session.trackVenue,

@@ -8,9 +8,9 @@ const BADGE = 'inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-
 
 /** Independent safety signals: reported contacts, track-limit severity and issued penalties. */
 export const DriverSafetySummary: React.FC<{ driver: DriverData }> = ({ driver: d }) => {
-  const incCount = d.totalIncidents ?? d.incidents?.length ?? 0;
-  const tlCount = d.totalTrackLimits ?? d.trackLimits?.length ?? 0;
-  const penCount = d.totalPenalties ?? d.penalties?.length ?? 0;
+  const incCount = d.incidents?.length ?? 0;
+  const tlCount = d.trackLimits?.length ?? 0;
+  const penCount = d.penalties?.length ?? 0;
   const tooltip = [
     `Driver: ${d.name}`,
     `- Contacts / Incidents: ${incCount}x`,
@@ -21,8 +21,8 @@ export const DriverSafetySummary: React.FC<{ driver: DriverData }> = ({ driver: 
           '',
           'Penalties:',
           ...d.penalties.map((p) => {
-            const lapLabel = p.lapNum
-              ? `Lap ${p.lapNum}`
+            const lapLabel = p.lapNumber
+              ? `Lap ${p.lapNumber}`
               : p.elapsedSeconds
               ? formatElapsedSeconds(p.elapsedSeconds)
               : '';
@@ -35,8 +35,8 @@ export const DriverSafetySummary: React.FC<{ driver: DriverData }> = ({ driver: 
           '',
           'Incidents:',
           ...d.incidents.slice(0, 8).map((inc) => {
-            const lapLabel = inc.lapNum
-              ? `Lap ${inc.lapNum}`
+            const lapLabel = inc.lapNumber
+              ? `Lap ${inc.lapNumber}`
               : inc.elapsedSeconds
               ? formatElapsedSeconds(inc.elapsedSeconds)
               : 'Lap ?';
@@ -55,8 +55,8 @@ export const DriverSafetySummary: React.FC<{ driver: DriverData }> = ({ driver: 
           '',
           'Track Limits:',
           ...d.trackLimits.slice(0, 6).map((tl) => {
-            const lapLabel = tl.lapNum
-              ? `Lap ${tl.lapNum}`
+            const lapLabel = tl.lapNumber
+              ? `Lap ${tl.lapNumber}`
               : tl.elapsedSeconds
               ? formatElapsedSeconds(tl.elapsedSeconds)
               : 'Warning';
@@ -76,8 +76,7 @@ export const DriverSafetySummary: React.FC<{ driver: DriverData }> = ({ driver: 
     );
   }
 
-  const allTls = d.trackLimits?.length ? d.trackLimits : d.laps.flatMap(lap => lap.trackLimits || []);
-  const tlSeverity = getWorstTrackLimitSeverity(allTls);
+  const tlSeverity = getWorstTrackLimitSeverity(d.trackLimits);
 
   return (
     <span className="inline-flex items-center justify-start gap-1.5 cursor-help" title={tooltip}>

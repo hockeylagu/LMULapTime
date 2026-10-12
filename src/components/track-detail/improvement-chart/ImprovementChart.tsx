@@ -81,13 +81,13 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
       p.driverName.toLowerCase().includes(q) ||
       p.sessionType.toLowerCase().includes(q) ||
       (p.sessionName || '').toLowerCase().includes(q) ||
-      (p.weatherInfo || '').toLowerCase().includes(q);
+      (p.weather?.weatherString || '').toLowerCase().includes(q);
 
     return isTrackMatch && matchesClass && matchesModel && matchesType && matchesSearch;
   });
 
   const allTrackData = rawTrackData
-    .filter((p) => !hideEmpty || (p.totalLapsCount > 0 && p.bestLapTime !== null))
+    .filter((p) => !hideEmpty || (p.declaredLapsCount > 0 && p.bestLapTime !== null))
     .sort((a, b) => compareSessions(a, b, 'asc'));
 
   const trackData = (() => {
@@ -119,9 +119,9 @@ export const ImprovementChart: React.FC<ImprovementChartProps> = ({
       ? firstValidSession.bestLapTime - bestLapTimeInTrack
       : null;
 
-  const validTop3 = trackData.filter((p) => p.top3AvgLapTime !== null && p.top3AvgLapTime !== undefined && p.top3AvgLapTime > 0);
-  const firstTop3 = validTop3[0]?.top3AvgLapTime ?? null;
-  const bestTop3 = validTop3.length > 0 ? Math.min(...validTop3.map((p) => p.top3AvgLapTime as number)) : null;
+  const validTop3 = trackData.filter((p) => p.top3Average !== null && p.top3Average !== undefined && p.top3Average > 0);
+  const firstTop3 = validTop3[0]?.top3Average ?? null;
+  const bestTop3 = validTop3.length > 0 ? Math.min(...validTop3.map((p) => p.top3Average as number)) : null;
   const top3Improvement = firstTop3 !== null && bestTop3 !== null && validTop3.length > 1 ? firstTop3 - bestTop3 : null;
 
   const latestTheoreticalGap = trackData.length > 0 ? trackData[trackData.length - 1].theoreticalGap ?? null : null;

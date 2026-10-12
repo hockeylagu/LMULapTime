@@ -1,5 +1,6 @@
 import React from 'react';
 import type { DashboardRecentPacePoint } from '../../../shared/types/dashboard.js';
+import { formatTime } from '../../../shared/domain/formatters.js';
 
 export interface DashboardPaceSparklineProps {
   points: DashboardRecentPacePoint[];
@@ -101,7 +102,7 @@ export const DashboardPaceSparkline: React.FC<DashboardPaceSparklineProps> = ({
               className={`absolute -translate-x-1/2 -translate-y-1/2 aspect-square rounded-full border-current ${
                 isLatest ? 'w-2.5 h-2.5 border-2 bg-current' : 'w-2 h-2 border-[1.5px] bg-lmu-surface'
               }`}
-              title={`${c.point.trackName} · ${c.point.bestLapTimeString} (${c.point.pacePercentage}%)`}
+              title={`${c.point.trackName} · ${formatTime(c.point.bestLapTime)} (${c.point.pacePercentage}%)`}
             />
           );
         })}

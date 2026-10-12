@@ -69,7 +69,7 @@ describe('Replay domain services and transforms', () => {
         carType: 'Toyota GR010',
         bestLapTime: 91.2,
         laps: [
-          { lapNum: 1, lapTime: 91.2, lapTimeString: '1:31.200', s1: 30.1, s2: 30.2, s3: 30.9, isValid: true },
+          { lapNumber: 1, lapTime: 91.2, s1: 30.1, s2: 30.2, s3: 30.9, isValid: true },
         ],
       };
       const session = {
@@ -89,7 +89,7 @@ describe('Replay domain services and transforms', () => {
 
       expect(composed.displayTrack).toBe('Autodromo Nazionale Monza');
       expect(composed.carClass).toBe('Hyper');
-      expect(composed.carModel).toBe('Toyota GR010');
+      expect(composed.carType).toBe('Toyota GR010');
       expect(composed.laps).toHaveLength(1);
       expect(composed.laps?.[0].isBest).toBe(true);
 
@@ -109,7 +109,7 @@ describe('Replay domain services and transforms', () => {
         totalEvents: 2,
         durationSec: 60,
         drivers: [
-          { slot: 0, name: 'Samuel Lague', vehicleId: '4_25_DKR_E8E7FBE8C', carModel: 'Oreca 07 LMP2', carClass: 'LMP2', isPlayer: true },
+          { slot: 0, name: 'Samuel Lague', vehicleId: '4_25_DKR_E8E7FBE8C', carType: 'Oreca 07 LMP2', carClass: 'LMP2', isPlayer: true },
           { slot: 1, name: 'Jules Wadoux', vehicleId: 'NEW_LIVERY_2027' },
         ],
       };
@@ -126,7 +126,7 @@ describe('Replay domain services and transforms', () => {
 
       const composed = composeReplayMetadata({ metadata: original, replayName: 'Monza R1 15.Vcr', matchedSession: session });
 
-      expect(composed.drivers.map(driver => [driver.carModel, driver.carClass])).toEqual([
+      expect(composed.drivers.map(driver => [driver.carType, driver.carClass])).toEqual([
         ['Ginetta G61-LT-P325 Evo', 'LMP3'],
         ['Duqueine D09 P3', 'LMP3'],
       ]);
@@ -137,28 +137,28 @@ describe('Replay domain services and transforms', () => {
       const metadata: ReplayMetadata = {
         filename: 'Practice.Vcr', filePath: '/replays/Practice.Vcr', fileSizeBytes: 2000, mtimeMs: 5000,
         timeSliceCount: 50, totalEvents: 2, durationSec: 60,
-        carModel: 'Joann car', carClass: 'GT3',
+        carType: 'Joann car', carClass: 'GT3',
         drivers: [
-          { slot: 1, name: 'Joann', carModel: 'Joann car', carClass: 'GT3', isPlayer: false },
-          { slot: 2, name: 'Ann', carModel: 'Ann car', carClass: 'Hyper', isPlayer: true },
+          { slot: 1, name: 'Joann', carType: 'Joann car', carClass: 'GT3', isPlayer: false },
+          { slot: 2, name: 'Ann', carType: 'Ann car', carClass: 'Hyper', isPlayer: true },
         ],
       };
       const session = {
         id: 'session-ann', trackVenue: 'Spa', trackCourse: 'Grand Prix', sessionType: 'Practice',
         drivers: [{ name: 'Ann', carType: 'Ann car', carClass: 'Hyper', bestLapTime: 90, laps: [
-          { lapNum: 1, lapTime: 90, s1: 30, s2: 30, s3: 30, isValid: true },
+          { lapNumber: 1, lapTime: 90, s1: 30, s2: 30, s3: 30, isValid: true },
         ] }],
         playerDriver: { name: 'Ann', carType: 'Ann car', carClass: 'Hyper', bestLapTime: 90, laps: [
-          { lapNum: 1, lapTime: 90, s1: 30, s2: 30, s3: 30, isValid: true },
+          { lapNumber: 1, lapTime: 90, s1: 30, s2: 30, s3: 30, isValid: true },
         ] },
       } as unknown as DetailedSession;
 
       const composed = composeReplayMetadata({ metadata, replayName: metadata.filename, matchedSession: session });
 
-      expect(composed.carModel).toBe('Ann car');
+      expect(composed.carType).toBe('Ann car');
       expect(composed.carClass).toBe('Hyper');
       expect(composed.laps?.map(lap => lap.lapNumber)).toEqual([1]);
-      expect(metadata.carModel).toBe('Joann car');
+      expect(metadata.carType).toBe('Joann car');
     });
 
     it('falls back to filename track tokens when no matched session exists', () => {
@@ -190,8 +190,8 @@ describe('Replay domain services and transforms', () => {
         storedReplays: [
           {
             filename: 'Replay_A.Vcr',
-            file_mtime: 1000,
-            file_size: 500,
+            file_mtime_ms: 1000,
+            file_size_bytes: 500,
             metadata: {
               filename: 'Replay_A.Vcr',
               filePath: '/replays/Replay_A.Vcr',
@@ -201,13 +201,13 @@ describe('Replay domain services and transforms', () => {
               totalEvents: 1,
               durationSec: 10,
               trackName: 'Test Track',
-              drivers: [{ slot: 1, name: 'Driver A', isPlayer: true, carClass: 'GT3', carModel: 'Aston Martin' }],
+              drivers: [{ slot: 1, name: 'Driver A', isPlayer: true, carClass: 'GT3', carType: 'Aston Martin' }],
             },
           },
           {
             filename: 'Archived_B.Vcr',
-            file_mtime: 2000,
-            file_size: 600,
+            file_mtime_ms: 2000,
+            file_size_bytes: 600,
             metadata: {
               filename: 'Archived_B.Vcr',
               filePath: '/replays/Archived_B.Vcr',
@@ -228,11 +228,11 @@ describe('Replay domain services and transforms', () => {
       });
 
       expect(summaries).toHaveLength(2);
-      // Sorted by mtime descending
+      // Sorted by mtimeMs descending
       expect(summaries[0].name).toBe('Archived_B.Vcr');
       expect(summaries[1].name).toBe('Replay_A.Vcr');
       expect(summaries[1].carClass).toBe('GT3');
-      expect(summaries[1].carModel).toBe('Aston Martin');
+      expect(summaries[1].carType).toBe('Aston Martin');
     });
   });
 
@@ -249,7 +249,7 @@ describe('Replay domain services and transforms', () => {
           { x: 3, y: 0, z: 3, speedKmh: 130 },
         ],
         pointsCount: 4,
-        rawPointsCount: 4,
+        vcrRawPointsCount: 4,
         sectors: { s1Frame: 1, s2Frame: 2 },
       } as unknown as ReplayTrajectoryData;
 
@@ -282,7 +282,7 @@ describe('Replay domain services and transforms', () => {
       const driver = {
         name: 'Official Driver',
         bestLapTime: 89.5,
-        laps: [{ lapNum: 1, lapTime: 89.5, s1: 29.8, s2: 30.0, s3: 29.7, isValid: true }],
+        laps: [{ lapNumber: 1, lapTime: 89.5, s1: 29.8, s2: 30.0, s3: 29.7, isValid: true }],
       } as unknown as DriverData;
 
       const validated = applyPureOfficialLapValidation(original, session, driver);
@@ -301,10 +301,10 @@ describe('Replay domain services and transforms', () => {
         points: [{ x: 0, y: 0, z: 0 }],
         laps: [1, 2, 3, 4].map(lapNumber => ({ lapNumber, lapTimeSec: 90, s1Sec: 30, s2Sec: 30, s3Sec: 30, isValid: true, isBest: lapNumber === 1 })) };
       const driver = { name: 'Official', laps: [
-        { lapNum: 1, lapTime: 90, isValid: true, isPitStop: true },
-        { lapNum: 2, lapTime: 90, isValid: true, isOutLap: true },
-        { lapNum: 3, lapTime: null, isValid: false },
-        { lapNum: 4, lapTime: 90, isValid: true },
+        { lapNumber: 1, lapTime: 90, isValid: true, isPitStop: true },
+        { lapNumber: 2, lapTime: 90, isValid: true, isOutLap: true },
+        { lapNumber: 3, lapTime: null, isValid: false },
+        { lapNumber: 4, lapTime: 90, isValid: true },
       ] } as unknown as DriverData;
       const result = applyPureOfficialLapValidation(original, { id: 'official', trackVenue: 'Monza', trackCourse: 'GP' } as DetailedSession, driver);
       expect(result.laps?.[0]).toMatchObject({ isPitStop: true, isBest: false });

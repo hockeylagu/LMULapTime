@@ -2,7 +2,7 @@ import { DetailedSession, DriverData, LapData } from '../../shared/types/index.j
 import type { TelemetryLinks } from '../telemetry/telemetryLinks.js';
 
 /** Official timing fields used by replay metadata and lap validation, without events or passes. */
-export type ReplayTimingLap = Pick<LapData, 'lapNum' | 'lapTime' | 's1' | 's2' | 's3' |
+export type ReplayTimingLap = Pick<LapData, 'lapNumber' | 'lapTime' | 's1' | 's2' | 's3' |
   'isValid' | 'isPitStop' | 'isOutLap' | 'nonRepresentativeReason' | 'lapOrdinal'>;
 export type ReplayContextDriver = Pick<DriverData, 'name' | 'carType' | 'carClass' |
   'bestLapTime' | 'isPlayer' | 'driverOrdinal'> & { laps: ReplayTimingLap[] };
@@ -27,8 +27,8 @@ export interface ReplaySummarySourceData {
   storedReplays: Array<{
     filename: string;
     file_path?: string;
-    file_mtime?: number;
-    file_size?: number;
+    file_mtime_ms?: number;
+    file_size_bytes?: number;
     metadata?: import('../../shared/types/index.js').ReplayMetadata | null;
   }>;
   replaysDir: string;

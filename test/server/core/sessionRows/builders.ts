@@ -13,9 +13,9 @@ export function memoryDb(): DatabaseType {
   return db;
 }
 
-export function lap(lapNum: number, overrides: Partial<LapData> = {}): LapData {
+export function lap(lapNumber: number, overrides: Partial<LapData> = {}): LapData {
   return {
-    lapNum, position: 1, lapTime: 100 + lapNum, lapTimeString: `1:${40 + lapNum}.000`, s1: 30, s2: 35, s3: 35 + lapNum,
+    lapNumber, position: 1, lapTime: 100 + lapNumber, s1: 30, s2: 35, s3: 35 + lapNumber,
     topSpeed: 300, fCompound: 'Medium', rCompound: 'Medium', isPitStop: false, isValid: true, ...overrides,
   };
 }
@@ -23,8 +23,8 @@ export function lap(lapNum: number, overrides: Partial<LapData> = {}): LapData {
 export function driver(name: string, laps: LapData[], overrides: Partial<DriverData> = {}): DriverData {
   return {
     name, carType: 'Ferrari 499P', carClass: 'Hyper', carNumber: '51', teamName: 'Team', isPlayer: false, position: 1, classPosition: 1,
-    bestLapTime: 101, bestLapTimeString: '1:41.000', bestS1: 30, bestS2: 35, bestS3: 36, theoreticalBest: 100.5,
-    theoreticalBestString: '1:40.500', lapsCount: laps.length, laps, ...overrides,
+    bestLapTime: 101, bestS1: 30, bestS2: 35, bestS3: 36, theoreticalBest: 100.5,
+ declaredLapsCount: laps.length, laps, ...overrides,
   };
 }
 

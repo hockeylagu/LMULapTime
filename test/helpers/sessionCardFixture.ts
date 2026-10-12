@@ -22,10 +22,10 @@ function paceCategory(value: string | null | undefined): NonNullable<NonNullable
 export function makeSessionCard(overrides: SessionCardOverrides = {}): SessionCard {
   const playerDriver: NonNullable<SessionCard['playerDriver']> = {
     name: 'Driver', carType: 'Car', carClass: 'GT3', carNumber: '1', teamName: 'Team',
-    isPlayer: true, position: 1, classPosition: 1, bestLapTime: 100, bestLapTimeString: '1:40.000',
-    bestS1: 30, bestS2: 35, bestS3: 35, theoreticalBest: 100, theoreticalBestString: '1:40.000',
-    lapsCount: 1, lapsLedCount: 0, totalIncidents: 0, totalTrackLimits: 0, totalPenalties: 0,
-    bestLapOrdinal: null, completedLapsCount: 1, cleanLapsCount: 1, drivingTimeSeconds: 100,
+    isPlayer: true, position: 1, classPosition: 1, bestLapTime: 100, 
+    bestS1: 30, bestS2: 35, bestS3: 35, theoreticalBest: 100, 
+    declaredLapsCount: 1, lapsLedCount: 0,
+    bestLapOrdinal: null, lapsCount: 1, cleanLapsCount: 1, drivingTimeSeconds: 100,
     pitStopsCount: 0, maxTopSpeed: null, consistencyScore: null, top3Average: null,
   };
   const { playerDriver: playerOverride, matchingReplayFile, sessionType: sessionKind, ...sessionOverrides } = overrides;
@@ -36,7 +36,7 @@ export function makeSessionCard(overrides: SessionCardOverrides = {}): SessionCa
     timestamp: parseDateStringToTimestamp(overrides.timeString ?? '2026-01-01 12:00:00'), sessionName: 'P1', driversCount: 1, isEmpty: false,
     ...sessionOverrides,
     sessionType: sessionType(sessionKind ?? 'Practice'),
-    matchingReplayFile: matchingReplayFile ? { name: 'replay.vcr', path: 'replay.vcr', sizeBytes: 0, ...matchingReplayFile } : undefined,
+    matchingReplayFile: matchingReplayFile ? { name: 'replay.vcr', path: 'replay.vcr', fileSizeBytes: 0, ...matchingReplayFile } : undefined,
     playerDriver: playerOverride ? { ...playerDriver, ...driverOverrides, bestLapPaceCategory: paceCategory(bestLapPaceCategory) } : undefined,
   };
 }
@@ -50,7 +50,7 @@ type DetailedSessionOverrides = Omit<Partial<DetailedSession>, 'playerDriver' | 
 
 function makeLapData(overrides: Partial<LapData>): LapData {
   return {
-    lapNum: 1, position: 1, lapTime: null, lapTimeString: '--:--.---', s1: null, s2: null, s3: null,
+    lapNumber: 1, position: 1, lapTime: null, s1: null, s2: null, s3: null,
     topSpeed: null, fCompound: '', rCompound: '', isPitStop: false, isValid: true, ...overrides,
   };
 }
@@ -58,9 +58,9 @@ function makeLapData(overrides: Partial<LapData>): LapData {
 export function makeDetailedSession(overrides: DetailedSessionOverrides = {}): DetailedSession {
   const playerDriver: DriverData = {
     name: 'Driver', carType: 'Car', carClass: 'GT3', carNumber: '1', teamName: 'Team', isPlayer: true,
-    position: 1, classPosition: 1, bestLapTime: 100, bestLapTimeString: '1:40.000',
-    bestS1: 30, bestS2: 35, bestS3: 35, theoreticalBest: 100, theoreticalBestString: '1:40.000',
-    lapsCount: 1, laps: [],
+    position: 1, classPosition: 1, bestLapTime: 100, 
+    bestS1: 30, bestS2: 35, bestS3: 35, theoreticalBest: 100, 
+    declaredLapsCount: 1, laps: [],
   };
   const { playerDriver: playerOverride, matchingReplayFile, sessionType: sessionKind, ...sessionOverrides } = overrides;
   const { bestLapPaceCategory, ...driverOverrides } = playerOverride ?? {};
@@ -70,7 +70,7 @@ export function makeDetailedSession(overrides: DetailedSessionOverrides = {}): D
     timestamp: parseDateStringToTimestamp(overrides.timeString ?? '2026-01-01 12:00:00'), sessionName: 'P1', driversCount: 1,
     drivers: [], ...sessionOverrides,
     sessionType: sessionType(sessionKind ?? 'Practice'),
-    matchingReplayFile: matchingReplayFile ? { name: 'replay.vcr', path: 'replay.vcr', sizeBytes: 0, ...matchingReplayFile } : undefined,
+    matchingReplayFile: matchingReplayFile ? { name: 'replay.vcr', path: 'replay.vcr', fileSizeBytes: 0, ...matchingReplayFile } : undefined,
     playerDriver: playerOverride ? {
       ...playerDriver, ...driverOverrides, bestLapPaceCategory: paceCategory(bestLapPaceCategory),
       laps: playerOverride.laps?.map(lap => makeLapData(lap)) ?? playerDriver.laps,

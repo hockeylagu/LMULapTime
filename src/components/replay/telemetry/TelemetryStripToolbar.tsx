@@ -19,8 +19,6 @@ export interface TelemetryStripToolbarProps {
   telemetryResolution?: TelemetryResolution;
   onChangeResolution?: (res: TelemetryResolution) => void;
   pointsCount?: number;
-  rawPointsCount?: number;
-  rawSampleRateHz?: number;
   vcrRawPointsCount?: number;
   vcrRawSampleRateHz?: number;
   duckdbRawPointsCount?: number;
@@ -53,8 +51,6 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
   telemetryResolution,
   onChangeResolution,
   pointsCount,
-  rawPointsCount,
-  rawSampleRateHz,
   vcrRawPointsCount,
   vcrRawSampleRateHz,
   duckdbRawPointsCount,
@@ -75,6 +71,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
   onSelectSource,
 }) => {
   const [isResPopoverOpen, setIsResPopoverOpen] = useState<boolean>(false);
+  const servedRate = source === 'duckdb' ? duckdbRawSampleRateHz : vcrRawSampleRateHz;
 
   const formatElapsed = (sec?: number): string => {
     const s = sec !== undefined && isFinite(sec) && sec >= 0 ? sec : 0;
@@ -169,7 +166,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
             >
               <Activity className="w-2.5 h-2.5 text-lmu-muted" />
               <span className="whitespace-nowrap">
-                <span className={source === 'duckdb' ? 'text-lmu-warn-soft' : 'text-lmu-muted'}>{rawSampleRateHz ? `${rawSampleRateHz}Hz` : 'Rate'}</span>{isFullResolution || telemetryResolution === 'full' ? ' • Full Raw' : ''}
+                <span className={source === 'duckdb' ? 'text-lmu-warn-soft' : 'text-lmu-muted'}>{servedRate ? `${servedRate}Hz` : 'Rate'}</span>{isFullResolution || telemetryResolution === 'full' ? ' • Full Raw' : ''}
               </span>
             </button>
 
@@ -180,8 +177,6 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
                 telemetryResolution={telemetryResolution ?? DEFAULT_TELEMETRY_RESOLUTION}
                 onChangeResolution={onChangeResolution ?? (() => {})}
                 pointsCount={pointsCount ?? 0}
-                rawPointsCount={rawPointsCount}
-                rawSampleRateHz={rawSampleRateHz}
                 vcrRawPointsCount={vcrRawPointsCount}
                 vcrRawSampleRateHz={vcrRawSampleRateHz}
                 duckdbRawPointsCount={duckdbRawPointsCount}

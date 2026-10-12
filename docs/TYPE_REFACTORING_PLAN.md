@@ -8,7 +8,7 @@ This plan outlines the systematic cleanup of TypeScript types across the **Le Ma
 
 1. **Single Source of Truth**: Every domain model and entity has one canonical TypeScript contract in `shared/types/`.
 2. **Zero Unnecessary Indirection**: Remove trivial `type A = B` aliases, redundant pass-through barrels, and duplicate model subsets.
-3. **Consistent Domain Taxonomy**: Unify divergent property names across Session, Replay, Projection, and Telemetry layers (`lapNum` vs `lapNumber`, `isOutLap` vs `isOutlap`, `carType` vs `carName`, etc.).
+3. **Consistent Domain Taxonomy**: Unify divergent property names across Session, Replay, Projection, and Telemetry layers (`lapNum` vs `lapNumber`, `isOutLap` vs `isOutlap`, `carType` vs `carName`, etc.; finished in Phase 6).
 4. **Zero Warnings & Zero Regressions**: Every phase must verify with `npm test` and `npm run build` with zero errors and zero warnings.
 
 ```mermaid
@@ -156,7 +156,7 @@ Eliminate redundant properties on core models that force defensive runtime fallb
 
 **Verification Gate 3**: Run `npm test` and `npm run build`.
 
-The old nullable `session_drivers.driver_name` SQLite column remains in the schema for compatibility with existing databases, but the runtime model no longer reads or writes it. Legacy JSON driver objects are canonicalized by dropping `driverName` while retaining `name`. Replay summary and traffic spell fields are API/runtime payloads; they are rebuilt per request and do not require a stored-cache version bump.
+The `session_drivers.driver_name` column and the `driverName` driver property are gone; replay summary and traffic spell fields are API/runtime payloads rebuilt per request.
 
 ---
 
@@ -211,9 +211,62 @@ In [`server/core/sessionSummaries/cards.ts`](../server/core/sessionSummaries/car
 - [x] In [`src/components/track-detail/trackDetailHelpers.ts#L75`](../src/components/track-detail/trackDetailHelpers.ts#L75):
   Eliminate `dateString: s.timeString` glue by accepting `timeString` consistently across progression points.
 
-Stored replay metadata and trajectory JSON can outlive their source `.Vcr` files, so their read boundary normalizes the legacy `isOutlap` spelling (including nested `allLapsData`) before version-specific early returns. A canonical `isOutLap: false` takes precedence, and reads do not rewrite compressed blobs. The SQLite `replay_laps.is_outlap` column remains unchanged. Other renamed fields are runtime projections and require no persistence version bump. `LapConditionGroup` and `WeatherCondition`, replay `carModel` and display `carType`, and ordinal and lap-number fields remain distinct because they encode different concepts.
+Stored replay JSON outlives the `.Vcr` files, so its keys were rewritten once by the offline script (Phase 6); the app keeps no read shim for `isOutlap`.
 
 **Verification Gate 5**: Final sequential `npm run test:coverage` passed (298 test files and 2,587 tests passed; 5 files and 56 tests skipped; coverage thresholds met: 92.41% statements, 83.77% branches, 92.64% functions, and 94.68% lines). `npm run build` passed afterward: TypeScript, local-data guards, and Vite production build completed with zero warnings or errors. Vitest ran with one worker and the required elevated validation permissions for its temporary SSR cache and localhost route tests.
+
+---
+
+## Phase 6: One Name Per Fact (TypeScript, SQL and stored JSON)
+
+Done in one pass, with no aliases, shims or legacy reads left in the app. Verification: `npm run build`, `npm test`,
+`npm run test:coverage`, a rewrite of a copy of the cache, and the guard test `test/domain/retiredNames.test.ts`.
+
+| Fact | Name now | Retired |
+|---|---|---|
+| Lap number | `lapNumber`, `bestLapNumber`, `initialLapNumber`, URL `lapNumber` / `compareLapNumber`, SQL `lap_number` | `lapNum`, `bestLapNum`, `initialLapNum`, `lap_num`, `best_lap_num` |
+| Average clean lap | `avgLapTime` / `avgLapTimeString`, SQL `avg_lap_time` | `averageLapTime`, `clean_average_lap_time` |
+| Top-3 average | `top3Average`, SQL `top3_average` | `top3AvgLapTime`, `top_three_average` |
+| Out lap | `isOutLap`, SQL `is_out_lap` | `isOutlap` (read shim removed), `is_outlap` |
+| Pace | `paceCategory` / `pacePercentage` | `benchmarkCategory` / `benchmarkPercentage` |
+| Car | `carType` (replay, telemetry metadata, filters `carType` / `carTypes`) | `carModel`, `carName`, `carModels` |
+| Session label | `timeString`; `todayActivity.sessionDay` | `dateString` |
+| Files | `mtimeMs`, `fileSizeBytes`; SQL `file_mtime_ms`, `file_size_bytes` | `mtime`, `sizeBytes`, `fileMtime`, `fileSize`, `file_mtime`, `file_size`, `size_bytes` |
+| Counted laps / pit stops | `lapsCount`, `pitStopsCount` (from laps) | `completedLapsCount`, `pit_count`, `completed_laps_count` |
+| Declared by the XML | `declaredLapsCount` (also on progression points), `declaredPitStopsCount` | `DriverData.lapsCount`, `DriverData.pitStopsCount`, `totalLapsCount` on progression points |
+| Projection columns | `driving_time_seconds`, `max_top_speed` | `driving_time_sum`, `max_speed` |
+| Duplicate `session_drivers` columns | `is_player`, `best_lap_number`, `best_lap_wet` (NULL = not wet), `avg_lap_time` | `is_player_driver`, `best_lap_num`, `best_lap_is_wet`, `clean_average_lap_time`, `driver_name` |
+
+Kept distinct on purpose: `topSpeed` (a lap) vs `maxTopSpeed` (an aggregate); `DetailedSession.totalLapsCount` (race distance);
+the DuckDB `telemetry_metadata.laps_count`; `driverName` on models where the driver is an attribute, `name` on `DriverData` and roster entries.
+
+---
+
+## Phase 7: One Fact, One Place (no model holds the same fact twice)
+
+Phase 6 gave each fact one name; Phase 7 gives it one place. Applies to TypeScript types, SQL columns and stored JSON alike.
+The stored data is rewritten offline by the appended idempotent steps of `rewrite-db-names.cjs` (no reparse from XML,
+sessions whose source files were deleted are preserved). Guard: `test/domain/retiredNames.test.ts`.
+
+| Fact | Held now | Removed |
+|---|---|---|
+| Events (incident, track limit, penalty) | once, on the driver (`incidents`, `trackLimits`, `penalties`), each event with its `lapNumber`; lap views use `lapEvents(driver, lapNumber)` | the copies on `LapData`; SQL `session_events.driver_seq` / `lap_ordinal` / `lap_seq`, `session_laps.lists_mask` |
+| Event counts | the list lengths | `incidentCount`, `trackLimitCount`, `penaltyCount`, `totalIncidents`, `totalTrackLimits`, `totalPenalties` (types and `incident_count`, `track_limit_count`, `penalty_count`, `total_*` columns) |
+| Weather | `weatherString`, `SessionProgressionPoint.weather` | `weatherInfo`, `sessions.weather_info` |
+| DuckDB file | `sessions.duckdb_filename` | `hasDuckDbTelemetry` on the session, `sessions.has_duckdb_telemetry`, the replay-link mirror and its glue |
+| Replay scene and event | root `sceneDesc` and `sessionType`; `eventInfo` keeps only the event's own fields | `eventInfo.sceneDesc`, `eventInfo.session`, root `eventTitle` |
+| Replay trajectory raw counts | `vcrRawPointsCount` / `vcrRawSampleRateHz` (VCR) and `duckdbRaw*` (DuckDB); the served pair derives from `source` | `rawPointsCount`, `rawSampleRateHz` |
+| Track name on a replay summary | `displayTrack` | `ReplaySummary.trackName` |
+| Aggregate projection | `drivers[].isPlayer`; the session's own `timeString` and `trackLengthMeters` | `SessionAggregateProjection.player`, `.timeString`, `.trackLengthMeters` |
+| Leaderboard | `entries` (`playerEntry(board)`, `rivalEntryOf(board, rival)`) | `Leaderboard.player`, `RivalStatus.rivalEntry` |
+| Reference benchmark | `targets` ladder (`targets.alienSec`), the diff's three lists | `target100Sec`, `diffSec`, `hasChanges` / `addedCount` / `updatedCount` / `removedCount` on the diff, `ReferenceLaptimeRefreshStatus.updatedCount`, the typed `reference_laptimes` columns |
+| Formatted times | the numbers; formatters in `shared/domain/formatters.ts` | every `*String` copy of a lap, sector, gap, elapsed or pit time, `oldAlienTimeString`, `newAlienTimeString`, `finishGapToLeaderString` (never written), and the matching `*_string` columns |
+
+Kept on purpose (evidence in the change log): `timeString` (the recording machine's clock; `timestamp` carries a session-type weight and depends on the
+machine time zone), `ReplayMetadata.trackName` (raw VCR header name; `displayTrack` is composed), `ReplaySummary.carClass` (the player's class; `carClasses[]`
+is the set), `BenchmarkItemImpact` counts (the sample list is capped at 25), `ReferenceLaptimeEntry.key`, `totalAffectedSessions` (a distinct count),
+`DriverData.theoreticalBest` (numeric, sum of the three sector bests), the `sessions.player_*` and `session_summary_facts` projection tiers that SQL sorts on,
+and the `replay_metadata` / `telemetry_metadata` stat columns that drive staleness checks.
 
 ---
 
@@ -221,6 +274,6 @@ Stored replay metadata and trajectory JSON can outlive their source `.Vcr` files
 
 | Risk | Impact | Mitigation |
 |---|---|---|
-| Persisted replay JSON compatibility | High (cached metadata and trajectories survive source-file deletion) | Normalize the old `isOutlap` JSON key at the read boundary before parser-version early returns; preserve canonical false, recurse nested laps, and leave stored blobs and SQL columns unchanged. |
+| Persisted replay JSON and SQL names | High (cached rows survive source-file deletion) | One offline rewrite (renames, key rewrites, duplicate-column checks) on a copy first; replay rows are rewritten in place, never deleted or version-bumped; the app contains no compatibility code. |
 | Runtime projection / API contract regressions | High | Update producers and consumers together, preserve meaningful `SessionCard | DetailedSession` inputs, and verify with the final sequential test and build gates. |
 | Build and test resource contention | Medium | Run `npm test`, `npm run build`, and `npm run test:coverage` sequentially; require zero warnings and all coverage thresholds. |

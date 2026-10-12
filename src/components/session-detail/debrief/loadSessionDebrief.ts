@@ -83,11 +83,11 @@ function repeatabilityLaps(laps: LapData[], trafficKnown: boolean): LapData[] {
 export async function loadSessionDebrief(session: DetailedSession, driver: DriverData, signal?: AbortSignal): Promise<SessionDebrief> {
   if (!session.matchingReplayFile) throw new DebriefUnavailableError('This session has no replay to analyse.');
   const lapNumber = getBestLapNumber(driver);
-  const lap = driver.laps?.find(l => l.lapNum === lapNumber);
+  const lap = driver.laps?.find(l => l.lapNumber === lapNumber);
   if (!lap || !lap.lapTime) throw new DebriefUnavailableError('No timed lap to analyse in this session.');
   const driverOrdinal = session.drivers.findIndex(item => item === driver ||
     item.name.trim().toLowerCase() === driver.name.trim().toLowerCase());
-  const lapOrdinal = driverOrdinal >= 0 ? session.drivers[driverOrdinal].laps.findIndex(item => item.lapNum === lapNumber) : -1;
+  const lapOrdinal = driverOrdinal >= 0 ? session.drivers[driverOrdinal].laps.findIndex(item => item.lapNumber === lapNumber) : -1;
   if (driverOrdinal < 0 || lapOrdinal < 0) throw new DebriefUnavailableError('The selected driver or lap is unavailable in this session.');
   // Started first: the first request for a race builds its positions index, the slowest step.
   const trafficRequest = loadTraffic(session.id, driver.name, signal);
@@ -95,13 +95,13 @@ export async function loadSessionDebrief(session: DetailedSession, driver: Drive
 
   const query = new URLSearchParams({
     track: getDisplayTrackName(session.trackVenue, session.trackCourse),
-    carModel: driver.carType,
+    carType: driver.carType,
     playerOnly: 'false',
   });
   const carClass = resolveDriverCarClass(driver);
   if (carClass) query.set('carClass', carClass);
   const { laps = [] } = await fetchJson<{ laps?: ComparableLap[] }>(`/api/compare/laps?${query.toString()}`, { signal });
-  const analysed = { sessionId: session.id, driverName: driver.name, lapNum: lapNumber, carType: driver.carType, lapTime: lap.lapTime };
+  const analysed = { sessionId: session.id, driverName: driver.name, lapNumber, carType: driver.carType, lapTime: lap.lapTime };
   const fastest = pickFastestSameCarLap(laps, analysed);
   const reference = pickAttainableSameCarLap(laps, analysed) ?? fastest;
   if (!reference?.sessionId || reference.driverOrdinal === undefined || reference.lapOrdinal === undefined) {
@@ -133,13 +133,13 @@ export async function loadSessionDebrief(session: DetailedSession, driver: Drive
   const techniqueSegments = techniqueTrajectory?.points?.length && hasCompatibleTrackStations(target, techniqueTrajectory) ? compare(techniqueTrajectory) : undefined;
 
   const otherLapNumbers = repeatabilityLaps(driver.laps || [], traffic !== null)
-    .map(l => l.lapNum)
+    .map(l => l.lapNumber)
     .filter(n => n !== lapNumber);
   const otherLaps = await Promise.all(otherLapNumbers.map(n =>
     fetchSessionTelemetry(session.id, {
       resolutionQuery: `maxPoints=${REPEATABILITY_LAP_MAX_POINTS}`,
       driverOrdinal,
-      lapOrdinal: session.drivers[driverOrdinal].laps.findIndex(item => item.lapNum === n),
+      lapOrdinal: session.drivers[driverOrdinal].laps.findIndex(item => item.lapNumber === n),
     }, { signal })
       .then((data): CornerConsistencyLapInput => ({ lapNumber: n, points: hasCompatibleTrackStations(target, data) ? applyTelemetryPostProcessing(data?.points || []) : [] }))
       .catch((err: unknown): CornerConsistencyLapInput => {

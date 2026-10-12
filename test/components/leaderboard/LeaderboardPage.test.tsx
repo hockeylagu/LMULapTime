@@ -113,7 +113,7 @@ describe('LeaderboardPage', () => {
   });
 
   it('switches track and class from the ribbon, dropping the lap the link asked for', async () => {
-    window.location.hash = '#/leaderboard?track=Autodromo%20Nazionale%20Monza&carClass=GT3&sessionId=s1&lapNum=4';
+    window.location.hash = '#/leaderboard?track=Autodromo%20Nazionale%20Monza&carClass=GT3&sessionId=s1&lapNumber=4';
     render(<LeaderboardPage sessions={[]} />);
 
     const daytona = await screen.findByRole('link', { name: /Daytona International Speedway \(Road Course\)/ });
@@ -125,7 +125,7 @@ describe('LeaderboardPage', () => {
     await waitFor(() => expect(urlParams().get('track')).toBe('Daytona International Speedway (Road Course)'));
     expect(urlParams().get('carClass')).toBe('Hyper');
     expect(urlParams().get('sessionId')).toBeNull();
-    expect(urlParams().get('lapNum')).toBeNull();
+    expect(urlParams().get('lapNumber')).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: /^GT3\s*P12\/20/ }));
     await waitFor(() => expect(urlParams().get('carClass')).toBe('GT3'));

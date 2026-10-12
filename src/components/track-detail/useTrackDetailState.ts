@@ -20,7 +20,7 @@ export interface TrackDetailData {
   sessions: SessionCard[];
   benchmarks: ReferenceLaptimeEntry[];
   summary?: TrackSummary;
-  filters?: { carModels: string[]; sessionTypes: string[]; emptyCount: number; replayCount: number };
+  filters?: { carTypes: string[]; sessionTypes: string[]; emptyCount: number; replayCount: number };
   progression?: { points: SessionProgressionPoint[]; total: number; page: number; pageSize: number };
   positions?: { qualifyingAveragePosition: number | null; finishAveragePosition: number | null };
   latestSession?: { trackVenue?: string; trackCourse?: string; trackLengthMeters?: number | null; carClass?: string; carType?: string };

@@ -15,7 +15,7 @@ const at = (iso: string) => Date.parse(iso);
 const duck = (filename: string, iso: string, sessionType = 'P', lapsCount = 3): DuckDbFileInfo => ({
   filename,
   filePath: `C:\\Telemetry\\${filename}`,
-  fileMtimeMs: at(iso),
+  mtimeMs: at(iso),
   fileSizeBytes: 1024,
   trackName: 'Circuit de la Sarthe',
   sessionType,
@@ -38,10 +38,10 @@ const session = (id: string, iso: string, replayName?: string): DetailedSession 
 const replay = (name: string, savedIso: string, durationSec = 600): ReplayFileEntry => ({
   name,
   path: `C:\\Replays\\${name}`,
-  sizeBytes: 1,
+  fileSizeBytes: 1,
   trackName: 'Circuit de la Sarthe',
   sessionCode: 'P1',
-  mtime: at(savedIso),
+  mtimeMs: at(savedIso),
   durationSec,
 });
 

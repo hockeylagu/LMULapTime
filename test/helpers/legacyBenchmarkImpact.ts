@@ -1,7 +1,6 @@
 /** Test-only parity oracle for compact benchmark impact queries. */
 import type { DetailedSession, ReferenceBenchmarkDiff, ReferenceBenchmarkDiffItem, LapCategoryShift, BenchmarkItemImpact } from '../../shared/types/index.js';
 import { matchesTrack, getPaceCategoryFromPercentage } from '../../shared/domain/paceCategory.js';
-import { formatTime } from '../../shared/domain/formatters.js';
 import { BENCHMARK_IMPACT_RULE } from '../../server/benchmarks/benchmarkImpact.js';
 
 const MAX_STORED_SAMPLE_SHIFTS = 25;
@@ -54,10 +53,9 @@ export function computeBenchmarkItemImpact(
             categoryShifts.push({
               driverName: driver.name || 'Driver',
               lapTimeSec: lap.lapTime,
-              lapTimeString: formatTime(lap.lapTime),
               sessionId: session.id,
               sessionName: session.sessionName || session.sessionType || 'Session',
-              lapNumber: lap.lapNum ?? (lap as unknown as { lapNumber?: number }).lapNumber ?? 0,
+              lapNumber: lap.lapNumber ?? (lap as unknown as { lapNumber?: number }).lapNumber ?? 0,
               oldCategory,
               newCategory,
             });

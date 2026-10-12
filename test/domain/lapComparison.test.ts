@@ -16,9 +16,8 @@ describe('lapComparison utility', () => {
     driverName: 'Driver A',
     carType: 'Ferrari 296 GT3',
     carClass: 'GT3',
-    lapNum: 1,
+    lapNumber: 1,
     lapTime: 120.5,
-    lapTimeString: '2:00.500',
     s1: 30.0,
     s2: 45.0,
     s3: 45.5,
@@ -105,7 +104,6 @@ describe('lapComparison utility', () => {
     it('creates a valid theoretical lap from valid sectors', () => {
       const theo = createTheoreticalBestLap(29.5, 44.2, 45.1, 'Theoretical Best', 'GT3', 'Optimal Sectors');
       expect(theo.lapTime).toBe(118.8);
-      expect(theo.lapTimeString).toBe('1:58.800');
       expect(theo.s1).toBe(29.5);
       expect(theo.s2).toBe(44.2);
       expect(theo.s3).toBe(45.1);
@@ -115,17 +113,14 @@ describe('lapComparison utility', () => {
     it('handles null sector values gracefully', () => {
       const theo = createTheoreticalBestLap(null, 44.2, 45.1);
       expect(theo.lapTime).toBeNull();
-      expect(theo.lapTimeString).toBe('--:--.---');
     });
 
     it('returns null lapTime if any sector is <= 0', () => {
       const theoZero = createTheoreticalBestLap(0, 44.2, 45.1);
       expect(theoZero.lapTime).toBeNull();
-      expect(theoZero.lapTimeString).toBe('--:--.---');
 
       const theoNegative = createTheoreticalBestLap(-5, 44.2, 45.1);
       expect(theoNegative.lapTime).toBeNull();
-      expect(theoNegative.lapTimeString).toBe('--:--.---');
     });
 
     it('creates a theoretical lap with paceCategory and pacePercentage attached', () => {
@@ -153,7 +148,6 @@ describe('lapComparison utility', () => {
         trackName: 'Bahrain',
         carClass: 'GT3',
         patch: '1.4+',
-        target100Sec: 120.0,
         targets: {
           alienSec: 120.0,
           competitiveSec: 121.2,
@@ -168,11 +162,11 @@ describe('lapComparison utility', () => {
 
       const benchmarks = createBenchmarkLaps(refEntry);
       expect(benchmarks.length).toBe(3);
-      expect(benchmarks[0].benchmarkCategory).toBe('Alien');
+      expect(benchmarks[0].paceCategory).toBe('Alien');
       expect(benchmarks[0].lapTime).toBe(120.0);
-      expect(benchmarks[1].benchmarkCategory).toBe('Competitive');
+      expect(benchmarks[1].paceCategory).toBe('Competitive');
       expect(benchmarks[1].lapTime).toBe(121.2);
-      expect(benchmarks[2].benchmarkCategory).toBe('Good');
+      expect(benchmarks[2].paceCategory).toBe('Good');
       expect(benchmarks[2].lapTime).toBe(122.4);
     });
   });
@@ -196,7 +190,7 @@ describe('lapComparison utility', () => {
       expect(result.every(l => l.carClass === 'GT3')).toBe(true);
     });
 
-    it('filters by both carClass and specific carModel', () => {
+    it('filters by both carClass and specific carType', () => {
       const result = filterLapsByCarCategory(mixedLaps, 'GT3', 'BMW M4 GT3');
       expect(result.length).toBe(1);
       expect(result[0].carType).toBe('BMW M4 GT3');
@@ -211,11 +205,11 @@ describe('lapComparison utility', () => {
 
     it('computes average of the top 3 clean laps, excluding lap 1 when multiple laps exist', () => {
       const laps = [
-        { lapNum: 1, lapTime: 125.0, isValid: true }, // out-lap excluded
-        { lapNum: 2, lapTime: 121.0, isValid: true },
-        { lapNum: 3, lapTime: 120.0, isValid: true },
-        { lapNum: 4, lapTime: 122.0, isValid: true },
-        { lapNum: 5, lapTime: 123.0, isValid: true },
+        { lapNumber: 1, lapTime: 125.0, isValid: true }, // out-lap excluded
+        { lapNumber: 2, lapTime: 121.0, isValid: true },
+        { lapNumber: 3, lapTime: 120.0, isValid: true },
+        { lapNumber: 4, lapTime: 122.0, isValid: true },
+        { lapNumber: 5, lapTime: 123.0, isValid: true },
       ];
       // Top 3 from laps 2-5 are 120.0, 121.0, 122.0 -> average is 121.000
       expect(computeTopNLapAverage(laps, 3)).toBe(121.0);
@@ -223,11 +217,11 @@ describe('lapComparison utility', () => {
 
     it('ignores invalid laps and pit stop laps', () => {
       const laps = [
-        { lapNum: 1, lapTime: 120.0, isValid: true },
-        { lapNum: 2, lapTime: 119.0, isValid: false }, // invalid
-        { lapNum: 3, lapTime: 121.0, isValid: true }, // flying lap
-        { lapNum: 4, lapTime: 122.0, isValid: true }, // flying lap
-        { lapNum: 5, lapTime: 135.0, isValid: true, isPitStop: true }, // pit stop
+        { lapNumber: 1, lapTime: 120.0, isValid: true },
+        { lapNumber: 2, lapTime: 119.0, isValid: false }, // invalid
+        { lapNumber: 3, lapTime: 121.0, isValid: true }, // flying lap
+        { lapNumber: 4, lapTime: 122.0, isValid: true }, // flying lap
+        { lapNumber: 5, lapTime: 135.0, isValid: true, isPitStop: true }, // pit stop
       ];
       // Valid flying laps are lap 3 (121.0) and lap 4 (122.0) -> average is 121.5
       expect(computeTopNLapAverage(laps, 3)).toBe(121.5);
@@ -235,12 +229,12 @@ describe('lapComparison utility', () => {
 
     it('excludes out-laps immediately following a valid pit stop', () => {
       const laps = [
-        { lapNum: 1, lapTime: 120.0, isValid: true },
-        { lapNum: 2, lapTime: 121.0, isValid: true },
-        { lapNum: 3, lapTime: 135.0, isValid: true, isPitStop: true }, // in-lap
-        { lapNum: 4, lapTime: 180.0, isValid: true }, // out-lap
-        { lapNum: 5, lapTime: 120.5, isValid: true },
-        { lapNum: 6, lapTime: 120.8, isValid: true },
+        { lapNumber: 1, lapTime: 120.0, isValid: true },
+        { lapNumber: 2, lapTime: 121.0, isValid: true },
+        { lapNumber: 3, lapTime: 135.0, isValid: true, isPitStop: true }, // in-lap
+        { lapNumber: 4, lapTime: 180.0, isValid: true }, // out-lap
+        { lapNumber: 5, lapTime: 120.5, isValid: true },
+        { lapNumber: 6, lapTime: 120.8, isValid: true },
       ];
       // Top 3 from flying laps (2, 5, 6: 121.0, 120.5, 120.8) -> average is 120.767
       expect(computeTopNLapAverage(laps, 3)).toBe(120.767);
@@ -249,7 +243,7 @@ describe('lapComparison utility', () => {
 
   describe('computeConsistencyRating', () => {
     it('returns 100% and 0 stdDev for a single lap', () => {
-      const res = computeConsistencyRating([{ lapNum: 1, lapTime: 120.0, isValid: true }]);
+      const res = computeConsistencyRating([{ lapNumber: 1, lapTime: 120.0, isValid: true }]);
       expect(res.consistencyScore).toBe(100);
       expect(res.stdDev).toBe(0);
       expect(res.avgLapTime).toBe(120.0);
@@ -258,8 +252,8 @@ describe('lapComparison utility', () => {
 
     it('excludes start lap and does not fall back when only 1 flying lap exists in multi-lap stint', () => {
       const laps = [
-        { lapNum: 1, lapTime: 135.0, isValid: true }, // Start lap (standing start / out-lap)
-        { lapNum: 2, lapTime: 120.0, isValid: true }, // Clean flying lap
+        { lapNumber: 1, lapTime: 135.0, isValid: true }, // Start lap (standing start / out-lap)
+        { lapNumber: 2, lapTime: 120.0, isValid: true }, // Clean flying lap
       ];
       const res = computeConsistencyRating(laps);
       expect(res.consistencyScore).toBe(100);
@@ -270,10 +264,10 @@ describe('lapComparison utility', () => {
 
     it('returns high consistency score for tightly grouped laps', () => {
       const laps = [
-        { lapNum: 1, lapTime: 125.0, isValid: true },
-        { lapNum: 2, lapTime: 120.0, isValid: true },
-        { lapNum: 3, lapTime: 120.1, isValid: true },
-        { lapNum: 4, lapTime: 120.05, isValid: true },
+        { lapNumber: 1, lapTime: 125.0, isValid: true },
+        { lapNumber: 2, lapTime: 120.0, isValid: true },
+        { lapNumber: 3, lapTime: 120.1, isValid: true },
+        { lapNumber: 4, lapTime: 120.05, isValid: true },
       ];
       const res = computeConsistencyRating(laps);
       expect(res.consistencyScore).toBeGreaterThan(99);
@@ -282,12 +276,12 @@ describe('lapComparison utility', () => {
 
     it('excludes pit stops and the out-lap the parser marked after them from consistency calculations', () => {
       const laps = [
-        { lapNum: 1, lapTime: 125.0, isValid: true }, // Start lap excluded
-        { lapNum: 2, lapTime: 120.0, isValid: true }, // Flying lap
-        { lapNum: 3, lapTime: 120.1, isValid: true }, // Flying lap
-        { lapNum: 4, lapTime: 145.0, isValid: true, isPitStop: true }, // In-lap / Pit Stop -> excluded
-        { lapNum: 5, lapTime: 210.0, isValid: true, isOutLap: true }, // Out-lap (marked by the parser) -> excluded
-        { lapNum: 6, lapTime: 120.05, isValid: true }, // Flying lap
+        { lapNumber: 1, lapTime: 125.0, isValid: true }, // Start lap excluded
+        { lapNumber: 2, lapTime: 120.0, isValid: true }, // Flying lap
+        { lapNumber: 3, lapTime: 120.1, isValid: true }, // Flying lap
+        { lapNumber: 4, lapTime: 145.0, isValid: true, isPitStop: true }, // In-lap / Pit Stop -> excluded
+        { lapNumber: 5, lapTime: 210.0, isValid: true, isOutLap: true }, // Out-lap (marked by the parser) -> excluded
+        { lapNumber: 6, lapTime: 120.05, isValid: true }, // Flying lap
       ];
       const res = computeConsistencyRating(laps);
       // Only laps 2, 3, 6 (120.0, 120.1, 120.05) should be evaluated
@@ -298,18 +292,18 @@ describe('lapComparison utility', () => {
 
     it('reads the out-lap flag instead of guessing it from the lap before', () => {
       const laps = [
-        { lapNum: 2, lapTime: 120.0, isValid: true },
-        { lapNum: 3, lapTime: 145.0, isValid: true, isPitStop: true },
-        { lapNum: 4, lapTime: 120.2, isValid: true }, // not marked as an out-lap: counted
+        { lapNumber: 2, lapTime: 120.0, isValid: true },
+        { lapNumber: 3, lapTime: 145.0, isValid: true, isPitStop: true },
+        { lapNumber: 4, lapTime: 120.2, isValid: true }, // not marked as an out-lap: counted
       ];
-      expect(selectCleanLapCandidates(laps).map(lap => lap.lapNum)).toEqual([2, 4]);
+      expect(selectCleanLapCandidates(laps).map(lap => lap.lapNumber)).toEqual([2, 4]);
     });
 
     it('does not exclude lap 2 as an out-lap if lap 1 was practice start with no completed lap time', () => {
       const laps = [
-        { lapNum: 1, lapTime: null, isValid: false, isPitStop: false }, // Practice start from garage
-        { lapNum: 2, lapTime: 120.0, isValid: true }, // First flying lap -> should be valid!
-        { lapNum: 3, lapTime: 120.2, isValid: true },
+        { lapNumber: 1, lapTime: null, isValid: false, isPitStop: false }, // Practice start from garage
+        { lapNumber: 2, lapTime: 120.0, isValid: true }, // First flying lap -> should be valid!
+        { lapNumber: 3, lapTime: 120.2, isValid: true },
       ];
       const res = computeConsistencyRating(laps);
       // Laps 2 and 3 should both be evaluated

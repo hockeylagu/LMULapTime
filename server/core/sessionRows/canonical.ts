@@ -2,7 +2,7 @@ import type { DetailedSession } from '../../../shared/types/index.js';
 import type { Field, Row } from './fields.js';
 import {
   BEST_SESSION_LAP_FIELDS, CONDITION_FIELDS, DRIVER_ALL_FIELDS, EVENT_LISTS, LAP_FIELDS, READ_TIME_DRIVER_PROPS, READ_TIME_LAP_PROPS,
-  LINK_TELEMETRY_FIELDS, RECORDING_FIELDS, SESSION_FIELDS, SETTINGS_FIELDS, TIRE_WEAR_FIELDS, WEATHER_FIELDS,
+  RECORDING_FIELDS, SESSION_FIELDS, SETTINGS_FIELDS, TIRE_WEAR_FIELDS, WEATHER_FIELDS,
 } from './specs.js';
 
 /**
@@ -18,15 +18,14 @@ function dropNulls(object: Row | undefined, fields: readonly Field[]): void {
   }
 }
 
-function canonicalLap(lap: Row): void {
+function canonicalLap(lap: Row, ordinal: number): void {
   for (const prop of READ_TIME_LAP_PROPS) delete lap[prop];
-  delete lap.lapOrdinal;
+  lap.lapOrdinal = ordinal;
   dropNulls(lap, LAP_FIELDS);
   dropNulls(lap.tireWear as Row | undefined, TIRE_WEAR_FIELDS);
   dropNulls(lap.conditions as Row | undefined, CONDITION_FIELDS);
   const traffic = lap.traffic as Row | undefined;
   if (traffic && traffic.pressured === null) delete traffic.pressured;
-  canonicalEvents(lap);
 }
 
 function canonicalEvents(owner: Row): void {
@@ -36,57 +35,33 @@ function canonicalEvents(owner: Row): void {
   }
 }
 
-function canonicalDriver(driver: Row): void {
+function canonicalDriver(driver: Row, ordinal: number): void {
   for (const prop of READ_TIME_DRIVER_PROPS) delete driver[prop];
-  delete driver.driverOrdinal;
+  driver.driverOrdinal = ordinal;
   delete driver.driverName;
   dropNulls(driver, DRIVER_ALL_FIELDS);
   canonicalEvents(driver);
   const laps = driver.laps;
-  if (Array.isArray(laps)) for (const lap of laps) canonicalLap(lap as Row);
-}
-
-/**
- * The session's main DuckDB file lives on the session alone. Rows stored before the session carried it
- * (116 of 992 in the local cache) hold it on the replay link only: the session takes the link's values
- * when it has none, so the link and the session agree again. The writer and the canonical form both use it.
- */
-export function sessionTelemetry(session: { hasDuckDbTelemetry?: boolean; duckdbFilename?: string | null; matchingReplayFile?: { hasDuckDbTelemetry?: boolean | null; duckdbFilename?: string | null } | null }):
-  { hasDuckDbTelemetry: boolean | undefined; duckdbFilename: string | undefined } {
-  const link = session.matchingReplayFile;
-  const duckdbFilename = session.duckdbFilename || (typeof link?.duckdbFilename === 'string' && link.duckdbFilename ? link.duckdbFilename : undefined);
-  const hasDuckDbTelemetry = session.hasDuckDbTelemetry || link?.hasDuckDbTelemetry === true ? true : session.hasDuckDbTelemetry;
-  return { hasDuckDbTelemetry: hasDuckDbTelemetry ?? undefined, duckdbFilename };
-}
-
-/** A replay link carries its session's DuckDB attachment, whichever of the two was decided first. */
-export function withSessionTelemetry<T extends Record<string, unknown>>(link: T, duckdbFilename: string | undefined): T {
-  const { hasDuckDbTelemetry: _flag, duckdbFilename: _file, ...rest } = link;
-  return (duckdbFilename ? { ...rest, hasDuckDbTelemetry: true, duckdbFilename } : rest) as T;
-}
-
-
-function liftLinkTelemetry(copy: Row): void {
-  const lifted = sessionTelemetry(copy as Parameters<typeof sessionTelemetry>[0]);
-  if (lifted.duckdbFilename !== undefined) copy.duckdbFilename = lifted.duckdbFilename;
-  if (lifted.hasDuckDbTelemetry !== undefined && lifted.hasDuckDbTelemetry !== null) copy.hasDuckDbTelemetry = lifted.hasDuckDbTelemetry;
+  if (Array.isArray(laps)) laps.forEach((lap, index) => canonicalLap(lap as Row, index));
 }
 
 /**
  * The form of a session that normalized rows keep: what the stored JSON holds minus what is filled at
- * read time (pace ratings, pit service, hydrated ordinals), and optional nulls as absent properties.
+ * read time (pace ratings, pit service, hydrated driver and lap ordinals), and optional nulls as absent properties.
  */
 export function canonicalSession(session: DetailedSession): DetailedSession {
   const copy = JSON.parse(JSON.stringify(session)) as Row;
-  liftLinkTelemetry(copy);
   dropNulls(copy, SESSION_FIELDS);
   dropNulls(copy.weather as Row | undefined, WEATHER_FIELDS);
   dropNulls(copy.settings as Row | undefined, SETTINGS_FIELDS);
   dropNulls(copy.bestSessionLap as Row | undefined, BEST_SESSION_LAP_FIELDS);
   dropNulls(copy.matchingReplayFile as Row | undefined, RECORDING_FIELDS);
-  dropNulls(copy.matchingReplayFile as Row | undefined, LINK_TELEMETRY_FIELDS);
-  if (copy.playerDriver) canonicalDriver(copy.playerDriver as Row);
-  if (Array.isArray(copy.drivers)) for (const driver of copy.drivers) canonicalDriver(driver as Row);
+  const drivers = Array.isArray(copy.drivers) ? copy.drivers as Row[] : [];
+  const player = copy.playerDriver as Row | undefined;
+  const playerKey = player ? JSON.stringify(player) : null;
+  const playerIndex = player ? drivers.findIndex(driver => JSON.stringify(driver) === playerKey) : -1;
+  drivers.forEach((driver, index) => canonicalDriver(driver, index));
+  if (player) canonicalDriver(player, playerIndex);
   return copy as unknown as DetailedSession;
 }
 

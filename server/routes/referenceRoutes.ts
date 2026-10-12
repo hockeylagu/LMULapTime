@@ -18,21 +18,8 @@ export function createReferenceRouter(context: ServerContext): Router {
         const currentCache = loadReferenceLaptimesFromCache();
         if (currentCache?.lastUpdateDiff) {
           const diff = currentCache.lastUpdateDiff;
-          const diffId = context.sessionDb.recordBenchmarkDiff(diff, currentCache.sourceUrl);
-          diff.id = diffId;
-          return res.json([
-            {
-              id: diffId,
-              timestamp: diff.timestamp,
-              hasChanges: diff.hasChanges,
-              addedCount: diff.addedCount,
-              updatedCount: diff.updatedCount,
-              removedCount: diff.removedCount,
-              totalEntries: diff.totalEntries,
-              totalAffectedSessions: diff.totalAffectedSessions || 0,
-              totalCategoryShifts: diff.totalCategoryShifts || 0,
-            },
-          ]);
+          context.sessionDb.recordBenchmarkDiff(diff, currentCache.sourceUrl);
+          return res.json(context.sessionDb.getBenchmarkDiffHistory(50));
         }
       }
       res.json(history);

@@ -194,8 +194,6 @@ export function fuseDuckDbWithVcrTrajectory(
     leadInPoints: onDuckClock(vcrTrajectory.leadInPoints, t => t < firstDuckTime),
     leadOutPoints: onDuckClock(vcrTrajectory.leadOutPoints, t => t > lastDuckTime),
     pointsCount: fusedPoints.length,
-    rawPointsCount: fusedPoints.length,
-    rawSampleRateHz: duckLap.sampleRateHz,
     isFullResolution: true,
     wheelTelemetryAvailable: Boolean(vcrTrajectory.wheelTelemetryAvailable || hasWheelData),
     energyTelemetryAvailable: Boolean(vcrTrajectory.energyTelemetryAvailable || hasEnergyData),

@@ -46,7 +46,7 @@ describe('useReplayInspectorData session locators', () => {
   it('pages comparison laps and scopes same-session requests while excluding missing replay links', async () => {
     const urls: URLSearchParams[] = [];
     const candidate = { id: 'first', sessionId: 'session-1', matchingReplayFile: metadata.filename,
-      driverOrdinal: 0, lapOrdinal: 0, driverName: 'Player Driver', lapNum: 2, lapTime: 100,
+      driverOrdinal: 0, lapOrdinal: 0, driverName: 'Player Driver', lapNumber: 2, lapTime: 100,
       isValid: true, isPitStop: false, isOutLap: false } as ComparableLap;
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = String(input);
@@ -123,7 +123,7 @@ describe('useReplayInspectorData session locators', () => {
     const candidate: ComparableLap = {
       id: 'other-session-lap', sessionId: 'session-2', driverOrdinal: 2, lapOrdinal: 4,
       driverName: 'Baseline Driver', carType: 'GT3', carClass: 'GT3', lapTime: 98,
-      lapTimeString: '1:38.000', s1: 30, s2: 34, s3: 34, topSpeed: 200,
+ s1: 30, s2: 34, s3: 34, topSpeed: 200,
       isValid: true, isPitStop: false, matchingReplayFile: 'Baseline_Q1.Vcr',
     };
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {

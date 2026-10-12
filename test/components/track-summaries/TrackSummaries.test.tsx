@@ -30,11 +30,10 @@ describe('TrackSummaries component', () => {
         carType: 'Ferrari 499P',
         carClass: 'Hyper',
         bestLapTime: 122.0,
-        bestLapTimeString: '2:02.000',
         bestS1: 34.0,
         bestS2: 42.0,
         bestS3: 46.0,
-        lapsCount: 15,
+        declaredLapsCount: 15,
       },
     },
     {
@@ -46,11 +45,10 @@ describe('TrackSummaries component', () => {
         carType: 'Porsche 911 GT3',
         carClass: 'GT3',
         bestLapTime: 108.0,
-        bestLapTimeString: '1:48.000',
         bestS1: 28.0,
         bestS2: 38.0,
         bestS3: 42.0,
-        lapsCount: 5,
+        declaredLapsCount: 5,
       },
     },
   ];
@@ -121,8 +119,8 @@ describe('TrackSummaries component', () => {
         driversCount: 1,
         playerDriver: {
           name: 'LMH Driver', carType: 'Ferrari 499P', carClass: 'Hyper',
-          bestLapTime: 130, bestLapTimeString: '2:10.000',
-          bestS1: 40, bestS2: 45, bestS3: 45, lapsCount: 8,
+          bestLapTime: 130, 
+          bestS1: 40, bestS2: 45, bestS3: 45, declaredLapsCount: 8,
         },
       },
       {
@@ -136,8 +134,8 @@ describe('TrackSummaries component', () => {
         driversCount: 1,
         playerDriver: {
           name: 'GT3 Driver', carType: 'Porsche 911 GT3', carClass: 'GT3',
-          bestLapTime: 140, bestLapTimeString: '2:20.000',
-          bestS1: 43, bestS2: 48, bestS3: 49, lapsCount: 4,
+          bestLapTime: 140, 
+          bestS1: 43, bestS2: 48, bestS3: 49, declaredLapsCount: 4,
         },
       },
     ];
@@ -179,8 +177,8 @@ describe('TrackSummaries component', () => {
       driversCount: 1,
       playerDriver: {
         name: 'Player', carType: 'Ferrari 499P', carClass: 'Hyper',
-        bestLapTime: 130 + index, bestLapTimeString: '2:10.000',
-        bestS1: 40, bestS2: 45, bestS3: 45, lapsCount: 1,
+        bestLapTime: 130 + index, 
+        bestS1: 40, bestS2: 45, bestS3: 45, declaredLapsCount: 1,
       },
     }));
 
@@ -263,7 +261,7 @@ describe('TrackSummaries component', () => {
     render(<TrackSummaries sessions={mockSessions} onSelectTrack={vi.fn()} selectedCarClass="All" setSelectedCarClass={vi.fn()} />);
     expect(screen.getByRole('status')).toHaveTextContent('Loading benchmark targets');
     expect(screen.getByRole('option', { name: 'Pace / Benchmark (Best First)' })).toBeDisabled();
-    finish?.({ ok: true, json: () => Promise.resolve({ entries: { monza: { trackName: 'Monza', carClass: 'GT3', target100Sec: 100 } } }) });
+    finish?.({ ok: true, json: () => Promise.resolve({ entries: { monza: { trackName: 'Monza', carClass: 'GT3', targets: { alienSec: 100 } } } }) });
     await waitFor(() => expect(screen.getByRole('option', { name: 'Pace / Benchmark (Best First)' })).toBeEnabled());
   });
 

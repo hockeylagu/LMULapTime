@@ -6,6 +6,7 @@ import {
   pickRivalEntry,
   pinnedTarget,
   resolveRival,
+  rivalEntryOf,
   rivalProgress,
 } from '../../shared/domain/rivals.js';
 import type { Leaderboard, LeaderboardEntry, RivalTarget } from '../../shared/types/leaderboard.js';
@@ -19,7 +20,7 @@ function board(times: Record<string, number>, noTelemetry: string[] = []): Leade
       isPlayer: driverName === 'Me',
       rank: i + 1,
       bestLap: {
-        sessionId: `s-${driverName}`, sessionName: 'R1', sessionType: 'Race', timestamp: 1000, lapNum: 2, lapTime,
+        sessionId: `s-${driverName}`, sessionName: 'R1', sessionType: 'Race', timestamp: 1000, lapNumber: 2, lapTime,
         s1: null, s2: null, s3: null, carType: 'Car', telemetryAvailable: !noTelemetry.includes(driverName),
       },
       bestS1: null, bestS2: null, bestS3: null, s1Rank: null, s2Rank: null, s3Rank: null,
@@ -28,7 +29,7 @@ function board(times: Record<string, number>, noTelemetry: string[] = []): Leade
     }));
   return {
     layoutKey: 'monza_gp', layoutName: '', carClass: 'GT3', scope: 'class', carType: null,
-    entries, player: entries.find((e) => e.isPlayer) ?? null, benchmark: null,
+    entries, benchmark: null,
   };
 }
 
@@ -144,7 +145,10 @@ describe('describeRival', () => {
       { sessionId: 'a', sessionName: 'P1', timestamp: 1, best: 100.5 },
       { sessionId: 'b', sessionName: 'R1', timestamp: 2, best: 100 },
     ]);
-    expect(status).toMatchObject({ gap: 0.3, progress: 0, theoreticalGap: 0, rivalEntry: { driverName: 'Rival' } });
+    expect(status).toMatchObject({ gap: 0.3, progress: 0, theoreticalGap: 0 });
+    expect(status).not.toHaveProperty('rivalEntry');
+    expect(rivalEntryOf(b, target({}))).toMatchObject({ driverName: 'Rival' });
+    expect(rivalEntryOf(b, target({ kind: 'ghost', driverName: null }))).toBeNull();
     expect(status.nextUp.map((e) => e.driverName)).toEqual(['Up1', 'Up2', 'Up3']);
     expect(status.trend.map((p) => p.gap)).toEqual([0.8, 0.3]);
     expect(nextRungs(b, 99.35, 5).map((e) => e.driverName)).toEqual(['Up4']);

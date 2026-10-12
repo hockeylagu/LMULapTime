@@ -3,6 +3,7 @@ import {
   buildLeaderboard,
   findLayoutBenchmark,
   listLeaderboardLayouts,
+  playerEntry,
 } from '../../shared/domain/leaderboard.js';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import type { ReferenceLaptimeEntry } from '../../shared/types/index.js';
@@ -28,8 +29,8 @@ describe('buildLeaderboard', () => {
       [2, 'Me', 0.6],
       [3, 'Slow', 1.5],
     ]);
-    expect(board.player?.driverName).toBe('Me');
-    expect(board.player?.bestLap).toMatchObject({ sessionId: 'r1', lapNum: 3, lapTime: 108.1 });
+    expect(playerEntry(board)?.driverName).toBe('Me');
+    expect(playerEntry(board)?.bestLap).toMatchObject({ sessionId: 'r1', lapNumber: 3, lapTime: 108.1 });
   });
 
   it('never ranks AI drivers: offline sessions only count the player', () => {
@@ -79,8 +80,8 @@ describe('buildLeaderboard', () => {
         ], { isPlayer: true }),
       ]),
     ], MONZA);
-    expect(board.player?.bestLap.lapNum).toBe(7);
-    expect(board.player?.representativeLaps).toBe(1);
+    expect(playerEntry(board)?.bestLap.lapNumber).toBe(7);
+    expect(playerEntry(board)?.representativeLaps).toBe(1);
   });
 
   it('builds the theoretical best from the best sectors of different laps, and ranks each sector', () => {
@@ -93,7 +94,7 @@ describe('buildLeaderboard', () => {
         driver('Rival', [lap(2, 109, { s1: 31, s2: 43, s3: 35 })]),
       ]),
     ], MONZA);
-    const me = board.player!;
+    const me = playerEntry(board)!;
     expect(me.theoreticalBest).toBe(109);
     expect([me.s1Rank, me.s2Rank, me.s3Rank]).toEqual([1, 2, 1]);
     expect(board.entries[0].driverName).toBe('Rival');
@@ -116,8 +117,8 @@ describe('buildLeaderboard', () => {
       session('r1', [driver('Me', [lap(2, 108), lap(3, 109), lap(4, 110), lap(5, 115)], { isPlayer: true })]),
       session('r2', [driver('Me', [lap(2, 107), lap(3, 120)], { isPlayer: true })], { timestamp: 2000 }),
     ], MONZA);
-    expect(board.player).toMatchObject({ top3Average: 109, top3AverageRank: 1, sessions: 2, lastDriven: 2000 });
-    expect(board.player?.bestLap.lapTime).toBe(107);
+    expect(playerEntry(board)).toMatchObject({ top3Average: 109, top3AverageRank: 1, sessions: 2, lastDriven: 2000 });
+    expect(playerEntry(board)?.bestLap.lapTime).toBe(107);
   });
 });
 
@@ -127,7 +128,7 @@ describe('findLayoutBenchmark', () => {
     trackName,
     carClass,
     patch: '1.4',
-    target100Sec: 100,
+    targets: { alienSec: 100 },
   } as ReferenceLaptimeEntry);
 
   it('takes the target of the layout and class, and never another class', () => {

@@ -82,14 +82,14 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
 
   const handleChartClick = (state: { activeLabel?: string | number } | null | undefined) => {
     if (state && state.activeLabel !== undefined) {
-      const lapNum = parseInt(String(state.activeLabel), 10);
-      if (!isNaN(lapNum) && lapNum > 0) {
+      const lapNumber = parseInt(String(state.activeLabel), 10);
+      if (!isNaN(lapNumber) && lapNumber > 0) {
         if (session.matchingReplayFile) {
-          const telemetryPath = sessionTelemetryPath(searchParams, session, selectedDriver, lapNum);
+          const telemetryPath = sessionTelemetryPath(searchParams, session, selectedDriver, lapNumber);
           if (telemetryPath) navigate(telemetryPath);
-          else navigate(sessionLapComparePath(session, selectedDriver, lapNum));
+          else navigate(sessionLapComparePath(session, selectedDriver, lapNumber));
         } else {
-          navigate(sessionLapComparePath(session, selectedDriver, lapNum));
+          navigate(sessionLapComparePath(session, selectedDriver, lapNumber));
         }
       }
     }
@@ -161,7 +161,7 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
             className="cursor-pointer"
           >
             <CartesianGrid vertical={false} stroke={LMU_COLORS.border} />
-            <XAxis dataKey="lapNum" stroke={LMU_COLORS.muted} fontSize={11} tickLine={false} axisLine={{ stroke: LMU_COLORS.border }} />
+            <XAxis dataKey="lapLabel" stroke={LMU_COLORS.muted} fontSize={11} tickLine={false} axisLine={{ stroke: LMU_COLORS.border }} />
             <YAxis
               reversed={activeChartMetric === 'positions'}
               domain={

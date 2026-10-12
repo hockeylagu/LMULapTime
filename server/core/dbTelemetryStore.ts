@@ -35,18 +35,18 @@ export function upsertTelemetryMetadata(
 
   const upsert = db.prepare(`
     INSERT INTO telemetry_metadata (
-      filename, file_path, file_mtime, file_size, track_name, session_type,
+      filename, file_path, file_mtime_ms, file_size_bytes, track_name, session_type,
       session_timestamp, laps_count, metadata_json, matched_session_id,
       matched_replay_filename, updated_at
     ) VALUES (
-      @filename, @filePath, @fileMtime, @fileSize, @trackName, @sessionType,
+      @filename, @filePath, @mtimeMs, @fileSizeBytes, @trackName, @sessionType,
       @sessionTimestamp, @lapsCount, @metadataJson, @matchedSessionId,
       @matchedReplayFilename, @updatedAt
     )
     ON CONFLICT(filename) DO UPDATE SET
       file_path = excluded.file_path,
-      file_mtime = excluded.file_mtime,
-      file_size = excluded.file_size,
+      file_mtime_ms = excluded.file_mtime_ms,
+      file_size_bytes = excluded.file_size_bytes,
       track_name = excluded.track_name,
       session_type = excluded.session_type,
       session_timestamp = excluded.session_timestamp,
@@ -60,8 +60,8 @@ export function upsertTelemetryMetadata(
   upsert.run({
     filename: info.filename,
     filePath: info.filePath,
-    fileMtime: info.fileMtimeMs,
-    fileSize: info.fileSizeBytes,
+    mtimeMs: info.mtimeMs,
+    fileSizeBytes: info.fileSizeBytes,
     trackName: info.trackName,
     sessionType: info.sessionType,
     sessionTimestamp: info.timestampStr,
@@ -159,7 +159,7 @@ export function clearTelemetryLinks(db: DatabaseType): void {
 
 /** Session attachments are derived from ownership and must be invalidated with it. */
 function clearSessionTelemetryAttachments(db: DatabaseType): void {
-  db.prepare('UPDATE sessions SET duckdb_filename=NULL, has_duckdb_telemetry=0 WHERE duckdb_filename IS NOT NULL OR has_duckdb_telemetry=1').run();
+  db.prepare('UPDATE sessions SET duckdb_filename=NULL WHERE duckdb_filename IS NOT NULL').run();
 }
 
 /** The telemetry files with at least one lap cached, at any version. */

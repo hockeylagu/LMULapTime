@@ -12,7 +12,7 @@ function fixture() {
     driver('Other', Array.from({ length: 1000 }, (_, index) => lap(index + 1)), {
       incidents: [{ type: 'contact', description: 'Not needed by telemetry' }],
     }),
-  ], { matchingReplayFile: { name: 'Archived.Vcr', path: 'archive', sizeBytes: 100, hasRain: true }, totalLapsCount: 1004 });
+  ], { matchingReplayFile: { name: 'Archived.Vcr', path: 'archive', fileSizeBytes: 100, hasRain: true }, totalLapsCount: 1004 });
 }
 
 describe('targeted replay session reads', () => {
@@ -23,7 +23,7 @@ describe('targeted replay session reads', () => {
       const prepare = vi.spyOn(db, 'prepare');
       const context = readReplaySessionContext(db, 'session-a', 'all')!;
       expect(context.drivers.map(item => item.driverOrdinal)).toEqual([0, 1, 2]);
-      expect(context.drivers[0].laps.map(item => [item.lapNum, item.lapOrdinal])).toEqual([[7, 0], [8, 1]]);
+      expect(context.drivers[0].laps.map(item => [item.lapNumber, item.lapOrdinal])).toEqual([[7, 0], [8, 1]]);
       expect(context.playerDriver).toBe(context.drivers[1]);
       const metadata: ReplayMetadata = { filename: 'Archived.Vcr', filePath: 'archive', fileSizeBytes: 100,
         mtimeMs: 1, timeSliceCount: 1, totalEvents: 0, durationSec: 10,

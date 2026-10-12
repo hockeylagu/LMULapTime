@@ -33,7 +33,7 @@ interface LapRow {
   s2_sec: number | null;
   s3_sec: number | null;
   lap_dist_m: number | null;
-  is_outlap: number | null;
+  is_out_lap: number | null;
   is_valid: number | null;
   is_best: number | null;
   start_frame: number | null;
@@ -45,7 +45,7 @@ export function replaceReplayDriverLapFacts(db: DatabaseType, filename: string, 
   db.prepare('DELETE FROM replay_laps WHERE filename = ? AND driver_slot = ?').run(filename, driverSlot);
   const insert = db.prepare(`
     INSERT INTO replay_laps (filename, driver_slot, lap_number, start_sec, end_sec, lap_time_sec, s1_sec, s2_sec, s3_sec,
-      lap_dist_m, is_outlap, is_valid, is_best, start_frame, end_frame, source_version)
+      lap_dist_m, is_out_lap, is_valid, is_best, start_frame, end_frame, source_version)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
   for (const lap of laps) {
@@ -100,7 +100,7 @@ export function getReplayLaps(db: DatabaseType, filename: string, driverSlot?: n
     s2Sec: r.s2_sec,
     s3Sec: r.s3_sec,
     lapDistM: r.lap_dist_m,
-    isOutLap: toBool(r.is_outlap),
+    isOutLap: toBool(r.is_out_lap),
     isValid: toBool(r.is_valid),
     isBest: toBool(r.is_best),
     startFrame: r.start_frame,

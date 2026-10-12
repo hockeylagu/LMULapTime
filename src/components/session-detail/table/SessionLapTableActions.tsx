@@ -10,7 +10,7 @@ const FOCUS_RING = 'focus-visible:outline-2 focus-visible:outline-offset-2 focus
 
 export interface SessionLapTableActionsProps {
   session: DetailedSession;
-  lapNum: number;
+  lapNumber: number;
   selectedDriver?: DriverData;
   telemetryUrl?: string;
   onOpenTelemetry: () => void;
@@ -18,19 +18,19 @@ export interface SessionLapTableActionsProps {
 
 export const SessionLapTableActions: React.FC<SessionLapTableActionsProps> = ({
   session,
-  lapNum,
+  lapNumber,
   selectedDriver,
   telemetryUrl,
   onOpenTelemetry,
 }) => {
-  const compareUrl = sessionLapComparePath(session, selectedDriver, lapNum);
+  const compareUrl = sessionLapComparePath(session, selectedDriver, lapNumber);
 
   // With a replay, the lap opens in it with the same glyph as the session's replay button. Without one there is
   // nothing to open: the compare button leads to the lap's comparison.
   const hasReplay = Boolean(session.matchingReplayFile);
-  const hasTelemetry = Boolean(session.hasDuckDbTelemetry || session.matchingReplayFile?.hasDuckDbTelemetry);
+  const hasTelemetry = Boolean(session.duckdbFilename);
   const replayClassName = `${REPLAY_ACTION} p-1.5`;
-  const replayTitle = `${hasTelemetry ? 'Replay + telemetry' : 'Replay'} for Lap ${lapNum}`;
+  const replayTitle = `${hasTelemetry ? 'Replay + telemetry' : 'Replay'} for Lap ${lapNumber}`;
   const replayIcon = <ReplayGlyph telemetry={hasTelemetry} size={14} />;
 
   return (
@@ -39,7 +39,7 @@ export const SessionLapTableActions: React.FC<SessionLapTableActionsProps> = ({
         <Link
           to={telemetryUrl}
           onClick={linkClickHandler(() => onOpenTelemetry())}
-          aria-label={`Telemetry for lap ${lapNum}`}
+          aria-label={`Telemetry for lap ${lapNumber}`}
           className={replayClassName}
           title={replayTitle}
         >
@@ -49,7 +49,7 @@ export const SessionLapTableActions: React.FC<SessionLapTableActionsProps> = ({
         <button
           type="button"
           onClick={onOpenTelemetry}
-          aria-label={`Telemetry for lap ${lapNum}`}
+          aria-label={`Telemetry for lap ${lapNumber}`}
           className={replayClassName}
           title={replayTitle}
         >
@@ -59,9 +59,9 @@ export const SessionLapTableActions: React.FC<SessionLapTableActionsProps> = ({
 
       <Link
         to={compareUrl}
-        aria-label={`Compare lap ${lapNum}`}
+        aria-label={`Compare lap ${lapNumber}`}
         className={`p-1.5 rounded-lg bg-lmu-bg hover:bg-lmu-raised hover:text-white text-lmu-muted border border-lmu-border hover:border-lmu-rule transition-all flex items-center justify-center cursor-pointer ${FOCUS_RING}`}
-        title={`Compare Lap ${lapNum}`}
+        title={`Compare Lap ${lapNumber}`}
       >
         <ArrowLeftRight className="w-3.5 h-3.5" aria-hidden="true" />
       </Link>

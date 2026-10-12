@@ -33,16 +33,16 @@ export function upsertTargetedReplayLink(
   db.transaction(() => {
     db.prepare(`
       INSERT INTO session_recordings (
-        session_id, recording_name, path, size_bytes, event_title, split_no, event_type,
+        session_id, recording_name, path, file_size_bytes, event_title, split_no, event_type,
         duration_sec, has_rain, max_rain_intensity, weather_condition, ambient_temp, track_temp
       ) VALUES (
-        @session_id, @recording_name, @path, @size_bytes, @event_title, @split_no, @event_type,
+        @session_id, @recording_name, @path, @file_size_bytes, @event_title, @split_no, @event_type,
         @duration_sec, @has_rain, @max_rain_intensity, @weather_condition, @ambient_temp, @track_temp
       )
       ON CONFLICT(session_id) DO UPDATE SET
         recording_name = excluded.recording_name,
         path = excluded.path,
-        size_bytes = excluded.size_bytes,
+        file_size_bytes = excluded.file_size_bytes,
         event_title = excluded.event_title,
         split_no = excluded.split_no,
         event_type = excluded.event_type,
@@ -102,8 +102,7 @@ export function renameTargetedReplay(
 
 
 /**
- * Targeted update for attaching or detaching a DuckDB telemetry file: sets `sessions.duckdb_filename`
- * and `has_duckdb_telemetry`.
+ * Targeted update for attaching or detaching a DuckDB telemetry file: sets `sessions.duckdb_filename`.
  */
 export function updateTargetedTelemetry(
   db: DatabaseType,
@@ -111,8 +110,7 @@ export function updateTargetedTelemetry(
   duckdbFilename: string | undefined
 ): void {
   db.transaction(() => {
-    db.prepare('UPDATE sessions SET duckdb_filename = ?, has_duckdb_telemetry = ? WHERE id = ?')
-      .run(duckdbFilename ?? null, duckdbFilename ? 1 : 0, sessionId);
+    db.prepare('UPDATE sessions SET duckdb_filename = ? WHERE id = ?').run(duckdbFilename ?? null, sessionId);
 
     bumpSessionDataRevision(db);
   })();
@@ -151,7 +149,7 @@ export function updateTargetedConditions(
 
     // 2. Update session_drivers and session_laps condition values
     const driverStmt = db.prepare(`UPDATE session_drivers SET
-      avg_lap_time = ?, avg_lap_time_string = ?, best_lap_wet = ?
+      avg_lap_time = ?, best_lap_wet = ?
       WHERE session_id = ? AND driver_ordinal = ?`);
 
     const lapStmt = db.prepare(`UPDATE session_laps SET
@@ -161,7 +159,6 @@ export function updateTargetedConditions(
     session.drivers.forEach((driver, driverOrdinal) => {
       driverStmt.run(
         driver.avgLapTime ?? null,
-        driver.avgLapTimeString ?? null,
         driver.bestLapWet ? 1 : null,
         session.id,
         driverOrdinal

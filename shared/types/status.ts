@@ -74,7 +74,6 @@ export interface ReferenceLaptimeRefreshStatus {
   checked: boolean;
   completedAt: string | null;
   refreshed: boolean;
-  updatedCount: number;
   diff: ReferenceBenchmarkDiff | null;
   error: string | null;
 }

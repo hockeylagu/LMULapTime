@@ -13,9 +13,8 @@ describe('TrackSessionsCard', () => {
       name: 'Player',
       carType: 'Ferrari 499P',
       carClass: 'Hyper',
-      lapsCount: 10,
+      declaredLapsCount: 10,
       bestLapTime: 95.5,
-      bestLapTimeString: '1:35.500',
     },
   });
 

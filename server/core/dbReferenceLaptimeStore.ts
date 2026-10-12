@@ -26,10 +26,10 @@ export function recordBenchmarkDiff(
     diff.timestamp || new Date().toISOString(),
     sourceUrl,
     diff.totalEntries,
-    diff.addedCount,
-    diff.updatedCount,
-    diff.removedCount,
-    diff.hasChanges ? 1 : 0,
+    diff.added.length,
+    diff.updated.length,
+    diff.removed.length,
+    diff.added.length + diff.updated.length + diff.removed.length > 0 ? 1 : 0,
     diff.totalAffectedSessions || 0,
     diff.totalCategoryShifts || 0,
     JSON.stringify(diff)
@@ -113,26 +113,11 @@ export function saveReferenceLaptimes(
 ): void {
   const upsertStmt = db.prepare(`
     INSERT INTO reference_laptimes (
-      key, track_name, car_class, patch, target100_sec,
-      alien_sec, competitive_sec, good_sec, good_midpack_sec,
-      midpack_sec, midpack_tail_sec, tail_ender_sec, offline_sec,
-      fastest_car, record_laptime_sec, data_json, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      key, track_name, car_class, data_json, updated_at
+    ) VALUES (?, ?, ?, ?, ?)
     ON CONFLICT(key) DO UPDATE SET
       track_name = excluded.track_name,
       car_class = excluded.car_class,
-      patch = excluded.patch,
-      target100_sec = excluded.target100_sec,
-      alien_sec = excluded.alien_sec,
-      competitive_sec = excluded.competitive_sec,
-      good_sec = excluded.good_sec,
-      good_midpack_sec = excluded.good_midpack_sec,
-      midpack_sec = excluded.midpack_sec,
-      midpack_tail_sec = excluded.midpack_tail_sec,
-      tail_ender_sec = excluded.tail_ender_sec,
-      offline_sec = excluded.offline_sec,
-      fastest_car = excluded.fastest_car,
-      record_laptime_sec = excluded.record_laptime_sec,
       data_json = excluded.data_json,
       updated_at = excluded.updated_at
   `);
@@ -150,33 +135,10 @@ export function saveReferenceLaptimes(
     }
 
     for (const entry of entries) {
-      const targets = entry.targets || {
-        alienSec: entry.target100Sec,
-        competitiveSec: entry.target100Sec * 1.01,
-        goodSec: entry.target100Sec * 1.02,
-        goodMidpackSec: entry.target100Sec * 1.03,
-        midpackSec: entry.target100Sec * 1.04,
-        midpackTailSec: entry.target100Sec * 1.05,
-        tailEnderSec: entry.target100Sec * 1.06,
-        offlineSec: entry.target100Sec * 1.07,
-      };
-
       upsertStmt.run(
         entry.key,
         entry.trackName,
         entry.carClass,
-        entry.patch || null,
-        entry.target100Sec,
-        targets.alienSec,
-        targets.competitiveSec,
-        targets.goodSec,
-        targets.goodMidpackSec,
-        targets.midpackSec,
-        targets.midpackTailSec,
-        targets.tailEnderSec,
-        targets.offlineSec,
-        entry.fastestCar || null,
-        entry.recordLaptimeSec ?? null,
         JSON.stringify(entry),
         now
       );

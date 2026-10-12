@@ -76,7 +76,7 @@ export const DriverTimingMetricsRow: React.FC<DriverTimingMetricsRowProps> = ({
       />
       <SummaryStat
         label="Theoretical"
-        value={selectedDriver.theoreticalBestString}
+        value={formatTime(selectedDriver.theoreticalBest)}
         hint={<><span className="font-mono text-lmu-gain">{theoGap !== null && theoGap > 0 ? `-${theoGap.toFixed(3)}` : '0.000'}</span> potential</>}
         title="Best three sectors combined"
       />

@@ -7,10 +7,10 @@ import type { ReplayFileEntry } from '../../../server/sessions/sessionXmlTypes.j
 const practiceRunReplay: ReplayFileEntry = {
   name: 'Bahrain Paddock Circuit P1 18.Vcr',
   path: 'C:\\replays\\Bahrain Paddock Circuit P1 18.Vcr',
-  sizeBytes: 6863306,
+  fileSizeBytes: 6863306,
   trackName: 'Bahrain Paddock Circuit',
   sessionCode: 'P1',
-  mtime: Date.parse('2026-06-28T23:44:43.122Z'),
+  mtimeMs: Date.parse('2026-06-28T23:44:43.122Z'),
   durationSec: 340.635,
 };
 
@@ -87,10 +87,10 @@ describe('layout matching', () => {
   const replay = (trackName: string, sceneDesc?: string): ReplayFileEntry => ({
     name: `${trackName} P1 1.Vcr`,
     path: `C:\replays\${trackName} P1 1.Vcr`,
-    sizeBytes: 1,
+    fileSizeBytes: 1,
     trackName,
     sessionCode: 'P1',
-    mtime: saved,
+    mtimeMs: saved,
     durationSec: 600,
     sceneDesc,
   });
@@ -120,8 +120,8 @@ describe('replayIndexEntryFromStored', () => {
   const stored = (metadata: Record<string, unknown>) => ({
     filename: 'Sebring School Circuit P1 1.Vcr',
     file_path: 'C:\replays\Sebring School Circuit P1 1.Vcr',
-    file_size: 1,
-    file_mtime: 2,
+    file_size_bytes: 1,
+    file_mtime_ms: 2,
     metadata: metadata as never,
   });
 
@@ -129,9 +129,9 @@ describe('replayIndexEntryFromStored', () => {
     expect(replayIndexEntryFromStored(stored({}))).toMatchObject({ trackName: 'Sebring School Circuit', sessionCode: 'P1' });
   });
 
-  it('takes the scene from the event info when older rows lack the top-level field', () => {
-    expect(replayIndexEntryFromStored(stored({ eventInfo: { sceneDesc: 'SEBRINGWEC_SCHOOL' } })).sceneDesc).toBe('SEBRINGWEC_SCHOOL');
-    expect(replayIndexEntryFromStored(stored({ sceneDesc: 'SEBRINGWEC', eventInfo: { sceneDesc: 'X' } })).sceneDesc).toBe('SEBRINGWEC');
+  it('reads the scene from the top-level field only', () => {
+    expect(replayIndexEntryFromStored(stored({ sceneDesc: 'SEBRINGWEC' })).sceneDesc).toBe('SEBRINGWEC');
+    expect(replayIndexEntryFromStored(stored({})).sceneDesc).toBeUndefined();
   });
 });
 
@@ -141,9 +141,9 @@ describe('candidate rules', () => {
     trackVenue: 'Circuit de Spa-Francorchamps', trackCourse: 'Circuit de Spa-Francorchamps', sessionCode: 'P1',
     sessionTimestampMs: saved - 1_200_000, xmlFileMtimeMs: saved, ...overrides,
   });
-  const spaReplay = (sessionCode: string, mtime: number, overrides: Partial<ReplayFileEntry> = {}): ReplayFileEntry => ({
-    name: `Circuit de Spa-Francorchamps ${sessionCode} ${mtime}.Vcr`, path: '', sizeBytes: 1,
-    trackName: 'Circuit de Spa-Francorchamps', sessionCode, mtime, durationSec: 1200, ...overrides,
+  const spaReplay = (sessionCode: string, mtimeMs: number, overrides: Partial<ReplayFileEntry> = {}): ReplayFileEntry => ({
+    name: `Circuit de Spa-Francorchamps ${sessionCode} ${mtimeMs}.Vcr`, path: '', fileSizeBytes: 1,
+    trackName: 'Circuit de Spa-Francorchamps', sessionCode, mtimeMs, durationSec: 1200, ...overrides,
   });
 
   it('matches a word session type from the XML to the replay code letter', () => {

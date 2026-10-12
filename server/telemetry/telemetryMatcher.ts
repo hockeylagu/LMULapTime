@@ -7,7 +7,7 @@ import { ReplayMetadata } from '../../shared/types/index.js';
 export interface DuckDbFileInfo {
   filename: string;
   filePath: string;
-  fileMtimeMs: number;
+  mtimeMs: number;
   fileSizeBytes: number;
   trackName: string;
   trackCourse?: string;
@@ -15,7 +15,7 @@ export interface DuckDbFileInfo {
   timestampStr: string;
   timestampEpochMs: number;
   driverName?: string;
-  carName?: string;
+  carType?: string;
   lapsCount?: number;
   bestLapTime?: number;
   enrichmentError?: string;
@@ -107,7 +107,7 @@ export function scanDuckDbDirectory(telemetryDir: string): DuckDbFileInfo[] {
           entries.push({
             filename: f,
             filePath,
-            fileMtimeMs: Math.floor(stats.mtimeMs),
+            mtimeMs: Math.floor(stats.mtimeMs),
             fileSizeBytes: stats.size,
             trackName: parsed.trackName,
             sessionType: parsed.sessionType,
@@ -247,8 +247,8 @@ export function findDuckDbForReplay(
 ): DuckDbMatch | null {
   if (duckdbFiles.length === 0) return null;
 
-  const replayTypeNorm = normalizeSessionType(replay.sessionType || replay.eventInfo?.session || '');
-  const replayCircuit = getCircuitSpecification(replay.trackName, replay.trackCourse, replay.sceneDesc || replay.eventInfo?.sceneDesc);
+  const replayTypeNorm = normalizeSessionType(replay.sessionType || '');
+  const replayCircuit = getCircuitSpecification(replay.trackName, replay.trackCourse, replay.sceneDesc);
 
   let bestMatch: DuckDbFileInfo | null = null;
   let smallestTimeDelta = Infinity;
@@ -277,7 +277,7 @@ export function findDuckDbForReplay(
       continue;
     }
 
-    // 3. Time comparison against replay file mtime (or estimated replay start time)
+    // 3. Time comparison against replay file mtimeMs (or estimated replay start time)
     if (replayMtimeMs && duck.timestampEpochMs > 0) {
       const replayStartMs = replay.durationSec && replay.durationSec > 0
         ? replayMtimeMs - Math.round(replay.durationSec * 1000)
@@ -331,7 +331,7 @@ export async function enrichDuckDbFileInfo(duck: DuckDbFileInfo): Promise<DuckDb
       sessionType: meta.sessionType || duck.sessionType,
       timestampEpochMs: recordingTimeEpochMs && !isNaN(recordingTimeEpochMs) ? recordingTimeEpochMs : duck.timestampEpochMs,
       driverName: meta.driverName || duck.driverName,
-      carName: meta.carName || duck.carName,
+      carType: meta.carType || duck.carType,
       lapsCount: laps.length,
       bestLapTime,
     };
@@ -365,10 +365,10 @@ export async function enrichDuckDbDirectory(
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     const cached = cachedMap?.get(file.filePath);
-    // If cached and file mtime & size match without error, reuse cached metadata immediately!
+    // If cached and file mtimeMs & size match without error, reuse cached metadata immediately!
     if (
       cached &&
-      cached.fileMtimeMs === file.fileMtimeMs &&
+      cached.mtimeMs === file.mtimeMs &&
       cached.fileSizeBytes === file.fileSizeBytes &&
       !cached.enrichmentError
     ) {

@@ -33,7 +33,7 @@ export interface LapIncident {
   type: 'contact' | 'damage' | 'other';
   description: string;
   details?: string;
-  lapNum?: number;
+  lapNumber?: number;
   elapsedSeconds?: number;
   force?: number;
   otherVehicle?: string;
@@ -42,7 +42,7 @@ export interface LapIncident {
 
 export interface LapTrackLimit {
   description: string;
-  lapNum?: number;
+  lapNumber?: number;
   elapsedSeconds?: number;
   warningPoints?: number;
   currentPoints?: number;
@@ -52,7 +52,7 @@ export interface LapTrackLimit {
 export interface LapPenalty {
   penalty: string; // e.g. "Drive Thru", "Stop and Go"
   reason: string; // e.g. "Speeding", "Jumped the start"
-  lapNum?: number;
+  lapNumber?: number;
   elapsedSeconds?: number;
   description: string;
 }
@@ -60,10 +60,9 @@ export interface LapPenalty {
 export interface LapData {
   /** Zero-based position in the source driver's lap list, when hydrated from a compact index. */
   lapOrdinal?: number;
-  lapNum: number;
+  lapNumber: number;
   position: number;
   lapTime: number | null; // seconds, null if incomplete/invalid
-  lapTimeString: string;
   s1: number | null;
   s2: number | null;
   s3: number | null;
@@ -80,12 +79,9 @@ export interface LapData {
   virtualEnergy?: number | null; // Remaining Virtual Energy % (0-100) for Hypercar
   virtualEnergyUsed?: number | null; // Virtual Energy consumed in lap %
   elapsedSeconds?: number | null; // Session elapsed seconds when the lap starts (et): the previous lap's line crossing
-  elapsedTimeString?: string; // Formatted MM:SS or HH:MM:SS
   pitStopDuration?: number | null; // Estimated pit lane / stop time in seconds
-  pitStopDurationString?: string; // Formatted pit duration (e.g. "32.4s")
   pitService?: PitService; // The stop on this in-lap, from the linked replay, added when the session is read
   gapToLeader?: number | null; // Gap to session leader at lap finish (seconds)
-  gapToLeaderString?: string; // Formatted gap (e.g. "+4.215s" or "LEADER")
   isPitStop: boolean;
   isOutLap?: boolean; // Out-lap immediately following a pit stop
   nonRepresentativeReason?: NonRepresentativeReason; // Set by the parser; left out of averages and consistency
@@ -96,12 +92,6 @@ export interface LapData {
   paceCategory?: PaceCategory | null;
   pacePercentage?: number | null;
   target100Sec?: number | null;
-  incidents?: LapIncident[];
-  trackLimits?: LapTrackLimit[];
-  penalties?: LapPenalty[];
-  incidentCount?: number;
-  trackLimitCount?: number;
-  penaltyCount?: number;
 }
 
 export interface DriverData {
@@ -117,18 +107,15 @@ export interface DriverData {
   position: number;
   classPosition: number;
   bestLapTime: number | null;
-  bestLapTimeString: string;
-  bestLapNum?: number | null;
+  bestLapNumber?: number | null;
   bestS1: number | null;
   bestS2: number | null;
   bestS3: number | null;
   theoreticalBest: number | null;
-  theoreticalBestString: string;
   bestLapPaceCategory?: PaceCategory | null; // The best lap against the dry benchmark; absent when it was wet
   bestLapPacePercentage?: number | null;
   bestLapWet?: boolean; // The best lap was run in the wet (it carries conditions), so it is not rated against the dry benchmark
   avgLapTime?: number | null;
-  avgLapTimeString?: string;
   avgFuelPerLap?: number | null; // Avg fuel consumed per clean lap (%)
   estFuelStintLaps?: number | null; // Estimated laps on full tank
   avgVePerLap?: number | null; // Avg Virtual Energy consumed per clean lap (%)
@@ -139,16 +126,13 @@ export interface DriverData {
   classPositionGain?: number | null;
   finishStatus?: string; // e.g. "Finished Normally", "DNF", "DQ", "DNS"
   dnfReason?: string;
-  pitStopsCount?: number;
+  declaredPitStopsCount?: number;
   lapsLedCount?: number;
   highestPosition?: number | null;
   lowestPosition?: number | null;
-  finishGapToLeaderString?: string;
   top3LapsCount?: number;
-  lapsCount: number;
-  totalIncidents?: number;
-  totalTrackLimits?: number;
-  totalPenalties?: number;
+  declaredLapsCount: number;
+  /** The race log's events of the driver, each with the number of the lap it fell on (see lapEvents). */
   incidents?: LapIncident[];
   trackLimits?: LapTrackLimit[];
   penalties?: LapPenalty[];
@@ -191,7 +175,6 @@ export interface SessionMetadata {
   timestamp: number; // Unix timestamp in seconds or ms
   sessionType: 'Practice' | 'Qualifying' | 'Race' | 'Unknown';
   sessionName: string; // e.g. "P1", "Q1", "R1"
-  weatherInfo?: string;
   weather?: SessionWeather;
   settings?: SessionSettings;
   gameVersion?: string;
@@ -201,25 +184,22 @@ export interface SessionMetadata {
     driverName: string;
     carType: string;
     lapTime: number;
-    lapTimeString: string;
   };
   matchingReplayFile?: {
     name: string;
     path: string;
-    sizeBytes: number;
+    fileSizeBytes: number;
     eventTitle?: string;
     splitNo?: number;
     eventType?: string;
     durationSec?: number;
-    hasDuckDbTelemetry?: boolean;
-    duckdbFilename?: string;
     hasRain?: boolean;
     maxRainIntensity?: number;
     weatherCondition?: WeatherCondition;
     ambientTemp?: number;
     trackTemp?: number;
   };
-  hasDuckDbTelemetry?: boolean;
+  /** The session's main DuckDB telemetry file; absent without telemetry. */
   duckdbFilename?: string;
 }
 
@@ -249,7 +229,7 @@ export interface SessionProgressionPoint {
   trackVenue: string;
   trackCourse?: string;
   displayTrack?: string;
-  weatherInfo?: string;
+  weather?: SessionWeather;
   carType: string;
   carClass: string;
   driverName: string;
@@ -259,15 +239,15 @@ export interface SessionProgressionPoint {
   bestS3: number | null;
   theoreticalBest: number | null;
   cleanLapsCount: number;
-  totalLapsCount: number;
+  declaredLapsCount: number;
   avgLapTime: number | null;
-  top3AvgLapTime?: number | null;
+  top3Average?: number | null;
   consistencyScore?: number | null;
   theoreticalGap?: number | null;
   settings?: { serverName?: string; modeSetting?: string };
   bestLapWet?: boolean;
-  benchmarkCategory?: PaceCategory | null;
-  benchmarkPercentage?: number | null;
+  paceCategory?: PaceCategory | null;
+  pacePercentage?: number | null;
 }
 
 export interface TrackSummary {
@@ -310,20 +290,16 @@ export interface ComparableLap {
   lapOrdinal?: number;
   sessionName?: string;
   sessionType?: string;
-  dateString?: string;
+  timeString?: string;
   timestamp?: number;
   driverName: string;
   carType: string;
   carClass: string;
-  lapNum?: number;
+  lapNumber?: number;
   lapTime: number | null;
-  lapTimeString: string;
   s1: number | null;
   s2: number | null;
   s3: number | null;
-  s1String?: string;
-  s2String?: string;
-  s3String?: string;
   topSpeed: number | null;
   fCompound?: string;
   rCompound?: string;
@@ -337,10 +313,8 @@ export interface ComparableLap {
   virtualEnergy?: number | null;
   virtualEnergyUsed?: number | null;
   elapsedSeconds?: number | null;
-  elapsedTimeString?: string;
-  pitStopDurationString?: string;
-  gapToLeaderString?: string;
   isPitStop?: boolean;
+  pitStopDuration?: number | null;
   isOutLap?: boolean;
   nonRepresentativeReason?: NonRepresentativeReason;
   isValid: boolean;
@@ -352,7 +326,6 @@ export interface ComparableLap {
   isAllTimePB?: boolean;
   isOverallTrackBest?: boolean;
   isBenchmarkTarget?: boolean;
-  benchmarkCategory?: string;
   isPlayer?: boolean;
   tag?: string;
   matchingReplayFile?: string;

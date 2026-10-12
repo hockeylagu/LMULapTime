@@ -4,7 +4,6 @@ import {
   ComparableLap,
   LapData,
 } from '../../shared/types/index.js';
-import { formatTime } from '../../shared/domain/formatters.js';
 import { selectCleanLapCandidates } from '../../shared/domain/lapComparison.js';
 
 export const computeAverageLapTime = (laps: LapData[]): number | null => {
@@ -32,24 +31,20 @@ export function toComparableLap(
   return {
     id: driverOrdinal >= 0 && lapOrdinal >= 0
       ? `${session.id}_driver_${driverOrdinal}_lap_${lapOrdinal}`
-      : `${session.id}_${driver.name}_lap_${lap.lapNum}`,
+      : `${session.id}_${driver.name}_lap_${lap.lapNumber}`,
     sessionId: session.id,
     sessionName: session.sessionName,
     sessionType: session.sessionType,
-    dateString: session.timeString,
+    timeString: session.timeString,
     timestamp: session.timestamp,
     driverName: driver.name,
     carType: driver.carType,
     carClass: driver.carClass || 'General',
-    lapNum: lap.lapNum,
+    lapNumber: lap.lapNumber,
     lapTime: lap.lapTime,
-    lapTimeString: lap.lapTimeString,
     s1: lap.s1,
     s2: lap.s2,
     s3: lap.s3,
-    s1String: formatTime(lap.s1),
-    s2String: formatTime(lap.s2),
-    s3String: formatTime(lap.s3),
     topSpeed: lap.topSpeed,
     fCompound: lap.fCompound,
     rCompound: lap.rCompound,
@@ -63,10 +58,8 @@ export function toComparableLap(
     virtualEnergy: lap.virtualEnergy,
     virtualEnergyUsed: lap.virtualEnergyUsed,
     elapsedSeconds: lap.elapsedSeconds,
-    elapsedTimeString: lap.elapsedTimeString,
-    pitStopDurationString: lap.pitStopDurationString,
-    gapToLeaderString: lap.gapToLeaderString,
     isPitStop: lap.isPitStop,
+    pitStopDuration: lap.pitStopDuration,
     isOutLap: lap.isOutLap || false,
     nonRepresentativeReason: lap.nonRepresentativeReason,
     isValid: lap.isValid,
@@ -90,10 +83,6 @@ export interface ComparableLapsResult {
   bestS1: number | null;
   bestS2: number | null;
   bestS3: number | null;
-  bestS1String: string;
-  bestS2String: string;
-  bestS3String: string;
   theoreticalBestSec: number | null;
-  theoreticalBestString: string;
   sessionsCount: number;
 }

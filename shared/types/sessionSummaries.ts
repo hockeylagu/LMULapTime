@@ -26,7 +26,7 @@ export interface SessionDriverProjection {
   pitStopsCount: number; maxTopSpeed: number | null; bestLapOrdinal: number | null;
   declaredLapsCount: number;
   bestLapNumber: number | null; bestLapTime: number | null; bestS1: number | null;
-  bestS2: number | null; bestS3: number | null; averageLapTime: number | null;
+  bestS2: number | null; bestS3: number | null; avgLapTime: number | null;
   top3Average: number | null; consistencyScore: number | null; bestLapWet: boolean;
 }
 
@@ -40,9 +40,8 @@ export interface SessionSummaryProjection {
 
 /** Stable session contributions, calculated with the same driver/lap rules as the detailed projections. */
 export interface SessionAggregateProjection {
-  player: SessionDriverProjection | null;
-  timeString: string; sessionDay: string; eventTimestamp: number; trackLengthMeters: number | null;
-  distanceKm: number; activityDistanceKm: number; positionGain: number | null; bestLapTimeString: string;
+  sessionDay: string; eventTimestamp: number;
+  distanceKm: number; activityDistanceKm: number; positionGain: number | null;
   primaryLapCount: number; primaryValidLapCount: number;
 }
 
@@ -52,7 +51,7 @@ export type SessionCard = Omit<SessionMetadata, 'playerDriver'> & {
   isEmpty: boolean;
   playerDriver?: Omit<DriverData, 'laps' | 'incidents' | 'trackLimits' | 'penalties'> & {
     bestLapOrdinal: number | null;
-    completedLapsCount: number; cleanLapsCount: number; drivingTimeSeconds: number;
+    lapsCount: number; cleanLapsCount: number; drivingTimeSeconds: number;
     pitStopsCount: number; maxTopSpeed: number | null; consistencyScore: number | null;
     top3Average: number | null;
   };

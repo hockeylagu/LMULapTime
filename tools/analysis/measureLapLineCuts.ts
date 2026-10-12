@@ -27,7 +27,7 @@ import { countStationGlitches } from '../../server/tracks/stationGlitches.js';
 type EndStatus = 'cut' | `extrapolated (${string})` | `not on the line (${string})`;
 type LapKind = 'flying' | 'out-lap' | 'pit' | 'first of recording' | 'last of recording';
 
-interface Row { lap_key: number; file_mtime: number; file_size: number; trajectory_br: Buffer }
+interface Row { lap_key: number; file_mtime_ms: number; file_size_bytes: number; trajectory_br: Buffer }
 
 interface ShardResult {
   tally: Record<string, number>;
@@ -65,7 +65,7 @@ function measureShard(shard: number, shardCount: number): ShardResult {
   ).all() as Array<{ filename: string; driver_slot: number }>).filter((_, g) => g % shardCount === shard);
   const selectMetadata = db.prepare('SELECT metadata_br FROM replay_metadata WHERE filename = ?');
   const selectGroup = db.prepare(
-    'SELECT lap_key, file_mtime, file_size, trajectory_br FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key >= 0 ORDER BY lap_key'
+    'SELECT lap_key, file_mtime_ms, file_size_bytes, trajectory_br FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key >= 0 ORDER BY lap_key'
   );
 
   for (const group of groups) {
@@ -82,7 +82,7 @@ function measureShard(shard: number, shardCount: number): ShardResult {
     const maxKey = rows[rows.length - 1].lap_key;
     const neighbourOf = (k: number, key: number): ReplayTrajectoryData | null => {
       const j = rows.findIndex(r => r.lap_key === key);
-      return j >= 0 && rows[j].file_mtime === rows[k].file_mtime && rows[j].file_size === rows[k].file_size ? laps[j] : null;
+      return j >= 0 && rows[j].file_mtime_ms === rows[k].file_mtime_ms && rows[j].file_size_bytes === rows[k].file_size_bytes ? laps[j] : null;
     };
 
     for (const [k, lap] of laps.entries()) {

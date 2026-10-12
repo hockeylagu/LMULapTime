@@ -11,16 +11,16 @@ describe('sessionAnalytics server module', () => {
   describe('computeAverageLapTime', () => {
     it('computes average lap time across valid clean laps', () => {
       const laps: LapData[] = [
-        { lapNum: 2, position: 1, lapTime: 120.0, lapTimeString: '2:00.000', s1: 30, s2: 45, s3: 45, topSpeed: 300, fCompound: 'Hard', rCompound: 'Hard', isValid: true, isPitStop: false },
-        { lapNum: 3, position: 1, lapTime: 122.0, lapTimeString: '2:02.000', s1: 31, s2: 45, s3: 46, topSpeed: 302, fCompound: 'Hard', rCompound: 'Hard', isValid: true, isPitStop: false },
+        { lapNumber: 2, position: 1, lapTime: 120.0, s1: 30, s2: 45, s3: 45, topSpeed: 300, fCompound: 'Hard', rCompound: 'Hard', isValid: true, isPitStop: false },
+        { lapNumber: 3, position: 1, lapTime: 122.0, s1: 31, s2: 45, s3: 46, topSpeed: 302, fCompound: 'Hard', rCompound: 'Hard', isValid: true, isPitStop: false },
       ];
       expect(computeAverageLapTime(laps)).toBe(121.0);
     });
 
     it('returns null when no clean laps are present', () => {
       const laps: LapData[] = [
-        { lapNum: 1, position: 1, lapTime: 120.0, lapTimeString: '2:00.000', s1: 30, s2: 45, s3: 45, topSpeed: 300, fCompound: 'Hard', rCompound: 'Hard', isValid: false, isPitStop: false },
-        { lapNum: 2, position: 1, lapTime: 180.0, lapTimeString: '3:00.000', s1: 40, s2: 60, s3: 80, topSpeed: 200, fCompound: 'Hard', rCompound: 'Hard', isValid: true, isPitStop: true },
+        { lapNumber: 1, position: 1, lapTime: 120.0, s1: 30, s2: 45, s3: 45, topSpeed: 300, fCompound: 'Hard', rCompound: 'Hard', isValid: false, isPitStop: false },
+        { lapNumber: 2, position: 1, lapTime: 180.0, s1: 40, s2: 60, s3: 80, topSpeed: 200, fCompound: 'Hard', rCompound: 'Hard', isValid: true, isPitStop: true },
       ];
       expect(computeAverageLapTime(laps)).toBeNull();
     });
@@ -53,16 +53,14 @@ describe('sessionAnalytics server module', () => {
               position: 1,
               classPosition: 1,
               bestLapTime: 120.0,
-              bestLapTimeString: '2:00.000',
               bestS1: 34.0,
               bestS2: 41.0,
               bestS3: 45.0,
               theoreticalBest: 120.0,
-              theoreticalBestString: '2:00.000',
-              lapsCount: 2,
+              declaredLapsCount: 2,
               laps: [
-                { lapNum: 1, position: 1, lapTime: 121.0, lapTimeString: '2:01.000', s1: 34, s2: 42, s3: 45, topSpeed: 320, fCompound: 'H', rCompound: 'H', isPitStop: false, isValid: true },
-                { lapNum: 2, position: 1, lapTime: 120.0, lapTimeString: '2:00.000', s1: 34, s2: 41, s3: 45, topSpeed: 322, fCompound: 'H', rCompound: 'H', isPitStop: false, isValid: true },
+                { lapNumber: 1, position: 1, lapTime: 121.0, s1: 34, s2: 42, s3: 45, topSpeed: 320, fCompound: 'H', rCompound: 'H', isPitStop: false, isValid: true },
+                { lapNumber: 2, position: 1, lapTime: 120.0, s1: 34, s2: 41, s3: 45, topSpeed: 322, fCompound: 'H', rCompound: 'H', isPitStop: false, isValid: true },
               ],
             },
           ],
@@ -92,15 +90,13 @@ describe('sessionAnalytics server module', () => {
               position: 1,
               classPosition: 1,
               bestLapTime: 122.0,
-              bestLapTimeString: '2:02.000',
               bestS1: 35.0,
               bestS2: 42.0,
               bestS3: 45.0,
               theoreticalBest: 122.0,
-              theoreticalBestString: '2:02.000',
-              lapsCount: 1,
+              declaredLapsCount: 1,
               laps: [
-                { lapNum: 1, position: 1, lapTime: 122.0, lapTimeString: '2:02.000', s1: 35, s2: 42, s3: 45, topSpeed: 320, fCompound: 'H', rCompound: 'H', isPitStop: false, isValid: true },
+                { lapNumber: 1, position: 1, lapTime: 122.0, s1: 35, s2: 42, s3: 45, topSpeed: 320, fCompound: 'H', rCompound: 'H', isPitStop: false, isValid: true },
               ],
             },
           ],
@@ -117,7 +113,7 @@ describe('sessionAnalytics server module', () => {
       expect(progression[1].bestLapTime).toBe(120.0);
       expect(progression[1].cleanLapsCount).toBe(1);
       expect(progression[1].avgLapTime).toBe(120.0);
-      expect(progression[1].top3AvgLapTime).toBe(120.0);
+      expect(progression[1].top3Average).toBe(120.0);
       expect(progression[1].theoreticalGap).toBe(0);
       expect(progression[1].consistencyScore).toBe(100);
     });
@@ -147,26 +143,24 @@ describe('sessionAnalytics server module', () => {
             position: 1,
             classPosition: 1,
             bestLapTime: 120.0,
-            bestLapTimeString: '2:00.000',
             bestS1: 34.0,
             bestS2: 41.0,
             bestS3: 45.0,
             theoreticalBest: 120.0,
-            theoreticalBestString: '2:00.000',
-            lapsCount: 5,
+            declaredLapsCount: 5,
             laps: [
-              { lapNum: 1, position: 1, lapTime: 125.0, lapTimeString: '2:05.000', s1: 35, s2: 43, s3: 47, topSpeed: 318, fCompound: 'H', rCompound: 'H', isPitStop: false, isValid: true },
-              { lapNum: 2, position: 1, lapTime: 120.0, lapTimeString: '2:00.000', s1: 34, s2: 41, s3: 45, topSpeed: 322, fCompound: 'H', rCompound: 'H', isPitStop: false, isValid: true },
-              { lapNum: 3, position: 1, lapTime: 145.0, lapTimeString: '2:25.000', s1: 34, s2: 42, s3: 69, topSpeed: 280, fCompound: 'H', rCompound: 'H', isPitStop: true, isValid: true },
-              { lapNum: 4, position: 1, lapTime: 180.0, lapTimeString: '3:00.000', s1: 60, s2: 60, s3: 60, topSpeed: 300, fCompound: 'H', rCompound: 'H', isOutLap: true, isPitStop: false, isValid: true },
-              { lapNum: 5, position: 1, lapTime: 120.5, lapTimeString: '2:00.500', s1: 34, s2: 41.5, s3: 45, topSpeed: 321, fCompound: 'H', rCompound: 'H', isPitStop: false, isValid: true },
+              { lapNumber: 1, position: 1, lapTime: 125.0, s1: 35, s2: 43, s3: 47, topSpeed: 318, fCompound: 'H', rCompound: 'H', isPitStop: false, isValid: true },
+              { lapNumber: 2, position: 1, lapTime: 120.0, s1: 34, s2: 41, s3: 45, topSpeed: 322, fCompound: 'H', rCompound: 'H', isPitStop: false, isValid: true },
+              { lapNumber: 3, position: 1, lapTime: 145.0, s1: 34, s2: 42, s3: 69, topSpeed: 280, fCompound: 'H', rCompound: 'H', isPitStop: true, isValid: true },
+              { lapNumber: 4, position: 1, lapTime: 180.0, s1: 60, s2: 60, s3: 60, topSpeed: 300, fCompound: 'H', rCompound: 'H', isOutLap: true, isPitStop: false, isValid: true },
+              { lapNumber: 5, position: 1, lapTime: 120.5, s1: 34, s2: 41.5, s3: 45, topSpeed: 321, fCompound: 'H', rCompound: 'H', isPitStop: false, isValid: true },
             ],
           },
         ],
       };
 
       const progression = computeProgression([mockSession], 'Player');
-      expect(progression[0].totalLapsCount).toBe(5);
+      expect(progression[0].declaredLapsCount).toBe(5);
       expect(progression[0].cleanLapsCount).toBe(2);
       expect(progression[0].bestLapTime).toBe(120.0);
     });
@@ -189,7 +183,7 @@ describe('sessionAnalytics server module', () => {
               carClass: 'GT3',
               bestLapTime: 121.5,
               laps: [
-                { lapNum: 1, lapTime: 121.5, s1: 30.0, s2: 45.0, s3: 46.5, isValid: true, isPitStop: false },
+                { lapNumber: 1, lapTime: 121.5, s1: 30.0, s2: 45.0, s3: 46.5, isValid: true, isPitStop: false },
               ],
             },
           ],
@@ -208,7 +202,7 @@ describe('sessionAnalytics server module', () => {
               carClass: 'GT3',
               bestLapTime: 63.2,
               laps: [
-                { lapNum: 1, lapTime: 63.2, s1: 15.0, s2: 24.0, s3: 24.2, isValid: true, isPitStop: false },
+                { lapNumber: 1, lapTime: 63.2, s1: 15.0, s2: 24.0, s3: 24.2, isValid: true, isPitStop: false },
               ],
             },
           ],
@@ -254,13 +248,11 @@ describe('sessionAnalytics server module', () => {
           position: 2,
           classPosition: 2,
           bestLapTime: 122.5,
-          bestLapTimeString: '2:02.500',
           theoreticalBest: 122.0,
-          theoreticalBestString: '2:02.000',
           lapsCount: 2,
           laps: [
-            { lapNum: 1, position: 2, lapTime: 124.0, lapTimeString: '2:04.000', s1: 31.0, s2: 46.0, s3: 47.0, isValid: true },
-            { lapNum: 2, position: 2, lapTime: 122.5, lapTimeString: '2:02.500', s1: 30.5, s2: 45.5, s3: 46.5, isValid: true },
+            { lapNumber: 1, position: 2, lapTime: 124.0, s1: 31.0, s2: 46.0, s3: 47.0, isValid: true },
+            { lapNumber: 2, position: 2, lapTime: 122.5, s1: 30.5, s2: 45.5, s3: 46.5, isValid: true },
           ],
         },
         drivers: [
@@ -274,11 +266,10 @@ describe('sessionAnalytics server module', () => {
             position: 2,
             classPosition: 2,
             bestLapTime: 122.5,
-            bestLapTimeString: '2:02.500',
             lapsCount: 2,
             laps: [
-              { lapNum: 1, position: 2, lapTime: 124.0, lapTimeString: '2:04.000', s1: 31.0, s2: 46.0, s3: 47.0, isValid: true },
-              { lapNum: 2, position: 2, lapTime: 122.5, lapTimeString: '2:02.500', s1: 30.5, s2: 45.5, s3: 46.5, isValid: true },
+              { lapNumber: 1, position: 2, lapTime: 124.0, s1: 31.0, s2: 46.0, s3: 47.0, isValid: true },
+              { lapNumber: 2, position: 2, lapTime: 122.5, s1: 30.5, s2: 45.5, s3: 46.5, isValid: true },
             ],
           },
           {
@@ -291,11 +282,10 @@ describe('sessionAnalytics server module', () => {
             position: 1,
             classPosition: 1,
             bestLapTime: 120.0,
-            bestLapTimeString: '2:00.000',
             lapsCount: 2,
             laps: [
-              { lapNum: 1, position: 1, lapTime: 121.0, lapTimeString: '2:01.000', s1: 30.0, s2: 45.0, s3: 46.0, isValid: true },
-              { lapNum: 2, position: 1, lapTime: 120.0, lapTimeString: '2:00.000', s1: 29.8, s2: 44.5, s3: 45.7, isValid: true },
+              { lapNumber: 1, position: 1, lapTime: 121.0, s1: 30.0, s2: 45.0, s3: 46.0, isValid: true },
+              { lapNumber: 2, position: 1, lapTime: 120.0, s1: 29.8, s2: 44.5, s3: 45.7, isValid: true },
             ],
           },
         ],
@@ -370,19 +360,19 @@ describe('sessionAnalytics server module', () => {
               name: 'LMP3 Driver',
               carClass: 'LMP3',
               carType: 'Ligier JS P320',
-              laps: [{ lapNum: 1, lapTime: 130.0, lapTimeString: '2:10.000', isValid: true }],
+              laps: [{ lapNumber: 1, lapTime: 130.0, isValid: true }],
             },
             {
               name: 'ELMS Driver',
               carClass: 'LMP2_ELMS',
               carType: 'Oreca 07 ELMS',
-              laps: [{ lapNum: 1, lapTime: 125.0, lapTimeString: '2:05.000', isValid: true }],
+              laps: [{ lapNumber: 1, lapTime: 125.0, isValid: true }],
             },
             {
               name: 'WEC Driver',
               carClass: 'LMP2',
               carType: 'Oreca 07 WEC',
-              laps: [{ lapNum: 1, lapTime: 124.0, lapTimeString: '2:04.000', isValid: true }],
+              laps: [{ lapNumber: 1, lapTime: 124.0, isValid: true }],
             },
           ],
         },
@@ -427,7 +417,7 @@ describe('sessionAnalytics server module', () => {
         sessionName: 'P1',
         driversCount: 1,
         drivers: [],
-        matchingReplayFile: { name: 'Monza_P1.Vcr', path: '/replays/Monza_P1.Vcr', sizeBytes: 1024 },
+        matchingReplayFile: { name: 'Monza_P1.Vcr', path: '/replays/Monza_P1.Vcr', fileSizeBytes: 1024 },
       };
 
       const mockDriver: DriverData = {
@@ -440,21 +430,18 @@ describe('sessionAnalytics server module', () => {
         position: 1,
         classPosition: 1,
         bestLapTime: 96.425,
-        bestLapTimeString: '1:36.425',
         bestS1: 27.12,
         bestS2: 38.45,
         bestS3: 30.855,
         theoreticalBest: 96.425,
-        theoreticalBestString: '1:36.425',
-        lapsCount: 1,
+        declaredLapsCount: 1,
         laps: [],
       };
 
       const mockLap: LapData = {
-        lapNum: 4,
+        lapNumber: 4,
         position: 1,
         lapTime: 96.425,
-        lapTimeString: '1:36.425',
         s1: 27.12,
         s2: 38.45,
         s3: 30.855,
@@ -477,7 +464,7 @@ describe('sessionAnalytics server module', () => {
       expect(projected.driverName).toBe('Test Pilot');
       expect(projected.carType).toBe('Ferrari 499P');
       expect(projected.carClass).toBe('Hyper');
-      expect(projected.lapNum).toBe(4);
+      expect(projected.lapNumber).toBe(4);
       expect(projected.lapTime).toBe(96.425);
       expect(projected.matchingReplayFile).toBe('Monza_P1.Vcr');
       expect(projected.isSessionBest).toBe(true);

@@ -73,8 +73,6 @@ export const ReplayInspectorTelemetryColumn: React.FC<ReplayInspectorTelemetryCo
           onZoomRangeChange={setChartZoomRange}
           telemetryResolution={telemetryResolution}
           onChangeResolution={handleChangeResolution}
-          rawPointsCount={trajectory?.rawPointsCount}
-          rawSampleRateHz={trajectory?.rawSampleRateHz}
           vcrRawPointsCount={trajectory?.vcrRawPointsCount}
           vcrRawSampleRateHz={trajectory?.vcrRawSampleRateHz}
           duckdbRawPointsCount={trajectory?.duckdbRawPointsCount}

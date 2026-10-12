@@ -1,5 +1,5 @@
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { DetailedSession, DriverData, LapData } from '../../../shared/types/index.js';
+import type { DetailedSession, DriverData, LapData, SessionMetadata } from '../../../shared/types/index.js';
 import type { TrafficGap, LapTraffic } from '../../../shared/types/raceTraffic.js';
 import { anyPresent, unpackFields, type Field, type Row } from './fields.js';
 import {
@@ -55,6 +55,7 @@ function lapOf(row: Row, passes: Row[], laps: LapData[]): void {
     traffic.passedBy = passes.filter(pass => pass.direction === 'passedBy').map(carOf);
     lap.traffic = traffic as unknown as LapTraffic;
   }
+  lap.lapOrdinal = row.lap_ordinal;
   laps.push(lap as unknown as LapData);
 }
 
@@ -68,18 +69,11 @@ function groupBy<T extends Row>(rows: T[], key: (row: T) => string): Map<string,
   return grouped;
 }
 
-/** Fills the event lists of a driver and of its laps from the driver's event rows. */
-function assignEvents(driver: DriverData, driverMask: number | null, lapMasks: Array<number | null>, events: Row[]): void {
+/** Fills the event lists of a driver from its event rows, in the order they were numbered. */
+function assignEvents(driver: DriverData, driverMask: number | null, events: Row[]): void {
   for (const list of EVENT_LISTS) {
-    const ofKind = events.filter(event => event.kind === list.kind);
-    const make = (event: Row) => unpackFields(event, list.fields);
-    if (((driverMask ?? 0) & list.bit) !== 0) {
-      driver[list.prop] = ofKind.filter(event => event.driver_seq !== null).sort((a, b) => (a.driver_seq as number) - (b.driver_seq as number)).map(make) as never;
-    }
-    driver.laps.forEach((lap, lapOrdinal) => {
-      if (((lapMasks[lapOrdinal] ?? 0) & list.bit) === 0) return;
-      lap[list.prop] = ofKind.filter(event => event.lap_ordinal === lapOrdinal).sort((a, b) => (a.lap_seq as number) - (b.lap_seq as number)).map(make) as never;
-    });
+    if (((driverMask ?? 0) & list.bit) === 0) continue;
+    driver[list.prop] = events.filter(event => event.kind === list.kind).map(event => unpackFields(event, list.fields)) as never;
   }
 }
 
@@ -99,18 +93,6 @@ export function sessionScalars(row: Row): Row {
   return session;
 }
 
-/**
- * The replay link of a session: its recording row, and the session's main DuckDB file, which is stored
- * once on the session and mirrored here (a link carries the attachment of the session it belongs to).
- */
-export function recordingLink(recording: Row, sessionRow: Row): Row {
-  const link = unpackFields(recording, RECORDING_FIELDS);
-  const filename = sessionRow.duckdb_filename;
-  if (sessionRow.has_duckdb_telemetry === 1 || typeof filename === 'string') link.hasDuckDbTelemetry = true;
-  if (typeof filename === 'string') link.duckdbFilename = filename;
-  return link;
-}
-
 /** A driver's scalars from a row of DRIVER_WITH_DICTIONARIES (no laps, no events). */
 export function driverScalars(row: Row): DriverData {
   const driver = unpackFields(row, DRIVER_DICTIONARY_FIELDS);
@@ -125,7 +107,7 @@ export function readSession(db: DatabaseType, id: string): DetailedSession | nul
   const session = sessionScalars(row);
 
   const recording = db.prepare('SELECT * FROM session_recordings WHERE session_id = ?').get(id) as Row | undefined;
-  if (recording) session.matchingReplayFile = recordingLink(recording, row);
+  if (recording) session.matchingReplayFile = unpackFields(recording, RECORDING_FIELDS) as SessionMetadata['matchingReplayFile'];
 
   const driverRows = db.prepare(`${DRIVER_WITH_DICTIONARIES} WHERE d.session_id = ? ORDER BY d.driver_ordinal`).all(id) as Row[];
   const lapRows = groupBy(db.prepare('SELECT * FROM session_laps WHERE session_id = ? ORDER BY driver_ordinal, lap_ordinal').all(id) as Row[], lap => String(lap.driver_ordinal));
@@ -136,14 +118,13 @@ export function readSession(db: DatabaseType, id: string): DetailedSession | nul
   const drivers = driverRows.map((driverRow): DriverData => {
     const ordinal = driverRow.driver_ordinal as number;
     const driver = driverScalars(driverRow);
+    driver.driverOrdinal = ordinal;
     const laps: LapData[] = [];
-    const lapMasks: Array<number | null> = [];
     for (const lapRow of lapRows.get(String(ordinal)) ?? []) {
       lapOf(lapRow, passRows.get(`${ordinal}:${lapRow.lap_ordinal}`) ?? [], laps);
-      lapMasks.push(lapRow.lists_mask as number | null);
     }
     driver.laps = laps;
-    assignEvents(driver, driverRow.lists_mask as number | null, lapMasks, eventRows.get(String(ordinal)) ?? []);
+    assignEvents(driver, driverRow.lists_mask as number | null, eventRows.get(String(ordinal)) ?? []);
     return driver;
   });
   session.drivers = drivers;

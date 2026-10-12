@@ -12,7 +12,7 @@ export interface BuildAiLapEvidenceOptions {
   baselineLapSummary?: ReplayLapSummary | null;
   segments: LapSegmentComparison[];
   carClass?: string;
-  carModel?: string;
+  carType?: string;
   /** The corners ranked by rankDebriefCorners: the report explains these, in this order. */
   priorities?: DebriefCorner[];
 }
@@ -31,7 +31,7 @@ export function buildAiLapEvidence({
   baselineLapSummary,
   segments,
   carClass,
-  carModel,
+  carType,
   priorities,
 }: BuildAiLapEvidenceOptions): AiLapEvidence {
   const lap = currentLapSummary || trajectory.laps?.find(item => item.lapNumber === trajectory.currentLap) || trajectory.laps?.[0];
@@ -141,7 +141,7 @@ export function buildAiLapEvidence({
       lapNumber: lap.lapNumber,
       driverName: trajectory.driverName,
       carClass,
-      carModel,
+      carType,
       lapTimeSec: round(lap.lapTimeSec),
       s1Sec: optionalRound(lap.s1Sec),
       s2Sec: optionalRound(lap.s2Sec),

@@ -1,7 +1,9 @@
 import type { Database as DatabaseType } from 'better-sqlite3';
 import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
 import type { Row } from '../sessionRows/fields.js';
-import { DRIVER_WITH_DICTIONARIES, SESSION_SCALAR_COLUMNS, driverScalars, recordingLink, sessionScalars } from '../sessionRows/reader.js';
+import { DRIVER_WITH_DICTIONARIES, SESSION_SCALAR_COLUMNS, driverScalars, sessionScalars } from '../sessionRows/reader.js';
+import { unpackFields } from '../sessionRows/fields.js';
+import { RECORDING_FIELDS } from '../sessionRows/specs.js';
 
 type CardPlayer = NonNullable<SessionCard['playerDriver']>;
 
@@ -20,31 +22,31 @@ function bySession(rows: Row[]): Map<string, Row[]> {
 }
 
 /** The player's figures the card adds to the driver: clean laps, driving time, pit stops, top speed. */
-function playerExtras(summary: Row | undefined): Pick<CardPlayer, 'driverOrdinal' | 'bestLapOrdinal' | 'completedLapsCount' | 'cleanLapsCount'
+function playerExtras(summary: Row | undefined): Pick<CardPlayer, 'driverOrdinal' | 'bestLapOrdinal' | 'lapsCount' | 'cleanLapsCount'
   | 'drivingTimeSeconds' | 'pitStopsCount' | 'maxTopSpeed' | 'consistencyScore' | 'top3Average'> {
   return {
     driverOrdinal: summary?.driver_ordinal as number | undefined,
     bestLapOrdinal: (summary?.best_lap_ordinal as number | null | undefined) ?? null,
-    completedLapsCount: (summary?.completed_laps_count as number | null | undefined) ?? 0,
+    lapsCount: (summary?.laps_count as number | null | undefined) ?? 0,
     cleanLapsCount: (summary?.clean_laps_count as number | null | undefined) ?? 0,
-    drivingTimeSeconds: (summary?.driving_time_sum as number | null | undefined) ?? 0,
-    pitStopsCount: (summary?.pit_count as number | null | undefined) ?? 0,
-    maxTopSpeed: (summary?.max_speed as number | null | undefined) ?? null,
+    drivingTimeSeconds: (summary?.driving_time_seconds as number | null | undefined) ?? 0,
+    pitStopsCount: (summary?.pit_stops_count as number | null | undefined) ?? 0,
+    maxTopSpeed: (summary?.max_top_speed as number | null | undefined) ?? null,
     consistencyScore: (summary?.consistency_score as number | null | undefined) ?? null,
-    top3Average: (summary?.top_three_average as number | null | undefined) ?? null,
+    top3Average: (summary?.top3_average as number | null | undefined) ?? null,
   };
 }
 
 function cardOf(session: Row, recording: Row | undefined, drivers: Row[]): SessionCard {
   const card = sessionScalars(session);
-  if (recording) card.matchingReplayFile = recordingLink(recording, session);
+  if (recording) card.matchingReplayFile = unpackFields(recording, RECORDING_FIELDS) as SessionCard['matchingReplayFile'];
   card.isEmpty = session.is_empty === 1;
   const playerOrdinal = session.player_driver_ordinal;
   const base = typeof playerOrdinal === 'number' && session.projection_error === null
     ? drivers.find(driver => driver.driver_ordinal === playerOrdinal) : undefined;
   if (base) {
     // The projection's summary row is the marked player, else the primary driver.
-    const summary = drivers.filter(driver => driver.is_player_driver === 1).sort((a, b) => (a.driver_ordinal as number) - (b.driver_ordinal as number))[0]
+    const summary = drivers.filter(driver => driver.is_player === 1).sort((a, b) => (a.driver_ordinal as number) - (b.driver_ordinal as number))[0]
       ?? drivers.find(driver => driver.driver_ordinal === session.primary_driver_ordinal);
     card.playerDriver = { ...driverScalars(base), ...playerExtras(summary) } as unknown as CardPlayer;
   }
@@ -64,7 +66,7 @@ export function readSessionCards(db: DatabaseType, ids: readonly string[]): Sess
       FROM sessions WHERE id IN (${marks})`).all(...chunk) as Row[];
     const recordings = bySession(db.prepare(`SELECT * FROM session_recordings WHERE session_id IN (${marks})`).all(...chunk) as Row[]);
     const drivers = bySession(db.prepare(`${DRIVER_WITH_DICTIONARIES} WHERE d.session_id IN (${marks})
-      AND (d.is_player_driver = 1 OR d.driver_ordinal = (SELECT player_driver_ordinal FROM sessions WHERE id = d.session_id)
+      AND (d.is_player = 1 OR d.driver_ordinal = (SELECT player_driver_ordinal FROM sessions WHERE id = d.session_id)
         OR d.driver_ordinal = (SELECT primary_driver_ordinal FROM sessions WHERE id = d.session_id))`).all(...chunk) as Row[]);
     for (const session of sessions) {
       const id = session.id as string;

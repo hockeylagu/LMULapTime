@@ -1,6 +1,5 @@
 import type { ComparableLap } from '../../../../shared/types/index.js';
 import type { LeaderboardEntry } from '../../../../shared/types/leaderboard.js';
-import { formatTime } from '../../../../shared/domain/formatters.js';
 import type { TelemetryLapRef } from '../../../utils/telemetryCompareLink.js';
 
 /** The id the server gives a driver's best board lap (session, driver, lap number). */
@@ -8,7 +7,7 @@ export function boardLapId(entry: LeaderboardEntry): string {
   const lap = entry.bestLap;
   return Number.isInteger(lap.driverOrdinal) && Number.isInteger(lap.lapOrdinal)
     ? `${lap.sessionId}_driver_${lap.driverOrdinal}_lap_${lap.lapOrdinal}`
-    : `${lap.sessionId}_${entry.driverName}_lap_${lap.lapNum}`;
+    : `${lap.sessionId}_${entry.driverName}_lap_${lap.lapNumber}`;
 }
 
 /**
@@ -28,15 +27,11 @@ export function boardLapToComparable(entry: LeaderboardEntry, carClass: string, 
     driverName: entry.driverName,
     carType: lap.carType,
     carClass,
-    lapNum: lap.lapNum,
+    lapNumber: lap.lapNumber,
     lapTime: lap.lapTime,
-    lapTimeString: formatTime(lap.lapTime),
     s1: lap.s1,
     s2: lap.s2,
     s3: lap.s3,
-    s1String: formatTime(lap.s1),
-    s2String: formatTime(lap.s2),
-    s3String: formatTime(lap.s3),
     topSpeed: null,
     isValid: true,
     isPlayer: entry.isPlayer,
@@ -53,6 +48,6 @@ export function boardLapTelemetryRef(entry: LeaderboardEntry): TelemetryLapRef |
     driverOrdinal: lap.driverOrdinal as number,
     lapOrdinal: lap.lapOrdinal as number,
     driverName: entry.driverName,
-    lapNum: lap.lapNum,
+    lapNumber: lap.lapNumber,
   };
 }

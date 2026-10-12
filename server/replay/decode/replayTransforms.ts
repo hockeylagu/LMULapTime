@@ -42,7 +42,7 @@ export function applyPureOfficialLapValidation(
   }
 
   const officialLaps = matchedDriver.laps.map((lap: ReplayTimingLap) => ({
-    lapNumber: lap.lapNum,
+    lapNumber: lap.lapNumber,
     lapTimeSec: lap.lapTime,
     s1Sec: lap.s1,
     s2Sec: lap.s2,

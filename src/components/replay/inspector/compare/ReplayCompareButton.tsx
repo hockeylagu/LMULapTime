@@ -47,7 +47,7 @@ export const ReplayCompareButton: React.FC<ReplayCompareButtonProps> = ({
           disabled={disabled}
           className="flex h-8 items-center gap-1.5 px-2.5 rounded-lg text-xs font-mono border transition-colors cursor-pointer bg-lmu-bg border-lmu-border hover:bg-lmu-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text disabled:text-lmu-faint disabled:hover:text-lmu-faint disabled:hover:bg-lmu-card disabled:cursor-not-allowed"
           style={{ color: TELEMETRY_COLORS.baseline }}
-          title={`Compare with your fastest lap in the ${suggestion.carType} here: ${suggestion.sessionType ?? ''} ${suggestion.dateString ?? ''}, lap ${suggestion.lapNum}`}
+          title={`Compare with your fastest lap in the ${suggestion.carType} here: ${suggestion.sessionType ?? ''} ${suggestion.timeString ?? ''}, lap ${suggestion.lapNumber}`}
         >
           <Sparkles className="w-3.5 h-3.5" />
           <span>vs your best {formatLapTime(suggestion.lapTime)}</span>

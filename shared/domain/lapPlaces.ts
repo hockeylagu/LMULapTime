@@ -15,17 +15,17 @@ export function lapClassPositions(session: DetailedSession, driver: DriverData |
       if (other.name === driver?.name || other.carClass !== carClass) continue;
       const seen = new Set<number>();
       for (const lap of other.laps || []) {
-        if (seen.has(lap.lapNum)) continue;
-        seen.add(lap.lapNum);
+        if (seen.has(lap.lapNumber)) continue;
+        seen.add(lap.lapNumber);
         if (lap.position <= 0) continue;
-        const onLap = peers.get(lap.lapNum) ?? [];
+        const onLap = peers.get(lap.lapNumber) ?? [];
         onLap.push(lap.position);
-        peers.set(lap.lapNum, onLap);
+        peers.set(lap.lapNumber, onLap);
       }
     }
   }
   for (const lap of laps) {
-    positions.set(lap, !isMultiClass ? lap.position : classPosition(lap.position, peers.get(lap.lapNum) ?? []));
+    positions.set(lap, !isMultiClass ? lap.position : classPosition(lap.position, peers.get(lap.lapNumber) ?? []));
   }
   return positions;
 }
@@ -39,7 +39,7 @@ export function lapClassPosition(session: DetailedSession, driver: DriverData | 
   const carClass = driver?.carClass ?? '';
   const peerPositions = (session.drivers || []).flatMap(other => {
     if (other.name === driver?.name || other.carClass !== carClass) return [];
-    const firstLap = other.laps?.find(candidate => candidate.lapNum === lap.lapNum);
+    const firstLap = other.laps?.find(candidate => candidate.lapNumber === lap.lapNumber);
     return firstLap ? [firstLap.position] : [];
   });
   return classPosition(lap.position, peerPositions);

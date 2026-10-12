@@ -37,17 +37,16 @@ describe('SessionTelemetryTooltip component', () => {
 
   const basePayloadItem: SessionTelemetryTooltipEntry = {
     payload: {
-      lapNum: 'Lap 5',
+      lapNumber: 'Lap 5',
       isValid: true,
       isInferred: false,
       isPitStop: false,
       isOutLap: false,
-      lapTimeString: '1:45.123',
+      lapTime: 105.123,
       avgLapTime: 106.5,
-      avgLapTimeString: '1:46.500',
-      s1String: '30.100',
-      s2String: '35.000',
-      s3String: '40.023',
+      s1: 30.1,
+      s2: 35,
+      s3: 40.023,
       topSpeed: 312.4,
       twFL: 92.5,
       twFR: 91.0,
@@ -57,9 +56,9 @@ describe('SessionTelemetryTooltip component', () => {
       fuel: 45.2,
       virtualEnergy: 78.5,
       'Samuel Lague': 1,
-      'Samuel Lague_lapTime': '1:45.123',
+      'Samuel Lague_lapTime': 105.123,
       'Rival Driver': 2,
-      'Rival Driver_lapTime': '1:45.800',
+      'Rival Driver_lapTime': 105.8,
       'Rival Driver_isPit': true,
     },
   };
@@ -97,9 +96,9 @@ describe('SessionTelemetryTooltip component', () => {
 
   it('renders sectors metric', () => {
     render(<SessionTelemetryTooltip {...defaultProps} activeChartMetric="sectors" />);
-    expect(screen.getByText('S1: 30.100')).toBeInTheDocument();
-    expect(screen.getByText('S2: 35.000')).toBeInTheDocument();
-    expect(screen.getByText('S3: 40.023')).toBeInTheDocument();
+    expect(screen.getByText('S1: 0:30.100')).toBeInTheDocument();
+    expect(screen.getByText('S2: 0:35.000')).toBeInTheDocument();
+    expect(screen.getByText('S3: 0:40.023')).toBeInTheDocument();
   });
 
   it('renders topSpeed metric', () => {

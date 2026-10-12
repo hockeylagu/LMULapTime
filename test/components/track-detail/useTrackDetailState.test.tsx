@@ -39,7 +39,7 @@ describe('useTrackDetailState', () => {
         matchingReplayFile: {
           name: 'Monza_2026.Vcr',
           path: 'C:/replays/Monza_2026.Vcr',
-          sizeBytes: 1000,
+          fileSizeBytes: 1000,
           modifiedMs: 12345,
         },
         playerDriver: { driverOrdinal: 1, bestLapOrdinal: 3 },

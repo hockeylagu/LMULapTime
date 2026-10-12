@@ -17,8 +17,8 @@ describe('worker SQLite persistence', () => {
   let db: SessionDatabase;
   let filePath: string;
   const filename = 'Worker_P1.Vcr';
-  let mtime: number;
-  let size: number;
+  let mtimeMs: number;
+  let fileSizeBytes: number;
 
   beforeEach(() => {
     directory = fs.mkdtempSync(path.join(process.cwd(), 'test/fixtures/worker-save-'));
@@ -26,9 +26,9 @@ describe('worker SQLite persistence', () => {
     filePath = path.join(directory, filename);
     fs.writeFileSync(filePath, createMockVcrBuffer());
     const stat = fs.statSync(filePath);
-    mtime = Math.floor(stat.mtimeMs);
-    size = stat.size;
-    db.upsertReplayMetadataCache(filename, filePath, mtime, size, parseReplayMetadata(filePath, { playerName: 'Test Driver' }));
+    mtimeMs = Math.floor(stat.mtimeMs);
+    fileSizeBytes = stat.size;
+    db.upsertReplayMetadataCache(filename, filePath, mtimeMs, fileSizeBytes, parseReplayMetadata(filePath, { playerName: 'Test Driver' }));
   });
 
   afterEach(() => {
@@ -36,9 +36,9 @@ describe('worker SQLite persistence', () => {
     fs.rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
   });
 
-  const store = async (host: SessionDatabase, source: string, fileMtime: number, fileSize: number) => {
+  const store = async (host: SessionDatabase, source: string, mtimeMs: number, fileSizeBytes: number) => {
     const extraction = storeReplayTrajectoryInWorker(host, source, { driverSlot: 1 }, {
-      filename, mtime: fileMtime, size: fileSize, driverSlotKey: 1, isPrimary: true,
+      filename, mtimeMs, fileSizeBytes, driverSlotKey: 1, isPrimary: true,
     });
     let step = await extraction.next();
     while (!step.done) step = await extraction.next();
@@ -56,9 +56,9 @@ describe('worker SQLite persistence', () => {
     const reference = new SessionDatabase(':memory:');
     try {
       const decoded = extractReplayTrajectory(filePath, { driverSlot: 1, allLaps: true, maxPoints: 0, silent: true });
-      reference.replaceReplayDriverLaps(filename, filePath, mtime, size, 1, decoded, true);
+      reference.replaceReplayDriverLaps(filename, filePath, mtimeMs, fileSizeBytes, 1, decoded, true);
       const mainSave = vi.spyOn(db, 'replaceReplayDriverLaps');
-      const summary = await store(db, filePath, mtime, size);
+      const summary = await store(db, filePath, mtimeMs, fileSizeBytes);
       expect(Object.keys(summary).sort()).toEqual(['currentLap', 'driverSlot']);
       expect(mainSave).not.toHaveBeenCalled();
       expect(db.getReplayDriverIngest(filename, 1)?.status).toBe('stored');
@@ -74,12 +74,12 @@ describe('worker SQLite persistence', () => {
 
   it('shares one file-backed decode when a batch waits for a single-driver request', async () => {
     const single = storeReplayTrajectoryInWorker(db, filePath, { driverSlot: 1 }, {
-      filename, mtime, size, driverSlotKey: 1, isPrimary: false,
+      filename, mtimeMs, fileSizeBytes, driverSlotKey: 1, isPrimary: false,
     });
     let singleStep = await single.next();
     const singleProgress: string[] = [];
     const batch = storeReplayDriversInWorker(db, filePath, { playerName: 'Test Driver' }, {
-      filename, mtime, size, driverSlots: [1], includePrimary: false,
+      filename, mtimeMs, fileSizeBytes, driverSlots: [1], includePrimary: false,
     });
     let batchStep = await batch.next();
     const batchProgress: string[] = [];
@@ -95,11 +95,11 @@ describe('worker SQLite persistence', () => {
 
   it('shares one file-backed decode when a single-driver request waits for a batch', async () => {
     const batch = storeReplayDriversInWorker(db, filePath, { playerName: 'Test Driver' }, {
-      filename, mtime, size, driverSlots: [1], includePrimary: false,
+      filename, mtimeMs, fileSizeBytes, driverSlots: [1], includePrimary: false,
     });
     const batchFirst = await batch.next();
     const single = storeReplayTrajectoryInWorker(db, filePath, { driverSlot: 1 }, {
-      filename, mtime, size, driverSlotKey: 1, isPrimary: false,
+      filename, mtimeMs, fileSizeBytes, driverSlotKey: 1, isPrimary: false,
     });
     const singleFirst = await single.next();
     const batchProgress: string[] = [];
@@ -116,11 +116,11 @@ describe('worker SQLite persistence', () => {
 
   it('promotes an explicit request result to primary without another decode or blob write', async () => {
     const owner = storeReplayTrajectoryInWorker(db, filePath, { driverSlot: 1 }, {
-      filename, mtime, size, driverSlotKey: 1, isPrimary: false,
+      filename, mtimeMs, fileSizeBytes, driverSlotKey: 1, isPrimary: false,
     });
     const ownerFirst = await owner.next();
     const batch = storeReplayDriversInWorker(db, filePath, { playerName: 'Samuel Lague' }, {
-      filename, mtime, size, driverSlots: [1], includePrimary: true,
+      filename, mtimeMs, fileSizeBytes, driverSlots: [1], includePrimary: true,
     });
     const batchFirst = await batch.next();
     await drain(owner, ownerFirst, []);
@@ -136,10 +136,10 @@ describe('worker SQLite persistence', () => {
   });
 
   it('reuses an already cached primary before starting a worker', async () => {
-    await store(db, filePath, mtime, size);
+    await store(db, filePath, mtimeMs, fileSizeBytes);
     db.getDb().exec('DELETE FROM replay_trajectory_defaults WHERE driver_slot = -1; DELETE FROM replay_ingest_drivers WHERE driver_slot = -1');
     const batch = storeReplayDriversInWorker(db, filePath, { playerName: 'Samuel Lague' }, {
-      filename, mtime, size, driverSlots: [1], includePrimary: true,
+      filename, mtimeMs, fileSizeBytes, driverSlots: [1], includePrimary: true,
     });
     const progress: string[] = [];
     const result = await drain(batch, await batch.next(), progress);
@@ -156,7 +156,7 @@ describe('worker SQLite persistence', () => {
     const playerName = db.getStoredReplayMetadata(filename)?.drivers.find(driver => driver.slot === 2)?.name;
     expect(playerName).toBeDefined();
     if (status === 'failed') {
-      for (let attempt = 0; attempt < MAX_DECODE_ATTEMPTS; attempt++) db.recordReplayDriverIngest(filename, -1, mtime, size, 'failed', 'Old player failure');
+      for (let attempt = 0; attempt < MAX_DECODE_ATTEMPTS; attempt++) db.recordReplayDriverIngest(filename, -1, mtimeMs, fileSizeBytes, 'failed', 'Old player failure');
     }
     const rows = () => db.getDb().prepare('SELECT * FROM replay_trajectories WHERE filename = ? ORDER BY driver_slot, lap_key').all(filename);
     const before = rows();
@@ -187,25 +187,25 @@ describe('worker SQLite persistence', () => {
   });
 
   it.each(['source', 'metadata'])('rejects primary promotion after the %s version changes', async (changed) => {
-    await store(db, filePath, mtime, size);
+    await store(db, filePath, mtimeMs, fileSizeBytes);
     db.getDb().exec('DELETE FROM replay_trajectory_defaults WHERE driver_slot = -1; DELETE FROM replay_ingest_drivers WHERE driver_slot = -1');
     if (changed === 'source') fs.appendFileSync(filePath, Buffer.alloc(1));
-    else db.getDb().prepare('UPDATE replay_metadata SET file_size = file_size + 1 WHERE filename = ?').run(filename);
-    expect(() => db.promoteReplayPrimary(filename, filePath, mtime, size, 1)).toThrow('Replay source changed');
+    else db.getDb().prepare('UPDATE replay_metadata SET file_size_bytes = file_size_bytes + 1 WHERE filename = ?').run(filename);
+    expect(() => db.promoteReplayPrimary(filename, filePath, mtimeMs, fileSizeBytes, 1)).toThrow('Replay source changed');
     expect(db.getStoredReplayTrajectory(filename, -1, -1)).toBeNull();
     expect(db.getStoredReplayTrajectory(filename, 1, -1)).not.toBeNull();
   });
 
   it('requires the current decoder version and rolls back failed alias publication', async () => {
-    await store(db, filePath, mtime, size);
+    await store(db, filePath, mtimeMs, fileSizeBytes);
     db.getDb().exec(`DELETE FROM replay_trajectory_defaults WHERE driver_slot = -1;
       DELETE FROM replay_ingest_drivers WHERE driver_slot = -1;
       UPDATE replay_trajectories SET parser_version = 'v4'`);
-    expect(db.promoteReplayPrimary(filename, filePath, mtime, size, 1)).toBe(false);
+    expect(db.promoteReplayPrimary(filename, filePath, mtimeMs, fileSizeBytes, 1)).toBe(false);
     db.getDb().prepare('UPDATE replay_trajectories SET parser_version = ?').run(REPLAY_CACHE_VERSION);
     db.getDb().exec(`CREATE TRIGGER reject_primary BEFORE INSERT ON replay_ingest_drivers
       WHEN NEW.driver_slot = -1 BEGIN SELECT RAISE(ABORT, 'injected alias failure'); END`);
-    expect(() => db.promoteReplayPrimary(filename, filePath, mtime, size, 1)).toThrow('injected alias failure');
+    expect(() => db.promoteReplayPrimary(filename, filePath, mtimeMs, fileSizeBytes, 1)).toThrow('injected alias failure');
     expect(db.getStoredReplayTrajectory(filename, -1, -1)).toBeNull();
     expect(db.getReplayDriverIngest(filename, -1)).toBeNull();
     expect(db.getStoredReplayTrajectory(filename, 1, -1)).not.toBeNull();
@@ -213,11 +213,11 @@ describe('worker SQLite persistence', () => {
 
   it('releases a waiter canceled just after its owner grants the file lease', async () => {
     const owner = storeReplayTrajectoryInWorker(db, filePath, { driverSlot: 1 }, {
-      filename, mtime, size, driverSlotKey: 1, isPrimary: false,
+      filename, mtimeMs, fileSizeBytes, driverSlotKey: 1, isPrimary: false,
     });
     const ownerFirst = await owner.next();
     const waiter = storeReplayDriversInWorker(db, filePath, { playerName: 'Test Driver' }, {
-      filename, mtime, size, driverSlots: [1], includePrimary: false,
+      filename, mtimeMs, fileSizeBytes, driverSlots: [1], includePrimary: false,
     });
     const waiterFirst = await waiter.next();
     expect(waiterFirst.done).toBe(false);
@@ -227,7 +227,7 @@ describe('worker SQLite persistence', () => {
     await waiter.return({ drivers: [], failures: [] });
 
     const nextCaller = storeReplayTrajectoryInWorker(db, filePath, { driverSlot: 1 }, {
-      filename, mtime, size, driverSlotKey: 1, isPrimary: false,
+      filename, mtimeMs, fileSizeBytes, driverSlotKey: 1, isPrimary: false,
     });
     const nextFirst = await nextCaller.next();
     expect(nextFirst.done).toBe(false);
@@ -239,11 +239,11 @@ describe('worker SQLite persistence', () => {
     db.getDb().exec(`CREATE TRIGGER reject_concurrent_save BEFORE INSERT ON replay_trajectories
       BEGIN SELECT RAISE(ABORT, 'injected write failure'); END`);
     const owner = storeReplayTrajectoryInWorker(db, filePath, { driverSlot: 1 }, {
-      filename, mtime, size, driverSlotKey: 1, isPrimary: false,
+      filename, mtimeMs, fileSizeBytes, driverSlotKey: 1, isPrimary: false,
     });
     const ownerFirst = await owner.next();
     const waiter = storeReplayTrajectoryInWorker(db, filePath, { driverSlot: 1 }, {
-      filename, mtime, size, driverSlotKey: 1, isPrimary: false,
+      filename, mtimeMs, fileSizeBytes, driverSlotKey: 1, isPrimary: false,
     });
     const waiterFirst = await waiter.next();
     const ownerProgress: string[] = [];
@@ -266,11 +266,11 @@ describe('worker SQLite persistence', () => {
     db.getDb().exec(`CREATE TRIGGER reject_primary_slot BEFORE INSERT ON replay_trajectories
       WHEN NEW.driver_slot = 1 BEGIN SELECT RAISE(ABORT, 'injected primary failure'); END`);
     const owner = storeReplayTrajectoryInWorker(db, filePath, { driverSlot: 1 }, {
-      filename, mtime, size, driverSlotKey: 1, isPrimary: false,
+      filename, mtimeMs, fileSizeBytes, driverSlotKey: 1, isPrimary: false,
     });
     const ownerFirst = await owner.next();
     const batch = storeReplayDriversInWorker(db, filePath, { playerName: 'Samuel Lague' }, {
-      filename, mtime, size, driverSlots: [], includePrimary: true,
+      filename, mtimeMs, fileSizeBytes, driverSlots: [], includePrimary: true,
     });
     const batchFirst = await batch.next();
     await expect(drain(owner, ownerFirst, [])).rejects.toThrow('injected primary failure');
@@ -284,15 +284,15 @@ describe('worker SQLite persistence', () => {
     db.getDb().exec(`CREATE TRIGGER reject_slot_one BEFORE INSERT ON replay_trajectories
       WHEN NEW.driver_slot = 1 BEGIN SELECT RAISE(ABORT, 'injected slot one failure'); END`);
     const owner = storeReplayTrajectoryInWorker(db, filePath, { driverSlot: 1 }, {
-      filename, mtime, size, driverSlotKey: 1, isPrimary: false,
+      filename, mtimeMs, fileSizeBytes, driverSlotKey: 1, isPrimary: false,
     });
     const ownerFirst = await owner.next();
     const unrelated = storeReplayDriversInWorker(db, filePath, { playerName: 'Test Driver' }, {
-      filename, mtime, size, driverSlots: [2], includePrimary: false,
+      filename, mtimeMs, fileSizeBytes, driverSlots: [2], includePrimary: false,
     });
     const unrelatedFirst = await unrelated.next();
     const later = storeReplayTrajectoryInWorker(db, filePath, { driverSlot: 1 }, {
-      filename, mtime, size, driverSlotKey: 1, isPrimary: false,
+      filename, mtimeMs, fileSizeBytes, driverSlotKey: 1, isPrimary: false,
     });
     const laterFirst = await later.next();
 
@@ -321,11 +321,11 @@ describe('worker SQLite persistence', () => {
   });
 
   it('rolls back a failed save and reports a storage interruption', async () => {
-    await store(db, filePath, mtime, size);
+    await store(db, filePath, mtimeMs, fileSizeBytes);
     const before = db.getStoredReplayTrajectory(filename, 1, -1);
     db.getDb().exec(`CREATE TRIGGER reject_save BEFORE INSERT ON replay_trajectories
       BEGIN SELECT RAISE(ABORT, 'injected write failure'); END`);
-    const error: unknown = await store(db, filePath, mtime, size).catch((caught: unknown) => caught);
+    const error: unknown = await store(db, filePath, mtimeMs, fileSizeBytes).catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(Error);
     expect(replayFailureStatus(error)).toBe('interrupted');
     expect(db.getStoredReplayTrajectory(filename, 1, -1)).toEqual(before);
@@ -334,16 +334,16 @@ describe('worker SQLite persistence', () => {
 
   it('rejects changed files without committing any trajectory', async () => {
     fs.appendFileSync(filePath, Buffer.alloc(1));
-    await expect(store(db, filePath, mtime, size)).rejects.toThrow('Replay source changed');
+    await expect(store(db, filePath, mtimeMs, fileSizeBytes)).rejects.toThrow('Replay source changed');
     expect(db.getStoredReplayTrajectory(filename, 1, -1)).toBeNull();
   });
 
   it('rejects reused metadata names without committing any trajectory', async () => {
     const stat = fs.statSync(filePath);
     const currentMtime = Math.floor(stat.mtimeMs);
-    db.getDb().prepare('UPDATE replay_metadata SET file_mtime = ?, file_path = ? WHERE filename = ?')
+    db.getDb().prepare('UPDATE replay_metadata SET file_mtime_ms = ?, file_path = ? WHERE filename = ?')
       .run(currentMtime, 'another recording', filename);
-    await expect(store(db, filePath, currentMtime, size)).rejects.toThrow('Replay source changed');
+    await expect(store(db, filePath, currentMtime, fileSizeBytes)).rejects.toThrow('Replay source changed');
     expect(db.getReplayDriverIngest(filename, 1)).toBeNull();
   });
 
@@ -361,7 +361,7 @@ describe('worker SQLite persistence', () => {
     db.getDb().exec(`CREATE TRIGGER reject_rival BEFORE INSERT ON replay_trajectories
       WHEN NEW.driver_slot = 2 BEGIN SELECT RAISE(ABORT, 'rival storage failure'); END`);
     const extraction = storeReplayDriversInWorker(db, filePath, { playerName: 'Samuel Lague' }, {
-      filename, mtime, size, driverSlots: [1, 2], includePrimary: true,
+      filename, mtimeMs, fileSizeBytes, driverSlots: [1, 2], includePrimary: true,
     });
     let traversals = 0;
     let step = await extraction.next();

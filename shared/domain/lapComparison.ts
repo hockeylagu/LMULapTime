@@ -1,5 +1,5 @@
-import { PaceCategory, ReferenceLaptimeEntry, ComparableLap, NonRepresentativeReason, LapConditions } from '../types/index.js';
-import { formatTime, computeTheoreticalBest } from './formatters.js';
+import { PaceCategory, ReferenceLaptimeEntry, ComparableLap, NonRepresentativeReason, LapConditions, DriverData, LapIncident, LapPenalty, LapTrackLimit } from '../types/index.js';
+import { computeTheoreticalBest } from './formatters.js';
 import { LapConditionGroup, lapConditionGroup } from './lapConditions.js';
 import type { ReplayLapSummary } from '../types/index.js';
 
@@ -15,7 +15,7 @@ export interface LapSelectionInput {
   isOutLap?: boolean;
   nonRepresentativeReason?: NonRepresentativeReason;
   conditions?: LapConditions;
-  lapNum?: number;
+  lapNumber?: number;
   s1?: number | null;
   s2?: number | null;
   s3?: number | null;
@@ -51,7 +51,7 @@ export function selectCleanLapCandidates<T extends LapSelectionInput>(
     !lap.isPitStop &&
     !lap.isOutLap &&
     !lap.nonRepresentativeReason &&
-    (!hasMultiple || (lap.lapNum ?? 2) > 1)
+    (!hasMultiple || (lap.lapNumber ?? 2) > 1)
   );
 
   const minimumFlyingLaps = options.minimumFlyingLaps ?? 1;
@@ -167,13 +167,9 @@ export function createTheoreticalBestLap(
     carType,
     carClass,
     lapTime,
-    lapTimeString: formatTime(lapTime),
     s1,
     s2,
     s3,
-    s1String: formatTime(s1),
-    s2String: formatTime(s2),
-    s3String: formatTime(s3),
     topSpeed: null,
     isValid: true,
     isTheoreticalBest: true,
@@ -196,14 +192,12 @@ export function createBenchmarkLaps(refEntry: ReferenceLaptimeEntry): Comparable
       carType: refEntry.fastestCar || `${refEntry.carClass} Reference`,
       carClass: refEntry.carClass,
       lapTime: refEntry.targets.alienSec,
-      lapTimeString: formatTime(refEntry.targets.alienSec),
       s1: null,
       s2: null,
       s3: null,
       topSpeed: null,
       isValid: true,
       isBenchmarkTarget: true,
-      benchmarkCategory: 'Alien',
       paceCategory: 'Alien',
       pacePercentage: 100,
       tag: '👾 Alien (100%)',
@@ -217,14 +211,12 @@ export function createBenchmarkLaps(refEntry: ReferenceLaptimeEntry): Comparable
       carType: refEntry.fastestCar || `${refEntry.carClass} Reference`,
       carClass: refEntry.carClass,
       lapTime: refEntry.targets.competitiveSec,
-      lapTimeString: formatTime(refEntry.targets.competitiveSec),
       s1: null,
       s2: null,
       s3: null,
       topSpeed: null,
       isValid: true,
       isBenchmarkTarget: true,
-      benchmarkCategory: 'Competitive',
       paceCategory: 'Competitive',
       pacePercentage: 101,
       tag: '🏆 Competitive (101%)',
@@ -238,14 +230,12 @@ export function createBenchmarkLaps(refEntry: ReferenceLaptimeEntry): Comparable
       carType: refEntry.fastestCar || `${refEntry.carClass} Reference`,
       carClass: refEntry.carClass,
       lapTime: refEntry.targets.goodSec,
-      lapTimeString: formatTime(refEntry.targets.goodSec),
       s1: null,
       s2: null,
       s3: null,
       topSpeed: null,
       isValid: true,
       isBenchmarkTarget: true,
-      benchmarkCategory: 'Good',
       paceCategory: 'Good',
       pacePercentage: 102,
       tag: '⭐ Good (102%)',
@@ -380,3 +370,19 @@ export function computeConsistencyRating(
   };
 }
 
+
+/** The race log's events of one lap: contact and damage, track limits and penalties. */
+export interface LapEvents {
+  incidents: LapIncident[];
+  trackLimits: LapTrackLimit[];
+  penalties: LapPenalty[];
+}
+
+/**
+ * A driver's events on one lap. The driver holds every event once, each with the number of the lap it
+ * fell on, so a lap never stores its own copy; an event that fell on no lap is on no lap's list.
+ */
+export function lapEvents(driver: Pick<DriverData, 'incidents' | 'trackLimits' | 'penalties'>, lapNumber: number): LapEvents {
+  const onLap = <T extends { lapNumber?: number }>(events: readonly T[] | undefined): T[] => (events ?? []).filter((event) => event.lapNumber === lapNumber);
+  return { incidents: onLap(driver.incidents), trackLimits: onLap(driver.trackLimits), penalties: onLap(driver.penalties) };
+}

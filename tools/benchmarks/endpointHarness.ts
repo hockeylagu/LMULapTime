@@ -45,7 +45,7 @@ export async function startBenchmarkServer(snapshot: string) {
   const absent = path.join(path.dirname(snapshot), 'no-live-recordings');
   const parser = new LmuParser(absent, absent, { indexReplays: false, readReplayMetadata: false, detectPlayer: false });
   const player = store.getDb().prepare(`SELECT n.name FROM session_drivers d JOIN drivers n ON n.driver_id=d.driver_id
-    WHERE d.is_player_driver=1 GROUP BY n.name ORDER BY count(*) DESC,n.name LIMIT 1`).get() as { name: string } | undefined;
+    WHERE d.is_player=1 GROUP BY n.name ORDER BY count(*) DESC,n.name LIMIT 1`).get() as { name: string } | undefined;
   parser.configuredPlayerName = player?.name ?? '';
   const context = new ServerContext({
     sessionDb: store, parser, resultsDir: absent, replaysDir: absent, telemetryDir: absent,

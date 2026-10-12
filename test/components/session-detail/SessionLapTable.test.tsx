@@ -24,8 +24,8 @@ describe('SessionLapTable optimal delta', () => {
   it('sorts multiclass laps by the class position shown rather than overall position', () => {
     const base = mockDetailedSession.playerDriver;
     const selectedDriver = { ...base, carClass: 'GT3', laps: [
-      { ...base.laps[0], lapNum: 1, position: 11 },
-      { ...base.laps[1], lapNum: 2, position: 12 },
+      { ...base.laps[0], lapNumber: 1, position: 11 },
+      { ...base.laps[1], lapNumber: 2, position: 12 },
     ] } as unknown as DriverData;
     const rival = { ...selectedDriver, name: 'GT3 rival', laps: [
       { ...selectedDriver.laps[0], position: 10 },
@@ -76,12 +76,12 @@ describe('SessionLapTable inferred timing', () => {
       ...mockDetailedSession.playerDriver,
       bestLapTime: 100,
       laps: [
-        { ...mockDetailedSession.playerDriver.laps[0], lapNum: 1, lapTime: 110, lapTimeString: '1:50.000', elapsedSeconds: 110 },
+        { ...mockDetailedSession.playerDriver.laps[0], lapNumber: 1, lapTime: 110, elapsedSeconds: 110 },
         {
-          ...mockDetailedSession.playerDriver.laps[1], lapNum: 2, lapTime: 103, lapTimeString: '1:43.000',
+          ...mockDetailedSession.playerDriver.laps[1], lapNumber: 2, lapTime: 103, 
           elapsedSeconds: 213, s1: 30, s2: 34, s3: 39, isInferred: true,
         },
-        { ...mockDetailedSession.playerDriver.laps[2], lapNum: 3, lapTime: null, lapTimeString: '--:--.---', elapsedSeconds: null },
+        { ...mockDetailedSession.playerDriver.laps[2], lapNumber: 3, lapTime: null, elapsedSeconds: null },
       ],
     } as unknown as DriverData;
     const session = {
@@ -120,9 +120,9 @@ describe('SessionLapTable traffic', () => {
     const selectedDriver = {
       ...mockDetailedSession.playerDriver,
       laps: [
-        { ...mockDetailedSession.playerDriver.laps[0], lapNum: 1 },
+        { ...mockDetailedSession.playerDriver.laps[0], lapNumber: 1 },
         {
-          ...mockDetailedSession.playerDriver.laps[1], lapNum: 2, nonRepresentativeReason: 'traffic',
+          ...mockDetailedSession.playerDriver.laps[1], lapNumber: 2, nonRepresentativeReason: 'traffic',
           traffic: { ahead: { car: gt3, gapSec: 2 }, behind: null, following: false, passed: [gt3], passedBy: [] },
         },
       ],
@@ -167,8 +167,8 @@ describe('SessionLapTable traffic', () => {
     const selectedDriver = {
       ...mockDetailedSession.playerDriver,
       laps: [
-        { ...mockDetailedSession.playerDriver.laps[0], lapNum: 1 },
-        { ...mockDetailedSession.playerDriver.laps[1], lapNum: 2, conditions: { wetTyres: true, rain: 18 } },
+        { ...mockDetailedSession.playerDriver.laps[0], lapNumber: 1 },
+        { ...mockDetailedSession.playerDriver.laps[1], lapNumber: 2, conditions: { wetTyres: true, rain: 18 } },
       ],
     } as unknown as DriverData;
     const session = { ...mockDetailedSession, playerDriver: selectedDriver, drivers: [selectedDriver] } as unknown as DetailedSession;

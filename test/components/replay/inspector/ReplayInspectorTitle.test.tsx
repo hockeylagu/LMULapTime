@@ -42,7 +42,7 @@ describe('ReplayInspectorTitle', () => {
     const selectedDriver: ReplayDriverEntry = {
       slot: 0,
       name: 'Player Driver',
-      carModel: 'Porsche 911 GT3 R LMGT3',
+      carType: 'Porsche 911 GT3 R LMGT3',
       carClass: 'GT3',
       isPlayer: true,
     };
@@ -74,7 +74,7 @@ describe('ReplayInspectorTitle', () => {
   it('resolves car information from trajectory vehicleIdentity or metadata fallbacks', () => {
     const trajectory = {
       vehicleIdentity: {
-        carModel: 'Ferrari 499P',
+        carType: 'Ferrari 499P',
         carClass: 'HY',
       },
     } as unknown as ReplayTrajectoryData;
@@ -92,10 +92,10 @@ describe('ReplayInspectorTitle', () => {
   });
 
   it('takes the class from the same car as the name in a multiclass replay', () => {
-    const selectedDriver: ReplayDriverEntry = { slot: 3, name: 'GT3 Driver', vehicleId: 'PORSCHE_911_GT3_R', carModel: 'Porsche 911 GT3 R LMGT3' };
+    const selectedDriver: ReplayDriverEntry = { slot: 3, name: 'GT3 Driver', vehicleId: 'PORSCHE_911_GT3_R', carType: 'Porsche 911 GT3 R LMGT3' };
     const metadata: ReplayMetadata = {
       ...baseMetadata,
-      drivers: [{ slot: 0, name: 'Leader', carModel: 'Ferrari 499P', carClass: 'Hyper' }, selectedDriver],
+      drivers: [{ slot: 0, name: 'Leader', carType: 'Ferrari 499P', carClass: 'Hyper' }, selectedDriver],
     };
 
     render(<ReplayInspectorTitle onClose={vi.fn()} metadata={metadata} trajectory={null} selectedDriver={selectedDriver} />);

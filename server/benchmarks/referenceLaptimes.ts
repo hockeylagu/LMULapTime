@@ -1,5 +1,5 @@
 import { ReferenceLaptimeEntry, ReferenceLaptimesCache, ReferenceBenchmarkDiff, ReferenceBenchmarkDiffItem, PaceCategoryInfo } from '../../shared/types/index.js';
-import { parseTimeStringToSeconds, formatTime } from '../../shared/domain/formatters.js';
+import { parseTimeStringToSeconds } from '../../shared/domain/formatters.js';
 import {
   calculateBenchmarkPace,
   createBenchmarkLookup,
@@ -26,7 +26,7 @@ export function computeReferenceBenchmarkDiff(
 
   for (const [key, newEntry] of Object.entries(newEntries)) {
     const oldEntry = oldEntries[key];
-    const newAlien = newEntry.targets?.alienSec ?? newEntry.target100Sec;
+    const newAlien = newEntry.targets.alienSec;
 
     if (!oldEntry) {
       if (oldKeysCount > 0) {
@@ -37,11 +37,10 @@ export function computeReferenceBenchmarkDiff(
           patch: newEntry.patch,
           type: 'added',
           newAlienSec: newAlien,
-          newAlienTimeString: formatTime(newAlien),
         });
       }
     } else {
-      const oldAlien = oldEntry.targets?.alienSec ?? oldEntry.target100Sec;
+      const oldAlien = oldEntry.targets.alienSec;
       const diffSec = parseFloat((newAlien - oldAlien).toFixed(3));
       const patchChanged = (oldEntry.patch || '').trim() !== (newEntry.patch || '').trim();
       const timeChanged = Math.abs(diffSec) >= 0.001;
@@ -57,9 +56,6 @@ export function computeReferenceBenchmarkDiff(
           type: 'updated',
           oldAlienSec: oldAlien,
           newAlienSec: newAlien,
-          oldAlienTimeString: formatTime(oldAlien),
-          newAlienTimeString: formatTime(newAlien),
-          diffSec,
         });
       }
     }
@@ -68,7 +64,7 @@ export function computeReferenceBenchmarkDiff(
   if (oldKeysCount > 0) {
     for (const [key, oldEntry] of Object.entries(oldEntries)) {
       if (!newEntries[key]) {
-        const oldAlien = oldEntry.targets?.alienSec ?? oldEntry.target100Sec;
+        const oldAlien = oldEntry.targets.alienSec;
         removed.push({
           key,
           trackName: oldEntry.trackName,
@@ -76,20 +72,13 @@ export function computeReferenceBenchmarkDiff(
           patch: oldEntry.patch,
           type: 'removed',
           oldAlienSec: oldAlien,
-          oldAlienTimeString: formatTime(oldAlien),
         });
       }
     }
   }
 
-  const hasChanges = added.length > 0 || updated.length > 0 || removed.length > 0;
-
   return {
     timestamp: new Date().toISOString(),
-    hasChanges,
-    addedCount: added.length,
-    updatedCount: updated.length,
-    removedCount: removed.length,
     totalEntries: Object.keys(newEntries).length,
     added,
     updated,
@@ -150,7 +139,6 @@ export function parseReferenceCsv(csvText: string): ReferenceLaptimesCache {
       trackName,
       carClass,
       patch,
-      target100Sec,
       targets: {
         alienSec: getTarget(4, 1.0),
         competitiveSec: getTarget(5, 1.01),
@@ -237,7 +225,7 @@ export async function fetchAndCacheReferenceLaptimes(): Promise<ReferenceLaptime
   try {
     const db = getSessionDatabase();
     db.saveReferenceLaptimes(cache);
-    console.log(`[SQLite Reference Laptimes] Saved ${cache.entriesCount} reference laptimes to SQLite database (changes: ${diff.hasChanges ? 'yes' : 'no'})`);
+    console.log(`[SQLite Reference Laptimes] Saved ${cache.entriesCount} reference laptimes to SQLite database (changes: ${diff.added.length + diff.updated.length + diff.removed.length > 0 ? 'yes' : 'no'})`);
   } catch (err) {
     console.error('[SQLite Reference Laptimes] Failed to save reference laptimes to database:', err);
   }
@@ -262,6 +250,6 @@ export function createPaceCalculator(entries = loadReferenceLaptimesFromCache()?
     if (!lapTimeSec || lapTimeSec <= 0) return null;
     const key = JSON.stringify([venue, course, carClass, trackLengthMeters]);
     if (!targets.has(key)) targets.set(key, lookup.findReferenceEntry(venue, course, carClass, trackLengthMeters));
-    return calculateBenchmarkPace(lapTimeSec, targets.get(key)?.target100Sec);
+    return calculateBenchmarkPace(lapTimeSec, targets.get(key)?.targets.alienSec);
   };
 }

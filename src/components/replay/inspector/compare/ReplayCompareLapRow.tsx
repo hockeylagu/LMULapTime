@@ -3,6 +3,7 @@ import { Check, CloudRain } from 'lucide-react';
 import { ComparableLap } from '../../../../../shared/types/index.js';
 import { CarIdentity } from '../../../vehicle/CarIdentity.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
+import { formatTime } from '../../../../../shared/domain/formatters.js';
 
 export interface ReplayCompareLapRowProps {
   lap: ComparableLap;
@@ -39,14 +40,14 @@ export const ReplayCompareLapRow: React.FC<ReplayCompareLapRowProps> = React.mem
           )}
         </span>
         <span className="block truncate text-[11px] text-lmu-muted">
-          {lap.dateString}
+          {lap.timeString}
         </span>
       </span>
       <span className="min-w-0">
         <span className="block truncate font-semibold text-white">{lap.driverName}</span>
         <CarIdentity carType={lap.carType} carClass={lap.carClass} nameClassName="text-[11px] text-lmu-muted" className="mt-0.5" />
       </span>
-      <span className="text-center font-mono text-xs text-lmu-muted">L{lap.lapNum}</span>
+      <span className="text-center font-mono text-xs text-lmu-muted">L{lap.lapNumber}</span>
       <span
         className={`flex items-center justify-end gap-1.5 font-mono font-bold text-xs ${
           lap.isAllTimePB ? 'text-lmu-gold' : lap.isSessionBest ? 'text-lmu-blue' : 'text-white'
@@ -62,7 +63,7 @@ export const ReplayCompareLapRow: React.FC<ReplayCompareLapRowProps> = React.mem
             <Check className="w-3 h-3" /> Baseline
           </span>
         )}
-        {lap.lapTimeString}
+        {formatTime(lap.lapTime)}
       </span>
     </button>
   );

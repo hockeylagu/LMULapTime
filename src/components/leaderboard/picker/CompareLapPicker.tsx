@@ -14,6 +14,7 @@ import {
   type LapPickerFilters,
   type SessionKind,
 } from './lapPickerModel.js';
+import { formatTime } from '../../../../shared/domain/formatters.js';
 
 export interface CompareLapPickerProps {
   /** The player's laps on this layout and class. */
@@ -38,7 +39,7 @@ const toggle = (on: boolean) =>
     on ? 'bg-lmu-raised border-lmu-rule text-lmu-text' : 'bg-lmu-bg border-lmu-border text-lmu-muted hover:text-lmu-text'
   }`;
 
-const lapName = (lap: ComparableLap) => plainTag(lap.tag) || `Lap ${lap.lapNum ?? '-'}`;
+const lapName = (lap: ComparableLap) => plainTag(lap.tag) || `Lap ${lap.lapNumber ?? '-'}`;
 
 /** Picks one of the player's laps, from any session on the layout, for one slot of the comparison. */
 export const CompareLapPicker: React.FC<CompareLapPickerProps> = ({ laps, anchor, replacing, comparedIds, personalBestId = null, onPick, onClose }) => {
@@ -55,12 +56,12 @@ export const CompareLapPicker: React.FC<CompareLapPickerProps> = ({ laps, anchor
           <h4 className="text-sm font-bold text-lmu-text flex items-center gap-2">
             <ListPlus className="w-4 h-4 text-lmu-muted shrink-0" aria-hidden="true" />
             {replacing ? (
-              <span>Replace {lapName(replacing)} <span className="font-mono text-lmu-text-soft">{replacing.lapTimeString}</span></span>
+              <span>Replace {lapName(replacing)} <span className="font-mono text-lmu-text-soft">{formatTime(replacing.lapTime)}</span></span>
             ) : 'Choose a lap to compare'}
           </h4>
           <p className="text-xs text-lmu-muted mt-1">
             Your laps on this layout, newest session first
-            {anchor && <>, against {lapName(anchor)} <span className="font-mono">{anchor.lapTimeString}</span></>}.
+            {anchor && <>, against {lapName(anchor)} <span className="font-mono">{formatTime(anchor.lapTime)}</span></>}.
           </p>
         </div>
         <button type="button" onClick={onClose} className={`p-1.5 rounded-lg text-lmu-muted hover:text-lmu-text hover:bg-lmu-card transition-colors cursor-pointer ${FOCUS_RING}`} aria-label="Close the lap picker" title="Close">
@@ -75,10 +76,10 @@ export const CompareLapPicker: React.FC<CompareLapPickerProps> = ({ laps, anchor
               {quickPicks.map((pick) => {
                 const dot = getSessionTypeStyle(pick.lap.sessionType, pick.lap.sessionName)?.dot ?? 'bg-lmu-muted';
                 return (
-                  <button key={pick.key} type="button" onClick={() => onPick(pick.lap)} title={`${pick.lap.sessionName || ''} lap ${pick.lap.lapNum ?? '-'}`.trim()} className={SECONDARY_BUTTON}>
+                  <button key={pick.key} type="button" onClick={() => onPick(pick.lap)} title={`${pick.lap.sessionName || ''} lap ${pick.lap.lapNumber ?? '-'}`.trim()} className={SECONDARY_BUTTON}>
                     <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dot}`} aria-hidden="true" />
                     {pick.label}
-                    <span className="font-mono font-bold text-lmu-text">{pick.lap.lapTimeString}</span>
+                    <span className="font-mono font-bold text-lmu-text">{formatTime(pick.lap.lapTime)}</span>
                   </button>
                 );
               })}

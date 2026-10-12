@@ -8,7 +8,6 @@ const benchmark: ReferenceLaptimeEntry = {
   trackName: 'Spa-Francorchamps',
   carClass: 'Hyper',
   patch: '1.4+',
-  target100Sec: 120.0,
   targets: {
     alienSec: 120.0,
     competitiveSec: 121.2,

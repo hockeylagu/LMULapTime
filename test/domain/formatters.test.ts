@@ -377,30 +377,30 @@ describe('formatters utility', () => {
       expect(getBestLapNumber(undefined)).toBe(1);
     });
 
-    it('returns bestLapNum if explicitly provided', () => {
-      expect(getBestLapNumber({ bestLapNum: 4 })).toBe(4);
+    it('returns bestLapNumber if explicitly provided', () => {
+      expect(getBestLapNumber({ bestLapNumber: 4 })).toBe(4);
     });
 
-    it('finds lapNum matching bestLapTime among valid laps', () => {
+    it('finds lapNumber matching bestLapTime among valid laps', () => {
       expect(
         getBestLapNumber({
           bestLapTime: 120.5,
           laps: [
-            { lapNum: 1, lapTime: 125.0, isValid: true },
-            { lapNum: 2, lapTime: 120.5, isValid: true },
-            { lapNum: 3, lapTime: 121.0, isValid: true },
+            { lapNumber: 1, lapTime: 125.0, isValid: true },
+            { lapNumber: 2, lapTime: 120.5, isValid: true },
+            { lapNumber: 3, lapTime: 121.0, isValid: true },
           ],
         })
       ).toBe(2);
     });
 
-    it('finds lapNum matching bestLapTime among any laps if not valid', () => {
+    it('finds lapNumber matching bestLapTime among any laps if not valid', () => {
       expect(
         getBestLapNumber({
           bestLapTime: 119.0,
           laps: [
-            { lapNum: 1, lapTime: 125.0, isValid: false },
-            { lapNum: 2, lapTime: 119.0, isValid: false },
+            { lapNumber: 1, lapTime: 125.0, isValid: false },
+            { lapNumber: 2, lapTime: 119.0, isValid: false },
           ],
         })
       ).toBe(2);
@@ -411,9 +411,9 @@ describe('formatters utility', () => {
         getBestLapNumber({
           bestLapTime: null,
           laps: [
-            { lapNum: 1, lapTime: 130.0, isValid: true },
-            { lapNum: 2, lapTime: 124.0, isValid: true },
-            { lapNum: 3, lapTime: 128.0, isValid: true },
+            { lapNumber: 1, lapTime: 130.0, isValid: true },
+            { lapNumber: 2, lapTime: 124.0, isValid: true },
+            { lapNumber: 3, lapTime: 128.0, isValid: true },
           ],
         })
       ).toBe(2);
@@ -424,8 +424,8 @@ describe('formatters utility', () => {
         getBestLapNumber({
           bestLapTime: null,
           laps: [
-            { lapNum: 1, lapTime: 140.0, isValid: false },
-            { lapNum: 2, lapTime: 135.0, isValid: false },
+            { lapNumber: 1, lapTime: 140.0, isValid: false },
+            { lapNumber: 2, lapTime: 135.0, isValid: false },
           ],
         })
       ).toBe(2);
@@ -436,7 +436,7 @@ describe('formatters utility', () => {
         getBestLapNumber({
           bestLapTime: null,
           laps: [
-            { lapNum: 5, lapTime: null, isValid: false },
+            { lapNumber: 5, lapTime: null, isValid: false },
           ],
         })
       ).toBe(5);

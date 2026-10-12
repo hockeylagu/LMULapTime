@@ -19,7 +19,6 @@ describe('SessionTableRow', () => {
       carClass: 'Hyper',
       lapsCount: 15,
       bestLapTime: 95.123,
-      bestLapTimeString: '1:35.123',
       position: 1,
       gridPosition: 3,
       positionGain: 2,
@@ -82,7 +81,6 @@ describe('SessionTableRow', () => {
         carClass: 'Hyper',
         lapsCount: 6,
         bestLapTime: 94.8,
-        bestLapTimeString: '1:34.800',
         position: 2,
         driverOrdinal: 0,
         bestLapOrdinal: 0,
@@ -131,7 +129,6 @@ describe('SessionTableRow', () => {
         carClass: 'LMP2',
         lapsCount: 0,
         bestLapTime: null,
-        bestLapTimeString: '--:--.---',
         position: 10,
         positionGain: -4,
       },
@@ -176,7 +173,7 @@ describe('SessionTableRow', () => {
     const withReplay = makeSessionCard({
       ...baseSession,
       matchingReplayFile: { name: 'Monza.Vcr', path: 'C:/LMU/Replays/Monza.Vcr' },
-      playerDriver: { ...baseSession.playerDriver!, bestLapNum: 4 },
+      playerDriver: { ...baseSession.playerDriver!, bestLapNumber: 4 },
     });
     const setup = () => {
       const onSelectSession = vi.fn();

@@ -76,7 +76,7 @@ export interface AiLapEvidence {
     lapNumber: number;
     driverName?: string;
     carClass?: string;
-    carModel?: string;
+    carType?: string;
     lapTimeSec: number;
     s1Sec?: number;
     s2Sec?: number;
@@ -91,7 +91,7 @@ export interface AiLapEvidence {
     lapNumber: number;
     driverName?: string;
     carClass?: string;
-    carModel?: string;
+    carType?: string;
     lapTimeSec: number;
     s1Sec?: number;
     s2Sec?: number;
@@ -104,7 +104,7 @@ export interface AiLapEvidence {
     leastConsistentPct?: number;
     stats: Array<{ label: string; avgSec: number; stdDevSec: number; consistencyPct: number }>;
   };
-  trackLimits?: { available: boolean; incidents: Array<{ description: string; lapNum?: number; warningPoints?: number }> };
+  trackLimits?: { available: boolean; incidents: Array<{ description: string; lapNumber?: number; warningPoints?: number }> };
   /** The corners to explain, already ranked by the app (time lost x repeatability x confidence). */
   priorities?: Array<{ rank: number; cornerNumber: number; timeLossSec: number; lapsLosing?: number; lapsSampled?: number; confidence: number }>;
 }

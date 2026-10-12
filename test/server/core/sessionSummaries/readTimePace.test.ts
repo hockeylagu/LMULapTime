@@ -46,7 +46,7 @@ describe('benchmark pace at read time', () => {
     expect(dashboard().trends.latestOuting?.pacePercentage).toBe(100.83);
 
     const refreshed = structuredClone(cache);
-    refreshed.entries.spa_hyper.target100Sec = 121;
+    refreshed.entries.spa_hyper.targets.alienSec = 121;
     db.saveReferenceLaptimes(refreshed);
     benchmarks.resetCachedReferenceLaptimes();
     expect(rateSessionDetail(db.getSessionById(id)!).playerDriver?.bestLapPacePercentage).toBe(100);

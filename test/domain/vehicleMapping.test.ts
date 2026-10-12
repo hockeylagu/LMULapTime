@@ -99,7 +99,7 @@ describe('vehicleMapping utility', () => {
       expect(mapVehicleIdToClass('D09', 'Duqueine D09 P3')).toBe('LMP3');
     });
 
-    it('correctly classifies vehicles using vehicleId alone when carModel is missing', () => {
+    it('correctly classifies vehicles using vehicleId alone when carType is missing', () => {
       expect(mapVehicleIdToClass('23_26_THOR59931582')).toBe('GT3');
       expect(mapVehicleIdToClass('50_26_499P_123456')).toBe('Hyper');
       expect(mapVehicleIdToClass('10_VECTOR_C18BEE4')).toBe('LMP2');
@@ -116,8 +116,8 @@ describe('vehicleMapping utility', () => {
   describe('comparison car class', () => {
     it('resolves a driver class from the entry, else from its vehicle', () => {
       expect(resolveDriverCarClass({ carClass: 'Hyper', vehicleId: '92_25_MANT9651C55B' })).toBe('Hyper');
-      expect(resolveDriverCarClass({ vehicleId: '777_DSTATI5BFA7EF3', carModel: 'Aston Martin Vantage AMR' })).toBe('GTE');
-      expect(resolveDriverCarClass({ vehicleId: 'CUSTOM_LIVERY', carModel: 'Lamborghini Huracan GT3 Evo2' })).toBe('GT3');
+      expect(resolveDriverCarClass({ vehicleId: '777_DSTATI5BFA7EF3', carType: 'Aston Martin Vantage AMR' })).toBe('GTE');
+      expect(resolveDriverCarClass({ vehicleId: 'CUSTOM_LIVERY', carType: 'Lamborghini Huracan GT3 Evo2' })).toBe('GT3');
       expect(resolveDriverCarClass(null)).toBe('');
     });
 

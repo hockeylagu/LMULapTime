@@ -122,7 +122,7 @@ export function detectLapsFromTelemetry(
 
     for (let i = 0; i < finishTimings.length; i++) {
       const ft = finishTimings[i];
-      const lapNum = ft.lapIdx + 1;
+      const lapNumber = ft.lapIdx + 1;
       const finishTime = ft.sTime;
       const startTime = i === 0
         ? (ft.splitSec > 0 ? ft.sTime - ft.splitSec : rawPts[0].sTime)
@@ -193,7 +193,7 @@ export function detectLapsFromTelemetry(
         || rawPts.slice(startIdx, endIdx + 1).some(point => point.inPit || point.pitLimiter);
 
       detectedLaps.push({
-        lapNumber: lapNum,
+        lapNumber,
         startIdx,
         endIdx,
         lapTimeSec,
@@ -337,15 +337,15 @@ function markBestReplayLap<T extends Pick<DetectedLapInternal, 'isValid' | 'isPi
   const validFlying = validLaps.filter(l => !l.isOutLap);
   const pool = validFlying.length > 0 ? validFlying : validLaps;
   let minTime = Infinity;
-  let bestLapNum = pool[0]?.lapNumber;
+  let bestLapNumber = pool[0]?.lapNumber;
   for (const l of pool) {
     if (l.lapTimeSec < minTime) {
       minTime = l.lapTimeSec;
-      bestLapNum = l.lapNumber;
+      bestLapNumber = l.lapNumber;
     }
   }
   laps.forEach(l => {
-    l.isBest = l.lapNumber === bestLapNum;
+    l.isBest = l.lapNumber === bestLapNumber;
   });
 }
 

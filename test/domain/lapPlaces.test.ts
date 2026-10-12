@@ -3,7 +3,7 @@ import { lapClassPosition, lapClassPositions } from '../../shared/domain/lapPlac
 import type { DetailedSession, DriverData, LapData } from '../../shared/types/index.js';
 
 const driver = (name: string, carClass: string, positions: number[]) =>
-  ({ name, carClass, laps: positions.map((position, i) => ({ lapNum: i + 1, position } as LapData)) } as DriverData);
+  ({ name, carClass, laps: positions.map((position, i) => ({ lapNumber: i + 1, position } as LapData)) } as DriverData);
 
 const me = driver('Me', 'GT3', [5, 3]);
 const session = {
@@ -20,7 +20,7 @@ describe('lapClassPosition', () => {
     const selected = driver('Me', 'GT3', [5, 0, -1, 3]);
     const rival = driver('Rival', 'gt3', [4, 1, 1, 3]);
     const sparse = driver('Sparse', 'GT3', [2]);
-    sparse.laps.push({ lapNum: 1, position: 1 } as LapData); // first recorded lap wins
+    sparse.laps.push({ lapNumber: 1, position: 1 } as LapData); // first recorded lap wins
     const field = { drivers: [selected, rival, sparse, driver('Hyper', 'Hyper', [1, 1, 1, 1])] } as DetailedSession;
     for (const multiClass of [true, false]) {
       const positions = lapClassPositions(field, selected, multiClass);

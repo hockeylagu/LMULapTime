@@ -38,11 +38,11 @@ export function parseStreamEvents(streamNode: RawStreamXmlNode, drivers: DriverD
     return driversByName.get(clean) ?? undefined;
   };
 
-  const matchLapForDriver = (driver: DriverData, et?: number, explicitLapNum?: number): LapData | undefined => {
+  const matchLapForDriver = (driver: DriverData, et?: number, explicitLapNumber?: number): LapData | undefined => {
     if (!driver.laps || driver.laps.length === 0) return undefined;
 
-    if (explicitLapNum !== undefined && explicitLapNum > 0) {
-      const explicitLap = driver.laps.find(l => l.lapNum === explicitLapNum);
+    if (explicitLapNumber !== undefined && explicitLapNumber > 0) {
+      const explicitLap = driver.laps.find(l => l.lapNumber === explicitLapNumber);
       if (explicitLap) return explicitLap;
     }
 
@@ -117,7 +117,7 @@ export function parseStreamEvents(streamNode: RawStreamXmlNode, drivers: DriverD
       type: 'contact',
       description,
       details: description,
-      lapNum: lap ? lap.lapNum : undefined,
+      lapNumber: lap ? lap.lapNumber : undefined,
       elapsedSeconds: et,
       force: !isNaN(force) ? force : undefined,
       otherVehicle,
@@ -126,12 +126,6 @@ export function parseStreamEvents(streamNode: RawStreamXmlNode, drivers: DriverD
 
     if (!driver.incidents) driver.incidents = [];
     driver.incidents.push(incident);
-
-    if (lap) {
-      if (!lap.incidents) lap.incidents = [];
-      lap.incidents.push(incident);
-      lap.incidentCount = lap.incidents.length;
-    }
   });
 
   // 2. Process Sector Damage
@@ -155,18 +149,12 @@ export function parseStreamEvents(streamNode: RawStreamXmlNode, drivers: DriverD
       type: 'damage',
       description: `New ${damageType} reported`,
       details: `New ${damageType} reported`,
-      lapNum: lap ? lap.lapNum : undefined,
+      lapNumber: lap ? lap.lapNumber : undefined,
       elapsedSeconds: et,
     };
 
     if (!driver.incidents) driver.incidents = [];
     driver.incidents.push(incident);
-
-    if (lap) {
-      if (!lap.incidents) lap.incidents = [];
-      lap.incidents.push(incident);
-      lap.incidentCount = lap.incidents.length;
-    }
   });
 
   // 3. Process TrackLimits
@@ -178,7 +166,7 @@ export function parseStreamEvents(streamNode: RawStreamXmlNode, drivers: DriverD
 
     const et = tl['@_et'] !== undefined ? parseFloat(String(tl['@_et'])) : undefined;
     const lapAttr = tl['@_Lap'] !== undefined ? parseInt(String(tl['@_Lap']), 10) : undefined;
-    const explicitLapNum = lapAttr !== undefined && !isNaN(lapAttr) ? lapAttr + 1 : undefined;
+    const explicitLapNumber = lapAttr !== undefined && !isNaN(lapAttr) ? lapAttr + 1 : undefined;
 
     const warnPts = parseFloat(String(tl['@_WarningPoints'] ?? tl['@_warningpoints'] ?? 0));
     const curPts = parseFloat(String(tl['@_CurrentPoints'] ?? tl['@_currentpoints'] ?? 0));
@@ -189,11 +177,11 @@ export function parseStreamEvents(streamNode: RawStreamXmlNode, drivers: DriverD
       ? `Track limits violation (+${warnPts || 0.25} pts)`
       : `Track limits review (${action || 'No Further Action'})`;
 
-    const lap = matchLapForDriver(driver, et, explicitLapNum);
+    const lap = matchLapForDriver(driver, et, explicitLapNumber);
 
     const trackLimit: LapTrackLimit = {
       description: desc,
-      lapNum: lap ? lap.lapNum : explicitLapNum,
+      lapNumber: lap ? lap.lapNumber : explicitLapNumber,
       elapsedSeconds: et,
       warningPoints: !isNaN(warnPts) ? warnPts : undefined,
       currentPoints: !isNaN(curPts) ? curPts : undefined,
@@ -202,12 +190,6 @@ export function parseStreamEvents(streamNode: RawStreamXmlNode, drivers: DriverD
 
     if (!driver.trackLimits) driver.trackLimits = [];
     driver.trackLimits.push(trackLimit);
-
-    if (lap) {
-      if (!lap.trackLimits) lap.trackLimits = [];
-      lap.trackLimits.push(trackLimit);
-      lap.trackLimitCount = lap.trackLimits.length;
-    }
   });
 
   // 4. Process Penalties
@@ -227,24 +209,12 @@ export function parseStreamEvents(streamNode: RawStreamXmlNode, drivers: DriverD
     const item: LapPenalty = {
       penalty,
       reason,
-      lapNum: lap ? lap.lapNum : undefined,
+      lapNumber: lap ? lap.lapNumber : undefined,
       elapsedSeconds: et,
       description: text,
     };
 
     if (!driver.penalties) driver.penalties = [];
     driver.penalties.push(item);
-
-    if (lap) {
-      if (!lap.penalties) lap.penalties = [];
-      lap.penalties.push(item);
-      lap.penaltyCount = lap.penalties.length;
-    }
-  });
-
-  drivers.forEach(d => {
-    d.totalIncidents = d.incidents ? d.incidents.length : 0;
-    d.totalTrackLimits = d.trackLimits ? d.trackLimits.length : 0;
-    d.totalPenalties = d.penalties ? d.penalties.length : 0;
   });
 }

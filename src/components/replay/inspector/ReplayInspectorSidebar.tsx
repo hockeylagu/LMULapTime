@@ -207,7 +207,7 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
                 cornerStats={cornerConsistencyStats}
                 currentLapSummary={currentLapSummary}
                 carClass={drivers.find(driver => driver.slot === selectedDriverSlot)?.carClass}
-                carModel={drivers.find(driver => driver.slot === selectedDriverSlot)?.carModel}
+                carType={drivers.find(driver => driver.slot === selectedDriverSlot)?.carType}
               />
             ) : cornerSubView === 'compare' ? (
               <CornerSpeedTable

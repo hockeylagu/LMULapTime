@@ -25,35 +25,35 @@ export const BestLapBlock: React.FC<BestLapBlockProps> = ({
   session,
 }) => {
   const [searchParams] = useSearchParams();
-  const bestLapNum =
-    selectedDriver.bestLapNum ||
+  const bestLapNumber =
+    selectedDriver.bestLapNumber ||
     (selectedDriver.bestLapTime
       ? selectedDriver.laps?.find(
           (l) => l.lapTime && Math.abs(l.lapTime - selectedDriver.bestLapTime!) < 0.001
-        )?.lapNum
+        )?.lapNumber
       : undefined) ||
-    (selectedDriver.laps && selectedDriver.laps.length > 0 ? selectedDriver.laps[0].lapNum : 1);
+    (selectedDriver.laps && selectedDriver.laps.length > 0 ? selectedDriver.laps[0].lapNumber : 1);
 
   const hasReplay = Boolean(session.matchingReplayFile);
 
   const targetUrl = session.matchingReplayFile
-    ? sessionTelemetryPath(searchParams, session, selectedDriver, bestLapNum) ?? sessionLapComparePath(session, selectedDriver, bestLapNum)
-    : sessionLapComparePath(session, selectedDriver, bestLapNum);
+    ? sessionTelemetryPath(searchParams, session, selectedDriver, bestLapNumber) ?? sessionLapComparePath(session, selectedDriver, bestLapNumber)
+    : sessionLapComparePath(session, selectedDriver, bestLapNumber);
 
   return (
     <div className="min-w-0">
       <p className={`text-[10px] uppercase tracking-wider font-semibold ${isPB ? 'text-lmu-personal-best' : 'text-lmu-muted'}`}>
         {isPB ? 'Personal best' : 'Best lap'}
-        {bestLapNum ? ` · L${bestLapNum}` : ''}
+        {bestLapNumber ? ` · L${bestLapNumber}` : ''}
       </p>
       <Link
         to={targetUrl}
-        title={hasReplay ? `Open telemetry for Lap ${bestLapNum}` : `Open Lap ${bestLapNum} on the leaderboard`}
+        title={hasReplay ? `Open telemetry for Lap ${bestLapNumber}` : `Open Lap ${bestLapNumber} on the leaderboard`}
         className={`group mt-0.5 inline-flex items-center gap-1.5 font-mono text-3xl font-extrabold leading-tight cursor-pointer rounded-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent ${
           isPB ? 'text-lmu-personal-best' : 'text-white'
         }`}
       >
-        {selectedDriver.bestLapTimeString}
+        {formatTime(selectedDriver.bestLapTime)}
         <ChevronRight
           className="w-5 h-5 text-lmu-muted group-hover:text-white transition-colors"
           aria-hidden="true"

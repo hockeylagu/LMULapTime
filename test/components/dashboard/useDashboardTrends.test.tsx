@@ -29,19 +29,17 @@ describe('useDashboardTrends', () => {
           carType: 'BMW M4 LMGT3',
           carClass: 'GT3',
           bestLapTime: 138.5,
-          bestLapTimeString: '2:18.500',
           bestS1: 40,
           bestS2: 50,
           bestS3: 48.5,
           theoreticalBest: 138.5,
-          theoreticalBestString: '2:18.500',
           bestLapPacePercentage: 103.5,
           bestLapPaceCategory: 'Good',
           position: 10,
           lapsCount: 8,
           laps: [
-            { lapNum: 1, position: 12, lapTime: 140, lapTimeString: '2:20.000', s1: null, s2: null, s3: null, topSpeed: 280, fCompound: 'M', rCompound: 'M', isPitStop: false, isValid: true },
-            { lapNum: 2, position: 10, lapTime: 138.5, lapTimeString: '2:18.500', s1: null, s2: null, s3: null, topSpeed: 282, fCompound: 'M', rCompound: 'M', isPitStop: false, isValid: true },
+            { lapNumber: 1, position: 12, lapTime: 140, s1: null, s2: null, s3: null, topSpeed: 280, fCompound: 'M', rCompound: 'M', isPitStop: false, isValid: true },
+            { lapNumber: 2, position: 10, lapTime: 138.5, s1: null, s2: null, s3: null, topSpeed: 282, fCompound: 'M', rCompound: 'M', isPitStop: false, isValid: true },
           ],
         },
       },
@@ -62,12 +60,10 @@ describe('useDashboardTrends', () => {
           carType: 'Chevrolet Corvette Z06 LMGT3.R',
           carClass: 'GT3',
           bestLapTime: 240.47,
-          bestLapTimeString: '4:00.470',
           bestS1: 70,
           bestS2: 90,
           bestS3: 80.47,
           theoreticalBest: 240.47,
-          theoreticalBestString: '4:00.470',
           bestLapPacePercentage: 102.4,
           bestLapPaceCategory: 'Good',
           position: 8,
@@ -75,8 +71,8 @@ describe('useDashboardTrends', () => {
           gridPosition: 15,
           positionGain: 7,
           laps: [
-            { lapNum: 1, position: 15, lapTime: 245, lapTimeString: '4:05.000', s1: null, s2: null, s3: null, topSpeed: 295, fCompound: 'M', rCompound: 'M', isPitStop: false, isValid: true },
-            { lapNum: 2, position: 8, lapTime: 240.47, lapTimeString: '4:00.470', s1: null, s2: null, s3: null, topSpeed: 298, fCompound: 'M', rCompound: 'M', isPitStop: false, isValid: true },
+            { lapNumber: 1, position: 15, lapTime: 245, s1: null, s2: null, s3: null, topSpeed: 295, fCompound: 'M', rCompound: 'M', isPitStop: false, isValid: true },
+            { lapNumber: 2, position: 8, lapTime: 240.47, s1: null, s2: null, s3: null, topSpeed: 298, fCompound: 'M', rCompound: 'M', isPitStop: false, isValid: true },
           ],
         },
       },
@@ -90,11 +86,11 @@ describe('useDashboardTrends', () => {
     expect(result.current.latestOuting?.id).toBe('session-new');
     expect(result.current.latestOuting?.trackName).toBe('Circuit de la Sarthe');
     expect(result.current.latestOuting?.carType).toBe('Chevrolet Corvette Z06 LMGT3.R');
-    expect(result.current.latestOuting?.bestLapTimeString).toBe('4:00.470');
+    expect(result.current.latestOuting?.bestLapTime).toBe(240.47);
     expect(result.current.latestOuting?.position).toBe(8);
     expect(result.current.latestOuting?.positionGain).toBe(7);
     expect(result.current.latestOuting?.hasReplay).toBe(true);
-    expect(result.current.latestOuting?.bestLapNum).toBe(2);
+    expect(result.current.latestOuting?.bestLapNumber).toBe(2);
 
     // Pace trend: 103.5% down to 102.4% -> +1.1% gain (improving)
     expect(result.current.recentPaceTrend).toHaveLength(2);
@@ -124,12 +120,10 @@ describe('useDashboardTrends', () => {
           carType: 'BMW M4 LMGT3',
           carClass: 'GT3',
           bestLapTime: null, // Empty: 0 timed laps!
-          bestLapTimeString: '',
           bestS1: null,
           bestS2: null,
           bestS3: null,
           theoreticalBest: null,
-          theoreticalBestString: '',
           lapsCount: 2, // Out-laps only
         },
       },
@@ -146,12 +140,10 @@ describe('useDashboardTrends', () => {
           carType: 'BMW M4 LMGT3',
           carClass: 'GT3',
           bestLapTime: 245.0,
-          bestLapTimeString: '4:05.000',
           bestS1: 72,
           bestS2: 92,
           bestS3: 81,
           theoreticalBest: 245.0,
-          theoreticalBestString: '4:05.000',
           lapsCount: 5,
         },
       },
@@ -168,12 +160,10 @@ describe('useDashboardTrends', () => {
           carType: 'Chevrolet Corvette Z06 LMGT3.R',
           carClass: 'GT3',
           bestLapTime: 240.47,
-          bestLapTimeString: '4:00.470',
           bestS1: 70,
           bestS2: 90,
           bestS3: 80.47,
           theoreticalBest: 240.47,
-          theoreticalBestString: '4:00.470',
           position: 5,
           positionGain: 3,
           lapsCount: 6,
@@ -188,7 +178,7 @@ describe('useDashboardTrends', () => {
     // Should PREFER the Race (sess-valid-race) over sess-valid-practice because it's a Race on the same day!
     expect(result.current.latestOuting?.id).toBe('sess-valid-race');
     expect(result.current.latestOuting?.sessionType).toBe('Race');
-    expect(result.current.latestOuting?.bestLapTimeString).toBe('4:00.470');
+    expect(result.current.latestOuting?.bestLapTime).toBe(240.47);
     expect(result.current.latestOuting?.position).toBe(5);
   });
 
@@ -208,12 +198,10 @@ describe('useDashboardTrends', () => {
           carType: 'Ferrari 499P',
           carClass: 'Hyper',
           bestLapTime: 96.5,
-          bestLapTimeString: '1:36.500',
           bestS1: 30,
           bestS2: 35,
           bestS3: 31.5,
           theoreticalBest: 96.5,
-          theoreticalBestString: '1:36.500',
           lapsCount: 8,
         },
       },
@@ -231,12 +219,10 @@ describe('useDashboardTrends', () => {
           carType: 'Ferrari 499P',
           carClass: 'Hyper',
           bestLapTime: 95.8,
-          bestLapTimeString: '1:35.800',
           bestS1: 29.5,
           bestS2: 35,
           bestS3: 31.3,
           theoreticalBest: 95.8,
-          theoreticalBestString: '1:35.800',
           position: 2,
           lapsCount: 5,
         },
@@ -255,12 +241,10 @@ describe('useDashboardTrends', () => {
           carType: 'Ferrari 499P',
           carClass: 'Hyper',
           bestLapTime: 95.5,
-          bestLapTimeString: '1:35.500',
           bestS1: 29.5,
           bestS2: 34.8,
           bestS3: 31.2,
           theoreticalBest: 95.5,
-          theoreticalBestString: '1:35.500',
           position: 1,
           lapsCount: 20,
         },
@@ -285,14 +269,12 @@ describe('useDashboardTrends', () => {
       carType,
       carClass,
       bestLapTime: 120,
-      bestLapTimeString: '2:00.000',
       bestS1: null,
       bestS2: null,
       bestS3: null,
       theoreticalBest: null,
-      theoreticalBestString: '',
       bestLapPacePercentage: pace,
-      lapsCount: 10,
+      declaredLapsCount: 10,
     },
   });
 

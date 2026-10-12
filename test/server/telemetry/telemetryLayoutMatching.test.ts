@@ -5,7 +5,7 @@ import type { ReplayMetadata } from '../../../shared/types/index.js';
 const start = Date.parse('2026-10-11T00:08:19Z');
 const file: DuckDbFileInfo = {
   filename: 'Bahrain International Circuit_P_2026-10-11T00_08_31Z.duckdb',
-  filePath: 'bahrain.duckdb', fileMtimeMs: start, fileSizeBytes: 1024,
+  filePath: 'bahrain.duckdb', mtimeMs: start, fileSizeBytes: 1024,
   trackName: 'Bahrain International Circuit', sessionType: 'P',
   timestampStr: '2026-10-11T00:08:31Z', timestampEpochMs: start + 12000,
   driverName: 'Samuel Lague',

@@ -90,7 +90,7 @@ describe('geometry revision migration', () => {
         { configuredPlayerName: 'Archived Driver' }, new ReplayTelemetryService(db));
       const served = await service.getTrajectory({ session: {
         id: 'archived-session', trackVenue: 'Autodromo Nazionale Monza', trackCourse: 'Monza GP', matchingReplayFile: { name: lap.replayName },
-        drivers: [{ name: 'Archived Driver', laps: [{ lapNum: 1 }] } as DriverData],
+        drivers: [{ name: 'Archived Driver', laps: [{ lapNumber: 1 }] } as DriverData],
       } as DetailedSession, driverOrdinal: 0, lapOrdinal: 0, maxPoints: 0, allowDuckDb: false });
       expect(fs.existsSync(sourcePath)).toBe(false);
       expect(served.points.map(point => [point.x, point.y, point.z, point.timeSec, point.tireTemps, point.brakeTemps]))

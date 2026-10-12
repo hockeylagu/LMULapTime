@@ -14,7 +14,7 @@ interface AIReportTabProps {
   baselineLapNumber: number | null;
   segments: LapSegmentComparison[];
   carClass?: string;
-  carModel?: string;
+  carType?: string;
   currentLapSummary?: ReplayLapSummary | null;
   /** The replay's laps timed through each corner, for how often each corner is lost. */
   cornerStats?: CornerConsistencyStat[];
@@ -53,7 +53,7 @@ export const AIReportTab: React.FC<AIReportTabProps> = ({
   segments,
   currentLapSummary,
   carClass,
-  carModel,
+  carType,
   cornerStats,
 }) => {
   const [configured, setConfigured] = useState<boolean | null>(null);
@@ -79,13 +79,13 @@ export const AIReportTab: React.FC<AIReportTabProps> = ({
         baselineLapSummary,
         segments,
         carClass,
-        carModel,
+        carType,
         priorities,
       });
     } catch {
       return null;
     }
-  }, [trajectory, baselineTrajectory, baselineLapNumber, currentLapSummary, segments, carClass, carModel, cornerStats]);
+  }, [trajectory, baselineTrajectory, baselineLapNumber, currentLapSummary, segments, carClass, carType, cornerStats]);
 
   useEffect(() => {
     let cancelled = false;

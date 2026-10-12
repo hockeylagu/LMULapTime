@@ -12,8 +12,6 @@ import {
 } from '../../shared/types/index.js';
 import { parseReplayMetadata, detectPlayerName } from '../replay/decode/replayParser.js';
 import {
-  formatTime,
-  formatElapsedSeconds,
   parseTimeStringToSeconds,
   computeTheoreticalBest,
   parseDateStringToTimestamp,
@@ -89,8 +87,8 @@ export class LmuParser {
     if (existingIndex >= 0) {
       const existing = this.replaysMap[existingIndex];
       if (
-        existing.mtime !== entry.mtime ||
-        existing.sizeBytes !== entry.sizeBytes ||
+        existing.mtimeMs !== entry.mtimeMs ||
+        existing.fileSizeBytes !== entry.fileSizeBytes ||
         existing.durationSec !== entry.durationSec ||
         existing.sceneDesc !== entry.sceneDesc
       ) {
@@ -124,10 +122,10 @@ export class LmuParser {
           this.addReplayEntry({
             name: f,
             path: filePath,
-            sizeBytes: stat.size,
+            fileSizeBytes: stat.size,
             trackName,
             sessionCode,
-            mtime: stat.mtime.getTime(),
+            mtimeMs: stat.mtime.getTime(),
           });
         } catch { /* Ignore unreadable file. */ }
       }
@@ -204,9 +202,9 @@ export class LmuParser {
       drivers.forEach(d => {
         d.laps.forEach(l => {
           if (l.elapsedSeconds !== null && l.elapsedSeconds !== undefined && l.elapsedSeconds > 0) {
-            const currentMin = leaderLapEtMap.get(l.lapNum);
+            const currentMin = leaderLapEtMap.get(l.lapNumber);
             if (currentMin === undefined || l.elapsedSeconds < currentMin) {
-              leaderLapEtMap.set(l.lapNum, l.elapsedSeconds);
+              leaderLapEtMap.set(l.lapNumber, l.elapsedSeconds);
             }
           }
         });
@@ -215,11 +213,10 @@ export class LmuParser {
       drivers.forEach(d => {
         d.laps.forEach(l => {
           if (l.elapsedSeconds !== null && l.elapsedSeconds !== undefined && l.elapsedSeconds > 0) {
-            const leaderEt = leaderLapEtMap.get(l.lapNum);
+            const leaderEt = leaderLapEtMap.get(l.lapNumber);
             if (leaderEt !== undefined) {
               const gap = parseFloat((l.elapsedSeconds - leaderEt).toFixed(3));
               l.gapToLeader = gap;
-              l.gapToLeaderString = gap <= 0.001 ? 'LEADER' : `+${gap.toFixed(3)}s`;
             }
           }
         });
@@ -262,7 +259,6 @@ export class LmuParser {
             driverName: d.name,
             carType: d.carType,
             lapTime: d.bestLapTime,
-            lapTimeString: d.bestLapTimeString,
           };
         }
       });
@@ -389,7 +385,6 @@ export class LmuParser {
         sessionType,
         sessionName,
         weather,
-        weatherInfo: weather?.weatherString,
         settings,
         gameVersion: raceResults.GameVersion || '',
         driversCount: drivers.length,
@@ -425,7 +420,7 @@ export class LmuParser {
           return {
             name: matchingReplay.name,
             path: matchingReplay.path,
-            sizeBytes: matchingReplay.sizeBytes,
+            fileSizeBytes: matchingReplay.fileSizeBytes,
             eventTitle: matchingReplay.eventTitle,
             splitNo: matchingReplay.splitNo,
             eventType: matchingReplay.eventType,
@@ -493,7 +488,7 @@ export class LmuParser {
       ? validLaps.reduce((best, cur) => ((cur.lapTime as number) < (best.lapTime as number) ? cur : best))
       : null;
     const bestLapTime: number | null = bestLap ? (bestLap.lapTime as number) : null;
-    const bestLapNum: number | null = bestLap ? bestLap.lapNum : null;
+    const bestLapNumber: number | null = bestLap ? bestLap.lapNumber : null;
 
     let bestS1: number | null = null;
     let bestS2: number | null = null;
@@ -553,7 +548,7 @@ export class LmuParser {
     const finishStatus = rawFinishStatus || (dnfReason ? `DNF (${dnfReason})` : (position > 0 ? 'Finished' : undefined));
 
     const rawPitstops = parseInt(String(d.Pitstops ?? d.PitStops ?? d.NumPitstops ?? ''), 10);
-    const pitStopsCount = !isNaN(rawPitstops) && rawPitstops >= 0
+    const declaredPitStopsCount = !isNaN(rawPitstops) && rawPitstops >= 0
       ? rawPitstops
       : laps.filter(l => l.isPitStop).length;
 
@@ -566,10 +561,6 @@ export class LmuParser {
     ];
     const highestPosition = validPositions.length > 0 ? Math.min(...validPositions) : null;
     const lowestPosition = validPositions.length > 0 ? Math.max(...validPositions) : null;
-
-    // Final gap to leader at finish
-    const lastLapWithGap = [...laps].reverse().find(l => l.gapToLeaderString);
-    const finishGapToLeaderString = lastLapWithGap?.gapToLeaderString;
 
     return {
       name,
@@ -586,33 +577,26 @@ export class LmuParser {
       classPositionGain,
       finishStatus,
       dnfReason,
-      pitStopsCount,
+      declaredPitStopsCount,
       lapsLedCount,
       highestPosition,
       lowestPosition,
-      finishGapToLeaderString,
       bestLapTime,
-      bestLapTimeString: formatTime(bestLapTime),
-      bestLapNum,
+      bestLapNumber,
       bestS1,
       bestS2,
       bestS3,
       theoreticalBest,
-      theoreticalBestString: formatTime(theoreticalBest),
       bestLapPaceCategory: undefined,
       bestLapPacePercentage: undefined,
       // Set by classifySessionLaps once the laps are inferred, marked and tagged.
       avgLapTime: null,
-      avgLapTimeString: formatTime(null),
       avgFuelPerLap,
       estFuelStintLaps,
       avgVePerLap,
       estVeStintLaps,
       top3LapsCount,
-      lapsCount: laps.length,
-      totalIncidents: 0,
-      totalTrackLimits: 0,
-      totalPenalties: 0,
+      declaredLapsCount: laps.length,
       incidents: [],
       trackLimits: [],
       penalties: [],
@@ -621,7 +605,7 @@ export class LmuParser {
   }
 
   private parseLap(l: RawLapXmlNode, fallbackNum: number): LapData {
-    const lapNum = typeof l['@_num'] === 'number' ? l['@_num'] : parseInt(String(l['@_num'] || ''), 10) || fallbackNum;
+    const lapNumber = typeof l['@_num'] === 'number' ? l['@_num'] : parseInt(String(l['@_num'] || ''), 10) || fallbackNum;
     const position = typeof l['@_p'] === 'number' ? l['@_p'] : parseInt(String(l['@_p'] || ''), 10) || 0;
 
     const bodyVal = typeof l === 'object' && l && '#text' in l && l['#text'] ? String(l['#text']) : (typeof l === 'string' || typeof l === 'number' ? String(l) : '');
@@ -633,15 +617,12 @@ export class LmuParser {
     const topSpeed = l['@_topspeed'] !== undefined ? (typeof l['@_topspeed'] === 'number' ? l['@_topspeed'] : parseFloat(String(l['@_topspeed']))) || null : null;
     const fCompound = l['@_fcompound'] ? String(l['@_fcompound']).split(',').pop()?.trim() || String(l['@_fcompound']) : '';
     const rCompound = l['@_rcompound'] ? String(l['@_rcompound']).split(',').pop()?.trim() || String(l['@_rcompound']) : '';
-    const isPitStop = (String(l['@_pit']) === '1' || l['@_pit'] === 1 || (String(l['@_et']) === '--.---' && lapNum > 1)) && !(lapNum === 1 && (lapTime === null || lapTime <= 0));
+    const isPitStop = (String(l['@_pit']) === '1' || l['@_pit'] === 1 || (String(l['@_et']) === '--.---' && lapNumber > 1)) && !(lapNumber === 1 && (lapTime === null || lapTime <= 0));
 
     const rawEt = l['@_et'] !== undefined ? String(l['@_et']) : undefined;
     const elapsedSeconds = rawEt !== undefined && rawEt !== null && rawEt !== '--.---' && rawEt !== '' && !isNaN(parseFloat(rawEt))
       ? parseFloat(parseFloat(rawEt).toFixed(3))
       : null;
-    const elapsedTimeString = elapsedSeconds !== null && elapsedSeconds >= 0
-      ? formatElapsedSeconds(elapsedSeconds)
-      : undefined;
 
     const cleanCompound = (val?: unknown): string | undefined => {
       if (!val) return undefined;
@@ -695,10 +676,9 @@ export class LmuParser {
     const isValid = lapTime !== null && lapTime > 0;
 
     return {
-      lapNum,
+      lapNumber,
       position,
       lapTime,
-      lapTimeString: formatTime(lapTime),
       s1,
       s2,
       s3,
@@ -715,12 +695,8 @@ export class LmuParser {
       virtualEnergy,
       virtualEnergyUsed,
       elapsedSeconds,
-      elapsedTimeString,
       isPitStop,
       isValid,
-      incidentCount: 0,
-      trackLimitCount: 0,
-      penaltyCount: 0,
     };
   }
 

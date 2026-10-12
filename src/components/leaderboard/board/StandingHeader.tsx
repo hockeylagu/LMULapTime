@@ -1,3 +1,4 @@
+import { playerEntry } from '../../../../shared/domain/leaderboard.js';
 import React from 'react';
 import type { Leaderboard, LeaderboardEntry, LeaderboardScope } from '../../../../shared/types/leaderboard.js';
 import { formatTime } from '../../../../shared/domain/formatters.js';
@@ -28,7 +29,7 @@ const Stat: React.FC<{ label: string; value: React.ReactNode; hint?: React.React
 
 /** Where the player stands on the board: rank, gaps, pace band, and the rank within reach. */
 export const StandingHeader: React.FC<StandingHeaderProps> = ({ board, scope = 'class' }) => {
-  const player = board.player;
+  const player = playerEntry(board);
   if (!player) {
     return (
       <p className="px-4 py-3 rounded-xl border border-lmu-border bg-lmu-bg/60 text-sm text-lmu-muted">

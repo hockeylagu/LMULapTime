@@ -17,8 +17,8 @@ if (fs.existsSync(databasePath)) throw Error('Refusing to overwrite a POC databa
 if (dataPlugin.status.state !== 'ready') throw Error('Track package is required: run with .env.local');
 const host = new SessionDatabase(databasePath);
 const db = host.getDb();
-const stat = fs.statSync(config.filePath), mtime = Math.floor(stat.mtimeMs);
-host.upsertReplayMetadataCache(config.filename, config.filePath, mtime, stat.size, config.metadata);
+const stat = fs.statSync(config.filePath), mtimeMs = Math.floor(stat.mtimeMs);
+host.upsertReplayMetadataCache(config.filename, config.filePath, mtimeMs, stat.size, config.metadata);
 if (mode !== 'baseline') db.exec(`
   CREATE TABLE poc_drivers(slot INTEGER PRIMARY KEY, shared BLOB NOT NULL);
   CREATE TABLE poc_samples(slot INTEGER,lap INTEGER,samples BLOB NOT NULL, PRIMARY KEY(slot,lap));
@@ -37,7 +37,7 @@ try {
     pointsCount += rawLaps.reduce((sum, lap) => sum + lap.points.length, 0);
     if (mode === 'baseline') {
       mark = performance.now();
-      host.replaceReplayDriverLaps(config.filename, config.filePath, mtime, stat.size, slot, driver, slot === config.slots[0]);
+      host.replaceReplayDriverLaps(config.filename, config.filePath, mtimeMs, stat.size, slot, driver, slot === config.slots[0]);
       stages.writeMs += performance.now() - mark; // Includes existing columnar conversion and compression.
     } else {
       mark = performance.now();

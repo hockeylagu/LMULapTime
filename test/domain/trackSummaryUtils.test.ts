@@ -17,7 +17,7 @@ describe('trackSummaryUtils', () => {
         bestS1: 34.0,
         bestS2: 42.0,
         bestS3: 46.5,
-        lapsCount: 10,
+        declaredLapsCount: 10,
       },
     },
     {
@@ -34,7 +34,7 @@ describe('trackSummaryUtils', () => {
         bestS1: 33.8,
         bestS2: 41.9,
         bestS3: 46.1,
-        lapsCount: 8,
+        declaredLapsCount: 8,
       },
     },
     {
@@ -51,7 +51,7 @@ describe('trackSummaryUtils', () => {
         bestS1: 38.0,
         bestS2: 46.0,
         bestS3: 51.2,
-        lapsCount: 12,
+        declaredLapsCount: 12,
       },
     },
     {
@@ -68,7 +68,7 @@ describe('trackSummaryUtils', () => {
         bestS1: 27.5,
         bestS2: 38.5,
         bestS3: 42.5,
-        lapsCount: 15,
+        declaredLapsCount: 15,
       },
     },
   ];
@@ -156,7 +156,7 @@ describe('trackSummaryUtils', () => {
           bestS1: 30.0,
           bestS2: 40.0,
           bestS3: 40.0,
-          lapsCount: 5,
+          declaredLapsCount: 5,
         },
       },
     ];

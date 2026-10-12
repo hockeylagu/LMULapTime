@@ -19,9 +19,8 @@ export interface TrackDetailHeaderProps {
   setSelectedClass: (cls: string) => void;
   selectedCarModel: string;
   setSelectedCarModel: (model: string) => void;
-  availableCarModels: string[];
+  availableCarTypes: string[];
   currentBenchmark?: ReferenceLaptimeEntry | null;
-  bestLapTimeString?: string | null;
   bestLapCar?: string | null;
   xmlTrackLengthMeters?: number | null;
   trackGeometry?: TrackBoundaryGeometry | null;
@@ -36,9 +35,8 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
   setSelectedClass,
   selectedCarModel,
   setSelectedCarModel,
-  availableCarModels,
+  availableCarTypes,
   currentBenchmark,
-  bestLapTimeString: _bestLapTimeString,
   bestLapCar: _bestLapCar,
   xmlTrackLengthMeters,
   trackGeometry,
@@ -110,7 +108,7 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
             </div>
 
         {/* Specific Car Model Sub-Filter Row */}
-        {selectedClass !== 'All' && availableCarModels.length > 0 && (
+        {selectedClass !== 'All' && availableCarTypes.length > 0 && (
           <div className="pt-3 border-t border-lmu-border/50 flex items-center gap-3 flex-wrap text-xs">
             <span className="text-xs font-semibold text-lmu-muted uppercase tracking-wider flex items-center gap-1.5 shrink-0">
               <Car className="w-3.5 h-3.5 text-lmu-accent-text" />
@@ -126,9 +124,9 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
                   : 'bg-lmu-bg text-lmu-muted hover:text-white border border-lmu-border'
                   }`}
               >
-                All {selectedClass} Cars ({availableCarModels.length})
+                All {selectedClass} Cars ({availableCarTypes.length})
               </button>
-              {availableCarModels.map((car) => (
+              {availableCarTypes.map((car) => (
                 <button
                   key={car}
                   type="button"
@@ -140,7 +138,7 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
                     : 'bg-lmu-bg text-lmu-muted hover:text-white border border-lmu-border'
                     }`}
                 >
-                  <CarLogo carModel={car} size="xs" decorative />
+                  <CarLogo carType={car} size="xs" decorative />
                   <span>{car}</span>
                 </button>
               ))}

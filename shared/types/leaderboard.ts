@@ -10,7 +10,7 @@ export interface LeaderboardLap {
   driverOrdinal?: number;
   /** Zero-based position in that driver's source lap list, when hydrated. */
   lapOrdinal?: number;
-  lapNum: number;
+  lapNumber: number;
   lapTime: number;
   s1: number | null;
   s2: number | null;
@@ -56,8 +56,6 @@ export interface Leaderboard {
   /** The car the board is limited to when scope is 'car'. */
   carType: string | null;
   entries: LeaderboardEntry[];
-  /** The player's entry, when the player has a representative lap here. */
-  player: LeaderboardEntry | null;
   /** The community benchmark targets for this layout and class, when known. */
   benchmark: ReferenceLaptimeEntry | null;
 }
@@ -127,8 +125,6 @@ export interface RivalGapPoint {
 /** The player's rival on a board, and how the chase is going. */
 export interface RivalStatus {
   rival: RivalTarget | null;
-  /** The rival driver's line on the board (their lap, replay and sectors); null for a ghost. */
-  rivalEntry: LeaderboardEntry | null;
   /** Player best - target: the time still to find (negative once beaten). */
   gap: number | null;
   /** 0 when the target was set, 1 at the target. */

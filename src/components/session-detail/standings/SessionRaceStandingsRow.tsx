@@ -20,7 +20,7 @@ export interface SessionRaceStandingsRowProps {
 }
 
 function getBestLap(driver: DriverData) {
-  return driver.laps.find((lap) => lap.lapNum === driver.bestLapNum) || driver.laps.find((lap) => lap.lapTime === driver.bestLapTime);
+  return driver.laps.find((lap) => lap.lapNumber === driver.bestLapNumber) || driver.laps.find((lap) => lap.lapTime === driver.bestLapTime);
 }
 
 export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = ({
@@ -45,16 +45,16 @@ export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = (
   const hasClassPosition = isMultiClass && d.classPosition > 0;
   const primaryPosition = hasClassPosition ? `P${d.classPosition}` : overallPosition;
   const finishLap = [...d.laps].reverse().find((lap) => typeof lap.elapsedSeconds === 'number');
-  const raceTime = finishLap?.elapsedTimeString || (finishLap?.elapsedSeconds !== undefined && finishLap?.elapsedSeconds !== null
+  const raceTime = finishLap?.elapsedSeconds !== undefined && finishLap?.elapsedSeconds !== null
     ? formatElapsedSeconds(finishLap.elapsedSeconds)
-    : '-');
+    : '-';
   const finishStatus = d.finishStatus || (d.position > 0 ? 'Finished' : 'Unknown');
   const isNonFinisher = /dnf|dns|dq|retired|disqual/i.test(finishStatus);
   const finishGap = !isNonFinisher && d.position !== 1 && typeof leaderFinishTime === 'number' && typeof finishLap?.elapsedSeconds === 'number'
-    ? d.lapsCount < leaderLaps
-      ? `+${leaderLaps - d.lapsCount} Lap${leaderLaps - d.lapsCount === 1 ? '' : 's'}`
+    ? d.declaredLapsCount < leaderLaps
+      ? `+${leaderLaps - d.declaredLapsCount} Lap${leaderLaps - d.declaredLapsCount === 1 ? '' : 's'}`
       : `+${Math.max(0, finishLap.elapsedSeconds - leaderFinishTime).toFixed(3)}s`
-    : d.finishGapToLeaderString || '-';
+    : '-';
   const raceTimeOrGap = d.position === 1 && !isNonFinisher ? raceTime : isNonFinisher ? finishStatus : finishGap;
   const lapGap = d.bestLapTime !== null && d.bestLapTime > 0 && fastestInClass !== null
     ? d.bestLapTime - fastestInClass < 0.0005 ? 'Fastest' : `+${(d.bestLapTime - fastestInClass).toFixed(3)}s`
@@ -103,9 +103,9 @@ export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = (
       <td className="px-3.5 py-2.5">
         <CarIdentity carType={d.carType} carClass={d.carClass} nameClassName="text-lmu-muted font-medium" />
       </td>
-      <td className="px-3.5 py-2.5 text-center font-mono text-white">{d.lapsCount}</td>
+      <td className="px-3.5 py-2.5 text-center font-mono text-white">{d.declaredLapsCount}</td>
       <td className="px-3.5 py-2.5 font-mono">
-        <div className="font-bold text-white">{d.bestLapTimeString}</div>
+        <div className="font-bold text-white">{formatTime(d.bestLapTime)}</div>
       </td>
       <td className={`px-3.5 py-2.5 text-right font-mono ${isBestS1 ? 'text-lmu-gold font-bold' : 'text-lmu-muted'}`} title={isBestS1 ? 'Session best S1' : undefined}>
         {bestLap?.s1 !== null && bestLap?.s1 !== undefined ? formatTime(bestLap.s1) : '-'}

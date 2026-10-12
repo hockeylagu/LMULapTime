@@ -6,15 +6,11 @@ import { ReferenceLaptimeEntry, ComparableLap } from '../../../shared/types/inde
 describe('CompareLapCard', () => {
   const baseLap: ComparableLap = {
     id: 'lap-1',
-    lapNum: 5,
+    lapNumber: 5,
     lapTime: 95.432,
-    lapTimeString: '1:35.432',
     s1: 28.123,
     s2: 34.567,
     s3: 32.742,
-    s1String: '28.123',
-    s2String: '34.567',
-    s3String: '32.742',
     topSpeed: 285.4,
     fCompound: 'Medium',
     rCompound: 'Medium',
@@ -45,7 +41,6 @@ describe('CompareLapCard', () => {
       trackName: 'Autodromo Nazionale Monza',
       carClass: 'Hyper',
       patch: '1.4+',
-      target100Sec: 94.5,
       targets: {
         alienSec: 94.5,
         competitiveSec: 95.5,
@@ -218,7 +213,6 @@ describe('CompareLapCard', () => {
       topSpeed: 0,
       tireWear: undefined,
       isPitStop: true,
-      pitStopDurationString: '24.5s',
     };
 
     render(

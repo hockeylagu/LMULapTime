@@ -15,33 +15,33 @@ import { renameTargetedReplay } from '../sessionRows/targeted.js';
 export const SAME_RECORDING_START_TOLERANCE_MS = 60_000;
 
 interface RecordingFacts {
-  mtime: number;
-  size: number;
+  mtimeMs: number;
+  fileSizeBytes: number;
   metadata: ReplayMetadata;
 }
 
 function sceneOf(metadata: ReplayMetadata): string | undefined {
-  return metadata.sceneDesc || metadata.eventInfo?.sceneDesc || undefined;
+  return metadata.sceneDesc || undefined;
 }
 
-// A replay is saved when its recording ends, so its start is the mtime minus the recorded duration.
+// A replay is saved when its recording ends, so its start is the mtimeMs minus the recorded duration.
 function recordingStartMs(recording: RecordingFacts): number {
-  return recording.mtime - Math.round((recording.metadata.durationSec ?? 0) * 1000);
+  return recording.mtimeMs - Math.round((recording.metadata.durationSec ?? 0) * 1000);
 }
 
 /** True when `next` is the stored recording saved again rather than another recording under its name. */
 export function isSameRecording(stored: StoredReplayFileInfo, next: RecordingFacts): boolean {
-  if (stored.file_mtime === next.mtime && stored.file_size === next.size) return true;
+  if (stored.file_mtime_ms === next.mtimeMs && stored.file_size_bytes === next.fileSizeBytes) return true;
   const storedScene = sceneOf(stored.metadata);
   const nextScene = sceneOf(next.metadata);
   if (storedScene && nextScene && storedScene !== nextScene) return false;
-  const storedStart = recordingStartMs({ mtime: stored.file_mtime, size: stored.file_size, metadata: stored.metadata });
+  const storedStart = recordingStartMs({ mtimeMs: stored.file_mtime_ms, fileSizeBytes: stored.file_size_bytes, metadata: stored.metadata });
   return Math.abs(storedStart - recordingStartMs(next)) <= SAME_RECORDING_START_TOLERANCE_MS;
 }
 
 /** "Spa P1 80.Vcr" saved at 2026-08-28T19:29:31Z -> "Spa P1 80 @2026-08-28T19-29-31Z.Vcr". */
-export function archivedReplayName(filename: string, mtime: number): string {
-  const stamp = new Date(mtime).toISOString().replace(/\.\d{3}Z$/, 'Z').replace(/:/g, '-');
+export function archivedReplayName(filename: string, mtimeMs: number): string {
+  const stamp = new Date(mtimeMs).toISOString().replace(/\.\d{3}Z$/, 'Z').replace(/:/g, '-');
   return `${filename.replace(/\.vcr$/i, '')} @${stamp}.Vcr`;
 }
 
@@ -84,7 +84,7 @@ function renameStoredReplay(db: DatabaseType, filename: string, storedPath: stri
 export function archiveReplacedRecording(db: DatabaseType, filename: string, next: RecordingFacts): string | null {
   const stored = getStoredReplayFileInfo(db, filename);
   if (!stored || isSameRecording(stored, next)) return null;
-  const newName = freeReplayName(db, archivedReplayName(filename, stored.file_mtime));
+  const newName = freeReplayName(db, archivedReplayName(filename, stored.file_mtime_ms));
   renameStoredReplay(db, filename, stored.file_path, newName);
   return newName;
 }

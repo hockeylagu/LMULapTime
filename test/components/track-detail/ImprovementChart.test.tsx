@@ -31,7 +31,7 @@ describe('ImprovementChart component', () => {
       bestS3: 46.0,
       theoreticalBest: 122.0,
       cleanLapsCount: 5,
-      totalLapsCount: 5,
+      declaredLapsCount: 5,
       avgLapTime: 123.0,
     },
     {
@@ -51,7 +51,7 @@ describe('ImprovementChart component', () => {
       bestS3: 45.5,
       theoreticalBest: 121.0,
       cleanLapsCount: 8,
-      totalLapsCount: 8,
+      declaredLapsCount: 8,
       avgLapTime: 122.5,
     },
   ];
@@ -209,13 +209,13 @@ describe('ImprovementChart component', () => {
       {
         ...mockProgressionData[0],
         consistencyScore: 98.5,
-        top3AvgLapTime: 121.5,
+        top3Average: 121.5,
         theoreticalGap: 0.2,
       },
       {
         ...mockProgressionData[1],
         consistencyScore: 99.2,
-        top3AvgLapTime: 120.8,
+        top3Average: 120.8,
         theoreticalGap: 0.1,
       },
     ];

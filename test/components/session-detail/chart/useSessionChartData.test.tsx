@@ -1,13 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useSessionChartData } from '../../../../src/components/session-detail/chart/useSessionChartData';
-import { formatTime } from '../../../../shared/domain/formatters';
 import type { DetailedSession, DriverData, LapData } from '../../../../shared/types/index';
 
-function lap(lapNum: number, lapTime: number | null, flags: Partial<LapData> = {}): LapData {
+function lap(lapNumber: number, lapTime: number | null, flags: Partial<LapData> = {}): LapData {
   const third = lapTime ? lapTime / 3 : null;
   return {
-    lapNum, position: 1, lapTime, lapTimeString: lapTime ? `${lapTime}` : '--', s1: third, s2: third, s3: third,
+    lapNumber, position: 1, lapTime, s1: third, s2: third, s3: third,
     topSpeed: 300, fCompound: 'Medium', rCompound: 'Medium', isPitStop: false, isValid: true, ...flags,
   };
 }
@@ -51,7 +50,7 @@ describe('useSessionChartData', () => {
     const player = driver('Player', 'Hypercar', [lap(1, 130), lap(2, 140, { isOutLap: true })], true);
     const { result } = renderHook(() => useSessionChartData({ session: session([player]), selectedDriver: player, isMultiClass: false }));
     expect(result.current.avgLapTime).toBeNull();
-    expect(result.current.sessionChartData[0].avgLapTimeString).toBe(formatTime(null));
+    expect(result.current.sessionChartData[0].avgLapTime).toBeNull();
   });
 
   it("ranks the selected driver's class on its own in a multi-class session", () => {

@@ -13,7 +13,7 @@ export interface ReplayInspectorHeaderProps {
   sessionId: string | null;
   metadata: ReplayMetadata | null;
   trajectory: ReplayTrajectoryData | null;
-  onSelectLap: (lapNum: number) => void;
+  onSelectLap: (lapNumber: number) => void;
   drivers: ReplayDriverEntry[];
   selectedDriverSlot: number | null;
   onSelectDriver: (slot: number) => void;

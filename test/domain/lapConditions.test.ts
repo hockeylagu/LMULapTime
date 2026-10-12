@@ -5,7 +5,7 @@ import { computeConsistencyRating } from '../../shared/domain/lapComparison.js';
 import type { LapConditions, NonRepresentativeReason } from '../../shared/types/index.js';
 
 interface TestLap {
-  lapNum: number;
+  lapNumber: number;
   lapTime: number | null;
   elapsedSeconds?: number;
   fCompound?: string;
@@ -21,7 +21,7 @@ function race(dry: number[], wet: number[]): TestLap[] {
   let et = 0;
   return [120, ...dry, ...wet].map((lapTime, i) => {
     const lap: TestLap = {
-      lapNum: i + 1, lapTime, elapsedSeconds: et, isValid: true, isPitStop: false,
+      lapNumber: i + 1, lapTime, elapsedSeconds: et, isValid: true, isPitStop: false,
       fCompound: i > dry.length ? 'Wet' : 'Medium', rCompound: i > dry.length ? 'Wet' : 'Medium',
     };
     et += lapTime;
@@ -32,9 +32,9 @@ function race(dry: number[], wet: number[]): TestLap[] {
 describe('annotateLapConditions', () => {
   it('tags wet tyres and rain from the threshold, and leaves dry laps untagged', () => {
     const laps: TestLap[] = [
-      { lapNum: 1, lapTime: 100, elapsedSeconds: 0, fCompound: 'Medium', rCompound: 'Medium', isValid: true, isPitStop: false },
-      { lapNum: 2, lapTime: 100, elapsedSeconds: 100, fCompound: 'Medium', rCompound: 'Medium', isValid: true, isPitStop: false },
-      { lapNum: 3, lapTime: 100, elapsedSeconds: 200, fCompound: 'Wet', rCompound: 'Wet', isValid: true, isPitStop: false },
+      { lapNumber: 1, lapTime: 100, elapsedSeconds: 0, fCompound: 'Medium', rCompound: 'Medium', isValid: true, isPitStop: false },
+      { lapNumber: 2, lapTime: 100, elapsedSeconds: 100, fCompound: 'Medium', rCompound: 'Medium', isValid: true, isPitStop: false },
+      { lapNumber: 3, lapTime: 100, elapsedSeconds: 200, fCompound: 'Wet', rCompound: 'Wet', isValid: true, isPitStop: false },
     ];
     // Light rain on lap 1, real rain from 250 s.
     const rainOverLap = (start: number, end: number) => (end > 250 ? 18 : start < 100 ? RAIN_WET_MIN - 1 : 0);
@@ -46,7 +46,7 @@ describe('annotateLapConditions', () => {
   });
 
   it('knows only the tyres without a replay, and clears a tag the lap no longer has', () => {
-    const lap: TestLap = { lapNum: 2, lapTime: 100, fCompound: 'Medium', rCompound: 'Medium', isValid: true, isPitStop: false, conditions: { rain: 20 } };
+    const lap: TestLap = { lapNumber: 2, lapTime: 100, fCompound: 'Medium', rCompound: 'Medium', isValid: true, isPitStop: false, conditions: { rain: 20 } };
     annotateLapConditions([lap]);
     expect(lap.conditions).toBeUndefined();
   });
@@ -62,7 +62,7 @@ describe('the lap rules with changing conditions', () => {
     markNonRepresentativeLaps(laps);
 
     // Every wet lap is >2% off the dry pace; only the one >2% off the wet pace is off pace.
-    expect(laps.filter((l) => l.nonRepresentativeReason).map((l) => l.lapNum)).toEqual([11]);
+    expect(laps.filter((l) => l.nonRepresentativeReason).map((l) => l.lapNumber)).toEqual([11]);
   });
 
   it('never calls a wet lap off pace without enough wet laps to compare it with', () => {

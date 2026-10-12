@@ -143,17 +143,17 @@ export class ReplayTelemetryService {
       if (files.length > 0) {
         trajectory.duckdbFilename = links.forSession(session!);
 
-        const chosenLapNum = trajectory.currentLap || input.lapNumber || 1;
-        const targetLapTimeSec = trajectory.laps?.find(lap => lap.lapNumber === chosenLapNum)?.lapTimeSec;
+        const chosenLapNumber = trajectory.currentLap || input.lapNumber || 1;
+        const targetLapTimeSec = trajectory.laps?.find(lap => lap.lapNumber === chosenLapNumber)?.lapTimeSec;
 
-        let found = this.cachedLap(files, chosenLapNum);
+        let found = this.cachedLap(files, chosenLapNumber);
         if (!found) {
           const onDisk = files.filter(file => links.isOnDisk(file.filename));
           if (onDisk.length > 0) {
-            found = await this.readLap(session.id, onDisk, chosenLapNum, targetLapTimeSec);
+            found = await this.readLap(session.id, onDisk, chosenLapNumber, targetLapTimeSec);
           }
           // A lap cached by an older reader is the only copy left once its file is deleted.
-          found ??= this.cachedLap(files.filter(file => !links.isOnDisk(file.filename)), chosenLapNum, true);
+          found ??= this.cachedLap(files.filter(file => !links.isOnDisk(file.filename)), chosenLapNumber, true);
           if (!found && onDisk.length === 0) {
             duckdbUnavailableReason = 'The DuckDB file of this session was deleted before this lap was read; using Native VCR data.';
           }
@@ -168,14 +168,12 @@ export class ReplayTelemetryService {
 
           const expectedLapTimeSec =
             targetLapTimeSec ||
-            input.fullTrajectory.laps?.find(lap => lap.lapNumber === chosenLapNum)?.lapTimeSec;
+            input.fullTrajectory.laps?.find(lap => lap.lapNumber === chosenLapNumber)?.lapTimeSec;
 
           if (!expectedLapTimeSec || expectedLapTimeSec <= 0 || duckLap.lapTimeSec >= expectedLapTimeSec - 0.5) {
             const fusedTrajectory = fuseDuckDbWithVcrTrajectory(duckLap, input.fullTrajectory, matchedDuck.filename);
             // Full resolution: the caller projects and cuts the lap before downsampling it.
             trajectory = fusedTrajectory;
-            trajectory.vcrRawPointsCount = input.fullTrajectory.rawPointsCount ?? input.fullTrajectory.points.length;
-            trajectory.vcrRawSampleRateHz = input.fullTrajectory.rawSampleRateHz;
             trajectory.duckdbRawPointsCount = duckLap.pointsCount;
             trajectory.duckdbRawSampleRateHz = duckLap.sampleRateHz;
             fused = true;

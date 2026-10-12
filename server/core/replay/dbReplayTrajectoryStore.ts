@@ -20,8 +20,8 @@ export interface TrajectoryDefaults {
 interface TrajectoryRow {
   filename: string;
   driver_slot: number;
-  file_mtime: number;
-  file_size: number;
+  file_mtime_ms: number;
+  file_size_bytes: number;
   source_path: string | null;
   parser_version: string;
   trajectory_br: Buffer;
@@ -108,7 +108,7 @@ export function resolveTrajectoryKey(
 
 function selectTrajectoryRow(db: DatabaseType, filename: string, driverSlot: number, lapKey: number): TrajectoryRow | undefined {
   return db.prepare(
-    'SELECT filename, driver_slot, file_mtime, file_size, source_path, parser_version, trajectory_br FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key = ?'
+    'SELECT filename, driver_slot, file_mtime_ms, file_size_bytes, source_path, parser_version, trajectory_br FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key = ?'
   ).get(filename, driverSlot, lapKey) as TrajectoryRow | undefined;
 }
 
@@ -121,9 +121,9 @@ function selectResolvedRow(db: DatabaseType, filename: string, driverSlot: numbe
   return selectTrajectoryRow(db, filename, resolved.driverSlot, resolved.lapKey);
 }
 
-function isRowValid(row: TrajectoryRow, mtime: number, size: number, filePath?: string): boolean {
-  return row.file_mtime === mtime &&
-    row.file_size === size &&
+function isRowValid(row: TrajectoryRow, mtimeMs: number, fileSizeBytes: number, filePath?: string): boolean {
+  return row.file_mtime_ms === mtimeMs &&
+    row.file_size_bytes === fileSizeBytes &&
     isCompatibleReplayCacheVersion(row.parser_version) &&
     (!filePath || !row.source_path || row.source_path === filePath);
 }
@@ -133,12 +133,12 @@ export function getReplayTrajectoryCache(
   filename: string,
   driverSlot: number,
   lapKey: number,
-  mtime: number,
-  size: number,
+  mtimeMs: number,
+  fileSizeBytes: number,
   filePath?: string
 ): ReplayTrajectoryData | null {
   const row = selectResolvedRow(db, filename, driverSlot, lapKey);
-  if (!row || !isRowValid(row, mtime, size, filePath)) return null;
+  if (!row || !isRowValid(row, mtimeMs, fileSizeBytes, filePath)) return null;
   return readTrajectoryRow(db, row);
 }
 
@@ -167,7 +167,7 @@ export function getStoredReplayTrajectory(
 /**
  * The laps just before and after (driverSlot, lapKey) of the same recording, read from the stored
  * rows only: a lap row is the one place the recording either side of a lap survives once LMU has
- * deleted the replay. Rows from another version of the file (different mtime or size) are ignored.
+ * deleted the replay. Rows from another version of the file (different mtimeMs or fileSizeBytes) are ignored.
  */
 export function getReplayLapEdges(
   db: DatabaseType,
@@ -176,14 +176,14 @@ export function getReplayLapEdges(
   lapKey: number,
   points: ReplayTrajectoryData['points'],
 ): { leadIn: ReplayTrajectoryData['points']; leadOut: ReplayTrajectoryData['points'] } {
-  const lap = db.prepare('SELECT file_mtime, file_size, source_path FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key = ?')
-    .get(filename, driverSlot, lapKey) as Pick<TrajectoryRow, 'file_mtime' | 'file_size' | 'source_path'> | undefined;
+  const lap = db.prepare('SELECT file_mtime_ms, file_size_bytes, source_path FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key = ?')
+    .get(filename, driverSlot, lapKey) as Pick<TrajectoryRow, 'file_mtime_ms' | 'file_size_bytes' | 'source_path'> | undefined;
   const first = points[0]?.timeSec;
   const last = points[points.length - 1]?.timeSec;
   if (!lap || first === undefined || last === undefined) return { leadIn: [], leadOut: [] };
   const neighbour = (key: number, boundary: number, direction: 'previous' | 'next'): ReplayTrajectoryData['points'] | undefined => {
     const row = selectTrajectoryRow(db, filename, driverSlot, key);
-    return row && row.file_mtime === lap.file_mtime && row.file_size === lap.file_size && row.source_path === lap.source_path
+    return row && row.file_mtime_ms === lap.file_mtime_ms && row.file_size_bytes === lap.file_size_bytes && row.source_path === lap.source_path
       ? decompressTrajectoryEdge(row.trajectory_br, row.parser_version, boundary, direction)
       : undefined;
   };
@@ -196,24 +196,24 @@ export function hasValidReplayTrajectoryCache(
   filename: string,
   driverSlot: number,
   lapKey: number,
-  mtime: number,
-  size: number,
+  mtimeMs: number,
+  fileSizeBytes: number,
   filePath?: string,
   expectedDriverSlot?: number,
 ): boolean {
   if (expectedDriverSlot !== undefined && driverSlot === -1 &&
       resolveTrajectoryKey(db, filename, driverSlot, lapKey)?.driverSlot !== expectedDriverSlot) return false;
   const literal = db.prepare(
-    'SELECT file_mtime, file_size, source_path, parser_version FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key = ?'
+    'SELECT file_mtime_ms, file_size_bytes, source_path, parser_version FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key = ?'
   ).get(filename, driverSlot, lapKey) as Omit<TrajectoryRow, 'trajectory_br'> | undefined;
-  if (literal) return isRowValid(literal as TrajectoryRow, mtime, size, filePath);
+  if (literal) return isRowValid(literal as TrajectoryRow, mtimeMs, fileSizeBytes, filePath);
 
   const resolved = resolveTrajectoryKey(db, filename, driverSlot, lapKey);
   if (!resolved) return false;
   const row = db.prepare(
-    'SELECT file_mtime, file_size, source_path, parser_version FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key = ?'
+    'SELECT file_mtime_ms, file_size_bytes, source_path, parser_version FROM replay_trajectories WHERE filename = ? AND driver_slot = ? AND lap_key = ?'
   ).get(filename, resolved.driverSlot, resolved.lapKey) as Omit<TrajectoryRow, 'trajectory_br'> | undefined;
-  return !!row && isRowValid(row as TrajectoryRow, mtime, size, filePath);
+  return !!row && isRowValid(row as TrajectoryRow, mtimeMs, fileSizeBytes, filePath);
 }
 
 export function upsertReplayTrajectoryCache(
@@ -221,18 +221,18 @@ export function upsertReplayTrajectoryCache(
   filename: string,
   driverSlot: number,
   lapKey: number,
-  mtime: number,
-  size: number,
+  mtimeMs: number,
+  fileSizeBytes: number,
   trajectory: ReplayTrajectoryData,
   filePath?: string
 ): void {
   db.prepare(`
-    INSERT INTO replay_trajectories (filename, source_path, driver_slot, lap_key, file_mtime, file_size, parser_version, points_count, trajectory_br, updated_at)
-    VALUES (@filename, @filePath, @driverSlot, @lapKey, @mtime, @size, @parserVersion, @pointsCount, @trajectoryBr, @updatedAt)
+    INSERT INTO replay_trajectories (filename, source_path, driver_slot, lap_key, file_mtime_ms, file_size_bytes, parser_version, points_count, trajectory_br, updated_at)
+    VALUES (@filename, @filePath, @driverSlot, @lapKey, @mtimeMs, @fileSizeBytes, @parserVersion, @pointsCount, @trajectoryBr, @updatedAt)
     ON CONFLICT(filename, driver_slot, lap_key) DO UPDATE SET
       source_path = excluded.source_path,
-      file_mtime = excluded.file_mtime,
-      file_size = excluded.file_size,
+      file_mtime_ms = excluded.file_mtime_ms,
+      file_size_bytes = excluded.file_size_bytes,
       parser_version = excluded.parser_version,
       points_count = excluded.points_count,
       trajectory_br = excluded.trajectory_br,
@@ -242,8 +242,8 @@ export function upsertReplayTrajectoryCache(
     filePath: filePath || null,
     driverSlot,
     lapKey,
-    mtime,
-    size,
+    mtimeMs,
+    fileSizeBytes,
     parserVersion: REPLAY_CACHE_VERSION,
     pointsCount: trajectory.points.length,
     trajectoryBr: compressTrajectory(trajectory),

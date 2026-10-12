@@ -1,3 +1,4 @@
+import { playerEntry } from '../../../../shared/domain/leaderboard.js';
 import React, { useMemo, useState } from 'react';
 import { ArrowUp, ListOrdered } from 'lucide-react';
 import type { Leaderboard, LeaderboardEntry, LeaderboardScope } from '../../../../shared/types/leaderboard.js';
@@ -140,7 +141,7 @@ export const LeaderboardSection: React.FC<LeaderboardSectionProps> = ({
                     <LeaderboardRow
                       key={row.kind === 'driver' ? row.entry.driverName : `${row.kind}-${i}`}
                       row={row}
-                      player={board.player}
+                      player={playerEntry(board)}
                       benchmark={board.benchmark}
                       onShowAll={() => setShowAll(true)}
                       onCompare={onCompare}

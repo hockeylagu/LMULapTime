@@ -28,7 +28,7 @@ describe('ReplayTrajectoryService', () => {
   let sessions: DetailedSession[];
 
   const sessionFor = (recordingFilename = 'Daytona.Vcr', driverName = 'Samuel Lague'): DetailedSession => {
-    const driver = { name: driverName, laps: [{ lapNum: 1, lapTime: 96, isValid: true }] } as DriverData;
+    const driver = { name: driverName, laps: [{ lapNumber: 1, lapTime: 96, isValid: true }] } as DriverData;
     return { id: 'selected-session', matchingReplayFile: { name: recordingFilename }, drivers: [driver],
       playerDriver: driverName === 'Samuel Lague' ? driver : undefined } as DetailedSession;
   };
@@ -47,8 +47,8 @@ describe('ReplayTrajectoryService', () => {
       { x: 30, y: 0, z: 60, timeSec: 3, speedKmh: 220 },
     ],
     pointsCount: 4,
-    rawPointsCount: 4,
-    rawSampleRateHz: 50,
+    vcrRawPointsCount: 4,
+    vcrRawSampleRateHz: 50,
     laps: [{ lapNumber: 1, lapTimeSec: 96.0, s1Sec: 30, s2Sec: 36, s3Sec: 30 }],
   } as unknown as ReplayTrajectoryData;
 
@@ -104,7 +104,7 @@ describe('ReplayTrajectoryService', () => {
 
     expect(traj.source).toBe('vcr');
     expect(traj.points).toHaveLength(2);
-    expect(traj.rawPointsCount).toBe(4);
+    expect(traj.vcrRawPointsCount).toBe(4);
     expect(traj.driverSlot).toBe(0);
     expect(traj.driverName).toBe('Samuel Lague');
     expect(readMetadata).toHaveBeenCalledTimes(1);
@@ -193,7 +193,7 @@ describe('ReplayTrajectoryService', () => {
     vi.spyOn(replayRecordings, 'getMetadata').mockReturnValue(mockMetadata);
 
     const player = { name: 'Samuel Lague', driverName: 'Samuel Lague', bestLapTime: 95.8,
-      laps: [{ lapNum: 1, lapTime: 95.8, s1: 29.9, s2: 35.9, s3: 30.0, isValid: true }] } as unknown as DriverData;
+      laps: [{ lapNumber: 1, lapTime: 95.8, s1: 29.9, s2: 35.9, s3: 30.0, isValid: true }] } as unknown as DriverData;
     const session = {
       id: 'daytona-session-1',
       matchingReplayFile: { name: 'Daytona.Vcr' },
@@ -256,8 +256,8 @@ describe('ReplayTrajectoryService', () => {
   });
 
   it('keeps official timing and player telemetry tied to the exact selected driver', async () => {
-    const player = { name: 'Ann Smith', laps: [{ lapNum: 1, lapTime: 96, isValid: true }] } as unknown as DriverData;
-    const other = { name: 'Ann Smithson', laps: [{ lapNum: 1, lapTime: 100, isValid: true }] } as unknown as DriverData;
+    const player = { name: 'Ann Smith', laps: [{ lapNumber: 1, lapTime: 96, isValid: true }] } as unknown as DriverData;
+    const other = { name: 'Ann Smithson', laps: [{ lapNumber: 1, lapTime: 100, isValid: true }] } as unknown as DriverData;
     const metadata = { ...mockMetadata, drivers: [{ slot: 0, name: other.name, isPlayer: false }, { slot: 1, name: player.name, isPlayer: true }] };
     vi.spyOn(replayRecordings, 'getMetadata').mockReturnValue(metadata);
     vi.spyOn(replayRecordings, 'getFullTrajectory').mockResolvedValue({ ...mockFullTrajectory, driverSlot: 1, driverName: player.name });

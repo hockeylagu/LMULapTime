@@ -265,8 +265,8 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     if (reconcileReplayPlayerOwnership(this.db, playerName)) this.replayMetadataRevision++;
   }
 
-  public getReplayMetadataCache(filename: string, mtime: number, size: number, filePath?: string, playerName?: string): ReplayMetadata | null {
-    return getReplayMetadataCache(this.db, filename, mtime, size, filePath, playerName);
+  public getReplayMetadataCache(filename: string, mtimeMs: number, fileSizeBytes: number, filePath?: string, playerName?: string): ReplayMetadata | null {
+    return getReplayMetadataCache(this.db, filename, mtimeMs, fileSizeBytes, filePath, playerName);
   }
 
   /** Returns stored metadata even when LMU has deleted the source .Vcr. */
@@ -296,19 +296,19 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
    * Stores `filename` as the recording described here. When the stored rows under that name hold a
    * different recording, they are renamed first (see dbReplayIdentity), never overwritten.
    */
-  public upsertReplayMetadataCache(filename: string, filePath: string, mtime: number, size: number, metadata: ReplayMetadata): void {
-    const archivedAs = archiveReplacedRecording(this.db, filename, { mtime, size, metadata });
+  public upsertReplayMetadataCache(filename: string, filePath: string, mtimeMs: number, fileSizeBytes: number, metadata: ReplayMetadata): void {
+    const archivedAs = archiveReplacedRecording(this.db, filename, { mtimeMs, fileSizeBytes, metadata });
     if (archivedAs) {
       console.log(`[SQLite Cache] ${filename} now holds another recording; the stored one is kept as ${archivedAs}`);
       this.markSessionDataChanged();
       this.telemetryMetadataRevision++;
     }
-    upsertReplayMetadataCache(this.db, filename, filePath, mtime, size, metadata);
+    upsertReplayMetadataCache(this.db, filename, filePath, mtimeMs, fileSizeBytes, metadata);
     this.replayMetadataRevision++;
   }
 
-  public getReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string): ReplayTrajectoryData | null {
-    return getReplayTrajectoryCache(this.db, filename, driverSlot, lapKey, mtime, size, filePath);
+  public getReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtimeMs: number, fileSizeBytes: number, filePath?: string): ReplayTrajectoryData | null {
+    return getReplayTrajectoryCache(this.db, filename, driverSlot, lapKey, mtimeMs, fileSizeBytes, filePath);
   }
 
   /** Returns a cached trajectory for a replay whose source .Vcr is no longer on disk. */
@@ -321,8 +321,8 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     return getReplayLapEdges(this.db, filename, driverSlot, lapKey, points);
   }
 
-  public hasValidReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, filePath?: string, expectedDriverSlot?: number): boolean {
-    return hasValidReplayTrajectoryCache(this.db, filename, driverSlot, lapKey, mtime, size, filePath, expectedDriverSlot);
+  public hasValidReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtimeMs: number, fileSizeBytes: number, filePath?: string, expectedDriverSlot?: number): boolean {
+    return hasValidReplayTrajectoryCache(this.db, filename, driverSlot, lapKey, mtimeMs, fileSizeBytes, filePath, expectedDriverSlot);
   }
 
   /** Which stored laps a replay's race positions index is built from (see dbRacePositionStore). */
@@ -342,8 +342,8 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     saveRacePositions(this.db, filename, signature, positions);
   }
 
-  public upsertReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtime: number, size: number, trajectory: ReplayTrajectoryData, filePath?: string): void {
-    upsertReplayTrajectoryCache(this.db, filename, driverSlot, lapKey, mtime, size, trajectory, filePath);
+  public upsertReplayTrajectoryCache(filename: string, driverSlot: number, lapKey: number, mtimeMs: number, fileSizeBytes: number, trajectory: ReplayTrajectoryData, filePath?: string): void {
+    upsertReplayTrajectoryCache(this.db, filename, driverSlot, lapKey, mtimeMs, fileSizeBytes, trajectory, filePath);
   }
 
   public setReplayTrajectoryDefaults(filename: string, driverSlot: number, defaultLapKey: number | null, resolvedDriverSlot?: number | null): void {
@@ -366,25 +366,25 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
   public replaceReplayDriverLaps(
     filename: string,
     filePath: string,
-    mtime: number,
-    size: number,
+    mtimeMs: number,
+    fileSizeBytes: number,
     driverSlotKey: number,
     trajectory: ReplayTrajectoryData,
     isPrimary: boolean
   ): void {
-    replaceReplayDriverLaps(this.db, { filename, filePath, mtime, size, driverSlotKey, isPrimary }, trajectory);
+    replaceReplayDriverLaps(this.db, { filename, filePath, mtimeMs, fileSizeBytes, driverSlotKey, isPrimary }, trajectory);
   }
 
   public getReplayDriverIngest(filename: string, driverSlot: number): ReplayDriverIngest | null {
     return getReplayDriverIngest(this.db, filename, driverSlot);
   }
 
-  public promoteReplayPrimary(filename: string, filePath: string, mtime: number, size: number, driverSlotKey: number): boolean {
-    return promoteReplayPrimary(this.db, { filename, filePath, mtime, size, driverSlotKey });
+  public promoteReplayPrimary(filename: string, filePath: string, mtimeMs: number, fileSizeBytes: number, driverSlotKey: number): boolean {
+    return promoteReplayPrimary(this.db, { filename, filePath, mtimeMs, fileSizeBytes, driverSlotKey });
   }
 
-  public recordReplayDriverIngest(filename: string, driverSlot: number, mtime: number, size: number, status: ReplayDriverIngestStatus, error?: string | null): void {
-    recordReplayDriverIngest(this.db, filename, driverSlot, mtime, size, status, error);
+  public recordReplayDriverIngest(filename: string, driverSlot: number, mtimeMs: number, fileSizeBytes: number, status: ReplayDriverIngestStatus, error?: string | null): void {
+    recordReplayDriverIngest(this.db, filename, driverSlot, mtimeMs, fileSizeBytes, status, error);
   }
 
   /** On-disk replays whose stored rows are behind the current parser version (see dbReplayUpgrade). */
@@ -560,8 +560,8 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     return { sessionsCount, tracksCount: new Set(rows.map(row => getDisplayTrackName(row.track_venue, row.track_course)).filter(Boolean)).size, summariesReadyCount };
   }
 
-  public upsertSession(session: DetailedSession, filePath: string, mtime: number, size: number): void {
-    insertOrUpdateSession(this.db, session, filePath, mtime, size);
+  public upsertSession(session: DetailedSession, filePath: string, mtimeMs: number, fileSizeBytes: number): void {
+    insertOrUpdateSession(this.db, session, filePath, mtimeMs, fileSizeBytes);
   }
 
   /** Links a replay to the session, whose laps then get that replay's conditions. */

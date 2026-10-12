@@ -22,8 +22,8 @@ export function repairSessionReload(store: SessionDatabase, playerName: string) 
     entries[key] = { ...entry, key, carClass };
     if (carClass !== entry.carClass) benchmarksChanged++;
   }
-  const rows = store.getDb().prepare('SELECT id,file_path,file_mtime,file_size FROM sessions').all() as Array<{
-    id: string; file_path: string; file_mtime: number; file_size: number;
+  const rows = store.getDb().prepare('SELECT id,file_path,file_mtime_ms,file_size_bytes FROM sessions').all() as Array<{
+    id: string; file_path: string; file_mtime_ms: number; file_size_bytes: number;
   }>;
   let sessionsChanged = 0;
   const unresolved: string[] = [];
@@ -39,7 +39,7 @@ export function repairSessionReload(store: SessionDatabase, playerName: string) 
       if (session.playerDriver === player && player.isPlayer && session.drivers.filter(driver => driver.isPlayer).length === 1) continue;
       for (const driver of session.drivers) driver.isPlayer = driver === player;
       session.playerDriver = player;
-      store.upsertSession(session, row.file_path, row.file_mtime, row.file_size);
+      store.upsertSession(session, row.file_path, row.file_mtime_ms, row.file_size_bytes);
       sessionsChanged++;
     }
   })();

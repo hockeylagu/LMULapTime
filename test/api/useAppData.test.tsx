@@ -1,13 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { serverRetryDelay, useAppData } from '../../src/api/useAppData.js';
-import type { ScanStatus } from '../../shared/types/index.js';
+import type { ReferenceBenchmarkDiff, ScanStatus } from '../../shared/types/index.js';
 import { getCachedVehicleLogos, setCachedVehicleLogos } from '../../src/api/vehicleLogosApi.js';
 
 const idle = (revision = 'server:0'): ScanStatus => ({ running: false, processed: 0, total: 0, currentFile: null,
   startedAt: null, finishedAt: null, result: null, error: null, dataRevision: revision,
   sessionScan: { running: false, startedAt: null, finishedAt: null, result: null, error: null },
-  referenceLaptimes: { started: true, running: false, checked: true, completedAt: null, refreshed: false, updatedCount: 0, diff: null, error: null } });
+  referenceLaptimes: { started: true, running: false, checked: true, completedAt: null, refreshed: false, diff: null, error: null } });
+/** A reference diff that updated this many targets. */
+const diffWith = (updated: number): ReferenceBenchmarkDiff => ({
+  timestamp: '2026-10-01T00:00:00Z', totalEntries: 10, added: [], removed: [],
+  updated: Array.from({ length: updated }, (_, i) => ({ key: `k${i}`, trackName: 'Spa', carClass: 'Hyper', patch: '1.4', type: 'updated' as const, oldAlienSec: 120, newAlienSec: 119 })),
+});
 const reply = (body: unknown) => Promise.resolve({ ok: true, json: () => Promise.resolve(body) });
 
 describe('app scan freshness', () => {
@@ -49,13 +54,13 @@ describe('app scan freshness', () => {
 
   it('shows a reference update once per completion, even across reloads', async () => {
     localStorage.removeItem('lmu.referenceUpdateSeen');
-    scan.referenceLaptimes = { ...scan.referenceLaptimes!, completedAt: 'ref-1', updatedCount: 3 };
+    scan.referenceLaptimes = { ...scan.referenceLaptimes!, completedAt: 'ref-1', diff: diffWith(3) };
     const first = await mount();
     expect(first.result.current.referenceUpdateCount).toBe(3);
     first.unmount();
     const second = await mount();
     expect(second.result.current.referenceUpdateCount).toBeNull();
-    scan.referenceLaptimes = { ...scan.referenceLaptimes!, completedAt: 'ref-2', updatedCount: 1 };
+    scan.referenceLaptimes = { ...scan.referenceLaptimes!, completedAt: 'ref-2', diff: diffWith(1) };
     second.unmount();
     const third = await mount();
     expect(third.result.current.referenceUpdateCount).toBe(1);

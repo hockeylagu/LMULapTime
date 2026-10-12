@@ -18,8 +18,8 @@ export function sessionTelemetryPath(
   const sourceDriver = driverOrdinal >= 0 ? session.drivers?.[driverOrdinal] : undefined;
   const driverLaps = sourceDriver?.laps ?? driver.laps;
   const lapMatches = (candidate: LapData) => typeof lap === 'number'
-    ? candidate.lapNum === lap
-    : candidate.lapNum === lap.lapNum && candidate.lapTime === lap.lapTime && candidate.s1 === lap.s1 && candidate.s2 === lap.s2 && candidate.s3 === lap.s3;
+    ? candidate.lapNumber === lap
+    : candidate.lapNumber === lap.lapNumber && candidate.lapTime === lap.lapTime && candidate.s1 === lap.s1 && candidate.s2 === lap.s2 && candidate.s3 === lap.s3;
   const matches = driverLaps.map((candidate, index) => lapMatches(candidate) ? index : -1).filter((index) => index >= 0);
   const lapOrdinal = typeof lap !== 'number' && driverLaps.includes(lap) ? driverLaps.indexOf(lap) : matches.length === 1 ? matches[0] : -1;
   if (driverOrdinal < 0 || lapOrdinal < 0) return null;
@@ -45,18 +45,18 @@ function sourceDriverOrdinal(session: { drivers?: DriverData[] }, driver: Partia
 export function sessionLapComparePath(
   session: Pick<DetailedSession, 'id' | 'trackVenue' | 'trackCourse'> & { drivers?: DetailedSession['drivers'] },
   driver: (Pick<DriverData, 'carClass' | 'carType'> & Partial<DriverData>) | undefined,
-  lapNum: number | null | undefined,
+  lapNumber: number | null | undefined,
 ): string {
   const params = new URLSearchParams({
     track: getDisplayTrackName(session.trackVenue, session.trackCourse),
     carClass: driver?.carClass ?? '',
     sessionId: session.id,
   });
-  if (lapNum) params.set('lapNum', String(lapNum));
+  if (lapNumber) params.set('lapNumber', String(lapNumber));
   if (driver) {
     const driverOrdinal = sourceDriverOrdinal(session, driver);
     const sourceDriver = driverOrdinal >= 0 ? session.drivers?.[driverOrdinal] : undefined;
-    const matches = (sourceDriver?.laps ?? driver.laps ?? []).flatMap((lap, index) => lap.lapNum === lapNum ? [index] : []);
+    const matches = (sourceDriver?.laps ?? driver.laps ?? []).flatMap((lap, index) => lap.lapNumber === lapNumber ? [index] : []);
     const lapOrdinal = matches.length === 1 ? matches[0] : -1;
     if (driverOrdinal >= 0 && lapOrdinal >= 0) {
       params.set('driverOrdinal', String(driverOrdinal));

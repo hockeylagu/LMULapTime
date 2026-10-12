@@ -19,7 +19,7 @@ function formatDelta(delta: number | null): string {
 }
 
 function LapLabel({ lap }: { lap: ComparableLap }) {
-  const when = [lap.sessionType, lap.dateString?.split(' ')[0]].filter(Boolean).join(' ');
+  const when = [lap.sessionType, lap.timeString?.split(' ')[0]].filter(Boolean).join(' ');
   return (
     <>
       <span className="text-white">{lap.driverName}</span>{' '}

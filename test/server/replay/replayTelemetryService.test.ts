@@ -20,7 +20,7 @@ describe('ReplayTelemetryService', () => {
   const mockDuckFile: DuckDbFileInfo = {
     filename: 'Daytona_R_2026.duckdb',
     filePath: '/telemetry/Daytona_R_2026.duckdb',
-    fileMtimeMs: 100000,
+    mtimeMs: 100000,
     fileSizeBytes: 2048,
     trackName: 'Daytona International Speedway',
     sessionType: 'R',
@@ -51,8 +51,8 @@ describe('ReplayTelemetryService', () => {
       { x: 20, y: 0, z: 40, timeSec: 2, speedKmh: 200 },
     ],
     pointsCount: 3,
-    rawPointsCount: 3,
-    rawSampleRateHz: 50,
+    vcrRawPointsCount: 3,
+    vcrRawSampleRateHz: 50,
     laps: [{ lapNumber: 1, lapTimeSec: 96.0, s1Sec: 30, s2Sec: 36, s3Sec: 30 }],
   } as unknown as ReplayTrajectoryData;
 
