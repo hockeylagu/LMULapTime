@@ -9,8 +9,7 @@ export function useMapDisplay(geometry?: TrackBoundaryGeometry | null, supplied?
   useEffect(() => {
     if (supplied !== undefined || !geometry?.geometryRevision) return;
     const controller = new AbortController();
-    const { layoutKey, geometryRevision } = geometry;
-    loadTrackMapDisplay(layoutKey, geometryRevision, controller.signal).then(display => {
+    loadTrackMapDisplay(geometry, controller.signal).then(display => {
       if (!controller.signal.aborted) setResult({ key, display, error: null });
     }).catch(error => {
       if (!controller.signal.aborted && !isAbortError(error)) setResult({ key, display: null,
