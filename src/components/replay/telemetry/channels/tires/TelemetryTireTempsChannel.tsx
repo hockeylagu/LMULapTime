@@ -4,7 +4,7 @@ import { Flame } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../../../shared/types/index.js';
 import { PointComparison } from '../../../../../utils/replayComparison.js';
 import { CornerPaths } from '../../telemetryChartPaths.js';
-import { WHEEL_CORNER_COLORS } from '../../../../../utils/themeColors.js';
+import { TelemetryWheelTrace } from '../TelemetryWheelTrace.js';
 
 export interface TelemetryTireTempsChannelProps {
   tireTempsPaths: CornerPaths;
@@ -27,27 +27,7 @@ export const TelemetryTireTempsChannel: React.FC<TelemetryTireTempsChannelProps>
   cursorPct,
 }) => {
   const chartSvg = useMemo(() => (
-    <svg viewBox="0 10 1000 85" preserveAspectRatio="none" className="w-full h-full">
-      {/* Baseline dashed lines */}
-      {baselineTireTempsPaths?.fl && (
-        <path d={baselineTireTempsPaths.fl} fill="none" stroke={WHEEL_CORNER_COLORS.fl} strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
-      )}
-      {baselineTireTempsPaths?.fr && (
-        <path d={baselineTireTempsPaths.fr} fill="none" stroke={WHEEL_CORNER_COLORS.fr} strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
-      )}
-      {baselineTireTempsPaths?.rl && (
-        <path d={baselineTireTempsPaths.rl} fill="none" stroke={WHEEL_CORNER_COLORS.rl} strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
-      )}
-      {baselineTireTempsPaths?.rr && (
-        <path d={baselineTireTempsPaths.rr} fill="none" stroke={WHEEL_CORNER_COLORS.rr} strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
-      )}
-
-      {/* Primary solid lines */}
-      {tireTempsPaths.fl && <path d={tireTempsPaths.fl} fill="none" stroke={WHEEL_CORNER_COLORS.fl} strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
-      {tireTempsPaths.fr && <path d={tireTempsPaths.fr} fill="none" stroke={WHEEL_CORNER_COLORS.fr} strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
-      {tireTempsPaths.rl && <path d={tireTempsPaths.rl} fill="none" stroke={WHEEL_CORNER_COLORS.rl} strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
-      {tireTempsPaths.rr && <path d={tireTempsPaths.rr} fill="none" stroke={WHEEL_CORNER_COLORS.rr} strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
-    </svg>
+    <TelemetryWheelTrace paths={tireTempsPaths} baselinePaths={baselineTireTempsPaths} />
   ), [tireTempsPaths, baselineTireTempsPaths]);
 
   const tt = currentPoint?.tireTemps;

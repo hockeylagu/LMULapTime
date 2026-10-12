@@ -4,7 +4,7 @@ import { Activity } from 'lucide-react';
 import { ReplayTelemetryPoint } from '../../../../../../shared/types/index.js';
 import { PointComparison } from '../../../../../utils/replayComparison.js';
 import { CornerPaths } from '../../telemetryChartPaths.js';
-import { WHEEL_CORNER_COLORS } from '../../../../../utils/themeColors.js';
+import { TelemetryWheelTrace } from '../TelemetryWheelTrace.js';
 
 export interface TelemetrySuspPosChannelProps {
   suspPosPaths: CornerPaths;
@@ -27,27 +27,7 @@ export const TelemetrySuspPosChannel: React.FC<TelemetrySuspPosChannelProps> = R
   cursorPct,
 }) => {
   const chartSvg = useMemo(() => (
-    <svg viewBox="0 10 1000 85" preserveAspectRatio="none" className="w-full h-full">
-      {/* Baseline dashed lines */}
-      {baselineSuspPosPaths?.fl && (
-        <path d={baselineSuspPosPaths.fl} fill="none" stroke={WHEEL_CORNER_COLORS.fl} strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
-      )}
-      {baselineSuspPosPaths?.fr && (
-        <path d={baselineSuspPosPaths.fr} fill="none" stroke={WHEEL_CORNER_COLORS.fr} strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
-      )}
-      {baselineSuspPosPaths?.rl && (
-        <path d={baselineSuspPosPaths.rl} fill="none" stroke={WHEEL_CORNER_COLORS.rl} strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
-      )}
-      {baselineSuspPosPaths?.rr && (
-        <path d={baselineSuspPosPaths.rr} fill="none" stroke={WHEEL_CORNER_COLORS.rr} strokeWidth="1" strokeDasharray="3 3" vectorEffect="non-scaling-stroke" opacity="0.6" />
-      )}
-
-      {/* Primary solid lines */}
-      {suspPosPaths.fl && <path d={suspPosPaths.fl} fill="none" stroke={WHEEL_CORNER_COLORS.fl} strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
-      {suspPosPaths.fr && <path d={suspPosPaths.fr} fill="none" stroke={WHEEL_CORNER_COLORS.fr} strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
-      {suspPosPaths.rl && <path d={suspPosPaths.rl} fill="none" stroke={WHEEL_CORNER_COLORS.rl} strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
-      {suspPosPaths.rr && <path d={suspPosPaths.rr} fill="none" stroke={WHEEL_CORNER_COLORS.rr} strokeWidth="1.3" vectorEffect="non-scaling-stroke" strokeLinecap="round" />}
-    </svg>
+    <TelemetryWheelTrace paths={suspPosPaths} baselinePaths={baselineSuspPosPaths} />
   ), [suspPosPaths, baselineSuspPosPaths]);
 
   const susp = currentPoint?.rideHeight;
