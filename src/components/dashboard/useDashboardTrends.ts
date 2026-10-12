@@ -89,9 +89,13 @@ export function useDashboardTrends(sessions: SessionSummary[]): DashboardTrendsR
       Test: 1,
     };
 
+    // Parse once per session instead of twice on every sort comparison.
+    const times = new Map(sessions.map(session => [session,
+      session.timeString ? new Date(session.timeString.replace(/\//g, '-')).getTime() : 0,
+    ]));
     const sorted = [...sessions].sort((a, b) => {
-      const timeA = a.timeString ? new Date(a.timeString.replace(/\//g, '-')).getTime() : 0;
-      const timeB = b.timeString ? new Date(b.timeString.replace(/\//g, '-')).getTime() : 0;
+      const timeA = times.get(a) ?? 0;
+      const timeB = times.get(b) ?? 0;
       if (timeB !== timeA) {
         return timeB - timeA;
       }
@@ -137,9 +141,7 @@ export function useDashboardTrends(sessions: SessionSummary[]): DashboardTrendsR
 
     if (validSessions.length > 0) {
       const newestValid = validSessions[0];
-      const newestValidTime = newestValid.timeString
-        ? new Date(newestValid.timeString.replace(/\//g, '-')).getTime()
-        : 0;
+      const newestValidTime = times.get(newestValid) ?? 0;
       const newestDateStr = newestValid.timeString?.split(' ')[0] || '';
 
       // 1. If there is a valid non-empty Race session on the same day/event, prefer it!
@@ -154,7 +156,7 @@ export function useDashboardTrends(sessions: SessionSummary[]): DashboardTrendsR
         const recentRace = validSessions.slice(0, 5).find(s => {
           if (s.sessionType !== 'Race') return false;
           if (!s.timeString || !newestValidTime) return true;
-          const sTime = new Date(s.timeString.replace(/\//g, '-')).getTime();
+          const sTime = times.get(s) ?? 0;
           return newestValidTime - sTime <= 7 * 24 * 60 * 60 * 1000;
         });
 
