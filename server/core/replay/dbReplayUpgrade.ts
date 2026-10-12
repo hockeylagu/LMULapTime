@@ -1,13 +1,13 @@
 import fs from 'fs';
-import { ReplayFileProgress } from './replayFileProgress.js';
 import path from 'path';
 import { Database as DatabaseType } from 'better-sqlite3';
 import { ReplayMetadata, ReplayTrajectoryData } from '../types.js';
 import { REPLAY_CACHE_VERSION, ReplaySyncProgress } from '../dbSchema.js';
-import { getReplayDriverIngest, isReplayDriverSettled, ReplayDriverIngestStatus } from './dbReplayIngestStore.js';
+import { getReplayDriverIngest, isReplayDriverSettled, ReplayDriverIngestStatus, type ReplayDriverIngest } from './dbReplayIngestStore.js';
 import { recordDriverFailure } from './dbReplaySync.js';
+import { ReplayDecodeError } from '../../replay/decode/replayDecodeError.js';
 import { parseReplayMetadata } from '../../replay/decode/replayParser.js';
-import { extractReplayTrajectoryInWorker } from '../../replay/worker/replayTrajectoryWorkerClient.js';
+import { storeReplayDriversInWorker } from '../../replay/worker/replayTrajectoryWorkerClient.js';
 
 // Rows written by an older, still compatible parser version are served as they are, but while LMU
 // still has the .Vcr they can be decoded again at the current version. That is this upgrade: one
@@ -41,6 +41,8 @@ export interface ReplayUpgradeResult {
 }
 
 export interface ReplayUpgradeHost {
+  getDbPath(): string;
+  getReplayDriverIngest(filename: string, driverSlot: number): ReplayDriverIngest | null;
   listReplayUpgradeBacklog(replaysDir: string): ReplayUpgradeCandidate[];
   upsertReplayMetadataCache(filename: string, filePath: string, mtime: number, size: number, metadata: ReplayMetadata): void;
   replaceReplayDriverLaps(filename: string, filePath: string, mtime: number, size: number, driverSlotKey: number, trajectory: ReplayTrajectoryData, isPrimary: boolean): void;
@@ -118,7 +120,6 @@ export async function* upgradeReplaysAsyncIterator(
   for (let index = 0; index < backlog.length && !interrupted; index++) {
     const candidate = backlog[index];
     const { filename, filePath, mtime, size } = candidate;
-    const fileProgress = new ReplayFileProgress(candidate.driverSlots.length);
     if (!isFileUnchanged(candidate)) continue;
 
     if (candidate.metadataOutdated) {
@@ -131,36 +132,67 @@ export async function* upgradeReplaysAsyncIterator(
       }
     }
 
-    for (const slot of candidate.driverSlots) {
-      if (options.shouldStop?.()) {
-        interrupted = true;
-        break;
-      }
+    if (options.shouldStop?.()) {
+      interrupted = true;
+      break;
+    }
+    if (candidate.driverSlots.length === 0) continue;
+    const includePrimary = candidate.driverSlots.includes(-1)
+      || candidate.primarySlot !== null && candidate.driverSlots.includes(candidate.primarySlot);
+    try {
+      const extraction = storeReplayDriversInWorker(host, filePath, { playerName: options.playerName }, {
+        filename, mtime, size, driverSlots: candidate.driverSlots.filter(slot => slot !== -1), includePrimary,
+        ...(includePrimary && candidate.primarySlot !== null && candidate.primarySlot >= 0 ? { primarySlot: candidate.primarySlot } : {}),
+      });
+      let step = await extraction.next();
+      let filePercent = 0;
       try {
-        // Slot -1 rows came from a decode that picked the player itself; decode them the same way.
-        const extraction = extractReplayTrajectoryInWorker(filePath, {
-          ...(slot === -1 ? {} : { driverSlot: slot }),
-          playerName: options.playerName,
-          maxPoints: 0,
-          allLaps: true,
-        });
-        let step = await extraction.next();
         while (!step.done) {
-          yield progress({ processed: index, total: backlog.length, currentFile: filename, stage: `Driver ${slot}: ${step.value.stageDescription}`, filePercent: fileProgress.decoding(step.value.percent) });
+          if (options.shouldStop?.()) {
+            interrupted = true;
+            break;
+          }
+          const update = step.value;
+          const percent = update.stage === 'caching'
+            ? 70 + 25 * (update.driversDone ?? 0) / Math.max(1, update.driversTotal ?? candidate.driverSlots.length)
+            : update.stage === 'lap_analysis' || update.stage === 'downsampling' ? 70 : update.percent * 0.75;
+          filePercent = Math.max(filePercent, Math.min(99, Math.floor(percent)));
+          yield progress({ processed: index, total: backlog.length, currentFile: filename,
+            stage: update.stageDescription, filePercent });
           step = await extraction.next();
         }
-        // LMU may have rewritten the file while it was decoded: leave it to the next sync.
-        if (!isFileUnchanged(candidate)) break;
-        const isPrimary = slot === -1 || slot === candidate.primarySlot;
-        const slotKey = slot === -1 ? (step.value.driverSlot ?? -1) : slot;
-        yield progress({ processed: index, total: backlog.length, currentFile: filename, stage: `Driver ${slot}: Persisting trajectory cache`, filePercent: fileProgress.saving() });
-        host.replaceReplayDriverLaps(filename, filePath, mtime, size, slotKey, step.value, isPrimary);
-        upgraded++;
-      } catch (error) {
+      } finally {
+        if (!step.done) await extraction.return({ drivers: [], failures: [] });
+      }
+      if (step.done) {
+        for (const slot of candidate.driverSlots) {
+          const match = (result: { driverSlotKey: number; isPrimary: boolean }) => result.driverSlotKey === slot || slot === -1 && result.isPrimary;
+          if (step.value.drivers.some(match)) upgraded++;
+          else {
+            failed++;
+            const failure = step.value.failures.find(match);
+            const error = failure?.code ? Object.assign(new Error(failure.message), { code: failure.code }) : new ReplayDecodeError(failure?.message ?? 'Replay driver produced no trajectory');
+            recordDriverFailure(host, filename, filePath, slot, mtime, size, error);
+          }
+        }
+        yield progress({ processed: index, total: backlog.length, currentFile: filename, stage: 'Finished replay drivers', filePercent: 100 });
+      } else if (interrupted) {
+        // Cancellation may arrive after a transaction commits but before the batch summary.
+        for (const slot of candidate.driverSlots) {
+          const attempt = host.getReplayDriverIngest(filename, slot);
+          if (attempt?.status === 'stored' && isReplayDriverSettled(attempt, mtime, size)) upgraded++;
+        }
+      }
+    } catch (error) {
+      for (const slot of candidate.driverSlots) {
+        const attempt = host.getReplayDriverIngest(filename, slot);
+        if (attempt?.status === 'stored' && isReplayDriverSettled(attempt, mtime, size)) {
+          upgraded++;
+          continue;
+        }
         failed++;
         recordDriverFailure(host, filename, filePath, slot, mtime, size, error);
       }
-      yield progress({ processed: index, total: backlog.length, currentFile: filename, stage: `Finished driver ${slot}`, filePercent: fileProgress.complete() });
     }
   }
 

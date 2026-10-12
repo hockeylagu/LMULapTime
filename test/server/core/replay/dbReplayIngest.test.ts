@@ -9,6 +9,7 @@ import { MAX_DECODE_ATTEMPTS } from '../../../../server/core/replay/dbReplayInge
 import { decompressTrajectory } from '../../../../server/core/replay/replayTrajectoryCodec.js';
 import type { ReplayTrajectoryData } from '../../../../server/core/types.js';
 import { createSliceVcrBuffer } from '../../../utils/mockVcr.js';
+import * as replayWorker from '../../../../server/replay/worker/replayTrajectoryWorkerClient.js';
 
 const name = 'Ingest_P1.Vcr';
 
@@ -41,12 +42,8 @@ describe('replay ingest', () => {
 
     it('keeps the previous set whole when a write fails partway', () => {
       db.replaceReplayDriverLaps(name, 'C:\\r\\' + name, 1, 1, 2, decoded([1, 2, 3]), false);
-      const write = db.upsertReplayTrajectoryCache.bind(db);
-      let writes = 0;
-      vi.spyOn(db, 'upsertReplayTrajectoryCache').mockImplementation((...args) => {
-        if (++writes === 2) throw new Error('disk full');
-        write(...args);
-      });
+      db.getDb().exec(`CREATE TRIGGER fail_second_lap BEFORE INSERT ON replay_trajectories
+        WHEN NEW.lap_key = 5 BEGIN SELECT RAISE(ABORT, 'disk full'); END`);
 
       expect(() => db.replaceReplayDriverLaps(name, 'C:\\r\\' + name, 1, 1, 2, decoded([4, 5]), false)).toThrow('disk full');
 
@@ -236,6 +233,25 @@ describe('replay ingest', () => {
       step = await retry.next();
       while (!step.done) step = await retry.next();
       expect(db.getStoredReplayTrajectory(name, -1, -1)).not.toBeNull();
+    });
+
+    it('preserves a committed primary when the shared worker crashes on a later driver', async () => {
+      const worker = vi.spyOn(replayWorker, 'storeReplayDriversInWorker').mockImplementation(async function* (_host, filePath, _options, save) {
+        const primary = { ...decoded([1]), driverSlot: 1 };
+        db.replaceReplayDriverLaps(name, filePath, save.mtime, save.size, 1, primary, true);
+        yield { stage: 'caching', stageDescription: 'Saved driver trajectory cache', percent: 100, driverStored: true, driverSlot: 1 };
+        throw new Error('worker stopped');
+      });
+      try {
+        const iterator = db.syncReplaysAsyncIterator(dir, { playerName: 'Player Driver' });
+        let step = await iterator.next();
+        while (!step.done) step = await iterator.next();
+        expect(db.getReplayDriverIngest(name, 1)?.status).toBe('stored');
+        expect(db.getReplayDriverIngest(name, -1)?.status).toBe('stored');
+        expect(db.getReplayDriverIngest(name, 2)).toMatchObject({ status: 'interrupted', error: 'worker stopped' });
+      } finally {
+        worker.mockRestore();
+      }
     });
 
     it('leaves a replay unplayable and queued for the next scan when its primary trajectory cannot be stored', async () => {

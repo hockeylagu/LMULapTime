@@ -506,6 +506,58 @@ Emitted with `eventType === 2` (across event classes) to report exact car states
 
 **Garage state of a point** (`server/replay/decode/garageState.ts`). A garage spell runs from a `21` (or the session start, when `16` is the driver's first pit event other than `33` / `49`) to the next `16`. Within it the car is `inGarage` while parked, then `inPit` from the moment it drives off (≥ 5 km/h) down the pit lane, where the pose pit bit (bit 17) is not set. The spell also ends once the car reaches 100 km/h, which keeps the race meanings of `16` / `21` from flagging racing laps. It is recomputed on read for every stored lap from the lap's `pitEvents`, so rows stored before the rule (type 49 taken for a garage return, the drive to the pit exit flagged as garage) need no re-decode.
 
+### Decoder stream performance and safety
+
+`extractReplayTrajectory` reads the frame stream in 16 MiB chunks. The 9-bit event
+payload size limits each event to 516 bytes including its header and padding. If
+`sliceStart + 6 + eventCount * 516` fits in the active buffer, the decoder can walk
+the event headers once. Otherwise it validates the complete slice before decoding
+any events; incomplete slices are carried into the next chunk without committing
+partial points, events or channel state.
+
+For an explicit or resolved target driver, unrelated pose, brake-temperature,
+virtual-energy and tyre-compound packets are skipped. Timing, weather, contacts,
+penalties, flags and standings remain replay-wide. X/Z rotations are rounded once
+when final trajectory points are built, preserving the previous precision and
+positive-zero output. The raw samples remain separate for lap classification and
+speed derivation. These optimizations do not change cached results or require a
+cache version bump.
+
+Local benchmark (2026-10-11): a 945,797,856-byte Daytona race replay, 61 drivers,
+extracting all 33 player laps at full resolution (185,101 points). After a warm-up
+pair, six alternating before/after pairs ran in fresh workers. Median extraction
+fell from 1,199 ms to 978 ms (221 ms / 18.4% saved); stream processing fell from
+871 ms to 645 ms. Finalization remained approximately 285 ms. All outputs had
+the same SHA-256 over serialized lap results, including replay-wide events.
+Measurements include file reads but exclude worker startup, result transfer and
+SQLite persistence. Filesystem reads were comparable (103 ms before / 104 ms
+after); this measures warm-file parsing, not cold-disk or full-race ingestion.
+
+For worker handoff, compression and complete field import measurements, see
+[VCR performance analysis](VCR_PERFORMANCE_ANALYSIS.md).
+
+File-backed imports now persist directly from the decoding worker. Lossless
+quality-6 compression runs before the SQLite writer transaction; driver laps,
+normalized facts, linked-session conditions, defaults and completion markers
+commit atomically after source-identity checks. The worker acknowledges the save
+with a compact summary, then on-demand requests read their requested lap from the
+committed cache. This changes neither the cache format nor parser version.
+
+Background sync and upgrades now use one frame-stream scan per replay for all
+pending drivers. `ReplayDriverSamples` copies each requested 65-byte pose payload,
+its session clock and channel-state reference into bounded 4,096-sample chunks.
+Lossless level-1 deflate chunks live in a worker-owned SQLite TEMP table, outside
+the application database. After the scan, one driver's chunks are consumed and
+deleted, decoded with the same pose decoder as direct requests, and finalized
+once using the complete timing, weather and incident history. Each finished lap
+is immediately encoded with the existing quality-6 Brotli codec; only compact
+lap spans remain for fact persistence. Each driver still commits atomically.
+
+Closing or terminating the worker releases temporary storage. Peak temporary
+allocation was 421 MiB for the measured 946 MB / 61-driver replay; this is an
+ingestion working-space cost, not additional archive data. Single-driver
+on-demand extraction retains the direct path without temporary packet staging.
+
 ## 5. Lap & Sector Timing Architecture: Official Simulation Timing Stream
 
 The parser directly streams official game engine scoring events (`Class 6 Type 6`) to construct lap summaries and sector splits matching the in-game HUD:

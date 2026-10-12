@@ -9,6 +9,7 @@ import { getReplayFactsVersion } from '../../../../server/core/replay/dbReplayLa
 import { ReplayDecodeError } from '../../../../server/replay/decode/replayDecodeError.js';
 import { MAX_DECODE_ATTEMPTS } from '../../../../server/core/replay/dbReplayIngestStore.js';
 import { createSliceVcrBuffer } from '../../../utils/mockVcr.js';
+import * as replayWorker from '../../../../server/replay/worker/replayTrajectoryWorkerClient.js';
 
 const name = 'Upgrade_P1.Vcr';
 
@@ -110,6 +111,15 @@ describe('replay upgrade', () => {
       .toEqual([{ source_version: REPLAY_CACHE_VERSION }]);
   });
 
+  it('preserves the stored default driver when the configured player changes', async () => {
+    ingestAsOlderVersion();
+    const iterator = db.upgradeReplaysAsyncIterator(dir, { playerName: 'Rival Driver' });
+    let step = await iterator.next();
+    while (!step.done) step = await iterator.next();
+    expect(step.value).toMatchObject({ upgraded: 2, failed: 0 });
+    expect(db.getStoredReplayTrajectory(name, -1, -1)?.driverSlot).toBe(1);
+  });
+
   it('records a driver the decoder rejects and keeps its older rows, listing it again until it failed MAX_DECODE_ATTEMPTS times', async () => {
     ingestAsOlderVersion();
     const replace = db.replaceReplayDriverLaps.bind(db);
@@ -132,14 +142,34 @@ describe('replay upgrade', () => {
 
   it('stops between drivers when asked, and the next run resumes with the rest', async () => {
     ingestAsOlderVersion();
-    let decoded = 0;
-
-    const first = await runUpgrade(() => decoded++ >= 1);
+    const first = await runUpgrade(() => db.getReplayDriverIngest(name, 1)?.status === 'stored');
 
     expect(first.interrupted).toBe(true);
+    expect(first.upgraded).toBe(1);
     expect(db.listReplayUpgradeBacklog(dir)).toEqual([expect.objectContaining({ driverSlots: [2], metadataOutdated: false })]);
 
     await runUpgrade();
     expect(db.listReplayUpgradeBacklog(dir)).toEqual([]);
+  });
+
+  it('keeps committed drivers marked as stored if the worker later crashes', async () => {
+    ingestAsOlderVersion();
+    const filePath = path.join(dir, name);
+    const stat = fs.statSync(filePath);
+    const trajectory = db.getStoredReplayTrajectory(name, 1, -1)!;
+    const worker = vi.spyOn(replayWorker, 'storeReplayDriversInWorker').mockImplementation(async function* () {
+      db.replaceReplayDriverLaps(name, filePath, Math.floor(stat.mtimeMs), stat.size, 1, trajectory, true);
+      yield { stage: 'caching', stageDescription: 'Saved driver trajectory cache', percent: 100, driverStored: true, driverSlot: 1 };
+      throw new Error('worker stopped');
+    });
+    try {
+      expect(await runUpgrade()).toMatchObject({ upgraded: 1, failed: 1 });
+      expect(db.getReplayDriverIngest(name, 1)?.status).toBe('stored');
+      expect(db.getReplayDriverIngest(name, -1)?.status).toBe('stored');
+      expect(db.getReplayDriverIngest(name, 2)).toMatchObject({ status: 'interrupted', error: 'worker stopped' });
+      expect(db.listReplayUpgradeBacklog(dir).map(candidate => candidate.driverSlots)).toEqual([[2]]);
+    } finally {
+      worker.mockRestore();
+    }
   });
 });

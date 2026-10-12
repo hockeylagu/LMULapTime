@@ -67,12 +67,7 @@ export interface LapDetectionResult {
 export function calculateCumulativeDistance(rawPts: RawTrajectoryPoint[]): number[] {
   const cumDist: number[] = [0];
   for (let i = 1; i < rawPts.length; i++) {
-    const d = Math.hypot(rawPts[i].x - rawPts[i - 1].x, rawPts[i].z - rawPts[i - 1].z);
-    if (d < 200) {
-      cumDist.push(cumDist[cumDist.length - 1] + d);
-    } else {
-      cumDist.push(cumDist[cumDist.length - 1]);
-    }
+    cumDist.push(cumDist[cumDist.length - 1] + replayDistanceStep(rawPts[i - 1], rawPts[i]));
   }
   return cumDist;
 }
@@ -112,7 +107,7 @@ export function detectLapsFromTelemetry(
   vcrTimingEvents: VcrTimingEvent[],
   targetSlot: number | undefined,
   replayPitEvents: ReplayPitEvent[],
-  maxPoints: number
+  maxPoints: number,
 ): LapDetectionResult {
   const cumDist = calculateCumulativeDistance(rawPts);
   let detectedLaps: DetectedLapInternal[] = [];
@@ -123,18 +118,7 @@ export function detectLapsFromTelemetry(
   const finishTimings = targetTimings.filter(e => e.sector === 0).sort((a, b) => a.lapIdx - b.lapIdx);
 
   if (finishTimings.length >= 1 && rawPts.length >= 2) {
-    function findClosestIdx(sTime: number): number {
-      let low = 0;
-      let high = rawPts.length - 1;
-      while (low <= high) {
-        const mid = (low + high) >> 1;
-        if (rawPts[mid].sTime < sTime) low = mid + 1;
-        else high = mid - 1;
-      }
-      if (low >= rawPts.length) return rawPts.length - 1;
-      if (low === 0) return 0;
-      return Math.abs(rawPts[low].sTime - sTime) < Math.abs(rawPts[low - 1].sTime - sTime) ? low : low - 1;
-    }
+
 
     for (let i = 0; i < finishTimings.length; i++) {
       const ft = finishTimings[i];
@@ -145,8 +129,8 @@ export function detectLapsFromTelemetry(
         : finishTimings[i - 1].sTime;
       const lapTimeSec = ft.splitSec > 0 ? Number(ft.splitSec.toFixed(3)) : Number((finishTime - startTime).toFixed(3));
 
-      const startIdx = findClosestIdx(startTime);
-      const endIdx = findClosestIdx(finishTime);
+      const startIdx = closestReplaySample(rawPts, startTime);
+      const endIdx = closestReplaySample(rawPts, finishTime);
       const lapDist = cumDist[endIdx] - cumDist[startIdx];
 
       const s1Ev = targetTimings.find(e => e.lapIdx === ft.lapIdx && e.sector === 1);
@@ -166,9 +150,9 @@ export function detectLapsFromTelemetry(
 
       if (s1Ev && isValidSplit(s1Ev.splitSec)) {
         s1Sec = Number(s1Ev.splitSec.toFixed(3));
-        s1Idx = findClosestIdx(s1Ev.sTime);
+        s1Idx = closestReplaySample(rawPts, s1Ev.sTime);
       } else if (s1Ev && s1Ev.sTime > startTime && (s1Ev.sTime - startTime) < lapTimeSec) {
-        s1Idx = findClosestIdx(s1Ev.sTime);
+        s1Idx = closestReplaySample(rawPts, s1Ev.sTime);
         s1Sec = Number((s1Ev.sTime - startTime).toFixed(3));
       } else {
         const s1TargetDist = cumDist[startIdx] + lapDist * 0.3333;
@@ -178,12 +162,12 @@ export function detectLapsFromTelemetry(
 
       if (s1Ev && s2Ev && isValidSplit(s1Ev.splitSec) && isValidSplit(s2Ev.splitSec) && s2Ev.splitSec > s1Ev.splitSec && (s2Ev.splitSec - s1Ev.splitSec) < lapTimeSec) {
         s2Sec = Number((s2Ev.splitSec - s1Ev.splitSec).toFixed(3));
-        s2Idx = findClosestIdx(s2Ev.sTime);
+        s2Idx = closestReplaySample(rawPts, s2Ev.sTime);
       } else if (s2Ev && s1Ev && s2Ev.sTime > s1Ev.sTime && (s2Ev.sTime - s1Ev.sTime) < lapTimeSec) {
-        s2Idx = findClosestIdx(s2Ev.sTime);
+        s2Idx = closestReplaySample(rawPts, s2Ev.sTime);
         s2Sec = Number((s2Ev.sTime - s1Ev.sTime).toFixed(3));
       } else if (s2Ev && s2Ev.sTime > startTime && (s2Ev.sTime - startTime) < lapTimeSec && (s2Ev.sTime - startTime) > s1Sec) {
-        s2Idx = findClosestIdx(s2Ev.sTime);
+        s2Idx = closestReplaySample(rawPts, s2Ev.sTime);
         s2Sec = Number((s2Ev.sTime - startTime - s1Sec).toFixed(3));
       } else {
         s2Idx = s1Idx;
@@ -230,7 +214,7 @@ export function detectLapsFromTelemetry(
     // Check if vehicle continued on track after last finish event and completed sectors
     if (finishTimings.length > 0 && rawPts.length > 0) {
       const lastFt = finishTimings[finishTimings.length - 1];
-      const lastStartIdx = findClosestIdx(lastFt.sTime);
+      const lastStartIdx = closestReplaySample(rawPts, lastFt.sTime);
       const finalIdx = rawPts.length - 1;
       const inProgressDist = cumDist[finalIdx] - cumDist[lastStartIdx];
       const inProgressTime = rawPts[finalIdx].sTime - lastFt.sTime;
@@ -246,9 +230,9 @@ export function detectLapsFromTelemetry(
 
         if (s1Ev && s1Ev.splitSec > 0) {
           s1Sec = Number(s1Ev.splitSec.toFixed(3));
-          s1Idx = findClosestIdx(s1Ev.sTime);
+          s1Idx = closestReplaySample(rawPts, s1Ev.sTime);
         } else if (s1Ev && s1Ev.sTime > lastFt.sTime) {
-          s1Idx = findClosestIdx(s1Ev.sTime);
+          s1Idx = closestReplaySample(rawPts, s1Ev.sTime);
           s1Sec = Number((s1Ev.sTime - lastFt.sTime).toFixed(3));
         } else {
           const s1TargetDist = cumDist[lastStartIdx] + inProgressDist * 0.3333;
@@ -258,9 +242,9 @@ export function detectLapsFromTelemetry(
 
         if (s2Ev && s1Ev && s2Ev.splitSec > s1Ev.splitSec && s1Ev.splitSec > 0) {
           s2Sec = Number((s2Ev.splitSec - s1Ev.splitSec).toFixed(3));
-          s2Idx = findClosestIdx(s2Ev.sTime);
+          s2Idx = closestReplaySample(rawPts, s2Ev.sTime);
         } else if (s2Ev && s1Ev && s2Ev.sTime > s1Ev.sTime) {
-          s2Idx = findClosestIdx(s2Ev.sTime);
+          s2Idx = closestReplaySample(rawPts, s2Ev.sTime);
           s2Sec = Number((s2Ev.sTime - s1Ev.sTime).toFixed(3));
         } else {
           s2Idx = s1Idx;
@@ -290,20 +274,7 @@ export function detectLapsFromTelemetry(
       }
     }
 
-    const validLaps = detectedLaps.filter(l => l.isValid && !l.isPitStop && l.lapTimeSec > 30);
-    const validFlying = validLaps.filter(l => !l.isOutlap);
-    const pool = validFlying.length > 0 ? validFlying : validLaps;
-    let minTime = Infinity;
-    let bestLapNum = pool[0]?.lapNumber;
-    for (const l of pool) {
-      if (l.lapTimeSec < minTime) {
-        minTime = l.lapTimeSec;
-        bestLapNum = l.lapNumber;
-      }
-    }
-    detectedLaps.forEach(l => {
-      if (l.lapNumber === bestLapNum) l.isBest = true;
-    });
+    markBestReplayLap(detectedLaps);
   }
 
   if (detectedLaps.length === 0) {
@@ -358,4 +329,40 @@ export function detectLapsFromTelemetry(
     pitIntervals,
     lapsSummary,
   };
+}
+
+/** Selects the clean flying pool, falling back to valid laps when none are flying. */
+function markBestReplayLap<T extends Pick<DetectedLapInternal, 'isValid' | 'isPitStop' | 'isOutlap' | 'lapTimeSec' | 'lapNumber' | 'isBest'>>(laps: T[]): void {
+  const validLaps = laps.filter(l => l.isValid && !l.isPitStop && l.lapTimeSec > 30);
+  const validFlying = validLaps.filter(l => !l.isOutlap);
+  const pool = validFlying.length > 0 ? validFlying : validLaps;
+  let minTime = Infinity;
+  let bestLapNum = pool[0]?.lapNumber;
+  for (const l of pool) {
+    if (l.lapTimeSec < minTime) {
+      minTime = l.lapTimeSec;
+      bestLapNum = l.lapNumber;
+    }
+  }
+  laps.forEach(l => {
+    l.isBest = l.lapNumber === bestLapNum;
+  });
+}
+
+function replayDistanceStep(previous: Pick<RawTrajectoryPoint, 'x' | 'z'>, current: Pick<RawTrajectoryPoint, 'x' | 'z'>): number {
+  const distance = Math.hypot(current.x - previous.x, current.z - previous.z);
+  return distance < 200 ? distance : 0;
+}
+
+function closestReplaySample(rawPts: ReadonlyArray<Pick<RawTrajectoryPoint, 'sTime'>>, sTime: number): number {
+  let low = 0;
+  let high = rawPts.length - 1;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    if (rawPts[mid].sTime < sTime) low = mid + 1;
+    else high = mid - 1;
+  }
+  if (low >= rawPts.length) return rawPts.length - 1;
+  if (low === 0) return 0;
+  return Math.abs(rawPts[low].sTime - sTime) < Math.abs(rawPts[low - 1].sTime - sTime) ? low : low - 1;
 }

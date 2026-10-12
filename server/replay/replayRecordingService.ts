@@ -1,7 +1,7 @@
 import fs from 'fs';
 import { SessionDatabase } from '../core/db.js';
 import { parseReplayMetadata } from './decode/replayParser.js';
-import { extractReplayTrajectoryInWorker } from './worker/replayTrajectoryWorkerClient.js';
+import { storeReplayTrajectoryInWorker } from './worker/replayTrajectoryWorkerClient.js';
 import { settledReplayFailure } from '../core/replay/dbReplayIngestStore.js';
 import { recordDriverFailure } from '../core/replay/dbReplaySync.js';
 import { decodeOrThrow } from './decode/replayDecodeError.js';
@@ -12,7 +12,7 @@ import { ReplayMetadata, ReplayTrajectoryData } from '../core/types.js';
 /** Serves retained replay recordings from SQLite, decoding missing drivers in a worker. */
 export class ReplayRecordingService {
   // Decodes in flight, by replay, driver and file version (see decodeDriver).
-  private readonly pendingDecodes = new Map<string, Promise<ReplayTrajectoryData>>();
+  private readonly pendingDecodes = new Map<string, Promise<void>>();
 
   public constructor(private readonly sessionDb: SessionDatabase) {}
 
@@ -120,10 +120,10 @@ export class ReplayRecordingService {
       throw new Error(`Replay ${replayName} could not be decoded for driver ${driverSlotKey}: ${settledError}`);
     }
 
-    const decoded = await this.decodeDriver(filePath, replayName, driverSlotKey, mtime, stat.size, options.playerName);
-    const laps = decoded.allLapsData && decoded.allLapsData.length > 0 ? decoded.allLapsData : [decoded];
-    // The requested lap, or the default lap (the best one) when the recording has no such lap.
-    const { allLapsData: _unused, ...chosen } = laps.find(lap => lap.currentLap === options.lapNumber) ?? decoded;
+    await this.decodeDriver(filePath, replayName, driverSlotKey, mtime, stat.size, options.playerName);
+    const chosen = this.sessionDb.getReplayTrajectoryCache(replayName, driverSlotKey, lapKey, mtime, stat.size, filePath)
+      ?? this.sessionDb.getReplayTrajectoryCache(replayName, driverSlotKey, -1, mtime, stat.size, filePath);
+    if (!chosen) throw new Error('Replay cache changed before the requested lap could be read');
     return this.withLapEdges(replayName, chosen);
   }
 
@@ -139,26 +139,23 @@ export class ReplayRecordingService {
     mtime: number,
     size: number,
     playerName?: string
-  ): Promise<ReplayTrajectoryData> {
+  ): Promise<void> {
     const key = `${replayName}\0${driverSlotKey}\0${mtime}\0${size}`;
     const pending = this.pendingDecodes.get(key);
     if (pending) return pending;
 
-    const decode = (async (): Promise<ReplayTrajectoryData> => {
+    const decode = (async (): Promise<void> => {
       // Stores the file's metadata first: if the file is another recording than the stored rows under
       // its name, those are renamed out of the way before the decoded laps take the name.
       this.getMetadata(filePath, replayName, playerName);
-      const extraction = extractReplayTrajectoryInWorker(filePath, {
+      const extraction = storeReplayTrajectoryInWorker(this.sessionDb, filePath, {
         driverSlot: driverSlotKey,
         playerName,
         maxPoints: 0,
         allLaps: true,
-      });
+      }, { filename: replayName, mtime, size, driverSlotKey, isPrimary: false });
       let step = await extraction.next();
       while (!step.done) step = await extraction.next();
-      const trajectory = step.value;
-      this.sessionDb.replaceReplayDriverLaps(replayName, filePath, mtime, size, driverSlotKey, trajectory, false);
-      return trajectory;
     })();
     this.pendingDecodes.set(key, decode);
     return decode

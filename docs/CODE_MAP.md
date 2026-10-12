@@ -257,8 +257,14 @@ index their explicitly supplied replay directory locally.
 ## 3. Life of a replay lap (VCR → telemetry studio)
 
 - Decode (all in `server/replay/decode/`): `replayParser.ts` (header, driver index, slices; format in `docs/VCR_FORMAT.md`) → `replayTrajectory.ts`
-  (`extractReplayTrajectory`) → laps sliced by `replayLapBuilder.ts` / `replayLapPoints.ts` → garage/pit state `garageState.ts`.
-- Always on a worker: `worker/replayTrajectoryWorkerClient.ts` (bootstrap `.mjs`), used by `ReplayRecordingService` (`replayRecordingService.ts`).
+  (`extractReplayTrajectory` / `extractReplayDriverTrajectories`) → shared pose decoder `replayPose.ts` → `replayTrajectoryFinalizer.ts`
+  → laps sliced by `replayLapBuilder.ts` / `replayLapPoints.ts` → garage/pit state `garageState.ts`.
+- File-backed ingestion runs in `worker/replayTrajectoryWorkerClient.ts` (bootstrap `.mjs`), also used by `ReplayRecordingService` (`replayRecordingService.ts`).
+  Sync/upgrades scan pending drivers together once, staging bounded pose chunks in worker-owned SQLite TEMP storage (`replayDriverSamples.ts`).
+  They materialize and finalize one driver at a time, encode each lap immediately, then atomically save its existing blobs/facts/defaults/ingest markers
+  through `dbReplayDriverStore.ts`. Upgrades preserve the stored default driver even when the configured player changes.
+  Single-driver on-demand requests use direct extraction, then read the committed cache. Private `:memory:` test databases use a synchronous fallback.
+  Temporary disk and peak-memory costs, first-driver availability and unchanged final DB sizes are measured in [VCR performance analysis](VCR_PERFORMANCE_ANALYSIS.md).
 - Driver selection prefers exact normalized names and rejects ambiguous partial matches.
   Native replay trajectories retain their session clock and timing-loop lap start; DuckDB fusion explicitly
   converts that clock to lap time, including early race laps. Older retained rows use their first sample.

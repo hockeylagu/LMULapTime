@@ -4,7 +4,7 @@ import path from 'node:path';
 import { SessionDatabase } from '../../../../server/core/db.js';
 import { getReplayConditions, getReplayLaps } from '../../../../server/core/replay/dbReplayLapStore.js';
 import { replayFailureStatus } from '../../../../server/core/replay/dbReplayIngestStore.js';
-import { storeReplayTrajectoryInWorker } from '../../../../server/replay/worker/replayTrajectoryWorkerClient.js';
+import { storeReplayTrajectoryInWorker, storeReplayDriversInWorker } from '../../../../server/replay/worker/replayTrajectoryWorkerClient.js';
 import { extractReplayTrajectory } from '../../../../server/replay/decode/replayTrajectory.js';
 import { parseReplayMetadata } from '../../../../server/replay/decode/replayParser.js';
 import { ReplayRecordingService } from '../../../../server/replay/replayRecordingService.js';
@@ -101,6 +101,26 @@ describe('worker SQLite persistence', () => {
     expect((await service.getFullTrajectory(filePath, filename, { driverSlot: 1 })).points).toEqual(result.points);
   });
 
+  it('isolates a driver write failure during one replay-wide worker scan', async () => {
+    db.getDb().exec(`CREATE TRIGGER reject_rival BEFORE INSERT ON replay_trajectories
+      WHEN NEW.driver_slot = 2 BEGIN SELECT RAISE(ABORT, 'rival storage failure'); END`);
+    const extraction = storeReplayDriversInWorker(db, filePath, { playerName: 'Samuel Lague' }, {
+      filename, mtime, size, driverSlots: [1, 2], includePrimary: true,
+    });
+    let traversals = 0;
+    let step = await extraction.next();
+    while (!step.done) {
+      if (step.value.stage === 'stream_init') traversals++;
+      step = await extraction.next();
+    }
+    expect(traversals).toBe(1);
+    expect(step.value.drivers.map(driver => driver.driverSlotKey)).toEqual([1]);
+    expect(step.value.failures).toEqual([expect.objectContaining({ driverSlotKey: 2, code: 'SQLITE_CONSTRAINT_TRIGGER' })]);
+    expect(db.getStoredReplayTrajectory(filename, 1, -1)).not.toBeNull();
+    expect(db.getStoredReplayTrajectory(filename, 2, -1)).toBeNull();
+    expect(db.getReplayDriverIngest(filename, -1)?.status).toBe('stored');
+  });
+
   it('uses worker saves during background ingestion and upgrades', async () => {
     fs.writeFileSync(filePath, createSliceVcrBuffer({
       drivers: [{ name: 'Test Driver', vehicleId: '21_26_AFCO95641716', team: 'A', carNumber: '21' }],
@@ -126,5 +146,28 @@ describe('worker SQLite persistence', () => {
     expect(upgraded.value).toMatchObject({ failed: 0, upgraded: 1 });
     expect(db.getReplayDriverIngest(filename, 1)?.parserVersion).toBe(REPLAY_CACHE_VERSION);
     expect(mainSave).not.toHaveBeenCalled();
+  });
+
+  it('preserves the stored default during a file-backed upgrade with a different player', async () => {
+    fs.writeFileSync(filePath, createSliceVcrBuffer({
+      drivers: [
+        { name: 'Original Player', vehicleId: '21_26_AFCO95641716', team: 'A', carNumber: '21' },
+        { name: 'New Player', vehicleId: '21_26_AFCO95641716', team: 'B', carNumber: '22' },
+      ],
+      slices: [1, 2].flatMap(driverSlot => [
+        { sTime: 0, driverSlot, x: 0, y: 0, z: 0 },
+        { sTime: 1, driverSlot, x: 10, y: 0, z: 10 },
+      ]),
+    }));
+    const sync = db.syncReplaysAsyncIterator(directory, { playerName: 'Original Player' });
+    let synced = await sync.next();
+    while (!synced.done) synced = await sync.next();
+    expect(db.getStoredReplayTrajectory(filename, -1, -1)?.driverSlot).toBe(1);
+    db.getDb().exec("UPDATE replay_trajectories SET parser_version = 'v4'; DELETE FROM replay_ingest_drivers;");
+    const upgrade = db.upgradeReplaysAsyncIterator(directory, { playerName: 'New Player' });
+    let upgraded = await upgrade.next();
+    while (!upgraded.done) upgraded = await upgrade.next();
+    expect(upgraded.value).toMatchObject({ upgraded: 2, failed: 0 });
+    expect(db.getStoredReplayTrajectory(filename, -1, -1)?.driverSlot).toBe(1);
   });
 });

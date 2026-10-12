@@ -22,6 +22,12 @@ export interface ReplayStreamProgress {
   lapsDetected?: number;
   /** Resolved primary slot, available before decoding starts so callers can count driver work once. */
   driverSlot?: number;
+  /** A per-driver transaction has committed during a replay-wide import. */
+  driverStored?: boolean;
+  driversDone?: number;
+  driversTotal?: number;
+  /** Allocated SQLite TEMP pages; removed when the replay worker closes. */
+  temporaryBytes?: number;
 }
 
 export type ReplayProgressCallback = (progress: ReplayStreamProgress) => void;
@@ -76,6 +82,7 @@ export class ReplayProgressTracker {
       currentTimeSec?: number;
       lapsDetected?: number;
       driverSlot?: number;
+      temporaryBytes?: number;
     }
   ): void {
     const clampedPercent = Math.min(100, Math.max(0, Math.round(percent)));

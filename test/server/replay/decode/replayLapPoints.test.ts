@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { lapEdgesFromNeighbours, LAP_EDGE_PADDING_SEC } from '../../../../server/replay/decode/replayLapPoints.js';
+import { buildTrajectoryPoints, lapEdgesFromNeighbours, LAP_EDGE_PADDING_SEC } from '../../../../server/replay/decode/replayLapPoints.js';
 import { ReplayTrajectoryPoint } from '../../../../server/core/types.js';
 
 // 50 m/s, one sample every 0.1 s (5 m); sample i is at time 100 + i * 0.1.
@@ -8,6 +8,14 @@ const samples = (from: number, to: number, jumpAt?: number): ReplayTrajectoryPoi
     const i = from + k;
     return { x: i * 5 + (jumpAt !== undefined && i < jumpAt ? -500 : 0), y: 0, z: 0, timeSec: Number((100 + i * 0.1).toFixed(2)) };
   });
+
+it('retains the decoder rotation precision and positive zero after a single rounding pass', () => {
+  const [point] = buildTrajectoryPoints([
+    { sTime: 1, x: 0, y: 0, z: 0, rotX: -0.000001, rotY: 0, rotZ: 0.123456 },
+  ], [], []);
+  expect(point.rotX).toBe(0);
+  expect(point.rotZ).toBe(0.1235);
+});
 
 describe('lapEdgesFromNeighbours', () => {
   it('takes LAP_EDGE_PADDING_SEC of recording from the end of the previous lap and the start of the next', () => {

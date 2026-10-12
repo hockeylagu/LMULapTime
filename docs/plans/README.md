@@ -1,12 +1,13 @@
 # Plans and remaining work
 
-Reviewed against the working tree on 2026-10-10. This is the entry point for delivery status;
+General review: 2026-10-10; replay storage/ingestion entries updated 2026-10-12. This is the entry point for delivery status;
 [CODE_MAP.md](../CODE_MAP.md) describes the implementation. A proposal is not a shipped feature.
 
 ## Active work
 
 | Plan | Status | Next useful step | Completion gate |
 |---|---|---|---|
+| [Replay storage and ingestion design](REPLAY_STORAGE_DESIGN.md) | Proposed; [initial POC](REPLAY_STORAGE_POC.md) complete; both candidates rejected on size | Evaluate storage reductions against current compact lap format | Storage size first, app read response second, ingestion third; archived-data safety and domain parity required |
 | [Corner comparison rework](CORNER_COMPARISON_REWORK.md) | In progress on `corner-map`; not integrated into main | Read the worktree's hybrid handoff; complete M2 metric/sequence revalidation, then M3 inspector acceptance | Accepted shared action maps, independent events, swap symmetry and additive timing; visual/sequence gates and consumer integration verified before merging |
 
 The main corner engine still derives windows from the primary lap's speed trace. The separate

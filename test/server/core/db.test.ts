@@ -412,8 +412,8 @@ describe('SessionDatabase replay cache', () => {
     const stat = fs.statSync(filePath);
     const mtime = Math.floor(stat.mtimeMs);
     expect(step.value).toMatchObject({ added: 1, skipped: 0, interrupted: false });
-    expect(progress).toContainEqual(expect.objectContaining({ stage: 'Primary driver: Decoding telemetry and events' }));
-    expect(progress).toContainEqual(expect.objectContaining({ stage: 'Rival Driver: Persisting trajectory cache' }));
+    expect(progress.filter(item => item.stage === 'Decoding telemetry and events')).toHaveLength(1);
+    expect(progress.filter(item => item.stage === 'Saved driver trajectory cache')).toHaveLength(2);
     const percents = progress.flatMap(item => item.filePercent === undefined ? [] : [item.filePercent]);
     expect(percents).toEqual([...percents].sort((a, b) => a - b));
     expect(percents.filter(percent => percent === 100)).toHaveLength(1);

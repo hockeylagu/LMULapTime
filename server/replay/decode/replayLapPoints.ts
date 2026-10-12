@@ -37,9 +37,11 @@ export function buildTrajectoryPoints(
       x: Number(cur.x.toFixed(4)),
       y: Number(cur.y.toFixed(4)),
       z: Number(cur.z.toFixed(4)),
-      rotX: cur.rotX !== undefined ? Number(cur.rotX.toFixed(4)) : undefined,
+      // The old decoder rounded X/Z before this conversion, turning rounded -0 into
+      // +0 on the second pass. Keep that output while rounding each value only once.
+      rotX: cur.rotX !== undefined ? Number(cur.rotX.toFixed(4)) + 0 : undefined,
       rotY: Number(cur.rotY.toFixed(4)),
-      rotZ: cur.rotZ !== undefined ? Number(cur.rotZ.toFixed(4)) : undefined,
+      rotZ: cur.rotZ !== undefined ? Number(cur.rotZ.toFixed(4)) + 0 : undefined,
       speedKmh: Number(rawSpeed.toFixed(2)),
       throttle: cur.rawThrottle ?? 0,
       brake: cur.rawBrake ?? 0,

@@ -21,7 +21,6 @@ import {
 import { DuckDbFileInfo } from '../telemetry/telemetryMatcher.js';
 import {
   initDbSchema,
-  REPLAY_CACHE_VERSION,
   CacheStats,
   SyncResult,
   SessionSyncProgress,
@@ -32,12 +31,10 @@ import {
   syncReplaysAsyncIterator as runSyncReplaysAsyncIterator,
   syncReplaysIterator as runSyncReplaysIterator,
   syncReplaysFromDir as runSyncReplaysFromDir,
-  cacheAllLapsForDriver,
   ReplaySyncHost,
   ReplayAsyncSyncOptions,
 } from './replay/dbReplaySync.js';
 import {
-  deleteReplayDriverLaps,
   getReplayDriverIngest,
   recordReplayDriverIngest,
   ReplayDriverIngest,
@@ -135,7 +132,7 @@ import {
   getTelemetrySessionCandidatesStartingBetween,
 } from './dbReconciliationStore.js';
 import type { ReplayMatchTarget } from '../sessions/replayMatching.js';
-import { storeDecodedReplayFacts } from './replay/dbReplayLapStore.js';
+import { replaceReplayDriverLaps } from './replay/dbReplayDriverStore.js';
 import { loadSessions } from './sessionRows/access.js';
 import { classifySessionConditions, reclassifyStoredSessions } from './dbSessionConditions.js';
 import {
@@ -375,21 +372,7 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     trajectory: ReplayTrajectoryData,
     isPrimary: boolean
   ): void {
-    this.db.transaction(() => {
-      deleteReplayDriverLaps(this.db, filename, driverSlotKey);
-      cacheAllLapsForDriver(this, filename, filePath, mtime, size, driverSlotKey, trajectory);
-      // New replay conditions reach the laps of the sessions linked to the replay.
-      if (storeDecodedReplayFacts(this.db, filename, driverSlotKey, trajectory, REPLAY_CACHE_VERSION)) {
-        this.reclassifyStoredSessions({ replayName: filename });
-      }
-      recordReplayDriverIngest(this.db, filename, driverSlotKey, mtime, size, 'stored');
-      if (isPrimary) {
-        // Rows stored under the alias itself (from a decode that could not name the slot) are superseded.
-        if (driverSlotKey !== -1) deleteReplayDriverLaps(this.db, filename, -1);
-        this.setReplayTrajectoryDefaults(filename, -1, trajectory.currentLap ?? null, driverSlotKey);
-        if (driverSlotKey !== -1) recordReplayDriverIngest(this.db, filename, -1, mtime, size, 'stored');
-      }
-    })();
+    replaceReplayDriverLaps(this.db, { filename, filePath, mtime, size, driverSlotKey, isPrimary }, trajectory);
   }
 
   public getReplayDriverIngest(filename: string, driverSlot: number): ReplayDriverIngest | null {

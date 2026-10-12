@@ -1,5 +1,8 @@
 import fs from 'fs';
 import path from 'path';
+import { ReplayDriverSamples } from './replayDriverSamples.js';
+import { decodeReplayPose } from './replayPose.js';
+import { finalizeReplayDriver } from './replayTrajectoryFinalizer.js';
 import {
   ReplayTrajectoryData,
   ReplayPenaltyEvent,
@@ -14,12 +17,7 @@ import { detectPlayerName, parseReplayMetadata } from './replayParser.js';
 import {
   RawTrajectoryPoint,
   VcrTimingEvent,
-  DetectedLapInternal,
-  detectLapsFromTelemetry,
 } from './replayLapBuilder.js';
-import { buildTrajectoryPoints } from './replayLapPoints.js';
-import { replayWeatherCondition } from '../../../shared/domain/lapConditions.js';
-import { nearestSelectedIndex, selectFeatureSamples } from './trajectoryDownsampler.js';
 import {
   ReplayProgressTracker,
   ReplayProgressCallback,
@@ -56,33 +54,6 @@ const PENALTY_TYPE_NAMES: Record<number, string> = {
   3: 'Time',
 };
 
-function decodePacketSpeedKmh(payload: Buffer, offset: number): number | undefined {
-  const b0 = payload[offset];
-  const b1 = payload[offset + 1];
-  const b2 = payload[offset + 2];
-  const b3 = payload[offset + 3];
-  const b4 = payload[offset + 4];
-  if ((b0 | b1 | b2 | b3 | b4) === 0) return undefined;
-
-  const readSigned16 = (low: number, high: number): number => {
-    const value = low | (high << 8);
-    return value & 0x8000 ? value - 0x10000 : value;
-  };
-
-  const high1 = (b1 & 0x20) ? (b1 & 0x3f) + 192 : b1 & 0x3f;
-  const velocity1 = 3.6 * readSigned16(b0, high1) / 32;
-
-  const low2 = (b1 >> 6) + ((b2 & 0x3f) << 2);
-  const high2 = (b2 >> 6) + ((b3 & 1) << 2) + ((b3 & 2) ? 248 : 0);
-  const velocity2 = 3.6 * readSigned16(low2, high2) / 20;
-
-  const low3 = ((b3 & 0xfc) >> 2) + ((b4 & 3) << 6);
-  const high3 = (b4 & 0x80) ? (b4 >> 2) + 192 : b4 >> 2;
-  const velocity3 = 3.6 * readSigned16(low3, high3) / 32;
-  const speed = Math.hypot(velocity1, velocity2, velocity3);
-  return isFinite(speed) ? speed : undefined;
-}
-
 /**
  * Extracts downsampled 2D/3D car trajectory and live inputs from replay frames.
  */
@@ -90,12 +61,34 @@ export function extractReplayTrajectory(
   filePath: string,
   options: ExtractReplayTrajectoryOptions = {}
 ): ReplayTrajectoryData {
-  const startTimeMs = Date.now();
+  const extraction = extractReplayDriverTrajectories(filePath, options);
+  try {
+    const first = extraction.next();
+    if (first.done) throw new Error('Replay decoder produced no driver result');
+    return first.value;
+  } finally {
+    extraction.return();
+  }
+}
+
+export interface ExtractReplayDriversOptions extends ExtractReplayTrajectoryOptions {
+  driverSlots?: readonly number[];
+  includePrimary?: boolean;
+  onDriverError?: (driverSlot: number | undefined, error: unknown) => void;
+  onLapResult?: (lap: ReplayTrajectoryData) => ReplayTrajectoryData;
+}
+
+/** Traverses the source stream once, then finalizes one driver at a time from bounded disk staging. */
+export function* extractReplayDriverTrajectories(
+  filePath: string,
+  options: ExtractReplayDriversOptions = {}
+): Generator<ReplayTrajectoryData, void, void> {
   const filename = path.basename(filePath);
   const stat = fs.statSync(filePath);
   const totalFileSize = stat.size;
 
   const fd = fs.openSync(filePath, 'r');
+  let samples: ReplayDriverSamples | undefined;
 
   try {
     const head = Buffer.alloc(64);
@@ -122,8 +115,8 @@ export function extractReplayTrajectory(
       );
     }
 
-    if (frameStreamBytes <= 0) {
-      return {
+    if (frameStreamBytes <= 0 && !options.driverSlots) {
+      yield {
         replayName: filename,
         pointsCount: 0,
         currentLap: 1,
@@ -132,6 +125,7 @@ export function extractReplayTrajectory(
         bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 },
         points: [],
       };
+      return;
     }
 
     // Stage 2: Metadata Block & Driver Roster
@@ -152,9 +146,16 @@ export function extractReplayTrajectory(
       if (players.length === 1 && typeof players[0].slot === 'number') targetSlot = players[0].slot;
     }
     if (options.driverName && targetSlot === undefined) throw new Error(`Replay driver "${options.driverName}" is unavailable`);
-    if (options.driverSlot !== undefined && !meta.drivers.some(driver => driver.slot === options.driverSlot)) {
+    if (!options.driverSlots && options.driverSlot !== undefined && !meta.drivers.some(driver => driver.slot === options.driverSlot)) {
       throw new Error(`Replay driver slot ${options.driverSlot} is unavailable`);
     }
+
+    const targets = options.driverSlots
+      ? [...new Set([...(options.includePrimary ? [targetSlot] : []), ...options.driverSlots])]
+      : [targetSlot];
+    const requestedSlots = options.driverSlots ? new Set(options.driverSlots) : undefined;
+    if (requestedSlots && options.includePrimary && targetSlot !== undefined) requestedSlots.add(targetSlot);
+    if (requestedSlots) samples = new ReplayDriverSamples();
 
     const matchedDriver = meta.drivers.find(d => d.slot === targetSlot);
     tracker.report('metadata', 10, { driverSlot: targetSlot });
@@ -238,16 +239,22 @@ export function extractReplayTrajectory(
           break;
         }
 
-        let tempSp = sp + 6;
-        let canParseSlice = true;
-        for (let e = 0; e < nEvents; e++) {
-          if (tempSp + 4 > activeLen) { canParseSlice = false; break; }
-          const h = buf.readUInt32LE(tempSp);
-          const sz = (h >> 8) & 0x1ff;
-          tempSp += 4 + 1 + sz;
-          if (tempSp > activeLen) { canParseSlice = false; break; }
+        // A 9-bit payload length cannot exceed 511 bytes (+4 header, +1 padding).
+        // Most slices therefore fit without a preliminary header walk. Near the buffer
+        // boundary, verify the whole slice before committing any events so carryover
+        // never duplicates points, timing events or state updates.
+        if (sp + 6 + nEvents * 516 > activeLen) {
+          let tempSp = sp + 6;
+          let canParseSlice = true;
+          for (let e = 0; e < nEvents; e++) {
+            if (tempSp + 4 > activeLen) { canParseSlice = false; break; }
+            const h = buf.readUInt32LE(tempSp);
+            const sz = (h >>> 8) & 0x1ff;
+            tempSp += 4 + 1 + sz;
+            if (tempSp > activeLen) { canParseSlice = false; break; }
+          }
+          if (!canParseSlice) break;
         }
-        if (!canParseSlice) break;
 
         slicesFound++;
         lastSTime = sTime;
@@ -261,93 +268,37 @@ export function extractReplayTrajectory(
           const rawClass = (h >>> 29);
           const evType = (h >>> 17) & 0x3f;
 
+          // Only the chosen driver's pose and channel state feed its trajectories.
+          // Scoring, weather, contacts and other replay-wide events remain unfiltered.
+          if ((requestedSlots ? !requestedSlots.has(drv) : targetSlot !== undefined && drv !== targetSlot) && (
+            (sz === 65 && evType >= 7 && evType <= 15)
+            || (evType === 15 && (sz === 24 || sz === 37))
+            || (evClass === 0 && evType === 51 && sz === 3)
+            || (evClass === 0 && evType === 16 && sz === 4)
+          )) {
+            eventSp += 4 + 1 + sz;
+            continue;
+          }
+
           if (sz === 65 && evType >= 7 && evType <= 15) {
-            if (targetSlot !== undefined && drv !== targetSlot) {
-              eventSp += 4 + 1 + sz;
-              continue;
-            }
-
-            const x = buf.readFloatLE(eventSp + 5 + 41);
-            const y = buf.readFloatLE(eventSp + 5 + 45);
-            const z = buf.readFloatLE(eventSp + 5 + 49);
-
-            if (Math.abs(x) < 20000 && Math.abs(z) < 20000 && !isNaN(x) && !isNaN(z)) {
-              const rotX = buf.readFloatLE(eventSp + 5 + 53);
-              const rotY = buf.readFloatLE(eventSp + 5 + 57);
-              const rotZ = buf.readFloatLE(eventSp + 5 + 61);
-
-              const info2 = buf.readUInt32LE(eventSp + 5 + 4);
-              const detachablePartState = info2 & 0x3ff;
-
-              const raw16 = buf.readUInt16LE(eventSp + 5 + 4);
-              const steer10 = raw16 & 0x3ff;
-              // The wheel reads positive to the right; ISO 8855 steering is positive to the left.
-              const steerYaw = parseFloat(((512 - steer10) / 512).toFixed(4));
-
-              // Byte 5 is raw 8-bit throttle pedal (1 = 0% idle/lift, 249 = 100% full throttle)
-              const rawThrByte = buf[eventSp + 5 + 5];
-              const rawThrottle = rawThrByte <= 1 ? 0 : Math.min(100, Math.round(((rawThrByte - 1) / 248) * 100));
-
-              // Byte 36 is raw brake input (0 = 0%, bits 0..5 = pressure, bit 6 = ABS, bit 7 = TC)
-              const rawBrkByte = buf[eventSp + 5 + 36];
-              const rawBrake = rawBrkByte === 0 ? 0 : Math.min(100, Math.round(((rawBrkByte & 0x3f) / 63) * 100));
-              const absActive = Boolean(rawBrkByte & 0x40);
-              const tcActive = Boolean(rawBrkByte & 0x80);
-
-              // Byte 38 is status & surface flags (bit 0 = off-track, bit 2 = pit limiter)
-              const statusByte = buf[eventSp + 5 + 38];
-              const isOffTrack = Boolean(statusByte & 0x01);
-              const pitLimiter = Boolean(statusByte & 0x04);
-              const info1 = buf.readUInt32LE(eventSp + 5);
-              const inPit = Boolean(info1 & (1 << 17));
-              const speedKmhRaw = decodePacketSpeedKmh(buf, eventSp + 5 + 8);
-
-              // Engine RPM: 10-bit field spanning byte 6 bit 5 through byte 7 bit 6
-              const rpmRaw10 = (buf.readUInt16LE(eventSp + 5 + 6) >>> 5) & 0x3ff;
-              const engineRpm = rpmRaw10 < 1023 ? Math.round(rpmRaw10 * 10.9228) : undefined;
-
-              // Gear: evType ranges 7-15, mapping to gear = evType - 8
-              const gearRaw = evType >= 7 && evType <= 15 ? evType - 8 : undefined;
-
-              const latestWheel = driverWheelTelemetry.get(drv);
-
-              const pt: RawTrajectoryPoint = {
-                sTime,
-                x,
-                y,
-                z,
-                rotX: Number(rotX.toFixed(4)),
-                rotY,
-                rotZ: Number(rotZ.toFixed(4)),
-                steerYaw,
-                rawThrottle,
-                rawBrake,
-                tcActive,
-                absActive,
-                pitLimiter,
-                inPit,
-                isOffTrack,
-                gearRaw,
-                speedKmhRaw,
-                detachablePartState,
-                engineRpm,
-                wheelSpeeds: latestWheel?.wheelSpeeds ? [...latestWheel.wheelSpeeds] : undefined,
-                brakeTemps: latestWheel?.brakeTemps ? [...latestWheel.brakeTemps] : undefined,
-                virtualEnergy: driverVirtualEnergy.get(drv),
-                rainIntensity: currentRainIntensity,
-                ambientTemp: currentAmbientTemp,
-                tireCompoundIndices: driverTireCompounds.get(drv),
-              };
-
-              if (targetSlot !== undefined) {
-                rawPts.push(pt);
-              } else {
-                let pts = driverPoints.get(drv);
-                if (!pts) {
-                  pts = [];
-                  driverPoints.set(drv, pts);
-                }
-                pts.push(pt);
+            const latestWheel = driverWheelTelemetry.get(drv);
+            const state = {
+              wheelSpeeds: latestWheel?.wheelSpeeds,
+              brakeTemps: latestWheel?.brakeTemps,
+              virtualEnergy: driverVirtualEnergy.get(drv),
+              rainIntensity: currentRainIntensity,
+              ambientTemp: currentAmbientTemp,
+              tireCompoundIndices: driverTireCompounds.get(drv),
+            };
+            if (samples) {
+              samples.append(drv, sTime, evType, buf, eventSp + 5, state);
+            } else {
+              const point = decodeReplayPose(buf, eventSp + 5, sTime, evType, state);
+              if (point && targetSlot !== undefined) rawPts.push(point);
+              else if (point) {
+                let points = driverPoints.get(drv);
+                if (!points) { points = []; driverPoints.set(drv, points); }
+                points.push(point);
               }
             }
           } else if (evClass === 3 && evType === 6 &&
@@ -539,6 +490,8 @@ export function extractReplayTrajectory(
         buf.copy(buf, 0, sp, activeLen);
       }
 
+      samples?.flush();
+
       // Progression update (mapped to 15% - 85% range)
       const bytesDone = filePos - 57;
       const streamFraction = frameStreamBytes > 0 ? Math.min(1, bytesDone / frameStreamBytes) : 1;
@@ -553,133 +506,32 @@ export function extractReplayTrajectory(
       });
     }
 
-    if (rawPts.length === 0 && targetSlot !== undefined && driverPoints.has(targetSlot)) {
-      rawPts.push(...driverPoints.get(targetSlot)!);
-    }
-
-    const maxPoints = options.maxPoints !== undefined ? options.maxPoints : 1200;
-
-    // Stage 5: Lap Classification & Split Timing Correlation
-    tracker.report('lap_analysis', 88);
-    const lapAnalysis = detectLapsFromTelemetry(rawPts, vcrTimingEvents, targetSlot, replayPitEvents, maxPoints);
-    const { detectedLaps, pitIntervals, lapsSummary } = lapAnalysis;
-    const targetPitEvents = targetSlot !== undefined ? replayPitEvents.filter(e => e.driverSlot === targetSlot) : [];
-
-    if (!options.silent) {
-      const cleanFlying = detectedLaps.filter(l => l.isValid && !l.isOutlap && !l.isPitStop);
-      const outLaps = detectedLaps.filter(l => l.isOutlap);
-      const best = detectedLaps.find(l => l.isBest);
-      const bestStr = best
-        ? `Best: Lap ${best.lapNumber} (${best.lapTimeSec.toFixed(3)}s [S1: ${best.s1Sec}s, S2: ${best.s2Sec}s, S3: ${best.s3Sec}s])`
-        : 'Best: N/A';
-      console.log(
-        `[VCR Parser] [5/6] Lap Analysis: ${detectedLaps.length} laps detected (${cleanFlying.length} flying, ${outLaps.length} out-laps) | ${bestStr}`
-      );
-    }
-
-    // Stage 6: Trajectory Downsampling & Finalization
-    tracker.report('downsampling', 95);
-
-    function buildLapResult(chosenLap: DetectedLapInternal): ReplayTrajectoryData {
-      const lapRawPts = rawPts.slice(chosenLap.startIdx, chosenLap.endIdx + 1);
-      const rawPointsCount = lapRawPts.length;
-      const lapDuration = chosenLap.lapTimeSec || (rawPts.length > 0 ? Math.max(0.001, rawPts[chosenLap.endIdx].sTime - rawPts[chosenLap.startIdx].sTime) : 0);
-      const rawSampleRateHz = lapDuration > 0 && rawPointsCount > 1
-        ? Math.round((rawPointsCount - 1) / lapDuration)
-        : 0;
-
-      const lapPoints = buildTrajectoryPoints(lapRawPts, pitIntervals, targetPitEvents);
-      const selected = maxPoints > 0 && lapPoints.length > maxPoints ? selectFeatureSamples(lapPoints, maxPoints) : null;
-      const finalPoints = selected ? selected.map(i => lapPoints[i]) : lapPoints;
-
-      const lapSpan = Math.max(1, chosenLap.endIdx - chosenLap.startIdx);
-      const sectorFrame = (sectorIdx: number): number => {
-        if (selected) return nearestSelectedIndex(selected, sectorIdx - chosenLap.startIdx);
-        const fraction = (sectorIdx - chosenLap.startIdx) / lapSpan;
-        return Math.min(finalPoints.length - 1, Math.round(fraction * finalPoints.length));
-      };
-      const s1Frame = sectorFrame(chosenLap.s1Idx);
-      const s2Frame = sectorFrame(chosenLap.s2Idx);
-
-      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-      for (const p of finalPoints) {
-        if (p.x < minX) minX = p.x;
-        if (p.x > maxX) maxX = p.x;
-        if (p.z < minZ) minZ = p.z;
-        if (p.z > maxZ) maxZ = p.z;
+    samples?.flush();
+    if (samples) tracker.report('lap_analysis', 85, { temporaryBytes: samples.allocatedBytes });
+    for (const driverSlot of targets) {
+      try {
+        const targetSlot = driverSlot;
+        if (targetSlot !== undefined && !meta.drivers.some(driver => driver.slot === targetSlot)) {
+          throw new Error(`Replay driver slot ${targetSlot} is unavailable`);
+        }
+        const driverName = meta.drivers.find(driver => driver.slot === targetSlot)?.name
+          || (targetSlot !== undefined ? `Driver ${targetSlot}` : undefined);
+        const context = {
+          filename, driverSlot: targetSlot, driverName, timings: vcrTimingEvents,
+          events: { penalties: replayPenalties, contacts: replayContacts, pitEvents: replayPitEvents,
+            flagEvents: replayFlagEvents, standingsHistory, weatherEvents: replayWeatherEvents },
+          maxSessionRain, currentAmbientTemp, tireCompounds: targetSlot !== undefined ? driverTireCompounds.get(targetSlot) : undefined,
+        };
+        const result = finalizeReplayDriver(samples ? samples.read(targetSlot) : rawPts, context, options, options.onLapResult);
+        if (!result) throw new Error('Replay decoder produced no driver result');
+        yield result;
+      } catch (error) {
+        if (!options.onDriverError) throw error;
+        options.onDriverError(driverSlot, error);
       }
-
-      if (!isFinite(minX)) {
-        minX = 0; maxX = 0; minZ = 0; maxZ = 0;
-      }
-
-      return {
-        replayName: filename,
-        driverSlot: targetSlot,
-        driverName,
-        pointsCount: finalPoints.length,
-        rawPointsCount,
-        rawSampleRateHz,
-        maxPoints: options.maxPoints,
-        isFullResolution: finalPoints.length >= rawPointsCount,
-        currentLap: chosenLap.lapNumber,
-        timeReference: 'session',
-        lapStartTimeSec: chosenLap.startTimeSec ?? lapRawPts[0]?.sTime,
-        laps: lapsSummary,
-        sectors: { s1Frame, s2Frame },
-        bounds: {
-          minX: Number(minX.toFixed(4)),
-          maxX: Number(maxX.toFixed(4)),
-          minZ: Number(minZ.toFixed(4)),
-          maxZ: Number(maxZ.toFixed(4)),
-          spanX: Number((maxX - minX).toFixed(4)),
-          spanZ: Number((maxZ - minZ).toFixed(4)),
-        },
-        points: finalPoints,
-        signConvention: 'iso8855',
-        penalties: replayPenalties.length > 0 ? replayPenalties : undefined,
-        contacts: replayContacts.length > 0 ? replayContacts : undefined,
-        pitEvents: replayPitEvents.length > 0 ? replayPitEvents : undefined,
-        flagEvents: replayFlagEvents.length > 0 ? replayFlagEvents : undefined,
-        standingsHistory: standingsHistory.length > 0 ? standingsHistory : undefined,
-        sessionRunningOrder: standingsHistory.length > 0 ? standingsHistory[standingsHistory.length - 1].order : undefined,
-        wheelTelemetryAvailable: Boolean(finalPoints.some(p => p.wheelSpeeds !== undefined || p.brakeTemps !== undefined)),
-        energyTelemetryAvailable: Boolean(finalPoints.some(p => p.virtualEnergy !== undefined)),
-        weatherEvents: replayWeatherEvents.length > 0 ? replayWeatherEvents : undefined,
-        weatherCondition: replayWeatherCondition(maxSessionRain),
-        maxRainIntensity: maxSessionRain > 0 ? maxSessionRain : undefined,
-        ambientTemp: currentAmbientTemp,
-        tireCompounds: targetSlot !== undefined ? driverTireCompounds.get(targetSlot) : undefined,
-      };
     }
-
-    let chosen = detectedLaps.find(l => l.lapNumber === options.lapNumber);
-    if (!chosen) {
-      chosen = detectedLaps.find(l => l.isBest) || detectedLaps[0];
-    }
-
-    const allLapsData = options.allLaps ? detectedLaps.map(l => buildLapResult(l)) : undefined;
-    const result = allLapsData
-      ? allLapsData.find(r => r.currentLap === chosen!.lapNumber)!
-      : buildLapResult(chosen);
-
-    if (allLapsData) {
-      result.allLapsData = allLapsData;
-    }
-
-    tracker.report('downsampling', 100);
-
-    if (!options.silent) {
-      const elapsedMs = Date.now() - startTimeMs;
-      const wheels = result.wheelTelemetryAvailable ? 'yes' : 'no';
-      const energy = result.energyTelemetryAvailable ? 'yes' : 'no';
-      console.log(
-        `[VCR Parser] [6/6] Finalized: Lap ${result.currentLap} downsampled to ${result.pointsCount} pts (raw: ${result.rawPointsCount} @ ${result.rawSampleRateHz}Hz) | Bounds: ${result.bounds.spanX}m x ${result.bounds.spanZ}m | Telemetry: wheels=${wheels}, energy=${energy} (${elapsedMs}ms)`
-      );
-    }
-
-    return result;
   } finally {
+    samples?.close();
     fs.closeSync(fd);
   }
 }

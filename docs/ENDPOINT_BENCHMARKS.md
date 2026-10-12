@@ -1,5 +1,30 @@
 # Endpoint performance history
 
+## One replay source scan, unchanged storage — 2026-10-12
+
+The endpoint sweep passed with 20 warm samples per case on the same fixed cohort
+and snapshot (`fd7875490434`) as the earlier direct-worker run. No case crossed
+the harness's regression threshold (>20% and >5 ms). Replay telemetry was 93.47 ms
+median versus 90.15 ms previously; replay-cache listing was 225.44 ms versus
+223.34 ms. These are cached HTTP requests and do not exercise live ingestion.
+Concurrent unrelated working-tree changes are also present, so small timing
+differences should not be attributed to this ingestion change. The controlled
+lap-cache comparison returned identical responses with roughly 11–14 ms medians.
+See [the complete ingestion measurements](VCR_PERFORMANCE_ANALYSIS.md) for the
+separate import benefit, identical database sizes and temporary-space tradeoff.
+
+## Direct replay worker persistence — 2026-10-12
+
+The production endpoint sweep completed successfully with 20 warm samples per
+case after integration. The fixed cohort was retained, but the database snapshot
+changed (`fd7875490434`), so the harness correctly withheld comparisons against
+the previous run. This sweep serves retained recordings and does not time live
+VCR imports. The slowest warm cases were replay-cache listing (223 ms median),
+native telemetry (158 ms) and traffic (151 ms); replay telemetry was 90 ms.
+Direct worker writes target import time and main-thread responsiveness, rather
+than these existing cached-read costs. See [the paired replay import measurements](VCR_PERFORMANCE_ANALYSIS.md)
+for the controlled before/after result and full data-equivalence checks.
+
 ## Fixed class identity correction — 2026-10-11
 
 The fixed Spa/Fuji cohort's class was explicitly updated from legacy `LMGT3` to the stored `GT3`
