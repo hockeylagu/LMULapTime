@@ -2,7 +2,8 @@ import fs from 'fs';
 import type { DetailedSession, ReplayMetadata } from '../core/types.js';
 import type { TelemetryLink, TelemetryMetadataRecord } from '../core/dbTelemetryStore.js';
 import type { ReplayFileEntry } from '../sessions/sessionXmlTypes.js';
-import { CIRCUIT_SPECIFICATIONS, getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
+import { CIRCUIT_SPECIFICATIONS } from '../../shared/domain/circuitDefinitions.js';
+import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import {
   DuckDbFileInfo,
   findDuckDbForReplay,

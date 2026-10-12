@@ -3,9 +3,9 @@
 A fast index for new sessions: find the right file without searching. `AGENTS.md` holds the rules;
 this file holds the **routes through the code**. Keep it current (see "Keeping this file current" at the end).
 
-Last checked 2026-10-11: 495 TypeScript source files in src/server/shared, 292 test files,
-2543 tests (2487 passed, 56 skipped). Full tests and production build rechecked after the benchmark GT3 identity correction, fixed player locator and non-empty response checks.
-Coverage rechecked during this cleanup: 94.84% lines, 92.53% statements,
+Last checked 2026-10-11: 494 TypeScript source files in src/server/shared, 295 test suites,
+2559 tests (2503 passed, 56 skipped). Full tests and production build rechecked after the shared-domain cleanup and ranking/weekend follow-up review.
+Previous coverage measurement (not rerun for the shared-domain cleanup): 94.84% lines, 92.53% statements,
 92.78% functions and 83.66% branches. Branch/worktree results are separate; see [plans](plans/README.md).
 
 ---
@@ -99,6 +99,17 @@ derived facts are columns of `session_drivers` / `session_laps` (see above); `se
 completed/declared/clean laps, driving time, distance, pit count, speed, position, pace inputs,
 and session date/layout. `buildSessionAggregate.ts` reuses the driver/lap projections; it does not
 reclassify laps. `aggregateStore.ts` writes those facts inside the same source/projection transaction.
+The 2026-10-11 shared-domain cleanup makes `buildSessionSummaryProjection.ts` select clean laps once per driver,
+reuse the selection for consistency and top-N metrics, reuse the consistency average, and check membership with a Set.
+Driver, lap and condition projection arrays are assembled once; consistency appends to local condition arrays.
+Projection consumers import its defining module directly. Circuit constants/types come from `circuitDefinitions.ts`,
+and every layout resolution calls `getCircuitSpecification` in `circuitSpecs.ts` directly.
+Leaderboard sector and top-three pace rankings map each sorted value to its first rank, preserving competition ties
+without scanning the sorted list for every entry. `findWeekendSessions` derives the current session's layout/event/timing
+once and selects the nearest session of each type during one traversal, retaining only the best candidates;
+`aggregateTrackSummaries` honors class filtering and the explicit empty-venue option in one pass.
+Same-car rival comparison computes class rivals only as a fallback. The scalar and indexed lap-class position APIs
+share the ranking rule while retaining the indexed API's reusable peer index.
 Dashboard metrics/trends scan these rows, not card JSON or detailed lap history; track queries
 reuse the stored timestamp/sectors/length and progression reads the stored date. Benchmarks remain
 current-target calculations. Failed projections retain a zero-player fact row for session counts.
@@ -489,7 +500,6 @@ the completed 2026-09-29 cleanup and does not describe all remaining findings.
 
 **Logic in the wrong place / duplicated**
 - Comparison profiling (read-only, 2026-10-10): selected normalized lap reads and shared equivalent best-lap queries removed full-session overfetch. All-driver pages still run personal-best lookups for each distinct visible driver; Spa LMP3's first all-driver page measured about 127 ms warm after the change. Investigate those SQL scopes and query plans if optimizing further; this is a backend observation, not a browser measurement.
-- `lapClassPosition` and the indexed `lapClassPositions` (`shared/domain/lapPlaces.ts`) match car classes by lowercased name instead of canonical class resolution.
 - The improvement chart keeps its own `SessionProgressionPoint` (`improvementChartTypes.ts`), a copy of the shared one plus the
   benchmark pace fields.
 
@@ -533,7 +543,7 @@ The client loads logos via `src/api/vehicleLogosApi.ts` (one shared request; a f
 `LOGO_RETRY_COOLDOWN_MS` before retrying) and renders manufacturer SVG badges via `src/components/vehicle/CarLogo.tsx` across car views (dashboard hero and cars card, session lists, session details, standings, track details, leaderboard, and rivals). Rows that name a car use `src/components/vehicle/CarIdentity.tsx` (logo, name and class badge with one spacing and tooltip; the logo is decorative next to the visible name).
 `serverTrackSync.ts` and `TrackGeometryStore` use this provider for projection and
 surface enrichment. Missing geometry clears old road annotations and marks odometer stations;
-`shared/domain/trackGeometry.ts` provides `hasCompatibleTrackStations` to reject odometer stations and require matching station sources and geometry revisions. `ReplayInspectorContent`, replay corner consistency, session debrief and leaderboard debrief gate geometry-dependent corner results with this check; recorded-channel analysis remains available without compatible track geometry. Metric map caches
+`shared/domain/trackGeometry.ts` provides `hasCompatibleTrackStations` to require explicit `track` station sources and nonempty matching geometry revisions; missing metadata and odometer stations are rejected. `ReplayInspectorContent`, replay corner consistency, session debrief and leaderboard debrief gate geometry-dependent corner results with this check; recorded-channel analysis remains available without compatible track geometry. Metric map caches
 include package revision. Basic SVG layouts remain bundled and thumbnail helpers can use them
 without loading any metric data.
 

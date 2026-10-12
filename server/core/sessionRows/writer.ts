@@ -2,7 +2,7 @@ import type { Database as DatabaseType, Statement } from 'better-sqlite3';
 import type { DetailedSession, DriverData, LapData } from '../types.js';
 import type { TrafficCar, TrafficGap } from '../../../shared/types/raceTraffic.js';
 import type { SessionDriverProjection, SessionLapProjection, SessionSummaryProjection } from '../../../shared/types/sessionSummaries.js';
-import { buildSessionSummaryProjection } from '../../../shared/domain/sessionSummaries/index.js';
+import { buildSessionSummaryProjection } from '../../../shared/domain/sessionSummaries/buildSessionSummaryProjection.js';
 import { insertSql, packFields, type Field, type Row, type SqlValue } from './fields.js';
 import { DRIVER_DERIVED_DEFS, LAP_DERIVED_DEFS, SESSION_ROW_TABLES, derivedNames } from './schema.js';
 import {

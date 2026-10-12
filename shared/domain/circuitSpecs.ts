@@ -1,10 +1,5 @@
-export {
-  type CircuitSpecification,
-  CIRCUIT_SPECIFICATIONS,
-  LMU_SCENE_DESC_MAP,
-} from './circuitDefinitions.js';
 import {
-  CircuitSpecification,
+  type CircuitSpecification,
   CIRCUIT_SPECIFICATIONS,
   LMU_SCENE_DESC_MAP,
 } from './circuitDefinitions.js';

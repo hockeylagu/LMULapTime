@@ -2,7 +2,8 @@ import type { Database } from 'better-sqlite3';
 import type { TrackSummary } from '../../../shared/types/index.js';
 import { computeTheoreticalBest, getDisplayTrackName, minValidTime } from '../../../shared/domain/formatters.js';
 import { sessionWhere, carClassMatch, type SessionQuery, type SqlFragment } from './pageQueries.js';
-import { CIRCUIT_SPECIFICATIONS, getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
+import { CIRCUIT_SPECIFICATIONS } from '../../../shared/domain/circuitDefinitions.js';
+import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 
 export interface TrackDetailFilterOptions {
   carModels: string[];

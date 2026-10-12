@@ -1,6 +1,7 @@
 import type { Database as DatabaseType } from 'better-sqlite3';
 import type { ComparableLap } from '../types.js';
-import { CIRCUIT_SPECIFICATIONS, getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
+import { CIRCUIT_SPECIFICATIONS } from '../../../shared/domain/circuitDefinitions.js';
+import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { formatTime } from '../../../shared/domain/formatters.js';
 import type { ComparableLapsResult } from '../../sessions/sessionAnalytics.js';
 import { comparisonLapKey, readComparisonLapRows } from './comparisonLapRows.js';

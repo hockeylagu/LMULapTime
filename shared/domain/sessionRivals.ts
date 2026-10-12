@@ -44,9 +44,9 @@ export function compareWithSameCarRivals(drivers: DriverData[], driver: DriverDa
   const others = drivers.filter((d) => d.name !== driver.name && positive(d.bestLapTime));
   const carRivals = others.filter((d) => sameCar(d, driver));
   const driverClass = resolveDriverCarClass(driver);
-  const classRivals = others.filter((d) => driverClass && areComparableCarClasses(driverClass, resolveDriverCarClass(d)));
   const scope: SameCarRivalComparison['scope'] = carRivals.length > 0 ? 'car' : 'class';
-  const rivals = carRivals.length > 0 ? carRivals : classRivals;
+  const rivals = carRivals.length > 0 ? carRivals
+    : others.filter((d) => driverClass && areComparableCarClasses(driverClass, resolveDriverCarClass(d)));
   if (rivals.length === 0) return null;
 
   const rows = SECTORS.map(({ key, label, pick }): RivalSectorRow => {

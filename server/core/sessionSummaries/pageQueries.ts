@@ -1,6 +1,7 @@
 import type { Database } from 'better-sqlite3';
 import type { SessionProgressionPoint } from '../../../shared/types/index.js';
-import { CIRCUIT_SPECIFICATIONS, getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
+import { CIRCUIT_SPECIFICATIONS } from '../../../shared/domain/circuitDefinitions.js';
+import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { computeTheoreticalBest, computeTheoreticalGap, getDisplayTrackName } from '../../../shared/domain/formatters.js';
 import { rateSessionCard } from './readTimePace.js';
 import { createPaceCalculator } from '../../benchmarks/referenceLaptimes.js';

@@ -34,6 +34,26 @@ describe('sessionDetailHelpers', () => {
         { id: 'q_spa', trackVenue: 'Circuit de Spa-Francorchamps', sessionType: 'Qualifying', timestamp: T0 - MIN },
       ];
       expect(links(findWeekendSessions(race, candidates))).toEqual(['practice:p', 'qualifying:q']);
+      expect(links(findWeekendSessions(race, (function* () { yield* candidates; })()))).toEqual(['practice:p', 'qualifying:q']);
+    });
+
+    it('keeps the first equally close candidate and rejects another layout of the same venue', () => {
+      const race = session({ id: 'r', sessionType: 'Race', timestamp: T0 });
+      const candidates: CandidateRelatedSession[] = [
+        { ...monza, id: 'wrong', trackCourse: 'Curva Grande Circuit', sessionType: 'Qualifying', timestamp: T0 - 1 },
+        { ...monza, id: 'first', sessionType: 'Qualifying', timestamp: T0 - MIN },
+        { ...monza, id: 'second', sessionType: 'Qualifying', timestamp: T0 - MIN },
+      ];
+      expect(links(findWeekendSessions(race, candidates))).toEqual(['qualifying:first']);
+    });
+
+    it('requires exact venue and course names for unknown layouts', () => {
+      const race = session({ id: 'r', trackVenue: 'Unknown Venue', trackCourse: 'Course A', sessionType: 'Race', timestamp: T0 });
+      const candidates: CandidateRelatedSession[] = [
+        { ...race, id: 'other', trackCourse: 'Course B', sessionType: 'Qualifying', timestamp: T0 - 1 },
+        { ...race, id: 'same', sessionType: 'Qualifying', timestamp: T0 - MIN },
+      ];
+      expect(links(findWeekendSessions(race, candidates))).toEqual(['qualifying:same']);
     });
 
     it('reads the start from the time string when the timestamp is missing', () => {

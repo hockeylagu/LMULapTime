@@ -1,5 +1,6 @@
 import { PaceCategory, ReferenceLaptimeEntry } from '../types/index.js';
-import { CIRCUIT_SPECIFICATIONS, getCircuitSpecification } from './circuitSpecs.js';
+import { CIRCUIT_SPECIFICATIONS } from './circuitDefinitions.js';
+import { getCircuitSpecification } from './circuitSpecs.js';
 
 export function getPaceCategoryFromPercentage(percentage: number): PaceCategory {
   if (percentage <= 100.5) return 'Alien';

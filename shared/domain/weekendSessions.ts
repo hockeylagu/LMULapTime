@@ -1,6 +1,7 @@
 import { parseDateStringToTimestamp } from './formatters.js';
 import { isOnlineSession } from './leaderboard.js';
-import { CIRCUIT_SPECIFICATIONS, getCircuitSpecification } from './circuitSpecs.js';
+import { CIRCUIT_SPECIFICATIONS } from './circuitDefinitions.js';
+import { getCircuitSpecification } from './circuitSpecs.js';
 export interface CandidateRelatedSession {
   id?: string;
   sessionId?: string;
@@ -31,17 +32,52 @@ const SAME_EVENT_START_MS = 500;
 
 const squash = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, '');
 
+interface TrackLayout {
+  trackVenue?: string;
+  trackCourse?: string;
+  layoutKey: string;
+}
+
+function sameTrackLayout(a: TrackLayout, b: TrackLayout): boolean {
+  if (!a.trackVenue || !b.trackVenue) return false;
+  const knownA = Object.prototype.hasOwnProperty.call(CIRCUIT_SPECIFICATIONS, a.layoutKey);
+  const knownB = Object.prototype.hasOwnProperty.call(CIRCUIT_SPECIFICATIONS, b.layoutKey);
+  return knownA && knownB
+    ? a.layoutKey === b.layoutKey
+    : !knownA && !knownB && a.trackVenue === b.trackVenue && (a.trackCourse ?? '') === (b.trackCourse ?? '');
+}
+
 /** Both sessions run on the same layout (circuitSpecs), or on the same unknown track by name. */
 export function areSameTrackLayout(venueA?: string, courseA?: string, venueB?: string, courseB?: string): boolean {
   if (!venueA || !venueB) return false;
-  const specA = getCircuitSpecification(venueA, courseA);
-  const specB = getCircuitSpecification(venueB, courseB);
-  const knownA = Object.prototype.hasOwnProperty.call(CIRCUIT_SPECIFICATIONS, specA.layoutKey);
-  const knownB = Object.prototype.hasOwnProperty.call(CIRCUIT_SPECIFICATIONS, specB.layoutKey);
-  if (knownA && knownB) {
-    return specA.layoutKey === specB.layoutKey;
-  }
-  return !knownA && !knownB && venueA === venueB && (courseA ?? '') === (courseB ?? '');
+  return sameTrackLayout(
+    { trackVenue: venueA, trackCourse: courseA, layoutKey: getCircuitSpecification(venueA, courseA).layoutKey },
+    { trackVenue: venueB, trackCourse: courseB, layoutKey: getCircuitSpecification(venueB, courseB).layoutKey },
+  );
+}
+
+interface WeekendContext extends TrackLayout {
+  id?: string;
+  online: boolean;
+  time: number;
+  eventStart: string;
+  carClass?: string;
+  event?: string;
+}
+
+/** Derive the reusable event identity and timing once per session in a search. */
+function weekendContext(session: CandidateRelatedSession): WeekendContext {
+  return {
+    trackVenue: session.trackVenue,
+    trackCourse: session.trackCourse,
+    layoutKey: getCircuitSpecification(session.trackVenue, session.trackCourse).layoutKey,
+    id: session.id || session.sessionId,
+    online: isOnlineSession(session),
+    time: sessionTime(session),
+    eventStart: (session.timeString || session.dateString || '').trim(),
+    carClass: session.playerDriver?.carClass || session.carClass,
+    event: session.trackEvent ? squash(session.trackEvent) : undefined,
+  };
 }
 
 /** Start of the session; the parser's timestamp carries the type weight (practice < qualifying < race). */
@@ -56,33 +92,20 @@ function sessionTime(s: CandidateRelatedSession): number {
  * - offline: the same class and event, starting within 3.5 hours.
  */
 export function isSameWeekendSession(current: CandidateRelatedSession, candidate: CandidateRelatedSession): boolean {
-  const currentId = current.id || current.sessionId;
-  const candId = candidate.id || candidate.sessionId;
-  if (currentId && candId && currentId === candId) return false;
+  const currentContext = weekendContext(current);
+  const candidateContext = weekendContext(candidate);
+  return matchesWeekend(currentContext, candidateContext);
+}
 
-  if (!areSameTrackLayout(current.trackVenue, current.trackCourse, candidate.trackVenue, candidate.trackCourse)) {
-    return false;
+function matchesWeekend(current: WeekendContext, candidate: WeekendContext): boolean {
+  if (current.id && candidate.id && current.id === candidate.id) return false;
+  if (!sameTrackLayout(current, candidate) || current.online !== candidate.online) return false;
+  const diffMs = Math.abs(current.time - candidate.time);
+  if (current.online) {
+    return Boolean(current.eventStart && current.eventStart === candidate.eventStart) || diffMs <= SAME_EVENT_START_MS;
   }
-
-  const isCurrentOnline = isOnlineSession(current);
-  if (isCurrentOnline !== isOnlineSession(candidate)) return false;
-
-  const diffMs = Math.abs(sessionTime(current) - sessionTime(candidate));
-
-  if (isCurrentOnline) {
-    const timeA = (current.timeString || current.dateString || '').trim();
-    const timeB = (candidate.timeString || candidate.dateString || '').trim();
-    return Boolean(timeA && timeA === timeB) || diffMs <= SAME_EVENT_START_MS;
-  }
-
-  const classA = current.playerDriver?.carClass || current.carClass;
-  const classB = candidate.playerDriver?.carClass || candidate.carClass;
-  if (classA && classB && classA !== classB) return false;
-
-  if (current.trackEvent && candidate.trackEvent && squash(current.trackEvent) !== squash(candidate.trackEvent)) {
-    return false;
-  }
-
+  if (current.carClass && candidate.carClass && current.carClass !== candidate.carClass) return false;
+  if (current.event !== undefined && candidate.event !== undefined && current.event !== candidate.event) return false;
   return diffMs <= MAX_OFFLINE_WEEKEND_GAP_MS;
 }
 
@@ -107,24 +130,25 @@ export function findWeekendSessions<T extends CandidateRelatedSession>(
   if (!current || !sessions) return [];
   const currentType = weekendSessionType(current);
   if (!currentType) return [];
-  const currentTime = sessionTime(current);
-
+  const currentContext = weekendContext(current);
+  const bestByType = new Map<WeekendSessionType, { target: T; difference: number }>();
+  for (const candidate of sessions) {
+    const type = weekendSessionType(candidate);
+    if (!type || type === currentType) continue;
+    const candidateContext = weekendContext(candidate);
+    if (!matchesWeekend(currentContext, candidateContext)) continue;
+    const offset = candidateContext.time - currentContext.time;
+    const isLater = WEEKEND_ORDER[type] > WEEKEND_ORDER[currentType];
+    if (isLater ? offset < 0 : offset > 0) continue;
+    const difference = Math.abs(offset);
+    if (difference < (bestByType.get(type)?.difference ?? Infinity)) {
+      bestByType.set(type, { target: candidate, difference });
+    }
+  }
   const links: WeekendSessionLink<T>[] = [];
   for (const type of ['practice', 'qualifying', 'race'] as const) {
-    if (type === currentType) continue;
-    const isLater = WEEKEND_ORDER[type] > WEEKEND_ORDER[currentType];
-    let best: T | null = null;
-    let bestDiff = Infinity;
-    for (const cand of sessions) {
-      if (weekendSessionType(cand) !== type || !isSameWeekendSession(current, cand)) continue;
-      const offset = sessionTime(cand) - currentTime;
-      if (isLater ? offset < 0 : offset > 0) continue;
-      if (Math.abs(offset) < bestDiff) {
-        bestDiff = Math.abs(offset);
-        best = cand;
-      }
-    }
-    if (best) links.push({ type, target: best });
+    const best = bestByType.get(type);
+    if (best) links.push({ type, target: best.target });
   }
   return links;
 }

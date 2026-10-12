@@ -283,6 +283,7 @@ export function hasCompatibleTrackStations(
   primary: {stationSource?: string; geometryRevision?: string},
   baseline: {stationSource?: string; geometryRevision?: string} = primary,
 ): boolean {
-  return primary.stationSource !== 'odometer' && baseline.stationSource !== 'odometer'
+  return primary.stationSource === 'track' && baseline.stationSource === 'track'
+    && Boolean(primary.geometryRevision?.trim() && baseline.geometryRevision?.trim())
     && primary.geometryRevision === baseline.geometryRevision;
 }

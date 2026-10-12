@@ -136,6 +136,13 @@ describe('trackSummaryUtils', () => {
     expect(monza.carsUsed).toEqual([]);
   });
 
+  it('omits venues represented only by excluded classes unless empty venues are requested', () => {
+    const withoutEmpty = aggregateTrackSummaries(sampleSessions, { carClass: 'Hyper', includeEmptyVenues: false });
+    expect(Object.values(withoutEmpty).some(track => track.trackVenue === 'Autodromo Nazionale Monza')).toBe(false);
+    const withEmpty = aggregateTrackSummaries(sampleSessions, { carClass: 'Hyper', includeEmptyVenues: true });
+    expect(Object.values(withEmpty).find(track => track.trackVenue === 'Autodromo Nazionale Monza')?.sessionsCount).toBe(0);
+  });
+
   it('handles sessions with missing timestamp by parsing timeString', () => {
     const sessionWithoutTimestamp: TrackSessionSummary[] = [
       {

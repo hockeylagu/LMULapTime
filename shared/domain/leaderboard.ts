@@ -52,10 +52,6 @@ export function selectLeaderboardLaps(laps: LapData[]): LapData[] {
   );
 }
 
-export function sessionLayoutKey(session: DetailedSession): string {
-  return getCircuitSpecification(session.trackVenue, session.trackCourse, null, null, null, session.trackLengthMeters).layoutKey;
-}
-
 const sameCar = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 interface DriverAccumulator {
@@ -105,7 +101,7 @@ function forEachRankedDriver(
       if (!isHumanDriver(session, driver)) continue;
       const laps = selectLeaderboardLaps(driver.laps ?? []);
       if (laps.length === 0) continue;
-      layoutKey ??= sessionLayoutKey(session);
+      layoutKey ??= getCircuitSpecification(session.trackVenue, session.trackCourse, null, null, null, session.trackLengthMeters).layoutKey;
       visit(session, driver, layoutKey, driver.carClass, laps);
     }
   }
@@ -135,7 +131,11 @@ const minOf = (values: Array<number | null>): number | null => {
 function rankBy(entries: LeaderboardEntry[], pick: (e: LeaderboardEntry) => number | null): Array<number | null> {
   const values = entries.map(pick);
   const sorted = values.filter((v): v is number => v !== null).sort((a, b) => a - b);
-  return values.map((v) => (v === null ? null : sorted.indexOf(v) + 1));
+  const ranks = new Map<number, number>();
+  sorted.forEach((value, index) => {
+    if (!ranks.has(value)) ranks.set(value, index + 1);
+  });
+  return values.map((v) => (v === null ? null : Number.isNaN(v) ? 0 : ranks.get(v)!));
 }
 
 function toEntries(acc: Map<string, DriverAccumulator>): LeaderboardEntry[] {

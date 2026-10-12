@@ -3,8 +3,8 @@ import {
   buildLeaderboard,
   findLayoutBenchmark,
   listLeaderboardLayouts,
-  sessionLayoutKey,
 } from '../../shared/domain/leaderboard.js';
+import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import type { ReferenceLaptimeEntry } from '../../shared/types/index.js';
 import { driver, lap, MONZA_CURVA_GRANDE, session } from './leaderboardFixtures.js';
 
@@ -45,8 +45,8 @@ describe('buildLeaderboard', () => {
       session('gp', [driver('Me', [lap(2, 108)], { isPlayer: true })]),
       session('cg', [driver('Curva', [lap(2, 90)])], { trackCourse: MONZA_CURVA_GRANDE }),
     ];
-    expect(sessionLayoutKey(sessions[0])).toBe('monza_gp');
-    expect(sessionLayoutKey(sessions[1])).toBe('monza_curvagrande');
+    expect(getCircuitSpecification(sessions[0].trackVenue, sessions[0].trackCourse, null, null, null, sessions[0].trackLengthMeters).layoutKey).toBe('monza_gp');
+    expect(getCircuitSpecification(sessions[1].trackVenue, sessions[1].trackCourse, null, null, null, sessions[1].trackLengthMeters).layoutKey).toBe('monza_curvagrande');
     expect(names(sessions)).toEqual(['Me']);
   });
 
@@ -97,6 +97,18 @@ describe('buildLeaderboard', () => {
     expect(me.theoreticalBest).toBe(109);
     expect([me.s1Rank, me.s2Rank, me.s3Rank]).toEqual([1, 2, 1]);
     expect(board.entries[0].driverName).toBe('Rival');
+  });
+
+  it('preserves competition rank gaps for tied sectors and pace, leaving missing values unranked', () => {
+    const board = buildLeaderboard([session('ties', [
+      driver('First', [2, 3, 4].map((n) => lap(n, 108, { s1: 30 }))),
+      driver('Tied', [2, 3, 4].map((n) => lap(n, 108, { s1: 30 }))),
+      driver('Third', [2, 3, 4].map((n) => lap(n, 110, { s1: 32 }))),
+      driver('Missing', [lap(2, 111, { s1: null })]),
+    ])], MONZA);
+    expect(board.entries.map((e) => [e.driverName, e.s1Rank, e.top3AverageRank])).toEqual([
+      ['First', 1, 1], ['Tied', 1, 1], ['Third', 3, 3], ['Missing', null, null],
+    ]);
   });
 
   it('gives race pace as the best average of three laps within one session', () => {

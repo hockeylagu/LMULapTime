@@ -46,6 +46,7 @@ File and folder size limits are ongoing checks; split only along meaningful resp
 
 | Record | Outcome | Historical completion |
 |---|---|---|
+| [Shared domain cleanup](archive/SHARED_DOMAIN_CLEANUP.md) | Eight audit findings fixed by Luna; independent review, 1,500-case parity, full tests/build and matching-dataset endpoint benchmarks passed | 2026-10-11 |
 | [Session reload recovery](archive/SESSION_RELOAD_RECOVERY.md) | Multiplayer player selection fixed; offline repair restored 739 sessions and canonicalized 132 benchmark entries while preserving retained data | 2026-10-11 |
 | [Exact identity matching cleanup](archive/EXACT_IDENTITY_MATCHING_CLEANUP.md) | Exact session IDs/types/layouts/drivers, versioned retained ownership reconciliation; full tests/build/coverage and same-dataset benchmark validated | 2026-10-11 |
 | [Replay cache normalization](archive/REPLAY_CACHE_NORMALIZATION.md) | Normalized replay facts/events/laps and completed cache migration; lap conditions also shipped | 2026-09-27; conditions follow-up 2026-09-28 |

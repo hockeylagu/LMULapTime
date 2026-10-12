@@ -5,7 +5,8 @@ import {
   computeTrackBoundaryPathD,
   TrackBoundaryGeometry,
 } from '../replay/map/index.js';
-import { CIRCUIT_SPECIFICATIONS, getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
+import { CIRCUIT_SPECIFICATIONS } from '../../../shared/domain/circuitDefinitions.js';
+import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import { CHART_COLORS } from '../../utils/themeColors.js';
 import { getTrackOutlineUrl } from '../../api/trackGeometryApi.js';

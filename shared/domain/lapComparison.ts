@@ -281,9 +281,11 @@ export function filterLapsByCarCategory(
  */
 export function computeTopNLapAverage(
   laps: LapSelectionInput[],
-  n = 3
+  n = 3,
+  /** Must be the clean selection for this same lap array. */
+  selectedCandidates?: readonly LapSelectionInput[]
 ): number | null {
-  const candidates = selectCleanLapCandidates(laps);
+  const candidates = selectedCandidates ?? selectCleanLapCandidates(laps);
 
   if (candidates.length === 0) return null;
   const sorted = [...candidates].sort((a, b) => (a.lapTime || 0) - (b.lapTime || 0));
@@ -329,8 +331,12 @@ function spreadWithinGroups(groups: number[][]): { squares: number; count: numbe
  * its own mean and the spreads are combined; without such a group, the largest group (dry on a tie)
  * is measured alone. The average stays the average of every clean lap.
  */
-export function computeConsistencyRating(laps: LapSelectionInput[]): ConsistencyRating {
-  const candidates = selectCleanLapCandidates(laps);
+export function computeConsistencyRating(
+  laps: LapSelectionInput[],
+  /** Must be the clean selection for this same lap array. */
+  selectedCandidates?: readonly LapSelectionInput[]
+): ConsistencyRating {
+  const candidates = selectedCandidates ?? selectCleanLapCandidates(laps);
 
   if (candidates.length === 0) {
     return { consistencyScore: null, avgLapTime: null, stdDev: null, sampleCount: 0 };
@@ -343,7 +349,9 @@ export function computeConsistencyRating(laps: LapSelectionInput[]): Consistency
   const byGroup = new Map<LapConditionGroup, number[]>();
   candidates.forEach((lap, index) => {
     const group = lapConditionGroup(lap);
-    byGroup.set(group, [...(byGroup.get(group) ?? []), times[index]]);
+    const groupTimes = byGroup.get(group);
+    if (groupTimes) groupTimes.push(times[index]);
+    else byGroup.set(group, [times[index]]);
   });
   const conditionGroups = byGroup.size > 1
     ? [...byGroup].map(([group, groupTimes]) => ({ group, laps: groupTimes.length }))

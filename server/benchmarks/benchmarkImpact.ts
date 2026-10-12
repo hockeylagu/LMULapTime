@@ -10,7 +10,8 @@ import {
   getPaceCategoryFromPercentage,
 } from '../../shared/domain/paceCategory.js';
 import { formatTime } from '../../shared/domain/formatters.js';
-import { CIRCUIT_SPECIFICATIONS, getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
+import { CIRCUIT_SPECIFICATIONS } from '../../shared/domain/circuitDefinitions.js';
+import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import type { PaceCategory } from '../../shared/types/index.js';
 import type { Database as DatabaseType } from 'better-sqlite3';
 

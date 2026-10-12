@@ -1,7 +1,7 @@
 import type { Database as DatabaseType } from 'better-sqlite3';
 import type { DetailedSession } from '../types.js';
 import type { SessionSummaryProjection, SessionProjectionState, SessionCard } from '../../../shared/types/sessionSummaries.js';
-import { buildSessionSummaryProjection } from '../../../shared/domain/sessionSummaries/index.js';
+import { buildSessionSummaryProjection } from '../../../shared/domain/sessionSummaries/buildSessionSummaryProjection.js';
 import { SESSION_SUMMARY_PROJECTION_VERSION } from '../../../shared/types/sessionSummaries.js';
 import { persistSessionAggregate } from './aggregateStore.js';
 import { writeSessionRows, clearDerivedColumns } from '../sessionRows/writer.js';

@@ -9,7 +9,8 @@ import { SessionTypeChip, FinishPosition, EmptyChip } from './SessionRowParts.js
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import type { PaceBadgeValue } from '../common/PaceBadge.js';
 import { linkClickHandler } from '../../utils/linkClick.js';
-import { CIRCUIT_SPECIFICATIONS, getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
+import { CIRCUIT_SPECIFICATIONS } from '../../../shared/domain/circuitDefinitions.js';
+import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { getTrackOutlineUrl } from '../../api/trackGeometryApi.js';
 
 export interface SessionGridCardProps {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DetailedSession, LapData } from '../../../shared/types/index.js';
-import { buildSessionSummaryProjection } from '../../../shared/domain/sessionSummaries/index.js';
+import { buildSessionSummaryProjection } from '../../../shared/domain/sessionSummaries/buildSessionSummaryProjection.js';
 import { selectCleanLapCandidates, computeTopNLapAverage, computeConsistencyRating } from '../../../shared/domain/lapComparison.js';
 
 function lap(lapNum: number, lapTime: number | null, changes: Partial<LapData> = {}): LapData {
@@ -34,6 +34,17 @@ describe('session summary projection', () => {
     expect(projected.conditions.map(item => item.conditionGroup)).toEqual(['dry', 'wet']);
     expect(projected.laps[2].leaderboardEligible).toBe(false);
     expect(projected.layoutKey).toBe('monza_gp');
+  });
+
+  it('reuses the original clean selection for start-lap and single-lap cases', () => {
+    const driver = session.drivers[0];
+    const withNoCleanLaps = [lap(1, 90), lap(2, 100, { isValid: false })];
+    const projectedEmpty = buildSessionSummaryProjection({ ...session, drivers: [{ ...driver, laps: withNoCleanLaps }] }, 1).drivers[0];
+    expect(projectedEmpty).toMatchObject({ cleanLapsCount: 0, averageLapTime: null, topThreeAverage: null, consistencyScore: null });
+
+    const loneStartNumberedLap = [lap(1, 90)];
+    const projectedSingle = buildSessionSummaryProjection({ ...session, drivers: [{ ...driver, laps: loneStartNumberedLap }] }, 1).drivers[0];
+    expect(projectedSingle).toMatchObject({ cleanLapsCount: 1, averageLapTime: 90, topThreeAverage: 90, consistencyScore: 100 });
   });
 
   it('preserves primary-driver ordinal identity and the no-lap progression fallback', () => {

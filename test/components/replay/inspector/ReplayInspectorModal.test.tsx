@@ -49,6 +49,8 @@ describe('ReplayInspectorModal', () => {
     lapOrdinal: 0,
     driverSlot: 1,
     pointsCount: 3,
+    stationSource: 'track',
+    geometryRevision: 'synthetic-canonical-track-v1',
     bounds: { minX: 100, maxX: 200, minZ: 200, maxZ: 240, spanX: 100, spanZ: 40 },
     points: [
       { x: 100, y: 10, z: 200, rotY: 0, speedKmh: 150, throttle: 80, brake: 0, timeSec: 0.0 },

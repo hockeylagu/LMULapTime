@@ -24,6 +24,8 @@ function trajectory(currentLap: number, laps: ReplayTrajectoryData['laps'] = [])
     ],
     maxPoints: 400,
     isFullResolution: false,
+    stationSource: 'track',
+    geometryRevision: 'synthetic-canonical-track-v1',
     bounds,
   };
 }
@@ -77,6 +79,7 @@ describe('useCornerConsistency', () => {
   });
   it('fetches valid comparison laps and includes the current valid lap', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      stationSource: 'track', geometryRevision: 'synthetic-canonical-track-v1',
       points: [{ x: 1, y: 0, z: 0, speedKmh: 110, timeSec: 0.5 }],
     }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     const current = trajectory(3, [
@@ -119,7 +122,7 @@ describe('useCornerConsistency', () => {
   it('refetches comparison laps after a remount and uses the selected telemetry source', async () => {
     let resolveFresh!: (response: Response) => void;
     const fetchMock = vi.spyOn(globalThis, 'fetch')
-      .mockResolvedValueOnce(new Response(JSON.stringify({ points: [{ x: 1, y: 0, z: 0, speedKmh: 110, timeSec: 0.5 }] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ stationSource: 'track', geometryRevision: 'synthetic-canonical-track-v1', points: [{ x: 1, y: 0, z: 0, speedKmh: 110, timeSec: 0.5 }] }), { status: 200 }))
       .mockImplementationOnce(() => new Promise(resolve => { resolveFresh = resolve; }));
     const current = { ...trajectory(1, [lapSummary(1, 100, { isValid: true }), lapSummary(2, 101)]), source: 'vcr' as const };
     const meta = metadataFor(current.laps, 3);
@@ -133,7 +136,7 @@ describe('useCornerConsistency', () => {
     const second = renderHook(() => useCornerConsistency(true, 'cached-session', meta, 3, current));
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(second.result.current).toEqual({ cornerStats: [], isLoading: true, lapsSampled: 0 });
-    await act(async () => resolveFresh(new Response(JSON.stringify({ points: [] }), { status: 200 })));
+    await act(async () => resolveFresh(new Response(JSON.stringify({ stationSource: 'track', geometryRevision: 'synthetic-canonical-track-v1', points: [] }), { status: 200 })));
     await waitFor(() => expect(second.result.current.isLoading).toBe(false));
     expect(second.result.current.lapsSampled).toBe(1);
   });
@@ -142,7 +145,7 @@ describe('useCornerConsistency', () => {
     let resolveOld!: (response: Response) => void;
     const fetchMock = vi.spyOn(globalThis, 'fetch')
       .mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve; }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ points: [{ x: 1, y: 0, z: 0, speedKmh: 110, timeSec: 0.5 }] }), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ stationSource: 'track', geometryRevision: 'synthetic-canonical-track-v1', points: [{ x: 1, y: 0, z: 0, speedKmh: 110, timeSec: 0.5 }] }), { status: 200 }));
     const oldTrajectory: ReplayTrajectoryData = { ...trajectory(1, [lapSummary(1, 100), lapSummary(2, 101)]), source: 'vcr' };
     const newTrajectory: ReplayTrajectoryData = { ...trajectory(1, [lapSummary(1, 100), lapSummary(3, 99)]), source: 'duckdb' };
     const oldMetadata = metadataFor(oldTrajectory.laps, 3);
@@ -155,7 +158,7 @@ describe('useCornerConsistency', () => {
     expect(String(fetchMock.mock.calls[1][0])).toContain('source=duckdb');
     await waitFor(() => expect(hook.result.current.isLoading).toBe(false));
     expect(fetchMock.mock.calls[0][1]?.signal?.aborted).toBe(true);
-    await act(async () => resolveOld(new Response(JSON.stringify({ points: [] }), { status: 200 })));
+    await act(async () => resolveOld(new Response(JSON.stringify({ stationSource: 'track', geometryRevision: 'synthetic-canonical-track-v1', points: [] }), { status: 200 })));
     expect(hook.result.current.lapsSampled).toBe(2);
   });
 
@@ -167,7 +170,7 @@ describe('useCornerConsistency', () => {
     await waitFor(() => expect(resolvePending).toBeDefined());
     hook.rerender({ enabled: false });
     expect(hook.result.current).toEqual({ cornerStats: [], isLoading: false, lapsSampled: 0 });
-    await act(async () => resolvePending(new Response(JSON.stringify({ points: [{ x: 1, y: 0, z: 0, speedKmh: 100, timeSec: 0.5 }] }), { status: 200 })));
+    await act(async () => resolvePending(new Response(JSON.stringify({ stationSource: 'track', geometryRevision: 'synthetic-canonical-track-v1', points: [{ x: 1, y: 0, z: 0, speedKmh: 100, timeSec: 0.5 }] }), { status: 200 })));
     expect(hook.result.current).toEqual({ cornerStats: [], isLoading: false, lapsSampled: 0 });
   });
 });

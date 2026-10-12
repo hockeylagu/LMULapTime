@@ -1,7 +1,8 @@
 import type { DetailedSession, DriverData, LapData } from '../../types/index.js';
 import type { SessionSummaryProjection, SessionDriverProjection, SessionLapProjection, SessionConditionProjection } from '../../types/sessionSummaries.js';
 import { SESSION_SUMMARY_PROJECTION_VERSION } from '../../types/sessionSummaries.js';
-import { CIRCUIT_SPECIFICATIONS, getCircuitSpecification } from '../circuitSpecs.js';
+import { CIRCUIT_SPECIFICATIONS } from '../circuitDefinitions.js';
+import { getCircuitSpecification } from '../circuitSpecs.js';
 import { lapConditionGroup } from '../lapConditions.js';
 import { computeConsistencyRating, computeTopNLapAverage, selectCleanLapCandidates } from '../lapComparison.js';
 import { isOnlineSession } from '../leaderboard.js';
@@ -19,12 +20,14 @@ function projectDriver(session: DetailedSession, driver: DriverData, driverOrdin
   const isHuman = isOnlineSession(session) || isPlayer;
   const bestOrdinal = (lap: LapData | undefined) => lap ? driverLaps.indexOf(lap) : null;
   const best = driverLaps.find(l => l.lapNum === driver.bestLapNum) ?? (driver.bestLapTime ? driverLaps.find(l => l.lapTime === driver.bestLapTime) : undefined);
-  const consistency = computeConsistencyRating(driverLaps);
+  const cleanSet = new Set(clean);
+  const consistency = computeConsistencyRating(driverLaps, clean);
   const laps = driverLaps.map((lap, lapOrdinal): SessionLapProjection => {
-    const isClean = clean.includes(lap);
-    const eligible = isClean && lap.isValid && lapConditionGroup(lap) === 'dry';
+    const isClean = cleanSet.has(lap);
+    const conditionGroup = lapConditionGroup(lap);
+    const eligible = isClean && lap.isValid && conditionGroup === 'dry';
     return { sessionId: session.id, driverOrdinal, lapOrdinal, lapNumber: lap.lapNum, lapTime: lap.lapTime,
-      s1: lap.s1, s2: lap.s2, s3: lap.s3, conditionGroup: lapConditionGroup(lap), isValid: lap.isValid,
+      s1: lap.s1, s2: lap.s2, s3: lap.s3, conditionGroup, isValid: lap.isValid,
       isInferred: Boolean(lap.isInferred), isPitLap: lap.isPitStop, isOutLap: Boolean(lap.isOutLap), isClean,
       isRepresentative: !lap.nonRepresentativeReason, isHuman, leaderboardEligible: eligible,
       nonRepresentativeReason: lap.nonRepresentativeReason ?? null };
@@ -48,8 +51,8 @@ function projectDriver(session: DetailedSession, driver: DriverData, driverOrdin
     maxSpeed: driverLaps.reduce<number | null>((value, lap) => lap.topSpeed !== null && (value === null || lap.topSpeed > value) ? lap.topSpeed : value, null),
     bestLapOrdinal: bestOrdinal(best), bestLapNumber: best?.lapNum ?? null, bestLapTime: driver.bestLapTime ?? null,
     bestS1: driver.bestS1, bestS2: driver.bestS2, bestS3: driver.bestS3,
-    averageLapTime: hasLaps ? (clean.length ? Number((clean.reduce((sum, lap) => sum + (lap.lapTime ?? 0), 0) / clean.length).toFixed(3)) : null) : (driver.avgLapTime ?? null),
-    topThreeAverage: computeTopNLapAverage(driverLaps, 3), consistencyScore: consistency.consistencyScore,
+    averageLapTime: hasLaps ? consistency.avgLapTime : (driver.avgLapTime ?? null),
+    topThreeAverage: computeTopNLapAverage(driverLaps, 3, clean), consistencyScore: consistency.consistencyScore,
     bestLapWet: Boolean(driver.bestLapWet ?? best?.conditions) }, laps, conditions };
 }
 
@@ -58,6 +61,9 @@ export function buildSessionSummaryProjection(session: DetailedSession, sourceRe
   const playerOrdinal = markedPlayers.length === 1 ? markedPlayers[0] : -1;
   const primary = playerOrdinal >= 0 ? playerOrdinal : session.drivers.length ? 0 : -1;
   const drivers = session.drivers.map((driver, ordinal) => projectDriver(session, driver, ordinal, playerOrdinal));
+  const driverProjections = drivers.map(value => value.driver);
+  const conditionProjections = drivers.flatMap(value => value.conditions);
+  const lapProjections = drivers.flatMap(value => value.laps);
   const recordingName = typeof session.matchingReplayFile === 'string' ? session.matchingReplayFile : session.matchingReplayFile?.name ?? null;
   const layout = getCircuitSpecification(session.trackVenue, session.trackCourse, null, recordingName, null, session.trackLengthMeters);
   return { sessionId: session.id, sourceRevision, projectionVersion: SESSION_SUMMARY_PROJECTION_VERSION,
@@ -65,6 +71,6 @@ export function buildSessionSummaryProjection(session: DetailedSession, sourceRe
     sessionKind: session.sessionType === 'Practice' || session.sessionType === 'Qualifying' || session.sessionType === 'Race'
       ? session.sessionType.toLowerCase() : 'unknown', isEmpty: isSessionEmpty(session),
     primaryDriverOrdinal: primary >= 0 ? primary : null, recordingName,
-    drivers: drivers.map(value => value.driver), conditions: drivers.flatMap(value => value.conditions), laps: drivers.flatMap(value => value.laps),
-    aggregate: buildSessionAggregate(session, drivers.map(value => value.driver), drivers.flatMap(value => value.laps), primary) };
+    drivers: driverProjections, conditions: conditionProjections, laps: lapProjections,
+    aggregate: buildSessionAggregate(session, driverProjections, lapProjections, primary) };
 }

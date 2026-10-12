@@ -76,7 +76,7 @@ export function mockDebriefServer(compareLaps: ComparableLap[] = [referenceLap],
     const step = sessionId && lapOrdinal ? stepByLocator[`${sessionId}|${lapOrdinal}`] : undefined;
     if (step === undefined) return Promise.resolve({ ok: false, status: 404, json: () => Promise.resolve({ error: 'Lap not found' }) });
     const lapNumber = sessionId === 'R1' ? [1, 16, 18, 20][Number(lapOrdinal)] : [3, 5][Number(lapOrdinal)];
-    return Promise.resolve({ ok: true, json: () => Promise.resolve({ sessionId, driverOrdinal: Number(params.get('driverOrdinal')), lapOrdinal: Number(lapOrdinal), replayName: sessionId === 'R1' ? MY_REPLAY : REF_REPLAY, currentLap: lapNumber, points: cornerLap(step) }) });
+    return Promise.resolve({ ok: true, json: () => Promise.resolve({ sessionId, driverOrdinal: Number(params.get('driverOrdinal')), lapOrdinal: Number(lapOrdinal), replayName: sessionId === 'R1' ? MY_REPLAY : REF_REPLAY, currentLap: lapNumber, stationSource: 'track', geometryRevision: 'synthetic-canonical-track-v1', points: cornerLap(step) }) });
   });
   global.fetch = fetchMock as unknown as typeof fetch;
   return fetchMock;

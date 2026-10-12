@@ -231,6 +231,9 @@ describe('track map display validation', () => {
 describe('canonical station availability',()=>{
  it('rejects odometer and mixed geometry frames while accepting a shared track revision',()=>{
   expect(hasCompatibleTrackStations({stationSource:'odometer'})).toBe(false);
+  expect(hasCompatibleTrackStations({}, {})).toBe(false);
+  expect(hasCompatibleTrackStations({stationSource:'track'}, {stationSource:'track'})).toBe(false);
+  expect(hasCompatibleTrackStations({geometryRevision:'one'}, {geometryRevision:'one'})).toBe(false);
   expect(hasCompatibleTrackStations({stationSource:'track',geometryRevision:'one'},{stationSource:'odometer'})).toBe(false);
   expect(hasCompatibleTrackStations({stationSource:'track',geometryRevision:'one'},{stationSource:'track',geometryRevision:'two'})).toBe(false);
   expect(hasCompatibleTrackStations({stationSource:'track',geometryRevision:'one'},{stationSource:'track',geometryRevision:'one'})).toBe(true);

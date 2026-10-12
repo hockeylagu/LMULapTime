@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
-import { CIRCUIT_SPECIFICATIONS } from '../../shared/domain/circuitSpecs.js';
+import { CIRCUIT_SPECIFICATIONS } from '../../shared/domain/circuitDefinitions.js';
 import { parseTrackMapDisplay } from '../../shared/domain/trackGeometry.js';
 import type { TrackBoundaryGeometry, TrackMapDisplay } from '../../shared/types/trackGeometry.js';
 import type { DataPluginStatus, VehicleDataRecord } from '../../shared/types/dataPlugin.js';

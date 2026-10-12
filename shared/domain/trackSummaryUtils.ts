@@ -65,37 +65,11 @@ export function aggregateTrackSummaries<T extends TrackSessionSummary>(
   const selectedCarClass = options?.carClass;
   const includeEmptyVenues = options?.includeEmptyVenues ?? false;
 
-  if (includeEmptyVenues) {
-    sessions.forEach(s => {
-      const venue = getDisplayTrackName(s.trackVenue, s.trackCourse);
-      if (!venue) return;
-      const key = summaryKey(s.trackVenue, s.trackCourse);
-      if (!map[key]) {
-        map[key] = {
-          trackVenue: venue,
-          identityVenue: s.trackVenue,
-          trackCourse: s.trackCourse ?? '',
-          layoutKey: getCircuitSpecification(s.trackVenue, s.trackCourse).layoutKey,
-          sessionsCount: 0,
-          totalLaps: 0,
-          bestLapTime: null,
-          bestLapDriver: '',
-          bestLapCar: '',
-          bestLapClass: '',
-          bestS1: null,
-          bestS2: null,
-          bestS3: null,
-          theoreticalBest: null,
-          carsUsed: [],
-          lastSessionTimestamp: 0,
-        };
-      }
-    });
-  }
-
   sessions.forEach(s => {
     const venue = getDisplayTrackName(s.trackVenue, s.trackCourse);
     if (!venue) return;
+    const matchesClass = !selectedCarClass || selectedCarClass === 'All' || matchesSessionCarClass(s, selectedCarClass);
+    if (!matchesClass && !includeEmptyVenues) return;
 
     const key = summaryKey(s.trackVenue, s.trackCourse);
     if (!map[key]) {
@@ -119,11 +93,9 @@ export function aggregateTrackSummaries<T extends TrackSessionSummary>(
       };
     }
 
-    if (selectedCarClass && selectedCarClass !== 'All' && !matchesSessionCarClass(s, selectedCarClass)) {
-      return;
-    }
+    if (!matchesClass) return;
 
-    const summary = map[summaryKey(s.trackVenue, s.trackCourse)];
+    const summary = map[key];
     summary.sessionsCount += 1;
 
     const timestamp = typeof s.timestamp === 'number' && s.timestamp > 0

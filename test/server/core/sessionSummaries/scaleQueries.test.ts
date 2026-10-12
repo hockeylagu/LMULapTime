@@ -6,7 +6,7 @@ import type { DetailedSession, ReferenceLaptimeEntry } from '../../../../shared/
 import { initDbSchema } from '../../../../server/core/dbSchema.js';
 import { queryCompactDashboard } from '../../../../server/core/sessionSummaries/dashboardQueries.js';
 import { persistSessionAggregate } from '../../../../server/core/sessionSummaries/aggregateStore.js';
-import { buildSessionSummaryProjection } from '../../../../shared/domain/sessionSummaries/index.js';
+import { buildSessionSummaryProjection } from '../../../../shared/domain/sessionSummaries/buildSessionSummaryProjection.js';
 import { SESSION_SUMMARY_PROJECTION_VERSION } from '../../../../shared/types/sessionSummaries.js';
 import { writeSessionRows } from '../../../../server/core/sessionRows/writer.js';
 import { queryCompactLeaderboard, queryCompactLeaderboardLayouts } from '../../../../server/core/sessionSummaries/leaderboardQueries.js';

@@ -1,5 +1,9 @@
 import type { DetailedSession, DriverData, LapData } from '../types/index.js';
 
+function classPosition(position: number, peerPositions: readonly number[]): number {
+  return position <= 0 ? position : 1 + peerPositions.filter(peer => peer > 0 && peer < position).length;
+}
+
 /** Index a driver's lap positions once, preserving the first recorded lap of each rival. */
 export function lapClassPositions(session: DetailedSession, driver: DriverData | undefined, isMultiClass: boolean): ReadonlyMap<LapData, number> {
   const positions = new Map<LapData, number>();
@@ -21,8 +25,7 @@ export function lapClassPositions(session: DetailedSession, driver: DriverData |
     }
   }
   for (const lap of laps) {
-    positions.set(lap, !isMultiClass || lap.position <= 0 ? lap.position
-      : 1 + (peers.get(lap.lapNum) ?? []).filter(position => position < lap.position).length);
+    positions.set(lap, !isMultiClass ? lap.position : classPosition(lap.position, peers.get(lap.lapNum) ?? []));
   }
   return positions;
 }
@@ -34,10 +37,10 @@ export function lapClassPositions(session: DetailedSession, driver: DriverData |
 export function lapClassPosition(session: DetailedSession, driver: DriverData | undefined, lap: LapData, isMultiClass: boolean): number {
   if (!isMultiClass || lap.position <= 0) return lap.position;
   const carClass = driver?.carClass ?? '';
-  return 1 + (session.drivers || [])
-    .filter((d) => d.name !== driver?.name && d.carClass === carClass)
-    .filter((d) => {
-      const otherLap = d.laps?.find((ol) => ol.lapNum === lap.lapNum);
-      return otherLap && otherLap.position > 0 && otherLap.position < lap.position;
-    }).length;
+  const peerPositions = (session.drivers || []).flatMap(other => {
+    if (other.name === driver?.name || other.carClass !== carClass) return [];
+    const firstLap = other.laps?.find(candidate => candidate.lapNum === lap.lapNum);
+    return firstLap ? [firstLap.position] : [];
+  });
+  return classPosition(lap.position, peerPositions);
 }
