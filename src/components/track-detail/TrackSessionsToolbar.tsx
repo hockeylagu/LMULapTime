@@ -7,8 +7,6 @@ import { SessionFilterRows, SessionSearchField } from '../session-list/SessionFi
 import { TRACK_DETAIL_SORT_OPTIONS } from './trackDetailSortOptions.js';
 import type { TrackDetailSortOption } from './trackDetailSortOptions.js';
 
-export type { TrackDetailSortOption };
-
 export interface TrackSessionsToolbarProps {
   filterType: string;
   setFilterType: (type: string) => void;

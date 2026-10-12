@@ -10,7 +10,6 @@ function resolveGear(p: ReplayTrajectoryPoint): number {
   return Math.min(7, Math.max(1, p.gear ?? 1));
 }
 
-export { type CornerPaths } from './telemetryCornerChartPaths.js';
 import {
   type CornerPaths,
   computeCornerExtrema,

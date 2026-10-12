@@ -30,8 +30,6 @@ import { useStableCullViewBox } from '../useStableCullViewBox.js';
 import type { GpsTrackMapSceneProps } from '../gpsTrackMapTypes.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 
-export type { GpsTrackMapSceneProps } from '../gpsTrackMapTypes.js';
-
 export const GpsTrackMapScene: React.FC<GpsTrackMapSceneProps> = (props) => {
   const {
     points, bounds, currentIndex, onSelectIndex, colorBy = 'pedal', className = '',

@@ -8,15 +8,12 @@ import { ImprovementChart } from './improvement-chart/ImprovementChart.js';
 import { SessionProgressionPoint } from './improvement-chart/improvementChartTypes.js';
 import { TrackDetailHeader } from './TrackDetailHeader.js';
 import { TrackSessionsCard } from './TrackSessionsCard.js';
-import { TrackDetailSortOption } from './TrackSessionsToolbar.js';
 import { SessionMeta, getPaceCategoryForLap, getSessionBestLapPace, buildTrackProgression } from './trackDetailHelpers.js';
 import { useTrackDetailState } from './useTrackDetailState.js';
 import { useSessionViewMode } from '../session-list/useSessionViewMode.js';
 import { LoadingState } from '../common/LoadingState.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import { linkClickHandler } from '../../utils/linkClick.js';
-
-export type { TrackDetailSortOption };
 
 export interface TrackDetailProps {
   trackName: string;

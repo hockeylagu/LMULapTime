@@ -1,7 +1,7 @@
 import { ReplayTelemetryPoint } from '../../../../shared/types/index.js';
 import { interpolatePointAtDistance } from '../../../utils/replayComparison.js';
 import { findIndexAtDistance } from '../../../utils/lapAlignment.js';
-import { TrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
+import { TrackBoundaryGeometry } from '../../../../shared/types/trackGeometry.js';
 import { SPEED_GRADIENT_STOPS, TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 import { BRAKE_ON_THRESHOLD_PCT } from '../../../utils/cornerAnalysis/helpers.js';
 

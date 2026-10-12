@@ -5,7 +5,7 @@ import { matchesSessionCarClass } from '../../../shared/domain/vehicleMapping.js
 import { selectCleanLapCandidates } from '../../../shared/domain/lapComparison.js';
 import { DetailedSession } from '../../../shared/types/index.js';
 import { BestRefLapInfo } from './BenchmarkLapsSummaryCard.js';
-import { DashboardSortOption } from './DashboardFilterBar.js';
+import { DashboardSortOption } from './dashboardSortOptions.js';
 import { SessionSummary } from './dashboardTypes.js';
 import type { DashboardTrackFilter } from '../../../shared/types/dashboard.js';
 

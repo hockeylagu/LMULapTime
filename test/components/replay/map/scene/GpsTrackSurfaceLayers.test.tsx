@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 import { GpsTrackSurfaceLayers } from '../../../../../src/components/replay/map/scene/GpsTrackSurfaceLayers.js';
-import type { TrackMapSurfaces } from '../../../../../src/components/replay/map/useTrackBoundaryGeometry.js';
+import type { TrackMapSurfaces } from '../../../../../shared/types/trackGeometry.js';
 
 describe('GpsTrackSurfaceLayers', () => {
   it('projects local meters with the same axis orientation as telemetry and preserves holes', () => {

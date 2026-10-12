@@ -11,8 +11,6 @@ import type { DashboardSortOption } from './dashboardSortOptions.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import type { DashboardTrackFilter } from '../../../shared/types/dashboard.js';
 
-export type { DashboardSortOption };
-
 export interface DashboardFilterBarProps {
   tracks: DashboardTrackFilter[];
   selectedTrack: string;

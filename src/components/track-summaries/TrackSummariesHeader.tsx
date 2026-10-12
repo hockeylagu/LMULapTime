@@ -5,8 +5,6 @@ import { SortDropdown } from '../common/SortDropdown.js';
 import { TRACK_SORT_OPTIONS } from './tracksSortOptions.js';
 import type { TracksSortOption } from './tracksSortOptions.js';
 
-export type { TracksSortOption };
-
 interface TrackSummariesHeaderProps {
   totalTracks: number;
   benchmarkSortAvailable: boolean;

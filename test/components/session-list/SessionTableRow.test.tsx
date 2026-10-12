@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { SessionTableRow } from '../../../src/components/session-list/SessionTableRow';
-import { SessionListItem } from '../../../src/components/session-list/SessionList';
+import { SessionListItem } from '../../../src/components/session-list/sessionListTypes.js';
 
 describe('SessionTableRow', () => {
   const baseSession: SessionListItem = {

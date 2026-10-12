@@ -3,7 +3,8 @@ import { useSessionDataContext } from '../../api/sessionDataContext.js';
 import type { LegendPayload } from 'recharts';
 import { DetailedSession, SessionProgressionPoint, ReferenceLaptimesCache } from '../../../shared/types/index.js';
 import { findReferenceEntry } from '../../../shared/domain/paceCategory.js';
-import { findWeekendSessions, CandidateRelatedSession, type WeekendSessionLink } from './sessionDetailHelpers.js';
+import { findWeekendSessions, CandidateRelatedSession } from '../../../shared/domain/weekendSessions.js';
+import type { WeekendSessionLink } from '../../../shared/domain/weekendSessions.js';
 import { ApiError, apiErrorMessage, fetchJson, isAbortError } from '../../api/apiClient.js';
 import { loadReferenceLaptimes, peekReferenceLaptimes } from '../../api/referenceApi.js';
 

@@ -8,8 +8,6 @@ import { useSessionPage } from './useSessionPage.js';
 import { SessionPagination } from './SessionPagination.js';
 import { SessionListItem, SessionListProps } from './sessionListTypes.js';
 
-export type { SessionListItem, SessionListProps } from './sessionListTypes.js';
-
 export const SessionList: React.FC<SessionListProps> = ({
   sessions,
   onSelectSession,

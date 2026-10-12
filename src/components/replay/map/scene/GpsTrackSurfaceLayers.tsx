@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { MAP_COLORS } from '../../../../utils/themeColors.js';
 import { projectBoundaryPoints } from '../replayMapUtils.js';
-import type { TrackMapSurfaces } from '../useTrackBoundaryGeometry.js';
+import type { TrackMapSurfaces } from '../../../../../shared/types/trackGeometry.js';
 import { DEFAULT_MAP_LAYERS, type MapLayers } from '../display/mapLayers.js';
 
 interface Props {

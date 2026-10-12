@@ -4,10 +4,7 @@ import {
   ImprovementPaceTooltip,
   ImprovementPaceTooltipProps,
 } from '../../../src/components/track-detail/improvement-chart/ImprovementPaceTooltip.js';
-import {
-  ImprovementTooltipPayloadEntry,
-  ImprovementChartPoint,
-} from '../../../src/components/track-detail/improvement-chart/ImprovementPaceChart.js';
+import { ImprovementTooltipPayloadEntry, ImprovementChartPoint } from '../../../src/components/track-detail/improvement-chart/improvementChartTypes.js';
 
 describe('ImprovementPaceTooltip component', () => {
   const basePointData = {

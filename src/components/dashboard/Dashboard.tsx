@@ -8,15 +8,14 @@ import { CarsSummaryCard } from './CarsSummaryCard.js';
 import { BenchmarkLapsSummaryCard } from './BenchmarkLapsSummaryCard.js';
 import { DrivingOverviewCard } from './DrivingOverviewCard.js';
 import { DashboardHero } from './DashboardHero.js';
-import { DashboardFilterBar, DashboardSortOption } from './DashboardFilterBar.js';
+import { DashboardFilterBar } from './DashboardFilterBar.js';
+import { DashboardSortOption } from './dashboardSortOptions.js';
 import { useDashboardMetrics } from './useDashboardMetrics.js';
 import { SessionSummary } from './dashboardTypes.js';
 import { useSessionViewMode } from '../session-list/useSessionViewMode.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import { useDashboardData } from './useDashboardData.js';
 import type { DashboardTrends } from '../../../shared/types/dashboard.js';
-
-export type { DashboardSortOption, SessionSummary };
 
 export interface DashboardProps {
   sessions?: SessionSummary[];

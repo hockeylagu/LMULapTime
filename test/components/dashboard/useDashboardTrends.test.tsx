@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useDashboardTrends } from '../../../src/components/dashboard/useDashboardTrends.js';
-import type { SessionSummary } from '../../../src/components/dashboard/Dashboard.js';
+import type { SessionSummary } from '../../../src/components/dashboard/dashboardTypes.js';
 
 describe('useDashboardTrends', () => {
   it('returns safe defaults for empty sessions', () => {

@@ -1,7 +1,6 @@
 import { DetailedSession, DriverData, LapData } from '../../../shared/types/index.js';
 import { getDisplayTrackName } from '../../../shared/domain/formatters.js';
 
-
 import { buildTelemetryComparePath } from '../../utils/telemetryCompareLink.js';
 
 /**
@@ -66,6 +65,3 @@ export function sessionLapComparePath(
   }
   return `/leaderboard?${params.toString()}`;
 }
-
-export { findWeekendSessions, isSameWeekendSession, areSameTrackLayout } from '../../../shared/domain/weekendSessions.js';
-export type { CandidateRelatedSession, WeekendSessionType, WeekendSessionLink } from '../../../shared/domain/weekendSessions.js';

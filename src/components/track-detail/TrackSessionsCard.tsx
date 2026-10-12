@@ -1,7 +1,9 @@
 import React from 'react';
-import { SessionList, SessionListItem } from '../session-list/SessionList.js';
+import { SessionList } from '../session-list/SessionList.js';
+import { SessionListItem } from '../session-list/sessionListTypes.js';
 import { SessionViewModeToggle } from '../session-list/SessionListHeader.js';
-import { TrackSessionsToolbar, TrackDetailSortOption } from './TrackSessionsToolbar';
+import { TrackSessionsToolbar } from './TrackSessionsToolbar.js';
+import { TrackDetailSortOption } from './trackDetailSortOptions.js';
 import type { PaceBadgeValue } from '../common/PaceBadge.js';
 
 export interface TrackSessionsCardProps {

@@ -1,6 +1,6 @@
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { MapColorMode } from './replayMapUtils.js';
-import { TrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
+import { TrackBoundaryGeometry } from '../../../../shared/types/trackGeometry.js';
 import type { TrackMapDisplay } from '../../../../shared/types/trackGeometry.js';
 
 export interface GpsTrackMapCorner {

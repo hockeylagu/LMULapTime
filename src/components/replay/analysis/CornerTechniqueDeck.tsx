@@ -1,10 +1,8 @@
 import React from 'react';
 import { CornerSegmentComparison } from '../../../utils/cornerAnalysis/types.js';
-import {
-  EntryPhaseCard,
-  RotationPhaseCard,
-  ExitPhaseCard,
-} from './CornerPhaseCards.js';
+import { EntryPhaseCard } from './EntryPhaseCard.js';
+import { RotationPhaseCard } from './RotationPhaseCard.js';
+import { ExitPhaseCard } from './ExitPhaseCard.js';
 
 export interface CornerTechniqueDeckProps {
   corner: CornerSegmentComparison;

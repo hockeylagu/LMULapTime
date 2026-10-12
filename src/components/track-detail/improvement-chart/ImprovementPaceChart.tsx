@@ -16,11 +16,6 @@ import { ImprovementPaceTooltip } from './ImprovementPaceTooltip.js';
 import { ImprovementPaceSeries } from './ImprovementPaceSeries.js';
 import type { ImprovementChartPoint } from './improvementChartTypes.js';
 
-export type {
-  ImprovementChartPoint,
-  ImprovementTooltipPayloadEntry,
-} from './improvementChartTypes.js';
-
 export interface ImprovementPaceChartProps {
   chartData: ImprovementChartPoint[];
   metric: ImprovementMetric;

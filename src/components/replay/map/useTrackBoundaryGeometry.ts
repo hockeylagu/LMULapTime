@@ -2,12 +2,6 @@ import { useState, useEffect } from 'react';
 import { loadTrackBoundaryGeometry } from '../../../api/trackGeometryApi.js';
 import { getCircuitSpecification } from '../../../../shared/domain/circuitSpecs.js';
 import type { TrackBoundaryGeometry } from '../../../../shared/types/trackGeometry.js';
-export type {
-  TimingGateGeometry,
-  TrackSurfacePolygon,
-  TrackMapSurfaces,
-  TrackBoundaryGeometry,
-} from '../../../../shared/types/trackGeometry.js';
 
 // In-memory module cache to avoid redundant network requests across tab/lap switches.
 // Capped with LRU eviction to keep memory low across 21 track geometries.

@@ -7,14 +7,9 @@ import { ImprovementStatsBanner } from './ImprovementStatsBanner.js';
 import { ImprovementChartControls, ImprovementMetric, TimeRangeFilter } from './ImprovementChartControls.js';
 import { ImprovementPaceChart } from './ImprovementPaceChart.js';
 
-export type { TimeRangeFilter, ImprovementMetric };
-
-export { buildPersonalBestSeries, calculateLapPrDelta } from './improvementChartUtils.js';
 import { buildPersonalBestSeries } from './improvementChartUtils.js';
 import { buildImprovementChartRows, getImprovementAxisBounds } from './improvementChartRows.js';
 import type { SessionProgressionPoint } from './improvementChartTypes.js';
-
-export type { SessionProgressionPoint };
 
 export interface ImprovementChartProps {
   progression: SessionProgressionPoint[];

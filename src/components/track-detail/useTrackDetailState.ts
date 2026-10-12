@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { updateSearchParams } from '../../utils/urlParams.js';
 import { fetchJson, isAbortError } from '../../api/apiClient.js';
 import { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
-import { TrackDetailSortOption } from './TrackSessionsToolbar.js';
+import { TrackDetailSortOption } from './trackDetailSortOptions.js';
 import { SessionMeta } from './trackDetailHelpers.js';
 import { TRACK_DETAIL_SORT_OPTIONS } from './trackDetailSortOptions.js';
 import type { TrackSummary } from '../../../shared/types/index.js';

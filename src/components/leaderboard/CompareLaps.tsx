@@ -15,8 +15,6 @@ import { FOCUS_RING } from '../common/buttonStyles.js';
 import { CompareLapPicker } from './picker/CompareLapPicker.js';
 import type { TelemetryLapRef } from '../../utils/telemetryCompareLink.js';
 
-export type { CompareLapsSessionItem };
-
 export interface CompareLapsProps {
   availableTracks?: string[];
   sessions?: CompareLapsSessionItem[];

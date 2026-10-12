@@ -4,7 +4,7 @@ import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { CornerSegmentComparison } from '../../../utils/cornerAnalysis/types.js';
 import { CornerTechniqueDeck } from './CornerTechniqueDeck.js';
 import { CornerSpeedGraph } from './CornerSpeedGraph.js';
-import { TrackBoundaryGeometry } from '../map/useTrackBoundaryGeometry.js';
+import { TrackBoundaryGeometry } from '../../../../shared/types/trackGeometry.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 
 export interface CornerApexChartProps {

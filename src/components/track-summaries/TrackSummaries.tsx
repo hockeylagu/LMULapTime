@@ -3,13 +3,13 @@ import { Link } from 'react-router';
 import { createBenchmarkLookup, getPaceCategoryFromPercentage } from '../../../shared/domain/paceCategory.js';
 import { aggregateTrackSummaries, TrackSessionSummary } from '../../../shared/domain/trackSummaryUtils.js';
 import { ReferenceLaptimeEntry, PaceCategory, ReferenceLaptimesCache, TrackSummary } from '../../../shared/types/index.js';
-import { TrackSummariesHeader, TracksSortOption } from './TrackSummariesHeader.js';
+import { TrackSummariesHeader } from './TrackSummariesHeader.js';
+import { TracksSortOption } from './tracksSortOptions.js';
 import { loadReferenceLaptimes, peekReferenceLaptimes } from '../../api/referenceApi.js';
 import { apiErrorMessage, isAbortError, fetchJson } from '../../api/apiClient.js';
 import { useSessionDataContext } from '../../api/sessionDataContext.js';
 import { TrackSummaryCard } from './TrackSummaryCard.js';
 
-export type { TracksSortOption, TrackSessionSummary };
 export type TrackSummaryData = TrackSummary;
 
 export interface TrackSummariesProps {

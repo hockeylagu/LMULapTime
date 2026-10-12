@@ -5,7 +5,7 @@ import { GpsTrackMap } from './GpsTrackMap.js';
 import { ReplayTelemetryHud } from '../inspector/ReplayTelemetryHud.js';
 import { MapColorMode } from './replayMapUtils.js';
 import { CornerSegmentComparison } from '../../../utils/cornerAnalysis/types.js';
-import { TrackBoundaryGeometry } from './useTrackBoundaryGeometry.js';
+import { TrackBoundaryGeometry } from '../../../../shared/types/trackGeometry.js';
 import { ReplayFrictionCircle } from './ReplayFrictionCircle.js';
 import { TrackCircuitLayout } from '../../track-detail/TrackCircuitLayout.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';

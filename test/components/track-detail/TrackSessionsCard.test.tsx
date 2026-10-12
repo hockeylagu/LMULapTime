@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { TrackSessionsCard } from '../../../src/components/track-detail/TrackSessionsCard';
-import { SessionListItem } from '../../../src/components/session-list/SessionList';
+import { SessionListItem } from '../../../src/components/session-list/sessionListTypes.js';
 
 describe('TrackSessionsCard', () => {
   const baseSession: SessionListItem = {

@@ -1,7 +1,4 @@
 import { LapData, PaceCategory } from '../../../shared/types/index.js';
-import type { DashboardSortOption } from './dashboardSortOptions.js';
-
-export type { DashboardSortOption };
 
 export interface SessionSummary {
   id: string;

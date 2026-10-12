@@ -7,8 +7,6 @@ import { MiniCornerMap } from '../map/MiniCornerMap.js';
 import { LapSelectorDropdown, LapConsistencyOption } from './LapSelectorDropdown.js';
 import { consistencyClass, MetricRow, LeastConsistentBadge } from './ConsistencyMetricRow.js';
 
-export type { LapConsistencyOption };
-
 export interface ConsistencyPanelProps {
   stats: LapConsistencyStats;
   cornerStats?: CornerConsistencyStat[];
@@ -27,7 +25,6 @@ export interface ConsistencyPanelProps {
   currentLapNumber?: number;
   className?: string;
 }
-
 
 export const ConsistencyPanel: React.FC<ConsistencyPanelProps> = ({
   stats,
