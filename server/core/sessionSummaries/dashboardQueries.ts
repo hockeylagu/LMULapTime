@@ -3,7 +3,7 @@ import type { ReferenceLaptimeEntry } from '../types.js';
 import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
 import type { DashboardData, DashboardMetrics, DashboardTrends } from '../../../shared/types/dashboard.js';
 import { getDisplayTrackName } from '../../../shared/domain/formatters.js';
-import { createBenchmarkLookup, getPaceCategoryFromPercentage } from '../../../shared/domain/paceCategory.js';
+import { calculateBenchmarkPace, createBenchmarkLookup, getPaceCategoryFromPercentage } from '../../../shared/domain/paceCategory.js';
 import { createPaceCalculator } from '../../benchmarks/referenceLaptimes.js';
 import { findLayoutBenchmark } from '../../../shared/domain/leaderboard.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
@@ -28,9 +28,7 @@ function paceFor(row: DashboardSummaryRow, entries: Record<string, ReferenceLapt
   if (row.best_lap_wet || !row.best_lap_time || row.best_lap_time <= 0) return null;
   const spec = getCircuitSpecification(row.track_venue, row.track_course, null, null, null, row.track_length);
   const target = findLayoutBenchmark(entries, spec.layoutKey, row.car_class, findTrackEntries);
-  if (!target?.target100Sec) return null;
-  const percentage = Number(((row.best_lap_time / target.target100Sec) * 100).toFixed(2));
-  return { percentage, category: getPaceCategoryFromPercentage(percentage) };
+  return calculateBenchmarkPace(row.best_lap_time, target?.target100Sec);
 }
 
 /** Current targets are small lookup inputs; SQLite rates history and returns only grouped results. */

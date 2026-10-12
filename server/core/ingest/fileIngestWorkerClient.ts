@@ -1,9 +1,9 @@
 import { Worker } from 'node:worker_threads';
 import { findWorkerBootstrap, isWorkerMessage } from '../../replay/worker/replayTrajectoryWorkerClient.js';
-import type { DetailedSession, ReplayMetadata, ReferenceLaptimesCache } from '../types.js';
+import type { DetailedSession, ReplayMetadata } from '../types.js';
 import type { ReplayFileEntry } from '../../sessions/sessionXmlTypes.js';
 
-type IngestRequest = { kind: 'xml' | 'replay'; filePath: string; playerName?: string; replays?: ReplayFileEntry[]; referenceCache?: ReferenceLaptimesCache | null };
+type IngestRequest = { kind: 'xml' | 'replay'; filePath: string; playerName?: string; replays?: ReplayFileEntry[] };
 type IngestResult = DetailedSession | ReplayMetadata | null;
 /** An answer of fileIngestWorker.ts. */
 type IngestAnswer = { type: 'result'; result: IngestResult } | { type: 'error'; message: string };
@@ -65,8 +65,8 @@ export class FileIngestWorker {
     });
   }
 
-  public async parseXml(filePath: string, playerName: string, replays: ReplayFileEntry[], referenceCache: ReferenceLaptimesCache | null = null): Promise<DetailedSession | null> {
-    return await this.request({ kind: 'xml', filePath, playerName, replays, referenceCache }) as DetailedSession | null;
+  public async parseXml(filePath: string, playerName: string, replays: ReplayFileEntry[]): Promise<DetailedSession | null> {
+    return await this.request({ kind: 'xml', filePath, playerName, replays }) as DetailedSession | null;
   }
   public async parseReplay(filePath: string, playerName?: string): Promise<ReplayMetadata> {
     const result = await this.request({ kind: 'replay', filePath, playerName });

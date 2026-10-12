@@ -21,7 +21,6 @@ import {
   minValidTime,
 } from '../../shared/domain/formatters.js';
 import { normalizeCarClass } from '../../shared/domain/vehicleMapping.js';
-import { rateDriversPace } from './sessionPaceRating.js';
 import {
   RawLapXmlNode,
   RawDriverXmlNode,
@@ -199,9 +198,6 @@ export class LmuParser {
       const rawDrivers = sessionDataNode?.Driver || raceResults.Driver || [];
       const driversList = Array.isArray(rawDrivers) ? rawDrivers : [rawDrivers];
       const drivers: DriverData[] = driversList.map((d: RawDriverXmlNode) => this.parseDriver(d)).filter(Boolean);
-
-      // Rate each lap and driver best lap against the benchmark targets
-      rateDriversPace(drivers, { venue: trackVenue, course: trackCourse, trackLengthMeters });
 
       // Compute Gap to Leader across drivers per lap
       const leaderLapEtMap = new Map<number, number>();

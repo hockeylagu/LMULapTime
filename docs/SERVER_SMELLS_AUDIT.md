@@ -195,9 +195,11 @@ search further if measurements justify it; do not add a second persistent weathe
 
 - `server/core/types.ts` remains a pass-through barrel, already recorded in CODE_MAP. Direct
   imports are an inexpensive later cleanup, not the main performance opportunity.
-- Parser pace rating runs in the worker and again at the synchronous ingestion write boundary.
-  The second pass intentionally prevents an old worker snapshot restoring stale benchmarks.
-  Remove the worker pass only with a clear raw-parse contract and standalone-parser coverage.
+- Fixed in the second pass: XML parsing and persistence both return/store unrated facts. Benchmark
+  pace is composed at read time, so a delayed worker result cannot restore obsolete ratings. XML
+  workers no longer receive benchmark snapshots; standalone parsing shares the unrated contract.
+  `calculateBenchmarkPace` owns the JavaScript percentage, delta and category calculation, including
+  dashboard trends. The dashboard's SQL history selection/ranking remains unchanged.
 - Ordinary per-call maps, retained-data compatibility adapters and geometry cloning are not
   redundant merely because they repeat work. They preserve ownership and deleted recordings.
 - Background decoding scans the replay stream separately for each driver. A batched decode may
@@ -208,6 +210,34 @@ search further if measurements justify it; do not add a second persistent weathe
   measurement; the old timing is not evidence for the current implementation.
 
 ## Verification and suggested delivery order
+
+### Second implementation pass — benchmark pace at read time
+
+XML parsing and persistence no longer calculate transient benchmark pace; standalone and worker
+parsing return the same unrated facts. Worker benchmark snapshot transport and its setter are
+removed. Lap classification marks best-lap conditions without copying benchmark ratings.
+JavaScript ratings share `calculateBenchmarkPace` for percentage/delta rounding and categories;
+the test-only single-call calculator forwarder is removed. Current-target lookup stays scoped to
+each read. No parser-version bump is required because parsed facts and stored fields are unchanged.
+
+Dashboard SQL history ranking/aggregation is unchanged. New regressions cover best percentage
+selection across classes (including a slower raw lap winning), layout isolation, deterministic ties,
+wet exclusion, percentage/category boundaries, average rounding, and target refresh without XML
+reparsing. Detail/card/trend pace, missing-target clearing and standalone/worker parity are covered.
+The full suite passed: 2,541 tests, 56 skipped across 302 suites; the production build was clean.
+An independent Luna review checked the removal points and dashboard invariants before verification.
+
+The endpoint benchmark completed with five samples on an isolated database snapshot; results
+are local-only in `.cache/pace-benchmark-after/latest.md`. The attempted before run failed local
+HTTP requests in the restricted sandbox, so there is no valid before/after latency comparison and
+no endpoint speed claim. The successful run used local HTTP access. Replay ingestion files were
+left to the concurrent optimization work; XML-only branches of the shared file-ingest worker changed.
+
+Independent final review identified a pre-existing rounding difference: SQLite `round` can yield
+105.50% where JavaScript `toFixed` yields 105.51% (105.505 seconds against 100 seconds). A boundary
+regression deliberately preserves both results. The user specifically requested unchanged dashboard
+best-pace behavior, so this pass centralizes JavaScript display ratings but retains SQL history
+aggregation and its existing rounding. Unifying those execution paths would be a separate behavior change.
 
 ### First implementation pass — 2026-10-12
 

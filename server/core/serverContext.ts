@@ -403,7 +403,7 @@ export class ServerContext {
     const iterator = this.sessionDb.syncSessionsAsyncIterator(resultsDir, {
       setReplayLookup: lookup => parser.setReplayLookup(lookup),
       parseSessionXml: filePath => parser.parseSessionXml(filePath),
-      parseSessionXmlAsync: filePath => worker.parseXml(filePath, parser.configuredPlayerName, [], this.sessionDb.getReferenceLaptimesCache?.() ?? null),
+      parseSessionXmlAsync: filePath => worker.parseXml(filePath, parser.configuredPlayerName, []),
     }, forceReparse);
     pumpScanInBackground(iterator, status, outcome => {
       void worker.close();

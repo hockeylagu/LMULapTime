@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { describe, expect, it } from 'vitest';
-import type { DetailedSession, LapData } from '../../../../shared/types/index.js';
+import type { DetailedSession, LapData, ReferenceLaptimeEntry } from '../../../../shared/types/index.js';
 import { initDbSchema } from '../../../../server/core/dbSchema.js';
 import { upsertSession } from '../../../../server/core/dbSessionStore.js';
 import { queryCompactDashboard } from '../../../../server/core/sessionSummaries/dashboardQueries.js';
@@ -17,6 +17,66 @@ const makeSession = (id: string, timestamp: number, lapTime: number): DetailedSe
 };
 
 describe('compact dashboard queries', () => {
+  it('keeps best benchmark pace selection, ties, wet exclusion and layout/class targets without ingest ratings', () => {
+    const db = new Database(':memory:');
+    try {
+      initDbSchema(db);
+      const benchmark = (trackName: string, carClass: string, target100Sec: number): ReferenceLaptimeEntry => ({
+        key: `${trackName}_${carClass}`, trackName, carClass, patch: 'test', target100Sec,
+        targets: { alienSec: target100Sec, competitiveSec: target100Sec, goodSec: target100Sec,
+          goodMidpackSec: target100Sec, midpackSec: target100Sec, midpackTailSec: target100Sec,
+          tailEnderSec: target100Sec, offlineSec: target100Sec },
+      });
+      const hyper = benchmark('Monza', 'Hyper', 90);
+      const gt3 = benchmark('Monza', 'GT3', 100);
+      const short = benchmark('Monza Curva Grande Circuit', 'Hyper', 60);
+      const entries = Object.fromEntries([hyper, gt3, short].map(entry => [entry.key, entry]));
+      const tiedFirst = makeSession('tie-first', 1, 90.455);
+      const tiedLast = makeSession('tie-last', 2, 90.455);
+      const otherClass = makeSession('gt3', 3, 102);
+      otherClass.drivers[0].carClass = 'GT3';
+      const wet = makeSession('wet', 4, 80);
+      wet.drivers[0].bestLapWet = true;
+      const otherLayout = makeSession('short', 5, 63);
+      otherLayout.trackVenue = 'Monza Curva Grande Circuit';
+      otherLayout.trackCourse = 'Curva Grande';
+      otherLayout.trackLengthMeters = 3970;
+      for (const session of [tiedFirst, tiedLast, otherClass, wet, otherLayout]) {
+        upsertSession(db, session, session.filePath, 1, 1);
+      }
+      const read = () => queryCompactDashboard(db, { referenceEntries: entries });
+      const first = read();
+      expect(first.metrics.bestTrackRefLaps).toMatchObject([
+        { sessionId: 'tie-first', percentage: 100.51, category: 'Competitive' },
+        { sessionId: 'short', percentage: 105, category: 'Midpack' },
+      ]);
+      expect(first.metrics.averageBenchmarkPacePercentage).toBe(102);
+      expect(first.trends.recentPaceTrend.map(point => point.id)).not.toContain('wet');
+      // A slower raw lap can have the best benchmark pace for its class after a target refresh.
+      gt3.target100Sec = 102;
+      expect(read().metrics.bestTrackRefLaps).toMatchObject([
+        { sessionId: 'gt3', percentage: 100, category: 'Alien' },
+        { sessionId: 'short', percentage: 105, category: 'Midpack' },
+      ]);
+      expect(read().metrics.averageBenchmarkPacePercentage).toBe(101.5);
+
+      // Preserve the existing SQLite rounding of dashboard history at a binary rounding tie.
+      // JS display/trend rounding historically differs here; centralizing it must not change
+      // which percentage/category the dashboard history reports.
+      const spa = benchmark('Spa', 'Hyper', 100);
+      entries[spa.key] = spa;
+      const rounding = makeSession('rounding', 6, 105.505);
+      rounding.trackVenue = 'Spa';
+      rounding.trackCourse = 'Grand Prix';
+      rounding.trackLengthMeters = 7004;
+      upsertSession(db, rounding, rounding.filePath, 1, 1);
+      const boundary = read();
+      expect(boundary.metrics.bestTrackRefLaps.find(lap => lap.sessionId === 'rounding'))
+        .toMatchObject({ percentage: 105.5, category: 'Midpack' });
+      expect(boundary.trends.recentPaceTrend.find(point => point.id === 'rounding')?.pacePercentage).toBe(105.51);
+    } finally { db.close(); }
+  });
+
   it('preserves unknown venue/course pairs in filter options and dashboard page scope', () => {
     const db = new Database(':memory:');
     initDbSchema(db);

@@ -38,7 +38,10 @@ Future table schema changes receive a migration when needed; there is no row-ver
 `vehicles` by raw XML car type and class, `teams` by name; an absent value is a NULL id. They are emptied with the session cache and never pruned.
 
 Benchmark rating uses `createBenchmarkLookup` (`shared/domain/paceCategory.ts`) to resolve benchmark layouts once per batch,
-and `createPaceCalculator` (`server/benchmarks/referenceLaptimes.ts`) to reuse target matches within a request or ingestion batch.
+and `createPaceCalculator` (`server/benchmarks/referenceLaptimes.ts`) to reuse target matches within a read.
+`calculateBenchmarkPace` (`shared/domain/paceCategory.ts`) owns percentage/delta rounding and category selection;
+detail, card, comparison and dashboard trend ratings consume it. Dashboard history aggregates retain bounded SQL
+calculation and ranking, using the same two-decimal percentage and shared category bands.
 Session lap rating and paginated cards share these batch lookups; dashboard trends use the same indexed snapshot while retaining
 strict class matching, and dashboard cards are rated once. Track cards compute pace once per card and reuse it for sorting and rendering.
 These lookups are scoped to the batch/view inputs and recreated with refreshed benchmarks; no persistent target cache or cache-version bump is needed.
@@ -163,7 +166,7 @@ API JSON requests use `no-store`; detailed geometry comes from the local package
 only mounted same-session data during a revision refresh; switching IDs or remounting fetches fresh.
 Refreshes during a scan are coalesced into one follow-up
 XML scan (preserving a requested force reparse), followed by replay and DuckDB scans.
-`server/core/ingest/fileIngestWorker*.ts` parses XML and replay metadata in a reused worker. XML receives a benchmark snapshot from the main thread and never opens SQLite in the worker. A worker that dies fails only the file it was reading (XML is then read on the main thread) and the next file starts a new worker.
+`server/core/ingest/fileIngestWorker*.ts` parses XML and replay metadata in a reused worker. XML returns unrated session facts, without benchmark snapshots or SQLite access in the worker. Standalone XML parsing has the same contract; compose displayed pace with the read-time rating functions. A worker that dies fails only the file it was reading (XML is then read on the main thread) and the next file starts a new worker.
 Every worker client (ingest, replay decode, race positions) reads its port through `isWorkerMessage` (`replayTrajectoryWorkerClient.ts`): under `npm run dev`
 (`node --watch`) tsx posts `{ 'watch:import': [...] }` on every worker port, which was once read as an empty answer and lost new sessions and replays.
 XML publishes ten-session transactions before proceeding; cached sessions whose XML is gone survive.
@@ -172,8 +175,8 @@ successful paths before stat/parsing. A new file that changed while it was read 
 as a failed read. A reparse keeps the stored replay link and DuckDB file (`restoreStoredSessionLinks`). Parser upgrades, explicit force reparses and failed reads
 are the exceptions. Replay matching reads stored XML mtimes from SQLite; missing values fall back
 to disk and failed reads retry. Validation runs during reconciliation without a per-session memo.
-Each batch rates pace against the current main-thread benchmarks immediately before persistence,
-then reapplies lap conditions, so delayed worker results cannot restore obsolete or wet-best ratings.
+Each batch reapplies lap conditions before persistence. Benchmark pace is calculated only at read time,
+so delayed worker results cannot restore obsolete ratings; stored best-lap conditions exclude wet bests.
 Replay discovery finishes and reconciles links in ten-session batches, yielding with
 `setImmediate` and keeping `/scan/status` incomplete through replay-link and DuckDB ownership
 reconciliation, before decoding associated recordings. Reconciliation is bounded by change stamps
@@ -228,17 +231,16 @@ index their explicitly supplied replay directory locally.
      (`isInferred`), out-laps marked (`isOutLap`, rule `isCompletedPitStop` in `shared/domain/lapComparison.ts`), pit loss on the in-lap
      (`pitStopDuration`, spans in-lap + out-lap);
    - `annotateLapTraffic` (`shared/domain/raceTraffic.ts`): who was around the car on each lap;
-   - `rateDriversPace` (`server/sessions/sessionPaceRating.ts`): each valid lap and the best lap against the cached benchmark targets;
    - `classifySessionLaps` (`server/sessions/sessionLapClassification.ts`): conditions (`shared/domain/lapConditions.ts`), non-representative
-     laps (`shared/domain/lapRepresentativeness.ts`), clean-lap average, best-lap benchmark rating (a wet best lap is
-     `bestLapWet` and unrated: the targets are dry laps);
+     laps (`shared/domain/lapRepresentativeness.ts`), clean-lap average and `bestLapWet` (wet bests are excluded
+     from read-time benchmark ratings: the targets are dry laps);
    - car class: `shared/domain/vehicleMapping.ts` (`resolveDriverCarClass`, `mapVehicleIdToClass`); layout: `getCircuitSpecification`;
    - replay match: `findMatchingReplay` (`server/sessions/replayMatching.ts`).
 2. **Store**: `dbSessionSync.ts` (holds `DB_PARSER_VERSION`; bumping it re-parses every stored session) → `dbSessionStore.ts`.
 3. **Re-classify with rain**: `server/core/dbSessionConditions.ts` runs `classifySessionLaps` again with the replay's rain when a
    session gets its replay or the replay's conditions are stored, and sets the link's peak rain and weather from every stored
    condition (the header scan samples 30 windows and can miss the peak).
-   Pace is rated during XML parsing; startup benchmark refresh no longer rewrites all detailed session JSON.
+   XML parsing and persistence do not rate benchmark pace; benchmark refresh needs no history rewrite or XML reparse.
 4. **Serve**: `GET /api/session/:id` (`server/routes/sessionRoutes.ts`) adds, per request and not stored:
    - current benchmark pace via `rateSessionDetail` and bounded history context via `querySessionContext`; history queries a personal best only for a uniquely identified session player. Selecting another driver loads `/api/session/:id/personal-best/:driverOrdinal` through `querySessionPersonalBestById`, reading layout and one driver's identity/class without hydrating the session and retaining only the active result without a per-driver cache. Both PB paths share a layout-first SQL query and strict unknown-layout venue/course scope. Stored telemetry attachments are already read from normalized session rows;
    - pit stop details from replay events (`attachPitServices`, `server/sessions/sessionPitStops.ts`, maths in `shared/domain/pitStops.ts`).

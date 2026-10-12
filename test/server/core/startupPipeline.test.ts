@@ -8,7 +8,6 @@ import { LmuParser } from '../../../server/sessions/parser.js';
 import { TelemetryCatalog } from '../../../server/telemetry/telemetryCatalog.js';
 import { ReplayRecordingService } from '../../../server/replay/replayRecordingService.js';
 import { FileIngestWorker } from '../../../server/core/ingest/fileIngestWorkerClient.js';
-import { parseReferenceCsv } from '../../../server/benchmarks/referenceLaptimes.js';
 
 describe('XML-first startup pipeline', () => {
   let dir: string;
@@ -38,15 +37,21 @@ describe('XML-first startup pipeline', () => {
     } finally { await worker.close(); }
   });
 
-  it('updates the reusable XML worker from explicit benchmark snapshots, including an empty cache', async () => {
+  it('returns the same unrated session facts from standalone and reusable worker parsing', async () => {
     const worker = new FileIngestWorker();
     const fixture = path.join(process.cwd(), 'test/fixtures/results/2026_05_28_P1.xml');
-    const cache = parseReferenceCsv('SpaLMH,Spa,1.4+,,2:00.000,2:01.200,2:02.400,2:03.600,2:04.800,2:06.000,2:07.200,2:08.400,Ferrari 499P,,,,LMH');
     try {
-      const parsed = await worker.parseXml(fixture, 'TestPlayer', [], cache);
-      expect(parsed?.drivers[0].laps[0].target100Sec).toBe(120);
-      const withoutBenchmarks = await worker.parseXml(fixture, 'TestPlayer', [], null);
-      expect(withoutBenchmarks?.drivers[0].laps[0].target100Sec).toBeUndefined();
+      const parser = new LmuParser(undefined, undefined, { detectPlayer: false, readReplayMetadata: false });
+      parser.configuredPlayerName = 'TestPlayer';
+      const standalone = parser.parseSessionXml(fixture);
+      expect(standalone).not.toBeNull();
+      for (let i = 0; i < 2; i++) {
+        const parsed = await worker.parseXml(fixture, 'TestPlayer', []);
+        expect(parsed).toEqual(standalone);
+        expect(parsed?.drivers[0].bestLapPacePercentage).toBeUndefined();
+        expect(parsed?.drivers[0].laps[0].paceCategory).toBeUndefined();
+        expect(parsed?.drivers[0].laps[0].target100Sec).toBeUndefined();
+      }
     } finally { await worker.close(); }
   });
 

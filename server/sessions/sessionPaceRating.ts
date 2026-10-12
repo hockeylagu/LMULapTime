@@ -11,9 +11,8 @@ export interface PaceTrack {
 
 /**
  * Rates every valid lap and each driver's best lap against the current benchmark targets. A lap
- * whose layout and class have no target loses any rating it carried. The parser runs it once; it
- * is reused for read-time detail/card ratings. classifySessionLaps
- * then decides whether the best lap keeps its rating (a wet best lap does not).
+ * whose layout and class have no target loses any rating it carried. Used only to compose
+ * read-time session details; their wet best laps are left unrated by rateSessionDetail.
  */
 export function rateDriversPace(drivers: RatedDriver[], track: PaceTrack): void {
   const calculatePaceCategory = createPaceCalculator();

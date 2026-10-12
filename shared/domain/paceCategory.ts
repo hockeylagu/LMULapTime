@@ -1,4 +1,4 @@
-import { PaceCategory, ReferenceLaptimeEntry } from '../types/index.js';
+import { PaceCategory, PaceCategoryInfo, ReferenceLaptimeEntry } from '../types/index.js';
 import { CIRCUIT_SPECIFICATIONS } from './circuitDefinitions.js';
 import { getCircuitSpecification } from './circuitSpecs.js';
 
@@ -17,6 +17,18 @@ export function getPaceCategoryFromPercentage(percentage: number): PaceCategory 
     if (percentage <= band.maxPercentage) return band.category;
   }
   return PACE_CATEGORY_BANDS[PACE_CATEGORY_BANDS.length - 1].category;
+}
+
+/** Current-target rating: round the percentage before applying the category cutoffs. */
+export function calculateBenchmarkPace(lapTimeSec: number | null, target100Sec?: number | null): PaceCategoryInfo | null {
+  if (!lapTimeSec || lapTimeSec <= 0 || !target100Sec) return null;
+  const percentage = Number(((lapTimeSec / target100Sec) * 100).toFixed(2));
+  return {
+    category: getPaceCategoryFromPercentage(percentage),
+    percentage,
+    target100Sec,
+    deltaToTargetSec: Number((lapTimeSec - target100Sec).toFixed(3)),
+  };
 }
 
 export function formatPacePercentage(percentage?: number | null): string {

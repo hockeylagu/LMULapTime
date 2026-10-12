@@ -7,9 +7,19 @@ import {
   findMatchingTrackBenchmarkEntries,
   findReferenceEntry,
   createBenchmarkLookup,
+  calculateBenchmarkPace,
 } from '../../shared/domain/paceCategory.js';
 
 describe('paceCategory utility', () => {
+
+  it('rounds benchmark pace before classification and preserves the millisecond delta', () => {
+    expect(calculateBenchmarkPace(120.605, 120)).toEqual({
+      percentage: 100.5, category: 'Alien', target100Sec: 120, deltaToTargetSec: 0.605,
+    });
+    expect(calculateBenchmarkPace(120.607, 120)?.category).toBe('Competitive');
+    for (const time of [null, 0, -1]) expect(calculateBenchmarkPace(time, 120)).toBeNull();
+    expect(calculateBenchmarkPace(120, undefined)).toBeNull();
+  });
 
   describe('formatPacePercentage', () => {
     it('returns formatted percentage string', () => {

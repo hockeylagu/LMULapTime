@@ -8,10 +8,10 @@ type ClassifiedDriver = Pick<DriverData, 'laps' | 'avgLapTime' | 'avgLapTimeStri
   | 'bestLapPaceCategory' | 'bestLapPacePercentage' | 'bestLapWet'>;
 
 /**
- * The benchmark targets are dry laps, so a wet best lap is not rated against them: it is flagged
- * `bestLapWet` instead. A dry best lap takes its lap's rating back (the parser rated every valid lap).
+ * Mark a wet best lap so read-time benchmark ratings can exclude it. Classification does not
+ * calculate ratings: they depend on the current benchmark snapshot, not on the parsed XML.
  */
-function rateBestLap(driver: ClassifiedDriver): void {
+function markBestLapConditions(driver: ClassifiedDriver): void {
   const best = driver.laps.find(l => l.lapNum === driver.bestLapNum)
     ?? (driver.bestLapTime ? driver.laps.find(l => l.lapTime === driver.bestLapTime) : undefined);
   if (!best) return;
@@ -22,15 +22,11 @@ function rateBestLap(driver: ClassifiedDriver): void {
     return;
   }
   delete driver.bestLapWet;
-  if (best.paceCategory && typeof best.pacePercentage === 'number') {
-    driver.bestLapPaceCategory = best.paceCategory;
-    driver.bestLapPacePercentage = best.pacePercentage;
-  }
 }
 
 /**
  * Tags each lap's conditions, marks the laps that do not show the driver's pace, recomputes each
- * driver's clean-lap average and rates the best lap against the dry benchmark only when it was dry. The parser runs it once lap times, incidents and traffic are
+ * driver's clean-lap average and marks whether the best lap was wet. The parser runs it once lap times, incidents and traffic are
  * attached, with the tyres only; it runs again with the linked replay's rain when the session gets
  * its replay or the replay's conditions are stored. Same rule both times: views and analytics only
  * read the result.
@@ -41,6 +37,6 @@ export function classifySessionLaps(drivers: ClassifiedDriver[], rainOverLap?: R
     markNonRepresentativeLaps(driver.laps);
     driver.avgLapTime = computeAverageLapTime(driver.laps);
     driver.avgLapTimeString = formatTime(driver.avgLapTime);
-    rateBestLap(driver);
+    markBestLapConditions(driver);
   }
 }

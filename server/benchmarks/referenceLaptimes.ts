@@ -1,7 +1,7 @@
 import { ReferenceLaptimeEntry, ReferenceLaptimesCache, ReferenceBenchmarkDiff, ReferenceBenchmarkDiffItem, PaceCategoryInfo } from '../core/types.js';
 import { parseTimeStringToSeconds, formatTime } from '../../shared/domain/formatters.js';
 import {
-  getPaceCategoryFromPercentage,
+  calculateBenchmarkPace,
   createBenchmarkLookup,
 } from '../../shared/domain/paceCategory.js';
 import { normalizeCarClass } from '../../shared/domain/vehicleMapping.js';
@@ -174,12 +174,6 @@ export function parseReferenceCsv(csvText: string): ReferenceLaptimesCache {
   };
 }
 
-/** Worker parsing receives the main thread's benchmarks without opening its SQLite database. */
-export function setWorkerReferenceLaptimes(cache: ReferenceLaptimesCache | null): void {
-  if (isMainThread) throw new Error('Benchmark snapshots are only used by ingest workers');
-  cachedData = cache;
-}
-
 export function resetCachedReferenceLaptimes(): void {
   cachedData = null;
 }
@@ -255,9 +249,12 @@ export async function fetchAndCacheReferenceLaptimes(): Promise<ReferenceLaptime
 
 
 // Find reference entry
-export type PaceCalculator = typeof calculatePaceCategory;
+export type PaceCalculator = (
+  lapTimeSec: number | null, venue: string, course: string, carClass: string, carType: string,
+  trackLengthMeters?: number | null,
+) => PaceCategoryInfo | null;
 
-/** Reuse target matching within a request or ingestion batch; a new calculator sees refreshed benchmarks. */
+/** Reuse target matching within a read; a new calculator sees refreshed benchmarks. */
 export function createPaceCalculator(entries = loadReferenceLaptimesFromCache()?.entries ?? {}): PaceCalculator {
   const lookup = createBenchmarkLookup(entries);
   const targets = new Map<string, ReferenceLaptimeEntry | null>();
@@ -265,35 +262,6 @@ export function createPaceCalculator(entries = loadReferenceLaptimesFromCache()?
     if (!lapTimeSec || lapTimeSec <= 0) return null;
     const key = JSON.stringify([venue, course, carClass, trackLengthMeters]);
     if (!targets.has(key)) targets.set(key, lookup.findReferenceEntry(venue, course, carClass, trackLengthMeters));
-    return paceFromReference(lapTimeSec, targets.get(key) ?? null);
-  };
-}
-
-// Calculate Pace Category for a Lap Time
-export function calculatePaceCategory(
-  lapTimeSec: number | null,
-  venue: string,
-  course: string,
-  carClass: string,
-  carType: string,
-  trackLengthMeters?: number | null
-): PaceCategoryInfo | null {
-  if (!lapTimeSec || lapTimeSec <= 0) return null;
-
-  return createPaceCalculator()(lapTimeSec, venue, course, carClass, carType, trackLengthMeters);
-}
-
-function paceFromReference(lapTimeSec: number, ref: ReferenceLaptimeEntry | null): PaceCategoryInfo | null {
-  if (!ref || !ref.target100Sec) return null;
-
-  const percentage = parseFloat(((lapTimeSec / ref.target100Sec) * 100).toFixed(2));
-  const deltaToTargetSec = parseFloat((lapTimeSec - ref.target100Sec).toFixed(3));
-  const category = getPaceCategoryFromPercentage(percentage);
-
-  return {
-    category,
-    percentage,
-    target100Sec: ref.target100Sec,
-    deltaToTargetSec,
+    return calculateBenchmarkPace(lapTimeSec, targets.get(key)?.target100Sec);
   };
 }

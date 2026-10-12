@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   parseReferenceCsv,
-  calculatePaceCategory,
   createPaceCalculator,
   loadReferenceLaptimesFromCache,
   isReferenceLaptimesCacheFresh,
@@ -44,15 +43,14 @@ HeaderRow,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest,Rec
     });
   });
 
-  describe('calculatePaceCategory', () => {
+  describe('createPaceCalculator', () => {
     it('rates a batch identically, preserves rounding, and uses refreshed targets in the next batch', () => {
       const cache = parseReferenceCsv(sampleCsv);
       getSessionDatabase().saveReferenceLaptimes(cache);
       resetCachedReferenceLaptimes();
       const rate = createPaceCalculator();
-      for (const time of [null, 0, -1, 120.605, 121.805, 124.205, 130]) {
-        expect(rate(time, 'Spa', 'GP', 'Hyper', 'Ferrari')).toEqual(calculatePaceCategory(time, 'Spa', 'GP', 'Hyper', 'Ferrari'));
-      }
+      expect([120.605, 121.805, 124.205, 130].map(time => rate(time, 'Spa', 'GP', 'Hyper', 'Ferrari')?.percentage))
+        .toEqual([100.5, 101.5, 103.5, 108.33]);
       const drivers: Parameters<typeof rateDriversPace>[0] = structuredClone(mockDetailedSession.drivers);
       rateDriversPace(drivers, { venue: 'Spa', course: 'GP' });
       for (const driver of drivers) {
@@ -68,9 +66,10 @@ HeaderRow,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest,Rec
       expect(createPaceCalculator({})(120, 'Spa', 'GP', 'Hyper', 'Ferrari')).toBeNull();
     });
     it('returns null for null, 0, or negative lap times', () => {
-      expect(calculatePaceCategory(null, 'Spa', 'GP', 'Hyper', 'Ferrari')).toBeNull();
-      expect(calculatePaceCategory(0, 'Spa', 'GP', 'Hyper', 'Ferrari')).toBeNull();
-      expect(calculatePaceCategory(-10, 'Spa', 'GP', 'Hyper', 'Ferrari')).toBeNull();
+      const rate = createPaceCalculator();
+      expect(rate(null, 'Spa', 'GP', 'Hyper', 'Ferrari')).toBeNull();
+      expect(rate(0, 'Spa', 'GP', 'Hyper', 'Ferrari')).toBeNull();
+      expect(rate(-10, 'Spa', 'GP', 'Hyper', 'Ferrari')).toBeNull();
     });
 
     it('correctly maps Alien (<100.5%), Competitive (100.5-101.5%), Good (101.5-103.5%), Midpack, Tail-ender, Offline', () => {
@@ -79,36 +78,37 @@ HeaderRow,Track,Patch,~100%,~100%,101%,102%,103%,104%,105%,106%,107%,Fastest,Rec
       const cache = parseReferenceCsv(sampleCsv);
       db.saveReferenceLaptimes(cache);
       resetCachedReferenceLaptimes();
+      const rate = createPaceCalculator();
 
       // 120s reference for Spa LMH
       // Alien: <= 120.6s (100.5%)
-      const alien = calculatePaceCategory(120.2, 'Spa', 'GP', 'Hyper', 'Ferrari');
+      const alien = rate(120.2, 'Spa', 'GP', 'Hyper', 'Ferrari');
       expect(alien?.category).toBe('Alien');
       expect(alien?.percentage).toBeCloseTo(100.17);
 
       // Competitive: <= 121.8s (101.5%)
-      const competitive = calculatePaceCategory(121.0, 'Spa', 'GP', 'Hyper', 'Ferrari');
+      const competitive = rate(121.0, 'Spa', 'GP', 'Hyper', 'Ferrari');
       expect(competitive?.category).toBe('Competitive');
 
       // Good: <= 124.2s (103.5%)
-      const good = calculatePaceCategory(123.0, 'Spa', 'GP', 'Hyper', 'Ferrari');
+      const good = rate(123.0, 'Spa', 'GP', 'Hyper', 'Ferrari');
       expect(good?.category).toBe('Good');
 
       // Midpack: <= 126.6s (105.5%)
-      const midpack = calculatePaceCategory(125.0, 'Spa', 'GP', 'Hyper', 'Ferrari');
+      const midpack = rate(125.0, 'Spa', 'GP', 'Hyper', 'Ferrari');
       expect(midpack?.category).toBe('Midpack');
 
       // Tail-ender: <= 128.4s (107.0%)
-      const tail = calculatePaceCategory(127.5, 'Spa', 'GP', 'Hyper', 'Ferrari');
+      const tail = rate(127.5, 'Spa', 'GP', 'Hyper', 'Ferrari');
       expect(tail?.category).toBe('Tail-ender');
 
       // Offline: > 107.0%
-      const offline = calculatePaceCategory(135.0, 'Spa', 'GP', 'Hyper', 'Ferrari');
+      const offline = rate(135.0, 'Spa', 'GP', 'Hyper', 'Ferrari');
       expect(offline?.category).toBe('Offline');
     });
 
     it('returns null if track or class does not exist in reference data', () => {
-      const unknown = calculatePaceCategory(100, 'NonExistentTrack12345', '', 'Hyper', '');
+      const unknown = createPaceCalculator()(100, 'NonExistentTrack12345', '', 'Hyper', '');
       expect(unknown).toBeNull();
     });
   });

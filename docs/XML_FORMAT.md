@@ -139,6 +139,11 @@ Benchmark CSV ingestion uses the same conversion. Stored sessions, projections,
 API filters, route parameters, comparisons and badges use exact canonical class
 values; they do not infer class from car models or accept aliases during matching.
 An unavailable class benchmark returns no pace rating. `All` is a filter sentinel.
+
+Benchmark ratings are read-time values, not XML facts. Standalone and worker XML parsing return
+lap times, classifications and best-lap conditions without pace categories, percentages or benchmark
+targets. API response composition rates those facts against current benchmarks; refreshing targets
+requires no XML reparse. Wet best laps remain excluded from dry benchmark ratings.
 `matchesSessionCarClass` selects the player's class, or participating drivers when
 there is no player. A parser version bump reparses existing results into this contract.
 
