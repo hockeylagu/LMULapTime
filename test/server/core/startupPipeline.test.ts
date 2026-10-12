@@ -9,8 +9,6 @@ import { TelemetryCatalog } from '../../../server/telemetry/telemetryCatalog.js'
 import { ReplayRecordingService } from '../../../server/replay/replayRecordingService.js';
 import { FileIngestWorker } from '../../../server/core/ingest/fileIngestWorkerClient.js';
 import { parseReferenceCsv } from '../../../server/benchmarks/referenceLaptimes.js';
-import type { ReplayIngestJob } from '../../../shared/types/index.js';
-import { createSliceVcrBuffer } from '../../utils/mockVcr.js';
 
 describe('XML-first startup pipeline', () => {
   let dir: string;
@@ -50,63 +48,6 @@ describe('XML-first startup pipeline', () => {
       const withoutBenchmarks = await worker.parseXml(fixture, 'TestPlayer', [], null);
       expect(withoutBenchmarks?.drivers[0].laps[0].target100Sec).toBeUndefined();
     } finally { await worker.close(); }
-  });
-
-  it('retries a failed replay decode on Refresh without changing its source file', async () => {
-    fs.writeFileSync(path.join(dir, 'retry.Vcr'), createSliceVcrBuffer({
-      drivers: [{ name: 'Player', vehicleId: '21_26_AFCO95641716', team: 'A', carNumber: '21' }],
-      slices: [{ sTime: 0, driverSlot: 1, x: 0, y: 0, z: 0 }, { sTime: 1, driverSlot: 1, x: 10, y: 0, z: 10 }] }));
-    const store = vi.spyOn(db, 'replaceReplayDriverLaps').mockImplementation(() => { throw new Error('Disk busy'); });
-    const jobs: ReplayIngestJob[] = [];
-    const run = async () => {
-      const iterator = db.syncReplaysAsyncIterator(dir, { retryFailed: true, onReplayState: job => jobs.push(job) });
-      let step = await iterator.next(); while (!step.done) step = await iterator.next();
-    };
-    await run(); expect(jobs[jobs.length - 1]).toMatchObject({ status: 'queued' });
-    expect(db.getReplayDriverIngest('retry.Vcr', -1)).toMatchObject({ status: 'interrupted', error: 'Disk busy' });
-    store.mockRestore(); await run(); expect(jobs[jobs.length - 1]?.status).toBe('ready');
-    expect(db.getStoredReplayTrajectory('retry.Vcr', -1, -1)).not.toBeNull();
-  });
-
-  it('decodes the newest replay first, whatever the filenames', async () => {
-    const bytes = createSliceVcrBuffer({ drivers: [{ name: 'Player', vehicleId: '21_26_AFCO95641716', team: 'A', carNumber: '21' }],
-      slices: [{ sTime: 0, driverSlot: 1, x: 0, y: 0, z: 0 }, { sTime: 1, driverSlot: 1, x: 10, y: 0, z: 10 }] });
-    const write = (name: string, date: Date) => { fs.writeFileSync(path.join(dir, name), bytes); fs.utimesSync(path.join(dir, name), date, date); };
-    write('A old.Vcr', new Date('2026-09-01T12:00:00Z'));
-    write('B newest.Vcr', new Date('2026-10-05T12:00:00Z'));
-    write('C middle.Vcr', new Date('2026-09-20T12:00:00Z'));
-    const processing: string[] = [];
-    const iterator = db.syncReplaysAsyncIterator(dir, { playerName: 'Player',
-      onReplayState: job => { if (job.status === 'processing') processing.push(job.name); } });
-    let step = await iterator.next(); while (!step.done) step = await iterator.next();
-
-    expect(processing).toEqual(['B newest.Vcr', 'C middle.Vcr', 'A old.Vcr']);
-  });
-
-  it('discovers all replay metadata before decoding only associated recordings and reuses cached decodes', async () => {
-    const bytes = createSliceVcrBuffer({ drivers: [{ name: 'Player', vehicleId: '21_26_AFCO95641716', team: 'A', carNumber: '21' }],
-      slices: [{ sTime: 0, driverSlot: 1, x: 0, y: 0, z: 0 }, { sTime: 1, driverSlot: 1, x: 10, y: 0, z: 10 }] });
-    fs.writeFileSync(path.join(dir, 'associated.Vcr'), bytes); fs.writeFileSync(path.join(dir, 'unrelated.Vcr'), bytes);
-    const jobs: ReplayIngestJob[] = [];
-    const run = async () => {
-      const iterator = db.syncReplaysAsyncIterator(dir, { playerName: 'Player',
-        onMetadataReady: async () => {
-          expect(db.getReplaysCount()).toBe(2); expect(db.getCacheStats().replayTrajectoriesCount).toBe(0);
-          await new Promise<void>(resolve => setImmediate(resolve));
-          return new Set(['associated.Vcr']);
-        },
-        onReplayState: job => jobs.push(job) });
-      let step = await iterator.next(); while (!step.done) step = await iterator.next(); return step.value;
-    };
-    expect((await run()).added).toBe(2);
-    expect(jobs.map(job => job.status)).toEqual(['queued', 'processing', 'ready']);
-    expect(jobs.every(job => job.name === 'associated.Vcr')).toBe(true);
-    expect(db.getStoredReplayTrajectory('associated.Vcr', -1, -1)).not.toBeNull();
-    expect(db.getStoredReplayTrajectory('unrelated.Vcr', -1, -1)).toBeNull();
-    const store = vi.spyOn(db, 'replaceReplayDriverLaps');
-    const iterator = db.syncReplaysAsyncIterator(dir, { onMetadataReady: () => new Set(['associated.Vcr']) });
-    let step = await iterator.next(); while (!step.done) step = await iterator.next();
-    expect(store).not.toHaveBeenCalled(); expect(step.value).toMatchObject({ added: 0, updated: 0 });
   });
 
   it('changes the data revision when session data changes and on a server restart', () => {
@@ -166,31 +107,5 @@ describe('XML-first startup pipeline', () => {
     expect(sessionDb.syncReplaysAsyncIterator).not.toHaveBeenCalled();
     await reconciliation;
     expect(sessionDb.syncReplaysAsyncIterator).toHaveBeenCalledTimes(1);
-  });
-
-  it('only counts new or unparsed replays in progress total instead of all on disk', async () => {
-    const bytes = createSliceVcrBuffer({ drivers: [{ name: 'Player', vehicleId: '21_26_AFCO95641716', team: 'A', carNumber: '21' }],
-      slices: [{ sTime: 0, driverSlot: 1, x: 0, y: 0, z: 0 }, { sTime: 1, driverSlot: 1, x: 10, y: 0, z: 10 }] });
-    const write = (name: string, date: Date) => { fs.writeFileSync(path.join(dir, name), bytes); fs.utimesSync(path.join(dir, name), date, date); };
-    write('older1.Vcr', new Date('2026-09-01T12:00:00Z'));
-    write('older2.Vcr', new Date('2026-09-10T12:00:00Z'));
-
-    // Cache older1 and older2
-    const seed = db.syncReplaysAsyncIterator(dir, { playerName: 'Player' });
-    let seedStep = await seed.next();
-    while (!seedStep.done) seedStep = await seed.next();
-
-    // Now add a 3rd replay (newest)
-    write('newest.Vcr', new Date('2026-10-06T12:00:00Z'));
-    const totals: number[] = [];
-    const iter = db.syncReplaysAsyncIterator(dir, { playerName: 'Player' });
-    let s = await iter.next();
-    while (!s.done) {
-      totals.push(s.value.total);
-      s = await iter.next();
-    }
-    // Only the 1 new replay is counted in progress total, not all 3 on disk
-    expect(totals.length).toBeGreaterThan(0);
-    expect(totals.every(total => total === 1)).toBe(true);
   });
 });

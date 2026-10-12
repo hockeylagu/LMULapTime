@@ -215,6 +215,10 @@ describe('SQL comparison query', () => {
       WHERE leaderboard_eligible=1 AND lap_time>0 ORDER BY lap_time LIMIT 1`).all() as Array<{ detail: string }>;
     expect(validBestPlan.some(row => row.detail.includes('idx_session_lap_valid_best'))).toBe(true);
     expect(boardBestPlan.some(row => row.detail.includes('idx_session_lap_board_best'))).toBe(true);
+    const comparePlan = (db.prepare(`EXPLAIN QUERY PLAN SELECT count(*) FROM sessions s JOIN session_drivers d ON d.session_id=s.id
+      LEFT JOIN drivers dn ON dn.driver_id=d.driver_id LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id
+      JOIN session_laps l ON l.session_id=d.session_id AND l.driver_ordinal=d.driver_ordinal WHERE s.layout_key=? AND d.is_human=1`).all('spa_gp') as Array<{ detail: string }>).map(r => r.detail);
+    expect(comparePlan.some(detail => /^SCAN (d|l|session_drivers|session_laps) /.test(detail))).toBe(false);
     const filters = { trackName: 'Spa', playerOnly: false, humansOnly: true };
     const actual = queryCompactComparableLaps(db, filters, { page: 2, pageSize: 2 });
     const expected = extractComparableLaps(sessions.filter(session => session.trackVenue === 'Spa'), filters);

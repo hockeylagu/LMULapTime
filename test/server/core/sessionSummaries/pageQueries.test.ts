@@ -6,6 +6,7 @@ import { queryProgression, querySessionPage, sessionWhere } from '../../../../se
 import { querySessionContext, querySessionPersonalBest, querySessionPersonalBestById } from '../../../../server/core/sessionSummaries/contextQueries.js';
 import { computeProgression } from '../../../../server/sessions/sessionAnalytics.js';
 import { normalizeCarClass } from '../../../../shared/domain/vehicleMapping.js';
+import { DRIVER_WITH_DICTIONARIES } from '../../../../server/core/sessionRows/reader.js';
 import type { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
 
 function fixture(id: string, timestamp: number): DetailedSession {
@@ -109,6 +110,21 @@ describe('paged session queries', () => {
       for (const value of [session, otherCourse]) upsertSession(db, value, value.filePath, 1, 1);
       expect(querySessionPersonalBestById(db, session.id, 0)).toEqual({ driverOrdinal: 0, bestLapTime: 90, ready: true });
       expect(querySessionPersonalBestById(db, session.id, 1)).toBeNull();
+    } finally { db.close(); }
+  });
+
+  it('uses idx_sessions_layout_timestamp and primary key for paged queries without table scans', () => {
+    const db = new Database(':memory:');
+    try {
+      initDbSchema(db);
+      const session = fixture('one', 1);
+      upsertSession(db, session, session.filePath, 1, 1);
+      const pagePlan = db.prepare(`EXPLAIN QUERY PLAN SELECT id FROM sessions
+        WHERE layout_key=? ORDER BY timestamp DESC,id DESC LIMIT 25`).all('monza_gp') as Array<{ detail: string }>;
+      expect(pagePlan.some(row => row.detail.includes('idx_sessions_layout_timestamp'))).toBe(true);
+      const cardDriversPlan = (db.prepare(`EXPLAIN QUERY PLAN ${DRIVER_WITH_DICTIONARIES} WHERE d.session_id IN (?) AND (d.is_player_driver = 1
+        OR d.driver_ordinal = (SELECT player_driver_ordinal FROM sessions WHERE id = d.session_id))`).all('one') as Array<{ detail: string }>).map(r => r.detail);
+      expect(cardDriversPlan.some(detail => detail.includes('PRIMARY KEY'))).toBe(true);
     } finally { db.close(); }
   });
 });

@@ -82,4 +82,22 @@ describe('compact leaderboard queries', () => {
     expect(queryCompactLeaderboardLayouts(db)[0].classes[0].playerRank).toBe(1);
     db.close();
   });
+
+  it('uses session_driver_condition_summaries index for compact leaderboard queries and produces compact entries', () => {
+    const db = new Database(':memory:');
+    try {
+      initDbSchema(db);
+      const value = session('board-plan', [driver('Me', [lap(2, 100)], { isPlayer: true })]);
+      upsertSession(db, value, value.filename, value.timestamp, 1);
+      const boardPlan = db.prepare(`EXPLAIN QUERY PLAN SELECT s.id,c.best_lap_time FROM session_driver_condition_summaries c
+        JOIN session_drivers d ON d.session_id=c.session_id AND d.driver_ordinal=c.driver_ordinal
+        JOIN sessions s ON s.id=d.session_id WHERE s.layout_key=? AND d.driver_class=? AND c.condition_group='dry' AND d.is_human=1`)
+        .all('monza_gp', 'GT3') as Array<{ detail: string }>;
+      expect(boardPlan.some(row => row.detail.includes('session_driver_condition_summaries'))).toBe(true);
+      const board = queryCompactLeaderboard(db, { layoutKey: 'monza_gp', carClass: 'GT3' });
+      expect(board.entries[0].bestLap).not.toHaveProperty('laps');
+    } finally {
+      db.close();
+    }
+  });
 });

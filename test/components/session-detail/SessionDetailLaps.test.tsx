@@ -91,9 +91,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
 
     render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
 
-    await waitFor(() => {
-      expect(screen.getByText('Laps led')).toBeInTheDocument();
-    });
+    await screen.findByText('Laps led');
 
     // The race result sits in the session summary: the finish under the best lap, six figures under the benchmark rungs
     for (const label of ['Finish', 'Places', 'Peak', 'Pit stops', 'Incidents', 'Track limits']) {

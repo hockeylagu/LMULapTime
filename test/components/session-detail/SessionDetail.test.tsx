@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { SessionDetail } from '../../../src/components/session-detail/index.js';
 import { mockDetailedSession } from './mockSessionDetail.js';
 
@@ -15,27 +15,16 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
     const onBack = vi.fn();
     render(<SessionDetail sessionId="sess123" onBack={onBack} />);
 
-    await waitFor(() => {
-      expect(screen.getAllByText('Spa').length).toBeGreaterThan(0);
-      expect(screen.getAllByText(/Sim Driver/).length).toBeGreaterThan(0);
-      expect(screen.getByRole('heading', { name: /^Laps\s*3$/ })).toBeInTheDocument();
-      expect(screen.getAllByText('2:02.000').length).toBeGreaterThan(0);
-      expect(screen.getByText('True pace')).toBeInTheDocument();
-      expect(screen.getByText('Sector 1')).toBeInTheDocument();
-      expect(screen.queryByText('Δ Prev')).not.toBeInTheDocument();
-    });
+    await screen.findByRole('heading', { name: /^Laps\s*3$/ });
+    expect(screen.getAllByText('Spa').length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Sim Driver/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('2:02.000').length).toBeGreaterThan(0);
+    expect(screen.getByText('True pace')).toBeInTheDocument();
+    expect(screen.getByText('Sector 1')).toBeInTheDocument();
+    expect(screen.queryByText('Δ Prev')).not.toBeInTheDocument();
 
-    // Metric buttons on telemetry chart
+    // Verify track link and back navigation
     expect(screen.getByRole('link', { name: 'Spa' })).toHaveAttribute('href', expect.stringContaining('/track/Spa'));
-    const sectorsBtn = screen.getByRole('button', { name: /^sectors$/i });
-    fireEvent.click(sectorsBtn);
-
-    const topSpeedBtn = screen.getAllByRole('button', { name: /^top speed$/i })[0];
-    fireEvent.click(topSpeedBtn);
-
-    const lapPaceBtn = screen.getByRole('button', { name: /^lap pace$/i });
-    fireEvent.click(lapPaceBtn);
-
     const backBtn = screen.getByRole('link', { name: /back to sessions/i });
     fireEvent.click(backBtn);
     expect(onBack).toHaveBeenCalled();
@@ -44,9 +33,7 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
   it('sorts lap timing columns while keeping the direction icon on the active column', async () => {
     render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
 
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /^Laps\s*3$/ })).toBeInTheDocument();
-    });
+    await screen.findByRole('heading', { name: /^Laps\s*3$/ });
 
     const getLapTitles = () => screen
       .getAllByTitle(/Details for Lap/)
@@ -76,25 +63,19 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
   it('allows switching drivers', async () => {
     render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
 
-    await waitFor(() => {
-      expect(screen.getAllByText(/Sim Driver/).length).toBeGreaterThan(0);
-    });
+    await screen.findAllByText(/Sim Driver/);
 
     // Switch driver
     const driverSelect = screen.getByRole('combobox');
     fireEvent.change(driverSelect, { target: { value: 'AI Driver 2' } });
 
-    await waitFor(() => {
-      expect(screen.getAllByText(/Porsche 963/i).length).toBeGreaterThan(0);
-    });
+    await screen.findAllByText(/Porsche 963/i);
   });
 
   it('navigates to track detail when clicking track heading, carrying the session car class', async () => {
     render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
 
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { level: 2, name: /Spa/i })).toBeInTheDocument();
-    });
+    await screen.findByRole('heading', { level: 2, name: /Spa/i });
 
     fireEvent.click(screen.getByRole('link', { name: 'Spa' }));
     expect(window.location.hash).toBe('#/track/Spa?trackVenue=Spa&trackCourse=GP&carClass=Hyper');
@@ -111,9 +92,7 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
   it('opens the full comparison studio when clicking compare buttons', async () => {
     render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
 
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /^Laps\s*3$/ })).toBeInTheDocument();
-    });
+    await screen.findByRole('heading', { name: /^Laps\s*3$/ });
 
     const compareButtons = screen.getAllByRole('link', { name: /^Compare lap \d+$/i });
     expect(compareButtons.length).toBeGreaterThan(0);
@@ -149,7 +128,9 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
 
     // Click Tire Wear metric toggle
     const tireWearToggle = screen.getByRole('button', { name: /Tire Wear/i });
-    fireEvent.click(tireWearToggle);
+    act(() => {
+      fireEvent.click(tireWearToggle);
+    });
 
     expect(screen.getByRole('heading', { name: 'Tire wear' })).toBeInTheDocument();
   });
@@ -189,7 +170,9 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
 
     // Click Fuel & Energy toggle
     const fuelToggle = screen.getByRole('button', { name: /Fuel & Energy/i });
-    fireEvent.click(fuelToggle);
+    act(() => {
+      fireEvent.click(fuelToggle);
+    });
 
     expect(screen.getByRole('heading', { name: 'Fuel & energy' })).toBeInTheDocument();
 
@@ -305,9 +288,7 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
 
     render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
 
-    await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /^Laps\s*\d+$/ })).toBeInTheDocument();
-    });
+    await screen.findByRole('heading', { name: /^Laps\s*\d+$/ });
 
     // Switch to Sectors
     const sectorsBtn = screen.getByRole('button', { name: /Sectors/i });

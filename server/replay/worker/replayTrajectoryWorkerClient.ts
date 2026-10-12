@@ -3,13 +3,25 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ReplayTrajectoryData } from '../../core/types.js';
-import { ExtractReplayTrajectoryOptions } from '../decode/replayTrajectory.js';
+import { ExtractReplayTrajectoryOptions, extractReplayTrajectory } from '../decode/replayTrajectory.js';
 import { ReplayStreamProgress } from '../replayProgress.js';
 import { ReplayDecodeError } from '../decode/replayDecodeError.js';
+import type { ReplayDriverSave } from '../../core/replay/dbReplayDriverStore.js';
+
+export interface StoredReplayDriver {
+  driverSlot?: number;
+  currentLap?: number;
+}
+
+interface ReplaySaveHost {
+  getDbPath(): string;
+  replaceReplayDriverLaps(filename: string, filePath: string, mtime: number, size: number, driverSlotKey: number, trajectory: ReplayTrajectoryData, isPrimary: boolean): void;
+}
 
 type WorkerMessage =
   | { type: 'progress'; progress: ReplayStreamProgress }
   | { type: 'result'; trajectory: ReplayTrajectoryData }
+  | { type: 'stored'; summary: StoredReplayDriver }
   | { type: 'error'; message: string; code?: string };
 
 export interface ReplayWorkerClientOptions {
@@ -59,9 +71,48 @@ export async function* extractReplayTrajectoryInWorker(
   options: ExtractReplayTrajectoryOptions,
   clientOptions: ReplayWorkerClientOptions = {}
 ): AsyncGenerator<ReplayStreamProgress, ReplayTrajectoryData, void> {
+  const result = yield* runReplayWorker(filePath, options, clientOptions);
+  if (!('points' in result)) throw new Error('Replay worker returned a save instead of a trajectory');
+  return result;
+}
+
+/** File-backed caches are written by the worker; private in-memory databases cannot be shared between threads. */
+export async function* storeReplayTrajectoryInWorker(
+  host: ReplaySaveHost,
+  filePath: string,
+  options: ExtractReplayTrajectoryOptions,
+  save: Omit<ReplayDriverSave, 'filePath'>,
+): AsyncGenerator<ReplayStreamProgress, StoredReplayDriver, void> {
+  const dbPath = host.getDbPath();
+  const fullResolution = { ...options, maxPoints: 0, allLaps: true };
+  if (dbPath === ':memory:') {
+    const progressList: ReplayStreamProgress[] = [];
+    const trajectory = extractReplayTrajectory(filePath, {
+      ...fullResolution,
+      silent: true,
+      onProgress: (progress) => progressList.push(progress),
+    });
+    for (const progress of progressList) {
+      yield progress;
+    }
+    yield { stage: 'caching', stageDescription: 'Persisting trajectory cache', percent: 100, driverSlot: trajectory.driverSlot };
+    host.replaceReplayDriverLaps(save.filename, filePath, save.mtime, save.size, save.driverSlotKey ?? trajectory.driverSlot ?? -1, trajectory, save.isPrimary);
+    return { driverSlot: trajectory.driverSlot, currentLap: trajectory.currentLap };
+  }
+  const result = yield* runReplayWorker(filePath, fullResolution, {}, { ...save, filePath, dbPath: path.resolve(dbPath) });
+  if ('points' in result) throw new Error('Replay worker returned a trajectory instead of a save');
+  return result;
+}
+
+async function* runReplayWorker(
+  filePath: string,
+  options: ExtractReplayTrajectoryOptions,
+  clientOptions: ReplayWorkerClientOptions,
+  save?: ReplayDriverSave & { dbPath: string },
+): AsyncGenerator<ReplayStreamProgress, ReplayTrajectoryData | StoredReplayDriver, void> {
   const workerPath = clientOptions.workerPath || findWorkerBootstrap(import.meta.url, ['replay', 'worker', 'replayTrajectoryWorkerBootstrap.mjs']);
   const worker = new Worker(workerPath, {
-    workerData: { filePath, options: { ...options, silent: true } },
+    workerData: { filePath, options: { ...options, silent: true }, save },
   });
   const messages: WorkerMessage[] = [];
   let notify: (() => void) | undefined;
@@ -74,8 +125,8 @@ export async function* extractReplayTrajectoryInWorker(
     waiting?.();
   };
   worker.on('message', (message: unknown) => {
-    if (!isWorkerMessage<WorkerMessage>(message, ['progress', 'result', 'error'])) return;
-    if (message.type === 'result') resultReceived = true;
+    if (!isWorkerMessage<WorkerMessage>(message, ['progress', 'result', 'stored', 'error'])) return;
+    if (message.type === 'result' || message.type === 'stored') resultReceived = true;
     messages.push(message);
     wake();
   });
@@ -104,6 +155,8 @@ export async function* extractReplayTrajectoryInWorker(
         yield message.progress;
       } else if (message.type === 'result') {
         return message.trajectory;
+      } else if (message.type === 'stored') {
+        return message.summary;
       } else {
         // The decoder rejected the file. An exit, a crash or a system error (code) is not the file's fault.
         throw message.code ? Object.assign(new Error(message.message), { code: message.code }) : new ReplayDecodeError(message.message);
@@ -112,6 +165,6 @@ export async function* extractReplayTrajectoryInWorker(
   } finally {
     // The worker exits by itself after posting its result; terminating also covers a consumer
     // that stops early or a worker that lingers, so no thread outlives its extraction.
-    void worker.terminate();
+    await worker.terminate();
   }
 }

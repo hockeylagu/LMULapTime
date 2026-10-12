@@ -85,7 +85,6 @@ describe('Server API wiring', () => {
     expect(cleared.status).toBe(200);
     expect(cleared.body.sqliteCache.sessionsCount).toBe(0);
 
-    await request(app).post('/api/scan').send(fixtureFolders);
   });
 
   it('keeps replay cache maintenance available without exposing replay-name telemetry URLs', async () => {
@@ -106,7 +105,7 @@ describe('Server API wiring', () => {
       const scanRes = await request(app)
         .post('/api/scan')
         .send({
-          resultsDir: path.join(process.cwd(), 'test', 'fixtures', 'results'),
+          resultsDir: tempReplaysDir,
           replaysDir: tempReplaysDir,
           playerName: 'Api Test Driver',
         });
@@ -119,7 +118,7 @@ describe('Server API wiring', () => {
       for (let i = 0; i < 50; i++) {
         status = (await request(app).get('/api/scan/status')).body;
         if (status.allComplete) break;
-        await new Promise(resolve => setTimeout(resolve, 20));
+        await new Promise(resolve => setTimeout(resolve, 5));
       }
       expect(status.allComplete).toBe(true);
       expect(status.result).toEqual(expect.objectContaining({ added: 1 }));
@@ -136,19 +135,6 @@ describe('Server API wiring', () => {
         .get('/api/replays/Api_Cache_Test_P1.Vcr/trajectory?driverSlot=1&source=vcr&maxPoints=10');
       expect(trajectoryRes.status).toBe(404);
     } finally {
-      // Restore the default fixtures replays dir so later test runs aren't affected
-      await request(app)
-        .post('/api/scan')
-        .send({
-          resultsDir: path.join(process.cwd(), 'test', 'fixtures', 'results'),
-          replaysDir: path.join(process.cwd(), 'test', 'fixtures', 'replays'),
-          playerName: 'TestPlayer',
-        });
-      for (let i = 0; i < 50; i++) {
-        const status = (await request(app).get('/api/scan/status')).body;
-        if (!status.running) break;
-        await new Promise(resolve => setTimeout(resolve, 20));
-      }
       fs.rmSync(tempReplaysDir, { recursive: true, force: true });
     }
   });

@@ -31,16 +31,22 @@ describe('LeaderboardSection', () => {
     expect(screen.getByText('S1 P30')).toBeInTheDocument();
   });
 
-  it('lists the top and the drivers around the player, and shows everyone on demand', () => {
+  it('lists the top and the drivers around the player', () => {
     renderSection();
     const table = screen.getByRole('table');
     expect(within(table).getByText('Driver 1')).toBeInTheDocument();
     expect(within(table).queryByText('Driver 20')).not.toBeInTheDocument();
     expect(within(table).getByText('Me')).toBeInTheDocument();
-    expect(within(table).getByRole('row', { name: /Alien pace, 100%/ })).toBeInTheDocument();
+    expect(within(table).getByText('100% Alien')).toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getByRole('button', { name: /19 more drivers/ }));
-    expect(within(table).getByText('Driver 20')).toBeInTheDocument();
+  it('shows everyone on demand when expanded', () => {
+    renderSection({ board: board(28, 25, BENCHMARK) });
+    const table = screen.getByRole('table');
+    expect(within(table).queryByText('Driver 15')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /\d+ more drivers/ }));
+    expect(within(table).getByText('Driver 15')).toBeInTheDocument();
     expect(within(table).getByRole('columnheader', { name: 'Benchmark Pace' })).toBeInTheDocument();
   });
 
@@ -90,7 +96,7 @@ describe('LeaderboardSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Best S2' }));
     expect(screen.getByRole('columnheader', { name: /Best S2/ })).toHaveAttribute('aria-sort', 'ascending');
     expect(screen.getByRole('columnheader', { name: /Best Lap/ })).not.toHaveAttribute('aria-sort');
-    expect(within(screen.getByRole('table')).queryByRole('row', { name: /Alien pace/ })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('table')).queryByText(/Alien pace/)).not.toBeInTheDocument();
   });
 
   it('rates every best lap against the benchmark, and marks the best sectors in their sector colours', () => {
