@@ -47,6 +47,7 @@ describe('CompareLaps component', () => {
   const mockCompareData = {
     laps: [lap(1, 122.5, [30.5, 45.5, 46.5]), lap(2, 121.8, [30.2, 45.1, 46.5])],
     allTimeBestLap: { ...lap(2, 121.8, [30.2, 45.1, 46.5]), tag: '⭐ All-Time Best Lap' },
+    playerBestLap: { ...lap(2, 121.8, [30.2, 45.1, 46.5]), tag: '⭐ Personal Best' },
     overallTrackBestLap: {
       ...lap(5, 120.5, [29.9, 44.8, 45.8]),
       id: 'sess1_Pro Driver_lap_5',

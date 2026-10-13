@@ -48,7 +48,7 @@ describe('useCompareLapsData selection fallbacks', () => {
       json: () => Promise.resolve({
         laps,
         allTimeBestLap: null,
-        playerBestLap: null,
+        playerBestLap: laps[1],
         overallTrackBestLap: laps[2],
         bestS1: 28,
         bestS2: 33,
@@ -66,17 +66,41 @@ describe('useCompareLapsData selection fallbacks', () => {
     await waitFor(() => expect(result.current.loading).toBe(false));
     await waitFor(() => expect(result.current.allTimePBObject?.id).toBe('fast-player'));
 
-    act(() => {
-      result.current.handleAddPersonalBest();
-      result.current.handleAddTheoreticalBest();
-      result.current.handleAddOverallTrackBest();
-    });
+    // The default selection already holds the server's personal best.
+    expect(result.current.selectedLaps.map(lap => lap.id)).toEqual(['fast-player']);
+    expect(result.current.isPBInComparison).toBe(true);
 
-    await waitFor(() => {
-      expect(result.current.selectedLaps.some(lap => lap.isTheoreticalBest)).toBe(true);
-      expect(result.current.selectedLaps.map(lap => lap.id)).toContain('overall');
-    });
+    act(() => { result.current.handleAddTheoreticalBest(); });
+    await waitFor(() => expect(result.current.selectedLaps.some(lap => lap.isTheoreticalBest)).toBe(true));
+    expect(result.current.selectedLaps.find(lap => lap.isTheoreticalBest)?.pacePercentage).toBe(101.03);
+
+    act(() => { result.current.handleAddOverallTrackBest(); });
+    await waitFor(() => expect(result.current.selectedLaps.map(lap => lap.id)).toContain('overall'));
     expect(result.current.chartData).toHaveLength(4);
+  });
+
+  it('has no personal or all-time best without the server bests, never the fastest lap of the page', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({
+        laps, allTimeBestLap: null, playerBestLap: null, overallTrackBestLap: null,
+        bestS1: 28, bestS2: 33, bestS3: 37, theoreticalBestSec: 98, benchmarks: [],
+      }),
+    });
+    const { result } = renderHook(
+      () => useCompareLapsData({ sessions: [makeSessionCard({ id: 'session-1', trackVenue: 'Spa', trackCourse: 'GP' })] }),
+      { wrapper }
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    await waitFor(() => expect(result.current.apiData.laps).toHaveLength(3));
+    expect(result.current.allTimePBObject).toBeNull();
+    expect(result.current.overallTrackBestObject).toBeNull();
+    expect(result.current.selectedLaps).toEqual([]);
+
+    act(() => { result.current.handleAddTheoreticalBest(); });
+    await waitFor(() => expect(result.current.selectedLaps).toHaveLength(1));
+    expect(result.current.selectedLaps[0].isTheoreticalBest).toBe(true);
+    expect(result.current.selectedLaps[0].pacePercentage ?? null).toBeNull();
   });
 
   it('updates comparison scope when the route query changes externally', async () => {

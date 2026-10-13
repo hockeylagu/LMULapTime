@@ -254,6 +254,11 @@ export function useCompareLapsData({
   const targetCompareDriverOrdinal = searchParams.get('compareDriverOrdinal') === null ? initialCompareDriverOrdinal : Number.parseInt(searchParams.get('compareDriverOrdinal') || '', 10);
   const targetCompareLapOrdinal = searchParams.get('compareLapOrdinal') === null ? initialCompareLapOrdinal : Number.parseInt(searchParams.get('compareLapOrdinal') || '', 10);
 
+  // The player's personal best is the server's exact one (dry, clean); without it there is none, never the fastest lap of the page.
+  const allTimePBObject: ComparableLap | null = useMemo(() => apiData.playerBestLap
+    ? { ...apiData.playerBestLap, isAllTimePB: true, tag: apiData.playerBestLap.tag || 'Personal best' }
+    : null, [apiData.playerBestLap]);
+
   useEffect(() => {
     // Until the laps of a newly selected track or class arrive (the URL can change it, not only the
     // ribbon), apiData still holds the previous selection's laps: never pick from those.
@@ -285,25 +290,7 @@ export function useCompareLapsData({
       candidates.push({ ...targetLap, tag: targetLap.tag || `Lap ${targetLap.lapNumber}` });
     }
 
-    const pbLap =
-      apiData.playerBestLap ||
-      apiData.allTimeBestLap ||
-      (apiData.laps && apiData.laps.length > 0
-        ? [...apiData.laps]
-            .filter((l) => l.isValid && l.lapTime && l.lapTime > 0)
-            .sort((a, b) => (a.lapTime || 9999) - (b.lapTime || 9999))[0]
-        : null);
-
-    if (pbLap) {
-      const pbLapFormatted: ComparableLap = {
-        ...pbLap,
-        isAllTimePB: true,
-        tag: pbLap.tag || 'Personal best',
-      };
-      if (!candidates.some((c) => c.id === pbLapFormatted.id)) {
-        candidates.push(pbLapFormatted);
-      }
-    }
+    if (allTimePBObject && !candidates.some((c) => c.id === allTimePBObject.id)) candidates.push(allTimePBObject);
 
     const initialSlice = candidates.slice(0, MAX_COMPARED_LAPS);
     setSelectedLaps(initialSlice);
@@ -313,7 +300,7 @@ export function useCompareLapsData({
       setPickerTarget({ replaceId: initialSlice.find((l) => l.id !== targetLap.id)?.id ?? null });
     }
     initializedScopeRef.current = currentScope;
-  }, [apiData, locatorLaps, loadedScope, lapScope, selectedTrack, selectedCarClass, targetSessionId, targetLapNumber, targetCompareSessionId, targetCompareDriver, targetCompareLapNumber, targetCompareDriverOrdinal, targetCompareLapOrdinal, searchParams]);
+  }, [apiData, allTimePBObject, locatorLaps, loadedScope, lapScope, selectedTrack, selectedCarClass, targetSessionId, targetLapNumber, targetCompareSessionId, targetCompareDriver, targetCompareLapNumber, targetCompareDriverOrdinal, targetCompareLapOrdinal, searchParams]);
 
   const handleToggleLap = (lap: ComparableLap) => {
     const next = toggleComparedLap(selectedLaps, lap);
@@ -367,16 +354,6 @@ export function useCompareLapsData({
     : null;
   const pickerReplacing = pickerTarget?.replaceId ? selectedLaps.find((l) => l.id === pickerTarget.replaceId) ?? null : null;
 
-  const allTimePBObject: ComparableLap | null = useMemo(() => {
-    const fastest = (list: ComparableLap[]) => [...list]
-      .filter((l) => l.isValid && l.lapTime && l.lapTime > 0)
-      .sort((a, b) => (a.lapTime || 9999) - (b.lapTime || 9999))[0];
-    // The laps loaded are the player's own (playerOnly), some without the flag.
-    const best = apiData.playerBestLap ?? fastest(apiData.laps.filter((l) => l.isPlayer))
-      ?? fastest(apiData.laps) ?? apiData.allTimeBestLap ?? null;
-    return best ? { ...best, isAllTimePB: true, tag: best.tag || 'Personal best' } : null;
-  }, [apiData.playerBestLap, apiData.allTimeBestLap, apiData.laps]);
-
   const isPBInComparison = Boolean(allTimePBObject && selectedLaps.some((l) => l.id === allTimePBObject.id));
 
   const handleAddPersonalBest = () => {
@@ -393,13 +370,6 @@ export function useCompareLapsData({
     if (matchingRef?.targets.alienSec && theoTime > 0) {
       pacePercentage = parseFloat(((theoTime / matchingRef.targets.alienSec) * 100).toFixed(2));
       paceCategory = getPaceCategoryFromPercentage(pacePercentage);
-    } else {
-      const sampleLap = apiData.laps.find((l) => l.isValid && l.lapTime && l.pacePercentage);
-      if (sampleLap?.lapTime && sampleLap.pacePercentage) {
-        const target100 = sampleLap.lapTime / (sampleLap.pacePercentage / 100);
-        pacePercentage = parseFloat(((theoTime / target100) * 100).toFixed(2));
-        paceCategory = getPaceCategoryFromPercentage(pacePercentage);
-      }
     }
 
     const theoLap = createTheoreticalBestLap(
@@ -418,15 +388,10 @@ export function useCompareLapsData({
     }
   };
 
-  const overallTrackBestObject: ComparableLap | null = useMemo(() => {
-    if (apiData.overallTrackBestLap) {
-      return { ...apiData.overallTrackBestLap, tag: apiData.overallTrackBestLap.tag || 'All-time best' };
-    }
-    const valid = apiData.laps.filter((l) => l.isValid && l.lapTime && l.lapTime > 0);
-    if (valid.length === 0) return null;
-    const sorted = [...valid].sort((a, b) => (a.lapTime || 9999) - (b.lapTime || 9999));
-    return sorted.length > 0 ? { ...sorted[0], tag: 'All-time best' } : null;
-  }, [apiData.overallTrackBestLap, apiData.laps]);
+  // The server's exact fastest valid lap on the track; none when it has none.
+  const overallTrackBestObject: ComparableLap | null = useMemo(() => apiData.overallTrackBestLap
+    ? { ...apiData.overallTrackBestLap, tag: apiData.overallTrackBestLap.tag || 'All-time best' }
+    : null, [apiData.overallTrackBestLap]);
 
   const isOverallBestInComparison = Boolean(
     overallTrackBestObject && selectedLaps.some((l) => l.id === overallTrackBestObject.id)
