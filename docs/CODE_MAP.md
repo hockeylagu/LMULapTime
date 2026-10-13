@@ -61,7 +61,7 @@ A driver's events are stored once, on the driver (`session_events`, one row per 
 `session_drivers.lists_mask` distinguishes an empty event array from an absent one. Times are stored as numbers only; the UI formats them
 with `shared/domain/formatters.ts` (`formatTime`, `formatElapsedSeconds`, `formatPitStopDuration`).
 
-The telemetry comparison picker requests `telemetryOnly=true` on `/api/compare/laps`: linked replay and flying-lap filters run before pagination.
+The telemetry comparison picker requests `telemetryOnly=true` on `/api/compare/laps`: linked replay and flying-lap filters run before pagination. With it, `sort` (`lap` default, `recent`, `driver`), `sessionType` (`practice`/`quali`/`race`) and `condition` (`Dry`/`Wet`/`Dynamic Weather`) also run before pagination (shared definitions in `shared/domain/compareLapScope.ts`), and the response lists `carTypes` of the scope ignoring the car filter; the picker state lives in `useReplayInspectorData`.
 That request uses `queryTelemetryComparableLaps` in `comparisonQueries.ts`: direct SQL reads of the visible lap rows,
 identity/display fields and best-lap badges, without full session hydration, benchmark rating or unused summary aggregates.
 The general leaderboard comparison response retains its summaries. Both paths share filter and personal-best scope rules.

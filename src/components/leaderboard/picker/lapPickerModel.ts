@@ -1,7 +1,7 @@
 import type { ComparableLap, WeatherCondition } from '../../../../shared/types/index.js';
 import { selectCleanLapCandidates } from '../../../../shared/domain/lapComparison.js';
+import { recordedCondition, sessionKindOf, type SessionKind } from '../../../../shared/domain/compareLapScope.js';
 
-export type SessionKind = 'practice' | 'quali' | 'race';
 export interface LapPickerFilters {
   kind: SessionKind | 'all';
   /** 'same' keeps the anchor lap's condition; without an anchor it keeps every condition. */
@@ -31,18 +31,6 @@ export interface LapQuickPick {
   key: string;
   label: string;
   lap: ComparableLap;
-}
-
-/** Practice, qualifying or race, from the canonical session type. */
-export function lapSessionKind(lap: Pick<ComparableLap, 'sessionType' | 'sessionName'>): SessionKind | null {
-  if (lap.sessionType === 'Qualifying') return 'quali';
-  if (lap.sessionType === 'Race') return 'race';
-  if (lap.sessionType === 'Practice') return 'practice';
-  return null;
-}
-
-export function lapCondition(lap: Pick<ComparableLap, 'weatherCondition' | 'hasRain'>): WeatherCondition {
-  return lap.weatherCondition ?? (lap.hasRain ? 'Wet' : 'Dry');
 }
 
 /** The calendar day of the lap's session: the sessions of one day on a layout are one event. */
@@ -75,8 +63,8 @@ function sessionsOf(laps: ComparableLap[]): Array<{ laps: ComparableLap[]; clean
 }
 
 function matchesFilters(lap: ComparableLap, filters: LapPickerFilters, anchor: ComparableLap | null): boolean {
-  if (filters.kind !== 'all' && lapSessionKind(lap) !== filters.kind) return false;
-  if (filters.condition === 'same' && anchor && lapCondition(lap) !== lapCondition(anchor)) return false;
+  if (filters.kind !== 'all' && sessionKindOf(lap.sessionType) !== filters.kind) return false;
+  if (filters.condition === 'same' && anchor && recordedCondition(lap.weatherCondition, lap.hasRain) !== recordedCondition(anchor.weatherCondition, anchor.hasRain)) return false;
   return true;
 }
 
@@ -92,10 +80,10 @@ export function groupPickerSessions(laps: ComparableLap[], filters: LapPickerFil
       sessionId: first.sessionId!,
       sessionName: first.sessionName,
       sessionType: first.sessionType,
-      kind: lapSessionKind(first),
+      kind: sessionKindOf(first.sessionType),
       timeString: first.timeString,
       timestamp: first.timestamp ?? 0,
-      condition: lapCondition(first),
+      condition: recordedCondition(first.weatherCondition, first.hasRain),
       laps: kept,
       bestLapId: [...clean].sort(byTime)[0]?.id ?? null,
       cleanLapIds: cleanIds,
@@ -120,7 +108,7 @@ export function pickerQuickPicks(
   const anchorTime = anchor.timestamp ?? sessions.find(s => s.laps[0].sessionId === anchor.sessionId)?.laps[0].timestamp ?? 0;
   const bestOf = (list: typeof sessions) => list.flatMap(s => s.clean).filter(l => !comparedIds.includes(l.id)).sort(byTime)[0];
   const sameEvent = (kind: SessionKind) => sessions.filter(s =>
-    s.laps[0].sessionId !== anchor.sessionId && lapEventDay(s.laps[0]) === day && lapSessionKind(s.laps[0]) === kind);
+    s.laps[0].sessionId !== anchor.sessionId && lapEventDay(s.laps[0]) === day && sessionKindOf(s.laps[0].sessionType) === kind);
   const previous = sessions.find(s => s.laps[0].sessionId !== anchor.sessionId && (s.laps[0].timestamp ?? 0) < anchorTime);
 
   const candidates: Array<[string, string, ComparableLap | undefined]> = [

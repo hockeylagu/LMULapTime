@@ -7,6 +7,7 @@ import { queryCompactComparableLaps, queryTelemetryComparableLaps } from '../../
 import { extractComparableLaps } from '../../../helpers/legacySessionAnalytics.js';
 import { toComparableLap } from '../../../../server/sessions/sessionAnalytics.js';
 import * as comparisonRows from '../../../../server/core/sessionSummaries/comparisonLapRows.js';
+import { recordedCondition } from '../../../../shared/domain/compareLapScope.js';
 import { readSession } from '../../../../server/core/sessionRows/reader.js';
 
 const paceTarget = vi.hoisted(() => ({ percentage: 67 }));
@@ -150,8 +151,10 @@ describe('SQL comparison query', () => {
     const pickerFirst = queryTelemetryComparableLaps(db, filters, { pageSize: 50 });
     const pickerSecond = queryTelemetryComparableLaps(db, filters, { page: 2, pageSize: 50 });
     expect(pickerFirst.total).toBe(first.total);
-    expect(pickerFirst.laps.map(item => item.id)).toEqual(first.laps.map(item => item.id));
-    expect(pickerSecond.laps.map(item => item.id)).toEqual(second.laps.map(item => item.id));
+    // The picker lists the fastest laps first; the leaderboard compare keeps session order.
+    expect(pickerFirst.laps[0].id).toBe('newest_driver_0_lap_0');
+    expect([...pickerFirst.laps, ...pickerSecond.laps].map(item => item.id).sort())
+      .toEqual([...first.laps, ...second.laps].map(item => item.id).sort());
     expect(queryTelemetryComparableLaps(db, { ...filters, sessionId: 'newest', driverOrdinal: 0, lapOrdinal: 0 }).laps)
       .toHaveLength(1);
     db.close();
@@ -195,6 +198,103 @@ describe('SQL comparison query', () => {
       .toMatchObject({ driverName: 'Rival', isPlayer: false, lapOrdinal: 0 });
     expect(queryTelemetryComparableLaps(db, { ...filters, carClass: 'GT3' }).total).toBe(0);
     db.close();
+  });
+
+  describe('telemetry picker ordering and filters', () => {
+    function build() {
+      const db = new Database(':memory:');
+      initDbSchema(db);
+      // Four sessions, newest last; times are chosen so every sort gives a different order.
+      const specs = [
+        { id: 's1', ts: 100, type: 'Practice', weather: 'Dry' as const, drivers: [
+          { name: 'Zed', car: 'BMW M4 LMGT3', laps: [lap(1, 90), lap(2, 91)] },
+          { name: 'amy', car: 'Lexus RCF LMGT3', laps: [lap(1, 85)] }] },
+        { id: 's2', ts: 200, type: 'Qualifying', weather: 'Wet' as const, drivers: [
+          { name: 'Zed', car: 'BMW M4 LMGT3', laps: [lap(1, 88)] }] },
+        { id: 's3', ts: 300, type: 'Race', weather: 'Dynamic Weather' as const, drivers: [
+          { name: 'Bob', car: 'Ferrari 296 LMGT3', laps: [lap(1, 86), lap(2, 87)] }] },
+        { id: 's4', ts: 400, type: 'Warmup', weather: undefined, drivers: [
+          { name: 'Bob', car: 'Ferrari 296 LMGT3', laps: [lap(1, 89)] }] },
+      ];
+      for (const spec of specs) {
+        const session = fixture(spec.id, spec.ts, 'Spa', spec.drivers.map(d => ({ name: d.name, player: true, laps: d.laps })));
+        session.drivers.forEach((driver, index) => { driver.carType = spec.drivers[index].car; });
+        session.matchingReplayFile = { name: `${spec.id}.Vcr`, path: 'x', fileSizeBytes: 1,
+          hasRain: spec.weather === 'Wet' || spec.weather === 'Dynamic Weather', weatherCondition: spec.weather };
+        addSession(db, session);
+        db.prepare('UPDATE sessions SET session_type=? WHERE id=?').run(spec.type, spec.id);
+      }
+      return db;
+    }
+    const base = { trackName: 'Spa', carClass: 'Hyper', playerOnly: false, telemetryOnly: true };
+    const times = (laps: Array<{ lapTime?: number | null }>) => laps.map(item => item.lapTime);
+
+    it('orders by fastest lap by default, newest session, or driver name', () => {
+      const db = build();
+      try {
+        expect(times(queryTelemetryComparableLaps(db, base).laps)).toEqual([85, 86, 87, 88, 89, 90, 91]);
+        expect(times(queryTelemetryComparableLaps(db, base, { sort: 'lap' }).laps)).toEqual([85, 86, 87, 88, 89, 90, 91]);
+        expect(queryTelemetryComparableLaps(db, base, { sort: 'recent' }).laps.map(item => item.sessionId))
+          .toEqual(['s4', 's3', 's3', 's2', 's1', 's1', 's1']);
+        const byDriver = queryTelemetryComparableLaps(db, base, { sort: 'driver' }).laps;
+        expect(byDriver.map(item => [item.driverName, item.lapTime])).toEqual([
+          ['amy', 85], ['Bob', 86], ['Bob', 87], ['Bob', 89], ['Zed', 88], ['Zed', 90], ['Zed', 91]]);
+      } finally { db.close(); }
+    });
+
+    it('slices one ordered list across pages', () => {
+      const db = build();
+      try {
+        const pages = [1, 2, 3, 4].map(page => queryTelemetryComparableLaps(db, base, { page, pageSize: 2, sort: 'lap' }));
+        expect(pages.every(result => result.total === 7)).toBe(true);
+        expect(pages.flatMap(result => times(result.laps))).toEqual([85, 86, 87, 88, 89, 90, 91]);
+        expect(pages[1].laps[0].lapTime!).toBeGreaterThanOrEqual(pages[0].laps[1].lapTime!);
+      } finally { db.close(); }
+    });
+
+    it('filters by session type bucket, condition and car with a consistent total', () => {
+      const db = build();
+      try {
+        const sessionsOf = (extra: object) => {
+          const result = queryTelemetryComparableLaps(db, { ...base, ...extra });
+          return [...new Set(result.laps.map(item => item.sessionId))].sort().concat(String(result.total));
+        };
+        expect(sessionsOf({ sessionKind: 'practice' })).toEqual(['s1', '3']);
+        expect(sessionsOf({ sessionKind: 'quali' })).toEqual(['s2', '1']);
+        expect(sessionsOf({ sessionKind: 'race' })).toEqual(['s3', '2']);
+        expect(sessionsOf({ condition: 'Dry' })).toEqual(['s1', 's4', '4']);
+        expect(sessionsOf({ condition: 'Wet' })).toEqual(['s2', '1']);
+        expect(sessionsOf({ condition: 'Dynamic Weather' })).toEqual(['s3', '2']);
+        expect(sessionsOf({ carType: 'Ferrari 296 LMGT3' })).toEqual(['s3', 's4', '3']);
+        expect(sessionsOf({ carType: 'BMW M4 LMGT3', condition: 'Dry', sessionKind: 'practice' })).toEqual(['s1', '2']);
+        const all = queryTelemetryComparableLaps(db, base).laps;
+        const wet = queryTelemetryComparableLaps(db, { ...base, condition: 'Wet' }).laps;
+        expect(all.filter(item => recordedCondition(item.weatherCondition, item.hasRain) === 'Wet').map(item => item.id))
+          .toEqual(wet.map(item => item.id));
+      } finally { db.close(); }
+    });
+
+    it('lists every car of the scope ignoring the car filter and the page', () => {
+      const db = build();
+      try {
+        const cars = ['BMW M4 LMGT3', 'Ferrari 296 LMGT3', 'Lexus RCF LMGT3'];
+        expect(queryTelemetryComparableLaps(db, base, { pageSize: 1 }).carTypes).toEqual(cars);
+        expect(queryTelemetryComparableLaps(db, { ...base, carType: 'Lexus RCF LMGT3' }).carTypes).toEqual(cars);
+        expect(queryTelemetryComparableLaps(db, { ...base, sessionKind: 'race' }).carTypes).toEqual(['Ferrari 296 LMGT3']);
+      } finally { db.close(); }
+    });
+
+    it('keeps the ordered picker query off full scans of the lap tables', () => {
+      const db = build();
+      try {
+        const plan = (db.prepare(`EXPLAIN QUERY PLAN SELECT l.lap_time FROM sessions s JOIN session_drivers d ON d.session_id=s.id
+          LEFT JOIN drivers dn ON dn.driver_id=d.driver_id LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id
+          JOIN session_laps l ON l.session_id=d.session_id AND l.driver_ordinal=d.driver_ordinal
+          LEFT JOIN session_recordings r ON r.session_id=s.id
+          WHERE s.layout_key=? AND s.recording_name IS NOT NULL ORDER BY l.lap_time LIMIT 50`).all('spa_gp') as Array<{ detail: string }>).map(row => row.detail);
+        expect(plan.some(detail => /^SCAN (d|l|session_drivers|session_laps|r|session_recordings) /.test(detail))).toBe(false);
+      } finally { db.close(); }
+    });
   });
 
   it('matches the extraction oracle across layouts, duplicate names, wet laps and selected locators using stored lap rows', () => {

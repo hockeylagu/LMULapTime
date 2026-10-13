@@ -59,7 +59,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     isComparePickerOpen,
     handleCloseComparePicker,
     availableCompareLaps,
-    compareLapFilter,
+    compareLapFilter, compareControls, compareCarTypes, setCompareControls,
     isCompareLapsLoading,
     setCompareLapFilter,
     handleSelectCompareLap,
@@ -226,6 +226,9 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
       handleCloseComparePicker={handleCloseComparePicker}
       availableCompareLaps={availableCompareLaps}
       compareLapFilter={compareLapFilter}
+      compareControls={compareControls}
+      compareCarTypes={compareCarTypes}
+      setCompareControls={setCompareControls}
       isCompareLapsLoading={isCompareLapsLoading}
       setCompareLapFilter={setCompareLapFilter}
       handleSelectCompareLap={handleSelectCompareLap}

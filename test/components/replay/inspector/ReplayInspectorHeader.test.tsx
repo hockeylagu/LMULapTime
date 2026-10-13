@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { ReplayInspectorHeader, type ReplayInspectorHeaderProps } from '../../../../src/components/replay/inspector/ReplayInspectorHeader.js';
 import { TELEMETRY_COLORS } from '../../../../src/utils/themeColors.js';
+import { DEFAULT_COMPARE_CONTROLS } from '../../../../src/components/replay/inspector/compare/compareLapControls.js';
 
 vi.mock('../../../../src/components/replay/inspector/ReplayInspectorTitle.js', () => ({ ReplayInspectorTitle: () => null }));
 
@@ -11,7 +12,7 @@ const props: ReplayInspectorHeaderProps = {
   selectedDriverSlot: 14, onSelectDriver: vi.fn(), isCompareMode: true, onToggleCompare: vi.fn(),
   onRemoveCompare: vi.fn(), baselineSessionId: 'spa-session', baselineLapNumber: 3,
   baselineDriverName: 'Compared Driver', isComparePickerOpen: false, onCloseComparePicker: vi.fn(),
-  availableCompareLaps: [], compareLapFilter: 'player', isCompareLapsLoading: false,
+  availableCompareLaps: [], compareLapFilter: 'player', compareControls: DEFAULT_COMPARE_CONTROLS, compareCarTypes: [], onChangeCompareControls: vi.fn(), isCompareLapsLoading: false,
   onChangeCompareLapFilter: vi.fn(), onSelectCompareLap: vi.fn(), isBaselineLoading: false,
   isTrajLoading: false, isPlaying: false, onTogglePlay: vi.fn(),
   onRewind: vi.fn(), playbackSpeed: 1, onSelectPlaybackSpeed: vi.fn(), formatLapTime: sec => String(sec),

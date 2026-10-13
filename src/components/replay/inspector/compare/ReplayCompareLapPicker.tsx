@@ -1,13 +1,13 @@
-import React, { useMemo, useState } from 'react';
+import React from 'react';
 import { LoaderCircle, X } from 'lucide-react';
 import type { ComparableLap, WeatherCondition } from '../../../../../shared/types/index.js';
+import { recordedCondition, sessionKindOf, type SessionKind } from '../../../../../shared/domain/compareLapScope.js';
+import type { CompareLapControls } from './compareLapControls.js';
 import { ReplayCompareLapRow } from './ReplayCompareLapRow.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 import { CompareLapPaginationControls, type CompareLapPagination } from './CompareLapPagination.js';
 
 export type CompareLapFilter = 'same-session-lap' | 'player' | 'same-sessions' | 'all';
-export type RaceTypeFilter = 'all' | 'practice' | 'quali' | 'race';
-type ConditionFilter = 'same' | 'all' | WeatherCondition;
 
 export interface ReplayCompareLapPickerProps {
   pagination?: CompareLapPagination;
@@ -22,10 +22,14 @@ export interface ReplayCompareLapPickerProps {
   currentRaceType?: string | null;
   currentWeatherCondition?: WeatherCondition | null;
   filter: CompareLapFilter;
+  controls: CompareLapControls;
+  /** Car types of the whole scope, not just this page. */
+  carTypes: string[];
   isLoading: boolean;
   error?: string | null;
   onRetry?: () => void;
   onChangeFilter: (filter: CompareLapFilter) => void;
+  onChangeControls: (controls: CompareLapControls) => void;
   onClose: () => void;
   onSelectLap: (lap: ComparableLap) => void;
 }
@@ -36,9 +40,6 @@ const FILTER_OPTIONS: Array<{ key: CompareLapFilter; label: string; title: strin
   { key: 'same-sessions', label: 'Same Sessions', title: 'All drivers from the current session' },
   { key: 'all', label: 'All Drivers', title: 'All drivers across all sessions' },
 ];
-
-const raceType = (sessionType?: string | null): RaceTypeFilter | null =>
-  sessionType === 'Practice' ? 'practice' : sessionType === 'Qualifying' ? 'quali' : sessionType === 'Race' ? 'race' : null;
 
 export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
   laps,
@@ -53,83 +54,33 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
   currentRaceType,
   currentWeatherCondition,
   filter,
+  controls,
+  carTypes,
   isLoading,
   error,
   onRetry,
   onChangeFilter,
+  onChangeControls,
   onClose,
   onSelectLap,
 }) => {
-  const [order, setOrder] = useState<'lap-asc' | 'date-desc' | 'driver-asc'>('lap-asc');
-  const [selectedCar, setSelectedCar] = useState<string>('all');
-  const [selectedRaceType, setSelectedRaceType] = useState<RaceTypeFilter>('all');
-  const [selectedCondition, setSelectedCondition] = useState<ConditionFilter>('same');
-
   const normalize = (val?: string | null) => (val || '').toLowerCase().trim();
   const effectiveSessionId = currentSessionId || selectedSessionId || null;
   const matchesIdentity = (lap: ComparableLap, identity: string | null | undefined) => Boolean(identity &&
     lap.sessionId === identity);
-
-  const currentLap = useMemo(() => {
-    if (!effectiveSessionId) return null;
-    return (
-      laps.find(lap => {
-        const matchesSession = matchesIdentity(lap, effectiveSessionId);
-        if (!matchesSession) return false;
-        const matchesDriver = !currentDriverName || normalize(lap.driverName) === normalize(currentDriverName);
-        if (!matchesDriver) return false;
-        return currentLapNumber != null ? lap.lapNumber === currentLapNumber : true;
-      }) ||
-      laps.find(lap => matchesIdentity(lap, effectiveSessionId)) ||
-      null
-    );
-  }, [laps, effectiveSessionId, currentDriverName, currentLapNumber]);
-
-  const exactCurrentLap = laps.find(lap => matchesIdentity(lap, effectiveSessionId) && lap.lapNumber === currentLapNumber
-    && (!currentDriverName || lap.driverName.toLowerCase() === currentDriverName.toLowerCase()));
-  const currentCondition = currentWeatherCondition ?? (exactCurrentLap
-    ? exactCurrentLap.weatherCondition ?? (exactCurrentLap.hasRain ? 'Wet' : 'Dry') : null);
-  const conditionToMatch = selectedCondition === 'same' ? currentCondition : selectedCondition;
-
-  const currentCar = useMemo(() => currentCarType || currentLap?.carType || null, [currentCarType, currentLap]);
-
-  const currentRace = useMemo(() => {
-    if (currentRaceType) {
-      return (currentRaceType === 'practice' || currentRaceType === 'quali' || currentRaceType === 'race')
-        ? (currentRaceType as RaceTypeFilter)
-        : raceType(currentRaceType);
-    }
-    return currentLap ? raceType(currentLap.sessionType) : null;
-  }, [currentRaceType, currentLap]);
-
-  const availableCars = useMemo(() => (
-    Array.from(new Set(laps.map(l => l.carType).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b))
-  ), [laps]);
-
-  const filteredLaps = useMemo(() => {
-    return laps.filter(lap => {
-      const isSameSession = Boolean(currentSessionId && lap.sessionId === currentSessionId);
-      const normDriver = normalize(lap.driverName);
-      const isPlayer = lap.isPlayer !== false || Boolean(currentDriverName && normDriver && normDriver === normalize(currentDriverName));
-
-      if (filter === 'same-session-lap' && (!isSameSession || !isPlayer)) return false;
-      if (filter === 'player' && !isPlayer) return false;
-      if (filter === 'same-sessions' && !isSameSession) return false;
-      if (selectedCar !== 'all' && lap.carType !== selectedCar) return false;
-      if (conditionToMatch && conditionToMatch !== 'all'
-        && (lap.weatherCondition ?? (lap.hasRain ? 'Wet' : 'Dry')) !== conditionToMatch) return false;
-      return selectedRaceType === 'all' || raceType(lap.sessionType) === selectedRaceType;
-    });
-  }, [laps, filter, currentSessionId, currentDriverName, selectedCar, selectedRaceType, conditionToMatch]);
-
-  const orderedLaps = useMemo(() => {
-    const sorted = [...filteredLaps].sort((a, b) => {
-      if (order === 'date-desc') return (b.timeString || '').localeCompare(a.timeString || '');
-      if (order === 'driver-asc') return a.driverName.localeCompare(b.driverName) || (a.lapTime || 999999) - (b.lapTime || 999999);
-      return (a.lapTime || 999999) - (b.lapTime || 999999);
-    });
-    return pagination ? sorted : sorted.slice(0, filter === 'all' ? 80 : 120);
-  }, [filteredLaps, order, filter, pagination]);
+  const isCurrent = (lap: ComparableLap) => matchesIdentity(lap, effectiveSessionId) &&
+    (currentLapNumber == null || lap.lapNumber === currentLapNumber) &&
+    (!currentDriverName || normalize(lap.driverName) === normalize(currentDriverName));
+  // Badges only: the filters themselves are applied by the server.
+  const exactCurrentLap = laps.find(isCurrent);
+  const currentLap = exactCurrentLap ?? laps.find(lap => matchesIdentity(lap, effectiveSessionId));
+  const currentCondition = currentWeatherCondition ?? (exactCurrentLap ? recordedCondition(exactCurrentLap.weatherCondition, exactCurrentLap.hasRain) : null);
+  const currentCar = currentCarType || currentLap?.carType || null;
+  const currentRace: SessionKind | null = currentRaceType
+    ? (sessionKindOf(currentRaceType) ?? (currentRaceType as SessionKind))
+    : sessionKindOf(currentLap?.sessionType);
+  const carOptions = controls.carType === 'all' || carTypes.includes(controls.carType) ? carTypes : [...carTypes, controls.carType];
+  const change = (patch: Partial<CompareLapControls>) => onChangeControls({ ...controls, ...patch });
 
   return (
     <div role="dialog" aria-modal="true" aria-label="Choose comparison lap"
@@ -175,13 +126,13 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
               {/* Car Filter with Current Car Badge in Dropdown */}
               <select
                 aria-label="Filter by car"
-                value={selectedCar}
-                onChange={event => setSelectedCar(event.target.value)}
+                value={controls.carType}
+                onChange={event => change({ carType: event.target.value })}
                 className="bg-lmu-bg border border-lmu-border rounded-md px-2.5 py-1 text-xs font-bold text-white max-w-[190px] truncate"
                 title="Filter by car"
               >
                 <option value="all">All Cars</option>
-                {availableCars.map(car => (
+                {carOptions.map(car => (
                   <option key={car} value={car}>
                     {car === currentCar ? `🏎️ ${car} (Current)` : car}
                   </option>
@@ -191,8 +142,8 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
               {/* Race Type Filter with Current Race Type Badge in Dropdown */}
               <select
                 aria-label="Filter by race type"
-                value={selectedRaceType}
-                onChange={event => setSelectedRaceType(event.target.value as RaceTypeFilter)}
+                value={controls.sessionKind}
+                onChange={event => change({ sessionKind: event.target.value as SessionKind | 'all' })}
                 className="bg-lmu-bg border border-lmu-border rounded-md px-2.5 py-1 text-xs font-bold text-white"
                 title="Filter by race type"
               >
@@ -203,8 +154,8 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
               </select>
               <select
                 aria-label="Filter by condition"
-                value={selectedCondition}
-                onChange={event => setSelectedCondition(event.target.value as ConditionFilter)}
+                value={controls.condition}
+                onChange={event => change({ condition: event.target.value as CompareLapControls['condition'] })}
                 className="bg-lmu-bg border border-lmu-border rounded-md px-2.5 py-1 text-xs font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
               >
                 <option value="same">Same condition{currentCondition ? ` (${currentCondition})` : ''}</option>
@@ -218,13 +169,13 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
             {/* Sort Order */}
             <select
               aria-label="Order comparison laps"
-              value={order}
-              onChange={event => setOrder(event.target.value as typeof order)}
+              value={controls.sort}
+              onChange={event => change({ sort: event.target.value as CompareLapControls['sort'] })}
               className="bg-lmu-bg border border-lmu-border rounded-md px-2.5 py-1 text-xs font-bold text-white shrink-0"
             >
-              <option value="lap-asc">Best Lap</option>
-              <option value="date-desc">Most recent</option>
-              <option value="driver-asc">Driver</option>
+              <option value="lap">Best Lap</option>
+              <option value="recent">Most recent</option>
+              <option value="driver">Driver</option>
             </select>
           </div>
         </div>
@@ -239,31 +190,26 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
               <p className="text-lmu-loss-soft">{error}</p>
               {onRetry && <button type="button" onClick={onRetry} className={`text-lmu-text-soft underline underline-offset-4 ${FOCUS_RING}`}>Try again</button>}
             </div>
-          ) : orderedLaps.length === 0 ? (
+          ) : laps.length === 0 ? (
             <p className="py-8 text-center text-xs text-lmu-muted">
               {filter === 'same-session-lap' && 'No other valid laps found for this driver in the current session.'}
               {filter === 'same-sessions' && 'No other replay-backed laps found in this session.'}
               {filter === 'player' && 'No player replay-backed laps found matching your filters.'}
               {filter === 'all' && 'No replay-backed laps found matching your filters.'}
-              <span className="block mt-1">{selectedCondition === 'all' ? 'Try changing your filters.' : 'Try All conditions or change your filters.'}</span>
+              <span className="block mt-1">{controls.condition === 'all' ? 'Try changing your filters.' : 'Try All conditions or change your filters.'}</span>
             </p>
           ) : (
             <div className="space-y-1">
-              {orderedLaps.map(lap => {
+              {laps.map(lap => {
                 const isSelected = matchesIdentity(lap, selectedSessionId) &&
                   lap.lapNumber === selectedLapNumber &&
                   (!selectedDriverName || lap.driverName === selectedDriverName);
-                const isCurrentLap = Boolean(
-                  matchesIdentity(lap, effectiveSessionId) &&
-                  (currentLapNumber == null || lap.lapNumber === currentLapNumber) &&
-                  (!currentDriverName || normalize(lap.driverName) === normalize(currentDriverName))
-                );
                 return (
                   <ReplayCompareLapRow
                     key={lap.id}
                     lap={lap}
                     isSelected={isSelected}
-                    isCurrentLap={isCurrentLap}
+                    isCurrentLap={isCurrent(lap)}
                     onSelect={selected => {
                       onSelectLap(selected);
                       onClose();

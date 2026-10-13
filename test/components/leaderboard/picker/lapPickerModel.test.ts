@@ -4,10 +4,10 @@ import {
   DEFAULT_PICKER_FILTERS,
   groupPickerSessions,
   lapEventDay,
-  lapSessionKind,
   pickerQuickPicks,
 } from '../../../../src/components/leaderboard/picker/lapPickerModel.js';
 import { placeComparedLap } from '../../../../src/components/leaderboard/useCompareLapsData.js';
+import { sessionKindOf } from '../../../../shared/domain/compareLapScope.js';
 
 const DAY = Date.parse('2026-09-20T12:00:00');
 
@@ -47,9 +47,8 @@ const raceLap = laps.find((l) => l.id === 'r_Me_lap_4')!;
 
 describe('lap picker model', () => {
   it('reads the session kind and the event day', () => {
-    expect(lapSessionKind({ sessionType: 'Qualifying', sessionName: 'Q1' })).toBe('quali');
-    expect(lapSessionKind({ sessionType: 'Race', sessionName: 'R1' })).toBe('race');
-    expect(lapSessionKind({ sessionType: 'Practice', sessionName: 'P1' })).toBe('practice');
+    expect(sessionKindOf('Qualifying')).toBe('quali');
+    expect(sessionKindOf('Warmup')).toBeNull();
     expect(lapEventDay({ timeString: '2026/09/20 14:00' })).toBe('2026/09/20');
   });
 

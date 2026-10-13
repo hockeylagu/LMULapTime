@@ -2,6 +2,7 @@ import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { ReplayInspectorModalBody } from '../../../../src/components/replay/inspector/ReplayInspectorModalBody';
+import { DEFAULT_COMPARE_CONTROLS } from '../../../../src/components/replay/inspector/compare/compareLapControls.js';
 import { LapSegmentComparison } from '../../../../src/utils/cornerAnalysis/types.js';
 
 vi.mock('../../../../src/components/replay/inspector/ReplayInspectorHeader', () => ({
@@ -67,6 +68,9 @@ describe('ReplayInspectorModalBody', () => {
         handleCloseComparePicker={vi.fn()}
         availableCompareLaps={[]}
         compareLapFilter="all"
+        compareControls={DEFAULT_COMPARE_CONTROLS}
+        compareCarTypes={[]}
+        setCompareControls={vi.fn()}
         isCompareLapsLoading={false}
         setCompareLapFilter={vi.fn()}
         handleSelectCompareLap={vi.fn()}
@@ -146,6 +150,9 @@ describe('ReplayInspectorModalBody', () => {
         handleCloseComparePicker={vi.fn()}
         availableCompareLaps={[]}
         compareLapFilter="all"
+        compareControls={DEFAULT_COMPARE_CONTROLS}
+        compareCarTypes={[]}
+        setCompareControls={vi.fn()}
         isCompareLapsLoading={false}
         setCompareLapFilter={vi.fn()}
         handleSelectCompareLap={vi.fn()}

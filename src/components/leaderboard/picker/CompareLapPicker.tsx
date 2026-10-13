@@ -9,12 +9,11 @@ import { CompareLapPickerSession, PICKER_ROW_GRID } from './CompareLapPickerSess
 import {
   DEFAULT_PICKER_FILTERS,
   groupPickerSessions,
-  lapCondition,
   pickerQuickPicks,
   type LapPickerFilters,
-  type SessionKind,
 } from './lapPickerModel.js';
 import { formatTime } from '../../../../shared/domain/formatters.js';
+import { recordedCondition, type SessionKind } from '../../../../shared/domain/compareLapScope.js';
 
 export interface CompareLapPickerProps {
   /** The player's laps on this layout and class. */
@@ -89,7 +88,7 @@ export const CompareLapPicker: React.FC<CompareLapPickerProps> = ({ laps, anchor
             <SessionTypePills size="xs" selectedType={PILL_BY_KIND[filters.kind]} onSelectType={(type) => update({ kind: KIND_BY_PILL[type] ?? 'all' })} />
             {anchor && (
               <button type="button" aria-pressed={filters.condition === 'same'} onClick={() => update({ condition: filters.condition === 'same' ? 'all' : 'same' })} className={toggle(filters.condition === 'same')} title="Only sessions in the same conditions as the lap kept">
-                Same conditions ({lapCondition(anchor)})
+                Same conditions ({recordedCondition(anchor.weatherCondition, anchor.hasRain)})
               </button>
             )}
             <button type="button" aria-pressed={filters.cleanOnly} onClick={() => update({ cleanOnly: !filters.cleanOnly })} className={toggle(filters.cleanOnly)} title="Leave out start, out, pit, invalid and unrepresentative laps">

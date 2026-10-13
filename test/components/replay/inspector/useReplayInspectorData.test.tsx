@@ -73,6 +73,41 @@ describe('useReplayInspectorData session locators', () => {
     });
   });
 
+  it('sends the picker order and filters to the server, returns to page 1 when they change and keeps the scope car types', async () => {
+    const urls: URLSearchParams[] = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = String(input);
+      if (url.endsWith('/telemetry/metadata')) return response({ ...metadata, weatherCondition: 'Wet' });
+      if (url.includes('/compare/laps')) {
+        urls.push(new URL(url, 'http://localhost').searchParams);
+        return response({ laps: [], total: 120, carTypes: ['BMW M4 LMGT3', 'Lexus RCF LMGT3'] });
+      }
+      return response(trajectory);
+    });
+    const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, sessionId: 'session-1' }), { wrapper });
+    await waitFor(() => expect(result.current.compareCarTypes).toEqual(['BMW M4 LMGT3', 'Lexus RCF LMGT3']));
+    const first = urls[urls.length - 1];
+    expect(first.get('sort')).toBe('lap');
+    expect(first.get('condition')).toBe('Wet');
+    expect(first.has('carType')).toBe(false);
+    expect(first.has('sessionType')).toBe(false);
+
+    act(() => result.current.comparePagination.onPageChange(3));
+    await waitFor(() => expect(urls[urls.length - 1].get('page')).toBe('3'));
+    act(() => result.current.setCompareControls({ sort: 'recent', carType: 'Lexus RCF LMGT3', sessionKind: 'race', condition: 'all' }));
+    await waitFor(() => expect(result.current.comparePagination.page).toBe(1));
+    await waitFor(() => {
+      const last = urls[urls.length - 1];
+      expect(last.get('page')).toBe('1');
+      expect(last.get('sort')).toBe('recent');
+      expect(last.get('carType')).toBe('Lexus RCF LMGT3');
+      expect(last.get('sessionType')).toBe('race');
+      expect(last.has('condition')).toBe(false);
+    });
+    act(() => result.current.setCompareControls({ ...result.current.compareControls, condition: 'Dynamic Weather' }));
+    await waitFor(() => expect(urls[urls.length - 1].get('condition')).toBe('Dynamic Weather'));
+  });
+
   afterEach(() => vi.restoreAllMocks());
 
   it('loads metadata and telemetry by session ID and keeps driver/lap ordinals in the request', async () => {

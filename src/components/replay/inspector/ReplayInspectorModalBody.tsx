@@ -6,6 +6,7 @@ import { CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
 import { LapConsistencyStats } from '../../../utils/lapConsistency.js';
 import type { LapConsistencyOption } from '../analysis/LapSelectorDropdown.js';
 import { CompareLapFilter } from './compare/ReplayCompareLapPicker.js';
+import type { CompareLapControls } from './compare/compareLapControls.js';
 import { ReplayInspectorHeader } from './ReplayInspectorHeader.js';
 import { ReplayInspectorTelemetryColumn } from './ReplayInspectorTelemetryColumn.js';
 import { MapColorMode } from '../map/replayMapUtils.js';
@@ -38,6 +39,9 @@ export interface ReplayInspectorModalBodyProps {
   handleCloseComparePicker: () => void;
   availableCompareLaps: ComparableLap[];
   compareLapFilter: CompareLapFilter;
+  compareControls: CompareLapControls;
+  compareCarTypes: string[];
+  setCompareControls: (controls: CompareLapControls) => void;
   isCompareLapsLoading: boolean;
   setCompareLapFilter: (filter: CompareLapFilter) => void;
   handleSelectCompareLap: (lap: ComparableLap) => void;
@@ -110,6 +114,9 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
   handleCloseComparePicker,
   availableCompareLaps,
   compareLapFilter,
+  compareControls,
+  compareCarTypes,
+  setCompareControls,
   isCompareLapsLoading,
   setCompareLapFilter,
   handleSelectCompareLap,
@@ -181,6 +188,9 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
         onCloseComparePicker={handleCloseComparePicker}
         availableCompareLaps={availableCompareLaps}
         compareLapFilter={compareLapFilter}
+        compareControls={compareControls}
+        compareCarTypes={compareCarTypes}
+        onChangeCompareControls={setCompareControls}
         isCompareLapsLoading={isCompareLapsLoading}
         onChangeCompareLapFilter={setCompareLapFilter}
         onSelectCompareLap={handleSelectCompareLap}

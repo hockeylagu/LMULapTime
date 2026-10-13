@@ -407,6 +407,18 @@ describe('sessionRoutes and filterSessions', () => {
       expect(readSession).not.toHaveBeenCalled();
     });
 
+    it.each(['sort=best', 'sessionType=Race', 'condition=Foggy'])('GET /api/compare/laps rejects unknown picker params (%s)', async param => {
+      const response = await request(app).get(`/api/compare/laps?track=Spa&telemetryOnly=true&${param}`);
+      expect(response.status).toBe(400);
+      expect(response.body.error).toMatch(param.split('=')[0]);
+    });
+
+    it('GET /api/compare/laps accepts the telemetry picker sort and filters and lists car types', async () => {
+      const response = await request(app).get('/api/compare/laps?track=Spa&telemetryOnly=true&sort=recent&sessionType=quali&condition=Dynamic%20Weather&carType=BMW');
+      expect(response.status).toBe(200);
+      expect(response.body).toMatchObject({ laps: [], total: 0, carTypes: [] });
+    });
+
     it('GET /api/compare/laps without a track has no benchmarks', async () => {
       const res = await request(app).get('/api/compare/laps?playerOnly=false');
       expect(res.status).toBe(200);

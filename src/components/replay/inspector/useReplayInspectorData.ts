@@ -9,6 +9,7 @@ import { updateSearchParams } from '../../../utils/urlParams.js';
 import { apiErrorMessage, fetchJson, isAbortError } from '../../../api/apiClient.js';
 import { fetchSessionTelemetry, fetchSessionTelemetryMetadata } from '../../../api/replayApi.js';
 import { CompareLapFilter } from './compare/ReplayCompareLapPicker.js';
+import { DEFAULT_COMPARE_CONTROLS, type CompareLapControls } from './compare/compareLapControls.js';
 import { advancePlaybackClock, PlaybackClock, playbackClockAt } from './replayPlaybackClock.js';
 import { createPlaybackCursor } from './replayPlaybackCursor.js';
 import { DEFAULT_TELEMETRY_RESOLUTION, TelemetryResolution, trajectoryResolutionQuery } from '../telemetry/telemetryResolution.js';
@@ -60,6 +61,8 @@ export function useReplayInspectorData({
   const [comparePage, setComparePage] = useState(1);
   const [compareTotal, setCompareTotal] = useState(0);
   const [compareLapFilter, setCompareLapFilter] = useState<CompareLapFilter>('player');
+  const [compareControls, setCompareControls] = useState<CompareLapControls>(DEFAULT_COMPARE_CONTROLS);
+  const [compareCarTypes, setCompareCarTypes] = useState<string[]>([]);
   const [isCompareLapsLoading, setIsCompareLapsLoading] = useState(false);
   const [compareLapsError, setCompareLapsError] = useState<string | null>(null);
   const [compareLoadVersion, setCompareLoadVersion] = useState(0);
@@ -215,7 +218,11 @@ export function useReplayInspectorData({
     };
   }, [isOpen, activeSessionId, replayLoadVersion, selectedDriverOrdinal, selectedLapOrdinal]);
 
-  useEffect(() => { setComparePage(1); }, [metadata, activeSessionId, selectedDriverSlot, compareLapFilter]);
+  // 'Same condition' follows the inspected lap's own weather; unknown, it filters nothing.
+  const currentCondition = trajectory?.weatherCondition ?? metadata?.weatherCondition ?? null;
+  const conditionFilter = compareControls.condition === 'same' ? currentCondition : compareControls.condition;
+  useEffect(() => { setComparePage(1); },
+    [metadata, activeSessionId, selectedDriverSlot, compareLapFilter, compareControls, conditionFilter]);
 
   // Fetch replay-backed comparison laps. Player laps are the safe default; the
   // all-driver view exposes the same candidate pool as Compare Laps.
@@ -244,16 +251,20 @@ export function useReplayInspectorData({
       track: trackToQuery,
       ...(metadata.trackVenue ? { trackVenue: metadata.trackVenue, trackCourse: metadata.trackCourse ?? '' } : {}),
       playerOnly: String(!needsAllDrivers),
-      telemetryOnly: 'true', page: String(comparePage), pageSize: '50',
+      telemetryOnly: 'true', page: String(comparePage), pageSize: '50', sort: compareControls.sort,
     });
+    if (compareControls.carType !== 'all') query.set('carType', compareControls.carType);
+    if (compareControls.sessionKind !== 'all') query.set('sessionType', compareControls.sessionKind);
+    if (conditionFilter && conditionFilter !== 'all') query.set('condition', conditionFilter);
     if (carClass) query.set('carClass', carClass);
     if (compareLapFilter === 'same-session-lap' || compareLapFilter === 'same-sessions') query.set('sessionId', activeSessionId!);
 
-    fetchJson<{ laps?: ComparableLap[]; total?: number }>(`/api/compare/laps?${query.toString()}`, { signal: controller.signal })
+    fetchJson<{ laps?: ComparableLap[]; total?: number; carTypes?: string[] }>(`/api/compare/laps?${query.toString()}`, { signal: controller.signal })
       .then(data => {
         if (!isCurrent) return;
         const laps = Array.isArray(data?.laps) ? data.laps : [];
         setCompareTotal(data.total ?? laps.length);
+        setCompareCarTypes(Array.isArray(data.carTypes) ? data.carTypes : []);
         setAvailableCompareLaps(laps.filter((lap: ComparableLap) =>
           Boolean(lap.matchingReplayFile) && isRacingLap(lap) &&
           typeof lap.lapTime === 'number' && lap.lapTime > 0
@@ -267,7 +278,7 @@ export function useReplayInspectorData({
         setIsCompareLapsLoading(false);
       });
     return () => { isCurrent = false; controller.abort(); };
-  }, [isOpen, metadata, activeSessionId, selectedDriverSlot, compareLapFilter, compareLoadVersion, comparePage]);
+  }, [isOpen, metadata, activeSessionId, selectedDriverSlot, compareLapFilter, compareControls, conditionFilter, compareLoadVersion, comparePage]);
 
   // Open the comparison lap picker. Comparison stays active until explicitly removed.
   const handleToggleCompare = () => {
@@ -601,7 +612,7 @@ export function useReplayInspectorData({
     isLoading, isTrajLoading, error, handleRetryLoad, isCompareMode, handleToggleCompare,
     handleSwapBaseline, handleRemoveCompare, handleCloseComparePicker, isComparePickerOpen, baselineSessionId, setBaselineSessionId,
     baselineLapNumber, setBaselineLapNumber, baselineDriverName, setBaselineDriverName,
-    baselineTrajectory: comparableBaselineTrajectory, baselineMetadata, availableCompareLaps, compareLapFilter,
+    baselineTrajectory: comparableBaselineTrajectory, baselineMetadata, availableCompareLaps, compareLapFilter, compareControls, compareCarTypes, setCompareControls,
     isCompareLapsLoading, compareLapsError, handleRetryCompareLaps, handleRetryBaseline, setCompareLapFilter, handleSelectCompareLap,
     comparePagination: { page: comparePage, pageSize: 50, total: compareTotal, onPageChange: setComparePage },
     isBaselineLoading, baselineError: comparableBaselineError, currentIndex, setCurrentIndex, isPlaying, setIsPlaying,

@@ -1,8 +1,9 @@
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { ComparableLap } from '../../../shared/types/index.js';
+import type { ComparableLap, WeatherCondition } from '../../../shared/types/index.js';
 import { CIRCUIT_SPECIFICATIONS } from '../../../shared/domain/circuitDefinitions.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { computeTheoreticalBest } from '../../../shared/domain/formatters.js';
+import { SESSION_TYPE_BY_KIND, type CompareLapSort, type SessionKind } from '../../../shared/domain/compareLapScope.js';
 import type { ComparableLapsResult } from '../../sessions/sessionAnalytics.js';
 import { comparisonLapKey, readComparisonLapRows } from './comparisonLapRows.js';
 
@@ -10,10 +11,16 @@ export interface CompactCompareFilters {
   trackName?: string; trackVenue?: string; trackCourse?: string; carClass?: string; carType?: string; driverName?: string; sessionId?: string;
   driverOrdinal?: number; lapOrdinal?: number; lapNumber?: number;
   playerOnly?: boolean; humansOnly?: boolean; telemetryOnly?: boolean;
+  /** Telemetry picker only: session-type bucket and recording condition the laps must have. */
+  sessionKind?: SessionKind; condition?: WeatherCondition;
 }
-export interface CompactComparePage { page?: number; pageSize?: number; }
+export interface CompactComparePage { page?: number; pageSize?: number; sort?: CompareLapSort; }
 export interface CompactCompareResult extends ComparableLapsResult { page: number; pageSize: number; total: number; }
-export interface TelemetryCompareResult { laps: ComparableLap[]; page: number; pageSize: number; total: number; }
+export interface TelemetryCompareResult {
+  laps: ComparableLap[]; page: number; pageSize: number; total: number;
+  /** Car types of the scope ignoring the car filter (the other filters still apply), sorted by name. */
+  carTypes: string[];
+}
 
 interface LapFact {
   session_id: string; timestamp: number; track_venue: string; track_course: string; session_name: string;
@@ -42,10 +49,26 @@ function append(parts: QueryParts, extra: QueryParts): QueryParts {
   return { where: [...parts.where, ...extra.where], args: [...parts.args, ...extra.args] };
 }
 function whereSql(parts: QueryParts): string { return parts.where.length ? parts.where.join(' AND ') : '1=1'; }
-function lapJoinWhere(parts: QueryParts): string {
+function lapJoinWhere(parts: QueryParts, recordings = false): string {
   return `FROM sessions s JOIN session_drivers d ON d.session_id=s.id LEFT JOIN drivers dn ON dn.driver_id=d.driver_id LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id
-    JOIN session_laps l ON l.session_id=d.session_id AND l.driver_ordinal=d.driver_ordinal
+    JOIN session_laps l ON l.session_id=d.session_id AND l.driver_ordinal=d.driver_ordinal${recordings ? ' LEFT JOIN session_recordings r ON r.session_id=s.id' : ''}
     WHERE ${whereSql(parts)}`;
+}
+
+/** The SQL form of `recordedCondition` over the joined recording `r`. */
+const RECORDED_CONDITION_SQL = "coalesce(r.weather_condition, CASE WHEN r.has_rain=1 THEN 'Wet' ELSE 'Dry' END)";
+
+const TELEMETRY_ORDER: Record<CompareLapSort, string> = {
+  lap: 'l.lap_time,s.timestamp,s.rowid,d.driver_ordinal,l.lap_ordinal',
+  recent: 's.timestamp DESC,s.rowid DESC,d.driver_ordinal,l.lap_ordinal',
+  driver: "coalesce(dn.name,'') COLLATE NOCASE,l.lap_time,s.timestamp,s.rowid,d.driver_ordinal,l.lap_ordinal",
+};
+
+function telemetryViewWhere(filters: CompactCompareFilters): QueryParts {
+  const parts: QueryParts = { where: [], args: [] };
+  if (filters.sessionKind) { parts.where.push('s.session_type=?'); parts.args.push(SESSION_TYPE_BY_KIND[filters.sessionKind]); }
+  if (filters.condition) { parts.where.push(`${RECORDED_CONDITION_SQL}=?`); parts.args.push(filters.condition); }
+  return parts;
 }
 
 function comparisonScope(filters: CompactCompareFilters) {
@@ -102,15 +125,19 @@ export function queryTelemetryComparableLaps(
 ): TelemetryCompareResult {
   const page = Math.max(1, Math.trunc(pageOptions.page ?? 1));
   const pageSize = Math.max(1, Math.min(250, Math.trunc(pageOptions.pageSize ?? 50)));
-  const { display, selected } = comparisonScope({ ...filters, telemetryOnly: true });
-  const total = (db.prepare(`SELECT count(*) total ${lapJoinWhere(selected)}`).get(...selected.args) as CountFact).total;
+  const { display, selected: scoped } = comparisonScope({ ...filters, telemetryOnly: true });
+  const selected = append(scoped, telemetryViewWhere(filters));
+  const total = (db.prepare(`SELECT count(*) total ${lapJoinWhere(selected, true)}`).get(...selected.args) as CountFact).total;
+  const carScope = comparisonScope({ ...filters, carType: undefined, telemetryOnly: true }).selected;
+  const carTypeScope = append(carScope, telemetryViewWhere(filters));
+  const carTypes = (db.prepare(`SELECT DISTINCT v.car_type car_type ${lapJoinWhere(carTypeScope, true)} AND coalesce(v.car_type,'')<>'' ORDER BY v.car_type`)
+    .all(...carTypeScope.args) as Array<{ car_type: string }>).map(row => row.car_type);
   const rows = db.prepare(`SELECT s.id session_id,s.timestamp,s.session_name,s.session_type,s.time_string,s.recording_name,
       d.driver_ordinal,coalesce(dn.name,'') driver_name,coalesce(v.car_type,'') car_type,coalesce(nullif(v.car_class,''),'General') car_class,
       d.is_player,d.best_lap_time,l.lap_ordinal,l.lap_number,l.lap_time,
       l.s1,l.s2,l.s3,l.top_speed,l.is_inferred,l.non_representative_reason,0 is_all_time_pb,
-      (SELECT has_rain FROM session_recordings WHERE session_id=s.id) has_rain,
-      (SELECT weather_condition FROM session_recordings WHERE session_id=s.id) weather_condition
-    ${lapJoinWhere(selected)} ORDER BY s.timestamp,s.rowid,d.driver_ordinal,l.lap_ordinal LIMIT ? OFFSET ?`)
+      r.has_rain,r.weather_condition
+    ${lapJoinWhere(selected, true)} ORDER BY ${TELEMETRY_ORDER[pageOptions.sort ?? 'lap']} LIMIT ? OFFSET ?`)
     .all(...selected.args, pageSize, (page - 1) * pageSize) as TelemetryLapFact[];
   markPagePersonalBests(db, rows, display);
   const laps: ComparableLap[] = rows.map(row => ({
@@ -127,7 +154,7 @@ export function queryTelemetryComparableLaps(
     matchingReplayFile: row.recording_name,
     hasRain: row.has_rain === null ? undefined : Boolean(row.has_rain), weatherCondition: row.weather_condition ?? undefined,
   }));
-  return { laps, total, page, pageSize };
+  return { laps, total, page, pageSize, carTypes };
 }
 
 /** SQL-scoped comparison reads; only the result page and three exact best laps are materialized. */

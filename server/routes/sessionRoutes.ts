@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { COMPARE_LAP_SORTS, SESSION_TYPE_BY_KIND, WEATHER_CONDITIONS, type SessionKind } from '../../shared/domain/compareLapScope.js';
 import { findMatchingTrackBenchmarkEntries } from '../../shared/domain/paceCategory.js';
 import { loadReferenceLaptimesFromCache } from '../benchmarks/referenceLaptimes.js';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
@@ -111,8 +112,24 @@ export function createSessionRouter(context: ServerContext): Router {
     if (res.headersSent) return;
     const lapNumber = ordinal('lapNumber', 10000000);
     if (res.headersSent) return;
+    const choice = <T extends string>(name: string, allowed: readonly T[]): T | undefined => {
+      const value = queryString(req.query[name]);
+      if (value === undefined) return undefined;
+      if (!(allowed as readonly string[]).includes(value)) {
+        res.status(400).json({ error: `${name} must be one of: ${allowed.join(', ')}` });
+        return undefined;
+      }
+      return value as T;
+    };
+    const sort = choice('sort', COMPARE_LAP_SORTS);
+    if (res.headersSent) return;
+    const sessionKind = choice('sessionType', Object.keys(SESSION_TYPE_BY_KIND) as SessionKind[]);
+    if (res.headersSent) return;
+    const condition = choice('condition', WEATHER_CONDITIONS);
+    if (res.headersSent) return;
     const track=queryString(req.query.track);
     const filters: CompactCompareFilters = {
+      sessionKind, condition,
       trackName:track,trackVenue:queryString(req.query.trackVenue),trackCourse:queryString(req.query.trackCourse),
       carClass:queryString(req.query.carClass),carType:queryString(req.query.carType),
       driverName:queryString(req.query.driver),sessionId:queryString(req.query.sessionId),
@@ -120,7 +137,7 @@ export function createSessionRouter(context: ServerContext): Router {
       playerOnly:req.query.playerOnly !== 'false',humansOnly:req.query.humansOnly === 'true',
       telemetryOnly:req.query.telemetryOnly === 'true',
     };
-    const page = {page:pageNumber(req.query.page,1,1000000),pageSize:pageNumber(req.query.pageSize,50,100)};
+    const page = {page:pageNumber(req.query.page,1,1000000),pageSize:pageNumber(req.query.pageSize,50,100),sort};
     if (filters.telemetryOnly) {
       res.json({...queryTelemetryComparableLaps(db,filters,page),revision:revision()});
       return;

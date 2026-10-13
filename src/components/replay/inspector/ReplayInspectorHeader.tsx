@@ -3,6 +3,7 @@ import type { CompareLapPagination } from './compare/CompareLapPagination.js';
 import { X, Play, Pause, RotateCcw, Flag, ArrowLeftRight, Users, ChevronDown, LoaderCircle } from 'lucide-react';
 import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ComparableLap } from '../../../../shared/types/index.js';
 import { CompareLapFilter, ReplayCompareLapPicker } from './compare/ReplayCompareLapPicker.js';
+import type { CompareLapControls } from './compare/compareLapControls.js';
 import { ReplayCompareButton } from './compare/ReplayCompareButton.js';
 import { ReplayInspectorTitle } from './ReplayInspectorTitle.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
@@ -29,12 +30,15 @@ export interface ReplayInspectorHeaderProps {
   onCloseComparePicker: () => void;
   availableCompareLaps: ComparableLap[];
   compareLapFilter: CompareLapFilter;
+  compareControls: CompareLapControls;
+  compareCarTypes: string[];
   isCompareLapsLoading: boolean;
   comparePagination?: CompareLapPagination;
   compareLapsError?: string | null;
   onRetryCompareLaps?: () => void;
   onRetryBaseline?: () => void;
   onChangeCompareLapFilter: (filter: CompareLapFilter) => void;
+  onChangeCompareControls: (controls: CompareLapControls) => void;
   onSelectCompareLap: (lap: ComparableLap) => void;
   isBaselineLoading: boolean;
   baselineError?: string | null;
@@ -52,7 +56,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
   onClose, sessionId, metadata, trajectory, onSelectLap,
   drivers, selectedDriverSlot, onSelectDriver,
   isCompareMode, onToggleCompare, onSwapBaseline, onRemoveCompare,
-  baselineSessionId, baselineLapNumber, baselineDriverName, baselineTrajectory, isComparePickerOpen, onCloseComparePicker, availableCompareLaps, compareLapFilter,
+  baselineSessionId, baselineLapNumber, baselineDriverName, baselineTrajectory, isComparePickerOpen, onCloseComparePicker, availableCompareLaps, compareLapFilter, compareControls, compareCarTypes, onChangeCompareControls,
   isCompareLapsLoading, comparePagination, compareLapsError, onRetryCompareLaps, onRetryBaseline, onChangeCompareLapFilter, onSelectCompareLap,
   isBaselineLoading, baselineError, isTrajLoading, isLoading = false,
   isPlaying, onTogglePlay, onRewind, playbackSpeed, onSelectPlaybackSpeed, formatLapTime,
@@ -193,6 +197,9 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
             currentDriverName={drivers.find(d => d.slot === selectedDriverSlot)?.name || trajectory?.driverName || null}
             currentWeatherCondition={trajectory?.weatherCondition ?? metadata?.weatherCondition}
             filter={compareLapFilter}
+            controls={compareControls}
+            carTypes={compareCarTypes}
+            onChangeControls={onChangeCompareControls}
             isLoading={isCompareLapsLoading}
             pagination={comparePagination}
             currentSessionId={sessionId}
