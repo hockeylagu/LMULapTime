@@ -15,7 +15,6 @@ function lap(sessionId: string, lapNumber: number, lapTime: number, extra: Parti
   } as ComparableLap;
 }
 
-// The roster names the car as the session log does (the replay metadata composer takes it from there).
 const driver: ReplayDriverEntry = { slot: 1, name: ME, isPlayer: true, carType: 'Peugeot 9x8', carClass: 'Hyper', sessionDriverOrdinal: 0 };
 const metadata = { filename: 'r.Vcr', trackVenue: 'Daytona', trackCourse: 'Road Course', drivers: [driver] } as unknown as ReplayMetadata;
 const trajectory = (lapTime: number) => ({
@@ -46,7 +45,7 @@ function renderButton(lapTime: number, onSelectCompareLap = vi.fn(), rosterDrive
 describe('ReplayCompareButton', () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it('asks the server once for the driver fastest representative lap in the inspected car, whatever the picker shows', async () => {
+  it('asks the server once for the driver fastest representative lap in the class, any car, whatever the picker shows', async () => {
     const urls = mockLaps([lap(PRACTICE, 24, 95.658)]);
     const onSelectCompareLap = renderButton(95.894);
 
@@ -55,13 +54,14 @@ describe('ReplayCompareButton', () => {
     expect(urls).toHaveLength(1);
     const query = urls[0].searchParams;
     expect(urls[0].pathname).toBe('/api/compare/laps');
-    expect(Object.fromEntries(['track', 'trackVenue', 'carType', 'carClass', 'driver', 'driverExact', 'sort', 'representativeOnly', 'telemetryOnly',
+    expect(Object.fromEntries(['track', 'trackVenue', 'carClass', 'driver', 'driverExact', 'sort', 'representativeOnly', 'telemetryOnly',
       'playerOnly', 'excludeSessionId', 'excludeLapOrdinal', 'pageSize'].map(key => [key, query.get(key)]))).toEqual({
-      track: 'Daytona', trackVenue: 'Daytona', carType: 'Peugeot 9x8', carClass: 'Hyper', driver: ME, driverExact: 'true', sort: 'lap',
+      track: 'Daytona', trackVenue: 'Daytona', carClass: 'Hyper', driver: ME, driverExact: 'true', sort: 'lap',
       representativeOnly: 'true', telemetryOnly: 'true', playerOnly: 'true', excludeSessionId: RACE, excludeLapOrdinal: '19', pageSize: '1',
     });
     // No session lap or page is needed to find the car, and the lap on screen is left out by the server.
     expect(query.has('sessionId')).toBe(false);
+    expect(query.has('carType')).toBe(false);
     expect(query.has('page')).toBe(false);
   });
 
@@ -79,16 +79,16 @@ describe('ReplayCompareButton', () => {
     expect(screen.queryByText(/vs your best/)).not.toBeInTheDocument();
   });
 
-  it('asks with the roster car name, which is the session name, so a package-style name cannot hide the suggestion', async () => {
-    const urls = mockLaps([lap(PRACTICE, 24, 95.658, { carType: 'Genesis GMR001' })]);
-    renderButton(95.894, vi.fn(), { ...driver, carType: 'Genesis GMR001' });
-    expect(await screen.findByText('vs your best 95.658')).toBeInTheDocument();
-    expect(urls[0].searchParams.get('carType')).toBe('Genesis GMR001');
+  it('suggests a faster lap of the class in another car', async () => {
+    mockLaps([lap(PRACTICE, 24, 95.658, { carType: 'Toyota GR010' })]);
+    const onSelectCompareLap = renderButton(95.894);
+    fireEvent.click(await screen.findByText('vs your best 95.658'));
+    expect(onSelectCompareLap).toHaveBeenCalledWith(expect.objectContaining({ carType: 'Toyota GR010' }));
   });
 
-  it('makes no request without a roster car name', async () => {
+  it('makes no request without a car class, so it never crosses classes', async () => {
     const urls = mockLaps([lap(PRACTICE, 24, 95.658)]);
-    renderButton(95.894, vi.fn(), { ...driver, carType: undefined });
+    renderButton(95.894, vi.fn(), { ...driver, carType: undefined, carClass: undefined });
     await new Promise(resolve => setTimeout(resolve, 20));
     expect(urls).toHaveLength(0);
     expect(screen.queryByText(/vs your best/)).not.toBeInTheDocument();

@@ -15,22 +15,21 @@ export interface SuggestionTarget {
 
 /**
  * The lap to compare against by default: the driver's fastest replay-backed, representative lap on
- * this layout, car class and car, when it beats the lap on screen. The server picks it from the
+ * this layout and car class, in any car of the class, when it beats the lap on screen. The server picks it from the
  * whole history (the driver by exact name, the lap on screen left out), independent of the lap
  * picker's page and filters.
  */
 export function useReferenceLapSuggestion(target: SuggestionTarget): ComparableLap | null {
   const { sessionId, metadata, driver, driverName, lapOrdinal, lapTime } = target;
   const [best, setBest] = useState<ComparableLap | null>(null);
-  const carType = driver?.carType;
 
   useEffect(() => {
-    const query = metadata && driverName && sessionId && carType ? replayCompareScope(metadata, driver) : null;
-    if (!query || !driverName || !sessionId || !carType) { setBest(null); return; }
+    const query = metadata && driverName && sessionId ? replayCompareScope(metadata, driver) : null;
+    // Any car of the class, never across classes: without a class there is no suggestion.
+    if (!query?.has('carClass') || !driverName || !sessionId) { setBest(null); return; }
     const controller = new AbortController();
-    // The roster names the car as the session log does, so it is the car the laps are stored with.
     query.set('telemetryOnly', 'true'); query.set('representativeOnly', 'true'); query.set('sort', 'lap');
-    query.set('carType', carType); query.set('driver', driverName); query.set('driverExact', 'true');
+    query.set('driver', driverName); query.set('driverExact', 'true');
     query.set('playerOnly', String(driver?.isPlayer === true));
     if (lapOrdinal != null) { query.set('excludeSessionId', sessionId); query.set('excludeLapOrdinal', String(lapOrdinal)); }
     query.set('pageSize', '1');
@@ -38,7 +37,7 @@ export function useReferenceLapSuggestion(target: SuggestionTarget): ComparableL
       .then(data => setBest(data.laps?.[0] ?? null))
       .catch((err: unknown) => { if (!isAbortError(err)) setBest(null); });
     return () => controller.abort();
-  }, [sessionId, metadata, driver, driverName, carType, lapOrdinal]);
+  }, [sessionId, metadata, driver, driverName, lapOrdinal]);
 
   return useMemo(() => {
     if (!sessionId || !best) return null;
