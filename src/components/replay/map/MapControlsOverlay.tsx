@@ -48,7 +48,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
           type="button"
           onClick={onTogglePlay}
           aria-label={isPlaying ? 'Pause' : 'Play'}
-          title={isPlaying ? 'Pause · Space' : 'Play · Space'}
+          title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
           className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer shrink-0 ${
             isPlaying
               ? 'bg-lmu-accent text-lmu-text hover:bg-lmu-accent/80'
@@ -63,7 +63,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
         onClick={onZoomIn}
         aria-label="Zoom in"
         className={`w-7 h-7 flex items-center justify-center rounded-lg bg-lmu-raised/40 hover:bg-lmu-raised text-lmu-muted hover:text-lmu-text transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}
-        title="Zoom In"
+        title="Zoom In (+)"
       >
         <Plus className="w-3.5 h-3.5" />
       </button>
@@ -72,7 +72,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
         onClick={onZoomOut}
         aria-label="Zoom out"
         className={`w-7 h-7 flex items-center justify-center rounded-lg bg-lmu-raised/40 hover:bg-lmu-raised text-lmu-muted hover:text-lmu-text transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}
-        title="Zoom Out"
+        title="Zoom Out (-)"
       >
         <Minus className="w-3.5 h-3.5" />
       </button>
@@ -82,7 +82,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
           type="button"
           onClick={onCenterCar}
           aria-label="Center car"
-          title="Center car · C"
+          title="Center car (C)"
           className={`w-7 h-7 flex items-center justify-center rounded-lg bg-lmu-raised/40 hover:bg-lmu-raised text-lmu-muted hover:text-lmu-text transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}
         >
           <LocateFixed className="w-3.5 h-3.5" />
@@ -99,7 +99,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
               ? 'bg-lmu-accent text-lmu-text'
               : 'bg-lmu-raised/40 hover:bg-lmu-raised text-lmu-muted hover:text-lmu-text'
           } ${FOCUS_RING}`}
-          title={followCar ? 'Follow car · F (active)' : 'Follow car · F'}
+          title={followCar ? 'Follow car (F) (active)' : 'Follow car (F)'}
         >
           <Crosshair className="w-3.5 h-3.5" />
         </button>
@@ -110,7 +110,7 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
         onClick={onReset}
         aria-label="Reset zoom and pan"
         className={`w-7 h-7 flex items-center justify-center rounded-lg bg-lmu-raised/40 hover:bg-lmu-raised text-lmu-muted hover:text-lmu-text transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}
-        title="Reset View"
+        title="Reset View (R)"
       >
         <RotateCcw className="w-3.5 h-3.5" />
       </button>

@@ -65,8 +65,8 @@ export const GpsCircuitMinimap: React.FC<GpsCircuitMinimapProps> = ({
   if (!activePathD) return null;
 
   const sizeClass = isExpanded
-    ? 'w-48 h-48 sm:w-56 sm:h-56 md:w-64 md:h-64 rounded-2xl p-1.5 top-3.5 left-3.5 shadow-2xl'
-    : 'w-28 h-28 sm:w-32 sm:h-32 rounded-xl p-1 top-2.5 left-2.5 shadow-lg';
+    ? 'w-52 h-52 sm:w-60 sm:h-60 md:w-64 md:h-64 top-3.5 left-3.5'
+    : 'w-36 h-36 sm:w-40 sm:h-40 md:w-44 md:h-44 top-2.5 left-2.5';
 
   return (
     <div
@@ -74,11 +74,12 @@ export const GpsCircuitMinimap: React.FC<GpsCircuitMinimapProps> = ({
       onClick={e => e.stopPropagation()}
       onPointerDown={e => e.stopPropagation()}
       onDoubleClick={e => e.stopPropagation()}
-      className={`absolute z-20 ${sizeClass} bg-lmu-deep/85 border border-lmu-border/70 backdrop-blur-md select-none flex items-center justify-center cursor-crosshair active:cursor-grabbing ${className}`}
+      className={`absolute z-20 ${sizeClass} select-none flex items-center justify-center cursor-crosshair active:cursor-grabbing ${className}`}
     >
       <svg
         viewBox="0 0 800 800"
-        className="w-full h-full drop-shadow-sm touch-none"
+        shapeRendering="geometricPrecision"
+        className="w-full h-full touch-none"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -86,15 +87,15 @@ export const GpsCircuitMinimap: React.FC<GpsCircuitMinimapProps> = ({
         <path
           d={activePathD}
           stroke={MAP_COLORS.minimapBorder}
-          strokeWidth="16"
+          strokeWidth="15"
           strokeLinecap="round"
           strokeLinejoin="round"
           fill="none"
         />
         <path
           d={activePathD}
-          stroke={MAP_COLORS.trackBoundary}
-          strokeWidth="8"
+          stroke="#64748B"
+          strokeWidth="7"
           strokeLinecap="round"
           strokeLinejoin="round"
           fill="none"
@@ -108,11 +109,12 @@ export const GpsCircuitMinimap: React.FC<GpsCircuitMinimapProps> = ({
             width={viewportBox.vw}
             height={viewportBox.vh}
             fill={TELEMETRY_COLORS.primary}
-            fillOpacity="0.12"
+            fillOpacity="0.08"
             stroke={TELEMETRY_COLORS.primary}
-            strokeWidth="5"
-            strokeDasharray="14 10"
-            rx="16"
+            strokeWidth="4"
+            strokeOpacity="0.75"
+            strokeDasharray="12 8"
+            rx="14"
           />
         )}
 
@@ -120,10 +122,10 @@ export const GpsCircuitMinimap: React.FC<GpsCircuitMinimapProps> = ({
           <circle
             cx={baselineGhostPos.sx}
             cy={baselineGhostPos.sy}
-            r="16"
+            r="14"
             fill={TELEMETRY_COLORS.baseline}
             stroke={CHART_COLORS.white}
-            strokeWidth="3.5"
+            strokeWidth="2.5"
           />
         )}
 
@@ -131,10 +133,10 @@ export const GpsCircuitMinimap: React.FC<GpsCircuitMinimapProps> = ({
           <circle
             cx={currentPos.sx}
             cy={currentPos.sy}
-            r="18"
+            r="16"
             fill={TELEMETRY_COLORS.primary}
             stroke={CHART_COLORS.white}
-            strokeWidth="4"
+            strokeWidth="3"
           />
         )}
       </svg>

@@ -19,6 +19,8 @@ export interface GpsTrackMapProps {
   points: ReplayTrajectoryPoint[];
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number; spanX: number; spanZ: number };
   currentIndex: number;
+  initialZoom?: number;
+  initialFollowCar?: boolean;
   onSelectIndex?: (index: number) => void;
   isPlaying?: boolean;
   onTogglePlay?: () => void;

@@ -51,9 +51,10 @@ export const MapLayersControl: React.FC<Props> = ({ layers, onChange, available,
       e.preventDefault(); setOpen(false); trigger.current?.focus();
     } }}>
     <button ref={trigger} type="button" aria-expanded={open} aria-controls={id}
+      aria-label="Layers" title="Layers"
       onClick={() => setOpen(value => !value)}
-      className={`h-7 px-2 flex items-center gap-1.5 rounded-lg text-xs text-lmu-text-soft hover:bg-lmu-raised cursor-pointer ${FOCUS_RING}`}>
-      <Layers className="w-3.5 h-3.5" />Layers
+      className={`w-7 h-7 flex items-center justify-center rounded-lg bg-lmu-raised/40 hover:bg-lmu-raised text-lmu-muted hover:text-lmu-text transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}>
+      <Layers className="w-3.5 h-3.5" />
     </button>
     {open && <div ref={panel} id={id} aria-label="Map layers" role="group"
       className="absolute top-full right-0 mt-2 w-56 max-h-[calc(100dvh-100px)] overflow-y-auto overscroll-contain p-3 bg-lmu-card border border-lmu-border rounded-lg shadow-lg z-40">

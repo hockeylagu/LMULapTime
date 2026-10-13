@@ -172,11 +172,11 @@ describe('GpsCircuitMinimap', () => {
       <GpsCircuitMinimap trackBoundaryPathD={mockBoundaryPathD} isExpanded={false} />
     );
     const minimap = container.querySelector('[data-testid="gps-circuit-minimap"]');
-    expect(minimap).toHaveClass('w-28');
+    expect(minimap).toHaveClass('w-36');
 
     rerender(
       <GpsCircuitMinimap trackBoundaryPathD={mockBoundaryPathD} isExpanded={true} />
     );
-    expect(minimap).toHaveClass('w-48', 'sm:w-56', 'md:w-64');
+    expect(minimap).toHaveClass('w-52', 'sm:w-60', 'md:w-64');
   });
 });

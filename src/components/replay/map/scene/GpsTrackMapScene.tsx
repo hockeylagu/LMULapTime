@@ -22,7 +22,7 @@ import { GpsMapExpandedOverlays } from '../display/GpsMapExpandedOverlays.js';
 import { MapScaleBar } from '../display/MapScaleBar.js';
 import { useMapDisplay } from '../display/useMapDisplay.js';
 import { activeTrackBounds } from '../display/mapLayers.js';
-import { useMapLayers, projectedPointBounds } from '../display/useMapLayers.js';
+import { useMapLayers } from '../display/useMapLayers.js';
 import { useTrackBoundaryGeometry } from '../useTrackBoundaryGeometry.js';
 import { usePlaybackPosition } from '../../inspector/replayPlaybackCursor.js';
 import { useGpsMapShortcuts } from '../useGpsMapShortcuts.js';
@@ -100,7 +100,12 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
     [effectiveGeometry, effectiveBounds]
   );
 
-  const camera = useGpsMapPanZoom({ viewBoxSize: VIEWBOX_SIZE, currentPos });
+  const camera = useGpsMapPanZoom({
+    viewBoxSize: VIEWBOX_SIZE,
+    currentPos,
+    initialZoom: props.initialZoom,
+    initialFollowCar: props.initialFollowCar,
+  });
   const { zoomLevel, containerRef, currentViewBox, handlePointerDown, handlePointerMove,
     handlePointerUp, handleDoubleClick, resetPanZoom, focusOnPoint, markerScale } = camera;
   useGpsMapShortcuts({
@@ -117,15 +122,15 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
     onPan: camera.panBy,
   });
   const cullViewBox = useStableCullViewBox(currentViewBox, zoomLevel >= 2.5);
-  const fittedLayout = useRef<string | null>(null);
+  const lastLayoutKeyRef = useRef<string | null>(null);
   useEffect(() => {
     const key = effectiveGeometry?.layoutKey ?? null;
-    if (!key || fittedLayout.current === key) return;
-    fittedLayout.current = key;
-    const points = leftSvgPoints.length && rightSvgPoints.length ? [...leftSvgPoints, ...rightSvgPoints] : svgPoints;
-    const rectangle = projectedPointBounds(points);
-    if (rectangle) camera.fitBounds(rectangle);
-  }, [effectiveGeometry?.layoutKey, leftSvgPoints, rightSvgPoints, svgPoints, camera]);
+    if (!key || lastLayoutKeyRef.current === key) return;
+    if (lastLayoutKeyRef.current !== null) {
+      resetPanZoom();
+    }
+    lastLayoutKeyRef.current = key;
+  }, [effectiveGeometry?.layoutKey, resetPanZoom]);
 
   const pathD = useMemo(() => buildContinuousSvgPath(svgPoints), [svgPoints]);
   const isStationary = useMemo(() => ((effectiveBounds?.spanX ?? 0) < 25 && (effectiveBounds?.spanZ ?? 0) < 25) || (points.length > 0 && points.every(p => (p.speedKmh || 0) <= 1)), [effectiveBounds, points]);

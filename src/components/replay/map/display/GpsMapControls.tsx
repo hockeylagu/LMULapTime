@@ -32,7 +32,7 @@ export const GpsMapControls: React.FC<Props> = ({ camera, layers, onChange, geom
   const fit = (points: Point[]) => { const rectangle = projectedPointBounds(points); if (rectangle) camera.fitBounds(rectangle); };
   const active = left.length && right.length ? [...left, ...right] : trajectory;
   const shouldShowPlayPause = showPlayPause ?? Boolean(isExpanded);
-  return <MapControlsOverlay onZoomIn={camera.zoomIn} onZoomOut={camera.zoomOut} onReset={() => fit(active)}
+  return <MapControlsOverlay onZoomIn={camera.zoomIn} onZoomOut={camera.zoomOut} onReset={camera.resetPanZoom}
     zoomDisplay={`${Number(camera.zoomLevel.toFixed(1))}x`} followCar={camera.followCar}
     onToggleFollowCar={() => camera.setFollowCar(value => !value)} onCenterCar={camera.centerOnCar}
     isPlaying={isPlaying} onTogglePlay={shouldShowPlayPause ? onTogglePlay : undefined}

@@ -9,8 +9,8 @@ describe('useGpsMapPanZoom', () => {
     act(() => result.current.setFollowCar(true));
     act(() => result.current.panBy(1, -1));
     expect(result.current.followCar).toBe(false);
-    expect(result.current.panOffset.x).toBeCloseTo(203.333);
-    expect(result.current.panOffset.y).toBeCloseTo(-353.333);
+    expect(result.current.panOffset.x).toBeCloseTo(158.889);
+    expect(result.current.panOffset.y).toBeCloseTo(-308.889);
     const view = result.current.currentViewBox;
     rerender({ position: { sx: 600, sy: 150 } });
     expect(result.current.currentViewBox).toBe(view);
@@ -63,18 +63,18 @@ describe('useGpsMapPanZoom', () => {
     expect(result.current.currentViewBox).toBe(view);
   });
 
-  it('initializes at zoomLevel=1 and computes default viewBox with BASE_ZOOM=1.5', () => {
+  it('initializes at zoomLevel=6, followCar=true and computes default viewBox with BASE_ZOOM=1.5', () => {
     const { result } = renderHook(() =>
       useGpsMapPanZoom({ viewBoxSize: 800, currentPos: { sx: 400, sy: 400 } })
     );
 
-    expect(result.current.zoomLevel).toBe(1);
-    expect(result.current.followCar).toBe(false);
+    expect(result.current.zoomLevel).toBe(6);
+    expect(result.current.followCar).toBe(true);
 
-    // Visible size is 800 / (1 * 1.5) = 533.3
+    // Visible size is 800 / (6 * 1.5) = 88.889
     const [, , vw, vh] = result.current.currentViewBox.split(' ').map(Number);
-    expect(vw).toBeCloseTo(533.3, 0);
-    expect(vh).toBeCloseTo(533.3, 0);
+    expect(vw).toBeCloseTo(88.9, 0);
+    expect(vh).toBeCloseTo(88.9, 0);
   });
 
   it('zooms in and zooms out with zoomIn and zoomOut controls', () => {
@@ -85,16 +85,16 @@ describe('useGpsMapPanZoom', () => {
     act(() => {
       result.current.zoomIn();
     });
-    expect(result.current.zoomLevel).toBe(2);
+    expect(result.current.zoomLevel).toBe(7.5);
 
     act(() => {
       result.current.zoomOut();
     });
-    expect(result.current.zoomLevel).toBe(1);
+    expect(result.current.zoomLevel).toBe(6);
   });
 
   it('crosses the overview zoom threshold in both directions', () => {
-    const { result } = renderHook(() => useGpsMapPanZoom({ viewBoxSize: 800 }));
+    const { result } = renderHook(() => useGpsMapPanZoom({ viewBoxSize: 800, initialZoom: 1 }));
     act(() => result.current.zoomOut());
     expect(result.current.zoomLevel).toBe(0.9);
     act(() => result.current.zoomIn());
@@ -115,12 +115,13 @@ describe('useGpsMapPanZoom', () => {
       result.current.zoomIn();
       result.current.zoomIn();
     });
-    expect(result.current.zoomLevel).toBe(3);
+    expect(result.current.zoomLevel).toBe(10);
 
     act(() => {
       result.current.resetPanZoom();
     });
-    expect(result.current.zoomLevel).toBe(1);
+    expect(result.current.zoomLevel).toBe(6);
+    expect(result.current.followCar).toBe(true);
   });
 
   it('focuses on a specific target coordinate with focusOnPoint', () => {
@@ -188,7 +189,7 @@ describe('useGpsMapPanZoom', () => {
 
   it('zooms in centered at the cursor coordinates with zoomAtCoords / handleDoubleClick', () => {
     const { result } = renderHook(() =>
-      useGpsMapPanZoom({ viewBoxSize: 800, currentPos: { sx: 400, sy: 400 } })
+      useGpsMapPanZoom({ viewBoxSize: 800, currentPos: { sx: 400, sy: 400 }, initialZoom: 1, initialFollowCar: false })
     );
 
     // Mock DOM container
@@ -242,16 +243,13 @@ describe('useGpsMapPanZoom', () => {
       useGpsMapPanZoom({ viewBoxSize: 800, currentPos: carPos })
     );
 
-    act(() => {
-      result.current.setFollowCar(true);
-    });
     expect(result.current.followCar).toBe(true);
 
     // Zoom in with + button
     act(() => {
       result.current.zoomIn();
     });
-    expect(result.current.zoomLevel).toBe(2);
+    expect(result.current.zoomLevel).toBe(7.5);
     expect(result.current.followCar).toBe(true);
     const [vx1, vy1, vw1, vh1] = result.current.currentViewBox.split(' ').map(Number);
     expect(vx1 + vw1 / 2).toBeCloseTo(carPos.sx, 0);
@@ -261,7 +259,7 @@ describe('useGpsMapPanZoom', () => {
     act(() => {
       result.current.zoomOut();
     });
-    expect(result.current.zoomLevel).toBe(1);
+    expect(result.current.zoomLevel).toBe(6);
     expect(result.current.followCar).toBe(true);
     const [vx2, vy2, vw2, vh2] = result.current.currentViewBox.split(' ').map(Number);
     expect(vx2 + vw2 / 2).toBeCloseTo(carPos.sx, 0);

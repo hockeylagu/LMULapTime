@@ -159,6 +159,7 @@ describe('GpsTrackMapScene overlays and geometry', () => {
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
+        initialZoom={1}
         corners={[
           { cornerNumber: 1, minDistM: 0 },
           { cornerNumber: 2, minDistM: 8 },
@@ -216,6 +217,8 @@ describe('GpsTrackMapScene overlays and geometry', () => {
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
+        initialZoom={1}
+        initialFollowCar={false}
       />
     );
 
@@ -273,7 +276,7 @@ describe('GpsTrackMapScene overlays and geometry', () => {
     const svgEl = container.querySelector('[data-testid="gps-map-scene"]');
     expect(svgEl).toBeInTheDocument();
     const defaultViewBox = svgEl?.getAttribute('viewBox');
-    expect(screen.getByText('1x')).toBeInTheDocument();
+    expect(screen.getByText('6x')).toBeInTheDocument();
 
     // Select Corner 1
     rerender(
@@ -306,7 +309,7 @@ describe('GpsTrackMapScene overlays and geometry', () => {
     );
 
     // Resets back to 1x
-    expect(screen.getByText('1x')).toBeInTheDocument();
+    expect(screen.getByText('6x')).toBeInTheDocument();
     expect(svgEl?.getAttribute('viewBox')).toEqual(defaultViewBox);
   });
 
@@ -558,6 +561,7 @@ describe('GpsTrackMapScene overlays and geometry', () => {
         baselinePoints={line(11, 1.05)}
         bounds={bounds}
         currentIndex={0}
+        initialZoom={1}
         trackLengthM={1000}
         pedalMarkers={[{ cornerNumber: 1, distM: 30, kind: 'brake', isBaseline: true }]}
         showPedalMarkers={true}

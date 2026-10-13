@@ -4,6 +4,8 @@ import { isReplaySurfaceTarget, replayShortcutBlocked } from '../../../utils/rep
 export interface UseGpsMapPanZoomOptions {
   viewBoxSize: number;
   currentPos?: { sx: number; sy: number };
+  initialZoom?: number;
+  initialFollowCar?: boolean;
 }
 
 const MAX_ZOOM = 100;
@@ -26,12 +28,19 @@ function getNextZoom(current: number, direction: 1 | -1, steps = 1): number {
   return result;
 }
 
+export const DEFAULT_ZOOM = 6;
+export const DEFAULT_FOLLOW_CAR = true;
 export const BASE_ZOOM = 1.5;
 
-export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOptions) {
-  const [zoomLevel, setZoomLevel] = useState<number>(1);
+export function useGpsMapPanZoom({
+  viewBoxSize,
+  currentPos,
+  initialZoom = DEFAULT_ZOOM,
+  initialFollowCar = DEFAULT_FOLLOW_CAR,
+}: UseGpsMapPanZoomOptions) {
+  const [zoomLevel, setZoomLevel] = useState<number>(initialZoom);
   const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const [followCar, setFollowCar] = useState<boolean>(false);
+  const [followCar, setFollowCar] = useState<boolean>(initialFollowCar);
   const isDraggingRef = useRef<boolean>(false);
   const hasPannedRef = useRef<boolean>(false);
   const dragStartRef = useRef<{
@@ -182,7 +191,7 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
 
   const handleDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
-    if ((e.target as HTMLElement).closest('button, [data-testid="minimap-container"]')) return;
+    if ((e.target as HTMLElement).closest('button, [data-testid="minimap-container"], [data-testid="gps-circuit-minimap"]')) return;
     e.preventDefault();
     zoomAtCoords(e.clientX, e.clientY, 1, 2);
   };
@@ -201,18 +210,18 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
       const nextZoom = getNextZoom(currentZoom, e.deltaY < 0 ? 1 : -1);
       if (nextZoom === currentZoom) return;
 
+      // If in follow-car mode, wheel zoom stays centered on the car and preserves followCar
+      if (followCarRef.current && currentPosRef.current) {
+        zoomLevelRef.current = nextZoom;
+        setZoomLevel(nextZoom);
+        return;
+      }
+
       if (nextZoom === 1) {
         zoomLevelRef.current = 1;
         panOffsetRef.current = { x: 0, y: 0 };
         setZoomLevel(1);
         setPanOffset({ x: 0, y: 0 });
-        return;
-      }
-
-      // If in follow-car mode, wheel zoom stays centered on the car and preserves followCar
-      if (followCarRef.current && currentPosRef.current) {
-        zoomLevelRef.current = nextZoom;
-        setZoomLevel(nextZoom);
         return;
       }
 
@@ -225,7 +234,7 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
-    if ((e.target as HTMLElement).closest('button, [data-testid="minimap-container"], [data-testid="map-controls-overlay"]')) return;
+    if ((e.target as HTMLElement).closest('button, [data-testid="minimap-container"], [data-testid="gps-circuit-minimap"], [data-testid="map-controls-overlay"]')) return;
     containerRef.current?.focus?.({ preventScroll: true });
     isDraggingRef.current = true;
     hasPannedRef.current = false;
@@ -281,10 +290,10 @@ export function useGpsMapPanZoom({ viewBoxSize, currentPos }: UseGpsMapPanZoomOp
   };
 
   const resetPanZoom = () => {
-    setZoomLevel(1);
+    setZoomLevel(initialZoom);
     setPanOffset({ x: 0, y: 0 });
-    setFollowCar(false);
-    followCarRef.current = false;
+    setFollowCar(initialFollowCar);
+    followCarRef.current = initialFollowCar;
     autoFollowOnScrubRef.current = true;
   };
 

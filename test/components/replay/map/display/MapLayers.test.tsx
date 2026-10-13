@@ -204,12 +204,14 @@ describe('GPS map display layers', () => {
     const panel = openLayers();
     fireEvent.wheel(panel, { deltaY: -120 });
     expect(mapSvg?.getAttribute('viewBox')).toBe(original);
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Runoff and other roads' }));
-    expect(mapSvg?.getAttribute('viewBox')).toBe(original);
-    fireEvent.click(screen.getByRole('button', { name: 'Fit visible layers' }));
-    expect(mapSvg?.getAttribute('viewBox')).not.toBe(original);
     fireEvent.click(screen.getByRole('button', { name: 'Fit track' }));
-    expect(mapSvg?.getAttribute('viewBox')).toBe(original);
+    const trackFitted = mapSvg?.getAttribute('viewBox');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Runoff and other roads' }));
+    expect(mapSvg?.getAttribute('viewBox')).toBe(trackFitted);
+    fireEvent.click(screen.getByRole('button', { name: 'Fit visible layers' }));
+    expect(mapSvg?.getAttribute('viewBox')).not.toBe(trackFitted);
+    fireEvent.click(screen.getByRole('button', { name: 'Fit track' }));
+    expect(mapSvg?.getAttribute('viewBox')).toBe(trackFitted);
   });
 
   it('persists layer choices, restores defaults, and keeps the UI working when storage fails', () => {

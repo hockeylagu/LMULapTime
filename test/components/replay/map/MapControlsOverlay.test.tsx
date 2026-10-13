@@ -23,7 +23,7 @@ describe('MapControlsOverlay', () => {
 
     const centerButton = screen.getByRole('button', { name: /center car/i });
     expect(centerButton).toBeInTheDocument();
-    expect(centerButton).toHaveAttribute('title', 'Center car · C');
+    expect(centerButton).toHaveAttribute('title', 'Center car (C)');
     expect(centerButton.querySelector('svg')).toBeInTheDocument();
 
     // No visible text label inside the button (icon-only to avoid taking too much space)
@@ -50,7 +50,7 @@ describe('MapControlsOverlay', () => {
     );
 
     const followButton = screen.getByRole('button', { name: /follow car/i });
-    expect(followButton).toHaveAttribute('title', 'Follow car · F');
+    expect(followButton).toHaveAttribute('title', 'Follow car (F)');
     expect(followButton).toHaveAttribute('aria-pressed', 'false');
 
     fireEvent.click(followButton);
@@ -66,7 +66,7 @@ describe('MapControlsOverlay', () => {
 
     expect(screen.getByRole('button', { name: /follow car/i })).toHaveAttribute(
       'title',
-      'Follow car · F (active)'
+      'Follow car (F) (active)'
     );
     expect(screen.getByRole('button', { name: /follow car/i })).toHaveAttribute(
       'aria-pressed',
@@ -91,7 +91,7 @@ describe('MapControlsOverlay', () => {
 
     const playButton = screen.getByRole('button', { name: 'Play' });
     expect(playButton).toBeInTheDocument();
-    expect(playButton).toHaveAttribute('title', 'Play · Space');
+    expect(playButton).toHaveAttribute('title', 'Play (Space)');
 
     fireEvent.click(playButton);
     expect(onTogglePlay).toHaveBeenCalledTimes(1);
@@ -102,7 +102,7 @@ describe('MapControlsOverlay', () => {
 
     const pauseButton = screen.getByRole('button', { name: 'Pause' });
     expect(pauseButton).toBeInTheDocument();
-    expect(pauseButton).toHaveAttribute('title', 'Pause · Space');
+    expect(pauseButton).toHaveAttribute('title', 'Pause (Space)');
 
     fireEvent.click(pauseButton);
     expect(onTogglePlay).toHaveBeenCalledTimes(2);

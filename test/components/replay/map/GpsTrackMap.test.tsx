@@ -137,6 +137,7 @@ describe('GpsTrackMapScene', () => {
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
+        initialZoom={1}
         corners={[{ cornerNumber: 1, minDistM: 0 }, { cornerNumber: 2, minDistM: 100 }]}
       />
     );
@@ -163,6 +164,7 @@ describe('GpsTrackMapScene', () => {
         points={cornerPoints}
         bounds={bounds}
         currentIndex={0}
+        initialZoom={1}
         corners={[{ cornerNumber: 1, minDistM: cornerDist }]}
       />
     );
@@ -227,6 +229,7 @@ describe('GpsTrackMapScene', () => {
         points={mockPoints}
         bounds={mockBounds}
         currentIndex={0}
+        initialZoom={1}
         corners={[{ cornerNumber: 1, minDistM: 0 }]}
       />
     );
@@ -271,7 +274,7 @@ describe('GpsTrackMapScene', () => {
     const zoomInBtn = screen.getByTitle(/Zoom in/i);
     const zoomOutBtn = screen.getByTitle(/Zoom out/i);
     const resetBtn = screen.getByTitle(/Reset view/i);
-    const zoomText = screen.getByText('1x');
+    const zoomText = screen.getByText('6x');
 
     // Fixed dimensions ensure buttons do not jump or resize as digits expand
     expect(zoomInBtn.className).toContain('w-7');
@@ -292,7 +295,7 @@ describe('GpsTrackMapScene', () => {
 
     // Zooming in updates zoom text while preserving the fixed class layout
     fireEvent.click(zoomInBtn);
-    expect(screen.getByText('2x')).toBeInTheDocument();
+    expect(screen.getByText('7.5x')).toBeInTheDocument();
   });
 
   it('zooms in where the cursor is when double clicking on the map container', () => {
@@ -304,7 +307,7 @@ describe('GpsTrackMapScene', () => {
       />
     );
 
-    expect(screen.getByText('1x')).toBeInTheDocument();
+    expect(screen.getByText('6x')).toBeInTheDocument();
 
     const mapContainer = container.firstElementChild;
     expect(mapContainer).toBeInTheDocument();
@@ -312,12 +315,12 @@ describe('GpsTrackMapScene', () => {
     // Double click at (200, 300)
     fireEvent.doubleClick(mapContainer!, { clientX: 200, clientY: 300, button: 0 });
 
-    // Zoom level increases to 3x (double click advances 2 steps)
-    expect(screen.getByText('3x')).toBeInTheDocument();
+    // Zoom level increases to 10x (double click advances 2 steps: 6 -> 7.5 -> 10)
+    expect(screen.getByText('10x')).toBeInTheDocument();
 
-    // Wheel scroll remains single step (3x -> 4.5x)
+    // Wheel scroll remains single step (10x -> 12.5x)
     fireEvent.wheel(mapContainer!, { deltaY: -100, clientX: 200, clientY: 300 });
-    expect(screen.getByText('4.5x')).toBeInTheDocument();
+    expect(screen.getByText('12.5x')).toBeInTheDocument();
   });
 
   it('keeps follow car mode active when clicking plus and minus zoom buttons', () => {
@@ -330,11 +333,6 @@ describe('GpsTrackMapScene', () => {
     );
 
     const followBtn = getByRole('button', { name: 'Follow car' });
-    expect(followBtn).toHaveAttribute('aria-pressed', 'false');
-
-    // Activate follow car mode
-    fireEvent.pointerDown(followBtn, { button: 0 });
-    fireEvent.click(followBtn);
     expect(followBtn).toHaveAttribute('aria-pressed', 'true');
 
     const zoomInBtn = getByRole('button', { name: 'Zoom in' });
@@ -343,14 +341,14 @@ describe('GpsTrackMapScene', () => {
     // Click Zoom In
     fireEvent.pointerDown(zoomInBtn, { button: 0 });
     fireEvent.click(zoomInBtn);
-    expect(getByText('2x')).toBeInTheDocument();
+    expect(getByText('7.5x')).toBeInTheDocument();
     // Follow car must remain active!
     expect(followBtn).toHaveAttribute('aria-pressed', 'true');
 
     // Click Zoom Out
     fireEvent.pointerDown(zoomOutBtn, { button: 0 });
     fireEvent.click(zoomOutBtn);
-    expect(getByText('1x')).toBeInTheDocument();
+    expect(getByText('6x')).toBeInTheDocument();
     // Follow car must remain active!
     expect(followBtn).toHaveAttribute('aria-pressed', 'true');
   });
