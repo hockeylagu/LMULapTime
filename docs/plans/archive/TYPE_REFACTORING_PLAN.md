@@ -1,5 +1,21 @@
 # 🏎️ TypeScript Type Refactoring & Simplification Plan
 
+**Status: Completed 2026-10-12.** Phases 1–7 are on main (`7cc9717c`, `bfa88743`, `33ae4f10`). The real cache
+was rewritten offline by `rewrite-db-names.cjs` (kept outside the repo, with a pre-rewrite backup) and the app was
+checked against it. `test/domain/retiredNames.test.ts` keeps retired names out of the source and the server SQL.
+Paths, test totals and commands below are historical; the current names are described in [CODE_MAP](../../CODE_MAP.md).
+
+Follow-ups on the same day, found while validating the refactor (some were already on origin/main):
+
+- Session detail selects drivers again: `readSession` sets each driver's and lap's ordinal.
+- Data packages publish the app's canonical classes (`Hyper`, `GT3`, …) and the app reads them as published.
+  Replay driver lists keep the car name the sessions use; the package supplies only the class and dimensions.
+- The replay compare picker sorts and filters on the server, across pages. "vs your best" is one exact
+  server request, and the client no longer filters the server's pages a second time.
+- The track improvement chart receives the whole progression, not one 200-session page.
+- Compare page bests come only from the server's exact bests, and pace only from the class benchmark,
+  never from the laps of the current page.
+
 This plan outlines the systematic cleanup of TypeScript types across the **Le Mans Ultimate Lap Time Analyzer** codebase. It targets redundant duplicate models, unnecessary 1:1 type indirections, confusing name collisions, and disparate property names that represent identical domain concepts.
 
 ---
@@ -55,26 +71,26 @@ Eliminate 1:1 type aliases that add zero abstraction and cause split imports acr
 
 ### 1.1 Remove Unused & Redundant Component Aliases
 - [x] **Remove `TrackSummaryData`**:
-  - File: [`src/components/track-summaries/TrackSummaries.tsx`](../src/components/track-summaries/TrackSummaries.tsx)
+  - File: [`src/components/track-summaries/TrackSummaries.tsx`](../../../src/components/track-summaries/TrackSummaries.tsx)
   - Action: Delete `export type TrackSummaryData = TrackSummary;` (completely unused in repo).
 - [x] **Remove `GpsTrackMapSceneProps`**:
-  - File: [`src/components/replay/map/gpsTrackMapTypes.ts`](../src/components/replay/map/gpsTrackMapTypes.ts)
+  - File: [`src/components/replay/map/gpsTrackMapTypes.ts`](../../../src/components/replay/map/gpsTrackMapTypes.ts)
   - Action: Delete `export type GpsTrackMapSceneProps = GpsTrackMapProps;`.
-  - In [`src/components/replay/map/scene/GpsTrackMapScene.tsx`](../src/components/replay/map/scene/GpsTrackMapScene.tsx), import and use `GpsTrackMapProps`.
+  - In [`src/components/replay/map/scene/GpsTrackMapScene.tsx`](../../../src/components/replay/map/scene/GpsTrackMapScene.tsx), import and use `GpsTrackMapProps`.
 - [x] **Remove `SceneCornerMarker`**:
-  - File: [`src/components/replay/map/scene/GpsSceneMarkers.tsx`](../src/components/replay/map/scene/GpsSceneMarkers.tsx)
+  - File: [`src/components/replay/map/scene/GpsSceneMarkers.tsx`](../../../src/components/replay/map/scene/GpsSceneMarkers.tsx)
   - Action: Delete `export type SceneCornerMarker = CornerMarkerPoint;`.
   - Use `CornerMarkerPoint` for `markers?: CornerMarkerPoint[]`.
 
 ### 1.2 Unify `ReplayTelemetryPoint` → `ReplayTrajectoryPoint`
-- [x] In [`shared/types/replay.ts`](../shared/types/replay.ts), remove the `ReplayTelemetryPoint` alias.
+- [x] In [`shared/types/replay.ts`](../../../shared/types/replay.ts), remove the `ReplayTelemetryPoint` alias.
 - [x] Update consumers across `src/components/replay/telemetry/channels/*`, `test/components/replay/*`, and related map utilities to import `ReplayTrajectoryPoint` directly.
-- [x] Fix [`TelemetrySteerChannel.tsx`](../src/components/replay/telemetry/channels/inputs/TelemetrySteerChannel.tsx) to import the canonical type once.
+- [x] Fix [`TelemetrySteerChannel.tsx`](../../../src/components/replay/telemetry/channels/inputs/TelemetrySteerChannel.tsx) to import the canonical type once.
 
 ### 1.3 Decommission `server/core/types.ts` Pass-Through Barrel
 Per `AGENTS.md` (*"Do not import and re-export symbols without an architectural reason. Import directly from defining modules; do not leave pass-through barrels or re-export shims. The sole approved barrel is shared/types/index.ts"*):
 - [x] Update callers across `server/`, `test/`, and analysis tools importing from `server/core/types.js` to import directly from `shared/types/index.js` or `server/telemetry/duckdbTypes.js`.
-- [x] Remove [`server/core/types.ts`](../server/core/types.ts).
+- [x] Remove [`server/core/types.ts`](../../../server/core/types.ts).
 
 **Verification Gate 1**: Run `npm test` and `npm run build`. Verify zero errors and zero warnings.
 
@@ -85,7 +101,7 @@ Per `AGENTS.md` (*"Do not import and re-export symbols without an architectural 
 Eliminate exact type duplications and establish canonical definitions for repeated inline unions.
 
 ### 2.1 Deduplicate `TimingGateGeometry` & Inlined `timingGates`
-- [x] In [`shared/types/trackGeometry.ts`](../shared/types/trackGeometry.ts):
+- [x] In [`shared/types/trackGeometry.ts`](../../../shared/types/trackGeometry.ts):
   - Retain `TimingGateGeometry`.
   - Add `TrackTimingGates`:
     ```ts
@@ -96,13 +112,13 @@ Eliminate exact type duplications and establish canonical definitions for repeat
     }
     ```
   - Update `TrackBoundaryGeometry` to use `timingGates?: TrackTimingGates;` instead of inlining the anonymous shape.
-- [x] In [`shared/types/replay.ts`](../shared/types/replay.ts):
+- [x] In [`shared/types/replay.ts`](../../../shared/types/replay.ts):
   - Remove duplicate `TimingGateGeometry` and `TrackTimingGates` definitions.
   - Import `TimingGateGeometry` and `TrackTimingGates` from `./trackGeometry.js`.
 
 ### 2.2 Canonical `WeatherCondition` Type
 The union `'Dry' | 'Wet' | 'Dynamic Weather'` is duplicated inline in 6 locations.
-- [x] In [`shared/types/session.ts`](../shared/types/session.ts), export:
+- [x] In [`shared/types/session.ts`](../../../shared/types/session.ts), export:
   ```ts
   export type WeatherCondition = 'Dry' | 'Wet' | 'Dynamic Weather';
   ```
@@ -114,13 +130,13 @@ The union `'Dry' | 'Wet' | 'Dynamic Weather'` is duplicated inline in 6 location
   - `ComparableLap.weatherCondition`
   - `ReplayFileEntry.weatherCondition`
 - [x] Remove ad-hoc type lookups:
-  - Delete `type WeatherCondition = NonNullable<ComparableLap['weatherCondition']>;` in [`ReplayCompareLapPicker.tsx`](../src/components/replay/inspector/compare/ReplayCompareLapPicker.tsx#L10).
-  - Delete `export type LapCondition = NonNullable<ComparableLap['weatherCondition']>;` in [`lapPickerModel.ts`](../src/components/leaderboard/picker/lapPickerModel.ts#L5) and import `WeatherCondition`.
+  - Delete `type WeatherCondition = NonNullable<ComparableLap['weatherCondition']>;` in [`ReplayCompareLapPicker.tsx`](../../../src/components/replay/inspector/compare/ReplayCompareLapPicker.tsx#L10).
+  - Delete `export type LapCondition = NonNullable<ComparableLap['weatherCondition']>;` in [`lapPickerModel.ts`](../../../src/components/leaderboard/picker/lapPickerModel.ts#L5) and import `WeatherCondition`.
 
 ### 2.3 Resolve `SessionProgressionPoint` Shadowing
-- [x] In [`shared/types/session.ts`](../shared/types/session.ts):
+- [x] In [`shared/types/session.ts`](../../../shared/types/session.ts):
   - Add optional `bestLapWet?: boolean`, `benchmarkCategory?: PaceCategory | null`, and `benchmarkPercentage?: number | null` directly to the canonical `SessionProgressionPoint`.
-- [x] In [`src/components/track-detail/improvement-chart/improvementChartTypes.ts`](../src/components/track-detail/improvement-chart/improvementChartTypes.ts):
+- [x] In [`src/components/track-detail/improvement-chart/improvementChartTypes.ts`](../../../src/components/track-detail/improvement-chart/improvementChartTypes.ts):
   - Remove the shadowed local `SessionProgressionPoint` interface.
   - Re-export or directly use `SessionProgressionPoint` from `shared/types/session.js`.
 
@@ -136,22 +152,22 @@ The union `'Dry' | 'Wet' | 'Dynamic Weather'` is duplicated inline in 6 location
 Eliminate redundant properties on core models that force defensive runtime fallback code.
 
 ### 3.1 Clean Up `DriverData.name` vs `DriverData.driverName`
-- [x] In [`shared/types/session.ts`](../shared/types/session.ts#L124-L174):
+- [x] In [`shared/types/session.ts`](../../../shared/types/session.ts#L124-L174):
   - Remove `driverName?: string` from `DriverData` (keeping canonical `name: string`).
-- [x] In [`server/sessions/parser.ts`](../server/sessions/parser.ts#L529):
+- [x] In [`server/sessions/parser.ts`](../../../server/sessions/parser.ts#L529):
   - Remove redundant `driverName: d.name` assignment.
 - [x] In `server/replay/decode/replayTransforms.ts`, `server/replay/replayTrajectoryService.ts`, and `server/routes/replayRoutes.ts`:
   - Simplify `matchedDriver.driverName || matchedDriver.name` to `matchedDriver.name`.
 
 ### 3.2 Clean Up `ReplaySummary` Dual Fields
-[`ReplaySummary`](../shared/types/replay.ts#L348-L354) currently carries both `sizeBytes` AND `fileSizeBytes?`, plus `mtime` AND `mtimeMs?`.
+[`ReplaySummary`](../../../shared/types/replay.ts#L348-L354) currently carries both `sizeBytes` AND `fileSizeBytes?`, plus `mtime` AND `mtimeMs?`.
 - [x] Standardize `ReplaySummary` on:
   - `fileSizeBytes: number` (matching `ReplayMetadata` and `ReplayCacheSummary`) or strictly `sizeBytes: number`.
   - `mtimeMs: number` (matching `ReplayMetadata` and `ReplayCacheSummary`).
 - [x] Update call sites and remove the secondary optional fields.
 
 ### 3.3 Clarify `TrafficSpell.carName`
-- [x] In [`shared/types/raceTraffic.ts`](../shared/types/raceTraffic.ts#L30):
+- [x] In [`shared/types/raceTraffic.ts`](../../../shared/types/raceTraffic.ts#L30):
   - Document or rename `carName` to `driverName` (since it contains `other.info?.name`, the driver's name, or `"Car <slot>"`).
 
 **Verification Gate 3**: Run `npm test` and `npm run build`.
@@ -162,17 +178,17 @@ The `session_drivers.driver_name` column and the `driverName` driver property ar
 
 ## Phase 4: Session Summary Model Consolidation
 
-Consolidate the 8 diverging session summary variants down to the canonical projection [`SessionCard`](../shared/types/sessionSummaries.ts#L51).
+Consolidate the 8 diverging session summary variants down to the canonical projection [`SessionCard`](../../../shared/types/sessionSummaries.ts#L51).
 
 ### 4.1 Unify Frontend Session Types
-- [x] Replace `SessionListItem` in [`src/components/session-list/sessionListTypes.ts`](../src/components/session-list/sessionListTypes.ts) with `SessionCard`.
-- [x] Replace `SessionSummary` in [`src/components/dashboard/dashboardTypes.ts`](../src/components/dashboard/dashboardTypes.ts) with `SessionCard`; remove the local dashboard-only model.
-- [x] Replace `SessionMeta` in [`src/components/track-detail/trackDetailHelpers.ts`](../src/components/track-detail/trackDetailHelpers.ts) with `SessionCard`.
-- [x] In [`shared/domain/trackSummaryUtils.ts`](../shared/domain/trackSummaryUtils.ts), derive the minimal aggregation input from canonical `SessionMetadata` and `DriverData` fields while retaining its detailed-driver fallback.
+- [x] Replace `SessionListItem` in [`src/components/session-list/sessionListTypes.ts`](../../../src/components/session-list/sessionListTypes.ts) with `SessionCard`.
+- [x] Replace `SessionSummary` in [`src/components/dashboard/dashboardTypes.ts`](../../../src/components/dashboard/dashboardTypes.ts) with `SessionCard`; remove the local dashboard-only model.
+- [x] Replace `SessionMeta` in [`src/components/track-detail/trackDetailHelpers.ts`](../../../src/components/track-detail/trackDetailHelpers.ts) with `SessionCard`.
+- [x] In [`shared/domain/trackSummaryUtils.ts`](../../../shared/domain/trackSummaryUtils.ts), derive the minimal aggregation input from canonical `SessionMetadata` and `DriverData` fields while retaining its detailed-driver fallback.
 
 ### 4.2 Remove Ad-Hoc Union Helpers
-- [x] Delete `DashboardSessionItem = SessionSummary | DetailedSession` in [`src/components/dashboard/useDashboardMetrics.ts`](../src/components/dashboard/useDashboardMetrics.ts#L11) (use `SessionCard | DetailedSession`).
-- [x] Remove `CompareLapsSessionItem` in [`src/components/leaderboard/useCompareLapsData.ts`](../src/components/leaderboard/useCompareLapsData.ts#L30) and use `SessionCard | DetailedSession` directly.
+- [x] Delete `DashboardSessionItem = SessionSummary | DetailedSession` in [`src/components/dashboard/useDashboardMetrics.ts`](../../../src/components/dashboard/useDashboardMetrics.ts#L11) (use `SessionCard | DetailedSession`).
+- [x] Remove `CompareLapsSessionItem` in [`src/components/leaderboard/useCompareLapsData.ts`](../../../src/components/leaderboard/useCompareLapsData.ts#L30) and use `SessionCard | DetailedSession` directly.
 
 The dashboard and shared session-list surface retain a meaningful `SessionCard | DetailedSession` input where callers supply detailed sessions; neither type is coerced into the other. Tests now construct full canonical fixtures rather than weakening session contracts.
 
@@ -185,30 +201,30 @@ The dashboard and shared session-list surface retain a meaningful `SessionCard |
 Eliminate mapping glue functions that translate between synonymous property names across domain boundaries.
 
 ### 5.1 Standardize `isOutLap` (Deprecate `isOutlap`)
-- [x] In [`shared/types/replay.ts`](../shared/types/replay.ts#L218) (`ReplayLapSummary`), rename `isOutlap` to `isOutLap`.
-- [x] In [`shared/types/aiReport.ts`](../shared/types/aiReport.ts#L85) (`AiLapEvidence`), rename `isOutlap` to `isOutLap`.
+- [x] In [`shared/types/replay.ts`](../../../shared/types/replay.ts#L218) (`ReplayLapSummary`), rename `isOutlap` to `isOutLap`.
+- [x] In [`shared/types/aiReport.ts`](../../../shared/types/aiReport.ts#L85) (`AiLapEvidence`), rename `isOutlap` to `isOutLap`.
 - [x] In `server/replay/decode/replayLapBuilder.ts` and `replayLapClassification.ts`:
   - Rename internal `isOutlap` to `isOutLap`.
 - [x] Remove translation glue:
-  - In [`server/replay/decode/replayTransforms.ts`](../server/replay/decode/replayTransforms.ts): use the canonical `isOutLap` key while retaining boolean normalization of optional match data.
-  - In [`server/replay/replayMetadataService.ts`](../server/replay/replayMetadataService.ts): assign the canonical field directly.
+  - In [`server/replay/decode/replayTransforms.ts`](../../../server/replay/decode/replayTransforms.ts): use the canonical `isOutLap` key while retaining boolean normalization of optional match data.
+  - In [`server/replay/replayMetadataService.ts`](../../../server/replay/replayMetadataService.ts): assign the canonical field directly.
 
 ### 5.2 Standardize `isPitStop` (Deprecate `isPitLap`)
-- [x] In [`shared/types/sessionSummaries.ts#L9`](../shared/types/sessionSummaries.ts#L9) (`SessionLapProjection`), rename `isPitLap` to `isPitStop` (matching `LapData`, `ReplayLapSummary`, and `ComparableLap`).
+- [x] In [`shared/types/sessionSummaries.ts#L9`](../../../shared/types/sessionSummaries.ts#L9) (`SessionLapProjection`), rename `isPitLap` to `isPitStop` (matching `LapData`, `ReplayLapSummary`, and `ComparableLap`).
 
 ### 5.3 Align Metrics across Projections & Cards
-In [`server/core/sessionSummaries/cards.ts`](../server/core/sessionSummaries/cards.ts#L23-L35), eliminate rename glue:
+In [`server/core/sessionSummaries/cards.ts`](../../../server/core/sessionSummaries/cards.ts#L23-L35), eliminate rename glue:
 - [x] Standardize `maxSpeed` vs `maxTopSpeed`: use `maxTopSpeed` in `SessionDriverProjection` or `SessionCard`.
 - [x] Standardize `drivingTimeSum` vs `drivingTimeSeconds`: use `drivingTimeSeconds` consistently.
 - [x] Standardize `pitCount` vs `pitStopsCount`: use `pitStopsCount` consistently across projection and card.
 - [x] Standardize `topThreeAverage`: use `top3Average` across `SessionDriverProjection`, `SessionCard`, and `LeaderboardEntry`.
 
 ### 5.4 Align `carType` vs `carName`
-- [x] In [`DashboardLatestOuting`](../shared/types/dashboard.ts#L24) and [`DashboardRecentPacePoint`](../shared/types/dashboard.ts#L18), rename `carName` to `carType`.
-- [x] In [`server/core/sessionSummaries/dashboardQueries.ts`](../server/core/sessionSummaries/dashboardQueries.ts#L49), eliminate rename glue (`carName: player.carType`).
+- [x] In [`DashboardLatestOuting`](../../../shared/types/dashboard.ts#L24) and [`DashboardRecentPacePoint`](../../../shared/types/dashboard.ts#L18), rename `carName` to `carType`.
+- [x] In [`server/core/sessionSummaries/dashboardQueries.ts`](../../../server/core/sessionSummaries/dashboardQueries.ts#L49), eliminate rename glue (`carName: player.carType`).
 
 ### 5.5 Align `dateString` vs `timeString`
-- [x] In [`src/components/track-detail/trackDetailHelpers.ts#L75`](../src/components/track-detail/trackDetailHelpers.ts#L75):
+- [x] In [`src/components/track-detail/trackDetailHelpers.ts#L75`](../../../src/components/track-detail/trackDetailHelpers.ts#L75):
   Eliminate `dateString: s.timeString` glue by accepting `timeString` consistently across progression points.
 
 Stored replay JSON outlives the `.Vcr` files, so its keys were rewritten once by the offline script (Phase 6); the app keeps no read shim for `isOutlap`.

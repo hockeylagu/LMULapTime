@@ -44,7 +44,11 @@ remain unavailable, including measured widths, kerb profiles and banking.
 
 Vehicle catalogs contain `schemaVersion: 1`,
 `coordinates: "local-xz-metres-forward-minus-z"`, and a `vehicles` array.
-Each record has `id`, `model`, `carClass`, `vehicleIds`; optional
+Each record has `id`, `model`, `carClass`, `vehicleIds`. `carClass` must be one of the app's
+canonical classes (`Hyper`, `GT3`, `GTE`, `LMP2`, `LMP2_ELMS`, `LMP3`, `SafetyCar`), not LMU's VEH
+labels such as `LMGT3`: the app reads it as published and uses it as the replay driver's class.
+`model` only helps resolve a vehicle; the car name shown and filtered on stays the one the
+sessions record. Optional
 `dimensions` hold `lengthM`, `widthM`, `heightM`. Optional convex
 `outlineXZ` coordinates are metres with forward -Z. A validated
 `replayOriginOffsetXZ` establishes calibrated placement on replay poses. Without it,

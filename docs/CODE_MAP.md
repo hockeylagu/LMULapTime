@@ -5,13 +5,14 @@ this file holds the **routes through the code**. Keep it current (see "Keeping t
 
 Canonical domain contracts live in `shared/types/`; `shared/types/index.ts` is the approved barrel.
 Import server telemetry reader contracts directly from `server/telemetry/duckdbTypes.ts`.
-The type cleanup is tracked in [TYPE_REFACTORING_PLAN.md](TYPE_REFACTORING_PLAN.md), and its
+The type cleanup is tracked in [the archived type refactoring plan](plans/archive/TYPE_REFACTORING_PLAN.md), and its
 Phase 6 naming table.
 
-Last checked 2026-10-12 after the type refactoring: 472 TypeScript source files in src/server/shared,
-303 test suites (298 passed, 5 skipped), 2643 tests (2587 passed, 56 skipped). The full coverage suite
-and production build passed without warnings or errors. Coverage: 94.68% lines, 92.41% statements,
-92.64% functions and 83.77% branches. Branch/worktree results are separate; see [plans](plans/README.md).
+Last checked 2026-10-12 after the type refactoring follow-ups (main `25d1e988`): 476 TypeScript source files
+in src/server/shared, 305 test suites (300 passed, 5 skipped), 2663 tests (2607 passed, 56 skipped); the
+production build passed without warnings or errors. Coverage was last measured before those follow-ups:
+94.68% lines, 92.41% statements, 92.64% functions and 83.77% branches. Branch/worktree results are separate;
+see [plans](plans/README.md).
 
 ---
 
@@ -392,7 +393,7 @@ minimal input from canonical session and driver contracts. Dashboard trends use 
 directly, and chart progression uses `SessionProgressionPoint` from `shared/types/session.ts`.
 Replay samples use `ReplayTrajectoryPoint`, weather summaries use `WeatherCondition`, and timing gates
 use the geometry-owned `TimingGateGeometry` / `TrackTimingGates` contracts.
-One name per fact, in TypeScript and SQL (the table is in [TYPE_REFACTORING_PLAN.md](TYPE_REFACTORING_PLAN.md)):
+One name per fact, in TypeScript and SQL (the table is in [the archived type refactoring plan](plans/archive/TYPE_REFACTORING_PLAN.md)):
 `lapNumber` (`lap_number`; URL parameters `lapNumber` / `compareLapNumber`), `bestLapNumber`, `isOutLap`, `isPitStop`,
 `carType` (replay and telemetry metadata included), `avgLapTime`, `top3Average`, `paceCategory` / `pacePercentage`,
 `timeString` (the full session label; `sessionDay` is the day), `mtimeMs` / `fileSizeBytes` (`file_mtime_ms` / `file_size_bytes`).
@@ -546,10 +547,11 @@ the completed 2026-09-29 cleanup and does not describe all remaining findings.
 - Folders near 20 files (direct files, checked 2026-10-10): `shared/domain/`, `src/components/settings/`, `test/domain/` (19 each);
   `src/components/common/`, `src/utils/`, `test/utils/`, `test/components/replay/telemetry/` (18 each);
   `src/components/replay/inspector/` (17; comparison picker split into `compare/`).
-- Components near the 300-line limit: `ReplayCompareLapPicker.tsx` (292), `ReplayInspectorContent.tsx` (290),
-  `GpsTrackMapScene.tsx` (289), `ReplayInspectorModalBody.tsx` (276), `TelemetryPresetModal.tsx` (273), `GpsMapTelemetryHud.tsx` (272).
+- Components near the 300-line limit (rechecked 2026-10-12): `ReplayInspectorContent.tsx` (293), `GpsTrackMapScene.tsx` (289),
+  `ReplayInspectorModalBody.tsx` (286), `TelemetryPresetModal.tsx` (273), `GpsMapTelemetryHud.tsx` (272).
 
 **Logic in the wrong place / duplicated**
+- Two personal-best rules (open, 2026-10-12): the gold PB badge (`markPagePersonalBests` in `comparisonQueries.ts`) ranks every valid lap in any weather, while "vs your best" and `playerBestLap` use the dry, representative best, so they can point at different laps. Pick one rule before changing either.
 - [Completed frontend simplification audit](plans/archive/SRC_SIMPLIFICATION_AUDIT.md) (2026-10-12): removed 23 frontend export barrels, consolidated six wheel-channel SVG renderers and rules-dialog focus handling, extended the canonical progression type, removed a route forwarder, parsed dashboard dates once per session, and accumulated wheel-chart extrema in one pass per lap. Follow-up commits also reuse geometry-owned display payloads and remove remaining named re-exports, the phase-card barrel, and the map forwarder. Reviewed candidates retained by design and their constraints are recorded in the archived audit.
 - [Server repeated-work audit](plans/archive/SERVER_SMELLS_AUDIT.md): the 2026-10-12 passes fixed XML event ownership, moved superseded analytics to test helpers, centralized pace bands/read-time ratings, and rechecked replay work after ingestion optimization. Replay fixes cover worker coordination, bounded neighbor objects, one metadata snapshot, shared DuckDB preparation and batch weather reads. GPS boundary scanning now stays inside DuckDB with lap-scoped result transfer. Further whole-blob changes are out of scope.
 - Comparison queries now mark page PBs with one window query for the visible drivers (`markPagePersonalBests`), rather than one query per driver. The older 2026-10-10 ~127 ms all-driver measurement predates that implementation and was not rerun in this audit; profile current query plans before optimizing further.

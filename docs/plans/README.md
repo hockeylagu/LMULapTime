@@ -1,6 +1,6 @@
 # Plans and remaining work
 
-General review: 2026-10-10; replay storage/ingestion entries updated 2026-10-12. This is the entry point for delivery status;
+General review: 2026-10-10; replay storage/ingestion entries updated and type refactoring archived 2026-10-12. This is the entry point for delivery status;
 [CODE_MAP.md](../CODE_MAP.md) describes the implementation. A proposal is not a shipped feature.
 
 ## Active work
@@ -17,7 +17,7 @@ quick references, shared consumer migration and final UI acceptance remain incom
 is authoritative for continuation; the main plan now distinguishes that branch work from shipped code.
 Do not restart completed phases or infer that implemented metrics have passed their user visual gates.
 
-Worktree inventory at review: main at `71c45e36`, `corner-map` at `9a11f3fa`, and
+Worktree inventory at review (main rechecked 2026-10-12): main at `25d1e988`, `corner-map` at `9a11f3fa`, and
 `debrief-first` at `80f8c56a`. The latter also has uncommitted debrief changes; its integration
 status and overlap with current main were not assessed. Preserve that work and review its
 behavior before deciding whether anything still needs porting. No worktree was merged or archived.
@@ -47,6 +47,7 @@ File and folder size limits are ongoing checks; split only along meaningful resp
 
 | Record | Outcome | Historical completion |
 |---|---|---|
+| [Type refactoring](archive/TYPE_REFACTORING_PLAN.md) | One canonical type per model, one name and one place per fact in TypeScript, SQL and stored JSON; cache rewritten offline; follow-up fixes for driver selection, canonical package classes and server-side compare picker, chart history and Compare page bests | 2026-10-12 |
 | [Frontend simplification audit](archive/SRC_SIMPLIFICATION_AUDIT.md) | Ten fixes committed separately: direct imports, shared wheel rendering and modal focus, canonical progression type, fewer repeated calculations and requests, and removed forwarders; full tests/build passed | 2026-10-12 |
 | [Shared domain cleanup](archive/SHARED_DOMAIN_CLEANUP.md) | Eight audit findings fixed by Luna; independent review, 1,500-case parity, full tests/build and matching-dataset endpoint benchmarks passed | 2026-10-11 |
 | [Session reload recovery](archive/SESSION_RELOAD_RECOVERY.md) | Multiplayer player selection fixed; offline repair restored 739 sessions and canonicalized 132 benchmark entries while preserving retained data | 2026-10-11 |
