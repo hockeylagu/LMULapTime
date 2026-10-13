@@ -3,7 +3,7 @@ import { DetailedSession, SessionMetadata } from '../../shared/types/index.js';
 import { isReplayLinkWithdrawn } from './replay/dbReplayLinkStore.js';
 import { persistSessionProjection } from './sessionSummaries/store.js';
 import { SESSION_DICTIONARY_TABLES, SESSION_ROW_TABLES } from './sessionRows/schema.js';
-import { loadSession, readStoredLinkState, sameReplayLink } from './sessionRows/access.js';
+import { readStoredLinkState, sameReplayLink } from './sessionRows/access.js';
 
 import { upsertTargetedReplayLink, updateTargetedTelemetry } from './sessionRows/targeted.js';
 
@@ -13,10 +13,6 @@ export function getSessionXmlMtime(db: DatabaseType, sessionId: string, filePath
   const row = db.prepare('SELECT file_mtime_ms FROM sessions WHERE id=? AND file_path=?')
     .get(sessionId, filePath) as { file_mtime_ms: number } | undefined;
   return row && Number.isFinite(row.file_mtime_ms) && row.file_mtime_ms > 0 ? row.file_mtime_ms : undefined;
-}
-
-export function getSessionById(db: DatabaseType, id: string): DetailedSession | null {
-  return loadSession(db, id);
 }
 
 /**

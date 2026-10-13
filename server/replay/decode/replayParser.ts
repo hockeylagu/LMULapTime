@@ -59,13 +59,6 @@ export function detectPlayerName(baseDirOrFile?: string): string | undefined {
   return undefined;
 }
 
-export type {
-  ReplayParsingStage,
-  ReplayStreamProgress,
-  ReplayProgressCallback,
-  ReplayLogOptions,
-} from '../replayProgress.js';
-
 export interface ParseReplayMetadataOptions {
   playerName?: string;
   verbose?: boolean;

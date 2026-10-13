@@ -8,17 +8,10 @@ import { stableKey } from './writer.js';
 
 type ReplayLink = NonNullable<SessionMetadata['matchingReplayFile']>;
 
-/**
- * The stored session, assembled directly from its normalized rows.
- */
-export function loadSession(db: DatabaseType, id: string): DetailedSession | null {
-  return readSession(db, id);
-}
-
 /** Loads each id that exists, in the order given. */
 export function loadSessions(db: DatabaseType, ids: readonly string[]): DetailedSession[] {
   return ids.flatMap(id => {
-    const session = loadSession(db, id);
+    const session = readSession(db, id);
     return session ? [session] : [];
   });
 }

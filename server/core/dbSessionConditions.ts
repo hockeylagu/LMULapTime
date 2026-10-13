@@ -4,7 +4,7 @@ import { getReplayConditions } from './replay/dbReplayLapStore.js';
 import { classifySessionLaps } from '../sessions/sessionLapClassification.js';
 import { replayWeatherCondition, type RainOverLap } from '../../shared/domain/lapConditions.js';
 import type { ReplayConditionFact } from '../replay/decode/replayFacts.js';
-import { loadSession } from './sessionRows/access.js';
+import { readSession } from './sessionRows/reader.js';
 import { updateTargetedConditions } from './sessionRows/targeted.js';
 
 
@@ -84,7 +84,7 @@ export function reclassifyStoredSessions(db: DatabaseType, which: { ids: string[
     : (db.prepare('SELECT id FROM sessions WHERE recording_name = ?').all(which.replayName) as Array<{ id: string }>).map(row => row.id);
   // Conditions and weather are updated in place, followed by targeted projection update.
   return ids.flatMap((id) => {
-    const session = loadSession(db, id);
+    const session = readSession(db, id);
     if (!session) return [];
     classifySessionConditions(db, session, rainCache);
     updateTargetedConditions(db, session, Date.now());

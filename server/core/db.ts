@@ -115,7 +115,6 @@ import {
   updateBenchmarkDiffImpact,
 } from './dbReferenceLaptimeStore.js';
 import {
-  getSessionById as fetchSessionById,
   upsertSession as insertOrUpdateSession,
   updateSessionMatchingReplay as modifySessionMatchingReplay,
   getSessionsCount as fetchSessionsCount,
@@ -128,12 +127,13 @@ import { getRejectedReplayLinks, rejectSessionReplayLink } from './replay/dbRepl
 import { archiveReplacedRecording } from './replay/dbReplayIdentity.js';
 import { getReplayMatchingEntries, getReplayMatchingEntriesOverlapping, getReplayMatchingEntry } from './replay/dbReplayMatchingStore.js';
 import {
-  getRecordingOwners, getReplayReconciliationCandidateIds, getSessionsByIds, getSessionsStartingBetween, getTelemetryOwnersWithoutFile,
+  getRecordingOwners, getReplayReconciliationCandidateIds, getSessionsStartingBetween, getTelemetryOwnersWithoutFile,
   getTelemetrySessionCandidatesStartingBetween,
 } from './dbReconciliationStore.js';
 import type { ReplayMatchTarget } from '../sessions/replayMatching.js';
 import { promoteReplayPrimary, replaceReplayDriverLaps } from './replay/dbReplayDriverStore.js';
 import { loadSessions } from './sessionRows/access.js';
+import { readSession } from './sessionRows/reader.js';
 import { classifySessionConditions, reclassifyStoredSessions } from './dbSessionConditions.js';
 import {
   backfillSessionSummaries, countReadySessionSummaries, isSessionSummaryReady, iterateStoredSessions, projectionState,
@@ -525,7 +525,7 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
   // --- Ingestion reconciliation (see dbReconciliationStore) ---
 
   public getReplayReconciliationCandidateIds(sinceMs: number): string[] { return getReplayReconciliationCandidateIds(this.db, sinceMs); }
-  public getSessionsByIds(ids: readonly string[]): DetailedSession[] { return getSessionsByIds(this.db, ids); }
+  public getSessionsByIds(ids: readonly string[]): DetailedSession[] { return loadSessions(this.db, ids); }
   public getSessionsStartingBetween(fromMs: number, toMs: number): DetailedSession[] { return getSessionsStartingBetween(this.db, fromMs, toMs); }
   public getTelemetrySessionCandidatesStartingBetween(fromMs: number, toMs: number) {
     return getTelemetrySessionCandidatesStartingBetween(this.db, fromMs, toMs);
@@ -540,7 +540,7 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
   }
 
   public getSessionById(id: string): DetailedSession | null {
-    return fetchSessionById(this.db, id);
+    return readSession(this.db, id);
   }
 
   public getSessionsLinkedToRecording(recordingName: string): DetailedSession[] {

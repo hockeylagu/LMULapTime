@@ -26,10 +26,6 @@ export function getReplayReconciliationCandidateIds(db: DatabaseType, sinceMs: n
   return rows.map(row => row.id);
 }
 
-export function getSessionsByIds(db: DatabaseType, ids: readonly string[]): DetailedSession[] {
-  return loadSessions(db, ids);
-}
-
 /** Sessions that started inside [fromMs, toMs], oldest first. */
 export function getSessionsStartingBetween(db: DatabaseType, fromMs: number, toMs: number): DetailedSession[] {
   const rows = db.prepare('SELECT id FROM sessions WHERE timestamp BETWEEN ? AND ? ORDER BY timestamp, id')

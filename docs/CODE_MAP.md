@@ -33,8 +33,8 @@ Normalized session rows (`server/core/sessionRows/`, completed plan [NORMALIZED_
 stored session. JSON columns, temporary conversion tools, verification backfill and its startup gate have been removed.
 `specs.ts` declares every stored column once (`fields.ts` helpers); `schema.ts` holds the DDL, extra session scalars and derived-column lists.
 `writer.ts` (`writeSessionRows`, `updateDerivedColumns`) writes or updates rows with their projection; `dictionaries.ts` resolves driver names, vehicles and teams.
-`reader.ts` (`readSession`, `sessionScalars`, `driverScalars`, `recordingLink`) assembles the `DetailedSession`;
-`access.ts` exposes `loadSession`, `readStoredLinkState` (link and DuckDB file from two small row reads), and `sameReplayLink`.
+`reader.ts` (`readSession`, `sessionScalars`, `driverScalars`, `recordingLink`) assembles the `DetailedSession`; callers import `readSession` directly.
+`access.ts` exposes `loadSessions` (ordered reads of existing ids), `readStoredLinkState` (link and DuckDB file from two small row reads), and `sameReplayLink`.
 `targeted.ts` implements granular replay link, rename, telemetry and conditions updates. Ingestion writes rows transactionally with the source and aggregates;
 write failures propagate so the transaction rolls back. `canonical.ts` defines round-trip expectations for regression tests and the shared
 `sessionTelemetry` / `withSessionTelemetry` attachment helpers; `stub.ts` inserts a bare session for tests and tools.
@@ -131,7 +131,7 @@ reuse the stored timestamp/sectors/length and progression reads the stored date.
 current-target calculations. Failed projections retain a zero-player fact row for session counts.
 The layout, session kind, primary driver ordinal,
 empty flag, source/projection revisions and projection version live on `sessions`. Rebuild old rows
-through `loadSession` in bounded batches (`backfillSessionSummaries`); never load full history to backfill.
+through `readSession` in bounded batches (`backfillSessionSummaries`); never load full history to backfill.
 `persistSessionProjection` is the only writer of the derived columns (cards are built directly from columns), so a current projection always has its card.
 A session whose summaries cannot be built is marked done with `projection_error`, its condition summaries and derived columns cleared, and a
 card without player figures, so one bad row never holds the rebuild. Readiness (`isSessionSummaryReady`)

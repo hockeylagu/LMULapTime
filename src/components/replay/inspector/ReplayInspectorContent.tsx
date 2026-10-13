@@ -195,8 +195,6 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     setSelectedCornerNumber(prev => (cornerNumber !== null && prev === cornerNumber ? null : cornerNumber));
   }, []);
 
-  const formatLapTime = (sec?: number | null): string => formatTime(sec);
-
   if (!isOpen) return null;
 
   return (
@@ -251,7 +249,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
       handleSwapBaseline={handleSwapBaseline}
       handleRemoveCompare={handleRemoveCompare}
       handleSelectBaselineLap={handleSelectBaselineLap}
-      formatLapTime={formatLapTime}
+      formatLapTime={formatTime}
       bestSectors={bestSectors}
       lapSegments={lapSegments}
       cornerSegments={cornerSegments}

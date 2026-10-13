@@ -5,7 +5,7 @@ import { buildSessionSummaryProjection } from '../../../shared/domain/sessionSum
 import { SESSION_SUMMARY_PROJECTION_VERSION } from '../../../shared/types/sessionSummaries.js';
 import { persistSessionAggregate } from './aggregateStore.js';
 import { writeSessionRows, clearDerivedColumns } from '../sessionRows/writer.js';
-import { loadSession } from '../sessionRows/access.js';
+import { readSession } from '../sessionRows/reader.js';
 import { readSessionCards } from './cards.js';
 const insertCondition = `INSERT INTO session_driver_condition_summaries VALUES (
  @sessionId,@driverOrdinal,@conditionGroup,@cleanCount,@cleanTimeSum,@cleanTimeSquareSum,@bestLapOrdinal,@bestLapTime,
@@ -104,7 +104,7 @@ export function backfillSessionSummaries(db: DatabaseType, batchSize = 10): Sess
   for (const { id } of ids) {
     try {
       const row = select.get(id) as { source_revision: number } | undefined;
-      const session = row ? loadSession(db, id) : null;
+      const session = row ? readSession(db, id) : null;
       if (!row || !session) continue;
       persistSessionProjection(db, session, row.source_revision);
     } catch (error: unknown) {
@@ -124,7 +124,7 @@ export function *iterateStoredSessions(db: DatabaseType, batchSize = 10): Genera
     if (!rows.length) return;
     for (const row of rows) {
       lastId = row.id;
-      const session = loadSession(db, row.id);
+      const session = readSession(db, row.id);
       if (session) yield session;
     }
   }

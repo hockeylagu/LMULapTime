@@ -88,10 +88,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
     updateSearchParams(searchParams, setSearchParams, { track, trackVenue: null, trackCourse: null });
   };
 
-  const setCarClass = (carClass: string) => {
-    setSelectedCarClass(carClass);
-  };
-
   const setFilterType = (type: string) => {
     legacySetFilterType?.(type);
     updateSearchParams(searchParams, setSearchParams, { type });
@@ -169,7 +165,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // One URL update: separate setters would each start from the same params and undo one another.
   const resetFilters = isFiltered
     ? () => {
-    setCarClass('All');
+        setSelectedCarClass('All');
         legacySetSelectedTrack?.('All');
         legacySetFilterType?.('All');
         legacySetSearchQuery?.('');
@@ -241,7 +237,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             selectedTrack={selectedTrack}
             setSelectedTrack={setSelectedTrack}
             selectedCarClass={selectedCarClass}
-            setSelectedCarClass={setCarClass}
+            setSelectedCarClass={setSelectedCarClass}
             filterType={filterType}
             setFilterType={setFilterType}
             searchQuery={searchQuery}

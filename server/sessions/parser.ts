@@ -22,7 +22,6 @@ import { normalizeCarClass } from '../../shared/domain/vehicleMapping.js';
 import {
   RawLapXmlNode,
   RawDriverXmlNode,
-  RawStreamXmlNode,
   RawSessionXmlNode,
   ReplayFileEntry,
 } from './sessionXmlTypes.js';
@@ -225,7 +224,7 @@ export class LmuParser {
       // Parse Incidents, Track Limits, Penalties, and Damage from Stream container
       const streamNode = sessionDataNode?.Stream ?? raceResults.Stream;
       if (streamNode) {
-        this.parseStreamEvents(streamNode, drivers);
+        parseStreamEvents(streamNode, drivers);
       }
 
       // With contacts and the cars met on track attached to their laps, tag the wet laps and mark
@@ -709,9 +708,5 @@ export class LmuParser {
   ): ReplayFileEntry | undefined {
     const target = { trackVenue, trackCourse, sessionCode, sessionTimestampMs, xmlFileMtimeMs };
     return findMatchingReplay(this.replayLookup ? this.replayLookup(target) : this.replaysMap, target);
-  }
-
-  private parseStreamEvents(streamNode: RawStreamXmlNode, drivers: DriverData[]) {
-    parseStreamEvents(streamNode, drivers);
   }
 }
