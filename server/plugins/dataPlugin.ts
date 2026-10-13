@@ -6,7 +6,7 @@ import { parseTrackMapDisplay } from '../../shared/domain/trackGeometry.js';
 import type { TrackBoundaryGeometry, TrackMapDisplay } from '../../shared/types/trackGeometry.js';
 import type { DataPluginStatus, VehicleDataRecord } from '../../shared/types/dataPlugin.js';
 import { validateTrackPackage } from './trackPackage.js';
-import { normalizeCarClass, setVehicleCatalog } from '../../shared/domain/vehicleMapping.js';
+import { setVehicleCatalog } from '../../shared/domain/vehicleMapping.js';
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('Expected object');
@@ -31,8 +31,7 @@ export function parseVehicleCatalog(value: unknown): VehicleDataRecord[] {
   return catalog.vehicles.map(item => {
     const row = object(item);
     keys(row, ['id', 'model', 'carClass', 'vehicleIds', 'dimensions', 'outlineXZ', 'replayOriginOffsetXZ']);
-    // Packages may name the class as LMU does (LMGT3); records carry the canonical class every comparison uses.
-    const id = text(row.id), model = text(row.model), carClass = normalizeCarClass(text(row.carClass));
+    const id = text(row.id), model = text(row.model), carClass = text(row.carClass);
     if (!/^[a-zA-Z0-9_-]+$/.test(id) || ids.has(id) || !Array.isArray(row.vehicleIds) || row.vehicleIds.length > 5000) throw Error('Invalid vehicle record');
     ids.add(id);
     const vehicleIds = row.vehicleIds.map(alias => {
