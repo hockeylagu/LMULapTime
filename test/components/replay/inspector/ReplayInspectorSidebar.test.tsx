@@ -110,7 +110,7 @@ describe('ReplayInspectorSidebar', () => {
     expect(screen.getByRole('button', { name: /Close side panel/i })).toBeInTheDocument();
 
     // Map elements present on the left
-    expect(screen.getByTitle('Zoom In')).toBeInTheDocument();
+    expect(screen.getByTitle('Zoom In (+)')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Pedal Points/i })).toBeInTheDocument();
 
     // Corners table present on the right
@@ -159,7 +159,7 @@ describe('ReplayInspectorSidebar', () => {
   it('renders single panel with GPS map only when activeTab is map', () => {
     render(<ReplayInspectorSidebar {...baseProps} activeTab="map" />);
 
-    expect(screen.getByTitle('Zoom In')).toBeInTheDocument();
+    expect(screen.getByTitle('Zoom In (+)')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Close side panel/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/vs Baseline/i)).not.toBeInTheDocument();
   });
@@ -169,7 +169,7 @@ describe('ReplayInspectorSidebar', () => {
     render(<ReplayInspectorSidebar {...baseProps} activeTab="ai-report" setActiveTab={setActiveTab} />);
 
     // Map is still present on the left
-    expect(screen.getByTitle('Zoom In')).toBeInTheDocument();
+    expect(screen.getByTitle('Zoom In (+)')).toBeInTheDocument();
 
     // AI Report UI is on the right
     await waitFor(() => {
