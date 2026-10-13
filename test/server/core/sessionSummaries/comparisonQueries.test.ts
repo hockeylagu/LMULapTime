@@ -78,7 +78,10 @@ describe('SQL comparison query', () => {
         'z-first_driver_0_lap_0', 'a-second_driver_1_lap_0',
       ]);
       expect(pbIds(queryTelemetryComparableLaps(db, filters, { page: 2, pageSize: 1 }).laps)).toEqual([]);
-      expect(queryTelemetryComparableLaps(db, { ...filters, sessionId: 'a-second', driverOrdinal: 0, lapOrdinal: 0 }).laps[0].isAllTimePB).toBe(true);
+      expect(queryTelemetryComparableLaps(db, { ...filters, sessionId: 'a-second', driverOrdinal: 0, lapOrdinal: 0 }).laps[0].isAllTimePB).toBe(false);
+      const sessionBestFilters = { ...filters, sessionId: 'z-first', driverOrdinal: 1, lapOrdinal: 0 };
+      expect(queryTelemetryComparableLaps(db, sessionBestFilters).laps[0]).toMatchObject({ isSessionBest: true, isAllTimePB: false });
+      expect(queryCompactComparableLaps(db, sessionBestFilters).laps[0].isAllTimePB).toBe(false);
       expect(queryTelemetryComparableLaps(db, { ...filters, driverOrdinal: 0, lapOrdinal: 0 }, { page: 2, pageSize: 1 }).laps[0].isAllTimePB).toBe(false);
       expect(queryTelemetryComparableLaps(db, filters, { page: 99 }).laps).toEqual([]);
     } finally { db.close(); }

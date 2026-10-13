@@ -3,7 +3,7 @@ import { LoaderCircle, X } from 'lucide-react';
 import type { ComparableLap, WeatherCondition } from '../../../../../shared/types/index.js';
 import { recordedCondition, sessionKindOf, type SessionKind } from '../../../../../shared/domain/compareLapScope.js';
 import type { CompareLapControls } from './compareLapControls.js';
-import { ReplayCompareLapRow } from './ReplayCompareLapRow.js';
+import { ReplayCompareLapRow, REPLAY_COMPARE_COLUMNS } from './ReplayCompareLapRow.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 import { CompareLapPaginationControls, type CompareLapPagination } from './CompareLapPagination.js';
 
@@ -180,7 +180,7 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar px-4 py-2">
+        <div className="min-h-0 flex-1 overflow-auto custom-scrollbar px-4">
           {isLoading ? (
             <div role="status" className="flex items-center justify-center gap-2 py-8 text-xs text-lmu-muted">
               <LoaderCircle className="w-4 h-4 animate-spin" /> Loading available laps...
@@ -199,24 +199,37 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
               <span className="block mt-1">{controls.condition === 'all' ? 'Try changing your filters.' : 'Try All conditions or change your filters.'}</span>
             </p>
           ) : (
-            <div className="space-y-1">
-              {laps.map(lap => {
-                const isSelected = matchesIdentity(lap, selectedSessionId) &&
-                  lap.lapNumber === selectedLapNumber &&
-                  (!selectedDriverName || lap.driverName === selectedDriverName);
-                return (
-                  <ReplayCompareLapRow
-                    key={lap.id}
-                    lap={lap}
-                    isSelected={isSelected}
-                    isCurrentLap={isCurrent(lap)}
-                    onSelect={selected => {
-                      onSelectLap(selected);
-                      onClose();
-                    }}
-                  />
-                );
-              })}
+            <div className="min-w-[1040px]">
+              <div aria-hidden="true" className={`${REPLAY_COMPARE_COLUMNS} sticky top-0 z-10 border-b border-lmu-border bg-lmu-strip px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-lmu-muted`}>
+                <span>Session</span>
+                <span>Date</span>
+                <span>Driver</span>
+                <span>Car</span>
+                <span className="text-right">Lap</span>
+                <span className="text-right">Lap time</span>
+                <span>Status</span>
+              </div>
+              <ul aria-label="Available comparison laps" className="divide-y divide-lmu-border/50">
+                {laps.map(lap => {
+                  const isSelected = matchesIdentity(lap, selectedSessionId) &&
+                    lap.lapNumber === selectedLapNumber &&
+                    (!selectedDriverName || lap.driverName === selectedDriverName);
+                  return (
+                    <li key={lap.id}>
+                      <ReplayCompareLapRow
+                        lap={lap}
+                        isSelected={isSelected}
+                        isCurrentLap={isCurrent(lap)}
+                        showPlayerBadge={filter === 'same-sessions' || filter === 'all'}
+                        onSelect={selected => {
+                          onSelectLap(selected);
+                          onClose();
+                        }}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
           )}
         </div>

@@ -1,5 +1,12 @@
 # Endpoint performance history
 
+## Comparison personal-best scope — 2026-10-12
+
+Session locators no longer narrow the history used for personal-best badges. A five-sample
+endpoint sweep completed with picker medians of 14.68 ms (player) and 14.48 ms (all drivers).
+The attempted before sweep failed on sandbox loopback access, so no before/after latency claim
+is made. The successful report is retained in `.cache/selector-pb-benchmark/latest.md`.
+
 ## Primary-driver resolution and cached promotion — 2026-10-12
 
 Five-sample before/after sweeps used the same dataset (`fd7875490434`) and cohort. The first

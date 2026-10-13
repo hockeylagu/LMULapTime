@@ -97,7 +97,7 @@ export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = (
       <td className="px-3.5 py-2.5 font-medium text-white">
         <div className="flex items-center gap-1.5">
           <span className={isPlayer || isSelected ? 'font-bold text-white' : 'text-white'}>{d.name}</span>
-          {isPlayer && <span className="text-lmu-muted font-normal">(You)</span>}
+          {isPlayer && <span className="text-[11px] font-bold px-1.5 rounded bg-lmu-accent/20 text-lmu-accent-soft shrink-0">You</span>}
         </div>
       </td>
       <td className="px-3.5 py-2.5">

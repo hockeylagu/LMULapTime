@@ -144,6 +144,15 @@ describe('ReplayCompareLapPicker', () => {
     expect(screen.getByText('Baseline')).toBeInTheDocument();
   });
 
+  it.each(['same-sessions', 'all', 'player', 'same-session-lap'] as const)(
+    'shows player badges only in mixed-driver scopes: %s', (filter) => {
+      renderPicker({ filter });
+      expect(screen.queryAllByText('You')).toHaveLength(
+        filter === 'same-sessions' || filter === 'all' ? mockLaps.filter(lap => lap.isPlayer).length : 0,
+      );
+    },
+  );
+
   it('selects a lap and closes the picker on click', () => {
     const onSelectLap = vi.fn();
     const onClose = vi.fn();

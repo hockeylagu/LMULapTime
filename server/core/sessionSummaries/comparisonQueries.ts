@@ -92,6 +92,7 @@ function comparisonScope(filters: CompactCompareFilters) {
   if (driverName && driverName !== 'all') {
     display.where.push(filters.driverNameExact ? 'lower(trim(dn.name))=?' : 'instr(lower(dn.name),?)>0'); display.args.push(driverName);
   }
+  const personalBestScope = { ...display, where: [...display.where], args: [...display.args] };
   if (filters.sessionId) { display.where.push('s.id=?'); display.args.push(filters.sessionId); }
   const selected = { ...display, where: [...display.where], args: [...display.args] };
   if (filters.telemetryOnly) selected.where.push('l.is_valid=1', 'coalesce(l.is_pit_stop,0)=0', 'coalesce(l.is_out_lap,0)=0', 'l.lap_time>0');
@@ -100,7 +101,7 @@ function comparisonScope(filters: CompactCompareFilters) {
   if (filters.lapOrdinal !== undefined) { selected.where.push('l.lap_ordinal=?'); selected.args.push(filters.lapOrdinal); }
   if (filters.lapNumber !== undefined) { selected.where.push('l.lap_number=?'); selected.args.push(filters.lapNumber); }
   if (filters.excludeLap) { selected.where.push('NOT (s.id=? AND l.lap_ordinal=?)'); selected.args.push(filters.excludeLap.sessionId, filters.excludeLap.lapOrdinal); }
-  return { trackParts, broad, display, selected };
+  return { trackParts, broad, display, selected, personalBestScope };
 }
 
 type PageLapFact = Pick<LapFact, 'session_id' | 'driver_ordinal' | 'lap_ordinal' | 'driver_name' | 'is_all_time_pb'>;
@@ -135,7 +136,7 @@ export function queryTelemetryComparableLaps(
 ): TelemetryCompareResult {
   const page = Math.max(1, Math.trunc(pageOptions.page ?? 1));
   const pageSize = Math.max(1, Math.min(250, Math.trunc(pageOptions.pageSize ?? 50)));
-  const { display, selected: scoped } = comparisonScope({ ...filters, telemetryOnly: true });
+  const { personalBestScope, selected: scoped } = comparisonScope({ ...filters, telemetryOnly: true });
   const selected = append(scoped, telemetryViewWhere(filters));
   const total = (db.prepare(`SELECT count(*) total ${lapJoinWhere(selected, true)}`).get(...selected.args) as CountFact).total;
   let carTypes: string[] | undefined;
@@ -152,7 +153,7 @@ export function queryTelemetryComparableLaps(
       r.has_rain,r.weather_condition
     ${lapJoinWhere(selected, true)} ORDER BY ${TELEMETRY_ORDER[pageOptions.sort ?? 'lap']} LIMIT ? OFFSET ?`)
     .all(...selected.args, pageSize, (page - 1) * pageSize) as TelemetryLapFact[];
-  markPagePersonalBests(db, rows, display);
+  markPagePersonalBests(db, rows, personalBestScope);
   const laps: ComparableLap[] = rows.map(row => ({
     id: `${row.session_id}_driver_${row.driver_ordinal}_lap_${row.lap_ordinal}`,
     sessionId: row.session_id, driverOrdinal: row.driver_ordinal, lapOrdinal: row.lap_ordinal,
@@ -178,7 +179,7 @@ export function queryCompactComparableLaps(
 ): CompactCompareResult {
   const page = Math.max(1, Math.trunc(pageOptions.page ?? 1));
   const pageSize = Math.max(1, Math.min(250, Math.trunc(pageOptions.pageSize ?? 100)));
-  const { trackParts, broad, display, selected } = comparisonScope(filters);
+  const { trackParts, broad, display, selected, personalBestScope } = comparisonScope(filters);
   const offset = (page - 1) * pageSize;
 
   const total = (db.prepare(`SELECT count(*) total ${lapJoinWhere(selected)}`).get(...selected.args) as CountFact).total;
@@ -210,7 +211,7 @@ export function queryCompactComparableLaps(
       0 is_all_time_pb
     ${lapJoinWhere(selected)} ORDER BY s.timestamp,s.rowid,d.driver_ordinal,l.lap_ordinal LIMIT ? OFFSET ?`)
     .all(...selected.args, pageSize, offset) as LapFact[];
-  markPagePersonalBests(db, rows, display);
+  markPagePersonalBests(db, rows, personalBestScope);
 
   const selectedLaps = readComparisonLapRows(db, [...rows,
     ...[overallFact, representativeBest, playerBest].filter((fact): fact is LapFact => fact !== null)]);
