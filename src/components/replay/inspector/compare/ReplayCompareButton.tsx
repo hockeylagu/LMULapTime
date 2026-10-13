@@ -27,7 +27,7 @@ export const ReplayCompareButton: React.FC<ReplayCompareButtonProps> = ({
   const currentLapTime = summary?.validatedTimeSec ?? summary?.lapTimeSec;
   const suggestion = useReferenceLapSuggestion({
     sessionId, metadata, driver, driverName, lapNumber: currentLap, lapTime: currentLapTime,
-    carType: driver?.carType ?? trajectory?.vehicleIdentity?.carType,
+    driverOrdinal: trajectory?.driverOrdinal ?? driver?.sessionDriverOrdinal,
   });
 
   return (

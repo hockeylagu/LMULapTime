@@ -15,17 +15,22 @@ function lap(sessionId: string, lapNumber: number, lapTime: number, extra: Parti
   } as ComparableLap;
 }
 
-const driver: ReplayDriverEntry = { slot: 1, name: ME, isPlayer: true, carType: 'Peugeot 9x8', carClass: 'Hyper' };
+// The roster names the car as the data package does; the session stores it differently.
+const driver: ReplayDriverEntry = { slot: 1, name: ME, isPlayer: true, carType: 'Peugeot 9X8 (package)', carClass: 'Hyper', sessionDriverOrdinal: 0 };
 const metadata = { filename: 'r.Vcr', trackVenue: 'Daytona', trackCourse: 'Road Course', drivers: [driver] } as unknown as ReplayMetadata;
 const trajectory = (lapTime: number) => ({
-  currentLap: 20, laps: [{ lapNumber: 20, lapTimeSec: lapTime + 0.01, validatedTimeSec: lapTime }],
+  currentLap: 20, driverOrdinal: 0, laps: [{ lapNumber: 20, lapTimeSec: lapTime + 0.01, validatedTimeSec: lapTime }],
 }) as unknown as ReplayTrajectoryData;
 
-function mockLaps(laps: ComparableLap[]) {
+/** The session's own laps name the car; the other request returns the candidates. Returns the candidate requests. */
+function mockLaps(laps: ComparableLap[], sessionCar: string | null = 'Peugeot 9x8') {
   const urls: URL[] = [];
   vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
-    urls.push(new URL(String(input), 'http://localhost'));
-    return { ok: true, status: 200, json: async () => ({ laps, total: laps.length }) } as Response;
+    const url = new URL(String(input), 'http://localhost');
+    const own = url.searchParams.has('driverOrdinal');
+    if (!own) urls.push(url);
+    const body = own ? { laps: sessionCar ? [lap(RACE, 20, 95.894, { carType: sessionCar })] : [] } : { laps, total: laps.length };
+    return { ok: true, status: 200, json: async () => body } as Response;
   });
   return urls;
 }
@@ -92,15 +97,17 @@ describe('ReplayCompareButton', () => {
     expect(await screen.findByText('vs your best 95.100')).toBeInTheDocument();
   });
 
-  it('has no suggestion without a known car', async () => {
-    const urls = mockLaps([lap(PRACTICE, 24, 95.658)]);
-    render(
-      <ReplayCompareButton
-        sessionId={RACE} driverName={ME} trajectory={trajectory(95.894)} metadata={metadata} driver={{ ...driver, carType: undefined }}
-        onToggleCompare={vi.fn()} onSelectCompareLap={vi.fn()} formatLapTime={(sec) => String(sec)}
-      />
-    );
-    expect(screen.getByText('Compare')).toBeInTheDocument();
+  it('uses the car stored with the session laps, not the replay roster name', async () => {
+    const urls = mockLaps([lap(PRACTICE, 24, 95.658, { carType: 'Genesis GMR001' })], 'Genesis GMR001');
+    renderButton(95.894);
+    expect(await screen.findByText('vs your best 95.658')).toBeInTheDocument();
+    expect(urls[0].searchParams.get('carType')).toBe('Genesis GMR001');
+  });
+
+  it('has no suggestion when the session has no lap naming the car', async () => {
+    const urls = mockLaps([lap(PRACTICE, 24, 95.658)], null);
+    renderButton(95.894);
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
     expect(urls).toHaveLength(0);
     expect(screen.queryByText(/vs your best/)).not.toBeInTheDocument();
   });
