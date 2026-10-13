@@ -74,6 +74,7 @@ warm backend time fell from 36.7 to 17.1 ms, and Road Atlanta LMGT3 from 17.5 to
 On 2026-10-10 the Road Atlanta GT3 default picker measured about 4 ms versus 19 ms previously (992 stored sessions),
 with zero full session reads and a 32 KB response instead of 58 KB; these are local backend measurements.
 The Compare page (`useCompareLapsData.ts`) takes its personal best (`playerBestLap`) and all-time best (`overallTrackBestLap`) only from the server's exact bests, for both the default selection and the preset buttons; with none, the lap and its button are absent, never the fastest lap of the current 50-lap page. Theoretical-best pace comes only from the benchmark target.
+The replay inspector's reference-lap suggestion (`compare/useReferenceLapSuggestion.ts`) is one request: `pageSize=1` with the roster `carType`, `driverExact=true` (whole-name match through `comparisonScope`) and `excludeSessionId` / `excludeLapOrdinal` (the lap on screen); the telemetry picker's `carTypes` list is returned on page 1 only and the client keeps it, and the client no longer re-filters the server's `telemetryOnly` page.
 Inspector state, comparison selection and reference suggestions use session IDs exclusively; recording filenames never substitute for session identity.
 `ReplayTrajectoryService` accepts session context plus driver/lap ordinals and resolves its recording internally; legacy filename/slot request parameters and unused request types are removed.
 `server/core/sessionRows/replayContext.ts` reads only the roster, replay link and compact official timing fields:

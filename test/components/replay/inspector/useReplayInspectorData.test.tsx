@@ -43,7 +43,7 @@ function wrapper({ children }: { children: React.ReactNode }) {
 }
 
 describe('useReplayInspectorData session locators', () => {
-  it('pages comparison laps and scopes same-session requests while excluding missing replay links', async () => {
+  it('pages comparison laps as the server returns them and scopes same-session requests', async () => {
     const urls: URLSearchParams[] = [];
     const candidate = { id: 'first', sessionId: 'session-1', matchingReplayFile: metadata.filename,
       driverOrdinal: 0, lapOrdinal: 0, driverName: 'Player Driver', lapNumber: 2, lapTime: 100,
@@ -55,7 +55,7 @@ describe('useReplayInspectorData session locators', () => {
         const params = new URL(url, 'http://localhost').searchParams;
         urls.push(params);
         const id = params.get('page') === '2' ? 'later' : 'first';
-        return response({ laps: [{ ...candidate, id }, { ...candidate, id: 'unavailable', matchingReplayFile: undefined }], total: 51 });
+        return response({ laps: [{ ...candidate, id }], total: 51 });
       }
       return response(trajectory);
     });
@@ -80,7 +80,9 @@ describe('useReplayInspectorData session locators', () => {
       if (url.endsWith('/telemetry/metadata')) return response({ ...metadata, weatherCondition: 'Wet' });
       if (url.includes('/compare/laps')) {
         urls.push(new URL(url, 'http://localhost').searchParams);
-        return response({ laps: [], total: 120, carTypes: ['BMW M4 LMGT3', 'Lexus RCF LMGT3'] });
+        // The server lists the car types on page 1 only.
+        const page = new URL(url, 'http://localhost').searchParams.get('page');
+        return response(page === '1' ? { laps: [], total: 120, carTypes: ['BMW M4 LMGT3', 'Lexus RCF LMGT3'] } : { laps: [], total: 120 });
       }
       return response(trajectory);
     });
@@ -94,6 +96,8 @@ describe('useReplayInspectorData session locators', () => {
 
     act(() => result.current.comparePagination.onPageChange(3));
     await waitFor(() => expect(urls[urls.length - 1].get('page')).toBe('3'));
+    await waitFor(() => expect(result.current.comparePagination.page).toBe(3));
+    expect(result.current.compareCarTypes).toEqual(['BMW M4 LMGT3', 'Lexus RCF LMGT3']);
     act(() => result.current.setCompareControls({ sort: 'recent', carType: 'Lexus RCF LMGT3', sessionKind: 'race', condition: 'all' }));
     await waitFor(() => expect(result.current.comparePagination.page).toBe(1));
     await waitFor(() => {

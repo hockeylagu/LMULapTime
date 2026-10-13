@@ -284,6 +284,32 @@ describe('SQL comparison query', () => {
       } finally { db.close(); }
     });
 
+    it('lists the car types on the first page only', () => {
+      const db = build();
+      try {
+        expect(queryTelemetryComparableLaps(db, base, { page: 2, pageSize: 2 }).carTypes).toBeUndefined();
+        expect(queryTelemetryComparableLaps(db, base, { page: 1, pageSize: 2 }).carTypes).toHaveLength(3);
+      } finally { db.close(); }
+    });
+
+    it('matches a driver name exactly, ignoring case, when asked, and leaves out the excluded lap', () => {
+      const db = build();
+      try {
+        expect(queryTelemetryComparableLaps(db, { ...base, driverName: 'bo' }).laps.every(item => item.driverName === 'Bob')).toBe(true);
+        expect(queryTelemetryComparableLaps(db, { ...base, driverName: 'bo', driverNameExact: true }).laps).toEqual([]);
+        const bob = queryTelemetryComparableLaps(db, { ...base, driverName: 'BOB', driverNameExact: true }).laps;
+        expect(bob.length).toBeGreaterThan(1);
+        expect(bob.every(item => item.driverName === 'Bob')).toBe(true);
+        const fastest = bob[0];
+        const without = queryTelemetryComparableLaps(db, {
+          ...base, driverName: 'BOB', driverNameExact: true, representativeOnly: true,
+          excludeLap: { sessionId: fastest.sessionId!, lapOrdinal: fastest.lapOrdinal! },
+        });
+        expect(without.laps.map(item => item.id)).not.toContain(fastest.id);
+        expect(without.total).toBe(bob.length - 1);
+      } finally { db.close(); }
+    });
+
     it('can skip laps the parser marked non-representative', () => {
       const db = build();
       try {

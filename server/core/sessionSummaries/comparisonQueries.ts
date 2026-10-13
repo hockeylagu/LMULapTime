@@ -15,13 +15,17 @@ export interface CompactCompareFilters {
   sessionKind?: SessionKind; condition?: WeatherCondition;
   /** Telemetry picker only: skip laps the parser marked non-representative. */
   representativeOnly?: boolean;
+  /** Match `driverName` as the whole name (case-insensitive) instead of as part of it. */
+  driverNameExact?: boolean;
+  /** Leave out one lap (the one on screen): its session and lap ordinal. */
+  excludeLap?: { sessionId: string; lapOrdinal: number };
 }
 export interface CompactComparePage { page?: number; pageSize?: number; sort?: CompareLapSort; }
 export interface CompactCompareResult extends ComparableLapsResult { page: number; pageSize: number; total: number; }
 export interface TelemetryCompareResult {
   laps: ComparableLap[]; page: number; pageSize: number; total: number;
-  /** Car types of the scope ignoring the car filter (the other filters still apply), sorted by name. */
-  carTypes: string[];
+  /** Car types of the scope ignoring the car filter (the other filters still apply), sorted by name. Page 1 only: the list does not depend on the page. */
+  carTypes?: string[];
 }
 
 interface LapFact {
@@ -85,7 +89,9 @@ function comparisonScope(filters: CompactCompareFilters) {
   const display = { ...broad, where: [...broad.where], args: [...broad.args] };
   if (filters.playerOnly) display.where.push('d.is_player=1');
   const driverName = filters.driverName?.trim().toLowerCase() ?? '';
-  if (driverName && driverName !== 'all') { display.where.push('instr(lower(dn.name),?)>0'); display.args.push(driverName); }
+  if (driverName && driverName !== 'all') {
+    display.where.push(filters.driverNameExact ? 'lower(trim(dn.name))=?' : 'instr(lower(dn.name),?)>0'); display.args.push(driverName);
+  }
   if (filters.sessionId) { display.where.push('s.id=?'); display.args.push(filters.sessionId); }
   const selected = { ...display, where: [...display.where], args: [...display.args] };
   if (filters.telemetryOnly) selected.where.push('l.is_valid=1', 'coalesce(l.is_pit_stop,0)=0', 'coalesce(l.is_out_lap,0)=0', 'l.lap_time>0');
@@ -93,6 +99,7 @@ function comparisonScope(filters: CompactCompareFilters) {
   if (filters.driverOrdinal !== undefined) { selected.where.push('d.driver_ordinal=?'); selected.args.push(filters.driverOrdinal); }
   if (filters.lapOrdinal !== undefined) { selected.where.push('l.lap_ordinal=?'); selected.args.push(filters.lapOrdinal); }
   if (filters.lapNumber !== undefined) { selected.where.push('l.lap_number=?'); selected.args.push(filters.lapNumber); }
+  if (filters.excludeLap) { selected.where.push('NOT (s.id=? AND l.lap_ordinal=?)'); selected.args.push(filters.excludeLap.sessionId, filters.excludeLap.lapOrdinal); }
   return { trackParts, broad, display, selected };
 }
 
@@ -131,10 +138,13 @@ export function queryTelemetryComparableLaps(
   const { display, selected: scoped } = comparisonScope({ ...filters, telemetryOnly: true });
   const selected = append(scoped, telemetryViewWhere(filters));
   const total = (db.prepare(`SELECT count(*) total ${lapJoinWhere(selected, true)}`).get(...selected.args) as CountFact).total;
-  const carScope = comparisonScope({ ...filters, carType: undefined, telemetryOnly: true }).selected;
-  const carTypeScope = append(carScope, telemetryViewWhere(filters));
-  const carTypes = (db.prepare(`SELECT DISTINCT v.car_type car_type ${lapJoinWhere(carTypeScope, true)} AND coalesce(v.car_type,'')<>'' ORDER BY v.car_type`)
-    .all(...carTypeScope.args) as Array<{ car_type: string }>).map(row => row.car_type);
+  let carTypes: string[] | undefined;
+  if (page === 1) {
+    const carScope = comparisonScope({ ...filters, carType: undefined, telemetryOnly: true }).selected;
+    const carTypeScope = append(carScope, telemetryViewWhere(filters));
+    carTypes = (db.prepare(`SELECT DISTINCT v.car_type car_type ${lapJoinWhere(carTypeScope, true)} AND coalesce(v.car_type,'')<>'' ORDER BY v.car_type`)
+      .all(...carTypeScope.args) as Array<{ car_type: string }>).map(row => row.car_type);
+  }
   const rows = db.prepare(`SELECT s.id session_id,s.timestamp,s.session_name,s.session_type,s.time_string,s.recording_name,
       d.driver_ordinal,coalesce(dn.name,'') driver_name,coalesce(v.car_type,'') car_type,coalesce(nullif(v.car_class,''),'General') car_class,
       d.is_player,d.best_lap_time,l.lap_ordinal,l.lap_number,l.lap_time,

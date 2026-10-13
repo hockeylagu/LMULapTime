@@ -3,7 +3,6 @@ import { isReplaySurfaceTarget, replayShortcutBlocked } from '../../../utils/rep
 import { useSearchParams } from 'react-router';
 import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ComparableLap } from '../../../../shared/types/index.js';
 import { areComparableCarClasses, resolveDriverCarClass } from '../../../../shared/domain/vehicleMapping.js';
-import { isRacingLap } from '../../../../shared/domain/lapComparison.js';
 import { applyTelemetryPostProcessingToTrajectory } from '../../../utils/telemetryPostProcessing.js';
 import { updateSearchParams } from '../../../utils/urlParams.js';
 import { apiErrorMessage, fetchJson, isAbortError } from '../../../api/apiClient.js';
@@ -265,11 +264,9 @@ export function useReplayInspectorData({
         if (!isCurrent) return;
         const laps = Array.isArray(data?.laps) ? data.laps : [];
         setCompareTotal(data.total ?? laps.length);
-        setCompareCarTypes(Array.isArray(data.carTypes) ? data.carTypes : []);
-        setAvailableCompareLaps(laps.filter((lap: ComparableLap) =>
-          Boolean(lap.matchingReplayFile) && isRacingLap(lap) &&
-          typeof lap.lapTime === 'number' && lap.lapTime > 0
-        ));
+        // The server lists the cars on page 1 only; later pages keep that list.
+        if (Array.isArray(data.carTypes)) setCompareCarTypes(data.carTypes);
+        setAvailableCompareLaps(laps);
         setIsCompareLapsLoading(false);
       })
       .catch((err: unknown) => {

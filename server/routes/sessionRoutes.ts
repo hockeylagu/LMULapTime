@@ -96,7 +96,7 @@ export function createSessionRouter(context: ServerContext): Router {
       benchmarks:references ? findMatchingTrackBenchmarkEntries(references.entries,req.params.trackName,course) : [],revision:revision()});
   });
   router.get('/compare/laps',(req,res) => {
-    const ordinal = (name: 'driverOrdinal' | 'lapOrdinal' | 'lapNumber', max: number): number | undefined => {
+    const ordinal = (name: 'driverOrdinal' | 'lapOrdinal' | 'lapNumber' | 'excludeLapOrdinal', max: number): number | undefined => {
       const value = req.query[name];
       if (value === undefined) return undefined;
       if (typeof value !== 'string' || !/^\d+$/.test(value) || Number(value) > max) {
@@ -111,6 +111,9 @@ export function createSessionRouter(context: ServerContext): Router {
     if (res.headersSent) return;
     const lapNumber = ordinal('lapNumber', 10000000);
     if (res.headersSent) return;
+    const excludeLapOrdinal = ordinal('excludeLapOrdinal', 10000000);
+    if (res.headersSent) return;
+    const excludeSessionId = queryString(req.query.excludeSessionId);
     const choice = <T extends string>(name: string, allowed: readonly T[]): T | undefined => {
       const value = queryString(req.query[name]);
       if (value === undefined) return undefined;
@@ -132,7 +135,8 @@ export function createSessionRouter(context: ServerContext): Router {
       trackName:track,trackVenue:queryString(req.query.trackVenue),trackCourse:queryString(req.query.trackCourse),
       carClass:queryString(req.query.carClass),carType:queryString(req.query.carType),
       driverName:queryString(req.query.driver),sessionId:queryString(req.query.sessionId),
-      driverOrdinal, lapOrdinal, lapNumber,
+      driverOrdinal, lapOrdinal, lapNumber, driverNameExact:req.query.driverExact === 'true',
+      excludeLap: excludeSessionId !== undefined && excludeLapOrdinal !== undefined ? { sessionId: excludeSessionId, lapOrdinal: excludeLapOrdinal } : undefined,
       playerOnly:req.query.playerOnly !== 'false',humansOnly:req.query.humansOnly === 'true',
       telemetryOnly:req.query.telemetryOnly === 'true',
     };

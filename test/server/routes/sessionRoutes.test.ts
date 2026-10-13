@@ -437,6 +437,13 @@ describe('sessionRoutes and filterSessions', () => {
       expect(response.body).toMatchObject({ laps: [], total: 0, carTypes: [] });
     });
 
+    it('GET /api/compare/laps accepts the exact-driver and excluded-lap options of the reference suggestion', async () => {
+      const response = await request(app).get('/api/compare/laps?track=Spa&telemetryOnly=true&driver=Driver%20Alpha&driverExact=true&excludeSessionId=sess_1&excludeLapOrdinal=0&pageSize=1&page=2');
+      expect(response.status).toBe(200);
+      expect(response.body.carTypes).toBeUndefined();
+      expect((await request(app).get('/api/compare/laps?track=Spa&telemetryOnly=true&excludeLapOrdinal=-1')).status).toBe(400);
+    });
+
     it('GET /api/compare/laps without a track has no benchmarks', async () => {
       const res = await request(app).get('/api/compare/laps?playerOnly=false');
       expect(res.status).toBe(200);
