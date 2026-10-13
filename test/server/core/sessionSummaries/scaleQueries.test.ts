@@ -43,9 +43,9 @@ function insertScaleFixture(db: Database.Database): number {
       playerDriver: { name: driverName, carType, carClass: 'Hyper', carNumber: '1', isPlayer: true,
         bestLapTime: 100 + (index % 50) / 100, bestLapNumber: 1, bestLapOrdinal: 0, driverOrdinal: 0,
         bestS1: 30, bestS2: 40, bestS3: 30, theoreticalBest: 100, 
-        position: 1, gridPosition: 1, positionGain: 0, lapsCount: LAPS_PER_SESSION, completedLapsCount: LAPS_PER_SESSION,
+        position: 1, gridPosition: 1, positionGain: 0, lapsCount: LAPS_PER_SESSION,
         cleanLapsCount: LAPS_PER_SESSION, drivingTimeSeconds: 2_000, pitStopsCount: 0, maxTopSpeed: 300,
-        consistencyScore: 99, topThreeAverage: 100.1, bestLapWet: false } });
+        consistencyScore: 99, top3Average: 100.1, bestLapWet: false } });
   };
   const insertSession = db.prepare(`INSERT INTO sessions (
     id,filename,file_path,file_mtime_ms,file_size_bytes,timestamp,track_venue,track_course,session_type,session_name,
