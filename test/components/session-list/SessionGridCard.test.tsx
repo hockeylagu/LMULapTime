@@ -17,7 +17,7 @@ const session = makeSessionCard({
   },
 });
 
-/** jsdom cannot open a new tab: swallow the browser default after React has seen the click. */
+/** The test DOM cannot open a new tab: swallow the browser default after React has seen the click. */
 function modifierClick(el: HTMLElement, init: { ctrlKey?: boolean; metaKey?: boolean }): void {
   el.addEventListener('click', e => e.preventDefault(), { once: true });
   fireEvent.click(el, init);

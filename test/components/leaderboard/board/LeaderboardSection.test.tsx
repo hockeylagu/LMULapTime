@@ -39,7 +39,7 @@ describe('LeaderboardSection', () => {
     expect(within(table).queryByText('Driver 20')).not.toBeInTheDocument();
     expect(within(table).getByText('Me')).toBeInTheDocument();
     expect(within(table).getByText('100% Alien')).toBeInTheDocument();
-    expect(within(table).getByRole('row', { name: /Alien pace, 100%/ })).toBeInTheDocument();
+    expect(within(table).getByLabelText(/Alien pace, 100%/)).toHaveRole('row');
   });
 
   it('shows everyone on demand when expanded', () => {
@@ -98,7 +98,7 @@ describe('LeaderboardSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Best S2' }));
     expect(screen.getByRole('columnheader', { name: /Best S2/ })).toHaveAttribute('aria-sort', 'ascending');
     expect(screen.getByRole('columnheader', { name: /Best Lap/ })).not.toHaveAttribute('aria-sort');
-    expect(within(screen.getByRole('table')).queryByRole('row', { name: /Alien pace/ })).not.toBeInTheDocument();
+    expect(within(screen.getByRole('table')).queryByLabelText(/Alien pace/)).not.toBeInTheDocument();
   });
 
   it('rates every best lap against the benchmark, and marks the best sectors in their sector colours', () => {

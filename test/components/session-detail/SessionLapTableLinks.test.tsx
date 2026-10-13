@@ -71,7 +71,7 @@ describe('SessionLapTableRow expansion and actions', () => {
   it('leaves ctrl and meta clicks on telemetry to the browser without expanding the row', () => {
     const row = renderTable();
     const link = within(row).getByRole('link', { name: 'Telemetry for lap 3' });
-    // jsdom cannot open a new tab; swallow the browser default after React has seen the click.
+    // The test DOM cannot open a new tab; swallow the browser default after React has seen the click.
     link.addEventListener('click', (e) => e.preventDefault());
     fireEvent.click(link, { ctrlKey: true });
     fireEvent.click(link, { metaKey: true });

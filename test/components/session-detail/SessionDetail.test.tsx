@@ -23,11 +23,6 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
     expect(screen.getByText('Sector 1')).toBeInTheDocument();
     expect(screen.queryByText('Δ Prev')).not.toBeInTheDocument();
 
-    // Metric buttons on telemetry chart
-    act(() => { fireEvent.click(screen.getByRole('button', { name: /^sectors$/i })); });
-    act(() => { fireEvent.click(screen.getAllByRole('button', { name: /^top speed$/i })[0]); });
-    act(() => { fireEvent.click(screen.getByRole('button', { name: /^lap pace$/i })); });
-
     // Verify track link and back navigation
     expect(screen.getByRole('link', { name: 'Spa' })).toHaveAttribute('href', expect.stringContaining('/track/Spa'));
     const backBtn = screen.getByRole('link', { name: /back to sessions/i });

@@ -74,11 +74,11 @@ describe('ReplayInspectorModal', () => {
     render(<ReplayInspectorModal isOpen onClose={vi.fn()} sessionId="session-1" />);
     const chart = await screen.findByLabelText('Telemetry charts');
     fireEvent.keyDown(chart, { key: ' ' });
-    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Pause')).toHaveRole('button');
     fireEvent.keyDown(chart, { key: 'Home' });
-    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Play')).toHaveRole('button');
     fireEvent.keyDown(screen.getByLabelText('Select Driver'), { key: ' ' });
-    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Play')).toHaveRole('button');
   });
 
   it('fetches and displays metadata and telemetry when open', async () => {

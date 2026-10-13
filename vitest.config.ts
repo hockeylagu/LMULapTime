@@ -10,6 +10,9 @@ export default defineConfig({
       : path.join(path.dirname(testPath), '__snapshots__', path.basename(testPath) + extension),
     globals: true,
     css: false,
+    // The default (all cores but one) oversubscribes the CPU: replay tests start their own worker
+    // threads and DOM files are heavy, so single tests stall past a second. 70% runs the suite as fast.
+    maxWorkers: '70%',
     projects: [
       {
         test: {
@@ -21,7 +24,7 @@ export default defineConfig({
       {
         test: {
           name: 'dom',
-          environment: 'jsdom',
+          environment: 'happy-dom',
           pool: 'vmThreads',
           include: ['test/**/*.test.tsx'],
           setupFiles: ['./test/setup.ts'],

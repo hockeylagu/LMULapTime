@@ -3,7 +3,7 @@ import { render, fireEvent } from '@testing-library/react';
 import { GpsTrackSegments } from '../../../../../src/components/replay/map/scene/GpsTrackSegments.js';
 import type { ProjectedPoint } from '../../../../../src/components/replay/map/replayMapUtils.js';
 
-/** jsdom has no layout: give the path an identity screen transform so clicks map 1:1 to SVG space. */
+/** The test DOM has no layout: give the path an identity screen transform so clicks map 1:1 to SVG space. */
 function withIdentityCtm(el: Element): Element {
   Object.assign(el, { getScreenCTM: () => ({ inverse: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }) }) });
   return el;

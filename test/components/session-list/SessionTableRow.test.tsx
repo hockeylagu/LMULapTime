@@ -193,7 +193,7 @@ describe('SessionTableRow', () => {
     it('leaves ctrl-clicks to the browser: no in-app handler, no row handler', () => {
       const { onSelectSession, onOpenReplay } = setup();
       const modifierClick = (el: HTMLElement, init: { ctrlKey?: boolean; metaKey?: boolean }) => {
-        // jsdom cannot open a new tab; swallow the browser default after React has seen the click.
+        // The test DOM cannot open a new tab; swallow the browser default after React has seen the click.
         el.addEventListener('click', (e) => e.preventDefault(), { once: true });
         fireEvent.click(el, init);
       };

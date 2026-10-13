@@ -224,7 +224,7 @@ describe('TrackSummaries component', () => {
     await user.keyboard('{Enter}');
     expect(onSelectTrack).toHaveBeenCalledWith(expect.objectContaining({ identityVenue: 'Monza', trackCourse: '' }));
     onSelectTrack.mockClear();
-    // jsdom cannot open another tab; cancel only the simulated browser default.
+    // The test DOM cannot open another tab; cancel only the simulated browser default.
     document.addEventListener('click', event => event.preventDefault(), { once: true });
     fireEvent.click(link, { ctrlKey: true });
     expect(onSelectTrack).not.toHaveBeenCalled();

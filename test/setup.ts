@@ -164,6 +164,29 @@ if (typeof window !== 'undefined') {
     })),
   });
 
+  // happy-dom's WheelEvent extends UIEvent, so it drops clientX/clientY and the modifier keys; a
+  // browser's extends MouseEvent. Cursor-anchored zoom and Shift-wheel scrolling read both.
+  window.WheelEvent = class WheelEvent extends window.MouseEvent {
+    static readonly DOM_DELTA_PIXEL = 0;
+    static readonly DOM_DELTA_LINE = 1;
+    static readonly DOM_DELTA_PAGE = 2;
+    readonly deltaX: number;
+    readonly deltaY: number;
+    readonly deltaZ: number;
+    readonly deltaMode: number;
+    constructor(type: string, init: WheelEventInit = {}) {
+      super(type, init);
+      this.deltaX = init.deltaX ?? 0;
+      this.deltaY = init.deltaY ?? 0;
+      this.deltaZ = init.deltaZ ?? 0;
+      this.deltaMode = init.deltaMode ?? 0;
+    }
+  } as unknown as typeof window.WheelEvent;
+
+  // happy-dom flags a value longer than maxlength as invalid and blocks the form submit. Browsers only
+  // apply maxlength to the user's edits, which it already stops at the limit, so tooLong stays false.
+  Object.defineProperty(window.ValidityState.prototype, 'tooLong', { configurable: true, get: () => false });
+
   // Mock ResizeObserver for Recharts
   global.ResizeObserver = class ResizeObserver {
     observe() {}
@@ -171,7 +194,7 @@ if (typeof window !== 'undefined') {
     disconnect() {}
   };
 
-  // Mock dimensions for responsive SVG / Recharts containers in jsdom
+  // Mock dimensions for responsive SVG / Recharts containers in the test DOM
   Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
     configurable: true,
     get: () => 800,
@@ -208,7 +231,7 @@ if (typeof window !== 'undefined') {
   HTMLAnchorElement.prototype.click = vi.fn();
 }
 
-// Safe default mock for global.fetch in jsdom tests
+// Safe default mock for global.fetch in DOM tests
 const currentFetch = global.fetch as (typeof global.fetch & { _isDefaultMock?: boolean }) | undefined;
 if (!currentFetch || currentFetch._isDefaultMock === undefined) {
   const defaultFetch = vi.fn().mockImplementation(() =>

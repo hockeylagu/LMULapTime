@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { describe, it, expect } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useStableCullViewBox } from '../../../../src/components/replay/map/useStableCullViewBox.js';

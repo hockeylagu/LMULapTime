@@ -35,7 +35,7 @@ function isInDistRange(distM: number | undefined, range: { startDistM: number; e
     : distM >= range.startDistM || distM <= range.endDistM;
 }
 
-/** The click position in the SVG's user space (null without layout, e.g. in jsdom). */
+/** The click position in the SVG's user space (null without layout, e.g. in a test DOM). */
 function toSvgCoords(e: React.MouseEvent<SVGPathElement>): { sx: number; sy: number } | null {
   const ctm = e.currentTarget.getScreenCTM?.();
   if (!ctm) return null;
