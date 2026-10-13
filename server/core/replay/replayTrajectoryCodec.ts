@@ -1,5 +1,5 @@
 import { ReplayMetadata, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../shared/types/index.js';
-import { compressJson, decompressJson } from '../dbSchema.js';
+import { compressJson, decompressJson } from '../dbCache.js';
 import { applyGarageState, garageSpells, garageState } from '../../replay/decode/garageState.js';
 import { LAP_EDGE_PADDING_SEC } from '../../replay/decode/replayLapPoints.js';
 

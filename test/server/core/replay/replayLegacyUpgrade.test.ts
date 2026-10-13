@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
-import { initDbSchema, compressJson, REPLAY_CACHE_VERSION } from '../../../../server/core/dbSchema.js';
+import { initDbSchema } from '../../../../server/core/dbSchema.js';
+import { compressJson, REPLAY_CACHE_VERSION } from '../../../../server/core/dbCache.js';
 import {
   compressTrajectory,
   recalibrateLegacyAmbientTemp,

@@ -2,7 +2,7 @@ import React from 'react';
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { PointComparison } from '../../../utils/replayComparison.js';
 import { CornerSegmentComparison, StraightSegmentComparison } from '../../../utils/cornerAnalysis/types.js';
-import { TelemetryChartPathsResult } from './telemetryChartPaths.js';
+import type { TelemetryChartPathsResult } from './telemetryChartTypes.js';
 import { TelemetryStripToolbar } from './TelemetryStripToolbar.js';
 import { TelemetryChannelRenderer } from './TelemetryChannelRenderer.js';
 import { TelemetryCornerStrip } from './TelemetryCornerStrip.js';

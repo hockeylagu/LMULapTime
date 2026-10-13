@@ -11,7 +11,8 @@ import {
   upgradeStoredTrajectory,
   withGarageState,
 } from '../../../../server/core/replay/replayTrajectoryCodec.js';
-import { compressJson, initDbSchema } from '../../../../server/core/dbSchema.js';
+import { compressJson } from '../../../../server/core/dbCache.js';
+import { initDbSchema } from '../../../../server/core/dbSchema.js';
 import { getTelemetryLapCache, upsertTelemetryLapCache } from '../../../../server/core/dbTelemetryStore.js';
 import { lapEdgesFromNeighbours } from '../../../../server/replay/decode/replayLapPoints.js';
 

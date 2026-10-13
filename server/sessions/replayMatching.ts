@@ -1,7 +1,7 @@
 import { CIRCUIT_SPECIFICATIONS, type CircuitSpecification } from '../../shared/domain/circuitDefinitions.js';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import type { ReplayLinkRejectionReason } from '../../shared/types/index.js';
-import type { StoredReplayFileInfo } from '../core/replay/dbReplayMetadataStore.js';
+import type { StoredReplayFileInfo } from '../core/replay/replayStorageTypes.js';
 import { ReplayFileEntry } from './sessionXmlTypes.js';
 
 /** The session a replay is matched against: its XML start timestamp and the XML file's mtimeMs (session end). */

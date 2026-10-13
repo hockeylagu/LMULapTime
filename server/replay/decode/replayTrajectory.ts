@@ -1,3 +1,4 @@
+import type { ExtractReplayTrajectoryOptions } from './replayTrajectoryTypes.js';
 import fs from 'fs';
 import path from 'path';
 import { ReplayDriverSamples } from './replayDriverSamples.js';
@@ -20,22 +21,7 @@ import {
 } from './replayLapBuilder.js';
 import {
   ReplayProgressTracker,
-  ReplayProgressCallback,
-  ReplayLogOptions,
 } from '../replayProgress.js';
-
-export interface ExtractReplayTrajectoryOptions extends ReplayLogOptions {
-  driverSlot?: number;
-  driverName?: string;
-  maxPoints?: number;
-  playerName?: string;
-  lapNumber?: number;
-  // When true, finalizes every detected lap for the target driver in this same file
-  // scan and attaches them all as `allLapsData`, so callers (e.g. the eager replay
-  // cache sync) can persist the whole driver's laps from a single binary pass.
-  allLaps?: boolean;
-  onProgress?: ReplayProgressCallback;
-}
 
 // Class 0 Type 17 contact, byte +32: values below ~105 are the other car's slot, these are objects.
 const CONTACT_OBJECT_NAMES: Record<number, string> = {

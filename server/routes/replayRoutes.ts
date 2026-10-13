@@ -1,6 +1,6 @@
 import path from 'path';
 import { Router } from 'express';
-import { REPLAY_CACHE_VERSION } from '../core/dbSchema.js';
+import { REPLAY_CACHE_VERSION } from '../core/dbCache.js';
 import { ServerContext } from '../core/serverContext.js';
 import { composeReplayMetadata } from '../replay/replayMetadataService.js';
 import { ReplayTelemetryService } from '../replay/replayTelemetryService.js';

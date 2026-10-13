@@ -1,7 +1,13 @@
 import { Database as DatabaseType } from 'better-sqlite3';
 import { ReplayTrajectoryData } from '../../../shared/types/index.js';
-import { REPLAY_CACHE_VERSION, isCompatibleReplayCacheVersion } from '../dbSchema.js';
-import { compressTrajectory, decompressTrajectory, decompressTrajectoryEdge, upgradeStoredTrajectory, withGarageState } from './replayTrajectoryCodec.js';
+import { REPLAY_CACHE_VERSION, isCompatibleReplayCacheVersion } from '../dbCache.js';
+import {
+  compressTrajectory,
+  decompressTrajectory,
+  decompressTrajectoryEdge,
+  upgradeStoredTrajectory,
+  withGarageState,
+} from './replayTrajectoryCodec.js';
 import { lapEdgesFromNeighbours } from '../../replay/decode/replayLapPoints.js';
 import { getReplayLaps } from './dbReplayLapStore.js';
 import { lapSummariesFrom } from '../../replay/decode/replayFacts.js';

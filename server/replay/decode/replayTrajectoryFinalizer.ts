@@ -4,7 +4,7 @@ import { buildTrajectoryPoints } from './replayLapPoints.js';
 import { replayWeatherCondition } from '../../../shared/domain/lapConditions.js';
 import { nearestSelectedIndex, selectFeatureSamples } from './trajectoryDownsampler.js';
 import { ReplayProgressTracker } from '../replayProgress.js';
-import type { ExtractReplayTrajectoryOptions } from './replayTrajectory.js';
+import type { ExtractReplayTrajectoryOptions } from './replayTrajectoryTypes.js';
 
 export interface ReplayFinalizeContext {
   filename: string;

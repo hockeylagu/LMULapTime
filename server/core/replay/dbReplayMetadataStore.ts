@@ -1,3 +1,4 @@
+import type { StoredReplayFileInfo } from './replayStorageTypes.js';
 import fs from 'fs';
 import path from 'path';
 import { Database as DatabaseType } from 'better-sqlite3';
@@ -5,7 +6,7 @@ import { ReplayMetadata, ReplayCacheSummary } from '../../../shared/types/index.
 import { upgradeStoredReplayMetadata } from './replayTrajectoryCodec.js';
 import { ReplayDriverIngestStatus, settledReplayFailure } from './dbReplayIngestStore.js';
 import { resolveRosterVehicles } from '../../../shared/domain/vehicleMapping.js';
-import { REPLAY_CACHE_VERSION, compressJson, decompressJson, isCompatibleReplayCacheVersion } from '../dbSchema.js';
+import { REPLAY_CACHE_VERSION, compressJson, decompressJson, isCompatibleReplayCacheVersion } from '../dbCache.js';
 import { writeReplayMatchingFacts } from './dbReplayMatchingStore.js';
 import { getMetadata, setMetadata } from '../dbMetadataStore.js';
 
@@ -59,13 +60,6 @@ export function reconcileReplayPlayerOwnership(db: DatabaseType, playerName: str
     setMetadata(db, 'replay_player_ownership_rule', rule);
   })();
   return true;
-}
-
-export interface StoredReplayFileInfo {
-  file_path: string;
-  file_mtime_ms: number;
-  file_size_bytes: number;
-  metadata: ReplayMetadata;
 }
 
 export function getReplayMetadataCache(db: DatabaseType, filename: string, mtimeMs: number, fileSizeBytes: number, filePath?: string, playerName?: string): ReplayMetadata | null {

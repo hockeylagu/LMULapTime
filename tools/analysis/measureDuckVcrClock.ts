@@ -11,7 +11,7 @@ import Database from 'better-sqlite3';
 import { ReplayMetadata } from '../../shared/types/index.js';
 import type { DuckDbLapTelemetry } from '../../server/telemetry/duckdbTypes.js';
 import { decompressTrajectory } from '../../server/core/replay/replayTrajectoryCodec.js';
-import { DUCKDB_TELEMETRY_CACHE_VERSION, decompressJson } from '../../server/core/dbSchema.js';
+import { DUCKDB_TELEMETRY_CACHE_VERSION, decompressJson } from '../../server/core/dbCache.js';
 import { vcrLapBaseTime } from '../../server/telemetry/telemetryFusion.js';
 import { checkDuckVcrClock } from './duckVcrClockCheck.js';
 

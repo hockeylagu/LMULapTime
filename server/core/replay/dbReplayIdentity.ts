@@ -1,7 +1,8 @@
 import path from 'path';
 import { Database as DatabaseType } from 'better-sqlite3';
 import { ReplayMetadata } from '../../../shared/types/index.js';
-import { getStoredReplayFileInfo, StoredReplayFileInfo } from './dbReplayMetadataStore.js';
+import { getStoredReplayFileInfo } from './dbReplayMetadataStore.js';
+import type { StoredReplayFileInfo } from './replayStorageTypes.js';
 import { renameReplayFacts } from './dbReplayLapStore.js';
 import { renameTargetedReplay } from '../sessionRows/targeted.js';
 

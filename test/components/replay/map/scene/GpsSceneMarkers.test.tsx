@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { GpsSceneMarkers } from '../../../../../src/components/replay/map/scene/GpsSceneMarkers.js';
-import type { CornerMarkerPoint, PedalMarkerPoint } from '../../../../../src/components/replay/map/scene/GpsSceneMarkers.js';
+import type { CornerMarkerPoint } from '../../../../../src/components/replay/map/scene/GpsSceneMarkers.js';
+import type { PedalMarkerPoint } from '../../../../../src/components/replay/map/gpsTrackMapTypes.js';
 
 describe('GpsSceneMarkers', () => {
   it('keeps the selected corner when overview labels overlap and reveals neighbors at closer scale', () => {

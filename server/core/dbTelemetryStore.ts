@@ -1,11 +1,7 @@
 import { Database as DatabaseType } from 'better-sqlite3';
 import type { DuckDbLapTelemetry } from '../telemetry/duckdbTypes.js';
 import { DuckDbFileInfo } from '../telemetry/telemetryMatcher.js';
-import {
-  DUCKDB_TELEMETRY_CACHE_VERSION,
-  compressJson,
-  decompressJson,
-} from './dbSchema.js';
+import { DUCKDB_TELEMETRY_CACHE_VERSION, compressJson, decompressJson } from './dbCache.js';
 import { toIso8855Steering } from './replay/replayTrajectoryCodec.js';
 
 export interface TelemetryMetadataRecord {

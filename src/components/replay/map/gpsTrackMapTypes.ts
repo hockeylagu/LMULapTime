@@ -59,3 +59,15 @@ export interface GpsTrackMapProps {
   // the map aligns laps with it exactly as the telemetry channels and corner analysis do.
   trackLengthM?: number;
 }
+
+export interface PedalMarkerPoint {
+  cornerNumber: number;
+  distM?: number;
+  kind: 'brake' | 'throttle';
+  sx: number;
+  sy: number;
+  nx?: number;
+  ny?: number;
+  isBaseline?: boolean;
+  isStaggered?: boolean;
+}

@@ -4,12 +4,15 @@ import path from 'node:path';
 import { SessionDatabase } from '../../../../server/core/db.js';
 import { getReplayConditions, getReplayLaps } from '../../../../server/core/replay/dbReplayLapStore.js';
 import { MAX_DECODE_ATTEMPTS, replayFailureStatus } from '../../../../server/core/replay/dbReplayIngestStore.js';
-import { storeReplayTrajectoryInWorker, storeReplayDriversInWorker } from '../../../../server/replay/worker/replayTrajectoryWorkerClient.js';
+import {
+  storeReplayTrajectoryInWorker,
+  storeReplayDriversInWorker,
+} from '../../../../server/replay/worker/replayTrajectoryWorkerClient.js';
 import { extractReplayTrajectory } from '../../../../server/replay/decode/replayTrajectory.js';
 import { parseReplayMetadata } from '../../../../server/replay/decode/replayParser.js';
 import { ReplayRecordingService } from '../../../../server/replay/replayRecordingService.js';
 import type { ReplayStreamProgress } from '../../../../server/replay/replayProgress.js';
-import { REPLAY_CACHE_VERSION } from '../../../../server/core/dbSchema.js';
+import { REPLAY_CACHE_VERSION } from '../../../../server/core/dbCache.js';
 import { createMockVcrBuffer, createSliceVcrBuffer } from '../../../utils/mockVcr.js';
 
 describe('worker SQLite persistence', () => {

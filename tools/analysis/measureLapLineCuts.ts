@@ -16,7 +16,7 @@ import { fileURLToPath } from 'url';
 import Database from 'better-sqlite3';
 import { LapEndCut, ReplayMetadata, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../shared/types/index.js';
 import { decompressTrajectory } from '../../server/core/replay/replayTrajectoryCodec.js';
-import { decompressJson } from '../../server/core/dbSchema.js';
+import { decompressJson } from '../../server/core/dbCache.js';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { getTrackDefinition } from '../../server/tracks/serverTrackSync.js';
 import { projectTrajectoryToCenterline } from '../../server/tracks/trackProjection.js';

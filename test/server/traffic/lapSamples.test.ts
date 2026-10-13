@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildRacePositions, readLapSamples } from '../../../server/traffic/lapSamples.js';
 import { buildRacePositionsInWorker } from '../../../server/traffic/racePositionsWorkerClient.js';
 import { compressTrajectory } from '../../../server/core/replay/replayTrajectoryCodec.js';
-import { compressJson } from '../../../server/core/dbSchema.js';
+import { compressJson } from '../../../server/core/dbCache.js';
 import { distanceAt, RACE_POSITIONS_VERSION } from '../../../server/traffic/racePositions.js';
 import type { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../shared/types/index.js';
 import { circleCenterline, pointAt } from './circleTrack.js';

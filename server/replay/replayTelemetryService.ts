@@ -6,7 +6,7 @@ import { DuckDbReader } from '../telemetry/duckdbReader.js';
 import { TelemetryLinks } from '../telemetry/telemetryLinks.js';
 import { fuseDuckDbWithVcrTrajectory } from '../telemetry/telemetryFusion.js';
 import fs from 'node:fs';
-import { DUCKDB_TELEMETRY_CACHE_VERSION } from '../core/dbSchema.js';
+import { DUCKDB_TELEMETRY_CACHE_VERSION } from '../core/dbCache.js';
 
 export interface TelemetryEnrichmentInput {
   sessionId?: string;

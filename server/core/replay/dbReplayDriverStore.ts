@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import type { Database } from 'better-sqlite3';
 import type { ReplayTrajectoryData } from '../../../shared/types/index.js';
-import { REPLAY_CACHE_VERSION } from '../dbSchema.js';
+import { REPLAY_CACHE_VERSION } from '../dbCache.js';
 import { reclassifyStoredSessions } from '../dbSessionConditions.js';
 import { factsDriverSlot, withoutReplayFacts } from '../../replay/decode/replayFacts.js';
 import { compressTrajectory } from './replayTrajectoryCodec.js';

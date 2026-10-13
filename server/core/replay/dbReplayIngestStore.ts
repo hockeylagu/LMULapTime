@@ -1,5 +1,5 @@
 import { Database as DatabaseType } from 'better-sqlite3';
-import { REPLAY_CACHE_VERSION } from '../dbSchema.js';
+import { REPLAY_CACHE_VERSION } from '../dbCache.js';
 import { deleteReplayDriverLapFacts } from './dbReplayLapStore.js';
 import { ReplayDecodeError } from '../../replay/decode/replayDecodeError.js';
 

@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Timer } from 'lucide-react';
 import { PointComparison } from '../../../../../utils/replayComparison.js';
-import { DeltaGradientStop } from '../../telemetryChartPaths.js';
+import type { DeltaGradientStop } from '../../telemetryChartTypes.js';
 import { CHART_COLORS, TELEMETRY_COLORS } from '../../../../../utils/themeColors.js';
 import { TelemetryGridLine, TelemetryStaticTrace } from '../../TelemetryStaticTrace.js';
 

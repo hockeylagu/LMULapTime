@@ -2,7 +2,7 @@ import type { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import type { PointComparison } from '../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 import type { CornerPaths } from './telemetryCornerChartPaths.js';
-import type { DeltaGradientStop, TelemetryChartPathsResult } from './telemetryChartPaths.js';
+import type { DeltaGradientStop, TelemetryChartPathsResult } from './telemetryChartTypes.js';
 
 /** Gear position in the full-height SVG coordinate system (0–100). */
 export function gearTraceY(gear: number): number {

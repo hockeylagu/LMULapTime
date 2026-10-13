@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { SessionDatabase } from '../../../../server/core/db.js';
-import { initReplayMatchingSchema } from '../../../../server/core/replay/dbReplayMatchingStore.js';
+import { initReplayMatchingSchema } from '../../../../server/core/replay/replayMatchingSchema.js';
 import type { ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { resolveReplayPrimarySlot } from '../../../../server/replay/decode/replayParser.js';
 

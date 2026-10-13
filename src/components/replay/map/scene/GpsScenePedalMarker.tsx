@@ -1,7 +1,7 @@
 import React from 'react';
 import { PEDAL_MARKER_LINE_HALF_LEN, PEDAL_MARKER_TAG_BASE_OFFSET, PEDAL_MARKER_TAG_STAGGER_OFFSET } from '../replayMapUtils.js';
 import { CHART_COLORS, MAP_COLORS, TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
-import type { PedalMarkerPoint } from './GpsSceneMarkers.js';
+import type { PedalMarkerPoint } from '../gpsTrackMapTypes.js';
 
 export interface GpsScenePedalMarkerProps {
   marker: PedalMarkerPoint;

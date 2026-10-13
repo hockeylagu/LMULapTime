@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import Database, { Database as DatabaseType } from 'better-sqlite3';
-import { initDbSchema, REPLAY_CACHE_VERSION } from '../../../../server/core/dbSchema.js';
+import { initDbSchema } from '../../../../server/core/dbSchema.js';
+import { REPLAY_CACHE_VERSION } from '../../../../server/core/dbCache.js';
 import {
   getReplayLapEdges,
   getReplayTrajectoryCache,

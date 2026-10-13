@@ -55,8 +55,8 @@ import {
   listReplayLapRows,
   saveRacePositions,
 } from './replay/dbRacePositionStore.js';
+import type { StoredReplayFileInfo } from './replay/replayStorageTypes.js';
 import {
-  StoredReplayFileInfo,
   getAllStoredReplayFiles,
   getReplayMetadataCache,
   getStoredReplayFileInfo,

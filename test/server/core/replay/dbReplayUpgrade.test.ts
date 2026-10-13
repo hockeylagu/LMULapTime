@@ -4,7 +4,7 @@ import os from 'os';
 import path from 'path';
 import { SessionDatabase } from '../../../../server/core/db.js';
 import type { ReplayUpgradeResult } from '../../../../server/core/db.js';
-import { REPLAY_CACHE_VERSION } from '../../../../server/core/dbSchema.js';
+import { REPLAY_CACHE_VERSION } from '../../../../server/core/dbCache.js';
 import { getReplayFactsVersion } from '../../../../server/core/replay/dbReplayLapStore.js';
 import { ReplayDecodeError } from '../../../../server/replay/decode/replayDecodeError.js';
 import { MAX_DECODE_ATTEMPTS } from '../../../../server/core/replay/dbReplayIngestStore.js';

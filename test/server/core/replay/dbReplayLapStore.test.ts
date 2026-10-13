@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SessionDatabase } from '../../../../server/core/db.js';
-import { REPLAY_CACHE_VERSION } from '../../../../server/core/dbSchema.js';
+import { REPLAY_CACHE_VERSION } from '../../../../server/core/dbCache.js';
 import type { ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import {
   getDriverEvents,

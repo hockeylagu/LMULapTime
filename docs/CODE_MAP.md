@@ -5,6 +5,10 @@ this file holds the **routes through the code**. Keep it current (see "Keeping t
 
 Canonical domain contracts live in `shared/types/`; `shared/types/index.ts` is the approved barrel.
 Import server telemetry reader contracts directly from `server/telemetry/duckdbTypes.ts`.
+Local contracts also have independent owners: replay storage facts in `server/core/replay/replayStorageTypes.ts`,
+decode options in `server/replay/decode/replayTrajectoryTypes.ts`, telemetry chart results in
+`src/components/replay/telemetry/telemetryChartTypes.ts`, and map marker coordinates in
+`src/components/replay/map/gpsTrackMapTypes.ts`. Import these definitions directly to avoid cycles through their consumers.
 The type cleanup is tracked in [the archived type refactoring plan](plans/archive/TYPE_REFACTORING_PLAN.md), and its
 Phase 6 naming table.
 
@@ -28,7 +32,8 @@ Other tables: `reference_laptimes` (benchmarks), `ai_reports`, `rival_targets` (
 `cache_metadata`, `ingest_errors`, `replay_ingest_drivers`, `rejected_replay_links`, `replay_trajectory_defaults`.
 DDL is coordinated by `server/core/dbSchema.ts`; additive session projection tables and indexes
 live in `server/core/sessionSummaries/schema.ts` and `aggregateStore.ts`, and replay matching columns/indexes in
-`server/core/replay/dbReplayMatchingStore.ts`.
+`server/core/replay/replayMatchingSchema.ts`. Cache versions and JSON compression live in the independent
+`server/core/dbCache.ts`; stores and codecs import them directly without depending on schema initialization.
 Normalized session rows (`server/core/sessionRows/`, completed plan [NORMALIZED_SESSION_STORAGE](plans/archive/NORMALIZED_SESSION_STORAGE.md)) are the
 stored session. JSON columns, temporary conversion tools, verification backfill and its startup gate have been removed.
 `specs.ts` declares every stored column once (`fields.ts` helpers); `schema.ts` holds the DDL, extra session scalars and derived-column lists.
@@ -459,8 +464,8 @@ standings 43 → 1.5 ms and player history 6.6 → 0.2 ms. These exclude HTTP an
 | `DB_PARSER_VERSION` | `server/core/dbSessionSync.ts` (exported const) | a parser/lap classification rule changes | every stored session re-parsed from XML |
 | `SESSION_SUMMARY_PROJECTION_VERSION` | `shared/types/sessionSummaries.ts` | persisted summary or lap-fact rules change (now 4: derived facts on the row tables) | bounded rebuild from the stored rows, without XML reads |
 | `REPLAY_MATCHING_PROJECTION_VERSION` | `server/core/replay/dbReplayMatchingStore.ts` | persisted replay matching facts change | one-time rebuild from retained metadata, without VCR reads |
-| `REPLAY_CACHE_VERSION` | `server/core/dbSchema.ts` | decoded replay rows change | on-disk replays decoded again in the background (deleted ones kept as they are) |
-| `DUCKDB_TELEMETRY_CACHE_VERSION` | `server/core/dbSchema.ts` | DuckDB lap cache shape changes | lap cache rebuilt |
+| `REPLAY_CACHE_VERSION` | `server/core/dbCache.ts` | decoded replay rows change | on-disk replays decoded again in the background (deleted ones kept as they are) |
+| `DUCKDB_TELEMETRY_CACHE_VERSION` | `server/core/dbCache.ts` | DuckDB lap cache shape changes | lap cache rebuilt |
 | `RACE_POSITIONS_VERSION` | `server/traffic/racePositions.ts` | race positions index changes | index rebuilt on demand |
 | `TELEMETRY_LINK_RULE` | `server/telemetry/telemetryLinks.ts` | DuckDB-to-session linking changes | links decided again |
 | `PROMPT_VERSION` | `server/ai/aiReport.ts` | AI prompt changes | new reports, old ones kept |
