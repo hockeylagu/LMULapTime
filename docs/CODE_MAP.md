@@ -66,7 +66,7 @@ The telemetry comparison picker requests `telemetryOnly=true` on `/api/compare/l
 That request uses `queryTelemetryComparableLaps` in `comparisonQueries.ts`: direct SQL reads of the visible lap rows,
 identity/display fields and best-lap badges, without full session hydration, benchmark rating or unused summary aggregates.
 The general leaderboard comparison response retains its summaries. Both paths share filter and personal-best scope rules.
-Personal-best (gold) badges mark each driver's fastest valid lap of the layout and class: any car, any condition, with or without a replay; car, recording, session and lap filters only narrow the displayed rows. Gold marks the personal best, while blue marks a session best.
+Personal-best (gold) badges mark each driver's fastest valid lap of the layout and class: any car, any condition, with or without a replay; car, recording, session and lap filters only narrow the displayed rows. Gold marks the personal best, while blue marks a session best. They are ranked from each session's stored driver best (`session_drivers.best_lap_ordinal` / `best_lap_time`), one row per driver and session.
 `comparisonLapRows.ts` reads the general response's selected page and up to three best-lap locators in one query,
 deduplicates those locators, and rates only those laps against current benchmarks. It never hydrates full sessions,
 driver histories or events. Equivalent representative/player-best queries share their result when the scopes match.

@@ -113,12 +113,15 @@ function markPagePersonalBests(db: DatabaseType, rows: PageLapFact[], display: Q
   if (!rows.length) return;
   const names = [...new Set(rows.map(row => row.driver_name.trim().toLowerCase()))];
   // Rank history once for the page's drivers. Locator/paging filters do not narrow a driver's PB.
+  // Each session row already stores the driver's fastest valid lap there, so only one row per
+  // driver and session is ranked, not every lap.
   const bests = db.prepare(`SELECT session_id,driver_ordinal,lap_ordinal FROM (
-      SELECT s.id session_id,d.driver_ordinal,l.lap_ordinal,
+      SELECT s.id session_id,d.driver_ordinal,d.best_lap_ordinal lap_ordinal,
         row_number() OVER (PARTITION BY lower(trim(dn.name))
-          ORDER BY l.lap_time,s.timestamp,s.rowid,d.driver_ordinal,l.lap_ordinal) best_rank
-      ${lapJoinWhere({ where: [...display.where, `lower(trim(dn.name)) IN (${names.map(() => '?').join(',')})`], args: [] })}
-        AND l.is_valid=1 AND l.lap_time>0
+          ORDER BY d.best_lap_time,s.timestamp,s.rowid,d.driver_ordinal) best_rank
+      FROM sessions s JOIN session_drivers d ON d.session_id=s.id LEFT JOIN drivers dn ON dn.driver_id=d.driver_id LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id
+      WHERE ${whereSql({ where: [...display.where, `lower(trim(dn.name)) IN (${names.map(() => '?').join(',')})`], args: [] })}
+        AND d.best_lap_time>0 AND d.best_lap_ordinal IS NOT NULL
     ) WHERE best_rank=1`).all(...display.args, ...names) as Array<Pick<PageLapFact, 'session_id' | 'driver_ordinal' | 'lap_ordinal'>>;
   const bestKeys = new Set(bests.map(best => `${best.session_id}:${best.driver_ordinal}:${best.lap_ordinal}`));
   for (const row of rows) row.is_all_time_pb = bestKeys.has(`${row.session_id}:${row.driver_ordinal}:${row.lap_ordinal}`) ? 1 : 0;

@@ -1,5 +1,13 @@
 # Endpoint performance history
 
+## Gold badge from stored session bests — 2026-10-13
+
+Gold badges now rank each driver's stored per-session best lap (one row per driver and session) instead of
+every lap. On the real cache the result is identical for all 4,944 driver/layout/class groups, and that
+ranking query fell from 321 to 29 ms. Two full 20-sample sweeps on the same snapshot, before and after:
+picker 13.40 / 16.59 ms → 8.34 / 10.64 ms (player / all drivers), comparison 22.06 / 25.81 ms →
+18.51 / 20.48 ms. Other endpoints were unchanged within noise.
+
 ## Class personal-best badge review — 2026-10-13
 
 A five-sample endpoint sweep passed after expanding gold-badge history to all cars and
