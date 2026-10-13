@@ -21,7 +21,7 @@ export interface TrackDetailData {
   benchmarks: ReferenceLaptimeEntry[];
   summary?: TrackSummary;
   filters?: { carTypes: string[]; sessionTypes: string[]; emptyCount: number; replayCount: number };
-  progression?: { points: SessionProgressionPoint[]; total: number; page: number; pageSize: number };
+  progression?: SessionProgressionPoint[];
   positions?: { qualifyingAveragePosition: number | null; finishAveragePosition: number | null };
   latestSession?: { trackVenue?: string; trackCourse?: string; trackLengthMeters?: number | null; carClass?: string; carType?: string };
   page?: number;
@@ -78,27 +78,27 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
 
   const setSelectedCarModel = (model: string) => {
     setSelectedCarModelState(model);
-    updateSearchParams(searchParams, setSearchParams, { model, page: null, progressionPage: null });
+    updateSearchParams(searchParams, setSearchParams, { model, page: null });
   };
 
   const setFilterType = (type: string) => {
     setFilterTypeState(type);
-    updateSearchParams(searchParams, setSearchParams, { type, page: null, progressionPage: null });
+    updateSearchParams(searchParams, setSearchParams, { type, page: null });
   };
 
   const setSearchQuery = (q: string) => {
     setSearchQueryState(q);
-    updateSearchParams(searchParams, setSearchParams, { q, page: null, progressionPage: null });
+    updateSearchParams(searchParams, setSearchParams, { q, page: null });
   };
 
   const setHideEmpty = (hide: boolean) => {
     setHideEmptyState(hide);
-    updateSearchParams(searchParams, setSearchParams, { hideEmpty: hide, page: null, progressionPage: null });
+    updateSearchParams(searchParams, setSearchParams, { hideEmpty: hide, page: null });
   };
 
   const setHasReplay = (replayOnly: boolean) => {
     setHasReplayState(replayOnly);
-    updateSearchParams(searchParams, setSearchParams, { hasReplay: replayOnly ? 'true' : null, page: null, progressionPage: null });
+    updateSearchParams(searchParams, setSearchParams, { hasReplay: replayOnly ? 'true' : null, page: null });
   };
 
   /**
@@ -106,18 +106,15 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
    * `showEmpty` also lists empty sessions (the empty-state recovery); otherwise they stay hidden, the default.
    */
   const resetSessionFilters = (showEmpty = false) => {
-    updateSearchParams(searchParams, setSearchParams, { model: null, type: null, q: null, hideEmpty: !showEmpty, hasReplay: null, page: null, progressionPage: null });
+    updateSearchParams(searchParams, setSearchParams, { model: null, type: null, q: null, hideEmpty: !showEmpty, hasReplay: null, page: null });
   };
-
-  const progressionPage = Math.max(1, Number(searchParams.get('progressionPage')) || 1);
-  const setProgressionPage = (page: number) => updateSearchParams(searchParams, setSearchParams, { progressionPage: page <= 1 ? null : String(page) });
 
   useEffect(() => {
     if (prevCarClassRef.current !== selectedCarClass) {
       prevCarClassRef.current = selectedCarClass;
       setSelectedCarModelState('All');
-      if (searchParams.has('model') || searchParams.has('page') || searchParams.has('progressionPage')) {
-        updateSearchParams(searchParams, setSearchParams, { model: null, page: null, progressionPage: null });
+      if (searchParams.has('model') || searchParams.has('page')) {
+        updateSearchParams(searchParams, setSearchParams, { model: null, page: null });
       }
     }
   }, [selectedCarClass, searchParams, setSearchParams]);
@@ -172,7 +169,5 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
     sortBy,
     setSortBy,
     handleOpenReplay,
-    progressionPage,
-    setProgressionPage,
   };
 }

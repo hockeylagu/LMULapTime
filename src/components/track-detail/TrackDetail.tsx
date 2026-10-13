@@ -5,10 +5,9 @@ import { formatTime, compareSessions, compareSessionsBySortOption, isSessionEmpt
 import { matchesSessionCarClass } from '../../../shared/domain/vehicleMapping.js';
 import { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 import { ImprovementChart } from './improvement-chart/ImprovementChart.js';
-import type { SessionProgressionPoint } from '../../../shared/types/index.js';
 import { TrackDetailHeader } from './TrackDetailHeader.js';
 import { TrackSessionsCard } from './TrackSessionsCard.js';
-import { getPaceCategoryForLap, getSessionBestLapPace, buildTrackProgression } from './trackDetailHelpers.js';
+import { getPaceCategoryForLap, getSessionBestLapPace } from './trackDetailHelpers.js';
 import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
 import { useTrackDetailState } from './useTrackDetailState.js';
 import { useSessionViewMode } from '../session-list/useSessionViewMode.js';
@@ -23,7 +22,6 @@ export interface TrackDetailProps {
   onOpenReplay?: (sessionId: string) => void;
   selectedCarClass: string;
   setSelectedCarClass: (carClass: string) => void;
-  progression?: SessionProgressionPoint[];
   trackGeometry?: TrackBoundaryGeometry | null;
 }
 
@@ -34,7 +32,6 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   onOpenReplay,
   selectedCarClass,
   setSelectedCarClass,
-  progression = [],
   trackGeometry,
 }) => {
   const { viewMode: sessionViewMode, setViewMode: setSessionListViewMode } = useSessionViewMode();
@@ -57,8 +54,6 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
     sortBy,
     setSortBy,
     handleOpenReplay,
-    progressionPage,
-    setProgressionPage,
   } = useTrackDetailState(trackName, selectedCarClass);
 
   const selectedClass = selectedCarClass;
@@ -124,8 +119,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
       .map(session => session.playerDriver?.position).filter((position): position is number => typeof position === 'number' && position > 0);
     return positions.length ? positions.reduce((sum, position) => sum + position, 0) / positions.length : null;
   };
-  const fallbackProgression = buildTrackProgression(filteredSessions, data.sessions, progression);
-  const trackProgression = (data.progression?.points ?? fallbackProgression).map((point) => {
+  const trackProgression = (data.progression ?? []).map((point) => {
     const paceInfo = point.bestLapWet ? null : getPaceCategoryForLap(
       point.bestLapTime,
       findBenchmarkForClass(point.carClass)
@@ -233,13 +227,6 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
             : undefined
         }
       />
-      {data.progression && data.progression.total > data.progression.pageSize && (
-        <div className="flex items-center justify-center gap-3 text-xs text-lmu-muted">
-          <button type="button" disabled={progressionPage <= 1} onClick={() => setProgressionPage(progressionPage - 1)} className="rounded-lg border border-lmu-border px-3 py-1.5 disabled:opacity-40">Older points</button>
-          <span>Progression page {data.progression.page} of {Math.max(1, Math.ceil(data.progression.total / data.progression.pageSize))} · {data.progression.total} sessions</span>
-          <button type="button" disabled={progressionPage >= Math.ceil(data.progression.total / data.progression.pageSize)} onClick={() => setProgressionPage(progressionPage + 1)} className="rounded-lg border border-lmu-border px-3 py-1.5 disabled:opacity-40">Newer points</button>
-        </div>
-      )}
     </div>
   );
 };

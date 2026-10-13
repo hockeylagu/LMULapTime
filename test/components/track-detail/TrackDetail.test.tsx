@@ -59,6 +59,20 @@ describe('TrackDetail component', () => {
         },
       },
     ],
+    progression: [
+      {
+        sessionId: 'sess-hypercar-1', timestamp: 1, timeString: '2026/05/28 14:00', sessionType: 'Practice',
+        sessionName: 'P1', trackVenue: 'Spa', trackCourse: 'GP', carType: 'Ferrari 499P', carClass: 'Hyper',
+        driverName: 'Player', bestLapTime: 122, bestS1: 35, bestS2: 42, bestS3: 45, theoreticalBest: 122,
+        cleanLapsCount: 5, declaredLapsCount: 5, avgLapTime: 122,
+      },
+      {
+        sessionId: 'sess-gt3-1', timestamp: 2, timeString: '2026/05/29 16:00', sessionType: 'Qualifying',
+        sessionName: 'Q1', trackVenue: 'Spa', trackCourse: 'GP', carType: 'Porsche 911 GT3', carClass: 'GT3',
+        driverName: 'Player', bestLapTime: 138, bestS1: 40, bestS2: 48, bestS3: 50, theoreticalBest: 138,
+        cleanLapsCount: 4, declaredLapsCount: 4, avgLapTime: 138,
+      },
+    ],
     benchmarks: [
       {
         key: 'spa_lmh',
@@ -333,20 +347,6 @@ describe('TrackDetail component', () => {
         onSelectSession={vi.fn()}
         selectedCarClass="All"
         setSelectedCarClass={vi.fn()}
-        progression={[
-          {
-            sessionId: 'sess-hypercar-1', timestamp: 1, timeString: '2026/05/28', sessionType: 'Practice',
-            sessionName: 'P1', trackVenue: 'Spa', trackCourse: 'GP', carType: 'Ferrari 499P', carClass: 'Hyper',
-            driverName: 'Player', bestLapTime: 122, bestS1: 35, bestS2: 42, bestS3: 45, theoreticalBest: 122,
-            cleanLapsCount: 5, declaredLapsCount: 5, avgLapTime: 122,
-          },
-          {
-            sessionId: 'sess-gt3-1', timestamp: 2, timeString: '2026/05/29', sessionType: 'Qualifying',
-            sessionName: 'Q1', trackVenue: 'Spa', trackCourse: 'GP', carType: 'Porsche 911 GT3', carClass: 'GT3',
-            driverName: 'Player', bestLapTime: 138, bestS1: 40, bestS2: 48, bestS3: 50, theoreticalBest: 138,
-            cleanLapsCount: 4, declaredLapsCount: 4, avgLapTime: 138,
-          },
-        ]}
       />
     );
 
@@ -611,6 +611,31 @@ describe('TrackDetail component', () => {
 
     // Race (worst raw position) sorts first, then Qualifying, then Practice (best raw position) last.
     expect(rowTimestamps).toEqual(['2026/05/30 14:00', '2026/05/29 14:00', '2026/05/28 14:00']);
+  });
+
+  it('charts the whole progression history with no pager, so the personal best spans every session', async () => {
+    const history = Array.from({ length: 230 }, (_, index) => ({
+      ...mockTrackDataWithMultipleClasses.progression[0],
+      sessionId: `hyper-${index}`, timestamp: index + 1, timeString: `2026/01/01 10:${String(index % 60).padStart(2, '0')}`,
+      bestLapTime: 130 - index * 0.01, theoreticalBest: null, bestS1: null, bestS2: null, bestS3: null,
+    }));
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ ...mockTrackDataWithMultipleClasses, total: 230, progression: history }),
+    });
+
+    render(
+      <TrackDetail
+        trackName="Spa"
+        onBack={vi.fn()}
+        onSelectSession={vi.fn()}
+        selectedCarClass="Hyper"
+        setSelectedCarClass={vi.fn()}
+      />
+    );
+
+    expect(await screen.findByText('Baseline 2:10.000 → PB 2:07.710')).toBeInTheDocument();
+    expect(screen.queryByText(/Older points|Newer points|Progression page/)).not.toBeInTheDocument();
   });
 
   it('renders interactive chart legend in TrackDetail and allows toggling series visibility', async () => {

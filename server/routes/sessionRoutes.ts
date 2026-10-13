@@ -84,8 +84,7 @@ export function createSessionRouter(context: ServerContext): Router {
     const latestSession=queryTrackLatestSessionContext(db,trackVenue,selected.carClass,queryString(req.query.car),trackCourse);
     const course=latestSession.trackCourse ?? page.sessions[0]?.trackCourse ?? '';
     const references=loadReferenceLaptimesFromCache();
-    const progressionPage = pageNumber(req.query.progressionPage,1,1000000);
-    const progression=queryProgression(db,{...selected,page:progressionPage,pageSize:200});
+    const progression=queryProgression(db,selected);
     const filters=queryTrackDetailFilters(db,trackVenue,selected.carClass,queryString(req.query.car),trackCourse);
     res.json({...page, sessionsCount:page.total, trackName:req.params.trackName,
       normalizedTrackName:getCircuitSpecification(req.params.trackName,course).benchmarkName,

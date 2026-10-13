@@ -27,7 +27,7 @@ describe('paged session queries', () => {
     expect(exact.sql).toContain("s.layout_key='unknown' AND s.track_venue = ? AND s.track_course = ?");
     expect(exact.values).toEqual(['Mod Ring', 'Short Course']);
   });
-  it('preserves progression metrics and includes empty sessions across explicit pages', () => {
+  it('preserves progression metrics and includes empty sessions', () => {
     const db = new Database(':memory:');
     try {
       initDbSchema(db);
@@ -43,12 +43,21 @@ describe('paged session queries', () => {
       const legacy = computeProgression([full, empty, fallback]).map(point => ({
         ...point, carClass: point.carClass === 'General' ? 'General' : normalizeCarClass(point.carClass),
       }));
-      const first = queryProgression(db, { pageSize: 1 });
-      const second = queryProgression(db, { pageSize: 1, page: 2 });
-      expect(first.total).toBe(3);
-      expect(first.points).toEqual([legacy[0]]);
-      expect(second.points).toEqual([legacy[1]]);
-      expect(queryProgression(db, { pageSize: 1, page: 3 }).points).toEqual([legacy[2]]);
+      expect(queryProgression(db, {})).toEqual(legacy);
+    } finally { db.close(); }
+  });
+
+  it('returns every progression point of the scope, oldest first, past 200 sessions', () => {
+    const db = new Database(':memory:');
+    try {
+      initDbSchema(db);
+      const sessions = Array.from({ length: 230 }, (_, index) => fixture(`s${index}`, 1000 + index));
+      db.transaction(() => { for (const session of sessions) upsertSession(db, session, session.filePath, 1, 1); })();
+      const points = queryProgression(db, { carClass: 'Hyper' });
+      expect(points).toHaveLength(230);
+      expect(points[0].sessionId).toBe('s0');
+      expect(points[229].sessionId).toBe('s229');
+      expect(points.map(point => point.timestamp)).toEqual([...points.map(point => point.timestamp)].sort((a, b) => a - b));
     } finally { db.close(); }
   });
 

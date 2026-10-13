@@ -119,24 +119,22 @@ interface ProgressionRow {
   has_lap_rows:number;
 }
 
-/** Explicitly paginated raw points: clients must request more, rather than assume a truncated history is complete. */
-export function queryProgression(db: Database, options: SessionQuery) {
+/** Every progression point of the scope, oldest first: the chart's personal-best line, ranges and totals need the whole history. */
+export function queryProgression(db: Database, options: SessionQuery): SessionProgressionPoint[] {
   const where = sessionWhere({...options,driver:undefined});
-  const pageSize = Math.min(500, Math.max(1, options.pageSize ?? 200)); const page = Math.max(1, options.page ?? 1);
   const driver = options.driver && options.driver !== 'All' ? options.driver.toLowerCase() : null;
   const join = `LEFT JOIN session_drivers d ON d.session_id=s.id AND d.driver_ordinal=coalesce(
     (SELECT x.driver_ordinal FROM session_drivers x JOIN drivers xn ON xn.driver_id=x.driver_id WHERE x.session_id=s.id AND lower(xn.name)=? ORDER BY x.driver_ordinal LIMIT 1),
     CASE WHEN ? IS NULL THEN s.primary_driver_ordinal ELSE 0 END)
     LEFT JOIN drivers dn ON dn.driver_id=d.driver_id LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id`;
-  const total = (db.prepare(`SELECT count(*) n FROM sessions s ${join} ${where.sql}`).get(driver,driver,...where.values) as {n:number}).n;
   const rows = db.prepare(`SELECT s.id,s.timestamp,s.track_venue,s.track_course,s.session_type,s.session_name,
     a.time_string,${[...WEATHER_FIELDS, ...SETTINGS_FIELDS].map(field => `s.${field.col}`).join(',')},
     dn.name driver_name,v.car_type,d.driver_class car_class,coalesce(d.declared_laps_count,0) declared_laps_count,d.clean_laps_count,
     d.best_lap_time,d.best_s1,d.best_s2,d.best_s3,d.avg_lap_time,d.top3_average,d.consistency_score,
     EXISTS(SELECT 1 FROM session_laps l WHERE l.session_id=s.id AND l.driver_ordinal=d.driver_ordinal) has_lap_rows
     FROM sessions s ${join} JOIN session_summary_facts a ON a.session_id=s.id ${where.sql}
-    ORDER BY s.timestamp ASC,s.id ASC LIMIT ? OFFSET ?`).all(driver,driver,...where.values,pageSize,(page-1)*pageSize) as Array<ProgressionRow & Record<string, unknown>>;
-  const points: SessionProgressionPoint[] = rows.map(r => {
+    ORDER BY s.timestamp ASC,s.id ASC`).all(driver,driver,...where.values) as Array<ProgressionRow & Record<string, unknown>>;
+  return rows.map((r): SessionProgressionPoint => {
     const theoreticalBest=computeTheoreticalBest(r.best_s1,r.best_s2,r.best_s3);
     return {sessionId:r.id,timestamp:r.timestamp,timeString:r.time_string,sessionType:r.session_type,sessionName:r.session_name,
       trackVenue:r.track_venue,trackCourse:r.track_course,displayTrack:getDisplayTrackName(r.track_venue,r.track_course),
@@ -145,5 +143,4 @@ export function queryProgression(db: Database, options: SessionQuery) {
       theoreticalBest,theoreticalGap:computeTheoreticalGap(r.best_lap_time,theoreticalBest),cleanLapsCount:r.clean_laps_count ?? 0,
       declaredLapsCount:r.declared_laps_count ?? 0,avgLapTime:r.has_lap_rows ? r.avg_lap_time : null,top3Average:r.top3_average ?? null,consistencyScore:r.consistency_score ?? null};
   });
-  return {points,total,page,pageSize};
 }

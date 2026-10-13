@@ -372,6 +372,24 @@ describe('sessionRoutes and filterSessions', () => {
       expect(res.body.benchmarks.map((b: ReferenceLaptimeEntry) => b.trackName)).toEqual(['Monza']);
     });
 
+    it('GET /api/track/:trackName returns every progression point, not one page of them', async () => {
+      const template = mockSessions.find(session => session.trackVenue === 'Spa');
+      if (!template) throw new Error('Spa fixture missing');
+      const many = Array.from({ length: 230 }, (_, index) => ({
+        ...structuredClone(template), id: `spa_many_${index}`, filename: `spa_many_${index}.xml`, filePath: `spa_many_${index}.xml`, timestamp: 5000 + index,
+      }));
+      const bigDb = createSessionDb(many);
+      const bigApp = express();
+      bigApp.use('/api', createSessionRouter({ sessionDb: bigDb, getScanStatus: () => ({ dataRevision: 'test:2' }) } as unknown as ServerContext));
+      try {
+        const res = await request(bigApp).get('/api/track/Spa');
+        expect(res.body.sessions).toHaveLength(25);
+        expect(res.body.progression).toHaveLength(230);
+        expect(res.body.progression[0].sessionId).toBe('spa_many_0');
+        expect(res.body.progression[229].sessionId).toBe('spa_many_229');
+      } finally { bigDb.close(); }
+    });
+
     it('GET /api/track/:trackName has no benchmarks before the table is first downloaded', async () => {
       referenceCache.load.mockReturnValue(null);
       const res = await request(app).get('/api/track/Spa');
