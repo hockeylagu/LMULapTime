@@ -141,7 +141,8 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
             sessionId={sessionId}
             driverName={drivers.find(d => d.slot === selectedDriverSlot)?.name ?? trajectory?.driverName ?? null}
             trajectory={trajectory}
-            availableCompareLaps={availableCompareLaps}
+            metadata={metadata}
+            driver={selectedDriver}
             onToggleCompare={onToggleCompare}
             onSelectCompareLap={onSelectCompareLap}
             formatLapTime={formatLapTime}

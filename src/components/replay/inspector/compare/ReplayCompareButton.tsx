@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { Scale, Sparkles } from 'lucide-react';
-import type { ComparableLap, ReplayTrajectoryData } from '../../../../../shared/types/index.js';
-import { suggestReferenceLap } from '../../../../utils/referenceLaps.js';
+import type { ComparableLap, ReplayDriverEntry, ReplayMetadata, ReplayTrajectoryData } from '../../../../../shared/types/index.js';
+import { useReferenceLapSuggestion } from './useReferenceLapSuggestion.js';
 import { TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 
@@ -9,7 +9,9 @@ export interface ReplayCompareButtonProps {
   sessionId: string | null;
   driverName: string | null;
   trajectory: ReplayTrajectoryData | null;
-  availableCompareLaps: ComparableLap[];
+  metadata: ReplayMetadata | null;
+  /** The inspected driver. */
+  driver: ReplayDriverEntry | undefined;
   onToggleCompare: () => void;
   onSelectCompareLap: (lap: ComparableLap) => void;
   formatLapTime: (sec?: number | null) => string;
@@ -18,15 +20,15 @@ export interface ReplayCompareButtonProps {
 
 /** The Compare button, with a one-click "vs your best" when a faster lap of the driver exists. */
 export const ReplayCompareButton: React.FC<ReplayCompareButtonProps> = ({
-  sessionId, driverName, trajectory, availableCompareLaps, onToggleCompare, onSelectCompareLap, formatLapTime, disabled = false,
+  sessionId, driverName, trajectory, metadata, driver, onToggleCompare, onSelectCompareLap, formatLapTime, disabled = false,
 }) => {
   const currentLap = trajectory?.currentLap;
   const summary = trajectory?.laps?.find(l => l.lapNumber === currentLap);
   const currentLapTime = summary?.validatedTimeSec ?? summary?.lapTimeSec;
-  const suggestion = useMemo(
-    () => suggestReferenceLap(availableCompareLaps, sessionId, driverName, currentLap, currentLapTime),
-    [availableCompareLaps, sessionId, driverName, currentLap, currentLapTime]
-  );
+  const suggestion = useReferenceLapSuggestion({
+    sessionId, metadata, driver, driverName, lapNumber: currentLap, lapTime: currentLapTime,
+    carType: driver?.carType ?? trajectory?.vehicleIdentity?.carType,
+  });
 
   return (
     <div className="flex items-center gap-1.5">

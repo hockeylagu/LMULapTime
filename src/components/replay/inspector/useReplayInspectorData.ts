@@ -9,6 +9,7 @@ import { updateSearchParams } from '../../../utils/urlParams.js';
 import { apiErrorMessage, fetchJson, isAbortError } from '../../../api/apiClient.js';
 import { fetchSessionTelemetry, fetchSessionTelemetryMetadata } from '../../../api/replayApi.js';
 import { CompareLapFilter } from './compare/ReplayCompareLapPicker.js';
+import { replayCompareScope } from './compare/compareLapsQuery.js';
 import { DEFAULT_COMPARE_CONTROLS, type CompareLapControls } from './compare/compareLapControls.js';
 import { advancePlaybackClock, PlaybackClock, playbackClockAt } from './replayPlaybackClock.js';
 import { createPlaybackCursor } from './replayPlaybackCursor.js';
@@ -227,10 +228,20 @@ export function useReplayInspectorData({
   // Fetch replay-backed comparison laps. Player laps are the safe default; the
   // all-driver view exposes the same candidate pool as Compare Laps.
   useEffect(() => {
-    const trackToQuery = metadata?.trackVenue || metadata?.displayTrack || metadata?.trackCourse || metadata?.trackName;
     // Wait for the metadata: before it the inspected driver's car class is unknown, and the
     // request would be repeated with it (laps are only compared within one car class).
-    if (!isOpen || !metadata || !trackToQuery) {
+    if (!isOpen || !metadata) {
+      setAvailableCompareLaps([]); setIsCompareLapsLoading(false);
+      setCompareLapsError(null);
+      return;
+    }
+    const markedPlayers = metadata.drivers.filter(d => d.isPlayer);
+    const activeDriver = metadata.drivers.find(d => d.slot === selectedDriverSlot) ||
+      (markedPlayers.length === 1 ? markedPlayers[0] : undefined);
+    // Laps are only compared within one car class: the INSPECTED driver's, which in a multiclass
+    // replay may differ from the replay's own (player's) class in metadata.carClass.
+    const query = replayCompareScope(metadata, activeDriver);
+    if (!query) {
       setAvailableCompareLaps([]); setIsCompareLapsLoading(false);
       setCompareLapsError(null);
       return;
@@ -240,23 +251,13 @@ export function useReplayInspectorData({
     setAvailableCompareLaps([]);
     setCompareLapsError(null);
     setIsCompareLapsLoading(true);
-    const markedPlayers = metadata.drivers.filter(d => d.isPlayer);
-    const activeDriver = metadata.drivers.find(d => d.slot === selectedDriverSlot) ||
-      (markedPlayers.length === 1 ? markedPlayers[0] : undefined);
-    // Laps are only compared within one car class: the INSPECTED driver's, which in a multiclass
-    // replay may differ from the replay's own (player's) class in metadata.carClass.
-    const carClass = resolveDriverCarClass(activeDriver);
     const needsAllDrivers = compareLapFilter === 'all' || compareLapFilter === 'same-sessions';
-    const query = new URLSearchParams({
-      track: trackToQuery,
-      ...(metadata.trackVenue ? { trackVenue: metadata.trackVenue, trackCourse: metadata.trackCourse ?? '' } : {}),
-      playerOnly: String(!needsAllDrivers),
-      telemetryOnly: 'true', page: String(comparePage), pageSize: '50', sort: compareControls.sort,
-    });
+    query.set('playerOnly', String(!needsAllDrivers));
+    query.set('telemetryOnly', 'true'); query.set('page', String(comparePage)); query.set('pageSize', '50');
+    query.set('sort', compareControls.sort);
     if (compareControls.carType !== 'all') query.set('carType', compareControls.carType);
     if (compareControls.sessionKind !== 'all') query.set('sessionType', compareControls.sessionKind);
     if (conditionFilter && conditionFilter !== 'all') query.set('condition', conditionFilter);
-    if (carClass) query.set('carClass', carClass);
     if (compareLapFilter === 'same-session-lap' || compareLapFilter === 'same-sessions') query.set('sessionId', activeSessionId!);
 
     fetchJson<{ laps?: ComparableLap[]; total?: number; carTypes?: string[] }>(`/api/compare/laps?${query.toString()}`, { signal: controller.signal })

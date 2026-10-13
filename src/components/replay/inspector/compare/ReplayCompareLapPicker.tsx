@@ -84,9 +84,9 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
 
   return (
     <div role="dialog" aria-modal="true" aria-label="Choose comparison lap"
-      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/60 p-4 pt-12 sm:pt-16 animate-fade-in">
-      <div className="w-full max-w-[1200px] border border-lmu-border bg-lmu-strip shadow-2xl rounded-xl overflow-hidden">
-        <div className="px-4 py-3 border-b border-lmu-border/60 space-y-2.5">
+      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/60 p-4 animate-fade-in">
+      <div className="flex h-full min-h-0 w-full max-w-[1200px] flex-col border border-lmu-border bg-lmu-strip shadow-2xl rounded-xl overflow-hidden">
+        <div className="shrink-0 px-4 py-3 border-b border-lmu-border/60 space-y-2.5">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-sm font-bold text-white">Available laps with replay telemetry</p>
@@ -180,7 +180,7 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
           </div>
         </div>
 
-        <div className="max-h-96 overflow-y-auto custom-scrollbar px-4 py-2">
+        <div className="min-h-0 flex-1 overflow-y-auto custom-scrollbar px-4 py-2">
           {isLoading ? (
             <div role="status" className="flex items-center justify-center gap-2 py-8 text-xs text-lmu-muted">
               <LoaderCircle className="w-4 h-4 animate-spin" /> Loading available laps...

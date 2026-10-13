@@ -2,37 +2,6 @@ import type { ComparableLap } from '../../shared/types/index.js';
 
 const sameCar = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
-/**
- * The lap to compare against by default: the driver's fastest lap on this layout in the car they
- * are driving in this session, when it beats the lap on screen. `laps` are the replay-backed
- * comparison laps already filtered to this layout and car class; the car is read from this
- * session's own laps, so car names never have to match across data sources.
- * Laps the parser marked non-representative are skipped.
- */
-export function suggestReferenceLap(
-  laps: ComparableLap[],
-  sessionId: string | null,
-  driverName: string | null,
-  currentLapNumber: number | null | undefined,
-  currentLapTime: number | null | undefined
-): ComparableLap | null {
-  if (!sessionId || !driverName) return null;
-  const driversLaps = laps.filter(l => l.driverName === driverName);
-  const carType = driversLaps.find(l => l.sessionId === sessionId)?.carType;
-  if (!carType) return null;
-
-  let best: ComparableLap | null = null;
-  for (const lap of driversLaps) {
-    if (!sameCar(lap.carType, carType) || lap.nonRepresentativeReason) continue;
-    if (lap.sessionId === sessionId && lap.lapNumber === currentLapNumber) continue;
-    if (typeof lap.lapTime !== 'number' || lap.lapTime <= 0) continue;
-    if (!best || lap.lapTime < (best.lapTime as number)) best = lap;
-  }
-  if (!best) return null;
-  if (typeof currentLapTime === 'number' && currentLapTime > 0 && (best.lapTime as number) >= currentLapTime) return null;
-  return best;
-}
-
 /** The lap being analysed, as the session knows it. */
 export interface AnalysedLap {
   sessionId: string;

@@ -129,7 +129,7 @@ export function createSessionRouter(context: ServerContext): Router {
     if (res.headersSent) return;
     const track=queryString(req.query.track);
     const filters: CompactCompareFilters = {
-      sessionKind, condition,
+      sessionKind, condition, representativeOnly:req.query.representativeOnly === 'true',
       trackName:track,trackVenue:queryString(req.query.trackVenue),trackCourse:queryString(req.query.trackCourse),
       carClass:queryString(req.query.carClass),carType:queryString(req.query.carType),
       driverName:queryString(req.query.driver),sessionId:queryString(req.query.sessionId),

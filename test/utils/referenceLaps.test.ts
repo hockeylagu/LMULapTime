@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { pickAttainableSameCarLap, pickFastestSameCarLap, suggestReferenceLap } from '../../src/utils/referenceLaps.js';
+import { pickAttainableSameCarLap, pickFastestSameCarLap } from '../../src/utils/referenceLaps.js';
 import type { ComparableLap } from '../../shared/types/index.js';
 
 const RACE = 'Daytona International Speedway Road Course R1 10.Vcr';
@@ -35,31 +35,6 @@ const myLaps = [
   // Faster, but in another car at this track: never the suggestion.
   lap(PRACTICE, 3, 94.9, { carType: 'Porsche 963' }),
 ];
-
-describe('suggestReferenceLap', () => {
-  it('suggests the driver fastest lap in the same car when it beats the lap on screen', () => {
-    expect(suggestReferenceLap(myLaps, RACE, ME, 20, 95.894)?.id).toBe(`${PRACTICE}_24`);
-  });
-
-  it('uses session identity when recording filenames differ from session IDs', () => {
-    const candidates = myLaps.map(lap => ({ ...lap, matchingReplayFile: 'reused-recording.Vcr' }));
-    expect(suggestReferenceLap(candidates, RACE, ME, 20, 95.894)?.id).toBe(`${PRACTICE}_24`);
-    expect(suggestReferenceLap(candidates, 'reused-recording.Vcr', ME, 20, 95.894)).toBeNull();
-  });
-
-  it('suggests nothing when the lap on screen is already the best', () => {
-    expect(suggestReferenceLap(myLaps, PRACTICE, ME, 24, 95.658)).toBeNull();
-  });
-
-  it('skips laps the parser marked non-representative', () => {
-    const marked = myLaps.map(l => (l.id === `${PRACTICE}_24` ? { ...l, nonRepresentativeReason: 'offPace' as const } : l));
-    expect(suggestReferenceLap(marked, RACE, ME, 20, 95.894)?.id).toBe(`${QUALI}_7`);
-  });
-
-  it('suggests nothing for a driver without laps in this replay', () => {
-    expect(suggestReferenceLap(myLaps, RACE, 'Alexandr Malynych', 20, 95.746)).toBeNull();
-  });
-});
 
 describe('pickFastestSameCarLap', () => {
   const analysed = { sessionId: RACE, driverName: ME, lapNumber: 20, carType: 'Peugeot 9x8' };

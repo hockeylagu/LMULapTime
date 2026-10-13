@@ -13,6 +13,8 @@ export interface CompactCompareFilters {
   playerOnly?: boolean; humansOnly?: boolean; telemetryOnly?: boolean;
   /** Telemetry picker only: session-type bucket and recording condition the laps must have. */
   sessionKind?: SessionKind; condition?: WeatherCondition;
+  /** Telemetry picker only: skip laps the parser marked non-representative. */
+  representativeOnly?: boolean;
 }
 export interface CompactComparePage { page?: number; pageSize?: number; sort?: CompareLapSort; }
 export interface CompactCompareResult extends ComparableLapsResult { page: number; pageSize: number; total: number; }
@@ -87,6 +89,7 @@ function comparisonScope(filters: CompactCompareFilters) {
   if (filters.sessionId) { display.where.push('s.id=?'); display.args.push(filters.sessionId); }
   const selected = { ...display, where: [...display.where], args: [...display.args] };
   if (filters.telemetryOnly) selected.where.push('l.is_valid=1', 'coalesce(l.is_pit_stop,0)=0', 'coalesce(l.is_out_lap,0)=0', 'l.lap_time>0');
+  if (filters.telemetryOnly && filters.representativeOnly) selected.where.push('l.non_representative_reason IS NULL');
   if (filters.driverOrdinal !== undefined) { selected.where.push('d.driver_ordinal=?'); selected.args.push(filters.driverOrdinal); }
   if (filters.lapOrdinal !== undefined) { selected.where.push('l.lap_ordinal=?'); selected.args.push(filters.lapOrdinal); }
   if (filters.lapNumber !== undefined) { selected.where.push('l.lap_number=?'); selected.args.push(filters.lapNumber); }

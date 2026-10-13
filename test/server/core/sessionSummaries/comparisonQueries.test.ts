@@ -284,6 +284,16 @@ describe('SQL comparison query', () => {
       } finally { db.close(); }
     });
 
+    it('can skip laps the parser marked non-representative', () => {
+      const db = build();
+      try {
+        db.prepare("UPDATE session_laps SET non_representative_reason='offPace' WHERE session_id='s1' AND driver_ordinal=1").run();
+        expect(times(queryTelemetryComparableLaps(db, base).laps)).toContain(85);
+        expect(times(queryTelemetryComparableLaps(db, { ...base, representativeOnly: true }).laps)).toEqual([86, 87, 88, 89, 90, 91]);
+        expect(queryTelemetryComparableLaps(db, { ...base, representativeOnly: true }).total).toBe(6);
+      } finally { db.close(); }
+    });
+
     it('keeps the ordered picker query off full scans of the lap tables', () => {
       const db = build();
       try {
