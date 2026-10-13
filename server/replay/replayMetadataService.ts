@@ -1,15 +1,11 @@
-import fs from 'fs';
 import { dataPlugin } from '../plugins/dataPlugin.js';
-import path from 'path';
 import {
   ReplayDriverEntry,
   ReplayLapSummary,
   ReplayMetadata,
-  ReplaySummary,
 } from '../../shared/types/index.js';
 import { getDisplayTrackName } from '../../shared/domain/formatters.js';
 import { resolveRosterVehicles } from '../../shared/domain/vehicleMapping.js';
-import { ReplaySummarySourceData } from './replayServiceTypes.js';
 import type { ReplaySessionContext } from './replayServiceTypes.js';
 
 export function cloneReplayMetadata(metadata: ReplayMetadata): ReplayMetadata {
@@ -107,96 +103,4 @@ export function composeReplayMetadata(options: ComposeReplayMetadataOptions): Re
     if (vehicle) entry.carClass = vehicle.carClass;
   }
   return metadata;
-}
-
-export function buildReplayListSummaries(input: ReplaySummarySourceData): ReplaySummary[] {
-  const diskFiles = input.diskFiles;
-  const storedMap = new Map(input.storedReplays.map(r => [r.filename, r]));
-  const allFilenames = Array.from(new Set([...diskFiles, ...storedMap.keys()]));
-  const summaries: ReplaySummary[] = [];
-
-  for (const filename of allFilenames) {
-    const stored = storedMap.get(filename);
-    const filePath = (stored?.file_path && fs.existsSync(stored.file_path))
-      ? stored.file_path
-      : path.join(input.replaysDir, filename);
-
-    try {
-      let mtimeMs = stored?.file_mtime_ms || 0;
-      let fileSizeBytes = stored?.file_size_bytes || 0;
-      let fileOnDisk = false;
-
-      if (fs.existsSync(filePath)) {
-        try {
-          const stat = fs.statSync(filePath);
-          mtimeMs = stat.mtime.getTime();
-          fileSizeBytes = stat.size;
-          fileOnDisk = true;
-        } catch {
-          // Ignore stat error
-        }
-      }
-
-      let metadata: ReplayMetadata | null = stored?.metadata || null;
-      if (!metadata && fileOnDisk) {
-        try {
-          metadata = input.getMetadata(filePath, filename);
-        } catch {
-          // Ignore active or invalid recordings
-        }
-      }
-      if (!metadata && stored?.metadata) {
-        metadata = stored.metadata;
-      }
-      if (!metadata) continue;
-
-      const matched = input.sessions.find(session => session.matchingReplayFile?.name === filename);
-      const markedPlayers = metadata.drivers?.filter((driver: ReplayDriverEntry) => driver.isPlayer) ?? [];
-      const playerDriver = markedPlayers.length === 1 ? markedPlayers[0] : undefined;
-      const carClass = matched?.playerDriver?.carClass || playerDriver?.carClass || metadata.carClass;
-      const carType = matched?.playerDriver?.carType || playerDriver?.carType || metadata.carType;
-      const carClasses = Array.from(new Set([
-        ...(metadata.drivers?.map(driver => driver.carClass).filter((value): value is string => Boolean(value)) || []),
-        ...(matched?.drivers?.map(driver => driver.carClass).filter((value): value is string => Boolean(value)) || []),
-        ...(carClass ? [carClass] : []),
-      ]));
-      const filenameMatch = filename.match(/^(.+?)\s+([PQR]\d+)\b/i);
-      const filenameTrack = filenameMatch ? filenameMatch[1].trim() : '';
-      const displayTrack = matched
-        ? getDisplayTrackName(matched.trackVenue, matched.trackCourse)
-        : (metadata.displayTrack || filenameTrack || metadata.trackName);
-
-      const matchedDuckFilename = input.telemetryLinks.forReplay(filename, matched);
-
-      summaries.push({
-        name: filename,
-        path: filePath,
-        fileSizeBytes,
-        mtimeMs,
-        trackVenue: matched?.trackVenue || metadata.trackVenue,
-        trackCourse: matched?.trackCourse || metadata.trackCourse || filenameTrack || undefined,
-        displayTrack,
-        durationSec: metadata.durationSec,
-        eventTitle: metadata.eventInfo?.eventTitle,
-        splitNo: metadata.eventInfo?.splitNo,
-        eventType: metadata.eventInfo?.eventType,
-        driversCount: metadata.drivers?.length,
-        matchedSessionId: matched?.id,
-        carClass: carClass || undefined,
-        carType: carType || undefined,
-        carClasses: carClasses.length > 0 ? carClasses : undefined,
-        duckdbFilename: matchedDuckFilename,
-        hasRain: metadata.hasRain,
-        maxRainIntensity: metadata.maxRainIntensity,
-        weatherCondition: metadata.weatherCondition,
-        ambientTemp: metadata.ambientTemp,
-        trackTemp: metadata.trackTemp,
-      });
-    } catch {
-      // Skip unreadable files
-    }
-  }
-
-  summaries.sort((left, right) => right.mtimeMs - left.mtimeMs);
-  return summaries;
 }

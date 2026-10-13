@@ -1,5 +1,4 @@
 import { DetailedSession, DriverData, LapData } from '../../shared/types/index.js';
-import type { TelemetryLinks } from '../telemetry/telemetryLinks.js';
 
 /** Official timing fields used by replay metadata and lap validation, without events or passes. */
 export type ReplayTimingLap = Pick<LapData, 'lapNumber' | 'lapTime' | 's1' | 's2' | 's3' |
@@ -20,22 +19,6 @@ export interface ReplayTrajectoryRequest {
   /** When set, the lap is served at one point per this many metres instead of `maxPoints`. */
   pointSpacingM?: number;
   allowDuckDb: boolean;
-}
-
-export interface ReplaySummarySourceData {
-  diskFiles: string[];
-  storedReplays: Array<{
-    filename: string;
-    file_path?: string;
-    file_mtime_ms?: number;
-    file_size_bytes?: number;
-    metadata?: import('../../shared/types/index.js').ReplayMetadata | null;
-  }>;
-  replaysDir: string;
-  sessions: DetailedSession[];
-  /** The stored DuckDB matches (TelemetryLinks). */
-  telemetryLinks: Pick<TelemetryLinks, 'forReplay'>;
-  getMetadata: (filePath: string, filename: string) => import('../../shared/types/index.js').ReplayMetadata | null;
 }
 
 /** Thrown when a trajectory is requested for a named driver who is not in the replay. */

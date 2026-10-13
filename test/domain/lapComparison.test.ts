@@ -2,13 +2,11 @@ import { describe, it, expect } from 'vitest';
 import {
   computeLapDeltas,
   createTheoreticalBestLap,
-  createBenchmarkLaps,
-  filterLapsByCarCategory,
   computeTopNLapAverage,
   computeConsistencyRating,
   selectCleanLapCandidates,
 } from '../../shared/domain/lapComparison.js';
-import { ReferenceLaptimeEntry, ComparableLap } from '../../shared/types/index.js';
+import { ComparableLap } from '../../shared/types/index.js';
 
 describe('lapComparison utility', () => {
   const baseLap: ComparableLap = {
@@ -138,62 +136,6 @@ describe('lapComparison utility', () => {
       expect(theo.paceCategory).toBe('Competitive');
       expect(theo.pacePercentage).toBe(101.5);
       expect(theo.tag).toBe('Theoretical Best');
-    });
-  });
-
-  describe('createBenchmarkLaps', () => {
-    it('creates Alien, Competitive, and Good benchmark laps from a ReferenceLaptimeEntry', () => {
-      const refEntry: ReferenceLaptimeEntry = {
-        key: 'Bahrain_LMGT3',
-        trackName: 'Bahrain',
-        carClass: 'GT3',
-        patch: '1.4+',
-        targets: {
-          alienSec: 120.0,
-          competitiveSec: 121.2,
-          goodSec: 122.4,
-          goodMidpackSec: 123.6,
-          midpackSec: 124.8,
-          midpackTailSec: 126.0,
-          tailEnderSec: 127.2,
-          offlineSec: 128.4,
-        },
-      };
-
-      const benchmarks = createBenchmarkLaps(refEntry);
-      expect(benchmarks.length).toBe(3);
-      expect(benchmarks[0].paceCategory).toBe('Alien');
-      expect(benchmarks[0].lapTime).toBe(120.0);
-      expect(benchmarks[1].paceCategory).toBe('Competitive');
-      expect(benchmarks[1].lapTime).toBe(121.2);
-      expect(benchmarks[2].paceCategory).toBe('Good');
-      expect(benchmarks[2].lapTime).toBe(122.4);
-    });
-  });
-
-  describe('filterLapsByCarCategory', () => {
-    const mixedLaps: ComparableLap[] = [
-      { ...baseLap, id: '1', carClass: 'GT3', carType: 'Ferrari 296 GT3' },
-      { ...baseLap, id: '2', carClass: 'GT3', carType: 'BMW M4 GT3' },
-      { ...baseLap, id: '3', carClass: 'Hyper', carType: 'Ferrari 499P' },
-      { ...baseLap, id: '4', carClass: 'LMP2', carType: 'Oreca 07' },
-    ];
-
-    it('returns all laps when carClass is All', () => {
-      const result = filterLapsByCarCategory(mixedLaps, 'All');
-      expect(result.length).toBe(4);
-    });
-
-    it('filters strictly by carClass', () => {
-      const result = filterLapsByCarCategory(mixedLaps, 'GT3');
-      expect(result.length).toBe(2);
-      expect(result.every(l => l.carClass === 'GT3')).toBe(true);
-    });
-
-    it('filters by both carClass and specific carType', () => {
-      const result = filterLapsByCarCategory(mixedLaps, 'GT3', 'BMW M4 GT3');
-      expect(result.length).toBe(1);
-      expect(result[0].carType).toBe('BMW M4 GT3');
     });
   });
 

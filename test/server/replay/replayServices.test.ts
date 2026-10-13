@@ -3,7 +3,6 @@ import { dataPlugin } from '../../../server/plugins/dataPlugin.js';
 import {
   cloneReplayMetadata,
   composeReplayMetadata,
-  buildReplayListSummaries,
 } from '../../../server/replay/replayMetadataService.js';
 import {
   applyPureOfficialLapValidation,
@@ -203,59 +202,6 @@ describe('Replay domain services and transforms', () => {
 
       expect(composed.displayTrack).toBe('Spa-Francorchamps');
       expect(composed.trackCourse).toBe('Spa-Francorchamps');
-    });
-  });
-
-  describe('buildReplayListSummaries', () => {
-    it('aggregates replays from disk and stored database rows', () => {
-      const summaries = buildReplayListSummaries({
-        diskFiles: ['Replay_A.Vcr'],
-        storedReplays: [
-          {
-            filename: 'Replay_A.Vcr',
-            file_mtime_ms: 1000,
-            file_size_bytes: 500,
-            metadata: {
-              filename: 'Replay_A.Vcr',
-              filePath: '/replays/Replay_A.Vcr',
-              fileSizeBytes: 500,
-              mtimeMs: 1000,
-              timeSliceCount: 1,
-              totalEvents: 1,
-              durationSec: 10,
-              trackName: 'Test Track',
-              drivers: [{ slot: 1, name: 'Driver A', isPlayer: true, carClass: 'GT3', carType: 'Aston Martin' }],
-            },
-          },
-          {
-            filename: 'Archived_B.Vcr',
-            file_mtime_ms: 2000,
-            file_size_bytes: 600,
-            metadata: {
-              filename: 'Archived_B.Vcr',
-              filePath: '/replays/Archived_B.Vcr',
-              fileSizeBytes: 600,
-              mtimeMs: 2000,
-              timeSliceCount: 2,
-              totalEvents: 1,
-              durationSec: 20,
-              trackName: 'Archive Track',
-              drivers: [{ slot: 1, name: 'Driver B', isPlayer: true, carClass: 'LMP2' }],
-            },
-          },
-        ],
-        replaysDir: '/mock/dir',
-        sessions: [],
-        telemetryLinks: { forReplay: () => undefined },
-        getMetadata: () => null,
-      });
-
-      expect(summaries).toHaveLength(2);
-      // Sorted by mtimeMs descending
-      expect(summaries[0].name).toBe('Archived_B.Vcr');
-      expect(summaries[1].name).toBe('Replay_A.Vcr');
-      expect(summaries[1].carClass).toBe('GT3');
-      expect(summaries[1].carType).toBe('Aston Martin');
     });
   });
 

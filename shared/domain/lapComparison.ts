@@ -1,4 +1,4 @@
-import { PaceCategory, ReferenceLaptimeEntry, ComparableLap, NonRepresentativeReason, LapConditions, DriverData, LapIncident, LapPenalty, LapTrackLimit } from '../types/index.js';
+import { PaceCategory, ComparableLap, NonRepresentativeReason, LapConditions, DriverData, LapIncident, LapPenalty, LapTrackLimit } from '../types/index.js';
 import { computeTheoreticalBest } from './formatters.js';
 import { LapConditionGroup, lapConditionGroup } from './lapConditions.js';
 import type { ReplayLapSummary } from '../types/index.js';
@@ -177,93 +177,6 @@ export function createTheoreticalBestLap(
     pacePercentage: pacePercentage !== undefined ? pacePercentage : null,
     tag,
   };
-}
-
-/**
- * Creates synthetic benchmark lap items from a ReferenceLaptimeEntry.
- */
-export function createBenchmarkLaps(refEntry: ReferenceLaptimeEntry): ComparableLap[] {
-  const benchmarks: ComparableLap[] = [];
-
-  if (refEntry.targets.alienSec) {
-    benchmarks.push({
-      id: `benchmark_alien_${refEntry.carClass}`,
-      driverName: 'Alien Benchmark (100%)',
-      carType: refEntry.fastestCar || `${refEntry.carClass} Reference`,
-      carClass: refEntry.carClass,
-      lapTime: refEntry.targets.alienSec,
-      s1: null,
-      s2: null,
-      s3: null,
-      topSpeed: null,
-      isValid: true,
-      isBenchmarkTarget: true,
-      paceCategory: 'Alien',
-      pacePercentage: 100,
-      tag: '👾 Alien (100%)',
-    });
-  }
-
-  if (refEntry.targets.competitiveSec) {
-    benchmarks.push({
-      id: `benchmark_competitive_${refEntry.carClass}`,
-      driverName: 'Competitive Benchmark (101%)',
-      carType: refEntry.fastestCar || `${refEntry.carClass} Reference`,
-      carClass: refEntry.carClass,
-      lapTime: refEntry.targets.competitiveSec,
-      s1: null,
-      s2: null,
-      s3: null,
-      topSpeed: null,
-      isValid: true,
-      isBenchmarkTarget: true,
-      paceCategory: 'Competitive',
-      pacePercentage: 101,
-      tag: '🏆 Competitive (101%)',
-    });
-  }
-
-  if (refEntry.targets.goodSec) {
-    benchmarks.push({
-      id: `benchmark_good_${refEntry.carClass}`,
-      driverName: 'Good Pace Benchmark (102%)',
-      carType: refEntry.fastestCar || `${refEntry.carClass} Reference`,
-      carClass: refEntry.carClass,
-      lapTime: refEntry.targets.goodSec,
-      s1: null,
-      s2: null,
-      s3: null,
-      topSpeed: null,
-      isValid: true,
-      isBenchmarkTarget: true,
-      paceCategory: 'Good',
-      pacePercentage: 102,
-      tag: '⭐ Good (102%)',
-    });
-  }
-
-  return benchmarks;
-}
-
-/**
- * Filter comparable laps strictly by matching vehicle class/category.
- */
-export function filterLapsByCarCategory(
-  laps: ComparableLap[],
-  targetCarClass: string,
-  targetCarModel?: string
-): ComparableLap[] {
-  if (!targetCarClass || targetCarClass === 'All') return laps;
-
-  return laps.filter(lap => {
-    const classMatches = lap.carClass === targetCarClass;
-    if (!classMatches) return false;
-
-    if (targetCarModel && targetCarModel !== 'All') {
-      return lap.carType.toLowerCase().trim() === targetCarModel.toLowerCase().trim();
-    }
-    return true;
-  });
 }
 
 /**
