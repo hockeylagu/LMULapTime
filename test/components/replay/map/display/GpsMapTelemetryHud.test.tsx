@@ -1,9 +1,10 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { beforeEach, describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
 import { GpsMapTelemetryHud } from '../../../../../src/components/replay/map/display/GpsMapTelemetryHud.js';
 import type { ReplayTrajectoryPoint } from '../../../../../shared/types/index.js';
 
 describe('GpsMapTelemetryHud', () => {
+  beforeEach(() => localStorage.clear());
   const mockPrimary: ReplayTrajectoryPoint = {
     x: 100,
     y: 0,
@@ -78,7 +79,7 @@ describe('GpsMapTelemetryHud', () => {
     expect(screen.getByText('Baseline')).toBeInTheDocument();
     expect(screen.queryByText('ME')).not.toBeInTheDocument();
     expect(screen.queryByText('RIVAL')).not.toBeInTheDocument();
-    expect(screen.getByText('LINE')).toHaveAttribute('title', 'Distance between racing lines at the same track distance, not a race gap.');
+    expect(screen.getByText('5.4 m line')).toHaveAttribute('title', 'Distance between racing lines at the same track distance, not a race gap.');
 
     // Primary speed
     expect(screen.getByText('227')).toBeInTheDocument();
@@ -86,22 +87,6 @@ describe('GpsMapTelemetryHud', () => {
     expect(screen.getByText('218')).toBeInTheDocument();
   });
 
-  it('toggles collapsed and expanded state on toggle button click', () => {
-    render(<GpsMapTelemetryHud primaryPoint={mockPrimary} />);
-
-    const toggleBtn = screen.getByRole('button', { name: /collapse telemetry bar/i });
-    expect(toggleBtn).toBeInTheDocument();
-
-    // Click to collapse
-    fireEvent.click(toggleBtn);
-    expect(screen.queryByTestId('telemetry-hud-primary')).toBeNull();
-    expect(screen.getByText(/THR 100%/)).toBeInTheDocument();
-
-    // Click to expand
-    const expandBtn = screen.getByRole('button', { name: /expand telemetry bar/i });
-    fireEvent.click(expandBtn);
-    expect(screen.getByTestId('telemetry-hud-primary')).toBeInTheDocument();
-  });
 
   it('renders delta column and values when comparing laps', () => {
     render(
@@ -112,11 +97,8 @@ describe('GpsMapTelemetryHud', () => {
       />
     );
 
-    expect(screen.getByText('DELTA')).toBeInTheDocument();
+    expect(screen.getByLabelText('Live delta: behind')).toBeInTheDocument();
     expect(screen.getByText('+0.53s')).toBeInTheDocument();
-    expect(screen.getByText('behind')).toBeInTheDocument();
-    expect(screen.getByText('REF')).toBeInTheDocument();
-    expect(screen.getByText('reference')).toBeInTheDocument();
   });
 
   it('renders negative delta correctly when ahead of the baseline', () => {
@@ -129,24 +111,9 @@ describe('GpsMapTelemetryHud', () => {
     );
 
     expect(screen.getByText('-0.24s')).toBeInTheDocument();
-    expect(screen.getByText('ahead')).toBeInTheDocument();
+    expect(screen.getByLabelText('Live delta: ahead')).toBeInTheDocument();
   });
 
-  it('renders delta in collapsed HUD bar when comparing laps', () => {
-    render(
-      <GpsMapTelemetryHud
-        primaryPoint={mockPrimary}
-        baselinePoint={mockBaseline}
-        deltaTimeSec={0.42}
-      />
-    );
-
-    const toggleBtn = screen.getByRole('button', { name: /collapse telemetry bar/i });
-    fireEvent.click(toggleBtn);
-
-    // Collapsed bar should include delta badge
-    expect(screen.getByText('+0.42s')).toBeInTheDocument();
-  });
 
   it('renders line separation distance between cars when comparing laps', () => {
     render(
@@ -158,34 +125,18 @@ describe('GpsMapTelemetryHud', () => {
     );
 
     // Header
-    expect(screen.getByText('LINE')).toBeInTheDocument();
+    expect(screen.getByText('5.4 m line')).toBeInTheDocument();
     // Computed hypot(100 - 105, 200 - 198) = hypot(-5, 2) = sqrt(29) ≈ 5.4m
-    expect(screen.getByText('5.4')).toBeInTheDocument();
-    expect(screen.getByText('line gap')).toBeInTheDocument();
   });
 
-  it('renders line distance in collapsed HUD bar when comparing laps', () => {
-    render(
-      <GpsMapTelemetryHud
-        primaryPoint={mockPrimary}
-        baselinePoint={mockBaseline}
-        lineDistanceM={2.8}
-      />
-    );
 
-    const toggleBtn = screen.getByRole('button', { name: /collapse telemetry bar/i });
-    fireEvent.click(toggleBtn);
-
-    expect(screen.getByText('2.8m line')).toBeInTheDocument();
-  });
-
-  it('maintains fixed width in comparing and single car modes to prevent resizing on steering changes', () => {
+  it('keeps the HUD in the full-width bottom bar in both lap modes', () => {
     const { rerender } = render(<GpsMapTelemetryHud primaryPoint={mockPrimary} />);
     const hud = screen.getByTestId('gps-map-telemetry-hud');
-    expect(hud).toHaveClass('w-[454px]');
+    expect(hud).toHaveClass('w-full');
 
     rerender(<GpsMapTelemetryHud primaryPoint={mockPrimary} baselinePoint={mockBaseline} />);
-    expect(hud).toHaveClass('w-[614px]');
+    expect(hud).toHaveClass('w-full');
   });
 
   it('renders steering input with tabular-nums and fixed one-decimal format', () => {
@@ -198,10 +149,10 @@ describe('GpsMapTelemetryHud', () => {
 
   it('labels negative lateral G as a right turn (ISO 8855)', () => {
     render(<GpsMapTelemetryHud primaryPoint={{ ...mockPrimary, accelLatG: -1.42, accelLonG: 0.31 }} />);
-    expect(screen.getByText('1.4R · 0.3A')).toBeInTheDocument();
+    expect(screen.getByLabelText('G-force: 1.4R · 0.3A')).toBeInTheDocument();
   });
 
-  it('renders dedicated G-FORCE column and keeps status clean', () => {
+  it('keeps the G-force breakdown and weather accessible without repeating them in the bar', () => {
     const gPoint: ReplayTrajectoryPoint = {
       ...mockPrimary,
       accelLatG: 1.82,
@@ -211,32 +162,24 @@ describe('GpsMapTelemetryHud', () => {
     render(<GpsMapTelemetryHud primaryPoint={gPoint} />);
 
     // Dedicated G-FORCE column header
-    expect(screen.getByText('G-FORCE')).toBeInTheDocument();
     // Hypotenuse = sqrt(1.82^2 + (-0.65)^2) = sqrt(3.3124 + 0.4225) = sqrt(3.7349) ≈ 1.93G
     expect(screen.getByText('1.93G')).toBeInTheDocument();
     // Lateral and longitudinal breakdown, ISO 8855: positive lateral G is a left turn
-    expect(screen.getByText('1.8L · 0.7B')).toBeInTheDocument();
+    expect(screen.getByLabelText('G-force: 1.8L · 0.7B')).toBeInTheDocument();
 
     // STATUS remains clean (not polluted with G-force)
     expect(screen.getByText('ON TRACK')).toBeInTheDocument();
-    expect(screen.getByText('air --')).toBeInTheDocument();
+    expect(screen.getByLabelText('ON TRACK, air --')).toBeInTheDocument();
   });
 
-  it('keeps missing and non-finite channels unavailable in both HUD states', () => {
+  it('keeps missing and non-finite channels unavailable', () => {
     render(<GpsMapTelemetryHud primaryPoint={{ x: 0, y: 0, z: 0, speedKmh: NaN, throttle: Infinity }} />);
     const row = screen.getByTestId('telemetry-hud-primary');
     expect(row).toHaveTextContent('GEAR --');
     expect(row).toHaveTextContent('UNKNOWN');
     expect(row).not.toHaveTextContent('0.00G');
     expect(row).not.toHaveTextContent('NaN');
-    const toggle = screen.getByRole('button', { name: 'Collapse telemetry bar' });
-    expect(toggle).toHaveAttribute('aria-expanded', 'true');
-    expect(document.getElementById(toggle.getAttribute('aria-controls')!)).toBeInTheDocument();
-    fireEvent.click(toggle);
-    expect(screen.getByText('-- km/h')).toBeInTheDocument();
-    expect(screen.getByText('THR --%')).toBeInTheDocument();
-    expect(screen.getByText('BRK --%')).toBeInTheDocument();
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
   it.each([[0, 'N'], [-1, 'R'], [8, '8']])('preserves recorded gear %s as %s', (gear, label) => {
@@ -246,10 +189,10 @@ describe('GpsMapTelemetryHud', () => {
 
   it('does not invent a pit speed or penalty validity from status flags', () => {
     const { rerender } = render(<GpsMapTelemetryHud primaryPoint={{ ...mockPrimary, pitLimiter: true }} />);
-    expect(screen.getByText('enabled')).toBeInTheDocument();
+    expect(screen.getByLabelText('LIMITER, enabled')).toBeInTheDocument();
     expect(screen.queryByText('60 km/h')).not.toBeInTheDocument();
     rerender(<GpsMapTelemetryHud primaryPoint={{ ...mockPrimary, isOffTrack: true }} />);
-    expect(screen.getByText('outside road')).toBeInTheDocument();
+    expect(screen.getByLabelText('OFF TRACK, outside road')).toBeInTheDocument();
     expect(screen.queryByText('limits cut')).not.toBeInTheDocument();
   });
 
@@ -257,7 +200,7 @@ describe('GpsMapTelemetryHud', () => {
     render(<GpsMapTelemetryHud primaryPoint={{ ...mockPrimary, ambientTemp: 0, gear: 0,
       speedKmh: 0, throttle: 0, brake: 0, steerYaw: 0, accelLatG: 0, accelLonG: 0 }} />);
     expect(screen.getByText('0.00G')).toBeInTheDocument();
-    expect(screen.getByText('air 0.0°C')).toBeInTheDocument();
+    expect(screen.getByLabelText('ON TRACK, air 0.0°C')).toBeInTheDocument();
     expect(screen.getByText('0.0% C')).toBeInTheDocument();
   });
 });

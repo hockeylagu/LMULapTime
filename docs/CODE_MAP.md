@@ -340,9 +340,33 @@ index their explicitly supplied replay directory locally.
   fitting controls, a metric scale bar and `GpsBrakeMarkers.tsx` for optional world-position braking boards (faded by
   zoom level; boards without a station fall back to their order along the lap). Their
   labels report printed board distances; unknown distances use a generic brake label.
+  Fullscreen adds `map/telemetry/GpsMapTelemetryDock.tsx`: one selectable 112px trace under the map, including
+  overlaid throttle/brake and comparison-only delta. It shares playback, chart paths and distance alignment with
+  the inspector, with separate persisted channel/collapse preferences (the collapse state lives in the scene so the T
+  shortcut shares it; remembered toggles use `map/useStoredToggle.ts`). It reuses the scene's lap comparisons, draws
+  S1/S2 lines from `trajectory.sectors` behind a remembered Sectors toggle, and leads its toolbar with
+  `GpsMapPlaybackStrip.tsx` (play, shared playback speed, cursor lap time and distance). `GpsMapTelemetryHud.tsx` sits horizontally
+  in the bottom dock above the trace, with primary left, baseline right, a centered live delta and always-visible readouts.
+  `GpsMapLapTimingPanel.tsx` floats on the right with recorded lap/S1/S2/S3 times and baseline differences; it
+  highlights the cursor's sector and, when comparing, its live change since that sector's start line
+  (`display/liveSectorSplit.ts`, deterministic from the distance-aligned delta). Below 2xl it stacks under the mode
+  bar in one right-hand column. Its lap-column headers consume `inspector/replayFullscreenControls.ts` (lap choices,
+  load state and playback speed): the primary button opens a keyboard-operable
+  lap menu; the baseline button opens the same comparison picker as the normal inspector. Selected times appear
+  only in the timing rows. The shared picker is body-portaled above fullscreen and uses `useModalFocus` to isolate
+  focus; Escape closes the picker first and restores its trigger. Header controls remain when timing rows collapse.
+  The bottom HUD uses one inline readout row; G-force breakdown and weather/status detail remain in accessible
+  labels and hover titles. `GpsMapCompactTrace.tsx` renders Speed, combined Pedals and Delta without duplicate
+  titles or live-value badges; other channels keep their existing renderers. Full-lap reset appears only while
+  zoomed; the common channels lead the selector, with the rest grouped under Other channels.
+  Camera scaling observes the viewport above the dock; chart pointer, wheel and keyboard gestures stay separate from map navigation.
+  Compact traces reserve a 56px scale gutter. Their SVG, scrub cursor and pointer hit area share the remaining
+  plot width, with ticks aligned to the same SVG scale. HUD readouts use matching fixed columns and a centered live delta.
   `useStableCullViewBox.ts` (rule `nextCullViewBox` in `replayMapUtils.ts`) keeps the culling view box unchanged while
   the live view stays inside its margin, so the memoised `TrackPathLayers` in `scene/GpsTrackSegments.tsx` skip
-  re-rendering during pans; `useGpsMapShortcuts.ts` acts only on the focused or expanded map, never on chart keys. Active road and kerbs are the defaults; runoff (one toggle for paved runoff, apron, gravel, grass and other circuit roads, with a colour key for the kinds present), pits,
+  re-rendering during pans; `useGpsMapShortcuts.ts` acts only on the focused or expanded map, never on chart keys,
+  except M (toggle fullscreen from any replay surface) and T (hide/show the fullscreen trace). Leaving fullscreen
+  entered from its button returns focus to the map, so M can re-expand it. Active road and kerbs are the defaults; runoff (one toggle for paved runoff, apron, gravel, grass and other circuit roads, with a colour key for the kinds present), pits,
   road edges and the centerline guide are opt-ins. Legacy files use a seam-free measured ribbon and measured kerb
   clipping; unavailable pit/outer-road controls are disabled. Layer toggles preserve camera and playback. Maps without
   surfaces retain the road ribbon),
@@ -351,7 +375,7 @@ index their explicitly supplied replay directory locally.
   browser modifiers and modal dialogs. Chart interaction supports Shift-wheel pointer-anchored zoom, Shift-drag range
   selection, Alt-drag pan, sample arrows / 0.5 s Shift-arrows, Home/End, +/− and 0 reset; distance windows and wheel
   normalization live in `telemetry/telemetryViewport.ts`, with viewport updates coalesced per animation frame.
-  Space toggles playback from a chart/map; manual cursor selection pauses it. Map C centers once at the existing zoom,
+  M toggles the fullscreen map from a chart/map; Escape exits. Space toggles playback from a chart/map; manual cursor selection pauses it. Map C centers once at the existing zoom,
   F toggles following while preserving the current camera when stopped, and the center button labels itself when the car
   is off-screen. Zoomed scrubbing resumes following unless the driver explicitly pans or disables it.
   `analysis/` (corner phase cards, consistency, AI tab). Corner consistency is lazy, recomputes from the mounted replay/driver/lap/trajectory/source inputs, and aborts obsolete comparison-lap requests; its result does not persist across view remounts. Algorithms in `src/utils/` (`cornerAnalysis/` (types, helpers, segmentComparisons), `lapAlignment.ts`,
@@ -556,8 +580,9 @@ the completed 2026-09-29 cleanup and does not describe all remaining findings.
 - Folders near 20 files (direct files, checked 2026-10-10): `shared/domain/`, `src/components/settings/`, `test/domain/` (19 each);
   `src/components/common/`, `src/utils/`, `test/utils/`, `test/components/replay/telemetry/` (18 each);
   `src/components/replay/inspector/` (17; comparison picker split into `compare/`).
-- Components near the 300-line limit (rechecked 2026-10-12): `ReplayInspectorContent.tsx` (293), `GpsTrackMapScene.tsx` (289),
-  `ReplayInspectorModalBody.tsx` (286), `TelemetryPresetModal.tsx` (273), `GpsMapTelemetryHud.tsx` (272).
+- Components near the 300-line limit (rechecked 2026-10-13): `ReplayInspectorContent.tsx` (291),
+  `ReplayInspectorModalBody.tsx` (289), `Dashboard.tsx` (279), `TelemetryPresetModal.tsx` (273), `ReplayInspectorSidebar.tsx` (270).
+  `GpsTrackMapScene.tsx` was split to 191 lines (2026-10-13) into the `scene/useGpsScene*.ts` hooks.
 
 **Logic in the wrong place / duplicated**
 - Personal-best meanings (decided 2026-10-13): the gold badge is the class best (any car, any condition); "vs your best" is the best representative lap in the class (any car, revised 2026-10-13); the Compare page `playerBestLap` is the clean dry best. Keep these distinct and labelled; do not merge them.
@@ -585,7 +610,10 @@ map through `ReplayInspectorSidebar.tsx` and `ReplayMapContainer.tsx`; a baselin
 replay retains the unknown fallback until its own class identity is supplied. These are visual
 estimates, not measured model footprints. `GpsSceneCarMarkers.tsx` renders each car independently;
 `GpsTrackMapScene.tsx` supplies map scale and replay body yaw (native forward -Z), interpolated
-on the shortest arc. Missing yaw keeps a dot. Local package loading in `server/plugins/` is implemented; model outlines
+on the shortest arc (the baseline's at the primary's distance station, from `scene/useGpsSceneDynamics.ts`). The scene
+composes three hooks: `useGpsSceneProjection.ts` (track package, shared bounds, SVG projections and boundary paths),
+`useGpsSceneDynamics.ts` (playback cursor, distance-aligned comparisons, live delta, baseline ghost, line gap) and
+`useGpsSceneCameraFocus.ts` (refit on layout change, zoom to the selected corner). Missing yaw keeps a dot. Local package loading in `server/plugins/` is implemented; model outlines
 use model shapes when available, with approximate placement until a replay-origin offset is established.
 
 

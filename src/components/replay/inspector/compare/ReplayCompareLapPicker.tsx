@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { LoaderCircle, X } from 'lucide-react';
 import type { ComparableLap, WeatherCondition } from '../../../../../shared/types/index.js';
 import { recordedCondition, sessionKindOf, type SessionKind } from '../../../../../shared/domain/compareLapScope.js';
@@ -6,6 +7,7 @@ import type { CompareLapControls } from './compareLapControls.js';
 import { ReplayCompareLapRow, REPLAY_COMPARE_COLUMNS } from './ReplayCompareLapRow.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 import { CompareLapPaginationControls, type CompareLapPagination } from './CompareLapPagination.js';
+import { useModalFocus } from '../../../common/useModalFocus.js';
 
 export type CompareLapFilter = 'same-session-lap' | 'player' | 'same-sessions' | 'all';
 
@@ -64,6 +66,7 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
   onClose,
   onSelectLap,
 }) => {
+  const dialogRef = useModalFocus(true, onClose);
   const normalize = (val?: string | null) => (val || '').toLowerCase().trim();
   const effectiveSessionId = currentSessionId || selectedSessionId || null;
   const matchesIdentity = (lap: ComparableLap, identity: string | null | undefined) => Boolean(identity &&
@@ -82,9 +85,9 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
   const carOptions = controls.carType === 'all' || carTypes.includes(controls.carType) ? carTypes : [...carTypes, controls.carType];
   const change = (patch: Partial<CompareLapControls>) => onChangeControls({ ...controls, ...patch });
 
-  return (
-    <div role="dialog" aria-modal="true" aria-label="Choose comparison lap"
-      className="fixed inset-0 z-[100] flex items-start justify-center bg-black/60 p-4 animate-fade-in">
+  return createPortal(
+    <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Choose comparison lap"
+      className="fixed inset-0 z-[1100] flex items-start justify-center bg-black/60 p-4 animate-fade-in">
       <div className="flex h-full min-h-0 w-full max-w-[1200px] flex-col border border-lmu-border bg-lmu-strip shadow-2xl rounded-xl overflow-hidden">
         <div className="shrink-0 px-4 py-3 border-b border-lmu-border/60 space-y-2.5">
           <div className="flex items-center justify-between gap-3">
@@ -235,6 +238,6 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
         </div>
         {pagination && <CompareLapPaginationControls pagination={pagination} loading={isLoading} />}
       </div>
-    </div>
+    </div>, document.body
   );
 };

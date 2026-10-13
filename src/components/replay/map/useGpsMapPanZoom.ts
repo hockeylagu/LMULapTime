@@ -59,6 +59,8 @@ export function useGpsMapPanZoom({
     isFollowCarAtStart: false,
   });
   const containerRef = useRef<HTMLDivElement | null>(null);
+  // The drawable map area; the fullscreen telemetry dock shares the container below it.
+  const viewportRef = useRef<HTMLDivElement | null>(null);
 
   const zoomLevelRef = useRef<number>(zoomLevel);
   zoomLevelRef.current = zoomLevel;
@@ -80,7 +82,7 @@ export function useGpsMapPanZoom({
   const [renderedSize, setRenderedSize] = useState<number>(800);
 
   useEffect(() => {
-    const el = containerRef.current;
+    const el = viewportRef.current ?? containerRef.current;
     if (!el) return;
     const update = () => {
       const rect = el.getBoundingClientRect();
@@ -143,7 +145,7 @@ export function useGpsMapPanZoom({
       return;
     }
 
-    const rect = el.getBoundingClientRect();
+    const rect = (viewportRef.current ?? el).getBoundingClientRect();
     const W = rect.width || 800;
     const H = rect.height || 800;
     const renderedSize = Math.min(W, H);
@@ -239,7 +241,7 @@ export function useGpsMapPanZoom({
     isDraggingRef.current = true;
     hasPannedRef.current = false;
     const el = containerRef.current;
-    const rect = el?.getBoundingClientRect();
+    const rect = (viewportRef.current ?? el)?.getBoundingClientRect();
     const renderedSize = Math.min(rect?.width || 800, rect?.height || 800);
     const visibleSize = viewBoxSize / (zoomLevelRef.current * BASE_ZOOM);
     const factor = visibleSize / (renderedSize || 800);
@@ -378,6 +380,7 @@ export function useGpsMapPanZoom({
     followCar,
     setFollowCar: handleSetFollowCar,
     containerRef,
+    viewportRef,
     currentViewBox,
     handlePointerDown,
     handlePointerMove,

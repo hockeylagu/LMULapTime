@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useId, useMemo } from 'react';
 import { Timer } from 'lucide-react';
 import { PointComparison } from '../../../../../utils/replayComparison.js';
 import type { DeltaGradientStop } from '../../telemetryChartTypes.js';
@@ -28,11 +28,12 @@ export const TelemetryDeltaChannel: React.FC<TelemetryDeltaChannelProps> = React
   isCursorInView,
   cursorPct,
 }) => {
+  const gradientId = useId();
   const chartSvg = useMemo(() => (
     <svg viewBox="0 10 1000 80" preserveAspectRatio="none" className="w-full h-full">
       <defs>
         {deltaGradientStops && deltaGradientStops.length > 0 && (
-          <linearGradient id="dynamicDeltaGrad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1000" y2="0">
+          <linearGradient id={`${gradientId}-dynamicDeltaGrad`} gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1000" y2="0">
             {deltaGradientStops.map((s, idx) => (
               <stop
                 key={idx}
@@ -43,17 +44,17 @@ export const TelemetryDeltaChannel: React.FC<TelemetryDeltaChannelProps> = React
             ))}
           </linearGradient>
         )}
-        <linearGradient id="gainDeltaGrad" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={`${gradientId}-gainDeltaGrad`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={TELEMETRY_COLORS.gain} stopOpacity="0.55" />
           <stop offset="50%" stopColor={TELEMETRY_COLORS.gain} stopOpacity="0.25" />
           <stop offset="100%" stopColor={TELEMETRY_COLORS.gain} stopOpacity="0.55" />
         </linearGradient>
-        <linearGradient id="lossDeltaGrad" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={`${gradientId}-lossDeltaGrad`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={TELEMETRY_COLORS.loss} stopOpacity="0.55" />
           <stop offset="50%" stopColor={TELEMETRY_COLORS.loss} stopOpacity="0.25" />
           <stop offset="100%" stopColor={TELEMETRY_COLORS.loss} stopOpacity="0.55" />
         </linearGradient>
-        <linearGradient id="deltaGrad" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={`${gradientId}-deltaGrad`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={TELEMETRY_COLORS.gain} stopOpacity="0.45" />
           <stop offset="50%" stopColor={TELEMETRY_COLORS.gain} stopOpacity="0.05" />
           <stop offset="50%" stopColor={TELEMETRY_COLORS.loss} stopOpacity="0.05" />
@@ -61,13 +62,13 @@ export const TelemetryDeltaChannel: React.FC<TelemetryDeltaChannelProps> = React
         </linearGradient>
       </defs>
       {deltaGradientStops && deltaGradientStops.length > 0 && deltaTimeArea ? (
-        <path d={deltaTimeArea} fill="url(#dynamicDeltaGrad)" />
+        <path d={deltaTimeArea} fill={`url(#${gradientId}-dynamicDeltaGrad)`} />
       ) : (
         <>
-          {deltaGainArea && <path d={deltaGainArea} fill="url(#gainDeltaGrad)" />}
-          {deltaLossArea && <path d={deltaLossArea} fill="url(#lossDeltaGrad)" />}
+          {deltaGainArea && <path d={deltaGainArea} fill={`url(#${gradientId}-gainDeltaGrad)`} />}
+          {deltaLossArea && <path d={deltaLossArea} fill={`url(#${gradientId}-lossDeltaGrad)`} />}
           {!deltaGainArea && !deltaLossArea && deltaTimeArea && (
-            <path d={deltaTimeArea} fill="url(#deltaGrad)" />
+            <path d={deltaTimeArea} fill={`url(#${gradientId}-deltaGrad)`} />
           )}
         </>
       )}
@@ -82,7 +83,7 @@ export const TelemetryDeltaChannel: React.FC<TelemetryDeltaChannelProps> = React
         strokeLinejoin="round"
       />
     </svg>
-  ), [deltaTimePath, deltaTimeArea, deltaGainArea, deltaLossArea, deltaGradientStops]);
+  ), [gradientId, deltaTimePath, deltaTimeArea, deltaGainArea, deltaLossArea, deltaGradientStops]);
 
   const gridLines = useMemo<readonly TelemetryGridLine[]>(() => [
     { label: `-${maxDeltaSec.toFixed(1)}s (Faster)`, borderClassName: 'border-b border-lmu-gain/40', labelClassName: 'text-[10px] text-lmu-gain font-mono' },

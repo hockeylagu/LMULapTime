@@ -13,8 +13,10 @@ import { MapColorMode } from '../map/replayMapUtils.js';
 import { ReplayInspectorSidebar } from './ReplayInspectorSidebar.js';
 import { TelemetryResolution } from '../telemetry/telemetryResolution.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
+import { ReplayFullscreenControlsContext, type ReplayFullscreenControls } from './replayFullscreenControls.js';
 
 export interface ReplayInspectorModalBodyProps {
+  fullscreenControls?: ReplayFullscreenControls;
   onClose: () => void;
   sessionId: string | null;
   metadata: ReplayMetadata | null;
@@ -94,6 +96,7 @@ export interface ReplayInspectorModalBodyProps {
 }
 
 export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> = ({
+  fullscreenControls,
   onClose,
   sessionId,
   metadata,
@@ -244,7 +247,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
           onSelectSource={onSelectSource}
         />
 
-        <ReplayInspectorSidebar
+        <ReplayFullscreenControlsContext.Provider value={fullscreenControls ?? null}><ReplayInspectorSidebar
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           cornerCount={cornerCount}
@@ -279,7 +282,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
           toggleConsistencyLap={toggleConsistencyLap}
           trackVenue={metadata?.trackVenue}
           trackCourse={metadata?.trackCourse}
-        />
+        /></ReplayFullscreenControlsContext.Provider>
       </div>
     </main>
   );

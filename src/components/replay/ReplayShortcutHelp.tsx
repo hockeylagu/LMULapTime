@@ -12,8 +12,9 @@ const shortcuts = [
   ['Home / End', 'Lap start / end'], ['+ / −', 'Zoom around the cursor'],
   ['0 / R / dbl-click', 'Show full lap / reset map view'], ['C', 'Center map on car, keep zoom'],
   ['F', 'Toggle follow car'], ['G', 'Toggle G-force arrow'], ['Minimap drag', 'Pan camera to circuit sector'],
+  ['M', 'Toggle fullscreen map'], ['T', 'Hide / show fullscreen trace'],
   ['W / A / S / D', 'Pan map up / left / down / right'],
-  ['Esc', 'Cancel gesture / close help'], ['?', 'Show shortcuts'],
+  ['Esc', 'Exit fullscreen / cancel gesture / close help'], ['?', 'Show shortcuts'],
 ];
 
 export function ReplayShortcutHelp() {
@@ -43,7 +44,7 @@ export function ReplayShortcutHelp() {
           <button ref={closeRef} type="button" onClick={() => setOpen(false)} aria-label="Close shortcuts" className={`px-2 py-1 rounded hover:bg-lmu-raised/70 transition-colors cursor-pointer ${FOCUS_RING}`}><X className="w-4 h-4" /></button></div>
         <dl className="grid grid-cols-[150px_1fr] gap-x-3 gap-y-2 text-xs">{shortcuts.map(([key, action]) =>
           <div key={key} className="contents"><dt className="font-mono text-lmu-text-soft">{key}</dt><dd className="text-lmu-muted">{action}</dd></div>)}</dl>
-        <p className="mt-4 text-xs text-lmu-muted">Click the chart to use chart shortcuts. C, F and Space work from the chart or map. Dragging the map pauses following.</p>
+        <p className="mt-4 text-xs text-lmu-muted">Click the chart to use chart shortcuts. C, F, M and Space work from the chart or map. Dragging the map pauses following.</p>
       </section>
     </div>, document.body)}
   </>;

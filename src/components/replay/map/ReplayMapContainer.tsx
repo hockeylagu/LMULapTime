@@ -188,6 +188,10 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
         <div className="flex-1 min-h-0 bg-lmu-deep p-0 flex items-center justify-center relative overflow-hidden">
           <GpsTrackMapScene
             points={trajectory.points}
+            source={trajectory.source}
+            sectors={trajectory.sectors}
+            primaryLapSummary={trajectory.laps?.find(lap => lap.lapNumber === trajectory.currentLap)}
+            baselineLapSummary={isCompareMode ? baselineTrajectory?.laps?.find(lap => lap.lapNumber === baselineTrajectory.currentLap) : undefined}
             bounds={trajectory.bounds}
             currentIndex={currentIndex}
             onSelectIndex={onSelectIndex}

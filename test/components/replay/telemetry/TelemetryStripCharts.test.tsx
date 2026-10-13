@@ -144,8 +144,8 @@ describe('TelemetryStripCharts', () => {
     expect(screen.getByText(/B: 170/i)).toBeInTheDocument();
 
     // SVG must define and use the gain/loss gradients
-    expect(container.querySelector('linearGradient#gainDeltaGrad')).toBeInTheDocument();
-    expect(container.querySelector('linearGradient#lossDeltaGrad')).toBeInTheDocument();
+    expect(container.querySelector('linearGradient[id$="-gainDeltaGrad"]')).toBeInTheDocument();
+    expect(container.querySelector('linearGradient[id$="-lossDeltaGrad"]')).toBeInTheDocument();
 
     // Dashed amber curves should be rendered in the SVGs
     const dashedLines = container.querySelectorAll('path[stroke="#F59E0B"]');

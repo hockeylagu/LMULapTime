@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import type { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
-import { replayShortcutBlocked } from '../../../utils/replayShortcuts.js';
+import { isReplaySurfaceTarget, replayShortcutBlocked } from '../../../utils/replayShortcuts.js';
 
 export interface UseGpsMapShortcutsOptions {
   isExpanded: boolean;
@@ -14,6 +14,9 @@ export interface UseGpsMapShortcutsOptions {
   onTogglePlay?: () => void;
   onToggleGForce?: () => void;
   onPan?: (horizontal: number, vertical: number) => void;
+  onToggleExpanded?: () => void;
+  /** Fullscreen only: hide or show the telemetry trace under the map. */
+  onToggleTrace?: () => void;
 }
 
 /**
@@ -26,6 +29,8 @@ export interface UseGpsMapShortcutsOptions {
  * - Space: Toggle playback
  * - G: Toggle G-force arrow
  * - W/A/S/D: Pan up/left/down/right without changing the scrub cursor
+ * - M: Toggle the fullscreen map, also from the telemetry chart
+ * - T: Hide / show the fullscreen telemetry trace, also from that trace
  */
 export function useGpsMapShortcuts({
   isExpanded,
@@ -39,6 +44,8 @@ export function useGpsMapShortcuts({
   onTogglePlay,
   onToggleGForce,
   onPan,
+  onToggleExpanded,
+  onToggleTrace,
 }: UseGpsMapShortcutsOptions): void {
   const optionsRef = useRef({
     isExpanded,
@@ -52,6 +59,8 @@ export function useGpsMapShortcuts({
     onTogglePlay,
     onToggleGForce,
     onPan,
+    onToggleExpanded,
+    onToggleTrace,
   });
   optionsRef.current = {
     isExpanded,
@@ -65,6 +74,8 @@ export function useGpsMapShortcuts({
     onTogglePlay,
     onToggleGForce,
     onPan,
+    onToggleExpanded,
+    onToggleTrace,
   };
 
   useEffect(() => {
@@ -82,9 +93,25 @@ export function useGpsMapShortcuts({
         onTogglePlay: togglePlay,
         onToggleGForce: toggleGForce,
         onPan: pan,
+        onToggleExpanded: toggleExpanded,
+        onToggleTrace: toggleTrace,
       } = optionsRef.current;
 
       const container = contRef.current;
+      if (event.key.toLowerCase() === 'm' && toggleExpanded) {
+        // M works from any replay surface, but only for this live map and never while another map is expanded.
+        if (event.repeat || !container || container.closest('[inert]') || !isReplaySurfaceTarget(event)) return;
+        const expandedMap = document.querySelector('[data-map-expanded]');
+        if (expandedMap && expandedMap !== container) return;
+        event.preventDefault();
+        toggleExpanded();
+        return;
+      }
+      if (event.key.toLowerCase() === 't' && expanded && toggleTrace) {
+        // Expanded, focus is trapped in the map, so T works from the map and from its trace alike.
+        if (!event.repeat) { event.preventDefault(); toggleTrace(); }
+        return;
+      }
       const isTargetOnMap = Boolean(container && event.target instanceof Node && container.contains(event.target));
       // Map keys act only on the map: focused on it, or expanded over everything. The telemetry
       // chart handles its own arrows, Home/End, zoom and reset, so a key pressed on it must not

@@ -254,7 +254,7 @@ export function useTelemetryStripInteraction({
         e.preventDefault(); zoomBy(e.key === '-' ? 1.25 : 0.8, pctForIndex(safeIndex) / 100);
       } else if (e.key === '0') {
         e.preventDefault(); viewportRef.current = null; handleResetZoom();
-      } else if (e.key === 'Escape') {
+      } else if (e.key === 'Escape' && (isDraggingRef.current || dragSelection || panRef.current)) {
         e.preventDefault(); handlePointerCancel();
       }
     };

@@ -44,7 +44,7 @@ export const GpsMapModeBar: React.FC<GpsMapModeBarProps> = ({
       onClick={e => e.stopPropagation()}
       onPointerDown={e => e.stopPropagation()}
       onDoubleClick={e => e.stopPropagation()}
-      className={`absolute top-3 left-1/2 -translate-x-1/2 z-30 flex flex-wrap items-center justify-center gap-2 px-3 py-1.5 rounded-xl bg-lmu-strip/95 border border-lmu-border backdrop-blur-md shadow-xl select-none pointer-events-auto max-2xl:top-16 max-2xl:left-72 max-2xl:right-3 max-2xl:translate-x-0 max-2xl:justify-end ${className}`}
+      className={`relative z-30 flex w-max max-w-full flex-wrap items-center justify-center gap-1.5 px-2 py-1 rounded-xl bg-lmu-strip/95 border border-lmu-border backdrop-blur-md shadow-xl select-none pointer-events-auto ${className}`}
     >
       {onChangeColorBy && (
         <div className="flex items-center gap-1">

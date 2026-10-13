@@ -36,7 +36,7 @@ export const MapFullscreenButton: React.FC<MapFullscreenButtonProps> = ({
 
   const label = active ? 'Exit full screen (Esc)' : 'Full screen map';
   return <button ref={buttonRef} type="button" onClick={toggle} aria-label={label}
-    aria-pressed={active} title={label}
+    aria-pressed={active} aria-keyshortcuts="M" title={active ? 'Exit full screen (M / Esc)' : 'Full screen map (M)'}
     className={`w-7 h-7 flex items-center justify-center rounded-lg bg-lmu-raised/40 hover:bg-lmu-raised text-lmu-muted hover:text-lmu-text transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}>
     {active ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
   </button>;

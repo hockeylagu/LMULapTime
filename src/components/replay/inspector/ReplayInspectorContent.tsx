@@ -85,7 +85,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     handleSwapBaseline,
     handleRemoveCompare,
     activeSessionId,
-    handleSelectBaselineLap,
+    handleSelectBaselineLap, fullscreenControls,
     selectedSource,
     handleSelectSource,
     hasDuckDbTelemetry,
@@ -248,7 +248,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
       lapDeltas={lapDeltas}
       handleSwapBaseline={handleSwapBaseline}
       handleRemoveCompare={handleRemoveCompare}
-      handleSelectBaselineLap={handleSelectBaselineLap}
+      handleSelectBaselineLap={handleSelectBaselineLap} fullscreenControls={fullscreenControls}
       formatLapTime={formatTime}
       bestSectors={bestSectors}
       lapSegments={lapSegments}

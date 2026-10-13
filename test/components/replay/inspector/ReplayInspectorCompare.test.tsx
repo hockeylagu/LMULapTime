@@ -447,4 +447,61 @@ describe('ReplayInspectorModal - Comparison & Source Modes', () => {
       expect(requestedUrls.some((u) => u.includes('source=duckdb'))).toBe(true);
     });
   });
+  it('changes both fullscreen laps using their own session and driver locators', async () => {
+    localStorage.clear();
+    window.location.hash = '#/telemetry?sessionId=session-1&driverOrdinal=0&lapOrdinal=0';
+    const primaryLaps = [1, 2, 3].map(lapNumber => ({ lapNumber, lapTimeSec: 134 + lapNumber,
+      s1Sec: 40, s2Sec: 50, s3Sec: 44 + lapNumber }));
+    const referenceLaps = [7, 9].map(lapNumber => ({ lapNumber, lapTimeSec: 133 + lapNumber,
+      s1Sec: 39, s2Sec: 50, s3Sec: 44 + lapNumber }));
+    const referenceMeta = { ...mockMeta, drivers: [{ ...mockMeta.drivers[1], sessionLapOrdinals: { '7': 2, '9': 6 } }] };
+    const requests: URL[] = [];
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      const request = new URL(url, 'http://localhost');
+      const reference = request.pathname.includes('/session-2/');
+      if (url.includes('/metadata')) return Promise.resolve({ ok: true, json: () => Promise.resolve(reference ? referenceMeta : mockMeta) });
+      if (url.includes('/telemetry?')) {
+        requests.push(request);
+        const ordinal = Number(request.searchParams.get('lapOrdinal'));
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ ...mockTraj,
+          sessionId: reference ? 'session-2' : 'session-1', driverOrdinal: reference ? 1 : 0,
+          driverSlot: reference ? 2 : 1, lapOrdinal: ordinal,
+          currentLap: reference ? ordinal === 6 ? 9 : 7 : ordinal + 1,
+          laps: reference ? referenceLaps : primaryLaps,
+        }) });
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ laps: [{ id: 'reference-9', sessionId: 'session-2', driverOrdinal: 1,
+        lapOrdinal: 6, lapNumber: 9, lapTime: 142, driverName: 'Rival Racer', carType: 'BMW M4 GT3', carClass: 'GT3', isValid: true,
+        sessionType: 'Race', matchingReplayFile: 'Reference.vcr' }] }) });
+    });
+    render(<ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1"
+      initialCompareMode={true} initialBaselineSessionId="session-2" initialBaselineDriverOrdinal={1} initialBaselineLapOrdinal={2} />);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Full screen map' })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Full screen map' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Change baseline lap' })).toHaveTextContent('Baseline L7'));
+    fireEvent.click(screen.getByRole('button', { name: 'Change primary lap' }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Lap 2/ }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Change primary lap' })).toHaveTextContent('Primary L2'));
+    expect(requests.some(request => request.pathname.includes('/session-1/') && request.searchParams.get('driverOrdinal') === '0'
+      && request.searchParams.get('lapOrdinal') === '1')).toBe(true);
+    screen.getByRole('button', { name: 'Change baseline lap' }).focus();
+    fireEvent.click(screen.getByRole('button', { name: 'Change baseline lap' }));
+    await waitFor(() => expect(screen.getByRole('dialog', { name: 'Choose comparison lap' })).toBeInTheDocument());
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Close comparison lap picker' }), { key: 'Escape' });
+    expect(screen.getByRole('button', { name: 'Change baseline lap' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Exit full screen (Esc)' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Change baseline lap' }));
+    await waitFor(() => expect(screen.getByText('Rival Racer')).toBeInTheDocument());
+    fireEvent.click(screen.getByText('Rival Racer'));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Change baseline lap' })).toHaveTextContent('Baseline L9'));
+    expect(screen.queryByRole('dialog', { name: 'Choose comparison lap' })).not.toBeInTheDocument();
+    expect(requests.some(request => request.pathname.includes('/session-2/') && request.searchParams.get('driverOrdinal') === '1'
+      && request.searchParams.get('lapOrdinal') === '6')).toBe(true);
+    const params = new URLSearchParams(window.location.hash.split('?')[1]);
+    expect(params.get('baselineSessionId')).toBe('session-2');
+    expect(params.get('baselineDriverOrdinal')).toBe('1');
+    expect(params.get('baselineLapOrdinal')).toBe('6');
+    expect(screen.getByRole('button', { name: 'Exit full screen (Esc)' })).toBeInTheDocument();
+  });
+
 });

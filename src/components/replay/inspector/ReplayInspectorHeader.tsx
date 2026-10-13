@@ -8,6 +8,7 @@ import { ReplayCompareButton } from './compare/ReplayCompareButton.js';
 import { ReplayInspectorTitle } from './ReplayInspectorTitle.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
+import { PLAYBACK_SPEEDS } from './replayFullscreenControls.js';
 
 export interface ReplayInspectorHeaderProps {
   onClose: () => void;
@@ -247,7 +248,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
           onChange={event => onSelectPlaybackSpeed(Number(event.target.value))}
           className="h-8 px-2 rounded-lg bg-lmu-card border border-lmu-border text-[11px] font-mono text-white cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
         >
-          {[0.5, 1, 2].map(speed => <option key={speed} value={speed}>{speed}×</option>)}
+          {PLAYBACK_SPEEDS.map(speed => <option key={speed} value={speed}>{speed}×</option>)}
         </select>
       </div>
     </header>

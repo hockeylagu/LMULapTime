@@ -12,6 +12,7 @@ import { replayCompareScope } from './compare/compareLapsQuery.js';
 import { DEFAULT_COMPARE_CONTROLS, type CompareLapControls } from './compare/compareLapControls.js';
 import { advancePlaybackClock, PlaybackClock, playbackClockAt } from './replayPlaybackClock.js';
 import { createPlaybackCursor } from './replayPlaybackCursor.js';
+import { PLAYBACK_SPEEDS, type ReplayFullscreenControls } from './replayFullscreenControls.js';
 import { DEFAULT_TELEMETRY_RESOLUTION, TelemetryResolution, trajectoryResolutionQuery } from '../telemetry/telemetryResolution.js';
 
 export interface UseReplayInspectorDataProps {
@@ -216,7 +217,9 @@ export function useReplayInspectorData({
       trajectoryRequestIdRef.current++;
       trajectoryControllerRef.current?.abort();
     };
-  }, [isOpen, activeSessionId, replayLoadVersion, selectedDriverOrdinal, selectedLapOrdinal]);
+  // Lap/driver changes already load through fetchTrajectory. Their successful locator updates
+  // must not clear the session again or remount an expanded map.
+  }, [isOpen, activeSessionId, replayLoadVersion]);
 
   // 'Same condition' follows the inspected lap's own weather; unknown, it filters nothing.
   const currentCondition = trajectory?.weatherCondition ?? metadata?.weatherCondition ?? null;
@@ -605,6 +608,28 @@ export function useReplayInspectorData({
     };
   }, [currentLapSummary, baselineLapSummary]);
 
+  // The fullscreen lap controls read this through context: keep it stable across renders that do not
+  // change lap selection (scrubbing, playback), calling the latest handlers through a ref.
+  const lapActionsRef = useRef({ handleToggleCompare, handleSelectLap, handleRetryLoad, handleRetryBaseline, setPlaybackSpeed });
+  lapActionsRef.current = { handleToggleCompare, handleSelectLap, handleRetryLoad, handleRetryBaseline, setPlaybackSpeed };
+  const lapOrdinals = selectedDriver?.sessionLapOrdinals;
+  const primaryLaps = useMemo(() => (trajectory?.laps ?? []).filter(lap => lapOrdinals?.[String(lap.lapNumber)] !== undefined),
+    [trajectory?.laps, lapOrdinals]);
+  const primaryLapNumber = trajectory?.currentLap ?? null;
+  const isPrimaryLoading = isLoading || isTrajLoading;
+  const fullscreenControls = useMemo<ReplayFullscreenControls>(() => ({
+    onOpenBaselinePicker: () => lapActionsRef.current.handleToggleCompare(),
+    primary: {
+      laps: primaryLaps, lapNumber: primaryLapNumber, onSelect: lap => lapActionsRef.current.handleSelectLap(lap),
+      isLoading: isPrimaryLoading, error, onRetry: () => lapActionsRef.current.handleRetryLoad(),
+    },
+    baseline: isCompareMode ? {
+      lapNumber: baselineLapNumber, isLoading: isBaselineLoading, error: comparableBaselineError,
+      onRetry: () => lapActionsRef.current.handleRetryBaseline(),
+    } : undefined,
+    playback: { speed: playbackSpeed, speeds: PLAYBACK_SPEEDS, onChangeSpeed: speed => lapActionsRef.current.setPlaybackSpeed(speed) },
+  }), [primaryLaps, primaryLapNumber, isPrimaryLoading, error, isCompareMode, baselineLapNumber, isBaselineLoading, comparableBaselineError, playbackSpeed]);
+
   return {
     metadata, trajectory, selectedDriverSlot, selectedDriver, playerDriver,
     isLoading, isTrajLoading, error, handleRetryLoad, isCompareMode, handleToggleCompare,
@@ -618,6 +643,7 @@ export function useReplayInspectorData({
     handleSelectDriver, handleSelectLap, telemetryResolution, handleChangeResolution,
     currentPoint, currentLapSummary, lapDeltas, activeSessionId,
     handleSelectBaselineLap,
+    fullscreenControls,
     selectedSource,
     handleSelectSource,
     hasDuckDbTelemetry: Boolean(metadata?.duckdbFilename || trajectory?.duckdbFilename || trajectory?.source === 'duckdb'),

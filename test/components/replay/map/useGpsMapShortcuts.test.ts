@@ -254,4 +254,23 @@ describe('useGpsMapShortcuts target scoping', () => {
     expect(handlers.onZoomIn).toHaveBeenCalledTimes(1);
     cleanup();
   });
+
+  it('toggles fullscreen with M from the chart or map, ignoring typing, modifiers, repeat and inert maps', () => {
+    const map = document.createElement('div'); map.dataset.replaySurface = 'map';
+    const chart = document.createElement('div'); chart.dataset.replaySurface = 'chart';
+    const select = document.createElement('select'); map.append(select);
+    document.body.append(map, chart);
+    const onToggleExpanded = vi.fn();
+    renderHook(() => useGpsMapShortcuts({ isExpanded: false, containerRef: { current: map }, points: pts, currentIndex: 1,
+      onZoomIn: vi.fn(), onZoomOut: vi.fn(), onResetZoom: vi.fn(), onToggleExpanded }));
+    const key = (el: Element, init: KeyboardEventInit) => el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init }));
+    key(chart, { key: 'm', ctrlKey: true }); key(chart, { key: 'm', repeat: true }); key(select, { key: 'm' }); key(document.body, { key: 'm' });
+    expect(onToggleExpanded).not.toHaveBeenCalled();
+    key(chart, { key: 'm' }); key(map, { key: 'M' });
+    expect(onToggleExpanded).toHaveBeenCalledTimes(2);
+    map.setAttribute('inert', '');
+    key(chart, { key: 'm' });
+    expect(onToggleExpanded).toHaveBeenCalledTimes(2);
+    map.remove(); chart.remove();
+  });
 });

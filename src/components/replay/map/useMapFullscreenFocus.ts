@@ -76,7 +76,10 @@ export function useMapFullscreenFocus(
       if (previousModal === null) map.removeAttribute('aria-modal'); else map.setAttribute('aria-modal', previousModal);
       if (previousTabIndex === null) map.removeAttribute('tabindex');
       map.removeAttribute('data-map-expanded');
-      if (previousFocus.isConnected) previousFocus.focus({ preventScroll: true });
+      // Entered from its own button: land on the (focusable) map instead, since shortcuts ignore
+      // keys on buttons and M could not re-expand it from there.
+      const restore = previousFocus === button && previousTabIndex !== null ? map : previousFocus;
+      if (restore.isConnected) restore.focus({ preventScroll: true });
     };
   }, [active, buttonRef]);
 }

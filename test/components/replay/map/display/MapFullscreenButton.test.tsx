@@ -9,6 +9,11 @@ function renderInMap() {
 }
 
 describe('MapFullscreenButton', () => {
+  it('advertises the M shortcut (handled by useGpsMapShortcuts)', () => {
+    renderInMap();
+    expect(screen.getByRole('button', { name: 'Full screen map' })).toHaveAttribute('aria-keyshortcuts', 'M');
+  });
+
   it('isolates ancestors, traps focus and restores scrolling and the trigger', () => {
     render(<div><button data-testid="background">Background</button><div data-replay-surface="map" data-testid="map">
       <MapFullscreenButton /><button>Last map control</button>
@@ -52,7 +57,8 @@ describe('MapFullscreenButton', () => {
     expect(help).toHaveFocus();
     fireEvent.keyDown(help, { key: 'Escape' });
     expect(screen.getByTestId('map')).not.toHaveAttribute('data-map-expanded');
-    expect(trigger).toHaveFocus();
+    // Entered from its button, focus lands on the focusable map so M can re-expand it.
+    expect(screen.getByTestId('map')).toHaveFocus();
   });
 
   it('expands the map over the window and restores it from the button', () => {

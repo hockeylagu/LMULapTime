@@ -1,4 +1,4 @@
-import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
+import { ReplayTrajectoryPoint, type ReplayLapSummary, type ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { MapColorMode } from './replayMapUtils.js';
 import { TrackBoundaryGeometry } from '../../../../shared/types/trackGeometry.js';
 import type { TrackMapDisplay } from '../../../../shared/types/trackGeometry.js';
@@ -16,9 +16,14 @@ export interface GpsTrackMapPedalMarker {
 }
 
 export interface GpsTrackMapProps {
+  primaryLapSummary?: ReplayLapSummary;
+  baselineLapSummary?: ReplayLapSummary;
   points: ReplayTrajectoryPoint[];
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number; spanX: number; spanZ: number };
   currentIndex: number;
+  source?: 'vcr' | 'duckdb';
+  /** Sector line crossings as primary sample indices, drawn on the fullscreen trace. */
+  sectors?: ReplayTrajectoryData['sectors'];
   initialZoom?: number;
   initialFollowCar?: boolean;
   onSelectIndex?: (index: number) => void;
