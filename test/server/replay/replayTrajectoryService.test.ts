@@ -11,7 +11,7 @@ import { SessionDatabase } from '../../../server/core/db.js';
 import { ReplayRecordingService } from '../../../server/replay/replayRecordingService.js';
 import { ReplayTelemetryService } from '../../../server/replay/replayTelemetryService.js';
 import { ReplayTrajectoryService } from '../../../server/replay/replayTrajectoryService.js';
-import { ReplayDriverNotFoundError } from '../../../server/replay/replayServiceTypes.js';
+import { ReplayDriverNotFoundError, ReplayLapNotRecordedError } from '../../../server/replay/replayServiceTypes.js';
 import { getTrackDefinition } from '../../../server/tracks/serverTrackSync.js';
 import type {
   DetailedSession,
@@ -111,20 +111,33 @@ describe('ReplayTrajectoryService', () => {
     expect(readTrajectory).toHaveBeenCalledWith(expect.any(String), 'Daytona.Vcr', expect.objectContaining({ metadata: mockMetadata }));
   });
 
-  it('uses the selected session driver laps, excluding replay-only segments and retaining invalid session laps', async () => {
+  it('lists the session laps the replay recorded, excluding replay-only segments and retaining invalid laps', async () => {
     const replayOnlyLap = { lapNumber: 2, lapTimeSec: 105.98, s1Sec: 12, s2Sec: 49, s3Sec: 44.98, isValid: false };
-    const raw = { ...mockFullTrajectory, laps: [...mockFullTrajectory.laps!, replayOnlyLap] };
+    const invalidLap = { lapNumber: 3, lapTimeSec: 101, s1Sec: 30, s2Sec: 40, s3Sec: 31, isValid: false };
+    const raw = { ...mockFullTrajectory, laps: [...mockFullTrajectory.laps!, replayOnlyLap, invalidLap] };
     vi.spyOn(replayRecordings, 'getFullTrajectory').mockResolvedValue(raw);
     vi.spyOn(replayRecordings, 'getMetadata').mockReturnValue(mockMetadata);
     const session = sessionFor();
-    session.drivers[0].laps.push({ lapNumber: 4, lapTime: 101, isValid: false } as DriverData['laps'][number]);
+    // Lap 4 is a session lap the recording missed: nothing to show, so it is not listed.
+    session.drivers[0].laps.push({ lapNumber: 3, lapTime: 101, isValid: false } as DriverData['laps'][number],
+      { lapNumber: 4, lapTime: 99, isValid: false } as DriverData['laps'][number]);
 
     const result = await trajectoryService.getTrajectory({ session, driverOrdinal: 0, lapOrdinal: 0,
       maxPoints: 4, allowDuckDb: false });
 
-    expect(result.laps?.map(lap => lap.lapNumber)).toEqual([1, 4]);
-    expect(result.laps?.[1]).toMatchObject({ lapNumber: 4, lapTimeSec: 101, isValid: false });
-    expect(raw.laps.map(lap => lap.lapNumber)).toEqual([1, 2]);
+    expect(result.laps?.map(lap => lap.lapNumber)).toEqual([1, 3]);
+    expect(result.laps?.[1]).toMatchObject({ lapNumber: 3, isValid: false });
+    expect(raw.laps.map(lap => lap.lapNumber)).toEqual([1, 2, 3]);
+  });
+
+  it('refuses a session lap the replay did not record instead of serving another lap', async () => {
+    vi.spyOn(replayRecordings, 'getFullTrajectory').mockResolvedValue(mockFullTrajectory);
+    vi.spyOn(replayRecordings, 'getMetadata').mockReturnValue(mockMetadata);
+    const session = sessionFor();
+    session.drivers[0].laps.push({ lapNumber: 5, lapTime: 72.3, isValid: false, isInferred: true } as DriverData['laps'][number]);
+
+    await expect(trajectoryService.getTrajectory({ session, driverOrdinal: 0, lapOrdinal: 1, maxPoints: 4, allowDuckDb: false }))
+      .rejects.toBeInstanceOf(ReplayLapNotRecordedError);
   });
 
   it('serves one point per pointSpacingM metres of the lap instead of maxPoints when asked', async () => {

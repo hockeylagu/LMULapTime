@@ -3,7 +3,7 @@ import { dataPlugin } from '../plugins/dataPlugin.js';
 import { ReplayMetadata, ReplayTrajectoryData } from '../../shared/types/index.js';
 import { ReplayRecordingService } from './replayRecordingService.js';
 import { ReplayTelemetryService } from './replayTelemetryService.js';
-import { ReplayDriverNotFoundError, ReplayTrajectoryRequest } from './replayServiceTypes.js';
+import { ReplayDriverNotFoundError, ReplayLapNotRecordedError, ReplayTrajectoryRequest } from './replayServiceTypes.js';
 import { composeReplayMetadata } from './replayMetadataService.js';
 import {
   applyPureOfficialLapValidation,
@@ -47,6 +47,10 @@ export class ReplayTrajectoryService {
       playerName: configuredPlayer,
       metadata: rawMetadata,
     });
+    // A session lap the recording missed has no segment: never serve the replay's default lap in its place.
+    if (fullTrajectory.laps?.length && !fullTrajectory.laps.some(lap => lap.lapNumber === recordingLap.lapNumber)) {
+      throw new ReplayLapNotRecordedError(recordingLap.lapNumber, replayName);
+    }
 
     // Kept at full resolution until the lap has been projected on the track and cut at the line.
     let trajectory: ReplayTrajectoryData = {
@@ -77,22 +81,13 @@ export class ReplayTrajectoryService {
     trajectory = telemetryResult.trajectory;
 
     trajectory = applyPureOfficialLapValidation(trajectory, matchedSession, matchedDriver);
-    // Inspector navigation, consistency and comparison all consume this list. Replay-only
-    // segments have no session locator, while session laps remain selectable even if invalid.
+    // Inspector navigation, consistency and comparison all consume this list: the session laps that
+    // have a replay segment, invalid ones included. Replay-only segments have no session locator, and a
+    // session lap the recording missed has nothing to show.
     const replayLaps = new Map(trajectory.laps?.map(lap => [lap.lapNumber, lap]));
-    trajectory.laps = matchedDriver.laps.map(lap => {
+    trajectory.laps = matchedDriver.laps.flatMap(lap => {
       const replayLap = replayLaps.get(lap.lapNumber);
-      return replayLap ?? {
-        lapNumber: lap.lapNumber,
-        lapTimeSec: lap.lapTime ?? 0,
-        s1Sec: lap.s1 ?? 0,
-        s2Sec: lap.s2 ?? 0,
-        s3Sec: lap.s3 ?? 0,
-        isValid: lap.isValid,
-        isPitStop: lap.isPitStop,
-        isOutLap: lap.isOutLap,
-        nonRepresentativeReason: lap.nonRepresentativeReason,
-      };
+      return replayLap ? [replayLap] : [];
     });
 
     const venue = matchedSession?.trackVenue || metadata?.trackVenue;

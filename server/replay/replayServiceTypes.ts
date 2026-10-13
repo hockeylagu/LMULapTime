@@ -29,6 +29,14 @@ export class ReplayDriverNotFoundError extends Error {
   }
 }
 
+/** Thrown when a session lap has no segment in the replay (for example an inferred lap the recording missed). */
+export class ReplayLapNotRecordedError extends Error {
+  public constructor(lapNumber: number, replayName: string) {
+    super(`Lap ${lapNumber} is not in replay "${replayName}"`);
+    this.name = 'ReplayLapNotRecordedError';
+  }
+}
+
 /** Thrown when LMU has deleted the replay and the cache holds no laps for the requested driver. */
 export class ReplayDriverNotRecordedError extends ReplayDriverNotFoundError {
   public constructor(driverSlot: number, replayName: string) {

@@ -284,8 +284,9 @@ index their explicitly supplied replay directory locally.
   `decode/replayLapClassification.ts` recovers pit flags from retained lap spans, pit events and samples on read;
   matched XML classification takes precedence in `replayTransforms.ts`. Replay consistency uses
   `isCleanReplayLap` (`shared/domain/lapComparison.ts`) to exclude pit, out, invalid and non-representative laps.
-  Session telemetry responses expose only the selected driver's session laps, retaining invalid session laps
-  and excluding replay-only segments without session locators. Inspector navigation follows this list's actual lap numbers.
+  Session telemetry responses list the selected driver's session laps that the replay recorded, retaining invalid laps;
+  replay-only segments (no session locator) and session laps the recording missed are left out. Requesting a missed lap
+  fails with `ReplayLapNotRecordedError` (404) rather than serving the replay's default lap. Inspector navigation follows this list's actual lap numbers.
   These read-time corrections preserve deleted recordings and require no cache version bump.
 - Normalised facts (pure): `replayFacts.ts` → written by `server/core/replay/dbReplayLapStore.ts`
   (`replaceReplayDriverLapFacts`, `replaceReplayWideFacts`; read with `getReplayLaps`, `getReplayConditions`, `getLapConditions`).
