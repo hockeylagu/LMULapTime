@@ -100,9 +100,11 @@ export function composeReplayMetadata(options: ComposeReplayMetadataOptions): Re
 
   if (options.duckdbFilename) metadata.duckdbFilename = options.duckdbFilename;
 
+  // The car name stays the one sessions store (resolveRosterVehicles took it from the session log);
+  // only the class comes from the data package, resolved by vehicle id.
   for (const entry of metadata.drivers) {
-    const vehicle=dataPlugin.vehicle(entry);
-    if(vehicle){entry.carType=vehicle.model;entry.carClass=vehicle.carClass;}
+    const vehicle = dataPlugin.vehicle(entry);
+    if (vehicle) entry.carClass = vehicle.carClass;
   }
   return metadata;
 }

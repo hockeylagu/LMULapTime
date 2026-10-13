@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { dataPlugin } from '../../../server/plugins/dataPlugin.js';
 import {
   cloneReplayMetadata,
   composeReplayMetadata,
@@ -131,6 +132,28 @@ describe('Replay domain services and transforms', () => {
         ['Duqueine D09 P3', 'LMP3'],
       ]);
       expect(original.drivers[0].carClass).toBe('LMP2');
+    });
+
+    it('keeps the session car name when the data package names the car differently, taking only the class from the package', () => {
+      const metadata: ReplayMetadata = {
+        filename: 'Spa R1 1.Vcr', filePath: '/replays/Spa R1 1.Vcr', fileSizeBytes: 2000, mtimeMs: 5000,
+        timeSliceCount: 50, totalEvents: 2, durationSec: 60,
+        drivers: [{ slot: 0, name: 'Ann', vehicleId: 'GENESIS_1', carType: 'Genesis GMR-001', carClass: 'Hyper' }],
+      };
+      const session = {
+        id: 'session-genesis', trackVenue: 'Spa', trackCourse: 'Grand Prix', sessionType: 'Race',
+        drivers: [{ name: 'Ann', carType: 'Genesis GMR001', carClass: 'Hyper', laps: [] }],
+      } as unknown as DetailedSession;
+      const vehicle = vi.spyOn(dataPlugin, 'vehicle').mockReturnValue({
+        model: 'Genesis GMR-001', carClass: 'Hyper',
+      } as unknown as NonNullable<ReturnType<typeof dataPlugin.vehicle>>);
+      try {
+        const composed = composeReplayMetadata({ metadata, replayName: metadata.filename, matchedSession: session });
+        expect(composed.drivers[0].carType).toBe('Genesis GMR001');
+        expect(composed.drivers[0].carClass).toBe('Hyper');
+      } finally {
+        vehicle.mockRestore();
+      }
     });
 
     it('composes player metadata only from the uniquely marked configured participant', () => {

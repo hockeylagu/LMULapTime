@@ -6,31 +6,6 @@ export function setVehicleCatalog(records: readonly {model:string;carClass:strin
   for (const record of records) for (const id of record.vehicleIds) VEHICLE_FILES.set(id.trim().replace(/\.veh$/i,'').toUpperCase(), {model:record.model,carClass:record.carClass});
 }
 
-// LMU results-log <CarType> names that differ from the model names the app shows.
-const LMU_CAR_TYPE_MODELS: Readonly<Record<string, string>> = {
-  'Aston Martin Vantage AMR LMGT3': 'Aston Martin Vantage GT3',
-  'BMW M4 LMGT3': 'BMW M4 GT3',
-  'Chevrolet Corvette Z06 LMGT3.R': 'Corvette Z06 GT3.R',
-  'Ferrari 296 LMGT3': 'Ferrari 296 GT3',
-  'Ferrari 296 LMGT3 Evo': 'Ferrari 296 GT3',
-  'Ford Mustang LMGT3': 'Ford Mustang GT3',
-  'Genesis GMR001': 'Genesis GMR001 Hypercar',
-  'Genesis GMR-001': 'Genesis GMR001 Hypercar',
-  'Lamborghini Huracan LMGT3 Evo2': 'Lamborghini Huracan GT3 Evo2',
-  'Lexus RCF LMGT3': 'Lexus RC F GT3',
-  'McLaren 720S LMGT3 Evo': 'McLaren 720S GT3 Evo',
-  'Mercedes-AMG LMGT3': 'Mercedes-AMG GT3',
-  'Oreca 07': 'Oreca 07 LMP2',
-  'Peugeot 9x8': 'Peugeot 9X8',
-  'Porsche 911 GT3 R LMGT3': 'Porsche 911 GT3 R',
-  'Toyota TR010': 'Toyota GR010 Hybrid',
-};
-
-/** A results-log <CarType> as the model name the app shows. */
-export function normalizeLmuCarType(carType: string): string {
-  return LMU_CAR_TYPE_MODELS[carType.trim()] ?? carType.trim();
-}
-
 /** Converts external XML/benchmark class labels once at ingestion. Internal data uses exact equality. */
 export function normalizeCarClass(carClass?: string | null): string {
   const value = carClass?.trim() ?? '';
@@ -298,7 +273,7 @@ export function resolveRosterVehicles<T extends { drivers?: RosterVehicle[]; car
     const key = driver.name.trim().toLowerCase();
     const logged = key && replayNameCounts.get(key) === 1 ? byName.get(key) : undefined;
     if (logged?.carType && logged.carType !== 'Unknown Car' && logged.carClass && logged.carClass !== 'General') {
-      driver.carType = normalizeLmuCarType(logged.carType);
+      driver.carType = logged.carType;
       driver.carClass = logged.carClass;
     } else if (driver.vehicleId) {
       driver.carType = mapVehicleIdToModel(driver.vehicleId);

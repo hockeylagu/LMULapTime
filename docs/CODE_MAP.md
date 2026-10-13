@@ -314,6 +314,7 @@ index their explicitly supplied replay directory locally.
   losing known on-track status after the timing-line sample. Fusion runs on request, without changing stored cache shapes)
   → `server/tracks/` (line cut `lapLineCut.ts`, projection
   `trackProjection.ts`, glitches `stationGlitches.ts`, geometry `serverTrackSync.ts`, store `trackGeometryStore.ts`).
+- Replay roster cars (`composeReplayMetadata`, `resolveRosterVehicles`): `carType` is the raw name the matched session log stores (unique driver-name match; the raw replay name otherwise), never the data package's model name, so exact car filters and the DB agree ("Genesis GMR001" vs the package's "Genesis GMR-001"). Only `carClass` comes from the data package, resolved by vehicle id.
 - Replay serving is session-addressed; filename-based replay list/metadata/trajectory routes are removed.
   Settings retains `/api/replays/cache` and `/api/replays/upgrade` for recording maintenance.
 - Traffic: `GET /api/session/:id/traffic` resolves the session's stored replay link → `server/traffic/raceTrafficService.ts` → race positions index
