@@ -91,7 +91,16 @@ function lapParams(base: Params, lap: LapData, derived: SessionLapProjection | u
 
 interface Statements {
   update: Statement; recording: Statement; driver: Statement; lap: Statement; pass: Statement; event: Statement;
-  dictionaries: Dictionaries;
+  deletes: Statement[];
+}
+
+/** Each database's writer statements, prepared once: a scan writes thousands of sessions. */
+const preparedStatements = new WeakMap<DatabaseType, Statements>();
+
+function statementsFor(db: DatabaseType): Statements {
+  let statements = preparedStatements.get(db);
+  if (!statements) preparedStatements.set(db, statements = prepare(db));
+  return statements;
 }
 
 function prepare(db: DatabaseType): Statements {
@@ -107,7 +116,7 @@ function prepare(db: DatabaseType): Statements {
       ...columnsOf(TIRE_WEAR_FIELDS), ...columnsOf(CONDITION_FIELDS), ...trafficColumns, ...derivedNames(LAP_DERIVED_DEFS)])),
     pass: db.prepare(insertSql('session_lap_passes', ['session_id', 'driver_ordinal', 'lap_ordinal', 'direction', 'seq', 'name', 'car_class', 'same_class'])),
     event: db.prepare(insertSql('session_events', ['session_id', 'driver_ordinal', 'seq', 'kind', ...columnsOf(EVENT_COLUMNS)])),
-    dictionaries: new Dictionaries(db),
+    deletes: SESSION_ROW_TABLES.map(table => db.prepare(`DELETE FROM ${table} WHERE session_id = ?`)),
   };
 }
 
@@ -153,8 +162,9 @@ function lapsByDriver(projection: SessionSummaryProjection): Map<number, Session
 export function writeSessionRows(db: DatabaseType, session: DetailedSession, projection: SessionSummaryProjection = buildSessionSummaryProjection(session, 0)): void {
   const derivedLaps = lapsByDriver(projection);
   db.transaction(() => {
-    const statements = prepare(db);
-    for (const table of SESSION_ROW_TABLES) db.prepare(`DELETE FROM ${table} WHERE session_id = ?`).run(session.id);
+    const statements = statementsFor(db);
+    const dictionaries = new Dictionaries(db);
+    for (const remove of statements.deletes) remove.run(session.id);
 
     const params: Params = { id: session.id };
     packFields(params, session as unknown as Row, SESSION_FIELDS);
@@ -172,8 +182,8 @@ export function writeSessionRows(db: DatabaseType, session: DetailedSession, pro
     }
     session.drivers.forEach((driver, driverOrdinal) => {
       const row: Params = {
-        session_id: session.id, driver_ordinal: driverOrdinal, driver_id: statements.dictionaries.driver(driver.name),
-        vehicle_id: statements.dictionaries.vehicle(driver.carType, driver.carClass), team_id: statements.dictionaries.team(driver.teamName),
+        session_id: session.id, driver_ordinal: driverOrdinal, driver_id: dictionaries.driver(driver.name),
+        vehicle_id: dictionaries.vehicle(driver.carType, driver.carClass), team_id: dictionaries.team(driver.teamName),
       };
       packFields(row, driver as unknown as Row, DRIVER_FIELDS);
       row.lists_mask = listsMask(driver);
