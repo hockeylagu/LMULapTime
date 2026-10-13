@@ -77,6 +77,23 @@ export class ReplayTrajectoryService {
     trajectory = telemetryResult.trajectory;
 
     trajectory = applyPureOfficialLapValidation(trajectory, matchedSession, matchedDriver);
+    // Inspector navigation, consistency and comparison all consume this list. Replay-only
+    // segments have no session locator, while session laps remain selectable even if invalid.
+    const replayLaps = new Map(trajectory.laps?.map(lap => [lap.lapNumber, lap]));
+    trajectory.laps = matchedDriver.laps.map(lap => {
+      const replayLap = replayLaps.get(lap.lapNumber);
+      return replayLap ?? {
+        lapNumber: lap.lapNumber,
+        lapTimeSec: lap.lapTime ?? 0,
+        s1Sec: lap.s1 ?? 0,
+        s2Sec: lap.s2 ?? 0,
+        s3Sec: lap.s3 ?? 0,
+        isValid: lap.isValid,
+        isPitStop: lap.isPitStop,
+        isOutLap: lap.isOutLap,
+        nonRepresentativeReason: lap.nonRepresentativeReason,
+      };
+    });
 
     const venue = matchedSession?.trackVenue || metadata?.trackVenue;
     const course = matchedSession?.trackCourse || metadata?.trackCourse;

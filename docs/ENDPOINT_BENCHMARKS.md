@@ -1,5 +1,15 @@
 # Endpoint performance history
 
+## Session telemetry lap locators — 2026-10-13
+
+Session telemetry now lists the selected driver's session laps, excluding replay-only segments
+that have no session locator while retaining invalid session laps. Five-sample endpoint sweeps
+completed before and after the change. The database snapshot hashes differed, so no latency
+delta is claimed. After-change medians were 175.40 ms for automatic telemetry and 84.69 ms
+for native replay telemetry; telemetry remained among the slower endpoints in the ranking.
+Reports are retained in `.cache/lap-locator-benchmark-before/latest.md` and
+`.cache/lap-locator-benchmark-after/latest.md`.
+
 ## Comparison personal-best scope — 2026-10-12
 
 Session locators no longer narrow the history used for personal-best badges. A five-sample

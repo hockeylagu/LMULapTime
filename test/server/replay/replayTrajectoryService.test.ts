@@ -111,6 +111,22 @@ describe('ReplayTrajectoryService', () => {
     expect(readTrajectory).toHaveBeenCalledWith(expect.any(String), 'Daytona.Vcr', expect.objectContaining({ metadata: mockMetadata }));
   });
 
+  it('uses the selected session driver laps, excluding replay-only segments and retaining invalid session laps', async () => {
+    const replayOnlyLap = { lapNumber: 2, lapTimeSec: 105.98, s1Sec: 12, s2Sec: 49, s3Sec: 44.98, isValid: false };
+    const raw = { ...mockFullTrajectory, laps: [...mockFullTrajectory.laps!, replayOnlyLap] };
+    vi.spyOn(replayRecordings, 'getFullTrajectory').mockResolvedValue(raw);
+    vi.spyOn(replayRecordings, 'getMetadata').mockReturnValue(mockMetadata);
+    const session = sessionFor();
+    session.drivers[0].laps.push({ lapNumber: 4, lapTime: 101, isValid: false } as DriverData['laps'][number]);
+
+    const result = await trajectoryService.getTrajectory({ session, driverOrdinal: 0, lapOrdinal: 0,
+      maxPoints: 4, allowDuckDb: false });
+
+    expect(result.laps?.map(lap => lap.lapNumber)).toEqual([1, 4]);
+    expect(result.laps?.[1]).toMatchObject({ lapNumber: 4, lapTimeSec: 101, isValid: false });
+    expect(raw.laps.map(lap => lap.lapNumber)).toEqual([1, 2]);
+  });
+
   it('serves one point per pointSpacingM metres of the lap instead of maxPoints when asked', async () => {
     vi.spyOn(replayRecordings, 'getFullTrajectory').mockResolvedValue(mockFullTrajectory);
     vi.spyOn(replayRecordings, 'getMetadata').mockReturnValue(mockMetadata);

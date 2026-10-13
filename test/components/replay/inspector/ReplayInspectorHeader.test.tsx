@@ -3,6 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { ReplayInspectorHeader, type ReplayInspectorHeaderProps } from '../../../../src/components/replay/inspector/ReplayInspectorHeader.js';
 import { TELEMETRY_COLORS } from '../../../../src/utils/themeColors.js';
 import { DEFAULT_COMPARE_CONTROLS } from '../../../../src/components/replay/inspector/compare/compareLapControls.js';
+import type { ReplayTrajectoryData } from '../../../../shared/types/index.js';
 
 vi.mock('../../../../src/components/replay/inspector/ReplayInspectorTitle.js', () => ({ ReplayInspectorTitle: () => null }));
 
@@ -19,6 +20,27 @@ const props: ReplayInspectorHeaderProps = {
 };
 
 describe('ReplayInspectorHeader', () => {
+  it('navigates the available lap numbers rather than assuming consecutive laps', () => {
+    const onSelectLap = vi.fn();
+    const trajectory: ReplayTrajectoryData = { replayName: 'test.Vcr', pointsCount: 0,
+      bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 },
+      currentLap: 4, points: [], laps: [
+        { lapNumber: 1, lapTimeSec: 96, s1Sec: 30, s2Sec: 36, s3Sec: 30 },
+        { lapNumber: 4, lapTimeSec: 101, s1Sec: 31, s2Sec: 39, s3Sec: 31, isValid: false },
+        { lapNumber: 7, lapTimeSec: 99, s1Sec: 31, s2Sec: 37, s3Sec: 31 },
+      ] };
+    const { rerender } = render(<ReplayInspectorHeader {...props} trajectory={trajectory} onSelectLap={onSelectLap} />);
+    fireEvent.click(screen.getByTitle('Previous Lap'));
+    expect(onSelectLap).toHaveBeenLastCalledWith(1);
+    fireEvent.click(screen.getByTitle('Next Lap'));
+    expect(onSelectLap).toHaveBeenLastCalledWith(7);
+    expect(screen.getByRole('option', { name: 'Lap 4 (101)' })).toBeInTheDocument();
+    rerender(<ReplayInspectorHeader {...props} trajectory={{ ...trajectory, currentLap: 7 }} onSelectLap={onSelectLap} />);
+    expect(screen.getByTitle('Next Lap')).toBeDisabled();
+    rerender(<ReplayInspectorHeader {...props} trajectory={{ ...trajectory, currentLap: 1 }} onSelectLap={onSelectLap} />);
+    expect(screen.getByTitle('Previous Lap')).toBeDisabled();
+  });
+
   it('keeps long driver names available and matches the baseline trace color', () => {
     render(<ReplayInspectorHeader {...props} />);
     const select = screen.getByRole('combobox', { name: 'Select Driver' });

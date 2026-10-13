@@ -63,6 +63,9 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
 }) => {
   const baselineSummary = baselineTrajectory?.laps?.find(l => l.lapNumber === (baselineTrajectory.currentLap ?? baselineLapNumber)) || baselineTrajectory?.laps?.[0];
   const isPrimaryBusy = isLoading || isTrajLoading;
+  const currentLapIndex = trajectory?.laps?.findIndex(lap => lap.lapNumber === trajectory.currentLap) ?? -1;
+  const previousLap = trajectory?.laps?.[currentLapIndex - 1];
+  const nextLap = currentLapIndex >= 0 ? trajectory?.laps?.[currentLapIndex + 1] : undefined;
   const selectedDriver = drivers.find(driver => driver.slot === selectedDriverSlot);
   const driverLabel = selectedDriver ? `${selectedDriver.carNumber ? `#${selectedDriver.carNumber} ` : ''}${selectedDriver.name}${selectedDriver.isPlayer ? ' (You)' : ''}` : '';
 
@@ -105,8 +108,8 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
               Lap:
             </span>
             <button
-              onClick={() => onSelectLap(Math.max(1, (trajectory.currentLap ?? 1) - 1))}
-              disabled={isPrimaryBusy || (trajectory.currentLap ?? 1) <= 1}
+              onClick={() => previousLap && onSelectLap(previousLap.lapNumber)}
+              disabled={isPrimaryBusy || !previousLap}
               className={`w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-lmu-muted hover:text-white disabled:text-lmu-faint disabled:hover:text-lmu-faint disabled:hover:bg-transparent disabled:cursor-not-allowed text-xs font-bold transition-colors cursor-pointer ${FOCUS_RING}`}
               title="Previous Lap"
             >
@@ -126,8 +129,8 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
               ))}
             </select>
             <button
-              onClick={() => onSelectLap(Math.min(trajectory.laps!.length, (trajectory.currentLap ?? 1) + 1))}
-              disabled={isPrimaryBusy || (trajectory.currentLap ?? 1) >= trajectory.laps.length}
+              onClick={() => nextLap && onSelectLap(nextLap.lapNumber)}
+              disabled={isPrimaryBusy || !nextLap}
               className={`w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-lmu-muted hover:text-white disabled:text-lmu-faint disabled:hover:text-lmu-faint disabled:hover:bg-transparent disabled:cursor-not-allowed text-xs font-bold transition-colors cursor-pointer ${FOCUS_RING}`}
               title="Next Lap"
             >
