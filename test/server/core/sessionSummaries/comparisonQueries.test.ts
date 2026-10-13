@@ -87,6 +87,23 @@ describe('SQL comparison query', () => {
     } finally { db.close(); }
   });
 
+  it('gives the gold PB to the class best: any car, any condition, with or without a replay', () => {
+    const db = new Database(':memory:');
+    initDbSchema(db);
+    try {
+      const recorded = fixture('recorded', 200, 'Spa', [{ name: 'alice', player: true, laps: [lap(1, 100)] }]);
+      recorded.matchingReplayFile = { name: 'recorded.Vcr', path: 'retained', fileSizeBytes: 1 };
+      const otherCarWet = fixture('other-car-wet', 100, 'Spa', [{ name: 'alice', player: true, laps: [lap(1, 95, { wetTyres: true })] }]);
+      otherCarWet.drivers[0].carType = 'Toyota GR010';
+      for (const session of [recorded, otherCarWet]) addSession(db, session);
+      const filters = { trackName: 'Spa', carClass: 'Hyper' };
+      // The faster lap is in another car, wet and without a replay: the recorded lap is not the class best.
+      expect(queryTelemetryComparableLaps(db, filters).laps.map(item => [item.id, item.isAllTimePB])).toEqual([['recorded_driver_0_lap_0', false]]);
+      expect(queryTelemetryComparableLaps(db, { ...filters, carType: 'Ferrari 499P' }).laps[0].isAllTimePB).toBe(false);
+      expect(queryCompactComparableLaps(db, filters).laps.find(item => item.sessionId === 'other-car-wet')?.isAllTimePB).toBe(true);
+    } finally { db.close(); }
+  });
+
   it('reads at most the page and three best laps from a thousand-lap session', () => {
     const db = new Database(':memory:');
     initDbSchema(db);

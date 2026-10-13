@@ -86,13 +86,16 @@ function comparisonScope(filters: CompactCompareFilters) {
   let broad = append(append(trackParts, classParts), humanParts);
   if (model && model !== 'all') broad = append(broad, { where: ['lower(trim(v.car_type))=?'], args: [model] });
   if (filters.telemetryOnly) broad.where.push('s.recording_name IS NOT NULL');
-  const display = { ...broad, where: [...broad.where], args: [...broad.args] };
-  if (filters.playerOnly) display.where.push('d.is_player=1');
+  const driverParts: QueryParts = { where: [], args: [] };
+  if (filters.playerOnly) driverParts.where.push('d.is_player=1');
   const driverName = filters.driverName?.trim().toLowerCase() ?? '';
   if (driverName && driverName !== 'all') {
-    display.where.push(filters.driverNameExact ? 'lower(trim(dn.name))=?' : 'instr(lower(dn.name),?)>0'); display.args.push(driverName);
+    driverParts.where.push(filters.driverNameExact ? 'lower(trim(dn.name))=?' : 'instr(lower(dn.name),?)>0'); driverParts.args.push(driverName);
   }
-  const personalBestScope = { ...display, where: [...display.where], args: [...display.args] };
+  const display = append(broad, driverParts);
+  // The gold personal best is the driver's fastest lap of the layout and class: any car, any condition,
+  // with or without a replay. Car, recording, session and lap filters only narrow the rows shown.
+  const personalBestScope = append(append(append(trackParts, classParts), humanParts), driverParts);
   if (filters.sessionId) { display.where.push('s.id=?'); display.args.push(filters.sessionId); }
   const selected = { ...display, where: [...display.where], args: [...display.args] };
   if (filters.telemetryOnly) selected.where.push('l.is_valid=1', 'coalesce(l.is_pit_stop,0)=0', 'coalesce(l.is_out_lap,0)=0', 'l.lap_time>0');

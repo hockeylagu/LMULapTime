@@ -57,7 +57,7 @@ export const ReplayCompareLapRow: React.FC<ReplayCompareLapRowProps> = React.mem
         className={`text-right font-mono font-bold tabular-nums text-sm ${
           lap.isAllTimePB ? 'text-lmu-personal-best' : lap.isSessionBest ? 'text-lmu-session-best' : 'text-lmu-text'
         }`}
-        title={lap.isAllTimePB ? 'Personal best' : lap.isSessionBest ? 'Session best' : undefined}
+        title={lap.isAllTimePB ? "This driver's best lap in the class: any car, any condition" : lap.isSessionBest ? 'Session best' : undefined}
       >
         {formatTime(lap.lapTime)}
       </span>

@@ -1,5 +1,13 @@
 # Endpoint performance history
 
+## Class personal-best badge review — 2026-10-13
+
+A five-sample endpoint sweep passed after expanding gold-badge history to all cars and
+recordings within the selected layout and class. Picker medians were 21.35 ms for the
+player and 27.01 ms for all drivers. No matching baseline was captured for this review,
+so no latency delta is claimed. The full ranking is retained in
+`.cache/pb-scope-review/latest.md`.
+
 ## Session telemetry lap locators — 2026-10-13
 
 Session telemetry now lists the selected driver's session laps, excluding replay-only segments
