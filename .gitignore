@@ -101,3 +101,4 @@ test/fixtures/replays_api_temp/
 # Captured personal regressions and their golden outputs stay private.
 /test/fixtures/replays/*.json
 /test/utils/lapAlignment/__snapshots__/
+*.tsbuildinfo
