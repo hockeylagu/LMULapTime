@@ -18,7 +18,6 @@ export interface CompareLapsDeckProps {
   onChooseLap?: (replacing: ComparableLap | null) => void;
   onSelectSession?: (sessionId: string) => void;
   benchmarks: ReferenceLaptimeEntry[];
-  allLaps: ComparableLap[];
   selectedCarClass: string;
   lapColors: readonly string[];
 }
@@ -33,7 +32,6 @@ export const CompareLapsDeck: React.FC<CompareLapsDeckProps> = ({
   onChooseLap,
   onSelectSession,
   benchmarks,
-  allLaps,
   selectedCarClass,
   lapColors,
 }) => {
@@ -67,7 +65,6 @@ export const CompareLapsDeck: React.FC<CompareLapsDeckProps> = ({
             onChangeLap={onChooseLap}
             onSelectSession={onSelectSession}
             benchmarks={benchmarks}
-            allLaps={allLaps}
             selectedCarClass={selectedCarClass}
           />
         );

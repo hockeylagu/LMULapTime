@@ -204,7 +204,6 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
         onChooseLap={(lap) => data.setPickerTarget({ replaceId: lap?.id ?? null })}
         onSelectSession={onSelectSession}
         benchmarks={data.apiData.benchmarks}
-        allLaps={data.apiData.laps}
         selectedCarClass={data.selectedCarClass}
         lapColors={COMPARE_LAP_COLORS}
       />

@@ -67,7 +67,6 @@ describe('CompareLapCard', () => {
         onSetBaseline={onSetBaseline}
         onRemoveLap={onRemoveLap}
         benchmarks={mockBenchmarks}
-        allLaps={[baseLap]}
         selectedCarClass="Hyper"
       />
     );
@@ -123,7 +122,6 @@ describe('CompareLapCard', () => {
         onRemoveLap={onRemoveLap}
         onSelectSession={onSelectSession}
         benchmarks={mockBenchmarks}
-        allLaps={[baseLap]}
         selectedCarClass="Hyper"
       />
     );
@@ -165,7 +163,6 @@ describe('CompareLapCard', () => {
         onSetBaseline={vi.fn()}
         onRemoveLap={vi.fn()}
         benchmarks={mockBenchmarks}
-        allLaps={[unratedLap]}
         selectedCarClass="Hyper"
       />
     );
@@ -174,13 +171,7 @@ describe('CompareLapCard', () => {
     expect(screen.getByText(/101\.0%/)).toBeInTheDocument();
   });
 
-  it('computes pace from sample lap when benchmarks are empty', () => {
-    const sampleLap: ComparableLap = {
-      ...baseLap,
-      lapTime: 95.0,
-      pacePercentage: 100.0,
-    };
-
+  it('leaves pace empty without a class benchmark', () => {
     const unratedLap: ComparableLap = {
       ...baseLap,
       lapTime: 96.9,
@@ -197,13 +188,11 @@ describe('CompareLapCard', () => {
         onSetBaseline={vi.fn()}
         onRemoveLap={vi.fn()}
         benchmarks={[]}
-        allLaps={[sampleLap, unratedLap]}
         selectedCarClass="Hyper"
       />
     );
 
-    // 96.9 / 95.0 * 100 = 102.0%
-    expect(screen.getByText(/102\.0%/)).toBeInTheDocument();
+    expect(screen.queryByText(/\d+\.\d%/)).not.toBeInTheDocument();
   });
 
   it('shows the lap status when the lap is not a clean one', () => {
@@ -224,7 +213,6 @@ describe('CompareLapCard', () => {
         onSetBaseline={vi.fn()}
         onRemoveLap={vi.fn()}
         benchmarks={mockBenchmarks}
-        allLaps={[pitLap]}
         selectedCarClass="Hyper"
       />
     );

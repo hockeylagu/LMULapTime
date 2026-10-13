@@ -26,7 +26,6 @@ export interface CompareLapCardProps {
   onChangeLap?: (lap: ComparableLap) => void;
   onSelectSession?: (sessionId: string) => void;
   benchmarks: ReferenceLaptimeEntry[];
-  allLaps: ComparableLap[];
   selectedCarClass: string;
 }
 
@@ -41,7 +40,6 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
   onChangeLap,
   onSelectSession,
   benchmarks,
-  allLaps,
 }) => {
   let cat = lap.paceCategory;
   let pct = lap.pacePercentage;
@@ -50,16 +48,10 @@ export const CompareLapCard: React.FC<CompareLapCardProps> = ({
     const matchingRef =
       benchmarks.find((b) => (b.carClass === lap.carClass));
 
+    // Pace is only ever measured against the class benchmark; without one it stays empty.
     if (matchingRef?.targets.alienSec) {
       pct = parseFloat(((lap.lapTime / matchingRef.targets.alienSec) * 100).toFixed(2));
       cat = getPaceCategoryFromPercentage(pct);
-    } else {
-      const sampleLap = allLaps.find((l) => l.isValid && l.lapTime && l.pacePercentage);
-      if (sampleLap?.lapTime && sampleLap.pacePercentage) {
-        const target100 = sampleLap.lapTime / (sampleLap.pacePercentage / 100);
-        pct = parseFloat(((lap.lapTime / target100) * 100).toFixed(2));
-        cat = getPaceCategoryFromPercentage(pct);
-      }
     }
   }
 
