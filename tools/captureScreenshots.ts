@@ -36,18 +36,120 @@ interface TargetScreenshot {
   url: string;
   outputPath: string;
   waitMs?: number;
+  evalBeforeNavigate?: string;
   evalBeforeCapture?: string;
 }
 
 const TARGETS: TargetScreenshot[] = [
   {
     name: 'Telemetry Studio (Bahrain LMP3 Competitive Dry Lap)',
-    url: 'http://localhost:5173/?demo=1#/telemetry?replayName=Bahrain%20International%20Circuit%20R1%2012.Vcr&lap=8&driverName=Ricky%20Bobby',
+    url: 'http://localhost:5173/?demo=1#/telemetry?sessionId=2026_09_30_23_37_59-24R1&driverOrdinal=1&lapOrdinal=7&baselineSessionId=2026_09_30_23_37_59-24R1&baselineDriverOrdinal=0&baselineLapOrdinal=10',
     outputPath: path.join(process.cwd(), 'assets', 'telemetry_studio.png'),
-    waitMs: 5000,
+    waitMs: 6000,
     evalBeforeCapture: `
       const toastBtn = document.querySelector('button[aria-label="Dismiss toast"], button[aria-label="Close"]');
       if (toastBtn) toastBtn.click();
+    `,
+  },
+  {
+    name: 'Fullscreen GPS Map (Bahrain 2x & Telemetry Dock)',
+    url: 'http://localhost:5173/?demo=1#/telemetry?sessionId=2026_09_30_23_37_59-24R1&driverOrdinal=1&lapOrdinal=7&baselineSessionId=2026_09_30_23_37_59-24R1&baselineDriverOrdinal=0&baselineLapOrdinal=10',
+    outputPath: path.join(process.cwd(), 'assets', 'fullscreen_gps_map.png'),
+    waitMs: 6000,
+    evalBeforeNavigate: `
+      try {
+        localStorage.setItem('lmu-map-layers-v1', JSON.stringify({
+          road: true, kerb: true, brakeMarkers: true,
+          brakeDistance: true, brakeAds: true, brakeDigi: true,
+          pit: false, centerline: false, runoff: false, otherRoad: false,
+          apron: false, gravel: false, grass: false,
+          sectors: true, turns: true, startFinish: true,
+        }));
+      } catch (e) {}
+    `,
+    evalBeforeCapture: `
+      const toastBtn = document.querySelector('button[aria-label="Dismiss toast"], button[aria-label="Close"]');
+      if (toastBtn) toastBtn.click();
+
+      // Open layers and ensure Braking markers, distance, ads, and digi are active
+      const layersBtn = document.querySelector('button[aria-label="Layers"]');
+      if (layersBtn) layersBtn.click();
+      const labels = Array.from(document.querySelectorAll('label'));
+      const brakeLabel = labels.find(l => l.textContent && l.textContent.includes('Braking markers'));
+      const brakeInput = brakeLabel ? brakeLabel.querySelector('input') : null;
+      if (brakeInput && !brakeInput.checked) brakeInput.click();
+      const adsLabel = labels.find(l => l.textContent && l.textContent.includes('Sponsor ads'));
+      const adsInput = adsLabel ? adsLabel.querySelector('input') : null;
+      if (adsInput && !adsInput.checked) adsInput.click();
+      const digiLabel = labels.find(l => l.textContent && l.textContent.includes('Digi boards'));
+      const digiInput = digiLabel ? digiLabel.querySelector('input') : null;
+      if (digiInput && !digiInput.checked) digiInput.click();
+      if (layersBtn) layersBtn.click();
+
+      // Zoom out 3 steps from default 6.0x -> 4.5 -> 3.0 -> 2.0x
+      const zoomOutBtn = document.querySelector('button[aria-label="Zoom out"]');
+      for (let i = 0; i < 3; i++) {
+        if (zoomOutBtn) zoomOutBtn.click();
+      }
+
+      const fsBtn = document.querySelector('button[aria-label="Full screen map"]');
+      if (fsBtn) fsBtn.click();
+    `,
+  },
+  {
+    name: 'Fullscreen GPS Map (Portimão Layout 0.6x Centered, Pit & Runoff)',
+    url: 'http://localhost:5173/?demo=1#/telemetry?sessionId=2026_09_23_15_49_06-37R1&driverOrdinal=11&lapOrdinal=3&baselineSessionId=2026_09_23_15_49_06-37R1&baselineDriverOrdinal=7&baselineLapOrdinal=7',
+    outputPath: path.join(process.cwd(), 'assets', 'fullscreen_gps_map_portimao.png'),
+    waitMs: 6000,
+    evalBeforeNavigate: `
+      try {
+        localStorage.setItem('lmu-map-layers-v1', JSON.stringify({
+          road: true, kerb: true, brakeMarkers: true,
+          brakeDistance: true, brakeAds: true, brakeDigi: true,
+          pit: true, centerline: false, runoff: true, otherRoad: true,
+          apron: true, gravel: true, grass: true,
+          sectors: true, turns: true, startFinish: true,
+        }));
+      } catch (e) {}
+    `,
+    evalBeforeCapture: `
+      const toastBtn = document.querySelector('button[aria-label="Dismiss toast"], button[aria-label="Close"]');
+      if (toastBtn) toastBtn.click();
+
+      // Open layers and activate Pit lane, Runoff, and Brake markers (ads + digi + distance)
+      const layersBtn = document.querySelector('button[aria-label="Layers"]');
+      if (layersBtn) layersBtn.click();
+      const labels = Array.from(document.querySelectorAll('label'));
+      const pitLabel = labels.find(l => l.textContent && l.textContent.includes('Pit lane'));
+      const pitInput = pitLabel ? pitLabel.querySelector('input') : null;
+      if (pitInput && !pitInput.checked) pitInput.click();
+      const runoffLabel = labels.find(l => l.textContent && l.textContent.includes('Runoff and other roads'));
+      const runoffInput = runoffLabel ? runoffLabel.querySelector('input') : null;
+      if (runoffInput && !runoffInput.checked) runoffInput.click();
+      const brakeLabel = labels.find(l => l.textContent && l.textContent.includes('Braking markers'));
+      const brakeInput = brakeLabel ? brakeLabel.querySelector('input') : null;
+      if (brakeInput && !brakeInput.checked) brakeInput.click();
+      const adsLabel = labels.find(l => l.textContent && l.textContent.includes('Sponsor ads'));
+      const adsInput = adsLabel ? adsLabel.querySelector('input') : null;
+      if (adsInput && !adsInput.checked) adsInput.click();
+      const digiLabel = labels.find(l => l.textContent && l.textContent.includes('Digi boards'));
+      const digiInput = digiLabel ? digiLabel.querySelector('input') : null;
+      if (digiInput && !digiInput.checked) digiInput.click();
+      if (layersBtn) layersBtn.click();
+
+      // Disable follow-car so map un-locks and centers on circuit
+      const followBtn = document.querySelector('button[aria-label="Follow car"]');
+      if (followBtn && followBtn.getAttribute('aria-pressed') === 'true') followBtn.click();
+
+      // Zoom out exactly 8 steps (6.0 -> 4.5 -> 3.0 -> 2.0 -> 1.0 -> 0.9 -> 0.8 -> 0.7 -> 0.6x)
+      const zoomOutBtn = document.querySelector('button[aria-label="Zoom out"]');
+      for (let i = 0; i < 8; i++) {
+        if (zoomOutBtn) zoomOutBtn.click();
+      }
+
+      // Expand to fullscreen
+      const fsBtn = document.querySelector('button[aria-label="Full screen map"]');
+      if (fsBtn) fsBtn.click();
     `,
   },
   {
@@ -199,12 +301,20 @@ async function captureScreenshots(): Promise<void> {
         mobile: false,
       });
 
+      if (target.evalBeforeNavigate) {
+        await pageSend('Page.addScriptToEvaluateOnNewDocument', { source: target.evalBeforeNavigate });
+      } else {
+        await pageSend('Page.addScriptToEvaluateOnNewDocument', {
+          source: `try { localStorage.removeItem('lmu-map-layers-v1'); } catch (e) {}`,
+        });
+      }
+
       await pageSend('Page.navigate', { url: target.url });
       await sleep(target.waitMs ?? 4000);
 
       if (target.evalBeforeCapture) {
         await pageSend('Runtime.evaluate', { expression: target.evalBeforeCapture });
-        await sleep(500);
+        await sleep(1000);
       }
 
       const shot = await pageSend<{ data: string }>('Page.captureScreenshot', { format: 'png' });

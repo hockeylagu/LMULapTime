@@ -19,8 +19,13 @@ Telemetry analytics and lap comparison for **Le Mans Ultimate (LMU)**. It decode
 ### 🗺️ Replay & Telemetry Studio
 - **100 Hz columnar DuckDB telemetry**: Ingests native telemetry at microsecond precision, smoothly interpolated across the start/finish timing loop.
 - **2D track map**: Recorded trajectories with color-coded speed, pedal zones and a live telemetry cursor. Bundled SVGs cover 32 layouts; calibrated road boundaries and physical profiles require an optional local data package.
+- **Fullscreen GPS map**: Follow-car camera with minimap HUD overlay, dynamic friction circle, sector lines, brake distance boards, and a docked live telemetry playback strip.
 - **Synchronized multi-channel traces**: Speed, lap delta, throttle & brake (with ABS/TC events), stepped gear changes, steering angle with real-time understeer/oversteer/scrub balance indicators, G-forces, dampers, tire temperatures & pressures, and Hypercar hybrid energy (SoC, Virtual Energy, Regen).
 - **Three-phase corner breakdown**: Micro-splits deconstructing every turn into Entry (braking point, trail brake decay), Rotation (apex minimum speed, yaw rate), and Exit (throttle pick-up timing, traction).
+
+![Fullscreen GPS Map - Follow-Car & Minimap HUD](assets/fullscreen_gps_map.png)
+
+![Fullscreen GPS Map - Portimão Circuit Layout, Pit Lane & Runoff](assets/fullscreen_gps_map_portimao.png)
 
 ### 🎬 Every Driver's Telemetry, from the Replays
 - **Reverse-engineered replay format**: LMU's binary `.Vcr` replays (`gMb1.002f`) are decoded to extract the trajectory and telemetry of every car in the session: position, speed, throttle and brake (with ABS/TC), steering, gear and brake temperatures.
