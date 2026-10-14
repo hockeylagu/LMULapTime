@@ -111,7 +111,8 @@ describe('ReplayInspectorSidebar', () => {
 
     // Map elements present on the left
     expect(screen.getByTitle('Zoom In (+)')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Pedal Points/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Layers' }));
+    expect(screen.getByRole('checkbox', { name: 'Pedal Points' })).toBeEnabled();
 
     // Corners table present on the right
     expect(screen.getAllByText('T1').length).toBeGreaterThanOrEqual(1);

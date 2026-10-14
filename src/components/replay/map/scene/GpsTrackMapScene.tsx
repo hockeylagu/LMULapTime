@@ -9,8 +9,10 @@ import { useGpsMapPanZoom } from '../useGpsMapPanZoom.js';
 import { GpsCircuitMinimap } from '../GpsCircuitMinimap.js';
 import { GpsTrackSegments } from './GpsTrackSegments.js';
 import { GpsStartFinishLine } from './GpsStartFinishLine.js';
+import { GpsSectorMarkers, placeSectorMarkers } from './GpsSectorMarkers.js';
 import { GpsMapBackground } from '../display/GpsMapBackground.js';
 import { GpsBrakeMarkers } from '../display/GpsBrakeMarkers.js';
+import { placeBrakeMarkers, showsFullBrakeBoards } from '../display/placeBrakeMarkers.js';
 import { GpsMapControls } from '../display/GpsMapControls.js';
 import { GpsMapExpandedOverlays } from '../display/GpsMapExpandedOverlays.js';
 import { MapScaleBar } from '../display/MapScaleBar.js';
@@ -25,6 +27,9 @@ import { useStoredToggle } from '../useStoredToggle.js';
 import { useGpsSceneProjection, VIEWBOX_SIZE, PADDING } from './useGpsSceneProjection.js';
 import { useGpsSceneDynamics } from './useGpsSceneDynamics.js';
 import { useGpsSceneCameraFocus } from './useGpsSceneCameraFocus.js';
+
+// Stable when Turns is hidden, so marker memos do not recompute on every frame.
+const NO_CORNER_MARKERS: ReturnType<typeof computeDispersedCornerMarkers> = [];
 
 export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
   const {
@@ -46,7 +51,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
 
   const {
     geometry: effectiveGeometry, display, displayError, effectiveBaselinePoints, effectiveBounds, svgPoints, baselineSvgPoints,
-    leftSvgPoints, rightSvgPoints, centerlineSvgPoints, trackBoundaryPathD, gateLeftSvg, gateRightSvg, pathD,
+    leftSvgPoints, rightSvgPoints, centerlineSvgPoints, trackBoundaryPathD, gateLeftSvg, gateRightSvg, pathD, sectorMarkers,
   } = useGpsSceneProjection(props);
   const {
     activeIndex, fraction, currentPos, primaryDists, baselineDists, comparisons, deltaByIdx, currentDeltaTimeSec,
@@ -92,6 +97,15 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
     [corners, primaryDists, svgPoints, baselineSvgPoints, pedalMarkerPoints]
   );
   useGpsSceneCameraFocus({ layoutKey: effectiveGeometry?.layoutKey, selectedCornerNumber, cornerMarkers, focusOnPoint, resetPanZoom });
+  const placedBrakes = useMemo(() => layers.brakeMarkers ? placeBrakeMarkers({ markers: display?.brakeMarkers ?? [],
+    bounds: effectiveBounds, viewBoxSize: VIEWBOX_SIZE, padding: PADDING, markerScale,
+    showDistance: layers.brakeDistance, showAds: layers.brakeAds, showDigi: layers.brakeDigi }) : [],
+  [layers.brakeMarkers, layers.brakeDistance, layers.brakeAds, layers.brakeDigi, display?.brakeMarkers, effectiveBounds, markerScale]);
+  const placedSectors = useMemo(() => layers.sectors ? placeSectorMarkers(sectorMarkers, markerScale, zoomLevel,
+    showsFullBrakeBoards(markerScale) ? placedBrakes.map(board => ({ x: board.posX, y: board.posY,
+      hw: board.width * markerScale / 2, hh: board.height * markerScale / 2 })) : []) : [],
+  [layers.sectors, sectorMarkers, markerScale, zoomLevel, placedBrakes]);
+  const visibleCornerMarkers = layers.turns ? cornerMarkers : NO_CORNER_MARKERS;
 
   if (points.length === 0) {
     return <div className={`flex items-center justify-center h-64 text-lmu-muted text-sm ${className}`}>No GPS trajectory data available for this replay recording.</div>;
@@ -108,7 +122,8 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
       {showControls && (
         <GpsMapControls camera={camera} layers={layers} onChange={changeLayers} geometry={effectiveGeometry}
           display={display} error={displayError} bounds={effectiveBounds} left={leftSvgPoints} right={rightSvgPoints}
-          center={centerlineSvgPoints} trajectory={svgPoints}
+          center={centerlineSvgPoints} trajectory={svgPoints} hasSectors={sectorMarkers.length > 0} hasTurns={cornerMarkers.length > 0}
+          pedalPoints={onTogglePedalMarkers ? { visible: showPedalMarkers, available: Boolean(pedalMarkers?.length), onToggle: onTogglePedalMarkers } : undefined}
           orientation={controlsOrientation ?? (isExpanded ? 'horizontal' : (dimNonSelectedTrack ? 'vertical' : 'horizontal'))}
           isPlaying={isPlaying} onTogglePlay={onTogglePlay} isExpanded={isExpanded} onToggleExpanded={setIsExpanded} />
       )}
@@ -125,11 +140,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
           <GpsMapBackground geometry={effectiveGeometry} display={display} bounds={effectiveBounds} layers={layers}
             left={leftSvgPoints} right={rightSvgPoints} center={centerlineSvgPoints} pathD={pathD} />
 
-          {layers.brakeMarkers && display?.brakeMarkers?.length ? <GpsBrakeMarkers markers={display.brakeMarkers}
-            bounds={effectiveBounds} viewBoxSize={VIEWBOX_SIZE} padding={PADDING} markerScale={markerScale}
-            showDistance={layers.brakeDistance !== false}
-            showAds={layers.brakeAds !== false}
-            showDigi={layers.brakeDigi !== false} /> : null}
+          {placedBrakes.length ? <GpsBrakeMarkers placement={placedBrakes} markerScale={markerScale} /> : null}
 
           <GpsTrackSegments
             svgPoints={svgPoints} baselineSvgPoints={baselineSvgPoints} colorBy={colorBy}
@@ -140,14 +151,15 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
             viewBox={cullViewBox}
           />
 
-          <GpsStartFinishLine
+          {layers.sectors && <GpsSectorMarkers markers={placedSectors} markerScale={markerScale} />}
+          {layers.startFinish && <GpsStartFinishLine
             svgPoints={svgPoints} zoomLevel={zoomLevel} markerScale={markerScale}
-            cornerMarkers={cornerMarkers} pedalMarkers={pedalMarkerPoints}
+            cornerMarkers={visibleCornerMarkers} pedalMarkers={pedalMarkerPoints}
             gateLeftSvg={gateLeftSvg} gateRightSvg={gateRightSvg}
-          />
+          />}
 
           <GpsSceneMarkers
-            cornerMarkers={cornerMarkers} pedalMarkers={pedalMarkerPoints}
+            cornerMarkers={visibleCornerMarkers} pedalMarkers={pedalMarkerPoints}
             selectedCornerNumber={selectedCornerNumber} onSelectCornerNumber={onSelectCornerNumber}
             onSelectIndex={onSelectIndex} markerScale={markerScale} zoomLevel={zoomLevel}
             primaryOpacity={primaryOpacity} baselineOpacity={baselineOpacity}
@@ -176,7 +188,6 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
             primaryLapSummary={props.primaryLapSummary} baselineLapSummary={props.baselineLapSummary} comparisons={comparisons} sectors={props.sectors} deltaTimeSec={currentDeltaTimeSec}
             primaryPoint={currentPrimaryPoint} baselinePoint={baselineGhostPos?.point ?? null} baselinePoints={effectiveBaselinePoints}
             colorBy={colorBy} onChangeColorBy={onChangeColorBy}
-            showPedalMarkers={showPedalMarkers} onTogglePedalMarkers={onTogglePedalMarkers} hasCorners={Boolean(corners?.length)}
             isCompareMode={Boolean(baselinePoints)} hasBaseline={Boolean(baselinePoints)} fadedLine={fadedLine}
             onToggleFadedLine={onToggleFadedLine} showGForce={showGForce} onToggleGForce={handleToggleGForce}
             showFrictionCircle={effectiveShowFriction} onToggleFrictionCircle={handleToggleFriction} />}

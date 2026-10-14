@@ -115,18 +115,27 @@ describe('ReplayMapContainer', () => {
     expect(screen.getByTestId('gps-circuit-minimap')).toBeInTheDocument();
   });
 
-  it('renders the pedal points button on top near the heatmap selector when corners exist', () => {
+  it('offers pedal points only in Layers and disables them without detected pedal points', () => {
     render(<ReplayMapContainer {...baseProps} corners={corners} />);
-    const pedalBtn = screen.getByRole('button', { name: /Pedal Points/i });
-    expect(pedalBtn).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Pedal Points/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Layers' }));
+    expect(screen.getByRole('checkbox', { name: 'Pedal Points' })).toBeDisabled();
   });
 
   it('toggles pedal points state when clicked', () => {
-    render(<ReplayMapContainer {...baseProps} corners={corners} />);
-    const pedalBtn = screen.getByRole('button', { name: /Pedal Points/i });
-    expect(pedalBtn).toHaveAttribute('title', 'Show brake/throttle points');
+    render(<ReplayMapContainer {...baseProps} corners={[{ ...corners[0], primaryBrakingDistM: 5 }]} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Layers' }));
+    const pedalBtn = screen.getByRole('checkbox', { name: 'Pedal Points' });
+    expect(pedalBtn).not.toBeChecked();
     fireEvent.click(pedalBtn);
-    expect(pedalBtn).toHaveAttribute('title', 'Hide brake/throttle points');
+    expect(pedalBtn).toBeChecked();
+    fireEvent.keyDown(pedalBtn, { key: 'Escape' });
+    fireEvent.click(screen.getByRole('button', { name: 'Full screen map' }));
+    expect(screen.queryByRole('button', { name: 'Pedal Points' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Layers' }));
+    expect(screen.getByRole('checkbox', { name: 'Pedal Points' })).toBeChecked();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Pedal Points' }));
+    expect(screen.getByRole('checkbox', { name: 'Pedal Points' })).not.toBeChecked();
   });
 
   it('renders Pedal as the first color mode button before Speed', () => {

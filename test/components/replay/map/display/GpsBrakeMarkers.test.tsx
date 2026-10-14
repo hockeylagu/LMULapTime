@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 import { GpsBrakeMarkers } from '../../../../../src/components/replay/map/display/GpsBrakeMarkers.js';
+import { placeBrakeMarkers, type BrakeMarkerLayoutOptions } from '../../../../../src/components/replay/map/display/placeBrakeMarkers.js';
 import type { TrackBrakeMarker } from '../../../../../shared/types/trackGeometry.js';
 
 const bounds = { minX: 0, maxX: 100, minZ: 0, maxZ: 100, spanX: 100, spanZ: 100 };
@@ -8,10 +9,11 @@ const bounds = { minX: 0, maxX: 100, minZ: 0, maxZ: 100, spanX: 100, spanZ: 100 
 const marker = (id: string, label: string, x: number, stationM: number): TrackBrakeMarker =>
   ({ id, center: [x, 50], label, stationM, side: 'right', normal: [1, 0] });
 
-function renderMarkers(markers: TrackBrakeMarker[], markerScale: number, extra: Partial<React.ComponentProps<typeof GpsBrakeMarkers>> = {}) {
+function renderMarkers(markers: TrackBrakeMarker[], markerScale: number, extra: Partial<BrakeMarkerLayoutOptions> = {}) {
+  const placement = placeBrakeMarkers({ markers, bounds, viewBoxSize: 800, padding: 60, markerScale, ...extra });
   return render(
     <svg>
-      <GpsBrakeMarkers markers={markers} bounds={bounds} viewBoxSize={800} padding={60} markerScale={markerScale} {...extra} />
+      <GpsBrakeMarkers placement={placement} markerScale={markerScale} />
     </svg>
   );
 }
@@ -68,4 +70,5 @@ describe('GpsBrakeMarkers', () => {
     expect(positions[11]).toBe(positions[12]);
     expect(positions[12]).not.toBe(positions[0]);
   });
+
 });

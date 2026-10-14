@@ -6,6 +6,7 @@ export const DEFAULT_MAP_LAYERS = {
   brakeDistance: true, brakeAds: true, brakeDigi: true,
   pit: false, centerline: false, runoff: false, otherRoad: false,
   apron: false, gravel: false, grass: false,
+  sectors: true, turns: true, startFinish: true,
 };
 export type MapLayers = typeof DEFAULT_MAP_LAYERS;
 export type MapLayerKey = keyof MapLayers;
@@ -20,8 +21,9 @@ export const RUNOFF_LEGEND = [
   { key: 'otherRoad', label: 'Other roads', color: MAP_COLORS.outerRoadSurface },
 ] as const satisfies ReadonlyArray<{ key: typeof RUNOFF_GROUP[number]; label: string; color: string }>;
 export const MAP_LAYER_LABELS: Record<Exclude<MapLayerKey, typeof RUNOFF_GROUP[number] | 'brakeDistance' | 'brakeAds' | 'brakeDigi'> | 'runoff', string> = {
-  road: 'Active track', kerb: 'Kerbs', brakeMarkers: 'Braking markers', pit: 'Pit lane',
-  centerline: 'Centerline guide', runoff: 'Runoff and other roads',
+  road: 'Active track', kerb: 'Kerbs', runoff: 'Runoff and other roads', pit: 'Pit lane',
+  startFinish: 'Start / finish line', sectors: 'Sector markers', turns: 'Turns', centerline: 'Centerline guide',
+  brakeMarkers: 'Braking markers',
 };
 export const MAP_LAYERS_STORAGE_KEY = 'lmu-map-layers-v1';
 

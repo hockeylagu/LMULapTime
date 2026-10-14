@@ -1,7 +1,14 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { Layers } from 'lucide-react';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
+import { DROPDOWN_CONTENT_INSET, DROPDOWN_PANEL } from '../../../common/dropdown/dropdownStyles.js';
 import { DEFAULT_MAP_LAYERS, MAP_LAYER_LABELS, RUNOFF_GROUP, RUNOFF_LEGEND, type MapLayers, type MapLayerKey } from './mapLayers.js';
+
+export interface PedalPointsControl {
+  visible: boolean;
+  available: boolean;
+  onToggle: () => void;
+}
 
 interface Props {
   layers: MapLayers;
@@ -12,9 +19,10 @@ interface Props {
   error?: string | null;
   onFitTrack: () => void;
   onFitVisible: () => void;
+  pedalPoints?: PedalPointsControl;
 }
 
-export const MapLayersControl: React.FC<Props> = ({ layers, onChange, available, runoffKinds = [], error, onFitTrack, onFitVisible }) => {
+export const MapLayersControl: React.FC<Props> = ({ layers, onChange, available, runoffKinds = [], error, onFitTrack, onFitVisible, pedalPoints }) => {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -24,16 +32,29 @@ export const MapLayersControl: React.FC<Props> = ({ layers, onChange, available,
   useEffect(() => {
     if (!open) return;
     panel.current?.querySelector<HTMLInputElement>('input:not(:disabled)')?.focus();
+    const viewport = root.current?.closest('[data-map-control="navigation"]')?.parentElement;
+    const resize = () => {
+      if (!viewport || !panel.current) return;
+      const bounds = viewport.getBoundingClientRect();
+      if (bounds.height > 0) panel.current.style.maxHeight = `${Math.max(0, bounds.bottom - panel.current.getBoundingClientRect().top - 12)}px`;
+    };
+    resize();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(resize) : null;
+    if (viewport) observer?.observe(viewport);
+    window.addEventListener('resize', resize);
     const dismiss = (event: PointerEvent) => {
-      if (!root.current?.contains(event.target as Node)) setOpen(false);
+      if (event.target instanceof Node && !root.current?.contains(event.target)) setOpen(false);
     };
     const onPointerUp = () => {
       isPointerDownInside.current = false;
     };
-    document.addEventListener('pointerdown', dismiss);
+    // Other map controls stop bubbling pointer events; capture still observes outside clicks.
+    document.addEventListener('pointerdown', dismiss, true);
     document.addEventListener('pointerup', onPointerUp);
     return () => {
-      document.removeEventListener('pointerdown', dismiss);
+      observer?.disconnect();
+      window.removeEventListener('resize', resize);
+      document.removeEventListener('pointerdown', dismiss, true);
       document.removeEventListener('pointerup', onPointerUp);
     };
   }, [open]);
@@ -53,22 +74,28 @@ export const MapLayersControl: React.FC<Props> = ({ layers, onChange, available,
     <button ref={trigger} type="button" aria-expanded={open} aria-controls={id}
       aria-label="Layers" title="Layers"
       onClick={() => setOpen(value => !value)}
-      className={`w-7 h-7 flex items-center justify-center rounded-lg bg-lmu-raised/40 hover:bg-lmu-raised text-lmu-muted hover:text-lmu-text transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}>
+      className={`w-7 h-7 flex items-center justify-center rounded-lg bg-lmu-raised/40 hover:bg-lmu-raised aria-expanded:bg-lmu-raised text-lmu-muted hover:text-lmu-text aria-expanded:text-lmu-text transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}>
       <Layers className="w-3.5 h-3.5" />
     </button>
     {open && <div ref={panel} id={id} aria-label="Map layers" role="group"
-      className="absolute top-full right-0 mt-2 w-56 max-h-[calc(100dvh-100px)] overflow-y-auto overscroll-contain p-3 bg-lmu-card border border-lmu-border rounded-lg shadow-lg z-40">
+      className={`absolute top-full right-0 mt-1 w-56 max-h-[calc(100dvh-100px)] overflow-y-auto overscroll-contain custom-scrollbar z-40 ${DROPDOWN_PANEL} ${DROPDOWN_CONTENT_INSET}`}>
       <div className="text-sm font-semibold text-lmu-text mb-2">Map layers</div>
       {(Object.keys(MAP_LAYER_LABELS) as Array<keyof typeof MAP_LAYER_LABELS>).map(key => (
         <React.Fragment key={key}>
           <label
-            className={`flex gap-2 items-center py-1.5 text-xs select-none ${available[key] === false ? 'text-lmu-faint cursor-not-allowed' : 'text-lmu-text-soft cursor-pointer hover:text-lmu-text'}`}>
+            className={`flex gap-2 items-center text-xs select-none ${key === 'startFinish' || key === 'brakeMarkers' ? 'mt-2 border-t border-lmu-border pt-3 pb-1.5' : 'py-1.5'} ${available[key] === false ? 'text-lmu-faint cursor-not-allowed' : 'text-lmu-text-soft cursor-pointer hover:text-lmu-text'}`}>
             <input type="checkbox" checked={available[key] !== false && layers[key]} disabled={available[key] === false}
               onChange={e => onChange(key === 'runoff'
                 ? { ...layers, ...Object.fromEntries(RUNOFF_GROUP.map(layer => [layer, e.target.checked])) }
                 : { ...layers, [key]: e.target.checked })}
               className={`accent-lmu-accent w-3.5 h-3.5 cursor-pointer disabled:cursor-not-allowed ${FOCUS_RING}`} />{MAP_LAYER_LABELS[key]}
           </label>
+          {key === 'turns' && pedalPoints && <label
+            className={`flex gap-2 items-center py-1.5 text-xs select-none ${pedalPoints.available ? 'text-lmu-text-soft cursor-pointer hover:text-lmu-text' : 'text-lmu-faint cursor-not-allowed'}`}>
+            <input type="checkbox" checked={pedalPoints.available && pedalPoints.visible} disabled={!pedalPoints.available}
+              onChange={pedalPoints.onToggle} className={`accent-lmu-accent w-3.5 h-3.5 cursor-pointer disabled:cursor-not-allowed ${FOCUS_RING}`} />
+            Pedal Points
+          </label>}
           {key === 'runoff' && layers.runoff && runoffKinds.length > 1 && (
             <ul className="pl-5 py-1 flex flex-col gap-1 border-l border-lmu-border ml-2 mb-1" aria-label="Runoff colours">
               {RUNOFF_LEGEND.filter(item => runoffKinds.includes(item.key)).map(item => (

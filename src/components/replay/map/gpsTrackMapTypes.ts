@@ -22,7 +22,7 @@ export interface GpsTrackMapProps {
   bounds: { minX: number; maxX: number; minZ: number; maxZ: number; spanX: number; spanZ: number };
   currentIndex: number;
   source?: 'vcr' | 'duckdb';
-  /** Sector line crossings as primary sample indices, drawn on the fullscreen trace. */
+  /** Sector line crossings as primary sample indices, drawn on the map and fullscreen trace. */
   sectors?: ReplayTrajectoryData['sectors'];
   initialZoom?: number;
   initialFollowCar?: boolean;

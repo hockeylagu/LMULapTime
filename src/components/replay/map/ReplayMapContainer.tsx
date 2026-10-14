@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { CircleDot, Disc } from 'lucide-react';
+import { CircleDot } from 'lucide-react';
 import { ReplayTrajectoryPoint, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { GpsTrackMapScene } from './scene/GpsTrackMapScene.js';
 import { ReplayTelemetryHud } from '../inspector/ReplayTelemetryHud.js';
@@ -116,22 +116,6 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
                 </button>
               ))}
             </div>
-          )}
-          {corners && corners.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowPedalMarkers(v => !v)}
-              aria-pressed={showPedalMarkers}
-              title={showPedalMarkers ? 'Hide brake/throttle points' : 'Show brake/throttle points'}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-[11px] font-semibold transition-all cursor-pointer ${
-                showPedalMarkers
-                  ? 'bg-lmu-raised text-white'
-                  : 'text-lmu-muted hover:text-white hover:bg-lmu-raised/50'
-              } ${FOCUS_RING}`}
-            >
-              <Disc className="w-3 h-3 text-lmu-loss" />
-              <span>Pedal Points</span>
-            </button>
           )}
         </div>
         <div className="flex items-center gap-1.5">

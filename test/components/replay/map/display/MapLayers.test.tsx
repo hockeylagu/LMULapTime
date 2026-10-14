@@ -78,6 +78,78 @@ describe('GPS map display layers', () => {
     expect(surfacePaths).toEqual(['road', 'kerb']);
   });
 
+  it('toggles sector, turn and start markers independently and remembers map preferences', () => {
+    const props = { points: [...mockPoints, { ...mockPoints[0], timeSec: 1.5 }], bounds: mockBounds, currentIndex: 0,
+      trackGeometry: geometry, mapDisplay: mapDisplay(), sectors: { s1Frame: 1, s2Frame: 2 },
+      corners: [{ cornerNumber: 1, minDistM: 0 }], onSelectIndex: vi.fn() };
+    const first = render(<GpsTrackMapScene {...props} />);
+    openLayers();
+    expect(screen.getByTestId('map-sector-s1')).toBeInTheDocument();
+    expect(screen.getByTestId('map-sector-s2')).toBeInTheDocument();
+    expect(screen.getByTestId('corner-flag-1')).toBeInTheDocument();
+    expect(screen.getByTestId('start-finish-line')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Sector markers' }));
+    expect(screen.queryByTestId('map-sector-s1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('corner-flag-1')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Turns' }));
+    expect(screen.queryByTestId('corner-flag-1')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Start / finish line' }));
+    expect(screen.queryByTestId('start-finish-line')).not.toBeInTheDocument();
+    first.unmount();
+    render(<GpsTrackMapScene {...props} />);
+    expect(screen.queryByTestId('map-sector-s2')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('start-finish-line')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Full screen map' }));
+    expect(screen.getByTestId('trace-sector-S1')).toBeVisible();
+    expect(screen.getByTestId('trace-sector-S2')).toBeVisible();
+    openLayers();
+    fireEvent.click(screen.getByRole('button', { name: 'Restore defaults' }));
+    expect(screen.getByTestId('map-sector-s1')).toBeInTheDocument();
+    expect(screen.getByTestId('start-finish-line')).toBeInTheDocument();
+  });
+
+  it('disables missing sector and turn data without inventing map markers', () => {
+    render(<GpsTrackMapScene points={mockPoints} bounds={mockBounds} currentIndex={0}
+      trackGeometry={geometry} mapDisplay={mapDisplay()} sectors={{ s1Frame: NaN, s2Frame: 100 }} />);
+    openLayers();
+    expect(screen.getByRole('checkbox', { name: 'Sector markers' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Turns' })).toBeDisabled();
+    expect(screen.queryByTestId('map-sector-s1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('map-sector-s2')).not.toBeInTheDocument();
+  });
+
+  it('uses canonical sector gates even without replay sector frames', () => {
+    const gate = { name: 'S1', center: [120, 200] as [number, number], left: [110, 190] as [number, number],
+      right: [130, 210] as [number, number], stationM: 40 };
+    render(<GpsTrackMapScene points={mockPoints} bounds={mockBounds} currentIndex={0} mapDisplay={mapDisplay()}
+      trackGeometry={{ ...geometry, timingGates: { startFinish: gate, sector1: gate } }} />);
+    openLayers();
+    expect(screen.getByRole('checkbox', { name: 'Sector markers' })).toBeEnabled();
+    expect(screen.getByTestId('map-sector-s1').querySelector('line')).toBeInTheDocument();
+    expect(screen.queryByTestId('map-sector-s2')).not.toBeInTheDocument();
+  });
+
+  it('moves the sector label around a visible braking board while leaving the board anchored', () => {
+    const gate = { name: 'S1', center: [110, 205] as [number, number], left: [100, 205] as [number, number],
+      right: [120, 205] as [number, number], stationM: 40 };
+    const { container } = render(<GpsTrackMapScene points={mockPoints} bounds={mockBounds} currentIndex={0}
+      initialZoom={8} trackGeometry={{ ...geometry, timingGates: { startFinish: gate, sector1: gate } }}
+      mapDisplay={{ ...mapDisplay(), brakeMarkers: [{ id: 'sector-board', center: [120, 205], label: '150',
+        stationM: 40, side: 'right', normal: [1, 0] }] }} />);
+    const sectorPosition = () => screen.getByTestId('map-sector-s1').querySelector('g[transform]')?.getAttribute('transform');
+    const before = sectorPosition();
+    openLayers();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Braking markers' }));
+    expect(sectorPosition()).not.toBe(before);
+    const boardPosition = () => container.querySelector('[data-marker-id="sector-board"] g[transform]')?.getAttribute('transform');
+    const anchored = boardPosition();
+    expect(anchored).toBeTruthy();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Sector markers' }));
+    expect(boardPosition()).toBe(anchored);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Sector markers' }));
+    expect(boardPosition()).toBe(anchored);
+  });
+
   it('renders centerline guide over active track when centerline layer is toggled on', () => {
     const { container } = renderMap();
     expect(container.querySelector('[data-testid="gps-track-centerline"]')).toBeNull();
@@ -108,10 +180,13 @@ describe('GPS map display layers', () => {
     expect(labels).toEqual([
       'Active track',
       'Kerbs',
-      'Braking markers',
-      'Pit lane',
-      'Centerline guide',
       'Runoff and other roads',
+      'Pit lane',
+      'Start / finish line',
+      'Sector markers',
+      'Turns',
+      'Centerline guide',
+      'Braking markers',
     ]);
   });
 
@@ -246,6 +321,19 @@ describe('GPS map display layers', () => {
     fireEvent.keyDown(panel, { key: 'Escape' });
     expect(screen.queryByRole('group', { name: 'Map layers' })).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
+  });
+
+  it('dismisses on another map control even when that control stops pointer propagation', async () => {
+    const user = userEvent.setup();
+    renderMap();
+    openLayers();
+
+    const reset = screen.getByRole('button', { name: 'Reset zoom and pan' });
+    await user.click(reset);
+
+    expect(screen.queryByRole('group', { name: 'Map layers' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Layers' })).toHaveAttribute('aria-expanded', 'false');
+    expect(reset).toHaveFocus();
   });
 
   it('provides sub-toggles for distance, sponsor ads, and digi boards and offsets overlapping digi boards', () => {

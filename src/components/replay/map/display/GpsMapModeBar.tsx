@@ -1,14 +1,11 @@
 import React from 'react';
-import { CircleDot, Compass, Disc } from 'lucide-react';
+import { CircleDot, Compass } from 'lucide-react';
 import type { MapColorMode } from '../replayMapUtils.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 
 export interface GpsMapModeBarProps {
   colorBy?: MapColorMode;
   onChangeColorBy?: (mode: MapColorMode) => void;
-  showPedalMarkers?: boolean;
-  onTogglePedalMarkers?: () => void;
-  hasCorners?: boolean;
   isCompareMode?: boolean;
   hasBaseline?: boolean;
   fadedLine?: 'none' | 'primary' | 'baseline';
@@ -23,9 +20,6 @@ export interface GpsMapModeBarProps {
 export const GpsMapModeBar: React.FC<GpsMapModeBarProps> = ({
   colorBy = 'pedal',
   onChangeColorBy,
-  showPedalMarkers = false,
-  onTogglePedalMarkers,
-  hasCorners = false,
   isCompareMode = false,
   hasBaseline = false,
   fadedLine = 'none',
@@ -64,23 +58,6 @@ export const GpsMapModeBar: React.FC<GpsMapModeBarProps> = ({
             </button>
           ))}
         </div>
-      )}
-
-      {hasCorners && onTogglePedalMarkers && (
-        <button
-          type="button"
-          onClick={onTogglePedalMarkers}
-          aria-pressed={showPedalMarkers}
-          title={showPedalMarkers ? 'Hide brake/throttle points' : 'Show brake/throttle points'}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold transition-colors cursor-pointer ${
-            showPedalMarkers
-              ? 'bg-lmu-raised text-lmu-text'
-              : 'text-lmu-muted hover:text-lmu-text hover:bg-lmu-raised/50'
-          } ${FOCUS_RING}`}
-        >
-          <Disc className="w-3.5 h-3.5" />
-          <span>Pedal Points</span>
-        </button>
       )}
 
       {onToggleGForce && (

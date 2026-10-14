@@ -36,7 +36,8 @@ export const MapControlsOverlay: React.FC<MapControlsOverlayProps> = ({
   return (
     <div data-map-control="navigation"
       data-testid="map-controls-overlay"
-      className={`absolute bottom-3 right-3 z-30 flex ${
+      // Keep navigation popovers above the timing/mode overlays (z-30), regardless of DOM order.
+      className={`absolute bottom-3 right-3 z-40 flex ${
         isVert ? 'flex-col items-center gap-1 p-1' : 'items-center gap-1.5 p-1.5'
       } bg-lmu-strip/90 backdrop-blur-md rounded-xl border border-lmu-border shadow-xl ${className}`}
       onClick={e => e.stopPropagation()}

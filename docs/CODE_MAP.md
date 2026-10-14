@@ -345,6 +345,10 @@ index their explicitly supplied replay directory locally.
   fitting controls, a metric scale bar and `GpsBrakeMarkers.tsx` for optional world-position braking boards (faded by
   zoom level; boards without a station fall back to their order along the lap). Their
   labels report printed board distances; unknown distances use a generic brake label.
+  `display/placeBrakeMarkers.ts` places the boards once per zoom in the scene, so `scene/GpsSectorMarkers.tsx` can
+  keep S1/S2 badges (canonical layout gates, else the recorded replay crossing) clear of visible boards. Map Layers
+  (`display/mapLayers.ts`, `MapLayersControl.tsx`) toggles start/finish, sector markers, turns and Pedal Points
+  independently; Pedal Points state stays in `ReplayMapContainer.tsx` and is shared by normal and fullscreen views.
   Fullscreen adds `map/telemetry/GpsMapTelemetryDock.tsx`: one selectable 112px trace under the map, including
   overlaid throttle/brake and comparison-only delta. It shares playback, chart paths and distance alignment with
   the inspector, with separate persisted channel/collapse preferences (the collapse state lives in the scene so the T

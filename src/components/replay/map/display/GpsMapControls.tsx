@@ -3,7 +3,7 @@ import type { TrackBoundaryGeometry, TrackMapDisplay } from '../../../../../shar
 import { MapControlsOverlay } from '../MapControlsOverlay.js';
 import { useGpsMapPanZoom } from '../useGpsMapPanZoom.js';
 import { projectBoundaryPoints } from '../replayMapUtils.js';
-import { MapLayersControl } from './MapLayersControl.js';
+import { MapLayersControl, type PedalPointsControl } from './MapLayersControl.js';
 import { MapFullscreenButton } from './MapFullscreenButton.js';
 import { ReplayShortcutHelp } from '../../ReplayShortcutHelp.js';
 import { RUNOFF_GROUP, visibleSurfacePoints, type MapLayers } from './mapLayers.js';
@@ -25,10 +25,13 @@ interface Props {
   isExpanded?: boolean;
   onToggleExpanded?: (expanded: boolean) => void;
   showPlayPause?: boolean;
+  hasSectors?: boolean;
+  hasTurns?: boolean;
+  pedalPoints?: PedalPointsControl;
 }
 
 export const GpsMapControls: React.FC<Props> = ({ camera, layers, onChange, geometry, display, error,
-  bounds, left, right, center, trajectory, orientation, isPlaying, onTogglePlay, isExpanded, onToggleExpanded, showPlayPause }) => {
+  bounds, left, right, center, trajectory, orientation, isPlaying, onTogglePlay, isExpanded, onToggleExpanded, showPlayPause, hasSectors, hasTurns, pedalPoints }) => {
   const fit = (points: Point[]) => { const rectangle = projectedPointBounds(points); if (rectangle) camera.fitBounds(rectangle); };
   const active = left.length && right.length ? [...left, ...right] : trajectory;
   const shouldShowPlayPause = showPlayPause ?? Boolean(isExpanded);
@@ -37,12 +40,12 @@ export const GpsMapControls: React.FC<Props> = ({ camera, layers, onChange, geom
     onToggleFollowCar={() => camera.setFollowCar(value => !value)} onCenterCar={camera.centerOnCar}
     isPlaying={isPlaying} onTogglePlay={shouldShowPlayPause ? onTogglePlay : undefined}
     orientation={orientation} className="top-2 right-2 bottom-auto">
-    <MapLayersControl layers={layers} onChange={onChange} error={error}
+    <MapLayersControl layers={layers} onChange={onChange} error={error} pedalPoints={pedalPoints}
       available={{ road: true, kerb: Boolean(display?.surfaces.kerb.length || geometry?.surfaceProfile && geometry.mapSurfaces?.kerb.length),
         runoff: RUNOFF_GROUP.some(key => display?.surfaces[key]?.length || geometry?.mapSurfaces?.[key]?.length),
         pit: Boolean(display?.surfaces.pit.length), otherRoad: Boolean(display?.surfaces.otherRoad.length),
         brakeMarkers: Boolean(display?.brakeMarkers?.length),
-        centerline: center.length > 0 }}
+        centerline: center.length > 0, sectors: Boolean(hasSectors), turns: Boolean(hasTurns) }}
       runoffKinds={RUNOFF_GROUP.filter(key => display?.surfaces[key]?.length || geometry?.mapSurfaces?.[key]?.length)}
       onFitTrack={() => fit(active)} onFitVisible={() => fit([...active,
         ...projectBoundaryPoints(visibleSurfacePoints(display?.surfaces ?? geometry?.mapSurfaces,
