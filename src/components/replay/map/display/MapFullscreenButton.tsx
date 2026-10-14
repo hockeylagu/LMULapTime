@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Maximize2, Minimize2 } from 'lucide-react';
+import { Maximize2, X } from 'lucide-react';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 import { useMapFullscreenFocus } from '../useMapFullscreenFocus.js';
 
@@ -38,6 +38,6 @@ export const MapFullscreenButton: React.FC<MapFullscreenButtonProps> = ({
   return <button ref={buttonRef} type="button" onClick={toggle} aria-label={label}
     aria-pressed={active} aria-keyshortcuts="M" title={active ? 'Exit full screen (M / Esc)' : 'Full screen map (M)'}
     className={`w-7 h-7 flex items-center justify-center rounded-lg bg-lmu-raised/40 hover:bg-lmu-raised text-lmu-muted hover:text-lmu-text transition-colors cursor-pointer shrink-0 ${FOCUS_RING}`}>
-    {active ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+    {active ? <X className="w-4 h-4" /> : <Maximize2 className="w-3.5 h-3.5" />}
   </button>;
 };

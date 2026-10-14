@@ -5,6 +5,7 @@ export interface ReplayFullscreenControls {
   primary: ReplayLapChoice;
   baseline?: Omit<ReplayLapChoice, 'laps' | 'onSelect'>;
   onOpenBaselinePicker: () => void;
+  onRemoveBaseline?: () => void;
   playback: { speed: number; speeds: readonly number[]; onChangeSpeed: (speed: number) => void };
 }
 

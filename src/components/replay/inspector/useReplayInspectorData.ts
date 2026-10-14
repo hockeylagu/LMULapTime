@@ -629,8 +629,8 @@ export function useReplayInspectorData({
 
   // The fullscreen lap controls read this through context: keep it stable across renders that do not
   // change lap selection (scrubbing, playback), calling the latest handlers through a ref.
-  const lapActionsRef = useRef({ handleToggleCompare, handleSelectLap, handleRetryLoad, handleRetryBaseline, setPlaybackSpeed });
-  lapActionsRef.current = { handleToggleCompare, handleSelectLap, handleRetryLoad, handleRetryBaseline, setPlaybackSpeed };
+  const lapActionsRef = useRef({ handleToggleCompare, handleRemoveCompare, handleSelectLap, handleRetryLoad, handleRetryBaseline, setPlaybackSpeed });
+  lapActionsRef.current = { handleToggleCompare, handleRemoveCompare, handleSelectLap, handleRetryLoad, handleRetryBaseline, setPlaybackSpeed };
   const lapOrdinals = selectedDriver?.sessionLapOrdinals;
   const primaryLaps = useMemo(() => (trajectory?.laps ?? []).filter(lap => lapOrdinals?.[String(lap.lapNumber)] !== undefined),
     [trajectory?.laps, lapOrdinals]);
@@ -638,6 +638,7 @@ export function useReplayInspectorData({
   const isPrimaryLoading = isLoading || isTrajLoading;
   const fullscreenControls = useMemo<ReplayFullscreenControls>(() => ({
     onOpenBaselinePicker: () => lapActionsRef.current.handleToggleCompare(),
+    onRemoveBaseline: () => lapActionsRef.current.handleRemoveCompare(),
     primary: {
       laps: primaryLaps, lapNumber: primaryLapNumber, onSelect: lap => lapActionsRef.current.handleSelectLap(lap),
       isLoading: isPrimaryLoading, error, onRetry: () => lapActionsRef.current.handleRetryLoad(),

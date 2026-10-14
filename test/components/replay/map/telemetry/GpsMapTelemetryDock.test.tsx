@@ -5,6 +5,7 @@ import { GpsTrackMapScene } from '../../../../../src/components/replay/map/scene
 import type { ReplayTrajectoryPoint } from '../../../../../shared/types/index.js';
 import type { ComponentProps } from 'react';
 import { useStoredToggle } from '../../../../../src/components/replay/map/useStoredToggle.js';
+import { chooseValue, selectedValue } from '../../../../helpers/selectControl.js';
 
 const points: ReplayTrajectoryPoint[] = Array.from({ length: 10 }, (_, index) => ({
   x: index * 20, y: 0, z: index * 10, timeSec: index, speedKmh: 100 + index,
@@ -23,14 +24,14 @@ describe('fullscreen map telemetry', () => {
   it('keeps combined pedals in one chart and remembers the selection and collapsed state', () => {
     const props = { points, currentIndex: 0, onSelectIndex: vi.fn(), hud: <span>Driving readouts</span> };
     const first = render(<Dock {...props} />);
-    fireEvent.change(screen.getByRole('combobox', { name: 'Telemetry trace channel' }), { target: { value: 'pedals' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Throttle + Brake' }));
     expect(screen.getByLabelText('Combined throttle and brake traces')).toBeInTheDocument();
     expect(screen.getAllByLabelText('Fullscreen telemetry chart')).toHaveLength(1);
     fireEvent.click(screen.getByRole('button', { name: 'Hide telemetry trace' }));
     expect(screen.getByText('Driving readouts')).toBeVisible();
     first.unmount();
     render(<Dock {...props} />);
-    expect(screen.getByRole('combobox')).toHaveValue('pedals');
+    expect(screen.getByRole('button', { name: 'Throttle + Brake' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: 'Show telemetry trace' })).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(screen.getByRole('button', { name: 'Show telemetry trace' }));
     expect(screen.getByLabelText('Fullscreen telemetry chart')).toBeVisible();
@@ -39,13 +40,31 @@ describe('fullscreen map telemetry', () => {
   it('offers delta only for a comparison and restores that choice when a baseline returns', () => {
     const props = { points, currentIndex: 0, onSelectIndex: vi.fn() };
     const { rerender } = render(<Dock {...props} baselinePoints={points} />);
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'delta' } });
-    expect(screen.getByRole('combobox')).toHaveValue('delta');
+    fireEvent.click(screen.getByRole('button', { name: 'Delta' }));
+    expect(screen.getByRole('button', { name: 'Delta' })).toHaveAttribute('aria-pressed', 'true');
     rerender(<Dock {...props} />);
-    expect(screen.getByRole('combobox')).toHaveValue('speed');
-    expect(screen.getByRole('option', { name: /comparison required/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Speed' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Delta' })).toBeDisabled();
     rerender(<Dock {...props} baselinePoints={points} />);
-    expect(screen.getByRole('combobox')).toHaveValue('delta');
+    expect(screen.getByRole('button', { name: 'Delta' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('offers remaining channels through More and returns to quick traces without moving the cursor', () => {
+    const onSelectIndex = vi.fn();
+    const props = { points, currentIndex: 4, onSelectIndex };
+    const first = render(<Dock {...props} />);
+    const more = screen.getByRole('combobox', { name: 'More telemetry channels' });
+    expect(more).toHaveTextContent('More');
+    chooseValue(more, 'rpm');
+    expect(selectedValue(more)).toBe('rpm');
+    expect(screen.getByRole('button', { name: 'Speed' })).toHaveAttribute('aria-pressed', 'false');
+    first.unmount();
+    render(<Dock {...props} />);
+    expect(selectedValue(screen.getByRole('combobox', { name: 'More telemetry channels' }))).toBe('rpm');
+    fireEvent.click(screen.getByRole('button', { name: 'Speed' }));
+    expect(screen.getByLabelText('Speed trace')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'More telemetry channels' })).toHaveTextContent('More');
+    expect(onSelectIndex).not.toHaveBeenCalled();
   });
 
   it('scrubs by distance without bubbling gestures into the map', () => {
@@ -83,22 +102,24 @@ describe('fullscreen map telemetry', () => {
     expect(screen.queryByRole('button', { name: 'Full lap' })).not.toBeInTheDocument();
   });
 
-  it('draws sector lines inside the lap and remembers hiding them', () => {
+  it('always draws sector lines inside the lap, ignoring the former hidden preference', () => {
+    localStorage.setItem('lmu-map-trace-sectors-v1', 'false');
     const props = { points, currentIndex: 0, onSelectIndex: vi.fn(), sectors: { s1Frame: 3, s2Frame: 6 } };
     const first = render(<Dock {...props} />);
     expect(screen.getByTestId('trace-sector-S1')).toHaveTextContent('S1');
     expect(screen.getByTestId('trace-sector-S2')).toHaveTextContent('S2');
-    fireEvent.click(screen.getByRole('button', { name: 'Sectors' }));
-    expect(screen.queryByTestId('trace-sector-S1')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Sectors' })).not.toBeInTheDocument();
     first.unmount();
     render(<Dock {...props} />);
-    expect(screen.getByRole('button', { name: 'Sectors' })).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.queryByTestId('trace-sector-S2')).not.toBeInTheDocument();
+    expect(screen.getByTestId('trace-sector-S1')).toBeVisible();
+    expect(screen.getByTestId('trace-sector-S2')).toBeVisible();
   });
 
   it('offers no sector toggle without sector data', () => {
     render(<Dock points={points} currentIndex={0} onSelectIndex={vi.fn()} />);
     expect(screen.queryByRole('button', { name: 'Sectors' })).not.toBeInTheDocument();
+    expect(screen.queryByTestId('trace-sector-S1')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('trace-sector-S2')).not.toBeInTheDocument();
   });
 
   it('shows the dock only when expanded, handles chart keys once, and exits on Escape', () => {

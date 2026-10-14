@@ -11,7 +11,8 @@ import { useTelemetryStripInteraction } from '../../telemetry/useTelemetryStripI
 import { AVAILABLE_TELEMETRY_CHANNELS, type TelemetryChannelId } from '../../telemetry/presets/telemetryPresets.js';
 import { GpsMapCompactTrace } from './GpsMapCompactTrace.js';
 import { GpsMapPlaybackStrip } from './GpsMapPlaybackStrip.js';
-import { useStoredToggle } from '../useStoredToggle.js';
+import { TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
+import { Select } from '../../../common/dropdown/Select.js';
 
 const CHANNEL_KEY = 'lmu-map-trace-channel-v1';
 type Channel = TelemetryChannelId | 'pedals';
@@ -47,8 +48,6 @@ interface Props {
 export function GpsMapTelemetryDock({ points, baselinePoints, comparisons: sceneComparisons, currentIndex, onSelectIndex, trackLengthM, source, sectors,
   isPlaying, onTogglePlay, traceHidden: collapsed, onToggleTrace, hud }: Props) {
   const [channel, setChannel] = useState(loadChannel);
-  // Sector lines default on: they are faint, and they tie trace features to a part of the lap.
-  const [showSectors, toggleSectors] = useStoredToggle('lmu-map-trace-sectors-v1', true);
   const contentId = useId();
   const hasBaseline = Boolean(baselinePoints?.length);
   // Keep the saved comparison choice, but show speed while there is no reference lap.
@@ -64,7 +63,7 @@ export function GpsMapTelemetryDock({ points, baselinePoints, comparisons: scene
   const elapsedSec = (playback?.timeSec ?? points[index]?.timeSec ?? 0) - (points[0]?.timeSec ?? 0);
   const distanceM = (cumDists[index] ?? 0) + ((cumDists[index + 1] ?? cumDists[index] ?? 0) - (cumDists[index] ?? 0)) * fraction;
   // Same rule as the main strip: a line only inside the visible range, never at the lap ends.
-  const sectorLines = sectors && showSectors ? [
+  const sectorLines = sectors ? [
     { label: 'S1', frame: sectors.s1Frame, line: 'bg-lmu-gold/50', tag: 'bg-lmu-gold/20 text-lmu-gold' },
     { label: 'S2', frame: sectors.s2Frame, line: 'bg-lmu-blue/50', tag: 'bg-lmu-blue/20 text-lmu-cyan' },
   ].filter(sector => sector.frame > viewStart && sector.frame < viewEnd) : [];
@@ -75,6 +74,10 @@ export function GpsMapTelemetryDock({ points, baselinePoints, comparisons: scene
   const paths = useMemo(() => computeTelemetryChartPaths(points, comparisons, viewStart, viewEnd, cumDists, baselineSamples),
     [points, comparisons, viewStart, viewEnd, cumDists, baselineSamples]);
   const compactChannel = activeChannel === 'speed' || activeChannel === 'pedals' || activeChannel === 'delta';
+  const selectChannel = (next: Channel) => {
+    setChannel(next);
+    try { localStorage.setItem(CHANNEL_KEY, next); } catch { /* Storage may be disabled. */ }
+  };
   const buttonClass = `inline-flex h-7 items-center gap-1.5 rounded px-2 text-[11px] text-lmu-muted hover:text-lmu-text hover:bg-lmu-raised transition-colors ${FOCUS_RING}`;
 
   return <section aria-label="Fullscreen telemetry" data-map-control
@@ -82,25 +85,26 @@ export function GpsMapTelemetryDock({ points, baselinePoints, comparisons: scene
     onPointerDown={event => event.stopPropagation()} onPointerMove={event => event.stopPropagation()}
     onPointerUp={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()}>
     {hud}
-    <div className="flex h-9 items-center gap-3 px-4">
-      <GpsMapPlaybackStrip isPlaying={isPlaying} onTogglePlay={onTogglePlay} elapsedSec={elapsedSec} distanceM={distanceM} />
+    <div className="flex min-h-9 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1">
+      <div role="group" aria-label="Quick telemetry traces" className="flex shrink-0 items-center gap-1">
+        {([
+          { value: 'speed', label: 'Speed' },
+          { value: 'delta', label: 'Delta' },
+          { value: 'pedals', label: 'Throttle + Brake' },
+        ] as const).map(item => <button key={item.value} type="button"
+          aria-pressed={activeChannel === item.value} disabled={item.value === 'delta' && !hasBaseline}
+          title={item.value === 'delta' && !hasBaseline ? 'Select a comparison lap to show delta' : `Show ${item.label.toLowerCase()} trace`}
+          onClick={() => selectChannel(item.value)}
+          className={`${buttonClass} font-semibold disabled:cursor-not-allowed disabled:opacity-50 ${activeChannel === item.value ? 'bg-lmu-raised text-lmu-text' : ''}`}>
+          {item.label}
+        </button>)}
+        <Select<TelemetryChannelId> value={compactChannel ? null : activeChannel} aria-label="More telemetry channels"
+          placeholder="More" title="More telemetry channels" className={compactChannel ? 'w-24' : 'w-48'} align="start"
+          onChange={selectChannel}
+          options={AVAILABLE_TELEMETRY_CHANNELS.filter(item => item.id !== 'speed' && item.id !== 'delta')
+            .map(item => ({ value: item.id, label: item.name }))} />
+      </div>
       <span aria-hidden="true" className="h-5 w-px bg-lmu-border" />
-      <label htmlFor={`${contentId}-channel`} className="sr-only">Trace</label>
-      <select id={`${contentId}-channel`} value={activeChannel} aria-label="Telemetry trace channel"
-        className={`h-7 w-48 rounded bg-lmu-raised px-2 text-[11px] text-lmu-text ${FOCUS_RING}`}
-        onChange={event => {
-          const next = event.target.value as Channel;
-          setChannel(next);
-          try { localStorage.setItem(CHANNEL_KEY, next); } catch { /* Storage may be disabled. */ }
-        }}>
-        <option value="speed">Speed</option>
-        <option value="pedals">Throttle + brake</option>
-        <option value="delta" disabled={!hasBaseline}>Delta{!hasBaseline ? ' (comparison required)' : ''}</option>
-        <optgroup label="Other channels">
-          {AVAILABLE_TELEMETRY_CHANNELS.filter(item => item.id !== 'speed' && item.id !== 'delta')
-            .map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-        </optgroup>
-      </select>
       {!collapsed && <>
         <button type="button" className={`${buttonClass} ${interaction.interactionMode === 'zoom' ? 'bg-lmu-raised text-lmu-text' : ''}`} aria-pressed={interaction.interactionMode === 'zoom'}
           title="Select a range by dragging. Shift-drag also selects a range; double-click restores the full lap."
@@ -109,31 +113,32 @@ export function GpsMapTelemetryDock({ points, baselinePoints, comparisons: scene
         </button>
         {interaction.isZoomed && <button type="button" className={buttonClass}
           onClick={interaction.handleResetZoom}>Full lap</button>}
-        {sectors && <button type="button" className={`${buttonClass} ${showSectors ? 'bg-lmu-raised text-lmu-text' : ''}`} aria-pressed={showSectors}
-          title="Show the S1 and S2 sector lines on the trace"
-          onClick={toggleSectors}>
-          Sectors
-        </button>}
         {activeChannel === 'pedals' && <span className="flex gap-3 text-[10px] text-lmu-muted">
-          <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="w-3 border-t-2 border-lmu-gain" />Throttle</span>
-          <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="w-3 border-t-2 border-lmu-loss" />Brake</span>
+          <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="w-3 border-t-2" style={{ borderColor: TELEMETRY_COLORS.throttle }} />Throttle</span>
+          <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="w-3 border-t-2" style={{ borderColor: TELEMETRY_COLORS.brake }} />Brake</span>
         </span>}
         {activeChannel === 'delta' && <span className="text-[10px] text-lmu-muted" title="Green shading shows time gained; red shading shows time lost.">− ahead / + behind</span>}
       </>}
-      <button type="button" className={`${buttonClass} ml-auto`}
+      <div className="ml-auto flex shrink-0 items-center gap-3">
+      <GpsMapPlaybackStrip isPlaying={isPlaying} onTogglePlay={onTogglePlay} elapsedSec={elapsedSec} distanceM={distanceM} />
+      <button type="button" className={buttonClass}
         aria-label={collapsed ? 'Show telemetry trace' : 'Hide telemetry trace'} aria-expanded={!collapsed} aria-controls={contentId}
         title={collapsed ? 'Show trace (T)' : 'Hide trace (T)'} aria-keyshortcuts="T" onClick={onToggleTrace}>
         {collapsed ? <ChevronUp size={14} /> : <ChevronDown size={14} />}{collapsed ? 'Show trace' : 'Hide trace'}
       </button>
+      </div>
     </div>
     <div id={contentId} ref={interaction.containerRef} tabIndex={0} data-replay-surface="chart" style={collapsed ? { display: 'none' } : undefined}
-      aria-label="Fullscreen telemetry chart" className={`relative flex h-28 flex-col cursor-crosshair ${compactChannel ? 'ml-14 mr-4' : 'overflow-hidden'} ${FOCUS_RING}`}
+      aria-label="Fullscreen telemetry chart" className={`group/trace relative flex h-28 flex-col cursor-crosshair outline-none ${compactChannel ? 'ml-14 mr-4' : 'overflow-hidden'}`}
       onPointerDown={interaction.handlePointerDown} onPointerMove={interaction.handlePointerMove}
       onPointerUp={interaction.handlePointerUp} onPointerCancel={interaction.handlePointerCancel}
       onDoubleClick={interaction.handleResetZoom}
       onKeyDown={event => {
         if (event.key === ' ') { event.preventDefault(); onTogglePlay?.(); }
       }}>
+      {/* Inset keyboard-focus corners stay visible at the screen edge without framing the data. */}
+      <span aria-hidden="true" className="pointer-events-none absolute left-0 top-0 z-20 hidden h-3 w-3 border-l-2 border-t-2 border-lmu-accent-text group-focus-visible/trace:block" />
+      <span aria-hidden="true" className="pointer-events-none absolute right-0 top-0 z-20 hidden h-3 w-3 border-r-2 border-t-2 border-lmu-accent-text group-focus-visible/trace:block" />
       {activeChannel === 'speed' || activeChannel === 'pedals' || activeChannel === 'delta'
         ? <GpsMapCompactTrace channel={activeChannel} paths={paths} /> : <TelemetryChannelRenderer channelId={activeChannel} paths={paths} points={points} source={source}
         currentPoint={points[index]} currentComparison={comparisons[index]} pointComparisons={comparisons}

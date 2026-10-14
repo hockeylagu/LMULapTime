@@ -480,9 +480,9 @@ describe('ReplayInspectorModal - Comparison & Source Modes', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Full screen map' })).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: 'Full screen map' }));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Change baseline lap' })).toHaveTextContent('Baseline L7'));
-    fireEvent.click(screen.getByRole('button', { name: 'Change primary lap' }));
-    fireEvent.click(screen.getByRole('menuitemradio', { name: /Lap 2/ }));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Change primary lap' })).toHaveTextContent('Primary L2'));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Change primary lap' }));
+    fireEvent.click(screen.getByRole('option', { name: /Lap 2/ }));
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Change primary lap' })).toHaveTextContent('Primary L2'));
     expect(requests.some(request => request.pathname.includes('/session-1/') && request.searchParams.get('driverOrdinal') === '0'
       && request.searchParams.get('lapOrdinal') === '1')).toBe(true);
     screen.getByRole('button', { name: 'Change baseline lap' }).focus();

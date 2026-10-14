@@ -16,7 +16,7 @@ describe('fullscreen lap timing panel', () => {
     expect(panel.getByText('1:29.000')).toBeInTheDocument();
     expect(panel.getByText('31.000s')).toBeInTheDocument();
     expect(panel.getByText('-1.000s')).toHaveClass('text-right', 'text-lmu-gain');
-    expect(panel.getByText('-1.000s').parentElement).toHaveClass('grid-cols-[28px_1fr_1fr_68px]');
+    expect(panel.getByText('-1.000s').parentElement).toHaveClass('grid-cols-[28px_minmax(0,1fr)_minmax(0,1fr)_68px]');
     expect(panel.getAllByText('+1.000s')).toHaveLength(3);
     expect(panel.getByText('Baseline · L4')).toBeInTheDocument();
   });
@@ -32,6 +32,8 @@ describe('fullscreen lap timing panel', () => {
   it('highlights the cursor sector and shows its live change only against a baseline', () => {
     const { container, rerender } = render(<GpsMapLapTimingPanel primaryLapSummary={lap} liveSplit={{ sector: 2, deltaSec: -0.123 }} />);
     expect(container.querySelector('[data-current-sector]')).toHaveTextContent('S2');
+    // Without a baseline the rows keep the selectors' primary/compare columns.
+    expect(container.querySelector('[data-current-sector]')).toHaveClass('grid-cols-[28px_minmax(0,1fr)_minmax(0,1fr)]');
     expect(screen.queryByText('S2 so far')).not.toBeInTheDocument();
     rerender(<GpsMapLapTimingPanel primaryLapSummary={lap} baselineLapSummary={{ ...lap, lapNumber: 4 }} liveSplit={{ sector: 2, deltaSec: -0.123 }} />);
     expect(screen.getByText('S2 so far')).toBeInTheDocument();

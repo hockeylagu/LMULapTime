@@ -353,9 +353,11 @@ index their explicitly supplied replay directory locally.
   overlaid throttle/brake and comparison-only delta. It shares playback, chart paths and distance alignment with
   the inspector, with separate persisted channel/collapse preferences (the collapse state lives in the scene so the T
   shortcut shares it; remembered toggles use `map/useStoredToggle.ts`). It reuses the scene's lap comparisons, draws
-  S1/S2 lines from `trajectory.sectors` behind a remembered Sectors toggle, and leads its toolbar with
-  `GpsMapPlaybackStrip.tsx` (play, shared playback speed, cursor lap time and distance). `GpsMapTelemetryHud.tsx` sits horizontally
+  S1/S2 lines from `trajectory.sectors` whenever they fall inside the visible range. Its toolbar has quick Speed, Delta and
+  Throttle + Brake buttons and a More channel selector on the left; `GpsMapPlaybackStrip.tsx` (play, shared playback
+  speed, cursor lap time and distance) sits on the right beside the trace visibility toggle. `GpsMapTelemetryHud.tsx` sits horizontally
   in the bottom dock above the trace, with primary left, baseline right, a centered live delta and always-visible readouts.
+  Completing a valid drag-to-zoom selection returns the shared telemetry interaction mode to scrubbing while retaining the zoomed range.
   `GpsMapLapTimingPanel.tsx` floats on the right with recorded lap/S1/S2/S3 times and baseline differences; it
   highlights the cursor's sector and, when comparing, its live change since that sector's start line
   (`display/liveSectorSplit.ts`, deterministic from the distance-aligned delta). Below 2xl it stacks under the mode

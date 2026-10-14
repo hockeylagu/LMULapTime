@@ -424,6 +424,18 @@ describe('GpsTrackMapScene', () => {
     expect(onTogglePlay).toHaveBeenCalledTimes(2);
   });
 
+  it('closes fullscreen from the top-right close button and restores the map focus', () => {
+    render(<GpsTrackMapScene points={mockPoints} bounds={mockBounds} currentIndex={0} />);
+    expect(screen.queryByRole('button', { name: 'Exit full screen (Esc)' })).not.toBeInTheDocument();
+    const trigger = screen.getByRole('button', { name: 'Full screen map' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    fireEvent.click(screen.getByRole('button', { name: 'Exit full screen (Esc)' }));
+    expect(screen.queryByRole('dialog', { name: 'Track map' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Full screen map' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByLabelText('Track map')).toHaveFocus();
+  });
+
   it('handles keyboard shortcuts in full screen mode', () => {
     const onSelectIndex = vi.fn();
     const onTogglePlay = vi.fn();
