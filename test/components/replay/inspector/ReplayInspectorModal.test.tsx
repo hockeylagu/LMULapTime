@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
 import type { ReactNode } from 'react';
 import { ReplayInspectorModal } from '../../../../src/components/replay/inspector/ReplayInspectorContent.js';
 import { ConsistencyPanel } from '../../../../src/components/replay/analysis/ConsistencyPanel.js';
+import { chooseValue, openSelect, selectedValue } from '../../../helpers/selectControl.js';
 
 vi.mock('recharts', () => {
   return {
@@ -103,9 +104,11 @@ describe('ReplayInspectorModal', () => {
     });
 
     const driverSelect = screen.getByLabelText(/Select Driver/i);
-    expect(driverSelect).toHaveValue('1');
+    expect(selectedValue(driverSelect)).toBe('1');
+    openSelect(driverSelect);
     expect(screen.getByRole('option', { name: /Samuel Lague.*You/i })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: /Rival Racer/i })).toBeInTheDocument();
+    fireEvent.keyDown(driverSelect, { key: 'Escape' });
     expect(screen.queryByText('Test_Replay.vcr')).not.toBeInTheDocument();
     const duration = screen.getByText('8m 20s');
     expect(duration).not.toBeVisible();
@@ -118,8 +121,8 @@ describe('ReplayInspectorModal', () => {
     expect(duration).not.toBeVisible();
     expect(info).toHaveFocus();
     const playbackSpeed = screen.getByRole('combobox', { name: 'Playback speed' });
-    fireEvent.change(playbackSpeed, { target: { value: '2' } });
-    expect(playbackSpeed).toHaveValue('2');
+    chooseValue(playbackSpeed, '2');
+    expect(selectedValue(playbackSpeed)).toBe('2');
   });
 
   it('shows the Corners tab for self-analysis even without a baseline lap loaded', async () => {
@@ -179,7 +182,7 @@ describe('ReplayInspectorModal', () => {
       expect(screen.getByText(/LMGT3 Fixed/i)).toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByLabelText(/Select Driver/i), { target: { value: '2' } });
+    chooseValue(screen.getByLabelText(/Select Driver/i), '2');
 
     await waitFor(() => {
       expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('driverOrdinal=1'), expect.objectContaining({ signal: expect.any(AbortSignal) }));
@@ -242,8 +245,8 @@ describe('ReplayInspectorModal', () => {
     });
 
     const driverSelect = screen.getByLabelText(/Select Driver/i);
-    expect(driverSelect).toHaveValue('1');
-    fireEvent.change(driverSelect, { target: { value: '2' } });
+    expect(selectedValue(driverSelect)).toBe('1');
+    chooseValue(driverSelect, '2');
 
     // Verify it called trajectory fetch with driverOrdinal=1
     await waitFor(() => {
@@ -312,17 +315,15 @@ describe('ReplayInspectorModal', () => {
       <ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />
     );
 
-    await waitFor(() => {
-      expect(screen.getByRole('option', { name: '0.5×' })).toBeInTheDocument();
-    });
-
-    const speedSelect = screen.getByRole('combobox', { name: 'Playback speed' });
+    const speedSelect = await screen.findByRole('combobox', { name: 'Playback speed' });
+    openSelect(speedSelect);
+    expect(screen.getByRole('option', { name: '0.5×' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: '1×' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: '2×' })).toBeInTheDocument();
     expect(screen.queryByRole('option', { name: '5×' })).not.toBeInTheDocument();
-    expect(speedSelect).toHaveValue('1');
-    fireEvent.change(speedSelect, { target: { value: '0.5' } });
-    expect(speedSelect).toHaveValue('0.5');
+    expect(selectedValue(speedSelect)).toBe('1');
+    chooseValue(speedSelect, '0.5');
+    expect(selectedValue(speedSelect)).toBe('0.5');
 
     // Flush any trailing async state updates (e.g. corner consistency data) that
     // resolve after this test's own assertions so they settle inside act().

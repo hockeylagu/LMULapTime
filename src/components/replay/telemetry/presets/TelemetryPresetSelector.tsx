@@ -1,7 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { SlidersHorizontal, ChevronDown, Check, Settings2 } from 'lucide-react';
 import { TelemetryPreset } from './telemetryPresets.js';
-import { FOCUS_RING } from '../../../common/buttonStyles.js';
+import { FOCUS_RING, SECONDARY_BUTTON } from '../../../common/buttonStyles.js';
+import { DROPDOWN_CHEVRON, DROPDOWN_GROUP_LABEL, DROPDOWN_OPTION, DROPDOWN_OPTION_SELECTED, DROPDOWN_PANEL, DROPDOWN_TRIGGER_COMPACT } from '../../../common/dropdown/dropdownStyles.js';
+import { useOutsidePress } from '../../../common/dropdown/useAnchoredPanel.js';
 
 export interface TelemetryPresetSelectorProps {
   presets: TelemetryPreset[];
@@ -10,6 +12,7 @@ export interface TelemetryPresetSelectorProps {
   onOpenManageModal: () => void;
 }
 
+/** Preset choice plus management actions; arrows move between the presets, Escape returns to the trigger. */
 export const TelemetryPresetSelector: React.FC<TelemetryPresetSelectorProps> = ({
   presets,
   activePresetId,
@@ -18,52 +21,62 @@ export const TelemetryPresetSelector: React.FC<TelemetryPresetSelectorProps> = (
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const menuId = useId();
+  const close = useCallback(() => setIsOpen(false), []);
+  useOutsidePress(isOpen, [containerRef], close);
 
   const activePreset = presets.find(p => p.id === activePresetId) || presets[0];
 
   useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    if (isOpen) {
-      document.addEventListener('mousedown', handleOutsideClick);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleOutsideClick);
-    };
+    if (!isOpen) return;
+    const list = listRef.current;
+    (list?.querySelector<HTMLButtonElement>('[aria-pressed="true"]') ?? list?.querySelector<HTMLButtonElement>('button'))?.focus();
   }, [isOpen]);
 
+  const finish = (action: () => void) => {
+    setIsOpen(false);
+    triggerRef.current?.focus();
+    action();
+  };
+
   return (
-    <div ref={containerRef} className="relative z-30">
-      <div className="flex items-center gap-1 p-0.5">
+    <div ref={containerRef} className="relative z-30" onKeyDown={event => {
+      if (event.key === 'Escape' && isOpen) {
+        event.preventDefault();
+        event.stopPropagation();
+        setIsOpen(false);
+        triggerRef.current?.focus();
+      }
+    }}>
+      <div className="flex items-center gap-1">
         <button
+          ref={triggerRef}
           type="button"
           onClick={() => setIsOpen(prev => !prev)}
-          className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] font-mono text-lmu-text hover:text-white hover:bg-white/5 transition-all cursor-pointer ${FOCUS_RING}`}
+          className={DROPDOWN_TRIGGER_COMPACT}
           aria-expanded={isOpen}
+          aria-controls={menuId}
           title="Select telemetry channel preset"
           data-testid="telemetry-preset-dropdown-btn"
         >
-          <SlidersHorizontal className="w-3 h-3 text-lmu-muted" />
-          <span className="font-bold truncate max-w-[120px] sm:max-w-[150px]">
+          <SlidersHorizontal aria-hidden="true" className="w-3 h-3 shrink-0 text-lmu-muted" />
+          <span className="truncate max-w-[120px] sm:max-w-[150px]">
             {activePreset?.name ?? 'Channels'}
           </span>
-          <span className="px-1 py-px text-lmu-muted text-[10px] font-bold">
+          <span className="font-mono text-lmu-muted">
             {activePreset?.channels.length ?? 0}
           </span>
-          <ChevronDown className={`w-3 h-3 text-lmu-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+          <ChevronDown aria-hidden="true" className={DROPDOWN_CHEVRON} />
         </button>
 
         <button
           type="button"
-          onClick={() => {
-            setIsOpen(false);
-            onOpenManageModal();
-          }}
-          className={`w-6 h-6 inline-flex items-center justify-center rounded text-lmu-muted hover:text-white hover:bg-white/5 transition-all cursor-pointer ${FOCUS_RING}`}
+          onClick={() => finish(onOpenManageModal)}
+          className={`w-6 h-6 inline-flex items-center justify-center rounded-lg text-lmu-muted hover:text-white hover:bg-lmu-raised transition-colors ${FOCUS_RING}`}
           title="Customize, rename, or add channel presets"
+          aria-label="Manage channel presets"
           data-testid="telemetry-preset-manage-btn"
         >
           <Settings2 className="w-3.5 h-3.5" />
@@ -71,67 +84,48 @@ export const TelemetryPresetSelector: React.FC<TelemetryPresetSelectorProps> = (
       </div>
 
       {isOpen && (
-        <div
-          className="absolute left-0 mt-1 w-64 rounded-xl bg-lmu-surface border border-lmu-border shadow-2xl z-50 py-1.5 animate-pop-in text-[11px]"
-          data-testid="telemetry-preset-menu"
-        >
-          <div className="px-3 py-1 text-[10px] font-bold text-lmu-muted uppercase tracking-wider border-b border-white/5 flex items-center justify-between">
-            <span>Telemetry Presets</span>
+        <div id={menuId} className={`absolute left-0 top-full mt-1 w-64 z-50 p-1 ${DROPDOWN_PANEL}`} data-testid="telemetry-preset-menu">
+          <div className="flex items-center justify-between pr-1.5">
+            <span className={DROPDOWN_GROUP_LABEL}>Telemetry presets</span>
             <button
               type="button"
-              onClick={() => {
-                setIsOpen(false);
-                onOpenManageModal();
-              }}
-              className={`text-lmu-muted hover:text-white hover:underline cursor-pointer ${FOCUS_RING}`}
+              onClick={() => finish(onOpenManageModal)}
+              className={`text-[11px] text-lmu-muted hover:text-white hover:underline rounded ${FOCUS_RING}`}
             >
               Manage
             </button>
           </div>
 
-          <div className="max-h-60 overflow-y-auto py-1">
+          <div ref={listRef} role="group" aria-label="Telemetry presets" className="max-h-60 overflow-y-auto custom-scrollbar"
+            onKeyDown={event => {
+              const options = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button')];
+              const current = options.indexOf(document.activeElement as HTMLButtonElement);
+              const target = event.key === 'ArrowDown' ? Math.min(current + 1, options.length - 1) : event.key === 'ArrowUp' ? Math.max(current - 1, 0)
+                : event.key === 'Home' ? 0 : event.key === 'End' ? options.length - 1 : -1;
+              if (target >= 0) { event.preventDefault(); options[target]?.focus(); }
+            }}>
             {presets.map(p => {
               const isSelected = p.id === activePresetId;
               return (
                 <button
                   key={p.id}
                   type="button"
-                  onClick={() => {
-                    onSelectPreset(p.id);
-                    setIsOpen(false);
-                  }}
-                  className={`w-full px-3 py-1.5 flex items-center justify-between text-left transition-colors cursor-pointer ${
-                    isSelected ? 'bg-lmu-raised/70 text-white font-semibold' : 'text-lmu-text-soft hover:bg-white/5 hover:text-white'
-                  } ${FOCUS_RING}`}
+                  onClick={() => finish(() => onSelectPreset(p.id))}
+                  className={`${DROPDOWN_OPTION} ${isSelected ? DROPDOWN_OPTION_SELECTED : ''} focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-lmu-accent-text`}
                   aria-pressed={isSelected}
                   data-testid={`telemetry-preset-option-${p.id}`}
                 >
-                  <div className="flex items-center gap-2 truncate pr-2">
-                    {isSelected ? (
-                      <Check className="w-3.5 h-3.5 text-white shrink-0" />
-                    ) : (
-                      <div className="w-3.5 h-3.5 shrink-0" />
-                    )}
-                    <span className="truncate">{p.name}</span>
-                  </div>
-                  <span className="text-[10px] px-1.5 py-px text-lmu-muted font-mono shrink-0">
-                    {p.channels.length} ch
-                  </span>
+                  <Check aria-hidden="true" className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-white' : 'invisible'}`} />
+                  <span className="min-w-0 flex-1 truncate">{p.name}</span>
+                  <span className="shrink-0 font-mono text-lmu-muted">{p.channels.length} ch</span>
                 </button>
               );
             })}
           </div>
 
-          <div className="pt-1.5 mt-1 border-t border-white/5 px-2">
-            <button
-              type="button"
-              onClick={() => {
-                setIsOpen(false);
-                onOpenManageModal();
-              }}
-              className={`w-full py-1 px-2.5 rounded-lg bg-lmu-raised/40 hover:bg-lmu-raised/70 border border-lmu-border text-lmu-text-soft font-semibold flex items-center justify-center gap-1.5 transition-all text-[10px] cursor-pointer ${FOCUS_RING}`}
-            >
-              <Settings2 className="w-3 h-3" />
+          <div className="mt-1 border-t border-lmu-border p-1.5 pb-0.5">
+            <button type="button" onClick={() => finish(onOpenManageModal)} className={`${SECONDARY_BUTTON} w-full`}>
+              <Settings2 aria-hidden="true" className="w-3.5 h-3.5" />
               Edit & Rename Presets
             </button>
           </div>

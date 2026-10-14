@@ -10,6 +10,7 @@ import { fetchBenchmarkDiffHistory, fetchBenchmarkDiffById } from '../../api/ref
 import { apiErrorMessage, isAbortError } from '../../api/apiClient.js';
 import { FOCUS_RING, SECONDARY_BUTTON } from '../common/buttonStyles.js';
 import { FeedbackMessage, SettingsFeedback, SettingsPanel } from './SettingsPanel.js';
+import { Select } from '../common/dropdown/Select.js';
 import { formatDateTime, formatNumber, pluralize } from './settingsFormat.js';
 
 const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTN03UvJDm99byA6vQPZHKOCYVvfxLu1zkJAzdaKyROykzEKY2-Xl1rl1q5znZEf36m88dxMKsY2eaO/pubhtml';
@@ -205,17 +206,16 @@ export const ReferenceLaptimesCard: React.FC<ReferenceLaptimesCardProps> = ({
               {history.length > 0 && (
                 <div className="flex flex-wrap items-center gap-3">
                   <label htmlFor="benchmark-history-select" className="text-xs text-lmu-muted">Show update</label>
-                  <select
+                  <Select
                     id="benchmark-history-select"
-                    value={selectedDiffId}
-                    onChange={(e) => handleSelectDiffVersion(e.target.value)}
-                    className={`bg-lmu-bg border border-lmu-border rounded-xl px-3 py-1.5 text-xs text-lmu-text focus:border-lmu-accent ${FOCUS_RING} font-mono transition-colors cursor-pointer`}
-                  >
-                    <option value="latest">Latest update</option>
-                    {history.map((h) => (
-                      <option key={h.id} value={h.id}>{describeBenchmarkUpdate(h)}</option>
-                    ))}
-                  </select>
+                    value={String(selectedDiffId)}
+                    onChange={handleSelectDiffVersion}
+                    options={[
+                      { value: 'latest', label: 'Latest update' },
+                      ...history.map((h) => ({ value: String(h.id), label: describeBenchmarkUpdate(h) })),
+                    ]}
+                    className="max-w-[420px]"
+                  />
                   {selectedDiffId !== 'latest' && (
                     <button
                       type="button"

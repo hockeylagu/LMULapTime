@@ -70,7 +70,7 @@ describe('LapSelectorDropdown component', () => {
     fireEvent.click(toggleBtn);
     expect(screen.getByText('Lap 1')).toBeInTheDocument();
 
-    fireEvent.mouseDown(screen.getByTestId('outside-area'));
+    fireEvent.pointerDown(screen.getByTestId('outside-area'));
     expect(screen.queryByText('Lap 1')).not.toBeInTheDocument();
   });
 });

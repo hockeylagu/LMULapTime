@@ -1,4 +1,4 @@
-import { SortOption } from '../common/SortDropdown.js';
+import { SortOption } from '../common/dropdown/SortDropdown.js';
 
 export type TrackDetailSortOption = 'date-desc' | 'date-asc' | 'pos-asc' | 'pace-asc' | 'pace-desc' | 'lap-asc';
 

@@ -1,6 +1,7 @@
 import React from 'react';
 import { TrendingUp } from 'lucide-react';
 import { VehicleClassPills } from '../../common/VehicleClassPills.js';
+import { Select } from '../../common/dropdown/Select.js';
 
 export interface ImprovementHeaderProps {
   embedded?: boolean;
@@ -35,17 +36,13 @@ export const ImprovementHeader: React.FC<ImprovementHeaderProps> = ({
 
       <div className="flex flex-wrap items-center gap-3">
         {/* Select Track */}
-        <select
+        <Select
+          aria-label="Track"
           value={activeTrack}
-          onChange={(e) => setSelectedTrack(e.target.value)}
-          className="bg-lmu-bg border border-lmu-border rounded-xl px-4 py-2 text-sm text-white focus:border-lmu-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text font-medium"
-        >
-          {tracks.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
+          onChange={setSelectedTrack}
+          options={tracks.map((t) => ({ value: t, label: t }))}
+          className="max-w-[320px]"
+        />
 
         {/* Vehicle Class Filter Buttons */}
         <VehicleClassPills

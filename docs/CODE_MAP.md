@@ -453,6 +453,8 @@ and type onto each projected lap point.
 
 Track detail keeps successful data keyed to its requested track, shows loading when switching back to a previously visited track, and offers an inline retry warning when a same-track refresh fails. Route sort values are validated. Circuit information uses the body-portaled focus/scroll isolation hook `src/components/common/useModalFocus.ts`. Progression view and series controls expose their pressed state and support keyboard operation.
 
+Every dropdown uses `src/components/common/dropdown/` (2026-10-13, [plan](plans/archive/DROPDOWN_STANDARDIZATION.md)): `Select.tsx` is the one single-choice control (a select-only combobox with typed string/number values, groups, disabled options, a trailing `detail`, typeahead and `data-value` for tests via `test/helpers/selectControl.ts`); there are no native `<select>` elements. Its list mounts fixed-position inside the open modal layer (a dialog or the expanded map) or the body through `useAnchoredPanel.ts`, so clipped toolbars and scroll rows cannot cut it off; `useOutsidePress` is the shared capture-phase dismissal. Checkbox lists, preset menus, the resolution popover and the Info/Beaten disclosures keep their own semantics and share `dropdownStyles.ts`. `SortDropdown.tsx` lives there too.
+
 Session cards (`session-list/SessionGridCard.tsx`) show bundled track SVGs to the left of session details,
 resolved directly by venue, course, replay name and track length, with visible benchmark pace percentages. Unknown layouts
 and unavailable SVGs omit the thumbnail without fetching metric geometry.

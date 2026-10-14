@@ -8,6 +8,7 @@ import { useInlineConfirm } from './controls/useInlineConfirm.js';
 import { AiSettingsResponse, AiSettingsState, useAiSettings } from './hooks/useAiSettings.js';
 import { FeedbackMessage, SettingsFeedback, SettingsPanel } from './SettingsPanel.js';
 import { FIELD_LABEL } from './labelStyles.js';
+import { Select } from '../common/dropdown/Select.js';
 
 const AI_MODELS = ['gemini-3.7-flash', 'gemini-3.8-flash'] as const;
 
@@ -106,9 +107,7 @@ const AISettingsPanel: React.FC<{ ai: AiSettingsState }> = ({ ai }) => {
       </div>
       <div>
         <label className={FIELD_LABEL_BLOCK} htmlFor="ai-model">Gemini model</label>
-        <select id="ai-model" value={model} onChange={event => setModel(event.target.value)} className={`w-64 ${FIELD_CLASS}`}>
-          {AI_MODELS.map(option => <option key={option} value={option}>{option}</option>)}
-        </select>
+        <Select id="ai-model" value={model} onChange={setModel} options={AI_MODELS.map(option => ({ value: option, label: option }))} className="w-64" />
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={() => void save()} disabled={isSaving || !cleanedKey} data-busy={isSaving} className={PRIMARY_BUTTON}><Save className="h-3.5 w-3.5" aria-hidden="true" /> Save Key</button>

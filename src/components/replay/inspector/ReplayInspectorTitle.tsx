@@ -1,9 +1,11 @@
-import React, { useRef } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { ArrowLeft, CloudRain, CloudSun, Info } from 'lucide-react';
 import { ReplayDriverEntry, ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { formatRain } from '../../../../shared/domain/lapConditions.js';
 import { mapVehicleIdToClass } from '../../../../shared/domain/vehicleMapping.js';
 import { CarIdentity } from '../../vehicle/CarIdentity.js';
+import { DROPDOWN_CONTENT_INSET, DROPDOWN_PANEL } from '../../common/dropdown/dropdownStyles.js';
+import { useOutsidePress } from '../../common/dropdown/useAnchoredPanel.js';
 
 export interface ReplayInspectorTitleProps {
   onClose: () => void;
@@ -21,6 +23,9 @@ const formatDuration = (s: number): string => `${Math.floor(s / 60)}m ${String(M
 export const ReplayInspectorTitle: React.FC<ReplayInspectorTitleProps> = ({ onClose, metadata, trajectory, selectedDriver }) => {
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const summaryRef = useRef<HTMLElement>(null);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const closeInfo = useCallback(() => { if (detailsRef.current) detailsRef.current.open = false; }, []);
+  useOutsidePress(infoOpen, [detailsRef], closeInfo);
   const track = metadata?.displayTrack || metadata?.trackCourse || metadata?.trackName || 'Telemetry';
   const eventTitle = metadata?.eventInfo?.eventTitle;
   const weather = trajectory?.weatherCondition || metadata?.weatherCondition;
@@ -76,17 +81,17 @@ export const ReplayInspectorTitle: React.FC<ReplayInspectorTitleProps> = ({ onCl
           </div>
         )}
       </div>
-      <details ref={detailsRef} className="relative shrink-0" onKeyDown={event => {
+      <details ref={detailsRef} className="relative shrink-0" onToggle={event => setInfoOpen(event.currentTarget.open)} onKeyDown={event => {
         if (event.key === 'Escape') {
           event.stopPropagation();
           if (detailsRef.current) detailsRef.current.open = false;
           summaryRef.current?.focus();
         }
       }}>
-        <summary ref={summaryRef} className="list-none flex items-center gap-1.5 text-[11px] text-lmu-muted hover:text-white cursor-pointer rounded px-2 py-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text [&::-webkit-details-marker]:hidden">
-          <Info className="w-3.5 h-3.5" /> Info
+        <summary ref={summaryRef} aria-expanded={infoOpen} className="list-none flex items-center gap-1.5 text-[11px] text-lmu-muted hover:text-white aria-expanded:text-white cursor-pointer rounded px-2 py-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text [&::-webkit-details-marker]:hidden">
+          <Info aria-hidden="true" className="w-3.5 h-3.5" /> Info
         </summary>
-        <div className="absolute top-full left-0 mt-2 w-[360px] max-h-[70vh] overflow-y-auto bg-lmu-card border border-lmu-border rounded-xl p-4 text-xs shadow-lg z-50">
+        <div className={`absolute top-full left-0 mt-1 w-[360px] max-h-[70vh] overflow-y-auto custom-scrollbar text-xs z-50 ${DROPDOWN_PANEL} ${DROPDOWN_CONTENT_INSET}`}>
           <h2 className="font-semibold text-white mb-3">Replay information</h2>
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-lmu-text-soft">
             {eventTitle && <><dt className="text-lmu-muted">Event</dt><dd>{eventTitle}</dd></>}

@@ -4,6 +4,7 @@ import { ReplayInspectorHeader, type ReplayInspectorHeaderProps } from '../../..
 import { TELEMETRY_COLORS } from '../../../../src/utils/themeColors.js';
 import { DEFAULT_COMPARE_CONTROLS } from '../../../../src/components/replay/inspector/compare/compareLapControls.js';
 import type { ReplayTrajectoryData } from '../../../../shared/types/index.js';
+import { openSelect, selectedValue } from '../../../helpers/selectControl.js';
 
 vi.mock('../../../../src/components/replay/inspector/ReplayInspectorTitle.js', () => ({ ReplayInspectorTitle: () => null }));
 
@@ -34,7 +35,9 @@ describe('ReplayInspectorHeader', () => {
     expect(onSelectLap).toHaveBeenLastCalledWith(1);
     fireEvent.click(screen.getByTitle('Next Lap'));
     expect(onSelectLap).toHaveBeenLastCalledWith(7);
-    expect(screen.getByRole('option', { name: 'Lap 4 (101)' })).toBeInTheDocument();
+    openSelect(screen.getByRole('combobox', { name: 'Select Lap' }));
+    expect(screen.getByRole('option', { name: /^Lap 4 ?101$/ })).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole('combobox', { name: 'Select Lap' }), { key: 'Escape' });
     rerender(<ReplayInspectorHeader {...props} trajectory={{ ...trajectory, currentLap: 7 }} onSelectLap={onSelectLap} />);
     expect(screen.getByTitle('Next Lap')).toBeDisabled();
     rerender(<ReplayInspectorHeader {...props} trajectory={{ ...trajectory, currentLap: 1 }} onSelectLap={onSelectLap} />);
@@ -44,7 +47,7 @@ describe('ReplayInspectorHeader', () => {
   it('keeps long driver names available and matches the baseline trace color', () => {
     render(<ReplayInspectorHeader {...props} />);
     const select = screen.getByRole('combobox', { name: 'Select Driver' });
-    expect(select).toHaveValue('14');
+    expect(selectedValue(select)).toBe('14');
     expect(select).toHaveAttribute('title', `#14 ${props.drivers[0].name} (You)`);
     expect(screen.getByRole('button', { name: /vs\s*Compared Driver L3/ })).toHaveStyle({ color: TELEMETRY_COLORS.baseline });
   });

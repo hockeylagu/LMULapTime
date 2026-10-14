@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event';
 import { invalidateReferenceLaptimes } from '../../../src/api/referenceApi.js';
 import { TrackSummaries } from '../../../src/components/track-summaries/TrackSummaries.js';
 import { TrackSessionSummary } from '../../../shared/domain/trackSummaryUtils.js';
+import { chooseValue, openSelect } from '../../helpers/selectControl.js';
 
 const render = (ui: ReactNode) => renderComponent(ui, { wrapper: MemoryRouter });
 
@@ -101,9 +102,9 @@ describe('TrackSummaries component', () => {
     expect(setSelectedCarClass).toHaveBeenCalledWith('GT3');
 
     const sortSelect = screen.getByRole('combobox');
-    fireEvent.change(sortSelect, { target: { value: 'name-desc' } });
-    fireEvent.change(sortSelect, { target: { value: 'pace-asc' } });
-    fireEvent.change(sortSelect, { target: { value: 'last-session-desc' } });
+    chooseValue(sortSelect, 'name-desc');
+    chooseValue(sortSelect, 'pace-asc');
+    chooseValue(sortSelect, 'last-session-desc');
   });
 
   it('computes class-filtered summaries directly from sessions', async () => {
@@ -246,7 +247,8 @@ describe('TrackSummaries component', () => {
     render(<TrackSummaries sessions={mockSessions} onSelectTrack={vi.fn()} selectedCarClass="All" setSelectedCarClass={vi.fn()} />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Benchmark service is offline');
     expect(screen.getByRole('link', { name: 'View Monza records' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: 'Pace / Benchmark (Best First)' })).toBeDisabled();
+    openSelect(screen.getByRole('combobox'));
+    expect(screen.getByRole('option', { name: 'Pace / Benchmark (Best First)' })).toHaveAttribute('aria-disabled', 'true');
     await user.click(screen.getByRole('button', { name: 'Try again' }));
     await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
     await screen.findByRole('link', { name: 'Review benchmarks in Settings' });
@@ -260,9 +262,10 @@ describe('TrackSummaries component', () => {
       : Promise.resolve({ ok: true, json: () => Promise.resolve({}) }));
     render(<TrackSummaries sessions={mockSessions} onSelectTrack={vi.fn()} selectedCarClass="All" setSelectedCarClass={vi.fn()} />);
     expect(screen.getByRole('status')).toHaveTextContent('Loading benchmark targets');
-    expect(screen.getByRole('option', { name: 'Pace / Benchmark (Best First)' })).toBeDisabled();
+    openSelect(screen.getByRole('combobox'));
+    expect(screen.getByRole('option', { name: 'Pace / Benchmark (Best First)' })).toHaveAttribute('aria-disabled', 'true');
     finish?.({ ok: true, json: () => Promise.resolve({ entries: { monza: { trackName: 'Monza', carClass: 'GT3', targets: { alienSec: 100 } } } }) });
-    await waitFor(() => expect(screen.getByRole('option', { name: 'Pace / Benchmark (Best First)' })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Pace / Benchmark (Best First)' })).not.toHaveAttribute('aria-disabled'));
   });
 
   it('explains absent lap and sector data instead of presenting placeholders as records', async () => {

@@ -1,5 +1,6 @@
 import React from 'react';
 import { FOCUS_RING } from '../../../../common/buttonStyles.js';
+import { Select } from '../../../../common/dropdown/Select.js';
 
 export interface TelemetrySteerOverlayTogglesProps {
   scaleMode?: string;
@@ -23,12 +24,13 @@ export const TelemetrySteerOverlayToggles: React.FC<TelemetrySteerOverlayToggles
 }) => (
   <div className="absolute top-0.5 right-3 z-20 flex items-center bg-lmu-strip p-0.5 pointer-events-auto">
     {onScaleChange && (
-      <select aria-label="Steering scale" title="Steering vertical scale" value={scaleMode} onChange={(event) => onScaleChange(event.target.value)} className="bg-lmu-card text-lmu-muted text-[10px] font-mono px-1 py-0.5 rounded mr-1">
-        <option value="fit">Fit ±{fittedRange}%</option>
-        <option value="25">±25%</option>
-        <option value="50">±50%</option>
-        <option value="100">±100%</option>
-      </select>
+      <Select aria-label="Steering scale" title="Steering vertical scale" value={scaleMode} onChange={onScaleChange} size="compact" mono align="end"
+        className="mr-1" options={[
+          { value: 'fit', label: `Fit ±${fittedRange}%` },
+          { value: '25', label: '±25%' },
+          { value: '50', label: '±50%' },
+          { value: '100', label: '±100%' },
+        ]} />
     )}
     <button
       type="button"

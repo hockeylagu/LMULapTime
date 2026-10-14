@@ -1,10 +1,11 @@
-import React, { useRef } from 'react';
-import { MapPin, X, ChevronDown } from 'lucide-react';
+import React from 'react';
+import { MapPin, X } from 'lucide-react';
 import { VehicleClassPills } from '../common/VehicleClassPills.js';
 import { SessionTypePills } from '../common/SessionTypePills.js';
 import { HideEmptyToggle } from '../common/HideEmptyToggle.js';
 import { HasReplayToggle } from '../common/HasReplayToggle.js';
-import { SortDropdown } from '../common/SortDropdown.js';
+import { SortDropdown } from '../common/dropdown/SortDropdown.js';
+import { Select } from '../common/dropdown/Select.js';
 import { SessionFilterRows, SessionSearchField } from '../session-list/SessionFilterParts.js';
 import { DASHBOARD_SORT_OPTIONS } from './dashboardSortOptions.js';
 import type { DashboardSortOption } from './dashboardSortOptions.js';
@@ -57,15 +58,12 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
   viewToggle,
   onClearFilters,
 }) => {
-  const trackSelectRef = useRef<HTMLSelectElement>(null);
-
-  const handleOpenTrackSelect = () => {
-    try {
-      trackSelectRef.current?.showPicker();
-    } catch {
-      trackSelectRef.current?.focus();
-    }
-  };
+  const isNarrowed = Boolean(selectedTrack) && selectedTrack !== 'All';
+  // Venue and course as JSON, so two layouts of one venue never share a value.
+  const trackOptions = [
+    { value: 'All', label: `All Tracks (${tracks.length})` },
+    ...tracks.map((t) => ({ value: JSON.stringify([t.trackVenue, t.trackCourse]), label: t.track })),
+  ];
 
   return (
     <SessionFilterRows
@@ -74,43 +72,26 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
       find={
         <>
           <SessionSearchField value={searchQuery} onChange={setSearchQuery} placeholder="Search track, car, file..." />
-          <div className="h-9 w-[300px] inline-flex items-center gap-2 bg-lmu-bg border border-lmu-border rounded-xl px-3 text-xs text-white has-[select:focus-visible]:outline-2 has-[select:focus-visible]:outline-offset-2 has-[select:focus-visible]:outline-lmu-accent-text">
-            <MapPin className="w-3.5 h-3.5 text-lmu-muted shrink-0 pointer-events-none" />
-            <select
-              ref={trackSelectRef}
-              value={selectedTrack}
-              onChange={(e) => setSelectedTrack(e.target.value)}
-              className="flex-1 min-w-0 bg-transparent text-white font-semibold text-xs outline-none cursor-pointer truncate appearance-none"
+          <div className="relative w-[300px] shrink-0">
+            <Select
               aria-label="Filter by track"
-            >
-              <option value="All" className="bg-lmu-card text-white">
-                All Tracks ({tracks.length})
-              </option>
-              {tracks.map((t) => (
-                <option key={JSON.stringify([t.trackVenue, t.trackCourse])} value={JSON.stringify([t.trackVenue, t.trackCourse])} className="bg-lmu-card text-white">
-                  {t.track}
-                </option>
-              ))}
-            </select>
-            {selectedTrack && selectedTrack !== 'All' ? (
+              value={selectedTrack}
+              onChange={setSelectedTrack}
+              options={trackOptions}
+              icon={<MapPin aria-hidden="true" className="w-3.5 h-3.5 text-lmu-muted shrink-0" />}
+              size="filter"
+              className={`w-full ${isNarrowed ? 'pr-9' : ''}`}
+            />
+            {isNarrowed && (
               <button
                 type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedTrack('All');
-                }}
-                className={`text-lmu-muted hover:text-white p-0.5 rounded cursor-pointer shrink-0 transition-colors ${FOCUS_RING}`}
+                onClick={() => setSelectedTrack('All')}
+                className={`absolute right-2 top-1/2 -translate-y-1/2 text-lmu-muted hover:text-white p-0.5 rounded transition-colors ${FOCUS_RING}`}
                 title="Reset to All Tracks"
                 aria-label="Reset track filter"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
-            ) : (
-              <ChevronDown
-                className="w-3.5 h-3.5 text-lmu-muted cursor-pointer shrink-0"
-                aria-hidden="true"
-                onClick={handleOpenTrackSelect}
-              />
             )}
           </div>
         </>

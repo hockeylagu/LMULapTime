@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useId, useRef, useState } from 'react';
 import { MousePointer2, ZoomIn, Expand, Activity, ChevronLeft, ChevronRight } from 'lucide-react';
 import { TelemetryResolutionPopover } from './TelemetryResolutionPopover.js';
 import { TelemetryPreset } from './presets/telemetryPresets.js';
@@ -6,6 +6,7 @@ import { TelemetryPresetSelector } from './presets/TelemetryPresetSelector.js';
 import { DEFAULT_TELEMETRY_RESOLUTION, TelemetryResolution } from './telemetryResolution.js';
 import { ReplayShortcutHelp } from '../ReplayShortcutHelp.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
+import { useOutsidePress } from '../../common/dropdown/useAnchoredPanel.js';
 
 export interface TelemetryStripToolbarProps {
   interactionMode: 'scrub' | 'zoom';
@@ -71,6 +72,11 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
   onSelectSource,
 }) => {
   const [isResPopoverOpen, setIsResPopoverOpen] = useState<boolean>(false);
+  const resolutionRef = useRef<HTMLDivElement>(null);
+  const resolutionTriggerRef = useRef<HTMLButtonElement>(null);
+  const resolutionId = useId();
+  const closeResolution = useCallback(() => setIsResPopoverOpen(false), []);
+  useOutsidePress(isResPopoverOpen, [resolutionRef], closeResolution);
   const servedRate = source === 'duckdb' ? duckdbRawSampleRateHz : vcrRawSampleRateHz;
 
   const formatElapsed = (sec?: number): string => {
@@ -154,17 +160,27 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
 
         <ReplayShortcutHelp />
         {onChangeResolution && (
-          <div className="relative z-[70]">
+          <div ref={resolutionRef} className="relative z-[70]" onKeyDown={(event) => {
+            if (event.key !== 'Escape' || !isResPopoverOpen) return;
+            event.preventDefault();
+            event.stopPropagation();
+            closeResolution();
+            resolutionTriggerRef.current?.focus();
+          }}>
             <button
+              ref={resolutionTriggerRef}
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 setIsResPopoverOpen(prev => !prev);
               }}
-              className={`px-2 py-0.5 rounded flex items-center gap-1 font-mono text-[10px] cursor-pointer text-lmu-muted hover:text-white ${isResPopoverOpen ? 'bg-lmu-raised text-white' : ''} ${FOCUS_RING}`}
+              aria-haspopup="dialog"
+              aria-expanded={isResPopoverOpen}
+              aria-controls={resolutionId}
+              className={`px-2 py-0.5 rounded flex items-center gap-1 font-mono text-[10px] text-lmu-muted hover:text-white ${isResPopoverOpen ? 'bg-lmu-raised text-white' : ''} ${FOCUS_RING}`}
               title="Inspect replay telemetry resolution and configure recording fidelity"
             >
-              <Activity className="w-2.5 h-2.5 text-lmu-muted" />
+              <Activity aria-hidden="true" className="w-2.5 h-2.5 text-lmu-muted" />
               <span className="whitespace-nowrap">
                 <span className={source === 'duckdb' ? 'text-lmu-warn-soft' : 'text-lmu-muted'}>{servedRate ? `${servedRate}Hz` : 'Rate'}</span>{isFullResolution || telemetryResolution === 'full' ? ' • Full Raw' : ''}
               </span>
@@ -172,8 +188,9 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
 
             {isResPopoverOpen && (
               <TelemetryResolutionPopover
+                id={resolutionId}
                 isOpen={isResPopoverOpen}
-                onClose={() => setIsResPopoverOpen(false)}
+                onClose={() => { closeResolution(); resolutionTriggerRef.current?.focus(); }}
                 telemetryResolution={telemetryResolution ?? DEFAULT_TELEMETRY_RESOLUTION}
                 onChangeResolution={onChangeResolution ?? (() => {})}
                 pointsCount={pointsCount ?? 0}

@@ -47,6 +47,7 @@ File and folder size limits are ongoing checks; split only along meaningful resp
 
 | Record | Outcome | Historical completion |
 |---|---|---|
+| [Dropdown standardization](archive/DROPDOWN_STANDARDIZATION.md) | All 24 inventoried dropdowns and disclosures on one shared family (`common/dropdown/`): custom select-only `Select` replaces every native select; keyboard, typeahead, Escape layering and modal/fullscreen placement verified; tests/build clean | 2026-10-13 |
 | [Type refactoring](archive/TYPE_REFACTORING_PLAN.md) | One canonical type per model, one name and one place per fact in TypeScript, SQL and stored JSON; cache rewritten offline; follow-up fixes for driver selection, canonical package classes and server-side compare picker, chart history and Compare page bests | 2026-10-12 |
 | [Frontend simplification audit](archive/SRC_SIMPLIFICATION_AUDIT.md) | Ten fixes committed separately: direct imports, shared wheel rendering and modal focus, canonical progression type, fewer repeated calculations and requests, and removed forwarders; full tests/build passed | 2026-10-12 |
 | [Shared domain cleanup](archive/SHARED_DOMAIN_CLEANUP.md) | Eight audit findings fixed by Luna; independent review, 1,500-case parity, full tests/build and matching-dataset endpoint benchmarks passed | 2026-10-11 |

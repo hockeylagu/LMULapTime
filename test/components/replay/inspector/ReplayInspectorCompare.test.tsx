@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { ReplayInspectorModal } from '../../../../src/components/replay/inspector/ReplayInspectorContent.js';
+import { chooseValue } from '../../../helpers/selectControl.js';
 
 vi.mock('recharts', () => ({
   BarChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -102,7 +103,7 @@ describe('ReplayInspectorModal - Comparison & Source Modes', () => {
 
     // Change primary lap to Lap 3
     const primarySelect = screen.getByLabelText(/Select Lap/i) as HTMLSelectElement;
-    fireEvent.change(primarySelect, { target: { value: '3' } });
+    chooseValue(primarySelect, '3');
 
     // Baseline should still request Lap 2 and compare mode must remain active.
     await waitFor(() => {

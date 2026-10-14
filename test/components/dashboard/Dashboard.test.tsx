@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent, within } from '@testing-library/react';
 import { Dashboard } from '../../../src/components/dashboard/Dashboard.js';
 import { makeSessionCard } from '../../helpers/sessionCardFixture.js';
+import { chooseValue } from '../../helpers/selectControl.js';
 
 vi.mock('../../../src/components/track-detail/TrackCircuitLayout.js', () => ({ TrackCircuitLayout: () => null }));
 
@@ -177,7 +178,7 @@ describe('Dashboard component', () => {
     const comboboxes = screen.getAllByRole('combobox');
     const trackSelect = comboboxes[0];
     const spaIdentity = JSON.stringify(['Spa', '']);
-    fireEvent.change(trackSelect, { target: { value: spaIdentity } });
+    chooseValue(trackSelect, spaIdentity);
     expect(setSelectedTrack).toHaveBeenCalledWith(spaIdentity);
 
     const searchInput = screen.getByPlaceholderText(/search track, car, file/i);
@@ -225,10 +226,10 @@ describe('Dashboard component', () => {
     const comboboxes = screen.getAllByRole('combobox');
     const sortSelect = comboboxes[1];
 
-    fireEvent.change(sortSelect, { target: { value: 'date-asc' } });
-    fireEvent.change(sortSelect, { target: { value: 'pace-asc' } });
-    fireEvent.change(sortSelect, { target: { value: 'pace-desc' } });
-    fireEvent.change(sortSelect, { target: { value: 'date-desc' } });
+    chooseValue(sortSelect, 'date-asc');
+    chooseValue(sortSelect, 'pace-asc');
+    chooseValue(sortSelect, 'pace-desc');
+    chooseValue(sortSelect, 'date-desc');
   });
 
   it('expands and collapses Show More Circuits, Cars, and Benchmarks', () => {

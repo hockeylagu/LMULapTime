@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { GpsMapPlaybackStrip } from '../../../../../src/components/replay/map/telemetry/GpsMapPlaybackStrip.js';
 import { ReplayFullscreenControlsContext, type ReplayFullscreenControls } from '../../../../../src/components/replay/inspector/replayFullscreenControls.js';
+import { chooseValue } from '../../../../helpers/selectControl.js';
 
 const controls = (onChangeSpeed = vi.fn()): ReplayFullscreenControls => ({
   primary: { laps: [], lapNumber: 1, onSelect: vi.fn(), isLoading: false, onRetry: vi.fn() },
@@ -18,7 +19,7 @@ describe('fullscreen playback strip', () => {
     </ReplayFullscreenControlsContext.Provider>);
     fireEvent.click(screen.getByRole('button', { name: 'Play' }));
     expect(onTogglePlay).toHaveBeenCalledTimes(1);
-    fireEvent.change(screen.getByRole('combobox', { name: 'Playback speed' }), { target: { value: '2' } });
+    chooseValue(screen.getByRole('combobox', { name: 'Playback speed' }), '2');
     expect(onChangeSpeed).toHaveBeenCalledWith(2);
     expect(screen.getByText('0:42.315')).toBeInTheDocument();
     expect(screen.getByText('1,234 m')).toBeInTheDocument();

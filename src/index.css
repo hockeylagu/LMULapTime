@@ -20,7 +20,7 @@
 }
 
 @layer base {
-  /* Native scrollbars, select popups and form controls render dark, like the app */
+  /* Native scrollbars and form controls render dark, like the app */
   :root {
     color-scheme: dark;
   }

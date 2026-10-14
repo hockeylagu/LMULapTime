@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { TrackSessionsToolbar } from '../../../src/components/track-detail/TrackSessionsToolbar';
+import { chooseValue } from '../../helpers/selectControl.js';
 
 describe('TrackSessionsToolbar', () => {
   it('renders all controls and handles interactions', () => {
@@ -50,7 +51,7 @@ describe('TrackSessionsToolbar', () => {
 
     // Sort dropdown
     const sortSelect = screen.getByRole('combobox');
-    fireEvent.change(sortSelect, { target: { value: 'lap-asc' } });
+    chooseValue(sortSelect, 'lap-asc');
     expect(setSortBy).toHaveBeenCalledWith('lap-asc');
   });
 });

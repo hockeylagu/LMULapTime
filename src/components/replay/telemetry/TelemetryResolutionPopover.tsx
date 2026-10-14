@@ -1,9 +1,11 @@
-import React, { useRef, useEffect } from 'react';
+import React from 'react';
 import { Activity, Zap, Cpu, Sparkles, X, Info, Film } from 'lucide-react';
 import { TELEMETRY_POINT_SPACING_M, TelemetryResolution } from './telemetryResolution.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
+import { DROPDOWN_PANEL } from '../../common/dropdown/dropdownStyles.js';
 
 export interface TelemetryResolutionPopoverProps {
+  id?: string;
   isOpen: boolean;
   onClose: () => void;
   telemetryResolution: TelemetryResolution;
@@ -40,21 +42,9 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
   duckdbFilename,
   hasDuckDb,
   duckdbUnavailableReason,
+  id,
   onSelectSource,
 }) => {
-  const popoverRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen, onClose]);
-
   if (!isOpen) return null;
 
   const hasSourceSelector = Boolean((hasDuckDb || duckdbFilename) && onSelectSource);
@@ -68,10 +58,10 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
 
   return (
     <div
-      ref={popoverRef}
+      id={id}
       role="dialog"
       aria-label="Telemetry resolution"
-      className="absolute top-9 right-0 z-[100] w-80 sm:w-96 p-4 rounded-xl bg-lmu-card border border-lmu-border shadow-2xl text-xs font-sans space-y-3 animate-pop-in"
+      className={`absolute top-full right-0 mt-1 z-[100] w-80 sm:w-96 p-4 text-xs font-sans space-y-3 ${DROPDOWN_PANEL}`}
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex items-center justify-between border-b border-lmu-border/60 pb-2">

@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { ReplayCompareLapPicker, type ReplayCompareLapPickerProps } from '../../../../../src/components/replay/inspector/compare/ReplayCompareLapPicker.js';
 import { DEFAULT_COMPARE_CONTROLS } from '../../../../../src/components/replay/inspector/compare/compareLapControls.js';
 import { ComparableLap } from '../../../../../shared/types/index.js';
+import { chooseValue, openSelect, selectedValue } from '../../../../helpers/selectControl.js';
 
 const mockLaps: ComparableLap[] = [
   {
@@ -171,38 +172,40 @@ describe('ReplayCompareLapPicker', () => {
 
   it('lists the car types of the whole scope, not only those on the page', () => {
     renderPicker({ laps: [mockLaps[0]] });
+    openSelect(screen.getByRole('combobox', { name: 'Filter by car' }));
     expect(screen.getByRole('option', { name: 'Lexus RCF LMGT3' })).toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'Ferrari 296 LMGT3' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: '🏎️ BMW M4 LMGT3 (Current)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'BMW M4 LMGT3 (Current)' })).toBeInTheDocument();
   });
 
   it('keeps a selected car listed when the scope no longer contains it', () => {
     renderPicker({ carTypes: ['BMW M4 LMGT3'], controls: { ...DEFAULT_COMPARE_CONTROLS, carType: 'Lexus RCF LMGT3' } });
-    expect(screen.getByRole('combobox', { name: 'Filter by car' })).toHaveValue('Lexus RCF LMGT3');
+    expect(selectedValue(screen.getByRole('combobox', { name: 'Filter by car' }))).toBe('Lexus RCF LMGT3');
   });
 
   it('reports the order and each filter to the server-backed controls', () => {
     const onChangeControls = vi.fn();
     renderPicker({ onChangeControls });
-    fireEvent.change(screen.getByRole('combobox', { name: 'Order comparison laps' }), { target: { value: 'recent' } });
+    chooseValue(screen.getByRole('combobox', { name: 'Order comparison laps' }), 'recent');
     expect(onChangeControls).toHaveBeenLastCalledWith({ ...DEFAULT_COMPARE_CONTROLS, sort: 'recent' });
-    fireEvent.change(screen.getByRole('combobox', { name: 'Filter by car' }), { target: { value: 'Ferrari 296 LMGT3' } });
+    chooseValue(screen.getByRole('combobox', { name: 'Filter by car' }), 'Ferrari 296 LMGT3');
     expect(onChangeControls).toHaveBeenLastCalledWith({ ...DEFAULT_COMPARE_CONTROLS, carType: 'Ferrari 296 LMGT3' });
-    fireEvent.change(screen.getByRole('combobox', { name: 'Filter by race type' }), { target: { value: 'race' } });
+    chooseValue(screen.getByRole('combobox', { name: 'Filter by race type' }), 'race');
     expect(onChangeControls).toHaveBeenLastCalledWith({ ...DEFAULT_COMPARE_CONTROLS, sessionKind: 'race' });
-    fireEvent.change(screen.getByRole('combobox', { name: 'Filter by condition' }), { target: { value: 'Wet' } });
+    chooseValue(screen.getByRole('combobox', { name: 'Filter by condition' }), 'Wet');
     expect(onChangeControls).toHaveBeenLastCalledWith({ ...DEFAULT_COMPARE_CONTROLS, condition: 'Wet' });
   });
 
   it('shows the controls it is given', () => {
     renderPicker({ controls: { sort: 'driver', carType: 'BMW M4 LMGT3', sessionKind: 'quali', condition: 'all' } });
-    expect(screen.getByRole('combobox', { name: 'Order comparison laps' })).toHaveValue('driver');
-    expect(screen.getByRole('combobox', { name: 'Filter by race type' })).toHaveValue('quali');
-    expect(screen.getByRole('combobox', { name: 'Filter by condition' })).toHaveValue('all');
+    expect(selectedValue(screen.getByRole('combobox', { name: 'Order comparison laps' }))).toBe('driver');
+    expect(selectedValue(screen.getByRole('combobox', { name: 'Filter by race type' }))).toBe('quali');
+    expect(selectedValue(screen.getByRole('combobox', { name: 'Filter by condition' }))).toBe('all');
   });
 
   it('names the current condition in the Same condition option', () => {
     const { rerender } = renderPicker({ currentWeatherCondition: 'Wet' });
+    openSelect(screen.getByRole('combobox', { name: 'Filter by condition' }));
     expect(screen.getByRole('option', { name: 'Same condition (Wet)' })).toBeInTheDocument();
     rerender(<ReplayCompareLapPicker {...baseProps} currentWeatherCondition="Dynamic Weather" />);
     expect(screen.getByRole('option', { name: 'Same condition (Dynamic Weather)' })).toBeInTheDocument();
@@ -211,6 +214,7 @@ describe('ReplayCompareLapPicker', () => {
   it('reads the current condition from the current lap, and not from another driver or lap', () => {
     const wet = { ...mockLaps[1], weatherCondition: 'Wet' as const };
     const { rerender } = renderPicker({ laps: [wet] });
+    openSelect(screen.getByRole('combobox', { name: 'Filter by condition' }));
     expect(screen.getByRole('option', { name: 'Same condition (Wet)' })).toBeInTheDocument();
     rerender(<ReplayCompareLapPicker {...baseProps} laps={[wet]} currentDriverName="Different Driver" currentLapNumber={9} />);
     expect(screen.getByRole('option', { name: /^Same condition$/ })).toBeInTheDocument();
@@ -218,10 +222,12 @@ describe('ReplayCompareLapPicker', () => {
 
   it('indicates the current and explicitly provided race type and car', () => {
     const { rerender } = renderPicker({ currentLapNumber: 2 });
-    expect(screen.getByRole('option', { name: '🏁 Quali (Current)' })).toBeInTheDocument();
+    openSelect(screen.getByRole('combobox', { name: 'Filter by race type' }));
+    expect(screen.getByRole('option', { name: 'Quali (Current)' })).toBeInTheDocument();
     rerender(<ReplayCompareLapPicker {...baseProps} currentCarType="Ferrari 296 LMGT3" currentRaceType="race" />);
-    expect(screen.getByRole('option', { name: '🏎️ Ferrari 296 LMGT3 (Current)' })).toBeInTheDocument();
-    expect(screen.getByRole('option', { name: '🏁 Race (Current)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Race (Current)' })).toBeInTheDocument();
+    openSelect(screen.getByRole('combobox', { name: 'Filter by car' }));
+    expect(screen.getByRole('option', { name: 'Ferrari 296 LMGT3 (Current)' })).toBeInTheDocument();
   });
 
   it('displays a loading spinner', () => {

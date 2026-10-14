@@ -1,7 +1,7 @@
 import React from 'react';
 import { Flag } from 'lucide-react';
 import { VehicleClassPills } from '../common/VehicleClassPills.js';
-import { SortDropdown } from '../common/SortDropdown.js';
+import { SortDropdown } from '../common/dropdown/SortDropdown.js';
 import { TRACK_SORT_OPTIONS } from './tracksSortOptions.js';
 import type { TracksSortOption } from './tracksSortOptions.js';
 

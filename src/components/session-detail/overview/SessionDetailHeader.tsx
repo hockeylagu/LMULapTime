@@ -12,6 +12,7 @@ import { sessionLapComparePath } from '../sessionDetailHelpers.js';
 import { TrackCircuitLayout } from '../../track-detail/TrackCircuitLayout.js';
 import { SessionConditions, hasSessionConditions } from './SessionConditions.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
+import { Select } from '../../common/dropdown/Select.js';
 import { linkClickHandler } from '../../../utils/linkClick.js';
 import { sessionTelemetryPath } from '../sessionDetailHelpers.js';
 
@@ -181,22 +182,21 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
                   Rules & Config
                 </button>
               )}
-              <label className="inline-flex items-center gap-2 h-8 pl-3 pr-1 rounded-lg bg-lmu-bg border border-lmu-border hover:border-lmu-rule focus-within:border-lmu-accent transition-colors shrink-0 has-[select:focus-visible]:outline-2 has-[select:focus-visible]:outline-offset-2 has-[select:focus-visible]:outline-lmu-accent-text">
-                <span className="text-[10px] font-semibold text-lmu-muted uppercase tracking-wider shrink-0">Driver</span>
-                <select
-                  value={selectedDriverOrdinal === null ? '' : String(selectedDriverOrdinal)}
-                  onChange={(e) => setSelectedDriverOrdinal(e.target.value === '' ? null : Number(e.target.value))}
-                  className="h-full bg-transparent pr-1 text-sm text-white font-semibold outline-none cursor-pointer"
-                >
-                  <option value="" className="bg-lmu-card text-lmu-muted">Select a driver</option>
-                  {(session.drivers || []).map((d) => (
-                    <option key={d.driverOrdinal} value={String(d.driverOrdinal)} className="bg-lmu-card text-white">
-                      {d.isPlayer ? '⭐ ' : ''}
-                      {d.name} ({d.carType})
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <Select
+                aria-label="Driver"
+                caption="Driver"
+                value={selectedDriverOrdinal === null ? '' : String(selectedDriverOrdinal)}
+                onChange={(value) => setSelectedDriverOrdinal(value === '' ? null : Number(value))}
+                options={[
+                  { value: '', label: 'Select a driver' },
+                  ...(session.drivers || []).map((d) => ({
+                    value: String(d.driverOrdinal),
+                    label: `${d.name} (${d.carType})${d.isPlayer ? ' · You' : ''}`,
+                  })),
+                ]}
+                className="max-w-[320px] shrink-0"
+                align="end"
+              />
             </div>
           </div>
 

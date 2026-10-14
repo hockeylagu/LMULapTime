@@ -1,6 +1,6 @@
 import React from 'react';
 import type { CompareLapPagination } from './compare/CompareLapPagination.js';
-import { X, Play, Pause, RotateCcw, Flag, ArrowLeftRight, Users, ChevronDown, LoaderCircle } from 'lucide-react';
+import { X, Play, Pause, RotateCcw, Flag, ArrowLeftRight, Users, ChevronLeft, ChevronRight, LoaderCircle } from 'lucide-react';
 import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ComparableLap } from '../../../../shared/types/index.js';
 import { CompareLapFilter, ReplayCompareLapPicker } from './compare/ReplayCompareLapPicker.js';
 import type { CompareLapControls } from './compare/compareLapControls.js';
@@ -9,6 +9,11 @@ import { ReplayInspectorTitle } from './ReplayInspectorTitle.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 import { PLAYBACK_SPEEDS } from './replayFullscreenControls.js';
+import { Select } from '../../common/dropdown/Select.js';
+
+/** Previous/next lap: square companions of the lap dropdown, in its well and hairline. */
+const LAP_STEP_BUTTON =
+  'w-8 h-8 flex items-center justify-center rounded-lg border border-lmu-border bg-lmu-bg text-lmu-muted hover:text-white hover:border-lmu-rule hover:bg-lmu-card disabled:text-lmu-faint disabled:hover:text-lmu-faint disabled:hover:bg-lmu-bg disabled:hover:border-lmu-border transition-colors';
 
 export interface ReplayInspectorHeaderProps {
   onClose: () => void;
@@ -82,60 +87,57 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
 
       {/* Center: Driver Selector, Lap Selector & Live State */}
       <div className="flex items-center gap-2 justify-self-center min-w-0">
-          <label aria-busy={isPrimaryBusy} className="relative flex h-8 items-center gap-2 pl-2.5 rounded-lg bg-lmu-bg border border-lmu-border hover:border-lmu-rule-strong transition-colors w-[220px] shrink-0 has-[select:focus-visible]:outline-2 has-[select:focus-visible]:outline-offset-2 has-[select:focus-visible]:outline-lmu-accent-text has-[select:disabled]:text-lmu-faint">
-            {isPrimaryBusy ? <LoaderCircle aria-hidden="true" className="w-3.5 h-3.5 text-lmu-muted animate-spin shrink-0" /> : <Users aria-hidden="true" className="w-3.5 h-3.5 text-lmu-accent-text shrink-0" />}
-            <select
-              aria-label="Select Driver"
-              title={driverLabel || (isLoading ? 'Loading drivers…' : 'No drivers available')}
-              disabled={isPrimaryBusy || drivers.length === 0}
-              value={selectedDriverSlot ?? ''}
-              onChange={e => onSelectDriver(parseInt(e.target.value, 10))}
-              className="appearance-none bg-transparent text-xs font-semibold text-white outline-none cursor-pointer min-w-0 w-full h-full pr-7 truncate disabled:cursor-wait"
-            >
-              {selectedDriverSlot === null && <option value="" disabled>{isLoading ? 'Loading drivers…' : drivers.length ? 'Select driver' : 'No drivers available'}</option>}
-              {drivers.filter(driver => typeof driver.slot === 'number').map(driver => (
-                <option key={driver.slot} value={driver.slot} className="bg-lmu-bg text-white">
-                  {driver.carNumber ? `#${driver.carNumber} ` : ''}{driver.name}{driver.isPlayer ? ' (You)' : ''}
-                </option>
-              ))}
-            </select>
-            <ChevronDown aria-hidden="true" className="absolute right-2.5 w-3.5 h-3.5 text-lmu-muted pointer-events-none" />
-          </label>
+          <Select<number>
+            aria-label="Select Driver"
+            title={driverLabel || (isLoading ? 'Loading drivers…' : 'No drivers available')}
+            disabled={isPrimaryBusy || drivers.length === 0}
+            busy={isPrimaryBusy}
+            value={selectedDriverSlot}
+            onChange={onSelectDriver}
+            placeholder={isLoading ? 'Loading drivers…' : drivers.length ? 'Select driver' : 'No drivers available'}
+            icon={<Users aria-hidden="true" className="w-3.5 h-3.5 text-lmu-accent-text shrink-0" />}
+            options={drivers.flatMap(driver => typeof driver.slot === 'number' ? [{
+              value: driver.slot,
+              label: `${driver.carNumber ? `#${driver.carNumber} ` : ''}${driver.name}${driver.isPlayer ? ' (You)' : ''}`,
+            }] : [])}
+            className="w-[220px] shrink-0"
+          />
 
         {trajectory?.laps && trajectory.laps.length > 0 && (
-          <div className="flex items-center gap-1 bg-lmu-card border border-lmu-border rounded-xl px-2 py-0.5 has-[select:focus-visible]:outline-2 has-[select:focus-visible]:outline-offset-2 has-[select:focus-visible]:outline-lmu-accent-text">
-            <span className="hidden lg:flex items-center gap-1 text-[11px] text-lmu-muted">
-              <Flag className="w-3 h-3 text-lmu-accent-text" />
-              Lap:
-            </span>
+          <div role="group" aria-label="Lap" className="flex items-center gap-1">
             <button
+              type="button"
               onClick={() => previousLap && onSelectLap(previousLap.lapNumber)}
               disabled={isPrimaryBusy || !previousLap}
-              className={`w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-lmu-muted hover:text-white disabled:text-lmu-faint disabled:hover:text-lmu-faint disabled:hover:bg-transparent disabled:cursor-not-allowed text-xs font-bold transition-colors cursor-pointer ${FOCUS_RING}`}
+              className={`${LAP_STEP_BUTTON} ${FOCUS_RING}`}
               title="Previous Lap"
+              aria-label="Previous Lap"
             >
-              ‹
+              <ChevronLeft aria-hidden="true" className="w-3.5 h-3.5" />
             </button>
-            <select
+            <Select<number>
               aria-label="Select Lap"
               disabled={isPrimaryBusy}
               value={trajectory.currentLap ?? 1}
-              onChange={e => onSelectLap(parseInt(e.target.value, 10))}
-              className="bg-transparent text-xs text-white font-bold outline-none cursor-pointer max-w-[140px] sm:max-w-[200px] truncate py-0.5"
-            >
-              {trajectory.laps.map(l => (
-                <option key={l.lapNumber} value={l.lapNumber} className="bg-lmu-bg text-white">
-                  Lap {l.lapNumber} ({formatLapTime(l.lapTimeSec)}){l.isBest ? ' ★' : l.isOutLap ? ' • Out' : ''}
-                </option>
-              ))}
-            </select>
+              onChange={onSelectLap}
+              icon={<Flag aria-hidden="true" className="w-3 h-3 text-lmu-accent-text shrink-0" />}
+              options={trajectory.laps.map(l => ({
+                value: l.lapNumber,
+                label: `Lap ${l.lapNumber}${l.isBest ? ' · Best' : l.isOutLap ? ' · Out' : ''}`,
+                detail: formatLapTime(l.lapTimeSec),
+              }))}
+              renderValue={option => option && <>{option.label} <span className="font-mono text-lmu-text-soft">{option.detail}</span></>}
+              className="max-w-[240px]"
+            />
             <button
+              type="button"
               onClick={() => nextLap && onSelectLap(nextLap.lapNumber)}
               disabled={isPrimaryBusy || !nextLap}
-              className={`w-6 h-6 flex items-center justify-center rounded hover:bg-white/10 text-lmu-muted hover:text-white disabled:text-lmu-faint disabled:hover:text-lmu-faint disabled:hover:bg-transparent disabled:cursor-not-allowed text-xs font-bold transition-colors cursor-pointer ${FOCUS_RING}`}
+              className={`${LAP_STEP_BUTTON} ${FOCUS_RING}`}
               title="Next Lap"
+              aria-label="Next Lap"
             >
-              ›
+              <ChevronRight aria-hidden="true" className="w-3.5 h-3.5" />
             </button>
           </div>
         )}
@@ -242,14 +244,14 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
           <span className="hidden sm:inline">{isPlaying ? 'Pause' : 'Play'}</span>
         </button>
 
-        <select
+        <Select<number>
           aria-label="Playback speed"
           value={playbackSpeed}
-          onChange={event => onSelectPlaybackSpeed(Number(event.target.value))}
-          className="h-8 px-2 rounded-lg bg-lmu-card border border-lmu-border text-[11px] font-mono text-white cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
-        >
-          {PLAYBACK_SPEEDS.map(speed => <option key={speed} value={speed}>{speed}×</option>)}
-        </select>
+          onChange={onSelectPlaybackSpeed}
+          options={PLAYBACK_SPEEDS.map(speed => ({ value: speed, label: `${speed}×` }))}
+          mono
+          align="end"
+        />
       </div>
     </header>
   );

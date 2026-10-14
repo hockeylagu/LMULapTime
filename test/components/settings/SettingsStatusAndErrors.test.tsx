@@ -5,6 +5,7 @@ import { ReferenceLaptimesCard } from '../../../src/components/settings/Referenc
 import { AiReportsHistoryCard } from '../../../src/components/settings/AiReportsHistoryCard.js';
 import { SETTINGS_SECTIONS } from '../../../src/components/settings/settingsSections.js';
 import type { AppStatus, BenchmarkDiffSummary } from '../../../shared/types/index.js';
+import { chooseValue, openSelect } from '../../helpers/selectControl.js';
 
 const status: AppStatus = {
   resultsDir: 'C:\\LMU\\Results',
@@ -122,7 +123,8 @@ describe('Error surfacing', () => {
     fireEvent.click(await screen.findByRole('button', { name: /update history/i }));
     const select = await screen.findByRole('combobox', { name: 'Show update' });
     expect(select).not.toHaveAttribute('aria-label');
-    expect(within(select).getByRole('option', { name: / — 3 changed, 5 pace shifts$/ })).toBeInTheDocument();
+    openSelect(select);
+    expect(screen.getByRole('option', { name: / — 3 changed, 5 pace shifts$/ })).toBeInTheDocument();
   });
 
   it('shows a failed diff load inline and does not leave the old diff under the new selection', async () => {
@@ -139,7 +141,7 @@ describe('Error surfacing', () => {
     fireEvent.click(await screen.findByRole('button', { name: /update history/i }));
     expect(await screen.findByText('Latest Ring')).toBeInTheDocument();
 
-    fireEvent.change(await screen.findByRole('combobox', { name: 'Show update' }), { target: { value: '9' } });
+    chooseValue(await screen.findByRole('combobox', { name: 'Show update' }), '9');
     expect(await screen.findByText('Snapshot 9 is missing')).toHaveClass('text-lmu-loss');
     expect(screen.queryByText('Latest Ring')).not.toBeInTheDocument();
   });

@@ -1,5 +1,6 @@
 import React from 'react';
 import { TrendingUp, Calendar } from 'lucide-react';
+import { Select } from '../../common/dropdown/Select.js';
 export type TimeRangeFilter = 'all' | 'last-5' | 'last-10' | 'last-20' | 'week' | 'month' | 'year';
 
 export type ImprovementMetric = 'bestLap' | 'sectors' | 'bestPr' | 'consistency';
@@ -34,28 +35,27 @@ export const ImprovementChartControls: React.FC<ImprovementChartControlsProps> =
 
       <div className="flex flex-wrap items-center gap-3">
         {/* Range & Session Count Selector */}
-        <div className="flex items-center gap-1.5 bg-lmu-bg border border-lmu-border rounded-xl px-3 py-1.5 text-xs text-white shrink-0">
-          <Calendar className="w-3.5 h-3.5 text-lmu-muted" />
-          <span className="text-lmu-muted font-medium">History:</span>
-          <select
-            aria-label="Progression history"
-            value={activeRange}
-            onChange={(e) => setRange(e.target.value as TimeRangeFilter)}
-            className="bg-transparent text-white font-semibold cursor-pointer rounded-sm focus-visible:outline-2 focus-visible:outline-lmu-accent-text focus-visible:outline-offset-2"
-          >
-            <optgroup label="Session Count" className="bg-lmu-card text-white font-semibold">
-              <option value="all" className="bg-lmu-card text-white">All Sessions ({totalSessionsCount})</option>
-              <option value="last-5" className="bg-lmu-card text-white">Last 5 Sessions</option>
-              <option value="last-10" className="bg-lmu-card text-white">Last 10 Sessions</option>
-              <option value="last-20" className="bg-lmu-card text-white">Last 20 Sessions</option>
-            </optgroup>
-            <optgroup label="Date Range" className="bg-lmu-card text-white font-semibold">
-              <option value="week" className="bg-lmu-card text-white">Last Week (7 Days)</option>
-              <option value="month" className="bg-lmu-card text-white">Last Month (30 Days)</option>
-              <option value="year" className="bg-lmu-card text-white">Last Year (365 Days)</option>
-            </optgroup>
-          </select>
-        </div>
+        <Select<TimeRangeFilter>
+          aria-label="Progression history"
+          value={activeRange}
+          onChange={setRange}
+          icon={<Calendar aria-hidden="true" className="w-3.5 h-3.5 shrink-0 text-lmu-muted" />}
+          caption="History:"
+          className="shrink-0"
+          options={[
+            { group: 'Session Count', options: [
+              { value: 'all', label: `All Sessions (${totalSessionsCount})` },
+              { value: 'last-5', label: 'Last 5 Sessions' },
+              { value: 'last-10', label: 'Last 10 Sessions' },
+              { value: 'last-20', label: 'Last 20 Sessions' },
+            ] },
+            { group: 'Date Range', options: [
+              { value: 'week', label: 'Last Week (7 Days)' },
+              { value: 'month', label: 'Last Month (30 Days)' },
+              { value: 'year', label: 'Last Year (365 Days)' },
+            ] },
+          ]}
+        />
 
         {/* Metric Toggle */}
         <div className="flex items-center bg-lmu-bg p-1 rounded-xl border border-lmu-border text-xs font-medium flex-wrap">

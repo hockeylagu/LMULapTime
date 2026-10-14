@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ReferenceLaptimesCard } from '../../../src/components/settings/ReferenceLaptimesCard.js';
 import type { AppStatus, ReferenceBenchmarkDiff, BenchmarkDiffSummary } from '../../../shared/types/index.js';
+import { chooseValue } from '../../helpers/selectControl.js';
 
 describe('ReferenceLaptimesCard component', () => {
   const mockStatus: AppStatus = {
@@ -197,7 +198,7 @@ describe('ReferenceLaptimesCard component', () => {
     renderCard();
     const select = await openHistory();
 
-    fireEvent.change(select, { target: { value: '9' } });
+    chooseValue(select, '9');
 
     await waitFor(() => {
       expect(screen.getByText('Spa-Francorchamps')).toBeInTheDocument();

@@ -8,6 +8,7 @@ import { ReplayCompareLapRow, REPLAY_COMPARE_COLUMNS } from './ReplayCompareLapR
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 import { CompareLapPaginationControls, type CompareLapPagination } from './CompareLapPagination.js';
 import { useModalFocus } from '../../../common/useModalFocus.js';
+import { Select } from '../../../common/dropdown/Select.js';
 
 export type CompareLapFilter = 'same-session-lap' | 'player' | 'same-sessions' | 'all';
 
@@ -35,6 +36,12 @@ export interface ReplayCompareLapPickerProps {
   onClose: () => void;
   onSelectLap: (lap: ComparableLap) => void;
 }
+
+const SESSION_KIND_OPTIONS: ReadonlyArray<{ value: SessionKind; label: string }> = [
+  { value: 'practice', label: 'Practice' },
+  { value: 'quali', label: 'Quali' },
+  { value: 'race', label: 'Race' },
+];
 
 const FILTER_OPTIONS: Array<{ key: CompareLapFilter; label: string; title: string }> = [
   { key: 'same-session-lap', label: 'Same Session Lap', title: 'Laps from the current session for the player' },
@@ -127,59 +134,56 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
               </div>
 
               {/* Car Filter with Current Car Badge in Dropdown */}
-              <select
+              <Select
                 aria-label="Filter by car"
-                value={controls.carType}
-                onChange={event => change({ carType: event.target.value })}
-                className="bg-lmu-bg border border-lmu-border rounded-md px-2.5 py-1 text-xs font-bold text-white max-w-[190px] truncate"
                 title="Filter by car"
-              >
-                <option value="all">All Cars</option>
-                {carOptions.map(car => (
-                  <option key={car} value={car}>
-                    {car === currentCar ? `🏎️ ${car} (Current)` : car}
-                  </option>
-                ))}
-              </select>
+                value={controls.carType}
+                onChange={carType => change({ carType })}
+                options={[
+                  { value: 'all', label: 'All Cars' },
+                  ...carOptions.map(car => ({ value: car, label: car === currentCar ? `${car} (Current)` : car })),
+                ]}
+                className="max-w-[220px]"
+              />
 
               {/* Race Type Filter with Current Race Type Badge in Dropdown */}
-              <select
+              <Select<SessionKind | 'all'>
                 aria-label="Filter by race type"
-                value={controls.sessionKind}
-                onChange={event => change({ sessionKind: event.target.value as SessionKind | 'all' })}
-                className="bg-lmu-bg border border-lmu-border rounded-md px-2.5 py-1 text-xs font-bold text-white"
                 title="Filter by race type"
-              >
-                <option value="all">All Types</option>
-                <option value="practice">{currentRace === 'practice' ? '🏁 Practice (Current)' : 'Practice'}</option>
-                <option value="quali">{currentRace === 'quali' ? '🏁 Quali (Current)' : 'Quali'}</option>
-                <option value="race">{currentRace === 'race' ? '🏁 Race (Current)' : 'Race'}</option>
-              </select>
-              <select
+                value={controls.sessionKind}
+                onChange={sessionKind => change({ sessionKind })}
+                options={[
+                  { value: 'all', label: 'All Types' },
+                  ...SESSION_KIND_OPTIONS.map(option => ({ value: option.value, label: currentRace === option.value ? `${option.label} (Current)` : option.label })),
+                ]}
+              />
+              <Select<CompareLapControls['condition']>
                 aria-label="Filter by condition"
                 value={controls.condition}
-                onChange={event => change({ condition: event.target.value as CompareLapControls['condition'] })}
-                className="bg-lmu-bg border border-lmu-border rounded-md px-2.5 py-1 text-xs font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text"
-              >
-                <option value="same">Same condition{currentCondition ? ` (${currentCondition})` : ''}</option>
-                <option value="all">All conditions</option>
-                <option value="Dry">Dry</option>
-                <option value="Wet">Wet</option>
-                <option value="Dynamic Weather">Dynamic weather</option>
-              </select>
+                onChange={condition => change({ condition })}
+                options={[
+                  { value: 'same', label: `Same condition${currentCondition ? ` (${currentCondition})` : ''}` },
+                  { value: 'all', label: 'All conditions' },
+                  { value: 'Dry', label: 'Dry' },
+                  { value: 'Wet', label: 'Wet' },
+                  { value: 'Dynamic Weather', label: 'Dynamic weather' },
+                ]}
+              />
             </div>
 
             {/* Sort Order */}
-            <select
+            <Select<CompareLapControls['sort']>
               aria-label="Order comparison laps"
               value={controls.sort}
-              onChange={event => change({ sort: event.target.value as CompareLapControls['sort'] })}
-              className="bg-lmu-bg border border-lmu-border rounded-md px-2.5 py-1 text-xs font-bold text-white shrink-0"
-            >
-              <option value="lap">Best Lap</option>
-              <option value="recent">Most recent</option>
-              <option value="driver">Driver</option>
-            </select>
+              onChange={sort => change({ sort })}
+              options={[
+                { value: 'lap', label: 'Best Lap' },
+                { value: 'recent', label: 'Most recent' },
+                { value: 'driver', label: 'Driver' },
+              ]}
+              className="shrink-0"
+              align="end"
+            />
           </div>
         </div>
 

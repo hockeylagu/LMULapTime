@@ -3,6 +3,7 @@ import { Pause, Play } from 'lucide-react';
 import { formatTime } from '../../../../../shared/domain/formatters.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 import { ReplayFullscreenControlsContext } from '../../inspector/replayFullscreenControls.js';
+import { Select } from '../../../common/dropdown/Select.js';
 
 interface Props {
   isPlaying?: boolean;
@@ -20,10 +21,8 @@ export function GpsMapPlaybackStrip({ isPlaying = false, onTogglePlay, elapsedSe
       className={`inline-flex h-7 w-7 items-center justify-center rounded bg-lmu-raised text-lmu-text hover:bg-lmu-raised/80 ${FOCUS_RING}`}>
       {isPlaying ? <Pause size={13} /> : <Play size={13} />}
     </button>}
-    {playback && <select aria-label="Playback speed" value={playback.speed} onChange={event => playback.onChangeSpeed(Number(event.target.value))}
-      className={`h-7 rounded bg-lmu-raised px-1.5 font-mono text-[11px] text-lmu-text ${FOCUS_RING}`}>
-      {playback.speeds.map(speed => <option key={speed} value={speed}>{speed}×</option>)}
-    </select>}
+    {playback && <Select<number> aria-label="Playback speed" value={playback.speed} onChange={playback.onChangeSpeed} mono
+      options={playback.speeds.map(speed => ({ value: speed, label: `${speed}×` }))} />}
     <span className="font-mono text-xs tabular-nums text-lmu-text" title="Lap time at the cursor">
       {elapsedSec > 0 ? formatTime(elapsedSec) : '0:00.000'}
     </span>

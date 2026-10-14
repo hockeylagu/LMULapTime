@@ -272,7 +272,7 @@ Telemetry, map, wheel-corner and pace-category colors used by charts and SVG are
 
   Every tier passes 4.5:1 on `lmu-bg` and `lmu-card`. `lmu-faint` drops to 4.26:1 on solid `lmu-raised`, so on a raised chip use `lmu-muted` or brighter.
 
-The root declares `color-scheme: dark` (`src/index.css`), so native scrollbars, select popups and form controls render dark without per-component styling.
+The root declares `color-scheme: dark` (`src/index.css`), so native scrollbars and form controls render dark without per-component styling. Dropdown lists are drawn by the app (see Dropdowns), never by the browser.
 
 ### Contrast
 | Pair | Ratio |
@@ -359,7 +359,7 @@ Borders are 1px hairlines in `lmu-border` (often at 40–70% opacity) or in a si
 ## Components
 
 ### Focus
-Every interactive control shows a 2px outline on keyboard focus: `focus-visible:outline-2 focus-visible:outline-offset-2` in `lmu-accent-text` (or `lmu-accent`). Table rows draw it inside the row (`-outline-offset-2`). A transparent select inside a well stays bare (`outline-none`) and the well draws the outline instead (`has-[select:focus-visible]:outline-2`). Mouse focus on buttons and selects shows nothing extra; text fields show the outline on any focus, as browsers treat them. Never use `focus:outline-none` without a replacement.
+Every interactive control shows a 2px outline on keyboard focus: `focus-visible:outline-2 focus-visible:outline-offset-2` in `lmu-accent-text` (or `lmu-accent`). Table rows draw it inside the row (`-outline-offset-2`). A dropdown trigger takes the same outline as a button; its open list keeps focus on the trigger, so the outline stays where the keyboard is. Mouse focus on buttons shows nothing extra; text fields show the outline on any focus, as browsers treat them. Never use `focus:outline-none` without a replacement.
 
 ### Buttons
 Compact and assertive.
@@ -432,7 +432,7 @@ What the app keeps (cached replays, AI reports) reads as a log inside its panel.
 ### Inputs / Fields
 - **Style:** `lmu-bg` well, hairline border, 12px radius, 12–14px white text (mono for paths), an optional leading muted icon.
 - **Focus:** the border shifts to Pit Lane Red; the session search shifts to `lmu-muted`, since red there would read as a filter. Both add the 2px outline (see Focus).
-- **Selects:** transparent inline selects with semibold white text inside a pill or toolbar well (the driver picker is a single `lmu-bg` well with a transparent select).
+- **Selects:** see Dropdowns.
 - **Field label and status** (`settings/PathField.tsx`): the 11px Field Label on the left, with one status on the right: "Detected" in gain with a check, "Not found" in warn with an alert, or, once the value is edited, muted "Changed, save to check" with a Reset link. A field the server rejects takes an `lmu-loss` border and the reason under it in loss with an icon, and the typed value is kept. 11px muted help text closes the field.
 - **Search in a side panel:** the settings search sits on `lmu-card` with an 8px radius and a leading icon, and a clear button appears once there is text. A polite line under it counts the matches ("2 of 6 sections match").
 - **Toolbar** (`SessionFilterParts.tsx`): two rows. Row one finds and orders (search, track select, sort, view mode); row two narrows (class, session type, toggles) and ends with a neutral "Clear filters" shown only while something narrows the list.
@@ -443,6 +443,18 @@ A sticky top bar: `lmu-card` at 75% opacity with a blur (the one sanctioned blur
 - **Tabs:** a group in an inset `lmu-bg` well with a 12px radius; tabs are 32px, 14px medium with a 16px icon. Active is solid red with white text; inactive is muted, lifting to `lmu-raised/60` on hover.
 - **Status:** 32px chips and the refresh button in the same well, muted, lifting to white with an `lmu-rule` border on hover (never red). The sessions dot is gain when LMU results exist and warn when none do; while a scan runs the film icon pulses and the refresh icon spins in `lmu-info`.
 - **Links:** titles that navigate (the circuit title) are native React Router links with a visible focus outline and keep the car-class context.
+
+### Dropdowns
+One family for every control that opens a list or panel from a trigger (`common/dropdown/`). Behavior and inventory are in `docs/plans/archive/DROPDOWN_STANDARDIZATION.md`.
+- **Trigger:** `lmu-bg` well, `lmu-border` hairline, 8px radius, 32px high with 10px side padding, 12px semibold white text. An optional leading muted icon and a muted caption ("Sort:", "History:") precede the value; one muted 14px chevron ends it. Hover and the open state lift the fill to `lmu-card` and the hairline to `lmu-rule`; red is kept for keyboard focus. Disabled text drops to `lmu-faint`; loading swaps the chevron for a spinner.
+- **Filter-row trigger:** the same surface at 36px with a 12px radius and 12px side padding, level with the session search field: the sort and track dropdowns of the dashboard, Tracks and track-session filter rows.
+- **Compact trigger:** the same surface at 24px and 11px text, only where a row cannot take 32px: trace title rows and the telemetry toolbar (preset, steering scale, Beaten rivals).
+- **Panel:** opaque `lmu-card`, hairline, 8px radius, `shadow-xl`, 4px from the trigger, `animate-pop-in`. Option lists take a 4px inset; informational and settings panels (Info, Map layers, resolution) a 12–16px one. Lists cap at 288px with the thin dark scrollbar and keep the active option in view.
+- **Options:** rows at least 32px high with 10px side padding and 12px text, `lmu-text-soft` at rest. Hover, the keyboard-active row and the selected row take the `lmu-raised` fill; the selected row is also white, semibold and carries a white check, so selection never rests on color alone. Multi-choice lists use native checkboxes instead of checks. Group captions are 10px uppercase muted. A trailing figure (a lap time, a channel count) is muted mono.
+- **Type:** sans for names and words; mono only for times, speeds, counts and scale values.
+- **Semantic color** stays on what it measures (gain times, invalid and traffic badges, the driver and lap flag icons, the DuckDB rate); the control chrome stays neutral.
+- **Single choice is a `Select`,** never a native `<select>`: the list looks the same in every browser, escapes clipped toolbars and stays inside the open dialog or expanded map. Escape closes only the list.
+- **Exceptions:** the map's Layers trigger stays a 28px icon button to match the map toolbar. The telemetry header's Info and the toolbar's sample-rate readout (100Hz) are quiet text buttons that open a popover, not dropdowns: no well, no chevron. Their panels follow the family.
 
 ### Section Navigation
 The table of contents beside a long page (`settings/SettingsSidebar.tsx`). Items are 12px medium text with a 16px icon, 8px × 12px padding and a 6px radius. Muted at rest, they lift to white over `lmu-card/60` on hover. The current section takes an `lmu-card` fill, white text, a 2px Pit Lane Red left edge and a red icon (`aria-current="location"`), which counts as a selection under the One Red Rule. A scrollspy tracks the section in view, and a click pins it until the scroll settles.
@@ -476,7 +488,7 @@ Modals (Rules & Config, circuit information) mount on the body with `animate-fad
 - **Map:** road surface and boundaries in `MAP_COLORS` line work, racing lines colored by speed, pedal or lateral G; monospace labels obey the 10px floor.
 
 ### Telemetry Studio
-- Telemetry header: track/layout leads, with primary and baseline driver/lap controls grouped beside it. Event, split, replay filename, duration and file size live in the Info disclosure; weather and temperatures stay visible under the track name. Back is the single page exit; playback groups rewind, play/pause and a native speed selector. Telemetry is a wide workspace designed for a minimum 1920px viewport.
+- Telemetry header: track/layout leads, with primary and baseline driver/lap controls grouped beside it. Event, split, replay filename, duration and file size live in the Info disclosure; weather and temperatures stay visible under the track name. Back is the single page exit; playback groups rewind, play/pause and a speed dropdown. The lap dropdown sits between square previous/next buttons in the same well and hairline. Telemetry is a wide workspace designed for a minimum 1920px viewport.
 - Telemetry charts, GPS map, HUD and corner phases share flat panes with compact toolbars and simple dividers, rather than nested cards. Trace and sector colors stay semantic. Toolbar sector times use sector 1 gold, sector 2 blue, and sector 3 teal only for session-best splits; other splits stay white. The toolbar lap time is gold only for the recorded personal-best replay/lap on the same layout and class, session-best blue otherwise, and white for ordinary laps; no Fastest Lap badge.
 - Telemetry channels reserve a compact 24px title row: plain colored names at the left, legends and controls at the right. Below it, traces and scale ticks share one plotting area, filling its height with a 6px bottom inset. SVG viewBoxes match each channel’s actual numeric scale; speed ticks use the path’s computed maximum. Live readings appear only on the scrub cursor; status and source indicators remain beside the channel name. Scrub readouts keep one vertical position below the upper scale label throughout the lap, switching sides only near the right edge.
 - The telemetry resolution popover uses flat fidelity statistics and explanatory text. Mode/source options use a shared neutral selected treatment; channel and source identity do not introduce saturated card fills.

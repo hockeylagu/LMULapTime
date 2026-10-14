@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useId, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { NonRepresentativeReason } from '../../../../shared/types/index.js';
 import { NON_REPRESENTATIVE_LABELS } from '../../../utils/lapTrafficText.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
+import { DROPDOWN_CHEVRON, DROPDOWN_LIST_INSET, DROPDOWN_OPTION, DROPDOWN_PANEL, DROPDOWN_TRIGGER_COMPACT } from '../../common/dropdown/dropdownStyles.js';
+import { useOutsidePress } from '../../common/dropdown/useAnchoredPanel.js';
 
 export interface LapConsistencyOption {
   lapNumber: number;
@@ -19,6 +21,7 @@ export interface LapSelectorDropdownProps {
   formatLapTime: (sec?: number | null) => string;
 }
 
+/** A checkbox list in the dropdown family: it stays open while laps are toggled. */
 export function LapSelectorDropdown({
   availableLaps,
   excludedLaps,
@@ -27,41 +30,43 @@ export function LapSelectorDropdown({
 }: LapSelectorDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isOpen]);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const panelId = useId();
+  const close = useCallback(() => setIsOpen(false), []);
+  useOutsidePress(isOpen, [ref], close);
 
   const includedCount = availableLaps.length - excludedLaps.size;
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative" onKeyDown={(event) => {
+      if (event.key !== 'Escape' || !isOpen) return;
+      event.preventDefault();
+      event.stopPropagation();
+      setIsOpen(false);
+      triggerRef.current?.focus();
+    }}>
       <button
+        ref={triggerRef}
+        type="button"
+        aria-expanded={isOpen}
+        aria-controls={panelId}
         onClick={() => setIsOpen(v => !v)}
-        className={`flex items-center gap-1.5 px-2 py-1 rounded-lg bg-lmu-card/60 border border-lmu-border/60 text-[11px] font-mono font-semibold text-white hover:border-lmu-accent transition-colors cursor-pointer ${FOCUS_RING}`}
+        className={DROPDOWN_TRIGGER_COMPACT}
       >
         <span>{includedCount}/{availableLaps.length} laps included</span>
-        <ChevronDown className={`w-3 h-3 text-lmu-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown aria-hidden="true" className={DROPDOWN_CHEVRON} />
       </button>
       {isOpen && (
-        <div className="absolute top-8 left-0 z-30 w-52 max-h-64 overflow-y-auto rounded-lg bg-lmu-card border border-lmu-border shadow-2xl py-1">
+        <div id={panelId} role="group" aria-label="Laps included" className={`absolute top-full left-0 z-30 mt-1 w-56 max-h-72 overflow-y-auto custom-scrollbar ${DROPDOWN_PANEL} ${DROPDOWN_LIST_INSET}`}>
           {availableLaps.map(({ lapNumber, lapTimeSec, isValid, nonRepresentativeReason }) => {
             const isExcluded = excludedLaps.has(lapNumber);
             return (
-              <label
-                key={lapNumber}
-                className="flex items-center gap-2 px-2.5 py-1.5 text-[11px] font-mono hover:bg-lmu-card/50 cursor-pointer"
-              >
+              <label key={lapNumber} className={`${DROPDOWN_OPTION} cursor-pointer`}>
                 <input
                   type="checkbox"
                   checked={!isExcluded}
                   onChange={() => onToggleLapExclusion(lapNumber)}
-                  className="accent-lmu-accent"
+                  className={`accent-lmu-accent w-3.5 h-3.5 shrink-0 ${FOCUS_RING}`}
                 />
                 <span className={isExcluded ? 'text-lmu-muted line-through' : 'text-white'}>Lap {lapNumber}</span>
                 {!isValid && (
@@ -77,7 +82,7 @@ export function LapSelectorDropdown({
                     {NON_REPRESENTATIVE_LABELS[nonRepresentativeReason].label}
                   </span>
                 )}
-                <span className={`ml-auto ${isExcluded ? 'text-lmu-muted line-through' : 'text-lmu-muted'}`}>{formatLapTime(lapTimeSec)}</span>
+                <span className={`ml-auto font-mono text-lmu-muted ${isExcluded ? 'line-through' : ''}`}>{formatLapTime(lapTimeSec)}</span>
               </label>
             );
           })}
