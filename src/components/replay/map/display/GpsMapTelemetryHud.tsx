@@ -1,6 +1,7 @@
 import React from 'react';
 import type { ReplayTrajectoryPoint } from '../../../../../shared/types/index.js';
 import { getSteerPercent } from '../../../../../shared/domain/formatters.js';
+import { TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 import { formatGear, formatReading, getStatusLabel, getStatusSubtext, hasReading, totalAcceleration } from './telemetryReadouts.js';
 
 export interface GpsMapTelemetryHudProps {
@@ -43,10 +44,10 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
       </span>
       <span className="font-mono tabular-nums"><span className="font-semibold">{formatReading(point.speedKmh)}</span> <span className="text-lmu-muted">km/h</span></span>
       <span className="font-mono tabular-nums" title="Selected gear">GEAR {formatGear(point.gear)}</span>
-      <span className="inline-flex items-baseline gap-1 font-mono tabular-nums"><span className="text-lmu-muted font-sans text-[10px]">THR</span><span className="text-lmu-gain">{formatReading(point.throttle, 0)}%</span>
+      <span className="inline-flex items-baseline gap-1 font-mono tabular-nums"><span className="text-lmu-muted font-sans text-[10px]">THR</span><span style={{ color: TELEMETRY_COLORS.throttle }}>{formatReading(point.throttle, 0)}%</span>
         {point.tcActive && <span className="text-[10px] text-lmu-warn">TC</span>}
       </span>
-      <span className="inline-flex items-baseline gap-1 font-mono tabular-nums"><span className="text-lmu-muted font-sans text-[10px]">BRK</span><span className="text-lmu-loss">{formatReading(point.brake, 0)}%</span>
+      <span className="inline-flex items-baseline gap-1 font-mono tabular-nums"><span className="text-lmu-muted font-sans text-[10px]">BRK</span><span style={{ color: TELEMETRY_COLORS.brake }}>{formatReading(point.brake, 0)}%</span>
         {point.absActive && <span className="text-[10px] text-lmu-info">ABS</span>}
       </span>
       <span className="inline-flex items-baseline gap-1"><span className="text-lmu-muted text-[10px]">STEER</span><span className="font-mono tabular-nums">{steering}</span></span>

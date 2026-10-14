@@ -2,6 +2,7 @@ import React from 'react';
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { getSteerPercent } from '../../../../shared/domain/formatters.js';
 import { formatRain } from '../../../../shared/domain/lapConditions.js';
+import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
 export interface ReplayTelemetryHudProps {
   currentPoint?: ReplayTrajectoryPoint | null;
@@ -29,14 +30,14 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
         currentPoint?.tcActive ? 'border-lmu-warn-strong/70 bg-lmu-warn-strong/10' : 'border-lmu-border'
       }`}>
         <div className="h-[15px] shrink-0 flex items-center gap-1">
-          <span className="text-[10px] text-lmu-gain font-bold">THR</span>
+          <span className="text-[10px] font-bold" style={{ color: TELEMETRY_COLORS.throttle }}>THR</span>
           {currentPoint?.tcActive && (
             <span className="inline-flex h-[15px] items-center px-1 rounded text-[10px] leading-none font-black bg-lmu-warn-strong text-black">
               TC
             </span>
           )}
         </div>
-        <span className="text-xs font-black text-lmu-gain font-mono">{(currentPoint?.throttle ?? 0).toFixed(0)}%</span>
+        <span className="text-xs font-black font-mono" style={{ color: TELEMETRY_COLORS.throttle }}>{(currentPoint?.throttle ?? 0).toFixed(0)}%</span>
         <span className="text-[10px] text-lmu-muted">{currentPoint?.tcActive ? 'tc active' : 'pedal'}</span>
       </div>
 
@@ -45,14 +46,14 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
         currentPoint?.absActive ? 'border-lmu-aqua-strong/70 bg-lmu-aqua-strong/10' : 'border-lmu-border'
       }`}>
         <div className="h-[15px] shrink-0 flex items-center gap-1">
-          <span className="text-[10px] text-lmu-loss font-bold">BRK</span>
+          <span className="text-[10px] font-bold" style={{ color: TELEMETRY_COLORS.brake }}>BRK</span>
           {currentPoint?.absActive && (
             <span className="inline-flex h-[15px] items-center px-1 rounded text-[10px] leading-none font-black bg-lmu-aqua text-black">
               ABS
             </span>
           )}
         </div>
-        <span className="text-xs font-black text-lmu-loss font-mono">{(currentPoint?.brake ?? 0).toFixed(0)}%</span>
+        <span className="text-xs font-black font-mono" style={{ color: TELEMETRY_COLORS.brake }}>{(currentPoint?.brake ?? 0).toFixed(0)}%</span>
         <span className="text-[10px] text-lmu-muted">{currentPoint?.absActive ? 'abs active' : 'pedal'}</span>
       </div>
 

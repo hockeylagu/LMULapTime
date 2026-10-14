@@ -78,7 +78,7 @@ describe('GpsSceneMarkers', () => {
     const brakeGroup = container.querySelector('[data-testid="pedal-marker-brake-1"]');
     const throttleGroup = container.querySelector('[data-testid="pedal-marker-throttle-1"]');
 
-    const brakeLine = brakeGroup?.querySelector('line[stroke="#F43F5E"]');
+    const brakeLine = brakeGroup?.querySelector('line[stroke="#EF4444"]');
     const throttleLine = throttleGroup?.querySelector('line[stroke="#10B981"]');
 
     expect(brakeLine).toBeInTheDocument();

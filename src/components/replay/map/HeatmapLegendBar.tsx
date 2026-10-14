@@ -1,5 +1,6 @@
 import React from 'react';
 import { MapColorMode } from './replayMapUtils.js';
+import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 
 export interface HeatmapLegendBarProps {
   colorBy: MapColorMode;
@@ -39,16 +40,16 @@ export const HeatmapLegendBar: React.FC<HeatmapLegendBarProps> = ({
       {colorBy === 'pedal' && (
         <div className="flex items-center gap-1.5 text-lmu-muted">
           <span className="font-bold text-white uppercase tracking-wider">Pedal:</span>
-          <span className="flex items-center gap-1 text-lmu-loss">
-            <span className="w-2 h-2 rounded-full bg-lmu-loss-strong" /> Brake
+          <span className="flex items-center gap-1" style={{ color: TELEMETRY_COLORS.brake }}>
+            <span className="w-2 h-2 rounded-full bg-current" /> Brake
           </span>
           <span>|</span>
           <span className="flex items-center gap-1 text-lmu-muted">
-            <span className="w-2 h-2 rounded-full bg-lmu-rule-strong" /> Coast
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: TELEMETRY_COLORS.neutral }} /> Coast
           </span>
           <span>|</span>
-          <span className="flex items-center gap-1 text-lmu-gain">
-            <span className="w-2 h-2 rounded-full bg-lmu-gain-strong" /> Throttle
+          <span className="flex items-center gap-1" style={{ color: TELEMETRY_COLORS.throttle }}>
+            <span className="w-2 h-2 rounded-full bg-current" /> Throttle
           </span>
         </div>
       )}

@@ -17,7 +17,7 @@ export const GpsScenePedalMarker: React.FC<GpsScenePedalMarkerProps> = ({ marker
   const isBase = Boolean(m.isBaseline);
 
   // Colors: primary uses solid red/green, baseline uses distinct tinted red/green styling
-  const primaryColor = isBrake ? MAP_COLORS.apex : TELEMETRY_COLORS.throttle;
+  const primaryColor = isBrake ? TELEMETRY_COLORS.brake : TELEMETRY_COLORS.throttle;
   const baselineColor = isBrake ? MAP_COLORS.baselineBrake : MAP_COLORS.baselineThrottle;
   const strokeColor = isBase ? baselineColor : primaryColor;
   const textColor = isBase ? baselineColor : primaryColor;
