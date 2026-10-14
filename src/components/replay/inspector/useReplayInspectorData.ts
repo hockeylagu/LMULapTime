@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router';
 import { ReplayMetadata, ReplayTrajectoryData, ReplayDriverEntry, ComparableLap } from '../../../../shared/types/index.js';
 import { areComparableCarClasses, resolveDriverCarClass } from '../../../../shared/domain/vehicleMapping.js';
 import { applyTelemetryPostProcessingToTrajectory } from '../../../utils/telemetryPostProcessing.js';
+import { findIndexAtDistance, getDistancesInReferenceFrame, getTrajectoryDistances } from '../../../utils/lapAlignment.js';
 import { updateSearchParams } from '../../../utils/urlParams.js';
 import { apiErrorMessage, fetchJson, isAbortError } from '../../../api/apiClient.js';
 import { fetchSessionTelemetry, fetchSessionTelemetryMetadata } from '../../../api/replayApi.js';
@@ -445,6 +446,24 @@ export function useReplayInspectorData({
         if (requestId !== trajectoryRequestIdRef.current) return;
         const trajData = applyTelemetryPostProcessingToTrajectory(rawTrajData);
         if (!trajData?.points.length) throw new Error('Requested lap has no telemetry samples');
+        // Source/resolution changes replace the samples of the same lap. Indices no longer
+        // identify the same position, so carry the live cursor and zoom over by lap distance.
+        if (trajectory?.points.length && trajectory.sessionId === activeSessionId
+          && trajectory.driverOrdinal === driverOrdinal && trajectory.lapOrdinal === lapOrdinal) {
+          const trackLengthM = trajectory.trackLengthM ?? trajData.trackLengthM;
+          const previousDistances = getTrajectoryDistances(trajectory.points, trackLengthM);
+          const nextDistances = getDistancesInReferenceFrame(trajData.points, trajectory.points, trackLengthM);
+          const indexAtPreviousPosition = (index: number) => findIndexAtDistance(nextDistances,
+            previousDistances[Math.max(0, Math.min(previousDistances.length - 1, index))]);
+          const nextIndex = indexAtPreviousPosition(currentIndexRef.current);
+          playbackCursor.clear();
+          playbackClockRef.current = null;
+          currentIndexRef.current = nextIndex;
+          setCurrentIndexState(nextIndex);
+          setChartZoomRange(range => range ? {
+            start: indexAtPreviousPosition(range.start), end: indexAtPreviousPosition(range.end),
+          } : null);
+        }
         setTrajectory(previous => ({
           ...trajData,
           duckdbRawPointsCount: trajData.duckdbRawPointsCount ?? previous?.duckdbRawPointsCount,

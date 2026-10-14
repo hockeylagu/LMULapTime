@@ -43,6 +43,70 @@ function wrapper({ children }: { children: React.ReactNode }) {
 }
 
 describe('useReplayInspectorData session locators', () => {
+  it.each(['source', 'resolution'] as const)('preserves the scrub location and chart range when changing %s', async change => {
+    const dense: ReplayTrajectoryData = {
+      ...trajectory, source: 'duckdb', trackLengthM: 1000, pointsCount: 11,
+      points: Array.from({ length: 11 }, (_, i) => ({
+        x: i * 10, y: 0, z: 0, distM: i * 10, stationM: i * 10, timeSec: i,
+      })),
+    };
+    const sparse: ReplayTrajectoryData = {
+      ...trajectory, source: 'vcr', trackLengthM: 1000, pointsCount: 6,
+      // The replay's driven distance differs; canonical stations identify the same spot.
+      points: Array.from({ length: 6 }, (_, i) => ({
+        x: i * 20, y: 0, z: 0, distM: i * 22, stationM: i * 20, timeSec: 100 + i * 2,
+      })),
+    };
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = String(input);
+      if (url.endsWith('/telemetry/metadata')) return response(metadata);
+      if (url.includes('/compare/laps')) return response({ laps: [] });
+      return response(url.includes('source=vcr') || url.includes('pointSpacingM=4') ? sparse : dense);
+    });
+    const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, sessionId: 'session-1' }), { wrapper });
+    await waitFor(() => expect(result.current.trajectory?.points).toHaveLength(11));
+    act(() => {
+      result.current.setCurrentIndex(6);
+      result.current.setChartZoomRange({ start: 2, end: 8 });
+    });
+    act(() => {
+      if (change === 'source') result.current.handleSelectSource('vcr');
+      else result.current.handleChangeResolution('standard');
+    });
+    await waitFor(() => expect(result.current.trajectory?.points).toHaveLength(6));
+    expect(result.current.currentIndex).toBe(3);
+    expect(result.current.currentPoint?.stationM).toBe(60);
+    expect(result.current.chartZoomRange).toEqual({ start: 1, end: 4 });
+    act(() => {
+      if (change === 'source') result.current.handleSelectSource('duckdb');
+      else result.current.handleChangeResolution('high');
+    });
+    await waitFor(() => expect(result.current.trajectory?.points).toHaveLength(11));
+    expect(result.current.currentIndex).toBe(6);
+    expect(result.current.chartZoomRange).toEqual({ start: 2, end: 8 });
+  });
+
+  it('remaps the latest scrub position if it moves while a new source loads', async () => {
+    let completeSource: ((value: Response) => void) | undefined;
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = String(input);
+      if (url.endsWith('/telemetry/metadata')) return response(metadata);
+      if (url.includes('/compare/laps')) return response({ laps: [] });
+      if (url.includes('source=vcr')) return new Promise<Response>(resolve => { completeSource = resolve; });
+      return response(trajectory);
+    });
+    const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, sessionId: 'session-1' }), { wrapper });
+    await waitFor(() => expect(result.current.trajectory?.points).toHaveLength(2));
+    act(() => result.current.handleSelectSource('vcr'));
+    act(() => result.current.setCurrentIndex(1));
+    await act(async () => completeSource?.(response({
+      ...trajectory, pointsCount: 3,
+      points: [trajectory.points[0], { x: 5, y: 0, z: 0, timeSec: 0.5 }, trajectory.points[1]],
+    })));
+    await waitFor(() => expect(result.current.currentIndex).toBe(2));
+    expect(result.current.currentPoint?.x).toBe(10);
+  });
+
   it('pages comparison laps as the server returns them and scopes same-session requests', async () => {
     const urls: URLSearchParams[] = [];
     const candidate = { id: 'first', sessionId: 'session-1', matchingReplayFile: metadata.filename,
