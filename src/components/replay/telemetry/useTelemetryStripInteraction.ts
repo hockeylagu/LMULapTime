@@ -190,6 +190,7 @@ export function useTelemetryStripInteraction({
         const newEnd = indexAtRatio(Math.max(dragSelection.startPct, dragSelection.currentPct) / 100);
         if (newEnd - newStart >= 3) {
           updateZoomRange({ start: newStart, end: newEnd });
+          setInteractionMode('scrub');
           if (safeIndex < newStart || safeIndex > newEnd) onSelectIndex(newStart);
         }
       } else {

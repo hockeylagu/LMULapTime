@@ -63,7 +63,8 @@ describe('fullscreen map telemetry', () => {
   });
 
   it('shows the reset only after selecting a zoom range', () => {
-    render(<Dock points={points} currentIndex={0} onSelectIndex={vi.fn()} />);
+    const onSelectIndex = vi.fn();
+    render(<Dock points={points} currentIndex={0} onSelectIndex={onSelectIndex} />);
     expect(screen.queryByRole('button', { name: 'Full lap' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Zoom range' }));
     const chart = screen.getByLabelText('Fullscreen telemetry chart');
@@ -72,6 +73,12 @@ describe('fullscreen map telemetry', () => {
     fireEvent.pointerDown(chart, { button: 0, clientX: 100, pointerId: 1 });
     fireEvent.pointerMove(chart, { clientX: 800, pointerId: 1 });
     fireEvent.pointerUp(chart, { clientX: 800, pointerId: 1 });
+    expect(screen.getByRole('button', { name: 'Zoom range' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('button', { name: 'Full lap' })).toBeInTheDocument();
+    onSelectIndex.mockClear();
+    fireEvent.pointerDown(chart, { button: 0, clientX: 500, pointerId: 2 });
+    expect(onSelectIndex).toHaveBeenCalledWith(4);
+    fireEvent.pointerUp(chart, { pointerId: 2 });
     fireEvent.click(screen.getByRole('button', { name: 'Full lap' }));
     expect(screen.queryByRole('button', { name: 'Full lap' })).not.toBeInTheDocument();
   });
