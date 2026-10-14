@@ -328,9 +328,9 @@ export function buildRoadRibbonSvgPath(
 
 export function buildClosedSvgPath(pts: Array<{ sx: number; sy: number }>): string {
   if (pts.length === 0) return '';
-  let d = `M ${pts[0].sx.toFixed(1)} ${pts[0].sy.toFixed(1)}`;
+  let d = `M ${pts[0].sx.toFixed(3)} ${pts[0].sy.toFixed(3)}`;
   for (let i = 1; i < pts.length; i++) {
-    d += ` L ${pts[i].sx.toFixed(1)} ${pts[i].sy.toFixed(1)}`;
+    d += ` L ${pts[i].sx.toFixed(3)} ${pts[i].sy.toFixed(3)}`;
   }
   d += ' Z';
   return d;

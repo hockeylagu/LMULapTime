@@ -83,7 +83,7 @@ describe('track boundary projection and SVG helpers', () => {
       { sx: 200, sy: 120 },
     ];
     const ribbonD = buildRoadRibbonSvgPath(left, right);
-    expect(ribbonD).toBe('M 100.0 100.0 L 200.0 100.0 Z M 100.0 120.0 L 200.0 120.0 Z');
+    expect(ribbonD).toBe('M 100.000 100.000 L 200.000 100.000 Z M 100.000 120.000 L 200.000 120.000 Z');
   });
 
   it('builds closed SVG path for boundary edge limits', () => {
@@ -93,7 +93,7 @@ describe('track boundary projection and SVG helpers', () => {
       { sx: 200, sy: 200 },
     ];
     const d = buildClosedSvgPath(pts);
-    expect(d).toBe('M 100.0 100.0 L 200.0 100.0 L 200.0 200.0 Z');
+    expect(d).toBe('M 100.000 100.000 L 200.000 100.000 L 200.000 200.000 Z');
   });
 
   it('computes unified effective bounds merging telemetry and track geometry', () => {

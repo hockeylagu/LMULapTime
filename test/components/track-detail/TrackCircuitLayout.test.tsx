@@ -116,7 +116,7 @@ describe('TrackCircuitLayout', () => {
     render(<TrackCircuitLayout trackName="Circuit de Spa-Francorchamps" trackGeometry={geometryWithBroadBounds} />);
 
     const path = screen.getByTestId('track-circuit-layout').querySelector('path');
-    expect(path?.getAttribute('d')).toMatch(/^M 45\.0 755\.0/);
+    expect(path?.getAttribute('d')).toMatch(/^M 45\.000 755\.000/);
   });
 
   it('loads a lightweight static outline without requesting full geometry', () => {
