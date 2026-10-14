@@ -113,7 +113,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
   const pendingCornerRef = useRef<number | null>(initialCornerNumber ?? null);
 
   useEffect(() => {
-    if (colorBy === 'delta' && (!isCompareMode || !baselineTrajectory)) {
+    if ((colorBy === 'delta' || colorBy === 'gainLoss') && (!isCompareMode || !baselineTrajectory)) {
       setColorBy('speed');
     }
   }, [colorBy, isCompareMode, baselineTrajectory]);

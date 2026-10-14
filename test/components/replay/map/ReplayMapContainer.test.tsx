@@ -77,9 +77,36 @@ describe('ReplayMapContainer', () => {
     trackGeometry: mockTrackGeometry,
   };
 
+  it('offers Gain / Loss on the regular map and in fullscreen when comparing', () => {
+    const onChangeColorBy = vi.fn();
+    const { rerender } = render(<ReplayMapContainer {...baseProps} onChangeColorBy={onChangeColorBy} />);
+    expect(screen.queryByRole('button', { name: 'Gain / Loss' })).not.toBeInTheDocument();
+    rerender(<ReplayMapContainer {...baseProps} colorBy="gainLoss" onChangeColorBy={onChangeColorBy}
+      isCompareMode baselineTrajectory={trajectory} />);
+    const regular = screen.getByRole('button', { name: 'Gain / Loss' });
+    expect(regular).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(regular);
+    expect(onChangeColorBy).toHaveBeenCalledWith('default');
+    fireEvent.click(screen.getByRole('button', { name: 'Full screen map' }));
+    const fullscreen = screen.getByTestId('gps-map-mode-bar');
+    expect(fullscreen.textContent).toContain('Gain / Loss');
+  });
+
   it('renders the map with corner flags when corners exist', () => {
     render(<ReplayMapContainer {...baseProps} corners={corners} selectedCornerNumber={null} />);
     expect(screen.getByTestId('gps-circuit-minimap')).toBeInTheDocument();
+  });
+
+  it('deselects the active heat map on the regular map and hides its legend', () => {
+    const onChangeColorBy = vi.fn();
+    const { rerender } = render(<ReplayMapContainer {...baseProps} onChangeColorBy={onChangeColorBy} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Speed' }));
+    expect(onChangeColorBy).toHaveBeenCalledWith('default');
+    rerender(<ReplayMapContainer {...baseProps} colorBy="default" onChangeColorBy={onChangeColorBy} />);
+    expect(screen.getByRole('button', { name: 'Speed' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByText('Speed:')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Speed' }));
+    expect(onChangeColorBy).toHaveBeenLastCalledWith('speed');
   });
 
   it('highlights the selected corner and renders the apex marker on the map', () => {

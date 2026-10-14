@@ -36,7 +36,7 @@ export const GpsMapModeBar: React.FC<GpsMapModeBarProps> = ({
   onToggleFrictionCircle,
   className = '',
 }) => {
-  const modes = ['pedal', 'speed', ...(isCompareMode && hasBaseline ? (['delta'] as const) : [])] as const;
+  const modes = ['pedal', 'speed', ...(isCompareMode && hasBaseline ? (['delta', 'gainLoss'] as const) : [])] as const;
 
   return (
     <div
@@ -52,14 +52,15 @@ export const GpsMapModeBar: React.FC<GpsMapModeBarProps> = ({
             <button
               key={mode}
               type="button"
-              onClick={() => onChangeColorBy(mode)}
-              title={`Color by ${mode}`}
+              onClick={() => onChangeColorBy(colorBy === mode ? 'default' : mode)}
+              title={colorBy === mode ? 'Turn off heat map and show normal line colors'
+                : mode === 'gainLoss' ? 'Local time gained or lost against baseline' : `Color by ${mode}`}
               aria-pressed={colorBy === mode}
               className={`px-2.5 py-1 rounded text-xs font-semibold capitalize transition-colors cursor-pointer ${
                 colorBy === mode ? 'bg-lmu-raised text-lmu-text' : 'text-lmu-muted hover:text-lmu-text'
               } ${FOCUS_RING}`}
             >
-              {mode === 'pedal' ? 'Pedal' : mode === 'speed' ? 'Speed' : 'Delta'}
+              {mode === 'pedal' ? 'Pedal' : mode === 'speed' ? 'Speed' : mode === 'delta' ? 'Delta' : 'Gain / Loss'}
             </button>
           ))}
         </div>

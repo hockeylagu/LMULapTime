@@ -5,7 +5,7 @@ import { TrackBoundaryGeometry } from '../../../../shared/types/trackGeometry.js
 import { SPEED_GRADIENT_STOPS, TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 import { BRAKE_ON_THRESHOLD_PCT } from '../../../utils/cornerAnalysis/helpers.js';
 
-export type MapColorMode = 'speed' | 'pedal' | 'delta' | 'default';
+export type MapColorMode = 'speed' | 'pedal' | 'delta' | 'gainLoss' | 'default';
 
 function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
@@ -41,8 +41,8 @@ const DELTA_NEUTRAL_COLOR = TELEMETRY_COLORS.neutral;
 
 /**
  * Returns a color string for a telemetry point based on the selected heatmap metric.
- * `deltaTimeSec` (positive = losing time vs baseline, negative = gaining time) is only
- * used when colorBy === 'delta' and must be supplied by the caller (requires a baseline lap).
+ * The comparison value is the cumulative gap in seconds for delta, or its local
+ * change in seconds per second for gainLoss. Positive means losing time.
  */
 export function getHeatmapColor(
   p: ReplayTrajectoryPoint,
@@ -68,12 +68,16 @@ export function getHeatmapColor(
     return COAST_COLOR;
   }
 
-  if (colorBy === 'delta') {
-    if (deltaTimeSec === undefined || Number.isNaN(deltaTimeSec) || Math.abs(deltaTimeSec) < 0.02) {
+  if (colorBy === 'delta' || colorBy === 'gainLoss') {
+    const deadband = colorBy === 'gainLoss' ? 0.015 : 0.02;
+    if (deltaTimeSec === undefined || !Number.isFinite(deltaTimeSec) || Math.abs(deltaTimeSec) < deadband) {
       return DELTA_NEUTRAL_COLOR;
     }
-    const maxDelta = 0.6; // seconds at which the gradient saturates
-    const t = Math.min(1, Math.abs(deltaTimeSec) / maxDelta);
+    const maxDelta = colorBy === 'gainLoss' ? 0.16 : 0.6;
+    // Local gains/losses start visibly colored as soon as they leave the deadband.
+    const t = colorBy === 'gainLoss'
+      ? 0.35 + 0.65 * Math.min(1, (Math.abs(deltaTimeSec) - deadband) / (maxDelta - deadband))
+      : Math.min(1, Math.abs(deltaTimeSec) / maxDelta);
     return deltaTimeSec < 0
       ? sampleGradient([[0, [71, 85, 105]], [1, [16, 185, 129]]], t) // gaining time -> green
       : sampleGradient([[0, [71, 85, 105]], [1, [239, 68, 68]]], t); // losing time -> red
@@ -82,6 +86,40 @@ export function getHeatmapColor(
   // Speed: continuous thermal heatmap, Blue (slow) -> Green -> Amber -> Purple (top speed)
   const spd = p.speedKmh || 0;
   return sampleGradient(SPEED_GRADIENT_STOPS, spd / MAX_SPEED_KMH);
+}
+
+/**
+ * Local change of the distance-aligned gap, in s/s, over +/- 0.3 seconds.
+ * A time window keeps smoothing consistent across replay and 100 Hz telemetry.
+ * Recording gaps and invalid timestamps split the window; missing rates stay neutral.
+ */
+export function computeGainLossByIdx(points: ReplayTrajectoryPoint[], deltas: number[] | null): number[] | null {
+  if (!deltas) return null;
+  const rates = points.map(() => Number.NaN);
+  let start = 0;
+  while (start < points.length) {
+    if (!Number.isFinite(points[start].timeSec) || !Number.isFinite(deltas[start])) {
+      start++;
+      continue;
+    }
+    let end = start + 1;
+    while (end < points.length && Number.isFinite(points[end].timeSec) && Number.isFinite(deltas[end])
+      && points[end].timeSec! > points[end - 1].timeSec!
+      && points[end].timeSec! - points[end - 1].timeSec! <= 1
+      && !points[end].isTeleport
+      && Math.hypot(points[end].x - points[end - 1].x, points[end].z - points[end - 1].z) <= 20) end++;
+    let left = start;
+    let right = start;
+    for (let i = start; i < end; i++) {
+      const time = points[i].timeSec!;
+      while (left < i && points[left].timeSec! < time - 0.3) left++;
+      while (right + 1 < end && points[right + 1].timeSec! <= time + 0.3) right++;
+      const elapsed = points[right].timeSec! - points[left].timeSec!;
+      if (elapsed > 0) rates[i] = (deltas[right] - deltas[left]) / elapsed;
+    }
+    start = end;
+  }
+  return rates;
 }
 
 export interface ProjectedPoint extends ReplayTrajectoryPoint {

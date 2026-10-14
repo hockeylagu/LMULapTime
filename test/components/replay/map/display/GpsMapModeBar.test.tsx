@@ -3,6 +3,18 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { GpsMapModeBar } from '../../../../../src/components/replay/map/display/GpsMapModeBar.js';
 
 describe('GpsMapModeBar', () => {
+  it('turns off the selected heat map and leaves all modes unselected for normal colors', () => {
+    const onChangeColorBy = vi.fn();
+    const { rerender } = render(<GpsMapModeBar colorBy="gainLoss" isCompareMode hasBaseline onChangeColorBy={onChangeColorBy} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Gain / Loss' }));
+    expect(onChangeColorBy).toHaveBeenCalledWith('default');
+    rerender(<GpsMapModeBar colorBy="default" isCompareMode hasBaseline onChangeColorBy={onChangeColorBy} />);
+    for (const name of ['Pedal', 'Speed', 'Delta', 'Gain / Loss']) {
+      expect(screen.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'false');
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Gain / Loss' }));
+    expect(onChangeColorBy).toHaveBeenLastCalledWith('gainLoss');
+  });
   it('exposes which comparison line is faded', () => {
     render(<GpsMapModeBar hasBaseline onToggleFadedLine={vi.fn()} fadedLine="baseline" />);
     expect(screen.getByRole('button', { name: 'Fade primary line' })).toHaveAttribute('aria-pressed', 'false');
@@ -31,6 +43,7 @@ describe('GpsMapModeBar', () => {
       />
     );
     expect(screen.queryByRole('button', { name: /delta/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Gain / Loss' })).toBeNull();
 
     rerender(
       <GpsMapModeBar
@@ -41,33 +54,8 @@ describe('GpsMapModeBar', () => {
       />
     );
     expect(screen.getByRole('button', { name: /delta/i })).toBeInTheDocument();
-  });
-
-  it('renders Pedal Points button when hasCorners is true and onTogglePedalMarkers is provided', () => {
-    const onTogglePedalMarkers = vi.fn();
-    const { rerender } = render(
-      <GpsMapModeBar
-        hasCorners={true}
-        onTogglePedalMarkers={onTogglePedalMarkers}
-        showPedalMarkers={false}
-      />
-    );
-
-    const pedalPtsBtn = screen.getByRole('button', { name: /pedal points/i });
-    expect(pedalPtsBtn).toBeInTheDocument();
-    expect(pedalPtsBtn).toHaveAttribute('aria-pressed', 'false');
-
-    fireEvent.click(pedalPtsBtn);
-    expect(onTogglePedalMarkers).toHaveBeenCalled();
-
-    rerender(
-      <GpsMapModeBar
-        hasCorners={true}
-        onTogglePedalMarkers={onTogglePedalMarkers}
-        showPedalMarkers={true}
-      />
-    );
-    expect(pedalPtsBtn).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Gain / Loss' }));
+    expect(onChangeColorBy).toHaveBeenCalledWith('gainLoss');
   });
 
   it('renders Primary and Baseline line fade toggles when hasBaseline is true', () => {

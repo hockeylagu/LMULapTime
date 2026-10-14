@@ -2,6 +2,8 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   buildTrackLineRuns,
   getHeatmapColor,
+  computeGainLossByIdx,
+  computeBaselineDeltaByIdx,
   isRunInViewBox,
   MapColorMode,
   nearestRunVertex,
@@ -10,6 +12,7 @@ import {
   TrackLineRun,
 } from '../replayMapUtils.js';
 import { GpsTrackHoverTooltip } from '../display/GpsTrackHoverTooltip.js';
+import { TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 
 export interface GpsTrackSegmentsProps {
   svgPoints: ProjectedPoint[];
@@ -62,18 +65,24 @@ export const GpsTrackSegments: React.FC<GpsTrackSegmentsProps> = React.memo(({
   const [hoveredPoint, setHoveredPoint] = useState<ProjectedPoint | null>(null);
 
   const viewBoxRect = useMemo(() => parseViewBox(viewBox), [viewBox]);
+  const gainLossByIdx = useMemo(() => colorBy === 'gainLoss'
+    ? computeGainLossByIdx(svgPoints, deltaByIdx ?? null) : null, [colorBy, svgPoints, deltaByIdx]);
+  const baselineGainLossByIdx = useMemo(() => colorBy === 'gainLoss'
+    ? computeBaselineDeltaByIdx(gainLossByIdx, primaryDists ?? [], baselineDists ?? []) : null,
+  [colorBy, gainLossByIdx, primaryDists, baselineDists]);
 
   const primaryRuns = useMemo(() => buildTrackLineRuns(
     svgPoints,
-    p => getHeatmapColor(p, colorBy, deltaByIdx ? deltaByIdx[p.idx] : undefined),
+    p => getHeatmapColor(p, colorBy, (colorBy === 'gainLoss' ? gainLossByIdx : deltaByIdx)?.[p.idx]),
     p => isInDistRange(primaryDists?.[p.idx], highlightDistRange, dimNonSelectedTrack)
-  ), [svgPoints, colorBy, deltaByIdx, primaryDists, highlightDistRange, dimNonSelectedTrack]);
+  ), [svgPoints, colorBy, deltaByIdx, gainLossByIdx, primaryDists, highlightDistRange, dimNonSelectedTrack]);
 
   const baselineRuns = useMemo(() => buildTrackLineRuns(
     baselineSvgPoints,
-    p => getHeatmapColor(p, colorBy, baselineDeltaByIdx ? baselineDeltaByIdx[p.idx] : undefined),
+    p => colorBy === 'default' ? TELEMETRY_COLORS.baseline
+      : getHeatmapColor(p, colorBy, (colorBy === 'gainLoss' ? baselineGainLossByIdx : baselineDeltaByIdx)?.[p.idx]),
     p => isInDistRange(baselineDists?.[p.idx], highlightDistRange, dimNonSelectedTrack)
-  ), [baselineSvgPoints, colorBy, baselineDeltaByIdx, baselineDists, highlightDistRange, dimNonSelectedTrack]);
+  ), [baselineSvgPoints, colorBy, baselineDeltaByIdx, baselineGainLossByIdx, baselineDists, highlightDistRange, dimNonSelectedTrack]);
 
   // Hit testing needs geometry, not a duplicate of every heatmap colour run.
   // Keep gaps separate while sharing one wide target along each continuous section.

@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, fireEvent } from '@testing-library/react';
 import { GpsTrackSegments } from '../../../../../src/components/replay/map/scene/GpsTrackSegments.js';
 import type { ProjectedPoint } from '../../../../../src/components/replay/map/replayMapUtils.js';
+import { TELEMETRY_COLORS } from '../../../../../src/utils/themeColors.js';
 
 /** The test DOM has no layout: give the path an identity screen transform so clicks map 1:1 to SVG space. */
 function withIdentityCtm(el: Element): Element {
@@ -10,6 +11,16 @@ function withIdentityCtm(el: Element): Element {
 }
 
 describe('GpsTrackSegments', () => {
+  it('colors both laps by the primary local gain at matched distances while still behind', () => {
+    const points: ProjectedPoint[] = [0, 1, 2, 3].map(i => ({
+      x: i, y: 0, z: 0, sx: i, sy: 0, idx: i, timeSec: i * 0.1,
+    }));
+    const { container } = render(<svg><GpsTrackSegments svgPoints={points} baselineSvgPoints={points}
+      colorBy="gainLoss" deltaByIdx={[2, 1.98, 1.96, 1.94]}
+      primaryDists={[0, 1, 2, 3]} baselineDists={[0, 1, 2, 3]} /></svg>);
+    expect(container.querySelector('[data-track-line="primary"]')).toHaveAttribute('stroke', 'rgb(16, 185, 129)');
+    expect(container.querySelector('[data-track-line="baseline"]')).toHaveAttribute('stroke', 'rgb(16, 185, 129)');
+  });
   const mockPrimaryPoints: ProjectedPoint[] = [
     { sx: 100, sy: 100, idx: 0, x: 10, y: 0, z: 10, speedKmh: 100, throttle: 100, brake: 0, timeSec: 0 },
     { sx: 110, sy: 110, idx: 1, x: 12, y: 0, z: 12, speedKmh: 120, throttle: 100, brake: 0, timeSec: 0.5 },
@@ -20,6 +31,13 @@ describe('GpsTrackSegments', () => {
     { sx: 105, sy: 105, idx: 0, x: 11, y: 0, z: 11, speedKmh: 110, throttle: 100, brake: 0, timeSec: 0 },
     { sx: 115, sy: 115, idx: 1, x: 13, y: 0, z: 13, speedKmh: 130, throttle: 100, brake: 0, timeSec: 0.5 },
   ];
+
+  it('uses normal primary and baseline colors when the heat map is deselected', () => {
+    const { container } = render(<svg><GpsTrackSegments svgPoints={mockPrimaryPoints}
+      baselineSvgPoints={mockBaselinePoints} colorBy="default" /></svg>);
+    expect(container.querySelector('[data-track-line="primary"]')).toHaveAttribute('stroke', TELEMETRY_COLORS.primary);
+    expect(container.querySelector('[data-track-line="baseline"]')).toHaveAttribute('stroke', TELEMETRY_COLORS.baseline);
+  });
 
   it('renders one solid path per colour run and selects the nearest sample on click', () => {
     const onSelectIndex = vi.fn();

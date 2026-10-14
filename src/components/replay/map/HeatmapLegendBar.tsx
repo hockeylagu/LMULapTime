@@ -10,6 +10,7 @@ export const HeatmapLegendBar: React.FC<HeatmapLegendBarProps> = ({
   colorBy,
   className = '',
 }) => {
+  if (colorBy === 'default') return null;
   return (
     <div
       className={`absolute bottom-2 left-2 z-20 flex items-center gap-2 bg-lmu-strip/90 backdrop-blur border border-white/10 px-2.5 py-1 rounded-lg text-[10px] shadow-lg pointer-events-none font-mono ${className}`}
@@ -52,11 +53,11 @@ export const HeatmapLegendBar: React.FC<HeatmapLegendBarProps> = ({
         </div>
       )}
 
-      {colorBy === 'delta' && (
+      {(colorBy === 'delta' || colorBy === 'gainLoss') && (
         <div className="flex items-center gap-1.5 text-lmu-muted">
-          <span className="font-bold text-white uppercase tracking-wider">Delta:</span>
+          <span className="font-bold text-white uppercase tracking-wider">{colorBy === 'delta' ? 'Delta:' : 'Gain / Loss:'}</span>
           <span className="flex items-center gap-1 text-lmu-gain">
-            <span className="w-2 h-2 rounded-full bg-lmu-gain-strong" /> Gaining
+            <span className="w-2 h-2 rounded-full bg-lmu-gain-strong" /> {colorBy === 'delta' ? 'Ahead' : 'Gaining'}
           </span>
           <span>|</span>
           <span className="flex items-center gap-1 text-lmu-muted">
@@ -64,7 +65,7 @@ export const HeatmapLegendBar: React.FC<HeatmapLegendBarProps> = ({
           </span>
           <span>|</span>
           <span className="flex items-center gap-1 text-lmu-loss">
-            <span className="w-2 h-2 rounded-full bg-lmu-loss-strong" /> Losing
+            <span className="w-2 h-2 rounded-full bg-lmu-loss-strong" /> {colorBy === 'delta' ? 'Behind' : 'Losing'}
           </span>
         </div>
       )}

@@ -101,17 +101,18 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
         <div className="flex items-center gap-1.5">
           {onChangeColorBy && (
             <div className="flex items-center gap-1">
-              {(['pedal', 'speed', ...(isCompareMode && baselinePoints ? (['delta'] as const) : [])] as const).map(mode => (
+              {(['pedal', 'speed', ...(isCompareMode && baselinePoints ? (['delta', 'gainLoss'] as const) : [])] as const).map(mode => (
                 <button
                   key={mode}
-                  onClick={() => onChangeColorBy(mode)}
-                  title={`Color by ${mode}`}
+                  onClick={() => onChangeColorBy(colorBy === mode ? 'default' : mode)}
+                  title={colorBy === mode ? 'Turn off heat map and show normal line colors'
+                    : mode === 'gainLoss' ? 'Local time gained or lost against baseline' : `Color by ${mode}`}
                   aria-pressed={colorBy === mode}
                   className={`px-2 py-0.5 rounded text-[11px] font-semibold capitalize transition-all cursor-pointer ${
                     colorBy === mode ? 'bg-lmu-raised text-white' : 'text-lmu-muted hover:text-white'
                   } ${FOCUS_RING}`}
                 >
-                  {mode === 'pedal' ? 'Pedal' : mode === 'speed' ? 'Speed' : 'Delta'}
+                  {mode === 'pedal' ? 'Pedal' : mode === 'speed' ? 'Speed' : mode === 'delta' ? 'Delta' : 'Gain / Loss'}
                 </button>
               ))}
             </div>
