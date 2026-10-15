@@ -6,9 +6,9 @@ import {
 } from './telemetryChartPathBuilders.js';
 
 // Neutral (0) and reverse (-1) are clamped to 1 since this chart's Y-scale only spans
-// forward gears 1-7.
-function resolveGear(p: ReplayTrajectoryPoint): number {
-  return Math.min(7, Math.max(1, p.gear ?? 1));
+// forward gears 1..maxGear.
+function resolveGear(p: ReplayTrajectoryPoint, maxGear: number = 7): number {
+  return Math.min(maxGear, Math.max(1, p.gear ?? 1));
 }
 
 import {
@@ -30,7 +30,7 @@ export function computeTelemetryChartPaths(
 ): TelemetryChartPathsResult {
   if (points.length === 0) return emptyChartPaths();
 
-  const bounds = computeChartBounds(points, pointComparisons);
+  const bounds = computeChartBounds(points, pointComparisons, baselineSamples);
   const cornerExtrema = computeCornerExtrema(points, pointComparisons, bounds.maxSpd);
 
   const distStart = distances[viewStart] ?? 0;
@@ -47,7 +47,7 @@ export function computeTelemetryChartPaths(
 
   // Baseline traces, one sample at a time (x in 0-1000 view units).
   const appendBaseline = (bp: InterpolatedPoint, prevBp: InterpolatedPoint, x: number, isFirst: boolean): void => {
-    appendScalarPoint(baseline, bp, bp.gear, prevBp.gear, x, isFirst, bounds);
+    appendScalarPoint(baseline, bp, resolveGear(bp, bounds.maxGear), resolveGear(prevBp, bounds.maxGear), x, isFirst, bounds);
     appendCornerPoint(bCornerBuilders, bp, x, isFirst, cornerExtrema);
   };
 
@@ -57,7 +57,7 @@ export function computeTelemetryChartPaths(
     const isFirst = i === viewStart;
 
     // Neutral and reverse are clamped to 1: the chart's gear scale spans forward gears only.
-    appendScalarPoint(primary, p, resolveGear(p), i > 0 ? resolveGear(points[i - 1]) : 0, x, isFirst, bounds);
+    appendScalarPoint(primary, p, resolveGear(p, bounds.maxGear), i > 0 ? resolveGear(points[i - 1], bounds.maxGear) : 0, x, isFirst, bounds);
     appendCornerPoint(cornerBuilders, p, x, isFirst, cornerExtrema);
 
     const comp = pointComparisons[i];
@@ -94,6 +94,7 @@ export function computeTelemetryChartPaths(
     brakeArea: `${primary.brk} L 1000 95 L 0 95 Z`,
     steerPath: primary.str,
     gearPath: primary.gr,
+    maxGear: bounds.maxGear,
     baselineSpeedPath: baseline.spd,
     baselineThrottlePath: baseline.thr,
     baselineBrakePath: baseline.brk,

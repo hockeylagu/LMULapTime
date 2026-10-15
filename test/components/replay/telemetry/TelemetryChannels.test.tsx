@@ -47,6 +47,15 @@ describe('Authentic VCR Telemetry Channels', () => {
     expect(Number.parseFloat(screen.getByText('G1').style.top)).toBeCloseTo(494 / 508 * 100);
   });
 
+  it('scales to 6 gears when maxGear is 6 and displays G6, G3, G1 ticks', () => {
+    const { container } = render(<TelemetryGearChannel gearPath="M 0 81.7 L 1000 81.7" maxGear={6} isCursorInView={false} cursorPct={0} />);
+    expect(container.querySelector('svg[viewBox="0 13 1000 70.66666666666667"]')).toBeInTheDocument();
+    expect(screen.getByText('G6')).toBeInTheDocument();
+    expect(screen.getByText('G3')).toBeInTheDocument();
+    expect(screen.getByText('G1')).toBeInTheDocument();
+    expect(screen.queryByText('G7')).not.toBeInTheDocument();
+  });
+
   it('renders TelemetryGearChannel with yellow/amber gear styling and label', () => {
     const { container } = render(
       <TelemetryGearChannel

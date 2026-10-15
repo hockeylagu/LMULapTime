@@ -1,12 +1,12 @@
 import type { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
-import type { PointComparison } from '../../../utils/replayComparison.js';
+import type { BaselineChartSample, PointComparison } from '../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 import type { CornerPaths } from './telemetryCornerChartPaths.js';
 import type { DeltaGradientStop, TelemetryChartPathsResult } from './telemetryChartTypes.js';
 
 /** Gear position in the full-height SVG coordinate system (0–100). */
-export function gearTraceY(gear: number): number {
-  return 95 - (gear / 7) * 80;
+export function gearTraceY(gear: number, maxGear: number = 7): number {
+  return 95 - (gear / maxGear) * 80;
 }
 
 /** The scales the single-value traces are normalised against. */
@@ -15,6 +15,7 @@ export interface ChartBounds {
   maxRpm: number;
   maxFuel: number;
   maxRegen: number;
+  maxGear: number;
 }
 
 /** The SVG path of every single-value channel of one lap (the primary or the baseline). */
@@ -108,22 +109,53 @@ export function appendScalarPoint(
     t[channel.key] += step(starts ? 'M' : 'L', x, channel.y(v, bounds));
   }
   // Forward gears occupy the inset range, keeping step strokes off the edges.
-  const gy = gearTraceY(gear);
+  const gy = gearTraceY(gear, bounds.maxGear);
   if (isFirst) t.gr += step('M', x, gy);
-  else t.gr += step('L', x, gearTraceY(prevGear)) + step('L', x, gy);
+  else t.gr += step('L', x, gearTraceY(prevGear, bounds.maxGear)) + step('L', x, gy);
 }
 
 /** The scales both laps share, with a floor so a quiet lap keeps a readable axis. */
-export function computeChartBounds(points: ReplayTrajectoryPoint[], comparisons: PointComparison[]): ChartBounds {
-  const maxSpd = Math.max(260, ...points.map(p => p.speedKmh || 0), ...comparisons.map(c => c.baseline.speedKmh));
-  const rawMaxRpm = Math.max(8000, ...points.map(p => p.engineRpm || 0), ...comparisons.map(c => c.baseline.engineRpm || 0));
-  const rawMaxFuel = Math.max(50, ...points.map(p => p.fuel || 0), ...comparisons.map(c => c.baseline.fuel || 0));
-  const rawMaxRegen = Math.max(150, ...points.map(p => p.regenRate || 0), ...comparisons.map(c => c.baseline.regenRate || 0));
+export function computeChartBounds(
+  points: ReplayTrajectoryPoint[],
+  comparisons: PointComparison[],
+  baselineSamples?: BaselineChartSample[]
+): ChartBounds {
+  let peakSpd = 0;
+  let rawMaxRpm = 8000;
+  let rawMaxFuel = 50;
+  let rawMaxRegen = 150;
+  let highestGear = 0;
+
+  for (const p of points) {
+    if (p.speedKmh) peakSpd = Math.max(peakSpd, p.speedKmh);
+    if (p.engineRpm) rawMaxRpm = Math.max(rawMaxRpm, p.engineRpm);
+    if (p.fuel) rawMaxFuel = Math.max(rawMaxFuel, p.fuel);
+    if (p.regenRate) rawMaxRegen = Math.max(rawMaxRegen, p.regenRate);
+    if (p.gear) highestGear = Math.max(highestGear, p.gear);
+  }
+
+  for (const c of comparisons) {
+    if (c.baseline.speedKmh) peakSpd = Math.max(peakSpd, c.baseline.speedKmh);
+    if (c.baseline.engineRpm) rawMaxRpm = Math.max(rawMaxRpm, c.baseline.engineRpm);
+    if (c.baseline.fuel) rawMaxFuel = Math.max(rawMaxFuel, c.baseline.fuel);
+    if (c.baseline.regenRate) rawMaxRegen = Math.max(rawMaxRegen, c.baseline.regenRate);
+    if (c.baseline.gear) highestGear = Math.max(highestGear, c.baseline.gear);
+  }
+
+  if (baselineSamples) {
+    for (const s of baselineSamples) {
+      if (s.point.gear) highestGear = Math.max(highestGear, s.point.gear);
+    }
+  }
+
+  const maxSpd = Math.max(260, Math.floor(peakSpd / 5) * 5 + 5);
+  const maxGear = highestGear >= 7 ? 7 : 6;
   return {
     maxSpd,
     maxRpm: Math.ceil(rawMaxRpm / 1000) * 1000,
     maxFuel: Math.ceil(rawMaxFuel / 10) * 10,
     maxRegen: Math.ceil(rawMaxRegen / 50) * 50,
+    maxGear,
   };
 }
 
@@ -241,7 +273,7 @@ export function buildDeltaGradientStops(
 export function emptyChartPaths(): TelemetryChartPathsResult {
   const emptyCorner: CornerPaths = { fl: '', fr: '', rl: '', rr: '' };
   return {
-    speedPath: '', maxSpeed: 260, throttlePath: '', throttleArea: '', brakePath: '', brakeArea: '', steerPath: '', gearPath: '',
+    speedPath: '', maxSpeed: 260, throttlePath: '', throttleArea: '', brakePath: '', brakeArea: '', steerPath: '', gearPath: '', maxGear: 6,
     baselineSpeedPath: '', baselineThrottlePath: '', baselineBrakePath: '', baselineSteerPath: '', baselineGearPath: '',
     deltaTimePath: '', deltaTimeArea: '', deltaGainArea: '', deltaLossArea: '', deltaGradientStops: [], maxDeltaSec: 1,
     rpmPath: '', rpmArea: '', baselineRpmPath: '', maxRpm: 9000,

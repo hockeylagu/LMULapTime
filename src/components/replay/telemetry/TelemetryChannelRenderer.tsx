@@ -82,7 +82,7 @@ export const TelemetryChannelRenderer: React.FC<TelemetryChannelRendererProps> =
     case 'brake':
       return <TelemetryBrakeChannel brakePath={paths.brakePath} brakeArea={paths.brakeArea} baselineBrakePath={paths.baselineBrakePath} {...cursorProps} />;
     case 'gear':
-      return <TelemetryGearChannel gearPath={paths.gearPath} baselineGearPath={paths.baselineGearPath} {...cursorProps} />;
+      return <TelemetryGearChannel gearPath={paths.gearPath} maxGear={paths.maxGear} baselineGearPath={paths.baselineGearPath} {...cursorProps} />;
     case 'steer':
       return (
         <TelemetrySteerChannel

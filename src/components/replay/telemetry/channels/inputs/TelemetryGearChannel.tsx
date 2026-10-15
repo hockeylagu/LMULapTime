@@ -4,15 +4,26 @@ import { ReplayTrajectoryPoint } from '../../../../../../shared/types/index.js';
 import { PointComparison } from '../../../../../utils/replayComparison.js';
 import { TELEMETRY_COLORS } from '../../../../../utils/themeColors.js';
 import { TelemetryGridLine, TelemetryStaticTrace } from '../../TelemetryStaticTrace.js';
+import { gearTraceY } from '../../telemetryChartPathBuilders.js';
 
-const GEAR_GRID_LINES: readonly TelemetryGridLine[] = [
-  { label: 'G7', yPercent: 2 / (508 / 7) * 100, borderClassName: 'border-b border-lmu-warn/30', labelClassName: 'text-[10px] text-lmu-warn font-mono' },
-  { label: 'G4', yPercent: 50, borderClassName: 'border-b border-lmu-warn/30', labelClassName: 'text-[10px] text-lmu-warn font-mono' },
-  { label: 'G1', yPercent: (494 / 7) / (508 / 7) * 100, borderClassName: 'border-b border-lmu-warn/30', labelClassName: 'text-[10px] text-lmu-warn font-mono' },
-];
+export function gearGridLines(maxGear: number): readonly TelemetryGridLine[] {
+  const minY = 13;
+  const maxY = gearTraceY(1, maxGear) + 2;
+  const span = maxY - minY;
+  const midGear = Math.round(maxGear / 2);
+  const gears = [maxGear, midGear, 1];
+
+  return gears.map(g => ({
+    label: `G${g}`,
+    yPercent: ((gearTraceY(g, maxGear) - minY) / span) * 100,
+    borderClassName: 'border-b border-lmu-warn/30',
+    labelClassName: 'text-[10px] text-lmu-warn font-mono',
+  }));
+}
 
 export interface TelemetryGearChannelProps {
   gearPath: string;
+  maxGear?: number;
   baselineGearPath?: string;
   currentPoint?: ReplayTrajectoryPoint;
   currentComparison?: PointComparison | null;
@@ -29,14 +40,18 @@ function formatGearLabel(g?: number): string {
 
 export const TelemetryGearChannel: React.FC<TelemetryGearChannelProps> = React.memo(({
   gearPath,
+  maxGear = 7,
   baselineGearPath,
   currentPoint,
   currentComparison,
   isCursorInView,
   cursorPct,
 }) => {
+  const viewBoxHeight = useMemo(() => gearTraceY(1, maxGear) + 2 - 13, [maxGear]);
+  const gridLines = useMemo(() => gearGridLines(maxGear), [maxGear]);
+
   const chartSvg = useMemo(() => (
-    <svg viewBox="0 13 1000 72.57142857142857" preserveAspectRatio="none" className="w-full h-full">
+    <svg viewBox={`0 13 1000 ${viewBoxHeight}`} preserveAspectRatio="none" className="w-full h-full overflow-visible">
       {baselineGearPath && (
         <path
           d={baselineGearPath}
@@ -76,7 +91,7 @@ export const TelemetryGearChannel: React.FC<TelemetryGearChannelProps> = React.m
 
       <TelemetryStaticTrace
         chart={chartSvg}
-        gridLines={GEAR_GRID_LINES}
+        gridLines={gridLines}
         gridClassName="absolute inset-0 pointer-events-none opacity-20"
       />
 

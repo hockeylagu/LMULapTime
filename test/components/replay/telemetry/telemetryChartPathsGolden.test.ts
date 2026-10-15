@@ -55,14 +55,16 @@ describe('computeTelemetryChartPaths - whole lap golden output', () => {
   const distances = getTrajectoryDistances(points);
 
   it('draws the whole lap with the baseline read at the primary samples', () => {
-    const { maxSpeed, ...paths } = computeTelemetryChartPaths(points, comparisons, 0, 80, distances);
-    expect(maxSpeed).toBe(260);
-    expect(digest(paths)).toBe('278c8ad681dda381');
+    const { maxSpeed, maxGear, ...paths } = computeTelemetryChartPaths(points, comparisons, 0, 80, distances);
+    expect(maxSpeed).toBe(265);
+    expect(maxGear).toBe(7);
+    expect(digest(paths)).toBe('a7e315513e4d88b3');
   });
 
   it('draws a zoomed window with the baseline lap on its own samples', () => {
-    const { maxSpeed, ...paths } = computeTelemetryChartPaths(points, comparisons, 20, 55, distances, baseline);
-    expect(maxSpeed).toBe(260);
-    expect(digest(paths)).toBe('af804d2781de7e34');
+    const { maxSpeed, maxGear, ...paths } = computeTelemetryChartPaths(points, comparisons, 20, 55, distances, baseline);
+    expect(maxSpeed).toBe(265);
+    expect(maxGear).toBe(7);
+    expect(digest(paths)).toBe('282745025ffc88df');
   });
 });

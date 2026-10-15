@@ -31,7 +31,7 @@ export const TelemetrySpeedChannel: React.FC<TelemetrySpeedChannelProps> = React
   cursorPct,
 }) => {
   const chartSvg = useMemo(() => (
-    <svg viewBox="0 10 1000 85" preserveAspectRatio="none" className="w-full h-full">
+    <svg viewBox="0 10 1000 85" preserveAspectRatio="none" className="w-full h-full overflow-visible">
       {baselineSpeedPath && (
         <path
           d={baselineSpeedPath}

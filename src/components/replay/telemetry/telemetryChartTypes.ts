@@ -15,6 +15,7 @@ export interface TelemetryChartPathsResult {
   brakeArea: string;
   steerPath: string;
   gearPath: string;
+  maxGear: number;
   baselineSpeedPath: string;
   baselineThrottlePath: string;
   baselineBrakePath: string;
