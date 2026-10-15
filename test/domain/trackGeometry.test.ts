@@ -218,6 +218,7 @@ describe('track map display validation', () => {
     ['wrong revision', { ...mapDisplay(), sourceRevision: 'old-mesh' }, 'test_gp', 'mesh-v2'],
     ['malformed polygon ring', { ...mapDisplay(), surfaces: { ...mapDisplay().surfaces, road: [[[[0, 0], [1, 1]]]] } }, 'test_gp', 'mesh-v2'],
     ['nonfinite coordinate', { ...mapDisplay(), surfaces: { ...mapDisplay().surfaces, road: [[[[0, 0], [10, 0], [Infinity, 10]]]] } }, 'test_gp', 'mesh-v2'],
+    ['malformed raised kerb ring', { ...mapDisplay(), surfaces: { ...mapDisplay().surfaces, raisedKerb: [[[[0, 0], [1, 1]]]] } }, 'test_gp', 'mesh-v2'],
     ['malformed grass ring', { ...mapDisplay(), surfaces: { ...mapDisplay().surfaces, grass: [[[[0, 0], [1, 1]]]] } }, 'test_gp', 'mesh-v2'],
     ['apron that is not an array', { ...mapDisplay(), surfaces: { ...mapDisplay().surfaces, apron: {} } }, 'test_gp', 'mesh-v2'],
     ['malformed braking marker', { ...mapDisplay(), brakeMarkers: [{ id: 'bad', center: [0, 0], stationM: -5, side: 'left' }] }, 'test_gp', 'mesh-v2'],

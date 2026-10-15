@@ -86,6 +86,7 @@ export const MAP_COLORS = {
   roadBorder: '#1A2234',
   physicalRoadSurface: '#253448',
   kerbSurface: '#64748B',
+  raisedKerbSurface: '#D4A45E',
   runoffSurface: '#30343A',
   apronSurface: '#3B3456',
   gravelSurface: '#4B4336',

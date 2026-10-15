@@ -72,6 +72,18 @@ describe('GPS map display layers', () => {
     expect(container.querySelector('[data-surface="otherRoad"]')).toBeInTheDocument();
   });
 
+  it('explains raised kerb colour under the existing Kerbs toggle', () => {
+    const { container } = renderMap(mapDisplay({ raisedKerb: [polygon(115)] }));
+    openLayers();
+    expect(screen.getByRole('list', { name: 'Kerb colours' })).toHaveTextContent('Standard kerbs');
+    expect(screen.getByRole('list', { name: 'Kerb colours' })).toHaveTextContent('Raised kerbs');
+    expect(screen.queryByRole('checkbox', { name: 'Raised kerbs' })).not.toBeInTheDocument();
+    expect(container.querySelector('[data-surface="raisedKerb"]')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Kerbs' }));
+    expect(container.querySelector('[data-surface="raisedKerb"]')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-surface="kerb"]')).not.toBeInTheDocument();
+  });
+
   it('shows only the active road and kerbs by default', () => {
     const { container } = renderMap();
     const surfacePaths = [...container.querySelectorAll('[data-surface]')].map(path => path.getAttribute('data-surface'));

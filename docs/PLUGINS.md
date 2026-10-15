@@ -78,6 +78,8 @@ No executable package scripts, downloads, registry, settings manager or automati
 of this version. Packages are supplied separately and excluded from static builds.
 `npm run build` checks inputs and output for forbidden detailed assets; basic SVGs are allowed.
 
+Optional display `surfaces.raisedKerb` polygons identify native raised/anti-cut kerbs. They are an amber overlay under the existing Kerbs toggle; the combined `kerb` footprint remains usable by older clients. Missing overlays in older packages retain the standard kerb colour.
+
 ## Regression tests
 
 The default suite uses synthetic geometry and vehicle records. Optional personal

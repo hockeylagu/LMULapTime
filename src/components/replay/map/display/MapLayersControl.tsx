@@ -1,5 +1,6 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { Layers } from 'lucide-react';
+import { MAP_COLORS } from '../../../../utils/themeColors.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 import { DROPDOWN_CONTENT_INSET, DROPDOWN_PANEL } from '../../../common/dropdown/dropdownStyles.js';
 import { DEFAULT_MAP_LAYERS, MAP_LAYER_LABELS, RUNOFF_GROUP, RUNOFF_LEGEND, type MapLayers, type MapLayerKey } from './mapLayers.js';
@@ -16,13 +17,14 @@ interface Props {
   available: Partial<Record<MapLayerKey, boolean>>;
   /** Runoff kinds this layout has, keyed for the colour legend. */
   runoffKinds?: readonly MapLayerKey[];
+  hasRaisedKerbs?: boolean;
   error?: string | null;
   onFitTrack: () => void;
   onFitVisible: () => void;
   pedalPoints?: PedalPointsControl;
 }
 
-export const MapLayersControl: React.FC<Props> = ({ layers, onChange, available, runoffKinds = [], error, onFitTrack, onFitVisible, pedalPoints }) => {
+export const MapLayersControl: React.FC<Props> = ({ layers, onChange, available, runoffKinds = [], hasRaisedKerbs = false, error, onFitTrack, onFitVisible, pedalPoints }) => {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -96,6 +98,16 @@ export const MapLayersControl: React.FC<Props> = ({ layers, onChange, available,
               onChange={pedalPoints.onToggle} className={`accent-lmu-accent w-3.5 h-3.5 cursor-pointer disabled:cursor-not-allowed ${FOCUS_RING}`} />
             Pedal Points
           </label>}
+          {key === 'kerb' && layers.kerb && hasRaisedKerbs && (
+            <ul className="pl-5 py-1 flex flex-col gap-1 border-l border-lmu-border ml-2 mb-1" aria-label="Kerb colours">
+              {[{ label: 'Standard kerbs', color: MAP_COLORS.kerbSurface },
+                { label: 'Raised kerbs', color: MAP_COLORS.raisedKerbSurface }].map(item => (
+                <li key={item.label} className="flex gap-2 items-center text-[11px] text-lmu-muted">
+                  <span aria-hidden className="w-3 h-3 rounded-sm border border-lmu-rule" style={{ backgroundColor: item.color }} />
+                  {item.label}
+                </li>))}
+            </ul>
+          )}
           {key === 'runoff' && layers.runoff && runoffKinds.length > 1 && (
             <ul className="pl-5 py-1 flex flex-col gap-1 border-l border-lmu-border ml-2 mb-1" aria-label="Runoff colours">
               {RUNOFF_LEGEND.filter(item => runoffKinds.includes(item.key)).map(item => (

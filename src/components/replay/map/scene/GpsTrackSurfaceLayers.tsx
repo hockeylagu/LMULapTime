@@ -14,7 +14,7 @@ interface Props {
 
 /** Compound SVG paths preserve islands and holes without creating one element per triangle. */
 export const GpsTrackSurfaceLayers: React.FC<Props> = React.memo(({ surfaces, bounds, viewBoxSize, padding, layers = DEFAULT_MAP_LAYERS }) => {
-  const paths = useMemo(() => (['grass', 'gravel', 'runoff', 'apron', 'otherRoad', 'pit', 'road', 'kerb'] as const).map(kind => ({
+  const paths = useMemo(() => (['grass', 'gravel', 'runoff', 'apron', 'otherRoad', 'pit', 'road', 'kerb', 'raisedKerb'] as const).map(kind => ({
     kind,
     d: (surfaces[kind] ?? []).map(polygon => polygon.map(ring => {
       const points = projectBoundaryPoints(ring, bounds, viewBoxSize, padding);
@@ -23,11 +23,11 @@ export const GpsTrackSurfaceLayers: React.FC<Props> = React.memo(({ surfaces, bo
     }).join(' ')).join(' '),
   })), [surfaces, bounds, viewBoxSize, padding]);
 
-  const fills = { road: MAP_COLORS.physicalRoadSurface, kerb: MAP_COLORS.kerbSurface, runoff: MAP_COLORS.runoffSurface,
+  const fills = { road: MAP_COLORS.physicalRoadSurface, kerb: MAP_COLORS.kerbSurface, raisedKerb: MAP_COLORS.raisedKerbSurface, runoff: MAP_COLORS.runoffSurface,
     apron: MAP_COLORS.apronSurface, gravel: MAP_COLORS.gravelSurface, grass: MAP_COLORS.grassSurface, pit: MAP_COLORS.pitSurface, otherRoad: MAP_COLORS.outerRoadSurface };
   return (
     <g data-testid="gps-track-surface-layers" className="pointer-events-none select-none">
-      {paths.filter(layer => layers[layer.kind] && layer.d.trim()).map(layer => (
+      {paths.filter(layer => layers[layer.kind === 'raisedKerb' ? 'kerb' : layer.kind] && layer.d.trim()).map(layer => (
         <path key={layer.kind} data-surface={layer.kind} d={layer.d} fill={fills[layer.kind]}
           fillRule="evenodd" stroke="none" />
       ))}

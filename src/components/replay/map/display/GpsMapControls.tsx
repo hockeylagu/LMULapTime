@@ -41,11 +41,12 @@ export const GpsMapControls: React.FC<Props> = ({ camera, layers, onChange, geom
     isPlaying={isPlaying} onTogglePlay={shouldShowPlayPause ? onTogglePlay : undefined}
     orientation={orientation} className="top-2 right-2 bottom-auto">
     <MapLayersControl layers={layers} onChange={onChange} error={error} pedalPoints={pedalPoints}
-      available={{ road: true, kerb: Boolean(display?.surfaces.kerb.length || geometry?.surfaceProfile && geometry.mapSurfaces?.kerb.length),
+      available={{ road: true, kerb: Boolean(display?.surfaces.kerb.length || display?.surfaces.raisedKerb?.length || geometry?.surfaceProfile && geometry.mapSurfaces?.kerb.length),
         runoff: RUNOFF_GROUP.some(key => display?.surfaces[key]?.length || geometry?.mapSurfaces?.[key]?.length),
         pit: Boolean(display?.surfaces.pit.length), otherRoad: Boolean(display?.surfaces.otherRoad.length),
         brakeMarkers: Boolean(display?.brakeMarkers?.length),
         centerline: center.length > 0, sectors: Boolean(hasSectors), turns: Boolean(hasTurns) }}
+      hasRaisedKerbs={Boolean(display?.surfaces.raisedKerb?.length)}
       runoffKinds={RUNOFF_GROUP.filter(key => display?.surfaces[key]?.length || geometry?.mapSurfaces?.[key]?.length)}
       onFitTrack={() => fit(active)} onFitVisible={() => fit([...active,
         ...projectBoundaryPoints(visibleSurfacePoints(display?.surfaces ?? geometry?.mapSurfaces,

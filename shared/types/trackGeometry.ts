@@ -18,6 +18,8 @@ export type TrackSurfacePolygon = Array<Array<[number, number]>>;
 export interface TrackMapSurfaces {
   road: TrackSurfacePolygon[];
   kerb: TrackSurfacePolygon[];
+  /** Native raised/anti-cut kerbs, drawn over the combined kerb layer; absent in older packages. */
+  raisedKerb?: TrackSurfacePolygon[];
   runoff: TrackSurfacePolygon[];
   /** Painted and artificial-turf runoff, split from `runoff` for display only. */
   apron?: TrackSurfacePolygon[];

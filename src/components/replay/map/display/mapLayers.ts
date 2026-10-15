@@ -56,6 +56,6 @@ export function activeTrackBounds(geometry: TrackBoundaryGeometry | null | undef
 
 export function visibleSurfacePoints(surfaces: TrackMapSurfaces | undefined, layers: MapLayers): Array<[number, number]> {
   if (!surfaces) return [];
-  return (['road', 'kerb', 'runoff', 'apron', 'gravel', 'grass', 'pit', 'otherRoad'] as const)
-    .flatMap(key => layers[key] ? (surfaces[key] ?? []).flatMap(polygon => polygon.flat()) : []);
+  return (['road', 'kerb', 'raisedKerb', 'runoff', 'apron', 'gravel', 'grass', 'pit', 'otherRoad'] as const)
+    .flatMap(key => layers[key === 'raisedKerb' ? 'kerb' : key] ? (surfaces[key] ?? []).flatMap(polygon => polygon.flat()) : []);
 }

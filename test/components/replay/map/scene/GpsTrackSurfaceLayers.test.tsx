@@ -4,6 +4,22 @@ import { GpsTrackSurfaceLayers } from '../../../../../src/components/replay/map/
 import type { TrackMapSurfaces } from '../../../../../shared/types/trackGeometry.js';
 
 describe('GpsTrackSurfaceLayers', () => {
+  it('draws raised kerbs in a distinct colour and hides both kerb types together', () => {
+    const surfaces: TrackMapSurfaces = { road: [], kerb: [[[[0, 0], [10, 0], [10, 1], [0, 0]]]],
+      raisedKerb: [[[[2, 1], [2.3, 1], [2.3, 4], [2, 1]]]], runoff: [] };
+    const props = { surfaces, bounds: { minX: 0, minZ: 0, spanX: 10, spanZ: 10 }, viewBoxSize: 100, padding: 10 };
+    const { container, rerender } = render(<svg><GpsTrackSurfaceLayers {...props} /></svg>);
+    const ordinary = container.querySelector('[data-surface="kerb"]');
+    const raised = container.querySelector('[data-surface="raisedKerb"]');
+    expect(raised).not.toBeNull();
+    expect(raised?.getAttribute('fill')).not.toBe(ordinary?.getAttribute('fill'));
+    rerender(<svg><GpsTrackSurfaceLayers {...props} layers={{ road: true, kerb: false, brakeMarkers: false,
+      brakeDistance: true, brakeAds: true, brakeDigi: true, pit: false, centerline: false, runoff: false,
+      otherRoad: false, apron: false, gravel: false, grass: false, sectors: true, turns: true, startFinish: true }} /></svg>);
+    expect(container.querySelector('[data-surface="kerb"]')).toBeNull();
+    expect(container.querySelector('[data-surface="raisedKerb"]')).toBeNull();
+  });
+
   it('projects local meters with the same axis orientation as telemetry and preserves holes', () => {
     const surfaces: TrackMapSurfaces = {
       road: [[[[0, 0], [10, 0], [10, 10], [0, 0]], [[2, 2], [3, 2], [3, 3], [2, 2]]]],
