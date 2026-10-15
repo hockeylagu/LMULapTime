@@ -50,7 +50,7 @@ describe('GpsTrackSegments', () => {
     // 120 and 140 km/h are different speed colours: two runs.
     const primaryPaths = container.querySelectorAll('path[data-track-line="primary"]');
     expect(primaryPaths).toHaveLength(2);
-    expect(primaryPaths[0]).toHaveAttribute('d', 'M 100.00 100.00 L 110.00 110.00');
+    expect(primaryPaths[0]).toHaveAttribute('d', 'M 100.000 100.000 L 110.000 110.000');
     expect(primaryPaths[0]).toHaveAttribute('vector-effect', 'non-scaling-stroke');
     expect(primaryPaths[0]).toHaveAttribute('stroke-width', '2.5');
 
@@ -78,7 +78,7 @@ describe('GpsTrackSegments', () => {
     const { container } = render(<svg><GpsTrackSegments svgPoints={fullThrottle} colorBy="pedal" /></svg>);
     const paths = container.querySelectorAll('path[data-track-line="primary"]');
     expect(paths).toHaveLength(1);
-    expect(paths[0]).toHaveAttribute('d', 'M 100.00 100.00 L 110.00 100.00 L 120.00 100.00 L 130.00 100.00');
+    expect(paths[0]).toHaveAttribute('d', 'M 100.000 100.000 L 110.000 100.000 L 120.000 100.000 L 130.000 100.000');
   });
 
   it('keeps touch targets independent of colour changes without joining gaps', () => {
@@ -128,7 +128,7 @@ describe('GpsTrackSegments', () => {
     ];
     const { container } = render(<svg><GpsTrackSegments svgPoints={gapped} colorBy="pedal" /></svg>);
     const paths = container.querySelectorAll('path[data-track-line="primary"]');
-    expect([...paths].map(p => p.getAttribute('d'))).toEqual(['M 100.00 100.00 L 110.00 100.00', 'M 200.00 100.00 L 210.00 100.00']);
+    expect([...paths].map(p => p.getAttribute('d'))).toEqual(['M 100.000 100.000 L 110.000 100.000', 'M 200.000 100.000 L 210.000 100.000']);
   });
 
   it('dims non-selected track segments outside highlightDistRange', () => {

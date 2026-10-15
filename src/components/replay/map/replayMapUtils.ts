@@ -155,12 +155,12 @@ export function buildContinuousSvgPath(svgPoints: Array<{ sx: number; sy: number
   for (let i = 0; i < svgPoints.length; i++) {
     const p = svgPoints[i];
     if (i === 0) {
-      d += `M ${p.sx.toFixed(1)} ${p.sy.toFixed(1)}`;
+      d += `M ${p.sx.toFixed(3)} ${p.sy.toFixed(3)}`;
     } else {
       if (isLineBreak(svgPoints[i - 1], p)) {
-        d += ` M ${p.sx.toFixed(1)} ${p.sy.toFixed(1)}`;
+        d += ` M ${p.sx.toFixed(3)} ${p.sy.toFixed(3)}`;
       } else {
-        d += ` L ${p.sx.toFixed(1)} ${p.sy.toFixed(1)}`;
+        d += ` L ${p.sx.toFixed(3)} ${p.sy.toFixed(3)}`;
       }
     }
   }
@@ -260,7 +260,7 @@ export function buildTrackLineRuns(
     const color = colorOf(p);
     const isHighlighted = isHighlightedAt(p);
     if (run && run.to === i - 1 && run.color === color && run.isHighlighted === isHighlighted) {
-      run.d += ` L ${p.sx.toFixed(2)} ${p.sy.toFixed(2)}`;
+      run.d += ` L ${p.sx.toFixed(3)} ${p.sy.toFixed(3)}`;
       run.to = i;
       run.minSx = Math.min(run.minSx!, p.sx);
       run.maxSx = Math.max(run.maxSx!, p.sx);
@@ -268,7 +268,7 @@ export function buildTrackLineRuns(
       run.maxSy = Math.max(run.maxSy!, p.sy);
     } else {
       run = {
-        d: `M ${prev.sx.toFixed(2)} ${prev.sy.toFixed(2)} L ${p.sx.toFixed(2)} ${p.sy.toFixed(2)}`,
+        d: `M ${prev.sx.toFixed(3)} ${prev.sy.toFixed(3)} L ${p.sx.toFixed(3)} ${p.sy.toFixed(3)}`,
         color,
         isHighlighted,
         from: i - 1,

@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   projectTrajectoryPoints,
   buildContinuousSvgPath,
+  buildClosedSvgPath,
+  projectBoundaryPoints,
   computeDispersedCornerMarkers,
   getHeatmapColor,
   computeTrackBoundaryPathD,
@@ -32,6 +34,20 @@ describe('replayMapUtils', () => {
     expect(projected[2].idx).toBe(2);
   });
 
+  it('keeps boundary serialization error below a centimetre in Sarthe-sized bounds', () => {
+    const points: Array<[number, number]> = Array.from({ length: 30 }, (_, i) => [123.456 + i * .27, 987.654 - i * .96]);
+    const bounds = { minX: 0, minZ: 0, spanX: 2599.647, spanZ: 5451.970 };
+    const projected = projectBoundaryPoints(points, bounds, 800, 60);
+    const path = buildClosedSvgPath(projected);
+    const encoded = (path.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+    const unitsPerMetre = 680 / bounds.spanZ;
+    for (let i = 0; i < points.length; i++) {
+      const errorM = Math.hypot(encoded[2 * i] - projected[i].sx, encoded[2 * i + 1] - projected[i].sy) / unitsPerMetre;
+      expect(errorM).toBeLessThan(.01);
+    }
+    expect(path.endsWith(' Z')).toBe(true);
+  });
+
   it('builds continuous SVG path string and handles teleport points', () => {
     const closePoints = [
       { sx: 100, sy: 100, x: 10, y: 0, z: 10 },
@@ -39,9 +55,9 @@ describe('replayMapUtils', () => {
       { sx: 120, sy: 120, x: 12, y: 0, z: 12 },
     ];
     const pathD = buildContinuousSvgPath(closePoints);
-    expect(pathD.startsWith('M 100.0 100.0')).toBe(true);
-    expect(pathD).toContain('L 110.0 110.0');
-    expect(pathD).toContain('L 120.0 120.0');
+    expect(pathD.startsWith('M 100.000 100.000')).toBe(true);
+    expect(pathD).toContain('L 110.000 110.000');
+    expect(pathD).toContain('L 120.000 120.000');
 
     // Teleport point creates a new 'M' move segment
     const withTeleport = [...closePoints, { sx: 400, sy: 400, x: 100, z: 100, isTeleport: true }];
@@ -113,20 +129,20 @@ describe('replayMapUtils', () => {
       const left = [{ sx: 8, sy: 18 }];
       const right = [{ sx: 12, sy: 22 }];
       const result = computeTrackBoundaryPathD(centerline, left, right);
-      expect(result).toBe('M 10.0 20.0 L 30.0 40.0 Z');
+      expect(result).toBe('M 10.000 20.000 L 30.000 40.000 Z');
     });
 
     it('derives boundary path from midpoints of left and right boundaries when centerline is absent', () => {
       const left = [{ sx: 10, sy: 10 }, { sx: 20, sy: 20 }];
       const right = [{ sx: 30, sy: 10 }, { sx: 40, sy: 20 }];
       const result = computeTrackBoundaryPathD([], left, right);
-      expect(result).toBe('M 20.0 10.0 L 30.0 20.0 Z');
+      expect(result).toBe('M 20.000 10.000 L 30.000 20.000 Z');
     });
 
     it('falls back to left boundary if right is absent', () => {
       const left = [{ sx: 15, sy: 25 }];
       const result = computeTrackBoundaryPathD([], left, []);
-      expect(result).toBe('M 15.0 25.0 Z');
+      expect(result).toBe('M 15.000 25.000 Z');
     });
 
     it('returns undefined if all boundary point arrays are empty', () => {
