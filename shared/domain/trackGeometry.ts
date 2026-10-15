@@ -18,7 +18,7 @@ const PROFILE_COLUMNS = [
 const KERB_TYPE_COLUMNS = ['leftKerbType', 'rightKerbType'] as const;
 const KERB_TYPES: readonly TrackKerbType[] = ['flat', 'sawtooth', 'other'];
 /** Surface layers added after the first packages; older packages omit them. */
-const OPTIONAL_SURFACES: readonly string[] = ['apron', 'gravel', 'grass', 'raisedKerb'];
+const OPTIONAL_SURFACES: readonly string[] = ['apron', 'gravel', 'grass', 'raisedKerb', 'otherRoadKerb'];
 
 function invalid(path: string): never {
   throw new Error(`Invalid track geometry: ${path}`);

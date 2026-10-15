@@ -54,8 +54,15 @@ export function activeTrackBounds(geometry: TrackBoundaryGeometry | null | undef
   return { minX, minZ, maxX, maxZ, spanX: maxX - minX, spanZ: maxZ - minZ };
 }
 
+/** Raised kerbs follow the Kerbs toggle; other roads' kerbs also need other roads to be shown. */
+export function surfaceLayerVisible(kind: keyof TrackMapSurfaces, layers: MapLayers): boolean {
+  if (kind === 'raisedKerb') return layers.kerb;
+  if (kind === 'otherRoadKerb') return layers.kerb && layers.otherRoad;
+  return layers[kind];
+}
+
 export function visibleSurfacePoints(surfaces: TrackMapSurfaces | undefined, layers: MapLayers): Array<[number, number]> {
   if (!surfaces) return [];
-  return (['road', 'kerb', 'raisedKerb', 'runoff', 'apron', 'gravel', 'grass', 'pit', 'otherRoad'] as const)
-    .flatMap(key => layers[key === 'raisedKerb' ? 'kerb' : key] ? (surfaces[key] ?? []).flatMap(polygon => polygon.flat()) : []);
+  return (['road', 'kerb', 'raisedKerb', 'otherRoadKerb', 'runoff', 'apron', 'gravel', 'grass', 'pit', 'otherRoad'] as const)
+    .flatMap(key => surfaceLayerVisible(key, layers) ? (surfaces[key] ?? []).flatMap(polygon => polygon.flat()) : []);
 }

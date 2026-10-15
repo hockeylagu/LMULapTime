@@ -20,6 +20,22 @@ describe('GpsTrackSurfaceLayers', () => {
     expect(container.querySelector('[data-surface="raisedKerb"]')).toBeNull();
   });
 
+  it('draws other roads\' kerbs in the kerb colour only while other roads are shown', () => {
+    const surfaces: TrackMapSurfaces = { road: [], kerb: [[[[0, 0], [10, 0], [10, 1], [0, 0]]]],
+      otherRoadKerb: [[[[0, 5], [3, 5], [3, 6], [0, 5]]]], runoff: [] };
+    const props = { surfaces, bounds: { minX: 0, minZ: 0, spanX: 10, spanZ: 10 }, viewBoxSize: 100, padding: 10 };
+    const layers = { road: true, kerb: true, brakeMarkers: false, brakeDistance: true, brakeAds: true, brakeDigi: true,
+      pit: false, centerline: false, runoff: false, otherRoad: false, apron: false, gravel: false, grass: false,
+      sectors: true, turns: true, startFinish: true };
+    const { container, rerender } = render(<svg><GpsTrackSurfaceLayers {...props} layers={layers} /></svg>);
+    expect(container.querySelector('[data-surface="otherRoadKerb"]')).toBeNull();
+    rerender(<svg><GpsTrackSurfaceLayers {...props} layers={{ ...layers, otherRoad: true }} /></svg>);
+    const other = container.querySelector('[data-surface="otherRoadKerb"]');
+    expect(other?.getAttribute('fill')).toBe(container.querySelector('[data-surface="kerb"]')?.getAttribute('fill'));
+    rerender(<svg><GpsTrackSurfaceLayers {...props} layers={{ ...layers, otherRoad: true, kerb: false }} /></svg>);
+    expect(container.querySelector('[data-surface="otherRoadKerb"]')).toBeNull();
+  });
+
   it('projects local meters with the same axis orientation as telemetry and preserves holes', () => {
     const surfaces: TrackMapSurfaces = {
       road: [[[[0, 0], [10, 0], [10, 10], [0, 0]], [[2, 2], [3, 2], [3, 3], [2, 2]]]],
