@@ -511,7 +511,7 @@ export function computeDispersedCornerMarkers(
   if (!corners || corners.length === 0 || svgPoints.length === 0) return [];
 
   const markers: DispersedCornerMarker[] = [];
-  const candidateDistances = [38, 46, 54, 62, 70];
+  const candidateDistances = [30, 36, 42, 48, 54];
 
   for (let i = 0; i < corners.length; i++) {
     const c = corners[i];
@@ -572,13 +572,13 @@ export function computeDispersedCornerMarkers(
           // Massive penalty if candidate overlaps with a pedal marker badge
           score = -1500 + distToPedal * 10;
         } else {
-          score = Math.min(clearance, 60) * 4;
+          score = Math.min(clearance, 30) * 4;
           if (side === outsideSign) score += 30; // prefer outside runoff area
           score += Math.min(distToExisting, 40);
           if (distToPedal < 42) {
             score -= (42 - distToPedal) * 10;
           }
-          score -= dist * 0.25; // slight preference for reasonable distance
+          score -= dist; // prefer the closest position with enough clearance
         }
 
         if (score > bestCand.score) {

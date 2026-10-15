@@ -9,6 +9,8 @@ import { useGpsMapPanZoom } from '../useGpsMapPanZoom.js';
 import { GpsCircuitMinimap } from '../GpsCircuitMinimap.js';
 import { GpsTrackSegments } from './GpsTrackSegments.js';
 import { GpsStartFinishLine } from './GpsStartFinishLine.js';
+import { placeStartFinish } from './startFinishPlacement.js';
+import { buildRibbonIndex } from './cornerRibbonClearance.js';
 import { GpsSectorMarkers, placeSectorMarkers } from './GpsSectorMarkers.js';
 import { GpsMapBackground } from '../display/GpsMapBackground.js';
 import { GpsBrakeMarkers } from '../display/GpsBrakeMarkers.js';
@@ -97,16 +99,37 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
     [corners, primaryDists, svgPoints, baselineSvgPoints, pedalMarkerPoints]
   );
   useGpsSceneCameraFocus({ layoutKey: effectiveGeometry?.layoutKey, selectedCornerNumber, cornerMarkers, focusOnPoint, resetPanZoom });
+  const markerTrajectories = useMemo(() => [svgPoints, baselineSvgPoints], [svgPoints, baselineSvgPoints]);
+  const ribbonIndex = useMemo(() => buildRibbonIndex(leftSvgPoints, rightSvgPoints, markerTrajectories),
+    [leftSvgPoints, rightSvgPoints, markerTrajectories]);
   const placedBrakes = useMemo(() => layers.brakeMarkers ? placeBrakeMarkers({ markers: display?.brakeMarkers ?? [],
-    bounds: effectiveBounds, viewBoxSize: VIEWBOX_SIZE, padding: PADDING, markerScale,
+    bounds: effectiveBounds, viewBoxSize: VIEWBOX_SIZE, padding: PADDING, markerScale, ribbon: ribbonIndex,
     showDistance: layers.brakeDistance, showAds: layers.brakeAds, showDigi: layers.brakeDigi }) : [],
-  [layers.brakeMarkers, layers.brakeDistance, layers.brakeAds, layers.brakeDigi, display?.brakeMarkers, effectiveBounds, markerScale]);
+  [layers.brakeMarkers, layers.brakeDistance, layers.brakeAds, layers.brakeDigi, display?.brakeMarkers, effectiveBounds, markerScale, ribbonIndex]);
+  const brakeBoxes = useMemo(() => showsFullBrakeBoards(markerScale) ? placedBrakes.map(board => ({
+    x: board.posX, y: board.posY, hw: (board.width / 2 + 0.7) * markerScale, hh: (board.height / 2 + 0.7) * markerScale,
+  })) : [], [placedBrakes, markerScale]);
+  const placedStart = useMemo(() => layers.startFinish ? placeStartFinish({ svgPoints, zoomLevel, markerScale,
+    gateLeftSvg, gateRightSvg, obstacles: brakeBoxes, ribbon: ribbonIndex }) : null,
+  [layers.startFinish, svgPoints, zoomLevel, markerScale, gateLeftSvg, gateRightSvg, brakeBoxes, ribbonIndex]);
+  const timingObstacles = useMemo(() => [...brakeBoxes, ...(placedStart ? [placedStart.box] : [])], [brakeBoxes, placedStart]);
   const placedSectors = useMemo(() => layers.sectors ? placeSectorMarkers(sectorMarkers, markerScale, zoomLevel,
-    showsFullBrakeBoards(markerScale) ? placedBrakes.map(board => ({ x: board.posX, y: board.posY,
-      hw: board.width * markerScale / 2, hh: board.height * markerScale / 2 })) : []) : [],
-  [layers.sectors, sectorMarkers, markerScale, zoomLevel, placedBrakes]);
+    timingObstacles, ribbonIndex) : [], [layers.sectors, sectorMarkers, markerScale, zoomLevel, timingObstacles, ribbonIndex]);
+  // Keeps badges off the gate itself; pedal lines may still cross it.
+  const gateReservation = useMemo(() => layers.startFinish && svgPoints.length ? [{ x: svgPoints[0].sx, y: svgPoints[0].sy,
+    hw: 13 * markerScale, hh: 13 * markerScale }] : [], [layers.startFinish, svgPoints, markerScale]);
+  const badgeObstacles = useMemo(() => [...timingObstacles,
+    ...placedSectors.map(marker => ({ x: marker.x, y: marker.y, hw: marker.hw, hh: marker.hh }))],
+  [timingObstacles, placedSectors]);
+  const markerObstacles = useMemo(() => [...badgeObstacles, ...gateReservation], [badgeObstacles, gateReservation]);
   const visibleCornerMarkers = layers.turns ? cornerMarkers : NO_CORNER_MARKERS;
-
+  const sectorGates = useMemo(() => placedSectors.flatMap(marker => marker.left ? [{ left: marker.left, right: marker.right }] : []), [placedSectors]);
+  const sceneMarkerObstacles = useMemo(() => [...badgeObstacles, ...placedBrakes.map(board => {
+    const x2 = showsFullBrakeBoards(markerScale) ? board.lineEndX : board.point.sx + board.ux * 7 * markerScale;
+    const y2 = showsFullBrakeBoards(markerScale) ? board.lineEndY : board.point.sy + board.uy * 7 * markerScale;
+    return { x: (board.point.sx + x2) / 2, y: (board.point.sy + y2) / 2,
+      hw: Math.abs(x2 - board.point.sx) / 2 + 2 * markerScale, hh: Math.abs(y2 - board.point.sy) / 2 + 2 * markerScale };
+  })], [badgeObstacles, placedBrakes, markerScale]);
   if (points.length === 0) {
     return <div className={`flex items-center justify-center h-64 text-lmu-muted text-sm ${className}`}>No GPS trajectory data available for this replay recording.</div>;
   }
@@ -140,7 +163,8 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
           <GpsMapBackground geometry={effectiveGeometry} display={display} bounds={effectiveBounds} layers={layers}
             left={leftSvgPoints} right={rightSvgPoints} center={centerlineSvgPoints} pathD={pathD} />
 
-          {placedBrakes.length ? <GpsBrakeMarkers placement={placedBrakes} markerScale={markerScale} /> : null}
+          {placedBrakes.length ? <GpsBrakeMarkers placement={placedBrakes} markerScale={markerScale}
+            startFinishGate={placedStart?.gate} timingGates={sectorGates} obstacles={markerObstacles} /> : null}
 
           <GpsTrackSegments
             svgPoints={svgPoints} baselineSvgPoints={baselineSvgPoints} colorBy={colorBy}
@@ -151,14 +175,16 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
             viewBox={cullViewBox}
           />
 
-          {layers.sectors && <GpsSectorMarkers markers={placedSectors} markerScale={markerScale} />}
-          {layers.startFinish && <GpsStartFinishLine
+          {layers.sectors && <GpsSectorMarkers markers={placedSectors} markerScale={markerScale} obstacles={markerObstacles} />}
+          {layers.startFinish && <GpsStartFinishLine placement={placedStart}
             svgPoints={svgPoints} zoomLevel={zoomLevel} markerScale={markerScale}
             cornerMarkers={visibleCornerMarkers} pedalMarkers={pedalMarkerPoints}
             gateLeftSvg={gateLeftSvg} gateRightSvg={gateRightSvg}
           />}
 
           <GpsSceneMarkers
+            markerObstacles={sceneMarkerObstacles} reserved={gateReservation} trajectories={markerTrajectories} ribbon={ribbonIndex}
+            leftBoundary={leftSvgPoints} rightBoundary={rightSvgPoints}
             cornerMarkers={visibleCornerMarkers} pedalMarkers={pedalMarkerPoints}
             selectedCornerNumber={selectedCornerNumber} onSelectCornerNumber={onSelectCornerNumber}
             onSelectIndex={onSelectIndex} markerScale={markerScale} zoomLevel={zoomLevel}

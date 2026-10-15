@@ -28,6 +28,9 @@ function getNextZoom(current: number, direction: 1 | -1, steps = 1): number {
   return result;
 }
 
+const CENTER_MIN = -500, CENTER_MAX = 1300;
+const clampCenter = (value: number) => Math.max(CENTER_MIN, Math.min(CENTER_MAX, value));
+
 export const DEFAULT_ZOOM = 6;
 export const DEFAULT_FOLLOW_CAR = true;
 export const BASE_ZOOM = 1.5;
@@ -122,10 +125,11 @@ export function useGpsMapPanZoom({
   const currentViewBox = useMemo(() => {
     const effectiveZoom = zoomLevel * BASE_ZOOM;
     const visibleSize = viewBoxSize / effectiveZoom;
-    const centerX = followCar && currentPos ? currentPos.sx : viewBoxSize / 2 + panOffset.x;
-    const centerY = followCar && currentPos ? currentPos.sy : viewBoxSize / 2 + panOffset.y;
-    const vx = Math.max(-500, Math.min(1300, centerX - visibleSize / 2));
-    const vy = Math.max(-500, Math.min(1300, centerY - visibleSize / 2));
+    // Clamp the centre, not the corner: a zoomed-out view is wider than the clamp range and would pin the pan.
+    const centerX = clampCenter(followCar && currentPos ? currentPos.sx : viewBoxSize / 2 + panOffset.x);
+    const centerY = clampCenter(followCar && currentPos ? currentPos.sy : viewBoxSize / 2 + panOffset.y);
+    const vx = centerX - visibleSize / 2;
+    const vy = centerY - visibleSize / 2;
     return `${vx.toFixed(3)} ${vy.toFixed(3)} ${visibleSize.toFixed(3)} ${visibleSize.toFixed(3)}`;
   }, [zoomLevel, followCar, currentPos, panOffset, viewBoxSize]);
 
@@ -180,8 +184,8 @@ export function useGpsMapPanZoom({
     const centerYNew = vyNew + visibleNew / 2;
 
     // Anchor relative to standard viewBox center because zooming disables car lock
-    const newPanX = Math.max(-1000, Math.min(1000, Number((centerXNew - viewBoxSize / 2).toFixed(1))));
-    const newPanY = Math.max(-1000, Math.min(1000, Number((centerYNew - viewBoxSize / 2).toFixed(1))));
+    const newPanX = Number((clampCenter(centerXNew) - viewBoxSize / 2).toFixed(1));
+    const newPanY = Number((clampCenter(centerYNew) - viewBoxSize / 2).toFixed(1));
 
     zoomLevelRef.current = nextZoom;
     panOffsetRef.current = { x: newPanX, y: newPanY };
@@ -279,8 +283,9 @@ export function useGpsMapPanZoom({
         setFollowCar(false);
       }
     }
-    const newPanX = panX - dx * factor;
-    const newPanY = panY - dy * factor;
+    // Keep the pan inside the visible clamp, so dragging back responds immediately.
+    const newPanX = clampCenter(viewBoxSize / 2 + panX - dx * factor) - viewBoxSize / 2;
+    const newPanY = clampCenter(viewBoxSize / 2 + panY - dy * factor) - viewBoxSize / 2;
     panOffsetRef.current = { x: newPanX, y: newPanY };
     setPanOffset({ x: newPanX, y: newPanY });
   };
@@ -310,8 +315,8 @@ export function useGpsMapPanZoom({
   };
 
   const focusOnPoint = (targetX: number, targetY: number, targetZoom = 4.5) => {
-    const newPanX = Math.max(-1000, Math.min(1000, Number((targetX - viewBoxSize / 2).toFixed(1))));
-    const newPanY = Math.max(-1000, Math.min(1000, Number((targetY - viewBoxSize / 2).toFixed(1))));
+    const newPanX = Number((clampCenter(targetX) - viewBoxSize / 2).toFixed(1));
+    const newPanY = Number((clampCenter(targetY) - viewBoxSize / 2).toFixed(1));
     zoomLevelRef.current = targetZoom;
     panOffsetRef.current = { x: newPanX, y: newPanY };
     setZoomLevel(targetZoom);
@@ -328,8 +333,8 @@ export function useGpsMapPanZoom({
   };
 
   const panTo = (targetX: number, targetY: number) => {
-    const newPanX = Math.max(-1000, Math.min(1000, targetX - viewBoxSize / 2));
-    const newPanY = Math.max(-1000, Math.min(1000, targetY - viewBoxSize / 2));
+    const newPanX = clampCenter(targetX) - viewBoxSize / 2;
+    const newPanY = clampCenter(targetY) - viewBoxSize / 2;
     panOffsetRef.current = { x: newPanX, y: newPanY };
     setPanOffset({ x: newPanX, y: newPanY });
     setFollowCar(false);

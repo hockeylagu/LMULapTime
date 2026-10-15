@@ -26,6 +26,20 @@ const tickOf = (container: HTMLElement, id: string) =>
 describe('GpsBrakeMarkers', () => {
   const markers = [marker('a', '150', 20, 100), marker('b', '100', 60, 400)];
 
+  it.each([0.6, 0.2])('gives the start gate priority over colliding ticks at marker scale %s', scale => {
+    const placement = placeBrakeMarkers({ markers: [marker('digi', 'DIGI', 50, 0), marker('nearby', '100', 60, 100)],
+      bounds, viewBoxSize: 800, padding: 60, markerScale: scale });
+    const gate = { left: { sx: 390, sy: 400 }, right: { sx: 410, sy: 400 } };
+    const { container, rerender } = render(<svg><GpsBrakeMarkers placement={placement} markerScale={scale} startFinishGate={gate} /></svg>);
+    expect(tickOf(container, 'digi')).toBeNull();
+    expect(tickOf(container, 'nearby')).toBeInTheDocument();
+    // The board remains at its canonical station; only the conflicting guide tick is suppressed.
+    expect(container.querySelector('[data-marker-id="digi"]')).toHaveAttribute('data-station-m', '0');
+    expect(badgeOf(container, 'digi')).toHaveAttribute('opacity', scale < 0.48 ? '1' : '0');
+    rerender(<svg><GpsBrakeMarkers placement={placement} markerScale={scale} startFinishGate={null} /></svg>);
+    expect(tickOf(container, 'digi')).toBeInTheDocument();
+  });
+
   it('hides badges at full-track zoom while keeping the roadside ticks', () => {
     const { container } = renderMarkers(markers, 0.6);
     expect(badgeOf(container, 'a')).toHaveAttribute('opacity', '0');
@@ -60,15 +74,14 @@ describe('GpsBrakeMarkers', () => {
     expect(ids(renderMarkers(mixed, 0.2, { showDigi: false }).container)).toEqual(['n', 'ad']);
   });
 
-  it('spreads colliding ads over candidate slots and accepts the last slot when every slot is taken', () => {
+  it('keeps every crowded badge separate even after the old candidate slots would be exhausted', () => {
     const crowd = Array.from({ length: 13 }, (_, i) => marker(`ad${i}`, 'ADS', 50, i));
     const { container } = renderMarkers(crowd, 0.2);
     const positions = crowd.map(m => badgeOf(container, m.id).getAttribute('transform'));
     expect(positions).toHaveLength(13);
-    expect(new Set(positions.slice(0, 10)).size).toBeGreaterThan(3);
-    // Slots exhausted: the remaining boards all take the same last candidate instead of being dropped.
-    expect(positions[11]).toBe(positions[12]);
-    expect(positions[12]).not.toBe(positions[0]);
+    expect(new Set(positions).size).toBe(crowd.length);
+    const x = positions.map(position => Number(position?.match(/translate\(([-\d.]+)/)?.[1]));
+    for (let i = 1; i < x.length; i++) expect(x[i] - x[i - 1]).toBeGreaterThan(28 * 0.2);
   });
 
 });

@@ -63,6 +63,26 @@ describe('useGpsMapPanZoom', () => {
     expect(result.current.currentViewBox).toBe(view);
   });
 
+  it('drags both ways when zoomed out beyond the view clamp, and stops at the clamp without dead travel', () => {
+    const { result } = renderHook(() => useGpsMapPanZoom({ viewBoxSize: 800, initialZoom: 0.1, initialFollowCar: false }));
+    const left = () => Number(result.current.currentViewBox.split(' ')[0]);
+    const drag = (dx: number) => act(() => {
+      const target = document.createElement('div');
+      result.current.handlePointerDown({ button: 0, target, clientX: 400, clientY: 400 } as unknown as React.PointerEvent<HTMLDivElement>);
+      result.current.handlePointerMove({ button: 0, target, clientX: 400 + dx, clientY: 400 } as unknown as React.PointerEvent<HTMLDivElement>);
+      result.current.handlePointerUp({ button: 0, target, clientX: 400 + dx, clientY: 400 } as unknown as React.PointerEvent<HTMLDivElement>);
+    });
+    const start = left();
+    drag(20);
+    expect(left()).toBeLessThan(start);
+    drag(-40);
+    expect(left()).toBeGreaterThan(start);
+    drag(-100000);
+    expect(result.current.panOffset.x).toBe(900);
+    drag(20);
+    expect(result.current.panOffset.x).toBeLessThan(900);
+  });
+
   it('initializes at zoomLevel=6, followCar=true and computes default viewBox with BASE_ZOOM=1.5', () => {
     const { result } = renderHook(() =>
       useGpsMapPanZoom({ viewBoxSize: 800, currentPos: { sx: 400, sy: 400 } })

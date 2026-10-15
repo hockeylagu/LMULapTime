@@ -4,15 +4,37 @@ import { GpsSceneMarkers } from '../../../../../src/components/replay/map/scene/
 import type { CornerMarkerPoint } from '../../../../../src/components/replay/map/scene/GpsSceneMarkers.js';
 import type { PedalMarkerPoint } from '../../../../../src/components/replay/map/gpsTrackMapTypes.js';
 
+function cornerPosition(element: HTMLElement) {
+  const transform = element.lastElementChild?.getAttribute('transform') ?? '';
+  const values = transform.match(/translate\(([-\d.]+),\s*([-\d.]+)\)/);
+  return { x: Number(values?.[1]), y: Number(values?.[2]) };
+}
+
 describe('GpsSceneMarkers', () => {
-  it('keeps the selected corner when overview labels overlap and reveals neighbors at closer scale', () => {
+  it.each([0.6, 1, 4.5])('clears circuit lines and DIGI badges at %sx zoom', zoom => {
+    const scale = 1 / zoom;
+    render(<svg><GpsSceneMarkers
+      cornerMarkers={[{ cornerNumber: 7, sx: 140, sy: 100, actualSx: 100, actualSy: 100, idx: 0 }]}
+      pedalMarkers={[]} zoomLevel={zoom} markerScale={scale}
+      trajectories={[[{ sx: 130, sy: 0 }, { sx: 130, sy: 200 }]]}
+      markerObstacles={[{ x: 175, y: 100, hw: 17 * scale, hh: 9 * scale }]}
+    /></svg>);
+    const { x } = cornerPosition(screen.getByTestId('corner-flag-7'));
+    const radius = 13.5 * scale;
+    expect(Math.abs(x - 130) - radius).toBeGreaterThanOrEqual(14 * scale);
+    expect(Math.abs(x - 175) - 17 * scale - radius).toBeGreaterThanOrEqual(14 * scale);
+  });
+
+  it('separates overview labels while keeping the selected corner visible', () => {
     const corners: CornerMarkerPoint[] = [
       { cornerNumber: 1, sx: 100, sy: 100, idx: 0, actualSx: 100, actualSy: 100 },
       { cornerNumber: 2, sx: 120, sy: 100, idx: 1, actualSx: 120, actualSy: 100 },
     ];
     const { rerender } = render(<svg><GpsSceneMarkers cornerMarkers={corners} selectedCornerNumber={2}
       pedalMarkers={[]} markerScale={1} /></svg>);
-    expect(screen.queryByTestId('corner-flag-1')).not.toBeInTheDocument();
+    const first = cornerPosition(screen.getByTestId('corner-flag-1'));
+    const second = cornerPosition(screen.getByTestId('corner-flag-2'));
+    expect(Math.hypot(first.x - second.x, first.y - second.y)).toBeGreaterThan(44);
     expect(screen.getByTestId('corner-flag-2')).toBeInTheDocument();
     rerender(<svg><GpsSceneMarkers cornerMarkers={corners} selectedCornerNumber={2}
       pedalMarkers={[]} markerScale={.25} /></svg>);
@@ -52,10 +74,12 @@ describe('GpsSceneMarkers', () => {
     const cornerGroup = container.querySelector('[data-testid="corner-flag-1"]');
     expect(cornerGroup).toBeInTheDocument();
 
-    // World-coordinate tether line from (m.sx, m.sy) to (m.actualSx, m.actualSy)
+    // The shortened tether retains the apex anchor and original direction.
     const tether = cornerGroup?.querySelector('line');
-    expect(tether).toHaveAttribute('x1', '140');
-    expect(tether).toHaveAttribute('y1', '140');
+    const x = Number(tether?.getAttribute('x1'));
+    const y = Number(tether?.getAttribute('y1'));
+    expect(x).toBe(y);
+    expect(Math.hypot(x - 100, y - 100)).toBeCloseTo(32);
     expect(tether).toHaveAttribute('x2', '100');
     expect(tether).toHaveAttribute('y2', '100');
     expect(tether).toHaveAttribute('vector-effect', 'non-scaling-stroke');
@@ -122,7 +146,7 @@ describe('GpsSceneMarkers', () => {
     expect(badgeText).toHaveAttribute('font-size', '10.5');
   });
 
-  it('flips pedal badge to opposite side when default side collides within 34px of a corner marker', () => {
+  it('moves a turn label clear of the pedal badge instead of overlapping it', () => {
     // Corner marker placed at (100, 126)
     const collidingCorner: CornerMarkerPoint = {
       cornerNumber: 2,
@@ -159,8 +183,8 @@ describe('GpsSceneMarkers', () => {
     const match = transform.match(/translate\(([-0-9.]+),\s*([-0-9.]+)\)/);
     const tagY = Number(match![2]);
 
-    // Because default side (+26) collided with corner marker at y=126, it flipped to -ny (y < 100)
-    expect(tagY).toBeLessThan(100);
+    const cornerY = Number(container.querySelector('[data-testid="corner-flag-2"] line')?.getAttribute('y1'));
+    expect(Math.abs(tagY - cornerY)).toBeGreaterThan(37);
   });
 
   it('adapts corner marker proximity when zoomed so it stays close to the corner without drifting far away', () => {
@@ -180,6 +204,7 @@ describe('GpsSceneMarkers', () => {
           cornerMarkers={[corner]}
           pedalMarkers={[]}
           zoomLevel={4.5}
+          markerScale={1 / 4.5}
         />
       </svg>
     );
@@ -189,9 +214,8 @@ describe('GpsSceneMarkers', () => {
     const x1 = Number(tether?.getAttribute('x1'));
 
     // Without adaptive proximity, x1 would be 150 (dist = 50 world units = 225 screen px at 4.5x).
-    // With adaptive proximity, on screen it stays around ~54px, so in SVG units x1 is ~112 (dist ~12 SVG units).
-    expect(x1).toBeLessThan(130);
-    expect(x1).toBeGreaterThan(105);
+    // The badge stays 32 screen units from the apex even at 4.5x zoom.
+    expect((x1 - 100) * 4.5).toBeCloseTo(32, 0);
   });
 
   it('dims non-selected corners instead of removing them when a corner is selected', () => {

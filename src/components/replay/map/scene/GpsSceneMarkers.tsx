@@ -2,7 +2,11 @@ import type { PedalMarkerPoint } from '../gpsTrackMapTypes.js';
 import React, { useMemo } from 'react';
 import { GpsScenePedalMarker } from './GpsScenePedalMarker.js';
 import { CHART_COLORS, MAP_COLORS } from '../../../../utils/themeColors.js';
-import { isPointInViewBox, parseViewBox } from '../replayMapUtils.js';
+import { isPointInViewBox, parseViewBox, PEDAL_MARKER_LINE_HALF_LEN,
+  PEDAL_MARKER_TAG_BASE_OFFSET, PEDAL_MARKER_TAG_STAGGER_OFFSET } from '../replayMapUtils.js';
+import { buildRibbonIndex, type RibbonIndex, type MarkerObstacle } from './cornerRibbonClearance.js';
+import { placeMarkerBox, placeCornerBadges, cornerExteriorSigns, markerSegmentsOverlap } from './markerPlacement.js';
+import { MarkerGuide } from './MarkerGuide.js';
 
 export interface CornerMarkerPoint {
   cornerNumber: number;
@@ -28,6 +32,13 @@ export interface GpsSceneMarkersProps {
   dimNonSelectedTrack?: boolean;
   showCornerFlags?: boolean;
   viewBox?: string;
+  leftBoundary?: Array<{ sx: number; sy: number }>;
+  rightBoundary?: Array<{ sx: number; sy: number }>;
+  markerObstacles?: MarkerObstacle[];
+  trajectories?: ReadonlyArray<readonly { sx: number; sy: number }[]>;
+  ribbon?: RibbonIndex;
+  /** Areas badges avoid but lines may cross, such as the start/finish gate. */
+  reserved?: MarkerObstacle[];
 }
 
 export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
@@ -44,6 +55,12 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
   dimNonSelectedTrack = false,
   showCornerFlags = true,
   viewBox,
+  leftBoundary,
+  rightBoundary,
+  markerObstacles,
+  trajectories,
+  ribbon,
+  reserved,
 }) => {
   const viewBoxRect = useMemo(() => parseViewBox(viewBox), [viewBox]);
 
@@ -51,43 +68,41 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
     return cornerMarkers ?? markers ?? [];
   }, [cornerMarkers, markers]);
 
-  const cornerPositions = useMemo(() => {
-    const effectiveZoom = zoomLevel ?? (markerScale > 0 ? 1 / markerScale : 1);
-    const hasSelection = selectedCornerNumber != null;
-    return cornersToRender.map(m => {
-      const isSelected = m.cornerNumber === selectedCornerNumber;
-      const isDimmed = hasSelection && !isSelected;
-      const dirX = m.sx - m.actualSx;
-      const dirY = m.sy - m.actualSy;
-      const distWorld = Math.hypot(dirX, dirY) || 1;
-      const uX = dirX / distWorld;
-      const uY = dirY / distWorld;
+  // Zoom-independent, so wheel steps only pay for the nearby-segment queries.
+  const ribbonIndex = useMemo(() => ribbon ?? buildRibbonIndex(leftBoundary ?? [], rightBoundary ?? [], trajectories),
+    [ribbon, leftBoundary, rightBoundary, trajectories]);
 
-      // When unzoomed, keep exact world positions
-      if (effectiveZoom <= 1.01 || distWorld <= 1e-4) {
-        return {
-          ...m,
-          isSelected,
-          isDimmed,
-          posX: m.sx,
-          posY: m.sy,
-        };
-      }
+  const placementObstacles = useMemo(() => [...(markerObstacles ?? []), ...(reserved ?? [])], [markerObstacles, reserved]);
 
-      // When zoomed in, keep badge at a comfortable screen distance (50-56px) rather than drifting hundreds of pixels away
-      const maxScreenDist = (isSelected ? 56 : 50) + Math.sqrt(effectiveZoom) * 2;
-      const targetScreenDist = Math.min(distWorld * effectiveZoom, maxScreenDist);
-      const dSvg = targetScreenDist / effectiveZoom;
+  const apexLabels = useMemo(() => {
+    const occupied = [...placementObstacles];
+    const result = new Map<number, MarkerObstacle>();
+    for (const marker of cornersToRender) {
+      if (showCornerFlags && marker.cornerNumber !== selectedCornerNumber) continue;
+      const dx = marker.sx - marker.actualSx, dy = marker.sy - marker.actualSy;
+      const box = placeMarkerBox({ anchor: { sx: marker.actualSx, sy: marker.actualSy },
+        direction: { sx: dx, sy: dy }, distance: 32 * markerScale },
+      20.6 * markerScale, 9.6 * markerScale, 8 * markerScale, occupied, ribbonIndex);
+      result.set(marker.cornerNumber, box);
+      occupied.push(box);
+    }
+    return result;
+  }, [cornersToRender, showCornerFlags, selectedCornerNumber, markerScale, placementObstacles, ribbonIndex]);
 
-      return {
-        ...m,
-        isSelected,
-        isDimmed,
-        posX: Number((m.actualSx + uX * dSvg).toFixed(1)),
-        posY: Number((m.actualSy + uY * dSvg).toFixed(1)),
-      };
-    });
-  }, [cornersToRender, selectedCornerNumber, zoomLevel, markerScale]);
+  const exteriorSigns = useMemo(() => cornerExteriorSigns(cornersToRender, trajectories?.[0] ?? []), [cornersToRender, trajectories]);
+
+  const cornerPositions = useMemo(() => placeCornerBadges(cornersToRender, { selectedCornerNumber, zoomLevel, markerScale,
+    occupied: [...placementObstacles, ...apexLabels.values()], ribbon: ribbonIndex, exteriorSigns,
+  }).map(({ marker: m, isSelected, isHidden, x, y }) => ({
+    ...m, isSelected, isHidden, isDimmed: selectedCornerNumber != null && !isSelected, posX: x, posY: y,
+    apexLabelX: apexLabels.get(m.cornerNumber)?.x ?? m.actualSx,
+    apexLabelY: apexLabels.get(m.cornerNumber)?.y ?? m.actualSy,
+  })), [cornersToRender, selectedCornerNumber, zoomLevel, markerScale, ribbonIndex, placementObstacles, apexLabels, exteriorSigns]);
+
+  const flagBoxes = useMemo(() => showCornerFlags ? cornerPositions.filter(marker => !marker.isHidden).map(marker => ({
+    x: marker.posX, y: marker.posY,
+    hw: (marker.isSelected ? 17.6 : 14.3) * markerScale, hh: (marker.isSelected ? 17.6 : 14.3) * markerScale })) : [],
+  [showCornerFlags, cornerPositions, markerScale]);
 
   const visiblePedalMarkers = useMemo(() => {
     let list = pedalMarkers;
@@ -100,10 +115,33 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
     return list;
   }, [pedalMarkers, dimNonSelectedTrack, selectedCornerNumber, viewBoxRect]);
 
+  const placedPedals = useMemo(() => {
+    const lines: Array<{ left: { sx: number; sy: number }; right: { sx: number; sy: number } }> = [];
+    const occupied = [...placementObstacles, ...apexLabels.values(), ...flagBoxes];
+    return visiblePedalMarkers.map(marker => {
+      const ray = { anchor: { sx: marker.sx, sy: marker.sy },
+        direction: { sx: marker.nx ?? 0, sy: marker.ny ?? 1 },
+        distance: Math.max(PEDAL_MARKER_LINE_HALF_LEN + 10.4 + 8,
+          PEDAL_MARKER_LINE_HALF_LEN + (marker.isStaggered ? PEDAL_MARKER_TAG_STAGGER_OFFSET : PEDAL_MARKER_TAG_BASE_OFFSET)) * markerScale };
+      const candidates = [ray, { ...ray, direction: { sx: -ray.direction.sx, sy: -ray.direction.sy } }]
+        .map(candidate => placeMarkerBox(candidate, 10.4 * markerScale, 10.4 * markerScale, 8 * markerScale, occupied, ribbonIndex));
+      const distance = (box: MarkerObstacle) => Math.hypot(box.x - marker.sx, box.y - marker.sy);
+      const badge = candidates[distance(candidates[0]) <= distance(candidates[1]) ? 0 : 1];
+      occupied.push(badge);
+      const half = PEDAL_MARKER_LINE_HALF_LEN * markerScale;
+      const line = { left: { sx: marker.sx - ray.direction.sx * half, sy: marker.sy - ray.direction.sy * half },
+        right: { sx: marker.sx + ray.direction.sx * half, sy: marker.sy + ray.direction.sy * half } };
+      const showLine = !lines.some(other => markerSegmentsOverlap(line.left, line.right, other, 3 * markerScale));
+      if (showLine) lines.push(line);
+      return { marker, badgePosition: { sx: badge.x, sy: badge.y }, showLine };
+    });
+  }, [visiblePedalMarkers, placementObstacles, apexLabels, flagBoxes, markerScale, ribbonIndex]);
+
   const visibleCornerFlags = useMemo(() => {
+    const placed = cornerPositions.filter(c => !c.isHidden);
     const candidates = viewBoxRect
-      ? cornerPositions.filter(c => isPointInViewBox(c.posX, c.posY, viewBoxRect) || isPointInViewBox(c.actualSx, c.actualSy, viewBoxRect))
-      : cornerPositions;
+      ? placed.filter(c => isPointInViewBox(c.posX, c.posY, viewBoxRect) || isPointInViewBox(c.actualSx, c.actualSy, viewBoxRect))
+      : placed;
     // Selected corners win collisions. The screen-space margin reveals more labels as zoom increases.
     const ordered = [...candidates].sort((a, b) => Number(b.isSelected) - Number(a.isSelected));
     const kept: typeof cornerPositions = [];
@@ -120,17 +158,14 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
     return cornerPositions.filter(m => isPointInViewBox(m.actualSx, m.actualSy, viewBoxRect));
   }, [cornerPositions, viewBoxRect]);
 
+  const badgeBoxes = [...(markerObstacles ?? []), ...apexLabels.values(), ...flagBoxes,
+    ...placedPedals.map(pedal => ({ x: pedal.badgePosition.sx, y: pedal.badgePosition.sy,
+      hw: 10.4 * markerScale, hh: 10.4 * markerScale }))];
+
   return (
     <>
       {!showCornerFlags && visibleApexMarkers.map(m => {
-        const dirX = m.sx - m.actualSx;
-        const dirY = m.sy - m.actualSy;
-        const distWorld = Math.hypot(dirX, dirY);
-        const uX = distWorld > 1e-4 ? dirX / distWorld : 0;
-        const uY = distWorld > 1e-4 ? dirY / distWorld : -1;
-        const labelDist = 22 * markerScale;
-        const labelX = Number((m.actualSx + uX * labelDist).toFixed(1));
-        const labelY = Number((m.actualSy + uY * labelDist).toFixed(1));
+        const labelX = m.apexLabelX, labelY = m.apexLabelY;
 
         return (
           <g
@@ -144,7 +179,7 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
               onSelectIndex?.(m.idx);
             }}
           >
-            <line x1={m.actualSx} y1={m.actualSy} x2={labelX} y2={labelY} stroke={MAP_COLORS.apex} strokeWidth="1.2" strokeDasharray="2.5 2" opacity={m.isDimmed ? 0.5 : 0.8} vectorEffect="non-scaling-stroke" />
+            <MarkerGuide from={{ sx: m.actualSx, sy: m.actualSy }} to={{ sx: labelX, sy: labelY }} badgeCenter={{ sx: labelX, sy: labelY }} obstacles={badgeBoxes} stroke={MAP_COLORS.apex} strokeWidth="1.2" strokeDasharray="2.5 2" opacity={m.isDimmed ? 0.5 : 0.8} vectorEffect="non-scaling-stroke" />
             {/* Zoom-agnostic apex red dot anchored at trajectory point */}
             <g transform={`translate(${m.actualSx}, ${m.actualSy}) scale(${markerScale})`} pointerEvents="none">
               <circle r="4" fill={MAP_COLORS.apex} stroke={CHART_COLORS.white} strokeWidth="1.5" />
@@ -172,11 +207,9 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
           }}
         >
           {/* Guide tether connecting badge to apex in world coordinates */}
-          <line
-            x1={m.posX}
-            y1={m.posY}
-            x2={m.actualSx}
-            y2={m.actualSy}
+          <MarkerGuide
+            from={{ sx: m.posX, sy: m.posY }} to={{ sx: m.actualSx, sy: m.actualSy }}
+            badgeCenter={{ sx: m.posX, sy: m.posY }} obstacles={badgeBoxes}
             stroke={m.isSelected ? MAP_COLORS.apex : MAP_COLORS.markerMuted}
             strokeWidth={m.isSelected ? '2' : '1.3'}
             strokeDasharray={m.isSelected ? undefined : '3 3'}
@@ -193,7 +226,7 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
             >
               <circle r="8" fill={MAP_COLORS.apex} opacity="0.3" />
               <circle r="4.5" fill={MAP_COLORS.apex} stroke={CHART_COLORS.white} strokeWidth="1.5" />
-              <g transform="translate(0, 18)">
+              <g transform={`translate(${(m.apexLabelX - m.actualSx) / markerScale}, ${(m.apexLabelY - m.actualSy) / markerScale})`}>
                 <rect x="-20" y="-9" width="40" height="18" rx="3" fill={MAP_COLORS.markerBg} stroke={MAP_COLORS.apex} strokeWidth="1.2" opacity="0.95" />
                 <text x="0" y="0" textAnchor="middle" dominantBaseline="central" fill={MAP_COLORS.apexText} fontSize="10" fontFamily="Consolas, monospace" fontWeight="bold" letterSpacing="0.06em" className="select-none">
                   APEX
@@ -224,11 +257,12 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
         </g>
       ))}
 
-      {visiblePedalMarkers.map((m, i) => (
+      {placedPedals.map(({ marker: m, badgePosition, showLine }, i) => (
         <GpsScenePedalMarker
           key={`pedal-${m.isBaseline ? 'base' : 'prim'}-${m.kind}-${m.cornerNumber}-${i}`}
           marker={m}
-          cornerBadgePositions={cornerPositions}
+          badgePosition={badgePosition}
+          obstacles={badgeBoxes} showLine={showLine}
           markerScale={markerScale}
           opacity={(m.isBaseline ? baselineOpacity : primaryOpacity) ?? 1}
         />

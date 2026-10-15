@@ -31,7 +31,10 @@ describe('sector label clearance', () => {
     const moved = placeSectorMarkers(gates, 0.2, 6, boards)[0];
     expect(boards).toEqual(snapshot);
     expect(moved.right).toEqual(gates[0].right);
-    expect(moved.x).toBeGreaterThan(original.x);
+    expect(moved.x !== original.x || moved.y !== original.y).toBe(true);
+    // It may step sideways around the gate, but stays near it instead of being pushed down the ray.
+    expect(Math.hypot(moved.x - moved.right!.sx, moved.y - moved.right!.sy))
+      .toBeLessThan(2 * Math.hypot(original.x - moved.right!.sx, original.y - moved.right!.sy) + 30 * 0.2);
     for (const board of boards) {
       expect(Math.abs(moved.x - board.x) >= moved.hw + board.hw + 1
         || Math.abs(moved.y - board.y) >= moved.hh + board.hh + 1).toBe(true);

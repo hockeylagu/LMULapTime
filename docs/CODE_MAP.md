@@ -345,8 +345,18 @@ index their explicitly supplied replay directory locally.
   fitting controls, a metric scale bar and `GpsBrakeMarkers.tsx` for optional world-position braking boards (faded by
   zoom level; boards without a station fall back to their order along the lap). Their
   labels report printed board distances; unknown distances use a generic brake label.
-  `display/placeBrakeMarkers.ts` places the boards once per zoom in the scene, so `scene/GpsSectorMarkers.tsx` can
-  keep S1/S2 badges (canonical layout gates, else the recorded replay crossing) clear of visible boards. Map Layers
+  `scene/markerPlacement.ts` shares badge-box and connector collision checks across brake boards, START,
+  sectors, turns, APEX and pedal badges. The scene lays out brake boards, then the exact START badge from
+  `scene/startFinishPlacement.ts`, then sectors and corner/pedal labels against those final occupied boxes.
+  Badge searches reuse the spatial road index in `scene/cornerRibbonClearance.ts` (built once per lap from
+  simplified edges and lines, so wheel zoom only pays for nearby-segment queries); measured stations and
+  timing gates stay fixed. Crowding moves labels outward rather than accepting an overlapping final slot;
+  `placeMarkerNear` lets turn and sector badges step around their anchor instead of being pushed far down one
+  ray, avoiding crossed turn tethers. `placeCornerBadges` prefers the circuit exterior on a closed lap and hides
+  an unselected turn badge with no room within 96px of its apex (zoomed out). Pan/zoom clamps the view centre.
+  Brake ticks yield to timing gates, other ticks and badges; `scene/MarkerGuide.tsx` suppresses decorative
+  connectors through occupied badges. Pedal badges remain distinct even when their physical events coincide.
+  The mixed-marker render regression checks every badge pair at 0.6x, 1x, 4.5x and 10x zoom. Map Layers
   (`display/mapLayers.ts`, `MapLayersControl.tsx`) toggles start/finish, sector markers, turns and Pedal Points
   independently; Pedal Points state stays in `ReplayMapContainer.tsx` and is shared by normal and fullscreen views.
   Fullscreen adds `map/telemetry/GpsMapTelemetryDock.tsx`: one selectable 112px trace under the map, including

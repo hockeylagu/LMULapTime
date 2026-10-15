@@ -1,18 +1,22 @@
 import React from 'react';
-import { PEDAL_MARKER_LINE_HALF_LEN, PEDAL_MARKER_TAG_BASE_OFFSET, PEDAL_MARKER_TAG_STAGGER_OFFSET } from '../replayMapUtils.js';
+import { PEDAL_MARKER_LINE_HALF_LEN } from '../replayMapUtils.js';
 import { CHART_COLORS, MAP_COLORS, TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 import type { PedalMarkerPoint } from '../gpsTrackMapTypes.js';
+import type { MarkerObstacle } from './cornerRibbonClearance.js';
+import { MarkerGuide } from './MarkerGuide.js';
+import { markerLineHitsBox } from './markerPlacement.js';
 
 export interface GpsScenePedalMarkerProps {
   marker: PedalMarkerPoint;
-  /** Where the corner badges sit; the tag flips to the other side of the line when it would land on one. */
-  cornerBadgePositions: { posX: number; posY: number }[];
+  badgePosition: { sx: number; sy: number };
+  obstacles: readonly MarkerObstacle[];
+  showLine: boolean;
   markerScale: number;
   opacity: number;
 }
 
 /** One braking-point or throttle-on line across the racing line, with its B / T tag. */
-export const GpsScenePedalMarker: React.FC<GpsScenePedalMarkerProps> = ({ marker: m, cornerBadgePositions, markerScale, opacity }) => {
+export const GpsScenePedalMarker: React.FC<GpsScenePedalMarkerProps> = ({ marker: m, badgePosition, markerScale, opacity, obstacles, showLine }) => {
   const isBrake = m.kind === 'brake';
   const isBase = Boolean(m.isBaseline);
 
@@ -31,17 +35,16 @@ export const GpsScenePedalMarker: React.FC<GpsScenePedalMarkerProps> = ({ marker
   const lineHalfLen = PEDAL_MARKER_LINE_HALF_LEN;
   const x1 = m.sx - nx * lineHalfLen, y1 = m.sy - ny * lineHalfLen;
   const x2 = m.sx + nx * lineHalfLen, y2 = m.sy + ny * lineHalfLen;
-  const tagDist = lineHalfLen + (m.isStaggered ? PEDAL_MARKER_TAG_STAGGER_OFFSET : PEDAL_MARKER_TAG_BASE_OFFSET);
-
-  const defTagX = m.sx + nx * tagDist;
-  const defTagY = m.sy + ny * tagDist;
-  const distToCornerDef = cornerBadgePositions.reduce((minD, c) => Math.min(minD, Math.hypot(defTagX - c.posX, defTagY - c.posY)), Infinity);
-  const side = distToCornerDef < 34 ? -1 : 1;
-  const tagX = m.sx + nx * side * tagDist;
-  const tagY = m.sy + ny * side * tagDist;
+  const tagX = m.sx + (badgePosition.sx - m.sx) / markerScale;
+  const tagY = m.sy + (badgePosition.sy - m.sy) / markerScale;
+  const tagDist = Math.hypot(tagX - m.sx, tagY - m.sy);
+  const side = (tagX - m.sx) * nx + (tagY - m.sy) * ny >= 0 ? 1 : -1;
 
   const stemX1 = m.sx + nx * side * (lineHalfLen + 1), stemY1 = m.sy + ny * side * (lineHalfLen + 1);
   const stemX2 = m.sx + nx * side * (tagDist - 9.5), stemY2 = m.sy + ny * side * (tagDist - 9.5);
+  const localBoxes = obstacles.map(box => ({ x: m.sx + (box.x - m.sx) / markerScale,
+    y: m.sy + (box.y - m.sy) / markerScale, hw: box.hw / markerScale, hh: box.hh / markerScale }));
+  const lineBlocked = localBoxes.some(box => markerLineHitsBox({ sx: x1, sy: y1 }, { sx: x2, sy: y2 }, box, 2));
 
   return (
     <g
@@ -56,13 +59,14 @@ export const GpsScenePedalMarker: React.FC<GpsScenePedalMarkerProps> = ({ marker
       </title>
 
       {/* Outer glow & guide stems */}
-      <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={strokeColor} strokeWidth="3.6" strokeLinecap="round" opacity="0.25" />
-      {m.isStaggered && (
-        <line x1={stemX1} y1={stemY1} x2={stemX2} y2={stemY2} stroke={strokeColor} strokeWidth="1.5" strokeDasharray="2 2" opacity="0.85" />
+      {showLine && !lineBlocked && <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={strokeColor} strokeWidth="3.6" strokeLinecap="round" opacity="0.25" />}
+      {(m.isStaggered || tagDist > 27) && (
+        <MarkerGuide from={{ sx: stemX1, sy: stemY1 }} to={{ sx: stemX2, sy: stemY2 }}
+          badgeCenter={{ sx: tagX, sy: tagY }} obstacles={localBoxes} stroke={strokeColor} strokeWidth="1.5" strokeDasharray="2 2" opacity="0.85" />
       )}
 
       {/* Perpendicular marker line across racing line */}
-      <line
+      {showLine && !lineBlocked && <line
         x1={x1}
         y1={y1}
         x2={x2}
@@ -72,12 +76,14 @@ export const GpsScenePedalMarker: React.FC<GpsScenePedalMarkerProps> = ({ marker
         strokeDasharray={isBase ? '4 3' : undefined}
         strokeLinecap="round"
         opacity={isBase ? '0.9' : '0.95'}
-      />
+      />}
 
       {/* Outer tips & in-line intersection dot */}
-      <circle cx={x1} cy={y1} r="2" fill={strokeColor} />
-      <circle cx={x2} cy={y2} r="2" fill={strokeColor} />
-      <circle cx={m.sx} cy={m.sy} r={isBase ? 2.8 : 2.4} fill={isBase ? MAP_COLORS.markerDotBase : primaryColor} stroke={isBase ? strokeColor : CHART_COLORS.black} strokeWidth={isBase ? 1.6 : 0.9} />
+      {showLine && !lineBlocked && <>
+        <circle cx={x1} cy={y1} r="2" fill={strokeColor} />
+        <circle cx={x2} cy={y2} r="2" fill={strokeColor} />
+        <circle cx={m.sx} cy={m.sy} r={isBase ? 2.8 : 2.4} fill={isBase ? MAP_COLORS.markerDotBase : primaryColor} stroke={isBase ? strokeColor : CHART_COLORS.black} strokeWidth={isBase ? 1.6 : 0.9} />
+      </>}
 
       {/* Indicator badge outside racing line */}
       <g transform={`translate(${tagX.toFixed(1)}, ${tagY.toFixed(1)})`}>
