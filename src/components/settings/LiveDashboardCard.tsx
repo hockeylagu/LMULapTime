@@ -3,7 +3,14 @@ import type { LiveSettings } from '../../../shared/types/live.js';
 import { apiErrorMessage, isAbortError } from '../../api/apiClient.js';
 import { fetchLiveSettings, saveLiveSettings } from '../../api/liveStream.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
+import { Select } from '../common/dropdown/Select.js';
 import { FeedbackMessage, SettingsPanel, type SettingsFeedback } from './SettingsPanel.js';
+
+/** VE or fuel kept at the pit entry or the finish (the server accepts these values only). */
+const RESERVE_OPTIONS = [0, 0.25, 0.5, 0.75, 1, 1.5, 2].map(laps => ({
+  value: laps,
+  label: laps === 0 ? 'No reserve' : `${laps} ${laps === 1 ? 'lap' : 'laps'}`,
+}));
 
 /** The live dashboard options: the page itself lives at `#/live`. */
 export const LiveDashboardCard: React.FC = () => {
@@ -24,11 +31,11 @@ export const LiveDashboardCard: React.FC = () => {
     return () => request.abort();
   }, []);
 
-  const toggle = async (autoOpen: boolean) => {
+  const save = async (change: Partial<LiveSettings>) => {
     setIsSaving(true);
     setMessage(null);
     try {
-      const next = await saveLiveSettings({ autoOpen });
+      const next = await saveLiveSettings(change);
       saved.current += 1;
       setSettings(next);
     } catch (error) {
@@ -46,16 +53,31 @@ export const LiveDashboardCard: React.FC = () => {
       {settings === null && !message ? (
         <p role="status" className="text-xs text-lmu-muted">Loading live dashboard settings…</p>
       ) : (
-        <label className="flex items-center gap-3 text-sm text-lmu-text cursor-pointer">
-          <input
-            type="checkbox"
-            checked={settings?.autoOpen === true}
-            disabled={settings === null || isSaving}
-            onChange={(event) => void toggle(event.target.checked)}
-            className={`h-4 w-4 accent-lmu-accent ${FOCUS_RING}`}
-          />
-          Switch the open app to the live dashboard when LMU starts
-        </label>
+        <>
+          <label className="flex items-center gap-3 text-sm text-lmu-text cursor-pointer">
+            <input
+              type="checkbox"
+              checked={settings?.autoOpen === true}
+              disabled={settings === null || isSaving}
+              onChange={(event) => void save({ autoOpen: event.target.checked })}
+              className={`h-4 w-4 accent-lmu-accent ${FOCUS_RING}`}
+            />
+            Switch the open app to the live dashboard when LMU starts
+          </label>
+          <div className="flex items-center gap-3 text-sm text-lmu-text">
+            <label htmlFor="live-reserve">VE and fuel reserve at the pit entry and the finish</label>
+            <Select
+              id="live-reserve"
+              value={settings?.reserveLaps ?? null}
+              onChange={(reserveLaps) => void save({ reserveLaps })}
+              options={RESERVE_OPTIONS}
+              disabled={settings === null || isSaving}
+              size="compact"
+              mono
+              className="w-36"
+            />
+          </div>
+        </>
       )}
       <FeedbackMessage feedback={message} />
     </SettingsPanel>

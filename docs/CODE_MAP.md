@@ -516,13 +516,23 @@ class from `mapVehicleIdToClass(vehicleName, vehicleClass)` in `liveScreens.ts`)
 screens, built by `liveScreen(snapshot)`), and `LivePedalTrace` (canvas, redrawn by rAF from the `PedalBuffer`
 ring in `pedalBuffer.ts`). `src/api/useAppEvents.ts` is the app-wide `GET /api/events` listener used by
 `useAppData` (scan-started restarts scan polling, scan-finished reloads data). Settings card:
-`settings/LiveDashboardCard.tsx` (`autoOpen`). Tests use `test/helpers/fakeEventSource.ts` and `test/helpers/liveSnapshot.ts`.
+`settings/LiveDashboardCard.tsx` (`autoOpen`, VE/fuel reserve laps). Tests use `test/helpers/fakeEventSource.ts` and `test/helpers/liveSnapshot.ts`.
 Step 2 (identity and timing): the 5 Hz `timing` event goes into `LiveTimingStore` (returned by `useLiveStream` as
 `timing`, read with `useLiveTiming` / `useSyncExternalStore`), so only the timing parts render, not the page. The
-driving content is `LiveDriving` by session kind: `LiveRaceView` (delta row + `LiveLastLapRow`, placeholder primary
-area for later pit advice), `LiveQualiView` (push lap delta, optional tyre average), `LivePracticeView` (also warmup
-and unknown) with `LivePracticeHistory`. `LiveSessionBar` carries laps left, PR and track temperature. `LiveDelta` and
+driving content is `LiveDriving` by session kind: `LiveRaceView`, `LiveQualiView` (push lap delta, optional tyre
+average), `LivePracticeView` (also warmup and unknown) with `LivePracticeHistory`: its current-lap row shows the lap
+number, the running lap clock (`LiveTiming.lapElapsedSeconds`, `formatRunningTime`) and S1/S2 as each line is crossed;
+at the finish it becomes the top completed row. The three completed laps and BEST row stay visible.
+`LiveSessionBar` carries the track (`liveTrackName`: the game's name, else the layout), laps left, PR and one fixed
+560 px weather slot (forecast change in blue, else track temperature). `LiveDelta` and
 `liveFormat.ts` hold the signed-delta (real minus sign, gain/loss tokens), sector and lap formatting.
+Race plan (`src/components/live/race/`): `raceAction.ts` (`racePlanView`) turns `LiveSnapshot.strategy` into one lead
+readout and three cells by mode (calculating, pit-now for a flat or lost wheel, in-pit, pit within 2 laps, stint,
+sprint when the finish is reachable); `LiveRacePlan.tsx` renders them with fixed label/value/note lines and
+`minmax(0, …)` columns so a mode change never moves anything (words get a smaller size than figures);
+`LiveDamageRow.tsx` replaces `LiveLastLapRow` only when `damage.significant`; `livePlanFormat.ts` formats amounts,
+ranges and tyre calls. `liveScreens.ts` also builds the loading screen (progress) and the garage screen (session kind
+title, laps, per lap, reserve, needed against the garage setting, toned by `LiveFigure.tone`).
 
 ### Live dashboard (server)
 
@@ -536,7 +546,7 @@ timeout = busy, `NAV_MAIN_MENU` = menu (the buffer keeps the last session in the
 or after a 3 min start-up grace),
 started by `liveReaderWorker.ts` through `liveReaderWorkerBootstrap.mjs`. The main thread side: `liveService.ts` (snapshot,
 SSE clients, 40 ms pedal batches only on track, heartbeat, slow clients drop batches, `session-loaded` / `lifecycle`
-events), `liveSettings.ts` (`live_auto_open` in
+events), `liveSettings.ts` (`live_auto_open`, `live_reserve_laps` in
 cache_metadata), `sse.ts`. The lifecycle rules are deterministic in `shared/domain/live/liveLifecycle.ts`. Routes:
 `routes/liveRoutes.ts` (`/api/live/stream`, `/api/live/settings`, `/api/events`; auto-open is the `game-started` app
 event when the lifecycle leaves offline, setting on and no dashboard page connected: the open app navigates itself to
@@ -546,11 +556,22 @@ temperature, rain and wetness; the telemetry decode adds the mean tyre surface t
 Deterministic models in `shared/domain/live/`: `liveLapTiming.ts` (laps, validity, session best, reference trace, delta,
 sector deltas), `liveLapsLeft.ts` (exact in lap races, estimated from the leader in timed ones), `liveWeather.ts`
 (whole-degree temperature, 5 min trend, 0.05 steps), `liveIdentity.ts` (layout via `getCircuitSpecification`, class,
-PR lookup), tied together by `liveSessionTracker.ts`. Server: `lmuNavigation.ts` (the only LMU REST read:
-`GET 127.0.0.1:6397/navigation/state`, 2 s timeout, never throws) and `liveIdentityResolver.ts` (once per loaded session,
+PR lookup), tied together by `liveSessionTracker.ts`. Server: `lmuNavigation.ts` (`GET 127.0.0.1:6397/navigation/state`,
+2 s timeout, never throws; `navigationProbe` maps it to menu / loading with progress / session) and `liveIdentityResolver.ts` (once per loaded session,
 then every 30 s, 30 s back-off, one request at a time); the PR comes from `queryLivePersonalBest`
 (`server/core/sessionSummaries/contextQueries.ts`), injected from `server/index.ts`. `timing` events go out at most every
 ~200 ms; snapshots only on a content change.
+Strategy (VE/fuel, pit, damage, tyres, forecast; contracts in `shared/types/liveStrategy.ts`): `lmuPitRest.ts` holds the
+allowlisted REST GETs (1 s timeout) and their parsers; `livePitPoller.ts` asks at most one a second, most overdue
+first, by mode (off / track / garage, only while a dashboard client is connected and a session is loaded),
+`GetGameState` every ~10 s and `/rest/garage/*` only after a no-replay answer from the last 15 s (a replay reads
+nothing else); a timeout pauses everything 10 s, a failed read pauses that read 30 s. `shared/domain/live/`:
+`liveUsage.ts` (`LiveUsageMeter`, per-lap use interpolated at each crossing, pit/caution/refuel laps excluded, mean
+of the last 3), `liveResourcePlan.ts` (VE for Hypercar and GT3, fuel otherwise; `planRace` with the reserve kept at
+pit entry and the finish, `planGarage`), `liveCarCondition.ts` (damage impact lap, measured pace loss, significance;
+tyre wear per stint), `liveForecast.ts` (next rain/dry change from the weather nodes) and `liveStrategyTracker.ts`
+(state per event and session, fed by telemetry `car` frames and REST updates). The lifecycle adds `loading`
+(`loadingProgress` on the snapshot), asked every 1 s while loading.
 
 **Scan hold:** `index.ts` wires `session-loaded` to `ServerContext.setLiveSessionLoaded`. While a session is loaded the
 session / replay / telemetry scans and the replay upgrade do not start (they set `pendingSessionRefresh`; a running

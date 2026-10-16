@@ -111,12 +111,18 @@ export class LiveLapTiming {
     const lap = this.current;
     if (!player || !lap) return null;
     const delta = this.delta(player, lap);
-    const done = lap.startedInPits ? [null, null, null] as Sectors : splitSectors(player.curSector1, player.curSector2, null);
+    const sector = player.sector === 0 ? 3 : player.sector === 2 ? 2 : 1;
+    // Gate by progress: the game's current-sector fields can still hold the previous lap's splits at the line.
+    const done = lap.startedInPits ? [null, null, null] as Sectors : splitSectors(
+      sector > 1 ? player.curSector1 : -1, sector > 2 ? player.curSector2 : -1, null,
+    );
     const best = this.best?.lapSectors;
     const sectorDeltas = done.map((time, i) => (time !== null && best?.[i] != null ? ms(time - best[i]) : null)) as Sectors;
     return {
       lapNumber: player.totalLaps + 1,
-      sector: player.sector === 0 ? 3 : player.sector === 2 ? 2 : 1,
+      sector,
+      lapElapsedSeconds: player.timeIntoLap >= 0 ? ms(player.timeIntoLap) : null,
+      sectors: done,
       deltaSeconds: delta,
       sectorDeltas,
     };

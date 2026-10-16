@@ -79,26 +79,31 @@ export function liveSessionKind(sessionCode: number): LiveSessionKind {
   return 'unknown';
 }
 
+/** What LMU's `navigation/state` (and `GetGameState.isReplayActive`) say beside the buffer. */
+export type LiveGameScreen = 'menu' | 'loading' | 'session';
+
 /**
- * Lifecycle from the decoded scoring, in this order: no reading -> offline; LMU on its main menu, or no
- * vehicles -> menu; not in realtime -> garage; game phase 0-4 -> starting, 5-7 -> driving, 8 -> finished;
- * phase 9 (paused) keeps the previous lifecycle. `inMenu` comes from LMU's `navigation/state`: the buffer
- * keeps the last session (vehicles included) after the driver leaves it for the menu (seen live 2026-10-16).
+ * Lifecycle from the decoded scoring, in this order: no reading -> offline; LMU loading a session -> loading;
+ * LMU on its main menu (or playing a replay), or no vehicles -> menu; not in realtime -> garage; game phase
+ * 0-4 -> starting, 5-7 -> driving, 8 -> finished; phase 9 (paused) keeps the previous lifecycle. `screen` comes
+ * from LMU's `navigation/state`: the buffer keeps the last session (vehicles included) after the driver leaves
+ * it for the menu (seen live 2026-10-16).
  */
-export function deriveLiveState(reading: LiveScoringReading | null, previous: LiveLifecycle, inMenu = false): LiveState {
+export function deriveLiveState(reading: LiveScoringReading | null, previous: LiveLifecycle, screen: LiveGameScreen = 'session'): LiveState {
   if (!reading) return { lifecycle: 'offline', paused: false, session: null };
+  if (screen === 'loading') return { lifecycle: 'loading', paused: false, session: null };
   const state = (lifecycle: LiveLifecycle, paused: boolean): LiveState => ({
     lifecycle,
     paused,
     session: lifecycle === 'menu' ? null : sessionInfo(reading),
   });
-  if (inMenu || reading.numVehicles <= 0) return state('menu', false);
+  if (screen === 'menu' || reading.numVehicles <= 0) return state('menu', false);
   if (!reading.inRealtime) return state('garage', false);
   const phase = reading.gamePhase;
   if (phase >= 0 && phase <= 4) return state('starting', false);
   if (phase >= 5 && phase <= 7) return state('driving', false);
   if (phase === 8) return state('finished', false);
-  if (phase === PAUSED_PHASE) return state(previous === 'offline' || previous === 'menu' ? 'driving' : previous, true);
+  if (phase === PAUSED_PHASE) return state(previous === 'offline' || previous === 'menu' || previous === 'loading' ? 'driving' : previous, true);
   return state(previous, false);
 }
 

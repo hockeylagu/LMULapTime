@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Profiler } from 'react';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import App from '../../../src/App.js';
 import { prefetchRoutePages } from '../../../src/routePages.js';
 import { LivePage } from '../../../src/components/live/LivePage.js';
@@ -30,13 +30,14 @@ describe('LivePage', () => {
   it.each([
     ['offline', null, 'WAITING FOR LMU', 'GAME NOT RUNNING'],
     ['menu', null, 'IN MENU', 'WAITING FOR A SESSION'],
-    ['garage', session(), 'GARAGE', 'RACE · Circuit de la Sarthe'],
+    // The bar says GARAGE; the screen names the session and the track.
+    ['garage', session(), 'RACE', 'Circuit de la Sarthe'],
     ['finished', session(), 'SESSION OVER', 'RACE · Circuit de la Sarthe'],
   ] as const)('shows the %s screen', (lifecycle, info, title, note) => {
     render(<LivePage />);
     send(snapshot({ lifecycle, session: info }));
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(title);
-    expect(screen.getByText(note)).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Session state' })).getByText(note)).toBeInTheDocument();
     expect(screen.queryByTestId('pedal-trace')).not.toBeInTheDocument();
     expect(screen.getByTestId('live-status')).toHaveTextContent('LIVE');
   });
@@ -52,15 +53,15 @@ describe('LivePage', () => {
   it('shows the race view with the class badge and the trace, and a PAUSED marker that keeps the screen', () => {
     render(<LivePage />);
     send(snapshot({}));
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('LAP 13');
-    expect(screen.getByText('P3')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('CALCULATING');
+    expect(screen.getByTestId('live-race-position')).toHaveTextContent('LAP 13 · P3');
     expect(screen.getByTestId('car-class-badge')).toHaveTextContent('HY');
     expect(screen.getByTestId('pedal-trace')).toBeInTheDocument();
-    // The marker's slot is held while unpaused (hidden), so pausing moves nothing.
-    expect(screen.getByTestId('live-paused')).toHaveClass('invisible');
+    // PAUSED takes the status slot, so pausing moves nothing.
+    expect(screen.getByTestId('live-status')).toHaveTextContent('LIVE');
     send(snapshot({ sequence: 2, paused: true }));
-    expect(screen.getByTestId('live-paused')).not.toHaveClass('invisible');
-    expect(screen.getByText('P3')).toBeInTheDocument();
+    expect(screen.getByTestId('live-status')).toHaveTextContent('PAUSED');
+    expect(screen.getByTestId('live-race-position')).toHaveTextContent('P3');
   });
 
   it('replaces live content with DATA LOST when the heartbeat goes silent', () => {
@@ -70,10 +71,10 @@ describe('LivePage', () => {
     act(() => { vi.advanceTimersByTime(LIVE_HEARTBEAT_MS * 2.5 + 1); });
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('DATA LOST');
     expect(screen.getByTestId('live-status')).toHaveTextContent('DISCONNECTED');
-    expect(screen.queryByText('P3')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('live-race-position')).not.toBeInTheDocument();
     expect(screen.queryByTestId('pedal-trace')).not.toBeInTheDocument();
     send(snapshot({ sequence: 9 }));
-    expect(screen.getByText('P3')).toBeInTheDocument();
+    expect(screen.getByTestId('live-race-position')).toHaveTextContent('P3');
   });
 
   it('draws pedal batches on the canvas without rendering the page again', async () => {

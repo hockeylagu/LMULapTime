@@ -1,8 +1,10 @@
 import type { LiveNavigation } from '../../shared/domain/live/liveIdentity.js';
+import type { GameProbe } from './liveReader.js';
 
 /**
- * The only LMU REST endpoint the live dashboard reads. `127.0.0.1`, never `localhost` (which tries IPv6
- * first and waits about 2 s). Garage paths crashed the game in the past: nothing else is ever requested.
+ * LMU's navigation state, read for the identity of the loaded session and (by the shared memory reader) to learn
+ * whether LMU is on its menu or loading. `127.0.0.1`, never `localhost` (which tries IPv6 first and waits about 2 s).
+ * The pit data reads are in `lmuPitRest.ts`.
  */
 export const LMU_NAVIGATION_URL = 'http://127.0.0.1:6397/navigation/state';
 export const NAVIGATION_TIMEOUT_MS = 2000;
@@ -56,5 +58,23 @@ export async function readNavigationState(
     return await Promise.race([request, timeout]);
   } finally {
     clearTimeout(timer);
+  }
+}
+
+/**
+ * LMU's main menu from the answer's `state.navigationState` (seen live: `NAV_MAIN_MENU`, `NAV_EVENT`, `NAV_REALTIME`),
+ * and a session loading from `loadingStatus.loading` with `percentage` 0..1 (-1 when not loading).
+ */
+export function navigationProbe(body: string): GameProbe {
+  try {
+    const answer = JSON.parse(body) as { state?: { navigationState?: unknown }; loadingStatus?: { loading?: unknown; percentage?: unknown } };
+    if (answer.state?.navigationState === 'NAV_MAIN_MENU') return 'menu';
+    if (answer.loadingStatus?.loading === true) {
+      const progress = answer.loadingStatus.percentage;
+      return { loading: typeof progress === 'number' && progress >= 0 && progress <= 1 ? Math.round(progress * 100) / 100 : null };
+    }
+    return 'session';
+  } catch {
+    return 'session';
   }
 }

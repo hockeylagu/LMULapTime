@@ -80,8 +80,12 @@ holds the earlier critique. Current state, all at 2560 x 1440, read in glances:
 - **Every driving view:** session bar (session, track and class, laps left in races, PR,
   one weather slot), the 20-second full-width pedal trace (curves and grid only), no
   paragraph text; labels about 48 px, supporting readouts 80-96 px, primary values larger.
-- **Practice:** last lap largest, session best and best possible, a three-lap history
-  table with a `BEST` row of best sectors; no fuel figures.
+- **Practice:** last lap largest, session best and best possible, a current-lap sector row
+  followed by three completed laps and a `BEST` row of best sectors; no fuel figures.
+  S1 and S2 fill from the game's cumulative timing fields at each crossing (S2 = cumulative S2 minus S1),
+  independently of whether a session best exists, beside the lap number and the running lap clock. Uncrossed
+  sectors remain unknown; at the finish the row becomes the top completed lap (S3 = lap time minus cumulative S2)
+  and a new current row starts. Out laps have no current splits.
 - **Qualifying:** `PUSH LAP · VS BEST` with the live delta, next attempt and tyre surface
   temperature, then the `LAST LAP` row; no fuel or VE, no valid flag (the HUD has it).
 - **Race, pit coming:** `PIT IN 2 LAPS` (then `PIT THIS LAP`), `VE · MFD` or `FUEL · MFD`
@@ -114,7 +118,7 @@ At 2560 x 1440, start with these design targets, then test from the actual seat:
 | Damage row | Measured pace loss, laps since impact, loss to the finish, repair time | 88 px values, 48 px labels |
 | Supporting status | Race laps left (counting the current lap; `~` when timed), PR, one weather slot (track temp or rain/forecast), data status; no session clock | 48 px |
 | Timing rows | Current lap vs best with sector deltas, then last lap with real S1/S2/S3 | 88 px values |
-| Bottom trace | Last 20 seconds; throttle and brake on one fixed 0-100% scale | Full width, 294 px (about 20%); no redundant header or legend |
+| Bottom trace | Last 30 seconds; throttle and brake on one fixed 0-100% scale | Full width, 294 px (about 20%); no redundant header or legend |
 
 These are starting sizes, not confirmed readable sizes. Browser zoom, OS scaling,
 window chrome and distance affect the rendered result. Configure size, reserves,
@@ -129,7 +133,7 @@ previous-lap sectors. Show unavailable splits as absent, never zero. The rows ke
 their position so each lap update does not move the main content.
 
 Use thick throttle/brake lines (initially 5-7 px) and a subtle grid. Omit the legend,
-title, numeric axis labels and current percentages. The history remains 20 seconds
+title, numeric axis labels and current percentages. The history remains 30 seconds
 on a fixed 0–100% scale. Retain colors from `TELEMETRY_COLORS`.
 Keep timestamps on a monotonic axis and break traces on gaps. Do not interpolate
 through dropped data. Avoid per-sample animations or layout shifts.
@@ -343,6 +347,15 @@ The post-session cache and parser remain authoritative for historical analysis.
    MFD targets. Exercise finish-line edge cases and unavailable-resource fallbacks.
 5. **Service and damage:** repair duration and total pit estimate, then performance
    attribution and marginal repair decisions once evidence supports them.
+
+**Built on `live-dashboard` (2026-10-16, mock-checked at 2560 x 1440, not yet raced):** the VE/fuel engine (measured
+per lap over the last 3 clean laps, game estimate before the first lap, reserve setting 0–2 laps, default 0.5),
+the race plan modes (stint, pit countdown with the MFD values, pit this lap, sprint, pit now for a flat or lost
+wheel, in pit, calculating), pit time with the random delays and stop-and-go while a penalty is pending, the damage
+row, tyres, the forecast slot, the garage screen (laps and amount needed against the garage setting) and the
+loading screen. Unverified until the next race weekend: the fuel-class MFD `FUEL:` line and garage fuel in litres,
+the online forecast, pace-loss confounders (traffic, tyres), and pit elapsed time during the stop (not shown).
+Per-lap use has no history fallback; before the first measured lap it is the game's estimate.
 
 Automated cases should cover refills, partial laps, capacity overflow, lap-number
 conventions, timed finishes, mandatory rules, resource changes, missing data,

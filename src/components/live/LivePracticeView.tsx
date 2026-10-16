@@ -44,7 +44,7 @@ export function LivePracticeView({ snapshot, store }: { snapshot: LiveSnapshot; 
           <Timing label="BEST POSSIBLE" seconds={best?.bestPossibleSeconds} />
         </div>
       </section>
-      <LivePracticeHistory laps={snapshot.recentLaps} best={best} />
+      <LivePracticeHistory laps={snapshot.recentLaps} best={best} store={store} />
     </>
   );
 }

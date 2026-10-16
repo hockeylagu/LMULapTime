@@ -7,13 +7,14 @@
 /**
  * What the game is doing, as the page shows it.
  * - `offline`: no shared memory (game closed, or the plugin is not enabled).
- * - `menu`: the game runs but no session is loaded.
+ * - `menu`: the game runs but no session is loaded (a replay playing counts as menu: it is not live driving).
+ * - `loading`: LMU is loading a session (`navigation/state` says so; progress in `loadingProgress`).
  * - `garage`: a session is loaded and the driver is in the monitor (not in realtime).
  * - `starting`: on track before the green flag (grid, formation, countdown).
  * - `driving`: on track, session running (green, full course yellow, stopped).
  * - `finished`: the session is over (checkered) and the driver is still on track.
  */
-export type LiveLifecycle = 'offline' | 'menu' | 'garage' | 'starting' | 'driving' | 'finished';
+export type LiveLifecycle = 'offline' | 'menu' | 'loading' | 'garage' | 'starting' | 'driving' | 'finished';
 
 /** Session family from the rF2 session code (0 test day, 1-4 practice, 5-8 qualifying, 9 warmup, 10-13 race). */
 export type LiveSessionKind = 'practice' | 'qualifying' | 'warmup' | 'race' | 'unknown';
@@ -38,6 +39,8 @@ export interface LiveSessionInfo {
   playerLapsCompleted: number | null;
   playerPlace: number | null;
 }
+
+import type { LiveStrategy } from './liveStrategy.js';
 
 /** Who and where, resolved once per session through the app's canonical definitions. */
 export interface LiveIdentity {
@@ -97,6 +100,10 @@ export interface LiveTiming {
   /** Lap in progress (completed laps + 1). */
   lapNumber: number;
   sector: 1 | 2 | 3;
+  /** Time into the lap in progress, seconds (the running lap clock); null before the line on a grid. */
+  lapElapsedSeconds: number | null;
+  /** Completed split sectors of the current lap; null until crossed (S3 moves into recentLaps at the finish). */
+  sectors: [number | null, number | null, number | null];
   /** Time into the current lap minus the session-best lap at the same distance; null without a reference. */
   deltaSeconds: number | null;
   /** Completed sectors of the current lap minus the session-best lap's sectors; null for sectors not yet done. */
@@ -126,6 +133,10 @@ export interface LiveSnapshot {
   /** The player's last three completed laps of this session, oldest first. */
   recentLaps: LiveLapRecord[];
   sessionBest: LiveSessionBest | null;
+  /** Session load progress 0..1 while `loading`; null otherwise or when LMU does not say. */
+  loadingProgress: number | null;
+  /** VE or fuel, the next stop, damage, tyres, forecast and the garage plan; null while no session is loaded. */
+  strategy: LiveStrategy | null;
 }
 
 /** One pedal sample: driver inputs (unfiltered), 0..1, at the session clock time `t` in seconds. */
@@ -142,6 +153,8 @@ export interface LivePedalBatch {
 export interface LiveSettings {
   /** Switch an open app page to the dashboard when LMU starts. On by default. */
   autoOpen: boolean;
+  /** VE or fuel kept at the pit entry or the finish, in laps. Half a lap by default. */
+  reserveLaps: number;
 }
 
 /** Server-sent event names on `GET /api/live/stream`. The data of each is JSON. */

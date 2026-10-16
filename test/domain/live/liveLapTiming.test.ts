@@ -142,6 +142,39 @@ describe('LiveLapTiming', () => {
     expect(timing.timing()).toMatchObject({ sector: 3, sectorDeltas: [-0.5, 1.5, null] });
   });
 
+  it('publishes each sector at its crossing before a completed lap or best exists, then clears at the finish', () => {
+    const timing = new LiveLapTiming();
+    timing.update(reading({ totalLaps: 0, sector: 1, curSector1: 31, curSector2: 64 }));
+    expect(timing.timing()?.sectors).toEqual([null, null, null]);
+
+    timing.update(reading({ totalLaps: 0, sector: 2, curSector1: 29.5, curSector2: 64, timeIntoLap: 31.2345 }));
+    expect(timing.timing()).toMatchObject({ lapElapsedSeconds: 31.235, sectors: [29.5, null, null], sectorDeltas: [null, null, null] });
+    expect(timing.recentLaps).toEqual([]);
+    expect(timing.sessionBest).toBeNull();
+
+    timing.update(reading({ totalLaps: 0, sector: 0, curSector1: 29.5, curSector2: 63 }));
+    expect(timing.timing()?.sectors).toEqual([29.5, 33.5, null]);
+    timing.update(reading({
+      totalLaps: 1, sector: 1, curSector1: 29.5, curSector2: 63,
+      lastSector1: 29.5, lastSector2: 63, lastLapTime: 101,
+    }));
+    expect(timing.recentLaps[0].sectors).toEqual([29.5, 33.5, 38]);
+    expect(timing.timing()?.sectors).toEqual([null, null, null]);
+    expect(timing.timing()?.sectorDeltas).toEqual([null, null, null]);
+  });
+
+  it('keeps unavailable splits unknown and suppresses current splits on an out lap', () => {
+    const timing = new LiveLapTiming();
+    timing.update(reading({ totalLaps: 0, sector: 0, curSector1: -1, curSector2: 63 }));
+    expect(timing.timing()?.sectors).toEqual([null, null, null]);
+    timing.update(reading({ totalLaps: 0, sector: 0, curSector1: 30, curSector2: 29 }));
+    expect(timing.timing()?.sectors).toEqual([30, null, null]);
+    timing.reset();
+    timing.update(reading({ totalLaps: 0, inPits: true }));
+    timing.update(reading({ totalLaps: 0, inPits: false, sector: 0, curSector1: 30, curSector2: 63 }));
+    expect(timing.timing()?.sectors).toEqual([null, null, null]);
+  });
+
   it('a lap seen only from the middle is no reference and no valid lap, and a full lap after it is', () => {
     const timing = new LiveLapTiming();
     timing.update(reading({ totalLaps: 0, lapDist: 4_000, timeIntoLap: 40, sector: 1 }));

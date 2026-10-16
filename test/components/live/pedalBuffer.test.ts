@@ -9,7 +9,9 @@ describe('PedalBuffer', () => {
     buffer.push(Array.from({ length: 6000 }, (_, i) => sample(i / 100)));
     expect(buffer.latest).toBeCloseTo(59.99);
     expect(buffer.visible[0].t).toBeGreaterThanOrEqual(59.99 - PEDAL_WINDOW_SECONDS - 1.01);
-    expect(buffer.visible.length).toBeLessThanOrEqual(2600);
+    // Keep the entire 30-second trace at 100 Hz, including the extra second for clipping at the left edge.
+    expect(buffer.visible[0].t).toBeLessThanOrEqual(29);
+    expect(buffer.visible.length).toBeLessThanOrEqual(3600);
   });
 
   it('ignores repeated times, starts over when the clock jumps back, and notifies subscribers', () => {

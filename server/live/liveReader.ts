@@ -1,3 +1,4 @@
+import type { LiveCarReading } from '../../shared/domain/live/liveCarCondition.js';
 import type { LiveScoringReading } from '../../shared/domain/live/liveLifecycle.js';
 import type { LivePedalSample } from '../../shared/types/live.js';
 import { readPedalFrame, readScoringFrame } from './rf2Decode.js';
@@ -6,16 +7,22 @@ import type { MappedBuffer } from './sharedMemory.js';
 
 /** What the reader posts to the main thread. `type` is the field every worker client filters on (isWorkerMessage). */
 export type LiveReaderMessage =
-  | { type: 'frame'; scoring?: LiveScoringReading; pedal?: LivePedalSample; tyreSurfaceAvgC?: number | null }
-  /** LMU is on its main menu (or left it): the buffer still holds the last session, so this decides the menu state. */
-  | { type: 'menu'; inMenu: boolean }
+  /** `car` (fuel, damage flags, compound) rides along at most every CAR_POST_MS. */
+  | { type: 'frame'; scoring?: LiveScoringReading; pedal?: LivePedalSample; tyreSurfaceAvgC?: number | null; car?: LiveCarReading }
+  /**
+   * What LMU's navigation says when it changes: its main menu (the buffer still holds the last session, so this
+   * decides the menu state), loading a session (with its progress 0..1 when known), or a session.
+   */
+  | { type: 'navigation'; screen: GameScreen; loadingProgress: number | null }
   | { type: 'closed' };
+
+export type GameScreen = 'menu' | 'loading' | 'session';
 
 /**
  * What LMU's local `navigation/state` says: `gone` (refused), `busy` (too slow to answer, e.g. loading a track),
- * `menu` (its main menu), `session` (anything else).
+ * `menu` (its main menu), `session` (anything else), or a session loading with its progress (0..1, null unknown).
  */
-export type GameProbe = 'gone' | 'busy' | 'menu' | 'session';
+export type GameProbe = 'gone' | 'busy' | 'menu' | 'session' | { loading: number | null };
 
 export interface LiveReaderDeps {
   openMapping(name: string, size: number): MappedBuffer | null;
@@ -26,8 +33,12 @@ export interface LiveReaderDeps {
 const OPEN_RETRY_MS = 3000;
 const REALTIME_INTERVAL_MS = 20;
 const IDLE_INTERVAL_MS = 1000;
+/** The car reading goes out at most this often: fuel and damage need no more. */
+export const CAR_POST_MS = 500;
 /** Both version counters standing still this long is the cue to ask the game whether it is still there. */
 const STILL_MS = 5000;
+/** While LMU loads a session it is asked this often, for the progress. */
+const LOADING_PROBE_MS = 1000;
 /**
  * While LMU loads, the mapping exists before its REST port listens, so a refusal then does not mean the game is gone.
  * A refusal counts once the game has answered since the mapping opened, or after this long without any answer
@@ -41,7 +52,8 @@ export const STARTUP_GRACE_MS = 180_000;
  * the mapping alive after the game exits, so when the counters have stood still for 5 s it asks the
  * game (one local request, see probeGame) and, if it is gone, unmaps and goes back to the 3 s check.
  * A game still loading has no REST port yet: see STARTUP_GRACE_MS. The same answer says when LMU is on its main
- * menu (the counters stand still there too); the first scoring change after that means a session is back.
+ * menu (the counters stand still there too; the first scoring change after that means a session is back) and when
+ * it loads a session (then it is asked every second for the progress, until it answers otherwise).
  */
 export class LiveReader {
   private scoringMap: MappedBuffer | null = null;
@@ -50,10 +62,12 @@ export class LiveReader {
   private stopped = false;
   private probing = false;
   private lastProbeAt = 0;
+  private lastCarAt = 0;
   private lastChangeAt = 0;
   private openedAt = 0;
   private gameAnswered = false;
-  private inMenu = false;
+  private screen: GameScreen = 'session';
+  private loadingProgress: number | null = null;
   private scoringVersion: number | null = null;
   private pedalVersion: number | null = null;
   private telemetryCounter: number | null = null;
@@ -110,7 +124,8 @@ export class LiveReader {
     this.lastProbeAt = this.lastChangeAt;
     this.openedAt = this.lastChangeAt;
     this.gameAnswered = false;
-    this.inMenu = false;
+    this.screen = 'session';
+    this.loadingProgress = null;
     this.tick();
   }
 
@@ -123,11 +138,12 @@ export class LiveReader {
     let scoring: LiveScoringReading | undefined;
     let pedal: LivePedalSample | undefined;
     let tyreSurfaceAvgC: number | null | undefined;
+    let car: LiveCarReading | undefined;
 
     const scoringRead = readScoringFrame(scoringMap, this.scoringVersion);
     if (scoringRead.status !== 'unchanged') changed = true;
     if (scoringRead.status === 'ok') {
-      if (this.scoringVersion !== null) this.setMenu(false);
+      if (this.scoringVersion !== null && this.screen === 'menu') this.setScreen('session', null);
       this.scoringVersion = scoringRead.version;
       scoring = scoringRead.value;
       this.playerId = scoring.player?.id ?? null;
@@ -143,6 +159,10 @@ export class LiveReader {
         this.slotHint = pedalRead.value.slot;
         pedal = pedalRead.value.sample ?? undefined;
         tyreSurfaceAvgC = pedalRead.value.tyreSurfaceAvgC;
+        if (pedalRead.value.car && now - this.lastCarAt >= CAR_POST_MS) {
+          car = pedalRead.value.car;
+          this.lastCarAt = now;
+        }
       }
     } else {
       const counter = telemetryMap.readU32(TELEMETRY.versionBegin);
@@ -150,17 +170,19 @@ export class LiveReader {
       this.telemetryCounter = counter;
     }
 
-    if (scoring || pedal) this.deps.post({ type: 'frame', scoring, pedal, tyreSurfaceAvgC });
+    if (scoring || pedal || car) this.deps.post({ type: 'frame', scoring, pedal, tyreSurfaceAvgC, car });
     if (changed) this.lastChangeAt = now;
     const still = now - this.lastChangeAt >= STILL_MS;
-    if ((still || !this.gameAnswered) && now - this.lastProbeAt >= STILL_MS && !this.probing) this.probe(now);
+    const due = now - this.lastProbeAt >= (this.screen === 'loading' ? LOADING_PROBE_MS : STILL_MS);
+    if ((still || !this.gameAnswered || this.screen === 'loading') && due && !this.probing) this.probe(now);
     this.schedule(this.inRealtime ? REALTIME_INTERVAL_MS : IDLE_INTERVAL_MS, () => this.tick());
   }
 
-  private setMenu(inMenu: boolean): void {
-    if (inMenu === this.inMenu) return;
-    this.inMenu = inMenu;
-    this.deps.post({ type: 'menu', inMenu });
+  private setScreen(screen: GameScreen, loadingProgress: number | null): void {
+    if (screen === this.screen && loadingProgress === this.loadingProgress) return;
+    this.screen = screen;
+    this.loadingProgress = loadingProgress;
+    this.deps.post({ type: 'navigation', screen, loadingProgress });
   }
 
   private probe(now: number): void {
@@ -169,9 +191,12 @@ export class LiveReader {
     void this.deps.probeGame().then(answer => {
       this.probing = false;
       if (this.stopped || !this.scoringMap) return;
-      if (answer === 'menu' || answer === 'session') {
+      if (typeof answer === 'object') {
         this.gameAnswered = true;
-        this.setMenu(answer === 'menu');
+        this.setScreen('loading', answer.loading);
+      } else if (answer === 'menu' || answer === 'session') {
+        this.gameAnswered = true;
+        this.setScreen(answer, null);
       }
       if (answer !== 'gone') return;
       if (!this.gameAnswered && Date.now() - this.openedAt < STARTUP_GRACE_MS) return;

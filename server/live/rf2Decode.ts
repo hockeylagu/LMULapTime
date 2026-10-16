@@ -1,3 +1,4 @@
+import type { LiveCarReading } from '../../shared/domain/live/liveCarCondition.js';
 import type { LiveScoringReading, LiveVehicleReading } from '../../shared/domain/live/liveLifecycle.js';
 import type { LivePedalSample } from '../../shared/types/live.js';
 import { MAX_MAPPED_VEHICLES, SCORING, SCORING_INFO, TELEMETRY, VEHICLE_SCORING, VEHICLE_TELEMETRY, WHEEL } from './rf2Layout.js';
@@ -105,12 +106,30 @@ function tyreSurfaceAverage(slot: Buffer): number | null {
   return Number.isFinite(average) && average > -KELVIN + 1 ? Math.round(average * 10) / 10 : null;
 }
 
-/** One telemetry vehicle slot (VEHICLE_TELEMETRY.size bytes): its id, the driver's unfiltered pedals at its session time and the tyre surface temperature. */
-export function decodePedalSlot(slot: Buffer): { id: number; sample: LivePedalSample; tyreSurfaceAvgC: number | null } {
+/** Fuel, damage flags and compound of one telemetry vehicle slot. */
+function decodeCar(slot: Buffer): LiveCarReading {
+  const at = VEHICLE_TELEMETRY.offsets;
+  const wheel = (index: number, field: string): boolean => slot.readUInt8(at.wheels + index * WHEEL.size + WHEEL.offsets[field]) !== 0;
+  const finite = (value: number): number => (Number.isFinite(value) ? value : 0);
+  return {
+    fuelLiters: finite(slot.readDoubleLE(at.fuel)),
+    fuelCapacityLiters: finite(slot.readDoubleLE(at.fuelCapacity)),
+    dentSeverity: Array.from({ length: 8 }, (_, index) => slot.readUInt8(at.dentSeverity + index)),
+    detached: slot.readUInt8(at.detached) !== 0,
+    wheels: [0, 1, 2, 3].map(index => ({ flat: wheel(index, 'flat'), detached: wheel(index, 'detached') })),
+    compound: cString(slot, at.frontTireCompoundName, 18).trim(),
+  };
+}
+
+export interface PedalSlot { id: number; sample: LivePedalSample; tyreSurfaceAvgC: number | null; car: LiveCarReading }
+
+/** One telemetry vehicle slot (VEHICLE_TELEMETRY.size bytes): its id, the driver's unfiltered pedals at its session time, the tyre surface temperature and the car. */
+export function decodePedalSlot(slot: Buffer): PedalSlot {
   const at = VEHICLE_TELEMETRY.offsets;
   return {
     id: slot.readInt32LE(at.id),
     tyreSurfaceAvgC: tyreSurfaceAverage(slot),
+    car: decodeCar(slot),
     sample: {
       t: slot.readDoubleLE(at.elapsedTime),
       throttle: clamp01(slot.readDoubleLE(at.unfilteredThrottle)),
@@ -145,9 +164,9 @@ export function readScoringFrame(source: FrameSource, lastVersion: number | null
   });
 }
 
-/** The player's pedal sample and tyre temperature; `slot` is where the player was found, to look there first next time. A missing player gives a null sample. */
+/** The player's pedal sample, tyre temperature and car; `slot` is where the player was found, to look there first next time. A missing player gives a null sample and car. */
 export function readPedalFrame(source: FrameSource, playerId: number, lastVersion: number | null,
-  slotHint: number): FrameRead<{ slot: number; sample: LivePedalSample | null; tyreSurfaceAvgC: number | null }> {
+  slotHint: number): FrameRead<{ slot: number; sample: LivePedalSample | null; tyreSurfaceAvgC: number | null; car: LiveCarReading | null }> {
   return readCoherent(source, TELEMETRY.versionBegin, TELEMETRY.versionEnd, lastVersion, () => {
     const count = Math.max(0, Math.min(source.readU32(TELEMETRY.numVehicles) | 0, MAX_MAPPED_VEHICLES));
     const slotOffset = (slot: number): number => TELEMETRY.vehicles + slot * TELEMETRY.vehicleStride;
@@ -156,8 +175,8 @@ export function readPedalFrame(source: FrameSource, playerId: number, lastVersio
     for (const slot of candidates) {
       if ((source.readU32(slotOffset(slot)) | 0) !== playerId) continue;
       const decoded = decodePedalSlot(source.read(slotOffset(slot), TELEMETRY.vehicleStride));
-      return { slot, sample: decoded.sample, tyreSurfaceAvgC: decoded.tyreSurfaceAvgC };
+      return { slot, sample: decoded.sample, tyreSurfaceAvgC: decoded.tyreSurfaceAvgC, car: decoded.car };
     }
-    return { slot: -1, sample: null, tyreSurfaceAvgC: null };
+    return { slot: -1, sample: null, tyreSurfaceAvgC: null, car: null };
   });
 }

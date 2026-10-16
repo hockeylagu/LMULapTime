@@ -198,6 +198,10 @@ file scans until the game closed.
 
 Still to test, in one offline race weekend (practice, qualifying, a 20-minute race):
 
+- The dashboard's race plan against the race: per-lap VE/fuel against the MFD, the pit lap it calls, and
+  the VE or fuel left at the finish; a fuel class (LMP2 or LMP3) for the MFD `FUEL:` line and the garage
+  fuel in litres.
+
 - `GetSessionsInfoForEvent` in the garage after practice and after qualifying;
   `watch/standings/history` and `strategy/overall` in the race.
 - Laps left (`~`) against the real finish, after the clock ends and once the leader has the flag.

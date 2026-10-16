@@ -49,7 +49,7 @@ function drawLine(
   ctx.stroke();
 }
 
-/** The last 20 seconds of throttle and brake on one fixed 0-100 % scale: lines and grid only, drawn on demand. */
+/** The last 30 seconds of throttle and brake on one fixed 0-100 % scale: lines and grid only, drawn on demand. */
 export function LivePedalTrace({ buffer }: { buffer: PedalBuffer }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 

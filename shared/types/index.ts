@@ -20,3 +20,7 @@ export type {
   LiveIdentity, LiveLapsLeft, LiveWeather, LiveLapRecord, LiveSessionBest, LiveTiming,
 } from './live.js';
 export { LIVE_STREAM_EVENTS, APP_EVENTS, LIVE_HEARTBEAT_MS } from './live.js';
+export type {
+  LiveResourceKind, LivePerLapSource, LiveResourcePlan, LiveRacePlan, LivePitState, LivePitMenu, LivePitInfo,
+  LiveCorner, LiveDamage, LiveTyres, LiveForecast, LiveGaragePlan, LiveStrategy,
+} from './liveStrategy.js';

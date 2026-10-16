@@ -47,6 +47,7 @@ describe('LiveReader', () => {
       scoring: expect.objectContaining({ numVehicles: 1, inRealtime: true, player: expect.objectContaining({ id: 12 }) }),
       pedal: { t: 100, throttle: 0.5, brake: 0 },
       tyreSurfaceAvgC: null,
+      car: expect.objectContaining({ fuelLiters: 0, compound: '' }),
     }]);
     t.reader.stop();
   });
@@ -150,6 +151,23 @@ describe('LiveReader', () => {
     await vi.advanceTimersByTimeAsync(5100);
     expect(probe).toHaveBeenCalledTimes(2);
     expect(t.posted).toContainEqual({ type: 'closed' });
+    t.reader.stop();
+  });
+
+  it('says when LMU loads a session, asks every second for the progress, and when the session is there', async () => {
+    const answers: GameProbe[] = ['menu', { loading: 0.25 }, { loading: 0.8 }, 'session'];
+    const probe = vi.fn(() => Promise.resolve(answers.length > 1 ? answers.shift() as GameProbe : answers[0]));
+    const t = setup(probe);
+    t.available.value = true;
+    t.reader.start();
+    await vi.advanceTimersByTimeAsync(5100);
+    expect(t.posted).toContainEqual({ type: 'navigation', screen: 'menu', loadingProgress: null });
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(t.posted).toContainEqual({ type: 'navigation', screen: 'loading', loadingProgress: 0.25 });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(t.posted).toContainEqual({ type: 'navigation', screen: 'loading', loadingProgress: 0.8 });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(t.posted[t.posted.length - 1]).toEqual({ type: 'navigation', screen: 'session', loadingProgress: null });
     t.reader.stop();
   });
 

@@ -19,6 +19,7 @@ import { createSystemRouter } from './routes/systemRoutes.js';
 import { createDataPluginRouter } from './routes/dataPluginRoutes.js';
 import { dataPlugin, formatPluginStatusLog } from './plugins/dataPlugin.js';
 import { LiveService } from './live/liveService.js';
+import { loadLiveSettings } from './live/liveSettings.js';
 import { queryLivePersonalBest } from './core/sessionSummaries/contextQueries.js';
 
 const app = express();
@@ -75,6 +76,7 @@ const startReferenceLaptimeRefresh = (): void => {
 };
 
 const liveService = new LiveService({
+  reserveLaps: loadLiveSettings(sessionDb).reserveLaps,
   personalBest: (layoutKey, carClass) =>
     queryLivePersonalBest(sessionDb.getDb(), serverContext.currentParser.configuredPlayerName, layoutKey, carClass),
 });

@@ -1,6 +1,8 @@
 import { Worker } from 'node:worker_threads';
 import { deriveLiveState, isLiveOnTrack, isLiveSessionLoaded } from '../../shared/domain/live/liveLifecycle.js';
-import type { LiveScoringReading } from '../../shared/domain/live/liveLifecycle.js';
+import type { LiveGameScreen, LiveScoringReading } from '../../shared/domain/live/liveLifecycle.js';
+import { LiveStrategyTracker } from '../../shared/domain/live/liveStrategyTracker.js';
+import type { LiveRestUpdate } from '../../shared/domain/live/liveStrategyTracker.js';
 import type { PersonalBestLookup } from '../../shared/domain/live/liveIdentity.js';
 import { LiveSessionTracker, NO_SESSION_DETAILS } from '../../shared/domain/live/liveSessionTracker.js';
 import { LIVE_HEARTBEAT_MS, LIVE_STREAM_EVENTS } from '../../shared/types/live.js';
@@ -10,6 +12,9 @@ import { findWorkerBootstrap, isWorkerMessage } from '../core/workerThreads.js';
 import type { LiveReaderMessage } from './liveReader.js';
 import { LiveIdentityResolver } from './liveIdentityResolver.js';
 import type { LiveIdentityOptions } from './liveIdentityResolver.js';
+import { LivePitPoller } from './livePitPoller.js';
+import { DEFAULT_RESERVE_LAPS } from './liveSettings.js';
+import type { LivePitPollerOptions, PitPollMode } from './livePitPoller.js';
 import { writeSseEvent } from './sse.js';
 import type { SseSink } from './sse.js';
 
@@ -35,10 +40,17 @@ export interface LiveServiceOptions {
   personalBest?: PersonalBestLookup;
   /** Replaces the identity resolver's REST read and clock (tests). */
   identity?: Pick<LiveIdentityOptions, 'readNavigation' | 'now'>;
+  /** Replaces the pit poller's REST read and clock (tests). */
+  pit?: Pick<LivePitPollerOptions, 'get' | 'now'>;
+  /** VE or fuel reserve in laps (the live settings); half a lap without it. Changed later with `setReserveLaps`. */
+  reserveLaps?: number;
 }
 
 function offlineSnapshot(): LiveSnapshot {
-  return { sequence: 0, receivedAt: Date.now(), lifecycle: 'offline', paused: false, session: null, identity: null, ...NO_SESSION_DETAILS };
+  return {
+    sequence: 0, receivedAt: Date.now(), lifecycle: 'offline', paused: false, session: null, identity: null,
+    ...NO_SESSION_DETAILS, loadingProgress: null, strategy: null,
+  };
 }
 
 /** What makes two snapshots the same to a page: everything but the sequence, the receipt time and the moving session clock. */
@@ -59,9 +71,15 @@ export class LiveService {
   private pendingTiming: LiveTiming | null = null;
   private lastTimingAt = 0;
   private tyreSurfaceAvgC: number | null = null;
-  /** The last scoring reading, kept so a menu notice can re-derive the state without a new frame. */
+  private readonly strategy = new LiveStrategyTracker();
+  private readonly pit: LivePitPoller;
+  /** The last scoring reading, kept so a navigation notice or a REST answer can re-derive the snapshot without a new frame. */
   private lastReading: LiveScoringReading | null = null;
-  private inMenu = false;
+  private screen: LiveGameScreen = 'session';
+  private loadingProgress: number | null = null;
+  /** `GetGameState.isReplayActive`: a replay playing is not live driving. */
+  private replay = false;
+  private reserveLaps: number;
   private readonly clients = new Map<SseSink, LiveClient>();
   private pedals: LivePedalSample[] = [];
   private worker: LiveWorker | null = null;
@@ -75,14 +93,29 @@ export class LiveService {
   public readonly firstReading = new Promise<void>(resolve => { this.markFirstReading = resolve; });
 
   public constructor(private readonly options: LiveServiceOptions = {}) {
+    this.reserveLaps = options.reserveLaps ?? DEFAULT_RESERVE_LAPS;
     this.identity = new LiveIdentityResolver({
       ...options.identity,
       personalBest: options.personalBest ?? (() => null),
       onChange: () => this.publish({ ...this.snapshot, identity: this.identity.identity }),
     });
+    this.pit = new LivePitPoller({
+      ...options.pit,
+      onUpdate: update => this.applyRest(update),
+      onReplay: active => {
+        this.replay = active === true;
+        this.applyReading(this.lastReading);
+      },
+    });
   }
 
   public getSnapshot(): LiveSnapshot { return this.snapshot; }
+
+  /** The reserve setting changed: the plan follows at once. */
+  public setReserveLaps(laps: number): void {
+    this.reserveLaps = laps;
+    this.applyReading(this.lastReading);
+  }
   public hasClients(): boolean { return this.clients.size > 0; }
   /** A session is loaded in the game, so the game may be writing its files. */
   public isSessionLoaded(): boolean { return isLiveSessionLoaded(this.snapshot.lifecycle); }
@@ -114,6 +147,7 @@ export class LiveService {
     this.restartTimer = null;
     this.clearTimers();
     this.identity.stop();
+    this.pit.stop();
     const worker = this.worker;
     this.worker = null;
     if (worker) {
@@ -127,36 +161,56 @@ export class LiveService {
     this.clients.set(sink, { blocked: false });
     this.send(sink, LIVE_STREAM_EVENTS.snapshot, this.snapshot);
     this.ensureTimers();
+    this.followPitMode();
     return () => {
       this.clients.delete(sink);
       if (this.clients.size === 0) this.clearTimers();
+      this.followPitMode();
     };
   }
 
   private handleMessage(message: unknown): void {
-    if (!isWorkerMessage<LiveReaderMessage>(message, ['frame', 'menu', 'closed'])) return;
+    if (!isWorkerMessage<LiveReaderMessage>(message, ['frame', 'navigation', 'closed'])) return;
     this.markFirstReading();
     if (message.type === 'closed') {
-      this.inMenu = false;
+      this.screen = 'session';
+      this.loadingProgress = null;
+      this.strategy.reset();
       this.applyReading(null);
       return;
     }
-    if (message.type === 'menu') {
-      this.inMenu = message.inMenu;
+    if (message.type === 'navigation') {
+      this.screen = message.screen;
+      this.loadingProgress = message.loadingProgress;
       this.applyReading(this.lastReading);
       return;
     }
     if (message.tyreSurfaceAvgC !== undefined) this.tyreSurfaceAvgC = message.tyreSurfaceAvgC;
+    if (message.car) this.strategy.applyCar(message.car);
     if (message.scoring) this.applyReading(message.scoring);
+    else if (message.car) this.applyReading(this.lastReading);
     if (message.pedal) this.bufferPedal(message.pedal);
   }
 
   private applyReading(reading: LiveScoringReading | null): void {
     const previous = this.snapshot;
     this.lastReading = reading;
-    const state = deriveLiveState(reading, previous.lifecycle, this.inMenu);
+    const screen: LiveGameScreen = this.replay && this.screen === 'session' ? 'menu' : this.screen;
+    const state = deriveLiveState(reading, previous.lifecycle, screen);
     this.identity.update(isLiveSessionLoaded(state.lifecycle) ? state.session : null);
-    const next = { ...state, identity: this.identity.identity, ...this.tracker.apply(reading, state) };
+    const identity = this.identity.identity;
+    const details = this.tracker.apply(reading, state);
+    const strategy = this.strategy.update(reading, state, {
+      carClass: identity?.carClass ?? null,
+      lapsLeft: details.lapsLeft,
+      latestLap: details.recentLaps[details.recentLaps.length - 1] ?? null,
+      reserveLaps: this.reserveLaps,
+    });
+    const next = {
+      ...state, identity, ...details,
+      loadingProgress: state.lifecycle === 'loading' ? this.loadingProgress : null,
+      strategy,
+    };
     this.pendingTiming = this.clients.size > 0 && isLiveOnTrack(state.lifecycle) ? this.tracker.timing() : null;
     if (contentKey(next) === this.snapshotKey) {
       // The session clock moves every frame; it alone is not a change worth a snapshot.
@@ -177,8 +231,29 @@ export class LiveService {
       this.pendingTiming = null;
     }
     for (const sink of this.clients.keys()) this.send(sink, LIVE_STREAM_EVENTS.snapshot, this.snapshot);
-    if (next.lifecycle !== previous.lifecycle) this.events.emit('lifecycle', next.lifecycle);
+    if (next.lifecycle !== previous.lifecycle) {
+      this.followPitMode();
+      this.events.emit('lifecycle', next.lifecycle);
+    }
     if (this.isSessionLoaded() !== wasLoaded) this.events.emit('session-loaded', this.isSessionLoaded());
+  }
+
+  private applyRest(update: LiveRestUpdate): void {
+    this.strategy.applyRest(update);
+    this.applyReading(this.lastReading);
+  }
+
+  /**
+   * Pit data is read only while a dashboard is open and a session is loaded. During a replay (shown as the menu)
+   * the poller keeps asking `GetGameState` only, to learn when it ends.
+   */
+  private followPitMode(): void {
+    const lifecycle = this.snapshot.lifecycle;
+    const replaying = this.replay && this.lastReading !== null && this.screen === 'session';
+    const mode: PitPollMode = this.clients.size === 0 ? 'off'
+      : replaying ? 'track'
+        : !isLiveSessionLoaded(lifecycle) ? 'off' : lifecycle === 'garage' ? 'garage' : 'track';
+    this.pit.setMode(mode);
   }
 
   private bufferPedal(sample: LivePedalSample): void {

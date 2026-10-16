@@ -36,16 +36,26 @@ describe('live routes', () => {
   });
 
   it('reads the auto-open setting, on by default', async () => {
-    expect((await request(setup().app).get('/api/live/settings')).body).toEqual({ autoOpen: true });
-    expect((await request(setup('false').app).get('/api/live/settings')).body).toEqual({ autoOpen: false });
+    expect((await request(setup().app).get('/api/live/settings')).body).toEqual({ autoOpen: true, reserveLaps: 0.5 });
+    expect((await request(setup('false').app).get('/api/live/settings')).body).toEqual({ autoOpen: false, reserveLaps: 0.5 });
   });
 
   it('stores a valid auto-open setting', async () => {
     const { app, metadata } = setup();
     const response = await request(app).post('/api/live/settings').send({ autoOpen: false });
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({ autoOpen: false });
+    expect(response.body).toEqual({ autoOpen: false, reserveLaps: 0.5 });
     expect(metadata.get('live_auto_open')).toBe('false');
+  });
+
+  it('stores the reserve alone, keeps auto-open, and hands the new reserve to the live service', async () => {
+    const { app, live, metadata } = setup('false');
+    const reserve = vi.spyOn(live, 'setReserveLaps');
+    const response = await request(app).post('/api/live/settings').send({ reserveLaps: 1 });
+    expect(response.body).toEqual({ autoOpen: false, reserveLaps: 1 });
+    expect(metadata.get('live_reserve_laps')).toBe('1');
+    expect(reserve).toHaveBeenCalledWith(1);
+    expect((await request(app).post('/api/live/settings').send({ reserveLaps: 0.3 })).status).toBe(400);
   });
 
   it.each([[{}], [{ autoOpen: 'yes' }], [{ autoOpen: 1 }], [{ autoOpen: null }]])('rejects %j with 400', async body => {
@@ -55,6 +65,7 @@ describe('live routes', () => {
     expect(response.body.error).toMatch(/autoOpen/);
     expect(metadata.size).toBe(0);
   });
+
 
   async function openStream(app: express.Express, path: string): Promise<{ response: http.IncomingMessage; chunks: string[] }> {
     const server = app.listen(0, '127.0.0.1');

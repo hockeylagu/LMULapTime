@@ -28,6 +28,15 @@ export function formatLapTime(seconds: number | null | undefined): string {
   return seconds == null || !(seconds > 0) ? UNKNOWN : formatTime(seconds);
 }
 
+/** The running lap clock in tenths, cut (not rounded) so it never reads ahead: `1:05.3`; the unknown mark for null. */
+export function formatRunningTime(seconds: number | null | undefined): string {
+  if (seconds == null || !(seconds >= 0)) return UNKNOWN;
+  const tenths = Math.floor(seconds * 10);
+  const minutes = Math.floor(tenths / 600);
+  const rest = ((tenths % 600) / 10).toFixed(1).padStart(4, '0');
+  return `${minutes}:${rest}`;
+}
+
 /** A sector time: `37.204` under a minute, a full lap time format above it, the unknown mark for null. */
 export function formatSectorTime(seconds: number | null | undefined): string {
   if (seconds == null || !(seconds > 0)) return UNKNOWN;

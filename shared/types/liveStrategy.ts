@@ -1,0 +1,159 @@
+/**
+ * Live race intelligence contracts: virtual energy or fuel, the next pit stop, damage, tyres and the forecast.
+ * Built by `shared/domain/live/liveStrategyTracker.ts` from the shared memory and LMU's local REST reads
+ * (docs/LMU_REST_API.md section 4.3). Every figure is deterministic; unknown values are null, never zero-filled.
+ */
+
+/** Virtual energy for GT3 and Hypercar, fuel for every other class; only one is ever shown. */
+export type LiveResourceKind = 've' | 'fuel';
+
+/** Where the per-lap use comes from: laps measured in this event, or LMU's own estimate before the first lap. */
+export type LivePerLapSource = 'measured' | 'game';
+
+export interface LiveResourcePlan {
+  kind: LiveResourceKind;
+  /** Percent of a full VE tank, or litres. */
+  unit: '%' | 'L';
+  /** Amount now. */
+  amount: number | null;
+  /** A full tank in `unit` (100 for VE). */
+  capacity: number | null;
+  /** Use per lap: the mean of the last three representative laps, or the game's estimate before the first. */
+  perLap: number | null;
+  perLapSource: LivePerLapSource | null;
+  /** Representative laps measured in this event (all sessions on this layout and car). */
+  lapsMeasured: number;
+  /** Reserve kept at the pit entry or the finish, in laps. */
+  reserveLaps: number;
+  /** Laps the amount still covers after the reserve, from the current position. */
+  lapsInTank: number | null;
+  /** Races only, with laps left known. */
+  race: LiveRacePlan | null;
+}
+
+export interface LiveRacePlan {
+  /** The finish is reachable with the reserve: no pit stop for the resource. */
+  finishReachable: boolean;
+  /** Projected at the finish when reachable. */
+  atFinish: number | null;
+  /** Laps before the pit lap: 0 is pit this lap. Null when the finish is reachable. */
+  pitInLaps: number | null;
+  /** Racing lap to pit on. */
+  pitLap: number | null;
+  /**
+   * Allowed use per lap to reach the pit lap (or the finish) with the reserve, minus the use per lap:
+   * positive is spare, negative means saving is needed.
+   */
+  sparePerLap: number | null;
+  /** What the tank should hold after the next stop to reach the finish with the reserve, capped at a full tank. */
+  neededAfterStop: number | null;
+  /** Further stops after the next one when a full tank does not reach the finish. */
+  stopsAfterNext: number;
+}
+
+export type LivePitState = 'none' | 'request' | 'entering' | 'stopped' | 'exiting';
+
+/** The MFD as set for the next stop (`receivePitMenu`). */
+export interface LivePitMenu {
+  /** VE percent (`VIRTUAL ENERGY:`, the target after the stop) or fuel; null when the line is not there. */
+  resourceValue: number | null;
+  /** The line's text as the game shows it, e.g. `50% 20 laps`. */
+  resourceText: string | null;
+  /** `TIRES:` setting, e.g. `No Change`, `New Medium`, `New Wet`. */
+  tyres: string | null;
+  /** `DAMAGE:` setting: `N/A` without damage, else `Do Not Repair`, `Repair Body`, `Repair All`. */
+  repair: string | null;
+}
+
+export interface LivePitInfo {
+  state: LivePitState;
+  /** Pending penalties: the next stop is a stop-and-go with no service while any is pending. */
+  penalties: number;
+  /** The game's estimate of the next service (`pitstop-estimate.total`); null while a penalty hides it. */
+  serviceSeconds: number | null;
+  /** The estimate plus the game's random delays (`pitStopTimes`), the top of the range. */
+  serviceMaxSeconds: number | null;
+  /** Stop-and-go hold while a penalty is pending. */
+  penaltySeconds: number | null;
+  mfd: LivePitMenu | null;
+}
+
+export type LiveCorner = 'FL' | 'FR' | 'RL' | 'RR';
+
+export interface LiveDamage {
+  /** A flat or lost wheel: pit now. */
+  wheel: { problem: 'flat' | 'detached'; corner: LiveCorner } | null;
+  /** Body aero damage (`getVehicleCondition.vehicleDamage`; above 1 after big hits). */
+  body: number | null;
+  /** Worst suspension damage, 0..1. */
+  suspension: number | null;
+  /** The game reports a detached part. */
+  partsDetached: boolean;
+  /** Racing lap on which the damage first showed. */
+  impactLap: number | null;
+  /** Completed laps since that lap. */
+  lapsSinceImpact: number | null;
+  /** Mean of the valid laps after the impact minus the mean of the last valid laps before it (two each at least). */
+  paceLossPerLap: number | null;
+  /** Pace loss times the race laps left. */
+  lossToFinish: number | null;
+  /** Repair time the game estimates (`pitstop-estimate.damage`), kept while a penalty hides it. */
+  repairSeconds: number | null;
+  /** Worth the driver's attention: a wheel problem, a pace loss of 0.3 s/lap or more, or a repair of 30 s or more. */
+  significant: boolean;
+}
+
+export interface LiveTyres {
+  /** Compound on the car (front), as the game names it. */
+  compound: string | null;
+  /** Tread left on the most worn tyre, 0..1 (`getVehicleCondition.tireCondition`). */
+  worst: number | null;
+  worstCorner: LiveCorner | null;
+  /** Measured loss of that figure per lap, from laps of this stint; null before two laps. */
+  wearPerLap: number | null;
+  /** New sets left in the inventory. */
+  newSets: number | null;
+}
+
+export interface LiveForecast {
+  /** The next change in this session: rain arriving or ending. */
+  change: 'rain' | 'dry';
+  /** Rain chance at that forecast node, percent. */
+  chance: number;
+  /** Session seconds of the node (nodes are fractions of the session length). */
+  atSeconds: number;
+  /** Racing lap it lands on, from the lap time; null without one. */
+  lap: number | null;
+}
+
+/** In the garage: what to load for this session. */
+export interface LiveGaragePlan {
+  kind: LiveResourceKind;
+  unit: '%' | 'L';
+  /** Session length in minutes. */
+  sessionMinutes: number | null;
+  /** Laps of the session (timed: laps started before the clock ends, plus the out lap). */
+  laps: number | null;
+  /** The lap time the laps come from. */
+  lapSeconds: number | null;
+  perLap: number | null;
+  perLapSource: LivePerLapSource | null;
+  lapsMeasured: number;
+  reserveLaps: number;
+  /** Amount to load, capped at a full tank. */
+  needed: number | null;
+  /** Stops the session needs when a full tank does not cover it. */
+  stops: number | null;
+  /** The start amount set in the garage (`getPlayerGarageData`). */
+  setInGarage: number | null;
+}
+
+export interface LiveStrategy {
+  resource: LiveResourcePlan | null;
+  pit: LivePitInfo | null;
+  damage: LiveDamage | null;
+  tyres: LiveTyres | null;
+  forecast: LiveForecast | null;
+  /** Garage only. */
+  garage: LiveGaragePlan | null;
+}

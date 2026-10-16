@@ -2,7 +2,9 @@ import { useLiveTiming, type LiveTimingStore } from '../../api/liveStream.js';
 import type { LiveSnapshot } from '../../../shared/types/live.js';
 import { LiveDelta } from './LiveDelta.js';
 import { LiveLastLapRow } from './LiveLastLapRow.js';
-import { lastLap, UNKNOWN } from './liveFormat.js';
+import { lastLap } from './liveFormat.js';
+import { LiveDamageRow } from './race/LiveDamageRow.js';
+import { LiveRacePlan } from './race/LiveRacePlan.js';
 
 const SECTOR_LABELS = ['S1 VS BEST', 'S2 VS BEST', 'S3 VS BEST'] as const;
 
@@ -40,26 +42,19 @@ function RaceDeltaRow({ store }: { store: LiveTimingStore }) {
   );
 }
 
-/** The race driving view. The primary area stays quiet until the pit advice arrives (later step). */
+/**
+ * The race driving view: the plan (pit countdown, per-lap use, MFD values, pit time), the current lap against the
+ * best, then the last lap, or the damage row in its place while damage matters.
+ */
 export function LiveRaceView({ snapshot, store }: { snapshot: LiveSnapshot; store: LiveTimingStore }) {
-  const session = snapshot.session;
-  const lap = session?.playerLapsCompleted != null ? session.playerLapsCompleted + 1 : null;
-  const lapsLeft = snapshot.lapsLeft;
-  const latest = lastLap(snapshot.recentLaps);
+  const damage = snapshot.strategy?.damage ?? null;
   return (
     <>
-      <section aria-label="Race" className="flex min-h-0 flex-1 flex-col justify-center gap-5">
-        <h1 className="text-[164px] font-bold leading-[1.1] tracking-[-0.03em]">{lap === null ? 'RACE' : `LAP ${lap}`}</h1>
-        {/* Both lines are always there, the unknown mark until known, so the lap title never moves. */}
-        <p data-testid="live-race-laps-left" className="font-mono text-[64px] font-semibold text-lmu-text-soft">
-          {lapsLeft ? `${lapsLeft.estimated ? '~' : ''}${lapsLeft.laps}` : UNKNOWN} LAPS LEFT
-        </p>
-        <p data-testid="live-race-place" className="text-[64px] font-semibold text-lmu-muted">
-          {session?.playerPlace != null ? `P${session.playerPlace}` : UNKNOWN}
-        </p>
-      </section>
+      <LiveRacePlan snapshot={snapshot} />
       <RaceDeltaRow store={store} />
-      <LiveLastLapRow lap={latest} />
+      {damage?.significant
+        ? <LiveDamageRow damage={damage} lapsLeft={snapshot.lapsLeft?.laps ?? null} />
+        : <LiveLastLapRow lap={lastLap(snapshot.recentLaps)} />}
     </>
   );
 }

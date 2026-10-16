@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { decodePedalSlot, decodeScoring, readPedalFrame, readScoringFrame } from '../../../server/live/rf2Decode.js';
-import { SCORING, SCORING_INFO, TELEMETRY } from '../../../server/live/rf2Layout.js';
+import { SCORING, SCORING_INFO, TELEMETRY, VEHICLE_TELEMETRY, WHEEL } from '../../../server/live/rf2Layout.js';
 import { scoringBuffer, source, telemetryBuffer } from './rf2Fixtures.js';
 import type { ScoringVehicle } from './rf2Fixtures.js';
 
@@ -96,7 +96,10 @@ describe('rF2 pedal decode', () => {
   it('decodes one slot, clamping the pedals to 0..1', () => {
     const buffer = telemetryBuffer(4, slots);
     const slot = buffer.subarray(TELEMETRY.vehicles + TELEMETRY.vehicleStride, TELEMETRY.vehicles + 2 * TELEMETRY.vehicleStride);
-    expect(decodePedalSlot(slot)).toEqual({ id: 12, sample: { t: 321.25, throttle: 0.75, brake: 1 }, tyreSurfaceAvgC: null });
+    expect(decodePedalSlot(slot)).toEqual({
+      id: 12, sample: { t: 321.25, throttle: 0.75, brake: 1 }, tyreSurfaceAvgC: null,
+      car: { fuelLiters: 0, fuelCapacityLiters: 0, dentSeverity: [0, 0, 0, 0, 0, 0, 0, 0], detached: false, wheels: Array(4).fill({ flat: false, detached: false }), compound: '' },
+    });
   });
 
   it('averages the 12 tyre surface temperatures and converts Kelvin to Celsius, null when the game reports none', () => {
@@ -108,10 +111,28 @@ describe('rF2 pedal decode', () => {
     expect(decoded(undefined)).toBeNull();
   });
 
+  it('reads the car: fuel and capacity in litres, dents, lost parts, flat or lost wheels and the front compound', () => {
+    const buffer = telemetryBuffer(4, [{ id: 12, et: 1, throttle: 0, brake: 0 }]);
+    const base = TELEMETRY.vehicles;
+    const at = VEHICLE_TELEMETRY.offsets;
+    buffer.writeDoubleLE(32.2, base + at.fuel);
+    buffer.writeDoubleLE(117, base + at.fuelCapacity);
+    buffer.writeUInt8(2, base + at.dentSeverity + 5);
+    buffer.writeUInt8(1, base + at.detached);
+    buffer.writeUInt8(1, base + at.wheels + 2 * WHEEL.size + WHEEL.offsets.flat);
+    buffer.writeUInt8(1, base + at.wheels + 3 * WHEEL.size + WHEEL.offsets.detached);
+    buffer.write('Medium', base + at.frontTireCompoundName, 'utf8');
+    expect(decodePedalSlot(buffer.subarray(base, base + TELEMETRY.vehicleStride)).car).toEqual({
+      fuelLiters: 32.2, fuelCapacityLiters: 117, dentSeverity: [0, 0, 0, 0, 0, 2, 0, 0], detached: true,
+      wheels: [{ flat: false, detached: false }, { flat: false, detached: false }, { flat: true, detached: false }, { flat: false, detached: true }],
+      compound: 'Medium',
+    });
+  });
+
   it('matches the player by id and remembers its slot', () => {
     const mapping = source(() => telemetryBuffer(4, slots));
     expect(readPedalFrame(mapping, 12, null, -1)).toEqual({
-      status: 'ok', version: 4, value: { slot: 1, sample: { t: 321.25, throttle: 0.75, brake: 1 }, tyreSurfaceAvgC: null },
+      status: 'ok', version: 4, value: { slot: 1, sample: { t: 321.25, throttle: 0.75, brake: 1 }, tyreSurfaceAvgC: null, car: expect.objectContaining({ fuelLiters: 0 }) },
     });
     expect(readPedalFrame(mapping, 12, 3, 1)).toMatchObject({ value: { slot: 1 } });
   });

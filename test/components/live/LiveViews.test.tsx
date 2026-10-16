@@ -37,7 +37,7 @@ describe('live driving views', () => {
   afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
   describe('session bar', () => {
-    it('shows laps left (~ when estimated), the personal record, the track temperature with its trend and the layout name', () => {
+    it('shows laps left (~ when estimated), the personal record, the track temperature with its trend and the game track name', () => {
       render(<LivePage />);
       send(liveSnapshot({
         identity: IDENTITY,
@@ -47,7 +47,8 @@ describe('live driving views', () => {
       expect(screen.getByTestId('live-laps-left')).toHaveTextContent('LAPS LEFT ~12');
       expect(screen.getByTestId('live-personal-best')).toHaveTextContent('PR 2:00.964');
       expect(screen.getByTestId('live-track-temp')).toHaveTextContent('TRACK 34° ↓');
-      expect(screen.getByText('Bahrain GP')).toBeInTheDocument();
+      // The game's own name, the same text as on every state screen (the layout key resolves the PR, not the label).
+      expect(screen.getByText('Circuit de la Sarthe')).toBeInTheDocument();
       expect(screen.getByTestId('car-class-badge')).toHaveTextContent('GT3');
       send(liveSnapshot({ sequence: 2, identity: IDENTITY, lapsLeft: { laps: 1, estimated: false } }));
       expect(screen.getByTestId('live-laps-left')).toHaveTextContent('LAPS LEFT 1');
@@ -60,7 +61,6 @@ describe('live driving views', () => {
       expect(screen.getByTestId('live-laps-left')).toHaveTextContent('LAPS LEFT —');
       expect(screen.getByTestId('live-personal-best')).toHaveTextContent('PR —');
       expect(screen.getByTestId('live-track-temp')).toHaveTextContent('TRACK —');
-      expect(screen.getByTestId('live-race-laps-left')).toHaveTextContent('— LAPS LEFT');
       expect(screen.getByText('Circuit de la Sarthe')).toBeInTheDocument();
     });
 
@@ -93,8 +93,7 @@ describe('live driving views', () => {
       expect(last).toHaveTextContent('37.204');
       expect(last).toHaveTextContent('45.116');
       expect(last).toHaveTextContent('39.512');
-      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('LAP 13');
-      expect(screen.getByRole('region', { name: 'Race' })).toHaveTextContent('~12 LAPS LEFT');
+      expect(screen.getByTestId('live-race-position')).toHaveTextContent('LAP 13 · P3');
     });
 
     it('shows the unknown mark, never zero, before timing and a lap exist', () => {
@@ -160,11 +159,30 @@ describe('live driving views', () => {
       expect(screen.getByText('BEST POSSIBLE').nextElementSibling).toHaveTextContent('2:01.284');
       expect(screen.getByTestId('live-practice-delta')).toHaveTextContent('−0.184');
       const rows = within(screen.getByTestId('live-history')).getAllByRole('row');
-      // Header, three laps newest first, the BEST footer.
-      expect(rows).toHaveLength(5);
-      expect(rows[1]).toHaveTextContent('52:01.83237.20445.11639.512+0.426');
-      expect(rows[3]).toHaveTextContent('32:02.20237.36645.20839.628+0.796');
+      // Header, current splits, three laps newest first, the BEST footer.
+      expect(rows).toHaveLength(6);
+      expect(rows[2]).toHaveTextContent('52:01.83237.20445.11639.512+0.426');
+      expect(rows[4]).toHaveTextContent('32:02.20237.36645.20839.628+0.796');
       expect(screen.getByTestId('live-history-best')).toHaveTextContent('BEST2:01.40637.15044.98039.154');
+    });
+
+    it('fills current splits from timing events before a lap completes, then moves all splits into history', () => {
+      render(<LivePage />);
+      send(practice({ recentLaps: [], sessionBest: null }));
+      const current = screen.getByTestId('live-history-current');
+      expect(current).toHaveTextContent('——————');
+      const renders = bar.renders;
+      timing(liveTiming({ lapNumber: 1, sector: 2, lapElapsedSeconds: 40.06, sectors: [37.204, null, null], deltaSeconds: null }));
+      expect(current).toHaveTextContent('10:40.037.204———');
+      expect(screen.queryByTestId('live-history-latest')).toBeNull();
+      timing(liveTiming({ lapNumber: 1, sector: 3, lapElapsedSeconds: 85.39, sectors: [37.204, 45.116, null], deltaSeconds: null }));
+      expect(current).toHaveTextContent('11:25.337.20445.116——');
+      expect(bar.renders).toBe(renders);
+
+      send(practice({ recentLaps: [liveLap(1, 121.832, [37.204, 45.116, 39.512])], sessionBest: null }));
+      timing(liveTiming({ lapNumber: 2, sector: 1, lapElapsedSeconds: 0.4, sectors: [null, null, null], deltaSeconds: null }));
+      expect(current).toHaveTextContent('20:00.4————');
+      expect(screen.getByTestId('live-history-latest')).toHaveTextContent('12:01.83237.20445.11639.512—');
     });
 
     it('tints only the latest lap\'s largest sector loss against the best sectors', () => {

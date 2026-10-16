@@ -1,9 +1,9 @@
 import type { LivePedalSample } from '../../../shared/types/live.js';
 
 /** The trace shows this many seconds. */
-export const PEDAL_WINDOW_SECONDS = 20;
+export const PEDAL_WINDOW_SECONDS = 30;
 /** A hard cap on stored samples (about 100 Hz for the window plus slack), so a bad clock cannot grow it. */
-const MAX_SAMPLES = 2600;
+const MAX_SAMPLES = PEDAL_WINDOW_SECONDS * 100 + 600;
 
 /**
  * The last seconds of pedal samples, outside React: the stream pushes into it 20-30 times a second and the trace

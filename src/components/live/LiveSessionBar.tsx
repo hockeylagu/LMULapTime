@@ -2,7 +2,8 @@ import type { LiveConnection } from '../../api/liveStream.js';
 import type { LiveSnapshot, LiveWeather } from '../../../shared/types/live.js';
 import { CarClassBadge } from '../common/CarClassBadge.js';
 import { formatLapTime, UNKNOWN } from './liveFormat.js';
-import { liveCarClass, sessionKindLabel } from './liveScreens.js';
+import { liveCarClass, liveTrackName, sessionKindLabel } from './liveScreens.js';
+import { forecastText } from './race/raceAction.js';
 
 const STATUS: Record<LiveConnection, { label: string; className: string }> = {
   live: { label: 'LIVE', className: 'text-lmu-gain' },
@@ -17,18 +18,20 @@ interface LiveSessionBarProps {
   connection: LiveConnection;
 }
 
-/** Brand, session, track and class on the left; pause and data status on the right. */
+/** Brand, session, track and class on the left; weather, laps left, PR and the data or pause status on the right. */
 export function LiveSessionBar({ snapshot, connection }: LiveSessionBarProps) {
   const session = snapshot?.session ?? null;
   const inSession = snapshot !== null && snapshot.lifecycle !== 'offline' && snapshot.lifecycle !== 'menu';
   const showSession = session !== null && inSession && connection !== 'disconnected';
   const identity = snapshot?.identity ?? null;
   const carClass = showSession ? (identity?.carClass ?? liveCarClass(session.vehicleName, session.vehicleClass)) : null;
-  const layout = identity?.layoutName || session?.trackName;
+  const layout = snapshot ? liveTrackName(snapshot) : '';
   const lapsLeft = showSession ? snapshot.lapsLeft : null;
   const personalBest = showSession ? (identity?.personalBestSeconds ?? null) : null;
   const weather = showSession ? snapshot.weather : null;
+  const forecast = showSession ? snapshot.strategy?.forecast ?? null : null;
   const status = STATUS[connection];
+  const paused = showSession && connection === 'live' && snapshot.paused;
   return (
     <header className="flex h-[88px] shrink-0 items-center justify-between whitespace-nowrap border-b border-lmu-border pb-5 text-[48px] font-semibold">
       <div className="flex items-center gap-7">
@@ -51,6 +54,21 @@ export function LiveSessionBar({ snapshot, connection }: LiveSessionBarProps) {
       </div>
       <div className="flex items-center gap-9">
         {/* Every slot is held for the whole session, showing the unknown mark until its value arrives, so nothing moves. */}
+        {/* One weather slot of fixed width, first on the right so its unused width joins the free space between the groups:
+            the forecast change when the session has one, else the track temperature. */}
+        {showSession && (
+          <span className="inline-block w-[520px] text-right">
+            {forecast ? (
+              <span data-testid="live-forecast" className="text-lmu-blue">{forecastText(forecast)}</span>
+            ) : (
+              <span data-testid="live-track-temp" aria-label={weather ? `Track temperature, ${weather.trackTempTrend}` : 'Track temperature'}>
+                <span className="text-lmu-muted">TRACK</span>{' '}
+                <b className="inline-block min-w-[3ch] text-right font-mono font-normal text-lmu-text-soft">{weather ? `${weather.trackTempC}°` : UNKNOWN}</b>{' '}
+                <span className="inline-block w-[1ch]">{weather ? TREND_ARROW[weather.trackTempTrend] : ''}</span>
+              </span>
+            )}
+          </span>
+        )}
         {showSession && session.kind === 'race' && (
           <span data-testid="live-laps-left">
             <span className="text-lmu-muted">LAPS LEFT</span>{' '}
@@ -62,18 +80,10 @@ export function LiveSessionBar({ snapshot, connection }: LiveSessionBarProps) {
             <span className="text-lmu-muted">PR</span> <b className="inline-block min-w-[8ch] text-right font-mono font-normal text-lmu-text-soft">{formatLapTime(personalBest)}</b>
           </span>
         )}
-        {showSession && (
-          <span data-testid="live-track-temp" aria-label={weather ? `Track temperature, ${weather.trackTempTrend}` : 'Track temperature'}>
-            <span className="text-lmu-muted">TRACK</span>{' '}
-            <b className="inline-block min-w-[3ch] text-right font-mono font-normal text-lmu-text-soft">{weather ? `${weather.trackTempC}°` : UNKNOWN}</b>{' '}
-            <span className="inline-block w-[1ch]">{weather ? TREND_ARROW[weather.trackTempTrend] : ''}</span>
-          </span>
-        )}
-        {/* Held while in a session so pausing does not shift the other items; hidden, not removed. */}
-        {showSession && (
-          <span data-testid="live-paused" aria-hidden={!snapshot.paused} className={`rounded border border-lmu-warn px-3 py-1 text-lmu-warn ${snapshot.paused ? '' : 'invisible'}`}>PAUSED</span>
-        )}
-        <span data-testid="live-status" className={`font-mono ${status.className}`}>{status.label}</span>
+        {/* PAUSED takes the status slot, which is as wide as PAUSED in a session, so pausing moves nothing. */}
+        <span data-testid="live-status" className={`font-mono ${showSession ? 'min-w-[6ch] text-right' : ''} ${paused ? 'text-lmu-warn' : status.className}`}>
+          {paused ? 'PAUSED' : status.label}
+        </span>
       </div>
     </header>
   );

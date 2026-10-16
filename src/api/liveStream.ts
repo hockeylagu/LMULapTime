@@ -111,6 +111,6 @@ export function fetchLiveSettings(signal?: AbortSignal): Promise<LiveSettings> {
   return fetchJson<LiveSettings>('/api/live/settings', { signal });
 }
 
-export function saveLiveSettings(settings: LiveSettings, signal?: AbortSignal): Promise<LiveSettings> {
+export function saveLiveSettings(settings: Partial<LiveSettings>, signal?: AbortSignal): Promise<LiveSettings> {
   return postJson<LiveSettings>('/api/live/settings', settings, { signal });
 }

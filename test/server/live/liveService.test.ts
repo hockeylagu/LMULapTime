@@ -6,6 +6,7 @@ import type { LiveLifecycle } from '../../../shared/types/live.js';
 import { scoringReading, vehicleReading } from '../../helpers/liveReadings.js';
 import { LiveService, PEDAL_FLUSH_MS, TIMING_MIN_INTERVAL_MS } from '../../../server/live/liveService.js';
 import type { LiveServiceOptions, LiveWorker } from '../../../server/live/liveService.js';
+import type { RestAnswer } from '../../../server/live/lmuPitRest.js';
 
 class FakeWorker extends EventEmitter {
   public postMessage = vi.fn();
@@ -29,9 +30,12 @@ function reading(overrides: Partial<LiveScoringReading> = {}): LiveScoringReadin
   });
 }
 
+/** LMU's REST API is never reached from tests: every pit read fails unless a test answers it. */
+const NO_GAME = { get: () => Promise.resolve<RestAnswer>({ ok: false, reason: 'error' }) };
+
 function setup(options: LiveServiceOptions = {}) {
   const worker = new FakeWorker();
-  const service = new LiveService({ createWorker: () => worker as unknown as LiveWorker, ...options });
+  const service = new LiveService({ createWorker: () => worker as unknown as LiveWorker, pit: NO_GAME, ...options });
   const lifecycles: LiveLifecycle[] = [];
   const loaded: boolean[] = [];
   service.events.on('lifecycle', value => lifecycles.push(value));
@@ -243,7 +247,7 @@ describe('LiveService', () => {
       vi.advanceTimersByTime(PEDAL_FLUSH_MS);
       expect(timings(sink)).toHaveLength(1);
       expect(sink.data(timings(sink)[0])).toEqual({
-        lapNumber: 4, sector: 1, deltaSeconds: null, sectorDeltas: [null, null, null], tyreSurfaceAvgC: null,
+        lapNumber: 4, sector: 1, lapElapsedSeconds: expect.any(Number), sectors: [null, null, null], deltaSeconds: null, sectorDeltas: [null, null, null], tyreSurfaceAvgC: null,
       });
 
       // Two frames inside one interval: only the newest goes out, once the interval has passed.
@@ -289,6 +293,54 @@ describe('LiveService', () => {
       service.addClient(sink);
       settle();
       expect(sink.events()).toEqual(['snapshot']);
+    });
+  });
+  describe('pit data', () => {
+    const answers = (replay: boolean) => (path: string): Promise<RestAnswer> => {
+      if (path === '/rest/sessions/GetGameState') return Promise.resolve({ ok: true, body: { isReplayActive: replay } });
+      if (path === '/rest/watch/standings') return Promise.resolve({ ok: true, body: [{ player: true, veFraction: 0.62, fuelFraction: 0.5, pitState: 'NONE', penalties: 0 }] });
+      if (path === '/rest/strategy/pitstop-estimate') return Promise.resolve({ ok: true, body: { total: 33.7, damage: 30, penalties: 0, fuel: 3.7, ve: 1.7, tires: 0 } });
+      return Promise.resolve({ ok: false, reason: 'status' });
+    };
+
+    it('reads the pit data only while a dashboard is open and a session is loaded, into the snapshot strategy', async () => {
+      const get = vi.fn(answers(false));
+      const { service, frame } = setup({ pit: { get } });
+      frame(reading());
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(get).not.toHaveBeenCalled();
+      const sink = new FakeSink();
+      const remove = service.addClient(sink);
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(get).toHaveBeenCalledWith('/rest/watch/standings');
+      expect(service.getSnapshot().strategy).toMatchObject({
+        resource: { kind: 've', amount: 62 },
+        pit: { serviceSeconds: 34, penalties: 0 },
+      });
+      remove();
+      const calls = get.mock.calls.length;
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(get.mock.calls.length).toBe(calls);
+    });
+
+    it('treats a replay as the menu, and reads nothing but the game state until it ends', async () => {
+      const get = vi.fn(answers(true));
+      const { service, frame, lifecycles } = setup({ pit: { get } });
+      service.addClient(new FakeSink());
+      frame(reading());
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(service.getSnapshot().lifecycle).toBe('menu');
+      expect(lifecycles).toEqual(['driving', 'menu']);
+      expect(new Set(get.mock.calls.map(([path]) => path))).toEqual(new Set(['/rest/sessions/GetGameState']));
+    });
+
+    it('shows the loading screen with its progress from the navigation notice', () => {
+      const { service, worker, frame } = setup();
+      frame(reading());
+      worker.emit('message', { type: 'navigation', screen: 'loading', loadingProgress: 0.4 });
+      expect(service.getSnapshot()).toMatchObject({ lifecycle: 'loading', loadingProgress: 0.4, session: null, strategy: null });
+      worker.emit('message', { type: 'navigation', screen: 'session', loadingProgress: null });
+      expect(service.getSnapshot()).toMatchObject({ lifecycle: 'driving', loadingProgress: null });
     });
   });
 });
