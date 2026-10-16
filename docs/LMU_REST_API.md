@@ -164,6 +164,70 @@ Measured on a replay loaded from the main menu. Evidence is in
 > `/rest/watch/*` and `/rest/replay/*` reads, one request at a time at ≤ 1 Hz, and stop on the
 > first non-200 or slow response. Never sweep every endpoint in the Swagger schema.
 
+### 4.2 Live Practice Reads (observed, build 14200, 2026-10-15)
+
+Offline practice (`PRACTICE1`, Laguna Seca, Porsche 911 GT3 R #91, out lap). One GET at a
+time, ≥ 1 s apart; every answer took about 0.21 s and the game stayed healthy. That time is
+the client trying IPv6 `localhost` first: on `127.0.0.1` the same reads answer in 2–40 ms
+(Python's `urllib` waits about 2 s on `localhost`). Use `127.0.0.1:6397`.
+
+An online session (Le Mans, LMP3, 15 cars) gave the same fields. Other cars' `veFraction` and
+`fuelFraction` read 0 and `strategy/usage` lists other drivers with `ve` only, so resource
+levels are known for the player only. `navigationState` `NAV_EVENT`, `inRealtime` false and
+`GetGameState.inMonitor` true mark the garage monitor; `settingMode` is `SETTING_MULTIPLAYER`.
+Online qualifying and a 20-minute race were then polled every 5–30 s (1,602 reads, all 200,
+slowest 134 ms on `127.0.0.1`). Lifecycle as the dashboard sees it:
+
+| Moment | `sessionInfo` (`session`, `gamePhase`, `inRealtime`) | `navigation/state` `gamePhase` | `GetGameState` |
+|---|---|---|---|
+| Qualifying running | `QUALIFY1`, 5, true | `GREEN` | `GPHASE_GREEN`, `DRIVING` |
+| Qualifying over, still driving | `QUALIFY1`, 8, true | `CHECKERED` | `GPHASE_CHECKERED` |
+| Back in the garage monitor | `QUALIFY1`, 8, false | `CHECKERED`, `NAV_EVENT` | `MONITOR_MENU`, `inMonitor` true; `raceFinished` briefly true |
+| Race loaded, before the grid | `RACE1`, 0, false | `BEFORE` | `GPHASE_BEFORE`, `MONITOR_MENU` |
+| On the grid | `RACE1`, 0, true | `BEFORE` | `GPHASE_BEFORE`, `DRIVING` |
+| Formation lap | `RACE1`, 3, true (`timeRemainingInGamePhase` −1) | `FORMATION` | `GPHASE_FORMATION` |
+| Green | `RACE1`, 5, true (remaining 1198 s: a timed race) | `GREEN` | `GPHASE_GREEN` |
+| Checkered, cool-down | `RACE1`, 8, true | `CHECKERED` | `GPHASE_CHECKERED`, `END_OF_RACE_GRACE` |
+| Back in the monitor | `RACE1`, 8, false | `CHECKERED` | `END_OF_RACE_GRACE`, `inMonitor` true |
+
+Phase 4 (countdown) fell between 5 s samples. In standings: `finishStatus` turns
+`FSTAT_FINISHED` at the flag (`FSTAT_DNF` for retirements), `qualification` is the grid slot
+(places gained = `qualification` − `position`), `pitState` passes `REQUEST` → `EXITING` as the
+car returns to the garage, and the per-car `flag` stayed `GREEN` throughout (not usable).
+After the flag `timeBehindNext` goes negative or jumps by tens of seconds as cars finish, so
+gaps at the line must be frozen when each car's `finishStatus` changes. In the race,
+`pitstop-estimate.fuel` grew steadily (2.4 → 6.9 s) as fuel burned: it is the time to add the
+fuel the pit menu is set to, an indirect read of the MFD refuel amount.
+
+Raw captures (shared memory + REST, practice → qualifying → race) are kept outside the repo in
+`C:/Documents/lmu-live-captures/2026-10-15-lemans-lmp3-online`.
+
+| Endpoint | Status | What it carries (live) |
+|---|---|---|
+| `GET /navigation/state` | 200 | `state.gameState` `GSTATE_DYN`, `gamePhase` `GREEN`, `gameSession` `PRACTICE1`, `navigationState` `NAV_REALTIME`, `appBuild`; `loadingData` (JSON string) has `selectedCar.classes` (`GT3`, …) and `trackInfo.sceneDesc` `LAGUNASECA`, plus the track's default weather slots per session |
+| `GET /rest/watch/sessionInfo` | 200 | `session`, `gamePhase` 5, `inRealtime`, `currentEventTime` (live, unlike replay), `endEventTime`, `timeRemainingInGamePhase`, `raceCompletion.timeCompletion`, `ambientTemp`, `trackTemp`, `raining`, `darkCloud`, path wetness (0 in the dry), `yellowFlagState`, `sectorFlag` |
+| `GET /rest/watch/standings` | 200 | Per car: **`veFraction` (0.978) and `fuelFraction`**, `position`, `qualification`, `carClass`, `lapsCompleted`, `lastLapTime`, `bestLapTime`, sector times (current/last/best), `estimatedLapTime`, `timeBehindNext` / `ClassLeader` / `Leader`, `lapsBehind*`, `pitState`, `pitstops`, `pitting`, `pitLapDistance`, `inGarageStall`, `countLapFlag`, `finishStatus`, `flag`, `underYellow`, `penalties`, `attackMode` |
+| `GET /rest/strategy/usage` | 200 | Per driver, one entry per lap: `lap`, `stint`, `pit`, `fuel` and `ve` (fractions), `tyres` (four values, 0–100, 99.6 when new) |
+| `GET /rest/strategy/pitstop-estimate` | 200 | Seconds per service part for the stop as currently set: `fuel` 2.76, `ve` 1.05, `tires`, `damage`, `brakes`, `brakeDucts`, `driverSwap`, `penalties`, `total` 2.76 |
+| `GET /rest/strategy/overall` | **400** | Immediate (0.21 s); probably needs a parameter. Not retried |
+| `GET /rest/sessions/weather` | 200 | Forecast per session (`PRACTICE`, `QUALIFY`, `RACE`) at nodes `START`, `NODE_25`, `NODE_50`, `NODE_75`, `FINISH` (% of session): `WNV_RAIN_CHANCE`, `WNV_SKY`, `WNV_TEMPERATURE`, `WNV_HUMIDITY`, wind |
+| `GET /rest/sessions/GetGameState` | 200 | `PitEntryDist` (m to pit entry), `PitState`, `MultiStintState`, `gamePhase` `GPHASE_GREEN`, `isReplayActive`, `raceFinished`, `closeestWeatherNode` (sic), `inControlOfVehicle`, `timeOfDay` |
+
+Damage test (same day, Le Mans, GT3, shared memory recorded alongside):
+
+| Hit | Shared memory | `pitstop-estimate` |
+|---|---|---|
+| None | all damage fields 0 | `damage` 0, `total` 2.0 s |
+| Right side at 132 km/h; HUD: right tyres and front-right suspension orange | `Flat` 1 on front right and rear right; `DentSeverity[5]` and `[7]` 1; `LastImpactMagnitude` 8896 | `damage` **113.4 s**, `tires` 4.5, `total` 120.0 |
+| Side at 133 km/h (after a reset cleared hit 1) | `DentSeverity[7]` 1; magnitude 3235 then 4149; no flats | `damage` **30.0 s**, `total` 32.1 |
+
+`pitstop-estimate.damage` gives the repair time for the current damage, and it grows with
+suspension damage, which shared memory does not expose. `GetGameState` answers
+`{"status": "unavailable", "gameState": "Setup"}` outside an active session.
+
+Not read yet: the `/rest/garage/*` screens (pit menu, repair and refuel, tyre management,
+vehicle condition), because of the replay crash above.
+
 ---
 
 ## 5. Garage, Car Setup & Pit Menu (`/rest/garage`)

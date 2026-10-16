@@ -5,5 +5,20 @@
       "maxFindings": 5,
       "maxChars": 8000
     }
+  },
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "docs/prototypes/live-dashboard/index.html"
+        ],
+        "createdAt": "2026-10-15T23:50:38.917Z",
+        "reason": "Claude verified: static scan cannot resolve calc(N * var(--u)) with vw/dvh units; rendered at 2560x1440 the flagged .targets/.service/.service-stat have 60/26-36/34 px insets"
+      }
+    ]
   }
 }

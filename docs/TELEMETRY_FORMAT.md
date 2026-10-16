@@ -169,6 +169,29 @@ Stored data: replay trajectory blobs and DuckDB lap-cache rows written since the
 copy and no replay needs decoding again. Lateral offsets are not stored: they are reprojected whenever
 a trajectory is served.
 
+## Possible enrichment from a live capture (idea, not planned)
+
+Shared memory and the LMU REST API carry a few things neither the DuckDB file nor the replay has.
+Compared on 2026-10-15 against the channel list of an LMU build 14200 race DuckDB and the live
+captures in `C:/Documents/lmu-live-captures/`:
+
+- **Measured motion, ~50 Hz:** yaw, pitch and roll rates and angles, and the local velocity
+  vector, so yaw rate and slip angle would be measured instead of computed from heading;
+  position in native LMU x/y/z (DuckDB has 10 Hz GPS and 10 Hz G forces).
+- **Per-tyre slip:** contact-patch and ground velocities give slip angle and slip ratio per
+  wheel; dynamic camber and toe per wheel.
+- **Damage:** dent severity in eight body zones over time (DuckDB has impact magnitude,
+  detached wheels and overheating only).
+- **Weather:** rain intensity, average and maximum path wetness (DuckDB has cloud darkness,
+  minimum and off-path wetness).
+- **REST:** the repair time estimate (`pitstop-estimate.damage`), which would end the pit-repair
+  guess; the session forecast; the MFD settings at each stop once the garage reads are verified.
+
+LMU zeroes tyre load, grip, tyre forces, downforce, drag, engine torque and chassis ride heights
+in shared memory (offline and online), so those cannot be added. The data exists only for
+sessions driven while the app records it: a live reader could save a small per-session file
+beside the DuckDB one; past sessions cannot gain it.
+
 ## Versioning and provenance
 
 The database schema is tied to the LMU telemetry exporter and may change with a game update. Record the LMU build, database filename, DuckDB version, `metadata` rows, catalog tables, and `config.json` beside imported data. Re-run the catalog queries after an update rather than assuming every channel has the same columns or timestamp behavior.
