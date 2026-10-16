@@ -31,7 +31,8 @@ function snapshotKey(scan: ScanStatus): string {
     scan.replayUpgrade?.driversDone, scan.referenceLaptimes?.completedAt, scan.sessionProjectionBackfill?.finishedAt]);
 }
 
-export function useAppData() {
+/** `onGameStarted`: LMU started and the auto-open setting asks for the live dashboard. */
+export function useAppData({ onGameStarted }: { onGameStarted?: () => void } = {}) {
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -153,6 +154,7 @@ export function useAppData() {
   useAppEvents({
     onScanStarted: startScanPolling,
     onScanFinished: () => { loadedKey.current = null; startScanPolling(); },
+    onGameStarted,
   }, true);
 
   useEffect(() => {

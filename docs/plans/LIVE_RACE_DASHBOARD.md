@@ -262,11 +262,11 @@ The C# recorder stays a capture tool.
 **Opens by itself when LMU starts.** While the app runs with the game closed, the live service
 checks every few seconds whether the plugin's shared memory exists (a cheap open attempt, no
 REST calls, since the REST port is not polled until the game is up). When it appears, the
-server opens the live dashboard once for that game launch: a browser window in app mode
-(Edge or Chrome `--app`) on the chosen monitor, fullscreen, or the default browser if
-neither is found. It does not open a second window when a dashboard page is already
-connected, and it does not reopen after the driver closes it until LMU is started again.
-Settings holds the on/off switch (on by default) and the monitor.
+server sends a `game-started` app event once for that game launch, and the app page that is
+already open switches itself to `#/live`. The app never starts a browser (decision
+2026-10-16: the driver keeps the site open on the second screen). Nothing happens when a
+dashboard page is already connected, and it does not switch again until LMU is started
+again. Settings holds the on/off switch (on by default).
 Polling is deliberate: Windows has no notice for a named mapping being created, and process
 start events (WMI) cost more or need admin rights. The app's own open handle keeps the
 mapping alive after LMU exits, so game exit is detected when the plugin's counters stand

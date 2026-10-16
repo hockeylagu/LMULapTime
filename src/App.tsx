@@ -101,7 +101,7 @@ function AnalysisApp() {
 
   const { status, loading, isRefreshing, replayScanStatus,
     referenceUpdateCount, setReferenceUpdateCount, revision, error, fetchData,
-    refreshReplayScanStatus } = useAppData();
+    refreshReplayScanStatus } = useAppData({ onGameStarted: () => navigate('/live') });
 
   // Keep view filters synchronized with the router URL.
   useEffect(() => {

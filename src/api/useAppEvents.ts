@@ -6,6 +6,8 @@ export interface AppEventHandlers {
   onScanStarted: () => void;
   /** Every step of a scan finished. */
   onScanFinished: () => void;
+  /** LMU started and the page should switch to the live dashboard (the server checked the setting). */
+  onGameStarted?: () => void;
 }
 
 /** Listens to the app-wide server events (`GET /api/events`) while `enabled`; the browser reconnects by itself. */
@@ -18,6 +20,7 @@ export function useAppEvents(handlers: AppEventHandlers, enabled: boolean): void
     const source = new EventSource('/api/events');
     source.addEventListener(APP_EVENTS.scanStarted, () => latest.current.onScanStarted());
     source.addEventListener(APP_EVENTS.scanFinished, () => latest.current.onScanFinished());
+    source.addEventListener(APP_EVENTS.gameStarted, () => latest.current.onGameStarted?.());
     return () => source.close();
   }, [enabled]);
 }

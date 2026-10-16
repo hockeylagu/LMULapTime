@@ -54,7 +54,7 @@ export const LiveDashboardCard: React.FC = () => {
             onChange={(event) => void toggle(event.target.checked)}
             className={`h-4 w-4 accent-lmu-accent ${FOCUS_RING}`}
           />
-          Open the live dashboard when LMU starts
+          Switch the open app to the live dashboard when LMU starts
         </label>
       )}
       <FeedbackMessage feedback={message} />

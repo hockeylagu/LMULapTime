@@ -534,9 +534,11 @@ Windows part (koffi `OpenFileMappingW` / `MapViewOfFile`); `liveReader.ts` is th
 realtime and 1 Hz otherwise, game-exit check: counters still for 5 s, then one `GET 127.0.0.1:6397/navigation/state`),
 started by `liveReaderWorker.ts` through `liveReaderWorkerBootstrap.mjs`. The main thread side: `liveService.ts` (snapshot,
 SSE clients, 40 ms pedal batches only on track, heartbeat, slow clients drop batches, `session-loaded` / `lifecycle`
-events), `liveAutoOpen.ts` (one app window per game launch, injectable opener), `liveSettings.ts` (`live_auto_open` in
+events), `liveSettings.ts` (`live_auto_open` in
 cache_metadata), `sse.ts`. The lifecycle rules are deterministic in `shared/domain/live/liveLifecycle.ts`. Routes:
-`routes/liveRoutes.ts` (`/api/live/stream`, `/api/live/settings`, `/api/events`).
+`routes/liveRoutes.ts` (`/api/live/stream`, `/api/live/settings`, `/api/events`; auto-open is the `game-started` app
+event when the lifecycle leaves offline, setting on and no dashboard page connected: the open app navigates itself to
+`#/live`, the server never opens a browser).
 Session identity and timing (step 2): the scoring decode also carries the player's and the leader's lap fields, track
 temperature, rain and wetness; the telemetry decode adds the mean tyre surface temperature (`tyreSurfaceAvgC`).
 Deterministic models in `shared/domain/live/`: `liveLapTiming.ts` (laps, validity, session best, reference trace, delta,

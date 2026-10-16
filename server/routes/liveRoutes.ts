@@ -32,6 +32,8 @@ export function createLiveRouter(context: ServerContext, live: LiveService): Rou
   });
 
   // App-wide events: the server can start a scan by itself (after a game session), and pages reload their data when it ends.
+  // When LMU starts (the lifecycle leaves offline), an open app page switches to the dashboard if the setting is on and no
+  // dashboard page is connected yet. The app never opens a browser window itself.
   router.get('/events', (req, res) => {
     openStream(res);
     const publish = (event: string): void => {
@@ -39,12 +41,19 @@ export function createLiveRouter(context: ServerContext, live: LiveService): Rou
     };
     const stopStarted = context.events.on('scan-started', () => publish(APP_EVENTS.scanStarted));
     const stopFinished = context.events.on('scan-finished', () => publish(APP_EVENTS.scanFinished));
+    let lifecycle = live.getSnapshot().lifecycle;
+    const stopLifecycle = live.events.on('lifecycle', next => {
+      const started = lifecycle === 'offline' && next !== 'offline';
+      lifecycle = next;
+      if (started && !live.hasClients() && loadLiveSettings(context.sessionDb).autoOpen) publish(APP_EVENTS.gameStarted);
+    });
     const heartbeat = setInterval(() => publish(APP_EVENTS.heartbeat), LIVE_HEARTBEAT_MS);
     heartbeat.unref();
     req.on('close', () => {
       clearInterval(heartbeat);
       stopStarted();
       stopFinished();
+      stopLifecycle();
     });
   });
 

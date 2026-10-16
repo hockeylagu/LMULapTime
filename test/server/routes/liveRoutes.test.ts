@@ -91,4 +91,35 @@ describe('live routes', () => {
     events.emit('scan-finished');
     await vi.waitFor(() => expect(chunks.join('')).toMatch(/event: scan-started\ndata: \{"at":\d+\}\n\nevent: scan-finished/));
   });
+
+  const gameStarts = (chunks: string[]) => chunks.join('').match(/event: game-started/g)?.length ?? 0;
+
+  it('tells open pages once per LMU launch, so they switch to the dashboard (the app never opens a window)', async () => {
+    const { app, live } = setup();
+    const { response, chunks } = await openStream(app, '/api/events');
+    expect(response.statusCode).toBe(200);
+    live.events.emit('lifecycle', 'menu');
+    live.events.emit('lifecycle', 'garage');
+    live.events.emit('lifecycle', 'driving');
+    await vi.waitFor(() => expect(gameStarts(chunks)).toBe(1));
+    live.events.emit('lifecycle', 'offline');
+    live.events.emit('lifecycle', 'menu');
+    await vi.waitFor(() => expect(gameStarts(chunks)).toBe(2));
+  });
+
+  it.each([
+    ['the setting is off', 'false', false],
+    ['a dashboard page is already connected', null, true],
+  ] as const)('stays quiet when LMU starts and %s', async (_case, stored, dashboardOpen) => {
+    const { app, live, events } = setup(stored);
+    if (dashboardOpen) {
+      await openStream(app, '/api/live/stream');
+      await vi.waitFor(() => expect(live.hasClients()).toBe(true));
+    }
+    const { chunks } = await openStream(app, '/api/events');
+    live.events.emit('lifecycle', 'menu');
+    events.emit('scan-started');
+    await vi.waitFor(() => expect(chunks.join('')).toContain('event: scan-started'));
+    expect(gameStarts(chunks)).toBe(0);
+  });
 });

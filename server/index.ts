@@ -18,10 +18,8 @@ import { createSystemRouter } from './routes/systemRoutes.js';
 
 import { createDataPluginRouter } from './routes/dataPluginRoutes.js';
 import { dataPlugin, formatPluginStatusLog } from './plugins/dataPlugin.js';
-import { LiveAutoOpen, openDashboardWindow } from './live/liveAutoOpen.js';
 import { LiveService } from './live/liveService.js';
 import { queryLivePersonalBest } from './core/sessionSummaries/contextQueries.js';
-import { loadLiveSettings } from './live/liveSettings.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -80,12 +78,6 @@ const liveService = new LiveService({
   personalBest: (layoutKey, carClass) =>
     queryLivePersonalBest(sessionDb.getDb(), serverContext.currentParser.configuredPlayerName, layoutKey, carClass),
 });
-const liveAutoOpen = new LiveAutoOpen({
-  autoOpenEnabled: () => loadLiveSettings(sessionDb).autoOpen,
-  hasClients: () => liveService.hasClients(),
-  open: openDashboardWindow,
-});
-liveService.events.on('lifecycle', lifecycle => liveAutoOpen.onLifecycle(lifecycle));
 liveService.events.on('session-loaded', loaded => serverContext.setLiveSessionLoaded(loaded));
 
 if (process.env.NODE_ENV === 'test') {

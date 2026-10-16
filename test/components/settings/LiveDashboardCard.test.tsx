@@ -12,7 +12,7 @@ describe('LiveDashboardCard', () => {
       reply(init?.method === 'POST' ? JSON.parse(String(init.body)) : { autoOpen: true }));
     vi.stubGlobal('fetch', fetchMock);
     render(<LiveDashboardCard />);
-    const toggle = await screen.findByRole('checkbox', { name: 'Open the live dashboard when LMU starts' });
+    const toggle = await screen.findByRole('checkbox', { name: 'Switch the open app to the live dashboard when LMU starts' });
     await waitFor(() => expect(toggle).toBeChecked());
     fireEvent.click(toggle);
     await waitFor(() => expect(toggle).not.toBeChecked());

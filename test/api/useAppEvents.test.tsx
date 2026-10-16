@@ -41,4 +41,12 @@ describe('app event stream', () => {
     unmount();
     expect(FakeEventSource.byUrl('/api/events').closed).toBe(true);
   });
+
+  it('hands the game start to the page, which switches itself to the dashboard', async () => {
+    const onGameStarted = vi.fn();
+    renderHook(() => useAppData({ onGameStarted }));
+    await act(async () => {});
+    await act(async () => { FakeEventSource.byUrl('/api/events').emit('game-started', { at: 1 }); });
+    expect(onGameStarted).toHaveBeenCalledTimes(1);
+  });
 });

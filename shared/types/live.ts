@@ -142,7 +142,7 @@ export interface LivePedalBatch {
 }
 
 export interface LiveSettings {
-  /** Open the dashboard window when LMU starts. On by default. */
+  /** Switch an open app page to the dashboard when LMU starts. On by default. */
   autoOpen: boolean;
 }
 
@@ -164,6 +164,8 @@ export const APP_EVENTS = {
   scanStarted: 'scan-started',
   /** `{ at: number }`: every scan step finished; the app reloads its data. */
   scanFinished: 'scan-finished',
+  /** `{ at: number }`: LMU started, and the auto-open setting is on with no dashboard page connected: the page goes to `#/live`. */
+  gameStarted: 'game-started',
   /** `{ at: number }`. */
   heartbeat: 'heartbeat',
 } as const;
