@@ -115,6 +115,8 @@ export interface ScanStatus extends ReplayScanStatus {
   sessionReplayJobs?: SessionReplayJob[];
   replayJobs?: ReplayIngestJob[];
   refreshQueued?: boolean;
+  /** A game session is loaded (live dashboard): scans and the replay upgrade wait until it ends. */
+  heldForLiveSession?: boolean;
   /** Changes when session data, replay metadata or telemetry links change, including on restart. */
   dataRevision?: string;
   sessionScan: SessionScanStatus;

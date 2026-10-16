@@ -71,6 +71,7 @@ describe('Settings navigation', () => {
     expect(sectionOrder()).toEqual([
       'Overview',
       'Reference Benchmarks',
+      'Live Dashboard',
       'AI Lap Reports',
       'AI Report History',
       'Cached Replays',

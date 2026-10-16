@@ -10,6 +10,7 @@ import { ReplayRecordingService } from './replay/replayRecordingService.js';
 import { ServerContext } from './core/serverContext.js';
 import { createAiRouter } from './routes/aiRoutes.js';
 import { createLeaderboardRouter } from './routes/leaderboardRoutes.js';
+import { createLiveRouter } from './routes/liveRoutes.js';
 import { createReferenceRouter } from './routes/referenceRoutes.js';
 import { createReplayRouter } from './routes/replayRoutes.js';
 import { createSessionRouter } from './routes/sessionRoutes.js';
@@ -17,6 +18,9 @@ import { createSystemRouter } from './routes/systemRoutes.js';
 
 import { createDataPluginRouter } from './routes/dataPluginRoutes.js';
 import { dataPlugin, formatPluginStatusLog } from './plugins/dataPlugin.js';
+import { LiveAutoOpen, openDashboardWindow } from './live/liveAutoOpen.js';
+import { LiveService } from './live/liveService.js';
+import { loadLiveSettings } from './live/liveSettings.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -71,7 +75,25 @@ const startReferenceLaptimeRefresh = (): void => {
   });
 };
 
-serverContext.runInitialSessionSyncInBackground();
+const liveService = new LiveService();
+const liveAutoOpen = new LiveAutoOpen({
+  autoOpenEnabled: () => loadLiveSettings(sessionDb).autoOpen,
+  hasClients: () => liveService.hasClients(),
+  open: openDashboardWindow,
+});
+liveService.events.on('lifecycle', lifecycle => liveAutoOpen.onLifecycle(lifecycle));
+liveService.events.on('session-loaded', loaded => serverContext.setLiveSessionLoaded(loaded));
+
+if (process.env.NODE_ENV === 'test') {
+  serverContext.runInitialSessionSyncInBackground();
+} else {
+  // The first scan waits for the live reader's first answer: a server started mid-session must not read
+  // the files LMU is still writing. A reader that never answers delays it 5 s at most.
+  liveService.start();
+  process.once('exit', () => liveService.stop());
+  const readerTimeout = new Promise<void>(resolve => { setTimeout(resolve, 5000).unref(); });
+  void Promise.race([liveService.firstReading, readerTimeout]).then(() => serverContext.runInitialSessionSyncInBackground());
+}
 
 app.use('/api/ai', createAiRouter(sessionDb));
 app.use('/api', createSystemRouter(serverContext));
@@ -79,6 +101,7 @@ app.use('/api', createReferenceRouter(serverContext));
 app.use('/api', createSessionRouter(serverContext));
 app.use('/api', createLeaderboardRouter(serverContext));
 app.use('/api', createReplayRouter(serverContext));
+app.use('/api', createLiveRouter(serverContext, liveService));
 
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, '127.0.0.1', () => {

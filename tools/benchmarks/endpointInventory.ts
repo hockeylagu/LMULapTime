@@ -15,6 +15,7 @@ const exclusions: Record<string, string> = {
   '/api/scan': 'Starts ingestion and changes the dataset.',
   '/api/reference-laptimes/refresh': 'Calls Google Sheets and changes benchmark targets.',
   '/api/rivals/pin': 'Changes the selected rival.',
+  '/api/live/settings': 'Changes the live dashboard settings.',
 };
 
 /** Discover literal API routes so newly added endpoints cannot silently escape the sweep. */

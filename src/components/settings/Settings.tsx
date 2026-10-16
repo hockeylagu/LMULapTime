@@ -7,6 +7,7 @@ import { updateSearchParams } from '../../utils/urlParams.js';
 import { OverviewCard } from './OverviewCard.js';
 import { ReferenceLaptimesCard } from './ReferenceLaptimesCard.js';
 import { FolderPathsCard } from './FolderPathsCard.js';
+import { LiveDashboardCard } from './LiveDashboardCard.js';
 import { AISettingsCard } from './AISettingsCard.js';
 import { ReplayCacheCard } from './ReplayCacheCard.js';
 import { AiReportsHistoryCard } from './AiReportsHistoryCard.js';
@@ -103,6 +104,8 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
         );
       case 'replay-cache':
         return <ReplayCacheCard replay={replay} replayScanStatus={replayScanStatus} />;
+      case 'live-dashboard':
+        return <LiveDashboardCard />;
       case 'ai-settings':
         return <AISettingsCard ai={ai} />;
       case 'ai-history':

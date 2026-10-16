@@ -3,6 +3,7 @@ import type { AppStatus, ScanStatus } from '../../shared/types/index.js';
 import { fetchJson, postJson, isAbortError, apiErrorMessage } from './apiClient.js';
 import { invalidateReferenceLaptimes } from './referenceApi.js';
 import { setVehicleLogoSource } from './vehicleLogosApi.js';
+import { useAppEvents } from './useAppEvents.js';
 
 const SERVER_RETRY_MS = 2000;
 /** An unreachable server is asked less and less often, down to once every 15 seconds. */
@@ -147,6 +148,12 @@ export function useAppData() {
       }
     }
   }, [startScanPolling]);
+
+  // The server can start a scan by itself (after a session); its events wake the polling that would otherwise be idle.
+  useAppEvents({
+    onScanStarted: startScanPolling,
+    onScanFinished: () => { loadedKey.current = null; startScanPolling(); },
+  }, true);
 
   useEffect(() => {
     mounted.current = true;

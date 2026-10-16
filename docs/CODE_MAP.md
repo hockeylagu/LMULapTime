@@ -504,6 +504,40 @@ their compact base to reuse class checks across aggregate expressions. Read-only
 992 sessions: LMGT3 tracks about 46 → 14 ms, Hypercar tracks 104–153 → 32 ms, Road Atlanta LMGT3
 standings 43 → 1.5 ms and player history 6.6 → 0.2 ms. These exclude HTTP and browser rendering.
 
+### Live dashboard (page)
+
+The fullscreen `#/live` page (plan: `docs/plans/LIVE_RACE_DASHBOARD.md`; contracts: `shared/types/live.ts`).
+`App.tsx` branches early on `/live`: no navbar, column, loading gate or analysis polling. `src/api/liveStream.ts`
+(`useLiveStream`) owns the one `EventSource('/api/live/stream')`: snapshot in state, pedal batches through an
+`onPedals` ref callback (never state), `connecting | live | disconnected` (error, or silence of 2.5 heartbeats);
+it also holds `fetchLiveSettings` / `saveLiveSettings`. `src/components/live/`: `LivePage` composes `LiveFrame`
+(fixed 2560x1440 stage scaled to the window), `LiveSessionBar` (class through the existing `CarClassBadge`, zoomed;
+class from `mapVehicleIdToClass(vehicleName, vehicleClass)` in `liveScreens.ts`), `LiveStateScreen` (the lifecycle
+screens, built by `liveScreen(snapshot)`), and `LivePedalTrace` (canvas, redrawn by rAF from the `PedalBuffer`
+ring in `pedalBuffer.ts`). `src/api/useAppEvents.ts` is the app-wide `GET /api/events` listener used by
+`useAppData` (scan-started restarts scan polling, scan-finished reloads data). Settings card:
+`settings/LiveDashboardCard.tsx` (`autoOpen`). Tests use `test/helpers/fakeEventSource.ts`.
+
+### Live dashboard (server)
+
+`server/live/` reads the rF2 shared memory plugin (`$rFactor2SMMP_Scoring$`, `$rFactor2SMMP_Telemetry$`) in a worker
+thread. `rf2Layout.ts` derives every byte offset from field lists that mirror `tools/telemetry-recorder/Rf2Structs.cs`
+(its test asserts the plugin's struct sizes: a shifted field fails there); `rf2Decode.ts` holds the pure decoders and the
+coherent read (begin counter, copy, end counter, 3 attempts, unchanged frames skipped); `sharedMemory.ts` is the only
+Windows part (koffi `OpenFileMappingW` / `MapViewOfFile`); `liveReader.ts` is the worker's loop (3 s open retry, 50 Hz in
+realtime and 1 Hz otherwise, game-exit check: counters still for 5 s, then one `GET 127.0.0.1:6397/navigation/state`),
+started by `liveReaderWorker.ts` through `liveReaderWorkerBootstrap.mjs`. The main thread side: `liveService.ts` (snapshot,
+SSE clients, 40 ms pedal batches only on track, heartbeat, slow clients drop batches, `session-loaded` / `lifecycle`
+events), `liveAutoOpen.ts` (one app window per game launch, injectable opener), `liveSettings.ts` (`live_auto_open` in
+cache_metadata), `sse.ts`. The lifecycle rules are deterministic in `shared/domain/live/liveLifecycle.ts`. Routes:
+`routes/liveRoutes.ts` (`/api/live/stream`, `/api/live/settings`, `/api/events`).
+
+**Scan hold:** `index.ts` wires `session-loaded` to `ServerContext.setLiveSessionLoaded`. While a session is loaded the
+session / replay / telemetry scans and the replay upgrade do not start (they set `pendingSessionRefresh`; a running
+upgrade is stopped); when it ends the pending refresh runs. `ScanStatus.heldForLiveSession` reports it. `ServerContext.events`
+(`TypedEmitter` in `core/typedEmitter.ts`) emits `scan-started` / `scan-finished` on idle/busy transitions for `GET /api/events`.
+A scan already running when the session loads is not interrupted (only its follow-up steps are held).
+
 ## 5. Cache versions: what to bump
 
 | Constant | File | Bump when | Effect |

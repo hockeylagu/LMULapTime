@@ -1,0 +1,93 @@
+import type { LiveLifecycle, LiveSessionInfo, LiveSessionKind } from '../../types/live.js';
+
+/** The scoring fields the live page is derived from (the rF2 scoring buffer, decoded by the server). */
+export interface LiveScoringReading {
+  trackName: string;
+  /** rF2 `mSession`. */
+  sessionCode: number;
+  currentEt: number;
+  endEt: number;
+  maxLaps: number;
+  numVehicles: number;
+  inRealtime: boolean;
+  gamePhase: number;
+  /** The scoring entry flagged as the player; null when none is. */
+  player: {
+    id: number;
+    place: number;
+    totalLaps: number;
+    vehicleName: string;
+    vehicleClass: string;
+  } | null;
+}
+
+export interface LiveState {
+  lifecycle: LiveLifecycle;
+  paused: boolean;
+  session: LiveSessionInfo | null;
+}
+
+/** A timed session reports a plausible end time; a lap-limited one a huge one (and the reverse for laps). */
+const MAX_PLAUSIBLE_END_SECONDS = 1_000_000;
+const MAX_PLAUSIBLE_LAPS = 100_000;
+const PAUSED_PHASE = 9;
+
+export function liveSessionKind(sessionCode: number): LiveSessionKind {
+  if (sessionCode >= 0 && sessionCode <= 4) return 'practice';
+  if (sessionCode >= 5 && sessionCode <= 8) return 'qualifying';
+  if (sessionCode === 9) return 'warmup';
+  if (sessionCode >= 10 && sessionCode <= 13) return 'race';
+  return 'unknown';
+}
+
+/**
+ * Lifecycle from the decoded scoring, in this order: no reading -> offline; no vehicles -> menu;
+ * not in realtime -> garage; game phase 0-4 -> starting, 5-7 -> driving, 8 -> finished; phase 9
+ * (paused) keeps the previous lifecycle. The menu rule (no vehicles) is unverified live: the
+ * buffer may keep the last session's vehicle count in the menu.
+ */
+export function deriveLiveState(reading: LiveScoringReading | null, previous: LiveLifecycle): LiveState {
+  if (!reading) return { lifecycle: 'offline', paused: false, session: null };
+  const state = (lifecycle: LiveLifecycle, paused: boolean): LiveState => ({
+    lifecycle,
+    paused,
+    session: lifecycle === 'menu' ? null : sessionInfo(reading),
+  });
+  if (reading.numVehicles <= 0) return state('menu', false);
+  if (!reading.inRealtime) return state('garage', false);
+  const phase = reading.gamePhase;
+  if (phase >= 0 && phase <= 4) return state('starting', false);
+  if (phase >= 5 && phase <= 7) return state('driving', false);
+  if (phase === 8) return state('finished', false);
+  if (phase === PAUSED_PHASE) return state(previous === 'offline' || previous === 'menu' ? 'driving' : previous, true);
+  return state(previous, false);
+}
+
+function sessionInfo(reading: LiveScoringReading): LiveSessionInfo {
+  const timed = Number.isFinite(reading.endEt) && reading.endEt > 0 && reading.endEt < MAX_PLAUSIBLE_END_SECONDS;
+  const lapLimited = reading.maxLaps > 0 && reading.maxLaps < MAX_PLAUSIBLE_LAPS;
+  return {
+    kind: liveSessionKind(reading.sessionCode),
+    sessionCode: reading.sessionCode,
+    gamePhase: reading.gamePhase,
+    inRealtime: reading.inRealtime,
+    trackName: reading.trackName,
+    vehicleName: reading.player?.vehicleName ?? '',
+    vehicleClass: reading.player?.vehicleClass ?? '',
+    elapsedSeconds: reading.currentEt,
+    endSeconds: timed ? reading.endEt : null,
+    maxLaps: lapLimited ? reading.maxLaps : null,
+    playerLapsCompleted: reading.player?.totalLaps ?? null,
+    playerPlace: reading.player?.place ?? null,
+  };
+}
+
+/** Lifecycles in which a session is loaded in the game (the app must not read the game's files). */
+export function isLiveSessionLoaded(lifecycle: LiveLifecycle): boolean {
+  return lifecycle === 'garage' || lifecycle === 'starting' || lifecycle === 'driving' || lifecycle === 'finished';
+}
+
+/** Lifecycles in which the driver is on track and pedal samples are streamed. */
+export function isLiveOnTrack(lifecycle: LiveLifecycle): boolean {
+  return lifecycle === 'starting' || lifecycle === 'driving' || lifecycle === 'finished';
+}

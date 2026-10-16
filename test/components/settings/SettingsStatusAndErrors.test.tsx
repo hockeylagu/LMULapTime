@@ -76,6 +76,7 @@ describe('Settings overview card', () => {
     expect(SETTINGS_SECTIONS.map((s) => s.title)).toEqual([
       'Overview',
       'Reference Benchmarks',
+      'Live Dashboard',
       'AI Lap Reports',
       'AI Report History',
       'Cached Replays',

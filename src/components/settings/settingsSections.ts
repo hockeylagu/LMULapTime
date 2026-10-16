@@ -1,4 +1,4 @@
-import { LucideIcon, LayoutDashboard, Film, BrainCircuit, History, Database, HardDrive } from 'lucide-react';
+import { LucideIcon, LayoutDashboard, Film, BrainCircuit, History, Database, HardDrive, Radio } from 'lucide-react';
 import { AppStatus } from '../../../shared/types/index.js';
 
 export interface SettingsSectionDef {
@@ -24,6 +24,13 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     icon: Database,
     description: 'Alien and competitive target times synchronized from Google Sheets',
     keywords: ['reference', 'benchmarks', 'alien', 'targets', 'google sheets', 'laptimes', 'pace', 'csv', 'diff', 'refresh', 'spreadsheet', 'competitive'],
+  },
+  {
+    id: 'live-dashboard',
+    title: 'Live Dashboard',
+    icon: Radio,
+    description: 'The fullscreen live page that follows the game, and whether it opens by itself when LMU starts',
+    keywords: ['live', 'dashboard', 'cockpit', 'auto open', 'open', 'start', 'launch', 'window', 'fullscreen', 'game', 'shared memory'],
   },
   {
     id: 'ai-settings',

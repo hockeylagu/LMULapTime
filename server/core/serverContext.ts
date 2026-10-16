@@ -19,6 +19,7 @@ import { TelemetryCatalog } from '../telemetry/telemetryCatalog.js';
 import { ReplayRecordingService } from '../replay/replayRecordingService.js';
 import { ReplayUpgradeRunner } from '../replay/replayUpgradeRunner.js';
 import { pumpScanInBackground, startedScanStatus } from './backgroundScan.js';
+import { TypedEmitter } from './typedEmitter.js';
 import { replaceCachedLastUpdateDiff } from '../benchmarks/referenceLaptimes.js';
 import { BENCHMARK_IMPACT_RULE, enrichBenchmarkDiffWithCompactImpact } from '../benchmarks/benchmarkImpact.js';
 
@@ -60,6 +61,11 @@ export class ServerContext {
   // A manual refresh asked the next replay sync to try again the replays that failed MAX_DECODE_ATTEMPTS times.
   private retryFailedReplays = false;
   private readonly instanceId = randomUUID();
+  // A game session is loaded (live dashboard): LMU may be writing its files, so no scan starts until it ends.
+  private liveSessionLoaded = false;
+  private scanBusy = false;
+  /** `scan-started` when any file scan starts; `scan-finished` when none is left (GET /api/events). */
+  public readonly events = new TypedEmitter<{ 'scan-started': []; 'scan-finished': [] }>();
 
   private replayUpgradeRunner: ReplayUpgradeRunner | null = null;
   private readonly replayLinks: SessionReplayLinks;
@@ -119,15 +125,48 @@ export class ServerContext {
   /** Null when the database cannot run the upgrade (test doubles). */
   public get replayUpgrade(): ReplayUpgradeRunner | null {
     if (!this.replayUpgradeRunner && typeof this.sessionDb.upgradeReplaysAsyncIterator === 'function') {
-      this.replayUpgradeRunner = new ReplayUpgradeRunner(this.sessionDb);
+      this.replayUpgradeRunner = new ReplayUpgradeRunner(this.sessionDb, () => this.publishScanActivity());
     }
     return this.replayUpgradeRunner;
   }
 
   // The upgrade is the lowest-priority work: it runs only once no scan is running.
   public startReplayUpgradeWhenIdle(): boolean {
+    if (this.liveSessionLoaded) {
+      this.replayUpgrade?.stop();
+      return false;
+    }
     if (this.hasActiveFileScan() || this.pendingSessionRefresh) return false;
     return this.replayUpgrade?.start(this.currentReplaysDir, this.parser.configuredPlayerName) ?? false;
+  }
+
+  /**
+   * While a game session is loaded no scan starts and a running replay upgrade stops: what was asked
+   * for is queued (one session refresh covers the replay and telemetry scans that follow it) and runs
+   * when the session has ended.
+   */
+  public setLiveSessionLoaded(loaded: boolean): void {
+    if (this.liveSessionLoaded === loaded) return;
+    this.liveSessionLoaded = loaded;
+    if (loaded) {
+      this.replayUpgrade?.stop();
+    } else if (!this.runPendingSessionRefresh()) {
+      this.startReplayUpgradeWhenIdle();
+    }
+    this.publishScanActivity();
+  }
+
+  private isScanBusy(): boolean {
+    return this.hasActiveFileScan() || this.pendingSessionRefresh || (this.replayUpgradeRunner?.getStatus().running ?? false);
+  }
+
+  /** Emits `scan-started` / `scan-finished` when the app goes from idle to busy and back. Called wherever that can change. */
+  private publishScanActivity(): void {
+    const busy = this.isScanBusy();
+    if (busy === this.scanBusy) return;
+    this.scanBusy = busy;
+    if (busy) this.events.emit('scan-started');
+    else this.events.emit('scan-finished');
   }
 
   public configureDirectories(values: { resultsDir?: unknown; replaysDir?: unknown; telemetryDir?: unknown; playerName?: unknown }): boolean {
@@ -244,6 +283,7 @@ export class ServerContext {
     if (!started) {
       this.pendingSessionRefresh = true;
       this.pendingForcedSessionReparse ||= forceReparse;
+      this.publishScanActivity();
     }
   }
 
@@ -321,6 +361,7 @@ export class ServerContext {
   }
 
   public runReplaySyncInBackground(): boolean {
+    if (this.liveSessionLoaded) return this.holdForLiveSession();
     if (this.replayScanStatus.running) return false;
     if (this.sessionReplayReconciliationRunning) {
       // Runs when the reconciliation ends: a session scan finishing meanwhile must not lose it.
@@ -357,13 +398,22 @@ export class ServerContext {
         }
         this.runPendingSessionRefresh();
         this.startReplayUpgradeWhenIdle();
+        this.publishScanActivity();
       })();
     });
+    this.publishScanActivity();
     return true;
   }
 
+  /** Queues a scan asked for while a game session is loaded. Always false: nothing started. */
+  private holdForLiveSession(forceReparse = false): false {
+    this.pendingSessionRefresh = true;
+    this.pendingForcedSessionReparse ||= forceReparse;
+    return false;
+  }
+
   private runPendingSessionRefresh(): boolean {
-    if (!this.pendingSessionRefresh) return false;
+    if (!this.pendingSessionRefresh || this.liveSessionLoaded) return false;
     const forceReparse = this.pendingForcedSessionReparse;
     this.pendingSessionRefresh = false;
     this.pendingForcedSessionReparse = false;
@@ -385,6 +435,7 @@ export class ServerContext {
    */
   public runSessionSyncInBackground(forceReparse = false, retryFailedReplays = false): boolean {
     if (retryFailedReplays) this.retryFailedReplays = true;
+    if (this.liveSessionLoaded) return this.holdForLiveSession(forceReparse);
     if (this.hasActiveFileScan()) return false;
     this.replayUpgrade?.stop();
     const status: SessionScanStatus = startedScanStatus();
@@ -410,7 +461,9 @@ export class ServerContext {
         if (this.sessionProjectionBackfill.running) this.pendingPostSessionDiscovery = true;
         else { this.runReplaySyncInBackground(); this.runTelemetryScanInBackground(); }
       }
+      this.publishScanActivity();
     });
+    this.publishScanActivity();
     return true;
   }
 
@@ -420,6 +473,10 @@ export class ServerContext {
    */
   public runTelemetryScanInBackground(): void {
     if (typeof this.telemetryCatalog?.refresh !== 'function') return;
+    if (this.liveSessionLoaded) {
+      this.holdForLiveSession();
+      return;
+    }
     const telemetryDir = this.currentTelemetryDir;
     void this.telemetryCatalog.refresh(telemetryDir).then(async (count) => {
       console.log(`[SQLite Cache] Found ${count} DuckDB telemetry files from ${telemetryDir}`);
@@ -430,7 +487,9 @@ export class ServerContext {
     }).finally(() => {
       this.runPendingSessionRefresh();
       this.startReplayUpgradeWhenIdle();
+      this.publishScanActivity();
     });
+    this.publishScanActivity();
   }
 
   public runInitialSessionSyncInBackground(): void {
@@ -578,6 +637,7 @@ export class ServerContext {
       replayJobs: [...this.replayJobs.values()],
       sessionReplayJobs,
       refreshQueued: this.pendingSessionRefresh,
+      heldForLiveSession: this.liveSessionLoaded,
       sessionScan: this.sessionScanStatus,
       sessionProjectionBackfill: this.sessionProjectionBackfill,
       replayUpgrade,

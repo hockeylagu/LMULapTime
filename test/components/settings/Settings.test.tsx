@@ -325,7 +325,7 @@ describe('Settings component', () => {
     fireEvent.change(searchInput, { target: { value: 'gemini' } });
 
     await waitFor(() => {
-      expect(screen.getByText('2 of 6 sections match')).toBeInTheDocument();
+      expect(screen.getByText('2 of 7 sections match')).toBeInTheDocument();
       expect(screen.getByRole('heading', { name: 'AI Lap Reports' })).toBeInTheDocument();
       expect(screen.getByRole('heading', { name: 'AI Report History' })).toBeInTheDocument();
       

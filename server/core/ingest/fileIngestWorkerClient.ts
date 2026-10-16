@@ -1,5 +1,5 @@
 import { Worker } from 'node:worker_threads';
-import { findWorkerBootstrap, isWorkerMessage } from '../../replay/worker/replayTrajectoryWorkerClient.js';
+import { findWorkerBootstrap, isWorkerMessage } from '../workerThreads.js';
 import type { DetailedSession, ReplayMetadata } from '../../../shared/types/index.js';
 import type { ReplayFileEntry } from '../../sessions/sessionXmlTypes.js';
 

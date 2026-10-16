@@ -61,7 +61,10 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
     dashboard: '/api/dashboard?page=1&pageSize=25&hideEmpty=true', tracks: '/api/tracks',
     'leaderboard-layouts': '/api/leaderboard/layouts',
     'replay-cache': '/api/replays/cache', 'replay-upgrade-status': '/api/replays/upgrade',
+    'live-settings': '/api/live/settings',
   })) add(id, url.split('?')[0], url);
+  add('live-stream', '/api/live/stream', undefined, 'Server-sent event stream: stays open, has no response time.');
+  add('app-events', '/api/events', undefined, 'Server-sent event stream: stays open, has no response time.');
   add('reference-diff', '/api/reference-laptimes/diffs/:id', cohort.diffId ? `/api/reference-laptimes/diffs/${cohort.diffId}` : undefined);
   const geometry = cohort.boards.find(board => dataPlugin.trackGeometry(board.layout));
   add('track-geometry', '/api/data-plugin/tracks/:layoutKey', geometry ? `/api/data-plugin/tracks/${geometry.layout}` : undefined, 'No metric geometry for the fixed cohort.');

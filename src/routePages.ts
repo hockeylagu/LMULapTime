@@ -41,10 +41,11 @@ const session = routePage(() => import('./components/session-detail/SessionDetai
 const track = routePage(() => import('./components/track-detail/TrackDetail.js'), (m) => m.TrackDetail);
 const leaderboard = routePage(() => import('./components/leaderboard/LeaderboardPage.js'), (m) => m.LeaderboardPage);
 const settings = routePage(() => import('./components/settings/Settings.js'), (m) => m.Settings);
+const live = routePage(() => import('./components/live/LivePage.js'), (m) => m.LivePage);
 const telemetry = routePage(() => import('./components/replay/ReplayInspectorPage.js'), (m) => m.ReplayInspectorPage);
 
 /** Pages by the first segment of their route path. */
-const pagesByRoute = { dashboard, tracks, session, track, leaderboard, settings, telemetry };
+const pagesByRoute = { dashboard, tracks, session, track, leaderboard, settings, telemetry, live };
 
 export const Dashboard = dashboard.Page;
 export const TrackSummaries = tracks.Page;
@@ -53,6 +54,7 @@ export const TrackDetail = track.Page;
 export const LeaderboardPage = leaderboard.Page;
 export const Settings = settings.Page;
 export const ReplayInspectorPage = telemetry.Page;
+export const LivePage = live.Page;
 
 /** Starts fetching the page for `pathname` (first segment, dashboard by default). */
 export function preloadRoutePage(pathname: string): void {

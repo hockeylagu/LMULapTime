@@ -11,6 +11,7 @@ import {
   Settings,
   LeaderboardPage,
   ReplayInspectorPage,
+  LivePage,
   prefetchRoutePages,
   preloadRoutePage,
 } from './routePages.js';
@@ -90,7 +91,7 @@ function TrackRoute({ onSelectSession, selectedCarClass, setSelectedCarClass }: 
   );
 }
 
-export default function App() {
+function AnalysisApp() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -220,4 +221,17 @@ export default function App() {
     </div>
     </SessionDataContext.Provider>
   );
+}
+
+/** The live dashboard is its own fullscreen page: no navbar, column or app data gate, and no analysis polling behind it. */
+export default function App() {
+  const { pathname } = useLocation();
+  if (pathname === '/live') {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-lmu-bg" />}>
+        <LivePage />
+      </Suspense>
+    );
+  }
+  return <AnalysisApp />;
 }
