@@ -42,7 +42,7 @@ export function LiveSessionBar({ snapshot, connection }: LiveSessionBarProps) {
             {layout && <span className="font-normal text-lmu-muted">{layout}</span>}
             {carClass && (
               // The badge is sized for a dense page; zoom brings it to cockpit scale without a second copy of it.
-              <span className="inline-block" style={{ zoom: 4 }}>
+              <span className="flex shrink-0 items-center" style={{ zoom: 4 }}>
                 <CarClassBadge carClass={carClass} size="md" />
               </span>
             )}
