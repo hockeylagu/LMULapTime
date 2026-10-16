@@ -81,13 +81,14 @@ holds the earlier critique. Current state, all at 2560 x 1440, read in glances:
   one weather slot), the 20-second full-width pedal trace (curves and grid only), no
   paragraph text; labels about 48 px, supporting readouts 80-96 px, primary values larger.
 - **Practice:** last lap largest, session best and best possible, a current-lap sector row
-  followed by three completed laps and a `BEST` row of best sectors; no fuel figures.
+  followed by two completed laps and a `BEST` row of best sectors; no fuel figures.
   S1 and S2 fill from the game's cumulative timing fields at each crossing (S2 = cumulative S2 minus S1),
   independently of whether a session best exists, beside the lap number and the running lap clock. Uncrossed
   sectors remain unknown; at the finish the row becomes the top completed lap (S3 = lap time minus cumulative S2)
   and a new current row starts. Out laps have no current splits.
-- **Qualifying:** `PUSH LAP · VS BEST` with the live delta, next attempt and tyre surface
-  temperature, then the `LAST LAP` row; no fuel or VE, no valid flag (the HUD has it).
+- **Qualifying:** `PUSH LAP · VS BEST` with the live delta beside session best, best possible and
+  position; tyre surface temperature with S1/S2/S3 vs best; then the `LAST LAP` row; no fuel or VE,
+  no valid flag (the HUD has it). Same columns as the race rows.
 - **Race, pit coming:** `PIT IN 2 LAPS` (then `PIT THIS LAP`), `VE · MFD` or `FUEL · MFD`
   and `TYRES · MFD` (`NEW MEDIUM`, `NEW WET`, `NO CHANGE`, compound coloured, forecast note
   under it); current lap vs best with sector deltas, then `LAST LAP` with real sectors.
@@ -202,6 +203,35 @@ The MFD exposes fuel/VE and pit settings:
 7. Compute the required departure resource target for the next planned stint or finish.
    If it exceeds capacity, schedule another stop rather than silently clipping the target.
    Recalculate after refuelling, condition changes and significant consumption changes.
+8. **Fuel ratio for VE cars (to do, 2026-10-16).** Hypercar and GT3 carry fuel as well as VE, and the fuel
+   ratio decides how much: if it is too low the car runs dry before the VE runs out, and if it is too high
+   it carries extra weight. **Goal: the lowest ratio that still lasts the VE**, to carry no fuel that is never
+   used. Show that ratio beside the VE target in the garage checklist and the pit-stop cells.
+   - **Lowest safe ratio** = the highest per-lap `fuel ÷ VE` over the measured laps (not the mean, so it holds
+     on the thirstiest lap), rounded **up** to the 0.01 step. No extra margin on top: the VE reserve already
+     covers the fuel, because the fuel loaded scales with the VE set. Before enough laps, use the game's
+     estimate and say so.
+   - **What it saves.** Each 0.01 of ratio is 0.01 L per % of VE: at 50 % VE that is 0.5 L (about 0.37 kg at
+     0.74 kg/L). The default 0.86 against the 0.84 the estimates give carried about 1 L more than needed.
+   - **Same conditions.** Fuel ÷ VE can differ between dry and wet, or with traffic and lift-and-coast;
+     measure it per condition, like the per-lap use, and recalculate when it moves.
+   What is available (Bahrain Outer, GT3, offline capture in `lmu-live-captures/2026-10-16-…`):
+   - **What the ratio means.** `getPlayerGarageData` `VM_FUEL_LEVEL` "0.86" with `VM_VIRTUAL_ENERGY` 50 % gave
+     `VM_FUEL_CAPACITY` "43.0L (19.7 laps)", so litres = VE % × ratio (50 × 0.86 = 43.0). The ratio steps run
+     0.01–1.17 (117 options), and 1.17 × 100 % = the 117 L tank, so the ratio is litres per 1 % of VE.
+     This comes from one capture; confirm it on a second car.
+   - **Fuel per lap.** Telemetry `fuel` / `fuelCapacity` (litres, already read every 500 ms for fuel classes,
+     and present for VE cars too); `standings.fuelFraction`; `getVehicleCondition.fuel`; before any lap,
+     `TireManagement.expectedUsage.fuelConsumption` (2.128 L) and `fuelFractionPerLap`.
+   - **VE per lap.** Already measured by `LiveUsageMeter` (`standings.veFraction`); before any lap,
+     `expectedUsage.virtualEnergyFractionPerLap` (2.533 %).
+   - **Where it is set.** The garage (`VM_FUEL_LEVEL`) and the MFD `FUEL RATIO:` line in `receivePitMenu`
+     (its settings list is the 0.01–1.17 steps; the index read in the garage was 49 = 0.50 while the setup
+     held 0.86, so read the MFD value only once the car has left the garage). `RepairAndRefuel.fuelInfo`
+     gives the tank in litres and VE in joules (`maxFuel` 117, `maxVirtualEnergy` 675 MJ).
+   - **Check.** From the game's estimates, 2.128 L ÷ 2.533 % = 0.84 L per %, just under the 0.86 that was
+     set. Measure fuel per lap with a second `LiveUsageMeter` fed by the telemetry fuel at the same crossings
+     as VE; once measured laps exist, they replace the estimate.
 
 MFD guidance must name the actual field and its verified semantics. Distinguish
 `TARGET AFTER STOP` from `AMOUNT TO ADD`. Calculate the latter from projected resource

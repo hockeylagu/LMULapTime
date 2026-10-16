@@ -9,6 +9,9 @@ const TREND_THRESHOLD_C = 0.5;
 const TREND_RELEASE_C = 0.25;
 /** The whole-degree value holds until the reading is this far (degrees) from it, so x.5 does not flicker. */
 const DEGREE_HOLD_C = 0.7;
+/** A wetness change smaller than this (0..1) is steady; one shown holds until the change falls below the release. */
+const WETNESS_THRESHOLD = 0.05;
+const WETNESS_RELEASE = 0.025;
 /** Less history than this (seconds) is too short for a trend. */
 const MIN_TREND_SPAN_SECONDS = 60;
 /** One sample is kept per this many seconds. */
@@ -16,25 +19,35 @@ const SAMPLE_SPACING_SECONDS = 10;
 /** Rain and wetness are reported in these steps, so slow drifts do not resend the snapshot every update. */
 const LEVEL_STEP = 0.05;
 
-interface Sample { et: number; trackTempC: number }
+interface Sample { et: number; trackTempC: number; wetness: number }
+type Trend = LiveWeather['trackTempTrend'];
 
 const quantize = (value: number): number => Math.round(value / LEVEL_STEP) * LEVEL_STEP;
 const level = (value: number): number => Math.round(quantize(value) * 100) / 100;
 
+/** Up or down once the change reaches the threshold; a trend already shown holds until it falls below the release. */
+function nextTrend(previous: Trend, change: number, threshold: number, release: number): Trend {
+  const holding = previous === 'rising' ? change > release : previous === 'falling' ? change < -release : false;
+  if (holding) return previous;
+  return change >= threshold ? 'rising' : change <= -threshold ? 'falling' : 'steady';
+}
+
 /**
  * Weather for the page: whole-degree track temperature, its trend against about five minutes earlier
  * (up or down by at least 0.5 C; steady until a minute of history exists), rain and path wetness in
- * 0.05 steps. Fed one scoring reading at a time; the session clock drives the history, so a paused
+ * 0.05 steps, and the wetness trend over the same window (wetter or drying by at least 0.05). Fed one scoring reading at a time; the session clock drives the history, so a paused
  * game does not age it. Clears when the clock goes back (a new session).
  */
 export class LiveWeatherTracker {
   private samples: Sample[] = [];
-  private trend: LiveWeather['trackTempTrend'] = 'steady';
+  private trend: Trend = 'steady';
+  private wetnessTrend: Trend = 'steady';
   private shownTemp: number | null = null;
 
   public reset(): void {
     this.samples = [];
     this.trend = 'steady';
+    this.wetnessTrend = 'steady';
     this.shownTemp = null;
   }
 
@@ -46,18 +59,19 @@ export class LiveWeatherTracker {
     const et = reading.currentEt;
     const last = this.samples[this.samples.length - 1];
     if (last && et < last.et) this.reset();
-    if (!last || et < last.et || et - last.et >= SAMPLE_SPACING_SECONDS) this.samples.push({ et, trackTempC: reading.trackTempC });
+    if (!last || et < last.et || et - last.et >= SAMPLE_SPACING_SECONDS) this.samples.push({ et, trackTempC: reading.trackTempC, wetness: reading.avgPathWetness });
     while (this.samples.length > 2 && this.samples[1].et <= et - WEATHER_TREND_WINDOW_SECONDS) this.samples.shift();
     const reference = this.samples[0];
-    const change = et - reference.et < MIN_TREND_SPAN_SECONDS ? 0 : reading.trackTempC - reference.trackTempC;
-    const holding = this.trend === 'rising' ? change > TREND_RELEASE_C : this.trend === 'falling' ? change < -TREND_RELEASE_C : false;
-    if (!holding) this.trend = change >= TREND_THRESHOLD_C ? 'rising' : change <= -TREND_THRESHOLD_C ? 'falling' : 'steady';
+    const enough = et - reference.et >= MIN_TREND_SPAN_SECONDS;
+    this.trend = nextTrend(this.trend, enough ? reading.trackTempC - reference.trackTempC : 0, TREND_THRESHOLD_C, TREND_RELEASE_C);
+    this.wetnessTrend = nextTrend(this.wetnessTrend, enough ? reading.avgPathWetness - reference.wetness : 0, WETNESS_THRESHOLD, WETNESS_RELEASE);
     if (this.shownTemp === null || Math.abs(reading.trackTempC - this.shownTemp) >= DEGREE_HOLD_C) this.shownTemp = Math.round(reading.trackTempC);
     return {
       trackTempC: this.shownTemp,
       trackTempTrend: this.trend,
       raining: level(reading.raining),
       avgPathWetness: level(reading.avgPathWetness),
+      wetnessTrend: this.wetnessTrend,
     };
   }
 }

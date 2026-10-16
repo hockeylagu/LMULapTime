@@ -88,7 +88,7 @@ export interface GaragePlanInput {
 }
 
 /** What to load in the garage for the loaded session: its laps and the reserve, capped at a full tank. */
-export function planGarage(input: GaragePlanInput): LiveGaragePlan {
+export function planGarage(input: GaragePlanInput): Omit<LiveGaragePlan, 'tyres'> {
   const { kind, sessionSeconds, lapSeconds, perLap, capacity, reserveLaps } = input;
   const laps = sessionSeconds !== null && lapSeconds !== null && sessionSeconds > 0 && lapSeconds > 0
     ? sessionLaps(sessionSeconds, lapSeconds) : null;

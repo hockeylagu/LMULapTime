@@ -1,39 +1,52 @@
 import { useLiveTiming, type LiveTimingStore } from '../../api/liveStream.js';
 import type { LiveSnapshot } from '../../../shared/types/live.js';
 import { LiveDelta } from './LiveDelta.js';
+import { LiveDeltaRow } from './LiveDeltaRow.js';
 import { LiveLastLapRow } from './LiveLastLapRow.js';
-import { lastLap, UNKNOWN } from './liveFormat.js';
+import { formatLapTime, lastLap, UNKNOWN } from './liveFormat.js';
+import { RACE_COLUMN, RACE_LEAD, RACE_ROW, RULED } from './raceColumns.js';
 
-/** The push lap against the session best, large; the tyre surface average underneath, held with the unknown mark until known. Renders at 5 Hz. */
-function PushLap({ store }: { store: LiveTimingStore }) {
+const LABEL = 'whitespace-nowrap text-[48px] font-semibold text-lmu-text-soft';
+const VALUE = 'mt-3 whitespace-nowrap font-mono text-[88px] font-bold leading-[1.2] tracking-[-0.025em]';
+
+/** The push lap against the session best, the page's lead value. Renders at 5 Hz. */
+function PushDelta({ store }: { store: LiveTimingStore }) {
   const timing = useLiveTiming(store);
-  const tyres = timing?.tyreSurfaceAvgC ?? null;
   return (
-    <>
-      <section aria-label="Push lap against the session best" className="flex min-h-0 flex-1 flex-col justify-center">
-        <h1 className="text-[48px] font-bold leading-[1.3]">PUSH LAP · VS BEST</h1>
-        <div data-testid="live-push-delta" className="whitespace-nowrap font-mono text-[200px] font-bold leading-[1.2] tracking-[-0.04em]">
-          <LiveDelta seconds={timing?.deltaSeconds ?? null} />
-        </div>
-      </section>
-      <section aria-label="Tyre surface average" className="flex h-[240px] shrink-0 items-center rounded-xl bg-lmu-card px-9">
-        <div>
-          <h2 className="text-[48px] font-semibold text-lmu-text-soft">TYRE SURFACE AVG</h2>
-          <div data-testid="live-tyre-avg" className="mt-3 whitespace-nowrap font-mono text-[96px] font-bold leading-[1.2] tracking-[-0.025em]">
-            {tyres === null ? <span className="text-lmu-muted">{UNKNOWN}</span> : Math.round(tyres)}
-            <span className="ml-3 text-[48px] font-normal text-lmu-text-soft">°C</span>
-          </div>
-        </div>
-      </section>
-    </>
+    <div data-testid="live-push-delta" className="whitespace-nowrap font-mono text-[180px] font-bold leading-[1.2] tracking-[-0.04em]">
+      <LiveDelta seconds={timing?.deltaSeconds ?? null} />
+    </div>
   );
 }
 
-/** The qualifying driving view: the push lap delta, tyre support, and the last lap. */
+function Figure({ label, value, testId }: { label: string; value: string; testId: string }) {
+  return (
+    <div data-testid={testId} className={`${RACE_COLUMN} ${RULED}`}>
+      <h2 className={LABEL}>{label}</h2>
+      <div className={VALUE}>{value}</div>
+    </div>
+  );
+}
+
+/**
+ * The qualifying driving view, on the race columns: the push lap delta beside the session best, the best possible
+ * and the position; then the tyre surface average and the sectors against the best; then the last lap.
+ */
 export function LiveQualiView({ snapshot, store }: { snapshot: LiveSnapshot; store: LiveTimingStore }) {
+  const best = snapshot.sessionBest;
+  const place = snapshot.session?.playerPlace ?? null;
   return (
     <>
-      <PushLap store={store} />
+      <section aria-label="Push lap against the session best" className={`${RACE_ROW} min-h-0 flex-1 items-center`}>
+        <div className={RACE_LEAD}>
+          <h1 className="text-[48px] font-bold leading-[1.3]">PUSH LAP · VS BEST</h1>
+          <PushDelta store={store} />
+        </div>
+        <Figure label="SESSION BEST" value={formatLapTime(best?.lapSeconds)} testId="live-quali-best" />
+        <Figure label="BEST POSSIBLE" value={formatLapTime(best?.bestPossibleSeconds)} testId="live-quali-possible" />
+        <Figure label="POSITION" value={place !== null ? `P${place}` : UNKNOWN} testId="live-quali-place" />
+      </section>
+      <LiveDeltaRow store={store} lead="tyres" testId="live-quali-deltas" />
       <LiveLastLapRow lap={lastLap(snapshot.recentLaps)} />
     </>
   );

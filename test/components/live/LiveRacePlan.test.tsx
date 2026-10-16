@@ -106,21 +106,38 @@ describe('race page with a plan', () => {
     expect(screen.queryByTestId('live-track-temp')).not.toBeInTheDocument();
   });
 
-  it('shows the garage load for the session against the garage setting, and the loading progress', () => {
+  it('shows the garage as a checklist: what to set, what the garage holds and what to do, then the loading progress', () => {
     render(<LivePage />);
     const garage = {
       kind: 've' as const, unit: '%' as const, sessionMinutes: 15, laps: 13, lapSeconds: 75.285, perLap: 2.5, perLapSource: 'measured' as const,
       lapsMeasured: 6, reserveLaps: 0.5, needed: 34, stops: 0, setInGarage: 30,
+      tyres: { compound: 'Medium', used: true, wear: 0.98, newSets: 55 },
     };
-    send(liveSnapshot({ lifecycle: 'garage', session: liveSession({ kind: 'qualifying', inRealtime: false }), strategy: { ...base, resource: null, pit: null, garage } }));
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('QUALIFYING');
-    expect(screen.getByText('Circuit de la Sarthe · VE / LAP FROM 6 LAPS THIS EVENT')).toBeInTheDocument();
-    const figures = screen.getByTestId('live-state-figures');
-    expect(figures).toHaveTextContent('15 MIN · 1:15.28513LAPS');
-    expect(figures).toHaveTextContent('VE NEEDED34%');
-    expect(figures.querySelector('[data-tone="short"]')).toHaveTextContent('SET IN GARAGE30%');
+    const inGarage = (kind: 'qualifying' | 'race' | 'practice', patch: Partial<typeof garage>, sequence: number) => liveSnapshot({
+      sequence, lifecycle: 'garage', session: liveSession({ kind, inRealtime: false }), strategy: { ...base, resource: null, pit: null, garage: { ...garage, ...patch } },
+    });
+    const rows = () => screen.getAllByTestId('live-garage-check');
 
-    send(liveSnapshot({ sequence: 2, lifecycle: 'loading', session: null, loadingProgress: 0.42 }));
+    send(inGarage('qualifying', {}, 1));
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('QUALIFYING');
+    expect(screen.getByText('15 MIN · 13 LAPS AT 1:15.285 · 2.5 % VE / LAP FROM 6 LAPS THIS EVENT')).toBeInTheDocument();
+    expect(rows()[0]).toHaveTextContent('VE34%30%RAISE +4%');
+    expect(rows()[0]).toHaveAttribute('data-action', 'change');
+    // Qualifying and the race want a new set: the one carried over is a change to make.
+    expect(rows()[1]).toHaveTextContent('TYRES · MEDIUMNEWUSED 98%FIT NEW');
+
+    send(inGarage('race', { setInGarage: 40, tyres: { ...garage.tyres, used: false, wear: 1 } }, 2));
+    expect(rows()[0]).toHaveAttribute('data-action', 'ok');
+    expect(rows()[1]).toHaveTextContent('TYRES · MEDIUMNEWNEWOK');
+    send(inGarage('race', { tyres: { ...garage.tyres, newSets: 0 } }, 3));
+    expect(rows()[1]).toHaveAttribute('data-action', 'warn');
+    expect(rows()[1]).toHaveTextContent('NO NEW SETS');
+    // Practice: any set will do, no call.
+    send(inGarage('practice', {}, 4));
+    expect(rows()[1]).toHaveTextContent('TYRES · MEDIUMANYUSED 98%');
+    expect(rows()[1]).not.toHaveAttribute('data-action');
+
+    send(liveSnapshot({ sequence: 5, lifecycle: 'loading', session: null, loadingProgress: 0.42 }));
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('LOADING');
     expect(screen.getByText('42%')).toBeInTheDocument();
   });

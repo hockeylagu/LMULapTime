@@ -39,7 +39,7 @@ export function LivePracticeView({ snapshot, store }: { snapshot: LiveSnapshot; 
           </div>
           <CurrentDelta store={store} />
         </div>
-        <div className="flex flex-col gap-8 border-l border-lmu-border pl-[60px]">
+        <div className="grid grid-cols-2 gap-x-[60px] border-l border-lmu-border pl-[60px]">
           <Timing label="SESSION BEST" seconds={best?.lapSeconds} />
           <Timing label="BEST POSSIBLE" seconds={best?.bestPossibleSeconds} />
         </div>

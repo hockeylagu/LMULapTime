@@ -1,5 +1,5 @@
 import type { LiveLapsLeft, LiveLapRecord, LiveSessionKind } from '../../types/live.js';
-import type { LivePitInfo, LivePitMenu, LivePitState, LiveResourceKind, LiveResourcePlan, LiveStrategy } from '../../types/liveStrategy.js';
+import type { LiveGarageTyres, LivePitInfo, LivePitMenu, LivePitState, LiveResourceKind, LiveResourcePlan, LiveStrategy } from '../../types/liveStrategy.js';
 import { LiveDamageTracker, LiveTyreTracker, worstTread } from './liveCarCondition.js';
 import type { LiveCarReading, LiveVehicleCondition } from './liveCarCondition.js';
 import { nextForecastChange } from './liveForecast.js';
@@ -9,13 +9,16 @@ import { liveResourceKind, planGarage, planRace, resourceUnit } from './liveReso
 import { LiveUsageMeter } from './liveUsage.js';
 
 /** One parsed answer of LMU's local REST API (server/live/lmuPitRest.ts). */
+/** The garage's selected tyre set, as `TireManagement` reports it. */
+export type LiveSelectedTyres = Omit<LiveGarageTyres, 'newSets'>;
+
 export type LiveRestUpdate =
   | { type: 'standings'; veFraction: number | null; fuelFraction: number | null; pitState: LivePitState; penalties: number }
   | { type: 'estimate'; total: number; damage: number; penalties: number; fuel: number; ve: number; tires: number }
   | { type: 'pitStopTimes'; fixRandom: number; fuelRandom: number; tireRandom: number; veRandom: number }
   | { type: 'pitMenu'; menu: LivePitMenu }
   | { type: 'condition'; condition: LiveVehicleCondition }
-  | { type: 'tireManagement'; vePerLap: number | null; fuelPerLap: number | null; newSets: number | null }
+  | { type: 'tireManagement'; vePerLap: number | null; fuelPerLap: number | null; newSets: number | null; selected: LiveSelectedTyres | null }
   | { type: 'garage'; veStart: number | null; fuelStart: number | null }
   | { type: 'forecast'; sessions: Record<string, LiveForecastNode[]> };
 
@@ -264,7 +267,7 @@ export class LiveStrategyTracker {
     const sessionSeconds = reading.endEt > 0 && reading.endEt < 1_000_000 ? reading.endEt : null;
     const estimated = reading.player && reading.player.estimatedLapTime > 0 ? reading.player.estimatedLapTime : null;
     const lapSeconds = median(this.eventLaps) ?? estimated;
-    return planGarage({
+    const plan = planGarage({
       kind,
       sessionSeconds,
       lapSeconds: lapSeconds === null ? null : round(lapSeconds, 3),
@@ -275,5 +278,11 @@ export class LiveStrategyTracker {
       capacity: resource.capacity,
       setInGarage: kind === 've' ? this.garage?.veStart ?? null : this.garage?.fuelStart ?? null,
     });
+    return { ...plan, tyres: this.garageTyres() };
+  }
+
+  private garageTyres(): LiveGarageTyres | null {
+    const selected = this.usage?.selected ?? null;
+    return selected ? { ...selected, newSets: this.usage?.newSets ?? null } : null;
   }
 }

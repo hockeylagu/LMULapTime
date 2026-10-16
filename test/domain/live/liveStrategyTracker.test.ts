@@ -39,7 +39,7 @@ function drive(tracker: LiveStrategyTracker, from: number, to: number) {
 describe('LiveStrategyTracker', () => {
   it('uses the game estimate before a lap, then the measured VE per lap, and plans the stop of a timed race', () => {
     const tracker = new LiveStrategyTracker();
-    tracker.applyRest({ type: 'tireManagement', vePerLap: 2.9, fuelPerLap: 2.1, newSets: 40 });
+    tracker.applyRest({ type: 'tireManagement', vePerLap: 2.9, fuelPerLap: 2.1, newSets: 40, selected: null });
     const early = drive(tracker, 0, 30);
     expect(early?.resource).toMatchObject({ kind: 've', unit: '%', perLap: 2.9, perLapSource: 'game', lapsMeasured: 0 });
 
@@ -66,7 +66,7 @@ describe('LiveStrategyTracker', () => {
 
   it('plans the garage load from the session length and the event lap time, beside the setting', () => {
     const tracker = new LiveStrategyTracker();
-    tracker.applyRest({ type: 'tireManagement', vePerLap: 2.5, fuelPerLap: 2.1, newSets: 40 });
+    tracker.applyRest({ type: 'tireManagement', vePerLap: 2.5, fuelPerLap: 2.1, newSets: 40, selected: null });
     tracker.applyRest({ type: 'garage', veStart: 50, fuelStart: null });
     const garage = at(0, { inRealtime: false, endEt: 900, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 75 }) });
     const strategy = context(tracker, garage, { lapsLeft: null });

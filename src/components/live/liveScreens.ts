@@ -1,16 +1,17 @@
 import type { LiveSessionKind, LiveSnapshot } from '../../../shared/types/live.js';
-import type { LiveGaragePlan } from '../../../shared/types/liveStrategy.js';
+import type { LiveGaragePlan, LiveGarageTyres } from '../../../shared/types/liveStrategy.js';
 import { mapVehicleIdToClass } from '../../../shared/domain/vehicleMapping.js';
 import { formatLapTime, UNKNOWN } from './liveFormat.js';
 import { formatAmount, formatPerLap, resourceName } from './race/livePlanFormat.js';
 
-export interface LiveFigure {
+/** One thing to set in the garage: the target, what the garage holds now, and what to do about it. */
+export interface GarageCheck {
   label: string;
-  value: string;
-  /** Small text after the value. */
+  target: string;
+  current: string;
   unit?: string;
-  /** `need` marks the amount to load; `short` a garage setting below it, `enough` one that covers it. */
-  tone?: 'need' | 'short' | 'enough';
+  /** `ok` when the garage already matches, `change` when the driver must act, `warn` when they cannot. */
+  action: { text: string; tone: 'ok' | 'change' | 'warn' } | null;
 }
 
 export interface LiveScreen {
@@ -18,7 +19,8 @@ export interface LiveScreen {
   note: string;
   /** Offline and menu read as waiting: muted title. */
   muted: boolean;
-  figures: LiveFigure[];
+  /** In the garage: the VE or fuel and the tyres to set before leaving. */
+  checks: GarageCheck[];
   /** The pedal trace stays for an input check (starting) and while driving. */
   showTrace: boolean;
 }
@@ -47,32 +49,43 @@ function startingNote(gamePhase: number): string {
   return 'ON THE GRID';
 }
 
-const reserveText = (laps: number): string => `${laps} ${laps === 1 ? 'LAP' : 'LAPS'}`;
-
-/** Where the per-lap figure comes from, said once under the title. */
-function perLapSourceNote(plan: LiveGaragePlan): string {
+/** How the target was worked out, said once under the title: session, laps, lap time and per-lap use. */
+function garageBasis(plan: LiveGaragePlan): string {
   const name = resourceName(plan.kind);
-  if (plan.perLapSource === 'measured') return `${name} / LAP FROM ${plan.lapsMeasured} ${plan.lapsMeasured === 1 ? 'LAP' : 'LAPS'} THIS EVENT`;
-  if (plan.perLapSource === 'game') return `${name} / LAP FROM THE GAME'S ESTIMATE`;
-  return `${name} / LAP AFTER THE FIRST LAP`;
+  const session = plan.sessionMinutes !== null ? `${plan.sessionMinutes} MIN` : 'SESSION';
+  const laps = plan.laps !== null ? `${plan.laps} LAPS AT ${formatLapTime(plan.lapSeconds)}` : `LAPS ${UNKNOWN}`;
+  const perLap = `${formatPerLap(plan.perLap, plan.unit)} ${plan.unit} ${name} / LAP`;
+  const source = plan.perLapSource === 'measured'
+    ? `FROM ${plan.lapsMeasured} ${plan.lapsMeasured === 1 ? 'LAP' : 'LAPS'} THIS EVENT`
+    : plan.perLapSource === 'game' ? "GAME'S ESTIMATE" : 'AFTER THE FIRST LAP';
+  return `${session} · ${laps} · ${perLap} ${source}`;
+}
+
+/** The VE or fuel to load against the garage setting: raise it when short, fine when it covers the session. */
+function resourceCheck(plan: LiveGaragePlan): GarageCheck {
+  const name = resourceName(plan.kind);
+  const { needed, setInGarage: set, unit } = plan;
+  const action: GarageCheck['action'] = needed === null || set === null ? null
+    : set >= needed ? { text: 'OK', tone: 'ok' }
+      : { text: `RAISE +${formatAmount(needed - set, unit)}${unit === '%' ? '%' : ' L'}`, tone: 'change' };
+  return {
+    label: plan.stops ? `${name} · ${plan.stops} ${plan.stops === 1 ? 'STOP' : 'STOPS'}` : name,
+    target: formatAmount(needed, unit), current: formatAmount(set, unit), unit, action,
+  };
 }
 
 /**
- * In the garage: what to load for the loaded session. The session's laps come from its length and the lap time,
- * the amount from the per-lap use and the reserve; the garage's own setting sits beside it.
+ * The set the car goes out on. Qualifying and the race want a new set: one carried over from the session before
+ * reads as a change to make (or a warning with no new sets left). In practice any set is fine.
  */
-function garageFigures(plan: LiveGaragePlan): LiveFigure[] {
-  const name = resourceName(plan.kind);
-  const unit = plan.unit;
-  const set = plan.setInGarage;
-  const covered = set !== null && plan.needed !== null ? set >= plan.needed : null;
-  return [
-    { label: plan.sessionMinutes !== null ? `${plan.sessionMinutes} MIN · ${formatLapTime(plan.lapSeconds)}` : 'SESSION', value: plan.laps !== null ? `${plan.laps}` : UNKNOWN, unit: 'LAPS' },
-    { label: `${name} / LAP`, value: formatPerLap(plan.perLap, unit), unit },
-    { label: 'RESERVE', value: reserveText(plan.reserveLaps) },
-    { label: plan.stops ? `${name} NEEDED · ${plan.stops} ${plan.stops === 1 ? 'STOP' : 'STOPS'}` : `${name} NEEDED`, value: formatAmount(plan.needed, unit), unit, tone: 'need' },
-    { label: 'SET IN GARAGE', value: formatAmount(set, unit), unit, tone: covered === null ? undefined : covered ? 'enough' : 'short' },
-  ];
+function tyreCheck(tyres: LiveGarageTyres | null, wantNew: boolean): GarageCheck {
+  const label = tyres?.compound ? `TYRES · ${tyres.compound.toUpperCase()}` : 'TYRES';
+  const current = !tyres ? UNKNOWN : tyres.used ? `USED ${Math.round(tyres.wear * 100)}%` : 'NEW';
+  if (!wantNew) return { label, target: 'ANY', current, action: null };
+  const action: GarageCheck['action'] = !tyres ? null
+    : !tyres.used ? { text: 'OK', tone: 'ok' }
+      : tyres.newSets === 0 ? { text: 'NO NEW SETS', tone: 'warn' } : { text: 'FIT NEW', tone: 'change' };
+  return { label, target: 'NEW', current, action };
 }
 
 /** The game's name for the track, as on its own screens (the same text in the bar and on every state screen). */
@@ -88,33 +101,34 @@ export function liveScreen(snapshot: LiveSnapshot): LiveScreen {
   const where = track ? `${kind} · ${track}` : kind;
   switch (snapshot.lifecycle) {
     case 'offline':
-      return { title: 'WAITING FOR LMU', note: 'GAME NOT RUNNING', muted: true, figures: [], showTrace: false };
+      return { title: 'WAITING FOR LMU', note: 'GAME NOT RUNNING', muted: true, checks: [], showTrace: false };
     case 'menu':
-      return { title: 'IN MENU', note: 'WAITING FOR A SESSION', muted: true, figures: [], showTrace: false };
+      return { title: 'IN MENU', note: 'WAITING FOR A SESSION', muted: true, checks: [], showTrace: false };
     case 'loading': {
       const progress = snapshot.loadingProgress;
-      return { title: 'LOADING', note: progress === null ? 'LOADING THE SESSION' : `${Math.round(progress * 100)}%`, muted: true, figures: [], showTrace: false };
+      return { title: 'LOADING', note: progress === null ? 'LOADING THE SESSION' : `${Math.round(progress * 100)}%`, muted: true, checks: [], showTrace: false };
     }
     case 'garage': {
-      // The bar already says GARAGE: the title names the session, the note the track and where the figures come from.
+      // The bar already says GARAGE and the track: the title names the session, the note how the targets were worked out.
       const plan = snapshot.strategy?.garage ?? null;
+      const wantNew = session?.kind === 'race' || session?.kind === 'qualifying';
       return {
         title: kind,
-        note: plan ? `${track} · ${perLapSourceNote(plan)}` : track,
+        note: plan ? garageBasis(plan) : track,
         muted: false,
-        figures: plan ? garageFigures(plan) : [],
+        checks: plan ? [resourceCheck(plan), tyreCheck(plan.tyres, wantNew)] : [],
         showTrace: false,
       };
     }
     case 'starting':
       return {
         title: session?.kind === 'race' ? 'RACE STARTING' : `${kind} STARTING`,
-        note: startingNote(session?.gamePhase ?? 0), muted: false, figures: [], showTrace: true,
+        note: startingNote(session?.gamePhase ?? 0), muted: false, checks: [], showTrace: true,
       };
     case 'finished':
-      return { title: 'SESSION OVER', note: where, muted: false, figures: [], showTrace: false };
+      return { title: 'SESSION OVER', note: where, muted: false, checks: [], showTrace: false };
     case 'driving':
       // The driving content is the session views (`LiveDriving`); this only says the trace stays.
-      return { title: kind, note: session?.trackName ?? '', muted: false, figures: [], showTrace: true };
+      return { title: kind, note: session?.trackName ?? '', muted: false, checks: [], showTrace: true };
   }
 }

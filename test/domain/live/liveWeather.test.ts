@@ -8,7 +8,7 @@ describe('LiveWeatherTracker', () => {
   it('reports whole degrees, rain and wetness; null without a session', () => {
     const tracker = new LiveWeatherTracker();
     expect(tracker.update(at(0, 31.6, { raining: 0.42, avgPathWetness: 0.31 }))).toEqual({
-      trackTempC: 32, trackTempTrend: 'steady', raining: 0.4, avgPathWetness: 0.3,
+      trackTempC: 32, trackTempTrend: 'steady', raining: 0.4, avgPathWetness: 0.3, wetnessTrend: 'steady',
     });
     expect(tracker.update(null)).toBeNull();
     expect(tracker.update(scoringReading({ numVehicles: 0 }))).toBeNull();
@@ -56,5 +56,17 @@ describe('LiveWeatherTracker', () => {
     const b = tracker.update(at(1, 30, { raining: 0.112, avgPathWetness: 0.21 }));
     expect(b).toEqual(a);
     expect(tracker.update(at(2, 30, { raining: 0.2, avgPathWetness: 0.21 }))?.raining).toBe(0.2);
+  });
+
+  it('marks the line getting wetter or drying against five minutes earlier, holding the trend near the edge', () => {
+    const tracker = new LiveWeatherTracker();
+    tracker.update(at(0, 30, { avgPathWetness: 0.1 }));
+    expect(tracker.update(at(30, 30, { avgPathWetness: 0.4 }))?.wetnessTrend).toBe('steady');
+    expect(tracker.update(at(70, 30, { avgPathWetness: 0.4 }))?.wetnessTrend).toBe('rising');
+    expect(tracker.update(at(80, 30, { avgPathWetness: 0.13 }))?.wetnessTrend).toBe('rising');
+    expect(tracker.update(at(90, 30, { avgPathWetness: 0.11 }))?.wetnessTrend).toBe('steady');
+    const drying = new LiveWeatherTracker();
+    drying.update(at(0, 30, { avgPathWetness: 0.6 }));
+    expect(drying.update(at(400, 30, { avgPathWetness: 0.45 }))?.wetnessTrend).toBe('falling');
   });
 });

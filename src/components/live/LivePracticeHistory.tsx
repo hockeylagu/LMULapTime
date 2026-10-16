@@ -3,7 +3,7 @@ import { useLiveTiming, type LiveTimingStore } from '../../api/liveStream.js';
 import { LiveDelta } from './LiveDelta.js';
 import { formatLapTime, formatRunningTime, formatSectorTime, UNKNOWN, worstSectorIndex } from './liveFormat.js';
 
-export const HISTORY_ROWS = 3;
+export const HISTORY_ROWS = 2;
 
 const HEAD = 'px-5 text-left text-[48px] font-medium text-lmu-text-soft';
 const CELL = 'px-5 text-left font-mono text-[80px] font-medium leading-[1.08]';
@@ -32,7 +32,7 @@ function CurrentLapRow({ store }: { store: LiveTimingStore }) {
 }
 
 /**
- * The lap in progress on top, then the last three laps and the session's best row. When the lap ends it moves
+ * The lap in progress on top, then the last two laps and the session's best row. When the lap ends it moves
  * down as the newest completed row. The latest completed lap's biggest sector loss is tinted.
  * Rows not driven yet are held at full height with hidden cells, so the table never reflows as laps arrive.
  */
@@ -41,7 +41,7 @@ export function LivePracticeHistory({ laps, best, store }: { laps: LiveLapRecord
   const blanks = HISTORY_ROWS - rows.length;
   const worst = rows[0]?.valid && best ? worstSectorIndex(rows[0], best.bestSectors) : -1;
   return (
-    <section aria-label="Lap in progress and last three completed laps" className="h-[560px] shrink-0 px-9">
+    <section aria-label="Lap in progress and last two completed laps" className="h-[460px] shrink-0 px-9">
       <table data-testid="live-history" className="h-full w-full table-fixed border-collapse">
         <colgroup><col className="w-[10%]" /><col className="w-[20%]" /><col /><col /><col /><col className="w-[17%]" /></colgroup>
         <thead className="h-16">

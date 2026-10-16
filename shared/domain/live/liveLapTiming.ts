@@ -54,6 +54,21 @@ function timeAt(trace: readonly TracePoint[], dist: number): number | null {
 }
 
 /**
+ * The delta for the sector in progress: the lap delta minus the deltas of the sectors already done (all against the
+ * session-best lap, so they add up to the lap delta at each line). Null without a lap delta or a
+ * known delta for every sector before it.
+ */
+export function activeSectorDelta(timing: Pick<LiveTiming, 'sector' | 'deltaSeconds' | 'sectorDeltas'>): number | null {
+  if (timing.deltaSeconds === null) return null;
+  let done = 0;
+  for (const delta of timing.sectorDeltas.slice(0, timing.sector - 1)) {
+    if (delta === null) return null;
+    done += delta;
+  }
+  return ms(timing.deltaSeconds - done);
+}
+
+/**
  * The player's lap timing for one session, fed the scoring readings (about 5 Hz). Deterministic, no clock of its own.
  *
  * - A lap completes when `totalLaps` rises; the game's last-lap fields on that reading time it. Sector times

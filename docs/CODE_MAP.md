@@ -519,20 +519,24 @@ ring in `pedalBuffer.ts`). `src/api/useAppEvents.ts` is the app-wide `GET /api/e
 `settings/LiveDashboardCard.tsx` (`autoOpen`, VE/fuel reserve laps). Tests use `test/helpers/fakeEventSource.ts` and `test/helpers/liveSnapshot.ts`.
 Step 2 (identity and timing): the 5 Hz `timing` event goes into `LiveTimingStore` (returned by `useLiveStream` as
 `timing`, read with `useLiveTiming` / `useSyncExternalStore`), so only the timing parts render, not the page. The
-driving content is `LiveDriving` by session kind: `LiveRaceView`, `LiveQualiView` (push lap delta, optional tyre
-average), `LivePracticeView` (also warmup and unknown) with `LivePracticeHistory`: its current-lap row shows the lap
+driving content is `LiveDriving` by session kind: `LiveRaceView`, `LiveQualiView` (push lap delta beside session best,
+best possible and place; tyre average and sector deltas in `LiveDeltaRow`), `LivePracticeView` (also warmup and unknown) with `LivePracticeHistory`: its current-lap row shows the lap
 number, the running lap clock (`LiveTiming.lapElapsedSeconds`, `formatRunningTime`) and S1/S2 as each line is crossed;
-at the finish it becomes the top completed row. The three completed laps and BEST row stay visible.
+at the finish it becomes the top completed row. The two completed laps and BEST row stay visible.
 `LiveSessionBar` carries the track (`liveTrackName`: the game's name, else the layout), laps left, PR and one fixed
-560 px weather slot (forecast change in blue, else track temperature). `LiveDelta` and
+520 px weather slot, first on the right: on a wet track (rain or path wetness above 0) `TRACK WET n%` with the
+wetness trend arrow from `liveWeather.ts` (wetter or drying by 0.05 over 5 min), else the forecast change in blue,
+else the track temperature). `LiveDelta` and
 `liveFormat.ts` hold the signed-delta (real minus sign, gain/loss tokens), sector and lap formatting.
-Race plan (`src/components/live/race/`): `raceAction.ts` (`racePlanView`) turns `LiveSnapshot.strategy` into one lead
+Race plan (`src/components/live/race/`): `raceColumns.ts` holds the one column layout every race and qualifying row shares; `raceAction.ts` (`racePlanView`) turns `LiveSnapshot.strategy` into one lead
 readout and three cells by mode (calculating, pit-now for a flat or lost wheel, in-pit, pit within 2 laps, stint,
 sprint when the finish is reachable); `LiveRacePlan.tsx` renders them with fixed label/value/note lines and
 `minmax(0, …)` columns so a mode change never moves anything (words get a smaller size than figures);
 `LiveDamageRow.tsx` replaces `LiveLastLapRow` only when `damage.significant`; `livePlanFormat.ts` formats amounts,
-ranges and tyre calls. `liveScreens.ts` also builds the loading screen (progress) and the garage screen (session kind
-title, laps, per lap, reserve, needed against the garage setting, toned by `LiveFigure.tone`).
+ranges and tyre calls. `liveScreens.ts` also builds the loading screen (progress) and the garage checklist (`GarageCheck`, drawn by
+`LiveGarageChecklist.tsx` on the race columns): the VE or fuel and the tyres, each with what to set, what the garage
+holds and the action (RAISE, FIT NEW, OK; qualifying and the race want a new set), under a line with the session,
+laps, lap time and per-lap source. The sector in progress shows its running delta (`activeSectorDelta` in `liveLapTiming.ts`).
 
 ### Live dashboard (server)
 

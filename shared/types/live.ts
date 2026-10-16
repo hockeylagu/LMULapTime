@@ -73,6 +73,8 @@ export interface LiveWeather {
   raining: number;
   /** Average path wetness, 0..1. */
   avgPathWetness: number;
+  /** Path wetness against about five minutes earlier: rising is getting wetter, falling is drying. */
+  wetnessTrend: 'rising' | 'falling' | 'steady';
 }
 
 /** A completed lap of the player in this session, as the game timed it. Sector times are split (not cumulative). */

@@ -1,7 +1,7 @@
 import http from 'node:http';
 import type { LiveVehicleCondition } from '../../shared/domain/live/liveCarCondition.js';
 import type { LiveForecastNode } from '../../shared/domain/live/liveForecast.js';
-import type { LiveRestUpdate } from '../../shared/domain/live/liveStrategyTracker.js';
+import type { LiveRestUpdate, LiveSelectedTyres } from '../../shared/domain/live/liveStrategyTracker.js';
 import type { LivePitMenu, LivePitState } from '../../shared/types/liveStrategy.js';
 
 /**
@@ -136,6 +136,27 @@ export function parseTireManagement(body: unknown): Extract<LiveRestUpdate, { ty
     vePerLap: veFraction !== null && veFraction > 0 ? veFraction * 100 : null,
     fuelPerLap: num(usage.fuelConsumption),
     newSets: num(record(json?.tireInventory)?.newTires),
+    selected: parseSelectedTyres(json),
+  };
+}
+
+/**
+ * `tireInvGarageOptions.selectedTires`: the set the car goes out on, one entry per wheel (`isUsed`, `wearValue`
+ * 0-100, `compoundIndex` into `optimalCompoundConditions.compounds`).
+ */
+function parseSelectedTyres(json: Json | null): LiveSelectedTyres | null {
+  const selected = record(json?.tireInvGarageOptions)?.selectedTires;
+  if (!Array.isArray(selected) || selected.length === 0) return null;
+  const wheels = selected.map(record).filter((wheel): wheel is Json => wheel !== null);
+  const wear = wheels.map(wheel => num(wheel.wearValue)).filter((value): value is number => value !== null);
+  if (wear.length === 0) return null;
+  const compounds = record(json?.optimalCompoundConditions)?.compounds;
+  const index = num(wheels[0].compoundIndex);
+  const compound = Array.isArray(compounds) && index !== null ? record(compounds[index])?.type : null;
+  return {
+    compound: typeof compound === 'string' ? compound : null,
+    used: wheels.some(wheel => wheel.isUsed === true),
+    wear: Math.min(...wear) / 100,
   };
 }
 

@@ -201,6 +201,8 @@ Still to test, in one offline race weekend (practice, qualifying, a 20-minute ra
 - The dashboard's race plan against the race: per-lap VE/fuel against the MFD, the pit lap it calls, and
   the VE or fuel left at the finish; a fuel class (LMP2 or LMP3) for the MFD `FUEL:` line and the garage
   fuel in litres.
+- The garage before the race: whether `TireManagement` `selectedTires` still holds the qualifying set
+  (used, with its wear) and switches to new when a new set is picked.
 
 - `GetSessionsInfoForEvent` in the garage after practice and after qualifying;
   `watch/standings/history` and `strategy/overall` in the race.
@@ -210,6 +212,8 @@ Still to test, in one offline race weekend (practice, qualifying, a 20-minute ra
   random delays).
 - A wet race long enough to see the track dry and the level where slicks are faster again
   (compare with `RAIN_WET_MIN`); wear on wets on a drying track.
+- The header's track wetness (`avgPathWetness`) and its trend against what the track looks like, as rain
+  starts and as the line dries.
 - Online, later: whether the server weather matches the local `sessions/weather` read.
 
 Not worth testing: `watch/trackmap` (static geometry), `watch/getIncidentsList` (the XML has

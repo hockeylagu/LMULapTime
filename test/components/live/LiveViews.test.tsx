@@ -42,7 +42,7 @@ describe('live driving views', () => {
       send(liveSnapshot({
         identity: IDENTITY,
         lapsLeft: { laps: 12, estimated: true },
-        weather: { trackTempC: 34, trackTempTrend: 'falling', raining: 0, avgPathWetness: 0 },
+        weather: { trackTempC: 34, trackTempTrend: 'falling', raining: 0, avgPathWetness: 0, wetnessTrend: 'steady' },
       }));
       expect(screen.getByTestId('live-laps-left')).toHaveTextContent('LAPS LEFT ~12');
       expect(screen.getByTestId('live-personal-best')).toHaveTextContent('PR 2:00.964');
@@ -66,8 +66,24 @@ describe('live driving views', () => {
 
     it.each([['rising', '↑'], ['steady', '→']] as const)('marks a %s track temperature', (trend, arrow) => {
       render(<LivePage />);
-      send(liveSnapshot({ weather: { trackTempC: 41, trackTempTrend: trend, raining: 0, avgPathWetness: 0 } }));
+      send(liveSnapshot({ weather: { trackTempC: 41, trackTempTrend: trend, raining: 0, avgPathWetness: 0, wetnessTrend: 'steady' } }));
       expect(screen.getByTestId('live-track-temp')).toHaveTextContent(`TRACK 41° ${arrow}`);
+    });
+
+    it('turns the weather slot to the track wetness and its trend once rain falls or the line is wet, ahead of a forecast', () => {
+      render(<LivePage />);
+      const wet = (raining: number, avgPathWetness: number, wetnessTrend: 'rising' | 'falling' | 'steady', sequence: number) => liveSnapshot({
+        sequence, weather: { trackTempC: 30, trackTempTrend: 'steady', raining, avgPathWetness, wetnessTrend },
+      });
+      send(wet(0.3, 0.35, 'rising', 1));
+      expect(screen.getByTestId('live-wetness')).toHaveTextContent('TRACK WET 35% ↑');
+      expect(screen.getByTestId('live-wetness')).toHaveAttribute('aria-label', 'Track wetness, getting wetter');
+      expect(screen.queryByTestId('live-track-temp')).not.toBeInTheDocument();
+      // Rain stopped, the line still wet and drying.
+      send(wet(0, 0.2, 'falling', 2));
+      expect(screen.getByTestId('live-wetness')).toHaveTextContent('TRACK WET 20% ↓');
+      send(wet(0, 0, 'falling', 3));
+      expect(screen.getByTestId('live-track-temp')).toHaveTextContent('TRACK 30°');
     });
   });
 
@@ -77,7 +93,7 @@ describe('live driving views', () => {
       recentLaps: [liveLap(12, 121.832, [37.204, 45.116, 39.512])],
     });
 
-    it('shows the delta row with signed gains and losses, the active sector, and the last lap with its sectors', () => {
+    it('shows the delta row with signed gains and losses, the running delta of the sector in progress, and the last lap with its sectors', () => {
       render(<LivePage />);
       send(race());
       timing(liveTiming({ deltaSeconds: -0.184, sectorDeltas: [-0.12, 0.064, null], sector: 3 }));
@@ -86,7 +102,8 @@ describe('live driving views', () => {
       expect(within(row).getByText('−0.184')).toHaveAttribute('data-delta', 'gain');
       expect(within(row).getByText('−0.120')).toHaveAttribute('data-delta', 'gain');
       expect(within(row).getByText('+0.064')).toHaveAttribute('data-delta', 'loss');
-      expect(within(row).getByTestId('live-active-sector')).toHaveTextContent('ACTIVE');
+      // S3 in progress: the lap delta minus S1 and S2.
+      expect(within(row).getByTestId('live-active-sector')).toHaveTextContent('−0.128');
       const last = screen.getByTestId('live-last-lap');
       expect(last).toHaveTextContent('LAST LAP 12');
       expect(last).toHaveTextContent('2:01.832');
@@ -127,9 +144,9 @@ describe('live driving views', () => {
   });
 
   describe('qualifying', () => {
-    const quali = () => liveSnapshot({ session: liveSession({ kind: 'qualifying' }), recentLaps: [LAPS[2]] });
+    const quali = () => liveSnapshot({ session: liveSession({ kind: 'qualifying' }), recentLaps: [LAPS[2]], sessionBest: BEST });
 
-    it('shows the push lap delta large, the tyre average slot held until sent, and the last lap', () => {
+    it('shows the push lap delta large, the session best, best possible and place, the tyre average slot held until sent, and the last lap', () => {
       render(<LivePage />);
       send(quali());
       expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('PUSH LAP · VS BEST');
@@ -142,6 +159,20 @@ describe('live driving views', () => {
       expect(within(screen.getByTestId('live-push-delta')).getByText('−0.184')).toHaveAttribute('data-delta', 'gain');
       expect(screen.getByTestId('live-tyre-avg')).toHaveTextContent('82°C');
       expect(screen.getByTestId('live-last-lap')).toHaveTextContent('2:01.832');
+      expect(screen.getByTestId('live-quali-best')).toHaveTextContent('SESSION BEST2:01.406');
+      expect(screen.getByTestId('live-quali-possible')).toHaveTextContent('BEST POSSIBLE2:01.284');
+      expect(screen.getByTestId('live-quali-place')).toHaveTextContent('POSITIONP3');
+    });
+
+    it('shows the sectors against the best as they are crossed, the one in progress refreshing with the lap delta', () => {
+      render(<LivePage />);
+      send(quali());
+      timing(liveTiming({ sector: 2, deltaSeconds: 0.03, sectorDeltas: [-0.12, null, null] }));
+      const row = screen.getByTestId('live-quali-deltas');
+      expect(row).toHaveTextContent('S1 VS BEST−0.120');
+      expect(within(row).getByTestId('live-active-sector')).toHaveTextContent('+0.150');
+      timing(liveTiming({ sector: 2, deltaSeconds: -0.2, sectorDeltas: [-0.12, null, null] }));
+      expect(within(row).getByTestId('live-active-sector')).toHaveTextContent('−0.080');
     });
   });
 
@@ -159,10 +190,9 @@ describe('live driving views', () => {
       expect(screen.getByText('BEST POSSIBLE').nextElementSibling).toHaveTextContent('2:01.284');
       expect(screen.getByTestId('live-practice-delta')).toHaveTextContent('−0.184');
       const rows = within(screen.getByTestId('live-history')).getAllByRole('row');
-      // Header, current splits, three laps newest first, the BEST footer.
-      expect(rows).toHaveLength(6);
+      // Header, current splits, two laps newest first, the BEST footer.
+      expect(rows).toHaveLength(5);
       expect(rows[2]).toHaveTextContent('52:01.83237.20445.11639.512+0.426');
-      expect(rows[4]).toHaveTextContent('32:02.20237.36645.20839.628+0.796');
       expect(screen.getByTestId('live-history-best')).toHaveTextContent('BEST2:01.40637.15044.98039.154');
     });
 
@@ -206,7 +236,7 @@ describe('live driving views', () => {
       render(<LivePage />);
       send(practice({ recentLaps: [LAPS[0]] }));
       const blanks = screen.getAllByTestId('live-history-blank');
-      expect(blanks).toHaveLength(2);
+      expect(blanks).toHaveLength(1);
       for (const blank of blanks) {
         expect(blank).toHaveClass('invisible');
         expect(blank.querySelectorAll('td')).toHaveLength(6);

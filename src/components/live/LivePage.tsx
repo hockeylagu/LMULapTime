@@ -8,8 +8,8 @@ import { LiveStateScreen } from './LiveStateScreen.js';
 import { liveScreen, type LiveScreen } from './liveScreens.js';
 import { PedalBuffer } from './pedalBuffer.js';
 
-const WAITING: LiveScreen = { title: 'CONNECTING', note: 'WAITING FOR THE SERVER', muted: true, figures: [], showTrace: false };
-const LOST: LiveScreen = { title: 'DATA LOST', note: 'RECONNECTING TO THE SERVER', muted: false, figures: [], showTrace: false };
+const WAITING: LiveScreen = { title: 'CONNECTING', note: 'WAITING FOR THE SERVER', muted: true, checks: [], showTrace: false };
+const LOST: LiveScreen = { title: 'DATA LOST', note: 'RECONNECTING TO THE SERVER', muted: false, checks: [], showTrace: false };
 
 /** The fullscreen live dashboard: session bar, the state of the game, and the pedal trace while on track. */
 export function LivePage() {

@@ -12,6 +12,11 @@ const STATUS: Record<LiveConnection, { label: string; className: string }> = {
 };
 
 const TREND_ARROW: Record<LiveWeather['trackTempTrend'], string> = { rising: '↑', falling: '↓', steady: '→' };
+const WETNESS_TREND: Record<LiveWeather['wetnessTrend'], string> = { rising: 'getting wetter', falling: 'drying', steady: 'steady' };
+
+/** Any rain falling or water on the racing line (in the 0.05 steps the server sends) makes the slot about the wet. */
+const wetWeather = (weather: LiveWeather | null): LiveWeather | null =>
+  weather !== null && (weather.raining > 0 || weather.avgPathWetness > 0) ? weather : null;
 
 interface LiveSessionBarProps {
   snapshot: LiveSnapshot | null;
@@ -29,6 +34,7 @@ export function LiveSessionBar({ snapshot, connection }: LiveSessionBarProps) {
   const lapsLeft = showSession ? snapshot.lapsLeft : null;
   const personalBest = showSession ? (identity?.personalBestSeconds ?? null) : null;
   const weather = showSession ? snapshot.weather : null;
+  const wet = wetWeather(weather);
   const forecast = showSession ? snapshot.strategy?.forecast ?? null : null;
   const status = STATUS[connection];
   const paused = showSession && connection === 'live' && snapshot.paused;
@@ -55,10 +61,17 @@ export function LiveSessionBar({ snapshot, connection }: LiveSessionBarProps) {
       <div className="flex items-center gap-9">
         {/* Every slot is held for the whole session, showing the unknown mark until its value arrives, so nothing moves. */}
         {/* One weather slot of fixed width, first on the right so its unused width joins the free space between the groups:
-            the forecast change when the session has one, else the track temperature. */}
+            on a wet track its wetness and whether it is getting wetter or drying, else the forecast change, else the track
+            temperature. In a race the plan still shows the forecast. */}
         {showSession && (
           <span className="inline-block w-[520px] text-right">
-            {forecast ? (
+            {wet ? (
+              <span data-testid="live-wetness" className="text-lmu-blue" aria-label={`Track wetness, ${WETNESS_TREND[wet.wetnessTrend]}`}>
+                TRACK WET{' '}
+                <b className="font-mono font-normal">{Math.round(wet.avgPathWetness * 100)}%</b>{' '}
+                <span className="inline-block w-[1ch]">{TREND_ARROW[wet.wetnessTrend]}</span>
+              </span>
+            ) : forecast ? (
               <span data-testid="live-forecast" className="text-lmu-blue">{forecastText(forecast)}</span>
             ) : (
               <span data-testid="live-track-temp" aria-label={weather ? `Track temperature, ${weather.trackTempTrend}` : 'Track temperature'}>

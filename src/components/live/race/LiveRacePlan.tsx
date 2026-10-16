@@ -1,4 +1,5 @@
 import type { LiveSnapshot } from '../../../../shared/types/live.js';
+import { RACE_COLUMN, RACE_LEAD, RACE_ROW, RULED } from '../raceColumns.js';
 import { racePlanView, type PlanReadout, type PlanTone } from './raceAction.js';
 
 const TONE: Record<Exclude<PlanTone, null>, string> = {
@@ -47,16 +48,16 @@ export function LiveRacePlan({ snapshot }: { snapshot: LiveSnapshot }) {
       aria-label="Race plan"
       data-testid="live-race-plan"
       data-mode={view.mode}
-      className="grid min-h-0 flex-1 grid-cols-[minmax(0,1.5fr)_repeat(3,minmax(0,1fr))] items-center gap-x-[34px]"
+      className={`${RACE_ROW} min-h-0 flex-1 items-center`}
     >
-      <div className="min-w-0">
+      <div className={RACE_LEAD}>
         <Readout readout={view.action} size="action" testId="live-race-action" />
         <p data-testid="live-race-position" className="whitespace-nowrap font-mono text-[48px] font-semibold text-lmu-muted">
           LAP {lap ?? '—'} · {session?.playerPlace != null ? `P${session.playerPlace}` : '—'}
         </p>
       </div>
       {view.cells.map((cell, index) => (
-        <div key={index} className="self-center border-l border-lmu-rule pl-[34px]">
+        <div key={index} className={`${RACE_COLUMN} ${RULED} self-center`}>
           <Readout readout={cell} size="cell" testId={`live-race-cell-${index + 1}`} />
         </div>
       ))}

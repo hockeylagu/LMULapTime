@@ -48,7 +48,21 @@ describe('LMU pit REST parsers', () => {
     expect(parseTireManagement({
       expectedUsage: { fuelConsumption: 2.128, fuelFractionPerLap: 0.018, virtualEnergyConsumption: 17096636, virtualEnergyFractionPerLap: 0.02533 },
       tireInventory: { maxAvailableTires: 56, newTires: 52 },
-    })).toEqual({ type: 'tireManagement', vePerLap: 2.533, fuelPerLap: 2.128, newSets: 52 });
+    })).toEqual({ type: 'tireManagement', vePerLap: 2.533, fuelPerLap: 2.128, newSets: 52, selected: null });
+  });
+
+  it('reads the selected set as used when any wheel was driven, with the most worn tread and the compound name', () => {
+    const wheel = (isUsed: boolean, wearValue: number) => ({ compoundIndex: 0, index: isUsed ? 0 : 1, isUsed, type: isUsed ? 2 : 0, wearValue });
+    const body = (selectedTires: unknown[]) => ({
+      expectedUsage: { virtualEnergyFractionPerLap: 0.025 },
+      optimalCompoundConditions: { compounds: [{ type: 'Medium', optimalTemperature: 92 }, { type: 'Wet', optimalTemperature: 50 }] },
+      tireInvGarageOptions: { newTiresRemaining: 55, selectedTires },
+    });
+    expect(parseTireManagement(body([wheel(true, 98), wheel(true, 99), wheel(true, 99), wheel(true, 99)]))?.selected)
+      .toEqual({ compound: 'Medium', used: true, wear: 0.98 });
+    expect(parseTireManagement(body(Array.from({ length: 4 }, () => wheel(false, 100))))?.selected)
+      .toEqual({ compound: 'Medium', used: false, wear: 1 });
+    expect(parseTireManagement(body([]))?.selected).toBeNull();
   });
 
   it('reads the start amounts set in the garage: VE in percent, fuel only when given in litres', () => {

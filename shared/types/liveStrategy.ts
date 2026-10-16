@@ -146,6 +146,18 @@ export interface LiveGaragePlan {
   stops: number | null;
   /** The start amount set in the garage (`getPlayerGarageData`). */
   setInGarage: number | null;
+  /** The tyres the car goes out on (`TireManagement` selected set); null until read. */
+  tyres: LiveGarageTyres | null;
+}
+
+/** The tyre set selected in the garage for the next run. */
+export interface LiveGarageTyres {
+  compound: string | null;
+  /** Any of the four already driven (a set carried over from an earlier session). */
+  used: boolean;
+  /** Tread left on the most worn of the four, 0-1. */
+  wear: number;
+  newSets: number | null;
 }
 
 export interface LiveStrategy {
