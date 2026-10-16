@@ -88,6 +88,7 @@ leaves the session, so it is not a live source.
 | Compound | `Front/RearTireCompoundName` (`Medium`), `…Index` | `UIScreen/TireManagement` (compounds, optimal temperature: Medium 92 °C, Wet 50 °C); MFD `TIRES:` options | **Live** |
 | Temps, pressure | `Wheel.Temperature[3]`, `TireCarcassTemperature`, `Pressure` (kPa) | `/rest/garage/tireinfo` (Kelvin, kPa, load) | **Live** (both) |
 | Sets remaining | — | `UIScreen/TireManagement` → `tireInventory` (56 new of 56) | **Live** |
+| Set fitted for the next run | — | `UIScreen/TireManagement` → `tireInvGarageOptions.selectedTires` (per wheel `isUsed`, `wearValue`); the qualifying set stays fitted for the race until a new one is picked (driver, 2026-10-16) | **Live** (practice); race garage to read |
 | Condition per tyre | `Wheel.Wear` | `getVehicleCondition.tireCondition` (0 = destroyed) | **Live** |
 | Puncture / lost wheel | `Wheel.Flat`, `Wheel.Detached` | — | Field |
 
@@ -201,8 +202,9 @@ Still to test, in one offline race weekend (practice, qualifying, a 20-minute ra
 - The dashboard's race plan against the race: per-lap VE/fuel against the MFD, the pit lap it calls, and
   the VE or fuel left at the finish; a fuel class (LMP2 or LMP3) for the MFD `FUEL:` line and the garage
   fuel in litres.
-- The garage before the race: whether `TireManagement` `selectedTires` still holds the qualifying set
-  (used, with its wear) and switches to new when a new set is picked.
+- The garage before the race: the game keeps the qualifying set fitted (confirmed by the driver,
+  2026-10-16); still to see in the REST read: `selectedTires` reporting it used with its wear, and new
+  once a new set is picked.
 
 - `GetSessionsInfoForEvent` in the garage after practice and after qualifying;
   `watch/standings/history` and `strategy/overall` in the race.
