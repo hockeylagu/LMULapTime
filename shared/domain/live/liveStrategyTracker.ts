@@ -25,6 +25,11 @@ export type LiveRestUpdate =
 /** What the strategy needs besides the reading: the session details already derived for the snapshot. */
 export interface LiveStrategyContext {
   carClass: string | null;
+  /**
+   * The exact layout (`LiveIdentity.layoutKey`): null until the game's navigation state names it when the track
+   * name fits several layouts of one facility, and never a guess.
+   */
+  layoutKey: string | null;
   lapsLeft: LiveLapsLeft | null;
   /** The newest completed lap of the session (it changes once per lap). */
   latestLap: LiveLapRecord | null;
@@ -50,10 +55,13 @@ const median = (values: readonly number[]): number | null => {
 /**
  * Builds the `strategy` part of the snapshot from the scoring readings, the player's telemetry (fuel, damage,
  * tyres) and LMU's REST answers. Per-lap use and lap times are kept for the event (same track and car) across its
- * sessions; damage, tyres and pit data belong to one session. Deterministic: no clock of its own.
+ * sessions; damage, tyres and pit data belong to one session. The game's track name can be the same for the layouts
+ * of one facility (Bahrain GP and Outer): an event resolved to one layout is forgotten when another loads, so
+ * no use or lap time crosses layouts (AGENTS.md section 3A). Deterministic: no clock of its own.
  */
 export class LiveStrategyTracker {
   private eventKey: string | null = null;
+  private eventLayout: string | null = null;
   private sessionKey: string | null = null;
   private readonly meters: Record<LiveResourceKind, LiveUsageMeter> = { ve: new LiveUsageMeter(), fuel: new LiveUsageMeter() };
   private eventLaps: number[] = [];
@@ -78,6 +86,7 @@ export class LiveStrategyTracker {
   /** Forgets everything (the game closed). */
   public reset(): void {
     this.eventKey = null;
+    this.eventLayout = null;
     this.meters.ve.clear();
     this.meters.fuel.clear();
     this.eventLaps = [];
@@ -143,6 +152,14 @@ export class LiveStrategyTracker {
     if (eventKey !== this.eventKey) {
       if (this.eventKey !== null) this.reset();
       this.eventKey = eventKey;
+    }
+    // An unresolved layout (null) neither starts nor ends an event: only two known layouts that differ do.
+    if (context.layoutKey !== null) {
+      if (this.eventLayout !== null && this.eventLayout !== context.layoutKey) {
+        this.reset();
+        this.eventKey = eventKey;
+      }
+      this.eventLayout = context.layoutKey;
     }
     const sessionKey = `${reading.sessionCode}|${reading.trackName}`;
     if (sessionKey !== this.sessionKey || reading.currentEt < this.et - 1) {

@@ -10,9 +10,11 @@ const positive = (value: number): boolean => Number.isFinite(value) && value > 0
  * the leader gets the flag at the first line crossing after the clock ends. With `L` its lap start
  *   time, `e` its estimated lap time and `E` the end time, it still has `ceil((E - L) / e)` laps counting the
  *   one in progress (the laps it still starts before the clock ends, plus the one it finishes: the lap in
- *   progress is the last when `L + e >= E`). A car `b` laps behind the leader finishes `b` laps fewer, but never
- *   fewer than the lap in progress. Marked `estimated`, since the lap time estimate moves.
- * Null when it is not a race, the player has finished, there is no usable estimate, or the leader
+ *   progress is the last when `L + e >= E`), so it takes the flag at `F = L + n * e`. Every other car gets the
+ *   flag at its first line crossing from `F`: `ceil((F - l) / p)` laps with `l` and `p` its own lap start and
+ *   estimate (a lapped car close behind the leader still runs as many laps; the laps it is down do not count).
+ *   Never fewer than the lap in progress. Marked `estimated`, since the lap time estimates move.
+ * Null when it is not a race, the player has finished, there is no usable lap start or estimate, or the leader
  *   has no lap left to run (everyone is cooling down).
  */
 export function computeLapsLeft(
@@ -27,6 +29,8 @@ export function computeLapsLeft(
   if (!(leader.lapStartEt >= 0) || !positive(leader.estimatedLapTime)) return null;
   const leaderLaps = Math.ceil((session.endSeconds - leader.lapStartEt) / leader.estimatedLapTime);
   if (leaderLaps < 1) return null;
-  const behind = leader.id === player.id ? 0 : Math.max(0, player.lapsBehindLeader);
-  return { laps: Math.max(1, leaderLaps - behind), estimated: true };
+  if (leader.id === player.id) return { laps: leaderLaps, estimated: true };
+  if (!(player.lapStartEt >= 0) || !positive(player.estimatedLapTime)) return null;
+  const flag = leader.lapStartEt + leaderLaps * leader.estimatedLapTime;
+  return { laps: Math.max(1, Math.ceil((flag - player.lapStartEt) / player.estimatedLapTime)), estimated: true };
 }

@@ -64,8 +64,10 @@ function forecastCell(forecast: LiveForecast | null, resource: LiveResourcePlan 
   return { label: `${resource ? resourceName(resource.kind) : 'VE'} NOW`, value: formatAmount(resource?.amount, unit), unit };
 }
 
-function mfdResourceCell(resource: LiveResourcePlan, pit: LivePitInfo | null): PlanReadout {
-  const needed = resource.race?.neededAfterStop ?? null;
+/** `now`: the stop is this lap (damage, in the pit lane), maybe earlier than planned: its target covers more laps. */
+function mfdResourceCell(resource: LiveResourcePlan, pit: LivePitInfo | null, now: boolean): PlanReadout {
+  const race = resource.race;
+  const needed = !race ? null : now ? race.neededStopNow : race.neededAfterStop;
   const set = pit?.mfd?.resourceValue ?? null;
   const short = needed !== null && set !== null && set < needed;
   return {
@@ -114,8 +116,8 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
   const damage = strategy?.damage ?? null;
   const unit = resource?.unit ?? '%';
   const name = resource ? resourceName(resource.kind) : 'VE';
-  const pitCells = (): RacePlanView['cells'] => [
-    resource && race ? mfdResourceCell(resource, pit) : { label: `${name} · MFD`, value: UNKNOWN },
+  const pitCells = (now: boolean): RacePlanView['cells'] => [
+    resource && race ? mfdResourceCell(resource, pit, now) : { label: `${name} · MFD`, value: UNKNOWN },
     tyreMfdCell(pit, forecast),
     pitTimeCell(pit, damage?.repairSeconds ?? null),
   ];
@@ -124,7 +126,7 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
     return {
       mode: 'pit-now',
       action: { label: '', value: 'PIT NOW', tone: 'loss', note: `${damage.wheel.problem === 'flat' ? 'FLAT' : 'WHEEL OFF'} · ${CORNER_NAMES[damage.wheel.corner]}`, noteTone: 'loss' },
-      cells: pitCells(),
+      cells: pitCells(true),
     };
   }
   if (pit && (pit.state === 'entering' || pit.state === 'stopped')) {
@@ -136,7 +138,7 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
         value: formatSecondsRange(penalty ? pit.penaltySeconds : pit.serviceSeconds, penalty ? null : pit.serviceMaxSeconds),
         unit: 's',
       },
-      cells: pitCells(),
+      cells: pitCells(true),
     };
   }
   if (!resource || !race || resource.perLap === null) {
@@ -168,7 +170,7 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
       action: pitInLaps === 0
         ? { label: 'PIT', value: 'THIS LAP', tone: 'warn' }
         : { label: 'PIT IN', value: `${pitInLaps}`, unit: lapsUnit(pitInLaps) },
-      cells: pitCells(),
+      cells: pitCells(false),
     };
   }
   return {

@@ -47,6 +47,11 @@ export interface LiveRacePlan {
   sparePerLap: number | null;
   /** What the tank should hold after the next stop to reach the finish with the reserve, capped at a full tank. */
   neededAfterStop: number | null;
+  /**
+   * The same for a stop at the end of the lap in progress (an unplanned stop: damage, or pitting early), also when
+   * the finish is reachable; capped at a full tank.
+   */
+  neededStopNow: number;
   /** Further stops after the next one when a full tank does not reach the finish. */
   stopsAfterNext: number;
 }

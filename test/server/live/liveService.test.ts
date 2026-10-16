@@ -188,15 +188,17 @@ describe('LiveService', () => {
 
       // The race clock ends at 1800 s; the leader's 300 s laps convert it to laps.
       const leader = (lapStartEt: number) => vehicleReading({ id: 2, place: 1, lapStartEt, estimatedLapTime: 300 });
-      frame(lap(3, {}, { sessionCode: 10, leader: leader(0) }));
+      // The player runs the leader's pace a few seconds behind it on the road.
+      const chase = { lapStartEt: 5, estimatedLapTime: 300 };
+      frame(lap(3, chase, { sessionCode: 10, leader: leader(0) }));
       expect(service.getSnapshot().lapsLeft).toEqual({ laps: 6, estimated: true });
       const before = sink.chunks.length;
-      frame(lap(3, {}, { sessionCode: 10, leader: leader(0), currentEt: 14, trackTempC: 31.3 }));
+      frame(lap(3, chase, { sessionCode: 10, leader: leader(0), currentEt: 14, trackTempC: 31.3 }));
       expect(sink.chunks).toHaveLength(before);
-      frame(lap(3, {}, { sessionCode: 10, leader: leader(0), currentEt: 15, trackTempC: 33.4 }));
+      frame(lap(3, chase, { sessionCode: 10, leader: leader(0), currentEt: 15, trackTempC: 33.4 }));
       expect(service.getSnapshot().weather?.trackTempC).toBe(33);
       expect(sink.chunks).toHaveLength(before + 1);
-      frame(lap(4, { lapDist: 5, timeIntoLap: 0.1 }, { sessionCode: 10, leader: leader(300), currentEt: 16, trackTempC: 33.4 }));
+      frame(lap(4, { ...chase, lapStartEt: 305, lapDist: 5, timeIntoLap: 0.1 }, { sessionCode: 10, leader: leader(300), currentEt: 16, trackTempC: 33.4 }));
       expect(service.getSnapshot().lapsLeft).toEqual({ laps: 5, estimated: true });
     });
 

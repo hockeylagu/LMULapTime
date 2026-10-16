@@ -21,7 +21,7 @@ describe('planRace', () => {
     // 50% at 4%/lap with half a lap kept: 12 crossings from the line, so lap 11 + 11 = 22 is the pit lap.
     expect(race()).toEqual({
       finishReachable: false, atFinish: null, pitInLaps: 11, pitLap: 22,
-      sparePerLap: 0, neededAfterStop: 34, stopsAfterNext: 0,
+      sparePerLap: 0, neededAfterStop: 34, neededStopNow: 78, stopsAfterNext: 0,
     });
   });
 
@@ -34,12 +34,21 @@ describe('planRace', () => {
   it('reports spare per lap and the amount at the finish when the finish is reachable (no pit stop)', () => {
     expect(race({ amount: 30, lapsLeft: 6, lapFraction: 0.5 })).toEqual({
       finishReachable: true, atFinish: 8, pitInLaps: null, pitLap: null,
-      sparePerLap: 1.09, neededAfterStop: null, stopsAfterNext: 0,
+      sparePerLap: 1.09, neededAfterStop: null, neededStopNow: 22, stopsAfterNext: 0,
     });
   });
 
   it('caps the amount after the stop at a full tank and counts the further stops', () => {
-    expect(race({ amount: 20, lapsLeft: 60 })).toMatchObject({ neededAfterStop: 100, stopsAfterNext: 2 });
+    expect(race({ amount: 20, lapsLeft: 60 })).toMatchObject({ neededAfterStop: 100, neededStopNow: 100, stopsAfterNext: 2 });
+  });
+
+  it('sets a stop at the end of this lap for every lap after it plus the reserve, more than the later planned stop', () => {
+    // Planned in 11 laps: 8 laps after it (34). Stopping now leaves 19 laps after it: 19.5 x 4 = 78.
+    expect(race()).toMatchObject({ pitInLaps: 11, neededAfterStop: 34, neededStopNow: 78 });
+    // On the pit lap the two agree.
+    expect(race({ amount: 4, lapFraction: 0.5 })).toMatchObject({ pitInLaps: 0, neededAfterStop: 78, neededStopNow: 78 });
+    // On the last lap only the reserve is left to load.
+    expect(race({ amount: 1, lapsLeft: 1 }).neededStopNow).toBe(2);
   });
 
   it('rounds the MFD amount up to a whole unit', () => {

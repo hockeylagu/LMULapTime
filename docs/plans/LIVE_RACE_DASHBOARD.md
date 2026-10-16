@@ -97,7 +97,7 @@ holds the earlier critique. Current state, all at 2560 x 1440, read in glances:
   the finish, `TYRES TO FINISH OK`.
 - **Damage:** sector deltas stay; the last-lap row becomes `PACE LOSS · MEASURED`, `SINCE IMPACT`,
   `TO FINISH`, `REPAIR TIME`; the resource can read `NO CHANGE`. **Flat or detached
-  wheel:** `PIT NOW`.
+  wheel:** `PIT NOW`, with the VE or fuel to set for a stop this lap (more than the planned later stop's).
 - **Lifecycle:** game closed, in menu, garage between sessions (`VE NEEDED` / `FUEL NEEDED`
   for the next session), race starting (plan and pedal check), finished (class place,
   battle at the flag, pace, debrief pointer).

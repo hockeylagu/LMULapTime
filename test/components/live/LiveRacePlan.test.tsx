@@ -61,6 +61,17 @@ describe('racePlanView', () => {
     expect(texts(withRace({}, { pit: { ...base.pit!, state: 'stopped' } })).action).toBe('PIT STOP · EST.|34–41|s|');
   });
 
+  it('sets the MFD for a stop this lap when pitting for damage or early, not for the later planned stop', () => {
+    const damage = { wheel: { problem: 'flat' as const, corner: 'RL' as const }, body: 0, suspension: 0, partsDetached: false, impactLap: 9, lapsSinceImpact: 0, paceLossPerLap: null, lossToFinish: null, repairSeconds: null, significant: true };
+    // Planned in 6 laps for 38; stopping now needs 58, more than the 50 set.
+    expect(racePlanView(withRace({}, { damage })).cells[0]).toMatchObject({ value: '58', note: 'SET 50%', noteTone: 'loss' });
+    expect(racePlanView(withRace({}, { pit: { ...base.pit!, state: 'entering' } })).cells[0]).toMatchObject({ value: '58', noteTone: 'loss' });
+    // Even with the finish reachable, a stop for damage has its target.
+    expect(racePlanView(withRace({ finishReachable: true, pitInLaps: null, neededAfterStop: null, neededStopNow: 20 }, { damage })).cells[0]).toMatchObject({ value: '20', noteTone: 'gain' });
+    // The countdown to the planned stop keeps the planned target.
+    expect(racePlanView(withRace({ pitInLaps: 2 })).cells[0]).toMatchObject({ value: '38' });
+  });
+
   it('calculates until the per-lap use and the laps left are known, naming the forecast when there is one', () => {
     expect(texts(liveSnapshot({ strategy: null })).mode).toBe('calculating');
     const forecast = { change: 'rain' as const, chance: 60, atSeconds: 900, lap: 20 };

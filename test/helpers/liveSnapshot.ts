@@ -26,7 +26,7 @@ export const liveStrategy = (patch: Partial<LiveStrategy> = {}): LiveStrategy =>
   resource: {
     kind: 've', unit: '%', amount: 62, capacity: 100, perLap: 2.5, perLapSource: 'measured', lapsMeasured: 5,
     reserveLaps: 0.5, lapsInTank: 24.3,
-    race: { finishReachable: false, atFinish: null, pitInLaps: 6, pitLap: 19, sparePerLap: 0.2, neededAfterStop: 38, stopsAfterNext: 0 },
+    race: { finishReachable: false, atFinish: null, pitInLaps: 6, pitLap: 19, sparePerLap: 0.2, neededAfterStop: 38, neededStopNow: 58, stopsAfterNext: 0 },
   },
   pit: {
     state: 'none', penalties: 0, serviceSeconds: 34, serviceMaxSeconds: 41, penaltySeconds: null,

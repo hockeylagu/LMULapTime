@@ -202,6 +202,7 @@ export class LiveService {
     const details = this.tracker.apply(reading, state);
     const strategy = this.strategy.update(reading, state, {
       carClass: identity?.carClass ?? null,
+      layoutKey: identity?.layoutKey ?? null,
       lapsLeft: details.lapsLeft,
       latestLap: details.recentLaps[details.recentLaps.length - 1] ?? null,
       reserveLaps: this.reserveLaps,

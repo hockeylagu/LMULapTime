@@ -8,7 +8,7 @@ const timedRace = { ...race, endSeconds: 1200 };
 describe('laps left', () => {
   it('is null off a race, without a player and after the flag', () => {
     const leader = vehicleReading({ id: 1, place: 1, lapStartEt: 0, estimatedLapTime: 100 });
-    const player = vehicleReading({ id: 7, totalLaps: 21 });
+    const player = vehicleReading({ id: 7, totalLaps: 21, lapStartEt: 5 });
     expect(computeLapsLeft(timedRace, player, leader)).toEqual({ laps: 12, estimated: true });
     expect(computeLapsLeft({ ...timedRace, kind: 'qualifying' }, player, leader)).toBeNull();
     expect(computeLapsLeft(null, player, leader)).toBeNull();
@@ -31,9 +31,21 @@ describe('laps left', () => {
       expect(computeLapsLeft(timedRace, vehicleReading({ id: 1, place: 1 }), leader(0, 100))).toEqual({ laps: 12, estimated: true });
     });
 
-    it('takes off the laps the player is behind the leader, but never goes under the lap in progress', () => {
-      expect(computeLapsLeft(timedRace, { ...player, lapsBehindLeader: 1 }, leader(0))).toEqual({ laps: 11, estimated: true });
-      expect(computeLapsLeft(timedRace, { ...player, lapsBehindLeader: 20 }, leader(0))).toEqual({ laps: 1, estimated: true });
+    it('counts the crossings a car still makes up to the leader flag, however many laps it is down', () => {
+      // The leader started its lap at 10: 12 laps left, the flag at 10 + 12 * 100 = 1210.
+      // A lapped car just behind it on the road, at the same pace, still runs 12 laps.
+      expect(computeLapsLeft(timedRace, { ...player, lapsBehindLeader: 1, lapStartEt: 15 }, leader(10))).toEqual({ laps: 12, estimated: true });
+      // A lapped car just ahead of it on the road crosses the line before the flag and runs one more.
+      expect(computeLapsLeft(timedRace, { ...player, lapsBehindLeader: 1, lapStartEt: 5 }, leader(10))).toEqual({ laps: 13, estimated: true });
+      // A slower car runs fewer: (1210 - 10) / 120 = 10.
+      expect(computeLapsLeft(timedRace, { ...player, lapsBehindLeader: 2, lapStartEt: 10, estimatedLapTime: 120 }, leader(10))).toEqual({ laps: 10, estimated: true });
+      // Never under the lap in progress.
+      expect(computeLapsLeft(timedRace, { ...player, lapStartEt: 1250 }, leader(1150))).toEqual({ laps: 1, estimated: true });
+    });
+
+    it('is null for a car behind the leader without its own lap start or estimate', () => {
+      expect(computeLapsLeft(timedRace, { ...player, lapStartEt: -1 }, leader(0))).toBeNull();
+      expect(computeLapsLeft(timedRace, { ...player, estimatedLapTime: 0 }, leader(0))).toBeNull();
     });
 
     it('is exactly one lap for a car still running once the leader has the flag', () => {

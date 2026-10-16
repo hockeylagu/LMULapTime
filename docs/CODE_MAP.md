@@ -558,7 +558,7 @@ event when the lifecycle leaves offline, setting on and no dashboard page connec
 Session identity and timing (step 2): the scoring decode also carries the player's and the leader's lap fields, track
 temperature, rain and wetness; the telemetry decode adds the mean tyre surface temperature (`tyreSurfaceAvgC`).
 Deterministic models in `shared/domain/live/`: `liveLapTiming.ts` (laps, validity, session best, reference trace, delta,
-sector deltas), `liveLapsLeft.ts` (exact in lap races, estimated from the leader in timed ones), `liveWeather.ts`
+sector deltas), `liveLapsLeft.ts` (estimated from the leader's flag time and the player's own lap start and estimate, so a lapped car is not cut short), `liveWeather.ts`
 (whole-degree temperature, 5 min trend, 0.05 steps), `liveIdentity.ts` (layout via `getCircuitSpecification`, class,
 PR lookup), tied together by `liveSessionTracker.ts`. Server: `lmuNavigation.ts` (`GET 127.0.0.1:6397/navigation/state`,
 2 s timeout, never throws; `navigationProbe` maps it to menu / loading with progress / session) and `liveIdentityResolver.ts` (once per loaded session,
@@ -574,7 +574,9 @@ nothing else); a timeout pauses everything 10 s, a failed read pauses that read 
 of the last 3), `liveResourcePlan.ts` (VE for Hypercar and GT3, fuel otherwise; `planRace` with the reserve kept at
 pit entry and the finish, `planGarage`), `liveCarCondition.ts` (damage impact lap, measured pace loss, significance;
 tyre wear per stint), `liveForecast.ts` (next rain/dry change from the weather nodes) and `liveStrategyTracker.ts`
-(state per event and session, fed by telemetry `car` frames and REST updates). The lifecycle adds `loading`
+(state per event and session, fed by telemetry `car` frames and REST updates; an event is the track name and car,
+forgotten when another resolved layout of the same track name loads). `planRace` also gives `neededStopNow`, the
+target for a stop at the end of this lap, which the PIT NOW and in-pit modes show instead of the planned stop's. The lifecycle adds `loading`
 (`loadingProgress` on the snapshot), asked every 1 s while loading.
 
 **Scan hold:** `index.ts` wires `session-loaded` to `ServerContext.setLiveSessionLoaded`. While a session is loaded the

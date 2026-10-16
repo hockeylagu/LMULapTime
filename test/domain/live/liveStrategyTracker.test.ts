@@ -20,17 +20,17 @@ function at(et: number, patch: Partial<LiveScoringReading> = {}): LiveScoringRea
 }
 
 const context = (tracker: LiveStrategyTracker, reading: LiveScoringReading, patch: Partial<LiveStrategyContext> = {}) =>
-  tracker.update(reading, deriveLiveState(reading, 'driving'), { carClass: 'GT3', lapsLeft: { laps: 30 - Math.floor(reading.currentEt / LAP), estimated: true }, latestLap: null, reserveLaps: 0.5, ...patch });
+  tracker.update(reading, deriveLiveState(reading, 'driving'), { carClass: 'GT3', layoutKey: null, lapsLeft: { laps: 30 - Math.floor(reading.currentEt / LAP), estimated: true }, latestLap: null, reserveLaps: 0.5, ...patch });
 
 /** Drives from `from` to `to` seconds: a scoring reading each second, VE from standings every 3 s. */
-function drive(tracker: LiveStrategyTracker, from: number, to: number) {
+function drive(tracker: LiveStrategyTracker, from: number, to: number, layoutKey: string | null = null) {
   let strategy = null;
   for (let et = from; et <= to; et += 1) {
     const reading = at(et);
-    strategy = context(tracker, reading);
+    strategy = context(tracker, reading, { layoutKey });
     if (et % 3 === 0) {
       tracker.applyRest({ type: 'standings', veFraction: (90 - (VE_PER_LAP * et) / LAP) / 100, fuelFraction: 0.4, pitState: 'none', penalties: 0 });
-      strategy = context(tracker, reading);
+      strategy = context(tracker, reading, { layoutKey });
     }
   }
   return strategy;
@@ -84,8 +84,19 @@ describe('LiveStrategyTracker', () => {
     const tracker = new LiveStrategyTracker();
     drive(tracker, 0, 450);
     const menu = at(460);
-    expect(tracker.update(menu, deriveLiveState(menu, 'driving', 'menu'), { carClass: 'GT3', lapsLeft: null, latestLap: null, reserveLaps: 0.5 })).toBeNull();
+    expect(tracker.update(menu, deriveLiveState(menu, 'driving', 'menu'), { carClass: 'GT3', layoutKey: null, lapsLeft: null, latestLap: null, reserveLaps: 0.5 })).toBeNull();
     const other = at(10, { trackName: 'Bahrain International Circuit' });
     expect(context(tracker, other)?.resource).toMatchObject({ perLap: null, lapsMeasured: 0, amount: null });
+  });
+
+  it('keeps the event across sessions of one layout, and forgets it when another layout of the same track name loads', () => {
+    const tracker = new LiveStrategyTracker();
+    drive(tracker, 0, 450, 'bahrain_gp');
+    // The next session of the event: the layout is unresolved until the navigation read, then the same.
+    const next = (layoutKey: string | null) => context(tracker, at(10, { sessionCode: 5 }), { layoutKey })?.resource;
+    expect(next(null)).toMatchObject({ perLap: 3, lapsMeasured: 3 });
+    expect(next('bahrain_gp')).toMatchObject({ perLap: 3, lapsMeasured: 3 });
+    // Same track name and car, the other layout: nothing measured there yet.
+    expect(next('bahrain_outer')).toMatchObject({ perLap: null, lapsMeasured: 0 });
   });
 });

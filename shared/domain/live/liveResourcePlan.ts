@@ -36,12 +36,19 @@ export interface RacePlanInput {
  * - Otherwise the pit lap is the last line the amount reaches with the reserve: `floor(lapFraction + amount/perLap - reserve)`
  *   crossings from now (at least this lap's). The spare per lap is then against that crossing, and the amount needed
  *   after the stop covers the laps after it plus the reserve, capped at a full tank; a cap means more stops.
+ * - Either way, the amount needed after a stop at the end of this lap covers the laps after this one plus the
+ *   reserve: what an unplanned stop (damage, an early stop) must load, more than the planned stop when it is later.
  */
 export function planRace(input: RacePlanInput): LiveRacePlan {
   const { amount, perLap, reserveLaps, capacity, lapsLeft, lapFraction, lapNumber } = input;
   const fraction = Math.min(Math.max(lapFraction, 0), 1);
   const usable = amount - reserveLaps * perLap;
   const toFinish = Math.max(lapsLeft - fraction, 0);
+  const neededFor = (lapsAfter: number): number => {
+    const need = (lapsAfter + reserveLaps) * perLap;
+    return settable(capacity !== null ? Math.min(need, capacity) : need);
+  };
+  const neededStopNow = neededFor(Math.max(lapsLeft - 1, 0));
   if (usable >= toFinish * perLap) {
     return {
       finishReachable: true,
@@ -50,6 +57,7 @@ export function planRace(input: RacePlanInput): LiveRacePlan {
       pitLap: null,
       sparePerLap: toFinish > 0 ? round(usable / toFinish - perLap, 2) : null,
       neededAfterStop: null,
+      neededStopNow,
       stopsAfterNext: 0,
     };
   }
@@ -57,7 +65,6 @@ export function planRace(input: RacePlanInput): LiveRacePlan {
   const pitInLaps = Math.max(0, crossings - 1);
   const toPit = pitInLaps + 1 - fraction;
   const lapsAfter = Math.max(lapsLeft - (pitInLaps + 1), 0);
-  const need = (lapsAfter + reserveLaps) * perLap;
   const fullTankLaps = capacity !== null ? (capacity - reserveLaps * perLap) / perLap : null;
   return {
     finishReachable: false,
@@ -65,7 +72,8 @@ export function planRace(input: RacePlanInput): LiveRacePlan {
     pitInLaps,
     pitLap: lapNumber + pitInLaps,
     sparePerLap: toPit > 0 ? round(usable / toPit - perLap, 2) : null,
-    neededAfterStop: settable(capacity !== null ? Math.min(need, capacity) : need),
+    neededAfterStop: neededFor(lapsAfter),
+    neededStopNow,
     stopsAfterNext: fullTankLaps !== null && fullTankLaps > 0 ? Math.max(0, Math.ceil(lapsAfter / fullTankLaps) - 1) : 0,
   };
 }
