@@ -6,7 +6,7 @@ import type { LiveSessionInfo } from '../../../shared/types/live.js';
 function session(overrides: Partial<LiveSessionInfo> = {}): LiveSessionInfo {
   return {
     kind: 'practice', sessionCode: 1, gamePhase: 5, inRealtime: true, trackName: 'Circuit de la Sarthe',
-    vehicleName: 'DKR Engineering #4:ELMS25 1.09', vehicleClass: 'LMP3', elapsedSeconds: 10, endSeconds: null, maxLaps: null,
+    vehicleName: 'DKR Engineering #4:ELMS25 1.09', vehicleClass: 'LMP3', elapsedSeconds: 10, endSeconds: null,
     playerLapsCompleted: 0, playerPlace: 1, ...overrides,
   };
 }

@@ -12,7 +12,7 @@ const FIELD: ScoringVehicle[] = [
 describe('rF2 scoring decode', () => {
   it('finds the player and decodes the session header', () => {
     expect(decodeScoring(scoringBuffer(2, FIELD))).toEqual({
-      trackName: 'Circuit de la Sarthe', sessionCode: 10, currentEt: 321.5, endEt: 3600, maxLaps: 2147483647, numVehicles: 2,
+      trackName: 'Circuit de la Sarthe', sessionCode: 10, currentEt: 321.5, endEt: 3600, numVehicles: 2,
       inRealtime: true, gamePhase: 5, trackLength: 13_626, trackTempC: 31.5, raining: 0, avgPathWetness: 0,
       player: expect.objectContaining({ id: 12, place: 4, totalLaps: 8, vehicleName: 'Ferrari 296 GT3', vehicleClass: 'GT3' }),
       leader: expect.objectContaining({ id: 7, place: 1, totalLaps: 9 }),

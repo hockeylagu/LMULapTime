@@ -531,7 +531,9 @@ thread. `rf2Layout.ts` derives every byte offset from field lists that mirror `t
 (its test asserts the plugin's struct sizes: a shifted field fails there); `rf2Decode.ts` holds the pure decoders and the
 coherent read (begin counter, copy, end counter, 3 attempts, unchanged frames skipped); `sharedMemory.ts` is the only
 Windows part (koffi `OpenFileMappingW` / `MapViewOfFile`); `liveReader.ts` is the worker's loop (3 s open retry, 50 Hz in
-realtime and 1 Hz otherwise, game-exit check: counters still for 5 s, then one `GET 127.0.0.1:6397/navigation/state`),
+realtime and 1 Hz otherwise, game-exit check: counters still for 5 s, then one `GET 127.0.0.1:6397/navigation/state`: refused = gone,
+timeout = busy, `NAV_MAIN_MENU` = menu (the buffer keeps the last session in the menu); a refusal only counts once LMU has answered,
+or after a 3 min start-up grace),
 started by `liveReaderWorker.ts` through `liveReaderWorkerBootstrap.mjs`. The main thread side: `liveService.ts` (snapshot,
 SSE clients, 40 ms pedal batches only on track, heartbeat, slow clients drop batches, `session-loaded` / `lifecycle`
 events), `liveSettings.ts` (`live_auto_open` in

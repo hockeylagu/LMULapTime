@@ -79,10 +79,23 @@ Returns the current loading state, selected vehicle and track configuration, and
 ```
 
 ### 2.2 Lifecycle State Codes
-- **`gamePhase`**: `"BEFORE"`, `"RECONNAISSANCE"`, `"GRID_FORMATION"`, `"STARTING"`, `"SESSION_ACTIVE"`, `"FINISHING"`, `"SESSION_OVER"`
-- **`gameSession`**: `"PRACTICE1"`, `"PRACTICE2"`, `"PRACTICE3"`, `"QUALIFY"`, `"WARMUP"`, `"RACE"`
-- **`gameState`**: `"GSTATE_SETUP"`, `"GSTATE_DRIVING"`, `"GSTATE_MONITOR"`, `"GSTATE_REPLAY"`, `"GSTATE_PAUSED"`
-- **`navigationState`**: `"NAV_MAIN_MENU"`, `"NAV_GARAGE"`, `"NAV_MONITOR"`, `"NAV_DRIVE"`, `"NAV_SETTINGS"`, `"NAV_RACE_WEEKEND"`
+
+Values **seen live** (build 14200, 2026-10-15/16); the rest of each enum is unconfirmed:
+
+| Screen | `navigationState` | `gameState` | `internalStateCode` | `loadingStatus` |
+|---|---|---|---|---|
+| Main menu, and every race-weekend setup page (track, car, sessions) | `NAV_MAIN_MENU` | `GSTATE_SETUP` | `OP_RAN_REALTIME_PASS` (`OP_IN_OPTIONS` briefly) | `loading` false, `percentage` -1 |
+| Session loading | `NAV_EVENT` | `GSTATE_INIT` | `OP_TO_REALTIME` | `loading` true, `percentage` 0 to 1 over about 12 s |
+| Garage monitor, and on track (offline) | `NAV_EVENT` | `GSTATE_DYN` | `OP_RAN_REALTIME_PASS` | `loading` false |
+| Driving (online capture) | `NAV_REALTIME` | `GSTATE_DYN` | `OP_RAN_REALTIME_PASS` | |
+
+- In the menu, `loadingStatus.track` follows the track picked in the race-weekend setup live
+  (`sceneDesc` e.g. `BAHRAINWEC_OUTER`), so the layout is known before the session loads.
+  `gameSession` and `gamePhase` keep the last session's values there and mean nothing.
+- `settingMode`: `SETTING_GRANDPRIX` offline, `SETTING_MULTIPLAYER` online.
+- `gamePhase` (text) seen: `BEFORE`, `FORMATION`, `GREEN`, `CHECKERED`. `gameSession`: `PRACTICE1`, `QUALIFY1`, `RACE1`.
+- The REST port is not listening while LMU starts up (the shared memory already exists then),
+  and a loading game can answer slowly: a refused connection means the game is gone, a timeout does not.
 
 ---
 
@@ -225,8 +238,78 @@ Damage test (same day, Le Mans, GT3, shared memory recorded alongside):
 suspension damage, which shared memory does not expose. `GetGameState` answers
 `{"status": "unavailable", "gameState": "Setup"}` outside an active session.
 
-Not read yet: the `/rest/garage/*` screens (pit menu, repair and refuel, tyre management,
-vehicle condition), because of the replay crash above.
+The `/rest/garage/*` screens were read live the next day: see 4.3.
+
+### 4.3 Garage, Pit, Damage and Weather Reads (observed, build 14200, 2026-10-16)
+
+Offline practice, Bahrain Outer Circuit, GT3 (Manthey #91). One GET at a time with a
+`navigation/state` health check after each. **Every `/rest/garage/*` read answered in 1–17 ms
+and LMU stayed healthy**, in the garage monitor and on track. The replay crash (4.1) stays a
+replay-only rule. Raw reads: `C:/Documents/lmu-live-captures/2026-10-16-bahrain-outer-gt3-offline`.
+
+| Endpoint | What it carries |
+|---|---|
+| `GET /rest/garage/getPlayerGarageData` | The car setup: 172 `VM_*` / `WM_*` items, each `{value, stringValue, lastSavedStringValue, minValue, maxValue, available}`. **`VM_VIRTUAL_ENERGY` "50% (20.1 laps)"** and `VM_FUEL_LEVEL` (the fuel ratio, "0.86") are the start-of-stint amounts; `VM_FUEL_CAPACITY` "43.0L (19.7 laps)" is the fuel that VE allows. Also compounds, pressures, brake balance, ABS. The only read that shows a garage change before the car leaves |
+| `GET /rest/garage/PitMenu/receivePitMenu` | The MFD for the next stop: 18 lines `{name, currentSetting, default, settings[{text}]}`: `DAMAGE:` ("N/A" until there is damage, then "Do Not Repair / Repair Body / Repair All"), `DRIVER:`, `VIRTUAL ENERGY:` (0–100 %, with the game's own laps estimate in the text, "50% 20 laps"), `FUEL RATIO:`, `TIRES:` ("No Change / New Medium / New Wet / Mixed Tyres"), each tyre, `R WING:`, `GRILLE:`, pressures, brake ducts, `REPLACE BRAKES:`. When the car leaves the garage, the MFD takes the setup's VE and ratio |
+| `GET /rest/garage/UIScreen/RepairAndRefuel` | `fuelInfo` (current and max fuel in litres; **current and max virtual energy in joules**: 337.5 MJ of 675 MJ), `pitMenu` (as above), `pitStopLength.timeInSeconds` (= `pitstop-estimate.total`), `pitStopTimes` (the game's pit rules: four tyres 12 s, fix all damage 30 s, brake change 120 s, fuel 3.4 L/s, random delays up to 5 s on repairs and 2 s on fuel), `pitRecommendations`, `wearables` (body aero, 18 `detachableParts` flags, brake pads in metres, suspension and tyre per corner), `racePosition` (place in class, gaps), `currentWeather`, `weatherForecast` |
+| `GET /rest/garage/UIScreen/TireManagement` | `expectedUsage`: the game's per-lap estimates (fuel 2.18 L or 1.87 % of the tank, **VE 2.49 %**), updated as laps are driven; `tireInventory` (56 new sets of 56); compounds with optimal temperatures (Medium 92 °C, Wet 50 °C); selected tyres; wheel info; weather |
+| `GET /rest/garage/getVehicleCondition` | Per corner `suspensionDamage` (0–1) and `tireCondition` (0–1, 0 = flat or destroyed), `brakeCondition`, `vehicleDamage` (= aero body damage; above 1 after big hits), `fuel` and `fuelCapacity` in litres |
+| `GET /rest/garage/brakeinfo` | Four pad thicknesses in metres (0.036 front, 0.032 rear); still 0.03599 after a whole practice: **brake wear is barely modelled** |
+| `GET /rest/garage/tireinfo` | Per corner left, centre and right temperature in **Kelvin**, pressure (kPa), load |
+| `GET /rest/sessions/GetSessionsInfoForEvent` | `scheduledSessions[{name, lengthTime (minutes), airTemp, rainChance}]`. A practice-only weekend listed only `PRACTICE 120`; a full weekend is not read yet |
+| `GET /rest/strategy/overall` | Still **400**, in the garage and on track |
+
+**VE and fuel.** `strategy/usage` stores `fuel`, `ve` and `tyres` in steps of 1/255 (0.39 %),
+so one lap reads 2.35 % or 2.75 % VE when the true use is about 2.5 %.
+`standings.veFraction` and `fuelFraction` are precise (0.37593 against 0.37647 in `usage`), so
+per-lap use should be sampled from `veFraction` at each line crossing. A garage VE change shows
+only in `getPlayerGarageData` until the car leaves; then `standings`, `usage`, `RepairAndRefuel`
+and the MFD all switch to it. Fuel follows VE through the fuel ratio (VE 50 % with ratio 0.86 gave 43.0 L).
+
+**Pit stop.** `standings.pitState` runs `NONE` → `REQUEST` (stop requested; 10 s before pit
+entry here) → `ENTERING` → `STOPPED` → `EXITING` → `NONE`. `EXITING` with `inGarageStall` true
+marks a drive-out from the garage. The lap count rose in the pit lane before the box (Bahrain
+Outer's timing line is before it). A served penalty does not count in `pitstops`.
+
+| Situation | `pitstop-estimate` | Real stop |
+|---|---|---|
+| Fresh car, nothing to service | `fuel` 2.0, `total` 2.0 | |
+| Front hit: suspension FR 0.72, FR tyre 0, body 1.38 | `damage` 129.9, fuel 5.2, VE 5.0, tyres 4.5, `total` 139.6 | |
+| Parts lost (left side destroyed), speeding penalty pending | `penalties` 10, **everything else 0**, `total` 10 | |
+| Side hit (suspension 0.11 / 0.03), penalty pending | `penalties` 10, `total` 10 | Stop-and-go: held 10 s, **no service** |
+| Same damage, penalties served | `damage` 30, fuel 3.1–3.7, VE 1.7, `total` 33.1–33.7 | Repair All + refuel: **38 s** in the game; everything repaired (suspension, body, brakes back to 1.0) |
+
+While a penalty is pending, the next stop is a stop-and-go only, and the estimate drops every
+service time. A repair estimate must therefore be kept separately and shown for the following
+stop. The estimate leaves out the random delays (and possibly crew preparation after a late
+request), so the real stop can be several seconds longer. `penalties` counts pending penalties:
+two speeding penalties needed two stops. Returning to the garage from the menu resets the car
+(full repair, the setup's VE and fuel) but keeps pending penalties.
+
+**Weather** (15-minute practice, forecast clear → storm at 25 % → clear → light clouds):
+
+| Session time | `sessionInfo.raining` | Path wetness min / avg / max | Air °C | `GetGameState.closeestWeatherNode` |
+|---|---|---|---|---|
+| 21 s | 0.07 | 0 / 0 / 0 | 29.0 | START (clear) |
+| 81 s | 0.40 | 0.05 | 26.0 | START |
+| 141 s | 0.83 | 0.05 / 0.12 / 0.12 | 21.8 | NODE_25 (storm, 100 %) |
+| 171–201 s | **0.94** | 0.12 / 0.40 / 0.40 | 21.0 | NODE_25 |
+| 231–282 s | 0.83 → 0.60 | 0.40 / 0.60 / 0.60 | 21–25 | NODE_25 |
+| 359 s | 0.00 | 0.40 / 0.60 / 0.60 | | NODE_25 |
+
+Rain is interpolated between forecast nodes: it rises from the start toward the storm node,
+peaks just before it, and had stopped before the clear node at 50 %. Nodes are fractions of the
+session length (225 s apart here). The closest node switches halfway between two nodes. Path
+wetness lags the rain and moves in steps (0.05, 0.12, 0.40, 0.60). `darkCloud` stayed 0 in the
+storm. `WNV_SKY` values seen: 0 Clear, 1 Light Clouds, 10 Overcast & Storm. All ten
+`sessions/weather` reads were identical: the offline forecast is a fixed script, not a live
+forecast. The in-game forecast showed "clear" during the storm, presumably the next node.
+
+**Session files** (stat only, never opened while LMU runs). The replay is written as a growing
+`Replays/_vcr*.tmp` during the session. The DuckDB telemetry file and its `.wal` appear when the
+car first leaves the garage, and grow. When the driver leaves the session (to the menu or the
+next session), the results XML, the final `.Vcr` and the DuckDB checkpoint (`.wal` folded in)
+all land in the same second.
 
 ---
 

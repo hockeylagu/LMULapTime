@@ -30,12 +30,12 @@ describe('live lifecycle', () => {
   it('describes the session only while one is loaded', () => {
     expect(deriveLiveState(null, 'driving').session).toBeNull();
     expect(deriveLiveState(reading({ numVehicles: 0 }), 'offline').session).toBeNull();
-    expect(deriveLiveState(reading({ endEt: 3600, maxLaps: 2147483647 }), 'offline').session).toMatchObject({
+    expect(deriveLiveState(reading({ endEt: 3600 }), 'offline').session).toMatchObject({
       kind: 'race', sessionCode: 10, trackName: 'Circuit de la Sarthe', vehicleName: 'Ferrari 296 GT3', vehicleClass: 'GT3',
-      endSeconds: 3600, maxLaps: null, playerLapsCompleted: 7, playerPlace: 4, elapsedSeconds: 120,
+      endSeconds: 3600, playerLapsCompleted: 7, playerPlace: 4, elapsedSeconds: 120,
     });
-    expect(deriveLiveState(reading({ endEt: 1e30, maxLaps: 30, player: null }), 'offline').session).toMatchObject({
-      endSeconds: null, maxLaps: 30, vehicleName: '', playerLapsCompleted: null, playerPlace: null,
+    expect(deriveLiveState(reading({ endEt: 1e30, player: null }), 'offline').session).toMatchObject({
+      endSeconds: null, vehicleName: '', playerLapsCompleted: null, playerPlace: null,
     });
   });
 

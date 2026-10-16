@@ -33,10 +33,8 @@ export interface LiveSessionInfo {
   vehicleClass: string;
   /** Session clock, seconds. */
   elapsedSeconds: number;
-  /** Session end time in seconds for a timed session; null when lap-limited or unknown. */
+  /** Session end time in seconds; null when unknown. LMU sessions, races included, are always timed. */
   endSeconds: number | null;
-  /** Lap limit for a lap-count session; null when timed or unknown. */
-  maxLaps: number | null;
   playerLapsCompleted: number | null;
   playerPlace: number | null;
 }
@@ -59,7 +57,7 @@ export interface LiveIdentity {
 /** Race laps left, counting the lap in progress. */
 export interface LiveLapsLeft {
   laps: number;
-  /** True for timed races: projected from the leader's progress and lap time, shown with `~`. */
+  /** Projected from the leader's progress and lap time, shown with `~`; false once the leader has the flag (exactly 1). */
   estimated: boolean;
 }
 

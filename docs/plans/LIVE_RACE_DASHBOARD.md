@@ -10,7 +10,7 @@ the garage reads, wet weather, cockpit readability and runtime performance are n
 
 - Dedicated second monitor connected to the same PC as LMU: 27-inch, 2560 x 1440,
   viewed from at least 50 inches (approximately 1.27 m).
-- Solo driving; timed and lap-count races. GT3 is the primary use, with all classes
+- Solo driving; races are always timed (never lap-limited), so every horizon converts the clock to laps. GT3 is the primary use, with all classes
   supported according to their available telemetry and resource rules.
 - Advice only. The driver manually enters pit settings in the game's MFD.
 - The live dashboard is one passive page: no interaction while racing, no tabs,
@@ -178,9 +178,17 @@ The MFD exposes fuel/VE and pit settings:
    Label the learning state until enough evidence exists. Explicitly show any manual
    fallback estimate. Estimate consumption from the current position to the actual pit box,
    including the pit approach, rather than assuming a full tank lasts an integer lap count.
-4. For lap-count races, resolve the actual finish rule and remaining distance, including
-   the unfinished current lap. For timed races, incorporate leader progress, finish rules,
-   expected pace and uncertainty; do not rely solely on `ceil(time / own lap time)`.
+3b. Live findings for the engine (2026-10-16, `LMU_REST_API.md` §4.3): sample per-lap VE and
+   fuel from `standings.veFraction` / `fuelFraction` at each line crossing (`strategy/usage` is
+   stored in 1/255 steps); before any lap, use `TireManagement.expectedUsage`; the start
+   amounts set in the garage come from `getPlayerGarageData`; the MFD from `receivePitMenu`.
+   `pitstop-estimate` shows only the penalty while one is pending, so keep the repair estimate
+   separately, and add the random delays (`pitStopTimes`) as a range.
+4. Races are always timed (LMU reports a lap limit of 2^32 - 1, confirmed 2026-10-15), so
+   the remaining time is converted to laps, including the unfinished current lap: leader
+   progress, the finish rule (the leader's first crossing after the clock ends), expected
+   pace and uncertainty; never only `ceil(time / own lap time)`. Laps left in the header
+   already does this (`shared/domain/live/liveLapsLeft.ts`).
 5. Compare each applicable resource horizon. The earliest limiting resource constrains
    the latest safe pit opportunity. Include mandatory stops, windows and penalties only
    when known; otherwise label the recommendation's scope.
@@ -331,7 +339,7 @@ The post-session cache and parser remain authoritative for historical analysis.
    information must be available without clicking, hovering or changing views.
 3. **Live fundamentals:** lifecycle states (game closed, menu, garage between sessions with the VE or fuel needed for the next one, session starting, finished; mocked), connect/disconnect/paused, opening the dashboard when LMU starts, player/session isolation,
    current fuel/energy and full-width pedals. Confirm low impact on LMU frame pacing.
-4. **Pit advice:** timed and lap-count horizons, reserves, stint planning and verified
+4. **Pit advice:** timed horizons converted to laps, reserves, stint planning and verified
    MFD targets. Exercise finish-line edge cases and unavailable-resource fallbacks.
 5. **Service and damage:** repair duration and total pit estimate, then performance
    attribution and marginal repair decisions once evidence supports them.

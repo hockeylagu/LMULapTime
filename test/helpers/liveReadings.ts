@@ -15,7 +15,7 @@ export function vehicleReading(overrides: Partial<LiveVehicleReading> = {}): Liv
 export function scoringReading(overrides: Partial<LiveScoringReading> = {}): LiveScoringReading {
   const player = vehicleReading();
   return {
-    trackName: 'Circuit de la Sarthe', sessionCode: 10, currentEt: 120, endEt: 3600, maxLaps: 2147483647,
+    trackName: 'Circuit de la Sarthe', sessionCode: 10, currentEt: 120, endEt: 3600,
     numVehicles: 20, inRealtime: true, gamePhase: 5, trackLength: 10_000, trackTempC: 31.2, raining: 0, avgPathWetness: 0,
     player, leader: vehicleReading({ id: 1, place: 1 }),
     ...overrides,

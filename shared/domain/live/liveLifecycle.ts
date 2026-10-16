@@ -7,7 +7,6 @@ export interface LiveScoringReading {
   sessionCode: number;
   currentEt: number;
   endEt: number;
-  maxLaps: number;
   numVehicles: number;
   inRealtime: boolean;
   gamePhase: number;
@@ -68,9 +67,8 @@ export interface LiveState {
   session: LiveSessionInfo | null;
 }
 
-/** A timed session reports a plausible end time; a lap-limited one a huge one (and the reverse for laps). */
+/** LMU sessions are timed: a plausible end time (an unset one reads huge). The lap limit is never used (LMU reports 2^32 - 1). */
 const MAX_PLAUSIBLE_END_SECONDS = 1_000_000;
-const MAX_PLAUSIBLE_LAPS = 100_000;
 const PAUSED_PHASE = 9;
 
 export function liveSessionKind(sessionCode: number): LiveSessionKind {
@@ -82,19 +80,19 @@ export function liveSessionKind(sessionCode: number): LiveSessionKind {
 }
 
 /**
- * Lifecycle from the decoded scoring, in this order: no reading -> offline; no vehicles -> menu;
- * not in realtime -> garage; game phase 0-4 -> starting, 5-7 -> driving, 8 -> finished; phase 9
- * (paused) keeps the previous lifecycle. The menu rule (no vehicles) is unverified live: the
- * buffer may keep the last session's vehicle count in the menu.
+ * Lifecycle from the decoded scoring, in this order: no reading -> offline; LMU on its main menu, or no
+ * vehicles -> menu; not in realtime -> garage; game phase 0-4 -> starting, 5-7 -> driving, 8 -> finished;
+ * phase 9 (paused) keeps the previous lifecycle. `inMenu` comes from LMU's `navigation/state`: the buffer
+ * keeps the last session (vehicles included) after the driver leaves it for the menu (seen live 2026-10-16).
  */
-export function deriveLiveState(reading: LiveScoringReading | null, previous: LiveLifecycle): LiveState {
+export function deriveLiveState(reading: LiveScoringReading | null, previous: LiveLifecycle, inMenu = false): LiveState {
   if (!reading) return { lifecycle: 'offline', paused: false, session: null };
   const state = (lifecycle: LiveLifecycle, paused: boolean): LiveState => ({
     lifecycle,
     paused,
     session: lifecycle === 'menu' ? null : sessionInfo(reading),
   });
-  if (reading.numVehicles <= 0) return state('menu', false);
+  if (inMenu || reading.numVehicles <= 0) return state('menu', false);
   if (!reading.inRealtime) return state('garage', false);
   const phase = reading.gamePhase;
   if (phase >= 0 && phase <= 4) return state('starting', false);
@@ -106,7 +104,6 @@ export function deriveLiveState(reading: LiveScoringReading | null, previous: Li
 
 function sessionInfo(reading: LiveScoringReading): LiveSessionInfo {
   const timed = Number.isFinite(reading.endEt) && reading.endEt > 0 && reading.endEt < MAX_PLAUSIBLE_END_SECONDS;
-  const lapLimited = reading.maxLaps > 0 && reading.maxLaps < MAX_PLAUSIBLE_LAPS;
   return {
     kind: liveSessionKind(reading.sessionCode),
     sessionCode: reading.sessionCode,
@@ -117,7 +114,6 @@ function sessionInfo(reading: LiveScoringReading): LiveSessionInfo {
     vehicleClass: reading.player?.vehicleClass ?? '',
     elapsedSeconds: reading.currentEt,
     endSeconds: timed ? reading.endEt : null,
-    maxLaps: lapLimited ? reading.maxLaps : null,
     playerLapsCompleted: reading.player?.totalLaps ?? null,
     playerPlace: reading.player?.place ?? null,
   };

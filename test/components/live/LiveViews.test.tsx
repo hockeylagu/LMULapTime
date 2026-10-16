@@ -49,8 +49,8 @@ describe('live driving views', () => {
       expect(screen.getByTestId('live-track-temp')).toHaveTextContent('TRACK 34° ↓');
       expect(screen.getByText('Bahrain GP')).toBeInTheDocument();
       expect(screen.getByTestId('car-class-badge')).toHaveTextContent('GT3');
-      send(liveSnapshot({ sequence: 2, identity: IDENTITY, lapsLeft: { laps: 5, estimated: false } }));
-      expect(screen.getByTestId('live-laps-left')).toHaveTextContent('LAPS LEFT 5');
+      send(liveSnapshot({ sequence: 2, identity: IDENTITY, lapsLeft: { laps: 1, estimated: false } }));
+      expect(screen.getByTestId('live-laps-left')).toHaveTextContent('LAPS LEFT 1');
       expect(screen.getByTestId('live-laps-left')).not.toHaveTextContent('~');
     });
 

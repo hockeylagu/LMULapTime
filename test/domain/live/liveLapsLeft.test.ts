@@ -2,24 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { computeLapsLeft } from '../../../shared/domain/live/liveLapsLeft.js';
 import { vehicleReading } from '../../helpers/liveReadings.js';
 
-const race = { kind: 'race' as const, maxLaps: null, endSeconds: null, elapsedSeconds: 500 };
-const lapRace = { ...race, maxLaps: 26 };
+const race = { kind: 'race' as const, endSeconds: null, elapsedSeconds: 500 };
 const timedRace = { ...race, endSeconds: 1200 };
 
 describe('laps left', () => {
-  it('is exact in a lap-count race and counts the lap in progress (lap 22 of 26 leaves 5)', () => {
-    expect(computeLapsLeft(lapRace, vehicleReading({ totalLaps: 21 }), null)).toEqual({ laps: 5, estimated: false });
-    expect(computeLapsLeft(lapRace, vehicleReading({ totalLaps: 25 }), null)).toEqual({ laps: 1, estimated: false });
-    expect(computeLapsLeft(lapRace, vehicleReading({ totalLaps: 0 }), null)).toEqual({ laps: 26, estimated: false });
-  });
-
-  it('is null off a race, without a player, after the flag and past the lap limit', () => {
-    const player = vehicleReading({ totalLaps: 21 });
-    expect(computeLapsLeft({ ...lapRace, kind: 'qualifying' }, player, null)).toBeNull();
-    expect(computeLapsLeft(null, player, null)).toBeNull();
-    expect(computeLapsLeft(lapRace, null, null)).toBeNull();
-    expect(computeLapsLeft(lapRace, vehicleReading({ totalLaps: 21, finishStatus: 1 }), null)).toBeNull();
-    expect(computeLapsLeft(lapRace, vehicleReading({ totalLaps: 26 }), null)).toBeNull();
+  it('is null off a race, without a player and after the flag', () => {
+    const leader = vehicleReading({ id: 1, place: 1, lapStartEt: 0, estimatedLapTime: 100 });
+    const player = vehicleReading({ id: 7, totalLaps: 21 });
+    expect(computeLapsLeft(timedRace, player, leader)).toEqual({ laps: 12, estimated: true });
+    expect(computeLapsLeft({ ...timedRace, kind: 'qualifying' }, player, leader)).toBeNull();
+    expect(computeLapsLeft(null, player, leader)).toBeNull();
+    expect(computeLapsLeft(timedRace, null, leader)).toBeNull();
+    expect(computeLapsLeft(timedRace, vehicleReading({ id: 7, finishStatus: 1 }), leader)).toBeNull();
   });
 
   describe('timed race', () => {
@@ -42,8 +36,8 @@ describe('laps left', () => {
       expect(computeLapsLeft(timedRace, { ...player, lapsBehindLeader: 20 }, leader(0))).toEqual({ laps: 1, estimated: true });
     });
 
-    it('is one lap for a car still running once the leader has the flag', () => {
-      expect(computeLapsLeft(timedRace, player, leader(1500, 100, { finishStatus: 1 }))).toEqual({ laps: 1, estimated: true });
+    it('is exactly one lap for a car still running once the leader has the flag', () => {
+      expect(computeLapsLeft(timedRace, player, leader(1500, 100, { finishStatus: 1 }))).toEqual({ laps: 1, estimated: false });
     });
 
     it('is null without a timed end, a leader, a lap start or a lap time estimate', () => {

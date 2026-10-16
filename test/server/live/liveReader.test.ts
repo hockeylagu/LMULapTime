@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LiveReader } from '../../../server/live/liveReader.js';
-import type { LiveReaderMessage } from '../../../server/live/liveReader.js';
+import { LiveReader, STARTUP_GRACE_MS } from '../../../server/live/liveReader.js';
+import type { GameProbe, LiveReaderMessage } from '../../../server/live/liveReader.js';
 import { SCORING_MAPPING_NAME, TELEMETRY_MAPPING_NAME } from '../../../server/live/rf2Layout.js';
 import type { MappedBuffer } from '../../../server/live/sharedMemory.js';
 import { scoringBuffer, source, telemetryBuffer } from './rf2Fixtures.js';
 
 const PLAYER = { id: 12, isPlayer: true, place: 4, totalLaps: 8, name: 'Ferrari 296 GT3', className: 'GT3' };
 
-function setup(probe: () => Promise<boolean> = () => Promise.resolve(true)) {
+function setup(probe: () => Promise<GameProbe> = () => Promise.resolve('session')) {
   let scoring = scoringBuffer(2, [PLAYER]);
   let telemetry = telemetryBuffer(4, [{ id: 12, et: 100, throttle: 0.5, brake: 0 }]);
   const closes = { scoring: vi.fn(), telemetry: vi.fn() };
@@ -81,7 +81,8 @@ describe('LiveReader', () => {
   });
 
   it('asks the game once the counters stand still, and unmaps when it is gone', async () => {
-    const probe = vi.fn(() => Promise.resolve(false));
+    const answers: GameProbe[] = ['session', 'gone'];
+    const probe = vi.fn(() => Promise.resolve(answers.shift() ?? 'gone'));
     const t = setup(probe);
     t.available.value = true;
     t.reader.start();
@@ -89,6 +90,9 @@ describe('LiveReader', () => {
     expect(probe).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(200);
     expect(probe).toHaveBeenCalledTimes(1);
+    expect(t.closes.scoring).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(probe).toHaveBeenCalledTimes(2);
     expect(t.posted[t.posted.length - 1]).toEqual({ type: 'closed' });
     expect(t.closes.scoring).toHaveBeenCalled();
     expect(t.closes.telemetry).toHaveBeenCalled();
@@ -100,7 +104,7 @@ describe('LiveReader', () => {
   });
 
   it('stays open while a paused game still answers, asking again no sooner than every 5 s', async () => {
-    const probe = vi.fn(() => Promise.resolve(true));
+    const probe = vi.fn(() => Promise.resolve<GameProbe>('session'));
     const t = setup(probe);
     t.available.value = true;
     t.reader.start();
@@ -113,6 +117,40 @@ describe('LiveReader', () => {
     expect(t.closes.scoring).not.toHaveBeenCalled();
     t.reader.stop();
     expect(t.closes.scoring).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a loading game (mapping there, REST port not yet) until it answers once, or for the start-up grace', async () => {
+    const probe = vi.fn(() => Promise.resolve<GameProbe>('gone'));
+    const t = setup(probe);
+    t.available.value = true;
+    t.reader.start();
+    await vi.advanceTimersByTimeAsync(STARTUP_GRACE_MS - 1000);
+    expect(probe.mock.calls.length).toBeGreaterThan(10);
+    expect(t.closes.scoring).not.toHaveBeenCalled();
+    expect(t.posted).not.toContainEqual({ type: 'closed' });
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(t.closes.scoring).toHaveBeenCalledTimes(1);
+    expect(t.posted).toContainEqual({ type: 'closed' });
+    t.reader.stop();
+  });
+
+  it('asks a game that keeps its counters moving until it answers once, then only when they stand still', async () => {
+    const probe = vi.fn(() => Promise.resolve<GameProbe>('session'));
+    const t = setup(probe);
+    t.available.value = true;
+    t.reader.start();
+    for (let version = 3; version < 23; version += 1) {
+      t.setScoring(scoringBuffer(version, [PLAYER]));
+      await vi.advanceTimersByTimeAsync(1000);
+    }
+    // One question at 5 s (no answer seen yet), none after it while the counters move.
+    expect(probe).toHaveBeenCalledTimes(1);
+    // The game closes: the counters stand still and the refusal now counts.
+    probe.mockImplementation(() => Promise.resolve<GameProbe>('gone'));
+    await vi.advanceTimersByTimeAsync(5100);
+    expect(probe).toHaveBeenCalledTimes(2);
+    expect(t.posted).toContainEqual({ type: 'closed' });
+    t.reader.stop();
   });
 
   it('closes a half-open pair when only one mapping exists', () => {

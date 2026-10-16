@@ -59,6 +59,9 @@ export class LiveService {
   private pendingTiming: LiveTiming | null = null;
   private lastTimingAt = 0;
   private tyreSurfaceAvgC: number | null = null;
+  /** The last scoring reading, kept so a menu notice can re-derive the state without a new frame. */
+  private lastReading: LiveScoringReading | null = null;
+  private inMenu = false;
   private readonly clients = new Map<SseSink, LiveClient>();
   private pedals: LivePedalSample[] = [];
   private worker: LiveWorker | null = null;
@@ -131,10 +134,16 @@ export class LiveService {
   }
 
   private handleMessage(message: unknown): void {
-    if (!isWorkerMessage<LiveReaderMessage>(message, ['frame', 'closed'])) return;
+    if (!isWorkerMessage<LiveReaderMessage>(message, ['frame', 'menu', 'closed'])) return;
     this.markFirstReading();
     if (message.type === 'closed') {
+      this.inMenu = false;
       this.applyReading(null);
+      return;
+    }
+    if (message.type === 'menu') {
+      this.inMenu = message.inMenu;
+      this.applyReading(this.lastReading);
       return;
     }
     if (message.tyreSurfaceAvgC !== undefined) this.tyreSurfaceAvgC = message.tyreSurfaceAvgC;
@@ -144,7 +153,8 @@ export class LiveService {
 
   private applyReading(reading: LiveScoringReading | null): void {
     const previous = this.snapshot;
-    const state = deriveLiveState(reading, previous.lifecycle);
+    this.lastReading = reading;
+    const state = deriveLiveState(reading, previous.lifecycle, this.inMenu);
     this.identity.update(isLiveSessionLoaded(state.lifecycle) ? state.session : null);
     const next = { ...state, identity: this.identity.identity, ...this.tracker.apply(reading, state) };
     this.pendingTiming = this.clients.size > 0 && isLiveOnTrack(state.lifecycle) ? this.tracker.timing() : null;

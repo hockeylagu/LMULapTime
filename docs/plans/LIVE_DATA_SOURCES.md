@@ -2,7 +2,9 @@
 
 Status: desk check, 2026-10-15, then a live offline practice the same day (Laguna Seca,
 GT3, build 14200): shared memory recorded for 25 s and eight REST reads (results in
-`docs/LMU_REST_API.md` §4.2). Rows marked **Live** were seen with values in that session.
+`docs/LMU_REST_API.md` §4.2). The garage namespace, damage, pit stops, menus, weather and
+session files followed on 2026-10-16 with the app's live reader running (§4.3 and §2.2 there).
+Rows marked **Live** were seen with values in one of those sessions.
 Companion to [LIVE_RACE_DASHBOARD.md](LIVE_RACE_DASHBOARD.md) and the
 [mock](../prototypes/live-dashboard/README.md).
 
@@ -19,7 +21,7 @@ Evidence levels used below:
 
 | Level | Meaning |
 |---|---|
-| **Live** | Read with values in the 2026-10-15 live practice |
+| **Live** | Read with values in the 2026-10-15/16 live sessions |
 | **Seen** | Values observed from the game in this repo's history |
 | **Field** | Field exists in the struct or the endpoint exists; values, units and timing not checked live |
 | **Guess** | Only an endpoint name or a doc description suggests it |
@@ -31,32 +33,34 @@ Evidence levels used below:
 
 | Dashboard need | Shared memory | REST | Level |
 |---|---|---|---|
-| Game closed | Mapping absent, or version counters stop advancing | Port 6397 refuses | Field |
-| In menu vs in session | `ScoringInfo.InRealtime` (true), `GamePhase` | `/navigation/state` → `NAV_REALTIME`, `GSTATE_DYN` | **Live** (both) |
+| Game closed | The app's own handle keeps the mapping; counters stop advancing | Port 6397 refuses (a timeout is a busy game, not a closed one; the port is not up yet while LMU starts) | **Live** (detected in about 6 s) |
+| Main menu vs session loaded | **Not usable:** the buffer keeps the last session (vehicles, `InRealtime` false) after the driver leaves to the menu | `/navigation/state` → `navigationState` `NAV_MAIN_MENU` (menu and all race-weekend setup pages) vs `NAV_EVENT` / `NAV_REALTIME` | **Live** (REST decides) |
+| Loading a session, with progress | — | `navigation/state` → `loadingStatus.loading` true, `percentage` 0 → 1; `gameState` `GSTATE_INIT` | **Live** |
+| Garage monitor vs on track | `ScoringInfo.InRealtime`, `GamePhase` | `GetGameState.inMonitor`; `navigation/state` does not tell them apart offline (`NAV_EVENT` in both) | **Live** (SM decides) |
 | Session type | `ScoringInfo.Session` = 1 in practice 1 | `/navigation/state` → `gameSession` `PRACTICE1` | **Live** (both) |
 | Starting / finished | `GamePhase` 0 before, 3 formation, 5 green, 8 over (rF2 codes hold); player `FinishStatus` | `navigation/state` `BEFORE` / `FORMATION` / `GREEN` / `CHECKERED`; `GetGameState` `END_OF_RACE_GRACE`; standings `finishStatus` `FSTAT_FINISHED` / `FSTAT_DNF` | **Live** (online race) |
 | Paused | `CurrentET` stops; rF2 phase 9 | `gameState` = `GSTATE_PAUSED` | Field |
 | Replay playing (must not count as driving) | Not distinguishable reliably | `/rest/sessions/GetGameState` → `isReplayActive` (false live) | **Live** (REST) |
 
-The rF2 numeric codes are the plugin's convention; LMU's use of them is unverified.
+The rF2 numeric codes are the plugin's convention; LMU's use of them matched in every session seen.
 
 ### Identity
 
 | Dashboard need | Shared memory | REST | Level |
 |---|---|---|---|
-| Exact layout | `TrackName` (name only) | `/navigation/state` → `loadingData.trackInfo.sceneDesc` (`LAGUNASECA`) → `getCircuitSpecification` | **Live** |
+| Exact layout | `TrackName` (name only) | `/navigation/state` → `loadingData.trackInfo.sceneDesc` (`LAGUNASECA`, `BAHRAINWEC_OUTER`) → `getCircuitSpecification`; `loadingStatus.track.sceneDesc` already follows the track picked in the menu | **Live** (app resolves `bahrain_outer`) |
 | Car and class | `VehicleName`, `VehicleClass` | `loadingData.selectedCar.classes`, `vehFile` | Both field/example |
-| PR | App database (canonical player best), not the game | — | App |
+| PR | App database (canonical player best), not the game | — | App (**Live**: 1:13.209 confirmed by the driver) |
 
 ### Timing
 
 | Dashboard need | Shared memory | REST | Level |
 |---|---|---|---|
-| Last lap, sectors, best | `LastLapTime`, `LastSector1/2`, `BestLapTime`, `BestSector1/2`, `CurSector1/2` | `/rest/watch/standings` (live outside replay) | **Live** fields (out lap, so −1/0 so far) |
-| Live delta | Computed from `LapDist`/`TimeIntoLap` vs own reference | — | Field |
-| Lap validity (quali) | `CountLapFlag` | Standings may carry it | Field |
-| Laps left (header) and time left (horizons only) | `TotalLaps`, `MaxLaps`, `EndET`, `CurrentET` | `/rest/watch/sessionInfo` | REST seen in replay |
-| Next session length (garage screen between sessions: quali minutes or laps, race laps or minutes) | — | `/rest/sessions/GetSessionsInfoForEvent` (untested); `sessionInfo` only describes the current session | Guess |
+| Last lap, sectors, best | `LastLapTime`, `LastSector1/2`, `BestLapTime`, `BestSector1/2`, `CurSector1/2` | `/rest/watch/standings` (live outside replay) | **Live** (app's 1:15.285 and split sectors match the HUD) |
+| Live delta | Computed from `LapDist`/`TimeIntoLap` vs own reference | — | Field (built; not compared on screen yet) |
+| Lap validity (quali) | `CountLapFlag` (a lap with a cut and a pit pass: `COUNT_LAP_ONLY`, no time, no sectors) | Standings `countLapFlag` | **Live** (a cut alone not separated yet) |
+| Laps left (header) and time left (horizons only); races are always timed, `MaxLaps` reads 2^32 - 1 and is not used | `TotalLaps`, `EndET`, `CurrentET`, the leader's `LapStartET` / `EstimatedLapTime` / `LapsBehindLeader` | `/rest/watch/sessionInfo` | REST seen in replay |
+| Next session length (garage screen between sessions: quali and race minutes, converted to laps) | — | `/rest/sessions/GetSessionsInfoForEvent` → `scheduledSessions[{name, lengthTime (min), airTemp, rainChance}]` (practice-only weekend listed `PRACTICE 120`) | **Live** shape; a full weekend not read yet |
 
 ### Fuel, energy and pit plan
 
@@ -64,47 +68,51 @@ The rF2 numeric codes are the plugin's convention; LMU's use of them is unverifi
 |---|---|---|---|
 | Fuel litres, capacity | `Fuel` (101.6 L), `FuelCapacity` (117 L), also for GT3 | `/rest/watch/standings` → `fuelFraction` | **Live** |
 | **Virtual energy** | Not in the structs (`BatteryChargeFraction` 0 on GT3) | **`/rest/watch/standings` → `veFraction`** (0.978 one lap out) | **Live** (REST only) |
-| Use per lap | Computed from fuel samples at line crossings | `/rest/strategy/usage` → per lap `fuel`, `ve`, `tyres`, `pit`, `stint` | **Live** |
-| MFD refuel / VE target currently set | `ScheduledStops` only | `/rest/garage/PitMenu/receivePitMenu`, `UIScreen/RepairAndRefuel` | Guess, garage namespace |
-| Pit state | `InPits`, `PitState`, `InGarageStall`, `NumPitstops`, `SpeedLimiter` | Standings `pitState`, `pitstops`, `pitting`; `GetGameState` → `PitEntryDist` (m to pit entry) | **Live** |
-| Pit time estimate | — (historic `shared/domain/pitStops.ts`) | `/rest/strategy/pitstop-estimate` → seconds for `fuel`, `ve`, `tires`, `damage`, `brakes`, `total` | **Live** |
+| Use per lap | Computed from fuel samples at line crossings | `standings.veFraction` / `fuelFraction` sampled at each line crossing (precise); `/rest/strategy/usage` per lap is stored in 1/255 steps (0.39 %), too coarse for one lap | **Live** |
+| Game's own per-lap estimate (fallback before any lap) | — | `UIScreen/TireManagement` → `expectedUsage` (VE 2.49 %, fuel 2.18 L per lap, updated while driving) | **Live** |
+| Start VE / fuel set in the garage | — | `getPlayerGarageData` → `VM_VIRTUAL_ENERGY` "50% (20.1 laps)", `VM_FUEL_LEVEL` (ratio); the car only takes it when it leaves the garage | **Live** |
+| MFD refuel / VE target currently set | `ScheduledStops` only | `PitMenu/receivePitMenu` → `VIRTUAL ENERGY:` "50% 20 laps", `FUEL RATIO:`, `TIRES:`, `DAMAGE:`; `RepairAndRefuel.fuelInfo` (litres and joules) | **Live** |
+| Pit state | `InPits`, `PitState`, `InGarageStall`, `NumPitstops`, `SpeedLimiter` | Standings `pitState` `NONE` → `REQUEST` → `ENTERING` → `STOPPED` → `EXITING`, `pitstops` (a penalty stop does not count), `penalties`; `GetGameState` → `PitEntryDist` | **Live** |
+| Pit time estimate | — (historic `shared/domain/pitStops.ts`) | `/rest/strategy/pitstop-estimate` → seconds for `fuel`, `ve`, `tires`, `damage`, `brakes`, `penalties`, `total`. **With a penalty pending it shows only the penalty** (the next stop is a stop-and-go). It leaves out random delays: 33.7 s estimated, 38 s real | **Live** |
 | Mandatory stops / windows | — | Session rules (`SESSSET_*`), unclear | None/guess |
 
-VE is the biggest gap: GT3 and Hypercar depend on it. LMU's own DuckDB telemetry has a
-`Virtual Energy` table (`server/telemetry/duckdbReader.ts`), but that file is not a live
-source (the plan rules out querying growing DuckDB files for the trace; reading it for
-per-lap VE would need its own check).
+VE comes only from REST (`veFraction`, `fuelInfo` in joules); shared memory has none. LMU's
+DuckDB telemetry has a `Virtual Energy` table, but that file is only complete when the driver
+leaves the session, so it is not a live source.
 
 ### Tyres
 
 | Dashboard need | Shared memory | REST | Level |
 |---|---|---|---|
 | Wear per wheel | `Wheel.Wear` = **remaining** fraction (0.9998 → 0.9989 over 25 s) | `/rest/strategy/usage` → `tyres` per lap (0–100) | **Live** |
-| Compound | `Front/RearTireCompoundName` (`Medium`), `…Index` | `/rest/garage/UIScreen/TireManagement` | **Live** (SM) |
-| Temps, pressure | `Wheel.Temperature[3]`, `TireCarcassTemperature`, `Pressure` (kPa) | `/rest/garage/tireinfo` | **Live** (SM) |
-| Sets remaining | — | `/rest/garage/UIScreen/TireManagement` | Guess, garage namespace |
+| Compound | `Front/RearTireCompoundName` (`Medium`), `…Index` | `UIScreen/TireManagement` (compounds, optimal temperature: Medium 92 °C, Wet 50 °C); MFD `TIRES:` options | **Live** |
+| Temps, pressure | `Wheel.Temperature[3]`, `TireCarcassTemperature`, `Pressure` (kPa) | `/rest/garage/tireinfo` (Kelvin, kPa, load) | **Live** (both) |
+| Sets remaining | — | `UIScreen/TireManagement` → `tireInventory` (56 new of 56) | **Live** |
+| Condition per tyre | `Wheel.Wear` | `getVehicleCondition.tireCondition` (0 = destroyed) | **Live** |
 | Puncture / lost wheel | `Wheel.Flat`, `Wheel.Detached` | — | Field |
 
 ### Damage and repairs
 
 | Dashboard need | Shared memory | REST | Level |
 |---|---|---|---|
-| Damage indicators | `DentSeverity[8]` (0–2; slots 5 and 7 lit on right/side hits), `LastImpactET/Magnitude`, `Detached`, `Overheating` (not yet triggered) | `/rest/garage/getVehicleCondition` | **Live** (SM); REST crashed LMU in replay |
+| Damage indicators | `DentSeverity[8]` (0–2; slots 5 and 7 lit on right/side hits), `LastImpactET/Magnitude`, `Detached`, `Overheating` (not triggered; overheating test skipped) | `getVehicleCondition.vehicleDamage` (= body aero, above 1 after big hits); `RepairAndRefuel.wearables.body.detachableParts` (18 flags: parts lost show as false) | **Live** (both; garage reads safe outside replay) |
 | Puncture | `Wheel.Flat` (front right and rear right went 0 → 1) | — | **Live** |
-| Suspension damage (shows the damage row without a measured loss) | No suspension field (HUD showed it, SM did not) | Indirect: `pitstop-estimate.damage` 113 s with suspension vs 30 s for a body hit; direct read via `getVehicleCondition` untested | Indirect **Live** |
-| Repair time / options | — | `/rest/strategy/pitstop-estimate` → `damage` seconds (0, 30, 113 seen); options via `/rest/garage/UIScreen/RepairAndRefuel` | **Live** |
+| Suspension damage (shows the damage row without a measured loss) | No suspension field (HUD showed it, SM did not) | `getVehicleCondition.suspensionDamage` per corner, 0–1 (0.72 front hit, 1.0 broken) | **Live** |
+| Repair time / options | — | `pitstop-estimate.damage` (0, 30, 113, 130 s seen; 0 while a penalty is pending); MFD `DAMAGE:` "Do Not Repair / Repair Body / Repair All"; `RepairAndRefuel.pitStopTimes` rules (fix all damage 30 s, random delay up to 5 s) | **Live** |
+| Brake wear | No pad wear | `brakeinfo` pad thickness (m), `getVehicleCondition.brakeCondition`: barely moves in a whole practice | **Live**: not modelled enough to show |
 
-No source in the repo records a repair (see the damage notes behind the existing pit-stop
-guess). Repair time stays unavailable until this REST read is checked live.
+A Repair All stop (30 s estimated repair + refuel, 33.7 s total) took 38 s in the game and
+fixed suspension, body and brakes. Pace loss after damage is still not measured (the cars hit
+were too slow to drive).
 
 ### Weather
 
 | Dashboard need | Shared memory | REST | Level |
 |---|---|---|---|
 | Track / air temp | `TrackTemp` (37.3), `AmbientTemp` (21.0) | `/rest/watch/sessionInfo` | **Live** (both) |
-| Rain now | `Raining`, `DarkCloud` | `sessionInfo.raining`, `darkCloud` | **Live** (dry: 0) |
-| Track wetness | `Min/Max/AvgPathWetness` | `sessionInfo` path wetness | **Live** fields, dry only (0); wet still to check |
-| Forecast | — | `/rest/sessions/weather` → per session, rain chance/sky/temp at `START`, 25/50/75 %, `FINISH`; `GetGameState` → closest node | **Live** |
+| Rain now | `Raining`, `DarkCloud` | `sessionInfo.raining` (0–0.94, interpolated between forecast nodes); `darkCloud` stayed 0 in a storm | **Live** (wet) |
+| Track wetness | `Min/Max/AvgPathWetness` | `sessionInfo` path wetness: lags the rain, moves in steps (0.05, 0.12, 0.40, 0.60) | **Live** (rising; drying not followed to the end) |
+| Forecast | — | `/rest/sessions/weather` → per session, rain chance, sky (0 Clear, 1 Light Clouds, 10 Overcast & Storm), temperature at `START`, 25/50/75 %, `FINISH`: fractions of the session length; a fixed script offline (unchanged over a session). `GetGameState` → closest node, switching halfway between nodes | **Live** |
 
 ### Inputs and traffic
 
@@ -118,9 +126,9 @@ guess). Repair time stays unavailable until this REST read is checked live.
 
 ## What this means for the mock
 
-- **Live from shared memory:** lifecycle, session type, fuel, pit state, tyre wear
-  (remaining fraction)/compound/temps/pressures, weather now, pedals at about 50 Hz.
-  Damage fields exist but no impact has been tested yet.
+- **Live from shared memory:** lifecycle on track and in the garage (not the main menu),
+  session type, lap times and split sectors, fuel, pit state, tyre wear (remaining
+  fraction)/compound/temps/pressures, weather now, pedals at about 50 Hz, dents and flats.
 - **Live from low-risk REST reads:** VE (`standings.veFraction`), per-lap VE/fuel/tyre use
   (`strategy/usage`), pit time per service part including `damage`
   (`strategy/pitstop-estimate`), forecast by session node (`sessions/weather`), pit entry
@@ -130,13 +138,17 @@ guess). Repair time stays unavailable until this REST read is checked live.
 - **Live online (qualifying + race):** the full lifecycle (before, grid, formation, green,
   checkered, back in the monitor), finish status, grid slot, gaps for all cars, and the
   pit-estimate fuel time growing as fuel burns (an indirect MFD refuel read).
-- **Still unconfirmed:** MFD values already set (directly), tyre sets, suspension damage (garage
-  namespace, beyond the repair-time proxy), pace loss after damage, which dent slot is which
-  body area, detached parts and overheating, wet path wetness, start/finish phases.
-- **Mock values now with a live source:** `VE / LAP` and `SPARE / LAP` (from
-  `strategy/usage` and `veFraction`), the forecast lines (`sessions/weather`), `REPAIR TIME`
-  (`pitstop-estimate.damage`, 30 s and 113 s seen). **Still without one:** the MFD
-  tyre setting and an MFD read for VE/fuel.
+- **Live from the garage namespace (2026-10-16, safe outside replay):** the MFD
+  (`receivePitMenu`), the start VE and fuel set in the garage (`getPlayerGarageData`), fuel and
+  VE in the car in litres and joules, the pit time rules, tyre sets, suspension damage per
+  corner, lost parts, the game's own per-lap VE and fuel estimate.
+- **Still unconfirmed:** pace loss after damage, overheating, which dent slot is which body
+  area, a cut lap on its own, the wetness level where slicks become faster, a full race
+  weekend (`GetSessionsInfoForEvent`, `standings/history`), laps left against a real finish,
+  `strategy/overall` (400).
+- **Every mock value now has a live source:** `VE / LAP`, `SPARE / LAP`, the forecast lines,
+  `REPAIR TIME`, the MFD VE / fuel / tyre setting (`receivePitMenu`), `VE NEEDED` / `FUEL NEEDED`
+  between sessions (setup `VM_VIRTUAL_ENERGY` plus `GetSessionsInfoForEvent` lengths).
 
 ## Validation run (needs LMU open, with the user present)
 
@@ -166,46 +178,35 @@ the game build for each read into `docs/LMU_REST_API.md`.
 Each confirmed field then moves from mock value to live value; anything still unconfirmed
 after step 4 stays shown as unavailable on the dashboard.
 
-## Next test session (planned 2026-10-16)
+## Test session results (2026-10-16) and what is left
 
-Steps 2 and 3 are done (live 2026-10-15). What is left, in order, same rules as above:
+Done live, with the app's reader running (details in `docs/LMU_REST_API.md` §2.2 and §4.3; raw
+reads in `C:/Documents/lmu-live-captures/2026-10-16-bahrain-outer-gt3-offline`):
 
-1. **Offline practice, garage reads.** Before driving, set a refuel or VE amount on the MFD that
-   is easy to recognise, plus a tyre change and repairs. Then on track, one read per run:
-   `PitMenu/receivePitMenu` (MFD values for the next stop), `UIScreen/RepairAndRefuel`,
-   `UIScreen/TireManagement` (sets left), `brakeinfo` (pad wear: `pitstop-estimate` has a
-   `brakes` time, shared memory has no pad wear), last `getVehicleCondition`. If
-   `receivePitMenu` says nothing useful, try `getPlayerGarageData` (it answered before the crash).
-   Skip `PitMenu/loadPitMenu` (a POST that may change the menu).
-2. **Same session, rest of the damage test.** A few clean laps for a baseline, then a heavy
-   front hit, a detached part and overheating if it can be provoked. Record shared memory
-   throughout; note pace loss after each hit and which `DentSeverity` slot lights.
-3. **Offline race weekend, read-only reads outside the garage namespace.** `sessions/GetSessionsInfoForEvent`
-   (each session's length, timed or laps, required stops), read in the garage monitor after
-   practice and after qualifying: it feeds the garage screen's `VE NEEDED` / `FUEL NEEDED`. In the race,
-   `watch/standings/history` (live, never tried outside replay), and one retry of `strategy/overall` (400 in practice).
-4. **Weather and forecast handling.** Offline race long enough to cross several nodes, dry
-   start, rain set at the 25 % or 50 % node and drying before the finish. Record shared memory,
-   and poll `sessions/weather` and `sessionInfo` every 30–60 s. Check:
-   - **Rain now:** `Raining` / `sessionInfo.raining` scale and steps, `DarkCloud`, and how far
-     the change at a node lags the node time.
-   - **Track wetness:** min/avg/max path wetness as it rises and dries; how quickly it follows
-     rain, and the level where wets are faster (to compare with `RAIN_WET_MIN`).
-   - **Forecast:** whether node values change as the session runs (a live forecast or a fixed
-     script); whether `WNV_RAIN_CHANCE` 60 % means rain did come; what `WNV_SKY` values map
-     to; whether nodes are fractions of the session length (time or laps) so the mock's
-     `RAIN ~LAP 25 · 60%` can turn a node into a lap; what `GetGameState` reports as the
-     closest node.
-   - **Online (later, any wet online race):** whether the server weather matches the local
-     `sessions/weather` read.
-   - **Tyres:** `strategy/usage` and wear on wets on a drying track; the compound name and
-     index for wets in shared memory.
+1. **Garage reads**, in the garage and on track: all answered in 1–17 ms, LMU healthy.
+   `loadPitMenu` skipped (a POST).
+2. **Damage:** front hit, lost parts, side hit, two penalty stops and a Repair All stop.
+   Overheating skipped (driver's choice).
+3. **Menus and loading:** main menu, race-weekend setup, loading with progress, garage.
+4. **Weather:** a 15-minute practice with a storm at the 25 % node.
+5. **Session files:** results XML, final `.Vcr` and DuckDB checkpoint all land when the driver
+   leaves the session; the app now scans about 6 s later (menu read from `navigation/state`).
 
-5. **When the files are complete.** During the runs above, watch the replay, results and
-   DuckDB folders (file size every few seconds, no reads): when the `.Vcr`, the results XML
-   and the DuckDB file appear, whether they grow during the session, and which lifecycle
-   moment they stop at (checkered, back in the monitor, next session loaded, main menu). That
-   moment is when the app may start its scan after a session.
+Fixed in the app from what the session showed: the game was dropped while it loaded (REST port
+not up yet), and the menu was never detected (the buffer keeps the last session), which held the
+file scans until the game closed.
+
+Still to test, in one offline race weekend (practice, qualifying, a 20-minute race):
+
+- `GetSessionsInfoForEvent` in the garage after practice and after qualifying;
+  `watch/standings/history` and `strategy/overall` in the race.
+- Laps left (`~`) against the real finish, after the clock ends and once the leader has the flag.
+- A lap with only a track-limits cut (does the game drop the sectors or only the time?).
+- Pace loss after a drivable hit; an early pit request against a late one (crew readiness vs
+  random delays).
+- A wet race long enough to see the track dry and the level where slicks are faster again
+  (compare with `RAIN_WET_MIN`); wear on wets on a drying track.
+- Online, later: whether the server weather matches the local `sessions/weather` read.
 
 Not worth testing: `watch/trackmap` (static geometry), `watch/getIncidentsList` (the XML has
 more), `options/liveInputs` (too slow), options, profile, material editor and multiplayer reads.

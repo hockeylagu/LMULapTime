@@ -2,7 +2,7 @@ import type { LiveLapRecord, LiveSessionInfo, LiveSnapshot, LiveTiming } from '.
 
 export const liveSession = (patch: Partial<LiveSessionInfo> = {}): LiveSessionInfo => ({
   kind: 'race', sessionCode: 10, gamePhase: 5, inRealtime: true, trackName: 'Circuit de la Sarthe', vehicleName: 'Ferrari 499P',
-  vehicleClass: 'Hypercar', elapsedSeconds: 0, endSeconds: null, maxLaps: 26, playerLapsCompleted: 12, playerPlace: 3, ...patch,
+  vehicleClass: 'Hypercar', elapsedSeconds: 0, endSeconds: 1200, playerLapsCompleted: 12, playerPlace: 3, ...patch,
 });
 
 /** A complete snapshot with every new field empty; override what a test is about. */

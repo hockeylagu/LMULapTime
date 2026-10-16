@@ -78,7 +78,6 @@ export function decodeScoring(buffer: Buffer): LiveScoringReading {
     sessionCode: buffer.readInt32LE(info + infoAt.session),
     currentEt: buffer.readDoubleLE(info + infoAt.currentET),
     endEt: buffer.readDoubleLE(info + infoAt.endET),
-    maxLaps: buffer.readInt32LE(info + infoAt.maxLaps),
     numVehicles,
     inRealtime: buffer.readUInt8(info + infoAt.inRealtime) !== 0,
     gamePhase: buffer.readUInt8(info + infoAt.gamePhase),
