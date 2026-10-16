@@ -516,7 +516,13 @@ class from `mapVehicleIdToClass(vehicleName, vehicleClass)` in `liveScreens.ts`)
 screens, built by `liveScreen(snapshot)`), and `LivePedalTrace` (canvas, redrawn by rAF from the `PedalBuffer`
 ring in `pedalBuffer.ts`). `src/api/useAppEvents.ts` is the app-wide `GET /api/events` listener used by
 `useAppData` (scan-started restarts scan polling, scan-finished reloads data). Settings card:
-`settings/LiveDashboardCard.tsx` (`autoOpen`). Tests use `test/helpers/fakeEventSource.ts`.
+`settings/LiveDashboardCard.tsx` (`autoOpen`). Tests use `test/helpers/fakeEventSource.ts` and `test/helpers/liveSnapshot.ts`.
+Step 2 (identity and timing): the 5 Hz `timing` event goes into `LiveTimingStore` (returned by `useLiveStream` as
+`timing`, read with `useLiveTiming` / `useSyncExternalStore`), so only the timing parts render, not the page. The
+driving content is `LiveDriving` by session kind: `LiveRaceView` (delta row + `LiveLastLapRow`, placeholder primary
+area for later pit advice), `LiveQualiView` (push lap delta, optional tyre average), `LivePracticeView` (also warmup
+and unknown) with `LivePracticeHistory`. `LiveSessionBar` carries laps left, PR and track temperature. `LiveDelta` and
+`liveFormat.ts` hold the signed-delta (real minus sign, gain/loss tokens), sector and lap formatting.
 
 ### Live dashboard (server)
 
@@ -531,6 +537,16 @@ SSE clients, 40 ms pedal batches only on track, heartbeat, slow clients drop bat
 events), `liveAutoOpen.ts` (one app window per game launch, injectable opener), `liveSettings.ts` (`live_auto_open` in
 cache_metadata), `sse.ts`. The lifecycle rules are deterministic in `shared/domain/live/liveLifecycle.ts`. Routes:
 `routes/liveRoutes.ts` (`/api/live/stream`, `/api/live/settings`, `/api/events`).
+Session identity and timing (step 2): the scoring decode also carries the player's and the leader's lap fields, track
+temperature, rain and wetness; the telemetry decode adds the mean tyre surface temperature (`tyreSurfaceAvgC`).
+Deterministic models in `shared/domain/live/`: `liveLapTiming.ts` (laps, validity, session best, reference trace, delta,
+sector deltas), `liveLapsLeft.ts` (exact in lap races, estimated from the leader in timed ones), `liveWeather.ts`
+(whole-degree temperature, 5 min trend, 0.05 steps), `liveIdentity.ts` (layout via `getCircuitSpecification`, class,
+PR lookup), tied together by `liveSessionTracker.ts`. Server: `lmuNavigation.ts` (the only LMU REST read:
+`GET 127.0.0.1:6397/navigation/state`, 2 s timeout, never throws) and `liveIdentityResolver.ts` (once per loaded session,
+then every 30 s, 30 s back-off, one request at a time); the PR comes from `queryLivePersonalBest`
+(`server/core/sessionSummaries/contextQueries.ts`), injected from `server/index.ts`. `timing` events go out at most every
+~200 ms; snapshots only on a content change.
 
 **Scan hold:** `index.ts` wires `session-loaded` to `ServerContext.setLiveSessionLoaded`. While a session is loaded the
 session / replay / telemetry scans and the replay upgrade do not start (they set `pendingSessionRefresh`; a running

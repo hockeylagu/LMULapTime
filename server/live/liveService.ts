@@ -1,11 +1,15 @@
 import { Worker } from 'node:worker_threads';
 import { deriveLiveState, isLiveOnTrack, isLiveSessionLoaded } from '../../shared/domain/live/liveLifecycle.js';
 import type { LiveScoringReading } from '../../shared/domain/live/liveLifecycle.js';
+import type { PersonalBestLookup } from '../../shared/domain/live/liveIdentity.js';
+import { LiveSessionTracker, NO_SESSION_DETAILS } from '../../shared/domain/live/liveSessionTracker.js';
 import { LIVE_HEARTBEAT_MS, LIVE_STREAM_EVENTS } from '../../shared/types/live.js';
-import type { LiveLifecycle, LivePedalBatch, LivePedalSample, LiveSnapshot } from '../../shared/types/live.js';
+import type { LiveLifecycle, LivePedalBatch, LivePedalSample, LiveSnapshot, LiveTiming } from '../../shared/types/live.js';
 import { TypedEmitter } from '../core/typedEmitter.js';
 import { findWorkerBootstrap, isWorkerMessage } from '../core/workerThreads.js';
 import type { LiveReaderMessage } from './liveReader.js';
+import { LiveIdentityResolver } from './liveIdentityResolver.js';
+import type { LiveIdentityOptions } from './liveIdentityResolver.js';
 import { writeSseEvent } from './sse.js';
 import type { SseSink } from './sse.js';
 
@@ -13,6 +17,8 @@ import type { SseSink } from './sse.js';
 export const PEDAL_FLUSH_MS = 40;
 /** Samples kept between two flushes; more than this means the reader outruns the stream, and the oldest go. */
 const MAX_BUFFERED_PEDALS = 250;
+/** `timing` events go out at most this often (the scoring buffer itself updates 5 times a second). */
+export const TIMING_MIN_INTERVAL_MS = 180;
 const WORKER_RESTART_MS = 3000;
 
 export type LiveWorker = Pick<Worker, 'on' | 'postMessage' | 'terminate' | 'unref'>;
@@ -25,11 +31,19 @@ interface LiveClient {
 export interface LiveServiceOptions {
   /** Replaces the shared memory worker (tests). */
   createWorker?: () => LiveWorker;
+  /** The player's personal record on a layout and class, from the app's history. Without it no record is shown. */
+  personalBest?: PersonalBestLookup;
+  /** Replaces the identity resolver's REST read and clock (tests). */
+  identity?: Pick<LiveIdentityOptions, 'readNavigation' | 'now'>;
 }
 
 function offlineSnapshot(): LiveSnapshot {
-  return { sequence: 0, receivedAt: Date.now(), lifecycle: 'offline', paused: false, session: null };
+  return { sequence: 0, receivedAt: Date.now(), lifecycle: 'offline', paused: false, session: null, identity: null, ...NO_SESSION_DETAILS };
 }
+
+/** What makes two snapshots the same to a page: everything but the sequence, the receipt time and the moving session clock. */
+const contentKey = (snapshot: Omit<LiveSnapshot, 'sequence' | 'receivedAt'>): string =>
+  JSON.stringify({ ...snapshot, session: snapshot.session && { ...snapshot.session, elapsedSeconds: 0 } });
 
 /**
  * Owns the shared memory worker, the current snapshot and the pages connected to the live stream.
@@ -39,6 +53,12 @@ function offlineSnapshot(): LiveSnapshot {
 export class LiveService {
   public readonly events = new TypedEmitter<{ lifecycle: [LiveLifecycle]; 'session-loaded': [boolean] }>();
   private snapshot: LiveSnapshot = offlineSnapshot();
+  private snapshotKey = contentKey(this.snapshot);
+  private readonly tracker = new LiveSessionTracker();
+  private readonly identity: LiveIdentityResolver;
+  private pendingTiming: LiveTiming | null = null;
+  private lastTimingAt = 0;
+  private tyreSurfaceAvgC: number | null = null;
   private readonly clients = new Map<SseSink, LiveClient>();
   private pedals: LivePedalSample[] = [];
   private worker: LiveWorker | null = null;
@@ -51,7 +71,13 @@ export class LiveService {
   /** Settles on the reader's first answer (game found or not), so file scans can wait for it. */
   public readonly firstReading = new Promise<void>(resolve => { this.markFirstReading = resolve; });
 
-  public constructor(private readonly options: LiveServiceOptions = {}) {}
+  public constructor(private readonly options: LiveServiceOptions = {}) {
+    this.identity = new LiveIdentityResolver({
+      ...options.identity,
+      personalBest: options.personalBest ?? (() => null),
+      onChange: () => this.publish({ ...this.snapshot, identity: this.identity.identity }),
+    });
+  }
 
   public getSnapshot(): LiveSnapshot { return this.snapshot; }
   public hasClients(): boolean { return this.clients.size > 0; }
@@ -84,6 +110,7 @@ export class LiveService {
     if (this.restartTimer) clearTimeout(this.restartTimer);
     this.restartTimer = null;
     this.clearTimers();
+    this.identity.stop();
     const worker = this.worker;
     this.worker = null;
     if (worker) {
@@ -110,6 +137,7 @@ export class LiveService {
       this.applyReading(null);
       return;
     }
+    if (message.tyreSurfaceAvgC !== undefined) this.tyreSurfaceAvgC = message.tyreSurfaceAvgC;
     if (message.scoring) this.applyReading(message.scoring);
     if (message.pedal) this.bufferPedal(message.pedal);
   }
@@ -117,20 +145,29 @@ export class LiveService {
   private applyReading(reading: LiveScoringReading | null): void {
     const previous = this.snapshot;
     const state = deriveLiveState(reading, previous.lifecycle);
-    const elapsed = state.session?.elapsedSeconds;
-    const sameState = state.lifecycle === previous.lifecycle && state.paused === previous.paused &&
-      JSON.stringify(state.session && { ...state.session, elapsedSeconds: 0 }) ===
-      JSON.stringify(previous.session && { ...previous.session, elapsedSeconds: 0 });
-    if (sameState) {
+    this.identity.update(isLiveSessionLoaded(state.lifecycle) ? state.session : null);
+    const next = { ...state, identity: this.identity.identity, ...this.tracker.apply(reading, state) };
+    this.pendingTiming = this.clients.size > 0 && isLiveOnTrack(state.lifecycle) ? this.tracker.timing() : null;
+    if (contentKey(next) === this.snapshotKey) {
       // The session clock moves every frame; it alone is not a change worth a snapshot.
-      if (previous.session && elapsed !== undefined) previous.session = { ...previous.session, elapsedSeconds: elapsed };
+      if (previous.session && next.session) previous.session = { ...previous.session, elapsedSeconds: next.session.elapsedSeconds };
       return;
     }
+    this.publish(next);
+  }
+
+  /** Makes `next` the current snapshot and sends it to every page. */
+  private publish(next: Omit<LiveSnapshot, 'sequence' | 'receivedAt'>): void {
+    const previous = this.snapshot;
     const wasLoaded = this.isSessionLoaded();
-    this.snapshot = { sequence: previous.sequence + 1, receivedAt: Date.now(), ...state };
-    if (!isLiveOnTrack(state.lifecycle)) this.pedals = [];
+    this.snapshot = { ...next, sequence: previous.sequence + 1, receivedAt: Date.now() };
+    this.snapshotKey = contentKey(next);
+    if (!isLiveOnTrack(next.lifecycle)) {
+      this.pedals = [];
+      this.pendingTiming = null;
+    }
     for (const sink of this.clients.keys()) this.send(sink, LIVE_STREAM_EVENTS.snapshot, this.snapshot);
-    if (state.lifecycle !== previous.lifecycle) this.events.emit('lifecycle', state.lifecycle);
+    if (next.lifecycle !== previous.lifecycle) this.events.emit('lifecycle', next.lifecycle);
     if (this.isSessionLoaded() !== wasLoaded) this.events.emit('session-loaded', this.isSessionLoaded());
   }
 
@@ -146,6 +183,17 @@ export class LiveService {
     this.pedals = [];
     if (!isLiveOnTrack(this.snapshot.lifecycle)) return;
     for (const sink of this.clients.keys()) this.send(sink, LIVE_STREAM_EVENTS.pedals, batch);
+  }
+
+  /** The newest current-lap progress, at most about 5 times a second, to pages that can take it. */
+  private flushTiming(): void {
+    const timing = this.pendingTiming;
+    const now = Date.now();
+    if (!timing || now - this.lastTimingAt < TIMING_MIN_INTERVAL_MS || !isLiveOnTrack(this.snapshot.lifecycle)) return;
+    this.pendingTiming = null;
+    this.lastTimingAt = now;
+    const event: LiveTiming = { ...timing, tyreSurfaceAvgC: this.tyreSurfaceAvgC };
+    for (const sink of this.clients.keys()) this.send(sink, LIVE_STREAM_EVENTS.timing, event);
   }
 
   /** Writes to one page unless its buffer is full; a full buffer drops everything until it drains, then catches up with the snapshot. */
@@ -166,7 +214,7 @@ export class LiveService {
   }
 
   private ensureTimers(): void {
-    this.flushTimer ??= setInterval(() => this.flushPedals(), PEDAL_FLUSH_MS);
+    this.flushTimer ??= setInterval(() => { this.flushTiming(); this.flushPedals(); }, PEDAL_FLUSH_MS);
     this.heartbeatTimer ??= setInterval(() => {
       for (const sink of this.clients.keys()) this.send(sink, LIVE_STREAM_EVENTS.heartbeat, { at: Date.now() });
     }, LIVE_HEARTBEAT_MS);

@@ -6,7 +6,7 @@ import type { MappedBuffer } from './sharedMemory.js';
 
 /** What the reader posts to the main thread. `type` is the field every worker client filters on (isWorkerMessage). */
 export type LiveReaderMessage =
-  | { type: 'frame'; scoring?: LiveScoringReading; pedal?: LivePedalSample }
+  | { type: 'frame'; scoring?: LiveScoringReading; pedal?: LivePedalSample; tyreSurfaceAvgC?: number | null }
   | { type: 'closed' };
 
 export interface LiveReaderDeps {
@@ -101,6 +101,7 @@ export class LiveReader {
     let changed = false;
     let scoring: LiveScoringReading | undefined;
     let pedal: LivePedalSample | undefined;
+    let tyreSurfaceAvgC: number | null | undefined;
 
     const scoringRead = readScoringFrame(scoringMap, this.scoringVersion);
     if (scoringRead.status !== 'unchanged') changed = true;
@@ -119,6 +120,7 @@ export class LiveReader {
         this.telemetryCounter = pedalRead.version;
         this.slotHint = pedalRead.value.slot;
         pedal = pedalRead.value.sample ?? undefined;
+        tyreSurfaceAvgC = pedalRead.value.tyreSurfaceAvgC;
       }
     } else {
       const counter = telemetryMap.readU32(TELEMETRY.versionBegin);
@@ -126,7 +128,7 @@ export class LiveReader {
       this.telemetryCounter = counter;
     }
 
-    if (scoring || pedal) this.deps.post({ type: 'frame', scoring, pedal });
+    if (scoring || pedal) this.deps.post({ type: 'frame', scoring, pedal, tyreSurfaceAvgC });
     if (changed) this.lastChangeAt = now;
     else if (now - this.lastChangeAt >= STILL_MS && now - this.lastProbeAt >= STILL_MS && !this.probing) this.probe(now);
     this.schedule(this.inRealtime ? REALTIME_INTERVAL_MS : IDLE_INTERVAL_MS, () => this.tick());

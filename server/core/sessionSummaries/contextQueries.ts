@@ -55,6 +55,17 @@ export function querySessionPersonalBestById(db: Database, sessionId: string, dr
   };
 }
 
+/**
+ * The configured player's personal record on a resolved layout and canonical class, for the live dashboard:
+ * the fastest valid lap of the layout and class, any car or condition. Null when the summaries are not ready,
+ * the player is not in the history, or no lap exists.
+ */
+export function queryLivePersonalBest(db: Database, playerName: string, layoutKey: string, carClass: string): number | null {
+  if (!playerName || layoutKey === 'unknown' || !isSessionSummaryReady(db)) return null;
+  const driver = db.prepare('SELECT driver_id FROM drivers WHERE name=?').get(playerName) as { driver_id: number } | undefined;
+  return driver ? queryPersonalBest(db, personalBestScope(layoutKey, '', ''), carClass, driver.driver_id) : null;
+}
+
 export function querySessionContext(db: Database, session: DetailedSession) {
   if (!isSessionSummaryReady(db)) return { relatedSessions: [], personalBests: [], ready: false };
   const scope = sessionScope(db, session);

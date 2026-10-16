@@ -1,10 +1,11 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { LiveScoringReading } from '../../../shared/domain/live/liveLifecycle.js';
+import type { LiveScoringReading, LiveVehicleReading } from '../../../shared/domain/live/liveLifecycle.js';
 import { LIVE_HEARTBEAT_MS } from '../../../shared/types/live.js';
 import type { LiveLifecycle } from '../../../shared/types/live.js';
-import { LiveService, PEDAL_FLUSH_MS } from '../../../server/live/liveService.js';
-import type { LiveWorker } from '../../../server/live/liveService.js';
+import { scoringReading, vehicleReading } from '../../helpers/liveReadings.js';
+import { LiveService, PEDAL_FLUSH_MS, TIMING_MIN_INTERVAL_MS } from '../../../server/live/liveService.js';
+import type { LiveServiceOptions, LiveWorker } from '../../../server/live/liveService.js';
 
 class FakeWorker extends EventEmitter {
   public postMessage = vi.fn();
@@ -21,16 +22,16 @@ class FakeSink extends EventEmitter {
 }
 
 function reading(overrides: Partial<LiveScoringReading> = {}): LiveScoringReading {
-  return {
-    trackName: 'Spa', sessionCode: 10, currentEt: 10, endEt: 1800, maxLaps: 2147483647, numVehicles: 10,
-    inRealtime: true, gamePhase: 5, player: { id: 1, place: 2, totalLaps: 3, vehicleName: 'Car', vehicleClass: 'GT3' },
+  return scoringReading({
+    trackName: 'Spa', currentEt: 10, endEt: 1800, numVehicles: 10,
+    player: vehicleReading({ id: 1, place: 2, totalLaps: 3, vehicleName: 'Car', vehicleClass: 'GT3' }),
     ...overrides,
-  };
+  });
 }
 
-function setup() {
+function setup(options: LiveServiceOptions = {}) {
   const worker = new FakeWorker();
-  const service = new LiveService({ createWorker: () => worker as unknown as LiveWorker });
+  const service = new LiveService({ createWorker: () => worker as unknown as LiveWorker, ...options });
   const lifecycles: LiveLifecycle[] = [];
   const loaded: boolean[] = [];
   service.events.on('lifecycle', value => lifecycles.push(value));
@@ -58,7 +59,7 @@ describe('LiveService', () => {
     expect(sink.data(1)).toMatchObject({ sequence: 1, lifecycle: 'driving', paused: false, session: { kind: 'race', trackName: 'Spa' } });
     expect(service.getSnapshot().session?.elapsedSeconds).toBe(11);
 
-    frame(reading({ player: { id: 1, place: 1, totalLaps: 3, vehicleName: 'Car', vehicleClass: 'GT3' } }));
+    frame(reading({ player: vehicleReading({ id: 1, place: 1, totalLaps: 3, vehicleName: 'Car', vehicleClass: 'GT3' }) }));
     expect(sink.events()).toHaveLength(3);
     expect(sink.data(2)).toMatchObject({ sequence: 2, session: { playerPlace: 1 } });
   });
@@ -168,5 +169,124 @@ describe('LiveService', () => {
     expect(worker.terminate).toHaveBeenCalled();
     worker.emit('exit', 0);
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  describe('session details', () => {
+    const lap = (laps: number, extra: Partial<LiveVehicleReading> = {}, header: Partial<LiveScoringReading> = {}) =>
+      reading({ player: vehicleReading({ id: 1, place: 2, totalLaps: laps, ...extra }), ...header });
+
+    it('fills weather and laps left into the snapshot and resends only for a real change', () => {
+      const { service, frame } = setup();
+      const sink = new FakeSink();
+      service.addClient(sink);
+      frame(lap(3, {}, { sessionCode: 1 }));
+      expect(service.getSnapshot()).toMatchObject({ lapsLeft: null, weather: { trackTempC: 31, trackTempTrend: 'steady' }, recentLaps: [], sessionBest: null });
+
+      frame(lap(3, {}, { maxLaps: 10, sessionCode: 10 }));
+      expect(service.getSnapshot().lapsLeft).toEqual({ laps: 7, estimated: false });
+      const before = sink.chunks.length;
+      frame(lap(3, {}, { sessionCode: 10, maxLaps: 10, currentEt: 14, trackTempC: 31.3 }));
+      expect(sink.chunks).toHaveLength(before);
+      frame(lap(3, {}, { sessionCode: 10, maxLaps: 10, currentEt: 15, trackTempC: 33.4 }));
+      expect(service.getSnapshot().weather?.trackTempC).toBe(33);
+      expect(sink.chunks).toHaveLength(before + 1);
+      frame(lap(4, { lapDist: 5, timeIntoLap: 0.1 }, { sessionCode: 10, maxLaps: 10, currentEt: 16, trackTempC: 33.4 }));
+      expect(service.getSnapshot().lapsLeft).toEqual({ laps: 6, estimated: false });
+    });
+
+    it('puts a completed lap into the snapshot', () => {
+      const { service, frame } = setup();
+      frame(lap(3, { lapDist: 9_990, timeIntoLap: 99 }));
+      frame(lap(4, { lapDist: 5, timeIntoLap: 0.1, lastLapTime: 100, lastSector1: 30, lastSector2: 60 }));
+      expect(service.getSnapshot().recentLaps).toEqual([{ lapNumber: 4, lapSeconds: 100, sectors: [30, 30, 40], valid: false }]);
+    });
+
+    it('resolves the identity from the game, then from LMU, with the record injected', async () => {
+      const readNavigation = vi.fn(() => Promise.resolve({ ok: true as const, navigation: { sceneDesc: 'LEMANSWEC', classes: [] } }));
+      const personalBest = vi.fn(() => 228.4);
+      const { service, frame } = setup({ personalBest, identity: { readNavigation } });
+      const sink = new FakeSink();
+      service.addClient(sink);
+      frame(lap(3, { vehicleName: 'Ginetta G61', vehicleClass: 'LMP3' }, { trackName: 'Circuit de la Sarthe' }));
+      expect(service.getSnapshot().identity).toMatchObject({ layoutKey: null, carClass: 'LMP3', personalBestSeconds: null });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(readNavigation).toHaveBeenCalledTimes(1);
+      expect(service.getSnapshot().identity).toMatchObject({ layoutKey: 'sarthe_full', carClass: 'LMP3', personalBestSeconds: 228.4 });
+      expect(sink.events()).toEqual(['snapshot', 'snapshot', 'snapshot']);
+      expect(sink.data(2)).toMatchObject({ sequence: 2, identity: { layoutKey: 'sarthe_full' } });
+    });
+
+    it('asks LMU for nothing in the menu', async () => {
+      const readNavigation = vi.fn(() => Promise.resolve({ ok: false as const }));
+      const { service, frame } = setup({ identity: { readNavigation } });
+      frame(reading({ numVehicles: 0 }));
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(readNavigation).not.toHaveBeenCalled();
+      expect(service.getSnapshot().identity).toBeNull();
+    });
+  });
+
+  describe('timing events', () => {
+    const drive = (frame: (scoring: LiveScoringReading) => void, dist: number, time: number) =>
+      frame(reading({ currentEt: time, player: vehicleReading({ id: 1, totalLaps: 3, lapDist: dist, timeIntoLap: time }) }));
+    const timings = (sink: FakeSink): number[] => sink.events().flatMap((name, i) => (name === 'timing' ? [i] : []));
+    /** One flush tick after the rate limit has passed. */
+    const settle = (): void => { vi.advanceTimersByTime(TIMING_MIN_INTERVAL_MS + PEDAL_FLUSH_MS); };
+
+    it('sends the newest lap progress about 5 times a second, only while on track', () => {
+      const { service, frame } = setup();
+      const sink = new FakeSink();
+      service.addClient(sink);
+      drive(frame, 100, 1);
+      vi.advanceTimersByTime(PEDAL_FLUSH_MS);
+      expect(timings(sink)).toHaveLength(1);
+      expect(sink.data(timings(sink)[0])).toEqual({
+        lapNumber: 4, sector: 1, deltaSeconds: null, sectorDeltas: [null, null, null], tyreSurfaceAvgC: null,
+      });
+
+      // Two frames inside one interval: only the newest goes out, once the interval has passed.
+      drive(frame, 200, 2);
+      drive(frame, 300, 3);
+      vi.advanceTimersByTime(PEDAL_FLUSH_MS);
+      expect(timings(sink)).toHaveLength(1);
+      settle();
+      expect(timings(sink)).toHaveLength(2);
+      settle();
+      settle();
+      expect(timings(sink)).toHaveLength(2);
+
+      frame(reading({ inRealtime: false }));
+      settle();
+      expect(timings(sink)).toHaveLength(2);
+    });
+
+    it('carries the tyre temperature from the telemetry and never goes to a blocked page', () => {
+      const { service, frame, worker } = setup();
+      const slow = new FakeSink();
+      const fast = new FakeSink();
+      service.addClient(slow);
+      service.addClient(fast);
+      worker.emit('message', { type: 'frame', tyreSurfaceAvgC: 81.5 });
+      drive(frame, 100, 1);
+      settle();
+      expect(fast.data(timings(fast)[0])).toMatchObject({ tyreSurfaceAvgC: 81.5 });
+      slow.accepting = false;
+      drive(frame, 200, 2);
+      settle();
+      const written = slow.chunks.length;
+      drive(frame, 300, 3);
+      settle();
+      expect(slow.chunks).toHaveLength(written);
+      expect(timings(fast)).toHaveLength(3);
+    });
+
+    it('sends no timing that was made before a page connected', () => {
+      const { service, frame } = setup();
+      drive(frame, 100, 1);
+      const sink = new FakeSink();
+      service.addClient(sink);
+      settle();
+      expect(sink.events()).toEqual(['snapshot']);
+    });
   });
 });

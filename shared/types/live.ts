@@ -41,6 +41,75 @@ export interface LiveSessionInfo {
   playerPlace: number | null;
 }
 
+/** Who and where, resolved once per session through the app's canonical definitions. */
+export interface LiveIdentity {
+  /** Canonical layout key from `getCircuitSpecification` (LMU `sceneDesc` first); null when unresolved. */
+  layoutKey: string | null;
+  /** Display name of the layout, or the game's track name when unresolved. */
+  layoutName: string;
+  /** Canonical class from `mapVehicleIdToClass`; null when unknown. */
+  carClass: string | null;
+  /**
+   * The player's personal record on this layout and class from the app's history (the gold
+   * personal-best meaning: fastest valid lap, any car, any condition); null when none or unresolved.
+   */
+  personalBestSeconds: number | null;
+}
+
+/** Race laps left, counting the lap in progress. */
+export interface LiveLapsLeft {
+  laps: number;
+  /** True for timed races: projected from the leader's progress and lap time, shown with `~`. */
+  estimated: boolean;
+}
+
+export interface LiveWeather {
+  /** Whole degrees Celsius. */
+  trackTempC: number;
+  /** Against about five minutes earlier. */
+  trackTempTrend: 'rising' | 'falling' | 'steady';
+  /** Rain now, 0..1 as the game reports it (scale unverified in the wet). */
+  raining: number;
+  /** Average path wetness, 0..1. */
+  avgPathWetness: number;
+}
+
+/** A completed lap of the player in this session, as the game timed it. Sector times are split (not cumulative). */
+export interface LiveLapRecord {
+  lapNumber: number;
+  lapSeconds: number | null;
+  sectors: [number | null, number | null, number | null];
+  /** The game counted the lap time (rF2 `mCountLapFlag` 2) and the lap did not start or end in the pits. */
+  valid: boolean;
+}
+
+export interface LiveSessionBest {
+  /** The player's best valid lap of this session. */
+  lapSeconds: number | null;
+  /** Split sectors of that lap: the reference for current-lap and sector deltas. */
+  lapSectors: [number | null, number | null, number | null];
+  /** Best individual split sectors over the session's valid laps. */
+  bestSectors: [number | null, number | null, number | null];
+  /** Sum of `bestSectors` when all three are known. */
+  bestPossibleSeconds: number | null;
+}
+
+/** Current-lap progress, sent about 5 times a second while on track (`timing` event). */
+export interface LiveTiming {
+  /** Lap in progress (completed laps + 1). */
+  lapNumber: number;
+  sector: 1 | 2 | 3;
+  /** Time into the current lap minus the session-best lap at the same distance; null without a reference. */
+  deltaSeconds: number | null;
+  /** Completed sectors of the current lap minus the session-best lap's sectors; null for sectors not yet done. */
+  sectorDeltas: [number | null, number | null, number | null];
+  /**
+   * Mean tyre surface temperature over the four wheels, degrees Celsius (the qualifying push-lap figure);
+   * null when the game reports none. Read from the telemetry buffer, so it can differ in age from the rest.
+   */
+  tyreSurfaceAvgC?: number | null;
+}
+
 export interface LiveSnapshot {
   /** Increases with every snapshot the server sends; resets when the server restarts. */
   sequence: number;
@@ -51,6 +120,14 @@ export interface LiveSnapshot {
   paused: boolean;
   /** Null while offline or in the menu. */
   session: LiveSessionInfo | null;
+  /** Null until resolved for the loaded session. */
+  identity: LiveIdentity | null;
+  /** Races only; null otherwise or when unknown. */
+  lapsLeft: LiveLapsLeft | null;
+  weather: LiveWeather | null;
+  /** The player's last three completed laps of this session, oldest first. */
+  recentLaps: LiveLapRecord[];
+  sessionBest: LiveSessionBest | null;
 }
 
 /** One pedal sample: driver inputs (unfiltered), 0..1, at the session clock time `t` in seconds. */
@@ -75,6 +152,8 @@ export const LIVE_STREAM_EVENTS = {
   snapshot: 'snapshot',
   /** `LivePedalBatch`: sent 20-30 times a second, only while on track. */
   pedals: 'pedals',
+  /** `LiveTiming`: about 5 times a second, only while on track. */
+  timing: 'timing',
   /** `{ at: number }`: sent every ~15 s so the page can tell a dead connection. */
   heartbeat: 'heartbeat',
 } as const;

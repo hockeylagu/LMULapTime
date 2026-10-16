@@ -13,9 +13,32 @@ describe('rF2 scoring decode', () => {
   it('finds the player and decodes the session header', () => {
     expect(decodeScoring(scoringBuffer(2, FIELD))).toEqual({
       trackName: 'Circuit de la Sarthe', sessionCode: 10, currentEt: 321.5, endEt: 3600, maxLaps: 2147483647, numVehicles: 2,
-      inRealtime: true, gamePhase: 5,
-      player: { id: 12, place: 4, totalLaps: 8, vehicleName: 'Ferrari 296 GT3', vehicleClass: 'GT3' },
+      inRealtime: true, gamePhase: 5, trackLength: 13_626, trackTempC: 31.5, raining: 0, avgPathWetness: 0,
+      player: expect.objectContaining({ id: 12, place: 4, totalLaps: 8, vehicleName: 'Ferrari 296 GT3', vehicleClass: 'GT3' }),
+      leader: expect.objectContaining({ id: 7, place: 1, totalLaps: 9 }),
     });
+  });
+
+  it('decodes the weather and every timing field of the player and the leader', () => {
+    const player: ScoringVehicle = {
+      ...FIELD[1],
+      doubles: {
+        lapDist: 4321.5, lastLapTime: 228.9, bestLapTime: 227.5, lastSector1: 35.9, lastSector2: 126.2, bestSector1: 35.5, bestSector2: 125.9,
+        curSector1: 36.1, curSector2: 126.7, lapStartET: 301.25, timeIntoLap: 20.5, estimatedLapTime: 229.5,
+      },
+      floats: { bestLapSector1: 35.5, bestLapSector2: 125.5 },
+      bytes: { sector: 2, finishStatus: 1, countLapFlag: 1, inPits: 1 },
+      lapsBehindLeader: 2,
+    };
+    const decoded = decodeScoring(scoringBuffer(2, [FIELD[0], player], { trackTemp: 47.25, raining: 0.4, avgPathWetness: 1.5, lapDist: 13_626.5 }));
+    expect(decoded).toMatchObject({ trackLength: 13_626.5, trackTempC: 47.25, raining: 0.4, avgPathWetness: 1 });
+    expect(decoded.player).toEqual({
+      id: 12, place: 4, totalLaps: 8, vehicleName: 'Ferrari 296 GT3', vehicleClass: 'GT3',
+      lapDist: 4321.5, sector: 2, lastLapTime: 228.9, bestLapTime: 227.5, lastSector1: 35.9, lastSector2: 126.2,
+      bestSector1: 35.5, bestSector2: 125.9, curSector1: 36.1, curSector2: 126.7, bestLapSector1: 35.5, bestLapSector2: 125.5,
+      lapStartEt: 301.25, timeIntoLap: 20.5, estimatedLapTime: 229.5, inPits: true, countLapFlag: 1, lapsBehindLeader: 2, finishStatus: 1,
+    });
+    expect(decoded.leader).toMatchObject({ id: 7, place: 1, inPits: false, countLapFlag: 2 });
   });
 
   it('has no player when none is flagged, and ignores vehicles beyond the count', () => {
@@ -73,13 +96,22 @@ describe('rF2 pedal decode', () => {
   it('decodes one slot, clamping the pedals to 0..1', () => {
     const buffer = telemetryBuffer(4, slots);
     const slot = buffer.subarray(TELEMETRY.vehicles + TELEMETRY.vehicleStride, TELEMETRY.vehicles + 2 * TELEMETRY.vehicleStride);
-    expect(decodePedalSlot(slot)).toEqual({ id: 12, sample: { t: 321.25, throttle: 0.75, brake: 1 } });
+    expect(decodePedalSlot(slot)).toEqual({ id: 12, sample: { t: 321.25, throttle: 0.75, brake: 1 }, tyreSurfaceAvgC: null });
+  });
+
+  it('averages the 12 tyre surface temperatures and converts Kelvin to Celsius, null when the game reports none', () => {
+    const decoded = (tyreKelvin?: number): number | null => {
+      const buffer = telemetryBuffer(4, [{ id: 12, et: 1, throttle: 0, brake: 0, tyreKelvin }]);
+      return decodePedalSlot(buffer.subarray(TELEMETRY.vehicles, TELEMETRY.vehicles + TELEMETRY.vehicleStride)).tyreSurfaceAvgC;
+    };
+    expect(decoded(353.65)).toBe(80.5);
+    expect(decoded(undefined)).toBeNull();
   });
 
   it('matches the player by id and remembers its slot', () => {
     const mapping = source(() => telemetryBuffer(4, slots));
     expect(readPedalFrame(mapping, 12, null, -1)).toEqual({
-      status: 'ok', version: 4, value: { slot: 1, sample: { t: 321.25, throttle: 0.75, brake: 1 } },
+      status: 'ok', version: 4, value: { slot: 1, sample: { t: 321.25, throttle: 0.75, brake: 1 }, tyreSurfaceAvgC: null },
     });
     expect(readPedalFrame(mapping, 12, 3, 1)).toMatchObject({ value: { slot: 1 } });
   });

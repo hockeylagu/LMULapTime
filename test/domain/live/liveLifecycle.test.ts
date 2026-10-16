@@ -1,15 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { deriveLiveState, isLiveOnTrack, isLiveSessionLoaded, liveSessionKind } from '../../../shared/domain/live/liveLifecycle.js';
 import type { LiveScoringReading } from '../../../shared/domain/live/liveLifecycle.js';
+import { scoringReading, vehicleReading } from '../../helpers/liveReadings.js';
 import type { LiveLifecycle } from '../../../shared/types/live.js';
 
 function reading(overrides: Partial<LiveScoringReading> = {}): LiveScoringReading {
-  return {
-    trackName: 'Circuit de la Sarthe', sessionCode: 10, currentEt: 120, endEt: 3600, maxLaps: 2147483647,
-    numVehicles: 20, inRealtime: true, gamePhase: 5,
-    player: { id: 3, place: 4, totalLaps: 7, vehicleName: 'Ferrari 296 GT3', vehicleClass: 'GT3' },
-    ...overrides,
-  };
+  return scoringReading({ player: vehicleReading({ id: 3, place: 4, totalLaps: 7 }), ...overrides });
 }
 
 describe('live lifecycle', () => {

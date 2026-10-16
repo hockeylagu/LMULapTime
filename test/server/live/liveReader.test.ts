@@ -46,6 +46,7 @@ describe('LiveReader', () => {
       type: 'frame',
       scoring: expect.objectContaining({ numVehicles: 1, inRealtime: true, player: expect.objectContaining({ id: 12 }) }),
       pedal: { t: 100, throttle: 0.5, brake: 0 },
+      tyreSurfaceAvgC: null,
     }]);
     t.reader.stop();
   });
@@ -59,7 +60,7 @@ describe('LiveReader', () => {
     expect(t.posted).toEqual([]);
     t.setTelemetry(telemetryBuffer(5, [{ id: 12, et: 100.02, throttle: 1, brake: 0 }]));
     vi.advanceTimersByTime(20);
-    expect(t.posted).toEqual([{ type: 'frame', scoring: undefined, pedal: { t: 100.02, throttle: 1, brake: 0 } }]);
+    expect(t.posted).toEqual([{ type: 'frame', scoring: undefined, pedal: { t: 100.02, throttle: 1, brake: 0 }, tyreSurfaceAvgC: null }]);
     t.reader.stop();
   });
 

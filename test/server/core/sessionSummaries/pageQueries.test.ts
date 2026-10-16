@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { initDbSchema } from '../../../../server/core/dbSchema.js';
 import { upsertSession } from '../../../../server/core/dbSessionStore.js';
 import { queryProgression, querySessionPage, sessionWhere } from '../../../../server/core/sessionSummaries/pageQueries.js';
-import { querySessionContext, querySessionPersonalBest, querySessionPersonalBestById } from '../../../../server/core/sessionSummaries/contextQueries.js';
+import { queryLivePersonalBest, querySessionContext, querySessionPersonalBest, querySessionPersonalBestById } from '../../../../server/core/sessionSummaries/contextQueries.js';
 import { computeProgression } from '../../../helpers/legacySessionAnalytics.js';
 import { normalizeCarClass } from '../../../../shared/domain/vehicleMapping.js';
 import { DRIVER_WITH_DICTIONARIES } from '../../../../server/core/sessionRows/reader.js';
@@ -119,6 +119,27 @@ describe('paged session queries', () => {
       for (const value of [session, otherCourse]) upsertSession(db, value, value.filePath, 1, 1);
       expect(querySessionPersonalBestById(db, session.id, 0)).toEqual({ driverOrdinal: 0, bestLapTime: 90, ready: true });
       expect(querySessionPersonalBestById(db, session.id, 1)).toBeNull();
+    } finally { db.close(); }
+  });
+
+  it('gives the live dashboard the player best on a layout and class, never another layout, class or driver', () => {
+    const db = new Database(':memory:');
+    try {
+      initDbSchema(db);
+      const current = fixture('live-a', 1);
+      current.drivers.push({ ...current.drivers[0], name: 'Rival', isPlayer: false, bestLapTime: 70 });
+      const otherLayout = fixture('live-b', 2);
+      otherLayout.trackCourse = 'Curva Grande';
+      otherLayout.trackLengthMeters = 5700;
+      otherLayout.drivers[0].bestLapTime = 80;
+      for (const value of [current, otherLayout]) upsertSession(db, value, value.filePath, 1, 1);
+      expect(queryLivePersonalBest(db, 'Player', 'monza_gp', 'Hyper')).toBe(90);
+      expect(queryLivePersonalBest(db, 'Player', 'monza_gp', 'GT3')).toBeNull();
+      expect(queryLivePersonalBest(db, 'Nobody', 'monza_gp', 'Hyper')).toBeNull();
+      expect(queryLivePersonalBest(db, '', 'monza_gp', 'Hyper')).toBeNull();
+      expect(queryLivePersonalBest(db, 'Player', 'unknown', 'Hyper')).toBeNull();
+      db.prepare('UPDATE sessions SET projection_revision=projection_revision-1').run();
+      expect(queryLivePersonalBest(db, 'Player', 'monza_gp', 'Hyper')).toBeNull();
     } finally { db.close(); }
   });
 

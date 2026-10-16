@@ -11,14 +11,55 @@ export interface LiveScoringReading {
   numVehicles: number;
   inRealtime: boolean;
   gamePhase: number;
+  /** Circuit length in meters (`mLapDist` of the scoring info); 0 when unknown. */
+  trackLength: number;
+  /** Track surface temperature, degrees Celsius. */
+  trackTempC: number;
+  /** Rain now, 0..1. */
+  raining: number;
+  /** Average path wetness, 0..1. */
+  avgPathWetness: number;
   /** The scoring entry flagged as the player; null when none is. */
-  player: {
-    id: number;
-    place: number;
-    totalLaps: number;
-    vehicleName: string;
-    vehicleClass: string;
-  } | null;
+  player: LiveVehicleReading | null;
+  /** The overall leader (place 1); null when none is listed. */
+  leader: LiveVehicleReading | null;
+}
+
+/**
+ * One scoring entry as the game reports it. Times are seconds with the game's sentinels kept
+ * (-1 or 0 for "not available"); `lastSector2`, `curSector2`, `bestSector2` and `bestLapSector2` are
+ * cumulative (sector 1 + sector 2), as the game timed them.
+ */
+export interface LiveVehicleReading {
+  id: number;
+  place: number;
+  /** Laps completed (rF2 `mTotalLaps`). */
+  totalLaps: number;
+  vehicleName: string;
+  vehicleClass: string;
+  /** Distance along the lap in meters (negative just before the line on a grid). */
+  lapDist: number;
+  /** rF2 `mSector` as reported: 1 and 2 are sectors 1 and 2, 0 is sector 3. */
+  sector: number;
+  lastLapTime: number;
+  bestLapTime: number;
+  lastSector1: number;
+  lastSector2: number;
+  bestSector1: number;
+  bestSector2: number;
+  curSector1: number;
+  curSector2: number;
+  bestLapSector1: number;
+  bestLapSector2: number;
+  lapStartEt: number;
+  timeIntoLap: number;
+  estimatedLapTime: number;
+  inPits: boolean;
+  /** rF2 `mCountLapFlag`: 0 neither, 1 lap only, 2 lap and time. */
+  countLapFlag: number;
+  lapsBehindLeader: number;
+  /** rF2 `mFinishStatus`: 0 none, 1 finished, 2 DNF, 3 DQ. */
+  finishStatus: number;
 }
 
 export interface LiveState {

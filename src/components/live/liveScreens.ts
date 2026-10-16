@@ -61,15 +61,8 @@ export function liveScreen(snapshot: LiveSnapshot): LiveScreen {
       };
     case 'finished':
       return { title: 'SESSION OVER', note: where, muted: false, figures: [], showTrace: false };
-    case 'driving': {
-      const figures: LiveFigure[] = [];
-      if (session?.playerPlace != null) figures.push({ label: 'PLACE', value: `P${session.playerPlace}` });
-      if (session?.playerLapsCompleted != null) {
-        figures.push({
-          label: 'LAPS', value: String(session.playerLapsCompleted), unit: session.maxLaps ? `/ ${session.maxLaps}` : undefined,
-        });
-      }
-      return { title: kind, note: session?.trackName ?? '', muted: false, figures, showTrace: true };
-    }
+    case 'driving':
+      // The driving content is the session views (`LiveDriving`); this only says the trace stays.
+      return { title: kind, note: session?.trackName ?? '', muted: false, figures: [], showTrace: true };
   }
 }

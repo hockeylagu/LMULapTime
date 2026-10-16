@@ -1,6 +1,6 @@
-import type { LiveScoringReading } from '../../shared/domain/live/liveLifecycle.js';
+import type { LiveScoringReading, LiveVehicleReading } from '../../shared/domain/live/liveLifecycle.js';
 import type { LivePedalSample } from '../../shared/types/live.js';
-import { MAX_MAPPED_VEHICLES, SCORING, SCORING_INFO, TELEMETRY, VEHICLE_SCORING, VEHICLE_TELEMETRY } from './rf2Layout.js';
+import { MAX_MAPPED_VEHICLES, SCORING, SCORING_INFO, TELEMETRY, VEHICLE_SCORING, VEHICLE_TELEMETRY, WHEEL } from './rf2Layout.js';
 import type { MappedBuffer } from './sharedMemory.js';
 
 /** What a coherent read needs from a mapping. */
@@ -20,9 +20,40 @@ function cString(buffer: Buffer, offset: number, length: number): string {
 
 const clamp01 = (value: number): number => (Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0);
 
+function decodeVehicle(buffer: Buffer, base: number): LiveVehicleReading {
+  const at = VEHICLE_SCORING.offsets;
+  const double = (name: string): number => buffer.readDoubleLE(base + at[name]);
+  return {
+    id: buffer.readInt32LE(base + at.id),
+    place: buffer.readUInt8(base + at.place),
+    totalLaps: buffer.readInt16LE(base + at.totalLaps),
+    vehicleName: cString(buffer, base + at.vehicleName, 64),
+    vehicleClass: cString(buffer, base + at.vehicleClass, 32),
+    lapDist: double('lapDist'),
+    sector: buffer.readInt8(base + at.sector),
+    lastLapTime: double('lastLapTime'),
+    bestLapTime: double('bestLapTime'),
+    lastSector1: double('lastSector1'),
+    lastSector2: double('lastSector2'),
+    bestSector1: double('bestSector1'),
+    bestSector2: double('bestSector2'),
+    curSector1: double('curSector1'),
+    curSector2: double('curSector2'),
+    bestLapSector1: buffer.readFloatLE(base + at.bestLapSector1),
+    bestLapSector2: buffer.readFloatLE(base + at.bestLapSector2),
+    lapStartEt: double('lapStartET'),
+    timeIntoLap: double('timeIntoLap'),
+    estimatedLapTime: double('estimatedLapTime'),
+    inPits: buffer.readUInt8(base + at.inPits) !== 0,
+    countLapFlag: buffer.readUInt8(base + at.countLapFlag),
+    lapsBehindLeader: buffer.readInt32LE(base + at.lapsBehindLeader),
+    finishStatus: buffer.readInt8(base + at.finishStatus),
+  };
+}
+
 /**
  * The scoring header and info followed by the vehicles that were copied, at their buffer offsets.
- * The player is the vehicle with `isPlayer` set.
+ * The player is the vehicle with `isPlayer` set, the leader the one in place 1.
  */
 export function decodeScoring(buffer: Buffer): LiveScoringReading {
   const info = SCORING.info;
@@ -31,17 +62,16 @@ export function decodeScoring(buffer: Buffer): LiveScoringReading {
   const copied = Math.floor((buffer.length - SCORING.vehicles) / SCORING.vehicleStride);
   const count = Math.max(0, Math.min(numVehicles, MAX_MAPPED_VEHICLES, copied));
   const at = VEHICLE_SCORING.offsets;
-  let player: LiveScoringReading['player'] = null;
-  for (let i = 0; i < count && !player; i++) {
+  let player: LiveVehicleReading | null = null;
+  let leader: LiveVehicleReading | null = null;
+  for (let i = 0; i < count && !(player && leader); i++) {
     const base = SCORING.vehicles + i * SCORING.vehicleStride;
-    if (buffer.readUInt8(base + at.isPlayer) === 0) continue;
-    player = {
-      id: buffer.readInt32LE(base + at.id),
-      place: buffer.readUInt8(base + at.place),
-      totalLaps: buffer.readInt16LE(base + at.totalLaps),
-      vehicleName: cString(buffer, base + at.vehicleName, 64),
-      vehicleClass: cString(buffer, base + at.vehicleClass, 32),
-    };
+    const isPlayer = !player && buffer.readUInt8(base + at.isPlayer) !== 0;
+    const isLeader = !leader && buffer.readUInt8(base + at.place) === 1;
+    if (!isPlayer && !isLeader) continue;
+    const vehicle = decodeVehicle(buffer, base);
+    if (isPlayer) player = vehicle;
+    if (isLeader) leader = vehicle;
   }
   return {
     trackName: cString(buffer, info + infoAt.trackName, 64),
@@ -52,15 +82,36 @@ export function decodeScoring(buffer: Buffer): LiveScoringReading {
     numVehicles,
     inRealtime: buffer.readUInt8(info + infoAt.inRealtime) !== 0,
     gamePhase: buffer.readUInt8(info + infoAt.gamePhase),
+    trackLength: buffer.readDoubleLE(info + infoAt.lapDist),
+    trackTempC: buffer.readDoubleLE(info + infoAt.trackTemp),
+    raining: clamp01(buffer.readDoubleLE(info + infoAt.raining)),
+    avgPathWetness: clamp01(buffer.readDoubleLE(info + infoAt.avgPathWetness)),
     player,
+    leader,
   };
 }
 
-/** One telemetry vehicle slot (VEHICLE_TELEMETRY.size bytes): its id and the driver's unfiltered pedals at its session time. */
-export function decodePedalSlot(slot: Buffer): { id: number; sample: LivePedalSample } {
+const KELVIN = 273.15;
+
+/** Mean tyre surface temperature of the four wheels (left, centre, right each), degrees Celsius; null when the game reports none. */
+function tyreSurfaceAverage(slot: Buffer): number | null {
+  const wheels = VEHICLE_TELEMETRY.offsets.wheels;
+  let sum = 0;
+  for (let wheel = 0; wheel < 4; wheel++) {
+    for (let part = 0; part < 3; part++) {
+      sum += slot.readDoubleLE(wheels + wheel * WHEEL.size + WHEEL.offsets.temperature + part * 8);
+    }
+  }
+  const average = sum / 12 - KELVIN;
+  return Number.isFinite(average) && average > -KELVIN + 1 ? Math.round(average * 10) / 10 : null;
+}
+
+/** One telemetry vehicle slot (VEHICLE_TELEMETRY.size bytes): its id, the driver's unfiltered pedals at its session time and the tyre surface temperature. */
+export function decodePedalSlot(slot: Buffer): { id: number; sample: LivePedalSample; tyreSurfaceAvgC: number | null } {
   const at = VEHICLE_TELEMETRY.offsets;
   return {
     id: slot.readInt32LE(at.id),
+    tyreSurfaceAvgC: tyreSurfaceAverage(slot),
     sample: {
       t: slot.readDoubleLE(at.elapsedTime),
       throttle: clamp01(slot.readDoubleLE(at.unfilteredThrottle)),
@@ -95,9 +146,9 @@ export function readScoringFrame(source: FrameSource, lastVersion: number | null
   });
 }
 
-/** The player's pedal sample; `slot` is where the player was found, to look there first next time. A missing player gives a null sample. */
+/** The player's pedal sample and tyre temperature; `slot` is where the player was found, to look there first next time. A missing player gives a null sample. */
 export function readPedalFrame(source: FrameSource, playerId: number, lastVersion: number | null,
-  slotHint: number): FrameRead<{ slot: number; sample: LivePedalSample | null }> {
+  slotHint: number): FrameRead<{ slot: number; sample: LivePedalSample | null; tyreSurfaceAvgC: number | null }> {
   return readCoherent(source, TELEMETRY.versionBegin, TELEMETRY.versionEnd, lastVersion, () => {
     const count = Math.max(0, Math.min(source.readU32(TELEMETRY.numVehicles) | 0, MAX_MAPPED_VEHICLES));
     const slotOffset = (slot: number): number => TELEMETRY.vehicles + slot * TELEMETRY.vehicleStride;
@@ -105,8 +156,9 @@ export function readPedalFrame(source: FrameSource, playerId: number, lastVersio
     for (let slot = 0; slot < count; slot++) if (slot !== slotHint) candidates.push(slot);
     for (const slot of candidates) {
       if ((source.readU32(slotOffset(slot)) | 0) !== playerId) continue;
-      return { slot, sample: decodePedalSlot(source.read(slotOffset(slot), TELEMETRY.vehicleStride)).sample };
+      const decoded = decodePedalSlot(source.read(slotOffset(slot), TELEMETRY.vehicleStride));
+      return { slot, sample: decoded.sample, tyreSurfaceAvgC: decoded.tyreSurfaceAvgC };
     }
-    return { slot: -1, sample: null };
+    return { slot: -1, sample: null, tyreSurfaceAvgC: null };
   });
 }

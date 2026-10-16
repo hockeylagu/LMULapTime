@@ -5,16 +5,12 @@ import App from '../../../src/App.js';
 import { prefetchRoutePages } from '../../../src/routePages.js';
 import { LivePage } from '../../../src/components/live/LivePage.js';
 import { LIVE_HEARTBEAT_MS } from '../../../shared/types/live.js';
-import type { LiveSessionInfo, LiveSnapshot } from '../../../shared/types/live.js';
+import type { LiveSnapshot } from '../../../shared/types/live.js';
 import { FakeEventSource } from '../../helpers/fakeEventSource.js';
+import { liveSession, liveSnapshot } from '../../helpers/liveSnapshot.js';
 
-const session = (patch: Partial<LiveSessionInfo> = {}): LiveSessionInfo => ({
-  kind: 'race', sessionCode: 10, gamePhase: 5, inRealtime: true, trackName: 'Circuit de la Sarthe', vehicleName: 'Ferrari 499P',
-  vehicleClass: 'Hypercar', elapsedSeconds: 0, endSeconds: null, maxLaps: 26, playerLapsCompleted: 12, playerPlace: 3, ...patch,
-});
-const snapshot = (patch: Partial<LiveSnapshot>): LiveSnapshot => ({
-  sequence: 1, receivedAt: 0, lifecycle: 'driving', paused: false, session: session(), ...patch,
-});
+const session = liveSession;
+const snapshot = liveSnapshot;
 const source = () => FakeEventSource.byUrl('/api/live/stream');
 const send = (value: LiveSnapshot) => act(() => source().emit('snapshot', value));
 
@@ -53,17 +49,17 @@ describe('LivePage', () => {
     expect(screen.getByTestId('pedal-trace')).toBeInTheDocument();
   });
 
-  it('shows the driving placeholder with the class badge and the trace, and a PAUSED marker that keeps the screen', () => {
+  it('shows the race view with the class badge and the trace, and a PAUSED marker that keeps the screen', () => {
     render(<LivePage />);
     send(snapshot({}));
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('RACE');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('LAP 13');
     expect(screen.getByText('P3')).toBeInTheDocument();
-    expect(screen.getByText('12')).toBeInTheDocument();
     expect(screen.getByTestId('car-class-badge')).toHaveTextContent('HY');
     expect(screen.getByTestId('pedal-trace')).toBeInTheDocument();
-    expect(screen.queryByText('PAUSED')).not.toBeInTheDocument();
+    // The marker's slot is held while unpaused (hidden), so pausing moves nothing.
+    expect(screen.getByTestId('live-paused')).toHaveClass('invisible');
     send(snapshot({ sequence: 2, paused: true }));
-    expect(screen.getByText('PAUSED')).toBeInTheDocument();
+    expect(screen.getByTestId('live-paused')).not.toHaveClass('invisible');
     expect(screen.getByText('P3')).toBeInTheDocument();
   });
 

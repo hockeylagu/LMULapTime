@@ -20,6 +20,7 @@ import { createDataPluginRouter } from './routes/dataPluginRoutes.js';
 import { dataPlugin, formatPluginStatusLog } from './plugins/dataPlugin.js';
 import { LiveAutoOpen, openDashboardWindow } from './live/liveAutoOpen.js';
 import { LiveService } from './live/liveService.js';
+import { queryLivePersonalBest } from './core/sessionSummaries/contextQueries.js';
 import { loadLiveSettings } from './live/liveSettings.js';
 
 const app = express();
@@ -75,7 +76,10 @@ const startReferenceLaptimeRefresh = (): void => {
   });
 };
 
-const liveService = new LiveService();
+const liveService = new LiveService({
+  personalBest: (layoutKey, carClass) =>
+    queryLivePersonalBest(sessionDb.getDb(), serverContext.currentParser.configuredPlayerName, layoutKey, carClass),
+});
 const liveAutoOpen = new LiveAutoOpen({
   autoOpenEnabled: () => loadLiveSettings(sessionDb).autoOpen,
   hasClients: () => liveService.hasClients(),
