@@ -77,8 +77,10 @@ export class LiveService {
   private lastReading: LiveScoringReading | null = null;
   private screen: LiveGameScreen = 'session';
   private loadingProgress: number | null = null;
-  /** `GetGameState.isReplayActive`: a replay playing is not live driving. */
+  /** A replay playing (`navigation/state` `settingMode`, from the pit poller): it is not live driving. */
   private replay = false;
+  /** The last `session-loaded` value sent. */
+  private sessionLoaded = false;
   private reserveLaps: number;
   private readonly clients = new Map<SseSink, LiveClient>();
   private pedals: LivePedalSample[] = [];
@@ -105,6 +107,7 @@ export class LiveService {
       onReplay: active => {
         this.replay = active === true;
         this.applyReading(this.lastReading);
+        this.followSessionLoaded();
       },
     });
   }
@@ -117,8 +120,14 @@ export class LiveService {
     this.applyReading(this.lastReading);
   }
   public hasClients(): boolean { return this.clients.size > 0; }
-  /** A session is loaded in the game, so the game may be writing its files. */
-  public isSessionLoaded(): boolean { return isLiveSessionLoaded(this.snapshot.lifecycle); }
+  /**
+   * A session is loaded in the game, so the game may be writing its files. A replay counts too: the page shows it
+   * as the menu, but one started from a session's monitor leaves that session loaded (and one from the main menu
+   * cannot be told apart from it, so holding the scans until it ends costs only that wait).
+   */
+  public isSessionLoaded(): boolean { return isLiveSessionLoaded(this.snapshot.lifecycle) || this.isReplaying(); }
+
+  private isReplaying(): boolean { return this.replay && this.lastReading !== null && this.screen === 'session'; }
 
   public start(): void {
     if (this.worker) return;
@@ -224,7 +233,6 @@ export class LiveService {
   /** Makes `next` the current snapshot and sends it to every page. */
   private publish(next: Omit<LiveSnapshot, 'sequence' | 'receivedAt'>): void {
     const previous = this.snapshot;
-    const wasLoaded = this.isSessionLoaded();
     this.snapshot = { ...next, sequence: previous.sequence + 1, receivedAt: Date.now() };
     this.snapshotKey = contentKey(next);
     if (!isLiveOnTrack(next.lifecycle)) {
@@ -236,7 +244,14 @@ export class LiveService {
       this.followPitMode();
       this.events.emit('lifecycle', next.lifecycle);
     }
-    if (this.isSessionLoaded() !== wasLoaded) this.events.emit('session-loaded', this.isSessionLoaded());
+    this.followSessionLoaded();
+  }
+
+  private followSessionLoaded(): void {
+    const loaded = this.isSessionLoaded();
+    if (loaded === this.sessionLoaded) return;
+    this.sessionLoaded = loaded;
+    this.events.emit('session-loaded', loaded);
   }
 
   private applyRest(update: LiveRestUpdate): void {
@@ -246,11 +261,11 @@ export class LiveService {
 
   /**
    * Pit data is read only while a dashboard is open and a session is loaded. During a replay (shown as the menu)
-   * the poller keeps asking `GetGameState` only, to learn when it ends.
+   * the poller keeps asking the state check only, to learn when it ends.
    */
   private followPitMode(): void {
     const lifecycle = this.snapshot.lifecycle;
-    const replaying = this.replay && this.lastReading !== null && this.screen === 'session';
+    const replaying = this.isReplaying();
     const mode: PitPollMode = this.clients.size === 0 ? 'off'
       : replaying ? 'track'
         : !isLiveSessionLoaded(lifecycle) ? 'off' : lifecycle === 'garage' ? 'garage' : 'track';

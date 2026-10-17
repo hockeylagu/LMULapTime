@@ -157,7 +157,7 @@ describe('LiveService', () => {
 
     frame(undefined, { t: 2, throttle: 1, brake: 0 });
     vi.advanceTimersByTime(PEDAL_FLUSH_MS);
-    frame(reading({ gamePhase: 8 }));
+    frame(reading({ gamePhase: 8, player: vehicleReading({ id: 1, place: 2, totalLaps: 4, finishStatus: 1 }) }));
     expect(slow.chunks).toHaveLength(writtenToSlow);
 
     slow.accepting = true;
@@ -299,7 +299,7 @@ describe('LiveService', () => {
   });
   describe('pit data', () => {
     const answers = (replay: boolean) => (path: string): Promise<RestAnswer> => {
-      if (path === '/rest/sessions/GetGameState') return Promise.resolve({ ok: true, body: { isReplayActive: replay } });
+      if (path === '/navigation/state') return Promise.resolve({ ok: true, body: { state: { settingMode: replay ? 'SETTING_REPLAY_PLAYBACK' : 'SETTING_GRANDPRIX' } } });
       if (path === '/rest/watch/standings') return Promise.resolve({ ok: true, body: [{ player: true, veFraction: 0.62, fuelFraction: 0.5, pitState: 'NONE', penalties: 0 }] });
       if (path === '/rest/strategy/pitstop-estimate') return Promise.resolve({ ok: true, body: { total: 33.7, damage: 30, penalties: 0, fuel: 3.7, ve: 1.7, tires: 0 } });
       return Promise.resolve({ ok: false, reason: 'status' });
@@ -333,7 +333,27 @@ describe('LiveService', () => {
       await vi.advanceTimersByTimeAsync(20_000);
       expect(service.getSnapshot().lifecycle).toBe('menu');
       expect(lifecycles).toEqual(['driving', 'menu']);
-      expect(new Set(get.mock.calls.map(([path]) => path))).toEqual(new Set(['/rest/sessions/GetGameState']));
+      expect(new Set(get.mock.calls.map(([path]) => path))).toEqual(new Set(['/navigation/state']));
+    });
+
+    it('keeps the scans held while a replay plays (the session can still be loaded), and releases them after', async () => {
+      let replay = true;
+      const get = vi.fn((path: string) => answers(replay)(path));
+      const { service, worker, frame, loaded } = setup({ pit: { get } });
+      service.addClient(new FakeSink());
+      frame(reading());
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(service.getSnapshot().lifecycle).toBe('menu');
+      expect(service.isSessionLoaded()).toBe(true);
+      expect(loaded).toEqual([true]);
+      // The replay ends with the driver back in the session: still loaded, nothing sent.
+      replay = false;
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(service.getSnapshot().lifecycle).toBe('driving');
+      expect(loaded).toEqual([true]);
+      // The driver leaves for the main menu: released.
+      worker.emit('message', { type: 'navigation', screen: 'menu', loadingProgress: null });
+      expect(loaded).toEqual([true, false]);
     });
 
     it('shows the loading screen with its progress from the navigation notice', () => {

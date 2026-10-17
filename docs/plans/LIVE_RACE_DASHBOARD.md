@@ -1,10 +1,12 @@
-# Live race dashboard proposal
+# Live race dashboard
 
-Status: analysis and proposed implementation; standalone mock placement previews
-created under `docs/prototypes/live-dashboard/`. No live application changes shipped.
-Updated: 2026-10-15. Evidence: shared memory and the safe REST reads validated live (offline
-practice, damage test, online LMP3 qualifying and race; see [LIVE_DATA_SOURCES.md](LIVE_DATA_SOURCES.md));
-the garage reads, wet weather, cockpit readability and runtime performance are not yet validated.
+Status: built on `live-dashboard` (the `#/live` page; see "Built" under Delivery and acceptance), checked against
+the mock at 2560 x 1440 and on a GT3 offline and LMP3 online session; not yet raced with the strategy views.
+Updated: 2026-10-16. Evidence: shared memory and the safe REST reads validated live (offline
+practice, damage test, online LMP3 qualifying and race; see [LIVE_DATA_SOURCES.md](LIVE_DATA_SOURCES.md)).
+Still to validate on a race weekend: the race plan in a real race, the fuel-class MFD line, the race-garage tyre
+read, wetness on a wet track, the online forecast, cockpit readability from the seat and the effect on LMU's frame
+pacing. The standalone mock under `docs/prototypes/live-dashboard/` stays the layout and wording reference.
 
 ## Confirmed brief
 
@@ -78,7 +80,7 @@ in the production entry. The [driver-centered review](../prototypes/live-dashboa
 holds the earlier critique. Current state, all at 2560 x 1440, read in glances:
 
 - **Every driving view:** session bar (session, track and class, laps left in races, PR,
-  one weather slot), the 20-second full-width pedal trace (curves and grid only), no
+  one weather slot), the 30-second full-width pedal trace (curves and grid only), no
   paragraph text; labels about 48 px, supporting readouts 80-96 px, primary values larger.
 - **Practice:** last lap largest, session best and best possible, a current-lap sector row
   followed by two completed laps and a `BEST` row of best sectors; no fuel figures.
@@ -98,9 +100,10 @@ holds the earlier critique. Current state, all at 2560 x 1440, read in glances:
 - **Damage:** sector deltas stay; the last-lap row becomes `PACE LOSS · MEASURED`, `SINCE IMPACT`,
   `TO FINISH`, `REPAIR TIME`; the resource can read `NO CHANGE`. **Flat or detached
   wheel:** `PIT NOW`, with the VE or fuel to set for a stop this lap (more than the planned later stop's).
-- **Lifecycle:** game closed, in menu, garage between sessions (`VE NEEDED` / `FUEL NEEDED`
-  for the next session), race starting (plan and pedal check), finished (class place,
-  battle at the flag, pace, debrief pointer).
+- **Lifecycle:** game closed, in menu, loading, garage between sessions (the checklist: VE or fuel to set and the
+  tyre set against the garage), race starting (pedal check), finished (`SESSION OVER`; class place, battle at the
+  flag, pace and a debrief pointer are not built). The session counts as finished for the driver only once they
+  take the flag: after the leader's flag the race view stays up for their last lap.
 
 Only GT3 and Hypercar show VE; other classes show fuel in the same place.
 
@@ -350,8 +353,10 @@ shows as disconnected. `EventSource` retries by itself only while the server is 
 **Effect on the existing app.** `/api/status` and `/api/scan/status` stay plain GETs; the
 analysis app polls scan progress once a second only while work runs and stops when idle,
 so moving them to a stream saves nothing, and race data must not reach app tabs. One gap:
-the server now starts a scan by itself after a session ends, and an idle app tab would not
-notice. Add a small app-wide event stream (`scan started`, `scan finished`), separate from
+the server runs the scans held during a session by itself when it ends, and an idle app tab would not
+notice. (Built: only a scan asked for during the session runs then; new results are found by Refresh or at the
+next start, as before. A replay playing also holds the scans: one started from a session's monitor leaves that
+session loaded.) Add a small app-wide event stream (`scan started`, `scan finished`), separate from
 the live stream but on the same transport code: `scan started` restarts the existing
 progress polling and `scan finished` reloads the data. Replacing the progress polling with
 it later is optional.
@@ -366,7 +371,8 @@ The post-session cache and parser remain authoritative for historical analysis.
 1. **Data feasibility:** largely done 2026-10-15 (shared memory and the safe REST reads,
    live). Left: the garage reads (MFD, repair options, tyre sets), the rest of the damage
    test, the race-weekend reads and wet weather; see the next test session in
-   [LIVE_DATA_SOURCES.md](LIVE_DATA_SOURCES.md). Never call garage endpoints during replay playback.
+   [LIVE_DATA_SOURCES.md](LIVE_DATA_SOURCES.md). Never call `getVehicleCondition` during replay playback (it crashed
+   LMU twice); the other reads the app makes answered safely in a replay ([LMU_REST_API.md](../LMU_REST_API.md) §4.1).
 2. **Cockpit prototype:** mock-data fullscreen page at 2560 x 1440; test from 50 inches
    or farther, with the game active on the main display. Validate key figures and trace
    readability before finalizing size, density and browser presentation. All race
@@ -386,6 +392,15 @@ row, tyres, the forecast slot, the garage screen (laps and amount needed against
 loading screen. Unverified until the next race weekend: the fuel-class MFD `FUEL:` line and garage fuel in litres,
 the online forecast, pace-loss confounders (traffic, tyres), and pit elapsed time during the stop (not shown).
 Per-lap use has no history fallback; before the first measured lap it is the game's estimate.
+Review fixes before the merge (2026-10-16): laps left counts a car's own crossings up to the leader's flag (a lapped
+car, or a GT3 behind a Hypercar leader, is no longer cut short); `PIT NOW` and the in-pit view set the MFD for a stop
+this lap; the event's per-lap use and lap times are forgotten when another resolved layout of the same track name
+loads; replays are detected from `navigation/state` `settingMode` (`GetGameState.isReplayActive` stayed false in a
+replay) and `getVehicleCondition`, the one read that crashed LMU in a replay, follows its own check; a replay holds the file
+scans; the race view stays up until the player takes the flag.
+Not built: the fuel ratio (item 8), pace-loss confounders, hysteresis on the pit countdown, the finished-screen
+summary, the history fallback for per-lap use, and the extra lap a car behind a faster overall leader can run in the
+race garage figure (the race plan counts it once the race runs).
 
 Automated cases should cover refills, partial laps, capacity overflow, lap-number
 conventions, timed finishes, mandatory rules, resource changes, missing data,
@@ -394,6 +409,5 @@ requirements; run endpoint benchmarks before/after API performance changes.
 GT3 (offline) and LMP3 (online) are validated live; Hypercar and LMP2 checks remain.
 No all-class success claim until each supported resource model is verified.
 
-This proposal expands the post-session-only operating context in `PRODUCT.md`.
-Update product/design documentation when implementing the agreed live surface;
+`PRODUCT.md` records the live dashboard as the one exception to its post-session operating context;
 the existing analysis pages retain their established behavior and scale.

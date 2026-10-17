@@ -79,13 +79,15 @@ export function liveSessionKind(sessionCode: number): LiveSessionKind {
   return 'unknown';
 }
 
-/** What LMU's `navigation/state` (and `GetGameState.isReplayActive`) say beside the buffer. */
+/** What LMU's `navigation/state` says beside the buffer (`navigationState`, loading, and `settingMode` for a replay). */
 export type LiveGameScreen = 'menu' | 'loading' | 'session';
 
 /**
  * Lifecycle from the decoded scoring, in this order: no reading -> offline; LMU loading a session -> loading;
  * LMU on its main menu (or playing a replay), or no vehicles -> menu; not in realtime -> garage; game phase
- * 0-4 -> starting, 5-7 -> driving, 8 -> finished; phase 9 (paused) keeps the previous lifecycle. `screen` comes
+ * 0-4 -> starting, 5-7 -> driving, 8 -> finished once the player has taken the flag (or is out), still driving on
+ * the last lap until then (the session is over from the leader's flag, a lap or more before a slower car's); phase 9
+ * (paused) keeps the previous lifecycle. `screen` comes
  * from LMU's `navigation/state`: the buffer keeps the last session (vehicles included) after the driver leaves
  * it for the menu (seen live 2026-10-16).
  */
@@ -102,7 +104,7 @@ export function deriveLiveState(reading: LiveScoringReading | null, previous: Li
   const phase = reading.gamePhase;
   if (phase >= 0 && phase <= 4) return state('starting', false);
   if (phase >= 5 && phase <= 7) return state('driving', false);
-  if (phase === 8) return state('finished', false);
+  if (phase === 8) return state(reading.player && reading.player.finishStatus === 0 ? 'driving' : 'finished', false);
   if (phase === PAUSED_PHASE) return state(previous === 'offline' || previous === 'menu' || previous === 'loading' ? 'driving' : previous, true);
   return state(previous, false);
 }

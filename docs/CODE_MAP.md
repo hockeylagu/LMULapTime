@@ -568,7 +568,8 @@ then every 30 s, 30 s back-off, one request at a time); the PR comes from `query
 Strategy (VE/fuel, pit, damage, tyres, forecast; contracts in `shared/types/liveStrategy.ts`): `lmuPitRest.ts` holds the
 allowlisted REST GETs (1 s timeout) and their parsers; `livePitPoller.ts` asks at most one a second, most overdue
 first, by mode (off / track / garage, only while a dashboard client is connected and a session is loaded),
-`GetGameState` every ~10 s and `/rest/garage/*` only after a no-replay answer from the last 15 s (a replay reads
+a state check (`navigation/state`, replay from `settingMode` via `parseReplayPlayback`) every ~10 s and right before
+each `getVehicleCondition`, the one read that crashes LMU in a replay; the other reads are replay-safe (a replay reads
 nothing else); a timeout pauses everything 10 s, a failed read pauses that read 30 s. `shared/domain/live/`:
 `liveUsage.ts` (`LiveUsageMeter`, per-lap use interpolated at each crossing, pit/caution/refuel laps excluded, mean
 of the last 3), `liveResourcePlan.ts` (VE for Hypercar and GT3, fuel otherwise; `planRace` with the reserve kept at
@@ -581,7 +582,8 @@ target for a stop at the end of this lap, which the PIT NOW and in-pit modes sho
 
 **Scan hold:** `index.ts` wires `session-loaded` to `ServerContext.setLiveSessionLoaded`. While a session is loaded the
 session / replay / telemetry scans and the replay upgrade do not start (they set `pendingSessionRefresh`; a running
-upgrade is stopped); when it ends the pending refresh runs. `ScanStatus.heldForLiveSession` reports it. `ServerContext.events`
+upgrade is stopped); when it ends the pending refresh runs. A replay playing counts as loaded (one started from a
+session's monitor leaves the session loaded), and phase 8 is `finished` only once the player takes the flag. `ScanStatus.heldForLiveSession` reports it. `ServerContext.events`
 (`TypedEmitter` in `core/typedEmitter.ts`) emits `scan-started` / `scan-finished` on idle/busy transitions for `GET /api/events`.
 A scan already running when the session loads is not interrupted (only its follow-up steps are held).
 

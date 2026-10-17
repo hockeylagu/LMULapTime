@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LMU_NAVIGATION_URL, NAVIGATION_TIMEOUT_MS, parseNavigationState, readNavigationState } from '../../../server/live/lmuNavigation.js';
+import { LMU_NAVIGATION_URL, NAVIGATION_TIMEOUT_MS, parseNavigationState, parseReplayPlayback, readNavigationState } from '../../../server/live/lmuNavigation.js';
 import type { NavigationFetch } from '../../../server/live/lmuNavigation.js';
 import { NAVIGATION_STATE_LE_MANS } from '../../fixtures/live/navigationState.js';
 
@@ -19,6 +19,14 @@ describe('LMU navigation state', () => {
     for (const body of [null, 'text', [], {}, { loadingStatus: {} }, { loadingStatus: { loadingData: '{broken' } }]) {
       expect(parseNavigationState(body)).toBeNull();
     }
+  });
+
+  it('says a replay plays from settingMode (GetGameState.isReplayActive stayed false in one), null without it', () => {
+    expect(parseReplayPlayback({ state: { navigationState: 'NAV_EVENT', settingMode: 'SETTING_REPLAY_PLAYBACK' } })).toBe(true);
+    expect(parseReplayPlayback({ state: { settingMode: 'SETTING_GRANDPRIX' } })).toBe(false);
+    expect(parseReplayPlayback({ state: { settingMode: 'SETTING_MULTIPLAYER' } })).toBe(false);
+    expect(parseReplayPlayback(NAVIGATION_STATE_LE_MANS)).toBeNull();
+    expect(parseReplayPlayback(null)).toBeNull();
   });
 
   it('asks 127.0.0.1:6397/navigation/state and nothing else, with an abort signal', async () => {

@@ -46,12 +46,6 @@ const PIT_STATES: Record<string, LivePitState> = {
   NONE: 'none', REQUEST: 'request', ENTERING: 'entering', STOPPED: 'stopped', EXITING: 'exiting',
 };
 
-/** `GET /rest/sessions/GetGameState`: whether a replay is playing (garage reads crashed LMU in replay). */
-export function parseReplayActive(body: unknown): boolean | null {
-  const value = record(body)?.isReplayActive;
-  return typeof value === 'boolean' ? value : null;
-}
-
 /** `GET /rest/watch/standings`: the player's row. */
 export function parseStandings(body: unknown): Extract<LiveRestUpdate, { type: 'standings' }> | null {
   if (!Array.isArray(body)) return null;

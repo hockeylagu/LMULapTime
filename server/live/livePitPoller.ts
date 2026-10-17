@@ -1,6 +1,7 @@
 import type { LiveRestUpdate } from '../../shared/domain/live/liveStrategyTracker.js';
+import { parseReplayPlayback } from './lmuNavigation.js';
 import {
-  lmuGet, parseEstimate, parseForecast, parseGarageData, parsePitMenu, parsePitStopTimes, parseReplayActive,
+  lmuGet, parseEstimate, parseForecast, parseGarageData, parsePitMenu, parsePitStopTimes,
   parseStandings, parseTireManagement, parseVehicleCondition,
 } from './lmuPitRest.js';
 import type { RestGet } from './lmuPitRest.js';
@@ -10,8 +11,13 @@ export type PitPollMode = 'off' | 'track' | 'garage';
 
 /** One request at most this often, all reads together (the gentle rule for LMU's REST API). */
 export const PIT_POLL_TICK_MS = 1000;
-/** Garage reads need a `GetGameState` this recent that says no replay is playing. */
+/** The game state is read at least this often, to learn when a replay starts or ends. */
 export const REPLAY_CHECK_MS = 15_000;
+/**
+ * A read that crashes LMU in a replay goes out only this soon after a state check that said no replay is playing:
+ * each one is paired with its own check, so a replay that just started is seen first.
+ */
+export const REPLAY_UNSAFE_CHECK_MS = 2000;
 /** A slow answer pauses every read this long; a refused or failed one pauses only that read. */
 export const SLOW_PAUSE_MS = 10_000;
 export const FAILED_READ_PAUSE_MS = 30_000;
@@ -20,34 +26,41 @@ interface PitRead {
   path: string;
   /** Period per mode, ms; absent when the read is not made in that mode. */
   every: Partial<Record<Exclude<PitPollMode, 'off'>, number>>;
-  /** Under `/rest/garage`: never during a replay. */
-  garage: boolean;
+  /**
+   * Crashed LMU during a replay (`getVehicleCondition`, reproduced 2026-10-16): only right after its own state check.
+   * Every other read answered in a replay (200, or 404 for the two garage screens), so it needs no check of its own.
+   */
+  crashesInReplay: boolean;
   parse(body: unknown): LiveRestUpdate | null;
 }
 
-const GAME_STATE_PATH = '/rest/sessions/GetGameState';
+/**
+ * The state check: `navigation/state`, whose `state.settingMode` reads `SETTING_REPLAY_PLAYBACK` while a replay plays.
+ * (`GetGameState.isReplayActive` stayed false during one, 2026-10-16.)
+ */
+const STATE_PATH = '/navigation/state';
 
 /** About 0.7 requests a second on track, less in the garage. */
 const READS: PitRead[] = [
-  { path: '/rest/watch/standings', every: { track: 3000 }, garage: false, parse: parseStandings },
-  { path: '/rest/strategy/pitstop-estimate', every: { track: 10_000 }, garage: false, parse: parseEstimate },
+  { path: '/rest/watch/standings', every: { track: 3000 }, crashesInReplay: false, parse: parseStandings },
+  { path: '/rest/strategy/pitstop-estimate', every: { track: 10_000 }, crashesInReplay: false, parse: parseEstimate },
   {
-    path: '/rest/garage/PitMenu/receivePitMenu', every: { track: 10_000 }, garage: true,
+    path: '/rest/garage/PitMenu/receivePitMenu', every: { track: 10_000 }, crashesInReplay: false,
     parse: body => { const menu = parsePitMenu(body); return menu && { type: 'pitMenu', menu }; },
   },
   {
-    path: '/rest/garage/getVehicleCondition', every: { track: 10_000 }, garage: true,
+    path: '/rest/garage/getVehicleCondition', every: { track: 10_000 }, crashesInReplay: true,
     parse: body => { const condition = parseVehicleCondition(body); return condition && { type: 'condition', condition }; },
   },
-  { path: '/rest/garage/UIScreen/TireManagement', every: { track: 30_000, garage: 20_000 }, garage: true, parse: parseTireManagement },
-  { path: '/rest/garage/UIScreen/RepairAndRefuel', every: { track: 120_000 }, garage: true, parse: parsePitStopTimes },
-  { path: '/rest/garage/getPlayerGarageData', every: { garage: 5000 }, garage: true, parse: parseGarageData },
-  { path: '/rest/sessions/weather', every: { track: 60_000, garage: 60_000 }, garage: false, parse: parseForecast },
+  { path: '/rest/garage/UIScreen/TireManagement', every: { track: 30_000, garage: 20_000 }, crashesInReplay: false, parse: parseTireManagement },
+  { path: '/rest/garage/UIScreen/RepairAndRefuel', every: { track: 120_000 }, crashesInReplay: false, parse: parsePitStopTimes },
+  { path: '/rest/garage/getPlayerGarageData', every: { garage: 5000 }, crashesInReplay: false, parse: parseGarageData },
+  { path: '/rest/sessions/weather', every: { track: 60_000, garage: 60_000 }, crashesInReplay: false, parse: parseForecast },
 ];
 
 export interface LivePitPollerOptions {
   onUpdate(update: LiveRestUpdate): void;
-  /** `GetGameState.isReplayActive` changed (null when unknown). */
+  /** Whether a replay is playing changed (`navigation/state` `settingMode`; null when unknown). */
   onReplay(active: boolean | null): void;
   /** Replaces the HTTP read (tests). */
   get?: RestGet;
@@ -56,9 +69,11 @@ export interface LivePitPollerOptions {
 
 /**
  * Reads LMU's pit, MFD, damage, tyre and forecast data while a session is loaded and a dashboard is open: one
- * request at a time, at most one a second, the most overdue read first. `/rest/garage/*` reads only follow a
- * `GetGameState` of the last 15 s that says no replay is playing (garage reads crashed LMU during a replay); every
- * other answer is welcome. A slow answer pauses everything 10 s; a failed one pauses that read 30 s.
+ * request at a time, at most one a second, the most overdue read first. The state check (`navigation/state`) runs
+ * every 10 s; while it says a replay plays, nothing else is read (the answers would be the replay's, not the
+ * session's). `getVehicleCondition`, which crashed LMU in a replay, follows its own check of the last 2 s that said no
+ * replay; the other reads are safe in a replay and need none. A slow answer pauses everything 10 s; a failed one
+ * pauses that read 30 s.
  */
 export class LivePitPoller {
   private mode: PitPollMode = 'off';
@@ -68,6 +83,8 @@ export class LivePitPoller {
   private pausedUntil = 0;
   private replay: boolean | null = null;
   private replayCheckedAt = -Infinity;
+  /** The last request was a state check that said no replay. */
+  private unsafeCheckFresh = false;
   private gameStateDue = 0;
   private readonly due = new Map<string, number>();
 
@@ -81,6 +98,7 @@ export class LivePitPoller {
     this.generation++;
     this.due.clear();
     this.gameStateDue = 0;
+    this.unsafeCheckFresh = false;
     if (mode === 'off') {
       this.clearTimer();
       this.setReplay(null, -Infinity);
@@ -111,19 +129,23 @@ export class LivePitPoller {
   private next(now: number): { path: string; read: PitRead | null } | null {
     const mode = this.mode;
     if (mode === 'off') return null;
-    if (now >= this.gameStateDue) return { path: GAME_STATE_PATH, read: null };
-    // A replay playing: nothing but the game state until it ends.
+    if (now >= this.gameStateDue) return { path: STATE_PATH, read: null };
+    // A replay playing: nothing but the state check until it ends.
     if (this.replay === true) return null;
-    const garageAllowed = this.replay === false && now - this.replayCheckedAt <= REPLAY_CHECK_MS;
     let best: PitRead | null = null;
     let bestLate = -Infinity;
     for (const read of READS) {
       const every = read.every[mode];
-      if (every === undefined || (read.garage && !garageAllowed)) continue;
+      if (every === undefined || (read.crashesInReplay && this.replay !== false)) continue;
       const late = (now - (this.due.get(read.path) ?? 0)) / every;
       if (late >= 0 && late > bestLate) { best = read; bestLate = late; }
     }
-    return best && { path: best.path, read: best };
+    if (!best) return null;
+    // A replay-unsafe read waits one tick behind a fresh check that no replay has started since the last one.
+    if (best.crashesInReplay && (!this.unsafeCheckFresh || now - this.replayCheckedAt > REPLAY_UNSAFE_CHECK_MS)) {
+      return { path: STATE_PATH, read: null };
+    }
+    return { path: best.path, read: best };
   }
 
   private async tick(): Promise<void> {
@@ -132,6 +154,8 @@ export class LivePitPoller {
     const next = this.next(now);
     if (!next) return;
     const generation = this.generation;
+    // A replay-unsafe read needs the state check to be the request just before it: any read spends the check.
+    if (next.read) this.unsafeCheckFresh = false;
     this.inFlight = true;
     const answer = await (this.options.get ?? lmuGet)(next.path);
     this.inFlight = false;
@@ -140,7 +164,8 @@ export class LivePitPoller {
     if (!answer.ok && answer.reason === 'timeout') this.pausedUntil = done + SLOW_PAUSE_MS;
     if (next.read === null) {
       this.gameStateDue = done + (answer.ok ? REPLAY_CHECK_MS * 2 / 3 : FAILED_READ_PAUSE_MS / 3);
-      this.setReplay(answer.ok ? parseReplayActive(answer.body) : null, done);
+      this.setReplay(answer.ok ? parseReplayPlayback(answer.body) : null, done);
+      this.unsafeCheckFresh = this.replay === false;
       return;
     }
     const every = next.read.every[this.mode] ?? FAILED_READ_PAUSE_MS;

@@ -62,6 +62,15 @@ export async function readNavigationState(
 }
 
 /**
+ * Whether a replay is playing, from `state.settingMode`: `SETTING_REPLAY_PLAYBACK` in a replay (seen 2026-10-16;
+ * `SETTING_GRANDPRIX` offline, `SETTING_MULTIPLAYER` online). Null when the field is missing.
+ */
+export function parseReplayPlayback(body: unknown): boolean | null {
+  const mode = asRecord(asRecord(body)?.state)?.settingMode;
+  return typeof mode === 'string' ? mode === 'SETTING_REPLAY_PLAYBACK' : null;
+}
+
+/**
  * LMU's main menu from the answer's `state.navigationState` (seen live: `NAV_MAIN_MENU`, `NAV_EVENT`, `NAV_REALTIME`),
  * and a session loading from `loadingStatus.loading` with `percentage` 0..1 (-1 when not loading).
  */

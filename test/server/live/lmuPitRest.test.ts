@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  parseEstimate, parseForecast, parseGarageData, parsePitMenu, parsePitStopTimes, parseReplayActive, parseStandings,
+  parseEstimate, parseForecast, parseGarageData, parsePitMenu, parsePitStopTimes, parseStandings,
   parseTireManagement, parseVehicleCondition,
 } from '../../../server/live/lmuPitRest.js';
 
@@ -8,11 +8,6 @@ import {
 const menuLine = (name: string, currentSetting: number, texts: string[]) => ({ name, currentSetting, default: 0, settings: texts.map(text => ({ text })) });
 
 describe('LMU pit REST parsers', () => {
-  it('reads the replay flag of GetGameState, null when absent', () => {
-    expect(parseReplayActive({ isReplayActive: false, PitState: 'NONE' })).toBe(false);
-    expect(parseReplayActive({ status: 'unavailable' })).toBeNull();
-  });
-
   it("reads the player's standings row: VE, fuel, pit state and pending penalties", () => {
     expect(parseStandings([
       { player: false, veFraction: 0.9, pitState: 'NONE', penalties: 0 },

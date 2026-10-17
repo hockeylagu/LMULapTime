@@ -40,7 +40,7 @@ Evidence levels used below:
 | Session type | `ScoringInfo.Session` = 1 in practice 1 | `/navigation/state` → `gameSession` `PRACTICE1` | **Live** (both) |
 | Starting / finished | `GamePhase` 0 before, 3 formation, 5 green, 8 over (rF2 codes hold); player `FinishStatus` | `navigation/state` `BEFORE` / `FORMATION` / `GREEN` / `CHECKERED`; `GetGameState` `END_OF_RACE_GRACE`; standings `finishStatus` `FSTAT_FINISHED` / `FSTAT_DNF` | **Live** (online race) |
 | Paused | `CurrentET` stops; rF2 phase 9 | `gameState` = `GSTATE_PAUSED` | Field |
-| Replay playing (must not count as driving) | Not distinguishable reliably | `/rest/sessions/GetGameState` → `isReplayActive` (false live) | **Live** (REST) |
+| Replay playing (must not count as driving) | Not distinguishable reliably | `navigation/state` → `state.settingMode` `SETTING_REPLAY_PLAYBACK`; `GetGameState.isReplayActive` stayed false in a replay (2026-10-16) | **Live** (REST; main-menu and monitor replays, 2026-10-16) |
 
 The rF2 numeric codes are the plugin's convention; LMU's use of them matched in every session seen.
 
@@ -133,7 +133,7 @@ were too slow to drive).
 - **Live from low-risk REST reads:** VE (`standings.veFraction`), per-lap VE/fuel/tyre use
   (`strategy/usage`), pit time per service part including `damage`
   (`strategy/pitstop-estimate`), forecast by session node (`sessions/weather`), pit entry
-  distance and replay detection (`GetGameState`), exact layout `sceneDesc`.
+  distance (`GetGameState`), replay detection and exact layout `sceneDesc` (`navigation/state`).
 - **Practice** was not captured online beyond one read; it is assumed to match qualifying
   (same fields, `PRACTICE1`, green until the flag, garage monitor between runs).
 - **Live online (qualifying + race):** the full lifecycle (before, grid, formation, green,

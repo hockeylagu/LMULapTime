@@ -27,7 +27,8 @@ Success means the driver leaves a session review knowing a few specific, correct
 
 ## Operating Context
 
-- Desktop browser, opened after a session: the driver finishes driving, then runs the app to review. It is not a live second-monitor companion while driving. The design width is a fixed 1500px column on a large monitor (the driver uses 2560 wide); laptops, tablets and mobile are not targets.
+- Desktop browser, opened after a session: the driver finishes driving, then runs the app to review. The design width is a fixed 1500px column on a large monitor (the driver uses 2560 wide); laptops, tablets and mobile are not targets.
+- One exception while driving: the live dashboard (`#/live`), a passive fullscreen page on a second monitor (2560 x 1440, read from 50 inches or more) that opens by itself when LMU starts. It gives advice only (pit lap, VE or fuel to set, damage pace loss beside repair time, pedal trace); the driver sets everything in the game. It never takes input while racing, and the app scans no game files while a session is loaded. Its scale is separate from the analysis pages ([LIVE_RACE_DASHBOARD.md](docs/plans/LIVE_RACE_DASHBOARD.md)).
 - A Node/Express server on port 3001 plus the Vite client; started with `npm run dev` / `launch.bat`.
 - Sources: `UserData/LOG/Results/*.xml`, `UserData/Telemetry/*.duckdb`, `UserData/Replays/*.Vcr`, and optionally LMU's embedded REST API. Replays can be several hundred MB to 1 GB and are decoded in workers and cached. The cache is the source of truth once replays are deleted.
 - Main areas: dashboard, sessions and session detail (debrief), tracks and track detail, leaderboard and rivals, telemetry/replay studio (`#/telemetry`), settings.

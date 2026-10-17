@@ -171,11 +171,26 @@ Measured on a replay loaded from the main menu. Evidence is in
 - **`/rest/watch/getIncidentsList/{minTimeBetweenContacts}`** returns the whole race's contact
   list (`player`, `contactWith`, `et`) without impact magnitude.
 
-> ⚠️ **Crash hazard.** Calling `/rest/garage/*` during replay playback is unsafe:
-> `/rest/garage/getVehicleCondition` hung for about 30 s and LMU crashed, right after
-> `/rest/garage/getPlayerGarageData` had answered. In replay mode, restrict tools to
-> `/rest/watch/*` and `/rest/replay/*` reads, one request at a time at ≤ 1 Hz, and stop on the
-> first non-200 or slow response. Never sweep every endpoint in the Swagger schema.
+> ⚠️ **Crash hazard.** `/rest/garage/getVehicleCondition` crashes LMU during replay playback:
+> it hung for about 30 s and LMU died in a 2026-09-27 sweep, and it did again in a one-request
+> test on 2026-10-16 (2.6 s, connection reset, then refused). Never sweep every endpoint in the
+> Swagger schema; probe one request at a time at ≤ 1 Hz and stop on the first non-200 or slow response.
+>
+> **Replay test, 2026-10-16** (build 14200, a replay started from the main menu, then one from a session's monitor;
+> one endpoint per run with a
+> `navigation/state` check before and after; log in `lmu-live-captures/2026-10-16-replay-rest-probe.jsonl`):
+>
+> | Endpoint | In replay |
+> |---|---|
+> | `navigation/state`, `sessions/GetGameState`, `watch/standings`, `strategy/pitstop-estimate`, `sessions/weather` | 200, fast |
+> | `garage/getPlayerGarageData`, `garage/PitMenu/receivePitMenu` | 200, fast |
+> | `garage/UIScreen/TireManagement`, `garage/UIScreen/RepairAndRefuel` | 404, no harm |
+> | `garage/getVehicleCondition` | **crash** (main-menu replay; not sent in the monitor replay) |
+>
+> **Replay detection:** `GetGameState.isReplayActive` stayed `false` while the replay played. `navigation/state`
+> `state.settingMode` reads `SETTING_REPLAY_PLAYBACK` (`navigationState` `NAV_EVENT`, `gameSession` `RACE1`); it
+> is `SETTING_GRANDPRIX` offline and `SETTING_MULTIPLAYER` online. A replay started from a session's monitor reads
+> the same (`SETTING_REPLAY_PLAYBACK`, `isReplayActive` false, `inMonitor` true) and gave the same answers.
 
 ### 4.2 Live Practice Reads (observed, build 14200, 2026-10-15)
 
