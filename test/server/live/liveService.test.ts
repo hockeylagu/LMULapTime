@@ -322,6 +322,29 @@ describe('LiveService', () => {
       expect(service.getSnapshot().recentLaps).toEqual([{ lapNumber: 4, lapSeconds: 100, sectors: [30, 30, 40], valid: false }]);
     });
 
+    it('shows the menu at once when the reader says a replay plays, and a failed state check does not end it', async () => {
+      let stateOk = true;
+      const get = vi.fn((path: string): Promise<RestAnswer> => (path === '/navigation/state' && stateOk
+        ? Promise.resolve({ ok: true, body: { state: { settingMode: 'SETTING_GRANDPRIX' } } })
+        : Promise.resolve({ ok: false, reason: 'status' })));
+      const { service, worker, frame } = setup({ pit: { get } });
+      service.addClient(new FakeSink());
+      frame(lap(3, { lapDist: 9_990, timeIntoLap: 99 }));
+      frame(lap(4, { lapDist: 5, timeIntoLap: 0.1, lastLapTime: 100, lastSector1: 30, lastSector2: 60 }));
+      await vi.advanceTimersByTimeAsync(2000);
+      worker.emit('message', { type: 'navigation', screen: 'replay', loadingProgress: null });
+      frame(lap(1, { lapDist: 50, timeIntoLap: 3 }));
+      expect(service.getSnapshot()).toMatchObject({ lifecycle: 'menu', recentLaps: [] });
+      expect(service.isSessionLoaded()).toBe(true);
+      stateOk = false;
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(service.getSnapshot().lifecycle).toBe('menu');
+      worker.emit('message', { type: 'navigation', screen: 'session', loadingProgress: null });
+      frame(lap(4, { lapDist: 50, timeIntoLap: 1 }));
+      expect(service.getSnapshot().lifecycle).toBe('driving');
+      expect(service.getSnapshot().recentLaps).toEqual([{ lapNumber: 4, lapSeconds: 100, sectors: [30, 30, 40], valid: false }]);
+    });
+
     it('resolves the identity from the game, then from the pit poller state check while a dashboard is open', async () => {
       const readNavigation = vi.fn(() => Promise.resolve({ ok: true as const, navigation: { sceneDesc: 'LEMANSWEC_MULSANNE', classes: [] } }));
       const state = { state: { settingMode: 'SETTING_GRANDPRIX' }, loadingStatus: { track: { sceneDesc: 'LEMANSWEC' } } };
@@ -376,7 +399,7 @@ describe('LiveService', () => {
       vi.advanceTimersByTime(PEDAL_FLUSH_MS);
       expect(timings(sink)).toHaveLength(1);
       expect(sink.data(timings(sink)[0])).toEqual({
-        lapNumber: 4, sector: 1, lapElapsedSeconds: expect.any(Number), sectors: [null, null, null], deltaSeconds: null, sectorDeltas: [null, null, null], tyreSurfaceAvgC: null,
+        lapNumber: 4, isOutLap: false, sector: 1, lapElapsedSeconds: expect.any(Number), sectors: [null, null, null], deltaSeconds: null, sectorDeltas: [null, null, null], tyreSurfaceAvgC: null,
       });
 
       // Two frames inside one interval: only the newest goes out, once the interval has passed.

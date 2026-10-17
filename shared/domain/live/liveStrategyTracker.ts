@@ -101,6 +101,12 @@ export class LiveStrategyTracker {
   private menu: LivePitMenu | null = null;
   private condition: LiveVehicleCondition | null = null;
   private usage: Extract<LiveRestUpdate, { type: 'tireManagement' }> | null = null;
+  /**
+   * The game's last per-lap estimates for the event: the same car on the same layout, so a new session starts from
+   * them instead of nothing until its own tyre screen is read (up to 20 s, often after the car has left the garage).
+   * Dropped with the measured use when the track turns wet or dry.
+   */
+  private eventEstimate: Pick<Extract<LiveRestUpdate, { type: 'tireManagement' }>, 'vePerLap' | 'fuelPerLap'> | null = null;
   private garage: Extract<LiveRestUpdate, { type: 'garage' }> | null = null;
   private forecast: Record<string, LiveForecastNode[]> | null = null;
   private raceMinutes: number | null = null;
@@ -113,7 +119,7 @@ export class LiveStrategyTracker {
     this.meters.ve.clear();
     this.meters.fuel.clear();
     this.eventLaps = [];
-    this.ratios = []; this.wet = null; this.eventTyreWear = null; this.eventCompound = ''; this.ratioOptions = [];
+    this.ratios = []; this.wet = null; this.eventTyreWear = null; this.eventCompound = ''; this.ratioOptions = []; this.eventEstimate = null;
     this.resetSession();
     this.sessionKey = null;
   }
@@ -165,7 +171,10 @@ export class LiveStrategyTracker {
         this.condition = update.condition;
         this.damage.updateCondition(update.condition);
         return;
-      case 'tireManagement': this.usage = update; return;
+      case 'tireManagement':
+        this.usage = update;
+        if (update.vePerLap !== null || update.fuelPerLap !== null) this.eventEstimate = { vePerLap: update.vePerLap, fuelPerLap: update.fuelPerLap };
+        return;
       case 'garage': this.garage = update; return;
       case 'forecast': this.forecast = update.sessions; return;
       case 'schedule': this.raceMinutes = update.raceMinutes; return;
@@ -206,6 +215,7 @@ export class LiveStrategyTracker {
     const wet = this.wet === true ? level >= DRY_AGAIN_MAX : level >= RAIN_WET_MIN;
     if (this.wet !== null && wet !== this.wet) {
       this.meters.fuel.clear(); this.meters.ve.clear(); this.ratios = []; this.eventLaps = []; this.lastPair = null; this.lapExcluded = true; this.eventTyreWear = null;
+      this.eventEstimate = null;
       this.tyres.reset();
     }
     this.wet = wet;
@@ -230,8 +240,8 @@ export class LiveStrategyTracker {
     const garage = state.lifecycle === 'garage' ? this.garagePlan(kind, reading, resource, context.reserveLaps) : null;
     if (garage?.tyres && garage.laps !== null) garage.tyreCoverage = tyreCoverage(garage.tyres.wear, this.eventTyreWear, garage.laps, garage.laps, 'finish', garage.tyres.newSets);
     const fuelRatio = kind === 've' ? planFuelRatio({ ratios: this.ratios,
-      fuelPerLap: this.ratios.length >= 3 ? this.perLap('fuel').perLap : this.usage?.fuelPerLap ?? null,
-      vePerLap: this.ratios.length >= 3 ? this.perLap('ve').perLap : this.usage?.vePerLap ?? null,
+      fuelPerLap: this.ratios.length >= 3 ? this.perLap('fuel').perLap : this.gameEstimate('fuel'),
+      vePerLap: this.ratios.length >= 3 ? this.perLap('ve').perLap : this.gameEstimate('ve'),
       garageSetting: this.garage?.fuelRatio ?? null, mfdSetting: state.lifecycle === 'garage' ? null : this.menu?.fuelRatio ?? null,
       options: this.ratioOptions, veTarget: garage?.needed ?? resource.race?.neededAfterStop ?? null,
       fuelNow: state.lifecycle === 'garage' ? null : this.car?.fuelLiters ?? null, veNow: state.lifecycle === 'garage' ? null : this.ve,
@@ -278,11 +288,17 @@ export class LiveStrategyTracker {
     return this.car && this.car.fuelCapacityLiters > 0 ? this.car.fuelCapacityLiters : null;
   }
 
+  /** The game's per-lap estimate: this session's tyre screen, else the event's last one. */
+  private gameEstimate(kind: LiveResourceKind): number | null {
+    return kind === 've' ? this.usage?.vePerLap ?? this.eventEstimate?.vePerLap ?? null
+      : this.usage?.fuelPerLap ?? this.eventEstimate?.fuelPerLap ?? null;
+  }
+
   private perLap(kind: LiveResourceKind): Pick<LiveResourcePlan, 'perLap' | 'perLapSource' | 'lapsMeasured'> {
     const meter = this.meters[kind];
     const measured = meter.perLap();
     if (measured !== null) return { perLap: round(measured, 2), perLapSource: 'measured', lapsMeasured: meter.laps.length };
-    const game = kind === 've' ? this.usage?.vePerLap ?? null : this.usage?.fuelPerLap ?? null;
+    const game = this.gameEstimate(kind);
     return { perLap: game !== null && game > 0 ? round(game, 2) : null, perLapSource: game !== null && game > 0 ? 'game' : null, lapsMeasured: 0 };
   }
 

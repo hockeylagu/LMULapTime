@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { LMU_COLORS, TELEMETRY_COLORS } from '../../utils/themeColors.js';
-import { PEDAL_WINDOW_SECONDS, type PedalBuffer } from './pedalBuffer.js';
+import type { PedalBuffer } from './pedalBuffer.js';
 
 /** A longer silence than this between two samples is a gap in the data: the line breaks instead of bridging it. */
 export const PEDAL_GAP_SECONDS = 0.25;
@@ -10,7 +10,7 @@ const PAD = LINE_WIDTH;
 const FALLBACK_WIDTH = 2448;
 const FALLBACK_HEIGHT = 282;
 
-function drawGrid(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+function drawGrid(ctx: CanvasRenderingContext2D, width: number, height: number, seconds: number): void {
   ctx.strokeStyle = LMU_COLORS.border;
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -19,8 +19,8 @@ function drawGrid(ctx: CanvasRenderingContext2D, width: number, height: number):
     ctx.moveTo(0, y);
     ctx.lineTo(width, y);
   }
-  for (let second = 0; second <= PEDAL_WINDOW_SECONDS; second += 5) {
-    const x = (width * second) / PEDAL_WINDOW_SECONDS;
+  for (let second = 0; second <= seconds; second += Math.max(1, seconds / 6)) {
+    const x = (width * second) / seconds;
     ctx.moveTo(x, 0);
     ctx.lineTo(x, height);
   }
@@ -32,7 +32,7 @@ function drawLine(
 ): void {
   const newest = buffer.latest;
   if (newest === null) return;
-  const left = newest - PEDAL_WINDOW_SECONDS;
+  const left = newest - buffer.windowSeconds;
   ctx.strokeStyle = color;
   ctx.lineWidth = LINE_WIDTH;
   ctx.lineJoin = 'round';
@@ -40,7 +40,7 @@ function drawLine(
   ctx.beginPath();
   let previousT: number | null = null;
   for (const sample of buffer.visible) {
-    const x = ((sample.t - left) / PEDAL_WINDOW_SECONDS) * width;
+    const x = ((sample.t - left) / buffer.windowSeconds) * width;
     const y = PAD + (1 - Math.min(1, Math.max(0, sample[key]))) * (height - 2 * PAD);
     if (previousT === null || sample.t - previousT > PEDAL_GAP_SECONDS) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
@@ -49,7 +49,7 @@ function drawLine(
   ctx.stroke();
 }
 
-/** The last 30 seconds of throttle and brake on one fixed 0-100 % scale: lines and grid only, drawn on demand. */
+/** The configured throttle/brake history on one fixed 0–100% scale, drawn on demand. */
 export function LivePedalTrace({ buffer }: { buffer: PedalBuffer }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -73,7 +73,7 @@ export function LivePedalTrace({ buffer }: { buffer: PedalBuffer }) {
       }
       ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
       ctx.clearRect(0, 0, width, height);
-      drawGrid(ctx, width, height);
+      drawGrid(ctx, width, height, buffer.windowSeconds);
       drawLine(ctx, buffer, 'throttle', TELEMETRY_COLORS.throttle, width, height);
       drawLine(ctx, buffer, 'brake', TELEMETRY_COLORS.brake, width, height);
     };
@@ -88,5 +88,5 @@ export function LivePedalTrace({ buffer }: { buffer: PedalBuffer }) {
     };
   }, [buffer]);
 
-  return <canvas ref={canvasRef} data-testid="pedal-trace" aria-hidden="true" className="block h-full w-full" />;
+  return <canvas ref={canvasRef} data-testid="pedal-trace" data-window-seconds={buffer.windowSeconds} aria-hidden="true" className="block h-full w-full" />;
 }

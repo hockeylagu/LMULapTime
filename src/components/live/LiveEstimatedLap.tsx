@@ -6,8 +6,8 @@ export function estimatedLapSeconds(bestSeconds: number | null | undefined, delt
   return bestSeconds != null && bestSeconds > 0 && deltaSeconds != null ? bestSeconds + deltaSeconds : null;
 }
 
-/** The estimated time of the lap in progress; the unknown mark before a session best. Renders at the timing rate. */
+/** Out laps are labelled explicitly; otherwise show the estimate or unknown without a reference. */
 export function LiveEstimatedLap({ store, bestSeconds }: { store: LiveTimingStore; bestSeconds: number | null | undefined }) {
   const timing = useLiveTiming(store);
-  return <span data-testid="live-estimated-lap">{formatLapTime(estimatedLapSeconds(bestSeconds, timing?.deltaSeconds))}</span>;
+  return <span data-testid="live-estimated-lap">{timing?.isOutLap ? 'OUT LAP' : formatLapTime(estimatedLapSeconds(bestSeconds, timing?.deltaSeconds))}</span>;
 }

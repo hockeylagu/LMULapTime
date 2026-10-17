@@ -319,13 +319,16 @@ already open) shows a banner above the navbar, "Le Mans Ultimate is running. Ope
 dashboard", from the `game-running` app event; the LMU mark on the dashboard leads back.
 The banner clears when exit is detected, or immediately if the app event stream fails.
 After 37.5 seconds without an app event or heartbeat, the page clears stale game status
-and reconnects every 2 seconds until the server answers. Frozen half-written shared-memory
-frames do not count as activity, so they cannot indefinitely postpone the exit probe.
+and reconnects every 2 seconds until the server answers.
 Polling is deliberate: Windows has no notice for a named mapping being created, and process
 start events (WMI) cost more or need admin rights. The app's own open handle keeps the
-mapping alive after LMU exits, so game exit is detected when the plugin's counters stand
-still for a few seconds and then one read of the REST port is refused (a paused game keeps
-answering); the service then closes its handle and returns to the slow check. The page itself then
+mapping alive after LMU exits, and the buffer alone keeps the last session on the menu and
+shows a replay as driving, so the reader asks `navigation/state` every 2 s: a refused read is
+the game gone (a reset or slow answer is not: LMU resets requests in the frozen last seconds of
+a load), and the answer says menu, loading (also while `OP_TO_REALTIME`, after LMU clears its
+loading flag), replay or session. A jump in the buffer (another session or track, the clock
+going back, any write on the menu, such as the one LMU makes as it exits) holds the frames
+until the game answers, within a second. The page itself then
 follows the lifecycle (menu, garage, on track) without any input.
 
 Add selective, lifecycle-gated REST reads through the backend for fields that

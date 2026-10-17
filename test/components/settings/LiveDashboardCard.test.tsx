@@ -15,9 +15,22 @@ describe('LiveDashboardCard', () => {
     const toggle = await screen.findByRole('checkbox', { name: 'Switch the open app to the live dashboard when LMU starts' });
     await waitFor(() => expect(toggle).toBeChecked());
     expect(screen.getByRole('link', { name: 'Export strategy history (CSV)' })).toHaveAttribute('href', '/api/live/audit.csv');
+    expect(screen.getByRole('link', { name: 'Open demo' })).toHaveAttribute('href', '#/live?demo=1');
     fireEvent.click(toggle);
     await waitFor(() => expect(toggle).not.toBeChecked());
     expect(fetchMock).toHaveBeenLastCalledWith('/api/live/settings', expect.objectContaining({ method: 'POST', body: '{"autoOpen":false}' }));
+  });
+
+  it('loads and saves the shared pedal trace duration', async () => {
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => reply({ autoOpen: true, reserveLaps: 0.5, pedalTraceSeconds: 30,
+      ...(init?.method === 'POST' ? JSON.parse(String(init.body)) as Record<string, unknown> : {}) }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<LiveDashboardCard />);
+    const duration = await screen.findByRole('combobox', { name: 'Pedal trace history' });
+    fireEvent.click(duration);
+    fireEvent.click(screen.getByRole('option', { name: '60 seconds' }));
+    await waitFor(() => expect(duration).toHaveTextContent('60 seconds'));
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/live/settings', expect.objectContaining({ method: 'POST', body: '{"pedalTraceSeconds":60}' }));
   });
 
   it('shows the server message when the setting cannot be read', async () => {
@@ -25,5 +38,6 @@ describe('LiveDashboardCard', () => {
     render(<LiveDashboardCard />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Live service is down');
     expect(screen.getByRole('checkbox')).toBeDisabled();
+    expect(screen.getByRole('link', { name: 'Open demo' })).toHaveAttribute('href', '#/live?demo=1');
   });
 });

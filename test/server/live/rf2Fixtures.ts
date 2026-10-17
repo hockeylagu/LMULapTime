@@ -13,7 +13,7 @@ export interface ScoringVehicle {
   floats?: { bestLapSector1?: number; bestLapSector2?: number };
 }
 
-export interface ScoringHeader { inRealtime?: boolean; phase?: number; trackTemp?: number; raining?: number; avgPathWetness?: number; lapDist?: number }
+export interface ScoringHeader { inRealtime?: boolean; currentEt?: number; phase?: number; trackTemp?: number; raining?: number; avgPathWetness?: number; lapDist?: number }
 
 export function scoringBuffer(version: number, vehicles: ScoringVehicle[], info: ScoringHeader = {}): Buffer {
   const buffer = Buffer.alloc(SCORING_BUFFER.size);
@@ -22,7 +22,7 @@ export function scoringBuffer(version: number, vehicles: ScoringVehicle[], info:
   const at = SCORING_INFO.offsets;
   buffer.write('Circuit de la Sarthe', SCORING.info + at.trackName, 'utf8');
   buffer.writeInt32LE(10, SCORING.info + at.session);
-  buffer.writeDoubleLE(321.5, SCORING.info + at.currentET);
+  buffer.writeDoubleLE(info.currentEt ?? 321.5, SCORING.info + at.currentET);
   buffer.writeDoubleLE(3600, SCORING.info + at.endET);
   buffer.writeInt32LE(2147483647, SCORING.info + at.maxLaps);
   buffer.writeInt32LE(vehicles.length, SCORING.info + at.numVehicles);

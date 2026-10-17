@@ -1,15 +1,15 @@
 import type { LivePedalSample } from '../../../shared/types/live.js';
-
-/** The trace shows this many seconds. */
-export const PEDAL_WINDOW_SECONDS = 30;
-/** A hard cap on stored samples (about 100 Hz for the window plus slack), so a bad clock cannot grow it. */
-const MAX_SAMPLES = PEDAL_WINDOW_SECONDS * 100 + 600;
+import { DEFAULT_LIVE_SETTINGS, PEDAL_TRACE_SECONDS_CHOICES } from '../../../shared/types/live.js';
 
 /**
  * The last seconds of pedal samples, outside React: the stream pushes into it 20-30 times a second and the trace
  * redraws from it. Time is the session clock; a clock that jumps back (new session) starts the buffer over.
  */
 export class PedalBuffer {
+  public readonly windowSeconds: number;
+  public constructor(windowSeconds = DEFAULT_LIVE_SETTINGS.pedalTraceSeconds) {
+    this.windowSeconds = (PEDAL_TRACE_SECONDS_CHOICES as readonly number[]).includes(windowSeconds) ? windowSeconds : DEFAULT_LIVE_SETTINGS.pedalTraceSeconds;
+  }
   private samples: LivePedalSample[] = [];
   private listeners = new Set<() => void>();
 
@@ -33,11 +33,12 @@ export class PedalBuffer {
     }
     const newest = this.latest;
     if (newest !== null) {
-      const from = newest - PEDAL_WINDOW_SECONDS - 1;
+      const from = newest - this.windowSeconds - 1;
       let drop = 0;
       while (drop < this.samples.length - 1 && this.samples[drop].t < from) drop += 1;
       if (drop > 0) this.samples.splice(0, drop);
-      if (this.samples.length > MAX_SAMPLES) this.samples.splice(0, this.samples.length - MAX_SAMPLES);
+      const maxSamples = this.windowSeconds * 100 + 600;
+      if (this.samples.length > maxSamples) this.samples.splice(0, this.samples.length - maxSamples);
     }
     this.listeners.forEach((listener) => listener());
   }

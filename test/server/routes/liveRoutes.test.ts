@@ -36,15 +36,15 @@ describe('live routes', () => {
   });
 
   it('reads the auto-open setting, on by default', async () => {
-    expect((await request(setup().app).get('/api/live/settings')).body).toEqual({ autoOpen: true, reserveLaps: 0.5 });
-    expect((await request(setup('false').app).get('/api/live/settings')).body).toEqual({ autoOpen: false, reserveLaps: 0.5 });
+    expect((await request(setup().app).get('/api/live/settings')).body).toEqual({ autoOpen: true, reserveLaps: 0.5, pedalTraceSeconds: 30 });
+    expect((await request(setup('false').app).get('/api/live/settings')).body).toEqual({ autoOpen: false, reserveLaps: 0.5, pedalTraceSeconds: 30 });
   });
 
   it('stores a valid auto-open setting', async () => {
     const { app, metadata } = setup();
     const response = await request(app).post('/api/live/settings').send({ autoOpen: false });
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({ autoOpen: false, reserveLaps: 0.5 });
+    expect(response.body).toEqual({ autoOpen: false, reserveLaps: 0.5, pedalTraceSeconds: 30 });
     expect(metadata.get('live_auto_open')).toBe('false');
   });
 
@@ -52,10 +52,22 @@ describe('live routes', () => {
     const { app, live, metadata } = setup('false');
     const reserve = vi.spyOn(live, 'setReserveLaps');
     const response = await request(app).post('/api/live/settings').send({ reserveLaps: 1 });
-    expect(response.body).toEqual({ autoOpen: false, reserveLaps: 1 });
+    expect(response.body).toEqual({ autoOpen: false, reserveLaps: 1, pedalTraceSeconds: 30 });
     expect(metadata.get('live_reserve_laps')).toBe('1');
     expect(reserve).toHaveBeenCalledWith(1);
     expect((await request(app).post('/api/live/settings').send({ reserveLaps: 0.3 })).status).toBe(400);
+  });
+
+  it('persists trace duration independently and preserves the other settings', async () => {
+    const { app, metadata } = setup('false');
+    metadata.set('live_reserve_laps', '1.5');
+    expect((await request(app).post('/api/live/settings').send({ pedalTraceSeconds: 60 })).body).toEqual({ autoOpen: false, reserveLaps: 1.5, pedalTraceSeconds: 60 });
+    expect(metadata.get('live_pedal_trace_seconds')).toBe('60');
+    expect((await request(app).get('/api/live/settings')).body.pedalTraceSeconds).toBe(60);
+    for (const pedalTraceSeconds of [0, -5, 31, 121, '60', null]) {
+      expect((await request(app).post('/api/live/settings').send({ pedalTraceSeconds })).status).toBe(400);
+    }
+    expect(metadata.get('live_pedal_trace_seconds')).toBe('60');
   });
 
   it.each([[{}], [{ autoOpen: 'yes' }], [{ autoOpen: 1 }], [{ autoOpen: null }]])('rejects %j with 400', async body => {

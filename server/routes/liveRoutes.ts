@@ -4,10 +4,10 @@ import { iterateLiveAudit, readLiveAudit } from '../core/live/dbLiveAuditStore.j
 import { exportLiveAudit } from '../live/audit/export.js';
 import type { Response } from 'express';
 import type { RequestHandler } from 'express';
-import { APP_EVENTS, LIVE_HEARTBEAT_MS } from '../../shared/types/live.js';
+import { APP_EVENTS, LIVE_HEARTBEAT_MS, PEDAL_TRACE_SECONDS_CHOICES, RESERVE_LAP_CHOICES } from '../../shared/types/live.js';
 import type { ServerContext } from '../core/serverContext.js';
 import type { LiveService } from '../live/liveService.js';
-import { isReserveLaps, loadLiveSettings, RESERVE_LAP_CHOICES, saveLiveSettings } from '../live/liveSettings.js';
+import { isPedalTraceSeconds, isReserveLaps, loadLiveSettings, saveLiveSettings } from '../live/liveSettings.js';
 import { SSE_HEADERS, writeSseEvent } from '../live/sse.js';
 
 function openStream(res: Response): void {
@@ -47,18 +47,22 @@ export function createLiveRouter(context: ServerContext, live: LiveService): Rou
 
   // Either setting may be sent alone; the other keeps its stored value.
   router.post('/live/settings', (req, res) => {
-    const body = (req.body ?? {}) as { autoOpen?: unknown; reserveLaps?: unknown };
+    const body = (req.body ?? {}) as { autoOpen?: unknown; reserveLaps?: unknown; pedalTraceSeconds?: unknown };
     const current = loadLiveSettings(context.sessionDb);
-    if (body.autoOpen === undefined && body.reserveLaps === undefined) {
-      return res.status(400).json({ error: 'Send autoOpen (true or false), reserveLaps, or both.' });
+    if (body.autoOpen === undefined && body.reserveLaps === undefined && body.pedalTraceSeconds === undefined) {
+      return res.status(400).json({ error: 'Send autoOpen (true or false), reserveLaps, or pedalTraceSeconds.' });
     }
     if (body.autoOpen !== undefined && typeof body.autoOpen !== 'boolean') return res.status(400).json({ error: 'autoOpen must be true or false.' });
     if (body.reserveLaps !== undefined && !isReserveLaps(body.reserveLaps)) {
       return res.status(400).json({ error: `reserveLaps must be one of ${RESERVE_LAP_CHOICES.join(', ')}.` });
     }
+    if (body.pedalTraceSeconds !== undefined && !isPedalTraceSeconds(body.pedalTraceSeconds)) {
+      return res.status(400).json({ error: `pedalTraceSeconds must be one of ${PEDAL_TRACE_SECONDS_CHOICES.join(', ')}.` });
+    }
     saveLiveSettings(context.sessionDb, {
       autoOpen: typeof body.autoOpen === 'boolean' ? body.autoOpen : current.autoOpen,
       reserveLaps: isReserveLaps(body.reserveLaps) ? body.reserveLaps : current.reserveLaps,
+      pedalTraceSeconds: isPedalTraceSeconds(body.pedalTraceSeconds) ? body.pedalTraceSeconds : current.pedalTraceSeconds,
     });
     const saved = loadLiveSettings(context.sessionDb);
     live.setReserveLaps(saved.reserveLaps);

@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Profiler } from 'react';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, within, waitFor } from '@testing-library/react';
 import App from '../../../src/App.js';
 import { prefetchRoutePages } from '../../../src/routePages.js';
 import { LivePage } from '../../../src/components/live/LivePage.js';
@@ -81,6 +81,13 @@ describe('LivePage', () => {
     expect(screen.getByTestId('live-race-position')).toHaveTextContent('P3');
   });
 
+  it('uses the saved pedal history duration in the real live dashboard', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ autoOpen: true, reserveLaps: 0.5, pedalTraceSeconds: 60 }) })));
+    render(<LivePage />);
+    send(snapshot({}));
+    await waitFor(() => expect(screen.getByTestId('pedal-trace')).toHaveAttribute('data-window-seconds', '60'));
+  });
+
   it('draws pedal batches on the canvas without rendering the page again', async () => {
     const calls: string[] = [];
     const ctx = new Proxy({}, {
@@ -123,6 +130,6 @@ describe('the /live route', () => {
     expect(screen.queryByText(/Loading LMU Replay/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Built for Le Mans Ultimate/)).not.toBeInTheDocument();
     expect(FakeEventSource.instances.map((s) => s.url)).toEqual(['/api/live/stream']);
-    expect(global.fetch).not.toHaveBeenCalled();
+    expect(global.fetch).toHaveBeenCalledWith('/api/live/settings', expect.objectContaining({ signal: expect.any(AbortSignal) }));
   });
 });

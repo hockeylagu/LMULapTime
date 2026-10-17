@@ -135,6 +135,7 @@ export class LiveLapTiming {
     const sectorDeltas = done.map((time, i) => (time !== null && best?.[i] != null ? ms(time - best[i]) : null)) as Sectors;
     return {
       lapNumber: player.totalLaps + 1,
+      isOutLap: lap.startedInPits,
       sector,
       lapElapsedSeconds: player.timeIntoLap >= 0 ? ms(player.timeIntoLap) : null,
       sectors: done,

@@ -1,7 +1,6 @@
-import { useLiveTiming, type LiveTimingStore } from '../../api/liveStream.js';
+import type { LiveTimingStore } from '../../api/liveStream.js';
 import type { LiveSnapshot } from '../../../shared/types/live.js';
 import type { ReactNode } from 'react';
-import { LiveDelta } from './LiveDelta.js';
 import { LiveEstimatedLap } from './LiveEstimatedLap.js';
 import { LiveDeltaRow } from './LiveDeltaRow.js';
 import { LiveLastLapRow } from './LiveLastLapRow.js';
@@ -10,16 +9,6 @@ import { RACE_COLUMN, RACE_LEAD, RACE_ROW, RULED } from './raceColumns.js';
 
 const LABEL = 'whitespace-nowrap text-[48px] font-semibold text-lmu-text-soft';
 const VALUE = 'mt-3 whitespace-nowrap font-mono text-[88px] font-bold leading-[1.2] tracking-[-0.025em]';
-
-/** The push lap against the session best, the page's lead value. Renders at 5 Hz. */
-function PushDelta({ store }: { store: LiveTimingStore }) {
-  const timing = useLiveTiming(store);
-  return (
-    <div data-testid="live-push-delta" className="whitespace-nowrap font-mono text-[180px] font-bold leading-[1.2] tracking-[-0.04em]">
-      <LiveDelta seconds={timing?.deltaSeconds ?? null} />
-    </div>
-  );
-}
 
 function Figure({ label, children, testId }: { label: string; children: ReactNode; testId: string }) {
   return (
@@ -31,7 +20,7 @@ function Figure({ label, children, testId }: { label: string; children: ReactNod
 }
 
 /**
- * The qualifying driving view, on the race columns: the push lap delta (position under it) beside the estimated lap,
+ * The qualifying driving view, on the race columns: the estimated lap (position under it) beside
  * the session best and the laps left; then the tyre surface average and the sectors against the best; then the last lap.
  */
 export function LiveQualiView({ snapshot, store }: { snapshot: LiveSnapshot; store: LiveTimingStore }) {
@@ -40,15 +29,16 @@ export function LiveQualiView({ snapshot, store }: { snapshot: LiveSnapshot; sto
   const lapsLeft = snapshot.lapsLeft;
   return (
     <>
-      <section aria-label="Push lap against the session best" className={`${RACE_ROW} min-h-0 flex-1 items-center`}>
-        <div className={RACE_LEAD}>
-          <h1 className="text-[48px] font-bold leading-[1.3]">PUSH LAP · VS BEST</h1>
-          <PushDelta store={store} />
+      <section aria-label="Qualifying estimated lap" className={`${RACE_ROW} min-h-0 flex-1 items-center`}>
+        <div data-testid="live-quali-estimate" className={`${RACE_LEAD} col-span-2`}>
+          <h1 className="text-[48px] font-bold leading-[1.3]">ESTIMATED LAP</h1>
+          <div className="whitespace-nowrap font-mono text-[180px] font-bold leading-[1.2] tracking-[-0.04em]">
+            <LiveEstimatedLap store={store} bestSeconds={best?.lapSeconds} />
+          </div>
           <p data-testid="live-quali-place" className="whitespace-nowrap font-mono text-[48px] font-semibold text-lmu-muted">
             {place !== null ? `P${place}` : UNKNOWN}
           </p>
         </div>
-        <Figure label="ESTIMATED LAP" testId="live-quali-estimate"><LiveEstimatedLap store={store} bestSeconds={best?.lapSeconds} /></Figure>
         <Figure label="SESSION BEST" testId="live-quali-best">{formatLapTime(best?.lapSeconds)}</Figure>
         <Figure label="LAPS LEFT" testId="live-quali-laps-left">{lapsLeft ? `${lapsLeft.estimated ? '~' : ''}${lapsLeft.laps}` : UNKNOWN}</Figure>
       </section>

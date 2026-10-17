@@ -29,8 +29,8 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     id: 'live-dashboard',
     title: 'Live Dashboard',
     icon: Radio,
-    description: 'The fullscreen live page that follows the game, and whether it opens by itself when LMU starts',
-    keywords: ['live', 'dashboard', 'cockpit', 'auto open', 'open', 'start', 'launch', 'window', 'fullscreen', 'game', 'shared memory'],
+    description: 'Live dashboard options and an offline demo with sample scenarios',
+    keywords: ['live', 'dashboard', 'pedal', 'trace', 'history', 'duration', 'reserve', 'demo', 'offline', 'preview', 'scenarios', 'cockpit', 'auto open', 'open', 'start', 'launch', 'window', 'fullscreen', 'game', 'shared memory'],
   },
   {
     id: 'ai-settings',

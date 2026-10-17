@@ -11,7 +11,7 @@ import { LiveResultTracker } from '../../shared/domain/live/liveResults.js';
 import type { LiveRestUpdate } from '../../shared/domain/live/liveStrategyTracker.js';
 import type { PersonalBestLookup } from '../../shared/domain/live/liveIdentity.js';
 import { LiveSessionTracker, NO_SESSION_DETAILS } from '../../shared/domain/live/liveSessionTracker.js';
-import { LIVE_HEARTBEAT_MS, LIVE_STREAM_EVENTS } from '../../shared/types/live.js';
+import { DEFAULT_LIVE_SETTINGS, LIVE_HEARTBEAT_MS, LIVE_STREAM_EVENTS } from '../../shared/types/live.js';
 import type { LiveLifecycle, LivePedalBatch, LivePedalSample, LiveSnapshot, LiveTiming } from '../../shared/types/live.js';
 import { TypedEmitter } from '../core/typedEmitter.js';
 import { findWorkerBootstrap, isWorkerMessage } from '../core/workerThreads.js';
@@ -20,7 +20,6 @@ import { LiveIdentityResolver } from './liveIdentityResolver.js';
 import type { LiveIdentityOptions } from './liveIdentityResolver.js';
 import { LivePitPoller } from './livePitPoller.js';
 import { parseNavigationState } from './lmuNavigation.js';
-import { DEFAULT_RESERVE_LAPS } from './liveSettings.js';
 import type { LivePitPollerOptions, PitPollMode } from './livePitPoller.js';
 import { writeSseEvent } from './sse.js';
 import type { SseSink } from './sse.js';
@@ -89,7 +88,10 @@ export class LiveService {
   private lastReading: LiveScoringReading | null = null;
   private screen: LiveGameScreen = 'session';
   private loadingProgress: number | null = null;
-  /** A replay playing (`navigation/state` `settingMode`, from the pit poller): it is not live driving. */
+  /**
+   * A replay playing (`navigation/state` `settingMode`): it is not live driving. The reader asks every 2 s, and the
+   * pit poller's state check says it too; both are fresh reads, so the newest wins. A failed check says nothing.
+   */
   private replay = false;
   /** The last `session-loaded` value sent. */
   private sessionLoaded = false;
@@ -120,7 +122,7 @@ export class LiveService {
         console.error('[Live] Strategy history could not be saved:', error instanceof Error ? error.message : String(error));
       }
     }) : null;
-    this.reserveLaps = options.reserveLaps ?? DEFAULT_RESERVE_LAPS;
+    this.reserveLaps = options.reserveLaps ?? DEFAULT_LIVE_SETTINGS.reserveLaps;
     this.identity = new LiveIdentityResolver({
       ...options.identity,
       personalBest: options.personalBest ?? (() => null),
@@ -134,9 +136,8 @@ export class LiveService {
         if (navigation) this.identity.offerNavigation(navigation);
       },
       onReplay: active => {
-        this.replay = active === true;
-        this.applyReading(this.lastReading);
-        this.followSessionLoaded();
+        if (active === null) return;
+        this.setReplay(active);
       },
     });
   }
@@ -225,9 +226,10 @@ export class LiveService {
       return;
     }
     if (message.type === 'navigation') {
-      this.screen = message.screen;
+      // A replay is a session screen whose frames are not the session's (applyReading shows it as the menu).
+      this.screen = message.screen === 'replay' ? 'session' : message.screen;
       this.loadingProgress = message.loadingProgress;
-      this.applyReading(this.lastReading);
+      this.setReplay(message.screen === 'replay');
       return;
     }
     if (message.tyreSurfaceAvgC !== undefined) this.tyreSurfaceAvgC = message.tyreSurfaceAvgC;
@@ -327,6 +329,13 @@ export class LiveService {
       this.events.emit('lifecycle', next.lifecycle);
     }
     this.followSessionLoaded();
+  }
+
+  private setReplay(active: boolean): void {
+    this.replay = active;
+    this.applyReading(this.lastReading);
+    this.followSessionLoaded();
+    this.followPitMode();
   }
 
   private followSessionLoaded(): void {

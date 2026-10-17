@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { LiveSettings } from '../../../shared/types/live.js';
+import { DEFAULT_LIVE_SETTINGS, PEDAL_TRACE_SECONDS_CHOICES, RESERVE_LAP_CHOICES } from '../../../shared/types/live.js';
 import { apiErrorMessage, isAbortError } from '../../api/apiClient.js';
 import { fetchLiveSettings, saveLiveSettings } from '../../api/liveStream.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
@@ -7,7 +8,7 @@ import { Select } from '../common/dropdown/Select.js';
 import { FeedbackMessage, SettingsPanel, type SettingsFeedback } from './SettingsPanel.js';
 
 /** VE or fuel kept at the pit entry or the finish (the server accepts these values only). */
-const RESERVE_OPTIONS = [0, 0.25, 0.5, 0.75, 1, 1.5, 2].map(laps => ({
+const RESERVE_OPTIONS = RESERVE_LAP_CHOICES.map(laps => ({
   value: laps,
   label: laps === 0 ? 'No reserve' : `${laps} ${laps === 1 ? 'lap' : 'laps'}`,
 }));
@@ -50,6 +51,10 @@ export const LiveDashboardCard: React.FC = () => {
       <p className="text-xs leading-relaxed text-lmu-muted">
         A fullscreen page for a second screen or an overlay, at <span className="font-mono">/#/live</span>. It follows the game while LMU runs.
       </p>
+      <div>
+        <a href="#/live?demo=1" className={`text-sm font-medium text-lmu-accent-text underline underline-offset-4 ${FOCUS_RING}`}>Open demo</a>
+        <p className="mt-1 text-xs leading-relaxed text-lmu-muted">Preview dashboard scenarios with sample data, without running LMU.</p>
+      </div>
       {settings === null && !message ? (
         <p role="status" className="text-xs text-lmu-muted">Loading live dashboard settings…</p>
       ) : (
@@ -77,6 +82,14 @@ export const LiveDashboardCard: React.FC = () => {
               className="w-36"
             />
           </div>
+          <div className="flex items-center gap-3 text-sm text-lmu-text">
+            <label htmlFor="live-pedal-duration">Pedal trace history</label>
+            <Select id="live-pedal-duration" value={settings?.pedalTraceSeconds ?? DEFAULT_LIVE_SETTINGS.pedalTraceSeconds}
+              onChange={pedalTraceSeconds => void save({ pedalTraceSeconds })}
+              options={PEDAL_TRACE_SECONDS_CHOICES.map(value => ({ value, label: `${value} seconds` }))}
+              disabled={settings === null || isSaving} size="compact" mono className="w-36" />
+          </div>
+          <p className="text-xs text-lmu-muted">Applies to the live dashboard and demo, including the corner preview.</p>
         </>
       )}
       <FeedbackMessage feedback={message} />

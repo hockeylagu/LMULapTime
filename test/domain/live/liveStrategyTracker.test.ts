@@ -99,6 +99,23 @@ describe('LiveStrategyTracker', () => {
     expect(strategy?.garage).toMatchObject({ kind: 've', sessionMinutes: 15, laps: 13, lapSeconds: 75, perLap: 2.5, needed: 34, setInGarage: 50 });
   });
 
+  it('starts the next session of the event from the game estimate, so the fuel ratio is there before qualifying', () => {
+    const tracker = new LiveStrategyTracker();
+    tracker.applyRest({ type: 'tireManagement', vePerLap: 2.5, fuelPerLap: 2.1, newSets: 40, selected: null });
+    tracker.applyRest({ type: 'pitMenu', menu: { resourceValue: null, resourceText: null, tyres: null, repair: null, fuelRatioOptions: [0.8, 0.84, 0.86, 0.88] } });
+    tracker.applyRest({ type: 'garage', veStart: 50, fuelStart: null, fuelRatio: 0.86 });
+    const practice = at(30, { sessionCode: 1, inRealtime: false, endEt: 600, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 100 }) });
+    expect(context(tracker, practice, { lapsLeft: null })?.fuelRatio?.recommended).toBe(0.84);
+    // Qualifying loads: its own tyre screen is not read yet, the practice estimate stands for the same car and layout.
+    const qualifying = at(5, { sessionCode: 5, inRealtime: false, endEt: 600, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 100 }) });
+    const strategy = context(tracker, qualifying, { lapsLeft: null });
+    expect(strategy?.fuelRatio).toMatchObject({ recommended: 0.84, source: 'game' });
+    expect(strategy?.garage).toMatchObject({ perLap: 2.5, perLapSource: 'game' });
+    // Another track: the estimate goes with the event.
+    const other = at(5, { trackName: 'Bahrain International Circuit', sessionCode: 5, inRealtime: false, endEt: 600 });
+    expect(context(tracker, other, { lapsLeft: null })?.fuelRatio ?? null).toBeNull();
+  });
+
   it('plans from the time left to the session end, and not from the countdown before a race', () => {
     const tracker = new LiveStrategyTracker();
     tracker.applyRest({ type: 'tireManagement', vePerLap: 2.5, fuelPerLap: 2.1, newSets: 40, selected: null });

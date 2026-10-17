@@ -5,8 +5,9 @@ import http from 'node:http';
  * - `ok`: the whole body arrived (any status; callers check it),
  * - `timeout`: no complete answer within the deadline (a socket's own `timeout` is an idle timer, and an answer
  *   trickling in would never trip it),
- * - `aborted`: the connection closed in the middle of the answer (the game exiting while it answers),
- * - `error`: no answer at all (refused: the game is not there).
+ * - `aborted`: the connection dropped before the whole answer came (a reset: LMU drops requests in the last
+ *   frozen seconds of a session load, seen 2026-10-16; or the game exiting while it answers),
+ * - `error`: the connection was refused: the game is not there.
  * Without the deadline and the abort cases a caller that waits for one request at a time could wait forever.
  */
 export type LmuHttpResult =
@@ -34,6 +35,6 @@ export function lmuHttpGet(url: string, deadlineMs: number): Promise<LmuHttpResu
     });
     const deadline = setTimeout(() => settle({ status: 'timeout' }), deadlineMs);
     deadline.unref();
-    request.on('error', () => settle({ status: 'error' }));
+    request.on('error', (error: NodeJS.ErrnoException) => settle({ status: error.code === 'ECONNREFUSED' ? 'error' : 'aborted' }));
   });
 }

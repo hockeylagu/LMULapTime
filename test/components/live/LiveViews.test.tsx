@@ -144,20 +144,31 @@ describe('live driving views', () => {
     });
   });
 
+  it.each(['practice', 'qualifying'] as const)('labels the %s estimate OUT LAP until a flying lap starts', kind => {
+    render(<LivePage />);
+    send(liveSnapshot({ session: liveSession({ kind }), sessionBest: BEST }));
+    timing(liveTiming({ isOutLap: true, deltaSeconds: null }));
+    expect(screen.getByTestId('live-estimated-lap')).toHaveTextContent('OUT LAP');
+    timing(liveTiming({ isOutLap: false, deltaSeconds: null }));
+    expect(screen.getByTestId('live-estimated-lap')).toHaveTextContent('—');
+    timing(liveTiming({ isOutLap: false, deltaSeconds: -0.184 }));
+    expect(screen.getByTestId('live-estimated-lap')).toHaveTextContent('2:01.222');
+  });
+
   describe('qualifying', () => {
     const quali = () => liveSnapshot({ session: liveSession({ kind: 'qualifying' }), recentLaps: [LAPS[2]], sessionBest: BEST });
 
-    it('shows the push lap delta large with the place, the estimated lap, session best and laps left, the tyre average slot held until sent, and the last lap', () => {
+    it('leads with estimated lap and place, session best and laps left, tyre average and last lap', () => {
       render(<LivePage />);
       send({ ...quali(), lapsLeft: { laps: 3, estimated: true } });
-      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('PUSH LAP · VS BEST');
-      expect(screen.getByTestId('live-push-delta')).toHaveTextContent('—');
+      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('ESTIMATED LAP');
+      expect(screen.getByTestId('live-estimated-lap')).toHaveTextContent('—');
+      expect(screen.queryByTestId('live-push-delta')).not.toBeInTheDocument();
       expect(screen.getByTestId('live-tyre-avg')).toHaveTextContent('—°C');
       timing(liveTiming({ deltaSeconds: 0.321 }));
-      expect(screen.getByTestId('live-push-delta')).toHaveTextContent('+0.321');
-      expect(within(screen.getByTestId('live-push-delta')).getByText('+0.321')).toHaveAttribute('data-delta', 'loss');
+      expect(screen.getByTestId('live-estimated-lap')).toHaveTextContent('2:01.727');
       timing({ ...liveTiming({ deltaSeconds: -0.184 }), tyreSurfaceAvgC: 82.4 });
-      expect(within(screen.getByTestId('live-push-delta')).getByText('−0.184')).toHaveAttribute('data-delta', 'gain');
+      expect(screen.getByTestId('live-estimated-lap')).toHaveTextContent('2:01.222');
       expect(screen.getByTestId('live-tyre-avg')).toHaveTextContent('82°C');
       expect(screen.getByTestId('live-last-lap')).toHaveTextContent('2:01.832');
       expect(screen.getByTestId('live-quali-best')).toHaveTextContent('SESSION BEST2:01.406');
@@ -190,7 +201,8 @@ describe('live driving views', () => {
       expect(screen.getByTestId('live-practice-last')).toHaveTextContent('2:01.832');
       expect(screen.getByText('SESSION BEST').nextElementSibling).toHaveTextContent('2:01.406');
       expect(screen.getByText('ESTIMATED LAP').nextElementSibling).toHaveTextContent('2:01.222');
-      expect(screen.getByTestId('live-practice-delta')).toHaveTextContent('−0.184');
+      expect(screen.queryByTestId('live-practice-delta')).not.toBeInTheDocument();
+      expect(screen.queryByText('CURRENT VS BEST')).not.toBeInTheDocument();
       const rows = within(screen.getByTestId('live-history')).getAllByRole('row');
       // Header, current splits, two laps newest first, the BEST footer.
       expect(rows).toHaveLength(5);
@@ -251,7 +263,7 @@ describe('live driving views', () => {
       expect(screen.getByTestId('live-practice-last')).toHaveTextContent('—');
       expect(screen.getByText('SESSION BEST').nextElementSibling).toHaveTextContent('—');
       expect(screen.getByTestId('live-history-best')).toHaveTextContent('BEST————');
-      expect(screen.getByTestId('live-practice-delta')).toHaveTextContent('—');
+      expect(screen.queryByTestId('live-practice-delta')).not.toBeInTheDocument();
     });
   });
 });

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LiveReader, STARTUP_GRACE_MS } from '../../../server/live/liveReader.js';
+import { CUE_PROBE_MS, LiveReader, PROBE_MS, STARTUP_GRACE_MS } from '../../../server/live/liveReader.js';
 import type { GameProbe, LiveReaderMessage } from '../../../server/live/liveReader.js';
 import { SCORING, SCORING_MAPPING_NAME, TELEMETRY, TELEMETRY_MAPPING_NAME } from '../../../server/live/rf2Layout.js';
 import type { MappedBuffer } from '../../../server/live/sharedMemory.js';
@@ -25,6 +25,9 @@ function setup(probe: () => Promise<GameProbe> = () => Promise.resolve('session'
     setTelemetry: (buffer: Buffer) => { telemetry = buffer; },
   };
 }
+
+const lastNavigation = (posted: LiveReaderMessage[]): LiveReaderMessage | undefined =>
+  posted.filter(message => message.type === 'navigation').pop();
 
 describe('LiveReader', () => {
   beforeEach(() => { vi.useFakeTimers(); });
@@ -81,18 +84,18 @@ describe('LiveReader', () => {
     t.reader.stop();
   });
 
-  it('asks the game once the counters stand still, and unmaps when it is gone', async () => {
+  it('asks the game every 2 s, and unmaps when it is gone', async () => {
     const answers: GameProbe[] = ['session', 'gone'];
     const probe = vi.fn(() => Promise.resolve(answers.shift() ?? 'gone'));
     const t = setup(probe);
     t.available.value = true;
     t.reader.start();
-    await vi.advanceTimersByTimeAsync(4900);
+    await vi.advanceTimersByTimeAsync(PROBE_MS - 100);
     expect(probe).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(200);
     expect(probe).toHaveBeenCalledTimes(1);
     expect(t.closes.scoring).not.toHaveBeenCalled();
-    await vi.advanceTimersByTimeAsync(5000);
+    await vi.advanceTimersByTimeAsync(PROBE_MS);
     expect(probe).toHaveBeenCalledTimes(2);
     expect(t.posted[t.posted.length - 1]).toEqual({ type: 'closed' });
     expect(t.closes.scoring).toHaveBeenCalled();
@@ -127,16 +130,16 @@ describe('LiveReader', () => {
     t.reader.stop();
   });
 
-  it('stays open while a paused game still answers, asking again no sooner than every 5 s', async () => {
+  it('stays open while a paused game still answers, asking again no sooner than every 2 s', async () => {
     const probe = vi.fn(() => Promise.resolve<GameProbe>('session'));
     const t = setup(probe);
     t.available.value = true;
     t.reader.start();
-    await vi.advanceTimersByTimeAsync(5100);
+    await vi.advanceTimersByTimeAsync(PROBE_MS + 100);
     expect(probe).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(4000);
+    await vi.advanceTimersByTimeAsync(PROBE_MS - 300);
     expect(probe).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(1100);
+    await vi.advanceTimersByTimeAsync(300);
     expect(probe).toHaveBeenCalledTimes(2);
     expect(t.closes.scoring).not.toHaveBeenCalled();
     t.reader.stop();
@@ -158,7 +161,7 @@ describe('LiveReader', () => {
     t.reader.stop();
   });
 
-  it('asks a game that keeps its counters moving until it answers once, then only when they stand still', async () => {
+  it('keeps asking every 2 s while the counters move, and unmaps on a refusal once the game has answered', async () => {
     const probe = vi.fn(() => Promise.resolve<GameProbe>('session'));
     const t = setup(probe);
     t.available.value = true;
@@ -167,18 +170,38 @@ describe('LiveReader', () => {
       t.setScoring(scoringBuffer(version, [PLAYER]));
       await vi.advanceTimersByTimeAsync(1000);
     }
-    // One question at 5 s (no answer seen yet), none after it while the counters move.
-    expect(probe).toHaveBeenCalledTimes(1);
-    // The game closes: the counters stand still and the refusal now counts.
+    expect(probe).toHaveBeenCalledTimes(10);
     probe.mockImplementation(() => Promise.resolve<GameProbe>('gone'));
-    await vi.advanceTimersByTimeAsync(5100);
-    expect(probe).toHaveBeenCalledTimes(2);
+    await vi.advanceTimersByTimeAsync(PROBE_MS + 100);
     expect(t.posted).toContainEqual({ type: 'closed' });
     t.reader.stop();
   });
 
+  it('holds the frames after the clock jumps back until the game answers, and says when it is a replay', async () => {
+    const probe = vi.fn(() => Promise.resolve<GameProbe>('session'));
+    const t = setup(probe);
+    t.available.value = true;
+    t.reader.start();
+    await vi.advanceTimersByTimeAsync(PROBE_MS + 100);
+    const asked = probe.mock.calls.length;
+    probe.mockImplementation(() => Promise.resolve<GameProbe>('replay'));
+    t.posted.length = 0;
+    // A replay starts from the monitor: the clock goes back to the start of the session.
+    t.setScoring(scoringBuffer(3, [PLAYER], { currentEt: 0 }));
+    await vi.advanceTimersByTimeAsync(CUE_PROBE_MS - 200);
+    expect(t.posted).toEqual([]);
+    await vi.advanceTimersByTimeAsync(300);
+    expect(probe.mock.calls.length).toBe(asked + 1);
+    expect(t.posted).toEqual([{ type: 'navigation', screen: 'replay', loadingProgress: null }]);
+    // The answer clears the hold: the next frame goes out again.
+    t.setScoring(scoringBuffer(4, [PLAYER], { currentEt: 0.2 }));
+    await vi.advanceTimersByTimeAsync(40);
+    expect(t.posted).toContainEqual(expect.objectContaining({ type: 'frame' }));
+    t.reader.stop();
+  });
+
   it('says when LMU loads a session, asks every second for the progress, and when the session is there', async () => {
-    const answers: GameProbe[] = ['menu', { loading: 0.25 }, { loading: 0.8 }, 'session'];
+    const answers: GameProbe[] = ['menu', { loading: 0.25 }, { loading: 0.8 }, { loading: null }, 'session'];
     const probe = vi.fn(() => Promise.resolve(answers.length > 1 ? answers.shift() as GameProbe : answers[0]));
     const t = setup(probe);
     t.available.value = true;
@@ -189,8 +212,34 @@ describe('LiveReader', () => {
     expect(t.posted).toContainEqual({ type: 'navigation', screen: 'loading', loadingProgress: 0.25 });
     await vi.advanceTimersByTimeAsync(1000);
     expect(t.posted).toContainEqual({ type: 'navigation', screen: 'loading', loadingProgress: 0.8 });
+    // The last frozen seconds of the load have no progress: the last one stays.
+    const before = t.posted.length;
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(t.posted.slice(before).filter(message => message.type === 'navigation')).toEqual([]);
     await vi.advanceTimersByTimeAsync(1000);
     expect(t.posted[t.posted.length - 1]).toEqual({ type: 'navigation', screen: 'session', loadingProgress: null });
+    t.reader.stop();
+  });
+
+  it('on the menu takes a scoring change as a cue to ask the game, not as a session back', async () => {
+    const answers: GameProbe[] = ['menu'];
+    const probe = vi.fn(() => Promise.resolve(answers[answers.length - 1]));
+    const t = setup(probe);
+    t.available.value = true;
+    t.reader.start();
+    await vi.advanceTimersByTimeAsync(5100);
+    expect(t.posted).toContainEqual({ type: 'navigation', screen: 'menu', loadingProgress: null });
+    const asked = probe.mock.calls.length;
+    // LMU exiting writes the last session once more: the game is asked within a second and still says menu.
+    t.setScoring(scoringBuffer(3, [PLAYER]));
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(probe.mock.calls.length).toBeGreaterThan(asked);
+    expect(lastNavigation(t.posted)).toEqual({ type: 'navigation', screen: 'menu', loadingProgress: null });
+    // A session really back: the next change is asked about and the answer switches the screen.
+    answers.push('session');
+    t.setScoring(scoringBuffer(4, [PLAYER]));
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(lastNavigation(t.posted)).toEqual({ type: 'navigation', screen: 'session', loadingProgress: null });
     t.reader.stop();
   });
 

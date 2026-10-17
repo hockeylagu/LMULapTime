@@ -521,17 +521,31 @@ it also holds `fetchLiveSettings` / `saveLiveSettings`. `src/components/live/`: 
 (fixed 2560x1440 stage scaled to the window), `LiveSessionBar` (class through the existing `CarClassBadge`, zoomed;
 class from `mapVehicleIdToClass(vehicleName, vehicleClass)` in `liveScreens.ts`), `LiveStateScreen` (the lifecycle
 screens, built by `liveScreen(snapshot)`), and `LivePedalTrace` (canvas, redrawn by rAF from the `PedalBuffer`
-ring in `pedalBuffer.ts`). `src/api/useAppEvents.ts` is the app-wide `GET /api/events` listener used by
+  ring in `pedalBuffer.ts`). `#/live?preview=corners` lazily opens `preview/LiveCornerPreview.tsx`, an isolated
+  sample-data layout showing the last corner's time loss and minimum/reference speeds beside the pedal trace;
+  it opens no live stream and provides no measured corner coaching.
+  `#/live?demo=1` lazily loads `demo/LiveDemoPage.tsx`: offline, production-available scenarios from
+  `demo/demoScenarios.ts`, with illustrative typed data in `demo/demoData.ts`. Both the connected page and demo
+  render `display/LiveDashboardView.tsx`, so lifecycle, strategy, timing and results use the same production UI.
+  Demo selection uses the hash query (`scenario`), with a picker, previous/next, a five-second tour, pedal animation
+  and an optional `carClass` override (GT3 by default). `demo/demoClasses.ts` applies illustrative class identity and pace, canonical VE/fuel units
+  and class-specific garage plans while keeping the selected scenario. The override survives scenario changes.
+  No game EventSource or recorded files. `src/api/useLiveDashboardSettings.ts` reads saved reserve and pedal trace
+  duration on mount/focus, falling back to defaults when unavailable. `PedalBuffer.windowSeconds` controls both
+  retention and the canvas time scale. Settings are shared with the production dashboard and standalone preview.
+  Usage: `docs/LIVE_DASHBOARD_DEMO.md`.
+  `src/api/useAppEvents.ts` is the app-wide `GET /api/events` listener used by
 `useAppData` (scan-started restarts scan polling, scan-finished reloads data). Settings card:
 `settings/LiveDashboardCard.tsx` (`autoOpen`, VE/fuel reserve laps). Tests use `test/helpers/fakeEventSource.ts` and `test/helpers/liveSnapshot.ts`.
 Step 2 (identity and timing): the `timing` event (each scoring update, about 5 a second; sent at most every 100 ms)
 goes into `LiveTimingStore` (returned by `useLiveStream` as `timing`, read with `useLiveTiming` /
 `useSyncExternalStore`), so only the timing parts render, not the page. `useLiveStream` reopens a lost stream every
 2 s (`LIVE_RETRY_MS`: server restart, proxy error or silence) until the server answers, so `DATA LOST` recovers
-without a reload. `LiveEstimatedLap` shows the lap in progress projected to the line (session best plus the running
-delta). The driving content is `LiveDriving` by session kind: `LiveRaceView` (`LiveDeltaRow` led by the estimated
-lap; a sprint's lead readout is the estimated lap), `LiveQualiView` (push lap delta with the place under it, beside
-the estimated lap, session best and laps left; tyre average and sector deltas in `LiveDeltaRow`), `LivePracticeView`
+without a reload. `LiveEstimatedLap` shows OUT LAP when the canonical live lap tracker reports
+`LiveTiming.isOutLap`; otherwise it projects to the line (session best plus the running delta), or shows unknown
+without a reference. The driving content is `LiveDriving` by session kind: `LiveRaceView` (`LiveDeltaRow` led by the estimated
+lap; a sprint's lead readout is the estimated lap), `LiveQualiView` (large estimated lap with the place under it, beside
+session best and laps left; tyre average and sector deltas in `LiveDeltaRow`), `LivePracticeView`
 (also warmup and unknown: last lap, estimated lap, session best) with `LivePracticeHistory`: its current-lap row shows the lap
 number, the running lap clock (`LiveTiming.lapElapsedSeconds`, `formatRunningTime`; `RunningClock` ticks on animation
 frames up to 0.25 s past the last update) and S1/S2 as each line is crossed;
@@ -573,9 +587,10 @@ thread. `rf2Layout.ts` derives every byte offset from field lists that mirror `t
 (its test asserts the plugin's struct sizes: a shifted field fails there); `rf2Decode.ts` holds the pure decoders and the
 coherent read (begin counter, copy, end counter, 3 attempts, unchanged frames skipped); `sharedMemory.ts` is the only
 Windows part (koffi `OpenFileMappingW` / `MapViewOfFile`); `liveReader.ts` is the worker's loop (3 s open retry, 50 Hz in
-realtime and 1 Hz otherwise, game-exit check: counters still for 5 s, then one `GET 127.0.0.1:6397/navigation/state`: refused = gone,
-timeout = busy, `NAV_MAIN_MENU` = menu (the buffer keeps the last session in the menu); a refusal only counts once LMU has answered,
-or after a 3 min start-up grace),
+realtime and 1 Hz otherwise, one `GET 127.0.0.1:6397/navigation/state` every 2 s: refused = gone (a reset or timeout = busy),
+`NAV_MAIN_MENU` = menu (the buffer keeps the last session in the menu), `loading` or `OP_TO_REALTIME` = loading (LMU clears
+`loading` a few frozen seconds early), `SETTING_REPLAY_PLAYBACK` = replay; a refusal only counts once LMU has answered, or after a
+3 min start-up grace; a jump in the buffer (session, track, clock back, any write on the menu) holds the frames and asks within 1 s),
 started by `liveReaderWorker.ts` through `liveReaderWorkerBootstrap.mjs`. The main thread side: `liveService.ts` (snapshot,
 SSE clients, 40 ms pedal batches only on track, heartbeat, slow clients drop batches, `session-loaded` / `lifecycle`
 events), `liveSettings.ts` (`live_auto_open`, `live_reserve_laps` in

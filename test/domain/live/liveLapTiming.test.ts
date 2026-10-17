@@ -109,6 +109,19 @@ describe('LiveLapTiming', () => {
     expect(timing.timing()?.deltaSeconds).toBeCloseTo(-0.5, 3);
   });
 
+  it('marks an out lap from pit departure until the next timing line crossing', () => {
+    const timing = new LiveLapTiming();
+    timing.update(reading({ totalLaps: 5, inPits: true, lapDist: 200, timeIntoLap: 10 }));
+    expect(timing.timing()?.isOutLap).toBe(true);
+    timing.update(reading({ totalLaps: 5, inPits: false, lapDist: 1000, timeIntoLap: 30 }));
+    expect(timing.timing()).toMatchObject({ isOutLap: true, deltaSeconds: null });
+    timing.update(reading({ totalLaps: 6, inPits: false, lapDist: 3, timeIntoLap: 0.1 }));
+    expect(timing.timing()?.isOutLap).toBe(false);
+    expect(timing.recentLaps[0].valid).toBe(false);
+    timing.reset();
+    expect(timing.timing()).toBeNull();
+  });
+
   it('gives no delta without a reference, in the pits, on an out lap or before the line', () => {
     const timing = new LiveLapTiming();
     timing.update(reading({ totalLaps: 0, lapDist: 3_000, timeIntoLap: 30 }));

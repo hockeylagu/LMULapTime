@@ -10,6 +10,7 @@ let origin = '';
 beforeAll(async () => {
   server = http.createServer((req, res) => {
     if (req.url === '/ok') { res.writeHead(404); res.end('{"a":1}'); return; }
+    if (req.url === '/reset') { req.socket.resetAndDestroy(); return; }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.write('{"a":');
     if (req.url === '/abort') { setTimeout(() => req.socket.destroy(), 20); return; }
@@ -38,6 +39,10 @@ describe('lmuHttpGet', () => {
 
   it('settles when the connection drops in the middle of the answer', async () => {
     expect(await lmuHttpGet(`${origin}/abort`, 5000)).toEqual({ status: 'aborted' });
+  });
+
+  it('reports a connection reset before any answer as aborted, not as a game that is gone', async () => {
+    expect(await lmuHttpGet(`${origin}/reset`, 5000)).toEqual({ status: 'aborted' });
   });
 
   it('reports a refused connection as an error', async () => {

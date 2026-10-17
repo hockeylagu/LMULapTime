@@ -102,6 +102,8 @@ export interface LiveSessionBest {
 
 /** Current-lap progress, sent about 5 times a second while on track (`timing` event). */
 export interface LiveTiming {
+  /** The current lap started in the pits, as classified by the live lap tracker. */
+  isOutLap?: boolean;
   /** Lap in progress (completed laps + 1). */
   lapNumber: number;
   sector: 1 | 2 | 3;
@@ -163,7 +165,13 @@ export interface LiveSettings {
   autoOpen: boolean;
   /** VE or fuel kept at the pit entry or the finish, in laps. Half a lap by default. */
   reserveLaps: number;
+  /** Seconds of throttle/brake history shown on the live dashboard and demo. */
+  pedalTraceSeconds: number;
 }
+
+export const PEDAL_TRACE_SECONDS_CHOICES = [5, 10, 15, 20, 30, 45, 60, 90, 120] as const;
+export const RESERVE_LAP_CHOICES = [0, 0.25, 0.5, 0.75, 1, 1.5, 2] as const;
+export const DEFAULT_LIVE_SETTINGS: LiveSettings = { autoOpen: true, reserveLaps: 0.5, pedalTraceSeconds: 30 };
 
 /** Server-sent event names on `GET /api/live/stream`. The data of each is JSON. */
 export const LIVE_STREAM_EVENTS = {
