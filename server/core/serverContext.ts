@@ -63,6 +63,9 @@ export class ServerContext {
   private readonly instanceId = randomUUID();
   // A game session is loaded (live dashboard): LMU may be writing its files, so no scan starts until it ends.
   private liveSessionLoaded = false;
+  // Replay and telemetry scans asked for while a game session is loaded (a held session refresh is pendingSessionRefresh).
+  private heldReplaySync = false;
+  private heldTelemetryScan = false;
   private scanBusy = false;
   /** `scan-started` when any file scan starts; `scan-finished` when none is left (GET /api/events). */
   public readonly events = new TypedEmitter<{ 'scan-started': []; 'scan-finished': [] }>();
@@ -142,22 +145,21 @@ export class ServerContext {
 
   /**
    * While a game session is loaded no scan starts and a running replay upgrade stops: what was asked
-   * for is queued (one session refresh covers the replay and telemetry scans that follow it) and runs
-   * when the session has ended.
+   * for is queued by kind (`holdForLiveSession`) and runs when the session has ended (`runHeldScans`).
+   * Held work is not published as scan activity, so pages do not poll for it during the session.
    */
   public setLiveSessionLoaded(loaded: boolean): void {
     if (this.liveSessionLoaded === loaded) return;
     this.liveSessionLoaded = loaded;
-    if (loaded) {
-      this.replayUpgrade?.stop();
-    } else if (!this.runPendingSessionRefresh()) {
-      this.startReplayUpgradeWhenIdle();
-    }
+    if (loaded) this.replayUpgrade?.stop();
+    else this.runHeldScans();
     this.publishScanActivity();
   }
 
   private isScanBusy(): boolean {
-    return this.hasActiveFileScan() || this.pendingSessionRefresh || (this.replayUpgradeRunner?.getStatus().running ?? false);
+    // Work held for a game session is not activity: nothing runs until the session ends.
+    const queued = !this.liveSessionLoaded && this.pendingSessionRefresh;
+    return this.hasActiveFileScan() || queued || (this.replayUpgradeRunner?.getStatus().running ?? false);
   }
 
   /** Emits `scan-started` / `scan-finished` when the app goes from idle to busy and back. Called wherever that can change. */
@@ -361,7 +363,7 @@ export class ServerContext {
   }
 
   public runReplaySyncInBackground(): boolean {
-    if (this.liveSessionLoaded) return this.holdForLiveSession();
+    if (this.liveSessionLoaded) return this.holdForLiveSession('replay');
     if (this.replayScanStatus.running) return false;
     if (this.sessionReplayReconciliationRunning) {
       // Runs when the reconciliation ends: a session scan finishing meanwhile must not lose it.
@@ -405,11 +407,36 @@ export class ServerContext {
     return true;
   }
 
-  /** Queues a scan asked for while a game session is loaded. Always false: nothing started. */
-  private holdForLiveSession(forceReparse = false): false {
-    this.pendingSessionRefresh = true;
-    this.pendingForcedSessionReparse ||= forceReparse;
+  /**
+   * Queues a scan asked for while a game session is loaded, by kind: a held replay or telemetry scan runs alone
+   * when the session ends, not as a full session refresh. Always false: nothing started.
+   */
+  private holdForLiveSession(kind: 'session' | 'replay' | 'telemetry', forceReparse = false): false {
+    if (kind === 'session') {
+      this.pendingSessionRefresh = true;
+      this.pendingForcedSessionReparse ||= forceReparse;
+    } else if (kind === 'replay') {
+      this.heldReplaySync = true;
+    } else {
+      this.heldTelemetryScan = true;
+    }
     return false;
+  }
+
+  /** The session ended: a held session refresh covers the replay and telemetry scans after it; otherwise those run alone. */
+  private runHeldScans(): void {
+    const replay = this.heldReplaySync;
+    const telemetry = this.heldTelemetryScan;
+    this.heldReplaySync = false;
+    this.heldTelemetryScan = false;
+    if (this.runPendingSessionRefresh()) return;
+    if (this.pendingSessionRefresh) {
+      // A scan still running finishes first; the refresh it then runs brings the replays and telemetry along.
+      return;
+    }
+    if (replay) this.runReplaySyncInBackground();
+    if (telemetry) this.runTelemetryScanInBackground();
+    this.startReplayUpgradeWhenIdle();
   }
 
   private runPendingSessionRefresh(): boolean {
@@ -435,7 +462,7 @@ export class ServerContext {
    */
   public runSessionSyncInBackground(forceReparse = false, retryFailedReplays = false): boolean {
     if (retryFailedReplays) this.retryFailedReplays = true;
-    if (this.liveSessionLoaded) return this.holdForLiveSession(forceReparse);
+    if (this.liveSessionLoaded) return this.holdForLiveSession('session', forceReparse);
     if (this.hasActiveFileScan()) return false;
     this.replayUpgrade?.stop();
     const status: SessionScanStatus = startedScanStatus();
@@ -474,7 +501,7 @@ export class ServerContext {
   public runTelemetryScanInBackground(): void {
     if (typeof this.telemetryCatalog?.refresh !== 'function') return;
     if (this.liveSessionLoaded) {
-      this.holdForLiveSession();
+      this.holdForLiveSession('telemetry');
       return;
     }
     const telemetryDir = this.currentTelemetryDir;
@@ -636,7 +663,7 @@ export class ServerContext {
       ...this.replayScanStatus,
       replayJobs: [...this.replayJobs.values()],
       sessionReplayJobs,
-      refreshQueued: this.pendingSessionRefresh,
+      refreshQueued: this.pendingSessionRefresh || this.heldReplaySync || this.heldTelemetryScan,
       heldForLiveSession: this.liveSessionLoaded,
       sessionScan: this.sessionScanStatus,
       sessionProjectionBackfill: this.sessionProjectionBackfill,

@@ -186,6 +186,12 @@ describe('app scan freshness', () => {
     unmount(); const calls = fetchMock.mock.calls.length; await poll(); expect(fetchMock).toHaveBeenCalledTimes(calls);
   });
 
+  it('does not poll for a refresh held until the game session ends', async () => {
+    scan.refreshQueued = true; scan.allComplete = false; scan.heldForLiveSession = true;
+    await mount();
+    const calls = fetchMock.mock.calls.length; await poll(); await poll(); expect(fetchMock).toHaveBeenCalledTimes(calls);
+  });
+
   it('drops a stale running scan when the server stops answering, and backs off the retries', async () => {
     scan.running = true; scan.total = 10; scan.processed = 4;
     const { result } = await mount();

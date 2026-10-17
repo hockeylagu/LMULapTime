@@ -109,8 +109,10 @@ export function useAppData({ onGameStarted }: { onGameStarted?: () => void } = {
           if (success) loadedKey.current = key;
           else retry = true;
         }
-        const active = scan.refreshQueued || scan.running || scan.sessionScan?.running || scan.telemetryScan?.running ||
-          scan.replayUpgrade?.running || scan.sessionProjectionBackfill?.running || scan.allComplete === false || (reference?.started && !reference.checked);
+        const running = scan.running || scan.sessionScan?.running || scan.telemetryScan?.running || scan.replayUpgrade?.running ||
+          scan.sessionProjectionBackfill?.running || (reference?.started && !reference.checked);
+        // Work held for a game session waits for its end, which the server announces (scan-started): no polling meanwhile.
+        const active = running || (!scan.heldForLiveSession && (scan.refreshQueued || scan.allComplete === false));
         if (active || retry) pollTimer.current = setTimeout(() => { void poll(); }, retry ? SERVER_RETRY_MS : 1000);
       } catch (err: unknown) {
         if (!mounted.current || generation !== pollGeneration.current || isAbortError(err)) return;

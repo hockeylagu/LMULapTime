@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useAppData } from '../../src/api/useAppData.js';
-import { APP_EVENT_SILENCE_MS } from '../../src/api/useAppEvents.js';
+import { APP_EVENT_ERROR_GRACE_MS, APP_EVENT_SILENCE_MS } from '../../src/api/useAppEvents.js';
 import { LIVE_HEARTBEAT_MS } from '../../shared/types/live.js';
 import { FakeEventSource } from '../helpers/fakeEventSource.js';
 
@@ -52,6 +52,23 @@ describe('app event stream', () => {
     expect(onGameStarted).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the game status through a stream error the reconnect answers, and clears it when none answers', async () => {
+    const { result } = renderHook(() => useAppData());
+    await act(async () => {});
+    const source = FakeEventSource.byUrl('/api/events');
+    act(() => source.emit('game-running', { running: true }));
+    act(() => source.emit('error'));
+    expect(result.current.gameRunning).toBe(true);
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    const reconnected = FakeEventSource.byUrl('/api/events');
+    act(() => reconnected.emit('game-running', { running: true }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(APP_EVENT_ERROR_GRACE_MS); });
+    expect(result.current.gameRunning).toBe(true);
+    act(() => reconnected.emit('error'));
+    await act(async () => { await vi.advanceTimersByTimeAsync(APP_EVENT_ERROR_GRACE_MS); });
+    expect(result.current.gameRunning).toBe(false);
+  });
+
   it.each(['error', 'silence'])('clears stale game status after stream %s and restores it on reconnect', async reason => {
     const { result, unmount } = renderHook(() => useAppData());
     await act(async () => {});
@@ -59,12 +76,12 @@ describe('app event stream', () => {
     act(() => source.emit('game-running', { running: true }));
     expect(result.current.gameRunning).toBe(true);
     await act(async () => {
-      if (reason === 'error') source.emit('error');
+      if (reason === 'error') { source.emit('error'); await vi.advanceTimersByTimeAsync(APP_EVENT_ERROR_GRACE_MS); }
       else await vi.advanceTimersByTimeAsync(APP_EVENT_SILENCE_MS);
     });
     expect(result.current.gameRunning).toBe(false);
     expect(source.closed).toBe(true);
-    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    if (reason === 'silence') await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
     const reconnected = FakeEventSource.byUrl('/api/events');
     expect(reconnected).not.toBe(source);
     act(() => reconnected.emit('game-running', { running: true }));

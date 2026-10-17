@@ -352,7 +352,8 @@ export class LiveStrategyTracker {
     const race = liveSessionKind(reading.sessionCode) === 'race';
     // `endEt` is a session time, not a length: what is left is the time to it. Before a race's clock runs it is not the
     // race end (`raceClockRunning`), so the race length comes from the event's schedule, unknown until it is read.
-    const sessionSeconds = race && !raceClockRunning(reading.gamePhase, reading.currentEt)
+    const clockRunning = raceClockRunning(reading.gamePhase, reading.currentEt);
+    const sessionSeconds = race && !clockRunning
       ? (this.raceMinutes === null ? null : this.raceMinutes * 60)
       : !(reading.endEt > 0 && reading.endEt < 1_000_000) ? null : Math.max(0, reading.endEt - Math.max(0, reading.currentEt));
     const estimated = reading.player && reading.player.estimatedLapTime > 0 ? reading.player.estimatedLapTime : null;
@@ -360,7 +361,9 @@ export class LiveStrategyTracker {
     const plan = planGarage({
       kind,
       sessionSeconds,
-      formationLap: race,
+      race,
+      // Once the race clock runs the formation lap is behind: the time left holds racing laps only.
+      formationLap: race && !clockRunning,
       raceLeaderLapSeconds: race ? reading.leader?.estimatedLapTime ?? null : null,
       lapSeconds: lapSeconds === null ? null : round(lapSeconds, 3),
       perLap: resource.perLap,

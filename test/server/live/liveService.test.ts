@@ -70,6 +70,23 @@ describe('LiveService', () => {
     service.stop();
   });
 
+  it('stops reading the game when the last page fails a write', async () => {
+    const get = vi.fn(() => Promise.resolve<RestAnswer>({ ok: false, reason: 'error' }));
+    const { service, frame } = setup({ pit: { get } });
+    frame(reading());
+    const sink = new FakeSink();
+    service.addClient(sink);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(get).toHaveBeenCalled();
+    sink.write = () => { throw new Error('socket closed'); };
+    frame(reading({ currentEt: 30, player: vehicleReading({ id: 1, place: 1, totalLaps: 4, vehicleName: 'Car', vehicleClass: 'GT3' }) }));
+    expect(service.hasClients()).toBe(false);
+    get.mockClear();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(get).not.toHaveBeenCalled();
+    service.stop();
+  });
+
   it('persists checkpoints and reports a storage failure without stopping live driving', () => {
     const saveAuditRecord = vi.fn();
     const { service, frame } = setup({ saveAuditRecord });

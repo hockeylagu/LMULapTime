@@ -63,6 +63,35 @@ describe('ServerContext while a game session is loaded', () => {
     expect(context.getScanStatus()).toMatchObject({ heldForLiveSession: false, refreshQueued: false, allComplete: true });
   });
 
+  it('runs a held telemetry or replay scan alone, not as a session refresh', async () => {
+    const { context, sessionDb, telemetryCatalog } = createContext();
+    context.setLiveSessionLoaded(true);
+    context.runTelemetryScanInBackground();
+    expect(context.runReplaySyncInBackground()).toBe(false);
+    expect(context.getScanStatus()).toMatchObject({ heldForLiveSession: true, refreshQueued: true });
+    context.setLiveSessionLoaded(false);
+    await vi.runAllTimersAsync();
+    expect(sessionDb.syncSessionsAsyncIterator).not.toHaveBeenCalled();
+    expect(sessionDb.syncReplaysAsyncIterator).toHaveBeenCalledTimes(1);
+    expect(telemetryCatalog.refresh).toHaveBeenCalledTimes(1);
+    expect(context.getScanStatus()).toMatchObject({ refreshQueued: false });
+  });
+
+  it('publishes no scan activity for work held during the session', async () => {
+    const { context } = createContext();
+    const seen: string[] = [];
+    context.events.on('scan-started', () => seen.push('started'));
+    context.events.on('scan-finished', () => seen.push('finished'));
+    context.setLiveSessionLoaded(true);
+    context.requestSessionRefresh();
+    context.runTelemetryScanInBackground();
+    expect(seen).toEqual([]);
+    context.setLiveSessionLoaded(false);
+    expect(seen).toEqual(['started']);
+    await vi.runAllTimersAsync();
+    expect(seen).toEqual(['started', 'finished']);
+  });
+
   it('carries a forced reparse through the hold', async () => {
     const { context, sessionDb } = createContext();
     context.setLiveSessionLoaded(true);

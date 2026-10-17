@@ -169,7 +169,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               {replayScanStatus?.running && fullScan?.telemetryScan?.running && (
                 <span className="text-[10px]">Syncing Telemetry… {fullScan.telemetryScan.processed}/{fullScan.telemetryScan.total}</span>
               )}
-              {fullScan?.refreshQueued && <span className="text-[10px]">Refresh queued</span>}
+              {fullScan?.refreshQueued && (
+                <span className="text-[10px]">{fullScan.heldForLiveSession ? 'Refresh after the game session' : 'Refresh queued'}</span>
+              )}
             </span>
           </Link>
 

@@ -91,7 +91,9 @@ describe('LiveStrategyTracker', () => {
     const tracker = new LiveStrategyTracker();
     tracker.applyRest({ type: 'tireManagement', vePerLap: 2.5, fuelPerLap: 2.1, newSets: 40, selected: null });
     tracker.applyRest({ type: 'garage', veStart: 50, fuelStart: null });
-    const garage = at(0, { inRealtime: false, endEt: 900, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 75 }) });
+    // The race garage before the start: the schedule's 15 minutes, twelve laps at 1:15 plus the formation lap.
+    tracker.applyRest({ type: 'schedule', raceMinutes: 15 });
+    const garage = at(0, { inRealtime: false, gamePhase: 0, endEt: 64, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 75 }) });
     const strategy = context(tracker, garage, { lapsLeft: null });
     expect(strategy?.resource).toBeNull();
     expect(strategy?.garage).toMatchObject({ kind: 've', sessionMinutes: 15, laps: 13, lapSeconds: 75, perLap: 2.5, needed: 34, setInGarage: 50 });
@@ -113,6 +115,9 @@ describe('LiveStrategyTracker', () => {
     tracker.applyRest({ type: 'schedule', raceMinutes: 5 });
     expect(context(tracker, paused, { lapsLeft: null })?.garage).toMatchObject({ sessionMinutes: 5, laps: 4 });
     expect(context(tracker, grid, { lapsLeft: null })?.garage).toMatchObject({ sessionMinutes: 5, laps: 4 });
+    // Back in the garage with the race clock running: the formation lap is behind, 5 minutes left are three laps to the flag.
+    const racing = at(60, { inRealtime: false, gamePhase: 5, endEt: 360, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 103 }) });
+    expect(context(tracker, racing, { lapsLeft: null })?.garage).toMatchObject({ sessionMinutes: 5, laps: 3 });
   });
 
   it('says the next forecast change of this session on the lap it lands', () => {

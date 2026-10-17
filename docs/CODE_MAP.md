@@ -539,7 +539,8 @@ at the finish it becomes the top completed row. The two completed laps and BEST 
 `computeLapsLeft` covers races and qualifying (the player's own laps to the first crossing after the clock ends);
 the race uses `classLeaderLapSeconds` (`liveLapsLeft.ts`), and class checks go through `knownCarClass`
 (`shared/domain/vehicleMapping.ts`). Garage plans use the time left (`endEt - currentEt`: `endEt` is a session time,
-not a length) and count a formation lap only in a race. Before a race's clock runs (`raceClockRunning`: phase 5-8,
+not a length) and count a formation lap only in a race whose clock has not started (back in the garage mid-race the
+time left holds racing laps only). Before a race's clock runs (`raceClockRunning`: phase 5-8,
 or 9 with the clock past 0) `endEt` is a countdown or a few seconds, so the race garage takes the length from the
 event schedule (`GetSessionsInfoForEvent` via `parseSchedule`, the `schedule` REST update) and race laps left wait for
 the clock; qualifying laps left count from now while the player is in the pits. A race garage counts laps to the
@@ -582,7 +583,8 @@ cache_metadata), `sse.ts`. The lifecycle rules are deterministic in `shared/doma
 `routes/liveRoutes.ts` (`/api/live/stream`, `/api/live/settings`, `/api/events`; auto-open is the `game-started` app
 event when the lifecycle leaves offline, setting on and no dashboard page connected: the open app navigates itself to
 `#/live`, the server never opens a browser; `game-running` tells each app page whether LMU is running, on connect
-and when it starts or closes, and the app shows `navbar/LiveGameBanner.tsx` above the navbar with a link to `#/live`).
+and when it starts or closes, and the app shows `navbar/LiveGameBanner.tsx` above the navbar with a link to `#/live`; `useAppEvents` keeps the
+status through a stream error for `APP_EVENT_ERROR_GRACE_MS` so the reconnect can answer, and clears it at once after silence).
 The LMU mark in `LiveSessionBar` links back to `#/dashboard`.
 Session identity and timing (step 2): the scoring decode also carries the player's and the leader's lap fields, track
 temperature, rain and wetness; the telemetry decode adds the mean tyre surface temperature (`tyreSurfaceAvgC`).
@@ -620,8 +622,11 @@ derives class place from the field's class labels and reads the game's pit-stop 
 `result` and `qualifyingResult` to snapshots; no historical session identity is guessed.
 
 **Scan hold:** `index.ts` wires `session-loaded` to `ServerContext.setLiveSessionLoaded`. While a session is loaded the
-session / replay / telemetry scans and the replay upgrade do not start (they set `pendingSessionRefresh`; a running
-upgrade is stopped); when it ends the pending refresh runs. A replay playing counts as loaded (one started from a
+session / replay / telemetry scans and the replay upgrade do not start: `holdForLiveSession` queues them by kind (a
+session refresh sets `pendingSessionRefresh`, a replay or telemetry scan its own held flag; a running upgrade is
+stopped), and `runHeldScans` runs them when it ends (a held session refresh brings the other two along). Held work is
+not scan activity: no `scan-started` is published for it and `useAppData` does not poll while `heldForLiveSession`
+(the navbar says `Refresh after the game session`). A replay playing counts as loaded (one started from a
 session's monitor leaves the session loaded), and phase 8 is `finished` only once the player takes the flag. `ScanStatus.heldForLiveSession` reports it. `ServerContext.events`
 (`TypedEmitter` in `core/typedEmitter.ts`) emits `scan-started` / `scan-finished` on idle/busy transitions for `GET /api/events`.
 A scan already running when the session loads is not interrupted (only its follow-up steps are held).
@@ -787,6 +792,6 @@ as approximate. Class estimates are used only when model dimensions are missing.
 assets and generated catalogs. Synthetic provider/footprint tests are always available;
 personal geometry/recording regressions require private roots (see [PLUGINS.md](PLUGINS.md)).
 
-Live strategy audit: `shared/domain/live/liveAudit.ts` freezes pre-lap forecasts and records deterministic comparisons; `shared/types/liveAudit.ts` defines capture/measurement contracts. `server/core/live/dbLiveAuditStore.ts` owns persistent checkpoints, with schema in `dbSchema.ts`; `server/live/audit/export.ts` streams spreadsheet-safe CSV. `liveRoutes.ts` exposes bounded JSON history and streaming CSV. Checkpoints are written only while a dashboard page is open (the REST reads they rely on stop without one), and a replay leaves the session's laps, strategy, results and capture untouched. Live dashboard settings link to exports; the cockpit dashboard and session review are passive and contain no interactive controls. No automatic forecast calibration or inferred XML-session linkage is applied.
+Live strategy audit: `shared/domain/live/liveAudit.ts` freezes pre-lap forecasts and records deterministic comparisons; `shared/types/liveAudit.ts` defines capture/measurement contracts. `server/core/live/dbLiveAuditStore.ts` owns persistent checkpoints, with schema in `dbSchema.ts`; `createLiveAuditWriter` prunes to the newest `LIVE_AUDIT_KEPT_RUNS` (30) captures at server start (`pruneLiveAudit`), since each capture stores a full snapshot every ~10 s; `server/live/audit/export.ts` streams spreadsheet-safe CSV. `liveRoutes.ts` exposes bounded JSON history and streaming CSV. Checkpoints are written only while a dashboard page is open (the REST reads they rely on stop without one), and a replay leaves the session's laps, strategy, results and capture untouched. Live dashboard settings link to exports; the cockpit dashboard and session review are passive and contain no interactive controls. No automatic forecast calibration or inferred XML-session linkage is applied.
 
 Live multiclass horizon: `liveLapsLeft.ts` owns `projectRaceFlagSeconds`, shared by live distance and `liveResourcePlan.ts` preparation. `rf2Decode.ts` resolves overall and player-class leaders independently using canonical class aliases; class pace supplies the player's distance horizon, with overall flag timing preserved. The preparation headline excludes the formation allowance retained in the resource model. Forecast audit model version 3 distinguishes this calculation from saved earlier estimates.

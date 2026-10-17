@@ -186,14 +186,17 @@ export class LiveService {
   /** Registers a page: it gets the current snapshot now. Returns the function that removes it. */
   public addClient(sink: SseSink): () => void {
     this.clients.set(sink, { blocked: false });
-    this.send(sink, LIVE_STREAM_EVENTS.snapshot, this.snapshot);
     this.ensureTimers();
     this.followPitMode();
-    return () => {
-      this.clients.delete(sink);
-      if (this.clients.size === 0) this.clearTimers();
-      this.followPitMode();
-    };
+    this.send(sink, LIVE_STREAM_EVENTS.snapshot, this.snapshot);
+    return () => this.removeClient(sink);
+  }
+
+  /** The last page gone stops the flush timers and the pit poller. */
+  private removeClient(sink: SseSink): void {
+    if (!this.clients.delete(sink)) return;
+    if (this.clients.size === 0) this.clearTimers();
+    this.followPitMode();
   }
 
   private handleMessage(message: unknown): void {
@@ -337,7 +340,7 @@ export class LiveService {
     try {
       if (writeSseEvent(sink, event, data)) return;
     } catch {
-      this.clients.delete(sink);
+      this.removeClient(sink);
       return;
     }
     client.blocked = true;

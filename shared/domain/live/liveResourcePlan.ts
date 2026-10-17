@@ -88,8 +88,10 @@ export function sessionLaps(sessionSeconds: number, lapSeconds: number, formatio
 }
 
 export interface GaragePlanInput {
-  /** A race: one formation lap is run before the clock starts. */
+  /** A formation lap is still to run before the clock starts (a race before its clock runs). */
   formationLap: boolean;
+  /** A race (ends at the leader's flag); `formationLap` when absent. False with a formation lap left is not a case. */
+  race?: boolean;
   /** Race only: overall leader pace predicts the flag, then the player's class pace converts that horizon to laps. */
   raceLeaderLapSeconds?: number | null;
   kind: LiveResourceKind;
@@ -109,7 +111,7 @@ export function planGarage(input: GaragePlanInput): Omit<LiveGaragePlan, 'tyres'
   // A race ends at the overall leader's first crossing after the clock. Without the leader's pace, plan for the latest
   // that can be, one of our laps after the clock: the bare clock can leave the car a lap short.
   const leaderPace = input.raceLeaderLapSeconds != null && input.raceLeaderLapSeconds > 0 ? input.raceLeaderLapSeconds : null;
-  const flagSeconds = sessionSeconds === null || !input.formationLap ? null
+  const flagSeconds = sessionSeconds === null || !(input.race ?? input.formationLap) ? null
     : leaderPace !== null ? projectRaceFlagSeconds(sessionSeconds, 0, leaderPace)
       : lapSeconds !== null && lapSeconds > 0 ? sessionSeconds + lapSeconds : null;
   const laps = sessionSeconds !== null && lapSeconds !== null && sessionSeconds > 0 && lapSeconds > 0

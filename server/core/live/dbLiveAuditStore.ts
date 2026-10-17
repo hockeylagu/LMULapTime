@@ -1,8 +1,21 @@
 import type { Database } from 'better-sqlite3';
 import type { LiveAuditRecord } from '../../../shared/types/liveAudit.js';
 
-/** One prepared insert per checkpoint, not per telemetry frame. The main database already uses WAL. */
+/** Captures kept: each holds a full snapshot every 10 s or so, so an endurance race alone can weigh tens of MB. */
+export const LIVE_AUDIT_KEPT_RUNS = 30;
+
+/** Deletes every capture but the `keepRuns` most recent ones (by their last record). Returns the rows deleted. */
+export function pruneLiveAudit(db: Database, keepRuns = LIVE_AUDIT_KEPT_RUNS): number {
+  return db.prepare(`DELETE FROM live_strategy_audit WHERE run_id NOT IN (
+    SELECT run_id FROM live_strategy_audit GROUP BY run_id ORDER BY MAX(recorded_at) DESC LIMIT ?)`).run(keepRuns).changes;
+}
+
+/**
+ * One prepared insert per checkpoint, not per telemetry frame. The main database already uses WAL.
+ * Old captures are pruned once here, when the server starts, never during a session.
+ */
 export function createLiveAuditWriter(db: Database): (record: LiveAuditRecord) => void {
+  pruneLiveAudit(db);
   const insert = db.prepare('INSERT INTO live_strategy_audit (run_id, sequence, recorded_at, record_json) VALUES (?, ?, ?, ?)');
   return record => { insert.run(record.runId, record.sequence, record.recordedAt, JSON.stringify(record)); };
 }

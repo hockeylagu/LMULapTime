@@ -3,7 +3,7 @@ import express from 'express';
 import request from 'supertest';
 import { afterEach, describe, expect, it } from 'vitest';
 import { initDbSchema } from '../../../server/core/dbSchema.js';
-import { createLiveAuditWriter, iterateLiveAudit, readLiveAudit } from '../../../server/core/live/dbLiveAuditStore.js';
+import { createLiveAuditWriter, iterateLiveAudit, pruneLiveAudit, readLiveAudit } from '../../../server/core/live/dbLiveAuditStore.js';
 import { exportLiveAudit } from '../../../server/live/audit/export.js';
 import { createLiveRouter } from '../../../server/routes/liveRoutes.js';
 import { LiveService } from '../../../server/live/liveService.js';
@@ -40,6 +40,17 @@ describe('persistent live strategy history', () => {
     expect(() => save(record(1))).toThrow(/UNIQUE/);
     initDbSchema(db);
     expect(readLiveAudit(db, null)).toHaveLength(3);
+  });
+
+  it('keeps only the most recent captures, pruned when the writer is created', () => {
+    const { db, save } = setup();
+    ['old', 'mid', 'new'].forEach((run, index) => {
+      for (const sequence of [1, 2]) save({ ...record(sequence, run), recordedAt: (index + 1) * 1000 + sequence });
+    });
+    expect(pruneLiveAudit(db, 2)).toBe(2);
+    expect(new Set([...iterateLiveAudit(db, null)].map(item => item.runId))).toEqual(new Set(['mid', 'new']));
+    createLiveAuditWriter(db);
+    expect([...iterateLiveAudit(db, null)]).toHaveLength(4);
   });
 
   it('returns saved history and a downloadable CSV, validates run IDs and scopes exports', async () => {
