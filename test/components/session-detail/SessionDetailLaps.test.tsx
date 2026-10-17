@@ -687,7 +687,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     expect(replayButtons.length).toBeGreaterThan(0);
 
     // Click replay for Lap 2
-    fireEvent.click(replayButtons[1]);
+    await act(async () => { fireEvent.click(replayButtons[1]); });
 
     expect(window.location.hash).toContain('sessionId=sess123');
     expect(window.location.hash).toContain('driverOrdinal=0');
@@ -768,13 +768,13 @@ describe('SessionDetail component - standings, laps & navigation', () => {
     });
 
     // The pit lap has events to expand; the session route stays open.
-    fireEvent.click(screen.getByTitle('Details for Lap 3'));
+    await act(async () => { fireEvent.click(screen.getByTitle('Details for Lap 3')); });
 
     expect(screen.getByTestId('lap-details-3')).toBeInTheDocument();
     expect(window.location.hash).toBe('#/session/sess123');
 
     // 2. Click the best lap time in the summary (best lap is Lap 2 with time 122.0)
-    fireEvent.click(screen.getByTitle('Open telemetry for Lap 2'));
+    await act(async () => { fireEvent.click(screen.getByTitle('Open telemetry for Lap 2')); });
 
     expect(window.location.hash).toContain('sessionId=sess123');
     expect(window.location.hash).toContain('driverOrdinal=0');

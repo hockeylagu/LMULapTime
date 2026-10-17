@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { act, render, screen, waitFor, fireEvent } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { ReplayInspectorModal } from '../../../../src/components/replay/inspector/ReplayInspectorContent.js';
 import { chooseValue } from '../../../helpers/selectControl.js';
@@ -19,6 +19,7 @@ vi.mock('recharts', () => ({
 describe('ReplayInspectorModal - Comparison & Source Modes', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    window.location.hash = '#/compare';
   });
 
   const mockMeta = {
@@ -284,7 +285,7 @@ describe('ReplayInspectorModal - Comparison & Source Modes', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Compare/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Compare/i })).toBeEnabled();
     });
 
     fireEvent.click(screen.getByRole('button', { name: /Compare/i }));
@@ -301,7 +302,7 @@ describe('ReplayInspectorModal - Comparison & Source Modes', () => {
       expect(params.get('baselineLapOrdinal')).toBe('7');
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /Remove comparison lap/i }));
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Remove comparison lap/i })); });
     const params = new URLSearchParams(window.location.hash.split('?')[1]);
     expect(params.has('baselineSessionId')).toBe(false);
     expect(params.has('compareDriver')).toBe(false);
@@ -369,7 +370,7 @@ describe('ReplayInspectorModal - Comparison & Source Modes', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /Compare/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Compare/i })).toBeEnabled();
     });
 
     fireEvent.click(screen.getByRole('button', { name: /Compare/i }));

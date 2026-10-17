@@ -128,7 +128,7 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
 
     // Click Tire Wear metric toggle
     const tireWearToggle = screen.getByRole('button', { name: /Tire Wear/i });
-    act(() => {
+    await act(async () => {
       fireEvent.click(tireWearToggle);
     });
 
@@ -148,7 +148,7 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
 
     // Click button to open modal dialog with full configuration
     const toggleBtn = screen.getByRole('button', { name: /Rules & Config/i });
-    fireEvent.click(toggleBtn);
+    await act(async () => { fireEvent.click(toggleBtn); });
 
     const dialog = screen.getByRole('dialog');
     expect(dialog).toBeInTheDocument();
