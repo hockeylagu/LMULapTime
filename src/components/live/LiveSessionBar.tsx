@@ -42,8 +42,9 @@ export function LiveSessionBar({ snapshot, connection }: LiveSessionBarProps) {
     <header className="flex h-[88px] shrink-0 items-center justify-between whitespace-nowrap border-b border-lmu-border pb-5 text-[48px] font-semibold">
       <div className="flex items-center gap-7">
         {/* A plain hash link: the dashboard page renders without a router of its own (HashRouter follows the hash). */}
-        <a href="#/dashboard" title="Back to the dashboard" className="flex items-center gap-5 font-black tracking-tight text-lmu-text hover:text-lmu-text-soft">
-          <span aria-hidden="true" className="block h-7 w-1 bg-lmu-accent" />
+        {/* The bar stands on the baseline at the capitals' height (0.71em), so it lines up with the letters. */}
+        <a href="#/dashboard" title="Back to the dashboard" className="flex items-baseline gap-5 font-black tracking-tight text-lmu-text hover:text-lmu-text-soft">
+          <span aria-hidden="true" className="block h-[0.71em] w-1.5 bg-lmu-accent" />
           LMU
         </a>
         {showSession && (

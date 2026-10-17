@@ -26,6 +26,12 @@ export function LiveStateScreen({ screen }: { screen: LiveScreen }) {
       </div>
       {screen.note && <p className={`${checklist ? 'text-[48px]' : 'text-[64px]'} font-semibold text-lmu-text-soft`}>{screen.note}</p>}
       {checklist && <LiveGarageChecklist checks={screen.checks} />}
+      {/* A plain hash link: the dashboard page renders without a router of its own (HashRouter follows the hash). */}
+      {screen.dashboardLink && (
+        <a href="#/dashboard" className="mt-8 self-start rounded-2xl border-2 border-lmu-border bg-lmu-card px-14 py-7 text-[56px] font-semibold text-lmu-text transition-colors hover:border-lmu-accent hover:bg-lmu-raised">
+          OPEN THE DASHBOARD
+        </a>
+      )}
     </section>
   );
 }

@@ -40,6 +40,8 @@ describe('LivePage', () => {
     const region = screen.getByRole('region', { name: 'Session state' });
     if (note) expect(within(region).getByText(note)).toBeInTheDocument();
     else expect(region.querySelector('p')).not.toBeInTheDocument();
+    // Only with the game closed is there a way back to the dashboard.
+    expect(within(region).queryByRole('link', { name: 'OPEN THE DASHBOARD' })?.getAttribute('href') ?? null).toBe(lifecycle === 'offline' ? '#/dashboard' : null);
     expect(screen.queryByTestId('pedal-trace')).not.toBeInTheDocument();
     expect(screen.getByTestId('live-status')).toHaveTextContent('LIVE');
   });

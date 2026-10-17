@@ -28,6 +28,8 @@ export interface LiveScreen {
   /** The pedal trace stays for an input check (starting) and while driving. */
   showTrace: boolean;
   preparation?: { laps: number | null; length: string; stopPlan: string | null };
+  /** With the game closed: a way back to the dashboard. */
+  dashboardLink?: boolean;
 }
 
 const KIND_LABELS: Record<LiveSessionKind, string> = {
@@ -94,7 +96,7 @@ export function liveScreen(snapshot: LiveSnapshot): LiveScreen {
   const kind = session ? sessionKindLabel(session.kind) : 'SESSION';
   switch (snapshot.lifecycle) {
     case 'offline':
-      return { title: 'WAITING FOR LMU', note: 'WAITING FOR LIVE DATA FROM THE GAME', muted: true, checks: [], showTrace: false };
+      return { title: 'WAITING FOR LMU', note: 'WAITING FOR LIVE DATA FROM THE GAME', muted: true, checks: [], showTrace: false, dashboardLink: true };
     case 'menu':
       return { title: 'IN MENU', note: 'JOIN A SESSION TO BEGIN', muted: true, checks: [], showTrace: false };
     case 'loading': {
