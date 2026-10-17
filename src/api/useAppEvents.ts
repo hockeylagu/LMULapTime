@@ -1,5 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { APP_EVENTS } from '../../shared/types/live.js';
+import { APP_EVENTS, LIVE_HEARTBEAT_MS } from '../../shared/types/live.js';
+
+/** Allow two missed heartbeats before discarding the last game status and reconnecting. */
+export const APP_EVENT_SILENCE_MS = LIVE_HEARTBEAT_MS * 2.5;
+const RETRY_MS = 2000;
 
 export interface AppEventHandlers {
   /** The server started a file scan by itself. */
@@ -29,11 +33,31 @@ export function useAppEvents(handlers: AppEventHandlers, enabled: boolean): void
 
   useEffect(() => {
     if (!enabled || typeof EventSource === 'undefined') return;
-    const source = new EventSource('/api/events');
-    source.addEventListener(APP_EVENTS.scanStarted, () => latest.current.onScanStarted());
-    source.addEventListener(APP_EVENTS.scanFinished, () => latest.current.onScanFinished());
-    source.addEventListener(APP_EVENTS.gameStarted, () => latest.current.onGameStarted?.());
-    source.addEventListener(APP_EVENTS.gameRunning, (event: MessageEvent) => latest.current.onGameRunning?.(readRunning(event.data)));
-    return () => source.close();
+    let source: EventSource;
+    let silence: ReturnType<typeof setTimeout>;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const heard = () => {
+      clearTimeout(silence);
+      silence = setTimeout(lost, APP_EVENT_SILENCE_MS);
+    };
+    function lost(): void {
+      clearTimeout(silence);
+      source.close();
+      latest.current.onGameRunning?.(false);
+      clearTimeout(retry);
+      retry = setTimeout(connect, RETRY_MS);
+    }
+    function connect(): void {
+      source = new EventSource('/api/events');
+      heard();
+      source.addEventListener(APP_EVENTS.heartbeat, heard);
+      source.addEventListener(APP_EVENTS.scanStarted, () => { heard(); latest.current.onScanStarted(); });
+      source.addEventListener(APP_EVENTS.scanFinished, () => { heard(); latest.current.onScanFinished(); });
+      source.addEventListener(APP_EVENTS.gameStarted, () => { heard(); latest.current.onGameStarted?.(); });
+      source.addEventListener(APP_EVENTS.gameRunning, (event: MessageEvent) => { heard(); latest.current.onGameRunning?.(readRunning(event.data)); });
+      source.addEventListener('error', lost);
+    }
+    connect();
+    return () => { clearTimeout(silence); clearTimeout(retry); source.close(); };
   }, [enabled]);
 }

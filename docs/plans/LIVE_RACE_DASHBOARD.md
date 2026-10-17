@@ -317,6 +317,10 @@ again. Settings holds the on/off switch (on by default).
 While LMU runs, an app page that was not switched (setting off, or another dashboard page
 already open) shows a banner above the navbar, "Le Mans Ultimate is running. Open the live
 dashboard", from the `game-running` app event; the LMU mark on the dashboard leads back.
+The banner clears when exit is detected, or immediately if the app event stream fails.
+After 37.5 seconds without an app event or heartbeat, the page clears stale game status
+and reconnects every 2 seconds until the server answers. Frozen half-written shared-memory
+frames do not count as activity, so they cannot indefinitely postpone the exit probe.
 Polling is deliberate: Windows has no notice for a named mapping being created, and process
 start events (WMI) cost more or need admin rights. The app's own open handle keeps the
 mapping alive after LMU exits, so game exit is detected when the plugin's counters stand

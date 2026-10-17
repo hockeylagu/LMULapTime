@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useAppData } from '../../src/api/useAppData.js';
+import { APP_EVENT_SILENCE_MS } from '../../src/api/useAppEvents.js';
+import { LIVE_HEARTBEAT_MS } from '../../shared/types/live.js';
 import { FakeEventSource } from '../helpers/fakeEventSource.js';
 
 const idleScan = {
@@ -48,6 +50,40 @@ describe('app event stream', () => {
     await act(async () => {});
     await act(async () => { FakeEventSource.byUrl('/api/events').emit('game-started', { at: 1 }); });
     expect(onGameStarted).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['error', 'silence'])('clears stale game status after stream %s and restores it on reconnect', async reason => {
+    const { result, unmount } = renderHook(() => useAppData());
+    await act(async () => {});
+    const source = FakeEventSource.byUrl('/api/events');
+    act(() => source.emit('game-running', { running: true }));
+    expect(result.current.gameRunning).toBe(true);
+    await act(async () => {
+      if (reason === 'error') source.emit('error');
+      else await vi.advanceTimersByTimeAsync(APP_EVENT_SILENCE_MS);
+    });
+    expect(result.current.gameRunning).toBe(false);
+    expect(source.closed).toBe(true);
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    const reconnected = FakeEventSource.byUrl('/api/events');
+    expect(reconnected).not.toBe(source);
+    act(() => reconnected.emit('game-running', { running: true }));
+    expect(result.current.gameRunning).toBe(true);
+    unmount();
+    await act(async () => { await vi.advanceTimersByTimeAsync(APP_EVENT_SILENCE_MS + 2000); });
+    expect(FakeEventSource.byUrl('/api/events')).toBe(reconnected);
+  });
+
+  it('keeps a healthy game status while heartbeats continue', async () => {
+    const { result } = renderHook(() => useAppData());
+    await act(async () => {});
+    const source = FakeEventSource.byUrl('/api/events');
+    act(() => source.emit('game-running', { running: true }));
+    for (let i = 0; i < 4; i += 1) {
+      await act(async () => { await vi.advanceTimersByTimeAsync(LIVE_HEARTBEAT_MS); source.emit('heartbeat'); });
+    }
+    expect(result.current.gameRunning).toBe(true);
+    expect(source.closed).toBe(false);
   });
 
   it('keeps whether LMU is running, so the page can offer the dashboard', async () => {

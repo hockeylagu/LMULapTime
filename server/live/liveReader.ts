@@ -141,7 +141,8 @@ export class LiveReader {
     let car: LiveCarReading | undefined;
 
     const scoringRead = readScoringFrame(scoringMap, this.scoringVersion);
-    if (scoringRead.status !== 'unchanged') changed = true;
+    // A frozen half-written frame is not activity: LMU can exit between its version-counter writes.
+    if (scoringRead.status === 'ok') changed = true;
     if (scoringRead.status === 'ok') {
       if (this.scoringVersion !== null && this.screen === 'menu') this.setScreen('session', null);
       this.scoringVersion = scoringRead.version;
@@ -152,7 +153,7 @@ export class LiveReader {
 
     if (this.inRealtime && this.playerId !== null) {
       const pedalRead = readPedalFrame(telemetryMap, this.playerId, this.pedalVersion, this.slotHint);
-      if (pedalRead.status !== 'unchanged') changed = true;
+      if (pedalRead.status === 'ok') changed = true;
       if (pedalRead.status === 'ok') {
         this.pedalVersion = pedalRead.version;
         this.telemetryCounter = pedalRead.version;

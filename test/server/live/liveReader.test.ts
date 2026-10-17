@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LiveReader, STARTUP_GRACE_MS } from '../../../server/live/liveReader.js';
 import type { GameProbe, LiveReaderMessage } from '../../../server/live/liveReader.js';
-import { SCORING_MAPPING_NAME, TELEMETRY_MAPPING_NAME } from '../../../server/live/rf2Layout.js';
+import { SCORING, SCORING_MAPPING_NAME, TELEMETRY, TELEMETRY_MAPPING_NAME } from '../../../server/live/rf2Layout.js';
 import type { MappedBuffer } from '../../../server/live/sharedMemory.js';
 import { scoringBuffer, source, telemetryBuffer } from './rf2Fixtures.js';
 
@@ -101,6 +101,29 @@ describe('LiveReader', () => {
     t.posted.length = 0;
     await vi.advanceTimersByTimeAsync(3000);
     expect(t.posted).toEqual([expect.objectContaining({ type: 'frame' })]);
+    t.reader.stop();
+  });
+
+  it.each(['scoring', 'telemetry'])('detects exit with a frozen half-written %s buffer', async buffer => {
+    const probe = vi.fn(() => Promise.resolve<GameProbe>('session'));
+    const t = setup(probe);
+    t.available.value = true;
+    t.reader.start();
+    await vi.advanceTimersByTimeAsync(5100);
+    if (buffer === 'scoring') {
+      const torn = scoringBuffer(3, [PLAYER]);
+      torn.writeUInt32LE(2, SCORING.versionEnd);
+      t.setScoring(torn);
+    } else {
+      const torn = telemetryBuffer(5, [{ id: 12, et: 101, throttle: 1, brake: 0 }]);
+      torn.writeUInt32LE(4, TELEMETRY.versionEnd);
+      t.setTelemetry(torn);
+    }
+    probe.mockImplementation(() => Promise.resolve<GameProbe>('gone'));
+    await vi.advanceTimersByTimeAsync(5100);
+    expect(t.posted).toContainEqual({ type: 'closed' });
+    expect(t.closes.scoring).toHaveBeenCalledOnce();
+    expect(t.closes.telemetry).toHaveBeenCalledOnce();
     t.reader.stop();
   });
 
