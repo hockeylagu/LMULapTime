@@ -48,7 +48,7 @@ Direct links are shareable and survive reloads:
 Add `&controls=hidden` to start with collapsed controls. An unknown scenario falls back to mid-stint with
 an explanatory message. `demo=false` and `demo=0` use the real game stream.
 
-Use **Car class** to configure any scenario, including garage, driving, results and the tentative corner preview.
+Use **Car class** to configure any scenario, including garage, driving, results and the tentative corner speed scenario.
 For example: `#/live?demo=1&scenario=garage-qualifying&carClass=LMP3` or
 `#/live?demo=1&scenario=garage-sprint&carClass=GT3`. Class selection remains in the URL while changing scenarios
 or touring. Supported canonical values are `Hyper`, `GT3`, `LMP2`, `LMP2_ELMS`, `LMP3` and `GTE`.
@@ -57,7 +57,7 @@ Class variants use illustrative cars and lap times; Hypercar/GT3 use VE and fuel
 and omit fuel ratio. Garage plans are recalculated for the class pace and resource type.
 
 Set **Settings → Live Dashboard → Pedal trace history** to choose 5–120 seconds (30 by default).
-The saved duration applies to both live data and demo traces, including the corner preview. Saved VE/fuel reserve
+The saved duration applies to both live data and demo traces. Saved VE/fuel reserve
 also applies to demo preparation and sprint plans. Reopening the page or focusing its window reloads settings.
 
 The catalogue covers all seven race action modes (calculating, pit now, in pit, pit countdown, stint, sprint,

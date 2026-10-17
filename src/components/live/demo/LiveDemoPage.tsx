@@ -7,7 +7,7 @@ import { Select } from '../../common/dropdown/Select.js';
 import { LiveFrame } from '../LiveFrame.js';
 import { LiveDashboardView } from '../display/LiveDashboardView.js';
 import { PedalBuffer } from '../pedalBuffer.js';
-import LiveCornerPreview from '../preview/LiveCornerPreview.js';
+import { DemoCornerView } from './DemoCornerView.js';
 import { createDemoState, DEMO_SCENARIOS } from './demoScenarios.js';
 import { DEMO_CLASS_OPTIONS } from './demoClasses.js';
 import { knownCarClass } from '../../../../shared/domain/vehicleMapping.js';
@@ -58,7 +58,7 @@ export default function LiveDemoPage() {
 
   const choose = (id: string) => updateSearchParams(params, setParams, { scenario: id });
   return <>
-    <LiveFrame>{selected.id === 'corners' ? <LiveCornerPreview embedded pedalBuffer={buffer} snapshot={state.snapshot ?? undefined} timing={state.timing ?? undefined} /> : <LiveDashboardView snapshot={state.snapshot} connection={state.connection} timing={timing} buffer={buffer} />}</LiveFrame>
+    <LiveFrame>{selected.id === 'corners' && state.snapshot ? <DemoCornerView snapshot={state.snapshot} store={timing} buffer={buffer} /> : <LiveDashboardView snapshot={state.snapshot} connection={state.connection} timing={timing} buffer={buffer} />}</LiveFrame>
     <aside aria-label="Offline demo controls" className="fixed bottom-3 left-1/2 z-50 w-max max-w-[calc(100vw-24px)] -translate-x-1/2 rounded-xl border border-lmu-border bg-lmu-card p-3 font-sans text-sm text-lmu-text shadow-lg">
       <div className="flex flex-wrap items-center gap-3">
         <strong className="text-lmu-warn">DEMO · SAMPLE DATA</strong>

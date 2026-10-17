@@ -521,18 +521,18 @@ it also holds `fetchLiveSettings` / `saveLiveSettings`. `src/components/live/`: 
 (fixed 2560x1440 stage scaled to the window), `LiveSessionBar` (class through the existing `CarClassBadge`, zoomed;
 class from `mapVehicleIdToClass(vehicleName, vehicleClass)` in `liveScreens.ts`), `LiveStateScreen` (the lifecycle
 screens, built by `liveScreen(snapshot)`), and `LivePedalTrace` (canvas, redrawn by rAF from the `PedalBuffer`
-  ring in `pedalBuffer.ts`). `#/live?preview=corners` lazily opens `preview/LiveCornerPreview.tsx`, an isolated
-  sample-data layout showing the last corner's time loss and minimum/reference speeds beside the pedal trace;
-  it opens no live stream and provides no measured corner coaching.
+  ring in `pedalBuffer.ts`).
   `#/live?demo=1` lazily loads `demo/LiveDemoPage.tsx`: offline, production-available scenarios from
-  `demo/demoScenarios.ts`, with illustrative typed data in `demo/demoData.ts`. Both the connected page and demo
+  `demo/demoScenarios.ts`, with illustrative typed data in `demo/demoData.ts`. The `corners` scenario renders `demo/DemoCornerView.tsx`, a
+  tentative layout of the last corner's time loss and minimum/reference speeds beside the pedal trace (sample data,
+  no measured corner coaching). Both the connected page and demo
   render `display/LiveDashboardView.tsx`, so lifecycle, strategy, timing and results use the same production UI.
   Demo selection uses the hash query (`scenario`), with a picker, previous/next, a five-second tour, pedal animation
   and an optional `carClass` override (GT3 by default). `demo/demoClasses.ts` applies illustrative class identity and pace, canonical VE/fuel units
   and class-specific garage plans while keeping the selected scenario. The override survives scenario changes.
   No game EventSource or recorded files. `src/api/useLiveDashboardSettings.ts` reads saved reserve and pedal trace
   duration on mount/focus, falling back to defaults when unavailable. `PedalBuffer.windowSeconds` controls both
-  retention and the canvas time scale. Settings are shared with the production dashboard and standalone preview.
+  retention and the canvas time scale. Settings are shared with the production dashboard.
   Usage: `docs/LIVE_DASHBOARD_DEMO.md`.
   `src/api/useAppEvents.ts` is the app-wide `GET /api/events` listener used by
 `useAppData` (scan-started restarts scan polling, scan-finished reloads data). Settings card:

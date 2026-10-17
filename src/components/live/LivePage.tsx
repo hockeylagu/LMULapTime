@@ -5,7 +5,6 @@ import { LiveFrame } from './LiveFrame.js';
 import { LiveDashboardView } from './display/LiveDashboardView.js';
 import { PedalBuffer } from './pedalBuffer.js';
 import { useLiveDashboardSettings } from '../../api/useLiveDashboardSettings.js';
-const LiveCornerPreview = lazy(() => import('./preview/LiveCornerPreview.js'));
 const LiveDemoPage = lazy(() => import('./demo/LiveDemoPage.js'));
 
 /** The fullscreen live dashboard: session bar, the state of the game, and the pedal trace while on track. */
@@ -14,7 +13,7 @@ export function LivePage() {
   if (params.has('demo') && params.get('demo') !== 'false' && params.get('demo') !== '0') {
     return <Suspense fallback={null}><LiveDemoPage /></Suspense>;
   }
-  return params.get('preview') === 'corners' ? <Suspense fallback={null}><LiveCornerPreview /></Suspense> : <LiveConnectedPage />;
+  return <LiveConnectedPage />;
 }
 
 function LiveConnectedPage() {

@@ -89,7 +89,7 @@ export const LiveDashboardCard: React.FC = () => {
               options={PEDAL_TRACE_SECONDS_CHOICES.map(value => ({ value, label: `${value} seconds` }))}
               disabled={settings === null || isSaving} size="compact" mono className="w-36" />
           </div>
-          <p className="text-xs text-lmu-muted">Applies to the live dashboard and demo, including the corner preview.</p>
+          <p className="text-xs text-lmu-muted">Applies to the live dashboard and the demo.</p>
         </>
       )}
       <FeedbackMessage feedback={message} />
