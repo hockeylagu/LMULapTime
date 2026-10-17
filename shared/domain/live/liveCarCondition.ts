@@ -12,6 +12,8 @@ export interface LiveCarReading {
   /** A part has come off. */
   detached: boolean;
   wheels: { flat: boolean; detached: boolean }[];
+  /** Session time of the last impact (`mLastImpactET`; 0 before any): a change asks LMU for the condition. */
+  lastImpactEt: number;
   /** Front compound name as the game reports it. */
   compound: string;
 }

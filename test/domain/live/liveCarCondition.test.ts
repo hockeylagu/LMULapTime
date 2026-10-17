@@ -6,7 +6,7 @@ import { liveLap } from '../../helpers/liveSnapshot.js';
 
 const wheel = { flat: false, detached: false };
 const car = (patch: Partial<LiveCarReading> = {}): LiveCarReading => ({
-  fuelLiters: 40, fuelCapacityLiters: 117, dentSeverity: [0, 0, 0, 0, 0, 0, 0, 0], detached: false,
+  fuelLiters: 40, fuelCapacityLiters: 117, dentSeverity: [0, 0, 0, 0, 0, 0, 0, 0], detached: false, lastImpactEt: 0,
   wheels: [wheel, wheel, wheel, wheel], compound: 'Medium', ...patch,
 });
 const condition = (patch: Partial<LiveVehicleCondition> = {}): LiveVehicleCondition => ({

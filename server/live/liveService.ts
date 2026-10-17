@@ -3,7 +3,9 @@ import { randomUUID } from 'node:crypto';
 import { LiveAuditTracker } from '../../shared/domain/live/liveAudit.js';
 import type { LiveAuditRecord } from '../../shared/types/liveAudit.js';
 import { deriveLiveState, isLiveOnTrack, isLiveSessionLoaded } from '../../shared/domain/live/liveLifecycle.js';
-import type { LiveGameScreen, LiveScoringReading } from '../../shared/domain/live/liveLifecycle.js';
+import type { LiveGameScreen, LiveScoringReading, LiveVehicleReading } from '../../shared/domain/live/liveLifecycle.js';
+import type { LiveCarReading } from '../../shared/domain/live/liveCarCondition.js';
+import type { LivePitState } from '../../shared/types/liveStrategy.js';
 import { LiveStrategyTracker } from '../../shared/domain/live/liveStrategyTracker.js';
 import { LiveResultTracker } from '../../shared/domain/live/liveResults.js';
 import type { LiveRestUpdate } from '../../shared/domain/live/liveStrategyTracker.js';
@@ -92,6 +94,11 @@ export class LiveService {
   /** The last `session-loaded` value sent. */
   private sessionLoaded = false;
   private reserveLaps: number;
+  /** What keeps the pit in play for the poller (`setPitActive`): the standings' pit state and damage seen in the car. */
+  private pitState: LivePitState = 'none';
+  private carDamaged = false;
+  /** The car's last impact time; null until the first car reading, so an old impact triggers nothing. */
+  private lastImpactEt: number | null = null;
   private readonly clients = new Map<SseSink, LiveClient>();
   private pedals: LivePedalSample[] = [];
   private worker: LiveWorker | null = null;
@@ -210,6 +217,9 @@ export class LiveService {
     if (message.type === 'closed') {
       this.screen = 'session';
       this.loadingProgress = null;
+      this.pitState = 'none';
+      this.carDamaged = false;
+      this.lastImpactEt = null;
       this.strategy.reset();
       this.applyReading(null);
       return;
@@ -221,10 +231,41 @@ export class LiveService {
       return;
     }
     if (message.tyreSurfaceAvgC !== undefined) this.tyreSurfaceAvgC = message.tyreSurfaceAvgC;
-    if (message.car) this.strategy.applyCar(message.car);
+    if (message.car) {
+      this.strategy.applyCar(message.car);
+      this.followCar(message.car);
+    }
+    const before = this.lastReading?.player ?? null;
     if (message.scoring) this.applyReading(message.scoring);
     else if (message.car) this.applyReading(this.lastReading);
+    if (message.scoring) this.followPlayer(before, message.scoring.player);
     if (message.pedal) this.bufferPedal(message.pedal);
+  }
+
+  /** Damage keeps the stop estimate and the MFD read often; a new impact asks for the condition now. */
+  private followCar(car: LiveCarReading): void {
+    this.carDamaged = car.detached || car.dentSeverity.some(dent => dent > 0) || car.wheels.some(wheel => wheel.flat || wheel.detached);
+    if (this.lastImpactEt !== null && car.lastImpactEt > this.lastImpactEt) this.pit.trigger('condition');
+    this.lastImpactEt = car.lastImpactEt;
+    this.followPitActive();
+  }
+
+  /**
+   * The condition is read once a lap, right after the line (the tyre tracker takes the tread at each crossing), and
+   * after a stop with the tyre screen (new sets, the set fitted). Nothing is triggered by a replay's frames.
+   */
+  private followPlayer(before: LiveVehicleReading | null, player: LiveVehicleReading | null): void {
+    if (this.isReplaying() || !before || !player || player.id !== before.id) return;
+    if (player.totalLaps > before.totalLaps) this.pit.trigger('condition');
+    if (before.inPits && !player.inPits) {
+      this.pit.trigger('condition');
+      this.pit.trigger('tireManagement');
+    }
+    this.followPitActive();
+  }
+
+  private followPitActive(): void {
+    this.pit.setPitActive(this.pitState !== 'none' || this.carDamaged || this.lastReading?.player?.inPits === true);
   }
 
   private applyReading(reading: LiveScoringReading | null): void {
@@ -296,6 +337,10 @@ export class LiveService {
   }
 
   private applyRest(update: LiveRestUpdate): void {
+    if (update.type === 'standings') {
+      this.pitState = update.pitState;
+      this.followPitActive();
+    }
     this.strategy.applyRest(update);
     this.applyReading(this.lastReading);
   }

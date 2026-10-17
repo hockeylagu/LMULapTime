@@ -124,7 +124,7 @@ describe('rF2 pedal decode', () => {
     const slot = buffer.subarray(TELEMETRY.vehicles + TELEMETRY.vehicleStride, TELEMETRY.vehicles + 2 * TELEMETRY.vehicleStride);
     expect(decodePedalSlot(slot)).toEqual({
       id: 12, sample: { t: 321.25, throttle: 0.75, brake: 1 }, tyreSurfaceAvgC: null,
-      car: { fuelLiters: 0, fuelCapacityLiters: 0, dentSeverity: [0, 0, 0, 0, 0, 0, 0, 0], detached: false, wheels: Array(4).fill({ flat: false, detached: false }), compound: '' },
+      car: { fuelLiters: 0, fuelCapacityLiters: 0, dentSeverity: [0, 0, 0, 0, 0, 0, 0, 0], detached: false, wheels: Array(4).fill({ flat: false, detached: false }), lastImpactEt: 0, compound: '' },
     });
   });
 
@@ -137,7 +137,7 @@ describe('rF2 pedal decode', () => {
     expect(decoded(undefined)).toBeNull();
   });
 
-  it('reads the car: fuel and capacity in litres, dents, lost parts, flat or lost wheels and the front compound', () => {
+  it('reads the car: fuel and capacity in litres, dents, lost parts, flat or lost wheels, the last impact and the front compound', () => {
     const buffer = telemetryBuffer(4, [{ id: 12, et: 1, throttle: 0, brake: 0 }]);
     const base = TELEMETRY.vehicles;
     const at = VEHICLE_TELEMETRY.offsets;
@@ -147,11 +147,12 @@ describe('rF2 pedal decode', () => {
     buffer.writeUInt8(1, base + at.detached);
     buffer.writeUInt8(1, base + at.wheels + 2 * WHEEL.size + WHEEL.offsets.flat);
     buffer.writeUInt8(1, base + at.wheels + 3 * WHEEL.size + WHEEL.offsets.detached);
+    buffer.writeDoubleLE(812.5, base + at.lastImpactET);
     buffer.write('Medium', base + at.frontTireCompoundName, 'utf8');
     expect(decodePedalSlot(buffer.subarray(base, base + TELEMETRY.vehicleStride)).car).toEqual({
       fuelLiters: 32.2, fuelCapacityLiters: 117, dentSeverity: [0, 0, 0, 0, 0, 2, 0, 0], detached: true,
       wheels: [{ flat: false, detached: false }, { flat: false, detached: false }, { flat: true, detached: false }, { flat: false, detached: true }],
-      compound: 'Medium',
+      lastImpactEt: 812.5, compound: 'Medium',
     });
   });
 

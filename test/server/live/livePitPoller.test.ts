@@ -79,7 +79,11 @@ describe('LivePitPoller', () => {
     let replay = false;
     const t = setup(false, path => (path === STATE ? { ok: true, body: navState(replay) } : null));
     t.poller.setMode('track');
-    await vi.advanceTimersByTimeAsync(60 * PIT_POLL_TICK_MS);
+    // The service asks for the condition after each line crossing; here every 10 s.
+    for (let lap = 0; lap < 6; lap++) {
+      t.poller.trigger('condition');
+      await vi.advanceTimersByTimeAsync(10 * PIT_POLL_TICK_MS);
+    }
     const condition = t.paths.map((path, i) => ({ path, i })).filter(({ path }) => path === '/rest/garage/getVehicleCondition');
     expect(condition.length).toBeGreaterThan(2);
     // Every one comes straight after a state check (one tick, under REPLAY_UNSAFE_CHECK_MS).
@@ -100,18 +104,70 @@ describe('LivePitPoller', () => {
 
   it('reads the event schedule in the garage only, each read right after its own state check, never while unknown', async () => {
     const SCHEDULE = '/rest/sessions/GetSessionsInfoForEvent';
-    const t = setup(false);
+    let answered = false;
+    const t = setup(false, path => (path === SCHEDULE && answered ? { ok: true, body: { scheduledSessions: [{ name: 'RACE', lengthTime: 5 }] } } : null));
     t.poller.setMode('garage');
     await vi.advanceTimersByTimeAsync(70 * PIT_POLL_TICK_MS);
+    // An answer it cannot read is asked again a minute later; a good one only once while a session stays loaded.
     const reads = t.paths.map((path, i) => ({ path, i })).filter(({ path }) => path === SCHEDULE);
     expect(reads.length).toBe(2);
     for (const { i } of reads) expect(t.paths[i - 1]).toBe(STATE);
+    answered = true;
+    await vi.advanceTimersByTimeAsync(60 * PIT_POLL_TICK_MS);
+    t.poller.setMode('track');
+    t.poller.setMode('garage');
+    await vi.advanceTimersByTimeAsync(130 * PIT_POLL_TICK_MS);
+    expect(t.paths.filter(path => path === SCHEDULE)).toHaveLength(3);
+    // The session unloads (off): the next one reads it again.
+    t.poller.setMode('off');
+    t.poller.setMode('garage');
+    await vi.advanceTimersByTimeAsync(20 * PIT_POLL_TICK_MS);
+    expect(t.paths.filter(path => path === SCHEDULE)).toHaveLength(4);
     t.poller.stop();
     const unknown = setup(null);
     unknown.poller.setMode('garage');
     await vi.advanceTimersByTimeAsync(70 * PIT_POLL_TICK_MS);
     expect(unknown.paths).not.toContain(SCHEDULE);
     unknown.poller.stop();
+  });
+
+  it('reads the stop estimate and the MFD often only while the pit is in play', async () => {
+    const ESTIMATE = '/rest/strategy/pitstop-estimate';
+    const MENU = '/rest/garage/PitMenu/receivePitMenu';
+    const t = setup(false);
+    t.poller.setMode('track');
+    await vi.advanceTimersByTimeAsync(120 * PIT_POLL_TICK_MS);
+    const count = (path: string) => t.paths.filter(item => item === path).length;
+    expect(count(ESTIMATE)).toBeLessThanOrEqual(3);
+    expect(count(MENU)).toBeLessThanOrEqual(5);
+    const before = { estimate: count(ESTIMATE), menu: count(MENU) };
+    t.poller.setPitActive(true);
+    await vi.advanceTimersByTimeAsync(3 * PIT_POLL_TICK_MS);
+    expect(count(ESTIMATE)).toBe(before.estimate + 1);
+    expect(count(MENU)).toBe(before.menu + 1);
+    await vi.advanceTimersByTimeAsync(60 * PIT_POLL_TICK_MS);
+    expect(count(ESTIMATE)).toBeGreaterThanOrEqual(before.estimate + 5);
+    t.poller.stop();
+  });
+
+  it('reads the condition and the tyre screen when triggered, and the pit rules once per loaded session', async () => {
+    const CONDITION = '/rest/garage/getVehicleCondition';
+    const TYRES = '/rest/garage/UIScreen/TireManagement';
+    const RULES = '/rest/garage/UIScreen/RepairAndRefuel';
+    const t = setup(false, path => (path === RULES ? { ok: true, body: { pitStopTimes: { times: {} } } } : null));
+    t.poller.setMode('track');
+    await vi.advanceTimersByTimeAsync(240 * PIT_POLL_TICK_MS);
+    const count = (path: string) => t.paths.filter(item => item === path).length;
+    // Without a trigger: the condition once on the way out, the pit rules once.
+    expect(count(CONDITION)).toBe(1);
+    expect(count(RULES)).toBe(1);
+    const tyres = count(TYRES);
+    t.poller.trigger('condition');
+    t.poller.trigger('tireManagement');
+    await vi.advanceTimersByTimeAsync(4 * PIT_POLL_TICK_MS);
+    expect(count(CONDITION)).toBe(2);
+    expect(count(TYRES)).toBe(tyres + 1);
+    t.poller.stop();
   });
 
   it('reads the garage set in the garage, and pauses everything for 10 s after a slow answer', async () => {

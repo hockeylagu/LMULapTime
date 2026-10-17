@@ -22,10 +22,21 @@ export const REPLAY_UNSAFE_CHECK_MS = 2000;
 export const SLOW_PAUSE_MS = 10_000;
 export const FAILED_READ_PAUSE_MS = 30_000;
 
+/** What the service asks to read again now: the condition after a line crossing, an impact or a pit exit; the tyre screen after a pit exit. */
+export type PitTrigger = 'condition' | 'tireManagement';
+
+type ReadMode = Exclude<PitPollMode, 'off'>;
+
 interface PitRead {
   path: string;
   /** Period per mode, ms; absent when the read is not made in that mode. */
-  every: Partial<Record<Exclude<PitPollMode, 'off'>, number>>;
+  every: Partial<Record<ReadMode, number>>;
+  /** Period while the pit is in play (a stop requested or under way, or the car damaged); `every` otherwise. */
+  busyEvery?: Partial<Record<ReadMode, number>>;
+  /** Fixed for the loaded session: read once (until the poller is off), retried only after a failure. */
+  once?: boolean;
+  /** Read again at once when the service triggers it; `every` is then only a fallback. */
+  trigger?: PitTrigger;
   /**
    * Crashed LMU during a replay (`getVehicleCondition`, reproduced 2026-10-16): only right after its own state check.
    * Every other read answered in a replay (200, or 404 for the two garage screens), so it needs no check of its own.
@@ -40,25 +51,36 @@ interface PitRead {
  */
 const STATE_PATH = '/navigation/state';
 
-/** About 0.7 requests a second on track, less in the garage. */
+/**
+ * About 0.45 requests a second on track (state checks included), less in the garage. Each read is made as often as
+ * its answer can change: VE every 3 s (the usage meter interpolates it at each crossing); the stop estimate and the
+ * MFD often only while the pit is in play; the condition once a lap (tread at the crossing) and after an impact or a
+ * stop; the tyre screen after a stop; the pit rules and the event schedule once per loaded session.
+ */
 const READS: PitRead[] = [
   { path: '/rest/watch/standings', every: { track: 3000 }, crashesInReplay: false, parse: parseStandings },
-  { path: '/rest/strategy/pitstop-estimate', every: { track: 10_000 }, crashesInReplay: false, parse: parseEstimate },
   {
-    path: '/rest/garage/PitMenu/receivePitMenu', every: { track: 10_000, garage: 10_000 }, crashesInReplay: false,
-    parse: body => { const menu = parsePitMenu(body); return menu && { type: 'pitMenu', menu }; },
+    path: '/rest/strategy/pitstop-estimate', every: { track: 60_000 }, busyEvery: { track: 10_000 }, crashesInReplay: false,
+    parse: parseEstimate,
   },
   {
-    path: '/rest/garage/getVehicleCondition', every: { track: 10_000 }, crashesInReplay: true,
+    path: '/rest/garage/PitMenu/receivePitMenu', every: { track: 30_000, garage: 10_000 }, busyEvery: { track: 10_000 },
+    crashesInReplay: false, parse: body => { const menu = parsePitMenu(body); return menu && { type: 'pitMenu', menu }; },
+  },
+  {
+    path: '/rest/garage/getVehicleCondition', every: { track: 300_000 }, trigger: 'condition', crashesInReplay: true,
     parse: body => { const condition = parseVehicleCondition(body); return condition && { type: 'condition', condition }; },
   },
-  { path: '/rest/garage/UIScreen/TireManagement', every: { track: 30_000, garage: 20_000 }, crashesInReplay: false, parse: parseTireManagement },
-  { path: '/rest/garage/UIScreen/RepairAndRefuel', every: { track: 120_000 }, crashesInReplay: false, parse: parsePitStopTimes },
+  {
+    path: '/rest/garage/UIScreen/TireManagement', every: { track: 60_000, garage: 20_000 }, trigger: 'tireManagement',
+    crashesInReplay: false, parse: parseTireManagement,
+  },
+  { path: '/rest/garage/UIScreen/RepairAndRefuel', every: { track: 120_000 }, once: true, crashesInReplay: false, parse: parsePitStopTimes },
   { path: '/rest/garage/getPlayerGarageData', every: { garage: 5000 }, crashesInReplay: false, parse: parseGarageData },
   { path: '/rest/sessions/weather', every: { track: 60_000, garage: 60_000 }, crashesInReplay: false, parse: parseForecast },
   // The race length for the garage before the start; it does not change during the event. Never read in a replay
   // yet, so it waits for its own state check like the read that crashed one.
-  { path: '/rest/sessions/GetSessionsInfoForEvent', every: { garage: 60_000 }, crashesInReplay: true, parse: parseSchedule },
+  { path: '/rest/sessions/GetSessionsInfoForEvent', every: { garage: 60_000 }, once: true, crashesInReplay: true, parse: parseSchedule },
 ];
 
 export interface LivePitPollerOptions {
@@ -92,6 +114,9 @@ export class LivePitPoller {
   private unsafeCheckFresh = false;
   private gameStateDue = 0;
   private readonly due = new Map<string, number>();
+  /** `once` reads answered since the poller last went off. */
+  private readonly onceDone = new Set<string>();
+  private pitActive = false;
 
   public constructor(private readonly options: LivePitPollerOptions) {}
 
@@ -106,6 +131,7 @@ export class LivePitPoller {
     this.unsafeCheckFresh = false;
     if (mode === 'off') {
       this.clearTimer();
+      this.onceDone.clear();
       this.setReplay(null, -Infinity);
       return;
     }
@@ -117,6 +143,23 @@ export class LivePitPoller {
   }
 
   public stop(): void { this.setMode('off'); }
+
+  /** A stop requested or under way, or the car damaged: the stop estimate and the MFD are read often, starting now. */
+  public setPitActive(active: boolean): void {
+    if (active === this.pitActive) return;
+    this.pitActive = active;
+    if (!active) return;
+    for (const read of READS) if (read.busyEvery) this.due.set(read.path, 0);
+  }
+
+  /** Reads `trigger` next (after the state check it may need). */
+  public trigger(trigger: PitTrigger): void {
+    for (const read of READS) if (read.trigger === trigger) this.due.set(read.path, 0);
+  }
+
+  private period(read: PitRead, mode: ReadMode): number | undefined {
+    return (this.pitActive ? read.busyEvery?.[mode] : undefined) ?? read.every[mode];
+  }
 
   private clearTimer(): void {
     if (this.timer) clearInterval(this.timer);
@@ -140,8 +183,8 @@ export class LivePitPoller {
     let best: PitRead | null = null;
     let bestLate = -Infinity;
     for (const read of READS) {
-      const every = read.every[mode];
-      if (every === undefined || (read.crashesInReplay && this.replay !== false)) continue;
+      const every = this.period(read, mode);
+      if (every === undefined || (read.once && this.onceDone.has(read.path)) || (read.crashesInReplay && this.replay !== false)) continue;
       const late = (now - (this.due.get(read.path) ?? 0)) / every;
       if (late >= 0 && late > bestLate) { best = read; bestLate = late; }
     }
@@ -174,9 +217,10 @@ export class LivePitPoller {
       if (answer.ok && this.replay === false) this.options.onNavigation?.(answer.body);
       return;
     }
-    const every = next.read.every[this.mode] ?? FAILED_READ_PAUSE_MS;
-    this.due.set(next.path, done + (answer.ok ? every : Math.max(every, FAILED_READ_PAUSE_MS)));
+    const every = this.period(next.read, this.mode);
+    this.due.set(next.path, done + (answer.ok ? every ?? FAILED_READ_PAUSE_MS : Math.max(every ?? 0, FAILED_READ_PAUSE_MS)));
     const update = answer.ok ? next.read.parse(answer.body) : null;
+    if (update && next.read.once) this.onceDone.add(next.path);
     if (update) this.options.onUpdate(update);
   }
 }

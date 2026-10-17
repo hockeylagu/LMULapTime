@@ -604,8 +604,14 @@ off midway, so a one-request-at-a-time caller never waits forever); `livePitPoll
 first, by mode (off / track / garage, only while a dashboard client is connected and a session is loaded),
 a state check (`navigation/state`, replay from `settingMode` via `parseReplayPlayback`) every ~10 s and right before
 each `getVehicleCondition`, the one read that crashes LMU in a replay, and each `GetSessionsInfoForEvent` (garage
-only, every 60 s; never tried in a replay); the other reads are replay-safe (a replay reads
-nothing else); a timeout pauses everything 10 s, a failed read pauses that read 30 s. `shared/domain/live/`:
+only, once per loaded session; never tried in a replay); the other reads are replay-safe (a replay reads
+nothing else); a timeout pauses everything 10 s, a failed read pauses that read 30 s. Each read is made as often as its
+answer can change (about 0.5 requests/s on track): standings every 3 s; `pitstop-estimate` and the MFD every 60 s /
+30 s, and every 10 s while `setPitActive` (pit state not NONE, the player in the pits, or damage in the car);
+`getVehicleCondition` on `trigger('condition')` (each line crossing, a new `lastImpactEt` in the car reading, a pit
+exit; 5 min fallback), so the tread the tyre tracker takes at each crossing is read just after the previous one;
+`TireManagement` on `trigger('tireManagement')` after a pit exit (60 s fallback); `RepairAndRefuel` and the schedule
+`once` per loaded session (again after the poller goes off). `LiveService.followCar` / `followPlayer` drive these. `shared/domain/live/`:
 `liveUsage.ts` (`LiveUsageMeter`, per-lap use interpolated at each crossing, pit/caution/refuel laps excluded, mean
 of the last 3), `liveResourcePlan.ts` (VE for Hypercar and GT3, fuel otherwise; `planRace` with the reserve kept at
 pit entry and the finish, `planGarage`), `liveCarCondition.ts` (damage impact lap, measured pace loss, significance;

@@ -138,6 +138,7 @@ function decodeCar(slot: Buffer): LiveCarReading {
     dentSeverity: Array.from({ length: 8 }, (_, index) => slot.readUInt8(at.dentSeverity + index)),
     detached: slot.readUInt8(at.detached) !== 0,
     wheels: [0, 1, 2, 3].map(index => ({ flat: wheel(index, 'flat'), detached: wheel(index, 'detached') })),
+    lastImpactEt: finite(slot.readDoubleLE(at.lastImpactET)),
     compound: cString(slot, at.frontTireCompoundName, 18).trim(),
   };
 }

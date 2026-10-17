@@ -40,7 +40,7 @@ describe('LiveStrategyTracker', () => {
   it('pairs fuel and VE on the same clean crossings, carries ratios into the garage, and resets on wet conditions', () => {
     const tracker = new LiveStrategyTracker();
     const car = (et: number) => ({ fuelLiters: 80 - et * 0.024, fuelCapacityLiters: 117,
-      dentSeverity: [0,0,0,0,0,0,0,0], detached: false,
+      dentSeverity: [0,0,0,0,0,0,0,0], detached: false, lastImpactEt: 0,
       wheels: Array.from({length:4}, () => ({flat:false,detached:false})), compound: 'Medium' });
     tracker.applyCar(car(0));
     tracker.applyRest({ type: 'tireManagement', vePerLap: 3, fuelPerLap: 2.1, newSets: 2, selected: { compound: 'Medium', used: true, wear: 0.9 } });

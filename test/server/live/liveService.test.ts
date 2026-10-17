@@ -70,6 +70,41 @@ describe('LiveService', () => {
     service.stop();
   });
 
+  it('asks for the condition after a line crossing, an impact or a stop, and for the tyre screen after a stop', async () => {
+    const paths: string[] = [];
+    const get = vi.fn((path: string) => {
+      paths.push(path);
+      return Promise.resolve<RestAnswer>(path === '/navigation/state'
+        ? { ok: true, body: { state: { settingMode: 'SETTING_GRANDPRIX' } } } : { ok: false, reason: 'status' });
+    });
+    const { service, worker, frame } = setup({ pit: { get } });
+    const count = (path: string) => paths.filter(item => item === path).length;
+    const CONDITION = '/rest/garage/getVehicleCondition';
+    const TYRES = '/rest/garage/UIScreen/TireManagement';
+    const player = (totalLaps: number, inPits = false) => vehicleReading({ id: 1, place: 2, totalLaps, inPits, vehicleName: 'Car', vehicleClass: 'GT3' });
+    const car = (lastImpactEt: number) => worker.emit('message', { type: 'frame', car: {
+      fuelLiters: 40, fuelCapacityLiters: 117, dentSeverity: [0, 0, 0, 0, 0, 0, 0, 0], detached: false,
+      wheels: Array(4).fill({ flat: false, detached: false }), lastImpactEt, compound: 'Medium' } });
+    service.addClient(new FakeSink());
+    frame(reading({ player: player(3) }));
+    car(0);
+    await vi.advanceTimersByTimeAsync(40_000);
+    expect(count(CONDITION)).toBe(1);
+    frame(reading({ currentEt: 50, player: player(4) }));
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(count(CONDITION)).toBe(2);
+    car(55);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(count(CONDITION)).toBe(3);
+    const tyres = count(TYRES);
+    frame(reading({ currentEt: 70, player: player(4, true) }));
+    frame(reading({ currentEt: 90, player: player(4, false) }));
+    await vi.advanceTimersByTimeAsync(6000);
+    expect(count(CONDITION)).toBe(4);
+    expect(count(TYRES)).toBe(tyres + 1);
+    service.stop();
+  });
+
   it('stops reading the game when the last page fails a write', async () => {
     const get = vi.fn(() => Promise.resolve<RestAnswer>({ ok: false, reason: 'error' }));
     const { service, frame } = setup({ pit: { get } });
