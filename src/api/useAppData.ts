@@ -41,6 +41,7 @@ export function useAppData({ onGameStarted }: { onGameStarted?: () => void } = {
   const [revision, setRevision] = useState(0);
   const [dataError, setDataError] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
+  const [gameRunning, setGameRunning] = useState(false);
   const mounted = useRef(false);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const dataAbort = useRef<AbortController | null>(null);
@@ -155,6 +156,7 @@ export function useAppData({ onGameStarted }: { onGameStarted?: () => void } = {
     onScanStarted: startScanPolling,
     onScanFinished: () => { loadedKey.current = null; startScanPolling(); },
     onGameStarted,
+    onGameRunning: setGameRunning,
   }, true);
 
   useEffect(() => {
@@ -170,7 +172,7 @@ export function useAppData({ onGameStarted }: { onGameStarted?: () => void } = {
     };
   }, [startScanPolling]);
 
-  return { status, loading, isRefreshing, replayScanStatus,
+  return { status, loading, isRefreshing, replayScanStatus, gameRunning,
     referenceUpdateCount, setReferenceUpdateCount, revision, error: statusError ?? dataError,
     fetchData: refresh, refreshReplayScanStatus: startScanPolling };
 }

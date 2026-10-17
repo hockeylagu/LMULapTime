@@ -76,9 +76,16 @@ export function createLiveRouter(context: ServerContext, live: LiveService): Rou
     const stopStarted = context.events.on('scan-started', () => publish(APP_EVENTS.scanStarted));
     const stopFinished = context.events.on('scan-finished', () => publish(APP_EVENTS.scanFinished));
     let lifecycle = live.getSnapshot().lifecycle;
+    // Whether LMU is running, so a page that was not switched to the dashboard can offer it.
+    const publishRunning = (): void => {
+      try { writeSseEvent(res, APP_EVENTS.gameRunning, { running: lifecycle !== 'offline' }); } catch { /* the connection is closing */ }
+    };
+    publishRunning();
     const stopLifecycle = live.events.on('lifecycle', next => {
       const started = lifecycle === 'offline' && next !== 'offline';
+      const changed = (lifecycle === 'offline') !== (next === 'offline');
       lifecycle = next;
+      if (changed) publishRunning();
       if (started && !live.hasClients() && loadLiveSettings(context.sessionDb).autoOpen) publish(APP_EVENTS.gameStarted);
     });
     const heartbeat = setInterval(() => publish(APP_EVENTS.heartbeat), LIVE_HEARTBEAT_MS);

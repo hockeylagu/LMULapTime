@@ -134,13 +134,13 @@ describe('live dashboard improvements', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('QUALIFYING COMPLETE');
     expect(screen.queryByText('PROVISIONAL RESULT')).not.toBeInTheDocument();
     expect(screen.getByTestId('live-session-review')).toHaveTextContent('+0.406 s');
-    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link').map(link => link.textContent)).toEqual(['LMU']);
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
     send('race');
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('RACE COMPLETE');
     expect(screen.getByText(/CAPTURED ONLY/)).toBeInTheDocument();
     expect(screen.queryByText('ESTIMATES AND SETTINGS SAVED')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link').map(link => link.textContent)).toEqual(['LMU']);
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });

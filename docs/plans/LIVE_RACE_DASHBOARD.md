@@ -314,6 +314,9 @@ already open switches itself to `#/live`. The app never starts a browser (decisi
 2026-10-16: the driver keeps the site open on the second screen). Nothing happens when a
 dashboard page is already connected, and it does not switch again until LMU is started
 again. Settings holds the on/off switch (on by default).
+While LMU runs, an app page that was not switched (setting off, or another dashboard page
+already open) shows a banner above the navbar, "Le Mans Ultimate is running. Open the live
+dashboard", from the `game-running` app event; the LMU mark on the dashboard leads back.
 Polling is deliberate: Windows has no notice for a named mapping being created, and process
 start events (WMI) cost more or need admin rights. The app's own open handle keeps the
 mapping alive after LMU exits, so game exit is detected when the plugin's counters stand

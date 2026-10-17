@@ -25,6 +25,7 @@ describe('LivePage', () => {
     render(<LivePage />);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('CONNECTING');
     expect(screen.getByTestId('live-status')).toHaveTextContent('CONNECTING');
+    expect(screen.getByRole('link', { name: 'LMU' })).toHaveAttribute('href', '#/dashboard');
   });
 
   it.each([

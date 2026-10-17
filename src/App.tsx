@@ -1,6 +1,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { Navbar } from './components/navbar/Navbar.js';
+import { LiveGameBanner } from './components/navbar/LiveGameBanner.js';
 import { ReferenceLaptimeUpdateToast } from './components/common/ReferenceLaptimeUpdateToast.js';
 import { LoadingState } from './components/common/LoadingState.js';
 import {
@@ -99,7 +100,7 @@ function AnalysisApp() {
   // Global Filter States
   const [selectedCarClass, setSelectedCarClassState] = useState<string>('All');
 
-  const { status, loading, isRefreshing, replayScanStatus,
+  const { status, loading, isRefreshing, replayScanStatus, gameRunning,
     referenceUpdateCount, setReferenceUpdateCount, revision, error, fetchData,
     refreshReplayScanStatus } = useAppData({ onGameStarted: () => navigate('/live') });
 
@@ -142,6 +143,7 @@ function AnalysisApp() {
     <SessionDataContext.Provider value={{ revision, scan: replayScanStatus }}>
     <div className="min-h-screen min-w-[1480px] bg-lmu-bg text-lmu-text flex flex-col font-sans">
 
+      {!isTelemetryRoute && gameRunning && <LiveGameBanner />}
       {!isTelemetryRoute && (
         <Navbar
           status={status}

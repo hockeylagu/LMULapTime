@@ -41,10 +41,11 @@ export function LiveSessionBar({ snapshot, connection }: LiveSessionBarProps) {
   return (
     <header className="flex h-[88px] shrink-0 items-center justify-between whitespace-nowrap border-b border-lmu-border pb-5 text-[48px] font-semibold">
       <div className="flex items-center gap-7">
-        <div className="flex items-center gap-5 font-black tracking-tight">
+        {/* A plain hash link: the dashboard page renders without a router of its own (HashRouter follows the hash). */}
+        <a href="#/dashboard" title="Back to the dashboard" className="flex items-center gap-5 font-black tracking-tight text-lmu-text hover:text-lmu-text-soft">
           <span aria-hidden="true" className="block h-7 w-1 bg-lmu-accent" />
           LMU
-        </div>
+        </a>
         {showSession && (
           <>
             <span>{snapshot.lifecycle === 'garage' ? 'GARAGE' : sessionKindLabel(session.kind)}</span>

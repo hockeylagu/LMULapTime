@@ -17,7 +17,12 @@ export function LivePage() {
   const buffer = useMemo(() => new PedalBuffer(), []);
   const { snapshot, connection, timing } = useLiveStream({ onPedals: (batch) => buffer.push(batch.samples) });
 
-  useEffect(() => { document.title = 'LMU Live'; }, []);
+  // The app's title comes back when the LMU link leads back to the dashboard.
+  useEffect(() => {
+    const appTitle = document.title;
+    document.title = 'LMU Live';
+    return () => { document.title = appTitle; };
+  }, []);
   // Stale samples must not reappear after data was lost.
   useEffect(() => { if (connection === 'disconnected') buffer.clear(); }, [connection, buffer]);
 

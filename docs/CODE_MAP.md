@@ -570,7 +570,9 @@ events), `liveSettings.ts` (`live_auto_open`, `live_reserve_laps` in
 cache_metadata), `sse.ts`. The lifecycle rules are deterministic in `shared/domain/live/liveLifecycle.ts`. Routes:
 `routes/liveRoutes.ts` (`/api/live/stream`, `/api/live/settings`, `/api/events`; auto-open is the `game-started` app
 event when the lifecycle leaves offline, setting on and no dashboard page connected: the open app navigates itself to
-`#/live`, the server never opens a browser).
+`#/live`, the server never opens a browser; `game-running` tells each app page whether LMU is running, on connect
+and when it starts or closes, and the app shows `navbar/LiveGameBanner.tsx` above the navbar with a link to `#/live`).
+The LMU mark in `LiveSessionBar` links back to `#/dashboard`.
 Session identity and timing (step 2): the scoring decode also carries the player's and the leader's lap fields, track
 temperature, rain and wetness; the telemetry decode adds the mean tyre surface temperature (`tyreSurfaceAvgC`).
 Deterministic models in `shared/domain/live/`: `liveLapTiming.ts` (laps, validity, session best, reference trace, delta,

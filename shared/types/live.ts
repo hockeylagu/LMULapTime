@@ -185,6 +185,8 @@ export const APP_EVENTS = {
   scanFinished: 'scan-finished',
   /** `{ at: number }`: LMU started, and the auto-open setting is on with no dashboard page connected: the page goes to `#/live`. */
   gameStarted: 'game-started',
+  /** `{ running: boolean }`: whether LMU is running, sent on connect and whenever it starts or closes. */
+  gameRunning: 'game-running',
   /** `{ at: number }`. */
   heartbeat: 'heartbeat',
 } as const;

@@ -118,6 +118,18 @@ describe('live routes', () => {
     await vi.waitFor(() => expect(gameStarts(chunks)).toBe(2));
   });
 
+  it('tells each page whether LMU is running on connect, then whenever it starts or closes', async () => {
+    const { app, live } = setup();
+    const { chunks } = await openStream(app, '/api/events');
+    const running = () => [...chunks.join('').matchAll(/event: game-running\ndata: (\{.*?\})/g)]
+      .map(([, data]) => (JSON.parse(data) as { running: boolean }).running);
+    await vi.waitFor(() => expect(running()).toEqual([false]));
+    live.events.emit('lifecycle', 'menu');
+    live.events.emit('lifecycle', 'garage');
+    live.events.emit('lifecycle', 'offline');
+    await vi.waitFor(() => expect(running()).toEqual([false, true, false]));
+  });
+
   it.each([
     ['the setting is off', 'false', false],
     ['a dashboard page is already connected', null, true],

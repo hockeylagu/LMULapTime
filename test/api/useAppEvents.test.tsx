@@ -49,4 +49,14 @@ describe('app event stream', () => {
     await act(async () => { FakeEventSource.byUrl('/api/events').emit('game-started', { at: 1 }); });
     expect(onGameStarted).toHaveBeenCalledTimes(1);
   });
+
+  it('keeps whether LMU is running, so the page can offer the dashboard', async () => {
+    const { result } = renderHook(() => useAppData());
+    await act(async () => {});
+    expect(result.current.gameRunning).toBe(false);
+    await act(async () => { FakeEventSource.byUrl('/api/events').emit('game-running', { running: true }); });
+    expect(result.current.gameRunning).toBe(true);
+    await act(async () => { FakeEventSource.byUrl('/api/events').emit('game-running', { running: false }); });
+    expect(result.current.gameRunning).toBe(false);
+  });
 });
