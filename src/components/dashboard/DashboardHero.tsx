@@ -139,7 +139,7 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
                     <span className={`text-xl font-extrabold ${latestOuting.position === 1 ? 'text-lmu-gold' : 'text-white'}`}>
                       P{latestOuting.position}
                     </span>
-                    {latestOuting.positionGain !== null && latestOuting.positionGain !== undefined && (
+                    {latestOuting.positionGain !== null && latestOuting.positionGain !== undefined && latestOuting.positionGain !== 0 && (
                       <span
                         data-testid="hero-finish-gain"
                         className={`text-xs font-bold ${
@@ -153,7 +153,7 @@ export const DashboardHero: React.FC<DashboardHeroProps> = ({
                         {latestOuting.positionGain > 0 ? `+${latestOuting.positionGain}` : latestOuting.positionGain}
                       </span>
                     )}
-                    {latestOuting.gridPosition && (
+                    {latestOuting.gridPosition && latestOuting.gridPosition !== latestOuting.position && (
                       <span className="text-xs text-lmu-muted">from P{latestOuting.gridPosition}</span>
                     )}
                   </span>

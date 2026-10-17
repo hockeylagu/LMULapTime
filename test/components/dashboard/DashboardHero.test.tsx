@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { DashboardHero } from '../../../src/components/dashboard/DashboardHero.js';
 import type { TrackBoundaryGeometry } from '../../../shared/types/trackGeometry.js';
-import { makeDetailedSession } from '../../helpers/sessionCardFixture.js';
+import { makeDetailedSession, makeSessionCard } from '../../helpers/sessionCardFixture.js';
 
 describe('DashboardHero', () => {
   const mockGeometry: TrackBoundaryGeometry = {
@@ -176,6 +176,34 @@ describe('DashboardHero', () => {
     expect(screen.getByText('Lap Consistency')).toBeInTheDocument();
     expect(screen.getByText('Race Net Positions')).toBeInTheDocument();
     expect(screen.getAllByText('+7')).toHaveLength(2); // finish gain and net positions
+  });
+
+  it.each([
+    { position: 8, gridPosition: 15, positionGain: 7, text: '+7' },
+    { position: 8, gridPosition: 7, positionGain: -1, text: '-1' },
+  ])('preserves the position change for a P$gridPosition start and P$position finish', ({ position, gridPosition, positionGain, text }) => {
+    const session = makeSessionCard({ sessionType: 'Race', playerDriver: { position, gridPosition, positionGain } });
+    render(<DashboardHero sessions={[session]} onSelectSession={vi.fn()} />);
+
+    expect(screen.getByTestId('hero-finish-gain')).toHaveTextContent(text);
+    expect(screen.getByTestId('hero-finish')).toHaveTextContent(`from P${gridPosition}`);
+  });
+
+  it('hides the zero change when the finishing position matches the start', () => {
+    const session = makeSessionCard({ sessionType: 'Race', playerDriver: { position: 1, gridPosition: 1, positionGain: 0 } });
+    render(<DashboardHero sessions={[session]} onSelectSession={vi.fn()} />);
+
+    expect(screen.getByTestId('hero-finish')).toHaveTextContent(/^FinishP1$/);
+    expect(screen.queryByTestId('hero-finish-gain')).not.toBeInTheDocument();
+  });
+
+  it('omits the starting position and change when they are unknown', () => {
+    const session = makeSessionCard({ sessionType: 'Race', playerDriver: { position: 1 } });
+    render(<DashboardHero sessions={[session]} onSelectSession={vi.fn()} />);
+
+    expect(screen.getByTestId('hero-finish')).toHaveTextContent('P1');
+    expect(screen.queryByTestId('hero-finish-gain')).not.toBeInTheDocument();
+    expect(screen.queryByText(/from P/)).not.toBeInTheDocument();
   });
 
   it('renders nothing when sessions list is empty', () => {
