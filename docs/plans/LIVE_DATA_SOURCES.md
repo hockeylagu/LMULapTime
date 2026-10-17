@@ -6,7 +6,7 @@ GT3, build 14200): shared memory recorded for 25 s and eight REST reads (results
 session files followed on 2026-10-16 with the app's live reader running (§4.3 and §2.2 there).
 Rows marked **Live** were seen with values in one of those sessions.
 Companion to [LIVE_RACE_DASHBOARD.md](LIVE_RACE_DASHBOARD.md) and the
-[mock](../prototypes/live-dashboard/README.md).
+[archived placement notes](../prototypes/live-dashboard/README.md).
 
 Two live sources, each checking the other where they overlap:
 

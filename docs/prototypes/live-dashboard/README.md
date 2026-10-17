@@ -1,23 +1,6 @@
-# Cockpit dashboard placement study
+# Archived cockpit dashboard placement study
 
-Standalone mock pages; no game connection, calculations or changes to the app routes.
-All numbers, advice and traces are illustrative. Most live sources are now verified
-(`docs/plans/LIVE_DATA_SOURCES.md`); the MFD values themselves are not. This prototype is excluded from the Vite production entry.
-The plain car/class header is a mock placeholder. Real implementation must reuse
-the site's existing car identity/type pattern and assets at a cockpit-readable size.
-
-With the Vite development server running, open any URL below, or switch patterns from the header dropdown:
-
-- Race: `/docs/prototypes/live-dashboard/index.html?session=race`
-- Race with damage: `/docs/prototypes/live-dashboard/index.html?session=race&condition=damage`
-- Puncture: `/docs/prototypes/live-dashboard/index.html?session=race&condition=flat`
-- Practice: `/docs/prototypes/live-dashboard/index.html?session=practice`
-- Qualifying: `/docs/prototypes/live-dashboard/index.html?session=quali`
-- Sprint race, no stop/damage: `/docs/prototypes/live-dashboard/index.html?session=race&scenario=sprint`
-- Fuel-class race example: `/docs/prototypes/live-dashboard/index.html?session=race&class=LMP2`
-- Mid-stint race: `/docs/prototypes/live-dashboard/index.html?session=race&scenario=stint` (add `&class=LMP2` for fuel)
-- Weather forecast: add `&weather=coming` (rain forecast) or `&weather=easing` (rain ending) to a race URL
-- Lifecycle: `state=offline` (game closed), `state=menu`, `state=between&next=quali` / `next=race` (garage between sessions; add `&class=LMP2` for fuel), `session=race&state=starting`, `session=race&state=finished`
+Historical design decisions from the synthetic placement study. The standalone HTML, JavaScript and CSS mock was removed on 2026-10-16 after implementation. The temporary review gallery and screenshots were also removed. Production components under src/components/live and their regression tests are the current reference; examples below describe the earlier mock, not a runnable page.
 
 The mid-stint variant (accepted 2026-10-16) is for stint management between corners: the primary readout is
 resource use averaged over the last three clean laps (one lap with traffic or a yellow
