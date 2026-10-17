@@ -65,6 +65,8 @@ export interface LivePitPollerOptions {
   onUpdate(update: LiveRestUpdate): void;
   /** Whether a replay is playing changed (`navigation/state` `settingMode`; null when unknown). */
   onReplay(active: boolean | null): void;
+  /** Every state check answered while no replay plays: its body, so the identity needs no request of its own. */
+  onNavigation?(body: unknown): void;
   /** Replaces the HTTP read (tests). */
   get?: RestGet;
   now?: () => number;
@@ -169,6 +171,7 @@ export class LivePitPoller {
       this.gameStateDue = done + (answer.ok ? REPLAY_CHECK_MS * 2 / 3 : FAILED_READ_PAUSE_MS / 3);
       this.setReplay(answer.ok ? parseReplayPlayback(answer.body) : null, done);
       this.unsafeCheckFresh = this.replay === false;
+      if (answer.ok && this.replay === false) this.options.onNavigation?.(answer.body);
       return;
     }
     const every = next.read.every[this.mode] ?? FAILED_READ_PAUSE_MS;

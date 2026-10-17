@@ -21,6 +21,8 @@ export interface LiveIdentityOptions {
  * Who and where for the loaded session. It resolves at once from the game's own names (track, car), then
  * asks LMU's navigation state for the exact layout: once when a session loads and every 30 s while it stays
  * loaded, one request at a time, backing off 30 s after any failure. Nothing is asked while no session is loaded.
+ * While the pit poller runs (a dashboard is open) it already reads the navigation state: the resolver is `shared`,
+ * asks nothing itself and takes the poller's answers (`offerNavigation`), so the two never overlap.
  */
 export class LiveIdentityResolver {
   private session: LiveSessionInfo | null = null;
@@ -31,6 +33,8 @@ export class LiveIdentityResolver {
   private inFlight = false;
   private generation = 0;
   private backoffUntil = 0;
+  private shared = false;
+  private lastAnswerAt = -Infinity;
 
   public constructor(private readonly options: LiveIdentityOptions) {}
 
@@ -46,7 +50,26 @@ export class LiveIdentityResolver {
     this.navigation = null;
     this.current = session ? this.resolve(session) : null;
     this.clearTimer();
-    if (session && !this.inFlight) this.schedule(Math.max(0, this.backoffUntil - this.now()));
+    this.lastAnswerAt = -Infinity;
+    if (session && !this.inFlight && !this.shared) this.schedule(Math.max(0, this.backoffUntil - this.now()));
+  }
+
+  /** The pit poller started (true) or stopped (false) reading the navigation state. Stopped, the resolver asks again itself, 30 s after the last answer. */
+  public setShared(shared: boolean): void {
+    if (shared === this.shared) return;
+    this.shared = shared;
+    this.clearTimer();
+    if (!shared && this.session && !this.inFlight) {
+      const now = this.now();
+      this.schedule(Math.max(0, this.backoffUntil - now, this.lastAnswerAt + NAVIGATION_POLL_MS - now));
+    }
+  }
+
+  /** A navigation state the pit poller read (no replay playing): it stands for this resolver's own read. */
+  public offerNavigation(navigation: LiveNavigation): void {
+    if (!this.session) return;
+    this.lastAnswerAt = this.now();
+    this.apply(navigation, this.session);
   }
 
   public stop(): void {
@@ -86,12 +109,15 @@ export class LiveIdentityResolver {
     if (!result.ok) this.backoffUntil = this.now() + NAVIGATION_POLL_MS;
     if (!this.session) return;
     if (generation !== this.generation) {
-      // The session changed while asking: the answer belongs to the old one. Ask again unless backing off.
-      this.schedule(Math.max(0, this.backoffUntil - this.now()));
+      // The session changed while asking: the answer belongs to the old one. Ask again unless backing off or shared.
+      if (!this.shared) this.schedule(Math.max(0, this.backoffUntil - this.now()));
       return;
     }
-    if (result.ok) this.apply(result.navigation, this.session);
-    this.schedule(NAVIGATION_POLL_MS);
+    if (result.ok) {
+      this.lastAnswerAt = this.now();
+      this.apply(result.navigation, this.session);
+    }
+    if (!this.shared) this.schedule(NAVIGATION_POLL_MS);
   }
 
   private apply(navigation: LiveNavigation, session: LiveSessionInfo): void {

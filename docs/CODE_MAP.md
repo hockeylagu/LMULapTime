@@ -593,11 +593,14 @@ sector deltas), `liveLapsLeft.ts` (estimated from the leader's flag time and the
 (whole-degree temperature, 5 min trend, 0.05 steps), `liveIdentity.ts` (layout via `getCircuitSpecification`, class,
 PR lookup), tied together by `liveSessionTracker.ts`. Server: `lmuNavigation.ts` (`GET 127.0.0.1:6397/navigation/state`,
 2 s timeout, never throws; `navigationProbe` maps it to menu / loading with progress / session) and `liveIdentityResolver.ts` (once per loaded session,
-then every 30 s, 30 s back-off, one request at a time); the PR comes from `queryLivePersonalBest`
+then every 30 s, 30 s back-off, one request at a time; while the pit poller runs it is `shared`: it asks nothing and
+takes the poller's non-replay state checks through `onNavigation` / `offerNavigation`, so the two never overlap); the PR comes from `queryLivePersonalBest`
 (`server/core/sessionSummaries/contextQueries.ts`), injected from `server/index.ts`. `timing` events go out at most every
 ~200 ms; snapshots only on a content change.
 Strategy (VE/fuel, pit, damage, tyres, forecast; contracts in `shared/types/liveStrategy.ts`): `lmuPitRest.ts` holds the
-allowlisted REST GETs (1 s timeout) and their parsers; `livePitPoller.ts` asks at most one a second, most overdue
+allowlisted REST GETs (1 s total deadline) and their parsers; `lmuGet` and the reader worker's `probeGame` go through
+`lmuHttp.ts` (`lmuHttpGet`: settles once, by a hard deadline rather than the socket's idle timeout, and on an answer cut
+off midway, so a one-request-at-a-time caller never waits forever); `livePitPoller.ts` asks at most one a second, most overdue
 first, by mode (off / track / garage, only while a dashboard client is connected and a session is loaded),
 a state check (`navigation/state`, replay from `settingMode` via `parseReplayPlayback`) every ~10 s and right before
 each `getVehicleCondition`, the one read that crashes LMU in a replay, and each `GetSessionsInfoForEvent` (garage

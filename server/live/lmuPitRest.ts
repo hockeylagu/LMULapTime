@@ -1,4 +1,4 @@
-import http from 'node:http';
+import { lmuHttpGet } from './lmuHttp.js';
 import type { LiveVehicleCondition } from '../../shared/domain/live/liveCarCondition.js';
 import type { LiveForecastNode } from '../../shared/domain/live/liveForecast.js';
 import type { LiveRestUpdate, LiveSelectedTyres } from '../../shared/domain/live/liveStrategyTracker.js';
@@ -15,20 +15,14 @@ export const REST_TIMEOUT_MS = 1000;
 export type RestAnswer = { ok: true; body: unknown } | { ok: false; reason: 'status' | 'timeout' | 'error' };
 export type RestGet = (path: string) => Promise<RestAnswer>;
 
-/** One GET; never throws. A non-200, an unreadable body, a refusal or an answer slower than 1 s is not ok. */
-export const lmuGet: RestGet = path => new Promise(resolve => {
-  const request = http.get(`${LMU_REST_ORIGIN}${path}`, { timeout: REST_TIMEOUT_MS }, response => {
-    let body = '';
-    response.setEncoding('utf8');
-    response.on('data', (chunk: string) => { body += chunk; });
-    response.on('end', () => {
-      if (response.statusCode !== 200) { resolve({ ok: false, reason: 'status' }); return; }
-      try { resolve({ ok: true, body: JSON.parse(body) as unknown }); } catch { resolve({ ok: false, reason: 'error' }); }
-    });
-  });
-  request.on('timeout', () => { request.destroy(); resolve({ ok: false, reason: 'timeout' }); });
-  request.on('error', () => resolve({ ok: false, reason: 'error' }));
-});
+/** One GET; never throws. A non-200, an unreadable body, a refusal, a dropped answer or one slower than 1 s is not ok. */
+export const lmuGet: RestGet = async path => {
+  const answer = await lmuHttpGet(`${LMU_REST_ORIGIN}${path}`, REST_TIMEOUT_MS);
+  if (answer.status === 'timeout') return { ok: false, reason: 'timeout' };
+  if (answer.status !== 'ok') return { ok: false, reason: 'error' };
+  if (answer.statusCode !== 200) return { ok: false, reason: 'status' };
+  try { return { ok: true, body: JSON.parse(answer.body) as unknown }; } catch { return { ok: false, reason: 'error' }; }
+};
 
 type Json = Record<string, unknown>;
 const record = (value: unknown): Json | null =>

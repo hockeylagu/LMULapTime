@@ -20,8 +20,9 @@ function setup(replay: boolean | null = false, answer: (path: string) => RestAns
   });
   const onUpdate = vi.fn();
   const onReplay = vi.fn();
-  const poller = new LivePitPoller({ get, onUpdate, onReplay });
-  return { poller, paths, get, onUpdate, onReplay };
+  const onNavigation = vi.fn();
+  const poller = new LivePitPoller({ get, onUpdate, onReplay, onNavigation });
+  return { poller, paths, get, onUpdate, onReplay, onNavigation };
 }
 
 describe('LivePitPoller', () => {
@@ -40,6 +41,19 @@ describe('LivePitPoller', () => {
     expect(t.onUpdate).toHaveBeenCalledWith({ type: 'standings', veFraction: 0.5, fuelFraction: 0.4, pitState: 'none', penalties: 0 });
     expect(t.paths).toContain('/rest/garage/getVehicleCondition');
     t.poller.stop();
+  });
+
+  it('hands on each state check answered outside a replay, and none from a replay', async () => {
+    const live = setup(false);
+    live.poller.setMode('track');
+    await vi.advanceTimersByTimeAsync(PIT_POLL_TICK_MS);
+    expect(live.onNavigation).toHaveBeenCalledWith(navState(false));
+    live.poller.stop();
+    const replay = setup(true);
+    replay.poller.setMode('track');
+    await vi.advanceTimersByTimeAsync(20 * PIT_POLL_TICK_MS);
+    expect(replay.onNavigation).not.toHaveBeenCalled();
+    replay.poller.stop();
   });
 
   it('reads nothing but the state check while a replay plays, and says so', async () => {

@@ -287,19 +287,33 @@ describe('LiveService', () => {
       expect(service.getSnapshot().recentLaps).toEqual([{ lapNumber: 4, lapSeconds: 100, sectors: [30, 30, 40], valid: false }]);
     });
 
-    it('resolves the identity from the game, then from LMU, with the record injected', async () => {
-      const readNavigation = vi.fn(() => Promise.resolve({ ok: true as const, navigation: { sceneDesc: 'LEMANSWEC', classes: [] } }));
+    it('resolves the identity from the game, then from the pit poller state check while a dashboard is open', async () => {
+      const readNavigation = vi.fn(() => Promise.resolve({ ok: true as const, navigation: { sceneDesc: 'LEMANSWEC_MULSANNE', classes: [] } }));
+      const state = { state: { settingMode: 'SETTING_GRANDPRIX' }, loadingStatus: { track: { sceneDesc: 'LEMANSWEC' } } };
+      const get = vi.fn((path: string) => Promise.resolve<RestAnswer>(path === '/navigation/state' ? { ok: true, body: state } : { ok: false, reason: 'error' }));
       const personalBest = vi.fn(() => 228.4);
-      const { service, frame } = setup({ personalBest, identity: { readNavigation } });
+      const { service, frame } = setup({ personalBest, identity: { readNavigation }, pit: { get } });
       const sink = new FakeSink();
       service.addClient(sink);
       frame(lap(3, { vehicleName: 'Ginetta G61', vehicleClass: 'LMP3' }, { trackName: 'Circuit de la Sarthe' }));
       expect(service.getSnapshot().identity).toMatchObject({ layoutKey: null, carClass: 'LMP3', personalBestSeconds: null });
+      await vi.advanceTimersByTimeAsync(60_000);
+      // One reader of the navigation state at a time: the identity asks nothing itself while the poller runs.
+      expect(readNavigation).not.toHaveBeenCalled();
+      expect(get).toHaveBeenCalledWith('/navigation/state');
+      expect(service.getSnapshot().identity).toMatchObject({ layoutKey: 'sarthe_full', carClass: 'LMP3', personalBestSeconds: 228.4 });
+      expect(sink.data(2)).toMatchObject({ sequence: 2, identity: { layoutKey: 'sarthe_full' } });
+      service.stop();
+    });
+
+    it('asks LMU itself for the identity while no dashboard is open', async () => {
+      const readNavigation = vi.fn(() => Promise.resolve({ ok: true as const, navigation: { sceneDesc: 'LEMANSWEC', classes: [] } }));
+      const { service, frame } = setup({ identity: { readNavigation } });
+      frame(lap(3, { vehicleName: 'Ginetta G61', vehicleClass: 'LMP3' }, { trackName: 'Circuit de la Sarthe' }));
       await vi.advanceTimersByTimeAsync(0);
       expect(readNavigation).toHaveBeenCalledTimes(1);
-      expect(service.getSnapshot().identity).toMatchObject({ layoutKey: 'sarthe_full', carClass: 'LMP3', personalBestSeconds: 228.4 });
-      expect(sink.events()).toEqual(['snapshot', 'snapshot', 'snapshot']);
-      expect(sink.data(2)).toMatchObject({ sequence: 2, identity: { layoutKey: 'sarthe_full' } });
+      expect(service.getSnapshot().identity).toMatchObject({ layoutKey: 'sarthe_full' });
+      service.stop();
     });
 
     it('asks LMU for nothing in the menu', async () => {

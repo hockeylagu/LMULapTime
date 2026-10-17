@@ -17,6 +17,7 @@ import type { LiveReaderMessage } from './liveReader.js';
 import { LiveIdentityResolver } from './liveIdentityResolver.js';
 import type { LiveIdentityOptions } from './liveIdentityResolver.js';
 import { LivePitPoller } from './livePitPoller.js';
+import { parseNavigationState } from './lmuNavigation.js';
 import { DEFAULT_RESERVE_LAPS } from './liveSettings.js';
 import type { LivePitPollerOptions, PitPollMode } from './livePitPoller.js';
 import { writeSseEvent } from './sse.js';
@@ -121,6 +122,10 @@ export class LiveService {
     this.pit = new LivePitPoller({
       ...options.pit,
       onUpdate: update => this.applyRest(update),
+      onNavigation: body => {
+        const navigation = parseNavigationState(body);
+        if (navigation) this.identity.offerNavigation(navigation);
+      },
       onReplay: active => {
         this.replay = active === true;
         this.applyReading(this.lastReading);
@@ -306,6 +311,8 @@ export class LiveService {
       : replaying ? 'track'
         : lifecycle === 'loading' || !isLiveSessionLoaded(lifecycle) ? 'off' : lifecycle === 'garage' ? 'garage' : 'track';
     this.pit.setMode(mode);
+    // The poller's state checks read the navigation state: the identity takes them instead of asking too.
+    this.identity.setShared(mode !== 'off');
   }
 
   private bufferPedal(sample: LivePedalSample): void {

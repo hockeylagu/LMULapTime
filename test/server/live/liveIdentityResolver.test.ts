@@ -52,6 +52,31 @@ describe('LiveIdentityResolver', () => {
     expect(t.onChange).toHaveBeenCalledTimes(2);
   });
 
+  it('asks nothing while shared, takes the offered answers, and asks again 30 s after the last one when unshared', async () => {
+    const t = setup([]);
+    t.resolver.setShared(true);
+    t.resolver.update(session());
+    await vi.advanceTimersByTimeAsync(NAVIGATION_POLL_MS * 3);
+    expect(t.reads).not.toHaveBeenCalled();
+    t.resolver.offerNavigation({ sceneDesc: 'LEMANSWEC_MULSANNE', classes: ['LMP3'] });
+    expect(t.resolver.identity?.layoutKey).toBe('sarthe_mulsanne');
+    expect(t.onChange).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(10_000);
+    t.resolver.setShared(false);
+    await vi.advanceTimersByTimeAsync(NAVIGATION_POLL_MS - 10_001);
+    expect(t.reads).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(t.reads).toHaveBeenCalledTimes(1);
+    expect(t.resolver.identity?.layoutKey).toBe('sarthe_full');
+  });
+
+  it('ignores an offered answer while no session is loaded', () => {
+    const t = setup([]);
+    t.resolver.offerNavigation({ sceneDesc: 'LEMANSWEC', classes: ['LMP3'] });
+    expect(t.resolver.identity).toBeNull();
+    expect(t.onChange).not.toHaveBeenCalled();
+  });
+
   it('stays quiet while no session is loaded and stops asking when it unloads', async () => {
     const t = setup([]);
     t.resolver.update(null);

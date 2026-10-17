@@ -1,8 +1,8 @@
-import http from 'node:http';
 import { parentPort } from 'node:worker_threads';
 import { isWorkerMessage } from '../core/workerThreads.js';
 import { LiveReader } from './liveReader.js';
 import type { GameProbe } from './liveReader.js';
+import { lmuHttpGet } from './lmuHttp.js';
 import { navigationProbe } from './lmuNavigation.js';
 import { openMapping } from './sharedMemory.js';
 
@@ -10,18 +10,12 @@ import { openMapping } from './sharedMemory.js';
 const GAME_STATE_URL = 'http://127.0.0.1:6397/navigation/state';
 const PROBE_TIMEOUT_MS = 1000;
 
-function probeGame(): Promise<GameProbe> {
-  return new Promise(resolve => {
-    const request = http.get(GAME_STATE_URL, { timeout: PROBE_TIMEOUT_MS }, response => {
-      let body = '';
-      response.setEncoding('utf8');
-      response.on('data', (chunk: string) => { body += chunk; });
-      response.on('end', () => resolve(navigationProbe(body)));
-    });
-    // Only a refused connection means gone: a game loading a track can be too slow to answer and is still there.
-    request.on('timeout', () => { request.destroy(); resolve('busy'); });
-    request.on('error', () => resolve('gone'));
-  });
+// Only a refused connection means gone: a game loading a track can be too slow to answer, and an answer cut off
+// midway is asked again (a game that exited refuses the next one).
+async function probeGame(): Promise<GameProbe> {
+  const answer = await lmuHttpGet(GAME_STATE_URL, PROBE_TIMEOUT_MS);
+  if (answer.status === 'ok') return navigationProbe(answer.body);
+  return answer.status === 'error' ? 'gone' : 'busy';
 }
 
 if (parentPort) {
