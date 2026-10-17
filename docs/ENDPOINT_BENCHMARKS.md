@@ -227,3 +227,7 @@ controlled model/network/cost benchmark rather than a fake validation-error timi
 Implementation: `tools/benchmarks/{benchmarkEndpoints,endpointHarness,endpointInventory,endpointCases,endpointReport,endpointValidation}.ts`.
 Tests: `test/tools/benchmarks/endpointBenchmarks.test.ts`. The benchmark tools are included in the
 TypeScript build; runtime reports and private identifiers are not committed.
+
+## Live strategy history — 2026-10-16
+
+The five-sample after-change sweep completed on an isolated 1,027-session snapshot. The new bounded JSON history endpoint measured 1.18 ms median / 1.35 ms p95 with an empty audit table; this does not measure a large accumulated history. Streaming CSV is exercised by persistence/export tests, outside the JSON benchmark. The live router is now mounted in the benchmark harness. Replay cache and automatic telemetry remained the slowest scenarios (241.91 and 156.97 ms median). The before sweep could not use sandbox loopback, so no latency delta is claimed. Report: `.cache/live-audit-benchmark/latest.md`.

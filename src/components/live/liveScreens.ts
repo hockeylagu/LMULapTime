@@ -2,7 +2,8 @@ import type { LiveSessionKind, LiveSnapshot } from '../../../shared/types/live.j
 import type { LiveGaragePlan, LiveGarageTyres } from '../../../shared/types/liveStrategy.js';
 import { mapVehicleIdToClass } from '../../../shared/domain/vehicleMapping.js';
 import { formatLapTime, UNKNOWN } from './liveFormat.js';
-import { formatAmount, formatPerLap, resourceName } from './race/livePlanFormat.js';
+import { formatAmount, resourceName } from './race/livePlanFormat.js';
+import { LIVE_TYRE_TREAD_FLOOR } from '../../../shared/domain/live/liveInsights.js';
 
 /** One thing to set in the garage: the target, what the garage holds now, and what to do about it. */
 export interface GarageCheck {
@@ -12,6 +13,7 @@ export interface GarageCheck {
   unit?: string;
   /** `ok` when the garage already matches, `change` when the driver must act, `warn` when they cannot. */
   action: { text: string; tone: 'ok' | 'change' | 'warn' } | null;
+  note?: string;
 }
 
 export interface LiveScreen {
@@ -23,6 +25,7 @@ export interface LiveScreen {
   checks: GarageCheck[];
   /** The pedal trace stays for an input check (starting) and while driving. */
   showTrace: boolean;
+  preparation?: { laps: number | null; minutes: number | null; stopPlan: string | null };
 }
 
 const KIND_LABELS: Record<LiveSessionKind, string> = {
@@ -49,18 +52,6 @@ function startingNote(gamePhase: number): string {
   return 'ON THE GRID';
 }
 
-/** How the target was worked out, said once under the title: session, laps, lap time and per-lap use. */
-function garageBasis(plan: LiveGaragePlan): string {
-  const name = resourceName(plan.kind);
-  const session = plan.sessionMinutes !== null ? `${plan.sessionMinutes} MIN` : 'SESSION';
-  const laps = plan.laps !== null ? `${plan.laps} LAPS AT ${formatLapTime(plan.lapSeconds)}` : `LAPS ${UNKNOWN}`;
-  const perLap = `${formatPerLap(plan.perLap, plan.unit)} ${plan.unit} ${name} / LAP`;
-  const source = plan.perLapSource === 'measured'
-    ? `FROM ${plan.lapsMeasured} ${plan.lapsMeasured === 1 ? 'LAP' : 'LAPS'} THIS EVENT`
-    : plan.perLapSource === 'game' ? "GAME'S ESTIMATE" : 'AFTER THE FIRST LAP';
-  return `${session} · ${laps} · ${perLap} ${source}`;
-}
-
 /** The VE or fuel to load against the garage setting: raise it when short, fine when it covers the session. */
 function resourceCheck(plan: LiveGaragePlan): GarageCheck {
   const name = resourceName(plan.kind);
@@ -69,8 +60,9 @@ function resourceCheck(plan: LiveGaragePlan): GarageCheck {
     : set >= needed ? { text: 'OK', tone: 'ok' }
       : { text: `RAISE +${formatAmount(needed - set, unit)}${unit === '%' ? '%' : ' L'}`, tone: 'change' };
   return {
-    label: plan.stops ? `${name} · ${plan.stops} ${plan.stops === 1 ? 'STOP' : 'STOPS'}` : name,
+    label: name,
     target: formatAmount(needed, unit), current: formatAmount(set, unit), unit, action,
+    note: plan.perLapSource === 'game' ? 'GAME ESTIMATE' : plan.perLapSource === null ? 'USE NOT MEASURED' : undefined,
   };
 }
 
@@ -97,26 +89,44 @@ export function liveTrackName(snapshot: LiveSnapshot): string {
 export function liveScreen(snapshot: LiveSnapshot): LiveScreen {
   const session = snapshot.session;
   const kind = session ? sessionKindLabel(session.kind) : 'SESSION';
-  const track = liveTrackName(snapshot);
-  const where = track ? `${kind} · ${track}` : kind;
   switch (snapshot.lifecycle) {
     case 'offline':
-      return { title: 'WAITING FOR LMU', note: 'GAME NOT RUNNING', muted: true, checks: [], showTrace: false };
+      return { title: 'WAITING FOR LMU', note: 'WAITING FOR LIVE DATA FROM THE GAME', muted: true, checks: [], showTrace: false };
     case 'menu':
-      return { title: 'IN MENU', note: 'WAITING FOR A SESSION', muted: true, checks: [], showTrace: false };
+      return { title: 'IN MENU', note: 'JOIN A SESSION TO BEGIN', muted: true, checks: [], showTrace: false };
     case 'loading': {
       const progress = snapshot.loadingProgress;
-      return { title: 'LOADING', note: progress === null ? 'LOADING THE SESSION' : `${Math.round(progress * 100)}%`, muted: true, checks: [], showTrace: false };
+      return { title: 'LOADING', note: progress === null ? '' : `${Math.round(progress * 100)}%`, muted: true, checks: [], showTrace: false };
     }
     case 'garage': {
       // The bar already says GARAGE and the track: the title names the session, the note how the targets were worked out.
       const plan = snapshot.strategy?.garage ?? null;
       const wantNew = session?.kind === 'race' || session?.kind === 'qualifying';
+      const checks = plan ? [resourceCheck(plan), tyreCheck(plan.tyres, wantNew)] : [];
+      const ratio = snapshot.strategy?.fuelRatio;
+      if (plan?.kind === 've' && ratio) checks.splice(1, 0, {
+        label: 'FUEL RATIO', target: ratio.recommended?.toFixed(2) ?? UNKNOWN, current: ratio.garageSetting?.toFixed(2) ?? UNKNOWN,
+        note: ratio.recommended === null ? 'SETTING RANGE NOT READ' : ratio.source === 'game' ? 'GAME ESTIMATE' : undefined,
+        action: ratio.recommended === null || ratio.garageSetting === null ? null : ratio.garageSetting < ratio.recommended
+          ? { text: 'RAISE', tone: 'change' } : ratio.garageSetting > ratio.recommended ? { text: 'LOWER', tone: 'change' } : { text: 'OK', tone: 'ok' },
+      });
+      const coverage = plan?.tyreCoverage;
+      if (coverage) {
+        const tyres = checks[checks.length - 1];
+        tyres.target = `~${Math.round(coverage.projectedTread * 100)}% END`;
+        tyres.note = coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR ? 'BELOW 40% MIN' : undefined;
+        tyres.action = coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR ? plan?.tyres?.newSets === 0 ? { text: 'NO NEW SETS', tone: 'warn' } : { text: 'FIT NEW', tone: 'change' } : coverage.availableSetsCover === false ? { text: 'SETS SHORT', tone: 'warn' } : null;
+      }
+      const qualifying = snapshot.qualifyingResult;
+      const qualiNote = session?.kind === 'race' && qualifying ? `QUALI ${qualifying.classPlace !== null ? `P${qualifying.classPlace}` : UNKNOWN} ${formatLapTime(qualifying.bestLap)}${qualifying.settled === true ? '' : ' (PROVISIONAL)'}` : '';
       return {
         title: kind,
-        note: plan ? garageBasis(plan) : track,
+        note: plan ? qualiNote : 'WAITING FOR GARAGE DATA',
+        preparation: plan ? { laps: session?.kind === 'race' && plan.laps !== null ? Math.max(0, plan.laps - 1) : plan.laps, minutes: plan.sessionMinutes, stopPlan: session?.kind !== 'race' ? null
+          : plan.stops === null ? 'STOPS UNKNOWN' : plan.stops === 0 ? 'NO STOP PLANNED'
+            : `${plan.stops} STOP${plan.stops === 1 ? '' : 'S'} PLANNED · ${plan.firstPitLap != null ? `PIT ~LAP ${plan.firstPitLap}` : 'PIT LAP UNKNOWN'}` } : undefined,
         muted: false,
-        checks: plan ? [resourceCheck(plan), tyreCheck(plan.tyres, wantNew)] : [],
+        checks,
         showTrace: false,
       };
     }
@@ -126,9 +136,9 @@ export function liveScreen(snapshot: LiveSnapshot): LiveScreen {
         note: startingNote(session?.gamePhase ?? 0), muted: false, checks: [], showTrace: true,
       };
     case 'finished':
-      return { title: 'SESSION OVER', note: where, muted: false, checks: [], showTrace: false };
+      return { title: 'SESSION OVER', note: '', muted: false, checks: [], showTrace: false };
     case 'driving':
       // The driving content is the session views (`LiveDriving`); this only says the trace stays.
-      return { title: kind, note: session?.trackName ?? '', muted: false, checks: [], showTrace: true };
+      return { title: kind, note: '', muted: false, checks: [], showTrace: true };
   }
 }

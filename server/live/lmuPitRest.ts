@@ -90,12 +90,14 @@ const RESOURCE_LINES = ['VIRTUAL ENERGY:', 'FUEL:'];
 export function parsePitMenu(body: unknown): LivePitMenu | null {
   if (!Array.isArray(body)) return null;
   const lines = new Map<string, string>();
+  let fuelRatioOptions: number[] = [];
   for (const item of body.map(record)) {
     const name = item?.name;
     const index = num(item?.currentSetting);
     const settings = item?.settings;
     if (typeof name !== 'string' || index === null || !Array.isArray(settings)) continue;
     const text = record(settings[index])?.text;
+    if (name.trim() === 'FUEL RATIO:') fuelRatioOptions = settings.map(setting => leadingNumber(record(setting)?.text)).filter((value): value is number => value !== null && value > 0);
     if (typeof text === 'string') lines.set(name.trim(), text.trim());
   }
   if (lines.size === 0) return null;
@@ -106,6 +108,7 @@ export function parsePitMenu(body: unknown): LivePitMenu | null {
     resourceText,
     tyres: lines.get('TIRES:') ?? null,
     repair: lines.get('DAMAGE:') ?? null,
+    ...(fuelRatioOptions.length > 0 ? { fuelRatio: leadingNumber(lines.get('FUEL RATIO:')), fuelRatioOptions } : {}),
   };
 }
 
@@ -166,6 +169,8 @@ export function parseGarageData(body: unknown): Extract<LiveRestUpdate, { type: 
     type: 'garage',
     veStart: ve?.available === false ? null : leadingNumber(ve?.stringValue),
     fuelStart: typeof fuelText === 'string' && /\d\s*L/i.test(fuelText) ? leadingNumber(fuelText) : null,
+    ...(ve?.available !== false && leadingNumber(ve?.stringValue) !== null && typeof fuelText === 'string' && !/L/i.test(fuelText)
+      ? { fuelRatio: leadingNumber(fuelText) } : {}),
   };
 }
 

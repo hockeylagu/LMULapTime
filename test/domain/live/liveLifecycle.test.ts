@@ -50,6 +50,10 @@ describe('live lifecycle', () => {
   });
 
   it('classifies which lifecycles hold the game files and stream pedals', () => {
+    expect(deriveLiveState(null, 'menu', 'loading').lifecycle).toBe('loading');
+    expect(deriveLiveState(null, 'offline', 'menu').lifecycle).toBe('menu');
+    expect(isLiveSessionLoaded('loading')).toBe(true);
+    expect(isLiveOnTrack('loading')).toBe(false);
     expect((['offline', 'menu', 'garage', 'starting', 'driving', 'finished'] as const).map(isLiveSessionLoaded))
       .toEqual([false, false, true, true, true, true]);
     expect((['offline', 'menu', 'garage', 'starting', 'driving', 'finished'] as const).map(isLiveOnTrack))

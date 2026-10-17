@@ -15,11 +15,15 @@ export class LiveSessionTracker {
   private readonly weather = new LiveWeatherTracker();
 
   public apply(reading: LiveScoringReading | null, state: LiveState): LiveSessionDetails {
+    if (!state.session) {
+      if (state.lifecycle !== 'loading') { this.laps.reset(); this.weather.reset(); }
+      return NO_SESSION_DETAILS;
+    }
     this.laps.update(reading);
     const weather = this.weather.update(reading);
     if (!reading || !state.session) return { ...NO_SESSION_DETAILS, weather };
     return {
-      lapsLeft: computeLapsLeft(state.session, reading.player, reading.leader),
+      lapsLeft: computeLapsLeft(state.session, reading.player, reading.leader, reading.classLeader),
       weather,
       recentLaps: this.laps.recentLaps,
       sessionBest: this.laps.sessionBest,

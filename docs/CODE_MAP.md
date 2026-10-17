@@ -530,13 +530,17 @@ else the track temperature). `LiveDelta` and
 `liveFormat.ts` hold the signed-delta (real minus sign, gain/loss tokens), sector and lap formatting.
 Race plan (`src/components/live/race/`): `raceColumns.ts` holds the one column layout every race and qualifying row shares; `raceAction.ts` (`racePlanView`) turns `LiveSnapshot.strategy` into one lead
 readout and three cells by mode (calculating, pit-now for a flat or lost wheel, in-pit, pit within 2 laps, stint,
-sprint when the finish is reachable); `LiveRacePlan.tsx` renders them with fixed label/value/note lines and
+sprint when the finish is reachable, saving for a modest measured no-stop scenario); `LiveRacePlan.tsx` renders them with fixed label/value/note lines and
 `minmax(0, …)` columns so a mode change never moves anything (words get a smaller size than figures);
 `LiveDamageRow.tsx` replaces `LiveLastLapRow` only when `damage.significant`; `livePlanFormat.ts` formats amounts,
 ranges and tyre calls. `liveScreens.ts` also builds the loading screen (progress) and the garage checklist (`GarageCheck`, drawn by
 `LiveGarageChecklist.tsx` on the race columns): the VE or fuel and the tyres, each with what to set, what the garage
 holds and the action (RAISE, FIT NEW, OK; qualifying and the race want a new set), under a line with the session,
 laps, lap time and per-lap source. The sector in progress shows its running delta (`activeSectorDelta` in `liveLapTiming.ts`).
+Healthy sprints lead with a timing-store subscriber for current delta; tyre temperature replaces the duplicate
+delta in the sector row. `LiveSessionReview.tsx` under `live/summary/` presents provisional post-quali/race results,
+including captured-only clean averages, and links to session analysis after driving. Race-garage checks carry the
+qualifying position/time, ratio recommendation versus the actual setup, reserve, stop plan and tyre projection.
 
 ### Live dashboard (server)
 
@@ -579,6 +583,15 @@ tyre wear per stint), `liveForecast.ts` (next rain/dry change from the weather n
 forgotten when another resolved layout of the same track name loads). `planRace` also gives `neededStopNow`, the
 target for a stop at the end of this lap, which the PIT NOW and in-pit modes show instead of the planned stop's. The lifecycle adds `loading`
 (`loadingProgress` on the snapshot), asked every 1 s while loading.
+`liveInsights.ts` owns conservative no-stop consumption ceilings, the maximum paired clean-lap fuel/VE ratio
+rounded up to available settings, and linear tread/inventory projections. Contracts are in `liveInsights.ts`
+under `shared/types/`. Consumption and ratio history clear on a dry/wet change (wet from `RAIN_WET_MIN`, dry again
+below 7 of 255, so a drying track does not flip); another compound resets only the tyre wear. `LiveUsageMeter.latestUse`
+provides matching crossing identifiers; `restart` prevents a new session bridging old samples while retaining
+compatible learned event use. `liveResults.ts` aggregates captured clean laps and freezes race metrics at the
+player's flag, retaining qualifying context only within the same resolved layout and car. The scoring decode
+derives class place from the field's class labels and reads the game's pit-stop count. `LiveService` attaches
+`result` and `qualifyingResult` to snapshots; no historical session identity is guessed.
 
 **Scan hold:** `index.ts` wires `session-loaded` to `ServerContext.setLiveSessionLoaded`. While a session is loaded the
 session / replay / telemetry scans and the replay upgrade do not start (they set `pendingSessionRefresh`; a running
@@ -747,3 +760,7 @@ as approximate. Class estimates are used only when model dimensions are missing.
 `tools/release/checkLocalData.mjs` runs before and after builds to reject detailed static
 assets and generated catalogs. Synthetic provider/footprint tests are always available;
 personal geometry/recording regressions require private roots (see [PLUGINS.md](PLUGINS.md)).
+
+Live strategy audit: `shared/domain/live/liveAudit.ts` freezes pre-lap forecasts and records deterministic comparisons; `shared/types/liveAudit.ts` defines capture/measurement contracts. `server/core/live/dbLiveAuditStore.ts` owns persistent checkpoints, with schema in `dbSchema.ts`; `server/live/audit/export.ts` streams spreadsheet-safe CSV. `liveRoutes.ts` exposes bounded JSON history and streaming CSV. Checkpoints are written only while a dashboard page is open (the REST reads they rely on stop without one), and a replay leaves the session's laps, strategy, results and capture untouched. Live dashboard settings link to exports; the cockpit dashboard and session review are passive and contain no interactive controls. No automatic forecast calibration or inferred XML-session linkage is applied.
+
+Live multiclass horizon: `liveLapsLeft.ts` owns `projectRaceFlagSeconds`, shared by live distance and `liveResourcePlan.ts` preparation. `rf2Decode.ts` resolves overall and player-class leaders independently using canonical class aliases; class pace supplies the player's distance horizon, with overall flag timing preserved. The preparation headline excludes the formation allowance retained in the resource model. Forecast audit model version 3 distinguishes this calculation from saved earlier estimates.

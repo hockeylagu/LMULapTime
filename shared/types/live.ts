@@ -38,9 +38,12 @@ export interface LiveSessionInfo {
   endSeconds: number | null;
   playerLapsCompleted: number | null;
   playerPlace: number | null;
+  playerClassPlace?: number | null;
+  finishStatus?: number;
 }
 
 import type { LiveStrategy } from './liveStrategy.js';
+import type { LiveSessionResult } from './liveInsights.js';
 
 /** Who and where, resolved once per session through the app's canonical definitions. */
 export interface LiveIdentity {
@@ -60,7 +63,7 @@ export interface LiveIdentity {
 /** Race laps left, counting the lap in progress. */
 export interface LiveLapsLeft {
   laps: number;
-  /** Projected from the leader's progress and lap time, shown with `~`; false once the leader has the flag (exactly 1). */
+  /** Overall leader determines the flag time; own-class pace projects remaining laps. False after the overall flag (exactly 1). */
   estimated: boolean;
 }
 
@@ -139,6 +142,9 @@ export interface LiveSnapshot {
   loadingProgress: number | null;
   /** VE or fuel, the next stop, damage, tyres, forecast and the garage plan; null while no session is loaded. */
   strategy: LiveStrategy | null;
+  result?: LiveSessionResult | null;
+  qualifyingResult?: LiveSessionResult | null;
+  audit?: { runId: string; status: 'recording' | 'unavailable' } | null;
 }
 
 /** One pedal sample: driver inputs (unfiltered), 0..1, at the session clock time `t` in seconds. */

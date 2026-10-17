@@ -10,12 +10,37 @@ const FIELD: ScoringVehicle[] = [
 ];
 
 describe('rF2 scoring decode', () => {
+  it('resolves the player class leader independently from the overall Hypercar leader', () => {
+    const field = [...FIELD, { id: 13, isPlayer: false, place: 2, totalLaps: 8, name: 'Class leader', className: 'GT3' }];
+    expect(decodeScoring(scoringBuffer(2, field))).toMatchObject({
+      leader: { id: 7, vehicleClass: 'Hyper' }, classLeader: { id: 13, vehicleClass: 'GT3' }, playerClassPlace: 2,
+    });
+  });
+  it('groups canonical class aliases and does not mix LMP2 WEC with ELMS', () => {
+    const player = { ...FIELD[1], className: 'LMP2 (ELMS)' };
+    const wec = { ...FIELD[0], id: 18, place: 2, className: 'LMP2 (WEC)' };
+    const elms = { ...FIELD[0], id: 19, place: 3, className: 'LMP2_ELMS' };
+    expect(decodeScoring(scoringBuffer(2, [FIELD[0], wec, elms, player]))).toMatchObject({
+      leader: { id: 7 }, classLeader: { id: 19 }, playerClassPlace: 2,
+    });
+  });
+  it('checks finish status across the whole field and leaves truncated fields unknown', () => {
+    const finished = FIELD.map(vehicle => ({ ...vehicle, bytes: { finishStatus: 1 } }));
+    expect(decodeScoring(scoringBuffer(2, finished)).allDriversFinished).toBe(true);
+    expect(decodeScoring(scoringBuffer(2, [finished[0], { ...finished[1], bytes: { finishStatus: 0 } }])).allDriversFinished).toBe(false);
+    expect(decodeScoring(scoringBuffer(2, [finished[0], { ...finished[1], bytes: { finishStatus: 3 } }])).allDriversFinished).toBe(true);
+    const truncated = scoringBuffer(2, finished).subarray(0, SCORING.vehicles + SCORING.vehicleStride);
+    expect(decodeScoring(truncated).allDriversFinished).toBeNull();
+  });
   it('finds the player and decodes the session header', () => {
     expect(decodeScoring(scoringBuffer(2, FIELD))).toEqual({
       trackName: 'Circuit de la Sarthe', sessionCode: 10, currentEt: 321.5, endEt: 3600, numVehicles: 2,
+      playerClassPlace: 1,
+      allDriversFinished: false,
       inRealtime: true, gamePhase: 5, trackLength: 13_626, trackTempC: 31.5, raining: 0, avgPathWetness: 0,
       player: expect.objectContaining({ id: 12, place: 4, totalLaps: 8, vehicleName: 'Ferrari 296 GT3', vehicleClass: 'GT3' }),
       leader: expect.objectContaining({ id: 7, place: 1, totalLaps: 9 }),
+      classLeader: expect.objectContaining({ id: 12, place: 4, vehicleClass: 'GT3' }),
     });
   });
 
@@ -34,6 +59,7 @@ describe('rF2 scoring decode', () => {
     expect(decoded).toMatchObject({ trackLength: 13_626.5, trackTempC: 47.25, raining: 0.4, avgPathWetness: 1 });
     expect(decoded.player).toEqual({
       id: 12, place: 4, totalLaps: 8, vehicleName: 'Ferrari 296 GT3', vehicleClass: 'GT3',
+      pitStops: 0,
       lapDist: 4321.5, sector: 2, lastLapTime: 228.9, bestLapTime: 227.5, lastSector1: 35.9, lastSector2: 126.2,
       bestSector1: 35.5, bestSector2: 125.9, curSector1: 36.1, curSector2: 126.7, bestLapSector1: 35.5, bestLapSector2: 125.5,
       lapStartEt: 301.25, timeIntoLap: 20.5, estimatedLapTime: 229.5, inPits: true, countLapFlag: 1, lapsBehindLeader: 2, finishStatus: 1,

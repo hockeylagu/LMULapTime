@@ -31,7 +31,7 @@ describe('LMU pit REST parsers', () => {
       menuLine('VIRTUAL ENERGY:', 2, ['0% 0 laps', '1% 0 laps', '50% 20 laps']),
       menuLine('FUEL RATIO:', 0, ['0.86']),
       menuLine('TIRES:', 1, ['No Change', 'New Medium ', 'New Wet ']),
-    ])).toEqual({ resourceValue: 50, resourceText: '50% 20 laps', tyres: 'New Medium', repair: 'Repair All' });
+    ])).toEqual({ resourceValue: 50, resourceText: '50% 20 laps', tyres: 'New Medium', repair: 'Repair All', fuelRatio: 0.86, fuelRatioOptions: [0.86] });
     expect(parsePitMenu([menuLine('FUEL:', 0, ['45.0L'])])).toMatchObject({ resourceValue: 45, tyres: null, repair: null });
     expect(parsePitMenu([])).toBeNull();
   });
@@ -64,7 +64,7 @@ describe('LMU pit REST parsers', () => {
     expect(parseGarageData({
       VM_VIRTUAL_ENERGY: { available: true, stringValue: '50% (20.1 laps)', value: 50 },
       VM_FUEL_LEVEL: { available: true, stringValue: '0.86', value: 85 },
-    })).toEqual({ type: 'garage', veStart: 50, fuelStart: null });
+    })).toEqual({ type: 'garage', veStart: 50, fuelStart: null, fuelRatio: 0.86 });
     expect(parseGarageData({ VM_VIRTUAL_ENERGY: { available: false, stringValue: '' }, VM_FUEL_LEVEL: { stringValue: '60.0L (21.3 laps)' } }))
       .toEqual({ type: 'garage', veStart: null, fuelStart: 60 });
   });

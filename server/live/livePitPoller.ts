@@ -45,7 +45,7 @@ const READS: PitRead[] = [
   { path: '/rest/watch/standings', every: { track: 3000 }, crashesInReplay: false, parse: parseStandings },
   { path: '/rest/strategy/pitstop-estimate', every: { track: 10_000 }, crashesInReplay: false, parse: parseEstimate },
   {
-    path: '/rest/garage/PitMenu/receivePitMenu', every: { track: 10_000 }, crashesInReplay: false,
+    path: '/rest/garage/PitMenu/receivePitMenu', every: { track: 10_000, garage: 10_000 }, crashesInReplay: false,
     parse: body => { const menu = parsePitMenu(body); return menu && { type: 'pitMenu', menu }; },
   },
   {

@@ -1,5 +1,9 @@
 import { Router } from 'express';
+import { Readable } from 'node:stream';
+import { iterateLiveAudit, readLiveAudit } from '../core/live/dbLiveAuditStore.js';
+import { exportLiveAudit } from '../live/audit/export.js';
 import type { Response } from 'express';
+import type { RequestHandler } from 'express';
 import { APP_EVENTS, LIVE_HEARTBEAT_MS } from '../../shared/types/live.js';
 import type { ServerContext } from '../core/serverContext.js';
 import type { LiveService } from '../live/liveService.js';
@@ -13,6 +17,23 @@ function openStream(res: Response): void {
 
 export function createLiveRouter(context: ServerContext, live: LiveService): Router {
   const router = Router();
+
+  // Optional UUID selects one capture; omitted exports all saved captures, including interrupted runs.
+  const auditHistory: RequestHandler = (req, res, next) => {
+    const runId = req.query.runId;
+    if (Object.keys(req.query).some(key => key !== 'runId') || (runId !== undefined && (typeof runId !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(runId)))) {
+      return res.status(400).json({ error: 'runId must identify one saved live capture.' });
+    }
+    const db = context.sessionDb.getDb();
+    if (!req.path.endsWith('.csv')) return res.json(readLiveAudit(db, runId ?? null));
+    res.type('text/csv').attachment(runId ? `lmu-strategy-${runId}.csv` : 'lmu-strategy-history.csv');
+    const stream = Readable.from(exportLiveAudit(iterateLiveAudit(db, runId ?? null)));
+    stream.on('error', next);
+    res.on('close', () => stream.destroy());
+    stream.pipe(res);
+  };
+  router.get('/live/audit', auditHistory);
+  router.get('/live/audit.csv', auditHistory);
 
   router.get('/live/stream', (req, res) => {
     openStream(res);

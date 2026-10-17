@@ -22,6 +22,11 @@ export interface LiveScoringReading {
   player: LiveVehicleReading | null;
   /** The overall leader (place 1); null when none is listed. */
   leader: LiveVehicleReading | null;
+  /** Best-placed car in the player's class, independently of the overall leader. */
+  classLeader?: LiveVehicleReading | null;
+  playerClassPlace?: number | null;
+  /** Every scoring entry has a terminal finish status; null when the full field was not copied. */
+  allDriversFinished?: boolean | null;
 }
 
 /**
@@ -59,6 +64,7 @@ export interface LiveVehicleReading {
   lapsBehindLeader: number;
   /** rF2 `mFinishStatus`: 0 none, 1 finished, 2 DNF, 3 DQ. */
   finishStatus: number;
+  pitStops?: number;
 }
 
 export interface LiveState {
@@ -83,7 +89,7 @@ export function liveSessionKind(sessionCode: number): LiveSessionKind {
 export type LiveGameScreen = 'menu' | 'loading' | 'session';
 
 /**
- * Lifecycle from the decoded scoring, in this order: no reading -> offline; LMU loading a session -> loading;
+ * Lifecycle from navigation first (loading/menu), then scoring: no reading -> offline;
  * LMU on its main menu (or playing a replay), or no vehicles -> menu; not in realtime -> garage; game phase
  * 0-4 -> starting, 5-7 -> driving, 8 -> finished once the player has taken the flag (or is out), still driving on
  * the last lap until then (the session is over from the leader's flag, a lap or more before a slower car's); phase 9
@@ -92,14 +98,15 @@ export type LiveGameScreen = 'menu' | 'loading' | 'session';
  * it for the menu (seen live 2026-10-16).
  */
 export function deriveLiveState(reading: LiveScoringReading | null, previous: LiveLifecycle, screen: LiveGameScreen = 'session'): LiveState {
-  if (!reading) return { lifecycle: 'offline', paused: false, session: null };
   if (screen === 'loading') return { lifecycle: 'loading', paused: false, session: null };
+  if (screen === 'menu') return { lifecycle: 'menu', paused: false, session: null };
+  if (!reading) return { lifecycle: 'offline', paused: false, session: null };
   const state = (lifecycle: LiveLifecycle, paused: boolean): LiveState => ({
     lifecycle,
     paused,
     session: lifecycle === 'menu' ? null : sessionInfo(reading),
   });
-  if (screen === 'menu' || reading.numVehicles <= 0) return state('menu', false);
+  if (reading.numVehicles <= 0) return state('menu', false);
   if (!reading.inRealtime) return state('garage', false);
   const phase = reading.gamePhase;
   if (phase >= 0 && phase <= 4) return state('starting', false);
@@ -123,12 +130,14 @@ function sessionInfo(reading: LiveScoringReading): LiveSessionInfo {
     endSeconds: timed ? reading.endEt : null,
     playerLapsCompleted: reading.player?.totalLaps ?? null,
     playerPlace: reading.player?.place ?? null,
+    playerClassPlace: reading.playerClassPlace ?? null,
+    finishStatus: reading.player?.finishStatus ?? 0,
   };
 }
 
 /** Lifecycles in which a session is loaded in the game (the app must not read the game's files). */
 export function isLiveSessionLoaded(lifecycle: LiveLifecycle): boolean {
-  return lifecycle === 'garage' || lifecycle === 'starting' || lifecycle === 'driving' || lifecycle === 'finished';
+  return lifecycle === 'loading' || lifecycle === 'garage' || lifecycle === 'starting' || lifecycle === 'driving' || lifecycle === 'finished';
 }
 
 /** Lifecycles in which the driver is on track and pedal samples are streamed. */

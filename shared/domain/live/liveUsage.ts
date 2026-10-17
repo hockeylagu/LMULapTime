@@ -33,6 +33,10 @@ export class LiveUsageMeter {
   private samples: Sample[] = [];
   private crossings: Crossing[] = [];
   private uses: number[] = [];
+  private newestUse: { lap: number; et: number; amount: number } | null = null;
+  public get latestUse() { return this.newestUse; }
+  /** Discard crossings on session changes, retain learned event consumption. */
+  public restart(): void { this.samples = []; this.crossings = []; this.newestUse = null; }
 
   /** Representative laps measured so far (oldest first). */
   public get laps(): readonly number[] { return this.uses; }
@@ -45,8 +49,7 @@ export class LiveUsageMeter {
 
   /** Clears everything, measured laps included (another layout or car). */
   public clear(): void {
-    this.samples = [];
-    this.crossings = [];
+    this.restart();
     this.uses = [];
   }
 
@@ -54,8 +57,7 @@ export class LiveUsageMeter {
     if (!Number.isFinite(et) || !Number.isFinite(amount)) return;
     const last = this.samples[this.samples.length - 1];
     if (last && et < last.et - NEAR_SECONDS) {
-      this.samples = [];
-      this.crossings = [];
+      this.restart();
     }
     if (last && Math.abs(et - last.et) < 1e-6) last.amount = amount;
     else this.samples.push({ et, amount });
@@ -96,6 +98,7 @@ export class LiveUsageMeter {
       const use = previous.amount - crossing.amount;
       if (use <= 0) continue;
       this.uses.push(round(use, 4));
+      this.newestUse = { lap: crossing.lap, et: crossing.et, amount: use };
       if (this.uses.length > MAX_USES) this.uses.shift();
     }
   }

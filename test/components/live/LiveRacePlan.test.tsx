@@ -5,7 +5,7 @@ import { racePlanView } from '../../../src/components/live/race/raceAction.js';
 import type { LiveSnapshot } from '../../../shared/types/live.js';
 import type { LiveRacePlan, LiveStrategy } from '../../../shared/types/liveStrategy.js';
 import { FakeEventSource } from '../../helpers/fakeEventSource.js';
-import { liveSession, liveSnapshot, liveStrategy } from '../../helpers/liveSnapshot.js';
+import { liveSession, liveSnapshot, liveStrategy, liveTiming } from '../../helpers/liveSnapshot.js';
 
 const source = () => FakeEventSource.instances[FakeEventSource.instances.length - 1];
 const send = (value: LiveSnapshot) => act(() => source().emit('snapshot', value));
@@ -39,7 +39,7 @@ describe('racePlanView', () => {
     });
     expect(racePlanView(withRace({ pitInLaps: 0 })).action).toMatchObject({ label: 'PIT', value: 'THIS LAP' });
     const short = racePlanView(withRace({ pitInLaps: 1, neededAfterStop: 62 }));
-    expect(short.cells[0]).toMatchObject({ value: '62', note: 'SET 50%', noteTone: 'loss' });
+    expect(short.cells[0]).toMatchObject({ value: '62', note: 'SET 50% · RAISE', noteTone: 'loss' });
   });
 
   it('shows a pending penalty as a stop-and-go with the repair kept for the stop after', () => {
@@ -48,11 +48,11 @@ describe('racePlanView', () => {
     expect(texts(withRace({ pitInLaps: 1 }, { pit, damage })).cells[2]).toBe('STOP & GO|10|THEN REPAIR 30 s');
   });
 
-  it('says no pit stop with the spare per lap when the finish is reachable, and the VE at the finish', () => {
+  it('leads with pace when the reserve is covered, and keeps projected finish VE secondary', () => {
     expect(texts(withRace({ finishReachable: true, atFinish: 7, pitInLaps: null, pitLap: null, sparePerLap: 0.8 }))).toMatchObject({
-      mode: 'sprint', action: 'SPARE / LAP|+0.8|%|NO PIT STOP',
+      mode: 'sprint', action: 'CURRENT VS BEST|—||',
     });
-    expect(racePlanView(withRace({ finishReachable: true, atFinish: 7, pitInLaps: null })).cells[0]).toMatchObject({ label: 'VE AT FINISH', value: '7' });
+    expect(racePlanView(withRace({ finishReachable: true, atFinish: 7, pitInLaps: null })).cells[0]).toMatchObject({ label: 'VE AT FINISH', value: '~7' });
   });
 
   it('overrides every plan with PIT NOW for a flat or lost wheel, and shows the stop while in the pit', () => {
@@ -64,7 +64,7 @@ describe('racePlanView', () => {
   it('sets the MFD for a stop this lap when pitting for damage or early, not for the later planned stop', () => {
     const damage = { wheel: { problem: 'flat' as const, corner: 'RL' as const }, body: 0, suspension: 0, partsDetached: false, impactLap: 9, lapsSinceImpact: 0, paceLossPerLap: null, lossToFinish: null, repairSeconds: null, significant: true };
     // Planned in 6 laps for 38; stopping now needs 58, more than the 50 set.
-    expect(racePlanView(withRace({}, { damage })).cells[0]).toMatchObject({ value: '58', note: 'SET 50%', noteTone: 'loss' });
+    expect(racePlanView(withRace({}, { damage })).cells[0]).toMatchObject({ value: '58', note: 'SET 50% · RAISE', noteTone: 'loss' });
     expect(racePlanView(withRace({}, { pit: { ...base.pit!, state: 'entering' } })).cells[0]).toMatchObject({ value: '58', noteTone: 'loss' });
     // Even with the finish reachable, a stop for damage has its target.
     expect(racePlanView(withRace({ finishReachable: true, pitInLaps: null, neededAfterStop: null, neededStopNow: 20 }, { damage })).cells[0]).toMatchObject({ value: '20', noteTone: 'gain' });
@@ -85,6 +85,22 @@ describe('race page with a plan', () => {
     vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
   });
   afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+
+  it('streams sprint pace into the primary readout and returns to pit advice when the margin is lost', () => {
+    render(<LivePage />);
+    send(withRace({ finishReachable: true, atFinish: 7, pitInLaps: null }));
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('—');
+    act(() => source().emit('timing', liveTiming({ deltaSeconds: -0.184, tyreSurfaceAvgC: 92 })));
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('−0.184s');
+    expect(screen.getByTestId('live-race-cell-1')).toHaveTextContent('VE AT FINISH~7%');
+    expect(screen.queryByTestId('live-race-cell-3')).not.toBeInTheDocument();
+    expect(screen.queryByText('RESERVE COVERED')).not.toBeInTheDocument();
+    expect(screen.getByTestId('live-race-deltas')).toHaveTextContent('TYRE SURFACE AVG');
+    expect(screen.getByTestId('live-last-lap')).toBeInTheDocument();
+    send(withRace({ finishReachable: false, pitInLaps: 0 }));
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('THIS LAP');
+    expect(screen.getByTestId('live-race-deltas')).toHaveTextContent('CURRENT VS BEST');
+  });
 
   it('keeps the plan readouts in place across modes, and swaps the last-lap row for the damage row only when damage matters', () => {
     render(<LivePage />);
@@ -131,7 +147,8 @@ describe('race page with a plan', () => {
 
     send(inGarage('qualifying', {}, 1));
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('QUALIFYING');
-    expect(screen.getByText('15 MIN · 13 LAPS AT 1:15.285 · 2.5 % VE / LAP FROM 6 LAPS THIS EVENT')).toBeInTheDocument();
+    expect(screen.getByText('15 MIN')).toBeInTheDocument();
+    expect(screen.getByTestId('live-preparation-laps')).toHaveTextContent('~13LAPS');
     expect(rows()[0]).toHaveTextContent('VE34%30%RAISE +4%');
     expect(rows()[0]).toHaveAttribute('data-action', 'change');
     // Qualifying and the race want a new set: the one carried over is a change to make.

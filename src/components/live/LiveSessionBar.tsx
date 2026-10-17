@@ -82,7 +82,7 @@ export function LiveSessionBar({ snapshot, connection }: LiveSessionBarProps) {
             )}
           </span>
         )}
-        {showSession && session.kind === 'race' && (
+        {showSession && session.kind === 'race' && snapshot.lifecycle !== 'garage' && (
           <span data-testid="live-laps-left">
             <span className="text-lmu-muted">LAPS LEFT</span>{' '}
             <b className="inline-block min-w-[3ch] text-right font-mono font-semibold">{lapsLeft ? `${lapsLeft.estimated ? '~' : ''}${lapsLeft.laps}` : UNKNOWN}</b>

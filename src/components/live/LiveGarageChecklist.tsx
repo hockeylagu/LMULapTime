@@ -41,11 +41,14 @@ export function LiveGarageChecklist({ checks }: { checks: GarageCheck[] }) {
           data-action={check.action?.tone}
           className={`${RACE_ROW} items-center border-t border-lmu-border py-6`}
         >
-          <h2 className={`${RACE_LEAD} whitespace-nowrap text-[64px] font-semibold text-lmu-text`}>{check.label}</h2>
+          <div className={RACE_LEAD}>
+            <h2 className="whitespace-nowrap text-[64px] font-semibold text-lmu-text">{check.label}</h2>
+            {check.note && <p className="mt-3 text-[36px] font-semibold text-lmu-muted">{check.note}</p>}
+          </div>
           <div className={`${RACE_COLUMN} ${RULED}`}><Value text={check.target} unit={check.unit} /></div>
           <div className={`${RACE_COLUMN} ${RULED}`}><Value text={check.current} unit={check.unit} className="text-lmu-text-soft" /></div>
           <div className={`${RACE_COLUMN} ${RULED}`}>
-            <div className={`h-[144px] whitespace-nowrap font-mono text-[96px] font-bold leading-[144px] tracking-[-0.025em] ${check.action ? ACTION_TONE[check.action.tone] : ''}`}>
+            <div className={`h-[144px] whitespace-nowrap font-mono ${check.action && check.action.text.length > 9 ? 'text-[72px]' : 'text-[96px]'} font-bold leading-[144px] tracking-[-0.025em] ${check.action ? ACTION_TONE[check.action.tone] : ''}`}>
               {check.action?.text ?? ''}
             </div>
           </div>

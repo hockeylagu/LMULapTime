@@ -1,4 +1,5 @@
 import type { LiveGaragePlan, LivePerLapSource, LiveRacePlan, LiveResourceKind } from '../../types/liveStrategy.js';
+import { projectRaceFlagSeconds } from './liveLapsLeft.js';
 
 /** The class names that race on virtual energy (canonical classes from `mapVehicleIdToClass`). */
 const VIRTUAL_ENERGY_CLASSES = new Set(['Hyper', 'GT3']);
@@ -84,6 +85,8 @@ export function sessionLaps(sessionSeconds: number, lapSeconds: number): number 
 }
 
 export interface GaragePlanInput {
+  /** Race only: overall leader pace predicts the flag, then the player's class pace converts that horizon to laps. */
+  raceLeaderLapSeconds?: number | null;
   kind: LiveResourceKind;
   sessionSeconds: number | null;
   lapSeconds: number | null;
@@ -98,9 +101,17 @@ export interface GaragePlanInput {
 /** What to load in the garage for the loaded session: its laps and the reserve, capped at a full tank. */
 export function planGarage(input: GaragePlanInput): Omit<LiveGaragePlan, 'tyres'> {
   const { kind, sessionSeconds, lapSeconds, perLap, capacity, reserveLaps } = input;
+  const flagSeconds = sessionSeconds !== null && input.raceLeaderLapSeconds != null
+    ? projectRaceFlagSeconds(sessionSeconds, 0, input.raceLeaderLapSeconds) : null;
   const laps = sessionSeconds !== null && lapSeconds !== null && sessionSeconds > 0 && lapSeconds > 0
-    ? sessionLaps(sessionSeconds, lapSeconds) : null;
+    ? sessionLaps(flagSeconds ?? sessionSeconds, lapSeconds) : null;
   const total = laps !== null && perLap !== null ? (laps + reserveLaps) * perLap : null;
+  const selected = input.setInGarage;
+  // Garage laps include one formation/out lap. Deduct its estimated use before applying racing-lap numbering.
+  const firstPit = laps !== null && laps > 1 && perLap !== null && Number.isFinite(perLap) && perLap > 0
+    && selected !== null && Number.isFinite(selected) && selected > perLap * (1 + reserveLaps)
+    ? planRace({ amount: Math.max(0, (capacity !== null ? Math.min(selected, capacity) : selected) - perLap),
+      perLap, reserveLaps, capacity, lapsLeft: laps - 1, lapFraction: 0, lapNumber: 1 }) : null;
   return {
     kind,
     unit: resourceUnit(kind),
@@ -114,5 +125,6 @@ export function planGarage(input: GaragePlanInput): Omit<LiveGaragePlan, 'tyres'
     needed: total === null ? null : settable(capacity !== null ? Math.min(total, capacity) : total),
     stops: total === null || capacity === null || capacity <= 0 ? null : Math.max(0, Math.ceil(total / capacity) - 1),
     setInGarage: input.setInGarage,
+    firstPitLap: firstPit?.pitLap ?? null,
   };
 }

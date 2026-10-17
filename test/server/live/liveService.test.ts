@@ -50,6 +50,43 @@ describe('LiveService', () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 
+  it('captures history and reads the game only while a dashboard is open', async () => {
+    const get = vi.fn(() => Promise.resolve<RestAnswer>({ ok: false, reason: 'error' }));
+    const saveAuditRecord = vi.fn();
+    const { service, frame } = setup({ saveAuditRecord, pit: { get } });
+    frame(reading());
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(get).not.toHaveBeenCalled();
+    expect(saveAuditRecord).not.toHaveBeenCalled();
+    const remove = service.addClient(new FakeSink());
+    frame(reading({ currentEt: 30 }));
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(get).toHaveBeenCalled();
+    expect(saveAuditRecord).toHaveBeenCalledWith(expect.objectContaining({ reason: 'start' }));
+    // The page closes: the capture ends with the next reading.
+    remove();
+    frame(reading({ currentEt: 60 }));
+    expect(saveAuditRecord).toHaveBeenLastCalledWith(expect.objectContaining({ reason: 'end' }));
+    service.stop();
+  });
+
+  it('persists checkpoints and reports a storage failure without stopping live driving', () => {
+    const saveAuditRecord = vi.fn();
+    const { service, frame } = setup({ saveAuditRecord });
+    service.addClient(new FakeSink());
+    frame(reading());
+    expect(saveAuditRecord).toHaveBeenCalledOnce();
+    expect(service.getSnapshot().audit).toMatchObject({ status: 'recording' });
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    saveAuditRecord.mockImplementation(() => { throw new Error('disk full'); });
+    frame(reading({ currentEt: 30 }));
+    expect(service.getSnapshot()).toMatchObject({ lifecycle: 'driving', audit: { status: 'unavailable' } });
+    frame(reading({ currentEt: 50 }));
+    expect(error).toHaveBeenCalledOnce();
+    service.stop();
+    error.mockRestore();
+  });
+
   it('sends the snapshot on connect and on every change, not for a moving clock alone', () => {
     const { service, frame } = setup();
     const sink = new FakeSink();
@@ -69,6 +106,7 @@ describe('LiveService', () => {
   });
 
   it('reports lifecycle and session-loaded changes, and offline when the reader closes or dies', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { service, worker, lifecycles, loaded, frame } = setup();
     frame(reading({ inRealtime: false }));
     expect(service.isSessionLoaded()).toBe(true);
@@ -80,6 +118,8 @@ describe('LiveService', () => {
     worker.emit('exit', 1);
     expect(service.getSnapshot().lifecycle).toBe('offline');
     expect(loaded).toEqual([true, false, true, false]);
+    expect(warn).toHaveBeenCalledWith('[Live] Shared memory reader exited with code 1');
+    warn.mockRestore();
   });
 
   it('settles firstReading on the reader\'s first answer, game found or not', async () => {
@@ -206,6 +246,27 @@ describe('LiveService', () => {
       const { service, frame } = setup();
       frame(lap(3, { lapDist: 9_990, timeIntoLap: 99 }));
       frame(lap(4, { lapDist: 5, timeIntoLap: 0.1, lastLapTime: 100, lastSector1: 30, lastSector2: 60 }));
+      expect(service.getSnapshot().recentLaps).toEqual([{ lapNumber: 4, lapSeconds: 100, sectors: [30, 30, 40], valid: false }]);
+    });
+
+    it('keeps the laps through a replay watched from the monitor, and shows the menu meanwhile', async () => {
+      let replay = false;
+      const get = vi.fn((path: string): Promise<RestAnswer> => (path === '/navigation/state'
+        ? Promise.resolve({ ok: true, body: { state: { settingMode: replay ? 'SETTING_REPLAY_PLAYBACK' : 'SETTING_GRANDPRIX' } } })
+        : Promise.resolve({ ok: false, reason: 'status' })));
+      const { service, frame } = setup({ pit: { get } });
+      service.addClient(new FakeSink());
+      frame(lap(3, { lapDist: 9_990, timeIntoLap: 99 }));
+      frame(lap(4, { lapDist: 5, timeIntoLap: 0.1, lastLapTime: 100, lastSector1: 30, lastSector2: 60 }));
+      replay = true;
+      await vi.advanceTimersByTimeAsync(11_000);
+      // The replay's own frames go by without touching the session's laps.
+      frame(lap(1, { lapDist: 50, timeIntoLap: 3 }));
+      expect(service.getSnapshot()).toMatchObject({ lifecycle: 'menu', recentLaps: [], strategy: null });
+      replay = false;
+      await vi.advanceTimersByTimeAsync(11_000);
+      frame(lap(4, { lapDist: 50, timeIntoLap: 1 }));
+      expect(service.getSnapshot().lifecycle).toBe('driving');
       expect(service.getSnapshot().recentLaps).toEqual([{ lapNumber: 4, lapSeconds: 100, sectors: [30, 30, 40], valid: false }]);
     });
 

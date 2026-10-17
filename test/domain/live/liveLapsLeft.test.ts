@@ -1,11 +1,39 @@
 import { describe, expect, it } from 'vitest';
 import { computeLapsLeft } from '../../../shared/domain/live/liveLapsLeft.js';
 import { vehicleReading } from '../../helpers/liveReadings.js';
+import { VEHICLE_CLASS_OPTIONS } from '../../../shared/domain/vehicleMapping.js';
 
 const race = { kind: 'race' as const, endSeconds: null, elapsedSeconds: 500 };
 const timedRace = { ...race, endSeconds: 1200 };
 
 describe('laps left', () => {
+  it.each(VEHICLE_CLASS_OPTIONS.filter(option => option.id !== 'All'))('uses the current player canonical class: $id', ({ id }) => {
+    const overallClass = id === 'Hyper' ? 'LMP2' : 'Hyper';
+    const overall = vehicleReading({ id: 1, vehicleClass: overallClass, lapStartEt: 2400, estimatedLapTime: 100 });
+    const player = vehicleReading({ id: 7, vehicleClass: id, lapStartEt: 2460, estimatedLapTime: 150 });
+    const classLeader = vehicleReading({ id: 9, vehicleClass: id, lapStartEt: 2460, estimatedLapTime: 120 });
+    expect(computeLapsLeft({ kind: 'race', endSeconds: 3600, elapsedSeconds: 2500 }, player, overall, classLeader)).toEqual({ laps: 10, estimated: true });
+  });
+  it('accepts canonical aliases and keeps WEC and ELMS LMP2 separate', () => {
+    const overall = vehicleReading({ id: 1, vehicleClass: 'Hyper', lapStartEt: 2400, estimatedLapTime: 100 });
+    const player = vehicleReading({ id: 7, vehicleClass: 'LMP2 (ELMS)', lapStartEt: 2460, estimatedLapTime: 150 });
+    const leader = vehicleReading({ id: 9, vehicleClass: 'LMP2_ELMS', lapStartEt: 2460, estimatedLapTime: 120 });
+    const session = { kind: 'race' as const, endSeconds: 3600, elapsedSeconds: 2500 };
+    expect(computeLapsLeft(session, player, overall, leader)).toEqual({ laps: 10, estimated: true });
+    expect(computeLapsLeft(session, player, overall, { ...leader, vehicleClass: 'LMP2' })).toEqual({ laps: 8, estimated: true });
+  });
+  it('uses the overall leader for the flag and GT3-class pace for GT3 laps, without adding laps already lost', () => {
+    const session = { kind: 'race' as const, endSeconds: 3600, elapsedSeconds: 2500 };
+    const overall = vehicleReading({ id: 1, vehicleClass: 'Hyper', totalLaps: 24, lapStartEt: 2400, estimatedLapTime: 100 });
+    const gt3Leader = vehicleReading({ id: 9, vehicleClass: 'GT3', totalLaps: 20, lapStartEt: 2460, estimatedLapTime: 120 });
+    const gt3 = vehicleReading({ id: 7, vehicleClass: 'GT3', totalLaps: 18, lapsBehindLeader: 6, lapStartEt: 2460, estimatedLapTime: 150 });
+    expect(computeLapsLeft(session, overall, overall)).toEqual({ laps: 12, estimated: true });
+    expect(computeLapsLeft(session, gt3, overall, gt3Leader)).toEqual({ laps: 10, estimated: true });
+    expect(computeLapsLeft(session, { ...gt3, lapsBehindLeader: 12 }, overall, gt3Leader)).toEqual({ laps: 10, estimated: true });
+    expect(computeLapsLeft(session, gt3, overall, { ...gt3Leader, vehicleClass: 'Hyper' })).toEqual({ laps: 8, estimated: true });
+    expect(computeLapsLeft(session, { ...gt3, estimatedLapTime: 0 }, overall, gt3Leader)).toEqual({ laps: 10, estimated: true });
+    expect(computeLapsLeft(session, gt3, { ...overall, finishStatus: 1 }, gt3Leader)).toEqual({ laps: 1, estimated: false });
+  });
   it('is null off a race, without a player and after the flag', () => {
     const leader = vehicleReading({ id: 1, place: 1, lapStartEt: 0, estimatedLapTime: 100 });
     const player = vehicleReading({ id: 7, totalLaps: 21, lapStartEt: 5 });

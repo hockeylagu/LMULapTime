@@ -58,6 +58,25 @@ describe('planRace', () => {
 });
 
 describe('planGarage', () => {
+  it('projects a multiclass race to the overall leader flag, then converts that time to class laps', () => {
+    const input = { kind: 've' as const, sessionSeconds: 3600, raceLeaderLapSeconds: 110, lapSeconds: 120,
+      perLap: 3.2, perLapSource: 'measured' as const, lapsMeasured: 8, reserveLaps: .5, capacity: 100, setInGarage: 100 };
+    // Overall leader: 33 x 110 = 3630 s. GT3: 31 racing laps plus one formation lap, not 33 Hyper laps.
+    expect(planGarage(input)).toMatchObject({ laps: 32, needed: 100, stops: 1 });
+    expect(planGarage({ ...input, raceLeaderLapSeconds: null })).toMatchObject({ laps: 31 });
+    expect(planGarage({ ...input, raceLeaderLapSeconds: 0 })).toMatchObject({ laps: 31 });
+  });
+  it('previews the first racing pit lap from the selected load, formation use and reserve', () => {
+    const input = { kind: 've' as const, sessionSeconds: 2700, lapSeconds: 121.4, perLap: 4.5,
+      perLapSource: 'measured' as const, lapsMeasured: 8, reserveLaps: .5, capacity: 100, setInGarage: 100 };
+    expect(planGarage(input)).toMatchObject({ laps: 24, stops: 1, firstPitLap: 20 });
+    expect(planGarage({ ...input, setInGarage: 80 })).toMatchObject({ firstPitLap: 16 });
+    expect(planGarage({ ...input, setInGarage: null }).firstPitLap).toBeNull();
+    expect(planGarage({ ...input, perLap: null }).firstPitLap).toBeNull();
+    expect(planGarage({ ...input, perLap: 0 }).firstPitLap).toBeNull();
+    expect(planGarage({ ...input, setInGarage: 2 }).firstPitLap).toBeNull();
+    expect(planGarage({ ...input, sessionSeconds: 1200 })).toMatchObject({ stops: 0, firstPitLap: null });
+  });
   it('loads the session laps (laps started before the clock ends plus the out lap) and the reserve, beside the setting', () => {
     expect(sessionLaps(900, 75)).toBe(13);
     expect(planGarage({
@@ -65,7 +84,7 @@ describe('planGarage', () => {
       reserveLaps: 0.5, capacity: 100, setInGarage: 50,
     })).toEqual({
       kind: 've', unit: '%', sessionMinutes: 15, laps: 13, lapSeconds: 75, perLap: 2.5, perLapSource: 'measured',
-      lapsMeasured: 6, reserveLaps: 0.5, needed: 34, stops: 0, setInGarage: 50,
+      lapsMeasured: 6, reserveLaps: 0.5, needed: 34, stops: 0, setInGarage: 50, firstPitLap: null,
     });
   });
 

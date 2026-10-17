@@ -19,6 +19,7 @@ import { createSystemRouter } from './routes/systemRoutes.js';
 import { createDataPluginRouter } from './routes/dataPluginRoutes.js';
 import { dataPlugin, formatPluginStatusLog } from './plugins/dataPlugin.js';
 import { LiveService } from './live/liveService.js';
+import { createLiveAuditWriter } from './core/live/dbLiveAuditStore.js';
 import { loadLiveSettings } from './live/liveSettings.js';
 import { queryLivePersonalBest } from './core/sessionSummaries/contextQueries.js';
 
@@ -76,6 +77,7 @@ const startReferenceLaptimeRefresh = (): void => {
 };
 
 const liveService = new LiveService({
+  saveAuditRecord: createLiveAuditWriter(sessionDb.getDb()),
   reserveLaps: loadLiveSettings(sessionDb).reserveLaps,
   personalBest: (layoutKey, carClass) =>
     queryLivePersonalBest(sessionDb.getDb(), serverContext.currentParser.configuredPlayerName, layoutKey, carClass),

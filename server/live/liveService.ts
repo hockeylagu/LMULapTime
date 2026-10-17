@@ -1,7 +1,11 @@
 import { Worker } from 'node:worker_threads';
+import { randomUUID } from 'node:crypto';
+import { LiveAuditTracker } from '../../shared/domain/live/liveAudit.js';
+import type { LiveAuditRecord } from '../../shared/types/liveAudit.js';
 import { deriveLiveState, isLiveOnTrack, isLiveSessionLoaded } from '../../shared/domain/live/liveLifecycle.js';
 import type { LiveGameScreen, LiveScoringReading } from '../../shared/domain/live/liveLifecycle.js';
 import { LiveStrategyTracker } from '../../shared/domain/live/liveStrategyTracker.js';
+import { LiveResultTracker } from '../../shared/domain/live/liveResults.js';
 import type { LiveRestUpdate } from '../../shared/domain/live/liveStrategyTracker.js';
 import type { PersonalBestLookup } from '../../shared/domain/live/liveIdentity.js';
 import { LiveSessionTracker, NO_SESSION_DETAILS } from '../../shared/domain/live/liveSessionTracker.js';
@@ -34,6 +38,8 @@ interface LiveClient {
 }
 
 export interface LiveServiceOptions {
+  /** Persists immutable checkpoints while a dashboard page is open (none without one). */
+  saveAuditRecord?: (record: LiveAuditRecord) => void;
   /** Replaces the shared memory worker (tests). */
   createWorker?: () => LiveWorker;
   /** The player's personal record on a layout and class, from the app's history. Without it no record is shown. */
@@ -72,6 +78,9 @@ export class LiveService {
   private lastTimingAt = 0;
   private tyreSurfaceAvgC: number | null = null;
   private readonly strategy = new LiveStrategyTracker();
+  private readonly results = new LiveResultTracker();
+  private readonly audit: LiveAuditTracker | null;
+  private auditFailed = false;
   private readonly pit: LivePitPoller;
   /** The last scoring reading, kept so a navigation notice or a REST answer can re-derive the snapshot without a new frame. */
   private lastReading: LiveScoringReading | null = null;
@@ -95,6 +104,14 @@ export class LiveService {
   public readonly firstReading = new Promise<void>(resolve => { this.markFirstReading = resolve; });
 
   public constructor(private readonly options: LiveServiceOptions = {}) {
+    this.audit = options.saveAuditRecord ? new LiveAuditTracker(randomUUID, record => {
+      if (this.auditFailed) return;
+      try { options.saveAuditRecord?.(record); }
+      catch (error) {
+        this.auditFailed = true;
+        console.error('[Live] Strategy history could not be saved:', error instanceof Error ? error.message : String(error));
+      }
+    }) : null;
     this.reserveLaps = options.reserveLaps ?? DEFAULT_RESERVE_LAPS;
     this.identity = new LiveIdentityResolver({
       ...options.identity,
@@ -151,6 +168,7 @@ export class LiveService {
   }
 
   public stop(): void {
+    this.audit?.end(Date.now());
     this.stopped = true;
     if (this.restartTimer) clearTimeout(this.restartTimer);
     this.restartTimer = null;
@@ -203,9 +221,18 @@ export class LiveService {
 
   private applyReading(reading: LiveScoringReading | null): void {
     const previous = this.snapshot;
+    if (this.replay && this.screen === 'session' && reading !== null) {
+      // The replay's frames are not the session's: show the menu, and leave the last session reading, laps, strategy,
+      // results and capture as they were (a replay watched from the monitor between sessions must not clear them).
+      this.lastReading ??= reading;
+      const menu = { ...deriveLiveState(reading, previous.lifecycle, 'menu'), identity: null, ...NO_SESSION_DETAILS,
+        loadingProgress: null, strategy: null, result: null, qualifyingResult: null, audit: previous.audit ?? null };
+      this.pendingTiming = null;
+      if (contentKey(menu) !== this.snapshotKey) this.publish(menu);
+      return;
+    }
     this.lastReading = reading;
-    const screen: LiveGameScreen = this.replay && this.screen === 'session' ? 'menu' : this.screen;
-    const state = deriveLiveState(reading, previous.lifecycle, screen);
+    const state = deriveLiveState(reading, previous.lifecycle, this.screen);
     this.identity.update(isLiveSessionLoaded(state.lifecycle) ? state.session : null);
     const identity = this.identity.identity;
     const details = this.tracker.apply(reading, state);
@@ -218,16 +245,22 @@ export class LiveService {
     });
     const next = {
       ...state, identity, ...details,
+      ...this.results.update(reading, state, details.recentLaps[details.recentLaps.length - 1] ?? null, details.sessionBest, strategy, identity?.layoutKey ?? null),
       loadingProgress: state.lifecycle === 'loading' ? this.loadingProgress : null,
       strategy,
     };
+    // History is captured only while a dashboard is open, like the REST reads it depends on.
+    if (this.clients.size === 0) this.audit?.end(Date.now());
+    const auditId = this.clients.size > 0
+      ? this.audit?.update({ ...next, sequence: previous.sequence + 1, receivedAt: Date.now() }, reading, this.strategy.observations(), Date.now()) : null;
+    const audited = { ...next, audit: auditId ? { runId: auditId, status: this.auditFailed ? 'unavailable' as const : 'recording' as const } : null };
     this.pendingTiming = this.clients.size > 0 && isLiveOnTrack(state.lifecycle) ? this.tracker.timing() : null;
-    if (contentKey(next) === this.snapshotKey) {
+    if (contentKey(audited) === this.snapshotKey) {
       // The session clock moves every frame; it alone is not a change worth a snapshot.
       if (previous.session && next.session) previous.session = { ...previous.session, elapsedSeconds: next.session.elapsedSeconds };
       return;
     }
-    this.publish(next);
+    this.publish(audited);
   }
 
   /** Makes `next` the current snapshot and sends it to every page. */
@@ -268,7 +301,7 @@ export class LiveService {
     const replaying = this.isReplaying();
     const mode: PitPollMode = this.clients.size === 0 ? 'off'
       : replaying ? 'track'
-        : !isLiveSessionLoaded(lifecycle) ? 'off' : lifecycle === 'garage' ? 'garage' : 'track';
+        : lifecycle === 'loading' || !isLiveSessionLoaded(lifecycle) ? 'off' : lifecycle === 'garage' ? 'garage' : 'track';
     this.pit.setMode(mode);
   }
 

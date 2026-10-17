@@ -37,6 +37,29 @@ function drive(tracker: LiveStrategyTracker, from: number, to: number, layoutKey
 }
 
 describe('LiveStrategyTracker', () => {
+  it('pairs fuel and VE on the same clean crossings, carries ratios into the garage, and resets on wet conditions', () => {
+    const tracker = new LiveStrategyTracker();
+    const car = (et: number) => ({ fuelLiters: 80 - et * 0.024, fuelCapacityLiters: 117,
+      dentSeverity: [0,0,0,0,0,0,0,0], detached: false,
+      wheels: Array.from({length:4}, () => ({flat:false,detached:false})), compound: 'Medium' });
+    tracker.applyCar(car(0));
+    tracker.applyRest({ type: 'tireManagement', vePerLap: 3, fuelPerLap: 2.1, newSets: 2, selected: { compound: 'Medium', used: true, wear: 0.9 } });
+    tracker.applyRest({ type: 'pitMenu', menu: { resourceValue: 50, resourceText: '50%', tyres: 'No Change', repair: 'N/A', fuelRatio: 0.9, fuelRatioOptions: [0.79,0.8,0.81,0.9] } });
+    for (let et = 0; et <= 450; et++) {
+      context(tracker, at(et));
+      tracker.applyCar(car(et));
+      if (et % 3 === 0) tracker.applyRest({ type: 'standings', veFraction: (90 - et * 0.03) / 100, fuelFraction: null, pitState: 'none', penalties: 0 });
+      context(tracker, at(et));
+    }
+    // Asynchronous VE samples can raise the thirstiest crossing slightly; round conservatively up.
+    expect(context(tracker, at(450))?.fuelRatio).toMatchObject({ recommended: 0.81, source: 'measured', pairedLaps: 3 });
+    const garage = at(0, { sessionCode: 1, inRealtime: false, player: vehicleReading({ totalLaps: 0 }) });
+    expect(context(tracker, garage)?.fuelRatio).toMatchObject({ recommended: 0.81, source: 'measured', pairedLaps: 3 });
+    // Another compound keeps the measured use (only the tyre wear starts again); a wet track clears it.
+    tracker.applyCar({ ...car(450), compound: 'Soft' });
+    expect(context(tracker, garage)?.fuelRatio).toMatchObject({ recommended: 0.81, source: 'measured', pairedLaps: 3 });
+    expect(context(tracker, at(1, { raining: 0.5 }))?.fuelRatio).toBeNull();
+  });
   it('uses the game estimate before a lap, then the measured VE per lap, and plans the stop of a timed race', () => {
     const tracker = new LiveStrategyTracker();
     tracker.applyRest({ type: 'tireManagement', vePerLap: 2.9, fuelPerLap: 2.1, newSets: 40, selected: null });

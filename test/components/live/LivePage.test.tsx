@@ -28,16 +28,17 @@ describe('LivePage', () => {
   });
 
   it.each([
-    ['offline', null, 'WAITING FOR LMU', 'GAME NOT RUNNING'],
-    ['menu', null, 'IN MENU', 'WAITING FOR A SESSION'],
-    // The bar says GARAGE; the screen names the session and the track.
-    ['garage', session(), 'RACE', 'Circuit de la Sarthe'],
-    ['finished', session(), 'SESSION OVER', 'RACE · Circuit de la Sarthe'],
+    ['offline', null, 'WAITING FOR LMU', 'WAITING FOR LIVE DATA FROM THE GAME'],
+    ['menu', null, 'IN MENU', 'JOIN A SESSION TO BEGIN'],
+    ['garage', session(), 'RACE', 'WAITING FOR GARAGE DATA'],
+    ['finished', session(), 'SESSION OVER', ''],
   ] as const)('shows the %s screen', (lifecycle, info, title, note) => {
     render(<LivePage />);
     send(snapshot({ lifecycle, session: info }));
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(title);
-    expect(within(screen.getByRole('region', { name: 'Session state' })).getByText(note)).toBeInTheDocument();
+    const region = screen.getByRole('region', { name: 'Session state' });
+    if (note) expect(within(region).getByText(note)).toBeInTheDocument();
+    else expect(region.querySelector('p')).not.toBeInTheDocument();
     expect(screen.queryByTestId('pedal-trace')).not.toBeInTheDocument();
     expect(screen.getByTestId('live-status')).toHaveTextContent('LIVE');
   });

@@ -6,7 +6,7 @@ Updated: 2026-10-16. Evidence: shared memory and the safe REST reads validated l
 practice, damage test, online LMP3 qualifying and race; see [LIVE_DATA_SOURCES.md](LIVE_DATA_SOURCES.md)).
 Still to validate on a race weekend: the race plan in a real race, the fuel-class MFD line, the race-garage tyre
 read, wetness on a wet track, the online forecast, cockpit readability from the seat and the effect on LMU's frame
-pacing. The standalone mock under `docs/prototypes/live-dashboard/` stays the layout and wording reference.
+pacing. Production components and regression tests are the current reference; historical placement decisions remain under `docs/prototypes/live-dashboard/`.
 
 ## Confirmed brief
 
@@ -74,10 +74,11 @@ pacing. The standalone mock under `docs/prototypes/live-dashboard/` stays the la
 
 ## Mock placement previews
 
-The standalone [prototype](../prototypes/live-dashboard/README.md) is the reference for
-layout and wording; its README records each decision. It makes no game/API calls and is not
-in the production entry. The [driver-centered review](../prototypes/live-dashboard/DRIVER_REVIEW.md)
-holds the earlier critique. Current state, all at 2560 x 1440, read in glances:
+The [archived placement notes](../prototypes/live-dashboard/README.md) record the original
+layout and wording decisions. The standalone mock and temporary review gallery were removed
+after implementation; production components and regression tests are the current reference.
+The [driver-centered review](../prototypes/live-dashboard/DRIVER_REVIEW.md) holds the earlier
+critique. The placement brief, at 2560 x 1440, read in glances:
 
 - **Every driving view:** session bar (session, track and class, laps left in races, PR,
   one weather slot), the 30-second full-width pedal trace (curves and grid only), no
@@ -95,8 +96,9 @@ holds the earlier critique. Current state, all at 2560 x 1440, read in glances:
   and `TYRES · MFD` (`NEW MEDIUM`, `NEW WET`, `NO CHANGE`, compound coloured, forecast note
   under it); current lap vs best with sector deltas, then `LAST LAP` with real sectors.
 - **Race, mid-stint (accepted):** `VE / LAP · LAST 3` with spare per lap, `PIT IN 6 LAPS`, `TYRES TO
-  PIT OK`, rain lap when forecast. **Sprint:** `SPARE / LAP` with `NO PIT STOP`, resource at
-  the finish, `TYRES TO FINISH OK`.
+  PIT OK`, rain lap when forecast. **Sprint:** current-lap delta against the session best
+  leads, with projected resource at the finish and reserve coverage secondary. Tyre
+  surface temperature leads the sector strip so the current delta appears only once.
 - **Damage:** sector deltas stay; the last-lap row becomes `PACE LOSS · MEASURED`, `SINCE IMPACT`,
   `TO FINISH`, `REPAIR TIME`; the resource can read `NO CHANGE`. **Flat or detached
   wheel:** `PIT NOW`, with the VE or fuel to set for a stop this lap (more than the planned later stop's).
@@ -398,8 +400,8 @@ this lap; the event's per-lap use and lap times are forgotten when another resol
 loads; replays are detected from `navigation/state` `settingMode` (`GetGameState.isReplayActive` stayed false in a
 replay) and `getVehicleCondition`, the one read that crashed LMU in a replay, follows its own check; a replay holds the file
 scans; the race view stays up until the player takes the flag.
-Not built: the fuel ratio (item 8), pace-loss confounders, hysteresis on the pit countdown, the finished-screen
-summary, the history fallback for per-lap use, and the extra lap a car behind a faster overall leader can run in the
+Not built: pace-loss confounders, hysteresis on the pit countdown,
+the history fallback for per-lap use, and the extra lap a car behind a faster overall leader can run in the
 race garage figure (the race plan counts it once the race runs).
 
 Automated cases should cover refills, partial laps, capacity overflow, lap-number
@@ -411,3 +413,162 @@ No all-class success claim until each supported resource model is verified.
 
 `PRODUCT.md` records the live dashboard as the one exception to its post-session operating context;
 the existing analysis pages retain their established behavior and scale.
+
+## Next priorities agreed with the driver (2026-10-16)
+
+The usual race has zero or one pit stop. Prioritize saving scenarios, tyre coverage,
+fuel-ratio guidance, pit execution, and better post-qualifying, pre-race and post-race
+screens. Multi-stint comparison is deferred: it has limited value for this use.
+Nearby cars and traffic are already covered by the in-game HUD; duplicating those
+views is not a priority for the second screen. These are next-scope decisions, not
+claims of implemented or validated features.
+
+- **Sprint presentation (provisional choice, accepted by the driver):** while the finish
+  reserve is covered, current-lap delta against the session best leads, with sector
+  deltas and the last completed lap clearly visible. Projected resource at the finish
+  and reserve coverage remain secondary; raw consumption per lap is not the primary.
+  Promote the required saving target and projected shortfall when resource management
+  requires a change in driving, and urgent pit advice when a car problem requires it.
+  Keep this direction until a better idea is agreed. Implemented first increment:
+  the healthy sprint leads with live delta and the session-best reference, projected
+  finish resource is marked estimated with reserve coverage, and tyre temperature
+  replaces the duplicate delta in the sector strip. Existing pit and damage modes
+  still override pace. New saving-target calculations remain next work.
+- **Saving scenarios:** show the per-lap VE or fuel target needed to reach the finish
+  with the configured reserve and, where feasible, avoid the single planned stop.
+  Distinguish avoiding a stop from reducing the load at a stop that remains necessary.
+  Use deterministic calculations and expose insufficient measurement confidence.
+- **Tyre coverage:** answer whether the fitted set covers the remaining race or the
+  next planned stop, and whether the available sets cover the intended strategy.
+  Validate wear extrapolation before showing a lifespan as reliable.
+- **Fuel ratio:** guide the garage and MFD ratio for VE cars using measured fuel/VE
+  use and an explicit physical-fuel margin; retain the single primary resource display.
+- **Pit execution:** compare the intended departure resource, tyres and repair choice
+  against actual MFD settings. Recalculate for an early or emergency stop. Distinguish
+  selected service, a pending penalty and completed service using verified game data.
+
+The following screen contents are proposals to refine with the driver:
+
+- **Post qualifying:** final class position when available, best valid lap, gap to the
+  driver's personal record, and the qualifying tyre set's wear. Carry useful measured
+  consumption and tyre information into race preparation, isolated by layout/car and
+  relevant conditions. Do not imply the grid is final while results remain provisional.
+- **Pre race:** a clear checklist for start resource, fuel ratio where applicable,
+  fitted tyre set and its coverage, expected zero/one-stop plan, reserve and weather.
+  Compare actual garage settings with targets; identify estimates and missing data.
+- **Post race:** final class result when available, best and average clean race pace,
+  actual stops and resource remaining, planned versus actual consumption, and a
+  concise handoff to the existing session analysis. Show provisional live results first;
+  official post-session results remain authoritative when ingested.
+
+All transitions remain automatic and passive while driving. Preserve the established
+cockpit readability and full-width pedal trace; detailed analysis belongs after driving.
+
+### Implemented strategy and session improvements (2026-10-16)
+
+- `shared/domain/live/liveInsights.ts` owns no-stop targets, paired-lap fuel ratios and
+  linear tyre projections. No AI or game control is involved. The no-stop ceiling is
+  `amount / (remaining fractional laps + reserve laps)`, rounded down to 0.01 for the
+  displayed target. The saving and shortfall update with resource level and race horizon.
+  A measured saving of up to 5%, after at least three measured laps, leads as `TO SKIP
+  STOP`; this cutoff limits presentation, not a claim of feasibility. Larger or game-based
+  scenarios remain secondary to the pit plan. Damage and penalties retain priority.
+- Fuel ratio uses the highest of up to 30 paired clean-lap fuel/VE measurements after
+  three pairs, or the labelled game estimate before then, rounded up to an available
+  MFD setting. No available range means no invented target; no clamping below the needed
+  ratio. Layout, car and dry/wet changes clear incompatible learned history (wet from `RAIN_WET_MIN`, dry again
+  below 7 of 255 so a drying track does not flip); another compound resets only the tyre wear.
+  Available ratio settings persist within the same event across qualifying/race; actual
+  garage and MFD settings are read independently. The garage now also reads the safe
+  pit-menu endpoint to obtain the setting range.
+- Tyre coverage projects remaining tread at the next pit or finish, using observed
+  wear, and compares the reported inventory with the linear race requirement. Zero or
+  unknown wear gives no lifespan. `LAPS TO ZERO` is explicitly a tread extrapolation,
+  not a useful-grip or safety limit. Same-compound wear carries into the pre-race
+  checklist; a new compound or changed conditions clears it.
+- Pit cells show the departure target against the actual MFD amount, fuel ratio,
+  selected tyres and repair choice. A flat with `NO CHANGE` flags a tyre change. No
+  repair choice is made on the driver's behalf, and no elapsed/finished-service claim
+  is inferred from a timer.
+- `LiveResultTracker` captures clean observed lap average, best lap, raw game pit-stop
+  count, class/overall position, resource remaining and recent use versus the start
+  plan. It freezes race metrics at the player's flag, never the leader's. Cooldown laps
+  and subsequent refills cannot overwrite the summary. Class order may still update;
+  every live result is marked provisional. Mid-session captures are labelled partial.
+- Post-qualifying and post-race summaries now replace the generic finished screen,
+  including in the garage after the flag. Qualifying context carries into race
+  preparation for the same layout and car. Race preparation shows zero/one-stop plan,
+  reserve, actual start resource, ratio, fitted tyres and wear projection. Post-race
+  links to session analysis; leave the live session and refresh to ingest official
+  results. No historical session ID is guessed from live names.
+
+Automated fixtures cover reserve preservation, conservative rounding, refill scenarios,
+paired measurements, available-setting limits, wet-condition resets, tyre extrapolation,
+early pit settings, partial captures and player/leader finish ordering. UI fixtures were
+checked at 2560 x 1440. Validate fuel-ratio ranges on a second VE car, wet runs, inventory
+units, real tyre degradation and a complete race weekend before treating these models
+as race-validated.
+
+### Persistent estimate / selection / outcome history (2026-10-16)
+
+The live service now writes immutable checkpoints into `live_strategy_audit` in the local WAL SQLite database while a dashboard page is open (driver decision 2026-10-16: no REST reads or history without one; no size limit for now, to be reviewed after a few sessions). Each capture has its own UUID, ordered sequence, wall clock, session clock and forecasting model version. Session changes, clock regressions, known layout changes and leaving the session close the capture; interrupted runs remain available. Capture scope is explicit, not a guessed XML session ID. No imported results are altered.
+
+Checkpoints preserve the complete plan, garage and next-stop MFD selections, physical fuel/VE readings, tyre tread/compound, conditions, reserve and eventual provisional result. They are written on start, settings or estimate changes, completed laps, new clean-lap measurements, finish, exit and otherwise every 10 session seconds. A storage failure leaves live driving operational and marks history unavailable rather than claiming it was saved.
+
+Accuracy comparisons freeze the consumption and fuel-ratio forecast at the start of a lap, then compare it against raw measured use at that lap's crossing. Actual minus forecast is positive for underestimation; percentage error divides that difference by the forecast. VE cars wait for matched fuel/VE crossings to calculate actual litres per 1% VE; each eligible lap contributes once. Mid-lap joins and changes of layout, compound or wet/dry regime have no retrospective comparison. The existing usage meter excludes pit, caution, invalid, refuelled and unbracketed laps. Zero/one-stop races both retain pit plans and selections; next-stop MFD settings are not described as the ratio already loaded in the car.
+
+Settings > Live dashboard offers CSV export; the cockpit dashboard stays passive with no links, buttons or export controls; `/api/live/audit` returns the newest 200 checkpoints (optional `runId`), and `/api/live/audit.csv` streams all history or that capture. CSV includes signed selection/recommendation mismatches and forecast/actual consumption and ratio errors. JSON retains original precision and context. Tyre projections and final tread are retained for review; there is no automatic tyre-error score across tyre changes, or invented full-race fuel requirement from clean-lap averages. Historical data collection does not yet change recommendations automatically. Any later calibration must group by canonical resolved layout, car, compound, conditions and model version, and distinguish interrupted captures from full races. Unresolved layouts must not train a layout-specific model.
+
+### Cockpit review refinements (2026-10-16)
+
+Finish-covered sprint racing now shows only the current pace delta, projected resource at the finish and projected tread. Fuel ratio (a next-stop setting), reserve reassurance, reference-lap subtitle and routine tyre-life subtitles are omitted. The pace readout uses two columns; all controls remain outside the cockpit dashboard.
+
+The driver's planning floor is 40% tread (`LIVE_TYRE_TREAD_FLOOR`), not zero. Set coverage uses usable fitted tread above that floor and 60% usable tread per fresh set. Healthy projections display only the approximate tread; below-floor projections and inventory shortages remain warnings. The floor is a driver preference, not an inferred grip guarantee. Forecast model version is now 2 so saved history distinguishes these planning rules.
+
+When tyre replacement is needed and the MFD says No Change, the pit readout shows a specific fresh set of the fitted compound (e.g. NEW MEDIUM), alongside SET NO CHANGE. Unknown compound shows NEW SET. This renewal advice does not infer a different compound from rain forecasts.
+
+Successful strategy-history saving is silent on the cockpit result screens. The routine saved-history label is omitted; an actual storage failure remains visible.
+
+Preparation hierarchy: the estimated session lap count is a dedicated 180 px readout, separate from the subtitle. Duration and the race stop plan use a 64 px supporting line; qualifying carryover remains secondary. Redundant lap/reserve/calculation text is removed from the subtitle; source labels stay beside the recommendations. Unknown lap counts display a dash.
+
+Subtitle audit: remove routine clean/paired sample counts, already-matching MFD selections, the duplicate tyre forecast, repair N/A, generic post-qualifying prompts and repeated lifecycle descriptions. Retain actual setting differences, missing-reading reasons, game-estimate qualifiers, tyre-floor/stock warnings, penalty-service restrictions, formation/countdown status, qualifying carryover and provisional/partial-result context. Race result consumption retains its recent-clean-lap horizon. The review gallery also includes a 45-minute / approximately 24-lap race with one planned stop, derived through planGarage at 4.5% VE per lap.
+
+Planned-stop preparation includes the estimated first racing pit lap (`LiveGaragePlan.firstPitLap`). `planGarage` delegates to canonical `planRace` using the selected garage load, reserve and consumption, after subtracting the existing garage model's one estimated formation/out lap from both load and session horizon. It does not count the formation lap as racing lap 1. Unknown load/use or an insufficient formation-and-reserve load gives no preview; a full-session load gives no pit lap. This is a resource-range preview, not an optimal pit window; tyre/forecast/damage advice still applies. The 45-minute fixture at 4.5% VE/lap previews lap 20 from a selected 100%, and lap 16 from 80%.
+
+Race preparation treats the completed qualifying result carried into the race garage as settled for cockpit presentation, so its QUALI position/time line has no provisional suffix. The underlying source remains live scoring; this presentation change does not claim XML-result linkage or change the result-summary source semantics.
+
+Qualifying settlement requires BOTH timer expiry (`currentEt >= endEt` with a valid timed end) and full-field terminal finish statuses (finished, DNF or DQ). The decoder reports an unknown completion state when the scoring field is absent/truncated. A personal flag, phase 8 or return to the garage alone cannot settle qualifying. The waiting summary remains provisional and still records the player's final lap; personal cooldown metrics freeze at the player's terminal status. Once all drivers finish and time expires, settlement latches for that qualifying session and carries to race preparation without the provisional label. Unknown/early-transition carryover remains provisional. This supersedes the earlier assumption that simply entering the race garage settles the qualifying result; no XML linkage is implied. Live confirmation of qualifying finish-status behaviour remains required.
+
+Multiclass horizon (forecast model version 3): the overall leader sets the timed-race flag. `projectRaceFlagSeconds` is shared by live laps remaining and garage preparation; a slower class never uses the overall leader lap count directly. The decoder selects the player's class leader from the complete scoring field via canonical class normalization, including aliases, while keeping LMP2 WEC and ELMS distinct. Remaining player crossings use same-class leader pace and the player's own lap-start phase, falling back to the player's estimate when no usable class reference exists. Laps already lost are never added back. Once the overall leader has finished, each running player has only its current lap to complete. Preparation projects the overall leader's final post-timer lap, converts that horizon with class pace, and shows racing laps only; the additional formation/out-lap use stays in the resource/tyre budget. This applies to every canonical player class, not specifically GT3. The gallery includes a one-hour GT3 example (Hyper overall leader at 110 s, player class at 120 s): overall flag at 3630 s, 33 Hyper racing laps versus 31 player-class racing laps, plus formation use in preparation budgeting.
+
+### Event transition validation (2026-10-16)
+
+Automated validation uses decoded scoring and navigation fixtures; it does not constitute a recorded online or single-player LMU weekend. Online and single-player sequences share the same lifecycle engine and session-code mapping.
+
+| Transition | Expected dashboard behavior | Automated coverage |
+|---|---|---|
+| Main menu before scoring arrives | IN MENU; no old session, results, weather or strategy | Service and rendered sequence |
+| Loading practice or another stage | LOADING; hide old session content; hold file ingestion; no pit-data polling | Service sequence and lifecycle checks |
+| Practice garage → driving | Practice setup → practice driving view and pedal trace | Service and rendered sequence |
+| Qualifying garage → driving | Qualifying setup → qualifying driving view | Service and rendered sequence |
+| Qualifying timer expires while drivers finish | Keep driving until player's flag; garage summary waits for complete field | Online sequence, result and rendered checks |
+| Timer expired and all drivers terminal | QUALIFYING COMPLETE; settled result retained | Online sequence, result and rendered checks |
+| Race garage, with or without intervening loading/warmup | Race preparation; settled qualifying retained for the same event; no old result screen | Weekend matrix and rendered sequence |
+| Grid → formation → countdown | RACE STARTING with phase-specific status and pedal trace | Service phases 0–4 and rendered sequence |
+| Green → race | Race view replaces starting screen | Service and rendered sequence |
+| Overall leader flagged, player still running | Keep race view and capture player's final lap | Service, result and rendered checks |
+| Player flagged → garage | Race summary; cooldown cannot overwrite frozen metrics | Service, result and page checks |
+| DNF / DQ / game closes | Terminal result or offline; clear event state on exit | Service and existing page/lifecycle checks |
+| Leave and rejoin same practice server | Clear previous best, laps, qualifying and strategy, even if old scoring remains | Service regression |
+
+The weekend matrix exercises every nonempty ordered subset of practice, qualifying, warmup and race (15 combinations), including practice only, qualifying only, race only, practice/race, qualifying/race and the complete weekend. A separate online three-stage sequence exercises transitions without a loading screen, pending qualifying completion, race preparation and the player's final race lap. Existing reader tests cover shared-memory opening/closure, busy loading probes, menu detection, pauses and reconnect behavior. The rendered sequence asserts that no buttons or text inputs appear.
+
+Fixed during validation:
+
+- Navigation loading/menu takes precedence before the first scoring frame. Loading holds the ingestion guard but does not start pit polling.
+- Menu/offline clears lap timing, weather, learned strategy and result carryover even if LMU retains the scoring buffer. Loading hides content while preserving event learning for the next stage.
+- Qualifying carryover survives a temporarily unresolved layout in the next session. Two different known layouts still invalidate carryover; a new practice cycle also clears prior qualifying.
+
+Checks: `npm test` — 2,987 passed, 56 skipped; `npm run build` — passed without warnings. The skips are existing optional fixture tests.
+
+Remaining live confirmation: record an online practice → qualifying → race event, a practice-only server and a single-player race-only start. Confirm navigation/phase timing, full-field qualifying finish flags, garage REST availability and formation behavior against these expectations. Missing or incomplete full-field finish data intentionally keeps qualifying provisional. Scoring-only fixtures cannot establish that every LMU server supplies those fields at the same moment.

@@ -10,6 +10,8 @@ export type LiveResourceKind = 've' | 'fuel';
 /** Where the per-lap use comes from: laps measured in this event, or LMU's own estimate before the first lap. */
 export type LivePerLapSource = 'measured' | 'game';
 
+import type { LiveFuelRatio, LiveSavingPlan, LiveTyreCoverage } from './liveInsights.js';
+
 export interface LiveResourcePlan {
   kind: LiveResourceKind;
   /** Percent of a full VE tank, or litres. */
@@ -29,6 +31,7 @@ export interface LiveResourcePlan {
   lapsInTank: number | null;
   /** Races only, with laps left known. */
   race: LiveRacePlan | null;
+  saving?: LiveSavingPlan | null;
 }
 
 export interface LiveRacePlan {
@@ -68,6 +71,8 @@ export interface LivePitMenu {
   tyres: string | null;
   /** `DAMAGE:` setting: `N/A` without damage, else `Do Not Repair`, `Repair Body`, `Repair All`. */
   repair: string | null;
+  fuelRatio?: number | null;
+  fuelRatioOptions?: number[];
 }
 
 export interface LivePitInfo {
@@ -109,6 +114,7 @@ export interface LiveDamage {
 }
 
 export interface LiveTyres {
+  coverage?: LiveTyreCoverage | null;
   /** Compound on the car (front), as the game names it. */
   compound: string | null;
   /** Tread left on the most worn tyre, 0..1 (`getVehicleCondition.tireCondition`). */
@@ -133,6 +139,7 @@ export interface LiveForecast {
 
 /** In the garage: what to load for this session. */
 export interface LiveGaragePlan {
+  tyreCoverage?: LiveTyreCoverage | null;
   kind: LiveResourceKind;
   unit: '%' | 'L';
   /** Session length in minutes. */
@@ -151,6 +158,8 @@ export interface LiveGaragePlan {
   stops: number | null;
   /** The start amount set in the garage (`getPlayerGarageData`). */
   setInGarage: number | null;
+  /** Resource-based first racing pit lap from the selected start load, allowing one formation/out lap; null if unknown or no stop. */
+  firstPitLap?: number | null;
   /** The tyres the car goes out on (`TireManagement` selected set); null until read. */
   tyres: LiveGarageTyres | null;
 }
@@ -173,4 +182,5 @@ export interface LiveStrategy {
   forecast: LiveForecast | null;
   /** Garage only. */
   garage: LiveGaragePlan | null;
+  fuelRatio?: LiveFuelRatio | null;
 }
