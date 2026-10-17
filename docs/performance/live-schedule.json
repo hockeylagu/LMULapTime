@@ -1,0 +1,82 @@
+{
+  "track": {
+    "steadyRequestsPerSecond": 0.775,
+    "paths": {
+      "/navigation/state": {
+        "firstSeconds": 0,
+        "averagePeriodSeconds": 7.265625,
+        "maxPeriodSeconds": 10
+      },
+      "/rest/watch/standings": {
+        "firstSeconds": 1,
+        "averagePeriodSeconds": 3.22972972972973,
+        "maxPeriodSeconds": 4
+      },
+      "/rest/strategy/pitstop-estimate": {
+        "firstSeconds": 2,
+        "averagePeriodSeconds": 11.069767441860465,
+        "maxPeriodSeconds": 14
+      },
+      "/rest/garage/PitMenu/receivePitMenu": {
+        "firstSeconds": 3,
+        "averagePeriodSeconds": 11.069767441860465,
+        "maxPeriodSeconds": 14
+      },
+      "/rest/garage/getVehicleCondition": {
+        "firstSeconds": 5,
+        "averagePeriodSeconds": 10.976190476190476,
+        "maxPeriodSeconds": 14
+      },
+      "/rest/garage/UIScreen/TireManagement": {
+        "firstSeconds": 6,
+        "averagePeriodSeconds": 32.857142857142854,
+        "maxPeriodSeconds": 37
+      },
+      "/rest/sessions/weather": {
+        "firstSeconds": 7,
+        "averagePeriodSeconds": 61.42857142857143,
+        "maxPeriodSeconds": 64
+      },
+      "/rest/garage/UIScreen/RepairAndRefuel": {
+        "firstSeconds": 8,
+        "averagePeriodSeconds": 121.66666666666667,
+        "maxPeriodSeconds": 122
+      }
+    }
+  },
+  "garage": {
+    "steadyRequestsPerSecond": 0.48333333333333334,
+    "paths": {
+      "/navigation/state": {
+        "firstSeconds": 0,
+        "averagePeriodSeconds": 10,
+        "maxPeriodSeconds": 10
+      },
+      "/rest/garage/getPlayerGarageData": {
+        "firstSeconds": 1,
+        "averagePeriodSeconds": 5,
+        "maxPeriodSeconds": 5
+      },
+      "/rest/garage/PitMenu/receivePitMenu": {
+        "firstSeconds": 2,
+        "averagePeriodSeconds": 10,
+        "maxPeriodSeconds": 10
+      },
+      "/rest/garage/UIScreen/TireManagement": {
+        "firstSeconds": 3,
+        "averagePeriodSeconds": 20,
+        "maxPeriodSeconds": 20
+      },
+      "/rest/sessions/weather": {
+        "firstSeconds": 4,
+        "averagePeriodSeconds": 60,
+        "maxPeriodSeconds": 60
+      },
+      "/rest/sessions/GetSessionsInfoForEvent": {
+        "firstSeconds": 6,
+        "averagePeriodSeconds": 60,
+        "maxPeriodSeconds": 60
+      }
+    }
+  }
+}

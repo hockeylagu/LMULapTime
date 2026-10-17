@@ -1,0 +1,250 @@
+{
+  "timestamp": "2026-10-17T03:06:31.239Z",
+  "node": "v24.21.0",
+  "browser": "155.0.4283.45",
+  "synthetic": true,
+  "errors": [],
+  "results": [
+    {
+      "name": "no-dashboard",
+      "server": {
+        "elapsedMs": 10022.160199999998,
+        "cpuOneCorePercent": 1.0875898790761698,
+        "frames": 325,
+        "restCalls": {},
+        "auditWrites": 0,
+        "auditMs": 0,
+        "workerTransitMs": {
+          "count": 325,
+          "p50": 0,
+          "p95": 0,
+          "max": 1
+        },
+        "sampleToMainMs": {
+          "count": 325,
+          "p50": 15,
+          "p95": 16,
+          "max": 17
+        },
+        "eventLoopP95Ms": 16.056319,
+        "eventLoopMaxMs": 16.826367,
+        "rssMiB": 234.7421875
+      },
+      "clients": []
+    },
+    {
+      "name": "one-dashboard-1440p",
+      "server": {
+        "elapsedMs": 20006.1307,
+        "cpuOneCorePercent": 0.6248084743343199,
+        "frames": 649,
+        "restCalls": {
+          "/rest/strategy/pitstop-estimate": 1,
+          "/rest/garage/PitMenu/receivePitMenu": 1,
+          "/navigation/state": 3,
+          "/rest/watch/standings": 6,
+          "/rest/garage/getVehicleCondition": 1,
+          "/rest/garage/UIScreen/TireManagement": 1
+        },
+        "auditWrites": 2,
+        "auditMs": 0.25359999999636784,
+        "workerTransitMs": {
+          "count": 649,
+          "p50": 0,
+          "p95": 1,
+          "max": 10
+        },
+        "sampleToMainMs": {
+          "count": 649,
+          "p50": 16,
+          "p95": 16,
+          "max": 25
+        },
+        "eventLoopP95Ms": 16.080895,
+        "eventLoopMaxMs": 31.866879,
+        "rssMiB": 236.10546875
+      },
+      "clients": [
+        {
+          "events": {
+            "pedals": 432,
+            "timing": 133,
+            "snapshot": 5,
+            "heartbeat": 1
+          },
+          "deliveryMs": {
+            "count": 432,
+            "p50": 43,
+            "p95": 48,
+            "max": 56
+          },
+          "drawAgeMs": {
+            "count": 432,
+            "p50": 43,
+            "p95": 48,
+            "max": 57
+          },
+          "drawMs": {
+            "count": 432,
+            "p50": 0,
+            "p95": 0.10000002384185791,
+            "max": 0.5
+          },
+          "longTasks": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          },
+          "rendererTaskPercent": 0.7963,
+          "scriptSeconds": 0.075556,
+          "layoutSeconds": 0.00006600000000000009,
+          "heapMiB": 4.641811370849609
+        }
+      ]
+    },
+    {
+      "name": "three-dashboards-1440p",
+      "server": {
+        "elapsedMs": 20018.23520000001,
+        "cpuOneCorePercent": 0.8642120460249159,
+        "frames": 648,
+        "restCalls": {
+          "/navigation/state": 2,
+          "/rest/watch/standings": 5,
+          "/rest/strategy/pitstop-estimate": 1,
+          "/rest/garage/PitMenu/receivePitMenu": 1,
+          "/rest/garage/getVehicleCondition": 1,
+          "/rest/garage/UIScreen/TireManagement": 1
+        },
+        "auditWrites": 2,
+        "auditMs": 0.1991999999881955,
+        "workerTransitMs": {
+          "count": 648,
+          "p50": 0,
+          "p95": 1,
+          "max": 1
+        },
+        "sampleToMainMs": {
+          "count": 648,
+          "p50": 16,
+          "p95": 16,
+          "max": 17
+        },
+        "eventLoopP95Ms": 16.138239,
+        "eventLoopMaxMs": 16.744447,
+        "rssMiB": 237.1328125
+      },
+      "clients": [
+        {
+          "events": {
+            "timing": 128,
+            "pedals": 432,
+            "snapshot": 4,
+            "heartbeat": 1
+          },
+          "deliveryMs": {
+            "count": 432,
+            "p50": 33,
+            "p95": 48,
+            "max": 49
+          },
+          "drawAgeMs": {
+            "count": 432,
+            "p50": 40,
+            "p95": 48,
+            "max": 49
+          },
+          "drawMs": {
+            "count": 432,
+            "p50": 0.09999999403953552,
+            "p95": 0.10000002384185791,
+            "max": 0.20000001788139343
+          },
+          "longTasks": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          },
+          "rendererTaskPercent": 0.7987850000000002,
+          "scriptSeconds": 0.07330299999999995,
+          "layoutSeconds": 0,
+          "heapMiB": 5.505615234375
+        },
+        {
+          "events": {
+            "timing": 128,
+            "pedals": 432,
+            "snapshot": 4,
+            "heartbeat": 1
+          },
+          "deliveryMs": {
+            "count": 432,
+            "p50": 33,
+            "p95": 48,
+            "max": 49
+          },
+          "drawAgeMs": {
+            "count": 432,
+            "p50": 33,
+            "p95": 48,
+            "max": 49
+          },
+          "drawMs": {
+            "count": 432,
+            "p50": 0.09999999403953552,
+            "p95": 0.20000001788139343,
+            "max": 0.699999988079071
+          },
+          "longTasks": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          },
+          "rendererTaskPercent": 0.8089749999999998,
+          "scriptSeconds": 0.07960500000000001,
+          "layoutSeconds": 0,
+          "heapMiB": 4.092830657958984
+        },
+        {
+          "events": {
+            "timing": 128,
+            "pedals": 432,
+            "snapshot": 4,
+            "heartbeat": 1
+          },
+          "deliveryMs": {
+            "count": 432,
+            "p50": 33,
+            "p95": 48,
+            "max": 49
+          },
+          "drawAgeMs": {
+            "count": 432,
+            "p50": 33,
+            "p95": 48,
+            "max": 49
+          },
+          "drawMs": {
+            "count": 432,
+            "p50": 0.09999999403953552,
+            "p95": 0.10000002384185791,
+            "max": 0.20000001788139343
+          },
+          "longTasks": {
+            "count": 0,
+            "p50": null,
+            "p95": null,
+            "max": null
+          },
+          "rendererTaskPercent": 0.79042,
+          "scriptSeconds": 0.078212,
+          "layoutSeconds": 0,
+          "heapMiB": 3.9498291015625
+        }
+      ]
+    }
+  ]
+}

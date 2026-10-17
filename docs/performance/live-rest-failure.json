@@ -1,0 +1,15 @@
+[
+  {
+    "path": "/trickle",
+    "elapsedMs": 1516.3735,
+    "result": {
+      "ok": true,
+      "body": {}
+    }
+  },
+  {
+    "path": "/abort",
+    "elapsedMs": 2215.1281,
+    "result": "unsettled after 2200ms"
+  }
+]
