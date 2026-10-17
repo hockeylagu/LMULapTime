@@ -50,7 +50,7 @@ describe('racePlanView', () => {
 
   it('leads with pace when the reserve is covered, and keeps projected finish VE secondary', () => {
     expect(texts(withRace({ finishReachable: true, atFinish: 7, pitInLaps: null, pitLap: null, sparePerLap: 0.8 }))).toMatchObject({
-      mode: 'sprint', action: 'CURRENT VS BEST|—||',
+      mode: 'sprint', action: 'ESTIMATED LAP|—||',
     });
     expect(racePlanView(withRace({ finishReachable: true, atFinish: 7, pitInLaps: null })).cells[0]).toMatchObject({ label: 'VE AT FINISH', value: '~7' });
   });
@@ -88,10 +88,11 @@ describe('race page with a plan', () => {
 
   it('streams sprint pace into the primary readout and returns to pit advice when the margin is lost', () => {
     render(<LivePage />);
-    send(withRace({ finishReachable: true, atFinish: 7, pitInLaps: null }));
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('—');
+    send({ ...withRace({ finishReachable: true, atFinish: 7, pitInLaps: null }), sessionBest: { lapSeconds: 121.406, lapSectors: [null, null, null], bestSectors: [null, null, null], bestPossibleSeconds: null } });
+    expect(screen.getByTestId('live-estimated-lap')).toHaveTextContent('—');
     act(() => source().emit('timing', liveTiming({ deltaSeconds: -0.184, tyreSurfaceAvgC: 92 })));
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('−0.184s');
+    // The session best plus the running delta: the lap in progress projected to the line.
+    expect(screen.getByTestId('live-estimated-lap')).toHaveTextContent('2:01.222');
     expect(screen.getByTestId('live-race-cell-1')).toHaveTextContent('VE AT FINISH~7%');
     expect(screen.queryByTestId('live-race-cell-3')).not.toBeInTheDocument();
     expect(screen.queryByText('RESERVE COVERED')).not.toBeInTheDocument();
@@ -99,7 +100,7 @@ describe('race page with a plan', () => {
     expect(screen.getByTestId('live-last-lap')).toBeInTheDocument();
     send(withRace({ finishReachable: false, pitInLaps: 0 }));
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('THIS LAP');
-    expect(screen.getByTestId('live-race-deltas')).toHaveTextContent('CURRENT VS BEST');
+    expect(screen.getByTestId('live-race-deltas')).toHaveTextContent('ESTIMATED LAP');
   });
 
   it('keeps the plan readouts in place across modes, and swaps the last-lap row for the damage row only when damage matters', () => {

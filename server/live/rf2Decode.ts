@@ -1,7 +1,7 @@
 import type { LiveCarReading } from '../../shared/domain/live/liveCarCondition.js';
 import type { LiveScoringReading, LiveVehicleReading } from '../../shared/domain/live/liveLifecycle.js';
 import type { LivePedalSample } from '../../shared/types/live.js';
-import { normalizeCarClass, VEHICLE_CLASS_OPTIONS } from '../../shared/domain/vehicleMapping.js';
+import { knownCarClass } from '../../shared/domain/vehicleMapping.js';
 import { MAX_MAPPED_VEHICLES, SCORING, SCORING_INFO, TELEMETRY, VEHICLE_SCORING, VEHICLE_TELEMETRY, WHEEL } from './rf2Layout.js';
 import type { MappedBuffer } from './sharedMemory.js';
 
@@ -77,21 +77,20 @@ export function decodeScoring(buffer: Buffer): LiveScoringReading {
     if (isLeader) leader = vehicle;
   }
   let classLeader: LiveVehicleReading | null = null;
-  const playerClass = normalizeCarClass(player?.vehicleClass);
-  const knownClass = playerClass !== 'All' && VEHICLE_CLASS_OPTIONS.some(option => option.id === playerClass);
-  if (knownClass && count === numVehicles) {
+  const playerClass = knownCarClass(player?.vehicleClass);
+  if (playerClass && count === numVehicles) {
     for (let i = 0; i < count; i++) {
       const base = SCORING.vehicles + i * SCORING.vehicleStride;
       const place = buffer.readUInt8(base + at.place);
       if (place > 0 && (!classLeader || place < classLeader.place)
-        && normalizeCarClass(cString(buffer, base + at.vehicleClass, 32)) === playerClass) classLeader = decodeVehicle(buffer, base);
+        && knownCarClass(cString(buffer, base + at.vehicleClass, 32)) === playerClass) classLeader = decodeVehicle(buffer, base);
     }
   }
   return {
     trackName: cString(buffer, info + infoAt.trackName, 64),
     playerClassPlace: player && player.vehicleClass && player.place > 0
       ? 1 + Array.from({ length: count }, (_, i) => SCORING.vehicles + i * SCORING.vehicleStride).filter(base =>
-        (knownClass ? normalizeCarClass(cString(buffer, base + at.vehicleClass, 32)) === playerClass : cString(buffer, base + at.vehicleClass, 32) === player.vehicleClass)
+        (playerClass ? knownCarClass(cString(buffer, base + at.vehicleClass, 32)) === playerClass : cString(buffer, base + at.vehicleClass, 32) === player.vehicleClass)
         && buffer.readUInt8(base + at.place) > 0 && buffer.readUInt8(base + at.place) < player.place).length
       : null,
     sessionCode: buffer.readInt32LE(info + infoAt.session),

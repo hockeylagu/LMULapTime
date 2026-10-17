@@ -1,10 +1,24 @@
 import type { LiveLapsLeft, LiveSessionInfo } from '../../types/live.js';
 import type { LiveVehicleReading } from './liveLifecycle.js';
-import { normalizeCarClass, VEHICLE_CLASS_OPTIONS } from '../vehicleMapping.js';
+import { knownCarClass } from '../vehicleMapping.js';
 
 const FINISHED = 1;
 
 const positive = (value: number): boolean => Number.isFinite(value) && value > 0;
+
+/** The class leader's estimated lap time when it races in the player's (known) class, else null. */
+export function classLeaderLapSeconds(player: LiveVehicleReading | null, classLeader: LiveVehicleReading | null | undefined): number | null {
+  const playerClass = knownCarClass(player?.vehicleClass);
+  return playerClass && classLeader && knownCarClass(classLeader.vehicleClass) === playerClass && positive(classLeader.estimatedLapTime)
+    ? classLeader.estimatedLapTime : null;
+}
+
+/** Qualifying: the player's own laps to its flag, the first line crossing after the clock ends. */
+function ownLapsLeft(endSeconds: number | null, player: LiveVehicleReading): LiveLapsLeft | null {
+  if (endSeconds === null) return null;
+  const flag = projectRaceFlagSeconds(endSeconds, player.lapStartEt, player.estimatedLapTime);
+  return flag === null ? null : { laps: Math.round((flag - player.lapStartEt) / player.estimatedLapTime), estimated: true };
+}
 
 /** Overall leader's first estimated line crossing at/after the timed end. No class sets its own race end. */
 export function projectRaceFlagSeconds(endSeconds: number, lapStart: number, lapSeconds: number): number | null {
@@ -31,7 +45,9 @@ export function computeLapsLeft(
   leader: LiveVehicleReading | null,
   classLeader: LiveVehicleReading | null = null,
 ): LiveLapsLeft | null {
-  if (!session || session.kind !== 'race' || !player || player.finishStatus === FINISHED) return null;
+  if (!session || !player || player.finishStatus === FINISHED) return null;
+  if (session.kind === 'qualifying') return ownLapsLeft(session.endSeconds, player);
+  if (session.kind !== 'race') return null;
   if (session.endSeconds === null || !leader) return null;
   // Once the leader has the flag, the lap in progress is the last: exact.
   if (leader.finishStatus === FINISHED) return { laps: 1, estimated: false };
@@ -39,11 +55,7 @@ export function computeLapsLeft(
   if (flag === null) return null;
   const leaderLaps = Math.round((flag - leader.lapStartEt) / leader.estimatedLapTime);
   if (leader.id === player.id) return { laps: leaderLaps, estimated: true };
-  const playerClass = normalizeCarClass(player.vehicleClass);
-  const knownClass = playerClass !== 'All' && VEHICLE_CLASS_OPTIONS.some(option => option.id === playerClass);
-  const classPace = classLeader && knownClass && normalizeCarClass(classLeader.vehicleClass) === playerClass
-    && positive(classLeader.estimatedLapTime) ? classLeader.estimatedLapTime : null;
-  const pace = classPace ?? player.estimatedLapTime;
+  const pace = classLeaderLapSeconds(player, classLeader) ?? player.estimatedLapTime;
   if (!(player.lapStartEt >= 0) || !positive(pace)) return null;
   return { laps: Math.max(1, Math.ceil((flag - player.lapStartEt) / pace)), estimated: true };
 }

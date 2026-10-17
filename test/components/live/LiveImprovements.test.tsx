@@ -15,7 +15,7 @@ const result: LiveSessionResult = { kind: 'qualifying', settled: true, trackName
 
 describe('live dashboard improvements', () => {
   it('shows the estimated first pit lap in the planned-stop preparation preview', () => {
-    const garage = { ...planGarage({ kind: 've', sessionSeconds: 2700, lapSeconds: 121.4, perLap: 4.5,
+    const garage = { ...planGarage({ kind: 've', formationLap: true, sessionSeconds: 2700, lapSeconds: 121.4, perLap: 4.5,
       perLapSource: 'measured', lapsMeasured: 8, reserveLaps: .5, capacity: 100, setInGarage: 100 }), tyres: null };
     const makeScreen = () => liveScreen(liveSnapshot({ lifecycle: 'garage', strategy: liveStrategy({ garage }) }));
     const { rerender } = render(<LiveStateScreen screen={makeScreen()} />);
@@ -99,15 +99,20 @@ describe('live dashboard improvements', () => {
         fuelRatio: { recommended: 0.84, source: 'game', pairedLaps: 0, garageSetting: 0.86, mfdSetting: null, excessLitres: 0.54, fuelBiasLaps: null } },
     }));
     expect(screen.note).toBe('QUALI P4 2:01.406');
-    expect(screen.preparation).toEqual({ laps: 9, minutes: 20, stopPlan: 'NO STOP PLANNED' });
+    expect(screen.preparation).toEqual({ laps: 9, length: '20 MIN', stopPlan: 'NO STOP PLANNED' });
     expect(screen.checks[1]).toMatchObject({ label: 'FUEL RATIO', target: '0.84', current: '0.86', action: { text: 'LOWER' } });
     expect(screen.checks[0].note).toBeUndefined();
     expect(screen.checks[1].note).toBe('GAME ESTIMATE');
+    // On the grid the clock is the countdown to the start: no length, laps or stop plan until the green flag.
+    const grid = liveScreen(liveSnapshot({ lifecycle: 'garage', session: liveSession({ inRealtime: false }),
+      strategy: { ...strategy, garage: { kind: 've', unit: '%', sessionMinutes: null, laps: null, lapSeconds: 120, perLap: 2.5, perLapSource: 'measured',
+        lapsMeasured: 3, reserveLaps: 0.5, needed: null, stops: null, setInGarage: 30, tyres: null } } }));
+    expect(grid.preparation).toEqual({ laps: null, length: 'LAPS AT THE START', stopPlan: null });
   });
 
   it('promotes preparation laps out of the subtitle and shows unknown laps without inventing a count', () => {
     const preparation = { title: 'RACE', note: '', muted: false, checks: [], showTrace: false,
-      preparation: { laps: 11, minutes: 20, stopPlan: 'NO STOP PLANNED' } };
+      preparation: { laps: 11, length: '20 MIN', stopPlan: 'NO STOP PLANNED' } };
     const { rerender } = render(<LiveStateScreen screen={preparation} />);
     expect(screen.getByTestId('live-preparation-laps')).toHaveTextContent('~11LAPS');
     expect(screen.getByText('20 MIN · NO STOP PLANNED')).toBeInTheDocument();

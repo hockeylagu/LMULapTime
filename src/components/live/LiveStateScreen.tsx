@@ -15,7 +15,7 @@ export function LiveStateScreen({ screen }: { screen: LiveScreen }) {
             {screen.title}
           </h1>
           {preparation && <p className="mt-5 text-[64px] font-semibold text-lmu-text-soft">
-            {preparation.minutes !== null ? `${preparation.minutes} MIN` : 'SESSION LENGTH UNKNOWN'}
+            {preparation.length}
             {preparation.stopPlan && ` · ${preparation.stopPlan}`}
           </p>}
         </div>

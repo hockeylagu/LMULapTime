@@ -1,6 +1,8 @@
 import { useLiveTiming, type LiveTimingStore } from '../../api/liveStream.js';
 import type { LiveSnapshot } from '../../../shared/types/live.js';
+import type { ReactNode } from 'react';
 import { LiveDelta } from './LiveDelta.js';
+import { LiveEstimatedLap } from './LiveEstimatedLap.js';
 import { formatLapTime, lastLap } from './liveFormat.js';
 import { LivePracticeHistory } from './LivePracticeHistory.js';
 
@@ -16,16 +18,16 @@ function CurrentDelta({ store }: { store: LiveTimingStore }) {
   );
 }
 
-function Timing({ label, seconds }: { label: string; seconds: number | null | undefined }) {
+function Timing({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
       <h3 className="text-[48px] font-semibold text-lmu-text-soft">{label}</h3>
-      <div className="whitespace-nowrap font-mono text-[96px] font-bold leading-[1.4] tracking-[-0.04em]">{formatLapTime(seconds)}</div>
+      <div className="whitespace-nowrap font-mono text-[96px] font-bold leading-[1.4] tracking-[-0.04em]">{children}</div>
     </div>
   );
 }
 
-/** The practice view (also warmup and unknown sessions): last lap, session best, best possible, and the lap history. */
+/** The practice view (also warmup and unknown sessions): last lap, the estimated lap, session best, and the lap history. */
 export function LivePracticeView({ snapshot, store }: { snapshot: LiveSnapshot; store: LiveTimingStore }) {
   const latest = lastLap(snapshot.recentLaps);
   const best = snapshot.sessionBest;
@@ -40,8 +42,8 @@ export function LivePracticeView({ snapshot, store }: { snapshot: LiveSnapshot; 
           <CurrentDelta store={store} />
         </div>
         <div className="grid grid-cols-2 gap-x-[60px] border-l border-lmu-border pl-[60px]">
-          <Timing label="SESSION BEST" seconds={best?.lapSeconds} />
-          <Timing label="BEST POSSIBLE" seconds={best?.bestPossibleSeconds} />
+          <Timing label="ESTIMATED LAP"><LiveEstimatedLap store={store} bestSeconds={best?.lapSeconds} /></Timing>
+          <Timing label="SESSION BEST">{formatLapTime(best?.lapSeconds)}</Timing>
         </div>
       </section>
       <LivePracticeHistory laps={snapshot.recentLaps} best={best} store={store} />

@@ -34,11 +34,18 @@ describe('laps left', () => {
     expect(computeLapsLeft(session, { ...gt3, estimatedLapTime: 0 }, overall, gt3Leader)).toEqual({ laps: 10, estimated: true });
     expect(computeLapsLeft(session, gt3, { ...overall, finishStatus: 1 }, gt3Leader)).toEqual({ laps: 1, estimated: false });
   });
-  it('is null off a race, without a player and after the flag', () => {
+  it('counts qualifying laps from the player own lap start and estimate, the lap in progress at the clock end included', () => {
+    // The clock ends at 1200 s; laps of 100 s from 950 s: this lap, then the one from 1050 s, which runs past the end.
+    const player = vehicleReading({ id: 7, totalLaps: 8, lapStartEt: 950, estimatedLapTime: 100 });
+    expect(computeLapsLeft({ ...timedRace, kind: 'qualifying' }, player, null)).toEqual({ laps: 3, estimated: true });
+    expect(computeLapsLeft({ ...timedRace, kind: 'qualifying' }, vehicleReading({ id: 7, lapStartEt: 950, estimatedLapTime: 0 }), null)).toBeNull();
+  });
+
+  it('is null off a race and qualifying, without a player and after the flag', () => {
     const leader = vehicleReading({ id: 1, place: 1, lapStartEt: 0, estimatedLapTime: 100 });
     const player = vehicleReading({ id: 7, totalLaps: 21, lapStartEt: 5 });
     expect(computeLapsLeft(timedRace, player, leader)).toEqual({ laps: 12, estimated: true });
-    expect(computeLapsLeft({ ...timedRace, kind: 'qualifying' }, player, leader)).toBeNull();
+    expect(computeLapsLeft({ ...timedRace, kind: 'practice' }, player, leader)).toBeNull();
     expect(computeLapsLeft(null, player, leader)).toBeNull();
     expect(computeLapsLeft(timedRace, null, leader)).toBeNull();
     expect(computeLapsLeft(timedRace, vehicleReading({ id: 7, finishStatus: 1 }), leader)).toBeNull();

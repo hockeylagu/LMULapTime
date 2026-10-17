@@ -3,10 +3,11 @@ import type { LiveForecast, LivePitInfo, LiveResourcePlan, LiveTyres } from '../
 import { UNKNOWN } from '../liveFormat.js';
 import { LIVE_TYRE_TREAD_FLOOR } from '../../../../shared/domain/live/liveInsights.js';
 import {
-  CORNER_NAMES, formatAmount, formatPerLap, formatSecondsRange, formatSignedPerLap, isWetTyre, resourceName, tyreCallText,
+  CORNER_NAMES, compoundTone, formatAmount, formatPerLap, formatSecondsRange, formatSignedPerLap, resourceName, tyreCallText,
+  type CompoundTone,
 } from './livePlanFormat.js';
 
-export type PlanTone = 'gain' | 'loss' | 'warn' | 'wet' | 'muted' | null;
+export type PlanTone = 'gain' | 'loss' | 'warn' | 'muted' | CompoundTone | null;
 
 export interface PlanReadout {
   label: string;
@@ -59,7 +60,7 @@ function tyresCell(tyres: LiveTyres | null): PlanReadout {
     value: worst === null ? UNKNOWN : `${Math.round(worst * 100)}`,
     unit: worst === null ? undefined : '%',
     note: wear !== null ? `${(wear * 100).toFixed(1)}% / LAP` : tyres?.newSets === 0 ? 'NO NEW SETS' : undefined,
-    tone: tyres?.compound && isWetTyre(tyres.compound) ? 'wet' : null,
+    tone: compoundTone(tyres?.compound),
   };
 }
 
@@ -95,7 +96,7 @@ function tyreMfdCell(pit: LivePitInfo | null): PlanReadout {
   return {
     label: 'TYRES · MFD',
     value: tyreCallText(call),
-    tone: isWetTyre(call) ? 'wet' : null,
+    tone: compoundTone(call),
   };
 }
 
@@ -197,7 +198,7 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
     return {
       mode: 'sprint',
       action: {
-        label: 'CURRENT VS BEST', value: UNKNOWN,
+        label: 'ESTIMATED LAP', value: UNKNOWN,
       },
       cells: [{ label: `${name} AT FINISH`, value: `~${formatAmount(race.atFinish, unit)}`, unit }, tyresCell(tyres)],
     };

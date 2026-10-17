@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { LiveLapRecord, LiveSessionBest } from '../../../shared/types/live.js';
 import { useLiveTiming, type LiveTimingStore } from '../../api/liveStream.js';
 import { LiveDelta } from './LiveDelta.js';
@@ -7,6 +8,28 @@ export const HISTORY_ROWS = 2;
 
 const HEAD = 'px-5 text-left text-[48px] font-medium text-lmu-text-soft';
 const CELL = 'px-5 text-left font-mono text-[80px] font-medium leading-[1.08]';
+
+/** The game updates the lap clock 5 times a second; the clock runs on between updates for at most this long. */
+const CLOCK_RUN_ON_SECONDS = 0.25;
+
+/**
+ * The running lap clock, ticking on animation frames between the game's updates so it reads smoothly. It runs on
+ * from the last update for at most a quarter second (a pause or a lost stream holds it, never races ahead).
+ */
+function RunningClock({ seconds }: { seconds: number | null | undefined }) {
+  const [shown, setShown] = useState(seconds);
+  useEffect(() => {
+    setShown(seconds);
+    if (seconds == null || typeof requestAnimationFrame !== 'function') return undefined;
+    const start = performance.now();
+    let frame = requestAnimationFrame(function tick(now) {
+      setShown(seconds + Math.min(CLOCK_RUN_ON_SECONDS, Math.max(0, (now - start) / 1000)));
+      frame = requestAnimationFrame(tick);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [seconds]);
+  return <>{formatRunningTime(shown)}</>;
+}
 
 /** A lap against the session best; unknown for an invalid lap or before a best exists. */
 function vsBest(lap: LiveLapRecord, best: LiveSessionBest | null): number | null {
@@ -22,7 +45,7 @@ function CurrentLapRow({ store }: { store: LiveTimingStore }) {
   return (
     <tr data-testid="live-history-current" className="border-b border-lmu-border bg-lmu-card font-bold">
       <th scope="row" className={CELL}>{timing?.lapNumber ?? UNKNOWN}</th>
-      <td className={CELL}>{formatRunningTime(timing?.lapElapsedSeconds)}</td>
+      <td className={CELL}><RunningClock seconds={timing?.lapElapsedSeconds} /></td>
       {[0, 1, 2].map((index) => (
         <td key={index} className={CELL}>{formatSectorTime(timing?.sectors[index])}</td>
       ))}

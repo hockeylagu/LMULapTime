@@ -1,4 +1,5 @@
 import type { GarageCheck } from './liveScreens.js';
+import { COMPOUND_CLASS, compoundTone } from './race/livePlanFormat.js';
 import { RACE_COLUMN, RACE_LEAD, RACE_ROW, RULED, UNRULED } from './raceColumns.js';
 
 const ACTION_TONE: Record<NonNullable<GarageCheck['action']>['tone'], string> = {
@@ -42,7 +43,10 @@ export function LiveGarageChecklist({ checks }: { checks: GarageCheck[] }) {
           className={`${RACE_ROW} items-center border-t border-lmu-border py-6`}
         >
           <div className={RACE_LEAD}>
-            <h2 className="whitespace-nowrap text-[64px] font-semibold text-lmu-text">{check.label}</h2>
+            <h2 className="whitespace-nowrap text-[64px] font-semibold text-lmu-text">
+              {check.label}
+              {check.compound && <> · <span className={COMPOUND_CLASS[compoundTone(check.compound) ?? 'hard']}>{check.compound}</span></>}
+            </h2>
             {check.note && <p className="mt-3 text-[36px] font-semibold text-lmu-muted">{check.note}</p>}
           </div>
           <div className={`${RACE_COLUMN} ${RULED}`}><Value text={check.target} unit={check.unit} /></div>

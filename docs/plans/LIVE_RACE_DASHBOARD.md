@@ -83,18 +83,18 @@ critique. The placement brief, at 2560 x 1440, read in glances:
 - **Every driving view:** session bar (session, track and class, laps left in races, PR,
   one weather slot), the 30-second full-width pedal trace (curves and grid only), no
   paragraph text; labels about 48 px, supporting readouts 80-96 px, primary values larger.
-- **Practice:** last lap largest, session best and best possible, a current-lap sector row
+- **Practice:** last lap largest, the estimated lap (session best plus the running delta) and session best, a current-lap sector row
   followed by two completed laps and a `BEST` row of best sectors; no fuel figures.
   S1 and S2 fill from the game's cumulative timing fields at each crossing (S2 = cumulative S2 minus S1),
   independently of whether a session best exists, beside the lap number and the running lap clock. Uncrossed
   sectors remain unknown; at the finish the row becomes the top completed lap (S3 = lap time minus cumulative S2)
   and a new current row starts. Out laps have no current splits.
-- **Qualifying:** `PUSH LAP · VS BEST` with the live delta beside session best, best possible and
-  position; tyre surface temperature with S1/S2/S3 vs best; then the `LAST LAP` row; no fuel or VE,
+- **Qualifying:** `PUSH LAP · VS BEST` with the live delta and the position under it, beside the estimated lap,
+  session best and laps left; tyre surface temperature with S1/S2/S3 vs best; then the `LAST LAP` row; no fuel or VE,
   no valid flag (the HUD has it). Same columns as the race rows.
 - **Race, pit coming:** `PIT IN 2 LAPS` (then `PIT THIS LAP`), `VE · MFD` or `FUEL · MFD`
   and `TYRES · MFD` (`NEW MEDIUM`, `NEW WET`, `NO CHANGE`, compound coloured, forecast note
-  under it); current lap vs best with sector deltas, then `LAST LAP` with real sectors.
+  under it); the estimated lap with sector deltas, then `LAST LAP` with real sectors.
 - **Race, mid-stint (accepted):** `VE / LAP · LAST 3` with spare per lap, `PIT IN 6 LAPS`, `TYRES TO
   PIT OK`, rain lap when forecast. **Sprint:** current-lap delta against the session best
   leads, with projected resource at the finish and reserve coverage secondary. Tyre
@@ -348,9 +348,10 @@ must not back-pressure the simulation reader or create an unbounded queue.
 SSE is a reasonable initial browser transport for advice-only data; compare it
 with WebSocket only if measured load/latency or future control requirements justify it.
 Preserve the zero-dependency path where practical and use an explicit snapshot
-after reconnect. The browser never polls: it holds one stream and the server pushes state
+after reconnect. The browser holds one stream and the server pushes state
 changes, pedal batches only while driving, and a heartbeat every ~15 s so a dead connection
-shows as disconnected. `EventSource` retries by itself only while the server is unreachable. Do not query growing DuckDB files to supply the live pedal trace.
+shows as disconnected. `EventSource` gives up on an error status (a dev proxy error during a server restart left the
+page on `DATA LOST`, 2026-10-16), so the page reopens the stream every 2 s until the server answers. Do not query growing DuckDB files to supply the live pedal trace.
 
 **Effect on the existing app.** `/api/status` and `/api/scan/status` stay plain GETs; the
 analysis app polls scan progress once a second only while work runs and stops when idle,
@@ -569,6 +570,19 @@ Fixed during validation:
 - Menu/offline clears lap timing, weather, learned strategy and result carryover even if LMU retains the scoring buffer. Loading hides content while preserving event learning for the next stage.
 - Qualifying carryover survives a temporarily unresolved layout in the next session. Two different known layouts still invalidate carryover; a new practice cycle also clears prior qualifying.
 
-Checks: `npm test` — 2,987 passed, 56 skipped; `npm run build` — passed without warnings. The skips are existing optional fixture tests.
+### Fixes from the 2026-10-16 race weekend
+
+- Garage length and laps: LMU's `endEt` is a session time, not a length (a 3-minute practice ended at 210 s, so the
+  garage said 4 MIN and ~3 laps). The garage now uses the time left, and the out lap of practice or qualifying is one
+  of the laps the clock allows (only a race adds its formation lap). On the race grid `endEt` is the countdown to the
+  start (64 s), so the race garage shows `LAPS AT THE START` until the green flag. The race length could come from
+  `GetSessionsInfoForEvent` (`lengthTime`, seen once in practice), not read yet.
+- A puncture is not wear: the flat read 0% tread, its lap counted as 49% wear, and after the tyre change the fitted set
+  read 0% at the finish. A drop of more than 15% in one lap now restarts the wear measurement.
+- The estimated lap (session best plus the running delta) replaces `CURRENT VS BEST` in the race and `BEST POSSIBLE`
+  in practice and qualifying; qualifying shows its laps left. Compounds read in their sidewall colours.
+- The running lap clock ticks smoothly between the game's 5 updates a second; a lost stream reconnects by itself.
+
+Checks: `npm test` — 2,991 passed, 56 skipped; `npm run build` — passed without warnings. The skips are existing optional fixture tests.
 
 Remaining live confirmation: record an online practice → qualifying → race event, a practice-only server and a single-player race-only start. Confirm navigation/phase timing, full-field qualifying finish flags, garage REST availability and formation behavior against these expectations. Missing or incomplete full-field finish data intentionally keeps qualifying provisional. Scoring-only fixtures cannot establish that every LMU server supplies those fields at the same moment.

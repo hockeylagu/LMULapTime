@@ -4,13 +4,14 @@ import { LiveDamageTracker, LiveTyreTracker, worstTread } from './liveCarConditi
 import type { LiveCarReading, LiveVehicleCondition } from './liveCarCondition.js';
 import { nextForecastChange } from './liveForecast.js';
 import type { LiveForecastNode } from './liveForecast.js';
+import { liveSessionKind } from './liveLifecycle.js';
 import type { LiveScoringReading, LiveState } from './liveLifecycle.js';
 import { liveResourceKind, planGarage, planRace, resourceUnit } from './liveResourcePlan.js';
 import { LiveUsageMeter } from './liveUsage.js';
 import { planFuelRatio, savingToFinish, tyreCoverage } from './liveInsights.js';
 import { RAIN_WET_MIN } from '../lapConditions.js';
 import type { LiveUsageObservation } from '../../types/liveAudit.js';
-import { normalizeCarClass, VEHICLE_CLASS_OPTIONS } from '../vehicleMapping.js';
+import { classLeaderLapSeconds } from './liveLapsLeft.js';
 
 /** One parsed answer of LMU's local REST API (server/live/lmuPitRest.ts). */
 /** The garage's selected tyre set, as `TireManagement` reports it. */
@@ -343,18 +344,18 @@ export class LiveStrategyTracker {
   }
 
   private garagePlan(kind: LiveResourceKind, reading: LiveScoringReading, resource: LiveResourcePlan, reserveLaps: number): LiveGaragePlan {
-    const sessionSeconds = reading.endEt > 0 && reading.endEt < 1_000_000 ? reading.endEt : null;
+    const race = liveSessionKind(reading.sessionCode) === 'race';
+    // `endEt` is a session time, not a length: what is left is the time to it. Before a race's green flag it is the
+    // countdown to the start, not the race (seen live 2026-10-16: 64 s on the grid, the race end only from the green).
+    const sessionSeconds = (race && reading.gamePhase < GREEN) || !(reading.endEt > 0 && reading.endEt < 1_000_000) ? null
+      : Math.max(0, reading.endEt - Math.max(0, reading.currentEt));
     const estimated = reading.player && reading.player.estimatedLapTime > 0 ? reading.player.estimatedLapTime : null;
-    const playerClass = normalizeCarClass(reading.player?.vehicleClass);
-    const knownClass = playerClass !== 'All' && VEHICLE_CLASS_OPTIONS.some(option => option.id === playerClass);
-    const classEstimate = reading.classLeader && knownClass
-      && normalizeCarClass(reading.classLeader.vehicleClass) === playerClass && reading.classLeader.estimatedLapTime > 0
-      ? reading.classLeader.estimatedLapTime : null;
-    const lapSeconds = classEstimate ?? median(this.eventLaps) ?? estimated;
+    const lapSeconds = classLeaderLapSeconds(reading.player, reading.classLeader) ?? median(this.eventLaps) ?? estimated;
     const plan = planGarage({
       kind,
       sessionSeconds,
-      raceLeaderLapSeconds: reading.sessionCode >= 10 && reading.sessionCode <= 13 ? reading.leader?.estimatedLapTime ?? null : null,
+      formationLap: race,
+      raceLeaderLapSeconds: race ? reading.leader?.estimatedLapTime ?? null : null,
       lapSeconds: lapSeconds === null ? null : round(lapSeconds, 3),
       perLap: resource.perLap,
       perLapSource: resource.perLapSource,

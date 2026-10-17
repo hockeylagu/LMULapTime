@@ -79,12 +79,17 @@ export function planRace(input: RacePlanInput): LiveRacePlan {
   };
 }
 
-/** Laps of a timed session: the laps started before the clock ends, plus the out lap (or the formation lap in a race). */
-export function sessionLaps(sessionSeconds: number, lapSeconds: number): number {
-  return Math.ceil(sessionSeconds / lapSeconds) + 1;
+/**
+ * Laps of a timed session: the laps started before the clock ends (the out lap of practice or qualifying is one of
+ * them), plus the formation lap of a race, run before its clock starts.
+ */
+export function sessionLaps(sessionSeconds: number, lapSeconds: number, formationLap: boolean): number {
+  return Math.ceil(sessionSeconds / lapSeconds) + (formationLap ? 1 : 0);
 }
 
 export interface GaragePlanInput {
+  /** A race: one formation lap is run before the clock starts. */
+  formationLap: boolean;
   /** Race only: overall leader pace predicts the flag, then the player's class pace converts that horizon to laps. */
   raceLeaderLapSeconds?: number | null;
   kind: LiveResourceKind;
@@ -104,14 +109,15 @@ export function planGarage(input: GaragePlanInput): Omit<LiveGaragePlan, 'tyres'
   const flagSeconds = sessionSeconds !== null && input.raceLeaderLapSeconds != null
     ? projectRaceFlagSeconds(sessionSeconds, 0, input.raceLeaderLapSeconds) : null;
   const laps = sessionSeconds !== null && lapSeconds !== null && sessionSeconds > 0 && lapSeconds > 0
-    ? sessionLaps(flagSeconds ?? sessionSeconds, lapSeconds) : null;
+    ? sessionLaps(flagSeconds ?? sessionSeconds, lapSeconds, input.formationLap) : null;
   const total = laps !== null && perLap !== null ? (laps + reserveLaps) * perLap : null;
   const selected = input.setInGarage;
-  // Garage laps include one formation/out lap. Deduct its estimated use before applying racing-lap numbering.
-  const firstPit = laps !== null && laps > 1 && perLap !== null && Number.isFinite(perLap) && perLap > 0
-    && selected !== null && Number.isFinite(selected) && selected > perLap * (1 + reserveLaps)
-    ? planRace({ amount: Math.max(0, (capacity !== null ? Math.min(selected, capacity) : selected) - perLap),
-      perLap, reserveLaps, capacity, lapsLeft: laps - 1, lapFraction: 0, lapNumber: 1 }) : null;
+  // A race's laps include the formation lap: deduct its estimated use before applying racing-lap numbering.
+  const formation = input.formationLap ? 1 : 0;
+  const firstPit = laps !== null && laps > formation && perLap !== null && Number.isFinite(perLap) && perLap > 0
+    && selected !== null && Number.isFinite(selected) && selected > perLap * (formation + reserveLaps)
+    ? planRace({ amount: Math.max(0, (capacity !== null ? Math.min(selected, capacity) : selected) - perLap * formation),
+      perLap, reserveLaps, capacity, lapsLeft: laps - formation, lapFraction: 0, lapNumber: 1 }) : null;
   return {
     kind,
     unit: resourceUnit(kind),

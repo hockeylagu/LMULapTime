@@ -14,6 +14,8 @@ export interface GarageCheck {
   /** `ok` when the garage already matches, `change` when the driver must act, `warn` when they cannot. */
   action: { text: string; tone: 'ok' | 'change' | 'warn' } | null;
   note?: string;
+  /** The tyre compound shown after the label, in its colour. */
+  compound?: string;
 }
 
 export interface LiveScreen {
@@ -25,7 +27,7 @@ export interface LiveScreen {
   checks: GarageCheck[];
   /** The pedal trace stays for an input check (starting) and while driving. */
   showTrace: boolean;
-  preparation?: { laps: number | null; minutes: number | null; stopPlan: string | null };
+  preparation?: { laps: number | null; length: string; stopPlan: string | null };
 }
 
 const KIND_LABELS: Record<LiveSessionKind, string> = {
@@ -71,13 +73,14 @@ function resourceCheck(plan: LiveGaragePlan): GarageCheck {
  * reads as a change to make (or a warning with no new sets left). In practice any set is fine.
  */
 function tyreCheck(tyres: LiveGarageTyres | null, wantNew: boolean): GarageCheck {
-  const label = tyres?.compound ? `TYRES · ${tyres.compound.toUpperCase()}` : 'TYRES';
+  const label = 'TYRES';
+  const compound = tyres?.compound ? tyres.compound.toUpperCase() : undefined;
   const current = !tyres ? UNKNOWN : tyres.used ? `USED ${Math.round(tyres.wear * 100)}%` : 'NEW';
-  if (!wantNew) return { label, target: 'ANY', current, action: null };
+  if (!wantNew) return { label, compound, target: 'ANY', current, action: null };
   const action: GarageCheck['action'] = !tyres ? null
     : !tyres.used ? { text: 'OK', tone: 'ok' }
       : tyres.newSets === 0 ? { text: 'NO NEW SETS', tone: 'warn' } : { text: 'FIT NEW', tone: 'change' };
-  return { label, target: 'NEW', current, action };
+  return { label, compound, target: 'NEW', current, action };
 }
 
 /** The game's name for the track, as on its own screens (the same text in the bar and on every state screen). */
@@ -122,7 +125,10 @@ export function liveScreen(snapshot: LiveSnapshot): LiveScreen {
       return {
         title: kind,
         note: plan ? qualiNote : 'WAITING FOR GARAGE DATA',
-        preparation: plan ? { laps: session?.kind === 'race' && plan.laps !== null ? Math.max(0, plan.laps - 1) : plan.laps, minutes: plan.sessionMinutes, stopPlan: session?.kind !== 'race' ? null
+        // Before the green flag LMU's clock is the countdown to the start: the race length (and its laps) come with it.
+        preparation: plan ? { laps: session?.kind === 'race' && plan.laps !== null ? Math.max(0, plan.laps - 1) : plan.laps,
+          length: plan.sessionMinutes !== null ? `${plan.sessionMinutes} MIN` : session?.kind === 'race' ? 'LAPS AT THE START' : 'SESSION LENGTH UNKNOWN',
+          stopPlan: session?.kind !== 'race' || plan.sessionMinutes === null ? null
           : plan.stops === null ? 'STOPS UNKNOWN' : plan.stops === 0 ? 'NO STOP PLANNED'
             : `${plan.stops} STOP${plan.stops === 1 ? '' : 'S'} PLANNED · ${plan.firstPitLap != null ? `PIT ~LAP ${plan.firstPitLap}` : 'PIT LAP UNKNOWN'}` } : undefined,
         muted: false,

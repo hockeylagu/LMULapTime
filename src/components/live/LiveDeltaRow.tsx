@@ -1,6 +1,7 @@
 import { useLiveTiming, type LiveTimingStore } from '../../api/liveStream.js';
 import { activeSectorDelta } from '../../../shared/domain/live/liveLapTiming.js';
 import { LiveDelta } from './LiveDelta.js';
+import { LiveEstimatedLap } from './LiveEstimatedLap.js';
 import { UNKNOWN } from './liveFormat.js';
 import { RACE_COLUMN, RACE_LEAD, RACE_ROW, RULED } from './raceColumns.js';
 
@@ -10,11 +11,13 @@ const VALUE = 'mt-3 whitespace-nowrap font-mono text-[96px] font-bold leading-[1
 const LABEL = 'text-[48px] font-semibold text-lmu-text-soft';
 
 /**
- * The sectors against the session best (the one in progress live, the done ones final), led by the current lap
- * against the best in a race or by the tyre surface average in qualifying, where the delta is the page's lead.
- * Renders at 5 Hz.
+ * The sectors against the session best (the one in progress live, the done ones final), led by the estimated time
+ * of the lap in progress in a race, or by the tyre surface average where the page already leads with the lap.
+ * Renders at the timing rate.
  */
-export function LiveDeltaRow({ store, lead, testId }: { store: LiveTimingStore; lead: 'delta' | 'tyres'; testId: string }) {
+export function LiveDeltaRow({ store, lead, testId, bestSeconds }: {
+  store: LiveTimingStore; lead: 'estimate' | 'tyres'; testId: string; bestSeconds?: number | null;
+}) {
   const timing = useLiveTiming(store);
   const tyres = timing?.tyreSurfaceAvgC ?? null;
   return (
@@ -23,10 +26,10 @@ export function LiveDeltaRow({ store, lead, testId }: { store: LiveTimingStore; 
       data-testid={testId}
       className={`${RACE_ROW} h-[240px] shrink-0 items-center rounded-xl bg-lmu-card`}
     >
-      {lead === 'delta' ? (
+      {lead === 'estimate' ? (
         <div className={RACE_LEAD}>
-          <h2 className={LABEL}>CURRENT VS BEST</h2>
-          <div className={VALUE}><LiveDelta seconds={timing?.deltaSeconds ?? null} /></div>
+          <h2 className={LABEL}>ESTIMATED LAP</h2>
+          <div className={VALUE}><LiveEstimatedLap store={store} bestSeconds={bestSeconds} /></div>
         </div>
       ) : (
         <div className={RACE_LEAD}>

@@ -97,6 +97,17 @@ describe('LiveStrategyTracker', () => {
     expect(strategy?.garage).toMatchObject({ kind: 've', sessionMinutes: 15, laps: 13, lapSeconds: 75, perLap: 2.5, needed: 34, setInGarage: 50 });
   });
 
+  it('plans from the time left to the session end, and not from the countdown before a race', () => {
+    const tracker = new LiveStrategyTracker();
+    tracker.applyRest({ type: 'tireManagement', vePerLap: 2.5, fuelPerLap: 2.1, newSets: 40, selected: null });
+    // A 3-minute practice whose clock ends at 210 s (seen live): 3 minutes and two laps at 1:46 from 30 s.
+    const practice = at(30, { sessionCode: 1, inRealtime: false, endEt: 210, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 106 }) });
+    expect(context(tracker, practice, { lapsLeft: null })?.garage).toMatchObject({ sessionMinutes: 3, laps: 2 });
+    // On the race grid `endEt` is the 64 s countdown to the start: the race length is unknown until the green flag.
+    const grid = at(3, { inRealtime: false, gamePhase: 0, endEt: 64, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 103 }) });
+    expect(context(tracker, grid, { lapsLeft: null })?.garage).toMatchObject({ sessionMinutes: null, laps: null, needed: null });
+  });
+
   it('says the next forecast change of this session on the lap it lands', () => {
     const tracker = new LiveStrategyTracker();
     tracker.applyRest({ type: 'forecast', sessions: { RACE: [{ fraction: 0, rainChance: 0 }, { fraction: 0.5, rainChance: 60 }, { fraction: 1, rainChance: 60 }] } });

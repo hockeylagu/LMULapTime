@@ -27,7 +27,7 @@ export const PEDAL_FLUSH_MS = 40;
 /** Samples kept between two flushes; more than this means the reader outruns the stream, and the oldest go. */
 const MAX_BUFFERED_PEDALS = 250;
 /** `timing` events go out at most this often (the scoring buffer itself updates 5 times a second). */
-export const TIMING_MIN_INTERVAL_MS = 180;
+export const TIMING_MIN_INTERVAL_MS = 100;
 const WORKER_RESTART_MS = 3000;
 
 export type LiveWorker = Pick<Worker, 'on' | 'postMessage' | 'terminate' | 'unref'>;

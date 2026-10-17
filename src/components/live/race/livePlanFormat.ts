@@ -33,5 +33,22 @@ export const CORNER_NAMES: Record<LiveCorner, string> = { FL: 'FRONT LEFT', FR: 
 /** The MFD's tyre text in the dashboard's voice: `NEW MEDIUM`, `NO CHANGE`. */
 export const tyreCallText = (setting: string | null): string => (setting ? setting.trim().toUpperCase() : UNKNOWN);
 
-/** A wet compound or tyre call reads blue; everything else stays plain. */
-export const isWetTyre = (text: string | null): boolean => text !== null && /wet|rain/i.test(text);
+export type CompoundTone = 'soft' | 'medium' | 'hard' | 'wet';
+
+/** The compound named in a compound or tyre call (`Medium`, `NEW WET`); null for `NO CHANGE` or an unknown name. */
+export function compoundTone(text: string | null | undefined): CompoundTone | null {
+  if (!text) return null;
+  if (/wet|rain/i.test(text)) return 'wet';
+  if (/soft/i.test(text)) return 'soft';
+  if (/medium/i.test(text)) return 'medium';
+  if (/hard/i.test(text)) return 'hard';
+  return null;
+}
+
+/** The sidewall colours of the sim convention: soft red, medium yellow, hard white, wet blue. */
+export const COMPOUND_CLASS: Record<CompoundTone, string> = {
+  soft: 'text-lmu-loss',
+  medium: 'text-lmu-warn',
+  hard: 'text-lmu-text',
+  wet: 'text-lmu-blue',
+};

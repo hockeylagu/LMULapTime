@@ -36,6 +36,8 @@ const PACE_LAPS = 2;
 const PACE_WINDOW = 3;
 /** A rise of the worst tyre's tread above this means new tyres: a new stint. */
 const NEW_TYRES_RISE = 0.05;
+/** More tread lost in one lap than this is damage, not wear (normal wear is well under 5% a lap). */
+const MAX_LAP_WEAR = 0.15;
 
 const mean = (values: readonly number[]): number => values.reduce((sum, value) => sum + value, 0) / values.length;
 const round = (value: number, digits: number): number => Math.round(value * 10 ** digits) / 10 ** digits;
@@ -151,6 +153,9 @@ export class LiveTyreTracker {
     if (worst === null) return;
     const last = this.stint[this.stint.length - 1];
     if (last !== undefined && worst > last + NEW_TYRES_RISE) this.stint = [];
+    // A drop no lap of wear makes is a puncture or a lost wheel, not wear: the wear starts again from the next tyres
+    // (seen live 2026-10-16: a flat read 0, and its 49% a lap of "wear" left the fitted set at 0% to the finish).
+    else if (last !== undefined && last - worst > MAX_LAP_WEAR) { this.stint = []; return; }
     this.stint.push(worst);
   }
 

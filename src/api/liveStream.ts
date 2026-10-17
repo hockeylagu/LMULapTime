@@ -5,6 +5,8 @@ import { fetchJson, postJson } from './apiClient.js';
 
 /** No message (heartbeats included) for this long means the connection is dead even if the browser has not noticed. */
 export const LIVE_SILENCE_MS = LIVE_HEARTBEAT_MS * 2.5;
+/** After a lost stream, how long before the page opens it again (and again, until the server answers). */
+export const LIVE_RETRY_MS = 2000;
 
 export type LiveConnection = 'connecting' | 'live' | 'disconnected';
 
@@ -64,43 +66,57 @@ export function useLiveStream(options: LiveStreamOptions = {}): LiveStreamState 
   onPedals.current = options.onPedals;
 
   useEffect(() => {
-    const source = new EventSource('/api/live/stream');
+    let source: EventSource | null = null;
     let silence: ReturnType<typeof setTimeout> | undefined;
-    const heard = () => {
-      clearTimeout(silence);
-      silence = setTimeout(() => { timing.set(null); setConnection('disconnected'); }, LIVE_SILENCE_MS);
-    };
-    heard();
-    source.addEventListener(LIVE_STREAM_EVENTS.snapshot, (event) => {
-      const next = parse<LiveSnapshot>(event);
-      if (!next) return;
-      heard();
-      // Timing is only sent on track; whatever was left from before must not show on another screen.
-      if (next.lifecycle !== 'driving') timing.set(null);
-      setSnapshot(next);
-      setConnection('live');
-    });
-    source.addEventListener(LIVE_STREAM_EVENTS.timing, (event) => {
-      const next = parse<LiveTiming>(event);
-      if (!next) return;
-      heard();
-      timing.set(next);
-    });
-    source.addEventListener(LIVE_STREAM_EVENTS.pedals, (event) => {
-      const batch = parse<LivePedalBatch>(event);
-      if (!batch) return;
-      heard();
-      onPedals.current?.(batch);
-    });
-    source.addEventListener(LIVE_STREAM_EVENTS.heartbeat, heard);
-    source.addEventListener('error', () => {
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    // A lost stream (server restart, proxy error, silence) is closed and opened again until the server answers:
+    // EventSource gives up by itself on an error status, and the page must recover mid-session without a reload.
+    const lost = () => {
       clearTimeout(silence);
       timing.set(null);
       setConnection('disconnected');
-    });
+      source?.close();
+      clearTimeout(retry);
+      retry = setTimeout(connect, LIVE_RETRY_MS);
+    };
+    const heard = () => {
+      clearTimeout(silence);
+      silence = setTimeout(lost, LIVE_SILENCE_MS);
+    };
+    function connect(): void {
+      source?.close();
+      const next = new EventSource('/api/live/stream');
+      source = next;
+      heard();
+      next.addEventListener(LIVE_STREAM_EVENTS.snapshot, (event) => {
+        const snapshot = parse<LiveSnapshot>(event);
+        if (!snapshot) return;
+        heard();
+        // Timing is only sent on track; whatever was left from before must not show on another screen.
+        if (snapshot.lifecycle !== 'driving') timing.set(null);
+        setSnapshot(snapshot);
+        setConnection('live');
+      });
+      next.addEventListener(LIVE_STREAM_EVENTS.timing, (event) => {
+        const value = parse<LiveTiming>(event);
+        if (!value) return;
+        heard();
+        timing.set(value);
+      });
+      next.addEventListener(LIVE_STREAM_EVENTS.pedals, (event) => {
+        const batch = parse<LivePedalBatch>(event);
+        if (!batch) return;
+        heard();
+        onPedals.current?.(batch);
+      });
+      next.addEventListener(LIVE_STREAM_EVENTS.heartbeat, heard);
+      next.addEventListener('error', lost);
+    }
+    connect();
     return () => {
       clearTimeout(silence);
-      source.close();
+      clearTimeout(retry);
+      source?.close();
     };
   }, [timing]);
 

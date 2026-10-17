@@ -20,6 +20,12 @@ export function normalizeCarClass(carClass?: string | null): string {
   }
 }
 
+/** The app's canonical class for a game class label, or null when the label is not one of its classes. */
+export function knownCarClass(carClass?: string | null): string | null {
+  const id = normalizeCarClass(carClass);
+  return id !== 'All' && VEHICLE_CLASS_OPTIONS.some(option => option.id === id) ? id : null;
+}
+
 export interface CarClassOption {
   id: string;
   label: string;

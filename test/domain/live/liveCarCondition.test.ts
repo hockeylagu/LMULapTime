@@ -65,6 +65,15 @@ describe('LiveTyreTracker', () => {
     tyres.lapCompleted(1);
     expect(tyres.tyres('Medium', null, null)).toEqual({ compound: 'Medium', worst: null, worstCorner: null, wearPerLap: null, newSets: null });
   });
+
+  it('takes a puncture for damage, not wear, and measures the wear again on the tyres after it', () => {
+    // Seen live: a flat read 0 at the crossing into the pits, then the changed tyre read 93%.
+    const tyres = new LiveTyreTracker();
+    for (const worst of [0.977, 0.973, 0, 0.93, 0.926]) tyres.lapCompleted(worst);
+    expect(tyres.tyres('Medium', null, null).wearPerLap).toBeNull();
+    tyres.lapCompleted(0.922);
+    expect(tyres.tyres('Medium', null, null).wearPerLap).toBe(0.004);
+  });
 });
 
 describe('nextForecastChange', () => {

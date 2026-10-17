@@ -517,12 +517,24 @@ screens, built by `liveScreen(snapshot)`), and `LivePedalTrace` (canvas, redrawn
 ring in `pedalBuffer.ts`). `src/api/useAppEvents.ts` is the app-wide `GET /api/events` listener used by
 `useAppData` (scan-started restarts scan polling, scan-finished reloads data). Settings card:
 `settings/LiveDashboardCard.tsx` (`autoOpen`, VE/fuel reserve laps). Tests use `test/helpers/fakeEventSource.ts` and `test/helpers/liveSnapshot.ts`.
-Step 2 (identity and timing): the 5 Hz `timing` event goes into `LiveTimingStore` (returned by `useLiveStream` as
-`timing`, read with `useLiveTiming` / `useSyncExternalStore`), so only the timing parts render, not the page. The
-driving content is `LiveDriving` by session kind: `LiveRaceView`, `LiveQualiView` (push lap delta beside session best,
-best possible and place; tyre average and sector deltas in `LiveDeltaRow`), `LivePracticeView` (also warmup and unknown) with `LivePracticeHistory`: its current-lap row shows the lap
-number, the running lap clock (`LiveTiming.lapElapsedSeconds`, `formatRunningTime`) and S1/S2 as each line is crossed;
+Step 2 (identity and timing): the `timing` event (each scoring update, about 5 a second; sent at most every 100 ms)
+goes into `LiveTimingStore` (returned by `useLiveStream` as `timing`, read with `useLiveTiming` /
+`useSyncExternalStore`), so only the timing parts render, not the page. `useLiveStream` reopens a lost stream every
+2 s (`LIVE_RETRY_MS`: server restart, proxy error or silence) until the server answers, so `DATA LOST` recovers
+without a reload. `LiveEstimatedLap` shows the lap in progress projected to the line (session best plus the running
+delta). The driving content is `LiveDriving` by session kind: `LiveRaceView` (`LiveDeltaRow` led by the estimated
+lap; a sprint's lead readout is the estimated lap), `LiveQualiView` (push lap delta with the place under it, beside
+the estimated lap, session best and laps left; tyre average and sector deltas in `LiveDeltaRow`), `LivePracticeView`
+(also warmup and unknown: last lap, estimated lap, session best) with `LivePracticeHistory`: its current-lap row shows the lap
+number, the running lap clock (`LiveTiming.lapElapsedSeconds`, `formatRunningTime`; `RunningClock` ticks on animation
+frames up to 0.25 s past the last update) and S1/S2 as each line is crossed;
 at the finish it becomes the top completed row. The two completed laps and BEST row stay visible.
+`computeLapsLeft` covers races and qualifying (the player's own laps to the first crossing after the clock ends);
+the race uses `classLeaderLapSeconds` (`liveLapsLeft.ts`), and class checks go through `knownCarClass`
+(`shared/domain/vehicleMapping.ts`). Garage plans use the time left (`endEt - currentEt`: `endEt` is a session time,
+not a length) and count a formation lap only in a race; on the race grid `endEt` is the countdown to the start, so
+the race length and laps wait for the green flag. `LiveTyreTracker` takes a drop of more than 15% tread in one lap for
+a puncture, not wear. Compounds read in their sidewall colours (`compoundTone`, `COMPOUND_CLASS` in `livePlanFormat.ts`).
 `LiveSessionBar` carries the track (`liveTrackName`: the game's name, else the layout), laps left, PR and one fixed
 520 px weather slot, first on the right: on a wet track (rain or path wetness above 0) `TRACK WET n%` with the
 wetness trend arrow from `liveWeather.ts` (wetter or drying by 0.05 over 5 min), else the forecast change in blue,

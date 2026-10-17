@@ -91,15 +91,16 @@ describe('live driving views', () => {
     const race = () => liveSnapshot({
       lapsLeft: { laps: 12, estimated: true },
       recentLaps: [liveLap(12, 121.832, [37.204, 45.116, 39.512])],
+      sessionBest: BEST,
     });
 
-    it('shows the delta row with signed gains and losses, the running delta of the sector in progress, and the last lap with its sectors', () => {
+    it('shows the estimated lap, the sectors with signed gains and losses, the running delta of the sector in progress, and the last lap', () => {
       render(<LivePage />);
       send(race());
       timing(liveTiming({ deltaSeconds: -0.184, sectorDeltas: [-0.12, 0.064, null], sector: 3 }));
       const row = screen.getByTestId('live-race-deltas');
-      expect(row).toHaveTextContent('CURRENT VS BEST');
-      expect(within(row).getByText('−0.184')).toHaveAttribute('data-delta', 'gain');
+      // The session best plus the running delta.
+      expect(row).toHaveTextContent('ESTIMATED LAP2:01.222');
       expect(within(row).getByText('−0.120')).toHaveAttribute('data-delta', 'gain');
       expect(within(row).getByText('+0.064')).toHaveAttribute('data-delta', 'loss');
       // S3 in progress: the lap delta minus S1 and S2.
@@ -129,7 +130,7 @@ describe('live driving views', () => {
       const before = bar.renders;
       timing(liveTiming({ deltaSeconds: -0.1 }));
       timing(liveTiming({ deltaSeconds: 0.25 }));
-      expect(screen.getByTestId('live-race-deltas')).toHaveTextContent('+0.250');
+      expect(screen.getByTestId('live-race-deltas')).toHaveTextContent('2:01.656');
       expect(bar.renders).toBe(before);
     });
 
@@ -146,9 +147,9 @@ describe('live driving views', () => {
   describe('qualifying', () => {
     const quali = () => liveSnapshot({ session: liveSession({ kind: 'qualifying' }), recentLaps: [LAPS[2]], sessionBest: BEST });
 
-    it('shows the push lap delta large, the session best, best possible and place, the tyre average slot held until sent, and the last lap', () => {
+    it('shows the push lap delta large with the place, the estimated lap, session best and laps left, the tyre average slot held until sent, and the last lap', () => {
       render(<LivePage />);
-      send(quali());
+      send({ ...quali(), lapsLeft: { laps: 3, estimated: true } });
       expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('PUSH LAP · VS BEST');
       expect(screen.getByTestId('live-push-delta')).toHaveTextContent('—');
       expect(screen.getByTestId('live-tyre-avg')).toHaveTextContent('—°C');
@@ -160,8 +161,9 @@ describe('live driving views', () => {
       expect(screen.getByTestId('live-tyre-avg')).toHaveTextContent('82°C');
       expect(screen.getByTestId('live-last-lap')).toHaveTextContent('2:01.832');
       expect(screen.getByTestId('live-quali-best')).toHaveTextContent('SESSION BEST2:01.406');
-      expect(screen.getByTestId('live-quali-possible')).toHaveTextContent('BEST POSSIBLE2:01.284');
-      expect(screen.getByTestId('live-quali-place')).toHaveTextContent('POSITIONP3');
+      expect(screen.getByTestId('live-quali-estimate')).toHaveTextContent('ESTIMATED LAP2:01.222');
+      expect(screen.getByTestId('live-quali-laps-left')).toHaveTextContent('LAPS LEFT~3');
+      expect(screen.getByTestId('live-quali-place')).toHaveTextContent('P3');
     });
 
     it('shows the sectors against the best as they are crossed, the one in progress refreshing with the lap delta', () => {
@@ -181,13 +183,13 @@ describe('live driving views', () => {
       session: liveSession({ kind }), recentLaps: LAPS, sessionBest: BEST, ...patch,
     });
 
-    it('shows the last lap, session best, best possible, the history table and the BEST row', () => {
+    it('shows the last lap, the estimated lap, session best, the history table and the BEST row', () => {
       render(<LivePage />);
       send(practice());
       timing(liveTiming({ deltaSeconds: -0.184 }));
       expect(screen.getByTestId('live-practice-last')).toHaveTextContent('2:01.832');
       expect(screen.getByText('SESSION BEST').nextElementSibling).toHaveTextContent('2:01.406');
-      expect(screen.getByText('BEST POSSIBLE').nextElementSibling).toHaveTextContent('2:01.284');
+      expect(screen.getByText('ESTIMATED LAP').nextElementSibling).toHaveTextContent('2:01.222');
       expect(screen.getByTestId('live-practice-delta')).toHaveTextContent('−0.184');
       const rows = within(screen.getByTestId('live-history')).getAllByRole('row');
       // Header, current splits, two laps newest first, the BEST footer.

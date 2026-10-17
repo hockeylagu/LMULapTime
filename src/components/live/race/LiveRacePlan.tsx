@@ -1,16 +1,17 @@
 import type { ReactNode } from 'react';
-import { useLiveTiming, type LiveTimingStore } from '../../../api/liveStream.js';
+import type { LiveTimingStore } from '../../../api/liveStream.js';
 import type { LiveSnapshot } from '../../../../shared/types/live.js';
-import { LiveDelta } from '../LiveDelta.js';
+import { LiveEstimatedLap } from '../LiveEstimatedLap.js';
 import { RACE_COLUMN, RACE_LEAD, RACE_ROW, RULED } from '../raceColumns.js';
 import type { RacePlanView, PlanReadout, PlanTone } from './raceAction.js';
+import { COMPOUND_CLASS } from './livePlanFormat.js';
 
 const TONE: Record<Exclude<PlanTone, null>, string> = {
   gain: 'text-lmu-gain',
   loss: 'text-lmu-loss',
   warn: 'text-lmu-warn',
-  wet: 'text-lmu-blue',
   muted: 'text-lmu-muted',
+  ...COMPOUND_CLASS,
 };
 const tone = (value: PlanTone | undefined): string => (value ? TONE[value] : '');
 
@@ -39,14 +40,8 @@ function Readout({ readout, size, testId, children }: { readout: PlanReadout; si
   );
 }
 
-/** Only this readout subscribes to the 5 Hz timing stream; strategy and the page stay on snapshots. */
-function SprintDelta({ store }: { store: LiveTimingStore }) {
-  const timing = useLiveTiming(store);
-  return <LiveDelta seconds={timing?.deltaSeconds ?? null} />;
-}
-
 /**
- * The race advice: one lead readout (pit countdown, per-lap use mid-stint, lap delta in a sprint, pit now)
+ * The race advice: one lead readout (pit countdown, per-lap use mid-stint, the estimated lap in a sprint, pit now)
  * and the supporting values. A finish-covered sprint gives pace two columns and keeps only resource and tread.
  */
 export function LiveRacePlan({ snapshot, view, store }: { snapshot: LiveSnapshot; view: RacePlanView; store: LiveTimingStore }) {
@@ -61,7 +56,8 @@ export function LiveRacePlan({ snapshot, view, store }: { snapshot: LiveSnapshot
     >
       <div className={`${RACE_LEAD} ${view.mode === 'sprint' ? 'col-span-2' : ''}`}>
         <Readout readout={view.action} size="action" testId="live-race-action">
-          {view.mode === 'sprint' ? <SprintDelta store={store} /> : undefined}
+          {/* Only this readout follows the timing stream; strategy and the page stay on snapshots. */}
+          {view.mode === 'sprint' ? <LiveEstimatedLap store={store} bestSeconds={snapshot.sessionBest?.lapSeconds} /> : undefined}
         </Readout>
         <p data-testid="live-race-position" className="whitespace-nowrap font-mono text-[48px] font-semibold text-lmu-muted">
           LAP {lap ?? '—'} · {session?.playerPlace != null ? `P${session.playerPlace}` : '—'}
