@@ -92,8 +92,8 @@ describe('useDashboardMetrics', () => {
     expect(track?.km).toBeCloseTo((4653 / 1000) * 5, 5);
   });
 
-  it('averages the benchmark pace percentage across sessions with a recorded pace category', () => {
-    const sessions = [
+  it('requires three rated sessions before including a layout/class best pace', () => {
+    let sessions = [
       makeSession({
         id: 's-1',
         playerDriver: {
@@ -112,7 +112,7 @@ describe('useDashboardMetrics', () => {
       }),
     ];
 
-    const { result } = renderHook(() =>
+    const { result, rerender } = renderHook(() =>
       useDashboardMetrics({
         sessions,
         selectedTrack: 'All',
@@ -124,7 +124,32 @@ describe('useDashboardMetrics', () => {
       })
     );
 
-    expect(result.current.averageBenchmarkPacePercentage).toBe(103);
+    expect(result.current.averageBenchmarkPacePercentage).toBeNull();
+    sessions = [...sessions, makeSession({ id: 's-3', playerDriver: {
+      ...makeSession().playerDriver!, bestLapPacePercentage: 110, bestLapPaceCategory: 'Offline',
+    } })];
+    rerender();
+    expect(result.current.averageBenchmarkPacePercentage).toBe(101);
+    expect(result.current.averageBenchmarkPaceCategory).toBe('Competitive');
+  });
+
+  it('equally weights qualified layout/class bests, merging layout aliases and excluding wet or unrated sessions', () => {
+    const rated = (id: string, percentage: number, carClass = 'Hyper', venue = 'Monza', course = 'GP') => makeSession({
+      id, trackVenue: venue, trackCourse: course, trackLengthMeters: venue.includes('Curva') ? 3970 : 5793,
+      playerDriver: { ...makeSession().playerDriver!, carClass, bestLapPacePercentage: percentage, bestLapPaceCategory: 'Midpack' },
+    });
+    const wet = rated('wet', 80);
+    wet.playerDriver!.bestLapWet = true;
+    const unrated = rated('unrated', 70);
+    delete unrated.playerDriver!.bestLapPaceCategory;
+    const sessions = [rated('h1', 101), rated('h2', 110),
+      rated('h3', 120, 'Hyper', 'Autodromo Nazionale Monza', 'Grand Prix'), wet, unrated,
+      ...[106, 110, 120, 130].map((pace, i) => rated(`g${i}`, pace, 'GT3')),
+      rated('short1', 90, 'Hyper', 'Monza Curva Grande Circuit', 'Curva Grande'),
+      rated('short2', 95, 'Hyper', 'Monza Curva Grande Circuit', 'Curva Grande')];
+    const { result } = renderHook(() => useDashboardMetrics({ sessions, selectedTrack: 'All', selectedCarClass: 'All',
+      filterType: 'All', searchQuery: '', hideEmpty: false, sortBy: 'date-desc' }));
+    expect(result.current.averageBenchmarkPacePercentage).toBe(103.5);
     expect(result.current.averageBenchmarkPaceCategory).toBe('Good');
   });
 

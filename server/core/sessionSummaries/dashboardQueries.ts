@@ -3,7 +3,7 @@ import type { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
 import type { DashboardData, DashboardMetrics, DashboardTrends } from '../../../shared/types/dashboard.js';
 import { getDisplayTrackName } from '../../../shared/domain/formatters.js';
-import { calculateBenchmarkPace, createBenchmarkLookup, getPaceCategoryFromPercentage } from '../../../shared/domain/paceCategory.js';
+import { averageQualifiedBenchmarkPace, calculateBenchmarkPace, createBenchmarkLookup, getPaceCategoryFromPercentage, type BenchmarkPaceGroup } from '../../../shared/domain/paceCategory.js';
 import { createPaceCalculator } from '../../benchmarks/referenceLaptimes.js';
 import { findLayoutBenchmark } from '../../../shared/domain/leaderboard.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
@@ -40,18 +40,19 @@ function benchmarkMetrics(db: DatabaseType, entries: Record<string, ReferenceLap
     const key = `${layout}:${carClass}`;
     if (!targets.has(key) && entry.targets.alienSec > 0) targets.set(key, [layout, carClass, entry.targets.alienSec]);
   }
-  if (!targets.size) return { sum: 0, count: 0, best: [] as DashboardMetrics['bestTrackRefLaps'] };
+  if (!targets.size) return { average: null, best: [] as DashboardMetrics['bestTrackRefLaps'] };
   const values = [...targets.values()];
   const cte = `WITH targets(layout,car_class,target) AS (VALUES ${values.map(() => '(?,?,?)').join(',')}), rated AS (
-    SELECT s.session_id id,s.timestamp,s.track_venue,s.track_course,s.car_type,
+    SELECT s.session_id id,s.timestamp,s.track_venue,s.track_course,s.car_type,s.layout_key,s.car_class,
       s.best_lap_time lap_time,
       round(s.best_lap_time*100.0/t.target,2) percentage
     FROM session_summary_facts s
     JOIN targets t ON t.layout=s.layout_key AND t.car_class=s.car_class
     WHERE s.has_player=1 AND s.best_lap_wet=0 AND s.best_lap_time>0
   )`;
-  const totals = db.prepare(`${cte} SELECT coalesce(sum(percentage),0) sum,count(*) count FROM rated`)
-    .get(...values.flat()) as { sum: number; count: number };
+  const groups = db.prepare(`${cte}
+    SELECT count(*) sessionCount,min(percentage) bestPercentage FROM rated GROUP BY layout_key,car_class`)
+    .all(...values.flat()) as BenchmarkPaceGroup[];
   const rows = db.prepare(`${cte}, ranked AS (
     SELECT *,row_number() OVER(PARTITION BY track_venue,track_course ORDER BY percentage,timestamp,id) rank FROM rated
   ) SELECT * FROM ranked WHERE rank=1`).all(...values.flat()) as Array<{
@@ -66,7 +67,7 @@ function benchmarkMetrics(db: DatabaseType, entries: Record<string, ReferenceLap
       lapTime:row.lap_time,track,trackVenue:row.track_venue,trackCourse:row.track_course,car:row.car_type,
     });
   }
-  return {...totals,best:[...best.values()].sort((a,b)=>a.percentage-b.percentage)};
+  return {average:averageQualifiedBenchmarkPace(groups),best:[...best.values()].sort((a,b)=>a.percentage-b.percentage)};
 }
 
 function dashboardMetrics(db: DatabaseType, entries: Record<string, ReferenceLaptimeEntry>): DashboardMetrics {
@@ -104,7 +105,7 @@ function dashboardMetrics(db: DatabaseType, entries: Record<string, ReferenceLap
   }
   const benchmark = benchmarkMetrics(db,entries);
   const cleanPercentage = totals.total_laps > 0 ? Math.round((totals.clean_laps / totals.total_laps) * 1000) / 10 : 0;
-  const average = benchmark.count ? Math.round((benchmark.sum / benchmark.count) * 10) / 10 : null;
+  const average = benchmark.average;
   return {
     sessionsCount: totals.sessions_count,
     totalLaps: totals.total_laps, cleanLaps: totals.clean_laps, cleanLapsPercentage: cleanPercentage,

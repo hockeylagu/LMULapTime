@@ -17,6 +17,53 @@ const makeSession = (id: string, timestamp: number, lapTime: number): DetailedSe
 };
 
 describe('compact dashboard queries', () => {
+  it('averages one best pace per layout/class only after three dry rated sessions, using current targets', () => {
+    const db = new Database(':memory:');
+    try {
+      initDbSchema(db);
+      const entries = Object.fromEntries([
+        ['Monza', 'Hyper'], ['Monza', 'GT3'], ['Monza Curva Grande Circuit', 'Hyper'],
+      ].map(([trackName, carClass]) => {
+        const entry: ReferenceLaptimeEntry = { key: `${trackName}_${carClass}`, trackName, carClass, patch: 'test',
+          targets: { alienSec: 100, competitiveSec: 101, goodSec: 102, goodMidpackSec: 103,
+            midpackSec: 104, midpackTailSec: 105, tailEnderSec: 106, offlineSec: 107 } };
+        return [entry.key, entry];
+      }));
+      const insert = (id: string, lapTime: number, carClass = 'Hyper', venue = 'Monza', course = 'GP', wet = false) => {
+        const session = makeSession(id, 1, lapTime);
+        session.trackVenue = venue;
+        session.trackCourse = course;
+        session.trackLengthMeters = venue.includes('Curva') ? 3970 : 5793;
+        session.drivers[0].carClass = carClass;
+        session.drivers[0].bestLapWet = wet;
+        upsertSession(db, session, session.filePath, 1, 1);
+      };
+      insert('hyper1', 101);
+      insert('hyper2', 110);
+      insert('gt1', 106, 'GT3');
+      insert('gt2', 120, 'GT3');
+      insert('short1', 90, 'Hyper', 'Monza Curva Grande Circuit', 'Curva Grande');
+      insert('short2', 95, 'Hyper', 'Monza Curva Grande Circuit', 'Curva Grande');
+      insert('wet', 80, 'Hyper', 'Monza', 'GP', true);
+      insert('unrated', 70, 'Unknown');
+      const read = () => queryCompactDashboard(db, { referenceEntries: entries, track: 'Spa', pageSize: 1 });
+      expect(read().metrics.averageBenchmarkPacePercentage).toBeNull();
+      expect(read().metrics.averageBenchmarkPaceCategory).toBeNull();
+
+      // Canonical layout aliases share the session minimum, while classes and layouts do not.
+      insert('hyper3', 120, 'Hyper', 'Autodromo Nazionale Monza', 'Grand Prix');
+      insert('gt3', 110, 'GT3');
+      insert('gt4', 130, 'GT3');
+      expect(read().metrics).toMatchObject({ averageBenchmarkPacePercentage: 103.5, averageBenchmarkPaceCategory: 'Good' });
+      insert('short3', 98, 'Hyper', 'Monza Curva Grande Circuit', 'Curva Grande');
+      expect(read().metrics.averageBenchmarkPacePercentage).toBe(99);
+
+      entries.Monza_GT3.targets.alienSec = 106;
+      expect(read().metrics.averageBenchmarkPacePercentage).toBe(97);
+      expect(queryCompactDashboard(db, {}).metrics.averageBenchmarkPacePercentage).toBeNull();
+    } finally { db.close(); }
+  });
+
   it('keeps best benchmark pace selection, ties, wet exclusion and layout/class targets without ingest ratings', () => {
     const db = new Database(':memory:');
     try {
@@ -50,7 +97,7 @@ describe('compact dashboard queries', () => {
         { sessionId: 'tie-first', percentage: 100.51, category: 'Competitive' },
         { sessionId: 'short', percentage: 105, category: 'Midpack' },
       ]);
-      expect(first.metrics.averageBenchmarkPacePercentage).toBe(102);
+      expect(first.metrics.averageBenchmarkPacePercentage).toBeNull();
       expect(first.trends.recentPaceTrend.map(point => point.id)).not.toContain('wet');
       // A slower raw lap can have the best benchmark pace for its class after a target refresh.
       gt3.targets.alienSec = 102;
@@ -58,7 +105,7 @@ describe('compact dashboard queries', () => {
         { sessionId: 'gt3', percentage: 100, category: 'Alien' },
         { sessionId: 'short', percentage: 105, category: 'Midpack' },
       ]);
-      expect(read().metrics.averageBenchmarkPacePercentage).toBe(101.5);
+      expect(read().metrics.averageBenchmarkPacePercentage).toBeNull();
 
       // Preserve the existing SQLite rounding of dashboard history at a binary rounding tie.
       // JS display/trend rounding historically differs here; centralizing it must not change
@@ -119,7 +166,7 @@ describe('compact dashboard queries', () => {
     expect(result.metrics).toMatchObject({
       sessionsCount: 2, totalLaps: 2, cleanLaps: 2, cleanLapsPercentage: 100,
       raceSessionsCount: 2, raceWinsCount: 2, racePodiumsCount: 2,
-      averageBenchmarkPacePercentage: 102.8, averageBenchmarkPaceCategory: 'Good', totalPitStops: 0,
+      averageBenchmarkPacePercentage: null, averageBenchmarkPaceCategory: null, totalPitStops: 0,
       rankedTracks: [{ track: 'Monza', laps: 2, km: 11.586 }],
       rankedCars: [{ car: 'Ferrari 499P', laps: 2, km: 11.586 }],
       bestTrackRefLaps: [{ sessionId: 'faster', percentage: 100, category: 'Alien', track: 'Monza', car: 'Ferrari 499P' }],

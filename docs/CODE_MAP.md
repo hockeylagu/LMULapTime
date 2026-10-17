@@ -433,6 +433,13 @@ index their explicitly supplied replay directory locally.
 | AI engineer | `aiRoutes.ts`, `server/ai/aiReport.ts` (`PROMPT_VERSION`), `dbAiReportStore.ts` | `shared/types/aiReport.ts` | `src/utils/aiReportPayload.ts`, `replay/analysis/AIReportTab.tsx` |
 | Settings & scans | `systemRoutes.ts` (`/status`, `/scan`, `/scan/status`, `/cache/clear`), `/replays/cache`, `/replays/upgrade` | | `components/settings/` (`SettingsPanel` panel + `FeedbackMessage`, `settingsFormat` numbers/plurals/bytes/dates with fallbacks, `aiKey` (clean and redact the Gemini key), `labelStyles.ts` (`READOUT_LABEL` / `FIELD_LABEL` shared label classes), `shared/domain/folderPath.ts` (`normalizeFolderPath` / `folderPathProblem`, used by the form and by `POST /scan`, which answers 400 `{error, field}`), `useSettingsScrollspy` TOC highlight, `PathField`, `OverviewCard` (the one status card: folders, sessions, replays, AI state, database size, telemetry files count, last sync, plus the scoped Clear parsed sessions action; section order is Overview, Reference Benchmarks, AI reports, AI history, Cached Replays, Folder Paths; `resolveSectionId` validates `?section=`), `ReferenceLaptimesCard` + `ReferenceChangesList` (purpose, pace categories, one status line, collapsed update history), `controls/InlineConfirm` + `useInlineConfirm` (focus returns to the trigger or the section heading), `hooks/` (`useAiSettings`, `useDeepLinkAlign`), `replays/` (cached-replay list model, `useReplayCache`, filters, table, progress; the table draws 200 rows at a time with "Show N more"; `replayView` / `replayFilter` / `replaySort` params beside `?section=`); `/replays/upgrade` also reports `currentVersion`, the version an on-disk replay must be at) |
 
+Dashboard **Avg benchmark pace** uses complete history, independent of session filters: rate each dry session
+best against the current 100% target for its canonical layout and car class (two decimal places), retain groups
+with at least three eligible sessions, then average each group's lowest percentage with equal group weight
+(one decimal place). `averageQualifiedBenchmarkPace` in `paceCategory.ts` owns the minimum and final average;
+SQLite groups history without loading lap arrays, and the injected-session hook uses the same rule. Groups
+below the minimum still appear in best-lap cards; if none qualify, the average shows “Not enough sessions”.
+
 Client routes (`src/App.tsx`): `/dashboard`, `/tracks`, `/track/:trackName`, `/leaderboard`, `/session/:sessionId`,
 `/telemetry`, `/settings` (`/compare` redirects). Pages load on demand from `src/routePages.ts` (the current route's
 page with the session data, the rest when idle; never import a page from the components barrel in `App.tsx`, and keep

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { driverLapsCount, isSessionEmpty, getDisplayTrackName, compareSessionsBySortOption } from '../../../shared/domain/formatters.js';
-import { matchesTrack, getPaceCategoryFromPercentage } from '../../../shared/domain/paceCategory.js';
+import { averageQualifiedBenchmarkPace, matchesTrack, getPaceCategoryFromPercentage, type BenchmarkPaceGroup } from '../../../shared/domain/paceCategory.js';
+import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { matchesSessionCarClass } from '../../../shared/domain/vehicleMapping.js';
 import { selectCleanLapCandidates } from '../../../shared/domain/lapComparison.js';
 import { DetailedSession } from '../../../shared/types/index.js';
@@ -92,8 +93,7 @@ export function useDashboardMetrics({
     let raceWinsCount = 0;
     let racePodiumsCount = 0;
     let totalPitStops = 0;
-    let benchmarkPaceSum = 0;
-    let benchmarkPaceCount = 0;
+    const benchmarkPaceGroups = new Map<string, BenchmarkPaceGroup>();
     const trackLapsMap: Record<string, { track: string; trackVenue: string; trackCourse: string; laps: number }> = {};
     const trackKmMap: Record<string, number> = {};
     const carLapsMap: Record<string, number> = {};
@@ -163,9 +163,13 @@ export function useDashboardMetrics({
         carKmMap[p.carType] = (carKmMap[p.carType] || 0) + sessionDistanceKm;
       }
 
-      if (p.bestLapPacePercentage && p.bestLapPaceCategory && p.bestLapTime) {
-        benchmarkPaceSum += p.bestLapPacePercentage;
-        benchmarkPaceCount++;
+      if (!p.bestLapWet && p.bestLapPacePercentage && p.bestLapPaceCategory && p.bestLapTime) {
+        const spec = getCircuitSpecification(s.trackVenue, s.trackCourse, null, null, null, s.trackLengthMeters);
+        const groupKey = JSON.stringify([spec.layoutKey, p.carClass]);
+        const group = benchmarkPaceGroups.get(groupKey) ?? { sessionCount: 0, bestPercentage: p.bestLapPacePercentage };
+        group.sessionCount++;
+        group.bestPercentage = Math.min(group.bestPercentage, p.bestLapPacePercentage);
+        benchmarkPaceGroups.set(groupKey, group);
 
         const currentBest = uniqueTrackRefLapsMap[trackIdentity];
         if (!currentBest || p.bestLapPacePercentage < currentBest.percentage) {
@@ -182,9 +186,7 @@ export function useDashboardMetrics({
     }
 
     const cleanLapsPercentage = totalLaps > 0 ? Math.round((cleanLaps / totalLaps) * 1000) / 10 : 0;
-    const averageBenchmarkPacePercentage = benchmarkPaceCount > 0
-      ? Math.round((benchmarkPaceSum / benchmarkPaceCount) * 10) / 10
-      : null;
+    const averageBenchmarkPacePercentage = averageQualifiedBenchmarkPace(benchmarkPaceGroups.values());
     const averageBenchmarkPaceCategory = averageBenchmarkPacePercentage !== null
       ? getPaceCategoryFromPercentage(averageBenchmarkPacePercentage)
       : null;

@@ -19,10 +19,12 @@ describe('DrivingOverviewCard', () => {
 
     expect(screen.getByText('Avg benchmark pace')).toBeInTheDocument();
     expect(screen.getByText(/102\.4%/)).toBeInTheDocument();
+    expect(screen.getByText('Avg benchmark pace').parentElement).toHaveAttribute('title',
+      'Average of your best benchmark pace for each circuit layout and car class with at least 3 dry, benchmark-rated sessions. Each combination has equal weight; lower is better.');
     expect(screen.queryByText('Average Speed')).not.toBeInTheDocument();
   });
 
-  it('shows N/A when no benchmark pace data is available', () => {
+  it('explains when no layout/class has enough eligible sessions', () => {
     render(
       <DrivingOverviewCard
         sessionsCount={0}
@@ -40,7 +42,7 @@ describe('DrivingOverviewCard', () => {
     const label = screen.getByText('Avg benchmark pace');
     const row = label.parentElement;
     expect(row).not.toBeNull();
-    expect(row!.textContent).toContain('N/A');
+    expect(row!.textContent).toContain('Not enough sessions');
   });
 
   it('hides expanded stats until "Show All Driving Stats" is clicked', () => {

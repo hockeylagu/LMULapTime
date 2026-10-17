@@ -1,5 +1,14 @@
 # Endpoint performance history
 
+## Qualified best benchmark pace — 2026-10-16
+
+Dashboard average pace now groups dry, benchmark-rated session bests by canonical layout and car
+class, requires three sessions per group, and averages each qualifying group's best percentage.
+Five-sample endpoint sweeps completed before and after; dashboard medians were 10.72 ms and
+11.19 ms (after p95: 11.41 ms). The database snapshot hashes differed, so no latency delta is
+claimed. Dashboard stayed below the heavier replay, telemetry, session-detail and geometry
+endpoints in the ranking. Both reports are retained in `.cache/benchmark-pace-best/history/`.
+
 ## Gold badge from stored session bests — 2026-10-13
 
 Gold badges now rank each driver's stored per-session best lap (one row per driver and session) instead of

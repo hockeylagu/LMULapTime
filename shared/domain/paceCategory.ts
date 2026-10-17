@@ -31,6 +31,23 @@ export function calculateBenchmarkPace(lapTimeSec: number | null, target100Sec?:
   };
 }
 
+export const MIN_BENCHMARK_PACE_SESSIONS = 3;
+
+/** One layout/class group's dry, benchmark-rated session bests. */
+export interface BenchmarkPaceGroup { sessionCount: number; bestPercentage: number; }
+
+/** Equal weight per qualified layout/class, using its fastest session best. */
+export function averageQualifiedBenchmarkPace(groups: Iterable<BenchmarkPaceGroup>): number | null {
+  let sum = 0;
+  let count = 0;
+  for (const group of groups) {
+    if (group.sessionCount < MIN_BENCHMARK_PACE_SESSIONS) continue;
+    sum += group.bestPercentage;
+    count++;
+  }
+  return count > 0 ? Math.round((sum / count) * 10) / 10 : null;
+}
+
 export function formatPacePercentage(percentage?: number | null): string {
   if (percentage === undefined || percentage === null || isNaN(percentage)) return '--%';
   return `${percentage.toFixed(1)}%`;

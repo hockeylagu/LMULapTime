@@ -2,6 +2,7 @@ import React from 'react';
 import { Calendar } from 'lucide-react';
 import { getPaceCategoryStyle } from '../../utils/paceCategoryStyles.js';
 import { PaceCategory } from '../../../shared/types/index.js';
+import { MIN_BENCHMARK_PACE_SESSIONS } from '../../../shared/domain/paceCategory.js';
 import { SummaryCard, LEADER_VALUE } from './DashboardSummaryParts.js';
 
 export interface DrivingOverviewCardProps {
@@ -107,7 +108,7 @@ export const DrivingOverviewCard: React.FC<DrivingOverviewCardProps> = ({
             <Row label="Clean flying laps" title={`${(cleanLaps ?? 0).toLocaleString()} valid laps out of ${totalLaps.toLocaleString()} total laps`}>
               {(cleanLaps ?? 0).toLocaleString()} ({cleanLapsPercentage ?? 0}%)
             </Row>
-            <Row label="Avg benchmark pace" title="Average benchmark pace percentage across your best laps">
+            <Row label="Avg benchmark pace" title={`Average of your best benchmark pace for each circuit layout and car class with at least ${MIN_BENCHMARK_PACE_SESSIONS} dry, benchmark-rated sessions. Each combination has equal weight; lower is better.`}>
               {averageBenchmarkPacePercentage ? (
                 <span className="inline-flex items-center gap-1.5">
                   <span className={pace.textClass} title={pace.label}>
@@ -115,7 +116,7 @@ export const DrivingOverviewCard: React.FC<DrivingOverviewCardProps> = ({
                   </span>
                   {averageBenchmarkPacePercentage.toFixed(1)}%
                 </span>
-              ) : 'N/A'}
+              ) : <span className="font-sans text-lmu-muted">Not enough sessions</span>}
             </Row>
             <Row label="Race wins · podiums" title={`${raceWinsCount ?? 0} Wins, ${racePodiumsCount ?? 0} Podiums across ${raceSessionsCount ?? 0} Races`}>
               {raceWinsCount ?? 0}W · {racePodiumsCount ?? 0}P

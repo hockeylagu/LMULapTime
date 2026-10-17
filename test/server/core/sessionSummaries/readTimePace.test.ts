@@ -52,7 +52,7 @@ describe('benchmark pace at read time', () => {
     expect(rateSessionDetail(db.getSessionById(id)!).playerDriver?.bestLapPacePercentage).toBe(100);
     const updated = dashboard();
     expect(updated.metrics.bestTrackRefLaps).toMatchObject([{ sessionId: id, percentage: 100, category: 'Alien' }]);
-    expect(updated.metrics.averageBenchmarkPacePercentage).toBe(100);
+    expect(updated.metrics.averageBenchmarkPacePercentage).toBeNull();
     expect(updated.trends.latestOuting?.pacePercentage).toBe(100);
     expect(updated.trends.recentPaceTrend[0].pacePercentage).toBe(100);
     expect(updated.sessions[0].playerDriver?.bestLapPacePercentage).toBe(100);
