@@ -532,8 +532,12 @@ at the finish it becomes the top completed row. The two completed laps and BEST 
 `computeLapsLeft` covers races and qualifying (the player's own laps to the first crossing after the clock ends);
 the race uses `classLeaderLapSeconds` (`liveLapsLeft.ts`), and class checks go through `knownCarClass`
 (`shared/domain/vehicleMapping.ts`). Garage plans use the time left (`endEt - currentEt`: `endEt` is a session time,
-not a length) and count a formation lap only in a race; on the race grid `endEt` is the countdown to the start, so
-the race length and laps wait for the green flag. `LiveTyreTracker` takes a drop of more than 15% tread in one lap for
+not a length) and count a formation lap only in a race. Before a race's clock runs (`raceClockRunning`: phase 5-8,
+or 9 with the clock past 0) `endEt` is a countdown or a few seconds, so the race garage takes the length from the
+event schedule (`GetSessionsInfoForEvent` via `parseSchedule`, the `schedule` REST update) and race laps left wait for
+the clock; qualifying laps left count from now while the player is in the pits. A race garage counts laps to the
+overall leader's flag (`projectRaceFlagSeconds`); without the leader's pace it plans for the latest flag, one of the
+player's laps after the clock, rather than a lap short. `LiveTyreTracker` takes a drop of more than 15% tread in one lap for
 a puncture, not wear. Compounds read in their sidewall colours (`compoundTone`, `COMPOUND_CLASS` in `livePlanFormat.ts`).
 `LiveSessionBar` carries the track (`liveTrackName`: the game's name, else the layout), laps left, PR and one fixed
 520 px weather slot, first on the right: on a wet track (rain or path wetness above 0) `TRACK WET n%` with the
@@ -587,7 +591,8 @@ Strategy (VE/fuel, pit, damage, tyres, forecast; contracts in `shared/types/live
 allowlisted REST GETs (1 s timeout) and their parsers; `livePitPoller.ts` asks at most one a second, most overdue
 first, by mode (off / track / garage, only while a dashboard client is connected and a session is loaded),
 a state check (`navigation/state`, replay from `settingMode` via `parseReplayPlayback`) every ~10 s and right before
-each `getVehicleCondition`, the one read that crashes LMU in a replay; the other reads are replay-safe (a replay reads
+each `getVehicleCondition`, the one read that crashes LMU in a replay, and each `GetSessionsInfoForEvent` (garage
+only, every 60 s; never tried in a replay); the other reads are replay-safe (a replay reads
 nothing else); a timeout pauses everything 10 s, a failed read pauses that read 30 s. `shared/domain/live/`:
 `liveUsage.ts` (`LiveUsageMeter`, per-lap use interpolated at each crossing, pit/caution/refuel laps excluded, mean
 of the last 3), `liveResourcePlan.ts` (VE for Hypercar and GT3, fuel otherwise; `planRace` with the reserve kept at

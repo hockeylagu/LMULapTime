@@ -106,8 +106,12 @@ export interface GaragePlanInput {
 /** What to load in the garage for the loaded session: its laps and the reserve, capped at a full tank. */
 export function planGarage(input: GaragePlanInput): Omit<LiveGaragePlan, 'tyres'> {
   const { kind, sessionSeconds, lapSeconds, perLap, capacity, reserveLaps } = input;
-  const flagSeconds = sessionSeconds !== null && input.raceLeaderLapSeconds != null
-    ? projectRaceFlagSeconds(sessionSeconds, 0, input.raceLeaderLapSeconds) : null;
+  // A race ends at the overall leader's first crossing after the clock. Without the leader's pace, plan for the latest
+  // that can be, one of our laps after the clock: the bare clock can leave the car a lap short.
+  const leaderPace = input.raceLeaderLapSeconds != null && input.raceLeaderLapSeconds > 0 ? input.raceLeaderLapSeconds : null;
+  const flagSeconds = sessionSeconds === null || !input.formationLap ? null
+    : leaderPace !== null ? projectRaceFlagSeconds(sessionSeconds, 0, leaderPace)
+      : lapSeconds !== null && lapSeconds > 0 ? sessionSeconds + lapSeconds : null;
   const laps = sessionSeconds !== null && lapSeconds !== null && sessionSeconds > 0 && lapSeconds > 0
     ? sessionLaps(flagSeconds ?? sessionSeconds, lapSeconds, input.formationLap) : null;
   const total = laps !== null && perLap !== null ? (laps + reserveLaps) * perLap : null;

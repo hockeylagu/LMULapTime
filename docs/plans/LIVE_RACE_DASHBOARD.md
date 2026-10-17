@@ -582,8 +582,15 @@ Fixed during validation:
 - Garage length and laps: LMU's `endEt` is a session time, not a length (a 3-minute practice ended at 210 s, so the
   garage said 4 MIN and ~3 laps). The garage now uses the time left, and the out lap of practice or qualifying is one
   of the laps the clock allows (only a race adds its formation lap). On the race grid `endEt` is the countdown to the
-  start (64 s), so the race garage shows `LAPS AT THE START` until the green flag. The race length could come from
-  `GetSessionsInfoForEvent` (`lengthTime`, seen once in practice), not read yet.
+  start (64 s); in a later weekend's race garage LMU reported phase 9 then 0 with the clock at 0 and the end at 5 s
+  (2026-10-17: the garage said `0 MIN · NO STOP PLANNED` and laps left ~1). The race length now comes from
+  `GetSessionsInfoForEvent` (every garage listed PRACTICE 5, QUALIFYING 10, RACE 5 minutes), read in the garage once a
+  minute behind its own replay check; without it the race garage shows `LAPS AT THE START`. Race laps left wait for
+  the race clock, and qualifying laps left count from now while the player is in the pits (they held at 9 in the
+  garage while the clock ran out).
+- Behind a faster overall leader the race garage counts laps to the leader's flag, which falls after the clock. When
+  the leader's pace is unknown it plans for the latest flag (one of the player's laps after the clock), so the fuel or
+  VE is never a lap short; at worst it is a lap long.
 - A puncture is not wear: the flat read 0% tread, its lap counted as 49% wear, and after the tyre change the fitted set
   read 0% at the finish. A drop of more than 15% in one lap now restarts the wear measurement.
 - The estimated lap (session best plus the running delta) replaces `CURRENT VS BEST` in the race and `BEST POSSIBLE`

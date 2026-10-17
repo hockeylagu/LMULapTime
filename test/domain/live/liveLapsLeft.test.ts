@@ -3,7 +3,7 @@ import { computeLapsLeft } from '../../../shared/domain/live/liveLapsLeft.js';
 import { vehicleReading } from '../../helpers/liveReadings.js';
 import { VEHICLE_CLASS_OPTIONS } from '../../../shared/domain/vehicleMapping.js';
 
-const race = { kind: 'race' as const, endSeconds: null, elapsedSeconds: 500 };
+const race = { kind: 'race' as const, endSeconds: null, elapsedSeconds: 500, gamePhase: 5 };
 const timedRace = { ...race, endSeconds: 1200 };
 
 describe('laps left', () => {
@@ -12,18 +12,18 @@ describe('laps left', () => {
     const overall = vehicleReading({ id: 1, vehicleClass: overallClass, lapStartEt: 2400, estimatedLapTime: 100 });
     const player = vehicleReading({ id: 7, vehicleClass: id, lapStartEt: 2460, estimatedLapTime: 150 });
     const classLeader = vehicleReading({ id: 9, vehicleClass: id, lapStartEt: 2460, estimatedLapTime: 120 });
-    expect(computeLapsLeft({ kind: 'race', endSeconds: 3600, elapsedSeconds: 2500 }, player, overall, classLeader)).toEqual({ laps: 10, estimated: true });
+    expect(computeLapsLeft({ kind: 'race', endSeconds: 3600, elapsedSeconds: 2500, gamePhase: 5 }, player, overall, classLeader)).toEqual({ laps: 10, estimated: true });
   });
   it('accepts canonical aliases and keeps WEC and ELMS LMP2 separate', () => {
     const overall = vehicleReading({ id: 1, vehicleClass: 'Hyper', lapStartEt: 2400, estimatedLapTime: 100 });
     const player = vehicleReading({ id: 7, vehicleClass: 'LMP2 (ELMS)', lapStartEt: 2460, estimatedLapTime: 150 });
     const leader = vehicleReading({ id: 9, vehicleClass: 'LMP2_ELMS', lapStartEt: 2460, estimatedLapTime: 120 });
-    const session = { kind: 'race' as const, endSeconds: 3600, elapsedSeconds: 2500 };
+    const session = { kind: 'race' as const, endSeconds: 3600, elapsedSeconds: 2500, gamePhase: 5 };
     expect(computeLapsLeft(session, player, overall, leader)).toEqual({ laps: 10, estimated: true });
     expect(computeLapsLeft(session, player, overall, { ...leader, vehicleClass: 'LMP2' })).toEqual({ laps: 8, estimated: true });
   });
   it('uses the overall leader for the flag and GT3-class pace for GT3 laps, without adding laps already lost', () => {
-    const session = { kind: 'race' as const, endSeconds: 3600, elapsedSeconds: 2500 };
+    const session = { kind: 'race' as const, endSeconds: 3600, elapsedSeconds: 2500, gamePhase: 5 };
     const overall = vehicleReading({ id: 1, vehicleClass: 'Hyper', totalLaps: 24, lapStartEt: 2400, estimatedLapTime: 100 });
     const gt3Leader = vehicleReading({ id: 9, vehicleClass: 'GT3', totalLaps: 20, lapStartEt: 2460, estimatedLapTime: 120 });
     const gt3 = vehicleReading({ id: 7, vehicleClass: 'GT3', totalLaps: 18, lapsBehindLeader: 6, lapStartEt: 2460, estimatedLapTime: 150 });
@@ -39,6 +39,23 @@ describe('laps left', () => {
     const player = vehicleReading({ id: 7, totalLaps: 8, lapStartEt: 950, estimatedLapTime: 100 });
     expect(computeLapsLeft({ ...timedRace, kind: 'qualifying' }, player, null)).toEqual({ laps: 3, estimated: true });
     expect(computeLapsLeft({ ...timedRace, kind: 'qualifying' }, vehicleReading({ id: 7, lapStartEt: 950, estimatedLapTime: 0 }), null)).toBeNull();
+  });
+
+  it('counts qualifying laps from now while the player sits in the pits, where the lap start stands still', () => {
+    // In the garage at 450 s of 1200: laps of 100 s from now, not from the lap start of 0 s.
+    const player = vehicleReading({ id: 7, lapStartEt: 0, estimatedLapTime: 100, inPits: true });
+    expect(computeLapsLeft({ ...timedRace, kind: 'qualifying', elapsedSeconds: 450 }, player, null)).toEqual({ laps: 8, estimated: true });
+    expect(computeLapsLeft({ ...timedRace, kind: 'qualifying', elapsedSeconds: 450 }, { ...player, inPits: false }, null)).toEqual({ laps: 12, estimated: true });
+  });
+
+  it.each([
+    ['in the garage at the paused phase, the clock at 0 (seen 2026-10-17)', 9, 0],
+    ['in the garage before the session starts', 0, 0],
+    ['on the grid during the countdown', 4, 30],
+  ])('is null before the race clock runs: %s', (_case, gamePhase, elapsedSeconds) => {
+    const leader = vehicleReading({ id: 1, place: 1, lapStartEt: 0, estimatedLapTime: 100 });
+    expect(computeLapsLeft({ kind: 'race', endSeconds: 5, elapsedSeconds, gamePhase }, leader, leader)).toBeNull();
+    expect(computeLapsLeft({ kind: 'race', endSeconds: 1200, elapsedSeconds: 600, gamePhase: 9 }, leader, leader)).toEqual({ laps: 12, estimated: true });
   });
 
   it('is null off a race and qualifying, without a player and after the flag', () => {

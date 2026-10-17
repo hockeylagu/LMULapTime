@@ -271,7 +271,7 @@ replay-only rule. Raw reads: `C:/Documents/lmu-live-captures/2026-10-16-bahrain-
 | `GET /rest/garage/getVehicleCondition` | Per corner `suspensionDamage` (0–1) and `tireCondition` (0–1, 0 = flat or destroyed), `brakeCondition`, `vehicleDamage` (= aero body damage; above 1 after big hits), `fuel` and `fuelCapacity` in litres |
 | `GET /rest/garage/brakeinfo` | Four pad thicknesses in metres (0.036 front, 0.032 rear); still 0.03599 after a whole practice: **brake wear is barely modelled** |
 | `GET /rest/garage/tireinfo` | Per corner left, centre and right temperature in **Kelvin**, pressure (kPa), load |
-| `GET /rest/sessions/GetSessionsInfoForEvent` | `scheduledSessions[{name, lengthTime (minutes), airTemp, rainChance}]`. A practice-only weekend listed only `PRACTICE 120`; a full weekend is not read yet |
+| `GET /rest/sessions/GetSessionsInfoForEvent` | `scheduledSessions[{name, lengthTime (minutes), airTemp, rainChance}]`. A practice-only weekend listed only `PRACTICE 120`; a full weekend (2026-10-17) listed `PRACTICE 5`, `QUALIFYING 10`, `RACE 5`, the same in every garage of the event (200 in 2-4 ms). Read by the live dashboard in the garage |
 | `GET /rest/strategy/overall` | Still **400**, in the garage and on track |
 
 **VE and fuel.** `strategy/usage` stores `fuel`, `ve` and `tyres` in steps of 1/255 (0.39 %),

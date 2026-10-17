@@ -192,3 +192,21 @@ export function parseForecast(body: unknown): Extract<LiveRestUpdate, { type: 'f
   }
   return Object.keys(sessions).length > 0 ? { type: 'forecast', sessions } : null;
 }
+
+/**
+ * `GetSessionsInfoForEvent`: `scheduledSessions[{ name, lengthTime }]` in minutes, the same list in every garage of the
+ * event (read 2026-10-17: PRACTICE 5, QUALIFYING 10, RACE 5). The race entry is the one named RACE; none, or several
+ * of different lengths, leave the race length unknown.
+ */
+export function parseSchedule(body: unknown): Extract<LiveRestUpdate, { type: 'schedule' }> | null {
+  const sessions = record(body)?.scheduledSessions;
+  if (!Array.isArray(sessions)) return null;
+  const races = new Set<number>();
+  for (const session of sessions) {
+    const entry = record(session);
+    const name = typeof entry?.name === 'string' ? entry.name.trim().toUpperCase() : '';
+    const minutes = num(entry?.lengthTime);
+    if (name.startsWith('RACE') && minutes !== null && minutes > 0) races.add(minutes);
+  }
+  return { type: 'schedule', raceMinutes: races.size === 1 ? [...races][0] : null };
+}

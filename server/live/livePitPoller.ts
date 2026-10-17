@@ -2,7 +2,7 @@ import type { LiveRestUpdate } from '../../shared/domain/live/liveStrategyTracke
 import { parseReplayPlayback } from './lmuNavigation.js';
 import {
   lmuGet, parseEstimate, parseForecast, parseGarageData, parsePitMenu, parsePitStopTimes,
-  parseStandings, parseTireManagement, parseVehicleCondition,
+  parseSchedule, parseStandings, parseTireManagement, parseVehicleCondition,
 } from './lmuPitRest.js';
 import type { RestGet } from './lmuPitRest.js';
 
@@ -56,6 +56,9 @@ const READS: PitRead[] = [
   { path: '/rest/garage/UIScreen/RepairAndRefuel', every: { track: 120_000 }, crashesInReplay: false, parse: parsePitStopTimes },
   { path: '/rest/garage/getPlayerGarageData', every: { garage: 5000 }, crashesInReplay: false, parse: parseGarageData },
   { path: '/rest/sessions/weather', every: { track: 60_000, garage: 60_000 }, crashesInReplay: false, parse: parseForecast },
+  // The race length for the garage before the start; it does not change during the event. Never read in a replay
+  // yet, so it waits for its own state check like the read that crashed one.
+  { path: '/rest/sessions/GetSessionsInfoForEvent', every: { garage: 60_000 }, crashesInReplay: true, parse: parseSchedule },
 ];
 
 export interface LivePitPollerOptions {

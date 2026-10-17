@@ -63,11 +63,15 @@ describe('planGarage', () => {
       perLap: 3.2, perLapSource: 'measured' as const, lapsMeasured: 8, reserveLaps: .5, capacity: 100, setInGarage: 100 };
     // Overall leader: 33 x 110 = 3630 s. GT3: 31 racing laps plus one formation lap, not 33 Hyper laps.
     expect(planGarage(input)).toMatchObject({ laps: 32, needed: 100, stops: 1 });
-    expect(planGarage({ ...input, raceLeaderLapSeconds: null })).toMatchObject({ laps: 31 });
-    expect(planGarage({ ...input, raceLeaderLapSeconds: 0 })).toMatchObject({ laps: 31 });
+    // Without the leader's pace the flag can fall up to one of our laps after the clock: 3720 s, 31 laps plus formation,
+    // not the 30 the bare clock gives (one lap short behind a faster leader).
+    expect(planGarage({ ...input, raceLeaderLapSeconds: null })).toMatchObject({ laps: 32 });
+    expect(planGarage({ ...input, raceLeaderLapSeconds: 0 })).toMatchObject({ laps: 32 });
+    // Practice and qualifying end with the clock: no flag lap added.
+    expect(planGarage({ ...input, formationLap: false, raceLeaderLapSeconds: null })).toMatchObject({ laps: 30 });
   });
   it('previews the first racing pit lap from the selected load, formation use and reserve', () => {
-    const input = { kind: 've' as const, formationLap: true, sessionSeconds: 2700, lapSeconds: 121.4, perLap: 4.5,
+    const input = { kind: 've' as const, formationLap: true, sessionSeconds: 2700, raceLeaderLapSeconds: 121.4, lapSeconds: 121.4, perLap: 4.5,
       perLapSource: 'measured' as const, lapsMeasured: 8, reserveLaps: .5, capacity: 100, setInGarage: 100 };
     expect(planGarage(input)).toMatchObject({ laps: 24, stops: 1, firstPitLap: 20 });
     expect(planGarage({ ...input, setInGarage: 80 })).toMatchObject({ firstPitLap: 16 });

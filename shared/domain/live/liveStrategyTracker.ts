@@ -11,7 +11,7 @@ import { LiveUsageMeter } from './liveUsage.js';
 import { planFuelRatio, savingToFinish, tyreCoverage } from './liveInsights.js';
 import { RAIN_WET_MIN } from '../lapConditions.js';
 import type { LiveUsageObservation } from '../../types/liveAudit.js';
-import { classLeaderLapSeconds } from './liveLapsLeft.js';
+import { classLeaderLapSeconds, raceClockRunning } from './liveLapsLeft.js';
 
 /** One parsed answer of LMU's local REST API (server/live/lmuPitRest.ts). */
 /** The garage's selected tyre set, as `TireManagement` reports it. */
@@ -25,7 +25,9 @@ export type LiveRestUpdate =
   | { type: 'condition'; condition: LiveVehicleCondition }
   | { type: 'tireManagement'; vePerLap: number | null; fuelPerLap: number | null; newSets: number | null; selected: LiveSelectedTyres | null }
   | { type: 'garage'; veStart: number | null; fuelStart: number | null; fuelRatio?: number | null }
-  | { type: 'forecast'; sessions: Record<string, LiveForecastNode[]> };
+  | { type: 'forecast'; sessions: Record<string, LiveForecastNode[]> }
+  /** The race length set for the event (`GetSessionsInfoForEvent`), minutes; null when the event has no single race. */
+  | { type: 'schedule'; raceMinutes: number | null };
 
 /** What the strategy needs besides the reading: the session details already derived for the snapshot. */
 export interface LiveStrategyContext {
@@ -101,11 +103,13 @@ export class LiveStrategyTracker {
   private usage: Extract<LiveRestUpdate, { type: 'tireManagement' }> | null = null;
   private garage: Extract<LiveRestUpdate, { type: 'garage' }> | null = null;
   private forecast: Record<string, LiveForecastNode[]> | null = null;
+  private raceMinutes: number | null = null;
 
   /** Forgets everything (the game closed). */
   public reset(): void {
     this.eventKey = null;
     this.eventLayout = null;
+    this.raceMinutes = null;
     this.meters.ve.clear();
     this.meters.fuel.clear();
     this.eventLaps = [];
@@ -164,6 +168,7 @@ export class LiveStrategyTracker {
       case 'tireManagement': this.usage = update; return;
       case 'garage': this.garage = update; return;
       case 'forecast': this.forecast = update.sessions; return;
+      case 'schedule': this.raceMinutes = update.raceMinutes; return;
     }
   }
 
@@ -345,10 +350,11 @@ export class LiveStrategyTracker {
 
   private garagePlan(kind: LiveResourceKind, reading: LiveScoringReading, resource: LiveResourcePlan, reserveLaps: number): LiveGaragePlan {
     const race = liveSessionKind(reading.sessionCode) === 'race';
-    // `endEt` is a session time, not a length: what is left is the time to it. Before a race's green flag it is the
-    // countdown to the start, not the race (seen live 2026-10-16: 64 s on the grid, the race end only from the green).
-    const sessionSeconds = (race && reading.gamePhase < GREEN) || !(reading.endEt > 0 && reading.endEt < 1_000_000) ? null
-      : Math.max(0, reading.endEt - Math.max(0, reading.currentEt));
+    // `endEt` is a session time, not a length: what is left is the time to it. Before a race's clock runs it is not the
+    // race end (`raceClockRunning`), so the race length comes from the event's schedule, unknown until it is read.
+    const sessionSeconds = race && !raceClockRunning(reading.gamePhase, reading.currentEt)
+      ? (this.raceMinutes === null ? null : this.raceMinutes * 60)
+      : !(reading.endEt > 0 && reading.endEt < 1_000_000) ? null : Math.max(0, reading.endEt - Math.max(0, reading.currentEt));
     const estimated = reading.player && reading.player.estimatedLapTime > 0 ? reading.player.estimatedLapTime : null;
     const lapSeconds = classLeaderLapSeconds(reading.player, reading.classLeader) ?? median(this.eventLaps) ?? estimated;
     const plan = planGarage({

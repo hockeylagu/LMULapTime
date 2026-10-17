@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   parseEstimate, parseForecast, parseGarageData, parsePitMenu, parsePitStopTimes, parseStandings,
-  parseTireManagement, parseVehicleCondition,
+  parseSchedule, parseTireManagement, parseVehicleCondition,
 } from '../../../server/live/lmuPitRest.js';
 
 /** Shapes as LMU build 14200 answered them (2026-10-16), trimmed to the fields read. */
@@ -85,5 +85,15 @@ describe('LMU pit REST parsers', () => {
       },
     });
     expect(parseForecast({})).toBeNull();
+  });
+
+  it('reads the race length from the event schedule, unknown without a single race', () => {
+    // As read in every garage of a weekend, 2026-10-17.
+    const session = (name: string, lengthTime: number) => ({ airTemp: 28, lengthTime, name, rainChance: 0 });
+    const weekend = [session('PRACTICE', 5), session('QUALIFYING', 10)];
+    expect(parseSchedule({ scheduledSessions: [...weekend, session('RACE', 5)] })).toEqual({ type: 'schedule', raceMinutes: 5 });
+    expect(parseSchedule({ scheduledSessions: weekend })).toEqual({ type: 'schedule', raceMinutes: null });
+    expect(parseSchedule({ scheduledSessions: [session('RACE 1', 20), session('RACE 2', 30)] })).toEqual({ type: 'schedule', raceMinutes: null });
+    expect(parseSchedule({})).toBeNull();
   });
 });

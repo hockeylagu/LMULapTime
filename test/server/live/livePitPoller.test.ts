@@ -84,6 +84,22 @@ describe('LivePitPoller', () => {
     t.poller.stop();
   });
 
+  it('reads the event schedule in the garage only, each read right after its own state check, never while unknown', async () => {
+    const SCHEDULE = '/rest/sessions/GetSessionsInfoForEvent';
+    const t = setup(false);
+    t.poller.setMode('garage');
+    await vi.advanceTimersByTimeAsync(70 * PIT_POLL_TICK_MS);
+    const reads = t.paths.map((path, i) => ({ path, i })).filter(({ path }) => path === SCHEDULE);
+    expect(reads.length).toBe(2);
+    for (const { i } of reads) expect(t.paths[i - 1]).toBe(STATE);
+    t.poller.stop();
+    const unknown = setup(null);
+    unknown.poller.setMode('garage');
+    await vi.advanceTimersByTimeAsync(70 * PIT_POLL_TICK_MS);
+    expect(unknown.paths).not.toContain(SCHEDULE);
+    unknown.poller.stop();
+  });
+
   it('reads the garage set in the garage, and pauses everything for 10 s after a slow answer', async () => {
     let slow = true;
     const t = setup(false, path => (path === '/rest/garage/getPlayerGarageData' && slow ? { ok: false, reason: 'timeout' } : null));

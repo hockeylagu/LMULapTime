@@ -106,6 +106,13 @@ describe('LiveStrategyTracker', () => {
     // On the race grid `endEt` is the 64 s countdown to the start: the race length is unknown until the green flag.
     const grid = at(3, { inRealtime: false, gamePhase: 0, endEt: 64, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 103 }) });
     expect(context(tracker, grid, { lapsLeft: null })?.garage).toMatchObject({ sessionMinutes: null, laps: null, needed: null });
+    // In the race garage LMU can report the paused phase with the clock at 0 and the end at 5 s (seen 2026-10-17).
+    const paused = at(0, { inRealtime: false, gamePhase: 9, endEt: 5, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 103 }) });
+    expect(context(tracker, paused, { lapsLeft: null })?.garage).toMatchObject({ sessionMinutes: null, laps: null });
+    // The event's schedule gives the race length: 5 minutes, three laps at 1:43 plus the formation lap.
+    tracker.applyRest({ type: 'schedule', raceMinutes: 5 });
+    expect(context(tracker, paused, { lapsLeft: null })?.garage).toMatchObject({ sessionMinutes: 5, laps: 4 });
+    expect(context(tracker, grid, { lapsLeft: null })?.garage).toMatchObject({ sessionMinutes: 5, laps: 4 });
   });
 
   it('says the next forecast change of this session on the lap it lands', () => {
