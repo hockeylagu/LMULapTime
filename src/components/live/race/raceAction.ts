@@ -193,7 +193,7 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
       ],
     };
   }
-  const estimate = resource.perLapSource === 'game' ? ' · GAME EST.' : '';
+  const estimate = resource.learning ? ' · LEARNED' : resource.perLapSource === 'game' ? ' · GAME EST.' : '';
   if (race.finishReachable) {
     return {
       mode: 'sprint',

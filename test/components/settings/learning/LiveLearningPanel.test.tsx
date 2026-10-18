@@ -6,6 +6,17 @@ import { learningReadinessFixture } from './fixture.js';
 afterEach(() => vi.unstubAllGlobals());
 
 describe('learning evidence status', () => {
+  it('distinguishes available corrections from the server disable switch', async () => {
+    const report = learningReadinessFixture();
+    report.automaticLearning = { enabled: true, active: 2, validating: 1 };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce({ ok: true, json: async () => report })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ...report, automaticLearning: { ...report.automaticLearning, enabled: false } }) }));
+    render(<LiveLearningPanel />);
+    fireEvent.click(screen.getByRole('button', { name: 'Check evidence' }));
+    await waitFor(() => expect(screen.getByText(/2 validated corrections available · 1 awaiting fresh sessions/)).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
+    await waitFor(() => expect(screen.getByText('Automatic corrections are disabled by server configuration.')).toBeInTheDocument());
+  });
   it('waits for a manual request and shows resource-isolated readiness and readable exclusions', async () => {
     const fetch = vi.fn(async () => ({ ok: true, json: async () => learningReadinessFixture() }));
     vi.stubGlobal('fetch', fetch);
@@ -18,7 +29,7 @@ describe('learning evidence status', () => {
     expect(screen.getByRole('row', { name: /Virtual energy 0 0 No eligible evidence/ })).toBeInTheDocument();
     expect(screen.getByText('Lap is not clean and representative')).toBeInTheDocument();
     expect(screen.getByText('No forecast was recorded at lap start')).toBeInTheDocument();
-    expect(screen.getByText(/Live corrections are disabled/)).toBeInTheDocument();
+    expect(screen.getByText(/0 validated corrections available/)).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith('/api/live/learning', expect.objectContaining({ cache: 'no-store', signal: expect.any(AbortSignal) }));
     fireEvent.click(screen.getByText('Minimum evidence and offline checks'));
     expect(screen.getByText(/Too few earlier sessions/)).toBeVisible();

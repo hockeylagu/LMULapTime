@@ -66,7 +66,7 @@ function resourceCheck(plan: LiveGaragePlan): GarageCheck {
   return {
     label: name,
     target: formatAmount(needed, unit), current: formatAmount(set, unit), unit, action,
-    note: plan.perLapSource === 'game' ? 'GAME ESTIMATE' : plan.perLapSource === null ? 'USE NOT MEASURED' : undefined,
+    note: plan.learning ? 'LEARNED CORRECTION' : plan.perLapSource === 'game' ? 'GAME ESTIMATE' : plan.perLapSource === null ? 'USE NOT MEASURED' : undefined,
   };
 }
 

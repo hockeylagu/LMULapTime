@@ -1,7 +1,7 @@
 import type { LiveLearningReadinessReport } from '../../../../shared/types/liveLearning.js';
 
 export function learningReadinessFixture(): LiveLearningReadinessReport {
-  return { state: 'evaluated', historicalCorrectionsEnabled: false, generatedAt: '2026-10-18T16:00:00Z',
+  return { state: 'evaluated', historicalCorrectionsEnabled: false, automaticLearning: { enabled: true, active: 0, validating: 0 }, generatedAt: '2026-10-18T16:00:00Z',
     captures: { indexed: 5, verified: 4, unavailable: 1 },
     processing: { current: 3, pending: 1 },
     dataset: { currentExamples: 102, eligible: 100, excluded: 2,

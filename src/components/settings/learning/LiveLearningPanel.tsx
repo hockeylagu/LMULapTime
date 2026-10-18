@@ -35,12 +35,14 @@ export const LiveLearningPanel: React.FC = () => {
     </button>
   }>
     <p className="text-xs leading-relaxed text-lmu-muted max-w-prose">
-      Review recorded fuel and virtual energy measurements and offline prediction checks. Live corrections are disabled.
+      Fuel and virtual energy learning runs automatically after sessions. Keep driving normally; this check only refreshes the status.
     </p>
     {loading && <p role="status" className="text-xs text-lmu-muted">Checking recorded evidence outside the live capture process…</p>}
     {error && <p role="alert" className="text-xs text-lmu-loss">{error}</p>}
     {report?.state === 'deferred' && <p role="status" className="text-xs text-lmu-muted">{report.message}</p>}
     {data && <>
+      <p className="text-xs text-lmu-muted">{!data.automaticLearning.enabled ? 'Automatic corrections are disabled by server configuration.'
+        : `${data.automaticLearning.active} validated corrections available · ${data.automaticLearning.validating} awaiting fresh sessions. Corrections require an exact match and a verified XML game patch from this game run.`}</p>
       <p role="status" className="text-xs text-lmu-text-soft">
         <span className="font-mono">{data.dataset.eligible}</span> usable measurements · <span className="font-mono">{data.captures.verified}</span> of{' '}
         <span className="font-mono">{data.captures.indexed}</span> recordings matched to sessions.
@@ -93,7 +95,7 @@ export const LiveLearningPanel: React.FC = () => {
             <span className="font-mono">{data.minimumEvidence.trainExamples}</span> measurements, plus{' '}
             <span className="font-mono">{data.minimumEvidence.testSessions}</span> later sessions with{' '}
             <span className="font-mono">{data.minimumEvidence.testExamples}</span> measurements.</p>
-          <p>Groups keep layout, car, driver, game patch, weather, tyres and predictor version/source separate. Passing offline checks does not enable live corrections.</p>
+          <p>Groups keep layout, car, driver, game patch, weather, tyres and predictor version/source separate. After offline checks, fixed corrections must improve predictions on two fresh sessions with at least 20 measurements before automatic use. Later regressions withdraw them.</p>
           {data.resources.filter(resource => Object.keys(resource.gates).length > 0).map(resource => <div key={resource.kind}>
             <h4 className="font-semibold text-lmu-text-soft">{resource.kind === 'fuel' ? 'Fuel' : 'Virtual energy'}: checks still unmet</h4>
             <ul className="mt-1 space-y-1">{Object.entries(resource.gates).map(([gate, count]) => <li key={gate}>
