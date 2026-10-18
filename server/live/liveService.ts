@@ -189,7 +189,9 @@ export class LiveService {
     });
     const lost = (reason: string): void => {
       if (this.worker !== worker) return;
-      console.warn(`[Live] Shared memory reader ${reason}`);
+      // Active races keep reader failures in their diagnostic sidecar. Surface startup failures
+      // in the server console when there is no session diagnostic sink yet.
+      if (!this.options.capture?.diagnostics?.sink()) console.warn(`[Live] Shared memory reader ${reason}`);
       this.options.capture?.diagnostics?.record({ kind: 'reader-failure', at: Date.now(), data: { reason } });
       this.worker = null;
       this.processRunning = null;

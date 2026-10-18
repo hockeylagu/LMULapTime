@@ -9,6 +9,7 @@ import type { CaptureWorker } from '../../../server/live/capture/controller.js';
 import { LiveService, PEDAL_FLUSH_MS, TIMING_MIN_INTERVAL_MS } from '../../../server/live/liveService.js';
 import type { LiveServiceOptions, LiveWorker } from '../../../server/live/liveService.js';
 import type { RestAnswer } from '../../../server/live/lmuPitRest.js';
+import { LiveDiagnostics } from '../../../server/live/capture/diagnostics.js';
 
 class FakeWorker extends EventEmitter {
   public postMessage = vi.fn();
@@ -211,6 +212,22 @@ describe('LiveService', () => {
     worker.emit('message', { type: 'closed' });
     await Promise.resolve();
     expect(settled).toBe(true);
+  });
+
+  it('records reader failures in the active diagnostic sink without duplicating console warnings', async () => {
+    const diagnostics = new LiveDiagnostics('unused');
+    const record = vi.spyOn(diagnostics, 'record').mockImplementation(() => {});
+    vi.spyOn(diagnostics, 'sink').mockReturnValue(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const capture = new LiveCaptureController({ directory: 'unused', onPersist: () => {}, diagnostics });
+    const { service, worker } = setup({ capture });
+    try {
+      worker.emit('exit', 1);
+      expect(record).toHaveBeenCalledWith(expect.objectContaining({ kind: 'reader-failure',
+        data: { reason: 'exited with code 1' } }));
+      expect(warn).not.toHaveBeenCalled();
+      await service.stop();
+    } finally { vi.restoreAllMocks(); }
   });
 
   it('ignores messages that are not the reader\'s (tsx posts watch:import)', () => {
