@@ -99,6 +99,7 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
   if (!cohort.sessions.length) add('session', '/api/session/:id');
   const locator = cohort.telemetry;
   const base = locator ? `/api/session/${encodeURIComponent(locator.sessionId)}` : undefined;
+  add('live-evidence', '/api/session/:sessionId/live-evidence', locator ? `${base}/live-evidence?driverOrdinal=${locator.driverOrdinal}&lapOrdinal=${locator.lapOrdinal}` : undefined);
   add('telemetry-metadata', '/api/session/:sessionId/telemetry/metadata', base ? `${base}/telemetry/metadata` : undefined);
   for (const source of ['auto', 'vcr']) {
     add(`telemetry-${source}`, '/api/session/:sessionId/telemetry', locator ? `${base}/telemetry?driverOrdinal=${locator.driverOrdinal}&lapOrdinal=${locator.lapOrdinal}&pointSpacingM=2${source === 'vcr' ? '&source=vcr' : ''}` : undefined);

@@ -25,6 +25,7 @@ import { queryLivePersonalBest } from './core/sessionSummaries/contextQueries.js
 import { LiveCaptureController } from './live/capture/controller.js';
 import { getLiveCaptureIndexRows, listLiveCaptureManifests, upsertLiveCapture } from './core/live/dbLiveCaptureStore.js';
 import { reconcileLiveCaptures } from './live/capture/reconcile.js';
+import { createLiveEvidenceRouter } from './routes/liveEvidenceRoutes.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -143,6 +144,7 @@ app.use('/api', createSessionRouter(serverContext));
 app.use('/api', createLeaderboardRouter(serverContext));
 app.use('/api', createReplayRouter(serverContext));
 app.use('/api', createLiveRouter(serverContext, liveService, liveCapture));
+app.use('/api', createLiveEvidenceRouter(serverContext, captureDirectory));
 
 if (process.env.NODE_ENV !== 'test') {
   const server = app.listen(PORT, '127.0.0.1', () => {

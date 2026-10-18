@@ -19,6 +19,7 @@ import { createSessionRouter } from '../../server/routes/sessionRoutes.js';
 import { createLeaderboardRouter } from '../../server/routes/leaderboardRoutes.js';
 import { createReplayRouter } from '../../server/routes/replayRoutes.js';
 import { createLiveRouter } from '../../server/routes/liveRoutes.js';
+import { createLiveEvidenceRouter } from '../../server/routes/liveEvidenceRoutes.js';
 import { LiveService } from '../../server/live/liveService.js';
 
 /** SQLite backup includes committed WAL data and never modifies the user's database. */
@@ -64,6 +65,7 @@ export async function startBenchmarkServer(snapshot: string) {
   app.use('/api', createLeaderboardRouter(context));
   app.use('/api', createReplayRouter(context));
   app.use('/api', createLiveRouter(context, new LiveService()));
+  app.use('/api', createLiveEvidenceRouter(context, absent));
   const server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
   const baseUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;

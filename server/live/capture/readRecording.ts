@@ -1,0 +1,125 @@
+import path from 'node:path';
+import { lstat } from 'node:fs/promises';
+import { DuckDbReader } from '../../telemetry/duckdbReader.js';
+import { LIVE_CAPTURE_CHANNELS } from './channels.js';
+import { LIVE_CAPTURE_NORMALIZATION_VERSION, LIVE_CAPTURE_SCHEMA_VERSION } from '../../../shared/types/liveCapture.js';
+import type { LiveCaptureManifest, LiveCaptureObservation } from '../../../shared/types/liveCapture.js';
+import type { LiveEvidenceReadRequest, LiveLapEvidence, LiveEvidenceUnavailableReason, LiveEvidenceObservation } from '../../../shared/types/liveEvidence.js';
+import { LiveEvidenceReadError } from './readError.js';
+
+const MAX_SAMPLES = 50_000;
+const MAX_OBSERVATIONS = 1000;
+const MAX_OBSERVATION_BYTES = 1_000_000;
+const channels = LIVE_CAPTURE_CHANNELS.filter(channel => channel.verified && channel.frame === 'iso8855-vehicle');
+
+function fail(reason: LiveEvidenceUnavailableReason, message: string): never { throw new LiveEvidenceReadError(reason, message); }
+
+interface SampleRow { sample_index: number | bigint; elapsed_seconds: number; [key: string]: number | bigint | null }
+interface ObservationRow {
+  observation_id: number | bigint;
+  elapsed_seconds: number | null; received_at: number; request_started_at: number | null;
+  request_finished_at: number | null; source: LiveCaptureObservation['source']; kind: string; data: string | null;
+}
+
+async function readObservations(reader: DuckDbReader, start: number, end: number, untimed: boolean) {
+  const rows = await reader.queryAll<ObservationRow>(`WITH candidates AS (
+    SELECT * FROM capture_observations
+    WHERE ${untimed ? 'elapsed_seconds IS NULL' : 'elapsed_seconds >= ? AND elapsed_seconds <= ?'}
+    ORDER BY observation_id LIMIT ?
+  ), bounded AS (
+    SELECT *, SUM(octet_length(encode(CAST(data AS VARCHAR)))) OVER (ORDER BY observation_id) AS bytes FROM candidates
+  ) SELECT observation_id, elapsed_seconds, received_at, request_started_at, request_finished_at, source, kind,
+    CASE WHEN bytes <= ? THEN CAST(data AS VARCHAR) ELSE NULL END AS data FROM bounded ORDER BY observation_id`,
+    untimed ? [MAX_OBSERVATIONS + 1, MAX_OBSERVATION_BYTES] : [start, end, MAX_OBSERVATIONS + 1, MAX_OBSERVATION_BYTES]);
+  const observations: LiveEvidenceObservation[] = [];
+  let bytes = 0;
+  for (const row of rows.slice(0, MAX_OBSERVATIONS)) {
+    if (row.data === null) break;
+    bytes += Buffer.byteLength(row.data, 'utf8');
+    if (bytes > MAX_OBSERVATION_BYTES) break;
+    observations.push({ observationId: Number(row.observation_id), elapsedSeconds: row.elapsed_seconds, receivedAt: row.received_at,
+      source: row.source, kind: row.kind, data: JSON.parse(row.data) as unknown,
+      ...(row.request_started_at !== null && row.request_finished_at !== null
+        ? { requestStartedAt: row.request_started_at, requestFinishedAt: row.request_finished_at } : {}) });
+  }
+  return { observations, truncated: rows.length > observations.length };
+}
+
+/** Runs in an expendable reader worker, never on the game's capture path. */
+export async function readLiveRecording(request: LiveEvidenceReadRequest): Promise<LiveLapEvidence> {
+  const { manifest, startSeconds, durationSeconds, lapNumber } = request;
+  if (manifest.source !== 'live-capture' || manifest.schemaVersion !== LIVE_CAPTURE_SCHEMA_VERSION
+    || manifest.normalizationVersion !== LIVE_CAPTURE_NORMALIZATION_VERSION || manifest.signConvention !== 'iso8855') {
+    fail('incompatible', 'Capture index schema or normalization is incompatible with this reader');
+  }
+  if (!Number.isFinite(startSeconds) || startSeconds < 0 || !Number.isFinite(durationSeconds) || durationSeconds <= 0
+    || durationSeconds > 3600 || !Number.isSafeInteger(lapNumber) || lapNumber < 0) fail('unverified-clock', 'Invalid lap clock bounds');
+  if (!manifest.sessionId || manifest.status === 'recording') fail('unlinked', 'Capture is not finalized and verified');
+  const directory = path.resolve(request.directory);
+  const filename = path.resolve(directory, manifest.filename);
+  if (path.dirname(filename) !== directory || path.basename(manifest.filename) !== manifest.filename) fail('incompatible', 'Invalid recording filename');
+  try {
+    const stat = await lstat(filename);
+    if (!stat.isFile() || stat.isSymbolicLink()) fail('incompatible', 'Recording is not a regular file');
+  } catch (error: unknown) {
+    if (error instanceof LiveEvidenceReadError) throw error;
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT') fail('missing', 'Live capture file was removed');
+    throw error;
+  }
+  const reader = new DuckDbReader(filename);
+  try {
+    const metadata = new Map((await reader.queryAll<{ key: string; value: string }>('SELECT key, value FROM capture_metadata'))
+      .map(row => [row.key, row.value]));
+    if (metadata.get('source') !== 'live-capture' || metadata.get('recording_id') !== manifest.recordingId
+      || metadata.get('schema_version') !== String(LIVE_CAPTURE_SCHEMA_VERSION)
+      || metadata.get('normalization_version') !== String(LIVE_CAPTURE_NORMALIZATION_VERSION)
+      || metadata.get('sign_convention') !== 'iso8855' || metadata.get('filename') !== manifest.filename) {
+      fail('incompatible', 'Live capture signature does not match the verified index');
+    }
+    const rows = await reader.queryAll<{ manifest_json: string }>('SELECT CAST(manifest_json AS VARCHAR) AS manifest_json FROM capture_manifest WHERE singleton = TRUE');
+    const stored = rows.length === 1 ? JSON.parse(rows[0].manifest_json) as LiveCaptureManifest : null;
+    if (!stored || stored.recordingId !== manifest.recordingId || stored.layoutKey !== manifest.layoutKey
+      || stored.driverName !== manifest.driverName || stored.vehicleName !== manifest.vehicleName
+      || stored.sessionCode !== manifest.sessionCode || stored.startedAt !== manifest.startedAt
+      || stored.samples !== manifest.samples || stored.lastElapsedSeconds !== manifest.lastElapsedSeconds
+      || stored.sessionId !== null && stored.sessionId !== manifest.sessionId
+      || JSON.stringify(stored.anchors) !== JSON.stringify(manifest.anchors)) {
+      fail('changed', 'Recording identity or coverage changed; refresh the capture index');
+    }
+    const anchor = stored.anchors.filter(item => item.lapNumber === lapNumber);
+    if (anchor.length !== 1 || anchor[0].startSeconds !== startSeconds || anchor[0].lapSeconds === null
+      || Math.abs(anchor[0].lapSeconds - durationSeconds) > 0.05) fail('unverified-clock', 'Lap anchor is not verified against XML');
+    const catalog = await reader.queryAll<{ ordinal: number; name: string; unit: string; frame: string; verified: boolean }>(
+      'SELECT ordinal, name, unit, frame, verified FROM capture_channels ORDER BY ordinal');
+    if (catalog.length !== LIVE_CAPTURE_CHANNELS.length || catalog.some((item, index) => {
+      const expected = LIVE_CAPTURE_CHANNELS[index];
+      return item.ordinal !== index || item.name !== expected.name || item.unit !== expected.unit
+        || item.frame !== expected.frame || item.verified !== expected.verified;
+    })) fail('incompatible', 'Live capture channel conventions do not match this reader');
+    const end = startSeconds + durationSeconds;
+    // Raw telemetry lap counters may be zero-based; verified scoring anchors select the time interval.
+    const samples = await reader.queryAll<SampleRow>(`SELECT sample_index, elapsed_seconds,
+      ${channels.map(channel => `"${channel.name}"`).join(', ')} FROM capture_samples
+      WHERE elapsed_seconds >= ? AND elapsed_seconds <= ? ORDER BY sample_index LIMIT ?`, [startSeconds, end, MAX_SAMPLES + 1]);
+    if (samples.length > MAX_SAMPLES) fail('too-large', 'Lap exceeds the 50,000-sample read limit');
+    const points = samples.map(row => ({ sampleIndex: Number(row.sample_index), elapsedSeconds: row.elapsed_seconds,
+      lapSeconds: row.elapsed_seconds - startSeconds,
+      values: channels.map(channel => typeof row[channel.name] === 'number' && Number.isFinite(row[channel.name]) ? Number(row[channel.name]) : null) }));
+    const gaps: LiveLapEvidence['coverage']['gaps'] = [];
+    for (let index = 1; index < points.length; index++) {
+      const before = points[index - 1];
+      const after = points[index];
+      if (after.elapsedSeconds <= before.elapsedSeconds) fail('changed', 'Stored sample clock is not strictly increasing');
+      if (after.lapSeconds - before.lapSeconds > 0.100000001) gaps.push({ afterLapSeconds: before.lapSeconds, beforeLapSeconds: after.lapSeconds });
+    }
+    const timed = await readObservations(reader, startSeconds, end, false);
+    const untimed = await readObservations(reader, startSeconds, end, true);
+    return { source: 'live-capture', recordingId: manifest.recordingId, schemaVersion: manifest.schemaVersion,
+      normalizationVersion: manifest.normalizationVersion, signConvention: 'iso8855', gameVersion: manifest.gameVersion,
+      lapNumber, startSeconds, durationSeconds, channels: channels.map(channel => ({ name: channel.name, unit: channel.unit,
+        frame: 'iso8855-vehicle', sourceField: channel.sourceField })), points, observations: timed.observations,
+      sessionObservations: untimed.observations, observationsTruncated: timed.truncated || untimed.truncated,
+      coverage: { firstLapSeconds: points[0]?.lapSeconds ?? null, lastLapSeconds: points[points.length - 1]?.lapSeconds ?? null,
+        gaps, recordingDroppedSamples: manifest.droppedSamples } };
+  } finally { await reader.close(); }
+}
