@@ -1,5 +1,14 @@
 # Endpoint performance history
 
+## Automatic learning lifecycle — 2026-10-18
+
+Twenty-request sweeps matched the manual-readiness baseline dataset (`61b58d425945`), request cohort
+and runtime/plugin environment. No shared endpoint exceeded both regression thresholds (>20% and
+>5 ms). Learning readiness returned 0.73 KiB at 138.06 ms median and 146.66 ms p95, including worker
+startup/exit. Reports: `.cache/learning-readiness-endpoints/` (before) and
+`.cache/automatic-learning-endpoints/` (after). The source database was unchanged; these empty-learning
+dataset measurements do not establish populated training throughput or in-game overhead.
+
 ## Manual learning readiness — 2026-10-18
 
 Twenty-request sweeps used the same dataset (`61b58d425945`), cohort and plugin revision as

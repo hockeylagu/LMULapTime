@@ -5,7 +5,7 @@ compact UI counts. `readinessReader.ts` and its worker/bootstrap use one read-on
 a transaction and a 15-second deadline. `GET /api/live/learning` gates loaded sessions/open writer
 handles, cancels on session start/disconnect and serves no stored report. `LiveLearningPanel` under
 Settings → Learning requests it manually, separates fuel/VE and shows excluded evidence,
-minimums and unmet offline gates. No activation or live-prediction change is implemented.
+minimums, unmet offline gates and automatic correction availability/validation counts.
 
 Fuel/VE learning foundation: `shared/domain/learning/capture.ts` freezes both resource forecasts at lap
 start and emits independently measured outcomes without dashboard clients. Versioned events live in
@@ -18,8 +18,16 @@ cleanup. `shared/domain/learning/evaluate.ts` splits whole sessions chronologica
 fuel/VE metrics and exact compatibility cohorts. `npm run learning:evaluate` prints a read-only report.
 `shared/domain/learning/calibration.ts` screens a session-median residual correction using only earlier
 training sessions, shrinkage, a 10% bound and fixed evidence/error gates on later sessions. Report
-version 2 includes candidate parameters and rejection reasons. Nothing is persisted or activated;
-the existing live rolling estimator remains. Full strategy audit checkpoints now share session DuckDB.
+version 3 includes candidate parameters, rejection reasons and automatic model status.
+`shared/domain/learning/automatic.ts` holds fixed screened candidates until genuinely fresh sessions
+pass the shared calibration error gates; changed support or later regressions withdraw them.
+`server/live/learning/automaticWorker.ts` evaluates a read-only snapshot off track;
+`runtime.ts` rejects stale/cancelled results, persists through `dbLearningModelStore.ts`, and holds
+an in-memory map for exact live lookup. XML patch trust is restricted to captures started in the current
+observed game run and cleared on closure. `learning/cohort.ts` owns the shared compatibility key.
+`LiveStrategyTracker` applies bounded corrections to advice while `learningForecasts()` keeps the
+original version-3 baseline; audits are version 4. `LMU_LIVE_LEARNING=0` disables promotion/use.
+Full strategy audit checkpoints share session DuckDB. Real-game acceptance remains outstanding.
 
 Disposable live diagnostics: `server/live/capture/diagnostics.ts` writes adjacent session JSONL sidecars
 with bounded async buffering, changed-response/one-minute checkpoint deduplication, explicit failures,

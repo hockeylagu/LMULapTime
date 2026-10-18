@@ -144,20 +144,44 @@ are conservative engineering defaults, not a validated accuracy guarantee. Reusi
 select candidates makes it unsuitable as final independent acceptance evidence; validate on fresh
 sessions before any activation. No parameters are persisted or applied to live advice.
 
-The current predictor still uses the rolling estimator/game fallback. Historical corrections remain
-disabled. Audit checkpoints remain in the consolidated recording source;
-correction activation and real-game validation remain in the
+Automatic learning runs after reconciliation/projection refresh, outside loaded sessions and open
+writer handles. A read-only worker screens candidates, then persists fixed parameters, their exact
+cohort and supporting-data signature in `live_learning_models`. Screening never activates a model.
+Acceptance requires at least two sessions and 20 examples that started **after candidate creation**,
+passing the same error gates. Backfilled historical sessions cannot serve as fresh acceptance.
+The candidate is not refitted on acceptance data. Further off-track evaluations withdraw it if support
+changes, acceptance evidence disappears or prospective error gates regress; replacements start validation again.
+
+The live planner uses eligible active corrections, bounded to ±10%, over its rolling estimator/game
+fallback. Lap-start training events still freeze the uncorrected baseline (version 3), preventing
+recursive bias fitting; corrected advice/audits use model version 4. Resource/garage plans disclose
+the baseline and applied adjustment, and dashboard source text identifies learned advice.
+Exact layout, car, driver, XML patch, weather, compound and baseline source/version must match.
+Because shared memory has no verified patch, runtime patch trust requires a verified completed capture
+started during this observed continuous game run. Closing LMU clears trust; until a new result is
+matched after restart, ordinary estimation applies. No last-known patch is guessed across game runs.
+
+Worker work is cancelled at session load, bounded to 15 seconds, and discarded if SQLite changed
+while it ran. Training failures clear the in-memory corrections. Unchanged data skips repeated
+evaluation. All per-frame use is an in-memory lookup with no database reads. Set
+`LMU_LIVE_LEARNING=0` before starting the server to disable automatic promotion/use; recording continues.
+These implementation gates are engineering defaults; actual improvement and overhead still require
+real-game acceptance. Audit checkpoints remain in the consolidated recording source;
+real-game validation remains in the
 [active plan](plans/LIVE_SESSION_EVIDENCE.md). The delivered foundation and original design are in the
 [archived implementation record](plans/archive/LIVE_SESSION_EVIDENCE_FOUNDATION.md).
 
 ## Learning readiness in Settings
 
 Settings → **Learning** runs only when **Check evidence** is pressed.
-It shows usable measurements, verified recording counts, failed/pending processing, unavailable raw
+It shows automatic learning configuration and active/validating correction counts, usable measurements,
+verified recording counts, failed/pending processing, unavailable raw
 files, separate fuel/VE earlier/later counts, offline matching-group results and readable exclusion
 reasons. Expand the minimum-evidence section for policy requirements and unmet checks. The checked
 time identifies the snapshot; refresh manually after ingestion completes. Passing offline checks
-never enables corrections.
+alone never enables corrections. Recording, fitting, prospective acceptance and withdrawal run
+automatically without this button; it only refreshes the displayed status. Available corrections
+still require current-run patch trust and an exact live match before use.
 
 `GET /api/live/learning` supplies this compact status from the same canonical evaluation as the CLI.
 It returns aggregate counts and reasons. The audit checkpoints remain available directly in DuckDB.

@@ -54,7 +54,8 @@ session recording uses its own DuckDB file, linked strictly to XML identity and 
 ISO 8855 dynamics augment yaw/body-slip charts; disposable response/error diagnostics support race
 debugging. Strategy audit checkpoints share the session DuckDB for direct inspection. Frozen fuel/VE forecasts and measured outcomes feed an offline baseline and bounded correction candidate evaluator.
 Settings → Learning includes a manual learning-evidence check with separate fuel/VE counts,
-exclusion reasons and offline readiness. Historical prediction corrections remain disabled; real-game
+exclusion reasons, offline readiness and automatic correction status. Corrections require fresh-session
+validation and an exact live identity/patch match; `LMU_LIVE_LEARNING=0` disables them. Real-game
 overhead validation is pending.
 See [live capture storage and channels](docs/LIVE_CAPTURE_FORMAT.md).
 

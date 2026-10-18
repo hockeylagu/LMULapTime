@@ -1,7 +1,7 @@
 # Live session evidence and learning — remaining work
 
 Reviewed 2026-10-18 on `codex/live-session-evidence`. Capture and the first offline learning
-foundation are implemented. Historical prediction corrections remain disabled.
+foundation and automatic correction lifecycle are implemented. Real-game acceptance remains outstanding.
 
 The delivered design and verification record is archived in
 [Live session evidence foundation](archive/LIVE_SESSION_EVIDENCE_FOUNDATION.md).
@@ -19,7 +19,8 @@ The current storage, channel and operational contract is [Live capture format](.
 | Learning | Frozen fuel/VE forecasts and measured outcomes, compact SQLite examples, chronological baseline and bounded offline correction candidate evaluation implemented |
 | Review fixes | Deferred recovery while layout is unresolved, consistent six-slot batch capacity and exact lap revalidation implemented |
 | Learning readiness | Settings → Learning has a manual evidence check; read-only worker, resource-separated counts, exclusions and offline gates; cancelled when a game session starts |
-| Acceptance | Real-game performance and race-weekend validation deferred by user; correction activation and runtime fallback/rollback controls pending |
+| Automatic corrections | Off-track fitting, fixed-candidate fresh-session validation, persistence, exact runtime matching, baseline fallback, automatic withdrawal and environment disable switch implemented |
+| Acceptance | Real-game performance, race-weekend behavior and prospective prediction improvement deferred by user |
 
 ## Next implementation and acceptance work
 
@@ -36,8 +37,11 @@ The current storage, channel and operational contract is [Live capture format](.
 4. Learning readiness and exclusion reasons are now visible in Settings → Learning. A manual
    check uses compact SQLite facts through a read-only worker, never live polling. The CLI screens a deterministic
    session-median residual correction with shrinkage, minimum evidence and a 10% adjustment bound.
-   Review compatible real cohorts and validate the fixed policy on fresh sessions before activation.
-   Define runtime fallback/rollback and promotion controls separately; no correction is enabled.
+   Automatic candidates now remain fixed while at least two genuinely fresh sessions and 20 examples
+   validate the same error gates. Accepted corrections apply only to exact live cohorts with a verified
+   XML patch from the current observed game run. Changed support, lost acceptance evidence or later
+   regressions withdraw corrections; failures fall back. `LMU_LIVE_LEARNING=0` disables promotion/use.
+   Verify this lifecycle and actual improvement using compatible real cohorts during acceptance.
 5. Verify additional wheel channels against new source evidence before populating their reserved columns.
    Broader damage/weather learning consumers require separate deterministic targets and validation.
 
@@ -82,3 +86,10 @@ Separate Learning section, 2026-10-18: moved readiness to its own Settings panel
 navigation and search, following the requested placement. All 3,203 tests passed, 56 intentionally
 skipped; production build passed without warnings. Desktop inspection and independent placement
 review passed. The evidence check remains manual, with no request when opening Settings.
+
+Automatic lifecycle, 2026-10-18: 3,212 tests passed, 56 intentionally skipped; production build
+passed without warnings. Tests cover prospective acceptance, backfilled-session exclusion, support
+invalidation, regression withdrawal, exact live matching, current-run XML patch trust, disable/fallback,
+worker cancellation, stale-result rejection and uncorrected training forecasts. Settings copy was
+checked with synthetic data; the UI detector had no findings. Matching-dataset endpoint checks found
+no regressions above the threshold. Real-game performance and prediction improvement remain unvalidated.
