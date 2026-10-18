@@ -79,6 +79,7 @@ export const DEMO_SCENARIOS: readonly Scenario[] = [
   scenario('drying', 'Alternative conditions and incidents', 'Drying · rain ending', s => { Object.assign(s.weather!, { avgPathWetness: 0.3, wetnessTrend: 'falling' }); s.strategy!.forecast = { change: 'dry', chance: 0, atSeconds: 2100, lap: 20 }; }),
   scenario('fcy', 'Alternative conditions and incidents', 'Full course yellow', s => { s.session!.gamePhase = 6; }),
   scenario('paused', 'Alternative conditions and incidents', 'Paused', s => { s.paused = true; s.session!.gamePhase = 9; }),
+  scenario('not-recording', 'Alternative conditions and incidents', 'Recording stopped', s => { s.audit = { runId: 'demo', status: 'unavailable' }; }),
   scenario('tyres', 'Alternative conditions and incidents', 'Tread below minimum · sets short', s => { s.strategy!.tyres!.coverage = { target: 'pit', projectedTread: 0.32, setsNeeded: 2, availableSetsCover: false }; s.strategy!.tyres!.newSets = 0; }),
   scenario('tyres-mfd', 'Alternative conditions and incidents', 'Worn tyres · MFD no change', s => {
     s.strategy!.resource!.race!.pitInLaps = 1; s.strategy!.tyres!.coverage = { target: 'pit', projectedTread: 0.32, setsNeeded: 2, availableSetsCover: false };

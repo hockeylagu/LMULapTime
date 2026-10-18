@@ -66,6 +66,9 @@ describe('LivePage', () => {
     send(snapshot({ sequence: 2, paused: true }));
     expect(screen.getByTestId('live-status')).toHaveTextContent('PAUSED');
     expect(screen.getByTestId('live-race-position')).toHaveTextContent('P3');
+    // A stopped recording takes the same slot, so the driver knows before the race ends.
+    send(snapshot({ sequence: 3, audit: { runId: 'run', status: 'unavailable' } }));
+    expect(screen.getByTestId('live-status')).toHaveTextContent('NO REC');
   });
 
   it('replaces live content with DATA LOST when the heartbeat goes silent', () => {

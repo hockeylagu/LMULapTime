@@ -112,6 +112,9 @@ DuckDB evidence and compact learning facts intact. Automatic cleanup is deferred
 stability is established; no retention cleanup or cleanup UI is implemented.
 Active-session reader failures go to the sidecar without a duplicate console warning; reader failures
 before a session sink exists and failures of the diagnostic writer itself remain operational console errors.
+Failed game REST reads and reader restarts are also saved in the recording itself as `failure`
+observations (path and outcome), so a race can be analysed later from DuckDB alone. If the recording
+itself stops, the dashboard status slot shows **NO REC** (demo scenario *Recording stopped*).
 
 ## Consolidated strategy audit
 

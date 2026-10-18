@@ -38,6 +38,8 @@ export function LiveSessionBar({ snapshot, connection }: LiveSessionBarProps) {
   const forecast = showSession ? snapshot.strategy?.forecast ?? null : null;
   const status = STATUS[connection];
   const paused = showSession && connection === 'live' && snapshot.paused;
+  // The recording stopped (disk, writer): say so, so a missing capture is not found only after the race.
+  const notRecording = showSession && connection === 'live' && snapshot.audit?.status === 'unavailable';
   return (
     <header className="flex h-[88px] shrink-0 items-center justify-between whitespace-nowrap border-b border-lmu-border pb-5 text-[48px] font-semibold">
       <div className="flex items-center gap-7">
@@ -95,9 +97,9 @@ export function LiveSessionBar({ snapshot, connection }: LiveSessionBarProps) {
             <span className="text-lmu-muted">PR</span> <b className="inline-block min-w-[8ch] text-right font-mono font-normal text-lmu-text-soft">{formatLapTime(personalBest)}</b>
           </span>
         )}
-        {/* PAUSED takes the status slot, which is as wide as PAUSED in a session, so pausing moves nothing. */}
-        <span data-testid="live-status" className={`font-mono ${showSession ? 'min-w-[6ch] text-right' : ''} ${paused ? 'text-lmu-warn' : status.className}`}>
-          {paused ? 'PAUSED' : status.label}
+        {/* PAUSED or NO REC takes the status slot, which is as wide as PAUSED in a session, so nothing moves. */}
+        <span data-testid="live-status" className={`font-mono ${showSession ? 'min-w-[6ch] text-right' : ''} ${paused || notRecording ? 'text-lmu-warn' : status.className}`}>
+          {paused ? 'PAUSED' : notRecording ? 'NO REC' : status.label}
         </span>
       </div>
     </header>
