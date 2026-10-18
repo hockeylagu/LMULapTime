@@ -88,11 +88,14 @@ describe('live evidence reader worker', () => {
     expect(evidence.sessionObservations.reduce((total, item) => total + JSON.stringify(item.data).length, 0)).toBeLessThanOrEqual(1_000_000);
   });
 
-  it('rejects excess concurrent readers without queueing work on the capture worker', async () => {
+  it('queues a few reads behind two running ones and asks the rest to retry', async () => {
     const request = await recording();
     const reader = new LiveEvidenceReader();
-    const pending = [reader.read(request), reader.read(request)];
+    const pending = Array.from({ length: 4 }, () => reader.read(request));
     try { await expect(reader.read(request)).rejects.toMatchObject({ reason: 'busy' }); }
-    finally { await Promise.all(pending); }
+    finally {
+      const results = await Promise.all(pending);
+      expect(results.every(result => result.recordingId === request.manifest.recordingId)).toBe(true);
+    }
   });
 });
