@@ -209,7 +209,7 @@ export const TelemetryResolutionPopover: React.FC<TelemetryResolutionPopoverProp
             >
               <div className="flex items-center gap-1.5 font-semibold text-[11px]">
                 <Zap className="w-3 h-3 text-lmu-warn" />
-                100Hz DuckDB
+                Native telemetry
               </div>
               <span className="text-[10px] text-lmu-muted mt-1 font-mono">
                 {duckdbResolutionLabel}

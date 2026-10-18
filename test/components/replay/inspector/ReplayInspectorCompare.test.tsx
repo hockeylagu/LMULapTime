@@ -427,7 +427,7 @@ describe('ReplayInspectorModal - Comparison & Source Modes', () => {
     fireEvent.click(screen.getByRole('button', { name: /Rate|Hz/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /100Hz DuckDB/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Native telemetry/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Native VCR/i })).toBeInTheDocument();
     });
 
@@ -440,10 +440,10 @@ describe('ReplayInspectorModal - Comparison & Source Modes', () => {
     fireEvent.click(screen.getByRole('button', { name: /Rate|Hz/i }));
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /100Hz DuckDB/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Native telemetry/i })).toBeInTheDocument();
     });
 
-    fireEvent.click(screen.getByRole('button', { name: /100Hz DuckDB/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Native telemetry/i }));
 
     await waitFor(() => {
       expect(requestedUrls.some((u) => u.includes('source=duckdb'))).toBe(true);

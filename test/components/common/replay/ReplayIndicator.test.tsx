@@ -131,7 +131,7 @@ describe('ReplayIndicator', () => {
     expect(screen.getByRole('status', { name: /Replay processing failed/ })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Open replay/ })).not.toBeInTheDocument();
     rerender(display(true));
-    expect(screen.getByRole('button', { name: /DuckDB telemetry is available/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /native telemetry is available/i })).toBeInTheDocument();
   });
 
   it('keeps launch enabled for cached player data or DuckDB after a secondary failure', () => {

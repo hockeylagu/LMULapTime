@@ -70,7 +70,7 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
   return (
     <SettingsPanel sectionId="folder-paths">
       <p className="text-xs text-lmu-muted">
-        Where Le Mans Ultimate writes XML results, VCR replays and DuckDB telemetry.
+        Where Le Mans Ultimate writes XML results, VCR replays and native telemetry.
       </p>
 
       {sessionScanStatus?.running && (
@@ -141,7 +141,7 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
         <PathField
           id="telemetry-dir"
           label="Telemetry"
-          help="DuckDB telemetry files, usually UserData\Telemetry."
+          help="Native telemetry files (.duckdb), usually UserData\Telemetry."
           value={telemetryDirInput}
           onChange={setTelemetryDirInput}
           icon={folderIcon}

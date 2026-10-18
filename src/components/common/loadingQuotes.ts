@@ -17,7 +17,7 @@ export const LOADING_QUOTES: readonly string[] = [
   'Checking whether the tire degradation is physical or psychological...',
   'Convincing race control that the cut at Monza T1 was a tactical detour...',
   'Applying 100% brake pressure and praying for mechanical grip...',
-  'Re-indexing DuckDB frames faster than a GT3 car through Tertre Rouge...',
+  'Re-indexing native telemetry faster than a GT3 car through Tertre Rouge...',
   'Hunting down that phantom vibration in the force feedback...',
   'Negotiating with the differential for a little more corner rotation...',
   'Checking the radar: 100% chance of yellow flags at the start...',

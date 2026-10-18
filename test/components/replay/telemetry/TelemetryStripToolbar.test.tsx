@@ -111,7 +111,7 @@ describe('TelemetryStripToolbar', () => {
     const vcrBtn = screen.getByRole('button', { name: /Native VCR/i });
     expect(vcrBtn).toBeInTheDocument();
 
-    const duckBtn = screen.getByRole('button', { name: /100Hz DuckDB/i });
+    const duckBtn = screen.getByRole('button', { name: /Native telemetry/i });
     expect(duckBtn).toBeInTheDocument();
 
     fireEvent.click(vcrBtn);

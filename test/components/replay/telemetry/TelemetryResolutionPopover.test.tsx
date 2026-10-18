@@ -80,7 +80,7 @@ describe('TelemetryResolutionPopover', () => {
       />
     );
 
-    const duckdbButton = screen.getByRole('button', { name: /100Hz DuckDB/i });
+    const duckdbButton = screen.getByRole('button', { name: /Native telemetry/i });
     expect(duckdbButton).toBeDisabled();
     expect(screen.getByText(/DuckDB telemetry is incomplete/i)).toBeInTheDocument();
 

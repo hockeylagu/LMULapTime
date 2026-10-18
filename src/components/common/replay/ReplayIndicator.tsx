@@ -58,7 +58,7 @@ export const ReplayIndicator: React.FC<ReplayIndicatorProps> = ({
 
   const title = isDuckDb ? 'Replay + telemetry' : 'Replay';
   const partialWarning = partialFailure
-    ? `${job?.playable ? 'Some replay drivers are unavailable' : 'Replay cache unavailable; DuckDB telemetry is available'}${job?.error ? ` — ${job.error}` : ''}`
+    ? `${job?.playable ? 'Some replay drivers are unavailable' : 'Replay cache unavailable; native telemetry is available'}${job?.error ? ` — ${job.error}` : ''}`
     : '';
   const indicatorTitle = partialWarning ? `${title} — ${partialWarning}` : title;
   const ariaLabel = partialFailure ? `Open replay telemetry; ${partialWarning}` : 'Open replay telemetry';
