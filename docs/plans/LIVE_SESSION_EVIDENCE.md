@@ -18,7 +18,8 @@ The current storage, channel and operational contract is [Live capture format](.
 | Audit consolidation | Full checkpoints in session DuckDB independent of dashboard; direct DuckDB debugging; JSON/CSV export endpoints/UI/workers and old SQLite compatibility removed |
 | Learning | Frozen fuel/VE forecasts and measured outcomes, compact SQLite examples, chronological baseline and bounded offline correction candidate evaluation implemented |
 | Review fixes | Deferred recovery while layout is unresolved, consistent six-slot batch capacity and exact lap revalidation implemented |
-| Acceptance | Real-game performance and race-weekend validation deferred by user; correction activation and learning UI pending |
+| Learning readiness | Settings → Live dashboard has a manual evidence check; read-only worker, resource-separated counts, exclusions and offline gates; cancelled when a game session starts |
+| Acceptance | Real-game performance and race-weekend validation deferred by user; correction activation and runtime fallback/rollback controls pending |
 
 ## Next implementation and acceptance work
 
@@ -32,7 +33,8 @@ The current storage, channel and operational contract is [Live capture format](.
    export endpoints, UI and reader workers are removed by user request. The inspected old SQLite audit
    table/data was deleted with approval, and its compatibility store/tests are removed. No automatic
    deletion migration or pruning runs. Verify real race checkpoints during later in-game validation.
-4. Expose learning readiness and exclusion reasons in the app. The CLI now screens a deterministic
+4. Learning readiness and exclusion reasons are now visible in Settings → Live dashboard. A manual
+   check uses compact SQLite facts through a read-only worker, never live polling. The CLI screens a deterministic
    session-median residual correction with shrinkage, minimum evidence and a 10% adjustment bound.
    Review compatible real cohorts and validate the fixed policy on fresh sessions before activation.
    Define runtime fallback/rollback and promotion controls separately; no correction is enabled.
@@ -69,3 +71,9 @@ Audit export removal, 2026-10-18: JSON/CSV endpoints, settings export UI, export
 their seven export-specific tests removed by user request. DuckDB checkpoint capture and independent
 learning events remain unchanged. Final suite: 3,192 passed, 56 intentionally skipped; final production
 build passed without warnings. Remaining endpoints passed matching-dataset performance checks.
+
+Learning readiness, 2026-10-18: 3,202 tests passed, 56 intentionally skipped; final build passed
+without warnings. Tests cover manual-only requests, empty/evaluated/deferred/error UI states,
+canonical exclusions, retained compact facts, read-only worker concurrency/cancellation and loaded
+session/writer-handle gates. Mock-data desktop inspection and independent subsection review passed;
+matching-dataset endpoint checks found no threshold regressions. No live-game validation performed.

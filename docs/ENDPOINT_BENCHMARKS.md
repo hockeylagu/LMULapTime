@@ -1,5 +1,15 @@
 # Endpoint performance history
 
+## Manual learning readiness — 2026-10-18
+
+Twenty-request sweeps used the same dataset (`61b58d425945`), cohort and plugin revision as
+`.cache/audit-export-removal-after/`. No existing endpoint exceeded both regression thresholds
+(>20% and >5 ms). The new `/api/live/learning` status returned 683 bytes from the empty learning
+dataset: 135.19 ms median, 144.68 ms p95, including independent read-only worker startup/exit.
+This does not measure a populated learning dataset or live-game overhead. It runs only on manual
+request, is deferred during a loaded session/open capture writer, and is cancelled when driving starts.
+After report: `.cache/learning-readiness-endpoints/`.
+
 ## Remove audit JSON/CSV exports — 2026-10-18
 
 The audit JSON and CSV routes and their benchmark cases are removed by user request. The remaining

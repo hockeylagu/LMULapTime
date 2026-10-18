@@ -1,5 +1,12 @@
 # Code Map: where things live and how they flow
 
+Learning readiness: `server/live/learning/readiness.ts` projects the CLI's canonical evaluation into
+compact UI counts. `readinessReader.ts` and its worker/bootstrap use one read-only SQLite worker,
+a transaction and a 15-second deadline. `GET /api/live/learning` gates loaded sessions/open writer
+handles, cancels on session start/disconnect and serves no stored report. `LiveLearningPanel` under
+Settings → Live dashboard requests it manually, separates fuel/VE and shows excluded evidence,
+minimums and unmet offline gates. No activation or live-prediction change is implemented.
+
 Fuel/VE learning foundation: `shared/domain/learning/capture.ts` freezes both resource forecasts at lap
 start and emits independently measured outcomes without dashboard clients. Versioned events live in
 the session DuckDB, separate from disposable diagnostics. `server/live/learning/` validates compact
@@ -75,6 +82,10 @@ SQLite audit retirement, 2026-10-18: obsolete store/tests removed after approved
 
 Audit export removal, 2026-10-18: 3,192 tests passed, 56 intentionally skipped; final production build
 clean. Removed export-only tests account for the lower count. DuckDB audit and learning capture remain.
+
+Manual learning readiness, 2026-10-18: 3,202 tests passed, 56 intentionally skipped; final build clean.
+Read-only worker, loaded-session cancellation, compact status API and manual Settings interactions
+are verified. Mock-data desktop subsection review passed; real-game validation remains deferred.
 
 Historical baseline, last checked 2026-10-12 after the type refactoring follow-ups (main `25d1e988`): 476 TypeScript source files
 in src/server/shared, 305 test suites (300 passed, 5 skipped), 2663 tests (2607 passed, 56 skipped); the

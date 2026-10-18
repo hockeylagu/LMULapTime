@@ -146,6 +146,23 @@ sessions before any activation. No parameters are persisted or applied to live a
 
 The current predictor still uses the rolling estimator/game fallback. Historical corrections remain
 disabled. Audit checkpoints remain in the consolidated recording source;
-learning UI, correction activation and real-game validation remain in the
+correction activation and real-game validation remain in the
 [active plan](plans/LIVE_SESSION_EVIDENCE.md). The delivered foundation and original design are in the
 [archived implementation record](plans/archive/LIVE_SESSION_EVIDENCE_FOUNDATION.md).
+
+## Learning readiness in Settings
+
+Settings → Live dashboard → **Learning evidence** runs only when **Check evidence** is pressed.
+It shows usable measurements, verified recording counts, failed/pending processing, unavailable raw
+files, separate fuel/VE earlier/later counts, offline matching-group results and readable exclusion
+reasons. Expand the minimum-evidence section for policy requirements and unmet checks. The checked
+time identifies the snapshot; refresh manually after ingestion completes. Passing offline checks
+never enables corrections.
+
+`GET /api/live/learning` supplies this compact status from the same canonical evaluation as the CLI.
+It returns aggregate counts and reasons. The audit checkpoints remain available directly in DuckDB.
+The server defers work while a game session is loaded or capture writer handles remain open. A new
+session or client disconnect cancels an in-flight check. Evaluation uses one independent read-only
+SQLite worker, a consistent transaction, the existing 100,000-example bound and a 15-second timeout;
+no recording file is opened, and no report is persisted. Busy/time-out errors offer manual retry.
+Opening Settings does not start a check or recurring requests. All live predictions stay unchanged.
