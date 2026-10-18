@@ -1,18 +1,43 @@
 # Live session evidence and learning ingestion
 
-Status: Capture foundation, aligned evidence API and chart integration implemented and validated, 2026-10-18.
-Learning/calibration remains planned.
+Status: Capture, reconciliation, aligned evidence API, chart integration and disposable diagnostics coded
+on `codex/live-session-evidence`, reviewed 2026-10-18. Automated checks pass; real-game validation is pending.
+Learning dataset extraction and historical calibration have not been implemented.
 Reviewed: Source, 199 native DuckDB catalogs, saved memory/REST recordings and synthetic integration tests.
 Scope: Persist live data as a fourth source alongside XML, replay and native telemetry; reconcile it to sessions;
 derive traceable evidence for analytics and deterministic learning.
 Dependencies: Existing live reader and replay-safe REST polling, normalized session storage, canonical
 layout/vehicle definitions, replay reconciliation, and multi-file DuckDB ownership.
-Next step: Validate capture overhead and session linking during a real LMU session, then build the
-deterministic evidence consumers described below; use the matched XML game patch.
+Next coding step: Build deduplicated, versioned fuel/VE learning examples and a chronological baseline
+evaluation before enabling historical corrections. Real-game capture/linking/performance validation is
+a separate outstanding acceptance gate; it does not prevent building the offline pipeline.
 Completion gate: Recoverable, versioned captures attach only to verified sessions, retain channel-level
 provenance, and produce deduplicated learning examples with chronological validation.
 
 ## Implementation status — 2026-10-18
+
+### Delivery checkpoint
+
+| Area | Current state | Remaining work |
+|---|---|---|
+| Automatic capture | Coded; independent of dashboard subscribers; one player-only DuckDB per attempt | Real LMU lifecycle and performance validation |
+| Channel normalization | Six verified ISO 8855 vehicle-vector channels plus sparse REST/scoring evidence | 24 wheel columns stay NULL until their conventions are verified |
+| Session attachment | SQLite source index, strict XML reconciliation, patch inheritance, missing-file handling | Validate real race-weekend links/restarts/swaps; do not relax ambiguous matching |
+| Read/analysis path | Bounded off-track evidence workers, lap alignment, yaw/body-slip chart enrichment | Broader resource/tyre/weather/stop projections are not built |
+| Diagnostics | Disposable JSONL sidecars, post-session tail, deferred gzip, manual cleanup | Real-session storage/overhead measurements; no cleanup UI |
+| Existing strategy audit | Still SQLite, dashboard-dependent, with frozen forecasts/comparisons and CSV export | Consolidation is not coded; user permits dropping the few old audit runs when replaced |
+| Learning dataset | Not coded | Versioned examples, eligibility/exclusions, source lineage and chronological splits |
+| Historical calibration | Not coded | Baseline evaluation, compatible cohorts, bounded corrections, validation and fallback |
+
+Current live fuel/VE estimates still use the arithmetic mean of up to the last three representative
+laps, with game estimates as fallback (`shared/domain/live/liveUsage.ts`, `liveStrategyTracker.ts`).
+Saving capture data does not train or refine a historical model automatically. Diagnostic sidecars are
+disposable debugging context and must not be the sole source for future learning labels.
+
+Implementation commits: `e51cfa06` capture/reconciliation, `f1cc462a` aligned reader,
+`092dae1d` chart fusion, `c2936099` source labels, `0c6e2247` fixture correction,
+`1e9b6b27` evidence documentation, `5039f785` diagnostics and `a57d2561` diagnostic documentation.
+These are local branch commits; no merge, push or deployment is recorded by this plan.
 
 The user authorized implementation after channel review. The first milestone records player evidence
 independently of dashboard subscribers, in `server/live-captures/` (override `LMU_LIVE_CAPTURE_DIR`).
@@ -234,9 +259,9 @@ The first milestone is trustworthy evidence, not automatic forecast calibration.
 remain deterministic, learn from measured outcomes, and demonstrate improvement against a baseline.
 AI may explain findings but must not calculate metrics, source ownership, scores or predictions.
 
-The original analysis did not authorize implementation. The subsequent user instruction authorized the
-capture foundation above. Historical findings below describe the inspected pre-change code; remaining
-schemas and learning interfaces are design sketches. No deployment or historical source rewrite occurred.
+Sections below combine implemented contracts and the longer-term target design. The delivery checkpoint
+and implementation sections above state what is coded; broader projection, recovery, compression and
+learning requirements below are not claims that those features are already implemented.
 
 ## 2. Current ingestion architecture and findings
 
@@ -245,7 +270,8 @@ schemas and learning interfaces are design sketches. No deployment or historical
 | Results XML | `server/core/dbSessionSync.ts` and `server/sessions/parser.ts`; normalized session/driver/lap rows | Creates the official historical session; new source attachments must survive reparses |
 | Replay | `server/core/replay/dbReplaySync.ts`, replay workers and stores | Adds trajectory, weather and race evidence; retained cache survives missing source files |
 | DuckDB | `server/telemetry/telemetryCatalog.ts`, `duckdbReader.ts`, `telemetryLinks.ts` | Multiple files can belong to one session; ownership and lap file selection are already distinct concerns |
-| Live | `server/live/liveReader.ts`, `liveService.ts`, domain trackers and `live_strategy_audit` | Captures dashboard/strategy checkpoints outside the session ingestion pipeline |
+| Live capture | `server/live/capture/`, `server/core/live/dbLiveCaptureStore.ts` | Durable player evidence, strict session links and aligned reads independent of the dashboard |
+| Live strategy audit | `LiveAuditTracker`, `live_strategy_audit` | Existing dashboard-dependent frozen forecasts/comparisons; separate from permanent capture and diagnostic sidecars |
 
 Relevant findings:
 
@@ -255,16 +281,15 @@ Relevant findings:
 - Session writes and summary projections are transactional. Source attachment and resulting projection
   changes must also be atomic.
 - Scans are held while a game session is loaded; live persistence must operate independently of that hold.
-- `LiveService` owns the reader worker, but strategy REST polling and audit writes depend on dashboard
-  clients. Disconnecting the page can end an audit run even though the game session continues.
+- `LiveService` owns the reader worker. Capture keeps safe REST polling running without dashboard
+  clients; the old SQLite audit still depends on clients and can end when the page disconnects.
 - `LiveAuditTracker` records snapshots at bounded checkpoints, including immutable forecasts and
   measured consumption comparisons. It is useful forecast evidence, not a complete source recording.
 - `dbLiveAuditStore.ts` stores JSON checkpoints and prunes to the newest 30 runs at startup. That policy
   cannot govern the long-term learning dataset.
-- Live identity includes canonical layout and class. It does not provide durable driver identity,
-  canonical car identity, linked XML game-patch provenance or a channel availability catalog.
-- `rf2Layout.ts` includes the scoring `driverName` field; `decodeVehicle` and `LiveVehicleReading`
-  currently omit it. A game vehicle slot is not a persistent driver identifier.
+- Capture manifests retain exact source driver name, canonical layout/vehicle, verified XML patch
+  provenance and channel declarations. They do not establish a globally unique person or swap ownership.
+- Scoring decoding now preserves `driverName`. A game vehicle slot is not a persistent driver identifier.
 - XML `GameVersion` is parsed and persisted as `sessions.game_version`. The live contracts do not
   establish an exact game build. Shared-memory update counters are frame-coherence counters.
 - Existing telemetry fusion implements explicit DuckDB/replay field precedence, but does not offer
@@ -298,12 +323,14 @@ Separate three identities:
 2. **Segment:** a continuous interval within one game session attempt and clock epoch.
 3. **Session attachment:** a versioned association between a segment and an existing stored session.
 
-A capture may contain practice, qualifying and race segments. One session may own multiple segments
-because recording started late, the server restarted or a connection was lost. Split any segment
-crossing session attempts; do not attach an entire mixed-session recording to a single session.
+The implementation creates a separate recording/file for each practice, qualifying, race or restarted
+attempt; it never stores a mixed-session capture. A unique recent interrupted recording may reopen only
+after strict identity/clock/lap-anchor continuity checks. Otherwise it creates another provisional file.
+General segment tables, fragment consolidation and driver-swap interval ownership remain future design.
 
-Track explicit states: recording, completed, interrupted, recovered and failed. Preserve late-start
-and partial coverage. Distinguish capture interruption from a game-session restart.
+Persisted manifest states are `recording`, `completed` and `interrupted`; controller health separately
+reports unavailable/errors. Recovery is a validated transition, not a separate persisted `recovered`
+state. Preserve late-start and partial coverage; distinguish interruption from session restart.
 
 Persist live evidence immediately without waiting for XML. Keep unmatched captures available for
 later reconciliation. Do not invent official historical results when no XML exists.
@@ -585,8 +612,8 @@ audit API contracts, persisted fields and migrations together. Do not reinterpre
 `duckdbFilename` as a live capture or collapse both sources into one filename slot. Keep native
 multi-file support: only the new canonical live recording is one file per session.
 Engine-specific adapters such as `DuckDbReader` can retain DuckDB in their names where it actually
-describes the engine. Do not add alias wrappers or forwarding shims just to hide a rename. This is a
-planned naming change, not a request to rename existing files, code or API fields during analysis.
+describes the engine. UI source naming is implemented; existing `duckdb` API/persistence identifiers
+remain compatible. No broad file/identifier migration or dependency migration was performed.
 
 The project currently uses the legacy `duckdb` Node client. Official documentation marks that client
 deprecated and recommends Node Neo, which exposes bulk appending. Evaluate binding support during
@@ -597,7 +624,9 @@ format benchmarking; no dependency migration is authorized by this analysis alon
 [bulk insert guidance](https://duckdb.org/docs/lts/data/insert),
 [Node Neo appender](https://duckdb.org/docs/lts/clients/node_neo/overview).
 
-Proposed table groups, with final naming/schema to be decided during contract design:
+Implemented raw tables are `capture_metadata`, `capture_manifest`, `capture_channels`, `capture_samples`,
+`capture_observations` and transactional `capture_batches`; SQLite owns the index/attachments.
+The following conceptual groups also include future projection/dataset tables:
 
 | Group | Purpose |
 |---|---|
@@ -640,6 +669,11 @@ Preserve existing safe REST request limits rather than increasing polling to fil
 
 ### Deferred compression and finalization
 
+Current boundary: DuckDB batch writes and off-track checkpoints are implemented; no separate raw
+DuckDB archive/compaction job is implemented. Diagnostic sidecars have their own gzip lifecycle described
+above. The resumable raw-data compression, disk-space preflight, independent block/index and
+replacement-verification requirements below remain future design, not diagnostic gzip guarantees.
+
 When the game session has ended, enqueue compression/compaction of closed chunks in a background
 worker. Browser closure, a temporary disconnection or return to the garage does not establish session
 completion. Bound concurrency and CPU/I/O usage; suspend or defer jobs if another game session starts.
@@ -673,7 +707,9 @@ existing 30-audit-run pruning delete training
 lineage. If raw evidence is deliberately removed, retain its manifest and mark
 which projections can no longer be recomputed; never claim full reproducibility without the inputs.
 
-Existing audit rows may remain historical forecast diagnostics. They cannot be upgraded into complete
+The user permits discarding the few existing SQLite audit runs when that audit path is replaced.
+No deletion or replacement has occurred; current audit writes/reads/CSV exports remain operational.
+Existing audit rows cannot be upgraded into complete
 channel recordings or assigned drivers that were never captured. A game patch may be inherited from
 a verified XML attachment with explicit provenance, not guessed from the audit date. Migrate only facts their
 stored evidence supports; ambiguous historical attachments remain unresolved.
@@ -706,6 +742,11 @@ Expose compact source availability, coverage, unresolved status and provenance f
 Invalidate only affected session/lap projections through existing revision mechanisms.
 
 ## 12. Learning dataset and deterministic calibration
+
+Status: Not implemented. Start with fuel/VE examples and offline baseline evaluation. The first
+implementation must retain pre-outcome forecasts and measured outcomes independently of disposable
+diagnostics and dashboard visibility. Resolve the old audit's replacement/retirement as part of that work;
+do not assume current ten-second prediction observations provide frozen lap-start evaluation semantics.
 
 Produce one example per physical lap, stint or stop, with:
 
@@ -743,15 +784,15 @@ count/source-age readouts should reflect validated evidence, not a decorative co
 
 ## 13. Delivery phases and acceptance gates
 
-| Phase | Deliverable | Acceptance gate |
+| Phase | State | Deliverable / remaining acceptance gate |
 |---|---|---|
-| 0. Capability review | Review exact channel inventory, source coverage, evidence, shapes/cadences and XML patch inheritance | User has reviewed chosen channels before implementation; unknowns documented; no guessed patch or unsupported channel claims |
-| 1. Contracts | Canonical capture/segment/channel/version/quality/link contracts and schema proposal | Concrete examples cover partial capture, multiple channels and session resets |
-| 2. Durable capture | Independent recording lifecycle, bounded storage, recovery and diagnostics | Dashboard closure does not stop recording; replay exclusion and interruption recovery verified |
-| 3. Reconciliation | Versioned session/participant/lap attachments and incremental ownership repair | Ambiguous matches stay pending; restart/layout/driver regressions pass; XML reparses preserve links |
-| 4. Augmentation | Compact resource, tyre, weather, damage and stop evidence with provenance | Source precedence, gaps, canonical classification and projection invalidation verified |
-| 5. Dataset | Deduplicated examples and chronological baseline evaluation | Reproducible cohort/lineage and leakage checks; no automatic calibration yet |
-| 6. Calibration | Validated compatible history, correction and confidence/fallback behavior | Held-out improvement, bounded behavior, versioning and rollback demonstrated |
+| 0. Capability review | Done | User reviewed channels; unverified wheel conventions remain explicit |
+| 1. Contracts | Coded for current scope | Capture/channel/version/link contracts; broader segment/projection contracts deferred |
+| 2. Durable capture | Coded and automatically tested | Live-game overhead/lifecycle and failure validation still pending |
+| 3. Reconciliation | Coded and automatically tested | Strict ambiguity/restart/layout/driver rules; real-weekend validation pending |
+| 4. Augmentation | Partial | Aligned API, source metadata and yaw/body-slip enrichment coded; resource/tyre/weather/stop projections remain |
+| 5. Dataset | Next coding milestone | Deduplicated fuel/VE examples, lineage, exclusions and chronological baseline evaluation |
+| 6. Calibration | Not started | Compatible cohorts, held-out improvement, bounded corrections, fallback/versioning/rollback |
 
 The first end-to-end milestone is phases 0-4: a trustworthy session-linked live evidence layer covering
 the verified useful channels missing from telemetry/replay. Unverified channels remain explicitly pending;
@@ -797,23 +838,26 @@ Keep domain rewrites out of schema initialization; use versioned reconciliation/
 
 Update `docs/CODE_MAP.md` only as behavior ships, and update `docs/TELEMETRY_FORMAT.md`,
 `docs/XML_FORMAT.md` and relevant live-source documentation when their contracts actually change.
-This plan's index entry is a proposal, not evidence that live ingestion is implemented.
+Use the delivery checkpoint and phase status table for implementation status; design requirements alone
+are not evidence that a feature has shipped or passed real-game validation.
 
-## 15. Open decisions before implementation
+## 15. Remaining decisions and validation
 
-1. Which content/setup identifiers are available and useful? Game-patch provenance is settled:
-   use XML `GameVersion` through a verified session attachment; exact build discovery is not required.
-2. What driver/vehicle identity evidence is available during swaps and reconnects?
-3. Which verified useful channels are missing from telemetry/replay, and what cadence preserves their
-   useful fidelity with lightweight writes? Which small overlaps are needed for integrity?
-4. Which chunk encoding/durability approach meets measured overhead and recovery requirements?
-5. What measured offsets/tolerances validate live source timestamps against the existing DuckDB/replay
-   game-time and lap-relative convention, including restarted or adjacent session attempts?
-6. Which chunk sizing, storage reporting and manual-cleanup behavior preserve lineage, recovery and
-   explicit coverage loss without an automatic retention cap?
-7. Which compatibility rules and held-out performance gates allow learned profiles across XML patches?
+1. Implement the first learning target as fuel/VE consumption, with separately measured outcomes and
+   immutable pre-outcome forecasts; define versioned example/projection schemas and persistence.
+2. Replace or retire the dashboard-dependent SQLite audit without losing frozen forecast semantics.
+   Old audit history can be dropped; permanent learning evidence must not depend on diagnostic retention.
+3. Define compatible layout/car/conditions/patch cohorts, chronological holdouts, minimum evidence and
+   promotion/error gates before selecting or enabling a correction model. Robust median/shrinkage or
+   bounded bias corrections are candidates, not an algorithm already selected or coded.
+4. Validate real-session capture/linking, clock tolerances, restarts/swaps, capture/diagnostic size,
+   game frame-time and writer/backpressure behavior. Synthetic measurements do not close this gate.
+5. Verify wheel frames/signs before enabling their 24 reserved columns; this does not block fuel/VE work.
+6. Source-management/cleanup UI, broader evidence projections, extended content/setup provenance,
+   swap ownership intervals and advanced raw compaction remain follow-ups; none is claimed complete.
 
-These are engineering discovery tasks; this analysis does not claim their answers are established.
+Container choice, ISO convention, reviewed initial channel scope, XML patch source, clock convention
+and manual retention are settled. They do not need to be reopened before learning-pipeline work.
 
 ## Source references
 

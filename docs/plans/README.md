@@ -7,7 +7,7 @@ General review: 2026-10-10; replay storage/ingestion entries updated and type re
 
 | Plan | Status | Next useful step | Completion gate |
 |---|---|---|---|
-| [Live session evidence and learning ingestion](LIVE_SESSION_EVIDENCE.md) | Capture, aligned API and chart integration implemented 2026-10-18; learning remains planned | Real-game validation, wheel ISO verification, learning-example extraction | Recoverable verified attachments, channel provenance and chronologically validated deterministic learning |
+| [Live session evidence and learning ingestion](LIVE_SESSION_EVIDENCE.md) | Capture, reconciliation, aligned API, chart integration and disposable diagnostics coded on `codex/live-session-evidence`, 2026-10-18; augmentation partial, learning not started | Fuel/VE dataset and chronological baseline evaluation; real-game capture/performance validation remains pending | Recoverable verified attachments, channel provenance and chronologically validated deterministic learning |
 | [Replay storage and ingestion design](REPLAY_STORAGE_DESIGN.md) | Proposed; [initial POC](REPLAY_STORAGE_POC.md) complete; both candidates rejected on size | Evaluate storage reductions against current compact lap format | Storage size first, app read response second, ingestion third; archived-data safety and domain parity required |
 | [Corner comparison rework](CORNER_COMPARISON_REWORK.md) | In progress on `corner-map`; not integrated into main | Read the worktree's hybrid handoff; complete M2 metric/sequence revalidation, then M3 inspector acceptance | Accepted shared action maps, independent events, swap symmetry and additive timing; visual/sequence gates and consumer integration verified before merging |
 | [Simplified 3D replay and camera controls](REPLAY_3D_PLAN.md) | Proposed; source analysis reviewed 2026-10-15 | Validate one exported plugin scene against cached replay poses | Simplified track, cars, cameras and comparison stay aligned with telemetry; layout/revision isolation, fallback and performance gates pass |
@@ -44,8 +44,10 @@ with its own verification. Historical timings below identify candidates; remeasu
 The fullscreen turn selector was removed by user request. Keyboard panning remains; restoring that
 selector is not a pending task. A keyboard corner-navigation alternative requires a separate design decision.
 Pit repair inference remains a known data limitation, pending trustworthy recorded or REST evidence.
-Live capture enrichment is now proposed in [Live session evidence and learning ingestion](LIVE_SESSION_EVIDENCE.md):
-session attachments, canonical identity, game/version provenance, multiple channels and learning evidence.
+Live capture enrichment is implemented on `codex/live-session-evidence`; see the
+[delivery checkpoint](LIVE_SESSION_EVIDENCE.md#delivery-checkpoint) for current scope, local commits
+and remaining gates. Session attachment, canonical identity, XML patch inheritance, aligned yaw/body-slip
+evidence and disposable diagnostics are coded. Persistent learning examples and calibration are not.
 The earlier channel capability notes remain in [TELEMETRY_FORMAT.md](../TELEMETRY_FORMAT.md#possible-enrichment-from-a-live-capture-idea-not-planned);
 they describe observations and possibilities, not implemented capture channels.
 File and folder size limits are ongoing checks; split only along meaningful responsibilities.
