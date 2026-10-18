@@ -201,6 +201,18 @@ describe('LiveCaptureController', () => {
     ]);
   });
 
+  it('stops waiting for the layout after 10 s and records a new file', () => {
+    let clock = Date.now();
+    const prior = priorManifest({}, clock);
+    const { controller } = makeController({ existing: [prior], now: () => clock });
+    start(controller, 101, snapshot('race', null));
+    expect(controller.status().recordingId).toBeNull();
+    clock += 10_000;
+    start(controller, 111, snapshot('race', null));
+    expect(controller.status().recordingId).not.toBeNull();
+    expect(controller.status().recordingId).not.toBe(prior.recordingId);
+  });
+
   it('does not reuse pending recovery proof after a clock reset or a different resolved layout', () => {
     for (const change of ['clock', 'layout', 'identity', 'offline'] as const) {
       const { controller } = makeController({ existing: [priorManifest()] });

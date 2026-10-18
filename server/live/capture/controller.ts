@@ -21,6 +21,8 @@ const BATCH_SAMPLES = 50;
 const MAX_OBSERVATIONS = 200;
 const MAX_OBSERVATION_BYTES = 256_000;
 const FLUSH_MS = 1000;
+/** How long a possible resume waits for navigation to name the layout before recording a new file. */
+const RECOVERY_LAYOUT_WAIT_MS = 10_000;
 
 export type CaptureWorker = Pick<Worker, 'postMessage' | 'on' | 'unref' | 'terminate'>;
 export interface LiveCaptureControllerOptions {
@@ -229,7 +231,7 @@ export class LiveCaptureController {
       && observedAt - record.updatedAt >= 0 && observedAt - record.updatedAt < 120_000
       && record.anchors.some(anchor => anchor.lapNumber === (continuity.player?.totalLaps ?? -1) + 1
         && anchor.startSeconds === continuity.player?.lapStartEt));
-    if (candidates.length && !snapshot.identity?.layoutKey) {
+    if (candidates.length && !snapshot.identity?.layoutKey && now - observedAt < RECOVERY_LAYOUT_WAIT_MS) {
       // Do not fork a known interrupted attempt while navigation resolves a multi-layout venue.
       this.recoveryProbe ??= { reading: { ...reading, player: { ...player } }, key, observedAt: now };
       return;
