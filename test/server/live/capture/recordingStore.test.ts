@@ -214,6 +214,29 @@ describe('LiveCaptureRecordingStore', () => {
     expect(readback.manifest.lastElapsedSeconds).toBe(1.04);
   });
 
+  it('keeps the file counters when a resumed writer carries a lagging index manifest', async () => {
+    const directory = await createDirectory();
+    const firstWriter = await createWriter(directory);
+    const first = makeBatch();
+    expect((await firstWriter.send({ ...first, manifest: { ...first.manifest, droppedSamples: 2 } })).type).toBe('persisted');
+    await firstWriter.close();
+
+    // After a crash the index still holds an older manifest: fewer samples, earlier end, fewer drops.
+    const nextWriter = await createWriter(directory);
+    const resumed = await nextWriter.send(makeBatch(1, {
+      manifest: { ...first.manifest, samples: 1, lastElapsedSeconds: 1, droppedSamples: 0, updatedAt: first.manifest.updatedAt + 20 },
+      samples: sampleRows(1.04),
+      observations: [],
+    }));
+    expect(resumed.type).toBe('persisted');
+    if (resumed.type !== 'persisted') throw new Error('Expected persisted resume');
+    expect(resumed.manifest).toMatchObject({ samples: 3, lastElapsedSeconds: 1.04, droppedSamples: 2 });
+    await nextWriter.close();
+    const readback = readInChild(path.join(directory, first.manifest.filename)) as { samples: string; manifest: LiveCaptureManifest };
+    expect(readback.samples).toBe('3');
+    expect(readback.manifest).toMatchObject({ samples: 3, lastElapsedSeconds: 1.04, droppedSamples: 2 });
+  });
+
   it('resumes interrupted recordings but refuses completed recordings', async () => {
     for (const status of ['interrupted', 'completed'] as const) {
       const directory = await createDirectory();

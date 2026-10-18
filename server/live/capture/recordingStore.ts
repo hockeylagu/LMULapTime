@@ -488,20 +488,18 @@ export class LiveCaptureRecordingStore {
       || priorManifest?.status === 'interrupted' && batch.manifest.status !== 'recording') {
       throw new Error('Cannot append to a finalized live capture');
     }
-    if (priorManifest && batch.manifest.droppedSamples < priorManifest.droppedSamples) throw new Error('Live capture dropped sample count cannot decrease');
-    if (batch.manifest.samples !== (priorManifest?.samples ?? 0) + checked.rowCount) {
-      throw new Error('Live capture manifest sample count does not match this batch');
+    if (priorManifest && batch.manifest.firstElapsedSeconds !== priorManifest.firstElapsedSeconds) {
+      throw new Error('Live capture manifest elapsed range moved backwards');
     }
     const batchLast = checked.rowCount > 0 ? batch.samples[batch.samples.length - LIVE_CAPTURE_SAMPLE_WIDTH] : null;
-    if (priorManifest) {
-      if (batch.manifest.firstElapsedSeconds !== priorManifest.firstElapsedSeconds
-        || batch.manifest.lastElapsedSeconds < priorManifest.lastElapsedSeconds) {
-        throw new Error('Live capture manifest elapsed range moved backwards');
-      }
-    }
-    if (batchLast !== null && batch.manifest.lastElapsedSeconds < batchLast) {
-      throw new Error('Live capture manifest lastElapsedSeconds precedes a stored sample');
-    }
+    // The file owns its counters: a writer resumed from a lagging index after a crash can never
+    // contradict the samples already stored.
+    const manifest: LiveCaptureManifest = {
+      ...batch.manifest,
+      samples: (priorManifest?.samples ?? 0) + checked.rowCount,
+      droppedSamples: Math.max(priorManifest?.droppedSamples ?? 0, batch.manifest.droppedSamples),
+      lastElapsedSeconds: Math.max(priorManifest?.lastElapsedSeconds ?? 0, batch.manifest.lastElapsedSeconds, batchLast ?? 0),
+    };
     if (this.lastSampleElapsed !== null && batch.samples.length > 0 && batch.samples[0] < this.lastSampleElapsed) {
       throw new Error('Live capture sample time moved backwards');
     }
@@ -515,7 +513,7 @@ export class LiveCaptureRecordingStore {
       await this.insertObservations(connection, batch, checked.observationData);
       await run(connection,
         'UPDATE capture_manifest SET recording_id = ?, manifest_json = CAST(? AS JSON), updated_at = ? WHERE singleton = TRUE',
-        [batch.manifest.recordingId, checked.manifestJson, batch.manifest.updatedAt]);
+        [manifest.recordingId, stableManifest(manifest), manifest.updatedAt]);
       await run(connection,
         'INSERT INTO capture_batches (sequence, fingerprint, manifest_json, sample_count) VALUES (?, ?, CAST(? AS JSON), ?)',
         [batch.sequence, checked.fingerprint, checked.manifestJson, checked.rowCount]);
@@ -524,10 +522,10 @@ export class LiveCaptureRecordingStore {
       try { await run(connection, 'ROLLBACK'); } catch { /* Preserve the write failure. */ }
       throw error;
     }
-    this.currentManifest = batch.manifest;
+    this.currentManifest = manifest;
     this.lastSequence = batch.sequence;
     if (batchLast !== null) this.lastSampleElapsed = batchLast;
-    return { manifest: batch.manifest, bytes: this.fileBytes(target) };
+    return { manifest, bytes: this.fileBytes(target) };
   }
 
   private async open(target: string, incoming: LiveCaptureManifest): Promise<void> {
