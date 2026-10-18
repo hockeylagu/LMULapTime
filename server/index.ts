@@ -111,7 +111,9 @@ async function refreshLiveCaptureLinks(discover = false): Promise<void> {
     if (result.changed) sessionDb.markSessionDataChanged();
     if (!liveCapture.hasOpenRecordingHandle) {
       await refreshLiveLearning(sessionDb.getDb(), captureDirectory, () => liveService.isSessionLoaded());
-      await automaticLearning.refresh(sessionDb.getDb(), () => liveService.isSessionLoaded() || liveCapture.hasOpenRecordingHandle);
+      // Learning is optional: its failure must never stop capture links below.
+      await automaticLearning.refresh(sessionDb.getDb(), () => liveService.isSessionLoaded() || liveCapture.hasOpenRecordingHandle)
+        .catch(error => sessionDb.recordIngestError('live-learning', captureDirectory, error));
     }
     if (liveService.isSessionLoaded()) return;
     liveCapture.synchronizeLinks(getLiveCaptureIndexRows(sessionDb.getDb())
