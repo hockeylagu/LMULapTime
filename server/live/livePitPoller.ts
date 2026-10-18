@@ -241,6 +241,10 @@ export class LivePitPoller {
       } });
     }
     if (stale) return;
+    // Failed reads go into the recording too, so a race can be debugged later without the console.
+    if (!answer.ok) this.options.onEvidence?.({ source: 'rest', kind: 'failure', elapsedSeconds: null, receivedAt: done,
+      requestStartedAt: now, requestFinishedAt: done, data: { path: next.path, outcome: answer.diagnostic?.outcome ?? answer.reason,
+        statusCode: answer.diagnostic?.statusCode ?? null, errorCode: answer.diagnostic?.errorCode ?? null } });
     if (!answer.ok && answer.reason === 'timeout') this.pausedUntil = done + SLOW_PAUSE_MS;
     if (next.read === null) {
       this.gameStateDue = done + (answer.ok ? REPLAY_CHECK_MS * 2 / 3 : FAILED_READ_PAUSE_MS / 3);

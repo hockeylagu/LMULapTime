@@ -193,6 +193,8 @@ export class LiveService {
       // in the server console when there is no session diagnostic sink yet.
       if (!this.options.capture?.diagnostics?.sink()) console.warn(`[Live] Shared memory reader ${reason}`);
       this.options.capture?.diagnostics?.record({ kind: 'reader-failure', at: Date.now(), data: { reason } });
+      this.options.capture?.observe({ source: 'recorder', kind: 'failure', elapsedSeconds: null, receivedAt: Date.now(),
+        data: { path: 'shared-memory-reader', outcome: reason } });
       this.worker = null;
       this.processRunning = null;
       this.handleMessage({ type: 'closed' });

@@ -46,4 +46,15 @@ describe('REST diagnostic integration', () => {
     expect(JSON.stringify(events)).not.toContain('opponent');
     poller.stop();
   });
+
+  it('hands failed reads to the recording as failure evidence', async () => {
+    vi.useFakeTimers();
+    const evidence: unknown[] = [];
+    const poller = new LivePitPoller({ get: async () => ({ ok: false, reason: 'timeout', diagnostic: { outcome: 'timeout' } }),
+      onEvidence: observation => evidence.push(observation), onUpdate: vi.fn(), onReplay: vi.fn() });
+    poller.setMode('track');
+    await vi.advanceTimersByTimeAsync(10);
+    expect(evidence[0]).toMatchObject({ source: 'rest', kind: 'failure', data: { path: '/navigation/state', outcome: 'timeout' } });
+    poller.stop();
+  });
 });
