@@ -90,6 +90,8 @@ export class LiveStrategyTracker {
   private lastPair: string | null = null;
   /** Wet or dry, with hysteresis (null before the first reading). */
   private wet: boolean | null = null;
+  /** Raw 0-255 wetness of the last reading: corrections use the training rule (RAIN_WET_MIN), not the planner's hysteresis. */
+  private wetness: number | null = null;
   private eventTyreWear: number | null = null;
   private eventCompound = '';
   private ratioOptions: number[] = [];
@@ -126,7 +128,7 @@ export class LiveStrategyTracker {
     this.meters.ve.clear();
     this.meters.fuel.clear();
     this.eventLaps = [];
-    this.ratios = []; this.wet = null; this.eventTyreWear = null; this.eventCompound = ''; this.ratioOptions = []; this.eventEstimate = null;
+    this.ratios = []; this.wet = null; this.wetness = null; this.eventTyreWear = null; this.eventCompound = ''; this.ratioOptions = []; this.eventEstimate = null;
     this.resetSession();
     this.sessionKey = null;
   }
@@ -226,6 +228,7 @@ export class LiveStrategyTracker {
       this.tyres.reset();
     }
     this.wet = wet;
+    this.wetness = level;
     this.followLaps(reading, context.latestLap);
     const fuelUse = this.meters.fuel.latestUse;
     const veUse = this.meters.ve.latestUse;
@@ -311,8 +314,8 @@ export class LiveStrategyTracker {
 
   private perLap(kind: LiveResourceKind): Pick<LiveResourcePlan, 'perLap' | 'perLapSource' | 'lapsMeasured' | 'learning'> {
     const base = this.basePerLap(kind);
-    const correction = base.perLap !== null && base.perLapSource !== null && this.wet !== null && this.eventCompound
-      ? this.correct?.(kind, base.perLap, base.perLapSource, this.wet ? 'wet' : 'dry', this.eventCompound) : null;
+    const correction = base.perLap !== null && base.perLapSource !== null && this.wetness !== null && this.eventCompound
+      ? this.correct?.(kind, base.perLap, base.perLapSource, this.wetness >= RAIN_WET_MIN ? 'wet' : 'dry', this.eventCompound) : null;
     return correction && Number.isFinite(correction.perLap) && correction.perLap > 0
       ? { ...base, perLap: correction.perLap, learning: { baselinePerLap: base.perLap!, adjustment: correction.adjustment } } : base;
   }

@@ -52,6 +52,18 @@ describe('LiveStrategyTracker', () => {
       selected: { compound: 'Medium', used: false, wear: 1 } });
     expect(context(fallback, at(0))?.resource?.perLap).toBe(3);
   });
+
+  it('looks up corrections with the training wet rule, not the planner hysteresis', () => {
+    const conditions: string[] = [];
+    const tracker = new LiveStrategyTracker((_kind, _predicted, _source, condition) => { conditions.push(condition); return null; });
+    tracker.applyRest({ type: 'tireManagement', vePerLap: 3, fuelPerLap: 2, newSets: 2,
+      selected: { compound: 'Wet', used: false, wear: 1 } });
+    context(tracker, at(0, { avgPathWetness: 20 / 255 }));
+    expect(conditions[conditions.length - 1]).toBe('wet');
+    // 10/255 is still wet for the planner (dry again only below 7) but dry for the training labels (13).
+    context(tracker, at(1, { avgPathWetness: 10 / 255 }));
+    expect(conditions[conditions.length - 1]).toBe('dry');
+  });
   it('pairs fuel and VE on the same clean crossings, carries ratios into the garage, and resets on wet conditions', () => {
     const tracker = new LiveStrategyTracker();
     const car = (et: number) => ({ fuelLiters: 80 - et * 0.024, fuelCapacityLiters: 117,
