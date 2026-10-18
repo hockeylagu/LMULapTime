@@ -4,6 +4,8 @@ import type { LiveScoringReading, LiveVehicleReading } from '../../../shared/dom
 import { LIVE_HEARTBEAT_MS } from '../../../shared/types/live.js';
 import type { LiveLifecycle } from '../../../shared/types/live.js';
 import { scoringReading, vehicleReading } from '../../helpers/liveReadings.js';
+import { LiveCaptureController } from '../../../server/live/capture/controller.js';
+import type { CaptureWorker } from '../../../server/live/capture/controller.js';
 import { LiveService, PEDAL_FLUSH_MS, TIMING_MIN_INTERVAL_MS } from '../../../server/live/liveService.js';
 import type { LiveServiceOptions, LiveWorker } from '../../../server/live/liveService.js';
 import type { RestAnswer } from '../../../server/live/lmuPitRest.js';
@@ -83,24 +85,21 @@ describe('LiveService', () => {
     expect(running).toEqual([true, false, true]);
   });
 
-  it('captures history and reads the game only while a dashboard is open', async () => {
+  it('records audit history independently of dashboard subscribers', async () => {
+    const writer = new FakeWorker();
+    const capture = new LiveCaptureController({ directory: 'unused', onPersist: () => {}, createWorker: () => writer as unknown as CaptureWorker });
     const get = vi.fn(() => Promise.resolve<RestAnswer>({ ok: false, reason: 'error' }));
-    const saveAuditRecord = vi.fn();
-    const { service, frame } = setup({ saveAuditRecord, pit: { get } });
+    const { service, frame } = setup({ capture, pit: { get } });
     frame(reading());
-    await vi.advanceTimersByTimeAsync(2000);
-    expect(get).not.toHaveBeenCalled();
-    expect(saveAuditRecord).not.toHaveBeenCalled();
-    const remove = service.addClient(new FakeSink());
-    frame(reading({ currentEt: 30 }));
-    await vi.advanceTimersByTimeAsync(2000);
+    await vi.advanceTimersByTimeAsync(1100);
     expect(get).toHaveBeenCalled();
-    expect(saveAuditRecord).toHaveBeenCalledWith(expect.objectContaining({ reason: 'start' }));
-    // The page closes: the capture ends with the next reading.
-    remove();
-    frame(reading({ currentEt: 60 }));
-    expect(saveAuditRecord).toHaveBeenLastCalledWith(expect.objectContaining({ reason: 'end' }));
-    service.stop();
+    expect(service.getSnapshot().audit).toMatchObject({ status: 'recording', runId: capture.status().recordingId });
+    expect(writer.postMessage.mock.calls.some(([batch]) => batch.observations?.some(
+      (item: { kind: string }) => item.kind === 'strategy-audit-v1'))).toBe(true);
+    const remove = service.addClient(new FakeSink()); remove();
+    frame(reading({ currentEt: 30 }));
+    expect(service.getSnapshot().audit?.runId).toBe(capture.status().recordingId);
+    void service.stop();
   });
 
   it('asks for the condition after a line crossing, an impact or a stop, and for the tyre screen after a stop', async () => {
@@ -155,21 +154,16 @@ describe('LiveService', () => {
     service.stop();
   });
 
-  it('persists checkpoints and reports a storage failure without stopping live driving', () => {
-    const saveAuditRecord = vi.fn();
-    const { service, frame } = setup({ saveAuditRecord });
-    service.addClient(new FakeSink());
+  it('reports asynchronous capture failure without stopping live driving', () => {
+    const writer = new FakeWorker();
+    const capture = new LiveCaptureController({ directory: 'unused', onPersist: () => {}, createWorker: () => writer as unknown as CaptureWorker });
+    const { service, frame } = setup({ capture });
     frame(reading());
-    expect(saveAuditRecord).toHaveBeenCalledOnce();
-    expect(service.getSnapshot().audit).toMatchObject({ status: 'recording' });
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-    saveAuditRecord.mockImplementation(() => { throw new Error('disk full'); });
+    expect(service.getSnapshot().audit?.status).toBe('recording');
+    writer.emit('message', { type: 'failed', error: 'disk full' });
     frame(reading({ currentEt: 30 }));
     expect(service.getSnapshot()).toMatchObject({ lifecycle: 'driving', audit: { status: 'unavailable' } });
-    frame(reading({ currentEt: 50 }));
-    expect(error).toHaveBeenCalledOnce();
-    service.stop();
-    error.mockRestore();
+    void service.stop();
   });
 
   it('sends the snapshot on connect and on every change, not for a moving clock alone', () => {

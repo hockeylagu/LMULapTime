@@ -6,13 +6,13 @@ import { LIVE_CAPTURE_NORMALIZATION_VERSION, LIVE_CAPTURE_SCHEMA_VERSION } from 
 import type { LiveCaptureManifest } from '../../../shared/types/liveCapture.js';
 import { LiveEvidenceReadError } from './readError.js';
 
-/** Shared identity/convention gate for off-track analytics and learning readers. Caller closes the handle. */
-export async function openVerifiedLiveRecording(directory: string, manifest: LiveCaptureManifest): Promise<DuckDbReader> {
+/** Shared capture signature gate. Charts/learning require verified ownership; raw audit history does not. Caller closes the handle. */
+export async function openLiveRecording(directory: string, manifest: LiveCaptureManifest, requireVerifiedOwnership: boolean): Promise<DuckDbReader> {
   if (manifest.source !== 'live-capture' || manifest.schemaVersion !== LIVE_CAPTURE_SCHEMA_VERSION
     || manifest.normalizationVersion !== LIVE_CAPTURE_NORMALIZATION_VERSION || manifest.signConvention !== 'iso8855') {
     throw new LiveEvidenceReadError('incompatible', 'Capture schema or normalization is incompatible with this reader');
   }
-  if (!manifest.sessionId || manifest.status === 'recording') throw new LiveEvidenceReadError('unlinked', 'Capture is not finalized and verified');
+  if ((requireVerifiedOwnership && !manifest.sessionId) || manifest.status === 'recording') throw new LiveEvidenceReadError('unlinked', 'Capture is not finalized and verified');
   const root = path.resolve(directory);
   const filename = path.resolve(root, manifest.filename);
   if (path.dirname(filename) !== root || path.basename(manifest.filename) !== manifest.filename) {
@@ -43,7 +43,7 @@ export async function openVerifiedLiveRecording(directory: string, manifest: Liv
       || stored.driverName !== manifest.driverName || stored.vehicleName !== manifest.vehicleName
       || stored.sessionCode !== manifest.sessionCode || stored.startedAt !== manifest.startedAt
       || stored.samples !== manifest.samples || stored.lastElapsedSeconds !== manifest.lastElapsedSeconds
-      || stored.sessionId !== null && stored.sessionId !== manifest.sessionId
+      || requireVerifiedOwnership && stored.sessionId !== null && stored.sessionId !== manifest.sessionId
       || JSON.stringify(stored.anchors) !== JSON.stringify(manifest.anchors)) {
       throw new LiveEvidenceReadError('changed', 'Recording identity or coverage changed; refresh the capture index');
     }

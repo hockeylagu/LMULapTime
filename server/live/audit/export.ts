@@ -21,9 +21,9 @@ function cell(value: string | number | null | undefined): string {
   return `"${text.replace(/"/g, '""')}"`;
 }
 
-export function* exportLiveAudit(records: Iterable<LiveAuditRecord>): Generator<string> {
+export async function* exportLiveAudit(records: Iterable<LiveAuditRecord> | AsyncIterable<LiveAuditRecord>): AsyncGenerator<string> {
   yield `${HEADERS.map(cell).join(',')}\r\n`;
-  for (const record of records) {
+  for await (const record of records) {
     const { snapshot: s, comparison: c, observation: o } = record;
     const strategy = s.strategy;
     const r = strategy?.resource;

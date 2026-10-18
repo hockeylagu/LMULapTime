@@ -12,7 +12,8 @@ import type {
   LiveCaptureCatalogEntry,
 } from '../../../shared/types/liveCapture.js';
 import { mapVehicleIdToModel } from '../../../shared/domain/vehicleMapping.js';
-import { LIVE_MODEL_VERSION } from '../../../shared/domain/live/liveAudit.js';
+import { LiveAuditTracker } from '../../../shared/domain/live/liveAudit.js';
+import type { LiveUsageObservation } from '../../../shared/types/liveAudit.js';
 import { findWorkerBootstrap, isWorkerMessage } from '../../core/workerThreads.js';
 import type { LiveDiagnostics } from './diagnostics.js';
 
@@ -55,7 +56,7 @@ export class LiveCaptureController {
   private stopping: Promise<void> | null = null;
   private closeResolve: (() => void) | null = null;
   private closingWorker = false;
-  private predictionAt = -Infinity;
+  private audit: LiveAuditTracker | null = null;
   private links = new Map<string, Pick<LiveCaptureManifest, 'recordingId' | 'filename' | 'sessionId' | 'gameVersion'>>();
   private linked = new Map<string, string>();
   private pendingLinks = new Map<string, string>();
@@ -79,7 +80,7 @@ export class LiveCaptureController {
   /** Native handles outlive close callbacks; defer independent file maintenance until worker exit. */
   public get hasOpenRecordingHandle(): boolean { return this.worker !== null; }
 
-  public update(reading: LiveScoringReading | null, snapshot: LiveSnapshot): void {
+  public update(reading: LiveScoringReading | null, snapshot: LiveSnapshot, usage?: LiveUsageObservation): void {
     if (this.stopped) return;
     const player = reading?.player;
     const session = snapshot.session;
@@ -98,11 +99,10 @@ export class LiveCaptureController {
     if (!this.manifest) this.begin(reading, snapshot, key);
     const manifest = this.manifest;
     if (!manifest) return;
-    manifest.updatedAt = this.now();
+    manifest.updatedAt = Math.max(manifest.updatedAt, this.now());
     manifest.lastElapsedSeconds = Math.max(manifest.lastElapsedSeconds, reading.currentEt);
     manifest.layoutKey ??= snapshot.identity?.layoutKey ?? null;
     const lap = player.totalLaps + 1;
-    const newLap = !manifest.anchors.some(anchor => anchor.lapNumber === lap);
     if (Number.isFinite(player.lapStartEt) && player.lapStartEt >= 0 && player.lapStartEt <= reading.currentEt) {
       const currentAnchor = manifest.anchors.find(anchor => anchor.lapNumber === lap);
       if (currentAnchor) currentAnchor.startSeconds = player.lapStartEt;
@@ -119,11 +119,7 @@ export class LiveCaptureController {
       inRealtime: reading.inRealtime, avgPathWetness: reading.avgPathWetness,
       maxPathWetness: reading.maxPathWetness ?? null,
     } });
-    if (newLap || reading.currentEt - this.predictionAt >= 10) {
-      this.predictionAt = reading.currentEt;
-      this.observe({ source: 'recorder', kind: 'strategy-prediction', elapsedSeconds: reading.currentEt,
-        receivedAt: this.now(), data: { modelVersion: LIVE_MODEL_VERSION, strategy: snapshot.strategy } });
-    }
+    if (usage) this.audit?.update(snapshot, reading, usage, this.now());
   }
 
   public sample(sample: LiveCaptureSample): void {
@@ -144,7 +140,7 @@ export class LiveCaptureController {
     this.sampleCount++;
     manifest.samples++;
     manifest.lastElapsedSeconds = Math.max(manifest.lastElapsedSeconds, sample.elapsedSeconds);
-    manifest.updatedAt = this.now();
+    manifest.updatedAt = Math.max(manifest.updatedAt, this.now());
     if (this.sampleCount === BATCH_SAMPLES) this.flush();
   }
 
@@ -163,6 +159,9 @@ export class LiveCaptureController {
     this.lastObservation.set(key, json);
     this.observations.push(observation);
     this.observationBytes += json.length;
+    if (Number.isFinite(observation.receivedAt)) {
+      this.manifest.updatedAt = Math.max(this.manifest.updatedAt, observation.receivedAt);
+    }
   }
 
   /** Replay playback pauses capture without closing or learning from replay frames. */
@@ -256,7 +255,10 @@ export class LiveCaptureController {
     this.diagnostics?.record({ kind: 'session', at: now, data: this.manifest });
     this.lastSample = prior?.lastElapsedSeconds ?? -Infinity;
     this.lastObservation.clear();
-    this.predictionAt = -Infinity;
+    this.audit = new LiveAuditTracker(() => recordingId, record => this.observe({
+      source: 'recorder', kind: 'strategy-audit-v1', elapsedSeconds: record.snapshot.session?.elapsedSeconds ?? null,
+      receivedAt: record.recordedAt, data: record,
+    }));
     this.error = null;
     this.ensureWorker();
     this.flush(true);
@@ -356,9 +358,12 @@ export class LiveCaptureController {
 
   private finish(status: LiveCaptureManifest['status']): void {
     if (!this.manifest) return;
+    // Finalize in the owning recording before any transition can open another file.
+    this.audit?.end(this.now());
+    this.audit = null;
     this.manifest.status = status;
     this.manifest.endedAt = status === 'completed' ? this.now() : null;
-    this.manifest.updatedAt = this.now();
+    this.manifest.updatedAt = Math.max(this.manifest.updatedAt, this.now());
     this.flush(true);
     this.diagnostics?.record({ kind: 'session-end', at: this.now(), data: { status, manifest: this.manifest } });
     this.diagnostics?.end();

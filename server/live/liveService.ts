@@ -1,7 +1,5 @@
 import { Worker } from 'node:worker_threads';
-import { randomUUID } from 'node:crypto';
-import { LIVE_MODEL_VERSION, LiveAuditTracker } from '../../shared/domain/live/liveAudit.js';
-import type { LiveAuditRecord } from '../../shared/types/liveAudit.js';
+import { LIVE_MODEL_VERSION } from '../../shared/domain/live/liveAudit.js';
 import { deriveLiveState, isLiveOnTrack, isLiveSessionLoaded } from '../../shared/domain/live/liveLifecycle.js';
 import type { LiveGameScreen, LiveScoringReading, LiveVehicleReading } from '../../shared/domain/live/liveLifecycle.js';
 import type { LiveCarReading } from '../../shared/domain/live/liveCarCondition.js';
@@ -44,8 +42,6 @@ interface LiveClient {
 export interface LiveServiceOptions {
   /** Durable capture also keeps safe REST polling alive without dashboard subscribers. */
   capture?: LiveCaptureController;
-  /** Persists immutable checkpoints while a dashboard page is open (none without one). */
-  saveAuditRecord?: (record: LiveAuditRecord) => void;
   /** Replaces the shared memory worker (tests). */
   createWorker?: () => LiveWorker;
   /** The player's personal record on a layout and class, from the app's history. Without it no record is shown. */
@@ -87,8 +83,6 @@ export class LiveService {
   private tyreSurfaceAvgC: number | null = null;
   private readonly strategy = new LiveStrategyTracker();
   private readonly results = new LiveResultTracker();
-  private readonly audit: LiveAuditTracker | null;
-  private auditFailed = false;
   private lastDiagnosticStrategyAt = -Infinity;
   private readonly learning = new LiveLearningCapture();
   private readonly pit: LivePitPoller;
@@ -122,14 +116,6 @@ export class LiveService {
   public readonly firstReading = new Promise<void>(resolve => { this.markFirstReading = resolve; });
 
   public constructor(private readonly options: LiveServiceOptions = {}) {
-    this.audit = options.saveAuditRecord ? new LiveAuditTracker(randomUUID, record => {
-      if (this.auditFailed) return;
-      try { options.saveAuditRecord?.(record); }
-      catch (error) {
-        this.auditFailed = true;
-        console.error('[Live] Strategy history could not be saved:', error instanceof Error ? error.message : String(error));
-      }
-    }) : null;
     this.reserveLaps = options.reserveLaps ?? DEFAULT_LIVE_SETTINGS.reserveLaps;
     this.identity = new LiveIdentityResolver({
       ...options.identity,
@@ -207,7 +193,6 @@ export class LiveService {
   }
 
   public stop(): Promise<void> {
-    this.audit?.end(Date.now());
     this.stopped = true;
     if (this.restartTimer) clearTimeout(this.restartTimer);
     this.restartTimer = null;
@@ -348,7 +333,7 @@ export class LiveService {
       loadingProgress: state.lifecycle === 'loading' ? this.loadingProgress : null,
       strategy,
     };
-    this.options.capture?.update(reading, { ...next, sequence: previous.sequence + 1, receivedAt: Date.now() });
+    this.options.capture?.update(reading, { ...next, sequence: previous.sequence + 1, receivedAt: Date.now() }, this.strategy.observations());
     const recordingId = this.options.capture?.status().recordingId;
     if (recordingId && reading) {
       const events = this.learning.update(recordingId, { ...next, sequence: previous.sequence + 1, receivedAt: Date.now() },
@@ -368,11 +353,11 @@ export class LiveService {
       } });
     }
     if (this.options.capture) this.followPitMode();
-    // History is captured only while a dashboard is open, like the REST reads it depends on.
-    if (this.clients.size === 0) this.audit?.end(Date.now());
-    const auditId = this.clients.size > 0
-      ? this.audit?.update({ ...next, sequence: previous.sequence + 1, receivedAt: Date.now() }, reading, this.strategy.observations(), Date.now()) : null;
-    const audited = { ...next, audit: auditId ? { runId: auditId, status: this.auditFailed ? 'unavailable' as const : 'recording' as const } : null };
+    const captureStatus = this.options.capture?.status();
+    const audited = { ...next, audit: captureStatus?.recordingId ? {
+      runId: captureStatus.recordingId,
+      status: captureStatus.state === 'unavailable' ? 'unavailable' as const : 'recording' as const,
+    } : null };
     this.pendingTiming = this.clients.size > 0 && isLiveOnTrack(state.lifecycle) ? this.tracker.timing() : null;
     if (contentKey(audited) === this.snapshotKey) {
       // The session clock moves every frame; it alone is not a change worth a snapshot.

@@ -3,7 +3,7 @@ import express from 'express';
 import request from 'supertest';
 import { afterEach, describe, expect, it } from 'vitest';
 import { initDbSchema } from '../../../server/core/dbSchema.js';
-import { createLiveAuditWriter, iterateLiveAudit, pruneLiveAudit, readLiveAudit } from '../../../server/core/live/dbLiveAuditStore.js';
+import { iterateLiveAudit, readLiveAudit } from '../../../server/core/live/dbLiveAuditStore.js';
 import { exportLiveAudit } from '../../../server/live/audit/export.js';
 import { createLiveRouter } from '../../../server/routes/liveRoutes.js';
 import { LiveService } from '../../../server/live/liveService.js';
@@ -20,7 +20,9 @@ function setup() {
   const db = new Database(':memory:');
   databases.push(db);
   initDbSchema(db);
-  const save = createLiveAuditWriter(db);
+  db.exec('CREATE TABLE live_strategy_audit (run_id TEXT, sequence INTEGER, recorded_at INTEGER, record_json TEXT, PRIMARY KEY(run_id,sequence))');
+  const insert = db.prepare('INSERT INTO live_strategy_audit VALUES (?,?,?,?)');
+  const save = (item: LiveAuditRecord) => insert.run(item.runId, item.sequence, item.recordedAt, JSON.stringify(item));
   const app = express();
   app.use('/api', createLiveRouter({ sessionDb: { getDb: () => db } } as unknown as ServerContext, new LiveService()));
   return { db, save, app };
@@ -42,15 +44,11 @@ describe('persistent live strategy history', () => {
     expect(readLiveAudit(db, null)).toHaveLength(3);
   });
 
-  it('keeps only the most recent captures, pruned when the writer is created', () => {
-    const { db, save } = setup();
-    ['old', 'mid', 'new'].forEach((run, index) => {
-      for (const sequence of [1, 2]) save({ ...record(sequence, run), recordedAt: (index + 1) * 1000 + sequence });
-    });
-    expect(pruneLiveAudit(db, 2)).toBe(2);
-    expect(new Set([...iterateLiveAudit(db, null)].map(item => item.runId))).toEqual(new Set(['mid', 'new']));
-    createLiveAuditWriter(db);
-    expect([...iterateLiveAudit(db, null)]).toHaveLength(4);
+  it('does not create legacy storage in a fresh database', () => {
+    const db = new Database(':memory:'); databases.push(db); initDbSchema(db);
+    expect(readLiveAudit(db, null)).toEqual([]);
+    expect([...iterateLiveAudit(db, null)]).toEqual([]);
+    expect(db.prepare("SELECT 1 FROM sqlite_master WHERE name='live_strategy_audit'").get()).toBeUndefined();
   });
 
   it('returns saved history and a downloadable CSV, validates run IDs and scopes exports', async () => {
@@ -69,13 +67,15 @@ describe('persistent live strategy history', () => {
     expect((await request(app).get('/api/live/audit?runId=unknown')).body).toEqual([]);
   });
 
-  it('escapes commas, quotes, newlines and spreadsheet formulas while keeping signed numeric errors', () => {
+  it('escapes commas, quotes, newlines and spreadsheet formulas while keeping signed numeric errors', async () => {
     const item = record(1);
     item.snapshot.session!.vehicleName = '=CMD("x,y")\ncar';
     item.comparison = { lap: 1, forecastAtSeconds: 0, resourceKind: 've', source: 'game',
       predictedPerLap: 3, actualPerLap: 2.5, errorPerLap: -0.5, errorPercent: -16.667,
       actualRatio: 0.8, recommendedRatio: 0.81, ratioError: -0.01, garageRatio: 0.85, nextStopRatio: 0.82 };
-    const csv = [...exportLiveAudit([item])].join('');
+    const lines: string[] = [];
+    for await (const line of exportLiveAudit([item])) lines.push(line);
+    const csv = lines.join('');
     expect(csv).toContain('"\'=CMD(""x,y"")\ncar"');
     expect(csv).toContain('"-0.5"');
     expect(csv).toContain('"0.85","0.82"');

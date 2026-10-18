@@ -92,6 +92,29 @@ describe('LiveCaptureController', () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 
+  it('owns audit checkpoints and finalizes the prior run before switching files', () => {
+    const { controller, writer } = makeController();
+    const usage = { fuel: null, ve: null, fuelNowLitres: 25, veNowPercent: 80 };
+    controller.update(reading(100), snapshot(), usage);
+    const oldId = controller.status().recordingId;
+    vi.advanceTimersByTime(1000);
+    for (const batch of writer.batches()) writer.acknowledge(batch);
+    controller.update(reading(200, { sessionCode: 1 }), snapshot('practice'), usage);
+    const newId = controller.status().recordingId;
+    expect(newId).not.toBe(oldId);
+    controller.update(null, { ...snapshot(), session: null, lifecycle: 'offline' }, usage);
+    const audits = writer.batches().flatMap(batch => batch.observations
+      .filter(item => item.kind === 'strategy-audit-v1')
+      .map(item => ({ owner: batch.manifest.recordingId, record: item.data as { runId: string; reason: string } })));
+    expect(audits).toEqual([
+      { owner: oldId, record: expect.objectContaining({ runId: oldId, reason: 'start' }) },
+      { owner: oldId, record: expect.objectContaining({ runId: oldId, reason: 'end' }) },
+      { owner: newId, record: expect.objectContaining({ runId: newId, reason: 'start' }) },
+      { owner: newId, record: expect.objectContaining({ runId: newId, reason: 'end' }) },
+    ]);
+    expect(writer.batches().flatMap(batch => batch.observations).some(item => item.kind === 'strategy-prediction')).toBe(false);
+  });
+
   it('starts independently of dashboard clients and batches ISO samples with the schema stride and metadata', () => {
     const { controller, writer } = makeController();
     start(controller);
