@@ -32,7 +32,7 @@ Native telemetry, XML and replay files retain their existing ownership.
    Disconnects clear live timing/pedal buffers and reconnect. SSE client backpressure never blocks capture.
 4. `capture/controller.ts` records independently of dashboard subscribers. It sends 50-sample batches
    or flushes once a second to `recordingWorker.ts`; sparse observations share the same bounded queue.
-   DuckDB transactions commit samples, observations, manifest and batch fingerprints together.
+   DuckDB transactions commit samples, observations, manifest and the batch sequence together.
 5. Session transitions finalize the owning recording before starting another. Shutdown requests an
    interrupted finalization; abrupt termination can leave only previously committed batches.
    Resuming an interrupted file requires exact identity, layout and lap-clock continuity proof; the
@@ -72,7 +72,7 @@ Schema and normalization versions are stored explicitly. The tables are:
 | `capture_channels` | Channel order, units and provenance |
 | `capture_samples` | Typed columnar motion samples and game/lap clocks |
 | `capture_observations` | Sparse source observations and versioned learning events |
-| `capture_batches` | Persisted batch sequence/signatures for reliable writes |
+| `capture_batches` | Committed batch sequences (a repeated or older sequence is rejected) |
 
 The controller batches samples for a worker-owned writer. Four normal pending batches plus two
 reserved initialization/finalization slots share the same six-batch FIFO, including batches containing

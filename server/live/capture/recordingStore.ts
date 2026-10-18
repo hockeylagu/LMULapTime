@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import duckdb from 'duckdb';
@@ -226,7 +225,7 @@ function serializeObservation(observation: LiveCaptureObservation): string {
   return data;
 }
 
-function validateBatch(batch: LiveCaptureBatch): { rowCount: number; observationData: string[]; fingerprint: string; manifestJson: string } {
+function validateBatch(batch: LiveCaptureBatch): { rowCount: number; observationData: string[]; manifestJson: string } {
   if (batch.type !== 'batch') throw new Error('Invalid live capture message type');
   validateManifest(batch.manifest);
   if (!Number.isSafeInteger(batch.sequence) || batch.sequence < 0) throw new Error('Invalid live capture batch sequence');
@@ -254,27 +253,7 @@ function validateBatch(batch: LiveCaptureBatch): { rowCount: number; observation
     priorElapsed = elapsed;
   }
   const observationData = batch.observations.map(serializeObservation);
-  const manifestJson = stableManifest(batch.manifest);
-  const hash = createHash('sha256');
-  hash.update(String(batch.sequence));
-  hash.update('\0');
-  hash.update(manifestJson);
-  hash.update('\0');
-  hash.update(Buffer.from(batch.samples.buffer, batch.samples.byteOffset, batch.samples.byteLength));
-  hash.update('\0');
-  for (const observation of batch.observations) {
-    hash.update(JSON.stringify({
-      elapsedSeconds: observation.elapsedSeconds,
-      receivedAt: observation.receivedAt,
-      source: observation.source,
-      kind: observation.kind,
-      requestStartedAt: observation.requestStartedAt ?? null,
-      requestFinishedAt: observation.requestFinishedAt ?? null,
-      data: JSON.parse(serializeObservation(observation)) as unknown,
-    }));
-    hash.update('\0');
-  }
-  return { rowCount, observationData, fingerprint: hash.digest('hex'), manifestJson };
+  return { rowCount, observationData, manifestJson: stableManifest(batch.manifest) };
 }
 
 function columnSql(): string {
@@ -299,32 +278,12 @@ export class LiveCaptureRecordingStore {
   private lastSequence = -1;
   private lastSampleElapsed: number | null = null;
   private closed = false;
-  private queue: Promise<unknown> = Promise.resolve();
 
   public constructor(private readonly directory: string) {}
 
-  public write(batch: LiveCaptureBatch): Promise<WriteAnswer> {
-    if (this.closed) return Promise.reject(new Error('Live capture recording store is closed'));
-    const operation = this.queue.then(() => this.writeSerial(batch));
-    this.queue = operation.then(() => undefined, () => undefined);
-    return operation;
-  }
-
-  public link(filename: string, recordingId: string, sessionId: string | null, gameVersion: string | null): Promise<void> {
-    if (this.closed) return Promise.reject(new Error('Live capture recording store is closed'));
-    const operation = this.queue.then(() => this.linkSerial(filename, recordingId, sessionId, gameVersion));
-    this.queue = operation.then(() => undefined, () => undefined);
-    return operation;
-  }
-
-  public catalog(): Promise<{ recordings: Array<{ manifest: LiveCaptureManifest; bytes: number }>; errors: Array<{ filename: string; error: string }> }> {
-    if (this.closed) return Promise.reject(new Error('Live capture recording store is closed'));
-    const operation = this.queue.then(() => this.catalogSerial());
-    this.queue = operation.then(() => undefined, () => undefined);
-    return operation;
-  }
-
-  private async catalogSerial(): Promise<{ recordings: Array<{ manifest: LiveCaptureManifest; bytes: number }>; errors: Array<{ filename: string; error: string }> }> {
+  /** The recording worker sends one message at a time, so the store needs no queue of its own. */
+  public async catalog(): Promise<{ recordings: Array<{ manifest: LiveCaptureManifest; bytes: number }>; errors: Array<{ filename: string; error: string }> }> {
+    if (this.closed) throw new Error('Live capture recording store is closed');
     // Catalog is requested only while the recorder is idle. Closing defensively also
     // ensures this worker never holds a writer handle while opening read-only files.
     await this.closeCurrent();
@@ -419,7 +378,8 @@ export class LiveCaptureRecordingStore {
     }
   }
 
-  private async linkSerial(filename: string, recordingId: string, sessionId: string | null, gameVersion: string | null): Promise<void> {
+  public async link(filename: string, recordingId: string, sessionId: string | null, gameVersion: string | null): Promise<void> {
+    if (this.closed) throw new Error('Live capture recording store is closed');
     if (!RECORDING_ID_PATTERN.test(recordingId)) throw new Error('Live capture recordingId must be a UUID');
     if (!validCaptureFilename(filename, recordingId)) throw new Error('Live capture filename must be a safe basename ending with its UUID and .live.duckdb');
     if (sessionId !== null && (typeof sessionId !== 'string' || sessionId.trim().length === 0)) throw new Error('Invalid linked sessionId');
@@ -457,7 +417,8 @@ export class LiveCaptureRecordingStore {
     this.currentManifest = linked;
   }
 
-  private async writeSerial(batch: LiveCaptureBatch): Promise<WriteAnswer> {
+  public async write(batch: LiveCaptureBatch): Promise<WriteAnswer> {
+    if (this.closed) throw new Error('Live capture recording store is closed');
     const checked = validateBatch(batch);
     await fs.promises.mkdir(this.directory, { recursive: true });
     const target = path.resolve(this.directory, batch.manifest.filename);
@@ -468,16 +429,6 @@ export class LiveCaptureRecordingStore {
     const connection = this.connection;
     if (!connection) throw new Error('Live capture database is not open');
 
-    const duplicate = await all(connection, 'SELECT fingerprint, manifest_json FROM capture_batches WHERE sequence = ?', [batch.sequence]);
-    if (duplicate.length > 0) {
-      const prior = duplicate[0];
-      if (rowString(prior, 'fingerprint') !== checked.fingerprint || rowString(prior, 'manifest_json') !== checked.manifestJson) {
-        throw new Error(`Live capture batch sequence ${batch.sequence} was already committed with different content`);
-      }
-      const stored = await this.readManifest(connection);
-      if (!stored) throw new Error('Live capture manifest is missing after a committed batch');
-      return { manifest: stored, bytes: this.fileBytes(target) };
-    }
     if (batch.sequence <= this.lastSequence) throw new Error(`Live capture batch sequence ${batch.sequence} is older than the committed sequence`);
 
     const priorManifest = this.currentManifest;
@@ -515,8 +466,8 @@ export class LiveCaptureRecordingStore {
         'UPDATE capture_manifest SET recording_id = ?, manifest_json = CAST(? AS JSON), updated_at = ? WHERE singleton = TRUE',
         [manifest.recordingId, stableManifest(manifest), manifest.updatedAt]);
       await run(connection,
-        'INSERT INTO capture_batches (sequence, fingerprint, manifest_json, sample_count) VALUES (?, ?, CAST(? AS JSON), ?)',
-        [batch.sequence, checked.fingerprint, checked.manifestJson, checked.rowCount]);
+        'INSERT INTO capture_batches (sequence, manifest_json, sample_count) VALUES (?, CAST(? AS JSON), ?)',
+        [batch.sequence, checked.manifestJson, checked.rowCount]);
       await run(connection, 'COMMIT');
     } catch (error: unknown) {
       try { await run(connection, 'ROLLBACK'); } catch { /* Preserve the write failure. */ }
@@ -562,7 +513,7 @@ export class LiveCaptureRecordingStore {
           request_started_at DOUBLE, request_finished_at DOUBLE, source VARCHAR NOT NULL, kind VARCHAR NOT NULL,
           data JSON NOT NULL)`);
         await run(connection, `CREATE TABLE IF NOT EXISTS capture_batches (
-          sequence BIGINT PRIMARY KEY, fingerprint VARCHAR NOT NULL, manifest_json JSON NOT NULL, sample_count INTEGER NOT NULL)`);
+          sequence BIGINT PRIMARY KEY, manifest_json JSON NOT NULL, sample_count INTEGER NOT NULL)`);
         if (!hasManifestTable && existingTables.length > 0) throw new Error('Refusing to initialize a non-empty DuckDB file');
         if (!hasManifestTable) {
           const metadataInsert = connection.prepare('INSERT INTO capture_metadata VALUES (?, ?)');
@@ -766,7 +717,6 @@ export class LiveCaptureRecordingStore {
   public async close(): Promise<void> {
     if (this.closed) return;
     this.closed = true;
-    await this.queue;
     await this.closeCurrent();
   }
 }

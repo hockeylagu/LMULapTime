@@ -178,19 +178,15 @@ describe('LiveCaptureRecordingStore', () => {
     expect(readback.manifest).toEqual(batch.manifest);
   });
 
-  it('makes an identical retry idempotent and rejects changed content for the same sequence', async () => {
+  it('rejects a batch whose sequence is already committed', async () => {
     const directory = await createDirectory();
     const writer = await createWriter(directory);
     const batch = makeBatch();
     expect((await writer.send(batch)).type).toBe('persisted');
-    const retry = await writer.send(batch);
-    expect(retry.type).toBe('persisted');
-    if (retry.type !== 'persisted') throw new Error('Expected persisted retry result');
-    expect(retry.manifest.samples).toBe(2);
-    const conflict = await writer.send({ ...batch, samples: sampleRows(1, 1.03) });
-    expect(conflict.type).toBe('failed');
-    if (conflict.type !== 'failed') throw new Error('Expected failed sequence conflict');
-    expect(conflict.error).toMatch(/already committed with different content/);
+    const repeat = await writer.send(batch);
+    expect(repeat.type).toBe('failed');
+    if (repeat.type !== 'failed') throw new Error('Expected failed repeat');
+    expect(repeat.error).toMatch(/older than the committed sequence/);
     await writer.close();
   });
 
