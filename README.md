@@ -53,7 +53,7 @@ The backend records supplemental player data while LMU runs, independent of the 
 session recording uses its own DuckDB file, linked strictly to XML identity and lap clocks. Verified
 ISO 8855 dynamics augment yaw/body-slip charts; disposable response/error diagnostics support race
 debugging. Strategy audit checkpoints share the session DuckDB and retain JSON/CSV export after
-recording closes; older SQLite history remains read-only. Frozen fuel/VE forecasts and measured outcomes feed an offline baseline and bounded correction candidate evaluator.
+recording closes. Frozen fuel/VE forecasts and measured outcomes feed an offline baseline and bounded correction candidate evaluator.
 Historical prediction corrections remain disabled; real-game overhead validation is pending.
 See [live capture storage and channels](docs/LIVE_CAPTURE_FORMAT.md).
 

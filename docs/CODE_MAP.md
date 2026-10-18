@@ -70,6 +70,9 @@ Audit consolidation, 2026-10-18: 3,201 tests passed, 56 intentionally skipped; p
 Matching-dataset endpoint sweeps found no regressions above the project threshold; raw DuckDB audit
 pagination/CSV and worker handle release are covered by isolated fixtures, not real-game acceptance.
 
+SQLite audit retirement, 2026-10-18: obsolete store/tests removed after approved local table deletion;
+3,199 tests passed, 56 intentionally skipped, production build clean and no threshold endpoint regressions.
+
 Historical baseline, last checked 2026-10-12 after the type refactoring follow-ups (main `25d1e988`): 476 TypeScript source files
 in src/server/shared, 305 test suites (300 passed, 5 skipped), 2663 tests (2607 passed, 56 skipped); the
 production build passed without warnings or errors. Coverage was last measured before those follow-ups:
@@ -882,12 +885,13 @@ personal geometry/recording regressions require private roots (see [PLUGINS.md](
 Live strategy audit: `LiveAuditTracker` runs inside the capture controller, independent of dashboard clients.
 Full `strategy-audit-v1` observations replace periodic `strategy-prediction` snapshots in session DuckDB.
 `server/live/audit/` reads finalized captures through bounded read-only worker pages and streams
-spreadsheet-safe CSV; `liveRoutes.ts` merges newest-200 JSON history with read-only legacy SQLite rows.
-New databases do not create the old audit table, and the legacy writer/pruner are removed. Reads wait
+spreadsheet-safe CSV; `liveRoutes.ts` serves newest-200 JSON history from recordings only.
+The old SQLite audit table, store module, writer/pruner and compatibility path are removed. Reads wait
 until the loaded session and writer handles close. Raw unlinked history can be exported without
 claiming XML ownership; aligned charts/learning still require their existing strict attachment gates.
 New run IDs are recording UUIDs; returned sequences are persisted observation IDs, including after
 recovery. A session transition finalizes its audit in the old file before the new file begins.
-Existing legacy rows are neither migrated by guesswork nor deleted. See [the operational reference](LIVE_CAPTURE_FORMAT.md#consolidated-strategy-audit-and-export).
+The local old audit data was deleted only after user approval of its inventory. No automatic deletion
+migration is shipped. See [the operational reference](LIVE_CAPTURE_FORMAT.md#consolidated-strategy-audit-and-export).
 
 Live multiclass horizon: `liveLapsLeft.ts` owns `projectRaceFlagSeconds`, shared by live distance and `liveResourcePlan.ts` preparation. `rf2Decode.ts` resolves overall and player-class leaders independently using canonical class aliases; class pace supplies the player's distance horizon, with overall flag timing preserved. The preparation headline excludes the formation allowance retained in the resource model. Forecast audit model version 3 distinguishes this calculation from saved earlier estimates.

@@ -92,15 +92,15 @@ laps, measurements, finish and end retain the existing audit semantics, plus ten
 The controller ends the old audit before switching files. A recovered recording keeps its recording
 UUID; exported sequences use persisted observation IDs so a tracker restart cannot duplicate keys.
 
-New audit checkpoints are never written to SQLite. Fresh databases do not create the old
-`live_strategy_audit` table; existing rows remain read-only and are included in history/export.
-There is no migration that guesses XML identity, no automatic pruning and no deletion of old history.
+Audit checkpoints are never written to SQLite. The old `live_strategy_audit` table and its historical
+rows were explicitly removed from the local database after the user approved the inspected inventory.
+The SQLite audit reader, writer and compatibility tests are removed; fresh databases do not create
+that table. No automatic deletion migration or legacy fallback is shipped.
 Audit history is diagnostic context; permanent frozen learning events and compact examples remain
 separate, and deleting diagnostics does not remove either of them.
 
-`GET /api/live/audit` still returns the newest 200 checkpoints, merging retained legacy history
-with available finalized recordings. `GET /api/live/audit.csv` streams the legacy history followed by
-recording groups in start order; each recording follows persisted observation order. Both accept
+`GET /api/live/audit` returns the newest 200 checkpoints from available finalized recordings.
+`GET /api/live/audit.csv` streams recording groups in start order; each recording follows persisted observation order. Both accept
 `runId`; for new captures this is the recording UUID. CSV columns and spreadsheet escaping remain.
 Exports wait until the game session and writer handles close (503 with a retry message while busy).
 Unlinked finalized recordings can be exported as raw diagnostic history without asserting XML ownership.
@@ -144,7 +144,7 @@ select candidates makes it unsuitable as final independent acceptance evidence; 
 sessions before any activation. No parameters are persisted or applied to live advice.
 
 The current predictor still uses the rolling estimator/game fallback. Historical corrections remain
-disabled. Audit history/export now reads the consolidated recording source plus retained legacy rows;
+disabled. Audit history/export reads the consolidated recording source;
 learning UI, correction activation and real-game validation remain in the
 [active plan](plans/LIVE_SESSION_EVIDENCE.md). The delivered foundation and original design are in the
 [archived implementation record](plans/archive/LIVE_SESSION_EVIDENCE_FOUNDATION.md).

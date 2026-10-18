@@ -523,9 +523,9 @@ as race-validated.
 ### Persistent estimate / selection / outcome history (2026-10-16)
 
 Storage update 2026-10-18: the implementation below is the original delivery record. Full checkpoints
-now live in the session DuckDB and run without dashboard subscribers. Existing SQLite rows are
-read-only; JSON/CSV includes both sources after recording closes. The old writer and 30-run pruning
-policy are removed. See [current audit storage](../LIVE_CAPTURE_FORMAT.md#consolidated-strategy-audit-and-export).
+now live in the session DuckDB and run without dashboard subscribers. The inspected old SQLite audit
+table/data was deleted with user approval; its compatibility code is removed. JSON/CSV reads only
+recordings after they close. The old writer and 30-run pruning policy are removed. See [current audit storage](../LIVE_CAPTURE_FORMAT.md#consolidated-strategy-audit-and-export).
 
 The live service now writes immutable checkpoints into `live_strategy_audit` in the local WAL SQLite database while a dashboard page is open (driver decision 2026-10-16: no REST reads or history without one; no size limit for now, to be reviewed after a few sessions). Each capture has its own UUID, ordered sequence, wall clock, session clock and forecasting model version. Session changes, clock regressions, known layout changes and leaving the session close the capture; interrupted runs remain available. Capture scope is explicit, not a guessed XML session ID. No imported results are altered.
 

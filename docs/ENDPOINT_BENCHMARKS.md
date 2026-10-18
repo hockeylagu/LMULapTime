@@ -1,5 +1,14 @@
 # Endpoint performance history
 
+## Remove SQLite audit compatibility — 2026-10-18
+
+After the user approved removal of the inspected old audit table/data, the former read path and
+recording-only path were measured against the same post-deletion dataset (`61b58d425945`), cohort
+and local plugin revision, 20 requests per case. No median regressed by both >20% and >5 ms.
+Empty audit JSON history median was 1.10 → 0.99 ms; raw DuckDB paging remains covered by worker
+fixtures. Reports: `.cache/audit-removal-before-corrected/` and `.cache/audit-removal-after/`.
+The earlier consolidation benchmark below retains its original pre-deletion dataset and results.
+
 ## Audit storage consolidation — 2026-10-18
 
 Twenty-request before/after sweeps used identical dataset and cohort hashes (snapshot
