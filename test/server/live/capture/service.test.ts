@@ -35,6 +35,30 @@ describe('LiveService capture integration', () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 
+  it('persists one frozen forecast per resource without a dashboard or SQLite audit writer', async () => {
+    const reader = new FakeWorker();
+    const writer = new FakeCaptureWriter();
+    const capture = new LiveCaptureController({ directory: 'unused-test-directory', onPersist: vi.fn(),
+      createWorker: () => writer as unknown as CaptureWorker });
+    const service = new LiveService({ capture, createWorker: () => reader as unknown as LiveWorker,
+      identity: { readNavigation: async () => ({ ok: false }) },
+      pit: { get: async () => ({ ok: false, reason: 'status' }) } });
+    service.start();
+    for (const currentEt of [100, 101]) reader.emit('message', { type: 'frame', scoring: scoringReading({ currentEt,
+      player: vehicleReading({ totalLaps: 1, lapStartEt: 100, driverName: 'Driver' }) }) });
+    expect(service.hasClients()).toBe(false);
+    expect(capture.hasOpenRecordingHandle).toBe(true);
+    const stopping = service.stop();
+    const forecasts = writer.batches().flatMap(batch => batch.observations).filter(event => event.kind === 'learning-forecast');
+    expect(forecasts).toHaveLength(2);
+    expect(forecasts[0].data).toMatchObject({ lapNumber: 2, forecastSeconds: 100, kind: 'fuel' });
+    expect(forecasts[1].data).toMatchObject({ lapNumber: 2, forecastSeconds: 100, kind: 've' });
+    for (const batch of writer.batches()) writer.emit('message', { type: 'persisted', sequence: batch.sequence, manifest: batch.manifest, bytes: 1 });
+    writer.emit('exit', 0);
+    await stopping;
+    expect(capture.hasOpenRecordingHandle).toBe(false);
+  });
+
   it('keeps polling and recording without a dashboard, ignores replay frames, then stops polling', async () => {
     const reader = new FakeWorker();
     const writer = new FakeCaptureWriter();

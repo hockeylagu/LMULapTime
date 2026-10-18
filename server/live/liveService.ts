@@ -24,6 +24,7 @@ import type { LivePitPollerOptions, PitPollMode } from './livePitPoller.js';
 import { writeSseEvent } from './sse.js';
 import type { SseSink } from './sse.js';
 import type { LiveCaptureController } from './capture/controller.js';
+import { LiveLearningCapture } from '../../shared/domain/learning/capture.js';
 
 /** How often buffered pedal samples go out to the pages (about 25 batches a second). */
 export const PEDAL_FLUSH_MS = 40;
@@ -89,6 +90,7 @@ export class LiveService {
   private readonly audit: LiveAuditTracker | null;
   private auditFailed = false;
   private lastDiagnosticStrategyAt = -Infinity;
+  private readonly learning = new LiveLearningCapture();
   private readonly pit: LivePitPoller;
   /** The last scoring reading, kept so a navigation notice or a REST answer can re-derive the snapshot without a new frame. */
   private lastReading: LiveScoringReading | null = null;
@@ -347,6 +349,13 @@ export class LiveService {
       strategy,
     };
     this.options.capture?.update(reading, { ...next, sequence: previous.sequence + 1, receivedAt: Date.now() });
+    const recordingId = this.options.capture?.status().recordingId;
+    if (recordingId && reading) {
+      const events = this.learning.update(recordingId, { ...next, sequence: previous.sequence + 1, receivedAt: Date.now() },
+        reading, this.strategy.learningForecasts(), this.strategy.observations());
+      for (const event of events) this.options.capture?.observe({ source: 'recorder', ...event,
+        elapsedSeconds: reading.currentEt, receivedAt: Date.now() });
+    }
     this.options.capture?.diagnostics?.record({ kind: 'app-state', at: Date.now(), data: {
       lifecycle: next.lifecycle, paused: next.paused, identity: next.identity, loadingProgress: next.loadingProgress,
       session: next.session ? { ...next.session, elapsedSeconds: undefined } : null,

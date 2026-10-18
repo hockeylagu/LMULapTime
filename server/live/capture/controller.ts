@@ -75,6 +75,9 @@ export class LiveCaptureController {
     };
   }
 
+  /** Native handles outlive close callbacks; defer independent file maintenance until worker exit. */
+  public get hasOpenRecordingHandle(): boolean { return this.worker !== null; }
+
   public update(reading: LiveScoringReading | null, snapshot: LiveSnapshot): void {
     if (this.stopped) return;
     const player = reading?.player;

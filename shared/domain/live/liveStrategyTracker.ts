@@ -74,6 +74,10 @@ export class LiveStrategyTracker {
     return { fuel: this.meters.fuel.latestUse, ve: this.meters.ve.latestUse,
       fuelNowLitres: this.car && this.car.fuelCapacityLiters > 0 ? this.car.fuelLiters : null, veNowPercent: this.ve };
   }
+  /** Freeze both resources using the same estimator as the live planner, including game fallback. */
+  public learningForecasts(): Record<LiveResourceKind, Pick<LiveResourcePlan, 'perLap' | 'perLapSource' | 'lapsMeasured'>> {
+    return { fuel: this.perLap('fuel'), ve: this.perLap('ve') };
+  }
   private eventKey: string | null = null;
   private eventLayout: string | null = null;
   private sessionKey: string | null = null;
