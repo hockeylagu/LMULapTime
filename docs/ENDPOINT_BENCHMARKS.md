@@ -1,5 +1,37 @@
 # Endpoint performance history
 
+## Live dynamics chart integration — 2026-10-18
+
+Twenty-request sweeps used the same snapshot (`c3633d286fd5`). Automatic telemetry median was
+154.57 → 152.00 ms; VCR telemetry 82.23 → 80.48 ms. No case exceeded both the >20% and
+>5 ms regression thresholds. The new attachment hint adds no recording read to these endpoints.
+This cohort has no linked live capture: the separate worker read and client fusion costs are excluded.
+Alignment, source fallback, native G preservation and cancellation are covered by integration/unit
+tests; a synthetic browser preview verifies live versus computed chart labels. Reports are retained
+under `.cache/live-channel-analysis/fusion-endpoints-before.md` and `fusion-endpoints-after.md`.
+
+## Aligned live evidence reader — 2026-10-18
+
+Twenty-request before/after sweeps used the same snapshot (`c3633d286fd5`). Session detail medians
+were 80.98 → 79.38 ms and 62.34 → 63.89 ms; dashboard 12.78 → 10.40 ms. No case crossed
+the >20% and >5 ms regression threshold against the original before-reader baseline. The new
+`/api/session/:sessionId/live-evidence` case measured 1.29 ms median / 2.39 ms p95 for an
+**unlinked** session: it measures the unavailable path, not a real DuckDB worker read. The isolated
+harness now mounts the new router; the initial after sweep exposed that missing harness registration
+and was superseded by this successful sweep. Reports are retained in `.cache/live-channel-analysis/reader-endpoints-before.md`
+and `reader-endpoints-after.md`. Real-file correctness and bounded/concurrent reads are covered by
+worker integration tests. These measurements exclude game frame time and chart rendering.
+
+## Live capture foundation — 2026-10-18
+
+Before/after sweeps used the same snapshot (`c3633d286fd5`), 1,036 sessions and 20 measured
+requests per case. Session detail medians were 79.51 → 81.58 ms and 63.80 → 61.43 ms;
+dashboard 11.72 → 10.22 ms. No endpoint crossed the >20% and >5 ms regression threshold.
+The new capture-status endpoint measured 1.03 ms median / 1.17 ms p95. Replay cache, traffic
+and telemetry still lead the slower ranking. These idle endpoint measurements exclude live capture
+overhead and game frame time. Reports are retained under `.cache/live-channel-analysis/endpoint-before.md`
+and `.cache/endpoint-benchmarks/latest.md` (with timestamped history).
+
 ## Qualified best benchmark pace — 2026-10-16
 
 Dashboard average pace now groups dry, benchmark-rated session bests by canonical layout and car

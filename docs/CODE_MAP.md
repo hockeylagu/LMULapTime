@@ -1,5 +1,26 @@
 # Code Map: where things live and how they flow
 
+Live capture foundation: `server/live/capture/controller.ts` batches player-only supplemental evidence
+independently of dashboard clients. `decode.ts` normalizes six verified vehicle-vector values to ISO 8855;
+unverified wheel columns remain NULL. `recordingWorker.ts` / `recordingStore.ts` own one typed DuckDB file
+per session attempt, bounded queues, checkpoints, signature validation and catalog discovery.
+`server/core/live/dbLiveCaptureStore.ts` keeps durable SQLite attachments/availability; `reconcile.ts`
+requires unique canonical identity and completed lap anchors before inheriting XML `GameVersion`.
+Session detail exposes `liveCaptures`; `GET /api/live/capture` returns health and channel metadata.
+Files default to ignored `server/live-captures/` (`LMU_LIVE_CAPTURE_DIR` override); no automatic deletion.
+Learning and aligned channel consumers remain planned in `docs/plans/LIVE_SESSION_EVIDENCE.md`.
+
+Aligned live evidence: `liveEvidenceRoutes.ts` exposes `/api/session/:sessionId/live-evidence` with
+driver/lap ordinals. `capture/evidenceService.ts` revalidates current XML ownership and lap anchors;
+`evidenceReader.ts`, `evidenceReaderWorker.ts` and `readRecording.ts` read bounded raw ISO samples and
+sparse evidence in independent read-only workers, off track. Untimed REST observations remain session
+scoped, gaps remain explicit and stale links cannot serve a response. `shared/types/liveEvidence.ts`
+defines provenance/coverage contracts; `src/api/liveEvidenceApi.ts` is the frontend access point.
+`shared/domain/live/liveTelemetryFusion.ts` joins verified source samples to explicit trajectory clocks
+within 25 ms. `fetchSessionTelemetry` requests evidence only with the player attachment hint;
+client post-processing preserves supplied yaw/slip and native G. The inspector's `LiveCaptureCoverage`
+and channel badges disclose live versus computed values. Deterministic learning consumers remain planned.
+
 A fast index for new sessions: find the right file without searching. `AGENTS.md` holds the rules;
 this file holds the **routes through the code**. Keep it current (see "Keeping this file current" at the end).
 
@@ -588,6 +609,10 @@ thread. `rf2Layout.ts` derives every byte offset from field lists that mirror `t
 coherent read (begin counter, copy, end counter, 3 attempts, unchanged frames skipped); `sharedMemory.ts` is the only
 Windows part (koffi `OpenFileMappingW` / `MapViewOfFile`); `liveReader.ts` is the worker's loop (3 s open retry, 50 Hz in
 realtime and 1 Hz otherwise, one `GET 127.0.0.1:6397/navigation/state` every 2 s: refused = gone (a reset or timeout = busy),
+`gameProcess.ts` discovers the exact `Le Mans Ultimate.exe` process through Windows Toolhelp and retains a query/synchronize
+handle. The reader checks it every 500 ms in the worker: startup publishes `game-running` before telemetry is ready, exit
+releases stale mappings, and REST refusal cannot override a known running process. Failed/unsupported process queries
+fall back to the telemetry lifecycle and REST exit detection. This requires no elevation and launches no helper processes.
 `NAV_MAIN_MENU` = menu (the buffer keeps the last session in the menu), `loading` or `OP_TO_REALTIME` = loading (LMU clears
 `loading` a few frozen seconds early), `SETTING_REPLAY_PLAYBACK` = replay; a refusal only counts once LMU has answered, or after a
 3 min start-up grace; a jump in the buffer (session, track, clock back, any write on the menu) holds the frames and asks within 1 s),
@@ -596,7 +621,7 @@ SSE clients, 40 ms pedal batches only on track, heartbeat, slow clients drop bat
 events), `liveSettings.ts` (`live_auto_open`, `live_reserve_laps` in
 cache_metadata), `sse.ts`. The lifecycle rules are deterministic in `shared/domain/live/liveLifecycle.ts`. Routes:
 `routes/liveRoutes.ts` (`/api/live/stream`, `/api/live/settings`, `/api/events`; auto-open is the `game-started` app
-event when the lifecycle leaves offline, setting on and no dashboard page connected: the open app navigates itself to
+event when the process starts (or the lifecycle leaves offline in fallback mode), setting on and no dashboard page connected: the open app navigates itself to
 `#/live`, the server never opens a browser; `game-running` tells each app page whether LMU is running, on connect
 and when it starts or closes, and the app shows `navbar/LiveGameBanner.tsx` above the navbar with a link to `#/live`; `useAppEvents` keeps the
 status through a stream error for `APP_EVENT_ERROR_GRACE_MS` so the reconnect can answer, and clears it at once after silence).
