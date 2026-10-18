@@ -167,6 +167,22 @@ describe('LiveService', () => {
     void service.stop();
   });
 
+  it('keeps the dashboard live when a recording step throws, showing the recording as stopped', () => {
+    const writer = new FakeWorker();
+    const capture = new LiveCaptureController({ directory: 'unused', onPersist: () => {}, createWorker: () => writer as unknown as CaptureWorker });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { service, frame } = setup({ capture });
+    frame(reading());
+    const observe = vi.spyOn(capture, 'observe').mockImplementation(() => { throw new Error('bad observation'); });
+    expect(() => frame(reading({ currentEt: 30 }))).not.toThrow();
+    expect(service.getSnapshot()).toMatchObject({ lifecycle: 'driving', session: { elapsedSeconds: 30 }, audit: { status: 'unavailable' } });
+    expect(capture.status().error).toMatch(/bad observation/);
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+    observe.mockRestore();
+    void service.stop();
+  });
+
   it('sends the snapshot on connect and on every change, not for a moving clock alone', () => {
     const { service, frame } = setup();
     const sink = new FakeSink();

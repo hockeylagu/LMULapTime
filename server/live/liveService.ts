@@ -138,7 +138,7 @@ export class LiveService {
       diagnosticSink: () => this.options.capture?.diagnostics?.sink(),
       onUpdate: update => this.applyRest(update),
       onEvidence: observation => {
-        if (!this.isReplaying()) this.options.capture?.observe(observation);
+        if (!this.isReplaying()) this.record(() => this.options.capture?.observe(observation));
       },
       onNavigation: body => {
         const navigation = parseNavigationState(body);
@@ -192,9 +192,11 @@ export class LiveService {
       // Active races keep reader failures in their diagnostic sidecar. Surface startup failures
       // in the server console when there is no session diagnostic sink yet.
       if (!this.options.capture?.diagnostics?.sink()) console.warn(`[Live] Shared memory reader ${reason}`);
-      this.options.capture?.diagnostics?.record({ kind: 'reader-failure', at: Date.now(), data: { reason } });
-      this.options.capture?.observe({ source: 'recorder', kind: 'failure', elapsedSeconds: null, receivedAt: Date.now(),
-        data: { path: 'shared-memory-reader', outcome: reason } });
+      this.record(() => {
+        this.options.capture?.diagnostics?.record({ kind: 'reader-failure', at: Date.now(), data: { reason } });
+        this.options.capture?.observe({ source: 'recorder', kind: 'failure', elapsedSeconds: null, receivedAt: Date.now(),
+          data: { path: 'shared-memory-reader', outcome: reason } });
+      });
       this.worker = null;
       this.processRunning = null;
       this.handleMessage({ type: 'closed' });
@@ -242,11 +244,11 @@ export class LiveService {
   private handleMessage(message: unknown): void {
     if (!isWorkerMessage<LiveReaderMessage>(message, ['frame', 'navigation', 'closed', 'process', 'diagnostic'])) return;
     if (message.type === 'diagnostic') {
-      this.options.capture?.diagnostics?.record(message.event);
+      this.record(() => this.options.capture?.diagnostics?.record(message.event));
       return;
     }
     if (message.type === 'process') {
-      this.options.capture?.diagnostics?.record({ kind: 'game-process', at: Date.now(), data: message });
+      this.record(() => this.options.capture?.diagnostics?.record({ kind: 'game-process', at: Date.now(), data: message }));
       this.processRunning = message.running;
       this.publishRunning();
       return;
@@ -264,7 +266,7 @@ export class LiveService {
       return;
     }
     if (message.type === 'navigation') {
-      this.options.capture?.diagnostics?.record({ kind: 'navigation', at: Date.now(), data: message });
+      this.record(() => this.options.capture?.diagnostics?.record({ kind: 'navigation', at: Date.now(), data: message }));
       // A replay is a session screen whose frames are not the session's (applyReading shows it as the menu).
       this.screen = message.screen === 'replay' ? 'session' : message.screen;
       this.loadingProgress = message.loadingProgress;
@@ -282,13 +284,20 @@ export class LiveService {
     else if (message.car) this.applyReading(this.lastReading);
     if (message.scoring) this.followPlayer(before, message.scoring.player);
     if (message.pedal) this.bufferPedal(message.pedal);
-    if (message.capture && this.snapshot.session?.inRealtime && !this.snapshot.paused) this.options.capture?.sample(message.capture);
-    if (message.car) this.options.capture?.observe({ source: 'shared-memory', kind: 'car-condition',
-      elapsedSeconds: message.pedal?.t ?? this.lastReading?.currentEt ?? null, receivedAt: Date.now(), data: {
-        fuelLitres: message.car.fuelLiters, fuelCapacityLitres: message.car.fuelCapacityLiters,
-        dents: message.car.dentSeverity, detached: message.car.detached, lastImpactEt: message.car.lastImpactEt,
-        compound: message.car.compound,
-      } });
+    const { capture, car } = message;
+    this.record(() => {
+      if (capture && this.snapshot.session?.inRealtime && !this.snapshot.paused) this.options.capture?.sample(capture);
+      if (car) this.options.capture?.observe({ source: 'shared-memory', kind: 'car-condition',
+        elapsedSeconds: message.pedal?.t ?? this.lastReading?.currentEt ?? null, receivedAt: Date.now(), data: {
+          fuelLitres: car.fuelLiters, fuelCapacityLitres: car.fuelCapacityLiters,
+          dents: car.dentSeverity, detached: car.detached, lastImpactEt: car.lastImpactEt, compound: car.compound,
+        } });
+    });
+  }
+
+  /** Recording, learning and diagnostics never stop the dashboard: a failure only ends the recording (NO REC). */
+  private record(work: () => void): void {
+    try { work(); } catch (error) { this.options.capture?.fail(error); }
   }
 
   /** Damage keeps the stop estimate and the MFD read often; a new impact asks for the condition now. */
@@ -348,25 +357,27 @@ export class LiveService {
       loadingProgress: state.lifecycle === 'loading' ? this.loadingProgress : null,
       strategy,
     };
-    this.options.capture?.update(reading, { ...next, sequence: previous.sequence + 1, receivedAt: Date.now() }, this.strategy.observations());
-    const recordingId = this.options.capture?.status().recordingId;
-    if (recordingId && reading) {
-      const events = this.learning.update(recordingId, { ...next, sequence: previous.sequence + 1, receivedAt: Date.now() },
-        reading, this.strategy.learningForecasts(), this.strategy.observations());
-      for (const event of events) this.options.capture?.observe({ source: 'recorder', ...event,
-        elapsedSeconds: reading.currentEt, receivedAt: Date.now() });
-    }
-    this.options.capture?.diagnostics?.record({ kind: 'app-state', at: Date.now(), data: {
-      lifecycle: next.lifecycle, paused: next.paused, identity: next.identity, loadingProgress: next.loadingProgress,
-      session: next.session ? { ...next.session, elapsedSeconds: undefined } : null,
-    } });
-    if (Date.now() - this.lastDiagnosticStrategyAt >= 10_000 || next.lifecycle !== previous.lifecycle) {
-      this.lastDiagnosticStrategyAt = Date.now();
-      this.options.capture?.diagnostics?.record({ kind: 'strategy', at: Date.now(), data: {
-        modelVersion: LIVE_MODEL_VERSION, elapsedSeconds: reading?.currentEt ?? null,
-        strategy: next.strategy, observations: this.strategy.observations(),
+    this.record(() => {
+      this.options.capture?.update(reading, { ...next, sequence: previous.sequence + 1, receivedAt: Date.now() }, this.strategy.observations());
+      const recordingId = this.options.capture?.status().recordingId;
+      if (recordingId && reading) {
+        const events = this.learning.update(recordingId, { ...next, sequence: previous.sequence + 1, receivedAt: Date.now() },
+          reading, this.strategy.learningForecasts(), this.strategy.observations());
+        for (const event of events) this.options.capture?.observe({ source: 'recorder', ...event,
+          elapsedSeconds: reading.currentEt, receivedAt: Date.now() });
+      }
+      this.options.capture?.diagnostics?.record({ kind: 'app-state', at: Date.now(), data: {
+        lifecycle: next.lifecycle, paused: next.paused, identity: next.identity, loadingProgress: next.loadingProgress,
+        session: next.session ? { ...next.session, elapsedSeconds: undefined } : null,
       } });
-    }
+      if (Date.now() - this.lastDiagnosticStrategyAt >= 10_000 || next.lifecycle !== previous.lifecycle) {
+        this.lastDiagnosticStrategyAt = Date.now();
+        this.options.capture?.diagnostics?.record({ kind: 'strategy', at: Date.now(), data: {
+          modelVersion: LIVE_MODEL_VERSION, elapsedSeconds: reading?.currentEt ?? null,
+          strategy: next.strategy, observations: this.strategy.observations(),
+        } });
+      }
+    });
     if (this.options.capture) this.followPitMode();
     const captureStatus = this.options.capture?.status();
     const audited = { ...next, audit: captureStatus?.recordingId ? {

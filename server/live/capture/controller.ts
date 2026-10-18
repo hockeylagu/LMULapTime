@@ -166,6 +166,13 @@ export class LiveCaptureController {
     }
   }
 
+  /** A recording, learning or diagnostics step threw: this session stops recording (the dashboard shows NO REC). */
+  public fail(error: unknown): void {
+    if (this.error) return;
+    this.error = `Live recording: ${error instanceof Error ? error.message : String(error)}`;
+    console.warn(`[Live] ${this.error}`);
+  }
+
   /** Replay playback pauses capture without closing or learning from replay frames. */
   public pause(): void { this.flush(); }
 

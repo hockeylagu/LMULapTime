@@ -115,6 +115,8 @@ before a session sink exists and failures of the diagnostic writer itself remain
 Failed game REST reads and reader restarts are also saved in the recording itself as `failure`
 observations (path and outcome), so a race can be analysed later from DuckDB alone. If the recording
 itself stops, the dashboard status slot shows **NO REC** (demo scenario *Recording stopped*).
+Recording, learning and diagnostics steps run under one guard in the live service: if one throws, the
+recording for that session stops (one console warning, NO REC) and the dashboard keeps updating.
 
 ## Consolidated strategy audit
 
