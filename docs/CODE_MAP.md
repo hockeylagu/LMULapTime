@@ -1,5 +1,13 @@
 # Code Map: where things live and how they flow
 
+Disposable live diagnostics: `server/live/capture/diagnostics.ts` writes adjacent session JSONL sidecars
+with bounded async buffering, changed-response/one-minute checkpoint deduplication, explicit failures,
+post-session tails and deferred gzip. `livePitPoller.ts` binds request diagnostics to the originating
+recording; `liveReaderWorker.ts` reports its existing navigation probes. `liveService.ts` adds state,
+reader failure and ten-second strategy context; the capture controller adds manifests and writer health.
+Manual deletion of closed `*.diagnostics.jsonl.gz` files leaves DuckDB evidence intact. Set
+`LMU_LIVE_DIAGNOSTICS=0` to disable; no extra requests, automatic cleanup or cleanup UI.
+
 Live capture foundation: `server/live/capture/controller.ts` batches player-only supplemental evidence
 independently of dashboard clients. `decode.ts` normalizes six verified vehicle-vector values to ISO 8855;
 unverified wheel columns remain NULL. `recordingWorker.ts` / `recordingStore.ts` own one typed DuckDB file

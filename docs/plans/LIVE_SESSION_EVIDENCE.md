@@ -59,6 +59,54 @@ Still planned: wheel convention verification, visible source
 management, durable learning-example extraction, chronological evaluation and forecast calibration.
 The sections below retain the broader design; proposed examples are not all shipped interfaces.
 
+## Disposable race diagnostics — 2026-10-18
+
+Implemented separately from permanent DuckDB evidence. Each recording activation creates an adjacent
+`<recording-stem>.<diagnostic-UUID>.diagnostics.jsonl` sidecar; the first record names its recording ID
+and DuckDB filename. A recovered recording gets another diagnostic segment rather than overwriting a
+previous file. Capture runs without dashboard subscribers. Disable only diagnostics with
+`LMU_LIVE_DIAGNOSTICS=0`; `LMU_LIVE_CAPTURE_DIR` controls both recording and sidecar location.
+
+Existing pit-poller requests and the shared-memory reader's navigation probes emit endpoint, wall-clock
+start/end/duration, HTTP status, timeout/abort/connection outcome, available OS error code, parser result
+and applied/ignored/stale disposition. Failed HTTP/JSON/partial transport bodies retain an 8,192-character
+excerpt. Successful parsed bodies retain up to 32,768 characters, with explicit truncation. Standings
+responses are reduced to the player before logging; opponent rows are excluded. No extra REST polling
+is introduced. Independent identity-resolver requests are not transport-logged; resolved identity changes
+are recorded in app state. This is bounded diagnostic evidence, not a lossless network trace.
+
+Successful unchanged responses are deduplicated by endpoint/outcome/body, ignoring request timing;
+one-minute checkpoints retain timing and a suppressed-response count. Every failure, parser rejection
+and stale response is retained subject to bounded buffering. State/navigation/loading/process changes,
+session manifests and endings, capture health/drop counts, writer/reader failures and ten-second strategy
+snapshots (model version, game elapsed time and tracker observations) provide application context.
+Strategy snapshots also occur on lifecycle transitions. Diagnostic forecasts are debugging context;
+they are not frozen learning labels or a replacement for the existing strategy audit.
+
+Requests bind to their original recording when issued, so late responses remain in that sidecar even
+after the poller discards them. Reader probe events route by request start time. A two-minute tail after
+session end retains existing post-race/menu probes and transitions; no new polling is started for the tail.
+Nothing is logged before the first recording or after its tail expires. A new session receives its own file.
+
+Writes use asynchronous streams with at most 256 KiB of queued/in-flight string bytes per sidecar;
+overflow increments explicit dropped-record counts. Successful responses/configuration changes are
+serialized at existing poll frequency, never per telemetry sample. After the tail, gzip runs asynchronously
+only once no newer capture is active; it writes a temporary output, renames it on completion, then removes
+the original JSONL. Shutdown drains recording writes and diagnostics. An abrupt exit can leave readable
+uncompressed JSONL; compression failure preserves the original (and may leave a temporary output).
+An already-running gzip job is not cancelled if a new session begins; real game overhead remains unmeasured.
+
+Retention is manual: keep the last couple of race weekends as useful, then delete only
+`*.diagnostics.jsonl.gz` (or closed crash-left `*.diagnostics.jsonl` / `*.diagnostics.jsonl.gz.tmp`).
+Use the file browser's size column to inspect usage. No automatic age/size deletion, storage quota,
+cleanup API or cleanup UI is added. Removing these sidecars does not alter DuckDB evidence, SQLite
+session links, learning inputs, or the old manually collected `C:\Documents\lmu-live-captures` folder.
+Never delete active JSONL files. Storage varies with response changes/failures; no fixed weekend-size
+claim or zero-overhead guarantee is made. Tests cover dedup/checkpoints, failures, gzip readback,
+overflow reporting, original-session ownership and deferring compression during a newer active capture.
+Validation passed: full suite 3,151 tests (56 intentionally skipped), production build, then 14 focused
+request/shutdown regression tests and TypeScript checking after the final bounded-close changes.
+
 ## Aligned evidence reader — 2026-10-18
 
 `GET /api/session/:sessionId/live-evidence?driverOrdinal=0&lapOrdinal=1` uses the same stored
