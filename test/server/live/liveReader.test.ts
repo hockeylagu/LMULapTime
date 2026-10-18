@@ -56,6 +56,23 @@ describe('LiveReader', () => {
     t.reader.stop();
   });
 
+  it('keeps dashboard frames flowing while capture waits, and a busy answer keeps a confirmed session', async () => {
+    let answer: GameProbe = 'busy';
+    const t = setup(async () => answer, undefined, true);
+    t.available.value = true;
+    t.reader.start();
+    await vi.advanceTimersByTimeAsync(PROBE_MS + 50);
+    expect(t.posted.some(m => m.type === 'frame' && m.scoring && m.capture === null)).toBe(true);
+    answer = 'session';
+    await vi.advanceTimersByTimeAsync(PROBE_MS);
+    answer = 'busy';
+    await vi.advanceTimersByTimeAsync(PROBE_MS);
+    t.setTelemetry(telemetryBuffer(6, [{ id: 12, et: 101, throttle: 0, brake: 0 }]));
+    await vi.advanceTimersByTimeAsync(40);
+    expect(t.posted.some(m => m.type === 'frame' && m.capture?.elapsedSeconds === 101)).toBe(true);
+    t.reader.stop();
+  });
+
   it('detects startup before telemetry and closes stale mappings within 500 ms of exit', async () => {
     let running = false;
     const close = vi.fn();

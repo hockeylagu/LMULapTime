@@ -211,7 +211,8 @@ export class LiveReader {
 
     // While a cue waits for the game's answer nothing goes out: the frames may be a replay's, or the last session
     // LMU writes again as it exits. The first scoring change after the answer carries the current reading.
-    if (!this.cue && (!this.deps.capture || this.captureConfirmed) && (scoring || pedal || car)) this.deps.post({ type: 'frame', scoring, pedal, tyreSurfaceAvgC, car,
+    // Only the capture sample waits for the game to confirm a session; the dashboard frames never do.
+    if (!this.cue && (scoring || pedal || car)) this.deps.post({ type: 'frame', scoring, pedal, tyreSurfaceAvgC, car,
       ...(this.deps.capture ? { capture: this.captureConfirmed ? capture : null } : {}) });
     const asking = this.screen === 'loading' || this.cue;
     if (now - this.lastProbeAt >= (asking ? CUE_PROBE_MS : PROBE_MS) && !this.probing) this.probe(now);
@@ -247,7 +248,8 @@ export class LiveReader {
     void this.deps.probeGame().then(answer => {
       settle();
       if (this.stopped || !this.scoringMap || this.scoringMap !== mapping) return;
-      this.captureConfirmed = answer === 'session';
+      // A busy game says nothing about the screen: keep the last confirmation.
+      if (answer !== 'busy') this.captureConfirmed = answer === 'session';
       if (typeof answer === 'object') {
         this.gameAnswered = true;
         // The last seconds of a load have no progress: the last one known stays on screen.
