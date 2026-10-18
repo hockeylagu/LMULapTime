@@ -6,17 +6,20 @@ import { LiveEvidenceReadError } from './readError.js';
 import { findLiveCaptureCandidates } from './reconcile.js';
 
 export interface LiveEvidenceLocator { sessionId: string; driverOrdinal: number; lapOrdinal: number }
-interface LapRow { lap_number: number; lap_time: number | null; is_player: number }
+interface LapRow {
+  lap_number: number; lap_time: number | null; is_player: number;
+  driver_id: number | null; vehicle_id: number | null;
+}
 
 /** Returns null only for an unknown session/driver/lap locator. No raw file is opened without verified ownership. */
 export async function getLiveLapEvidence(db: Database, directory: string, locator: LiveEvidenceLocator,
   sessionLoaded: () => boolean, read: (request: LiveEvidenceReadRequest) => Promise<LiveLapEvidence>): Promise<LiveEvidenceResponse | null> {
   const unavailable = (reason: LiveEvidenceUnavailableReason, message: string): LiveEvidenceResponse =>
     ({ state: 'unavailable', ...locator, reason, message });
-  const lap = db.prepare(`SELECT l.lap_number, l.lap_time, d.is_player FROM session_laps l
+  const lapQuery = db.prepare(`SELECT l.lap_number, l.lap_time, d.is_player, d.driver_id, d.vehicle_id FROM session_laps l
     JOIN session_drivers d ON d.session_id=l.session_id AND d.driver_ordinal=l.driver_ordinal
-    WHERE l.session_id=? AND l.driver_ordinal=? AND l.lap_ordinal=?`)
-    .get(locator.sessionId, locator.driverOrdinal, locator.lapOrdinal) as LapRow | undefined;
+    WHERE l.session_id=? AND l.driver_ordinal=? AND l.lap_ordinal=?`);
+  const lap = lapQuery.get(locator.sessionId, locator.driverOrdinal, locator.lapOrdinal) as LapRow | undefined;
   if (!lap) return null;
   if (!lap.is_player) return unavailable('not-player', 'Live capture contains only the player car');
   if (sessionLoaded()) return unavailable('session-loaded', 'Live evidence reads resume after the loaded game session');
@@ -47,9 +50,12 @@ export async function getLiveLapEvidence(db: Database, directory: string, locato
     const current = db.prepare(`SELECT session_id, match_version, available FROM live_capture_index
       WHERE recording_id=? AND match_status='verified' AND match_rule_version=?`)
       .get(manifest.recordingId, LIVE_CAPTURE_MATCH_RULE_VERSION) as { session_id: string; match_version: number; available: number } | undefined;
+    const currentLap = lapQuery.get(locator.sessionId, locator.driverOrdinal, locator.lapOrdinal) as LapRow | undefined;
     if (!current || current.session_id !== locator.sessionId || current.match_version !== row.match_version || !current.available
+      || !currentLap || currentLap.lap_number !== lap.lap_number || currentLap.lap_time !== lap.lap_time
+      || currentLap.is_player !== lap.is_player || currentLap.driver_id !== lap.driver_id || currentLap.vehicle_id !== lap.vehicle_id
       || !ownershipIsCurrent()) {
-      return unavailable('changed', 'Capture ownership changed during the read; refresh the session');
+      return unavailable('changed', 'Capture ownership or the requested lap changed during the read; refresh the session');
     }
     if (sessionLoaded()) return unavailable('session-loaded', 'A game session loaded during the evidence read');
     return { state: 'available', ...locator, evidence };

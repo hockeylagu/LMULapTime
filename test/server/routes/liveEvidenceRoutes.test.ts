@@ -101,4 +101,37 @@ describe('session live evidence API', () => {
     });
     expect((await request(t.app).get(url)).body.reason).toBe('changed');
   });
+
+  it('rejects a lap ordinal reassigned during the read even when all original timing anchors still match', async () => {
+    const t = fixture(); t.link();
+    t.read.mockImplementation(async () => {
+      t.db.exec(`UPDATE session_laps SET lap_ordinal=lap_ordinal+10 WHERE driver_ordinal=0;
+        UPDATE session_laps SET lap_ordinal=lap_ordinal-9 WHERE driver_ordinal=0;
+        INSERT INTO session_laps(session_id,driver_ordinal,lap_ordinal,lap_number,lap_time,is_valid)
+          VALUES('session',0,0,1,100,1);`);
+      return t.evidence;
+    });
+    expect((await request(t.app).get(url)).body.reason).toBe('changed');
+  });
+
+  it('rejects a removed lap ordinal while preserving other matching anchors', async () => {
+    const t = fixture(); t.link();
+    t.read.mockImplementation(async () => {
+      t.db.prepare('UPDATE session_laps SET lap_ordinal=9 WHERE driver_ordinal=0 AND lap_ordinal=0').run();
+      return t.evidence;
+    });
+    expect((await request(t.app).get(url)).body.reason).toBe('changed');
+  });
+
+  it('rejects player driver ordinals exchanged by a reparse while the read is pending', async () => {
+    const t = fixture(); t.link();
+    t.read.mockImplementation(async () => {
+      for (const table of ['session_drivers', 'session_laps']) t.db.exec(`
+        UPDATE ${table} SET driver_ordinal=10 WHERE driver_ordinal=0;
+        UPDATE ${table} SET driver_ordinal=0 WHERE driver_ordinal=1;
+        UPDATE ${table} SET driver_ordinal=1 WHERE driver_ordinal=10;`);
+      return t.evidence;
+    });
+    expect((await request(t.app).get(url)).body.reason).toBe('changed');
+  });
 });
