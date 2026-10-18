@@ -1,66 +1,21 @@
 # Code Map: where things live and how they flow
 
-Learning readiness: `server/live/learning/readiness.ts` projects the CLI's canonical evaluation into
-compact UI counts. `readinessReader.ts` and its worker/bootstrap use one read-only SQLite worker,
-a transaction and a 15-second deadline. `GET /api/live/learning` gates loaded sessions/open writer
-handles, cancels on session start/disconnect and serves no stored report. `LiveLearningPanel` under
-Settings → Learning requests it manually, separates fuel/VE and shows excluded evidence,
-minimums, unmet offline gates and automatic correction availability/validation counts.
+## Live capture and learning
 
-Fuel/VE learning foundation: `shared/domain/learning/capture.ts` freezes both resource forecasts at lap
-start and emits independently measured outcomes without dashboard clients. Versioned events live in
-the session DuckDB, separate from disposable diagnostics. `server/live/learning/` validates compact
-events in an off-track worker, rechecks canonical XML/link inputs and builds deduplicated examples via
-`shared/domain/learning/examples.ts`. `server/core/live/dbLiveLearningStore.ts` retains compact
-examples and source signatures/status in SQLite, with DDL in `dbSchema.ts`. Stale/ambiguous ownership,
-classification changes and missing predictions prevent eligibility; valid compact facts survive raw
-cleanup. `shared/domain/learning/evaluate.ts` splits whole sessions chronologically and separates
-fuel/VE metrics and exact compatibility cohorts. `npm run learning:evaluate` prints a read-only report.
-`shared/domain/learning/calibration.ts` screens a session-median residual correction using only earlier
-training sessions, shrinkage, a 10% bound and fixed evidence/error gates on later sessions. Report
-version 3 includes candidate parameters, rejection reasons and automatic model status.
-`shared/domain/learning/automatic.ts` holds fixed screened candidates until genuinely fresh sessions
-pass the shared calibration error gates; changed support or later regressions withdraw them.
-`server/live/learning/automaticWorker.ts` evaluates a read-only snapshot off track;
-`runtime.ts` rejects stale/cancelled results, persists through `dbLearningModelStore.ts`, and holds
-an in-memory map for exact live lookup. XML patch trust is restricted to captures started in the current
-observed game run and cleared on closure. `learning/cohort.ts` owns the shared compatibility key.
-`LiveStrategyTracker` applies bounded corrections to advice while `learningForecasts()` keeps the
-original version-3 baseline; audits are version 4. `LMU_LIVE_LEARNING=0` disables promotion/use.
-Full strategy audit checkpoints share session DuckDB. Real-game acceptance remains outstanding.
+Current pipeline, storage, diagnostics and learning contracts: [Live capture reference](LIVE_CAPTURE_FORMAT.md).
+Remaining validation: [Live session evidence plan](plans/LIVE_SESSION_EVIDENCE.md).
 
-Disposable live diagnostics: `server/live/capture/diagnostics.ts` writes adjacent session JSONL sidecars
-with bounded async buffering, changed-response/one-minute checkpoint deduplication, explicit failures,
-post-session tails and deferred gzip. `livePitPoller.ts` binds request diagnostics to the originating
-recording; `liveReaderWorker.ts` reports its existing navigation probes. `liveService.ts` adds state,
-reader failure and ten-second strategy context; the capture controller adds manifests and writer health.
-Manual deletion of closed `*.diagnostics.jsonl.gz` files leaves DuckDB evidence intact. Set
-`LMU_LIVE_DIAGNOSTICS=0` to disable; no extra requests, automatic cleanup or cleanup UI.
-
-Live capture foundation: `server/live/capture/controller.ts` batches player-only supplemental evidence
-independently of dashboard clients. `decode.ts` normalizes six verified vehicle-vector values to ISO 8855;
-unverified wheel columns remain NULL. `recordingWorker.ts` / `recordingStore.ts` own one typed DuckDB file
-per session attempt, bounded queues, checkpoints, signature validation and catalog discovery.
-`server/core/live/dbLiveCaptureStore.ts` keeps durable SQLite attachments/availability; `reconcile.ts`
-requires unique canonical identity and completed lap anchors before inheriting XML `GameVersion`.
-Session detail exposes `liveCaptures`; `GET /api/live/capture` returns health and channel metadata.
-Files default to ignored `server/live-captures/` (`LMU_LIVE_CAPTURE_DIR` override); no automatic deletion.
-Aligned consumers and the first fuel/VE dataset/evaluator are implemented. Calibration and
-real-game acceptance remain in [the active plan](plans/LIVE_SESSION_EVIDENCE.md); current contracts
-are in [Live capture format](LIVE_CAPTURE_FORMAT.md). Recovery waits for exact layout proof before
-resuming or forking. The writer accepts four normal batches plus two reserved finalization slots.
-
-Aligned live evidence: `liveEvidenceRoutes.ts` exposes `/api/session/:sessionId/live-evidence` with
-driver/lap ordinals. `capture/evidenceService.ts` revalidates current XML ownership and lap anchors;
-`evidenceReader.ts`, `evidenceReaderWorker.ts` and `readRecording.ts` read bounded raw ISO samples and
-sparse evidence in independent read-only workers, off track. Untimed REST observations remain session
-scoped, gaps remain explicit and stale links cannot serve a response. `shared/types/liveEvidence.ts`
-defines provenance/coverage contracts; `src/api/liveEvidenceApi.ts` is the frontend access point.
-`shared/domain/live/liveTelemetryFusion.ts` joins verified source samples to explicit trajectory clocks
-within 25 ms. `fetchSessionTelemetry` requests evidence only with the player attachment hint;
-client post-processing preserves supplied yaw/slip and native G. The inspector's `LiveCaptureCoverage`
-discloses coverage; computed fallback channels retain `COMPUTED`, while measured channels need no extra badge.
-The evidence service rechecks exact driver/lap ownership after each asynchronous read.
+| Owner | Responsibility |
+|---|---|
+| `server/live/capture/controller.ts`, `recordingWorker.ts`, `recordingStore.ts` | Bounded player capture, worker-owned DuckDB writes and recovery |
+| `server/live/capture/diagnostics.ts`, `livePitPoller.ts`, `liveReaderWorker.ts` | Disposable session diagnostics and request provenance |
+| `server/core/live/dbLiveCaptureStore.ts`, `server/live/capture/reconcile.ts` | SQLite attachment index and strict XML ownership |
+| `server/live/capture/evidenceService.ts`, `evidenceReader.ts`, `readRecording.ts` | Verified, off-track lap evidence reads |
+| `shared/domain/live/liveTelemetryFusion.ts`, `src/api/liveEvidenceApi.ts` | Aligned evidence consumption and coverage |
+| `shared/domain/learning/capture.ts`, `examples.ts`, `evaluate.ts`, `calibration.ts`, `automatic.ts` | Frozen forecasts, examples, evaluation and correction gates |
+| `server/live/learning/service.ts`, `runtime.ts`, `automaticWorker.ts` | Projection refresh, persisted model lifecycle and exact live lookup |
+| `server/live/learning/readiness.ts`, `readinessReader.ts`, `server/routes/liveRoutes.ts` | Manual Settings evidence check |
+| `server/core/live/dbLiveLearningStore.ts`, `dbLearningModelStore.ts` | Compact learning facts and correction models |
 
 A fast index for new sessions: find the right file without searching. `AGENTS.md` holds the rules;
 this file holds the **routes through the code**. Keep it current (see "Keeping this file current" at the end).
@@ -904,12 +859,7 @@ as approximate. Class estimates are used only when model dimensions are missing.
 assets and generated catalogs. Synthetic provider/footprint tests are always available;
 personal geometry/recording regressions require private roots (see [PLUGINS.md](PLUGINS.md)).
 
-Live strategy audit: `LiveAuditTracker` runs inside the capture controller, independent of dashboard clients.
-Full `strategy-audit-v1` observations replace periodic `strategy-prediction` snapshots in session DuckDB.
-Inspect closed recordings directly through `capture_observations`; no audit JSON/CSV endpoints, export
-UI or export-reader workers remain. A session transition finalizes its audit in the old file before
-the new file begins. Use persisted observation IDs across tracker restarts. The former SQLite audit
-store/table and compatibility path were removed after explicit local data-deletion approval.
-No automatic deletion migration is shipped. See [the operational reference](LIVE_CAPTURE_FORMAT.md#consolidated-strategy-audit).
+Live strategy audit: `shared/domain/live/liveAudit.ts` runs inside the capture controller.
+Storage and inspection: [strategy audit contract](LIVE_CAPTURE_FORMAT.md#consolidated-strategy-audit).
 
 Live multiclass horizon: `liveLapsLeft.ts` owns `projectRaceFlagSeconds`, shared by live distance and `liveResourcePlan.ts` preparation. `rf2Decode.ts` resolves overall and player-class leaders independently using canonical class aliases; class pace supplies the player's distance horizon, with overall flag timing preserved. The preparation headline excludes the formation allowance retained in the resource model. Forecast audit model version 3 distinguishes this calculation from saved earlier estimates.

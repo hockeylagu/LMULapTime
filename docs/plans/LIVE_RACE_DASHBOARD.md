@@ -1,5 +1,9 @@
 # Live race dashboard
 
+Design and delivery record. Current capture, diagnostics and learning behavior is maintained in
+[Live capture reference](../LIVE_CAPTURE_FORMAT.md); remaining evidence/learning validation is in
+[the active plan](LIVE_SESSION_EVIDENCE.md). Dated implementation notes below are historical.
+
 Status: built on `live-dashboard` (the `#/live` page; see "Built" under Delivery and acceptance), checked against
 the mock at 2560 x 1440 and on a GT3 offline and LMP3 online session; not yet raced with the strategy views.
 Updated: 2026-10-16. Evidence: shared memory and the safe REST reads validated live (offline

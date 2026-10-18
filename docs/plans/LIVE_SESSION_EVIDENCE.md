@@ -1,95 +1,25 @@
 # Live session evidence and learning — remaining work
 
-Reviewed 2026-10-18 on `codex/live-session-evidence`. Capture and the first offline learning
-foundation and automatic correction lifecycle are implemented. Real-game acceptance remains outstanding.
+Reviewed 2026-10-18. Capture, XML attachment, aligned evidence, diagnostics, consolidated audit,
+learning readiness and automatic correction lifecycle are implemented.
+See [Live capture reference](../LIVE_CAPTURE_FORMAT.md) for the current pipeline and contracts;
+[the archived foundation](archive/LIVE_SESSION_EVIDENCE_FOUNDATION.md) preserves the original design.
 
-The delivered design and verification record is archived in
-[Live session evidence foundation](archive/LIVE_SESSION_EVIDENCE_FOUNDATION.md).
-The current storage, channel and operational contract is [Live capture format](../LIVE_CAPTURE_FORMAT.md).
+## Remaining acceptance
 
-### Delivery checkpoint
+1. Validate a complete race weekend: frame-time overhead, dashboard readability, session transitions,
+   interruption/restart, writer failures, XML attachment and usefulness of transient-error diagnostics.
+2. Collect eligible sessions and run `npm run learning:evaluate`. Verify exact cohort isolation,
+   prospective acceptance, current-run XML patch trust, withdrawal and actual prediction improvement.
+   Historical holdouts alone do not establish real-world improvement.
+3. Verify additional wheel channels before populating reserved columns. Damage/weather learning
+   requires separate deterministic targets and validation.
+4. Keep diagnostic-sidecar deletion manual until live stability is established. Automatic retention
+   is deferred; permanent session evidence and compact learning facts have separate ownership rules.
 
-| Area | Current state |
-|---|---|
-| Capture | Player-only supplemental DuckDB recording independent of dashboard clients; ISO 8855 normalization, bounded worker writes and interrupted-session recovery implemented |
-| Attachment | Strict XML identity and completed-lap anchors; XML game patch inheritance; ambiguous ownership rejected |
-| Consumers | Aligned evidence API and yaw/body-slip chart fusion; native G preserved; computed fallback disclosed |
-| Diagnostics | Bounded response/error sidecars, post-session tail and deferred gzip; manual cleanup |
-| Audit consolidation | Full checkpoints in session DuckDB independent of dashboard; direct DuckDB debugging; JSON/CSV export endpoints/UI/workers and old SQLite compatibility removed |
-| Learning | Frozen fuel/VE forecasts and measured outcomes, compact SQLite examples, chronological baseline and bounded offline correction candidate evaluation implemented |
-| Review fixes | Deferred recovery while layout is unresolved, consistent six-slot batch capacity and exact lap revalidation implemented |
-| Learning readiness | Settings → Learning has a manual evidence check; read-only worker, resource-separated counts, exclusions and offline gates; cancelled when a game session starts |
-| Automatic corrections | Off-track fitting, fixed-candidate fresh-session validation, persistence, exact runtime matching, baseline fallback, automatic withdrawal and environment disable switch implemented |
-| Acceptance | Real-game performance, race-weekend behavior and prospective prediction improvement deferred by user |
+## Latest verification
 
-## Next implementation and acceptance work
-
-1. Collect new eligible recordings across several sessions. Check game/frame-time overhead,
-   session transitions, interruption/restart, writer failures, XML attachment and diagnostic usefulness
-   through a complete race weekend. Old captures without forecast events cannot supply invented predictions.
-2. Run `npm run learning:evaluate` and inspect eligibility/exclusion counts, exact compatibility
-   cohorts and whole-session chronological holdouts. Fuel and VE use separate units and metrics.
-   Require sufficient independent sessions before interpreting changes as improvement.
-3. Audit consolidation is complete: full checkpoints live in DuckDB for direct debugging. JSON/CSV
-   export endpoints, UI and reader workers are removed by user request. The inspected old SQLite audit
-   table/data was deleted with approval, and its compatibility store/tests are removed. No automatic
-   deletion migration or pruning runs. Verify real race checkpoints during later in-game validation.
-4. Learning readiness and exclusion reasons are now visible in Settings → Learning. A manual
-   check uses compact SQLite facts through a read-only worker, never live polling. The CLI screens a deterministic
-   session-median residual correction with shrinkage, minimum evidence and a 10% adjustment bound.
-   Automatic candidates now remain fixed while at least two genuinely fresh sessions and 20 examples
-   validate the same error gates. Accepted corrections apply only to exact live cohorts with a verified
-   XML patch from the current observed game run. Changed support, lost acceptance evidence or later
-   regressions withdraw corrections; failures fall back. `LMU_LIVE_LEARNING=0` disables promotion/use.
-   Verify this lifecycle and actual improvement using compatible real cohorts during acceptance.
-5. Verify additional wheel channels against new source evidence before populating their reserved columns.
-   Broader damage/weather learning consumers require separate deterministic targets and validation.
-
-There is no automatic disk quota or eviction. Raw session files and closed diagnostic sidecars are
-manually removable; compact learning facts have separate ownership and invalidation rules.
-
-## Verification recorded for the delivered foundation
-
-2026-10-18: 3,182 tests passed, 56 intentionally skipped; production build passed without warnings.
-Matching-dataset endpoint sweeps found no regressions above the project's threshold; details are in
-[endpoint benchmarks](../ENDPOINT_BENCHMARKS.md). These checks do not replace real-game acceptance.
-
-Offline candidate addition, 2026-10-18: 3,195 tests passed, 56 intentionally skipped; production
-build passed without warnings. Focused regressions cover future-data leakage, session weighting,
-exact cohort/resource isolation, minimum evidence, bounded adjustments, worsening shortfall,
-stale projection exclusion and read-only report generation. No real-game validation was performed.
-
-Audit consolidation, 2026-10-18: 3,201 tests passed, 56 intentionally skipped; production build
-passed without warnings. Real DuckDB worker tests cover complete/paged exports, byte-bounded pages,
-stable sequence IDs across tracker resets, concurrent reader limits, identity/ownership failures,
-legacy compatibility and loaded-session/writer-handle gates. Matching-snapshot endpoint sweeps
-found no regressions above the project threshold. In-game validation remains deferred.
-
-SQLite audit retirement, 2026-10-18: after explicit approval of the inventory, the local old audit
-table (15 recording runs, 638 checkpoints) was dropped. The schemas and row counts of all 31 other
-tables were unchanged. The compatibility store/tests are removed; CSV formatting/escaping tests
-now live with the recording audit tests. Final suite: 3,199 passed, 56 intentionally skipped;
-production build clean and matching-dataset endpoint sweeps without threshold regressions.
-
-Audit export removal, 2026-10-18: JSON/CSV endpoints, settings export UI, export-reader workers and
-their seven export-specific tests removed by user request. DuckDB checkpoint capture and independent
-learning events remain unchanged. Final suite: 3,192 passed, 56 intentionally skipped; final production
-build passed without warnings. Remaining endpoints passed matching-dataset performance checks.
-
-Learning readiness, 2026-10-18: 3,202 tests passed, 56 intentionally skipped; final build passed
-without warnings. Tests cover manual-only requests, empty/evaluated/deferred/error UI states,
-canonical exclusions, retained compact facts, read-only worker concurrency/cancellation and loaded
-session/writer-handle gates. Mock-data desktop inspection and independent subsection review passed;
-matching-dataset endpoint checks found no threshold regressions. No live-game validation performed.
-
-Separate Learning section, 2026-10-18: moved readiness to its own Settings panel with sidebar
-navigation and search, following the requested placement. All 3,203 tests passed, 56 intentionally
-skipped; production build passed without warnings. Desktop inspection and independent placement
-review passed. The evidence check remains manual, with no request when opening Settings.
-
-Automatic lifecycle, 2026-10-18: 3,212 tests passed, 56 intentionally skipped; production build
-passed without warnings. Tests cover prospective acceptance, backfilled-session exclusion, support
-invalidation, regression withdrawal, exact live matching, current-run XML patch trust, disable/fallback,
-worker cancellation, stale-result rejection and uncorrected training forecasts. Settings copy was
-checked with synthetic data; the UI detector had no findings. Matching-dataset endpoint checks found
-no regressions above the threshold. Real-game performance and prediction improvement remain unvalidated.
+2026-10-18: 3,214 tests passed, 56 skipped; production build passed without warnings.
+The suite covers capture/recovery, strict ownership, evidence reads, diagnostic routing and automatic
+learning gates. Real-race acceptance remains outstanding. Earlier endpoint performance results are in
+[endpoint benchmarks](../ENDPOINT_BENCHMARKS.md); this documentation/log-routing cleanup changes no API work.

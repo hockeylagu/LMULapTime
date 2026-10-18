@@ -1,6 +1,6 @@
 # App live capture: channels, storage and learning
 
-Implementation reference, reviewed 2026-10-18 on `codex/live-session-evidence`.
+Current implementation reference, reviewed 2026-10-18.
 For LMU's own exporter see [native telemetry](TELEMETRY_FORMAT.md): its DuckDB schema differs
 from the app's supplemental capture schema described here.
 
@@ -17,6 +17,32 @@ Raw samples live in DuckDB. SQLite stores attachment/availability metadata and c
 examples, rather than a duplicate stream of motion samples. There is no automatic disk cap or
 eviction. Close a recording before manually deleting its raw file or diagnostic sidecar.
 Native telemetry, XML and replay files retain their existing ownership.
+
+## Live dashboard and save pipeline
+
+1. `server/index.ts` starts `LiveService` and its capture controller with the backend. Windows
+   process checks run every 500 ms; the reader worker opens the rF2 scoring/telemetry mappings,
+   reads at about 50 Hz in realtime and 1 Hz otherwise, and probes navigation every two seconds.
+   Navigation confirmation gates recording; replay playback cannot supply live capture samples.
+2. `LiveService` feeds deterministic session, timing, results and strategy trackers. Existing REST
+   requests supply pit, garage, weather and resource context through a bounded, replay-aware poller.
+   Process-query unavailability, network retries and game estimates remain supported degraded operation.
+3. `/api/live/stream` sends snapshots, timing, pedal batches and heartbeats to the dashboard.
+   Disconnects clear live timing/pedal buffers and reconnect. SSE client backpressure never blocks capture.
+4. `capture/controller.ts` records independently of dashboard subscribers. It sends 50-sample batches
+   or flushes once a second to `recordingWorker.ts`; sparse observations share the same bounded queue.
+   DuckDB transactions commit samples, observations, manifest and batch fingerprints together.
+5. Session transitions finalize the owning recording before starting another. Shutdown requests an
+   interrupted finalization; abrupt termination can leave only previously committed batches.
+   Resuming an interrupted file requires exact identity, layout and lap-clock continuity proof; the
+   file's stored sample/drop counters and end time win over a lagging SQLite index manifest.
+6. After the loaded session ends, catalog discovery and XML reconciliation validate ownership using
+   player, car, layout, session kind, timestamps and at least two matching completed-lap anchors.
+   SQLite retains attachments/availability and compact learning facts. Off-track workers build and
+   validate learning projections; lap-evidence readers recheck ownership before serving saved data.
+
+The explicitly selected `?demo` dashboard and isolated performance harness remain development tools;
+neither supplies substitute data to a connected dashboard.
 
 ## Channels and clocks
 
@@ -80,8 +106,10 @@ A two-minute post-session tail supports transient-error investigation. Gzip is d
 the session; a new active session defers pending compression. An already-running compression is not
 cancelled. Crash leftovers remain available for investigation. Set `LMU_LIVE_DIAGNOSTICS=0` to disable.
 Delete closed `*.diagnostics.jsonl.gz` files manually after the relevant race weekends; doing so leaves
-DuckDB evidence and compact learning facts intact. No retention cleanup or cleanup UI is implemented.
-The legacy `C:\Documents\lmu-live-captures` directory belongs to manual capture scripts and is unchanged.
+DuckDB evidence and compact learning facts intact. Automatic cleanup is deferred until real-race
+stability is established; no retention cleanup or cleanup UI is implemented.
+Active-session reader failures go to the sidecar without a duplicate console warning; reader failures
+before a session sink exists and failures of the diagnostic writer itself remain operational console errors.
 
 ## Consolidated strategy audit
 
@@ -109,10 +137,8 @@ separate. Disposable REST/error sidecars can be deleted without removing these c
 Deleting a closed DuckDB recording removes its audit history; eligible compact learning facts can
 survive separately under the normal invalidation rules.
 
-No audit JSON/CSV endpoints, export UI, export workers or legacy fallback remain. The old SQLite
-`live_strategy_audit` table/data was removed locally after approval of its inventory, and its store
-and compatibility tests are removed. Fresh databases do not create that table; no automatic deletion
-migration is shipped. Neither the learning pipeline nor live predictions depends on an export.
+No audit JSON/CSV endpoints, export UI, export workers or SQLite audit compatibility layer remain.
+Fresh databases do not create `live_strategy_audit`; no automatic deletion migration is shipped.
 
 ## Learning: implemented scope and remaining gates
 
@@ -138,11 +164,10 @@ Training needs at least three sessions and 30 examples; held-out evaluation need
 and 20 examples. A candidate must improve MAE by at least 5%, with no increase in p95 absolute error,
 underprediction count or mean shortfall. Fuel and VE retain their separate units.
 
-Report version 2 adds `calibration`: fitted candidate parameters, baseline/candidate errors, evidence
-counts, exclusion gates and a per-cohort screening result. These fixed version-1 policy thresholds
-are conservative engineering defaults, not a validated accuracy guarantee. Reusing a holdout to
-select candidates makes it unsuitable as final independent acceptance evidence; validate on fresh
-sessions before any activation. No parameters are persisted or applied to live advice.
+Report version 3 includes calibration parameters, baseline/candidate errors, evidence counts,
+exclusion gates and automatic model status. These fixed version-1 policy thresholds are engineering
+defaults, not a validated accuracy guarantee. The CLI is read-only; the automatic lifecycle below
+owns persistence and activation, with fresh sessions required for acceptance.
 
 Automatic learning runs after reconciliation/projection refresh, outside loaded sessions and open
 writer handles. A read-only worker screens candidates, then persists fixed parameters, their exact

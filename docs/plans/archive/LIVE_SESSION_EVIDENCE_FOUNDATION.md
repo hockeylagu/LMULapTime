@@ -4,9 +4,9 @@ Archived 2026-10-18: capture, strict reconciliation, aligned reads/chart fusion,
 first fuel/VE dataset/baseline evaluation and the three code-review fixes are implemented on
 `codex/live-session-evidence`. This archives the delivered code milestone and its original design;
 it does not claim that every longer-term requirement below was implemented or validated in a live game.
-Historical corrections remain disabled. Current operational/schema guidance is in the
-[live capture reference](../../LIVE_CAPTURE_FORMAT.md); remaining calibration, audit consolidation
-and real-game acceptance belong to the [active plan](../LIVE_SESSION_EVIDENCE.md).
+This is a historical record; its implementation status and correction policy are superseded by the
+[live capture reference](../../LIVE_CAPTURE_FORMAT.md). Remaining validation belongs to the
+[active plan](../LIVE_SESSION_EVIDENCE.md).
 
 Status: Capture, reconciliation, aligned evidence API, chart integration and disposable diagnostics coded
 on `codex/live-session-evidence`, reviewed 2026-10-18. Automated checks pass; real-game validation is pending.

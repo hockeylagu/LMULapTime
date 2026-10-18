@@ -44,16 +44,9 @@ with its own verification. Historical timings below identify candidates; remeasu
 The fullscreen turn selector was removed by user request. Keyboard panning remains; restoring that
 selector is not a pending task. A keyboard corner-navigation alternative requires a separate design decision.
 Pit repair inference remains a known data limitation, pending trustworthy recorded or REST evidence.
-Live capture enrichment is implemented on `codex/live-session-evidence`; see the
-[delivery checkpoint](LIVE_SESSION_EVIDENCE.md#delivery-checkpoint) for current scope, local commits
-and remaining gates. Session attachment, canonical identity, XML patch inheritance, aligned yaw/body-slip
-evidence, disposable diagnostics, compact fuel/VE learning examples and offline baseline evaluation
-are coded. Audit checkpoints now share the session DuckDB; the approved old SQLite history and
-its compatibility code are removed. Audit debugging uses DuckDB directly; export endpoints/UI are removed. Offline calibration candidate fitting/screening and manual readiness in the separate Settings → Learning section are implemented;
-automatic corrections now require fixed-candidate fresh-session acceptance and exact runtime identity,
-including current-run XML patch trust. Fallback, withdrawal and a server disable switch are implemented;
-real-game acceptance remains outstanding.
-Current channel and storage contracts are in [LIVE_CAPTURE_FORMAT.md](../LIVE_CAPTURE_FORMAT.md);
+Live capture and automatic learning are implemented; [remaining acceptance](LIVE_SESSION_EVIDENCE.md)
+covers real-race stability and prospective prediction improvement. Current pipeline, channel, storage
+and diagnostic retention contracts are in [Live capture reference](../LIVE_CAPTURE_FORMAT.md);
 [native telemetry enrichment](../TELEMETRY_FORMAT.md#complementary-live-capture) distinguishes implemented vectors from unverified wheel channels.
 File and folder size limits are ongoing checks; split only along meaningful responsibilities.
 
@@ -61,7 +54,7 @@ File and folder size limits are ongoing checks; split only along meaningful resp
 
 | Record | Outcome | Historical completion |
 |---|---|---|
-| [Live session evidence foundation](archive/LIVE_SESSION_EVIDENCE_FOUNDATION.md) | Capture, strict reconciliation, aligned API/chart fusion, disposable diagnostics, fuel/VE dataset and baseline evaluator, plus three review fixes; calibration and real-game gates remain active | 2026-10-18 |
+| [Live session evidence foundation](archive/LIVE_SESSION_EVIDENCE_FOUNDATION.md) | Historical capture/learning foundation; current behavior is in the live capture reference, remaining validation in the active plan | 2026-10-18 |
 | [Dropdown standardization](archive/DROPDOWN_STANDARDIZATION.md) | All 24 inventoried dropdowns and disclosures on one shared family (`common/dropdown/`): custom select-only `Select` replaces every native select; keyboard, typeahead, Escape layering and modal/fullscreen placement verified; tests/build clean | 2026-10-13 |
 | [Type refactoring](archive/TYPE_REFACTORING_PLAN.md) | One canonical type per model, one name and one place per fact in TypeScript, SQL and stored JSON; cache rewritten offline; follow-up fixes for driver selection, canonical package classes and server-side compare picker, chart history and Compare page bests | 2026-10-12 |
 | [Frontend simplification audit](archive/SRC_SIMPLIFICATION_AUDIT.md) | Ten fixes committed separately: direct imports, shared wheel rendering and modal focus, canonical progression type, fewer repeated calculations and requests, and removed forwarders; full tests/build passed | 2026-10-12 |
