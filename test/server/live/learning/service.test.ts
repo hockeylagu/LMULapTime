@@ -99,6 +99,10 @@ describe('automatic correction runtime', () => {
     expect(runtime.correct('fuel', 2, { ...identity, compound: 'Soft' })).toBeNull();
     expect(runtime.correct('fuel', 2, { ...identity, layoutKey: null })).toBeNull();
     expect(readLearningModels(db.getDb())).toEqual(state);
+    // A refresh that loses a race with another write keeps serving the committed models.
+    db.setMetadata('touched', '1');
+    await runtime.refresh(db.getDb(), () => false, async () => { db.setMetadata('changed', '1'); return { version: 1, models: [] }; });
+    expect(runtime.correct('fuel', 2, identity)).toEqual({ perLap: 2.2, adjustment: 2.2 - 2 });
     runtime.gameRunning(false); runtime.gameRunning(true, capture.startedAt + 1);
     await runtime.refresh(db.getDb(), () => false, async () => state);
     expect(runtime.correct('fuel', 2, identity)).toBeNull();

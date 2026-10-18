@@ -3,7 +3,7 @@ import type { AutomaticLearningState } from '../../../shared/domain/learning/aut
 import { boundedCorrection } from '../../../shared/domain/learning/automatic.js';
 import { learningCohort, type LearningIdentity } from '../../../shared/domain/learning/cohort.js';
 import type { LiveResourceKind } from '../../../shared/types/liveStrategy.js';
-import { saveLearningModels } from '../../core/live/dbLearningModelStore.js';
+import { readLearningModels, saveLearningModels } from '../../core/live/dbLearningModelStore.js';
 import { getLiveCaptureIndexRows } from '../../core/live/dbLiveCaptureStore.js';
 import { learningProjectionInputs } from './inputs.js';
 import { readAutomaticLearning } from './automaticReader.js';
@@ -43,25 +43,26 @@ export class AutomaticLearningRuntime {
     const revision = (): string => JSON.stringify([db.prepare('SELECT total_changes() AS n').get(), db.pragma('data_version')]);
     const before = revision();
     if (before === this.lastRevision) { this.pending = null; return; }
+    let saved = false;
     try {
       const state: AutomaticLearningState = await read(db.name, request.signal);
-      if (blocked() || request.signal.aborted) { this.models.clear(); return; }
-      const committed = db.transaction(() => {
+      if (blocked() || request.signal.aborted) return;
+      saved = db.transaction(() => {
         if (before !== revision()) return false;
         saveLearningModels(db, state);
         return true;
       }).immediate();
-      if (!committed) { this.models.clear(); return; }
-      this.models = new Map(state.models.filter(model => model.state === 'active')
-        .map(model => [JSON.stringify([model.resourceKind, model.cohort]), model.adjustment]));
-      const patches = new Set(getLiveCaptureIndexRows(db).filter(entry => this.runStartedAt !== null
-        && entry.manifest.startedAt >= this.runStartedAt && learningProjectionInputs(db, entry) !== null)
-        .map(entry => entry.manifest.gameVersion).filter((patch): patch is string => Boolean(patch)));
-      this.patch = patches.size === 1 ? [...patches][0] : null;
-      this.lastRevision = revision();
     } catch (error) {
-      this.models.clear(); this.patch = null;
-      if (!request.signal.aborted) throw error;
+      if (request.signal.aborted) return;
+      throw error;
     } finally { this.pending = null; }
+    // Serve what is committed: a refresh that lost a race keeps the previous models instead of none.
+    this.models = new Map(readLearningModels(db).models.filter(model => model.state === 'active')
+      .map(model => [JSON.stringify([model.resourceKind, model.cohort]), model.adjustment]));
+    const patches = new Set(getLiveCaptureIndexRows(db).filter(entry => this.runStartedAt !== null
+      && entry.manifest.startedAt >= this.runStartedAt && learningProjectionInputs(db, entry) !== null)
+      .map(entry => entry.manifest.gameVersion).filter((patch): patch is string => Boolean(patch)));
+    this.patch = patches.size === 1 ? [...patches][0] : null;
+    if (saved) this.lastRevision = revision();
   }
 }
