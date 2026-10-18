@@ -10,6 +10,7 @@ import { TelemetryLinks } from '../telemetry/telemetryLinks.js';
 import { RaceTrafficService } from '../traffic/raceTrafficService.js';
 import { parseBoundedInteger, queryString } from './queryParams.js';
 import { readReplaySessionContext } from '../core/sessionRows/replayContext.js';
+import { hasVerifiedLiveCapture } from '../core/live/dbLiveCaptureStore.js';
 
 export function createReplayRouter(context: ServerContext): Router {
   const router = Router();
@@ -127,7 +128,8 @@ export function createReplayRouter(context: ServerContext): Router {
         pointSpacingM,
         allowDuckDb: queryString(req.query.source)?.toLowerCase() !== 'vcr',
       });
-      res.json(trajectory);
+      res.json(hasVerifiedLiveCapture(context.sessionDb.getDb(), sessionId, driverOrdinal)
+        ? { ...trajectory, hasLiveCapture: true } : trajectory);
     } catch (error: unknown) {
       if (error instanceof ReplayDriverNotFoundError) return res.status(404).json({ error: error.message });
       res.status(404).json({ error: error instanceof Error ? error.message : 'Session telemetry unavailable' });

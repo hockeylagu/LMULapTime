@@ -351,9 +351,11 @@ export function computeVehicleDynamics(points: ReplayTrajectoryPoint[]): ReplayT
   if (points.length === 0) return points;
 
   const lonG = computeLongitudinalG(points);
-  const yawRates = computeYawRate(points);
+  const yawRates = computeYawRate(points).map((value, index) =>
+    points[index].liveDynamics?.yawRate && Number.isFinite(points[index].yawRateDeg) ? points[index].yawRateDeg! : value);
   const latG = computeLateralG(points, yawRates);
-  const slipAngles = computeSlipAngle(points, latG);
+  const slipAngles = computeSlipAngle(points, latG).map((value, index) =>
+    points[index].liveDynamics?.slipAngle && Number.isFinite(points[index].slipAngleDeg) ? points[index].slipAngleDeg! : value);
   const underOversteer = computeUnderOversteer(points, yawRates);
   const { tireSlipPct, wheelLockActive } = computeTireSlipAndLockup(
     points,

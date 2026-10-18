@@ -62,9 +62,11 @@ export const TelemetrySlipAngleChannel: React.FC<TelemetrySlipAngleChannelProps>
           <Compass className="w-3 h-3" />
           BODY SLIP ANGLE (BETA)
         </span>
-        <span className="px-1 py-px rounded bg-lmu-violet-strong/20 text-lmu-violet-soft font-bold text-[10px] tracking-wider flex items-center gap-0.5">
-          <Sparkles className="w-2.5 h-2.5" /> COMPUTED
-        </span>
+        {!currentPoint?.liveDynamics?.slipAngle && (
+          <span className="px-1 py-px rounded bg-lmu-violet-strong/20 text-lmu-violet-soft font-bold text-[10px] tracking-wider flex items-center gap-0.5">
+            <Sparkles className="w-2.5 h-2.5" /> COMPUTED
+          </span>
+        )}
         {!(hasSlipAngle) && (<span className="text-[10px] font-mono text-lmu-muted italic">
             Awaiting telemetry
           </span>)}

@@ -2,6 +2,7 @@ import type { NonRepresentativeReason } from './session.js';
 import type { VehicleDataRecord } from './dataPlugin.js';
 import type { TrackKerbType, TrackTimingGates } from './trackGeometry.js';
 import type { WeatherCondition } from './session.js';
+import type { LiveCaptureOverlay, LiveDynamicsProvenance } from './liveEvidence.js';
 
 export interface ReplayEventInfo {
   eventId?: string;
@@ -140,6 +141,8 @@ export interface ReplayTrajectoryPoint {
   accelTotalG?: number;
   /** ISO yaw rate in degrees/s: positive left about the upward axis. */
   yawRateDeg?: number;
+  /** Source sample retained when supplemental live dynamics replace computed estimates. */
+  liveDynamics?: LiveDynamicsProvenance;
   /** ISO sideslip beta in degrees: positive velocity left of the nose. */
   slipAngleDeg?: number;
   understeerDeg?: number;
@@ -262,6 +265,9 @@ export interface ReplayTrajectoryValidation {
 export type LapEndCut = 'line' | 'extrapolated' | 'none';
 
 export interface ReplayTrajectoryData {
+  /** Attachment hint only; the live-evidence API validates current ownership before use. */
+  hasLiveCapture?: boolean;
+  liveCaptureOverlay?: LiveCaptureOverlay;
   sessionId?: string;
   driverOrdinal?: number;
   lapOrdinal?: number;

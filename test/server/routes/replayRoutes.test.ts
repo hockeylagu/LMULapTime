@@ -14,6 +14,8 @@ import { session as sessionFixture, driver, lap } from '../core/sessionRows/buil
 import { ReplayTrajectoryService } from '../../../server/replay/replayTrajectoryService.js';
 import { RaceTrafficService } from '../../../server/traffic/raceTrafficService.js';
 import type { ReplayTrajectoryData } from '../../../shared/types/index.js';
+import { setLiveCaptureMatch, upsertLiveCapture } from '../../../server/core/live/dbLiveCaptureStore.js';
+import type { LiveCaptureManifest } from '../../../shared/types/liveCapture.js';
 
 describe('session telemetry routes', () => {
   let db: SessionDatabase;
@@ -132,6 +134,27 @@ describe('session telemetry routes', () => {
     expect(list.status).toBe(404);
     expect(metadata.status).toBe(404);
     expect(trajectory.status).toBe(404);
+  });
+
+  it('advertises live evidence only for the player with a current verified available attachment', async () => {
+    db.getDb().prepare('UPDATE session_drivers SET is_player=1 WHERE session_id=? AND driver_ordinal=0').run('session-1');
+    const retained = { points: [], pointsCount: 0 } as unknown as ReplayTrajectoryData;
+    vi.spyOn(ReplayTrajectoryService.prototype, 'getTrajectory').mockResolvedValue(retained);
+    const capture: LiveCaptureManifest = { recordingId: 'capture', filename: 'capture.live.duckdb', source: 'live-capture',
+      schemaVersion: 1, normalizationVersion: 1, signConvention: 'iso8855', layoutKey: 'monza_gp', trackName: 'Monza',
+      driverName: 'Route Driver', vehicleName: 'Test Car', vehicleModel: null, carClass: 'GT3', sessionCode: 1,
+      sessionKind: 'practice', startedAt: 0, updatedAt: 1000, firstElapsedSeconds: 0, lastElapsedSeconds: 100,
+      endedAt: 1000, status: 'completed', samples: 1, droppedSamples: 0, anchors: [], sessionId: null, gameVersion: null };
+    upsertLiveCapture(db.getDb(), capture, 100);
+    setLiveCaptureMatch(db.getDb(), 'capture', 'session-1', 'Build-42', 'verified');
+    const url = '/api/session/session-1/telemetry?driverOrdinal=0&lapOrdinal=0';
+    expect((await request(app).get(url)).body.hasLiveCapture).toBe(true);
+    expect(retained.hasLiveCapture).toBeUndefined();
+    db.getDb().prepare('UPDATE session_drivers SET is_player=0 WHERE session_id=?').run('session-1');
+    expect((await request(app).get(url)).body.hasLiveCapture).toBeUndefined();
+    db.getDb().prepare('UPDATE session_drivers SET is_player=1 WHERE session_id=?').run('session-1');
+    db.getDb().prepare('UPDATE live_capture_index SET available=0').run();
+    expect((await request(app).get(url)).body.hasLiveCapture).toBeUndefined();
   });
 
   it('keeps replay cache and upgrade controls available for maintenance', async () => {
