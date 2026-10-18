@@ -91,8 +91,6 @@ CREATE TABLE IF NOT EXISTS ai_reports (
 export function initDbSchema(db: DatabaseType): void {
   db.exec(LIVE_CAPTURE_INDEX_SCHEMA);
   db.exec(`
-    -- Existing live_strategy_audit tables are retained read-only; new audits live in DuckDB.
-
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
       filename TEXT NOT NULL,

@@ -113,13 +113,11 @@ describe('consolidated strategy history', () => {
     await expect(readAuditHistory(opts)).rejects.toThrow('closes');
   });
 
-  it('merges legacy and raw recent history, bounds JSON to 200 and streams every CSV record', async () => {
+  it('bounds recording JSON to 200 and streams every CSV record without a SQLite audit table', async () => {
     const { directory, capture } = await recording();
     const opts = options(capture, directory); const reader = new LiveAuditReader();
     opts.read = request => reader.read(request);
-    opts.db.exec('CREATE TABLE live_strategy_audit (run_id TEXT,sequence INTEGER,recorded_at INTEGER,record_json TEXT)');
-    const legacy = record(999, 'old-run');
-    opts.db.prepare('INSERT INTO live_strategy_audit VALUES (?,?,?,?)').run(legacy.runId, 1, legacy.recordedAt, JSON.stringify(legacy));
+    expect(opts.db.prepare("SELECT 1 FROM sqlite_master WHERE name='live_strategy_audit'").get()).toBeUndefined();
     const live = new LiveService();
     const captureSource = { directory, hasOpenRecordingHandle: false,
       status: () => ({ state: 'idle' as const, recordingId: null, samples: 0, droppedSamples: 0, pendingBatches: 0, error: null }) };
@@ -128,11 +126,12 @@ describe('consolidated strategy history', () => {
     const response = await request(app).get('/api/live/audit');
     expect(response.status).toBe(200);
     expect(response.body).toHaveLength(200);
-    expect(response.body[0].runId).toBe('old-run');
+    expect(response.body[0].runId).toBe(capture.recordingId);
     const csv = await request(app).get(`/api/live/audit.csv?runId=${capture.recordingId}`);
     expect(csv.status).toBe(200);
     expect(csv.text.split('\r\n').filter(Boolean)).toHaveLength(451);
-    expect(csv.text).not.toContain('old-run');
+    expect((await request(app).get('/api/live/audit?runId=unknown')).body).toEqual([]);
+    expect((await request(app).get('/api/live/audit.csv?runId[]=bad')).status).toBe(400);
     const blocked = vi.spyOn(live, 'isSessionLoaded').mockReturnValue(true);
     expect((await request(app).get('/api/live/audit.csv')).status).toBe(503);
     blocked.mockRestore();

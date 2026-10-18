@@ -1,7 +1,6 @@
 import type { Database } from 'better-sqlite3';
 import type { LiveAuditRecord } from '../../../shared/types/liveAudit.js';
 import { getLiveCaptureIndexRows } from '../../core/live/dbLiveCaptureStore.js';
-import { iterateLiveAudit, readLiveAudit } from '../../core/live/dbLiveAuditStore.js';
 import type { AuditPageReader } from './reader.js';
 import { AuditReadError } from './readPage.js';
 
@@ -25,7 +24,6 @@ export async function* iterateAuditHistory(options: AuditHistoryOptions, newestO
       && (options.runId === null || entry.manifest.recordingId === options.runId))
     .sort((a, b) => newestOnly ? b.manifest.updatedAt - a.manifest.updatedAt : a.manifest.startedAt - b.manifest.startedAt);
   if (captures.length > 1000) throw new AuditReadError(413, 'Select a runId to export more than 1,000 strategy recordings');
-  const legacy = newestOnly ? readLiveAudit(options.db, options.runId) : iterateLiveAudit(options.db, options.runId);
   const newestTimes: number[] = [];
   const rememberTime = (record: LiveAuditRecord): void => {
     if (!newestOnly) return;
@@ -33,7 +31,6 @@ export async function* iterateAuditHistory(options: AuditHistoryOptions, newestO
     newestTimes.sort((a, b) => b - a);
     if (newestTimes.length > 200) newestTimes.length = 200;
   };
-  for (const record of legacy) { rememberTime(record); yield record; }
   for (const entry of captures) {
     if (newestOnly && newestTimes.length === 200 && entry.manifest.updatedAt < newestTimes[199]) break;
     let after: number | null = null;
@@ -57,7 +54,7 @@ export async function* iterateAuditHistory(options: AuditHistoryOptions, newestO
   }
 }
 
-/** Merge bounded recent pages from both stores; raw checkpoint snapshots are never cached in SQLite. */
+/** Merge bounded recent recording pages; raw checkpoint snapshots are never cached in SQLite. */
 export async function readAuditHistory(options: AuditHistoryOptions): Promise<LiveAuditRecord[]> {
   let records: LiveAuditRecord[] = [];
   for await (const record of iterateAuditHistory(options, true)) {
