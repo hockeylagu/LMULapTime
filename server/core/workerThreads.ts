@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { Worker } from 'node:worker_threads';
 
 // Shared by every worker client and the workers themselves; kept free of heavy imports so a
 // small worker (the live shared memory reader) does not load the replay decoder with it.
@@ -41,4 +42,43 @@ export function findWorkerBootstrap(moduleUrl: string, serverRelativePath: strin
   }
 
   throw new Error(`Unable to locate worker bootstrap ${fileName}`);
+}
+
+export interface OneShotWorkerOptions {
+  /** Ends the worker after this many milliseconds and rejects with `timeoutError()`. */
+  timeoutMs: number;
+  timeoutError: () => Error;
+  /** The rejection when the worker exits without posting an answer. */
+  missingError: (code: number) => Error;
+  /** Aborting the signal ends the worker and rejects with `error()`. */
+  abort?: { signal: AbortSignal; error: () => Error };
+}
+
+/**
+ * Runs a worker that posts one answer of `types` and exits. Settles only once the worker has exited,
+ * so its native handles (DuckDB on Windows, SQLite) are released before the caller moves on.
+ */
+export function runWorkerOnce<T extends { type: string }>(bootstrap: string, workerData: unknown,
+  types: ReadonlyArray<T['type']>, options: OneShotWorkerOptions): Promise<T> {
+  const { abort } = options;
+  if (abort?.signal.aborted) return Promise.reject(abort.error());
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(bootstrap, { workerData });
+    let answer: T | null = null;
+    let failure: Error | null = null;
+    const end = (error: Error): void => { failure ??= error; void worker.terminate(); };
+    const cancel = (): void => end(abort?.error() ?? new Error('Worker cancelled'));
+    const timer = setTimeout(() => end(options.timeoutError()), options.timeoutMs);
+    timer.unref();
+    abort?.signal.addEventListener('abort', cancel, { once: true });
+    worker.on('message', (message: unknown) => { if (isWorkerMessage<T>(message, types)) answer = message; });
+    worker.on('error', error => { failure ??= error instanceof Error ? error : new Error(String(error)); });
+    worker.on('exit', code => {
+      clearTimeout(timer);
+      abort?.signal.removeEventListener('abort', cancel);
+      if (failure) reject(failure);
+      else if (answer && code === 0) resolve(answer);
+      else reject(options.missingError(code));
+    });
+  });
 }

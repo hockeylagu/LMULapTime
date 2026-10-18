@@ -1,5 +1,4 @@
-import { Worker } from 'node:worker_threads';
-import { findWorkerBootstrap, isWorkerMessage } from '../../core/workerThreads.js';
+import { findWorkerBootstrap, runWorkerOnce } from '../../core/workerThreads.js';
 import type { LiveLearningReadinessReport } from '../../../shared/types/liveLearning.js';
 
 export class LearningReadinessError extends Error {
@@ -16,29 +15,15 @@ export class LearningReadinessReader {
     if (this.active) throw new LearningReadinessError(503, 'Learning evidence is already being checked. Try again shortly.');
     this.active = true;
     try {
-      return await new Promise<LiveLearningReadinessReport>((resolve, reject) => {
-        const worker = new Worker(findWorkerBootstrap(import.meta.url, ['live', 'learning', 'readinessWorkerBootstrap.mjs']), { workerData: filename });
-        let answer: Answer | null = null;
-        let failure: Error | null = null;
-        const cancel = (): void => { failure = new DOMException('Learning readiness cancelled', 'AbortError'); void worker.terminate(); };
-        const timer = setTimeout(() => {
-          failure = new LearningReadinessError(503, 'Learning evidence check timed out. Try again after ingestion finishes.');
-          void worker.terminate();
-        }, 15_000);
-        timer.unref();
-        signal.addEventListener('abort', cancel, { once: true });
-        worker.on('message', (message: unknown) => {
-          if (isWorkerMessage<Answer>(message, ['readiness', 'failed'])) answer = message;
+      const answer = await runWorkerOnce<Answer>(findWorkerBootstrap(import.meta.url, ['live', 'learning', 'readinessWorkerBootstrap.mjs']),
+        filename, ['readiness', 'failed'], {
+          timeoutMs: 15_000,
+          timeoutError: () => new LearningReadinessError(503, 'Learning evidence check timed out. Try again after ingestion finishes.'),
+          missingError: code => new LearningReadinessError(500, `Learning evidence reader exited without a report (${code})`),
+          abort: { signal, error: () => new DOMException('Learning readiness cancelled', 'AbortError') },
         });
-        worker.on('error', error => { failure = error instanceof Error ? error : new Error(String(error)); });
-        worker.on('exit', code => {
-          clearTimeout(timer); signal.removeEventListener('abort', cancel);
-          if (failure) reject(failure);
-          else if (answer?.type === 'readiness' && code === 0) resolve(answer.report);
-          else if (answer?.type === 'failed') reject(new LearningReadinessError(500, answer.error));
-          else reject(new LearningReadinessError(500, `Learning evidence reader exited without a report (${code})`));
-        });
-      });
+      if (answer.type === 'failed') throw new LearningReadinessError(500, answer.error);
+      return answer.report;
     } finally { this.active = false; }
   }
 }
