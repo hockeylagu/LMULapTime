@@ -23,6 +23,7 @@ import { parseNavigationState } from './lmuNavigation.js';
 import type { LivePitPollerOptions, PitPollMode } from './livePitPoller.js';
 import { writeSseEvent } from './sse.js';
 import type { SseSink } from './sse.js';
+import type { LiveCaptureController } from './capture/controller.js';
 
 /** How often buffered pedal samples go out to the pages (about 25 batches a second). */
 export const PEDAL_FLUSH_MS = 40;
@@ -40,6 +41,8 @@ interface LiveClient {
 }
 
 export interface LiveServiceOptions {
+  /** Durable capture also keeps safe REST polling alive without dashboard subscribers. */
+  capture?: LiveCaptureController;
   /** Persists immutable checkpoints while a dashboard page is open (none without one). */
   saveAuditRecord?: (record: LiveAuditRecord) => void;
   /** Replaces the shared memory worker (tests). */
@@ -71,7 +74,9 @@ const contentKey = (snapshot: Omit<LiveSnapshot, 'sequence' | 'receivedAt'>): st
  * and a heartbeat. A page that cannot keep up misses batches; the reader is never held back by it.
  */
 export class LiveService {
-  public readonly events = new TypedEmitter<{ lifecycle: [LiveLifecycle]; 'session-loaded': [boolean] }>();
+  public readonly events = new TypedEmitter<{ lifecycle: [LiveLifecycle]; 'session-loaded': [boolean]; 'game-running': [boolean] }>();
+  private processRunning: boolean | null = null;
+  private reportedRunning = false;
   private snapshot: LiveSnapshot = offlineSnapshot();
   private snapshotKey = contentKey(this.snapshot);
   private readonly tracker = new LiveSessionTracker();
@@ -131,6 +136,9 @@ export class LiveService {
     this.pit = new LivePitPoller({
       ...options.pit,
       onUpdate: update => this.applyRest(update),
+      onEvidence: observation => {
+        if (!this.isReplaying()) this.options.capture?.observe(observation);
+      },
       onNavigation: body => {
         const navigation = parseNavigationState(body);
         if (navigation) this.identity.offerNavigation(navigation);
@@ -143,6 +151,14 @@ export class LiveService {
   }
 
   public getSnapshot(): LiveSnapshot { return this.snapshot; }
+  public isGameRunning(): boolean { return this.processRunning ?? this.snapshot.lifecycle !== 'offline'; }
+
+  private publishRunning(): void {
+    const running = this.isGameRunning();
+    if (running === this.reportedRunning) return;
+    this.reportedRunning = running;
+    this.events.emit('game-running', running);
+  }
 
   /** The reserve setting changed: the plan follows at once. */
   public setReserveLaps(laps: number): void {
@@ -166,12 +182,16 @@ export class LiveService {
       ?? new Worker(findWorkerBootstrap(import.meta.url, ['live', 'liveReaderWorkerBootstrap.mjs']));
     this.worker = worker;
     worker.unref();
-    worker.on('message', (message: unknown) => this.handleMessage(message));
+    worker.on('message', (message: unknown) => {
+      if (this.worker === worker) this.handleMessage(message);
+    });
     const lost = (reason: string): void => {
       if (this.worker !== worker) return;
       console.warn(`[Live] Shared memory reader ${reason}`);
       this.worker = null;
-      this.applyReading(null);
+      this.processRunning = null;
+      this.handleMessage({ type: 'closed' });
+      this.publishRunning();
       if (this.stopped) return;
       this.restartTimer = setTimeout(() => this.start(), WORKER_RESTART_MS);
       this.restartTimer.unref();
@@ -180,7 +200,7 @@ export class LiveService {
     worker.on('exit', (code: number) => lost(`exited with code ${code}`));
   }
 
-  public stop(): void {
+  public stop(): Promise<void> {
     this.audit?.end(Date.now());
     this.stopped = true;
     if (this.restartTimer) clearTimeout(this.restartTimer);
@@ -194,6 +214,7 @@ export class LiveService {
       worker.postMessage({ type: 'stop' });
       void worker.terminate();
     }
+    return this.options.capture?.stop() ?? Promise.resolve();
   }
 
   /** Registers a page: it gets the current snapshot now. Returns the function that removes it. */
@@ -213,9 +234,15 @@ export class LiveService {
   }
 
   private handleMessage(message: unknown): void {
-    if (!isWorkerMessage<LiveReaderMessage>(message, ['frame', 'navigation', 'closed'])) return;
+    if (!isWorkerMessage<LiveReaderMessage>(message, ['frame', 'navigation', 'closed', 'process'])) return;
+    if (message.type === 'process') {
+      this.processRunning = message.running;
+      this.publishRunning();
+      return;
+    }
     this.markFirstReading();
     if (message.type === 'closed') {
+      this.replay = false;
       this.screen = 'session';
       this.loadingProgress = null;
       this.pitState = 'none';
@@ -232,6 +259,7 @@ export class LiveService {
       this.setReplay(message.screen === 'replay');
       return;
     }
+    if (this.isReplaying()) return;
     if (message.tyreSurfaceAvgC !== undefined) this.tyreSurfaceAvgC = message.tyreSurfaceAvgC;
     if (message.car) {
       this.strategy.applyCar(message.car);
@@ -242,6 +270,13 @@ export class LiveService {
     else if (message.car) this.applyReading(this.lastReading);
     if (message.scoring) this.followPlayer(before, message.scoring.player);
     if (message.pedal) this.bufferPedal(message.pedal);
+    if (message.capture && this.snapshot.session?.inRealtime && !this.snapshot.paused) this.options.capture?.sample(message.capture);
+    if (message.car) this.options.capture?.observe({ source: 'shared-memory', kind: 'car-condition',
+      elapsedSeconds: message.pedal?.t ?? this.lastReading?.currentEt ?? null, receivedAt: Date.now(), data: {
+        fuelLitres: message.car.fuelLiters, fuelCapacityLitres: message.car.fuelCapacityLiters,
+        dents: message.car.dentSeverity, detached: message.car.detached, lastImpactEt: message.car.lastImpactEt,
+        compound: message.car.compound,
+      } });
   }
 
   /** Damage keeps the stop estimate and the MFD read often; a new impact asks for the condition now. */
@@ -273,6 +308,7 @@ export class LiveService {
   private applyReading(reading: LiveScoringReading | null): void {
     const previous = this.snapshot;
     if (this.replay && this.screen === 'session' && reading !== null) {
+      this.options.capture?.pause();
       // The replay's frames are not the session's: show the menu, and leave the last session reading, laps, strategy,
       // results and capture as they were (a replay watched from the monitor between sessions must not clear them).
       this.lastReading ??= reading;
@@ -300,6 +336,8 @@ export class LiveService {
       loadingProgress: state.lifecycle === 'loading' ? this.loadingProgress : null,
       strategy,
     };
+    this.options.capture?.update(reading, { ...next, sequence: previous.sequence + 1, receivedAt: Date.now() });
+    if (this.options.capture) this.followPitMode();
     // History is captured only while a dashboard is open, like the REST reads it depends on.
     if (this.clients.size === 0) this.audit?.end(Date.now());
     const auditId = this.clients.size > 0
@@ -319,6 +357,7 @@ export class LiveService {
     const previous = this.snapshot;
     this.snapshot = { ...next, sequence: previous.sequence + 1, receivedAt: Date.now() };
     this.snapshotKey = contentKey(next);
+    this.publishRunning();
     if (!isLiveOnTrack(next.lifecycle)) {
       this.pedals = [];
       this.pendingTiming = null;
@@ -361,10 +400,10 @@ export class LiveService {
   private followPitMode(): void {
     const lifecycle = this.snapshot.lifecycle;
     const replaying = this.isReplaying();
-    const mode: PitPollMode = this.clients.size === 0 ? 'off'
+    const mode: PitPollMode = this.clients.size === 0 && !this.options.capture ? 'off'
       : replaying ? 'track'
         : lifecycle === 'loading' || !isLiveSessionLoaded(lifecycle) ? 'off' : lifecycle === 'garage' ? 'garage' : 'track';
-    this.pit.setMode(mode);
+    this.pit.setMode(mode, this.options.capture?.status().recordingId ?? '');
     // The poller's state checks read the navigation state: the identity takes them instead of asking too.
     this.identity.setShared(mode !== 'off');
   }

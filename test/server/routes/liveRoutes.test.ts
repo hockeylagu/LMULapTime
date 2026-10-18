@@ -121,12 +121,12 @@ describe('live routes', () => {
     const { app, live } = setup();
     const { response, chunks } = await openStream(app, '/api/events');
     expect(response.statusCode).toBe(200);
-    live.events.emit('lifecycle', 'menu');
+    live.events.emit('game-running', true);
     live.events.emit('lifecycle', 'garage');
     live.events.emit('lifecycle', 'driving');
     await vi.waitFor(() => expect(gameStarts(chunks)).toBe(1));
-    live.events.emit('lifecycle', 'offline');
-    live.events.emit('lifecycle', 'menu');
+    live.events.emit('game-running', false);
+    live.events.emit('game-running', true);
     await vi.waitFor(() => expect(gameStarts(chunks)).toBe(2));
   });
 
@@ -136,9 +136,9 @@ describe('live routes', () => {
     const running = () => [...chunks.join('').matchAll(/event: game-running\ndata: (\{.*?\})/g)]
       .map(([, data]) => (JSON.parse(data) as { running: boolean }).running);
     await vi.waitFor(() => expect(running()).toEqual([false]));
-    live.events.emit('lifecycle', 'menu');
+    live.events.emit('game-running', true);
     live.events.emit('lifecycle', 'garage');
-    live.events.emit('lifecycle', 'offline');
+    live.events.emit('game-running', false);
     await vi.waitFor(() => expect(running()).toEqual([false, true, false]));
   });
 
@@ -152,7 +152,7 @@ describe('live routes', () => {
       await vi.waitFor(() => expect(live.hasClients()).toBe(true));
     }
     const { chunks } = await openStream(app, '/api/events');
-    live.events.emit('lifecycle', 'menu');
+    live.events.emit('game-running', true);
     events.emit('scan-started');
     await vi.waitFor(() => expect(chunks.join('')).toContain('event: scan-started'));
     expect(gameStarts(chunks)).toBe(0);

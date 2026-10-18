@@ -1,6 +1,8 @@
 import type { LiveCarReading } from '../../shared/domain/live/liveCarCondition.js';
 import type { LiveScoringReading, LiveVehicleReading } from '../../shared/domain/live/liveLifecycle.js';
 import type { LivePedalSample } from '../../shared/types/live.js';
+import type { LiveCaptureSample } from '../../shared/types/liveCapture.js';
+import { decodeLiveCaptureSample } from './capture/decode.js';
 import { knownCarClass } from '../../shared/domain/vehicleMapping.js';
 import { MAX_MAPPED_VEHICLES, SCORING, SCORING_INFO, TELEMETRY, VEHICLE_SCORING, VEHICLE_TELEMETRY, WHEEL } from './rf2Layout.js';
 import type { MappedBuffer } from './sharedMemory.js';
@@ -27,6 +29,7 @@ function decodeVehicle(buffer: Buffer, base: number): LiveVehicleReading {
   const double = (name: string): number => buffer.readDoubleLE(base + at[name]);
   return {
     id: buffer.readInt32LE(base + at.id),
+    ...(cString(buffer, base + at.driverName, 32) ? { driverName: cString(buffer, base + at.driverName, 32) } : {}),
     place: buffer.readUInt8(base + at.place),
     totalLaps: buffer.readInt16LE(base + at.totalLaps),
     vehicleName: cString(buffer, base + at.vehicleName, 64),
@@ -106,6 +109,8 @@ export function decodeScoring(buffer: Buffer): LiveScoringReading {
     trackTempC: buffer.readDoubleLE(info + infoAt.trackTemp),
     raining: clamp01(buffer.readDoubleLE(info + infoAt.raining)),
     avgPathWetness: clamp01(buffer.readDoubleLE(info + infoAt.avgPathWetness)),
+    maxPathWetness: Number.isFinite(buffer.readDoubleLE(info + infoAt.maxPathWetness))
+      ? clamp01(buffer.readDoubleLE(info + infoAt.maxPathWetness)) : undefined,
     player,
     leader,
     classLeader,
@@ -143,15 +148,19 @@ function decodeCar(slot: Buffer): LiveCarReading {
   };
 }
 
-export interface PedalSlot { id: number; sample: LivePedalSample; tyreSurfaceAvgC: number | null; car: LiveCarReading }
+export interface PedalSlot {
+  id: number; sample: LivePedalSample; tyreSurfaceAvgC: number | null; car: LiveCarReading;
+  capture?: LiveCaptureSample | null;
+}
 
 /** One telemetry vehicle slot (VEHICLE_TELEMETRY.size bytes): its id, the driver's unfiltered pedals at its session time, the tyre surface temperature and the car. */
-export function decodePedalSlot(slot: Buffer): PedalSlot {
+export function decodePedalSlot(slot: Buffer, capture = false): PedalSlot {
   const at = VEHICLE_TELEMETRY.offsets;
   return {
     id: slot.readInt32LE(at.id),
     tyreSurfaceAvgC: tyreSurfaceAverage(slot),
     car: decodeCar(slot),
+    ...(capture ? { capture: decodeLiveCaptureSample(slot) } : {}),
     sample: {
       t: slot.readDoubleLE(at.elapsedTime),
       throttle: clamp01(slot.readDoubleLE(at.unfilteredThrottle)),
@@ -188,7 +197,7 @@ export function readScoringFrame(source: FrameSource, lastVersion: number | null
 
 /** The player's pedal sample, tyre temperature and car; `slot` is where the player was found, to look there first next time. A missing player gives a null sample and car. */
 export function readPedalFrame(source: FrameSource, playerId: number, lastVersion: number | null,
-  slotHint: number): FrameRead<{ slot: number; sample: LivePedalSample | null; tyreSurfaceAvgC: number | null; car: LiveCarReading | null }> {
+  slotHint: number, capture = false): FrameRead<{ slot: number; sample: LivePedalSample | null; tyreSurfaceAvgC: number | null; car: LiveCarReading | null; capture?: LiveCaptureSample | null }> {
   return readCoherent(source, TELEMETRY.versionBegin, TELEMETRY.versionEnd, lastVersion, () => {
     const count = Math.max(0, Math.min(source.readU32(TELEMETRY.numVehicles) | 0, MAX_MAPPED_VEHICLES));
     const slotOffset = (slot: number): number => TELEMETRY.vehicles + slot * TELEMETRY.vehicleStride;
@@ -196,8 +205,9 @@ export function readPedalFrame(source: FrameSource, playerId: number, lastVersio
     for (let slot = 0; slot < count; slot++) if (slot !== slotHint) candidates.push(slot);
     for (const slot of candidates) {
       if ((source.readU32(slotOffset(slot)) | 0) !== playerId) continue;
-      const decoded = decodePedalSlot(source.read(slotOffset(slot), TELEMETRY.vehicleStride));
-      return { slot, sample: decoded.sample, tyreSurfaceAvgC: decoded.tyreSurfaceAvgC, car: decoded.car };
+      const decoded = decodePedalSlot(source.read(slotOffset(slot), TELEMETRY.vehicleStride), capture);
+      return { slot, sample: decoded.sample, tyreSurfaceAvgC: decoded.tyreSurfaceAvgC, car: decoded.car,
+        ...(capture ? { capture: decoded.capture } : {}) };
     }
     return { slot: -1, sample: null, tyreSurfaceAvgC: null, car: null };
   });

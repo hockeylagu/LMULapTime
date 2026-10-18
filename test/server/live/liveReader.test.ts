@@ -4,10 +4,11 @@ import type { GameProbe, LiveReaderMessage } from '../../../server/live/liveRead
 import { SCORING, SCORING_MAPPING_NAME, TELEMETRY, TELEMETRY_MAPPING_NAME } from '../../../server/live/rf2Layout.js';
 import type { MappedBuffer } from '../../../server/live/sharedMemory.js';
 import { scoringBuffer, source, telemetryBuffer } from './rf2Fixtures.js';
+import type { GameProcessProbe } from '../../../server/live/gameProcess.js';
 
 const PLAYER = { id: 12, isPlayer: true, place: 4, totalLaps: 8, name: 'Ferrari 296 GT3', className: 'GT3' };
 
-function setup(probe: () => Promise<GameProbe> = () => Promise.resolve('session')) {
+function setup(probe: () => Promise<GameProbe> = () => Promise.resolve('session'), process?: GameProcessProbe, capture = false) {
   let scoring = scoringBuffer(2, [PLAYER]);
   let telemetry = telemetryBuffer(4, [{ id: 12, et: 100, throttle: 0.5, brake: 0 }]);
   const closes = { scoring: vi.fn(), telemetry: vi.fn() };
@@ -18,7 +19,7 @@ function setup(probe: () => Promise<GameProbe> = () => Promise.resolve('session'
     if (!available.value) return null;
     return name === SCORING_MAPPING_NAME ? mappingOf(() => scoring, closes.scoring) : mappingOf(() => telemetry, closes.telemetry);
   });
-  const reader = new LiveReader({ openMapping, probeGame: vi.fn(probe), post: message => posted.push(message) });
+  const reader = new LiveReader({ openMapping, probeGame: vi.fn(probe), process, capture, post: message => posted.push(message) });
   return {
     reader, posted, openMapping, closes, available,
     setScoring: (buffer: Buffer) => { scoring = buffer; },
@@ -32,6 +33,83 @@ const lastNavigation = (posted: LiveReaderMessage[]): LiveReaderMessage | undefi
 describe('LiveReader', () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
+
+  it('withholds durable capture until navigation confirms live play and after an inconclusive replay cue', async () => {
+    let answer: GameProbe = 'busy';
+    const t = setup(async () => answer, undefined, true);
+    t.available.value = true;
+    t.reader.start();
+    await vi.advanceTimersByTimeAsync(PROBE_MS + 50);
+    expect(t.posted.filter(m => m.type === 'frame').every(m => m.type === 'frame' && !m.capture)).toBe(true);
+    answer = 'session';
+    await vi.advanceTimersByTimeAsync(PROBE_MS);
+    t.setTelemetry(telemetryBuffer(6, [{ id: 12, et: 101, throttle: 0, brake: 0 }]));
+    await vi.advanceTimersByTimeAsync(40);
+    expect(t.posted.some(m => m.type === 'frame' && m.capture?.elapsedSeconds === 101)).toBe(true);
+    t.posted.length = 0;
+    answer = 'busy';
+    t.setScoring(scoringBuffer(4, [PLAYER], { currentEt: 10 }));
+    await vi.advanceTimersByTimeAsync(CUE_PROBE_MS + 100);
+    t.setTelemetry(telemetryBuffer(8, [{ id: 12, et: 10, throttle: 0, brake: 0 }]));
+    await vi.advanceTimersByTimeAsync(40);
+    expect(t.posted.filter(m => m.type === 'frame').every(m => m.type === 'frame' && !m.capture)).toBe(true);
+    t.reader.stop();
+  });
+
+  it('detects startup before telemetry and closes stale mappings within 500 ms of exit', async () => {
+    let running = false;
+    const close = vi.fn();
+    const t = setup(() => Promise.resolve('gone'), { read: () => running, close });
+    t.reader.start();
+    expect(t.openMapping).not.toHaveBeenCalled();
+    running = true;
+    await vi.advanceTimersByTimeAsync(500);
+    expect(t.posted).toContainEqual({ type: 'process', running: true });
+    expect(t.openMapping).toHaveBeenCalled();
+    // The plugin becomes available after startup. A refused REST port cannot disconnect a live process.
+    t.available.value = true;
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(t.posted.some(message => message.type === 'frame')).toBe(true);
+    expect(t.closes.scoring).not.toHaveBeenCalled();
+    running = false;
+    await vi.advanceTimersByTimeAsync(500);
+    expect(t.posted.slice(-2)).toEqual([{ type: 'process', running: false }, { type: 'closed' }]);
+    expect(t.closes.scoring).toHaveBeenCalledTimes(1);
+    expect(t.closes.telemetry).toHaveBeenCalledTimes(1);
+    const count = t.posted.length;
+    t.reader.stop();
+    await vi.advanceTimersByTimeAsync(4000);
+    expect(t.posted).toHaveLength(count);
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it('uses REST exit detection when the process query is unavailable', async () => {
+    const t = setup(() => Promise.resolve('gone'), { read: () => null, close: vi.fn() });
+    t.available.value = true;
+    t.reader.start();
+    expect(t.posted).toContainEqual({ type: 'process', running: null });
+    await vi.advanceTimersByTimeAsync(STARTUP_GRACE_MS + PROBE_MS);
+    expect(t.closes.scoring).toHaveBeenCalled();
+    t.reader.stop();
+  });
+
+  it('ignores a pending navigation response from a process that already exited', async () => {
+    let running = true;
+    let resolve: (answer: GameProbe) => void = () => {};
+    const t = setup(() => new Promise<GameProbe>(done => { resolve = done; }), { read: () => running, close: vi.fn() });
+    t.available.value = true;
+    t.reader.start();
+    await vi.advanceTimersByTimeAsync(PROBE_MS + 100);
+    running = false;
+    await vi.advanceTimersByTimeAsync(500);
+    running = true;
+    await vi.advanceTimersByTimeAsync(500);
+    t.posted.length = 0;
+    resolve('menu');
+    await Promise.resolve();
+    expect(t.posted).toEqual([]);
+    t.reader.stop();
+  });
 
   it('answers closed at once without the game, tries every 3 s, then posts the first scoring and pedal frame', () => {
     const t = setup();

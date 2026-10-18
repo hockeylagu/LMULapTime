@@ -1,4 +1,6 @@
 import type { LiveRestUpdate } from '../../shared/domain/live/liveStrategyTracker.js';
+import type { LiveCaptureObservation } from '../../shared/types/liveCapture.js';
+import { captureRestEvidence } from './capture/evidence.js';
 import { parseReplayPlayback } from './lmuNavigation.js';
 import {
   lmuGet, parseEstimate, parseForecast, parseGarageData, parsePitMenu, parsePitStopTimes,
@@ -84,6 +86,7 @@ const READS: PitRead[] = [
 ];
 
 export interface LivePitPollerOptions {
+  onEvidence?: (observation: LiveCaptureObservation) => void;
   onUpdate(update: LiveRestUpdate): void;
   /** Whether a replay is playing changed (`navigation/state` `settingMode`; null when unknown). */
   onReplay(active: boolean | null): void;
@@ -117,13 +120,16 @@ export class LivePitPoller {
   /** `once` reads answered since the poller last went off. */
   private readonly onceDone = new Set<string>();
   private pitActive = false;
+  private sessionKey = '';
 
   public constructor(private readonly options: LivePitPollerOptions) {}
 
   private now(): number { return (this.options.now ?? Date.now)(); }
 
-  public setMode(mode: PitPollMode): void {
-    if (mode === this.mode) return;
+  public setMode(mode: PitPollMode, sessionKey = ''): void {
+    if (mode === this.mode && sessionKey === this.sessionKey) return;
+    if (sessionKey !== this.sessionKey) this.onceDone.clear();
+    this.sessionKey = sessionKey;
     this.mode = mode;
     this.generation++;
     this.due.clear();
@@ -220,6 +226,11 @@ export class LivePitPoller {
     const every = this.period(next.read, this.mode);
     this.due.set(next.path, done + (answer.ok ? every ?? FAILED_READ_PAUSE_MS : Math.max(every ?? 0, FAILED_READ_PAUSE_MS)));
     const update = answer.ok ? next.read.parse(answer.body) : null;
+    if (answer.ok && this.options.onEvidence) {
+      const evidence = captureRestEvidence(next.path, answer.body);
+      if (evidence) this.options.onEvidence({ ...evidence, source: 'rest', elapsedSeconds: null,
+        receivedAt: done, requestStartedAt: now, requestFinishedAt: done });
+    }
     if (update && next.read.once) this.onceDone.add(next.path);
     if (update) this.options.onUpdate(update);
   }

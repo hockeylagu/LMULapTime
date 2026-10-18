@@ -18,6 +18,7 @@ export interface LiveScoringReading {
   raining: number;
   /** Average path wetness, 0..1. */
   avgPathWetness: number;
+  maxPathWetness?: number;
   /** The scoring entry flagged as the player; null when none is. */
   player: LiveVehicleReading | null;
   /** The overall leader (place 1); null when none is listed. */
@@ -36,6 +37,8 @@ export interface LiveScoringReading {
  */
 export interface LiveVehicleReading {
   id: number;
+  /** Exact source identity; vehicle slots are not persistent driver identities. */
+  driverName?: string;
   place: number;
   /** Laps completed (rF2 `mTotalLaps`). */
   totalLaps: number;

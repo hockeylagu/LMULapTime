@@ -13,6 +13,7 @@ import { queryTrackDetailFilters, queryTrackDetailSummary, queryTrackLatestSessi
 import { rateSessionDetail } from '../core/sessionSummaries/readTimePace.js';
 import { querySessionContext, querySessionPersonalBestById } from '../core/sessionSummaries/contextQueries.js';
 import { queryCompactDashboard } from '../core/sessionSummaries/dashboardQueries.js';
+import { getSessionLiveCaptures } from '../core/live/dbLiveCaptureStore.js';
 
 export interface SessionFilterOptions {
   track?: string;
@@ -61,7 +62,8 @@ export function createSessionRouter(context: ServerContext): Router {
     const session=context.sessionDb.getSessionById(req.params.id);
     if (!session) return res.status(404).json({error:'Session not found'});
     attachPitServices(db,session);
-    return res.json({...rateSessionDetail(session),historyContext:querySessionContext(db,session),revision:revision()});
+    return res.json({...rateSessionDetail(session),liveCaptures:getSessionLiveCaptures(db,session.id),
+      historyContext:querySessionContext(db,session),revision:revision()});
   });
   router.get('/session/:id/personal-best/:driverOrdinal', (req, res) => {
     res.setHeader('Cache-Control', 'no-store');

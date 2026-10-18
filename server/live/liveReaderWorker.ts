@@ -5,8 +5,9 @@ import type { GameProbe } from './liveReader.js';
 import { lmuHttpGet } from './lmuHttp.js';
 import { navigationProbe } from './lmuNavigation.js';
 import { openMapping } from './sharedMemory.js';
+import { createGameProcessProbe } from './gameProcess.js';
 
-/** The one LMU REST read the app makes to learn the game is gone. A paused game still answers; a busy one may be slow. */
+/** Navigation determines the screen; connection refusal is an exit fallback if process detection is unavailable. */
 const GAME_STATE_URL = 'http://127.0.0.1:6397/navigation/state';
 const PROBE_TIMEOUT_MS = 1000;
 
@@ -20,7 +21,8 @@ async function probeGame(): Promise<GameProbe> {
 
 if (parentPort) {
   const port = parentPort;
-  const reader = new LiveReader({ openMapping, probeGame, post: message => port.postMessage(message) });
+  const reader = new LiveReader({ openMapping, probeGame, process: createGameProcessProbe(), capture: true,
+    post: message => port.postMessage(message) });
   port.on('message', (message: unknown) => {
     if (!isWorkerMessage<{ type: 'stop' }>(message, ['stop'])) return;
     reader.stop();

@@ -9,14 +9,24 @@ import type { ServerContext } from '../core/serverContext.js';
 import type { LiveService } from '../live/liveService.js';
 import { isPedalTraceSeconds, isReserveLaps, loadLiveSettings, saveLiveSettings } from '../live/liveSettings.js';
 import { SSE_HEADERS, writeSseEvent } from '../live/sse.js';
+import type { LiveCaptureController } from '../live/capture/controller.js';
+import { LIVE_CAPTURE_CHANNELS } from '../live/capture/channels.js';
+import { LIVE_CAPTURE_NORMALIZATION_VERSION, LIVE_CAPTURE_SCHEMA_VERSION } from '../../shared/types/liveCapture.js';
 
 function openStream(res: Response): void {
   res.writeHead(200, SSE_HEADERS);
   res.flushHeaders();
 }
 
-export function createLiveRouter(context: ServerContext, live: LiveService): Router {
+export function createLiveRouter(context: ServerContext, live: LiveService, capture?: Pick<LiveCaptureController, 'directory' | 'status'>): Router {
   const router = Router();
+  router.get('/live/capture', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ source: 'live-capture', schemaVersion: LIVE_CAPTURE_SCHEMA_VERSION,
+      normalizationVersion: LIVE_CAPTURE_NORMALIZATION_VERSION, directory: capture?.directory ?? null,
+      ...(capture?.status() ?? { state: 'idle', recordingId: null, samples: 0, droppedSamples: 0, pendingBatches: 0, error: null }),
+      channels: LIVE_CAPTURE_CHANNELS });
+  });
 
   // Optional UUID selects one capture; omitted exports all saved captures, including interrupted runs.
   const auditHistory: RequestHandler = (req, res, next) => {
@@ -70,7 +80,7 @@ export function createLiveRouter(context: ServerContext, live: LiveService): Rou
   });
 
   // App-wide events: the server can start a scan by itself (after a game session), and pages reload their data when it ends.
-  // When LMU starts (the lifecycle leaves offline), an open app page switches to the dashboard if the setting is on and no
+  // When LMU's process starts, an open app page switches to the dashboard if the setting is on and no
   // dashboard page is connected yet. The app never opens a browser window itself.
   router.get('/events', (req, res) => {
     openStream(res);
@@ -79,17 +89,16 @@ export function createLiveRouter(context: ServerContext, live: LiveService): Rou
     };
     const stopStarted = context.events.on('scan-started', () => publish(APP_EVENTS.scanStarted));
     const stopFinished = context.events.on('scan-finished', () => publish(APP_EVENTS.scanFinished));
-    let lifecycle = live.getSnapshot().lifecycle;
+    let running = live.isGameRunning();
     // Whether LMU is running, so a page that was not switched to the dashboard can offer it.
     const publishRunning = (): void => {
-      try { writeSseEvent(res, APP_EVENTS.gameRunning, { running: lifecycle !== 'offline' }); } catch { /* the connection is closing */ }
+      try { writeSseEvent(res, APP_EVENTS.gameRunning, { running }); } catch { /* the connection is closing */ }
     };
     publishRunning();
-    const stopLifecycle = live.events.on('lifecycle', next => {
-      const started = lifecycle === 'offline' && next !== 'offline';
-      const changed = (lifecycle === 'offline') !== (next === 'offline');
-      lifecycle = next;
-      if (changed) publishRunning();
+    const stopRunning = live.events.on('game-running', next => {
+      const started = !running && next;
+      running = next;
+      publishRunning();
       if (started && !live.hasClients() && loadLiveSettings(context.sessionDb).autoOpen) publish(APP_EVENTS.gameStarted);
     });
     const heartbeat = setInterval(() => publish(APP_EVENTS.heartbeat), LIVE_HEARTBEAT_MS);
@@ -98,7 +107,7 @@ export function createLiveRouter(context: ServerContext, live: LiveService): Rou
       clearInterval(heartbeat);
       stopStarted();
       stopFinished();
-      stopLifecycle();
+      stopRunning();
     });
   });
 

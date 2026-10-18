@@ -3,6 +3,27 @@ import { initSessionSummarySchema } from './sessionSummaries/schema.js';
 import { initSessionRowsSchema } from './sessionRows/schema.js';
 import { initReplayMatchingSchema } from './replay/replayMatchingSchema.js';
 
+/** Durable identity/provenance survives manual deletion of a raw recording. */
+const LIVE_CAPTURE_INDEX_SCHEMA = `
+CREATE TABLE IF NOT EXISTS live_capture_index (
+  recording_id TEXT PRIMARY KEY,
+  filename TEXT NOT NULL,
+  manifest_json TEXT NOT NULL,
+  bytes INTEGER NOT NULL DEFAULT 0,
+  available INTEGER NOT NULL DEFAULT 1,
+  session_id TEXT,
+  game_version TEXT,
+  match_version INTEGER NOT NULL DEFAULT 0,
+  match_rule_version INTEGER NOT NULL DEFAULT 1,
+  match_status TEXT NOT NULL DEFAULT 'pending',
+  started_at INTEGER NOT NULL,
+  ended_at INTEGER,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_live_capture_session ON live_capture_index(session_id);
+CREATE INDEX IF NOT EXISTS idx_live_capture_interval ON live_capture_index(started_at, ended_at);
+`;
+
 export interface CacheStats {
   enabled: boolean;
   dbPath: string;
@@ -68,6 +89,7 @@ CREATE TABLE IF NOT EXISTS ai_reports (
 `;
 
 export function initDbSchema(db: DatabaseType): void {
+  db.exec(LIVE_CAPTURE_INDEX_SCHEMA);
   db.exec(`
     CREATE TABLE IF NOT EXISTS live_strategy_audit (
       run_id TEXT NOT NULL,

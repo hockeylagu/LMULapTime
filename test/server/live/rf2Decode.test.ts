@@ -37,7 +37,7 @@ describe('rF2 scoring decode', () => {
       trackName: 'Circuit de la Sarthe', sessionCode: 10, currentEt: 321.5, endEt: 3600, numVehicles: 2,
       playerClassPlace: 1,
       allDriversFinished: false,
-      inRealtime: true, gamePhase: 5, trackLength: 13_626, trackTempC: 31.5, raining: 0, avgPathWetness: 0,
+      inRealtime: true, gamePhase: 5, trackLength: 13_626, trackTempC: 31.5, raining: 0, avgPathWetness: 0, maxPathWetness: 0,
       player: expect.objectContaining({ id: 12, place: 4, totalLaps: 8, vehicleName: 'Ferrari 296 GT3', vehicleClass: 'GT3' }),
       leader: expect.objectContaining({ id: 7, place: 1, totalLaps: 9 }),
       classLeader: expect.objectContaining({ id: 12, place: 4, vehicleClass: 'GT3' }),

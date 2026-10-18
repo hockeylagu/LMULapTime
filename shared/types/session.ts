@@ -1,6 +1,7 @@
 import type { PaceCategory } from './reference.js';
 import type { LapTraffic } from './raceTraffic.js';
 import type { PitService } from './pitStops.js';
+import type { SessionLiveCapture } from './liveCapture.js';
 
 export type WeatherCondition = 'Dry' | 'Wet' | 'Dynamic Weather';
 
@@ -201,6 +202,8 @@ export interface SessionMetadata {
   };
   /** The session's main DuckDB telemetry file; absent without telemetry. */
   duckdbFilename?: string;
+  /** Supplemental app-owned source, independent of native telemetry and replay availability. */
+  liveCaptures?: SessionLiveCapture[];
 }
 
 /**

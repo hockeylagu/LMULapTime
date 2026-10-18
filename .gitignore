@@ -50,6 +50,7 @@ tools/analysis/cache/*
 test/fixtures/telemetry/*.jsonl
 test/fixtures/telemetry/*.duckdb
 server/lmu_cache.db*
+/server/live-captures/
 *.db
 *.db-wal
 *.db-shm

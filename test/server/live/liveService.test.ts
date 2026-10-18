@@ -50,6 +50,39 @@ describe('LiveService', () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 
+  it('recovers live frames after the game closes during replay playback', async () => {
+    const { worker, service, frame } = setup();
+    frame(reading());
+    worker.emit('message', { type: 'navigation', screen: 'replay', loadingProgress: null });
+    worker.emit('message', { type: 'closed' });
+    frame(reading({ currentEt: 20 }));
+    expect(service.isSessionLoaded()).toBe(true);
+    expect(service.getSnapshot().session?.elapsedSeconds).toBe(20);
+    await service.stop();
+  });
+
+  it('reports process presence independently of telemetry, falling back when detection is unavailable', () => {
+    const { worker, service, frame } = setup();
+    const running: boolean[] = [];
+    service.events.on('game-running', value => running.push(value));
+    worker.emit('message', { type: 'process', running: true });
+    expect(service.isGameRunning()).toBe(true);
+    expect(service.getSnapshot().lifecycle).toBe('offline');
+    worker.emit('message', { type: 'closed' });
+    expect(service.isGameRunning()).toBe(true);
+    frame(reading());
+    worker.emit('message', { type: 'process', running: false });
+    worker.emit('message', { type: 'closed' });
+    expect(service.isGameRunning()).toBe(false);
+    worker.emit('message', { type: 'process', running: null });
+    frame(reading());
+    expect(service.isGameRunning()).toBe(true);
+    expect(running).toEqual([true, false, true]);
+    service.stop();
+    worker.emit('message', { type: 'process', running: false });
+    expect(running).toEqual([true, false, true]);
+  });
+
   it('captures history and reads the game only while a dashboard is open', async () => {
     const get = vi.fn(() => Promise.resolve<RestAnswer>({ ok: false, reason: 'error' }));
     const saveAuditRecord = vi.fn();
