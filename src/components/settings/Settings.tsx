@@ -8,6 +8,7 @@ import { OverviewCard } from './OverviewCard.js';
 import { ReferenceLaptimesCard } from './ReferenceLaptimesCard.js';
 import { FolderPathsCard } from './FolderPathsCard.js';
 import { LiveDashboardCard } from './LiveDashboardCard.js';
+import { LiveLearningPanel } from './learning/LiveLearningPanel.js';
 import { AISettingsCard } from './AISettingsCard.js';
 import { ReplayCacheCard } from './ReplayCacheCard.js';
 import { AiReportsHistoryCard } from './AiReportsHistoryCard.js';
@@ -106,6 +107,8 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
         return <ReplayCacheCard replay={replay} replayScanStatus={replayScanStatus} />;
       case 'live-dashboard':
         return <LiveDashboardCard />;
+      case 'learning':
+        return <LiveLearningPanel />;
       case 'ai-settings':
         return <AISettingsCard ai={ai} />;
       case 'ai-history':

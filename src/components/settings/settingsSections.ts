@@ -1,4 +1,4 @@
-import { LucideIcon, LayoutDashboard, Film, BrainCircuit, History, Database, HardDrive, Radio } from 'lucide-react';
+import { LucideIcon, LayoutDashboard, Film, BrainCircuit, History, Database, HardDrive, Radio, ChartNoAxesCombined } from 'lucide-react';
 import { AppStatus } from '../../../shared/types/index.js';
 
 export interface SettingsSectionDef {
@@ -29,8 +29,15 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     id: 'live-dashboard',
     title: 'Live Dashboard',
     icon: Radio,
-    description: 'Live dashboard options, learning evidence readiness and an offline demo',
-    keywords: ['live', 'dashboard', 'learning', 'evidence', 'prediction', 'fuel', 'energy', 'pedal', 'trace', 'history', 'duration', 'reserve', 'demo', 'offline', 'preview', 'scenarios', 'cockpit', 'auto open', 'open', 'start', 'launch', 'window', 'fullscreen', 'game', 'shared memory'],
+    description: 'Live dashboard options and an offline demo with sample scenarios',
+    keywords: ['live', 'dashboard', 'pedal', 'trace', 'history', 'duration', 'reserve', 'demo', 'offline', 'preview', 'scenarios', 'cockpit', 'auto open', 'open', 'start', 'launch', 'window', 'fullscreen', 'game', 'shared memory'],
+  },
+  {
+    id: 'learning',
+    title: 'Learning',
+    icon: ChartNoAxesCombined,
+    description: 'Recorded fuel and virtual energy evidence, exclusions and offline prediction readiness',
+    keywords: ['learning', 'evidence', 'prediction', 'fuel', 'energy', 'consumption', 'calibration', 'measurements', 'exclusions', 'readiness'],
   },
   {
     id: 'ai-settings',

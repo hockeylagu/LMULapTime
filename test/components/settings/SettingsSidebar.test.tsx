@@ -55,7 +55,7 @@ describe('SettingsSidebar component', () => {
       />
     );
 
-    expect(screen.getByText(/2 of 7 sections match/i)).toBeInTheDocument();
+    expect(screen.getByText(/2 of 8 sections match/i)).toBeInTheDocument();
 
     const clearBtn = screen.getByRole('button', { name: /clear search/i });
     fireEvent.click(clearBtn);

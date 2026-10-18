@@ -3,6 +3,7 @@ import type { LiveLearningReadiness } from '../../../../shared/types/liveLearnin
 import { apiErrorMessage, fetchJson, isAbortError } from '../../../api/apiClient.js';
 import { FOCUS_RING, SECONDARY_BUTTON } from '../../common/buttonStyles.js';
 import { exclusionSummary, LEARNING_GATE_LABELS } from './readinessCopy.js';
+import { SettingsPanel } from '../SettingsPanel.js';
 
 /** Manual, off-track evidence review; opening Settings never starts evaluation or polling. */
 export const LiveLearningPanel: React.FC = () => {
@@ -28,13 +29,11 @@ export const LiveLearningPanel: React.FC = () => {
   const failed = data?.sources.find(source => source.state === 'failed')?.count ?? 0;
   const stale = data?.sources.find(source => source.state === 'stale')?.count ?? 0;
 
-  return <section aria-labelledby="live-learning-heading" className="border-t border-lmu-border pt-4 space-y-3">
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <h4 id="live-learning-heading" className="text-sm font-semibold text-lmu-text">Learning evidence</h4>
-      <button type="button" className={SECONDARY_BUTTON} disabled={loading} onClick={() => void check()}>
+  return <SettingsPanel sectionId="learning" aside={
+    <button type="button" className={SECONDARY_BUTTON} disabled={loading} onClick={() => void check()}>
         {loading ? 'Checking evidence…' : report || error ? 'Check again' : 'Check evidence'}
-      </button>
-    </div>
+    </button>
+  }>
     <p className="text-xs leading-relaxed text-lmu-muted max-w-prose">
       Review recorded fuel and virtual energy measurements and offline prediction checks. Live corrections are disabled.
     </p>
@@ -82,7 +81,7 @@ export const LiveLearningPanel: React.FC = () => {
         </table>
       </div>
       {exclusions.length > 0 && <div className="space-y-1">
-        <h5 className="text-xs font-semibold text-lmu-text">Excluded evidence: <span className="font-mono">{data.dataset.excluded}</span> measurements</h5>
+        <h4 className="text-xs font-semibold text-lmu-text">Excluded evidence: <span className="font-mono">{data.dataset.excluded}</span> measurements</h4>
         <ul className="text-xs text-lmu-muted space-y-1">{exclusions.slice(0, 6).map(reason =>
           <li key={reason.label} className="flex justify-between gap-4"><span>{reason.label}</span><span className="font-mono">{reason.count}</span></li>)}</ul>
         <p className="text-xs text-lmu-muted">Reason counts can overlap.{exclusions.length > 6 && ' Showing the six most common reasons.'}</p>
@@ -96,7 +95,7 @@ export const LiveLearningPanel: React.FC = () => {
             <span className="font-mono">{data.minimumEvidence.testExamples}</span> measurements.</p>
           <p>Groups keep layout, car, driver, game patch, weather, tyres and predictor version/source separate. Passing offline checks does not enable live corrections.</p>
           {data.resources.filter(resource => Object.keys(resource.gates).length > 0).map(resource => <div key={resource.kind}>
-            <h5 className="font-semibold text-lmu-text-soft">{resource.kind === 'fuel' ? 'Fuel' : 'Virtual energy'}: checks still unmet</h5>
+            <h4 className="font-semibold text-lmu-text-soft">{resource.kind === 'fuel' ? 'Fuel' : 'Virtual energy'}: checks still unmet</h4>
             <ul className="mt-1 space-y-1">{Object.entries(resource.gates).map(([gate, count]) => <li key={gate}>
               {LEARNING_GATE_LABELS[gate] ?? 'Other offline checks'} · <span className="font-mono">{count}</span> matching group{count === 1 ? '' : 's'}
             </li>)}</ul>
@@ -105,5 +104,5 @@ export const LiveLearningPanel: React.FC = () => {
       </details>
       <p className="text-xs text-lmu-muted">Checked {new Date(data.generatedAt).toLocaleString()}. Check again after new recordings are processed.</p>
     </>}
-  </section>;
+  </SettingsPanel>;
 };

@@ -6,7 +6,6 @@ import { fetchLiveSettings, saveLiveSettings } from '../../api/liveStream.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import { Select } from '../common/dropdown/Select.js';
 import { FeedbackMessage, SettingsPanel, type SettingsFeedback } from './SettingsPanel.js';
-import { LiveLearningPanel } from './learning/LiveLearningPanel.js';
 
 /** VE or fuel kept at the pit entry or the finish (the server accepts these values only). */
 const RESERVE_OPTIONS = RESERVE_LAP_CHOICES.map(laps => ({
@@ -94,7 +93,6 @@ export const LiveDashboardCard: React.FC = () => {
         </>
       )}
       <FeedbackMessage feedback={message} />
-      <LiveLearningPanel />
     </SettingsPanel>
   );
 };

@@ -325,7 +325,7 @@ describe('Settings component', () => {
     fireEvent.change(searchInput, { target: { value: 'gemini' } });
 
     await waitFor(() => {
-      expect(screen.getByText('2 of 7 sections match')).toBeInTheDocument();
+      expect(screen.getByText('2 of 8 sections match')).toBeInTheDocument();
       expect(screen.getByRole('heading', { name: 'AI Lap Reports' })).toBeInTheDocument();
       expect(screen.getByRole('heading', { name: 'AI Report History' })).toBeInTheDocument();
       
@@ -340,6 +340,18 @@ describe('Settings component', () => {
       expect(screen.getByRole('heading', { name: 'Overview' })).toBeInTheDocument();
     });
     await settled();
+  });
+
+  it('finds Learning as its own section without starting an evidence check', async () => {
+    render(<Settings status={mockStatus} onUpdatePaths={vi.fn()} />);
+    await settled();
+    expect(screen.getByRole('heading', { name: 'Learning', level: 3 })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole('textbox', { name: /search settings/i }), { target: { value: 'evidence' } });
+    expect(screen.getByText('1 of 8 sections match')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Learning', level: 3 })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Live Dashboard' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Check evidence' })).toBeInTheDocument();
+    expect(vi.mocked(global.fetch).mock.calls.some(([url]) => url === '/api/live/learning')).toBe(false);
   });
 
   it('shows empty state when no settings match and clears via empty state button', async () => {

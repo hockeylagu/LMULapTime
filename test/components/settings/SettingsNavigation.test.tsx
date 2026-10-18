@@ -72,6 +72,7 @@ describe('Settings navigation', () => {
       'Overview',
       'Reference Benchmarks',
       'Live Dashboard',
+      'Learning',
       'AI Lap Reports',
       'AI Report History',
       'Cached Replays',
