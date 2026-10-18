@@ -5,6 +5,10 @@ import { getLearningSource, readCurrentLearningExamples } from '../../../../serv
 import { evaluateLiveLearning } from '../../../../server/live/learning/report.js';
 import { learningReadiness } from '../../../../server/live/learning/readiness.js';
 import { refreshLiveLearning } from '../../../../server/live/learning/service.js';
+import { AutomaticLearningRuntime } from '../../../../server/live/learning/runtime.js';
+import { readLearningModels } from '../../../../server/core/live/dbLearningModelStore.js';
+import { learningCohort } from '../../../../shared/domain/learning/cohort.js';
+import type { AutomaticLearningState } from '../../../../shared/domain/learning/automatic.js';
 import type { LiveCaptureManifest } from '../../../../shared/types/liveCapture.js';
 import type { StoredLearningEvent } from '../../../../shared/types/liveLearning.js';
 
@@ -76,6 +80,50 @@ function events(): StoredLearningEvent[] {
   }
   return result;
 }
+
+describe('automatic correction runtime', () => {
+  const identity = { layoutKey: 'monza_gp', vehicleModel: 'Ferrari 296 GT3', driverName: 'Player One',
+    condition: 'dry', compound: 'Medium', modelVersion: 3, predictionSource: 'measured' as const };
+  const state: AutomaticLearningState = { version: 1, models: [{ cohort: learningCohort({ ...identity, gameVersion: 'Build-42' })!,
+    resourceKind: 'fuel', adjustment: 1, screenedThrough: 1, createdAt: 1, supportSessions: [], supportSignature: '',
+    state: 'active', validationExamples: 20, validationSessions: 2 }] };
+
+  it('uses only a verified patch from this continuous run, exact identity and bounded corrections; restart clears trust', async () => {
+    const { db, capture } = verifiedDatabase();
+    const runtime = new AutomaticLearningRuntime();
+    runtime.gameRunning(true, capture.startedAt - 1);
+    expect(runtime.correct('fuel', 2, identity)).toBeNull();
+    await runtime.refresh(db.getDb(), () => false, async () => state);
+    expect(runtime.correct('fuel', 2, identity)).toEqual({ perLap: 2.2, adjustment: 2.2 - 2 });
+    expect(runtime.correct('ve', 2, identity)).toBeNull();
+    expect(runtime.correct('fuel', 2, { ...identity, compound: 'Soft' })).toBeNull();
+    expect(runtime.correct('fuel', 2, { ...identity, layoutKey: null })).toBeNull();
+    expect(readLearningModels(db.getDb())).toEqual(state);
+    runtime.gameRunning(false); runtime.gameRunning(true, capture.startedAt + 1);
+    await runtime.refresh(db.getDb(), () => false, async () => state);
+    expect(runtime.correct('fuel', 2, identity)).toBeNull();
+    setLiveCaptureMatch(db.getDb(), capture.recordingId, null, null, 'pending');
+    await runtime.refresh(db.getDb(), () => false, async () => state);
+    expect(runtime.correct('fuel', 2, identity)).toBeNull();
+  });
+
+  it('discards a stale worker snapshot, cancels for loaded sessions and honors the disable switch', async () => {
+    const { db, capture } = verifiedDatabase();
+    const runtime = new AutomaticLearningRuntime(); runtime.gameRunning(true, capture.startedAt - 1);
+    await runtime.refresh(db.getDb(), () => false, async () => { db.setMetadata('changed', '1'); return state; });
+    expect(readLearningModels(db.getDb()).models).toHaveLength(0);
+    await runtime.refresh(db.getDb(), () => false, async (_filename, signal) => {
+      runtime.cancel(); expect(signal.aborted).toBe(true); return state;
+    });
+    expect(readLearningModels(db.getDb()).models).toHaveLength(0);
+    let called = false;
+    await runtime.refresh(db.getDb(), () => true, async () => { called = true; return state; });
+    const disabled = new AutomaticLearningRuntime(false); disabled.gameRunning(true, capture.startedAt - 1);
+    await disabled.refresh(db.getDb(), () => false, async () => { called = true; return state; });
+    expect(called).toBe(false);
+    expect(disabled.correct('fuel', 2, identity)).toBeNull();
+  });
+});
 
 describe('refreshLiveLearning', () => {
   it('builds eligible compact examples without reading a loaded session and skips an unchanged projection', async () => {
@@ -169,7 +217,7 @@ describe('refreshLiveLearning', () => {
     setLiveCaptureAvailability(db.getDb(), capture.recordingId, false);
     const before = db.getDb().prepare('SELECT total_changes() AS count').get();
     const report = evaluateLiveLearning(db.getDb());
-    expect(report.reportVersion).toBe(2);
+    expect(report.reportVersion).toBe(3);
     expect(report.historicalCorrectionsEnabled).toBe(false);
     expect(report.dataset.eligible).toBe(2);
     expect(report.calibration.activationEnabled).toBe(false);

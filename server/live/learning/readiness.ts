@@ -7,7 +7,8 @@ export function learningReadiness(db: Database): LiveLearningReadinessReport {
   const report = evaluateLiveLearning(db);
   const policy = report.calibration.policy;
   return {
-    state: 'evaluated', generatedAt: report.generatedAt, historicalCorrectionsEnabled: false,
+    state: 'evaluated', generatedAt: report.generatedAt, historicalCorrectionsEnabled: report.historicalCorrectionsEnabled,
+    automaticLearning: report.automaticLearning,
     captures: report.captures, processing: report.processing, dataset: report.dataset,
     sessions: { training: report.evaluation.trainSessionIds.length, heldOut: report.evaluation.testSessionIds.length },
     sources: report.sources,

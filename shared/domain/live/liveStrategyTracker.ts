@@ -69,6 +69,8 @@ const median = (values: readonly number[]): number | null => {
  * no use or lap time crosses layouts (AGENTS.md section 3A). Deterministic: no clock of its own.
  */
 export class LiveStrategyTracker {
+  public constructor(private readonly correct?: (kind: LiveResourceKind, predicted: number,
+    source: 'measured' | 'game', condition: 'dry' | 'wet', compound: string) => { perLap: number; adjustment: number } | null) {}
   /** Raw clean-lap measurements; separate from the rolling estimate used by the planner. */
   public observations(): LiveUsageObservation {
     return { fuel: this.meters.fuel.latestUse, ve: this.meters.ve.latestUse,
@@ -76,7 +78,8 @@ export class LiveStrategyTracker {
   }
   /** Freeze both resources using the same estimator as the live planner, including game fallback. */
   public learningForecasts(): Record<LiveResourceKind, Pick<LiveResourcePlan, 'perLap' | 'perLapSource' | 'lapsMeasured'>> {
-    return { fuel: this.perLap('fuel'), ve: this.perLap('ve') };
+    // Always freeze the uncorrected baseline: learning must never recursively fit its own adjustment.
+    return { fuel: this.basePerLap('fuel'), ve: this.basePerLap('ve') };
   }
   private eventKey: string | null = null;
   private eventLayout: string | null = null;
@@ -298,12 +301,20 @@ export class LiveStrategyTracker {
       : this.usage?.fuelPerLap ?? this.eventEstimate?.fuelPerLap ?? null;
   }
 
-  private perLap(kind: LiveResourceKind): Pick<LiveResourcePlan, 'perLap' | 'perLapSource' | 'lapsMeasured'> {
+  private basePerLap(kind: LiveResourceKind): Pick<LiveResourcePlan, 'perLap' | 'perLapSource' | 'lapsMeasured'> {
     const meter = this.meters[kind];
     const measured = meter.perLap();
     if (measured !== null) return { perLap: round(measured, 2), perLapSource: 'measured', lapsMeasured: meter.laps.length };
     const game = this.gameEstimate(kind);
     return { perLap: game !== null && game > 0 ? round(game, 2) : null, perLapSource: game !== null && game > 0 ? 'game' : null, lapsMeasured: 0 };
+  }
+
+  private perLap(kind: LiveResourceKind): Pick<LiveResourcePlan, 'perLap' | 'perLapSource' | 'lapsMeasured' | 'learning'> {
+    const base = this.basePerLap(kind);
+    const correction = base.perLap !== null && base.perLapSource !== null && this.wet !== null && this.eventCompound
+      ? this.correct?.(kind, base.perLap, base.perLapSource, this.wet ? 'wet' : 'dry', this.eventCompound) : null;
+    return correction && Number.isFinite(correction.perLap) && correction.perLap > 0
+      ? { ...base, perLap: correction.perLap, learning: { baselinePerLap: base.perLap!, adjustment: correction.adjustment } } : base;
   }
 
   private resource(kind: LiveResourceKind, reading: LiveScoringReading, state: LiveState, context: LiveStrategyContext): LiveResourcePlan {
@@ -393,7 +404,7 @@ export class LiveStrategyTracker {
       capacity: resource.capacity,
       setInGarage: kind === 've' ? this.garage?.veStart ?? null : this.garage?.fuelStart ?? null,
     });
-    return { ...plan, tyres: this.garageTyres(), tyreCoverage: null };
+    return { ...plan, ...(resource.learning ? { learning: resource.learning } : {}), tyres: this.garageTyres(), tyreCoverage: null };
   }
 
   private garageTyres(): LiveGarageTyres | null {

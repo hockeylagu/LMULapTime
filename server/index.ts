@@ -27,6 +27,7 @@ import { getLiveCaptureIndexRows, listLiveCaptureManifests, upsertLiveCapture } 
 import { reconcileLiveCaptures } from './live/capture/reconcile.js';
 import { createLiveEvidenceRouter } from './routes/liveEvidenceRoutes.js';
 import { refreshLiveLearning } from './live/learning/service.js';
+import { AutomaticLearningRuntime } from './live/learning/runtime.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -82,6 +83,7 @@ const startReferenceLaptimeRefresh = (): void => {
 };
 
 const captureDirectory = path.resolve(process.env.LMU_LIVE_CAPTURE_DIR || path.join('server', 'live-captures'));
+const automaticLearning = new AutomaticLearningRuntime(process.env.LMU_LIVE_LEARNING !== '0');
 const liveCapture = new LiveCaptureController({
   directory: captureDirectory,
   diagnostics: process.env.LMU_LIVE_DIAGNOSTICS === '0' ? undefined : new LiveDiagnostics(captureDirectory),
@@ -109,6 +111,7 @@ async function refreshLiveCaptureLinks(discover = false): Promise<void> {
     if (result.changed) sessionDb.markSessionDataChanged();
     if (!liveCapture.hasOpenRecordingHandle) {
       await refreshLiveLearning(sessionDb.getDb(), captureDirectory, () => liveService.isSessionLoaded());
+      await automaticLearning.refresh(sessionDb.getDb(), () => liveService.isSessionLoaded() || liveCapture.hasOpenRecordingHandle);
     }
     if (liveService.isSessionLoaded()) return;
     liveCapture.synchronizeLinks(getLiveCaptureIndexRows(sessionDb.getDb())
@@ -120,12 +123,15 @@ async function refreshLiveCaptureLinks(discover = false): Promise<void> {
 }
 
 const liveService = new LiveService({
+  learning: automaticLearning,
   capture: liveCapture,
   reserveLaps: loadLiveSettings(sessionDb).reserveLaps,
   personalBest: (layoutKey, carClass) =>
     queryLivePersonalBest(sessionDb.getDb(), serverContext.currentParser.configuredPlayerName, layoutKey, carClass),
 });
 liveService.events.on('session-loaded', loaded => serverContext.setLiveSessionLoaded(loaded));
+liveService.events.on('session-loaded', loaded => { if (loaded) automaticLearning.cancel(); });
+liveService.events.on('game-running', running => automaticLearning.gameRunning(running));
 
 if (process.env.NODE_ENV === 'test') {
   serverContext.runInitialSessionSyncInBackground();

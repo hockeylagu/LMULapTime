@@ -3,9 +3,11 @@ import { evaluateLearningCalibration } from '../../../shared/domain/learning/cal
 import { getLiveCaptureIndexRows } from '../../core/live/dbLiveCaptureStore.js';
 import { getLearningSource, readCurrentLearningExamples } from '../../core/live/dbLiveLearningStore.js';
 import { learningProjectionInputs } from './inputs.js';
+import { learningCohort } from '../../../shared/domain/learning/cohort.js';
+import { readLearningModels } from '../../core/live/dbLearningModelStore.js';
 
 /** Read-only evaluation rechecks canonical ownership/classification; raw recordings need not still exist. */
-export function evaluateLiveLearning(db: Database, holdoutFraction = 0.25) {
+export function evaluateLiveLearning(db: Database, holdoutFraction = 0.25, includeExamples = false) {
   const captures = getLiveCaptureIndexRows(db);
   const current = new Set(captures.filter(entry => {
     const source = getLearningSource(db, entry.manifest.recordingId);
@@ -18,13 +20,19 @@ export function evaluateLiveLearning(db: Database, holdoutFraction = 0.25) {
     for (const reason of reasons) exclusions[reason] = (exclusions[reason] ?? 0) + 1;
     return reasons.length === 0;
   });
-  const { baseline: evaluation, calibration } = evaluateLearningCalibration(eligible.map(example => ({ sessionId: example.sessionId,
+  const evaluationExamples = eligible.map(example => ({ sessionId: example.sessionId,
     startedAt: example.startedAt, resourceKind: example.kind, predicted: example.predicted!, actual: example.actual,
-    cohort: JSON.stringify([example.layoutKey, example.vehicleModel, example.driverName, example.gameVersion,
-      example.condition, example.compound, example.modelVersion, example.predictionSource]),
-  })), holdoutFraction);
+    cohort: learningCohort(example) ?? '',
+  }));
+  const { baseline: evaluation, calibration } = evaluateLearningCalibration(evaluationExamples, holdoutFraction);
+  const models = readLearningModels(db).models;
+  const automaticLearning = { enabled: process.env.LMU_LIVE_LEARNING !== '0',
+    active: models.filter(model => model.state === 'active').length,
+    validating: models.filter(model => model.state === 'validating').length };
   return {
-    reportVersion: 2, generatedAt: new Date().toISOString(), historicalCorrectionsEnabled: false,
+    reportVersion: 3, generatedAt: new Date().toISOString(),
+    historicalCorrectionsEnabled: automaticLearning.enabled && automaticLearning.active > 0,
+    automaticLearning,
     state: eligible.length === 0 ? 'awaiting-eligible-evidence' : evaluation.testCount === 0 ? 'insufficient-sessions' : 'baseline-evaluated',
     errorConvention: 'predicted-minus-actual; negative means underprediction',
     units: { fuel: 'litres per lap', ve: 'percentage points per lap' },
@@ -38,5 +46,6 @@ export function evaluateLiveLearning(db: Database, holdoutFraction = 0.25) {
       WHERE state='failed' ORDER BY updated_at DESC LIMIT 20`).all(),
     evaluation,
     calibration,
+    evaluationExamples: includeExamples ? evaluationExamples : undefined,
   };
 }

@@ -23,6 +23,8 @@ export interface LiveResourcePlan {
   /** Use per lap: the mean of the last three representative laps, or the game's estimate before the first. */
   perLap: number | null;
   perLapSource: LivePerLapSource | null;
+  /** Historical calibration applied to the baseline; absent when ordinary estimation is used. */
+  learning?: { baselinePerLap: number; adjustment: number };
   /** Representative laps measured in this event (all sessions on this layout and car). */
   lapsMeasured: number;
   /** Reserve kept at the pit entry or the finish, in laps. */
@@ -139,6 +141,7 @@ export interface LiveForecast {
 
 /** In the garage: what to load for this session. */
 export interface LiveGaragePlan {
+  learning?: LiveResourcePlan['learning'];
   tyreCoverage?: LiveTyreCoverage | null;
   kind: LiveResourceKind;
   unit: '%' | 'L';

@@ -4,7 +4,9 @@ import type { LiveScoringReading } from './liveLifecycle.js';
 import { RAIN_WET_MIN } from '../lapConditions.js';
 
 /** Bump when the forecasting formulas change; history keeps the version that produced each estimate. */
-export const LIVE_MODEL_VERSION = 3;
+export const LIVE_MODEL_VERSION = 4;
+/** Uncorrected estimator recorded for training and used as the exact calibration compatibility version. */
+export const LIVE_BASELINE_MODEL_VERSION = 3;
 const SAMPLE_SECONDS = 10;
 interface Baseline { snapshot: LiveSnapshot; regime: string; et: number }
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;

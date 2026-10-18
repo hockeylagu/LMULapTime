@@ -1,5 +1,5 @@
 import { Worker } from 'node:worker_threads';
-import { LIVE_MODEL_VERSION } from '../../shared/domain/live/liveAudit.js';
+import { LIVE_BASELINE_MODEL_VERSION, LIVE_MODEL_VERSION } from '../../shared/domain/live/liveAudit.js';
 import { deriveLiveState, isLiveOnTrack, isLiveSessionLoaded } from '../../shared/domain/live/liveLifecycle.js';
 import type { LiveGameScreen, LiveScoringReading, LiveVehicleReading } from '../../shared/domain/live/liveLifecycle.js';
 import type { LiveCarReading } from '../../shared/domain/live/liveCarCondition.js';
@@ -23,6 +23,8 @@ import { writeSseEvent } from './sse.js';
 import type { SseSink } from './sse.js';
 import type { LiveCaptureController } from './capture/controller.js';
 import { LiveLearningCapture } from '../../shared/domain/learning/capture.js';
+import type { AutomaticLearningRuntime } from './learning/runtime.js';
+import { mapVehicleIdToModel } from '../../shared/domain/vehicleMapping.js';
 
 /** How often buffered pedal samples go out to the pages (about 25 batches a second). */
 export const PEDAL_FLUSH_MS = 40;
@@ -40,6 +42,7 @@ interface LiveClient {
 }
 
 export interface LiveServiceOptions {
+  learning?: AutomaticLearningRuntime;
   /** Durable capture also keeps safe REST polling alive without dashboard subscribers. */
   capture?: LiveCaptureController;
   /** Replaces the shared memory worker (tests). */
@@ -81,7 +84,15 @@ export class LiveService {
   private pendingTiming: LiveTiming | null = null;
   private lastTimingAt = 0;
   private tyreSurfaceAvgC: number | null = null;
-  private readonly strategy = new LiveStrategyTracker();
+  private readonly strategy = new LiveStrategyTracker((kind, predicted, source, condition, compound) => {
+    const player = this.lastReading?.player;
+    if (!player) return null;
+    const model = mapVehicleIdToModel(player.vehicleName);
+    return this.options.learning?.correct(kind, predicted, {
+      layoutKey: this.identity.identity?.layoutKey ?? null, vehicleModel: model === 'Unknown Vehicle' ? null : model,
+      driverName: player.driverName ?? '', condition, compound, modelVersion: LIVE_BASELINE_MODEL_VERSION, predictionSource: source,
+    }) ?? null;
+  });
   private readonly results = new LiveResultTracker();
   private lastDiagnosticStrategyAt = -Infinity;
   private readonly learning = new LiveLearningCapture();

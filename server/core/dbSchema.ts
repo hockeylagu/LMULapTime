@@ -338,6 +338,11 @@ export function initDbSchema(db: DatabaseType): void {
       error TEXT,
       updated_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS live_learning_models (
+      id INTEGER PRIMARY KEY CHECK(id=1),
+      state_json TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS live_learning_examples (
       session_id TEXT NOT NULL,
       driver_ordinal INTEGER NOT NULL,

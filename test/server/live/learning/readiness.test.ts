@@ -4,6 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { afterEach, describe, expect, it } from 'vitest';
 import { SessionDatabase } from '../../../../server/core/db.js';
 import { LearningReadinessReader } from '../../../../server/live/learning/readinessReader.js';
+import { readAutomaticLearning } from '../../../../server/live/learning/automaticReader.js';
 
 const folders: string[] = [];
 const databases: SessionDatabase[] = [];
@@ -23,6 +24,16 @@ async function fixture() {
 }
 
 describe('read-only learning readiness worker', () => {
+  it('evaluates automatic candidates in a saved read-only snapshot and cancels worker work', async () => {
+    const { filename, db } = await fixture();
+    const before = db.getDb().prepare('SELECT total_changes() AS count').get();
+    expect(await readAutomaticLearning(filename, new AbortController().signal)).toEqual({ version: 1, models: [] });
+    expect(db.getDb().prepare('SELECT total_changes() AS count').get()).toEqual(before);
+    const abort = new AbortController();
+    const pending = readAutomaticLearning(filename, abort.signal); abort.abort();
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    await expect(readAutomaticLearning(filename, abort.signal)).rejects.toMatchObject({ name: 'AbortError' });
+  });
   it('reports the compact empty state without writes or raw-file access and bounds concurrent evaluation', async () => {
     const { filename, db } = await fixture();
     const before = db.getDb().prepare('SELECT total_changes() AS count').get();

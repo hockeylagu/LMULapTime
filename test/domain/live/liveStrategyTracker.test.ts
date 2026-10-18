@@ -37,6 +37,21 @@ function drive(tracker: LiveStrategyTracker, from: number, to: number, layoutKey
 }
 
 describe('LiveStrategyTracker', () => {
+  it('uses learned consumption for advice but freezes the original baseline and preserves raw measurements', () => {
+    const tracker = new LiveStrategyTracker((_kind, predicted) => ({ perLap: predicted + 0.2, adjustment: 0.2 }));
+    tracker.applyRest({ type: 'tireManagement', vePerLap: 3, fuelPerLap: 2, newSets: 2,
+      selected: { compound: 'Medium', used: false, wear: 1 } });
+    const strategy = context(tracker, at(0));
+    expect(strategy?.resource).toMatchObject({ perLap: 3.2, perLapSource: 'game', learning: { baselinePerLap: 3, adjustment: 0.2 } });
+    expect(tracker.learningForecasts().ve).toMatchObject({ perLap: 3, perLapSource: 'game' });
+    expect(tracker.observations().ve).toBeNull();
+    const garage = context(tracker, at(1, { inRealtime: false }));
+    expect(garage?.garage).toMatchObject({ perLap: 3.2, learning: { baselinePerLap: 3, adjustment: 0.2 } });
+    const fallback = new LiveStrategyTracker(() => null);
+    fallback.applyRest({ type: 'tireManagement', vePerLap: 3, fuelPerLap: 2, newSets: 2,
+      selected: { compound: 'Medium', used: false, wear: 1 } });
+    expect(context(fallback, at(0))?.resource?.perLap).toBe(3);
+  });
   it('pairs fuel and VE on the same clean crossings, carries ratios into the garage, and resets on wet conditions', () => {
     const tracker = new LiveStrategyTracker();
     const car = (et: number) => ({ fuelLiters: 80 - et * 0.024, fuelCapacityLiters: 117,

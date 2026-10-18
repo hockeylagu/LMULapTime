@@ -57,7 +57,8 @@ export interface LiveLearningExample {
 export interface LiveLearningReadinessReport {
   state: 'evaluated';
   generatedAt: string;
-  historicalCorrectionsEnabled: false;
+  historicalCorrectionsEnabled: boolean;
+  automaticLearning: { enabled: boolean; active: number; validating: number };
   captures: { indexed: number; verified: number; unavailable: number };
   processing: { current: number; pending: number };
   dataset: { currentExamples: number; eligible: number; excluded: number; exclusions: Record<string, number> };

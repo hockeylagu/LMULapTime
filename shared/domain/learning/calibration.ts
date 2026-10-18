@@ -3,7 +3,7 @@ import {
   type EvaluationExample, type EvaluationMetrics,
 } from './evaluate.js';
 
-/** Research policy, versioned independently of the live predictor. Never activates a model. */
+/** Versioned policy shared by screening and prospective acceptance; screening alone never activates. */
 export const CALIBRATION_POLICY = Object.freeze({
   version: 1,
   minTrainSessions: 3,
@@ -46,9 +46,21 @@ function median(values: number[]): number {
   return sorted.length % 2 ? sorted[middle] : sorted[middle - 1] / 2 + sorted[middle] / 2;
 }
 
-function calibrationMetrics(examples: EvaluationExample[]): CalibrationMetrics {
+export function calibrationMetrics(examples: EvaluationExample[]): CalibrationMetrics {
   return { ...evaluationMetrics(examples), meanUnderprediction: examples.reduce((sum, example) =>
     sum + Math.max(0, example.actual - example.predicted), 0) / examples.length };
+}
+
+/** Shared screening, fresh-session acceptance and ongoing withdrawal criteria. */
+export function calibrationErrorGates(baseline: CalibrationMetrics, candidate: CalibrationMetrics): CalibrationGate[] {
+  const gates: CalibrationGate[] = [];
+  const tolerance = Math.max(baseline.mae, candidate.mae, Number.MIN_VALUE) * 1e-9;
+  if (baseline.mae <= 0 || baseline.mae - candidate.mae + tolerance
+    < baseline.mae * CALIBRATION_POLICY.minMaeImprovementFraction) gates.push('mae-not-improved');
+  if (candidate.p95AbsoluteError > baseline.p95AbsoluteError + tolerance) gates.push('p95-regressed');
+  if (candidate.underpredictionCount > baseline.underpredictionCount) gates.push('underprediction-count-regressed');
+  if (candidate.meanUnderprediction > baseline.meanUnderprediction + tolerance) gates.push('underprediction-amount-regressed');
+  return gates;
 }
 
 function evaluateCohort(cohort: string, resourceKind: EvaluationExample['resourceKind'],
@@ -90,12 +102,7 @@ function evaluateCohort(cohort: string, resourceKind: EvaluationExample['resourc
   result.maeImprovementFraction = baseline.mae > 0 ? (baseline.mae - candidate.mae) / baseline.mae : null;
   if (gates.length) return result;
   // Relative numerical tolerance only; fuel and VE stay in their own units and cohorts.
-  const tolerance = Math.max(baseline.mae, candidate.mae, Number.MIN_VALUE) * 1e-9;
-  if (baseline.mae <= 0 || baseline.mae - candidate.mae + tolerance
-    < baseline.mae * CALIBRATION_POLICY.minMaeImprovementFraction) gates.push('mae-not-improved');
-  if (candidate.p95AbsoluteError > baseline.p95AbsoluteError + tolerance) gates.push('p95-regressed');
-  if (candidate.underpredictionCount > baseline.underpredictionCount) gates.push('underprediction-count-regressed');
-  if (candidate.meanUnderprediction > baseline.meanUnderprediction + tolerance) gates.push('underprediction-amount-regressed');
+  gates.push(...calibrationErrorGates(baseline, candidate));
   result.state = gates.length ? 'rejected' : 'passes-offline-gates';
   return result;
 }

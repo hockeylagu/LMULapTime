@@ -1,4 +1,4 @@
-import { LIVE_MODEL_VERSION } from '../live/liveAudit.js';
+import { LIVE_BASELINE_MODEL_VERSION } from '../live/liveAudit.js';
 import { RAIN_WET_MIN } from '../lapConditions.js';
 import type { LiveScoringReading } from '../live/liveLifecycle.js';
 import type { LiveSnapshot } from '../../types/live.js';
@@ -65,7 +65,7 @@ export class LiveLearningCapture {
         events.push({ kind: 'learning-forecast', data: { version: LIVE_LEARNING_VERSION,
           lapNumber: lap, lapStartSeconds: player.lapStartEt, forecastSeconds: reading.currentEt, kind,
           predicted: predictions[kind].perLap, predictionSource: predictions[kind].perLapSource,
-          modelVersion: LIVE_MODEL_VERSION, condition, compound } });
+          modelVersion: LIVE_BASELINE_MODEL_VERSION, condition, compound } });
       }
       const use = observations[kind];
       const outcomeKey = use ? `${use.lap}:${kind}` : '';
