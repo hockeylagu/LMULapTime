@@ -14,7 +14,6 @@ describe('LiveDashboardCard', () => {
     render(<LiveDashboardCard />);
     const toggle = await screen.findByRole('checkbox', { name: 'Switch the open app to the live dashboard when LMU starts' });
     await waitFor(() => expect(toggle).toBeChecked());
-    expect(screen.getByRole('link', { name: 'Export strategy history (CSV)' })).toHaveAttribute('href', '/api/live/audit.csv');
     expect(screen.getByRole('link', { name: 'Open demo' })).toHaveAttribute('href', '#/live?demo=1');
     fireEvent.click(toggle);
     await waitFor(() => expect(toggle).not.toBeChecked());

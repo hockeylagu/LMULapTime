@@ -1,4 +1,4 @@
-import { openLiveRecording } from './recordingValidation.js';
+import { openVerifiedLiveRecording } from './recordingValidation.js';
 import type { DuckDbReader } from '../../telemetry/duckdbReader.js';
 import { LIVE_CAPTURE_CHANNELS } from './channels.js';
 
@@ -49,7 +49,7 @@ export async function readLiveRecording(request: LiveEvidenceReadRequest): Promi
   const { manifest, startSeconds, durationSeconds, lapNumber } = request;
   if (!Number.isFinite(startSeconds) || startSeconds < 0 || !Number.isFinite(durationSeconds) || durationSeconds <= 0
     || durationSeconds > 3600 || !Number.isSafeInteger(lapNumber) || lapNumber < 0) fail('unverified-clock', 'Invalid lap clock bounds');
-  const reader = await openLiveRecording(request.directory, manifest, true);
+  const reader = await openVerifiedLiveRecording(request.directory, manifest);
   try {
     const anchor = manifest.anchors.filter(item => item.lapNumber === lapNumber);
     if (anchor.length !== 1 || anchor[0].startSeconds !== startSeconds || anchor[0].lapSeconds === null

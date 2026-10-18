@@ -93,10 +93,6 @@ export const LiveDashboardCard: React.FC = () => {
         </>
       )}
       <FeedbackMessage feedback={message} />
-      <div className="border-t border-lmu-border pt-4">
-        <p className="text-xs leading-relaxed text-lmu-muted">Strategy history saves estimates, garage and pit settings, and measured outcomes with each session recording, even when the dashboard is closed. Export after leaving the session.</p>
-        <a href="/api/live/audit.csv" download className={`mt-3 inline-block text-sm font-medium text-lmu-accent-text underline underline-offset-4 ${FOCUS_RING}`}>Export strategy history (CSV)</a>
-      </div>
     </SettingsPanel>
   );
 };

@@ -1,7 +1,7 @@
 import { LIVE_LEARNING_VERSION } from '../../../shared/types/liveLearning.js';
 import type { LiveLearningEvent, StoredLearningEvent } from '../../../shared/types/liveLearning.js';
 import type { LiveCaptureManifest } from '../../../shared/types/liveCapture.js';
-import { openLiveRecording } from '../capture/recordingValidation.js';
+import { openVerifiedLiveRecording } from '../capture/recordingValidation.js';
 
 export interface LearningReadRequest { directory: string; manifest: LiveCaptureManifest }
 const record = (value: unknown): Record<string, unknown> | null =>
@@ -33,7 +33,7 @@ export function parseLearningEvent(kind: string, value: unknown): LiveLearningEv
 
 /** Read only compact learning observations, never the high-rate telemetry columns. Runs in a worker. */
 export async function readLearningEvents(request: LearningReadRequest): Promise<StoredLearningEvent[]> {
-  const reader = await openLiveRecording(request.directory, request.manifest, true);
+  const reader = await openVerifiedLiveRecording(request.directory, request.manifest);
   try {
     const rows = await reader.queryAll<{ observation_id: number | bigint; kind: string; data: string | null }>(`
       WITH candidates AS (

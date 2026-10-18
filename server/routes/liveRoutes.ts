@@ -1,12 +1,5 @@
 import { Router } from 'express';
-import { Readable } from 'node:stream';
-import { iterateAuditHistory, readAuditHistory } from '../live/audit/history.js';
-import { LiveAuditReader } from '../live/audit/reader.js';
-import type { AuditPageReader } from '../live/audit/reader.js';
-import { AuditReadError } from '../live/audit/readPage.js';
-import { exportLiveAudit } from '../live/audit/export.js';
 import type { Response } from 'express';
-import type { RequestHandler } from 'express';
 import { APP_EVENTS, LIVE_HEARTBEAT_MS, PEDAL_TRACE_SECONDS_CHOICES, RESERVE_LAP_CHOICES } from '../../shared/types/live.js';
 import type { ServerContext } from '../core/serverContext.js';
 import type { LiveService } from '../live/liveService.js';
@@ -22,10 +15,8 @@ function openStream(res: Response): void {
 }
 
 export function createLiveRouter(context: ServerContext, live: LiveService,
-  capture?: Pick<LiveCaptureController, 'directory' | 'status'> & Partial<Pick<LiveCaptureController, 'hasOpenRecordingHandle'>>,
-  readAuditPage?: AuditPageReader): Router {
+  capture?: Pick<LiveCaptureController, 'directory' | 'status'>): Router {
   const router = Router();
-  const auditReader = new LiveAuditReader();
   router.get('/live/capture', (_req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     return res.json({ source: 'live-capture', schemaVersion: LIVE_CAPTURE_SCHEMA_VERSION,
@@ -33,40 +24,6 @@ export function createLiveRouter(context: ServerContext, live: LiveService,
       ...(capture?.status() ?? { state: 'idle', recordingId: null, samples: 0, droppedSamples: 0, pendingBatches: 0, error: null }),
       channels: LIVE_CAPTURE_CHANNELS });
   });
-
-  // Optional UUID selects one capture; omitted exports all saved captures, including interrupted runs.
-  const auditHistory: RequestHandler = async (req, res, next) => {
-    const runId = req.query.runId;
-    if (Object.keys(req.query).some(key => key !== 'runId') || (runId !== undefined && (typeof runId !== 'string' || !/^[a-zA-Z0-9-]{1,64}$/.test(runId)))) {
-      return res.status(400).json({ error: 'runId must identify one saved live capture.' });
-    }
-    res.setHeader('Cache-Control', 'no-store');
-    const options = { db: context.sessionDb.getDb(), directory: capture?.directory ?? null, runId: runId ?? null,
-      blocked: () => res.destroyed || live.isSessionLoaded() || capture?.hasOpenRecordingHandle === true,
-      read: readAuditPage ?? ((request) => auditReader.read(request)) };
-    try {
-      if (!req.path.endsWith('.csv')) return res.json(await readAuditHistory(options));
-      const records = iterateAuditHistory(options);
-      // Preflight the first record before committing response headers, including loaded/busy errors.
-      const first = await records.next();
-      if (res.destroyed) { await records.return(undefined); return; }
-      async function* history() {
-        try { if (!first.done) yield first.value; yield* records; }
-        finally { await records.return(undefined); }
-      }
-      res.type('text/csv').attachment(runId ? `lmu-strategy-${runId}.csv` : 'lmu-strategy-history.csv');
-      const stream = Readable.from(exportLiveAudit(history()));
-      stream.on('error', error => { if (res.headersSent) res.destroy(error); else next(error); });
-      res.on('close', () => stream.destroy());
-      stream.pipe(res);
-    } catch (error) {
-      if (res.destroyed) return;
-      if (error instanceof AuditReadError) return res.status(error.status).json({ error: error.message });
-      return next(error);
-    }
-  };
-  router.get('/live/audit', auditHistory);
-  router.get('/live/audit.csv', auditHistory);
 
   router.get('/live/stream', (req, res) => {
     openStream(res);
