@@ -5,6 +5,7 @@ import type { LiveScoringReading } from '../../../shared/domain/live/liveLifecyc
 import type { LiveSnapshot } from '../../../shared/types/live.js';
 import {
   LIVE_CAPTURE_NORMALIZATION_VERSION, LIVE_CAPTURE_SAMPLE_WIDTH, LIVE_CAPTURE_SCHEMA_VERSION, LIVE_CAPTURE_SOURCE,
+  LIVE_CAPTURE_PENDING_BATCHES, LIVE_CAPTURE_FINALIZATION_SLOTS,
 } from '../../../shared/types/liveCapture.js';
 import type {
   LiveCaptureBatch, LiveCaptureManifest, LiveCaptureObservation, LiveCaptureSample, LiveCaptureStatus, LiveCaptureWriteResult,
@@ -16,7 +17,6 @@ import { findWorkerBootstrap, isWorkerMessage } from '../../core/workerThreads.j
 import type { LiveDiagnostics } from './diagnostics.js';
 
 const BATCH_SAMPLES = 50;
-const MAX_PENDING_BATCHES = 4;
 const MAX_OBSERVATIONS = 200;
 const MAX_OBSERVATION_BYTES = 256_000;
 const FLUSH_MS = 1000;
@@ -131,7 +131,7 @@ export class LiveCaptureController {
     if (!manifest || this.stopped || this.error) return;
     if (!Number.isFinite(sample.elapsedSeconds) || sample.elapsedSeconds < 0 || sample.elapsedSeconds <= this.lastSample
       || !Number.isSafeInteger(sample.lapNumber) || sample.lapNumber < 0 || sample.values.length !== 30) return;
-    if (this.pending.size >= MAX_PENDING_BATCHES || this.sampleCount >= BATCH_SAMPLES) {
+    if (this.pending.size >= LIVE_CAPTURE_PENDING_BATCHES || this.sampleCount >= BATCH_SAMPLES) {
       manifest.droppedSamples++;
       return;
     }
@@ -335,7 +335,7 @@ export class LiveCaptureController {
   private flush(force = false): void {
     this.diagnostics?.record({ kind: 'capture-health', at: this.now(), data: this.status() });
     if (!this.manifest || !this.worker || this.closingWorker || this.error) return;
-    if (this.pending.size >= MAX_PENDING_BATCHES + (force ? 2 : 0)) {
+    if (this.pending.size >= LIVE_CAPTURE_PENDING_BATCHES + (force ? LIVE_CAPTURE_FINALIZATION_SLOTS : 0)) {
       if (force) this.error = 'Live capture writer cannot finalize while its bounded queue is full';
       return;
     }

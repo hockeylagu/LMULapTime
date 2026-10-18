@@ -6,8 +6,9 @@ import type {
   LiveCaptureWriteResult,
 } from '../../../shared/types/liveCapture.js';
 import { LiveCaptureRecordingStore } from './recordingStore.js';
+import { LIVE_CAPTURE_PENDING_BATCHES, LIVE_CAPTURE_FINALIZATION_SLOTS } from '../../../shared/types/liveCapture.js';
 
-const MAX_PENDING_BATCHES = 4;
+const MAX_PENDING_BATCHES = LIVE_CAPTURE_PENDING_BATCHES + LIVE_CAPTURE_FINALIZATION_SLOTS;
 const MAX_PENDING_CONTROLS = 2;
 const port = parentPort;
 if (!port) throw new Error('Live capture recording worker requires a parent port');
@@ -35,20 +36,13 @@ function enqueueBatch(batch: LiveCaptureBatch): void {
     fail('Live capture recording worker is closing');
     return;
   }
-  const isControl = batch.samples.length === 0 || batch.manifest.status !== 'recording';
-  if (isControl) {
-    if (pendingControls >= MAX_PENDING_CONTROLS) {
-      fail(`Live capture worker control queue is full (limit ${MAX_PENDING_CONTROLS})`);
-      return;
-    }
-    pendingControls++;
-  } else {
-    if (pendingBatches >= MAX_PENDING_BATCHES) {
-      fail(`Live capture worker queue is full (limit ${MAX_PENDING_BATCHES})`);
-      return;
-    }
-    pendingBatches++;
+  // The controller reserves the final two batch slots. Sparse-only batches use the same
+  // envelope as numeric batches; maintenance controls have their own small bound.
+  if (pendingBatches >= MAX_PENDING_BATCHES) {
+    fail(`Live capture worker queue is full (limit ${MAX_PENDING_BATCHES})`);
+    return;
   }
+  pendingBatches++;
   queue = queue.then(async () => {
     try {
       const result = await store.write(batch);
@@ -56,8 +50,7 @@ function enqueueBatch(batch: LiveCaptureBatch): void {
     } catch (error: unknown) {
       fail(errorText(error));
     } finally {
-      if (isControl) pendingControls--;
-      else pendingBatches--;
+      pendingBatches--;
     }
   });
 }

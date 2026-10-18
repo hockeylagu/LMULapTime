@@ -3,6 +3,9 @@ export const LIVE_CAPTURE_SCHEMA_VERSION = 1;
 export const LIVE_CAPTURE_NORMALIZATION_VERSION = 1;
 export const LIVE_CAPTURE_SOURCE = 'live-capture' as const;
 export const LIVE_CAPTURE_SAMPLE_WIDTH = 33;
+/** Normal transport bound plus reserved slots for initialization/finalization. */
+export const LIVE_CAPTURE_PENDING_BATCHES = 4;
+export const LIVE_CAPTURE_FINALIZATION_SLOTS = 2;
 
 export interface LiveCaptureSample {
   elapsedSeconds: number;

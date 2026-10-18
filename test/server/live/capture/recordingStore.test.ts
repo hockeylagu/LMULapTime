@@ -460,4 +460,23 @@ describe('LiveCaptureRecordingStore', () => {
     expect(results.map(result => result.type)).toEqual(['persisted', 'persisted', 'persisted', 'persisted', 'persisted']);
     await writer.close();
   });
+
+  it('accepts observation-only batches in the same six-slot transport envelope and bounds overflow', async () => {
+    const directory = await createDirectory();
+    const writer = await createWriter(directory);
+    const messages: LiveCaptureBatch[] = Array.from({ length: 7 }, (_, index) => makeBatch(index, {
+      manifest: makeManifest({ samples: 0, lastElapsedSeconds: index + 1, updatedAt: 1_800_000_000_000 + index,
+        status: index === 5 ? 'completed' : 'recording', endedAt: index === 5 ? 1_800_000_000_100 : null }),
+      samples: new Float64Array(),
+      observations: index === 5 ? [] : [{ source: 'rest', kind: 'condition', elapsedSeconds: index + 1,
+        receivedAt: 1_800_000_000_000 + index, data: { body: index } }],
+    }));
+    for (const message of messages) writer.post(message);
+    const results = await Promise.all(messages.map(() => writer.next()));
+    expect(results.filter(result => result.type === 'persisted')).toHaveLength(6);
+    expect(results.filter(result => result.type === 'failed')).toEqual([
+      expect.objectContaining({ sequence: 6, error: 'Live capture worker queue is full (limit 6)' }),
+    ]);
+    await writer.close();
+  });
 });
