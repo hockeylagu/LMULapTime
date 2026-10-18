@@ -1,8 +1,9 @@
 # Server cache audit
 
 Live evidence ownership update (2026-10-18): raw streams and sparse learning events live in per-session
-DuckDB. SQLite holds attachment metadata and compact learning examples; the older dashboard strategy
-audit still coexists. Diagnostic JSONL/gzip sidecars are disposable. No automatic raw-file retention cap
+DuckDB, including full strategy audit checkpoints independent of dashboard clients. SQLite holds
+attachment metadata, compact learning examples and any retained read-only legacy audit rows. New
+audit writes and startup pruning are removed. JSON/CSV reads are paged off track. Diagnostic sidecars are disposable. No automatic raw-file retention cap
 applies; canonical changes can invalidate compact facts after raw cleanup. See
 [Live capture format](LIVE_CAPTURE_FORMAT.md). Historical measurements below retain their original dates.
 

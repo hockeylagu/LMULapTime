@@ -83,6 +83,36 @@ Delete closed `*.diagnostics.jsonl.gz` files manually after the relevant race we
 DuckDB evidence and compact learning facts intact. No retention cleanup or cleanup UI is implemented.
 The legacy `C:\Documents\lmu-live-captures` directory belongs to manual capture scripts and is unchanged.
 
+## Consolidated strategy audit and export
+
+Full estimate/selection/outcome checkpoints now use recorder observations of kind
+`strategy-audit-v1` inside the owning session DuckDB. They run without dashboard subscribers and
+replace the older periodic `strategy-prediction` observation. Start, settings/estimate changes,
+laps, measurements, finish and end retain the existing audit semantics, plus ten-second checkpoints.
+The controller ends the old audit before switching files. A recovered recording keeps its recording
+UUID; exported sequences use persisted observation IDs so a tracker restart cannot duplicate keys.
+
+New audit checkpoints are never written to SQLite. Fresh databases do not create the old
+`live_strategy_audit` table; existing rows remain read-only and are included in history/export.
+There is no migration that guesses XML identity, no automatic pruning and no deletion of old history.
+Audit history is diagnostic context; permanent frozen learning events and compact examples remain
+separate, and deleting diagnostics does not remove either of them.
+
+`GET /api/live/audit` still returns the newest 200 checkpoints, merging retained legacy history
+with available finalized recordings. `GET /api/live/audit.csv` streams the legacy history followed by
+recording groups in start order; each recording follows persisted observation order. Both accept
+`runId`; for new captures this is the recording UUID. CSV columns and spreadsheet escaping remain.
+Exports wait until the game session and writer handles close (503 with a retry message while busy).
+Unlinked finalized recordings can be exported as raw diagnostic history without asserting XML ownership.
+
+Independent read-only workers page by observation ID: at most 200 records and 4 MiB per page,
+two concurrent page readers, and a ten-second page timeout. JSON reads stop once newer pages prove
+that older files cannot affect its 200-row result. Broad exports support up to 1,000 recordings per
+request; use `runId` for a larger archive. This is a read bound, not a disk-retention cap.
+Missing, changed or corrupt files fail explicitly; an error after CSV streaming starts aborts the
+response rather than silently producing a successful partial export. Manually deleting a closed
+DuckDB recording removes its new audit history; compact eligible learning facts can survive separately.
+
 ## Learning: implemented scope and remaining gates
 
 Versioned events freeze fuel/VE forecasts at lap start and pair them with independently measured
@@ -114,7 +144,7 @@ select candidates makes it unsuitable as final independent acceptance evidence; 
 sessions before any activation. No parameters are persisted or applied to live advice.
 
 The current predictor still uses the rolling estimator/game fallback. Historical corrections remain
-disabled. The older dashboard-dependent SQLite strategy audit and CSV export still coexist;
-their consolidation, learning UI, correction activation and real-game validation remain in the
+disabled. Audit history/export now reads the consolidated recording source plus retained legacy rows;
+learning UI, correction activation and real-game validation remain in the
 [active plan](plans/LIVE_SESSION_EVIDENCE.md). The delivered foundation and original design are in the
 [archived implementation record](plans/archive/LIVE_SESSION_EVIDENCE_FOUNDATION.md).

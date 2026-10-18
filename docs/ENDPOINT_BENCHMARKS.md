@@ -1,5 +1,15 @@
 # Endpoint performance history
 
+## Audit storage consolidation — 2026-10-18
+
+Twenty-request before/after sweeps used identical dataset and cohort hashes (snapshot
+`c3633d286fd5`). No median regressed by both >20% and >5 ms. The audit JSON endpoint returned the
+same 595,521-byte legacy response: median 8.65 → 8.26 ms; p95 11.61 → 10.36 ms. These sweeps
+exclude new DuckDB audit reads. Real worker fixtures separately verify 450-record pagination/CSV,
+byte-bounded pages, reader concurrency and native handle release. Full suite: 3,201 passed,
+56 intentionally skipped; build clean. Reports: `.cache/audit-consolidation-before/` and
+`.cache/audit-consolidation-after/`. Real-game performance remains unvalidated.
+
 ## Live evidence review fixes — 2026-10-18
 
 Before/after sweeps used 20 requests per case and identical dataset/cohort hashes (snapshot

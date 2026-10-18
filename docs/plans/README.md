@@ -7,7 +7,7 @@ Live evidence status/archival reviewed 2026-10-18. General review: 2026-10-10; r
 
 | Plan | Status | Next useful step | Completion gate |
 |---|---|---|---|
-| [Live session learning and acceptance](LIVE_SESSION_EVIDENCE.md) | Foundation archived; historical corrections disabled | Collect eligible sessions, validate real-game overhead, review chronological baseline and consolidate the older audit | Independently validated calibration, explicit fallback/activation gates and race-weekend acceptance |
+| [Live session learning and acceptance](LIVE_SESSION_EVIDENCE.md) | Foundation archived; historical corrections disabled | Collect eligible sessions, validate real-game overhead, review chronological baseline and expose learning readiness | Independently validated calibration, explicit fallback/activation gates and race-weekend acceptance |
 | [Replay storage and ingestion design](REPLAY_STORAGE_DESIGN.md) | Proposed; [initial POC](REPLAY_STORAGE_POC.md) complete; both candidates rejected on size | Evaluate storage reductions against current compact lap format | Storage size first, app read response second, ingestion third; archived-data safety and domain parity required |
 | [Corner comparison rework](CORNER_COMPARISON_REWORK.md) | In progress on `corner-map`; not integrated into main | Read the worktree's hybrid handoff; complete M2 metric/sequence revalidation, then M3 inspector acceptance | Accepted shared action maps, independent events, swap symmetry and additive timing; visual/sequence gates and consumer integration verified before merging |
 | [Simplified 3D replay and camera controls](REPLAY_3D_PLAN.md) | Proposed; source analysis reviewed 2026-10-15 | Validate one exported plugin scene against cached replay poses | Simplified track, cars, cameras and comparison stay aligned with telemetry; layout/revision isolation, fallback and performance gates pass |
@@ -48,7 +48,8 @@ Live capture enrichment is implemented on `codex/live-session-evidence`; see the
 [delivery checkpoint](LIVE_SESSION_EVIDENCE.md#delivery-checkpoint) for current scope, local commits
 and remaining gates. Session attachment, canonical identity, XML patch inheritance, aligned yaw/body-slip
 evidence, disposable diagnostics, compact fuel/VE learning examples and offline baseline evaluation
-are coded. Offline calibration candidate fitting/screening is implemented; live corrections remain disabled.
+are coded. Audit checkpoints now share the session DuckDB; legacy SQLite rows are read-only and
+JSON/CSV export remains available after recording closes. Offline calibration candidate fitting/screening is implemented; live corrections remain disabled.
 Current channel and storage contracts are in [LIVE_CAPTURE_FORMAT.md](../LIVE_CAPTURE_FORMAT.md);
 [native telemetry enrichment](../TELEMETRY_FORMAT.md#complementary-live-capture) distinguishes implemented vectors from unverified wheel channels.
 File and folder size limits are ongoing checks; split only along meaningful responsibilities.

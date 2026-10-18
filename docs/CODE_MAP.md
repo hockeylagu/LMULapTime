@@ -12,7 +12,7 @@ fuel/VE metrics and exact compatibility cohorts. `npm run learning:evaluate` pri
 `shared/domain/learning/calibration.ts` screens a session-median residual correction using only earlier
 training sessions, shrinkage, a 10% bound and fixed evidence/error gates on later sessions. Report
 version 2 includes candidate parameters and rejection reasons. Nothing is persisted or activated;
-the existing live rolling estimator and old strategy audit remain.
+the existing live rolling estimator remains. Full strategy audit checkpoints now share session DuckDB.
 
 Disposable live diagnostics: `server/live/capture/diagnostics.ts` writes adjacent session JSONL sidecars
 with bounded async buffering, changed-response/one-minute checkpoint deduplication, explicit failures,
@@ -65,6 +65,10 @@ re-audit of the historical inventory below.
 
 Offline calibration addition, 2026-10-18: 3,195 tests passed, 56 intentionally skipped; production
 build passed without warnings. Report generation remains CLI-only, read-only and separate from capture.
+
+Audit consolidation, 2026-10-18: 3,201 tests passed, 56 intentionally skipped; production build clean.
+Matching-dataset endpoint sweeps found no regressions above the project threshold; raw DuckDB audit
+pagination/CSV and worker handle release are covered by isolated fixtures, not real-game acceptance.
 
 Historical baseline, last checked 2026-10-12 after the type refactoring follow-ups (main `25d1e988`): 476 TypeScript source files
 in src/server/shared, 305 test suites (300 passed, 5 skipped), 2663 tests (2607 passed, 56 skipped); the
@@ -875,6 +879,15 @@ as approximate. Class estimates are used only when model dimensions are missing.
 assets and generated catalogs. Synthetic provider/footprint tests are always available;
 personal geometry/recording regressions require private roots (see [PLUGINS.md](PLUGINS.md)).
 
-Live strategy audit: `shared/domain/live/liveAudit.ts` freezes pre-lap forecasts and records deterministic comparisons; `shared/types/liveAudit.ts` defines capture/measurement contracts. `server/core/live/dbLiveAuditStore.ts` owns persistent checkpoints, with schema in `dbSchema.ts`; `createLiveAuditWriter` prunes to the newest `LIVE_AUDIT_KEPT_RUNS` (30) captures at server start (`pruneLiveAudit`), since each capture stores a full snapshot every ~10 s; `server/live/audit/export.ts` streams spreadsheet-safe CSV. `liveRoutes.ts` exposes bounded JSON history and streaming CSV. Legacy audit checkpoints are written only while a dashboard page is open; supplemental capture keeps its own REST polling and frozen learning events active independently, and a replay leaves the session's laps, strategy, results and capture untouched. Live dashboard settings link to exports; the cockpit dashboard and session review are passive and contain no interactive controls. No automatic forecast calibration or inferred XML-session linkage is applied.
+Live strategy audit: `LiveAuditTracker` runs inside the capture controller, independent of dashboard clients.
+Full `strategy-audit-v1` observations replace periodic `strategy-prediction` snapshots in session DuckDB.
+`server/live/audit/` reads finalized captures through bounded read-only worker pages and streams
+spreadsheet-safe CSV; `liveRoutes.ts` merges newest-200 JSON history with read-only legacy SQLite rows.
+New databases do not create the old audit table, and the legacy writer/pruner are removed. Reads wait
+until the loaded session and writer handles close. Raw unlinked history can be exported without
+claiming XML ownership; aligned charts/learning still require their existing strict attachment gates.
+New run IDs are recording UUIDs; returned sequences are persisted observation IDs, including after
+recovery. A session transition finalizes its audit in the old file before the new file begins.
+Existing legacy rows are neither migrated by guesswork nor deleted. See [the operational reference](LIVE_CAPTURE_FORMAT.md#consolidated-strategy-audit-and-export).
 
 Live multiclass horizon: `liveLapsLeft.ts` owns `projectRaceFlagSeconds`, shared by live distance and `liveResourcePlan.ts` preparation. `rf2Decode.ts` resolves overall and player-class leaders independently using canonical class aliases; class pace supplies the player's distance horizon, with overall flag timing preserved. The preparation headline excludes the formation allowance retained in the resource model. Forecast audit model version 3 distinguishes this calculation from saved earlier estimates.
