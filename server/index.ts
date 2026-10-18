@@ -86,7 +86,7 @@ const captureDirectory = path.resolve(process.env.LMU_LIVE_CAPTURE_DIR || path.j
 const automaticLearning = new AutomaticLearningRuntime(process.env.LMU_LIVE_LEARNING !== '0');
 const liveCapture = new LiveCaptureController({
   directory: captureDirectory,
-  diagnostics: process.env.LMU_LIVE_DIAGNOSTICS === '0' ? undefined : new LiveDiagnostics(captureDirectory),
+  diagnostics: process.env.LMU_LIVE_DIAGNOSTICS === '1' ? new LiveDiagnostics(captureDirectory) : undefined,
   existing: () => listLiveCaptureManifests(sessionDb.getDb()),
   onPersist: (manifest, bytes) => {
     upsertLiveCapture(sessionDb.getDb(), manifest, bytes);

@@ -97,7 +97,7 @@ across missing samples. Measured yaw and body slip use the capture; computed fal
 `COMPUTED` label. Coverage is disclosed separately. Supplied native telemetry G values, including zero,
 are preserved; replay-derived G remains a computed fallback.
 
-## Disposable race diagnostics
+## Disposable race diagnostics (opt-in)
 
 Adjacent `*.diagnostics.jsonl` sidecars record existing REST requests/responses and errors, reader
 failures, lifecycle, writer health and strategy context. Successful unchanged responses are deduplicated
@@ -106,7 +106,8 @@ avoids retaining the full opponent standings payload. Diagnostics add no REST re
 
 A two-minute post-session tail supports transient-error investigation. Gzip is deferred until after
 the session; a new active session defers pending compression. An already-running compression is not
-cancelled. Crash leftovers remain available for investigation. Set `LMU_LIVE_DIAGNOSTICS=0` to disable.
+cancelled. Crash leftovers remain available for investigation. Sidecars are opt-in: set
+`LMU_LIVE_DIAGNOSTICS=1` to write them (failures are always saved in the recording, see below).
 Delete closed `*.diagnostics.jsonl.gz` files manually after the relevant race weekends; doing so leaves
 DuckDB evidence and compact learning facts intact. Automatic cleanup is deferred until real-race
 stability is established; no retention cleanup or cleanup UI is implemented.
