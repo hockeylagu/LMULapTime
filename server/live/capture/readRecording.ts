@@ -1,9 +1,8 @@
-import path from 'node:path';
-import { lstat } from 'node:fs/promises';
-import { DuckDbReader } from '../../telemetry/duckdbReader.js';
+import { openVerifiedLiveRecording } from './recordingValidation.js';
+import type { DuckDbReader } from '../../telemetry/duckdbReader.js';
 import { LIVE_CAPTURE_CHANNELS } from './channels.js';
-import { LIVE_CAPTURE_NORMALIZATION_VERSION, LIVE_CAPTURE_SCHEMA_VERSION } from '../../../shared/types/liveCapture.js';
-import type { LiveCaptureManifest, LiveCaptureObservation } from '../../../shared/types/liveCapture.js';
+
+import type { LiveCaptureObservation } from '../../../shared/types/liveCapture.js';
 import type { LiveEvidenceReadRequest, LiveLapEvidence, LiveEvidenceUnavailableReason, LiveEvidenceObservation } from '../../../shared/types/liveEvidence.js';
 import { LiveEvidenceReadError } from './readError.js';
 
@@ -48,54 +47,13 @@ async function readObservations(reader: DuckDbReader, start: number, end: number
 /** Runs in an expendable reader worker, never on the game's capture path. */
 export async function readLiveRecording(request: LiveEvidenceReadRequest): Promise<LiveLapEvidence> {
   const { manifest, startSeconds, durationSeconds, lapNumber } = request;
-  if (manifest.source !== 'live-capture' || manifest.schemaVersion !== LIVE_CAPTURE_SCHEMA_VERSION
-    || manifest.normalizationVersion !== LIVE_CAPTURE_NORMALIZATION_VERSION || manifest.signConvention !== 'iso8855') {
-    fail('incompatible', 'Capture index schema or normalization is incompatible with this reader');
-  }
   if (!Number.isFinite(startSeconds) || startSeconds < 0 || !Number.isFinite(durationSeconds) || durationSeconds <= 0
     || durationSeconds > 3600 || !Number.isSafeInteger(lapNumber) || lapNumber < 0) fail('unverified-clock', 'Invalid lap clock bounds');
-  if (!manifest.sessionId || manifest.status === 'recording') fail('unlinked', 'Capture is not finalized and verified');
-  const directory = path.resolve(request.directory);
-  const filename = path.resolve(directory, manifest.filename);
-  if (path.dirname(filename) !== directory || path.basename(manifest.filename) !== manifest.filename) fail('incompatible', 'Invalid recording filename');
+  const reader = await openVerifiedLiveRecording(request.directory, manifest);
   try {
-    const stat = await lstat(filename);
-    if (!stat.isFile() || stat.isSymbolicLink()) fail('incompatible', 'Recording is not a regular file');
-  } catch (error: unknown) {
-    if (error instanceof LiveEvidenceReadError) throw error;
-    if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT') fail('missing', 'Live capture file was removed');
-    throw error;
-  }
-  const reader = new DuckDbReader(filename);
-  try {
-    const metadata = new Map((await reader.queryAll<{ key: string; value: string }>('SELECT key, value FROM capture_metadata'))
-      .map(row => [row.key, row.value]));
-    if (metadata.get('source') !== 'live-capture' || metadata.get('recording_id') !== manifest.recordingId
-      || metadata.get('schema_version') !== String(LIVE_CAPTURE_SCHEMA_VERSION)
-      || metadata.get('normalization_version') !== String(LIVE_CAPTURE_NORMALIZATION_VERSION)
-      || metadata.get('sign_convention') !== 'iso8855' || metadata.get('filename') !== manifest.filename) {
-      fail('incompatible', 'Live capture signature does not match the verified index');
-    }
-    const rows = await reader.queryAll<{ manifest_json: string }>('SELECT CAST(manifest_json AS VARCHAR) AS manifest_json FROM capture_manifest WHERE singleton = TRUE');
-    const stored = rows.length === 1 ? JSON.parse(rows[0].manifest_json) as LiveCaptureManifest : null;
-    if (!stored || stored.recordingId !== manifest.recordingId || stored.layoutKey !== manifest.layoutKey
-      || stored.driverName !== manifest.driverName || stored.vehicleName !== manifest.vehicleName
-      || stored.sessionCode !== manifest.sessionCode || stored.startedAt !== manifest.startedAt
-      || stored.samples !== manifest.samples || stored.lastElapsedSeconds !== manifest.lastElapsedSeconds
-      || stored.sessionId !== null && stored.sessionId !== manifest.sessionId
-      || JSON.stringify(stored.anchors) !== JSON.stringify(manifest.anchors)) {
-      fail('changed', 'Recording identity or coverage changed; refresh the capture index');
-    }
-    const anchor = stored.anchors.filter(item => item.lapNumber === lapNumber);
+    const anchor = manifest.anchors.filter(item => item.lapNumber === lapNumber);
     if (anchor.length !== 1 || anchor[0].startSeconds !== startSeconds || anchor[0].lapSeconds === null
       || Math.abs(anchor[0].lapSeconds - durationSeconds) > 0.05) fail('unverified-clock', 'Lap anchor is not verified against XML');
-    const catalog = await reader.queryAll<{ ordinal: number; name: string; unit: string; frame: string; verified: boolean }>(
-      'SELECT ordinal, name, unit, frame, verified FROM capture_channels ORDER BY ordinal');
-    if (catalog.length !== LIVE_CAPTURE_CHANNELS.length || catalog.some((item, index) => {
-      const expected = LIVE_CAPTURE_CHANNELS[index];
-      return item.ordinal !== index || item.name !== expected.name || item.unit !== expected.unit
-        || item.frame !== expected.frame || item.verified !== expected.verified;
-    })) fail('incompatible', 'Live capture channel conventions do not match this reader');
     const end = startSeconds + durationSeconds;
     // Raw telemetry lap counters may be zero-based; verified scoring anchors select the time interval.
     const samples = await reader.queryAll<SampleRow>(`SELECT sample_index, elapsed_seconds,

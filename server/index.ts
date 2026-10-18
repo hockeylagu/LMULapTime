@@ -27,6 +27,7 @@ import { LiveDiagnostics } from './live/capture/diagnostics.js';
 import { getLiveCaptureIndexRows, listLiveCaptureManifests, upsertLiveCapture } from './core/live/dbLiveCaptureStore.js';
 import { reconcileLiveCaptures } from './live/capture/reconcile.js';
 import { createLiveEvidenceRouter } from './routes/liveEvidenceRoutes.js';
+import { refreshLiveLearning } from './live/learning/service.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -107,6 +108,10 @@ async function refreshLiveCaptureLinks(discover = false): Promise<void> {
     if (liveService.isSessionLoaded()) return;
     const result = await reconcileLiveCaptures(sessionDb.getDb(), captureDirectory);
     if (result.changed) sessionDb.markSessionDataChanged();
+    if (!liveCapture.hasOpenRecordingHandle) {
+      await refreshLiveLearning(sessionDb.getDb(), captureDirectory, () => liveService.isSessionLoaded());
+    }
+    if (liveService.isSessionLoaded()) return;
     liveCapture.synchronizeLinks(getLiveCaptureIndexRows(sessionDb.getDb())
       .filter(entry => entry.available).map(entry => entry.manifest));
   })().catch(error => {

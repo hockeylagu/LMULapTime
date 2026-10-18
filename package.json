@@ -27,6 +27,7 @@
     "telemetry:probe": "dotnet run -c Release --project tools/telemetry-recorder -- probe",
     "telemetry:record": "dotnet run -c Release --project tools/telemetry-recorder -- record",
     "vcr:correlate": "tsx tools/analysis/correlateVcr.ts",
+    "learning:evaluate": "tsx tools/analysis/evaluateLiveLearning.ts",
     "screenshots": "tsx tools/captureScreenshots.ts",
     "check:local-data": "node tools/release/checkLocalData.mjs"
   },

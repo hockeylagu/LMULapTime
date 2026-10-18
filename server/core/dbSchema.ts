@@ -340,6 +340,26 @@ export function initDbSchema(db: DatabaseType): void {
       PRIMARY KEY (filename, lap_number)
     );
 
+    CREATE TABLE IF NOT EXISTS live_learning_sources (
+      recording_id TEXT PRIMARY KEY,
+      signature TEXT NOT NULL,
+      state TEXT NOT NULL,
+      error TEXT,
+      updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS live_learning_examples (
+      session_id TEXT NOT NULL,
+      driver_ordinal INTEGER NOT NULL,
+      lap_ordinal INTEGER NOT NULL,
+      resource_kind TEXT NOT NULL,
+      recording_id TEXT NOT NULL,
+      match_version INTEGER NOT NULL,
+      eligible INTEGER NOT NULL,
+      example_json TEXT NOT NULL,
+      PRIMARY KEY(session_id, driver_ordinal, lap_ordinal, resource_kind)
+    ) WITHOUT ROWID;
+    CREATE INDEX IF NOT EXISTS idx_live_learning_recording ON live_learning_examples(recording_id);
+
     CREATE TABLE IF NOT EXISTS ingest_errors (
       source_type TEXT NOT NULL,
       source_path TEXT NOT NULL,
