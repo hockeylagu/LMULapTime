@@ -1,5 +1,16 @@
 # Code Map: where things live and how they flow
 
+Fuel/VE learning foundation: `shared/domain/learning/capture.ts` freezes both resource forecasts at lap
+start and emits independently measured outcomes without dashboard clients. Versioned events live in
+the session DuckDB, separate from disposable diagnostics. `server/live/learning/` validates compact
+events in an off-track worker, rechecks canonical XML/link inputs and builds deduplicated examples via
+`shared/domain/learning/examples.ts`. `server/core/live/dbLiveLearningStore.ts` retains compact
+examples and source signatures/status in SQLite, with DDL in `dbSchema.ts`. Stale/ambiguous ownership,
+classification changes and missing predictions prevent eligibility; valid compact facts survive raw
+cleanup. `shared/domain/learning/evaluate.ts` splits whole sessions chronologically and separates
+fuel/VE metrics and exact compatibility cohorts. `npm run learning:evaluate` prints a read-only report.
+No correction is trained or activated; the existing rolling estimator and old strategy audit remain.
+
 Disposable live diagnostics: `server/live/capture/diagnostics.ts` writes adjacent session JSONL sidecars
 with bounded async buffering, changed-response/one-minute checkpoint deduplication, explicit failures,
 post-session tails and deferred gzip. `livePitPoller.ts` binds request diagnostics to the originating

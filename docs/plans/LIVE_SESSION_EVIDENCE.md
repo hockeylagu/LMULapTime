@@ -2,15 +2,16 @@
 
 Status: Capture, reconciliation, aligned evidence API, chart integration and disposable diagnostics coded
 on `codex/live-session-evidence`, reviewed 2026-10-18. Automated checks pass; real-game validation is pending.
-Learning dataset extraction and historical calibration have not been implemented.
+Fuel/VE learning-event capture, compact dataset extraction and chronological baseline evaluation are
+also coded. Historical calibration/corrections remain unimplemented and disabled.
 Reviewed: Source, 199 native DuckDB catalogs, saved memory/REST recordings and synthetic integration tests.
 Scope: Persist live data as a fourth source alongside XML, replay and native telemetry; reconcile it to sessions;
 derive traceable evidence for analytics and deterministic learning.
 Dependencies: Existing live reader and replay-safe REST polling, normalized session storage, canonical
 layout/vehicle definitions, replay reconciliation, and multi-file DuckDB ownership.
-Next coding step: Build deduplicated, versioned fuel/VE learning examples and a chronological baseline
-evaluation before enabling historical corrections. Real-game capture/linking/performance validation is
-a separate outstanding acceptance gate; it does not prevent building the offline pipeline.
+Next step: Collect eligible new sessions, inspect the baseline report, then evaluate a bounded historical
+correction candidate before enabling corrections. Real-game capture/linking/performance validation is
+a separate outstanding acceptance gate. The old dashboard-only SQLite audit remains a separate follow-up.
 Completion gate: Recoverable, versioned captures attach only to verified sessions, retain channel-level
 provenance, and produce deduplicated learning examples with chronological validation.
 
@@ -26,17 +27,19 @@ provenance, and produce deduplicated learning examples with chronological valida
 | Read/analysis path | Bounded off-track evidence workers, lap alignment, yaw/body-slip chart enrichment | Broader resource/tyre/weather/stop projections are not built |
 | Diagnostics | Disposable JSONL sidecars, post-session tail, deferred gzip, manual cleanup | Real-session storage/overhead measurements; no cleanup UI |
 | Existing strategy audit | Still SQLite, dashboard-dependent, with frozen forecasts/comparisons and CSV export | Consolidation is not coded; user permits dropping the few old audit runs when replaced |
-| Learning dataset | Not coded | Versioned examples, eligibility/exclusions, source lineage and chronological splits |
-| Historical calibration | Not coded | Baseline evaluation, compatible cohorts, bounded corrections, validation and fallback |
+| Learning dataset | First fuel/VE scope coded and tested | Collect eligible new captures; broader learning targets remain deferred |
+| Historical calibration | Not coded | Fit/evaluate a correction candidate, promotion gates, bounded activation and fallback |
 
 Current live fuel/VE estimates still use the arithmetic mean of up to the last three representative
 laps, with game estimates as fallback (`shared/domain/live/liveUsage.ts`, `liveStrategyTracker.ts`).
-Saving capture data does not train or refine a historical model automatically. Diagnostic sidecars are
+Saving capture data now also supplies frozen fuel/VE forecasts and independent measured outcomes for
+off-track dataset extraction; it does not fit or activate a historical correction model. Diagnostic sidecars are
 disposable debugging context and must not be the sole source for future learning labels.
 
 Implementation commits: `e51cfa06` capture/reconciliation, `f1cc462a` aligned reader,
 `092dae1d` chart fusion, `c2936099` source labels, `0c6e2247` fixture correction,
 `1e9b6b27` evidence documentation, `5039f785` diagnostics and `a57d2561` diagnostic documentation.
+Learning milestone: `d946e593` frozen resource evidence and `bf43434d` dataset/baseline evaluation.
 These are local branch commits; no merge, push or deployment is recorded by this plan.
 
 The user authorized implementation after channel review. The first milestone records player evidence
@@ -80,8 +83,8 @@ p95 per 50-row batch. These are storage/throughput measurements, **not measured 
 Checks passed: 3,118 tests (56 intentionally skipped), production build, final recorder/API tests (63),
 source-label/settings tests (174) and the endpoint benchmark. The source-label detector found no issues.
 
-Still planned: wheel convention verification, visible source
-management, durable learning-example extraction, chronological evaluation and forecast calibration.
+Still planned: wheel convention verification, visible source management, broader learning targets,
+real-session baseline evaluation and forecast calibration.
 The sections below retain the broader design; proposed examples are not all shipped interfaces.
 
 ## Disposable race diagnostics — 2026-10-18
@@ -132,6 +135,74 @@ overflow reporting, original-session ownership and deferring compression during 
 Validation passed: full suite 3,151 tests (56 intentionally skipped), production build, then 14 focused
 request/shutdown regression tests and TypeScript checking after the final bounded-close changes.
 
+## First learning milestone — 2026-10-18
+
+Implemented fuel/VE dataset construction and offline baseline evaluation; no historical correction
+parameters are fitted or used by the live planner. `LiveLearningCapture` emits version-1 compact
+`learning-forecast` and `learning-outcome` observations into the session DuckDB through the existing
+bounded writer. It operates without dashboard clients, SQLite audit checkpoints or diagnostic sidecars.
+
+Forecasts freeze each resource's actual live estimator output once, within two seconds of the lap
+start, retaining model version, measured/game source, compound and wet/dry context. Fuel and VE freeze
+separately, even if one is unavailable. Later `LiveUsageMeter` observations supply independent crossing
+consumption outcomes, separately deduplicated for asynchronous fuel/VE arrival. Joining mid-lap never
+manufactures an earlier forecast. Context changes, pits, caution/start phases, invalid lap flags,
+significant damage, resource increases and scoring gaps over two game seconds leave exclusion evidence.
+Recent context/dedup state is bounded; measurements arriving over two laps late are ignored.
+
+After XML reconciliation, `server/live/learning/service.ts` processes at most four sources per refresh,
+serially and only off track. It waits until the recording writer's worker has exited before opening
+another DuckDB handle. A dedicated reader worker opens finalized/verified recordings through the same
+signature/convention gate as the chart reader; it selects learning observations only, not telemetry
+frames. Reads reject unsupported/corrupt learning events and exceedance of 40,000 events or 16 MB of
+JSON; workers have a 30-second timeout. No new job starts while a game session is loaded; a session
+loading during an existing read causes its result to be discarded. In-flight reads are not cancelled,
+so these workload limits do not establish measured zero game overhead.
+
+`buildLearningExamples` produces one row per physical session/driver/lap/resource. It requires unique
+forecast/outcome evidence, canonical stored clean/representative XML flags, completed non-start laps,
+matching start/duration/crossing clocks (0.05-second tolerance), known layout/car/XML patch/compound,
+valid frozen predictions and consistent conditions. Any recorder drop conservatively excludes that
+recording's examples. Duplicate observations, missing forecasts and other failures remain explicit
+exclusions. Only measured accepted meter outcomes produce rows; unsupported or unmeasured laps do
+not acquire invented labels. Captures predating these events yield zero examples; there is no backfill
+of retrospective forecasts from old snapshots or diagnostic responses.
+
+SQLite stores only the compact rebuildable `live_learning_examples` projection and
+`live_learning_sources` signatures/status/errors, not duplicate raw recordings. Transactional replacement
+and a physical-lap/resource primary key prevent repeated ingestion from multiplying examples. Signatures
+include current attachment revision, manifest and canonical lap eligibility/timing/conditions. Readers
+recheck those inputs before evaluation; XML reparses, ambiguity or link withdrawals exclude stale data.
+Unchanged valid compact facts survive manual raw-file deletion. If XML changes after raw deletion,
+stale facts remain stored but are excluded because they cannot be safely rebuilt. Read failures retain
+their error and retry after a one-minute backoff. Existing SQLite strategy audit/CSV writes remain;
+replacing that separate path and dropping its few historical runs has not been done.
+
+Run `npm run learning:evaluate` for the default `server/lmu_cache.db`, or
+`npm run learning:evaluate -- <sqlite-path> <holdout-fraction>` (default 0.25). The CLI is read-only:
+it does not start REST requests, scan recordings or initialize a database. Start the updated app to
+initialize tables and build projections; the command reports `not-initialized` for an older database.
+An empty/new dataset reports `awaiting-eligible-evidence`. Current eligible examples are split by whole
+session in chronological order; equal start timestamps stay on the same side of the split. With too
+few distinct session start times, test counts stay zero; zero-count metrics are not evidence of accuracy.
+
+The report gives separate fuel (L/lap) and VE (percentage-points/lap) metrics: count, signed bias,
+MAE, nearest-rank p95 absolute error and underprediction count. Error is predicted minus actual;
+negative means underprediction. Exact cohorts include layout, vehicle, driver, XML patch, conditions,
+compound, prediction model and measured/game source; compatible training counts identify sparse or
+previously unseen cohorts. It reports exclusion counts and source failures and explicitly states
+`historicalCorrectionsEnabled=false`. It measures the existing frozen live estimator; no alternative
+model, confidence calibration, promotion gate, correction rollout or learning dashboard is implemented.
+
+Verification covers immutable independent forecasts/outcomes, no-dashboard persistence, asynchronous
+measurements, exclusion evidence, real DuckDB worker readback, stale ownership/classification races,
+retry recovery, idempotent compact projections, raw-file cleanup and chronological split/unit integrity.
+Final checks passed: 3,176 tests (56 intentionally skipped), production build and TypeScript checking.
+A read-only CLI smoke check against an initialized empty SQLite fixture returned
+`awaiting-eligible-evidence` and left the database bytes unchanged; the existing local database returned
+`not-initialized` until the updated app initializes its schema. No personal data was rewritten for validation.
+Real-session capture overhead, useful sample yield and held-out prediction accuracy remain unmeasured.
+
 ## Aligned evidence reader — 2026-10-18
 
 `GET /api/session/:sessionId/live-evidence?driverOrdinal=0&lapOrdinal=1` uses the same stored
@@ -171,7 +242,8 @@ preservation, gaps, session-only REST evidence, stale identity/clocks, path trav
 The before/after endpoint sweep on the same snapshot found no regression above the project's
 >20% and >5 ms threshold. The unlinked evidence path measured 1.29 ms median / 2.39 ms p95;
 that number does not represent a real-file read or game frame-time overhead.
-This reader does not yet extract training examples, calibrate forecasts or enable unverified wheel data.
+This chart reader does not extract training examples; the separate learning worker above does.
+Neither path calibrates forecasts or enables unverified wheel data.
 
 ## Chart and analysis integration — 2026-10-18
 
@@ -743,10 +815,11 @@ Invalidate only affected session/lap projections through existing revision mecha
 
 ## 12. Learning dataset and deterministic calibration
 
-Status: Not implemented. Start with fuel/VE examples and offline baseline evaluation. The first
-implementation must retain pre-outcome forecasts and measured outcomes independently of disposable
-diagnostics and dashboard visibility. Resolve the old audit's replacement/retirement as part of that work;
-do not assume current ten-second prediction observations provide frozen lap-start evaluation semantics.
+Status: Fuel/VE examples and offline baseline evaluation are implemented as described in the first
+learning milestone above. Dedicated immutable forecast/outcome events operate independently of
+diagnostic retention and dashboard visibility; ten-second strategy snapshots are not used as frozen
+learning forecasts. Old-audit replacement and historical correction fitting/promotion remain pending.
+The broader dataset targets and calibration requirements below are future work.
 
 Produce one example per physical lap, stint or stop, with:
 
@@ -791,7 +864,7 @@ count/source-age readouts should reflect validated evidence, not a decorative co
 | 2. Durable capture | Coded and automatically tested | Live-game overhead/lifecycle and failure validation still pending |
 | 3. Reconciliation | Coded and automatically tested | Strict ambiguity/restart/layout/driver rules; real-weekend validation pending |
 | 4. Augmentation | Partial | Aligned API, source metadata and yaw/body-slip enrichment coded; resource/tyre/weather/stop projections remain |
-| 5. Dataset | Next coding milestone | Deduplicated fuel/VE examples, lineage, exclusions and chronological baseline evaluation |
+| 5. Dataset | First fuel/VE scope coded and tested | Immutable forecasts/outcomes, deduplication, lineage, exclusions, chronological CLI report; real sample yield/evaluation pending |
 | 6. Calibration | Not started | Compatible cohorts, held-out improvement, bounded corrections, fallback/versioning/rollback |
 
 The first end-to-end milestone is phases 0-4: a trustworthy session-linked live evidence layer covering
@@ -843,10 +916,11 @@ are not evidence that a feature has shipped or passed real-game validation.
 
 ## 15. Remaining decisions and validation
 
-1. Implement the first learning target as fuel/VE consumption, with separately measured outcomes and
-   immutable pre-outcome forecasts; define versioned example/projection schemas and persistence.
-2. Replace or retire the dashboard-dependent SQLite audit without losing frozen forecast semantics.
-   Old audit history can be dropped; permanent learning evidence must not depend on diagnostic retention.
+1. Collect eligible new fuel/VE forecasts/outcomes and multiple distinct chronological sessions; review
+   exclusion rates, baseline error and compatible cohort counts before choosing a correction candidate.
+2. Replace or retire the dashboard-dependent SQLite audit/CSV path if consolidation is pursued.
+   Old audit history can be dropped; the new permanent learning events already retain independent
+   frozen forecast semantics and do not depend on diagnostic retention.
 3. Define compatible layout/car/conditions/patch cohorts, chronological holdouts, minimum evidence and
    promotion/error gates before selecting or enabling a correction model. Robust median/shrinkage or
    bounded bias corrections are candidates, not an algorithm already selected or coded.
