@@ -22,7 +22,6 @@ export function createGameProcessProbe(executable = 'Le Mans Ultimate.exe'): Gam
     const open = lib.func('void* __stdcall OpenProcess(uint32 access, int inherit, uint32 pid)') as (access: number, inherit: number, pid: number) => bigint | null;
     const wait = lib.func('uint32 __stdcall WaitForSingleObject(void* handle, uint32 timeout)') as (handle: bigint, timeout: number) => number;
     const close = lib.func('int __stdcall CloseHandle(void* handle)') as (handle: bigint) => number;
-    const lastError = lib.func('uint32 __stdcall GetLastError()') as () => number;
     // PROCESSENTRY32W contains one pointer-sized field before szExeFile.
     const is32Bit = process.arch === 'ia32';
     const entry = Buffer.alloc(is32Bit ? 556 : 568);
@@ -60,7 +59,8 @@ export function createGameProcessProbe(executable = 'Le Mans Ultimate.exe'): Gam
             release();
             return result === 0 ? false : null;
           } while (next(list, entry));
-          return lastError() === 18 ? false : null; // ERROR_NO_MORE_FILES
+          // The whole list was read without the game in it. (GetLastError is not reliable across FFI calls.)
+          return false;
         } finally {
           close(list);
         }
