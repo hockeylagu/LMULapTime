@@ -9,7 +9,10 @@ examples and source signatures/status in SQLite, with DDL in `dbSchema.ts`. Stal
 classification changes and missing predictions prevent eligibility; valid compact facts survive raw
 cleanup. `shared/domain/learning/evaluate.ts` splits whole sessions chronologically and separates
 fuel/VE metrics and exact compatibility cohorts. `npm run learning:evaluate` prints a read-only report.
-No correction is trained or activated; the existing rolling estimator and old strategy audit remain.
+`shared/domain/learning/calibration.ts` screens a session-median residual correction using only earlier
+training sessions, shrinkage, a 10% bound and fixed evidence/error gates on later sessions. Report
+version 2 includes candidate parameters and rejection reasons. Nothing is persisted or activated;
+the existing live rolling estimator and old strategy audit remain.
 
 Disposable live diagnostics: `server/live/capture/diagnostics.ts` writes adjacent session JSONL sidecars
 with bounded async buffering, changed-response/one-minute checkpoint deduplication, explicit failures,
@@ -59,6 +62,9 @@ Phase 6 naming table.
 Live-evidence branch verification, 2026-10-18: 3,182 tests passed, 56 intentionally skipped; production
 build passed without warnings. This is a focused update, not a new coverage measurement or global
 re-audit of the historical inventory below.
+
+Offline calibration addition, 2026-10-18: 3,195 tests passed, 56 intentionally skipped; production
+build passed without warnings. Report generation remains CLI-only, read-only and separate from capture.
 
 Historical baseline, last checked 2026-10-12 after the type refactoring follow-ups (main `25d1e988`): 476 TypeScript source files
 in src/server/shared, 305 test suites (300 passed, 5 skipped), 2663 tests (2607 passed, 56 skipped); the
@@ -869,6 +875,6 @@ as approximate. Class estimates are used only when model dimensions are missing.
 assets and generated catalogs. Synthetic provider/footprint tests are always available;
 personal geometry/recording regressions require private roots (see [PLUGINS.md](PLUGINS.md)).
 
-Live strategy audit: `shared/domain/live/liveAudit.ts` freezes pre-lap forecasts and records deterministic comparisons; `shared/types/liveAudit.ts` defines capture/measurement contracts. `server/core/live/dbLiveAuditStore.ts` owns persistent checkpoints, with schema in `dbSchema.ts`; `createLiveAuditWriter` prunes to the newest `LIVE_AUDIT_KEPT_RUNS` (30) captures at server start (`pruneLiveAudit`), since each capture stores a full snapshot every ~10 s; `server/live/audit/export.ts` streams spreadsheet-safe CSV. `liveRoutes.ts` exposes bounded JSON history and streaming CSV. Checkpoints are written only while a dashboard page is open (the REST reads they rely on stop without one), and a replay leaves the session's laps, strategy, results and capture untouched. Live dashboard settings link to exports; the cockpit dashboard and session review are passive and contain no interactive controls. No automatic forecast calibration or inferred XML-session linkage is applied.
+Live strategy audit: `shared/domain/live/liveAudit.ts` freezes pre-lap forecasts and records deterministic comparisons; `shared/types/liveAudit.ts` defines capture/measurement contracts. `server/core/live/dbLiveAuditStore.ts` owns persistent checkpoints, with schema in `dbSchema.ts`; `createLiveAuditWriter` prunes to the newest `LIVE_AUDIT_KEPT_RUNS` (30) captures at server start (`pruneLiveAudit`), since each capture stores a full snapshot every ~10 s; `server/live/audit/export.ts` streams spreadsheet-safe CSV. `liveRoutes.ts` exposes bounded JSON history and streaming CSV. Legacy audit checkpoints are written only while a dashboard page is open; supplemental capture keeps its own REST polling and frozen learning events active independently, and a replay leaves the session's laps, strategy, results and capture untouched. Live dashboard settings link to exports; the cockpit dashboard and session review are passive and contain no interactive controls. No automatic forecast calibration or inferred XML-session linkage is applied.
 
 Live multiclass horizon: `liveLapsLeft.ts` owns `projectRaceFlagSeconds`, shared by live distance and `liveResourcePlan.ts` preparation. `rf2Decode.ts` resolves overall and player-class leaders independently using canonical class aliases; class pace supplies the player's distance horizon, with overall flag timing preserved. The preparation headline excludes the formation allowance retained in the resource model. Forecast audit model version 3 distinguishes this calculation from saved earlier estimates.

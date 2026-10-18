@@ -15,9 +15,9 @@ The current storage, channel and operational contract is [Live capture format](.
 | Attachment | Strict XML identity and completed-lap anchors; XML game patch inheritance; ambiguous ownership rejected |
 | Consumers | Aligned evidence API and yaw/body-slip chart fusion; native G preserved; computed fallback disclosed |
 | Diagnostics | Bounded response/error sidecars, post-session tail and deferred gzip; manual cleanup |
-| Learning | Frozen fuel/VE forecasts and measured outcomes, compact SQLite examples and chronological baseline evaluation implemented |
+| Learning | Frozen fuel/VE forecasts and measured outcomes, compact SQLite examples, chronological baseline and bounded offline correction candidate evaluation implemented |
 | Review fixes | Deferred recovery while layout is unresolved, consistent six-slot batch capacity and exact lap revalidation implemented |
-| Acceptance | Real-game performance and race-weekend validation pending; calibration fitting, activation and learning UI pending |
+| Acceptance | Real-game performance and race-weekend validation deferred by user; correction activation and learning UI pending |
 
 ## Next implementation and acceptance work
 
@@ -30,9 +30,10 @@ The current storage, channel and operational contract is [Live capture format](.
 3. Consolidate the older dashboard-dependent SQLite strategy audit/CSV history with the recorded
    evidence workflow. Define migration or explicit disposal of its few historical runs; keep useful
    debugging coverage and remove redundant persistence only after parity is checked.
-4. Expose learning readiness and exclusion reasons in the app. Then evaluate a deterministic correction
-   candidate against the frozen rolling-estimator baseline. Define minimum evidence, bounded corrections,
-   fallback and rollback before activation. Training and activation are separate gates.
+4. Expose learning readiness and exclusion reasons in the app. The CLI now screens a deterministic
+   session-median residual correction with shrinkage, minimum evidence and a 10% adjustment bound.
+   Review compatible real cohorts and validate the fixed policy on fresh sessions before activation.
+   Define runtime fallback/rollback and promotion controls separately; no correction is enabled.
 5. Verify additional wheel channels against new source evidence before populating their reserved columns.
    Broader damage/weather learning consumers require separate deterministic targets and validation.
 
@@ -44,3 +45,8 @@ manually removable; compact learning facts have separate ownership and invalidat
 2026-10-18: 3,182 tests passed, 56 intentionally skipped; production build passed without warnings.
 Matching-dataset endpoint sweeps found no regressions above the project's threshold; details are in
 [endpoint benchmarks](../ENDPOINT_BENCHMARKS.md). These checks do not replace real-game acceptance.
+
+Offline candidate addition, 2026-10-18: 3,195 tests passed, 56 intentionally skipped; production
+build passed without warnings. Focused regressions cover future-data leakage, session weighting,
+exact cohort/resource isolation, minimum evidence, bounded adjustments, worsening shortfall,
+stale projection exclusion and read-only report generation. No real-game validation was performed.

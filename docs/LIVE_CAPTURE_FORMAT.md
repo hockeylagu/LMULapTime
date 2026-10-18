@@ -99,8 +99,22 @@ learning storage is not initialized. Evaluation keeps whole sessions in chronolo
 separates fuel/VE metrics and exact compatible layout/car/driver/patch/condition/compound/model cohorts,
 and compares frozen predictions to measured consumption. Bias is predicted minus actual.
 
-The current predictor still uses the rolling estimator/game fallback. No historical correction is
-fitted or activated. The older dashboard-dependent SQLite strategy audit and CSV export still coexist;
-their consolidation, learning UI, calibration and real-game validation remain in the
+The CLI also fits an offline correction candidate using earlier sessions only. For each exact cohort
+and resource, it takes the median of each training session's `actual - predicted` residuals, then
+the median across sessions. Equal session weight prevents one endurance race from dominating.
+The adjustment is shrunk by `trainSessions / (trainSessions + 3)` and capped to ±10% of each forecast.
+Training needs at least three sessions and 30 examples; held-out evaluation needs two later sessions
+and 20 examples. A candidate must improve MAE by at least 5%, with no increase in p95 absolute error,
+underprediction count or mean shortfall. Fuel and VE retain their separate units.
+
+Report version 2 adds `calibration`: fitted candidate parameters, baseline/candidate errors, evidence
+counts, exclusion gates and a per-cohort screening result. These fixed version-1 policy thresholds
+are conservative engineering defaults, not a validated accuracy guarantee. Reusing a holdout to
+select candidates makes it unsuitable as final independent acceptance evidence; validate on fresh
+sessions before any activation. No parameters are persisted or applied to live advice.
+
+The current predictor still uses the rolling estimator/game fallback. Historical corrections remain
+disabled. The older dashboard-dependent SQLite strategy audit and CSV export still coexist;
+their consolidation, learning UI, correction activation and real-game validation remain in the
 [active plan](plans/LIVE_SESSION_EVIDENCE.md). The delivered foundation and original design are in the
 [archived implementation record](plans/archive/LIVE_SESSION_EVIDENCE_FOUNDATION.md).

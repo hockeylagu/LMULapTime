@@ -48,7 +48,7 @@ Live capture enrichment is implemented on `codex/live-session-evidence`; see the
 [delivery checkpoint](LIVE_SESSION_EVIDENCE.md#delivery-checkpoint) for current scope, local commits
 and remaining gates. Session attachment, canonical identity, XML patch inheritance, aligned yaw/body-slip
 evidence, disposable diagnostics, compact fuel/VE learning examples and offline baseline evaluation
-are coded. Historical calibration/corrections remain unimplemented and disabled.
+are coded. Offline calibration candidate fitting/screening is implemented; live corrections remain disabled.
 Current channel and storage contracts are in [LIVE_CAPTURE_FORMAT.md](../LIVE_CAPTURE_FORMAT.md);
 [native telemetry enrichment](../TELEMETRY_FORMAT.md#complementary-live-capture) distinguishes implemented vectors from unverified wheel channels.
 File and folder size limits are ongoing checks; split only along meaningful responsibilities.

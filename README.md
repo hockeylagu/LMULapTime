@@ -52,7 +52,7 @@ Telemetry analytics and lap comparison for **Le Mans Ultimate (LMU)**. It decode
 The backend records supplemental player data while LMU runs, independent of the dashboard. Each
 session recording uses its own DuckDB file, linked strictly to XML identity and lap clocks. Verified
 ISO 8855 dynamics augment yaw/body-slip charts; disposable response/error diagnostics support race
-debugging. Frozen fuel/VE forecasts and measured outcomes feed an offline baseline evaluator.
+debugging. Frozen fuel/VE forecasts and measured outcomes feed an offline baseline and bounded correction candidate evaluator.
 Historical prediction corrections remain disabled; real-game overhead validation is pending.
 See [live capture storage and channels](docs/LIVE_CAPTURE_FORMAT.md).
 
@@ -149,7 +149,7 @@ To adjust your paths or driver profile:
 | `npm test` | Runs the complete Vitest suite; latest verification is recorded in [CODE_MAP](docs/CODE_MAP.md). |
 | `npm run test:watch` | Runs Vitest in interactive watch mode. |
 | `npm run test:coverage` | Runs the test suite and generates V8 code coverage reports. |
-| `npm run learning:evaluate` | Read-only chronological fuel/VE baseline report from compact learning examples; does not activate corrections. |
+| `npm run learning:evaluate` | Read-only chronological fuel/VE baseline and bounded correction candidate report; does not activate corrections. |
 | `npm run telemetry:probe` | Probes live memory-mapped telemetry structures via .NET 8 tool. |
 | `npm run telemetry:record`| Records live session telemetry to disk via .NET 8 tool. |
 | `npm run vcr:correlate` | Runs offline correlation between XML results and binary replay streams. |
