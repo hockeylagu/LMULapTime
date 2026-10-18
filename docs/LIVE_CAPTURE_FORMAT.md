@@ -106,8 +106,9 @@ avoids retaining the full opponent standings payload. Diagnostics add no REST re
 
 A two-minute post-session tail supports transient-error investigation. Gzip is deferred until after
 the session; a new active session defers pending compression. An already-running compression is not
-cancelled. Crash leftovers remain available for investigation. Sidecars are opt-in: set
-`LMU_LIVE_DIAGNOSTICS=1` to write them (failures are always saved in the recording, see below).
+cancelled. Crash leftovers remain available for investigation. Sidecars are opt-in: turn on
+*Write a diagnostic file with each recording* in Settings → Live dashboard (from the next session;
+failures are always saved in the recording, see below).
 Delete closed `*.diagnostics.jsonl.gz` files manually after the relevant race weekends; doing so leaves
 DuckDB evidence and compact learning facts intact. Automatic cleanup is deferred until real-race
 stability is established; no retention cleanup or cleanup UI is implemented.

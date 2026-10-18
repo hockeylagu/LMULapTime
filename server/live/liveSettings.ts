@@ -5,6 +5,7 @@ import type { SessionDatabase } from '../core/db.js';
 const AUTO_OPEN_KEY = 'live_auto_open';
 const RESERVE_KEY = 'live_reserve_laps';
 const PEDAL_TRACE_KEY = 'live_pedal_trace_seconds';
+const DIAGNOSTICS_KEY = 'live_diagnostics';
 
 type SettingsStore = Pick<SessionDatabase, 'getMetadata' | 'setMetadata'>;
 
@@ -14,7 +15,7 @@ export const isReserveLaps = (value: unknown): value is number =>
 export const isPedalTraceSeconds = (value: unknown): value is number =>
   typeof value === 'number' && (PEDAL_TRACE_SECONDS_CHOICES as readonly number[]).includes(value);
 
-/** Auto-open is on until the driver turns it off; the reserve is half a lap until changed. */
+/** Auto-open is on until the driver turns it off; the reserve is half a lap until changed; diagnostics are off until turned on. */
 export function loadLiveSettings(store: SettingsStore): LiveSettings {
   const reserve = Number(store.getMetadata(RESERVE_KEY));
   const pedalTrace = Number(store.getMetadata(PEDAL_TRACE_KEY));
@@ -22,6 +23,7 @@ export function loadLiveSettings(store: SettingsStore): LiveSettings {
     autoOpen: store.getMetadata(AUTO_OPEN_KEY) !== 'false',
     reserveLaps: store.getMetadata(RESERVE_KEY) !== null && isReserveLaps(reserve) ? reserve : DEFAULT_LIVE_SETTINGS.reserveLaps,
     pedalTraceSeconds: isPedalTraceSeconds(pedalTrace) ? pedalTrace : DEFAULT_LIVE_SETTINGS.pedalTraceSeconds,
+    diagnostics: store.getMetadata(DIAGNOSTICS_KEY) === 'true',
   };
 }
 
@@ -29,4 +31,5 @@ export function saveLiveSettings(store: SettingsStore, settings: LiveSettings): 
   store.setMetadata(AUTO_OPEN_KEY, settings.autoOpen ? 'true' : 'false');
   store.setMetadata(RESERVE_KEY, String(settings.reserveLaps));
   store.setMetadata(PEDAL_TRACE_KEY, String(settings.pedalTraceSeconds));
+  store.setMetadata(DIAGNOSTICS_KEY, settings.diagnostics ? 'true' : 'false');
 }

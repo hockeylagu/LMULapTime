@@ -32,11 +32,23 @@ describe('LiveDashboardCard', () => {
     expect(fetchMock).toHaveBeenLastCalledWith('/api/live/settings', expect.objectContaining({ method: 'POST', body: '{"pedalTraceSeconds":60}' }));
   });
 
+  it('loads and saves the diagnostics setting, off by default', async () => {
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => reply({ autoOpen: true, reserveLaps: 0.5, pedalTraceSeconds: 30, diagnostics: false,
+      ...(init?.method === 'POST' ? JSON.parse(String(init.body)) as Record<string, unknown> : {}) }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<LiveDashboardCard />);
+    const toggle = await screen.findByRole('checkbox', { name: 'Write a diagnostic file with each recording' });
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+    await waitFor(() => expect(toggle).toBeChecked());
+    expect(fetchMock).toHaveBeenLastCalledWith('/api/live/settings', expect.objectContaining({ method: 'POST', body: '{"diagnostics":true}' }));
+  });
+
   it('shows the server message when the setting cannot be read', async () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation(() => reply({ error: 'Live service is down' }, false)));
     render(<LiveDashboardCard />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Live service is down');
-    expect(screen.getByRole('checkbox')).toBeDisabled();
+    for (const checkbox of screen.getAllByRole('checkbox')) expect(checkbox).toBeDisabled();
     expect(screen.getByRole('link', { name: 'Open demo' })).toHaveAttribute('href', '#/live?demo=1');
   });
 });

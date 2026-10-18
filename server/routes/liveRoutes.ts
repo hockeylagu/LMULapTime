@@ -18,7 +18,7 @@ function openStream(res: Response): void {
 }
 
 export function createLiveRouter(context: ServerContext, live: LiveService,
-  capture?: Pick<LiveCaptureController, 'directory' | 'status'> & Partial<Pick<LiveCaptureController, 'hasOpenRecordingHandle'>>,
+  capture?: Pick<LiveCaptureController, 'directory' | 'status'> & Partial<Pick<LiveCaptureController, 'hasOpenRecordingHandle' | 'diagnostics'>>,
   readReadiness?: ReadLearningReadiness): Router {
   const router = Router();
   const readinessReader = new LearningReadinessReader();
@@ -63,14 +63,15 @@ export function createLiveRouter(context: ServerContext, live: LiveService,
     res.json(loadLiveSettings(context.sessionDb));
   });
 
-  // Either setting may be sent alone; the other keeps its stored value.
+  // Any setting may be sent alone; the others keep their stored values.
   router.post('/live/settings', (req, res) => {
-    const body = (req.body ?? {}) as { autoOpen?: unknown; reserveLaps?: unknown; pedalTraceSeconds?: unknown };
+    const body = (req.body ?? {}) as { autoOpen?: unknown; reserveLaps?: unknown; pedalTraceSeconds?: unknown; diagnostics?: unknown };
     const current = loadLiveSettings(context.sessionDb);
-    if (body.autoOpen === undefined && body.reserveLaps === undefined && body.pedalTraceSeconds === undefined) {
-      return res.status(400).json({ error: 'Send autoOpen (true or false), reserveLaps, or pedalTraceSeconds.' });
+    if (body.autoOpen === undefined && body.reserveLaps === undefined && body.pedalTraceSeconds === undefined && body.diagnostics === undefined) {
+      return res.status(400).json({ error: 'Send autoOpen (true or false), reserveLaps, pedalTraceSeconds, or diagnostics (true or false).' });
     }
     if (body.autoOpen !== undefined && typeof body.autoOpen !== 'boolean') return res.status(400).json({ error: 'autoOpen must be true or false.' });
+    if (body.diagnostics !== undefined && typeof body.diagnostics !== 'boolean') return res.status(400).json({ error: 'diagnostics must be true or false.' });
     if (body.reserveLaps !== undefined && !isReserveLaps(body.reserveLaps)) {
       return res.status(400).json({ error: `reserveLaps must be one of ${RESERVE_LAP_CHOICES.join(', ')}.` });
     }
@@ -81,9 +82,11 @@ export function createLiveRouter(context: ServerContext, live: LiveService,
       autoOpen: typeof body.autoOpen === 'boolean' ? body.autoOpen : current.autoOpen,
       reserveLaps: isReserveLaps(body.reserveLaps) ? body.reserveLaps : current.reserveLaps,
       pedalTraceSeconds: isPedalTraceSeconds(body.pedalTraceSeconds) ? body.pedalTraceSeconds : current.pedalTraceSeconds,
+      diagnostics: typeof body.diagnostics === 'boolean' ? body.diagnostics : current.diagnostics,
     });
     const saved = loadLiveSettings(context.sessionDb);
     live.setReserveLaps(saved.reserveLaps);
+    if (capture?.diagnostics) capture.diagnostics.enabled = saved.diagnostics;
     res.json(saved);
   });
 

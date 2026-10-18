@@ -131,7 +131,7 @@ By default, the application automatically detects standard Steam installation pa
 
 App recordings default to `server/live-captures/` (`LMU_LIVE_CAPTURE_DIR` override). There is no
 automatic disk quota; manually remove closed recordings or disposable diagnostic sidecars when needed.
-Diagnostic sidecars are off unless `LMU_LIVE_DIAGNOSTICS=1`. These settings are backend environment variables.
+Diagnostic sidecars are off unless turned on in Settings → Live dashboard. These settings are backend environment variables.
 
 To adjust your paths or driver profile:
 1. Click **Settings** in the top navigation bar.

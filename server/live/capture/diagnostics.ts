@@ -10,15 +10,22 @@ export type DiagnosticSink = (event: DiagnosticEvent) => void;
 const MAX_BUFFER_BYTES = 256 * 1024;
 const CHECKPOINT_MS = 60_000;
 
-/** Disposable JSONL alongside the recording. Async writes; compression only after the post-session tail. */
+/**
+ * Disposable JSONL alongside the recording. Async writes; compression only after the post-session tail.
+ * `enabled` is the live setting: a change applies from the next session.
+ */
 export class LiveDiagnostics {
   private readonly files = new Set<DiagnosticFile>();
   private current: DiagnosticFile | null = null;
-  public constructor(private readonly directory: string) {}
+  public constructor(private readonly directory: string, public enabled = true) {}
 
   public begin(filename: string, recordingId: string): void {
     this.end();
     if (this.current) this.current.requestEndAt = Date.now();
+    if (!this.enabled) {
+      this.current = null;
+      return;
+    }
     const file = new DiagnosticFile(path.join(this.directory,
       `${filename.replace(/\.live\.duckdb$/, '')}.${randomUUID()}.diagnostics.jsonl`));
     this.files.add(file);

@@ -76,4 +76,17 @@ describe('disposable live diagnostic sidecars', () => {
     expect(file.rows.some(row => row.kind === 'oversized')).toBe(false);
     expect(file.rows.find(row => row.kind === 'small')?.droppedBefore).toBe(1);
   });
+
+  it('writes nothing for a session that starts while the setting is off, and ends the previous file', async () => {
+    const { directory, diagnostics } = await setup();
+    diagnostics.enabled = false;
+    diagnostics.begin('second.live.duckdb', 'recording-2');
+    expect(diagnostics.sink()).toBeUndefined();
+    diagnostics.record({ kind: 'new-response', at: Date.now(), data: {} });
+    await diagnostics.stop();
+    const files = await records(directory);
+    expect(files).toHaveLength(1);
+    expect(files[0].rows[0].data.recordingId).toBe('recording-1');
+    expect(files[0].rows.some(row => row.kind === 'new-response')).toBe(false);
+  });
 });

@@ -90,6 +90,21 @@ export const LiveDashboardCard: React.FC = () => {
               disabled={settings === null || isSaving} size="compact" mono className="w-36" />
           </div>
           <p className="text-xs text-lmu-muted">Applies to the live dashboard and the demo.</p>
+          <div>
+            <label className="flex items-center gap-3 text-sm text-lmu-text cursor-pointer">
+              <input
+                type="checkbox"
+                checked={settings?.diagnostics === true}
+                disabled={settings === null || isSaving}
+                onChange={(event) => void save({ diagnostics: event.target.checked })}
+                className={`h-4 w-4 accent-lmu-accent ${FOCUS_RING}`}
+              />
+              Write a diagnostic file with each recording
+            </label>
+            <p className="mt-1 text-xs leading-relaxed text-lmu-muted">
+              For investigating a problem: game requests and app state go to a file beside the recording. Starts with the next session. Failures are saved in the recording either way.
+            </p>
+          </div>
         </>
       )}
       <FeedbackMessage feedback={message} />

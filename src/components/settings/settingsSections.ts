@@ -30,7 +30,7 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     title: 'Live Dashboard',
     icon: Radio,
     description: 'Live dashboard options and an offline demo with sample scenarios',
-    keywords: ['live', 'dashboard', 'pedal', 'trace', 'history', 'duration', 'reserve', 'demo', 'offline', 'preview', 'scenarios', 'cockpit', 'auto open', 'open', 'start', 'launch', 'window', 'fullscreen', 'game', 'shared memory'],
+    keywords: ['live', 'dashboard', 'pedal', 'trace', 'history', 'duration', 'reserve', 'demo', 'offline', 'preview', 'scenarios', 'cockpit', 'auto open', 'open', 'start', 'launch', 'window', 'fullscreen', 'game', 'shared memory', 'diagnostics', 'debug', 'recording'],
   },
   {
     id: 'learning',

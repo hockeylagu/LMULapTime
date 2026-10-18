@@ -167,11 +167,13 @@ export interface LiveSettings {
   reserveLaps: number;
   /** Seconds of throttle/brake history shown on the live dashboard and demo. */
   pedalTraceSeconds: number;
+  /** Write a diagnostic JSONL file beside each recording, from the next session. Off by default. */
+  diagnostics: boolean;
 }
 
 export const PEDAL_TRACE_SECONDS_CHOICES = [5, 10, 15, 20, 30, 45, 60, 90, 120] as const;
 export const RESERVE_LAP_CHOICES = [0, 0.25, 0.5, 0.75, 1, 1.5, 2] as const;
-export const DEFAULT_LIVE_SETTINGS: LiveSettings = { autoOpen: true, reserveLaps: 0.5, pedalTraceSeconds: 30 };
+export const DEFAULT_LIVE_SETTINGS: LiveSettings = { autoOpen: true, reserveLaps: 0.5, pedalTraceSeconds: 30, diagnostics: false };
 
 /** Server-sent event names on `GET /api/live/stream`. The data of each is JSON. */
 export const LIVE_STREAM_EVENTS = {
