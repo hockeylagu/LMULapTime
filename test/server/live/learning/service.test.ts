@@ -158,5 +158,24 @@ describe('refreshLiveLearning', () => {
     const report = evaluateLiveLearning(db.getDb());
     expect(report.dataset).toMatchObject({ currentExamples: 2, eligible: 0, excluded: 2 });
     expect(report.dataset.exclusions['stale-projection']).toBe(2);
+    expect(report.calibration.cohorts).toEqual([]);
+  });
+
+  it('reports offline candidates from eligible compact facts without writing or enabling corrections', async () => {
+    const { db, capture } = verifiedDatabase();
+    await refreshLiveLearning(db.getDb(), 'recordings', () => false, async () => events());
+    setLiveCaptureAvailability(db.getDb(), capture.recordingId, false);
+    const before = db.getDb().prepare('SELECT total_changes() AS count').get();
+    const report = evaluateLiveLearning(db.getDb());
+    expect(report.reportVersion).toBe(2);
+    expect(report.historicalCorrectionsEnabled).toBe(false);
+    expect(report.dataset.eligible).toBe(2);
+    expect(report.calibration.activationEnabled).toBe(false);
+    expect(report.calibration.summary.insufficientEvidence).toBe(2);
+    expect(report.calibration.cohorts).toEqual(expect.arrayContaining([
+      expect.objectContaining({ resourceKind: 'fuel', state: 'insufficient-evidence', model: null }),
+      expect.objectContaining({ resourceKind: 've', state: 'insufficient-evidence', model: null }),
+    ]));
+    expect(db.getDb().prepare('SELECT total_changes() AS count').get()).toEqual(before);
   });
 });

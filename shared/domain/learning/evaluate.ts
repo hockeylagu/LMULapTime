@@ -33,7 +33,7 @@ export interface LearningBaselineEvaluation {
   cohorts: CohortEvaluation[];
 }
 
-function isValidExample(value: EvaluationExample): boolean {
+export function isValidEvaluationExample(value: EvaluationExample): boolean {
   return typeof value.sessionId === 'string' && value.sessionId.length > 0
     && Number.isFinite(value.startedAt)
     && typeof value.cohort === 'string' && value.cohort.length > 0
@@ -42,7 +42,8 @@ function isValidExample(value: EvaluationExample): boolean {
     && Number.isFinite(value.actual) && value.actual > 0;
 }
 
-function metrics(examples: EvaluationExample[]): EvaluationMetrics {
+export function evaluationMetrics(examples: EvaluationExample[]): EvaluationMetrics {
+  if (examples.length === 0) return { count: 0, bias: 0, mae: 0, p95AbsoluteError: 0, underpredictionCount: 0 };
   const errors = examples.map(({ predicted, actual }) => predicted - actual);
   const absoluteErrors = errors.map(Math.abs).sort((a, b) => a - b);
   const p95Index = Math.max(0, Math.ceil(absoluteErrors.length * 0.95) - 1);
@@ -63,7 +64,7 @@ export function evaluateLearningBaseline(
     throw new RangeError('holdoutFraction must be finite and between 0 and 1');
   }
 
-  const valid = examples.filter(isValidExample);
+  const valid = examples.filter(isValidEvaluationExample);
   const sessions = new Map<string, number>();
   for (const example of valid) {
     const existing = sessions.get(example.sessionId);
@@ -100,7 +101,7 @@ export function evaluateLearningBaseline(
       resourceKind,
       trainCount: cohortTrain.length,
       hasCompatibleTrainingEvidence: cohortTrain.length > 0,
-      test: cohortTest.length > 0 ? metrics(cohortTest) : null,
+      test: cohortTest.length > 0 ? evaluationMetrics(cohortTest) : null,
     };
   }).sort((a, b) => a.resourceKind.localeCompare(b.resourceKind) || a.cohort.localeCompare(b.cohort));
 
@@ -111,13 +112,9 @@ export function evaluateLearningBaseline(
     testCount: test.length,
     excludedCount: examples.length - valid.length,
     byResource: {
-      fuel: test.some((example) => example.resourceKind === 'fuel') ? metrics(test.filter((example) => example.resourceKind === 'fuel')) : emptyMetrics(),
-      ve: test.some((example) => example.resourceKind === 've') ? metrics(test.filter((example) => example.resourceKind === 've')) : emptyMetrics(),
+      fuel: evaluationMetrics(test.filter((example) => example.resourceKind === 'fuel')),
+      ve: evaluationMetrics(test.filter((example) => example.resourceKind === 've')),
     },
     cohorts,
   };
-}
-
-function emptyMetrics(): EvaluationMetrics {
-  return { count: 0, bias: 0, mae: 0, p95AbsoluteError: 0, underpredictionCount: 0 };
 }
