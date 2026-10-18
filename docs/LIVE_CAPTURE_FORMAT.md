@@ -11,7 +11,8 @@ independent of an open dashboard. Recording is gated by live lifecycle/replay st
 Files default to ignored `server/live-captures/`; `LMU_LIVE_CAPTURE_DIR` overrides that directory.
 Each recording attempt owns one `*.live.duckdb` file with a unique recording ID.
 An interrupted attempt resumes only with unambiguous continuity proof. If the exact layout is
-temporarily unknown, recovery waits for it; samples during that wait remain a coverage gap.
+temporarily unknown, recovery waits up to 10 s for it, then records a new file; samples during that
+wait remain a coverage gap.
 
 Raw samples live in DuckDB. SQLite stores attachment/availability metadata and compact learning
 examples, rather than a duplicate stream of motion samples. There is no automatic disk cap or
@@ -87,7 +88,8 @@ Existing immutable XML ingestion rules are unchanged. Ambiguous or stale links c
 
 `GET /api/live/capture` exposes capture health/channel metadata. Session detail exposes `liveCaptures`.
 `GET /api/session/:sessionId/live-evidence` selects exact driver/lap ordinals, reads through a bounded
-read-only worker off track, and rechecks XML/link ownership and the exact requested lap after the read.
+read-only worker off track (two at once, two more queued), and rechecks XML/link ownership and the exact
+requested lap after the read. While the recorder still has a file open it answers `busy` without reading.
 Reclassification or changed ordinal ownership invalidates the response.
 
 Chart fusion matches verified samples to explicit trajectory clocks within 25 ms, without interpolating
@@ -181,13 +183,15 @@ The live planner uses eligible active corrections, bounded to ±10%, over its ro
 fallback. Lap-start training events still freeze the uncorrected baseline (version 3), preventing
 recursive bias fitting; corrected advice/audits use model version 4. Resource/garage plans disclose
 the baseline and applied adjustment, and dashboard source text identifies learned advice.
-Exact layout, car, driver, XML patch, weather, compound and baseline source/version must match.
+Exact layout, car, driver, XML patch, weather, compound and baseline source/version must match; weather
+uses the training rule (wet from `RAIN_WET_MIN`), not the planner's drying hysteresis.
 Because shared memory has no verified patch, runtime patch trust requires a verified completed capture
 started during this observed continuous game run. Closing LMU clears trust; until a new result is
 matched after restart, ordinary estimation applies. No last-known patch is guessed across game runs.
 
 Worker work is cancelled at session load, bounded to 15 seconds, and discarded if SQLite changed
-while it ran. Training failures clear the in-memory corrections. Unchanged data skips repeated
+while it ran. Live lookups always serve the corrections last committed to SQLite, so a discarded or
+failed refresh keeps them; a learning failure never stops capture link synchronization. Unchanged data skips repeated
 evaluation. All per-frame use is an in-memory lookup with no database reads. Set
 `LMU_LIVE_LEARNING=0` before starting the server to disable automatic promotion/use; recording continues.
 These implementation gates are engineering defaults; actual improvement and overhead still require
