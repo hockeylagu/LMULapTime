@@ -1,5 +1,11 @@
 # 🏎️ Le Mans Ultimate Embedded REST API Specification
 
+Current app integration (2026-10-18): capture keeps existing gentle REST polling active independently
+of dashboard clients while eligible live sessions run. Sparse evidence belongs to session DuckDB;
+bounded response/error diagnostics use disposable JSONL sidecars with deferred gzip. Diagnostics add
+no REST requests. The legacy manual capture directory is unchanged. See
+[Live capture format](LIVE_CAPTURE_FORMAT.md). API findings below retain their original provenance.
+
 This document provides a comprehensive technical reference for the embedded HTTP REST API and Swagger interface running natively inside **Le Mans Ultimate (LMU)** (Studio 397 / Motorsport Games, rFactor 2 engine lineage).
 
 ---

@@ -9,12 +9,16 @@ web
 ## Users
 
 - **Primary: the author**, a Le Mans Ultimate sim racer who reviews their own sessions. The tool is built around their use first.
-- **Secondary: other LMU drivers on PC.** The project is open source (MIT) so any LMU driver can run it locally. Design must not rely on the author's personal habits or data.
+- **Secondary: other LMU drivers on PC.** The project is open source (MPL-2.0) so any LMU driver can run it locally. Design must not rely on the author's personal habits or data.
 - The job: after driving, find out where time was lost, against whom, and what to change next. This means reading laps, corners and stints, and comparing against real drivers from the same layout and class.
 
 ## Product Purpose
 
 A local telemetry analytics, lap comparison and race intelligence hub for Le Mans Ultimate. It reads LMU's own files (results XML, 100 Hz DuckDB telemetry, binary `.Vcr` replays) and turns them into clean laps, true pace, corner-by-corner analysis, comparisons, a leaderboard and a rival to chase.
+
+Supplemental player evidence is also recorded by the running backend into per-session DuckDB files.
+It augments measured dynamics and supplies fuel/VE learning examples; historical prediction
+corrections are not enabled. See [live capture](docs/LIVE_CAPTURE_FORMAT.md).
 
 Success means the driver leaves a session review knowing a few specific, correct things to work on, backed by numbers they can trust.
 
@@ -29,8 +33,9 @@ Success means the driver leaves a session review knowing a few specific, correct
 
 - Desktop browser, opened after a session: the driver finishes driving, then runs the app to review. The design width is a fixed 1500px column on a large monitor (the driver uses 2560 wide); laptops, tablets and mobile are not targets.
 - One exception while driving: the live dashboard (`#/live`), a passive fullscreen page on a second monitor (2560 x 1440, read from 50 inches or more) that opens by itself when LMU starts. It gives advice only (pit lap, VE or fuel to set, damage pace loss beside repair time, pedal trace); the driver sets everything in the game. It never takes input while racing, and the app scans no game files while a session is loaded. Its scale is separate from the analysis pages ([LIVE_RACE_DASHBOARD.md](docs/plans/LIVE_RACE_DASHBOARD.md)).
+- Supplemental capture runs whenever the backend and LMU have an eligible loaded live session, even without the dashboard open.
 - A Node/Express server on port 3001 plus the Vite client; started with `npm run dev` / `launch.bat`.
-- Sources: `UserData/LOG/Results/*.xml`, `UserData/Telemetry/*.duckdb`, `UserData/Replays/*.Vcr`, and optionally LMU's embedded REST API. Replays can be several hundred MB to 1 GB and are decoded in workers and cached. The cache is the source of truth once replays are deleted.
+- Sources: `UserData/LOG/Results/*.xml`, `UserData/Telemetry/*.duckdb`, `UserData/Replays/*.Vcr`, plus shared memory and LMU's embedded REST API for live evidence. Replays can be several hundred MB to 1 GB and are decoded in workers and cached. The cache is the source of truth once replays are deleted.
 - Main areas: dashboard, sessions and session detail (debrief), tracks and track detail, leaderboard and rivals, telemetry/replay studio (`#/telemetry`), settings.
 
 ## Capabilities and Constraints
@@ -40,7 +45,7 @@ Success means the driver leaves a session review knowing a few specific, correct
 - **Lap classification is fixed.** True pace and consistency use clean flying laps only. Start, out, in, partial and wet laps are judged apart.
 - **Numbers must be exact.** Lap times, deltas and units are shown precisely. Nothing is rounded or estimated silently, and unknown or inferred values are labeled as such.
 - **Advice must be right or absent.** No advice is better than bad advice, and any coaching shown to the driver needs very high confidence. Metrics and lap detection are deterministic. AI (Google Gemini, optional) may interpret information that is too hard to read directly, when that helps, but it is held to the same confidence bar. The app must work fully without it.
-- Damage/repair state is not available in VCR or XML. Pit repairs are only a guess and must be presented as such.
+- VCR/XML do not establish damage/repair state. Recorded live condition and REST repair estimates add evidence when available; an estimate does not prove a repair occurred. Inferred repairs remain labeled as estimates.
 
 ## Brand Commitments
 

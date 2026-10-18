@@ -27,7 +27,10 @@ per session attempt, bounded queues, checkpoints, signature validation and catal
 requires unique canonical identity and completed lap anchors before inheriting XML `GameVersion`.
 Session detail exposes `liveCaptures`; `GET /api/live/capture` returns health and channel metadata.
 Files default to ignored `server/live-captures/` (`LMU_LIVE_CAPTURE_DIR` override); no automatic deletion.
-Learning and aligned channel consumers remain planned in `docs/plans/LIVE_SESSION_EVIDENCE.md`.
+Aligned consumers and the first fuel/VE dataset/evaluator are implemented. Calibration and
+real-game acceptance remain in [the active plan](plans/LIVE_SESSION_EVIDENCE.md); current contracts
+are in [Live capture format](LIVE_CAPTURE_FORMAT.md). Recovery waits for exact layout proof before
+resuming or forking. The writer accepts four normal batches plus two reserved finalization slots.
 
 Aligned live evidence: `liveEvidenceRoutes.ts` exposes `/api/session/:sessionId/live-evidence` with
 driver/lap ordinals. `capture/evidenceService.ts` revalidates current XML ownership and lap anchors;
@@ -38,7 +41,8 @@ defines provenance/coverage contracts; `src/api/liveEvidenceApi.ts` is the front
 `shared/domain/live/liveTelemetryFusion.ts` joins verified source samples to explicit trajectory clocks
 within 25 ms. `fetchSessionTelemetry` requests evidence only with the player attachment hint;
 client post-processing preserves supplied yaw/slip and native G. The inspector's `LiveCaptureCoverage`
-and channel badges disclose live versus computed values. Deterministic learning consumers remain planned.
+discloses coverage; computed fallback channels retain `COMPUTED`, while measured channels need no extra badge.
+The evidence service rechecks exact driver/lap ownership after each asynchronous read.
 
 A fast index for new sessions: find the right file without searching. `AGENTS.md` holds the rules;
 this file holds the **routes through the code**. Keep it current (see "Keeping this file current" at the end).
@@ -52,7 +56,11 @@ decode options in `server/replay/decode/replayTrajectoryTypes.ts`, telemetry cha
 The type cleanup is tracked in [the archived type refactoring plan](plans/archive/TYPE_REFACTORING_PLAN.md), and its
 Phase 6 naming table.
 
-Last checked 2026-10-12 after the type refactoring follow-ups (main `25d1e988`): 476 TypeScript source files
+Live-evidence branch verification, 2026-10-18: 3,182 tests passed, 56 intentionally skipped; production
+build passed without warnings. This is a focused update, not a new coverage measurement or global
+re-audit of the historical inventory below.
+
+Historical baseline, last checked 2026-10-12 after the type refactoring follow-ups (main `25d1e988`): 476 TypeScript source files
 in src/server/shared, 305 test suites (300 passed, 5 skipped), 2663 tests (2607 passed, 56 skipped); the
 production build passed without warnings or errors. Coverage was last measured before those follow-ups:
 94.68% lines, 92.41% statements, 92.64% functions and 83.77% branches. Branch/worktree results are separate;
@@ -60,13 +68,14 @@ see [plans](plans/README.md).
 
 ---
 
-## 1. The three data sources and where each enters
+## 1. The four data sources and where each enters
 
 | Source | Files on disk | Ingest entry | Stored in (SQLite, `server/lmu_cache.db`) |
 |---|---|---|---|
 | XML results log | `UserData/LOG/Results/*.xml` | `server/core/dbSessionSync.ts` → `LmuParser.parseSessionXml` (`server/sessions/parser.ts`) | `sessions` (58 scalar columns, legacy JSON columns removed in Phase 3) and its rows: `session_recordings`, `session_drivers`, `session_laps`, `session_lap_passes`, `session_events`, with the dictionaries `drivers`, `vehicles`, `teams` |
 | Binary replay | `UserData/Replays/*.Vcr` | `server/core/replay/dbReplaySync.ts` → worker (`server/replay/worker/replayTrajectoryWorker*.ts`) → `replayTrajectory.ts` → `replayFacts.ts` | `replay_metadata`, `replay_trajectories`, `replay_facts`, `replay_laps`, `replay_conditions`, `replay_driver_events`, `replay_running_order`, `replay_race_positions` |
-| DuckDB 100 Hz telemetry | `UserData/Telemetry/*.duckdb` | `server/telemetry/telemetryCatalog.ts` → `duckdbReader.ts` | `telemetry_metadata`, `telemetry_lap_cache` |
+| App live capture | `server/live-captures/*.live.duckdb` | `server/live/capture/controller.ts` → recording worker; strict XML reconciliation | Raw streams remain in DuckDB; SQLite holds attachments and compact learning projections |
+| Native DuckDB 100 Hz telemetry | `UserData/Telemetry/*.duckdb` | `server/telemetry/telemetryCatalog.ts` → `duckdbReader.ts` | `telemetry_metadata`, `telemetry_lap_cache` |
 
 Other tables: `reference_laptimes` (benchmarks), `ai_reports`, `rival_targets` (user state, never cleared),
 `cache_metadata`, `ingest_errors`, `replay_ingest_drivers`, `rejected_replay_links`, `replay_trajectory_defaults`.
@@ -660,7 +669,7 @@ Strategy (VE/fuel, pit, damage, tyres, forecast; contracts in `shared/types/live
 allowlisted REST GETs (1 s total deadline) and their parsers; `lmuGet` and the reader worker's `probeGame` go through
 `lmuHttp.ts` (`lmuHttpGet`: settles once, by a hard deadline rather than the socket's idle timeout, and on an answer cut
 off midway, so a one-request-at-a-time caller never waits forever); `livePitPoller.ts` asks at most one a second, most overdue
-first, by mode (off / track / garage, only while a dashboard client is connected and a session is loaded),
+first, by mode (off / track / garage, while a dashboard client or capture requires polling and a session is loaded),
 a state check (`navigation/state`, replay from `settingMode` via `parseReplayPlayback`) every ~10 s and right before
 each `getVehicleCondition`, the one read that crashes LMU in a replay, and each `GetSessionsInfoForEvent` (garage
 only, once per loaded session; never tried in a replay); the other reads are replay-safe (a replay reads
@@ -809,7 +818,7 @@ the completed 2026-09-29 cleanup and does not describe all remaining findings.
 - Comparison queries now mark page PBs with one window query for the visible drivers (`markPagePersonalBests`), rather than one query per driver. The older 2026-10-10 ~127 ms all-driver measurement predates that implementation and was not rerun in this audit; profile current query plans before optimizing further.
 
 **Known data limits (not code bugs)**
-- Pit repairs are a guess: neither the VCR nor the XML has repair or damage state. Validating against the LMU REST API is deferred.
+- VCR/XML do not prove repairs. Live capture retains condition and REST repair estimates, but inferred completed repairs still require explicit uncertainty.
 
 ---
 

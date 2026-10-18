@@ -169,28 +169,20 @@ Stored data: replay trajectory blobs and DuckDB lap-cache rows written since the
 copy and no replay needs decoding again. Lateral offsets are not stored: they are reprojected whenever
 a trajectory is served.
 
-## Possible enrichment from a live capture (idea, not planned)
+## Complementary live capture
 
-Shared memory and the LMU REST API carry a few things neither the DuckDB file nor the replay has.
-Compared on 2026-10-15 against the channel list of an LMU build 14200 race DuckDB and the live
-captures in `C:/Documents/lmu-live-captures/`:
+The app now records supplemental player evidence into its own per-session DuckDB files, independent
+of dashboard clients. This schema differs from LMU's native telemetry exporter described above.
+Six verified ISO 8855 vehicle velocity/angular-velocity values augment measured yaw and body-slip
+charts; native telemetry G values are preserved. Twenty-four reserved wheel columns remain NULL
+until verified. Sparse condition/weather/REST observations and versioned fuel/VE forecast/outcome
+events support analysis without inventing unavailable measurements.
 
-- **Measured motion, ~50 Hz:** yaw, pitch and roll rates and angles, and the local velocity
-  vector, so yaw rate and slip angle would be measured instead of computed from heading;
-  position in native LMU x/y/z (DuckDB has 10 Hz GPS and 10 Hz G forces).
-- **Per-tyre slip:** contact-patch and ground velocities give slip angle and slip ratio per
-  wheel; dynamic camber and toe per wheel.
-- **Damage:** dent severity in eight body zones over time (DuckDB has impact magnitude,
-  detached wheels and overheating only).
-- **Weather:** rain intensity, average and maximum path wetness (DuckDB has cloud darkness,
-  minimum and off-path wetness).
-- **REST:** the repair time estimate (`pitstop-estimate.damage`), which would end the pit-repair
-  guess; the session forecast; the MFD settings at each stop once the garage reads are verified.
-
-LMU zeroes tyre load, grip, tyre forces, downforce, drag, engine torque and chassis ride heights
-in shared memory (offline and online), so those cannot be added. The data exists only for
-sessions driven while the app records it: a live reader could save a small per-session file
-beside the DuckDB one; past sessions cannot gain it.
+Capture only covers sessions driven while the backend records. XML identity, completed-lap anchors
+and XML game patch establish ownership. Unknown timing and coverage gaps remain explicit.
+See [Live capture format](LIVE_CAPTURE_FORMAT.md) for channels, clocks, schema, diagnostics and learning;
+[remaining work](plans/LIVE_SESSION_EVIDENCE.md) includes calibration and real-game validation.
+The [archived foundation](plans/archive/LIVE_SESSION_EVIDENCE_FOUNDATION.md) preserves the original analysis.
 
 ## Versioning and provenance
 

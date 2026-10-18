@@ -1,13 +1,13 @@
 # Plans and remaining work
 
-General review: 2026-10-10; replay storage/ingestion entries updated and type refactoring archived 2026-10-12. This is the entry point for delivery status;
+Live evidence status/archival reviewed 2026-10-18. General review: 2026-10-10; replay storage/ingestion entries updated and type refactoring archived 2026-10-12. This is the entry point for delivery status;
 [CODE_MAP.md](../CODE_MAP.md) describes the implementation. A proposal is not a shipped feature.
 
 ## Active work
 
 | Plan | Status | Next useful step | Completion gate |
 |---|---|---|---|
-| [Live session evidence and learning ingestion](LIVE_SESSION_EVIDENCE.md) | Capture, reconciliation, aligned API, chart integration, diagnostics and first fuel/VE dataset/baseline evaluator coded on `codex/live-session-evidence`, 2026-10-18; historical corrections disabled | Collect eligible new sessions, review chronological baseline, then evaluate a correction candidate; real-game overhead validation pending | Recoverable verified attachments, channel provenance and chronologically validated deterministic learning |
+| [Live session learning and acceptance](LIVE_SESSION_EVIDENCE.md) | Foundation archived; historical corrections disabled | Collect eligible sessions, validate real-game overhead, review chronological baseline and consolidate the older audit | Independently validated calibration, explicit fallback/activation gates and race-weekend acceptance |
 | [Replay storage and ingestion design](REPLAY_STORAGE_DESIGN.md) | Proposed; [initial POC](REPLAY_STORAGE_POC.md) complete; both candidates rejected on size | Evaluate storage reductions against current compact lap format | Storage size first, app read response second, ingestion third; archived-data safety and domain parity required |
 | [Corner comparison rework](CORNER_COMPARISON_REWORK.md) | In progress on `corner-map`; not integrated into main | Read the worktree's hybrid handoff; complete M2 metric/sequence revalidation, then M3 inspector acceptance | Accepted shared action maps, independent events, swap symmetry and additive timing; visual/sequence gates and consumer integration verified before merging |
 | [Simplified 3D replay and camera controls](REPLAY_3D_PLAN.md) | Proposed; source analysis reviewed 2026-10-15 | Validate one exported plugin scene against cached replay poses | Simplified track, cars, cameras and comparison stay aligned with telemetry; layout/revision isolation, fallback and performance gates pass |
@@ -49,14 +49,15 @@ Live capture enrichment is implemented on `codex/live-session-evidence`; see the
 and remaining gates. Session attachment, canonical identity, XML patch inheritance, aligned yaw/body-slip
 evidence, disposable diagnostics, compact fuel/VE learning examples and offline baseline evaluation
 are coded. Historical calibration/corrections remain unimplemented and disabled.
-The earlier channel capability notes remain in [TELEMETRY_FORMAT.md](../TELEMETRY_FORMAT.md#possible-enrichment-from-a-live-capture-idea-not-planned);
-they describe observations and possibilities, not implemented capture channels.
+Current channel and storage contracts are in [LIVE_CAPTURE_FORMAT.md](../LIVE_CAPTURE_FORMAT.md);
+[native telemetry enrichment](../TELEMETRY_FORMAT.md#complementary-live-capture) distinguishes implemented vectors from unverified wheel channels.
 File and folder size limits are ongoing checks; split only along meaningful responsibilities.
 
 ## Completed plans
 
 | Record | Outcome | Historical completion |
 |---|---|---|
+| [Live session evidence foundation](archive/LIVE_SESSION_EVIDENCE_FOUNDATION.md) | Capture, strict reconciliation, aligned API/chart fusion, disposable diagnostics, fuel/VE dataset and baseline evaluator, plus three review fixes; calibration and real-game gates remain active | 2026-10-18 |
 | [Dropdown standardization](archive/DROPDOWN_STANDARDIZATION.md) | All 24 inventoried dropdowns and disclosures on one shared family (`common/dropdown/`): custom select-only `Select` replaces every native select; keyboard, typeahead, Escape layering and modal/fullscreen placement verified; tests/build clean | 2026-10-13 |
 | [Type refactoring](archive/TYPE_REFACTORING_PLAN.md) | One canonical type per model, one name and one place per fact in TypeScript, SQL and stored JSON; cache rewritten offline; follow-up fixes for driver selection, canonical package classes and server-side compare picker, chart history and Compare page bests | 2026-10-12 |
 | [Frontend simplification audit](archive/SRC_SIMPLIFICATION_AUDIT.md) | Ten fixes committed separately: direct imports, shared wheel rendering and modal focus, canonical progression type, fewer repeated calculations and requests, and removed forwarders; full tests/build passed | 2026-10-12 |

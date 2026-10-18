@@ -6,7 +6,7 @@
 [![Vite](https://img.shields.io/badge/Vite-8-646cff.svg)](https://vitejs.dev/)
 [![SQLite](https://img.shields.io/badge/SQLite-WAL%20Mode-003B57.svg)](https://sqlite.org/)
 [![DuckDB](https://img.shields.io/badge/DuckDB-100Hz%20Telemetry-FFF000.svg)](https://duckdb.org/)
-[![Tests](https://img.shields.io/badge/Tests-2000%2B%20Passing-brightgreen.svg)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Tests-3000%2B%20Passing-brightgreen.svg)](https://vitest.dev/)
 
 Telemetry analytics and lap comparison for **Le Mans Ultimate (LMU)**. It decodes LMU's own replays to get the telemetry of every car on track, not just yours, and puts your laps next to theirs.
 
@@ -47,6 +47,15 @@ Telemetry analytics and lap comparison for **Le Mans Ultimate (LMU)**. It decode
 
 ![Dashboard Overview](assets/dashboard.png)
 
+### Live capture and learning evidence
+
+The backend records supplemental player data while LMU runs, independent of the dashboard. Each
+session recording uses its own DuckDB file, linked strictly to XML identity and lap clocks. Verified
+ISO 8855 dynamics augment yaw/body-slip charts; disposable response/error diagnostics support race
+debugging. Frozen fuel/VE forecasts and measured outcomes feed an offline baseline evaluator.
+Historical prediction corrections remain disabled; real-game overhead validation is pending.
+See [live capture storage and channels](docs/LIVE_CAPTURE_FORMAT.md).
+
 ### 🎯 Coaching
 - **Corner analysis**: entry (braking, trail brake), rotation (apex speed) and exit (throttle pick-up) for every turn, with consistency scoring.
 - **Deterministic coaching**: driving deficits ranked by time lost, repeatability and confidence (`priority = timeLoss * repeatability * confidence`).
@@ -63,6 +72,7 @@ Telemetry analytics and lap comparison for **Le Mans Ultimate (LMU)**. It decode
 - [`docs/plans/README.md`](docs/plans/README.md): completed work, active branch work and remaining priorities.
 - [`docs/CODE_MAP.md`](docs/CODE_MAP.md): implementation, routes, storage and cache versions.
 - [`docs/PLUGINS.md`](docs/PLUGINS.md): optional local data packages, setup and fallback.
+- [`docs/LIVE_CAPTURE_FORMAT.md`](docs/LIVE_CAPTURE_FORMAT.md): app-owned live recordings, diagnostics and learning evidence.
 - [`docs/TELEMETRY_FORMAT.md`](docs/TELEMETRY_FORMAT.md): LMU 100 Hz DuckDB telemetry tables and channels.
 - [`docs/VCR_FORMAT.md`](docs/VCR_FORMAT.md) / [`docs/VCR_ANALYSIS.md`](docs/VCR_ANALYSIS.md): the reverse-engineered binary replay format (`gMb1.002f`) and its accuracy.
 - [`docs/XML_FORMAT.md`](docs/XML_FORMAT.md): LMU results XML schema.
@@ -114,7 +124,11 @@ Telemetry analytics and lap comparison for **Le Mans Ultimate (LMU)**. It decode
 By default, the application automatically detects standard Steam installation paths:
 - **Session Results XML**: `C:\Program Files (x86)\Steam\steamapps\common\Le Mans Ultimate\UserData\LOG\Results`
 - **Replays Directory**: `C:\Program Files (x86)\Steam\steamapps\common\Le Mans Ultimate\UserData\Replays`
-- **Telemetry DuckDB Directory**: `C:\Program Files (x86)\Steam\steamapps\common\Le Mans Ultimate\UserData\Telemetry`
+- **Native telemetry directory**: `C:\Program Files (x86)\Steam\steamapps\common\Le Mans Ultimate\UserData\Telemetry`
+
+App recordings default to `server/live-captures/` (`LMU_LIVE_CAPTURE_DIR` override). There is no
+automatic disk quota; manually remove closed recordings or disposable diagnostic sidecars when needed.
+Set `LMU_LIVE_DIAGNOSTICS=0` to disable diagnostics. These settings are backend environment variables.
 
 To adjust your paths or driver profile:
 1. Click **Settings** in the top navigation bar.
@@ -135,6 +149,7 @@ To adjust your paths or driver profile:
 | `npm test` | Runs the complete Vitest suite; latest verification is recorded in [CODE_MAP](docs/CODE_MAP.md). |
 | `npm run test:watch` | Runs Vitest in interactive watch mode. |
 | `npm run test:coverage` | Runs the test suite and generates V8 code coverage reports. |
+| `npm run learning:evaluate` | Read-only chronological fuel/VE baseline report from compact learning examples; does not activate corrections. |
 | `npm run telemetry:probe` | Probes live memory-mapped telemetry structures via .NET 8 tool. |
 | `npm run telemetry:record`| Records live session telemetry to disk via .NET 8 tool. |
 | `npm run vcr:correlate` | Runs offline correlation between XML results and binary replay streams. |
@@ -148,7 +163,7 @@ To adjust your paths or driver profile:
 - **Frontend**: [React 19](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [Vite 8](https://vitejs.dev/), [Tailwind CSS v4](https://tailwindcss.com/), [Recharts](https://recharts.org/), [Lucide React](https://lucide.dev/)
 - **Backend**: [Node.js](https://nodejs.org/), [Express 5](https://expressjs.com/), [Better-SQLite3](https://github.com/WiseLibs/better-sqlite3) (WAL Mode), [DuckDB](https://duckdb.org/), [Fast-XML-Parser](https://github.com/NaturalIntelligence/fast-xml-parser), [@google/genai](https://github.com/googleapis/genai-js)
 - **Diagnostics & Tooling**: C# .NET 8 Telemetry Recorder, TSX analysis scripts
-- **Test Suite**: [Vitest](https://vitest.dev/), Testing Library, JSDOM
+- **Test Suite**: [Vitest](https://vitest.dev/), Testing Library, happy-dom
 
 ---
 

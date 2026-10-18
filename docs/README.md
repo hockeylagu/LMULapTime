@@ -1,6 +1,6 @@
 # Documentation guide
 
-Reviewed 2026-10-10 against repository source. Start with the document that answers the question:
+General review 2026-10-10; live capture, learning and relevant root references updated 2026-10-18. Start with the document that answers the question:
 
 | Need | Document |
 |---|---|
@@ -13,7 +13,11 @@ Reviewed 2026-10-10 against repository source. Start with the document that answ
 | Work on results ingestion | [XML format](XML_FORMAT.md) |
 | Work on replay decoding | [VCR format](VCR_FORMAT.md), [analysis and provenance](VCR_ANALYSIS.md) |
 | Work on native telemetry ingestion | [DuckDB telemetry format](TELEMETRY_FORMAT.md) |
+| Work on app-owned capture, diagnostics and learning | [Live capture format](LIVE_CAPTURE_FORMAT.md) |
 | Investigate the game's embedded API | [LMU REST API](LMU_REST_API.md), [captured Swagger schema](swagger-schema.json) |
+
+The delivered live-capture foundation is [archived](plans/archive/LIVE_SESSION_EVIDENCE_FOUNDATION.md);
+[calibration and real-game acceptance](plans/LIVE_SESSION_EVIDENCE.md) remain active.
 
 Current main implementation belongs in CODE_MAP and setup/reference docs. Active plans distinguish
 proposals and unmerged branch work; [archived plans](plans/README.md#completed-plans) preserve completed designs and evidence.

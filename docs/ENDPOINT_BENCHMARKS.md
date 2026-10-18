@@ -1,5 +1,15 @@
 # Endpoint performance history
 
+## Live evidence review fixes — 2026-10-18
+
+Before/after sweeps used 20 requests per case and identical dataset/cohort hashes (snapshot
+`c3633d286fd5`). No median exceeded both regression thresholds (>20% and >5 ms). The unlinked
+live-evidence endpoint median was 1.26 → 1.17 ms; this excludes a DuckDB read. A separate 20-sample
+verified coordinator probe with an injected reader measured 0.8401 → 0.8732 ms median (excluding
+DuckDB I/O and HTTP). Full suite: 3,182 passed, 56 intentionally skipped; production build clean.
+Reports: `.cache/review-fix-endpoints-before/`, `.cache/review-fix-endpoints-after/`,
+`.cache/live-channel-analysis/review-fix-evidence-performance.json`.
+
 ## Live dynamics chart integration — 2026-10-18
 
 Twenty-request sweeps used the same snapshot (`c3633d286fd5`). Automatic telemetry median was

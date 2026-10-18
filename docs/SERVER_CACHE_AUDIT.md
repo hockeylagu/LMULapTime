@@ -1,5 +1,11 @@
 # Server cache audit
 
+Live evidence ownership update (2026-10-18): raw streams and sparse learning events live in per-session
+DuckDB. SQLite holds attachment metadata and compact learning examples; the older dashboard strategy
+audit still coexists. Diagnostic JSONL/gzip sidecars are disposable. No automatic raw-file retention cap
+applies; canonical changes can invalidate compact facts after raw cleanup. See
+[Live capture format](LIVE_CAPTURE_FORMAT.md). Historical measurements below retain their original dates.
+
 Reviewed 2026-10-10. Current follow-ups are indexed in [plans/README.md](plans/README.md). Historical measurements were not rerun in the documentation review. Scope: server caches, shared server-side indexes, and their SQLite alternatives.
 Client loader/hook state, SQLite's own page cache and transient per-calculation maps are excluded.
 
