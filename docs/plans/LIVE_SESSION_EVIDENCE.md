@@ -15,7 +15,7 @@ The current storage, channel and operational contract is [Live capture format](.
 | Attachment | Strict XML identity and completed-lap anchors; XML game patch inheritance; ambiguous ownership rejected |
 | Consumers | Aligned evidence API and yaw/body-slip chart fusion; native G preserved; computed fallback disclosed |
 | Diagnostics | Bounded response/error sidecars, post-session tail and deferred gzip; manual cleanup |
-| Audit consolidation | Full checkpoints in session DuckDB independent of dashboard; worker-paged JSON/CSV; old SQLite table and compatibility code removed with user approval |
+| Audit consolidation | Full checkpoints in session DuckDB independent of dashboard; direct DuckDB debugging; JSON/CSV export endpoints/UI/workers and old SQLite compatibility removed |
 | Learning | Frozen fuel/VE forecasts and measured outcomes, compact SQLite examples, chronological baseline and bounded offline correction candidate evaluation implemented |
 | Review fixes | Deferred recovery while layout is unresolved, consistent six-slot batch capacity and exact lap revalidation implemented |
 | Acceptance | Real-game performance and race-weekend validation deferred by user; correction activation and learning UI pending |
@@ -28,10 +28,10 @@ The current storage, channel and operational contract is [Live capture format](.
 2. Run `npm run learning:evaluate` and inspect eligibility/exclusion counts, exact compatibility
    cohorts and whole-session chronological holdouts. Fuel and VE use separate units and metrics.
    Require sufficient independent sessions before interpreting changes as improvement.
-3. Audit consolidation is coded: new full checkpoints live in DuckDB, JSON/CSV read recordings off
-   track through bounded workers. The inspected old SQLite audit table/data was deleted with user
-   approval, and its compatibility store/tests are removed. No automatic deletion migration or pruning
-   runs. Verify a real race export after in-game validation.
+3. Audit consolidation is complete: full checkpoints live in DuckDB for direct debugging. JSON/CSV
+   export endpoints, UI and reader workers are removed by user request. The inspected old SQLite audit
+   table/data was deleted with approval, and its compatibility store/tests are removed. No automatic
+   deletion migration or pruning runs. Verify real race checkpoints during later in-game validation.
 4. Expose learning readiness and exclusion reasons in the app. The CLI now screens a deterministic
    session-median residual correction with shrinkage, minimum evidence and a 10% adjustment bound.
    Review compatible real cohorts and validate the fixed policy on fresh sessions before activation.
@@ -64,3 +64,8 @@ table (15 recording runs, 638 checkpoints) was dropped. The schemas and row coun
 tables were unchanged. The compatibility store/tests are removed; CSV formatting/escaping tests
 now live with the recording audit tests. Final suite: 3,199 passed, 56 intentionally skipped;
 production build clean and matching-dataset endpoint sweeps without threshold regressions.
+
+Audit export removal, 2026-10-18: JSON/CSV endpoints, settings export UI, export-reader workers and
+their seven export-specific tests removed by user request. DuckDB checkpoint capture and independent
+learning events remain unchanged. Final suite: 3,192 passed, 56 intentionally skipped; final production
+build passed without warnings. Remaining endpoints passed matching-dataset performance checks.

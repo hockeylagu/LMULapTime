@@ -980,5 +980,5 @@ and manual retention are settled. They do not need to be reopened before learnin
 - [Live identity](../../../shared/domain/live/liveIdentity.ts),
   [audit tracker](../../../shared/domain/live/liveAudit.ts),
   [audit contracts](../../../shared/types/liveAudit.ts),
-  [current audit storage](../../LIVE_CAPTURE_FORMAT.md#consolidated-strategy-audit-and-export)
+  [current audit storage](../../LIVE_CAPTURE_FORMAT.md#consolidated-strategy-audit)
   (the former SQLite audit store was subsequently removed with user approval).

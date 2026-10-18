@@ -83,35 +83,36 @@ Delete closed `*.diagnostics.jsonl.gz` files manually after the relevant race we
 DuckDB evidence and compact learning facts intact. No retention cleanup or cleanup UI is implemented.
 The legacy `C:\Documents\lmu-live-captures` directory belongs to manual capture scripts and is unchanged.
 
-## Consolidated strategy audit and export
+## Consolidated strategy audit
 
-Full estimate/selection/outcome checkpoints now use recorder observations of kind
+Full estimate/selection/outcome checkpoints use recorder observations of kind
 `strategy-audit-v1` inside the owning session DuckDB. They run without dashboard subscribers and
 replace the older periodic `strategy-prediction` observation. Start, settings/estimate changes,
 laps, measurements, finish and end retain the existing audit semantics, plus ten-second checkpoints.
 The controller ends the old audit before switching files. A recovered recording keeps its recording
-UUID; exported sequences use persisted observation IDs so a tracker restart cannot duplicate keys.
+UUID; use `observation_id` to distinguish checkpoints across tracker restarts because the tracker’s
+local `data.sequence` counter can restart.
 
-Audit checkpoints are never written to SQLite. The old `live_strategy_audit` table and its historical
-rows were explicitly removed from the local database after the user approved the inspected inventory.
-The SQLite audit reader, writer and compatibility tests are removed; fresh databases do not create
-that table. No automatic deletion migration or legacy fallback is shipped.
-Audit history is diagnostic context; permanent frozen learning events and compact examples remain
-separate, and deleting diagnostics does not remove either of them.
+Inspect a closed recording directly with a read-only DuckDB connection:
 
-`GET /api/live/audit` returns the newest 200 checkpoints from available finalized recordings.
-`GET /api/live/audit.csv` streams recording groups in start order; each recording follows persisted observation order. Both accept
-`runId`; for new captures this is the recording UUID. CSV columns and spreadsheet escaping remain.
-Exports wait until the game session and writer handles close (503 with a retry message while busy).
-Unlinked finalized recordings can be exported as raw diagnostic history without asserting XML ownership.
+```sql
+SELECT observation_id, elapsed_seconds, received_at,
+       json_extract_string(data, '$.reason') AS reason, data
+FROM capture_observations
+WHERE source = 'recorder' AND kind = 'strategy-audit-v1'
+ORDER BY observation_id;
+```
 
-Independent read-only workers page by observation ID: at most 200 records and 4 MiB per page,
-two concurrent page readers, and a ten-second page timeout. JSON reads stop once newer pages prove
-that older files cannot affect its 200-row result. Broad exports support up to 1,000 recordings per
-request; use `runId` for a larger archive. This is a read bound, not a disk-retention cap.
-Missing, changed or corrupt files fail explicitly; an error after CSV streaming starts aborts the
-response rather than silently producing a successful partial export. Manually deleting a closed
-DuckDB recording removes its new audit history; compact eligible learning facts can survive separately.
+The JSON payload contains the captured snapshot, usage observations and any forecast/actual
+comparison. It is diagnostic context; permanent frozen learning events and compact examples remain
+separate. Disposable REST/error sidecars can be deleted without removing these checkpoints.
+Deleting a closed DuckDB recording removes its audit history; eligible compact learning facts can
+survive separately under the normal invalidation rules.
+
+No audit JSON/CSV endpoints, export UI, export workers or legacy fallback remain. The old SQLite
+`live_strategy_audit` table/data was removed locally after approval of its inventory, and its store
+and compatibility tests are removed. Fresh databases do not create that table; no automatic deletion
+migration is shipped. Neither the learning pipeline nor live predictions depends on an export.
 
 ## Learning: implemented scope and remaining gates
 
@@ -144,7 +145,7 @@ select candidates makes it unsuitable as final independent acceptance evidence; 
 sessions before any activation. No parameters are persisted or applied to live advice.
 
 The current predictor still uses the rolling estimator/game fallback. Historical corrections remain
-disabled. Audit history/export reads the consolidated recording source;
+disabled. Audit checkpoints remain in the consolidated recording source;
 learning UI, correction activation and real-game validation remain in the
 [active plan](plans/LIVE_SESSION_EVIDENCE.md). The delivered foundation and original design are in the
 [archived implementation record](plans/archive/LIVE_SESSION_EVIDENCE_FOUNDATION.md).

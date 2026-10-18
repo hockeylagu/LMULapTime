@@ -3,7 +3,8 @@
 Live evidence ownership update (2026-10-18): raw streams and sparse learning events live in per-session
 DuckDB, including full strategy audit checkpoints independent of dashboard clients. SQLite holds
 attachment metadata and compact learning examples. The old audit table was deleted with user approval;
-its SQLite store/compatibility code and startup pruning are removed. JSON/CSV reads are paged off track. Diagnostic sidecars are disposable. No automatic raw-file retention cap
+its SQLite store/compatibility code and startup pruning are removed. Audit debugging uses DuckDB directly;
+JSON/CSV endpoints/UI and their reader workers are removed. Diagnostic sidecars are disposable. No automatic raw-file retention cap
 applies; canonical changes can invalidate compact facts after raw cleanup. See
 [Live capture format](LIVE_CAPTURE_FORMAT.md). Historical measurements below retain their original dates.
 

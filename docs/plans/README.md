@@ -49,7 +49,7 @@ Live capture enrichment is implemented on `codex/live-session-evidence`; see the
 and remaining gates. Session attachment, canonical identity, XML patch inheritance, aligned yaw/body-slip
 evidence, disposable diagnostics, compact fuel/VE learning examples and offline baseline evaluation
 are coded. Audit checkpoints now share the session DuckDB; the approved old SQLite history and
-its compatibility code are removed. JSON/CSV export remains available after recording closes. Offline calibration candidate fitting/screening is implemented; live corrections remain disabled.
+its compatibility code are removed. Audit debugging uses DuckDB directly; export endpoints/UI are removed. Offline calibration candidate fitting/screening is implemented; live corrections remain disabled.
 Current channel and storage contracts are in [LIVE_CAPTURE_FORMAT.md](../LIVE_CAPTURE_FORMAT.md);
 [native telemetry enrichment](../TELEMETRY_FORMAT.md#complementary-live-capture) distinguishes implemented vectors from unverified wheel channels.
 File and folder size limits are ongoing checks; split only along meaningful responsibilities.

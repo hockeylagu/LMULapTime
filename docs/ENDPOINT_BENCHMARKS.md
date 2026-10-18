@@ -1,5 +1,13 @@
 # Endpoint performance history
 
+## Remove audit JSON/CSV exports — 2026-10-18
+
+The audit JSON and CSV routes and their benchmark cases are removed by user request. The remaining
+endpoints were measured with 20 requests per case against the immediately preceding
+`.cache/audit-removal-after/` baseline: identical post-deletion dataset (`61b58d425945`), cohort and
+plugin revision. No shared endpoint median regressed by both >20% and >5 ms.
+After report: `.cache/audit-export-removal-after/`. Earlier audit-route measurements below are historical.
+
 ## Remove SQLite audit compatibility — 2026-10-18
 
 After the user approved removal of the inspected old audit table/data, the former read path and
