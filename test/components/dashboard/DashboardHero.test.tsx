@@ -183,7 +183,7 @@ describe('DashboardHero', () => {
     { position: 8, gridPosition: 7, positionGain: -1, text: '-1' },
   ])('preserves the position change for a P$gridPosition start and P$position finish', ({ position, gridPosition, positionGain, text }) => {
     const session = makeSessionCard({ sessionType: 'Race', playerDriver: { position, gridPosition, positionGain } });
-    render(<DashboardHero sessions={[session]} onSelectSession={vi.fn()} />);
+    render(<DashboardHero sessions={[session]} onSelectSession={vi.fn()} trackGeometry={mockGeometry} />);
 
     expect(screen.getByTestId('hero-finish-gain')).toHaveTextContent(text);
     expect(screen.getByTestId('hero-finish')).toHaveTextContent(`from P${gridPosition}`);
@@ -191,7 +191,7 @@ describe('DashboardHero', () => {
 
   it('hides the zero change when the finishing position matches the start', () => {
     const session = makeSessionCard({ sessionType: 'Race', playerDriver: { position: 1, gridPosition: 1, positionGain: 0 } });
-    render(<DashboardHero sessions={[session]} onSelectSession={vi.fn()} />);
+    render(<DashboardHero sessions={[session]} onSelectSession={vi.fn()} trackGeometry={mockGeometry} />);
 
     expect(screen.getByTestId('hero-finish')).toHaveTextContent(/^FinishP1$/);
     expect(screen.queryByTestId('hero-finish-gain')).not.toBeInTheDocument();
@@ -199,7 +199,7 @@ describe('DashboardHero', () => {
 
   it('omits the starting position and change when they are unknown', () => {
     const session = makeSessionCard({ sessionType: 'Race', playerDriver: { position: 1 } });
-    render(<DashboardHero sessions={[session]} onSelectSession={vi.fn()} />);
+    render(<DashboardHero sessions={[session]} onSelectSession={vi.fn()} trackGeometry={mockGeometry} />);
 
     expect(screen.getByTestId('hero-finish')).toHaveTextContent('P1');
     expect(screen.queryByTestId('hero-finish-gain')).not.toBeInTheDocument();
