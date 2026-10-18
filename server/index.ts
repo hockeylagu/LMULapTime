@@ -157,7 +157,7 @@ app.use('/api', createSessionRouter(serverContext));
 app.use('/api', createLeaderboardRouter(serverContext));
 app.use('/api', createReplayRouter(serverContext));
 app.use('/api', createLiveRouter(serverContext, liveService, liveCapture));
-app.use('/api', createLiveEvidenceRouter(serverContext, captureDirectory));
+app.use('/api', createLiveEvidenceRouter(serverContext, captureDirectory, undefined, () => liveCapture.hasOpenRecordingHandle));
 
 if (process.env.NODE_ENV !== 'test') {
   const server = app.listen(PORT, '127.0.0.1', () => {

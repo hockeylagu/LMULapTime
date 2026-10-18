@@ -34,11 +34,12 @@ function fixture() {
     coverage: { firstLapSeconds: null, lastLapSeconds: null, gaps: [], recordingDroppedSamples: 0 } };
   const read = vi.fn(async () => evidence);
   let loaded = false;
+  let recorderOpen = false;
   const context = { sessionDb: store, getScanStatus: () => ({ heldForLiveSession: loaded }) } as unknown as ServerContext;
   const app = express();
-  app.use('/api', createLiveEvidenceRouter(context, 'unused', { read }));
+  app.use('/api', createLiveEvidenceRouter(context, 'unused', { read }, () => recorderOpen));
   const link = () => { upsertLiveCapture(db, manifest, 100); setLiveCaptureMatch(db, 'capture', 'session', 'Build-42', 'verified'); };
-  return { app, db, read, evidence, manifest, link, load: () => { loaded = true; } };
+  return { app, db, read, evidence, manifest, link, load: () => { loaded = true; }, openRecorder: () => { recorderOpen = true; } };
 }
 
 const url = '/api/session/session/live-evidence?driverOrdinal=0&lapOrdinal=0';
@@ -63,6 +64,14 @@ describe('session live evidence API', () => {
     expect((await request(t.app).get(url)).body.reason).toBe('missing');
     t.load();
     expect((await request(t.app).get(url)).body.reason).toBe('session-loaded');
+    expect(t.read).not.toHaveBeenCalled();
+  });
+
+  it('asks for a retry without opening the file while the recorder still has captures open', async () => {
+    const t = fixture();
+    t.link();
+    t.openRecorder();
+    expect((await request(t.app).get(url)).body).toMatchObject({ state: 'unavailable', reason: 'busy' });
     expect(t.read).not.toHaveBeenCalled();
   });
 

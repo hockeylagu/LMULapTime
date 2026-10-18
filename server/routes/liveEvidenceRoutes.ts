@@ -2,9 +2,10 @@ import { Router } from 'express';
 import type { ServerContext } from '../core/serverContext.js';
 import { LiveEvidenceReader } from '../live/capture/evidenceReader.js';
 import { getLiveLapEvidence } from '../live/capture/evidenceService.js';
+import { LiveEvidenceReadError } from '../live/capture/readError.js';
 
 export function createLiveEvidenceRouter(context: ServerContext, directory: string,
-  reader: Pick<LiveEvidenceReader, 'read'> = new LiveEvidenceReader()): Router {
+  reader: Pick<LiveEvidenceReader, 'read'> = new LiveEvidenceReader(), recorderOpen: () => boolean = () => false): Router {
   const router = Router();
   router.get('/session/:sessionId/live-evidence', async (req, res) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -17,7 +18,10 @@ export function createLiveEvidenceRouter(context: ServerContext, directory: stri
     }
     const result = await getLiveLapEvidence(context.sessionDb.getDb(), directory,
       { sessionId: req.params.sessionId, driverOrdinal, lapOrdinal }, () => Boolean(context.getScanStatus().heldForLiveSession),
-      request => reader.read(request));
+      // The recorder may hold the file read-write (finishing it, or writing an XML link): retry later.
+      request => recorderOpen()
+        ? Promise.reject(new LiveEvidenceReadError('busy', 'The recorder is still writing live captures; retry shortly'))
+        : reader.read(request));
     return result ? res.json(result) : res.status(404).json({ error: 'Session lap not found' });
   });
   return router;
