@@ -53,3 +53,30 @@ export interface LiveLearningExample {
   crossingSeconds: number;
   exclusions: string[];
 }
+
+export interface LiveLearningReadinessReport {
+  state: 'evaluated';
+  generatedAt: string;
+  historicalCorrectionsEnabled: false;
+  captures: { indexed: number; verified: number; unavailable: number };
+  processing: { current: number; pending: number };
+  dataset: { currentExamples: number; eligible: number; excluded: number; exclusions: Record<string, number> };
+  sessions: { training: number; heldOut: number };
+  sources: Array<{ state: string; count: number }>;
+  resources: Array<{
+    kind: LiveResourceKind;
+    trainingExamples: number;
+    heldOutExamples: number;
+    insufficientCohorts: number;
+    rejectedCohorts: number;
+    passingCohorts: number;
+    gates: Record<string, number>;
+  }>;
+  minimumEvidence: { trainSessions: number; trainExamples: number; testSessions: number; testExamples: number };
+}
+
+export type LiveLearningReadiness = LiveLearningReadinessReport | {
+  state: 'deferred';
+  historicalCorrectionsEnabled: false;
+  message: string;
+};

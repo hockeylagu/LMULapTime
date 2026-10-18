@@ -30,8 +30,10 @@ export function evaluateLiveLearning(db: Database, holdoutFraction = 0.25) {
     units: { fuel: 'litres per lap', ve: 'percentage points per lap' },
     captures: { indexed: captures.length, verified: captures.filter(entry => entry.matchStatus === 'verified').length,
       unavailable: captures.filter(entry => !entry.available).length },
+    processing: { current: current.size, pending: captures.filter(entry => entry.matchStatus === 'verified'
+      && !current.has(entry.manifest.recordingId)).length },
     dataset: { currentExamples: examples.length, eligible: eligible.length, excluded: examples.length - eligible.length, exclusions },
-    sources: db.prepare('SELECT state,count(*) AS count FROM live_learning_sources GROUP BY state ORDER BY state').all(),
+    sources: db.prepare('SELECT state,count(*) AS count FROM live_learning_sources GROUP BY state ORDER BY state').all() as Array<{ state: string; count: number }>,
     sourceFailures: db.prepare(`SELECT recording_id AS recordingId,error,updated_at AS updatedAt FROM live_learning_sources
       WHERE state='failed' ORDER BY updated_at DESC LIMIT 20`).all(),
     evaluation,

@@ -62,6 +62,7 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
     'leaderboard-layouts': '/api/leaderboard/layouts',
     'replay-cache': '/api/replays/cache', 'replay-upgrade-status': '/api/replays/upgrade',
     'live-settings': '/api/live/settings',
+    'live-learning': '/api/live/learning',
     'live-capture': '/api/live/capture',
   })) add(id, url.split('?')[0], url);
   add('live-stream', '/api/live/stream', undefined, 'Server-sent event stream: stays open, has no response time.');

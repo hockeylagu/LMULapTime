@@ -8,6 +8,9 @@ import { SSE_HEADERS, writeSseEvent } from '../live/sse.js';
 import type { LiveCaptureController } from '../live/capture/controller.js';
 import { LIVE_CAPTURE_CHANNELS } from '../live/capture/channels.js';
 import { LIVE_CAPTURE_NORMALIZATION_VERSION, LIVE_CAPTURE_SCHEMA_VERSION } from '../../shared/types/liveCapture.js';
+import { LearningReadinessError, LearningReadinessReader } from '../live/learning/readinessReader.js';
+import type { ReadLearningReadiness } from '../live/learning/readinessReader.js';
+import type { LiveLearningReadiness } from '../../shared/types/liveLearning.js';
 
 function openStream(res: Response): void {
   res.writeHead(200, SSE_HEADERS);
@@ -15,8 +18,33 @@ function openStream(res: Response): void {
 }
 
 export function createLiveRouter(context: ServerContext, live: LiveService,
-  capture?: Pick<LiveCaptureController, 'directory' | 'status'>): Router {
+  capture?: Pick<LiveCaptureController, 'directory' | 'status'> & Partial<Pick<LiveCaptureController, 'hasOpenRecordingHandle'>>,
+  readReadiness?: ReadLearningReadiness): Router {
   const router = Router();
+  const readinessReader = new LearningReadinessReader();
+  const deferredReadiness = (): LiveLearningReadiness => ({ state: 'deferred', historicalCorrectionsEnabled: false,
+    message: 'Evidence checks resume after you leave the game session and its recording closes.' });
+  router.get('/live/learning', async (req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    if (Object.keys(req.query).length) return res.status(400).json({ error: 'Learning readiness does not accept query parameters.' });
+    const blocked = (): boolean => live.isSessionLoaded() || capture?.hasOpenRecordingHandle === true;
+    if (blocked()) return res.json(deferredReadiness());
+    const abort = new AbortController();
+    const cancel = (): void => abort.abort();
+    const stopLoaded = live.events.on('session-loaded', loaded => { if (loaded) cancel(); });
+    res.once('close', cancel);
+    try {
+      const filename = context.sessionDb.getDb().name;
+      const report = await (readReadiness ?? ((file, signal) => readinessReader.read(file, signal)))(filename, abort.signal);
+      if (res.destroyed) return;
+      return res.json(blocked() || abort.signal.aborted ? deferredReadiness() : report);
+    } catch (error) {
+      if (res.destroyed) return;
+      if (blocked() || abort.signal.aborted) return res.json(deferredReadiness());
+      return res.status(error instanceof LearningReadinessError ? error.status : 500)
+        .json({ error: error instanceof Error ? error.message : 'Unable to check learning evidence.' });
+    } finally { stopLoaded(); res.off('close', cancel); }
+  });
   router.get('/live/capture', (_req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     return res.json({ source: 'live-capture', schemaVersion: LIVE_CAPTURE_SCHEMA_VERSION,

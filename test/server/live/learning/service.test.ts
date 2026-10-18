@@ -3,6 +3,7 @@ import { SessionDatabase } from '../../../../server/core/db.js';
 import { getLiveCaptureIndexRows, setLiveCaptureAvailability, setLiveCaptureMatch, upsertLiveCapture } from '../../../../server/core/live/dbLiveCaptureStore.js';
 import { getLearningSource, readCurrentLearningExamples } from '../../../../server/core/live/dbLiveLearningStore.js';
 import { evaluateLiveLearning } from '../../../../server/live/learning/report.js';
+import { learningReadiness } from '../../../../server/live/learning/readiness.js';
 import { refreshLiveLearning } from '../../../../server/live/learning/service.js';
 import type { LiveCaptureManifest } from '../../../../shared/types/liveCapture.js';
 import type { StoredLearningEvent } from '../../../../shared/types/liveLearning.js';
@@ -159,6 +160,7 @@ describe('refreshLiveLearning', () => {
     expect(report.dataset).toMatchObject({ currentExamples: 2, eligible: 0, excluded: 2 });
     expect(report.dataset.exclusions['stale-projection']).toBe(2);
     expect(report.calibration.cohorts).toEqual([]);
+    expect(learningReadiness(db.getDb()).dataset.exclusions['stale-projection']).toBe(2);
   });
 
   it('reports offline candidates from eligible compact facts without writing or enabling corrections', async () => {
@@ -175,6 +177,13 @@ describe('refreshLiveLearning', () => {
     expect(report.calibration.cohorts).toEqual(expect.arrayContaining([
       expect.objectContaining({ resourceKind: 'fuel', state: 'insufficient-evidence', model: null }),
       expect.objectContaining({ resourceKind: 've', state: 'insufficient-evidence', model: null }),
+    ]));
+    const readiness = learningReadiness(db.getDb());
+    expect(readiness).toMatchObject({ state: 'evaluated', historicalCorrectionsEnabled: false,
+      sessions: { training: 1, heldOut: 0 }, dataset: { eligible: 2 }, captures: { unavailable: 1 } });
+    expect(readiness.resources).toEqual(expect.arrayContaining([
+      expect.objectContaining({ kind: 'fuel', trainingExamples: 1, heldOutExamples: 0, passingCohorts: 0, insufficientCohorts: 1 }),
+      expect.objectContaining({ kind: 've', trainingExamples: 1, passingCohorts: 0, insufficientCohorts: 1 }),
     ]));
     expect(db.getDb().prepare('SELECT total_changes() AS count').get()).toEqual(before);
   });
