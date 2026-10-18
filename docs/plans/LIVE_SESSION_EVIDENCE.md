@@ -18,7 +18,7 @@ The current storage, channel and operational contract is [Live capture format](.
 | Audit consolidation | Full checkpoints in session DuckDB independent of dashboard; direct DuckDB debugging; JSON/CSV export endpoints/UI/workers and old SQLite compatibility removed |
 | Learning | Frozen fuel/VE forecasts and measured outcomes, compact SQLite examples, chronological baseline and bounded offline correction candidate evaluation implemented |
 | Review fixes | Deferred recovery while layout is unresolved, consistent six-slot batch capacity and exact lap revalidation implemented |
-| Learning readiness | Settings → Live dashboard has a manual evidence check; read-only worker, resource-separated counts, exclusions and offline gates; cancelled when a game session starts |
+| Learning readiness | Settings → Learning has a manual evidence check; read-only worker, resource-separated counts, exclusions and offline gates; cancelled when a game session starts |
 | Acceptance | Real-game performance and race-weekend validation deferred by user; correction activation and runtime fallback/rollback controls pending |
 
 ## Next implementation and acceptance work
@@ -33,7 +33,7 @@ The current storage, channel and operational contract is [Live capture format](.
    export endpoints, UI and reader workers are removed by user request. The inspected old SQLite audit
    table/data was deleted with approval, and its compatibility store/tests are removed. No automatic
    deletion migration or pruning runs. Verify real race checkpoints during later in-game validation.
-4. Learning readiness and exclusion reasons are now visible in Settings → Live dashboard. A manual
+4. Learning readiness and exclusion reasons are now visible in Settings → Learning. A manual
    check uses compact SQLite facts through a read-only worker, never live polling. The CLI screens a deterministic
    session-median residual correction with shrinkage, minimum evidence and a 10% adjustment bound.
    Review compatible real cohorts and validate the fixed policy on fresh sessions before activation.
@@ -77,3 +77,8 @@ without warnings. Tests cover manual-only requests, empty/evaluated/deferred/err
 canonical exclusions, retained compact facts, read-only worker concurrency/cancellation and loaded
 session/writer-handle gates. Mock-data desktop inspection and independent subsection review passed;
 matching-dataset endpoint checks found no threshold regressions. No live-game validation performed.
+
+Separate Learning section, 2026-10-18: moved readiness to its own Settings panel with sidebar
+navigation and search, following the requested placement. All 3,203 tests passed, 56 intentionally
+skipped; production build passed without warnings. Desktop inspection and independent placement
+review passed. The evidence check remains manual, with no request when opening Settings.

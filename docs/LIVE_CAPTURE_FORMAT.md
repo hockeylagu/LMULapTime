@@ -152,7 +152,7 @@ correction activation and real-game validation remain in the
 
 ## Learning readiness in Settings
 
-Settings → Live dashboard → **Learning evidence** runs only when **Check evidence** is pressed.
+Settings → **Learning** runs only when **Check evidence** is pressed.
 It shows usable measurements, verified recording counts, failed/pending processing, unavailable raw
 files, separate fuel/VE earlier/later counts, offline matching-group results and readable exclusion
 reasons. Expand the minimum-evidence section for policy requirements and unmet checks. The checked

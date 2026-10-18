@@ -4,7 +4,7 @@ Learning readiness: `server/live/learning/readiness.ts` projects the CLI's canon
 compact UI counts. `readinessReader.ts` and its worker/bootstrap use one read-only SQLite worker,
 a transaction and a 15-second deadline. `GET /api/live/learning` gates loaded sessions/open writer
 handles, cancels on session start/disconnect and serves no stored report. `LiveLearningPanel` under
-Settings → Live dashboard requests it manually, separates fuel/VE and shows excluded evidence,
+Settings → Learning requests it manually, separates fuel/VE and shows excluded evidence,
 minimums and unmet offline gates. No activation or live-prediction change is implemented.
 
 Fuel/VE learning foundation: `shared/domain/learning/capture.ts` freezes both resource forecasts at lap
