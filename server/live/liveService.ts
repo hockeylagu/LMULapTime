@@ -1,6 +1,6 @@
 import { Worker } from 'node:worker_threads';
 import { randomUUID } from 'node:crypto';
-import { LiveAuditTracker } from '../../shared/domain/live/liveAudit.js';
+import { LIVE_MODEL_VERSION, LiveAuditTracker } from '../../shared/domain/live/liveAudit.js';
 import type { LiveAuditRecord } from '../../shared/types/liveAudit.js';
 import { deriveLiveState, isLiveOnTrack, isLiveSessionLoaded } from '../../shared/domain/live/liveLifecycle.js';
 import type { LiveGameScreen, LiveScoringReading, LiveVehicleReading } from '../../shared/domain/live/liveLifecycle.js';
@@ -88,6 +88,7 @@ export class LiveService {
   private readonly results = new LiveResultTracker();
   private readonly audit: LiveAuditTracker | null;
   private auditFailed = false;
+  private lastDiagnosticStrategyAt = -Infinity;
   private readonly pit: LivePitPoller;
   /** The last scoring reading, kept so a navigation notice or a REST answer can re-derive the snapshot without a new frame. */
   private lastReading: LiveScoringReading | null = null;
@@ -135,6 +136,7 @@ export class LiveService {
     });
     this.pit = new LivePitPoller({
       ...options.pit,
+      diagnosticSink: () => this.options.capture?.diagnostics?.sink(),
       onUpdate: update => this.applyRest(update),
       onEvidence: observation => {
         if (!this.isReplaying()) this.options.capture?.observe(observation);
@@ -179,7 +181,8 @@ export class LiveService {
     if (this.worker) return;
     this.stopped = false;
     const worker = this.options.createWorker?.()
-      ?? new Worker(findWorkerBootstrap(import.meta.url, ['live', 'liveReaderWorkerBootstrap.mjs']));
+      ?? new Worker(findWorkerBootstrap(import.meta.url, ['live', 'liveReaderWorkerBootstrap.mjs']),
+        { workerData: { diagnostics: this.options.capture?.diagnostics !== undefined } });
     this.worker = worker;
     worker.unref();
     worker.on('message', (message: unknown) => {
@@ -188,6 +191,7 @@ export class LiveService {
     const lost = (reason: string): void => {
       if (this.worker !== worker) return;
       console.warn(`[Live] Shared memory reader ${reason}`);
+      this.options.capture?.diagnostics?.record({ kind: 'reader-failure', at: Date.now(), data: { reason } });
       this.worker = null;
       this.processRunning = null;
       this.handleMessage({ type: 'closed' });
@@ -234,8 +238,13 @@ export class LiveService {
   }
 
   private handleMessage(message: unknown): void {
-    if (!isWorkerMessage<LiveReaderMessage>(message, ['frame', 'navigation', 'closed', 'process'])) return;
+    if (!isWorkerMessage<LiveReaderMessage>(message, ['frame', 'navigation', 'closed', 'process', 'diagnostic'])) return;
+    if (message.type === 'diagnostic') {
+      this.options.capture?.diagnostics?.record(message.event);
+      return;
+    }
     if (message.type === 'process') {
+      this.options.capture?.diagnostics?.record({ kind: 'game-process', at: Date.now(), data: message });
       this.processRunning = message.running;
       this.publishRunning();
       return;
@@ -253,6 +262,7 @@ export class LiveService {
       return;
     }
     if (message.type === 'navigation') {
+      this.options.capture?.diagnostics?.record({ kind: 'navigation', at: Date.now(), data: message });
       // A replay is a session screen whose frames are not the session's (applyReading shows it as the menu).
       this.screen = message.screen === 'replay' ? 'session' : message.screen;
       this.loadingProgress = message.loadingProgress;
@@ -337,6 +347,17 @@ export class LiveService {
       strategy,
     };
     this.options.capture?.update(reading, { ...next, sequence: previous.sequence + 1, receivedAt: Date.now() });
+    this.options.capture?.diagnostics?.record({ kind: 'app-state', at: Date.now(), data: {
+      lifecycle: next.lifecycle, paused: next.paused, identity: next.identity, loadingProgress: next.loadingProgress,
+      session: next.session ? { ...next.session, elapsedSeconds: undefined } : null,
+    } });
+    if (Date.now() - this.lastDiagnosticStrategyAt >= 10_000 || next.lifecycle !== previous.lifecycle) {
+      this.lastDiagnosticStrategyAt = Date.now();
+      this.options.capture?.diagnostics?.record({ kind: 'strategy', at: Date.now(), data: {
+        modelVersion: LIVE_MODEL_VERSION, elapsedSeconds: reading?.currentEt ?? null,
+        strategy: next.strategy, observations: this.strategy.observations(),
+      } });
+    }
     if (this.options.capture) this.followPitMode();
     // History is captured only while a dashboard is open, like the REST reads it depends on.
     if (this.clients.size === 0) this.audit?.end(Date.now());

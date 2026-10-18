@@ -12,29 +12,46 @@ import http from 'node:http';
  */
 export type LmuHttpResult =
   | { status: 'ok'; statusCode: number; body: string }
-  | { status: 'timeout' | 'aborted' | 'error' };
+  | { status: 'timeout' | 'aborted' | 'error'; diagnostic?: {
+    statusCode?: number; bodyExcerpt: string; bodyTruncated: boolean; errorCode?: string;
+  } };
 
-export function lmuHttpGet(url: string, deadlineMs: number): Promise<LmuHttpResult> {
+export function lmuHttpGet(url: string, deadlineMs: number, captureFailure = false): Promise<LmuHttpResult> {
   return new Promise(resolve => {
     let settled = false;
+    let partialBody = '';
+    let partialTruncated = false;
+    let statusCode: number | undefined;
+    let errorCode: string | undefined;
     const settle = (result: LmuHttpResult): void => {
       if (settled) return;
       settled = true;
       clearTimeout(deadline);
       if (result.status !== 'ok') request.destroy();
-      resolve(result);
+      resolve(result.status !== 'ok' && captureFailure ? { ...result,
+        diagnostic: { statusCode, bodyExcerpt: partialBody, bodyTruncated: partialTruncated, errorCode } } : result);
     };
     const request = http.get(url, response => {
+      statusCode = response.statusCode;
       let body = '';
       let complete = false;
       response.setEncoding('utf8');
-      response.on('data', (chunk: string) => { body += chunk; });
+      response.on('data', (chunk: string) => {
+        body += chunk;
+        if (captureFailure) {
+          partialTruncated ||= partialBody.length + chunk.length > 8192;
+          partialBody = (partialBody + chunk).slice(0, 8192);
+        }
+      });
       response.on('end', () => { complete = true; settle({ status: 'ok', statusCode: response.statusCode ?? 0, body }); });
       response.on('error', () => settle({ status: 'aborted' }));
       response.on('close', () => { if (!complete) settle({ status: 'aborted' }); });
     });
     const deadline = setTimeout(() => settle({ status: 'timeout' }), deadlineMs);
     deadline.unref();
-    request.on('error', (error: NodeJS.ErrnoException) => settle({ status: error.code === 'ECONNREFUSED' ? 'error' : 'aborted' }));
+    request.on('error', (error: NodeJS.ErrnoException) => {
+      errorCode = error.code;
+      settle({ status: error.code === 'ECONNREFUSED' ? 'error' : 'aborted' });
+    });
   });
 }

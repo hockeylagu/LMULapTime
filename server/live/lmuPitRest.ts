@@ -12,16 +12,29 @@ import type { LivePitMenu, LivePitState } from '../../shared/types/liveStrategy.
 export const LMU_REST_ORIGIN = 'http://127.0.0.1:6397';
 export const REST_TIMEOUT_MS = 1000;
 
-export type RestAnswer = { ok: true; body: unknown } | { ok: false; reason: 'status' | 'timeout' | 'error' };
+export interface RestDiagnostic {
+  outcome: 'ok' | 'timeout' | 'aborted' | 'error' | 'http-error' | 'invalid-json';
+  statusCode?: number;
+  bodyExcerpt?: string;
+  bodyTruncated?: boolean;
+  errorCode?: string;
+}
+export type RestAnswer = ({ ok: true; body: unknown } | { ok: false; reason: 'status' | 'timeout' | 'error' })
+  & { diagnostic?: RestDiagnostic };
 export type RestGet = (path: string) => Promise<RestAnswer>;
 
 /** One GET; never throws. A non-200, an unreadable body, a refusal, a dropped answer or one slower than 1 s is not ok. */
 export const lmuGet: RestGet = async path => {
-  const answer = await lmuHttpGet(`${LMU_REST_ORIGIN}${path}`, REST_TIMEOUT_MS);
-  if (answer.status === 'timeout') return { ok: false, reason: 'timeout' };
-  if (answer.status !== 'ok') return { ok: false, reason: 'error' };
-  if (answer.statusCode !== 200) return { ok: false, reason: 'status' };
-  try { return { ok: true, body: JSON.parse(answer.body) as unknown }; } catch { return { ok: false, reason: 'error' }; }
+  const answer = await lmuHttpGet(`${LMU_REST_ORIGIN}${path}`, REST_TIMEOUT_MS, true);
+  if (answer.status !== 'ok') return { ok: false, reason: answer.status === 'timeout' ? 'timeout' : 'error',
+    diagnostic: { outcome: answer.status, ...answer.diagnostic } };
+  const diagnostic: RestDiagnostic = { outcome: 'ok', statusCode: answer.statusCode };
+  const failed = (outcome: 'http-error' | 'invalid-json', reason: 'status' | 'error'): RestAnswer => ({
+    ok: false, reason, diagnostic: { ...diagnostic, outcome, bodyExcerpt: answer.body.slice(0, 8192), bodyTruncated: answer.body.length > 8192 },
+  });
+  if (answer.statusCode !== 200) return failed('http-error', 'status');
+  try { return { ok: true, body: JSON.parse(answer.body) as unknown, diagnostic }; }
+  catch { return failed('invalid-json', 'error'); }
 };
 
 type Json = Record<string, unknown>;

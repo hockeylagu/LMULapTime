@@ -52,4 +52,10 @@ describe('lmuHttpGet', () => {
     await new Promise(resolve => { closed.close(resolve); });
     expect(await lmuHttpGet(`http://127.0.0.1:${port}/`, DEADLINE_MS)).toEqual({ status: 'error' });
   });
+
+  it('retains the partial response and HTTP status when diagnostics are requested', async () => {
+    expect(await lmuHttpGet(`${origin}/abort`, 5000, true)).toMatchObject({ status: 'aborted', diagnostic: {
+      statusCode: 200, bodyExcerpt: '{"a":', bodyTruncated: false,
+    } });
+  });
 });

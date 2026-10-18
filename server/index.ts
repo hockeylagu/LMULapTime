@@ -23,6 +23,7 @@ import { createLiveAuditWriter } from './core/live/dbLiveAuditStore.js';
 import { loadLiveSettings } from './live/liveSettings.js';
 import { queryLivePersonalBest } from './core/sessionSummaries/contextQueries.js';
 import { LiveCaptureController } from './live/capture/controller.js';
+import { LiveDiagnostics } from './live/capture/diagnostics.js';
 import { getLiveCaptureIndexRows, listLiveCaptureManifests, upsertLiveCapture } from './core/live/dbLiveCaptureStore.js';
 import { reconcileLiveCaptures } from './live/capture/reconcile.js';
 import { createLiveEvidenceRouter } from './routes/liveEvidenceRoutes.js';
@@ -83,6 +84,7 @@ const startReferenceLaptimeRefresh = (): void => {
 const captureDirectory = path.resolve(process.env.LMU_LIVE_CAPTURE_DIR || path.join('server', 'live-captures'));
 const liveCapture = new LiveCaptureController({
   directory: captureDirectory,
+  diagnostics: process.env.LMU_LIVE_DIAGNOSTICS === '0' ? undefined : new LiveDiagnostics(captureDirectory),
   existing: () => listLiveCaptureManifests(sessionDb.getDb()),
   onPersist: (manifest, bytes) => {
     upsertLiveCapture(sessionDb.getDb(), manifest, bytes);

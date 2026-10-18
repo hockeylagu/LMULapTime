@@ -13,6 +13,7 @@ import type {
 import { mapVehicleIdToModel } from '../../../shared/domain/vehicleMapping.js';
 import { LIVE_MODEL_VERSION } from '../../../shared/domain/live/liveAudit.js';
 import { findWorkerBootstrap, isWorkerMessage } from '../../core/workerThreads.js';
+import type { LiveDiagnostics } from './diagnostics.js';
 
 const BATCH_SAMPLES = 50;
 const MAX_PENDING_BATCHES = 4;
@@ -28,11 +29,13 @@ export interface LiveCaptureControllerOptions {
   existing?: () => LiveCaptureManifest[];
   createWorker?: () => CaptureWorker;
   now?: () => number;
+  diagnostics?: LiveDiagnostics;
 }
 
 /** Bounded capture transport. No filesystem, DuckDB work or per-sample JSON on the reader path. */
 export class LiveCaptureController {
   public readonly directory: string;
+  public readonly diagnostics: LiveDiagnostics | undefined;
   private manifest: LiveCaptureManifest | null = null;
   private worker: CaptureWorker | null = null;
   private buffer = new Float64Array(BATCH_SAMPLES * LIVE_CAPTURE_SAMPLE_WIDTH);
@@ -59,7 +62,10 @@ export class LiveCaptureController {
   private catalogResolve: (() => void) | null = null;
   private catalogSent = false;
 
-  public constructor(private readonly options: LiveCaptureControllerOptions) { this.directory = path.resolve(options.directory); }
+  public constructor(private readonly options: LiveCaptureControllerOptions) {
+    this.directory = path.resolve(options.directory);
+    this.diagnostics = options.diagnostics;
+  }
 
   public status(): LiveCaptureStatus {
     return {
@@ -185,7 +191,7 @@ export class LiveCaptureController {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
     const worker = this.worker;
-    if (!worker) return Promise.resolve();
+    if (!worker) return this.diagnostics?.stop() ?? Promise.resolve();
     this.stopping = new Promise<void>(resolve => {
       let settled = false;
       const done = (): void => { if (settled) return; settled = true; clearTimeout(timeout); this.closeResolve = null; resolve(); };
@@ -194,6 +200,7 @@ export class LiveCaptureController {
       this.closeResolve = done;
       if (!this.closingWorker) { this.closingWorker = true; worker.postMessage({ type: 'close' }); }
     });
+    if (this.diagnostics) this.stopping = this.stopping.then(() => this.diagnostics?.stop());
     return this.stopping;
   }
 
@@ -225,6 +232,8 @@ export class LiveCaptureController {
       endedAt: null, status: 'recording', samples: 0, droppedSamples: 0, anchors: [], sessionId: null, gameVersion: null,
     };
     this.sessionKey = key;
+    this.diagnostics?.begin(this.manifest.filename, recordingId);
+    this.diagnostics?.record({ kind: 'session', at: now, data: this.manifest });
     this.lastSample = prior?.lastElapsedSeconds ?? -Infinity;
     this.lastObservation.clear();
     this.predictionAt = -Infinity;
@@ -267,6 +276,7 @@ export class LiveCaptureController {
         this.pumpLinks();
         this.closeIfIdle(worker);
       } else if (message.type === 'failed') {
+        this.diagnostics?.record({ kind: 'capture-failure', at: this.now(), data: message });
         this.error = message.error;
         if (message.sequence !== undefined) this.pending.delete(message.sequence);
         if (message.operation === 'link' || message.recordingId !== undefined) {
@@ -278,11 +288,13 @@ export class LiveCaptureController {
       // Wait for worker exit rather than the close callback, so native handles are released.
     });
     worker.on('error', (error: Error) => {
+      this.diagnostics?.record({ kind: 'capture-failure', at: this.now(), data: { error: error.message } });
       this.error = error.message; this.pending.clear();
       this.catalogResolve?.(); this.catalogResolve = null; this.catalogPromise = null; this.catalogSent = false;
     });
     worker.on('exit', (code: number) => {
       const expected = this.closingWorker;
+      this.diagnostics?.record({ kind: 'capture-worker-exit', at: this.now(), data: { code, expected } });
       if (this.worker === worker) { this.worker = null; this.closingWorker = false; }
       if (!this.stopped && !expected) this.error ??= `Live capture writer exited (${code})`;
       this.pending.clear();
@@ -301,6 +313,7 @@ export class LiveCaptureController {
   }
 
   private flush(force = false): void {
+    this.diagnostics?.record({ kind: 'capture-health', at: this.now(), data: this.status() });
     if (!this.manifest || !this.worker || this.closingWorker || this.error) return;
     if (this.pending.size >= MAX_PENDING_BATCHES + (force ? 2 : 0)) {
       if (force) this.error = 'Live capture writer cannot finalize while its bounded queue is full';
@@ -327,6 +340,8 @@ export class LiveCaptureController {
     this.manifest.endedAt = status === 'completed' ? this.now() : null;
     this.manifest.updatedAt = this.now();
     this.flush(true);
+    this.diagnostics?.record({ kind: 'session-end', at: this.now(), data: { status, manifest: this.manifest } });
+    this.diagnostics?.end();
     this.recoverable ??= [];
     this.recoverable = this.recoverable.filter(record => record.recordingId !== this.manifest?.recordingId);
     if (status === 'interrupted') this.recoverable.push(this.manifest);

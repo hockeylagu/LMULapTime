@@ -6,7 +6,8 @@ import {
   lmuGet, parseEstimate, parseForecast, parseGarageData, parsePitMenu, parsePitStopTimes,
   parseSchedule, parseStandings, parseTireManagement, parseVehicleCondition,
 } from './lmuPitRest.js';
-import type { RestGet } from './lmuPitRest.js';
+import type { RestAnswer, RestGet } from './lmuPitRest.js';
+import type { DiagnosticSink } from './capture/diagnostics.js';
 
 /** What the poller reads: nothing, the on-track set, or the garage set (between runs, before the car leaves). */
 export type PitPollMode = 'off' | 'track' | 'garage';
@@ -86,6 +87,7 @@ const READS: PitRead[] = [
 ];
 
 export interface LivePitPollerOptions {
+  diagnosticSink?: () => DiagnosticSink | undefined;
   onEvidence?: (observation: LiveCaptureObservation) => void;
   onUpdate(update: LiveRestUpdate): void;
   /** Whether a replay is playing changed (`navigation/state` `settingMode`; null when unknown). */
@@ -208,24 +210,48 @@ export class LivePitPoller {
     const next = this.next(now);
     if (!next) return;
     const generation = this.generation;
+    const diagnostic = this.options.diagnosticSink?.();
+    const requestMode = this.mode;
+    const requestSession = this.sessionKey;
     // A replay-unsafe read needs the state check to be the request just before it: any read spends the check.
     if (next.read) this.unsafeCheckFresh = false;
     this.inFlight = true;
-    const answer = await (this.options.get ?? lmuGet)(next.path);
+    let answer: RestAnswer;
+    try { answer = await (this.options.get ?? lmuGet)(next.path); }
+    catch { answer = { ok: false as const, reason: 'error' as const }; }
     this.inFlight = false;
-    if (generation !== this.generation || this.mode === 'off') return;
     const done = this.now();
+    const stale = generation !== this.generation || this.mode === 'off';
+    const parsed = answer.ok ? next.read ? next.read.parse(answer.body) : parseReplayPlayback(answer.body) : null;
+    if (diagnostic) {
+      // Standings diagnostics stay player-only; retain raw shape for the other local endpoints.
+      const body = answer.ok ? next.path === '/rest/watch/standings' && Array.isArray(answer.body)
+        ? answer.body.filter((row: unknown) => typeof row === 'object' && row !== null && 'player' in row && row.player === true)
+        : answer.body : undefined;
+      const serialized = body === undefined ? undefined : JSON.stringify(body);
+      diagnostic({ kind: 'rest', at: done, data: {
+        path: next.path, startedAt: now, finishedAt: done, durationMs: done - now,
+        mode: requestMode, sessionKey: requestSession, ...answer.diagnostic,
+        outcome: answer.diagnostic?.outcome ?? (answer.ok ? 'ok' : answer.reason),
+        parser: !answer.ok ? 'not-run' : parsed === null ? 'rejected' : 'accepted',
+        disposition: stale ? 'stale-discarded' : parsed === null ? 'ignored' : 'applied',
+        body: serialized && serialized.length > 32768 ? serialized.slice(0, 32768) : body,
+        bodyTruncated: (serialized?.length ?? 0) > 32768 || answer.diagnostic?.bodyTruncated === true,
+        parsed,
+      } });
+    }
+    if (stale) return;
     if (!answer.ok && answer.reason === 'timeout') this.pausedUntil = done + SLOW_PAUSE_MS;
     if (next.read === null) {
       this.gameStateDue = done + (answer.ok ? REPLAY_CHECK_MS * 2 / 3 : FAILED_READ_PAUSE_MS / 3);
-      this.setReplay(answer.ok ? parseReplayPlayback(answer.body) : null, done);
+      this.setReplay(typeof parsed === 'boolean' ? parsed : null, done);
       this.unsafeCheckFresh = this.replay === false;
       if (answer.ok && this.replay === false) this.options.onNavigation?.(answer.body);
       return;
     }
-    const every = this.period(next.read, this.mode);
+    const every = this.period(next.read, this.mode as ReadMode);
     this.due.set(next.path, done + (answer.ok ? every ?? FAILED_READ_PAUSE_MS : Math.max(every ?? 0, FAILED_READ_PAUSE_MS)));
-    const update = answer.ok ? next.read.parse(answer.body) : null;
+    const update = typeof parsed === 'object' ? parsed : null;
     if (answer.ok && this.options.onEvidence) {
       const evidence = captureRestEvidence(next.path, answer.body);
       if (evidence) this.options.onEvidence({ ...evidence, source: 'rest', elapsedSeconds: null,

@@ -6,9 +6,11 @@ import { readPedalFrame, readScoringFrame } from './rf2Decode.js';
 import { SCORING_BUFFER, SCORING_MAPPING_NAME, TELEMETRY_BUFFER, TELEMETRY_MAPPING_NAME } from './rf2Layout.js';
 import type { MappedBuffer } from './sharedMemory.js';
 import type { GameProcessProbe } from './gameProcess.js';
+import type { DiagnosticEvent } from './capture/diagnostics.js';
 
 /** What the reader posts to the main thread. `type` is the field every worker client filters on (isWorkerMessage). */
 export type LiveReaderMessage =
+  | { type: 'diagnostic'; event: DiagnosticEvent }
   | { type: 'process'; running: boolean | null }
   /** `car` (fuel, damage flags, compound) rides along at most every CAR_POST_MS. */
   | { type: 'frame'; scoring?: LiveScoringReading; pedal?: LivePedalSample; tyreSurfaceAvgC?: number | null; car?: LiveCarReading; capture?: LiveCaptureSample | null }
