@@ -157,6 +157,45 @@ describe('LiveCaptureController', () => {
     }
   });
 
+  it('waits for layout resolution before resuming and retains the initial clock proof across a line crossing', () => {
+    const prior = priorManifest();
+    const { controller, writer } = makeController({ existing: [prior] });
+    start(controller, 101, snapshot('race', null));
+    controller.sample(sample(101.1));
+    expect(controller.status()).toMatchObject({ state: 'idle', recordingId: null });
+    expect(writer.batches()).toHaveLength(0);
+
+    controller.update(reading(201, { player: vehicleReading({ driverName: 'Driver', totalLaps: 8,
+      lapStartEt: 200, lastLapTime: 100 }) }), snapshot());
+    expect(controller.status().recordingId).toBe(prior.recordingId);
+    expect(writer.batches().every(batch => batch.manifest.recordingId === prior.recordingId)).toBe(true);
+    expect(writer.batches()[0].manifest.samples).toBe(prior.samples);
+    controller.sample(sample(201.1));
+    controller.pause();
+    expect(last(writer.batches())?.manifest.anchors).toEqual([
+      { lapNumber: 8, startSeconds: 100, lapSeconds: 100 },
+      { lapNumber: 9, startSeconds: 200, lapSeconds: null },
+    ]);
+  });
+
+  it('does not reuse pending recovery proof after a clock reset or a different resolved layout', () => {
+    for (const change of ['clock', 'layout', 'identity', 'offline'] as const) {
+      const { controller } = makeController({ existing: [priorManifest()] });
+      start(controller, 101, snapshot('race', null));
+      if (change === 'clock') start(controller, 99);
+      else if (change === 'layout') start(controller, 102, snapshot('race', 'sarthe:outer'));
+      else if (change === 'identity') controller.update(reading(102, {
+        player: vehicleReading({ driverName: 'Other', totalLaps: 7, lapStartEt: 100 }),
+      }), snapshot());
+      else {
+        controller.update(null, { ...snapshot(), session: null, lifecycle: 'offline' });
+        controller.update(reading(201, { player: vehicleReading({ driverName: 'Driver', totalLaps: 8, lapStartEt: 200 }) }), snapshot());
+      }
+      expect(controller.status().recordingId).not.toBe('previous-recording');
+      expect(controller.status().recordingId).not.toBeNull();
+    }
+  });
+
   it('pauses replay capture by flushing while keeping the recording open', () => {
     const { controller, writer } = makeController();
     start(controller);

@@ -50,6 +50,7 @@ export class LiveCaptureController {
   private error: string | null = null;
   private lastObservation = new Map<string, string>();
   private recoverable: LiveCaptureManifest[] | null = null;
+  private recoveryProbe: { reading: LiveScoringReading; key: string; observedAt: number } | null = null;
   private stopped = false;
   private stopping: Promise<void> | null = null;
   private closeResolve: (() => void) | null = null;
@@ -83,6 +84,7 @@ export class LiveCaptureController {
     const player = reading?.player;
     const session = snapshot.session;
     if (!reading || !player || !session) {
+      this.recoveryProbe = null;
       this.finish(snapshot.lifecycle === 'offline' ? 'interrupted' : 'completed');
       return;
     }
@@ -214,13 +216,28 @@ export class LiveCaptureController {
     if (!player) return;
     const now = this.now();
     this.recoverable ??= this.options.existing?.() ?? [];
+    const probe = this.recoveryProbe;
+    if (probe && (probe.key !== key || reading.currentEt < probe.reading.currentEt
+      || player.totalLaps < (probe.reading.player?.totalLaps ?? 0)
+      || (player.totalLaps === probe.reading.player?.totalLaps ? player.lapStartEt !== probe.reading.player.lapStartEt
+        : player.lapStartEt < probe.reading.currentEt))) this.recoveryProbe = null;
+    const continuity = this.recoveryProbe?.reading ?? reading;
+    const observedAt = this.recoveryProbe?.observedAt ?? now;
     const candidates = this.recoverable.filter(record => record.status !== 'completed'
-      && record.layoutKey !== null && record.layoutKey === snapshot.identity?.layoutKey
+      && record.layoutKey !== null && record.trackName === reading.trackName
       && record.sessionCode === reading.sessionCode && record.driverName === (player.driverName ?? '')
-      && record.vehicleName === player.vehicleName && record.lastElapsedSeconds <= reading.currentEt
-      && now - record.updatedAt >= 0 && now - record.updatedAt < 120_000
-      && record.anchors.some(anchor => anchor.lapNumber === player.totalLaps + 1 && anchor.startSeconds === player.lapStartEt));
-    const prior = candidates.length === 1 ? candidates[0] : null;
+      && record.vehicleName === player.vehicleName && record.lastElapsedSeconds <= continuity.currentEt
+      && observedAt - record.updatedAt >= 0 && observedAt - record.updatedAt < 120_000
+      && record.anchors.some(anchor => anchor.lapNumber === (continuity.player?.totalLaps ?? -1) + 1
+        && anchor.startSeconds === continuity.player?.lapStartEt));
+    if (candidates.length && !snapshot.identity?.layoutKey) {
+      // Do not fork a known interrupted attempt while navigation resolves a multi-layout venue.
+      this.recoveryProbe ??= { reading: { ...reading, player: { ...player } }, key, observedAt: now };
+      return;
+    }
+    const matching = candidates.filter(record => record.layoutKey === snapshot.identity?.layoutKey);
+    const prior = matching.length === 1 ? matching[0] : null;
+    this.recoveryProbe = null;
     const recordingId = prior?.recordingId ?? randomUUID();
     const safeLayout = (snapshot.identity?.layoutKey ?? 'unresolved').replace(/[^a-zA-Z0-9_-]/g, '_');
     const model = mapVehicleIdToModel(player.vehicleName);
