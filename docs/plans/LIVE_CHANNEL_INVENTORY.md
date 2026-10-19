@@ -155,4 +155,4 @@ have no hard cap or automatic eviction; storage cleanup is manual, preserving co
   [decoder](../../server/live/rf2Decode.ts), [REST parsers](../../server/live/lmuPitRest.ts).
 - [DuckDB reader](../../server/telemetry/duckdbReader.ts),
   [replay contracts](../../shared/types/replay.ts),
-  [diagnostic capture fields](../../tools/telemetry-recorder/Program.cs).
+  [diagnostic capture fields](../../tools/telemetryRecorder.ts).

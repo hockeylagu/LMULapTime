@@ -7,7 +7,7 @@
  *
  * Prerequisites
  *   1. Record shared memory while driving:
- *        tools/telemetry-recorder -> `record`  (see tools/telemetry-recorder/Program.cs)
+ *        npm run telemetry:record  (see tools/telemetryRecorder.ts)
  *   2. Save a replay of that same session BEFORE leaving it. Without the paired .Vcr there
  *      is nothing to correlate against.
  *

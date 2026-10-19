@@ -1,8 +1,7 @@
 /**
- * Byte layout of the rFactor 2 shared memory plugin buffers (v3.x), derived from field lists that
- * mirror tools/telemetry-recorder/Rf2Structs.cs (Pack = 4: every member aligns to at most 4 bytes).
- * A wrong or missing field shifts every later offset, so the struct sizes are asserted against the
- * plugin's published sizes in test/server/live/rf2Layout.test.ts.
+ * Byte layout of the rFactor 2 shared memory plugin buffers (v3.x) with Pack = 4
+ * (every member aligns to at most 4 bytes). A wrong or missing field shifts every later offset,
+ * so the struct sizes are asserted against the plugin's published sizes in test/server/live/rf2Layout.test.ts.
  */
 
 export type Rf2Primitive = 'i8' | 'u8' | 'i16' | 'u16' | 'i32' | 'u32' | 'f32' | 'f64';

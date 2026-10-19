@@ -24,9 +24,9 @@ cross-referencing against the rF2 shared memory plugin, which LMU ships and enab
 
 | Step | Tool | Command |
 |---|---|---|
-| Verify plugin/struct health first | `tools/telemetry-recorder` (C#) | `npm run telemetry:probe` |
+| Verify plugin/struct health first | `tools/telemetryRecorder.ts` | `npm run telemetry:probe` |
 | Capture live telemetry | same | `npm run telemetry:record` |
-| Diagnose an empty/odd buffer | same | `lmu-telemetry-recorder.exe dump` |
+| Diagnose an empty/odd buffer | same | `npm run telemetry:dump` |
 | Sweep VCR bytes vs telemetry | `tools/analysis/correlateVcr.ts` | `npx tsx tools/analysis/correlateVcr.ts --vcr <f.Vcr> --telemetry <f.jsonl>` |
 | Cross-validate a field, no ground truth needed | Historical `verifyRpm.ts` experiment (not shipped in the current tree) | See §2.1 for the recorded method/results; there is no current command for this removed tool |
 
@@ -973,4 +973,4 @@ To achieve zero-compromise analytics:
 - **Ground Truth Driving Telemetry**: Use **DuckDB** for the main driver whenever available (exact 100 Hz pedals, speed, RPM, gear, wheel speeds, ride height).
 - **Spatial Track Position**: Use **VCR Replay** for world coordinates $(x, z)$, yaw heading, and track map display (interpolating the VCR trajectory onto the DuckDB timeline).
 - **Opponent Overlays**: Use **VCR Replay** for multi-car telemetry traces and benchmark ghost comparisons.
-- **Offline Development & Deep Reverse Engineering**: Use **`npm run telemetry:record`** (`tools/telemetry-recorder`) for live memory-mapped calibration sweeps and unknown byte validation.
+- **Offline Development & Deep Reverse Engineering**: Use **`npm run telemetry:record`** (`tools/telemetryRecorder.ts`) for live memory-mapped calibration sweeps and unknown byte validation.

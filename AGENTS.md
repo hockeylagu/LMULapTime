@@ -11,7 +11,7 @@ Telemetry analytics, lap comparison, and race intelligence hub for **Le Mans Ult
 
 - **Frontend**: React 19, TypeScript (strict), Vite 8, Tailwind CSS v4, Recharts, Lucide React, Hash routing (`HashRouter`).
 - **Backend**: Node.js + Express 5 (port 3001), Better-SQLite3 (WAL mode), DuckDB Node reader, Fast-XML-Parser, worker-thread VCR decoder, Google Gen AI SDK (`@google/genai`).
-- **Tools**: C# .NET 8 telemetry recorder (`tools/telemetry-recorder/`), TSX analysis scripts (`tools/analysis/`).
+- **Tools**: TSX telemetry recorder (`tools/telemetryRecorder.ts`), TSX analysis scripts (`tools/analysis/`).
 
 ---
 

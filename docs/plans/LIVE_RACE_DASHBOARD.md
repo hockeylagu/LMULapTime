@@ -159,7 +159,7 @@ Field-by-field source map and the validation run: [LIVE_DATA_SOURCES.md](LIVE_DA
 
 | Capability | Repository evidence | Remaining validation |
 |---|---|---|
-| Physical fuel and capacity | `tools/telemetry-recorder/Program.cs` and `Rf2Structs.cs` | Correct units/values during live driving and refuelling, across classes |
+| Physical fuel and capacity | `tools/telemetryRecorder.ts` and `server/live/rf2Layout.ts` | Correct units/values during live driving and refuelling, across classes |
 | Pedal inputs | Recorder exposes filtered and unfiltered throttle/brake | Choose driver-input channels; verify update rate and latency |
 | Session timing and pit state | Scoring structs (elapsed/end time, max laps, pit flags); lifecycle seen live online (phases 0, 3, 5, 8; `navigation/state`, `GetGameState`) | Displayed lap numbering, timed-race finish rule, phase 4 |
 | Damage indicators | Dents, impacts, `Flat` seen live (side hit, suspension hit) | Dent slot per body area, detached parts, overheating, pace loss |
@@ -299,7 +299,7 @@ Decided 2026-10-15: read shared memory inside the app, not through a sidecar. Th
 is the rF2 shared memory plugin (`$rFactor2SMMP_Telemetry$`, `$rFactor2SMMP_Scoring$`), as
 the recorder uses today; a native LMU source can replace it later. A `worker_thread` maps
 the buffers through koffi (`OpenFileMappingW` / `MapViewOfFile`, no compiler needed) and
-decodes with `DataView` at the offsets in `tools/telemetry-recorder/Rf2Structs.cs`. To keep
+decodes at the offsets in `server/live/rf2Layout.ts`. To keep
 CPU low it copies only the player's vehicle, checks the plugin's version counters before and
 after each copy, skips unchanged frames, reads at about 50 Hz only while `inRealtime` (1 Hz or
 less otherwise), and runs the pit/strategy models per lap and on events, not per sample.

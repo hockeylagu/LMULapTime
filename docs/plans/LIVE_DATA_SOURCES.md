@@ -11,7 +11,7 @@ Companion to [LIVE_RACE_DASHBOARD.md](LIVE_RACE_DASHBOARD.md) and the
 Two live sources, each checking the other where they overlap:
 
 - **Shared memory** (`$rFactor2SMMP_Telemetry$`, `$rFactor2SMMP_Scoring$`): read-only memory
-  mapping, no risk to the game. Field list from `tools/telemetry-recorder/Rf2Structs.cs`.
+  mapping, no risk to the game. Field list from `tools/telemetryRecorder.ts` and `server/live/rf2Layout.ts`.
 - **LMU REST API** (`localhost:6397`): HTTP reads with a crash history. Paths from
   `docs/swagger-schema.json`, which lists **no response schemas**; only `/navigation/state`
   (example response, build 14200) and the `/rest/watch/*` replay behaviour

@@ -4,7 +4,7 @@
  * 15, Daytona International Speedway Road Course = 12).
  *
  * Accepts two input formats:
- *  - .jsonl: raw shared-memory "tel" records (see tools/telemetry-recorder), carrying real
+ *  - .jsonl: raw shared-memory "tel" records (see tools/telemetryRecorder.ts), carrying real
  *    speed/steer/throttle/brake/x/z at ~100 Hz.
  *  - .Vcr: a real game replay file, parsed via server/replayParser.ts's extractReplayTrajectory
  *    (full resolution, best lap by default).
