@@ -41,9 +41,6 @@ Thumbs.db
 tmp/
 .tmp/
 
-# Telemetry recorder build output
-tools/telemetry-recorder/bin/
-tools/telemetry-recorder/obj/
 tools/analysis/cache/*
 
 # Raw shared-memory captures (large; keep only derived track models)
