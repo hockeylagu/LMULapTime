@@ -153,8 +153,9 @@ To adjust your paths or driver profile:
 | `npm run test:watch` | Runs Vitest in interactive watch mode. |
 | `npm run test:coverage` | Runs the test suite and generates V8 code coverage reports. |
 | `npm run learning:evaluate` | Read-only chronological fuel/VE baseline and bounded correction candidate report; does not activate corrections. |
-| `npm run telemetry:probe` | Probes live memory-mapped telemetry structures via .NET 8 tool. |
-| `npm run telemetry:record`| Records live session telemetry to disk via .NET 8 tool. |
+| `npm run telemetry:probe` | Probes live memory-mapped telemetry structures via TypeScript diagnostic tool. |
+| `npm run telemetry:record`| Records live session telemetry to disk via TypeScript diagnostic tool. |
+| `npm run telemetry:dump` | One-shot diagnostic dump of shared memory buffers via TypeScript diagnostic tool. |
 | `npm run vcr:correlate` | Runs offline correlation between XML results and binary replay streams. |
 | `npm run check:local-data` | Checks release inputs for forbidden detailed local data. |
 | `npm run screenshots` | Captures application screenshots with the configured tooling. |
@@ -165,7 +166,7 @@ To adjust your paths or driver profile:
 
 - **Frontend**: [React 19](https://react.dev/), [TypeScript](https://www.typescriptlang.org/), [Vite 8](https://vitejs.dev/), [Tailwind CSS v4](https://tailwindcss.com/), [Recharts](https://recharts.org/), [Lucide React](https://lucide.dev/)
 - **Backend**: [Node.js](https://nodejs.org/), [Express 5](https://expressjs.com/), [Better-SQLite3](https://github.com/WiseLibs/better-sqlite3) (WAL Mode), [DuckDB](https://duckdb.org/), [Fast-XML-Parser](https://github.com/NaturalIntelligence/fast-xml-parser), [@google/genai](https://github.com/googleapis/genai-js)
-- **Diagnostics & Tooling**: C# .NET 8 Telemetry Recorder, TSX analysis scripts
+- **Diagnostics & Tooling**: TypeScript Telemetry Recorder (`tools/telemetryRecorder.ts`), TSX analysis scripts
 - **Test Suite**: [Vitest](https://vitest.dev/), Testing Library, happy-dom
 
 ---
