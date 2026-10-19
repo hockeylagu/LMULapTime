@@ -37,14 +37,11 @@ export async function fetchJson<T>(path: string, init?: RequestInit): Promise<T>
 
 /** POSTs `body` as JSON and returns the parsed JSON response; throws ApiError on a non-2xx status. */
 export function postJson<T>(path: string, body?: unknown, init?: RequestInit): Promise<T> {
-  // Demo settings contain display aliases and masked paths. Scan the existing configuration
-  // without saving those placeholders as the user's actual settings.
-  const requestBody = isDemoMode() && path.split('?')[0] === '/api/scan' ? undefined : body;
   return fetchJson<T>(path, {
     ...init,
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...init?.headers },
-    body: requestBody === undefined ? undefined : JSON.stringify(requestBody),
+    body: body === undefined ? undefined : JSON.stringify(body),
   });
 }
 

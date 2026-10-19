@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchJson, postJson } from '../../src/api/apiClient.js';
+import { fetchJson } from '../../src/api/apiClient.js';
 import {
   anonymizeDriverName,
   anonymizePath,
@@ -45,14 +45,6 @@ describe('anonymizeData', () => {
     await expect(fetchJson('/api/status')).resolves.toEqual({ playerName: 'Ricky Bobby' });
     window.history.replaceState(null, '', '/#/settings');
     await expect(fetchJson('/api/status')).resolves.toEqual({ playerName: 'Samuel Lague' });
-  });
-
-  it('scans without saving demo aliases or masked folder paths', async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response('{"success":true}', { status: 200 }));
-    vi.stubGlobal('fetch', fetchMock);
-    window.history.replaceState(null, '', '/?demo=1#/settings');
-    await postJson('/api/scan', { playerName: 'Ricky Bobby', resultsDir: 'C:/masked/Results' });
-    expect(fetchMock).toHaveBeenCalledWith('/api/scan', expect.objectContaining({ method: 'POST', body: undefined }));
   });
 
   it('anonymizes player driver name to Ricky Bobby', () => {

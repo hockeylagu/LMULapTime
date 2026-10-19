@@ -3,6 +3,7 @@ import { AppStatus, ReferenceBenchmarkDiff } from '../../../shared/types/index.j
 import { folderPathProblem, normalizeFolderPath } from '../../../shared/domain/folderPath.js';
 import { ApiError, apiErrorMessage, postJson } from '../../api/apiClient.js';
 import { invalidateReferenceLaptimes } from '../../api/referenceApi.js';
+import { isDemoMode } from '../../api/anonymizeData.js';
 import { SettingsFeedback } from './SettingsPanel.js';
 import { pluralize } from './settingsFormat.js';
 
@@ -128,7 +129,8 @@ export function useSettingsActions({ status, onUpdatePaths, onReplayScanTriggere
     inFlight.current.scan = true;
     setIsScanning(true);
 
-    postJson<{ success?: boolean; playerName?: string }>('/api/scan', { ...folders, playerName })
+    // Demo inputs hold display aliases and masked paths: scan the saved configuration without replacing it.
+    postJson<{ success?: boolean; playerName?: string }>('/api/scan', isDemoMode() ? undefined : { ...folders, playerName })
       .then((data) => {
         if (data.success) {
           // Show the saved form of what was typed: no quotes, no trailing backslash, no stray spaces.

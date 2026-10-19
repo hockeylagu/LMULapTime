@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
+import type React from 'react';
 import { renderHook, act } from '@testing-library/react';
 import { useSettingsActions } from '../../../src/components/settings/useSettingsActions.js';
 import type { AppStatus } from '../../../shared/types/index.js';
@@ -45,5 +46,18 @@ describe('useSettingsActions input sync', () => {
     rerender({ s: { ...status, resultsDir: 'E:\New', replaysDir: 'E:\NewReplays' } });
     expect(result.current.resultsDirInput).toBe('E:\New');
     expect(result.current.replaysDirInput).toBe('D:\Typing');
+  });
+});
+
+describe('useSettingsActions scan in demo mode', () => {
+  afterEach(() => { vi.unstubAllGlobals(); window.history.replaceState(null, '', '/'); });
+
+  it('scans without saving demo aliases or masked folder paths', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response('{"success":true}', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    window.history.replaceState(null, '', '/?demo=1#/settings');
+    const { result } = setup(status);
+    await act(async () => { result.current.handleScanPaths({ preventDefault: () => {} } as React.FormEvent); });
+    expect(fetchMock).toHaveBeenCalledWith('/api/scan', expect.objectContaining({ method: 'POST', body: undefined }));
   });
 });
