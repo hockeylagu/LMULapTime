@@ -47,24 +47,43 @@ neither supplies substitute data to a connected dashboard.
 
 ## Channels and clocks
 
-Normalization version 2 captures 30 values: six vehicle-vector channels plus 24 wheel channels.
+Normalization version 3 captures 34 values: six vehicle-vector channels plus 28 wheel channels.
 The producer's left-handed local axes are left/up/back. ISO vehicle velocity is `(-z, x, y)`;
 angular velocity is an axial vector and maps as `(z, -x, -y)` (roll, pitch, yaw). Version 1 had
 incorrect lateral/roll/yaw signs: evidence reads correct those three signs once without rewriting
-the source and disclose `sourceNormalizationVersion: 1` alongside response normalization version 2.
-Its wheel catalog stays unverified and its wheel columns unavailable. New attempts use version 2;
-an interrupted version-1 attempt is not resumed with the new convention.
+the source and disclose `sourceNormalizationVersion: 1` alongside response normalization version 3.
+Its wheel catalog stays unverified and its wheel columns unavailable. Version 2 retains its verified
+30-value catalog. Both older versions remain readable; new attempts use version 3 and do not resume
+an older-version file. Batch rows have three clocks/counters followed by the versioned values:
+37 float64 entries in version 3, 33 in versions 1 and 2.
 
 FL/FR/RL/RR each record patch and ground lateral/longitudinal velocity (m/s), camber and dynamic
-toe (radians). Wheel lateral is already left-positive; longitudinal is negated to forward-positive.
+toe (radians), plus tyre vertical deflection (metres). Deflection is a scalar compression distance,
+preserved without an axis/sign transform; it is not suspension travel.
+Wheel lateral is already left-positive; longitudinal is negated to forward-positive.
 Camber is outward-positive on both sides, matching ISO camber rather than a globally signed roll
 angle. Toe-in is positive: preserve the source angle on left wheels and negate it on right wheels.
 The toe value includes current steering/suspension effects; it is not a measured static setup value.
 Patch velocity is not relabelled as wheel speed or a slip ratio. Nonfinite input becomes SQL NULL;
-valid finite zero remains zero. The existing typed column count and bounded batch size are unchanged.
+valid finite zero remains zero. Version 3 appends the four deflection columns; batch size stays bounded.
 The current aligned motion API still serves its six vehicle channels; wheel evidence is retained in
 the recording for direct DuckDB inspection and future consumers. Native G is not changed.
 Sources and saved-recording verification: [wheel evidence assessment](plans/WHEEL_CAPTURE_EVIDENCE.md).
+
+Additional shared-memory evidence is sparse:
+
+| Observation kind | Stored data and meaning |
+|---|---|
+| `impact` | `impactElapsedSeconds` and native `magnitude`; observation elapsed time is the source impact time, receipt time is retained separately. Repeated state is suppressed; equal magnitudes at different impact times remain distinct. Nonfinite/negative magnitude is NULL, not a fabricated zero. Magnitude units are not assigned without evidence. |
+| `upgrade-pack` | Player scoring's exact 16-byte `rawHex`, including zero bytes; initial state and configuration changes. Contents remain opaque. |
+| `terrain-material` | Session-file dictionary definition `{materialId, rawName}`, untimed and recorder scoped. Raw names preserve all 16 source bytes up to NUL using Latin-1, including commas/truncation. |
+| `terrain-change` | Initial state and changes `{corner, materialId}` at the sampled game elapsed time, with FL/FR/RL/RR indexing. An empty source name becomes a NULL material reference. |
+
+The reader worker sends sparse-state changes at capture cadence and small car-rate checkpoints
+(about 2 Hz) so new recordings recover initial state. The controller suppresses duplicate persisted
+events. Terrain interning runs in the DuckDB writer transaction, reuses definitions after restart and
+stores each name once per recording. Last-impact memory is state, not an impact history queue:
+multiple impacts between observed source updates cannot be reconstructed.
 
 Sparse observations retain source semantics: shared-memory condition/state, existing REST responses
 and recorder events. This supports damage/repair estimates, weather, pit/garage context and learning

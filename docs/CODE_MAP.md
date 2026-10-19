@@ -10,14 +10,16 @@ decode options in `server/replay/decode/replayTrajectoryTypes.ts`, telemetry cha
 `src/components/replay/telemetry/telemetryChartTypes.ts`, and map markers in
 `src/components/replay/map/gpsTrackMapTypes.ts`. Import these directly to avoid cycles through consumers.
 
-Verification baseline: 3,243 tests passed, 56 intentionally skipped; production build clean (zero warnings, zero errors).
+Verification baseline: 3,250 tests passed, 56 intentionally skipped; production build clean (zero warnings, zero errors).
 
 ---
 
 ## Live Capture and Learning
 
-`capture/decode.ts` and `capture/channels.ts` own the 30-value normalization-version-2 catalog.
-It corrects the source's left-handed vehicle-vector signs and records all 24 wheel values.
+`capture/decode.ts` and `capture/channels.ts` own the 34-value normalization-version-3 catalog.
+It retains corrected vehicle-vector signs and records all 28 wheel values, including tyre deflection.
+`capture/terrain.ts` interns terrain names into sparse dictionary definitions/change events in the writer;
+the controller also retains source-timed impact magnitudes and opaque player upgrade-pack configuration.
 Version-1 files remain unchanged; `readRecording.ts` normalizes their motion signs on read and
 reports the source version. See [wheel evidence and mappings](plans/WHEEL_CAPTURE_EVIDENCE.md).
 

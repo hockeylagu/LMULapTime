@@ -1,5 +1,15 @@
 # Endpoint performance history
 
+## Accepted live capture additions / normalization version 3 — 2026-10-18
+
+Twenty-request sweeps used the same snapshot (`b272a4960f76`), cohort and runtime/plugin environment
+as the 20:47:44 normalization-version-2 baseline. The first run overlapped tests and flagged telemetry
+and traffic latency. An idle rerun at 21:06:01 found no shared endpoint above both thresholds
+(>20% and >5 ms) against that pre-change baseline. Capture status measured 1.07 ms median / 1.29 ms
+p95; automatic telemetry 206.27 ms, replay telemetry 106.15 ms and traffic 51.41 ms median.
+Reports remain under `.cache/wheel-capture-endpoints/history/`. These are API timings with an idle
+recorder, not evidence of capture write throughput, disk growth or in-game overhead.
+
 ## Wheel capture and normalization version 2 — 2026-10-18
 
 Two twenty-request sweeps during implementation used the same dataset (`b272a4960f76`), request

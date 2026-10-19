@@ -5,10 +5,10 @@ the [current capture contract](../LIVE_CAPTURE_FORMAT.md). This is a checklist, 
 
 ## What the next session can establish
 
-- The normal app records six vehicle motion and 24 wheel channels, sparse damage/pit/weather observations,
+- The normal app records six vehicle motion and 28 wheel channels, sparse impact/terrain/configuration/damage/pit/weather observations,
   audit checkpoints and fuel/VE learning evidence into session DuckDB.
 - Wheel mappings and tests use the existing C# JSONL evidence; new attempts use normalization
-  version 2. See the [recorded evidence assessment](WHEEL_CAPTURE_EVIDENCE.md). The next live
+  version 3. See the [recorded evidence assessment](WHEEL_CAPTURE_EVIDENCE.md). The next live
   capture must confirm those values and corrected vehicle-axis signs. A fresh probe is needed only
   for a specific unresolved comparison. Older version-1 wheel columns remain unavailable.
 - One race cannot complete learning acceptance: screening needs multiple independent compatible
@@ -34,8 +34,8 @@ Only if the saved recordings leave a specific verification gap, run a short whee
 npm run telemetry:record -- --out .cache/live-validation/wheel-probe --seconds 900
 ```
 
-This separate diagnostic command records raw shared-memory JSONL, including the six wheel fields
-for every wheel. Normal version-2 app capture independently writes normalized DuckDB values. Stop earlier with Ctrl+C
+This separate diagnostic command records raw shared-memory JSONL, including the seven wheel fields
+for every wheel. Normal version-3 app capture independently writes normalized DuckDB values. Stop earlier with Ctrl+C
 if the sequence is complete. Preserve this small probe until mapping verification is finished;
 the app's regular historical JSON/CSV exports remain removed.
 
@@ -46,13 +46,27 @@ practice on a known dry layout, with one car and compound. Note each segment's t
 Keep the setup fixed except for the explicitly separate setup comparison. Avoid combining a
 surface change, tyre change and setup change in the same comparison.
 
-| Segment | Pending fields / reference | Evidence required before enabling capture |
+| Segment | Fields / reference | Live acceptance evidence |
 |---|---|---|
 | Stationary, steering centred; then steering left/right | All fields; known car motion and steering | Finite plausible values, stable wheel indexing and confirmed behaviour when stopped; constants/zero-filled unsupported fields are not accepted as measurements |
 | Straight, steady forward speed at two speeds | `lateralGroundVel`, `longitudinalGroundVel`; native speed, wheel speed and vehicle velocity | Establish units, scale and wheel-local reference frame; longitudinal response follows speed, with small lateral response on a straight. Do not assume a vehicle-axis sign mapping applies to wheel axes |
 | Straight acceleration and braking | `lateralPatchVel`, `longitudinalPatchVel`; wheel rotation, native slip channels if present, throttle/brake | Distinguish contact-patch slip from ground speed; verify sign and response under traction/braking. Include a clearly marked controlled lock/spin only if achievable in private practice; do not invent evidence from ABS/TC-limited driving |
 | Sustained left and right corners, then straight | Both lateral velocities, camber/toe; steering, yaw and native wheel channels | Distinguish turn-direction response, steerable front-wheel frame and axle/corner ordering; repeat both directions. Correlation alone does not establish the physical definition |
 | Separate stationary/setup comparison | `camber`, `toe`; known setup values and source field definitions | Establish radians versus degrees, per-corner sign, static versus dynamic meaning and whether steering is included. Record before/after setup values. If the available setup does not expose a controllable comparison, keep that field unverified |
+| Straight, braking and a safe kerb crossing | `verticalTireDeflection` at FL/FR/RL/RR | Compare raw metre values with the four stored deflection columns; distinguish compression from suspension travel and check finite zero/unsupported values |
+
+Also inspect the recording's sparse observations during private practice:
+
+- Move between road and a safe alternate surface. Resolve each `terrain-change.materialId` through
+  `terrain-material` definitions; confirm corner order, initial state, change times, preserved truncated
+  names and no repeated unchanged entries. Empty names should reference NULL, not an invented surface.
+- Compare any naturally occurring impact with `lastImpactET`/`lastImpactMagnitude`. The impact event
+  uses source impact time; receipt time stays separate. Repeated last-impact memory should not produce
+  duplicates. Do not create a collision during a race just for validation.
+- Check `upgrade-pack.rawHex` against the player's 16 scoring bytes, including zero bytes. It should
+  persist initially and on configuration changes without assigning unsupported upgrade meanings.
+- After a controlled recording restart, verify dictionary IDs remain valid and material names are
+  defined once per file. Verify version-1/2 attempts are kept separate from version-3 attempts.
 
 For all four corners, confirm structure offsets/order against the producer contract and independent
 channel evidence where available. Read C# `Rf2Wheel`, TS `WHEEL` and the actual sampled values together;

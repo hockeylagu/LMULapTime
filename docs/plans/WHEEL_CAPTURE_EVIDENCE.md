@@ -1,12 +1,13 @@
 # Saved wheel evidence assessment
 
 Inspected 2026-10-18. Existing raw shared-memory JSONL can supply the wheel-channel verification
-dataset; another drive is not the starting requirement. Normalization-version-2 capture is implemented
+dataset; another drive is not the starting requirement. Normalization-version-3 capture is implemented
 using the mappings below, with a saved-frame round-trip through the real DuckDB worker.
 
 ## Available data
 
-Streaming inspection found four captures with all six pending fields at all four corners:
+Streaming inspection found four captures with all six original pending fields at all four corners;
+the same saved telemetry also supplies `verticalTireDeflection` and raw terrain names:
 
 | Capture | Valid telemetry rows | Rows above 30 km/h |
 |---|---:|---:|
@@ -50,12 +51,13 @@ define all wheel velocity signs. It is lineage evidence, not a substitute for ch
 
 ## Delivered mapping and tests
 
-| Source field at FL/FR/RL/RR | Normalization version 2 |
+| Source field at FL/FR/RL/RR | Normalization version 3 (version-2 mappings retained) |
 |---|---|
 | `lateralPatchVel`, `lateralGroundVel` | Preserve left-positive value in m/s |
 | `longitudinalPatchVel`, `longitudinalGroundVel` | Negate back-positive value to forward-positive m/s |
 | `camber` | Preserve outward-positive radians at every corner (ISO camber, not globally signed inclination/roll) |
 | `toe` | Preserve on FL/RL; negate on FR/RR, yielding inward-positive radians; retains current steering |
+| `verticalTireDeflection` | Version 3 adds scalar compression distance in metres, preserving source sign and precision; not suspension travel |
 
 The source frame must not be inferred solely from steering or the old decoder's comments.
 The producer's [InternalsPlugin header](https://github.com/cosimo/rFactor2-DeltaBest/blob/master/Include/InternalsPlugin.hpp)
@@ -78,7 +80,11 @@ is not used as the authority for the current ISO axis definition.
 
 Tests cover all corners with distinct values, both direction signs, radians, finite zero, NaN/infinity,
 versioned catalogs, old-file read conversion and interrupted-version isolation. A captured Laguna
-frame's 24 wheel values survive service → writer worker → DuckDB → separate read-only process.
+frame's 28 wheel values survive service → writer worker → DuckDB → separate read-only process.
+Its deflections are `[0.01678, 0.01883, 0.00851, 0.01225]` metres. Version-2 files retain 24 wheel
+columns and stay readable; they are not resumed under version 3. Sparse pipeline tests also persist
+impact time/magnitude, the exact player upgrade hex and four terrain references sharing one raw-name
+dictionary entry. Worker-restart tests verify dictionary reuse without duplicate definitions.
 The aligned motion API still serves its six vehicle channels; wheel values are stored for DuckDB
 analysis and future consumers. Existing JSONL is verification input, not automatically imported history.
 

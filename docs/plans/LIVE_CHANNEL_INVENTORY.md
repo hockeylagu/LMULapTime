@@ -1,10 +1,10 @@
 # Live capture channel inventory
 
-Status: Capture implemented 2026-10-18. Normalization version 2 enables all 30 vehicle/wheel values;
+Status: Capture implemented 2026-10-18. Normalization version 3 enables all 34 vehicle/wheel values;
 saved-recording analysis and worker round-trip tests pass. New live-recording acceptance remains.
 Scope audit 2026-10-18: §9.1 of the analysis also selected tyre vertical deflection, impact magnitude,
-terrain names and player upgrade-pack capture. Those four additions remain unimplemented;
-see [remaining capture implementation](LIVE_SESSION_EVIDENCE.md#remaining-capture-implementation).
+terrain names and player upgrade-pack capture. All four additions are implemented;
+see [capture completion audit](LIVE_SESSION_EVIDENCE.md#capture-completion-audit).
 Reviewed: 2026-10-17 against 199 native catalogs, three shared-memory captures and saved REST evidence.
 Companion: [Live session evidence plan](LIVE_SESSION_EVIDENCE.md).
 
@@ -17,7 +17,7 @@ keep their existing LMU frame; no ISO conversion is applied to physical track ge
 The [measured analysis and full native catalog](LIVE_CHANNEL_ANALYSIS.md) supersede preliminary absence
 claims. Confirmed corrections: wind, brake thickness, vertical G, all three tyre-temperature bands and
 initial setup are already in DuckDB. Motion/per-wheel values vary at about 50 Hz in GT3/LMP3 captures.
-The proposed 30-scalar dynamic core costs 44.64 MB/hour (50.4 MB/hour with tyre deflection, [section 9](LIVE_CHANNEL_ANALYSIS.md)) as float64 values with one timestamp per sample,
+The delivered 34-scalar dynamic core costs 50.4 MB/hour ([section 9](LIVE_CHANNEL_ANALYSIS.md)) as float64 values with one timestamp per sample,
 before metadata. No final storage size or game-performance improvement is claimed.
 
 Implementation was authorized after user review. Existing game observations are historical
@@ -71,7 +71,9 @@ FL/FR/RL/RR. REST condition responses retain observation intervals and age; no f
 
 The first six rows form the proposed 30-scalar dynamic core: actual useful variation is established in
 GT3/LMP3 captures, and no equivalent is declared by the 199 native catalogs or established VCR fields.
-The 30-value core is captured in normalization version 2; the proposal rows below preserve the original
+The 30-value core was captured in normalization version 2; version 3 adds four tyre-deflection values.
+Impact magnitude/time, dictionary-encoded terrain and opaque player upgrades are also captured sparsely.
+The proposal rows below preserve the original
 inventory rationale. Current mappings and evidence are in [wheel capture evidence](WHEEL_CAPTURE_EVIDENCE.md).
 
 | Channel / values | Source fields | Benefit / overlap | Proposed representation and cadence |
@@ -82,7 +84,7 @@ inventory rationale. Current mappings and evidence are in [wheel capture evidenc
 | Wheel ground velocity, lateral/longitudinal per wheel | SM `lateralGroundVel`, `longitudinalGroundVel` | Complements patch velocity; slip definitions need physical validation | Eight typed values, same timestamps as patch values |
 | Dynamic camber per wheel | SM `camber` | Measured wheel geometry rather than static setup | Four typed values; 50 Hz proposed; variation verified, radians working unit, side/sign checks remain |
 | Dynamic toe per wheel | SM `toe` | Adds changing alignment evidence | Four typed values; 50 Hz proposed; variation verified, radians working unit, side/sign checks remain |
-| Tyre vertical deflection per wheel | SM wheel `verticalTireDeflection` | Absent from native catalogs; varies 0-0.057 m at 50 Hz | Proposed addition to the core (34 scalars); four typed values |
+| Tyre vertical deflection per wheel | SM wheel `verticalTireDeflection` | Absent from native catalogs; varies 0-0.057 m at 50 Hz | Implemented in normalization version 3 (34 scalars); four typed metre values |
 | Local acceleration, three axes | SM `localAccel` | Same quantity as native G Force (r ≥ 0.955) at 10 Hz | Conditional; only 5x cadence gain for transients |
 | Angular acceleration, three axes | SM `localRotAccel` | Potential transient handling evidence; may be derivable/noisy | Conditional; keep only if measured benefit exceeds differentiating angular velocity |
 | Wind vector | SM scoring `wind` | Native Wind Speed/Heading already exported at 1 Hz | Exclude duplicate by default; checked SM vectors all zero |
