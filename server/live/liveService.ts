@@ -83,6 +83,7 @@ export class LiveService {
   private readonly identity: LiveIdentityResolver;
   private pendingTiming: LiveTiming | null = null;
   private lastTimingAt = 0;
+  private lastTimingDiagnosticAt = -Infinity;
   private tyreSurfaceAvgC: number | null = null;
   private readonly strategy = new LiveStrategyTracker((kind, predicted, source, condition, compound) => {
     const player = this.lastReading?.player;
@@ -471,6 +472,15 @@ export class LiveService {
     this.pendingTiming = null;
     this.lastTimingAt = now;
     const event: LiveTiming = { ...timing, tyreSurfaceAvgC: this.tyreSurfaceAvgC };
+    if (now - this.lastTimingDiagnosticAt >= 1000) {
+      this.lastTimingDiagnosticAt = now;
+      const player = this.lastReading?.player;
+      this.record(() => this.options.capture?.diagnostics?.record({ kind: 'lap-timing', at: now, data: {
+        timing: event, clients: this.clients.size,
+        input: player ? { currentEt: this.lastReading?.currentEt, totalLaps: player.totalLaps,
+          lapStartEt: player.lapStartEt, timeIntoLap: player.timeIntoLap, lapDist: player.lapDist } : null,
+      } }));
+    }
     for (const sink of this.clients.keys()) this.send(sink, LIVE_STREAM_EVENTS.timing, event);
   }
 

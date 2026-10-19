@@ -33,7 +33,7 @@ export function LiveQualiView({ snapshot, store }: { snapshot: LiveSnapshot; sto
         <div data-testid="live-quali-estimate" className={`${RACE_LEAD} col-span-2`}>
           <h1 className="text-[48px] font-bold leading-[1.3]">ESTIMATED LAP</h1>
           <div className="whitespace-nowrap font-mono text-[180px] font-bold leading-[1.2] tracking-[-0.04em]">
-            <LiveEstimatedLap store={store} bestSeconds={best?.lapSeconds} />
+            <LiveEstimatedLap store={store} />
           </div>
           <p data-testid="live-quali-place" className="whitespace-nowrap font-mono text-[48px] font-semibold text-lmu-muted">
             {place !== null ? `P${place}` : UNKNOWN}

@@ -57,7 +57,7 @@ export function LiveRacePlan({ snapshot, view, store }: { snapshot: LiveSnapshot
       <div className={`${RACE_LEAD} ${view.mode === 'sprint' ? 'col-span-2' : ''}`}>
         <Readout readout={view.action} size="action" testId="live-race-action">
           {/* Only this readout follows the timing stream; strategy and the page stay on snapshots. */}
-          {view.mode === 'sprint' ? <LiveEstimatedLap store={store} bestSeconds={snapshot.sessionBest?.lapSeconds} /> : undefined}
+          {view.mode === 'sprint' ? <LiveEstimatedLap store={store} /> : undefined}
         </Readout>
         <p data-testid="live-race-position" className="whitespace-nowrap font-mono text-[48px] font-semibold text-lmu-muted">
           LAP {lap ?? '—'} · {session?.playerPlace != null ? `P${session.playerPlace}` : '—'}

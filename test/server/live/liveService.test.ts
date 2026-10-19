@@ -246,6 +246,45 @@ describe('LiveService', () => {
     } finally { vi.restoreAllMocks(); }
   });
 
+  it('records the emitted timing and source clocks at most once a second', async () => {
+    const diagnostics = new LiveDiagnostics('unused');
+    vi.spyOn(diagnostics, 'begin').mockImplementation(() => {});
+    const record = vi.spyOn(diagnostics, 'record').mockImplementation(() => {});
+    vi.spyOn(diagnostics, 'sink').mockReturnValue(() => {});
+    const writer = new FakeWorker();
+    const capture = new LiveCaptureController({ directory: 'unused', onPersist: () => {}, diagnostics,
+      createWorker: () => writer as unknown as CaptureWorker });
+    const { service, frame } = setup({ capture });
+    const sink = new FakeSink();
+    service.addClient(sink);
+    const samples = () => record.mock.calls.map(([event]) => event).filter(event => event.kind === 'lap-timing');
+    try {
+      frame(reading({ player: vehicleReading({ totalLaps: 5, bestLapTime: 100, bestLapSector1: 30,
+        bestLapSector2: 60, sector: 2, curSector1: 29.5, timeIntoLap: 31, lapStartEt: 100, lapDist: 1200 }) }));
+      vi.advanceTimersByTime(120);
+      const sent = sink.chunks.findIndex(chunk => chunk.startsWith('event: timing'));
+      expect(sent).toBeGreaterThan(-1);
+      expect(samples()).toHaveLength(1);
+      expect(samples()[0].data).toEqual({ timing: sink.data(sent), clients: 1,
+        input: { currentEt: 10, totalLaps: 5, lapStartEt: 100, timeIntoLap: 31, lapDist: 1200 } });
+      expect(sink.data(sent)).toMatchObject({ lapEstimate: {
+        seconds: 99.5, referenceSeconds: 100, deltaSeconds: -0.5, source: 'sector',
+      } });
+      frame(reading());
+      vi.advanceTimersByTime(120);
+      expect(samples()).toHaveLength(1);
+      vi.advanceTimersByTime(1000);
+      frame(reading());
+      vi.advanceTimersByTime(120);
+      expect(samples()).toHaveLength(2);
+    } finally {
+      const stopping = service.stop();
+      writer.emit('exit', 0);
+      await stopping;
+      vi.restoreAllMocks();
+    }
+  });
+
   it('ignores messages that are not the reader\'s (tsx posts watch:import)', () => {
     const { service, worker } = setup();
     worker.emit('message', { 'watch:import': ['file.ts'] });
@@ -459,7 +498,7 @@ describe('LiveService', () => {
       vi.advanceTimersByTime(PEDAL_FLUSH_MS);
       expect(timings(sink)).toHaveLength(1);
       expect(sink.data(timings(sink)[0])).toEqual({
-        lapNumber: 4, isOutLap: false, sector: 1, lapElapsedSeconds: expect.any(Number), sectors: [null, null, null], deltaSeconds: null, sectorEstimatedLapSeconds: null, sectorDeltas: [null, null, null], tyreSurfaceAvgC: null,
+        lapNumber: 4, isOutLap: false, sector: 1, lapElapsedSeconds: expect.any(Number), sectors: [null, null, null], deltaSeconds: null, lapEstimate: null, sectorDeltas: [null, null, null], tyreSurfaceAvgC: null,
       });
 
       // Two frames inside one interval: only the newest goes out, once the interval has passed.

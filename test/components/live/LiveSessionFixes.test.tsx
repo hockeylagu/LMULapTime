@@ -28,18 +28,24 @@ it('ticks smoothly without snapping backward on delayed updates, and bounds run-
 
 it('uses a split projection without a redundant approximation mark until a matching lap delta exists', () => {
   const store = new LiveTimingStore();
-  render(<LiveEstimatedLap store={store} bestSeconds={121.406} />);
+  render(<LiveEstimatedLap store={store} />);
   const estimate = screen.getByTestId('live-estimated-lap');
-  act(() => store.set(liveTiming({ deltaSeconds: null, sectorEstimatedLapSeconds: 133.0757 })));
+  act(() => store.set(liveTiming({ deltaSeconds: null, lapEstimate: { seconds: 133.0757, referenceSeconds: 134, deltaSeconds: -0.9243, source: 'sector' } })));
   expect(estimate).toHaveTextContent('2:13.076');
   expect(estimate).not.toHaveTextContent('~');
   expect(estimate).toHaveAttribute('data-estimate-source', 'sector');
-  act(() => store.set(liveTiming({ deltaSeconds: -0.184, sectorEstimatedLapSeconds: 133.0757 })));
+  act(() => store.set(liveTiming({ deltaSeconds: -0.184 })));
   expect(estimate).toHaveTextContent('2:01.222');
-  expect(estimate).toHaveAttribute('data-estimate-source', 'session-trace');
-  act(() => store.set(liveTiming({ isOutLap: true, sectorEstimatedLapSeconds: 133.0757 })));
+  expect(estimate).toHaveAttribute('data-estimate-source', 'distance');
+  act(() => store.set(liveTiming({ deltaSeconds: 0.225 })));
+  expect(estimate).toHaveTextContent('2:01.631');
+  act(() => store.set(liveTiming({ deltaSeconds: -0.557, lapEstimate: {
+    seconds: 131.201, referenceSeconds: 131.758, deltaSeconds: -0.557, source: 'distance',
+  } })));
+  expect(estimate).toHaveTextContent('2:11.201');
+  act(() => store.set(liveTiming({ isOutLap: true, lapEstimate: { seconds: 133.0757, referenceSeconds: 134, deltaSeconds: -0.9243, source: 'sector' } })));
   expect(estimate).toHaveTextContent('OUT LAP');
-  act(() => store.set(liveTiming({ deltaSeconds: null, sectorEstimatedLapSeconds: -1 })));
+  act(() => store.set(liveTiming({ deltaSeconds: null, lapEstimate: null })));
   expect(estimate).toHaveTextContent('—');
 });
 
@@ -49,6 +55,6 @@ it('retains a computed invalid lap in gray with its provenance and without promo
   }]} />);
   expect(screen.getByTestId('live-history-latest')).toHaveClass('text-lmu-muted');
   expect(screen.getByTitle('Computed lap time')).toHaveTextContent('2:13.076');
-  expect(screen.getByText('INVALID · COMPUTED TIME')).toBeInTheDocument();
+  expect(screen.queryByText(/INVALID/)).not.toBeInTheDocument();
   expect(screen.getByTestId('live-history-best')).toHaveTextContent('BEST————');
 });

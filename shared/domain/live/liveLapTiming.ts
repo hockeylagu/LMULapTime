@@ -132,9 +132,15 @@ export class LiveLapTiming {
     const best = this.best?.lapSectors;
     const sectorDeltas = done.map((time, i) => (time !== null && best?.[i] != null ? ms(time - best[i]) : null)) as Sectors;
     const completed = sectorDeltas.slice(0, sector - 1);
-    const splitEstimate = !player.inPits && !lap.startedInPits && this.best?.lapSeconds != null
+    const splitDelta = !player.inPits && !lap.startedInPits && this.best?.lapSeconds != null
       && completed.length > 0 && completed.every(value => value !== null)
-      ? ms(this.best.lapSeconds + completed.reduce<number>((sum, value) => sum + (value ?? 0), 0)) : null;
+      ? ms(completed.reduce<number>((sum, value) => sum + (value ?? 0), 0)) : null;
+    const estimateDelta = delta ?? splitDelta;
+    const referenceSeconds = this.best?.lapSeconds;
+    const lapEstimate: LiveTiming['lapEstimate'] = referenceSeconds != null && estimateDelta !== null
+      && Number.isFinite(estimateDelta) && referenceSeconds + estimateDelta > 0
+      ? { seconds: ms(referenceSeconds + estimateDelta), referenceSeconds, deltaSeconds: estimateDelta,
+        source: delta !== null ? 'distance' : 'sector' } : null;
     return {
       lapNumber: player.totalLaps + 1,
       isOutLap: lap.startedInPits,
@@ -142,7 +148,7 @@ export class LiveLapTiming {
       lapElapsedSeconds: Number.isFinite(player.timeIntoLap) && player.timeIntoLap >= 0 ? ms(player.timeIntoLap) : null,
       sectors: done,
       deltaSeconds: delta,
-      sectorEstimatedLapSeconds: delta === null ? splitEstimate : null,
+      lapEstimate,
       sectorDeltas,
     };
   }

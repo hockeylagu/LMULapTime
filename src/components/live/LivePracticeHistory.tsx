@@ -76,7 +76,7 @@ export function LivePracticeHistory({ laps, best, store, paused = false }: { lap
             </tr>
             {row === 0 && <tr aria-label={`Lap ${lap.lapNumber} sector deltas against the best lap`} className="border-b border-lmu-border">
               <th colSpan={2} scope="row" className="px-5 pb-3 text-left text-[32px] font-normal text-lmu-muted">
-                {lap.valid ? 'VS BEST' : lap.timeSource === 'lap-start' ? 'INVALID · COMPUTED TIME' : 'INVALID LAP'}
+                VS BEST
               </th>
               {[0, 1, 2].map(index => {
                 const time = lap.sectors[index];

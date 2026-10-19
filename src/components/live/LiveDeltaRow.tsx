@@ -15,8 +15,8 @@ const LABEL = 'text-[48px] font-semibold text-lmu-text-soft';
  * of the lap in progress in a race, or by the tyre surface average where the page already leads with the lap.
  * Renders at the timing rate.
  */
-export function LiveDeltaRow({ store, lead, testId, bestSeconds }: {
-  store: LiveTimingStore; lead: 'estimate' | 'tyres'; testId: string; bestSeconds?: number | null;
+export function LiveDeltaRow({ store, lead, testId }: {
+  store: LiveTimingStore; lead: 'estimate' | 'tyres'; testId: string;
 }) {
   const timing = useLiveTiming(store);
   const tyres = timing?.tyreSurfaceAvgC ?? null;
@@ -29,7 +29,7 @@ export function LiveDeltaRow({ store, lead, testId, bestSeconds }: {
       {lead === 'estimate' ? (
         <div className={RACE_LEAD}>
           <h2 className={LABEL}>ESTIMATED LAP</h2>
-          <div className={VALUE}><LiveEstimatedLap store={store} bestSeconds={bestSeconds} /></div>
+          <div className={VALUE}><LiveEstimatedLap store={store} /></div>
         </div>
       ) : (
         <div className={RACE_LEAD}>

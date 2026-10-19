@@ -17,9 +17,16 @@ export const liveLap = (lapNumber: number, lapSeconds: number | null, sectors: L
   lapNumber, lapSeconds, sectors, valid,
 });
 
-export const liveTiming = (patch: Partial<LiveTiming> = {}): LiveTiming => ({
-  lapNumber: 13, sector: 3, lapElapsedSeconds: 88.4, sectors: [null, null, null], deltaSeconds: -0.184, sectorDeltas: [-0.12, -0.064, null], ...patch,
-});
+export const liveTiming = (patch: Partial<LiveTiming> = {}): LiveTiming => {
+  const timing: LiveTiming = {
+    lapNumber: 13, sector: 3, lapElapsedSeconds: 88.4, sectors: [null, null, null], deltaSeconds: -0.184, sectorDeltas: [-0.12, -0.064, null], ...patch,
+  };
+  if (!('lapEstimate' in patch)) timing.lapEstimate = timing.deltaSeconds == null ? null : {
+    seconds: Math.round((121.406 + timing.deltaSeconds) * 1000) / 1000,
+    referenceSeconds: 121.406, deltaSeconds: timing.deltaSeconds, source: 'distance',
+  };
+  return timing;
+};
 
 /** A GT3 race strategy mid-stint: 62% VE at 2.5%/lap measured, pit in 6 laps; override what a test is about. */
 export const liveStrategy = (patch: Partial<LiveStrategy> = {}): LiveStrategy => ({

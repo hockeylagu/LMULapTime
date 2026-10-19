@@ -24,7 +24,7 @@ export function LivePracticeView({ snapshot, store }: { snapshot: LiveSnapshot; 
         <div className="pr-12">
           <h1 className="text-[48px] font-bold leading-[1.3]">ESTIMATED LAP</h1>
           <div className="whitespace-nowrap font-mono text-[182px] font-bold leading-[1.2] tracking-[-0.04em]">
-            <LiveEstimatedLap store={store} bestSeconds={best?.lapSeconds} />
+            <LiveEstimatedLap store={store} />
           </div>
         </div>
         <div className="grid grid-cols-2 gap-x-[60px] border-l border-lmu-border pl-[60px]">

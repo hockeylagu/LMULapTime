@@ -119,6 +119,11 @@ export function createDemoState(id: string, carClass: string | null = 'GT3', res
   selected.apply(snapshot, timing);
   configureDemoClass(snapshot, timing, carClass ?? 'GT3');
   configureDemoSession(snapshot, timing, selected.id === 'sprint' || selected.id === 'garage-sprint', reserveLaps);
+  const reference = snapshot.sessionBest?.lapSeconds;
+  timing.lapEstimate = !timing.isOutLap && reference != null && timing.deltaSeconds != null ? {
+    seconds: Math.round((reference + timing.deltaSeconds) * 1000) / 1000,
+    referenceSeconds: reference, deltaSeconds: timing.deltaSeconds, source: 'distance',
+  } : null;
   if (selected.id === 'connecting') return { snapshot: null, timing: null, connection: 'connecting' };
   if (selected.id === 'disconnected') return { snapshot, timing: null, connection: 'disconnected' };
   return { snapshot, timing: selected.id === 'unknown-data' ? null : timing, connection: 'live' };

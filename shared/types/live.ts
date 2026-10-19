@@ -115,8 +115,8 @@ export interface LiveTiming {
   sectors: [number | null, number | null, number | null];
   /** Time into the current lap minus the session-best lap at the same distance; null without a reference. */
   deltaSeconds: number | null;
-  /** Best lap plus the delta at the latest completed split, when a complete reference trace is unavailable. */
-  sectorEstimatedLapSeconds?: number | null;
+  /** Coherent estimate/reference/delta from this timing event; never rebuilt from a separate snapshot. */
+  lapEstimate?: { seconds: number; referenceSeconds: number; deltaSeconds: number; source: 'distance' | 'sector' } | null;
   /** Completed sectors of the current lap minus the session-best lap's sectors; null for sectors not yet done. */
   sectorDeltas: [number | null, number | null, number | null];
   /**

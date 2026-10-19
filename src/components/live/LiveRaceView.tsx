@@ -17,7 +17,7 @@ export function LiveRaceView({ snapshot, store }: { snapshot: LiveSnapshot; stor
   return (
     <>
       <LiveRacePlan snapshot={snapshot} view={view} store={store} />
-      <LiveDeltaRow store={store} lead={view.mode === 'sprint' ? 'tyres' : 'estimate'} testId="live-race-deltas" bestSeconds={snapshot.sessionBest?.lapSeconds} />
+      <LiveDeltaRow store={store} lead={view.mode === 'sprint' ? 'tyres' : 'estimate'} testId="live-race-deltas" />
       {damage?.significant
         ? <LiveDamageRow damage={damage} lapsLeft={snapshot.lapsLeft?.laps ?? null} />
         : <LiveLastLapRow lap={lastLap(snapshot.recentLaps)} />}

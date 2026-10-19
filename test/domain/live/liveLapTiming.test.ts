@@ -77,11 +77,11 @@ describe('LiveLapTiming', () => {
     const timing = new LiveLapTiming();
     const player = { totalLaps: 5, bestLapTime: 100, bestLapSector1: 30, bestLapSector2: 60, estimatedLapTime: 100 };
     timing.update(reading({ ...player, sector: 1 }));
-    expect(timing.timing()).toMatchObject({ deltaSeconds: null, sectorEstimatedLapSeconds: null });
+    expect(timing.timing()).toMatchObject({ deltaSeconds: null, lapEstimate: null });
     timing.update(reading({ ...player, sector: 2, curSector1: 29.5 }));
-    expect(timing.timing()?.sectorEstimatedLapSeconds).toBe(99.5);
+    expect(timing.timing()?.lapEstimate).toEqual({ seconds: 99.5, referenceSeconds: 100, deltaSeconds: -0.5, source: 'sector' });
     timing.update(reading({ ...player, sector: 0, curSector1: 29.5, curSector2: 61.2 }));
-    expect(timing.timing()?.sectorEstimatedLapSeconds).toBe(101.2);
+    expect(timing.timing()?.lapEstimate).toEqual({ seconds: 101.2, referenceSeconds: 100, deltaSeconds: 1.2, source: 'sector' });
   });
 
   it('recovers an invalid completed time from consecutive lap-start clocks without accepting it as a record', () => {
@@ -153,10 +153,12 @@ describe('LiveLapTiming', () => {
     driveLap(timing, { seconds: 100, completed: 0 });
     // Same distance, 2 s later than the reference (which covers 100 m a second).
     timing.update(reading({ totalLaps: 1, lapDist: 2_500, timeIntoLap: 27, sector: 1, curSector1: -1 }));
-    expect(timing.timing()).toMatchObject({ lapNumber: 2, sector: 1, deltaSeconds: 2 });
+    expect(timing.timing()).toMatchObject({ lapNumber: 2, sector: 1, deltaSeconds: 2,
+      lapEstimate: { seconds: 102, referenceSeconds: 100, deltaSeconds: 2, source: 'distance' } });
     // Between two trace samples: 1234.5 m is 12.345 s on the reference.
     timing.update(reading({ totalLaps: 1, lapDist: 1_234.5, timeIntoLap: 11.845, sector: 1 }));
     expect(timing.timing()?.deltaSeconds).toBeCloseTo(-0.5, 3);
+    expect(timing.timing()?.lapEstimate).toEqual({ seconds: 99.5, referenceSeconds: 100, deltaSeconds: -0.5, source: 'distance' });
   });
 
   it('marks an out lap from pit departure until the next timing line crossing', () => {
