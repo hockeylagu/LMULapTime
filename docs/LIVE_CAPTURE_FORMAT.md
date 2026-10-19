@@ -22,9 +22,15 @@ Native telemetry, XML and replay files retain their existing ownership.
 Settings Overview reports **Live telemetry files** separately from native **Telemetry files**.
 The live count uses available SQLite capture-index entries, including active and unlinked recordings;
 missing files stop counting after reconciliation. It does not open raw DuckDB files on status requests.
-A `[SQLite Cache] Found live telemetry DuckDB recording: <filename>` console entry is emitted when
-a recording is first indexed or becomes available again, both from writer acknowledgements and
-startup discovery. Repeated checkpoints and unchanged rediscovery do not repeat the log.
+All four source summaries use `[SQLite Cache] Synced <total> <source> (<new> new, <updated> updated) from <directory>`:
+XML sessions, replays, telemetry DuckDB files and live telemetry DuckDB files. A nonzero rejected/deferred
+file count adds `, <count> skipped`; unchanged cached files are not called skipped. The first live directory discovery
+prints a summary, including `0 new, 0 updated` at startup. Overlapping startup/scan triggers suppress
+repeated unchanged live summaries; new/updated files or a changed total still print. Startup discovery is
+triggered after the XML/replay/native scan pass completes; the first reader answer only releases
+that pass and does not independently scan the live directory. First writer acknowledgement of a new
+or restored recording also prints the live summary; repeated recording checkpoints do not. Live discovery
+compares persisted manifests and byte counts so unchanged rediscovery does not count as an update.
 
 ## Live dashboard and save pipeline
 
