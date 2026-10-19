@@ -134,7 +134,7 @@ function AnalysisApp() {
   };
 
   const handleSelectTrack = (track: TrackSummary) => {
-    const params = new URLSearchParams({ trackVenue: track.identityVenue, trackCourse: track.trackCourse });
+    const params = new URLSearchParams({ track: track.trackVenue });
     if (selectedCarClass !== 'All') params.set('carClass', selectedCarClass);
     navigate(`/track/${encodeURIComponent(track.trackVenue)}?${params}`);
   };

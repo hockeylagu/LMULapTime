@@ -68,24 +68,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
     replayParams.set('lapOrdinal', String(lapOrdinal));
     navigate(`/telemetry?${replayParams.toString()}`);
   };
-  const selectedTrackVenue = searchParams.get('trackVenue') || undefined;
-  const selectedTrackCourse = searchParams.get('trackCourse') || '';
-  const selectedTrack = selectedTrackVenue
-    ? JSON.stringify([selectedTrackVenue, selectedTrackCourse])
-    : searchParams.get('track') || initialSelectedTrack;
+  const selectedTrack = searchParams.get('track') || initialSelectedTrack;
   const filterType = searchParams.get('type') || initialFilterType;
   const searchQuery = searchParams.get('q') || initialSearchQuery;
 
   const setSelectedTrack = (track: string) => {
     legacySetSelectedTrack?.(track);
-    try {
-      const identity: unknown = JSON.parse(track);
-      if (Array.isArray(identity) && identity.length === 2 && identity.every(value => typeof value === 'string')) {
-        updateSearchParams(searchParams, setSearchParams, { track: identity[0], trackVenue: identity[0], trackCourse: identity[1] });
-        return;
-      }
-    } catch { /* A legacy or All filter is a plain value. */ }
-    updateSearchParams(searchParams, setSearchParams, { track, trackVenue: null, trackCourse: null });
+    updateSearchParams(searchParams, setSearchParams, { track });
   };
 
   const setFilterType = (type: string) => {
@@ -150,8 +139,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
   } = useDashboardMetrics({
     sessions,
     selectedTrack,
-    selectedTrackVenue,
-    selectedTrackCourse,
     selectedCarClass,
     filterType,
     searchQuery,
@@ -161,7 +148,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     isExpanded,
   });
 
-  const isFiltered = (selectedTrack !== 'All' && !selectedTrackVenue) || Boolean(selectedTrackVenue) || selectedCarClass !== 'All' || filterType !== 'All' || searchQuery !== '' || hasReplay;
+  const isFiltered = selectedTrack !== 'All' || selectedCarClass !== 'All' || filterType !== 'All' || searchQuery !== '' || hasReplay;
   // One URL update: separate setters would each start from the same params and undo one another.
   const resetFilters = isFiltered
     ? () => {
@@ -169,7 +156,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         legacySetSelectedTrack?.('All');
         legacySetFilterType?.('All');
         legacySetSearchQuery?.('');
-        updateSearchParams(searchParams, setSearchParams, { track: null, trackVenue: null, trackCourse: null, carClass: null, type: null, q: null, hasReplay: null });
+        updateSearchParams(searchParams, setSearchParams, { track: null, carClass: null, type: null, q: null, hasReplay: null });
       }
     : undefined;
 

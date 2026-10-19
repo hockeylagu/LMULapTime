@@ -59,10 +59,10 @@ export const DashboardFilterBar: React.FC<DashboardFilterBarProps> = ({
   onClearFilters,
 }) => {
   const isNarrowed = Boolean(selectedTrack) && selectedTrack !== 'All';
-  // Venue and course as JSON, so two layouts of one venue never share a value.
+  // Use the same full layout name as circuit links and the leaderboard.
   const trackOptions = [
     { value: 'All', label: `All Tracks (${tracks.length})` },
-    ...tracks.map((t) => ({ value: JSON.stringify([t.trackVenue, t.trackCourse]), label: t.track })),
+    ...tracks.map((t) => ({ value: t.track, label: t.track })),
   ];
 
   return (

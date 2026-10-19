@@ -13,8 +13,6 @@ import type { DashboardTrackFilter } from '../../../shared/types/dashboard.js';
 export interface UseDashboardMetricsParams {
   sessions: (SessionCard | DetailedSession)[];
   selectedTrack: string;
-  selectedTrackVenue?: string;
-  selectedTrackCourse?: string;
   selectedCarClass: string;
   filterType: string;
   searchQuery: string;
@@ -30,8 +28,6 @@ export interface UseDashboardMetricsParams {
 export function useDashboardMetrics({
   sessions,
   selectedTrack,
-  selectedTrackVenue,
-  selectedTrackCourse = '',
   selectedCarClass,
   filterType,
   searchQuery,
@@ -47,7 +43,7 @@ export function useDashboardMetrics({
     const options = new Map<string, DashboardTrackFilter>();
     for (const session of sessions) {
       const track = getDisplayTrackName(session.trackVenue, session.trackCourse);
-      if (track) options.set(JSON.stringify([session.trackVenue, session.trackCourse]), {
+      if (track) options.set(track, {
         track, trackVenue: session.trackVenue, trackCourse: session.trackCourse ?? '',
       });
     }
@@ -60,8 +56,7 @@ export function useDashboardMetrics({
   const filteredSessions = useMemo(() => {
     return sessions.filter((s) => {
       const displayTrack = getDisplayTrackName(s.trackVenue, s.trackCourse);
-      const isTrackMatch = matchesTrack(selectedTrackVenue || selectedTrack, s.trackVenue, s.trackCourse,
-        selectedTrackVenue ? selectedTrackCourse : '');
+      const isTrackMatch = matchesTrack(selectedTrack, s.trackVenue, s.trackCourse);
       const matchesType = filterType === 'All' || s.sessionType === filterType;
       const isMatchingCarClass = matchesSessionCarClass(s, selectedCarClass);
       const matchesSearch =
@@ -74,7 +69,7 @@ export function useDashboardMetrics({
       const matchesReplay = !hasReplay || Boolean(s.matchingReplayFile);
       return isTrackMatch && matchesType && isMatchingCarClass && matchesSearch && matchesEmpty && matchesReplay;
     });
-  }, [sessions, selectedTrack, selectedTrackVenue, selectedTrackCourse, filterType, selectedCarClass, searchQuery, hideEmpty, hasReplay]);
+  }, [sessions, selectedTrack, filterType, selectedCarClass, searchQuery, hideEmpty, hasReplay]);
 
   const sortedSessions = useMemo(() => {
     return [...filteredSessions].sort((a, b) => compareSessionsBySortOption(a, b, sortBy));
@@ -87,6 +82,7 @@ export function useDashboardMetrics({
     let totalDrivingSeconds = 0;
     let maxTopSpeed = 0;
     let maxTopSpeedTrack = '';
+    let maxTopSpeedCar = '';
     let practiceSessionsCount = 0;
     let qualifyingSessionsCount = 0;
     let raceSessionsCount = 0;

@@ -20,7 +20,7 @@ export interface TrackRibbonCardProps {
 export const TrackRibbonCard: React.FC<TrackRibbonCardProps> = ({ layout, selected, onSelect }) => {
   const latest = layout.classes.find((c) => c.carClass === layout.lastCarClass) ?? layout.classes[0];
   const carClass = layout.lastCarClass;
-  const targetUrl = `/leaderboard?track=${encodeURIComponent(layout.trackName)}&carClass=${encodeURIComponent(carClass)}`;
+  const targetUrl = `/leaderboard?${new URLSearchParams({ track: layout.trackName, carClass })}`;
   const spec = getCircuitSpecification(layout.trackName, null, null, null, layout.layoutKey);
   const [failedOutline, setFailedOutline] = React.useState<string | null>(null);
   const showOutline = spec.layoutKey !== 'unknown' && failedOutline !== spec.layoutKey;

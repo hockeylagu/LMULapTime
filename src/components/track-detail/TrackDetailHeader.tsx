@@ -43,9 +43,10 @@ export const TrackDetailHeader: React.FC<TrackDetailHeaderProps> = ({
 }) => {
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const backUrl = selectedClass !== 'All' ? `/tracks?carClass=${encodeURIComponent(selectedClass)}` : '/tracks';
-  const compareUrl = `/leaderboard?track=${encodeURIComponent(trackName)}&carClass=${encodeURIComponent(
-    selectedClass !== 'All' ? selectedClass : 'GT3'
-  )}`;
+  const compareUrl = `/leaderboard?${new URLSearchParams({
+    track: trackName,
+    carClass: selectedClass !== 'All' ? selectedClass : 'GT3',
+  })}`;
 
   return (
     <>

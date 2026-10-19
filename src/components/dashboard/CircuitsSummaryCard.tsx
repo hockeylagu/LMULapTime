@@ -47,8 +47,7 @@ export const CircuitsSummaryCard: React.FC<CircuitsSummaryCardProps> = ({
           title: `View ${item.track} Track Details`,
           to: `/track/${encodeURIComponent(item.track)}?${new URLSearchParams({
             ...(selectedCarClass !== 'All' ? { carClass: selectedCarClass } : {}),
-            trackVenue: item.trackVenue ?? item.track,
-            trackCourse: item.trackCourse ?? '',
+            track: item.track,
           }).toString()}`,
         }))}
       />

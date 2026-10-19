@@ -220,7 +220,7 @@ describe('TrackSummaries component', () => {
     render(<TrackSummaries sessions={mockSessions} onSelectTrack={onSelectTrack} selectedCarClass="GT3" setSelectedCarClass={vi.fn()} />);
     await waitFor(() => expect(screen.queryByText('Loading benchmark targets…')).not.toBeInTheDocument());
     const link = screen.getByRole('link', { name: 'View Monza records' });
-    expect(link).toHaveAttribute('href', '/track/Monza?trackVenue=Monza&trackCourse=&carClass=GT3');
+    expect(link).toHaveAttribute('href', '/track/Monza?track=Monza&carClass=GT3');
     link.focus();
     await user.keyboard('{Enter}');
     expect(onSelectTrack).toHaveBeenCalledWith(expect.objectContaining({ identityVenue: 'Monza', trackCourse: '' }));
@@ -281,7 +281,7 @@ describe('TrackSummaries component', () => {
     render(<TrackSummaries sessions={[{ ...mockSessions[0], trackVenue: name }]} onSelectTrack={vi.fn()} selectedCarClass="All" setSelectedCarClass={vi.fn()} />);
     await waitFor(() => expect(screen.queryByText('Loading benchmark targets…')).not.toBeInTheDocument());
     expect(screen.getByRole('heading', { name })).toHaveAttribute('dir', 'auto');
-    expect(screen.getByRole('link', { name: `View ${name} records` })).toHaveAttribute('href', `/track/${encodeURIComponent(name)}?${new URLSearchParams({ trackVenue: name, trackCourse: '' })}`);
+    expect(screen.getByRole('link', { name: `View ${name} records` })).toHaveAttribute('href', `/track/${encodeURIComponent(name)}?${new URLSearchParams({ track: name })}`);
   });
 
   it('keeps custom courses separate in both ordinary and native navigation', async () => {
@@ -290,9 +290,9 @@ describe('TrackSummaries component', () => {
       onSelectTrack={onSelectTrack} selectedCarClass="Hyper" setSelectedCarClass={vi.fn()} />);
     await waitFor(() => expect(screen.queryByText('Loading benchmark targets…')).not.toBeInTheDocument());
     const short = screen.getByRole('link', { name: 'View Custom Ring (Short) records' });
-    expect(short).toHaveAttribute('href', '/track/Custom%20Ring%20(Short)?trackVenue=Custom+Ring&trackCourse=Short&carClass=Hyper');
+    expect(short).toHaveAttribute('href', '/track/Custom%20Ring%20(Short)?track=Custom+Ring+%28Short%29&carClass=Hyper');
     expect(screen.getByRole('link', { name: 'View Custom Ring (Long) records' })).toHaveAttribute('href',
-      '/track/Custom%20Ring%20(Long)?trackVenue=Custom+Ring&trackCourse=Long&carClass=Hyper');
+      '/track/Custom%20Ring%20(Long)?track=Custom+Ring+%28Long%29&carClass=Hyper');
     fireEvent.click(short);
     expect(onSelectTrack).toHaveBeenCalledWith(expect.objectContaining({ identityVenue: 'Custom Ring', trackCourse: 'Short' }));
   });

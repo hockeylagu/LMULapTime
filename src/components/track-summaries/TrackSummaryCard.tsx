@@ -28,7 +28,7 @@ export const TrackSummaryCard: React.FC<TrackSummaryCardProps> = ({
   const lastDriven = t.lastSessionTimestamp && Number.isFinite(t.lastSessionTimestamp) && t.lastSessionTimestamp > 0
     ? new Date(t.lastSessionTimestamp) : null;
   const validLastDriven = lastDriven && Number.isFinite(lastDriven.getTime()) ? lastDriven : null;
-  const params = new URLSearchParams({ trackVenue: t.identityVenue, trackCourse: t.trackCourse });
+  const params = new URLSearchParams({ track: t.trackVenue });
   if (selectedCarClass !== 'All') params.set('carClass', selectedCarClass);
   return (
     <Link

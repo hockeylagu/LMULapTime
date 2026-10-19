@@ -177,9 +177,8 @@ describe('Dashboard component', () => {
 
     const comboboxes = screen.getAllByRole('combobox');
     const trackSelect = comboboxes[0];
-    const spaIdentity = JSON.stringify(['Spa', '']);
-    chooseValue(trackSelect, spaIdentity);
-    expect(setSelectedTrack).toHaveBeenCalledWith(spaIdentity);
+    chooseValue(trackSelect, 'Spa');
+    expect(setSelectedTrack).toHaveBeenCalledWith('Spa');
 
     const searchInput = screen.getByPlaceholderText(/search track, car, file/i);
     fireEvent.change(searchInput, { target: { value: 'Porsche' } });
@@ -203,8 +202,38 @@ describe('Dashboard component', () => {
     );
 
     const table = screen.getByRole('table');
+    expect(screen.getByRole('combobox', { name: 'Filter by track' })).toHaveTextContent('Monza');
     expect(within(table).getByText('Porsche 911 GT3')).toBeInTheDocument();
     expect(within(table).queryByText('Ferrari 499P')).not.toBeInTheDocument();
+  });
+
+  it('keeps the full layout name selected when arriving from the leaderboard', () => {
+    const venue = 'Bahrain International Circuit';
+    const outer = `${venue} (Outer Circuit)`;
+    window.location.hash = `#/dashboard?${new URLSearchParams({ track: outer, carClass: 'GT3', view: 'table' })}`;
+    const sessions = [
+      { ...mockSessions[1], id: 'bahrain-gp', trackVenue: venue, trackCourse: venue },
+      { ...mockSessions[1], id: 'bahrain-outer', trackVenue: venue, trackCourse: 'Outer Circuit' },
+    ];
+    render(<Dashboard sessions={sessions} onSelectSession={vi.fn()} selectedCarClass="All" setSelectedCarClass={vi.fn()} />);
+
+    const trackSelect = screen.getByRole('combobox', { name: 'Filter by track' });
+    expect(trackSelect).toHaveTextContent(outer);
+    expect(within(screen.getByRole('table')).getByText(outer)).toBeInTheDocument();
+    expect(within(screen.getByRole('table')).queryByText(venue, { exact: true })).not.toBeInTheDocument();
+
+    chooseValue(trackSelect, venue);
+    expect(trackSelect).toHaveTextContent(venue);
+    const params = new URLSearchParams(window.location.hash.split('?')[1]);
+    expect(params.get('track')).toBe(venue);
+    expect(params.get('carClass')).toBe('GT3');
+    expect(params.has('trackVenue')).toBe(false);
+    expect(params.has('trackCourse')).toBe(false);
+    expect(within(screen.getByRole('table')).queryByText(outer)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reset track filter' }));
+    expect(trackSelect).toHaveTextContent('All Tracks');
+    expect(new URLSearchParams(window.location.hash.split('?')[1]).has('track')).toBe(false);
   });
 
   it('handles sort dropdown changes (date-asc, pace-asc, pace-desc)', () => {

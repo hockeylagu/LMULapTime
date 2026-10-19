@@ -81,7 +81,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
 
   // The course and event lines often just repeat the display name; keep only what adds to it.
   const trackName = getDisplayTrackName(session.trackVenue, session.trackCourse);
-  const trackParams = new URLSearchParams({ trackVenue: session.trackVenue, trackCourse: session.trackCourse });
+  const trackParams = new URLSearchParams({ track: trackName });
   if (session.playerDriver?.carClass) trackParams.set('carClass', session.playerDriver.carClass);
   const squash = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, '');
   const subtitle = [...new Set([session.trackCourse, session.trackEvent].filter((t): t is string => Boolean(t)))]

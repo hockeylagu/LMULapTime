@@ -4,6 +4,10 @@ A fast index for development: find the right file without searching. `AGENTS.md`
 this file holds the **routes through the code**. Keep it current (see "Keeping this file current" at the end).
 
 Canonical domain contracts live in `shared/types/`; `shared/types/index.ts` is the approved barrel.
+Circuit navigation uses `track=<full display layout name>` in query parameters on every page,
+including circuit detail links. Dashboard options use that same string directly; browser URLs
+do not encode JSON identities or separate `trackVenue`/`trackCourse` filters. Query strings are
+serialized with `URLSearchParams`. Layout matching remains in `getCircuitSpecification`.
 Import server telemetry reader contracts directly from `server/telemetry/duckdbTypes.ts`.
 Local contracts have independent owners: replay storage facts in `server/core/replay/replayStorageTypes.ts`,
 decode options in `server/replay/decode/replayTrajectoryTypes.ts`, telemetry chart results in

@@ -12,7 +12,7 @@ export function useDashboardData(revision = '', enabled = true): DashboardDataSt
   const [searchParams] = useSearchParams();
   const requestQuery = useMemo(() => {
     const query = new URLSearchParams();
-    for (const key of ['track', 'trackVenue', 'trackCourse', 'carClass', 'type', 'q', 'hideEmpty', 'hasReplay', 'sort', 'page']) {
+    for (const key of ['track', 'carClass', 'type', 'q', 'hideEmpty', 'hasReplay', 'sort', 'page']) {
       const value = searchParams.get(key);
       if (value !== null) query.set(key, value);
     }
