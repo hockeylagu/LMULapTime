@@ -53,6 +53,7 @@ export const OverviewCard: React.FC<OverviewCardProps> = ({ status, replay, ai, 
   const sessionsLabel = `${pluralize(sessionsCount, 'parsed session')}`;
   const counts = replay.counts;
   const telemetryFiles = cache?.telemetryFilesCount;
+  const liveTelemetryFiles = cache?.liveTelemetryFilesCount;
 
   const aiValue = ai.settings
     ? (ai.settings.configured ? 'Ready' : 'Optional · not set up')
@@ -87,6 +88,11 @@ export const OverviewCard: React.FC<OverviewCardProps> = ({ status, replay, ai, 
         <Readout
           label="Last synced"
           value={!status ? '—' : formatDateTime(cache?.lastSyncedAt, 'Never')}
+        />
+        <Readout
+          label="Live telemetry files"
+          value={formatNumber(liveTelemetryFiles)}
+          hint={liveTelemetryFiles === 0 ? 'No live recordings yet' : 'Supplemental DuckDB recordings'}
         />
       </div>
 

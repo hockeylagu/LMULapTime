@@ -51,6 +51,7 @@ export function createSystemRouter(context: ServerContext): Router {
         replaysCount: cacheStats.replaysCount,
         replayTrajectoriesCount: cacheStats.replayTrajectoriesCount,
         telemetryFilesCount: cacheStats.telemetryFilesCount,
+        liveTelemetryFilesCount: cacheStats.liveTelemetryFilesCount,
         sessionSummariesReadyCount: catalog.summariesReadyCount,
         telemetryCatalog: context.telemetryCatalog.getStatus(context.telemetryDir),
         ingestErrors: context.sessionDb.getIngestErrors(),

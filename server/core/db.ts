@@ -687,6 +687,8 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     const replayTrajectoriesCount = (this.db.prepare('SELECT COUNT(*) as count FROM replay_trajectories').get() as { count: number }).count;
     const telemetryFilesCount = (this.db.prepare('SELECT COUNT(*) as count FROM telemetry_metadata').get() as { count: number }).count;
 
+    const liveTelemetryFilesCount = (this.db.prepare('SELECT COUNT(*) as count FROM live_capture_index WHERE available = 1').get() as { count: number }).count;
+
     let dbSizeBytes = 0;
     if (this.dbPath !== ':memory:' && fs.existsSync(this.dbPath)) {
       try {
@@ -705,6 +707,7 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
       replaysCount,
       replayTrajectoriesCount,
       telemetryFilesCount,
+      liveTelemetryFilesCount,
     };
   }
 

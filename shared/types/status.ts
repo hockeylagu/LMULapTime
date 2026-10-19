@@ -27,6 +27,8 @@ export interface AppStatus {
     replaysCount?: number;
     replayTrajectoriesCount?: number;
     telemetryFilesCount?: number;
+    /** Available supplemental live DuckDB recordings, including unlinked sessions. */
+    liveTelemetryFilesCount?: number;
     sessionSummariesReadyCount?: number;
   };
 }

@@ -33,11 +33,11 @@ function manifestFromRow(row: IndexedRow): LiveCaptureManifest {
   return { ...manifest, sessionId: row.session_id, gameVersion: row.game_version };
 }
 
-/** Persists the rolling manifest snapshot while preserving a previously verified XML attachment. */
-export function upsertLiveCapture(db: Database, manifest: LiveCaptureManifest, bytes: number, available = true): void {
+/** Persists the manifest, preserving verified XML links; returns true for a newly available recording. */
+export function upsertLiveCapture(db: Database, manifest: LiveCaptureManifest, bytes: number, available = true): boolean {
   const filename = filenameOnly(manifest.filename);
-  const current = db.prepare('SELECT session_id, game_version, match_status FROM live_capture_index WHERE recording_id = ?')
-    .get(manifest.recordingId) as { session_id: string | null; game_version: string | null; match_status: string } | undefined;
+  const current = db.prepare('SELECT session_id, game_version, match_status, available FROM live_capture_index WHERE recording_id = ?')
+    .get(manifest.recordingId) as { session_id: string | null; game_version: string | null; match_status: string; available: number } | undefined;
   // The persisted row is authoritative even when its link was explicitly withdrawn. A delayed writer
   // acknowledgement may update capture coverage, but it can never recreate a verified XML link.
   const sessionId = current?.session_id ?? null;
@@ -56,6 +56,7 @@ export function upsertLiveCapture(db: Database, manifest: LiveCaptureManifest, b
     sessionId, gameVersion, LIVE_CAPTURE_MATCH_RULE_VERSION, current?.match_status ?? 'pending',
     manifest.startedAt, manifest.endedAt, Date.now(),
   );
+  return available && (!current || current.available === 0);
 }
 
 export function getSessionLiveCaptures(db: Database, sessionId: string): SessionLiveCapture[] {

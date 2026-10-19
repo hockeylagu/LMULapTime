@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { SessionDatabase } from '../../../../server/core/db.js';
-import { getSessionLiveCaptures, listLiveCaptureManifests, upsertLiveCapture } from '../../../../server/core/live/dbLiveCaptureStore.js';
+import { getSessionLiveCaptures, listLiveCaptureManifests, setLiveCaptureAvailability, upsertLiveCapture } from '../../../../server/core/live/dbLiveCaptureStore.js';
 import { reconcileLiveCaptures } from '../../../../server/live/capture/reconcile.js';
 import type { LiveCaptureManifest } from '../../../../shared/types/liveCapture.js';
 
@@ -63,6 +63,23 @@ function manifest(overrides: Partial<LiveCaptureManifest> = {}): LiveCaptureMani
 }
 
 describe('live capture XML reconciliation', () => {
+  it('reports only newly available recordings and counts available files independently of XML links', () => {
+    const db = database();
+    const raw = db.getDb();
+    const capture = manifest();
+    expect(db.getCacheStats().liveTelemetryFilesCount).toBe(0);
+    expect(upsertLiveCapture(raw, capture, 4096)).toBe(true);
+    expect(upsertLiveCapture(raw, { ...capture, samples: 360001 }, 8192)).toBe(false);
+    expect(db.getCacheStats().liveTelemetryFilesCount).toBe(1);
+    upsertLiveCapture(raw, manifest({ recordingId: 'missing', filename: 'missing.duckdb' }), 4096, false);
+    expect(db.getCacheStats().liveTelemetryFilesCount).toBe(1);
+    setLiveCaptureAvailability(raw, capture.recordingId, false);
+    expect(db.getCacheStats().liveTelemetryFilesCount).toBe(0);
+    expect(upsertLiveCapture(raw, capture, 8192)).toBe(true);
+    expect(upsertLiveCapture(raw, capture, 8192)).toBe(false);
+    expect(db.getCacheStats().liveTelemetryFilesCount).toBe(1);
+  });
+
   it('links only a unique candidate with matching identity, interval, layout and two lap anchors', async () => {
     const db = database();
     const directory = await recordingDirectory();

@@ -89,12 +89,16 @@ const liveCapture = new LiveCaptureController({
   diagnostics: new LiveDiagnostics(captureDirectory, loadLiveSettings(sessionDb).diagnostics),
   existing: () => listLiveCaptureManifests(sessionDb.getDb()),
   onPersist: (manifest, bytes) => {
-    upsertLiveCapture(sessionDb.getDb(), manifest, bytes);
+    if (upsertLiveCapture(sessionDb.getDb(), manifest, bytes)) {
+      console.log(`[SQLite Cache] Found live telemetry DuckDB recording: ${manifest.filename}`);
+    }
     if (manifest.status !== 'recording') void refreshLiveCaptureLinks();
   },
   onCatalog: (recordings, errors) => {
     for (const { manifest, bytes } of recordings) {
-      upsertLiveCapture(sessionDb.getDb(), manifest.status === 'recording' ? { ...manifest, status: 'interrupted' } : manifest, bytes);
+      if (upsertLiveCapture(sessionDb.getDb(), manifest.status === 'recording' ? { ...manifest, status: 'interrupted' } : manifest, bytes)) {
+        console.log(`[SQLite Cache] Found live telemetry DuckDB recording: ${manifest.filename}`);
+      }
       sessionDb.clearIngestError('live-capture', path.join(captureDirectory, manifest.filename));
     }
     for (const entry of errors) sessionDb.recordIngestError('live-capture', path.join(captureDirectory, entry.filename), new Error(entry.error));

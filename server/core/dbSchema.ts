@@ -33,6 +33,7 @@ export interface CacheStats {
   replaysCount: number;
   replayTrajectoriesCount: number;
   telemetryFilesCount: number;
+  liveTelemetryFilesCount: number;
 }
 
 export interface SyncResult {

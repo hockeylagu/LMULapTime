@@ -16,7 +16,7 @@ import type { ServerContext } from '../../../server/core/serverContext.js';
 
 const cacheStats = {
   enabled: true, dbPath: ':memory:', sessionsCount: 3, lastSyncedAt: null, dbSizeBytes: 0,
-  replaysCount: 1, replayTrajectoriesCount: 1, telemetryFilesCount: 0,
+  replaysCount: 1, replayTrajectoriesCount: 1, telemetryFilesCount: 0, liveTelemetryFilesCount: 12,
 };
 
 function fakeContext(dir: string) {
@@ -77,7 +77,7 @@ describe('system routes', () => {
         resultsExist: true, replaysExist: false, telemetryExist: true,
         playerName: 'Test Player', sessionsCount: 3, tracksCount: 2,
         referenceLaptimes: { lastUpdated: null, entriesCount: 0, lastUpdateDiff: null },
-        sqliteCache: { sessionsCount: 3, replaysCount: 1, telemetryCatalog: { running: false }, ingestErrors: [{ filePath: 'bad.xml' }] },
+        sqliteCache: { sessionsCount: 3, replaysCount: 1, liveTelemetryFilesCount: 12, telemetryCatalog: { running: false }, ingestErrors: [{ filePath: 'bad.xml' }] },
       });
       expect(context.loadSessions).not.toHaveBeenCalled();
     });
