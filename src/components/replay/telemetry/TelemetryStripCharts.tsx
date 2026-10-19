@@ -13,8 +13,6 @@ import { LoadingState } from '../../common/LoadingState.js';
 import { usePlaybackPosition } from '../inspector/replayPlaybackCursor.js';
 import { TelemetryScrubCursor } from './TelemetryScrubCursor.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
-import type { LiveCaptureOverlay } from '../../../../shared/types/liveEvidence.js';
-import { LiveCaptureCoverage } from './LiveCaptureCoverage.js';
 
 export interface SelectedCornerMarkers {
   cornerNumber: number;
@@ -24,7 +22,6 @@ export interface SelectedCornerMarkers {
 }
 
 export interface TelemetryStripChartsProps {
-  liveCaptureOverlay?: LiveCaptureOverlay;
   points: ReplayTrajectoryPoint[];
   currentIndex: number;
   onSelectIndex: (index: number) => void;
@@ -61,7 +58,6 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   baselinePoints, zoomRange, onZoomRangeChange, telemetryResolution, onChangeResolution,
   vcrRawPointsCount, vcrRawSampleRateHz, duckdbRawPointsCount, duckdbRawSampleRateHz, isFullResolution, selectedCornerMarkers, source, duckdbFilename,
   hasDuckDb, duckdbUnavailableReason, onSelectSource, trackLengthM,
-  liveCaptureOverlay,
 }) => {
   const {
     containerRef,
@@ -215,7 +211,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
         isFullResolution={isFullResolution}
         currentTimeSec={currentTimeSec}
         totalFrames={points.length}
-        headerContent={<>{headerContent}<LiveCaptureCoverage overlay={liveCaptureOverlay} /></>}
+        headerContent={headerContent}
         dragSelection={dragSelection}
         markerPcts={metrics} activeChannels={activePreset?.channels}
         presets={presets} activePresetId={activePresetId} onSelectPreset={handleSelectPreset}

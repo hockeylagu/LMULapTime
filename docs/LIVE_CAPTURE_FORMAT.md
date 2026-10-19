@@ -140,7 +140,7 @@ Reclassification or changed ordinal ownership invalidates the response.
 
 Chart fusion matches verified samples to explicit trajectory clocks within 25 ms, without interpolating
 across missing samples. Measured yaw and body slip use the capture; computed fallbacks retain the
-`COMPUTED` label. Coverage is disclosed separately. Supplied native telemetry G values, including zero,
+`COMPUTED` label. Coverage/provenance remains in response metadata; the telemetry header has no capture-coverage indicator. Supplied native telemetry G values, including zero,
 are preserved; replay-derived G remains a computed fallback.
 
 ## Disposable race diagnostics (opt-in)

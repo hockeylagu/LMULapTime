@@ -84,7 +84,6 @@ export const ReplayInspectorTelemetryColumn: React.FC<ReplayInspectorTelemetryCo
           selectedCornerNumber={selectedCornerNumber}
           onSelectCorner={handleSelectCorner}
           source={trajectory?.source}
-          liveCaptureOverlay={trajectory?.liveCaptureOverlay}
           duckdbFilename={trajectory?.duckdbFilename}
           hasDuckDb={hasDuckDbTelemetry}
           duckdbUnavailableReason={duckdbUnavailableReason}
