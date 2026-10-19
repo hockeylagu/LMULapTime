@@ -52,6 +52,7 @@ export class LiveCaptureController {
   private sessionKey = '';
   private error: string | null = null;
   private lastObservation = new Map<string, string>();
+  private terrainMaterials: Array<string | undefined> = [];
   private recoverable: LiveCaptureManifest[] | null = null;
   private recoveryProbe: { reading: LiveScoringReading; key: string; observedAt: number } | null = null;
   private stopped = false;
@@ -121,6 +122,8 @@ export class LiveCaptureController {
       inRealtime: reading.inRealtime, avgPathWetness: reading.avgPathWetness,
       maxPathWetness: reading.maxPathWetness ?? null,
     } });
+    if (player.upgradePackHex !== undefined) this.observe({ source: 'shared-memory', kind: 'upgrade-pack',
+      elapsedSeconds: reading.currentEt, receivedAt: this.now(), data: { rawHex: player.upgradePackHex } });
     if (usage) this.audit?.update(snapshot, reading, usage, this.now());
   }
 
@@ -128,7 +131,16 @@ export class LiveCaptureController {
     const manifest = this.manifest;
     if (!manifest || this.stopped || this.error) return;
     if (!Number.isFinite(sample.elapsedSeconds) || sample.elapsedSeconds < 0 || sample.elapsedSeconds <= this.lastSample
-      || !Number.isSafeInteger(sample.lapNumber) || sample.lapNumber < 0 || sample.values.length !== 30) return;
+      || !Number.isSafeInteger(sample.lapNumber) || sample.lapNumber < 0 || sample.values.length !== LIVE_CAPTURE_SAMPLE_WIDTH - 3) return;
+    if (sample.impact) this.observe({ source: 'shared-memory', kind: 'impact',
+      elapsedSeconds: sample.impact.elapsedSeconds, receivedAt: this.now(),
+      data: { impactElapsedSeconds: sample.impact.elapsedSeconds, magnitude: sample.impact.magnitude } });
+    if (sample.terrainMaterials?.length === 4) sample.terrainMaterials.forEach((rawName, corner) => {
+      if (rawName === this.terrainMaterials[corner]) return;
+      this.observe({ source: 'shared-memory', kind: 'terrain-change', elapsedSeconds: sample.elapsedSeconds,
+        receivedAt: this.now(), data: { corner: ['FL', 'FR', 'RL', 'RR'][corner], rawName } });
+      this.terrainMaterials[corner] = rawName;
+    });
     if (this.pending.size >= LIVE_CAPTURE_PENDING_BATCHES || this.sampleCount >= BATCH_SAMPLES) {
       manifest.droppedSamples++;
       return;
@@ -265,6 +277,7 @@ export class LiveCaptureController {
     this.diagnostics?.record({ kind: 'session', at: now, data: this.manifest });
     this.lastSample = prior?.lastElapsedSeconds ?? -Infinity;
     this.lastObservation.clear();
+    this.terrainMaterials = [];
     this.audit = new LiveAuditTracker(() => recordingId, record => this.observe({
       source: 'recorder', kind: 'strategy-audit-v1', elapsedSeconds: record.snapshot.session?.elapsedSeconds ?? null,
       receivedAt: record.recordedAt, data: record,

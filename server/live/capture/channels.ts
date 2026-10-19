@@ -10,7 +10,7 @@ export interface LiveCaptureChannel {
 
 /** Per-recording catalog: old recordings must not acquire verification for values they never captured. */
 export function liveCaptureChannels(normalizationVersion: number): readonly LiveCaptureChannel[] {
-  if (normalizationVersion !== 1 && normalizationVersion !== LIVE_CAPTURE_NORMALIZATION_VERSION) {
+  if (!Number.isInteger(normalizationVersion) || normalizationVersion < 1 || normalizationVersion > LIVE_CAPTURE_NORMALIZATION_VERSION) {
     throw new Error(`Unsupported live capture normalization version ${normalizationVersion}`);
   }
   const wheelsVerified = normalizationVersion >= 2;
@@ -35,6 +35,10 @@ export function liveCaptureChannels(normalizationVersion: number): readonly Live
     name: `${corner}_${angle}_rad`, unit: 'rad', sourceField: angle,
     frame: 'iso8855-wheel' as const, verified: wheelsVerified,
   }))),
+  ...(normalizationVersion >= 3 ? ['fl', 'fr', 'rl', 'rr'].map(corner => ({
+    name: `${corner}_tyre_vertical_deflection_m`, unit: 'm', sourceField: 'verticalTireDeflection',
+    frame: 'iso8855-wheel' as const, verified: true,
+  })) : []),
   ];
 }
 

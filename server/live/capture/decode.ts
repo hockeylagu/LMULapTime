@@ -43,12 +43,26 @@ export function decodeLiveCaptureSample(slot: Buffer): LiveCaptureSample | null 
     // Current wheel orientation includes steering. ISO toe-in is positive: rightward points inward
     // at a left wheel and outward at a right wheel. This is not the static garage alignment setting.
     values[26 + corner] = finiteOrNaN(slot.readDoubleLE(wheel + WHEEL.offsets.toe) * (corner % 2 === 0 ? 1 : -1));
+    // A compression distance, not suspension travel or a vector-axis component; retain metres/sign.
+    values[30 + corner] = finiteOrNaN(slot.readDoubleLE(wheel + WHEEL.offsets.verticalTireDeflection));
   }
+
+  const impactTime = slot.readDoubleLE(at.lastImpactET);
+  const impactMagnitude = slot.readDoubleLE(at.lastImpactMagnitude);
 
   return {
     elapsedSeconds,
     lapNumber,
     lapStartSeconds: Number.isFinite(lapStart) && lapStart >= 0 ? lapStart : null,
     values,
+    terrainMaterials: Array.from({ length: 4 }, (_, corner) => {
+      const field = slot.subarray(at.wheels + corner * WHEEL.size + WHEEL.offsets.terrainName,
+        at.wheels + corner * WHEEL.size + WHEEL.offsets.terrainName + 16);
+      const end = field.indexOf(0);
+      return field.toString('latin1', 0, end < 0 ? field.length : end);
+    }),
+    ...(Number.isFinite(impactTime) && impactTime > 0 && impactTime <= elapsedSeconds ? {
+      impact: { elapsedSeconds: impactTime, magnitude: Number.isFinite(impactMagnitude) && impactMagnitude >= 0 ? impactMagnitude : null },
+    } : {}),
   };
 }

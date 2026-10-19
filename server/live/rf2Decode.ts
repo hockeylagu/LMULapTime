@@ -28,6 +28,7 @@ function decodeVehicle(buffer: Buffer, base: number): LiveVehicleReading {
   const at = VEHICLE_SCORING.offsets;
   const double = (name: string): number => buffer.readDoubleLE(base + at[name]);
   return {
+    upgradePackHex: buffer.subarray(base + at.upgradePack, base + at.upgradePack + 16).toString('hex'),
     id: buffer.readInt32LE(base + at.id),
     ...(cString(buffer, base + at.driverName, 32) ? { driverName: cString(buffer, base + at.driverName, 32) } : {}),
     place: buffer.readUInt8(base + at.place),

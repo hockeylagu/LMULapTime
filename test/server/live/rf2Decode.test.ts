@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { decodePedalSlot, decodeScoring, readPedalFrame, readScoringFrame } from '../../../server/live/rf2Decode.js';
-import { SCORING, SCORING_INFO, TELEMETRY, VEHICLE_TELEMETRY, WHEEL } from '../../../server/live/rf2Layout.js';
+import { SCORING, SCORING_INFO, TELEMETRY, VEHICLE_SCORING, VEHICLE_TELEMETRY, WHEEL } from '../../../server/live/rf2Layout.js';
 import { scoringBuffer, source, telemetryBuffer } from './rf2Fixtures.js';
 import type { ScoringVehicle } from './rf2Fixtures.js';
 
@@ -10,6 +10,14 @@ const FIELD: ScoringVehicle[] = [
 ];
 
 describe('rF2 scoring decode', () => {
+  it('preserves all 16 upgrade-pack bytes as opaque player hex, including zero and high-bit bytes', () => {
+    const buffer = scoringBuffer(2, FIELD);
+    const rawHex = '004280ff000102030405060708090a0b';
+    Buffer.from(rawHex, 'hex').copy(buffer, SCORING.vehicles + VEHICLE_SCORING.size + VEHICLE_SCORING.offsets.upgradePack);
+    const decoded = decodeScoring(buffer);
+    expect(decoded.player?.upgradePackHex).toBe(rawHex);
+    expect(decoded.leader?.upgradePackHex).toBe('00000000000000000000000000000000');
+  });
   it('resolves the player class leader independently from the overall Hypercar leader', () => {
     const field = [...FIELD, { id: 13, isPlayer: false, place: 2, totalLaps: 8, name: 'Class leader', className: 'GT3' }];
     expect(decodeScoring(scoringBuffer(2, field))).toMatchObject({
@@ -58,6 +66,7 @@ describe('rF2 scoring decode', () => {
     const decoded = decodeScoring(scoringBuffer(2, [FIELD[0], player], { trackTemp: 47.25, raining: 0.4, avgPathWetness: 1.5, lapDist: 13_626.5 }));
     expect(decoded).toMatchObject({ trackLength: 13_626.5, trackTempC: 47.25, raining: 0.4, avgPathWetness: 1 });
     expect(decoded.player).toEqual({
+      upgradePackHex: '00000000000000000000000000000000',
       id: 12, place: 4, totalLaps: 8, vehicleName: 'Ferrari 296 GT3', vehicleClass: 'GT3',
       pitStops: 0,
       lapDist: 4321.5, sector: 2, lastLapTime: 228.9, bestLapTime: 227.5, lastSector1: 35.9, lastSector2: 126.2,

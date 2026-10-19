@@ -5,6 +5,7 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { LiveEvidenceReader } from '../../../../server/live/capture/evidenceReader.js';
 import type { LiveCaptureBatch, LiveCaptureManifest, LiveCaptureWriteResult } from '../../../../shared/types/liveCapture.js';
+import { liveCaptureChannels } from '../../../../server/live/capture/channels.js';
 import type { LiveEvidenceReadRequest } from '../../../../shared/types/liveEvidence.js';
 
 const folders: string[] = [];
@@ -23,9 +24,10 @@ async function recording(largeObservations = false, normalizationVersion = 1): P
     samples: 6, droppedSamples: 3, anchors: [{ lapNumber: 2, startSeconds: 100, lapSeconds: 1 }],
     sessionId: 'fixture-session', gameVersion: 'Build-42',
   };
-  const samples = new Float64Array(6 * 33).fill(NaN);
+  const width = liveCaptureChannels(normalizationVersion).length + 3;
+  const samples = new Float64Array(6 * width).fill(NaN);
   for (const [index, time] of [99.9, 100.02, 100.04, 100.5, 101, 102].entries()) {
-    const at = index * 33;
+    const at = index * width;
     samples[at] = time;
     samples[at + 1] = 1; // Native telemetry counter differs from the official scoring anchor.
     samples[at + 2] = 100;
@@ -54,9 +56,9 @@ async function recording(largeObservations = false, normalizationVersion = 1): P
 }
 
 describe('live evidence reader worker', () => {
-  it('reads version-2 wheel recordings while keeping the motion API limited to its six vehicle channels', async () => {
-    const evidence = await new LiveEvidenceReader().read(await recording(false, 2));
-    expect(evidence.normalizationVersion).toBe(2);
+  it.each([2, 3])('reads version-%i wheel recordings while keeping the motion API limited to its six vehicle channels', async version => {
+    const evidence = await new LiveEvidenceReader().read(await recording(false, version));
+    expect(evidence.normalizationVersion).toBe(3);
     expect(evidence.channels).toHaveLength(6);
     expect(evidence.channels.every(channel => channel.frame === 'iso8855-vehicle')).toBe(true);
   });
@@ -67,7 +69,7 @@ describe('live evidence reader worker', () => {
     expect(evidence.points.map(point => point.elapsedSeconds)).toEqual([100.02, 100.04, 100.5, 101]);
     expect(evidence.points[0].lapSeconds).toBeCloseTo(0.02, 10);
     expect(evidence.points[0].values).toEqual([0, 1, null, null, null, -0.25]);
-    expect(evidence).toMatchObject({ normalizationVersion: 2, sourceNormalizationVersion: 1 });
+    expect(evidence).toMatchObject({ normalizationVersion: 3, sourceNormalizationVersion: 1 });
     const repeated = await new LiveEvidenceReader().read(request);
     expect(repeated.points).toEqual(evidence.points); // No stored rewrite or second sign flip on a later read.
     expect(evidence.coverage.gaps).toHaveLength(2);

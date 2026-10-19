@@ -42,17 +42,24 @@ it('persists recorded memory values through service, real worker, rediscovery an
     }
     // Same saved frame, FL/FR/RL/RR. No input is reconstructed from a normalized result.
     const rawWheels = [
-      [-0.4129, -1.8818, -0.4157, -23.9723, -0.03201, -0.02633],
-      [-0.4397, -1.6297, -0.4509, -24.224, -0.031, -0.0264],
-      [-0.1159, -0.7526, -0.1181, -23.9834, -0.02966, 0.00102],
-      [-0.1789, -1.1636, -0.1839, -24.2205, -0.02683, -0.00049],
+      [-0.4129, -1.8818, -0.4157, -23.9723, -0.03201, -0.02633, 0.01678],
+      [-0.4397, -1.6297, -0.4509, -24.224, -0.031, -0.0264, 0.01883],
+      [-0.1159, -0.7526, -0.1181, -23.9834, -0.02966, 0.00102, 0.00851],
+      [-0.1789, -1.1636, -0.1839, -24.2205, -0.02683, -0.00049, 0.01225],
     ];
-    const wheelFields = ['lateralPatchVel', 'longitudinalPatchVel', 'lateralGroundVel', 'longitudinalGroundVel', 'camber', 'toe'];
+    const wheelFields = ['lateralPatchVel', 'longitudinalPatchVel', 'lateralGroundVel', 'longitudinalGroundVel', 'camber', 'toe', 'verticalTireDeflection'];
     rawWheels.forEach((wheel, corner) => wheel.forEach((value, field) =>
       slot.writeDoubleLE(value, at.wheels + corner * WHEEL.size + WHEEL.offsets[wheelFields[field]])));
+    for (let corner = 0; corner < 4; corner++) {
+      slot.write('RDRACEOLD,ROAD,', at.wheels + corner * WHEEL.size + WHEEL.offsets.terrainName, 'latin1');
+    }
+    // Synthetic impact/configuration state alongside the saved wheel frame exercises sparse persistence.
+    slot.writeDoubleLE(69.4, at.lastImpactET);
+    slot.writeDoubleLE(8896.196, at.lastImpactMagnitude);
+    const upgradePackHex = '004280ff000102030405060708090a0b';
     service.start();
     reader.emit('message', { type: 'frame', scoring: scoringReading({ currentEt: 69.2,
-      player: vehicleReading({ driverName: 'Fixture Driver', vehicleName: 'Ferrari 296 GT3' }) }),
+      player: vehicleReading({ driverName: 'Fixture Driver', vehicleName: 'Ferrari 296 GT3', upgradePackHex }) }),
     capture: decodeLiveCaptureSample(slot) });
     expect(service.hasClients()).toBe(false);
     expect(capture.status().samples).toBe(1);
@@ -73,9 +80,25 @@ it('persists recorded memory values through service, real worker, rediscovery an
     const expected = [24.0998, 0.0003, 0.3096, 0.0212, 0.04272, 0.14548,
       -0.4129, 1.8818, -0.4397, 1.6297, -0.1159, 0.7526, -0.1789, 1.1636,
       -0.4157, 23.9723, -0.4509, 24.224, -0.1181, 23.9834, -0.1839, 24.2205,
-      -0.03201, -0.031, -0.02966, -0.02683, -0.02633, 0.0264, 0.00102, 0.00049];
+      -0.03201, -0.031, -0.02966, -0.02683, -0.02633, 0.0264, 0.00102, 0.00049,
+      0.01678, 0.01883, 0.00851, 0.01225];
     expect(JSON.parse(output)).toEqual([Object.fromEntries(LIVE_CAPTURE_CHANNELS.map((channel, index) => [channel.name, expected[index]]))]);
-    expect(indexed[0].manifest.normalizationVersion).toBe(2);
+    expect(indexed[0].manifest.normalizationVersion).toBe(3);
+    const observations = execFileSync(process.execPath, ['-e', `
+      const duckdb = require('duckdb');
+      const db = new duckdb.Database(process.argv[1], duckdb.OPEN_READONLY);
+      db.all('SELECT kind, elapsed_seconds, data FROM capture_observations ORDER BY observation_id', (error, rows) => {
+        if (error) throw error;
+        process.stdout.write(JSON.stringify(rows));
+        db.close(() => {});
+      });`, filename], { encoding: 'utf8' });
+    const stored: { kind: string; elapsed_seconds: number | null; data: string }[] = JSON.parse(observations);
+    const byKind = (kind: string) => stored.filter(item => item.kind === kind).map(item => JSON.parse(item.data) as unknown);
+    expect(byKind('impact')).toEqual([{ impactElapsedSeconds: 69.4, magnitude: 8896.196 }]);
+    expect(stored.find(item => item.kind === 'impact')?.elapsed_seconds).toBe(69.4);
+    expect(byKind('upgrade-pack')).toEqual([{ rawHex: upgradePackHex }]);
+    expect(byKind('terrain-material')).toEqual([{ materialId: 0, rawName: 'RDRACEOLD,ROAD,' }]);
+    expect(byKind('terrain-change')).toEqual(['FL', 'FR', 'RL', 'RR'].map(corner => ({ corner, materialId: 0 })));
     const discovered: string[] = [];
     const discovery = new LiveCaptureController({ directory, onPersist: () => {},
       onCatalog: (recordings, errors) => {

@@ -6,6 +6,7 @@ import type { CaptureWorker } from '../../../../server/live/capture/controller.j
 import { LiveService } from '../../../../server/live/liveService.js';
 import type { LiveWorker } from '../../../../server/live/liveService.js';
 import type { LiveCaptureBatch, LiveCaptureSample } from '../../../../shared/types/liveCapture.js';
+import { LIVE_CAPTURE_SAMPLE_WIDTH } from '../../../../shared/types/liveCapture.js';
 import type { RestAnswer } from '../../../../server/live/lmuPitRest.js';
 import type { SseSink } from '../../../../server/live/sse.js';
 
@@ -28,7 +29,7 @@ class FakeCaptureWriter extends EventEmitter {
 }
 
 function sample(elapsedSeconds: number): LiveCaptureSample {
-  return { elapsedSeconds, lapNumber: 8, lapStartSeconds: 100, values: new Float64Array(30).fill(1) };
+  return { elapsedSeconds, lapNumber: 8, lapStartSeconds: 100, values: new Float64Array(LIVE_CAPTURE_SAMPLE_WIDTH - 3).fill(1) };
 }
 
 describe('LiveService capture integration', () => {
@@ -97,7 +98,7 @@ describe('LiveService capture integration', () => {
     await Promise.resolve();
     expect(stopResolved).toBe(false);
     const dataBatch = writer.batches().find(batch => batch.samples.length > 0);
-    expect(dataBatch?.samples).toHaveLength(33);
+    expect(dataBatch?.samples).toHaveLength(LIVE_CAPTURE_SAMPLE_WIDTH);
     expect(Array.from(dataBatch!.samples.slice(0, 4))).toEqual([120, 8, 100, 1]);
     for (const batch of writer.batches()) {
       writer.emit('message', { type: 'persisted', sequence: batch.sequence, manifest: batch.manifest, bytes: 1 });

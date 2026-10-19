@@ -9,7 +9,8 @@ import { LiveEvidenceReadError } from './readError.js';
 /** Shared identity/convention gate for off-track analytics and learning readers. Caller closes the handle. */
 export async function openVerifiedLiveRecording(directory: string, manifest: LiveCaptureManifest): Promise<DuckDbReader> {
   if (manifest.source !== 'live-capture' || manifest.schemaVersion !== LIVE_CAPTURE_SCHEMA_VERSION
-    || (manifest.normalizationVersion !== 1 && manifest.normalizationVersion !== LIVE_CAPTURE_NORMALIZATION_VERSION) || manifest.signConvention !== 'iso8855') {
+    || !Number.isInteger(manifest.normalizationVersion) || manifest.normalizationVersion < 1
+    || manifest.normalizationVersion > LIVE_CAPTURE_NORMALIZATION_VERSION || manifest.signConvention !== 'iso8855') {
     throw new LiveEvidenceReadError('incompatible', 'Capture schema or normalization is incompatible with this reader');
   }
   if (!manifest.sessionId || manifest.status === 'recording') throw new LiveEvidenceReadError('unlinked', 'Capture is not finalized and verified');

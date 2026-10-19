@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CUE_PROBE_MS, LiveReader, PROBE_MS, STARTUP_GRACE_MS } from '../../../server/live/liveReader.js';
 import type { GameProbe, LiveReaderMessage } from '../../../server/live/liveReader.js';
-import { SCORING, SCORING_MAPPING_NAME, TELEMETRY, TELEMETRY_MAPPING_NAME } from '../../../server/live/rf2Layout.js';
+import { SCORING, SCORING_MAPPING_NAME, TELEMETRY, TELEMETRY_MAPPING_NAME, VEHICLE_TELEMETRY, WHEEL } from '../../../server/live/rf2Layout.js';
 import type { MappedBuffer } from '../../../server/live/sharedMemory.js';
 import { scoringBuffer, source, telemetryBuffer } from './rf2Fixtures.js';
 import type { GameProcessProbe } from '../../../server/live/gameProcess.js';
@@ -33,6 +33,41 @@ const lastNavigation = (posted: LiveReaderMessage[]): LiveReaderMessage | undefi
 describe('LiveReader', () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
+
+  it('sends terrain and impact changes between car checkpoints without repeating unchanged sparse state', async () => {
+    const t = setup(undefined, undefined, true);
+    t.available.value = true;
+    t.reader.start();
+    await vi.advanceTimersByTimeAsync(PROBE_MS + 50);
+    const post = async (version: number, et: number, terrain: string, impactEt: number) => {
+      const buffer = telemetryBuffer(version, [{ id: 12, et, throttle: 0, brake: 0 }]);
+      const base = TELEMETRY.vehicles;
+      buffer.writeDoubleLE(impactEt, base + VEHICLE_TELEMETRY.offsets.lastImpactET);
+      buffer.writeDoubleLE(12.5, base + VEHICLE_TELEMETRY.offsets.lastImpactMagnitude);
+      for (let corner = 0; corner < 4; corner++) buffer.write(terrain,
+        base + VEHICLE_TELEMETRY.offsets.wheels + corner * WHEEL.size + WHEEL.offsets.terrainName, 'latin1');
+      t.setTelemetry(buffer);
+      await vi.advanceTimersByTimeAsync(40);
+      const message = t.posted.filter(item => item.type === 'frame' && item.capture?.elapsedSeconds === et).pop();
+      if (!message || message.type !== 'frame') throw new Error('Missing capture frame');
+      return message;
+    };
+    try {
+      expect((await post(6, 101, 'ROAD', 100.9)).capture?.terrainMaterials).toEqual(['ROAD', 'ROAD', 'ROAD', 'ROAD']);
+      const repeated = await post(8, 101.04, 'ROAD', 100.9);
+      expect(repeated.car).toBeUndefined();
+      expect(repeated.capture?.terrainMaterials).toBeUndefined();
+      expect(repeated.capture?.impact).toBeUndefined();
+      const changed = await post(10, 101.08, 'GRVL', 101.07);
+      expect(changed.car).toBeUndefined();
+      expect(changed.capture?.terrainMaterials).toEqual(['GRVL', 'GRVL', 'GRVL', 'GRVL']);
+      expect(changed.capture?.impact).toEqual({ elapsedSeconds: 101.07, magnitude: 12.5 });
+      await vi.advanceTimersByTimeAsync(500);
+      const checkpoint = await post(12, 101.7, 'GRVL', 101.07);
+      expect(checkpoint.car).toBeDefined();
+      expect(checkpoint.capture?.terrainMaterials).toEqual(['GRVL', 'GRVL', 'GRVL', 'GRVL']);
+    } finally { t.reader.stop(); }
+  });
 
   it('withholds durable capture until navigation confirms live play and after an inconclusive replay cue', async () => {
     let answer: GameProbe = 'busy';

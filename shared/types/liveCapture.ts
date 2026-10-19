@@ -1,9 +1,9 @@
 /** App-owned complementary recordings; native LMU telemetry has a different schema/source identity. */
 export const LIVE_CAPTURE_SCHEMA_VERSION = 1;
-/** Version 2 fixes left-handed vehicle-vector signs and enables normalized wheel channels. */
-export const LIVE_CAPTURE_NORMALIZATION_VERSION = 2;
+/** Version 3 adds tyre deflection; version 2 fixes source signs and enables the other wheel channels. */
+export const LIVE_CAPTURE_NORMALIZATION_VERSION = 3;
 export const LIVE_CAPTURE_SOURCE = 'live-capture' as const;
-export const LIVE_CAPTURE_SAMPLE_WIDTH = 33;
+export const LIVE_CAPTURE_SAMPLE_WIDTH = 37;
 /** Normal transport bound plus reserved slots for initialization/finalization. */
 export const LIVE_CAPTURE_PENDING_BATCHES = 4;
 export const LIVE_CAPTURE_FINALIZATION_SLOTS = 2;
@@ -12,8 +12,12 @@ export interface LiveCaptureSample {
   elapsedSeconds: number;
   lapNumber: number;
   lapStartSeconds: number | null;
-  /** Thirty channel values in LIVE_CAPTURE_CHANNELS order. NaN means unavailable, never measured zero. */
+  /** Thirty-four values in LIVE_CAPTURE_CHANNELS order. NaN means unavailable, never measured zero. */
   values: Float64Array;
+  /** Raw per-corner material names, preserving the source's truncation; omitted when unchanged. */
+  terrainMaterials?: string[];
+  /** Last source impact; omitted when unavailable/unchanged. Magnitude has no invented physical unit. */
+  impact?: { elapsedSeconds: number; magnitude: number | null };
 }
 
 export interface LiveCaptureObservation {
@@ -66,7 +70,7 @@ export interface LiveCaptureBatch {
   type: 'batch';
   sequence: number;
   manifest: LiveCaptureManifest;
-  /** Interleaved [session seconds, lap number, lap-start seconds, ...30 channel values]. */
+  /** Interleaved [session seconds, lap number, lap-start seconds, ...catalog values]; current stride 37. */
   samples: Float64Array;
   observations: LiveCaptureObservation[];
 }

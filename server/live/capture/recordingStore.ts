@@ -4,7 +4,6 @@ import duckdb from 'duckdb';
 import type { DuckDbError } from 'duckdb';
 import {
   LIVE_CAPTURE_NORMALIZATION_VERSION,
-  LIVE_CAPTURE_SAMPLE_WIDTH,
   LIVE_CAPTURE_SCHEMA_VERSION,
   LIVE_CAPTURE_SOURCE,
 } from '../../../shared/types/liveCapture.js';
@@ -13,7 +12,8 @@ import type {
   LiveCaptureManifest,
   LiveCaptureObservation,
 } from '../../../shared/types/liveCapture.js';
-import { LIVE_CAPTURE_CHANNELS, liveCaptureChannels } from './channels.js';
+import { liveCaptureChannels } from './channels.js';
+import { internTerrainObservations } from './terrain.js';
 
 const MAX_ROWS_PER_INSERT = 512;
 const MAX_CATALOG_FILES = 10_000;
@@ -168,7 +168,8 @@ function validateManifest(manifest: LiveCaptureManifest): void {
   if (!validCaptureFilename(manifest.filename, manifest.recordingId)) throw new Error('Live capture filename must be a safe basename ending with its UUID and .live.duckdb');
   if (manifest.source !== LIVE_CAPTURE_SOURCE
     || manifest.schemaVersion !== LIVE_CAPTURE_SCHEMA_VERSION
-    || (manifest.normalizationVersion !== 1 && manifest.normalizationVersion !== LIVE_CAPTURE_NORMALIZATION_VERSION)
+    || !Number.isInteger(manifest.normalizationVersion) || manifest.normalizationVersion < 1
+    || manifest.normalizationVersion > LIVE_CAPTURE_NORMALIZATION_VERSION
     || manifest.signConvention !== 'iso8855') throw new Error('Live capture schema signature does not match this build');
   requiredText(manifest.trackName, 'trackName');
   if (typeof manifest.driverName !== 'string') throw new Error('Invalid live capture driverName');
@@ -229,24 +230,26 @@ function validateBatch(batch: LiveCaptureBatch): { rowCount: number; observation
   if (batch.type !== 'batch') throw new Error('Invalid live capture message type');
   validateManifest(batch.manifest);
   if (!Number.isSafeInteger(batch.sequence) || batch.sequence < 0) throw new Error('Invalid live capture batch sequence');
-  if (!(batch.samples instanceof Float64Array) || batch.samples.length % LIVE_CAPTURE_SAMPLE_WIDTH !== 0) {
-    throw new Error('Live capture samples must be a Float64Array with complete 33-value rows');
+  const channels = liveCaptureChannels(batch.manifest.normalizationVersion);
+  const width = channels.length + 3;
+  if (!(batch.samples instanceof Float64Array) || batch.samples.length % width !== 0) {
+    throw new Error(`Live capture samples must be a Float64Array with complete ${width}-value rows`);
   }
-  const rowCount = batch.samples.length / LIVE_CAPTURE_SAMPLE_WIDTH;
+  const rowCount = batch.samples.length / width;
   if (rowCount > 10_000) throw new Error('Live capture batch exceeds the 10,000-sample limit');
   if (!Array.isArray(batch.observations)) throw new Error('Live capture observations must be an array');
   if (batch.observations.length > 10_000) throw new Error('Live capture batch exceeds the observation limit');
 
   let priorElapsed = -Infinity;
   for (let row = 0; row < rowCount; row++) {
-    const offset = row * LIVE_CAPTURE_SAMPLE_WIDTH;
+    const offset = row * width;
     const elapsed = batch.samples[offset];
     const lap = batch.samples[offset + 1];
     const lapStart = batch.samples[offset + 2];
     if (!Number.isFinite(elapsed) || elapsed < 0 || elapsed < priorElapsed) throw new Error(`Malformed elapsed timestamp at sample ${row}`);
     if (!Number.isSafeInteger(lap) || lap < 0) throw new Error(`Malformed lap number at sample ${row}`);
     if (!(Number.isNaN(lapStart) || Number.isFinite(lapStart) && lapStart >= 0)) throw new Error(`Malformed lap start at sample ${row}`);
-    for (let channel = 0; channel < LIVE_CAPTURE_CHANNELS.length; channel++) {
+    for (let channel = 0; channel < channels.length; channel++) {
       const value = batch.samples[offset + 3 + channel];
       if (!Number.isNaN(value) && !Number.isFinite(value)) throw new Error(`Malformed channel value at sample ${row}, channel ${channel}`);
     }
@@ -256,8 +259,8 @@ function validateBatch(batch: LiveCaptureBatch): { rowCount: number; observation
   return { rowCount, observationData, manifestJson: stableManifest(batch.manifest) };
 }
 
-function columnSql(): string {
-  return LIVE_CAPTURE_CHANNELS.map(channel => `"${channel.name}" DOUBLE`).join(', ');
+function columnSql(normalizationVersion: number): string {
+  return liveCaptureChannels(normalizationVersion).map(channel => `"${channel.name}" DOUBLE`).join(', ');
 }
 
 function expectedMetadata(manifest: LiveCaptureManifest): Map<string, string> {
@@ -442,7 +445,7 @@ export class LiveCaptureRecordingStore {
     if (priorManifest && batch.manifest.firstElapsedSeconds !== priorManifest.firstElapsedSeconds) {
       throw new Error('Live capture manifest elapsed range moved backwards');
     }
-    const batchLast = checked.rowCount > 0 ? batch.samples[batch.samples.length - LIVE_CAPTURE_SAMPLE_WIDTH] : null;
+    const batchLast = checked.rowCount > 0 ? batch.samples[batch.samples.length - liveCaptureChannels(batch.manifest.normalizationVersion).length - 3] : null;
     // The file owns its counters: a writer resumed from a lagging index after a crash can never
     // contradict the samples already stored.
     const manifest: LiveCaptureManifest = {
@@ -507,7 +510,7 @@ export class LiveCaptureRecordingStore {
           source_field VARCHAR NOT NULL, frame VARCHAR NOT NULL, verified BOOLEAN NOT NULL)`);
         await run(connection, `CREATE TABLE IF NOT EXISTS capture_samples (
           sample_index BIGINT NOT NULL, elapsed_seconds DOUBLE NOT NULL, lap_number INTEGER NOT NULL,
-          lap_start_seconds DOUBLE, ${columnSql()})`);
+          lap_start_seconds DOUBLE, ${columnSql(incoming.normalizationVersion)})`);
         await run(connection, `CREATE TABLE IF NOT EXISTS capture_observations (
           observation_id BIGINT PRIMARY KEY, elapsed_seconds DOUBLE, received_at DOUBLE NOT NULL,
           request_started_at DOUBLE, request_finished_at DOUBLE, source VARCHAR NOT NULL, kind VARCHAR NOT NULL,
@@ -611,8 +614,8 @@ export class LiveCaptureRecordingStore {
     }
     const channels = await all(connection,
       'SELECT ordinal, name, unit, source_field, frame, verified FROM capture_channels ORDER BY ordinal');
-    if (channels.length !== LIVE_CAPTURE_CHANNELS.length) throw new Error('Live capture channel catalog has an incompatible size');
     const expectedChannels = liveCaptureChannels(manifest.normalizationVersion);
+    if (channels.length !== expectedChannels.length) throw new Error('Live capture channel catalog has an incompatible size');
     for (let index = 0; index < expectedChannels.length; index++) {
       const stored = channels[index];
       const expected = expectedChannels[index];
@@ -639,15 +642,16 @@ export class LiveCaptureRecordingStore {
 
   private async insertSamples(connection: Connection, batch: LiveCaptureBatch, rowCount: number, sampleOffset: number): Promise<void> {
     const channels = liveCaptureChannels(batch.manifest.normalizationVersion);
+    const width = channels.length + 3;
     for (let start = 0; start < rowCount; start += MAX_ROWS_PER_INSERT) {
       const count = Math.min(MAX_ROWS_PER_INSERT, rowCount - start);
-      const tuple = `(${Array(4 + LIVE_CAPTURE_CHANNELS.length).fill('?').join(', ')})`;
+      const tuple = `(${Array(4 + channels.length).fill('?').join(', ')})`;
       const sql = `INSERT INTO capture_samples VALUES ${Array(count).fill(tuple).join(', ')}`;
       const values: unknown[] = [];
       for (let row = start; row < start + count; row++) {
-        const offset = row * LIVE_CAPTURE_SAMPLE_WIDTH;
+        const offset = row * width;
         values.push(sampleOffset + row, batch.samples[offset], batch.samples[offset + 1], Number.isNaN(batch.samples[offset + 2]) ? null : batch.samples[offset + 2]);
-        for (let channel = 0; channel < LIVE_CAPTURE_CHANNELS.length; channel++) {
+        for (let channel = 0; channel < channels.length; channel++) {
           const value = batch.samples[offset + 3 + channel];
           values.push(!channels[channel].verified || Number.isNaN(value) ? null : value);
         }
@@ -658,17 +662,26 @@ export class LiveCaptureRecordingStore {
 
   private async insertObservations(connection: Connection, batch: LiveCaptureBatch, data: string[]): Promise<void> {
     if (batch.observations.length === 0) return;
+    let observations = batch.observations;
+    if (observations.some(item => item.source === 'shared-memory' && item.kind === 'terrain-change')) {
+      const definitions = await all(connection, `SELECT CAST(data AS VARCHAR) AS data FROM capture_observations
+        WHERE source='recorder' AND kind='terrain-material' ORDER BY observation_id LIMIT 10001`);
+      if (definitions.length > 10_000) throw new Error('Terrain dictionary exceeds its 10,000-material bound');
+      observations = internTerrainObservations(observations, definitions.map(row => rowString(row, 'data')));
+      if (observations.length > 10_000) throw new Error('Expanded terrain observations exceed the batch limit');
+      data = observations.map(serializeObservation);
+    }
     const rows = await all(connection, 'SELECT COALESCE(MAX(observation_id), -1) AS last_id FROM capture_observations');
     const last = rows[0]?.last_id;
     if (typeof last !== 'bigint' && typeof last !== 'number') throw new Error('Invalid live capture observation state');
     const firstId = Number(last) + 1;
-    for (let start = 0; start < batch.observations.length; start += MAX_ROWS_PER_INSERT) {
-      const count = Math.min(MAX_ROWS_PER_INSERT, batch.observations.length - start);
+    for (let start = 0; start < observations.length; start += MAX_ROWS_PER_INSERT) {
+      const count = Math.min(MAX_ROWS_PER_INSERT, observations.length - start);
       const tuple = '(?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON))';
       const sql = `INSERT INTO capture_observations VALUES ${Array(count).fill(tuple).join(', ')}`;
       const values: unknown[] = [];
       for (let index = start; index < start + count; index++) {
-        const observation = batch.observations[index];
+        const observation = observations[index];
         values.push(firstId + index, observation.elapsedSeconds, observation.receivedAt,
           observation.requestStartedAt ?? null, observation.requestFinishedAt ?? null,
           observation.source, observation.kind, data[index]);

@@ -39,6 +39,8 @@ export interface LiveVehicleReading {
   id: number;
   /** Exact source identity; vehicle slots are not persistent driver identities. */
   driverName?: string;
+  /** Opaque 16-byte player configuration; capture stores raw hex without interpreting option bits. */
+  upgradePackHex?: string;
   place: number;
   /** Laps completed (rF2 `mTotalLaps`). */
   totalLaps: number;

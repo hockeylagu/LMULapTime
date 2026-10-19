@@ -8,7 +8,7 @@ import type { CaptureWorker } from '../../../../server/live/capture/controller.j
 import type {
   LiveCaptureBatch, LiveCaptureManifest, LiveCaptureSample,
 } from '../../../../shared/types/liveCapture.js';
-import { LIVE_CAPTURE_NORMALIZATION_VERSION } from '../../../../shared/types/liveCapture.js';
+import { LIVE_CAPTURE_NORMALIZATION_VERSION, LIVE_CAPTURE_SAMPLE_WIDTH } from '../../../../shared/types/liveCapture.js';
 
 interface PostedMessage { message: unknown; transfer?: readonly ArrayBuffer[] }
 
@@ -56,7 +56,7 @@ function reading(currentEt: number, overrides: Partial<LiveScoringReading> = {})
 function sample(elapsedSeconds: number, value = 2): LiveCaptureSample {
   return {
     elapsedSeconds, lapNumber: 8, lapStartSeconds: 100,
-    values: Float64Array.from({ length: 30 }, (_, index) => value + index),
+    values: Float64Array.from({ length: LIVE_CAPTURE_SAMPLE_WIDTH - 3 }, (_, index) => value + index),
   };
 }
 
@@ -93,12 +93,35 @@ describe('LiveCaptureController', () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 
-  it('starts a new attempt instead of appending wheel values to a version-1 interrupted recording', () => {
-    const previous = priorManifest({ normalizationVersion: 1 });
+  it('records initial player configuration, distinct impacts and only changed wheel materials', () => {
+    const { controller, writer } = makeController();
+    const game = snapshot();
+    const source = reading(100);
+    source.player!.upgradePackHex = '0123456789abcdeffedcba9876543210';
+    controller.update(source, game);
+    const frame = { ...sample(100.02), terrainMaterials: ['ASPHALT', 'ASPHALT', 'RMBLFLAT', ''],
+      impact: { elapsedSeconds: 99.5, magnitude: 8896 } };
+    controller.sample(frame);
+    controller.sample({ ...frame, elapsedSeconds: 100.04 });
+    controller.sample({ ...frame, elapsedSeconds: 100.06, terrainMaterials: ['GRVL', 'ASPHALT', 'RMBLFLAT', ''],
+      impact: { elapsedSeconds: 100.05, magnitude: 8896 } });
+    controller.update(source, game);
+    vi.advanceTimersByTime(1000);
+    const observations = writer.batches().flatMap(batch => batch.observations);
+    expect(observations.filter(item => item.kind === 'upgrade-pack')).toEqual([expect.objectContaining({
+      data: { rawHex: source.player!.upgradePackHex },
+    })]);
+    expect(observations.filter(item => item.kind === 'impact').map(item => item.elapsedSeconds)).toEqual([99.5, 100.05]);
+    expect(observations.filter(item => item.kind === 'terrain-change')).toHaveLength(5);
+    expect(last(observations.filter(item => item.kind === 'terrain-change'))?.data).toEqual({ corner: 'FL', rawName: 'GRVL' });
+  });
+
+  it.each([1, 2])('starts a new attempt instead of appending current values to a version-%i interrupted recording', version => {
+    const previous = priorManifest({ normalizationVersion: version });
     const { controller, writer } = makeController({ existing: [previous] });
     start(controller);
     expect(writer.batches()[0].manifest.recordingId).not.toBe(previous.recordingId);
-    expect(writer.batches()[0].manifest.normalizationVersion).toBe(2);
+    expect(writer.batches()[0].manifest.normalizationVersion).toBe(LIVE_CAPTURE_NORMALIZATION_VERSION);
   });
 
   it('owns audit checkpoints and finalizes the prior run before switching files', () => {
@@ -140,7 +163,7 @@ describe('LiveCaptureController', () => {
     vi.advanceTimersByTime(1000);
 
     const batch = last(writer.batches());
-    expect(batch?.samples).toHaveLength(33);
+    expect(batch?.samples).toHaveLength(LIVE_CAPTURE_SAMPLE_WIDTH);
     expect(Array.from(batch!.samples.slice(0, 3))).toEqual([100.02, 8, 100]);
     expect(Array.from(batch!.samples.slice(3, 6))).toEqual([2, 3, 4]);
     expect(Number.isNaN(batch!.samples[9])).toBe(true);
@@ -247,7 +270,7 @@ describe('LiveCaptureController', () => {
     controller.pause();
     expect(controller.status().state).toBe('recording');
     expect(last(writer.batches())?.manifest.status).toBe('recording');
-    expect(last(writer.batches())?.samples).toHaveLength(33);
+    expect(last(writer.batches())?.samples).toHaveLength(LIVE_CAPTURE_SAMPLE_WIDTH);
   });
 
   it('rejects duplicate and nonfinite sample times without hiding the next valid gap', () => {
@@ -263,8 +286,8 @@ describe('LiveCaptureController', () => {
 
     expect(controller.status().samples).toBe(2);
     const batch = last(writer.batches());
-    expect(batch?.samples).toHaveLength(66);
-    expect([batch?.samples[0], batch?.samples[33]]).toEqual([100.02, 100.08]);
+    expect(batch?.samples).toHaveLength(2 * LIVE_CAPTURE_SAMPLE_WIDTH);
+    expect([batch?.samples[0], batch?.samples[LIVE_CAPTURE_SAMPLE_WIDTH]]).toEqual([100.02, 100.08]);
   });
 
   it('bounds outstanding batches and counts samples dropped under writer backpressure', () => {
@@ -315,7 +338,7 @@ describe('LiveCaptureController', () => {
     expect(last(secondWriter.batches())).toMatchObject({
       manifest: { sessionKind: 'practice', layoutKey: 'sarthe:outer' },
     });
-    expect(last(secondWriter.batches())?.samples).toHaveLength(33);
+    expect(last(secondWriter.batches())?.samples).toHaveLength(LIVE_CAPTURE_SAMPLE_WIDTH);
   });
 
   it('flushes on stop, waits for worker exit after the close message, and ignores new samples', async () => {
@@ -329,7 +352,7 @@ describe('LiveCaptureController', () => {
     await Promise.resolve();
     expect(resolved).toBe(false);
     expect(last(writer.batches())).toMatchObject({ manifest: { status: 'interrupted', endedAt: null }, samples: expect.any(Float64Array) });
-    expect(last(writer.batches())?.samples).toHaveLength(33);
+    expect(last(writer.batches())?.samples).toHaveLength(LIVE_CAPTURE_SAMPLE_WIDTH);
     expect(last(writer.posted)?.message).toEqual({ type: 'close' });
     const priorCount = controller.status().samples;
     controller.sample(sample(100.2));

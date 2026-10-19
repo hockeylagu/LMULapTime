@@ -93,6 +93,8 @@ export class LiveReader {
   private playerId: number | null = null;
   private slotHint = -1;
   private inRealtime = false;
+  private lastTerrainMaterials = '';
+  private lastImpact = '';
 
   public constructor(private readonly deps: LiveReaderDeps) {}
 
@@ -212,8 +214,20 @@ export class LiveReader {
     // While a cue waits for the game's answer nothing goes out: the frames may be a replay's, or the last session
     // LMU writes again as it exits. The first scoring change after the answer carries the current reading.
     // Only the capture sample waits for the game to confirm a session; the dashboard frames never do.
-    if (!this.cue && (scoring || pedal || car)) this.deps.post({ type: 'frame', scoring, pedal, tyreSurfaceAvgC, car,
-      ...(this.deps.capture ? { capture: this.captureConfirmed ? capture : null } : {}) });
+    if (!this.cue && (scoring || pedal || car)) {
+      if (capture && this.captureConfirmed) {
+        const terrainKey = JSON.stringify(capture.terrainMaterials);
+        const impactKey = JSON.stringify(capture.impact);
+        // Send changes at capture cadence. A small car-rate checkpoint gives a new recording its initial
+        // state even when a session transition kept the same material and last-impact values.
+        const terrainMaterials = car || terrainKey !== this.lastTerrainMaterials ? capture.terrainMaterials : undefined;
+        const impact = car || impactKey !== this.lastImpact ? capture.impact : undefined;
+        this.lastTerrainMaterials = terrainKey; this.lastImpact = impactKey;
+        capture = { ...capture, terrainMaterials, impact };
+      }
+      this.deps.post({ type: 'frame', scoring, pedal, tyreSurfaceAvgC, car,
+        ...(this.deps.capture ? { capture: this.captureConfirmed ? capture : null } : {}) });
+    }
     const asking = this.screen === 'loading' || this.cue;
     if (now - this.lastProbeAt >= (asking ? CUE_PROBE_MS : PROBE_MS) && !this.probing) this.probe(now);
     this.schedule(this.inRealtime ? REALTIME_INTERVAL_MS : IDLE_INTERVAL_MS, () => this.tick());

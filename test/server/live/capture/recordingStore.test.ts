@@ -157,11 +157,43 @@ afterEach(async () => {
 });
 
 describe('LiveCaptureRecordingStore', () => {
+  it('interns material names once and preserves dictionary references after reopening the recording', async () => {
+    const directory = await createDirectory();
+    const writer = await createWriter(directory);
+    const first = makeBatch();
+    first.observations = ['RDRACEOLD,ROAD,', 'RDRACEOLD,ROAD,', 'RMBLFLAT', ''].map((rawName, index) => ({
+      source: 'shared-memory', kind: 'terrain-change', elapsedSeconds: 1.01, receivedAt: 100,
+      data: { corner: ['FL', 'FR', 'RL', 'RR'][index], rawName },
+    }));
+    expect((await writer.send(first)).type).toBe('persisted');
+    await writer.close();
+    const resumed = await createWriter(directory);
+    const next = makeBatch(1, { manifest: { ...first.manifest, lastElapsedSeconds: 1.04, samples: 3, updatedAt: first.manifest.updatedAt + 20 },
+      samples: sampleRows(1.04), observations: ['RDRACEOLD,ROAD,', 'GRVL'].map((rawName, index) => ({
+        source: 'shared-memory', kind: 'terrain-change', elapsedSeconds: 1.04, receivedAt: 120,
+        data: { corner: ['FL', 'RR'][index], rawName },
+      })) });
+    expect((await resumed.send(next)).type).toBe('persisted');
+    await resumed.close();
+    const output = execFileSync(process.execPath, ['-e', `
+      const duckdb = require('duckdb'); const db = new duckdb.Database(process.argv[1], duckdb.OPEN_READONLY);
+      db.all("SELECT CAST(observation_id AS DOUBLE) AS id,kind,CAST(data AS VARCHAR) AS data FROM capture_observations ORDER BY observation_id", (error, rows) => {
+        if (error) throw error; process.stdout.write(JSON.stringify(rows)); db.close(() => {});
+      });`, path.join(directory, first.manifest.filename)], { encoding: 'utf8' });
+    const rows = JSON.parse(output) as Array<{ id: number; kind: string; data: string }>;
+    expect(rows.filter(row => row.kind === 'terrain-material').map(row => JSON.parse(row.data))).toEqual([
+      { materialId: 0, rawName: 'RDRACEOLD,ROAD,' }, { materialId: 1, rawName: 'RMBLFLAT' }, { materialId: 2, rawName: 'GRVL' },
+    ]);
+    expect(rows.filter(row => row.kind === 'terrain-change').map(row => (JSON.parse(row.data) as { materialId: number | null }).materialId))
+      .toEqual([0, 0, 1, null, 0, 2]);
+    expect(rows.map(row => row.id)).toEqual(Array.from({ length: 9 }, (_, index) => index));
+  });
   it('retains the version-1 catalog and masks unverified wheel input instead of relabeling older recordings', async () => {
     const directory = await createDirectory();
     const writer = await createWriter(directory);
     const batch = makeBatch();
     batch.manifest.normalizationVersion = 1;
+    batch.samples = Float64Array.from([1, 1, 0, ...Array<number>(30).fill(1), 1.02, 1, 0, ...Array<number>(30).fill(2)]);
     expect((await writer.send(batch)).type).toBe('persisted');
     await writer.close();
     expect(readInChild(path.join(directory, batch.manifest.filename))).toMatchObject({
