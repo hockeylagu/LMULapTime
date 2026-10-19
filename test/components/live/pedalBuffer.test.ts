@@ -4,7 +4,7 @@ import { PedalBuffer } from '../../../src/components/live/pedalBuffer.js';
 const sample = (t: number) => ({ t, throttle: 0.5, brake: 0 });
 
 describe('PedalBuffer', () => {
-  it.each([5, 60, 120])('retains a complete %s-second history with a bounded sample count', seconds => {
+  it.each([5, 25, 60, 120])('retains a complete %s-second history with a bounded sample count', seconds => {
     const buffer = new PedalBuffer(seconds);
     buffer.push(Array.from({ length: 15001 }, (_, i) => sample(i / 100)));
     expect(buffer.windowSeconds).toBe(seconds);

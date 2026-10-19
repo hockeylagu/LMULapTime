@@ -27,6 +27,7 @@ describe('LiveDashboardCard', () => {
     render(<LiveDashboardCard />);
     const duration = await screen.findByRole('combobox', { name: 'Pedal trace history' });
     fireEvent.click(duration);
+    expect(screen.getByRole('option', { name: '25 seconds' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('option', { name: '60 seconds' }));
     await waitFor(() => expect(duration).toHaveTextContent('60 seconds'));
     expect(fetchMock).toHaveBeenLastCalledWith('/api/live/settings', expect.objectContaining({ method: 'POST', body: '{"pedalTraceSeconds":60}' }));

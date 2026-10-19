@@ -64,12 +64,13 @@ describe('live routes', () => {
     const { app, metadata } = setup('false');
     metadata.set('live_reserve_laps', '1.5');
     expect((await request(app).post('/api/live/settings').send({ pedalTraceSeconds: 60 })).body).toEqual({ autoOpen: false, reserveLaps: 1.5, pedalTraceSeconds: 60, diagnostics: false });
-    expect(metadata.get('live_pedal_trace_seconds')).toBe('60');
-    expect((await request(app).get('/api/live/settings')).body.pedalTraceSeconds).toBe(60);
+    expect((await request(app).post('/api/live/settings').send({ pedalTraceSeconds: 25 })).body).toEqual({ autoOpen: false, reserveLaps: 1.5, pedalTraceSeconds: 25, diagnostics: false });
+    expect(metadata.get('live_pedal_trace_seconds')).toBe('25');
+    expect((await request(app).get('/api/live/settings')).body.pedalTraceSeconds).toBe(25);
     for (const pedalTraceSeconds of [0, -5, 31, 121, '60', null]) {
       expect((await request(app).post('/api/live/settings').send({ pedalTraceSeconds })).status).toBe(400);
     }
-    expect(metadata.get('live_pedal_trace_seconds')).toBe('60');
+    expect(metadata.get('live_pedal_trace_seconds')).toBe('25');
   });
 
   it('stores the diagnostics setting and applies it to the recorder from the next session', async () => {
