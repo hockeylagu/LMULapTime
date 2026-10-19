@@ -93,9 +93,11 @@ not HUD acceptance. Tests also cover fixed engine progress, stopping, gains/loss
 pause/garage transitions and stale/future anchors.
 
 Verification: 3,267 tests passed, 56 skipped; production build passed without warnings.
-Next drive: restart the backend/reload the page, verify out-lap seconds advance normally, then check
-that estimates respond to gains/losses after a complete valid reference lap. Compare sector crossings
-with the HUD and retain the diagnostic sidecar.
+Live confirmation — 2026-10-19: after a new session, the driver reported that the estimate looked
+good and explicitly confirmed that the out-lap clock advances at a normal rate. Both reported
+symptoms pass driver-observed live validation. This confirmation does not establish a quantified
+HUD delta error bound or validate every pause, garage-return and timing-line edge case. Exact
+sector/HUD comparisons, race-weekend overhead and the other runbook gates remain separate.
 
 ## What the next session can establish
 

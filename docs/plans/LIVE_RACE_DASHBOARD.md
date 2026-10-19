@@ -656,6 +656,8 @@ for evidence limits and next-drive checks.
 Bahrain diagnostics established that `timeIntoLap` is estimated progress, not elapsed time. The
 running clock and reference traces now use `currentEt - lapStartEt`; out-laps use an observed
 local departure clock. Stale anchors, garage returns and pause/crossing transitions are guarded.
-A sanitized recorded-clock regression demonstrates changing gains/losses and estimates; corrected
-in-game acceptance remains pending. Verification: 3,267 tests passed, 56 skipped; build warning-free.
+A sanitized recorded-clock regression demonstrates changing gains/losses and estimates.
+The driver confirmed the estimate looks good and the out-lap clock runs normally in a new session
+on 2026-10-19. Quantified HUD accuracy and remaining edge-case/runbook checks are separate.
+Verification at implementation: 3,267 tests passed, 56 skipped; build warning-free.
 See [the runbook](LIVE_SESSION_VALIDATION.md).
