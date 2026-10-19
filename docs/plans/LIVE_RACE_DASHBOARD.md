@@ -626,3 +626,18 @@ Loading state takes precedence over a stale main-menu label, and a held garage f
 session confirmation even when the scoring counter stops changing. Regression tests pass; the next
 drive must confirm these changes. The brief freeze reported inside LMU remains unexplained.
 See the [practice findings and next checks](LIVE_SESSION_VALIDATION.md#first-practice-findings--2026-10-18).
+
+### Current practice delivery — 2026-10-18
+
+The approved layout retains the hero and table. Only the latest completed lap has a second row of
+large green/red sector deltas; raw sector times stay neutral. Comparisons and the `BEST` footer use
+the actual session-best lap, not a composite of individual best sectors. The temporary preview was removed.
+
+Clock smoothing is restored with monotonic, bounded corrections; this display clock never enters
+calculations. The app computes continuous delta against a complete matching lap trace. When that trace
+is unavailable, estimated lap uses the latest completed split rather than the game's potentially fixed
+pace estimate. There is no `~` prefix; the source is disclosed in tooltip/metadata. Timing-line rollover
+before the lap counter updates preserves the prior trace. Invalid lap durations can be recovered from
+consecutive lap-start clocks, remain gray with computed provenance, and stay excluded from valid records.
+Checks: 3,262 tests passed, 56 skipped; production build passed without warnings. See
+[second practice and next-drive checks](LIVE_SESSION_VALIDATION.md#second-practice-and-approved-layout--2026-10-18).

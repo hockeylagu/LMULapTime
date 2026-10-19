@@ -14,14 +14,43 @@ identify the validity of the preceding completed lap.
 Implemented follow-ups: explicit loading overrides a stale main-menu label; an empty initializing
 session stays loading; session confirmation releases a held coherent garage frame without waiting
 for another scoring-counter update. The displayed lap clock now follows received game time without
-wall-clock run-on. A positive completed flying-lap time is independent of trace completeness and
+wall-clock run-on in the initial fix. A positive completed flying-lap time is independent of trace completeness and
 transient current-lap flags; out/in laps and untimed laps remain excluded from clean pace. Incomplete
 traces never become delta references. Estimated lap uses session best plus its matching delta, or a
-marked `~` game projection when that trace is unavailable; an out lap still reads `OUT LAP`.
+marked `~` game projection when that trace is unavailable in the initial fix; these clock/projection
+choices are superseded by the second-practice changes below. An out lap still reads `OUT LAP`.
 
 Regression suite: 3,256 passed, 56 skipped. The next session must verify these behaviors live.
 The driver's report of LMU itself briefly pausing after 100% loading is not yet explained or resolved.
 This practice does not complete race-weekend, performance or multi-session learning acceptance.
+
+## Second practice and approved layout — 2026-10-18
+
+The driver confirmed that the menu label did not recur and loading-to-garage was quick on this run.
+The clock no longer jumped backward, but its raw 5 Hz steps were distracting. The game pace projection
+could remain fixed; it must not substitute for a live estimate. The HUD delta itself has not been
+established as inaccurate or exposed through the fields currently consumed by the app.
+
+Delivered changes:
+
+- The original hero and history table remain. Only the last completed lap has a second row of 64 px
+  sector deltas: green gains, red losses, neutral times. Each compares with the same session-best lap,
+  whose actual sector times appear in the `BEST` footer. The temporary layout-preview scenarios were removed.
+- The display clock advances between updates, clamps same-lap corrections against backward movement,
+  freezes on pause, and stops run-on after 250 ms of unchanged game time. It never supplies analytics.
+- A complete best-lap distance/time trace supplies the app's continuous delta and estimated finish time.
+  A position/time wrap just before the completed-lap counter advances no longer discards that trace.
+  Without a complete trace, the latest matching completed split supplies an estimate; no fixed game-pace
+  fallback or redundant `~` prefix is displayed. The source remains available in tooltip/metadata.
+- Invalid-lap durations are recovered from consecutive lap-start timestamps when exactly one lap has
+  completed. They stay gray, carry computed provenance, and cannot establish a valid record or reference.
+  Missing/unchanged anchors and skipped lap counters leave the duration unknown. Late-settling anchors are handled.
+
+Verification: 3,262 tests passed, 56 skipped; production build passed without warnings. The next drive
+must compare the app's delta with the HUD after one complete valid reference lap, verify smooth clock
+behavior through pauses and crossings, and check a naturally invalidated lap's recovered duration.
+The split-based estimate updates at sector crossings, not continuously. Race-weekend overhead and
+multi-session learning acceptance remain outstanding.
 
 ## What the next session can establish
 

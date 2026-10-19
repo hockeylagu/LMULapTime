@@ -10,7 +10,7 @@ decode options in `server/replay/decode/replayTrajectoryTypes.ts`, telemetry cha
 `src/components/replay/telemetry/telemetryChartTypes.ts`, and map markers in
 `src/components/replay/map/gpsTrackMapTypes.ts`. Import these directly to avoid cycles through consumers.
 
-Verification baseline: 3,256 tests passed, 56 intentionally skipped; production build clean (zero warnings, zero errors).
+Verification baseline: 3,262 tests passed, 56 intentionally skipped; production build clean (zero warnings, zero errors).
 
 ---
 
