@@ -2,6 +2,9 @@
 
 Status: Capture implemented 2026-10-18. Normalization version 2 enables all 30 vehicle/wheel values;
 saved-recording analysis and worker round-trip tests pass. New live-recording acceptance remains.
+Scope audit 2026-10-18: §9.1 of the analysis also selected tyre vertical deflection, impact magnitude,
+terrain names and player upgrade-pack capture. Those four additions remain unimplemented;
+see [remaining capture implementation](LIVE_SESSION_EVIDENCE.md#remaining-capture-implementation).
 Reviewed: 2026-10-17 against 199 native catalogs, three shared-memory captures and saved REST evidence.
 Companion: [Live session evidence plan](LIVE_SESSION_EVIDENCE.md).
 
