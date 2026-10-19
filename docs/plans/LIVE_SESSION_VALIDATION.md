@@ -7,9 +7,11 @@ the [current capture contract](../LIVE_CAPTURE_FORMAT.md). This is a checklist, 
 
 - The normal app records six verified motion channels, sparse damage/pit/weather observations,
   audit checkpoints and fuel/VE learning evidence into session DuckDB.
-- The 24 supplemental wheel columns are still NULL. A normal app recording cannot verify their
-  values. Use the existing C# diagnostic recorder for a short, controlled raw-memory probe.
-- After analysing that probe, implement only verified wheel mappings and their regression tests.
+- The 24 supplemental wheel columns are still NULL. Existing C# JSONL recordings already contain
+  all six pending fields at all four corners; analyse those first. See the
+  [recorded evidence assessment](WHEEL_CAPTURE_EVIDENCE.md). A fresh probe is needed only for a
+  specific unresolved comparison, not as a prerequisite to starting wheel verification.
+- After analysing the saved evidence, implement only verified wheel mappings and their regression tests.
   A subsequent live capture must confirm that the enabled columns contain the expected data.
 - One race cannot complete learning acceptance: screening needs multiple independent compatible
   sessions, then fixed candidates need genuinely new sessions before activation.
@@ -28,7 +30,7 @@ Let the app record normally with the dashboard closed first, then open it. Verif
 in both cases. Do not assume the older `C:\Documents\lmu-live-captures` location is active: inspect
 the configured capture directory (`LMU_LIVE_CAPTURE_DIR`, default `server/live-captures`).
 
-For the short wheel probe, run from the repository root:
+Only if the saved recordings leave a specific verification gap, run a short wheel probe from the repository root:
 
 ```powershell
 npm run telemetry:record -- --out .cache/live-validation/wheel-probe --seconds 900
@@ -41,7 +43,8 @@ the app's regular historical JSON/CSV exports remain removed.
 
 ## 2. Wheel probe sequence and acceptance
 
-Perform the sequence on a known dry layout, with one car and compound. Note each segment's time.
+First find these segments in the saved JSONL. Perform only missing comparisons in a new private
+practice on a known dry layout, with one car and compound. Note each segment's time.
 Keep the setup fixed except for the explicitly separate setup comparison. Avoid combining a
 surface change, tyre change and setup change in the same comparison.
 
