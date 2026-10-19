@@ -18,6 +18,7 @@ const CLOCK_REGRESSION = 1;
 interface CurrentLap {
   /** Laps completed when the lap started. */
   completedLaps: number;
+  startSeconds: number | null;
   startedInPits: boolean;
   lastInPits: boolean;
   /** The lap was seen from (about) the line, so its trace is whole. False when the app joined mid-lap. */
@@ -114,8 +115,7 @@ export class LiveLapTiming {
     this.lastEt = reading.currentEt;
     if (!this.current) this.startSession(player);
     else if (player.totalLaps > this.current.completedLaps) this.completeLap(player, reading.trackLength);
-    this.latest = player;
-    if (this.current) this.addSample(this.current, player);
+    if (this.current && this.addSample(this.current, player, reading.trackLength)) this.latest = player;
   }
 
   /** Current-lap progress for the page; null before a player reading. */
@@ -131,14 +131,18 @@ export class LiveLapTiming {
     );
     const best = this.best?.lapSectors;
     const sectorDeltas = done.map((time, i) => (time !== null && best?.[i] != null ? ms(time - best[i]) : null)) as Sectors;
+    const completed = sectorDeltas.slice(0, sector - 1);
+    const splitEstimate = !player.inPits && !lap.startedInPits && this.best?.lapSeconds != null
+      && completed.length > 0 && completed.every(value => value !== null)
+      ? ms(this.best.lapSeconds + completed.reduce<number>((sum, value) => sum + (value ?? 0), 0)) : null;
     return {
       lapNumber: player.totalLaps + 1,
       isOutLap: lap.startedInPits,
       sector,
-      lapElapsedSeconds: player.timeIntoLap >= 0 ? ms(player.timeIntoLap) : null,
+      lapElapsedSeconds: Number.isFinite(player.timeIntoLap) && player.timeIntoLap >= 0 ? ms(player.timeIntoLap) : null,
       sectors: done,
       deltaSeconds: delta,
-      gameEstimatedLapSeconds: positive(player.estimatedLapTime),
+      sectorEstimatedLapSeconds: delta === null ? splitEstimate : null,
       sectorDeltas,
     };
   }
@@ -165,6 +169,7 @@ export class LiveLapTiming {
   private newLap(player: LiveVehicleReading, joinedMidLap: boolean): CurrentLap {
     return {
       completedLaps: player.totalLaps,
+      startSeconds: Number.isFinite(player.lapStartEt) && player.lapStartEt >= 0 ? player.lapStartEt : null,
       startedInPits: player.inPits,
       lastInPits: player.inPits,
       fromStart: !joinedMidLap,
@@ -172,27 +177,37 @@ export class LiveLapTiming {
     };
   }
 
-  private addSample(lap: CurrentLap, player: LiveVehicleReading): void {
-    lap.lastInPits = player.inPits;
-    if (player.timeIntoLap < 0 || player.lapDist < 0) return;
+  private addSample(lap: CurrentLap, player: LiveVehicleReading, trackLength: number): boolean {
     const last = lap.trace[lap.trace.length - 1];
+    // Position/time can roll over one scoring frame before totalLaps. Keep the completed trace intact
+    // and wait for the official counter instead of interpreting the timing-line wrap as a spin/reset.
+    if (last && trackLength > 0 && !player.inPits && last.dist > trackLength - MAX_GAP
+      && player.lapDist >= 0 && player.lapDist < MAX_START_DIST && player.timeIntoLap >= 0 && player.timeIntoLap < 2) return false;
+    if (Number.isFinite(player.lapStartEt) && player.lapStartEt >= 0) lap.startSeconds = player.lapStartEt;
+    lap.lastInPits = player.inPits;
+    if (player.timeIntoLap < 0 || player.lapDist < 0) return true;
     if (!last) {
       if (player.lapDist > MAX_START_DIST) lap.fromStart = false;
     } else if (player.lapDist < last.dist - REVERSE_TOLERANCE || player.lapDist - last.dist > MAX_GAP) {
       lap.fromStart = false;
     }
     if (!last || player.lapDist > last.dist) lap.trace.push({ dist: player.lapDist, time: player.timeIntoLap });
+    return true;
   }
 
   private completeLap(player: LiveVehicleReading, trackLength: number): void {
     const lap = this.current;
     if (!lap) return;
-    const seconds = positive(player.lastLapTime);
+    const gameSeconds = positive(player.lastLapTime);
+    const computed = player.totalLaps === lap.completedLaps + 1 && lap.startSeconds !== null
+      ? difference(Number.isFinite(player.lapStartEt) ? player.lapStartEt : null, lap.startSeconds) : null;
+    const seconds = gameSeconds ?? computed;
     const record: LiveLapRecord = {
       lapNumber: player.totalLaps,
       lapSeconds: seconds,
+      ...(gameSeconds === null && computed !== null ? { timeSource: 'lap-start' as const } : {}),
       sectors: splitSectors(player.lastSector1, player.lastSector2, seconds),
-      valid: seconds !== null && !lap.startedInPits && !lap.lastInPits,
+      valid: gameSeconds !== null && !lap.startedInPits && !lap.lastInPits,
     };
     this.records.push(record);
     if (this.records.length > LIVE_RECENT_LAP_COUNT) this.records.shift();

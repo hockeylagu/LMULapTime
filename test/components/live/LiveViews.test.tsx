@@ -205,9 +205,9 @@ describe('live driving views', () => {
       expect(screen.queryByText('CURRENT VS BEST')).not.toBeInTheDocument();
       const rows = within(screen.getByTestId('live-history')).getAllByRole('row');
       // Header, current splits, two laps newest first, the BEST footer.
-      expect(rows).toHaveLength(5);
+      expect(rows).toHaveLength(6);
       expect(rows[2]).toHaveTextContent('52:01.83237.20445.11639.512+0.426');
-      expect(screen.getByTestId('live-history-best')).toHaveTextContent('BEST2:01.40637.15044.98039.154');
+      expect(screen.getByTestId('live-history-best')).toHaveTextContent('BEST2:01.40637.20045.00039.200');
     });
 
     it('fills current splits from timing events before a lap completes, then moves all splits into history', () => {
@@ -229,18 +229,21 @@ describe('live driving views', () => {
       expect(screen.getByTestId('live-history-latest')).toHaveTextContent('12:01.83237.20445.11639.512—');
     });
 
-    it('tints only the latest lap\'s largest sector loss against the best sectors', () => {
+    it('keeps sector times neutral and shows green/red deltas beneath only the latest lap', () => {
       render(<LivePage />);
       send(practice());
-      const tinted = within(screen.getByTestId('live-history')).getAllByText((_, el) => el?.getAttribute('data-sector-loss') === 'true');
-      expect(tinted).toHaveLength(1);
-      expect(tinted[0]).toHaveTextContent('39.512');
+      expect(screen.getByTestId('live-history-latest').querySelector('.text-lmu-loss')).not.toBeNull(); // Overall lap delta.
+      expect(screen.getByTestId('live-history').querySelector('[data-sector-loss]')).toBeNull();
+      expect(within(screen.getByTestId('live-history')).getAllByRole('row', { name: /sector deltas against/ })).toHaveLength(1);
+      expect(screen.getByTestId('live-completed-sector-delta-1')).toHaveTextContent('+0.004');
+      expect(screen.getByTestId('live-completed-sector-delta-2')).toHaveTextContent('+0.116');
+      expect(screen.getByTestId('live-completed-sector-delta-3')).toHaveTextContent('+0.312');
     });
 
     it('dims an invalid lap without extra text and does not tint it', () => {
       render(<LivePage />);
       send(practice({ recentLaps: [LAPS[0], LAPS[1], liveLap(5, 121.832, [37.204, 45.116, 39.512], false)] }));
-      expect(screen.getByTestId('live-history-latest')).toHaveClass('opacity-50');
+      expect(screen.getByTestId('live-history-latest')).toHaveClass('text-lmu-muted');
       expect(screen.getByTestId('live-history-latest')).not.toHaveTextContent(/invalid/i);
       expect(screen.getByTestId('live-history').querySelector('[data-sector-loss]')).toBeNull();
       expect(screen.getByTestId('live-history-latest')).toHaveTextContent(/39\.512—$/);

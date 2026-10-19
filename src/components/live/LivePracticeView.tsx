@@ -28,11 +28,11 @@ export function LivePracticeView({ snapshot, store }: { snapshot: LiveSnapshot; 
           </div>
         </div>
         <div className="grid grid-cols-2 gap-x-[60px] border-l border-lmu-border pl-[60px]">
-          <Timing label="LAST LAP"><span data-testid="live-practice-last" className={latest && !latest.valid ? 'opacity-50' : undefined}>{formatLapTime(latest?.lapSeconds)}</span></Timing>
+          <Timing label="LAST LAP"><span data-testid="live-practice-last" title={latest?.timeSource === 'lap-start' ? 'Computed lap time' : undefined} className={latest && !latest.valid ? 'text-lmu-muted' : undefined}>{formatLapTime(latest?.lapSeconds)}</span></Timing>
           <Timing label="SESSION BEST">{formatLapTime(best?.lapSeconds)}</Timing>
         </div>
       </section>
-      <LivePracticeHistory laps={snapshot.recentLaps} best={best} store={store} />
+      <LivePracticeHistory laps={snapshot.recentLaps} best={best} store={store} paused={snapshot.paused} />
     </>
   );
 }

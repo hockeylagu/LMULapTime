@@ -73,12 +73,46 @@ describe('LiveLapTiming', () => {
     expect(timing.sessionBest?.lapSeconds).toBe(100);
   });
 
-  it('offers the game projection before a reference exists without inventing a matching delta', () => {
+  it('uses matching completed splits instead of a static game pace when a trace is unavailable', () => {
     const timing = new LiveLapTiming();
-    timing.update(reading({ estimatedLapTime: 133.0757 }));
-    expect(timing.timing()).toMatchObject({ deltaSeconds: null, gameEstimatedLapSeconds: 133.0757 });
-    timing.update(reading({ estimatedLapTime: NaN }));
-    expect(timing.timing()?.gameEstimatedLapSeconds).toBeNull();
+    const player = { totalLaps: 5, bestLapTime: 100, bestLapSector1: 30, bestLapSector2: 60, estimatedLapTime: 100 };
+    timing.update(reading({ ...player, sector: 1 }));
+    expect(timing.timing()).toMatchObject({ deltaSeconds: null, sectorEstimatedLapSeconds: null });
+    timing.update(reading({ ...player, sector: 2, curSector1: 29.5 }));
+    expect(timing.timing()?.sectorEstimatedLapSeconds).toBe(99.5);
+    timing.update(reading({ ...player, sector: 0, curSector1: 29.5, curSector2: 61.2 }));
+    expect(timing.timing()?.sectorEstimatedLapSeconds).toBe(101.2);
+  });
+
+  it('recovers an invalid completed time from consecutive lap-start clocks without accepting it as a record', () => {
+    const timing = new LiveLapTiming();
+    timing.update(reading({ totalLaps: 3, lapStartEt: 1000, lapDist: 0, timeIntoLap: 0 }));
+    timing.update(reading({ totalLaps: 4, lapStartEt: 1133.0757, lapDist: 5, timeIntoLap: 0.1,
+      lastLapTime: -1, lastSector1: 37, lastSector2: 87 }, 1133.2));
+    expect(timing.recentLaps[0]).toEqual({ lapNumber: 4, lapSeconds: 133.076,
+      sectors: [37, 50, 46.076], valid: false, timeSource: 'lap-start' });
+    expect(timing.sessionBest).toBeNull();
+    timing.update(reading({ totalLaps: 6, lapStartEt: 1400, lastLapTime: -1 }, 1400.2));
+    expect(timing.recentLaps[1]).toMatchObject({ lapSeconds: null, valid: false });
+  });
+
+  it('keeps a complete best-lap trace when position rolls over just before the lap counter', () => {
+    const timing = new LiveLapTiming();
+    for (let time = 0; time < 100; time++) timing.update(reading({ totalLaps: 0, lapDist: time * 100, timeIntoLap: time }));
+    timing.update(reading({ totalLaps: 0, lapDist: 2, timeIntoLap: 0.02 }));
+    expect(timing.timing()?.lapElapsedSeconds).toBe(99);
+    timing.update(reading({ totalLaps: 1, lapDist: 5, timeIntoLap: 0.1, lastLapTime: 100, lastSector1: 30, lastSector2: 60 }));
+    timing.update(reading({ totalLaps: 1, lapDist: 5000, timeIntoLap: 51 }));
+    expect(timing.timing()?.deltaSeconds).toBe(1);
+  });
+
+  it('uses a lap-start anchor that settles after the counter changes when recovering the following lap', () => {
+    const timing = new LiveLapTiming();
+    timing.update(reading({ totalLaps: 3, lapStartEt: 1000, lapDist: 0, timeIntoLap: 0 }));
+    timing.update(reading({ totalLaps: 4, lapStartEt: 1000, lapDist: 1, timeIntoLap: 0.01, lastLapTime: 135 }));
+    timing.update(reading({ totalLaps: 4, lapStartEt: 1135, lapDist: 5, timeIntoLap: 0.1 }, 1135.1));
+    timing.update(reading({ totalLaps: 5, lapStartEt: 1268.0757, lapDist: 5, timeIntoLap: 0.1, lastLapTime: -1 }, 1268.2));
+    expect(timing.recentLaps[1]).toMatchObject({ lapSeconds: 133.076, valid: false, timeSource: 'lap-start' });
   });
 
   it('splits the cumulative sector fields into S1, S2 and S3 and keeps the last three laps', () => {

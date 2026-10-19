@@ -84,6 +84,8 @@ export interface LiveWeather {
 export interface LiveLapRecord {
   lapNumber: number;
   lapSeconds: number | null;
+  /** A retained invalid-lap duration may be recovered from consecutive game lap-start timestamps. */
+  timeSource?: 'game' | 'lap-start';
   sectors: [number | null, number | null, number | null];
   /** Positive completed time from the game on a flying lap; trace completeness is independent. */
   valid: boolean;
@@ -113,8 +115,8 @@ export interface LiveTiming {
   sectors: [number | null, number | null, number | null];
   /** Time into the current lap minus the session-best lap at the same distance; null without a reference. */
   deltaSeconds: number | null;
-  /** Standalone game projection, used when a matching session-best trace is unavailable. */
-  gameEstimatedLapSeconds?: number | null;
+  /** Best lap plus the delta at the latest completed split, when a complete reference trace is unavailable. */
+  sectorEstimatedLapSeconds?: number | null;
   /** Completed sectors of the current lap minus the session-best lap's sectors; null for sectors not yet done. */
   sectorDeltas: [number | null, number | null, number | null];
   /**
