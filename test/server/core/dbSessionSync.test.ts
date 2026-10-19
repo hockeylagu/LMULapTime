@@ -7,6 +7,7 @@ import { SessionDatabase } from '../../../server/core/db.js';
 import { DB_PARSER_VERSION } from '../../../server/core/dbSessionSync.js';
 import { LmuParser } from '../../../server/sessions/parser.js';
 import { initDbSchema } from '../../../server/core/dbSchema.js';
+import { pumpScanInBackground, startedScanStatus } from '../../../server/core/backgroundScan.js';
 
 describe('session parser-version migration writes', () => {
   let tempDir: string | null = null;
@@ -41,6 +42,50 @@ describe('session parser-version migration writes', () => {
 
     expect(database.syncSessionsFromDir(dir, parser, true)).toMatchObject({ added: 0, updated: 1, total: 1 });
     expect(parse).toHaveBeenCalledTimes(1);
+  });
+
+  it('yields between retained-session repair batches and retries an interrupted upgrade', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lmu-retained-upgrade-'));
+    tempDir = dir;
+    const database = new SessionDatabase(':memory:');
+    db = database;
+    const fixture = path.join(process.cwd(), 'test/fixtures/results/2026_05_28_P1.xml');
+    for (let index = 0; index < 25; index++) fs.copyFileSync(fixture, path.join(dir, `${index}.xml`));
+    const parser = new LmuParser(undefined, undefined, { detectPlayer: false });
+    database.syncSessionsFromDir(dir, parser);
+    for (const file of fs.readdirSync(dir)) fs.unlinkSync(path.join(dir, file));
+    database.setMetadata('parser_version', 'older-parser-version');
+    const repair = database.reclassifyStoredSessions.bind(database);
+    let batches = 0;
+    const interrupted = vi.spyOn(database, 'reclassifyStoredSessions').mockImplementation(which => {
+      if (++batches === 2) throw new Error('Interrupted repair');
+      return repair(which);
+    });
+    const run = () => new Promise<void>((resolve, reject) => {
+      pumpScanInBackground(database.syncSessionsAsyncIterator(dir, parser), startedScanStatus(), outcome => {
+        if ('error' in outcome) reject(outcome.error);
+        else resolve();
+      });
+    });
+    await expect(run()).rejects.toThrow('Interrupted repair');
+    expect(database.getMetadata('parser_version')).toBe('older-parser-version');
+    expect(database.getSessionsCount()).toBe(25);
+    interrupted.mockRestore();
+
+    const callbacks: number[] = [];
+    let repaired = 0;
+    vi.spyOn(database, 'reclassifyStoredSessions').mockImplementation(which => {
+      repair(which);
+      repaired += 'ids' in which ? which.ids.length : 0;
+      setImmediate(() => callbacks.push(repaired));
+    });
+    // The async startup path lists XMLs without a blocking directory read.
+    const listing = vi.spyOn(fs, 'readdirSync');
+    await run();
+    expect(listing).not.toHaveBeenCalled();
+    expect(callbacks).toEqual([10, 20, 25]);
+    expect(database.getSessionsCount()).toBe(25);
+    expect(database.getMetadata('parser_version')).toBe(DB_PARSER_VERSION);
   });
 
   it.each([true, false])('repairs Fuji layouts and preserves them across startup (XML retained: %s)', (keepXml) => {

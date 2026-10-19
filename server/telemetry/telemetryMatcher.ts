@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { setImmediate as yieldToEventLoop } from 'node:timers/promises';
 import path from 'path';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { DuckDbReader } from './duckdbReader.js';
@@ -90,18 +91,14 @@ export function parseDuckDbFilename(filename: string): {
   };
 }
 
-export function scanDuckDbDirectory(telemetryDir: string): DuckDbFileInfo[] {
-  if (!fs.existsSync(telemetryDir)) {
-    return [];
-  }
-
+export async function scanDuckDbDirectory(telemetryDir: string): Promise<DuckDbFileInfo[]> {
   const entries: DuckDbFileInfo[] = [];
   try {
-    const files = fs.readdirSync(telemetryDir).filter((f) => f.toLowerCase().endsWith('.duckdb'));
+    const files = (await fs.promises.readdir(telemetryDir)).filter((f) => f.toLowerCase().endsWith('.duckdb'));
     for (const f of files) {
       const filePath = path.join(telemetryDir, f);
       try {
-        const stats = fs.statSync(filePath);
+        const stats = await fs.promises.stat(filePath);
         const parsed = parseDuckDbFilename(f);
         if (parsed) {
           entries.push({
@@ -120,7 +117,9 @@ export function scanDuckDbDirectory(telemetryDir: string): DuckDbFileInfo[] {
       }
     }
   } catch (err) {
-    console.error(`[TelemetryMatcher] Error scanning telemetry directory ${telemetryDir}:`, err);
+    if (!(err instanceof Error && 'code' in err && err.code === 'ENOENT')) {
+      console.error(`[TelemetryMatcher] Error scanning telemetry directory ${telemetryDir}:`, err);
+    }
   }
 
   return entries;
@@ -360,7 +359,7 @@ export async function enrichDuckDbDirectory(
     onProgress?: (progress: { processed: number; total: number; currentFile: string; cached: boolean }) => void;
   }
 ): Promise<DuckDbFileInfo[]> {
-  const files = scanDuckDbDirectory(telemetryDir);
+  const files = await scanDuckDbDirectory(telemetryDir);
   const cachedMap = options?.cachedFiles;
   const results: DuckDbFileInfo[] = [];
 
@@ -384,6 +383,8 @@ export async function enrichDuckDbDirectory(
       options?.onFile?.(enriched);
       options?.onProgress?.({ processed: i + 1, total: files.length, currentFile: file.filename, cached: false });
     }
+    // A fully cached folder otherwise runs only synchronous callbacks until every file is done.
+    await yieldToEventLoop();
   }
 
   return results;

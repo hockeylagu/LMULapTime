@@ -116,9 +116,9 @@ function AnalysisApp() {
 
   useEffect(() => { preloadRoutePage(location.pathname); }, [location.pathname]);
 
-  // Once the first page is up, fetch the other pages in the background so navigation never waits on a chunk.
+  // Prefetch built chunks in production; dev keeps transforms focused on the current page.
   useEffect(() => {
-    if (loading) return;
+    if (loading || import.meta.env.DEV) return;
     const idle = window.requestIdleCallback ?? ((run: () => void) => window.setTimeout(run, 200));
     const cancel = window.cancelIdleCallback ?? window.clearTimeout;
     const handle = idle(() => { void prefetchRoutePages(); });

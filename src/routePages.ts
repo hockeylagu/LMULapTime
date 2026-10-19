@@ -2,7 +2,7 @@ import { createElement, use, type ComponentType } from 'react';
 
 /**
  * Route pages load on demand so the first screen parses only its own page: the current route's page downloads
- * alongside the session data (`preloadRoutePage`) and the rest once the browser is idle (`prefetchRoutePages`).
+ * alongside the session data (`preloadRoutePage`). Production prefetches the rest while idle; dev loads only visited pages.
  * Import pages from their own module, never from the components barrel, or the split is lost.
  *
  * Not `React.lazy`: lazy suspends on first render even when the module is already loaded, and React 19 then holds the

@@ -105,7 +105,11 @@ it('persists recorded memory values through service, real worker, rediscovery an
         expect(errors).toEqual([]);
         discovered.push(...recordings.map(entry => entry.manifest.recordingId));
       } });
-    await discovery.discover();
+    const cataloguing = discovery.discover();
+    // A real DuckDB catalog runs in its worker while main-thread callbacks remain available.
+    await new Promise<void>(resolve => setImmediate(resolve));
+    expect(discovered).toEqual([]);
+    await cataloguing;
     await discovery.stop();
     expect(discovered).toEqual([indexed[0].manifest.recordingId]);
     expect(await reconcileLiveCaptures(db.getDb(), directory)).toMatchObject({ indexed: 1, verified: 0, pending: 1 });

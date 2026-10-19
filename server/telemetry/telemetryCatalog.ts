@@ -1,4 +1,5 @@
 import { SessionDatabase } from '../core/db.js';
+import { setImmediate as yieldToEventLoop } from 'node:timers/promises';
 import { TelemetryScanStatus } from '../../shared/types/index.js';
 import { DuckDbFileInfo, enrichDuckDbDirectory } from './telemetryMatcher.js';
 
@@ -109,11 +110,16 @@ export class TelemetryCatalog {
         this.scanStatus.currentFile = p.currentFile || null;
       },
     })
-      .then((files) => {
+      .then(async (files) => {
         if (generation !== this.refreshGeneration) return files.length;
         this.directory = directory;
         this.updatedAt = new Date().toISOString();
-        for (const file of files) {
+        for (let index = 0; index < files.length; index++) {
+          if (index > 0 && index % 10 === 0) {
+            await yieldToEventLoop();
+            if (generation !== this.refreshGeneration) return files.length;
+          }
+          const file = files[index];
           const prev = cachedMap.get(file.filePath);
           if (!prev) {
             addedCount++;

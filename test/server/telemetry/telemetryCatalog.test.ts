@@ -91,4 +91,22 @@ describe('TelemetryCatalog', () => {
     expect(db.getTelemetryFiles()).toEqual([newFile]);
     expect(catalog.getStatus(newDirectory).directory).toBe(newDirectory);
   });
+
+  it('yields during bulk publication and stops a stale scan before publishing more files', async () => {
+    const db = database();
+    const files = Array.from({ length: 25 }, (_, index) => file('C:\\fake', `session-${index}.duckdb`));
+    const catalog = new TelemetryCatalog(db, async () => files);
+    const upsert = db.upsertTelemetryMetadata.bind(db);
+    let published = 0;
+    vi.spyOn(db, 'upsertTelemetryMetadata').mockImplementation(entry => {
+      upsert(entry);
+      if (++published === 1) setImmediate(() => catalog.clear());
+    });
+    const prune = vi.spyOn(db, 'pruneTelemetryLapCache');
+    await catalog.refresh('C:\\fake');
+    expect(published).toBeGreaterThan(0);
+    expect(published).toBeLessThan(files.length);
+    expect(prune).not.toHaveBeenCalled();
+    expect(catalog.getScanStatus()).toMatchObject({ running: false, result: null, error: null });
+  });
 });

@@ -192,7 +192,8 @@ export async function reconcileLiveCaptures(db: Database, directory: string): Pr
   const refreshed = getLiveCaptureIndexRows(db);
   const verified = refreshed.filter(entry => entry.manifest.sessionId !== null).length;
   const pending = refreshed.length - verified;
+  const refreshedOwners = new Map(refreshed.map(entry => [entry.manifest.recordingId, entry.manifest.sessionId]));
   const withdrawn = entries.filter(entry => entry.manifest.sessionId !== null
-    && !refreshed.some(current => current.manifest.recordingId === entry.manifest.recordingId && current.manifest.sessionId === entry.manifest.sessionId)).length;
+    && refreshedOwners.get(entry.manifest.recordingId) !== entry.manifest.sessionId).length;
   return { changed, indexed: refreshed.length, verified, pending, withdrawn, filesChecked };
 }

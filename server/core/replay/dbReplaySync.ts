@@ -1,4 +1,5 @@
 import fs from 'fs';
+import { setImmediate as yieldToEventLoop } from 'node:timers/promises';
 import { FileIngestWorker } from '../ingest/fileIngestWorkerClient.js';
 import type { ReplayIngestJob } from '../../../shared/types/index.js';
 import path from 'path';
@@ -248,7 +249,7 @@ export async function* syncReplaysAsyncIterator(
     return { added: 0, updated: 0, skipped: 0, total: host.getReplaysCount(), lastSyncedAt, interrupted: false };
   }
 
-  const files = fs.readdirSync(replaysDir).filter(f => f.toLowerCase().endsWith('.vcr'));
+  const files = (await fs.promises.readdir(replaysDir)).filter(f => f.toLowerCase().endsWith('.vcr'));
   let added = 0;
   let updated = 0;
   let skipped = 0;
@@ -263,7 +264,7 @@ export async function* syncReplaysAsyncIterator(
     const filename = files[index];
     const filePath = path.join(replaysDir, filename);
     try {
-      const stat = fs.statSync(filePath);
+      const stat = await fs.promises.stat(filePath);
       const mtimeMs = Math.floor(stat.mtimeMs);
       const fileSizeBytes = stat.size;
       const metadata = host.getReplayMetadataCache(filename, mtimeMs, fileSizeBytes, filePath);
@@ -277,6 +278,8 @@ export async function* syncReplaysAsyncIterator(
       skipped++;
       options.onReplayState?.({ name: filename, status: 'failed', error: error instanceof Error ? error.message : String(error) });
     }
+    // Cached metadata still needs decompression; do not monopolize a turn on a warm start.
+    await yieldToEventLoop();
   }
 
   if (filesToParse.length > 0) {
@@ -306,17 +309,21 @@ export async function* syncReplaysAsyncIterator(
   // Newest first: the replay of the session just driven is ready before older ones are retried.
   const candidates = (associated ? discovered.filter(file => associated.has(file.filename)) : discovered)
     .sort((a, b) => b.mtimeMs - a.mtimeMs);
-  const queue = candidates.filter(file => replayNeedsDecode(host, file, options.retryFailed, options.playerName));
-
-  // Replays with nothing left to decode stay out of the progress count, but one that failed too often
-  // still reports it, so its button keeps saying Refresh to retry.
+  const queue: typeof candidates = [];
+  // A warm library can contain thousands of driver cache checks. The scan pump only yields when
+  // this generator publishes progress, and cached replays deliberately stay out of decode totals.
   for (const file of candidates) {
-    if (queue.includes(file)) continue;
-    const error = settledReplayError(host, file.filename, file.filePath, file.metadata, file.mtimeMs, file.fileSizeBytes, options.playerName);
-    if (error) {
-      options.onReplayState?.({ name: file.filename, status: 'failed', error,
-        playable: host.hasValidReplayTrajectoryCache(file.filename, -1, -1, file.mtimeMs, file.fileSizeBytes, file.filePath) });
+    if (replayNeedsDecode(host, file, options.retryFailed, options.playerName)) {
+      queue.push(file);
+    } else {
+      // Settled failures still report Refresh to retry, without increasing the decode count.
+      const error = settledReplayError(host, file.filename, file.filePath, file.metadata, file.mtimeMs, file.fileSizeBytes, options.playerName);
+      if (error) {
+        options.onReplayState?.({ name: file.filename, status: 'failed', error,
+          playable: host.hasValidReplayTrajectoryCache(file.filename, -1, -1, file.mtimeMs, file.fileSizeBytes, file.filePath) });
+      }
     }
+    await yieldToEventLoop();
   }
 
   for (const file of queue) options.onReplayState?.({ name: file.filename, status: 'queued' });

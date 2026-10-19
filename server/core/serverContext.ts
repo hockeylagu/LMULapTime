@@ -588,7 +588,11 @@ export class ServerContext {
       }
       // Rows stored before the attachment was persisted on them.
       for (const id of this.sessionDb.getTelemetryOwnersWithoutFile()) owners.add(id);
-      for (const id of owners) this.applySessionTelemetryById(id);
+      let processedOwners = 0;
+      for (const id of owners) {
+        this.applySessionTelemetryById(id);
+        if (++processedOwners % 10 === 0) await yieldToEventLoop();
+      }
     })().finally(() => {
       this.telemetryOwnershipReconciliationRunning = false;
       this.telemetryOwnershipReconciliation = null;

@@ -420,12 +420,12 @@ describe('telemetryMatcher', () => {
     });
     afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
-    it('lists the DuckDB files it can name, with their size and filename time', () => {
+    it('lists the DuckDB files it can name, with their size and filename time', async () => {
       fs.writeFileSync(path.join(dir, spaName), 'x'.repeat(10));
       fs.writeFileSync(path.join(dir, 'notes.txt'), '');
       fs.writeFileSync(path.join(dir, 'unnamed.duckdb'), '');
 
-      const files = scanDuckDbDirectory(dir);
+      const files = await scanDuckDbDirectory(dir);
 
       expect(files).toHaveLength(1);
       expect(files[0]).toMatchObject({
@@ -439,7 +439,7 @@ describe('telemetryMatcher', () => {
       duckdb.metadata = { trackName: 'Circuit de Spa-Francorchamps', sessionType: 'Q', driverName: 'Test Driver', carType: 'Porsche 963', RecordingTime: '2026-09-13T19_30_00Z' };
       duckdb.laps = [{ lapTimeSec: 12 }, { lapTimeSec: 139.4 }, { lapTimeSec: 137.9 }];
 
-      const [listed] = scanDuckDbDirectory(dir);
+      const [listed] = await scanDuckDbDirectory(dir);
       const enriched = await enrichDuckDbFileInfo(listed);
 
       expect(enriched).toMatchObject({
@@ -462,12 +462,29 @@ describe('telemetryMatcher', () => {
       expect(replacement.driverName).toBeUndefined();
     });
 
+    it('keeps the event loop available while publishing an entirely cached folder', async () => {
+      for (const name of ['Spa_P_2026-09-13T20_33_32Z.duckdb', 'Spa_Q_2026-09-13T21_33_32Z.duckdb', 'Spa_R_2026-09-13T22_33_32Z.duckdb']) {
+        fs.writeFileSync(path.join(dir, name), 'cached');
+      }
+      const files = await scanDuckDbDirectory(dir);
+      const cachedFiles = new Map(files.map(file => [file.filePath, file]));
+      let published = 0;
+      const callbacks: number[] = [];
+      const result = await enrichDuckDbDirectory(dir, { cachedFiles, onFile: () => {
+        published++;
+        setImmediate(() => callbacks.push(published));
+      } });
+      expect(result).toEqual(files);
+      expect(duckdb.opened).toHaveLength(0);
+      expect(callbacks).toEqual([1, 2, 3]);
+    });
+
     it('keeps the filename values and records the error when the file cannot be read', async () => {
       vi.spyOn(console, 'warn').mockImplementation(() => undefined);
       fs.writeFileSync(path.join(dir, 'Monza_R_2026-09-13T20_33_32Z.duckdb'), '');
       duckdb.openError = new Error('database is locked');
 
-      const [listed] = scanDuckDbDirectory(dir);
+      const [listed] = await scanDuckDbDirectory(dir);
       const enriched = await enrichDuckDbFileInfo(listed);
 
       expect(enriched).toMatchObject({ trackName: 'Monza', sessionType: 'R', enrichmentError: 'database is locked' });
@@ -478,7 +495,7 @@ describe('telemetryMatcher', () => {
       for (const name of ['Spa_P_2026-09-13T20_33_32Z.duckdb', 'Spa_Q_2026-09-13T21_33_32Z.duckdb', 'Spa_R_2026-09-13T22_33_32Z.duckdb']) {
         fs.writeFileSync(path.join(dir, name), 'data');
       }
-      const listed = scanDuckDbDirectory(dir);
+      const listed = await scanDuckDbDirectory(dir);
       const byType = (type: string) => listed.find(file => file.sessionType === type)!;
       const cachedFiles = new Map<string, DuckDbFileInfo>([
         [byType('P').filePath, { ...byType('P'), lapsCount: 7 }],

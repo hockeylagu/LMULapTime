@@ -35,7 +35,8 @@ export function *syncSessionsIterator(
   host: SessionSyncHost,
   resultsDir: string,
   parser: SessionXmlSyncParser,
-  forceReparse = false
+  forceReparse = false,
+  discoveredFiles?: string[]
 ): Generator<SessionSyncProgress, SyncResult, DetailedSession | null | undefined> {
   if (!fs.existsSync(resultsDir)) {
     return {
@@ -65,7 +66,7 @@ export function *syncSessionsIterator(
 
   parser.setReplayLookup(target => host.getReplayMatchingEntries(target));
 
-  const files = fs.readdirSync(resultsDir).filter(f => f.toLowerCase().endsWith('.xml'));
+  const files = discoveredFiles ?? fs.readdirSync(resultsDir).filter(f => f.toLowerCase().endsWith('.xml'));
   let added = 0;
   let updated = 0;
 
@@ -144,9 +145,14 @@ export function *syncSessionsIterator(
     pendingInserts.length = 0;
   }
   if (versionMismatch) {
+    // Retained sessions may be the only copy after LMU deletes their XML. Repair them in
+    // short transactions, leaving the old version in place until every batch commits.
+    const retainedIds = existingRows.map(row => row.id).filter(id => !parsedIds.has(id));
+    for (let index = 0; index < retainedIds.length; index += 10) {
+      db.transaction(() => host.reclassifyStoredSessions({ ids: retainedIds.slice(index, index + 10) }))();
+      yield { processed: files.length, total: files.length, currentFile: '', stage: 'Updating retained session classifications' };
+    }
     db.transaction(() => {
-      // Rows whose XML is gone are kept and reclassified: they are the only remaining copy.
-      host.reclassifyStoredSessions({ ids: existingRows.map(row => row.id).filter(id => !parsedIds.has(id)) });
       host.setMetadata('parser_version', DB_PARSER_VERSION);
       host.markSessionDataChanged();
     })();
@@ -187,7 +193,14 @@ export async function *syncSessionsAsyncIterator(
   parser: SessionXmlSyncParser,
   forceReparse = false
 ): AsyncGenerator<SessionSyncProgress, SyncResult, void> {
-  const iterator = syncSessionsIterator(host, resultsDir, parser, forceReparse);
+  let files: string[];
+  try {
+    files = (await fs.promises.readdir(resultsDir)).filter(file => file.toLowerCase().endsWith('.xml'));
+  } catch (error: unknown) {
+    if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
+    files = [];
+  }
+  const iterator = syncSessionsIterator(host, resultsDir, parser, forceReparse, files);
   let step = iterator.next();
   while (!step.done) {
     yield step.value;

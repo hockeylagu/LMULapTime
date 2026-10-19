@@ -1,5 +1,35 @@
 # Endpoint performance history
 
+## Page responses during scans and live discovery — 2026-10-19
+
+An isolated copy of the real cache compared the replay scan from Git HEAD with the working-tree fix,
+using the same production HTTP routers and 437 replay files. Five paired runs per page used the same
+queries with cached decoding skipped. Median full-response times during the scan:
+
+| Page API | Previous replay scan | Fixed replay scan | Idle |
+|---|---:|---:|---:|
+| Dashboard | 811.77 ms | 26.56 ms | 19.82 ms |
+| Tracks | 832.72 ms | 12.00 ms | 11.62 ms |
+| Sessions, page 1 | 612.20 ms | 3.72 ms | 3.61 ms |
+
+Median replay scan duration across the fifteen runs was 710.56 ms before / 741.54 ms after (+4.4%).
+This trades about 31 ms of scan completion time for serving page requests during the scan. These
+measurements cover backend responses, not browser rendering or first paint.
+
+Ten paired read-only directory scans of the 204 native telemetry files reused version-matched cached
+entries. Median scan duration was 10.70 ms before / 15.88 ms after; a callback scheduled before the
+scan ran after 10.71 ms before / 0.024 ms after. Previously it ran only after scanning finished;
+with the fix it ran while scanning was in progress. No DuckDB files were opened by this warm probe.
+
+Three real worker catalog runs each discovered all 19 app-owned live captures without errors, using
+read-only DuckDB handles. Median catalog duration was 685.05 ms; 45–46 main-thread callbacks ran
+during each catalog, with the longest interval 16.43 ms. Lifecycle tests also cover holding scans
+while a game session is loaded. This does not measure in-game capture throughput.
+
+Raw results and local runners are under `.cache/startup-validation/`. Regression tests cover cached
+telemetry responsiveness, invalidation during publication, and responsiveness during real live-worker
+discovery. Full validation: 3,291 tests passed, 56 skipped.
+
 ## Live telemetry file count — 2026-10-19
 
 Five-request sweeps before and after the indexed live-recording count used the same request cohort
@@ -8,6 +38,16 @@ and 1,041-session dataset totals. Status measured 4.02 ms median / 5.41 ms p95 b
 Snapshot hashes differ (`e3b1d3d50e24` and `cf115280a576`), so the harness withholds direct regression
 comparisons. Reports: `.cache/live-file-count-endpoints/history/`. Status counts available SQLite
 index rows; it performs no filesystem scan or DuckDB reads.
+
+## Cached replay startup responsiveness — 2026-10-19
+
+Replay discovery now uses asynchronous directory/stat reads and yields between cached metadata and
+driver-state checks. A five-request sweep on the isolated 1,041-session snapshot completed successfully:
+status measured 4.48 ms median / 6.22 ms p95; scan status measured 2.10 ms / 2.65 ms.
+Report: `.cache/startup-responsiveness-after/latest.md`. The pre-change attempt in
+`.cache/startup-responsiveness-before/` failed because sandboxed localhost requests were unavailable,
+so no before/after latency comparison is claimed. The harness disables scans; the replay sync
+regression test separately checks that event-loop callbacks run between cached recordings.
 
 ## Accepted live capture additions / normalization version 3 — 2026-10-18
 

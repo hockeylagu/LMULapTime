@@ -22,6 +22,9 @@ export default defineConfig({
   // LMU_UI_PORT / LMU_API_PORT let a second checkout (a worktree) run beside the main one.
   server: {
     port: Number(process.env.LMU_UI_PORT) || 5173,
+    warmup: {
+      clientFiles: ['./src/main.tsx', './src/components/dashboard/Dashboard.tsx'],
+    },
     watch: {
       // DuckDB recordings and temporary test databases can be exclusively locked on Windows.
       ignored: ['**/.tmp/**', '**/server/live-captures/**'],

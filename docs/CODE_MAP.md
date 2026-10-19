@@ -85,6 +85,10 @@ because active recordings can be exclusively locked on Windows.
   - Matches DuckDB files to sessions via session time spans and player identity.
   - Venue-only matching: official venue names without layout are layout-unspecified; explicit layout names must match the owner layout (`server/telemetry/telemetryMatcher.ts`).
 - **Background orchestration**:
+  - Cached replay discovery uses asynchronous directory/stat reads; metadata and driver-cache checks yield between recordings so a warm startup does not monopolize the HTTP event loop. SQLite coordination still runs on the main thread; parsing and decoding run in workers.
+  - Native telemetry discovery also uses asynchronous directory/stat reads and yields while publishing cached files. `TelemetryCatalog` finalizes SQLite metadata in batches of ten, checking scan generation after each yield so a superseded refresh cannot publish or prune newer state. App-owned live capture discovery remains in the recording worker and is held while recording.
+  - Startup XML discovery reads the directory asynchronously. Parser upgrades reclassify retained sessions in transactions of ten and yield through the scan pump; the parser version advances only after all batches commit. Final telemetry-owner updates also yield every ten sessions.
+  - Live XML reconciliation checks the compact capture index in one synchronous pass and publishes the one-to-one links in a transaction. File discovery and DuckDB reads remain in the recording worker. Withdrawal counting uses a map rather than repeatedly searching the capture list.
   - `src/api/useAppData.ts` coordinates client polling during active scans and upgrades. `/scan/status` exposes monotonic `dataRevision`. `/status` includes server instance identity and plugin revision.
   - Ingestion worker: `server/core/ingest/fileIngestWorker*.ts` parses XML and replay metadata in worker threads, returning unrated facts.
   - Worker port safety: every worker client checks messages with `isWorkerMessage` (`server/core/workerThreads.ts`) to ignore dev-mode watcher traffic (`watch:import`).
@@ -196,7 +200,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
 
 ### Cross-Cutting Architecture
 - **Dashboard benchmark pace**: `averageQualifiedBenchmarkPace` in `paceCategory.ts` averages each eligible group's lowest percentage (minimum 3 sessions) with equal group weighting.
-- **Client routing & code splitting** (`src/App.tsx`, `src/routePages.ts`): Pages load on demand via custom preload wrapper without `React.lazy` reveal-throttling. Recharts is excluded from the initial bundle (`vite.config.ts`).
+- **Client routing & code splitting** (`src/App.tsx`, `src/routePages.ts`): Pages load on demand via custom preload wrapper without `React.lazy` reveal-throttling. Development loads visited pages only; production prefetches the remaining pages while idle. Vite warms the entry point and dashboard during dev startup. Recharts is excluded from the initial bundle (`vite.config.ts`).
 - **Canonical contracts**: Centralized in `shared/types/` (`session.ts`, `reference.ts`, `replay.ts`, `leaderboard.ts`, `live.ts`, `trackGeometry.ts`, `dashboard.ts`, `status.ts`).
 - **Track geometry & surfaces**: `shared/types/trackGeometry.ts` defines map polygons, elevation/grade profiles, and revisions. Validated by `shared/domain/trackGeometry.ts`, stored in `server/tracks/trackGeometryStore.ts`, and served via `/api/data-plugin/tracks/:layoutKey`.
 - **Standardized dropdowns**: `src/components/common/dropdown/` (`Select.tsx`) is the sole single-choice selection control; it anchors fixed-position panels via `useAnchoredPanel.ts` and dismisses via `useOutsidePress`.

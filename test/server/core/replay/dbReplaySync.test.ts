@@ -19,6 +19,35 @@ describe('Replay startup sync pipeline', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
+  it('serves event-loop callbacks between cached replay discovery and driver checks', async () => {
+    for (const filename of ['a.Vcr', 'b.Vcr', 'c.Vcr']) fs.writeFileSync(path.join(dir, filename), 'cached');
+    let discovered = 0;
+    let verified = 0;
+    const discoveryTurns: number[] = [];
+    const verificationTurns: number[] = [];
+    vi.spyOn(db, 'getReplayMetadataCache').mockImplementation((filename, mtimeMs, fileSizeBytes, filePath) => {
+      discovered++;
+      setImmediate(() => discoveryTurns.push(discovered));
+      return { filename, filePath: filePath!, mtimeMs, fileSizeBytes, timeSliceCount: 0,
+        totalEvents: 0, durationSec: 0, drivers: [{ slot: 1, name: 'Other' }] };
+    });
+    const iterator = db.syncReplaysAsyncIterator(dir, {
+      playerName: 'Player',
+      onMetadataReady: () => new Set(['a.Vcr', 'b.Vcr', 'c.Vcr']),
+    });
+    vi.spyOn(db, 'hasValidReplayTrajectoryCache').mockReturnValue(true);
+    vi.spyOn(db, 'getReplayDriverIngest').mockImplementation(() => {
+      verified++;
+      setImmediate(() => verificationTurns.push(verified));
+      return null;
+    });
+    let step = await iterator.next();
+    while (!step.done) step = await iterator.next();
+    expect(discoveryTurns).toEqual([1, 2, 3]);
+    expect(step.value).toMatchObject({ added: 0, updated: 0 });
+    expect(verificationTurns).toEqual([2, 2, 4, 4, 6, 6]);
+  });
+
   it('retries a failed replay decode on Refresh without changing its source file', async () => {
     fs.writeFileSync(
       path.join(dir, 'retry.Vcr'),
