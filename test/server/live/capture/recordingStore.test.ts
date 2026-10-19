@@ -166,9 +166,16 @@ describe('LiveCaptureRecordingStore', () => {
       data: { corner: ['FL', 'FR', 'RL', 'RR'][index], rawName },
     }));
     expect((await writer.send(first)).type).toBe('persisted');
+    // The same writer reuses its dictionary: RMBLFLAT keeps its id, GRVL is defined once.
+    const same = makeBatch(1, { manifest: { ...first.manifest, lastElapsedSeconds: 1.03, samples: 3, updatedAt: first.manifest.updatedAt + 10 },
+      samples: sampleRows(1.03), observations: ['RMBLFLAT', 'GRVL'].map((rawName, index) => ({
+        source: 'shared-memory', kind: 'terrain-change', elapsedSeconds: 1.03, receivedAt: 110,
+        data: { corner: ['RL', 'FR'][index], rawName },
+      })) });
+    expect((await writer.send(same)).type).toBe('persisted');
     await writer.close();
     const resumed = await createWriter(directory);
-    const next = makeBatch(1, { manifest: { ...first.manifest, lastElapsedSeconds: 1.04, samples: 3, updatedAt: first.manifest.updatedAt + 20 },
+    const next = makeBatch(2, { manifest: { ...first.manifest, lastElapsedSeconds: 1.04, samples: 4, updatedAt: first.manifest.updatedAt + 20 },
       samples: sampleRows(1.04), observations: ['RDRACEOLD,ROAD,', 'GRVL'].map((rawName, index) => ({
         source: 'shared-memory', kind: 'terrain-change', elapsedSeconds: 1.04, receivedAt: 120,
         data: { corner: ['FL', 'RR'][index], rawName },
@@ -185,8 +192,8 @@ describe('LiveCaptureRecordingStore', () => {
       { materialId: 0, rawName: 'RDRACEOLD,ROAD,' }, { materialId: 1, rawName: 'RMBLFLAT' }, { materialId: 2, rawName: 'GRVL' },
     ]);
     expect(rows.filter(row => row.kind === 'terrain-change').map(row => (JSON.parse(row.data) as { materialId: number | null }).materialId))
-      .toEqual([0, 0, 1, null, 0, 2]);
-    expect(rows.map(row => row.id)).toEqual(Array.from({ length: 9 }, (_, index) => index));
+      .toEqual([0, 0, 1, null, 1, 2, 0, 2]);
+    expect(rows.map(row => row.id)).toEqual(Array.from({ length: 11 }, (_, index) => index));
   });
   it('retains the version-1 catalog and masks unverified wheel input instead of relabeling older recordings', async () => {
     const directory = await createDirectory();

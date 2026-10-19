@@ -1,18 +1,27 @@
 import type { LiveCaptureObservation } from '../../../shared/types/liveCapture.js';
 
 /** File-scoped dictionary definitions live with observations and survive reader/controller restarts. */
-export function internTerrainObservations(observations: LiveCaptureObservation[], definitions: string[]): LiveCaptureObservation[] {
+export function readTerrainDictionary(definitions: string[]): Map<string, number> {
   const materials = new Map<string, number>();
   const ids = new Set<number>();
-  let nextId = 0;
   for (const json of definitions) {
     const value: unknown = JSON.parse(json);
     if (!value || typeof value !== 'object' || !('rawName' in value) || typeof value.rawName !== 'string'
       || !('materialId' in value) || typeof value.materialId !== 'number' || !Number.isSafeInteger(value.materialId)
       || value.materialId < 0 || materials.has(value.rawName) || ids.has(value.materialId)) throw new Error('Invalid terrain dictionary');
     materials.set(value.rawName, value.materialId); ids.add(value.materialId);
-    nextId = Math.max(nextId, value.materialId + 1);
   }
+  return materials;
+}
+
+/**
+ * Replaces raw names with dictionary ids, defining new materials ahead of their first use. Returns the
+ * extended dictionary separately, so the caller adopts it only once the batch commits.
+ */
+export function internTerrainObservations(observations: LiveCaptureObservation[], dictionary: ReadonlyMap<string, number>):
+  { observations: LiveCaptureObservation[]; materials: Map<string, number> } {
+  const materials = new Map(dictionary);
+  let nextId = Math.max(-1, ...materials.values()) + 1;
   const result: LiveCaptureObservation[] = [];
   for (const observation of observations) {
     if (observation.source !== 'shared-memory' || observation.kind !== 'terrain-change') { result.push(observation); continue; }
@@ -31,5 +40,5 @@ export function internTerrainObservations(observations: LiveCaptureObservation[]
     }
     result.push({ ...observation, data: { corner: data.corner, materialId } });
   }
-  return result;
+  return { observations: result, materials };
 }

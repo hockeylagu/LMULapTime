@@ -13,7 +13,7 @@ import type {
   LiveCaptureObservation,
 } from '../../../shared/types/liveCapture.js';
 import { liveCaptureChannels } from './channels.js';
-import { internTerrainObservations } from './terrain.js';
+import { internTerrainObservations, readTerrainDictionary } from './terrain.js';
 
 const MAX_ROWS_PER_INSERT = 512;
 const MAX_CATALOG_FILES = 10_000;
@@ -280,6 +280,8 @@ export class LiveCaptureRecordingStore {
   private currentManifest: LiveCaptureManifest | null = null;
   private lastSequence = -1;
   private lastSampleElapsed: number | null = null;
+  /** The open file's terrain dictionary, read once on its first terrain change. */
+  private terrain: Map<string, number> | null = null;
   private closed = false;
 
   public constructor(private readonly directory: string) {}
@@ -461,10 +463,11 @@ export class LiveCaptureRecordingStore {
       throw new Error('Verified live capture session ownership cannot change');
     }
 
+    let terrain: Map<string, number> | null = null;
     await run(connection, 'BEGIN TRANSACTION');
     try {
       await this.insertSamples(connection, batch, checked.rowCount, priorManifest?.samples ?? 0);
-      await this.insertObservations(connection, batch, checked.observationData);
+      terrain = await this.insertObservations(connection, batch, checked.observationData);
       await run(connection,
         'UPDATE capture_manifest SET recording_id = ?, manifest_json = CAST(? AS JSON), updated_at = ? WHERE singleton = TRUE',
         [manifest.recordingId, stableManifest(manifest), manifest.updatedAt]);
@@ -478,6 +481,7 @@ export class LiveCaptureRecordingStore {
     }
     this.currentManifest = manifest;
     this.lastSequence = batch.sequence;
+    if (terrain) this.terrain = terrain;
     if (batchLast !== null) this.lastSampleElapsed = batchLast;
     return { manifest, bytes: this.fileBytes(target) };
   }
@@ -660,14 +664,23 @@ export class LiveCaptureRecordingStore {
     }
   }
 
-  private async insertObservations(connection: Connection, batch: LiveCaptureBatch, data: string[]): Promise<void> {
-    if (batch.observations.length === 0) return;
+  /** Returns the extended terrain dictionary when the batch defined materials; the caller adopts it after COMMIT. */
+  private async insertObservations(connection: Connection, batch: LiveCaptureBatch, data: string[]): Promise<Map<string, number> | null> {
+    if (batch.observations.length === 0) return null;
     let observations = batch.observations;
+    let terrain: Map<string, number> | null = null;
     if (observations.some(item => item.source === 'shared-memory' && item.kind === 'terrain-change')) {
-      const definitions = await all(connection, `SELECT CAST(data AS VARCHAR) AS data FROM capture_observations
-        WHERE source='recorder' AND kind='terrain-material' ORDER BY observation_id LIMIT 10001`);
-      if (definitions.length > 10_000) throw new Error('Terrain dictionary exceeds its 10,000-material bound');
-      observations = internTerrainObservations(observations, definitions.map(row => rowString(row, 'data')));
+      let dictionary = this.terrain;
+      if (!dictionary) {
+        const definitions = await all(connection, `SELECT CAST(data AS VARCHAR) AS data FROM capture_observations
+          WHERE source='recorder' AND kind='terrain-material' ORDER BY observation_id LIMIT 10001`);
+        if (definitions.length > 10_000) throw new Error('Terrain dictionary exceeds its 10,000-material bound');
+        dictionary = readTerrainDictionary(definitions.map(row => rowString(row, 'data')));
+      }
+      const interned = internTerrainObservations(observations, dictionary);
+      if (interned.materials.size > 10_000) throw new Error('Terrain dictionary exceeds its 10,000-material bound');
+      observations = interned.observations;
+      terrain = interned.materials;
       if (observations.length > 10_000) throw new Error('Expanded terrain observations exceed the batch limit');
       data = observations.map(serializeObservation);
     }
@@ -688,6 +701,7 @@ export class LiveCaptureRecordingStore {
       }
       await run(connection, sql, values);
     }
+    return terrain;
   }
 
   private runPrepared(statement: Statement, values: unknown[]): Promise<void> {
@@ -714,6 +728,7 @@ export class LiveCaptureRecordingStore {
     this.currentManifest = null;
     this.lastSequence = -1;
     this.lastSampleElapsed = null;
+    this.terrain = null;
     if (!connection && !database) return;
     let failure: unknown;
     if (connection) {
