@@ -61,6 +61,7 @@ export interface LiveVehicleReading {
   bestLapSector1: number;
   bestLapSector2: number;
   lapStartEt: number;
+  /** Engine estimate based on progress, NOT elapsed lap seconds. Never use as a clock or trace timestamp. */
   timeIntoLap: number;
   estimatedLapTime: number;
   inPits: boolean;

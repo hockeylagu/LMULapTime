@@ -109,7 +109,7 @@ export interface LiveTiming {
   /** Lap in progress (completed laps + 1). */
   lapNumber: number;
   sector: 1 | 2 | 3;
-  /** Time into the lap in progress, seconds (the running lap clock); null before the line on a grid. */
+  /** Elapsed game seconds since LapStartET, or observed departure on an out-lap; null without an anchor/before the grid line. */
   lapElapsedSeconds: number | null;
   /** Completed split sectors of the current lap; null until crossed (S3 moves into recentLaps at the finish). */
   sectors: [number | null, number | null, number | null];

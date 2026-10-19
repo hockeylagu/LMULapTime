@@ -498,7 +498,7 @@ describe('LiveService', () => {
       vi.advanceTimersByTime(PEDAL_FLUSH_MS);
       expect(timings(sink)).toHaveLength(1);
       expect(sink.data(timings(sink)[0])).toEqual({
-        lapNumber: 4, isOutLap: false, sector: 1, lapElapsedSeconds: expect.any(Number), sectors: [null, null, null], deltaSeconds: null, lapEstimate: null, sectorDeltas: [null, null, null], tyreSurfaceAvgC: null,
+        lapNumber: 4, isOutLap: false, sector: 1, lapElapsedSeconds: null, sectors: [null, null, null], deltaSeconds: null, lapEstimate: null, sectorDeltas: [null, null, null], tyreSurfaceAvgC: null,
       });
 
       // Two frames inside one interval: only the newest goes out, once the interval has passed.

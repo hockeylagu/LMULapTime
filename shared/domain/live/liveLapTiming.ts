@@ -19,6 +19,10 @@ interface CurrentLap {
   /** Laps completed when the lap started. */
   completedLaps: number;
   startSeconds: number | null;
+  /** A new counter must receive a newer anchor before its timing can be used. */
+  previousStartSeconds: number | null;
+  departureSeconds: number | null;
+  departureDistance: number;
   startedInPits: boolean;
   lastInPits: boolean;
   /** The lap was seen from (about) the line, so its trace is whole. False when the app joined mid-lap. */
@@ -75,7 +79,7 @@ export function activeSectorDelta(timing: Pick<LiveTiming, 'sector' | 'deltaSeco
  *   completed time and it did not start or end in the pits. Current-lap flags and trace coverage do not veto it.
  * - The session best is the fastest valid lap. Its distance->time trace is the reference for the live delta.
  *   Joining mid-session seeds the best lap time and sectors from the game's own best-lap fields, without a trace.
- * - `deltaSeconds` = time into the lap minus the reference time at the same lap distance (linear interpolation).
+ * - `deltaSeconds` = session elapsed time minus the lap-start anchor, minus the reference time at the same lap distance (linear interpolation).
  *   It is null without a reference, in the pit lane and on a lap that started in the pits (an out lap is not
  *   comparable). A lap that lost its time still shows a delta: the driver keeps driving it.
  * - `sectorDeltas` = the completed split sectors of the current lap minus those of the session-best lap.
@@ -86,6 +90,7 @@ export class LiveLapTiming {
   private lastEt = 0;
   private current: CurrentLap | null = null;
   private latest: LiveVehicleReading | null = null;
+  private elapsedSeconds: number | null = null;
   private records: LiveLapRecord[] = [];
   private best: LiveSessionBest | null = null;
   private reference: TracePoint[] | null = null;
@@ -97,6 +102,7 @@ export class LiveLapTiming {
     this.sessionKey = null;
     this.current = null;
     this.latest = null;
+    this.elapsedSeconds = null;
     this.records = [];
     this.best = null;
     this.reference = null;
@@ -114,8 +120,8 @@ export class LiveLapTiming {
     }
     this.lastEt = reading.currentEt;
     if (!this.current) this.startSession(player);
-    else if (player.totalLaps > this.current.completedLaps) this.completeLap(player, reading.trackLength);
-    if (this.current && this.addSample(this.current, player, reading.trackLength)) this.latest = player;
+    else if (player.totalLaps > this.current.completedLaps) this.completeLap(player, reading.trackLength, reading.currentEt);
+    if (this.current && this.addSample(this.current, player, reading)) this.latest = player;
   }
 
   /** Current-lap progress for the page; null before a player reading. */
@@ -145,7 +151,7 @@ export class LiveLapTiming {
       lapNumber: player.totalLaps + 1,
       isOutLap: lap.startedInPits,
       sector,
-      lapElapsedSeconds: Number.isFinite(player.timeIntoLap) && player.timeIntoLap >= 0 ? ms(player.timeIntoLap) : null,
+      lapElapsedSeconds: this.elapsedSeconds === null ? null : ms(this.elapsedSeconds),
       sectors: done,
       deltaSeconds: delta,
       lapEstimate,
@@ -154,9 +160,9 @@ export class LiveLapTiming {
   }
 
   private delta(player: LiveVehicleReading, lap: CurrentLap): number | null {
-    if (!this.reference || lap.startedInPits || player.inPits || player.timeIntoLap < 0 || player.lapDist < 0) return null;
+    if (!this.reference || lap.startedInPits || player.inPits || this.elapsedSeconds === null || player.lapDist < 0) return null;
     const reference = timeAt(this.reference, player.lapDist);
-    return reference === null ? null : ms(player.timeIntoLap - reference);
+    return reference === null ? null : ms(this.elapsedSeconds - reference);
   }
 
   private startSession(player: LiveVehicleReading): void {
@@ -172,10 +178,13 @@ export class LiveLapTiming {
     }
   }
 
-  private newLap(player: LiveVehicleReading, joinedMidLap: boolean): CurrentLap {
+  private newLap(player: LiveVehicleReading, joinedMidLap: boolean, previousStartSeconds: number | null = null): CurrentLap {
     return {
       completedLaps: player.totalLaps,
-      startSeconds: Number.isFinite(player.lapStartEt) && player.lapStartEt >= 0 ? player.lapStartEt : null,
+      startSeconds: null,
+      previousStartSeconds,
+      departureSeconds: null,
+      departureDistance: player.lapDist,
       startedInPits: player.inPits,
       lastInPits: player.inPits,
       fromStart: !joinedMidLap,
@@ -183,30 +192,55 @@ export class LiveLapTiming {
     };
   }
 
-  private addSample(lap: CurrentLap, player: LiveVehicleReading, trackLength: number): boolean {
+  private addSample(lap: CurrentLap, player: LiveVehicleReading, reading: LiveScoringReading): boolean {
     const last = lap.trace[lap.trace.length - 1];
-    // Position/time can roll over one scoring frame before totalLaps. Keep the completed trace intact
-    // and wait for the official counter instead of interpreting the timing-line wrap as a spin/reset.
-    if (last && trackLength > 0 && !player.inPits && last.dist > trackLength - MAX_GAP
-      && player.lapDist >= 0 && player.lapDist < MAX_START_DIST && player.timeIntoLap >= 0 && player.timeIntoLap < 2) return false;
-    if (Number.isFinite(player.lapStartEt) && player.lapStartEt >= 0) lap.startSeconds = player.lapStartEt;
+    // Position can cross the line a scoring frame before the lap counter. Keep the old trace and clock.
+    if (last && reading.trackLength > 0 && !player.inPits && last.dist > reading.trackLength - MAX_GAP
+      && player.lapDist >= 0 && player.lapDist < MAX_START_DIST) return false;
+    if (reading.gamePhase === 9) return true;
+    const now = reading.currentEt;
+    const anchor = player.lapStartEt;
+    const validAnchor = Number.isFinite(now) && Number.isFinite(anchor) && anchor >= 0 && anchor <= now
+      && !(lap.startedInPits && anchor === 0)
+      && (lap.previousStartSeconds === null || anchor > lap.previousStartSeconds);
+    if (validAnchor && anchor !== lap.startSeconds) {
+      // A late-settling lap anchor shifts every trace point onto the same clock.
+      if (lap.startSeconds !== null) {
+        const shift = lap.startSeconds - anchor;
+        for (const point of lap.trace) point.time += shift;
+        if (lap.trace.some(point => point.time < 0)) lap.fromStart = false;
+      }
+      lap.startSeconds = anchor;
+    }
+    if (!reading.inRealtime) {
+      lap.departureSeconds = null;
+      lap.departureDistance = player.lapDist;
+      if (player.inPits) { lap.startedInPits = true; lap.fromStart = false; lap.trace = []; }
+    } else if (lap.startedInPits && lap.departureSeconds === null
+      && Math.abs(player.lapDist - lap.departureDistance) > 0.5) {
+      // Initial out-lap has no timing-line anchor: start at the observed departure, in game seconds.
+      lap.departureSeconds = now;
+    }
+    const start = lap.startedInPits ? lap.departureSeconds : lap.startSeconds;
+    this.elapsedSeconds = start !== null && Number.isFinite(now) && now >= start && player.lapDist >= 0 ? now - start : null;
     lap.lastInPits = player.inPits;
-    if (player.timeIntoLap < 0 || player.lapDist < 0) return true;
+    if (this.elapsedSeconds === null || player.lapDist < 0) return true;
     if (!last) {
       if (player.lapDist > MAX_START_DIST) lap.fromStart = false;
-    } else if (player.lapDist < last.dist - REVERSE_TOLERANCE || player.lapDist - last.dist > MAX_GAP) {
+    } else if (player.lapDist < last.dist - REVERSE_TOLERANCE || player.lapDist - last.dist > MAX_GAP
+      || this.elapsedSeconds < last.time) {
       lap.fromStart = false;
     }
-    if (!last || player.lapDist > last.dist) lap.trace.push({ dist: player.lapDist, time: player.timeIntoLap });
+    if (!last || player.lapDist > last.dist) lap.trace.push({ dist: player.lapDist, time: this.elapsedSeconds });
     return true;
   }
 
-  private completeLap(player: LiveVehicleReading, trackLength: number): void {
+  private completeLap(player: LiveVehicleReading, trackLength: number, currentEt: number): void {
     const lap = this.current;
     if (!lap) return;
     const gameSeconds = positive(player.lastLapTime);
     const computed = player.totalLaps === lap.completedLaps + 1 && lap.startSeconds !== null
-      ? difference(Number.isFinite(player.lapStartEt) ? player.lapStartEt : null, lap.startSeconds) : null;
+      ? difference(Number.isFinite(player.lapStartEt) && player.lapStartEt <= currentEt ? player.lapStartEt : null, lap.startSeconds) : null;
     const seconds = gameSeconds ?? computed;
     const record: LiveLapRecord = {
       lapNumber: player.totalLaps,
@@ -218,7 +252,7 @@ export class LiveLapTiming {
     this.records.push(record);
     if (this.records.length > LIVE_RECENT_LAP_COUNT) this.records.shift();
     if (record.valid && seconds !== null) this.acceptValidLap(record, seconds, lap, trackLength);
-    this.current = this.newLap(player, false);
+    this.current = this.newLap(player, false, lap.startSeconds);
   }
 
   private acceptValidLap(record: LiveLapRecord, seconds: number, lap: CurrentLap, trackLength: number): void {

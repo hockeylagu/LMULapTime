@@ -6,7 +6,7 @@ import { scoringReading, vehicleReading } from '../../helpers/liveReadings.js';
 const TRACK = 10_000;
 /** The session clock: every reading is a second later than the one before. */
 let clock = 1000;
-const tick = (): number => ++clock;
+const anchors = new Map<number, number>();
 const S1 = 30;
 
 interface LapPlan {
@@ -27,12 +27,15 @@ interface LapPlan {
 /** Feeds one lap at 1 reading a second, then the reading right after the line that carries the game's last-lap fields. */
 function driveLap(timing: LiveLapTiming, plan: LapPlan, session = 10): void {
   const { seconds, completed, s2Cumulative = seconds * 0.6 } = plan;
-  for (let t = plan.joinAt ?? 0; t < seconds; t++) {
+  const existing = anchors.get(completed);
+  const origin = existing ?? clock + 1;
+  anchors.set(completed, origin);
+  for (let t = plan.joinAt ?? (existing === undefined ? 0 : Math.max(1, Math.floor(clock - origin) + 1)); t < seconds; t++) {
     const timeIntoLap = t;
     timing.update(scoringReading({
-      sessionCode: session, currentEt: tick(), trackLength: TRACK,
+      sessionCode: session, currentEt: clock = origin + t, trackLength: TRACK,
       player: vehicleReading({
-        totalLaps: completed, lapDist: (TRACK * t) / seconds, timeIntoLap,
+        lapStartEt: origin, totalLaps: completed, lapDist: (TRACK * t) / seconds, timeIntoLap,
         inPits: ((plan.inPits ?? false) && t < 5) || ((plan.endInPits ?? false) && t >= seconds - 2),
         countLapFlag: plan.loseFlagAt !== undefined && t >= plan.loseFlagAt ? 1 : 2,
         sector: t < S1 ? 1 : t < s2Cumulative ? 2 : 0,
@@ -40,17 +43,22 @@ function driveLap(timing: LiveLapTiming, plan: LapPlan, session = 10): void {
       }),
     }));
   }
+  anchors.set(completed + 1, origin + seconds);
   timing.update(scoringReading({
-    sessionCode: session, currentEt: tick(), trackLength: TRACK,
+    sessionCode: session, currentEt: clock = origin + seconds + 0.1, trackLength: TRACK,
     player: vehicleReading({
-      totalLaps: completed + 1, lapDist: 3, timeIntoLap: 0.1,
+      lapStartEt: origin + seconds, totalLaps: completed + 1, lapDist: 3, timeIntoLap: 0.1,
       lastLapTime: plan.loseFlagAt === undefined ? seconds : -1, lastSector1: S1, lastSector2: s2Cumulative,
     }),
   }));
 }
 
-function reading(player: Partial<LiveVehicleReading>, currentEt = tick()) {
-  return scoringReading({ currentEt, trackLength: TRACK, player: vehicleReading(player) });
+function reading(player: Partial<LiveVehicleReading>, currentEt?: number) {
+  const completed = player.totalLaps ?? 7;
+  const anchor = player.lapStartEt ?? anchors.get(completed) ?? clock + 1;
+  anchors.set(completed, anchor);
+  clock = currentEt ?? Math.max(clock + 0.2, anchor + (player.timeIntoLap ?? 20));
+  return scoringReading({ currentEt: clock, trackLength: TRACK, player: vehicleReading({ lapStartEt: anchor, ...player }) });
 }
 
 describe('activeSectorDelta', () => {
@@ -63,7 +71,65 @@ describe('activeSectorDelta', () => {
 });
 
 describe('LiveLapTiming', () => {
-  beforeEach(() => { clock = 1000; });
+  beforeEach(() => { clock = 1000; anchors.clear(); });
+
+  it('uses real elapsed time even when engine progress repeats at the same distance', () => {
+    const timing = new LiveLapTiming();
+    for (let t = 0; t < 100; t++) timing.update(scoringReading({ currentEt: 100 + t, trackLength: TRACK,
+      player: vehicleReading({ totalLaps: 0, lapStartEt: 100, lapDist: t * 100, timeIntoLap: t / 2 }) }));
+    timing.update(scoringReading({ currentEt: 200.1, trackLength: TRACK,
+      player: vehicleReading({ totalLaps: 1, lapStartEt: 200, lapDist: 5, timeIntoLap: 0.025, lastLapTime: 100 }) }));
+    timing.update(scoringReading({ currentEt: 223, trackLength: TRACK,
+      player: vehicleReading({ totalLaps: 1, lapStartEt: 200, lapDist: 2500, timeIntoLap: 12.5 }) }));
+    expect(timing.timing()).toMatchObject({ lapElapsedSeconds: 23, deltaSeconds: -2,
+      lapEstimate: { seconds: 98, source: 'distance' } });
+    timing.update(scoringReading({ currentEt: 232, trackLength: TRACK,
+      player: vehicleReading({ totalLaps: 1, lapStartEt: 200, lapDist: 2500, timeIntoLap: 12.5 }) }));
+    expect(timing.timing()).toMatchObject({ lapElapsedSeconds: 32, deltaSeconds: 7,
+      lapEstimate: { seconds: 107, source: 'distance' } });
+    // Stopping at the same distance still consumes real time; a distance-derived clock would freeze.
+    timing.update(scoringReading({ currentEt: 235, trackLength: TRACK,
+      player: vehicleReading({ totalLaps: 1, lapStartEt: 200, lapDist: 2500, timeIntoLap: 12.5 }) }));
+    expect(timing.timing()).toMatchObject({ lapElapsedSeconds: 35, deltaSeconds: 10,
+      lapEstimate: { seconds: 110, source: 'distance' } });
+  });
+
+  it('starts an unanchored out-lap on observed departure and advances in game seconds at pit speed', () => {
+    const timing = new LiveLapTiming();
+    const player = { totalLaps: 0, lapStartEt: 0, inPits: true, lapDist: 202.58, timeIntoLap: 3.223 };
+    timing.update(scoringReading({ currentEt: 27.8, inRealtime: false, player: vehicleReading(player) }));
+    timing.update(scoringReading({ currentEt: 29.8, player: vehicleReading(player) }));
+    expect(timing.timing()?.lapElapsedSeconds).toBeNull();
+    timing.update(scoringReading({ currentEt: 31, player: vehicleReading({ ...player, lapDist: 203.412, timeIntoLap: 3.236 }) }));
+    timing.update(scoringReading({ currentEt: 32, player: vehicleReading({ ...player, lapDist: 208.752, timeIntoLap: 3.318 }) }));
+    expect(timing.timing()).toMatchObject({ isOutLap: true, lapElapsedSeconds: 1, deltaSeconds: null });
+    timing.update(scoringReading({ currentEt: 33, player: vehicleReading({ ...player, lapDist: 208.752, timeIntoLap: 3.318 }) }));
+    expect(timing.timing()?.lapElapsedSeconds).toBe(2);
+    timing.update(scoringReading({ currentEt: 33, gamePhase: 9, player: vehicleReading(player) }));
+    expect(timing.timing()?.lapElapsedSeconds).toBe(2);
+    timing.update(scoringReading({ currentEt: 40, inRealtime: false, player: vehicleReading(player) }));
+    timing.update(scoringReading({ currentEt: 50, player: vehicleReading({ ...player, lapDist: 205 }) }));
+    expect(timing.timing()?.lapElapsedSeconds).toBe(0);
+    timing.update(scoringReading({ currentEt: 51, player: vehicleReading({ ...player, lapDist: 210 }) }));
+    expect(timing.timing()?.lapElapsedSeconds).toBe(1);
+  });
+
+  it('leaves unusable anchors unknown and waits for a newer anchor at the lap counter', () => {
+    const timing = new LiveLapTiming();
+    const sample = (currentEt: number, totalLaps: number, lapStartEt: number) => timing.update(scoringReading({
+      currentEt, player: vehicleReading({ totalLaps, lapStartEt, lapDist: 5, timeIntoLap: 0.1 }),
+    }));
+    sample(100, 2, 101);
+    expect(timing.timing()?.lapElapsedSeconds).toBeNull();
+    sample(101, 2, Number.NaN);
+    expect(timing.timing()?.lapElapsedSeconds).toBeNull();
+    sample(102, 2, 100);
+    expect(timing.timing()?.lapElapsedSeconds).toBe(2);
+    sample(200, 3, 100);
+    expect(timing.timing()?.lapElapsedSeconds).toBeNull();
+    sample(200.2, 3, 199.8);
+    expect(timing.timing()?.lapElapsedSeconds).toBe(0.4);
+  });
 
   it('trusts the completed game time despite a transient current-lap flag inherited near the start', () => {
     const timing = new LiveLapTiming();
@@ -129,9 +195,9 @@ describe('LiveLapTiming', () => {
     driveLap(timing, { seconds: 100, completed: 2, endInPits: true });
     driveLap(timing, { seconds: 99, completed: 3 });
     expect(timing.recentLaps.map(lap => lap.valid)).toEqual([false, false, true]);
-    // The lap that lost its time has no lap time (the game reports -1), its sectors are still the game's.
+    // An untimed lap is recovered from real lap-start anchors, but remains invalid.
     driveLap(timing, { seconds: 101, completed: 4, loseFlagAt: 10 });
-    expect(timing.recentLaps[2]).toMatchObject({ lapNumber: 5, lapSeconds: null, sectors: [30, 30.6, null], valid: false });
+    expect(timing.recentLaps[2]).toMatchObject({ lapNumber: 5, lapSeconds: 101, timeSource: 'lap-start', sectors: [30, 30.6, 40.4], valid: false });
   });
 
   it('keeps the best valid lap, its sectors, the best sectors over laps and the best possible lap', () => {
@@ -151,14 +217,14 @@ describe('LiveLapTiming', () => {
     const timing = new LiveLapTiming();
     expect(timing.timing()).toBeNull();
     driveLap(timing, { seconds: 100, completed: 0 });
-    // Same distance, 2 s later than the reference (which covers 100 m a second).
-    timing.update(reading({ totalLaps: 1, lapDist: 2_500, timeIntoLap: 27, sector: 1, curSector1: -1 }));
-    expect(timing.timing()).toMatchObject({ lapNumber: 2, sector: 1, deltaSeconds: 2,
-      lapEstimate: { seconds: 102, referenceSeconds: 100, deltaSeconds: 2, source: 'distance' } });
     // Between two trace samples: 1234.5 m is 12.345 s on the reference.
     timing.update(reading({ totalLaps: 1, lapDist: 1_234.5, timeIntoLap: 11.845, sector: 1 }));
     expect(timing.timing()?.deltaSeconds).toBeCloseTo(-0.5, 3);
     expect(timing.timing()?.lapEstimate).toEqual({ seconds: 99.5, referenceSeconds: 100, deltaSeconds: -0.5, source: 'distance' });
+    // Same distance, 2 s later than the reference (which covers 100 m a second).
+    timing.update(reading({ totalLaps: 1, lapDist: 2_500, timeIntoLap: 27, sector: 1, curSector1: -1 }));
+    expect(timing.timing()).toMatchObject({ lapNumber: 2, sector: 1, deltaSeconds: 2,
+      lapEstimate: { seconds: 102, referenceSeconds: 100, deltaSeconds: 2, source: 'distance' } });
   });
 
   it('marks an out lap from pit departure until the next timing line crossing', () => {
@@ -284,6 +350,7 @@ describe('LiveLapTiming', () => {
       timing => timing.update(null),
     ];
     for (const reset of resets) {
+      anchors.clear();
       const timing = new LiveLapTiming();
       driveLap(timing, { seconds: 100, completed: 0 });
       timing.update(reading({ totalLaps: 1 }));
