@@ -340,6 +340,7 @@ describe('ServerContext background session sync', () => {
     const telemetryCatalog = {
       getFiles: vi.fn(() => []),
       refresh: vi.fn(() => Promise.resolve(1)),
+      getScanStatus: vi.fn(() => ({ result: { total: 1, added: 0, updated: 0 } })),
     } as unknown as TelemetryCatalog;
     const context = createServerContext({
       resultsDir: '', replaysDir: '', telemetryDir: 'C:/lmu/telemetry', parser: new LmuParser(),
@@ -350,7 +351,7 @@ describe('ServerContext background session sync', () => {
     expect(telemetryCatalog.refresh).not.toHaveBeenCalled();
     await vi.runAllTimersAsync();
     expect(telemetryCatalog.refresh).toHaveBeenCalledWith('C:/lmu/telemetry');
-    expect(log).toHaveBeenCalledWith('[SQLite Cache] Found 1 DuckDB telemetry files from C:/lmu/telemetry');
+    expect(log).toHaveBeenCalledWith('[SQLite Cache] Synced 1 telemetry DuckDB files (0 new, 0 updated) from C:/lmu/telemetry');
     await vi.waitFor(() => expect(storedTelemetryLinks.linkTelemetryFiles).toHaveBeenCalled());
     expect(storedTelemetryLinks.linkTelemetryFiles).toHaveBeenCalled();
     // Candidates come from the file's time window, never from walking every stored session.
@@ -603,7 +604,7 @@ describe('telemetry ownership catalog lifetime', () => {
       const fullSessionsById = vi.spyOn(db, 'getSessionsByIds');
       const context = createServerContext({ resultsDir: '', replaysDir: '', telemetryDir: '',
         parser: new LmuParser(undefined, undefined, { detectPlayer: false }), sessionDb: db,
-        telemetryCatalog: { refresh: async () => 2 } as unknown as TelemetryCatalog,
+        telemetryCatalog: { refresh: async () => 2, getScanStatus: () => ({ result: { total: 2, added: 0, updated: 0 } }) } as unknown as TelemetryCatalog,
         replayRecordings: {} as ReplayRecordingService });
       context.runTelemetryScanInBackground();
       await vi.waitFor(() => expect(db.getSessionById('batch-24')?.duckdbFilename).toBe('batch-24.duckdb'));

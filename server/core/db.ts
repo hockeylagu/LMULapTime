@@ -1,3 +1,4 @@
+import { getAvailableLiveCaptureCount } from './live/dbLiveCaptureStore.js';
 import Database, { Database as DatabaseType } from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
@@ -687,7 +688,7 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     const replayTrajectoriesCount = (this.db.prepare('SELECT COUNT(*) as count FROM replay_trajectories').get() as { count: number }).count;
     const telemetryFilesCount = (this.db.prepare('SELECT COUNT(*) as count FROM telemetry_metadata').get() as { count: number }).count;
 
-    const liveTelemetryFilesCount = (this.db.prepare('SELECT COUNT(*) as count FROM live_capture_index WHERE available = 1').get() as { count: number }).count;
+    const liveTelemetryFilesCount = getAvailableLiveCaptureCount(this.db);
 
     let dbSizeBytes = 0;
     if (this.dbPath !== ':memory:' && fs.existsSync(this.dbPath)) {

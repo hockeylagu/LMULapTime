@@ -1,3 +1,4 @@
+import { CacheSyncLog } from './core/cacheSyncLog.js';
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -23,7 +24,7 @@ import { loadLiveSettings } from './live/liveSettings.js';
 import { queryLivePersonalBest } from './core/sessionSummaries/contextQueries.js';
 import { LiveCaptureController } from './live/capture/controller.js';
 import { LiveDiagnostics } from './live/capture/diagnostics.js';
-import { getLiveCaptureIndexRows, listLiveCaptureManifests, upsertLiveCapture } from './core/live/dbLiveCaptureStore.js';
+import { getAvailableLiveCaptureCount, getLiveCaptureIndexRows, indexLiveCaptureCatalog, listLiveCaptureManifests, upsertLiveCapture } from './core/live/dbLiveCaptureStore.js';
 import { reconcileLiveCaptures } from './live/capture/reconcile.js';
 import { createLiveEvidenceRouter } from './routes/liveEvidenceRoutes.js';
 import { refreshLiveLearning } from './live/learning/service.js';
@@ -83,6 +84,7 @@ const startReferenceLaptimeRefresh = (): void => {
 };
 
 const captureDirectory = path.resolve(process.env.LMU_LIVE_CAPTURE_DIR || path.join('server', 'live-captures'));
+const liveCaptureLog = new CacheSyncLog('live telemetry DuckDB files', captureDirectory);
 const automaticLearning = new AutomaticLearningRuntime(process.env.LMU_LIVE_LEARNING !== '0');
 const liveCapture = new LiveCaptureController({
   directory: captureDirectory,
@@ -90,15 +92,18 @@ const liveCapture = new LiveCaptureController({
   existing: () => listLiveCaptureManifests(sessionDb.getDb()),
   onPersist: (manifest, bytes) => {
     if (upsertLiveCapture(sessionDb.getDb(), manifest, bytes)) {
-      console.log(`[SQLite Cache] Found live telemetry DuckDB recording: ${manifest.filename}`);
+      const message = liveCaptureLog.format({
+        total: getAvailableLiveCaptureCount(sessionDb.getDb()), added: 1, updated: 0,
+      });
+      if (message) console.log(message);
     }
     if (manifest.status !== 'recording') void refreshLiveCaptureLinks();
   },
   onCatalog: (recordings, errors) => {
-    for (const { manifest, bytes } of recordings) {
-      if (upsertLiveCapture(sessionDb.getDb(), manifest.status === 'recording' ? { ...manifest, status: 'interrupted' } : manifest, bytes)) {
-        console.log(`[SQLite Cache] Found live telemetry DuckDB recording: ${manifest.filename}`);
-      }
+    const result = indexLiveCaptureCatalog(sessionDb.getDb(), recordings);
+    const message = liveCaptureLog.format(result);
+    if (message) console.log(message);
+    for (const { manifest } of recordings) {
       sessionDb.clearIngestError('live-capture', path.join(captureDirectory, manifest.filename));
     }
     for (const entry of errors) sessionDb.recordIngestError('live-capture', path.join(captureDirectory, entry.filename), new Error(entry.error));
@@ -145,11 +150,12 @@ if (process.env.NODE_ENV === 'test') {
   // The first scan waits for the live reader's first answer: a server started mid-session must not read
   // the files LMU is still writing. A reader that never answers delays it 5 s at most.
   liveService.start();
+  // Discover live files once the XML/replay/native telemetry discovery pass is complete.
+  // The first reader answer only releases that pass; it must not start a second live catalog scan.
   serverContext.events.on('scan-finished', () => { void refreshLiveCaptureLinks(true); });
   process.once('exit', () => { void liveService.stop(); });
   const readerTimeout = new Promise<void>(resolve => { setTimeout(resolve, 5000).unref(); });
   void Promise.race([liveService.firstReading, readerTimeout]).then(() => serverContext.runInitialSessionSyncInBackground());
-  void liveService.firstReading.then(() => refreshLiveCaptureLinks(true));
   const captureRefreshTimer = setInterval(() => { void refreshLiveCaptureLinks(); }, 30_000);
   captureRefreshTimer.unref();
 }

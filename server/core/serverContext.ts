@@ -1,3 +1,4 @@
+import { formatCacheSyncLog } from './cacheSyncLog.js';
 import fs from 'fs';
 import { randomUUID } from 'node:crypto';
 import { FileIngestWorker } from './ingest/fileIngestWorkerClient.js';
@@ -388,8 +389,7 @@ export class ServerContext {
     pumpScanInBackground(iterator, this.replayScanStatus, outcome => {
       void (async () => {
         if ('result' in outcome) {
-          const { total, added, updated, skipped } = outcome.result;
-          console.log(`[SQLite Cache] Cached ${total} replays (${added} new, ${updated} updated, ${skipped} skipped) from ${replaysDir}`);
+          console.log(formatCacheSyncLog('replays', replaysDir, outcome.result));
           try {
             await this.reconcileSessionReplayLinks();
           } catch (err) {
@@ -478,8 +478,7 @@ export class ServerContext {
     pumpScanInBackground(iterator, status, outcome => {
       void worker.close();
       if ('result' in outcome) {
-        const { total, added, updated } = outcome.result;
-        console.log(`[SQLite Cache] Loaded ${total} sessions (${added} new, ${updated} updated) from ${resultsDir}`);
+        console.log(formatCacheSyncLog('XML sessions', resultsDir, outcome.result));
       } else {
         console.warn('[SQLite Cache] Initial sync warning:', outcome.error);
       }
@@ -506,7 +505,10 @@ export class ServerContext {
     }
     const telemetryDir = this.currentTelemetryDir;
     void this.telemetryCatalog.refresh(telemetryDir).then(async (count) => {
-      console.log(`[SQLite Cache] Found ${count} DuckDB telemetry files from ${telemetryDir}`);
+      const result = this.telemetryCatalog.getScanStatus().result;
+      console.log(formatCacheSyncLog('telemetry DuckDB files', telemetryDir, {
+        total: count, added: result?.added ?? 0, updated: result?.updated ?? 0,
+      }));
       await this.reconcileTelemetryOwnership();
     }).catch((error: unknown) => {
       // The catalog records the failure as an ingest error.

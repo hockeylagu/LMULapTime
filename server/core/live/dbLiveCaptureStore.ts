@@ -1,7 +1,13 @@
+import { isDeepStrictEqual } from 'node:util';
 import type { Database } from 'better-sqlite3';
 import type { LiveCaptureManifest, SessionLiveCapture } from '../../../shared/types/liveCapture.js';
 
 export const LIVE_CAPTURE_MATCH_RULE_VERSION = 1;
+
+/** Available raw files only; retained provenance for deleted recordings is excluded. */
+export function getAvailableLiveCaptureCount(db: Database): number {
+  return (db.prepare('SELECT COUNT(*) as count FROM live_capture_index WHERE available = 1').get() as { count: number }).count;
+}
 
 /** Cheap hint for player telemetry requests; full identity/clock checks belong to the evidence reader. */
 export function hasVerifiedLiveCapture(db: Database, sessionId: string, driverOrdinal: number): boolean {
@@ -57,6 +63,26 @@ export function upsertLiveCapture(db: Database, manifest: LiveCaptureManifest, b
     manifest.startedAt, manifest.endedAt, Date.now(),
   );
   return available && (!current || current.available === 0);
+}
+
+/** Summarize directory discovery without treating every unchanged manifest as an update. */
+export function indexLiveCaptureCatalog(db: Database, recordings: Array<{ manifest: LiveCaptureManifest; bytes: number }>): {
+  total: number; added: number; updated: number;
+} {
+  const previous = new Map(getLiveCaptureIndexRows(db).map(row => [row.manifest.recordingId, row]));
+  let added = 0;
+  let updated = 0;
+  db.transaction(() => {
+    for (const { manifest, bytes } of recordings) {
+      const before = previous.get(manifest.recordingId);
+      const normalized = { ...manifest, status: manifest.status === 'recording' ? 'interrupted' as const : manifest.status };
+      if (upsertLiveCapture(db, normalized, bytes)) added++;
+      else if (before && (before.bytes !== bytes || !isDeepStrictEqual(before.manifest, {
+        ...normalized, sessionId: before.manifest.sessionId, gameVersion: before.manifest.gameVersion,
+      }))) updated++;
+    }
+  })();
+  return { total: recordings.length, added, updated };
 }
 
 export function getSessionLiveCaptures(db: Database, sessionId: string): SessionLiveCapture[] {

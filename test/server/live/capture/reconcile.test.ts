@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { SessionDatabase } from '../../../../server/core/db.js';
-import { getSessionLiveCaptures, listLiveCaptureManifests, setLiveCaptureAvailability, upsertLiveCapture } from '../../../../server/core/live/dbLiveCaptureStore.js';
+import { getSessionLiveCaptures, indexLiveCaptureCatalog, listLiveCaptureManifests, setLiveCaptureAvailability, upsertLiveCapture } from '../../../../server/core/live/dbLiveCaptureStore.js';
 import { reconcileLiveCaptures } from '../../../../server/live/capture/reconcile.js';
 import type { LiveCaptureManifest } from '../../../../shared/types/liveCapture.js';
 
@@ -63,6 +63,19 @@ function manifest(overrides: Partial<LiveCaptureManifest> = {}): LiveCaptureMani
 }
 
 describe('live capture XML reconciliation', () => {
+  it('summarizes startup discovery, unchanged scans, updates and restored files', () => {
+    const db = database();
+    const raw = db.getDb();
+    const entry = { manifest: manifest(), bytes: 4096 };
+    expect(indexLiveCaptureCatalog(raw, [entry])).toEqual({ total: 1, added: 1, updated: 0 });
+    expect(indexLiveCaptureCatalog(raw, [entry])).toEqual({ total: 1, added: 0, updated: 0 });
+    const changed = { ...entry, bytes: 8192 };
+    expect(indexLiveCaptureCatalog(raw, [changed])).toEqual({ total: 1, added: 0, updated: 1 });
+    setLiveCaptureAvailability(raw, entry.manifest.recordingId, false);
+    expect(indexLiveCaptureCatalog(raw, [changed])).toEqual({ total: 1, added: 1, updated: 0 });
+    expect(indexLiveCaptureCatalog(raw, [])).toEqual({ total: 0, added: 0, updated: 0 });
+  });
+
   it('reports only newly available recordings and counts available files independently of XML links', () => {
     const db = database();
     const raw = db.getDb();
