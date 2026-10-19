@@ -1,5 +1,14 @@
 # Endpoint performance history
 
+## Live telemetry file count — 2026-10-19
+
+Five-request sweeps before and after the indexed live-recording count used the same request cohort
+and 1,041-session dataset totals. Status measured 4.02 ms median / 5.41 ms p95 before and 4.22 ms /
+5.82 ms after. Replay-cache remains the slowest measured endpoint (294.92 ms median after).
+Snapshot hashes differ (`e3b1d3d50e24` and `cf115280a576`), so the harness withholds direct regression
+comparisons. Reports: `.cache/live-file-count-endpoints/history/`. Status counts available SQLite
+index rows; it performs no filesystem scan or DuckDB reads.
+
 ## Accepted live capture additions / normalization version 3 — 2026-10-18
 
 Twenty-request sweeps used the same snapshot (`b272a4960f76`), cohort and runtime/plugin environment
