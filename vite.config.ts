@@ -23,8 +23,8 @@ export default defineConfig({
   server: {
     port: Number(process.env.LMU_UI_PORT) || 5173,
     watch: {
-      // Temporary test databases can be exclusively locked by DuckDB on Windows.
-      ignored: ['**/.tmp/**'],
+      // DuckDB recordings and temporary test databases can be exclusively locked on Windows.
+      ignored: ['**/.tmp/**', '**/server/live-captures/**'],
     },
     proxy: {
       '/api': {

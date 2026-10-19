@@ -25,6 +25,9 @@ reports the source version. See [wheel evidence and mappings](plans/WHEEL_CAPTUR
 
 Contracts and pipeline specifications: [Live capture reference](LIVE_CAPTURE_FORMAT.md) and [Live session evidence plan](plans/LIVE_SESSION_EVIDENCE.md).
 
+Vite and the TSX development watcher exclude `server/live-captures/`, including DuckDB WAL files,
+because active recordings can be exclusively locked on Windows.
+
 | Owner | Responsibility |
 |---|---|
 | `server/live/capture/controller.ts`, `recordingWorker.ts`, `recordingStore.ts` | Bounded player capture, worker-owned DuckDB writes and recovery |
