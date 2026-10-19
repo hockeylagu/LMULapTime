@@ -10,13 +10,13 @@ import type { LiveEvidenceReadRequest } from '../../../../shared/types/liveEvide
 const folders: string[] = [];
 afterEach(async () => { for (const folder of folders.splice(0)) await rm(folder, { recursive: true, force: true }); });
 
-async function recording(largeObservations = false): Promise<LiveEvidenceReadRequest> {
+async function recording(largeObservations = false, normalizationVersion = 1): Promise<LiveEvidenceReadRequest> {
   const directory = await mkdtemp(path.join(tmpdir(), 'lmu-evidence-reader-'));
   folders.push(directory);
   const id = '83b74549-3e4c-4471-99ec-a6a4dca178b5';
   const manifest: LiveCaptureManifest = {
     recordingId: id, filename: `${id}.live.duckdb`, source: 'live-capture', schemaVersion: 1,
-    normalizationVersion: 1, signConvention: 'iso8855', layoutKey: 'monza_gp', trackName: 'Monza',
+    normalizationVersion, signConvention: 'iso8855', layoutKey: 'monza_gp', trackName: 'Monza',
     driverName: 'Fixture Driver', vehicleName: 'Ferrari 296 GT3', vehicleModel: 'Ferrari 296 GT3', carClass: 'GT3',
     sessionCode: 10, sessionKind: 'race', startedAt: 1800000000000, updatedAt: 1800000010000,
     firstElapsedSeconds: 100, lastElapsedSeconds: 102, endedAt: 1800000010000, status: 'completed',
@@ -54,13 +54,22 @@ async function recording(largeObservations = false): Promise<LiveEvidenceReadReq
 }
 
 describe('live evidence reader worker', () => {
+  it('reads version-2 wheel recordings while keeping the motion API limited to its six vehicle channels', async () => {
+    const evidence = await new LiveEvidenceReader().read(await recording(false, 2));
+    expect(evidence.normalizationVersion).toBe(2);
+    expect(evidence.channels).toHaveLength(6);
+    expect(evidence.channels.every(channel => channel.frame === 'iso8855-vehicle')).toBe(true);
+  });
   it('reads the exact anchored lap, retains ISO values and gaps, and keeps untimed REST evidence at session scope', async () => {
     const request = await recording();
     const evidence = await new LiveEvidenceReader().read(request);
     expect(evidence.channels).toHaveLength(6);
     expect(evidence.points.map(point => point.elapsedSeconds)).toEqual([100.02, 100.04, 100.5, 101]);
     expect(evidence.points[0].lapSeconds).toBeCloseTo(0.02, 10);
-    expect(evidence.points[0].values).toEqual([0, -1, null, null, null, 0.25]);
+    expect(evidence.points[0].values).toEqual([0, 1, null, null, null, -0.25]);
+    expect(evidence).toMatchObject({ normalizationVersion: 2, sourceNormalizationVersion: 1 });
+    const repeated = await new LiveEvidenceReader().read(request);
+    expect(repeated.points).toEqual(evidence.points); // No stored rewrite or second sign flip on a later read.
     expect(evidence.coverage.gaps).toHaveLength(2);
     expect(evidence.coverage).toMatchObject({ recordingDroppedSamples: 3, lastLapSeconds: 1 });
     expect(evidence.observations.map(item => item.kind)).toEqual(['scoring']);

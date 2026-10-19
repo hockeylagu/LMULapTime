@@ -1,6 +1,6 @@
 import type { LiveCaptureSample } from '../../../shared/types/liveCapture.js';
 import { LIVE_CAPTURE_CHANNELS } from './channels.js';
-import { VEHICLE_TELEMETRY } from '../rf2Layout.js';
+import { VEHICLE_TELEMETRY, WHEEL } from '../rf2Layout.js';
 
 const SAMPLE_VALUE_COUNT = LIVE_CAPTURE_CHANNELS.length;
 
@@ -21,15 +21,29 @@ export function decodeLiveCaptureSample(slot: Buffer): LiveCaptureSample | null 
   const values = new Float64Array(SAMPLE_VALUE_COUNT);
   values.fill(Number.NaN);
 
-  // ISO 8855 vehicle axes are forward, left, up. LMU local axes are right, up, back.
+  // The producer defines left/up/back in a left-handed frame; ISO is forward/left/up.
   values[0] = finiteOrNaN(-slot.readDoubleLE(at.localVel + 2 * 8));
-  values[1] = finiteOrNaN(-slot.readDoubleLE(at.localVel));
+  values[1] = finiteOrNaN(slot.readDoubleLE(at.localVel));
   values[2] = finiteOrNaN(slot.readDoubleLE(at.localVel + 8));
 
-  // Angular velocity is an axial vector; this mapping is the same proper rotation as velocity.
-  values[3] = finiteOrNaN(-slot.readDoubleLE(at.localRot + 2 * 8));
+  // Axial vectors also change handedness: raw +X pitches up, +Y yaws right, +Z rolls right.
+  values[3] = finiteOrNaN(slot.readDoubleLE(at.localRot + 2 * 8));
   values[4] = finiteOrNaN(-slot.readDoubleLE(at.localRot));
-  values[5] = finiteOrNaN(slot.readDoubleLE(at.localRot + 8));
+  values[5] = finiteOrNaN(-slot.readDoubleLE(at.localRot + 8));
+
+  for (let corner = 0; corner < 4; corner++) {
+    const wheel = at.wheels + corner * WHEEL.size;
+    // Wheel lateral is already left-positive; longitudinal is back-positive and must be negated.
+    values[6 + corner * 2] = finiteOrNaN(slot.readDoubleLE(wheel + WHEEL.offsets.lateralPatchVel));
+    values[7 + corner * 2] = finiteOrNaN(-slot.readDoubleLE(wheel + WHEEL.offsets.longitudinalPatchVel));
+    values[14 + corner * 2] = finiteOrNaN(slot.readDoubleLE(wheel + WHEEL.offsets.lateralGroundVel));
+    values[15 + corner * 2] = finiteOrNaN(-slot.readDoubleLE(wheel + WHEEL.offsets.longitudinalGroundVel));
+    // ISO camber is outward-positive on BOTH sides, matching the producer (not a signed roll angle).
+    values[22 + corner] = finiteOrNaN(slot.readDoubleLE(wheel + WHEEL.offsets.camber));
+    // Current wheel orientation includes steering. ISO toe-in is positive: rightward points inward
+    // at a left wheel and outward at a right wheel. This is not the static garage alignment setting.
+    values[26 + corner] = finiteOrNaN(slot.readDoubleLE(wheel + WHEEL.offsets.toe) * (corner % 2 === 0 ? 1 : -1));
+  }
 
   return {
     elapsedSeconds,

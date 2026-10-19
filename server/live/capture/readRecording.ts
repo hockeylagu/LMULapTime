@@ -3,6 +3,7 @@ import type { DuckDbReader } from '../../telemetry/duckdbReader.js';
 import { LIVE_CAPTURE_CHANNELS } from './channels.js';
 
 import type { LiveCaptureObservation } from '../../../shared/types/liveCapture.js';
+import { LIVE_CAPTURE_NORMALIZATION_VERSION } from '../../../shared/types/liveCapture.js';
 import type { LiveEvidenceReadRequest, LiveLapEvidence, LiveEvidenceUnavailableReason, LiveEvidenceObservation } from '../../../shared/types/liveEvidence.js';
 import { LiveEvidenceReadError } from './readError.js';
 
@@ -62,7 +63,12 @@ export async function readLiveRecording(request: LiveEvidenceReadRequest): Promi
     if (samples.length > MAX_SAMPLES) fail('too-large', 'Lap exceeds the 50,000-sample read limit');
     const points = samples.map(row => ({ sampleIndex: Number(row.sample_index), elapsedSeconds: row.elapsed_seconds,
       lapSeconds: row.elapsed_seconds - startSeconds,
-      values: channels.map(channel => typeof row[channel.name] === 'number' && Number.isFinite(row[channel.name]) ? Number(row[channel.name]) : null) }));
+      values: channels.map(channel => {
+        const value = row[channel.name];
+        if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+        // Correct the old recording convention at the boundary without rewriting retained files.
+        return manifest.normalizationVersion === 1 && ['velocity_left_mps', 'roll_rate_radps', 'yaw_rate_radps'].includes(channel.name) ? -value : value;
+      }) }));
     const gaps: LiveLapEvidence['coverage']['gaps'] = [];
     for (let index = 1; index < points.length; index++) {
       const before = points[index - 1];
@@ -73,7 +79,9 @@ export async function readLiveRecording(request: LiveEvidenceReadRequest): Promi
     const timed = await readObservations(reader, startSeconds, end, false);
     const untimed = await readObservations(reader, startSeconds, end, true);
     return { source: 'live-capture', recordingId: manifest.recordingId, schemaVersion: manifest.schemaVersion,
-      normalizationVersion: manifest.normalizationVersion, signConvention: 'iso8855', gameVersion: manifest.gameVersion,
+      normalizationVersion: LIVE_CAPTURE_NORMALIZATION_VERSION,
+      ...(manifest.normalizationVersion !== LIVE_CAPTURE_NORMALIZATION_VERSION ? { sourceNormalizationVersion: manifest.normalizationVersion } : {}),
+      signConvention: 'iso8855', gameVersion: manifest.gameVersion,
       lapNumber, startSeconds, durationSeconds, channels: channels.map(channel => ({ name: channel.name, unit: channel.unit,
         frame: 'iso8855-vehicle', sourceField: channel.sourceField })), points, observations: timed.observations,
       sessionObservations: untimed.observations, observationsTruncated: timed.truncated || untimed.truncated,

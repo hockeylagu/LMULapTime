@@ -1,6 +1,7 @@
 /** App-owned complementary recordings; native LMU telemetry has a different schema/source identity. */
 export const LIVE_CAPTURE_SCHEMA_VERSION = 1;
-export const LIVE_CAPTURE_NORMALIZATION_VERSION = 1;
+/** Version 2 fixes left-handed vehicle-vector signs and enables normalized wheel channels. */
+export const LIVE_CAPTURE_NORMALIZATION_VERSION = 2;
 export const LIVE_CAPTURE_SOURCE = 'live-capture' as const;
 export const LIVE_CAPTURE_SAMPLE_WIDTH = 33;
 /** Normal transport bound plus reserved slots for initialization/finalization. */

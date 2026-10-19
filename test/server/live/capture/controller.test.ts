@@ -8,6 +8,7 @@ import type { CaptureWorker } from '../../../../server/live/capture/controller.j
 import type {
   LiveCaptureBatch, LiveCaptureManifest, LiveCaptureSample,
 } from '../../../../shared/types/liveCapture.js';
+import { LIVE_CAPTURE_NORMALIZATION_VERSION } from '../../../../shared/types/liveCapture.js';
 
 interface PostedMessage { message: unknown; transfer?: readonly ArrayBuffer[] }
 
@@ -78,7 +79,7 @@ function start(controller: LiveCaptureController, et = 100, game = snapshot()): 
 
 function priorManifest(overrides: Partial<LiveCaptureManifest> = {}, now = Date.now()): LiveCaptureManifest {
   return {
-    recordingId: 'previous-recording', source: 'live-capture', schemaVersion: 1, normalizationVersion: 1, signConvention: 'iso8855',
+    recordingId: 'previous-recording', source: 'live-capture', schemaVersion: 1, normalizationVersion: LIVE_CAPTURE_NORMALIZATION_VERSION, signConvention: 'iso8855',
     filename: 'prior.live.duckdb', layoutKey: 'sarthe:full', trackName: 'Circuit de la Sarthe', driverName: 'Driver',
     vehicleName: 'Ferrari 296 GT3', vehicleModel: null, carClass: 'GT3', sessionCode: 10, sessionKind: 'race',
     startedAt: now - 30_000, updatedAt: now - 10_000, firstElapsedSeconds: 90, lastElapsedSeconds: 100, endedAt: null,
@@ -91,6 +92,14 @@ function priorManifest(overrides: Partial<LiveCaptureManifest> = {}, now = Date.
 describe('LiveCaptureController', () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
+
+  it('starts a new attempt instead of appending wheel values to a version-1 interrupted recording', () => {
+    const previous = priorManifest({ normalizationVersion: 1 });
+    const { controller, writer } = makeController({ existing: [previous] });
+    start(controller);
+    expect(writer.batches()[0].manifest.recordingId).not.toBe(previous.recordingId);
+    expect(writer.batches()[0].manifest.normalizationVersion).toBe(2);
+  });
 
   it('owns audit checkpoints and finalizes the prior run before switching files', () => {
     const { controller, writer } = makeController();
@@ -121,7 +130,7 @@ describe('LiveCaptureController', () => {
     expect(controller.status()).toMatchObject({ state: 'recording', samples: 0 });
     expect(writer.unref).toHaveBeenCalledOnce();
     expect(writer.batches()[0].manifest).toMatchObject({
-      source: 'live-capture', schemaVersion: 1, normalizationVersion: 1, signConvention: 'iso8855',
+      source: 'live-capture', schemaVersion: 1, normalizationVersion: LIVE_CAPTURE_NORMALIZATION_VERSION, signConvention: 'iso8855',
       layoutKey: 'sarthe:full', sessionKind: 'race', driverName: 'Driver', vehicleName: 'Ferrari 296 GT3',
     });
 

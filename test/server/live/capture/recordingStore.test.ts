@@ -157,6 +157,17 @@ afterEach(async () => {
 });
 
 describe('LiveCaptureRecordingStore', () => {
+  it('retains the version-1 catalog and masks unverified wheel input instead of relabeling older recordings', async () => {
+    const directory = await createDirectory();
+    const writer = await createWriter(directory);
+    const batch = makeBatch();
+    batch.manifest.normalizationVersion = 1;
+    expect((await writer.send(batch)).type).toBe('persisted');
+    await writer.close();
+    expect(readInChild(path.join(directory, batch.manifest.filename))).toMatchObject({
+      wheelNull: true, manifest: { normalizationVersion: 1 },
+    });
+  });
   it('writes typed samples and sparse JSON evidence, then reopens read-only in a clean process', async () => {
     const directory = await createDirectory();
     const writer = await createWriter(directory);
@@ -174,7 +185,8 @@ describe('LiveCaptureRecordingStore', () => {
     expect(readback.samples).toBe('2');
     expect(readback.observations).toBe('1');
     expect(readback.velocity).toBe(0);
-    expect(readback.wheelNull).toBe(true);
+    // FL NaN stays NULL, while FR now carries its finite version-2 wheel measurement.
+    expect(readback.wheelNull).toBe(false);
     expect(readback.manifest).toEqual(batch.manifest);
   });
 

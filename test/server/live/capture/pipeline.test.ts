@@ -8,7 +8,8 @@ import { LiveService } from '../../../../server/live/liveService.js';
 import type { LiveWorker } from '../../../../server/live/liveService.js';
 import { LiveCaptureController } from '../../../../server/live/capture/controller.js';
 import { decodeLiveCaptureSample } from '../../../../server/live/capture/decode.js';
-import { VEHICLE_TELEMETRY } from '../../../../server/live/rf2Layout.js';
+import { VEHICLE_TELEMETRY, WHEEL } from '../../../../server/live/rf2Layout.js';
+import { LIVE_CAPTURE_CHANNELS } from '../../../../server/live/capture/channels.js';
 import { SessionDatabase } from '../../../../server/core/db.js';
 import { getLiveCaptureIndexRows, upsertLiveCapture } from '../../../../server/core/live/dbLiveCaptureStore.js';
 import { reconcileLiveCaptures } from '../../../../server/live/capture/reconcile.js';
@@ -39,6 +40,16 @@ it('persists recorded memory values through service, real worker, rediscovery an
       ['localRot', [-0.04272, -0.14548, 0.0212]]] as const) {
       values.forEach((value, index) => slot.writeDoubleLE(value, at[field] + index * 8));
     }
+    // Same saved frame, FL/FR/RL/RR. No input is reconstructed from a normalized result.
+    const rawWheels = [
+      [-0.4129, -1.8818, -0.4157, -23.9723, -0.03201, -0.02633],
+      [-0.4397, -1.6297, -0.4509, -24.224, -0.031, -0.0264],
+      [-0.1159, -0.7526, -0.1181, -23.9834, -0.02966, 0.00102],
+      [-0.1789, -1.1636, -0.1839, -24.2205, -0.02683, -0.00049],
+    ];
+    const wheelFields = ['lateralPatchVel', 'longitudinalPatchVel', 'lateralGroundVel', 'longitudinalGroundVel', 'camber', 'toe'];
+    rawWheels.forEach((wheel, corner) => wheel.forEach((value, field) =>
+      slot.writeDoubleLE(value, at.wheels + corner * WHEEL.size + WHEEL.offsets[wheelFields[field]])));
     service.start();
     reader.emit('message', { type: 'frame', scoring: scoringReading({ currentEt: 69.2,
       player: vehicleReading({ driverName: 'Fixture Driver', vehicleName: 'Ferrari 296 GT3' }) }),
@@ -54,14 +65,17 @@ it('persists recorded memory values through service, real worker, rediscovery an
     const output = execFileSync(process.execPath, ['-e', `
       const duckdb = require('duckdb');
       const db = new duckdb.Database(process.argv[1], duckdb.OPEN_READONLY);
-      db.all('SELECT velocity_forward_mps, velocity_left_mps, velocity_up_mps, roll_rate_radps, pitch_rate_radps, yaw_rate_radps, fl_patch_lateral_mps FROM capture_samples', (error, rows) => {
+      db.all('SELECT ${LIVE_CAPTURE_CHANNELS.map(channel => channel.name).join(', ')} FROM capture_samples', (error, rows) => {
         if (error) throw error;
         process.stdout.write(JSON.stringify(rows));
         db.close(() => {});
       });`, filename], { encoding: 'utf8' });
-    expect(JSON.parse(output)).toEqual([{ velocity_forward_mps: 24.0998, velocity_left_mps: -0.0003,
-      velocity_up_mps: 0.3096, roll_rate_radps: -0.0212, pitch_rate_radps: 0.04272,
-      yaw_rate_radps: -0.14548, fl_patch_lateral_mps: null }]);
+    const expected = [24.0998, 0.0003, 0.3096, 0.0212, 0.04272, 0.14548,
+      -0.4129, 1.8818, -0.4397, 1.6297, -0.1159, 0.7526, -0.1789, 1.1636,
+      -0.4157, 23.9723, -0.4509, 24.224, -0.1181, 23.9834, -0.1839, 24.2205,
+      -0.03201, -0.031, -0.02966, -0.02683, -0.02633, 0.0264, 0.00102, 0.00049];
+    expect(JSON.parse(output)).toEqual([Object.fromEntries(LIVE_CAPTURE_CHANNELS.map((channel, index) => [channel.name, expected[index]]))]);
+    expect(indexed[0].manifest.normalizationVersion).toBe(2);
     const discovered: string[] = [];
     const discovery = new LiveCaptureController({ directory, onPersist: () => {},
       onCatalog: (recordings, errors) => {

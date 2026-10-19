@@ -13,7 +13,7 @@ import type {
   LiveCaptureManifest,
   LiveCaptureObservation,
 } from '../../../shared/types/liveCapture.js';
-import { LIVE_CAPTURE_CHANNELS } from './channels.js';
+import { LIVE_CAPTURE_CHANNELS, liveCaptureChannels } from './channels.js';
 
 const MAX_ROWS_PER_INSERT = 512;
 const MAX_CATALOG_FILES = 10_000;
@@ -168,7 +168,7 @@ function validateManifest(manifest: LiveCaptureManifest): void {
   if (!validCaptureFilename(manifest.filename, manifest.recordingId)) throw new Error('Live capture filename must be a safe basename ending with its UUID and .live.duckdb');
   if (manifest.source !== LIVE_CAPTURE_SOURCE
     || manifest.schemaVersion !== LIVE_CAPTURE_SCHEMA_VERSION
-    || manifest.normalizationVersion !== LIVE_CAPTURE_NORMALIZATION_VERSION
+    || (manifest.normalizationVersion !== 1 && manifest.normalizationVersion !== LIVE_CAPTURE_NORMALIZATION_VERSION)
     || manifest.signConvention !== 'iso8855') throw new Error('Live capture schema signature does not match this build');
   requiredText(manifest.trackName, 'trackName');
   if (typeof manifest.driverName !== 'string') throw new Error('Invalid live capture driverName');
@@ -519,7 +519,7 @@ export class LiveCaptureRecordingStore {
           const metadataInsert = connection.prepare('INSERT INTO capture_metadata VALUES (?, ?)');
           for (const [key, value] of manifestMetadata(incoming)) await this.runPrepared(metadataInsert, [key, value]);
           const channelInsert = connection.prepare('INSERT INTO capture_channels VALUES (?, ?, ?, ?, ?, ?)');
-          for (const [ordinal, channel] of LIVE_CAPTURE_CHANNELS.entries()) {
+          for (const [ordinal, channel] of liveCaptureChannels(incoming.normalizationVersion).entries()) {
             await this.runPrepared(channelInsert, [ordinal, channel.name, channel.unit, channel.sourceField, channel.frame, channel.verified]);
           }
           await callbackPromise<void>(callback => metadataInsert.finalize(callback));
@@ -612,9 +612,10 @@ export class LiveCaptureRecordingStore {
     const channels = await all(connection,
       'SELECT ordinal, name, unit, source_field, frame, verified FROM capture_channels ORDER BY ordinal');
     if (channels.length !== LIVE_CAPTURE_CHANNELS.length) throw new Error('Live capture channel catalog has an incompatible size');
-    for (let index = 0; index < LIVE_CAPTURE_CHANNELS.length; index++) {
+    const expectedChannels = liveCaptureChannels(manifest.normalizationVersion);
+    for (let index = 0; index < expectedChannels.length; index++) {
       const stored = channels[index];
-      const expected = LIVE_CAPTURE_CHANNELS[index];
+      const expected = expectedChannels[index];
       if (stored.ordinal !== index || stored.name !== expected.name || stored.unit !== expected.unit
         || stored.source_field !== expected.sourceField || stored.frame !== expected.frame || stored.verified !== expected.verified) {
         throw new Error(`Live capture channel catalog mismatch at channel ${index}`);
@@ -637,6 +638,7 @@ export class LiveCaptureRecordingStore {
   }
 
   private async insertSamples(connection: Connection, batch: LiveCaptureBatch, rowCount: number, sampleOffset: number): Promise<void> {
+    const channels = liveCaptureChannels(batch.manifest.normalizationVersion);
     for (let start = 0; start < rowCount; start += MAX_ROWS_PER_INSERT) {
       const count = Math.min(MAX_ROWS_PER_INSERT, rowCount - start);
       const tuple = `(${Array(4 + LIVE_CAPTURE_CHANNELS.length).fill('?').join(', ')})`;
@@ -647,7 +649,7 @@ export class LiveCaptureRecordingStore {
         values.push(sampleOffset + row, batch.samples[offset], batch.samples[offset + 1], Number.isNaN(batch.samples[offset + 2]) ? null : batch.samples[offset + 2]);
         for (let channel = 0; channel < LIVE_CAPTURE_CHANNELS.length; channel++) {
           const value = batch.samples[offset + 3 + channel];
-          values.push(!LIVE_CAPTURE_CHANNELS[channel].verified || Number.isNaN(value) ? null : value);
+          values.push(!channels[channel].verified || Number.isNaN(value) ? null : value);
         }
       }
       await run(connection, sql, values);

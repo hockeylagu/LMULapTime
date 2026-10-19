@@ -25,6 +25,8 @@ export interface LiveLapEvidence {
   recordingId: string;
   schemaVersion: number;
   normalizationVersion: number;
+  /** Present when the stored recording uses an older convention than the normalized response. */
+  sourceNormalizationVersion?: number;
   signConvention: 'iso8855';
   gameVersion: string | null;
   lapNumber: number;

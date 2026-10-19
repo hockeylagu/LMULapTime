@@ -232,6 +232,7 @@ export class LiveCaptureController {
     const continuity = this.recoveryProbe?.reading ?? reading;
     const observedAt = this.recoveryProbe?.observedAt ?? now;
     const candidates = this.recoverable.filter(record => record.status !== 'completed'
+      && record.normalizationVersion === LIVE_CAPTURE_NORMALIZATION_VERSION
       && record.layoutKey !== null && record.trackName === reading.trackName
       && record.sessionCode === reading.sessionCode && record.driverName === (player.driverName ?? '')
       && record.vehicleName === player.vehicleName && record.lastElapsedSeconds <= continuity.currentEt
