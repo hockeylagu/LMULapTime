@@ -1,6 +1,6 @@
 # Live session evidence and learning — remaining work
 
-Reviewed 2026-10-18. Capture, XML attachment, aligned evidence, diagnostics, consolidated audit,
+Reviewed 2026-10-19. Capture, XML attachment, aligned evidence, diagnostics, consolidated audit,
 learning readiness and automatic correction lifecycle are implemented.
 See [Live capture reference](../LIVE_CAPTURE_FORMAT.md) for the current pipeline and contracts;
 [the archived foundation](archive/LIVE_SESSION_EVIDENCE_FOUNDATION.md) preserves the original design.
@@ -24,6 +24,15 @@ rain/sky/temperature/humidity/wind and average/maximum path wetness have capture
 Conditional extras (angular acceleration, duplicate higher-rate G, brake condition and detailed
 detachable-part state) still require distinct usefulness/coverage evidence; they are not silently
 included in the delivered core. Damage/weather learning consumers remain separate future work.
+
+## Latest practice evidence — 2026-10-19
+
+The [Bahrain Outer assessment](BAHRAIN_PRACTICE_VALIDATION.md) confirms verified XML/native ownership,
+all 34 populated finite channels, 68,234 samples with no reported drops, explained garage gaps,
+clock/speed consistency, terrain/impact/dent evidence and useful exit-error diagnostics. The driver
+confirmed the estimate and out-lap timer. Learning produced 16 eligible examples per resource;
+no model is active. These practice results support the delivered pipeline but do not close the
+race-weekend, independent physical wheel calibration, performance or prospective-learning gates.
 
 ## Remaining acceptance
 

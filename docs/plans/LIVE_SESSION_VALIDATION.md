@@ -99,6 +99,12 @@ symptoms pass driver-observed live validation. This confirmation does not establ
 HUD delta error bound or validate every pause, garage-return and timing-line edge case. Exact
 sector/HUD comparisons, race-weekend overhead and the other runbook gates remain separate.
 
+## Saved Bahrain practice assessment — 2026-10-19
+
+The [recorded assessment](BAHRAIN_PRACTICE_VALIDATION.md) identifies passed checks and limits for the
+latest BMW M4 GT3 practice. Use its remaining-check list to avoid repeating already captured evidence.
+Numeric presence is confirmed for all wheel fields; independent physical calibration remains separate.
+
 ## What the next session can establish
 
 - The normal app records six vehicle motion and 28 wheel channels, sparse impact/terrain/configuration/damage/pit/weather observations,
