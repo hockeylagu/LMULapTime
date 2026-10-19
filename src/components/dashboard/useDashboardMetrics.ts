@@ -138,12 +138,19 @@ export function useDashboardMetrics({
           if (lap.topSpeed && lap.topSpeed > maxTopSpeed) {
             maxTopSpeed = lap.topSpeed;
             maxTopSpeedTrack = displayTrack;
+            maxTopSpeedCar = p.carType ?? '';
           }
         }
         cleanLaps += selectCleanLapCandidates(laps).length;
       } else if (p.avgLapTime && completedLapsCount > 0) {
         totalDrivingSeconds += p.avgLapTime * completedLapsCount;
         cleanLaps += completedLapsCount;
+      }
+
+      if (!laps && 'maxTopSpeed' in p && typeof p.maxTopSpeed === 'number' && p.maxTopSpeed > maxTopSpeed) {
+        maxTopSpeed = p.maxTopSpeed;
+        maxTopSpeedTrack = displayTrack;
+        maxTopSpeedCar = p.carType ?? '';
       }
 
       const sessionDistanceKm = (trackMeters / 1000) * completedLapsCount;
@@ -205,6 +212,7 @@ export function useDashboardMetrics({
       totalDrivingSeconds,
       maxTopSpeed,
       maxTopSpeedTrack,
+      maxTopSpeedCar,
       averageBenchmarkPacePercentage,
       averageBenchmarkPaceCategory,
       practiceSessionsCount,

@@ -8,7 +8,7 @@ export interface DashboardBestPaceLap { sessionId?: string; percentage: number; 
 
 export interface DashboardMetrics {
   sessionsCount: number; totalLaps: number; cleanLaps: number; cleanLapsPercentage: number; totalDistanceKm: number; totalDrivingSeconds: number;
-  maxTopSpeed: number; maxTopSpeedTrack: string; averageBenchmarkPacePercentage: number | null;
+  maxTopSpeed: number; maxTopSpeedTrack: string; maxTopSpeedCar: string; averageBenchmarkPacePercentage: number | null;
   averageBenchmarkPaceCategory: PaceCategory | null; practiceSessionsCount: number; qualifyingSessionsCount: number;
   raceSessionsCount: number; raceWinsCount: number; racePodiumsCount: number; totalPitStops: number;
   rankedTracks: DashboardRankedTrack[]; rankedCars: DashboardRankedCar[]; bestTrackRefLaps: DashboardBestPaceLap[];

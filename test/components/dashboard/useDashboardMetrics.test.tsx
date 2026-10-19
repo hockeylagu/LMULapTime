@@ -90,6 +90,9 @@ describe('useDashboardMetrics', () => {
     const track = result.current.rankedTracks.find((t) => t.track === 'Algarve International Circuit');
     expect(track?.laps).toBe(5);
     expect(track?.km).toBeCloseTo((4653 / 1000) * 5, 5);
+    expect(result.current.maxTopSpeed).toBe(286);
+    expect(result.current.maxTopSpeedTrack).toBe('Algarve International Circuit');
+    expect(result.current.maxTopSpeedCar).toBe('Ferrari 499P');
   });
 
   it('requires three rated sessions before including a layout/class best pace', () => {

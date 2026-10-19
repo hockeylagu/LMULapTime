@@ -166,7 +166,7 @@ describe('compact dashboard queries', () => {
     expect(result.metrics).toMatchObject({
       sessionsCount: 2, totalLaps: 2, cleanLaps: 2, cleanLapsPercentage: 100,
       raceSessionsCount: 2, raceWinsCount: 2, racePodiumsCount: 2,
-      averageBenchmarkPacePercentage: null, averageBenchmarkPaceCategory: null, totalPitStops: 0,
+      maxTopSpeed: 250, maxTopSpeedTrack: 'Monza', maxTopSpeedCar: 'Ferrari 499P',
       rankedTracks: [{ track: 'Monza', laps: 2, km: 11.586 }],
       rankedCars: [{ car: 'Ferrari 499P', laps: 2, km: 11.586 }],
       bestTrackRefLaps: [{ sessionId: 'faster', percentage: 100, category: 'Alien', track: 'Monza', car: 'Ferrari 499P' }],

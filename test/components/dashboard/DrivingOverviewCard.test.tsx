@@ -84,4 +84,22 @@ describe('DrivingOverviewCard', () => {
     expect(facts).toHaveTextContent('Around the Earth63%');
     expect(facts).toHaveTextContent('Top speed · Circuit de la Sarthe332.0 km/h');
   });
+
+  it('includes the car in the top speed title tooltip', () => {
+    render(
+      <DrivingOverviewCard
+        sessionsCount={10}
+        totalLaps={50}
+        totalDistanceKm={200}
+        totalDrivingSeconds={3600}
+        maxTopSpeed={335.5}
+        maxTopSpeedTrack="Circuit de la Sarthe"
+        maxTopSpeedCar="Ferrari 499P"
+      />
+    );
+
+    const topSpeedLabel = screen.getByText(/Top speed/);
+    const topSpeedRow = topSpeedLabel.closest('[title]');
+    expect(topSpeedRow).toHaveAttribute('title', 'Circuit de la Sarthe · Ferrari 499P');
+  });
 });

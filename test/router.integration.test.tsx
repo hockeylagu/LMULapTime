@@ -15,7 +15,7 @@ function mockApi() {
       if (url.startsWith('/api/dashboard')) return Promise.resolve({ok:true,json:()=>Promise.resolve({
         revision:'test:1',sessions:[],total:1,page:1,pageSize:25,tracks:['Spa'],emptyCount:0,replayCount:0,
         metrics:{sessionsCount:1,totalLaps:5,cleanLaps:5,cleanLapsPercentage:100,totalDistanceKm:35,totalDrivingSeconds:600,
-          maxTopSpeed:0,maxTopSpeedTrack:'',averageBenchmarkPacePercentage:100.1,averageBenchmarkPaceCategory:'Alien',
+          maxTopSpeed:0,maxTopSpeedTrack:'',maxTopSpeedCar:'',averageBenchmarkPacePercentage:100.1,averageBenchmarkPaceCategory:'Alien',
           practiceSessionsCount:1,qualifyingSessionsCount:0,raceSessionsCount:0,raceWinsCount:0,racePodiumsCount:0,totalPitStops:0,
           rankedTracks:[{track:'Spa',laps:5,km:35}],rankedCars:[{car:'Ferrari 499P',laps:5,km:35}],bestTrackRefLaps:[]},
         trends:{hasData:false,driverName:'Player',latestOuting:null,todayActivity:null,recentPaceTrend:[],paceDelta:null,

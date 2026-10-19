@@ -27,7 +27,7 @@ export default defineConfig({
     },
     watch: {
       // DuckDB recordings and temporary test databases can be exclusively locked on Windows.
-      ignored: ['**/.tmp/**', '**/server/live-captures/**'],
+      ignored: ['**/.tmp/**', '**/server/live-captures/**', '**/test/**'],
     },
     proxy: {
       '/api': {

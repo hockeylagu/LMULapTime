@@ -15,6 +15,7 @@ export interface DrivingOverviewCardProps {
   cleanLapsPercentage?: number;
   maxTopSpeed?: number;
   maxTopSpeedTrack?: string;
+  maxTopSpeedCar?: string;
   averageBenchmarkPacePercentage?: number | null;
   averageBenchmarkPaceCategory?: PaceCategory | null;
   practiceSessionsCount?: number;
@@ -67,6 +68,7 @@ export const DrivingOverviewCard: React.FC<DrivingOverviewCardProps> = ({
   cleanLapsPercentage,
   maxTopSpeed,
   maxTopSpeedTrack,
+  maxTopSpeedCar,
   averageBenchmarkPacePercentage,
   averageBenchmarkPaceCategory,
   practiceSessionsCount,
@@ -80,6 +82,7 @@ export const DrivingOverviewCard: React.FC<DrivingOverviewCardProps> = ({
 }) => {
   const earth = earthFact(totalDistanceKm);
   const pace = getPaceCategoryStyle(averageBenchmarkPaceCategory);
+  const topSpeedTitle = [maxTopSpeedTrack, maxTopSpeedCar].filter(Boolean).join(' · ') || undefined;
 
   return (
     <SummaryCard
@@ -99,7 +102,7 @@ export const DrivingOverviewCard: React.FC<DrivingOverviewCardProps> = ({
       <div className="mt-2 border-t border-lmu-border/60 pt-1.5" data-testid="overview-fun-facts">
         {earth && <Row label="Around the Earth" title={`${Math.round(totalDistanceKm).toLocaleString()} km against a 40,075 km equator`}>{earth}</Row>}
         {maxTopSpeed && maxTopSpeed > 0 ? (
-          <Row label={<>Top speed{maxTopSpeedTrack && <span className="text-lmu-muted"> · {maxTopSpeedTrack}</span>}</>} title={maxTopSpeedTrack}>
+          <Row label={<>Top speed{maxTopSpeedTrack && <span className="text-lmu-muted"> · {maxTopSpeedTrack}</span>}</>} title={topSpeedTitle}>
             {maxTopSpeed.toFixed(1)} <span className="text-lmu-muted">km/h</span>
           </Row>
         ) : null}
