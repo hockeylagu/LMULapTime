@@ -1,17 +1,17 @@
 # 🏎️ Le Mans Ultimate Lap Time Analyzer — Agent Guidelines (AGENTS.md)
 
 Architectural standards, domain rules, and coding conventions for AI agents.
-> **Detailed code map & smells backlog**: [`docs/CODE_MAP.md`](docs/CODE_MAP.md). Format specs: `docs/XML_FORMAT.md`, `docs/VCR_FORMAT.md`, `docs/TELEMETRY_FORMAT.md`.
+> **Detailed code map & smells backlog**: [`docs/CODE_MAP.md`](docs/CODE_MAP.md). Format specs: `docs/XML_FORMAT.md`, `docs/VCR_FORMAT.md`, `docs/TELEMETRY_FORMAT.md`, `docs/LIVE_CAPTURE_FORMAT.md`, `docs/LMU_REST_API.md`.
 
 ---
 
 ## 1. Project Overview & Tech Stack
 
-Telemetry analytics, lap comparison, and race intelligence hub for **Le Mans Ultimate (LMU)** (rFactor 2 engine lineage). Ingests 100 Hz DuckDB telemetry, binary `.Vcr` replays, and XML session logs.
+Telemetry analytics, lap comparison, and race intelligence hub for **Le Mans Ultimate (LMU)** (rFactor 2 engine lineage). Ingests 100 Hz DuckDB telemetry, binary `.Vcr` replays, XML session logs, and live app capture streams (`*.live.duckdb`).
 
 - **Frontend**: React 19, TypeScript (strict), Vite 8, Tailwind CSS v4, Recharts, Lucide React, Hash routing (`HashRouter`).
-- **Backend**: Node.js + Express 5 (port 3001), Better-SQLite3 (WAL mode), DuckDB Node reader, Fast-XML-Parser, worker-thread VCR decoder, Google Gen AI SDK (`@google/genai`).
-- **Tools**: TSX telemetry recorder (`tools/telemetryRecorder.ts`), TSX analysis scripts (`tools/analysis/`).
+- **Backend**: Node.js + Express 5 (port 3001), Better-SQLite3 (WAL mode), DuckDB Node reader, Fast-XML-Parser, Koffi (rFactor 2 shared memory FFI), worker threads (VCR decoding, live recording, learning), Server-Sent Events (SSE), Google Gen AI SDK (`@google/genai`).
+- **Tools**: TSX telemetry recorder (`tools/telemetryRecorder.ts`), TSX analysis scripts (`tools/analysis/`), benchmark suites (`tools/benchmarks/`), data guard scripts (`tools/release/checkLocalData.mjs`).
 
 ---
 
@@ -20,24 +20,24 @@ Telemetry analytics, lap comparison, and race intelligence hub for **Le Mans Ult
 | Folder | Contents |
 |---|---|
 | `docs/` | Reverse-engineered specs, API docs, plans, and [`CODE_MAP.md`](docs/CODE_MAP.md) |
-| `server/core/` | SQLite coordinator (`db.ts`), schema (`dbSchema.ts`), modular stores (`db*Store.ts`), context |
-| `server/core/replay/` | Replay cache stores (metadata, trajectories, links, identity, upgrades, positions) |
+| `server/core/` | SQLite coordinator (`db.ts`), schema (`dbSchema.ts`), modular stores (`ingest/`, `live/`, `replay/`, `sessionRows/`, `sessionSummaries/`) |
+| `server/live/` | Live capture controller, RF2 shared memory reader, LMU REST poller, SSE streamer, learning runtime (`capture/`, `learning/`) |
 | `server/sessions/` | XML parser (`parser.ts`), lap classification, replay matching, pit stops, analytics |
 | `server/replay/` | Trajectory/telemetry services, upgrade runner, `decode/` (.Vcr decoding), `worker/` (worker thread) |
 | `server/telemetry/` | DuckDB 100 Hz reader, catalog, session links, coordinate fusion |
 | `server/traffic/` | Replay 5 Hz track position index and traffic spells |
 | `server/tracks/` | Track geometry, centerline projection, timing line cuts, station glitch repair |
-| `server/routes/` | Express domain routers (`ai`, `leaderboard`, `reference`, `replay`, `session`, `system`, `dataPlugin`) |
+| `server/routes/` | Express domain routers (`ai`, `leaderboard`, `live`, `liveEvidence`, `reference`, `replay`, `session`, `system`, `dataPlugin`), readiness gates |
 | `server/ai/`, `server/benchmarks/` | Gemini race engineer; Google Sheets alien benchmarks scraper and diff |
 | `server/plugins/` | Local package loaders for detailed track geometry and manufacturer assets |
 | `public/track-outlines/` | Bundled basic SVG illustrations (metric data stays in external local packages) |
-| `shared/domain/` | Deterministic domain engines (circuits, vehicles, laps, conditions, pace, pit stops, traffic, rivals) |
+| `shared/domain/` | Deterministic domain engines (circuits, vehicles, laps, conditions, pace, pit stops, traffic, rivals, `learning/`, `live/`, `sessionSummaries/`) |
 | `shared/types/` | Canonical TypeScript contracts (`index.ts` barrel, plus domain-specific type files) |
 | `src/api/` | Frontend API client and domain fetchers (sole bridge to server) |
-| `src/components/<feature>/` | UI features: `dashboard`, `session-list`, `session-detail`, `track-detail`, `leaderboard`, `replay`, `settings`, `common` |
+| `src/components/<feature>/` | UI features: `dashboard`, `track-summaries`, `session-list`, `session-detail`, `track-detail`, `leaderboard`, `replay`, `live`, `settings`, `navbar`, `vehicle`, `common` |
 | `src/utils/` | Client algorithms (corners, alignment, debrief, computed telemetry, theme tokens) |
 | `test/` | Mirrors source tree: `test/server/`, `test/components/`, `test/domain/`, `test/utils/`, `test/fixtures/` |
-| `tools/` | C# recorder and TSX correlation utilities |
+| `tools/` | TSX recorder (`telemetryRecorder.ts`), TSX analysis scripts, performance benchmarks (`benchmarks/`), and data guards (`release/`) |
 
 ---
 
@@ -71,6 +71,11 @@ Telemetry analytics, lap comparison, and race intelligence hub for **Le Mans Ult
 - **Session-Replay Matching**: Match strictly on layout, driver, and timestamp constraints (`replayMatching.ts`). Withdraw invalid links (`dbReplayLinkStore.ts`); never guess. Protect against reused replay filenames with collision versioning (`dbReplayIdentity.ts`).
 - **Timing Line Continuity**: Interpolate start/finish line crossings smoothly (`lapLineCut.ts`) without losing 4-corner channels or injecting zeroed samples. Repair station glitches (`stationGlitches.ts`).
 
+### G. Live Capture, Evidence & Online Learning Invariants
+- **Worker-Owned DuckDB Recording**: Active `.live.duckdb` capture files are exclusively owned and written by worker threads (`recordingWorker.ts`). The main thread and HTTP evidence readers must never write to active recordings; read operations use read-only handles or queue evidence reads to eliminate DuckDB file lock contention.
+- **Strict XML Reconciliation & Ownership**: Completed live captures are reconciled against official XML session logs (`reconcile.ts`, `dbLiveCaptureStore.ts`). Live evidence supplements and enriches telemetry data without overwriting official XML lap times or timing line definitions.
+- **Deterministic Online Learning & Acceptance Gates**: Learned model corrections (`shared/domain/learning/`, `server/live/learning/`) must pass acceptance calibration gates (`calibration.ts`, `evaluate.ts`) before being applied or committed to SQLite (`dbLiveLearningStore.ts`, `dbLearningModelStore.ts`). If a projection refresh fails or is discarded, existing committed models must continue serving without interruption.
+
 ---
 
 ## 4. Coding & Architecture Conventions
@@ -88,8 +93,9 @@ Telemetry analytics, lap comparison, and race intelligence hub for **Le Mans Ult
 
 ### Database Patterns (`server/core/db.ts` & Modular Stores)
 - Use **Better-SQLite3** with synchronous prepared statements and mandatory **WAL mode** (`PRAGMA journal_mode = WAL;`).
-- **Modular Stores**: One store module per table group in `server/core/` (`db<Name>Store.ts`) and `server/core/replay/`. Schema DDL in `dbSchema.ts`.
+- **Modular Stores**: Modular stores organized by table group in `server/core/` (`dbSessionStore.ts`, `dbSessionSync.ts`), `server/core/replay/`, `server/core/live/`, `server/core/sessionRows/`, and `server/core/sessionSummaries/`. Schema DDL in `dbSchema.ts`.
 - **Data Repairs**: Keep domain data rewrites out of schema initialization. Use versioned reparses or projection rebuilds with canonical domain logic; preserve sessions whose source files were deleted. Remove obsolete one-off migration scripts when the versioned path supersedes them, and review migration code whenever its schema changes.
+- **Summary Readiness Gate**: Return 503 on history endpoints while session summaries rebuild (`summaryReadiness.ts` checking `idx_sessions_ready`).
 - Use columnar tables for high-frequency telemetry. Parameterize all queries (`stmt.run(arg)`). Wrap bulk operations in `db.transaction(...)`.
 
 ### UI & Styling
