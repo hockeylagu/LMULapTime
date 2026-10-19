@@ -641,3 +641,21 @@ before the lap counter updates preserves the prior trace. Invalid lap durations 
 consecutive lap-start clocks, remain gray with computed provenance, and stay excluded from valid records.
 Checks: 3,262 tests passed, 56 skipped; production build passed without warnings. See
 [second practice and next-drive checks](LIVE_SESSION_VALIDATION.md#second-practice-and-approved-layout--2026-10-18).
+
+### Third-practice follow-up — 2026-10-18
+
+The reported fixed estimate remains pending live acceptance. Timing events now carry the complete
+estimate/reference/delta/source together; all production timing views render that value directly.
+Opt-in sidecars sample timing output and source clocks at most once a second for post-session
+investigation. Invalid-lap text is removed; gray times remain. See the
+[validation runbook](LIVE_SESSION_VALIDATION.md#third-practice-estimate-investigation--2026-10-18)
+for evidence limits and next-drive checks.
+
+### Elapsed-clock source correction — 2026-10-19
+
+Bahrain diagnostics established that `timeIntoLap` is estimated progress, not elapsed time. The
+running clock and reference traces now use `currentEt - lapStartEt`; out-laps use an observed
+local departure clock. Stale anchors, garage returns and pause/crossing transitions are guarded.
+A sanitized recorded-clock regression demonstrates changing gains/losses and estimates; corrected
+in-game acceptance remains pending. Verification: 3,267 tests passed, 56 skipped; build warning-free.
+See [the runbook](LIVE_SESSION_VALIDATION.md).

@@ -57,10 +57,14 @@ The rF2 numeric codes are the plugin's convention; LMU's use of them matched in 
 | Dashboard need | Shared memory | REST | Level |
 |---|---|---|---|
 | Last lap, sectors, best | `LastLapTime`, `LastSector1/2`, `BestLapTime`, `BestSector1/2`, `CurSector1/2` | `/rest/watch/standings` (live outside replay) | **Live** (app's 1:15.285 and split sectors match the HUD) |
-| Live delta | Computed from `LapDist`/`TimeIntoLap` vs own reference | — | Field (built; not compared on screen yet) |
+| Live delta | Computed from `LapDist` and `CurrentET - LapStartET` vs own elapsed-time reference | — | Recorded-clock regression verified; corrected HUD comparison pending |
 | Lap validity (quali) | `CountLapFlag` (a lap with a cut and a pit pass: `COUNT_LAP_ONLY`, no time, no sectors) | Standings `countLapFlag` | **Live** (a cut alone not separated yet) |
 | Laps left (header) and time left (horizons only); races are always timed, `MaxLaps` reads 2^32 - 1 and is not used | `TotalLaps`, `EndET`, `CurrentET`, the leader's `LapStartET` / `EstimatedLapTime` / `LapsBehindLeader` | `/rest/watch/sessionInfo` | REST seen in replay |
 | Next session length (garage screen between sessions: quali and race minutes, converted to laps) | — | `/rest/sessions/GetSessionsInfoForEvent` → `scheduledSessions[{name, lengthTime (min), airTemp, rainChance}]` (practice-only weekend listed `PRACTICE 120`; a full weekend listed PRACTICE 5, QUALIFYING 10, RACE 5 in every garage, 2026-10-17) | **Live**, used for the race garage length |
+
+`TimeIntoLap` is an engine estimate of progress, not an elapsed lap clock. It must not timestamp
+reference traces or supply the running timer/delta. An initial out-lap uses game seconds since
+observed departure; missing/future or stale crossing anchors do not fall back to `TimeIntoLap`.
 
 ### Fuel, energy and pit plan
 

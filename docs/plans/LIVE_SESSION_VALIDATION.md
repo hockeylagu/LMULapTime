@@ -52,6 +52,51 @@ behavior through pauses and crossings, and check a naturally invalidated lap's r
 The split-based estimate updates at sector crossings, not continuously. Race-weekend overhead and
 multi-session learning acceptance remain outstanding.
 
+## Third practice estimate investigation — 2026-10-18
+
+The driver confirmed that current-lap `VS BEST` changed while `ESTIMATED LAP` stayed at the best.
+Replaying saved REST inputs from recording `41cdc2d9-c498-43d7-9526-331dd1736876` produced
+changing local deltas and estimates; the original timing events were not recorded, so the exact
+live failure has not been reproduced or established as resolved.
+
+The backend now publishes `lapEstimate` with its seconds, reference seconds, delta and source in
+one timing event. Practice, qualifying and race views display that value directly rather than
+combining a timing event with a separately delivered snapshot reference. Tests cover changing
+positive/negative deltas, reference changes, split fallback and out-lap/missing states. The invalid
+lap text has been removed; gray styling and computed-time provenance remain.
+
+Opt-in diagnostics now retain a `lap-timing` output sample at most once per second, including the
+coherent estimate and the raw source clocks/distance. This adds no game polling. It records producer
+output, not browser receipt; next-drive acceptance still requires checking that the hero follows the
+current delta after a complete valid reference lap, including gains and losses. Restart the backend
+and reload the dashboard together so both use the updated timing contract.
+
+Verification: 3,263 tests passed, 56 skipped; production build passed without warnings.
+
+## Elapsed-clock correction — 2026-10-19
+
+Bahrain Outer recording `226abfa6-f2df-46b0-9109-30f5cde6b580` confirms the source clock mistake:
+`timeIntoLap` is estimated progress, not elapsed seconds. Of 485 timing outputs, 324 usable deltas
+on laps 3–7 ranged only from −0.005 to +0.002 s. One actual pit-departure game second advanced
+that field by only 0.082 s. Atomic delivery alone did not resolve this source error.
+
+Running lap time, live delta and reference-trace timestamps now use `currentEt - lapStartEt`.
+Out-laps use game seconds since the first observed movement over 0.5 m; this departure anchor has
+scoring-sample precision and never supplies a reference lap. Garage returns clear it. Pause readings
+hold timing; missing/future anchors remain unknown; a new lap waits for a newer anchor. Late-settling
+anchors shift all trace timestamps consistently. Timing-line wrap preserves the previous trace/clock.
+
+A sanitized fixture retains 485 raw clock/position samples. Reconstructing completed durations from
+consecutive line anchors yields 324 deltas from −1.035 to +4.481 s. At lap 5, position 2987.882 m,
+elapsed time is 62.342 s, delta +0.655 s and estimate 74.674 s. This verifies the offline algorithm,
+not HUD acceptance. Tests also cover fixed engine progress, stopping, gains/losses, pit-speed timing,
+pause/garage transitions and stale/future anchors.
+
+Verification: 3,267 tests passed, 56 skipped; production build passed without warnings.
+Next drive: restart the backend/reload the page, verify out-lap seconds advance normally, then check
+that estimates respond to gains/losses after a complete valid reference lap. Compare sector crossings
+with the HUD and retain the diagnostic sidecar.
+
 ## What the next session can establish
 
 - The normal app records six vehicle motion and 28 wheel channels, sparse impact/terrain/configuration/damage/pit/weather observations,

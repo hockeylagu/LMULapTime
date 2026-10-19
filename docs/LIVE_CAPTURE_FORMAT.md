@@ -136,6 +136,13 @@ Adjacent `*.diagnostics.jsonl` sidecars record existing REST requests/responses 
 failures, lifecycle, writer health and strategy context. Successful unchanged responses are deduplicated
 with periodic checkpoints; response bodies and asynchronous buffering are bounded. Player filtering
 avoids retaining the full opponent standings payload. Diagnostics add no REST requests.
+`lap-timing` records producer output at most once per second: timing fields, the atomic
+`lapEstimate` (seconds, reference seconds, delta seconds and distance/sector source), subscriber
+count and source session/lap clocks and distance. This does not confirm browser receipt. The
+estimate is delivered in the timing event; clients do not rebuild it from snapshot session best.
+The timer and distance-reference timestamps use `currentEt - lapStartEt`, not the engine's
+estimated `timeIntoLap` (retained only as raw diagnostic evidence). Initial out-laps use elapsed
+game time since observed movement away from the departure position, never a learning/reference lap.
 
 A two-minute post-session tail supports transient-error investigation. Gzip is deferred until after
 the session; a new active session defers pending compression. An already-running compression is not
