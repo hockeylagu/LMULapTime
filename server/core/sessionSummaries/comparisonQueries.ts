@@ -109,6 +109,13 @@ function comparisonScope(filters: CompactCompareFilters) {
 
 type PageLapFact = Pick<LapFact, 'session_id' | 'driver_ordinal' | 'lap_ordinal' | 'driver_name' | 'is_all_time_pb'>;
 
+/**
+ * Personal-best distinctions:
+ * - Gold badge (`is_all_time_pb`): fastest valid lap in the class across any car and condition.
+ * - Blue badge: session best.
+ * - Compare page `playerBestLap`: clean dry personal best.
+ * - "vs your best": fastest representative lap in the class.
+ */
 function markPagePersonalBests(db: DatabaseType, rows: PageLapFact[], display: QueryParts): void {
   if (!rows.length) return;
   const names = [...new Set(rows.map(row => row.driver_name.trim().toLowerCase()))];

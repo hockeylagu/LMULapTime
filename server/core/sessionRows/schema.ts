@@ -48,6 +48,10 @@ export function initSessionRowsSchema(db: DatabaseType): void {
 
   db.exec(`
     -- Legacy class-first indexes make layout-scoped boards traverse unrelated sessions.
+    -- Do not add an index that leads with driver_class or driver_id on session_drivers:
+    -- the query planner would then scan every driver of that class across all sessions
+    -- (measured ~520 ms vs ~5 ms starting from the layout index). Sessions of a layout are
+    -- resolved via idx_sessions_layout_timestamp, then their drivers by primary key.
     DROP INDEX IF EXISTS idx_session_drivers_class;
     CREATE TABLE IF NOT EXISTS session_recordings (
       session_id TEXT NOT NULL PRIMARY KEY, ${columnDefinitions(RECORDING_FIELDS)}

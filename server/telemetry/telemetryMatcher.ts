@@ -258,6 +258,8 @@ export function findDuckDbForReplay(
   for (const duck of duckdbFiles) {
     // 1. Check track match
     const duckCircuit = getCircuitSpecification(duck.trackName, undefined, duck.trackName);
+    // Native telemetry records the venue without a layout. Only an exact official venue
+    // name is unspecified; explicit layout names/keys must still agree with the owner.
     const venueOnly = duck.trackName.trim().toLowerCase() === duckCircuit.officialName.toLowerCase();
     if (duckCircuit.officialLengthMeters > 0 && replayCircuit.officialLengthMeters > 0) {
       if (venueOnly ? duckCircuit.circuitId !== replayCircuit.circuitId : duckCircuit.layoutKey !== replayCircuit.layoutKey) continue;

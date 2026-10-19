@@ -13,6 +13,11 @@ const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 const difference = (actual: number | null, predicted: number | null): number | null =>
   actual !== null && predicted !== null ? actual - predicted : null;
 
+/**
+ * Live strategy audit tracker: runs inside the capture controller.
+ * Storage and inspection contract: docs/LIVE_CAPTURE_FORMAT.md#consolidated-strategy-audit
+ */
+
 /** Records bounded checkpoints rather than every telemetry frame; never learns from its own predictions. */
 export class LiveAuditTracker {
   private runId: string | null = null;

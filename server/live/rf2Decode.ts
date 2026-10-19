@@ -60,6 +60,8 @@ function decodeVehicle(buffer: Buffer, base: number): LiveVehicleReading {
 /**
  * The scoring header and info followed by the vehicles that were copied, at their buffer offsets.
  * The player is the vehicle with `isPlayer` set, the leader the one in place 1.
+ * Resolves overall and player-class leaders independently using canonical class aliases (`knownCarClass`);
+ * class pace supplies the player's distance horizon, with overall flag timing preserved.
  */
 export function decodeScoring(buffer: Buffer): LiveScoringReading {
   const info = SCORING.info;
