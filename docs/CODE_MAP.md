@@ -209,6 +209,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   - `LiveEstimatedLap`: distinguishes out-laps from active line projections based on running deltas.
   - UI modes: `LiveRaceView`, `LiveQualiView`, `LivePracticeView`, `LivePracticeHistory`, `LivePedalTrace` (canvas rAF from `PedalBuffer` ring), `LiveRacePlan.tsx` (`raceColumns.ts`, `raceAction.ts`), `LiveGarageChecklist.tsx`, `LiveDamageRow.tsx`, and `LiveSessionReview.tsx`.
   - Offline demo mode: `demo/LiveDemoPage.tsx` (`#/live?demo=1`, scenarios in `demo/demoScenarios.ts`).
+  - API anonymization (`src/api/anonymizeData.ts`) is scoped to explicit `demo`/`anonymize` URL flags; browser storage cannot enable it. `useAppData` refreshes status on mode changes, and demo scans never save masked configuration.
 - **Server** (`server/live/`):
   - Shared memory reader: `rf2Layout.ts` defines rF2/LMU v3.x layout offsets; `rf2Decode.ts` performs coherent 3-attempt buffer reads, resolving overall and class leaders independently (`knownCarClass`). `sharedMemory.ts` accesses Windows file mappings via koffi. Tooling: `tools/telemetryRecorder.ts`.
   - Process lifecycle: `gameProcess.ts` monitors `Le Mans Ultimate.exe` via Windows Toolhelp handles.

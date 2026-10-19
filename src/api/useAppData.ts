@@ -3,6 +3,7 @@ import type { AppStatus, ScanStatus } from '../../shared/types/index.js';
 import { fetchJson, postJson, isAbortError, apiErrorMessage } from './apiClient.js';
 import { invalidateReferenceLaptimes } from './referenceApi.js';
 import { setVehicleLogoSource } from './vehicleLogosApi.js';
+import { isDemoMode } from './anonymizeData.js';
 import { useAppEvents } from './useAppEvents.js';
 
 const SERVER_RETRY_MS = 2000;
@@ -33,6 +34,7 @@ function snapshotKey(scan: ScanStatus): string {
 
 /** `onGameStarted`: LMU started and the auto-open setting asks for the live dashboard. */
 export function useAppData({ onGameStarted }: { onGameStarted?: () => void } = {}) {
+  const demoMode = isDemoMode();
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -163,6 +165,8 @@ export function useAppData({ onGameStarted }: { onGameStarted?: () => void } = {
 
   useEffect(() => {
     mounted.current = true;
+    // Route changes can enter or leave demo mode without reloading the app.
+    loadedKey.current = null;
     startScanPolling();
     return () => {
       mounted.current = false;
@@ -172,7 +176,7 @@ export function useAppData({ onGameStarted }: { onGameStarted?: () => void } = {
       dataAbort.current?.abort();
       refreshAbort.current?.abort();
     };
-  }, [startScanPolling]);
+  }, [startScanPolling, demoMode]);
 
   return { status, loading, isRefreshing, replayScanStatus, gameRunning,
     referenceUpdateCount, setReferenceUpdateCount, revision, error: statusError ?? dataError,

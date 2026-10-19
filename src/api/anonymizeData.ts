@@ -1,6 +1,6 @@
 /**
  * Client-side anonymizer for demo mode and visual showcase captures.
- * Activated via URL parameter (?demo=1 or ?anonymize=1) or localStorage 'lmu_demo_mode'.
+ * Activated only via URL parameter (?demo=1 or ?anonymize=1).
  * Replaces personal driver names, opponent names, and file paths.
  */
 
@@ -47,12 +47,10 @@ function hashString(str: string): number {
 
 export function isDemoMode(): boolean {
   if (typeof window === 'undefined') return false;
-  const search = window.location.search || window.location.hash;
-  if (/[?&](demo|anonymize)(=1|=true)?\b/i.test(search)) {
-    window.localStorage?.setItem('lmu_demo_mode', 'true');
-    return true;
-  }
-  return window.localStorage?.getItem('lmu_demo_mode') === 'true';
+  const queries = [window.location.search, window.location.hash.split('?')[1] ?? ''];
+  return queries.some(query => [...new URLSearchParams(query)].some(([key, value]) =>
+    /^(demo|anonymize)$/i.test(key) && /^(1|true)?$/i.test(value),
+  ));
 }
 
 export function setDemoPlayerName(name: string): void {

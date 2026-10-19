@@ -37,6 +37,24 @@ describe('app scan freshness', () => {
   }
   async function poll() { await act(async () => { await vi.advanceTimersByTimeAsync(1000); }); }
 
+  it('restores the detected player name when leaving the demo without a reload', async () => {
+    fetchMock.mockImplementation((url: string) => url === '/api/status'
+      ? reply({ playerName: 'Samuel Lague' })
+      : url === '/api/scan/status' ? reply(idle()) : reply([]));
+    window.history.replaceState(null, '', '/#/live?demo=1');
+    const { result, rerender, unmount } = await mount();
+    try {
+      expect(result.current.status?.playerName).toBe('Ricky Bobby');
+      window.history.replaceState(null, '', '/#/settings');
+      rerender();
+      await act(async () => {});
+      expect(result.current.status?.playerName).toBe('Samuel Lague');
+    } finally {
+      unmount();
+      window.history.replaceState(null, '', '/');
+    }
+  });
+
   it('publishes XML batches while scanning, keeps all sessions visible during replay decoding, then stops idle polling', async () => {
     scan.sessionScan.running = true;
     const { result } = await mount();
