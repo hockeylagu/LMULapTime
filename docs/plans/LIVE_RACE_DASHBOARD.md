@@ -608,8 +608,21 @@ Fixed during validation:
   read 0% at the finish. A drop of more than 15% in one lap now restarts the wear measurement.
 - The estimated lap (session best plus the running delta) replaces `CURRENT VS BEST` in the race and `BEST POSSIBLE`
   in practice and qualifying; qualifying shows its laps left. Compounds read in their sidewall colours.
-- The running lap clock ticks smoothly between the game's 5 updates a second; a lost stream reconnects by itself.
+- The original running lap clock advanced between the game's 5 updates a second; this run-on is superseded by
+  the 2026-10-18 practice fix below. A lost stream reconnects by itself.
 
 Checks: `npm test` — 2,991 passed, 56 skipped; `npm run build` — passed without warnings. The skips are existing optional fixture tests.
 
 Remaining live confirmation: record an online practice → qualifying → race event, a practice-only server and a single-player race-only start. Confirm navigation/phase timing, full-field qualifying finish flags, garage REST availability and formation behavior against these expectations. Missing or incomplete full-field finish data intentionally keeps qualifying provisional. Scoring-only fixtures cannot establish that every LMU server supplies those fields at the same moment.
+
+### First practice fixes — 2026-10-18
+
+The lap clock now displays received game time without speculative run-on, eliminating animation-induced
+backward snaps. A game's positive completed flying-lap time remains valid even when the app missed
+part of its trace or sampled a transient current-lap flag; incomplete traces still cannot supply deltas.
+Before a matching session-best trace exists, the estimate may use the game's own projection, marked
+with `~`. It never combines a personal best with a delta from a different lap. Out laps stay explicit.
+Loading state takes precedence over a stale main-menu label, and a held garage frame is released on
+session confirmation even when the scoring counter stops changing. Regression tests pass; the next
+drive must confirm these changes. The brief freeze reported inside LMU remains unexplained.
+See the [practice findings and next checks](LIVE_SESSION_VALIDATION.md#first-practice-findings--2026-10-18).

@@ -3,6 +3,26 @@
 Prepared 2026-10-18. Companion to [remaining acceptance](LIVE_SESSION_EVIDENCE.md) and
 the [current capture contract](../LIVE_CAPTURE_FORMAT.md). This is a checklist, not recorded acceptance.
 
+## First practice findings — 2026-10-18
+
+The COTA GT3 practice recording `27ceca18-dba6-4553-8122-99de87593d1d` exposed a brief
+load-to-garage menu label, a running lap clock that advanced then snapped backward, and game-timed
+laps presented as invalid. Source observations contain completed times of 135.027893 and 133.075745
+seconds as well as genuine unavailable completed times (`-1`); the current-lap flag alone does not
+identify the validity of the preceding completed lap.
+
+Implemented follow-ups: explicit loading overrides a stale main-menu label; an empty initializing
+session stays loading; session confirmation releases a held coherent garage frame without waiting
+for another scoring-counter update. The displayed lap clock now follows received game time without
+wall-clock run-on. A positive completed flying-lap time is independent of trace completeness and
+transient current-lap flags; out/in laps and untimed laps remain excluded from clean pace. Incomplete
+traces never become delta references. Estimated lap uses session best plus its matching delta, or a
+marked `~` game projection when that trace is unavailable; an out lap still reads `OUT LAP`.
+
+Regression suite: 3,256 passed, 56 skipped. The next session must verify these behaviors live.
+The driver's report of LMU itself briefly pausing after 100% loading is not yet explained or resolved.
+This practice does not complete race-weekend, performance or multi-session learning acceptance.
+
 ## What the next session can establish
 
 - The normal app records six vehicle motion and 28 wheel channels, sparse impact/terrain/configuration/damage/pit/weather observations,
