@@ -11,9 +11,9 @@ import {
   AiTokenUsage,
 } from '../../shared/types/index.js';
 
-export const AI_MODELS = ['gemini-3.7-flash', 'gemini-3.8-flash'] as const;
+export const AI_MODELS = ['gemini-3.8-flash'] as const;
 export type AiModel = typeof AI_MODELS[number];
-const DEFAULT_AI_MODEL: AiModel = 'gemini-3.7-flash';
+const DEFAULT_AI_MODEL: AiModel = 'gemini-3.8-flash';
 // v8: the app ranks the corners (evidence.priorities); the report explains them in that order.
 const PROMPT_VERSION = 8;
 

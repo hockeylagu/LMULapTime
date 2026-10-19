@@ -38,7 +38,7 @@ describe('Gemini AI adapter', () => {
     vi.restoreAllMocks();
     clearSessionApiKey();
     setSessionApiKey('test-key');
-    setSessionModel('gemini-3.7-flash');
+    setSessionModel('gemini-3.8-flash');
     generateContentMock.mockReset();
   });
 
@@ -48,7 +48,7 @@ describe('Gemini AI adapter', () => {
     expect(result.report.overallSummary).toContain('second');
     expect(result.tokensUsed?.total).toBe(150);
     expect(generateContentMock).toHaveBeenCalledWith(expect.objectContaining({
-      model: 'gemini-3.7-flash',
+      model: 'gemini-3.8-flash',
       config: expect.objectContaining({ responseMimeType: 'application/json', responseJsonSchema: expect.any(Object) }),
     }));
   });

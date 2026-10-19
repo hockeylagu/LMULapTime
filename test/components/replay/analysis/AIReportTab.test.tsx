@@ -28,7 +28,7 @@ const reportResponse = {
     }],
   },
   cached: false,
-  modelUsed: 'gemini-3.7-flash',
+  modelUsed: 'gemini-3.8-flash',
   generatedAt: '2026-09-14T12:00:00.000Z',
   tokensUsed: { prompt: 100, completion: 50, total: 150 },
 };

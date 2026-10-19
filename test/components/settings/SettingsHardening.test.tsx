@@ -35,7 +35,7 @@ function mockServer(onScan: (call: ScanCall) => Promise<unknown>) {
     }
     if (url.includes('/api/replays/upgrade')) return json({ pendingReplays: 0, pendingDrivers: 0, status: { running: false, enabled: true } });
     if (url.includes('/api/replays/cache') || url.includes('/api/ai/reports') || url.includes('/diffs')) return json([]);
-    if (url.includes('/api/ai/settings')) return json({ configured: false, model: 'gemini-3.7-flash', keySource: null });
+    if (url.includes('/api/ai/settings')) return json({ configured: false, model: 'gemini-3.8-flash', keySource: null });
     return json({});
   });
   return scans;

@@ -23,14 +23,14 @@ describe('Gemini key handling', () => {
 
   beforeEach(() => {
     posts.length = 0;
-    settingsAnswer = () => json({ configured: true, model: 'gemini-3.7-flash', keySource: 'session' });
+    settingsAnswer = () => json({ configured: true, model: 'gemini-3.8-flash', keySource: 'session' });
     global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
       if (url !== '/api/ai/settings') return json({});
       if (init?.method === 'POST') {
         posts.push(JSON.parse(String(init.body)) as Record<string, unknown>);
         return settingsAnswer();
       }
-      return json({ configured: false, model: 'gemini-3.7-flash', keySource: null });
+      return json({ configured: false, model: 'gemini-3.8-flash', keySource: null });
     });
   });
   afterEach(() => vi.restoreAllMocks());
@@ -95,18 +95,18 @@ describe('Gemini key handling', () => {
     expect(posts).toHaveLength(1);
     expect(save()).toBeDisabled();
     expect(screen.getByRole('button', { name: /remove session key/i })).toBeDisabled();
-    finish({ ok: true, json: () => Promise.resolve({ configured: true, model: 'gemini-3.7-flash', keySource: 'session' }) });
+    finish({ ok: true, json: () => Promise.resolve({ configured: true, model: 'gemini-3.8-flash', keySource: 'session' }) });
     await screen.findByText('Ready, key set this session');
   });
 
   it('returns focus to the Remove button on cancel, and removes only once when confirmed', async () => {
-    settingsAnswer = () => json({ configured: false, model: 'gemini-3.7-flash', keySource: null });
+    settingsAnswer = () => json({ configured: false, model: 'gemini-3.8-flash', keySource: null });
     global.fetch = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
       if (init?.method === 'POST') {
         posts.push(JSON.parse(String(init.body)) as Record<string, unknown>);
         return settingsAnswer();
       }
-      return json({ configured: true, model: 'gemini-3.7-flash', keySource: 'session' });
+      return json({ configured: true, model: 'gemini-3.8-flash', keySource: 'session' });
     });
     render(<AISettingsCard />);
     await screen.findByText('Ready, key set this session');
@@ -124,7 +124,7 @@ describe('Gemini key handling', () => {
   it('offers Retry when the key state cannot be read, and recovers', async () => {
     let healthy = false;
     global.fetch = vi.fn().mockImplementation(() =>
-      healthy ? json({ configured: false, model: 'gemini-3.7-flash', keySource: null }) : apiFailure(503, { error: 'Server is starting' })
+      healthy ? json({ configured: false, model: 'gemini-3.8-flash', keySource: null }) : apiFailure(503, { error: 'Server is starting' })
     );
     render(<AISettingsCard />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Server is starting');
@@ -157,7 +157,7 @@ describe('AI report history', () => {
   });
 
   it('never prints Invalid Date or 1970 and gets token plurals right', async () => {
-    const base = { model: 'gemini-3.7-flash', lapNumber: 3, replayName: 'Spa R1' };
+    const base = { model: 'gemini-3.8-flash', lapNumber: 3, replayName: 'Spa R1' };
     global.fetch = vi.fn().mockImplementation(() => json([
       { ...base, cacheKey: 'a', generatedAt: 'not a date', tokensUsed: { total: 1 } },
       { ...base, cacheKey: 'b', generatedAt: 0, tokensUsed: { total: 1500 } },

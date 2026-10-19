@@ -15,7 +15,7 @@ const evidence: AiLapEvidence = {
 const generatedResponse: AiAnalyzeResponse = {
   report: { overallSummary: 'A measured lap review.', improvements: [] },
   cached: false,
-  modelUsed: 'gemini-3.7-flash',
+  modelUsed: 'gemini-3.8-flash',
   generatedAt: '2026-09-14T00:00:00.000Z',
 };
 
@@ -42,11 +42,15 @@ describe('AI routes', () => {
   it('reads and updates settings while validating input', async () => {
     const initial = await request(app).get('/api/ai/settings');
     expect(initial.status).toBe(200);
-    expect(initial.body).toMatchObject({ configured: false, keySource: null });
+    expect(initial.body).toMatchObject({ configured: false, keySource: null, model: 'gemini-3.8-flash' });
 
     const invalidModel = await request(app).post('/api/ai/settings').send({ model: 'invalid' });
     expect(invalidModel.status).toBe(400);
     expect(invalidModel.body.errorCode).toBe('invalid_model');
+
+    const retiredModel = await request(app).post('/api/ai/settings').send({ model: 'gemini-3.7-flash' });
+    expect(retiredModel.status).toBe(400);
+    expect(retiredModel.body.errorCode).toBe('invalid_model');
 
     const invalidKey = await request(app).post('/api/ai/settings').send({ apiKey: 42 });
     expect(invalidKey.status).toBe(400);

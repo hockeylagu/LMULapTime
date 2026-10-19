@@ -26,7 +26,7 @@ describe('AiReportsHistoryCard', () => {
           cacheKey: 'key-1',
           sessionId: 'spa-session', driverOrdinal: 0, lapOrdinal: 4,
           lapNumber: 5,
-          model: 'gemini-3.7-flash',
+          model: 'gemini-3.8-flash',
           overallSummary: 'Brake later into Eau Rouge.',
           tokensUsed: { prompt: 100, completion: 50, total: 150 },
           generatedAt: Date.now(),
@@ -40,7 +40,7 @@ describe('AiReportsHistoryCard', () => {
       expect(screen.getByText(/spa-session · Lap 5/)).toBeInTheDocument();
     });
     expect(screen.getByText('Brake later into Eau Rouge.')).toBeInTheDocument();
-    expect(screen.getByText('gemini-3.7-flash')).toBeInTheDocument();
+    expect(screen.getByText('gemini-3.8-flash')).toBeInTheDocument();
     expect(screen.getByText('150 tokens')).toBeInTheDocument();
     expect(screen.getByText('1 cached')).toBeInTheDocument();
   });

@@ -35,7 +35,7 @@ describe('Settings navigation', () => {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ pendingReplays: 0, pendingDrivers: 0, status: { running: false, enabled: false } }) });
       }
       if (url.includes('/api/ai/settings')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ configured: false, model: 'gemini-3.7-flash', keySource: null }) });
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ configured: false, model: 'gemini-3.8-flash', keySource: null }) });
       }
       if (url.includes('/api/replays/cache') || url.includes('/api/ai/reports')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });

@@ -18,7 +18,7 @@ describe('AISettingsCard component', () => {
       if (url === '/api/ai/settings') {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ configured: true, model: 'gemini-3.7-flash', keySource: 'session' }),
+          json: () => Promise.resolve({ configured: true, model: 'gemini-3.8-flash', keySource: 'session' }),
         });
       }
       return Promise.reject(new Error('Unknown url'));
@@ -47,12 +47,12 @@ describe('AISettingsCard component', () => {
       if (url === '/api/ai/settings' && options?.method === 'POST') {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ configured: true, model: 'gemini-3.7-flash', keySource: 'session' }),
+          json: () => Promise.resolve({ configured: true, model: 'gemini-3.8-flash', keySource: 'session' }),
         });
       }
       return Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ configured: false, model: 'gemini-3.7-flash', keySource: null }),
+        json: () => Promise.resolve({ configured: false, model: 'gemini-3.8-flash', keySource: null }),
       });
     });
 
@@ -88,7 +88,7 @@ describe('AISettingsCard component', () => {
       }
       return Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ configured: false, model: 'gemini-3.7-flash', keySource: null }),
+        json: () => Promise.resolve({ configured: false, model: 'gemini-3.8-flash', keySource: null }),
       });
     });
 
@@ -109,7 +109,7 @@ describe('AISettingsCard component', () => {
   it('prevents removing environment key', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ configured: true, model: 'gemini-3.7-flash', keySource: 'environment' }),
+      json: () => Promise.resolve({ configured: true, model: 'gemini-3.8-flash', keySource: 'environment' }),
     });
 
     render(<AISettingsCard />);
@@ -126,12 +126,12 @@ describe('AISettingsCard component', () => {
       if (url === '/api/ai/settings' && options?.method === 'POST') {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ configured: false, model: 'gemini-3.7-flash', keySource: null }),
+          json: () => Promise.resolve({ configured: false, model: 'gemini-3.8-flash', keySource: null }),
         });
       }
       return Promise.resolve({
         ok: true,
-        json: () => Promise.resolve({ configured: true, model: 'gemini-3.7-flash', keySource: 'session' }),
+        json: () => Promise.resolve({ configured: true, model: 'gemini-3.8-flash', keySource: 'session' }),
       });
     });
 
@@ -155,7 +155,7 @@ describe('AISettingsCard component', () => {
   it('cancels key removal from the inline confirm without calling the server', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ configured: true, model: 'gemini-3.7-flash', keySource: 'session' }),
+      json: () => Promise.resolve({ configured: true, model: 'gemini-3.8-flash', keySource: 'session' }),
     });
     global.fetch = fetchMock;
 

@@ -37,7 +37,7 @@ describe('Settings overview card', () => {
           { filename: 'B R1 2.Vcr', isOnDisk: false, replayVersion: 'v7', fileSizeBytes: 1, compressedSizeBytes: 1 },
         ]);
       }
-      if (url.includes('/api/ai/settings')) return json({ configured: false, model: 'gemini-3.7-flash', keySource: null });
+      if (url.includes('/api/ai/settings')) return json({ configured: false, model: 'gemini-3.8-flash', keySource: null });
       return json([]);
     });
   });
@@ -157,7 +157,7 @@ describe('Error surfacing', () => {
 
   it('shows no count while the history loads, then the latest reports with Show all', async () => {
     const reports = Array.from({ length: 8 }, (_, i) => ({
-      cacheKey: `k${i}`, replayName: `Replay ${i}`, lapNumber: i + 1, model: 'gemini-3.7-flash', generatedAt: 1,
+      cacheKey: `k${i}`, replayName: `Replay ${i}`, lapNumber: i + 1, model: 'gemini-3.8-flash', generatedAt: 1,
     }));
     global.fetch = vi.fn().mockImplementation(() => json(reports));
     render(<AiReportsHistoryCard />);

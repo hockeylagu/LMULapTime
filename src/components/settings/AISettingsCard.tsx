@@ -10,7 +10,7 @@ import { FeedbackMessage, SettingsFeedback, SettingsPanel } from './SettingsPane
 import { FIELD_LABEL } from './labelStyles.js';
 import { Select } from '../common/dropdown/Select.js';
 
-const AI_MODELS = ['gemini-3.7-flash', 'gemini-3.8-flash'] as const;
+const AI_MODELS = ['gemini-3.8-flash'] as const;
 
 const FIELD_LABEL_BLOCK = `block mb-1.5 ${FIELD_LABEL}`;
 const FIELD_CLASS = `rounded-xl border border-lmu-border bg-lmu-bg px-3 py-2 text-sm text-lmu-text focus:border-lmu-accent ${FOCUS_RING}`;
@@ -25,7 +25,7 @@ export function aiStatusText(settings: AiSettingsResponse | null, loadError: str
 const AISettingsPanel: React.FC<{ ai: AiSettingsState }> = ({ ai }) => {
   const { settings, setSettings, loadError } = ai;
   const [apiKey, setApiKey] = useState('');
-  const [model, setModel] = useState<string>(settings?.model ?? 'gemini-3.7-flash');
+  const [model, setModel] = useState<string>(settings?.model ?? 'gemini-3.8-flash');
   const [syncedModel, setSyncedModel] = useState<string | undefined>(settings?.model);
   const [message, setMessage] = useState<SettingsFeedback | null>(null);
   const [isSaving, setIsSaving] = useState(false);

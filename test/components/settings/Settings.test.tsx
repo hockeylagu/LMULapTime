@@ -44,7 +44,7 @@ describe('Settings component', () => {
       if (url.includes('/api/ai/settings')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve({ configured: false, model: 'gemini-3.7-flash', keySource: null }),
+          json: () => Promise.resolve({ configured: false, model: 'gemini-3.8-flash', keySource: null }),
         });
       }
       if (url.includes('/api/ai/reports')) {

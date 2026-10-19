@@ -624,7 +624,7 @@ describe('SessionDatabase AI report history', () => {
     cacheKey: overrides.cacheKey || 'key-1',
     sessionId: 'test-session', driverOrdinal: 0, lapOrdinal: 2,
     lapNumber: 3,
-    model: 'gemini-3.7-flash',
+    model: 'gemini-3.8-flash',
     promptVersion: 1,
     report: { overallSummary: 'Brake later into T1.', improvements: [] },
     promptTokens: 100,
