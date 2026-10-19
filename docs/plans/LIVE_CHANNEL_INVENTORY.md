@@ -1,7 +1,7 @@
 # Live capture channel inventory
 
-Status: Reviewed inventory; capture foundation implemented 2026-10-18. Six vehicle dynamics are
-enabled; reserved wheel channels remain unavailable pending ISO frame/sign verification.
+Status: Capture implemented 2026-10-18. Normalization version 2 enables all 30 vehicle/wheel values;
+saved-recording analysis and worker round-trip tests pass. New live-recording acceptance remains.
 Reviewed: 2026-10-17 against 199 native catalogs, three shared-memory captures and saved REST evidence.
 Companion: [Live session evidence plan](LIVE_SESSION_EVIDENCE.md).
 
@@ -68,7 +68,8 @@ FL/FR/RL/RR. REST condition responses retain observation intervals and age; no f
 
 The first six rows form the proposed 30-scalar dynamic core: actual useful variation is established in
 GT3/LMP3 captures, and no equivalent is declared by the 199 native catalogs or established VCR fields.
-Full-axis/physical normalization still needs validation; detailed ranges and timing checks are in the analysis.
+The 30-value core is captured in normalization version 2; the proposal rows below preserve the original
+inventory rationale. Current mappings and evidence are in [wheel capture evidence](WHEEL_CAPTURE_EVIDENCE.md).
 
 | Channel / values | Source fields | Benefit / overlap | Proposed representation and cadence |
 |---|---|---|---|

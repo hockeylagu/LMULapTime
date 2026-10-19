@@ -47,7 +47,7 @@ Pit repair inference remains a known data limitation, pending trustworthy record
 Live capture and automatic learning are implemented; [remaining acceptance](LIVE_SESSION_EVIDENCE.md)
 covers real-race stability and prospective prediction improvement. Current pipeline, channel, storage
 and diagnostic retention contracts are in [Live capture reference](../LIVE_CAPTURE_FORMAT.md);
-[native telemetry enrichment](../TELEMETRY_FORMAT.md#complementary-live-capture) distinguishes implemented vectors from unverified wheel channels.
+[native telemetry enrichment](../TELEMETRY_FORMAT.md#complementary-live-capture) distinguishes native telemetry from the implemented supplemental vehicle/wheel channels.
 File and folder size limits are ongoing checks; split only along meaningful responsibilities.
 
 ## Completed plans

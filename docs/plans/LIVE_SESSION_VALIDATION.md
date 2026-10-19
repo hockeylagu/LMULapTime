@@ -5,14 +5,12 @@ the [current capture contract](../LIVE_CAPTURE_FORMAT.md). This is a checklist, 
 
 ## What the next session can establish
 
-- The normal app records six verified motion channels, sparse damage/pit/weather observations,
+- The normal app records six vehicle motion and 24 wheel channels, sparse damage/pit/weather observations,
   audit checkpoints and fuel/VE learning evidence into session DuckDB.
-- The 24 supplemental wheel columns are still NULL. Existing C# JSONL recordings already contain
-  all six pending fields at all four corners; analyse those first. See the
-  [recorded evidence assessment](WHEEL_CAPTURE_EVIDENCE.md). A fresh probe is needed only for a
-  specific unresolved comparison, not as a prerequisite to starting wheel verification.
-- After analysing the saved evidence, implement only verified wheel mappings and their regression tests.
-  A subsequent live capture must confirm that the enabled columns contain the expected data.
+- Wheel mappings and tests use the existing C# JSONL evidence; new attempts use normalization
+  version 2. See the [recorded evidence assessment](WHEEL_CAPTURE_EVIDENCE.md). The next live
+  capture must confirm those values and corrected vehicle-axis signs. A fresh probe is needed only
+  for a specific unresolved comparison. Older version-1 wheel columns remain unavailable.
 - One race cannot complete learning acceptance: screening needs multiple independent compatible
   sessions, then fixed candidates need genuinely new sessions before activation.
 - Damage recording is implemented. Learning damage-related pace loss or repair benefit is a
@@ -36,8 +34,8 @@ Only if the saved recordings leave a specific verification gap, run a short whee
 npm run telemetry:record -- --out .cache/live-validation/wheel-probe --seconds 900
 ```
 
-This separate diagnostic command records raw shared-memory JSONL, including the six pending fields
-for every wheel. It does not enable supplemental DuckDB wheel columns. Stop earlier with Ctrl+C
+This separate diagnostic command records raw shared-memory JSONL, including the six wheel fields
+for every wheel. Normal version-2 app capture independently writes normalized DuckDB values. Stop earlier with Ctrl+C
 if the sequence is complete. Preserve this small probe until mapping verification is finished;
 the app's regular historical JSON/CSV exports remain removed.
 
@@ -62,9 +60,9 @@ matching struct layouts alone does not prove physical meaning. Document the conv
 app's ISO 8855 wheel convention explicitly. Preserve raw probe values as the source evidence.
 Mark each field/corner **verified**, **unsupported**, or **unresolved**, with the reason.
 
-After analysis: update `server/live/capture/channels.ts` and `decode.ts` only for verified fields,
-test ordering/units/signs and unknown handling, and confirm a new DuckDB recording matches the
-probe. Unresolved columns remain NULL. Complete this coding step before calling wheel capture done.
+The mappings in `channels.ts` and `decode.ts` and their worker tests are implemented. Confirm a new
+DuckDB recording matches the saved-frame expectations, inspect its version-2 catalog and preserve
+discrepancies as acceptance failures. Nonfinite measurements remain NULL.
 
 ## 3. Normal capture, clocks and ownership
 
@@ -150,5 +148,5 @@ validation and withdrawal happen automatically off track. Settings → Learning 
 For every row/step, record **pass**, **fail**, **not exercised**, or **inconclusive**, with recording ID,
 file path, timestamps and the observation/metric supporting it. Keep failures and missing coverage
 visible. Close the current learning/capture plan only after normal race-weekend and prospective
-learning gates pass. Track unresolved wheel mappings explicitly; do not call them recorded until
-their implementation and follow-up recording have been checked.
+learning gates pass. Track wheel mapping discrepancies explicitly; implementation is complete,
+but a new recording must still establish live acceptance.

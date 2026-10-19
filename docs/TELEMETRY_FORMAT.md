@@ -174,8 +174,10 @@ a trajectory is served.
 The app now records supplemental player evidence into its own per-session DuckDB files, independent
 of dashboard clients. This schema differs from LMU's native telemetry exporter described above.
 Six verified ISO 8855 vehicle velocity/angular-velocity values augment measured yaw and body-slip
-charts; native telemetry G values are preserved. Twenty-four reserved wheel columns remain NULL
-until verified. Sparse condition/weather/REST observations and versioned fuel/VE forecast/outcome
+charts; native telemetry G values are preserved. Normalization version 2 also records 24 wheel
+velocity/camber/dynamic-toe values, using conventional ISO scalar signs and finite/unavailable handling.
+Version-1 recordings retain their original catalog; their motion signs are corrected at read time.
+Sparse condition/weather/REST observations and versioned fuel/VE forecast/outcome
 events support analysis without inventing unavailable measurements.
 
 Capture only covers sessions driven while the backend records. XML identity, completed-lap anchors

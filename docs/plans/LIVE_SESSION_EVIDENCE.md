@@ -12,12 +12,20 @@ See [Live capture reference](../LIVE_CAPTURE_FORMAT.md) for the current pipeline
 2. Collect eligible sessions and run `npm run learning:evaluate`. Verify exact cohort isolation,
    prospective acceptance, current-run XML patch trust, withdrawal and actual prediction improvement.
    Historical holdouts alone do not establish real-world improvement.
-3. Verify additional wheel channels before populating reserved columns. Damage/weather learning
-   requires separate deterministic targets and validation.
+3. Verify new normalization-version-2 recordings against saved wheel evidence: all 24 wheel fields,
+   corrected vehicle axes and finite/unavailable values. Implementation and worker round-trip tests
+   are complete; live acceptance remains. Damage/weather learning requires separate deterministic targets.
 4. Keep diagnostic-sidecar deletion manual until live stability is established. Automatic retention
    is deferred; permanent session evidence and compact learning facts have separate ownership rules.
 
 ## Latest verification
+
+Wheel capture / normalization version 2, 2026-10-18: 3,243 tests passed, 56 skipped; final production
+build passed without warnings. Saved wheel values round-trip through the real writer worker and
+DuckDB. Regressions cover source handedness, all four corners, scalar signs, nonfinite/zero values,
+old-file normalization/provenance and recording-version isolation. Focused reader tests passed after
+the final stored-version integrity check. Matching-snapshot API sweeps found no threshold regressions;
+this does not validate in-game overhead or replace a new live recording.
 
 2026-10-18: 3,214 tests passed, 56 skipped; production build passed without warnings.
 The suite covers capture/recovery, strict ownership, evidence reads, diagnostic routing and automatic

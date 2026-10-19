@@ -1,5 +1,14 @@
 # Endpoint performance history
 
+## Wheel capture and normalization version 2 — 2026-10-18
+
+Two twenty-request sweeps during implementation used the same dataset (`b272a4960f76`), request
+cohort and runtime/plugin environment. No shared endpoint crossed both regression thresholds
+(>20% and >5 ms) after the final read-normalization change. Reports are under
+`.cache/wheel-capture-endpoints/history/` (20:43:57 and 20:47:44 Toronto time). These compare API
+response times during the implementation, not a capture-disabled game baseline. Real wheel write
+throughput, disk growth and game overhead still require the live acceptance run.
+
 ## Automatic learning lifecycle — 2026-10-18
 
 Twenty-request sweeps matched the manual-readiness baseline dataset (`61b58d425945`), request cohort

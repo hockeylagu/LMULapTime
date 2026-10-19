@@ -47,10 +47,24 @@ neither supplies substitute data to a connected dashboard.
 
 ## Channels and clocks
 
-Six verified vehicle-vector channels are normalized once to ISO 8855: longitudinal, lateral and
-vertical velocity, plus roll, pitch and yaw angular velocity. The native-to-ISO vector rotation is
-`(-z, -x, y)`. Channel definitions carry units and normalization provenance. Twenty-four reserved
-wheel-channel columns remain NULL until verified; unavailable values never become measured zero.
+Normalization version 2 captures 30 values: six vehicle-vector channels plus 24 wheel channels.
+The producer's left-handed local axes are left/up/back. ISO vehicle velocity is `(-z, x, y)`;
+angular velocity is an axial vector and maps as `(z, -x, -y)` (roll, pitch, yaw). Version 1 had
+incorrect lateral/roll/yaw signs: evidence reads correct those three signs once without rewriting
+the source and disclose `sourceNormalizationVersion: 1` alongside response normalization version 2.
+Its wheel catalog stays unverified and its wheel columns unavailable. New attempts use version 2;
+an interrupted version-1 attempt is not resumed with the new convention.
+
+FL/FR/RL/RR each record patch and ground lateral/longitudinal velocity (m/s), camber and dynamic
+toe (radians). Wheel lateral is already left-positive; longitudinal is negated to forward-positive.
+Camber is outward-positive on both sides, matching ISO camber rather than a globally signed roll
+angle. Toe-in is positive: preserve the source angle on left wheels and negate it on right wheels.
+The toe value includes current steering/suspension effects; it is not a measured static setup value.
+Patch velocity is not relabelled as wheel speed or a slip ratio. Nonfinite input becomes SQL NULL;
+valid finite zero remains zero. The existing typed column count and bounded batch size are unchanged.
+The current aligned motion API still serves its six vehicle channels; wheel evidence is retained in
+the recording for direct DuckDB inspection and future consumers. Native G is not changed.
+Sources and saved-recording verification: [wheel evidence assessment](plans/WHEEL_CAPTURE_EVIDENCE.md).
 
 Sparse observations retain source semantics: shared-memory condition/state, existing REST responses
 and recorder events. This supports damage/repair estimates, weather, pit/garage context and learning
