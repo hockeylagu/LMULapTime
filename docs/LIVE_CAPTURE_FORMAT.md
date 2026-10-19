@@ -19,6 +19,13 @@ examples, rather than a duplicate stream of motion samples. There is no automati
 eviction. Close a recording before manually deleting its raw file or diagnostic sidecar.
 Native telemetry, XML and replay files retain their existing ownership.
 
+Settings Overview reports **Live telemetry files** separately from native **Telemetry files**.
+The live count uses available SQLite capture-index entries, including active and unlinked recordings;
+missing files stop counting after reconciliation. It does not open raw DuckDB files on status requests.
+A `[SQLite Cache] Found live telemetry DuckDB recording: <filename>` console entry is emitted when
+a recording is first indexed or becomes available again, both from writer acknowledgements and
+startup discovery. Repeated checkpoints and unchanged rediscovery do not repeat the log.
+
 ## Live dashboard and save pipeline
 
 1. `server/index.ts` starts `LiveService` and its capture controller with the backend. Windows
