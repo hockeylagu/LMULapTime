@@ -358,7 +358,7 @@ describe('LiveService', () => {
       const { service, frame } = setup();
       frame(lap(3, { lapDist: 9_990, timeIntoLap: 99 }));
       frame(lap(4, { lapDist: 5, timeIntoLap: 0.1, lastLapTime: 100, lastSector1: 30, lastSector2: 60 }));
-      expect(service.getSnapshot().recentLaps).toEqual([{ lapNumber: 4, lapSeconds: 100, sectors: [30, 30, 40], valid: false }]);
+      expect(service.getSnapshot().recentLaps).toEqual([{ lapNumber: 4, lapSeconds: 100, sectors: [30, 30, 40], valid: true }]);
     });
 
     it('keeps the laps through a replay watched from the monitor, and shows the menu meanwhile', async () => {
@@ -379,7 +379,7 @@ describe('LiveService', () => {
       await vi.advanceTimersByTimeAsync(11_000);
       frame(lap(4, { lapDist: 50, timeIntoLap: 1 }));
       expect(service.getSnapshot().lifecycle).toBe('driving');
-      expect(service.getSnapshot().recentLaps).toEqual([{ lapNumber: 4, lapSeconds: 100, sectors: [30, 30, 40], valid: false }]);
+      expect(service.getSnapshot().recentLaps).toEqual([{ lapNumber: 4, lapSeconds: 100, sectors: [30, 30, 40], valid: true }]);
     });
 
     it('shows the menu at once when the reader says a replay plays, and a failed state check does not end it', async () => {
@@ -402,7 +402,7 @@ describe('LiveService', () => {
       worker.emit('message', { type: 'navigation', screen: 'session', loadingProgress: null });
       frame(lap(4, { lapDist: 50, timeIntoLap: 1 }));
       expect(service.getSnapshot().lifecycle).toBe('driving');
-      expect(service.getSnapshot().recentLaps).toEqual([{ lapNumber: 4, lapSeconds: 100, sectors: [30, 30, 40], valid: false }]);
+      expect(service.getSnapshot().recentLaps).toEqual([{ lapNumber: 4, lapSeconds: 100, sectors: [30, 30, 40], valid: true }]);
     });
 
     it('resolves the identity from the game, then from the pit poller state check while a dashboard is open', async () => {
@@ -459,7 +459,7 @@ describe('LiveService', () => {
       vi.advanceTimersByTime(PEDAL_FLUSH_MS);
       expect(timings(sink)).toHaveLength(1);
       expect(sink.data(timings(sink)[0])).toEqual({
-        lapNumber: 4, isOutLap: false, sector: 1, lapElapsedSeconds: expect.any(Number), sectors: [null, null, null], deltaSeconds: null, sectorDeltas: [null, null, null], tyreSurfaceAvgC: null,
+        lapNumber: 4, isOutLap: false, sector: 1, lapElapsedSeconds: expect.any(Number), sectors: [null, null, null], deltaSeconds: null, gameEstimatedLapSeconds: 100, sectorDeltas: [null, null, null], tyreSurfaceAvgC: null,
       });
 
       // Two frames inside one interval: only the newest goes out, once the interval has passed.

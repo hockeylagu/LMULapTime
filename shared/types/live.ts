@@ -85,7 +85,7 @@ export interface LiveLapRecord {
   lapNumber: number;
   lapSeconds: number | null;
   sectors: [number | null, number | null, number | null];
-  /** The game counted the lap time (rF2 `mCountLapFlag` 2) and the lap did not start or end in the pits. */
+  /** Positive completed time from the game on a flying lap; trace completeness is independent. */
   valid: boolean;
 }
 
@@ -113,6 +113,8 @@ export interface LiveTiming {
   sectors: [number | null, number | null, number | null];
   /** Time into the current lap minus the session-best lap at the same distance; null without a reference. */
   deltaSeconds: number | null;
+  /** Standalone game projection, used when a matching session-best trace is unavailable. */
+  gameEstimatedLapSeconds?: number | null;
   /** Completed sectors of the current lap minus the session-best lap's sectors; null for sectors not yet done. */
   sectorDeltas: [number | null, number | null, number | null];
   /**

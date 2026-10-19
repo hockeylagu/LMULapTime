@@ -20,8 +20,6 @@ interface CurrentLap {
   completedLaps: number;
   startedInPits: boolean;
   lastInPits: boolean;
-  /** The game counted the lap time (`countLapFlag` 2) at every reading of the lap. */
-  flagOk: boolean;
   /** The lap was seen from (about) the line, so its trace is whole. False when the app joined mid-lap. */
   fromStart: boolean;
   trace: TracePoint[];
@@ -72,8 +70,8 @@ export function activeSectorDelta(timing: Pick<LiveTiming, 'sector' | 'deltaSeco
  * The player's lap timing for one session, fed the scoring readings (about 5 Hz). Deterministic, no clock of its own.
  *
  * - A lap completes when `totalLaps` rises; the game's last-lap fields on that reading time it. Sector times
- *   are split from the game's cumulative fields. A lap is `valid` when the game counted its time at every
- *   reading (`countLapFlag` 2), it has a lap time, it did not start or end in the pits and it was seen from the line.
+ *   are split from the game's cumulative fields. A clean flying lap is `valid` when the game publishes a positive
+ *   completed time and it did not start or end in the pits. Current-lap flags and trace coverage do not veto it.
  * - The session best is the fastest valid lap. Its distance->time trace is the reference for the live delta.
  *   Joining mid-session seeds the best lap time and sectors from the game's own best-lap fields, without a trace.
  * - `deltaSeconds` = time into the lap minus the reference time at the same lap distance (linear interpolation).
@@ -140,6 +138,7 @@ export class LiveLapTiming {
       lapElapsedSeconds: player.timeIntoLap >= 0 ? ms(player.timeIntoLap) : null,
       sectors: done,
       deltaSeconds: delta,
+      gameEstimatedLapSeconds: positive(player.estimatedLapTime),
       sectorDeltas,
     };
   }
@@ -168,7 +167,6 @@ export class LiveLapTiming {
       completedLaps: player.totalLaps,
       startedInPits: player.inPits,
       lastInPits: player.inPits,
-      flagOk: true,
       fromStart: !joinedMidLap,
       trace: [],
     };
@@ -176,7 +174,6 @@ export class LiveLapTiming {
 
   private addSample(lap: CurrentLap, player: LiveVehicleReading): void {
     lap.lastInPits = player.inPits;
-    if (player.countLapFlag !== 2) lap.flagOk = false;
     if (player.timeIntoLap < 0 || player.lapDist < 0) return;
     const last = lap.trace[lap.trace.length - 1];
     if (!last) {
@@ -195,7 +192,7 @@ export class LiveLapTiming {
       lapNumber: player.totalLaps,
       lapSeconds: seconds,
       sectors: splitSectors(player.lastSector1, player.lastSector2, seconds),
-      valid: lap.flagOk && seconds !== null && !lap.startedInPits && !lap.lastInPits && lap.fromStart,
+      valid: seconds !== null && !lap.startedInPits && !lap.lastInPits,
     };
     this.records.push(record);
     if (this.records.length > LIVE_RECENT_LAP_COUNT) this.records.shift();
@@ -210,14 +207,15 @@ export class LiveLapTiming {
       if (time !== null && (bestSectors[i] === null || time < bestSectors[i])) bestSectors[i] = time;
     });
     const faster = previous?.lapSeconds == null || seconds < previous.lapSeconds;
+    const replaceReference = faster || (this.reference === null && seconds === previous?.lapSeconds);
     const [b1, b2, b3] = bestSectors;
     this.best = {
       lapSeconds: faster ? seconds : previous.lapSeconds,
-      lapSectors: faster ? record.sectors : previous.lapSectors,
+      lapSectors: replaceReference ? record.sectors : previous.lapSectors,
       bestSectors,
       bestPossibleSeconds: b1 !== null && b2 !== null && b3 !== null ? ms(b1 + b2 + b3) : null,
     };
-    if (faster) this.reference = this.finishedTrace(lap, seconds, trackLength);
+    if (replaceReference) this.reference = this.finishedTrace(lap, seconds, trackLength);
   }
 
   /** The lap's samples closed at both ends (the line at 0 and the finish at the circuit length); null for a trace that is not whole. */

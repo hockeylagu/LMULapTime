@@ -9,5 +9,10 @@ export function estimatedLapSeconds(bestSeconds: number | null | undefined, delt
 /** Out laps are labelled explicitly; otherwise show the estimate or unknown without a reference. */
 export function LiveEstimatedLap({ store, bestSeconds }: { store: LiveTimingStore; bestSeconds: number | null | undefined }) {
   const timing = useLiveTiming(store);
-  return <span data-testid="live-estimated-lap">{timing?.isOutLap ? 'OUT LAP' : formatLapTime(estimatedLapSeconds(bestSeconds, timing?.deltaSeconds))}</span>;
+  const matched = estimatedLapSeconds(bestSeconds, timing?.deltaSeconds);
+  const game = timing?.gameEstimatedLapSeconds;
+  const fallback = matched === null && game != null && Number.isFinite(game) && game > 0 ? game : null;
+  return <span data-testid="live-estimated-lap" data-estimate-source={timing?.isOutLap ? undefined : matched !== null ? 'session-trace' : fallback !== null ? 'game' : undefined}>
+    {timing?.isOutLap ? 'OUT LAP' : fallback !== null ? `~${formatLapTime(fallback)}` : formatLapTime(matched)}
+  </span>;
 }

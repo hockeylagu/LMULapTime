@@ -65,6 +65,22 @@ describe('activeSectorDelta', () => {
 describe('LiveLapTiming', () => {
   beforeEach(() => { clock = 1000; });
 
+  it('trusts the completed game time despite a transient current-lap flag inherited near the start', () => {
+    const timing = new LiveLapTiming();
+    timing.update(reading({ totalLaps: 0, lapDist: 0, timeIntoLap: 0, countLapFlag: 1 }));
+    driveLap(timing, { seconds: 100, completed: 0 });
+    expect(timing.recentLaps[0].valid).toBe(true);
+    expect(timing.sessionBest?.lapSeconds).toBe(100);
+  });
+
+  it('offers the game projection before a reference exists without inventing a matching delta', () => {
+    const timing = new LiveLapTiming();
+    timing.update(reading({ estimatedLapTime: 133.0757 }));
+    expect(timing.timing()).toMatchObject({ deltaSeconds: null, gameEstimatedLapSeconds: 133.0757 });
+    timing.update(reading({ estimatedLapTime: NaN }));
+    expect(timing.timing()?.gameEstimatedLapSeconds).toBeNull();
+  });
+
   it('splits the cumulative sector fields into S1, S2 and S3 and keeps the last three laps', () => {
     const timing = new LiveLapTiming();
     [100, 99, 98, 97].forEach((seconds, i) => driveLap(timing, { seconds, completed: i, s2Cumulative: 60 }));
@@ -197,13 +213,13 @@ describe('LiveLapTiming', () => {
     expect(timing.timing()?.sectors).toEqual([null, null, null]);
   });
 
-  it('a lap seen only from the middle is no reference and no valid lap, and a full lap after it is', () => {
+  it('retains a game-timed flying lap seen from the middle without inventing a reference trace', () => {
     const timing = new LiveLapTiming();
     timing.update(reading({ totalLaps: 0, lapDist: 4_000, timeIntoLap: 40, sector: 1 }));
     expect(timing.timing()?.deltaSeconds).toBeNull();
     driveLap(timing, { seconds: 100, completed: 0, joinAt: 40 });
-    expect(timing.recentLaps).toEqual([{ lapNumber: 1, lapSeconds: 100, sectors: [30, 30, 40], valid: false }]);
-    expect(timing.sessionBest).toBeNull();
+    expect(timing.recentLaps).toEqual([{ lapNumber: 1, lapSeconds: 100, sectors: [30, 30, 40], valid: true }]);
+    expect(timing.sessionBest?.lapSeconds).toBe(100);
     expect(timing.timing()?.deltaSeconds).toBeNull();
     driveLap(timing, { seconds: 100, completed: 1 });
     timing.update(reading({ totalLaps: 2, lapDist: 5_000, timeIntoLap: 51 }));
@@ -244,13 +260,14 @@ describe('LiveLapTiming', () => {
     }
   });
 
-  it('drops a trace that went backwards or lost samples, so a lap with a spin is no reference', () => {
+  it('drops an unusable trace without invalidating the completed time accepted by the game', () => {
     const timing = new LiveLapTiming();
     for (const [dist, time] of [[10, 1], [2_000, 20], [1_500, 25], [3_000, 40]]) {
       timing.update(reading({ totalLaps: 0, lapDist: dist, timeIntoLap: time }));
     }
     timing.update(reading({ totalLaps: 1, lapDist: 3, timeIntoLap: 0.1, lastLapTime: 100, lastSector1: 30, lastSector2: 60 }));
-    expect(timing.recentLaps[0].valid).toBe(false);
-    expect(timing.sessionBest).toBeNull();
+    expect(timing.recentLaps[0].valid).toBe(true);
+    expect(timing.sessionBest?.lapSeconds).toBe(100);
+    expect(timing.timing()?.deltaSeconds).toBeNull();
   });
 });
