@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { navigationProbe } from '../../../server/live/lmuNavigation.js';
 
 describe('navigationProbe', () => {
+  it('lets explicit load activity override a stale main-menu navigation label', () => {
+    expect(navigationProbe(JSON.stringify({ state: { navigationState: 'NAV_MAIN_MENU' },
+      loadingStatus: { loading: true, percentage: 1 } }))).toEqual({ loading: 1 });
+    expect(navigationProbe(JSON.stringify({ state: { navigationState: 'NAV_MAIN_MENU', internalStateCode: 'OP_TO_REALTIME' },
+      loadingStatus: { loading: false } }))).toEqual({ loading: null });
+  });
   it('reads the main menu, a session loading with its progress, and anything else as a session', () => {
     expect(navigationProbe(JSON.stringify({ state: { navigationState: 'NAV_MAIN_MENU' } }))).toBe('menu');
     expect(navigationProbe(JSON.stringify({ state: { navigationState: 'NAV_EVENT' }, loadingStatus: { loading: true, percentage: 0.4567 } })))

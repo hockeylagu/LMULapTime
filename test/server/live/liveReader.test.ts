@@ -34,6 +34,24 @@ describe('LiveReader', () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 
+  it('releases the held garage scoring after session confirmation even when its counter stops changing', async () => {
+    let answer: GameProbe = 'menu';
+    const t = setup(async () => answer, undefined, true);
+    t.available.value = true;
+    t.reader.start();
+    await vi.advanceTimersByTimeAsync(PROBE_MS + 50);
+    t.posted.length = 0;
+    answer = 'session';
+    t.setScoring(scoringBuffer(4, [PLAYER], { currentEt: 0, inRealtime: false }));
+    await vi.advanceTimersByTimeAsync(PROBE_MS + 100);
+    expect(t.posted).toContainEqual(expect.objectContaining({ type: 'frame', capture: null,
+      scoring: expect.objectContaining({ currentEt: 0, inRealtime: false }) }));
+    const frames = t.posted.filter(item => item.type === 'frame').length;
+    await vi.advanceTimersByTimeAsync(PROBE_MS);
+    expect(t.posted.filter(item => item.type === 'frame')).toHaveLength(frames);
+    t.reader.stop();
+  });
+
   it('sends terrain and impact changes between car checkpoints without repeating unchanged sparse state', async () => {
     const t = setup(undefined, undefined, true);
     t.available.value = true;

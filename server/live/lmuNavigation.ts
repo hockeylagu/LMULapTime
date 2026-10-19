@@ -75,7 +75,8 @@ export function parseReplayPlayback(body: unknown): boolean | null {
  * and a session loading from `loadingStatus.loading` with `percentage` 0..1 (-1 when not loading). LMU clears
  * `loading` a few seconds before the session is in (frozen, the buffer not yet written): `internalStateCode`
  * stays `OP_TO_REALTIME` until then (seen 2026-10-16 through `GSTATE_INIT` and `GSTATE_RESTART`), so that is
- * still loading, with no progress. A loaded replay is `replay` (parseReplayPlayback). An answer that is not JSON
+ * still loading, with no progress. Explicit loading wins over a stale NAV_MAIN_MENU label during transition.
+ * A loaded replay is `replay` (parseReplayPlayback). An answer that is not JSON
  * (a game shutting down) says nothing: `busy`.
  */
 export function navigationProbe(body: string): GameProbe {
@@ -84,12 +85,12 @@ export function navigationProbe(body: string): GameProbe {
       state?: { navigationState?: unknown; internalStateCode?: unknown };
       loadingStatus?: { loading?: unknown; percentage?: unknown };
     };
-    if (answer.state?.navigationState === 'NAV_MAIN_MENU') return 'menu';
     if (answer.loadingStatus?.loading === true) {
       const progress = answer.loadingStatus.percentage;
       return { loading: typeof progress === 'number' && progress >= 0 && progress <= 1 ? Math.round(progress * 100) / 100 : null };
     }
     if (answer.state?.internalStateCode === 'OP_TO_REALTIME') return { loading: null };
+    if (answer.state?.navigationState === 'NAV_MAIN_MENU') return 'menu';
     return parseReplayPlayback(answer) ? 'replay' : 'session';
   } catch {
     return 'busy';

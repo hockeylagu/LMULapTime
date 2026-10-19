@@ -86,6 +86,7 @@ export class LiveReader {
   private cue = false;
   private captureConfirmed = false;
   private lastScoring: LiveScoringReading | null = null;
+  private heldScoring: LiveScoringReading | null = null;
   private screen: GameScreen = 'session';
   private loadingProgress: number | null = null;
   private scoringVersion: number | null = null;
@@ -170,6 +171,7 @@ export class LiveReader {
     this.captureConfirmed = false;
     this.cue = false;
     this.lastScoring = null;
+    this.heldScoring = null;
     this.screen = 'session';
     this.loadingProgress = null;
     this.tick();
@@ -192,6 +194,7 @@ export class LiveReader {
       this.scoringVersion = scoringRead.version;
       scoring = scoringRead.value;
       this.lastScoring = scoring;
+      if (this.cue) this.heldScoring = scoring;
       this.playerId = scoring.player?.id ?? null;
       this.inRealtime = scoring.inRealtime;
     }
@@ -215,6 +218,7 @@ export class LiveReader {
     // LMU writes again as it exits. The first scoring change after the answer carries the current reading.
     // Only the capture sample waits for the game to confirm a session; the dashboard frames never do.
     if (!this.cue && (scoring || pedal || car)) {
+      if (scoring) this.heldScoring = null;
       if (capture && this.captureConfirmed) {
         const terrainKey = JSON.stringify(capture.terrainMaterials);
         const impactKey = JSON.stringify(capture.impact);
@@ -271,6 +275,13 @@ export class LiveReader {
       } else if (answer === 'menu' || answer === 'session' || answer === 'replay') {
         this.gameAnswered = true;
         this.setScreen(answer, null);
+        // A garage can stop updating scoring immediately after loading. Publish the coherent frame
+        // already held for this cue; waiting for another counter change would leave the dashboard stuck.
+        if (answer === 'session' && this.heldScoring) {
+          this.deps.post({ type: 'frame', scoring: this.heldScoring,
+            ...(this.deps.capture ? { capture: null } : {}) });
+          this.heldScoring = null;
+        }
       }
       if (answer !== 'gone') return;
       if (this.processRunning === true) return;

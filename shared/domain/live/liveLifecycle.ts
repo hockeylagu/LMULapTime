@@ -95,7 +95,8 @@ export type LiveGameScreen = 'menu' | 'loading' | 'session';
 
 /**
  * Lifecycle from navigation first (loading/menu), then scoring: no reading -> offline;
- * LMU on its main menu (or playing a replay), or no vehicles -> menu; not in realtime -> garage; game phase
+ * LMU on its main menu (or playing a replay) -> menu; an initializing empty session stays loading;
+ * not in realtime -> garage; game phase
  * 0-4 -> starting, 5-7 -> driving, 8 -> finished once the player has taken the flag (or is out), still driving on
  * the last lap until then (the session is over from the leader's flag, a lap or more before a slower car's); phase 9
  * (paused) keeps the previous lifecycle. `screen` comes
@@ -111,7 +112,8 @@ export function deriveLiveState(reading: LiveScoringReading | null, previous: Li
     paused,
     session: lifecycle === 'menu' ? null : sessionInfo(reading),
   });
-  if (reading.numVehicles <= 0) return state('menu', false);
+  // Navigation still says session: an empty buffer during initialization is not proof of the main menu.
+  if (reading.numVehicles <= 0) return { lifecycle: 'loading', paused: false, session: null };
   if (!reading.inRealtime) return state('garage', false);
   const phase = reading.gamePhase;
   if (phase >= 0 && phase <= 4) return state('starting', false);

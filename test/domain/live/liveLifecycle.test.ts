@@ -11,7 +11,7 @@ function reading(overrides: Partial<LiveScoringReading> = {}): LiveScoringReadin
 describe('live lifecycle', () => {
   it.each<[string, LiveScoringReading | null, LiveLifecycle, LiveLifecycle, boolean]>([
     ['no shared memory', null, 'driving', 'offline', false],
-    ['no vehicles in the session', reading({ numVehicles: 0 }), 'offline', 'menu', false],
+    ['session awaiting its first vehicles', reading({ numVehicles: 0 }), 'offline', 'loading', false],
     ['in the monitor', reading({ inRealtime: false }), 'driving', 'garage', false],
     ['grid (phase 0)', reading({ gamePhase: 0 }), 'garage', 'starting', false],
     ['formation (phase 3)', reading({ gamePhase: 3 }), 'garage', 'starting', false],
