@@ -21,10 +21,10 @@ const paceDomain = (values: number[]): { lo: number; hi: number } => {
 };
 
 const TREND_STYLES = {
-  improving: { line: 'text-lmu-gain', pill: 'bg-lmu-gain-deep/60 text-lmu-gain border-lmu-gain-strong/30' },
-  declining: { line: 'text-lmu-loss', pill: 'bg-lmu-loss-deep/60 text-lmu-loss border-lmu-loss-strong/30' },
-  steady: { line: 'text-lmu-info', pill: 'bg-lmu-raised/60 text-lmu-text-soft border-lmu-rule' },
-  none: { line: 'text-lmu-info', pill: '' },
+  improving: 'bg-lmu-gain-deep/60 text-lmu-gain border-lmu-gain-strong/30',
+  declining: 'bg-lmu-raised/60 text-lmu-text-soft border-lmu-rule',
+  steady: 'bg-lmu-raised/60 text-lmu-text-soft border-lmu-rule',
+  none: '',
 } as const;
 
 const dateOf = (timeString: string) => timeString.split(' ')[0];
@@ -77,7 +77,7 @@ export const DashboardPaceSparkline: React.FC<DashboardPaceSparklineProps> = ({
           </span>
         </div>
         {paceTrendDirection !== 'none' && (
-          <span className={`mb-1 font-mono font-bold px-1.5 py-0.5 rounded text-[11px] border ${trend.pill}`}>
+          <span className={`mb-1 font-mono font-bold px-1.5 py-0.5 rounded text-[11px] border ${trend}`}>
             {/* paceDelta is the drop in benchmark %, so positive is faster. */}
             {paceTrendDirection === 'improving' && paceDelta !== null && `${paceDelta.toFixed(2)}% faster ↗`}
             {paceTrendDirection === 'declining' && paceDelta !== null && `${Math.abs(paceDelta).toFixed(2)}% slower ↘`}
@@ -86,9 +86,10 @@ export const DashboardPaceSparkline: React.FC<DashboardPaceSparklineProps> = ({
         )}
       </div>
 
-      <div className={`relative w-full h-[72px] bg-lmu-deep/60 rounded-md border border-lmu-border/80 overflow-hidden ${trend.line}`}>
+      {/* The trace is pace history; its color does not grade the driver's overall pace. */}
+      <div className="relative w-full h-[72px] bg-lmu-deep/60 rounded-md border border-lmu-border/80 overflow-hidden text-lmu-info">
         <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-full block" preserveAspectRatio="none">
-          <path d={areaD} fill="currentColor" fillOpacity="0.1" />
+          <path d={areaD} fill="currentColor" fillOpacity="0.05" />
           <path d={lineD} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
         </svg>
 

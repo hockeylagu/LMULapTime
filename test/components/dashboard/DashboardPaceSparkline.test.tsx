@@ -97,7 +97,7 @@ describe('DashboardPaceSparkline component', () => {
       <DashboardPaceSparkline points={points} paceDelta={-1.5} paceTrendDirection="declining" />
     );
     // 102.0% then 103.5% of the benchmark: slower, said in words rather than a signed delta.
-    expect(screen.getByText('1.50% slower ↘')).toHaveClass('text-lmu-loss');
+    expect(screen.getByText('1.50% slower ↘')).toHaveClass('text-lmu-text-soft');
 
     rerender(
       <DashboardPaceSparkline points={points} paceDelta={0.05} paceTrendDirection="steady" />
