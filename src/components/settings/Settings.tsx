@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useEffectEvent, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { AlertCircle, Search } from 'lucide-react';
 import { AppStatus, ReplayScanStatus, ScanStatus } from '../../../shared/types/index.js';
@@ -76,16 +76,13 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
 
   // Open on the section named by ?section=<id>. Cards above it load after the first paint, so the
   // alignment is repeated (instantly) while the page grows, until the reader scrolls.
-  const requestedSection = useRef<string | null>(null);
-  if (requestedSection.current === null) {
-    const requested = searchParams.get('section');
-    requestedSection.current = resolveSectionId(requested) ?? '';
-  }
-  useEffect(() => {
-    if (requestedSection.current) goToSection(requestedSection.current, false, 'auto');
-    // Only the first render honours the link; later changes come from the TOC itself.
-  }, []);
-  useDeepLinkAlign(requestedSection.current || null, (id) => {
+  const [requestedSection] = useState(() => resolveSectionId(searchParams.get('section')) ?? '');
+  const openRequestedSection = useEffectEvent(() => {
+    if (requestedSection) goToSection(requestedSection, false, 'auto');
+  });
+  // Only the first render honours the link; later changes come from the TOC itself.
+  useEffect(() => { openRequestedSection(); }, []);
+  useDeepLinkAlign(requestedSection || null, (id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'auto', block: 'start' });
   });
 

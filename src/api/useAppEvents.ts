@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useEffectEvent } from 'react';
 import { APP_EVENTS, LIVE_HEARTBEAT_MS } from '../../shared/types/live.js';
 
 /** Allow two missed heartbeats before discarding the last game status and reconnecting. */
@@ -30,8 +30,10 @@ function readRunning(data: unknown): boolean {
 
 /** Listens to the app-wide server events (`GET /api/events`) while `enabled`; the browser reconnects by itself. */
 export function useAppEvents(handlers: AppEventHandlers, enabled: boolean): void {
-  const latest = useRef(handlers);
-  latest.current = handlers;
+  const scanStarted = useEffectEvent(() => handlers.onScanStarted());
+  const scanFinished = useEffectEvent(() => handlers.onScanFinished());
+  const gameStarted = useEffectEvent(() => handlers.onGameStarted?.());
+  const gameRunning = useEffectEvent((running: boolean) => handlers.onGameRunning?.(running));
 
   useEffect(() => {
     if (!enabled || typeof EventSource === 'undefined') return;
@@ -45,7 +47,7 @@ export function useAppEvents(handlers: AppEventHandlers, enabled: boolean): void
     };
     const clearGameRunning = () => {
       stale = undefined;
-      latest.current.onGameRunning?.(false);
+      gameRunning(false);
     };
     // Silence already waited 2.5 heartbeats: the status is stale now. An error keeps it until the reconnect can answer.
     function lost(graceMs: number): void {
@@ -60,14 +62,14 @@ export function useAppEvents(handlers: AppEventHandlers, enabled: boolean): void
       source = new EventSource('/api/events');
       heard();
       source.addEventListener(APP_EVENTS.heartbeat, heard);
-      source.addEventListener(APP_EVENTS.scanStarted, () => { heard(); latest.current.onScanStarted(); });
-      source.addEventListener(APP_EVENTS.scanFinished, () => { heard(); latest.current.onScanFinished(); });
-      source.addEventListener(APP_EVENTS.gameStarted, () => { heard(); latest.current.onGameStarted?.(); });
+      source.addEventListener(APP_EVENTS.scanStarted, () => { heard(); scanStarted(); });
+      source.addEventListener(APP_EVENTS.scanFinished, () => { heard(); scanFinished(); });
+      source.addEventListener(APP_EVENTS.gameStarted, () => { heard(); gameStarted(); });
       source.addEventListener(APP_EVENTS.gameRunning, (event: MessageEvent) => {
         heard();
         clearTimeout(stale);
         stale = undefined;
-        latest.current.onGameRunning?.(readRunning(event.data));
+        gameRunning(readRunning(event.data));
       });
       source.addEventListener('error', () => lost(APP_EVENT_ERROR_GRACE_MS));
     }

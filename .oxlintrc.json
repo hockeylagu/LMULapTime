@@ -11,10 +11,10 @@
     "react/rules-of-hooks": "error",
     "react/exhaustive-deps": "error",
     "react/set-state-in-effect": "error",
-    "react/refs": "off", // The latest-value ref pattern (ref.current = value in render) keeps event listeners stable.
+    "react/refs": "error",
     "unicorn/no-new-array": "off", // Hot numeric code preallocates arrays by length (new Array<number>(n)); Array.from is slower.
     "oxc/no-map-spread": "off", // Per-item copies in map() are deliberate: rows stay immutable.
-    "react/no-array-index-key": "off", // Index keys are only used on static lists that never reorder.
+    "react/no-array-index-key": "off", // Index keys mark positions (gradient stops, ticks, fixed columns, report text); filtered lists key by data.
     "max-lines": ["error", { "max": 1000, "skipBlankLines": false, "skipComments": false }]
   },
   "overrides": [
@@ -45,6 +45,17 @@
       "files": ["test/**", "tools/**"],
       "rules": {
         "eslint/no-await-in-loop": "off" // Test setup and benchmark steps each depend on the one before.
+      }
+    },
+    {
+      "files": [
+        "src/components/replay/inspector/useReplayInspectorData.ts",
+        "src/components/replay/map/scene/GpsTrackSegments.tsx",
+        "src/components/replay/map/useGpsMapPanZoom.ts",
+        "src/components/replay/telemetry/useTelemetryStripInteraction.ts"
+      ],
+      "rules": {
+        "react/refs": "off" // Playback, pan/zoom and scrub handlers read and update these refs mid-gesture, ahead of the next render.
       }
     },
     {

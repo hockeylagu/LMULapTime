@@ -45,7 +45,7 @@ export interface OverviewCardProps {
  * Benchmark figures live in their own card, so each number appears once on the page.
  */
 export const OverviewCard: React.FC<OverviewCardProps> = ({ status, replay, ai, isClearingCache, isScanRunning = false, onClearCache, cacheMessage }) => {
-  const confirm = useInlineConfirm('overview-heading');
+  const { isOpen: isConfirmOpen, triggerRef, open: openConfirm, cancel: cancelConfirm, confirm } = useInlineConfirm('overview-heading');
   const missing = getMissingPaths(status);
   const cache = status?.sqliteCache;
   const sessionsKnown = cache?.sessionsCount ?? status?.sessionsCount;
@@ -103,19 +103,19 @@ export const OverviewCard: React.FC<OverviewCardProps> = ({ status, replay, ai, 
             : 'Parsed sessions are cached in SQLite; a sync reads only new or changed logs. Clearing re-reads them from your XML logs and keeps replays and telemetry.'}
         </p>
 
-        {confirm.isOpen ? (
+        {isConfirmOpen ? (
           <InlineConfirm
             label="Confirm clearing the session cache"
             message={`Clear ${sessionsLabel}?`}
             confirmIcon={<Trash2 className="w-3.5 h-3.5" aria-hidden="true" />}
-            onConfirm={() => confirm.confirm(onClearCache)}
-            onCancel={confirm.cancel}
+            onConfirm={() => confirm(onClearCache)}
+            onCancel={cancelConfirm}
           />
         ) : (
           <button
-            ref={confirm.triggerRef}
+            ref={triggerRef}
             type="button"
-            onClick={confirm.open}
+            onClick={openConfirm}
             disabled={isClearingCache || isScanRunning || sessionsCount === 0}
             title={isScanRunning ? 'Wait for the running scan to finish' : undefined}
             className={`${SECONDARY_BUTTON} shrink-0`}

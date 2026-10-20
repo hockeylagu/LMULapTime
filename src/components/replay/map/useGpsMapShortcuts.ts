@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useEffectEvent } from 'react';
 import type { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { isReplaySurfaceTarget, replayShortcutBlocked } from '../../../utils/replayShortcuts.js';
 
@@ -20,7 +20,7 @@ export interface UseGpsMapShortcutsOptions {
 }
 
 /**
- * Handles keyboard shortcuts on the GPS track map (only when it is focused or expanded, never for keys
+ * Handles keyboard shortcuts on the GPS track map (only when it is focused or isExpanded, never for keys
  * pressed on the telemetry chart), matching the telemetry strip interactions:
  * - ArrowLeft / ArrowRight: Step by 1 sample (or Shift + Arrow: jump by 0.5s)
  * - Home / End: Lap start / end
@@ -47,130 +47,84 @@ export function useGpsMapShortcuts({
   onToggleExpanded,
   onToggleTrace,
 }: UseGpsMapShortcutsOptions): void {
-  const optionsRef = useRef({
-    isExpanded,
-    containerRef,
-    points,
-    currentIndex,
-    onSelectIndex,
-    onZoomIn,
-    onZoomOut,
-    onResetZoom,
-    onTogglePlay,
-    onToggleGForce,
-    onPan,
-    onToggleExpanded,
-    onToggleTrace,
+  const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    if (replayShortcutBlocked(event)) return;
+    const container = containerRef.current;
+    if (event.key.toLowerCase() === 'm' && onToggleExpanded) {
+      // M works from any replay surface, but only for this live map and never while another map is expanded.
+      if (event.repeat || !container || container.closest('[inert]') || !isReplaySurfaceTarget(event)) return;
+      const expandedMap = document.querySelector('[data-map-expanded]');
+      if (expandedMap && expandedMap !== container) return;
+      event.preventDefault();
+      onToggleExpanded();
+      return;
+    }
+    if (event.key.toLowerCase() === 't' && isExpanded && onToggleTrace) {
+      // Expanded, focus is trapped in the map, so T works from the map and from its trace alike.
+      if (!event.repeat) { event.preventDefault(); onToggleTrace(); }
+      return;
+    }
+    const isTargetOnMap = Boolean(container && event.target instanceof Node && container.contains(event.target));
+    // Map keys act only on the map: focused on it, or expanded over everything. The telemetry
+    // chart handles its own arrows, Home/End, zoom and reset, so a key pressed on it must not
+    // also move the map (each press acts once).
+    if (!isExpanded && !isTargetOnMap) return;
+    const otherSurface = event.target instanceof Element ? event.target.closest('[data-replay-surface]') : null;
+    if (otherSurface && otherSurface !== container) return;
+
+    const total = points.length;
+    if (total === 0) return;
+    const safeIndex = Math.max(0, Math.min(total - 1, currentIndex));
+
+    const panDirections: Record<string, [number, number]> = { w: [0, -1], a: [-1, 0], s: [0, 1], d: [1, 0] };
+    const panDirection = panDirections[event.key.toLowerCase()];
+    if (onPan && panDirection) {
+      event.preventDefault();
+      onPan(...panDirection);
+    } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+      event.preventDefault();
+      const direction = event.key === 'ArrowLeft' ? -1 : 1;
+      if (!event.shiftKey) {
+        onSelectIndex?.(Math.max(0, Math.min(total - 1, safeIndex + direction)));
+      } else {
+        const currentTime = points[safeIndex]?.timeSec ?? safeIndex / 40;
+        const target = currentTime + direction * 0.5;
+        let lo = 0;
+        let hi = total - 1;
+        while (lo < hi) {
+          const mid = (lo + hi + 1) >> 1;
+          if ((points[mid]?.timeSec ?? mid / 40) <= target) lo = mid;
+          else hi = mid - 1;
+        }
+        onSelectIndex?.(lo);
+      }
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      onSelectIndex?.(0);
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      onSelectIndex?.(total - 1);
+    } else if (event.key === '+' || event.key === '=') {
+      event.preventDefault();
+      onZoomIn();
+    } else if (event.key === '-') {
+      event.preventDefault();
+      onZoomOut();
+    } else if (event.key === '0' || event.key.toLowerCase() === 'r') {
+      event.preventDefault();
+      onResetZoom();
+    } else if (event.key === ' ' && isExpanded) {
+      event.preventDefault();
+      onTogglePlay?.();
+    } else if (event.key.toLowerCase() === 'g') {
+      event.preventDefault();
+      onToggleGForce?.();
+    }
   });
-  optionsRef.current = {
-    isExpanded,
-    containerRef,
-    points,
-    currentIndex,
-    onSelectIndex,
-    onZoomIn,
-    onZoomOut,
-    onResetZoom,
-    onTogglePlay,
-    onToggleGForce,
-    onPan,
-    onToggleExpanded,
-    onToggleTrace,
-  };
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (replayShortcutBlocked(event)) return;
-      const {
-        isExpanded: expanded,
-        containerRef: contRef,
-        points: pts,
-        currentIndex: idx,
-        onSelectIndex: selectIndex,
-        onZoomIn: zoomIn,
-        onZoomOut: zoomOut,
-        onResetZoom: resetZoom,
-        onTogglePlay: togglePlay,
-        onToggleGForce: toggleGForce,
-        onPan: pan,
-        onToggleExpanded: toggleExpanded,
-        onToggleTrace: toggleTrace,
-      } = optionsRef.current;
-
-      const container = contRef.current;
-      if (event.key.toLowerCase() === 'm' && toggleExpanded) {
-        // M works from any replay surface, but only for this live map and never while another map is expanded.
-        if (event.repeat || !container || container.closest('[inert]') || !isReplaySurfaceTarget(event)) return;
-        const expandedMap = document.querySelector('[data-map-expanded]');
-        if (expandedMap && expandedMap !== container) return;
-        event.preventDefault();
-        toggleExpanded();
-        return;
-      }
-      if (event.key.toLowerCase() === 't' && expanded && toggleTrace) {
-        // Expanded, focus is trapped in the map, so T works from the map and from its trace alike.
-        if (!event.repeat) { event.preventDefault(); toggleTrace(); }
-        return;
-      }
-      const isTargetOnMap = Boolean(container && event.target instanceof Node && container.contains(event.target));
-      // Map keys act only on the map: focused on it, or expanded over everything. The telemetry
-      // chart handles its own arrows, Home/End, zoom and reset, so a key pressed on it must not
-      // also move the map (each press acts once).
-      if (!expanded && !isTargetOnMap) return;
-      const otherSurface = event.target instanceof Element ? event.target.closest('[data-replay-surface]') : null;
-      if (otherSurface && otherSurface !== container) return;
-
-      const total = pts.length;
-      if (total === 0) return;
-      const safeIndex = Math.max(0, Math.min(total - 1, idx));
-
-      const panDirections: Record<string, [number, number]> = { w: [0, -1], a: [-1, 0], s: [0, 1], d: [1, 0] };
-      const panDirection = panDirections[event.key.toLowerCase()];
-      if (pan && panDirection) {
-        event.preventDefault();
-        pan(...panDirection);
-      } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-        event.preventDefault();
-        const direction = event.key === 'ArrowLeft' ? -1 : 1;
-        if (!event.shiftKey) {
-          selectIndex?.(Math.max(0, Math.min(total - 1, safeIndex + direction)));
-        } else {
-          const currentTime = pts[safeIndex]?.timeSec ?? safeIndex / 40;
-          const target = currentTime + direction * 0.5;
-          let lo = 0;
-          let hi = total - 1;
-          while (lo < hi) {
-            const mid = (lo + hi + 1) >> 1;
-            if ((pts[mid]?.timeSec ?? mid / 40) <= target) lo = mid;
-            else hi = mid - 1;
-          }
-          selectIndex?.(lo);
-        }
-      } else if (event.key === 'Home') {
-        event.preventDefault();
-        selectIndex?.(0);
-      } else if (event.key === 'End') {
-        event.preventDefault();
-        selectIndex?.(total - 1);
-      } else if (event.key === '+' || event.key === '=') {
-        event.preventDefault();
-        zoomIn();
-      } else if (event.key === '-') {
-        event.preventDefault();
-        zoomOut();
-      } else if (event.key === '0' || event.key.toLowerCase() === 'r') {
-        event.preventDefault();
-        resetZoom();
-      } else if (event.key === ' ' && expanded) {
-        event.preventDefault();
-        togglePlay?.();
-      } else if (event.key.toLowerCase() === 'g') {
-        event.preventDefault();
-        toggleGForce?.();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    const onKeyDown = (event: KeyboardEvent) => handleKeyDown(event);
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 }

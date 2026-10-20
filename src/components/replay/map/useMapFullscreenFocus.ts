@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useEffectEvent } from 'react';
 
 /** Isolate an in-place expanded map without remounting its playback/camera state. */
 export function useMapFullscreenFocus(
@@ -6,8 +6,7 @@ export function useMapFullscreenFocus(
   buttonRef: React.RefObject<HTMLButtonElement | null>,
   onClose: () => void,
 ) {
-  const closeRef = useRef(onClose);
-  closeRef.current = onClose;
+  const close = useEffectEvent(onClose);
   useEffect(() => {
     const button = buttonRef.current;
     const map = button?.closest<HTMLElement>('[data-replay-surface="map"]');
@@ -46,7 +45,7 @@ export function useMapFullscreenFocus(
       if (event.defaultPrevented || hasNestedDialog()) return;
       if (event.key === 'Escape') {
         event.preventDefault();
-        closeRef.current();
+        close();
       } else if (event.key === 'Tab') {
         const items = controls();
         const first = items[0] ?? map;

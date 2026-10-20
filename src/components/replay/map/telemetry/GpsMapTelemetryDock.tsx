@@ -52,8 +52,10 @@ export function GpsMapTelemetryDock({ points, baselinePoints, comparisons: scene
   const hasBaseline = Boolean(baselinePoints?.length);
   // Keep the saved comparison choice, but show speed while there is no reference lap.
   const activeChannel = channel === 'delta' && !hasBaseline ? 'speed' : channel;
-  const interaction = useTelemetryStripInteraction({ points, currentIndex, onSelectIndex, trackLengthM, enabled: !collapsed });
-  const { viewStart, viewEnd, cumDists, safeIndex, pctForIndex } = interaction;
+  const {
+    viewStart, viewEnd, cumDists, safeIndex, pctForIndex, containerRef, dragSelection, interactionMode, isZoomed,
+    setInteractionMode, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleResetZoom,
+  } = useTelemetryStripInteraction({ points, currentIndex, onSelectIndex, trackLengthM, enabled: !collapsed });
   const playback = usePlaybackPosition(points, currentIndex);
   const index = playback?.index ?? safeIndex;
   const cursorPct = pctForIndex(index) + (playback?.fraction ?? 0)
@@ -106,13 +108,13 @@ export function GpsMapTelemetryDock({ points, baselinePoints, comparisons: scene
       </div>
       <span aria-hidden="true" className="h-5 w-px bg-lmu-border" />
       {!collapsed && <>
-        <button type="button" className={`${buttonClass} ${interaction.interactionMode === 'zoom' ? 'bg-lmu-raised text-lmu-text' : ''}`} aria-pressed={interaction.interactionMode === 'zoom'}
+        <button type="button" className={`${buttonClass} ${interactionMode === 'zoom' ? 'bg-lmu-raised text-lmu-text' : ''}`} aria-pressed={interactionMode === 'zoom'}
           title="Select a range by dragging. Shift-drag also selects a range; double-click restores the full lap."
-          onClick={() => interaction.setInteractionMode(mode => mode === 'scrub' ? 'zoom' : 'scrub')}>
+          onClick={() => setInteractionMode(mode => mode === 'scrub' ? 'zoom' : 'scrub')}>
           Zoom range
         </button>
-        {interaction.isZoomed && <button type="button" className={buttonClass}
-          onClick={interaction.handleResetZoom}>Full lap</button>}
+        {isZoomed && <button type="button" className={buttonClass}
+          onClick={handleResetZoom}>Full lap</button>}
         {activeChannel === 'pedals' && <span className="flex gap-3 text-[10px] text-lmu-muted">
           <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="w-3 border-t-2" style={{ borderColor: TELEMETRY_COLORS.throttle }} />Throttle</span>
           <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="w-3 border-t-2" style={{ borderColor: TELEMETRY_COLORS.brake }} />Brake</span>
@@ -128,11 +130,11 @@ export function GpsMapTelemetryDock({ points, baselinePoints, comparisons: scene
       </button>
       </div>
     </div>
-    <div id={contentId} ref={interaction.containerRef} tabIndex={0} data-replay-surface="chart" style={collapsed ? { display: 'none' } : undefined}
+    <div id={contentId} ref={containerRef} tabIndex={0} data-replay-surface="chart" style={collapsed ? { display: 'none' } : undefined}
       aria-label="Fullscreen telemetry chart" className={`group/trace relative flex h-28 flex-col cursor-crosshair outline-none ${compactChannel ? 'ml-14 mr-4' : 'overflow-hidden'}`}
-      onPointerDown={interaction.handlePointerDown} onPointerMove={interaction.handlePointerMove}
-      onPointerUp={interaction.handlePointerUp} onPointerCancel={interaction.handlePointerCancel}
-      onDoubleClick={interaction.handleResetZoom}
+      onPointerDown={handlePointerDown} onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel}
+      onDoubleClick={handleResetZoom}
       onKeyDown={event => {
         if (event.key === ' ') { event.preventDefault(); onTogglePlay?.(); }
       }}>
@@ -148,9 +150,9 @@ export function GpsMapTelemetryDock({ points, baselinePoints, comparisons: scene
         <span className={`absolute top-1 left-1 rounded px-1 py-0.5 font-mono text-[10px] font-bold ${sector.tag}`}>{sector.label}</span>
       </div>)}
       {isCursorInView && <TelemetryScrubCursor cursorPct={cursorPct} />}
-      {interaction.dragSelection && <div className="absolute inset-y-0 bg-lmu-info-strong/25 border-x border-lmu-info pointer-events-none"
-        style={{ left: `${Math.min(interaction.dragSelection.startPct, interaction.dragSelection.currentPct)}%`,
-          width: `${Math.abs(interaction.dragSelection.currentPct - interaction.dragSelection.startPct)}%` }} />}
+      {dragSelection && <div className="absolute inset-y-0 bg-lmu-info-strong/25 border-x border-lmu-info pointer-events-none"
+        style={{ left: `${Math.min(dragSelection.startPct, dragSelection.currentPct)}%`,
+          width: `${Math.abs(dragSelection.currentPct - dragSelection.startPct)}%` }} />}
     </div>
   </section>;
 }

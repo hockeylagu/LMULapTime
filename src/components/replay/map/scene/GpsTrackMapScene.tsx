@@ -66,21 +66,21 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
     initialZoom: props.initialZoom,
     initialFollowCar: props.initialFollowCar,
   });
-  const { zoomLevel, containerRef, currentViewBox, handlePointerDown, handlePointerMove,
-    handlePointerUp, handleDoubleClick, resetPanZoom, focusOnPoint, markerScale } = camera;
+  const { zoomLevel, containerRef, viewportRef, currentViewBox, handlePointerDown, handlePointerMove,
+    handlePointerUp, handleDoubleClick, resetPanZoom, focusOnPoint, markerScale, zoomIn, zoomOut, panBy, panTo } = camera;
   useGpsMapShortcuts({
     isExpanded,
     containerRef,
     points,
     currentIndex,
     onSelectIndex,
-    onZoomIn: camera.zoomIn,
-    onZoomOut: camera.zoomOut,
-    onResetZoom: camera.resetPanZoom,
+    onZoomIn: zoomIn,
+    onZoomOut: zoomOut,
+    onResetZoom: resetPanZoom,
     onTogglePlay,
     onToggleGForce: handleToggleGForce,
     onToggleTrace: toggleTrace,
-    onPan: camera.panBy,
+    onPan: panBy,
     onToggleExpanded: () => setIsExpanded(expanded => !expanded),
   });
   const cullViewBox = useStableCullViewBox(currentViewBox, zoomLevel >= 2.5);
@@ -141,7 +141,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
       onPointerUp={handlePointerUp} onDoubleClick={handleDoubleClick}
       className={`relative flex flex-col items-center select-none overflow-hidden overscroll-contain touch-none cursor-grab active:cursor-grabbing [&[data-map-expanded]]:fixed [&[data-map-expanded]]:inset-0 [&[data-map-expanded]]:z-[1000] [&[data-map-expanded]]:w-screen [&[data-map-expanded]]:h-screen [&[data-map-expanded]]:bg-lmu-bg ${className} ${FOCUS_RING}`}
     >
-      <div ref={camera.viewportRef} className="relative w-full flex-1 min-h-0 overflow-hidden">
+      <div ref={viewportRef} className="relative w-full flex-1 min-h-0 overflow-hidden">
       {showControls && (
         <GpsMapControls camera={camera} layers={layers} onChange={changeLayers} geometry={effectiveGeometry}
           display={display} error={displayError} bounds={effectiveBounds} left={leftSvgPoints} right={rightSvgPoints}
@@ -153,7 +153,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
 
       {showMinimap && (
         <GpsCircuitMinimap trackBoundaryPathD={trackBoundaryPathD} layoutPathD={trackBoundaryPathD}
-          currentPos={currentPos} baselineGhostPos={baselineGhostPos} currentViewBox={currentViewBox} onPanTo={camera.panTo}
+          currentPos={currentPos} baselineGhostPos={baselineGhostPos} currentViewBox={currentViewBox} onPanTo={panTo}
           isExpanded={isExpanded} />
       )}
 

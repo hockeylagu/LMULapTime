@@ -14,8 +14,9 @@ function setup() {
   let navigation: ReturnType<typeof useTelemetryStripInteraction>;
   function Harness() {
     navigation = useTelemetryStripInteraction({ points, currentIndex: 50, onSelectIndex: select });
-    return <div ref={navigation.containerRef} tabIndex={0} data-testid="chart" data-replay-surface="chart"
-      onPointerDown={navigation.handlePointerDown} onPointerMove={navigation.handlePointerMove} onPointerUp={navigation.handlePointerUp}>
+    const { containerRef, handlePointerDown, handlePointerMove, handlePointerUp } = navigation;
+    return <div ref={containerRef} tabIndex={0} data-testid="chart" data-replay-surface="chart"
+      onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp}>
       <input aria-label="Typing" /><button>Native control</button>
     </div>;
   }

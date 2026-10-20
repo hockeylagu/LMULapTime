@@ -29,7 +29,7 @@ const AISettingsPanel: React.FC<{ ai: AiSettingsState }> = ({ ai }) => {
   const [syncedModel, setSyncedModel] = useState<string | undefined>(settings?.model);
   const [message, setMessage] = useState<SettingsFeedback | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const removeConfirm = useInlineConfirm('ai-settings-heading');
+  const { isOpen: isRemoveOpen, triggerRef: removeTriggerRef, open: openRemove, cancel: cancelRemove, confirm: confirmRemove } = useInlineConfirm('ai-settings-heading');
   const busy = useRef(false);
 
   // Follow the model the server reports, the first time it is known.
@@ -80,7 +80,7 @@ const AISettingsPanel: React.FC<{ ai: AiSettingsState }> = ({ ai }) => {
       return;
     }
     setMessage(null);
-    removeConfirm.open();
+    openRemove();
   };
 
   const statusText = aiStatusText(settings, loadError);
@@ -111,17 +111,17 @@ const AISettingsPanel: React.FC<{ ai: AiSettingsState }> = ({ ai }) => {
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" onClick={() => void save()} disabled={isSaving || !cleanedKey} data-busy={isSaving} className={PRIMARY_BUTTON}><Save className="h-3.5 w-3.5" aria-hidden="true" /> Save Key</button>
-        {removeConfirm.isOpen ? (
+        {isRemoveOpen ? (
           <InlineConfirm
             label="Confirm removing the Gemini key"
             message="Remove the key and turn AI reports off for this server session?"
             confirmLabel="Remove key"
             confirmIcon={<Trash2 className="h-3.5 w-3.5" aria-hidden="true" />}
-            onConfirm={() => removeConfirm.confirm(() => void remove())}
-            onCancel={removeConfirm.cancel}
+            onConfirm={() => confirmRemove(() => void remove())}
+            onCancel={cancelRemove}
           />
         ) : (
-          <button ref={removeConfirm.triggerRef} type="button" onClick={requestRemove} disabled={isSaving || !settings?.configured || settings.keySource === 'environment'} className={SECONDARY_BUTTON}><Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Remove session key</button>
+          <button ref={removeTriggerRef} type="button" onClick={requestRemove} disabled={isSaving || !settings?.configured || settings.keySource === 'environment'} className={SECONDARY_BUTTON}><Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Remove session key</button>
         )}
         <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className={`inline-flex items-center gap-1.5 h-8 rounded-lg border border-lmu-border px-3 text-xs font-semibold text-lmu-muted hover:text-lmu-text hover:border-lmu-rule transition-colors ${FOCUS_RING}`}><ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /> Get a Gemini key</a>
       </div>

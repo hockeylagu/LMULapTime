@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { LiveTimingStore } from '../../../api/liveStream.js';
 import { updateSearchParams } from '../../../utils/urlParams.js';
@@ -15,9 +15,18 @@ import { useLiveDashboardSettings } from '../../../api/useLiveDashboardSettings.
 
 const GROUPS = [...new Set(DEMO_SCENARIOS.map(s => s.group))];
 
+function buildDemo(scenario: string, carClass: string, reserveLaps: number, pedalTraceSeconds: number) {
+  const state = createDemoState(scenario, carClass, reserveLaps);
+  const timing = new LiveTimingStore();
+  timing.set(state.timing);
+  const buffer = new PedalBuffer(pedalTraceSeconds);
+  buffer.push(Array.from({ length: pedalTraceSeconds * 50 + 1 }, (_, i) => pedalSample(i / 50)));
+  return { state, timing, buffer };
+}
+
 /** Explicit opt-in: mounts no game stream and needs no backend or recorded files. */
 export default function LiveDemoPage() {
-  const settings = useLiveDashboardSettings();
+  const { reserveLaps, pedalTraceSeconds } = useLiveDashboardSettings();
   const [params, setParams] = useSearchParams();
   const requested = params.get('scenario') ?? 'race';
   const requestedIndex = DEMO_SCENARIOS.findIndex(s => s.id === requested);
@@ -28,14 +37,11 @@ export default function LiveDemoPage() {
   const [tour, setTour] = useState(false);
   const [animate, setAnimate] = useState(false);
   const [controls, setControls] = useState(params.get('controls') !== 'hidden');
-  const { state, timing, buffer } = useMemo(() => {
-    const state = createDemoState(selected.id, carClass, settings.reserveLaps);
-    const timing = new LiveTimingStore();
-    timing.set(state.timing);
-    const buffer = new PedalBuffer(settings.pedalTraceSeconds);
-    buffer.push(Array.from({ length: settings.pedalTraceSeconds * 50 + 1 }, (_, i) => pedalSample(i / 50)));
-    return { state, timing, buffer };
-  }, [selected.id, carClass, settings.reserveLaps, settings.pedalTraceSeconds]);
+  // The stores are mutable (the animation pushes pedal samples), so they live in state, rebuilt when the inputs change.
+  const demoKey = `${selected.id}|${carClass}|${reserveLaps}|${pedalTraceSeconds}`;
+  const [demo, setDemo] = useState(() => ({ key: demoKey, ...buildDemo(selected.id, carClass, reserveLaps, pedalTraceSeconds) }));
+  if (demo.key !== demoKey) setDemo({ key: demoKey, ...buildDemo(selected.id, carClass, reserveLaps, pedalTraceSeconds) });
+  const { state, timing, buffer } = demo;
 
   useEffect(() => {
     const previous = document.title;

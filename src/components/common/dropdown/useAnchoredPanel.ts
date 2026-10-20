@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useEffectEvent, useLayoutEffect, useState, type RefObject } from 'react';
 
 const GAP = 4;
 const EDGE = 8;
@@ -62,15 +62,15 @@ export function useAnchoredPanel(open: boolean, anchorRef: RefObject<HTMLElement
 
 /** Closes on a pointer press outside every given element. Capture: map overlays stop bubbling pointer events. */
 export function useOutsidePress(open: boolean, refs: ReadonlyArray<RefObject<HTMLElement | null>>, onOutside: () => void) {
-  const latest = useRef({ refs, onOutside });
-  latest.current = { refs, onOutside };
+  const press = useEffectEvent((target: Node) => {
+    if (refs.every(ref => !ref.current?.contains(target))) onOutside();
+  });
   useEffect(() => {
     if (!open) return;
-    const press = (event: PointerEvent) => {
-      const target = event.target;
-      if (target instanceof Node && latest.current.refs.every(ref => !ref.current?.contains(target))) latest.current.onOutside();
+    const onPress = (event: PointerEvent) => {
+      if (event.target instanceof Node) press(event.target);
     };
-    document.addEventListener('pointerdown', press, true);
-    return () => document.removeEventListener('pointerdown', press, true);
+    document.addEventListener('pointerdown', onPress, true);
+    return () => document.removeEventListener('pointerdown', onPress, true);
   }, [open]);
 }

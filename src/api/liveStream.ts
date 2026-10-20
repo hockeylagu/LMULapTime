@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useEffectEvent, useState, useSyncExternalStore } from 'react';
 import { LIVE_HEARTBEAT_MS, LIVE_STREAM_EVENTS } from '../../shared/types/live.js';
 import type { LivePedalBatch, LiveSettings, LiveSnapshot, LiveTiming } from '../../shared/types/live.js';
 import { fetchJson, postJson } from './apiClient.js';
@@ -62,8 +62,7 @@ export function useLiveStream(options: LiveStreamOptions = {}): LiveStreamState 
   const [snapshot, setSnapshot] = useState<LiveSnapshot | null>(null);
   const [connection, setConnection] = useState<LiveConnection>('connecting');
   const [timing] = useState(() => new LiveTimingStore());
-  const onPedals = useRef(options.onPedals);
-  onPedals.current = options.onPedals;
+  const pedals = useEffectEvent((batch: LivePedalBatch) => options.onPedals?.(batch));
 
   useEffect(() => {
     let source: EventSource | null = null;
@@ -107,7 +106,7 @@ export function useLiveStream(options: LiveStreamOptions = {}): LiveStreamState 
         const batch = parse<LivePedalBatch>(event);
         if (!batch) return;
         heard();
-        onPedals.current?.(batch);
+        pedals(batch);
       });
       next.addEventListener(LIVE_STREAM_EVENTS.heartbeat, heard);
       next.addEventListener('error', lost);

@@ -50,24 +50,23 @@ describe('Select', () => {
   });
 
   it('jumps by typed prefix and never lands on a disabled option', () => {
-    vi.useFakeTimers();
-    try {
-      render(<Harness initial="monza" />);
-      const combobox = screen.getByRole('combobox', { name: 'Track' });
-      fireEvent.keyDown(combobox, { key: 'l' });
-      fireEvent.keyDown(combobox, { key: 'e' });
-      expect(active(combobox)).toContain('Le Mans');
-      fireEvent.keyDown(combobox, { key: 'Escape' });
-      vi.advanceTimersByTime(600);
-      fireEvent.keyDown(combobox, { key: 's' });
-      expect(active(combobox)).toBe('Spa');
-      vi.advanceTimersByTime(600);
-      // Sebring is disabled, so S cycles past it back to Spa.
-      fireEvent.keyDown(combobox, { key: 's' });
-      expect(active(combobox)).toBe('Spa');
-    } finally {
-      vi.useRealTimers();
-    }
+    render(<Harness initial="monza" />);
+    const combobox = screen.getByRole('combobox', { name: 'Track' });
+    // Typeahead times keys by the event's own timestamp.
+    const keyAt = (key: string, timeStamp: number) => {
+      const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'timeStamp', { value: timeStamp });
+      fireEvent(combobox, event);
+    };
+    keyAt('l', 1000);
+    keyAt('e', 1100);
+    expect(active(combobox)).toContain('Le Mans');
+    keyAt('Escape', 1200);
+    keyAt('s', 1800);
+    expect(active(combobox)).toBe('Spa');
+    // Sebring is disabled, so S cycles past it back to Spa.
+    keyAt('s', 2400);
+    expect(active(combobox)).toBe('Spa');
   });
 
   it('keeps disabled options inert to the pointer and shows group captions', () => {

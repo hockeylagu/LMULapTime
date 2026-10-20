@@ -257,9 +257,9 @@ export const GpsSceneMarkers: React.FC<GpsSceneMarkersProps> = React.memo(({
         </g>
       ))}
 
-      {placedPedals.map(({ marker: m, badgePosition, showLine }, i) => (
+      {placedPedals.map(({ marker: m, badgePosition, showLine }) => (
         <GpsScenePedalMarker
-          key={`pedal-${m.isBaseline ? 'base' : 'prim'}-${m.kind}-${m.cornerNumber}-${i}`}
+          key={`pedal-${m.isBaseline ? 'base' : 'prim'}-${m.kind}-${m.distM}`}
           marker={m}
           badgePosition={badgePosition}
           obstacles={badgeBoxes} showLine={showLine}

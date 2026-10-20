@@ -1,10 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useEffectEvent, useRef } from 'react';
 
 /** Isolates a body-portaled dialog, traps focus, and restores its trigger and scrolling. */
 export function useModalFocus(isOpen: boolean, onClose: () => void) {
   const dialogRef = useRef<HTMLDivElement>(null);
-  const closeRef = useRef(onClose);
-  closeRef.current = onClose;
+  const close = useEffectEvent(onClose);
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -19,7 +18,7 @@ export function useModalFocus(isOpen: boolean, onClose: () => void) {
     const focusFirst = () => (focusable()[0] ?? dialog).focus();
     focusFirst();
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { event.preventDefault(); closeRef.current(); }
+      if (event.key === 'Escape') { event.preventDefault(); close(); }
       if (event.key !== 'Tab') return;
       const controls = focusable();
       const first = controls[0] ?? dialog;

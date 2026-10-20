@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useState } from 'react';
 import { nextCullViewBox } from './replayMapUtils.js';
 
 /**
@@ -7,10 +7,8 @@ import { nextCullViewBox } from './replayMapUtils.js';
  * meaningfully. `undefined` when culling is off.
  */
 export function useStableCullViewBox(liveViewBox: string, enabled: boolean): string | undefined {
-  const committed = useRef<string | null>(null);
-  return useMemo(() => {
-    if (!enabled) { committed.current = null; return undefined; }
-    committed.current = nextCullViewBox(committed.current, liveViewBox);
-    return committed.current;
-  }, [liveViewBox, enabled]);
+  const [committed, setCommitted] = useState<string | null>(null);
+  const next = enabled ? nextCullViewBox(committed, liveViewBox) : null;
+  if (next !== committed) setCommitted(next);
+  return next ?? undefined;
 }

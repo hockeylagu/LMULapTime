@@ -55,6 +55,7 @@ export interface SelectProps<T extends SelectValue> {
 
 const isGroup = <T extends SelectValue>(item: SelectItem<T>): item is SelectGroup<T> => 'group' in item;
 const textOf = <T extends SelectValue>(option: SelectOption<T>) => option.text ?? (typeof option.label === 'string' ? option.label : String(option.value));
+const assignRef = <E,>(ref: Ref<E> | undefined, node: E | null) => { if (typeof ref === 'function') ref(node); else if (ref) ref.current = node; };
 
 /**
  * The single-choice dropdown (DESIGN.md, Dropdowns): a select-only combobox. Focus stays on the trigger and
@@ -99,8 +100,7 @@ export function Select<T extends SelectValue>({
     setOpen(false);
     if (option && !option.disabled && option.value !== value) onChange(option.value);
   };
-  const typeahead = (key: string) => {
-    const now = Date.now();
+  const typeahead = (key: string, now: number) => {
     typed.current = { text: now - typed.current.at > 500 ? key : typed.current.text + key, at: now };
     const prefix = typed.current.text.toLowerCase();
     const start = open ? active : selectedIndex;
@@ -112,12 +112,12 @@ export function Select<T extends SelectValue>({
 
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     const { key } = event;
-    const printable = key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey && (key !== ' ' || typed.current.text !== '' && Date.now() - typed.current.at < 500);
+    const printable = key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey && (key !== ' ' || typed.current.text !== '' && event.timeStamp - typed.current.at < 500);
     if (printable) {
       event.preventDefault();
       event.stopPropagation();
-      const match = typeahead(key);
-      if (match >= 0) open ? setActive(match) : openList(match);
+      const match = typeahead(key, event.timeStamp);
+      if (match >= 0) { if (open) setActive(match); else openList(match); }
       return;
     }
     if (!open) {
@@ -158,7 +158,7 @@ export function Select<T extends SelectValue>({
   return <>
     <button ref={node => {
       buttonRef.current = node;
-      if (typeof triggerRef === 'function') triggerRef(node); else if (triggerRef) triggerRef.current = node;
+      assignRef(triggerRef, node);
     }} id={id} type="button" role="combobox" aria-haspopup="listbox" aria-expanded={open} aria-controls={listId}
       aria-activedescendant={open && active >= 0 ? `${baseId}-${active}` : undefined} aria-busy={busy || undefined}
       aria-label={aria['aria-label']} title={title ?? (selected ? textOf(selected) : undefined)} disabled={disabled} data-value={value ?? ''}
