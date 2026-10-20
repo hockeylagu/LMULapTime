@@ -20,6 +20,9 @@ describe('Replay startup sync pipeline', () => {
   });
 
   it('serves event-loop callbacks between cached replay discovery and driver checks', async () => {
+    // Every item uses up a whole time slice, so the loop turns after each one.
+    let clock = 0;
+    vi.spyOn(performance, 'now').mockImplementation(() => clock += 1000);
     for (const filename of ['a.Vcr', 'b.Vcr', 'c.Vcr']) fs.writeFileSync(path.join(dir, filename), 'cached');
     let discovered = 0;
     let verified = 0;
@@ -194,5 +197,49 @@ describe('Replay startup sync pipeline', () => {
     // Only the 1 new replay is counted in progress total, not both on disk
     expect(totals.length).toBeGreaterThan(0);
     expect(totals.every((total) => total === 1)).toBe(true);
+  });
+
+  it('records a replay it cannot stat and still discovers the others', async () => {
+    const bytes = createSliceVcrBuffer({
+      drivers: [{ name: 'Player', vehicleId: '21_26_AFCO95641716', team: 'A', carNumber: '21' }],
+      slices: [{ sTime: 0, driverSlot: 1, x: 0, y: 0, z: 0 }, { sTime: 1, driverSlot: 1, x: 10, y: 0, z: 10 }],
+    });
+    fs.writeFileSync(path.join(dir, 'locked.Vcr'), bytes);
+    fs.writeFileSync(path.join(dir, 'fine.Vcr'), bytes);
+    const stat = fs.promises.stat.bind(fs.promises);
+    vi.spyOn(fs.promises, 'stat').mockImplementation(async (target, ...rest) => {
+      if (String(target).endsWith('locked.Vcr')) throw new Error('EBUSY: resource busy');
+      return stat(target, ...rest);
+    });
+    const jobs: ReplayIngestJob[] = [];
+    const iterator = db.syncReplaysAsyncIterator(dir, { playerName: 'Player', onReplayState: (job) => jobs.push(job) });
+    let step = await iterator.next();
+    while (!step.done) step = await iterator.next();
+    expect(step.value).toMatchObject({ added: 1, skipped: 1 });
+    expect(jobs.find((job) => job.name === 'locked.Vcr')).toMatchObject({ status: 'failed', error: 'EBUSY: resource busy' });
+    expect(db.getStoredReplayTrajectory('fine.Vcr', -1, -1)).not.toBeNull();
+  });
+
+  it('stops a decode in progress and leaves the replay queued for the next scan', async () => {
+    fs.writeFileSync(path.join(dir, 'stopped.Vcr'), createSliceVcrBuffer({
+      drivers: [{ name: 'Player', vehicleId: '21_26_AFCO95641716', team: 'A', carNumber: '21' }],
+      slices: [{ sTime: 0, driverSlot: 1, x: 0, y: 0, z: 0 }, { sTime: 1, driverSlot: 1, x: 10, y: 0, z: 10 }],
+    }));
+    let decoding = false;
+    const jobs: ReplayIngestJob[] = [];
+    const iterator = db.syncReplaysAsyncIterator(dir, {
+      playerName: 'Player',
+      // Stops at the first worker progress, after the decode has started.
+      shouldStop: () => decoding,
+      onReplayState: (job) => jobs.push(job),
+    });
+    let step = await iterator.next();
+    while (!step.done) {
+      if (step.value.stage === 'Verifying trajectory cache') decoding = true;
+      step = await iterator.next();
+    }
+    expect(step.value).toMatchObject({ interrupted: true });
+    expect(jobs[jobs.length - 1]).toMatchObject({ name: 'stopped.Vcr', status: 'queued' });
+    expect(db.getStoredReplayTrajectory('stopped.Vcr', -1, -1)).toBeNull();
   });
 });

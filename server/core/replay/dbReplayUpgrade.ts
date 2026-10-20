@@ -149,8 +149,10 @@ export async function* upgradeReplaysAsyncIterator(
         filename, mtimeMs, fileSizeBytes, driverSlots: candidate.driverSlots.filter(slot => slot !== -1), includePrimary,
         ...(includePrimary && candidate.primarySlot !== null && candidate.primarySlot >= 0 ? { primarySlot: candidate.primarySlot } : {}),
       });
-      let step = await extraction.next();
       let filePercent = 0;
+      // The generator's return value holds the stored drivers, which `for await` would drop.
+      // oxlint-disable-next-line eslint/no-await-in-loop -- Replays decode one at a time: each is a large worker job that writes SQLite.
+      let step = await extraction.next();
       try {
         while (!step.done) {
           if (options.shouldStop?.()) {
@@ -164,18 +166,21 @@ export async function* upgradeReplaysAsyncIterator(
           filePercent = Math.max(filePercent, Math.min(99, Math.floor(percent)));
           yield progress({ processed: index, total: backlog.length, currentFile: filename,
             stage: update.stageDescription, filePercent });
+          // oxlint-disable-next-line eslint/no-await-in-loop -- Progress arrives in order from the one worker decoding this replay.
           step = await extraction.next();
         }
       } finally {
+        // oxlint-disable-next-line eslint/no-await-in-loop -- An interrupted decode stops its worker before the next replay starts.
         if (!step.done) await extraction.return({ drivers: [], failures: [] });
       }
       if (step.done) {
+        const stored = step.value;
         for (const slot of candidate.driverSlots) {
           const match = (result: { driverSlotKey: number; isPrimary: boolean }) => result.driverSlotKey === slot || slot === -1 && result.isPrimary;
-          if (step.value.drivers.some(match)) upgraded++;
+          if (stored.drivers.some(match)) upgraded++;
           else {
             failed++;
-            const failure = step.value.failures.find(match);
+            const failure = stored.failures.find(match);
             const error = failure?.code ? Object.assign(new Error(failure.message), { code: failure.code }) : new ReplayDecodeError(failure?.message ?? 'Replay driver produced no trajectory');
             recordDriverFailure(host, filename, filePath, slot, mtimeMs, fileSizeBytes, error);
           }

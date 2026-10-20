@@ -120,7 +120,8 @@ function createProgressingSessionIterator() {
 
 describe('ServerContext background session sync', () => {
   it('publishes recording progress under its session ID, excluding unowned recordings', () => {
-    const sessionDb = { getRecordingOwners: vi.fn(() => new Map([['linked.Vcr', 'session-42']])) } as unknown as SessionDatabase;
+    const sessionDbMock = { getRecordingOwners: vi.fn(() => new Map([['linked.Vcr', 'session-42']])) };
+    const sessionDb = sessionDbMock as unknown as SessionDatabase;
     const context = createContext(sessionDb);
     Object.assign(context, { replayJobs: new Map([
       ['linked.Vcr', { name: 'linked.Vcr', status: 'failed', playable: true }],
@@ -148,7 +149,7 @@ describe('ServerContext background session sync', () => {
     let telemetryRunning = false;
     const events: string[] = [];
     let scans = 0;
-    const sessionDb = {
+    const sessionDbMock = {
       ...storedTelemetryLinks,
       getTelemetryMetadata: vi.fn(() => []),
       getTelemetryOwnersWithoutFile: vi.fn(() => []),
@@ -163,7 +164,8 @@ describe('ServerContext background session sync', () => {
         if (scans === 1) await new Promise<void>(resolve => { releaseReplay = resolve; });
         return { added: 0, updated: 0, skipped: 0, total: 0, lastSyncedAt: 'now', interrupted: false };
       })()),
-    } as unknown as SessionDatabase;
+    };
+    const sessionDb = sessionDbMock as unknown as SessionDatabase;
     const telemetryCatalog = {
       getScanStatus: () => ({ running: telemetryRunning }),
       refresh: vi.fn(() => {
@@ -182,18 +184,19 @@ describe('ServerContext background session sync', () => {
     context.requestSessionRefresh(); context.requestSessionRefresh();
     expect(context.getScanStatus().refreshQueued).toBe(true);
     releaseReplay?.(); await vi.runOnlyPendingTimersAsync();
-    expect(sessionDb.syncSessionsAsyncIterator).toHaveBeenCalledTimes(1);
+    expect(sessionDbMock.syncSessionsAsyncIterator).toHaveBeenCalledTimes(1);
     releaseTelemetry?.(); await vi.runAllTimersAsync();
-    expect(sessionDb.syncSessionsAsyncIterator).toHaveBeenCalledTimes(2);
+    expect(sessionDbMock.syncSessionsAsyncIterator).toHaveBeenCalledTimes(2);
     expect(context.getScanStatus()).toMatchObject({ refreshQueued: false, allComplete: true });
   });
 
   it('records the completed session scan and starts replay indexing once', async () => {
-    const sessionDb = {
+    const sessionDbMock = {
       getAllStoredReplayFiles: vi.fn(() => []),
       syncSessionsAsyncIterator: vi.fn(createCompletedSessionIterator),
       syncReplaysAsyncIterator: vi.fn(createCompletedReplayIterator),
-    } as unknown as SessionDatabase;
+    };
+    const sessionDb = sessionDbMock as unknown as SessionDatabase;
     const context = createContext(sessionDb);
 
     context.runInitialSessionSyncInBackground();
@@ -203,8 +206,8 @@ describe('ServerContext background session sync', () => {
 
     await vi.runAllTimersAsync();
 
-    expect(sessionDb.syncSessionsAsyncIterator).toHaveBeenCalledTimes(1);
-    expect(sessionDb.syncReplaysAsyncIterator).toHaveBeenCalledTimes(1);
+    expect(sessionDbMock.syncSessionsAsyncIterator).toHaveBeenCalledTimes(1);
+    expect(sessionDbMock.syncReplaysAsyncIterator).toHaveBeenCalledTimes(1);
     expect(context.getScanStatus()).toMatchObject({
       running: false,
       processed: 0,
@@ -222,18 +225,19 @@ describe('ServerContext background session sync', () => {
   });
 
   it('reports a session scan error and still runs replay indexing', async () => {
-    const sessionDb = {
+    const sessionDbMock = {
       getAllStoredReplayFiles: vi.fn(() => []),
       syncSessionsAsyncIterator: vi.fn(createFailingSessionIterator),
       syncReplaysAsyncIterator: vi.fn(createCompletedReplayIterator),
-    } as unknown as SessionDatabase;
+    };
+    const sessionDb = sessionDbMock as unknown as SessionDatabase;
     const context = createContext(sessionDb);
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     context.runInitialSessionSyncInBackground();
     await vi.runAllTimersAsync();
 
-    expect(sessionDb.syncReplaysAsyncIterator).toHaveBeenCalledTimes(1);
+    expect(sessionDbMock.syncReplaysAsyncIterator).toHaveBeenCalledTimes(1);
     expect(context.getScanStatus()).toMatchObject({
       running: false,
       sessionScan: {
@@ -246,13 +250,14 @@ describe('ServerContext background session sync', () => {
   });
 
   it('retries the replays that failed every attempt on a manual refresh only, not at a server start', async () => {
-    const sessionDb = {
+    const sessionDbMock = {
       getAllStoredReplayFiles: vi.fn(() => []),
       syncSessionsAsyncIterator: vi.fn(createCompletedSessionIterator),
       syncReplaysAsyncIterator: vi.fn(createCompletedReplayIterator),
-    } as unknown as SessionDatabase;
+    };
+    const sessionDb = sessionDbMock as unknown as SessionDatabase;
     const context = createContext(sessionDb);
-    const retryFailed = (call: number) => (vi.mocked(sessionDb.syncReplaysAsyncIterator).mock.calls[call] as unknown[])[1] as { retryFailed?: boolean };
+    const retryFailed = (call: number) => (vi.mocked(sessionDbMock.syncReplaysAsyncIterator).mock.calls[call] as unknown[])[1] as { retryFailed?: boolean };
 
     context.runInitialSessionSyncInBackground();
     await vi.runAllTimersAsync();
@@ -268,11 +273,12 @@ describe('ServerContext background session sync', () => {
   });
 
   it('publishes XML file and stage progress before session scanning completes', async () => {
-    const sessionDb = {
+    const sessionDbMock = {
       getAllStoredReplayFiles: vi.fn(() => []),
       syncSessionsAsyncIterator: vi.fn(createProgressingSessionIterator),
       syncReplaysAsyncIterator: vi.fn(createCompletedReplayIterator),
-    } as unknown as SessionDatabase;
+    };
+    const sessionDb = sessionDbMock as unknown as SessionDatabase;
     const context = createContext(sessionDb);
 
     context.runSessionSyncInBackground();
@@ -289,10 +295,11 @@ describe('ServerContext background session sync', () => {
   });
 
   it('refuses directory reconfiguration while a session scan is active', () => {
-    const sessionDb = {
+    const sessionDbMock = {
       getAllStoredReplayFiles: vi.fn(() => []),
       syncSessionsAsyncIterator: vi.fn(createProgressingSessionIterator),
-    } as unknown as SessionDatabase;
+    };
+    const sessionDb = sessionDbMock as unknown as SessionDatabase;
     const context = createContext(sessionDb);
 
     expect(context.runSessionSyncInBackground()).toBe(true);
@@ -301,26 +308,27 @@ describe('ServerContext background session sync', () => {
   });
 
   it('routes forced reparsing through the guarded background iterator', () => {
-    const sessionDb = {
+    const sessionDbMock = {
       getAllStoredReplayFiles: vi.fn(() => []),
 
       getSessionsCount: vi.fn(() => 0),
       getTelemetryMetadata: vi.fn(() => []),
       syncSessionsFromDir: vi.fn(),
       syncSessionsAsyncIterator: vi.fn(createCompletedSessionIterator),
-    } as unknown as SessionDatabase;
+    };
+    const sessionDb = sessionDbMock as unknown as SessionDatabase;
     const context = createContext(sessionDb);
 
     context.requestSessionRefresh(true);
 
-    expect(sessionDb.syncSessionsFromDir).not.toHaveBeenCalled();
-    expect(sessionDb.syncSessionsAsyncIterator).toHaveBeenCalledWith('', expect.objectContaining({ parseSessionXmlAsync: expect.any(Function) }), true);
+    expect(sessionDbMock.syncSessionsFromDir).not.toHaveBeenCalled();
+    expect(sessionDbMock.syncSessionsAsyncIterator).toHaveBeenCalledWith('', expect.objectContaining({ parseSessionXmlAsync: expect.any(Function) }), true);
   });
 
   it('rescans the DuckDB folder on Refresh and matches the new files to the sessions', async () => {
     const recordedAt = Date.parse('2026-09-14T18:37:49Z');
     const log = vi.spyOn(console, 'log').mockImplementation(() => undefined);
-    const sessionDb = {
+    const sessionDbMock = {
       ...storedTelemetryLinks,
       getAllStoredReplayFiles: vi.fn(() => []),
       getTelemetryFiles: vi.fn(() => [{
@@ -328,7 +336,7 @@ describe('ServerContext background session sync', () => {
         mtimeMs: recordedAt, fileSizeBytes: 100, trackName: 'Spa', sessionType: 'P', timestampStr: '', timestampEpochMs: recordedAt,
       }]),
       getSessionsCount: vi.fn(() => 0),
-      getTelemetrySessionCandidatesStartingBetween: vi.fn(() => []),
+      getTelemetrySessionCandidatesStartingBetween: vi.fn((_fromMs: number, _toMs: number) => []),
       getReplayMatchingEntriesOverlapping: vi.fn(() => []),
       getRecordingOwners: vi.fn(() => new Map()),
       getTelemetryOwnersWithoutFile: vi.fn(() => []),
@@ -336,26 +344,28 @@ describe('ServerContext background session sync', () => {
       getTelemetryMetadata: vi.fn(() => []),
       syncSessionsAsyncIterator: vi.fn(createCompletedSessionIterator),
       syncReplaysAsyncIterator: vi.fn(createCompletedReplayIterator),
-    } as unknown as SessionDatabase;
-    const telemetryCatalog = {
+    };
+    const sessionDb = sessionDbMock as unknown as SessionDatabase;
+    const telemetryCatalogMock = {
       getFiles: vi.fn(() => []),
       refresh: vi.fn(() => Promise.resolve(1)),
       getScanStatus: vi.fn(() => ({ result: { total: 1, added: 0, updated: 0 } })),
-    } as unknown as TelemetryCatalog;
+    };
+    const telemetryCatalog = telemetryCatalogMock as unknown as TelemetryCatalog;
     const context = createServerContext({
       resultsDir: '', replaysDir: '', telemetryDir: 'C:/lmu/telemetry', parser: new LmuParser(),
       sessionDb, telemetryCatalog, replayRecordings: {} as ReplayRecordingService,
     });
 
     context.requestSessionRefresh();
-    expect(telemetryCatalog.refresh).not.toHaveBeenCalled();
+    expect(telemetryCatalogMock.refresh).not.toHaveBeenCalled();
     await vi.runAllTimersAsync();
-    expect(telemetryCatalog.refresh).toHaveBeenCalledWith('C:/lmu/telemetry');
+    expect(telemetryCatalogMock.refresh).toHaveBeenCalledWith('C:/lmu/telemetry');
     expect(log).toHaveBeenCalledWith('[SQLite Cache] Synced 1 telemetry DuckDB files (0 new, 0 updated) from C:/lmu/telemetry');
     await vi.waitFor(() => expect(storedTelemetryLinks.linkTelemetryFiles).toHaveBeenCalled());
     expect(storedTelemetryLinks.linkTelemetryFiles).toHaveBeenCalled();
     // Candidates come from the file's time window, never from walking every stored session.
-    const [from, to] = vi.mocked(sessionDb.getTelemetrySessionCandidatesStartingBetween).mock.calls[0];
+    const [from, to] = vi.mocked(sessionDbMock.getTelemetrySessionCandidatesStartingBetween).mock.calls[0];
     expect(from).toBeLessThan(recordedAt);
     expect(recordedAt - from).toBeLessThanOrEqual(27 * 3600_000);
     expect(to - recordedAt).toBeLessThanOrEqual(120_000);
@@ -376,39 +386,41 @@ describe('ServerContext background session sync', () => {
   });
 
   it('queues a forced session reparse until replay indexing finishes', async () => {
-    const sessionDb = {
+    const sessionDbMock = {
       getAllStoredReplayFiles: vi.fn(() => []),
 
       getTelemetryMetadata: vi.fn(() => []),
       syncReplaysAsyncIterator: vi.fn(createProgressingReplayIterator),
       syncSessionsAsyncIterator: vi.fn(createCompletedSessionIterator),
-    } as unknown as SessionDatabase;
+    };
+    const sessionDb = sessionDbMock as unknown as SessionDatabase;
     const context = createContext(sessionDb);
 
     expect(context.runReplaySyncInBackground()).toBe(true);
     context.requestSessionRefresh(true);
-    expect(sessionDb.syncSessionsAsyncIterator).not.toHaveBeenCalled();
+    expect(sessionDbMock.syncSessionsAsyncIterator).not.toHaveBeenCalled();
 
     await vi.runAllTimersAsync();
 
-    expect(sessionDb.syncSessionsAsyncIterator).toHaveBeenCalledTimes(1);
-    expect(sessionDb.syncSessionsAsyncIterator).toHaveBeenCalledWith('', expect.objectContaining({ parseSessionXmlAsync: expect.any(Function) }), true);
+    expect(sessionDbMock.syncSessionsAsyncIterator).toHaveBeenCalledTimes(1);
+    expect(sessionDbMock.syncSessionsAsyncIterator).toHaveBeenCalledWith('', expect.objectContaining({ parseSessionXmlAsync: expect.any(Function) }), true);
   });
 });
 
 describe('ServerContext configuration and telemetry enrichment', () => {
   it('queries replay candidates on demand without hydrating the full replay history', () => {
-    const sessionDb = {
+    const sessionDbMock = {
       getAllStoredReplayFiles: vi.fn(() => []),
       getReplayMatchingEntries: vi.fn(() => []),
-    } as unknown as SessionDatabase;
+    };
+    const sessionDb = sessionDbMock as unknown as SessionDatabase;
     const context = createContext(sessionDb);
-    expect(sessionDb.getAllStoredReplayFiles).not.toHaveBeenCalled();
-    expect(sessionDb.getReplayMatchingEntries).not.toHaveBeenCalled();
+    expect(sessionDbMock.getAllStoredReplayFiles).not.toHaveBeenCalled();
+    expect(sessionDbMock.getReplayMatchingEntries).not.toHaveBeenCalled();
     context.currentParser.findMatchingReplay('Monza', 'GP', 'R1', 1000, 2000);
-    expect(sessionDb.getReplayMatchingEntries).toHaveBeenCalledWith(expect.objectContaining({ sessionTimestampMs: 1000, xmlFileMtimeMs: 2000 }));
+    expect(sessionDbMock.getReplayMatchingEntries).toHaveBeenCalledWith(expect.objectContaining({ sessionTimestampMs: 1000, xmlFileMtimeMs: 2000 }));
     context.configureDirectories({});
-    expect(sessionDb.getAllStoredReplayFiles).not.toHaveBeenCalled();
+    expect(sessionDbMock.getAllStoredReplayFiles).not.toHaveBeenCalled();
     expect(context.currentParser.getReplaysList()).toEqual([]);
   });
 
@@ -420,12 +432,14 @@ describe('ServerContext configuration and telemetry enrichment', () => {
     fs.mkdirSync(resultsDir);
     fs.mkdirSync(replaysDir);
     fs.mkdirSync(telemetryDir);
-    const sessionDb = {
+    const sessionDbMock = {
       getAllStoredReplayFiles: vi.fn(() => []),
       setMetadata: vi.fn(),
       clearTelemetryCache: vi.fn(),
-    } as unknown as SessionDatabase;
-    const telemetryCatalog = { clear: vi.fn() } as unknown as TelemetryCatalog;
+    };
+    const sessionDb = sessionDbMock as unknown as SessionDatabase;
+    const telemetryCatalogMock = { clear: vi.fn() };
+    const telemetryCatalog = telemetryCatalogMock as unknown as TelemetryCatalog;
     const context = createServerContext({
       resultsDir: '',
       replaysDir: '',
@@ -443,16 +457,16 @@ describe('ServerContext configuration and telemetry enrichment', () => {
       expect(context.replaysDir).toBe(replaysDir);
       expect(context.telemetryDir).toBe(telemetryDir);
       expect(context.currentParser.configuredPlayerName).toBe('Test Driver');
-      expect(sessionDb.setMetadata).toHaveBeenCalledWith('telemetry_dir', telemetryDir);
-      expect(sessionDb.clearTelemetryCache).toHaveBeenCalledTimes(1);
-      expect(telemetryCatalog.clear).toHaveBeenCalledTimes(1);
+      expect(sessionDbMock.setMetadata).toHaveBeenCalledWith('telemetry_dir', telemetryDir);
+      expect(sessionDbMock.clearTelemetryCache).toHaveBeenCalledTimes(1);
+      expect(telemetryCatalogMock.clear).toHaveBeenCalledTimes(1);
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
   });
 
   it('matches a replay and restores cached telemetry metadata for a session', () => {
-    const sessionDb = {
+    const sessionDbMock = {
       getAllStoredReplayFiles: vi.fn(() => []),
       getTelemetryMetadata: vi.fn(() => [{
         filename: 'Spa_P1.duckdb',
@@ -464,7 +478,8 @@ describe('ServerContext configuration and telemetry enrichment', () => {
       // Not on disk: its cached laps keep serving it.
       getTelemetryLapCacheFilenames: vi.fn(() => new Set(['Spa_P1.duckdb'])),
       updateSessionMatchingReplay: vi.fn(),
-    } as unknown as SessionDatabase;
+    };
+    const sessionDb = sessionDbMock as unknown as SessionDatabase;
     const telemetryCatalog = {
       getFiles: vi.fn(() => []),
     } as unknown as TelemetryCatalog;
@@ -499,16 +514,17 @@ describe('ServerContext configuration and telemetry enrichment', () => {
     // A replay filename association does not grant DuckDB ownership to the session.
     expect(session.matchingReplayFile).toMatchObject({ name: 'Spa P1.Vcr' });
     expect(session.duckdbFilename).toBeUndefined();
-    expect(sessionDb.updateSessionMatchingReplay).toHaveBeenCalledTimes(1);
+    expect(sessionDbMock.updateSessionMatchingReplay).toHaveBeenCalledTimes(1);
   });
 
   it('removes stale telemetry links when the active directory has no match', () => {
-    const sessionDb = {
+    const sessionDbMock = {
       getAllStoredReplayFiles: vi.fn(() => []),
       getTelemetryMetadata: vi.fn(() => []),
       ...storedTelemetryLinks,
       updateSessionMatchingReplay: vi.fn(),
-    } as unknown as SessionDatabase;
+    };
+    const sessionDb = sessionDbMock as unknown as SessionDatabase;
     const telemetryCatalog = { getFiles: vi.fn(() => []) } as unknown as TelemetryCatalog;
     const context = createServerContext({
       resultsDir: '',
@@ -667,17 +683,18 @@ describe('ServerContext reference laptime refresh', () => {
     const stale: ReferenceBenchmarkDiff = { ...benchmarkDiff, id: 7, totalAffectedSessions: 35, totalCategoryShifts: 70 };
     const db = new Database(':memory:');
     initDbSchema(db);
-    const sessionDb = {
+    const sessionDbMock = {
       getAllStoredReplayFiles: vi.fn(() => []),
       getBenchmarkDiffIdsWithImpactRuleOtherThan: vi.fn(() => [7]),
       getBenchmarkDiffById: vi.fn(() => stale),
       updateBenchmarkDiffImpact: vi.fn(),
       getDb: vi.fn(() => db),
-    } as unknown as SessionDatabase;
+    };
+    const sessionDb = sessionDbMock as unknown as SessionDatabase;
     const context = createContext(sessionDb);
     context.refreshBenchmarkDiffImpacts();
 
-    expect(sessionDb.updateBenchmarkDiffImpact).toHaveBeenCalledWith(7, expect.objectContaining({
+    expect(sessionDbMock.updateBenchmarkDiffImpact).toHaveBeenCalledWith(7, expect.objectContaining({
       id: 7, totalAffectedSessions: 0, totalCategoryShifts: 0, impactRule: expect.any(Number),
     }));
     db.close();
@@ -716,10 +733,11 @@ describe('ServerContext replay scan progress', () => {
   });
 
   it('publishes worker decoding progress before the scan completes', async () => {
-    const sessionDb = {
+    const sessionDbMock = {
       getAllStoredReplayFiles: vi.fn(() => []),
       syncReplaysAsyncIterator: vi.fn(createProgressingReplayIterator),
-    } as unknown as SessionDatabase;
+    };
+    const sessionDb = sessionDbMock as unknown as SessionDatabase;
     const context = createContext(sessionDb);
 
     context.runReplaySyncInBackground();
@@ -749,7 +767,7 @@ describe('ServerContext replay scan progress', () => {
 
     function setup(storedReplays: ReturnType<typeof replayRow>[], linkedReplay: string) {
       vi.spyOn(fs, 'statSync').mockReturnValue({ mtimeMs: xmlMtimeMs } as unknown as fs.Stats);
-      const sessionDb = {
+      const sessionDbMock = {
         getReplayMatchingEntries: vi.fn(() => storedReplays.map(row => replayIndexEntryFromStored({...row, metadata: row.metadata as import('../../../shared/types/index.js').ReplayMetadata}))),
         getReplayMatchingEntry: vi.fn((name: string) => { const row = storedReplays.find(row => row.filename === name); return row ? replayIndexEntryFromStored({...row, metadata: row.metadata as import('../../../shared/types/index.js').ReplayMetadata}) : undefined; }),
         ...storedTelemetryLinks,
@@ -757,7 +775,8 @@ describe('ServerContext replay scan progress', () => {
         updateSessionMatchingReplay: vi.fn(),
         rejectSessionReplayLink: vi.fn((_id: string, link: { name: string }, reason: string) => ({ replayName: link.name, reason, rejectedAt: 1 })),
         getRejectedReplayLinks: vi.fn(() => new Map()),
-      } as unknown as SessionDatabase;
+      };
+      const sessionDb = sessionDbMock as unknown as SessionDatabase;
       const context = createServerContext({
         resultsDir: '',
         replaysDir: '',
@@ -778,16 +797,16 @@ describe('ServerContext replay scan progress', () => {
         drivers: [],
         matchingReplayFile: { name: linkedReplay, path: 'C:\\replays\\' + linkedReplay, fileSizeBytes: 100 },
       } as unknown as DetailedSession;
-      return { context, sessionDb, session };
+      return { context, sessionDb, sessionDbMock, session };
     }
 
     it('replaces a stale match with the replay saved alongside the session XML', () => {
-      const { context, sessionDb, session } = setup([previousRace, ownRace], previousRace.filename);
+      const { context, sessionDbMock, session } = setup([previousRace, ownRace], previousRace.filename);
 
       context.enrichSessionsWithTelemetry([session]);
 
       expect(session.matchingReplayFile?.name).toBe(ownRace.filename);
-      expect(sessionDb.updateSessionMatchingReplay).toHaveBeenCalledWith(
+      expect(sessionDbMock.updateSessionMatchingReplay).toHaveBeenCalledWith(
         '2026_09_03_14_41_14-69R1',
         expect.objectContaining({ name: ownRace.filename })
       );
@@ -795,31 +814,31 @@ describe('ServerContext replay scan progress', () => {
 
     it('withdraws a match to the previous race when the session has no replay of its own', () => {
       // The previous race ended ~50 minutes before this race's XML: outside the match window.
-      const { context, sessionDb, session } = setup([previousRace], previousRace.filename);
+      const { context, sessionDbMock, session } = setup([previousRace], previousRace.filename);
 
       context.enrichSessionsWithTelemetry([session]);
 
       expect(session.matchingReplayFile).toBeUndefined();
-      expect(sessionDb.rejectSessionReplayLink).toHaveBeenCalledWith(
+      expect(sessionDbMock.rejectSessionReplayLink).toHaveBeenCalledWith(
         '2026_09_03_14_41_14-69R1',
         expect.objectContaining({ name: previousRace.filename }),
         'time-window'
       );
-      expect(sessionDb.updateSessionMatchingReplay).not.toHaveBeenCalled();
+      expect(sessionDbMock.updateSessionMatchingReplay).not.toHaveBeenCalled();
     });
 
     it('keeps a match to a replay that is no longer in the index: it cannot be judged', () => {
-      const { context, sessionDb, session } = setup([ownRace], 'Circuit de la Sarthe R1 26.Vcr');
+      const { context, sessionDbMock, session } = setup([ownRace], 'Circuit de la Sarthe R1 26.Vcr');
 
       context.enrichSessionsWithTelemetry([session]);
 
       expect(session.matchingReplayFile?.name).toBe('Circuit de la Sarthe R1 26.Vcr');
-      expect(sessionDb.rejectSessionReplayLink).not.toHaveBeenCalled();
+      expect(sessionDbMock.rejectSessionReplayLink).not.toHaveBeenCalled();
     });
 
     it('gives a replay claimed by two sessions to the one saved with it', () => {
       // Both XMLs are within the match window of the replay; the earlier one loses it.
-      const { context, sessionDb, session } = setup([ownRace], ownRace.filename);
+      const { context, sessionDbMock, session } = setup([ownRace], ownRace.filename);
       const earlier = {
         ...session,
         id: '2026_09_03_14_36_00-11R1',
@@ -834,37 +853,37 @@ describe('ServerContext replay scan progress', () => {
 
       expect(session.matchingReplayFile?.name).toBe(ownRace.filename);
       expect(earlier.matchingReplayFile).toBeUndefined();
-      expect(sessionDb.rejectSessionReplayLink).toHaveBeenCalledWith(earlier.id, expect.anything(), 'owned-by-other-session');
-      expect(sessionDb.rejectSessionReplayLink).toHaveBeenCalledTimes(1);
+      expect(sessionDbMock.rejectSessionReplayLink).toHaveBeenCalledWith(earlier.id, expect.anything(), 'owned-by-other-session');
+      expect(sessionDbMock.rejectSessionReplayLink).toHaveBeenCalledTimes(1);
     });
 
     it('never links a session again to a replay withdrawn from it', () => {
-      const { context, sessionDb, session } = setup([ownRace], '');
+      const { context, sessionDbMock, session } = setup([ownRace], '');
       Object.assign(session, { matchingReplayFile: undefined });
       const withdrawal = { replayName: ownRace.filename, reason: 'owned-by-other-session', rejectedAt: 5 };
-      vi.mocked(sessionDb.getRejectedReplayLinks).mockReturnValue(new Map([[session.id, [withdrawal]]]) as never);
+      vi.mocked(sessionDbMock.getRejectedReplayLinks).mockReturnValue(new Map([[session.id, [withdrawal]]]) as never);
 
       context.enrichSessionsWithTelemetry([session]);
 
       expect(session.matchingReplayFile).toBeUndefined();
-      expect(sessionDb.updateSessionMatchingReplay).not.toHaveBeenCalled();
+      expect(sessionDbMock.updateSessionMatchingReplay).not.toHaveBeenCalled();
     });
 
     it('keeps a match saved alongside the session XML without searching again', () => {
-      const { context, sessionDb, session } = setup([previousRace, ownRace], ownRace.filename);
+      const { context, sessionDbMock, session } = setup([previousRace, ownRace], ownRace.filename);
       const findSpy = vi.spyOn(context.currentParser, 'findMatchingReplay');
 
       context.enrichSessionsWithTelemetry([session]);
 
       expect(session.matchingReplayFile?.name).toBe(ownRace.filename);
       expect(findSpy).not.toHaveBeenCalled();
-      expect(sessionDb.updateSessionMatchingReplay).not.toHaveBeenCalled();
+      expect(sessionDbMock.updateSessionMatchingReplay).not.toHaveBeenCalled();
     });
 
     it('links an unmatched session once the replay sync has cached its replay, using the XML mtimeMs', () => {
       // Session sync runs first: the new VCR is not cached yet, so the session stays unlinked.
       const storedReplays = [previousRace];
-      const { context, sessionDb, session } = setup(storedReplays, '');
+      const { context, sessionDbMock, session } = setup(storedReplays, '');
       Object.assign(session, { matchingReplayFile: undefined });
       // Last lap ends at 18:23:02, 18 minutes before the XML (and VCR) were written at 18:41:14;
       // an end-time estimate from laps alone would fall outside the match window.
@@ -878,7 +897,7 @@ describe('ServerContext replay scan progress', () => {
       context.enrichSessionsWithTelemetry([session]);
 
       expect(session.matchingReplayFile?.name).toBe(ownRace.filename);
-      expect(sessionDb.updateSessionMatchingReplay).toHaveBeenCalledWith(
+      expect(sessionDbMock.updateSessionMatchingReplay).toHaveBeenCalledWith(
         '2026_09_03_14_41_14-69R1',
         expect.objectContaining({ name: ownRace.filename })
       );

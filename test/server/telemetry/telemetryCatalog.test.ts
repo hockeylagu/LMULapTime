@@ -73,6 +73,29 @@ describe('TelemetryCatalog', () => {
     expect(db.getTelemetryFiles()).toEqual([changed]);
   });
 
+  it('shows progress while it runs and records files that could not be read', async () => {
+    const db = database();
+    const record = vi.spyOn(db, 'recordIngestError');
+    const unreadable = { ...file('C:\\fake', 'locked.duckdb'), enrichmentError: 'database is locked' };
+    const catalog = new TelemetryCatalog(db, async (_directory, options) => {
+      options?.onProgress?.({ processed: 1, total: 2, currentFile: 'locked.duckdb', cached: false });
+      expect(catalog.getScanStatus()).toMatchObject({ running: true, processed: 1, total: 2, currentFile: 'locked.duckdb' });
+      return [file(), unreadable];
+    });
+    await catalog.refresh('C:\\fake');
+    expect(record).toHaveBeenCalledWith('duckdb', unreadable.filePath, 'database is locked');
+    expect(catalog.getScanStatus()).toMatchObject({ running: false, result: { total: 2, added: 2 } });
+  });
+
+  it('reports a directory that fails to scan', async () => {
+    const db = database();
+    const record = vi.spyOn(db, 'recordIngestError');
+    const catalog = new TelemetryCatalog(db, async () => { throw new Error('access denied'); });
+    await expect(catalog.refresh('C:\\fake')).rejects.toThrow('access denied');
+    expect(catalog.getScanStatus().error).toBe('access denied');
+    expect(record).toHaveBeenCalledWith('duckdb-directory', 'C:\\fake', expect.any(Error));
+  });
+
   it('ignores a stale refresh after the directory changes', async () => {
     const db = database();
     const resolvers = new Map<string, (files: DuckDbFileInfo[]) => void>();
@@ -103,7 +126,11 @@ describe('TelemetryCatalog', () => {
       if (++published === 1) setImmediate(() => catalog.clear());
     });
     const prune = vi.spyOn(db, 'pruneTelemetryLapCache');
+    // Every file uses up a whole time slice, so the loop turns after each one.
+    let clock = 0;
+    const now = vi.spyOn(performance, 'now').mockImplementation(() => clock += 1000);
     await catalog.refresh('C:\\fake');
+    now.mockRestore();
     expect(published).toBeGreaterThan(0);
     expect(published).toBeLessThan(files.length);
     expect(prune).not.toHaveBeenCalled();

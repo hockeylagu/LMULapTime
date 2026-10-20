@@ -23,14 +23,14 @@ import { pumpScanInBackground, startedScanStatus } from './backgroundScan.js';
 import { TypedEmitter } from './typedEmitter.js';
 import { replaceCachedLastUpdateDiff } from '../benchmarks/referenceLaptimes.js';
 import { BENCHMARK_IMPACT_RULE, enrichBenchmarkDiffWithCompactImpact } from '../benchmarks/benchmarkImpact.js';
+import { setImmediate as yieldToEventLoop } from 'node:timers/promises';
+import { startYieldSlice } from './yieldSlice.js';
 
 /** When the replay links were last reconciled (cache_metadata): later changes are the next candidates. */
 const REPLAY_LINKS_RECONCILED_AT = 'replay_links_reconciled_at';
 const REPLAY_LINKS_RULE_VERSION = 'replay_links_rule_version';
 const REPLAY_LINKS_RULE = 'exact-layout-type-time-v2';
 const REPLAY_DEFAULTS_RULE_VERSION = 'replay_default_owner_rule_version';
-
-const yieldToEventLoop = () => new Promise<void>(resolve => setImmediate(resolve));
 
 export interface ServerContextOptions {
   resultsDir: string;
@@ -301,7 +301,7 @@ export class ServerContext {
       status.running = false;
       status.currentSessionId = null;
       status.finishedAt = new Date().toISOString();
-      if (error !== undefined) status.error = error instanceof Error ? error.message : String(error);
+      if (error !== undefined) status.error = error instanceof Error ? error.message : typeof error === 'string' ? error : 'Unknown error';
       if (this.pendingPostSessionDiscovery) {
         this.pendingPostSessionDiscovery = false;
         this.runReplaySyncInBackground();
@@ -344,9 +344,11 @@ export class ServerContext {
       this.configureReplayLookup();
       const replaysByName = this.replayByName();
       const ids = this.sessionDb.getReplayReconciliationCandidateIds(since);
+      const sliceUsed = startYieldSlice();
       for (let i = 0; i < ids.length; i += 10) {
         this.replayLinks.linkSessions(this.sessionDb.getSessionsByIds(ids.slice(i, i + 10)), this.parser, replaysByName);
-        await yieldToEventLoop();
+        // oxlint-disable-next-line eslint/no-await-in-loop -- Gives HTTP and SSE a turn once a slice of session links is used up.
+        if (sliceUsed()) await yieldToEventLoop();
       }
       // Rows written during this run carry a later stamp and are checked again next time.
       this.sessionDb.setMetadata(REPLAY_LINKS_RECONCILED_AT, String(startedAt));
@@ -577,6 +579,7 @@ export class ServerContext {
       const pending = catalog.files.filter(file => !claimed.has(file.filename) && file.timestampEpochMs > 0)
         .sort((a, b) => a.timestampEpochMs - b.timestampEpochMs);
       const owners = new Set<string>();
+      const sliceUsed = startYieldSlice();
       for (const chunk of telemetryFileChunks(pending)) {
         const window = telemetryCandidateWindow(chunk[0].timestampEpochMs, chunk[chunk.length - 1].timestampEpochMs);
         const sessions = this.sessionDb.getTelemetrySessionCandidatesStartingBetween(window.sessionsFromMs, window.sessionsToMs);
@@ -584,14 +587,15 @@ export class ServerContext {
         const links = this.storeNewTelemetryLinks(sessions, replays, { files: chunk, stored: catalog.stored },
           this.sessionDb.getRecordingOwners(replays.map(replay => replay.name)));
         for (const link of links) if (link.sessionId) owners.add(link.sessionId);
-        await yieldToEventLoop();
+        // oxlint-disable-next-line eslint/no-await-in-loop -- Gives HTTP and SSE a turn once a slice of telemetry links is used up.
+        if (sliceUsed()) await yieldToEventLoop();
       }
       // Rows stored before the attachment was persisted on them.
       for (const id of this.sessionDb.getTelemetryOwnersWithoutFile()) owners.add(id);
-      let processedOwners = 0;
       for (const id of owners) {
         this.applySessionTelemetryById(id);
-        if (++processedOwners % 10 === 0) await yieldToEventLoop();
+        // oxlint-disable-next-line eslint/no-await-in-loop -- Gives HTTP and SSE a turn once a slice of session updates is used up.
+        if (sliceUsed()) await yieldToEventLoop();
       }
     })().finally(() => {
       this.telemetryOwnershipReconciliationRunning = false;

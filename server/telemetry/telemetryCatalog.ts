@@ -1,5 +1,6 @@
 import { SessionDatabase } from '../core/db.js';
 import { setImmediate as yieldToEventLoop } from 'node:timers/promises';
+import { startYieldSlice } from '../core/yieldSlice.js';
 import { TelemetryScanStatus } from '../../shared/types/index.js';
 import { DuckDbFileInfo, enrichDuckDbDirectory } from './telemetryMatcher.js';
 
@@ -114,12 +115,8 @@ export class TelemetryCatalog {
         if (generation !== this.refreshGeneration) return files.length;
         this.directory = directory;
         this.updatedAt = new Date().toISOString();
-        for (let index = 0; index < files.length; index++) {
-          if (index > 0 && index % 10 === 0) {
-            await yieldToEventLoop();
-            if (generation !== this.refreshGeneration) return files.length;
-          }
-          const file = files[index];
+        const sliceUsed = startYieldSlice();
+        for (const file of files) {
           const prev = cachedMap.get(file.filePath);
           if (!prev) {
             addedCount++;
@@ -140,6 +137,10 @@ export class TelemetryCatalog {
               this.sessionDb.clearIngestError('duckdb', file.filePath);
             }
           }
+          if (!sliceUsed()) continue;
+          // oxlint-disable-next-line eslint/no-await-in-loop -- Gives HTTP and SSE a turn once a slice of catalog rows is used up.
+          await yieldToEventLoop();
+          if (generation !== this.refreshGeneration) return files.length;
         }
         if (typeof this.sessionDb?.pruneTelemetryLapCache === 'function') {
           this.sessionDb.pruneTelemetryLapCache(new Set(files.map(file => file.filename)));

@@ -1,5 +1,6 @@
 import fs from 'fs';
 import { setImmediate as yieldToEventLoop } from 'node:timers/promises';
+import { startYieldSlice } from '../core/yieldSlice.js';
 import path from 'path';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { DuckDbReader } from './duckdbReader.js';
@@ -95,25 +96,30 @@ export async function scanDuckDbDirectory(telemetryDir: string): Promise<DuckDbF
   const entries: DuckDbFileInfo[] = [];
   try {
     const files = (await fs.promises.readdir(telemetryDir)).filter((f) => f.toLowerCase().endsWith('.duckdb'));
-    for (const f of files) {
+    const statted = await Promise.all(files.map(async (f) => {
       const filePath = path.join(telemetryDir, f);
       try {
-        const stats = await fs.promises.stat(filePath);
-        const parsed = parseDuckDbFilename(f);
-        if (parsed) {
-          entries.push({
-            filename: f,
-            filePath,
-            mtimeMs: Math.floor(stats.mtimeMs),
-            fileSizeBytes: stats.size,
-            trackName: parsed.trackName,
-            sessionType: parsed.sessionType,
-            timestampStr: parsed.timestampStr,
-            timestampEpochMs: parsed.timestampEpochMs || Math.floor(stats.mtimeMs),
-          });
-        }
+        return { f, filePath, stats: await fs.promises.stat(filePath) };
       } catch (err) {
         console.warn(`[TelemetryMatcher] Error reading duckdb file stat ${filePath}:`, err);
+        return null;
+      }
+    }));
+    for (const item of statted) {
+      if (!item) continue;
+      const { f, filePath, stats } = item;
+      const parsed = parseDuckDbFilename(f);
+      if (parsed) {
+        entries.push({
+          filename: f,
+          filePath,
+          mtimeMs: Math.floor(stats.mtimeMs),
+          fileSizeBytes: stats.size,
+          trackName: parsed.trackName,
+          sessionType: parsed.sessionType,
+          timestampStr: parsed.timestampStr,
+          timestampEpochMs: parsed.timestampEpochMs || Math.floor(stats.mtimeMs),
+        });
       }
     }
   } catch (err) {
@@ -363,8 +369,8 @@ export async function enrichDuckDbDirectory(
   const cachedMap = options?.cachedFiles;
   const results: DuckDbFileInfo[] = [];
 
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
+  const sliceUsed = startYieldSlice();
+  for (const [i, file] of files.entries()) {
     const cached = cachedMap?.get(file.filePath);
     // If cached and file mtimeMs & size match without error, reuse cached metadata immediately!
     if (
@@ -378,13 +384,14 @@ export async function enrichDuckDbDirectory(
       options?.onFile?.(cached);
     } else {
       options?.onProgress?.({ processed: i, total: files.length, currentFile: file.filename, cached: false });
+      // oxlint-disable-next-line eslint/no-await-in-loop -- One DuckDB file is enriched at a time, so progress events stay in file order.
       const enriched = await enrichDuckDbFileInfo(file);
       results.push(enriched);
       options?.onFile?.(enriched);
       options?.onProgress?.({ processed: i + 1, total: files.length, currentFile: file.filename, cached: false });
     }
-    // A fully cached folder otherwise runs only synchronous callbacks until every file is done.
-    await yieldToEventLoop();
+    // oxlint-disable-next-line eslint/no-await-in-loop -- A fully cached folder otherwise runs only synchronous callbacks until every file is done.
+    if (sliceUsed()) await yieldToEventLoop();
   }
 
   return results;

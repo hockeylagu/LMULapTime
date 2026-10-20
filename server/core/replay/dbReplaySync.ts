@@ -1,5 +1,4 @@
 import fs from 'fs';
-import { setImmediate as yieldToEventLoop } from 'node:timers/promises';
 import { FileIngestWorker } from '../ingest/fileIngestWorkerClient.js';
 import type { ReplayIngestJob } from '../../../shared/types/index.js';
 import path from 'path';
@@ -10,6 +9,8 @@ import { extractReplayTrajectory } from '../../replay/decode/replayTrajectory.js
 import { storeReplayDriversInWorker } from '../../replay/worker/replayTrajectoryWorkerClient.js';
 import { isReplayDriverSettled, ReplayDriverIngest, ReplayDriverIngestStatus, replayErrorMessage, replayFailureStatus, settledReplayFailure } from './dbReplayIngestStore.js';
 import { ReplayDecodeError, decodeOrThrow } from '../../replay/decode/replayDecodeError.js';
+import { setImmediate as yieldToEventLoop } from 'node:timers/promises';
+import { startYieldSlice } from '../yieldSlice.js';
 
 export interface ReplayAsyncSyncOptions {
   playerName?: string;
@@ -260,11 +261,16 @@ export async function* syncReplaysAsyncIterator(
   const discovered: Array<{ filename: string; filePath: string; mtimeMs: number; fileSizeBytes: number; metadata: ReplayMetadata; isNewMetadata: boolean }> = [];
   const filesToParse: Array<{ filename: string; filePath: string; mtimeMs: number; fileSizeBytes: number }> = [];
 
-  for (let index = 0; index < files.length; index++) {
-    const filename = files[index];
+  // Stat calls are cheap and run on the libuv thread pool, which bounds how many are in flight.
+  const stats = await Promise.all(files.map(filename =>
+    fs.promises.stat(path.join(replaysDir, filename)).then(stat => ({ stat }), (error: unknown) => ({ error }))));
+  const sliceUsed = startYieldSlice();
+  for (const [index, filename] of files.entries()) {
     const filePath = path.join(replaysDir, filename);
     try {
-      const stat = await fs.promises.stat(filePath);
+      const result = stats[index];
+      if ('error' in result) throw result.error;
+      const { stat } = result;
       const mtimeMs = Math.floor(stat.mtimeMs);
       const fileSizeBytes = stat.size;
       const metadata = host.getReplayMetadataCache(filename, mtimeMs, fileSizeBytes, filePath);
@@ -278,8 +284,8 @@ export async function* syncReplaysAsyncIterator(
       skipped++;
       options.onReplayState?.({ name: filename, status: 'failed', error: error instanceof Error ? error.message : String(error) });
     }
-    // Cached metadata still needs decompression; do not monopolize a turn on a warm start.
-    await yieldToEventLoop();
+    // oxlint-disable-next-line eslint/no-await-in-loop -- Cached metadata still needs decompression; a warm start must not monopolize the event loop.
+    if (sliceUsed()) await yieldToEventLoop();
   }
 
   if (filesToParse.length > 0) {
@@ -289,6 +295,7 @@ export async function* syncReplaysAsyncIterator(
         const { filename, filePath, mtimeMs, fileSizeBytes } = filesToParse[i];
         yield { processed: i, total: filesToParse.length, currentFile: filename, stage: 'Indexing replay metadata', filePercent: 0 };
         try {
+          // oxlint-disable-next-line eslint/no-await-in-loop -- One worker parses one file at a time; parallel calls would only queue inside it.
           const metadata = await worker.parseReplay(filePath, options.playerName);
           host.upsertReplayMetadataCache(filename, filePath, mtimeMs, fileSizeBytes, metadata);
           host.clearIngestError('vcr', filePath);
@@ -323,7 +330,8 @@ export async function* syncReplaysAsyncIterator(
           playable: host.hasValidReplayTrajectoryCache(file.filename, -1, -1, file.mtimeMs, file.fileSizeBytes, file.filePath) });
       }
     }
-    await yieldToEventLoop();
+    // oxlint-disable-next-line eslint/no-await-in-loop -- Gives HTTP and SSE a turn once a slice of cache checks is used up.
+    if (sliceUsed()) await yieldToEventLoop();
   }
 
   for (const file of queue) options.onReplayState?.({ name: file.filename, status: 'queued' });
@@ -347,8 +355,10 @@ export async function* syncReplaysAsyncIterator(
       const extraction = storeReplayDriversInWorker(host, filePath, { playerName }, {
         filename, mtimeMs, fileSizeBytes, driverSlots: [...pendingSlots], includePrimary: primaryPending, primarySlot,
       });
-      let step = await extraction.next();
       let filePercent = 5;
+      // The generator's return value holds the stored drivers, which `for await` would drop.
+      // oxlint-disable-next-line eslint/no-await-in-loop -- Replays decode one at a time: each is a large worker job that writes SQLite.
+      let step = await extraction.next();
       try {
         while (!step.done) {
           if (options.shouldStop?.()) {
@@ -362,14 +372,17 @@ export async function* syncReplaysAsyncIterator(
           filePercent = Math.max(filePercent, Math.min(99, Math.floor(percent)));
           yield { processed: index, total: queue.length, currentFile: filename,
             stage: progress.stageDescription, filePercent };
+          // oxlint-disable-next-line eslint/no-await-in-loop -- Progress arrives in order from the one worker decoding this replay.
           step = await extraction.next();
         }
       } finally {
+        // oxlint-disable-next-line eslint/no-await-in-loop -- An interrupted decode stops its worker before the next replay starts.
         if (!step.done) await extraction.return({ drivers: [], failures: [] });
       }
       if (step.done) {
-        trajectoryCached = step.value.drivers.length > 0;
-        for (const failure of step.value.failures) {
+        const stored = step.value;
+        trajectoryCached = stored.drivers.length > 0;
+        for (const failure of stored.failures) {
           retrying = true;
           const error = failure.code ? Object.assign(new Error(failure.message), { code: failure.code }) : new ReplayDecodeError(failure.message);
           recordDriverFailure(host, filename, filePath, failure.driverSlotKey, mtimeMs, fileSizeBytes, error);

@@ -463,6 +463,9 @@ describe('telemetryMatcher', () => {
     });
 
     it('keeps the event loop available while publishing an entirely cached folder', async () => {
+      // Every item uses up a whole time slice, so the loop turns after each one.
+      let clock = 0;
+      vi.spyOn(performance, 'now').mockImplementation(() => clock += 1000);
       for (const name of ['Spa_P_2026-09-13T20_33_32Z.duckdb', 'Spa_Q_2026-09-13T21_33_32Z.duckdb', 'Spa_R_2026-09-13T22_33_32Z.duckdb']) {
         fs.writeFileSync(path.join(dir, name), 'cached');
       }
@@ -477,6 +480,7 @@ describe('telemetryMatcher', () => {
       expect(result).toEqual(files);
       expect(duckdb.opened).toHaveLength(0);
       expect(callbacks).toEqual([1, 2, 3]);
+      vi.restoreAllMocks();
     });
 
     it('keeps the filename values and records the error when the file cannot be read', async () => {
