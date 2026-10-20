@@ -9,7 +9,6 @@ import fs from 'fs';
 import zlib from 'zlib';
 import { fileURLToPath } from 'url';
 import Database from 'better-sqlite3';
-import { ReplayTrajectoryData } from '../../shared/types/index.js';
 import type { DuckDbLapTelemetry } from '../../server/telemetry/duckdbTypes.js';
 import { decompressTrajectory } from '../../server/core/replay/replayTrajectoryCodec.js';
 

@@ -75,7 +75,7 @@ export const TelemetryGearChannel: React.FC<TelemetryGearChannelProps> = React.m
         />
       )}
     </svg>
-  ), [gearPath, baselineGearPath]);
+  ), [gearPath, baselineGearPath, viewBoxHeight]);
 
   const currentGearVal = currentPoint?.gear;
 

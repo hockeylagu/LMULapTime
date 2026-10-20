@@ -627,9 +627,9 @@ describe('replayParser - trajectory & timing', () => {
               const text = lapMatches[i][2].trim();
               const xmlLapNumber = parseInt(attrs.match(/num="(\d+)"/)?.[1] || '0', 10);
               const xmlLapTime = text !== '--.----' && text !== '' ? parseFloat(text) : null;
-              const xmlS1 = parseFloat(attrs.match(/s1="([\d\.]+)"/)?.[1] || '0');
-              const xmlS2 = parseFloat(attrs.match(/s2="([\d\.]+)"/)?.[1] || '0');
-              const s3Match = attrs.match(/s3="([\d\.]+)"/);
+              const xmlS1 = parseFloat(attrs.match(/s1="([\d.]+)"/)?.[1] || '0');
+              const xmlS2 = parseFloat(attrs.match(/s2="([\d.]+)"/)?.[1] || '0');
+              const s3Match = attrs.match(/s3="([\d.]+)"/);
               const xmlS3 = s3Match ? parseFloat(s3Match[1]) : null;
 
               const vcrLap = traj.laps?.[i];

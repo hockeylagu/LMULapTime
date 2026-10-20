@@ -141,7 +141,7 @@ export interface DriverData {
 }
 
 export interface SessionWeather {
-  condition: 'Dry' | 'Wet' | string;
+  condition: string; // 'Dry' or 'Wet'; any other text is the game's own wording
   timeOfDay: 'Morning' | 'Daytime' | 'Evening' | 'Night';
   weatherString: string;
 }

@@ -19,7 +19,10 @@ export const CircuitsSummaryCard: React.FC<CircuitsSummaryCardProps> = ({
 }) => {
   const [unit, setUnit] = useState<'laps' | 'km'>('laps');
 
-  const sourceTracks = rankedTracks && rankedTracks.length > 0 ? rankedTracks : (visibleTracks || []);
+  const sourceTracks = useMemo(
+    () => (rankedTracks && rankedTracks.length > 0 ? rankedTracks : (visibleTracks || [])),
+    [rankedTracks, visibleTracks],
+  );
 
   const sortedTracks = useMemo(() => {
     return [...sourceTracks].sort((a, b) => (unit === 'km' ? b.km - a.km : b.laps - a.laps));

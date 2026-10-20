@@ -15,6 +15,7 @@ import { ComparableLap } from '../../../shared/types/index.js';
 import { formatTime } from '../../../shared/domain/formatters.js';
 import { LMU_COLORS, CHART_COLORS, TELEMETRY_COLORS } from '../../utils/themeColors.js';
 import { plainTag } from './CompareLapCard.js';
+import { EMPTY_ARRAY } from '../../utils/emptyDefaults.js';
 
 export interface CompareSectorChartDataItem {
   metric: string;
@@ -49,8 +50,8 @@ export const CompareSectorTooltip: React.FC<CompareSectorTooltipProps> = ({
   active,
   payload,
   label,
-  chartData = [],
-  selectedLaps = [],
+  chartData = EMPTY_ARRAY,
+  selectedLaps = EMPTY_ARRAY,
   baselineLap,
 }) => {
   if (!active || !payload || !payload.length || !baselineLap) return null;

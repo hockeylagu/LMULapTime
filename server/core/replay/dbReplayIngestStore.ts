@@ -74,7 +74,7 @@ export function replayFailureStatus(error: unknown): Exclude<ReplayDriverIngestS
 }
 
 export function replayErrorMessage(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error ?? '');
+  const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
   return message.trim() || 'Replay decode stopped without an error message';
 }
 

@@ -785,10 +785,10 @@ describe('DuckDB telemetry caching in SessionDatabase', () => {
 
   it('skips rewriting an unchanged telemetry row and counts the rows that do change', () => {
     const file = {
-      filename: 'Spa_R.duckdb', filePath: 'C:\Telemetry\Spa_R.duckdb', mtimeMs: 1000, fileSizeBytes: 1024,
+      filename: 'Spa_R.duckdb', filePath: 'C:\\Telemetry\\Spa_R.duckdb', mtimeMs: 1000, fileSizeBytes: 1024,
       trackName: 'Spa', sessionType: 'R', timestampStr: '2026-09-01T00:00:00Z', timestampEpochMs: 1000,
     };
-    const other = { ...file, filename: 'Spa_Q.duckdb', filePath: 'C:\Telemetry\Spa_Q.duckdb' };
+    const other = { ...file, filename: 'Spa_Q.duckdb', filePath: 'C:\\Telemetry\\Spa_Q.duckdb' };
     const start = db.getTelemetryMetadataRevision();
 
     db.upsertTelemetryMetadata(file, 'session-spa', 'Spa_R.Vcr');

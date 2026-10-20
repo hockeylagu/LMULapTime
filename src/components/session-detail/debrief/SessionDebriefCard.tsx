@@ -120,7 +120,7 @@ export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session,
                   corner={corner}
                   hasTechnique={state.debrief.technique !== null}
                   toLink={(cornerNumber, against) => debriefCornerLink(state.debrief, cornerNumber, against)}
-                  onOpen={(cornerNumber, against) => navigate(debriefCornerLink(state.debrief, cornerNumber, against))}
+                  onOpen={(cornerNumber, against) => void navigate(debriefCornerLink(state.debrief, cornerNumber, against))}
                 />
               ))}
             </ol>

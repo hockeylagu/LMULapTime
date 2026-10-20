@@ -13,6 +13,7 @@ import {
 } from '../replayMapUtils.js';
 import { GpsTrackHoverTooltip } from '../display/GpsTrackHoverTooltip.js';
 import { TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
+import { EMPTY_ARRAY } from '../../../../utils/emptyDefaults.js';
 
 export interface GpsTrackSegmentsProps {
   svgPoints: ProjectedPoint[];
@@ -48,7 +49,7 @@ function toSvgCoords(e: React.MouseEvent<SVGPathElement>): { sx: number; sy: num
 
 export const GpsTrackSegments: React.FC<GpsTrackSegmentsProps> = React.memo(({
   svgPoints,
-  baselineSvgPoints = [],
+  baselineSvgPoints = EMPTY_ARRAY,
   colorBy,
   deltaByIdx,
   baselineDeltaByIdx,

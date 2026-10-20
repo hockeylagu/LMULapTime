@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useEffectEvent, useMemo } from 'react';
 import { isReplaySurfaceTarget, replayShortcutBlocked } from '../../../utils/replayShortcuts.js';
 
 export interface UseGpsMapPanZoomOptions {
@@ -75,7 +75,7 @@ export function useGpsMapPanZoom({
   currentPosRef.current = currentPos;
   const autoFollowOnScrubRef = useRef(true);
   useEffect(() => {
-    if (zoomLevelRef.current > 1 && autoFollowOnScrubRef.current && !followCarRef.current && currentPos) {
+    if (zoomLevelRef.current > 1 && autoFollowOnScrubRef.current && !followCarRef.current && currentPos?.sx !== undefined) {
       followCarRef.current = true;
       panOffsetRef.current = { x: 0, y: 0 };
       setPanOffset({ x: 0, y: 0 }); setFollowCar(true);
@@ -202,6 +202,8 @@ export function useGpsMapPanZoom({
     zoomAtCoords(e.clientX, e.clientY, 1, 2);
   };
 
+  // The wheel listener reads the latest position and zoom: it must not rebind on every update.
+  const zoomAtWheel = useEffectEvent(zoomAtCoords);
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -231,7 +233,7 @@ export function useGpsMapPanZoom({
         return;
       }
 
-      zoomAtCoords(e.clientX, e.clientY, e.deltaY < 0 ? 1 : -1);
+      zoomAtWheel(e.clientX, e.clientY, e.deltaY < 0 ? 1 : -1);
     };
 
     el.addEventListener('wheel', onWheel, { passive: false });

@@ -17,15 +17,16 @@ export interface DriverPerformancePanelProps {
   allTimeCategoryTrackPB: number | null;
 }
 
-export const DriverPerformancePanel: React.FC<DriverPerformancePanelProps> = ({
+export const DriverPerformancePanel: React.FC<DriverPerformancePanelProps> = ({ selectedDriver, ...rest }) =>
+  selectedDriver ? <DriverPerformanceContent selectedDriver={selectedDriver} {...rest} /> : null;
+
+const DriverPerformanceContent: React.FC<DriverPerformancePanelProps & { selectedDriver: DriverData }> = ({
   session,
   selectedDriver,
   isMultiClass,
   isCurrentSessionAllTimePB,
   allTimeCategoryTrackPB,
 }) => {
-  if (!selectedDriver) return null;
-
   const isRaceSession =
     session.sessionType === 'Race' ||
     (selectedDriver.gridPosition != null && selectedDriver.gridPosition > 0) ||

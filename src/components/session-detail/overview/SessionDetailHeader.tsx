@@ -15,6 +15,7 @@ import { FOCUS_RING } from '../../common/buttonStyles.js';
 import { Select } from '../../common/dropdown/Select.js';
 import { linkClickHandler } from '../../../utils/linkClick.js';
 import { sessionTelemetryPath } from '../sessionDetailHelpers.js';
+import { EMPTY_ARRAY } from '../../../utils/emptyDefaults.js';
 
 /** The neutral jump buttons of the header: the icon carries the only color. */
 const JUMP_BUTTON =
@@ -46,7 +47,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
   selectedDriverOrdinal,
   setSelectedDriverOrdinal,
   onBack,
-  relatedSessions = [],
+  relatedSessions = EMPTY_ARRAY,
   handleNavigateToSession,
   refEntry,
 }) => {
@@ -54,7 +55,7 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
   const [searchParams] = useSearchParams();
 
   const handleOpenReplay = (targetLap?: number) => {
-    navigate(telemetryPath(targetLap));
+    void navigate(telemetryPath(targetLap));
   };
   const telemetryPath = (targetLap?: number): string => sessionTelemetryPath(
     searchParams, session, selectedDriver, targetLap || selectedDriver?.bestLapNumber || 1

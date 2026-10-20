@@ -1,3 +1,4 @@
+/* oxlint-disable typescript/unbound-method -- Saves prototype methods to wrap and call them with the right this. */
 import { createRoot } from 'react-dom/client';
 import { LivePage } from '../../../src/components/live/LivePage.js';
 import '../../../src/index.css';

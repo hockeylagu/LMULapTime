@@ -365,7 +365,7 @@ describe('GpsTrackMapScene overlays and geometry', () => {
 
     const pedalGroup = screen.getByTestId('pedal-marker-throttle-1');
     const pedalBadge = pedalGroup.querySelector('circle[r="9.5"]')?.parentElement;
-    const pedalTransform = pedalBadge?.getAttribute('transform')!;
+    const pedalTransform = pedalBadge!.getAttribute('transform')!;
     const pedalMatch = pedalTransform.match(/translate\(([-0-9.]+),\s*([-0-9.]+)\)/);
     const pedalX = Number(pedalMatch![1]);
     const pedalY = Number(pedalMatch![2]);

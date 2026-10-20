@@ -9,7 +9,7 @@ export const ReplayInspectorPage: React.FC = () => {
   const sessionId = searchParams.get('sessionId');
 
   React.useEffect(() => {
-    if (!sessionId) navigate('/dashboard', { replace: true });
+    if (!sessionId) void navigate('/dashboard', { replace: true });
   }, [navigate, sessionId]);
 
   if (!sessionId) return null;
@@ -24,7 +24,7 @@ export const ReplayInspectorPage: React.FC = () => {
   return (
     <ReplayInspectorContent
       isOpen
-      onClose={() => navigate(-1)}
+      onClose={() => void navigate(-1)}
       sessionId={sessionId}
       initialDriverOrdinal={Number.isInteger(driverOrdinal) && driverOrdinal >= 0 ? driverOrdinal : 0}
       initialLapOrdinal={Number.isInteger(lapOrdinal) && lapOrdinal >= 0 ? lapOrdinal : 0}

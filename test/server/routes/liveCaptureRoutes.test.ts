@@ -10,15 +10,16 @@ import { LIVE_CAPTURE_NORMALIZATION_VERSION, LIVE_CAPTURE_SCHEMA_VERSION } from 
 import type { LiveCaptureStatus } from '../../../shared/types/liveCapture.js';
 
 function makeApp(status: LiveCaptureStatus, statusRead = vi.fn(() => status)) {
+  const sessionDb = { getMetadata: vi.fn(() => null), setMetadata: vi.fn() };
   const context = {
     events: new TypedEmitter<{ 'scan-started': []; 'scan-finished': [] }>(),
-    sessionDb: { getMetadata: vi.fn(() => null), setMetadata: vi.fn() },
+    sessionDb,
   } as unknown as ServerContext;
   const live = new LiveService();
   const capture = { directory: 'D:/LMU/live-captures', status: statusRead };
   const app = express();
   app.use('/api', createLiveRouter(context, live, capture));
-  return { app, capture, context, statusRead };
+  return { app, capture, context, sessionDb, statusRead };
 }
 
 describe('live capture status route', () => {
@@ -27,7 +28,7 @@ describe('live capture status route', () => {
       state: 'unavailable', recordingId: null, samples: 14, droppedSamples: 3, pendingBatches: 0, error: 'writer disk full',
     };
     const statusRead = vi.fn(() => status);
-    const { app, context } = makeApp(status, statusRead);
+    const { app, sessionDb } = makeApp(status, statusRead);
     const response = await request(app).get('/api/live/capture');
 
     expect(response.status).toBe(200);
@@ -38,7 +39,7 @@ describe('live capture status route', () => {
       ...status, channels: LIVE_CAPTURE_CHANNELS,
     });
     expect(statusRead).toHaveBeenCalledOnce();
-    expect(context.sessionDb.setMetadata).not.toHaveBeenCalled();
+    expect(sessionDb.setMetadata).not.toHaveBeenCalled();
   });
 
   it('provides an idle response when capture support is omitted', async () => {

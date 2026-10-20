@@ -30,7 +30,8 @@
     "vcr:correlate": "tsx tools/analysis/correlateVcr.ts",
     "learning:evaluate": "tsx tools/analysis/evaluateLiveLearning.ts",
     "screenshots": "tsx tools/captureScreenshots.ts",
-    "check:local-data": "node tools/release/checkLocalData.mjs"
+    "check:local-data": "node tools/release/checkLocalData.mjs",
+    "lint": "oxlint --type-aware --max-warnings 0 --report-unused-disable-directives && node tools/release/checkLintReasons.mjs"
   },
   "dependencies": {
     "@duckdb/node-api": "^1.5.6-r.1",
@@ -62,6 +63,8 @@
     "@vitest/coverage-v8": "^5.0.3",
     "concurrently": "^10.0.5",
     "happy-dom": "^21.0.3",
+    "oxlint": "^1.89.0",
+    "oxlint-tsgolint": "^7.0.2004",
     "postcss": "^8.5.28",
     "supertest": "^7.3.1",
     "tailwindcss": "^4.3.3",

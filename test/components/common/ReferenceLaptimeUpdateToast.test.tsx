@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ReferenceLaptimeUpdateToast } from '../../../src/components/common/ReferenceLaptimeUpdateToast';
+import { ReferenceLaptimeUpdateToast } from '../../../src/components/common/ReferenceLaptimeUpdateToast.js';
 
 describe('ReferenceLaptimeUpdateToast', () => {
   it('renders singular message when updatedCount is 1', () => {

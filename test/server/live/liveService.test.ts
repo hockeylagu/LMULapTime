@@ -81,7 +81,7 @@ describe('LiveService', () => {
     frame(reading());
     expect(service.isGameRunning()).toBe(true);
     expect(running).toEqual([true, false, true]);
-    service.stop();
+    void service.stop();
     worker.emit('message', { type: 'process', running: false });
     expect(running).toEqual([true, false, true]);
   });
@@ -135,7 +135,7 @@ describe('LiveService', () => {
     await vi.advanceTimersByTimeAsync(6000);
     expect(count(CONDITION)).toBe(4);
     expect(count(TYRES)).toBe(tyres + 1);
-    service.stop();
+    void service.stop();
   });
 
   it('stops reading the game when the last page fails a write', async () => {
@@ -152,7 +152,7 @@ describe('LiveService', () => {
     get.mockClear();
     await vi.advanceTimersByTimeAsync(60_000);
     expect(get).not.toHaveBeenCalled();
-    service.stop();
+    void service.stop();
   });
 
   it('reports asynchronous capture failure without stopping live driving', () => {
@@ -359,7 +359,7 @@ describe('LiveService', () => {
 
   it('terminates the worker on stop and does not restart it', () => {
     const { service, worker } = setup();
-    service.stop();
+    void service.stop();
     expect(worker.postMessage).toHaveBeenCalledWith({ type: 'stop' });
     expect(worker.terminate).toHaveBeenCalled();
     worker.emit('exit', 0);
@@ -460,7 +460,7 @@ describe('LiveService', () => {
       expect(get).toHaveBeenCalledWith('/navigation/state');
       expect(service.getSnapshot().identity).toMatchObject({ layoutKey: 'sarthe_full', carClass: 'LMP3', personalBestSeconds: 228.4 });
       expect(sink.data(2)).toMatchObject({ sequence: 2, identity: { layoutKey: 'sarthe_full' } });
-      service.stop();
+      void service.stop();
     });
 
     it('asks LMU itself for the identity while no dashboard is open', async () => {
@@ -470,7 +470,7 @@ describe('LiveService', () => {
       await vi.advanceTimersByTimeAsync(0);
       expect(readNavigation).toHaveBeenCalledTimes(1);
       expect(service.getSnapshot().identity).toMatchObject({ layoutKey: 'sarthe_full' });
-      service.stop();
+      void service.stop();
     });
 
     it('asks LMU for nothing in the menu', async () => {

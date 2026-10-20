@@ -88,10 +88,8 @@ export class ReplayTelemetryService {
       if (found) this.sessionDb.upsertTelemetryLapCache(found.file.filename, lapNumber, found.lap);
       return found;
     } finally {
-      for (const [filename, reader] of readers) {
-        try { await reader.close(); }
-        catch (error) { console.warn(`[DuckDB] Failed to close ${filename}:`, error); }
-      }
+      await Promise.all([...readers].map(([filename, reader]) => reader.close()
+        .catch((error: unknown) => { console.warn(`[DuckDB] Failed to close ${filename}:`, error); })));
     }
   }
 
@@ -108,8 +106,10 @@ export class ReplayTelemetryService {
         if (!reader) {
           reader = new DuckDbReader(file.filePath);
           readers.set(file.filename, reader);
+          // oxlint-disable-next-line eslint/no-await-in-loop -- Stops at the first file that has the lap; later files are never opened.
           await reader.open();
         }
+        // oxlint-disable-next-line eslint/no-await-in-loop -- Stops at the first file that has the lap; later files are never opened.
         const lap = await read(reader);
         if (lap) return { file, lap };
       } catch (error) {

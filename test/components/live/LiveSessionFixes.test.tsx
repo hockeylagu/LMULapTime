@@ -14,11 +14,11 @@ it('ticks smoothly without snapping backward on delayed updates, and bounds run-
   const clock = () => within(screen.getByTestId('live-history-current')).getAllByRole('cell')[0];
   act(() => store.set(liveTiming({ lapNumber: 1, lapElapsedSeconds: 10.09 })));
   expect(clock()).toHaveTextContent('0:10.0');
-  act(() => vi.advanceTimersByTime(220));
+  act(() => { vi.advanceTimersByTime(220); });
   expect(clock()).toHaveTextContent('0:10.2');
   act(() => store.set(liveTiming({ lapNumber: 1, lapElapsedSeconds: 10.15 })));
   expect(clock()).toHaveTextContent('0:10.3');
-  act(() => vi.advanceTimersByTime(10_000));
+  act(() => { vi.advanceTimersByTime(10_000); });
   expect(clock()).toHaveTextContent('0:10.4');
   act(() => store.set(liveTiming({ lapNumber: 2, lapElapsedSeconds: 0.05 })));
   expect(clock()).toHaveTextContent('0:00.0');

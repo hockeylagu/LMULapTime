@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { CompareLapCard } from '../../../src/components/leaderboard/CompareLapCard';
-import { ReferenceLaptimeEntry, ComparableLap } from '../../../shared/types/index';
+import { CompareLapCard } from '../../../src/components/leaderboard/CompareLapCard.js';
+import { ReferenceLaptimeEntry, ComparableLap } from '../../../shared/types/index.js';
 
 describe('CompareLapCard', () => {
   const baseLap: ComparableLap = {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { ComparisonAccuracyNotice, describeComparisonCaveats } from '../../../../src/components/replay/inspector/ComparisonAccuracyNotice';
+import { ComparisonAccuracyNotice, describeComparisonCaveats } from '../../../../src/components/replay/inspector/ComparisonAccuracyNotice.js';
 import { ReplayTrajectoryData } from '../../../../shared/types/index.js';
 
 const lap = (overrides: Partial<ReplayTrajectoryData> = {}): ReplayTrajectoryData => ({

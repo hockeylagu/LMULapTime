@@ -5,11 +5,11 @@ import { useSettingsActions } from '../../../src/components/settings/useSettings
 import type { AppStatus } from '../../../shared/types/index.js';
 
 const status: AppStatus = {
-  resultsDir: 'C:\LMU\Results',
+  resultsDir: 'C:\\LMU\\Results',
   resultsExist: true,
-  replaysDir: 'C:\LMU\Replays',
+  replaysDir: 'C:\\LMU\\Replays',
   replaysExist: true,
-  telemetryDir: 'C:\LMU\Telemetry',
+  telemetryDir: 'C:\\LMU\\Telemetry',
   telemetryExist: true,
   playerName: 'Player1',
   sessionsCount: 1,
@@ -25,7 +25,7 @@ describe('useSettingsActions input sync', () => {
     const { result, rerender } = setup(null);
     expect(result.current.resultsDirInput).toBe('');
     rerender({ s: status });
-    expect(result.current.resultsDirInput).toBe('C:\LMU\Results');
+    expect(result.current.resultsDirInput).toBe('C:\\LMU\\Results');
     expect(result.current.playerNameInput).toBe('Player1');
   });
 
@@ -42,10 +42,10 @@ describe('useSettingsActions input sync', () => {
 
   it('updates an unedited field when its saved value changes, but not an edited one', () => {
     const { result, rerender } = setup(status);
-    act(() => result.current.setReplaysDirInput('D:\Typing'));
-    rerender({ s: { ...status, resultsDir: 'E:\New', replaysDir: 'E:\NewReplays' } });
-    expect(result.current.resultsDirInput).toBe('E:\New');
-    expect(result.current.replaysDirInput).toBe('D:\Typing');
+    act(() => result.current.setReplaysDirInput('D:\\Typing'));
+    rerender({ s: { ...status, resultsDir: 'E:\\New', replaysDir: 'E:\\NewReplays' } });
+    expect(result.current.resultsDirInput).toBe('E:\\New');
+    expect(result.current.replaysDirInput).toBe('D:\\Typing');
   });
 });
 

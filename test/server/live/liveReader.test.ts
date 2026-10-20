@@ -28,7 +28,7 @@ function setup(probe: () => Promise<GameProbe> = () => Promise.resolve('session'
 }
 
 const lastNavigation = (posted: LiveReaderMessage[]): LiveReaderMessage | undefined =>
-  posted.filter(message => message.type === 'navigation').pop();
+  posted.findLast(message => message.type === 'navigation');
 
 describe('LiveReader', () => {
   beforeEach(() => { vi.useFakeTimers(); });
@@ -66,7 +66,7 @@ describe('LiveReader', () => {
         base + VEHICLE_TELEMETRY.offsets.wheels + corner * WHEEL.size + WHEEL.offsets.terrainName, 'latin1');
       t.setTelemetry(buffer);
       await vi.advanceTimersByTimeAsync(40);
-      const message = t.posted.filter(item => item.type === 'frame' && item.capture?.elapsedSeconds === et).pop();
+      const message = t.posted.findLast(item => item.type === 'frame' && item.capture?.elapsedSeconds === et);
       if (!message || message.type !== 'frame') throw new Error('Missing capture frame');
       return message;
     };

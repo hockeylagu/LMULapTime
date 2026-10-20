@@ -139,7 +139,7 @@ if (shardArg) {
   const uncutFlyingLaps = results.flatMap(r => r.uncutFlyingLaps).sort();
 
   console.log(`laps on recognised tracks: ${sum(r => r.lapsSeen)}; unknown layout: ${sum(r => r.lapsUnknownLayout)}; layout without geometry: ${sum(r => r.lapsNoGeometry)}\n`);
-  for (const [key, count] of [...tally.entries()].sort()) console.log(`${String(count).padStart(6)}  ${key}`);
+  for (const [key, count] of [...tally.entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) console.log(`${String(count).padStart(6)}  ${key}`);
   console.log(`\nflying laps with an uncut end (first 40 of ${uncutFlyingLaps.length}):`);
   for (const line of uncutFlyingLaps.slice(0, 40)) console.log(`  ${line}`);
   console.log(`\nflying laps with on-track projection glitches (first 40 of ${glitchLaps.length}):`);

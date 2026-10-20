@@ -112,7 +112,7 @@ export function readSession(db: DatabaseType, id: string): DetailedSession | nul
   const driverRows = db.prepare(`${DRIVER_WITH_DICTIONARIES} WHERE d.session_id = ? ORDER BY d.driver_ordinal`).all(id) as Row[];
   const lapRows = groupBy(db.prepare('SELECT * FROM session_laps WHERE session_id = ? ORDER BY driver_ordinal, lap_ordinal').all(id) as Row[], lap => String(lap.driver_ordinal));
   const passRows = groupBy(db.prepare('SELECT * FROM session_lap_passes WHERE session_id = ? ORDER BY driver_ordinal, lap_ordinal, direction, seq').all(id) as Row[],
-    pass => `${pass.driver_ordinal}:${pass.lap_ordinal}`);
+    pass => `${String(pass.driver_ordinal)}:${String(pass.lap_ordinal)}`);
   const eventRows = groupBy(db.prepare('SELECT * FROM session_events WHERE session_id = ? ORDER BY driver_ordinal, seq').all(id) as Row[], event => String(event.driver_ordinal));
 
   const drivers = driverRows.map((driverRow): DriverData => {
@@ -121,7 +121,7 @@ export function readSession(db: DatabaseType, id: string): DetailedSession | nul
     driver.driverOrdinal = ordinal;
     const laps: LapData[] = [];
     for (const lapRow of lapRows.get(String(ordinal)) ?? []) {
-      lapOf(lapRow, passRows.get(`${ordinal}:${lapRow.lap_ordinal}`) ?? [], laps);
+      lapOf(lapRow, passRows.get(`${ordinal}:${String(lapRow.lap_ordinal)}`) ?? [], laps);
     }
     driver.laps = laps;
     assignEvents(driver, driverRow.lists_mask as number | null, eventRows.get(String(ordinal)) ?? []);

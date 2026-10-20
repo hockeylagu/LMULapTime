@@ -40,7 +40,7 @@ export function postJson<T>(path: string, body?: unknown, init?: RequestInit): P
   return fetchJson<T>(path, {
     ...init,
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    headers: { 'Content-Type': 'application/json', ...(init?.headers as Record<string, string> | undefined) },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
 }

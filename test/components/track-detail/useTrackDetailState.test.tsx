@@ -2,7 +2,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { MemoryRouter, useSearchParams } from 'react-router';
-import { useTrackDetailState } from '../../../src/components/track-detail/useTrackDetailState';
+import { useTrackDetailState } from '../../../src/components/track-detail/useTrackDetailState.js';
 
 const mockNavigate = vi.fn();
 vi.mock('react-router', async (importOriginal) => {

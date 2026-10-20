@@ -181,9 +181,11 @@ describe('track geometry runtime validation', () => {
 
   it('rejects sparse arrays instead of treating missing measurements as unavailable nulls', () => {
     const geometry = native();
+    // oxlint-disable-next-line typescript/no-array-delete -- Builds a sparse array on purpose.
     delete geometry.surfaceProfile!.leftWidthM[1];
     expect(() => parseTrackBoundaryGeometry(geometry)).toThrow('missing');
     const sparsePoints = legacy();
+    // oxlint-disable-next-line typescript/no-array-delete -- Builds a sparse array on purpose.
     delete sparsePoints.centerline[1];
     expect(() => parseTrackBoundaryGeometry(sparsePoints)).toThrow('missing');
   });

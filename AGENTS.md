@@ -81,15 +81,11 @@ Telemetry analytics, lap comparison, and race intelligence hub for **Le Mans Ult
 ## 4. Coding & Architecture Conventions
 
 ### TypeScript & Modules
-- **ESM**: Module type `"type": "module"`. Include `.js` extensions on relative imports in Node/ESM contexts (`server/`, `shared/`, `test/`).
-- **Zero-`any`**: Forbidden everywhere (`src/`, `server/`, `test/`). Use canonical models from `shared/types/`, telemetry reader contracts from `server/telemetry/duckdbTypes.ts`, strict interfaces, or `unknown` with type narrowing.
-- **Zero Warnings Standard**: Production builds (`npm run build`) and test runs (`npm test`) must finish with **zero warnings and zero errors** (no rollup chunk warnings, unhandled React `act(...)` warnings, or unused variables).
-- **Strict File Size Limits**:
-  - Max **1,000 lines** for any `.ts` / `.tsx` source or test file.
-  - Max **300 lines** for frontend components (`src/components/**/*.tsx`).
-  - Max **20 files** per directory (excluding `public/track-outlines/`). Split into semantically focused subdirectories when approaching limit.
-- **No Unnecessary Re-exports / Direct Imports**: Do not import and re-export symbols without an architectural reason. Import directly from defining modules; do not leave pass-through barrels or re-export shims. (The sole approved barrel is `shared/types/index.ts`).
-- **No Shim Methods / Trivial Forwarders**: Do not write wrapper functions that merely forward calls to another function without added logic or abstraction. Call canonical implementations directly; update all call sites during refactors.
+- **Enforced by `npm run lint`**: no `any`, `.js` extensions on relative imports in `server/`, `shared/`, `test/`, no raw `fetch` in `src/`, `src/` and `shared/` never import `server/`, max 1,000 lines per file and 300 per `src/components/**/*.tsx`, no floating promises, React hooks rules.
+- **Types**: Use canonical models from `shared/types/`, telemetry reader contracts from `server/telemetry/duckdbTypes.ts`, or `unknown` with narrowing.
+- **Zero Warnings**: `npm run build`, `npm run lint` and `npm test` finish with zero warnings and zero errors (incl. rollup chunk and React `act(...)` warnings).
+- **Max 20 files per directory** (excluding `public/track-outlines/`); split into focused subdirectories when approaching it.
+- **No re-exports or trivial forwarders**: import from the defining module (sole barrel: `shared/types/index.ts`); call canonical implementations directly and update all call sites during refactors.
 
 ### Database Patterns (`server/core/db.ts` & Modular Stores)
 - Use **Better-SQLite3** with synchronous prepared statements and mandatory **WAL mode** (`PRAGMA journal_mode = WAL;`).
@@ -104,7 +100,7 @@ Telemetry analytics, lap comparison, and race intelligence hub for **Le Mans Ult
 - Detailed geometry is loaded from external packages via `server/plugins/`; never commit detailed geometry under `public/`.
 
 ### API & Routing
-- Call backend through `src/api/apiClient.ts` (`fetchJson`, `postJson`) or domain API modules—never raw `fetch`. Use relative `/api/...` paths.
+- Call the backend through `src/api/apiClient.ts` (`fetchJson`, `postJson`) or domain API modules, with relative `/api/...` paths.
 - Handle `ApiError` by displaying its message; ignore `isAbortError`.
 - Navigation uses `HashRouter`. Manage query parameters with React Router's `useSearchParams` and `updateSearchParams` from `src/utils/urlParams.ts`.
 
@@ -113,6 +109,7 @@ Telemetry analytics, lap comparison, and race intelligence hub for **Le Mans Ult
 ## 5. Testing & Quality Assurance
 
 - **Run all tests**: `npm test`
+- **Lint**: `npm run lint` (oxlint type-aware, `.oxlintrc.json`). Fix the code before opting out; every opt-out needs a reason (`-- reason` on disable comments, a trailing comment on each `"off"`), checked by `tools/release/checkLintReasons.mjs`.
 - **Watch mode**: `npm run test:watch`
 - **Coverage report**: `npm run test:coverage` (enforces thresholds in `vitest.config.ts`; never lower thresholds).
 - **Typecheck & Build**: `npm run build`

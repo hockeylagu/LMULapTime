@@ -95,6 +95,7 @@ async function* acquireReplaySaveLease(key: string): AsyncGenerator<ReplayStream
   let handedOff = false;
   try {
     while (!owner.granted) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- Each wait depends on the state the previous turn left behind.
       await Promise.race([new Promise<void>(resolve => { owner.resolve = () => { owner.granted = true; resolve(); }; }), new Promise<void>(resolve => setTimeout(resolve, 100))]);
       if (!owner.granted) yield { stage: 'caching', stageDescription: 'Waiting for another decode of this replay', percent: 0 };
     }
@@ -350,6 +351,7 @@ async function* runReplayWorker(
   try {
     while (true) {
       while (messages.length === 0 && !workerError) {
+        // oxlint-disable-next-line eslint/no-await-in-loop -- Each wait depends on the state the previous turn left behind.
         await new Promise<void>((resolve) => { notify = resolve; });
       }
       // A worker can post its decoder error and exit before this consumer resumes.

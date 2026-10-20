@@ -37,7 +37,7 @@ const weekends = Array.from({ length: 15 }, (_, index) => [1, 5, 9, 10].filter((
 
 describe('live event transitions through the service', () => {
   beforeEach(() => vi.useFakeTimers());
-  afterEach(() => { for (const service of services.splice(0)) service.stop(); vi.useRealTimers(); });
+  afterEach(() => { for (const service of services.splice(0)) void service.stop(); vi.useRealTimers(); });
 
   it.each(weekends.map(codes => [codes.map(liveSessionKind).join(' → '), codes] as const))
   ('supports the single-player weekend %s', (_name, codes) => {

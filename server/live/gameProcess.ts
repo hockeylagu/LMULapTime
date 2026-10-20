@@ -48,7 +48,7 @@ export function createGameProcessProbe(executable = 'Le Mans Ultimate.exe'): Gam
         try {
           entry.writeUInt32LE(entry.length, 0);
           if (!first(list, entry)) return null;
-          do {
+          for (let more = true; more; more = Boolean(next(list, entry))) {
             const name = entry.toString('utf16le', nameOffset).split('\0', 1)[0];
             if (name.toLowerCase() !== executable.toLowerCase()) continue;
             handle = open(PROCESS_QUERY_LIMITED_INFORMATION | SYNCHRONIZE, 0, entry.readUInt32LE(8));
@@ -58,7 +58,7 @@ export function createGameProcessProbe(executable = 'Le Mans Ultimate.exe'): Gam
             if (result === WAIT_TIMEOUT) return true;
             release();
             return result === 0 ? false : null;
-          } while (next(list, entry));
+          }
           // The whole list was read without the game in it. (GetLastError is not reliable across FFI calls.)
           return false;
         } finally {

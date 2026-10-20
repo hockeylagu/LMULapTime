@@ -11,6 +11,7 @@ import { boardLapId } from './leaderboardLaps.js';
 import { CompareBar } from './CompareBar.js';
 import { LoadError } from '../LoadError.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
+import { EMPTY_ARRAY } from '../../../utils/emptyDefaults.js';
 
 export interface LeaderboardSectionProps {
   board: Leaderboard | null;
@@ -50,7 +51,7 @@ const BEST_SECTOR_HINT = 'Best sector from any clean lap, not always from the be
 
 export const LeaderboardSection: React.FC<LeaderboardSectionProps> = ({
   board, loading, error, carClass, scope, playerCarType, onScopeChange, onCompare, onTelemetry, rivalName, onPin,
-  comparedLapIds = [], onPick, onOpenSession, onGoToCompare, retry,
+  comparedLapIds = EMPTY_ARRAY, onPick, onOpenSession, onGoToCompare, retry,
 }) => {
   const [sort, setSort] = useState<LeaderboardSort>('lap');
   const [showAll, setShowAll] = useState(false);

@@ -1,12 +1,12 @@
 import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { TelemetryAccelLatChannel } from '../../../../../src/components/replay/telemetry/channels/dynamics/TelemetryAccelLatChannel';
-import { TelemetryAccelLonChannel } from '../../../../../src/components/replay/telemetry/channels/dynamics/TelemetryAccelLonChannel';
-import { TelemetryAccelTotalChannel } from '../../../../../src/components/replay/telemetry/channels/dynamics/TelemetryAccelTotalChannel';
-import { TelemetrySlipAngleChannel } from '../../../../../src/components/replay/telemetry/channels/dynamics/TelemetrySlipAngleChannel';
-import { TelemetryUndersteerChannel } from '../../../../../src/components/replay/telemetry/channels/dynamics/TelemetryUndersteerChannel';
-import { TelemetryYawRateChannel } from '../../../../../src/components/replay/telemetry/channels/dynamics/TelemetryYawRateChannel';
+import { TelemetryAccelLatChannel } from '../../../../../src/components/replay/telemetry/channels/dynamics/TelemetryAccelLatChannel.js';
+import { TelemetryAccelLonChannel } from '../../../../../src/components/replay/telemetry/channels/dynamics/TelemetryAccelLonChannel.js';
+import { TelemetryAccelTotalChannel } from '../../../../../src/components/replay/telemetry/channels/dynamics/TelemetryAccelTotalChannel.js';
+import { TelemetrySlipAngleChannel } from '../../../../../src/components/replay/telemetry/channels/dynamics/TelemetrySlipAngleChannel.js';
+import { TelemetryUndersteerChannel } from '../../../../../src/components/replay/telemetry/channels/dynamics/TelemetryUndersteerChannel.js';
+import { TelemetryYawRateChannel } from '../../../../../src/components/replay/telemetry/channels/dynamics/TelemetryYawRateChannel.js';
 import type { PointComparison } from '../../../../../src/utils/replayComparison';
 import type { ReplayTrajectoryPoint } from '../../../../../shared/types/index';
 

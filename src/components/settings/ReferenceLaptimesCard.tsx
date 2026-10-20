@@ -54,7 +54,9 @@ export const ReferenceLaptimesCard: React.FC<ReferenceLaptimesCardProps> = ({
 }) => {
   const [history, setHistory] = useState<BenchmarkDiffSummary[]>([]);
   const [selectedDiffId, setSelectedDiffId] = useState<number | 'latest'>('latest');
-  const [displayedDiff, setDisplayedDiff] = useState<ReferenceBenchmarkDiff | null>(updateDiff);
+  const [pickedDiff, setPickedDiff] = useState<ReferenceBenchmarkDiff | null>(null);
+  // "Latest update" follows the newest diff; an older update shows the one picked.
+  const displayedDiff = selectedDiffId === 'latest' ? updateDiff : pickedDiff;
   const [isLoadingDiff, setIsLoadingDiff] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyReload, setHistoryReload] = useState(0);
@@ -82,11 +84,6 @@ export const ReferenceLaptimesCard: React.FC<ReferenceLaptimesCardProps> = ({
     return () => controller.abort();
   }, [updateDiff, historyReload]);
 
-  // While "Latest update" is selected, it follows the newest diff.
-  useEffect(() => {
-    if (selectedDiffId === 'latest') setDisplayedDiff(updateDiff);
-  }, [updateDiff, selectedDiffId]);
-
   // An update the reader just asked for shows what it changed.
   const wasUpdating = useRef(isUpdatingLaptimes);
   useEffect(() => {
@@ -100,7 +97,6 @@ export const ReferenceLaptimesCard: React.FC<ReferenceLaptimesCardProps> = ({
 
     if (val === 'latest') {
       setSelectedDiffId('latest');
-      setDisplayedDiff(updateDiff);
       setIsLoadingDiff(false);
       return;
     }
@@ -112,11 +108,11 @@ export const ReferenceLaptimesCard: React.FC<ReferenceLaptimesCardProps> = ({
     diffRequest.current = controller;
     setSelectedDiffId(id);
     // The old diff must not sit under the new selection while this one loads, or if it fails.
-    setDisplayedDiff(null);
+    setPickedDiff(null);
     setIsLoadingDiff(true);
 
     fetchBenchmarkDiffById(id, { signal: controller.signal })
-      .then((diff) => setDisplayedDiff(diff))
+      .then((diff) => setPickedDiff(diff))
       .catch((err: unknown) => {
         if (isAbortError(err)) return;
         setDiffError(apiErrorMessage(err, 'Unable to load that update.'));

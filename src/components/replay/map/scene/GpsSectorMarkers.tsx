@@ -2,6 +2,7 @@ import { MAP_COLORS, SECTOR_COLORS } from '../../../../utils/themeColors.js';
 import { placeMarkerNear } from './markerPlacement.js';
 import type { MarkerObstacle, RibbonIndex } from './cornerRibbonClearance.js';
 import { MarkerGuide } from './MarkerGuide.js';
+import { EMPTY_ARRAY } from '../../../../utils/emptyDefaults.js';
 
 type Point = { sx: number; sy: number };
 export type SectorMapMarker = { key: 's1' | 's2' } & ({ left: Point; right: Point; point?: never }
@@ -33,7 +34,7 @@ export function placeSectorMarkers(markers: SectorMapMarker[], markerScale: numb
 }
 
 /** Canonical road gates when available; otherwise a point at the replay's recorded sector crossing. */
-export function GpsSectorMarkers({ markers, markerScale, obstacles = [] }: {
+export function GpsSectorMarkers({ markers, markerScale, obstacles = EMPTY_ARRAY }: {
   markers: ReturnType<typeof placeSectorMarkers>; markerScale: number; obstacles?: readonly MarkerObstacle[];
 }) {
   return <g aria-label="Sector timing markers" className="pointer-events-none select-none">

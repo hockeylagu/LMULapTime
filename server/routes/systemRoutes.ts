@@ -11,7 +11,7 @@ const FOLDER_FIELDS = [
   { field: 'telemetryDir', label: 'telemetry folder' },
 ] as const;
 const MAX_PLAYER_NAME_LENGTH = 64;
-const CONTROL_CHARS = /[\u0000-\u001f]/g;
+const CONTROL_CHARS = /\p{Cc}/gu;
 
 export function createSystemRouter(context: ServerContext): Router {
   const router = Router();

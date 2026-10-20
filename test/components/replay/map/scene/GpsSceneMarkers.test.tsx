@@ -179,7 +179,7 @@ describe('GpsSceneMarkers', () => {
 
     const pedalGroup = container.querySelector('[data-testid="pedal-marker-throttle-2"]');
     const badgeGroup = pedalGroup?.querySelector('circle[r="9.5"]')?.parentElement;
-    const transform = badgeGroup?.getAttribute('transform')!;
+    const transform = badgeGroup!.getAttribute('transform')!;
     const match = transform.match(/translate\(([-0-9.]+),\s*([-0-9.]+)\)/);
     const tagY = Number(match![2]);
 

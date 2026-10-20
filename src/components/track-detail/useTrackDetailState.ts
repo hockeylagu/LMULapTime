@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useEffectEvent, useRef } from 'react';
 import { useSessionDataContext } from '../../api/sessionDataContext.js';
 import { useNavigate, useSearchParams } from 'react-router';
 import { updateSearchParams } from '../../utils/urlParams.js';
@@ -50,14 +50,17 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
   const requestedTrackRef = useRef<string | null>(null);
   const lastRequestVersionRef = useRef<{ attempt: number; revision: number } | null>(null);
 
-  useEffect(() => {
+  // The filters follow the URL when it changes (back, forward, a link).
+  const [syncedParams, setSyncedParams] = useState(searchParams);
+  if (searchParams !== syncedParams) {
+    setSyncedParams(searchParams);
     setHideEmptyState(searchParams.get('hideEmpty') !== 'false');
     setHasReplayState(searchParams.get('hasReplay') === 'true');
     setSelectedCarModelState(searchParams.get('model') || 'All');
     setFilterTypeState(searchParams.get('type') || 'All');
     setSearchQueryState(searchParams.get('q') || '');
     setSortByState(readSort(searchParams.get('sort')));
-  }, [searchParams]);
+  }
 
   const handleOpenReplay = (sessionId: string) => {
     const session = data?.sessions.find((item) => item.id === sessionId);
@@ -68,7 +71,7 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
     replayParams.set('sessionId', session.id);
     replayParams.set('driverOrdinal', String(driverOrdinal));
     replayParams.set('lapOrdinal', String(lapOrdinal));
-    navigate(`/telemetry?${replayParams.toString()}`);
+    void navigate(`/telemetry?${replayParams.toString()}`);
   };
 
   const setSortBy = (val: TrackDetailSortOption) => {
@@ -119,12 +122,15 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
     }
   }, [selectedCarClass, searchParams, setSearchParams]);
 
+  // loadedTrack is the previous result, not a trigger: the load is keyed on its request inputs.
+  const previousTrack = useEffectEvent(() => loadedTrack);
   useEffect(() => {
+    const loaded = previousTrack();
     let isCurrent = true;
     const controller = new AbortController();
     const sameRequestVersion = lastRequestVersionRef.current?.attempt === loadAttempt && lastRequestVersionRef.current?.revision === revision;
-    if (loadedTrack?.trackName === trackName && requestedTrackRef.current === trackName && !loadedTrack.data.filters && sameRequestVersion) return () => controller.abort();
-    if (requestedTrackRef.current !== trackName || loadedTrack?.trackName !== trackName) setLoading(true);
+    if (loaded?.trackName === trackName && requestedTrackRef.current === trackName && !loaded.data.filters && sameRequestVersion) return () => controller.abort();
+    if (requestedTrackRef.current !== trackName || loaded?.trackName !== trackName) setLoading(true);
     requestedTrackRef.current = trackName;
     lastRequestVersionRef.current = { attempt: loadAttempt, revision };
     setError(null);

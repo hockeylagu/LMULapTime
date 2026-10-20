@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { AppStatus, ReferenceBenchmarkDiff } from '../../../shared/types/index.js';
 import { folderPathProblem, normalizeFolderPath } from '../../../shared/domain/folderPath.js';
 import { ApiError, apiErrorMessage, postJson } from '../../api/apiClient.js';
@@ -71,29 +71,20 @@ export function useSettingsActions({ status, onUpdatePaths, onReplayScanTriggere
 
   // Each input follows its saved server value only when that value changes, and only while the user has not
   // edited it away from the previous saved value, so clearing a field to retype it survives status refreshes.
-  const lastSaved = useRef<Record<'resultsDir' | 'replaysDir' | 'telemetryDir' | 'playerName', string>>({
-    resultsDir: status?.resultsDir ?? '',
-    replaysDir: status?.replaysDir ?? '',
-    telemetryDir: status?.telemetryDir ?? '',
-    playerName: status?.playerName || '',
-  });
-
-  useEffect(() => {
-    if (!status) return;
-    const follow = (key: keyof typeof lastSaved.current, next: string, set: React.Dispatch<React.SetStateAction<string>>) => {
-      const previous = lastSaved.current[key];
-      if (next === previous) return;
-      lastSaved.current[key] = next;
-      set((current) => (current === previous ? next : current));
+  const [followedStatus, setFollowedStatus] = useState(status);
+  if (status && status !== followedStatus) {
+    setFollowedStatus(status);
+    const follow = (previous: string, next: string, set: React.Dispatch<React.SetStateAction<string>>) => {
+      if (next !== previous) set((current) => (current === previous ? next : current));
     };
-    follow('resultsDir', status.resultsDir ?? '', setResultsDirInputState);
-    follow('replaysDir', status.replaysDir ?? '', setReplaysDirInputState);
-    follow('telemetryDir', status.telemetryDir ?? '', setTelemetryDirInputState);
-    follow('playerName', status.playerName || '', setPlayerNameInput);
+    follow(followedStatus?.resultsDir ?? '', status.resultsDir ?? '', setResultsDirInputState);
+    follow(followedStatus?.replaysDir ?? '', status.replaysDir ?? '', setReplaysDirInputState);
+    follow(followedStatus?.telemetryDir ?? '', status.telemetryDir ?? '', setTelemetryDirInputState);
+    follow(followedStatus?.playerName || '', status.playerName || '', setPlayerNameInput);
     if (status.referenceLaptimes?.lastUpdateDiff) {
       setUpdateDiff(status.referenceLaptimes.lastUpdateDiff);
     }
-  }, [status]);
+  }
 
   /** Typing in a field clears that field's error; the rest of what was typed stays as it is. */
   const folderSetter = (field: FolderField, set: (value: string) => void) => (value: string) => {
@@ -124,7 +115,7 @@ export function useSettingsActions({ status, onUpdatePaths, onReplayScanTriggere
       focusFirstInvalid(errors);
       return;
     }
-    const playerName = playerNameInput.replace(/[\u0000-\u001f]/g, '').trim().slice(0, MAX_PLAYER_NAME_LENGTH);
+    const playerName = playerNameInput.replace(/\p{Cc}/gu, '').trim().slice(0, MAX_PLAYER_NAME_LENGTH);
 
     inFlight.current.scan = true;
     setIsScanning(true);

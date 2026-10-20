@@ -189,7 +189,7 @@ describe('ReplayTrajectoryService', () => {
   });
 
   it('resolves the recording driver slot from the selected session driver', async () => {
-    vi.spyOn(replayRecordings, 'resolveDriverSlot').mockReturnValue(1);
+    const resolveDriverSlot = vi.spyOn(replayRecordings, 'resolveDriverSlot').mockReturnValue(1);
     const getFullTrajSpy = vi.spyOn(replayRecordings, 'getFullTrajectory').mockResolvedValue({
       ...mockFullTrajectory,
       driverSlot: 1,
@@ -202,7 +202,7 @@ describe('ReplayTrajectoryService', () => {
       allowDuckDb: false,
     });
 
-    expect(replayRecordings.resolveDriverSlot).toHaveBeenCalledWith(
+    expect(resolveDriverSlot).toHaveBeenCalledWith(
       expect.stringContaining('Daytona.Vcr'),
       'Daytona.Vcr',
       'Other Driver',

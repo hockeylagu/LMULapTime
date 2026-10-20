@@ -21,23 +21,29 @@ export interface SuggestionTarget {
  */
 export function useReferenceLapSuggestion(target: SuggestionTarget): ComparableLap | null {
   const { sessionId, metadata, driver, driverName, lapOrdinal, lapTime } = target;
-  const [best, setBest] = useState<ComparableLap | null>(null);
+  const [fetched, setFetched] = useState<ComparableLap | null>(null);
+  const query = useMemo(() => {
+    const scope = metadata && driverName && sessionId ? replayCompareScope(metadata, driver) : null;
+    // Any car of the class, never across classes: without a class there is no suggestion.
+    if (!scope?.has('carClass') || !driverName || !sessionId) return null;
+    scope.set('telemetryOnly', 'true'); scope.set('representativeOnly', 'true'); scope.set('sort', 'lap');
+    scope.set('driver', driverName); scope.set('driverExact', 'true');
+    scope.set('playerOnly', String(driver?.isPlayer === true));
+    if (lapOrdinal != null) { scope.set('excludeSessionId', sessionId); scope.set('excludeLapOrdinal', String(lapOrdinal)); }
+    scope.set('pageSize', '1');
+    return scope.toString();
+  }, [sessionId, metadata, driver, driverName, lapOrdinal]);
+  // The previous suggestion stays until the next one arrives; without a query there is none.
+  const best = query ? fetched : null;
 
   useEffect(() => {
-    const query = metadata && driverName && sessionId ? replayCompareScope(metadata, driver) : null;
-    // Any car of the class, never across classes: without a class there is no suggestion.
-    if (!query?.has('carClass') || !driverName || !sessionId) { setBest(null); return; }
+    if (!query) return;
     const controller = new AbortController();
-    query.set('telemetryOnly', 'true'); query.set('representativeOnly', 'true'); query.set('sort', 'lap');
-    query.set('driver', driverName); query.set('driverExact', 'true');
-    query.set('playerOnly', String(driver?.isPlayer === true));
-    if (lapOrdinal != null) { query.set('excludeSessionId', sessionId); query.set('excludeLapOrdinal', String(lapOrdinal)); }
-    query.set('pageSize', '1');
-    fetchJson<{ laps?: ComparableLap[] }>(`/api/compare/laps?${query.toString()}`, { signal: controller.signal })
-      .then(data => setBest(data.laps?.[0] ?? null))
-      .catch((err: unknown) => { if (!isAbortError(err)) setBest(null); });
+    fetchJson<{ laps?: ComparableLap[] }>(`/api/compare/laps?${query}`, { signal: controller.signal })
+      .then(data => setFetched(data.laps?.[0] ?? null))
+      .catch((err: unknown) => { if (!isAbortError(err)) setFetched(null); });
     return () => controller.abort();
-  }, [sessionId, metadata, driver, driverName, lapOrdinal]);
+  }, [query]);
 
   return useMemo(() => {
     if (!sessionId || !best) return null;

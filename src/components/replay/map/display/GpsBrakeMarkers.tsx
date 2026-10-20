@@ -3,6 +3,7 @@ import { MAP_COLORS } from '../../../../utils/themeColors.js';
 import { showsFullBrakeBoards, type PlacedBrakeMarker } from './placeBrakeMarkers.js';
 import { markerSegmentsOverlap, markerLineHitsBox, type MarkerPoint } from '../scene/markerPlacement.js';
 import type { MarkerObstacle } from '../scene/cornerRibbonClearance.js';
+import { EMPTY_ARRAY } from '../../../../utils/emptyDefaults.js';
 
 interface Props {
   placement: PlacedBrakeMarker[];
@@ -13,7 +14,7 @@ interface Props {
 }
 
 /** Braking boards use the same local-meter projection as the track geometry; the scene places them. */
-export const GpsBrakeMarkers: React.FC<Props> = React.memo(({ placement: placedMarkers, markerScale, startFinishGate, obstacles = [], timingGates = [] }) => {
+export const GpsBrakeMarkers: React.FC<Props> = React.memo(({ placement: placedMarkers, markerScale, startFinishGate, obstacles = EMPTY_ARRAY, timingGates = EMPTY_ARRAY }) => {
   // Level of detail: show either the full board (zoomed in) or the roadside LOD tick line (zoomed out)
   // without intermediate levels, preventing visual clutter and overlapping semi-transparent artifacts.
   const showFullBoard = showsFullBrakeBoards(markerScale);

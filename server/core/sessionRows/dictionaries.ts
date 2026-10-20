@@ -27,9 +27,8 @@ export class Dictionaries {
   }
 
   /** The id of an exact driver name; null for an absent name. */
-  driver(value: unknown): number | null {
-    if (value === undefined || value === null) return null;
-    const name = String(value);
+  driver(name: string | null | undefined): number | null {
+    if (name === undefined || name === null) return null;
     let id = this.names.get(name);
     if (id === undefined) {
       this.insertName.run(name, name.trim().toLowerCase());
@@ -40,9 +39,9 @@ export class Dictionaries {
   }
 
   /** The id of a raw car type and class pair; null when both are absent. */
-  vehicle(carType: unknown, carClass: unknown): number | null {
-    const type = carType === undefined || carType === null ? null : String(carType);
-    const klass = carClass === undefined || carClass === null ? null : String(carClass);
+  vehicle(carType: string | null | undefined, carClass: string | null | undefined): number | null {
+    const type = carType ?? null;
+    const klass = carClass ?? null;
     if (type === null && klass === null) return null;
     const key = JSON.stringify([type, klass]);
     let id = this.vehicles.get(key);
@@ -59,9 +58,8 @@ export class Dictionaries {
   }
 
   /** The id of a team name; null for an absent name. */
-  team(value: unknown): number | null {
-    if (value === undefined || value === null) return null;
-    const name = String(value);
+  team(name: string | null | undefined): number | null {
+    if (name === undefined || name === null) return null;
     let id = this.teams.get(name);
     if (id === undefined) {
       this.insertTeam.run(name);

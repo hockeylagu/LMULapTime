@@ -20,16 +20,16 @@ describe('useGpsMapPanZoom', () => {
     const { result, rerender } = renderHook(({ position }) => useGpsMapPanZoom({ viewBoxSize: 800, currentPos: position }),
       { initialProps: { position: { sx: 550, sy: 100 } } });
     act(() => result.current.setZoomLevel(4));
-    act(() => surface.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', bubbles: true })));
+    act(() => { surface.dispatchEvent(new KeyboardEvent('keydown', { key: 'c', bubbles: true })); });
     expect(result.current.zoomLevel).toBe(4); expect(result.current.followCar).toBe(false);
     const centered = result.current.currentViewBox;
     rerender({ position: { sx: 650, sy: 200 } });
     expect(result.current.currentViewBox).toBe(centered);
-    act(() => surface.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', bubbles: true })));
+    act(() => { surface.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', bubbles: true })); });
     expect(result.current.followCar).toBe(true);
     rerender({ position: { sx: 700, sy: 250 } });
     const followed = result.current.currentViewBox;
-    act(() => surface.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', bubbles: true })));
+    act(() => { surface.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', bubbles: true })); });
     expect(result.current.followCar).toBe(false);
     expect(result.current.currentViewBox).toBe(followed);
     rerender({ position: { sx: 750, sy: 300 } });

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { SessionTableRow } from '../../../src/components/session-list/SessionTableRow';
+import { SessionTableRow } from '../../../src/components/session-list/SessionTableRow.js';
 import { makeSessionCard } from '../../helpers/sessionCardFixture.js';
 
 describe('SessionTableRow', () => {

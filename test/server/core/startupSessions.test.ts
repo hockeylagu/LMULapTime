@@ -61,6 +61,7 @@ describe('sessions on the web after a server start', () => {
 
   it('still shows the newest sessions when the XML worker dies during the startup scan', async () => {
     for (const name of ['2026_10_05_20_12_31-51Q1.xml', '2026_10_05_20_37_38-93R1.xml', '2026_10_05_21_22_50-68R1.xml']) writeSession(name);
+    // oxlint-disable-next-line typescript/unbound-method -- Kept to call on each worker, with that worker as `this`.
     const parse = FileIngestWorker.prototype.parseXml;
     let calls = 0;
     vi.spyOn(FileIngestWorker.prototype, 'parseXml').mockImplementation(function (this: FileIngestWorker, ...args) {

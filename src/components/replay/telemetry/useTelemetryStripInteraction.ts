@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { getTrajectoryDistances, findIndexAtDistance } from '../../../utils/lapAlignment.js';
 import { replayShortcutBlocked } from '../../../utils/replayShortcuts.js';
@@ -48,7 +48,17 @@ export function useTelemetryStripInteraction({
   const [interactionMode, setInteractionMode] = useState<'scrub' | 'zoom'>('scrub');
   const [dragSelection, setDragSelection] = useState<TelemetryDragSelection | null>(null);
 
-  const activeZoomRange = zoomRange !== undefined ? zoomRange : internalZoomRange;
+  const fitsPoints = (range: { start: number; end: number } | null) => !!range && points.length > 0 && range.end < points.length;
+  const requestedZoomRange = zoomRange !== undefined ? zoomRange : internalZoomRange;
+  const activeZoomRange = fitsPoints(requestedZoomRange) ? requestedZoomRange : null;
+  // A range that no longer fits the points is dropped, and the parent is told.
+  const [droppedZoomRange, setDroppedZoomRange] = useState<{ start: number; end: number } | null>(null);
+  if (internalZoomRange && !fitsPoints(internalZoomRange)) {
+    setDroppedZoomRange(internalZoomRange);
+    setInternalZoomRange(null);
+  }
+  const droppedControlledRange = zoomRange && !fitsPoints(zoomRange) ? zoomRange : null;
+  const notifyZoomDropped = useEffectEvent(() => onZoomRangeChange?.(null));
   const updateZoomRange = useCallback((range: { start: number; end: number } | null) => {
     setInternalZoomRange(range);
     onZoomRangeChange?.(range);
@@ -56,8 +66,8 @@ export function useTelemetryStripInteraction({
   const handleResetZoom = useCallback(() => updateZoomRange(null), [updateZoomRange]);
 
   useEffect(() => {
-    if (activeZoomRange && (points.length === 0 || activeZoomRange.end >= points.length)) updateZoomRange(null);
-  }, [points.length, activeZoomRange, updateZoomRange]);
+    if (droppedZoomRange || droppedControlledRange) notifyZoomDropped();
+  }, [droppedZoomRange, droppedControlledRange]);
 
   useEffect(() => () => {
     if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);

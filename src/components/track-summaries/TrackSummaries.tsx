@@ -34,16 +34,13 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
   useEffect(()=>{
     if(sessions!==undefined)return;
     const controller=new AbortController();
-    setTrackError(null);
     fetchJson<{tracks:TrackSummary[]}>(`/api/tracks?carClass=${encodeURIComponent(selectedCarClass)}`,{signal:controller.signal})
-      .then(data=>setStoredTracks(data.tracks)).catch((err:unknown)=>{if(!isAbortError(err))setTrackError(apiErrorMessage(err,'Unable to load circuits.'));});
+      .then(data=>{setStoredTracks(data.tracks);setTrackError(null);}).catch((err:unknown)=>{if(!isAbortError(err))setTrackError(apiErrorMessage(err,'Unable to load circuits.'));});
     return ()=>controller.abort();
   },[sessions,selectedCarClass,revision]);
 
   useEffect(() => {
     let active = true;
-    setBenchmarkState('loading');
-    setBenchmarkError('');
     loadReferenceLaptimes()
       .then(data => {
         if (!active) return;
@@ -58,6 +55,12 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
     // The loader is shared: ignore this view's completion without cancelling other consumers.
     return () => { active = false; };
   }, [retryCount]);
+  // The first load starts from the shared cache's state; a retry shows loading again.
+  const retryBenchmarks = () => {
+    setBenchmarkState('loading');
+    setBenchmarkError('');
+    setRetryCount(count => count + 1);
+  };
 
   const trackList: TrackSummary[] = useMemo(() => {
     if (sessions===undefined) return storedTracks;
@@ -90,9 +93,8 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
   }, [trackList, refCache, selectedCarClass]);
   const benchmarkSortAvailable = benchmarkState === 'ready' && [...paceByTrack.values()].some(pace => pace !== null);
 
-  useEffect(() => {
-    if (!benchmarkSortAvailable && sortBy === 'pace-asc') setSortBy('name-asc');
-  }, [benchmarkSortAvailable, sortBy]);
+  // Without benchmarks there is no pace to sort by.
+  if (!benchmarkSortAvailable && sortBy === 'pace-asc') setSortBy('name-asc');
 
   const sortedTrackList = useMemo(() => {
     return [...trackList].sort((a, b) => {
@@ -138,7 +140,7 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
       {benchmarkState === 'error' && (
         <div role="alert" className="flex items-center justify-between gap-4 border border-lmu-border rounded-xl p-4 text-xs">
           <p className="text-lmu-text-soft break-words">Benchmarks unavailable: {benchmarkError}</p>
-          <button type="button" onClick={() => setRetryCount(count => count + 1)} className="shrink-0 text-lmu-text underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-lmu-accent-text">Try again</button>
+          <button type="button" onClick={retryBenchmarks} className="shrink-0 text-lmu-text underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-lmu-accent-text">Try again</button>
         </div>
       )}
       {sortedTrackList.length === 0 && (

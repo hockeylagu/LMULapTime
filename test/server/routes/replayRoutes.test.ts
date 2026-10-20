@@ -2,7 +2,7 @@ import express from 'express';
 import fs from 'fs';
 import path from 'path';
 import request from 'supertest';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { ReplayRecordingService } from '../../../server/replay/replayRecordingService.js';
 import { SessionDatabase } from '../../../server/core/db.js';
 import { createReplayRouter } from '../../../server/routes/replayRoutes.js';
@@ -23,6 +23,7 @@ describe('session telemetry routes', () => {
   let replayPath: string;
   let app: express.Express;
   let session: DetailedSession;
+  let getSessionById: MockInstance<SessionDatabase['getSessionById']>;
 
   beforeEach(() => {
     db = new SessionDatabase(':memory:');
@@ -58,7 +59,7 @@ describe('session telemetry routes', () => {
     session = sessionFixture(session.drivers.map(item => driver(item.name,
       item.laps.map(itemLap => lap(itemLap.lapNumber, itemLap)), item)), session);
     db.upsertSession(session, 'session-1.xml', 1, 1);
-    vi.spyOn(db, 'getSessionById');
+    getSessionById = vi.spyOn(db, 'getSessionById');
 
     const context = {
       replaysDir: tempDir,
@@ -92,7 +93,7 @@ describe('session telemetry routes', () => {
       sessionDriverOrdinal: 0,
       sessionLapOrdinals: { '1': 0 },
     });
-    expect(db.getSessionById).not.toHaveBeenCalled();
+    expect(getSessionById).not.toHaveBeenCalled();
   });
 
   it('requires session driver and lap ordinals for telemetry requests', async () => {
@@ -123,7 +124,7 @@ describe('session telemetry routes', () => {
     const response = await request(app).get('/api/session/session-1/traffic');
     expect(response.status).toBe(200);
     expect(traffic.mock.calls[0][0].session?.drivers[0]).toMatchObject({ name: 'Route Driver', carClass: 'GT3', laps: [] });
-    expect(db.getSessionById).not.toHaveBeenCalled();
+    expect(getSessionById).not.toHaveBeenCalled();
   });
 
   it('does not expose replay-name telemetry routes', async () => {

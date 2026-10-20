@@ -5,6 +5,7 @@ import { X, Sliders, Shield, Fuel, Flame, Snowflake, Wrench, Clock, Flag, Globe,
 import { DetailedSession, SessionSettings } from '../../../../shared/types/index.js';
 import { formatRain } from '../../../../shared/domain/lapConditions.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
+import { EMPTY_RECORD } from '../../../utils/emptyDefaults.js';
 
 export type SessionConditionsInfo = Pick<NonNullable<DetailedSession['matchingReplayFile']>, 'weatherCondition' | 'maxRainIntensity' | 'ambientTemp' | 'trackTemp'>;
 
@@ -20,7 +21,7 @@ const WEATHER_LABEL = { Dry: 'Dry Track', Wet: 'Wet Track', 'Dynamic Weather': '
 export const SessionRulesModal: React.FC<SessionRulesModalProps> = ({
   isOpen,
   onClose,
-  settings = {},
+  settings = EMPTY_RECORD,
   conditions,
 }) => {
   const dialogRef = useModalFocus(isOpen, onClose);

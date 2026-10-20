@@ -65,7 +65,7 @@ describe('class size preview', () => {
     const {rerender} = render(<GpsTrackMapScene points={sliding} bounds={bounds} currentIndex={1} baselinePoints={points.map(p=>({...p,rotY:Math.PI}))} />);
     expect(Number(screen.getByTestId('gps-car-footprint').parentElement?.getAttribute('transform')?.slice(7,-1))).toBeCloseTo(-90);
     expect(Number(screen.getByTestId('gps-ghost-footprint').parentElement?.getAttribute('transform')?.match(/rotate\((.*)\)/)?.[1])).toBeCloseTo(0);
-    rerender(<GpsTrackMapScene points={points.map(({rotY,...p})=>p)} bounds={bounds} currentIndex={1} />);
+    rerender(<GpsTrackMapScene points={points.map(({ rotY: _rotY, ...p }) => p)} bounds={bounds} currentIndex={1} />);
     expect(screen.queryByTestId('gps-car-footprint')).toBeNull();
   });
 });

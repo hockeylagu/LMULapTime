@@ -27,12 +27,12 @@ export function useAiSettings(): AiSettingsState {
   // Once a save or remove has answered, a slower earlier read must not bring the old state back.
   const savedSince = useRef(0);
 
-  const load = useCallback(() => {
+  // Loading starts true; a reload enters it in reload, so the fetch only sets state when it answers.
+  const fetchSettings = useCallback(() => {
     controller.current?.abort();
     const request = new AbortController();
     controller.current = request;
     const startedAt = savedSince.current;
-    setIsLoading(true);
     fetchJson<AiSettingsResponse>('/api/ai/settings', { signal: request.signal })
       .then((next) => {
         if (request.signal.aborted || savedSince.current !== startedAt) return;
@@ -47,9 +47,13 @@ export function useAiSettings(): AiSettingsState {
   }, []);
 
   useEffect(() => {
-    load();
+    fetchSettings();
     return () => controller.current?.abort();
-  }, [load]);
+  }, [fetchSettings]);
+  const reload = useCallback(() => {
+    setIsLoading(true);
+    fetchSettings();
+  }, [fetchSettings]);
 
   const setSettings = useCallback((next: AiSettingsResponse) => {
     savedSince.current += 1;
@@ -57,5 +61,5 @@ export function useAiSettings(): AiSettingsState {
     setLoadError(null);
   }, []);
 
-  return { settings, setSettings, loadError, reload: load, isLoading };
+  return { settings, setSettings, loadError, reload, isLoading };
 }

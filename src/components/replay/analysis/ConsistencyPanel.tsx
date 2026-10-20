@@ -6,6 +6,7 @@ import { CornerConsistencyStat } from '../../../utils/cornerConsistency.js';
 import { MiniCornerMap } from '../map/MiniCornerMap.js';
 import { LapSelectorDropdown, LapConsistencyOption } from './LapSelectorDropdown.js';
 import { consistencyClass, MetricRow, LeastConsistentBadge } from './ConsistencyMetricRow.js';
+import { EMPTY_ARRAY } from '../../../utils/emptyDefaults.js';
 
 export interface ConsistencyPanelProps {
   stats: LapConsistencyStats;
@@ -26,9 +27,11 @@ export interface ConsistencyPanelProps {
   className?: string;
 }
 
+const NO_EXCLUDED_LAPS = new Set<number>();
+
 export const ConsistencyPanel: React.FC<ConsistencyPanelProps> = ({
   stats,
-  cornerStats = [],
+  cornerStats = EMPTY_ARRAY,
   isLoadingCornerStats = false,
   onSelectCorner,
   onSelectBaselineLap,
@@ -36,8 +39,8 @@ export const ConsistencyPanel: React.FC<ConsistencyPanelProps> = ({
   trackPoints,
   trackBounds,
   trackLengthM,
-  availableLaps = [],
-  excludedLaps = new Set<number>(),
+  availableLaps = EMPTY_ARRAY,
+  excludedLaps = NO_EXCLUDED_LAPS,
   onToggleLapExclusion,
   currentLapNumber,
   className = '',

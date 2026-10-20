@@ -245,7 +245,7 @@ export interface SessionSortSelectors<T> {
 export function compareSessionsBySortOption<T extends SessionComparable>(
   a: T,
   b: T,
-  sortBy: SessionSortOption | string,
+  sortBy: string,
   selectors?: SessionSortSelectors<T>
 ): number {
   if (sortBy === 'date-desc' || sortBy === 'date-asc') {

@@ -18,8 +18,6 @@ export const AiReportsHistoryCard: React.FC = () => {
 
   useEffect(() => {
     const controller = new AbortController();
-    setIsLoading(true);
-    setError(null);
     fetchJson<AiReportHistoryEntry[]>('/api/ai/reports', { signal: controller.signal })
       .then(data => setReports(Array.isArray(data) ? data : []))
       .catch((err: unknown) => {
@@ -29,6 +27,12 @@ export const AiReportsHistoryCard: React.FC = () => {
       .finally(() => { if (!controller.signal.aborted) setIsLoading(false); });
     return () => controller.abort();
   }, [reloadCount]);
+  // The first load starts in the loading state; a reload enters it here.
+  const reload = () => {
+    setIsLoading(true);
+    setError(null);
+    setReloadCount(count => count + 1);
+  };
 
   const shown = reports && !showAll ? reports.slice(0, LATEST_COUNT) : reports;
 
@@ -40,7 +44,7 @@ export const AiReportsHistoryCard: React.FC = () => {
           {reports && reports.length > 0 && <span className="text-xs font-mono text-lmu-muted">{formatNumber(reports.length)} cached</span>}
           <button
             type="button"
-            onClick={() => setReloadCount(count => count + 1)}
+            onClick={reload}
             disabled={isLoading}
             aria-label="Refresh AI report history"
             className={`p-1.5 rounded-md text-lmu-muted hover:text-lmu-text hover:bg-lmu-card-hover transition-colors cursor-pointer disabled:cursor-default ${FOCUS_RING}`}
@@ -57,7 +61,7 @@ export const AiReportsHistoryCard: React.FC = () => {
       {error && (
         <div role="alert" className="flex flex-wrap items-center gap-3 text-xs">
           <span className="font-semibold text-lmu-loss break-words min-w-0">{error}</span>
-          <button type="button" onClick={() => setReloadCount(count => count + 1)} disabled={isLoading} className={SECONDARY_BUTTON}>Retry</button>
+          <button type="button" onClick={reload} disabled={isLoading} className={SECONDARY_BUTTON}>Retry</button>
         </div>
       )}
 

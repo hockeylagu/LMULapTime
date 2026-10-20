@@ -4,7 +4,7 @@ import type { LapData, PitService } from '../types/index.js';
 const ENTERED_PIT_LANE = 34;
 const EXITED_PIT_LANE = 32;
 const IN_STALL = 18;
-const ON_JACKS = [35, 36];
+const ON_JACKS = new Set([35, 36]);
 const SERVICE_COMPLETE = 37;
 
 /**
@@ -48,7 +48,7 @@ export function pitStopsFromEvents(events: PitEventTime[]): PitStopTimes[] {
       stall = null;
     } else if (!open) {
       continue;
-    } else if (code !== null && ON_JACKS.includes(code) && open.jacksSec === null) {
+    } else if (code !== null && ON_JACKS.has(code) && open.jacksSec === null) {
       open.jacksSec = timeSec;
     } else if (code === IN_STALL && stall === null) {
       stall = timeSec;

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { TrackSessionsCard } from '../../../src/components/track-detail/TrackSessionsCard';
+import { TrackSessionsCard } from '../../../src/components/track-detail/TrackSessionsCard.js';
 import { makeSessionCard } from '../../helpers/sessionCardFixture.js';
 
 describe('TrackSessionsCard', () => {

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useEffectEvent } from 'react';
 
 /** Longest wait for the page above the target to stop changing height. */
 const SETTLE_WINDOW_MS = 2500;
@@ -8,6 +8,8 @@ const SETTLE_WINDOW_MS = 2500;
  * page height and re-aligns each time it grows, until the window ends or the user scrolls on their own.
  */
 export function useDeepLinkAlign(sectionId: string | null, align: (sectionId: string) => void): void {
+  // align is an inline callback: the observer must start once per section, not once per render.
+  const alignSection = useEffectEvent(align);
   useEffect(() => {
     if (!sectionId || typeof ResizeObserver === 'undefined') return;
     let userScrolled = false;
@@ -20,7 +22,7 @@ export function useDeepLinkAlign(sectionId: string | null, align: (sectionId: st
       const height = document.documentElement.scrollHeight;
       if (userScrolled || height === lastHeight) return;
       lastHeight = height;
-      align(sectionId);
+      alignSection(sectionId);
     });
     observer.observe(document.body);
     const timer = setTimeout(() => observer.disconnect(), SETTLE_WINDOW_MS);
@@ -30,6 +32,5 @@ export function useDeepLinkAlign(sectionId: string | null, align: (sectionId: st
       observer.disconnect();
       events.forEach((name) => window.removeEventListener(name, stop));
     };
-    // Runs once for the link the page opened with.
-  }, []);
+  }, [sectionId]);
 }

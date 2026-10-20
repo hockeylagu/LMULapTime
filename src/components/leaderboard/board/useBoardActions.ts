@@ -67,11 +67,11 @@ export function useBoardActions(board: Leaderboard | null, carClass: string | nu
     const yours = boardLapTelemetryRef(player);
     if (!yours) return;
     if (entry.isPlayer) {
-      navigate(buildTelemetryComparePath(searchParams, yours, null));
+      void navigate(buildTelemetryComparePath(searchParams, yours, null));
       return;
     }
     const theirs = boardLapTelemetryRef(entry);
-    if (theirs) navigate(buildTelemetryComparePath(searchParams, yours, theirs));
+    if (theirs) void navigate(buildTelemetryComparePath(searchParams, yours, theirs));
   };
 
   return { compareRequest, compareRef, scrollToCompare, onPick, onCompare, onAnalyse, onTelemetry };

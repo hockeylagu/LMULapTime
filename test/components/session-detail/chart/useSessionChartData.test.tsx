@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { useSessionChartData } from '../../../../src/components/session-detail/chart/useSessionChartData';
+import { useSessionChartData } from '../../../../src/components/session-detail/chart/useSessionChartData.js';
 import type { DetailedSession, DriverData, LapData } from '../../../../shared/types/index';
 
 function lap(lapNumber: number, lapTime: number | null, flags: Partial<LapData> = {}): LapData {

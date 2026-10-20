@@ -86,10 +86,10 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
       if (!isNaN(lapNumber) && lapNumber > 0) {
         if (session.matchingReplayFile) {
           const telemetryPath = sessionTelemetryPath(searchParams, session, selectedDriver, lapNumber);
-          if (telemetryPath) navigate(telemetryPath);
-          else navigate(sessionLapComparePath(session, selectedDriver, lapNumber));
+          if (telemetryPath) void navigate(telemetryPath);
+          else void navigate(sessionLapComparePath(session, selectedDriver, lapNumber));
         } else {
-          navigate(sessionLapComparePath(session, selectedDriver, lapNumber));
+          void navigate(sessionLapComparePath(session, selectedDriver, lapNumber));
         }
       }
     }

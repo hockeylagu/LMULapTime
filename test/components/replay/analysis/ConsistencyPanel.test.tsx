@@ -1,9 +1,9 @@
 import { ReactNode } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ConsistencyPanel } from '../../../../src/components/replay/analysis/ConsistencyPanel';
-import { LapConsistencyStats } from '../../../../src/utils/lapConsistency';
-import { CornerConsistencyStat } from '../../../../src/utils/cornerConsistency';
+import { ConsistencyPanel } from '../../../../src/components/replay/analysis/ConsistencyPanel.js';
+import { LapConsistencyStats } from '../../../../src/utils/lapConsistency.js';
+import { CornerConsistencyStat } from '../../../../src/utils/cornerConsistency.js';
 
 vi.mock('recharts', () => ({
   BarChart: ({ children }: { children: ReactNode }) => <div>{children}</div>,

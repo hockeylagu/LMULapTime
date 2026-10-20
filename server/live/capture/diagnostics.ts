@@ -109,7 +109,7 @@ class DiagnosticFile {
     // Response timing changes every request; deduplicate payload/outcome, not timestamps/duration.
     const value = (event.kind === 'rest' || event.kind === 'reader-rest') && typeof event.data === 'object' && event.data !== null
       ? event.data as Record<string, unknown> : null;
-    const key = `${event.kind}:${String(value?.path ?? '')}`;
+    const key = `${event.kind}:${typeof value?.path === 'string' ? value.path : ''}`;
     const content = value ? JSON.stringify({ ...value, startedAt: undefined, finishedAt: undefined, durationMs: undefined }) : data;
     const previous = this.previous.get(key);
     const failure = value && (value.outcome !== 'ok' || value.parser !== 'accepted'

@@ -147,8 +147,8 @@ export class ReplayRecordingService {
         maxPoints: 0,
         allLaps: true,
       }, { filename: replayName, mtimeMs, fileSizeBytes, driverSlotKey, isPrimary: false });
-      let step = await extraction.next();
-      while (!step.done) step = await extraction.next();
+      // Only completion matters here: the progress events are drained unread.
+      for await (const _progress of extraction) { /* drained */ }
     })();
     this.pendingDecodes.set(key, decode);
     return decode

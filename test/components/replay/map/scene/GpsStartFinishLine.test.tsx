@@ -106,7 +106,7 @@ describe('GpsStartFinishLine', () => {
     );
 
     const label = container.querySelector('[data-testid="start-finish-label"]');
-    const transform = label?.getAttribute('transform')!;
+    const transform = label!.getAttribute('transform')!;
     const match = transform.match(/translate\(([-0-9.]+),\s*([-0-9.]+)\)/);
     const labelX = Number(match![1]);
 

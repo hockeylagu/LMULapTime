@@ -299,8 +299,7 @@ describe('LiveCaptureController', () => {
     controller.sample(sample(201));
     expect(controller.status()).toMatchObject({ pendingBatches: 4, samples: 200, droppedSamples: 1 });
 
-    const dataBatches = writer.batches().filter(batch => batch.samples.length > 0);
-    writer.acknowledge(dataBatches[0]);
+    writer.acknowledge(writer.batches().find(batch => batch.samples.length > 0)!);
     controller.sample(sample(201));
     controller.pause();
     expect(controller.status()).toMatchObject({ pendingBatches: 4, samples: 201, droppedSamples: 1 });

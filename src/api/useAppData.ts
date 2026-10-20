@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, startTransition } from 'react';
+import { useState, useEffect, useEffectEvent, useCallback, useRef, startTransition } from 'react';
 import type { AppStatus, ScanStatus } from '../../shared/types/index.js';
 import { fetchJson, postJson, isAbortError, apiErrorMessage } from './apiClient.js';
 import { invalidateReferenceLaptimes } from './referenceApi.js';
@@ -163,19 +163,21 @@ export function useAppData({ onGameStarted }: { onGameStarted?: () => void } = {
     onGameRunning: setGameRunning,
   }, true);
 
+  // Cancels whatever timers and requests are current when the effect ends.
+  const cancelPending = useEffectEvent(() => {
+    mounted.current = false;
+    ++pollGeneration.current;
+    clearTimeout(pollTimer.current);
+    scanAbort.current?.abort();
+    dataAbort.current?.abort();
+    refreshAbort.current?.abort();
+  });
   useEffect(() => {
     mounted.current = true;
     // Route changes can enter or leave demo mode without reloading the app.
     loadedKey.current = null;
     startScanPolling();
-    return () => {
-      mounted.current = false;
-      ++pollGeneration.current;
-      clearTimeout(pollTimer.current);
-      scanAbort.current?.abort();
-      dataAbort.current?.abort();
-      refreshAbort.current?.abort();
-    };
+    return () => cancelPending();
   }, [startScanPolling, demoMode]);
 
   return { status, loading, isRefreshing, replayScanStatus, gameRunning,

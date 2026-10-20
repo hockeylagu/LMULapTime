@@ -11,7 +11,7 @@ const DRIVE_ROOT = /^[a-zA-Z]:\\$/;
 const LONG_PATH_PREFIX = '\\\\?\\';
 /** Characters Windows never allows in a path (the drive colon and the long-path prefix are handled apart). */
 const FORBIDDEN_CHARS = /[<>"|?*]/;
-const CONTROL_CHARS = /[\u0000-\u001f]/;
+const CONTROL_CHARS = /\p{Cc}/u;
 
 function stripQuotes(value: string): string {
   const trimmed = value.trim();

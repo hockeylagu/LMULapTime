@@ -276,7 +276,7 @@ export class LmuParser {
       // Parse Session Settings & Server Rules
       const parseNum = (val: unknown): number | undefined => {
         if (val === undefined || val === null || val === '') return undefined;
-        const n = typeof val === 'number' ? val : parseFloat(String(val));
+        const n = typeof val === 'number' ? val : typeof val === 'string' ? parseFloat(val) : NaN;
         return isNaN(n) ? undefined : n;
       };
 
@@ -625,7 +625,8 @@ export class LmuParser {
 
     const cleanCompound = (val?: unknown): string | undefined => {
       if (!val) return undefined;
-      const str = String(val).split(',').pop()?.trim();
+      // Attribute values are parsed, so a compound written as a bare number arrives as one.
+      const str = (typeof val === 'string' || typeof val === 'number' ? String(val) : '').split(',').pop()?.trim();
       return str || undefined;
     };
 
@@ -636,7 +637,7 @@ export class LmuParser {
 
     const parsePercentVal = (val: unknown): number | null => {
       if (val === undefined || val === null || val === '') return null;
-      const parsed = typeof val === 'number' ? val : parseFloat(String(val));
+      const parsed = typeof val === 'number' ? val : typeof val === 'string' ? parseFloat(val) : NaN;
       if (isNaN(parsed)) return null;
       // If LMU outputs fraction e.g. 0.957 -> convert to 95.7%
       const pct = parsed <= 1.0 && parsed >= 0 ? parsed * 100 : parsed;

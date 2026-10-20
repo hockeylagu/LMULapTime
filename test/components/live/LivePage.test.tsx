@@ -97,7 +97,7 @@ describe('LivePage', () => {
       get: (_target, name) => (...args: unknown[]) => { calls.push(`${String(name)}:${args.length}`); },
       set: () => true,
     });
-    vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(ctx as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx as unknown as CanvasRenderingContext2D);
     let renders = 0;
     render(<Profiler id="live" onRender={() => { renders += 1; }}><LivePage /></Profiler>);
     send(snapshot({}));

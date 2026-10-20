@@ -16,7 +16,7 @@ const PROFILE_COLUMNS = [
   'leftKerbHeightM', 'rightKerbHeightM',
 ] as const satisfies readonly (keyof TrackSurfaceProfileColumns)[];
 const KERB_TYPE_COLUMNS = ['leftKerbType', 'rightKerbType'] as const;
-const KERB_TYPES: readonly TrackKerbType[] = ['flat', 'sawtooth', 'other'];
+const KERB_TYPES: ReadonlySet<string> = new Set<TrackKerbType>(['flat', 'sawtooth', 'other']);
 /** Surface layers added after the first packages; older packages omit them. */
 const OPTIONAL_SURFACES: readonly string[] = ['apron', 'gravel', 'grass', 'raisedKerb', 'otherRoadKerb'];
 
@@ -168,7 +168,7 @@ export function parseTrackBoundaryGeometry(value: unknown, expectedLayoutKey?: s
       const column = array(profile[key], `surfaceProfile.${key}`);
       if (column.length !== stations.length) invalid(`surfaceProfile.${key} length`);
       column.forEach((kind, index) => {
-        if (kind !== null && !KERB_TYPES.includes(kind as TrackKerbType)) invalid(`surfaceProfile.${key}[${index}]`);
+        if (kind !== null && !KERB_TYPES.has(kind as string)) invalid(`surfaceProfile.${key}[${index}]`);
       });
     }
   }

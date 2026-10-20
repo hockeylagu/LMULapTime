@@ -106,8 +106,10 @@ export function findTrafficSpells(
       });
     }
     // A car that drops just out of range for a moment is still the same spell.
-    for (const [key, spell] of [...open]) if (time - spell.endSec > SPELL_BREAK_SEC) close(key);
+    // Copies the collection because the loop body mutates it.
+    for (const [key, spell] of Array.from(open)) if (time - spell.endSec > SPELL_BREAK_SEC) close(key);
   }
-  for (const key of [...open.keys()]) close(key);
+  // Copies the collection because the loop body mutates it.
+  for (const key of Array.from(open.keys())) close(key);
   return spells.sort((a, b) => a.startSec - b.startSec);
 }

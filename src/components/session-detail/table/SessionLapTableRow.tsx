@@ -118,7 +118,7 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
     : sessionLapComparePath(session, selectedDriver, l.lapNumber);
 
   const handleOpenTelemetry = () => {
-    navigate(telemetryUrl);
+    void navigate(telemetryUrl);
   };
 
   return (

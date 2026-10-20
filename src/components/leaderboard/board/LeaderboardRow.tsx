@@ -48,9 +48,9 @@ const SectorCell: React.FC<{ sector: 0 | 1 | 2; time: number | null; rank: numbe
 );
 
 /** One row of the board: a driver, a benchmark band, or the drivers a compact board hides. */
-export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
-  row, player, benchmark, onShowAll, onCompare, onTelemetry, isRival, onPin, isCompared = false, onPick, onOpenSession,
-}) => {
+export const LeaderboardRow: React.FC<LeaderboardRowProps> = (props) => {
+  const { row, onShowAll } = props;
+  if (row.kind === 'driver') return <DriverRow {...props} row={row} />;
   if (row.kind === 'band') {
     return (
       <tr aria-label={`${row.label} pace, ${row.percent}%`}>
@@ -65,24 +65,27 @@ export const LeaderboardRow: React.FC<LeaderboardRowProps> = ({
       </tr>
     );
   }
+  return (
+    <tr>
+      <td />
+      <td colSpan={LEADERBOARD_COLUMNS - 1} className="px-3 py-0.5">
+        <button
+          type="button"
+          onClick={onShowAll}
+          className={`text-[11px] text-lmu-faint hover:text-white hover:underline underline-offset-2 rounded cursor-pointer ${FOCUS_RING}`}
+        >
+          {row.count} more driver{row.count === 1 ? '' : 's'}
+        </button>
+      </td>
+    </tr>
+  );
+};
 
-  if (row.kind === 'hidden') {
-    return (
-      <tr>
-        <td />
-        <td colSpan={LEADERBOARD_COLUMNS - 1} className="px-3 py-0.5">
-          <button
-            type="button"
-            onClick={onShowAll}
-            className={`text-[11px] text-lmu-faint hover:text-white hover:underline underline-offset-2 rounded cursor-pointer ${FOCUS_RING}`}
-          >
-            {row.count} more driver{row.count === 1 ? '' : 's'}
-          </button>
-        </td>
-      </tr>
-    );
-  }
+type DriverRowProps = Omit<LeaderboardRowProps, 'row'> & { row: Extract<Row, { kind: 'driver' }> };
 
+const DriverRow: React.FC<DriverRowProps> = ({
+  row, player, benchmark, onCompare, onTelemetry, isRival, onPin, isCompared = false, onPick, onOpenSession,
+}) => {
   const { entry } = row;
   const vsYou = player && !entry.isPlayer ? entry.bestLap.lapTime - player.bestLap.lapTime : null;
   const hasTelemetry = Boolean(entry.bestLap.telemetryAvailable && player?.bestLap.telemetryAvailable);

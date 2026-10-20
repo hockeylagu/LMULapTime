@@ -48,19 +48,21 @@ export function useReplayCache(replayScanStatus?: ScanStatus | ReplayScanStatus 
   const [error, setError] = useState<string | null>(null);
   const [upgradeOverview, setUpgradeOverview] = useState<ReplayUpgradeOverview | null>(null);
   const [upgradeError, setUpgradeError] = useState<string | null>(null);
-  const upgradeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const lifetime = useRef<AbortController | null>(null);
   // Only the newest request of each kind may write state: a slow older answer is dropped.
   const replaysRequest = useRef(0);
   const upgradeRequest = useRef(0);
 
+  // The first load starts in the loading state and reload enters it; refreshes after a scan or upgrade stay quiet.
   const loadReplays = useCallback(() => {
     const id = ++replaysRequest.current;
     const isCurrent = () => id === replaysRequest.current && !lifetime.current?.signal.aborted;
-    setIsLoading(true);
-    setError(null);
     fetchJson<ReplayCacheSummary[]>('/api/replays/cache', { signal: lifetime.current?.signal })
-      .then((data) => { if (isCurrent()) setReplays(Array.isArray(data) ? data : []); })
+      .then((data) => {
+        if (!isCurrent()) return;
+        setReplays(Array.isArray(data) ? data : []);
+        setError(null);
+      })
       .catch((err: unknown) => {
         if (isAbortError(err) || !isCurrent()) return;
         setError(apiErrorMessage(err, 'Unable to load the cached replays.'));
@@ -71,7 +73,6 @@ export function useReplayCache(replayScanStatus?: ScanStatus | ReplayScanStatus 
   }, []);
 
   const loadUpgrade = useCallback(() => {
-    if (upgradeTimer.current) clearTimeout(upgradeTimer.current);
     const id = ++upgradeRequest.current;
     const isCurrent = () => id === upgradeRequest.current && !lifetime.current?.signal.aborted;
     fetchJson<unknown>('/api/replays/upgrade', { signal: lifetime.current?.signal })
@@ -79,7 +80,6 @@ export function useReplayCache(replayScanStatus?: ScanStatus | ReplayScanStatus 
         if (!isCurrent() || !isUpgradeOverview(data)) return;
         setUpgradeError(null);
         setUpgradeOverview(data);
-        if (data.status.running) upgradeTimer.current = setTimeout(loadUpgrade, UPGRADE_POLL_MS);
       })
       .catch((err: unknown) => {
         if (isAbortError(err) || !isCurrent()) return;
@@ -90,6 +90,8 @@ export function useReplayCache(replayScanStatus?: ScanStatus | ReplayScanStatus 
   }, []);
 
   const reload = useCallback(() => {
+    setIsLoading(true);
+    setError(null);
     loadReplays();
     loadUpgrade();
   }, [loadReplays, loadUpgrade]);
@@ -101,9 +103,15 @@ export function useReplayCache(replayScanStatus?: ScanStatus | ReplayScanStatus 
     loadUpgrade();
     return () => {
       controller.abort();
-      if (upgradeTimer.current) clearTimeout(upgradeTimer.current);
     };
   }, [loadReplays, loadUpgrade]);
+
+  // Polls while an upgrade runs: each new overview arms the next request.
+  useEffect(() => {
+    if (!upgradeOverview?.status.running) return;
+    const timer = setTimeout(loadUpgrade, UPGRADE_POLL_MS);
+    return () => clearTimeout(timer);
+  }, [upgradeOverview, loadUpgrade]);
 
   const isScanRunning = !!replayScanStatus?.running;
   const wasScanRunning = useRef(isScanRunning);

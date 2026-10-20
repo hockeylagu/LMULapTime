@@ -64,19 +64,23 @@ describe('XML-first startup pipeline', () => {
   });
 
   it('yields while reconciling stored replay links and keeps scan status incomplete', async () => {
+    // Every item uses up a whole time slice, so the loop turns after each one.
+    let clock = 0;
+    vi.spyOn(performance, 'now').mockImplementation(() => clock += 1000);
     const metadata = new Map<string, string>();
-    const sessionDb = {
+    const sessionDbMock = {
       getAllStoredReplayFiles: () => [],
       getMetadata: (key: string) => metadata.get(key) ?? null,
       setMetadata: (key: string, value: string) => { metadata.set(key, value); },
       reconcileReplayPlayerOwnership: vi.fn(),
       invalidateUnresolvedReplayDefaults: vi.fn(),
-      getReplayReconciliationCandidateIds: vi.fn(() => Array.from({ length: 25 }, (_, index) => `stored-${index}`)),
+      getReplayReconciliationCandidateIds: vi.fn((_since: number) => Array.from({ length: 25 }, (_, index) => `stored-${index}`)),
       getSessionsByIds: (ids: string[]) => ids.map((id, index) => ({
         id, filename: `${id}.xml`, filePath: '', timestamp: index,
         trackVenue: '', trackCourse: '', trackLengthMeters: null, sessionType: 'Race', sessionName: 'R1', drivers: [],
       } as unknown as import('../../../shared/types/index.js').DetailedSession)),
-    } as unknown as SessionDatabase;
+    };
+    const sessionDb = sessionDbMock as unknown as SessionDatabase;
     const context = new ServerContext({ resultsDir: dir, replaysDir: dir, telemetryDir: dir, parser: new LmuParser(),
       sessionDb, telemetryCatalog: new TelemetryCatalog(sessionDb), replayRecordings: new ReplayRecordingService(sessionDb) });
     const reconciliation = context.reconcileSessionReplayLinks();
@@ -88,13 +92,13 @@ describe('XML-first startup pipeline', () => {
     expect(context.getScanStatus().allComplete).toBe(true);
     // The next run only looks at what changed since this one.
     await context.reconcileSessionReplayLinks();
-    const calls = vi.mocked(sessionDb.getReplayReconciliationCandidateIds).mock.calls;
+    const calls = sessionDbMock.getReplayReconciliationCandidateIds.mock.calls;
     expect(calls[0][0]).toBe(0);
     expect(calls[1][0]).toBeGreaterThan(0);
   });
 
   it('runs a replay sync asked for during link reconciliation once it ends', async () => {
-    const sessionDb = {
+    const sessionDbMock = {
       getAllStoredReplayFiles: () => [],
       getMetadata: () => null,
       setMetadata: () => undefined,
@@ -103,14 +107,15 @@ describe('XML-first startup pipeline', () => {
       getReplayReconciliationCandidateIds: () => [],
       getSessionsByIds: () => [],
       syncReplaysAsyncIterator: vi.fn(async function* () { return { total: 0, added: 0, updated: 0, skipped: 0 }; }),
-    } as unknown as SessionDatabase;
+    };
+    const sessionDb = sessionDbMock as unknown as SessionDatabase;
     const context = new ServerContext({ resultsDir: dir, replaysDir: dir, telemetryDir: dir, parser: new LmuParser(),
       sessionDb, telemetryCatalog: new TelemetryCatalog(sessionDb), replayRecordings: new ReplayRecordingService(sessionDb) });
     const reconciliation = context.reconcileSessionReplayLinks();
 
     expect(context.runReplaySyncInBackground()).toBe(false);
-    expect(sessionDb.syncReplaysAsyncIterator).not.toHaveBeenCalled();
+    expect(sessionDbMock.syncReplaysAsyncIterator).not.toHaveBeenCalled();
     await reconciliation;
-    expect(sessionDb.syncReplaysAsyncIterator).toHaveBeenCalledTimes(1);
+    expect(sessionDbMock.syncReplaysAsyncIterator).toHaveBeenCalledTimes(1);
   });
 });

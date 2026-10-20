@@ -35,56 +35,44 @@ export function useTrackBoundaryGeometry(options: UseTrackBoundaryGeometryOption
   const resolvedKey = spec.layoutKey !== 'unknown' ? spec.layoutKey : null;
   const cacheKey = resolvedKey ? `${resolvedKey}:${options.packageRevision || 'startup'}` : null;
 
-  const [trackGeometry, setTrackGeometry] = useState<TrackBoundaryGeometry | null>(
-    resolvedKey ? geometryCache.get(cacheKey!) || null : null
-  );
-  const [isLoading, setIsLoading] = useState<boolean>(
-    Boolean(resolvedKey && !geometryCache.has(cacheKey!))
-  );
+  // The geometry shown is the one loaded for this key, else the shared cache's copy.
+  const [loaded, setLoaded] = useState<{ key: string; geometry: TrackBoundaryGeometry | null } | null>(null);
+  const loadedHere = !!cacheKey && loaded?.key === cacheKey;
+  const trackGeometry = !cacheKey ? null : loadedHere ? loaded.geometry : geometryCache.get(cacheKey) ?? null;
+  const isLoading = !!cacheKey && !loadedHere && !geometryCache.has(cacheKey);
 
   useEffect(() => {
-    if (!resolvedKey) {
-      setTrackGeometry(null);
-      setIsLoading(false);
-      return;
-    }
+    if (!resolvedKey || !cacheKey) return;
 
-    if (geometryCache.has(cacheKey!)) {
-      const existing = geometryCache.get(cacheKey!)!;
+    const existing = geometryCache.get(cacheKey);
+    if (existing) {
       // Refresh LRU order
-      geometryCache.delete(cacheKey!);
-      geometryCache.set(cacheKey!, existing);
-      setTrackGeometry(existing);
-      setIsLoading(false);
+      geometryCache.delete(cacheKey);
+      geometryCache.set(cacheKey, existing);
       return;
     }
 
     let isMounted = true;
-    setIsLoading(true);
-
-    let fetchPromise = inFlightRequests.get(cacheKey!);
+    let fetchPromise = inFlightRequests.get(cacheKey);
     if (!fetchPromise) {
       fetchPromise = loadTrackBoundaryGeometry(resolvedKey)
         .then((data) => {
-          setGeometryCache(cacheKey!, data);
-          inFlightRequests.delete(cacheKey!);
+          setGeometryCache(cacheKey, data);
+          inFlightRequests.delete(cacheKey);
           return data;
         })
         .catch(err => {
-          inFlightRequests.delete(cacheKey!);
+          inFlightRequests.delete(cacheKey);
           if (typeof process === 'undefined' || process.env?.NODE_ENV !== 'test') {
             console.warn(`[useTrackBoundaryGeometry] Could not fetch geometry for ${resolvedKey}:`, err);
           }
           return null;
         });
-      inFlightRequests.set(cacheKey!, fetchPromise);
+      inFlightRequests.set(cacheKey, fetchPromise);
     }
 
-    fetchPromise.then(data => {
-      if (isMounted) {
-        setTrackGeometry(data);
-        setIsLoading(false);
-      }
+    void fetchPromise.then(geometry => {
+      if (isMounted) setLoaded({ key: cacheKey, geometry });
     });
 
     return () => {

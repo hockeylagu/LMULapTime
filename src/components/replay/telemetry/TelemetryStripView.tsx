@@ -66,6 +66,8 @@ export interface TelemetryStripViewProps {
   onSelectSource?: (source: 'duckdb' | 'vcr') => void;
 }
 
+const DEFAULT_CHANNELS: TelemetryChannelId[] = ['speed', 'delta', 'throttle', 'brake', 'steer', 'gear'];
+
 export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
   points, currentPoint, safeIndex, viewStart, viewEnd, isCursorInView, cursorPct,
   currentComparison, pointComparisons, paths, sectors, cornerSegments, initialStraight,
@@ -73,7 +75,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
   selectedCornerMarkers, interactionMode, setInteractionMode, isZoomed, onResetZoom,
   onStepIndex, hasBaseline, telemetryResolution, onChangeResolution, isFullResolution, currentTimeSec, totalFrames, headerContent, dragSelection, markerPcts,
   vcrRawPointsCount, vcrRawSampleRateHz, duckdbRawPointsCount, duckdbRawSampleRateHz,
-  activeChannels = ['speed', 'delta', 'throttle', 'brake', 'steer', 'gear'],
+  activeChannels = DEFAULT_CHANNELS,
   presets, activePresetId, onSelectPreset, onOpenManageModal, source, duckdbFilename,
   hasDuckDb, duckdbUnavailableReason, onSelectSource,
 }) => {

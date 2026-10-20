@@ -15,7 +15,7 @@ export interface LapConsistencyOption {
 }
 
 export interface LapSelectorDropdownProps {
-  availableLaps: LapConsistencyOption[];
+  availableLaps: readonly LapConsistencyOption[];
   excludedLaps: Set<number>;
   onToggleLapExclusion: (lapNumber: number) => void;
   formatLapTime: (sec?: number | null) => string;

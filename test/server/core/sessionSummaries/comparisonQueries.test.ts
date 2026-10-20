@@ -277,7 +277,7 @@ describe('SQL comparison query', () => {
       try {
         const sessionsOf = (extra: object) => {
           const result = queryTelemetryComparableLaps(db, { ...base, ...extra });
-          return [...new Set(result.laps.map(item => item.sessionId))].sort().concat(String(result.total));
+          return [...new Set(result.laps.map(item => item.sessionId))].sort((a, b) => (a ?? '').localeCompare(b ?? '')).concat(String(result.total));
         };
         expect(sessionsOf({ sessionKind: 'practice' })).toEqual(['s1', '3']);
         expect(sessionsOf({ sessionKind: 'quali' })).toEqual(['s2', '1']);

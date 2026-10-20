@@ -7,6 +7,7 @@ import { PathField } from './PathField.js';
 import type { PathErrors } from './useSettingsActions.js';
 import { READOUT_LABEL } from './labelStyles.js';
 import { FeedbackMessage, SettingsFeedback, SettingsPanel } from './SettingsPanel.js';
+import { EMPTY_RECORD } from '../../utils/emptyDefaults.js';
 
 export interface FolderPathsCardProps {
   status: AppStatus | null;
@@ -42,7 +43,7 @@ export const FolderPathsCard: React.FC<FolderPathsCardProps> = ({
   playerNameInput,
   setPlayerNameInput,
   isScanning,
-  pathErrors = {},
+  pathErrors = EMPTY_RECORD,
   isScanRunning = false,
   onScanPaths,
   pathMessage,

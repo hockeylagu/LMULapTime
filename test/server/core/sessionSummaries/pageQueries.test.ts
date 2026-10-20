@@ -57,7 +57,7 @@ describe('paged session queries', () => {
       expect(points).toHaveLength(230);
       expect(points[0].sessionId).toBe('s0');
       expect(points[229].sessionId).toBe('s229');
-      expect(points.map(point => point.timestamp)).toEqual([...points.map(point => point.timestamp)].sort((a, b) => a - b));
+      expect(points.map(point => point.timestamp)).toEqual(points.map(point => point.timestamp).sort((a, b) => a - b));
     } finally { db.close(); }
   });
 

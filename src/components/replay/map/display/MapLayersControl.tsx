@@ -4,6 +4,7 @@ import { MAP_COLORS } from '../../../../utils/themeColors.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
 import { DROPDOWN_CONTENT_INSET, DROPDOWN_PANEL } from '../../../common/dropdown/dropdownStyles.js';
 import { DEFAULT_MAP_LAYERS, MAP_LAYER_LABELS, RUNOFF_GROUP, RUNOFF_LEGEND, type MapLayers, type MapLayerKey } from './mapLayers.js';
+import { EMPTY_ARRAY } from '../../../../utils/emptyDefaults.js';
 
 export interface PedalPointsControl {
   visible: boolean;
@@ -24,7 +25,7 @@ interface Props {
   pedalPoints?: PedalPointsControl;
 }
 
-export const MapLayersControl: React.FC<Props> = ({ layers, onChange, available, runoffKinds = [], hasRaisedKerbs = false, error, onFitTrack, onFitVisible, pedalPoints }) => {
+export const MapLayersControl: React.FC<Props> = ({ layers, onChange, available, runoffKinds = EMPTY_ARRAY, hasRaisedKerbs = false, error, onFitTrack, onFitVisible, pedalPoints }) => {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);

@@ -244,7 +244,7 @@ export function isPointInViewBox(sx: number, sy: number, box: ViewBoxRect | null
  * browser re-rasterises on every pan or zoom). A segment takes the style of its end sample.
  */
 export function buildTrackLineRuns(
-  points: ProjectedPoint[],
+  points: readonly ProjectedPoint[],
   colorOf: (p: ProjectedPoint) => string,
   isHighlightedAt: (p: ProjectedPoint) => boolean
 ): TrackLineRun[] {

@@ -119,7 +119,7 @@ describe('layout matching', () => {
 describe('replayIndexEntryFromStored', () => {
   const stored = (metadata: Record<string, unknown>) => ({
     filename: 'Sebring School Circuit P1 1.Vcr',
-    file_path: 'C:\replays\Sebring School Circuit P1 1.Vcr',
+    file_path: 'C:\\replays\\Sebring School Circuit P1 1.Vcr',
     file_size_bytes: 1,
     file_mtime_ms: 2,
     metadata: metadata as never,

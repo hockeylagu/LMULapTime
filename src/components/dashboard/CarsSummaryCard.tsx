@@ -20,7 +20,10 @@ export const CarsSummaryCard: React.FC<CarsSummaryCardProps> = ({
 }) => {
   const [unit, setUnit] = useState<'laps' | 'km'>('laps');
 
-  const sourceCars = rankedCars && rankedCars.length > 0 ? rankedCars : (visibleCars || []);
+  const sourceCars = useMemo(
+    () => (rankedCars && rankedCars.length > 0 ? rankedCars : (visibleCars || [])),
+    [rankedCars, visibleCars],
+  );
 
   const sortedCars = useMemo(() => {
     return [...sourceCars].sort((a, b) => (unit === 'km' ? b.km - a.km : b.laps - a.laps));

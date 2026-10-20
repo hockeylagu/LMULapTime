@@ -208,6 +208,7 @@ export async function *syncSessionsAsyncIterator(
       const filePath = path.join(resultsDir, step.value.currentFile);
       let parsed: DetailedSession | null;
       try {
+        // oxlint-disable-next-line eslint/no-await-in-loop -- Files are ingested one at a time to keep the worker load and write order.
         parsed = await parser.parseSessionXmlAsync(filePath);
       } catch (error: unknown) {
         // The worker failed, not the file: read it here instead of leaving the session out of this scan.

@@ -15,6 +15,7 @@ import { SectorGapSummary } from './debrief/SectorGapSummary.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import { CompareLapPicker } from './picker/CompareLapPicker.js';
 import type { TelemetryLapRef } from '../../utils/telemetryCompareLink.js';
+import { EMPTY_ARRAY } from '../../utils/emptyDefaults.js';
 
 export interface CompareLapsProps {
   availableTracks?: string[];
@@ -48,7 +49,7 @@ export function telemetryPair(laps: ComparableLap[], baseline: ComparableLap | n
 
 export const CompareLaps: React.FC<CompareLapsProps> = ({
   availableTracks,
-  sessions = [],
+  sessions = EMPTY_ARRAY,
   initialTrack,
   initialCarClass,
   initialSessionId,
@@ -90,7 +91,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
     return { sessionId: lap.sessionId, driverOrdinal: lap.driverOrdinal!, lapOrdinal: lap.lapOrdinal!, driverName: lap.driverName, lapNumber: lap.lapNumber };
   };
 
-  const handleCompareTelemetry = async () => {
+  const handleCompareTelemetry = () => {
     if (selectedLaps.length !== 2) return;
     setTelemetryError(null);
     const { target: targetLap, base: baseLap } = telemetryPair(selectedLaps, baselineLap);
@@ -108,7 +109,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
       return;
     }
 
-    navigate(buildTelemetryComparePath(searchParams, targetRef, baseRef));
+    void navigate(buildTelemetryComparePath(searchParams, targetRef, baseRef));
   };
 
   const swapBaseline = () => {
@@ -149,7 +150,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
     const targetRef = telemetryRef(targetLap);
     const baseRef = telemetryRef(baseLap);
     return targetRef && baseRef ? buildTelemetryComparePath(searchParams, targetRef, baseRef) : undefined;
-  }, [selectedLaps, baselineLap, sessions, searchParams]);
+  }, [selectedLaps, baselineLap, searchParams]);
 
   return (
     <section aria-label="Compare laps" className="bg-lmu-card border border-lmu-border p-6 rounded-2xl space-y-4">

@@ -64,9 +64,9 @@ export function getTrackLimitSeverity(tl: LapTrackLimit): TrackLimitSeverity {
  */
 export function getWorstTrackLimitSeverity(tls?: LapTrackLimit[]): TrackLimitSeverity {
   if (!tls || tls.length === 0) return 'warning';
-  const severities = tls.map(getTrackLimitSeverity);
-  if (severities.includes('serious')) return 'serious';
-  if (severities.includes('warning')) return 'warning';
+  const severities = new Set(tls.map(getTrackLimitSeverity));
+  if (severities.has('serious')) return 'serious';
+  if (severities.has('warning')) return 'warning';
   return 'cleared';
 }
 

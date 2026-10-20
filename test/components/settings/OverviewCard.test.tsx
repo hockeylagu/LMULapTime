@@ -6,9 +6,9 @@ import type { ReplayCacheState } from '../../../src/components/settings/replays/
 import type { AiSettingsState } from '../../../src/components/settings/hooks/useAiSettings.js';
 
 const status = (sessions: number): AppStatus => ({
-  resultsDir: 'C:\LMU\Results',
+  resultsDir: 'C:\\LMU\\Results',
   resultsExist: true,
-  replaysDir: 'C:\LMU\Replays',
+  replaysDir: 'C:\\LMU\\Replays',
   replaysExist: true,
   sessionsCount: sessions,
   tracksCount: 1,

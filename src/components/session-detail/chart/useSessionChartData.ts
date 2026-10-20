@@ -133,7 +133,7 @@ export function useSessionChartData({ session, selectedDriver, isMultiClass }: U
         isOutLap,
       };
     });
-  }, [selectedDriver.laps, avgLapTime, avgS1, avgS2, avgS3, selectedDriver.bestLapTime]);
+  }, [selectedDriver.laps, avgLapTime, avgS1, avgS2, avgS3]);
 
   return {
     driversToPlot,

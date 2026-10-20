@@ -248,7 +248,7 @@ async function captureScreenshots(): Promise<void> {
     const ws = new WebSocket(wsUrl);
     await new Promise<void>((resolve, reject) => {
       ws.onopen = () => resolve();
-      ws.onerror = (e) => reject(new Error(`Browser WS error: ${String(e)}`));
+      ws.onerror = (e) => reject(new Error(`Browser WS error: ${e.type}`));
     });
 
     let msgId = 0;
@@ -274,7 +274,7 @@ async function captureScreenshots(): Promise<void> {
       const pageWs = new WebSocket(`ws://127.0.0.1:${cdpPort}/devtools/page/${targetId}`);
       await new Promise<void>((resolve, reject) => {
         pageWs.onopen = () => resolve();
-        pageWs.onerror = (e) => reject(new Error(`Page WS error: ${String(e)}`));
+        pageWs.onerror = (e) => reject(new Error(`Page WS error: ${e.type}`));
       });
 
       let pageMsgId = 0;

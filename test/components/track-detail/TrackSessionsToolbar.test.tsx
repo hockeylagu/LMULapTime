@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { TrackSessionsToolbar } from '../../../src/components/track-detail/TrackSessionsToolbar';
+import { TrackSessionsToolbar } from '../../../src/components/track-detail/TrackSessionsToolbar.js';
 import { chooseValue } from '../../helpers/selectControl.js';
 
 describe('TrackSessionsToolbar', () => {

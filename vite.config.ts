@@ -11,9 +11,9 @@ export default defineConfig({
         // recharts chunks, which made every page preload recharts.
         codeSplitting: {
           groups: [
-            { name: 'vendor', test: /node_modules[\/](react|react-dom|scheduler)[\/]/, priority: 30 },
-            { name: 'recharts', test: /node_modules[\/]recharts[\/]/, priority: 20 },
-            { name: 'lucide', test: /node_modules[\/]lucide-react[\/]/, priority: 10 },
+            { name: 'vendor', test: /node_modules[/](react|react-dom|scheduler)[/]/, priority: 30 },
+            { name: 'recharts', test: /node_modules[/]recharts[/]/, priority: 20 },
+            { name: 'lucide', test: /node_modules[/]lucide-react[/]/, priority: 10 },
           ],
         },
       },
@@ -26,8 +26,20 @@ export default defineConfig({
       clientFiles: ['./src/main.tsx', './src/components/dashboard/Dashboard.tsx'],
     },
     watch: {
-      // DuckDB recordings and temporary test databases can be exclusively locked on Windows.
-      ignored: ['**/.tmp/**', '**/server/live-captures/**', '**/test/**'],
+      // DuckDB recordings, temporary databases, test artifacts, docs, tools, and backend directories
+      ignored: [
+        '**/.tmp/**',
+        '**/.cache/**',
+        '**/coverage/**',
+        '**/dist/**',
+        '**/docs/**',
+        '**/server/**',
+        '**/test/**',
+        '**/tools/**',
+        '**/.impeccable/**',
+        '**/*.db*',
+        '**/*.duckdb*',
+      ],
     },
     proxy: {
       '/api': {

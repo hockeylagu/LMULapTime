@@ -1,4 +1,4 @@
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import { Navbar } from './components/navbar/Navbar.js';
 import { LiveGameBanner } from './components/navbar/LiveGameBanner.js';
@@ -83,7 +83,7 @@ function TrackRoute({ onSelectSession, selectedCarClass, setSelectedCarClass }: 
   return (
     <TrackDetail
       trackName={trackName}
-      onBack={() => navigate(selectedCarClass !== 'All' ? `/tracks?carClass=${encodeURIComponent(selectedCarClass)}` : '/tracks', { replace: true })}
+      onBack={() => void navigate(selectedCarClass !== 'All' ? `/tracks?carClass=${encodeURIComponent(selectedCarClass)}` : '/tracks', { replace: true })}
       onSelectSession={onSelectSession}
       selectedCarClass={selectedCarClass}
       setSelectedCarClass={setSelectedCarClass}
@@ -102,12 +102,14 @@ function AnalysisApp() {
 
   const { status, loading, isRefreshing, replayScanStatus, gameRunning,
     referenceUpdateCount, setReferenceUpdateCount, revision, error, fetchData,
-    refreshReplayScanStatus } = useAppData({ onGameStarted: () => navigate('/live') });
+    refreshReplayScanStatus } = useAppData({ onGameStarted: () => void navigate('/live') });
 
   // Keep view filters synchronized with the router URL.
-  useEffect(() => {
+  const [syncedParams, setSyncedParams] = useState<URLSearchParams | null>(null);
+  if (searchParams !== syncedParams) {
+    setSyncedParams(searchParams);
     setSelectedCarClassState(searchParams.get('carClass') || 'All');
-  }, [searchParams]);
+  }
 
   const setSelectedCarClass = (carClass: string) => {
     setSelectedCarClassState(carClass);
@@ -126,21 +128,23 @@ function AnalysisApp() {
   }, [loading]);
 
   const handleSelectSession = (id: string) => {
-    navigate(`/session/${encodeURIComponent(id)}`);
+    void navigate(`/session/${encodeURIComponent(id)}`);
   };
 
   const handleBackToSessions = () => {
-    navigate('/dashboard', { replace: true });
+    void navigate('/dashboard', { replace: true });
   };
 
   const handleSelectTrack = (track: TrackSummary) => {
     const params = new URLSearchParams({ track: track.trackVenue });
     if (selectedCarClass !== 'All') params.set('carClass', selectedCarClass);
-    navigate(`/track/${encodeURIComponent(track.trackVenue)}?${params}`);
+    void navigate(`/track/${encodeURIComponent(track.trackVenue)}?${params}`);
   };
 
+  const sessionData = useMemo(() => ({ revision, scan: replayScanStatus }), [revision, replayScanStatus]);
+
   return (
-    <SessionDataContext.Provider value={{ revision, scan: replayScanStatus }}>
+    <SessionDataContext.Provider value={sessionData}>
     <div className="min-h-screen min-w-[1480px] bg-lmu-bg text-lmu-text flex flex-col font-sans">
 
       {!isTelemetryRoute && gameRunning && <LiveGameBanner />}
@@ -148,7 +152,7 @@ function AnalysisApp() {
         <Navbar
           status={status}
           replayScanStatus={replayScanStatus}
-          onRefresh={() => fetchData(true)}
+          onRefresh={() => { void fetchData(true); }}
           isRefreshing={isRefreshing}
         />
       )}
@@ -192,7 +196,7 @@ function AnalysisApp() {
             <Route path="/settings" element={
               <Settings
                 status={status}
-                onUpdatePaths={(resultsDir) => fetchData(resultsDir === undefined)}
+                onUpdatePaths={(resultsDir) => { void fetchData(resultsDir === undefined); }}
                 replayScanStatus={replayScanStatus}
                 onReplayScanTriggered={refreshReplayScanStatus}
               />

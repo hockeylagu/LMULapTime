@@ -25,6 +25,7 @@ export async function refreshLiveLearning(db: Database, directory: string, sessi
     if (!entry.available) continue;
     rebuilt++;
     try {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- Captures rebuild one at a time: each reads a large recording and writes SQLite.
       const events = await read({ directory, manifest });
       if (sessionLoaded()) break;
       const current = getLiveCaptureIndexRows(db).find(item => item.manifest.recordingId === manifest.recordingId);

@@ -71,7 +71,7 @@ try {
   clearInterval(timer);
   const rows = db.getDb().prepare('SELECT COUNT(*) laps, SUM(points_count) points, SUM(length(trajectory_br)) bytes FROM replay_trajectories').get();
   const integrity = db.getDb().pragma('integrity_check', { simple: true });
-  if (integrity !== 'ok') throw new Error(`SQLite integrity check: ${integrity}`);
+  if (integrity !== 'ok') throw new Error(`SQLite integrity check: ${JSON.stringify(integrity)}`);
   delays.sort((a, b) => a - b);
   result = { mode, filePath, fileSizeBytes, slots, pipelineMs, batches, rows, integrity, temporaryBytes, firstDriverStoredMs, phases,
     peakRssMiB: process.resourceUsage().maxRSS / 1024,

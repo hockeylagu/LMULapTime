@@ -18,7 +18,6 @@ export function useLeaderboardLayouts(): LeaderboardLayoutsState {
 
   useEffect(() => {
     const controller = new AbortController();
-    setState((prev) => ({ ...prev, loading: true, error: null }));
     loadLeaderboardLayouts(controller.signal)
       .then((layouts) => setState({ layouts, loading: false, error: null }))
       .catch((err) => {
@@ -28,6 +27,10 @@ export function useLeaderboardLayouts(): LeaderboardLayoutsState {
     return () => controller.abort();
   }, [attempt]);
 
-  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+  // The first load starts in the loading state; a retry enters it here.
+  const retry = useCallback(() => {
+    setState((prev) => ({ ...prev, loading: true, error: null }));
+    setAttempt((n) => n + 1);
+  }, []);
   return { ...state, retry };
 }

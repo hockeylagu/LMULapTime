@@ -12,7 +12,8 @@ export class TypedEmitter<Events extends { [K in keyof Events]: unknown[] }> {
   }
 
   public emit<K extends keyof Events>(event: K, ...args: Events[K]): void {
-    for (const listener of [...(this.listeners.get(event) ?? [])]) {
+    // Copies the collection because the loop body mutates it.
+    for (const listener of Array.from(this.listeners.get(event) ?? [])) {
       try {
         listener(...args);
       } catch (error: unknown) {
