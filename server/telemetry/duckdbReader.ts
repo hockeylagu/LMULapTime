@@ -1,4 +1,4 @@
-import duckdb from 'duckdb';
+import { DuckDBInstance, type DuckDBConnection, type DuckDBValue } from '@duckdb/node-api';
 import {
   DuckDbChannelEntry,
   DuckDbEventEntry,
@@ -37,7 +37,9 @@ export function normalizeDuckDbGForces(
 }
 
 export class DuckDbReader {
-  private db: duckdb.Database | null = null;
+  private db: DuckDBInstance | null = null;
+  private connection: DuckDBConnection | null = null;
+  private opening: Promise<void> | null = null;
   private filePath: string;
   private cachedTables: string[] | null = null;
   private cachedLapList: Promise<DuckDbLapSummary[]> | null = null;
@@ -48,45 +50,39 @@ export class DuckDbReader {
   }
 
   public async open(): Promise<void> {
-    if (this.db) return;
-    await new Promise<void>((resolve, reject) => {
-      this.db = new duckdb.Database(this.filePath, duckdb.OPEN_READONLY, (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
+    if (this.connection) return;
+    if (this.opening) return this.opening;
+    this.opening = (async () => {
+      const database = await DuckDBInstance.create(this.filePath, { access_mode: 'READ_ONLY' });
+      try {
+        this.connection = await database.connect();
+        this.db = database;
+      } catch (error: unknown) {
+        database.closeSync();
+        throw error;
+      }
+    })();
+    try { await this.opening; }
+    finally { this.opening = null; }
   }
 
   public async close(): Promise<void> {
-    if (!this.db) return;
+    await this.opening;
     this.connectionGeneration++;
     this.cachedTables = null;
     this.cachedLapList = null;
-    await new Promise<void>((resolve, reject) => {
-      this.db!.close((err) => {
-        this.db = null;
-        this.connectionGeneration++;
-        this.cachedTables = null;
-        this.cachedLapList = null;
-        if (err) reject(err);
-        else resolve();
-      });
-    });
+    try { this.connection?.closeSync(); }
+    finally {
+      this.connection = null;
+      this.db?.closeSync();
+      this.db = null;
+    }
   }
 
-  public async queryAll<T>(sql: string, params: unknown[] = []): Promise<T[]> {
-    if (!this.db) {
-      await this.open();
-    }
-    return new Promise<T[]>((resolve, reject) => {
-      this.db!.all(sql, ...params, (err: Error | null, rows: unknown) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve((rows as T[]) || []);
-        }
-      });
-    });
+  public async queryAll<T>(sql: string, params: DuckDBValue[] = []): Promise<T[]> {
+    await this.open();
+    const result = await this.connection!.runAndReadAll(sql, params);
+    return result.getRowObjects() as T[];
   }
 
   public async getTables(): Promise<string[]> {

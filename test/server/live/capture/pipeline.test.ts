@@ -70,13 +70,18 @@ it('persists recorded memory values through service, real worker, rediscovery an
     expect(indexed[0].manifest).toMatchObject({ status: 'interrupted', samples: 1, sessionId: null, gameVersion: null });
     const filename = path.join(directory, indexed[0].filename);
     const output = execFileSync(process.execPath, ['-e', `
-      const duckdb = require('duckdb');
-      const db = new duckdb.Database(process.argv[1], duckdb.OPEN_READONLY);
-      db.all('SELECT ${LIVE_CAPTURE_CHANNELS.map(channel => channel.name).join(', ')} FROM capture_samples', (error, rows) => {
-        if (error) throw error;
-        process.stdout.write(JSON.stringify(rows));
-        db.close(() => {});
-      });`, filename], { encoding: 'utf8' });
+      const { DuckDBInstance } = require('@duckdb/node-api');
+      (async () => {
+        const instance = await DuckDBInstance.create(process.argv[1], { access_mode: 'READ_ONLY' });
+        const connection = await instance.connect();
+        try {
+          const rows = (await connection.runAndReadAll('SELECT ${LIVE_CAPTURE_CHANNELS.map(channel => channel.name).join(', ')} FROM capture_samples')).getRowObjects();
+          process.stdout.write(JSON.stringify(rows));
+        } finally {
+          connection.closeSync();
+          instance.closeSync();
+        }
+      })().catch(error => { console.error(error); process.exitCode = 1; });`, filename], { encoding: 'utf8' });
     const expected = [24.0998, 0.0003, 0.3096, 0.0212, 0.04272, 0.14548,
       -0.4129, 1.8818, -0.4397, 1.6297, -0.1159, 0.7526, -0.1789, 1.1636,
       -0.4157, 23.9723, -0.4509, 24.224, -0.1181, 23.9834, -0.1839, 24.2205,
@@ -85,13 +90,18 @@ it('persists recorded memory values through service, real worker, rediscovery an
     expect(JSON.parse(output)).toEqual([Object.fromEntries(LIVE_CAPTURE_CHANNELS.map((channel, index) => [channel.name, expected[index]]))]);
     expect(indexed[0].manifest.normalizationVersion).toBe(3);
     const observations = execFileSync(process.execPath, ['-e', `
-      const duckdb = require('duckdb');
-      const db = new duckdb.Database(process.argv[1], duckdb.OPEN_READONLY);
-      db.all('SELECT kind, elapsed_seconds, data FROM capture_observations ORDER BY observation_id', (error, rows) => {
-        if (error) throw error;
-        process.stdout.write(JSON.stringify(rows));
-        db.close(() => {});
-      });`, filename], { encoding: 'utf8' });
+      const { DuckDBInstance } = require('@duckdb/node-api');
+      (async () => {
+        const instance = await DuckDBInstance.create(process.argv[1], { access_mode: 'READ_ONLY' });
+        const connection = await instance.connect();
+        try {
+          const rows = (await connection.runAndReadAll('SELECT kind, elapsed_seconds, data FROM capture_observations ORDER BY observation_id')).getRowObjects();
+          process.stdout.write(JSON.stringify(rows));
+        } finally {
+          connection.closeSync();
+          instance.closeSync();
+        }
+      })().catch(error => { console.error(error); process.exitCode = 1; });`, filename], { encoding: 'utf8' });
     const stored: { kind: string; elapsed_seconds: number | null; data: string }[] = JSON.parse(observations);
     const byKind = (kind: string) => stored.filter(item => item.kind === kind).map(item => JSON.parse(item.data) as unknown);
     expect(byKind('impact')).toEqual([{ impactElapsedSeconds: 69.4, magnitude: 8896.196 }]);

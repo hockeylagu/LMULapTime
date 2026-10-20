@@ -4,16 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { afterEach, describe, expect, it } from 'vitest';
-import {
-  LIVE_CAPTURE_CHANNELS,
-} from '../../../../server/live/capture/channels.js';
 import type { LiveCaptureWriteMessage, LiveCaptureWriteResult } from '../../../../shared/types/liveCapture.js';
-import {
-  LIVE_CAPTURE_NORMALIZATION_VERSION,
-  LIVE_CAPTURE_SAMPLE_WIDTH,
-  LIVE_CAPTURE_SCHEMA_VERSION,
-  LIVE_CAPTURE_SOURCE,
-} from '../../../../shared/types/liveCapture.js';
+import { makeManifest, makeBatch, sampleRows } from '../../../helpers/liveCaptureBatch.js';
 import type { LiveCaptureBatch, LiveCaptureManifest } from '../../../../shared/types/liveCapture.js';
 
 const directories: string[] = [];
@@ -68,85 +60,22 @@ async function createWriter(directory: string): Promise<TestWriter> {
   };
 }
 
-function makeManifest(overrides: Partial<LiveCaptureManifest> = {}): LiveCaptureManifest {
-  const recordingId = 'a3e6b4b3-54a7-4fc2-9b22-8e5818b8b318';
-  return {
-    recordingId,
-    source: LIVE_CAPTURE_SOURCE,
-    schemaVersion: LIVE_CAPTURE_SCHEMA_VERSION,
-    normalizationVersion: LIVE_CAPTURE_NORMALIZATION_VERSION,
-    signConvention: 'iso8855',
-    filename: `bahrain_Race_2026-10-17T18-00-00Z_${recordingId}.live.duckdb`,
-    layoutKey: 'bahrain:gp',
-    trackName: 'Bahrain International Circuit',
-    driverName: 'Driver One',
-    vehicleName: 'LMGT3 Car',
-    vehicleModel: 'Test Model',
-    carClass: 'LMGT3',
-    sessionCode: 3,
-    sessionKind: 'Race',
-    startedAt: 1_800_000_000_000,
-    updatedAt: 1_800_000_000_000,
-    firstElapsedSeconds: 1,
-    lastElapsedSeconds: 1,
-    endedAt: null,
-    status: 'recording',
-    samples: 1,
-    droppedSamples: 0,
-    anchors: [],
-    sessionId: null,
-    gameVersion: '1.2.3',
-    ...overrides,
-  };
-}
-
-function sampleRows(...times: number[]): Float64Array {
-  const result = new Float64Array(times.length * LIVE_CAPTURE_SAMPLE_WIDTH);
-  for (const [row, time] of times.entries()) {
-    const offset = row * LIVE_CAPTURE_SAMPLE_WIDTH;
-    result[offset] = time;
-    result[offset + 1] = 1;
-    result[offset + 2] = 0;
-    for (let channel = 0; channel < LIVE_CAPTURE_CHANNELS.length; channel++) result[offset + 3 + channel] = channel === 6 ? Number.NaN : row + channel / 10;
-  }
-  return result;
-}
-
-function makeBatch(sequence = 0, overrides: Partial<LiveCaptureBatch> = {}): LiveCaptureBatch {
-  const samples = sampleRows(1, 1.02);
-  const manifest = makeManifest({ firstElapsedSeconds: 1, lastElapsedSeconds: 1.02, samples: 2, updatedAt: 1_800_000_000_100 });
-  return {
-    type: 'batch',
-    sequence,
-    manifest,
-    samples,
-    observations: [{
-      elapsedSeconds: 1.01,
-      receivedAt: 1_800_000_000_050,
-      source: 'rest',
-      kind: 'standings',
-      requestStartedAt: 1_800_000_000_040,
-      requestFinishedAt: 1_800_000_000_050,
-      data: { position: 3, nested: { status: 'ok' } },
-    }],
-    ...overrides,
-  };
-}
-
 function readInChild(filename: string): unknown {
   const source = `
-    const duckdb = require('duckdb');
-    const filename = process.argv[1];
-    const db = new duckdb.Database(filename, duckdb.OPEN_READONLY, error => {
-      if (error) { console.error(error.message); process.exitCode = 1; return; }
-      db.all('SELECT (SELECT count(*) FROM capture_samples) AS samples, (SELECT count(*) FROM capture_observations) AS observations, velocity_forward_mps, fl_patch_lateral_mps, fr_patch_lateral_mps, (SELECT manifest_json FROM capture_manifest WHERE singleton = TRUE) AS manifest FROM capture_samples ORDER BY sample_index LIMIT 1', (queryError, rows) => {
-        if (queryError) { console.error(queryError.message); process.exitCode = 1; db.close(() => {}); return; }
+    const { DuckDBInstance } = require('@duckdb/node-api');
+    (async () => {
+      const instance = await DuckDBInstance.create(process.argv[1], { access_mode: 'READ_ONLY' });
+      const connection = await instance.connect();
+      try {
+        const rows = (await connection.runAndReadAll('SELECT (SELECT count(*) FROM capture_samples) AS samples, (SELECT count(*) FROM capture_observations) AS observations, velocity_forward_mps, fl_patch_lateral_mps, fr_patch_lateral_mps, (SELECT manifest_json FROM capture_manifest WHERE singleton = TRUE) AS manifest FROM capture_samples ORDER BY sample_index LIMIT 1')).getRowObjects();
         const row = rows[0];
         const result = { samples: String(row.samples), observations: String(row.observations), velocity: row.velocity_forward_mps, wheelNull: row.fl_patch_lateral_mps === null && row.fr_patch_lateral_mps === null, manifest: JSON.parse(row.manifest) };
         process.stdout.write(JSON.stringify(result));
-        db.close(closeError => { if (closeError) process.exitCode = 1; });
-      });
-    });
+      } finally {
+        connection.closeSync();
+        instance.closeSync();
+      }
+    })().catch(error => { console.error(error); process.exitCode = 1; });
   `;
   const output = execFileSync(process.execPath, ['-e', source, filename], { encoding: 'utf8' });
   return JSON.parse(output) as unknown;
@@ -183,10 +112,18 @@ describe('LiveCaptureRecordingStore', () => {
     expect((await resumed.send(next)).type).toBe('persisted');
     await resumed.close();
     const output = execFileSync(process.execPath, ['-e', `
-      const duckdb = require('duckdb'); const db = new duckdb.Database(process.argv[1], duckdb.OPEN_READONLY);
-      db.all("SELECT CAST(observation_id AS DOUBLE) AS id,kind,CAST(data AS VARCHAR) AS data FROM capture_observations ORDER BY observation_id", (error, rows) => {
-        if (error) throw error; process.stdout.write(JSON.stringify(rows)); db.close(() => {});
-      });`, path.join(directory, first.manifest.filename)], { encoding: 'utf8' });
+      const { DuckDBInstance } = require('@duckdb/node-api');
+      (async () => {
+        const instance = await DuckDBInstance.create(process.argv[1], { access_mode: 'READ_ONLY' });
+        const connection = await instance.connect();
+        try {
+          const rows = (await connection.runAndReadAll("SELECT CAST(observation_id AS DOUBLE) AS id,kind,CAST(data AS VARCHAR) AS data FROM capture_observations ORDER BY observation_id")).getRowObjects();
+          process.stdout.write(JSON.stringify(rows));
+        } finally {
+          connection.closeSync();
+          instance.closeSync();
+        }
+      })().catch(error => { console.error(error); process.exitCode = 1; });`, path.join(directory, first.manifest.filename)], { encoding: 'utf8' });
     const rows = JSON.parse(output) as Array<{ id: number; kind: string; data: string }>;
     expect(rows.filter(row => row.kind === 'terrain-material').map(row => JSON.parse(row.data))).toEqual([
       { materialId: 0, rawName: 'RDRACEOLD,ROAD,' }, { materialId: 1, rawName: 'RMBLFLAT' }, { materialId: 2, rawName: 'GRVL' },

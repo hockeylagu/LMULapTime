@@ -16,7 +16,7 @@
   "scripts": {
     "start": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "dev:server": "tsx watch --clear-screen=false --exclude \"server/lmu_cache.db*\" --exclude \"server/live-captures/**\" --exclude \"test/**\" --env-file-if-exists=.env.local server/index.ts",
+    "dev:server": "tsx watch --clear-screen=false --exclude \"server/lmu_cache.db*\" --exclude \"server/live-captures/**\" --env-file-if-exists=.env.local server/index.ts",
     "dev:client": "vite",
     "build": "npm run check:local-data && tsc && vite build && node tools/release/checkLocalData.mjs --built",
     "preview": "vite preview",
@@ -33,10 +33,10 @@
     "check:local-data": "node tools/release/checkLocalData.mjs"
   },
   "dependencies": {
+    "@duckdb/node-api": "^1.5.6-r.1",
     "@google/genai": "^2.26.0",
     "better-sqlite3": "^13.0.3",
     "cors": "^2.8.6",
-    "duckdb": "^1.4.4",
     "express": "^5.2.1",
     "fast-xml-parser": "^5.11.2",
     "koffi": "^3.3.3",

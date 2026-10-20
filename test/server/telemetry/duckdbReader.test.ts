@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
-import duckdb from 'duckdb';
+import { DuckDBInstance, type DuckDBValue } from '@duckdb/node-api';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -15,9 +15,7 @@ describe('DuckDbReader', () => {
     });
   });
 
-  // A fresh folder per run, outside the repository: the duckdb binding keeps a database file
-  // locked until it is garbage-collected, even once closed, so reusing or deleting a fixed path
-  // failed at random. Removing it is best effort; the next run sweeps what was left.
+  // Isolate native database fixtures in a fresh temporary folder for each run.
   const TEMP_PREFIX = 'lmu-duckdb-reader-';
   const testDbDir = fs.mkdtempSync(path.join(os.tmpdir(), TEMP_PREFIX));
   const removeQuietly = (dir: string) => {
@@ -36,9 +34,9 @@ describe('DuckDbReader', () => {
     }
 
     // Create fixture DuckDB file with representative schema
-    const db = new duckdb.Database(testDbPath);
-    await new Promise<void>((resolve, reject) => {
-      db.exec(`
+    const instance = await DuckDBInstance.create(testDbPath);
+    const db = await instance.connect();
+    await db.run(`
         CREATE TABLE metadata (key VARCHAR NOT NULL, value VARCHAR);
         INSERT INTO metadata VALUES
           ('track', 'Bahrain International Circuit'),
@@ -126,18 +124,41 @@ describe('DuckDbReader', () => {
         INSERT INTO "Virtual Energy" SELECT (95.0 - (i * 0.02))::FLOAT FROM range(240) t(i);
         INSERT INTO "SoC" SELECT (88.0)::FLOAT FROM range(240) t(i);
         INSERT INTO "Regen Rate" SELECT (120.0)::FLOAT FROM range(1200) t(i);
-      `, (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
+      `);
 
-    await new Promise<void>((resolve, reject) => {
-      db.close((err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
+    db.closeSync();
+    instance.closeSync();
+  });
+
+  it('shares concurrent opens, preserves bound values, and releases the file on close', async () => {
+    const reader = new DuckDbReader(testDbPath);
+    await Promise.all([reader.open(), reader.open(), reader.open()]);
+    try {
+      expect(await reader.queryAll('SELECT ?::BIGINT AS count, ?::VARCHAR AS text, ?::DOUBLE AS missing',
+        [9007199254740993n, "driver's car", null])).toEqual([
+        { count: 9007199254740993n, text: "driver's car", missing: null },
+      ]);
+      await expect(reader.queryAll('CREATE TABLE forbidden (value INTEGER)')).rejects.toThrow();
+    } finally {
+      await reader.close();
+    }
+    await reader.open();
+    expect(await reader.hasTable('Lap')).toBe(true);
+    await reader.close();
+  });
+
+  it('can retry opening after a missing file becomes available', async () => {
+    const filename = path.join(testDbDir, 'retry.duckdb');
+    const reader = new DuckDbReader(filename);
+    await expect(reader.open()).rejects.toThrow();
+    const instance = await DuckDBInstance.create(filename);
+    instance.closeSync();
+    try {
+      await reader.open();
+      expect(await reader.getTables()).toEqual([]);
+    } finally {
+      await reader.close();
+    }
   });
 
   it('reads metadata and catalogs correctly', async () => {
@@ -206,7 +227,7 @@ describe('DuckDbReader', () => {
     await reader.open();
     const queryAll = reader.queryAll.bind(reader);
     let failLapQuery = true;
-    vi.spyOn(reader, 'queryAll').mockImplementation(async <T>(sql: string, params: unknown[] = []) => {
+    vi.spyOn(reader, 'queryAll').mockImplementation(async <T>(sql: string, params: DuckDBValue[] = []) => {
       if (sql === 'SELECT ts, value FROM "Lap" ORDER BY ts ASC' && failLapQuery) {
         failLapQuery = false;
         throw new Error('transient DuckDB read failure');
@@ -247,9 +268,9 @@ describe('DuckDbReader', () => {
   it('supports continuous TC channel, hasColumn detection, and lap time alignment', async () => {
     const multiRateDbPath = path.join(testDbDir, 'MultiRate_Test.duckdb');
 
-    const db = new duckdb.Database(multiRateDbPath);
-    await new Promise<void>((resolve, reject) => {
-      db.exec(`
+    const instance = await DuckDBInstance.create(multiRateDbPath);
+    const db = await instance.connect();
+    await db.run(`
         CREATE TABLE channelsList (channelName VARCHAR NOT NULL, frequency INTEGER, unit VARCHAR);
         INSERT INTO channelsList VALUES
           ('GPS Time', 100, 's'),
@@ -285,18 +306,10 @@ describe('DuckDbReader', () => {
 
         -- 10Hz channel: 200 points (from 0 to 200s)
         INSERT INTO "TyresPressure" SELECT 175.0::FLOAT, 175.0::FLOAT, 175.0::FLOAT, 175.0::FLOAT FROM range(200) t(i);
-      `, (err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
+      `);
 
-    await new Promise<void>((resolve, reject) => {
-      db.close((err) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
+    db.closeSync();
+    instance.closeSync();
 
     const reader = new DuckDbReader(multiRateDbPath);
     await reader.open();
@@ -328,9 +341,9 @@ describe('DuckDbReader', () => {
     // LMU stores pedals in percent. Deciding the scale per sample turned 0.8 % into 80 %: a spike
     // each time the brake was pressed or released (Le Mans R1 41, 2026-09-25).
     const percentDbPath = path.join(testDbDir, 'Sarthe_Percent_R_2026-09-25T16_59_48Z.duckdb');
-    const db = new duckdb.Database(percentDbPath);
-    await new Promise<void>((resolve, reject) => {
-      db.exec(`
+    const instance = await DuckDBInstance.create(percentDbPath);
+    const db = await instance.connect();
+    await db.run(`
         CREATE TABLE channelsList (channelName VARCHAR NOT NULL, frequency INTEGER, unit VARCHAR);
         INSERT INTO channelsList VALUES ('GPS Time', 100, 's'), ('Ground Speed', 100, 'km/h'),
           ('Throttle Pos', 100, '%'), ('Brake Pos', 100, '%');
@@ -345,9 +358,9 @@ describe('DuckDbReader', () => {
         -- Brake: 0, a press through 0.4 and 0.8 %, then 100 %, then a release through 0.8 %.
         INSERT INTO "Brake Pos" SELECT (CASE WHEN i = 300 THEN 0.4 WHEN i = 301 THEN 0.8 WHEN i > 301 AND i < 500 THEN 100.0 WHEN i = 500 THEN 0.8 ELSE 0.0 END)::FLOAT FROM range(1100) t(i);
         INSERT INTO "Throttle Pos" SELECT (CASE WHEN i < 300 THEN 100.0 WHEN i = 600 THEN 0.7 WHEN i > 600 THEN 100.0 ELSE 0.0 END)::FLOAT FROM range(1100) t(i);
-      `, (err) => (err ? reject(err) : resolve()));
-    });
-    await new Promise<void>((resolve, reject) => db.close(err => (err ? reject(err) : resolve())));
+      `);
+    db.closeSync();
+    instance.closeSync();
 
     const reader = new DuckDbReader(percentDbPath);
     await reader.open();
@@ -366,9 +379,9 @@ describe('DuckDbReader', () => {
     // At Daytona the last upshift to 7th is well before the line down the banking; looking back
     // only 5 s found no shift and every lap started in gear 1 at 318 km/h (R1 10, 2026-09-25).
     const gearDbPath = path.join(testDbDir, 'Daytona_Gear_R_2026-09-25T22_42_51Z.duckdb');
-    const db = new duckdb.Database(gearDbPath);
-    await new Promise<void>((resolve, reject) => {
-      db.exec(`
+    const instance = await DuckDBInstance.create(gearDbPath);
+    const db = await instance.connect();
+    await db.run(`
         CREATE TABLE channelsList (channelName VARCHAR NOT NULL, frequency INTEGER, unit VARCHAR);
         INSERT INTO channelsList VALUES ('GPS Time', 100, 's'), ('Ground Speed', 100, 'km/h');
         CREATE TABLE "GPS Time" (value FLOAT);
@@ -383,9 +396,9 @@ describe('DuckDbReader', () => {
         INSERT INTO "ABS" VALUES (20.0, 1), (31.0, 0);
         INSERT INTO "GPS Time" SELECT (i * 0.01)::FLOAT FROM range(6100) t(i);
         INSERT INTO "Ground Speed" SELECT 318.0::FLOAT FROM range(6100) t(i);
-      `, (err) => (err ? reject(err) : resolve()));
-    });
-    await new Promise<void>((resolve, reject) => db.close(err => (err ? reject(err) : resolve())));
+      `);
+    db.closeSync();
+    instance.closeSync();
 
     const reader = new DuckDbReader(gearDbPath);
     await reader.open();
@@ -417,11 +430,12 @@ describe('DuckDbReader', () => {
       indices: Array.from({ length: 101 }, (_, i) => 100 + i), times: Array.from({ length: 101 }, (_, i) => i / 10) },
   ])('preserves channel indices with $name', async ({ name, gps, start, indices, times }) => {
     const filePath = path.join(testDbDir, `${name}.duckdb`);
-    const db = new duckdb.Database(filePath);
+    const instance = await DuckDBInstance.create(filePath);
+    const db = await instance.connect();
     const timelineSql = gps === null ? '' : `CREATE TABLE "GPS Time" (value FLOAT); ${gps.length
       ? `INSERT INTO "GPS Time" VALUES ${gps.map(value => `(${value === null ? 'NULL' : Number.isNaN(value) ? "'NaN'::FLOAT" : value})`).join(',')};` : ''}`;
     try {
-      await new Promise<void>((resolve, reject) => db.exec(`
+      await db.run(`
         CREATE TABLE channelsList (channelName VARCHAR, frequency INTEGER, unit VARCHAR);
         INSERT INTO channelsList VALUES ('Ground Speed', 10, 'km/h'), ('Wheel Speed', 5, 'km/h');
         CREATE TABLE "Ground Speed" AS SELECT (100 + i)::FLOAT AS value FROM range(300) t(i);
@@ -432,15 +446,16 @@ describe('DuckDbReader', () => {
         CREATE TABLE "Gear" (ts DOUBLE, value INTEGER);
         INSERT INTO "Gear" VALUES (-10, 7), (12, 6);
         ${timelineSql}
-      `, error => error ? reject(error) : resolve()));
+      `);
     } finally {
-      await new Promise<void>((resolve, reject) => db.close(error => error ? reject(error) : resolve()));
+      db.closeSync();
+      instance.closeSync();
     }
     const reader = new DuckDbReader(filePath);
     try {
       const actualQuery = reader.queryAll.bind(reader);
       let returnedGpsRows = 0;
-      vi.spyOn(reader, 'queryAll').mockImplementation(async <T>(sql: string, params: unknown[] = []) => {
+      vi.spyOn(reader, 'queryAll').mockImplementation(async <T>(sql: string, params: DuckDBValue[] = []) => {
         const rows = await actualQuery<T>(sql, params);
         if (sql.includes('FROM "GPS Time"')) returnedGpsRows += rows.length;
         return rows;

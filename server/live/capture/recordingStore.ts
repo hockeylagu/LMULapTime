@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import duckdb from 'duckdb';
-import type { DuckDbError } from 'duckdb';
+import { DuckDBInstance, type DuckDBConnection, type DuckDBValue } from '@duckdb/node-api';
 import {
   LIVE_CAPTURE_NORMALIZATION_VERSION,
   LIVE_CAPTURE_SCHEMA_VERSION,
@@ -17,6 +16,7 @@ import { internTerrainObservations, readTerrainDictionary } from './terrain.js';
 
 const MAX_ROWS_PER_INSERT = 512;
 const MAX_CATALOG_FILES = 10_000;
+const CATALOG_READ_CONCURRENCY = 4;
 const MAX_CATALOG_METADATA_BYTES = 2 * 1024 * 1024;
 const RECORDING_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SAFE_FILENAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._ -]*$/;
@@ -24,9 +24,6 @@ const EXPECTED_TABLES = [
   'capture_batches', 'capture_channels', 'capture_manifest', 'capture_metadata', 'capture_observations', 'capture_samples',
 ] as const;
 
-type Db = duckdb.Database;
-type Connection = duckdb.Connection;
-type Statement = duckdb.Statement;
 type DbRow = Record<string, unknown>;
 type WriteAnswer = { manifest: LiveCaptureManifest; bytes: number };
 
@@ -34,47 +31,8 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function callbackPromise<T>(invoke: (callback: (error: DuckDbError | null, result: T) => void) => unknown): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    try {
-      invoke((error, result) => error ? reject(error) : resolve(result));
-    } catch (error: unknown) {
-      reject(error);
-    }
-  });
-}
-
-function run(connection: Connection, sql: string, values: unknown[] = []): Promise<void> {
-  return callbackPromise<void>(callback => connection.run(sql, ...values, callback));
-}
-
-function all(connection: Connection, sql: string, values: unknown[] = []): Promise<DbRow[]> {
-  return callbackPromise<DbRow[]>(callback => connection.all(sql, ...values, callback) as unknown as void);
-}
-
-function closeConnection(connection: Connection): Promise<void> {
-  return callbackPromise<void>(callback => connection.close(callback));
-}
-
-function closeDatabase(database: Db): Promise<void> {
-  return callbackPromise<void>(callback => database.close(callback));
-}
-
-function openDatabase(filename: string, readOnly = false): Promise<Db> {
-  return new Promise<Db>((resolve, reject) => {
-    let database: Db;
-    try {
-      const onOpen = (error: DuckDbError | null): void => {
-        if (error) reject(error);
-        else resolve(database);
-      };
-      database = readOnly
-        ? new duckdb.Database(filename, duckdb.OPEN_READONLY, onOpen)
-        : new duckdb.Database(filename, onOpen);
-    } catch (error: unknown) {
-      reject(error);
-    }
-  });
+async function all(connection: DuckDBConnection, sql: string, values: DuckDBValue[] = []): Promise<DbRow[]> {
+  return (await connection.runAndReadAll(sql, values)).getRowObjects();
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -274,8 +232,8 @@ function rowString(row: DbRow, key: string): string {
 }
 
 export class LiveCaptureRecordingStore {
-  private database: Db | null = null;
-  private connection: Connection | null = null;
+  private database: DuckDBInstance | null = null;
+  private connection: DuckDBConnection | null = null;
   private filename: string | null = null;
   private currentManifest: LiveCaptureManifest | null = null;
   private lastSequence = -1;
@@ -304,7 +262,7 @@ export class LiveCaptureRecordingStore {
     if (candidates.length > MAX_CATALOG_FILES) {
       return { recordings, errors: [{ filename: '<directory>', error: `Live capture catalog exceeds the ${MAX_CATALOG_FILES}-file limit` }] };
     }
-    for (const entry of candidates) {
+    const readEntry = async (entry: fs.Dirent) => {
       const filename = entry.name;
       try {
         const target = path.resolve(this.directory, filename);
@@ -317,9 +275,17 @@ export class LiveCaptureRecordingStore {
         catch (error: unknown) {
           if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') throw error;
         }
-        recordings.push({ manifest, bytes });
+        return { recording: { manifest, bytes } };
       } catch (error: unknown) {
-        errors.push({ filename, error: errorText(error) });
+        return { error: { filename, error: errorText(error) } };
+      }
+    };
+    for (let start = 0; start < candidates.length; start += CATALOG_READ_CONCURRENCY) {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- A few catalog files open at once: enough overlap for the disk, few enough DuckDB handles.
+      const results = await Promise.all(candidates.slice(start, start + CATALOG_READ_CONCURRENCY).map(readEntry));
+      for (const result of results) {
+        if (result.recording) recordings.push(result.recording);
+        if (result.error) errors.push(result.error);
       }
     }
     recordings.sort((left, right) => left.manifest.startedAt - right.manifest.startedAt || left.manifest.recordingId.localeCompare(right.manifest.recordingId));
@@ -327,9 +293,15 @@ export class LiveCaptureRecordingStore {
   }
 
   private async readCatalogFile(target: string, filename: string): Promise<LiveCaptureManifest> {
-    const database = await openDatabase(target, true);
-    const connection = database.connect();
+    const database = await DuckDBInstance.create(target, { access_mode: 'READ_ONLY' });
+    let connection: DuckDBConnection;
+    try { connection = await database.connect(); }
+    catch (error: unknown) {
+      database.closeSync();
+      throw error;
+    }
     let failure: unknown;
+    let result: LiveCaptureManifest | null = null;
     try {
       const existingTables = (await all(connection,
         "SELECT table_name FROM information_schema.tables WHERE table_schema = 'main' ORDER BY table_name"))
@@ -370,17 +342,17 @@ export class LiveCaptureRecordingStore {
       if ((typeof sampleCount !== 'number' && typeof sampleCount !== 'bigint') || Number(sampleCount) !== manifest.samples) {
         throw new Error('Live capture manifest sample count does not match stored samples');
       }
-      return manifest;
+      result = manifest;
     } catch (error: unknown) {
       failure = error;
-      throw error;
-    } finally {
-      try { await closeConnection(connection); }
-      catch (error: unknown) { failure ??= error; }
-      try { await closeDatabase(database); }
-      catch (error: unknown) { failure ??= error; }
-      if (failure) throw failure;
     }
+    try { connection.closeSync(); }
+    catch (error: unknown) { failure ??= error; }
+    try { database.closeSync(); }
+    catch (error: unknown) { failure ??= error; }
+    // A read failure wins over a close failure; a clean read still surfaces a failed close.
+    if (failure || !result) throw failure;
+    return result;
   }
 
   public async link(filename: string, recordingId: string, sessionId: string | null, gameVersion: string | null): Promise<void> {
@@ -409,14 +381,13 @@ export class LiveCaptureRecordingStore {
       gameVersion,
       updatedAt: manifest.updatedAt,
     };
-    await run(connection, 'BEGIN TRANSACTION');
+    await connection.run('BEGIN TRANSACTION');
     try {
-      await run(connection,
-        'UPDATE capture_manifest SET manifest_json = CAST(? AS JSON), updated_at = ? WHERE singleton = TRUE AND recording_id = ?',
+      await connection.run('UPDATE capture_manifest SET manifest_json = CAST(? AS JSON), updated_at = ? WHERE singleton = TRUE AND recording_id = ?',
         [stableManifest(linked), linked.updatedAt, recordingId]);
-      await run(connection, 'COMMIT');
+      await connection.run('COMMIT');
     } catch (error: unknown) {
-      try { await run(connection, 'ROLLBACK'); } catch { /* Preserve the link failure. */ }
+      try { await connection.run('ROLLBACK'); } catch { /* Preserve the link failure. */ }
       throw error;
     }
     this.currentManifest = linked;
@@ -464,19 +435,17 @@ export class LiveCaptureRecordingStore {
     }
 
     let terrain: Map<string, number> | null = null;
-    await run(connection, 'BEGIN TRANSACTION');
+    await connection.run('BEGIN TRANSACTION');
     try {
       await this.insertSamples(connection, batch, checked.rowCount, priorManifest?.samples ?? 0);
       terrain = await this.insertObservations(connection, batch, checked.observationData);
-      await run(connection,
-        'UPDATE capture_manifest SET recording_id = ?, manifest_json = CAST(? AS JSON), updated_at = ? WHERE singleton = TRUE',
+      await connection.run('UPDATE capture_manifest SET recording_id = ?, manifest_json = CAST(? AS JSON), updated_at = ? WHERE singleton = TRUE',
         [manifest.recordingId, stableManifest(manifest), manifest.updatedAt]);
-      await run(connection,
-        'INSERT INTO capture_batches (sequence, manifest_json, sample_count) VALUES (?, CAST(? AS JSON), ?)',
+      await connection.run('INSERT INTO capture_batches (sequence, manifest_json, sample_count) VALUES (?, CAST(? AS JSON), ?)',
         [batch.sequence, checked.manifestJson, checked.rowCount]);
-      await run(connection, 'COMMIT');
+      await connection.run('COMMIT');
     } catch (error: unknown) {
-      try { await run(connection, 'ROLLBACK'); } catch { /* Preserve the write failure. */ }
+      try { await connection.run('ROLLBACK'); } catch { /* Preserve the write failure. */ }
       throw error;
     }
     this.currentManifest = manifest;
@@ -489,8 +458,13 @@ export class LiveCaptureRecordingStore {
   private async open(target: string, incoming: LiveCaptureManifest): Promise<void> {
     const existingPath = await fs.promises.lstat(target).catch((error: NodeJS.ErrnoException) => error.code === 'ENOENT' ? null : Promise.reject(error));
     if (existingPath?.isSymbolicLink() || (existingPath && !existingPath.isFile())) throw new Error('Live capture path must be a regular file');
-    const database = await openDatabase(target);
-    const connection = database.connect();
+    const database = await DuckDBInstance.create(target);
+    let connection: DuckDBConnection;
+    try { connection = await database.connect(); }
+    catch (error: unknown) {
+      database.closeSync();
+      throw error;
+    }
     this.database = database;
     this.connection = connection;
     this.filename = target;
@@ -503,34 +477,31 @@ export class LiveCaptureRecordingStore {
       if (existingTables.length > 0 && !EXPECTED_TABLES.every(table => tableSet.has(table))) {
         throw new Error('Existing DuckDB file is not a compatible live capture');
       }
-      await run(connection, 'BEGIN TRANSACTION');
+      await connection.run('BEGIN TRANSACTION');
       try {
-        await run(connection, `CREATE TABLE IF NOT EXISTS capture_manifest (
+        await connection.run(`CREATE TABLE IF NOT EXISTS capture_manifest (
           singleton BOOLEAN PRIMARY KEY CHECK (singleton = TRUE), recording_id VARCHAR NOT NULL,
           manifest_json JSON NOT NULL, updated_at DOUBLE NOT NULL)`);
-        await run(connection, 'CREATE TABLE IF NOT EXISTS capture_metadata (key VARCHAR PRIMARY KEY, value VARCHAR NOT NULL)');
-        await run(connection, `CREATE TABLE IF NOT EXISTS capture_channels (
+        await connection.run('CREATE TABLE IF NOT EXISTS capture_metadata (key VARCHAR PRIMARY KEY, value VARCHAR NOT NULL)');
+        await connection.run(`CREATE TABLE IF NOT EXISTS capture_channels (
           ordinal INTEGER PRIMARY KEY, name VARCHAR UNIQUE NOT NULL, unit VARCHAR NOT NULL,
           source_field VARCHAR NOT NULL, frame VARCHAR NOT NULL, verified BOOLEAN NOT NULL)`);
-        await run(connection, `CREATE TABLE IF NOT EXISTS capture_samples (
+        await connection.run(`CREATE TABLE IF NOT EXISTS capture_samples (
           sample_index BIGINT NOT NULL, elapsed_seconds DOUBLE NOT NULL, lap_number INTEGER NOT NULL,
           lap_start_seconds DOUBLE, ${columnSql(incoming.normalizationVersion)})`);
-        await run(connection, `CREATE TABLE IF NOT EXISTS capture_observations (
+        await connection.run(`CREATE TABLE IF NOT EXISTS capture_observations (
           observation_id BIGINT PRIMARY KEY, elapsed_seconds DOUBLE, received_at DOUBLE NOT NULL,
           request_started_at DOUBLE, request_finished_at DOUBLE, source VARCHAR NOT NULL, kind VARCHAR NOT NULL,
           data JSON NOT NULL)`);
-        await run(connection, `CREATE TABLE IF NOT EXISTS capture_batches (
+        await connection.run(`CREATE TABLE IF NOT EXISTS capture_batches (
           sequence BIGINT PRIMARY KEY, manifest_json JSON NOT NULL, sample_count INTEGER NOT NULL)`);
         if (!hasManifestTable && existingTables.length > 0) throw new Error('Refusing to initialize a non-empty DuckDB file');
         if (!hasManifestTable) {
-          const metadataInsert = connection.prepare('INSERT INTO capture_metadata VALUES (?, ?)');
-          for (const [key, value] of manifestMetadata(incoming)) await this.runPrepared(metadataInsert, [key, value]);
-          const channelInsert = connection.prepare('INSERT INTO capture_channels VALUES (?, ?, ?, ?, ?, ?)');
-          for (const [ordinal, channel] of liveCaptureChannels(incoming.normalizationVersion).entries()) {
-            await this.runPrepared(channelInsert, [ordinal, channel.name, channel.unit, channel.sourceField, channel.frame, channel.verified]);
-          }
-          await callbackPromise<void>(callback => metadataInsert.finalize(callback));
-          await callbackPromise<void>(callback => channelInsert.finalize(callback));
+          const metadata = manifestMetadata(incoming);
+          await connection.run(`INSERT INTO capture_metadata VALUES ${metadata.map(() => '(?, ?)').join(', ')}`, metadata.flat());
+          const channels = liveCaptureChannels(incoming.normalizationVersion);
+          await connection.run(`INSERT INTO capture_channels VALUES ${channels.map(() => '(?, ?, ?, ?, ?, ?)').join(', ')}`,
+            channels.flatMap((channel, ordinal) => [ordinal, channel.name, channel.unit, channel.sourceField, channel.frame, channel.verified]));
           const initial: LiveCaptureManifest = {
             ...incoming,
             updatedAt: incoming.startedAt,
@@ -539,12 +510,12 @@ export class LiveCaptureRecordingStore {
             samples: 0,
             droppedSamples: 0,
           };
-          await run(connection, 'INSERT INTO capture_manifest VALUES (TRUE, ?, CAST(? AS JSON), ?)',
+          await connection.run('INSERT INTO capture_manifest VALUES (TRUE, ?, CAST(? AS JSON), ?)',
             [initial.recordingId, stableManifest(initial), initial.updatedAt]);
         }
-        await run(connection, 'COMMIT');
+        await connection.run('COMMIT');
       } catch (error: unknown) {
-        try { await run(connection, 'ROLLBACK'); } catch { /* Keep the initialization error. */ }
+        try { await connection.run('ROLLBACK'); } catch { /* Keep the initialization error. */ }
         throw error;
       }
       const stored = await this.readManifest(connection);
@@ -574,8 +545,13 @@ export class LiveCaptureRecordingStore {
   }
 
   private async openExisting(target: string): Promise<void> {
-    const database = await openDatabase(target);
-    const connection = database.connect();
+    const database = await DuckDBInstance.create(target);
+    let connection: DuckDBConnection;
+    try { connection = await database.connect(); }
+    catch (error: unknown) {
+      database.closeSync();
+      throw error;
+    }
     this.database = database;
     this.connection = connection;
     this.filename = target;
@@ -610,7 +586,7 @@ export class LiveCaptureRecordingStore {
     }
   }
 
-  private async verifyCatalog(connection: Connection, manifest: LiveCaptureManifest): Promise<void> {
+  private async verifyCatalog(connection: DuckDBConnection, manifest: LiveCaptureManifest): Promise<void> {
     const metadataRows = await all(connection, 'SELECT key, value FROM capture_metadata ORDER BY key');
     const metadata = new Map(metadataRows.map(row => [rowString(row, 'key'), rowString(row, 'value')]));
     for (const [key, value] of expectedMetadata(manifest)) {
@@ -630,7 +606,7 @@ export class LiveCaptureRecordingStore {
     }
   }
 
-  private async readManifest(connection: Connection): Promise<LiveCaptureManifest | null> {
+  private async readManifest(connection: DuckDBConnection): Promise<LiveCaptureManifest | null> {
     const rows = await all(connection, 'SELECT recording_id, manifest_json FROM capture_manifest WHERE singleton = TRUE');
     if (rows.length === 0) return null;
     const json = rowString(rows[0], 'manifest_json');
@@ -644,14 +620,14 @@ export class LiveCaptureRecordingStore {
     return stored;
   }
 
-  private async insertSamples(connection: Connection, batch: LiveCaptureBatch, rowCount: number, sampleOffset: number): Promise<void> {
+  private async insertSamples(connection: DuckDBConnection, batch: LiveCaptureBatch, rowCount: number, sampleOffset: number): Promise<void> {
     const channels = liveCaptureChannels(batch.manifest.normalizationVersion);
     const width = channels.length + 3;
     for (let start = 0; start < rowCount; start += MAX_ROWS_PER_INSERT) {
       const count = Math.min(MAX_ROWS_PER_INSERT, rowCount - start);
       const tuple = `(${Array(4 + channels.length).fill('?').join(', ')})`;
       const sql = `INSERT INTO capture_samples VALUES ${Array(count).fill(tuple).join(', ')}`;
-      const values: unknown[] = [];
+      const values: DuckDBValue[] = [];
       for (let row = start; row < start + count; row++) {
         const offset = row * width;
         values.push(sampleOffset + row, batch.samples[offset], batch.samples[offset + 1], Number.isNaN(batch.samples[offset + 2]) ? null : batch.samples[offset + 2]);
@@ -660,12 +636,13 @@ export class LiveCaptureRecordingStore {
           values.push(!channels[channel].verified || Number.isNaN(value) ? null : value);
         }
       }
-      await run(connection, sql, values);
+      // oxlint-disable-next-line eslint/no-await-in-loop -- Rows are already batched; chunks stay under the per-statement parameter limit on one connection.
+      await connection.run(sql, values);
     }
   }
 
   /** Returns the extended terrain dictionary when the batch defined materials; the caller adopts it after COMMIT. */
-  private async insertObservations(connection: Connection, batch: LiveCaptureBatch, data: string[]): Promise<Map<string, number> | null> {
+  private async insertObservations(connection: DuckDBConnection, batch: LiveCaptureBatch, data: string[]): Promise<Map<string, number> | null> {
     if (batch.observations.length === 0) return null;
     let observations = batch.observations;
     let terrain: Map<string, number> | null = null;
@@ -692,20 +669,17 @@ export class LiveCaptureRecordingStore {
       const count = Math.min(MAX_ROWS_PER_INSERT, observations.length - start);
       const tuple = '(?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON))';
       const sql = `INSERT INTO capture_observations VALUES ${Array(count).fill(tuple).join(', ')}`;
-      const values: unknown[] = [];
+      const values: DuckDBValue[] = [];
       for (let index = start; index < start + count; index++) {
         const observation = observations[index];
         values.push(firstId + index, observation.elapsedSeconds, observation.receivedAt,
           observation.requestStartedAt ?? null, observation.requestFinishedAt ?? null,
           observation.source, observation.kind, data[index]);
       }
-      await run(connection, sql, values);
+      // oxlint-disable-next-line eslint/no-await-in-loop -- Rows are already batched; chunks stay under the per-statement parameter limit on one connection.
+      await connection.run(sql, values);
     }
     return terrain;
-  }
-
-  private runPrepared(statement: Statement, values: unknown[]): Promise<void> {
-    return callbackPromise<void>(callback => statement.run(...values, callback));
   }
 
   private fileBytes(target: string): number {
@@ -732,13 +706,13 @@ export class LiveCaptureRecordingStore {
     if (!connection && !database) return;
     let failure: unknown;
     if (connection) {
-      try { await run(connection, 'CHECKPOINT'); }
+      try { await connection.run('CHECKPOINT'); }
       catch (error: unknown) { failure = error; }
-      try { await closeConnection(connection); }
+      try { connection.closeSync(); }
       catch (error: unknown) { failure ??= error; }
     }
     if (database) {
-      try { await closeDatabase(database); }
+      try { database.closeSync(); }
       catch (error: unknown) { failure ??= error; }
     }
     if (failure) throw failure;

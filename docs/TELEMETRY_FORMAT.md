@@ -196,3 +196,7 @@ References:
 - [DuckDB documentation](https://duckdb.org/docs/)
 - [DuckDB information schema](https://duckdb.org/docs/stable/sql/meta/information_schema)
 - Local source evidence: `UserData/Telemetry/config.json` in the inspected LMU installation (not bundled in this repository).
+
+### Node.js client
+
+The telemetry reader and worker-owned live recording store use `@duckdb/node-api`. Native telemetry and live catalog reads open instances with `access_mode: READ_ONLY`; recording writes remain in the worker. Queries bind typed values and materialize row objects, preserving SQL NULLs and BIGINT values. Connections close before their instances to release file handles.
