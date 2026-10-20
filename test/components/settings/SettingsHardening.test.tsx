@@ -6,6 +6,7 @@ import { FeedbackMessage } from '../../../src/components/settings/SettingsPanel.
 import type { AppStatus, ScanStatus } from '../../../shared/types/index.js';
 import type { ReplayCacheState } from '../../../src/components/settings/replays/useReplayCache.js';
 import type { AiSettingsState } from '../../../src/components/settings/hooks/useAiSettings.js';
+import { requestBody } from '../../fixtures/requestUrl.js';
 
 const status: AppStatus = {
   resultsDir: 'C:\\LMU\\Results',
@@ -29,7 +30,7 @@ function mockServer(onScan: (call: ScanCall) => Promise<unknown>) {
   const scans: ScanCall[] = [];
   global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
     if (url === '/api/scan') {
-      const call = { body: JSON.parse(String(init?.body ?? '{}')) as Record<string, unknown> };
+      const call = { body: JSON.parse(requestBody(init?.body ?? '{}')) as Record<string, unknown> };
       scans.push(call);
       return onScan(call);
     }

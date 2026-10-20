@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useSearchParams } from 'react-router';
-import { fetchJson, isAbortError } from '../../api/apiClient.js';
+import { fetchJson } from '../../api/apiClient.js';
+import { useRequest } from '../../api/useRequest.js';
 import type { DashboardData } from '../../../shared/types/dashboard.js';
 import { useSessionDataContext } from '../../api/sessionDataContext.js';
 
@@ -20,20 +21,14 @@ export function useDashboardData(revision = '', enabled = true): DashboardDataSt
     query.set('pageSize', '25');
     return query.toString();
   }, [searchParams]);
-  const [state, setState] = useState<DashboardDataState>({ data: null, loading: true, error: null });
-
-  useEffect(() => {
-    if (!enabled) { setState({ data: null, loading: false, error: null }); return; }
-    const controller = new AbortController();
-    setState(previous => ({ ...previous, loading: true, error: null }));
-    fetchJson<DashboardData>(`/api/dashboard?${requestQuery}`, { signal: controller.signal })
-      .then(data => setState({ data, loading: false, error: null }))
-      .catch(error => {
-        if (isAbortError(error)) return;
-        setState(previous => ({ ...previous, loading: false, error: error instanceof Error ? error.message : 'Unable to load dashboard data' }));
-      });
-    return () => controller.abort();
-  }, [requestQuery, revision, sessionRevision, enabled]);
-
-  return state;
+  // Each new request shows loading over the previous data; disabled, there is nothing to show.
+  const dashboard = useRequest(enabled ? requestQuery : null,
+    (query, signal) => fetchJson<DashboardData>(`/api/dashboard?${query}`, { signal }),
+    { keepPrevious: true, refresh: `${revision}|${sessionRevision}` });
+  const { error } = dashboard;
+  return {
+    data: dashboard.data,
+    loading: dashboard.loading,
+    error: error ? error instanceof Error ? error.message : 'Unable to load dashboard data' : null,
+  };
 }

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { LiveDashboardCard } from '../../../src/components/settings/LiveDashboardCard.js';
+import { requestBody } from '../../fixtures/requestUrl.js';
 
 const reply = (body: unknown, ok = true) => Promise.resolve({ ok, status: ok ? 200 : 500, json: () => Promise.resolve(body) });
 
@@ -9,7 +10,7 @@ describe('LiveDashboardCard', () => {
 
   it('loads the setting and saves the toggle', async () => {
     const fetchMock = vi.fn((_url: string, init?: RequestInit) =>
-      reply(init?.method === 'POST' ? JSON.parse(String(init.body)) : { autoOpen: true }));
+      reply(init?.method === 'POST' ? JSON.parse(requestBody(init.body)) : { autoOpen: true }));
     vi.stubGlobal('fetch', fetchMock);
     render(<LiveDashboardCard />);
     const toggle = await screen.findByRole('checkbox', { name: 'Switch the open app to the live dashboard when LMU starts' });
@@ -22,7 +23,7 @@ describe('LiveDashboardCard', () => {
 
   it('loads and saves the shared pedal trace duration', async () => {
     const fetchMock = vi.fn((_url: string, init?: RequestInit) => reply({ autoOpen: true, reserveLaps: 0.5, pedalTraceSeconds: 30,
-      ...(init?.method === 'POST' ? JSON.parse(String(init.body)) as Record<string, unknown> : {}) }));
+      ...(init?.method === 'POST' ? JSON.parse(requestBody(init.body)) as Record<string, unknown> : {}) }));
     vi.stubGlobal('fetch', fetchMock);
     render(<LiveDashboardCard />);
     const duration = await screen.findByRole('combobox', { name: 'Pedal trace history' });
@@ -35,7 +36,7 @@ describe('LiveDashboardCard', () => {
 
   it('loads and saves the diagnostics setting, off by default', async () => {
     const fetchMock = vi.fn((_url: string, init?: RequestInit) => reply({ autoOpen: true, reserveLaps: 0.5, pedalTraceSeconds: 30, diagnostics: false,
-      ...(init?.method === 'POST' ? JSON.parse(String(init.body)) as Record<string, unknown> : {}) }));
+      ...(init?.method === 'POST' ? JSON.parse(requestBody(init.body)) as Record<string, unknown> : {}) }));
     vi.stubGlobal('fetch', fetchMock);
     render(<LiveDashboardCard />);
     const toggle = await screen.findByRole('checkbox', { name: 'Write a diagnostic file with each recording' });

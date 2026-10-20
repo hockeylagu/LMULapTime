@@ -105,18 +105,16 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
   const [activeTab, setActiveTab] = useState<'map' | 'corners' | 'ai-report'>('map');
   const [cornerSubView, setCornerSubView] = useState<'compare' | 'consistency'>('compare');
   const [colorBy, setColorBy] = useState<MapColorMode>('pedal');
-  const [selectedCornerNumber, setSelectedCornerNumber] = useState<number | null>(null);
   const { availableConsistencyLaps, excludedConsistencyLaps, toggleConsistencyLap } =
     useConsistencyLapSelection(trajectory, metadata, activeSessionId, selectedDriverSlot);
   // A corner asked for in the URL (the session debrief links to one) opens once the laps it
   // belongs to are loaded; corner numbers come from the lap and its comparison.
   const pendingCornerRef = useRef<number | null>(initialCornerNumber ?? null);
 
-  useEffect(() => {
-    if ((colorBy === 'delta' || colorBy === 'gainLoss') && (!isCompareMode || !baselineTrajectory)) {
-      setColorBy('speed');
-    }
-  }, [colorBy, isCompareMode, baselineTrajectory]);
+  // Delta colours need a baseline: without one the map falls back to speed.
+  if ((colorBy === 'delta' || colorBy === 'gainLoss') && (!isCompareMode || !baselineTrajectory)) {
+    setColorBy('speed');
+  }
 
   const lapSegments = useMemo(() => {
     if (!trajectory || !hasCompatibleTrackStations(trajectory, isCompareMode && baselineTrajectory ? baselineTrajectory : trajectory)) return [];
@@ -163,9 +161,10 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     [trajectory]
   );
 
-  useEffect(() => {
-    setSelectedCornerNumber(null);
-  }, [trajectory, baselineTrajectory]);
+  // The corner picked belongs to the laps it was picked on: other laps show none selected.
+  const [pickedCorner, setPickedCorner] = useState<{ trajectory: typeof trajectory; baselineTrajectory: typeof baselineTrajectory; number: number | null } | null>(null);
+  const selectedCornerNumber = pickedCorner?.trajectory === trajectory && pickedCorner.baselineTrajectory === baselineTrajectory
+    ? pickedCorner.number : null;
 
   useEffect(() => {
     const pending = pendingCornerRef.current;
@@ -173,8 +172,8 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     if (!cornerSegments.some(s => s.cornerNumber === pending)) return;
     pendingCornerRef.current = null;
     setActiveTab('corners');
-    setSelectedCornerNumber(pending);
-  }, [cornerSegments, baselineTrajectory, initialCompareMode]);
+    setPickedCorner({ trajectory, baselineTrajectory, number: pending });
+  }, [cornerSegments, trajectory, baselineTrajectory, initialCompareMode]);
 
   const selectedCorner = useMemo(
     () => cornerSegments.find(s => s.cornerNumber === selectedCornerNumber) || null,
@@ -192,8 +191,10 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
   }, [selectedCorner, primaryDists]);
 
   const handleSelectCorner = useCallback((cornerNumber: number | null) => {
-    setSelectedCornerNumber(prev => (cornerNumber !== null && prev === cornerNumber ? null : cornerNumber));
-  }, []);
+    // Picking the selected corner again clears it.
+    const number = cornerNumber !== null && selectedCornerNumber === cornerNumber ? null : cornerNumber;
+    setPickedCorner({ trajectory, baselineTrajectory, number });
+  }, [trajectory, baselineTrajectory, selectedCornerNumber]);
 
   if (!isOpen) return null;
 

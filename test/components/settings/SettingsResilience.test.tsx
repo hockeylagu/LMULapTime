@@ -10,6 +10,7 @@ import { useReplayCache } from '../../../src/components/settings/replays/useRepl
 import { aiKeyErrorMessage, cleanApiKey } from '../../../src/components/settings/aiKey.js';
 import { ApiError } from '../../../src/api/apiClient.js';
 import type { BenchmarkDiffSummary, ReferenceBenchmarkDiff } from '../../../shared/types/index.js';
+import { requestBody } from '../../fixtures/requestUrl.js';
 
 const json = (body: unknown) => Promise.resolve({ ok: true, json: () => Promise.resolve(body) });
 const apiFailure = (code: number, body: unknown) => Promise.resolve({ ok: false, status: code, json: () => Promise.resolve(body) });
@@ -27,7 +28,7 @@ describe('Gemini key handling', () => {
     global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
       if (url !== '/api/ai/settings') return json({});
       if (init?.method === 'POST') {
-        posts.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+        posts.push(JSON.parse(requestBody(init.body)) as Record<string, unknown>);
         return settingsAnswer();
       }
       return json({ configured: false, model: 'gemini-3.8-flash', keySource: null });
@@ -103,7 +104,7 @@ describe('Gemini key handling', () => {
     settingsAnswer = () => json({ configured: false, model: 'gemini-3.8-flash', keySource: null });
     global.fetch = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
       if (init?.method === 'POST') {
-        posts.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+        posts.push(JSON.parse(requestBody(init.body)) as Record<string, unknown>);
         return settingsAnswer();
       }
       return json({ configured: true, model: 'gemini-3.8-flash', keySource: 'session' });
@@ -244,7 +245,7 @@ describe('Cached replays at scale', { timeout: 20000 }, () => {
     mockReplays([{ ...rows(1)[0], replayDateMs: 0, driversCount: undefined, isOnDisk: true }]);
     render(<Harness />);
     await screen.findByRole('region', { name: 'Cached replays' });
-    expect(screen.getByText((_, el) => el?.tagName === 'P' && /^1 replay · 1 on disk · 0 kept after LMU deleted them/.test(el.textContent ?? ''))).toBeInTheDocument();
+    expect(screen.getByText((_, el) => el?.tagName === 'P' && (el.textContent ?? '').startsWith('1 replay · 1 on disk · 0 kept after LMU deleted them'))).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/1970|Invalid Date|NaN|undefined/);
   });
 

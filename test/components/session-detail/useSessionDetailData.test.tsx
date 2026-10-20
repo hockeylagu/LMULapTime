@@ -26,6 +26,7 @@ describe('SessionDetail loading', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it('loads opponents PB only on selection, hides stale PBs, and fetches again after switching back', async () => {
+    // The player's best comes with the detail; only other drivers' bests are asked for.
     const session = { ...mockDetailedSession, historyContext: {
       ready: true, relatedSessions: [], personalBests: [{ driverOrdinal: 0, bestLapTime: 122 }],
     } };
@@ -45,9 +46,11 @@ describe('SessionDetail loading', () => {
     await act(async () => resolveOpponent?.({ ok: true, status: 200, json: () => Promise.resolve({ ready: true, bestLapTime: 120 }) }));
     await waitFor(() => expect(hook.result.current.allTimeCategoryTrackPB).toBe(120));
     act(() => hook.result.current.setSelectedDriverOrdinal(0));
-    await waitFor(() => expect(hook.result.current.allTimeCategoryTrackPB).toBe(121));
+    expect(hook.result.current.allTimeCategoryTrackPB).toBe(122);
     act(() => hook.result.current.setSelectedDriverOrdinal(1));
+    expect(hook.result.current.allTimeCategoryTrackPB).toBeNull();
     expect(fetchMock.mock.calls.filter(([url]) => url.endsWith('/personal-best/1'))).toHaveLength(2);
+    expect(fetchMock.mock.calls.filter(([url]) => url.endsWith('/personal-best/0'))).toHaveLength(0);
     hook.unmount();
   });
 
@@ -178,8 +181,11 @@ describe('useSessionDetailData', () => {
     let resolveRefresh: ((value: { ok: boolean; status: number; json: () => Promise<unknown> }) => void) | undefined;
     let revision = 0;
     const fetchMock = vi.fn((url: string) => {
-      if (!url.startsWith('/api/session/')) return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
-      if (fetchMock.mock.calls.length === 1) return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(mockDetailedSession) });
+      // Personal bests answer at once: only the session detail refresh is held.
+      if (url !== '/api/session/revision') return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve([]) });
+      if (!resolveRefresh && fetchMock.mock.calls.filter(([called]) => called === url).length === 1) {
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(mockDetailedSession) });
+      }
       return new Promise((resolve) => { resolveRefresh = resolve; });
     });
     vi.stubGlobal('fetch', fetchMock);

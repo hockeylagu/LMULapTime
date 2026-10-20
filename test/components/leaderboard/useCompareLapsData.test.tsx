@@ -11,6 +11,7 @@ import {
 } from '../../../src/components/leaderboard/useCompareLapsData.js';
 import type { ComparableLap } from '../../../shared/types/index.js';
 import { makeSessionCard } from '../../helpers/sessionCardFixture.js';
+import { requestUrl } from '../../fixtures/requestUrl.js';
 
 const laps = [
   {
@@ -30,7 +31,8 @@ const laps = [
 let navigateTo: (to: string) => void = () => {};
 
 const NavigationBridge: React.FC = () => {
-  navigateTo = useNavigate();
+  const navigate = useNavigate();
+  navigateTo = (to) => { void navigate(to); };
   return null;
 };
 
@@ -136,7 +138,7 @@ describe('useCompareLapsData selection fallbacks', () => {
   it('fetches an exact session/driver/lap deep link with one-row pagination even without a lap number', async () => {
     const urls: string[] = [];
     vi.stubGlobal('fetch', vi.fn((input: RequestInfo | URL) => {
-      urls.push(String(input));
+      urls.push(requestUrl(input));
       return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({
         laps, allTimeBestLap: null, playerBestLap: null, overallTrackBestLap: null,
         bestS1: 28, bestS2: 33, bestS3: 37, theoreticalBestSec: 98, benchmarks: [],

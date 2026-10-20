@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { Leaderboard, RivalStatus } from '../../../../shared/types/leaderboard.js';
-import { apiErrorMessage, isAbortError } from '../../../api/apiClient.js';
+import { apiErrorMessage } from '../../../api/apiClient.js';
+import { useRequest } from '../../../api/useRequest.js';
 import { LeaderboardRequest, loadLeaderboardWithRival, pinRival } from '../../../api/leaderboardApi.js';
 
 export interface RivalState {
@@ -20,65 +21,37 @@ export interface RivalState {
 
 /** Standings and rival share one request and selection lifecycle. */
 export function useRival(request: LeaderboardRequest | null): RivalState & { board: Leaderboard | null } {
-  const [board, setBoard] = useState<Leaderboard | null>(null);
-  const [status, setStatus] = useState<RivalStatus | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-  const [attempt, setAttempt] = useState(0);
   const layoutKey = request?.layoutKey ?? null;
   const carClass = request?.carClass ?? null;
   const carType = request?.carType ?? null;
-  // The board a change was made on: its answer is dropped once another board is picked.
-  const boardKey = `${layoutKey}|${carClass}|${carType}`;
-  const boardKeyRef = useRef(boardKey);
-
-  useEffect(() => {
-    boardKeyRef.current = boardKey;
-    setBoard(null);
-    setStatus(null);
-    setError(null);
-    setActionError(null);
-    setPending(false);
-    setLoading(false);
-    if (!layoutKey || !carClass) return;
-    const controller = new AbortController();
-    setLoading(true);
-    loadLeaderboardWithRival({ layoutKey, carClass, carType }, controller.signal)
-      .then((next) => {
-        if (controller.signal.aborted) return;
-        setBoard(next);
-        setStatus(next.rivalStatus);
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (controller.signal.aborted || isAbortError(err)) return;
-        setError(apiErrorMessage(err, 'The leaderboard could not be loaded.'));
-        setLoading(false);
-      });
-    return () => controller.abort();
-  }, [layoutKey, carClass, carType, boardKey, attempt]);
+  const boardRequest = useMemo(() => layoutKey && carClass ? { layoutKey, carClass, carType } : null, [layoutKey, carClass, carType]);
+  const loaded = useRequest(boardRequest, loadLeaderboardWithRival);
+  const board = loaded.data;
+  // A change belongs to the board answer it was made on: another board, or a reload, shows none of it.
+  const [change, setChange] = useState<{ board: Leaderboard; status: RivalStatus | null; error: string | null; pending: boolean } | null>(null);
+  const current = board && change?.board === board ? change : null;
+  const status = current ? current.status : board?.rivalStatus ?? null;
+  const pending = current?.pending ?? false;
 
   const act = useCallback((action: (r: LeaderboardRequest) => Promise<RivalStatus>) => {
-    if (!layoutKey || !carClass || pending) return;
-    const madeOn = boardKeyRef.current;
-    setActionError(null);
-    setPending(true);
-    action({ layoutKey, carClass, carType })
-      .then((next) => {
-        if (boardKeyRef.current === madeOn) setStatus(next);
-      })
-      .catch((err) => {
-        if (boardKeyRef.current === madeOn) setActionError(apiErrorMessage(err, 'Your rival could not be changed.'));
-      })
-      .finally(() => {
-        if (boardKeyRef.current === madeOn) setPending(false);
-      });
-  }, [layoutKey, carClass, carType, pending]);
+    if (!boardRequest || !board || pending) return;
+    const madeOn = board;
+    setChange({ board: madeOn, status, error: null, pending: true });
+    const settle = (next: Partial<NonNullable<typeof change>>) =>
+      setChange(previous => previous?.board === madeOn ? { ...previous, ...next, pending: false } : previous);
+    action(boardRequest)
+      .then(next => settle({ status: next }))
+      .catch((err: unknown) => settle({ error: apiErrorMessage(err, 'Your rival could not be changed.') }));
+  }, [boardRequest, board, pending, status]);
 
   const pin = useCallback((driverName: string) => act((r) => pinRival(r, driverName)), [act]);
-  const retry = useCallback(() => setAttempt((n) => n + 1), []);
+  const { reload } = loaded;
+  const retry = useCallback(() => reload(), [reload]);
 
-  return { board, status, loading, error, actionError, pending, pin, retry };
+  return {
+    board, status, pending, pin, retry,
+    loading: loaded.loading,
+    error: loaded.error ? apiErrorMessage(loaded.error, 'The leaderboard could not be loaded.') : null,
+    actionError: current?.error ?? null,
+  };
 }

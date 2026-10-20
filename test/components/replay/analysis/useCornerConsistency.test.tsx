@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useCornerConsistency } from '../../../../src/components/replay/analysis/useCornerConsistency.js';
 import type { ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
+import { requestUrl } from '../../../fixtures/requestUrl.js';
 
 const bounds = { minX: 0, maxX: 10, minZ: 0, maxZ: 0, spanX: 10, spanZ: 0 };
 
@@ -129,7 +130,7 @@ describe('useCornerConsistency', () => {
     const first = renderHook(() => useCornerConsistency(true, 'cached-session', meta, 3, current));
     await waitFor(() => expect(first.result.current.isLoading).toBe(false));
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(String(fetchMock.mock.calls[0][0])).toContain('source=vcr');
+    expect(requestUrl(fetchMock.mock.calls[0][0])).toContain('source=vcr');
     first.unmount();
 
     expect(first.result.current.lapsSampled).toBe(2);
@@ -154,8 +155,8 @@ describe('useCornerConsistency', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     hook.rerender({ data: newTrajectory });
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    expect(String(fetchMock.mock.calls[1][0])).toContain('lapOrdinal=1');
-    expect(String(fetchMock.mock.calls[1][0])).toContain('source=duckdb');
+    expect(requestUrl(fetchMock.mock.calls[1][0])).toContain('lapOrdinal=1');
+    expect(requestUrl(fetchMock.mock.calls[1][0])).toContain('source=duckdb');
     await waitFor(() => expect(hook.result.current.isLoading).toBe(false));
     expect(fetchMock.mock.calls[0][1]?.signal?.aborted).toBe(true);
     await act(async () => resolveOld(new Response(JSON.stringify({ stationSource: 'track', geometryRevision: 'synthetic-canonical-track-v1', points: [] }), { status: 200 })));

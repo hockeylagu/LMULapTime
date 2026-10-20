@@ -2,6 +2,7 @@ import { afterEach, describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ReplayCompareButton } from '../../../../../src/components/replay/inspector/compare/ReplayCompareButton.js';
 import type { ComparableLap, ReplayDriverEntry, ReplayMetadata, ReplayTrajectoryData } from '../../../../../shared/types/index.js';
+import { requestUrl } from '../../../../fixtures/requestUrl.js';
 
 const RACE = 'race-session';
 const PRACTICE = 'practice-session';
@@ -25,7 +26,7 @@ const trajectory = (lapTime: number) => ({
 function mockLaps(laps: ComparableLap[]) {
   const urls: URL[] = [];
   vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
-    urls.push(new URL(String(input), 'http://localhost'));
+    urls.push(new URL(requestUrl(input), 'http://localhost'));
     return { ok: true, status: 200, json: async () => ({ laps, total: laps.length }) } as Response;
   });
   return urls;

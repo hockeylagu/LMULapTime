@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import { LeaderboardPage, findLayoutForTrack } from '../../../src/components/leaderboard/LeaderboardPage.js';
 import type { LeaderboardLayout } from '../../../shared/types/leaderboard.js';
 import { board } from './board/leaderboardFixtures.js';
+import { requestUrl, requestBody } from '../../fixtures/requestUrl.js';
 
 const layout = (layoutKey: string, trackName: string, lastDriven: number, classes: Array<[string, number]>): LeaderboardLayout => ({
   layoutKey,
@@ -72,8 +73,8 @@ describe('LeaderboardPage', () => {
     expect(screen.getByRole('button', { name: /^GT3\s*P12\/20/ })).toHaveAttribute('aria-pressed', 'false');
     expect(await screen.findByRole('heading', { name: /Hypercar board/ })).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledWith('/api/leaderboard?layout=daytona_road_course&carClass=Hyper&includeRival=true', expect.anything());
-    expect(vi.mocked(global.fetch).mock.calls.filter(([url]) => String(url).startsWith('/api/leaderboard/layouts'))).toHaveLength(1);
-    expect(vi.mocked(global.fetch).mock.calls.some(([url]) => String(url).startsWith('/api/rivals?'))).toBe(false);
+    expect(vi.mocked(global.fetch).mock.calls.filter(([url]) => requestUrl(url).startsWith('/api/leaderboard/layouts'))).toHaveLength(1);
+    expect(vi.mocked(global.fetch).mock.calls.some(([url]) => requestUrl(url).startsWith('/api/rivals?'))).toBe(false);
   });
 
   it.each(['', '&carClass=All'])('selects the chosen track default class when the class is missing or All (%s)', async classQuery => {
@@ -135,7 +136,7 @@ describe('LeaderboardPage', () => {
     const fetchMock = vi.mocked(global.fetch);
     const defaultFetch = fetchMock.getMockImplementation() as (url: string) => Promise<Response>;
     fetchMock.mockImplementation((input) => {
-      const url = String(input);
+      const url = requestUrl(input);
       return url.startsWith('/api/leaderboard?')
         ? Promise.resolve({ ok: true, json: () => Promise.resolve(board(3, 3)) } as Response)
         : defaultFetch(url);
@@ -166,7 +167,7 @@ describe('LeaderboardPage', () => {
     const fetchMock = vi.mocked(global.fetch);
     const defaultFetch = fetchMock.getMockImplementation() as (url: string) => Promise<Response>;
     fetchMock.mockImplementation((input) => {
-      const url = String(input);
+      const url = requestUrl(input);
       return url.startsWith('/api/leaderboard?')
         ? Promise.resolve({ ok: true, json: () => Promise.resolve(board(3, 3)) } as Response)
         : defaultFetch(url);
@@ -189,7 +190,7 @@ describe('LeaderboardPage', () => {
     const fetchMock = vi.mocked(global.fetch);
     const defaultFetch = fetchMock.getMockImplementation() as (url: string) => Promise<Response>;
     fetchMock.mockImplementation((input) => {
-      const url = String(input);
+      const url = requestUrl(input);
       return url.startsWith('/api/leaderboard?')
         ? Promise.resolve({ ok: true, json: () => Promise.resolve(board(3, 3)) } as Response)
         : defaultFetch(url);
@@ -215,7 +216,7 @@ describe('LeaderboardPage', () => {
     const fetchMock = vi.mocked(global.fetch);
     const defaultFetch = fetchMock.getMockImplementation() as (url: string, init?: RequestInit) => Promise<Response>;
     fetchMock.mockImplementation((input, init) => {
-      const url = String(input);
+      const url = requestUrl(input);
       if (url.startsWith('/api/leaderboard?')) return Promise.resolve({ ok: true, json: () => Promise.resolve({ ...b, rivalStatus }) } as Response);
       if (url.startsWith('/api/rivals')) return Promise.resolve({ ok: true, json: () => Promise.resolve(rivalStatus) } as Response);
       return defaultFetch(url, init);
@@ -227,7 +228,7 @@ describe('LeaderboardPage', () => {
     fireEvent.click(within(rivalCard).getByRole('button', { name: 'Make Driver 3 your rival' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/rivals/pin', expect.objectContaining({ method: 'POST' })));
     const pinCall = fetchMock.mock.calls.find(([u]) => u === '/api/rivals/pin');
-    expect(JSON.parse(String(pinCall?.[1]?.body))).toEqual({ layout: 'daytona_road_course', carClass: 'Hyper', driverName: 'Driver 3' });
+    expect(JSON.parse(requestBody(pinCall?.[1]?.body))).toEqual({ layout: 'daytona_road_course', carClass: 'Hyper', driverName: 'Driver 3' });
   });
 
   it('says why when the tracks cannot be loaded', async () => {
@@ -241,7 +242,7 @@ describe('LeaderboardPage', () => {
     const defaultFetch = fetchMock.getMockImplementation() as (url: string) => Promise<Response>;
     let failed = true;
     fetchMock.mockImplementation(input => {
-      const url = String(input);
+      const url = requestUrl(input);
       if (url.startsWith('/api/leaderboard?') && failed) {
         return Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({ error: 'Board unavailable' }) } as Response);
       }
@@ -252,7 +253,7 @@ describe('LeaderboardPage', () => {
     failed = false;
     fireEvent.click(screen.getByRole('button', { name: /try again/i }));
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
-    expect(fetchMock.mock.calls.filter(([url]) => String(url).startsWith('/api/leaderboard/layouts'))).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([url]) => requestUrl(url).startsWith('/api/leaderboard/layouts'))).toHaveLength(1);
   });
 });
 

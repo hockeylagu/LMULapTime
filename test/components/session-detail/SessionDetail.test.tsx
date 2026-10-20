@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { SessionDetail } from '../../../src/components/session-detail/SessionDetail.js';
 import { mockDetailedSession } from './mockSessionDetail.js';
@@ -238,7 +238,7 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
       drivers: [driverWithoutData],
     };
 
-    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+    (global.fetch as unknown as Mock<(url: string) => Promise<unknown>>).mockImplementation((url: string) => {
       if (url.includes('/api/session/sess123')) {
         return Promise.resolve({
           ok: true,
@@ -272,7 +272,7 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
   });
 
   it('switches between Sector Times, Top Speed, and Lap Pace chart views', async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+    (global.fetch as unknown as Mock<(url: string) => Promise<unknown>>).mockImplementation((url: string) => {
       if (url.includes('/api/session/sess123')) {
         return Promise.resolve({
           ok: true,

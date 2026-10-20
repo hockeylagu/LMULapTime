@@ -7,6 +7,16 @@ import { findWeekendSessions, CandidateRelatedSession } from '../../../shared/do
 import type { WeekendSessionLink } from '../../../shared/domain/weekendSessions.js';
 import { ApiError, apiErrorMessage, fetchJson, isAbortError } from '../../api/apiClient.js';
 import { loadReferenceLaptimes, peekReferenceLaptimes } from '../../api/referenceApi.js';
+import { useRequest } from '../../api/useRequest.js';
+
+type SessionDetailResponse = DetailedSession & {
+  historyContext?: {
+    ready?: boolean;
+    relatedSessions: WeekendSessionLink<CandidateRelatedSession>[];
+    personalBests: Array<{ driverOrdinal: number; bestLapTime: number | null }>;
+  };
+};
+const NO_RELATED: WeekendSessionLink<CandidateRelatedSession>[] = [];
 
 export interface UseSessionDetailDataParams {
   sessionId: string;
@@ -22,26 +32,46 @@ export function useSessionDetailData({
   initialSessions,
 }: UseSessionDetailDataParams) {
   const { revision } = useSessionDataContext();
-  const [loadedSession, setLoadedSession] = useState<{ sessionId: string; data: DetailedSession } | null>(null);
-  const session = loadedSession?.sessionId === sessionId ? loadedSession.data : null;
   const [refCache, setRefCache] = useState<ReferenceLaptimesCache | null>(peekReferenceLaptimes);
   // Injected history supports isolated views; ordinary navigation reads compact context with the detail.
   // Read from props, never copied into state: a parent passing a new array on each render must not
   // restart loading (it re-rendered forever).
   const hasInitialProgression = initialProgression !== undefined;
   const hasInitialSessions = initialSessions !== undefined;
-  const [personalBest, setPersonalBest] = useState<{
-    session: DetailedSession; driverOrdinal: number; bestLapTime: number | null;
-  } | null>(null);
-  const [personalBestError, setPersonalBestError] = useState<string | null>(null);
-  const [fetchedRelated, setFetchedRelated] = useState<WeekendSessionLink<CandidateRelatedSession>[]>([]);
   const progression = hasInitialProgression && initialProgression ? initialProgression : [];
   const allSessions = hasInitialSessions && initialSessions ? initialSessions : [];
-  const [settledSessionId, setSettledSessionId] = useState<string | null>(null);
-  const loading = !session && settledSessionId !== sessionId;
+
+  // The session stays shown while a data revision reloads it; another session shows nothing until it answers.
+  const detail = useRequest({ sessionId }, (request, signal) =>
+    fetchJson<SessionDetailResponse>(`/api/session/${encodeURIComponent(request.sessionId)}`, { signal })
+      .catch((err: unknown) => {
+        if (!isAbortError(err)) console.error('Failed to load session detail data:', err);
+        throw err;
+      }),
+    { refresh: `${revision}|${hasInitialProgression}|${hasInitialSessions}` });
+  // A session the server does not have is not an error: there is just nothing to show.
+  const notFound = detail.error instanceof ApiError && detail.error.status === 404;
+  const sessionData = notFound ? null : detail.data;
+  const session: DetailedSession | null = sessionData;
+  const loading = !session && detail.loading;
   // Why the session could not be loaded; null while loading, when loaded, or when the server has no such session.
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [selectedDriverOrdinal, setSelectedDriverOrdinal] = useState<number | null>(null);
+  const loadError = detail.error && !notFound ? apiErrorMessage(detail.error, 'The session could not be loaded.') : null;
+  const fetchedRelated = sessionData?.historyContext?.relatedSessions ?? NO_RELATED;
+
+  // The driver picked belongs to its session; until one is picked, the session's player is selected.
+  const [pickedDriver, setPickedDriver] = useState<{ sessionId: string; ordinal: number | null } | null>(null);
+  const selectedDriverOrdinal = pickedDriver?.sessionId === sessionId
+    ? pickedDriver.ordinal : session?.playerDriver?.driverOrdinal ?? null;
+  const setSelectedDriverOrdinal = (ordinal: number | null) => setPickedDriver({ sessionId, ordinal });
+
+  useEffect(() => {
+    // Reference targets are shared across views until a benchmark refresh.
+    let isCurrent = true;
+    loadReferenceLaptimes()
+      .then((refData) => { if (isCurrent) setRefCache(refData); })
+      .catch(() => null);
+    return () => { isCurrent = false; };
+  }, [sessionId, hasInitialProgression, hasInitialSessions, revision]);
   const [chartMetric, setChartMetric] = useState<'lapTime' | 'sectors' | 'topSpeed' | 'tireWear' | 'fuelEnergy' | 'positions'>('lapTime');
   const [hiddenSeries, setHiddenSeries] = useState<Record<string, boolean>>({});
 
@@ -55,82 +85,24 @@ export function useSessionDetailData({
     }));
   };
 
-  useEffect(() => {
-    let isCurrent = true;
-    const abortController = new AbortController();
-    const { signal } = abortController;
-    const existingSession = loadedSession?.sessionId === sessionId ? loadedSession.data : null;
-    if (!existingSession) {
-      setLoadedSession(null);
-      setSettledSessionId(null);
-      setSelectedDriverOrdinal(null);
-    }
-    setLoadError(null);
-
-    // 1. Fetch Session Telemetry Data (primary critical path)
-    fetchJson<DetailedSession & {historyContext?:{ready?:boolean;relatedSessions:WeekendSessionLink<CandidateRelatedSession>[];personalBests:Array<{driverOrdinal:number;bestLapTime:number|null}>}}>(`/api/session/${encodeURIComponent(sessionId)}`, { signal })
-      .then((sessionData) => {
-        if (!isCurrent) return;
-        setLoadedSession({ sessionId, data: sessionData });
-        setFetchedRelated(sessionData.historyContext?.relatedSessions ?? []);
-        const driverOrdinal = sessionData.playerDriver?.driverOrdinal;
-        const best = sessionData.historyContext?.personalBests?.find(item => item.driverOrdinal === driverOrdinal);
-        if (driverOrdinal !== undefined && (best || sessionData.historyContext?.ready === false)) {
-          setPersonalBest({ session: sessionData, driverOrdinal, bestLapTime: sessionData.historyContext?.ready === false ? null : best?.bestLapTime ?? null });
-        }
-        if (!existingSession && sessionData.playerDriver) {
-          setSelectedDriverOrdinal(sessionData.playerDriver.driverOrdinal ?? null);
-        }
-        setLoadError(null);
-        setSettledSessionId(sessionId);
-      })
-      .catch((err) => {
-        if (!isCurrent || isAbortError(err)) return;
-        console.error('Failed to load session detail data:', err);
-        if (err instanceof ApiError && err.status === 404) {
-          setLoadedSession((current) => current?.sessionId === sessionId ? null : current);
-          setSelectedDriverOrdinal(null);
-          setLoadError(null);
-        } else {
-          setLoadError(apiErrorMessage(err, 'The session could not be loaded.'));
-        }
-        setSettledSessionId(sessionId);
-      });
-
-    // 2. Fetch Reference Targets (shared across views until a benchmark refresh)
-    loadReferenceLaptimes()
-      .then((refData) => { if (isCurrent) setRefCache(refData); })
-      .catch(() => null);
-
-    return () => {
-      isCurrent = false;
-      abortController.abort();
-    };
-  }, [sessionId, hasInitialProgression, hasInitialSessions, revision]);
-
   const selectedDriver = useMemo(() => {
     if (!session) return undefined;
     if (!session.drivers || selectedDriverOrdinal === null) return undefined;
     return session.drivers.find(driver => driver.driverOrdinal === selectedDriverOrdinal);
   }, [session, selectedDriverOrdinal]);
 
-  useEffect(() => {
-    setPersonalBestError(null);
-    if (!session || !selectedDriver || selectedDriver.driverOrdinal === undefined) return;
-    const driverOrdinal = selectedDriver.driverOrdinal;
-    if (personalBest?.session === session && personalBest.driverOrdinal === driverOrdinal) return;
-    const controller = new AbortController();
-    fetchJson<{ bestLapTime: number | null; ready: boolean }>(
-      `/api/session/${encodeURIComponent(session.id)}/personal-best/${driverOrdinal}`, { signal: controller.signal }
-    ).then(result => {
-      if (!controller.signal.aborted) setPersonalBest({ session, driverOrdinal, bestLapTime: result.ready ? result.bestLapTime : null });
-    }).catch((error: unknown) => {
-      if (!controller.signal.aborted && !isAbortError(error)) {
-        setPersonalBestError(apiErrorMessage(error, 'Could not load the driver personal best.'));
-      }
-    });
-    return () => controller.abort();
-  }, [session, selectedDriver, personalBest]);
+  // The detail answers the player's personal best; another driver's is asked for on its own.
+  const driverOrdinal = selectedDriver?.driverOrdinal;
+  const history = sessionData?.historyContext;
+  const playerOrdinal = sessionData?.playerDriver?.driverOrdinal;
+  const playerBest = history?.personalBests?.find(item => item.driverOrdinal === playerOrdinal);
+  const answeredByDetail = driverOrdinal !== undefined && driverOrdinal === playerOrdinal && (!!playerBest || history?.ready === false);
+  const personalBestAnswer = useRequest(
+    session && driverOrdinal !== undefined && !answeredByDetail ? { sessionId: session.id, driverOrdinal } : null,
+    (request, signal) => fetchJson<{ bestLapTime: number | null; ready: boolean }>(
+      `/api/session/${encodeURIComponent(request.sessionId)}/personal-best/${request.driverOrdinal}`, { signal }),
+    { refresh: revision });
+  const personalBestError = personalBestAnswer.error ? apiErrorMessage(personalBestAnswer.error, 'Could not load the driver personal best.') : null;
 
   const hasTireWearData = useMemo(() => {
     return (
@@ -172,12 +144,9 @@ export function useSessionDetailData({
       ? 'lapTime'
       : chartMetric;
 
-  const allTimeCategoryTrackPB = useMemo(() => {
-    if (!session || !selectedDriver) return null;
-    if (selectedDriver.driverOrdinal === undefined) return null;
-    return personalBest?.session === session && personalBest.driverOrdinal === selectedDriver.driverOrdinal
-      ? personalBest.bestLapTime : null;
-  }, [session, selectedDriver, personalBest]);
+  const allTimeCategoryTrackPB = answeredByDetail
+    ? (history?.ready === false ? null : playerBest?.bestLapTime ?? null)
+    : personalBestAnswer.data?.ready ? personalBestAnswer.data.bestLapTime : null;
 
   const isCurrentSessionAllTimePB =
     selectedDriver?.bestLapTime !== null &&

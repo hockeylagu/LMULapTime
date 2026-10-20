@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { TrackDetail } from '../../../src/components/track-detail/TrackDetail.js';
 import { SessionDataContext } from '../../../src/api/sessionDataContext.js';
+import { requestUrl } from '../../fixtures/requestUrl.js';
 
 describe('TrackDetail component', () => {
   const mockTrackDataWithMultipleClasses = {
@@ -141,7 +142,7 @@ describe('TrackDetail component', () => {
 
   beforeEach(() => {
     global.fetch = vi.fn().mockImplementation((input: RequestInfo | URL) => {
-      const url = String(input);
+      const url = requestUrl(input);
       if (url.includes('/tracks/')) {
         return Promise.resolve({
           ok: true,

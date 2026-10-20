@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Search } from 'lucide-react';
-import { apiErrorMessage, isAbortError } from '../../../api/apiClient.js';
+import { apiErrorMessage } from '../../../api/apiClient.js';
+import { useRequest } from '../../../api/useRequest.js';
 import { buildTelemetryComparePath } from '../../../utils/telemetryCompareLink.js';
 import { DebriefCornerRow } from '../../session-detail/debrief/DebriefCornerRow.js';
 import type { LapDebrief } from './loadLapDebrief.js';
@@ -26,32 +27,18 @@ export interface LapDebriefPanelProps {
 export const LapDebriefPanel: React.FC<LapDebriefPanelProps> = ({ pairKey, againstLabel, load, autoStart = false }) => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [state, setState] = useState<PanelState>({ kind: 'idle' });
-  const controllerRef = useRef<AbortController | null>(null);
-  const loadRef = useRef(load);
-  useEffect(() => {
-    loadRef.current = load;
-  });
-
-  const build = useCallback(() => {
-    controllerRef.current?.abort();
-    const controller = new AbortController();
-    controllerRef.current = controller;
-    setState({ kind: 'loading' });
-    loadRef.current(controller.signal)
-      .then((debrief) => setState({ kind: 'ready', debrief }))
-      .catch((err) => {
-        if (isAbortError(err)) return;
-        setState({ kind: 'error', message: apiErrorMessage(err, 'The debrief could not be built.') });
-      });
-  }, []);
-
-  // Another pair of laps: the debrief shown belongs to the previous one.
-  useEffect(() => {
-    if (autoStart) build();
-    else setState({ kind: 'idle' });
-    return () => controllerRef.current?.abort();
-  }, [pairKey, autoStart, build]);
+  // The pair asked for: shown at once with autoStart, otherwise on the click. Another pair starts over.
+  const [askedPair, setAskedPair] = useState<string | null>(null);
+  const asked = autoStart || askedPair === pairKey;
+  const debriefAnswer = useRequest(asked ? { pairKey } : null, (_pair, signal) => load(signal));
+  const state: PanelState = !asked ? { kind: 'idle' }
+    : debriefAnswer.loading ? { kind: 'loading' }
+    : debriefAnswer.error ? { kind: 'error', message: apiErrorMessage(debriefAnswer.error, 'The debrief could not be built.') }
+    : debriefAnswer.data ? { kind: 'ready', debrief: debriefAnswer.data } : { kind: 'idle' };
+  const build = () => {
+    if (asked) debriefAnswer.reload();
+    else setAskedPair(pairKey);
+  };
 
   if (state.kind === 'idle' || state.kind === 'loading') {
     return (
@@ -86,7 +73,7 @@ export const LapDebriefPanel: React.FC<LapDebriefPanelProps> = ({ pairKey, again
               corner={corner}
               hasTechnique={false}
               toLink={(cornerNumber) => buildTelemetryComparePath(searchParams, debrief.yours, debrief.theirs, cornerNumber)}
-              onOpen={(cornerNumber) => navigate(buildTelemetryComparePath(searchParams, debrief.yours, debrief.theirs, cornerNumber))}
+              onOpen={(cornerNumber) => void navigate(buildTelemetryComparePath(searchParams, debrief.yours, debrief.theirs, cornerNumber))}
             />
           ))}
         </ol>

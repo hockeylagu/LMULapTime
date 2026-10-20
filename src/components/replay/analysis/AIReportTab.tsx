@@ -46,6 +46,14 @@ function describeAiFailure(cause: unknown): { code: AiErrorCode; detail: string 
   return { code, detail: requestId ? `${detail || 'Request failed.'} (Request ID: ${requestId})` : detail };
 }
 
+interface ReportOutcome {
+  context: string;
+  loading: boolean;
+  report: AiAnalyzeResponse | null;
+  errorCode: AiErrorCode | null;
+  errorMessage: string | null;
+}
+
 export const AIReportTab: React.FC<AIReportTabProps> = ({
   trajectory,
   baselineTrajectory,
@@ -57,12 +65,15 @@ export const AIReportTab: React.FC<AIReportTabProps> = ({
   cornerStats,
 }) => {
   const [configured, setConfigured] = useState<boolean | null>(null);
-  const [report, setReport] = useState<AiAnalyzeResponse | null>(null);
-  const [errorCode, setErrorCode] = useState<AiErrorCode | null>(null);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const requestAbortRef = useRef<AbortController | null>(null);
   const contextKey = `${trajectory?.sessionId ?? ''}|${trajectory?.driverOrdinal ?? ''}|${trajectory?.lapOrdinal ?? ''}|${baselineTrajectory?.sessionId ?? ''}|${baselineTrajectory?.driverOrdinal ?? ''}|${baselineTrajectory?.lapOrdinal ?? baselineLapNumber ?? ''}`;
+  // The report, its failure and its progress belong to the lap pair they were asked for: another pair shows none of them.
+  const [outcome, setOutcome] = useState<ReportOutcome | null>(null);
+  const shown = outcome?.context === contextKey ? outcome : null;
+  const report = shown?.report ?? null;
+  const errorCode = shown?.errorCode ?? null;
+  const errorMessage = shown?.errorMessage ?? null;
+  const isLoading = shown?.loading ?? false;
 
   const evidence = useMemo(() => {
     if (!trajectory) return null;
@@ -89,9 +100,6 @@ export const AIReportTab: React.FC<AIReportTabProps> = ({
 
   useEffect(() => {
     let cancelled = false;
-    setReport(null);
-    setErrorCode(null);
-    setErrorMessage(null);
     void fetchJson<{ configured?: boolean }>('/api/ai/settings')
       .then(data => { if (!cancelled) setConfigured(Boolean(data.configured)); })
       .catch(() => { if (!cancelled) setConfigured(false); });
@@ -106,18 +114,18 @@ export const AIReportTab: React.FC<AIReportTabProps> = ({
     requestAbortRef.current?.abort();
     const controller = new AbortController();
     requestAbortRef.current = controller;
-    setIsLoading(true);
-    setErrorCode(null);
-    setErrorMessage(null);
+    const context = contextKey;
+    // The report shown stays while it is generated again.
+    setOutcome({ context, loading: true, report, errorCode: null, errorMessage: null });
+    const settle = (next: Partial<ReportOutcome>) =>
+      setOutcome(previous => previous?.context === context ? { ...previous, ...next, loading: false } : previous);
     try {
-      setReport(await postJson<AiAnalyzeResponse>('/api/ai/analyze-lap', { forceRegenerate, evidence }, { signal: controller.signal }));
+      const generated = await postJson<AiAnalyzeResponse>('/api/ai/analyze-lap', { forceRegenerate, evidence }, { signal: controller.signal });
+      settle({ report: generated });
     } catch (cause) {
       if (isAbortError(cause)) return;
       const failure = describeAiFailure(cause);
-      setErrorCode(failure.code);
-      setErrorMessage(failure.detail);
-    } finally {
-      if (!controller.signal.aborted) setIsLoading(false);
+      settle({ errorCode: failure.code, errorMessage: failure.detail });
     }
   };
 

@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { SessionDetail } from '../../../src/components/session-detail/SessionDetail.js';
 import { DriverData } from '../../../shared/types/index.js';
 import { mockDetailedSession } from './mockSessionDetail.js';
+import { requestUrl } from '../../fixtures/requestUrl.js';
 
 function responseFor(url: string, fallback: unknown): Response {
   const body = url.includes('/personal-best/') ? { ready: true, bestLapTime: null } : fallback;
@@ -11,7 +12,7 @@ function responseFor(url: string, fallback: unknown): Response {
 
 describe('SessionDetail component - standings, laps & navigation', () => {
   beforeEach(() => {
-    global.fetch = vi.fn((input: RequestInfo | URL) => Promise.resolve(responseFor(String(input), mockDetailedSession)));
+    global.fetch = vi.fn((input: RequestInfo | URL) => Promise.resolve(responseFor(requestUrl(input), mockDetailedSession)));
   });
 
   it('renders race standings, position deltas, and multi-driver classification for race sessions', async () => {
@@ -75,7 +76,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
       ],
     };
 
-    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+    (global.fetch as unknown as Mock<(url: string) => Promise<unknown>>).mockImplementation((url: string) => {
       if (url === '/api/session/sess123') {
         return Promise.resolve({
           ok: true,
@@ -269,7 +270,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
       ],
     };
 
-    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+    (global.fetch as unknown as Mock<(url: string) => Promise<unknown>>).mockImplementation((url: string) => {
       if (url === '/api/session/test-session-1') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(multiClassSession) });
       }
@@ -324,7 +325,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
       ],
     };
 
-    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+    (global.fetch as unknown as Mock<(url: string) => Promise<unknown>>).mockImplementation((url: string) => {
       if (url === '/api/session/test-session-1') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(practiceSession) });
       }
@@ -365,7 +366,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
       ],
     };
 
-    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+    (global.fetch as unknown as Mock<(url: string) => Promise<unknown>>).mockImplementation((url: string) => {
       if (url === '/api/session/test-session-1') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(sessionWithInvalidLap) });
       }
@@ -421,7 +422,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
       ],
     };
 
-    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+    (global.fetch as unknown as Mock<(url: string) => Promise<unknown>>).mockImplementation((url: string) => {
       if (url === '/api/session/test-session-1') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(qualiSession) });
       }
@@ -529,7 +530,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
 
     incidentSession.drivers = [incidentSession.playerDriver as unknown as DriverData];
 
-    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+    (global.fetch as unknown as Mock<(url: string) => Promise<unknown>>).mockImplementation((url: string) => {
       if (url === '/api/session/test-session-incidents') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(incidentSession) });
       }
@@ -626,7 +627,7 @@ describe('SessionDetail component - standings, laps & navigation', () => {
 
     sessionWithVariedLimits.drivers = [sessionWithVariedLimits.playerDriver as unknown as DriverData];
 
-    (global.fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+    (global.fetch as unknown as Mock<(url: string) => Promise<unknown>>).mockImplementation((url: string) => {
       if (url === '/api/session/test-session-tl-colors') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(sessionWithVariedLimits) });
       }

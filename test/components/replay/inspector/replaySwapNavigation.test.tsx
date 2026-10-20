@@ -5,6 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { useReplayInspectorData } from '../../../../src/components/replay/inspector/useReplayInspectorData.js';
 import { updateSearchParams } from '../../../../src/utils/urlParams.js';
 import type { ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
+import { requestUrl } from '../../../fixtures/requestUrl.js';
 
 function useRoutedInspector() {
   const [params, setParams] = useSearchParams();
@@ -30,7 +31,7 @@ it.each([false, true])('swaps exact session and lap locators through route updat
   const primarySession = 'session-primary';
   const baselineSession = sameSession ? primarySession : 'session-baseline';
   vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
-    const url = new URL(String(input), 'http://localhost');
+    const url = new URL(requestUrl(input), 'http://localhost');
     if (url.pathname.includes('/compare/laps')) return Response.json({ laps: [] });
     const sessionId = decodeURIComponent(url.pathname.split('/')[3]);
     if (url.pathname.endsWith('/metadata')) {

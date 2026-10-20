@@ -112,6 +112,29 @@ describe('ReplayInspectorModal - Comparison & Source Modes', () => {
     });
   });
 
+  it('reports a comparison lap without samples and loads it again on Retry', async () => {
+    let baselineRequests = 0;
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/metadata')) return Promise.resolve({ ok: true, json: () => Promise.resolve(mockMeta) });
+      if (url.includes('/telemetry?')) {
+        const isBaseline = url.includes('lapOrdinal=2');
+        if (isBaseline) baselineRequests++;
+        const points = isBaseline && baselineRequests === 1 ? [] : mockTraj.points;
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ ...mockTraj, points, currentLap: isBaseline ? 3 : 1 }) });
+      }
+      return Promise.reject(new Error('Unknown URL'));
+    });
+
+    render(<ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" initialCompareMode={true} initialBaselineLapOrdinal={2} />);
+
+    const retry = await screen.findByRole('button', { name: 'Retry comparison lap' });
+    expect(screen.getByTitle(/Comparison lap has no telemetry samples/)).toBeInTheDocument();
+    fireEvent.click(retry);
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Retry comparison lap' })).not.toBeInTheDocument());
+    expect(screen.getByTitle('Click to change the comparison lap')).toBeInTheDocument();
+    expect(baselineRequests).toBe(2);
+  });
+
   it('displays distinct baseline replay laps instead of current session laps when another replay is selected', async () => {
     const otherMeta = {
       ...mockMeta,

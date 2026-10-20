@@ -4,6 +4,7 @@ import { MemoryRouter, useLocation } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useReplayInspectorData } from '../../../../src/components/replay/inspector/useReplayInspectorData.js';
 import type { ComparableLap, ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
+import { requestUrl } from '../../../fixtures/requestUrl.js';
 
 const metadata: ReplayMetadata = {
   filename: 'Inspector_Test_P1.Vcr', filePath: '/tmp/Inspector_Test_P1.Vcr', fileSizeBytes: 1,
@@ -58,7 +59,7 @@ describe('useReplayInspectorData session locators', () => {
       })),
     };
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
-      const url = String(input);
+      const url = requestUrl(input);
       if (url.endsWith('/telemetry/metadata')) return response(metadata);
       if (url.includes('/compare/laps')) return response({ laps: [] });
       return response(url.includes('source=vcr') || url.includes('pointSpacingM=4') ? sparse : dense);
@@ -89,7 +90,7 @@ describe('useReplayInspectorData session locators', () => {
   it('remaps the latest scrub position if it moves while a new source loads', async () => {
     let completeSource: ((value: Response) => void) | undefined;
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
-      const url = String(input);
+      const url = requestUrl(input);
       if (url.endsWith('/telemetry/metadata')) return response(metadata);
       if (url.includes('/compare/laps')) return response({ laps: [] });
       if (url.includes('source=vcr')) return new Promise<Response>(resolve => { completeSource = resolve; });
@@ -113,7 +114,7 @@ describe('useReplayInspectorData session locators', () => {
       driverOrdinal: 0, lapOrdinal: 0, driverName: 'Player Driver', lapNumber: 2, lapTime: 100,
       isValid: true, isPitStop: false, isOutLap: false } as ComparableLap;
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
-      const url = String(input);
+      const url = requestUrl(input);
       if (url.endsWith('/telemetry/metadata')) return response(metadata);
       if (url.includes('/compare/laps')) {
         const params = new URL(url, 'http://localhost').searchParams;
@@ -140,7 +141,7 @@ describe('useReplayInspectorData session locators', () => {
   it('sends the picker order and filters to the server, returns to page 1 when they change and keeps the scope car types', async () => {
     const urls: URLSearchParams[] = [];
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
-      const url = String(input);
+      const url = requestUrl(input);
       if (url.endsWith('/telemetry/metadata')) return response({ ...metadata, weatherCondition: 'Wet' });
       if (url.includes('/compare/laps')) {
         urls.push(new URL(url, 'http://localhost').searchParams);
@@ -181,7 +182,7 @@ describe('useReplayInspectorData session locators', () => {
   it('loads metadata and telemetry by session ID and keeps driver/lap ordinals in the request', async () => {
     const urls: string[] = [];
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
-      const url = String(input);
+      const url = requestUrl(input);
       urls.push(url);
       if (url.endsWith('/telemetry/metadata')) return response(metadata);
       if (url.includes('/compare/laps')) return response({ laps: [] });
@@ -203,7 +204,7 @@ describe('useReplayInspectorData session locators', () => {
   it('changes the selected driver using its session ordinal and updates route locators', async () => {
     const urls: string[] = [];
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
-      const url = String(input);
+      const url = requestUrl(input);
       urls.push(url);
       if (url.endsWith('/telemetry/metadata')) return response(metadata);
       if (url.includes('/compare/laps')) return response({ laps: [] });
@@ -230,7 +231,7 @@ describe('useReplayInspectorData session locators', () => {
       isValid: true, isPitStop: false, matchingReplayFile: 'Baseline_Q1.Vcr',
     };
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
-      const url = String(input);
+      const url = requestUrl(input);
       if (url.endsWith('/telemetry/metadata')) return response(metadata);
       if (url.includes('/compare/laps')) return response({ laps: [candidate] });
       if (url.startsWith('/api/session/session-2/telemetry/metadata')) return response(metadata);

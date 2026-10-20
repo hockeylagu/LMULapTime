@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 import { updateSearchParams } from '../../utils/urlParams.js';
 import { ReferenceLaptimeEntry, PaceCategory, DetailedSession, ComparableLap } from '../../../shared/types/index.js';
@@ -8,6 +8,7 @@ import {
 } from '../../../shared/domain/paceCategory.js';
 import { createTheoreticalBestLap } from '../../../shared/domain/lapComparison.js';
 import { apiErrorMessage, fetchJson, isAbortError } from '../../api/apiClient.js';
+import { useRequest } from '../../api/useRequest.js';
 import { loadLeaderboardLayouts } from '../../api/leaderboardApi.js';
 import type { LeaderboardLayout } from '../../../shared/types/leaderboard.js';
 import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
@@ -30,7 +31,7 @@ interface CompareLapsApiData {
 
 export interface UseCompareLapsParams {
   availableTracks?: string[];
-  sessions?: (SessionCard | DetailedSession)[];
+  sessions?: readonly (SessionCard | DetailedSession)[];
   initialTrack?: string;
   initialCarClass?: string;
   initialSessionId?: string;
@@ -122,7 +123,6 @@ export function useCompareLapsData({
 }: UseCompareLapsParams) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [layoutTracks, setLayoutTracks] = useState<string[]>([]);
-  const [locatorLaps, setLocatorLaps] = useState<ComparableLap[]>([]);
   const page = Math.max(1, Number.parseInt(searchParams.get('page') || '1', 10) || 1);
 
   const availableTracks = useMemo(() => {
@@ -146,19 +146,11 @@ export function useCompareLapsData({
   const selectedTrack = searchParams.get('track') || initialTrack || (availableTracks.length > 0 ? availableTracks[0] : layoutTracks[0] || 'Bahrain');
   const rawCarClass = searchParams.get('carClass') || initialCarClass || 'GT3';
   const selectedCarClass = rawCarClass;
-  const [loading, setLoading] = useState<boolean>(false);
-
-  const [apiData, setApiData] = useState<CompareLapsApiData>(NO_COMPARE_LAPS);
-  // Why the laps for the selected track could not be loaded; null otherwise.
-  const [loadError, setLoadError] = useState<string | null>(null);
 
   const [selectedLaps, setSelectedLaps] = useState<ComparableLap[]>([]);
   const [baselineLapId, setBaselineLapId] = useState<string>('');
   const [pickerTarget, setPickerTarget] = useState<LapPickerTarget | null>(null);
 
-  const initializedScopeRef = useRef<string>('');
-  // The track and class the laps in apiData were loaded for: laps are only picked from data of the current selection.
-  const [loadedScope, setLoadedScope] = useState<string>('');
   const lapScope = `${selectedTrack}__${selectedCarClass}`;
 
   // The page picks the track and class (the ribbon): laps of the previous pick are never kept.
@@ -170,43 +162,33 @@ export function useCompareLapsData({
     setPickerTarget(null);
   }
 
-  useEffect(() => {
-    if (!selectedTrack) return;
-    const controller = new AbortController();
-    setLoading(true);
-    setLoadError(null);
-    // The player's own laps and bests; the other drivers' laps come from the leaderboard.
+  // The player's own laps and bests; the other drivers' laps come from the leaderboard. The previous
+  // page stays shown while the next one loads; a failed load never leaves another selection's laps.
+  const lapsRequest = selectedTrack ? { track: selectedTrack, carClass: selectedCarClass, page } : null;
+  const lapsAnswer = useRequest(lapsRequest, (request, signal) => {
     const query = new URLSearchParams({
-      track: selectedTrack,
-      carClass: selectedCarClass,
+      track: request.track,
+      carClass: request.carClass,
       playerOnly: 'true',
       // The compare page only ever shows real people: offline sessions' other drivers are AI.
       humansOnly: 'true',
-      page: String(page),
+      page: String(request.page),
       pageSize: '50',
     });
-    fetchJson<CompareLapsApiData>(`/api/compare/laps?${query.toString()}`, { signal: controller.signal })
-      .then((data) => {
-        setApiData(data);
-        setLoadedScope(lapScope);
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (isAbortError(err)) return;
-        console.error('Failed to fetch compare laps:', err);
-        // Never leave the previous track's or layout's laps under the new selection.
-        setApiData(NO_COMPARE_LAPS);
-        setLoadedScope(lapScope);
-        setLoadError(apiErrorMessage(err, 'The laps for this track could not be loaded.'));
-        setLoading(false);
-      });
+    return fetchJson<CompareLapsApiData>(`/api/compare/laps?${query.toString()}`, { signal }).catch((err: unknown) => {
+      if (!isAbortError(err)) console.error('Failed to fetch compare laps:', err);
+      throw err;
+    });
+  }, { keepPrevious: true });
+  const loading = lapsAnswer.loading;
+  // Why the laps for the selected track could not be loaded; null otherwise.
+  const loadError = lapsAnswer.error ? apiErrorMessage(lapsAnswer.error, 'The laps for this track could not be loaded.') : null;
+  const apiData = (!lapsAnswer.error && lapsAnswer.data) || NO_COMPARE_LAPS;
+  // Laps are only picked once the current selection has answered, never from the previous one's data.
+  const lapsAnswered = lapsRequest !== null && !lapsAnswer.loading;
 
-    return () => {
-      controller.abort();
-    };
-  }, [selectedTrack, selectedCarClass, lapScope, page]);
-
-  useEffect(() => {
+  // The laps the URL points at, found wherever they are in the history.
+  const locatorTargets = useMemo(() => {
     const sessionId = searchParams.get('sessionId') || initialSessionId;
     const lapNumberRaw = searchParams.get('lapNumber');
     const lapNumber = lapNumberRaw ? Number.parseInt(lapNumberRaw, 10) : initialLapNumber;
@@ -225,20 +207,20 @@ export function useCompareLapsData({
       { id: sessionId, lapNumber, driverOrdinal, lapOrdinal },
       { id: compareSessionId, lapNumber: compareLapNumber, driverOrdinal: compareDriverOrdinal, lapOrdinal: compareLapOrdinal },
     ].filter((target, index) => target.id && (Number.isInteger(target.driverOrdinal) && Number.isInteger(target.lapOrdinal) || Number.isInteger(target.lapNumber)) && (index === 0 || target.id !== sessionId || target.driverOrdinal !== driverOrdinal || target.lapOrdinal !== lapOrdinal));
-    if (targets.length === 0) { setLocatorLaps([]); return; }
-    const controller = new AbortController();
-    const requests = targets.map(target => {
-      const query = new URLSearchParams({ track: selectedTrack, carClass: selectedCarClass, playerOnly: 'false', humansOnly: 'true', sessionId: target.id!, page: '1', pageSize: '1' });
+    return targets;
+  }, [searchParams, initialSessionId, initialLapNumber, initialCompareSessionId, initialCompareLapNumber, initialCompareDriverOrdinal, initialCompareLapOrdinal]);
+  const locatorRequest = locatorTargets.length > 0 ? { targets: locatorTargets, track: selectedTrack, carClass: selectedCarClass } : null;
+  const locatorAnswer = useRequest(locatorRequest, async (request, signal) => {
+    const results = await Promise.all(request.targets.map(target => {
+      const query = new URLSearchParams({ track: request.track, carClass: request.carClass, playerOnly: 'false', humansOnly: 'true', sessionId: target.id!, page: '1', pageSize: '1' });
       if (Number.isInteger(target.driverOrdinal)) query.set('driverOrdinal', String(target.driverOrdinal));
       if (Number.isInteger(target.lapOrdinal)) query.set('lapOrdinal', String(target.lapOrdinal));
       if (Number.isInteger(target.lapNumber)) query.set('lapNumber', String(target.lapNumber));
-      return fetchJson<CompareLapsApiData>(`/api/compare/laps?${query.toString()}`, { signal: controller.signal });
-    });
-    Promise.all(requests)
-      .then((results) => setLocatorLaps(results.flatMap(result => result.laps)))
-      .catch((error: unknown) => { if (!isAbortError(error)) setLocatorLaps([]); });
-    return () => controller.abort();
-  }, [searchParams, initialSessionId, initialLapNumber, initialCompareSessionId, initialCompareLapNumber, initialCompareDriverOrdinal, initialCompareLapOrdinal, selectedTrack, selectedCarClass]);
+      return fetchJson<CompareLapsApiData>(`/api/compare/laps?${query.toString()}`, { signal });
+    }));
+    return results.flatMap(result => result.laps);
+  });
+  const locatorLaps = useMemo(() => locatorAnswer.data ?? [], [locatorAnswer.data]);
 
   const targetSessionId = searchParams.get('sessionId') || initialSessionId || undefined;
   const targetLapNumber =
@@ -259,48 +241,48 @@ export function useCompareLapsData({
     ? { ...apiData.playerBestLap, isAllTimePB: true, tag: apiData.playerBestLap.tag || 'Personal best' }
     : null, [apiData.playerBestLap]);
 
-  useEffect(() => {
-    // Until the laps of a newly selected track or class arrive (the URL can change it, not only the
-    // ribbon), apiData still holds the previous selection's laps: never pick from those.
-    if (loadedScope !== lapScope) return;
+  // The default selection is made once per scope, when its laps arrive.
+  const [initializedScope, setInitializedScope] = useState('');
+  const currentScope = `${selectedTrack}__${selectedCarClass}__${targetSessionId || ''}__${targetLapNumber ?? ''}__${searchParams.get('driverOrdinal') ?? ''}__${searchParams.get('lapOrdinal') ?? ''}__${targetCompareSessionId || ''}__${targetCompareDriverOrdinal ?? targetCompareDriver ?? ''}__${targetCompareLapOrdinal ?? targetCompareLapNumber ?? ''}`;
+  if (lapsAnswered && initializedScope !== currentScope) {
+      // Until the laps of a newly selected track or class arrive (the URL can change it, not only the
+      // ribbon), apiData still holds the previous selection's laps: never pick from those.
 
-    const currentScope = `${selectedTrack}__${selectedCarClass}__${targetSessionId || ''}__${targetLapNumber ?? ''}__${searchParams.get('driverOrdinal') ?? ''}__${searchParams.get('lapOrdinal') ?? ''}__${targetCompareSessionId || ''}__${targetCompareDriverOrdinal ?? targetCompareDriver ?? ''}__${targetCompareLapOrdinal ?? targetCompareLapNumber ?? ''}`;
-    if (initializedScopeRef.current === currentScope) return;
+    setInitializedScope(currentScope);
 
-    const candidates: ComparableLap[] = [];
-    const targetDriverOrdinal = searchParams.get('driverOrdinal') === null ? undefined : Number.parseInt(searchParams.get('driverOrdinal') || '', 10);
-    const targetLapOrdinal = searchParams.get('lapOrdinal') === null ? undefined : Number.parseInt(searchParams.get('lapOrdinal') || '', 10);
-    const findSessionLap = (sessionId?: string, driverName?: string, lapNumber?: number) => [...locatorLaps, ...apiData.laps].find(
-      lap => lap.sessionId === sessionId &&
-        (driverName === undefined || lap.driverName === driverName) &&
-        (sessionId !== targetSessionId || targetDriverOrdinal === undefined || lap.driverOrdinal === targetDriverOrdinal) &&
-        (sessionId !== targetSessionId || targetLapOrdinal === undefined || lap.lapOrdinal === targetLapOrdinal) &&
-        (lapNumber === undefined || lap.lapNumber === lapNumber)
-    );
+      const candidates: ComparableLap[] = [];
+      const targetDriverOrdinal = searchParams.get('driverOrdinal') === null ? undefined : Number.parseInt(searchParams.get('driverOrdinal') || '', 10);
+      const targetLapOrdinal = searchParams.get('lapOrdinal') === null ? undefined : Number.parseInt(searchParams.get('lapOrdinal') || '', 10);
+      const findSessionLap = (sessionId?: string, driverName?: string, lapNumber?: number) => [...locatorLaps, ...apiData.laps].find(
+        lap => lap.sessionId === sessionId &&
+          (driverName === undefined || lap.driverName === driverName) &&
+          (sessionId !== targetSessionId || targetDriverOrdinal === undefined || lap.driverOrdinal === targetDriverOrdinal) &&
+          (sessionId !== targetSessionId || targetLapOrdinal === undefined || lap.lapOrdinal === targetLapOrdinal) &&
+          (lapNumber === undefined || lap.lapNumber === lapNumber)
+      );
 
-    const compareLap = [...locatorLaps, ...apiData.laps].find(lap => lap.sessionId === targetCompareSessionId &&
-      (targetCompareDriverOrdinal === undefined || lap.driverOrdinal === targetCompareDriverOrdinal) &&
-      (targetCompareLapOrdinal === undefined || lap.lapOrdinal === targetCompareLapOrdinal) &&
-      (targetCompareDriverOrdinal !== undefined || targetCompareDriver === undefined || lap.driverName === targetCompareDriver) &&
-      (targetCompareLapNumber === undefined || lap.lapNumber === targetCompareLapNumber));
-    if (compareLap) candidates.push({ ...compareLap, tag: compareLap.tag || `Lap ${compareLap.lapNumber}` });
+      const compareLap = [...locatorLaps, ...apiData.laps].find(lap => lap.sessionId === targetCompareSessionId &&
+        (targetCompareDriverOrdinal === undefined || lap.driverOrdinal === targetCompareDriverOrdinal) &&
+        (targetCompareLapOrdinal === undefined || lap.lapOrdinal === targetCompareLapOrdinal) &&
+        (targetCompareDriverOrdinal !== undefined || targetCompareDriver === undefined || lap.driverName === targetCompareDriver) &&
+        (targetCompareLapNumber === undefined || lap.lapNumber === targetCompareLapNumber));
+      if (compareLap) candidates.push({ ...compareLap, tag: compareLap.tag || `Lap ${compareLap.lapNumber}` });
 
-    const targetLap = findSessionLap(targetSessionId, undefined, targetLapNumber);
-    if (targetLap && !candidates.some(candidate => candidate.id === targetLap.id)) {
-      candidates.push({ ...targetLap, tag: targetLap.tag || `Lap ${targetLap.lapNumber}` });
-    }
+      const targetLap = findSessionLap(targetSessionId, undefined, targetLapNumber);
+      if (targetLap && !candidates.some(candidate => candidate.id === targetLap.id)) {
+        candidates.push({ ...targetLap, tag: targetLap.tag || `Lap ${targetLap.lapNumber}` });
+      }
 
-    if (allTimePBObject && !candidates.some((c) => c.id === allTimePBObject.id)) candidates.push(allTimePBObject);
+      if (allTimePBObject && !candidates.some((c) => c.id === allTimePBObject.id)) candidates.push(allTimePBObject);
 
-    const initialSlice = candidates.slice(0, MAX_COMPARED_LAPS);
-    setSelectedLaps(initialSlice);
-    setBaselineLapId(initialSlice.length > 0 ? initialSlice[0].id : '');
-    // A lap opened from its session (no pair asked for): offer what to set against it right away.
-    if (targetLap && !compareLap) {
-      setPickerTarget({ replaceId: initialSlice.find((l) => l.id !== targetLap.id)?.id ?? null });
-    }
-    initializedScopeRef.current = currentScope;
-  }, [apiData, allTimePBObject, locatorLaps, loadedScope, lapScope, selectedTrack, selectedCarClass, targetSessionId, targetLapNumber, targetCompareSessionId, targetCompareDriver, targetCompareLapNumber, targetCompareDriverOrdinal, targetCompareLapOrdinal, searchParams]);
+      const initialSlice = candidates.slice(0, MAX_COMPARED_LAPS);
+      setSelectedLaps(initialSlice);
+      setBaselineLapId(initialSlice.length > 0 ? initialSlice[0].id : '');
+      // A lap opened from its session (no pair asked for): offer what to set against it right away.
+      if (targetLap && !compareLap) {
+        setPickerTarget({ replaceId: initialSlice.find((l) => l.id !== targetLap.id)?.id ?? null });
+      }
+  }
 
   const handleToggleLap = (lap: ComparableLap) => {
     const next = toggleComparedLap(selectedLaps, lap);
@@ -313,19 +295,18 @@ export function useCompareLapsData({
 
   // What the page asked for (the leaderboard). Declared after the default selection above so that,
   // when the laps of the pick arrive in the same render, the request is what stays selected.
-  const appliedRequestKeyRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (!compareRequest || appliedRequestKeyRef.current === compareRequest.key || loadedScope !== lapScope) return;
-    appliedRequestKeyRef.current = compareRequest.key;
+  const [appliedRequestKey, setAppliedRequestKey] = useState<number | null>(null);
+  if (compareRequest && appliedRequestKey !== compareRequest.key && lapsAnswered) {
+    setAppliedRequestKey(compareRequest.key);
     if (compareRequest.reference) {
       setSelectedLaps([compareRequest.reference, compareRequest.lap]);
       setBaselineLapId(compareRequest.reference.id);
-      return;
+    } else {
+      const next = toggleComparedLap(selectedLaps, compareRequest.lap);
+      setSelectedLaps(next);
+      setBaselineLapId(defaultBaselineId(next));
     }
-    const next = toggleComparedLap(selectedLaps, compareRequest.lap);
-    setSelectedLaps(next);
-    setBaselineLapId(defaultBaselineId(next));
-  }, [compareRequest, loadedScope, lapScope, selectedLaps]);
+  }
 
   const baselineLap = useMemo(() => {
     if (selectedLaps.length === 0) return null;
