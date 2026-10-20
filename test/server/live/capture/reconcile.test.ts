@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { SessionDatabase } from '../../../../server/core/db.js';
-import { getSessionLiveCaptures, indexLiveCaptureCatalog, listLiveCaptureManifests, setLiveCaptureAvailability, upsertLiveCapture } from '../../../../server/core/live/dbLiveCaptureStore.js';
+import { getSessionLiveCaptures, indexLiveCaptureCatalog, listLiveCaptureManifests, setLiveCaptureAvailability, setLiveCaptureMatch, upsertLiveCapture } from '../../../../server/core/live/dbLiveCaptureStore.js';
 import { reconcileLiveCaptures } from '../../../../server/live/capture/reconcile.js';
 import type { LiveCaptureManifest } from '../../../../shared/types/liveCapture.js';
 
@@ -63,6 +63,20 @@ function manifest(overrides: Partial<LiveCaptureManifest> = {}): LiveCaptureMani
 }
 
 describe('live capture XML reconciliation', () => {
+  it('updates renamed filenames in the index while preserving verified XML ownership', () => {
+    const db = database();
+    const raw = db.getDb();
+    addSession(db, { id: 'official', timestamp: 0, mtime: 3600_000 });
+    const capture = manifest({ filename: 'unresolved_recording-a.live.duckdb' });
+    upsertLiveCapture(raw, capture, 4096);
+    setLiveCaptureMatch(raw, capture.recordingId, 'official', 'Build-42', 'verified');
+    const renamed = { ...capture, filename: 'monza_gp_recording-a.live.duckdb' };
+    expect(indexLiveCaptureCatalog(raw, [{ manifest: renamed, bytes: 4096 }])).toEqual({ total: 1, added: 0, updated: 1 });
+    expect(listLiveCaptureManifests(raw)).toEqual([{ ...renamed, sessionId: 'official', gameVersion: 'Build-42' }]);
+    expect(getSessionLiveCaptures(raw, 'official')).toEqual([expect.objectContaining({ filename: renamed.filename, available: true })]);
+    expect(db.getCacheStats().liveTelemetryFilesCount).toBe(1);
+  });
+
   it('summarizes startup discovery, unchanged scans, updates and restored files', () => {
     const db = database();
     const raw = db.getDb();

@@ -312,6 +312,10 @@ export class LiveCaptureController {
         this.pumpLinks();
         this.closeIfIdle(worker);
       } else if (message.type === 'catalogued') {
+        for (const { manifest } of message.recordings) {
+          const link = this.links.get(manifest.recordingId);
+          if (link) link.filename = manifest.filename;
+        }
         try { this.options.onCatalog?.(message.recordings, message.errors); }
         catch (error) { this.error = `Recording catalog: ${error instanceof Error ? error.message : String(error)}`; }
         this.catalogResolve?.();
@@ -402,10 +406,12 @@ export class LiveCaptureController {
 
   private pumpLinks(): void {
     if (this.manifest || this.stopped || this.closingWorker || this.pending.size || this.error) return;
-    if (this.catalogPromise && !this.catalogSent) {
-      this.ensureWorker();
-      this.catalogSent = true;
-      this.worker?.postMessage({ type: 'catalog' });
+    if (this.catalogPromise) {
+      if (!this.catalogSent) {
+        this.ensureWorker();
+        this.catalogSent = true;
+        this.worker?.postMessage({ type: 'catalog' });
+      }
       return;
     }
     if (!this.links.size) return;

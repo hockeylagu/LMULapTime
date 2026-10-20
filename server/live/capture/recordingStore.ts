@@ -13,6 +13,7 @@ import type {
 } from '../../../shared/types/liveCapture.js';
 import { liveCaptureChannels } from './channels.js';
 import { internTerrainObservations, readTerrainDictionary } from './terrain.js';
+import { finalizeCaptureFilename, resolvedCaptureFilename } from './maintenance/filenames.js';
 
 const MAX_ROWS_PER_INSERT = 512;
 const MAX_CATALOG_FILES = 10_000;
@@ -269,9 +270,11 @@ export class LiveCaptureRecordingStore {
         if (path.dirname(target) !== path.resolve(this.directory)) throw new Error('Catalog path escaped its directory');
         const stat = await fs.promises.lstat(target);
         if (stat.isSymbolicLink() || !stat.isFile()) throw new Error('Catalog path is not a regular file');
-        const manifest = await this.readCatalogFile(target, filename);
-        let bytes = stat.size;
-        try { bytes += (await fs.promises.stat(`${target}.wal`)).size; }
+        const stored = await this.readCatalogFile(target, filename);
+        const manifest = await finalizeCaptureFilename(this.directory, stored, filename);
+        const finalTarget = path.resolve(this.directory, manifest.filename);
+        let bytes = (await fs.promises.stat(finalTarget)).size;
+        try { bytes += (await fs.promises.stat(`${finalTarget}.wal`)).size; }
         catch (error: unknown) {
           if (!(error instanceof Error) || !('code' in error) || error.code !== 'ENOENT') throw error;
         }
@@ -334,7 +337,10 @@ export class LiveCaptureRecordingStore {
       const manifest = parsed as LiveCaptureManifest;
       if (manifest.recordingId !== manifestRows[0].recording_id) throw new Error('Live capture manifest recording ID mismatch');
       validateManifest(manifest);
-      if (manifest.filename !== filename) throw new Error('Live capture manifest filename does not match its file');
+      // Recover a process exit between the physical rename and its metadata transaction.
+      if (manifest.filename !== filename && resolvedCaptureFilename(manifest) !== filename) {
+        throw new Error('Live capture manifest filename does not match its file');
+      }
       await this.verifyCatalog(connection, manifest);
       const counts = await all(connection,
         'SELECT count(*) AS sample_count FROM capture_samples');
@@ -452,6 +458,16 @@ export class LiveCaptureRecordingStore {
     this.lastSequence = batch.sequence;
     if (terrain) this.terrain = terrain;
     if (batchLast !== null) this.lastSampleElapsed = batchLast;
+    if (resolvedCaptureFilename(manifest) !== manifest.filename) {
+      await this.closeCurrent();
+      try {
+        const finalized = await finalizeCaptureFilename(this.directory, manifest);
+        return { manifest: finalized, bytes: this.fileBytes(path.resolve(this.directory, finalized.filename)) };
+      } catch (error: unknown) {
+        // The batch is committed: keep the unresolved name and let discovery repair it later.
+        if (!fs.existsSync(target)) throw error;
+      }
+    }
     return { manifest, bytes: this.fileBytes(target) };
   }
 

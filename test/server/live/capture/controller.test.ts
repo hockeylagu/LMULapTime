@@ -93,6 +93,18 @@ describe('LiveCaptureController', () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 
+  it('waits for discovery to repair filenames before sending queued XML links', async () => {
+    const { controller, writer } = makeController();
+    const discovery = controller.discover();
+    const manifest = priorManifest({ status: 'completed', filename: 'unresolved_prior.live.duckdb', sessionId: 'xml-session' });
+    controller.synchronizeLinks([manifest]);
+    expect(writer.posted.map(item => item.message)).toEqual([{ type: 'catalog' }]);
+    writer.emit('message', { type: 'catalogued', recordings: [{ manifest: { ...manifest, filename: 'sarthe_full_prior.live.duckdb' }, bytes: 128 }], errors: [] });
+    await discovery;
+    expect(last(writer.posted)?.message).toEqual({ type: 'link', filename: 'sarthe_full_prior.live.duckdb',
+      recordingId: manifest.recordingId, sessionId: 'xml-session', gameVersion: null });
+  });
+
   it('records initial player configuration, distinct impacts and only changed wheel materials', () => {
     const { controller, writer } = makeController();
     const game = snapshot();
