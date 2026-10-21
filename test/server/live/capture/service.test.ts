@@ -138,12 +138,12 @@ describe('LiveService capture integration', () => {
     reader.emit('message', { type: 'frame', scoring: makeGarageReading(10, 120), capture: null });
     await vi.advanceTimersByTimeAsync(1);
     expect(get).toHaveBeenCalledTimes(1);
-    const firstRecording = capture.status().recordingId;
+    // Garage frames open no recording; the stale answer below must not stop the later on-track one.
+    expect(capture.status().recordingId).toBeNull();
     expect(service.getSnapshot().lifecycle).toBe('garage');
 
     reader.emit('message', { type: 'frame', scoring: makeGarageReading(1, 121), capture: sample(121) });
-    const secondRecording = capture.status().recordingId;
-    expect(secondRecording).not.toBe(firstRecording);
+    expect(capture.status().recordingId).toBeNull();
     expect(service.getSnapshot().lifecycle).toBe('garage');
     expect(firstRequest.release).toBeTypeOf('function');
     firstRequest.release?.({ ok: true, body: { state: { navigationState: 'NAV_EVENT', settingMode: 'SETTING_REPLAY_PLAYBACK' } } });
@@ -153,7 +153,7 @@ describe('LiveService capture integration', () => {
       trackName: 'Circuit de la Sarthe', sessionCode: 1, currentEt: 121.2,
       player: vehicleReading({ id: 4, driverName: 'Driver', vehicleName: 'Ferrari 296 GT3', totalLaps: 7, lapStartEt: 100 }),
     }), capture: sample(121.2) });
-    expect(capture.status()).toMatchObject({ state: 'recording', recordingId: secondRecording, samples: 1 });
+    expect(capture.status()).toMatchObject({ state: 'recording', samples: 1 });
 
     const stopping = service.stop();
     writer.emit('exit', 0);
