@@ -3,13 +3,16 @@ import {
   type EvaluationExample, type EvaluationMetrics,
 } from './evaluate.js';
 
-/** Versioned policy shared by screening and prospective acceptance; screening alone never activates. */
+/**
+ * Versioned policy shared by screening and prospective acceptance; screening alone never activates. Version 2 halved
+ * the lap totals (sessions unchanged): 20 to 60 minute races give about 6 to 20 clean laps each.
+ */
 export const CALIBRATION_POLICY = Object.freeze({
-  version: 1,
+  version: 2,
   minTrainSessions: 3,
-  minTrainExamples: 30,
+  minTrainExamples: 15,
   minTestSessions: 2,
-  minTestExamples: 20,
+  minTestExamples: 10,
   shrinkageSessions: 3,
   maxAdjustmentFraction: 0.1,
   minMaeImprovementFraction: 0.05,

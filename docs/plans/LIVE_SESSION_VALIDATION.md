@@ -240,10 +240,10 @@ validation and withdrawal happen automatically off track. Settings → Learning 
 2. Check resource/cohort isolation: fuel litres and VE percentage points never mix; layout, car,
    driver, XML patch, weather, compound and baseline version/source must match exactly.
 3. Accumulate enough independent sessions **within a compatible cohort**. Screening requires at
-   least three training sessions/30 examples and two chronological held-out sessions/20 examples;
+   least three training sessions/15 examples and two chronological held-out sessions/10 examples;
    the automatic 25% split may require more sessions to satisfy both. A long race cannot replace
    independent sessions. Separate game versus measured estimator cohorts can be sparse.
-4. A passing fixed candidate must remain **validating** until at least two sessions/20 examples
+4. A passing fixed candidate must remain **validating** until at least two sessions/10 examples
    that started after its creation pass the same error gates. Historical/backfilled sessions do not
    count as fresh acceptance. Verify parameters stay fixed during that validation.
 5. Before actual use, check current-run XML patch trust: complete/import a matching recorded session

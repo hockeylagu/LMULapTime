@@ -44,7 +44,7 @@ describe('automatic historical corrections', () => {
     const result = advanceAutomaticLearning([...screened, ...unrelated, ...sameTime], staged, signature, 8);
     expect(result.models.every(model => model.state === 'validating')).toBe(true);
     expect(result.models.find(model => model.cohort === 'exact' && model.resourceKind === 'fuel')?.validationSessions).toBe(0);
-    expect(advanceAutomaticLearning([...screened, ...sessions(9, 2).slice(0, 11)], staged, signature, 8).models[0].state).toBe('validating');
+    expect(advanceAutomaticLearning([...screened, ...sessions(9, 1).slice(0, 4), ...sessions(10, 1).slice(0, 5)], staged, signature, 8).models[0].state).toBe('validating');
   });
 
   it('bounds each correction and requires every compatibility field', () => {

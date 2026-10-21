@@ -230,8 +230,8 @@ The CLI also fits an offline correction candidate using earlier sessions only. F
 and resource, it takes the median of each training session's `actual - predicted` residuals, then
 the median across sessions. Equal session weight prevents one endurance race from dominating.
 The adjustment is shrunk by `trainSessions / (trainSessions + 3)` and capped to ±10% of each forecast.
-Training needs at least three sessions and 30 examples; held-out evaluation needs two later sessions
-and 20 examples. A candidate must improve MAE by at least 5%, with no increase in p95 absolute error,
+Training needs at least three sessions and 15 examples; held-out evaluation needs two later sessions
+and 10 examples (policy version 2; version 1 asked for 30 and 20). A candidate must improve MAE by at least 5%, with no increase in p95 absolute error,
 underprediction count or mean shortfall. Fuel and VE retain their separate units.
 
 Report version 3 includes calibration parameters, baseline/candidate errors, evidence counts,
@@ -242,7 +242,7 @@ owns persistence and activation, with fresh sessions required for acceptance.
 Automatic learning runs after reconciliation/projection refresh, outside loaded sessions and open
 writer handles. A read-only worker screens candidates, then persists fixed parameters, their exact
 cohort and supporting-data signature in `live_learning_models`. Screening never activates a model.
-Acceptance requires at least two sessions and 20 examples that started **after candidate creation**,
+Acceptance requires at least two sessions and 10 examples that started **after candidate creation**,
 passing the same error gates. Backfilled historical sessions cannot serve as fresh acceptance.
 The candidate is not refitted on acceptance data. Further off-track evaluations withdraw it if support
 changes, acceptance evidence disappears or prospective error gates regress; replacements start validation again.
