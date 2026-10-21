@@ -1,6 +1,6 @@
 import { openVerifiedLiveRecording } from './recordingValidation.js';
 import type { DuckDbReader } from '../../telemetry/duckdbReader.js';
-import { LIVE_CAPTURE_CHANNELS } from './channels.js';
+import { liveCaptureChannels } from './channels.js';
 
 import type { LiveCaptureObservation } from '../../../shared/types/liveCapture.js';
 import { LIVE_CAPTURE_NORMALIZATION_VERSION } from '../../../shared/types/liveCapture.js';
@@ -10,7 +10,9 @@ import { LiveEvidenceReadError } from './readError.js';
 const MAX_SAMPLES = 50_000;
 const MAX_OBSERVATIONS = 1000;
 const MAX_OBSERVATION_BYTES = 1_000_000;
-const channels = LIVE_CAPTURE_CHANNELS.filter(channel => channel.verified && channel.frame === 'iso8855-vehicle');
+/** Vehicle motion plus longitudinal wheel velocities (slip); a recording's own catalog decides what is verified. */
+const evidenceChannels = (normalizationVersion: number) => liveCaptureChannels(normalizationVersion).filter(channel => channel.verified
+  && (channel.frame === 'iso8855-vehicle' || /_(patch|ground)_longitudinal_mps$/.test(channel.name)));
 
 function fail(reason: LiveEvidenceUnavailableReason, message: string): never { throw new LiveEvidenceReadError(reason, message); }
 
@@ -52,6 +54,7 @@ export async function readLiveRecording(request: LiveEvidenceReadRequest): Promi
     || durationSeconds > 3600 || !Number.isSafeInteger(lapNumber) || lapNumber < 0) fail('unverified-clock', 'Invalid lap clock bounds');
   const reader = await openVerifiedLiveRecording(request.directory, manifest);
   try {
+    const channels = evidenceChannels(manifest.normalizationVersion);
     const anchor = manifest.anchors.filter(item => item.lapNumber === lapNumber);
     if (anchor.length !== 1 || anchor[0].startSeconds !== startSeconds || anchor[0].lapSeconds === null
       || Math.abs(anchor[0].lapSeconds - durationSeconds) > 0.05) fail('unverified-clock', 'Lap anchor is not verified against XML');
@@ -83,7 +86,7 @@ export async function readLiveRecording(request: LiveEvidenceReadRequest): Promi
       ...(manifest.normalizationVersion !== LIVE_CAPTURE_NORMALIZATION_VERSION ? { sourceNormalizationVersion: manifest.normalizationVersion } : {}),
       signConvention: 'iso8855', gameVersion: manifest.gameVersion,
       lapNumber, startSeconds, durationSeconds, channels: channels.map(channel => ({ name: channel.name, unit: channel.unit,
-        frame: 'iso8855-vehicle', sourceField: channel.sourceField })), points, observations: timed.observations,
+        frame: channel.frame, sourceField: channel.sourceField })), points, observations: timed.observations,
       sessionObservations: untimed.observations, observationsTruncated: timed.truncated || untimed.truncated,
       coverage: { firstLapSeconds: points[0]?.lapSeconds ?? null, lastLapSeconds: points[points.length - 1]?.lapSeconds ?? null,
         gaps, recordingDroppedSamples: manifest.droppedSamples } };

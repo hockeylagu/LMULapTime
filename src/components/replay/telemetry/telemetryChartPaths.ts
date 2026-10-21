@@ -82,8 +82,8 @@ export function computeTelemetryChartPaths(
   }
 
   const closed = (path: string): string => (path ? `${path} L 1000 95 L 0 95 Z` : '');
-  const { bt, sp, ws, tp, tw, tt } = cornerBuilders;
-  const { bt: bBt, sp: bSp, ws: bWs, tp: bTp, tw: bTw, tt: bTt } = bCornerBuilders;
+  const { bt, sp, ws, tp, tw, tt, wsl } = cornerBuilders;
+  const { bt: bBt, sp: bSp, ws: bWs, tp: bTp, tw: bTw, tt: bTt, wsl: bWsl } = bCornerBuilders;
 
   return {
     speedPath: primary.spd,
@@ -123,6 +123,9 @@ export function computeTelemetryChartPaths(
     baselineWheelSpeedsPaths: bWs,
     hasWheelSpeeds: cornerExtrema.hasWheelSpeeds,
     maxWheelSpeed: cornerExtrema.maxWheelSpeed,
+    wheelSlipPaths: wsl,
+    baselineWheelSlipPaths: bWsl,
+    hasWheelSlip: points.some(p => p.liveWheelSlip !== undefined),
     tirePressuresPaths: tp,
     baselineTirePressuresPaths: bTp,
     hasTirePressures: cornerExtrema.hasTirePressures,

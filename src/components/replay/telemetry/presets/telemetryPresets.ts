@@ -11,6 +11,7 @@ export type TelemetryChannelId =
   | 'brake-temps'
   | 'ride-height'
   | 'wheel-speeds'
+  | 'wheel-slip'
   | 'tire-pressures'
   | 'tire-wear'
   | 'tire-temps'
@@ -154,6 +155,17 @@ export const AVAILABLE_TELEMETRY_CHANNELS: TelemetryChannelInfo[] = [
     isComputed: false,
     description: 'Individual 4-wheel rotation linear velocity (FL, FR, RL, RR)',
     badgeColor: 'text-lmu-aqua bg-lmu-aqua-strong/20',
+    lineColor: WHEEL_CORNER_COLORS.fl,
+  },
+  {
+    id: 'wheel-slip',
+    name: 'Wheel Slip (4-Corner)',
+    shortName: 'WHEEL SLIP',
+    unit: '%',
+    category: 'wheels',
+    isComputed: false,
+    description: 'Measured longitudinal slip per wheel with lockups and wheelspin (laps recorded live by the app)',
+    badgeColor: 'text-lmu-loss bg-lmu-loss-strong/20',
     lineColor: WHEEL_CORNER_COLORS.fl,
   },
   {
@@ -329,7 +341,7 @@ export const DEFAULT_TELEMETRY_PRESETS: TelemetryPreset[] = [
     id: 'wheels-suspension',
     name: 'Wheels & Tires',
     isBuiltIn: true,
-    channels: ['speed', 'delta', 'ride-height', 'wheel-speeds', 'tire-pressures', 'tire-wear', 'tire-temps', 'brake-temps'],
+    channels: ['speed', 'delta', 'ride-height', 'wheel-speeds', 'wheel-slip', 'tire-pressures', 'tire-wear', 'tire-temps', 'brake-temps'],
   },
   {
     id: 'g-forces',
@@ -364,6 +376,7 @@ export const DEFAULT_TELEMETRY_PRESETS: TelemetryPreset[] = [
       'brake-temps',
       'ride-height',
       'wheel-speeds',
+      'wheel-slip',
       'tire-pressures',
       'tire-wear',
       'tire-temps',

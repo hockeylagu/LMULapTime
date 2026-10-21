@@ -4,7 +4,7 @@ export interface LiveEvidenceChannel {
   name: string;
   unit: string;
   sourceField: string;
-  frame: 'iso8855-vehicle';
+  frame: 'iso8855-vehicle' | 'iso8855-wheel';
 }
 
 export interface LiveEvidencePoint {
@@ -77,10 +77,35 @@ export interface LiveDynamicsProvenance {
   yawRate: boolean;
   /** Beta derived from measured body velocity, not a directly measured angle. */
   slipAngle: boolean;
+  /** Longitudinal slip ratios derived from measured contact-patch and ground velocities. */
+  wheelSlip: boolean;
+}
+
+export type WheelPosition = 'fl' | 'fr' | 'rl' | 'rr';
+
+/** Longitudinal slip ratio per wheel (FL, FR, RL, RR); NULL where the wheel is airborne, slow or unrecorded. */
+export type WheelSlipRatios = [number | null, number | null, number | null, number | null];
+
+export interface WheelSlipEvent {
+  kind: 'lockup' | 'wheelspin';
+  wheel: WheelPosition;
+  startLapSeconds: number;
+  endLapSeconds: number;
+  /** Most extreme ratio inside the event: negative for a lockup, positive for wheelspin. */
+  peakSlipRatio: number;
+}
+
+/** Measured per-point wheel slip and the wheels inside a detected event at that point. */
+export interface LiveWheelSlip {
+  ratios: WheelSlipRatios;
+  lockup: WheelPosition[];
+  wheelspin: WheelPosition[];
 }
 
 export type LiveCaptureOverlay =
   | { state: 'applied'; recordingId: string; gameVersion: string | null; normalizationVersion: number;
-      yawPoints: number; slipPoints: number; totalPoints: number; maxOffsetSeconds: number;
+      yawPoints: number; slipPoints: number; wheelSlipPoints: number; totalPoints: number; maxOffsetSeconds: number;
+      /** Detected on every live sample of the lap, not only on the chart points. */
+      wheelSlipEvents: WheelSlipEvent[];
       recordingDroppedSamples: number; captureGaps: number }
   | { state: 'unavailable' | 'unaligned'; message: string };

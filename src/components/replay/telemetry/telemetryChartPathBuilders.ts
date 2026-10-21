@@ -280,6 +280,7 @@ export function emptyChartPaths(): TelemetryChartPathsResult {
     brakeTempsPaths: emptyCorner, baselineBrakeTempsPaths: emptyCorner, hasBrakeTemps: false, maxBrakeTemp: 800,
     suspPosPaths: emptyCorner, baselineSuspPosPaths: emptyCorner, hasSuspPos: false, minSuspPos: 0, maxSuspPos: 50,
     wheelSpeedsPaths: emptyCorner, baselineWheelSpeedsPaths: emptyCorner, hasWheelSpeeds: false, maxWheelSpeed: 300,
+    wheelSlipPaths: emptyCorner, baselineWheelSlipPaths: emptyCorner, hasWheelSlip: false,
     tirePressuresPaths: emptyCorner, baselineTirePressuresPaths: emptyCorner, hasTirePressures: false, minTirePressure: 150, maxTirePressure: 220,
     tireWearPaths: emptyCorner, baselineTireWearPaths: emptyCorner, hasTireWear: false, minTireWear: 80, maxTireWear: 100,
     tireTempsPaths: emptyCorner, baselineTireTempsPaths: emptyCorner, hasTireTemps: false, minTireTemp: 40, maxTireTemp: 120,

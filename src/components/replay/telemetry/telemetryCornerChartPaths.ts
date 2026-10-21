@@ -1,6 +1,10 @@
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { PointComparison } from '../../../utils/replayComparison.js';
 
+/** Measured wheel slip ratio shown at full channel height (±30 %). */
+const WHEEL_SLIP_CHART_RANGE = 0.3;
+const WHEELS = ['fl', 'fr', 'rl', 'rr'] as const;
+
 export interface CornerPaths {
   fl: string;
   fr: string;
@@ -110,6 +114,9 @@ export interface CornerChannelBuilders {
   tp: CornerPaths;
   tw: CornerPaths;
   tt: CornerPaths;
+  wsl: CornerPaths;
+  /** Whether each wheel's slip line continues: unavailable ratios break the line instead of bridging it. */
+  wslOpen: [boolean, boolean, boolean, boolean];
 }
 
 export function createCornerChannelBuilders(): CornerChannelBuilders {
@@ -120,6 +127,8 @@ export function createCornerChannelBuilders(): CornerChannelBuilders {
     tp: createEmptyCornerPaths(),
     tw: createEmptyCornerPaths(),
     tt: createEmptyCornerPaths(),
+    wsl: createEmptyCornerPaths(),
+    wslOpen: [false, false, false, false],
   };
 }
 
@@ -130,7 +139,7 @@ export function appendCornerPoint(
   isFirst: boolean,
   extrema: CornerExtrema
 ): void {
-  const { bt, sp, ws, tp, tw, tt } = builders;
+  const { bt, sp, ws, tp, tw, tt, wsl, wslOpen } = builders;
   const {
     maxBrakeTemp,
     minSuspPos,
@@ -183,6 +192,16 @@ export function appendCornerPoint(
     ws.rl += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${rlY.toFixed(1)} `;
     ws.rr += `${isFirst ? 'M' : 'L'} ${x.toFixed(1)} ${rrY.toFixed(1)} `;
   }
+
+  // Measured wheel slip: -30 % (lockup) to +30 % (wheelspin) -> 95 to 10 in SVG Y, 0 % centred
+  const ratios = p.liveWheelSlip?.ratios;
+  WHEELS.forEach((corner, index) => {
+    const ratio = ratios?.[index];
+    if (ratio === null || ratio === undefined) { wslOpen[index] = false; return; }
+    const y = 52.5 - Math.max(-1, Math.min(1, ratio / WHEEL_SLIP_CHART_RANGE)) * 42.5;
+    wsl[corner] += `${wslOpen[index] && !isFirst ? 'L' : 'M'} ${x.toFixed(1)} ${y.toFixed(1)} `;
+    wslOpen[index] = true;
+  });
 
   // Tire Pressures: minTirePressure to maxTirePressure kPa -> 95 to 10 in SVG Y
   if (p.tirePressures) {

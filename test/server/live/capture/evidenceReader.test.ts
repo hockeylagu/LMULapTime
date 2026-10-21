@@ -56,11 +56,14 @@ async function recording(largeObservations = false, normalizationVersion = 1): P
 }
 
 describe('live evidence reader worker', () => {
-  it.each([2, 3])('reads version-%i wheel recordings while keeping the motion API limited to its six vehicle channels', async version => {
+  it.each([2, 3])('reads version-%i wheel recordings with the six vehicle channels plus longitudinal wheel velocities', async version => {
     const evidence = await new LiveEvidenceReader().read(await recording(false, version));
     expect(evidence.normalizationVersion).toBe(3);
-    expect(evidence.channels).toHaveLength(6);
-    expect(evidence.channels.every(channel => channel.frame === 'iso8855-vehicle')).toBe(true);
+    expect(evidence.channels.filter(channel => channel.frame === 'iso8855-vehicle')).toHaveLength(6);
+    expect(evidence.channels.filter(channel => channel.frame === 'iso8855-wheel').map(channel => channel.name)).toEqual(
+      ['fl', 'fr', 'rl', 'rr'].flatMap(wheel => [`${wheel}_patch_longitudinal_mps`]).concat(
+        ['fl', 'fr', 'rl', 'rr'].map(wheel => `${wheel}_ground_longitudinal_mps`)));
+    expect(evidence.points[0].values).toHaveLength(14);
   });
   it('reads the exact anchored lap, retains ISO values and gaps, and keeps untimed REST evidence at session scope', async () => {
     const request = await recording();
