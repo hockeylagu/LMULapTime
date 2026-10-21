@@ -33,7 +33,8 @@ export interface LiveAuditRecord {
   sequence: number;
   recordedAt: number;
   modelVersion: number;
-  reason: 'start' | 'sample' | 'settings' | 'lap' | 'measurement' | 'finish' | 'end';
+  /** Recordings before 2026-10-21 also contain 10-second 'sample' checkpoints. */
+  reason: 'start' | 'settings' | 'lap' | 'measurement' | 'finish' | 'end';
   /** Immutable forecast, settings and context as they existed at capture time. */
   snapshot: LiveSnapshot;
   observation: LiveUsageObservation;

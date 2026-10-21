@@ -7,7 +7,6 @@ import { RAIN_WET_MIN } from '../lapConditions.js';
 export const LIVE_MODEL_VERSION = 4;
 /** Uncorrected estimator recorded for training and used as the exact calibration compatibility version. */
 export const LIVE_BASELINE_MODEL_VERSION = 3;
-const SAMPLE_SECONDS = 10;
 interface Baseline { snapshot: LiveSnapshot; regime: string; et: number }
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 const difference = (actual: number | null, predicted: number | null): number | null =>
@@ -18,13 +17,12 @@ const difference = (actual: number | null, predicted: number | null): number | n
  * Storage and inspection contract: docs/LIVE_CAPTURE_FORMAT.md#consolidated-strategy-audit
  */
 
-/** Records bounded checkpoints rather than every telemetry frame; never learns from its own predictions. */
+/** Records event checkpoints (start, lap, settings, measurement, finish, end), never periodic ones; never learns from its own predictions. */
 export class LiveAuditTracker {
   private runId: string | null = null;
   private key = '';
   private sequence = 0;
   private last: LiveSnapshot | null = null;
-  private sampledAt = -Infinity;
   private settings = '';
   private observationKey = '';
   private regime = '';
@@ -46,7 +44,7 @@ export class LiveAuditTracker {
     if (!this.runId || key !== this.key || changedLayout || session.elapsedSeconds < (this.last?.session?.elapsedSeconds ?? 0) - 1) {
       this.end(now);
       this.runId = this.createId(); this.key = key; this.sequence = 0;
-      this.settings = ''; this.observationKey = ''; this.baselines.clear(); this.compared.clear(); this.sampledAt = -Infinity;
+      this.settings = ''; this.observationKey = ''; this.baselines.clear(); this.compared.clear();
     }
     const strategy = snapshot.strategy;
     const compound = strategy?.tyres?.compound ?? strategy?.garage?.tyres?.compound ?? '';
@@ -69,13 +67,11 @@ export class LiveAuditTracker {
     const completedLap = lap !== this.last?.session?.playerLapsCompleted;
     const finish = !!snapshot.result && !this.last?.result;
     const reason = !this.last ? 'start' : finish ? 'finish' : measurement ? 'measurement'
-      : completedLap ? 'lap' : settingKey !== this.settings ? 'settings'
-        : session.elapsedSeconds - this.sampledAt >= SAMPLE_SECONDS ? 'sample' : null;
+      : completedLap ? 'lap' : settingKey !== this.settings ? 'settings' : null;
     const comparison = measurement ? this.compare(observation, regime) : null;
     if (reason) {
       this.save({ runId: this.runId, sequence: ++this.sequence, recordedAt: now, modelVersion: LIVE_MODEL_VERSION,
         reason, snapshot: clone(snapshot), observation: clone(observation), comparison });
-      this.sampledAt = session.elapsedSeconds;
     }
     this.settings = settingKey; this.observationKey = observedKey;
     this.last = snapshot;

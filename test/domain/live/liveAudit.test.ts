@@ -51,13 +51,12 @@ describe('immutable live strategy history', () => {
     expect(records[records.length - 1]?.comparison).toBeNull();
   });
 
-  it('records checkpoints, finalises interrupted runs and separates restarts', () => {
+  it('records event checkpoints only, finalises interrupted runs and separates restarts', () => {
     const { tracker, records, update } = setup();
     update(0, 0);
-    for (let et = 1; et < 10; et++) update(et, 0, empty, { start: 0 });
-    expect(records).toHaveLength(1);
-    update(10, 0, empty, { start: 0 });
-    expect(records[records.length - 1]?.reason).toBe('sample');
+    // An unchanged session adds no periodic checkpoint, however long it runs.
+    for (let et = 1; et <= 60; et++) update(et, 0, empty, { start: 0 });
+    expect(records.map(record => record.reason)).toEqual(['start']);
     update(0, 0);
     expect(records.slice(-2).map(record => [record.reason, record.runId])).toEqual([['end', 'run-1'], ['start', 'run-2']]);
     tracker.update(liveSnapshot({ session: null, lifecycle: 'offline' }), null, empty, 20_000);
