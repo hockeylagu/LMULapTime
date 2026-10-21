@@ -16,6 +16,7 @@ import { LiveAuditTracker } from '../../../shared/domain/live/liveAudit.js';
 import type { LiveUsageObservation } from '../../../shared/types/liveAudit.js';
 import { findWorkerBootstrap, isWorkerMessage } from '../../core/workerThreads.js';
 import type { LiveDiagnostics } from './diagnostics.js';
+import { resolvedCaptureFilename } from './maintenance/filenames.js';
 
 const BATCH_SAMPLES = 50;
 const MAX_OBSERVATIONS = 200;
@@ -393,7 +394,7 @@ export class LiveCaptureController {
     this.manifest.updatedAt = Math.max(this.manifest.updatedAt, this.now());
     this.flush(true);
     this.diagnostics?.record({ kind: 'session-end', at: this.now(), data: { status, manifest: this.manifest } });
-    this.diagnostics?.end();
+    this.diagnostics?.end(resolvedCaptureFilename(this.manifest));
     this.recoverable ??= [];
     this.recoverable = this.recoverable.filter(record => record.recordingId !== this.manifest?.recordingId);
     if (status === 'interrupted') this.recoverable.push(this.manifest);

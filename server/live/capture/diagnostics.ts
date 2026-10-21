@@ -26,8 +26,8 @@ export class LiveDiagnostics {
       this.current = null;
       return;
     }
-    const file = new DiagnosticFile(path.join(this.directory,
-      `${filename.replace(/\.live\.duckdb$/, '')}.${randomUUID()}.diagnostics.jsonl`));
+    const id = randomUUID();
+    const file = new DiagnosticFile(this.sidecarPath(filename, id), id);
     this.files.add(file);
     this.current = file;
     file.write({ kind: 'diagnostics-start', at: Date.now(), data: { schemaVersion: 1, recordingId, recordingFilename: filename } });
@@ -47,10 +47,12 @@ export class LiveDiagnostics {
     file?.write(event);
   }
 
-  public end(): void {
+  /** `recordingFilename` is the recording's final name, so the compressed sidecar follows a layout rename. */
+  public end(recordingFilename?: string): void {
     const file = this.current;
     if (!file || file.ending) return;
     file.ending = true;
+    if (recordingFilename) file.finalFilename = this.sidecarPath(recordingFilename, file.id);
     file.write({ kind: 'diagnostics-tail', at: Date.now(), data: { milliseconds: 120_000 } });
     const closeWhenIdle = (): void => {
       if (this.current && !this.current.ending) {
@@ -65,6 +67,10 @@ export class LiveDiagnostics {
     file.timer.unref();
   }
 
+  private sidecarPath(recordingFilename: string, id: string): string {
+    return path.join(this.directory, `${recordingFilename.replace(/\.live\.duckdb$/, '')}.${id}.diagnostics.jsonl`);
+  }
+
   public async stop(): Promise<void> {
     this.current = null;
     await Promise.all([...this.files].map(file => file.close()));
@@ -77,6 +83,7 @@ class DiagnosticFile {
   public requestEndAt = Infinity;
   public ending = false;
   public timer: NodeJS.Timeout | null = null;
+  public finalFilename: string;
   private stream: ReturnType<typeof createWriteStream> | null = null;
   private queue: string[] = [];
   private queuedBytes = 0;
@@ -87,7 +94,8 @@ class DiagnosticFile {
   private readonly ready: Promise<void>;
   private readonly previous = new Map<string, { key: string; at: number; suppressed: number }>();
 
-  public constructor(private readonly filename: string) {
+  public constructor(private readonly filename: string, public readonly id: string) {
+    this.finalFilename = filename;
     this.ready = mkdir(path.dirname(filename), { recursive: true }).then(() => {
       this.stream = createWriteStream(filename, { flags: 'wx' });
       this.stream.on('error', error => this.fail(error));
@@ -166,7 +174,7 @@ class DiagnosticFile {
     const temporary = `${this.filename}.gz.tmp`;
     try {
       await pipeline(createReadStream(this.filename), createGzip(), createWriteStream(temporary, { flags: 'wx' }));
-      await rename(temporary, `${this.filename}.gz`);
+      await rename(temporary, `${this.finalFilename}.gz`);
       await unlink(this.filename);
     } catch (error) { this.fail(error); } // Keep the uncompressed original on failure.
   }

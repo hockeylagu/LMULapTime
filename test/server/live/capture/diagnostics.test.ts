@@ -49,6 +49,18 @@ describe('disposable live diagnostic sidecars', () => {
     expect(file.rows[file.rows.length - 1]?.kind).toBe('diagnostics-end');
   });
 
+  it('compresses under the final recording name when the recording was renamed to its layout', async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), 'lmu-diagnostics-'));
+    directories.push(directory);
+    const diagnostics = new LiveDiagnostics(directory);
+    diagnostics.begin('unresolved_race_2026-10-20_abc.live.duckdb', 'recording-1');
+    diagnostics.end('cota_gp_race_2026-10-20_abc.live.duckdb');
+    await diagnostics.stop();
+    const [file] = await records(directory);
+    expect(file.filename).toMatch(/^cota_gp_race_2026-10-20_abc\.[0-9a-f-]{36}\.diagnostics\.jsonl\.gz$/);
+    expect(file.rows[0].data.recordingFilename).toBe('unresolved_race_2026-10-20_abc.live.duckdb');
+  });
+
   it('keeps delayed requests with their original session and does not mix new sessions', async () => {
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
     const { directory, diagnostics } = await setup();

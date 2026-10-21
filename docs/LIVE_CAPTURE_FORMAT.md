@@ -166,7 +166,8 @@ estimated `timeIntoLap` (retained only as raw diagnostic evidence). Initial out-
 game time since observed movement away from the departure position, never a learning/reference lap.
 
 A two-minute post-session tail supports transient-error investigation. Gzip is deferred until after
-the session; a new active session defers pending compression. An already-running compression is not
+the session; a new active session defers pending compression. The compressed sidecar takes the
+completed recording's layout filename; an uncompressed leftover keeps its `unresolved_` name. An already-running compression is not
 cancelled. Crash leftovers remain available for investigation. Sidecars are opt-in: turn on
 *Write a diagnostic file with each recording* in Settings → Live dashboard (from the next session;
 failures are always saved in the recording, see below).
