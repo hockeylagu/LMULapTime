@@ -105,6 +105,21 @@ describe('LiveCaptureController', () => {
       recordingId: manifest.recordingId, sessionId: 'xml-session', gameVersion: null });
   });
 
+  it('opens no recording until the player is in the car, and keeps one open through a garage visit', () => {
+    const { controller, writer } = makeController();
+    const garage = { inRealtime: false, sessionCode: 10 };
+    // Garage menus and a finished session's last frame (game phase 8) never produce motion samples.
+    controller.update(reading(100, garage), snapshot());
+    controller.update(reading(100, { ...garage, gamePhase: 8 }), snapshot());
+    expect(controller.status()).toMatchObject({ state: 'idle', recordingId: null });
+    expect(writer.posted).toEqual([]);
+    start(controller, 101);
+    const recordingId = controller.status().recordingId;
+    expect(recordingId).not.toBeNull();
+    controller.update(reading(102, garage), snapshot());
+    expect(controller.status()).toMatchObject({ state: 'recording', recordingId });
+  });
+
   it('records initial player configuration, distinct impacts and only changed wheel materials', () => {
     const { controller, writer } = makeController();
     const game = snapshot();

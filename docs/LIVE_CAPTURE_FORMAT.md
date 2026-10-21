@@ -10,6 +10,10 @@ The app records player evidence while the backend and LMU are running with a loa
 independent of an open dashboard. Recording is gated by live lifecycle/replay state.
 Files default to ignored `server/live-captures/`; `LMU_LIVE_CAPTURE_DIR` overrides that directory.
 Each recording attempt owns one `*.live.duckdb` file with a unique recording ID.
+An attempt opens only once the player is in the car (`inRealtime`): garage menus and a finished
+session's last frames produce no motion samples, so they create no file. A started attempt stays open
+through garage visits. Garage-only REST reads (event schedule, garage data) made before the first drive
+are therefore not in the recording; the live dashboard still uses them.
 Recording starts immediately even when the exact layout is pending, using an `unresolved_` filename.
 Once a completed attempt has a known layout, its worker checkpoints and closes the recording handle,
 then replaces that prefix with the sanitized layout key. It updates the file's manifest and filename
@@ -17,7 +21,7 @@ metadata before acknowledging the new name to the SQLite index; recording ID and
 If that rename fails (for example a locked file), the completed attempt keeps its `unresolved_` name.
 Idle catalog discovery applies the same repair to existing completed files and recovers a process exit
 between the physical rename and metadata update. Unknown layouts and resumable interrupted attempts
-keep their existing filenames. Diagnostic sidecars retain their original names and recording IDs.
+keep their existing filenames. Compressed diagnostic sidecars follow the completed name (see below).
 An interrupted attempt resumes only with unambiguous continuity proof. If the exact layout is
 temporarily unknown, recovery waits up to 10 s for it, then records a new file; samples during that
 wait remain a coverage gap.

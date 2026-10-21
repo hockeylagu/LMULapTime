@@ -100,7 +100,8 @@ export class LiveCaptureController {
     if (this.manifest && (key !== this.sessionKey || changedLayout || reading.currentEt < this.manifest.lastElapsedSeconds - 1)) {
       this.finish('completed');
     }
-    if (!this.manifest) this.begin(reading, snapshot, key);
+    // Open a recording only once the player is in the car: garage menus and session-over screens produce no motion samples.
+    if (!this.manifest && reading.inRealtime) this.begin(reading, snapshot, key);
     const manifest = this.manifest;
     if (!manifest) return;
     manifest.updatedAt = Math.max(manifest.updatedAt, this.now());
