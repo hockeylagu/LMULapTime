@@ -87,27 +87,30 @@ critique. The placement brief, at 2560 x 1440, read in glances:
 - **Every driving view:** session bar (session, track and class, laps left in races, PR,
   one weather slot), the 30-second full-width pedal trace (curves and grid only), no
   paragraph text; labels about 48 px, supporting readouts 80-96 px, primary values larger.
-- **Practice:** last lap largest, the estimated lap (session best plus the running delta) and session best, a current-lap sector row
-  followed by two completed laps and a `BEST` row of best sectors; no fuel figures.
+- **Practice:** the estimated lap (session best plus the running delta) largest, the live `DELTA` and session best,
+  then the history table: the current-lap row followed by two completed laps (the latest with its sector deltas
+  against the best sectors) and a `BEST` row (best lap time, best individual sectors); no fuel figures.
   S1 and S2 fill from the game's cumulative timing fields at each crossing (S2 = cumulative S2 minus S1),
   independently of whether a session best exists, beside the lap number and the running lap clock. Uncrossed
   sectors remain unknown; at the finish the row becomes the top completed lap (S3 = lap time minus cumulative S2)
   and a new current row starts. Out laps have no current splits.
-- **Qualifying:** `PUSH LAP · VS BEST` with the live delta and the position under it, beside the estimated lap,
-  session best and laps left; tyre surface temperature with S1/S2/S3 vs best; then the `LAST LAP` row; no fuel or VE,
-  no valid flag (the HUD has it). Same columns as the race rows.
+- **Qualifying (2026-10-20):** the practice layout with `LAPS LEFT` in place of session best (the `BEST` row has it);
+  no position, no tyre temperature, no fuel or VE, no valid flag (the HUD has it).
 - **Race, pit coming:** `PIT IN 2 LAPS` (then `PIT THIS LAP`), `VE · MFD` or `FUEL · MFD`
   and `TYRES · MFD` (`NEW MEDIUM`, `NEW WET`, `NO CHANGE`, compound coloured, forecast note
-  under it); the estimated lap with sector deltas, then `LAST LAP` with real sectors.
+  under it); then the history table as in practice.
 - **Race, mid-stint (accepted):** `VE / LAP · LAST 3` with spare per lap, `PIT IN 6 LAPS`, `TYRES TO
-  PIT OK`, rain lap when forecast. **Sprint:** current-lap delta against the session best
-  leads, with projected resource at the finish and reserve coverage secondary. Tyre
-  surface temperature leads the sector strip so the current delta appears only once.
-- **Damage:** sector deltas stay; the last-lap row becomes `PACE LOSS · MEASURED`, `SINCE IMPACT`,
-  `TO FINISH`, `REPAIR TIME`; the resource can read `NO CHANGE`. **Flat or detached
+  PIT OK`, rain lap when forecast. **No stop needed (sprint, most races):** the estimated lap
+  leads, with the projected resource at the finish and the tyres secondary. Every race mode is
+  followed by the practice history table (2026-10-20); the place sits in the session bar.
+- **Damage:** a red alert row takes the session bar's place: `PACE LOSS · MEASURED` (median of laps either side),
+  `SINCE IMPACT`, `TO FINISH`, `REPAIR TIME`, with the data status at its right end; the plan stays and the history
+  keeps one completed lap; the resource can read `NO CHANGE`. **Flat or detached
   wheel:** `PIT NOW`, with the VE or fuel to set for a stop this lap (more than the planned later stop's).
 - **Lifecycle:** game closed, in menu, loading, garage between sessions (the checklist: VE or fuel to set and the
-  tyre set against the garage), race starting (pedal check), finished (`SESSION OVER`; class place, battle at the
+  tyre set against the garage; in practice a load short of the session only reads as the laps it holds, since a
+  light car for qualifying runs is a choice), race starting (pedal check; on the grid before the formation lap the
+  garage checklist stays under the phase title, as the driver can still go back in), finished (`SESSION OVER`; class place, battle at the
   flag, pace and a debrief pointer are not built). The session counts as finished for the driver only once they
   take the flag: after the leader's flag the race view stays up for their last lap.
 
@@ -136,9 +139,9 @@ race overrides and optional fallback values in the existing app Settings before
 driving. The window opens by itself when LMU starts (see Proposed architecture). The live page itself has
 no controls or scrolling. A pre-race preview checks readability.
 
-Race keeps two timing rows: current lap against best with completed sector deltas, then
-`LAST LAP` with its real S1/S2/S3 times. Practice uses the history table, qualifying the
-`LAST LAP` row. S1/S2/S3 in a row come from that same lap; do not mix current-lap and
+Practice, qualifying and the race share the history table: the current lap with its running delta,
+the completed laps (the last one shown whether valid or not, greyed when invalid) and the `BEST` row.
+S1/S2/S3 in a lap row come from that same lap; do not mix current-lap and
 previous-lap sectors. Show unavailable splits as absent, never zero. The rows keep
 their position so each lap update does not move the main content.
 
@@ -379,8 +382,9 @@ progress polling and `scan finished` reloads the data. Replacing the progress po
 it later is optional.
 
 Clear learned state on session/car/layout changes, clock regression, restart or
-return to garage as appropriate. Distinguish game paused from disconnected using
-both game state and receipt freshness. Unknown fields stay absent, never zero-filled.
+return to garage as appropriate. No PAUSED marker: offline LMU never reports its pause in
+the shared memory (no game phase 9 in any capture, 2026-10-20), so a paused game simply
+holds its last values; disconnection comes from receipt freshness. Unknown fields stay absent, never zero-filled.
 The post-session cache and parser remain authoritative for historical analysis.
 
 ## Delivery and acceptance
@@ -575,7 +579,7 @@ Automated validation uses decoded scoring and navigation fixtures; it does not c
 | Qualifying timer expires while drivers finish | Keep driving until player's flag; garage summary waits for complete field | Online sequence, result and rendered checks |
 | Timer expired and all drivers terminal | QUALIFYING COMPLETE; settled result retained | Online sequence, result and rendered checks |
 | Race garage, with or without intervening loading/warmup | Race preparation; settled qualifying retained for the same event; no old result screen | Weekend matrix and rendered sequence |
-| Grid → formation → countdown | RACE STARTING with phase-specific status and pedal trace | Service phases 0–4 and rendered sequence |
+| Grid → formation → countdown | Grid: phase title + garage checklist + pedal trace; from the formation lap RACE STARTING with phase-specific status and pedal trace | Service phases 0–4 and rendered sequence |
 | Green → race | Race view replaces starting screen | Service and rendered sequence |
 | Overall leader flagged, player still running | Keep race view and capture player's final lap | Service, result and rendered checks |
 | Player flagged → garage | Race summary; cooldown cannot overwrite frozen metrics | Service, result and page checks |

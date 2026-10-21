@@ -61,7 +61,7 @@ it('renders the whole weekend without controls or stale results between stages',
   send(frame(10, { inRealtime: true, gamePhase: 4 }));
   expect(screen.getByText('COUNTDOWN')).toBeInTheDocument();
   send(frame(10, { inRealtime: true, gamePhase: 5 }));
-  expect(screen.getByTestId('live-race-position')).toBeInTheDocument();
+  expect(screen.getByTestId('live-race-plan')).toBeInTheDocument();
   send(frame(10, { inRealtime: true, gamePhase: 8, player: vehicleReading({ finishStatus: 0 }) }));
   expect(screen.queryByTestId('live-session-review')).not.toBeInTheDocument();
   send(frame(10, { inRealtime: true, gamePhase: 8, player: vehicleReading({ finishStatus: 1 }) })); title('RACE COMPLETE');

@@ -34,6 +34,14 @@ describe('LiveDamageTracker', () => {
     });
   });
 
+  it('does not read one slow lap after a scrape as damage pace (COTA race 2026-10-20)', () => {
+    const damage = new LiveDamageTracker();
+    for (const [lap, time] of [[2, 135.4], [3, 135.2]] as const) damage.lapCompleted(liveLap(lap, time, [null, null, null]));
+    damage.updateCondition(condition({ body: 0.03 }));
+    for (const [lap, time] of [[5, 132.3], [6, 131.4], [7, 132.3], [8, 145.2]] as const) damage.lapCompleted(liveLap(lap, time, [null, null, null]));
+    expect(damage.damage(8, 6)).toMatchObject({ paceLossPerLap: 0, significant: false });
+  });
+
   it('keeps the repair estimate while a penalty hides it, and clears everything once repaired', () => {
     const damage = new LiveDamageTracker();
     damage.updateCondition(condition({ body: 1.38, suspension: [0, 0.72, 0, 0], tires: [0.98, 0, 0.99, 0.98] }));

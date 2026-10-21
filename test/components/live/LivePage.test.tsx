@@ -54,18 +54,14 @@ describe('LivePage', () => {
     expect(screen.getByTestId('pedal-trace')).toBeInTheDocument();
   });
 
-  it('shows the race view with the class badge and the trace, and a PAUSED marker that keeps the screen', () => {
+  it('shows the race view with the class badge and the trace, and a NO REC marker in the status slot', () => {
     render(<LivePage />);
     send(snapshot({}));
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('CALCULATING');
-    expect(screen.getByTestId('live-race-position')).toHaveTextContent('LAP 13 · P3');
+    expect(screen.getByTestId('live-bar-place')).toHaveTextContent('P3');
     expect(screen.getByTestId('car-class-badge')).toHaveTextContent('HY');
     expect(screen.getByTestId('pedal-trace')).toBeInTheDocument();
-    // PAUSED takes the status slot, so pausing moves nothing.
     expect(screen.getByTestId('live-status')).toHaveTextContent('LIVE');
-    send(snapshot({ sequence: 2, paused: true }));
-    expect(screen.getByTestId('live-status')).toHaveTextContent('PAUSED');
-    expect(screen.getByTestId('live-race-position')).toHaveTextContent('P3');
     // A stopped recording takes the same slot, so the driver knows before the race ends.
     send(snapshot({ sequence: 3, audit: { runId: 'run', status: 'unavailable' } }));
     expect(screen.getByTestId('live-status')).toHaveTextContent('NO REC');
@@ -78,10 +74,10 @@ describe('LivePage', () => {
     act(() => { vi.advanceTimersByTime(LIVE_HEARTBEAT_MS * 2.5 + 1); });
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('DATA LOST');
     expect(screen.getByTestId('live-status')).toHaveTextContent('DISCONNECTED');
-    expect(screen.queryByTestId('live-race-position')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('live-bar-place')).not.toBeInTheDocument();
     expect(screen.queryByTestId('pedal-trace')).not.toBeInTheDocument();
     send(snapshot({ sequence: 9 }));
-    expect(screen.getByTestId('live-race-position')).toHaveTextContent('P3');
+    expect(screen.getByTestId('live-bar-place')).toHaveTextContent('P3');
   });
 
   it('uses the saved pedal history duration in the real live dashboard', async () => {

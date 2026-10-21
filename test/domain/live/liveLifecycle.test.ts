@@ -9,25 +9,25 @@ function reading(overrides: Partial<LiveScoringReading> = {}): LiveScoringReadin
 }
 
 describe('live lifecycle', () => {
-  it.each<[string, LiveScoringReading | null, LiveLifecycle, LiveLifecycle, boolean]>([
-    ['no shared memory', null, 'driving', 'offline', false],
-    ['session awaiting its first vehicles', reading({ numVehicles: 0 }), 'offline', 'loading', false],
-    ['in the monitor', reading({ inRealtime: false }), 'driving', 'garage', false],
-    ['grid (phase 0)', reading({ gamePhase: 0 }), 'garage', 'starting', false],
-    ['formation (phase 3)', reading({ gamePhase: 3 }), 'garage', 'starting', false],
-    ['countdown (phase 4)', reading({ gamePhase: 4 }), 'garage', 'starting', false],
-    ['green (phase 5)', reading({ gamePhase: 5 }), 'starting', 'driving', false],
-    ['full course yellow (phase 6)', reading({ gamePhase: 6 }), 'driving', 'driving', false],
-    ['stopped (phase 7)', reading({ gamePhase: 7 }), 'driving', 'driving', false],
-    ['checkered (phase 8), player still on the last lap', reading({ gamePhase: 8 }), 'driving', 'driving', false],
-    ['checkered (phase 8), player flagged', reading({ gamePhase: 8, player: vehicleReading({ id: 3, finishStatus: 1 }) }), 'driving', 'finished', false],
-    ['checkered (phase 8), player retired', reading({ gamePhase: 8, player: vehicleReading({ id: 3, finishStatus: 2 }) }), 'driving', 'finished', false],
-    ['checkered (phase 8), no player', reading({ gamePhase: 8, player: null }), 'driving', 'finished', false],
-    ['paused keeps the previous lifecycle', reading({ gamePhase: 9 }), 'finished', 'finished', true],
-    ['paused with no history is on track', reading({ gamePhase: 9 }), 'offline', 'driving', true],
-    ['unknown phase keeps the previous lifecycle', reading({ gamePhase: 42 }), 'driving', 'driving', false],
-  ])('%s', (_name, input, previous, lifecycle, paused) => {
-    expect(deriveLiveState(input, previous)).toMatchObject({ lifecycle, paused });
+  it.each<[string, LiveScoringReading | null, LiveLifecycle, LiveLifecycle]>([
+    ['no shared memory', null, 'driving', 'offline'],
+    ['session awaiting its first vehicles', reading({ numVehicles: 0 }), 'offline', 'loading'],
+    ['in the monitor', reading({ inRealtime: false }), 'driving', 'garage'],
+    ['grid (phase 0)', reading({ gamePhase: 0 }), 'garage', 'starting'],
+    ['formation (phase 3)', reading({ gamePhase: 3 }), 'garage', 'starting'],
+    ['countdown (phase 4)', reading({ gamePhase: 4 }), 'garage', 'starting'],
+    ['green (phase 5)', reading({ gamePhase: 5 }), 'starting', 'driving'],
+    ['full course yellow (phase 6)', reading({ gamePhase: 6 }), 'driving', 'driving'],
+    ['stopped (phase 7)', reading({ gamePhase: 7 }), 'driving', 'driving'],
+    ['checkered (phase 8), player still on the last lap', reading({ gamePhase: 8 }), 'driving', 'driving'],
+    ['checkered (phase 8), player flagged', reading({ gamePhase: 8, player: vehicleReading({ id: 3, finishStatus: 1 }) }), 'driving', 'finished'],
+    ['checkered (phase 8), player retired', reading({ gamePhase: 8, player: vehicleReading({ id: 3, finishStatus: 2 }) }), 'driving', 'finished'],
+    ['checkered (phase 8), no player', reading({ gamePhase: 8, player: null }), 'driving', 'finished'],
+    ['paused keeps the previous lifecycle', reading({ gamePhase: 9 }), 'finished', 'finished'],
+    ['paused with no history is on track', reading({ gamePhase: 9 }), 'offline', 'driving'],
+    ['unknown phase keeps the previous lifecycle', reading({ gamePhase: 42 }), 'driving', 'driving'],
+  ])('%s', (_name, input, previous, lifecycle) => {
+    expect(deriveLiveState(input, previous)).toMatchObject({ lifecycle });
   });
 
   it('describes the session only while one is loaded', () => {

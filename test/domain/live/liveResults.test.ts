@@ -86,6 +86,6 @@ describe('live result summaries', () => {
     const tracker = new LiveResultTracker();
     const frame = scoringReading({ gamePhase: 8, player: vehicleReading({ totalLaps: 7, finishStatus: 1 }) });
     expect(tracker.update(frame, deriveLiveState(frame,'driving'), liveLap(7,100,[30,30,40]), null, null, null).result).toMatchObject({ completeHistory: false, cleanLaps: 1, cleanAverage: 100 });
-    expect(tracker.update(null, { lifecycle: 'offline', paused: false, session: null }, null, null, null, null)).toEqual({ result: null, qualifyingResult: null });
+    expect(tracker.update(null, { lifecycle: 'offline', session: null }, null, null, null, null)).toEqual({ result: null, qualifyingResult: null });
   });
 });

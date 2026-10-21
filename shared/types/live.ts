@@ -132,8 +132,6 @@ export interface LiveSnapshot {
   /** Server receipt time, ms since the epoch. */
   receivedAt: number;
   lifecycle: LiveLifecycle;
-  /** The game is paused (game phase 9); the lifecycle keeps its last value. */
-  paused: boolean;
   /** Null while offline or in the menu. */
   session: LiveSessionInfo | null;
   /** Null until resolved for the loaded session. */

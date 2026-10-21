@@ -192,7 +192,9 @@ export class LiveStrategyTracker {
 
   /** Follows one scoring reading; returns the strategy for the snapshot, null while no session is loaded. */
   public update(reading: LiveScoringReading | null, state: LiveState, context: LiveStrategyContext): LiveStrategy | null {
-    if (state.lifecycle === 'menu' || state.lifecycle === 'offline') { this.reset(); return null; }
+    // The menu ends the session, not the event: the same car back on the same track keeps its measured use and ratios.
+    if (state.lifecycle === 'menu') { this.resetSession(); this.sessionKey = null; return null; }
+    if (state.lifecycle === 'offline') { this.reset(); return null; }
     const player = reading?.player;
     if (!reading || !player || !state.session) return null;
     const eventKey = `${reading.trackName}|${player.vehicleName}`;
@@ -247,7 +249,8 @@ export class LiveStrategyTracker {
       const toPit = race?.pitInLaps != null ? race.pitInLaps + 1 - fraction : lapsLeft - fraction;
       tyres.coverage = tyreCoverage(tyres.worst, tyres.wearPerLap, toPit, lapsLeft - fraction, race?.finishReachable ? 'finish' : 'pit', tyres.newSets);
     }
-    const garage = state.lifecycle === 'garage' ? this.garagePlan(kind, reading, resource, context.reserveLaps) : null;
+    // The grid keeps the plan: before the start the driver can still go back to the garage and change the load.
+    const garage = state.lifecycle === 'garage' || state.lifecycle === 'starting' ? this.garagePlan(kind, reading, resource, context.reserveLaps) : null;
     if (garage?.tyres && garage.laps !== null) garage.tyreCoverage = tyreCoverage(garage.tyres.wear, this.eventTyreWear, garage.laps, garage.laps, 'finish', garage.tyres.newSets);
     const fuelRatio = kind === 've' ? planFuelRatio({ ratios: this.ratios,
       fuelPerLap: this.ratios.length >= 3 ? this.perLap('fuel').perLap : this.gameEstimate('fuel'),
@@ -270,16 +273,18 @@ export class LiveStrategyTracker {
     const player = reading.player;
     if (!player) return;
     if (player.inPits || (reading.gamePhase !== GREEN && reading.gamePhase !== 9)) this.lapExcluded = true;
-    if (player.countLapFlag !== 2) this.lapExcluded = true;
     if (this.completedLaps === null) {
       this.completedLaps = player.totalLaps;
-      this.lapExcluded = player.inPits || player.countLapFlag !== 2;
+      this.lapExcluded = player.inPits;
     } else if (player.totalLaps > this.completedLaps) {
-      const excluded = this.lapExcluded || player.inPits || (latestLap !== null && !latestLap.valid);
+      // The lap's own validity, not `countLapFlag` along it: the flag drops to 1 for a second or two on laps the game
+      // still counts (COTA race 2026-10-20: 8 of 11 valid laps went unmeasured).
+      const invalid = latestLap !== null && (latestLap.lapNumber !== player.totalLaps || !latestLap.valid);
+      const excluded = this.lapExcluded || player.inPits || invalid;
       for (const meter of Object.values(this.meters)) meter.addCrossing(player.totalLaps, player.lapStartEt, excluded);
       this.tyres.lapCompleted(worstTread(this.condition));
       this.completedLaps = player.totalLaps;
-      this.lapExcluded = player.inPits || player.countLapFlag !== 2;
+      this.lapExcluded = player.inPits;
     }
     if (latestLap && latestLap.lapNumber !== this.lastLapSeen) {
       this.lastLapSeen = latestLap.lapNumber;

@@ -1,6 +1,6 @@
 import type { LiveConnection } from '../../../api/liveStream.js';
 import type { LiveSnapshot, LiveTiming } from '../../../../shared/types/live.js';
-import { configureDemoSession, demoResult, demoSnapshot, demoStrategy, demoTiming } from './demoData.js';
+import { configureDemoSession, demoResult, demoSnapshot, demoStrategy, demoTiming, type DemoSprint } from './demoData.js';
 import { configureDemoClass } from './demoClasses.js';
 
 interface DemoState { snapshot: LiveSnapshot | null; timing: LiveTiming | null; connection: LiveConnection }
@@ -20,6 +20,9 @@ export const DEMO_SCENARIOS: readonly Scenario[] = [
     s.lifecycle = 'loading'; s.loadingProgress = 0.63;
   }),
   scenario('garage-practice', 'Practice · 60 min', 'Practice preparation', s => {
+    s.lifecycle = 'garage'; s.session!.kind = 'practice'; s.session!.inRealtime = false;
+  }),
+  scenario('garage-practice-light', 'Practice · 60 min', 'Practice preparation · light load', s => {
     s.lifecycle = 'garage'; s.session!.kind = 'practice'; s.session!.inRealtime = false;
   }),
   scenario('practice-out-lap', 'Practice · 60 min', 'Practice · out lap', (s, t) => {
@@ -67,7 +70,8 @@ export const DEMO_SCENARIOS: readonly Scenario[] = [
   scenario('pit-entering', 'Race · pit stop', 'Pit entering', s => { s.strategy!.pit!.state = 'entering'; }),
   scenario('pit-stopped', 'Race · pit stop', 'Pit stopped', s => { s.strategy!.pit!.state = 'stopped'; }),
   scenario('pit-exiting', 'Race · pit stop', 'Pit exiting', s => { s.strategy!.pit!.state = 'exiting'; }),
-  scenario('sprint', 'Race · finish', '20 min sprint · finish reachable', () => {}),
+  scenario('no-stop', 'Race · opening and stint', '20 min · no stop, early', () => {}),
+  scenario('sprint', 'Race · finish', '20 min sprint · finish reachable, invalid last lap', s => { s.recentLaps[2].valid = false; }),
   scenario('finished', 'Race · finish', 'Race finished', s => {
     s.lifecycle = 'finished';
   }),
@@ -78,7 +82,6 @@ export const DEMO_SCENARIOS: readonly Scenario[] = [
   scenario('wet', 'Alternative conditions and incidents', 'Wet · getting wetter', s => { Object.assign(s.weather!, { raining: 0.5, avgPathWetness: 0.65, wetnessTrend: 'rising', trackTempTrend: 'falling' }); s.strategy!.tyres!.compound = 'Wet'; }),
   scenario('drying', 'Alternative conditions and incidents', 'Drying · rain ending', s => { Object.assign(s.weather!, { avgPathWetness: 0.3, wetnessTrend: 'falling' }); s.strategy!.forecast = { change: 'dry', chance: 0, atSeconds: 2100, lap: 20 }; }),
   scenario('fcy', 'Alternative conditions and incidents', 'Full course yellow', s => { s.session!.gamePhase = 6; }),
-  scenario('paused', 'Alternative conditions and incidents', 'Paused', s => { s.paused = true; s.session!.gamePhase = 9; }),
   scenario('not-recording', 'Alternative conditions and incidents', 'Recording stopped', s => { s.audit = { runId: 'demo', status: 'unavailable' }; }),
   scenario('tyres', 'Alternative conditions and incidents', 'Tread below minimum · sets short', s => { s.strategy!.tyres!.coverage = { target: 'pit', projectedTread: 0.32, setsNeeded: 2, availableSetsCover: false }; s.strategy!.tyres!.newSets = 0; }),
   scenario('tyres-mfd', 'Alternative conditions and incidents', 'Worn tyres · MFD no change', s => {
@@ -118,7 +121,10 @@ export function createDemoState(id: string, carClass: string | null = 'GT3', res
   const timing = demoTiming();
   selected.apply(snapshot, timing);
   configureDemoClass(snapshot, timing, carClass ?? 'GT3');
-  configureDemoSession(snapshot, timing, selected.id === 'sprint' || selected.id === 'garage-sprint', reserveLaps);
+  const sprint: DemoSprint = selected.id === 'no-stop' ? 'early' : selected.id === 'sprint' || selected.id === 'garage-sprint' ? 'late' : null;
+  configureDemoSession(snapshot, timing, sprint, reserveLaps);
+  // A light load for qualifying runs: practice says how many laps it holds instead of asking for more.
+  if (selected.id === 'garage-practice-light' && snapshot.strategy?.garage) snapshot.strategy.garage.setInGarage = 30;
   const reference = snapshot.sessionBest?.lapSeconds;
   timing.lapEstimate = !timing.isOutLap && reference != null && timing.deltaSeconds != null ? {
     seconds: Math.round((reference + timing.deltaSeconds) * 1000) / 1000,

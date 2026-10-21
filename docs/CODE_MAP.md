@@ -221,7 +221,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   - `src/api/liveStream.ts` (`useLiveStream`): manages SSE stream (`/api/live/stream`) with reconnect backoff.
   - `LiveTimingStore`: separate `useSyncExternalStore` subscription for high-frequency (5 Hz) timing updates.
   - `LiveEstimatedLap`: distinguishes out-laps from active line projections based on running deltas.
-  - UI modes: `LiveRaceView`, `LiveQualiView`, `LivePracticeView`, `LivePracticeHistory`, `LivePedalTrace` (canvas rAF from `PedalBuffer` ring), `LiveRacePlan.tsx` (`raceColumns.ts`, `raceAction.ts`), `LiveGarageChecklist.tsx`, `LiveDamageRow.tsx`, and `LiveSessionReview.tsx`.
+  - UI modes: `LiveRaceView`, `LivePracticeView` (practice, qualifying, warmup), `LivePracticeHistory`, `LivePedalTrace` (canvas rAF from `PedalBuffer` ring), `LiveRacePlan.tsx` (`raceColumns.ts`, `raceAction.ts`), `LiveGarageChecklist.tsx`, `LiveDamageRow.tsx`, and `LiveSessionReview.tsx`.
   - Offline demo mode: `demo/LiveDemoPage.tsx` (`#/live?demo=1`, scenarios in `demo/demoScenarios.ts`).
   - API anonymization (`src/api/anonymizeData.ts`) is scoped to explicit `demo`/`anonymize` URL flags; browser storage cannot enable it. `useAppData` refreshes status on mode changes, and demo scans never save masked configuration.
 - **Server** (`server/live/`):

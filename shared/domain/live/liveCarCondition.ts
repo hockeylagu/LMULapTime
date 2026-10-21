@@ -41,11 +41,16 @@ const NEW_TYRES_RISE = 0.05;
 /** More tread lost in one lap than this is damage, not wear (normal wear is well under 5% a lap). */
 const MAX_LAP_WEAR = 0.15;
 
-const mean = (values: readonly number[]): number => values.reduce((sum, value) => sum + value, 0) / values.length;
+/** One slow lap (an off, traffic) among the window must not read as damage pace. */
+const median = (values: readonly number[]): number => {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+};
 const round = (value: number, digits: number): number => Math.round(value * 10 ** digits) / 10 ** digits;
 
 /**
- * Damage for the race view: what is damaged, since which lap, the pace it costs (measured on the driver's own valid
+ * Damage for the race view: what is damaged, since which lap, the pace it costs (the median of the driver's own valid
  * laps either side of the impact, never guessed) and the repair time the game estimates. The estimate drops every
  * service time while a penalty is pending (the stop is a stop-and-go), so the last repair figure seen is kept.
  */
@@ -126,7 +131,7 @@ export class LiveDamageTracker {
   public damage(completedLaps: number, lapsLeft: number | null): LiveDamage | null {
     if (this.impactLap === null) return null;
     const pace = this.before.length >= PACE_LAPS && this.after.length >= PACE_LAPS
-      ? Math.max(0, round(mean(this.after) - mean(this.before), 1)) : null;
+      ? Math.max(0, round(median(this.after) - median(this.before), 1)) : null;
     const wheel = this.wheel();
     const condition = this.condition;
     return {

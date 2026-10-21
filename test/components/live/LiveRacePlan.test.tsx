@@ -4,6 +4,7 @@ import { LivePage } from '../../../src/components/live/LivePage.js';
 import { racePlanView } from '../../../src/components/live/race/raceAction.js';
 import type { LiveSnapshot } from '../../../shared/types/live.js';
 import type { LiveRacePlan, LiveStrategy } from '../../../shared/types/liveStrategy.js';
+import type { LiveTyreCoverage } from '../../../shared/types/liveInsights.js';
 import { FakeEventSource } from '../../helpers/fakeEventSource.js';
 import { liveSession, liveSnapshot, liveStrategy, liveTiming } from '../../helpers/liveSnapshot.js';
 
@@ -26,7 +27,7 @@ describe('racePlanView', () => {
     expect(texts(withRace({}))).toEqual({
       mode: 'stint',
       action: 'VE / LAP · LAST 3|2.5|%|+0.2 % SPARE / LAP',
-      cells: ['PIT IN|6|', 'TYRES · MEDIUM|91|0.4% / LAP', 'VE NOW|62|'],
+      cells: ['PIT IN|6|', 'TYRES · MEDIUM|91|', 'VE NOW|62|'],
     });
     expect(racePlanView(withRace({ sparePerLap: -0.3 })).action).toMatchObject({ tone: 'loss', note: '−0.3 % OVER / LAP' });
   });
@@ -96,14 +97,14 @@ describe('race page with a plan', () => {
     expect(screen.getByTestId('live-race-cell-1')).toHaveTextContent('VE AT FINISH~7%');
     expect(screen.queryByTestId('live-race-cell-3')).not.toBeInTheDocument();
     expect(screen.queryByText('RESERVE COVERED')).not.toBeInTheDocument();
-    expect(screen.getByTestId('live-race-deltas')).toHaveTextContent('TYRE SURFACE AVG');
-    expect(screen.getByTestId('live-last-lap')).toBeInTheDocument();
+    expect(screen.queryByTestId('live-tyre-avg')).not.toBeInTheDocument();
+    expect(screen.getByTestId('live-history')).toBeInTheDocument();
     send(withRace({ finishReachable: false, pitInLaps: 0 }));
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('THIS LAP');
-    expect(screen.getByTestId('live-race-deltas')).toHaveTextContent('ESTIMATED LAP');
+    expect(screen.queryByTestId('live-estimated-lap')).not.toBeInTheDocument();
   });
 
-  it('keeps the plan readouts in place across modes, and swaps the last-lap row for the damage row only when damage matters', () => {
+  it('keeps the plan readouts in place across modes, and swaps the session bar for the damage row only when damage matters', () => {
     render(<LivePage />);
     send(withRace({}));
     const plan = screen.getByTestId('live-race-plan');
@@ -113,7 +114,10 @@ describe('race page with a plan', () => {
     expect(screen.getByTestId('live-race-plan')).toBe(plan);
     expect(plan).toHaveAttribute('data-mode', 'pit');
     expect(screen.getByTestId('live-race-cell-1')).toHaveTextContent('VE · MFD38%SET 50%');
-    expect(screen.getByTestId('live-last-lap')).toBeInTheDocument();
+    // Two completed rows (held blank until driven), then one while damage takes the top.
+    const completed = () => screen.queryAllByTestId(/^live-history-(latest|row|blank)$/).length;
+    expect(completed()).toBe(2);
+    expect(screen.queryByTestId('live-damage-row')).not.toBeInTheDocument();
 
     const damage = { wheel: null, body: 0.4, suspension: 0.1, partsDetached: false, impactLap: 9, lapsSinceImpact: 3, paceLossPerLap: 0.8, lossToFinish: 4, repairSeconds: 30, significant: true };
     send({ ...withRace({}, { damage }), sequence: 3, lapsLeft: { laps: 5, estimated: true } });
@@ -122,9 +126,14 @@ describe('race page with a plan', () => {
     expect(row).toHaveTextContent('SINCE IMPACT3LAPS');
     expect(row).toHaveTextContent('TO FINISH · 5 LAPS+4.0s');
     expect(row).toHaveTextContent('REPAIR TIME · EST.30s');
-    expect(screen.queryByTestId('live-last-lap')).not.toBeInTheDocument();
+    expect(row).toHaveTextContent('LIVE');
+    // The bar gives way; the plan stays, and the history keeps the latest lap.
+    expect(screen.queryByTestId('live-personal-best')).not.toBeInTheDocument();
+    expect(screen.getByTestId('live-race-plan')).toBe(plan);
+    expect(completed()).toBe(1);
     send({ ...withRace({}, { damage: { ...damage, significant: false } }), sequence: 4 });
-    expect(screen.getByTestId('live-last-lap')).toBeInTheDocument();
+    expect(screen.queryByTestId('live-damage-row')).not.toBeInTheDocument();
+    expect(screen.getByTestId('live-personal-best')).toBeInTheDocument();
   });
 
   it('puts the forecast change in the weather slot instead of the track temperature', () => {
@@ -140,6 +149,7 @@ describe('race page with a plan', () => {
       kind: 've' as const, unit: '%' as const, sessionMinutes: 15, laps: 13, lapSeconds: 75.285, perLap: 2.5, perLapSource: 'measured' as const,
       lapsMeasured: 6, reserveLaps: 0.5, needed: 34, stops: 0, setInGarage: 30,
       tyres: { compound: 'Medium', used: true, wear: 0.98, newSets: 55 },
+      tyreCoverage: null as LiveTyreCoverage | null,
     };
     const inGarage = (kind: 'qualifying' | 'race' | 'practice', patch: Partial<typeof garage>, sequence: number) => liveSnapshot({
       sequence, lifecycle: 'garage', session: liveSession({ kind, inRealtime: false }), strategy: { ...base, resource: null, pit: null, garage: { ...garage, ...patch } },
@@ -154,6 +164,9 @@ describe('race page with a plan', () => {
     expect(rows()[0]).toHaveAttribute('data-action', 'change');
     // Qualifying and the race want a new set: the one carried over is a change to make.
     expect(rows()[1]).toHaveTextContent('TYRES · MEDIUMNEWUSED 98%FIT NEW');
+    // Even when the used set would last the session.
+    send(inGarage('qualifying', { tyreCoverage: { target: 'finish' as const, projectedTread: 0.9, setsNeeded: 0, availableSetsCover: true } }, 1.5));
+    expect(rows()[1]).toHaveTextContent('TYRES · MEDIUMNEWUSED 98%FIT NEW');
 
     send(inGarage('race', { setInGarage: 40, tyres: { ...garage.tyres, used: false, wear: 1 } }, 2));
     expect(rows()[0]).toHaveAttribute('data-action', 'ok');
@@ -161,10 +174,24 @@ describe('race page with a plan', () => {
     send(inGarage('race', { tyres: { ...garage.tyres, newSets: 0 } }, 3));
     expect(rows()[1]).toHaveAttribute('data-action', 'warn');
     expect(rows()[1]).toHaveTextContent('NO NEW SETS');
-    // Practice: any set will do, no call.
+    // Practice: any set will do, no call; a light load (qualifying runs) only says how many laps it holds.
     send(inGarage('practice', {}, 4));
+    expect(rows()[0]).toHaveTextContent('VE34%30%~12 LAPS');
+    expect(rows()[0]).toHaveAttribute('data-action', 'warn');
     expect(rows()[1]).toHaveTextContent('TYRES · MEDIUMANYUSED 98%');
     expect(rows()[1]).not.toHaveAttribute('data-action');
+    // On the grid the race checklist stays under the start phase, over the pedal trace, until the formation lap.
+    const onGrid = (gamePhase: number, sequence: number) => liveSnapshot({ sequence, lifecycle: 'starting', session: liveSession({ kind: 'race', gamePhase }),
+      strategy: { ...base, garage: { ...garage, tyres: { ...garage.tyres, used: false, wear: 1 } } } });
+    send(onGrid(0, 4.5));
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('ON THE GRID');
+    expect(rows()[0]).toHaveTextContent('VE34%30%RAISE +4%');
+    expect(rows()[1]).toHaveTextContent('TYRES · MEDIUMNEWNEWOK');
+    expect(screen.getByTestId('pedal-trace')).toBeInTheDocument();
+    // From the formation lap it is too late to go back in.
+    send(onGrid(3, 4.6));
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('RACE STARTING');
+    expect(screen.queryByTestId('live-garage-check')).not.toBeInTheDocument();
 
     send(liveSnapshot({ sequence: 5, lifecycle: 'loading', session: null, loadingProgress: 0.42 }));
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('LOADING');

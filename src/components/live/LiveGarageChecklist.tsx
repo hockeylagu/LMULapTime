@@ -26,9 +26,9 @@ function Value({ text, unit, className = '' }: { text: string; unit?: string; cl
  * The garage before a session as a checklist on the race columns: what to set, what the garage holds now, and the
  * one thing to do about it (raise the VE, fit new tyres), so the answer reads without comparing two numbers.
  */
-export function LiveGarageChecklist({ checks }: { checks: GarageCheck[] }) {
+export function LiveGarageChecklist({ checks, compact = false }: { checks: GarageCheck[]; compact?: boolean }) {
   return (
-    <section aria-label="Garage checklist" data-testid="live-garage-checks" className="mt-16">
+    <section aria-label="Garage checklist" data-testid="live-garage-checks" className={compact ? '' : 'mt-16'}>
       <div aria-hidden="true" className={`${RACE_ROW} pb-4`}>
         <span className={RACE_LEAD} />
         <span className={`${RACE_COLUMN} ${UNRULED} ${HEAD}`}>TO SET</span>

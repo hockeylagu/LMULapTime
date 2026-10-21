@@ -87,6 +87,25 @@ describe('LiveStrategyTracker', () => {
     expect(context(tracker, garage)?.fuelRatio).toMatchObject({ recommended: 0.81, source: 'measured', pairedLaps: 3 });
     expect(context(tracker, at(1, { raining: 0.5 }))?.fuelRatio).toBeNull();
   });
+  it('measures a lap the game counts through a countLapFlag blip, and leaves out a lap it invalidates', () => {
+    const tracker = new LiveStrategyTracker();
+    const lap = (lapNumber: number, valid: boolean) => ({ lapNumber, lapSeconds: LAP, sectors: [null, null, null] as [null, null, null], valid });
+    for (let et = 0; et <= 350; et += 1) {
+      const laps = Math.floor(et / LAP);
+      // COTA race 2026-10-20: the flag drops to 1 for a second or two on laps the game still counts.
+      const reading = at(et, et % LAP === 50 ? { player: vehicleReading({ totalLaps: laps, lapStartEt: laps * LAP, lapDist: 5000, estimatedLapTime: LAP, countLapFlag: 1 }) } : {});
+      const latestLap = laps === 0 ? null : lap(laps, laps !== 3);
+      context(tracker, reading, { latestLap });
+      if (et % 3 === 0) {
+        tracker.applyRest({ type: 'standings', veFraction: (90 - (VE_PER_LAP * et) / LAP) / 100, fuelFraction: 0.4, pitState: 'none', penalties: 0 });
+        context(tracker, reading, { latestLap });
+      }
+    }
+    // Laps 2 and 3 end on the line at 200 and 300 s: lap 2 counts despite its blip, lap 3 is invalid.
+    expect(tracker.observations().ve?.lap).toBe(2);
+    expect(context(tracker, at(350))?.resource).toMatchObject({ perLapSource: 'measured', lapsMeasured: 1 });
+  });
+
   it('uses the game estimate before a lap, then the measured VE per lap, and plans the stop of a timed race', () => {
     const tracker = new LiveStrategyTracker();
     tracker.applyRest({ type: 'tireManagement', vePerLap: 2.9, fuelPerLap: 2.1, newSets: 40, selected: null });
@@ -124,6 +143,11 @@ describe('LiveStrategyTracker', () => {
     const strategy = context(tracker, garage, { lapsLeft: null });
     expect(strategy?.resource).toBeNull();
     expect(strategy?.garage).toMatchObject({ kind: 've', sessionMinutes: 15, laps: 13, lapSeconds: 75, perLap: 2.5, needed: 34, setInGarage: 50 });
+    // On the grid the plan stays: the driver can still go back to the garage before the start.
+    const grid = at(0, { gamePhase: 0, endEt: 64, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 75 }) });
+    expect(context(tracker, grid, { lapsLeft: null })?.garage).toMatchObject({ sessionMinutes: 15, laps: 13, needed: 34, setInGarage: 50 });
+    // Once the race runs there is no garage plan.
+    expect(context(tracker, at(10, { gamePhase: 5 }))?.garage).toBeNull();
   });
 
   it('starts the next session of the event from the game estimate, so the fuel ratio is there before qualifying', () => {
@@ -170,11 +194,13 @@ describe('LiveStrategyTracker', () => {
     expect(context(tracker, at(150))?.forecast).toEqual({ change: 'rain', chance: 60, atSeconds: 750, lap: 8 });
   });
 
-  it('gives nothing in the menu, and forgets the event when the track or car changes', () => {
+  it('gives nothing in the menu, keeps the event through it, and forgets it when the track or car changes', () => {
     const tracker = new LiveStrategyTracker();
     drive(tracker, 0, 450);
     const menu = at(460);
     expect(tracker.update(menu, deriveLiveState(menu, 'driving', 'menu'), { carClass: 'GT3', layoutKey: null, lapsLeft: null, latestLap: null, reserveLaps: 0.5 })).toBeNull();
+    // Back from the menu with the same car on the same track: the event's measured use is kept.
+    expect(context(tracker, at(10))?.resource).toMatchObject({ perLap: 3, lapsMeasured: 3 });
     const other = at(10, { trackName: 'Bahrain International Circuit' });
     expect(context(tracker, other)?.resource).toMatchObject({ perLap: null, lapsMeasured: 0, amount: null });
   });

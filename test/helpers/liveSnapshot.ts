@@ -8,7 +8,7 @@ export const liveSession = (patch: Partial<LiveSessionInfo> = {}): LiveSessionIn
 
 /** A complete snapshot with every new field empty; override what a test is about. */
 export const liveSnapshot = (patch: Partial<LiveSnapshot> = {}): LiveSnapshot => ({
-  sequence: 1, receivedAt: 0, lifecycle: 'driving', paused: false, session: liveSession(),
+  sequence: 1, receivedAt: 0, lifecycle: 'driving', session: liveSession(),
   identity: null, lapsLeft: null, weather: null, recentLaps: [], sessionBest: null,
   loadingProgress: null, strategy: null, ...patch,
 });

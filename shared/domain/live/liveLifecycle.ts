@@ -75,7 +75,6 @@ export interface LiveVehicleReading {
 
 export interface LiveState {
   lifecycle: LiveLifecycle;
-  paused: boolean;
   session: LiveSessionInfo | null;
 }
 
@@ -105,23 +104,23 @@ export type LiveGameScreen = 'menu' | 'loading' | 'session';
  * it for the menu (seen live 2026-10-16).
  */
 export function deriveLiveState(reading: LiveScoringReading | null, previous: LiveLifecycle, screen: LiveGameScreen = 'session'): LiveState {
-  if (screen === 'loading') return { lifecycle: 'loading', paused: false, session: null };
-  if (screen === 'menu') return { lifecycle: 'menu', paused: false, session: null };
-  if (!reading) return { lifecycle: 'offline', paused: false, session: null };
-  const state = (lifecycle: LiveLifecycle, paused: boolean): LiveState => ({
+  if (screen === 'loading') return { lifecycle: 'loading', session: null };
+  if (screen === 'menu') return { lifecycle: 'menu', session: null };
+  if (!reading) return { lifecycle: 'offline', session: null };
+  const state = (lifecycle: LiveLifecycle): LiveState => ({
     lifecycle,
-    paused,
     session: lifecycle === 'menu' ? null : sessionInfo(reading),
   });
   // Navigation still says session: an empty buffer during initialization is not proof of the main menu.
-  if (reading.numVehicles <= 0) return { lifecycle: 'loading', paused: false, session: null };
-  if (!reading.inRealtime) return state('garage', false);
+  if (reading.numVehicles <= 0) return { lifecycle: 'loading', session: null };
+  if (!reading.inRealtime) return state('garage');
   const phase = reading.gamePhase;
-  if (phase >= 0 && phase <= 4) return state('starting', false);
-  if (phase >= 5 && phase <= 7) return state('driving', false);
-  if (phase === 8) return state(reading.player && reading.player.finishStatus === 0 ? 'driving' : 'finished', false);
-  if (phase === PAUSED_PHASE) return state(previous === 'offline' || previous === 'menu' || previous === 'loading' ? 'driving' : previous, true);
-  return state(previous, false);
+  if (phase >= 0 && phase <= 4) return state('starting');
+  if (phase >= 5 && phase <= 7) return state('driving');
+  if (phase === 8) return state(reading.player && reading.player.finishStatus === 0 ? 'driving' : 'finished');
+  // Paused (offline LMU never reports it; seen only in a race garage): the lifecycle stays.
+  if (phase === PAUSED_PHASE) return state(previous === 'offline' || previous === 'menu' || previous === 'loading' ? 'driving' : previous);
+  return state(previous);
 }
 
 function sessionInfo(reading: LiveScoringReading): LiveSessionInfo {

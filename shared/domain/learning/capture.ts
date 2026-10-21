@@ -52,7 +52,6 @@ export class LiveLearningCapture {
     else this.regimes.set(lap, regime);
     if (this.regimes.has(lap - 1) && this.regimes.get(lap - 1) !== regime) this.excluded.get(lap - 1)?.add('context-changed-at-crossing');
     if (player.inPits) reasons.add('pit-lap');
-    if (player.countLapFlag !== 2) reasons.add('invalid-live-lap');
     if (reading.gamePhase !== 5 && reading.gamePhase !== 9) reasons.add('caution-or-start');
     if (snapshot.strategy?.damage?.significant) reasons.add('damage');
     const events: LiveLearningEvent[] = [];

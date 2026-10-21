@@ -193,7 +193,7 @@ describe('LiveService', () => {
     frame(reading());
     frame(reading({ currentEt: 11 }));
     expect(sink.events()).toEqual(['snapshot', 'snapshot']);
-    expect(sink.data(1)).toMatchObject({ sequence: 1, lifecycle: 'driving', paused: false, session: { kind: 'race', trackName: 'Spa' } });
+    expect(sink.data(1)).toMatchObject({ sequence: 1, lifecycle: 'driving', session: { kind: 'race', trackName: 'Spa' } });
     expect(service.getSnapshot().session?.elapsedSeconds).toBe(11);
 
     frame(reading({ player: vehicleReading({ id: 1, place: 1, totalLaps: 3, vehicleName: 'Car', vehicleClass: 'GT3' }) }));

@@ -18,6 +18,15 @@ const WETNESS_TREND: Record<LiveWeather['wetnessTrend'], string> = { rising: 'ge
 const wetWeather = (weather: LiveWeather | null): LiveWeather | null =>
   weather !== null && (weather.raining > 0 || weather.avgPathWetness > 0) ? weather : null;
 
+/**
+ * The data status word: LIVE, CONNECTING or DISCONNECTED, or in a session NO REC (the recording stopped:
+ * disk, writer), so a missing capture is not found only after the race.
+ */
+export function liveStatus(snapshot: LiveSnapshot | null, connection: LiveConnection, inSession: boolean): { label: string; className: string } {
+  const notRecording = inSession && connection === 'live' && snapshot?.audit?.status === 'unavailable';
+  return notRecording ? { label: 'NO REC', className: 'text-lmu-warn' } : STATUS[connection];
+}
+
 interface LiveSessionBarProps {
   snapshot: LiveSnapshot | null;
   connection: LiveConnection;
@@ -36,10 +45,7 @@ export function LiveSessionBar({ snapshot, connection }: LiveSessionBarProps) {
   const weather = showSession ? snapshot.weather : null;
   const wet = wetWeather(weather);
   const forecast = showSession ? snapshot.strategy?.forecast ?? null : null;
-  const status = STATUS[connection];
-  const paused = showSession && connection === 'live' && snapshot.paused;
-  // The recording stopped (disk, writer): say so, so a missing capture is not found only after the race.
-  const notRecording = showSession && connection === 'live' && snapshot.audit?.status === 'unavailable';
+  const status = liveStatus(snapshot, connection, showSession);
   return (
     <header className="flex h-[88px] shrink-0 items-center justify-between whitespace-nowrap border-b border-lmu-border pb-5 text-[48px] font-semibold">
       <div className="flex items-center gap-7">
@@ -57,6 +63,12 @@ export function LiveSessionBar({ snapshot, connection }: LiveSessionBarProps) {
               // The badge is sized for a dense page; zoom brings it to cockpit scale without a second copy of it.
               <span className="flex shrink-0 items-center" style={{ zoom: 4 }}>
                 <CarClassBadge carClass={carClass} size="md" />
+              </span>
+            )}
+            {/* The race place follows the class: the race page has no other position line. */}
+            {session.kind === 'race' && snapshot.lifecycle !== 'garage' && (
+              <span data-testid="live-bar-place" className="inline-block min-w-[3ch] font-mono">
+                {session.playerPlace != null ? `P${session.playerPlace}` : UNKNOWN}
               </span>
             )}
           </>
@@ -97,9 +109,9 @@ export function LiveSessionBar({ snapshot, connection }: LiveSessionBarProps) {
             <span className="text-lmu-muted">PR</span> <b className="inline-block min-w-[8ch] text-right font-mono font-normal text-lmu-text-soft">{formatLapTime(personalBest)}</b>
           </span>
         )}
-        {/* PAUSED or NO REC takes the status slot, which is as wide as PAUSED in a session, so nothing moves. */}
-        <span data-testid="live-status" className={`font-mono ${showSession ? 'min-w-[6ch] text-right' : ''} ${paused || notRecording ? 'text-lmu-warn' : status.className}`}>
-          {paused ? 'PAUSED' : notRecording ? 'NO REC' : status.label}
+        {/* NO REC takes the status slot, which is held at its width in a session, so nothing moves. */}
+        <span data-testid="live-status" className={`font-mono ${showSession ? 'min-w-[6ch] text-right' : ''} ${status.className}`}>
+          {status.label}
         </span>
       </div>
     </header>

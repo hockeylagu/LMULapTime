@@ -23,7 +23,7 @@ export interface LiveScreen {
   note: string;
   /** Offline and menu read as waiting: muted title. */
   muted: boolean;
-  /** In the garage: the VE or fuel and the tyres to set before leaving. */
+  /** In the garage and on the grid before the formation lap: the VE or fuel and the tyres to set before leaving. */
   checks: GarageCheck[];
   /** The pedal trace stays for an input check (starting) and while driving. */
   showTrace: boolean;
@@ -56,13 +56,17 @@ function startingNote(gamePhase: number): string {
   return 'ON THE GRID';
 }
 
-/** The VE or fuel to load against the garage setting: raise it when short, fine when it covers the session. */
-function resourceCheck(plan: LiveGaragePlan): GarageCheck {
+/**
+ * The VE or fuel to load against the garage setting: raise it when short, fine when it covers the session. Practice
+ * may run light on purpose (qualifying runs), so a short load there only says how many laps it holds.
+ */
+function resourceCheck(plan: LiveGaragePlan, practice: boolean): GarageCheck {
   const name = resourceName(plan.kind);
-  const { needed, setInGarage: set, unit } = plan;
+  const { needed, setInGarage: set, unit, perLap } = plan;
   const action: GarageCheck['action'] = needed === null || set === null ? null
     : set >= needed ? { text: 'OK', tone: 'ok' }
-      : { text: `RAISE +${formatAmount(needed - set, unit)}${unit === '%' ? '%' : ' L'}`, tone: 'change' };
+      : practice ? perLap ? { text: `~${Math.floor(set / perLap)} LAPS`, tone: 'warn' } : null
+        : { text: `RAISE +${formatAmount(needed - set, unit)}${unit === '%' ? '%' : ' L'}`, tone: 'change' };
   return {
     label: name,
     target: formatAmount(needed, unit), current: formatAmount(set, unit), unit, action,
@@ -83,6 +87,38 @@ function tyreCheck(tyres: LiveGarageTyres | null, wantNew: boolean): GarageCheck
     : !tyres.used ? { text: 'OK', tone: 'ok' }
       : tyres.newSets === 0 ? { text: 'NO NEW SETS', tone: 'warn' } : { text: 'FIT NEW', tone: 'change' };
   return { label, compound, target: 'NEW', current, action };
+}
+
+/** The garage checklist: the VE or fuel load, the fuel ratio (VE classes) and the tyres the car goes out on. */
+function garageChecks(snapshot: LiveSnapshot, plan: LiveGaragePlan): GarageCheck[] {
+  const kind = snapshot.session?.kind;
+  const checks = [resourceCheck(plan, kind === 'practice'), tyreCheck(plan.tyres, kind === 'race' || kind === 'qualifying')];
+  const ratio = snapshot.strategy?.fuelRatio;
+  if (plan.kind === 've' && ratio) checks.splice(1, 0, {
+    label: 'FUEL RATIO', target: ratio.recommended?.toFixed(2) ?? UNKNOWN, current: ratio.garageSetting?.toFixed(2) ?? UNKNOWN,
+    note: ratio.recommended === null ? 'SETTING RANGE NOT READ' : ratio.source === 'game' ? 'GAME ESTIMATE' : undefined,
+    action: ratio.recommended === null || ratio.garageSetting === null ? null : ratio.garageSetting < ratio.recommended
+      ? { text: 'RAISE', tone: 'change' } : ratio.garageSetting > ratio.recommended ? { text: 'LOWER', tone: 'change' } : { text: 'OK', tone: 'ok' },
+  });
+  // Qualifying wants a new set however long the fitted one would last.
+  const coverage = kind === 'qualifying' ? null : plan.tyreCoverage;
+  if (coverage) {
+    const tyres = checks[checks.length - 1];
+    tyres.target = `~${Math.round(coverage.projectedTread * 100)}% END`;
+    tyres.note = coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR ? 'BELOW 40% MIN' : undefined;
+    tyres.action = coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR ? plan.tyres?.newSets === 0 ? { text: 'NO NEW SETS', tone: 'warn' } : { text: 'FIT NEW', tone: 'change' } : coverage.availableSetsCover === false ? { text: 'SETS SHORT', tone: 'warn' } : null;
+  }
+  return checks;
+}
+
+/** The session laps, length and (races) stop plan the garage load is worked out for. */
+function garagePreparation(kind: LiveSessionKind | undefined, plan: LiveGaragePlan): NonNullable<LiveScreen['preparation']> {
+  // Before the green flag LMU's clock is the countdown to the start: the race length (and its laps) come with it.
+  return { laps: kind === 'race' && plan.laps !== null ? Math.max(0, plan.laps - 1) : plan.laps,
+    length: plan.sessionMinutes !== null ? `${plan.sessionMinutes} MIN` : kind === 'race' ? 'LAPS AT THE START' : 'SESSION LENGTH UNKNOWN',
+    stopPlan: kind !== 'race' || plan.sessionMinutes === null ? null
+      : plan.stops === null ? 'STOPS UNKNOWN' : plan.stops === 0 ? 'NO STOP PLANNED'
+        : `${plan.stops} STOP${plan.stops === 1 ? '' : 'S'} PLANNED · ${plan.firstPitLap != null ? `PIT ~LAP ${plan.firstPitLap}` : 'PIT LAP UNKNOWN'}` };
 }
 
 /** The game's name for the track, as on its own screens (the same text in the bar and on every state screen). */
@@ -106,43 +142,31 @@ export function liveScreen(snapshot: LiveSnapshot): LiveScreen {
     case 'garage': {
       // The bar already says GARAGE and the track: the title names the session, the note how the targets were worked out.
       const plan = snapshot.strategy?.garage ?? null;
-      const wantNew = session?.kind === 'race' || session?.kind === 'qualifying';
-      const checks = plan ? [resourceCheck(plan), tyreCheck(plan.tyres, wantNew)] : [];
-      const ratio = snapshot.strategy?.fuelRatio;
-      if (plan?.kind === 've' && ratio) checks.splice(1, 0, {
-        label: 'FUEL RATIO', target: ratio.recommended?.toFixed(2) ?? UNKNOWN, current: ratio.garageSetting?.toFixed(2) ?? UNKNOWN,
-        note: ratio.recommended === null ? 'SETTING RANGE NOT READ' : ratio.source === 'game' ? 'GAME ESTIMATE' : undefined,
-        action: ratio.recommended === null || ratio.garageSetting === null ? null : ratio.garageSetting < ratio.recommended
-          ? { text: 'RAISE', tone: 'change' } : ratio.garageSetting > ratio.recommended ? { text: 'LOWER', tone: 'change' } : { text: 'OK', tone: 'ok' },
-      });
-      const coverage = plan?.tyreCoverage;
-      if (coverage) {
-        const tyres = checks[checks.length - 1];
-        tyres.target = `~${Math.round(coverage.projectedTread * 100)}% END`;
-        tyres.note = coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR ? 'BELOW 40% MIN' : undefined;
-        tyres.action = coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR ? plan?.tyres?.newSets === 0 ? { text: 'NO NEW SETS', tone: 'warn' } : { text: 'FIT NEW', tone: 'change' } : coverage.availableSetsCover === false ? { text: 'SETS SHORT', tone: 'warn' } : null;
-      }
       const qualifying = snapshot.qualifyingResult;
       const qualiNote = session?.kind === 'race' && qualifying ? `QUALI ${qualifying.classPlace !== null ? `P${qualifying.classPlace}` : UNKNOWN} ${formatLapTime(qualifying.bestLap)}${qualifying.settled === true ? '' : ' (PROVISIONAL)'}` : '';
       return {
         title: kind,
         note: plan ? qualiNote : 'WAITING FOR GARAGE DATA',
-        // Before the green flag LMU's clock is the countdown to the start: the race length (and its laps) come with it.
-        preparation: plan ? { laps: session?.kind === 'race' && plan.laps !== null ? Math.max(0, plan.laps - 1) : plan.laps,
-          length: plan.sessionMinutes !== null ? `${plan.sessionMinutes} MIN` : session?.kind === 'race' ? 'LAPS AT THE START' : 'SESSION LENGTH UNKNOWN',
-          stopPlan: session?.kind !== 'race' || plan.sessionMinutes === null ? null
-          : plan.stops === null ? 'STOPS UNKNOWN' : plan.stops === 0 ? 'NO STOP PLANNED'
-            : `${plan.stops} STOP${plan.stops === 1 ? '' : 'S'} PLANNED · ${plan.firstPitLap != null ? `PIT ~LAP ${plan.firstPitLap}` : 'PIT LAP UNKNOWN'}` } : undefined,
+        preparation: plan ? garagePreparation(session?.kind, plan) : undefined,
         muted: false,
-        checks,
+        checks: plan ? garageChecks(snapshot, plan) : [],
         showTrace: false,
       };
     }
-    case 'starting':
+    case 'starting': {
+      // On the grid, until the formation lap, the driver can still go back to the garage for fuel, tyres or setup: the
+      // checklist stays, and the start phase becomes the title (the bar names the session) so it fits over the trace.
+      const gamePhase = session?.gamePhase ?? 0;
+      const plan = gamePhase < 3 ? snapshot.strategy?.garage ?? null : null;
+      const phase = startingNote(gamePhase);
       return {
-        title: session?.kind === 'race' ? 'RACE STARTING' : `${kind} STARTING`,
-        note: startingNote(session?.gamePhase ?? 0), muted: false, checks: [], showTrace: true,
+        title: plan ? phase : session?.kind === 'race' ? 'RACE STARTING' : `${kind} STARTING`,
+        note: plan ? '' : phase, muted: false,
+        preparation: plan ? garagePreparation(session?.kind, plan) : undefined,
+        checks: plan ? garageChecks(snapshot, plan) : [],
+        showTrace: true,
       };
+    }
     case 'finished':
       return { title: 'SESSION OVER', note: '', muted: false, checks: [], showTrace: false };
     case 'driving':

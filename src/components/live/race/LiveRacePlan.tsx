@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 import type { LiveTimingStore } from '../../../api/liveStream.js';
-import type { LiveSnapshot } from '../../../../shared/types/live.js';
 import { LiveEstimatedLap } from '../LiveEstimatedLap.js';
 import { RACE_COLUMN, RACE_LEAD, RACE_ROW, RULED } from '../raceColumns.js';
 import type { RacePlanView, PlanReadout, PlanTone } from './raceAction.js';
@@ -44,9 +43,7 @@ function Readout({ readout, size, testId, children }: { readout: PlanReadout; si
  * The race advice: one lead readout (pit countdown, per-lap use mid-stint, the estimated lap in a sprint, pit now)
  * and the supporting values. A finish-covered sprint gives pace two columns and keeps only resource and tread.
  */
-export function LiveRacePlan({ snapshot, view, store }: { snapshot: LiveSnapshot; view: RacePlanView; store: LiveTimingStore }) {
-  const session = snapshot.session;
-  const lap = session?.playerLapsCompleted != null ? session.playerLapsCompleted + 1 : null;
+export function LiveRacePlan({ view, store }: { view: RacePlanView; store: LiveTimingStore }) {
   return (
     <section
       aria-label="Race plan"
@@ -59,9 +56,6 @@ export function LiveRacePlan({ snapshot, view, store }: { snapshot: LiveSnapshot
           {/* Only this readout follows the timing stream; strategy and the page stay on snapshots. */}
           {view.mode === 'sprint' ? <LiveEstimatedLap store={store} /> : undefined}
         </Readout>
-        <p data-testid="live-race-position" className="whitespace-nowrap font-mono text-[48px] font-semibold text-lmu-muted">
-          LAP {lap ?? '—'} · {session?.playerPlace != null ? `P${session.playerPlace}` : '—'}
-        </p>
       </div>
       {view.cells.map((cell, index) => (
         <div key={index} className={`${RACE_COLUMN} ${RULED} self-center`}>

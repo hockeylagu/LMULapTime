@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, cleanup, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, cleanup, waitFor, within } from '@testing-library/react';
 import { LivePage } from '../../../src/components/live/LivePage.js';
 import LiveDemoPage from '../../../src/components/live/demo/LiveDemoPage.js';
 import { createDemoState, DEMO_SCENARIOS } from '../../../src/components/live/demo/demoScenarios.js';
@@ -140,7 +140,7 @@ describe('offline live dashboard demo', () => {
   it('steps through session preparation, out laps, qualifying results and race start in weekend order', () => {
     render(<LiveDemoPage />);
     for (const [from, next] of [
-      ['garage-practice', 'practice-out-lap'], ['invalid-lap', 'garage-qualifying'],
+      ['garage-practice', 'garage-practice-light'], ['garage-practice-light', 'practice-out-lap'], ['invalid-lap', 'garage-qualifying'],
       ['garage-qualifying', 'qualifying-out-lap'], ['positive-delta', 'result-qualifying'],
       ['result-qualifying', 'result-qualifying-settled'], ['start-0', 'start-3'],
       ['start-3', 'start-4'], ['pit-entering', 'pit-stopped'], ['pit-stopped', 'pit-exiting'],
@@ -164,6 +164,31 @@ describe('offline live dashboard demo', () => {
     pick(/Scenario/, 'race');
     expect(screen.getByTestId('live-race-plan')).toBeInTheDocument();
     expect(FakeEventSource.instances).toHaveLength(0);
+  });
+
+  it('shows the race layout: the place in the bar, the plan over the lap history, damage in the bar place', () => {
+    render(<LiveDemoPage />);
+    pick(/Scenario/, 'sprint');
+    expect(screen.getByTestId('live-race-plan')).toHaveAttribute('data-mode', 'sprint');
+    expect(screen.getByTestId('live-bar-place')).toHaveTextContent('P3');
+    expect(screen.queryByTestId('live-race-position')).toBeNull();
+    expect(screen.getByTestId('live-race-action')).toHaveTextContent('ESTIMATED LAP');
+    expect(screen.getByTestId('live-history-current')).toBeInTheDocument();
+    // The last lap shows even when invalid, muted; no tyre temperature; the BEST row closes the table.
+    expect(screen.getByTestId('live-history-latest')).toHaveClass('text-lmu-muted');
+    expect(screen.getAllByTestId('live-history-row')).toHaveLength(1);
+    expect(screen.queryByTestId('live-tyre-avg')).toBeNull();
+    expect(screen.getByTestId('live-history-best')).toBeInTheDocument();
+    pick(/Scenario/, 'no-stop');
+    expect(screen.getByTestId('live-race-plan')).toHaveAttribute('data-mode', 'sprint');
+    expect(screen.getAllByTestId('live-history-row')).toHaveLength(1);
+    pick(/Scenario/, 'damage-body');
+    expect(screen.getByTestId('live-damage-row')).toBeInTheDocument();
+    expect(screen.getByTestId('live-race-plan')).toBeInTheDocument();
+    expect(screen.queryByTestId('live-bar-place')).toBeNull();
+    expect(within(screen.getByTestId('live-damage-row')).getByTestId('live-status')).toHaveTextContent('LIVE');
+    expect(screen.queryByTestId('live-history-row')).toBeNull();
+    expect(screen.getByTestId('pedal-trace')).toBeInTheDocument();
   });
 
   it('applies every class to every scenario without mixing resource types or identity', () => {

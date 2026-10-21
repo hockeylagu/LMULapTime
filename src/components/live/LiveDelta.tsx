@@ -16,9 +16,12 @@ interface LiveDeltaProps {
 export function LiveDelta({ seconds, unit = true }: LiveDeltaProps) {
   if (seconds === null) return <span data-delta="unknown" className="text-lmu-muted">{UNKNOWN}</span>;
   const tone = deltaTone(seconds);
+  const text = formatSignedDelta(seconds);
   return (
     <span data-delta={tone} className={TONE_CLASS[tone]}>
-      {formatSignedDelta(seconds)}
+      {/* Zero has no sign: an unseen one holds its place so the digits line up with the signed rows. */}
+      {text.startsWith('+') || text.startsWith('−') ? null : <span aria-hidden="true" className="invisible">+</span>}
+      {text}
       {unit && <span className="ml-[0.2em] text-[0.5em] font-normal text-lmu-text-soft">s</span>}
     </span>
   );

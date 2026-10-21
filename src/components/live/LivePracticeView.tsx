@@ -1,8 +1,9 @@
-import type { LiveTimingStore } from '../../api/liveStream.js';
+import { useLiveTiming, type LiveTimingStore } from '../../api/liveStream.js';
 import type { LiveSnapshot } from '../../../shared/types/live.js';
 import type { ReactNode } from 'react';
 import { LiveEstimatedLap } from './LiveEstimatedLap.js';
-import { formatLapTime, lastLap } from './liveFormat.js';
+import { LiveDelta } from './LiveDelta.js';
+import { formatLapTime, UNKNOWN } from './liveFormat.js';
 import { LivePracticeHistory } from './LivePracticeHistory.js';
 
 function Timing({ label, children }: { label: string; children: ReactNode }) {
@@ -14,10 +15,18 @@ function Timing({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/** Practice, warmup and unknown sessions: estimated lap leads, followed by last lap, best and history. */
+/** The lap in progress against the best, live; the last lap is in the history below. */
+function CurrentDelta({ store }: { store: LiveTimingStore }) {
+  return <span data-testid="live-practice-delta"><LiveDelta seconds={useLiveTiming(store)?.deltaSeconds ?? null} unit={false} /></span>;
+}
+
+/**
+ * Practice, qualifying, warmup and unknown sessions: estimated lap leads, followed by the live delta, the session best
+ * (laps left in qualifying, where the best is already the history's BEST row) and the history.
+ */
 export function LivePracticeView({ snapshot, store }: { snapshot: LiveSnapshot; store: LiveTimingStore }) {
-  const latest = lastLap(snapshot.recentLaps);
   const best = snapshot.sessionBest;
+  const lapsLeft = snapshot.lapsLeft;
   return (
     <>
       <section aria-label="Last lap and session timing" className="grid min-h-0 flex-1 grid-cols-[1.05fr_1fr] items-center">
@@ -28,11 +37,13 @@ export function LivePracticeView({ snapshot, store }: { snapshot: LiveSnapshot; 
           </div>
         </div>
         <div className="grid grid-cols-2 gap-x-[60px] border-l border-lmu-border pl-[60px]">
-          <Timing label="LAST LAP"><span data-testid="live-practice-last" title={latest?.timeSource === 'lap-start' ? 'Computed lap time' : undefined} className={latest && !latest.valid ? 'text-lmu-muted' : undefined}>{formatLapTime(latest?.lapSeconds)}</span></Timing>
-          <Timing label="SESSION BEST">{formatLapTime(best?.lapSeconds)}</Timing>
+          <Timing label="DELTA"><CurrentDelta store={store} /></Timing>
+          {snapshot.session?.kind === 'qualifying'
+            ? <Timing label="LAPS LEFT"><span data-testid="live-quali-laps-left">{lapsLeft ? `${lapsLeft.estimated ? '~' : ''}${lapsLeft.laps}` : UNKNOWN}</span></Timing>
+            : <Timing label="SESSION BEST">{formatLapTime(best?.lapSeconds)}</Timing>}
         </div>
       </section>
-      <LivePracticeHistory laps={snapshot.recentLaps} best={best} store={store} paused={snapshot.paused} />
+      <LivePracticeHistory laps={snapshot.recentLaps} best={best} store={store} />
     </>
   );
 }

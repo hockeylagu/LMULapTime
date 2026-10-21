@@ -21,7 +21,9 @@ describe('fuel ratio', () => {
     expect(planFuelRatio({ ...input, options: [0.83, 0.86] })?.recommended).toBe(0.86);
   });
   it('labels the game fallback and refuses to invent settings or clamp a too-high ratio', () => {
-    expect(planFuelRatio({ ...input, ratios: [0.9] })).toMatchObject({ recommended: 0.84, source: 'game' });
+    expect(planFuelRatio({ ...input, ratios: [0.82] })).toMatchObject({ recommended: 0.84, source: 'game' });
+    // A measured lap above the game's estimate lifts it before three laps are paired.
+    expect(planFuelRatio({ ...input, ratios: [0.846] })).toMatchObject({ recommended: 0.85, source: 'game' });
     expect(planFuelRatio({ ...input, options: [] })?.recommended).toBeNull();
     expect(planFuelRatio({ ...input, ratios: [2, 2, 2] })?.recommended).toBeNull();
     expect(planFuelRatio({ ...input, fuelPerLap: null, ratios: [] })).toBeNull();

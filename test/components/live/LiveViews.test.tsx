@@ -94,34 +94,26 @@ describe('live driving views', () => {
       sessionBest: BEST,
     });
 
-    it('shows the estimated lap, the sectors with signed gains and losses, the running delta of the sector in progress, and the last lap', () => {
+    it('shows the lap in progress with its delta, the last lap and its sectors against the best ones, the BEST row and the place in the bar', () => {
       render(<LivePage />);
       send(race());
       timing(liveTiming({ deltaSeconds: -0.184, sectorDeltas: [-0.12, 0.064, null], sector: 3 }));
-      const row = screen.getByTestId('live-race-deltas');
-      // The session best plus the running delta.
-      expect(row).toHaveTextContent('ESTIMATED LAP2:01.222');
-      expect(within(row).getByText('−0.120')).toHaveAttribute('data-delta', 'gain');
-      expect(within(row).getByText('+0.064')).toHaveAttribute('data-delta', 'loss');
-      // S3 in progress: the lap delta minus S1 and S2.
-      expect(within(row).getByTestId('live-active-sector')).toHaveTextContent('−0.128');
-      const last = screen.getByTestId('live-last-lap');
-      expect(last).toHaveTextContent('LAST LAP 12');
-      expect(last).toHaveTextContent('2:01.832');
-      expect(last).toHaveTextContent('37.204');
-      expect(last).toHaveTextContent('45.116');
-      expect(last).toHaveTextContent('39.512');
-      expect(screen.getByTestId('live-race-position')).toHaveTextContent('LAP 13 · P3');
+      const current = screen.getByTestId('live-history-current');
+      expect(within(current).getByText('−0.184')).toHaveAttribute('data-delta', 'gain');
+      expect(screen.getByTestId('live-history-latest')).toHaveTextContent('122:01.83237.20445.11639.512+0.426');
+      expect(screen.getByTestId('live-completed-sector-delta-1')).toHaveTextContent('+0.054');
+      expect(screen.getByTestId('live-history-best')).toHaveTextContent('BEST2:01.40637.15044.98039.154');
+      expect(screen.getByTestId('live-bar-place')).toHaveTextContent('P3');
+      expect(screen.queryByTestId('live-tyre-avg')).not.toBeInTheDocument();
     });
 
     it('shows the unknown mark, never zero, before timing and a lap exist', () => {
       render(<LivePage />);
       send(liveSnapshot());
-      const row = screen.getByTestId('live-race-deltas');
-      expect(within(row).getAllByText('—')).toHaveLength(4);
-      expect(within(row).queryByTestId('live-active-sector')).not.toBeInTheDocument();
-      expect(row).not.toHaveTextContent('0.000');
-      expect(screen.getByTestId('live-last-lap')).not.toHaveTextContent('0');
+      const current = screen.getByTestId('live-history-current');
+      expect(within(current).getAllByText('—').length).toBeGreaterThan(0);
+      expect(screen.queryByTestId('live-history-latest')).not.toBeInTheDocument();
+      expect(screen.getByTestId('live-history')).not.toHaveTextContent('0.000');
     });
 
     it('updates only the timing parts on a timing event, not the page shell', () => {
@@ -130,17 +122,17 @@ describe('live driving views', () => {
       const before = bar.renders;
       timing(liveTiming({ deltaSeconds: -0.1 }));
       timing(liveTiming({ deltaSeconds: 0.25 }));
-      expect(screen.getByTestId('live-race-deltas')).toHaveTextContent('2:01.656');
+      expect(screen.getByTestId('live-history-current')).toHaveTextContent('+0.250');
       expect(bar.renders).toBe(before);
     });
 
     it('drops the timing when the game leaves the track', () => {
       render(<LivePage />);
       send(race());
-      timing(liveTiming());
+      timing(liveTiming({ deltaSeconds: 0.25 }));
       send(liveSnapshot({ sequence: 3, lifecycle: 'garage' }));
       send(race());
-      expect(within(screen.getByTestId('live-race-deltas')).getAllByText('—')).toHaveLength(4);
+      expect(screen.getByTestId('live-history-current')).not.toHaveTextContent('+0.250');
     });
   });
 
@@ -158,34 +150,19 @@ describe('live driving views', () => {
   describe('qualifying', () => {
     const quali = () => liveSnapshot({ session: liveSession({ kind: 'qualifying' }), recentLaps: [LAPS[2]], sessionBest: BEST });
 
-    it('leads with estimated lap and place, session best and laps left, tyre average and last lap', () => {
+    it('takes the practice layout with laps left in place of the session best, and no place', () => {
       render(<LivePage />);
       send({ ...quali(), lapsLeft: { laps: 3, estimated: true } });
       expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('ESTIMATED LAP');
       expect(screen.getByTestId('live-estimated-lap')).toHaveTextContent('—');
-      expect(screen.queryByTestId('live-push-delta')).not.toBeInTheDocument();
-      expect(screen.getByTestId('live-tyre-avg')).toHaveTextContent('—°C');
-      timing(liveTiming({ deltaSeconds: 0.321 }));
-      expect(screen.getByTestId('live-estimated-lap')).toHaveTextContent('2:01.727');
-      timing({ ...liveTiming({ deltaSeconds: -0.184 }), tyreSurfaceAvgC: 82.4 });
+      timing(liveTiming({ deltaSeconds: -0.184 }));
       expect(screen.getByTestId('live-estimated-lap')).toHaveTextContent('2:01.222');
-      expect(screen.getByTestId('live-tyre-avg')).toHaveTextContent('82°C');
-      expect(screen.getByTestId('live-last-lap')).toHaveTextContent('2:01.832');
-      expect(screen.getByTestId('live-quali-best')).toHaveTextContent('SESSION BEST2:01.406');
-      expect(screen.getByTestId('live-quali-estimate')).toHaveTextContent('ESTIMATED LAP2:01.222');
-      expect(screen.getByTestId('live-quali-laps-left')).toHaveTextContent('LAPS LEFT~3');
-      expect(screen.getByTestId('live-quali-place')).toHaveTextContent('P3');
-    });
-
-    it('shows the sectors against the best as they are crossed, the one in progress refreshing with the lap delta', () => {
-      render(<LivePage />);
-      send(quali());
-      timing(liveTiming({ sector: 2, deltaSeconds: 0.03, sectorDeltas: [-0.12, null, null] }));
-      const row = screen.getByTestId('live-quali-deltas');
-      expect(row).toHaveTextContent('S1 VS BEST−0.120');
-      expect(within(row).getByTestId('live-active-sector')).toHaveTextContent('+0.150');
-      timing(liveTiming({ sector: 2, deltaSeconds: -0.2, sectorDeltas: [-0.12, null, null] }));
-      expect(within(row).getByTestId('live-active-sector')).toHaveTextContent('−0.080');
+      expect(screen.getByTestId('live-practice-delta')).toHaveTextContent('−0.184');
+      expect(screen.getByTestId('live-quali-laps-left')).toHaveTextContent('~3');
+      expect(screen.queryByText('SESSION BEST')).not.toBeInTheDocument();
+      expect(screen.getByTestId('live-history-best')).toHaveTextContent('BEST2:01.406');
+      expect(screen.queryByText('P3')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('live-tyre-avg')).not.toBeInTheDocument();
     });
   });
 
@@ -194,20 +171,19 @@ describe('live driving views', () => {
       session: liveSession({ kind }), recentLaps: LAPS, sessionBest: BEST, ...patch,
     });
 
-    it('shows the last lap, the estimated lap, session best, the history table and the BEST row', () => {
+    it('shows the live delta, the estimated lap, session best, the history table and the BEST row', () => {
       render(<LivePage />);
       send(practice());
       timing(liveTiming({ deltaSeconds: -0.184 }));
-      expect(screen.getByTestId('live-practice-last')).toHaveTextContent('2:01.832');
+      expect(screen.getByTestId('live-practice-delta')).toHaveTextContent('−0.184');
       expect(screen.getByText('SESSION BEST').nextElementSibling).toHaveTextContent('2:01.406');
       expect(screen.getByText('ESTIMATED LAP').nextElementSibling).toHaveTextContent('2:01.222');
-      expect(screen.queryByTestId('live-practice-delta')).not.toBeInTheDocument();
       expect(screen.queryByText('CURRENT VS BEST')).not.toBeInTheDocument();
       const rows = within(screen.getByTestId('live-history')).getAllByRole('row');
       // Header, current splits, two laps newest first, the BEST footer.
       expect(rows).toHaveLength(6);
       expect(rows[2]).toHaveTextContent('52:01.83237.20445.11639.512+0.426');
-      expect(screen.getByTestId('live-history-best')).toHaveTextContent('BEST2:01.40637.20045.00039.200');
+      expect(screen.getByTestId('live-history-best')).toHaveTextContent('BEST2:01.40637.15044.98039.154');
     });
 
     it('fills current splits from timing events before a lap completes, then moves all splits into history', () => {
@@ -235,9 +211,9 @@ describe('live driving views', () => {
       expect(screen.getByTestId('live-history-latest').querySelector('.text-lmu-loss')).not.toBeNull(); // Overall lap delta.
       expect(screen.getByTestId('live-history').querySelector('[data-sector-loss]')).toBeNull();
       expect(within(screen.getByTestId('live-history')).getAllByRole('row', { name: /sector deltas against/ })).toHaveLength(1);
-      expect(screen.getByTestId('live-completed-sector-delta-1')).toHaveTextContent('+0.004');
-      expect(screen.getByTestId('live-completed-sector-delta-2')).toHaveTextContent('+0.116');
-      expect(screen.getByTestId('live-completed-sector-delta-3')).toHaveTextContent('+0.312');
+      expect(screen.getByTestId('live-completed-sector-delta-1')).toHaveTextContent('+0.054');
+      expect(screen.getByTestId('live-completed-sector-delta-2')).toHaveTextContent('+0.136');
+      expect(screen.getByTestId('live-completed-sector-delta-3')).toHaveTextContent('+0.358');
     });
 
     it('dims an invalid lap without extra text and does not tint it', () => {
@@ -263,10 +239,9 @@ describe('live driving views', () => {
     it('shows the unknown mark for what is not known yet', () => {
       render(<LivePage />);
       send(practice({ recentLaps: [liveLap(1, null, [null, 45.1, null])], sessionBest: null }));
-      expect(screen.getByTestId('live-practice-last')).toHaveTextContent('—');
+      expect(screen.getByTestId('live-practice-delta')).toHaveTextContent('—');
       expect(screen.getByText('SESSION BEST').nextElementSibling).toHaveTextContent('—');
       expect(screen.getByTestId('live-history-best')).toHaveTextContent('BEST————');
-      expect(screen.queryByTestId('live-practice-delta')).not.toBeInTheDocument();
     });
   });
 });

@@ -8,7 +8,7 @@ import { planGarage, planRace, sessionLaps } from '../../../../shared/domain/liv
 export function demoSnapshot(): LiveSnapshot {
   const circuit = getCircuitSpecification(null, null, 'monzawec');
   return {
-    sequence: 1, receivedAt: 0, lifecycle: 'driving', paused: false, loadingProgress: null,
+    sequence: 1, receivedAt: 0, lifecycle: 'driving', loadingProgress: null,
     session: { kind: 'race', sessionCode: 10, gamePhase: 5, inRealtime: true,
       trackName: 'Monza', vehicleName: 'Ferrari 499P', vehicleClass: 'Hypercar',
       elapsedSeconds: 1450, endSeconds: 3600, playerLapsCompleted: 12, playerPlace: 3, playerClassPlace: 2 },
@@ -16,11 +16,11 @@ export function demoSnapshot(): LiveSnapshot {
     lapsLeft: { laps: 23, estimated: true },
     weather: { trackTempC: 32, trackTempTrend: 'rising', raining: 0, avgPathWetness: 0, wetnessTrend: 'steady' },
     recentLaps: [
-      { lapNumber: 10, lapSeconds: 97.1, sectors: [30.2, 33.4, 33.5], valid: true },
+      { lapNumber: 10, lapSeconds: 97.1, sectors: [30.05, 33.45, 33.6], valid: true },
       { lapNumber: 11, lapSeconds: 96.6, sectors: [30.1, 33.2, 33.3], valid: true },
       { lapNumber: 12, lapSeconds: 96.9, sectors: [30.2, 33.3, 33.4], valid: true },
     ],
-    sessionBest: { lapSeconds: 96.6, lapSectors: [30.1, 33.2, 33.3], bestSectors: [30.1, 33.2, 33.3], bestPossibleSeconds: 96.6 },
+    sessionBest: { lapSeconds: 96.6, lapSectors: [30.1, 33.2, 33.3], bestSectors: [30.05, 33.2, 33.3], bestPossibleSeconds: 96.55 },
     strategy: null,
   };
 }
@@ -51,8 +51,11 @@ export function demoResult(): LiveSessionResult {
     pitStops: 1, resourceKind: 've', resourceRemaining: 8, actualPerLap: 4, plannedPerLap: 4.1, tyreTread: 0.62 };
 }
 
+/** A 20-minute race the tank covers: late (eight laps done, little to spare) or early (three done, ~6 % at the finish). */
+export type DemoSprint = 'late' | 'early' | null;
+
 /** Keep illustrative clocks, history and resource plans consistent with the selected session. */
-export function configureDemoSession(snapshot: LiveSnapshot, timing: LiveTiming, sprint: boolean, reserveLaps = 0.5): void {
+export function configureDemoSession(snapshot: LiveSnapshot, timing: LiveTiming, sprint: DemoSprint, reserveLaps = 0.5): void {
   const session = snapshot.session;
   if (!session) return;
   const qualifying = session.kind === 'qualifying';
@@ -60,7 +63,7 @@ export function configureDemoSession(snapshot: LiveSnapshot, timing: LiveTiming,
   session.endSeconds = qualifying ? 600 : sprint ? 1200 : 3600;
   session.sessionCode = qualifying ? 5 : session.kind === 'race' ? 10 : 1;
   if (qualifying || sprint) {
-    session.playerLapsCompleted = qualifying ? 4 : 8;
+    session.playerLapsCompleted = qualifying ? 4 : sprint === 'early' ? 3 : 8;
     timing.lapNumber = session.playerLapsCompleted + 1;
     snapshot.recentLaps.forEach((lap, i) => { lap.lapNumber = session.playerLapsCompleted! - 2 + i; });
     session.elapsedSeconds = session.playerLapsCompleted * pace + (timing.lapElapsedSeconds ?? 0);
@@ -103,15 +106,18 @@ export function configureDemoSession(snapshot: LiveSnapshot, timing: LiveTiming,
     if (strategy.tyres && timing.isOutLap) { strategy.tyres.worst = 1; strategy.tyres.wearPerLap = null; }
   }
   if (sprint && resource && snapshot.lapsLeft) {
-    resource.amount = 26;
-    resource.lapsInTank = 26 / 4 - reserveLaps;
-    resource.race = planRace({ amount: 26, perLap: 4, reserveLaps, capacity: 100,
-      lapsLeft: snapshot.lapsLeft.laps, lapFraction: (timing.lapElapsedSeconds ?? 0) / pace, lapNumber: timing.lapNumber });
+    const lapFraction = (timing.lapElapsedSeconds ?? 0) / pace;
+    const amount = sprint === 'early' ? Math.round((snapshot.lapsLeft.laps - lapFraction) * 4 + 6) : 26;
+    resource.amount = amount;
+    resource.lapsInTank = amount / 4 - reserveLaps;
+    resource.race = planRace({ amount, perLap: 4, reserveLaps, capacity: 100,
+      lapsLeft: snapshot.lapsLeft.laps, lapFraction, lapNumber: timing.lapNumber });
   }
-  if (strategy && snapshot.lifecycle === 'garage') {
+  // The grid keeps the garage plan: the driver can still go back in before the formation lap.
+  if (strategy && (snapshot.lifecycle === 'garage' || snapshot.lifecycle === 'starting')) {
     session.elapsedSeconds = 0;
     session.playerLapsCompleted = 0;
-    session.gamePhase = 0;
+    if (snapshot.lifecycle === 'garage') session.gamePhase = 0;
     snapshot.recentLaps = [];
     snapshot.sessionBest = null;
     snapshot.lapsLeft = null;

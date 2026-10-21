@@ -54,12 +54,11 @@ function tyresCell(tyres: LiveTyres | null): PlanReadout {
     tone: coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR ? 'loss' : null,
   };
   const worst = tyres?.worst ?? null;
-  const wear = tyres?.wearPerLap ?? null;
   return {
     label: tyres?.compound ? `TYRES · ${tyres.compound.toUpperCase()}` : 'TYRES',
     value: worst === null ? UNKNOWN : `${Math.round(worst * 100)}`,
     unit: worst === null ? undefined : '%',
-    note: wear !== null ? `${(wear * 100).toFixed(1)}% / LAP` : tyres?.newSets === 0 ? 'NO NEW SETS' : undefined,
+    note: tyres?.newSets === 0 ? 'NO NEW SETS' : undefined,
     tone: compoundTone(tyres?.compound),
   };
 }

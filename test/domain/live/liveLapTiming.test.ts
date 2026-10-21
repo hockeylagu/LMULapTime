@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { activeSectorDelta, LiveLapTiming } from '../../../shared/domain/live/liveLapTiming.js';
+import { LiveLapTiming } from '../../../shared/domain/live/liveLapTiming.js';
 import type { LiveVehicleReading } from '../../../shared/domain/live/liveLifecycle.js';
 import { scoringReading, vehicleReading } from '../../helpers/liveReadings.js';
 
@@ -60,15 +60,6 @@ function reading(player: Partial<LiveVehicleReading>, currentEt?: number) {
   clock = currentEt ?? Math.max(clock + 0.2, anchor + (player.timeIntoLap ?? 20));
   return scoringReading({ currentEt: clock, trackLength: TRACK, player: vehicleReading({ lapStartEt: anchor, ...player }) });
 }
-
-describe('activeSectorDelta', () => {
-  it('is the lap delta minus the done sectors, unknown without the lap delta or a done sector', () => {
-    expect(activeSectorDelta({ sector: 1, deltaSeconds: 0.2, sectorDeltas: [null, null, null] })).toBe(0.2);
-    expect(activeSectorDelta({ sector: 3, deltaSeconds: -0.184, sectorDeltas: [-0.12, 0.064, null] })).toBe(-0.128);
-    expect(activeSectorDelta({ sector: 2, deltaSeconds: null, sectorDeltas: [-0.12, null, null] })).toBeNull();
-    expect(activeSectorDelta({ sector: 3, deltaSeconds: 0.1, sectorDeltas: [null, 0.05, null] })).toBeNull();
-  });
-});
 
 describe('LiveLapTiming', () => {
   beforeEach(() => { clock = 1000; anchors.clear(); });

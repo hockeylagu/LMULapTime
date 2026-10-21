@@ -26,12 +26,16 @@ export interface FuelRatioInput {
   veNow: number | null;
 }
 
-/** Highest paired clean-lap ratio, then the next available setting. No margin beyond the VE reserve. */
+/**
+ * Highest paired clean-lap ratio, then the next available setting. No margin beyond the VE reserve. Before three
+ * paired laps the game's estimate leads, but never below a lap already measured (its first estimate runs low).
+ */
 export function planFuelRatio(input: FuelRatioInput): LiveFuelRatio | null {
   const measured = input.ratios.filter(value => Number.isFinite(value) && value > 0);
   const fallback = input.fuelPerLap !== null && input.vePerLap !== null && input.fuelPerLap > 0 && input.vePerLap > 0
     ? input.fuelPerLap / input.vePerLap : null;
-  const required = measured.length >= 3 ? Math.max(...measured) : fallback;
+  const candidates = measured.length >= 3 ? measured : fallback === null ? measured : [fallback, ...measured];
+  const required = candidates.length > 0 ? Math.max(...candidates) : null;
   if (required === null || !Number.isFinite(required)) return null;
   const rounded = Math.ceil(required * 100 - 1e-9) / 100;
   const recommended = [...input.options].filter(value => Number.isFinite(value) && value >= rounded).sort((a, b) => a - b)[0] ?? null;

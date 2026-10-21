@@ -59,7 +59,7 @@ export interface LiveServiceOptions {
 
 function offlineSnapshot(): LiveSnapshot {
   return {
-    sequence: 0, receivedAt: Date.now(), lifecycle: 'offline', paused: false, session: null, identity: null,
+    sequence: 0, receivedAt: Date.now(), lifecycle: 'offline', session: null, identity: null,
     ...NO_SESSION_DETAILS, loadingProgress: null, strategy: null,
   };
 }
@@ -287,7 +287,7 @@ export class LiveService {
     if (message.pedal) this.bufferPedal(message.pedal);
     const { capture, car } = message;
     this.record(() => {
-      if (capture && this.snapshot.session?.inRealtime && !this.snapshot.paused) this.options.capture?.sample(capture);
+      if (capture && this.snapshot.session?.inRealtime) this.options.capture?.sample(capture);
       if (car) this.options.capture?.observe({ source: 'shared-memory', kind: 'car-condition',
         elapsedSeconds: message.pedal?.t ?? this.lastReading?.currentEt ?? null, receivedAt: Date.now(), data: {
           fuelLitres: car.fuelLiters, fuelCapacityLitres: car.fuelCapacityLiters,
@@ -368,7 +368,7 @@ export class LiveService {
           elapsedSeconds: reading.currentEt, receivedAt: Date.now() });
       }
       this.options.capture?.diagnostics?.record({ kind: 'app-state', at: Date.now(), data: {
-        lifecycle: next.lifecycle, paused: next.paused, identity: next.identity, loadingProgress: next.loadingProgress,
+        lifecycle: next.lifecycle, identity: next.identity, loadingProgress: next.loadingProgress,
         session: next.session ? { ...next.session, elapsedSeconds: undefined } : null,
       } });
       if (Date.now() - this.lastDiagnosticStrategyAt >= 10_000 || next.lifecycle !== previous.lifecycle) {

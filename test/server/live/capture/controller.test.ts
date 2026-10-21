@@ -34,7 +34,7 @@ class FakeCaptureWriter extends EventEmitter {
 function snapshot(kind: NonNullable<LiveSnapshot['session']>['kind'] = 'race',
   layoutKey: string | null = 'sarthe:full', lifecycle: LiveSnapshot['lifecycle'] = 'driving'): LiveSnapshot {
   return {
-    sequence: 1, receivedAt: Date.now(), lifecycle, paused: false,
+    sequence: 1, receivedAt: Date.now(), lifecycle,
     session: {
       kind, sessionCode: kind === 'race' ? 10 : kind === 'practice' ? 1 : 10, gamePhase: 5, inRealtime: true,
       trackName: 'Circuit de la Sarthe', vehicleName: 'Ferrari 296 GT3', vehicleClass: 'GT3', elapsedSeconds: 100,
