@@ -116,6 +116,11 @@ See [live capture storage and channels](docs/LIVE_CAPTURE_FORMAT.md).
    ```
    *Windows users can also simply double-click `launch.bat`.*
 
+   On Windows, a system tray gauge icon appears while the backend is running. Double-click it,
+   or right-click and choose **Open LMU Lap Time Analyzer**, to open the website. The icon closes
+   automatically when the backend stops or restarts. Set `LMU_TRAY=0` in `.env.local` to disable it.
+   It opens `LMU_UI_ORIGIN` when configured, otherwise `http://localhost:5173` (or `LMU_UI_PORT`).
+
 5. **Open your browser**:
    - Frontend UI: [http://localhost:5173](http://localhost:5173)
    - Backend API: [http://localhost:3001](http://localhost:3001)

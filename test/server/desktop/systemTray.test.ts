@@ -1,0 +1,75 @@
+import { EventEmitter } from 'node:events';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { PassThrough } from 'node:stream';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { startSystemTray } from '../../../server/desktop/systemTray.js';
+
+vi.mock('node:child_process', () => ({ spawn: vi.fn() }));
+
+describe('Windows system tray lifecycle', () => {
+  let helper: EventEmitter & { stdin: PassThrough; stderr: PassThrough };
+
+  beforeEach(() => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('LMU_TRAY', '');
+    vi.stubEnv('LMU_UI_ORIGIN', '');
+    vi.stubEnv('LMU_UI_PORT', '');
+    helper = Object.assign(new EventEmitter(), { stdin: new PassThrough(), stderr: new PassThrough() });
+    vi.mocked(spawn).mockReturnValue(helper as unknown as ChildProcess);
+  });
+
+  afterEach(() => {
+    helper.emit('exit', 0);
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.clearAllMocks();
+  });
+
+  it('starts a hidden helper for the default website and closes its lifetime pipe on shutdown', () => {
+    const previousListeners = process.listenerCount('exit');
+    const stop = startSystemTray();
+    expect(spawn).toHaveBeenCalledWith('powershell.exe', expect.arrayContaining([
+      '-STA', '-File', expect.stringMatching(/systemTray\.ps1$/), '-WebsiteUrl', 'http://localhost:5173/',
+    ]), { windowsHide: true, stdio: ['pipe', 'ignore', 'pipe'] });
+    expect(process.listenerCount('exit')).toBe(previousListeners + 1);
+    stop?.();
+    expect(helper.stdin.writableEnded).toBe(true);
+    helper.emit('exit', 0);
+    expect(process.listenerCount('exit')).toBe(previousListeners);
+  });
+
+  it('uses the configured frontend port and gives an explicit UI origin precedence', () => {
+    vi.stubEnv('LMU_UI_PORT', '5180');
+    startSystemTray()?.();
+    helper.emit('exit', 0);
+    expect(vi.mocked(spawn).mock.calls[0]?.[1]).toContain('http://localhost:5180/');
+    vi.stubEnv('LMU_UI_ORIGIN', 'https://localhost:5443/');
+    startSystemTray()?.();
+    expect(vi.mocked(spawn).mock.calls[1]?.[1]).toContain('https://localhost:5443/');
+  });
+
+  it.each(['test', 'disabled', 'other-platform'])('skips native UI for %s', mode => {
+    if (mode === 'test') vi.stubEnv('NODE_ENV', 'test');
+    if (mode === 'disabled') vi.stubEnv('LMU_TRAY', '0');
+    if (mode === 'other-platform') vi.spyOn(process, 'platform', 'get').mockReturnValue('linux');
+    expect(startSystemTray()).toBeUndefined();
+    expect(spawn).not.toHaveBeenCalled();
+  });
+
+  it.each(['invalid url', 'file:///C:/Windows'])('rejects invalid website address %s without affecting the server', origin => {
+    vi.stubEnv('LMU_UI_ORIGIN', origin);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(startSystemTray()).toBeUndefined();
+    expect(spawn).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledOnce();
+  });
+
+  it('reports helper launch failures and tolerates a closed stdin pipe', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    startSystemTray();
+    helper.emit('error', new Error('PowerShell unavailable'));
+    helper.stdin.emit('error', new Error('EPIPE'));
+    expect(warn).toHaveBeenCalledWith('System tray unavailable: PowerShell unavailable');
+  });
+});

@@ -29,6 +29,7 @@ import { reconcileLiveCaptures } from './live/capture/reconcile.js';
 import { createLiveEvidenceRouter } from './routes/liveEvidenceRoutes.js';
 import { refreshLiveLearning } from './live/learning/service.js';
 import { AutomaticLearningRuntime } from './live/learning/runtime.js';
+import { startSystemTray } from './desktop/systemTray.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -170,15 +171,19 @@ app.use('/api', createLiveRouter(serverContext, liveService, liveCapture));
 app.use('/api', createLiveEvidenceRouter(serverContext, captureDirectory, undefined, () => liveCapture.hasOpenRecordingHandle));
 
 if (process.env.NODE_ENV !== 'test') {
+  let stopSystemTray: (() => void) | undefined;
   const server = app.listen(PORT, '127.0.0.1', () => {
+    stopSystemTray = startSystemTray();
     console.log(`LMU Lap Time Analyzer Server running on http://localhost:${PORT}`);
     console.log(formatPluginStatusLog(dataPlugin.status));
     startReferenceLaptimeRefresh();
   });
   const shutdown = (): void => {
+    stopSystemTray?.();
     server.close();
     void liveService.stop().finally(() => process.exit(0));
   };
+  server.once('close', () => stopSystemTray?.());
   process.once('SIGINT', shutdown);
   process.once('SIGTERM', shutdown);
 }

@@ -16,6 +16,11 @@ decode options in `server/replay/decode/replayTrajectoryTypes.ts`, telemetry cha
 
 Verification baseline: 3,267 tests passed, 56 intentionally skipped; production build clean (zero warnings, zero errors).
 
+Windows desktop integration: `server/desktop/systemTray.ts` starts the hidden PowerShell
+Windows Forms helper `systemTray.ps1` after HTTP listening succeeds. Its tray menu and double-click
+open the frontend (`LMU_UI_ORIGIN`, otherwise `LMU_UI_PORT` / 5173). Closing the server's stdin
+pipe disposes the icon, including on crashes and watch restarts; `LMU_TRAY=0` disables it.
+
 ---
 
 ## Live Capture and Learning

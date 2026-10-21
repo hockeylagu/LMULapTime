@@ -1,0 +1,35 @@
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+/** The helper owns the native Windows UI; its stdin closes when this server exits. */
+export function startSystemTray(): (() => void) | undefined {
+  if (process.platform !== 'win32' || process.env.NODE_ENV === 'test' || process.env.LMU_TRAY === '0') return;
+
+  let website: URL;
+  try {
+    website = new URL(process.env.LMU_UI_ORIGIN || `http://localhost:${Number(process.env.LMU_UI_PORT) || 5173}`);
+  } catch {
+    console.warn('System tray disabled: LMU_UI_ORIGIN is not a valid URL.');
+    return;
+  }
+  if (website.protocol !== 'http:' && website.protocol !== 'https:') {
+    console.warn('System tray disabled: LMU_UI_ORIGIN must use HTTP or HTTPS.');
+    return;
+  }
+
+  const helper = spawn('powershell.exe', [
+    '-NoLogo', '-NoProfile', '-NonInteractive', '-STA', '-ExecutionPolicy', 'Bypass',
+    '-File', fileURLToPath(new URL('./systemTray.ps1', import.meta.url)),
+    '-WebsiteUrl', website.href,
+  ], { windowsHide: true, stdio: ['pipe', 'ignore', 'pipe'] });
+
+  // Tray failures must not interrupt capture, ingestion, or HTTP serving.
+  helper.on('error', error => console.warn(`System tray unavailable: ${error.message}`));
+  helper.stdin?.on('error', () => { /* The helper can exit before server shutdown. */ });
+  helper.stderr?.on('data', (message: Buffer) => console.warn(`System tray: ${message.toString().trim()}`));
+
+  const stop = (): void => { helper.stdin?.end(); };
+  process.once('exit', stop);
+  helper.once('exit', () => { process.removeListener('exit', stop); });
+  return stop;
+}
