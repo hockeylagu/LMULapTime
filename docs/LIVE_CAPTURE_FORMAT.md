@@ -205,7 +205,7 @@ Full estimate/selection/outcome checkpoints use recorder observations of kind
 `strategy-audit-v1` inside the owning session DuckDB. They run without dashboard subscribers and
 replace the older periodic `strategy-prediction` observation. Start, settings/estimate changes,
 laps, measurements, finish and end retain the existing audit semantics. There are no periodic
-checkpoints (recordings before 2026-10-21 also hold ten-second `sample` records).
+checkpoints.
 The controller ends the old audit before switching files. A recovered recording keeps its recording
 UUID; use `observation_id` to distinguish checkpoints across tracker restarts because the tracker’s
 local `data.sequence` counter can restart.
