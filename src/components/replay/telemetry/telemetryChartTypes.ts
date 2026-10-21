@@ -50,6 +50,11 @@ export interface TelemetryChartPathsResult {
   hasWheelSpeeds: boolean;
   maxWheelSpeed: number;
 
+  /** Measured from live capture only; no computed fallback. */
+  wheelSlipPaths: CornerPaths;
+  baselineWheelSlipPaths: CornerPaths;
+  hasWheelSlip: boolean;
+
   tirePressuresPaths: CornerPaths;
   baselineTirePressuresPaths: CornerPaths;
   hasTirePressures: boolean;

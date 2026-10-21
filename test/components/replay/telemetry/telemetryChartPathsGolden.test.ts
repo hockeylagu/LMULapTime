@@ -55,14 +55,28 @@ describe('computeTelemetryChartPaths - whole lap golden output', () => {
   const distances = getTrajectoryDistances(points);
 
   it('draws the whole lap with the baseline read at the primary samples', () => {
-    const { maxSpeed, maxGear, ...paths } = computeTelemetryChartPaths(points, comparisons, 0, 80, distances);
+    const { maxSpeed, maxGear, wheelSlipPaths, baselineWheelSlipPaths, hasWheelSlip, ...paths } = computeTelemetryChartPaths(points, comparisons, 0, 80, distances);
     expect(maxSpeed).toBe(265);
     expect(maxGear).toBe(7);
     expect(digest(paths)).toBe('a7e315513e4d88b3');
+    // Measured wheel slip is live-capture only: absent here, and it leaves every other trace unchanged.
+    expect({ wheelSlipPaths, baselineWheelSlipPaths, hasWheelSlip }).toEqual({ wheelSlipPaths: { fl: '', fr: '', rl: '', rr: '' },
+      baselineWheelSlipPaths: { fl: '', fr: '', rl: '', rr: '' }, hasWheelSlip: false });
+  });
+
+  it('draws measured wheel slip on a ±30 % scale and breaks the line where a ratio is unavailable', () => {
+    const slipPoints = points.slice(0, 4).map((point, i) => ({ ...point, liveWheelSlip: {
+      ratios: [-0.15, i === 2 ? null : 0.3, 0, 0.6] as [number | null, number | null, number | null, number | null], lockup: [], wheelspin: [] } }));
+    const result = computeTelemetryChartPaths(slipPoints, [], 0, 3, getTrajectoryDistances(slipPoints));
+    expect(result.hasWheelSlip).toBe(true);
+    expect(result.wheelSlipPaths.fl.match(/\d+\.\d (\d+\.\d)/g)?.map(pair => pair.split(' ')[1])).toEqual(['73.8', '73.8', '73.8', '73.8']);
+    expect(result.wheelSlipPaths.fr.trim().split(/ (?=[ML])/).map(command => command[0])).toEqual(['M', 'L', 'M']);
+    expect(result.wheelSlipPaths.rl).toContain(' 52.5');
+    expect(result.wheelSlipPaths.rr).toContain(' 10.0'); // Clamped at +30 %.
   });
 
   it('draws a zoomed window with the baseline lap on its own samples', () => {
-    const { maxSpeed, maxGear, ...paths } = computeTelemetryChartPaths(points, comparisons, 20, 55, distances, baseline);
+    const { maxSpeed, maxGear, wheelSlipPaths: _slip, baselineWheelSlipPaths: _baselineSlip, hasWheelSlip: _hasSlip, ...paths } = computeTelemetryChartPaths(points, comparisons, 20, 55, distances, baseline);
     expect(maxSpeed).toBe(265);
     expect(maxGear).toBe(7);
     expect(digest(paths)).toBe('282745025ffc88df');

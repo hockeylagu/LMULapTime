@@ -300,7 +300,11 @@ export function computeTireSlipAndLockup(
 
     // Detect non-ABS wheel lockup under heavy braking
     let isLocked = false;
-    if (abs) {
+    if (p.liveWheelSlip) {
+      // Measured patch slip replaces the inference, including ABS cycling below the lockup threshold.
+      isLocked = p.liveWheelSlip.lockup.length > 0;
+      if (isLocked) slip = Math.max(slip, 92);
+    } else if (abs) {
       // ABS active represents wheel slip / threshold lock cycling
       isLocked = true;
       slip = Math.max(slip, 90);

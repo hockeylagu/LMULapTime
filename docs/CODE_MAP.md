@@ -44,6 +44,7 @@ because active recordings can be exclusively locked on Windows.
 | `server/core/live/dbLiveCaptureStore.ts`, `server/live/capture/reconcile.ts` | SQLite attachment index and strict XML ownership |
 | `server/live/capture/evidenceService.ts`, `evidenceReader.ts`, `readRecording.ts` | Verified, off-track lap evidence reads |
 | `shared/domain/live/liveTelemetryFusion.ts`, `src/api/liveEvidenceApi.ts` | Aligned evidence consumption and coverage |
+| `shared/domain/live/wheelSlip.ts`, `tools/analysis/listWheelSlipEvents.ts` | Measured wheel slip ratio, lockup/wheelspin events, calibration rerun |
 | `shared/domain/live/liveAudit.ts` | Consolidated live strategy audit (checkpoints during capture) |
 | `shared/domain/learning/capture.ts`, `examples.ts`, `evaluate.ts`, `calibration.ts`, `automatic.ts` | Frozen forecasts, examples, evaluation and correction gates |
 | `server/live/learning/service.ts`, `runtime.ts`, `automaticWorker.ts` | Projection refresh, persisted model lifecycle and exact live lookup |

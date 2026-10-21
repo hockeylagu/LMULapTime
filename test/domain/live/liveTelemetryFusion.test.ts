@@ -83,4 +83,35 @@ describe('supplemental live telemetry fusion', () => {
     expect(result.points[0].liveDynamics).toBeUndefined();
     expect(result.points[3].liveDynamics).toBeUndefined();
   });
+
+  it('detects wheel slip on every live sample and marks the chart points inside an event', () => {
+    const trajectory = liveTrajectoryFixture();
+    const response = liveEvidenceFixture();
+    const wheels = ['fl', 'fr', 'rl', 'rr'];
+    response.evidence.channels.push(...['patch', 'ground'].flatMap(kind => wheels.map(wheel => ({
+      name: `${wheel}_${kind}_longitudinal_mps`, unit: 'm/s', frame: 'iso8855-wheel' as const, sourceField: kind }))));
+    // RL spins at +25 % (patch sliding backwards) from 0.02 s to 0.08 s; the other wheels roll.
+    response.evidence.points = Array.from({ length: 9 }, (_, index) => {
+      const lapSeconds = 0.02 + index * 0.01;
+      const rearPatch = lapSeconds <= 0.08 + 1e-9 ? -10 : 0;
+      return { sampleIndex: index, elapsedSeconds: 100 + lapSeconds, lapSeconds,
+        values: [20, 0, 0, 0, 0, rearPatch, 0, 40, 40, 40, 40] };
+    });
+    response.evidence.coverage.gaps = [];
+    const result = fuseLiveTelemetry(trajectory, response);
+    expect(result.liveCaptureOverlay).toMatchObject({ state: 'applied', wheelSlipPoints: 2,
+      wheelSlipEvents: [{ kind: 'wheelspin', wheel: 'rl', startLapSeconds: 0.02, peakSlipRatio: 0.25 }] });
+    expect(result.points[1].liveWheelSlip).toEqual({ ratios: [-0, -0, 0.25, -0], lockup: [], wheelspin: ['rl'] });
+    expect(result.points[1].liveDynamics?.wheelSlip).toBe(true);
+    expect(result.points[2].liveWheelSlip).toBeUndefined();
+  });
+
+  it('lets a measured lockup decide the lockup flag instead of the inferred one', () => {
+    const trajectory = liveTrajectoryFixture();
+    trajectory.points = trajectory.points.map(point => ({ ...point, absActive: true,
+      liveWheelSlip: { ratios: [-0.08, -0.08, 0, 0], lockup: [], wheelspin: [] } }));
+    trajectory.points[1].liveWheelSlip = { ratios: [-0.4, -0.08, 0, 0], lockup: ['fl'], wheelspin: [] };
+    const processed = applyTelemetryPostProcessingToTrajectory(trajectory);
+    expect(processed.points.map(point => point.wheelLockActive)).toEqual([false, true, false, false]);
+  });
 });

@@ -21,6 +21,7 @@ import { TelemetryYawRateChannel } from './channels/dynamics/TelemetryYawRateCha
 import { TelemetryBrakeTempsChannel } from './channels/tires/TelemetryBrakeTempsChannel.js';
 import { TelemetrySuspPosChannel } from './channels/dynamics/TelemetrySuspPosChannel.js';
 import { TelemetryWheelSpeedsChannel } from './channels/tires/TelemetryWheelSpeedsChannel.js';
+import { TelemetryWheelSlipChannel } from './channels/tires/TelemetryWheelSlipChannel.js';
 import { TelemetryTirePressuresChannel } from './channels/tires/TelemetryTirePressuresChannel.js';
 import { TelemetryTireWearChannel } from './channels/tires/TelemetryTireWearChannel.js';
 import { TelemetryTireTempsChannel } from './channels/tires/TelemetryTireTempsChannel.js';
@@ -105,6 +106,8 @@ export const TelemetryChannelRenderer: React.FC<TelemetryChannelRendererProps> =
       return <TelemetrySuspPosChannel suspPosPaths={paths.suspPosPaths} baselineSuspPosPaths={paths.baselineSuspPosPaths} minSuspPos={paths.minSuspPos} maxSuspPos={paths.maxSuspPos} {...cursorProps} />;
     case 'wheel-speeds':
       return <TelemetryWheelSpeedsChannel wheelSpeedsPaths={paths.wheelSpeedsPaths} baselineWheelSpeedsPaths={paths.baselineWheelSpeedsPaths} maxWheelSpeed={paths.maxWheelSpeed} {...cursorProps} />;
+    case 'wheel-slip':
+      return <TelemetryWheelSlipChannel wheelSlipPaths={paths.wheelSlipPaths} baselineWheelSlipPaths={paths.baselineWheelSlipPaths} hasWheelSlip={paths.hasWheelSlip} {...cursorProps} />;
     case 'tire-pressures':
       return <TelemetryTirePressuresChannel tirePressuresPaths={paths.tirePressuresPaths} baselineTirePressuresPaths={paths.baselineTirePressuresPaths} minTirePressure={paths.minTirePressure} maxTirePressure={paths.maxTirePressure} {...cursorProps} />;
     case 'tire-wear':

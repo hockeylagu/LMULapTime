@@ -85,10 +85,11 @@ Wheel lateral is already left-positive; longitudinal is negated to forward-posit
 Camber is outward-positive on both sides, matching ISO camber rather than a globally signed roll
 angle. Toe-in is positive: preserve the source angle on left wheels and negate it on right wheels.
 The toe value includes current steering/suspension effects; it is not a measured static setup value.
-Patch velocity is not relabelled as wheel speed or a slip ratio. Nonfinite input becomes SQL NULL;
+Patch velocity is not relabelled as wheel speed; the slip ratio is derived on read (below). Nonfinite input becomes SQL NULL;
 valid finite zero remains zero. Version 3 appends the four deflection columns; batch size stays bounded.
-The current aligned motion API still serves its six vehicle channels; wheel evidence is retained in
-the recording for direct DuckDB inspection and future consumers. Native G is not changed.
+The aligned motion API serves the six vehicle channels plus the eight longitudinal patch/ground
+velocities of version 2+ recordings; camber, toe, deflection and lateral wheel velocities stay in the
+recording for direct DuckDB inspection and future consumers. Native G is not changed.
 Sources and saved-recording verification: [wheel evidence assessment](plans/WHEEL_CAPTURE_EVIDENCE.md).
 
 Additional shared-memory evidence is sparse:
@@ -150,6 +151,18 @@ Chart fusion matches verified samples to explicit trajectory clocks within 25 ms
 across missing samples. Measured yaw and body slip use the capture; computed fallbacks retain the
 `COMPUTED` label. Coverage/provenance remains in response metadata; the telemetry header has no capture-coverage indicator. Supplied native telemetry G values, including zero,
 are preserved; replay-derived G remains a computed fallback.
+
+Wheel slip (`shared/domain/live/wheelSlip.ts`) is the longitudinal slip ratio `-patch / ground` per
+wheel, SAE sign: negative braking/lockup, positive wheelspin. It is NULL below 5 m/s ground velocity
+(airborne, slow or reversing wheel). Lockup and wheelspin events are spans beyond ±15 % lasting at
+least 40 ms (five 100 Hz samples), detected on every live sample of the lap, merged across measured
+dips under 50 ms and never across a missing sample or capture gap. The threshold comes from the
+2026-10-20 COTA GT3 race: while native ABS was active, front slip was 6 % median, 8.7 % p90 and
+10.7 % p99. It is not yet checked on a car without ABS; `tools/analysis/listWheelSlipEvents.ts`
+reruns the detection over the saved recordings. Native `Wheel Speed` cannot replace this: it tracks
+ground speed within ±4 % even under braking. Where a chart point has measured slip, its lockup flag
+follows the measured events instead of the G-based inference. The Wheel Slip chart channel has no
+computed fallback.
 
 ## Disposable race diagnostics (opt-in)
 
