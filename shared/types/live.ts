@@ -51,8 +51,10 @@ export interface LiveIdentity {
   layoutKey: string | null;
   /** Display name of the layout, or the game's track name when unresolved. */
   layoutName: string;
-  /** Canonical class from `mapVehicleIdToClass`; null when unknown. */
+  /** Canonical class (`resolveVehicle`, else the game's class names); null when unknown. */
   carClass: string | null;
+  /** The car's public model from `resolveVehicle`; null when unknown. */
+  vehicleModel: string | null;
   /**
    * The player's personal record on this layout and class from the app's history (the gold
    * personal-best meaning: fastest valid lap, any car, any condition); null when none or unresolved.

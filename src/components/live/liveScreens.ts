@@ -1,6 +1,6 @@
 import type { LiveSessionKind, LiveSnapshot } from '../../../shared/types/live.js';
 import type { LiveGaragePlan, LiveGarageTyres } from '../../../shared/types/liveStrategy.js';
-import { mapVehicleIdToClass } from '../../../shared/domain/vehicleMapping.js';
+import { knownCarClass, resolveVehicle } from '../../../shared/domain/vehicleMapping.js';
 import { formatLapTime, UNKNOWN } from './liveFormat.js';
 import { formatAmount, resourceName } from './race/livePlanFormat.js';
 import { LIVE_TYRE_TREAD_FLOOR } from '../../../shared/domain/live/liveInsights.js';
@@ -46,8 +46,7 @@ export function sessionKindLabel(kind: LiveSessionKind): string {
 
 /** The canonical class (`Hyper`, `GT3`, ...) of the player's car, from the names the game reports. */
 export function liveCarClass(vehicleName: string, vehicleClass: string): string | null {
-  const resolved = mapVehicleIdToClass(vehicleName, vehicleClass);
-  return resolved || null;
+  return resolveVehicle(vehicleName)?.carClass ?? knownCarClass(vehicleClass);
 }
 
 function startingNote(gamePhase: number): string {

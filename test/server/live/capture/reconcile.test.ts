@@ -38,8 +38,8 @@ function addSession(db: SessionDatabase, values: {
     values.venue ?? 'Monza', values.course ?? 'GP', values.type ?? 'Race', values.type === 'Practice' ? 'P1' : 'R1');
   raw.prepare('INSERT OR IGNORE INTO drivers (name, normalized_name) VALUES (?, ?)').run(values.driver ?? 'Player One', (values.driver ?? 'Player One').toLowerCase());
   const driverId = (raw.prepare('SELECT driver_id FROM drivers WHERE name = ?').get(values.driver ?? 'Player One') as { driver_id: number }).driver_id;
-  raw.prepare('INSERT OR IGNORE INTO vehicles (car_type, car_class) VALUES (?, ?)').run(values.car ?? 'Ferrari 296 GT3', values.carClass ?? 'GT3');
-  const vehicleId = (raw.prepare('SELECT vehicle_id FROM vehicles WHERE car_type = ? AND car_class = ?').get(values.car ?? 'Ferrari 296 GT3', values.carClass ?? 'GT3') as { vehicle_id: number }).vehicle_id;
+  raw.prepare('INSERT OR IGNORE INTO vehicles (car_type, car_class) VALUES (?, ?)').run(values.car ?? 'Ferrari 296 LMGT3', values.carClass ?? 'GT3');
+  const vehicleId = (raw.prepare('SELECT vehicle_id FROM vehicles WHERE car_type = ? AND car_class = ?').get(values.car ?? 'Ferrari 296 LMGT3', values.carClass ?? 'GT3') as { vehicle_id: number }).vehicle_id;
   raw.prepare(`INSERT INTO session_drivers (session_id, driver_ordinal, driver_id, vehicle_id, is_player)
     VALUES (?, 0, ?, ?, 1)`).run(values.id, driverId, vehicleId);
   const insertLap = raw.prepare(`INSERT INTO session_laps (session_id, driver_ordinal, lap_ordinal, lap_number, lap_time, is_valid)
@@ -53,7 +53,7 @@ function manifest(overrides: Partial<LiveCaptureManifest> = {}): LiveCaptureMani
   return {
     recordingId: 'recording-a', source: 'live-capture', schemaVersion: 1, normalizationVersion: 1,
     signConvention: 'iso8855', filename: 'recording-a.duckdb', layoutKey: 'monza_gp', trackName: 'Monza',
-    driverName: 'Player One', vehicleName: 'Ferrari 296 GT3', vehicleModel: 'Ferrari 296 GT3', carClass: 'GT3',
+    driverName: 'Player One', vehicleName: 'Ferrari 296 LMGT3', vehicleModel: 'Ferrari 296 LMGT3', carClass: 'GT3',
     sessionCode: 3, sessionKind: 'race', startedAt: Date.parse('2026-10-10T11:00:00Z'),
     updatedAt: Date.parse('2026-10-10T12:00:00Z'), firstElapsedSeconds: 0, lastElapsedSeconds: 3600,
     endedAt: Date.parse('2026-10-10T12:00:00Z'), status: 'completed', samples: 360000, droppedSamples: 0,
@@ -114,7 +114,7 @@ describe('live capture XML reconciliation', () => {
     addSession(db, { id: 'session-match', timestamp: start - 5_000, mtime: start + 3600_000 });
     addSession(db, { id: 'wrong-layout', timestamp: start - 5_000, mtime: start + 3600_000, venue: 'Bahrain', course: 'GP' });
     addSession(db, { id: 'wrong-driver', timestamp: start - 5_000, mtime: start + 3600_000, driver: 'Other Driver' });
-    addSession(db, { id: 'wrong-car-same-class', timestamp: start - 5_000, mtime: start + 3600_000, car: 'BMW M4 GT3' });
+    addSession(db, { id: 'wrong-car-same-class', timestamp: start - 5_000, mtime: start + 3600_000, car: 'BMW M4 LMGT3' });
     const capture = manifest();
     upsertLiveCapture(db.getDb(), capture, 4096);
     await writeFile(path.join(directory, capture.filename), 'capture');
@@ -125,6 +125,21 @@ describe('live capture XML reconciliation', () => {
       recordingId: capture.recordingId, available: true, gameVersion: 'Build-42', bytes: 4096,
     })]);
     expect((await reconcileLiveCaptures(db.getDb(), directory)).changed).toBe(false);
+  });
+
+  it('links an entry name to the session of the same car, across the 2026 rename (COTA race 2026-10-21)', async () => {
+    const db = database();
+    const directory = await recordingDirectory();
+    const start = Date.parse('2026-10-10T11:00:00Z');
+    addSession(db, { id: 'session-match', timestamp: start - 5_000, mtime: start + 3600_000, car: 'Ferrari 296 LMGT3 Evo' });
+    addSession(db, { id: 'wrong-class', timestamp: start - 5_000, mtime: start + 3600_000, car: 'Oreca 07 LMP2', carClass: 'LMP2' });
+    const entry = 'Vista AF Corse 2026 #21:LM';
+    const capture = manifest({ vehicleName: entry, vehicleModel: entry });
+    upsertLiveCapture(db.getDb(), capture, 4096);
+    await writeFile(path.join(directory, capture.filename), 'capture');
+
+    expect(await reconcileLiveCaptures(db.getDb(), directory)).toMatchObject({ verified: 1, pending: 0 });
+    expect(getSessionLiveCaptures(db.getDb(), 'session-match')).toEqual([expect.objectContaining({ recordingId: capture.recordingId })]);
   });
 
   it('keeps insufficient, restarted and ambiguous evidence pending, then withdraws a no-longer-unique link', async () => {

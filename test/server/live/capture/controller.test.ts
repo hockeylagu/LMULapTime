@@ -40,7 +40,7 @@ function snapshot(kind: NonNullable<LiveSnapshot['session']>['kind'] = 'race',
       trackName: 'Circuit de la Sarthe', vehicleName: 'Ferrari 296 GT3', vehicleClass: 'GT3', elapsedSeconds: 100,
       endSeconds: 3600, playerLapsCompleted: 7, playerPlace: 1,
     },
-    identity: { layoutKey, layoutName: 'Le Mans', carClass: 'GT3', personalBestSeconds: null },
+    identity: { layoutKey, layoutName: 'Le Mans', carClass: 'GT3', vehicleModel: null, personalBestSeconds: null },
     lapsLeft: null, weather: null, recentLaps: [], sessionBest: null, loadingProgress: null, strategy: null,
   };
 }

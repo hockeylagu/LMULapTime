@@ -513,6 +513,17 @@ Returns all vehicles across installed classes with driver rosters, skill ratings
 }
 ```
 
+Observed 2026-10-21 (build 14200, main menu, one GET, 200 in about 1 s, 614 KB): 584 entries, also `desc` (the entry
+name, "Team WRT 2026 #32:LM", which shared memory and XML `<VehName>` use), `liveryName`, `isOwned`, `classesOverride`.
+Entry names and `.veh` file names are each unique. `classes` is series, class and the car name
+(`["WEC2026", "GT3", "Ferrari_296_LMGT3"]`), the same car name in every season; `vehicle` is the entry name plus
+the car version (" 1.29"). The custom-team liveries (#397, `Default_Custom_Livery`) are not listed; their `.veh` files
+carry the same `Classes=` and `Description=` lines.
+
+`tools/release/updateVehicleKeys.mjs` adds the entries of a saved answer (and of `.veh` folders) to the vehicle keys in
+`shared/domain/vehicleMapping.ts`; `selectedCar.classes` and `selectedCar.vehFile` of `/navigation/state` resolve
+the player's car through the same table.
+
 ---
 
 ## 9. Hardware, Live Inputs & Settings (`/rest/options`)

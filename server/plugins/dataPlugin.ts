@@ -6,7 +6,6 @@ import { parseTrackMapDisplay } from '../../shared/domain/trackGeometry.js';
 import type { TrackBoundaryGeometry, TrackMapDisplay } from '../../shared/types/trackGeometry.js';
 import type { DataPluginStatus, VehicleDataRecord } from '../../shared/types/dataPlugin.js';
 import { validateTrackPackage } from './trackPackage.js';
-import { setVehicleCatalog } from '../../shared/domain/vehicleMapping.js';
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('Expected object');
@@ -185,4 +184,3 @@ export function formatPluginStatusLog(status: DataPluginStatus): string {
 }
 
 export const dataPlugin = new DataPlugin(process.env.LMU_PLUGIN_ROOT);
-setVehicleCatalog(dataPlugin.vehicles());

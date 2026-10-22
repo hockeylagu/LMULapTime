@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  mapVehicleIdToModel,
-  mapVehicleIdToClass,
+  resolveVehicle,
+  resolveRosterVehicles,
   resolveDriverCarClass,
   areComparableCarClasses,
   resolveCarManufacturer,
@@ -11,105 +11,45 @@ import {
 } from '../../shared/domain/vehicleMapping.js';
 
 describe('vehicleMapping utility', () => {
-  describe('mapVehicleIdToModel', () => {
-    it('correctly maps known vehicle skin tokens to friendly model names', () => {
-      // LMGT3
-      expect(mapVehicleIdToModel('21_26_AFCO95641716')).toBe('Ferrari 296 GT3');
-      expect(mapVehicleIdToModel('32_26_WRT_83524148')).toBe('BMW M4 GT3');
-      expect(mapVehicleIdToModel('397_25_MUSTANG')).toBe('Ford Mustang GT3');
-      expect(mapVehicleIdToModel('23_26_THOR59931582')).toBe('Aston Martin Vantage GT3');
-      expect(mapVehicleIdToModel('91_26_MANT18218509')).toBe('Porsche 911 GT3 R');
-      expect(mapVehicleIdToModel('58_26_GARA17941687')).toBe('McLaren 720S GT3 Evo');
-      expect(mapVehicleIdToModel('8_26_GCHAL79481284')).toBe('McLaren 720S GT3 Evo');
-      expect(mapVehicleIdToModel('TEST_AMG_GT3')).toBe('Mercedes-AMG GT3');
-      expect(mapVehicleIdToModel('60_24_IRONDCDFC07B')).toBe('Lamborghini Huracan GT3 Evo2');
-      expect(mapVehicleIdToModel('78_25_AKKOF71490E4')).toBe('Lexus RC F GT3');
-      expect(mapVehicleIdToModel('CORVETTE_Z06')).toBe('Corvette Z06 GT3.R');
-      expect(mapVehicleIdToModel('AMG_GT3')).toBe('Mercedes-AMG GT3');
-
-      // LMH / Hypercar
-      expect(mapVehicleIdToModel('50_26_499P_123456')).toBe('Ferrari 499P');
-      expect(mapVehicleIdToModel('963')).toBe('Porsche 963');
-      expect(mapVehicleIdToModel('101_26_WTR51729170')).toBe('Cadillac V-Series.R');
-      expect(mapVehicleIdToModel('93_26_PEUG27100541')).toBe('Peugeot 9X8');
-      expect(mapVehicleIdToModel('GR010')).toBe('Toyota GR010 Hybrid');
-      expect(mapVehicleIdToModel('007_26_THO73564855')).toBe('Aston Martin Valkyrie LMH');
-      expect(mapVehicleIdToModel('BMW_HY')).toBe('BMW M Hybrid V8');
-      expect(mapVehicleIdToModel('A424')).toBe('Alpine A424');
-      expect(mapVehicleIdToModel('SC63')).toBe('Lamborghini SC63');
-      expect(mapVehicleIdToModel('ISOTTA')).toBe('Isotta Fraschini Tipo 6');
-      expect(mapVehicleIdToModel('GENESIS')).toBe('Genesis GMR001 Hypercar');
-
-      // LMP2
-      expect(mapVehicleIdToModel('10_VECTOR_C18BEE4')).toBe('Oreca 07 LMP2');
-      expect(mapVehicleIdToModel('TEST_ORECA_LMP2')).toBe('Oreca 07 LMP2');
-
-      // GTE
-      expect(mapVehicleIdToModel('777_DSTATI5BFA7EF3')).toBe('Aston Martin Vantage AMR');
-      expect(mapVehicleIdToModel('RSR_2019')).toBe('Porsche 911 RSR-19');
-      expect(mapVehicleIdToModel('KESSEL_488')).toBe('Ferrari 488 GTE EVO');
-
-      // LMP3
-      expect(mapVehicleIdToModel('G61')).toBe('Ginetta G61-LT-P325 Evo');
-      expect(mapVehicleIdToModel('D09')).toBe('Duqueine D09 P3');
-      expect(mapVehicleIdToModel('LIGIER_JSP')).toBe('Ligier JS P325');
-      expect(mapVehicleIdToModel('ADESS_AD25')).toBe('ADESS AD25 LMP3');
-
-      // Safety Car
-      expect(mapVehicleIdToModel('992S_PC')).toBe('Porsche 992 (Safety Car)');
+  describe('resolveVehicle', () => {
+    it('resolves vehicle files of every season and folder to one public model and class', () => {
+      expect(resolveVehicle('21_26_AFCO31910023')).toEqual({ model: 'Ferrari 296 LMGT3', carClass: 'GT3' });
+      expect(resolveVehicle(String.raw`C:\LMU\Installed\Vehicles\BMW_M4_LMGT3_2023\1.23\32_26_WRT_65186446.VEH`))
+        .toEqual({ model: 'BMW M4 LMGT3', carClass: 'GT3' });
+      expect(resolveVehicle('32_26_wrt_83524148.veh')).toEqual({ model: 'BMW M4 LMGT3', carClass: 'GT3' });
+      expect(resolveVehicle('397_25_AMG')).toEqual({ model: 'Mercedes-AMG LMGT3', carClass: 'GT3' });
+      expect(resolveVehicle('992S_PC')).toEqual({ model: 'Porsche 992S Pace Car', carClass: 'Safety Car' });
     });
 
-    it('falls back gracefully on unknown vehicle strings', () => {
-      expect(mapVehicleIdToModel('')).toBe('Unknown Vehicle');
-      expect(mapVehicleIdToModel(undefined)).toBe('Unknown Vehicle');
-      expect(mapVehicleIdToModel('CustomMod_Vehicle_X')).toBe('CustomMod_Vehicle_X');
+    it('resolves entry names, where team tokens name cars of several classes', () => {
+      expect(resolveVehicle('Vista AF Corse 2026 #21:LM')).toEqual({ model: 'Ferrari 296 LMGT3', carClass: 'GT3' });
+      expect(resolveVehicle('Team WRT 2026 #32:LM')).toEqual({ model: 'BMW M4 LMGT3', carClass: 'GT3' });
+      expect(resolveVehicle('BMW M Team WRT 2024 #15:LM')).toEqual({ model: 'BMW M Hybrid V8', carClass: 'Hyper' });
+    });
+
+    it('resolves car names and public names, merging the 2026 updates into one car', () => {
+      expect(resolveVehicle('Ferrari_296_LMGT3')).toEqual({ model: 'Ferrari 296 LMGT3', carClass: 'GT3' });
+      expect(resolveVehicle('Ferrari 296 LMGT3 Evo')).toEqual({ model: 'Ferrari 296 LMGT3', carClass: 'GT3' });
+      expect(resolveVehicle('Toyota TR010')).toEqual({ model: 'Toyota GR010', carClass: 'Hyper' });
+      expect(resolveVehicle('McLaren 720S LMGT3 Evo')).toEqual({ model: 'McLaren 720S LMGT3 Evo', carClass: 'GT3' });
+    });
+
+    it('gives a name two classes share without a class, and nothing for unknown names', () => {
+      expect(resolveVehicle('Oreca 07')).toEqual({ model: 'Oreca 07', carClass: null });
+      expect(resolveVehicle('CustomMod_Vehicle_X')).toBeNull();
+      expect(resolveVehicle('')).toBeNull();
+      expect(resolveVehicle(undefined)).toBeNull();
     });
   });
 
-  describe('mapVehicleIdToClass', () => {
-    it('correctly classifies LMGT3 vehicles', () => {
-      expect(mapVehicleIdToClass('21_26_AFCO95641716', 'Ferrari 296 GT3')).toBe('GT3');
-      expect(mapVehicleIdToClass('32_26_WRT_83524148', 'BMW M4 GT3')).toBe('GT3');
-      expect(mapVehicleIdToClass('397_25_MUSTANG', 'Ford Mustang GT3')).toBe('GT3');
-      expect(mapVehicleIdToClass('8_26_GCHAL79481284', 'McLaren 720S GT3 Evo')).toBe('GT3');
-      expect(mapVehicleIdToClass('91_26_MANT18218509', 'Porsche 911 GT3 R')).toBe('GT3');
-      expect(mapVehicleIdToClass('78_25_AKKOF71490E4', 'Lexus RC F GT3')).toBe('GT3');
-      expect(mapVehicleIdToClass('TEST_AMG_GT3', 'Mercedes-AMG GT3')).toBe('GT3');
-    });
-
-    it('correctly classifies Hypercar / LMH vehicles', () => {
-      expect(mapVehicleIdToClass('50_26_499P_123456', 'Ferrari 499P')).toBe('Hyper');
-      expect(mapVehicleIdToClass('963', 'Porsche 963')).toBe('Hyper');
-      expect(mapVehicleIdToClass('101_26_WTR51729170', 'Cadillac V-Series.R')).toBe('Hyper');
-      expect(mapVehicleIdToClass('93_26_PEUG27100541', 'Peugeot 9X8')).toBe('Hyper');
-      expect(mapVehicleIdToClass('GR010', 'Toyota GR010 Hybrid')).toBe('Hyper');
-      expect(mapVehicleIdToClass('007_26_THO73564855', 'Aston Martin Valkyrie LMH')).toBe('Hyper');
-      expect(mapVehicleIdToClass('BMW_HY', 'BMW M Hybrid V8')).toBe('Hyper');
-      expect(mapVehicleIdToClass('A424', 'Alpine A424')).toBe('Hyper');
-      expect(mapVehicleIdToClass('GENESIS', 'Genesis GMR001 Hypercar')).toBe('Hyper');
-    });
-
-    it('correctly classifies LMP2, GTE, and LMP3 vehicles', () => {
-      expect(mapVehicleIdToClass('10_VECTOR_C18BEE4', 'Oreca 07 LMP2')).toBe('LMP2');
-      expect(mapVehicleIdToClass('TEST_ORECA_LMP2', 'Oreca 07 LMP2')).toBe('LMP2');
-      expect(mapVehicleIdToClass('LMP2_ELMS', 'Oreca 07 LMP2 ELMS')).toBe('LMP2_ELMS');
-      expect(mapVehicleIdToClass('777_DSTATI5BFA7EF3', 'Aston Martin Vantage AMR')).toBe('GTE');
-      expect(mapVehicleIdToClass('488', 'Ferrari 488 GTE EVO')).toBe('GTE');
-      expect(mapVehicleIdToClass('G61', 'Ginetta G61-LT-P325 Evo')).toBe('LMP3');
-      expect(mapVehicleIdToClass('D09', 'Duqueine D09 P3')).toBe('LMP3');
-    });
-
-    it('correctly classifies vehicles using vehicleId alone when carType is missing', () => {
-      expect(mapVehicleIdToClass('23_26_THOR59931582')).toBe('GT3');
-      expect(mapVehicleIdToClass('50_26_499P_123456')).toBe('Hyper');
-      expect(mapVehicleIdToClass('10_VECTOR_C18BEE4')).toBe('LMP2');
-      expect(mapVehicleIdToClass('777_DSTATI5BFA7EF3')).toBe('GTE');
-      expect(mapVehicleIdToClass('G61')).toBe('LMP3');
-    });
-
-    it('correctly classifies safety cars and returns empty string for unknown classes', () => {
-      expect(mapVehicleIdToClass('992S_PC', 'Porsche 992 (Safety Car)')).toBe('Safety Car');
-      expect(mapVehicleIdToClass('Custom_Kart_99', 'Kart')).toBe('');
+  describe('resolveRosterVehicles', () => {
+    it('takes the car from the results log, else from the vehicle file', () => {
+      const roster = { drivers: [{ name: 'Logged Driver', vehicleId: 'TEST_UNKNOWN' }, { name: 'Other Driver', vehicleId: '21_26_AFCO31910023' }] };
+      resolveRosterVehicles(roster, [{ name: 'Logged Driver', carType: 'Test Model', carClass: 'GTE' }]);
+      expect(roster.drivers).toEqual([
+        expect.objectContaining({ carType: 'Test Model', carClass: 'GTE' }),
+        expect.objectContaining({ carType: 'Ferrari 296 LMGT3', carClass: 'GT3' }),
+      ]);
     });
   });
 
@@ -117,7 +57,7 @@ describe('vehicleMapping utility', () => {
     it('resolves a driver class from the entry, else from its vehicle', () => {
       expect(resolveDriverCarClass({ carClass: 'Hyper', vehicleId: '92_25_MANT9651C55B' })).toBe('Hyper');
       expect(resolveDriverCarClass({ vehicleId: '777_DSTATI5BFA7EF3', carType: 'Aston Martin Vantage AMR' })).toBe('GTE');
-      expect(resolveDriverCarClass({ vehicleId: 'CUSTOM_LIVERY', carType: 'Lamborghini Huracan GT3 Evo2' })).toBe('GT3');
+      expect(resolveDriverCarClass({ vehicleId: 'CUSTOM_LIVERY', carType: 'Lamborghini Huracan LMGT3 Evo2' })).toBe('GT3');
       expect(resolveDriverCarClass(null)).toBe('');
     });
 

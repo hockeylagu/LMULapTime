@@ -151,6 +151,11 @@ requires no XML reparse. Wet best laps remain excluded from dry benchmark rating
 `matchesSessionCarClass` selects the player's class, or participating drivers when
 there is no player. A parser version bump reparses existing results into this contract.
 
+The car is resolved once with `resolveVehicle` (`shared/domain/vehicleMapping.ts`): `<VehFile>` first, then
+`<VehName>` (the entry name, the same one shared memory reports), then `<CarType>`. Every livery and season of a car
+maps to one public model stored as `car_type` ("Ferrari 296 LMGT3 Evo" is stored as "Ferrari 296 LMGT3"). The log's
+`<CarClass>` stays the class. An unknown car keeps its `<CarType>`.
+
 ```xml
 <Driver>
   <Name>Samuel Lague</Name>
@@ -161,7 +166,7 @@ there is no player. A parser version bump reparses existing results into this co
   <TeamName>Ferrari AF Corse</TeamName>
   <Category>WEC 2024, Hypercar, Ferrari 499P</Category>
   <VehFile>50_FERRARI499P.VEH</VehFile>
-  <VehName>Ferrari 499P #50</VehName>
+  <VehName>Ferrari AF Corse 2024 #50:LM</VehName>
   <UpgradeCode>08210400 00000000 00000000 00000000</UpgradeCode>
   <Connected>1</Connected>
   <Position>1</Position>
@@ -182,7 +187,9 @@ there is no player. A parser version bump reparses existing results into this co
 | :--- | :--- | :--- |
 | `<Name>` | String | Driver name. |
 | `<isPlayer>` | Integer | Human-driver flag: multiplayer logs can mark remote humans as `1` too. Resolve the local player by a unique exact configured profile name; the flag alone does not identify the local player in a multiplayer roster. |
-| `<CarType>` | String | Vehicle model description (e.g. `Ferrari 499P`, `Porsche 911 GT3 R`). |
+| `<CarType>` | String | Vehicle model description (e.g. `Ferrari 499P`, `Porsche 911 GT3 R LMGT3`). |
+| `<VehFile>` | String | Installed vehicle file of the entry (`<number>_<season>_<team><id>.VEH`); one car, one livery. |
+| `<VehName>` | String | Entry name (`<team> <season> #<number>:<livery>`), as shared memory names the car. |
 | `<CarClass>` | String | Standard WEC class code (`Hypercar`, `LMP2`, `LMGT3`, `GTE`). |
 | `<CarNumber>` | String | Vehicle competition race number (e.g. `50`, `83`, `911`). |
 | `<TeamName>` | String | Official entrant/team name. |

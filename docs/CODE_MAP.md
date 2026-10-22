@@ -125,7 +125,7 @@ Results XML ──> LmuParser ──> dbSessionSync ──> Normalized SQLite Ro
    - `applyLapTiming` (`sessionLapTiming.ts`): infers missing lap times (`isInferred`), flags out-laps (`isOutLap`), computes pit stop loss (`pitStopDuration`).
    - `annotateLapTraffic` (`shared/domain/raceTraffic.ts`): determines nearby cars and pressure per lap.
    - `classifySessionLaps` (`server/sessions/sessionLapClassification.ts`): assigns lap conditions (`lapConditions.ts`), flags non-representative laps (`lapRepresentativeness.ts`), and computes clean-lap averages (`bestLapWet`).
-   - Resolves car class (`vehicleMapping.ts`) and circuit specification (`circuitSpecs.ts`).
+   - Resolves the car (`resolveVehicle` in `vehicleMapping.ts`) and circuit specification (`circuitSpecs.ts`).
    - Matches replay candidate (`server/sessions/replayMatching.ts`).
 2. **Store**: `dbSessionSync.ts` (coordinates `DB_PARSER_VERSION`) → writes normalized rows via `server/core/sessionRows/writer.ts` and projection facts via `aggregateStore.ts`.
 3. **Re-classify with rain**: `server/core/dbSessionConditions.ts` updates lap conditions using replay rain data when a linked replay is attached or decoded.
@@ -264,7 +264,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
 - **New API endpoint**: Add handler in `server/routes/<domain>Routes.ts` → mount in `server/index.ts` if creating a new router → add supertest in `test/server/routes/` → add typed client fetcher in `src/api/`.
 - **New SQLite table/store**: Add DDL in `dbSchema.ts` → create prepared statement functions taking `Database` in `server/core/db<Name>Store.ts` → call via `sessionDb.getDb()`.
 - **New circuit layout**: Add layout definition and targets to `shared/domain/circuitDefinitions.ts` → add basic SVG to `public/track-outlines/`. Detailed metric geometry belongs in external local packages.
-- **New vehicle mapping**: Add vehicle pattern to `shared/domain/vehicleMapping.ts`. Class dimensions belong in `vehicleDimensions.ts`.
+- **New vehicle mapping**: A new car is a `VEHICLE_MODELS` row in `shared/domain/vehicleMapping.ts` (class, LMU car name from `Classes`, public model). Then run `node tools/release/updateVehicleKeys.mjs <getAllVehicles.json> <.veh folder>` to add its vehicle files and entry names to the generated `VEHICLE_KEYS` block (keys are only added, so older game versions keep resolving). Class dimensions belong in `vehicleDimensions.ts`.
 - **New session list filter**: Add control to `narrow` slot of `DashboardFilterBar.tsx` and `TrackSessionsToolbar.tsx` → clear in filter resets (`resetFilters` in `Dashboard.tsx`, `resetSessionFilters` in `useTrackDetailState.ts`).
 - **Navigation link**: Use React Router `Link` with a concrete `to` prop. For custom click handling, pass `linkClickHandler` from `src/utils/linkClick.ts`.
 - **Vehicle dynamics channel**: Follow ISO 8855 (positive left for steering, yaw rate, lateral G, lateral offset). Convert LMU coordinate signs during ingestion (`replayTrajectory.ts`, `duckdbReader.ts`).

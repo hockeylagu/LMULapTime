@@ -175,7 +175,7 @@ describe('replayParser - extended format & pit info', () => {
 
         expect(meta.drivers.length).toBe(2);
         expect(meta.drivers[0].name).toBe('Douglas Riviera');
-        expect(meta.drivers[0].carType).toBe('BMW M4 GT3');
+        expect(meta.drivers[0].carType).toBe('BMW M4 LMGT3');
         expect(meta.drivers[0].entryTime).toBe(10.5);
         expect(meta.drivers[0].exitTime).toBe(120.0);
 

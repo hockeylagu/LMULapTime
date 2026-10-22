@@ -11,7 +11,6 @@ import type {
   LiveCaptureBatch, LiveCaptureManifest, LiveCaptureObservation, LiveCaptureSample, LiveCaptureStatus, LiveCaptureWriteResult,
   LiveCaptureCatalogEntry,
 } from '../../../shared/types/liveCapture.js';
-import { mapVehicleIdToModel } from '../../../shared/domain/vehicleMapping.js';
 import { LiveAuditTracker } from '../../../shared/domain/live/liveAudit.js';
 import type { LiveUsageObservation } from '../../../shared/types/liveAudit.js';
 import { findWorkerBootstrap, isWorkerMessage } from '../../core/workerThreads.js';
@@ -263,13 +262,12 @@ export class LiveCaptureController {
     this.recoveryProbe = null;
     const recordingId = prior?.recordingId ?? randomUUID();
     const safeLayout = (snapshot.identity?.layoutKey ?? 'unresolved').replace(/[^a-zA-Z0-9_-]/g, '_');
-    const model = mapVehicleIdToModel(player.vehicleName);
     this.manifest = prior ? { ...prior, status: 'recording', endedAt: null, updatedAt: now, anchors: prior.anchors.map(a => ({ ...a })) } : {
       recordingId, source: LIVE_CAPTURE_SOURCE, schemaVersion: LIVE_CAPTURE_SCHEMA_VERSION,
       normalizationVersion: LIVE_CAPTURE_NORMALIZATION_VERSION, signConvention: 'iso8855',
       filename: `${safeLayout}_${snapshot.session?.kind ?? 'unknown'}_${new Date(now).toISOString().replace(/:/g, '-')}_${recordingId}.live.duckdb`,
       layoutKey: snapshot.identity?.layoutKey ?? null, trackName: reading.trackName, driverName: player.driverName ?? '',
-      vehicleName: player.vehicleName, vehicleModel: model === 'Unknown Vehicle' ? null : model,
+      vehicleName: player.vehicleName, vehicleModel: snapshot.identity?.vehicleModel ?? null,
       carClass: snapshot.identity?.carClass ?? null, sessionCode: reading.sessionCode, sessionKind: snapshot.session?.kind ?? 'unknown',
       startedAt: now, updatedAt: now, firstElapsedSeconds: reading.currentEt, lastElapsedSeconds: reading.currentEt,
       endedAt: null, status: 'recording', samples: 0, droppedSamples: 0, anchors: [], sessionId: null, gameVersion: null,

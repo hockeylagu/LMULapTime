@@ -463,7 +463,7 @@ describe('LiveService', () => {
     });
 
     it('resolves the identity from the game, then from the pit poller state check while a dashboard is open', async () => {
-      const readNavigation = vi.fn(() => Promise.resolve({ ok: true as const, navigation: { sceneDesc: 'LEMANSWEC_MULSANNE', classes: [] } }));
+      const readNavigation = vi.fn(() => Promise.resolve({ ok: true as const, navigation: { sceneDesc: 'LEMANSWEC_MULSANNE', classes: [], vehFile: null } }));
       const state = { state: { settingMode: 'SETTING_GRANDPRIX' }, loadingStatus: { track: { sceneDesc: 'LEMANSWEC' } } };
       const get = vi.fn((path: string) => Promise.resolve<RestAnswer>(path === '/navigation/state' ? { ok: true, body: state } : { ok: false, reason: 'error' }));
       const personalBest = vi.fn(() => 228.4);
@@ -482,7 +482,7 @@ describe('LiveService', () => {
     });
 
     it('asks LMU itself for the identity while no dashboard is open', async () => {
-      const readNavigation = vi.fn(() => Promise.resolve({ ok: true as const, navigation: { sceneDesc: 'LEMANSWEC', classes: [] } }));
+      const readNavigation = vi.fn(() => Promise.resolve({ ok: true as const, navigation: { sceneDesc: 'LEMANSWEC', classes: [], vehFile: null } }));
       const { service, frame } = setup({ identity: { readNavigation } });
       frame(lap(3, { vehicleName: 'Ginetta G61', vehicleClass: 'LMP3' }, { trackName: 'Circuit de la Sarthe' }));
       await vi.advanceTimersByTimeAsync(0);

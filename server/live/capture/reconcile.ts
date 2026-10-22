@@ -1,7 +1,7 @@
 import { readdir } from 'node:fs/promises';
 import type { Database } from 'better-sqlite3';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
-import { mapVehicleIdToModel } from '../../../shared/domain/vehicleMapping.js';
+import { normalizeCarClass, resolveVehicle } from '../../../shared/domain/vehicleMapping.js';
 import type { LiveCaptureLapAnchor, LiveCaptureManifest } from '../../../shared/types/liveCapture.js';
 import {
   getLiveCaptureIndexRows, setLiveCaptureAvailability, setLiveCaptureMatch,
@@ -71,16 +71,15 @@ function sameLayout(manifest: LiveCaptureManifest, candidate: SessionCandidate):
   return captureKey !== null && sessionKey !== null && captureKey === sessionKey;
 }
 
-function canonicalModel(value: string | null | undefined): string {
-  if (!value?.trim()) return '';
-  const model = mapVehicleIdToModel(value);
-  return model === 'Unknown Vehicle' ? '' : model.trim().toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-}
-
+/**
+ * The same car: the same model when both name a known car (the capture's entry name, "Vista AF Corse 2026 #21:LM", or
+ * its model; the log's car type), else the same class. The lap anchors still have to agree.
+ */
 function vehicleMatches(manifest: LiveCaptureManifest, candidate: SessionCandidate): boolean {
-  const captureModel = canonicalModel(manifest.vehicleModel || manifest.vehicleName);
-  const xmlModel = canonicalModel(candidate.car_type);
-  return captureModel !== '' && xmlModel !== '' && captureModel === xmlModel;
+  const captureModel = resolveVehicle(manifest.vehicleName)?.model ?? resolveVehicle(manifest.vehicleModel)?.model;
+  const sessionModel = resolveVehicle(candidate.car_type)?.model;
+  if (captureModel && sessionModel) return captureModel === sessionModel;
+  return manifest.carClass !== null && manifest.carClass === normalizeCarClass(candidate.car_class);
 }
 
 function hasMonotonicAnchors(anchors: readonly LiveCaptureLapAnchor[]): boolean {

@@ -2,7 +2,7 @@ import React, { useCallback, useRef, useState } from 'react';
 import { ArrowLeft, CloudRain, CloudSun, Info } from 'lucide-react';
 import { ReplayDriverEntry, ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { formatRain } from '../../../../shared/domain/lapConditions.js';
-import { mapVehicleIdToClass } from '../../../../shared/domain/vehicleMapping.js';
+import { resolveDriverCarClass } from '../../../../shared/domain/vehicleMapping.js';
 import { CarIdentity } from '../../vehicle/CarIdentity.js';
 import { DROPDOWN_CONTENT_INSET, DROPDOWN_PANEL } from '../../common/dropdown/dropdownStyles.js';
 import { useOutsidePress } from '../../common/dropdown/useAnchoredPanel.js';
@@ -53,9 +53,7 @@ export const ReplayInspectorTitle: React.FC<ReplayInspectorTitleProps> = ({ onCl
     metadata?.drivers?.[0],
   ].find((source): source is CarSource => Boolean(source?.carType));
   const carType = carSource?.carType || null;
-  const carClass = carSource
-    ? carSource.carClass || mapVehicleIdToClass(carSource.vehicleId, carSource.carType) || null
-    : null;
+  const carClass = resolveDriverCarClass(carSource) || null;
 
   const hasSubline = Boolean(carType || conditions);
 

@@ -7,10 +7,7 @@ import {
   ReplayTrajectoryData,
   WeatherCondition,
 } from '../../../shared/types/index.js';
-import {
-  mapVehicleIdToModel,
-  mapVehicleIdToClass,
-} from '../../../shared/domain/vehicleMapping.js';
+import { resolveVehicle } from '../../../shared/domain/vehicleMapping.js';
 import { nearestSelectedIndex, selectFeatureSamples } from './trajectoryDownsampler.js';
 import { replayWeatherCondition } from '../../../shared/domain/lapConditions.js';
 
@@ -330,8 +327,9 @@ export function parseReplayMetadata(
 
           const isPlayer = false;
 
-          const carType = mapVehicleIdToModel(sVeh.str);
-          const carClass = mapVehicleIdToClass(sVeh.str, carType);
+          const car = resolveVehicle(sVeh.str);
+          const carType = car?.model ?? (sVeh.str || 'Unknown Vehicle');
+          const carClass = car?.carClass;
 
           structDrivers.push({
             slot: curSlot,
@@ -400,8 +398,9 @@ export function parseReplayMetadata(
 
                 const isPlayer = false;
 
-                const carType = mapVehicleIdToModel(sVehicle.str);
-                const carClass = mapVehicleIdToClass(sVehicle.str, carType);
+                const car = resolveVehicle(sVehicle.str);
+                const carType = car?.model ?? (sVehicle.str || 'Unknown Vehicle');
+                const carClass = car?.carClass;
 
                 drivers.push({
                   slot,

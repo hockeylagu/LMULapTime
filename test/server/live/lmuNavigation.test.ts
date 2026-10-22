@@ -10,12 +10,15 @@ describe('LMU navigation state', () => {
   afterEach(() => { vi.useRealTimers(); });
 
   it('reads the exact layout and the car classes from the loading data (a JSON string)', () => {
-    expect(parseNavigationState(NAVIGATION_STATE_LE_MANS)).toEqual({ sceneDesc: 'LEMANSWEC', classes: ['ELMS2025', 'Ginetta_G61LTP3_Evo', 'LMP3'] });
+    expect(parseNavigationState(NAVIGATION_STATE_LE_MANS)).toEqual({
+      sceneDesc: 'LEMANSWEC', classes: ['ELMS2025', 'Ginetta_G61LTP3_Evo', 'LMP3'],
+      vehFile: String.raw`C:\LMU\Installed\Vehicles\Ginetta_G61Evo_2025\1.09\4_25_DKR_E8E7FBE8C.VEH`,
+    });
   });
 
   it('falls back to the track record of the loading status, and rejects what it cannot read', () => {
     const noLoadingData = { loadingStatus: { loadingData: null, track: { sceneDesc: 'LAGUNASECA' } } };
-    expect(parseNavigationState(noLoadingData)).toEqual({ sceneDesc: 'LAGUNASECA', classes: [] });
+    expect(parseNavigationState(noLoadingData)).toEqual({ sceneDesc: 'LAGUNASECA', classes: [], vehFile: null });
     for (const body of [null, 'text', [], {}, { loadingStatus: {} }, { loadingStatus: { loadingData: '{broken' } }]) {
       expect(parseNavigationState(body)).toBeNull();
     }

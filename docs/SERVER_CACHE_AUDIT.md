@@ -41,7 +41,7 @@ excludes rebuilding its latest diff.
 | `benchmarks/referenceLaptimes.ts`: `cachedData` | Hot per-lap/driver benchmark lookup; lazy load, replaced on refresh; worker gets a snapshot | **Keep.** Reconstructing the whole benchmark set per lap is unnecessary. Indexed single-entry SQL is the alternative. Workers deliberately avoid main SQLite. |
 | `telemetry/telemetryCatalog.ts`: scan-local file-version map | Loaded from SQLite only when a scan starts; released after settlement | **Keep operation-scoped.** Reuses only matching mtime/size without enrichment errors. Completed metadata/listings belong to SQLite; status uses a SQL count. |
 | `plugins/dataPlugin.ts`: tracks/display, vehicles, logos | Validated immutable package snapshot, eagerly loaded | **Keep as source snapshot.** Files are not in SQLite; adding them creates another persistence layer. Measure package validation separately before changing startup. |
-| `shared/domain/vehicleMapping.ts`: `VEHICLE_FILES` | Model/class alias index from package; reset by `setVehicleCatalog` | **Keep.** Small derived identity lookup, not a full catalog copy. SQL adds a table and per-driver queries. |
+| `shared/domain/vehicleMapping.ts`: `LOOKUPS` | Key and name index built once from the committed `VEHICLE_MODELS` / `VEHICLE_KEYS` tables | **Keep.** Small immutable identity lookup from code, shared with the browser; no package or SQL copy. |
 | `tracks/trackGeometryStore.ts`: `cache` | Lazy derived centerline spatial index with references to plugin geometry | **Keep.** SQL cannot replace constructing the spatial index. File-backed mode checks stamps; provider mode shares frozen geometry arrays without copying raw geometry or display data. |
 | `telemetry/telemetryLinks.ts`: availability and ownership maps | Operation-scoped loaded links and file-existence memoization | **Keep operation-scoped.** SQL rows are already read directly. Disk existence still needs filesystem access; these are not process-wide availability caches. |
 | `telemetry/duckdbReader.ts`: `cachedTables` | Schema table list per open reader; discarded on close | **Keep reader-scoped.** Avoids repeated DuckDB schema queries; SQLite does not own that schema. |
@@ -170,7 +170,7 @@ user-authorized removal of four caches is recorded above; the original findings 
 | State | Reason and remaining caveat |
 |---|---|
 | Server benchmark `cachedData` and worker snapshot | Small repeated lookup used per lap; keep. Refresh replaces it. Direct `SessionDatabase.saveReferenceLaptimes`/`clearReferenceLaptimes` bypass memory invalidation, so future writers must use one coordinated update path. |
-| Vehicle alias map | Small immutable derived identity index; keep. Rebuilt by `setVehicleCatalog`. |
+| Vehicle key map | Small immutable identity index built from committed tables; keep. Changes only with a code change. |
 | Track spatial indexes | Expensive derived search structure, bounded by layouts rather than session history; keep. Avoid duplicate raw geometry ownership. |
 | DuckDB reader table list | Lives only as long as its reader; keep. It does not duplicate telemetry samples. |
 | Traffic lap-start WeakMap | Derived array tied to `DriverPositions` lifetime; keep. No permanent history retention. |

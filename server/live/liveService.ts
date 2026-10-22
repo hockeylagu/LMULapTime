@@ -24,7 +24,6 @@ import type { SseSink } from './sse.js';
 import type { LiveCaptureController } from './capture/controller.js';
 import { LiveLearningCapture } from '../../shared/domain/learning/capture.js';
 import type { AutomaticLearningRuntime } from './learning/runtime.js';
-import { mapVehicleIdToModel } from '../../shared/domain/vehicleMapping.js';
 
 /** How often buffered pedal samples go out to the pages (about 25 batches a second). */
 export const PEDAL_FLUSH_MS = 40;
@@ -88,9 +87,8 @@ export class LiveService {
   private readonly strategy = new LiveStrategyTracker((kind, predicted, source, condition, compound) => {
     const player = this.lastReading?.player;
     if (!player) return null;
-    const model = mapVehicleIdToModel(player.vehicleName);
     return this.options.learning?.correct(kind, predicted, {
-      layoutKey: this.identity.identity?.layoutKey ?? null, vehicleModel: model === 'Unknown Vehicle' ? null : model,
+      layoutKey: this.identity.identity?.layoutKey ?? null, vehicleModel: this.identity.identity?.vehicleModel ?? null,
       driverName: player.driverName ?? '', condition, compound, modelVersion: LIVE_BASELINE_MODEL_VERSION, predictionSource: source,
     }) ?? null;
   });

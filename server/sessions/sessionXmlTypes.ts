@@ -39,6 +39,7 @@ export interface RawLapXmlNode {
 export interface RawDriverXmlNode {
   Name?: string;
   CarType?: string;
+  VehFile?: string;
   VehName?: string;
   CarClass?: string;
   CarNumber?: string | number;

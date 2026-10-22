@@ -20,7 +20,7 @@ const source = () => FakeEventSource.byUrl('/api/live/stream');
 const send = (value: LiveSnapshot) => act(() => source().emit('snapshot', value));
 const timing = (value: unknown) => act(() => source().emit('timing', value));
 
-const IDENTITY = { layoutKey: 'bahrain-gp', layoutName: 'Bahrain GP', carClass: 'GT3', personalBestSeconds: 120.964 };
+const IDENTITY = { layoutKey: 'bahrain-gp', layoutName: 'Bahrain GP', carClass: 'GT3', vehicleModel: null, personalBestSeconds: 120.964 };
 const LAPS = [
   liveLap(3, 122.202, [37.366, 45.208, 39.628]),
   liveLap(4, 122.206, [37.404, 45.234, 39.568]),

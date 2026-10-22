@@ -11,8 +11,8 @@ function session(overrides: Partial<LiveSessionInfo> = {}): LiveSessionInfo {
   };
 }
 
-const LE_MANS: NavigationRead = { ok: true, navigation: { sceneDesc: 'LEMANSWEC', classes: ['LMP3'] } };
-const MULSANNE: NavigationRead = { ok: true, navigation: { sceneDesc: 'LEMANSWEC_MULSANNE', classes: ['LMP3'] } };
+const LE_MANS: NavigationRead = { ok: true, navigation: { sceneDesc: 'LEMANSWEC', classes: ['LMP3'], vehFile: null } };
+const MULSANNE: NavigationRead = { ok: true, navigation: { sceneDesc: 'LEMANSWEC_MULSANNE', classes: ['LMP3'], vehFile: null } };
 const FAILED: NavigationRead = { ok: false };
 
 function setup(answers: NavigationRead[]) {
@@ -58,7 +58,7 @@ describe('LiveIdentityResolver', () => {
     t.resolver.update(session());
     await vi.advanceTimersByTimeAsync(NAVIGATION_POLL_MS * 3);
     expect(t.reads).not.toHaveBeenCalled();
-    t.resolver.offerNavigation({ sceneDesc: 'LEMANSWEC_MULSANNE', classes: ['LMP3'] });
+    t.resolver.offerNavigation({ sceneDesc: 'LEMANSWEC_MULSANNE', classes: ['LMP3'], vehFile: null });
     expect(t.resolver.identity?.layoutKey).toBe('sarthe_mulsanne');
     expect(t.onChange).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(10_000);
@@ -72,7 +72,7 @@ describe('LiveIdentityResolver', () => {
 
   it('ignores an offered answer while no session is loaded', () => {
     const t = setup([]);
-    t.resolver.offerNavigation({ sceneDesc: 'LEMANSWEC', classes: ['LMP3'] });
+    t.resolver.offerNavigation({ sceneDesc: 'LEMANSWEC', classes: ['LMP3'], vehFile: null });
     expect(t.resolver.identity).toBeNull();
     expect(t.onChange).not.toHaveBeenCalled();
   });

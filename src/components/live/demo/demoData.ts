@@ -12,7 +12,7 @@ export function demoSnapshot(): LiveSnapshot {
     session: { kind: 'race', sessionCode: 10, gamePhase: 5, inRealtime: true,
       trackName: 'Monza', vehicleName: 'Ferrari 499P', vehicleClass: 'Hypercar',
       elapsedSeconds: 1450, endSeconds: 3600, playerLapsCompleted: 12, playerPlace: 3, playerClassPlace: 2 },
-    identity: { layoutKey: circuit.layoutKey, layoutName: 'Monza GP', carClass: 'Hyper', personalBestSeconds: 96.42 },
+    identity: { layoutKey: circuit.layoutKey, layoutName: 'Monza GP', carClass: 'Hyper', vehicleModel: 'Ferrari 499P', personalBestSeconds: 96.42 },
     lapsLeft: { laps: 23, estimated: true },
     weather: { trackTempC: 32, trackTempTrend: 'rising', raining: 0, avgPathWetness: 0, wetnessTrend: 'steady' },
     recentLaps: [

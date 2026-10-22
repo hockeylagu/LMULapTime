@@ -207,12 +207,12 @@ describe('replayParser - metadata, player detection & downsampling', () => {
 
       const samuel = meta.drivers.find(d => d.name === 'Samuel Lague');
       expect(samuel).toBeDefined();
-      expect(samuel?.carType).toBe('Ferrari 296 GT3');
+      expect(samuel?.carType).toBe('Ferrari 296 LMGT3');
       expect(samuel?.carClass).toBe('GT3');
       expect(samuel?.team).toBe('Vista AF Corsa');
       expect(samuel?.carNumber).toBe('21');
       expect(meta.carClass).toBe('GT3');
-      expect(meta.carType).toBe('Ferrari 296 GT3');
+      expect(meta.carType).toBe('Ferrari 296 LMGT3');
     });
 
     it('throws error for invalid files', () => {
@@ -261,7 +261,7 @@ describe('replayParser - metadata, player detection & downsampling', () => {
       const binPath = path.join(tempDir, 'binary_drivers.vcr');
       fs.writeFileSync(binPath, createBinaryDriverVcrBuffer({
         drivers: [
-          { slot: 5, name: 'Max Verstappen', vehicleId: '33_26_AFCO12345678', livery: 'RedBull_Livery', team: 'Oracle Red Bull', carNumber: '1' },
+          { slot: 5, name: 'Max Verstappen', vehicleId: '21_26_AFCO31910023', livery: 'RedBull_Livery', team: 'Oracle Red Bull', carNumber: '1' },
           { slot: 12, name: 'Lewis Hamilton', vehicleId: '44_26_AFCO87654321', livery: 'Scuderia_Livery', team: 'Scuderia Ferrari', carNumber: '44' },
         ],
       }));
@@ -273,7 +273,7 @@ describe('replayParser - metadata, player detection & downsampling', () => {
       const lewis = meta.drivers.find(d => d.name === 'Lewis Hamilton');
       expect(max).toBeDefined();
       expect(max?.slot).toBe(5);
-      expect(max?.carType).toBe('Ferrari 296 GT3');
+      expect(max?.carType).toBe('Ferrari 296 LMGT3');
       expect(max?.team).toBe('Oracle Red Bull');
       expect(max?.carNumber).toBe('1');
 

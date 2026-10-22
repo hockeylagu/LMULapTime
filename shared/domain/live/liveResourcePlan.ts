@@ -1,7 +1,7 @@
 import type { LiveGaragePlan, LivePerLapSource, LiveRacePlan, LiveResourceKind } from '../../types/liveStrategy.js';
 import { projectRaceFlagSeconds } from './liveLapsLeft.js';
 
-/** The class names that race on virtual energy (canonical classes from `mapVehicleIdToClass`). */
+/** The class names that race on virtual energy (canonical classes from `resolveVehicle`). */
 const VIRTUAL_ENERGY_CLASSES = new Set(['Hyper', 'GT3']);
 
 /** VE for GT3 and Hypercar, fuel for every other class (and an unknown one). */

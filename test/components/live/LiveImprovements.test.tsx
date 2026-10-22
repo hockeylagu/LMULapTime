@@ -125,7 +125,7 @@ describe('live dashboard improvements', () => {
     const send = (kind: 'qualifying' | 'race', settled = true) => act(() => FakeEventSource.byUrl('/api/live/stream').emit('snapshot', liveSnapshot({
       lifecycle: 'garage', session: liveSession({ kind, inRealtime: false, gamePhase: 8 }), result: { ...result, kind, completeHistory: false, settled },
       audit: { runId: 'saved-session', status: 'recording' },
-      identity: { layoutKey: 'bahrain_wec', layoutName: 'Bahrain', carClass: 'GT3', personalBestSeconds: 121 },
+      identity: { layoutKey: 'bahrain_wec', layoutName: 'Bahrain', carClass: 'GT3', vehicleModel: null, personalBestSeconds: 121 },
     })));
     send('qualifying', false);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('QUALIFYING · WAITING');

@@ -21,16 +21,21 @@ function parseJson(text: unknown): Record<string, unknown> | null {
   try { return asRecord(JSON.parse(text)); } catch { return null; }
 }
 
-/** `loadingStatus.loadingData` is a JSON string: `trackInfo.sceneDesc` is the layout, `selectedCar.classes` the class hint. */
+/**
+ * `loadingStatus.loadingData` is a JSON string: `trackInfo.sceneDesc` is the layout, `selectedCar.classes` the class hint
+ * and `selectedCar.vehFile` the car's vehicle file (shared memory names only the entry).
+ */
 export function parseNavigationState(body: unknown): LiveNavigation | null {
   const status = asRecord(asRecord(body)?.loadingStatus);
   const loading = parseJson(status?.loadingData);
   const sceneDesc = asRecord(loading?.trackInfo)?.sceneDesc ?? asRecord(status?.track)?.sceneDesc;
-  const classes = asRecord(loading?.selectedCar)?.classes;
+  const selectedCar = asRecord(loading?.selectedCar);
+  const classes = selectedCar?.classes;
   if (typeof sceneDesc !== 'string' && !Array.isArray(classes)) return null;
   return {
     sceneDesc: typeof sceneDesc === 'string' && sceneDesc.trim() ? sceneDesc.trim() : null,
     classes: Array.isArray(classes) ? classes.filter((name): name is string => typeof name === 'string') : [],
+    vehFile: typeof selectedCar?.vehFile === 'string' && selectedCar.vehFile.trim() ? selectedCar.vehFile.trim() : null,
   };
 }
 

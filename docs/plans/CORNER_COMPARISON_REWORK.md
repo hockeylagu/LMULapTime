@@ -149,7 +149,7 @@ The corner set depends on which lap is the primary:
    pressure, more wheel and tyre channels), shown only on their own laps and their own consistency, and added only
    where it tells the driver something the replay level cannot.
 9. **Deterministic, same class, same layout.** All metrics, labels and rankings are deterministic; AI only writes the
-   sentence. Comparisons stay in one car class (`mapVehicleIdToClass`). Nothing is shared between layouts of one
+   sentence. Comparisons stay in one car class (`resolveVehicle`). Nothing is shared between layouts of one
    venue (AGENTS.md §4A): maps are keyed by `getCircuitSpecification(...).layoutKey`.
 10. **No new metric cache.** Corner metrics are computed on demand from the cached full-rate trajectory (§4.1).
 11. **AI laps never count** for anything built from other drivers' laps (references, class profile).

@@ -18,7 +18,7 @@ import {
   getSessionTypeWeight,
   minValidTime,
 } from '../../shared/domain/formatters.js';
-import { normalizeCarClass } from '../../shared/domain/vehicleMapping.js';
+import { normalizeCarClass, resolveVehicle } from '../../shared/domain/vehicleMapping.js';
 import {
   RawLapXmlNode,
   RawDriverXmlNode,
@@ -469,8 +469,10 @@ export class LmuParser {
 
   private parseDriver(d: RawDriverXmlNode): DriverData {
     const name = String(d.Name || 'Unknown Driver');
-    const carType = String(d.CarType || d.VehName || 'Unknown Car');
-    const carClass = normalizeCarClass(String(d.CarClass || 'General'));
+    // One public name per car (seasons and liveries apart); the log's own class stays the class.
+    const car = resolveVehicle(String(d.VehFile ?? '')) ?? resolveVehicle(String(d.VehName ?? '')) ?? resolveVehicle(String(d.CarType ?? ''));
+    const carType = car?.model ?? String(d.CarType || d.VehName || 'Unknown Car');
+    const carClass = normalizeCarClass(String(d.CarClass || car?.carClass || 'General'));
     const carNumber = String(d.CarNumber || '');
     const teamName = String(d.TeamName || '');
     const isPlayer = String(d.isPlayer) === '1' || d.isPlayer === true;
