@@ -19,7 +19,7 @@ const withRace = (race: Partial<LiveRacePlan>, patch: Partial<LiveStrategy> = {}
 };
 const texts = (snapshot: LiveSnapshot) => {
   const view = racePlanView(snapshot);
-  return { mode: view.mode, action: `${view.action.label}|${view.action.value}|${view.action.unit ?? ''}|${view.action.note ?? ''}`, cells: view.cells.map(cell => `${cell.label}|${cell.value}|${cell.note ?? ''}`) };
+  return { mode: view.mode, action: `${view.action.label}|${view.action.value}|${view.action.unit ?? ''}|${view.action.note ?? ''}`, cells: view.cells.map(cell => `${cell.label}${cell.labelAccent ? ` · ${cell.labelAccent}` : ''}|${cell.value}|${cell.note ?? ''}`) };
 };
 
 describe('racePlanView', () => {
@@ -30,6 +30,9 @@ describe('racePlanView', () => {
       cells: ['PIT IN|6|', 'TYRES · MEDIUM|91|', 'VE NOW|62|'],
     });
     expect(racePlanView(withRace({ sparePerLap: -0.3 })).action).toMatchObject({ tone: 'loss', note: '−0.3 % OVER / LAP' });
+    // The compound word carries the sidewall colour; the tread figure stays plain.
+    expect(racePlanView(withRace({})).cells[1]).toMatchObject({ labelAccentTone: 'medium' });
+    expect(racePlanView(withRace({})).cells[1].tone).toBeUndefined();
   });
 
   it('leads with the pit countdown two laps out: the MFD VE needed against the setting, the tyre call and the stop time', () => {

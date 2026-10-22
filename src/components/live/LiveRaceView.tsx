@@ -10,11 +10,13 @@ import { racePlanView } from './race/raceAction.js';
  * (`LiveDashboardView`), and the history keeps one completed lap to make room.
  */
 export function LiveRaceView({ snapshot, store }: { snapshot: LiveSnapshot; store: LiveTimingStore }) {
+  const view = racePlanView(snapshot);
   return (
     <>
-      <LiveRacePlan view={racePlanView(snapshot)} store={store} />
+      <LiveRacePlan view={view} store={store} />
+      {/* A sprint leads with the estimated lap; otherwise it takes the running clock's place in the lap row. */}
       <LivePracticeHistory laps={snapshot.recentLaps} best={snapshot.sessionBest} store={store}
-        completedRows={snapshot.strategy?.damage?.significant ? 1 : 2} />
+        completedRows={snapshot.strategy?.damage?.significant ? 1 : 2} estimate={view.mode !== 'sprint'} />
     </>
   );
 }

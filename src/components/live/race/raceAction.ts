@@ -11,6 +11,9 @@ export type PlanTone = 'gain' | 'loss' | 'warn' | 'muted' | CompoundTone | null;
 
 export interface PlanReadout {
   label: string;
+  /** A word after the label (`TYRES · MEDIUM`) in its own tone. */
+  labelAccent?: string;
+  labelAccentTone?: PlanTone;
   value: string;
   unit?: string;
   note?: string;
@@ -55,11 +58,12 @@ function tyresCell(tyres: LiveTyres | null): PlanReadout {
   };
   const worst = tyres?.worst ?? null;
   return {
-    label: tyres?.compound ? `TYRES · ${tyres.compound.toUpperCase()}` : 'TYRES',
+    label: 'TYRES',
+    labelAccent: tyres?.compound?.toUpperCase(),
+    labelAccentTone: compoundTone(tyres?.compound),
     value: worst === null ? UNKNOWN : `${Math.round(worst * 100)}`,
     unit: worst === null ? undefined : '%',
     note: tyres?.newSets === 0 ? 'NO NEW SETS' : undefined,
-    tone: compoundTone(tyres?.compound),
   };
 }
 

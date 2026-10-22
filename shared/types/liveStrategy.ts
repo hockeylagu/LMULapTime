@@ -124,7 +124,7 @@ export interface LiveTyres {
   worstCorner: LiveCorner | null;
   /** Measured loss of that figure per lap, from laps of this stint; null before two laps. */
   wearPerLap: number | null;
-  /** New sets left in the inventory. */
+  /** Complete new sets left: the game's new tyre count in whole fours. */
   newSets: number | null;
 }
 

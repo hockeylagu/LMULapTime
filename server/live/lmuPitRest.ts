@@ -129,17 +129,21 @@ export function parseVehicleCondition(body: unknown): LiveVehicleCondition | nul
   return { body: damage, suspension, tires };
 }
 
-/** `GET /rest/garage/UIScreen/TireManagement`: the game's per-lap use (VE as a fraction) and the new sets left. */
+/**
+ * `GET /rest/garage/UIScreen/TireManagement`: the game's per-lap use (VE as a fraction) and the new sets left. The
+ * inventory counts single tyres (an allocation of 10 is two sets and two spares), so sets are whole fours.
+ */
 export function parseTireManagement(body: unknown): Extract<LiveRestUpdate, { type: 'tireManagement' }> | null {
   const json = record(body);
   const usage = record(json?.expectedUsage);
   if (!usage) return null;
   const veFraction = num(usage.virtualEnergyFractionPerLap);
+  const newTyres = num(record(json?.tireInventory)?.newTires);
   return {
     type: 'tireManagement',
     vePerLap: veFraction !== null && veFraction > 0 ? veFraction * 100 : null,
     fuelPerLap: num(usage.fuelConsumption),
-    newSets: num(record(json?.tireInventory)?.newTires),
+    newSets: newTyres === null ? null : Math.floor(newTyres / 4),
     selected: parseSelectedTyres(json),
   };
 }

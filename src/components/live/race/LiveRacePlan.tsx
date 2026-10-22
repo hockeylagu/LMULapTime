@@ -28,7 +28,9 @@ function Readout({ readout, size, testId, children }: { readout: PlanReadout; si
   return (
     <div data-testid={testId} className="min-w-0">
       {/* Label, value and note always hold their lines, so a mode change never moves the row. */}
-      <h2 className={LABEL}>{readout.label}</h2>
+      <h2 className={LABEL}>
+        {readout.label}{readout.labelAccent && <> · <span className={tone(readout.labelAccentTone)}>{readout.labelAccent}</span></>}
+      </h2>
       <Value className={`${value} overflow-hidden text-ellipsis whitespace-nowrap font-mono font-bold ${tone(readout.tone)}`}>
         {children ?? readout.value}
         {readout.unit && <span className="ml-3 text-[56px] font-normal text-lmu-text-soft">{readout.unit}</span>}

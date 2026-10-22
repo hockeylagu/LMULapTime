@@ -18,15 +18,21 @@ function vsBest(lap: LiveLapRecord, best: LiveSessionBest | null): number | null
 }
 
 /**
- * The lap in progress, in the same pattern as the completed rows: lap number, the running lap clock, and each
- * sector as it is crossed. Only this row subscribes to the 5 Hz timing stream; completed history stays stable.
+ * The lap in progress, in the same pattern as the completed rows: lap number, the running lap clock (or the
+ * estimated lap, `~` marked, when asked and known), and each sector as it is crossed. Only this row subscribes to
+ * the 5 Hz timing stream; completed history stays stable.
  */
-function CurrentLapRow({ store }: { store: LiveTimingStore }) {
+function CurrentLapRow({ store, estimate }: { store: LiveTimingStore; estimate: boolean }) {
   const timing = useLiveTiming(store);
+  const estimated = estimate && !timing?.isOutLap ? timing?.lapEstimate?.seconds : null;
   return (
     <tr data-testid="live-history-current" className="border-b border-lmu-border bg-lmu-card font-bold">
       <th scope="row" className={CELL}>{timing?.lapNumber ?? UNKNOWN}</th>
-      <td className={CELL}><RunningLapClock lapNumber={timing?.lapNumber ?? 0} seconds={timing?.lapElapsedSeconds} /></td>
+      <td className={CELL} data-testid="live-history-current-time">
+        {estimated != null && Number.isFinite(estimated) && estimated > 0
+          ? <><span className="font-normal text-lmu-text-soft">~</span>{formatLapTime(estimated)}</>
+          : <RunningLapClock lapNumber={timing?.lapNumber ?? 0} seconds={timing?.lapElapsedSeconds} />}
+      </td>
       {[0, 1, 2].map((index) => (
         <td key={index} className={CELL}>{formatSectorTime(timing?.sectors[index])}</td>
       ))}
@@ -40,8 +46,8 @@ function CurrentLapRow({ store }: { store: LiveTimingStore }) {
  * down as the newest completed row. Only that lap gets a second row of colored sector deltas, against the best sectors.
  * Rows not driven yet are held at full height with hidden cells, so the table never reflows as laps arrive.
  */
-export function LivePracticeHistory({ laps, best, store, completedRows = HISTORY_ROWS }: {
-  laps: LiveLapRecord[]; best: LiveSessionBest | null; store: LiveTimingStore; completedRows?: 1 | 2;
+export function LivePracticeHistory({ laps, best, store, completedRows = HISTORY_ROWS, estimate = false }: {
+  laps: LiveLapRecord[]; best: LiveSessionBest | null; store: LiveTimingStore; completedRows?: 1 | 2; estimate?: boolean;
 }) {
   const rows = laps.slice(-completedRows).reverse();
   const blanks = completedRows - rows.length;
@@ -60,7 +66,7 @@ export function LivePracticeHistory({ laps, best, store, completedRows = HISTORY
           </tr>
         </thead>
         <tbody>
-          <CurrentLapRow store={store} />
+          <CurrentLapRow store={store} estimate={estimate} />
           {rows.map((lap, row) => <Fragment key={lap.lapNumber}>
             <tr
               data-testid={row === 0 ? 'live-history-latest' : 'live-history-row'}

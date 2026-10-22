@@ -107,6 +107,16 @@ describe('live driving views', () => {
       expect(screen.queryByTestId('live-tyre-avg')).not.toBeInTheDocument();
     });
 
+    it('shows the estimated lap in place of the running clock, and the clock on an out lap', () => {
+      render(<LivePage />);
+      send(race());
+      const estimate = { seconds: 121.222, referenceSeconds: 121.406, deltaSeconds: -0.184, source: 'distance' as const };
+      timing(liveTiming({ deltaSeconds: -0.184, lapEstimate: estimate }));
+      expect(screen.getByTestId('live-history-current-time')).toHaveTextContent('~2:01.222');
+      timing(liveTiming({ isOutLap: true, lapEstimate: estimate }));
+      expect(screen.getByTestId('live-history-current-time')).not.toHaveTextContent('~');
+    });
+
     it('shows the unknown mark, never zero, before timing and a lap exist', () => {
       render(<LivePage />);
       send(liveSnapshot());

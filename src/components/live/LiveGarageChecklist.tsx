@@ -8,6 +8,12 @@ const ACTION_TONE: Record<NonNullable<GarageCheck['action']>['tone'], string> = 
   warn: 'text-lmu-warn',
 };
 
+/** The compound's sidewall colour; plain text for a name we don't know. */
+const compoundText = (compound: string): string => {
+  const tone = compoundTone(compound);
+  return tone ? COMPOUND_CLASS[tone] : 'text-lmu-text';
+};
+
 const HEAD = 'whitespace-nowrap text-[48px] font-semibold text-lmu-muted';
 // Words (NEW, USED 98%) take a smaller size than figures so they fit the column at the same baseline.
 const value = (text: string): string =>
@@ -45,7 +51,7 @@ export function LiveGarageChecklist({ checks, compact = false }: { checks: Garag
           <div className={RACE_LEAD}>
             <h2 className="whitespace-nowrap text-[64px] font-semibold text-lmu-text">
               {check.label}
-              {check.compound && <> · <span className={COMPOUND_CLASS[compoundTone(check.compound) ?? 'hard']}>{check.compound}</span></>}
+              {check.compound && <> · <span className={compoundText(check.compound)}>{check.compound}</span></>}
             </h2>
             {check.note && <p className="mt-3 text-[36px] font-semibold text-lmu-muted">{check.note}</p>}
           </div>

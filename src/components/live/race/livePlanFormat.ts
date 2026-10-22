@@ -45,10 +45,10 @@ export function compoundTone(text: string | null | undefined): CompoundTone | nu
   return null;
 }
 
-/** The sidewall colours of the sim convention: soft red, medium yellow, hard white, wet blue. */
+/** The LMU sidewall colours: soft white, medium yellow, hard red, wet blue. */
 export const COMPOUND_CLASS: Record<CompoundTone, string> = {
-  soft: 'text-lmu-loss',
+  soft: 'text-lmu-text',
   medium: 'text-lmu-warn',
-  hard: 'text-lmu-text',
+  hard: 'text-lmu-loss',
   wet: 'text-lmu-blue',
 };

@@ -43,7 +43,8 @@ describe('LMU pit REST parsers', () => {
     expect(parseTireManagement({
       expectedUsage: { fuelConsumption: 2.128, fuelFractionPerLap: 0.018, virtualEnergyConsumption: 17096636, virtualEnergyFractionPerLap: 0.02533 },
       tireInventory: { maxAvailableTires: 56, newTires: 52 },
-    })).toEqual({ type: 'tireManagement', vePerLap: 2.533, fuelPerLap: 2.128, newSets: 52, selected: null });
+    })).toEqual({ type: 'tireManagement', vePerLap: 2.533, fuelPerLap: 2.128, newSets: 13, selected: null });
+    expect(parseTireManagement({ expectedUsage: {}, tireInventory: { maxAvailableTires: 10, newTires: 7 } })?.newSets).toBe(1);
   });
 
   it('reads the selected set as used when any wheel was driven, with the most worn tread and the compound name', () => {
