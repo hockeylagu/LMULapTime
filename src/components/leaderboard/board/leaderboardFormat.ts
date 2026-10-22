@@ -7,15 +7,22 @@ export function toEpochMs(timestamp: number): number {
   return timestamp < 1e12 ? timestamp * 1000 : timestamp;
 }
 
-/** "today", "yesterday", "5 days ago", "3 weeks ago", "4 months ago". */
+/** Relative age in local calendar days: "today", "yesterday", "5 days ago", etc. */
 export function formatDrivenAgo(timestamp: number, now = Date.now()): string {
-  const days = Math.floor((now - toEpochMs(timestamp)) / 86_400_000);
+  const drivenDate = new Date(toEpochMs(timestamp));
+  const currentDate = new Date(now);
+  // Map local dates to UTC day numbers so daylight-saving changes cannot skew the count.
+  const drivenDay = Date.UTC(drivenDate.getFullYear(), drivenDate.getMonth(), drivenDate.getDate());
+  const currentDay = Date.UTC(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+  const days = (currentDay - drivenDay) / 86_400_000;
   if (days <= 0) return 'today';
   if (days === 1) return 'yesterday';
   if (days < 14) return `${days} days ago`;
-  if (days < 60) return `${Math.floor(days / 7)} weeks ago`;
-  if (days < 730) return `${Math.floor(days / 30)} months ago`;
-  return `${Math.floor(days / 365)} years ago`;
+  const years = currentDate.getFullYear() - drivenDate.getFullYear();
+  const months = years * 12 + currentDate.getMonth() - drivenDate.getMonth();
+  if (months < 2) return `${Math.floor(days / 7)} weeks ago`;
+  if (months < 24) return `${months} months ago`;
+  return `${years} years ago`;
 }
 
 /** "+0.312", "-0.080", "±0.000": a gap in seconds with its sign. */
