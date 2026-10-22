@@ -76,7 +76,7 @@ export function parseEstimate(body: unknown): Extract<LiveRestUpdate, { type: 'e
   return { type: 'estimate', total, damage: part('damage'), penalties: part('penalties'), fuel: part('fuel'), ve: part('ve'), tires: part('tires') };
 }
 
-/** `GET /rest/garage/UIScreen/RepairAndRefuel`: the random delays of the game's pit rules. */
+/** `GET /rest/garage/UIScreen/RepairAndRefuel`: the random delays and refuel rates of the game's pit rules. */
 export function parsePitStopTimes(body: unknown): Extract<LiveRestUpdate, { type: 'pitStopTimes' }> | null {
   const times = record(record(record(body)?.pitStopTimes)?.times);
   if (!times) return null;
@@ -87,6 +87,11 @@ export function parsePitStopTimes(body: unknown): Extract<LiveRestUpdate, { type
     fuelRandom: delay('FuelRandomDelay'),
     tireRandom: delay('RandomTireDelay'),
     veRandom: delay('virtualEnergyRandomDelay'),
+    // Litres a second; VE as a fraction a second (0.025 at Le Mans 2026-10-22, the game's 0.4 s per % VE).
+    fuelFillRate: delay('FuelFillRate'),
+    veFillRate: delay('virtualEnergyFillRate') * 100,
+    fuelInsert: delay('FuelInsert'),
+    veInsert: delay('virtualEnergyInsert'),
   };
 }
 

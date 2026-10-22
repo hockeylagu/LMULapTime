@@ -342,7 +342,8 @@ export class LiveService {
     const state = deriveLiveState(reading, previous.lifecycle, this.screen);
     this.identity.update(isLiveSessionLoaded(state.lifecycle) ? state.session : null);
     const identity = this.identity.identity;
-    const details = this.tracker.apply(reading, state);
+    // The previous strategy: the planned stop it holds shortens the race distance (`LiveSessionTracker`).
+    const details = this.tracker.apply(reading, state, previous.strategy ?? null);
     const strategy = this.strategy.update(reading, state, {
       carClass: identity?.carClass ?? null,
       layoutKey: identity?.layoutKey ?? null,

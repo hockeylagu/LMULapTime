@@ -280,7 +280,8 @@ changes, acceptance evidence disappears or prospective error gates regress; repl
 
 The live planner uses eligible active corrections, bounded to ±10%, over its rolling estimator/game
 fallback. Lap-start training events still freeze the uncorrected baseline (version 3), preventing
-recursive bias fitting; corrected advice/audits use model version 4. Resource/garage plans disclose
+recursive bias fitting; corrected advice/audits use model version 5 (4 before 2026-10-22: reserve kept at
+the finish, laps left at the class leader's pace without the planned stop, the pit timer for a stop made now). Resource/garage plans disclose
 the baseline and applied adjustment, and dashboard source text identifies learned advice.
 Exact layout, car, driver, XML patch, weather, compound and baseline source/version must match; weather
 uses the training rule (wet from `RAIN_WET_MIN`), not the planner's drying hysteresis.

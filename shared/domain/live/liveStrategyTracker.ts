@@ -12,6 +12,8 @@ import { planFuelRatio, savingToFinish, tyreCoverage } from './liveInsights.js';
 import { RAIN_WET_MIN } from '../lapConditions.js';
 import type { LiveUsageObservation } from '../../types/liveAudit.js';
 import { classLeaderLapSeconds, raceClockRunning } from './liveLapsLeft.js';
+import { plannedServiceSeconds, refuelBase, refuelSeconds } from './livePitTime.js';
+import type { RefuelPart } from './livePitTime.js';
 
 /** One parsed answer of LMU's local REST API (server/live/lmuPitRest.ts). */
 /** The garage's selected tyre set, as `TireManagement` reports it. */
@@ -20,7 +22,9 @@ export type LiveSelectedTyres = Omit<LiveGarageTyres, 'newSets'>;
 export type LiveRestUpdate =
   | { type: 'standings'; veFraction: number | null; fuelFraction: number | null; pitState: LivePitState; penalties: number }
   | { type: 'estimate'; total: number; damage: number; penalties: number; fuel: number; ve: number; tires: number }
-  | { type: 'pitStopTimes'; fixRandom: number; fuelRandom: number; tireRandom: number; veRandom: number }
+  /** The pit rules: random delays (s), fill rates (litres or % VE a second) and the insert times of a refuel (s). */
+  | { type: 'pitStopTimes'; fixRandom: number; fuelRandom: number; tireRandom: number; veRandom: number;
+    fuelFillRate: number; veFillRate: number; fuelInsert: number; veInsert: number }
   | { type: 'pitMenu'; menu: LivePitMenu }
   | { type: 'condition'; condition: LiveVehicleCondition }
   | { type: 'tireManagement'; vePerLap: number | null; fuelPerLap: number | null; newSets: number | null; selected: LiveSelectedTyres | null }
@@ -106,6 +110,10 @@ export class LiveStrategyTracker {
   private pitState: LivePitState = 'none';
   private penalties = 0;
   private estimate: Extract<LiveRestUpdate, { type: 'estimate' }> | null = null;
+  /** The player's resource, known from the first reading (REST answers can come before it). */
+  private kind: LiveResourceKind | null = null;
+  /** The fixed seconds of each refuel part, learned from the game's estimates (`refuelBase`). */
+  private refuelBases: Record<LiveResourceKind, number | null> = { ve: null, fuel: null };
   private delays: Extract<LiveRestUpdate, { type: 'pitStopTimes' }> | null = null;
   private menu: LivePitMenu | null = null;
   private condition: LiveVehicleCondition | null = null;
@@ -145,6 +153,7 @@ export class LiveStrategyTracker {
     this.pitState = 'none';
     this.penalties = 0;
     this.estimate = null;
+    this.refuelBases = { ve: null, fuel: null };
     this.menu = null;
     this.condition = null;
     this.usage = null;
@@ -169,6 +178,7 @@ export class LiveStrategyTracker {
         return;
       case 'estimate':
         this.estimate = update;
+        this.learnRefuelBases(update);
         this.damage.updateEstimate(update.damage, update.penalties);
         return;
       case 'pitStopTimes': this.delays = update; return;
@@ -239,6 +249,7 @@ export class LiveStrategyTracker {
       if (pair !== this.lastPair) { this.ratios = [...this.ratios, fuelUse.amount / veUse.amount].slice(-30); this.lastPair = pair; }
     }
     const kind = liveResourceKind(context.carClass);
+    this.kind = kind;
     const resource = this.resource(kind, reading, state, context);
     const lapsLeft = context.lapsLeft?.laps ?? null;
     const tyres = this.tyres.tyres(this.car?.compound ?? null, this.condition, this.usage?.newSets ?? null);
@@ -261,7 +272,7 @@ export class LiveStrategyTracker {
     }) : null;
     return {
       resource: state.lifecycle === 'garage' ? null : resource,
-      pit: state.lifecycle === 'garage' ? null : this.pit(),
+      pit: state.lifecycle === 'garage' ? null : this.pit(state.session.kind === 'race' ? this.lapsToStop(resource, fraction) : null),
       damage: this.damage.damage(player.totalLaps, state.session.kind === 'race' ? lapsLeft : null),
       tyres,
       forecast: this.nextForecast(reading, state.session.kind),
@@ -347,18 +358,74 @@ export class LiveStrategyTracker {
       lapsInTank: amount !== null && perLap !== null && perLap > 0 ? round(Math.max(0, amount / perLap - reserveLaps), 1) : null,
       race,
       saving: state.session?.kind === 'race' && amount !== null && perLap !== null && lapsLeft !== null && usage.perLapSource !== null
-        ? savingToFinish(amount, perLap, Math.max(0, lapsLeft - lapFraction), reserveLaps, usage.perLapSource) : null,
+        ? savingToFinish(amount, perLap, Math.max(0, lapsLeft - lapFraction), usage.perLapSource) : null,
     };
   }
 
-  private pit(): LivePitInfo {
+  /** Laps to the line of the next stop: this lap's once requested or without a planned stop, else the planned one. */
+  private lapsToStop(resource: LiveResourcePlan, fraction: number): number {
+    const pitInLaps = this.pitState === 'none' ? resource.race?.pitInLaps ?? 0 : 0;
+    return pitInLaps + 1 - fraction;
+  }
+
+  /**
+   * What each refuel part adds from these amounts up to the MFD target: VE and its fuel (`target x ratio` litres) on
+   * a VE car, fuel on the others. Null parts are unknown.
+   */
+  private refuelAdded(ve: number | null, fuel: number | null): Record<LiveResourceKind, number | null> {
+    const target = this.menu?.resourceValue ?? null;
+    if (target === null || this.kind === null) return { ve: null, fuel: null };
+    if (this.kind === 'fuel') return { ve: null, fuel: fuel === null ? null : target - fuel };
+    const ratio = this.menu?.fuelRatio ?? null;
+    return { ve: ve === null ? null : target - ve, fuel: ratio && fuel !== null ? target * ratio - fuel : null };
+  }
+
+  private fillSeconds(kind: LiveResourceKind): number | null {
+    const rate = kind === 've' ? this.delays?.veFillRate : this.delays?.fuelFillRate;
+    return rate && rate > 0 ? 1 / rate : null;
+  }
+
+  private learnRefuelBases(estimate: Extract<LiveRestUpdate, { type: 'estimate' }>): void {
+    const added = this.refuelAdded(this.ve, this.car && this.car.fuelCapacityLiters > 0 ? this.car.fuelLiters : null);
+    for (const kind of ['ve', 'fuel'] as const) {
+      const perUnit = this.fillSeconds(kind);
+      const base = perUnit !== null && added[kind] !== null ? refuelBase(estimate[kind], added[kind]!, perUnit) : null;
+      if (base !== null) this.refuelBases[kind] = base;
+    }
+  }
+
+  /**
+   * The game's estimate is for a stop made now; the planned stop refuels from the amounts left at its pit entry,
+   * `lapsToStop` laps of use from now. In the pit lane (and outside a race) the game's estimate stands.
+   */
+  private service(estimate: Extract<LiveRestUpdate, { type: 'estimate' }>, lapsToStop: number | null): { seconds: number; refuels: boolean } {
+    const game = { seconds: estimate.total, refuels: estimate.fuel > 0 || estimate.ve > 0 };
+    if (lapsToStop === null || (this.pitState !== 'none' && this.pitState !== 'request')) return game;
+    const fuelNow = this.car && this.car.fuelCapacityLiters > 0 ? this.car.fuelLiters : null;
+    const atEntry = (now: number | null, kind: LiveResourceKind): number | null => {
+      const perLap = this.perLap(kind).perLap;
+      return now === null || perLap === null ? null : Math.max(0, now - perLap * lapsToStop);
+    };
+    const added = this.refuelAdded(atEntry(this.ve, 've'), atEntry(fuelNow, 'fuel'));
+    const parts: RefuelPart[] = [];
+    for (const kind of ['ve', 'fuel'] as const) {
+      const perUnit = this.fillSeconds(kind);
+      const insert = kind === 've' ? this.delays?.veInsert : this.delays?.fuelInsert;
+      if (perUnit !== null && added[kind] !== null) parts.push({ added: added[kind]!, secondsPerUnit: perUnit, base: this.refuelBases[kind] ?? insert ?? 0 });
+    }
+    return parts.length === 0 ? game
+      : { seconds: plannedServiceSeconds(estimate, parts), refuels: parts.some(part => refuelSeconds(part) > 0) };
+  }
+
+  private pit(lapsToStop: number | null): LivePitInfo {
     const estimate = this.estimate;
     const penalties = Math.max(this.penalties, estimate?.penalties ? 1 : 0);
-    const service = estimate && penalties === 0 ? estimate.total : null;
+    const planned = estimate && penalties === 0 ? this.service(estimate, lapsToStop) : null;
+    const service = planned?.seconds ?? null;
     const delays = this.delays;
     const random = estimate && delays
       ? (estimate.damage > 0 ? delays.fixRandom : 0)
-        + (estimate.fuel > 0 || estimate.ve > 0 ? Math.max(delays.fuelRandom, delays.veRandom) : 0)
+        + (planned?.refuels ? Math.max(delays.fuelRandom, delays.veRandom) : 0)
         + (estimate.tires > 0 ? delays.tireRandom : 0)
       : 0;
     return {

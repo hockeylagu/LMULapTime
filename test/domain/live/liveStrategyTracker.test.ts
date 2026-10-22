@@ -114,15 +114,15 @@ describe('LiveStrategyTracker', () => {
 
     const later = drive(tracker, 31, 450);
     expect(later?.resource).toMatchObject({ kind: 've', perLap: 3, perLapSource: 'measured', lapsMeasured: 3, capacity: 100 });
-    // At 450 s, halfway round lap 5 with 26 laps left: 76.5% at 3%/lap with half a lap kept reaches 25 more lines,
-    // so the stop is at the end of lap 29, and the last lap plus the reserve needs 4.5%, set as 5%.
+    // At 450 s, halfway round lap 5 with 26 laps left: 76.5% at 3%/lap covers the 25.5 laps to the flag exactly. The
+    // finish keeps no reserve, so there is no stop; one at the end of this lap would load 25 laps plus the reserve.
     expect(later?.resource?.amount).toBe(76.5);
-    expect(later?.resource?.race).toMatchObject({ finishReachable: false, pitInLaps: 24, pitLap: 29, neededAfterStop: 5, sparePerLap: 0.06 });
+    expect(later?.resource?.race).toMatchObject({ finishReachable: true, atFinish: 0, pitInLaps: null, sparePerLap: 0, neededStopNow: 77 });
   });
 
   it('shows the stop-and-go while a penalty is pending, then the service with its random delays', () => {
     const tracker = new LiveStrategyTracker();
-    tracker.applyRest({ type: 'pitStopTimes', fixRandom: 5, fuelRandom: 2, tireRandom: 1, veRandom: 0 });
+    tracker.applyRest({ type: 'pitStopTimes', fixRandom: 5, fuelRandom: 2, tireRandom: 1, veRandom: 0, fuelFillRate: 4, veFillRate: 2.5, fuelInsert: 1, veInsert: 0 });
     tracker.applyRest({ type: 'standings', veFraction: 0.5, fuelFraction: 0.4, pitState: 'request', penalties: 1 });
     tracker.applyRest({ type: 'estimate', total: 10, damage: 0, penalties: 10, fuel: 0, ve: 0, tires: 0 });
     expect(context(tracker, at(10))?.pit).toEqual({
@@ -131,6 +131,32 @@ describe('LiveStrategyTracker', () => {
     tracker.applyRest({ type: 'standings', veFraction: 0.5, fuelFraction: 0.4, pitState: 'none', penalties: 0 });
     tracker.applyRest({ type: 'estimate', total: 33.7, damage: 30, penalties: 0, fuel: 3.7, ve: 1.7, tires: 0 });
     expect(context(tracker, at(11))?.pit).toMatchObject({ penalties: 0, serviceSeconds: 34, serviceMaxSeconds: 41, penaltySeconds: null });
+  });
+
+  it('times the refuel of the planned stop from the VE left at its pit entry, not from the VE now', () => {
+    // Le Mans race 2026-10-22, lap 11: 29% VE, MFD at 20%, the game estimating 0 s; the stop came two laps later.
+    const tracker = new LiveStrategyTracker();
+    tracker.applyRest({ type: 'pitStopTimes', fixRandom: 5, fuelRandom: 2, tireRandom: 1, veRandom: 0, fuelFillRate: 4, veFillRate: 2.5, fuelInsert: 1, veInsert: 0 });
+    tracker.applyRest({ type: 'tireManagement', vePerLap: 8, fuelPerLap: null, newSets: 0, selected: null });
+    tracker.applyRest({ type: 'standings', veFraction: 0.29, fuelFraction: 0.4, pitState: 'none', penalties: 0 });
+    const menu = (target: number) => ({ type: 'pitMenu' as const, menu: { resourceValue: target, resourceText: `${target}%`, tyres: 'No Change', repair: 'N/A' } });
+    context(tracker, at(0));
+    // Filling to 100% from 29%: 71% at 0.4 s and a fixed 1.3 s, learned from the game's own estimate.
+    tracker.applyRest(menu(100));
+    tracker.applyRest({ type: 'estimate', total: 29.7, damage: 0, penalties: 0, fuel: 15, ve: 29.7, tires: 0 });
+    tracker.applyRest(menu(20));
+    tracker.applyRest({ type: 'estimate', total: 0, damage: 0, penalties: 0, fuel: 0, ve: 0, tires: 0 });
+    // 25% usable at 8%/lap reaches 3 lines: in at 5%, so 15% to load: 1.3 + 6 s, up to 2 s more.
+    const strategy = context(tracker, at(0));
+    expect(strategy?.resource?.race).toMatchObject({ pitInLaps: 2 });
+    expect(strategy?.pit).toMatchObject({ serviceSeconds: 7, serviceMaxSeconds: 9 });
+    // Requested: the stop is at the end of this lap, from 29 - 8 = 21%: nothing to load.
+    tracker.applyRest({ type: 'standings', veFraction: 0.29, fuelFraction: 0.4, pitState: 'request', penalties: 0 });
+    expect(context(tracker, at(0))?.pit).toMatchObject({ serviceSeconds: 0, serviceMaxSeconds: 0 });
+    // In the pit lane the game's own estimate stands.
+    tracker.applyRest({ type: 'standings', veFraction: 0.29, fuelFraction: 0.4, pitState: 'entering', penalties: 0 });
+    tracker.applyRest({ type: 'estimate', total: 6.1, damage: 0, penalties: 0, fuel: 4.2, ve: 6.1, tires: 0 });
+    expect(context(tracker, at(0))?.pit).toMatchObject({ serviceSeconds: 6, serviceMaxSeconds: 8 });
   });
 
   it('plans the garage load from the session length and the event lap time, beside the setting', () => {

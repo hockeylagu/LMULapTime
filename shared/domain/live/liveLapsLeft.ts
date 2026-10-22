@@ -43,14 +43,27 @@ export function projectRaceFlagSeconds(endSeconds: number, lapStart: number, lap
   return laps >= 1 ? lapStart + laps * lapSeconds : null;
 }
 
+/** The player's own side of the race distance (`LiveSessionTracker`). */
+export interface LiveOwnPace {
+  /** Median of the player's recent valid laps; null before one. */
+  lapSeconds: number | null;
+  /** Time a planned stop still costs before the flag (pit lane loss plus service); 0 without one. */
+  stopSeconds: number;
+  /** Share of the lap in progress already driven, 0..1; null when unknown. */
+  lapFraction: number | null;
+}
+
 /**
  * Race laps left, counting the lap in progress. LMU races are always timed, so the clock is converted to laps:
  * the leader gets the flag at the first line crossing after the clock ends. With `L` its lap start
  *   time, `e` its estimated lap time and `E` the end time, it still has `ceil((E - L) / e)` laps counting the
  *   one in progress (the laps it still starts before the clock ends, plus the one it finishes: the lap in
  *   progress is the last when `L + e >= E`), so it takes the flag at `F = L + n * e`. Every other car gets the
- *   flag at its first line crossing from `F`: `ceil((F - l) / p)` laps with `l` its own lap start and `p` the
- *   same-class leader's pace when known, otherwise its own estimate. Laps already lost never add extra laps.
+ *   flag at its first line crossing from `F`. With `p` its own measured pace (else the same-class leader's, else its
+ *   own estimate), its next crossing is `c = max(l + p, now + (1 - fraction) * p)` (`l` its lap start: a lap slowed by
+ *   a stop or a spin crosses later), and it has `1 + ceil((F - c - s) / p)` laps, or 1 when `c >= F`, with `s` the
+ *   time its planned stop still costs (Le Mans race 2026-10-22: the class leader's pace and no stop read 17 laps to
+ *   lap 11, the car ran 16). The leader itself counts the same way to `E`. Laps already lost never add extra laps.
  *   Never fewer than the lap in progress. Marked `estimated`, since the lap time estimates move.
  * Null when it is not a race, the race clock does not run yet (`raceClockRunning`), the player has finished, there is no usable lap start or estimate, or the leader
  *   has no lap left to run (everyone is cooling down).
@@ -60,6 +73,7 @@ export function computeLapsLeft(
   player: LiveVehicleReading | null,
   leader: LiveVehicleReading | null,
   classLeader: LiveVehicleReading | null = null,
+  own: LiveOwnPace = { lapSeconds: null, stopSeconds: 0, lapFraction: null },
 ): LiveLapsLeft | null {
   if (!session || !player || player.finishStatus === FINISHED) return null;
   if (session.kind === 'qualifying') return ownLapsLeft(session, player);
@@ -67,11 +81,20 @@ export function computeLapsLeft(
   if (session.endSeconds === null || !leader || !raceClockRunning(session.gamePhase, session.elapsedSeconds)) return null;
   // Once the leader has the flag, the lap in progress is the last: exact.
   if (leader.finishStatus === FINISHED) return { laps: 1, estimated: false };
+  const stop = Number.isFinite(own.stopSeconds) ? Math.max(0, own.stopSeconds) : 0;
+  const ownPace = own.lapSeconds !== null && positive(own.lapSeconds) ? own.lapSeconds : null;
+  const fraction = own.lapFraction !== null && Number.isFinite(own.lapFraction) ? Math.min(Math.max(own.lapFraction, 0), 1) : null;
+  const lapsTo = (flag: number, lapStart: number, pace: number): LiveLapsLeft => {
+    const next = Math.max(lapStart + pace, fraction === null ? -Infinity : session.elapsedSeconds + (1 - fraction) * pace);
+    return { laps: next >= flag ? 1 : 1 + Math.max(0, Math.ceil((flag - next - stop) / pace)), estimated: true };
+  };
+  if (leader.id === player.id) {
+    const pace = ownPace ?? leader.estimatedLapTime;
+    return projectRaceFlagSeconds(session.endSeconds, leader.lapStartEt, pace) === null ? null : lapsTo(session.endSeconds, leader.lapStartEt, pace);
+  }
   const flag = projectRaceFlagSeconds(session.endSeconds, leader.lapStartEt, leader.estimatedLapTime);
   if (flag === null) return null;
-  const leaderLaps = Math.round((flag - leader.lapStartEt) / leader.estimatedLapTime);
-  if (leader.id === player.id) return { laps: leaderLaps, estimated: true };
-  const pace = classLeaderLapSeconds(player, classLeader) ?? player.estimatedLapTime;
+  const pace = ownPace ?? classLeaderLapSeconds(player, classLeader) ?? player.estimatedLapTime;
   if (!(player.lapStartEt >= 0) || !positive(pace)) return null;
-  return { laps: Math.max(1, Math.ceil((flag - player.lapStartEt) / pace)), estimated: true };
+  return lapsTo(flag, player.lapStartEt, pace);
 }

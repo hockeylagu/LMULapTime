@@ -25,8 +25,11 @@ export const REPLAY_UNSAFE_CHECK_MS = 2000;
 export const SLOW_PAUSE_MS = 10_000;
 export const FAILED_READ_PAUSE_MS = 30_000;
 
-/** What the service asks to read again now: the condition after a line crossing, an impact or a pit exit; the tyre screen after a pit exit. */
-export type PitTrigger = 'condition' | 'tireManagement';
+/**
+ * What to read again now: the condition after a line crossing, an impact or a pit exit; the tyre screen after a pit
+ * exit (both asked by the service); the stop estimate after an MFD change (the poller's own).
+ */
+export type PitTrigger = 'condition' | 'tireManagement' | 'estimate';
 
 type ReadMode = Exclude<PitPollMode, 'off'>;
 
@@ -63,8 +66,8 @@ const STATE_PATH = '/navigation/state';
 const READS: PitRead[] = [
   { path: '/rest/watch/standings', every: { track: 3000 }, crashesInReplay: false, parse: parseStandings },
   {
-    path: '/rest/strategy/pitstop-estimate', every: { track: 60_000 }, busyEvery: { track: 10_000 }, crashesInReplay: false,
-    parse: parseEstimate,
+    path: '/rest/strategy/pitstop-estimate', every: { track: 60_000 }, busyEvery: { track: 10_000 }, trigger: 'estimate',
+    crashesInReplay: false, parse: parseEstimate,
   },
   {
     path: '/rest/garage/PitMenu/receivePitMenu', every: { track: 30_000, garage: 10_000 }, busyEvery: { track: 10_000 },
@@ -123,6 +126,8 @@ export class LivePitPoller {
   private readonly onceDone = new Set<string>();
   private pitActive = false;
   private sessionKey = '';
+  /** The last MFD read (serialized), so a change can bring the stop estimate forward. */
+  private lastMenu: string | null = null;
 
   public constructor(private readonly options: LivePitPollerOptions) {}
 
@@ -130,7 +135,7 @@ export class LivePitPoller {
 
   public setMode(mode: PitPollMode, sessionKey = ''): void {
     if (mode === this.mode && sessionKey === this.sessionKey) return;
-    if (sessionKey !== this.sessionKey) this.onceDone.clear();
+    if (sessionKey !== this.sessionKey) { this.onceDone.clear(); this.lastMenu = null; }
     this.sessionKey = sessionKey;
     this.mode = mode;
     this.generation++;
@@ -263,5 +268,11 @@ export class LivePitPoller {
     }
     if (update && next.read.once) this.onceDone.add(next.path);
     if (update) this.options.onUpdate(update);
+    // The estimate's tyres and repairs follow the MFD: read it again once the menu changes, not up to a minute later.
+    if (update?.type === 'pitMenu') {
+      const menu = JSON.stringify(update.menu);
+      if (this.lastMenu !== null && menu !== this.lastMenu) this.trigger('estimate');
+      this.lastMenu = menu;
+    }
   }
 }

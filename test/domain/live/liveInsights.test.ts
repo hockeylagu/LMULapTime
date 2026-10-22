@@ -2,13 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { planFuelRatio, savingToFinish, tyreCoverage } from '../../../shared/domain/live/liveInsights.js';
 
 describe('saving scenarios', () => {
-  it('preserves the reserve at the target consumption and recalculates after a refill', () => {
-    const plan = savingToFinish(29, 3, 9.5, 0.5, 'measured');
-    expect(plan).toEqual({ targetPerLap: 2.9, savePerLap: 0.1, savePercent: 3.3, shortfall: 1, source: 'measured' });
-    expect(savingToFinish(40, 3, 9.5, 0.5, 'measured')).toMatchObject({ savePercent: 0, shortfall: 0 });
-    expect(savingToFinish(0, 3, 2, 0, 'game')).toMatchObject({ targetPerLap: 0, savePercent: 100 });
-    expect(savingToFinish(5, 0, 2, 0.5, 'game')).toBeNull();
-    expect(savingToFinish(5, 3, 0, 0.5, 'game')).toBeNull();
+  it('targets the use that reaches the flag, with no reserve at the finish', () => {
+    const plan = savingToFinish(28.5, 3, 9.5, 'measured');
+    expect(plan).toEqual({ targetPerLap: 3, savePerLap: 0, savePercent: 0, shortfall: 0, source: 'measured' });
+    expect(savingToFinish(27, 3, 9.5, 'measured')).toEqual({ targetPerLap: 2.84, savePerLap: 0.16, savePercent: 5.3, shortfall: 1.5, source: 'measured' });
+    expect(savingToFinish(0, 3, 2, 'game')).toMatchObject({ targetPerLap: 0, savePercent: 100 });
+    expect(savingToFinish(5, 0, 2, 'game')).toBeNull();
+    expect(savingToFinish(5, 3, 0, 'game')).toBeNull();
   });
 });
 

@@ -5,13 +5,13 @@ const round = (value: number, digits: number): number => Math.round(value * 10 *
 /** Driver's minimum planned tread, not a universal grip/safety threshold. */
 export const LIVE_TYRE_TREAD_FLOOR = 0.4;
 
-/** A mathematical no-stop scenario, not a claim that the driver can achieve the saving. */
-export function savingToFinish(amount: number, perLap: number, laps: number, reserve: number, source: LivePerLapSource): LiveSavingPlan | null {
-  if (![amount, perLap, laps, reserve].every(Number.isFinite) || amount < 0 || perLap <= 0 || laps <= 0 || reserve < 0) return null;
-  const target = amount / (laps + reserve);
+/** A mathematical no-stop scenario to the flag (no reserve: the finish needs none), not a claim that the driver can achieve the saving. */
+export function savingToFinish(amount: number, perLap: number, laps: number, source: LivePerLapSource): LiveSavingPlan | null {
+  if (![amount, perLap, laps].every(Number.isFinite) || amount < 0 || perLap <= 0 || laps <= 0) return null;
+  const target = amount / laps;
   const settable = Math.floor(target * 100 + 1e-9) / 100;
   return { targetPerLap: settable, savePerLap: round(Math.max(0, perLap - settable), 3),
-    savePercent: round(Math.max(0, 1 - settable / perLap) * 100, 1), shortfall: round(Math.max(0, (laps + reserve) * perLap - amount), 2), source };
+    savePercent: round(Math.max(0, 1 - settable / perLap) * 100, 1), shortfall: round(Math.max(0, laps * perLap - amount), 2), source };
 }
 
 export interface FuelRatioInput {

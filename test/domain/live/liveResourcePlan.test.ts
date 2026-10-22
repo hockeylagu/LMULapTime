@@ -34,8 +34,14 @@ describe('planRace', () => {
   it('reports spare per lap and the amount at the finish when the finish is reachable (no pit stop)', () => {
     expect(race({ amount: 30, lapsLeft: 6, lapFraction: 0.5 })).toEqual({
       finishReachable: true, atFinish: 8, pitInLaps: null, pitLap: null,
-      sparePerLap: 1.09, neededAfterStop: null, neededStopNow: 22, stopsAfterNext: 0,
+      sparePerLap: 1.45, neededAfterStop: null, neededStopNow: 22, stopsAfterNext: 0,
     });
+  });
+
+  it('keeps no reserve at the finish: a reachable flag never calls a stop', () => {
+    // Le Mans race 2026-10-22, last lap: 11% VE at 7.67%/lap, under the 11.5% with the reserve; finished with 3%.
+    expect(race({ amount: 11, perLap: 7.67, lapsLeft: 1, lapFraction: 0 })).toMatchObject({ finishReachable: true, atFinish: 3.3, pitInLaps: null });
+    expect(race({ amount: 7, perLap: 7.67, lapsLeft: 1, lapFraction: 0 })).toMatchObject({ finishReachable: false, pitInLaps: 0 });
   });
 
   it('caps the amount after the stop at a full tank and counts the further stops', () => {

@@ -232,7 +232,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   - Shared memory reader: `rf2Layout.ts` defines rF2/LMU v3.x layout offsets; `rf2Decode.ts` performs coherent 3-attempt buffer reads, resolving overall and class leaders independently (`knownCarClass`). `sharedMemory.ts` accesses Windows file mappings via koffi. Tooling: `tools/telemetryRecorder.ts`.
   - Process lifecycle: `gameProcess.ts` monitors `Le Mans Ultimate.exe` via Windows Toolhelp handles.
   - REST poller: `livePitPoller.ts` queries LMU REST endpoints (`lmuHttp.ts`) at safe intervals, pausing sensitive reads (e.g. `getVehicleCondition`) in replays. `lmuNavigation.ts` probes state; `liveIdentityResolver.ts` resolves session layouts.
-  - Deterministic engines: `liveLapTiming.ts`, `liveLapsLeft.ts` (`computeLapsLeft`, `projectRaceFlagSeconds`, `raceClockRunning`), `liveResourcePlan.ts` (`planRace`, `neededStopNow`, `planGarage`), `liveCarCondition.ts`, `liveWeather.ts`, `liveInsights.ts`, and `liveAudit.ts` (`LiveAuditTracker`).
+  - Deterministic engines: `liveLapTiming.ts`, `liveLapsLeft.ts` (`computeLapsLeft`, `projectRaceFlagSeconds`, `raceClockRunning`), `liveResourcePlan.ts` (`planRace`, `neededStopNow`, `planGarage`), `livePitTime.ts` (planned stop service from the pit entry amount), `liveCarCondition.ts`, `liveWeather.ts`, `liveInsights.ts`, and `liveAudit.ts` (`LiveAuditTracker`).
   - Scan hold: `ServerContext.setLiveSessionLoaded` queues background scans while a live session is running (`holdForLiveSession`, `runHeldScans`).
 
 ### Local Data Packages (`server/plugins/`)

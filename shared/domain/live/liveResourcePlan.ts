@@ -30,10 +30,11 @@ export interface RacePlanInput {
 }
 
 /**
- * The resource plan of a timed race, from the current position. The reserve is kept at the pit entry and at the
- * finish (taken as the line: pit entry sits just before it on most layouts).
- * - Finish reachable when `amount - reserve * perLap` covers the `lapsLeft - lapFraction` laps still to drive;
- *   then the spare per lap is what may be used per lap on top of `perLap`, and the amount at the finish is projected.
+ * The resource plan of a timed race, from the current position. The reserve is kept at the pit entry and in what a
+ * stop loads, never at the finish: a car that reaches the flag needs no stop (Le Mans race 2026-10-22: a stop was
+ * called on the last lap with 11 % VE for a 7.8 % lap, the car finished with 3 %).
+ * - Finish reachable when `amount` covers the `lapsLeft - lapFraction` laps still to drive; then the spare per lap is
+ *   what may be used per lap on top of `perLap`, and the amount at the finish is projected.
  * - Otherwise the pit lap is the last line the amount reaches with the reserve: `floor(lapFraction + amount/perLap - reserve)`
  *   crossings from now (at least this lap's). The spare per lap is then against that crossing, and the amount needed
  *   after the stop covers the laps after it plus the reserve, capped at a full tank; a cap means more stops.
@@ -50,13 +51,13 @@ export function planRace(input: RacePlanInput): LiveRacePlan {
     return settable(capacity !== null ? Math.min(need, capacity) : need);
   };
   const neededStopNow = neededFor(Math.max(lapsLeft - 1, 0));
-  if (usable >= toFinish * perLap) {
+  if (amount >= toFinish * perLap) {
     return {
       finishReachable: true,
       atFinish: round(amount - toFinish * perLap, 1),
       pitInLaps: null,
       pitLap: null,
-      sparePerLap: toFinish > 0 ? round(usable / toFinish - perLap, 2) : null,
+      sparePerLap: toFinish > 0 ? round(amount / toFinish - perLap, 2) : null,
       neededAfterStop: null,
       neededStopNow,
       stopsAfterNext: 0,

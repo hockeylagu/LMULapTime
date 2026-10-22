@@ -14,6 +14,24 @@ describe('laps left', () => {
     const classLeader = vehicleReading({ id: 9, vehicleClass: id, lapStartEt: 2460, estimatedLapTime: 120 });
     expect(computeLapsLeft({ kind: 'race', endSeconds: 3600, elapsedSeconds: 2500, gamePhase: 5 }, player, overall, classLeader)).toEqual({ laps: 10, estimated: true });
   });
+  it('times the player by its own pace, the lap in progress by its position and a planned stop by its cost', () => {
+    // Le Mans race 2026-10-22 after lap 11: the flag at 2900 + 5 x 213 = 3965 s, the class leader at 210 s a lap.
+    const session = { kind: 'race' as const, endSeconds: 3783, elapsedSeconds: 2914, gamePhase: 5 };
+    const overall = vehicleReading({ id: 1, vehicleClass: 'Hyper', lapStartEt: 2900, estimatedLapTime: 213 });
+    const player = vehicleReading({ id: 7, vehicleClass: 'Hyper', lapStartEt: 2914, estimatedLapTime: 216 });
+    const classLeader = vehicleReading({ id: 9, vehicleClass: 'Hyper', lapStartEt: 2800, estimatedLapTime: 210 });
+    const own = (patch: Partial<{ lapSeconds: number | null; stopSeconds: number; lapFraction: number | null }>) =>
+      ({ lapSeconds: null, stopSeconds: 0, lapFraction: null, ...patch });
+    // The class leader's pace read 6, one too many; the car's own 216 s reads the 5 it ran.
+    expect(computeLapsLeft(session, player, overall, classLeader)).toEqual({ laps: 6, estimated: true });
+    expect(computeLapsLeft(session, player, overall, classLeader, own({ lapSeconds: 216 }))).toEqual({ laps: 5, estimated: true });
+    // At the class leader's pace a planned 27 s stop takes the extra lap off: 1 + ceil((3965 - 3124 - 27) / 210).
+    expect(computeLapsLeft(session, player, overall, classLeader, own({ lapSeconds: 210, stopSeconds: 27 }))).toEqual({ laps: 5, estimated: true });
+    // Stopped in the lane at 3100 s, 10% round: the next line is at 3289, not 3124.
+    expect(computeLapsLeft({ ...session, elapsedSeconds: 3100 }, player, overall, classLeader, own({ lapSeconds: 210, lapFraction: 0.1 })))
+      .toEqual({ laps: 5, estimated: true });
+    expect(computeLapsLeft({ ...session, elapsedSeconds: 3100 }, player, overall, classLeader, own({ lapSeconds: 210 }))).toEqual({ laps: 6, estimated: true });
+  });
   it('accepts canonical aliases and keeps WEC and ELMS LMP2 separate', () => {
     const overall = vehicleReading({ id: 1, vehicleClass: 'Hyper', lapStartEt: 2400, estimatedLapTime: 100 });
     const player = vehicleReading({ id: 7, vehicleClass: 'LMP2 (ELMS)', lapStartEt: 2460, estimatedLapTime: 150 });

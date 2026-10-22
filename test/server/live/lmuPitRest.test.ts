@@ -21,8 +21,9 @@ describe('LMU pit REST parsers', () => {
     expect(parseEstimate({ brakeDucts: 0, brakes: 0, damage: 129.9, driverSwap: 0, fuel: 5.17, penalties: 0, tires: 4.5, total: 139.6, ve: 5.04 }))
       .toEqual({ type: 'estimate', total: 139.6, damage: 129.9, penalties: 0, fuel: 5.17, ve: 5.04, tires: 4.5 });
     expect(parseEstimate({ damage: 1 })).toBeNull();
-    expect(parsePitStopTimes({ pitStopTimes: { times: { FixRandomDelay: 5, FuelRandomDelay: 2, RandomTireDelay: 1, virtualEnergyRandomDelay: 0 } } }))
-      .toEqual({ type: 'pitStopTimes', fixRandom: 5, fuelRandom: 2, tireRandom: 1, veRandom: 0 });
+    expect(parsePitStopTimes({ pitStopTimes: { times: { FixRandomDelay: 5, FuelRandomDelay: 2, RandomTireDelay: 1, virtualEnergyRandomDelay: 0,
+      FuelFillRate: 4, FuelInsert: 1, virtualEnergyFillRate: 0.025, virtualEnergyInsert: 0 } } }))
+      .toEqual({ type: 'pitStopTimes', fixRandom: 5, fuelRandom: 2, tireRandom: 1, veRandom: 0, fuelFillRate: 4, veFillRate: 2.5, fuelInsert: 1, veInsert: 0 });
   });
 
   it('reads the MFD: the VE line (target after the stop), tyres and repair, each at its current setting', () => {

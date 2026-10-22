@@ -211,7 +211,7 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
   if (saving && saving.savePercent > 0 && saving.savePercent <= 5 && resource.lapsMeasured >= 3 && saving.source === 'measured' && !damage && !pit?.penalties) {
     return { mode: 'saving', action: { label: 'TO SKIP STOP', value: saving.targetPerLap.toFixed(2), unit: `${unit}/lap`,
       note: `SAVE ${saving.savePerLap.toFixed(2)} ${unit}/LAP`, noteTone: 'warn' },
-      cells: [{ label: 'SHORT OF RESERVE', value: formatAmount(saving.shortfall, unit), unit },
+      cells: [{ label: 'SHORT TO FINISH', value: formatAmount(saving.shortfall, unit), unit },
         tyresCell(tyres), { label: 'OR PIT IN', value: `${race.pitInLaps ?? 0}`, unit: 'LAPS' }] };
   }
   const pitInLaps = race.pitInLaps ?? 0;

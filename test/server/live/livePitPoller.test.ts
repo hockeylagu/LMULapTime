@@ -150,6 +150,29 @@ describe('LivePitPoller', () => {
     t.poller.stop();
   });
 
+  it('reads the stop estimate again right after the MFD changes', async () => {
+    const ESTIMATE = '/rest/strategy/pitstop-estimate';
+    const MENU = '/rest/garage/PitMenu/receivePitMenu';
+    let target = 100;
+    const line = () => [{ name: 'VIRTUAL ENERGY:', currentSetting: 0, settings: [{ text: `${target}% 12 laps` }] }];
+    const t = setup(false, path => (path === MENU ? { ok: true, body: line() } : null));
+    t.poller.setMode('track');
+    const count = (path: string) => t.paths.filter(item => item === path).length;
+    // An unchanged MFD brings nothing forward: the estimate stays at once a minute.
+    await vi.advanceTimersByTimeAsync(120 * PIT_POLL_TICK_MS);
+    expect(count(ESTIMATE)).toBeLessThanOrEqual(3);
+    // Changed right after a regular estimate read, so the next regular one is a minute away.
+    const regular = count(ESTIMATE);
+    while (count(ESTIMATE) === regular) await vi.advanceTimersByTimeAsync(PIT_POLL_TICK_MS);
+    target = 20;
+    const menus = count(MENU);
+    while (count(MENU) === menus) await vi.advanceTimersByTimeAsync(PIT_POLL_TICK_MS);
+    const estimates = count(ESTIMATE);
+    await vi.advanceTimersByTimeAsync(3 * PIT_POLL_TICK_MS);
+    expect(count(ESTIMATE)).toBe(estimates + 1);
+    t.poller.stop();
+  });
+
   it('reads the condition and the tyre screen when triggered, and the pit rules once per loaded session', async () => {
     const CONDITION = '/rest/garage/getVehicleCondition';
     const TYRES = '/rest/garage/UIScreen/TireManagement';
