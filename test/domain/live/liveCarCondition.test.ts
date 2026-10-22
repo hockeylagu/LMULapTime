@@ -42,6 +42,21 @@ describe('LiveDamageTracker', () => {
     expect(damage.damage(8, 6)).toMatchObject({ paceLossPerLap: 0, significant: false });
   });
 
+  it('moves the impact to a later hit that breaks the suspension (COTA race 2026-10-21)', () => {
+    const damage = new LiveDamageTracker();
+    damage.updateCar(car(), 1);
+    damage.updateCondition(condition({ body: 0.13 }));
+    for (const [lap, time] of [[2, 75.2], [3, 75], [4, 75.1]] as const) damage.lapCompleted(liveLap(lap, time, [null, null, null]));
+    damage.updateCar(car(), 5);
+    damage.updateCondition(condition({ body: 0.19 }));
+    expect(damage.damage(4, 6)).toMatchObject({ impactLap: 1, paceLossPerLap: null });
+
+    damage.updateCondition(condition({ body: 0.23, suspension: [0, 0, 0, 0.12] }));
+    damage.updateEstimate(30, 0);
+    for (const [lap, time] of [[5, 80], [6, 76], [7, 76.2]] as const) damage.lapCompleted(liveLap(lap, time, [null, null, null]));
+    expect(damage.damage(7, 3)).toMatchObject({ impactLap: 5, lapsSinceImpact: 3, paceLossPerLap: 1, lossToFinish: 3, repairSeconds: 30 });
+  });
+
   it('keeps the repair estimate while a penalty hides it, and clears everything once repaired', () => {
     const damage = new LiveDamageTracker();
     damage.updateCondition(condition({ body: 1.38, suspension: [0, 0.72, 0, 0], tires: [0.98, 0, 0.99, 0.98] }));

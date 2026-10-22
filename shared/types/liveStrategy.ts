@@ -101,11 +101,11 @@ export interface LiveDamage {
   suspension: number | null;
   /** The game reports a detached part. */
   partsDetached: boolean;
-  /** Racing lap on which the damage first showed. */
+  /** Racing lap on which the damage first showed, or last got worse (suspension, a wheel or a part lost). */
   impactLap: number | null;
   /** Completed laps since that lap. */
   lapsSinceImpact: number | null;
-  /** Mean of the valid laps after the impact minus the mean of the last valid laps before it (two each at least). */
+  /** Median of the valid laps after the impact minus the median of the last valid laps before it (two each at least). */
   paceLossPerLap: number | null;
   /** Pace loss times the race laps left. */
   lossToFinish: number | null;

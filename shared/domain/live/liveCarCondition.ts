@@ -49,13 +49,27 @@ const median = (values: readonly number[]): number => {
 };
 const round = (value: number, digits: number): number => Math.round(value * 10 ** digits) / 10 ** digits;
 
+/** What a later hit can make worse enough to cost pace again: the worst suspension, and wheels or parts lost. */
+interface DamageSeverity {
+  suspension: number;
+  /** Flat or lost wheels plus a detached part. */
+  lost: number;
+}
+
 /**
  * Damage for the race view: what is damaged, since which lap, the pace it costs (the median of the driver's own valid
  * laps either side of the impact, never guessed) and the repair time the game estimates. The estimate drops every
  * service time while a penalty is pending (the stop is a stop-and-go), so the last repair figure seen is kept.
+ *
+ * A later hit that makes the suspension worse or costs a wheel or a part moves the impact to its lap, with the laps
+ * just before it as the baseline: a scrape on lap 1 must not hide the suspension broken on lap 9 (COTA race
+ * 2026-10-21, where the pace loss was never measured because no valid lap came before lap 1).
  */
 export class LiveDamageTracker {
   private impactLap: number | null = null;
+  private worst: DamageSeverity = { suspension: 0, lost: 0 };
+  /** The last valid laps, whatever the damage. */
+  private recent: number[] = [];
   private before: number[] = [];
   private after: number[] = [];
   private repair: number | null = null;
@@ -65,6 +79,8 @@ export class LiveDamageTracker {
 
   public reset(): void {
     this.impactLap = null;
+    this.worst = { suspension: 0, lost: 0 };
+    this.recent = [];
     this.before = [];
     this.after = [];
     this.repair = null;
@@ -91,11 +107,8 @@ export class LiveDamageTracker {
 
   public lapCompleted(lap: LiveLapRecord): void {
     if (!lap.valid || lap.lapSeconds === null) return;
-    if (this.impactLap === null) {
-      this.before = [...this.before, lap.lapSeconds].slice(-PACE_WINDOW);
-    } else if (lap.lapNumber > this.impactLap) {
-      this.after = [...this.after, lap.lapSeconds].slice(-PACE_WINDOW);
-    }
+    if (this.impactLap !== null && lap.lapNumber > this.impactLap) this.after = [...this.after, lap.lapSeconds].slice(-PACE_WINDOW);
+    this.recent = [...this.recent, lap.lapSeconds].slice(-PACE_WINDOW);
   }
 
   private isDamaged(): boolean {
@@ -105,17 +118,31 @@ export class LiveDamageTracker {
     return condition.body > DAMAGE_EPSILON || condition.suspension.some(value => value > DAMAGE_EPSILON) || condition.tires.some(tread => tread <= 0);
   }
 
+  private severity(): DamageSeverity {
+    const wheels = this.car?.wheels ?? [];
+    const tires = this.condition?.tires ?? [];
+    const corners = CORNERS.filter((_, i) => wheels[i]?.flat || wheels[i]?.detached || (tires[i] ?? 1) <= 0).length;
+    const suspension = this.condition?.suspension ?? [];
+    return { suspension: suspension.length > 0 ? Math.max(...suspension) : 0, lost: corners + (this.car?.detached ? 1 : 0) };
+  }
+
   private follow(): void {
-    const damaged = this.isDamaged();
-    if (damaged && this.impactLap === null) {
-      this.impactLap = this.lapNumber;
-      this.after = [];
-    } else if (!damaged && this.impactLap !== null) {
+    if (!this.isDamaged()) {
+      if (this.impactLap === null) return;
       // Repaired: the pace after the repair is the new baseline.
       this.impactLap = null;
+      this.worst = { suspension: 0, lost: 0 };
       this.after = [];
       this.repair = null;
+      return;
     }
+    const now = this.severity();
+    if (this.impactLap === null || now.suspension > this.worst.suspension + DAMAGE_EPSILON || now.lost > this.worst.lost) {
+      this.impactLap = this.lapNumber;
+      this.before = this.recent;
+      this.after = [];
+    }
+    this.worst = { suspension: Math.max(this.worst.suspension, now.suspension), lost: Math.max(this.worst.lost, now.lost) };
   }
 
   private wheel(): LiveDamage['wheel'] {
