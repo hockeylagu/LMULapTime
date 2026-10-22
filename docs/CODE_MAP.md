@@ -190,6 +190,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
      - Multi-channel charts, `TelemetryScrubCursor.tsx` (sub-pixel snapping), channel presets (`presets/`).
      - Channel scaling: Gear G1-G7 (`gearTraceY` in `telemetryChartPathBuilders.ts`), steering symmetric lap-wide fit (±25/50/100%).
      - Viewport & gestures: `telemetry/telemetryViewport.ts` (Shift-wheel zoom, Shift-drag range, Alt-drag pan, keyboard navigation via `src/utils/replayShortcuts.ts`).
+     - Measure marker: Alt-click drops marker A (kept as a distance, Esc or double-click clears; double-click resets zoom only without a marker); `TelemetryDeltaMarker.tsx` shows distance, time, baseline time and delta change from A to the cursor on the marker line (pinned to the view edge, with the shaded span, while zoomed past A).
    - **Analysis** (`analysis/`):
      - Corner phase breakdown cards, consistency tab, AI engineer tab (`AIReportTab.tsx`).
      - Steering handling balance: `src/utils/handlingBalance/evidence.ts` (requires sustained response deficit or rear slide, not just Ackermann residual; with baseline, requires ≥0.10s delta growth and sustained speed deficit).

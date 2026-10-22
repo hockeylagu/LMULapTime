@@ -46,6 +46,8 @@ export interface TelemetryStripViewProps {
   currentTimeSec?: number;
   totalFrames?: number;
   headerContent?: React.ReactNode;
+  /** Alt-click marker line and its readout, drawn over the charts. */
+  markerOverlay?: React.ReactNode;
   dragSelection?: { startPct: number; currentPct: number; startX: number; currentX: number } | null;
   markerPcts: {
     s1Pct: number | null;
@@ -73,7 +75,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
   currentComparison, pointComparisons, paths, sectors, cornerSegments, initialStraight,
   selectedCornerNumber, onSelectCorner, onJumpToDistance, cumDists, currentDistM,
   selectedCornerMarkers, interactionMode, setInteractionMode, isZoomed, onResetZoom,
-  onStepIndex, hasBaseline, telemetryResolution, onChangeResolution, isFullResolution, currentTimeSec, totalFrames, headerContent, dragSelection, markerPcts,
+  onStepIndex, hasBaseline, telemetryResolution, onChangeResolution, isFullResolution, currentTimeSec, totalFrames, headerContent, markerOverlay, dragSelection, markerPcts,
   vcrRawPointsCount, vcrRawSampleRateHz, duckdbRawPointsCount, duckdbRawSampleRateHz,
   activeChannels = DEFAULT_CHANNELS,
   presets, activePresetId, onSelectPreset, onOpenManageModal, source, duckdbFilename,
@@ -188,6 +190,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
           )}
         </div>
 
+        {markerOverlay}
         {isCursorInView && (
           <TelemetryScrubCursor cursorPct={cursorPct} />
         )}

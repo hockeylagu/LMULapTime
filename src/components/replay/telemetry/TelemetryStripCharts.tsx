@@ -13,6 +13,7 @@ import { LoadingState } from '../../common/LoadingState.js';
 import { usePlaybackPosition } from '../inspector/replayPlaybackCursor.js';
 import { TelemetryScrubCursor } from './TelemetryScrubCursor.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
+import { TelemetryDeltaMarker, measureMarkerSpan } from './TelemetryDeltaMarker.js';
 
 export interface SelectedCornerMarkers {
   cornerNumber: number;
@@ -71,6 +72,9 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
     safeIndex,
     pctForIndex,
     onStepIndex,
+    markerIndex,
+    clearMarker,
+    handleDoubleClick,
     onJumpToDistance,
     handleResetZoom,
     handlePointerDown,
@@ -124,6 +128,16 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
   const cursorPct = pctForIndex(activeIndex) + (playbackPosition?.fraction ?? 0)
     * (pctForIndex(Math.min(activeIndex + 1, points.length - 1)) - pctForIndex(activeIndex));
 
+  const markerOverlay = markerIndex === null ? null : (
+    <TelemetryDeltaMarker
+      span={measureMarkerSpan(points, cumDists, pointComparisons, markerIndex, activeIndex)}
+      markerPct={pctForIndex(markerIndex)}
+      offscreen={markerIndex < viewStart ? 'left' : markerIndex > viewEnd ? 'right' : null}
+      cursorPct={cursorPct}
+      onClear={clearMarker}
+    />
+  );
+
   const s1Pct = sectors && sectors.s1Frame > viewStart && sectors.s1Frame < viewEnd ? pctForIndex(sectors.s1Frame) : null;
   const s2Pct = sectors && sectors.s2Frame > viewStart && sectors.s2Frame < viewEnd ? pctForIndex(sectors.s2Frame) : null;
 
@@ -156,7 +170,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
-      onDoubleClick={handleResetZoom}
+      onDoubleClick={handleDoubleClick}
       className={`relative select-none flex flex-col justify-between h-full bg-lmu-strip overflow-hidden cursor-crosshair ${className} ${FOCUS_RING}`}
     >
       {sectors && sectors.s1Frame > 0 && sectors.s2Frame > 0 && (
@@ -212,6 +226,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
         currentTimeSec={currentTimeSec}
         totalFrames={points.length}
         headerContent={headerContent}
+        markerOverlay={markerOverlay}
         dragSelection={dragSelection}
         markerPcts={metrics} activeChannels={activePreset?.channels}
         presets={presets} activePresetId={activePresetId} onSelectPreset={handleSelectPreset}

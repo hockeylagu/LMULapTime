@@ -7,7 +7,8 @@ import { FOCUS_RING } from '../common/buttonStyles.js';
 
 const shortcuts = [
   ['Shift + wheel', 'Zoom around the mouse'], ['Shift + drag', 'Zoom into a range'],
-  ['Alt + drag', 'Pan the zoomed chart'], ['← / →', 'Previous / next recorded sample'],
+  ['Alt + drag', 'Pan the zoomed chart'], ['Alt + click', 'Drop marker A: time and delta to the cursor'],
+  ['Esc / dbl-click', 'Remove marker A'], ['← / →', 'Previous / next recorded sample'],
   ['Shift + ← / →', 'Move cursor by 0.5 seconds'], ['Space', 'Play / pause'],
   ['Home / End', 'Lap start / end'], ['+ / −', 'Zoom around the cursor'],
   ['0 / R / dbl-click', 'Show full lap / reset map view'], ['C', 'Center map on car, keep zoom'],

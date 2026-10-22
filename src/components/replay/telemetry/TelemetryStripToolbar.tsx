@@ -128,7 +128,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
                 : 'text-lmu-muted hover:text-white'
             } ${FOCUS_RING}`}
             aria-pressed={interactionMode === 'scrub'}
-            title="Drag to move the cursor. Shift + wheel zooms, Shift + drag selects a range, Alt + drag pans."
+            title="Drag to move the cursor. Shift + wheel zooms, Shift + drag selects a range, Alt + drag pans, Alt + click drops a marker to measure time and delta to the cursor, double-click removes it."
           >
             <MousePointer2 className="w-3 h-3" />
             Move cursor

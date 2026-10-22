@@ -151,6 +151,72 @@ describe('useTelemetryStripInteraction', () => {
     expect(onZoomRangeChange).toHaveBeenLastCalledWith(null);
   });
 
+  it('drops a marker on Alt-click and clears it with Escape', () => {
+    const onSelectIndex = vi.fn();
+    const { result } = renderHook(() => useTelemetryStripInteraction({ points: makePoints(20), currentIndex: 0, onSelectIndex }));
+    const container = document.createElement('div');
+    vi.spyOn(container, 'getBoundingClientRect').mockReturnValue({ left: 0, width: 100 } as DOMRect);
+    result.current.containerRef.current = container;
+    const target = document.createElement('div');
+
+    act(() => {
+      result.current.handlePointerDown({ target, clientX: 50, altKey: true, pointerId: 1 } as unknown as React.PointerEvent<HTMLDivElement>);
+    });
+    act(() => {
+      result.current.handlePointerUp({ target, clientX: 51, pointerId: 1 } as unknown as React.PointerEvent<HTMLDivElement>);
+    });
+    expect(result.current.markerIndex).toBe(10);
+    expect(onSelectIndex).not.toHaveBeenCalled();
+
+    document.body.appendChild(container);
+    act(() => {
+      container.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    container.remove();
+    expect(result.current.markerIndex).toBeNull();
+  });
+
+  it('removes the marker on double-click before resetting the zoom', () => {
+    const onZoomRangeChange = vi.fn();
+    const { result } = renderHook(() => useTelemetryStripInteraction({
+      points: makePoints(20), currentIndex: 0, onSelectIndex: vi.fn(), zoomRange: { start: 2, end: 17 }, onZoomRangeChange,
+    }));
+    const container = document.createElement('div');
+    vi.spyOn(container, 'getBoundingClientRect').mockReturnValue({ left: 0, width: 100 } as DOMRect);
+    result.current.containerRef.current = container;
+    const target = document.createElement('div');
+    act(() => {
+      result.current.handlePointerDown({ target, clientX: 50, altKey: true, pointerId: 1 } as unknown as React.PointerEvent<HTMLDivElement>);
+    });
+    act(() => {
+      result.current.handlePointerUp({ target, clientX: 50, pointerId: 1 } as unknown as React.PointerEvent<HTMLDivElement>);
+    });
+    expect(result.current.markerIndex).not.toBeNull();
+
+    act(() => result.current.handleDoubleClick());
+    expect(result.current.markerIndex).toBeNull();
+    expect(onZoomRangeChange).not.toHaveBeenCalled();
+
+    act(() => result.current.handleDoubleClick());
+    expect(onZoomRangeChange).toHaveBeenCalledWith(null);
+  });
+
+  it('keeps Alt-drag as a pan without dropping a marker', () => {
+    const { result } = renderHook(() => useTelemetryStripInteraction({ points: makePoints(20), currentIndex: 0, onSelectIndex: vi.fn() }));
+    const container = document.createElement('div');
+    vi.spyOn(container, 'getBoundingClientRect').mockReturnValue({ left: 0, width: 100 } as DOMRect);
+    result.current.containerRef.current = container;
+    const target = document.createElement('div');
+
+    act(() => {
+      result.current.handlePointerDown({ target, clientX: 50, altKey: true, pointerId: 1 } as unknown as React.PointerEvent<HTMLDivElement>);
+    });
+    act(() => {
+      result.current.handlePointerUp({ target, clientX: 80, pointerId: 1 } as unknown as React.PointerEvent<HTMLDivElement>);
+    });
+    expect(result.current.markerIndex).toBeNull();
+  });
+
   it('does not move the scrub line for keyboard events from editable elements', () => {
     const onSelectIndex = vi.fn();
     renderHook(() => useTelemetryStripInteraction({ points: makePoints(10), currentIndex: 5, onSelectIndex }));

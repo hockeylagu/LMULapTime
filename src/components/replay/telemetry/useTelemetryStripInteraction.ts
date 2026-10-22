@@ -44,6 +44,9 @@ export function useTelemetryStripInteraction({
   const viewportRafRef = useRef<number | null>(null);
   const panRef = useRef<{ x: number; width: number; window: DistanceWindow } | null>(null);
   const keyHandlerRef = useRef<(event: KeyboardEvent) => void>(() => {});
+  const altClickXRef = useRef<number | null>(null);
+  // Alt-click marker, kept as a distance so it survives a resolution or lap reload.
+  const [markerDistM, setMarkerDistM] = useState<number | null>(null);
   const [internalZoomRange, setInternalZoomRange] = useState<{ start: number; end: number } | null>(null);
   const [interactionMode, setInteractionMode] = useState<'scrub' | 'zoom'>('scrub');
   const [dragSelection, setDragSelection] = useState<TelemetryDragSelection | null>(null);
@@ -149,8 +152,8 @@ export function useTelemetryStripInteraction({
     const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
     const pct = rect.width > 0 ? (x / rect.width) * 100 : 0;
     if (e.altKey) {
-      if (!isZoomed) return;
-      panRef.current = { x: e.clientX, width: rect.width, window: viewportRef.current ?? { start: distStart, end: distEnd } };
+      altClickXRef.current = e.clientX;
+      if (isZoomed) panRef.current = { x: e.clientX, width: rect.width, window: viewportRef.current ?? { start: distStart, end: distEnd } };
     } else if (interactionMode === 'zoom' || e.shiftKey) {
       setDragSelection({ startX: x, currentX: x, startPct: pct, currentPct: pct });
       isDraggingRef.current = false;
@@ -190,6 +193,13 @@ export function useTelemetryStripInteraction({
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     panRef.current = null;
+    const altClickX = altClickXRef.current;
+    altClickXRef.current = null;
+    if (altClickX !== null && Math.abs((e.clientX ?? altClickX) - altClickX) < 4 && containerRef.current) {
+      const rect = rectRef.current || containerRef.current.getBoundingClientRect();
+      const ratio = rect.width > 0 ? Math.max(0, Math.min(1, (altClickX - rect.left) / rect.width)) : 0;
+      setMarkerDistM(cumDists[indexAtRatio(ratio)] ?? null);
+    }
     if (rafIdRef.current !== null) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; }
     if (pendingIndexRef.current !== null) { onSelectIndex(pendingIndexRef.current); pendingIndexRef.current = null; }
     rectRef.current = null;
@@ -221,6 +231,7 @@ export function useTelemetryStripInteraction({
     isDraggingRef.current = false;
     pendingIndexRef.current = null;
     panRef.current = null;
+    altClickXRef.current = null;
   };
 
   const onStepIndex = useCallback((delta: number) => {
@@ -267,6 +278,8 @@ export function useTelemetryStripInteraction({
         e.preventDefault(); viewportRef.current = null; handleResetZoom();
       } else if (e.key === 'Escape' && (isDraggingRef.current || dragSelection || panRef.current)) {
         e.preventDefault(); handlePointerCancel();
+      } else if (e.key === 'Escape' && markerDistM !== null) {
+        e.preventDefault(); setMarkerDistM(null);
       }
     };
   useEffect(() => {
@@ -287,6 +300,10 @@ export function useTelemetryStripInteraction({
     safeIndex,
     pctForIndex,
     onStepIndex,
+    markerIndex: markerDistM === null || cumDists.length === 0 ? null : findIndexAtDistance(cumDists, markerDistM),
+    clearMarker: useCallback(() => setMarkerDistM(null), []),
+    // A double-click removes the marker first, then resets the zoom.
+    handleDoubleClick: () => (markerDistM !== null ? setMarkerDistM(null) : handleResetZoom()),
     onJumpToDistance: useCallback((distM: number) => {
       if (cumDists.length === 0) return;
       onSelectIndex(findIndexAtDistance(cumDists, distM));

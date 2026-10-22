@@ -8,6 +8,7 @@ describe('replay shortcut help', () => {
     const chart = screen.getByTestId('chart'); chart.focus();
     fireEvent.keyDown(chart, { key: '?' });
     expect(screen.getByRole('dialog')).toHaveTextContent('Shift + wheel');
+    expect(screen.getByRole('dialog')).toHaveTextContent('Alt + click');
     expect(screen.getByRole('button', { name: 'Close shortcuts' })).toHaveFocus();
     fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
