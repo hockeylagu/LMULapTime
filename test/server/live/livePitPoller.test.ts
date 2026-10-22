@@ -209,4 +209,18 @@ describe('LivePitPoller', () => {
     expect(t.paths.length).toBeGreaterThan(count);
     t.poller.stop();
   });
+  it('logs the player standings row without its motion, and keeps the rest of it', async () => {
+    const rows = [{ ...STANDINGS[0], carPosition: { x: 1 }, carVelocity: { velocity: 2 }, carAcceleration: { x: 3 }, gamePhase: 'FORMATION' },
+      { player: false, veFraction: 0.9 }];
+    const events: Array<{ kind: string; data: unknown }> = [];
+    const poller = new LivePitPoller({
+      get: path => Promise.resolve(path === STATE ? { ok: true, body: navState(false) } : { ok: true, body: path === '/rest/watch/standings' ? rows : {} }),
+      onUpdate: vi.fn(), onReplay: vi.fn(), onNavigation: vi.fn(), diagnosticSink: () => event => events.push(event),
+    });
+    poller.setMode('track');
+    await vi.advanceTimersByTimeAsync(3 * PIT_POLL_TICK_MS);
+    const standings = events.find(event => (event.data as { path: string }).path === '/rest/watch/standings');
+    expect((standings?.data as { body: unknown } | undefined)?.body).toEqual([{ ...STANDINGS[0], gamePhase: 'FORMATION' }]);
+    poller.stop();
+  });
 });

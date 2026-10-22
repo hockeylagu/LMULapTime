@@ -58,6 +58,20 @@ interface PitRead {
 const STATE_PATH = '/navigation/state';
 
 /**
+ * A reply as the diagnostics keep it: the raw shape, less what is kept elsewhere. Standings keep the player's row
+ * without its motion (the recording has it at 100 Hz, and it would defeat deduplication); the tyre screen drops its
+ * copy of the pit menu, which is logged from its own read.
+ */
+function diagnosticBody(path: string, body: unknown): unknown {
+  if (path === '/rest/watch/standings' && Array.isArray(body)) {
+    return body.filter((row: unknown) => typeof row === 'object' && row !== null && 'player' in row && row.player === true)
+      .map((row: Record<string, unknown>) => ({ ...row, carPosition: undefined, carVelocity: undefined, carAcceleration: undefined }));
+  }
+  if (path === '/rest/garage/UIScreen/TireManagement' && typeof body === 'object' && body !== null) return { ...body, pitMenu: undefined };
+  return body;
+}
+
+/**
  * About 0.45 requests a second on track (state checks included), less in the garage. Each read is made as often as
  * its answer can change: VE every 3 s (the usage meter interpolates it at each crossing); the stop estimate and the
  * MFD often only while the pit is in play; the condition once a lap (tread at the crossing) and after an impact or a
@@ -229,10 +243,7 @@ export class LivePitPoller {
     const stale = generation !== this.generation || this.mode === 'off';
     const parsed = answer.ok ? next.read ? next.read.parse(answer.body) : parseReplayPlayback(answer.body) : null;
     if (diagnostic) {
-      // Standings diagnostics stay player-only; retain raw shape for the other local endpoints.
-      const body = answer.ok ? next.path === '/rest/watch/standings' && Array.isArray(answer.body)
-        ? answer.body.filter((row: unknown) => typeof row === 'object' && row !== null && 'player' in row && row.player === true)
-        : answer.body : undefined;
+      const body = answer.ok ? diagnosticBody(next.path, answer.body) : undefined;
       const serialized = body === undefined ? undefined : JSON.stringify(body);
       diagnostic({ kind: 'rest', at: done, data: {
         path: next.path, startedAt: now, finishedAt: done, durationMs: done - now,

@@ -372,9 +372,12 @@ export class LiveService {
       } });
       if (Date.now() - this.lastDiagnosticStrategyAt >= 10_000 || next.lifecycle !== previous.lifecycle) {
         this.lastDiagnosticStrategyAt = Date.now();
+        // The MFD's fuel ratio choices never change in a session: the pit menu reads log them, not every strategy record.
+        const pit = next.strategy?.pit;
+        const strategy = next.strategy && pit?.mfd ? { ...next.strategy, pit: { ...pit, mfd: { ...pit.mfd, fuelRatioOptions: undefined } } } : next.strategy;
         this.options.capture?.diagnostics?.record({ kind: 'strategy', at: Date.now(), data: {
           modelVersion: LIVE_MODEL_VERSION, elapsedSeconds: reading?.currentEt ?? null,
-          strategy: next.strategy, observations: this.strategy.observations(),
+          strategy, observations: this.strategy.observations(),
         } });
       }
     });

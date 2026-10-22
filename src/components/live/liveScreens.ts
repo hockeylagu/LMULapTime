@@ -165,12 +165,15 @@ export function liveScreen(snapshot: LiveSnapshot): LiveScreen {
     case 'starting': {
       // On the grid, until the formation lap, the driver can still go back to the garage for fuel, tyres or setup: the
       // checklist stays, and the start phase becomes the title (the bar names the session) so it fits over the trace.
+      // From the formation lap the checklist goes, but the stop plan stays until the race plan takes over at the green flag.
       const gamePhase = session?.gamePhase ?? 0;
-      const plan = gamePhase < 3 ? snapshot.strategy?.garage ?? null : null;
+      const garage = snapshot.strategy?.garage ?? null;
+      const plan = gamePhase < 3 ? garage : null;
       const phase = startingNote(gamePhase);
+      const stopPlan = !plan && garage ? garagePreparation(session?.kind, garage).stopPlan : null;
       return {
         title: plan ? phase : session?.kind === 'race' ? 'RACE STARTING' : `${kind} STARTING`,
-        note: plan ? '' : phase, muted: false,
+        note: plan ? '' : stopPlan ? `${phase} · ${stopPlan}` : phase, muted: false,
         preparation: plan ? garagePreparation(session?.kind, plan) : undefined,
         checks: plan ? garageChecks(snapshot, plan) : [],
         showTrace: true,

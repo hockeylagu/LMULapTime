@@ -49,6 +49,17 @@ describe('disposable live diagnostic sidecars', () => {
     expect(file.rows[file.rows.length - 1]?.kind).toBe('diagnostics-end');
   });
 
+  it('writes recorder health only when its state, drops or backlog change, not for the growing sample count', async () => {
+    const { directory, diagnostics } = await setup();
+    const health = (at: number, samples: number, pendingBatches = 0) => diagnostics.record({ kind: 'capture-health', at, data: {
+      state: 'recording', recordingId: 'recording-1', samples, droppedSamples: 0, pendingBatches, error: null,
+    } });
+    health(1000, 100); health(2000, 200); health(3000, 300, 1); health(4000, 400, 2); health(5000, 500); health(66_000, 600);
+    await diagnostics.stop();
+    const [file] = await records(directory);
+    expect(file.rows.filter(row => row.kind === 'capture-health').map(row => row.data.samples)).toEqual([100, 300, 500, 600]);
+  });
+
   it('compresses under the final recording name when the recording was renamed to its layout', async () => {
     const directory = await mkdtemp(path.join(tmpdir(), 'lmu-diagnostics-'));
     directories.push(directory);

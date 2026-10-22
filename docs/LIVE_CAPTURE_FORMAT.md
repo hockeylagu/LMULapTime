@@ -185,7 +185,12 @@ computed fallback.
 Adjacent `*.diagnostics.jsonl` sidecars record existing REST requests/responses and errors, reader
 failures, lifecycle, writer health and strategy context. Successful unchanged responses are deduplicated
 with periodic checkpoints; response bodies and asynchronous buffering are bounded. Player filtering
-avoids retaining the full opponent standings payload. Diagnostics add no REST requests.
+avoids retaining the full opponent standings payload. Diagnostics add no REST requests. Nothing kept elsewhere
+is repeated: the player's standings row drops `carPosition`/`carVelocity`/`carAcceleration` (100 Hz in the
+recording), the tyre screen drops its copy of the pit menu (logged from its own read), the reader's game-state
+probe keeps its body only for an error or unreadable reply (the pit poller logs the same reply), `strategy`
+records omit the MFD fuel ratio choices, and `capture-health` is written when the writer's state, error, drops
+or backlog change (plus the 60 s checkpoint), not for the growing sample count.
 `lap-timing` records producer output at most once per second: timing fields, the atomic
 `lapEstimate` (seconds, reference seconds, delta seconds and distance/sector source), subscriber
 count and source session/lap clocks and distance. This does not confirm browser receipt. The

@@ -78,6 +78,12 @@ export class LiveDiagnostics {
   }
 }
 
+/** Writer health repeats unless its state, error, drops or backlog change: the growing sample count alone is not news. */
+function healthContent(data: unknown): string {
+  const health = typeof data === 'object' && data !== null ? data as Record<string, unknown> : {};
+  return JSON.stringify({ ...health, samples: undefined, pendingBatches: typeof health.pendingBatches === 'number' && health.pendingBatches > 0 });
+}
+
 class DiagnosticFile {
   public readonly startedAt = Date.now();
   public requestEndAt = Infinity;
@@ -118,7 +124,8 @@ class DiagnosticFile {
     const value = (event.kind === 'rest' || event.kind === 'reader-rest') && typeof event.data === 'object' && event.data !== null
       ? event.data as Record<string, unknown> : null;
     const key = `${event.kind}:${typeof value?.path === 'string' ? value.path : ''}`;
-    const content = value ? JSON.stringify({ ...value, startedAt: undefined, finishedAt: undefined, durationMs: undefined }) : data;
+    const content = value ? JSON.stringify({ ...value, startedAt: undefined, finishedAt: undefined, durationMs: undefined })
+      : event.kind === 'capture-health' ? healthContent(event.data) : data;
     const previous = this.previous.get(key);
     const failure = value && (value.outcome !== 'ok' || value.parser !== 'accepted'
       || value.disposition === 'stale-discarded' || value.disposition === 'ignored');
