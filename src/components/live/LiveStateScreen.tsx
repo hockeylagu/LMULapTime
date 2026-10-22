@@ -1,5 +1,5 @@
 import { LiveGarageChecklist } from './LiveGarageChecklist.js';
-import type { LiveScreen } from './liveScreens.js';
+import { syncOnReturnToDashboard, type LiveScreen } from './liveScreens.js';
 
 /** The big state title with its note and, in the garage, the checklist of what to set before leaving. */
 export function LiveStateScreen({ screen }: { screen: LiveScreen }) {
@@ -29,7 +29,7 @@ export function LiveStateScreen({ screen }: { screen: LiveScreen }) {
       {checklist && <LiveGarageChecklist checks={screen.checks} compact={screen.showTrace} />}
       {/* A plain hash link: the dashboard page renders without a router of its own (HashRouter follows the hash). */}
       {screen.dashboardLink && (
-        <a href="#/dashboard" className="mt-8 self-start rounded-2xl border-2 border-lmu-border bg-lmu-card px-14 py-7 text-[56px] font-semibold text-lmu-text transition-colors hover:border-lmu-accent hover:bg-lmu-raised">
+        <a href="#/dashboard" onClick={syncOnReturnToDashboard} className="mt-8 self-start rounded-2xl border-2 border-lmu-border bg-lmu-card px-14 py-7 text-[56px] font-semibold text-lmu-text transition-colors hover:border-lmu-accent hover:bg-lmu-raised">
           OPEN THE DASHBOARD
         </a>
       )}

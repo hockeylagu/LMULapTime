@@ -20,6 +20,11 @@ function writeSeenReference(completedAt: string): void {
   try { localStorage.setItem(REFERENCE_SEEN_KEY, completedAt); } catch { /* storage unavailable: the toast may show again */ }
 }
 
+/** Asks the server to scan the LMU folders for new results, replays and telemetry (a manual refresh). */
+export function requestDirectoryScan(signal?: AbortSignal): Promise<unknown> {
+  return postJson('/api/scan', {}, { signal });
+}
+
 export function serverRetryDelay(failures: number): number {
   return Math.min(SERVER_RETRY_MS * 2 ** Math.max(0, failures - 1), SERVER_RETRY_MAX_MS);
 }
@@ -141,7 +146,7 @@ export function useAppData({ onGameStarted }: { onGameStarted?: () => void } = {
     scanAbort.current?.abort();
     dataAbort.current?.abort();
     try {
-      if (forceRefresh) await postJson('/api/scan', {}, { signal: controller.signal });
+      if (forceRefresh) await requestDirectoryScan(controller.signal);
       acknowledged = true;
       loadedKey.current = null;
     } catch (err: unknown) {

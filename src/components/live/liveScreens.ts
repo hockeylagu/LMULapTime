@@ -4,6 +4,16 @@ import { knownCarClass, resolveVehicle } from '../../../shared/domain/vehicleMap
 import { formatLapTime, UNKNOWN } from './liveFormat.js';
 import { formatAmount, resourceName } from './race/livePlanFormat.js';
 import { LIVE_TYRE_TREAD_FLOOR } from '../../../shared/domain/live/liveInsights.js';
+import { requestDirectoryScan } from '../../api/useAppData.js';
+
+/**
+ * The way back to the dashboard brings the session just driven along: its results XML, replay and telemetry are
+ * synced. Asked during a session, the server holds the scan until the session ends.
+ */
+export function syncOnReturnToDashboard(): void {
+  // A server that does not answer shows on the dashboard itself.
+  requestDirectoryScan().catch(() => undefined);
+}
 
 /** One thing to set in the garage: the target, what the garage holds now, and what to do about it. */
 export interface GarageCheck {

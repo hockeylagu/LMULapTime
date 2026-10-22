@@ -2,7 +2,7 @@ import type { LiveConnection } from '../../api/liveStream.js';
 import type { LiveSnapshot, LiveWeather } from '../../../shared/types/live.js';
 import { CarClassBadge } from '../common/CarClassBadge.js';
 import { formatLapTime, UNKNOWN } from './liveFormat.js';
-import { liveCarClass, liveTrackName, sessionKindLabel } from './liveScreens.js';
+import { liveCarClass, liveTrackName, sessionKindLabel, syncOnReturnToDashboard } from './liveScreens.js';
 import { forecastText } from './race/raceAction.js';
 
 const STATUS: Record<LiveConnection, { label: string; className: string }> = {
@@ -51,7 +51,7 @@ export function LiveSessionBar({ snapshot, connection }: LiveSessionBarProps) {
       <div className="flex items-center gap-7">
         {/* A plain hash link: the dashboard page renders without a router of its own (HashRouter follows the hash). */}
         {/* The bar stands on the baseline at the capitals' height (0.71em), so it lines up with the letters. */}
-        <a href="#/dashboard" title="Back to the dashboard" className="flex items-baseline gap-5 font-black tracking-tight text-lmu-text hover:text-lmu-text-soft">
+        <a href="#/dashboard" title="Back to the dashboard" onClick={syncOnReturnToDashboard} className="flex items-baseline gap-5 font-black tracking-tight text-lmu-text hover:text-lmu-text-soft">
           <span aria-hidden="true" className="block h-[0.71em] w-1.5 bg-lmu-accent" />
           LMU
         </a>

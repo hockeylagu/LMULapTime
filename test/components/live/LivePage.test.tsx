@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Profiler } from 'react';
-import { act, render, screen, within, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, within, waitFor } from '@testing-library/react';
 import App from '../../../src/App.js';
 import { prefetchRoutePages } from '../../../src/routePages.js';
 import { LivePage } from '../../../src/components/live/LivePage.js';
@@ -44,6 +44,16 @@ describe('LivePage', () => {
     expect(within(region).queryByRole('link', { name: 'OPEN THE DASHBOARD' })?.getAttribute('href') ?? null).toBe(lifecycle === 'offline' ? '#/dashboard' : null);
     expect(screen.queryByTestId('pedal-trace')).not.toBeInTheDocument();
     expect(screen.getByTestId('live-status')).toHaveTextContent('LIVE');
+  });
+
+  it.each(['OPEN THE DASHBOARD', 'LMU'])('syncs the LMU folders when %s leads back to the dashboard', (name) => {
+    const fetchMock = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<LivePage />);
+    send(snapshot({ lifecycle: 'offline', session: null }));
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/scan', expect.anything());
+    fireEvent.click(screen.getByRole('link', { name }));
+    expect(fetchMock).toHaveBeenCalledWith('/api/scan', expect.objectContaining({ method: 'POST' }));
   });
 
   it('keeps the pedal trace for the race start, with the phase as the note', () => {
