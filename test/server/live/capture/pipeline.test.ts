@@ -85,7 +85,6 @@ it('persists recorded memory values through service, real worker, rediscovery an
     const expected = [24.0998, 0.0003, 0.3096, 0.0212, 0.04272, 0.14548,
       -0.4129, 1.8818, -0.4397, 1.6297, -0.1159, 0.7526, -0.1789, 1.1636,
       -0.4157, 23.9723, -0.4509, 24.224, -0.1181, 23.9834, -0.1839, 24.2205,
-      -0.03201, -0.031, -0.02966, -0.02683, -0.02633, 0.0264, 0.00102, 0.00049,
       0.01678, 0.01883, 0.00851, 0.01225];
     expect(JSON.parse(output)).toEqual([Object.fromEntries(LIVE_CAPTURE_CHANNELS.map((channel, index) => [channel.name, expected[index]]))]);
     expect(indexed[0].manifest.normalizationVersion).toBe(3);

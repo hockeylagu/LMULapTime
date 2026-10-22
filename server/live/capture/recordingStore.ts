@@ -185,7 +185,7 @@ function serializeObservation(observation: LiveCaptureObservation): string {
   return data;
 }
 
-function validateBatch(batch: LiveCaptureBatch): { rowCount: number; observationData: string[]; manifestJson: string } {
+function validateBatch(batch: LiveCaptureBatch): { rowCount: number; observationData: string[] } {
   if (batch.type !== 'batch') throw new Error('Invalid live capture message type');
   validateManifest(batch.manifest);
   if (!Number.isSafeInteger(batch.sequence) || batch.sequence < 0) throw new Error('Invalid live capture batch sequence');
@@ -215,7 +215,7 @@ function validateBatch(batch: LiveCaptureBatch): { rowCount: number; observation
     priorElapsed = elapsed;
   }
   const observationData = batch.observations.map(serializeObservation);
-  return { rowCount, observationData, manifestJson: stableManifest(batch.manifest) };
+  return { rowCount, observationData };
 }
 
 function columnSql(normalizationVersion: number): string {
@@ -447,8 +447,7 @@ export class LiveCaptureRecordingStore {
       terrain = await this.insertObservations(connection, batch, checked.observationData);
       await connection.run('UPDATE capture_manifest SET recording_id = ?, manifest_json = CAST(? AS JSON), updated_at = ? WHERE singleton = TRUE',
         [manifest.recordingId, stableManifest(manifest), manifest.updatedAt]);
-      await connection.run('INSERT INTO capture_batches (sequence, manifest_json, sample_count) VALUES (?, CAST(? AS JSON), ?)',
-        [batch.sequence, checked.manifestJson, checked.rowCount]);
+      await connection.run('INSERT INTO capture_batches (sequence, sample_count) VALUES (?, ?)', [batch.sequence, checked.rowCount]);
       await connection.run('COMMIT');
     } catch (error: unknown) {
       try { await connection.run('ROLLBACK'); } catch { /* Preserve the write failure. */ }
@@ -510,7 +509,7 @@ export class LiveCaptureRecordingStore {
           request_started_at DOUBLE, request_finished_at DOUBLE, source VARCHAR NOT NULL, kind VARCHAR NOT NULL,
           data JSON NOT NULL)`);
         await connection.run(`CREATE TABLE IF NOT EXISTS capture_batches (
-          sequence BIGINT PRIMARY KEY, manifest_json JSON NOT NULL, sample_count INTEGER NOT NULL)`);
+          sequence BIGINT PRIMARY KEY, sample_count INTEGER NOT NULL)`);
         if (!hasManifestTable && existingTables.length > 0) throw new Error('Refusing to initialize a non-empty DuckDB file');
         if (!hasManifestTable) {
           const metadata = manifestMetadata(incoming);

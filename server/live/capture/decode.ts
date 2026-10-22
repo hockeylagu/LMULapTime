@@ -38,13 +38,8 @@ export function decodeLiveCaptureSample(slot: Buffer): LiveCaptureSample | null 
     values[7 + corner * 2] = finiteOrNaN(-slot.readDoubleLE(wheel + WHEEL.offsets.longitudinalPatchVel));
     values[14 + corner * 2] = finiteOrNaN(slot.readDoubleLE(wheel + WHEEL.offsets.lateralGroundVel));
     values[15 + corner * 2] = finiteOrNaN(-slot.readDoubleLE(wheel + WHEEL.offsets.longitudinalGroundVel));
-    // ISO camber is outward-positive on BOTH sides, matching the producer (not a signed roll angle).
-    values[22 + corner] = finiteOrNaN(slot.readDoubleLE(wheel + WHEEL.offsets.camber));
-    // Current wheel orientation includes steering. ISO toe-in is positive: rightward points inward
-    // at a left wheel and outward at a right wheel. This is not the static garage alignment setting.
-    values[26 + corner] = finiteOrNaN(slot.readDoubleLE(wheel + WHEEL.offsets.toe) * (corner % 2 === 0 ? 1 : -1));
     // A compression distance, not suspension travel or a vector-axis component; retain metres/sign.
-    values[30 + corner] = finiteOrNaN(slot.readDoubleLE(wheel + WHEEL.offsets.verticalTireDeflection));
+    values[22 + corner] = finiteOrNaN(slot.readDoubleLE(wheel + WHEEL.offsets.verticalTireDeflection));
   }
 
   const impactTime = slot.readDoubleLE(at.lastImpactET);

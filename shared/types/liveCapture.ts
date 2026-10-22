@@ -3,7 +3,7 @@ export const LIVE_CAPTURE_SCHEMA_VERSION = 1;
 /** Version 3 adds tyre deflection; version 2 fixes source signs and enables the other wheel channels. */
 export const LIVE_CAPTURE_NORMALIZATION_VERSION = 3;
 export const LIVE_CAPTURE_SOURCE = 'live-capture' as const;
-export const LIVE_CAPTURE_SAMPLE_WIDTH = 37;
+export const LIVE_CAPTURE_SAMPLE_WIDTH = 29;
 /** Normal transport bound plus reserved slots for initialization/finalization. */
 export const LIVE_CAPTURE_PENDING_BATCHES = 4;
 export const LIVE_CAPTURE_FINALIZATION_SLOTS = 2;
@@ -12,7 +12,7 @@ export interface LiveCaptureSample {
   elapsedSeconds: number;
   lapNumber: number;
   lapStartSeconds: number | null;
-  /** Thirty-four values in LIVE_CAPTURE_CHANNELS order. NaN means unavailable, never measured zero. */
+  /** Twenty-six values in LIVE_CAPTURE_CHANNELS order. NaN means unavailable, never measured zero. */
   values: Float64Array;
   /** Raw per-corner material names, preserving the source's truncation; omitted when unchanged. */
   terrainMaterials?: string[];

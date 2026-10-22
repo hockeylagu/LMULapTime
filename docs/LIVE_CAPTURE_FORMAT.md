@@ -72,27 +72,24 @@ neither supplies substitute data to a connected dashboard.
 
 ## Channels and clocks
 
-Normalization version 3 captures 34 values: six vehicle-vector channels plus 28 wheel channels.
+Normalization version 3 captures 26 values: six vehicle-vector channels plus 20 wheel channels.
 The producer's left-handed local axes are left/up/back. ISO vehicle velocity is `(-z, x, y)`;
 angular velocity is an axial vector and maps as `(z, -x, -y)` (roll, pitch, yaw). Version 1 had
 incorrect lateral/roll/yaw signs: evidence reads correct those three signs once without rewriting
 the source and disclose `sourceNormalizationVersion: 1` alongside response normalization version 3.
 Its wheel catalog stays unverified and its wheel columns unavailable. Version 2 retains its verified
-30-value catalog. Both older versions remain readable; new attempts use version 3 and do not resume
+22-value catalog. Both older versions remain readable; new attempts use version 3 and do not resume
 an older-version file. Batch rows have three clocks/counters followed by the versioned values:
-37 float64 entries in version 3, 33 in versions 1 and 2.
+29 float64 entries in version 3, 25 in versions 1 and 2.
 
-FL/FR/RL/RR each record patch and ground lateral/longitudinal velocity (m/s), camber and dynamic
-toe (radians), plus tyre vertical deflection (metres). Deflection is a scalar compression distance,
+FL/FR/RL/RR each record patch and ground lateral/longitudinal velocity (m/s) plus tyre vertical
+deflection (metres). Camber and toe are not recorded (removed 2026-10-21, including from existing recordings). Deflection is a scalar compression distance,
 preserved without an axis/sign transform; it is not suspension travel.
 Wheel lateral is already left-positive; longitudinal is negated to forward-positive.
-Camber is outward-positive on both sides, matching ISO camber rather than a globally signed roll
-angle. Toe-in is positive: preserve the source angle on left wheels and negate it on right wheels.
-The toe value includes current steering/suspension effects; it is not a measured static setup value.
 Patch velocity is not relabelled as wheel speed; the slip ratio is derived on read (below). Nonfinite input becomes SQL NULL;
 valid finite zero remains zero. Version 3 appends the four deflection columns; batch size stays bounded.
 The aligned motion API serves the six vehicle channels plus the eight longitudinal patch/ground
-velocities of version 2+ recordings; camber, toe, deflection and lateral wheel velocities stay in the
+velocities of version 2+ recordings; deflection and lateral wheel velocities stay in the
 recording for direct DuckDB inspection and future consumers. Native G is not changed.
 Sources and saved-recording verification: [wheel evidence assessment](plans/WHEEL_CAPTURE_EVIDENCE.md).
 
@@ -131,7 +128,7 @@ Schema and normalization versions are stored explicitly. The tables are:
 | `capture_channels` | Channel order, units and provenance |
 | `capture_samples` | Typed columnar motion samples and game/lap clocks |
 | `capture_observations` | Sparse source observations and versioned learning events |
-| `capture_batches` | Committed batch sequences (a repeated or older sequence is rejected) |
+| `capture_batches` | Committed batch sequence and sample count (a repeated or older sequence is rejected) |
 
 The controller batches samples for a worker-owned writer. Four normal pending batches plus two
 reserved initialization/finalization slots share the same six-batch FIFO, including batches containing

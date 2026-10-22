@@ -137,7 +137,7 @@ describe('LiveCaptureRecordingStore', () => {
     const writer = await createWriter(directory);
     const batch = makeBatch();
     batch.manifest.normalizationVersion = 1;
-    batch.samples = Float64Array.from([1, 1, 0, ...Array<number>(30).fill(1), 1.02, 1, 0, ...Array<number>(30).fill(2)]);
+    batch.samples = Float64Array.from([1, 1, 0, ...Array<number>(22).fill(1), 1.02, 1, 0, ...Array<number>(22).fill(2)]);
     expect((await writer.send(batch)).type).toBe('persisted');
     await writer.close();
     expect(readInChild(path.join(directory, batch.manifest.filename))).toMatchObject({

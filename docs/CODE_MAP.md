@@ -25,7 +25,7 @@ pipe disposes the icon, including on crashes and watch restarts; `LMU_TRAY=0` di
 
 ## Live Capture and Learning
 
-`capture/decode.ts` and `capture/channels.ts` own the 34-value normalization-version-3 catalog.
+`capture/decode.ts` and `capture/channels.ts` own the 26-value normalization-version-3 catalog.
 It retains corrected vehicle-vector signs and records all 28 wheel values, including tyre deflection.
 `capture/terrain.ts` interns terrain names into sparse dictionary definitions/change events in the writer;
 the controller also retains source-timed impact magnitudes and opaque player upgrade-pack configuration.

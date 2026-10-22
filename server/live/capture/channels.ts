@@ -31,10 +31,6 @@ export function liveCaptureChannels(normalizationVersion: number): readonly Live
     { name: `${corner}_ground_lateral_mps`, unit: 'm/s', sourceField: 'lateralGroundVel', frame: 'iso8855-wheel' as const, verified: wheelsVerified },
     { name: `${corner}_ground_longitudinal_mps`, unit: 'm/s', sourceField: 'longitudinalGroundVel', frame: 'iso8855-wheel' as const, verified: wheelsVerified },
   ]),
-  ...['camber', 'toe'].flatMap(angle => ['fl', 'fr', 'rl', 'rr'].map(corner => ({
-    name: `${corner}_${angle}_rad`, unit: 'rad', sourceField: angle,
-    frame: 'iso8855-wheel' as const, verified: wheelsVerified,
-  }))),
   ...(normalizationVersion >= 3 ? ['fl', 'fr', 'rl', 'rr'].map(corner => ({
     name: `${corner}_tyre_vertical_deflection_m`, unit: 'm', sourceField: 'verticalTireDeflection',
     frame: 'iso8855-wheel' as const, verified: true,
