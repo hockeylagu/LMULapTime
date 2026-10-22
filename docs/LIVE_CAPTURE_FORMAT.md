@@ -100,6 +100,7 @@ Additional shared-memory evidence is sparse:
 | `impact` | `impactElapsedSeconds` and native `magnitude`; observation elapsed time is the source impact time, receipt time is retained separately. Repeated state is suppressed; equal magnitudes at different impact times remain distinct. Nonfinite/negative magnitude is NULL, not a fabricated zero. Magnitude units are not assigned without evidence. |
 | `upgrade-pack` | Player scoring's exact 16-byte `rawHex`, including zero bytes; initial state and configuration changes. Contents remain opaque. |
 | `terrain-material` | Session-file dictionary definition `{materialId, rawName}`, untimed and recorder scoped. Raw names preserve all 16 source bytes up to NUL using Latin-1, including commas/truncation. |
+| `car-condition` | `{fuelCapacityLitres, dents, detached, lastImpactEt, compound}`: eight body-zone dent severities (0-2), detached parts, last contact time and tyre compound. Recorded at the start and on change only; fuel level is not repeated here (the learning events hold it). |
 | `terrain-change` | Initial state and changes `{corner, materialId}` at the sampled game elapsed time, with FL/FR/RL/RR indexing. An empty source name becomes a NULL material reference. |
 
 The reader worker sends sparse-state changes at capture cadence and small car-rate checkpoints

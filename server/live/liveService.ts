@@ -290,7 +290,7 @@ export class LiveService {
       if (capture && this.snapshot.session?.inRealtime) this.options.capture?.sample(capture);
       if (car) this.options.capture?.observe({ source: 'shared-memory', kind: 'car-condition',
         elapsedSeconds: message.pedal?.t ?? this.lastReading?.currentEt ?? null, receivedAt: Date.now(), data: {
-          fuelLitres: car.fuelLiters, fuelCapacityLitres: car.fuelCapacityLiters,
+          fuelCapacityLitres: car.fuelCapacityLiters,
           dents: car.dentSeverity, detached: car.detached, lastImpactEt: car.lastImpactEt, compound: car.compound,
         } });
     });

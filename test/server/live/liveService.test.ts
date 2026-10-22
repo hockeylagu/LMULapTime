@@ -183,6 +183,24 @@ describe('LiveService', () => {
     void service.stop();
   });
 
+  it('repeats no car condition while only fuel burns, so the recorder stores changes alone', () => {
+    const writer = new FakeWorker();
+    const capture = new LiveCaptureController({ directory: 'unused', onPersist: () => {}, createWorker: () => writer as unknown as CaptureWorker });
+    const { service, worker, frame } = setup({ capture });
+    frame(reading());
+    const observe = vi.spyOn(capture, 'observe');
+    const car = (fuelLiters: number, dents: number) => worker.emit('message', { type: 'frame', car: {
+      fuelLiters, fuelCapacityLiters: 117, dentSeverity: [dents, 0, 0, 0, 0, 0, 0, 0], detached: false,
+      wheels: Array(4).fill({ flat: false, detached: false }), lastImpactEt: 0, compound: 'Medium' } });
+    car(40, 0); car(39.9, 0); car(39.8, 1);
+    const stored = observe.mock.calls.filter(([item]) => item.kind === 'car-condition').map(([item]) => JSON.stringify(item.data));
+    expect(stored).toHaveLength(3);
+    expect(stored[1]).toBe(stored[0]);
+    expect(stored[2]).not.toBe(stored[1]);
+    observe.mockRestore();
+    void service.stop();
+  });
+
   it('sends the snapshot on connect and on every change, not for a moving clock alone', () => {
     const { service, frame } = setup();
     const sink = new FakeSink();
