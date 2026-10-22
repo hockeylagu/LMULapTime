@@ -491,6 +491,19 @@ describe('LiveService', () => {
       void service.stop();
     });
 
+    it('reads the stored pit lane loss of the exact layout and class once the identity resolves', async () => {
+      const readNavigation = vi.fn(() => Promise.resolve({ ok: true as const, navigation: { sceneDesc: 'LEMANSWEC', classes: [], vehFile: null } }));
+      const pitLane = { read: vi.fn(() => 30.7), record: vi.fn() };
+      const { service, frame } = setup({ identity: { readNavigation }, pitLane });
+      frame(lap(3, { vehicleName: 'Ginetta G61', vehicleClass: 'LMP3' }, { trackName: 'Circuit de la Sarthe' }));
+      await vi.advanceTimersByTimeAsync(0);
+      frame(lap(3, { vehicleName: 'Ginetta G61', vehicleClass: 'LMP3' }, { trackName: 'Circuit de la Sarthe', currentEt: 20 }));
+      expect(pitLane.read).toHaveBeenLastCalledWith('sarthe_full', 'LMP3');
+      expect(pitLane.read).not.toHaveBeenCalledWith(null, expect.anything());
+      expect(pitLane.record).not.toHaveBeenCalled();
+      void service.stop();
+    });
+
     it('asks LMU for nothing in the menu', async () => {
       const readNavigation = vi.fn(() => Promise.resolve({ ok: false as const }));
       const { service, frame } = setup({ identity: { readNavigation } });

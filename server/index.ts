@@ -22,6 +22,7 @@ import { dataPlugin, formatPluginStatusLog } from './plugins/dataPlugin.js';
 import { LiveService } from './live/liveService.js';
 import { loadLiveSettings } from './live/liveSettings.js';
 import { queryLivePersonalBest } from './core/sessionSummaries/contextQueries.js';
+import { readPitLaneLoss, recordPitLaneLoss } from './core/live/dbPitLaneStore.js';
 import { LiveCaptureController } from './live/capture/controller.js';
 import { LiveDiagnostics } from './live/capture/diagnostics.js';
 import { getAvailableLiveCaptureCount, getLiveCaptureIndexRows, indexLiveCaptureCatalog, listLiveCaptureManifests, upsertLiveCapture } from './core/live/dbLiveCaptureStore.js';
@@ -140,6 +141,10 @@ const liveService = new LiveService({
   reserveLaps: loadLiveSettings(sessionDb).reserveLaps,
   personalBest: (layoutKey, carClass) =>
     queryLivePersonalBest(sessionDb.getDb(), serverContext.currentParser.configuredPlayerName, layoutKey, carClass),
+  pitLane: {
+    read: (layoutKey, carClass) => readPitLaneLoss(sessionDb.getDb(), layoutKey, carClass),
+    record: row => recordPitLaneLoss(sessionDb.getDb(), row),
+  },
 });
 liveService.events.on('session-loaded', loaded => serverContext.setLiveSessionLoaded(loaded));
 liveService.events.on('session-loaded', loaded => { if (loaded) automaticLearning.cancel(); });

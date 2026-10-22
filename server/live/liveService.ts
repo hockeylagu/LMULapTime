@@ -8,6 +8,7 @@ import { LiveStrategyTracker } from '../../shared/domain/live/liveStrategyTracke
 import { LiveResultTracker } from '../../shared/domain/live/liveResults.js';
 import type { LiveRestUpdate } from '../../shared/domain/live/liveStrategyTracker.js';
 import type { PersonalBestLookup } from '../../shared/domain/live/liveIdentity.js';
+import type { PitLaneLossRow } from '../core/live/dbPitLaneStore.js';
 import { LiveSessionTracker, NO_SESSION_DETAILS } from '../../shared/domain/live/liveSessionTracker.js';
 import { DEFAULT_LIVE_SETTINGS, LIVE_HEARTBEAT_MS, LIVE_STREAM_EVENTS } from '../../shared/types/live.js';
 import type { LiveLifecycle, LivePedalBatch, LivePedalSample, LiveSnapshot, LiveTiming } from '../../shared/types/live.js';
@@ -54,6 +55,11 @@ export interface LiveServiceOptions {
   pit?: Pick<LivePitPollerOptions, 'get' | 'now'>;
   /** VE or fuel reserve in laps (the live settings); half a lap without it. Changed later with `setReserveLaps`. */
   reserveLaps?: number;
+  /** The stored pit lane loss per layout and class (`server/core/live/dbPitLaneStore.ts`); none without it. */
+  pitLane?: {
+    read(layoutKey: string, carClass: string): number | null;
+    record(row: PitLaneLossRow): void;
+  };
 }
 
 function offlineSnapshot(): LiveSnapshot {
@@ -95,6 +101,8 @@ export class LiveService {
   private readonly results = new LiveResultTracker();
   private lastDiagnosticStrategyAt = -Infinity;
   private readonly learning = new LiveLearningCapture();
+  private pitLaneKey: string | null = null;
+  private pitLaneSession = 0;
   private readonly pit: LivePitPoller;
   /** The last scoring reading, kept so a navigation notice or a REST answer can re-derive the snapshot without a new frame. */
   private lastReading: LiveScoringReading | null = null;
@@ -294,6 +302,30 @@ export class LiveService {
     });
   }
 
+  /**
+   * The stored pit lane loss follows the exact layout and class (never a guess: none while either is unknown); a stop
+   * measured on them is stored and the median read again. A storage failure only loses that stop.
+   */
+  private followPitLane(layoutKey: string | null, carClass: string | null): void {
+    const store = this.options.pitLane;
+    if (!store) return;
+    const key = layoutKey && carClass ? `${layoutKey}|${carClass}` : null;
+    const measured = this.tracker.takeLaneLoss();
+    try {
+      if (measured && layoutKey && carClass) {
+        const recordingId = this.options.capture?.status().recordingId ?? `live-${this.pitLaneSession}`;
+        store.record({ stopKey: `${recordingId}|${measured.inLap}`, layoutKey, carClass, lossSeconds: measured.seconds, measuredAt: Date.now() });
+      }
+      if (key !== this.pitLaneKey || measured) {
+        if (key !== this.pitLaneKey) this.pitLaneSession = Date.now();
+        this.pitLaneKey = key;
+        this.tracker.setStoredLaneLoss(layoutKey && carClass ? store.read(layoutKey, carClass) : null);
+      }
+    } catch (error) {
+      console.warn('[Live] Pit lane loss store failed:', error);
+    }
+  }
+
   /** Recording, learning and diagnostics never stop the dashboard: a failure only ends the recording (NO REC). */
   private record(work: () => void): void {
     try { work(); } catch (error) { this.options.capture?.fail(error); }
@@ -344,6 +376,7 @@ export class LiveService {
     const identity = this.identity.identity;
     // The previous strategy: the planned stop it holds shortens the race distance (`LiveSessionTracker`).
     const details = this.tracker.apply(reading, state, previous.strategy ?? null);
+    this.followPitLane(identity?.layoutKey ?? null, identity?.carClass ?? null);
     const strategy = this.strategy.update(reading, state, {
       carClass: identity?.carClass ?? null,
       layoutKey: identity?.layoutKey ?? null,

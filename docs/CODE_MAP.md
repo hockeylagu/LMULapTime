@@ -50,6 +50,7 @@ because active recordings can be exclusively locked on Windows.
 | `server/live/learning/service.ts`, `runtime.ts`, `automaticWorker.ts` | Projection refresh, persisted model lifecycle and exact live lookup |
 | `server/live/learning/readiness.ts`, `readinessReader.ts`, `server/routes/liveRoutes.ts` | Manual Settings evidence check |
 | `server/core/live/dbLiveLearningStore.ts`, `dbLearningModelStore.ts` | Compact learning facts and correction models |
+| `shared/domain/live/livePitLane.ts`, `server/core/live/dbPitLaneStore.ts`, `tools/analysis/backfillPitLaneLoss.ts` | Pit lane loss per race stop (in-lap + out-lap - 2 x pace - time stopped), stored per layout and class (`live_pit_lane_losses`), backfill from closed captures |
 
 ---
 

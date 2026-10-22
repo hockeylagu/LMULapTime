@@ -371,6 +371,15 @@ export function initDbSchema(db: DatabaseType): void {
       PRIMARY KEY(session_id, driver_ordinal, lap_ordinal, resource_kind)
     ) WITHOUT ROWID;
     CREATE INDEX IF NOT EXISTS idx_live_learning_recording ON live_learning_examples(recording_id);
+    -- One measured race stop each (shared/domain/live/livePitLane.ts): the pit lane loss without the time stopped.
+    CREATE TABLE IF NOT EXISTS live_pit_lane_losses (
+      stop_key TEXT PRIMARY KEY,
+      layout_key TEXT NOT NULL,
+      car_class TEXT NOT NULL,
+      loss_seconds REAL NOT NULL,
+      measured_at INTEGER NOT NULL
+    ) WITHOUT ROWID;
+    CREATE INDEX IF NOT EXISTS idx_live_pit_lane_layout ON live_pit_lane_losses(layout_key, car_class, measured_at);
 
     CREATE TABLE IF NOT EXISTS ingest_errors (
       source_type TEXT NOT NULL,

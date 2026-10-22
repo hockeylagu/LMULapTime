@@ -4,6 +4,8 @@ import { LiveLapTiming } from './liveLapTiming.js';
 import { computeLapsLeft } from './liveLapsLeft.js';
 import type { LiveOwnPace } from './liveLapsLeft.js';
 import type { LiveScoringReading, LiveState } from './liveLifecycle.js';
+import { LivePitLaneMeter } from './livePitLane.js';
+import type { PitLaneMeasurement } from './livePitLane.js';
 import { LiveWeatherTracker } from './liveWeather.js';
 
 /** The snapshot fields that come from following the scoring readings over time. */
@@ -11,28 +13,31 @@ export type LiveSessionDetails = Pick<LiveSnapshot, 'lapsLeft' | 'weather' | 're
 
 export const NO_SESSION_DETAILS: LiveSessionDetails = { lapsLeft: null, weather: null, recentLaps: [], sessionBest: null };
 
-const median = (values: readonly number[]): number | null => {
-  if (values.length === 0) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = sorted.length >> 1;
-  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
-};
-
 /**
  * Follows the player's laps, the weather and the race distance across scoring readings; no reading (offline) clears
- * them. The race distance counts the player's own pace and the planned stop: the pit lane's loss is measured at the
- * session's first stop (lane time less a racing lap's time over the same distance, less the service the game
- * estimated at the entry), then added to the next stop's service.
+ * them. The race distance counts the player's own pace and the planned stop: its pit lane loss (the stored median of
+ * the layout and class, else this session's measured stop) plus the service the game estimates for it.
  */
 export class LiveSessionTracker {
   private readonly laps = new LiveLapTiming();
   private readonly weather = new LiveWeatherTracker();
+  private readonly lane = new LivePitLaneMeter();
   private sessionKey: string | null = null;
-  private lane: { et: number; dist: number; service: number } | null = null;
-  private wasInPits: boolean | null = null;
-  private laneLoss: number | null = null;
+  private storedLaneLoss: number | null = null;
+  private sessionLaneLoss: number | null = null;
+  private measured: PitLaneMeasurement | null = null;
 
-  /** `strategy`: the previous snapshot's, for the planned stop and the service estimated at the pit entry. */
+  /** The stored pit lane loss of the loaded layout and class (median of the newest stops); null when none. */
+  public setStoredLaneLoss(seconds: number | null): void { this.storedLaneLoss = seconds; }
+
+  /** A stop measured since the last call (`LivePitLaneMeter`), to be stored for the layout and class. */
+  public takeLaneLoss(): PitLaneMeasurement | null {
+    const measured = this.measured;
+    this.measured = null;
+    return measured;
+  }
+
+  /** `strategy`: the previous snapshot's, for the planned stop and the damage at a pit entry. */
   public apply(reading: LiveScoringReading | null, state: LiveState, strategy: LiveStrategy | null = null): LiveSessionDetails {
     if (!state.session) {
       if (state.lifecycle !== 'loading') { this.laps.reset(); this.weather.reset(); this.resetLane(null); }
@@ -41,16 +46,24 @@ export class LiveSessionTracker {
     this.laps.update(reading);
     const weather = this.weather.update(reading);
     if (!reading || !state.session) return { ...NO_SESSION_DETAILS, weather };
-    const pace = median(this.laps.recentLaps.filter(lap => lap.valid && lap.lapSeconds !== null).map(lap => lap.lapSeconds!));
-    this.followLane(reading, strategy, pace);
+    const key = `${reading.sessionCode}|${reading.trackName}`;
+    if (key !== this.sessionKey) this.resetLane(key);
+    const player = reading.player;
+    if (player && state.session.kind === 'race') {
+      const loss = this.lane.update(player, reading.currentEt, this.laps.recentLaps, strategy?.damage?.impactLap ?? null);
+      if (loss !== null) { this.sessionLaneLoss = loss.seconds; this.measured = loss; }
+    }
     const race = strategy?.resource?.race;
     const pit = strategy?.pit;
     const stopAhead = race?.finishReachable === false && (pit?.state === 'none' || pit?.state === 'request');
-    const player = reading.player;
-    const own: LiveOwnPace = { lapSeconds: pace, stopSeconds: stopAhead ? (this.laneLoss ?? 0) + (pit?.serviceSeconds ?? 0) : 0,
-      lapFraction: player && reading.trackLength > 0 ? player.lapDist / reading.trackLength : null };
+    const laneLoss = this.storedLaneLoss ?? this.sessionLaneLoss ?? 0;
+    const own: LiveOwnPace = {
+      lapSeconds: this.lane.pace(),
+      stopSeconds: stopAhead ? laneLoss + (pit?.serviceSeconds ?? 0) : 0,
+      lapFraction: player && reading.trackLength > 0 ? player.lapDist / reading.trackLength : null,
+    };
     return {
-      lapsLeft: computeLapsLeft(state.session, reading.player, reading.leader, reading.classLeader, own),
+      lapsLeft: computeLapsLeft(state.session, player, reading.leader, reading.classLeader, own),
       weather,
       recentLaps: this.laps.recentLaps,
       sessionBest: this.laps.sessionBest,
@@ -59,23 +72,5 @@ export class LiveSessionTracker {
 
   public timing(): LiveTiming | null { return this.laps.timing(); }
 
-  private resetLane(key: string | null): void { this.sessionKey = key; this.lane = null; this.laneLoss = null; this.wasInPits = null; }
-
-  private followLane(reading: LiveScoringReading, strategy: LiveStrategy | null, pace: number | null): void {
-    const player = reading.player;
-    const key = `${reading.sessionCode}|${reading.trackName}`;
-    if (key !== this.sessionKey) this.resetLane(key);
-    if (!player) return;
-    const entered = player.inPits && this.wasInPits === false;
-    this.wasInPits = player.inPits;
-    // A start from the garage or the pit lane is no stop: only an entry seen from the track counts.
-    if (entered) this.lane = { et: reading.currentEt, dist: player.lapDist, service: strategy?.pit?.serviceSeconds ?? 0 };
-    if (player.inPits || !this.lane) return;
-    const lane = this.lane;
-    this.lane = null;
-    if (this.laneLoss !== null || pace === null || !(reading.trackLength > 0)) return;
-    const distance = (player.lapDist - lane.dist + reading.trackLength) % reading.trackLength;
-    const loss = reading.currentEt - lane.et - (distance / reading.trackLength) * pace - lane.service;
-    if (loss > 0) this.laneLoss = loss;
-  }
+  private resetLane(key: string | null): void { this.sessionKey = key; this.lane.reset(); this.sessionLaneLoss = null; this.measured = null; }
 }
