@@ -72,25 +72,37 @@ neither supplies substitute data to a connected dashboard.
 
 ## Channels and clocks
 
-Normalization version 3 captures 26 values: six vehicle-vector channels plus 20 wheel channels.
-The producer's left-handed local axes are left/up/back. ISO vehicle velocity is `(-z, x, y)`;
-angular velocity is an axial vector and maps as `(z, -x, -y)` (roll, pitch, yaw). Version 1 had
-incorrect lateral/roll/yaw signs: evidence reads correct those three signs once without rewriting
-the source and disclose `sourceNormalizationVersion: 1` alongside response normalization version 3.
-Its wheel catalog stays unverified and its wheel columns unavailable. Version 2 retains its verified
-22-value catalog. Both older versions remain readable; new attempts use version 3 and do not resume
-an older-version file. Batch rows have three clocks/counters followed by the versioned values:
-29 float64 entries in version 3, 25 in versions 1 and 2.
+The recorder keeps only the 11 channels the app reads: ISO forward and left velocity (m/s) and yaw
+rate (rad/s) for body slip, plus FL/FR/RL/RR patch and ground longitudinal velocity (m/s) for wheel slip.
+The producer's left-handed local axes are left/up/back: forward velocity is `-z`, left velocity is `x`
+and yaw rate is the axial `-y`. Wheel longitudinal is back-positive in the source and negated to
+forward-positive. Patch velocity is not relabelled as wheel speed; the slip ratio is derived on read
+(below). Nonfinite input becomes SQL NULL; valid finite zero remains zero. Batch rows have three
+clocks/counters followed by the 11 values (14 float64 entries).
 
-FL/FR/RL/RR each record patch and ground lateral/longitudinal velocity (m/s) plus tyre vertical
-deflection (metres). Camber and toe are not recorded (removed 2026-10-21, including from existing recordings). Deflection is a scalar compression distance,
-preserved without an axis/sign transform; it is not suspension travel.
-Wheel lateral is already left-positive; longitudinal is negated to forward-positive.
-Patch velocity is not relabelled as wheel speed; the slip ratio is derived on read (below). Nonfinite input becomes SQL NULL;
-valid finite zero remains zero. Version 3 appends the four deflection columns; batch size stays bounded.
-The aligned motion API serves the six vehicle channels plus the eight longitudinal patch/ground
-velocities of version 2+ recordings; deflection and lateral wheel velocities stay in the
-recording for direct DuckDB inspection and future consumers. Native G is not changed.
+Version 1 had incorrect lateral/yaw signs: evidence reads correct those signs once without rewriting
+the source and disclose `sourceNormalizationVersion: 1` alongside response normalization version 3.
+Its wheel catalog stays unverified and its wheel columns unavailable. Versions 2 and 3 share the
+verified catalog. Older versions remain readable; new attempts use version 3 and do not resume an
+older-version file. On 2026-10-21 every existing recording was rewritten offline to this catalog.
+
+### Dropped channels (available for future analysis or coaching)
+
+The shared-memory telemetry slot (`server/live/rf2Layout.ts`) still exposes these fields; they were
+recorded until 2026-10-21 and removed because nothing read them. Re-adding one means a catalog entry in
+`capture/channels.ts`, a decode line in `capture/decode.ts` and its sign convention below.
+
+| Channel | Source field | ISO convention and caveat | Possible use |
+|---|---|---|---|
+| `velocity_up_mps` | `localVel.y` | Up-positive, unchanged | Jumps, compressions |
+| `roll_rate_radps`, `pitch_rate_radps` | `localRot.z`, `localRot.x` | Roll `z`, pitch `-x` (axial vector, handedness change) | Kerb strikes, bumps, weight transfer |
+| `{fl,fr,rl,rr}_patch_lateral_mps`, `_ground_lateral_mps` | `lateralPatchVel`, `lateralGroundVel` | Already left-positive | Measured under/oversteer per axle (front vs rear lateral slip) |
+| `{fl,fr,rl,rr}_tyre_vertical_deflection_m` | `verticalTireDeflection` | Metres, a scalar compression distance (not suspension travel), no sign transform | Tyre load, kerb strikes, bottoming |
+| `{fl,fr,rl,rr}_camber_rad` | `camber` | Outward-positive on both sides (ISO camber, not a signed roll angle) | Dynamic camber under load |
+| `{fl,fr,rl,rr}_toe_rad` | `toe` | Toe-in positive: keep the source on left wheels, negate on right; includes steering, not the garage setting | Steering/toe analysis |
+
+Measured on the 2026-10-21 recordings, each dropped channel cost about 3.5 MB per driving hour after
+DuckDB compression; a recording now takes about 77 MB per driving hour, observations included.
 Sources and saved-recording verification: [wheel evidence assessment](plans/WHEEL_CAPTURE_EVIDENCE.md).
 
 Additional shared-memory evidence is sparse:

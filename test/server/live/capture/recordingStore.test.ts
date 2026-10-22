@@ -67,9 +67,9 @@ function readInChild(filename: string): unknown {
       const instance = await DuckDBInstance.create(process.argv[1], { access_mode: 'READ_ONLY' });
       const connection = await instance.connect();
       try {
-        const rows = (await connection.runAndReadAll('SELECT (SELECT count(*) FROM capture_samples) AS samples, (SELECT count(*) FROM capture_observations) AS observations, velocity_forward_mps, fl_patch_lateral_mps, fr_patch_lateral_mps, (SELECT manifest_json FROM capture_manifest WHERE singleton = TRUE) AS manifest FROM capture_samples ORDER BY sample_index LIMIT 1')).getRowObjects();
+        const rows = (await connection.runAndReadAll('SELECT (SELECT count(*) FROM capture_samples) AS samples, (SELECT count(*) FROM capture_observations) AS observations, velocity_forward_mps, fl_patch_longitudinal_mps, fr_patch_longitudinal_mps, (SELECT manifest_json FROM capture_manifest WHERE singleton = TRUE) AS manifest FROM capture_samples ORDER BY sample_index LIMIT 1')).getRowObjects();
         const row = rows[0];
-        const result = { samples: String(row.samples), observations: String(row.observations), velocity: row.velocity_forward_mps, wheelNull: row.fl_patch_lateral_mps === null && row.fr_patch_lateral_mps === null, manifest: JSON.parse(row.manifest) };
+        const result = { samples: String(row.samples), observations: String(row.observations), velocity: row.velocity_forward_mps, wheelNull: row.fl_patch_longitudinal_mps === null && row.fr_patch_longitudinal_mps === null, manifest: JSON.parse(row.manifest) };
         process.stdout.write(JSON.stringify(result));
       } finally {
         connection.closeSync();
@@ -137,7 +137,7 @@ describe('LiveCaptureRecordingStore', () => {
     const writer = await createWriter(directory);
     const batch = makeBatch();
     batch.manifest.normalizationVersion = 1;
-    batch.samples = Float64Array.from([1, 1, 0, ...Array<number>(22).fill(1), 1.02, 1, 0, ...Array<number>(22).fill(2)]);
+    batch.samples = Float64Array.from([1, 1, 0, ...Array<number>(11).fill(1), 1.02, 1, 0, ...Array<number>(11).fill(2)]);
     expect((await writer.send(batch)).type).toBe('persisted');
     await writer.close();
     expect(readInChild(path.join(directory, batch.manifest.filename))).toMatchObject({

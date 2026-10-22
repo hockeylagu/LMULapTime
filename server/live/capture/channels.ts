@@ -14,27 +14,15 @@ export function liveCaptureChannels(normalizationVersion: number): readonly Live
     throw new Error(`Unsupported live capture normalization version ${normalizationVersion}`);
   }
   const wheelsVerified = normalizationVersion >= 2;
+  // Only channels the app reads; dropped source fields and their conventions are listed in docs/LIVE_CAPTURE_FORMAT.md.
   return [
-  ...(['forward', 'left', 'up'] as const).map((axis, i) => ({
-    name: `velocity_${axis}_mps`, unit: 'm/s', sourceField: `localVel.${['z', 'x', 'y'][i]}`,
-    frame: 'iso8855-vehicle' as const, verified: true,
-  })),
-  ...(['roll', 'pitch', 'yaw'] as const).map((axis, i) => ({
-    name: `${axis}_rate_radps`, unit: 'rad/s', sourceField: `localRot.${['z', 'x', 'y'][i]}`,
-    frame: 'iso8855-vehicle' as const, verified: true,
-  })),
-  ...['fl', 'fr', 'rl', 'rr'].flatMap(corner => [
-    { name: `${corner}_patch_lateral_mps`, unit: 'm/s', sourceField: 'lateralPatchVel', frame: 'iso8855-wheel' as const, verified: wheelsVerified },
-    { name: `${corner}_patch_longitudinal_mps`, unit: 'm/s', sourceField: 'longitudinalPatchVel', frame: 'iso8855-wheel' as const, verified: wheelsVerified },
-  ]),
-  ...['fl', 'fr', 'rl', 'rr'].flatMap(corner => [
-    { name: `${corner}_ground_lateral_mps`, unit: 'm/s', sourceField: 'lateralGroundVel', frame: 'iso8855-wheel' as const, verified: wheelsVerified },
-    { name: `${corner}_ground_longitudinal_mps`, unit: 'm/s', sourceField: 'longitudinalGroundVel', frame: 'iso8855-wheel' as const, verified: wheelsVerified },
-  ]),
-  ...(normalizationVersion >= 3 ? ['fl', 'fr', 'rl', 'rr'].map(corner => ({
-    name: `${corner}_tyre_vertical_deflection_m`, unit: 'm', sourceField: 'verticalTireDeflection',
-    frame: 'iso8855-wheel' as const, verified: true,
-  })) : []),
+    { name: 'velocity_forward_mps', unit: 'm/s', sourceField: 'localVel.z', frame: 'iso8855-vehicle', verified: true },
+    { name: 'velocity_left_mps', unit: 'm/s', sourceField: 'localVel.x', frame: 'iso8855-vehicle', verified: true },
+    { name: 'yaw_rate_radps', unit: 'rad/s', sourceField: 'localRot.y', frame: 'iso8855-vehicle', verified: true },
+    ...(['patch', 'ground'] as const).flatMap(kind => ['fl', 'fr', 'rl', 'rr'].map(corner => ({
+      name: `${corner}_${kind}_longitudinal_mps`, unit: 'm/s', sourceField: `longitudinal${kind === 'patch' ? 'Patch' : 'Ground'}Vel`,
+      frame: 'iso8855-wheel' as const, verified: wheelsVerified,
+    }))),
   ];
 }
 

@@ -33,7 +33,7 @@ async function recording(largeObservations = false, normalizationVersion = 1): P
     samples[at + 2] = 100;
     samples[at + 3] = 0;
     samples[at + 4] = -1;
-    samples[at + 8] = 0.25;
+    samples[at + 5] = 0.25;
   }
   const batch: LiveCaptureBatch = { type: 'batch', sequence: 0, manifest, samples, observations: [
     { elapsedSeconds: 99.9, receivedAt: 1, source: 'shared-memory', kind: 'outside', data: {} },
@@ -56,22 +56,22 @@ async function recording(largeObservations = false, normalizationVersion = 1): P
 }
 
 describe('live evidence reader worker', () => {
-  it.each([2, 3])('reads version-%i wheel recordings with the six vehicle channels plus longitudinal wheel velocities', async version => {
+  it.each([2, 3])('reads version-%i wheel recordings with the vehicle channels plus longitudinal wheel velocities', async version => {
     const evidence = await new LiveEvidenceReader().read(await recording(false, version));
     expect(evidence.normalizationVersion).toBe(3);
-    expect(evidence.channels.filter(channel => channel.frame === 'iso8855-vehicle')).toHaveLength(6);
+    expect(evidence.channels.filter(channel => channel.frame === 'iso8855-vehicle')).toHaveLength(3);
     expect(evidence.channels.filter(channel => channel.frame === 'iso8855-wheel').map(channel => channel.name)).toEqual(
       ['fl', 'fr', 'rl', 'rr'].flatMap(wheel => [`${wheel}_patch_longitudinal_mps`]).concat(
         ['fl', 'fr', 'rl', 'rr'].map(wheel => `${wheel}_ground_longitudinal_mps`)));
-    expect(evidence.points[0].values).toHaveLength(14);
+    expect(evidence.points[0].values).toHaveLength(11);
   });
   it('reads the exact anchored lap, retains ISO values and gaps, and keeps untimed REST evidence at session scope', async () => {
     const request = await recording();
     const evidence = await new LiveEvidenceReader().read(request);
-    expect(evidence.channels).toHaveLength(6);
+    expect(evidence.channels).toHaveLength(3);
     expect(evidence.points.map(point => point.elapsedSeconds)).toEqual([100.02, 100.04, 100.5, 101]);
     expect(evidence.points[0].lapSeconds).toBeCloseTo(0.02, 10);
-    expect(evidence.points[0].values).toEqual([0, 1, null, null, null, -0.25]);
+    expect(evidence.points[0].values).toEqual([0, 1, -0.25]);
     expect(evidence).toMatchObject({ normalizationVersion: 3, sourceNormalizationVersion: 1 });
     const repeated = await new LiveEvidenceReader().read(request);
     expect(repeated.points).toEqual(evidence.points); // No stored rewrite or second sign flip on a later read.

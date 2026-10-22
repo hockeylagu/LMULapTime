@@ -24,22 +24,14 @@ export function decodeLiveCaptureSample(slot: Buffer): LiveCaptureSample | null 
   // The producer defines left/up/back in a left-handed frame; ISO is forward/left/up.
   values[0] = finiteOrNaN(-slot.readDoubleLE(at.localVel + 2 * 8));
   values[1] = finiteOrNaN(slot.readDoubleLE(at.localVel));
-  values[2] = finiteOrNaN(slot.readDoubleLE(at.localVel + 8));
-
-  // Axial vectors also change handedness: raw +X pitches up, +Y yaws right, +Z rolls right.
-  values[3] = finiteOrNaN(slot.readDoubleLE(at.localRot + 2 * 8));
-  values[4] = finiteOrNaN(-slot.readDoubleLE(at.localRot));
-  values[5] = finiteOrNaN(-slot.readDoubleLE(at.localRot + 8));
+  // Axial vectors also change handedness: raw +Y yaws right.
+  values[2] = finiteOrNaN(-slot.readDoubleLE(at.localRot + 8));
 
   for (let corner = 0; corner < 4; corner++) {
     const wheel = at.wheels + corner * WHEEL.size;
-    // Wheel lateral is already left-positive; longitudinal is back-positive and must be negated.
-    values[6 + corner * 2] = finiteOrNaN(slot.readDoubleLE(wheel + WHEEL.offsets.lateralPatchVel));
-    values[7 + corner * 2] = finiteOrNaN(-slot.readDoubleLE(wheel + WHEEL.offsets.longitudinalPatchVel));
-    values[14 + corner * 2] = finiteOrNaN(slot.readDoubleLE(wheel + WHEEL.offsets.lateralGroundVel));
-    values[15 + corner * 2] = finiteOrNaN(-slot.readDoubleLE(wheel + WHEEL.offsets.longitudinalGroundVel));
-    // A compression distance, not suspension travel or a vector-axis component; retain metres/sign.
-    values[22 + corner] = finiteOrNaN(slot.readDoubleLE(wheel + WHEEL.offsets.verticalTireDeflection));
+    // Wheel longitudinal is back-positive and must be negated.
+    values[3 + corner] = finiteOrNaN(-slot.readDoubleLE(wheel + WHEEL.offsets.longitudinalPatchVel));
+    values[7 + corner] = finiteOrNaN(-slot.readDoubleLE(wheel + WHEEL.offsets.longitudinalGroundVel));
   }
 
   const impactTime = slot.readDoubleLE(at.lastImpactET);

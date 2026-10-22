@@ -51,9 +51,9 @@ describe('LiveCaptureRecordingStore in process', () => {
     await withDatabase(batch.manifest.filename, true, async connection => {
       expect((await connection.runAndReadAll('SELECT count(*) AS n, min(sample_index) AS first, max(sample_index) AS last FROM capture_samples')).getRowObjects())
         .toEqual([{ n: 1025n, first: 0n, last: 1024n }]);
-      expect((await connection.runAndReadAll('SELECT sample_index, velocity_forward_mps, lap_start_seconds, fl_patch_lateral_mps FROM capture_samples WHERE sample_index IN (0, 511, 512, 1023, 1024) ORDER BY sample_index')).getRowObjects())
+      expect((await connection.runAndReadAll('SELECT sample_index, velocity_forward_mps, lap_start_seconds, rr_patch_longitudinal_mps FROM capture_samples WHERE sample_index IN (0, 511, 512, 1023, 1024) ORDER BY sample_index')).getRowObjects())
         .toEqual([0, 511, 512, 1023, 1024].map(index => ({ sample_index: BigInt(index), velocity_forward_mps: index,
-          lap_start_seconds: index === 0 ? null : 0, fl_patch_lateral_mps: null })));
+          lap_start_seconds: index === 0 ? null : 0, rr_patch_longitudinal_mps: null })));
       const observations = (await connection.runAndReadAll('SELECT observation_id, data, request_started_at FROM capture_observations ORDER BY observation_id')).getRowObjects();
       expect(observations).toHaveLength(1025);
       for (const index of [0, 511, 512, 1023, 1024]) {

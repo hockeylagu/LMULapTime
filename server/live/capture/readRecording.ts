@@ -11,8 +11,7 @@ const MAX_SAMPLES = 50_000;
 const MAX_OBSERVATIONS = 1000;
 const MAX_OBSERVATION_BYTES = 1_000_000;
 /** Vehicle motion plus longitudinal wheel velocities (slip); a recording's own catalog decides what is verified. */
-const evidenceChannels = (normalizationVersion: number) => liveCaptureChannels(normalizationVersion).filter(channel => channel.verified
-  && (channel.frame === 'iso8855-vehicle' || /_(patch|ground)_longitudinal_mps$/.test(channel.name)));
+const evidenceChannels = (normalizationVersion: number) => liveCaptureChannels(normalizationVersion).filter(channel => channel.verified);
 
 function fail(reason: LiveEvidenceUnavailableReason, message: string): never { throw new LiveEvidenceReadError(reason, message); }
 
@@ -70,7 +69,7 @@ export async function readLiveRecording(request: LiveEvidenceReadRequest): Promi
         const value = row[channel.name];
         if (typeof value !== 'number' || !Number.isFinite(value)) return null;
         // Correct the old recording convention at the boundary without rewriting retained files.
-        return manifest.normalizationVersion === 1 && ['velocity_left_mps', 'roll_rate_radps', 'yaw_rate_radps'].includes(channel.name) ? -value : value;
+        return manifest.normalizationVersion === 1 && ['velocity_left_mps', 'yaw_rate_radps'].includes(channel.name) ? -value : value;
       }) }));
     const gaps: LiveLapEvidence['coverage']['gaps'] = [];
     for (let index = 1; index < points.length; index++) {

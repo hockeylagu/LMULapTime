@@ -12,7 +12,7 @@ function writeDouble(slot: Buffer, field: string, value: number, element = 0): v
 }
 
 describe('decodeLiveCaptureSample', () => {
-  it('maps cardinal vehicle vectors to ISO forward, left and up axes', () => {
+  it('maps cardinal vehicle vectors to ISO forward and left velocity and yaw rate', () => {
     const slot = vehicleSlot();
     writeDouble(slot, 'elapsedTime', 42.125);
     slot.writeInt32LE(3, VEHICLE_TELEMETRY.offsets.lapNumber);
@@ -27,7 +27,7 @@ describe('decodeLiveCaptureSample', () => {
     const sample = decodeLiveCaptureSample(slot);
     expect(sample).not.toBeNull();
     expect(sample).toMatchObject({ elapsedSeconds: 42.125, lapNumber: 3, lapStartSeconds: 12.5 });
-    expect(Array.from(sample!.values.slice(0, 6))).toEqual([4, 2, 3, 7, 5, -6]);
+    expect(Array.from(sample!.values.slice(0, 3))).toEqual([4, 2, -6]);
   });
 
   it('preserves negative values and the exact float64 input precision', () => {
@@ -43,7 +43,7 @@ describe('decodeLiveCaptureSample', () => {
     expect(sample?.elapsedSeconds).toBe(0.10000000000000002);
     expect(sample?.lapNumber).toBe(-1);
     expect(sample?.lapStartSeconds).toBeNull();
-    expect(Array.from(sample!.values.slice(0, 3))).toEqual([-0.5, -0.10000000000000002, -0.25]);
+    expect(Array.from(sample!.values.slice(0, 2))).toEqual([-0.5, -0.10000000000000002]);
   });
 
   it('uses NaN for nonfinite inputs without converting missing wheel values to measured zero', () => {
@@ -54,11 +54,8 @@ describe('decodeLiveCaptureSample', () => {
     writeDouble(slot, 'localVel', Number.NaN, 0);
     writeDouble(slot, 'localVel', Number.POSITIVE_INFINITY, 1);
     writeDouble(slot, 'localVel', Number.NEGATIVE_INFINITY, 2);
-    writeDouble(slot, 'localRot', 0.1, 0);
-    writeDouble(slot, 'localRot', Number.NaN, 1);
-    writeDouble(slot, 'localRot', -0.3, 2);
-    for (let corner = 0; corner < 4; corner++) for (const field of ['lateralPatchVel', 'longitudinalPatchVel',
-      'lateralGroundVel', 'longitudinalGroundVel', 'verticalTireDeflection']) {
+    writeDouble(slot, 'localRot', 0.3, 1);
+    for (let corner = 0; corner < 4; corner++) for (const field of ['longitudinalPatchVel', 'longitudinalGroundVel']) {
       slot.writeDoubleLE(corner % 2 === 0 ? Number.NaN : Number.POSITIVE_INFINITY,
         VEHICLE_TELEMETRY.offsets.wheels + corner * WHEEL.size + WHEEL.offsets[field]);
     }
@@ -67,27 +64,27 @@ describe('decodeLiveCaptureSample', () => {
     expect(sample?.lapStartSeconds).toBeNull();
     expect(Number.isNaN(sample!.values[0])).toBe(true);
     expect(Number.isNaN(sample!.values[1])).toBe(true);
-    expect(Number.isNaN(sample!.values[2])).toBe(true);
-    expect(Array.from(sample!.values.slice(3, 6))).toEqual([-0.3, -0.1, Number.NaN]);
-    expect(sample!.values).toHaveLength(26);
-    expect(sample!.values.slice(6).every(Number.isNaN)).toBe(true);
-    expect(LIVE_CAPTURE_CHANNELS).toHaveLength(26);
+    expect(sample!.values[2]).toBe(-0.3);
+    expect(sample!.values).toHaveLength(11);
+    expect(sample!.values.slice(3).every(Number.isNaN)).toBe(true);
+    expect(LIVE_CAPTURE_CHANNELS).toHaveLength(11);
   });
 
   it('uses ISO component signs at all four distinct corners', () => {
     const slot = vehicleSlot(); writeDouble(slot, 'elapsedTime', 1);
     for (let corner = 0; corner < 4; corner++) {
       const at = VEHICLE_TELEMETRY.offsets.wheels + corner * WHEEL.size;
-      for (const [field, value] of [['lateralPatchVel', corner + 1], ['longitudinalPatchVel', -10 - corner],
-        ['lateralGroundVel', -20 - corner], ['longitudinalGroundVel', 30 + corner]] as const) slot.writeDoubleLE(value, at + WHEEL.offsets[field]);
+      for (const [field, value] of [['longitudinalPatchVel', -10 - corner], ['longitudinalGroundVel', 30 + corner]] as const) {
+        slot.writeDoubleLE(value, at + WHEEL.offsets[field]);
+      }
     }
     const values = decodeLiveCaptureSample(slot)!.values;
-    expect(Array.from(values.slice(6, 14))).toEqual([1, 10, 2, 11, 3, 12, 4, 13]);
-    expect(Array.from(values.slice(14, 22))).toEqual([-20, -30, -21, -31, -22, -32, -23, -33]);
+    expect(Array.from(values.slice(3, 7))).toEqual([10, 11, 12, 13]);
+    expect(Array.from(values.slice(7, 11))).toEqual([-30, -31, -32, -33]);
     // A valid stationary zero is available, unlike nonfinite input.
-    expect(decodeLiveCaptureSample(vehicleSlot())!.values.slice(6).every(value => value === 0)).toBe(true);
+    expect(decodeLiveCaptureSample(vehicleSlot())!.values.slice(3).every(value => value === 0)).toBe(true);
     expect(LIVE_CAPTURE_CHANNELS.every(channel => channel.verified)).toBe(true);
-    expect(liveCaptureChannels(1).slice(6).every(channel => !channel.verified)).toBe(true);
+    expect(liveCaptureChannels(1).slice(3).every(channel => !channel.verified)).toBe(true);
     expect(() => liveCaptureChannels(999)).toThrow('Unsupported');
   });
 
@@ -102,16 +99,14 @@ describe('decodeLiveCaptureSample', () => {
     expect(decodeLiveCaptureSample(slot.subarray(0, VEHICLE_TELEMETRY.size - 1))).toBeNull();
   });
 
-  it('retains deflection metres, raw 16-byte terrain names and finite last-impact magnitude without inventing zeros', () => {
+  it('retains raw 16-byte terrain names and finite last-impact magnitude without inventing zeros', () => {
     const slot = vehicleSlot(); writeDouble(slot, 'elapsedTime', 100);
     writeDouble(slot, 'lastImpactET', 99.125); writeDouble(slot, 'lastImpactMagnitude', 8896.12345);
     for (let corner = 0; corner < 4; corner++) {
       const offset = VEHICLE_TELEMETRY.offsets.wheels + corner * WHEEL.size;
-      slot.writeDoubleLE([0, 0.01678, -0.00001, Number.NaN][corner], offset + WHEEL.offsets.verticalTireDeflection);
       slot.write(['RDRACEOLD,ROAD,', 'RMBLFLAT', '1234567890ABCDEF', ''][corner], offset + WHEEL.offsets.terrainName, 16, 'latin1');
     }
     const decoded = decodeLiveCaptureSample(slot)!;
-    expect(Array.from(decoded.values.slice(22))).toEqual([0, 0.01678, -0.00001, Number.NaN]);
     expect(decoded.terrainMaterials).toEqual(['RDRACEOLD,ROAD,', 'RMBLFLAT', '1234567890ABCDEF', '']);
     expect(decoded.impact).toEqual({ elapsedSeconds: 99.125, magnitude: 8896.12345 });
     writeDouble(slot, 'lastImpactMagnitude', Infinity);

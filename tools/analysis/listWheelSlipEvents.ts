@@ -9,7 +9,7 @@ import { liveCaptureChannels } from '../../server/live/capture/channels.js';
 // Usage: tsx tools/analysis/listWheelSlipEvents.ts [captureDirectory]
 const directory = path.resolve(process.argv[2] ?? path.join('server', 'live-captures'));
 const channels: LiveEvidenceChannel[] = liveCaptureChannels(3)
-  .filter(channel => /_(patch|ground)_longitudinal_mps$/.test(channel.name))
+  .filter(channel => channel.frame === 'iso8855-wheel')
   .map(channel => ({ name: channel.name, unit: channel.unit, frame: channel.frame, sourceField: channel.sourceField }));
 const indexes = wheelSlipChannelIndexes(channels)!;
 
