@@ -63,9 +63,9 @@ describe('supplemental live telemetry fusion', () => {
     expect(fuseLiveTelemetry(trajectory, response).liveCaptureOverlay?.state).toBe('unaligned');
   });
 
-  it('never uses samples farther than 25 ms or unavailable/reverse velocity channels', () => {
+  it('never uses samples farther than 50 ms or unavailable/reverse velocity channels', () => {
     const trajectory = liveTrajectoryFixture();
-    trajectory.points[0].timeSec = 0.066;
+    trajectory.points[0].timeSec = 0.091;
     const response = liveEvidenceFixture();
     response.evidence.points[0].values = [-10, 2, null];
     response.evidence.points[1].values = [null, null, null];

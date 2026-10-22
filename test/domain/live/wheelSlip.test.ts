@@ -6,9 +6,9 @@ const wheelChannels: LiveEvidenceChannel[] = ['fl', 'fr', 'rl', 'rr'].flatMap(wh
   name: `${wheel}_${kind}_longitudinal_mps`, unit: 'm/s', frame: 'iso8855-wheel' as const, sourceField: kind,
 })));
 
-/** 100 Hz samples; `rear` is the RL ratio, the other wheels roll freely. */
-const samples = (rear: Array<number | null>, from = 0) => rear.map((ratio, index) => ({
-  lapSeconds: from + index * 0.01, ratios: [0, 0, ratio, 0] as WheelSlipRatios,
+/** Evenly spaced samples (default 10 ms); `rear` is the RL ratio, the other wheels roll freely. */
+const samples = (rear: Array<number | null>, from = 0, step = 0.01) => rear.map((ratio, index) => ({
+  lapSeconds: from + index * step, ratios: [0, 0, ratio, 0] as WheelSlipRatios,
 }));
 
 describe('measured wheel slip', () => {
@@ -24,7 +24,7 @@ describe('measured wheel slip', () => {
     expect(wheelSlipChannelIndexes(wheelChannels.map(channel => ({ ...channel, frame: 'iso8855-vehicle' as const })))).toBeNull();
   });
 
-  it('keeps spans of at least five samples beyond 15 %, with the most extreme ratio', () => {
+  it('keeps spans of at least 40 ms beyond 15 %, with the most extreme ratio', () => {
     const events = detectWheelSlipEvents([...samples([0.2, 0.3, 0.2, 0.2]), ...samples([0.16, 0.2, 0.4, 0.2, 0.16, 0.1], 0.5)]);
     expect(events).toEqual([{ kind: 'wheelspin', wheel: 'rl', startLapSeconds: 0.5, endLapSeconds: 0.54, peakSlipRatio: 0.4 }]);
   });
@@ -32,7 +32,13 @@ describe('measured wheel slip', () => {
   it('separates lockups from wheelspin and merges cycling across short dips only', () => {
     const lockup = detectWheelSlipEvents(samples([-0.2, -0.2, -0.2, 0, 0, 0, -0.3, -0.2]));
     expect(lockup).toEqual([{ kind: 'lockup', wheel: 'rl', startLapSeconds: 0, endLapSeconds: 0.07, peakSlipRatio: -0.3 }]);
-    expect(detectWheelSlipEvents(samples([-0.2, -0.2, -0.2, 0, 0, 0, 0, 0, 0, -0.2, -0.2, -0.2]))).toEqual([]);
+    expect(detectWheelSlipEvents(samples([-0.2, -0.2, -0.2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.2, -0.2, -0.2]))).toEqual([]);
+  });
+
+  it('counts time, not samples, so 25 Hz captures keep two-sample events and merge across one dipped sample', () => {
+    expect(detectWheelSlipEvents(samples([-0.2, -0.2, 0, -0.3, -0.2], 0, 0.04))).toEqual([
+      { kind: 'lockup', wheel: 'rl', startLapSeconds: 0, endLapSeconds: 0.16, peakSlipRatio: -0.3 }]);
+    expect(detectWheelSlipEvents(samples([0, -0.2, 0], 0, 0.04))).toEqual([]);
   });
 
   it('never spans a capture gap or an unavailable ratio', () => {

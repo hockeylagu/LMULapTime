@@ -2,8 +2,13 @@ import type { ReplayTrajectoryData } from '../../types/replay.js';
 import type { LiveEvidenceResponse, WheelPosition } from '../../types/liveEvidence.js';
 import { detectWheelSlipEvents, WHEEL_POSITIONS, wheelSlipChannelIndexes, wheelSlipRatios } from './wheelSlip.js';
 
-/** At most one 50 Hz source interval away; explicit clocks only, never a fitted/shifted trace. */
-const MAX_OFFSET_SECONDS = 0.025;
+/** Replay and live game clocks must agree this closely; explicit clocks only, never a fitted/shifted trace. */
+const CLOCK_ANCHOR_TOLERANCE_SECONDS = 0.025;
+/**
+ * Half the capture gap rule (100 ms): every chart point between two consecutive live samples gets the
+ * nearer one, whatever the capture rate (25–50 Hz in practice), and points inside a capture gap stay native.
+ */
+const MAX_OFFSET_SECONDS = 0.05;
 const RAD_TO_DEG = 180 / Math.PI;
 
 export function fuseLiveTelemetry(trajectory: ReplayTrajectoryData, response: LiveEvidenceResponse): ReplayTrajectoryData {
@@ -18,7 +23,7 @@ export function fuseLiveTelemetry(trajectory: ReplayTrajectoryData, response: Li
   const base = trajectory.timeReference === 'lap' ? 0
     : trajectory.timeReference === 'session' && Number.isFinite(trajectory.lapStartTimeSec) ? trajectory.lapStartTimeSec : undefined;
   if (base === undefined) return unaligned('The trajectory has no explicit lap clock');
-  if (trajectory.timeReference === 'session' && Math.abs(base - evidence.startSeconds) > MAX_OFFSET_SECONDS) {
+  if (trajectory.timeReference === 'session' && Math.abs(base - evidence.startSeconds) > CLOCK_ANCHOR_TOLERANCE_SECONDS) {
     return unaligned('Replay and live game-clock anchors do not agree within 25 ms');
   }
   const clockOrigin = trajectory.timeReference === 'session' ? evidence.startSeconds : 0;

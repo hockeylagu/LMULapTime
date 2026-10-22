@@ -3,15 +3,19 @@ import type { LiveEvidenceChannel, WheelPosition, WheelSlipEvent, WheelSlipRatio
 export const WHEEL_POSITIONS: readonly WheelPosition[] = ['fl', 'fr', 'rl', 'rr'];
 /**
  * ABS holds GT3 front slip near 6–9 % (COTA race: native ABS flags against live patch slip, p90 8.7 %,
- * p99 10.7 %), so 15 % is beyond what ABS/TC allow. Not yet checked on a car without ABS.
+ * p99 10.7 %), so 15 % is beyond what ABS/TC allow. Without ABS (Portimão LMP3 race) hard-braking
+ * front slip sits at p1 -5.6 %, and real lockups jump straight past -18 %, so the same cutoff holds.
  */
 export const WHEEL_SLIP_EVENT_RATIO = 0.15;
-/** Five consecutive 100 Hz samples: single-sample kerb spikes are not events. */
+/** Two or more live samples (captured at 25–50 Hz): single-sample kerb spikes are not events. */
 export const WHEEL_SLIP_MIN_EVENT_SECONDS = 0.04;
-/** Same-wheel spans this close are one event (ABS/TC cycling around the threshold). */
-const MERGE_GAP_SECONDS = 0.05;
 /** Matches the capture gap rule: no event spans missing samples. */
 const MAX_SAMPLE_GAP_SECONDS = 0.1;
+/**
+ * Same-wheel spans this close are one event (ABS/TC cycling around the threshold). One dipped sample at
+ * the slowest 40 ms capture interval leaves an 80 ms hole, so the window is the capture gap rule itself.
+ */
+const MERGE_GAP_SECONDS = MAX_SAMPLE_GAP_SECONDS;
 /** The ratio is undefined for an airborne (zero ground velocity), slow or reversing wheel. */
 const MIN_GROUND_SPEED_MPS = 5;
 

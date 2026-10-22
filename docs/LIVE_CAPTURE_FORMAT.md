@@ -161,7 +161,8 @@ read-only worker off track (two at once, two more queued), and rechecks XML/link
 requested lap after the read. While the recorder still has a file open it answers `busy` without reading.
 Reclassification or changed ordinal ownership invalidates the response.
 
-Chart fusion matches verified samples to explicit trajectory clocks within 25 ms, without interpolating
+Chart fusion gives each trajectory point the nearest verified sample within 50 ms (half the 100 ms gap
+rule, so it holds at any capture rate; replay and live clock anchors must still agree within 25 ms), without interpolating
 across missing samples. Measured yaw and body slip use the capture; computed fallbacks retain the
 `COMPUTED` label. Coverage/provenance remains in response metadata; the telemetry header has no capture-coverage indicator. Supplied native telemetry G values, including zero,
 are preserved; replay-derived G remains a computed fallback.
@@ -169,10 +170,11 @@ are preserved; replay-derived G remains a computed fallback.
 Wheel slip (`shared/domain/live/wheelSlip.ts`) is the longitudinal slip ratio `-patch / ground` per
 wheel, SAE sign: negative braking/lockup, positive wheelspin. It is NULL below 5 m/s ground velocity
 (airborne, slow or reversing wheel). Lockup and wheelspin events are spans beyond ±15 % lasting at
-least 40 ms (five 100 Hz samples), detected on every live sample of the lap, merged across measured
-dips under 50 ms and never across a missing sample or capture gap. The threshold comes from the
+least 40 ms (two or more samples at the 25–50 Hz capture rate), detected on every live sample of the lap, merged across measured
+dips under 100 ms (one dipped sample at the slowest 40 ms interval) and never across a missing sample or capture gap. The threshold comes from the
 2026-10-20 COTA GT3 race: while native ABS was active, front slip was 6 % median, 8.7 % p90 and
-10.7 % p99. It is not yet checked on a car without ABS; `tools/analysis/listWheelSlipEvents.ts`
+10.7 % p99. On the 2026-10-22 Portimão LMP3 race (no ABS) hard-braking front slip stayed within
+-5.6 % at p1 and real lockups jumped straight past -18 %, so the cutoff holds without ABS too; `tools/analysis/listWheelSlipEvents.ts`
 reruns the detection over the saved recordings. Native `Wheel Speed` cannot replace this: it tracks
 ground speed within ±4 % even under braking. Where a chart point has measured slip, its lockup flag
 follows the measured events instead of the G-based inference. The Wheel Slip chart channel has no
