@@ -107,7 +107,7 @@ describe('live capture XML reconciliation', () => {
     expect(db.getCacheStats().liveTelemetryFilesCount).toBe(1);
   });
 
-  it('links only a unique candidate with matching identity, interval, layout and two lap anchors', async () => {
+  it('links only a unique candidate with matching identity, interval, layout and lap anchors', async () => {
     const db = database();
     const directory = await recordingDirectory();
     const start = Date.parse('2026-10-10T11:00:00Z');
@@ -142,12 +142,26 @@ describe('live capture XML reconciliation', () => {
     expect(getSessionLiveCaptures(db.getDb(), 'session-match')).toEqual([expect.objectContaining({ recordingId: capture.recordingId })]);
   });
 
+  it('links on one timed lap and rejects a timed lap that disagrees (COTA practice 2026-10-20)', async () => {
+    const db = database();
+    const directory = await recordingDirectory();
+    const start = Date.parse('2026-10-10T11:00:00Z');
+    addSession(db, { id: 'session-a', timestamp: start - 5_000, mtime: start + 3600_000, laps: [{ number: 2, time: 101.2 }, { number: 4, time: 100 }] });
+    const capture = manifest({ anchors: [{ lapNumber: 2, startSeconds: 300, lapSeconds: 101.2 }, { lapNumber: 3, startSeconds: 401.2, lapSeconds: null }] });
+    upsertLiveCapture(db.getDb(), capture, 123);
+    await writeFile(path.join(directory, capture.filename), 'capture');
+    expect((await reconcileLiveCaptures(db.getDb(), directory)).verified).toBe(1);
+
+    upsertLiveCapture(db.getDb(), { ...capture, anchors: [...capture.anchors, { lapNumber: 4, startSeconds: 502, lapSeconds: 99.5 }] }, 123);
+    expect((await reconcileLiveCaptures(db.getDb(), directory)).pending).toBe(1);
+  });
+
   it('keeps insufficient, restarted and ambiguous evidence pending, then withdraws a no-longer-unique link', async () => {
     const db = database();
     const directory = await recordingDirectory();
     const start = Date.parse('2026-10-10T11:00:00Z');
     addSession(db, { id: 'session-a', timestamp: start - 5_000, mtime: start + 3600_000 });
-    const capture = manifest({ anchors: [{ lapNumber: 2, startSeconds: 300, lapSeconds: 101.2 }] });
+    const capture = manifest({ anchors: [{ lapNumber: 1, startSeconds: 0, lapSeconds: null }] });
     upsertLiveCapture(db.getDb(), capture, 123);
     await writeFile(path.join(directory, capture.filename), 'capture');
     expect((await reconcileLiveCaptures(db.getDb(), directory)).pending).toBe(1);

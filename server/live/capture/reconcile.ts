@@ -10,7 +10,7 @@ import {
 const SESSION_START_LOOKBACK_MS = 26 * 60 * 60 * 1000;
 const SESSION_END_TOLERANCE_MS = 20 * 60 * 1000;
 const LAP_TIME_TOLERANCE_SECONDS = 0.05;
-const MIN_MATCHING_LAPS = 2;
+const MIN_MATCHING_LAPS = 1;
 
 interface SessionCandidate {
   id: string;
@@ -141,7 +141,8 @@ export function findLiveCaptureCandidates(db: Database, manifest: LiveCaptureMan
 
 /**
  * Reconcile retained capture manifests against a bounded XML candidate window. Every link requires
- * exact player identity, canonical layout/vehicle/session kind, wall-time overlap and two lap anchors.
+ * exact player identity, canonical layout/vehicle/session kind, wall-time overlap and one timed lap anchor
+ * with no timed lap that disagrees.
  * The matching relation must be one-to-one; restarts and competing candidates remain pending.
  */
 export async function reconcileLiveCaptures(db: Database, directory: string): Promise<LiveCaptureReconcileResult> {

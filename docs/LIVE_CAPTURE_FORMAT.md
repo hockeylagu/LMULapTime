@@ -63,7 +63,7 @@ compares persisted manifests and byte counts so unchanged rediscovery does not c
    Resuming an interrupted file requires exact identity, layout and lap-clock continuity proof; the
    file's stored sample/drop counters and end time win over a lagging SQLite index manifest.
 6. After the loaded session ends, catalog discovery and XML reconciliation validate ownership using
-   player, car, layout, session kind, timestamps and at least two matching completed-lap anchors.
+   player, car, layout, session kind, timestamps and at least one matching completed-lap anchor (no timed lap may disagree).
    SQLite retains attachments/availability and compact learning facts. Off-track workers build and
    validate learning projections; lap-evidence readers recheck ownership before serving saved data.
 
