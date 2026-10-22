@@ -55,6 +55,8 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     handleToggleCompare,
     baselineSessionId,
     baselineLapNumber,
+    baselineDriverOrdinal,
+    baselineLapOrdinal,
     baselineDriverName,
     isComparePickerOpen,
     handleCloseComparePicker,
@@ -220,6 +222,8 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
       handleToggleCompare={handleToggleCompare}
       baselineSessionId={baselineSessionId}
       baselineLapNumber={baselineLapNumber}
+      baselineDriverOrdinal={baselineDriverOrdinal}
+      baselineLapOrdinal={baselineLapOrdinal}
       baselineDriverName={baselineDriverName}
       isComparePickerOpen={isComparePickerOpen}
       handleCloseComparePicker={handleCloseComparePicker}

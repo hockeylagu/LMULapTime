@@ -36,6 +36,8 @@ export interface ReplayInspectorModalBodyProps {
   handleToggleCompare: () => void;
   baselineSessionId: string | null;
   baselineLapNumber: number | null;
+  baselineDriverOrdinal?: number | null;
+  baselineLapOrdinal?: number | null;
   baselineDriverName: string | null;
   isComparePickerOpen: boolean;
   handleCloseComparePicker: () => void;
@@ -112,6 +114,8 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
   handleToggleCompare,
   baselineSessionId,
   baselineLapNumber,
+  baselineDriverOrdinal,
+  baselineLapOrdinal,
   baselineDriverName,
   isComparePickerOpen,
   handleCloseComparePicker,
@@ -185,6 +189,8 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
         onRemoveCompare={handleRemoveCompare}
         baselineSessionId={baselineSessionId}
         baselineLapNumber={baselineLapNumber}
+        baselineDriverOrdinal={baselineDriverOrdinal}
+        baselineLapOrdinal={baselineLapOrdinal}
         baselineDriverName={baselineDriverName}
         baselineTrajectory={baselineTrajectory ?? null}
         isComparePickerOpen={isComparePickerOpen}

@@ -7,7 +7,7 @@ import { chooseValue, openSelect, selectedValue } from '../../../../helpers/sele
 
 const mockLaps: ComparableLap[] = [
   {
-    id: 'lap-1',
+    id: 'lap-1', driverOrdinal: 0, lapOrdinal: 1,
     matchingReplayFile: 'Bahrain_Q1_7.Vcr',
     sessionId: 'session-1',
     sessionType: 'Qualifying',
@@ -102,7 +102,7 @@ describe('ReplayCompareLapPicker', () => {
   const baseProps = {
     laps: mockLaps, carTypes: ['BMW M4 LMGT3', 'Ferrari 296 LMGT3', 'Lexus RCF LMGT3'],
     controls: DEFAULT_COMPARE_CONTROLS,
-    selectedSessionId: 'session-1', selectedLapNumber: 2,
+    selectedSessionId: 'session-1', selectedDriverOrdinal: 0, selectedLapOrdinal: 1,
     currentSessionId: 'session-1', currentLapNumber: 4, currentDriverName: 'Samuel Lague',
     filter: 'player' as const, isLoading: false,
     onChangeFilter: vi.fn(), onChangeControls: vi.fn(), onClose: vi.fn(), onSelectLap: vi.fn(),
@@ -143,6 +143,26 @@ describe('ReplayCompareLapPicker', () => {
     renderPicker({ filter: 'same-session-lap' });
     expect(screen.getByText('Current')).toBeInTheDocument();
     expect(screen.getByText('Baseline')).toBeInTheDocument();
+  });
+
+  it('marks only the exact baseline when drivers share a lap number', () => {
+    const baseline = mockLaps[0];
+    const otherDriver = { ...baseline, id: 'other-driver', driverOrdinal: 1, driverName: 'Other Driver' };
+    const otherLap = { ...baseline, id: 'other-lap', lapOrdinal: 2 };
+    const otherSession = { ...baseline, id: 'other-session', sessionId: 'session-2' };
+    const { rerender } = renderPicker({ laps: [baseline, otherDriver, otherLap, otherSession], filter: 'all' });
+    expect(screen.getAllByText('Baseline')).toHaveLength(1);
+    expect(screen.getByRole('button', { pressed: true })).toHaveTextContent(baseline.driverName);
+    rerender(<ReplayCompareLapPicker {...baseProps} laps={[baseline, otherDriver, otherLap, otherSession]}
+      selectedDriverOrdinal={1} />);
+    expect(screen.getAllByText('Baseline')).toHaveLength(1);
+    expect(screen.getByRole('button', { pressed: true })).toHaveTextContent('Other Driver');
+  });
+
+  it('does not mark another driver when the baseline is absent from the page', () => {
+    renderPicker({ laps: [{ ...mockLaps[0], id: 'other-driver', driverOrdinal: 1 }] });
+    expect(screen.queryByText('Baseline')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { pressed: true })).not.toBeInTheDocument();
   });
 
   it.each(['same-sessions', 'all', 'player', 'same-session-lap'] as const)(

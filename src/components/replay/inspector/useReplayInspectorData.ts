@@ -627,7 +627,7 @@ export function useReplayInspectorData({
     metadata, trajectory, selectedDriverSlot, selectedDriver, playerDriver,
     isLoading, isTrajLoading, error, handleRetryLoad, isCompareMode, handleToggleCompare,
     handleSwapBaseline, handleRemoveCompare, handleCloseComparePicker, isComparePickerOpen, baselineSessionId, setBaselineSessionId,
-    baselineLapNumber, setBaselineLapNumber, baselineDriverName, setBaselineDriverName,
+    baselineLapNumber, setBaselineLapNumber, baselineDriverOrdinal, baselineLapOrdinal, baselineDriverName, setBaselineDriverName,
     baselineTrajectory: comparableBaselineTrajectory, baselineMetadata, availableCompareLaps, compareLapFilter, compareControls, compareCarTypes, setCompareControls,
     isCompareLapsLoading, compareLapsError, handleRetryCompareLaps, handleRetryBaseline, setCompareLapFilter, handleSelectCompareLap,
     comparePagination: { page: comparePage, pageSize: 50, total: compareTotal, onPageChange: setComparePage },

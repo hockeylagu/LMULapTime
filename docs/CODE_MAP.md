@@ -211,6 +211,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
 | Settings & scans | `systemRoutes.ts`, `/replays/cache`, `/replays/upgrade` | `shared/domain/folderPath.ts` | `components/settings/` (`SettingsPanel.tsx`, `OverviewCard.tsx`, `replays/`) |
 
 ### Cross-Cutting Architecture
+- **Baseline identity**: The replay comparison picker identifies the selected baseline by session ID, driver ordinal, and lap ordinal; display lap numbers and optional driver names do not determine baseline status.
 - **Dashboard benchmark pace**: `averageQualifiedBenchmarkPace` in `paceCategory.ts` averages each eligible group's lowest percentage (minimum 3 sessions) with equal group weighting.
 - **Client routing & code splitting** (`src/App.tsx`, `src/routePages.ts`): Pages load on demand via custom preload wrapper without `React.lazy` reveal-throttling. Development loads visited pages only; production prefetches the remaining pages while idle. Vite warms the entry point and dashboard during dev startup. Recharts is excluded from the initial bundle (`vite.config.ts`).
 - **Canonical contracts**: Centralized in `shared/types/` (`session.ts`, `reference.ts`, `replay.ts`, `leaderboard.ts`, `live.ts`, `trackGeometry.ts`, `dashboard.ts`, `status.ts`).

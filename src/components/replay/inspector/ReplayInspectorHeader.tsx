@@ -30,6 +30,8 @@ export interface ReplayInspectorHeaderProps {
   onRemoveCompare: () => void;
   baselineSessionId: string | null;
   baselineLapNumber: number | null;
+  baselineDriverOrdinal?: number | null;
+  baselineLapOrdinal?: number | null;
   baselineDriverName?: string | null;
   baselineTrajectory?: ReplayTrajectoryData | null;
   isComparePickerOpen: boolean;
@@ -62,7 +64,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
   onClose, sessionId, metadata, trajectory, onSelectLap,
   drivers, selectedDriverSlot, onSelectDriver,
   isCompareMode, onToggleCompare, onSwapBaseline, onRemoveCompare,
-  baselineSessionId, baselineLapNumber, baselineDriverName, baselineTrajectory, isComparePickerOpen, onCloseComparePicker, availableCompareLaps, compareLapFilter, compareControls, compareCarTypes, onChangeCompareControls,
+  baselineSessionId, baselineLapNumber, baselineDriverOrdinal, baselineLapOrdinal, baselineDriverName, baselineTrajectory, isComparePickerOpen, onCloseComparePicker, availableCompareLaps, compareLapFilter, compareControls, compareCarTypes, onChangeCompareControls,
   isCompareLapsLoading, comparePagination, compareLapsError, onRetryCompareLaps, onRetryBaseline, onChangeCompareLapFilter, onSelectCompareLap,
   isBaselineLoading, baselineError, isTrajLoading, isLoading = false,
   isPlaying, onTogglePlay, onRewind, playbackSpeed, onSelectPlaybackSpeed, formatLapTime,
@@ -198,8 +200,8 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
           <ReplayCompareLapPicker
             laps={availableCompareLaps}
             selectedSessionId={baselineSessionId}
-            selectedLapNumber={baselineLapNumber}
-            selectedDriverName={baselineDriverName}
+            selectedDriverOrdinal={baselineDriverOrdinal ?? null}
+            selectedLapOrdinal={baselineLapOrdinal ?? null}
             currentLapNumber={trajectory?.currentLap ?? null}
             currentDriverName={drivers.find(d => d.slot === selectedDriverSlot)?.name || trajectory?.driverName || null}
             currentWeatherCondition={trajectory?.weatherCondition ?? metadata?.weatherCondition}

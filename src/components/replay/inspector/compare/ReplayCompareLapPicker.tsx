@@ -16,8 +16,8 @@ export interface ReplayCompareLapPickerProps {
   pagination?: CompareLapPagination;
   laps: ComparableLap[];
   selectedSessionId: string | null;
-  selectedLapNumber: number | null;
-  selectedDriverName?: string | null;
+  selectedDriverOrdinal: number | null;
+  selectedLapOrdinal: number | null;
   currentLapNumber?: number | null;
   currentDriverName?: string | null;
   currentSessionId?: string | null;
@@ -54,8 +54,8 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
   laps,
   pagination,
   selectedSessionId,
-  selectedLapNumber,
-  selectedDriverName,
+  selectedDriverOrdinal,
+  selectedLapOrdinal,
   currentLapNumber,
   currentDriverName,
   currentSessionId,
@@ -219,8 +219,8 @@ export const ReplayCompareLapPicker: React.FC<ReplayCompareLapPickerProps> = ({
               <ul aria-label="Available comparison laps" className="divide-y divide-lmu-border/50">
                 {laps.map(lap => {
                   const isSelected = matchesIdentity(lap, selectedSessionId) &&
-                    lap.lapNumber === selectedLapNumber &&
-                    (!selectedDriverName || lap.driverName === selectedDriverName);
+                    selectedDriverOrdinal != null && selectedLapOrdinal != null &&
+                    lap.driverOrdinal === selectedDriverOrdinal && lap.lapOrdinal === selectedLapOrdinal;
                   return (
                     <li key={lap.id}>
                       <ReplayCompareLapRow
