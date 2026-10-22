@@ -5,6 +5,7 @@ import { LAP_FIELDS, TIRE_WEAR_FIELDS } from '../sessionRows/specs.js';
 import { group } from '../sessionRows/reader.js';
 import { createPaceCalculator } from '../../benchmarks/referenceLaptimes.js';
 import { toComparableLap } from '../../sessions/sessionAnalytics.js';
+import { AVAILABLE_REPLAY_LAP_SQL } from '../replay/replayLapAvailability.js';
 
 export interface ComparisonLapLocator {
   session_id: string;
@@ -17,6 +18,7 @@ interface ComparisonLapRow extends Row, ComparisonLapLocator {
   track_venue: string; track_course: string; track_length_meters: number | null;
   driver_name: string; car_type: string; car_class: string; best_lap_time: number | null; is_player: number;
   recording_name: string | null; path: string | null; file_size_bytes: number | null;
+  telemetry_available: number;
   has_rain: number | null; weather_condition: NonNullable<DetailedSession['matchingReplayFile']>['weatherCondition'] | null;
 }
 
@@ -33,7 +35,8 @@ export function readComparisonLapRows(db: Database, locators: ComparisonLapLocat
       s.session_name,s.session_type,s.time_string,s.timestamp,
       s.track_venue,s.track_course,s.track_length_meters,
       dn.name driver_name,v.car_type,v.car_class,d.best_lap_time,d.is_player,
-      r.recording_name,r.path,r.file_size_bytes,r.has_rain,r.weather_condition
+      r.recording_name,r.path,r.file_size_bytes,r.has_rain,r.weather_condition,
+      ${AVAILABLE_REPLAY_LAP_SQL} telemetry_available
     FROM json_each(?) picked
     JOIN session_laps l ON l.session_id=json_extract(picked.value,'$.session_id')
       AND l.driver_ordinal=json_extract(picked.value,'$.driver_ordinal')
@@ -64,6 +67,7 @@ export function readComparisonLapRows(db: Database, locators: ComparisonLapLocat
       isPlayer: Boolean(row.is_player),
       isSessionBest: lap.lapTime !== null && row.best_lap_time !== null && Math.abs(lap.lapTime - row.best_lap_time) < 0.0005,
     });
+    dto.telemetryAvailable = Boolean(row.telemetry_available);
     return [comparisonLapKey(row), dto];
   }));
 }

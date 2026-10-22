@@ -126,6 +126,7 @@ import {
 } from './dbSessionStore.js';
 import { getRejectedReplayLinks, rejectSessionReplayLink } from './replay/dbReplayLinkStore.js';
 import { archiveReplacedRecording } from './replay/dbReplayIdentity.js';
+import { backfillReplayDriverRosters } from './replay/replayLapAvailability.js';
 import { getReplayMatchingEntries, getReplayMatchingEntriesOverlapping, getReplayMatchingEntry } from './replay/dbReplayMatchingStore.js';
 import {
   getRecordingOwners, getReplayReconciliationCandidateIds, getSessionsStartingBetween, getTelemetryOwnersWithoutFile,
@@ -196,6 +197,7 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
     this.db.pragma('synchronous = NORMAL');
     this.db.pragma('busy_timeout = 5000');
     initDbSchema(this.db);
+    backfillReplayDriverRosters(this.db);
   }
 
   public getDb(): DatabaseType {

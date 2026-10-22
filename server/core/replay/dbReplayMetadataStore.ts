@@ -8,6 +8,7 @@ import { resolveRosterVehicles } from '../../../shared/domain/vehicleMapping.js'
 import { REPLAY_CACHE_VERSION, compressJson, decompressJson, isCompatibleReplayCacheVersion } from '../dbCache.js';
 import { writeReplayMatchingFacts } from './dbReplayMatchingStore.js';
 import { getMetadata, setMetadata } from '../dbMetadataStore.js';
+import { writeReplayDriverRoster } from './replayLapAvailability.js';
 
 // Replay metadata rows, one per .Vcr file. They outlive the file: LMU deletes old replays, and
 // the stored row is then the only copy of the metadata.
@@ -134,6 +135,7 @@ export function upsertReplayMetadataCache(db: DatabaseType, filename: string, fi
     updatedAt: Date.now(),
   });
   writeReplayMatchingFacts(db, filename, filePath, mtimeMs, fileSizeBytes, metadata);
+  writeReplayDriverRoster(db, filename, metadata);
   })();
 }
 

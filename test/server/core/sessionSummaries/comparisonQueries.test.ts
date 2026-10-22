@@ -9,6 +9,8 @@ import { toComparableLap } from '../../../../server/sessions/sessionAnalytics.js
 import * as comparisonRows from '../../../../server/core/sessionSummaries/comparisonLapRows.js';
 import { recordedCondition } from '../../../../shared/domain/compareLapScope.js';
 import { readSession } from '../../../../server/core/sessionRows/reader.js';
+import { retainSessionReplay } from '../../../helpers/retainedReplayFixture.js';
+import { queryCompactLeaderboard } from '../../../../server/core/sessionSummaries/leaderboardQueries.js';
 
 const paceTarget = vi.hoisted(() => ({ percentage: 67 }));
 vi.mock('../../../../server/benchmarks/referenceLaptimes.js', () => ({
@@ -39,6 +41,7 @@ function addSession(db: Database.Database, session: DetailedSession): void {
     session.timestamp, venue, course, 'Race', 'R1', session.timestamp, layout, session.matchingReplayFile?.name ?? null, 'race', 0);
   // The rows and their derived columns come from the writer, as in ingestion.
   persistSessionProjection(db, session);
+  retainSessionReplay(db, session);
 }
 
 const lap = (lapNumber: number, lapTime: number, conditions?: LapData['conditions']): LapData => ({
@@ -47,6 +50,38 @@ const lap = (lapNumber: number, lapTime: number, conditions?: LapData['condition
 } as LapData);
 
 describe('SQL comparison query', () => {
+  it('hides missing driver laps before pagination and disables their telemetry without replacing the official best', () => {
+    const db = new Database(':memory:');
+    initDbSchema(db);
+    try {
+      const session = fixture('partial-replay', 100, 'Spa', [
+        { name: 'Élodie', player: true, laps: [lap(2, 90), lap(3, 91), lap(4, 92)] },
+        { name: 'Missing driver', player: false, laps: [lap(2, 89)] },
+      ]);
+      session.matchingReplayFile = { name: 'partial.Vcr', path: 'deleted', fileSizeBytes: 1 };
+      session.drivers[1].carType = 'Unavailable car';
+      addSession(db, session);
+      db.prepare('DELETE FROM replay_trajectories WHERE filename=? AND (driver_slot=1 OR lap_key=2)').run('partial.Vcr');
+      const filters = { trackName: 'Spa', carClass: 'Hyper', playerOnly: false };
+      const first = queryTelemetryComparableLaps(db, filters, { pageSize: 1 });
+      const second = queryTelemetryComparableLaps(db, filters, { pageSize: 1, page: 2 });
+      expect(first.total).toBe(2);
+      expect(first.laps.map(item => item.lapNumber)).toEqual([3]);
+      expect(second.laps.map(item => item.lapNumber)).toEqual([4]);
+      expect(first.carTypes).toEqual(['Ferrari 499P']);
+      expect(queryTelemetryComparableLaps(db, { ...filters, carType: 'Unavailable car' }).carTypes).toEqual(['Ferrari 499P']);
+      const comparison = queryCompactComparableLaps(db, filters);
+      expect(comparison.laps.filter(item => item.telemetryAvailable).map(item => item.lapNumber)).toEqual([3, 4]);
+      expect(comparison.overallTrackBestLap).toMatchObject({ driverName: 'Missing driver', lapTime: 89, telemetryAvailable: false });
+      const board = queryCompactLeaderboard(db, { layoutKey: 'spa_gp', carClass: 'Hyper' });
+      expect(board.entries).toHaveLength(1);
+      expect(board.entries.every(item => !item.bestLap.telemetryAvailable)).toBe(true);
+      expect(board.entries.find(item => item.driverName === 'Élodie')?.bestLap.lapTime).toBe(90);
+      // New reads see cache deletion immediately, without a summary rebuild.
+      db.prepare('DELETE FROM replay_trajectories').run();
+      expect(queryTelemetryComparableLaps(db, filters).total).toBe(0);
+    } finally { db.close(); }
+  });
   it('marks driver PBs across the page with stable ties, normalized names and full filter scope', () => {
     const db = new Database(':memory:');
     initDbSchema(db);
@@ -140,7 +175,7 @@ describe('SQL comparison query', () => {
     const stored = readSession(db, source.id)!;
     const driver = stored.drivers[0];
     const ratedLap = { ...driver.laps[0], lapOrdinal: 0, paceCategory: 'Alien' as const, pacePercentage: paceTarget.percentage };
-    expect(rows.get('fields_driver_0_lap_0')).toEqual(toComparableLap(stored, driver, ratedLap, { isPlayer: true, isSessionBest: true }));
+    expect(rows.get('fields_driver_0_lap_0')).toEqual(toComparableLap(stored, driver, ratedLap, { isPlayer: true, isSessionBest: true, telemetryAvailable: true }));
     expect(rows.get('fields_driver_0_lap_1')).toMatchObject({ lapTime: null, isValid: false, paceCategory: null, pacePercentage: null });
     db.close();
   });

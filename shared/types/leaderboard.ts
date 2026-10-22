@@ -16,7 +16,7 @@ export interface LeaderboardLap {
   s2: number | null;
   s3: number | null;
   carType: string;
-  /** Whether this session currently has a recording available for telemetry. */
+  /** Whether this exact driver's lap is available in the linked recording. */
   telemetryAvailable: boolean;
 }
 

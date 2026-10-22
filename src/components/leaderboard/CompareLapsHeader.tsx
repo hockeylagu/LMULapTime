@@ -86,9 +86,9 @@ export const CompareLapsHeader: React.FC<CompareLapsHeaderProps> = ({
           ) : (
             <button
               type="button"
-              onClick={onCompareTelemetry}
-              className={`${headerAction} ${FOCUS_RING}`}
-              title="Speed, pedals, delta and line of the two laps, overlaid"
+              disabled
+              className={`${headerAction} ${FOCUS_RING} disabled:opacity-40 disabled:cursor-not-allowed`}
+              title="Telemetry is unavailable for one or both selected laps"
             >
               <Activity className="w-3.5 h-3.5" aria-hidden="true" />
               Compare Telemetry

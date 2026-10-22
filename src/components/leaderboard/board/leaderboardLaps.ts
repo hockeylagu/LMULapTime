@@ -36,6 +36,7 @@ export function boardLapToComparable(entry: LeaderboardEntry, carClass: string, 
     isValid: true,
     isPlayer: entry.isPlayer,
     tag,
+    telemetryAvailable: lap.telemetryAvailable,
   };
 }
 

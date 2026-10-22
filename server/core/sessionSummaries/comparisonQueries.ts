@@ -6,6 +6,7 @@ import { computeTheoreticalBest } from '../../../shared/domain/formatters.js';
 import { SESSION_TYPE_BY_KIND, type CompareLapSort, type SessionKind } from '../../../shared/domain/compareLapScope.js';
 import type { ComparableLapsResult } from '../../sessions/sessionAnalytics.js';
 import { comparisonLapKey, readComparisonLapRows } from './comparisonLapRows.js';
+import { AVAILABLE_REPLAY_LAP_SQL } from '../replay/replayLapAvailability.js';
 
 export interface CompactCompareFilters {
   trackName?: string; trackVenue?: string; trackCourse?: string; carClass?: string; carType?: string; driverName?: string; sessionId?: string;
@@ -150,11 +151,13 @@ export function queryTelemetryComparableLaps(
   const page = Math.max(1, Math.trunc(pageOptions.page ?? 1));
   const pageSize = Math.max(1, Math.min(250, Math.trunc(pageOptions.pageSize ?? 50)));
   const { personalBestScope, selected: scoped } = comparisonScope({ ...filters, telemetryOnly: true });
+  const carScope = comparisonScope({ ...filters, carType: undefined, telemetryOnly: true }).selected;
+  scoped.where.push(AVAILABLE_REPLAY_LAP_SQL);
   const selected = append(scoped, telemetryViewWhere(filters));
   const total = (db.prepare(`SELECT count(*) total ${lapJoinWhere(selected, true)}`).get(...selected.args) as CountFact).total;
   let carTypes: string[] | undefined;
   if (page === 1) {
-    const carScope = comparisonScope({ ...filters, carType: undefined, telemetryOnly: true }).selected;
+    carScope.where.push(AVAILABLE_REPLAY_LAP_SQL);
     const carTypeScope = append(carScope, telemetryViewWhere(filters));
     carTypes = (db.prepare(`SELECT DISTINCT v.car_type car_type ${lapJoinWhere(carTypeScope, true)} AND coalesce(v.car_type,'')<>'' ORDER BY v.car_type`)
       .all(...carTypeScope.args) as Array<{ car_type: string }>).map(row => row.car_type);

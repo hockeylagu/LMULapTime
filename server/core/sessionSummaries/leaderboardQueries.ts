@@ -4,11 +4,13 @@ import type { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { computeTheoreticalBest, getDisplayTrackName } from '../../../shared/domain/formatters.js';
 import { findLayoutBenchmark, type LeaderboardQuery } from '../../../shared/domain/leaderboard.js';
+import { AVAILABLE_REPLAY_LAP_SQL } from '../replay/replayLapAvailability.js';
 
 interface SummaryRow {
   session_id: string; timestamp: number; session_type: string; session_name: string; recording_name: string | null;
   driver_ordinal: number; driver_name: string; is_player: number; car_type: string;
   lap_ordinal: number | null; lap_number: number | null; lap_time: number | null; s1: number | null; s2: number | null; s3: number | null;
+  telemetry_available: number;
 }
 interface DriverFact {
   driver_name: string; is_player: number; best_lap_time: number; best_timestamp: number; best_lap: LeaderboardLap;
@@ -30,13 +32,14 @@ function queryBoardDriverFacts(db: DatabaseType, query: LeaderboardQuery): Drive
   // deterministic winning locator; all leaderboard aggregates come from compact condition rows.
   const bestRows = db.prepare(`WITH ranked AS (
       SELECT s.id session_id,s.timestamp,s.session_type,s.session_name,s.recording_name,
-        d.driver_ordinal,coalesce(n.name,'') driver_name,d.is_player,coalesce(v.car_type,'') car_type,c.best_lap_ordinal lap_ordinal,
+        d.driver_ordinal,coalesce(dn.name,'') driver_name,d.is_player,coalesce(v.car_type,'') car_type,c.best_lap_ordinal lap_ordinal,
         l.lap_number lap_number,c.best_lap_time lap_time,l.s1,l.s2,l.s3,
-        row_number() OVER (PARTITION BY coalesce(n.name,'') ORDER BY c.best_lap_time,s.timestamp,s.id,d.driver_ordinal,c.best_lap_ordinal) best_rank
+        ${AVAILABLE_REPLAY_LAP_SQL} telemetry_available,
+        row_number() OVER (PARTITION BY coalesce(dn.name,'') ORDER BY c.best_lap_time,s.timestamp,s.id,d.driver_ordinal,c.best_lap_ordinal) best_rank
       -- Keep the layout's sessions first even when a legacy driver-class index exists.
       FROM sessions s CROSS JOIN session_drivers d ON d.session_id=s.id
       JOIN session_driver_condition_summaries c ON c.session_id=d.session_id AND c.driver_ordinal=d.driver_ordinal
-      LEFT JOIN drivers n ON n.driver_id=d.driver_id LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id
+      LEFT JOIN drivers dn ON dn.driver_id=d.driver_id LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id
       LEFT JOIN session_laps l ON l.session_id=c.session_id AND l.driver_ordinal=c.driver_ordinal AND l.lap_ordinal=c.best_lap_ordinal
       WHERE ${scopeSql} AND c.condition_group='dry' AND c.best_lap_time IS NOT NULL AND d.is_human=1
     ) SELECT * FROM ranked WHERE best_rank=1`).all(...params) as SummaryRow[];
@@ -61,7 +64,7 @@ function queryBoardDriverFacts(db: DatabaseType, query: LeaderboardQuery): Drive
     bestByDriver.set(row.driver_name, { timestamp: row.timestamp, lap: { sessionId: row.session_id, sessionName: row.session_name,
       sessionType: row.session_type, timestamp: row.timestamp, driverOrdinal: row.driver_ordinal, lapOrdinal: row.lap_ordinal,
       lapNumber: row.lap_number, lapTime: row.lap_time, s1: row.s1, s2: row.s2, s3: row.s3, carType: row.car_type,
-      telemetryAvailable: row.recording_name !== null } });
+      telemetryAvailable: Boolean(row.telemetry_available) } });
   }
   return facts.map(fact => {
     const best = bestByDriver.get(fact.driver_name);

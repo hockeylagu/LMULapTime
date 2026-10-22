@@ -249,6 +249,18 @@ describe('CompareLaps component', () => {
     });
   });
 
+  it('disables Compare Telemetry when a selected lap is unavailable', async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({
+      ...mockCompareData, laps: mockCompareData.laps.map(item => ({ ...item, telemetryAvailable: false })),
+      allTimeBestLap: { ...mockCompareData.allTimeBestLap, telemetryAvailable: false },
+      playerBestLap: { ...mockCompareData.playerBestLap, telemetryAvailable: false },
+    }) });
+    render(<CompareLaps sessions={mockSessions} initialTrack="Spa GP" initialCarClass="GT3" initialSessionId="sess1" initialLapNumber={1} />);
+    await waitFor(() => expect(screen.queryAllByTitle('Remove from comparison')).toHaveLength(2));
+    expect(screen.getByRole('button', { name: /Compare Telemetry/i })).toBeDisabled();
+    expect(screen.queryByRole('link', { name: /Compare Telemetry/i })).not.toBeInTheDocument();
+  });
+
   it('retains a test that the old replay discovery flow is gone', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(mockCompareData) });
     global.fetch = fetchMock;

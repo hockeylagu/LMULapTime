@@ -90,6 +90,8 @@ CREATE TABLE IF NOT EXISTS ai_reports (
 `;
 
 export function initDbSchema(db: DatabaseType): void {
+  // Match replay names the way replay driver resolution does: trimmed and lowercased.
+  db.function('lmu_driver_key', { deterministic: true }, (name: unknown) => typeof name === 'string' ? name.trim().toLowerCase() : '');
   db.exec(LIVE_CAPTURE_INDEX_SCHEMA);
   db.exec(`
     CREATE TABLE IF NOT EXISTS sessions (
@@ -192,6 +194,19 @@ export function initDbSchema(db: DatabaseType): void {
       updated_at INTEGER NOT NULL,
       PRIMARY KEY (filename, driver_slot, lap_key)
     );
+
+    CREATE TABLE IF NOT EXISTS replay_driver_roster (
+      filename TEXT NOT NULL,
+      driver_name TEXT NOT NULL,
+      driver_slot INTEGER NOT NULL,
+      PRIMARY KEY (filename, driver_name)
+    ) WITHOUT ROWID;
+    CREATE TRIGGER IF NOT EXISTS replay_roster_delete AFTER DELETE ON replay_metadata BEGIN
+      DELETE FROM replay_driver_roster WHERE filename=old.filename;
+    END;
+    CREATE TRIGGER IF NOT EXISTS replay_roster_rename AFTER UPDATE OF filename ON replay_metadata BEGIN
+      UPDATE replay_driver_roster SET filename=new.filename WHERE filename=old.filename;
+    END;
 
     -- Normalized replay facts (server/core/replay/dbReplayLapStore.ts): each fact once, at its own
     -- level (replay -> driver -> lap), instead of copied into every lap blob. Replay-wide conditions
@@ -396,6 +411,8 @@ export function initDbSchema(db: DatabaseType): void {
   `);
 
   initSessionSummarySchema(db);
+  const replayColumns = db.prepare('PRAGMA table_info(replay_metadata)').all() as Array<{ name: string }>;
+  if (!replayColumns.some(column => column.name === 'roster_version')) db.exec('ALTER TABLE replay_metadata ADD COLUMN roster_version INTEGER NOT NULL DEFAULT 0');
   initSessionRowsSchema(db);
   initReplayMatchingSchema(db);
 }

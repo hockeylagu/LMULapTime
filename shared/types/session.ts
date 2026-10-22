@@ -332,6 +332,8 @@ export interface ComparableLap {
   isPlayer?: boolean;
   tag?: string;
   matchingReplayFile?: string;
+  /** Whether this exact driver's lap can be loaded from its linked recording. */
+  telemetryAvailable?: boolean;
   hasRain?: boolean;
   weatherCondition?: WeatherCondition;
 }

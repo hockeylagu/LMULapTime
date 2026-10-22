@@ -1,5 +1,25 @@
 # Endpoint performance history
 
+## Persisted replay lap availability — 2026-10-22
+
+Before/after isolated-cache runs used production HTTP routers, five measured requests per scenario,
+and the same data counts: 1,065 sessions, 17,955 drivers, 87,481 laps and 54,511 replay trajectories.
+The previous request-time roster decompression, filesystem checks and JSON availability filter were
+replaced by a persisted unique-name roster and primary-key lookups into cached trajectory rows.
+
+| API scenario | Previous median | Indexed median | Previous p95 | Indexed p95 |
+|---|---:|---:|---:|---:|
+| Picker, all drivers | 147.48 ms | 20.74 ms | 154.49 ms | 22.37 ms |
+| Picker, player | 126.93 ms | 9.34 ms | 130.13 ms | 9.60 ms |
+| Leaderboard, layout 0 | 55.83 ms | 10.84 ms | 58.51 ms | 11.54 ms |
+| Leaderboard, layout 1 | 84.55 ms | 14.26 ms | 99.97 ms | 16.58 ms |
+| Compare, all drivers | 23.21 ms | 21.37 ms | 28.19 ms | 22.06 ms |
+
+Availability now means an exact driver/lap has a cached trajectory containing points. An on-disk
+recording that has not yet been decoded is offered after ingestion completes. Deleted source files
+remain usable through retained cache rows. The one-time roster backfill runs at startup before
+requests are served; these numbers measure ready-state HTTP responses, excluding browser rendering.
+
 ## Page responses during scans and live discovery — 2026-10-19
 
 An isolated copy of the real cache compared the replay scan from Git HEAD with the working-tree fix,

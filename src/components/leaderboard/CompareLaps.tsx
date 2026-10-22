@@ -87,6 +87,7 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
   }, [comparedKey, onComparedLapsChange]);
 
   const telemetryRef = (lap: ComparableLap): TelemetryLapRef | null => {
+    if (lap.telemetryAvailable === false) return null;
     if (!lap.sessionId || !Number.isInteger(lap.driverOrdinal) || !Number.isInteger(lap.lapOrdinal)) return null;
     return { sessionId: lap.sessionId, driverOrdinal: lap.driverOrdinal!, lapOrdinal: lap.lapOrdinal!, driverName: lap.driverName, lapNumber: lap.lapNumber };
   };
@@ -139,7 +140,8 @@ export const CompareLaps: React.FC<CompareLapsProps> = ({
     const baseRef = telemetryRef(base);
     if (!targetRef || !baseRef) {
       const lap = !targetRef ? target : base;
-      throw new LapDebriefUnavailableError(`${lap.driverName}'s lap ${lap.lapNumber ?? '-'} has no session telemetry locator.`);
+      const reason = lap.telemetryAvailable === false ? 'is not in its linked recording' : 'has no session telemetry locator';
+      throw new LapDebriefUnavailableError(`${lap.driverName}'s lap ${lap.lapNumber ?? '-'} ${reason}.`);
     }
     return loadLapPairDebrief(targetRef, baseRef, signal);
   };
