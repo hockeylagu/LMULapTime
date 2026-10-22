@@ -38,7 +38,9 @@ export function resolveLiveIdentity(
 ): LiveIdentity {
   const spec = resolveLayout(session.trackName, navigation?.sceneDesc ?? null);
   const classes = navigation?.classes ?? [];
-  const car = resolveVehicle(navigation?.vehFile) ?? resolveVehicle(session.vehicleName)
+  // The entry name first: it is the session's own car. The REST car can already be the main menu's next one
+  // (Bahrain race 2026-10-21: the Ferrari in the menu while the BMW session was still in shared memory).
+  const car = resolveVehicle(session.vehicleName) ?? resolveVehicle(navigation?.vehFile)
     ?? classes.map(name => resolveVehicle(name)).find(Boolean) ?? null;
   const carClass = car?.carClass ?? knownCarClass(session.vehicleClass)
     ?? classes.map(name => knownCarClass(name)).find(Boolean) ?? null;

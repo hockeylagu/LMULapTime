@@ -37,6 +37,15 @@ describe('live identity', () => {
     expect(personalBest).not.toHaveBeenCalled();
   });
 
+  it('takes the car from the entry name, the REST vehicle file only when the entry name is unknown', () => {
+    const bahrain = { trackName: 'Bahrain International Circuit', vehicleName: 'Team WRT 2026 #32:LM', vehicleClass: 'GT3' };
+    // The main menu already selects the next car while shared memory still holds the race (Bahrain race 2026-10-21).
+    const menu = { sceneDesc: null, classes: ['WEC2026', 'GT3', 'Ferrari_296_LMGT3'], vehFile: '21_26_AFCO31910023.VEH' };
+    expect(resolveLiveIdentity(bahrain, menu, () => null)).toMatchObject({ carClass: 'GT3', vehicleModel: 'BMW M4 LMGT3' });
+    expect(resolveLiveIdentity({ ...bahrain, vehicleName: 'Mystery' }, menu, () => null))
+      .toMatchObject({ carClass: 'GT3', vehicleModel: 'Ferrari 296 LMGT3' });
+  });
+
   it('falls back to the class names the game lists for the selected car', () => {
     const unknownCar = { ...LE_MANS, vehicleName: 'Mystery', vehicleClass: '' };
     expect(resolveLiveIdentity(unknownCar, { sceneDesc: 'LEMANSWEC', classes: ['Nothing', 'LMP3'], vehFile: null }, () => null).carClass).toBe('LMP3');
