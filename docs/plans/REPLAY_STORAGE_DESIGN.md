@@ -1,7 +1,7 @@
 # Replay storage and ingestion design
 
-Status: **Proposed; initial POC complete, tested replacements rejected on storage size**.
-Reviewed: 2026-10-12. Next step: evaluate storage reductions against the current columnar JSON baseline; no production migration.
+Status: **Proposed; initial POC complete; binary lap codec done** ([REPLAY_BINARY_LAP_CODEC.md](REPLAY_BINARY_LAP_CODEC.md)).
+Reviewed: 2026-10-22. Lap blobs are now binary columns (6.4 GB to 2.6 GB database); prepared views and channel groups remain open.
 Dependencies: canonical replay classification, track geometry revisions, XML ownership, DuckDB session links.
 
 ## Requirements
@@ -49,7 +49,7 @@ Evidence: `server/replay/replayRecordingService.ts`, `replayTrajectoryService.ts
 
 ## What the existing model already gets right
 
-- Lap blobs are already columnar JSON with constant-channel elimination and Brotli quality 6. This is not an object-per-sample storage redesign from scratch.
+- Lap blobs are columns with constant-channel elimination, stored in the lossless binary lap format (scaled-integer deltas in byte planes, Brotli 9) since 2026-10-22. Rows hold what the app serves; no read-time fixes.
 - Normalized SQL tables already hold lap facts, conditions, driver events and running order.
 - Default-driver/default-lap selection already uses pointers rather than duplicate blobs.
 - Current canonical writes strip most replay-wide arrays and the driver's lap list from blobs. Own-driver pit events remain for garage reconstruction; some metadata remains repeated.
@@ -62,8 +62,7 @@ The access patterns support this more strongly than a replay-wide or whole-drive
 Use bounded physical segments only where needed for malformed/missing lap timing or exceptionally long recordings; the lap index can reference those segments.
 The normal timed-lap path should not incur segment joins without demonstrated benefit.
 
-Compare the existing columnar JSON codec against a versioned binary column codec before choosing the encoding.
-Binary is a candidate, not a proven speed/space win. Preserve absence masks, known channel precision, four-wheel arrays and meaningful boolean state.
+The binary column codec was chosen and shipped (0.41 of the JSON size, reads faster). Preserve absence masks, known channel precision, four-wheel arrays and meaningful boolean state.
 Separately compressed channel groups may improve time/position and energy reads, but reduce cross-channel compression and add row/index overhead. Measure that tradeoff.
 
 Proposed ownership:

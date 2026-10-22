@@ -2,7 +2,6 @@ import { Database as DatabaseType } from 'better-sqlite3';
 import type { DuckDbLapTelemetry } from '../telemetry/duckdbTypes.js';
 import { DuckDbFileInfo } from '../telemetry/telemetryMatcher.js';
 import { DUCKDB_TELEMETRY_CACHE_VERSION, compressJson, decompressJson } from './dbCache.js';
-import { toIso8855Steering } from './replay/replayTrajectoryCodec.js';
 
 export interface TelemetryMetadataRecord {
   filename: string;
@@ -108,7 +107,7 @@ export function getTelemetryLapCache(db: DatabaseType, filename: string, lapNumb
     'SELECT telemetry_br, cache_version FROM telemetry_lap_cache WHERE filename = ? AND lap_number = ?'
   ).get(filename, lapNumber) as { telemetry_br: Buffer; cache_version: string } | undefined;
   if (!row || (!anyVersion && row.cache_version !== DUCKDB_TELEMETRY_CACHE_VERSION)) return null;
-  return toIso8855Steering(decompressJson<DuckDbLapTelemetry>(row.telemetry_br));
+  return decompressJson<DuckDbLapTelemetry>(row.telemetry_br);
 }
 
 export function upsertTelemetryLapCache(db: DatabaseType, filename: string, lapNumber: number, lapData: DuckDbLapTelemetry): void {

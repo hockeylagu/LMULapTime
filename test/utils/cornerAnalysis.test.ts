@@ -9,7 +9,6 @@ import fs from 'fs';
 import path from 'path';
 import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../shared/types/index.js';
 import { enrichTrajectoryWithTrackGeometry } from '../../server/tracks/serverTrackSync.js';
-import { toIso8855Steering } from '../../server/core/replay/replayTrajectoryCodec.js';
 
 /** Loads a lap captured from the replay cache by tools/analysis/captureCachedLapFixture.ts. */
 function loadCachedLapFixture(name: string): ReplayTrajectoryData {
@@ -31,14 +30,17 @@ function loadCachedLapFixture(name: string): ReplayTrajectoryData {
     return point as unknown as ReplayTrajectoryPoint;
   });
   // Fixtures captured before the ISO 8855 conversion carry right-positive steering.
-  return toIso8855Steering({
+  if (fixture.signConvention !== 'iso8855') {
+    for (const point of points) if (typeof point.steerYaw === 'number' && point.steerYaw !== 0) point.steerYaw = -point.steerYaw;
+  }
+  return {
     replayName: fixture.replayName,
     driverName: fixture.driverName,
     currentLap: fixture.currentLap,
     pointsCount: points.length,
     points,
-    signConvention: fixture.signConvention,
-  } as ReplayTrajectoryData);
+    signConvention: 'iso8855',
+  } as ReplayTrajectoryData;
 }
 
 describe('computeLapSegmentComparisons', () => {

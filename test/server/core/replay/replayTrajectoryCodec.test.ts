@@ -1,19 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import zlib from 'node:zlib';
-import Database from 'better-sqlite3';
 import { ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import {
   compressTrajectory,
   decompressTrajectory,
   toColumnarTrajectory,
-  isColumnar,
   decompressTrajectoryEdge,
-  upgradeStoredTrajectory,
-  withGarageState,
 } from '../../../../server/core/replay/replayTrajectoryCodec.js';
 import { compressJson } from '../../../../server/core/dbCache.js';
-import { initDbSchema } from '../../../../server/core/dbSchema.js';
-import { getTelemetryLapCache, upsertTelemetryLapCache } from '../../../../server/core/dbTelemetryStore.js';
+import { applyGarageState } from '../../../../server/replay/decode/garageState.js';
 import { lapEdgesFromNeighbours } from '../../../../server/replay/decode/replayLapPoints.js';
 
 function buildTrajectory(points: ReplayTrajectoryData['points']): ReplayTrajectoryData {
@@ -29,17 +24,18 @@ function buildTrajectory(points: ReplayTrajectoryData['points']): ReplayTrajecto
 }
 
 describe('replay trajectory columnar codec', () => {
-  it('decodes bounded edges with identical garage phases, sign conversion and four-wheel channels', () => {
+  it('decodes bounded edges with the stored garage phases and four-wheel channels', () => {
     const points = Array.from({ length: 1000 }, (_, i) => ({
       x: i * 0.1, y: 0, z: 0, timeSec: i * 0.02, speedKmh: i < 10 ? 0 : i < 500 ? 120 : 20,
       steerYaw: 0.25, inPit: false, brakeTemps: [1, 2, 3, 4] as [number, number, number, number],
     }));
     const trajectory = { ...buildTrajectory(points), pitEvents: [{ driverSlot: 3, timeSec: 0, code: 21, action: 'Garage' }] };
+    applyGarageState(trajectory.points, trajectory.pitEvents);
     const buffer = compressTrajectory(trajectory);
-    const full = withGarageState(decompressTrajectory(buffer));
+    const full = decompressTrajectory(buffer);
     for (const direction of ['previous', 'next'] as const) {
       const boundary = direction === 'previous' ? 20 : 18;
-      const edge = decompressTrajectoryEdge(buffer, 'v7', boundary, direction);
+      const edge = decompressTrajectoryEdge(buffer, boundary, direction);
       expect(edge).toEqual(full.points.filter(point => direction === 'previous'
         ? point.timeSec! >= 18 : point.timeSec! > 18));
       expect(edge.length).toBeLessThanOrEqual(100);
@@ -48,21 +44,19 @@ describe('replay trajectory columnar codec', () => {
     }
   });
 
-  it('preserves legacy energy conversion and continuity barriers when decoding edges', () => {
+  it('keeps continuity barriers when decoding edges', () => {
     const previous = buildTrajectory([
-      { x: 0, y: 0, z: 0, timeSec: 0, fuel: 50, steerYaw: 1 },
-      { x: 10, y: 0, z: 0, timeSec: 9, fuel: 0, steerYaw: 1 },
-      { x: 11, y: 0, z: 0, fuel: 0 },
-      { x: 12, y: 0, z: 0, timeSec: 9.9, fuel: 0, steerYaw: 1 },
+      { x: 0, y: 0, z: 0, timeSec: 0 },
+      { x: 10, y: 0, z: 0, timeSec: 9 },
+      { x: 11, y: 0, z: 0 },
+      { x: 12, y: 0, z: 0, timeSec: 9.9 },
     ]);
-    // Legacy object blobs have neither columnar encoding nor a steering convention marker.
-    const buffer = compressJson(previous);
-    const full = withGarageState(upgradeStoredTrajectory(decompressTrajectory(buffer), 'v5'));
+    const buffer = compressTrajectory(previous);
     const lap = [{ x: 13, y: 0, z: 0, timeSec: 10 }];
-    const bounded = decompressTrajectoryEdge(buffer, 'v5', 10, 'previous');
+    const bounded = decompressTrajectoryEdge(buffer, 10, 'previous');
     expect(lapEdgesFromNeighbours(lap, bounded, undefined))
-      .toEqual(lapEdgesFromNeighbours(lap, full.points, undefined));
-    expect(bounded[bounded.length - 1]).toMatchObject({ virtualEnergy: 0, steerYaw: -1 });
+      .toEqual(lapEdgesFromNeighbours(lap, decompressTrajectory(buffer).points, undefined));
+    expect(bounded).toEqual([{ x: 11, y: 0, z: 0 }, { x: 12, y: 0, z: 0, timeSec: 9.9 }]);
   });
 
   it('round-trips points losslessly through compression', () => {
@@ -88,8 +82,6 @@ describe('replay trajectory columnar codec', () => {
 
     const encoded = toColumnarTrajectory(trajectory);
 
-    expect(isColumnar(encoded)).toBe(true);
-    if (!isColumnar(encoded)) return;
     expect(encoded.constants).toEqual({ y: 0, gear: 3, inPit: false });
     expect(Object.keys(encoded.columns).sort()).toEqual(['x', 'z']);
     expect(encoded.pointsLength).toBe(2);
@@ -109,24 +101,16 @@ describe('replay trajectory columnar codec', () => {
     expect(restored.points[2].engineRpm).toBe(7000);
   });
 
-  it('reads legacy object-per-point blobs written before the columnar format', () => {
-    const legacy = buildTrajectory([
-      { x: 1, y: 2, z: 3, speedKmh: 99 },
-      { x: 4, y: 5, z: 6, speedKmh: 98 },
-    ]);
-    const legacyBuffer = zlib.brotliCompressSync(Buffer.from(JSON.stringify(legacy), 'utf8'));
-
-    const restored = decompressTrajectory(legacyBuffer);
-
-    expect(restored.points).toEqual(legacy.points);
-    expect(restored.replayName).toBe('Codec_P1.Vcr');
+  it('refuses rows written before the binary lap format', () => {
+    const legacy = toColumnarTrajectory(buildTrajectory([{ x: 1, y: 2, z: 3 }, { x: 4, y: 5, z: 6 }]));
+    expect(() => decompressTrajectory(compressJson(legacy))).toThrow(/replay cache rewrite/);
   });
 
-  it('leaves an empty trajectory untouched', () => {
+  it('stores an empty trajectory', () => {
     const empty = buildTrajectory([]);
 
-    expect(isColumnar(toColumnarTrajectory(empty))).toBe(false);
-    expect(decompressTrajectory(compressTrajectory(empty)).points).toEqual([]);
+    expect(toColumnarTrajectory(empty).pointsLength).toBe(0);
+    expect(decompressTrajectory(compressTrajectory(empty))).toEqual({ ...empty, signConvention: 'iso8855' });
   });
 
   it('stores fewer bytes than the object-per-point layout', () => {
@@ -145,18 +129,6 @@ describe('replay trajectory columnar codec', () => {
     expect(columnar).toBeLessThan(legacy);
   });
 
-  it('flips the right-positive steering of blobs written before the ISO 8855 conversion, laps included', () => {
-    const legacy = buildTrajectory([{ x: 0, y: 0, z: 0, steerYaw: 0.25 }, { x: 1, y: 0, z: 1, steerYaw: 0 }]);
-    legacy.leadInPoints = [{ x: -1, y: 0, z: -1, steerYaw: -0.5 }];
-    legacy.allLapsData = [buildTrajectory([{ x: 0, y: 0, z: 0, steerYaw: 0.1 }])];
-    const restored = decompressTrajectory(compressJson(toColumnarTrajectory(legacy)));
-
-    expect(restored.points.map(p => p.steerYaw)).toEqual([-0.25, 0]);
-    expect(restored.leadInPoints?.[0].steerYaw).toBe(0.5);
-    expect(restored.allLapsData?.[0].points?.[0].steerYaw).toBe(-0.1);
-    expect(restored.signConvention).toBe('iso8855');
-  });
-
   it('marks new blobs as ISO 8855 and never flips them again', () => {
     const trajectory = buildTrajectory([{ x: 0, y: 0, z: 0, steerYaw: 0.25 }]);
     const once = decompressTrajectory(compressTrajectory(trajectory));
@@ -165,18 +137,5 @@ describe('replay trajectory columnar codec', () => {
     expect(once.points[0].steerYaw).toBe(0.25);
     expect(twice.points[0].steerYaw).toBe(0.25);
     expect(trajectory.signConvention).toBeUndefined();
-  });
-
-  it('converts DuckDB laps cached before the ISO 8855 conversion, including old-version rows', () => {
-    const db = new Database(':memory:');
-    initDbSchema(db);
-    const lap = { lapNumber: 1, lapTimeSec: 90, pointsCount: 1, sampleRateHz: 100, points: [{ x: 0, y: 0, z: 0, steerYaw: 0.3 }] };
-    db.prepare('INSERT INTO telemetry_lap_cache (filename, lap_number, points_count, telemetry_br, cache_version, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
-      .run('Old.duckdb', 1, 1, compressJson(lap), 'v1', 0);
-    upsertTelemetryLapCache(db, 'New.duckdb', 1, lap);
-
-    expect(getTelemetryLapCache(db, 'Old.duckdb', 1, true)?.points[0].steerYaw).toBe(-0.3);
-    expect(getTelemetryLapCache(db, 'New.duckdb', 1)?.points[0].steerYaw).toBe(0.3);
-    db.close();
   });
 });

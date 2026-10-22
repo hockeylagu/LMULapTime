@@ -2,7 +2,6 @@ import fs from 'fs';
 import path from 'path';
 import { ReplayTrajectoryPoint } from '../../../shared/types/index.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
-import { toIso8855Steering } from '../../../server/core/replay/replayTrajectoryCodec.js';
 import { applyTelemetryPostProcessing } from '../../../src/utils/telemetryPostProcessing.js';
 import {
   computeLapComparisons,
@@ -89,8 +88,8 @@ function decodeLap(lap: FixtureLap): LoadedLap {
   }
   if (lap.signConvention !== 'iso8855') {
     // Captured before the ISO 8855 conversion: steering and the served lateral offset were right-positive.
-    toIso8855Steering({ points: rawPoints });
     for (const point of rawPoints) {
+      if (typeof point.steerYaw === 'number' && point.steerYaw !== 0) point.steerYaw = -point.steerYaw;
       if (typeof point.lateralOffsetM === 'number' && point.lateralOffsetM !== 0) point.lateralOffsetM = -point.lateralOffsetM;
     }
   }

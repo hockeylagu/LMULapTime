@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { applyGarageState, garageSpells } from '../../../../server/replay/decode/garageState.js';
-import { withGarageState } from '../../../../server/core/replay/replayTrajectoryCodec.js';
-import type { ReplayPitEvent, ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
+import type { ReplayPitEvent, ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 
 const event = (timeSec: number, code: number): ReplayPitEvent => ({ driverSlot: 0, timeSec, code, action: String(code) });
 
@@ -61,13 +60,3 @@ describe('applyGarageState', () => {
   });
 });
 
-describe('withGarageState', () => {
-  it('recomputes the flags of a stored lap from its own driver\'s pit events', () => {
-    const trajectory: ReplayTrajectoryData = {
-      replayName: 'Q1.Vcr', driverSlot: 2, pointsCount: 3, points: lap(0, [0, 20, 150], true),
-      bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 },
-      pitEvents: [{ ...event(1.5, 16), driverSlot: 2 }, { ...event(0.5, 21), driverSlot: 5 }],
-    };
-    expect(flags(withGarageState(trajectory).points)).toBe('GP-');
-  });
-});

@@ -121,8 +121,8 @@ describe('dbReplayTrajectoryStore', () => {
       upsertReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 5, 1000, 5000, next);
       setVersion('v2');
       const edges = getReplayLapEdges(db, 'Spa_R1.Vcr', 3, 4, lap(4).points);
-      expect(edges.leadIn).toEqual([{ ...previous.points[0], inGarage: false }]);
-      expect(edges.leadOut).toEqual([{ ...next.points[0], inGarage: false }]);
+      expect(edges.leadIn).toEqual(previous.points);
+      expect(edges.leadOut).toEqual(next.points);
     });
 
     it('only uses laps of the same driver and the same recording', () => {

@@ -163,10 +163,10 @@ Evidence (2026-10-05):
 - **VCR steering.** Replay `steer10` is right-positive: r = +0.95 against the path's right-turn rate for
   three AI cars of the same Bahrain replay.
 
-Stored data: replay trajectory blobs and DuckDB lap-cache rows written since the conversion carry
-`signConvention: 'iso8855'`. Rows without it hold right-positive steering and are flipped on read
-(`toIso8855Steering`, `replayTrajectoryCodec.ts`), never rewritten, so deleted replays keep their only
-copy and no replay needs decoding again. Lateral offsets are not stored: they are reprojected whenever
+Stored data: replay trajectory blobs and DuckDB lap-cache rows hold ISO 8855 steering and carry
+`signConvention: 'iso8855'`. Older right-positive rows were flipped once by the offline binary lap
+rewrite (2026-10, [plan](plans/REPLAY_BINARY_LAP_CODEC.md)) from their stored blobs, so deleted replays
+kept their only copy and no replay needed decoding again; reads apply no fix. Lateral offsets are not stored: they are reprojected whenever
 a trajectory is served.
 
 ## Complementary live capture

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { register } from 'tsx/esm/api';
 register();
 const { getStoredReplayTrajectory, getAdjacentLapTrajectories } = await import('../../../server/core/replay/dbReplayTrajectoryStore.ts');
-const { withGarageState } = await import('../../../server/core/replay/replayTrajectoryCodec.ts');
+const { applyGarageState } = await import('../../../server/replay/decode/garageState.ts');
 const { lapEdgesFromNeighbours } = await import('../../../server/replay/decode/replayLapPoints.ts');
 const { withoutReplayFacts, lapFactsFrom, lapSpanFrom, lapSummariesFrom } = await import('../../../server/replay/decode/replayFacts.ts');
 const { classifyRetainedReplayLaps } = await import('../../../server/replay/decode/replayLapClassification.ts');
@@ -24,7 +24,8 @@ export function canonicalDriverLaps(driver) {
   return laps.map(lap => {
     const stripped = withoutReplayFacts(lap, driver.driverSlot);
     const { allLapsData: _all, ...single } = stripped;
-    const result = withGarageState({ ...single, points: single.points.map(point => ({ ...point })) });
+    const result = { ...single, points: single.points.map(point => ({ ...point })) };
+    applyGarageState(result.points, (result.pitEvents ?? []).filter(event => event.driverSlot === result.driverSlot));
     result.laps = summaries.map(summary => ({ ...summary, isPitStop: undefined }));
     result.laps = classifyRetainedReplayLaps(result, spans, driver.driverSlot);
     return result;

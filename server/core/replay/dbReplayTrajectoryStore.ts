@@ -5,8 +5,6 @@ import {
   compressTrajectory,
   decompressTrajectory,
   decompressTrajectoryEdge,
-  upgradeStoredTrajectory,
-  withGarageState,
 } from './replayTrajectoryCodec.js';
 import { lapEdgesFromNeighbours } from '../../replay/decode/replayLapPoints.js';
 import { getReplayLaps } from './dbReplayLapStore.js';
@@ -35,7 +33,7 @@ interface TrajectoryRow {
 
 /** The driver's lap list comes from replay_laps; the blob's own copy only when the replay has no lap facts. */
 function readTrajectoryRow(db: DatabaseType, row: TrajectoryRow): ReplayTrajectoryData {
-  const trajectory = withGarageState(upgradeStoredTrajectory(decompressTrajectory(row.trajectory_br), row.parser_version));
+  const trajectory = decompressTrajectory(row.trajectory_br);
   const slot = row.driver_slot >= 0 ? row.driver_slot : trajectory.driverSlot;
   if (typeof slot !== 'number' || slot < 0) return trajectory;
   const facts = getReplayLaps(db, row.filename, slot);
@@ -190,7 +188,7 @@ export function getReplayLapEdges(
   const neighbour = (key: number, boundary: number, direction: 'previous' | 'next'): ReplayTrajectoryData['points'] | undefined => {
     const row = selectTrajectoryRow(db, filename, driverSlot, key);
     return row && row.file_mtime_ms === lap.file_mtime_ms && row.file_size_bytes === lap.file_size_bytes && row.source_path === lap.source_path
-      ? decompressTrajectoryEdge(row.trajectory_br, row.parser_version, boundary, direction)
+      ? decompressTrajectoryEdge(row.trajectory_br, boundary, direction)
       : undefined;
   };
   return lapEdgesFromNeighbours(points, neighbour(lapKey - 1, first, 'previous'), neighbour(lapKey + 1, last, 'next'));

@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { buildRacePositions, readLapSamples } from '../../../server/traffic/lapSamples.js';
 import { buildRacePositionsInWorker } from '../../../server/traffic/racePositionsWorkerClient.js';
 import { compressTrajectory } from '../../../server/core/replay/replayTrajectoryCodec.js';
-import { compressJson } from '../../../server/core/dbCache.js';
 import { distanceAt, RACE_POSITIONS_VERSION } from '../../../server/traffic/racePositions.js';
 import type { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../shared/types/index.js';
 import { circleCenterline, pointAt } from './circleTrack.js';
@@ -31,23 +30,11 @@ describe('readLapSamples', () => {
     expect(samples.onTrack.filter(Boolean)).toHaveLength(40); // in the pits from 108 s
   });
 
-  it('recomputes the garage state instead of trusting the stored flag', () => {
-    // Stored before the fix: a type 49 event at a race pit stop flagged the rest of the race as garage.
-    const lap = { ...storedLap(7, 500, 10, 0), driverSlot: 3, pitEvents: [
-      { driverSlot: 3, timeSec: 400, code: 18, action: 'stopped in pit stall' },
-      { driverSlot: 3, timeSec: 400.1, code: 49, action: 'entered pit / garage', isGarage: true },
-    ] };
-    lap.points.forEach(p => { p.inGarage = true; });
+  it('takes a car in the garage off the track, from the stored garage flag', () => {
+    const lap = storedLap(7, 500, 2, 0);
+    lap.points.forEach((p, i) => { p.inGarage = i < 50; });
 
-    expect(readLapSamples(7, compressTrajectory(lap)).onTrack.every(Boolean)).toBe(true);
-  });
-
-  it('reads a lap stored in the older one-object-per-point format too', () => {
-    const lap = storedLap(1, 0, 2, 0);
-    const samples = readLapSamples(1, compressJson(lap));
-
-    expect(samples.times).toHaveLength(11);
-    expect(samples.onTrack.every(Boolean)).toBe(true);
+    expect(readLapSamples(7, compressTrajectory(lap)).onTrack).toEqual([...new Array(5).fill(false), ...new Array(6).fill(true)]);
   });
 });
 

@@ -7,9 +7,9 @@ import zlib from 'zlib';
 // v6: calibrated ambient temp formula, Virtual Energy (1/51), contact events (1/17), tyre compounds (1/16), removal of fake trackTemp
 // v7: event classes read without the race-session bit (29), so practice / qualifying replays get
 //     weather, tyre compounds, contacts, Virtual Energy and flags; penalties decoded from class 3.
-// Garage state (inGarage, and inPit on the drive out of the garage) is recomputed on read from the
-// pit events for every version (withGarageState, replayTrajectoryCodec.ts), so it needed no bump.
-// If a later bump rewrites every stored row, deleted replays included, drop that adapter.
+// Stored rows of every version hold what the app serves (garage state, ISO 8855 steering, Virtual
+// Energy, calibrated ambient): a rule change rewrites the rows offline (as the 2026-10 binary lap
+// rewrite did, docs/plans/REPLAY_BINARY_LAP_CODEC.md) instead of adding a read-time adapter.
 export const REPLAY_CACHE_VERSION = 'v7';
 export const COMPATIBLE_REPLAY_CACHE_VERSIONS: ReadonlySet<string> = new Set([
   REPLAY_CACHE_VERSION,
@@ -19,7 +19,7 @@ export const COMPATIBLE_REPLAY_CACHE_VERSIONS: ReadonlySet<string> = new Set([
   // Written by an unreleased build that also stored each lap's edge samples (now derived from
   // the neighbouring lap rows on read); otherwise identical to v3.
   'v4',
-  // Preserves full backwards compatibility with v3 cached trajectories and metadata (lossy 0.01s/0.01m/integer km/h)
+  // v3 rows stay coarser (0.01 s, 0.01 m, integer km/h) and lack the events added since
   'v3',
 ]);
 

@@ -164,7 +164,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
    - Atomic commits of trajectory blobs, facts, and ingest markers via `server/core/replay/dbReplayDriverStore.ts`. Primary slot promotion via `resolveReplayPrimarySlot`.
 3. **Persisted replay facts**:
    - Facts: `replayFacts.ts` → stored via `server/core/replay/dbReplayLapStore.ts` (`replaceReplayDriverLapFacts`, `replaceReplayWideFacts`).
-   - Columnar trajectory blobs: stored via `dbReplayTrajectoryStore.ts` using `replayTrajectoryCodec.ts`. Downsampler `trajectoryDownsampler.ts` preserves apex speed minimums, straight maximums, and braking onsets.
+   - Columnar trajectory blobs: stored via `dbReplayTrajectoryStore.ts` using `replayTrajectoryCodec.ts`, in the lossless binary lap format of `lapColumnsCodec.ts` (selected-column decode for `server/traffic/lapSamples.ts`). Rows already hold what the app serves (garage state, ISO 8855 steering, Virtual Energy): no read-time fixes; a rule change rewrites rows offline. Downsampler `trajectoryDownsampler.ts` preserves apex speed minimums, straight maximums, and braking onsets.
 4. **Telemetry fusion & track projection**:
    - `server/telemetry/telemetryFusion.ts`: fuses high-rate DuckDB channels with replay telemetry. Native status/weather take precedence; VCR supplies discrete flags and weather.
    - `server/tracks/`: interpolates timing line crossings (`lapLineCut.ts`), centerline projection (`trackProjection.ts`, reusing candidate segments during search), and glitch repair (`stationGlitches.ts`).

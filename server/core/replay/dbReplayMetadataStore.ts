@@ -3,7 +3,6 @@ import fs from 'fs';
 import path from 'path';
 import { Database as DatabaseType } from 'better-sqlite3';
 import { ReplayMetadata, ReplayCacheSummary } from '../../../shared/types/index.js';
-import { upgradeStoredReplayMetadata } from './replayTrajectoryCodec.js';
 import { ReplayDriverIngestStatus, settledReplayFailure } from './dbReplayIngestStore.js';
 import { resolveRosterVehicles } from '../../../shared/domain/vehicleMapping.js';
 import { REPLAY_CACHE_VERSION, compressJson, decompressJson, isCompatibleReplayCacheVersion } from '../dbCache.js';
@@ -16,8 +15,8 @@ import { getMetadata, setMetadata } from '../dbMetadataStore.js';
 
 // Each driver's car is re-derived from its vehicle id on read, so a corrected vehicle mapping
 // reaches every stored row, including replays LMU has deleted, without a cache version bump.
-function readMetadataRow(row: { parser_version: string; metadata_br: Buffer }, playerName?: string): { metadata: ReplayMetadata; ownershipChanged: boolean } {
-  const metadata = upgradeStoredReplayMetadata(decompressJson<ReplayMetadata>(row.metadata_br), row.parser_version);
+function readMetadataRow(row: { metadata_br: Buffer }, playerName?: string): { metadata: ReplayMetadata; ownershipChanged: boolean } {
+  const metadata = decompressJson<ReplayMetadata>(row.metadata_br);
   const ownershipChanged = applyConfiguredPlayer(metadata, playerName);
   return { metadata: resolveRosterVehicles(metadata), ownershipChanged };
 }

@@ -221,7 +221,7 @@ export function factsDriverSlot(driverSlotKey: number, trajectory: Pick<ReplayTr
 
 /**
  * A lap row without what the normalized tables hold. The driver's own pit events stay: the garage
- * state is recomputed from them on every read (withGarageState, lapSamples.ts). The lap list stays
+ * state was set from them when the lap was built (applyGarageState). The lap list stays
  * when the decode filed no lap facts (factsSlot null).
  */
 export function withoutReplayFacts(lap: ReplayTrajectoryData, factsSlot: number | null): ReplayTrajectoryData {
