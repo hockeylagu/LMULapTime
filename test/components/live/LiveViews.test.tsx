@@ -3,7 +3,7 @@ import { act, render, screen, within } from '@testing-library/react';
 import { LivePage } from '../../../src/components/live/LivePage.js';
 import type { LiveSnapshot } from '../../../shared/types/live.js';
 import { FakeEventSource } from '../../helpers/fakeEventSource.js';
-import { liveLap, liveSession, liveSnapshot, liveTiming } from '../../helpers/liveSnapshot.js';
+import { liveLap, liveSession, liveSnapshot, liveStrategy, liveTiming } from '../../helpers/liveSnapshot.js';
 
 const bar = vi.hoisted(() => ({ renders: 0 }));
 vi.mock('../../../src/components/live/LiveSessionBar.js', async (importOriginal) => {
@@ -68,6 +68,17 @@ describe('live driving views', () => {
       render(<LivePage />);
       send(liveSnapshot({ weather: { trackTempC: 41, trackTempTrend: trend, raining: 0, avgPathWetness: 0, wetnessTrend: 'steady' } }));
       expect(screen.getByTestId('live-track-temp')).toHaveTextContent(`TRACK 41° ${arrow}`);
+    });
+
+    it('says DRY beside the track temperature when the forecast holds to the end, and nothing while it is unknown', () => {
+      render(<LivePage />);
+      const weather = { trackTempC: 32, trackTempTrend: 'rising', raining: 0, avgPathWetness: 0, wetnessTrend: 'steady' } as const;
+      const dry = { change: 'none', chance: 0, atSeconds: 900, lap: null } as const;
+      send(liveSnapshot({ weather, strategy: liveStrategy({ forecast: dry }) }));
+      expect(screen.getByTestId('live-track-temp')).toHaveTextContent('DRY · TRACK 32° ↑');
+      send(liveSnapshot({ sequence: 2, weather }));
+      expect(screen.getByTestId('live-track-temp')).toHaveTextContent('TRACK 32° ↑');
+      expect(screen.queryByTestId('live-forecast')).not.toBeInTheDocument();
     });
 
     it('turns the weather slot to the track wetness and its trend once rain falls or the line is wet, ahead of a forecast', () => {

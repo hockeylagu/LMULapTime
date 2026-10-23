@@ -1,5 +1,6 @@
 import type { GarageCheck } from './liveScreens.js';
-import { COMPOUND_CLASS, compoundTone } from './race/livePlanFormat.js';
+import { UNKNOWN } from './liveFormat.js';
+import { CompoundText } from './race/CompoundText.js';
 import { RACE_COLUMN, RACE_LEAD, RACE_ROW, RULED, UNRULED } from './raceColumns.js';
 
 const ACTION_TONE: Record<NonNullable<GarageCheck['action']>['tone'], string> = {
@@ -8,21 +9,16 @@ const ACTION_TONE: Record<NonNullable<GarageCheck['action']>['tone'], string> = 
   warn: 'text-lmu-warn',
 };
 
-/** The compound's sidewall colour; plain text for a name we don't know. */
-const compoundText = (compound: string): string => {
-  const tone = compoundTone(compound);
-  return tone ? COMPOUND_CLASS[tone] : 'text-lmu-text';
-};
-
 const HEAD = 'whitespace-nowrap text-[48px] font-semibold text-lmu-muted';
-// Words (NEW, USED 98%) take a smaller size than figures so they fit the column at the same baseline.
+// Words (NEW, USED MED) take a smaller size than figures so they fit the column at the same baseline.
 const value = (text: string): string =>
   `h-[144px] whitespace-nowrap font-mono font-bold tracking-[-0.025em] leading-[144px] ${/[A-Z]{2}/.test(text) ? 'text-[96px]' : 'text-[120px]'}`;
 
-function Value({ text, unit, className = '' }: { text: string; unit?: string; className?: string }) {
+/** A value, with the compound after it; MEDIUM reads MED so `USED MED` fits the column. Compounds take their colour. */
+function Value({ text, unit, compound, className = '' }: { text: string; unit?: string; compound?: string; className?: string }) {
   return (
     <div className={`${value(text)} ${className}`}>
-      {text}
+      <CompoundText text={compound ? `${text} ${compound.replace('MEDIUM', 'MED')}` : text} />
       {unit && <span className="ml-3 text-[56px] font-normal text-lmu-text-soft">{unit}</span>}
     </div>
   );
@@ -51,12 +47,11 @@ export function LiveGarageChecklist({ checks, compact = false }: { checks: Garag
           <div className={RACE_LEAD}>
             <h2 className="whitespace-nowrap text-[64px] font-semibold text-lmu-text">
               {check.label}
-              {check.compound && <> · <span className={compoundText(check.compound)}>{check.compound}</span></>}
             </h2>
             {check.note && <p className="mt-3 text-[36px] font-semibold text-lmu-muted">{check.note}</p>}
           </div>
           <div className={`${RACE_COLUMN} ${RULED}`}><Value text={check.target} unit={check.unit} /></div>
-          <div className={`${RACE_COLUMN} ${RULED}`}><Value text={check.current} unit={check.unit} className="text-lmu-text-soft" /></div>
+          <div className={`${RACE_COLUMN} ${RULED}`}><Value text={check.current} unit={check.unit} compound={check.current === UNKNOWN ? undefined : check.compound} className="text-lmu-text-soft" /></div>
           <div className={`${RACE_COLUMN} ${RULED}`}>
             <div className={`h-[144px] whitespace-nowrap font-mono ${check.action && check.action.text.length > 9 ? 'text-[72px]' : 'text-[96px]'} font-bold leading-[144px] tracking-[-0.025em] ${check.action ? ACTION_TONE[check.action.tone] : ''}`}>
               {check.action?.text ?? ''}

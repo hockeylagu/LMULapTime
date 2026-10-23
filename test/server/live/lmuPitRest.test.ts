@@ -22,8 +22,8 @@ describe('LMU pit REST parsers', () => {
       .toEqual({ type: 'estimate', total: 139.6, damage: 129.9, penalties: 0, fuel: 5.17, ve: 5.04, tires: 4.5 });
     expect(parseEstimate({ damage: 1 })).toBeNull();
     expect(parsePitStopTimes({ pitStopTimes: { times: { FixRandomDelay: 5, FuelRandomDelay: 2, RandomTireDelay: 1, virtualEnergyRandomDelay: 0,
-      FuelFillRate: 4, FuelInsert: 1, virtualEnergyFillRate: 0.025, virtualEnergyInsert: 0 } } }))
-      .toEqual({ type: 'pitStopTimes', fixRandom: 5, fuelRandom: 2, tireRandom: 1, veRandom: 0, fuelFillRate: 4, veFillRate: 2.5, fuelInsert: 1, veInsert: 0 });
+      FuelFillRate: 4, FuelInsert: 1, virtualEnergyFillRate: 0.025, virtualEnergyInsert: 0, FourTireChange: 12 } } }))
+      .toEqual({ type: 'pitStopTimes', fixRandom: 5, fuelRandom: 2, tireRandom: 1, veRandom: 0, fuelFillRate: 4, veFillRate: 2.5, fuelInsert: 1, veInsert: 0, fourTyreChange: 12 });
   });
 
   it('reads the MFD: the VE line (target after the stop), tyres and repair, each at its current setting', () => {
@@ -93,9 +93,13 @@ describe('LMU pit REST parsers', () => {
     // As read in every garage of a weekend, 2026-10-17.
     const session = (name: string, lengthTime: number) => ({ airTemp: 28, lengthTime, name, rainChance: 0 });
     const weekend = [session('PRACTICE', 5), session('QUALIFYING', 10)];
-    expect(parseSchedule({ scheduledSessions: [...weekend, session('RACE', 5)] })).toEqual({ type: 'schedule', raceMinutes: 5 });
-    expect(parseSchedule({ scheduledSessions: weekend })).toEqual({ type: 'schedule', raceMinutes: null });
-    expect(parseSchedule({ scheduledSessions: [session('RACE 1', 20), session('RACE 2', 30)] })).toEqual({ type: 'schedule', raceMinutes: null });
+    expect(parseSchedule({ scheduledSessions: [...weekend, session('RACE', 5)] })).toEqual({ type: 'schedule', raceMinutes: 5, hasQualifying: true });
+    expect(parseSchedule({ scheduledSessions: weekend })).toEqual({ type: 'schedule', raceMinutes: null, hasQualifying: true });
+    expect(parseSchedule({ scheduledSessions: [session('RACE 1', 20), session('RACE 2', 30)] })).toEqual({ type: 'schedule', raceMinutes: null, hasQualifying: false });
+    expect(parseSchedule({ scheduledSessions: [session('PRACTICE', 120)] })).toEqual({ type: 'schedule', raceMinutes: null, hasQualifying: false });
+    expect(parseSchedule({ scheduledSessions: [session('RACE', 20)] })).toEqual({ type: 'schedule', raceMinutes: 20, hasQualifying: false });
+    expect(parseSchedule({ scheduledSessions: [session(' qualify ', 10)] })).toEqual({ type: 'schedule', raceMinutes: null, hasQualifying: true });
+    expect(parseSchedule({ scheduledSessions: [] })).toEqual({ type: 'schedule', raceMinutes: null, hasQualifying: false });
     expect(parseSchedule({})).toBeNull();
   });
 });

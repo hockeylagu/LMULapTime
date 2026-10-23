@@ -116,8 +116,8 @@ describe('nextForecastChange', () => {
       .toEqual({ change: 'dry', chance: 100, atSeconds: 338, lap: 5 });
   });
 
-  it('says nothing when the forecast does not change, or without a session length', () => {
-    expect(nextForecastChange({ ...base, elapsedSeconds: 400 })).toBeNull();
+  it('says the weather holds when the forecast does not change, and nothing without a session length', () => {
+    expect(nextForecastChange({ ...base, elapsedSeconds: 400 })).toEqual({ change: 'none', chance: 0, atSeconds: 900, lap: null });
     expect(nextForecastChange({ ...base, elapsedSeconds: 10, sessionSeconds: 0 })).toBeNull();
     expect(nextForecastChange({ ...base, elapsedSeconds: 10, lapSeconds: null })).toMatchObject({ lap: null });
   });

@@ -35,6 +35,9 @@ export const DEMO_SCENARIOS: readonly Scenario[] = [
   scenario('garage-qualifying', 'Qualifying · 10 min', 'Qualifying preparation', s => {
     s.lifecycle = 'garage'; s.session!.kind = 'qualifying'; s.session!.inRealtime = false;
   }),
+  scenario('garage-qualifying-sprint', 'Qualifying · 10 min', 'Qualifying preparation · 20 min race, no stop', s => {
+    s.lifecycle = 'garage'; s.session!.kind = 'qualifying'; s.session!.inRealtime = false;
+  }),
   scenario('qualifying-out-lap', 'Qualifying · 10 min', 'Qualifying · out lap', (s, t) => {
     s.session!.kind = 'qualifying'; t.isOutLap = true; t.deltaSeconds = null;
     t.sectors = [null, null, null]; t.sectorDeltas = [null, null, null];
@@ -65,7 +68,9 @@ export const DEMO_SCENARIOS: readonly Scenario[] = [
   scenario('saving', 'Race · opening and stint', 'Save to skip stop', s => { s.strategy!.resource!.saving = { targetPerLap: 3.9, savePerLap: 0.1, savePercent: 2.5, shortfall: 2, source: 'measured' }; }),
   scenario('multi-stop', 'Race · opening and stint', 'Multiple stops remaining', s => { s.strategy!.resource!.race!.stopsAfterNext = 2; }),
   scenario('pit-request', 'Race · pit stop', 'Pit request', s => { s.strategy!.pit!.state = 'request'; }),
+  scenario('pit-three', 'Race · pit stop', 'Pit in three laps · next MFD setup', s => { Object.assign(s.strategy!.resource!.race!, { pitInLaps: 3, pitLap: 16 }); }),
   scenario('pit-soon', 'Race · pit stop', 'Pit in two laps', s => { s.strategy!.resource!.race!.pitInLaps = 2; }),
+  scenario('pit-one', 'Race · pit stop', 'Pit in one lap · MFD setup', s => { Object.assign(s.strategy!.resource!.race!, { pitInLaps: 1, pitLap: 14 }); }),
   scenario('pit-this-lap', 'Race · pit stop', 'Pit this lap · MFD short', s => { s.strategy!.resource!.race!.pitInLaps = 0; }),
   scenario('pit-entering', 'Race · pit stop', 'Pit entering', s => { s.strategy!.pit!.state = 'entering'; }),
   scenario('pit-stopped', 'Race · pit stop', 'Pit stopped', s => { s.strategy!.pit!.state = 'stopped'; }),
@@ -81,7 +86,6 @@ export const DEMO_SCENARIOS: readonly Scenario[] = [
   scenario('rain', 'Alternative conditions and incidents', 'Rain forecast', s => { s.strategy!.forecast = { change: 'rain', chance: 80, atSeconds: 2100, lap: 20 }; }),
   scenario('wet', 'Alternative conditions and incidents', 'Wet · getting wetter', s => { Object.assign(s.weather!, { raining: 0.5, avgPathWetness: 0.65, wetnessTrend: 'rising', trackTempTrend: 'falling' }); s.strategy!.tyres!.compound = 'Wet'; }),
   scenario('drying', 'Alternative conditions and incidents', 'Drying · rain ending', s => { Object.assign(s.weather!, { avgPathWetness: 0.3, wetnessTrend: 'falling' }); s.strategy!.forecast = { change: 'dry', chance: 0, atSeconds: 2100, lap: 20 }; }),
-  scenario('fcy', 'Alternative conditions and incidents', 'Full course yellow', s => { s.session!.gamePhase = 6; }),
   scenario('not-recording', 'Alternative conditions and incidents', 'Recording stopped', s => { s.audit = { runId: 'demo', status: 'unavailable' }; }),
   scenario('tyres', 'Alternative conditions and incidents', 'Tread below minimum · sets short', s => { s.strategy!.tyres!.coverage = { target: 'pit', projectedTread: 0.32, setsNeeded: 2, availableSetsCover: false }; s.strategy!.tyres!.newSets = 0; }),
   scenario('tyres-mfd', 'Alternative conditions and incidents', 'Worn tyres · MFD no change', s => {
@@ -111,6 +115,11 @@ export const DEMO_SCENARIOS: readonly Scenario[] = [
   scenario('unknown', 'Missing data and failures', 'Unknown · on track', s => { s.session!.kind = 'unknown'; }),
   scenario('unknown-data', 'Missing data and failures', 'Timing, weather and identity unknown', s => { s.weather = null; s.identity = null; s.lapsLeft = null; s.recentLaps = []; s.sessionBest = null; s.strategy = null; }),
   scenario('disconnected', 'Missing data and failures', 'Data lost', () => {}),
+  scenario('tyre-strategy-quali', 'Tentative previews', 'Qualifying set · soft before the race', s => {
+    s.lifecycle = 'garage'; s.session!.kind = 'qualifying'; s.session!.inRealtime = false;
+  }),
+  scenario('strategy-changed', 'Tentative previews', 'Race strategy · tyres changed', s => { Object.assign(s.strategy!.tyres!, { worst: 0.74, wearPerLap: 0.011 }); }),
+  scenario('strategy-changed-ve', 'Tentative previews', 'Race strategy · VE changed', s => { Object.assign(s.strategy!.resource!.race!, { pitInLaps: 8, pitLap: 21 }); }),
   scenario('corners', 'Tentative previews', 'Corner speed · tentative', s => { s.session!.kind = 'practice'; }),
 ];
 
@@ -122,9 +131,9 @@ export function createDemoState(id: string, carClass: string | null = 'GT3', res
   selected.apply(snapshot, timing);
   configureDemoClass(snapshot, timing, carClass ?? 'GT3');
   const sprint: DemoSprint = selected.id === 'no-stop' ? 'early' : selected.id === 'sprint' || selected.id === 'garage-sprint' ? 'late' : null;
-  configureDemoSession(snapshot, timing, sprint, reserveLaps);
   // A light load for qualifying runs: practice says how many laps it holds instead of asking for more.
-  if (selected.id === 'garage-practice-light' && snapshot.strategy?.garage) snapshot.strategy.garage.setInGarage = 30;
+  configureDemoSession(snapshot, timing, sprint, reserveLaps, sprint || selected.id === 'garage-qualifying-sprint' ? 20 : 60,
+    selected.id === 'garage-practice-light' ? 30 : null);
   const reference = snapshot.sessionBest?.lapSeconds;
   timing.lapEstimate = !timing.isOutLap && reference != null && timing.deltaSeconds != null ? {
     seconds: Math.round((reference + timing.deltaSeconds) * 1000) / 1000,

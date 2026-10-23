@@ -12,6 +12,74 @@ Still to validate on a race weekend: the race plan in a real race, the fuel-clas
 read, wetness on a wet track, the online forecast, cockpit readability from the seat and the effect on LMU's frame
 pacing. Production components and regression tests are the current reference; historical placement decisions remain under `docs/prototypes/live-dashboard/`.
 
+## Race strategy in the garage (2026-10-22)
+
+Every garage before the race (practice, qualifying, the race's own) shows the race strategy under a compact
+checklist, the session length and laps folded into the title (`planRaceStrategies`, `LiveRaceStrategy`). Inputs:
+the event's race length (`GetSessionsInfoForEvent`), the event lap time, the VE or fuel per lap, the reserve, the
+new sets (one kept for qualifying before it), the selected set, the event's measured wear of the most worn tyre
+and the game's four-tyre time (`FourTireChange`, read with the pit rules on track). The race laps follow the
+garage rule without the leader's pace (a lap past the clock).
+
+- VE: the fewest stops, full at the start when there is one, the finish's need at the last stop (VE TO FINISH),
+  or only the race's need without a stop.
+- Tyres: keep the starting set to the flag, or a new set at every stop (+ the four-tyre time, which adds to the
+  refuel). The chosen plan is the quickest whose tread stays above the floor at every change and at the flag; the
+  next best is said on one line by what it changes and its cost, with its tread when it would not last.
+- Unknown wear shows the tread as unknown and keeps the set; an unknown change time drops the gap.
+- Not modelled yet: the pace of fresh tyres or a lighter car (no FULL VE alternative to a sprint's load), two-tyre
+  changes, an extra stop to save VE, LICO, the set qualifying takes (demo only), plan changes in the race (demo).
+
+Before the event has a lap: the use per lap and the wear come from the player's newest races (up to 5) on the exact
+layout in the exact class that have a native telemetry recording (`readStrategyHistory` → `estimateFromHistory`,
+read once when the layout and class resolve): the median use of the races on the same resource (two clean laps at
+least), the median wear of the races on the same compound. The use is the dashboard's own (`perLapSource`
+`history`): the garage load (FROM YOUR RACES HERE), the race strategy and the race plan until the first measured lap
+(· YOUR RACES). The event's own measured use and wear replace them; the game's estimate (with its learned
+correction) is the last fallback for the use, and the learning always keeps the game baseline, never the history.
+Not used in the wet (the races do not say their conditions). The strategy title says the source: FROM YOUR LAST 3
+RACES, USE FROM…, WEAR FROM…, GAME ESTIMATE.
+
+Plan vs actual: the last plan the garage or grid showed before the race clock ran is saved once with the race's
+live recording (`live_race_plans`, keyed by recording id; it waits for the recording when that begins only at the
+green; qualifying plans are never saved). The session's strategy debrief reads it through the capture's session
+link and shows it beside what the native telemetry measured: stops and pit lap, the start load, the load leaving
+the last stop, the tyres at each stop, the racing laps and the tread at the flag. No verdict is drawn yet.
+
+## Next-stop MFD preview in the demo (2026-10-23)
+
+Demo only: mid-stint (`race`) and three laps out (`pit-three`) show the next VE/fuel target beneath
+the pit countdown and the tyre call beneath current tread. At fewer than three laps, the existing
+pit view expands to the resource target versus the current MFD setting, fuel ratio where applicable,
+tyres and estimated service time. `pit-soon`, `pit-one` and `pit-this-lap` preview that transition.
+Plan-change previews use the same VE target in the countdown and the change strip.
+
+## Strategy voice proof of concept (2026-10-22)
+
+A proof of concept in the demo only (not in the real dashboard, user 2026-10-22): the tentative
+plan-change scenarios (`strategy-changed`, `strategy-changed-ve`) have optional browser TTS controls.
+Enable strategy voice; it starts muted on each page visit. Read strategy repeats the current call.
+
+Calls add a decision or consequence to the figures: an insufficient pit setting, saving that could skip
+a stop, tyre coverage conflicting with “No Change”, fuel running out before energy, or whether repairs
+alone exceed projected damage loss. A lower repair estimate still needs pit-lane time adding; it does
+not prove a stop pays back. They use the existing deterministic `racePlanView` and strategy evidence.
+Routine countdowns and finish coverage stay silent. The box call says the whole stop as the MFD should
+read (“Box this lap. Energy 38 percent, new medium.”); it and a lost wheel are urgent and speak at once.
+Every other call waits for a straight: one second flat out (throttle ≥ 98 %, brake ≤ 5 %) in the pedal
+buffer, so nothing lands in a braking zone; the pedals are watched only while the voice is on. A plan
+change from the strategy engine is a call of its own (demo: “Plan change. Using less energy. Box lap 21,
+energy 58 percent, no tyre change.”), spoken on the straight where the strip shows; urgent calls go first.
+Automatic calls require a change in implication; lap completion and moving numeric estimates alone stay
+silent. A 60-second per-call cooldown suppresses bouncing estimates, while new urgent calls still
+interrupt. Read strategy explicitly bypasses suppression. Ordinary pit entry stays silent.
+Calculating, non-race, paused, non-driving and
+disconnected states suppress calls and cancel pending audio. Muting or leaving cancels audio too.
+Browser speech synthesis requires no new package or API key; voice availability and audio behavior
+depend on the browser and installed voices. Unsupported browsers show an unavailable state; speech
+errors offer a manual retry. This POC does not persist preferences or provide voice selection.
+Voice selection is left to the browser, with the original English (`en-GB`) language setting.
+
 ## Confirmed brief
 
 - Dedicated second monitor connected to the same PC as LMU: 27-inch, 2560 x 1440,

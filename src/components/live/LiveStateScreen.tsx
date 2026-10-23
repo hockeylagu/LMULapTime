@@ -1,8 +1,12 @@
 import { LiveGarageChecklist } from './LiveGarageChecklist.js';
+import { LiveRaceStrategy } from './LiveRaceStrategy.js';
 import { syncOnReturnToDashboard, type LiveScreen } from './liveScreens.js';
 
-/** The big state title with its note and, in the garage, the checklist of what to set before leaving. */
-export function LiveStateScreen({ screen }: { screen: LiveScreen }) {
+/**
+ * The big state title with its note and, in the garage, the checklist of what to set before leaving and the race
+ * strategy. `quali` names the set qualifying takes when known (the demo's, until the car's compounds are read).
+ */
+export function LiveStateScreen({ screen, quali }: { screen: LiveScreen; quali?: string }) {
   // With a checklist the title steps down so the things to set lead the screen.
   const checklist = screen.checks.length > 0;
   const title = checklist ? 'text-[120px]' : 'text-[164px]';
@@ -26,7 +30,8 @@ export function LiveStateScreen({ screen }: { screen: LiveScreen }) {
       </div>
       {screen.note && <p className={`${checklist ? 'text-[48px]' : 'text-[64px]'} font-semibold text-lmu-text-soft`}>{screen.note}</p>}
       {/* On the grid the pedal trace shares the screen: the checklist sits closer under the title. */}
-      {checklist && <LiveGarageChecklist checks={screen.checks} compact={screen.showTrace} />}
+      {checklist && <LiveGarageChecklist checks={screen.checks} compact={screen.showTrace || screen.raceStrategy !== undefined} />}
+      {screen.raceStrategy && <LiveRaceStrategy strategies={screen.raceStrategy} quali={quali} />}
       {/* A plain hash link: the dashboard page renders without a router of its own (HashRouter follows the hash). */}
       {screen.dashboardLink && (
         <a href="#/dashboard" onClick={syncOnReturnToDashboard} className="mt-8 self-start rounded-2xl border-2 border-lmu-border bg-lmu-card px-14 py-7 text-[56px] font-semibold text-lmu-text transition-colors hover:border-lmu-accent hover:bg-lmu-raised">

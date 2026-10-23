@@ -1,5 +1,6 @@
 import type { LiveLapsLeft, LiveLapRecord, LiveSessionKind } from '../../types/live.js';
-import type { LiveGaragePlan, LiveGarageTyres, LivePitInfo, LivePitMenu, LivePitState, LiveResourceKind, LiveResourcePlan, LiveStrategy } from '../../types/liveStrategy.js';
+import type { LiveGaragePlan, LiveGarageTyres, LivePitInfo, LivePitMenu, LivePitState, LiveRaceStrategies, LiveResourceKind, LiveResourcePlan, LiveStrategy } from '../../types/liveStrategy.js';
+import type { SessionStrategy } from '../../types/session.js';
 import { LiveDamageTracker, LiveTyreTracker, worstTread } from './liveCarCondition.js';
 import type { LiveCarReading, LiveVehicleCondition } from './liveCarCondition.js';
 import { nextForecastChange } from './liveForecast.js';
@@ -13,6 +14,9 @@ import { RAIN_WET_MIN } from '../lapConditions.js';
 import type { LiveUsageObservation } from '../../types/liveAudit.js';
 import { classLeaderLapSeconds, raceClockRunning } from './liveLapsLeft.js';
 import { plannedServiceSeconds, refuelBase, refuelSeconds } from './livePitTime.js';
+import { planRaceStrategies } from '../strategy/raceStrategy.js';
+import { estimateFromHistory } from '../strategy/strategyHistory.js';
+import type { StrategyHistoryEstimate } from '../strategy/strategyHistory.js';
 import type { RefuelPart } from './livePitTime.js';
 
 /** One parsed answer of LMU's local REST API (server/live/lmuPitRest.ts). */
@@ -24,14 +28,16 @@ export type LiveRestUpdate =
   | { type: 'estimate'; total: number; damage: number; penalties: number; fuel: number; ve: number; tires: number }
   /** The pit rules: random delays (s), fill rates (litres or % VE a second) and the insert times of a refuel (s). */
   | { type: 'pitStopTimes'; fixRandom: number; fuelRandom: number; tireRandom: number; veRandom: number;
-    fuelFillRate: number; veFillRate: number; fuelInsert: number; veInsert: number }
+    fuelFillRate: number; veFillRate: number; fuelInsert: number; veInsert: number;
+    /** Seconds to change four tyres (`FourTireChange`, 12 at Le Mans 2026-10-22); added to the refuel, null when absent. */
+    fourTyreChange?: number | null }
   | { type: 'pitMenu'; menu: LivePitMenu }
   | { type: 'condition'; condition: LiveVehicleCondition }
   | { type: 'tireManagement'; vePerLap: number | null; fuelPerLap: number | null; newSets: number | null; selected: LiveSelectedTyres | null }
   | { type: 'garage'; veStart: number | null; fuelStart: number | null; fuelRatio?: number | null }
   | { type: 'forecast'; sessions: Record<string, LiveForecastNode[]> }
-  /** The race length set for the event (`GetSessionsInfoForEvent`), minutes; null when the event has no single race. */
-  | { type: 'schedule'; raceMinutes: number | null };
+  /** The actual weekend (`GetSessionsInfoForEvent`); a race needs an unambiguous length in minutes. */
+  | { type: 'schedule'; raceMinutes: number | null; hasQualifying: boolean };
 
 /** What the strategy needs besides the reading: the session details already derived for the snapshot. */
 export interface LiveStrategyContext {
@@ -126,13 +132,20 @@ export class LiveStrategyTracker {
   private eventEstimate: Pick<Extract<LiveRestUpdate, { type: 'tireManagement' }>, 'vePerLap' | 'fuelPerLap'> | null = null;
   private garage: Extract<LiveRestUpdate, { type: 'garage' }> | null = null;
   private forecast: Record<string, LiveForecastNode[]> | null = null;
-  private raceMinutes: number | null = null;
+  private schedule: Extract<LiveRestUpdate, { type: 'schedule' }> | null = null;
+  /** The player's earlier races on the layout in the class (`setRaceHistory`), for the race plan before event laps. */
+  private raceHistory: SessionStrategy[] = [];
+
+  /** The player's earlier races on this layout in this class, newest first; empty on another layout or class. */
+  public setRaceHistory(races: SessionStrategy[]): void {
+    this.raceHistory = races;
+  }
 
   /** Forgets everything (the game closed). */
   public reset(): void {
     this.eventKey = null;
     this.eventLayout = null;
-    this.raceMinutes = null;
+    this.schedule = null;
     this.meters.ve.clear();
     this.meters.fuel.clear();
     this.eventLaps = [];
@@ -196,14 +209,19 @@ export class LiveStrategyTracker {
         return;
       case 'garage': this.garage = update; return;
       case 'forecast': this.forecast = update.sessions; return;
-      case 'schedule': this.raceMinutes = update.raceMinutes; return;
+      case 'schedule': this.schedule = update; return;
     }
   }
 
   /** Follows one scoring reading; returns the strategy for the snapshot, null while no session is loaded. */
   public update(reading: LiveScoringReading | null, state: LiveState, context: LiveStrategyContext): LiveStrategy | null {
     // The menu ends the session, not the event: the same car back on the same track keeps its measured use and ratios.
-    if (state.lifecycle === 'menu') { this.resetSession(); this.sessionKey = null; return null; }
+    if (state.lifecycle === 'menu') {
+      this.resetSession(); this.sessionKey = null;
+      // Another server can use the same track and car: wait for its own weekend, even when estimates are retained.
+      this.schedule = null;
+      return null;
+    }
     if (state.lifecycle === 'offline') { this.reset(); return null; }
     const player = reading?.player;
     if (!reading || !player || !state.session) return null;
@@ -328,9 +346,21 @@ export class LiveStrategyTracker {
     return { perLap: game !== null && game > 0 ? round(game, 2) : null, perLapSource: game !== null && game > 0 ? 'game' : null, lapsMeasured: 0 };
   }
 
+  /** What the player's earlier races on the layout in the class measured (dry only: the races do not say their conditions). */
+  private history(kind: LiveResourceKind): StrategyHistoryEstimate | null {
+    return this.wet ? null : estimateFromHistory(this.raceHistory, kind, this.eventCompound || this.usage?.selected?.compound || null);
+  }
+
+  /**
+   * The use per lap: the event's own laps, else the player's earlier races here, else the game's estimate with its
+   * learned correction (fitted to the game's estimate, not to the races). The learning keeps the uncorrected
+   * baseline (`learningForecasts`), never the history.
+   */
   private perLap(kind: LiveResourceKind): Pick<LiveResourcePlan, 'perLap' | 'perLapSource' | 'lapsMeasured' | 'learning'> {
     const base = this.basePerLap(kind);
-    const correction = base.perLap !== null && base.perLapSource !== null && this.wetness !== null && this.eventCompound
+    const history = base.perLapSource === 'measured' ? null : this.history(kind)?.perLap ?? null;
+    if (history !== null) return { perLap: history, perLapSource: 'history', lapsMeasured: 0 };
+    const correction = base.perLap !== null && base.perLapSource !== null && base.perLapSource !== 'history' && this.wetness !== null && this.eventCompound
       ? this.correct?.(kind, base.perLap, base.perLapSource, this.wetness >= RAIN_WET_MIN ? 'wet' : 'dry', this.eventCompound) : null;
     return correction && Number.isFinite(correction.perLap) && correction.perLap > 0
       ? { ...base, perLap: correction.perLap, learning: { baselinePerLap: base.perLap!, adjustment: correction.adjustment } } : base;
@@ -454,16 +484,35 @@ export class LiveStrategyTracker {
     });
   }
 
+  /** The race plan, on the dashboard's use per lap; the wear is the event's once measured, else the earlier races'. */
+  private raceStrategy(kind: LiveResourceKind, lapSeconds: number | null, resource: LiveResourcePlan, reserveLaps: number,
+    tyres: LiveGarageTyres | null, qualifyingAhead: boolean): LiveRaceStrategies | null {
+    const history = this.history(kind);
+    const historyWear = this.eventTyreWear === null ? history?.wearPerLap ?? null : null;
+    const strategy = planRaceStrategies({
+      kind, raceMinutes: this.schedule?.raceMinutes ?? null, lapSeconds, perLap: resource.perLap, reserveLaps, capacity: resource.capacity,
+      qualifyingAhead, tyres, compound: this.eventCompound || tyres?.compound || null,
+      wearPerLap: historyWear ?? this.eventTyreWear, tyreChangeSeconds: this.delays?.fourTyreChange ?? null,
+    });
+    if (!strategy) return null;
+    const source = resource.perLapSource;
+    const races = Math.max(source === 'history' ? history?.useRaces ?? 0 : 0, historyWear !== null ? history?.wearRaces ?? 0 : 0);
+    return { ...strategy, basis: {
+      use: source === 'measured' ? 'event' : source, wear: this.eventTyreWear !== null ? 'event' : historyWear !== null ? 'history' : null, races } };
+  }
+
   private garagePlan(kind: LiveResourceKind, reading: LiveScoringReading, resource: LiveResourcePlan, reserveLaps: number): LiveGaragePlan {
     const race = liveSessionKind(reading.sessionCode) === 'race';
     // `endEt` is a session time, not a length: what is left is the time to it. Before a race's clock runs it is not the
     // race end (`raceClockRunning`), so the race length comes from the event's schedule, unknown until it is read.
     const clockRunning = raceClockRunning(reading.gamePhase, reading.currentEt);
+    const raceMinutes = this.schedule?.raceMinutes ?? null;
     const sessionSeconds = race && !clockRunning
-      ? (this.raceMinutes === null ? null : this.raceMinutes * 60)
+      ? (raceMinutes === null ? null : raceMinutes * 60)
       : !(reading.endEt > 0 && reading.endEt < 1_000_000) ? null : Math.max(0, reading.endEt - Math.max(0, reading.currentEt));
     const estimated = reading.player && reading.player.estimatedLapTime > 0 ? reading.player.estimatedLapTime : null;
     const lapSeconds = classLeaderLapSeconds(reading.player, reading.classLeader) ?? median(this.eventLaps) ?? estimated;
+    const tyres = this.garageTyres();
     const plan = planGarage({
       kind,
       sessionSeconds,
@@ -479,7 +528,11 @@ export class LiveStrategyTracker {
       capacity: resource.capacity,
       setInGarage: kind === 've' ? this.garage?.veStart ?? null : this.garage?.fuelStart ?? null,
     });
-    return { ...plan, ...(resource.learning ? { learning: resource.learning } : {}), tyres: this.garageTyres(), tyreCoverage: null };
+    const sessionKind = liveSessionKind(reading.sessionCode);
+    // Planned from any garage before the race; once the race clock runs it is the race plan's job.
+    const raceStrategy = race && clockRunning ? null : this.raceStrategy(kind, plan.lapSeconds, resource, reserveLaps, tyres,
+      sessionKind === 'qualifying' || (sessionKind === 'practice' && this.schedule?.hasQualifying === true));
+    return { ...plan, ...(resource.learning ? { learning: resource.learning } : {}), tyres, tyreCoverage: null, raceStrategy };
   }
 
   private garageTyres(): LiveGarageTyres | null {

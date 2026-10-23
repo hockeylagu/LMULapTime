@@ -1,5 +1,5 @@
 import type { LiveSessionKind, LiveSnapshot } from '../../../shared/types/live.js';
-import type { LiveGaragePlan, LiveGarageTyres } from '../../../shared/types/liveStrategy.js';
+import type { LiveGaragePlan, LiveGarageTyres, LiveRaceStrategies } from '../../../shared/types/liveStrategy.js';
 import { knownCarClass, resolveVehicle } from '../../../shared/domain/vehicleMapping.js';
 import { formatLapTime, UNKNOWN } from './liveFormat.js';
 import { formatAmount, resourceName } from './race/livePlanFormat.js';
@@ -24,7 +24,7 @@ export interface GarageCheck {
   /** `ok` when the garage already matches, `change` when the driver must act, `warn` when they cannot. */
   action: { text: string; tone: 'ok' | 'change' | 'warn' } | null;
   note?: string;
-  /** The tyre compound shown after the label, in its colour. */
+  /** The compound fitted in the garage, after `current` (`NEW MEDIUM`) in its colour. */
   compound?: string;
 }
 
@@ -38,6 +38,8 @@ export interface LiveScreen {
   /** The pedal trace stays for an input check (starting) and while driving. */
   showTrace: boolean;
   preparation?: { laps: number | null; length: string; stopPlan: string | null };
+  /** In a garage before the race: the race plan the engine chose, and the next best. */
+  raceStrategy?: LiveRaceStrategies;
   /** With the game closed: a way back to the dashboard. */
   dashboardLink?: boolean;
 }
@@ -79,7 +81,7 @@ function resourceCheck(plan: LiveGaragePlan, practice: boolean): GarageCheck {
   return {
     label: name,
     target: formatAmount(needed, unit), current: formatAmount(set, unit), unit, action,
-    note: plan.learning ? 'LEARNED CORRECTION' : plan.perLapSource === 'game' ? 'GAME ESTIMATE' : plan.perLapSource === null ? 'USE NOT MEASURED' : undefined,
+    note: plan.learning ? 'LEARNED CORRECTION' : plan.perLapSource === 'history' ? 'FROM YOUR RACES HERE' : plan.perLapSource === 'game' ? 'GAME ESTIMATE' : plan.perLapSource === null ? 'USE NOT MEASURED' : undefined,
   };
 }
 
@@ -90,12 +92,14 @@ function resourceCheck(plan: LiveGaragePlan, practice: boolean): GarageCheck {
 function tyreCheck(tyres: LiveGarageTyres | null, wantNew: boolean): GarageCheck {
   const label = 'TYRES';
   const compound = tyres?.compound ? tyres.compound.toUpperCase() : undefined;
-  const current = !tyres ? UNKNOWN : tyres.used ? `USED ${Math.round(tyres.wear * 100)}%` : 'NEW';
-  if (!wantNew) return { label, compound, target: 'ANY', current, action: null };
+  const current = !tyres ? UNKNOWN : tyres.used ? 'USED' : 'NEW';
+  // The tread of a used set goes under the label: the garage column keeps the state and the compound.
+  const note = tyres?.used ? `${Math.round(tyres.wear * 100)}% TREAD` : undefined;
+  if (!wantNew) return { label, compound, target: 'ANY', current, action: null, note };
   const action: GarageCheck['action'] = !tyres ? null
     : !tyres.used ? { text: 'OK', tone: 'ok' }
       : tyres.newSets === 0 ? { text: 'NO NEW SETS', tone: 'warn' } : { text: 'FIT NEW', tone: 'change' };
-  return { label, compound, target: 'NEW', current, action };
+  return { label, compound, target: 'NEW', current, action, note };
 }
 
 /** The garage checklist: the VE or fuel load, the fuel ratio (VE classes) and the tyres the car goes out on. */
@@ -153,10 +157,14 @@ export function liveScreen(snapshot: LiveSnapshot): LiveScreen {
       const plan = snapshot.strategy?.garage ?? null;
       const qualifying = snapshot.qualifyingResult;
       const qualiNote = session?.kind === 'race' && qualifying ? `QUALI ${qualifying.classPlace !== null ? `P${qualifying.classPlace}` : UNKNOWN} ${formatLapTime(qualifying.bestLap)}${qualifying.settled === true ? '' : ' (PROVISIONAL)'}` : '';
+      const prep = plan ? garagePreparation(session?.kind, plan) : undefined;
+      // The race strategy needs the room: the session length and laps join the title, the checklist takes its compact size.
+      const raceStrategy = plan?.raceStrategy ?? undefined;
       return {
-        title: kind,
+        title: raceStrategy && prep ? `${kind} · ${prep.length}${prep.laps !== null ? ` · ~${prep.laps} LAPS` : ''}` : kind,
         note: plan ? qualiNote : 'WAITING FOR GARAGE DATA',
-        preparation: plan ? garagePreparation(session?.kind, plan) : undefined,
+        preparation: raceStrategy ? undefined : prep,
+        ...(raceStrategy ? { raceStrategy } : {}),
         muted: false,
         checks: plan ? garageChecks(snapshot, plan) : [],
         showTrace: false,

@@ -166,14 +166,14 @@ describe('race page with a plan', () => {
     expect(rows()[0]).toHaveTextContent('VE34%30%RAISE +4%');
     expect(rows()[0]).toHaveAttribute('data-action', 'change');
     // Qualifying and the race want a new set: the one carried over is a change to make.
-    expect(rows()[1]).toHaveTextContent('TYRES · MEDIUMNEWUSED 98%FIT NEW');
+    expect(rows()[1]).toHaveTextContent('TYRES98% TREADNEWUSED MEDFIT NEW');
     // Even when the used set would last the session.
     send(inGarage('qualifying', { tyreCoverage: { target: 'finish' as const, projectedTread: 0.9, setsNeeded: 0, availableSetsCover: true } }, 1.5));
-    expect(rows()[1]).toHaveTextContent('TYRES · MEDIUMNEWUSED 98%FIT NEW');
+    expect(rows()[1]).toHaveTextContent('TYRES98% TREADNEWUSED MEDFIT NEW');
 
     send(inGarage('race', { setInGarage: 40, tyres: { ...garage.tyres, used: false, wear: 1 } }, 2));
     expect(rows()[0]).toHaveAttribute('data-action', 'ok');
-    expect(rows()[1]).toHaveTextContent('TYRES · MEDIUMNEWNEWOK');
+    expect(rows()[1]).toHaveTextContent('TYRESNEWNEW MEDOK');
     send(inGarage('race', { tyres: { ...garage.tyres, newSets: 0 } }, 3));
     expect(rows()[1]).toHaveAttribute('data-action', 'warn');
     expect(rows()[1]).toHaveTextContent('NO NEW SETS');
@@ -181,7 +181,7 @@ describe('race page with a plan', () => {
     send(inGarage('practice', {}, 4));
     expect(rows()[0]).toHaveTextContent('VE34%30%~12 LAPS');
     expect(rows()[0]).toHaveAttribute('data-action', 'warn');
-    expect(rows()[1]).toHaveTextContent('TYRES · MEDIUMANYUSED 98%');
+    expect(rows()[1]).toHaveTextContent('TYRES98% TREADANYUSED MED');
     expect(rows()[1]).not.toHaveAttribute('data-action');
     // On the grid the race checklist stays under the start phase, over the pedal trace, until the formation lap.
     const onGrid = (gamePhase: number, sequence: number) => liveSnapshot({ sequence, lifecycle: 'starting', session: liveSession({ kind: 'race', gamePhase }),
@@ -189,7 +189,7 @@ describe('race page with a plan', () => {
     send(onGrid(0, 4.5));
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('ON THE GRID');
     expect(rows()[0]).toHaveTextContent('VE34%30%RAISE +4%');
-    expect(rows()[1]).toHaveTextContent('TYRES · MEDIUMNEWNEWOK');
+    expect(rows()[1]).toHaveTextContent('TYRESNEWNEW MEDOK');
     expect(screen.getByTestId('pedal-trace')).toBeInTheDocument();
     // From the formation lap it is too late to go back in.
     send(onGrid(3, 4.6));

@@ -8,7 +8,8 @@
 export type LiveResourceKind = 've' | 'fuel';
 
 /** Where the per-lap use comes from: laps measured in this event, or LMU's own estimate before the first lap. */
-export type LivePerLapSource = 'measured' | 'game';
+/** `history`: the player's earlier races on the layout in the class (the garage plan only, before the event's laps). */
+export type LivePerLapSource = 'measured' | 'game' | 'history';
 
 import type { LiveFuelRatio, LiveSavingPlan, LiveTyreCoverage } from './liveInsights.js';
 
@@ -129,8 +130,8 @@ export interface LiveTyres {
 }
 
 export interface LiveForecast {
-  /** The next change in this session: rain arriving or ending. */
-  change: 'rain' | 'dry';
+  /** The next change in this session: rain arriving or ending; `none` when the weather holds to the end. */
+  change: 'rain' | 'dry' | 'none';
   /** Rain chance at that forecast node, percent. */
   chance: number;
   /** Session seconds of the node (nodes are fractions of the session length). */
@@ -165,27 +166,8 @@ export interface LiveGaragePlan {
   firstPitLap?: number | null;
   /** The tyres the car goes out on (`TireManagement` selected set); null until read. */
   tyres: LiveGarageTyres | null;
-}
-
-/** The tyre set selected in the garage for the next run. */
-export interface LiveGarageTyres {
-  compound: string | null;
-  /** Any of the four already driven (a set carried over from an earlier session). */
-  used: boolean;
-  /** Tread left on the most worn of the four, 0-1. */
-  wear: number;
-  newSets: number | null;
-}
-
-export interface LiveStrategy {
-  resource: LiveResourcePlan | null;
-  pit: LivePitInfo | null;
-  damage: LiveDamage | null;
-  tyres: LiveTyres | null;
-  forecast: LiveForecast | null;
-  /** Garage only. */
-  garage: LiveGaragePlan | null;
-  fuelRatio?: LiveFuelRatio | null;
+  /** The race of the event, planned from any garage before it (`shared/domain/strategy/raceStrategy.ts`); null until it can be. */
+  raceStrategy?: LiveRaceStrategies | null;
 }
 
 /** One way to run the race: the stops the VE or fuel needs, what to load, and the race tyres. */
@@ -227,4 +209,25 @@ export interface LiveRaceStrategies {
   nextBest: LiveRaceStrategy | null;
   /** Set by the live tracker; the demo leaves it out. */
   basis?: LiveRaceStrategyBasis;
+}
+
+/** The tyre set selected in the garage for the next run. */
+export interface LiveGarageTyres {
+  compound: string | null;
+  /** Any of the four already driven (a set carried over from an earlier session). */
+  used: boolean;
+  /** Tread left on the most worn of the four, 0-1. */
+  wear: number;
+  newSets: number | null;
+}
+
+export interface LiveStrategy {
+  resource: LiveResourcePlan | null;
+  pit: LivePitInfo | null;
+  damage: LiveDamage | null;
+  tyres: LiveTyres | null;
+  forecast: LiveForecast | null;
+  /** Garage only. */
+  garage: LiveGaragePlan | null;
+  fuelRatio?: LiveFuelRatio | null;
 }

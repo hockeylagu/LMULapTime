@@ -103,7 +103,11 @@ export function createLiveRouter(context: ServerContext, live: LiveService,
     let running = live.isGameRunning();
     // Whether LMU is running, so a page that was not switched to the dashboard can offer it.
     const publishRunning = (): void => {
-      try { writeSseEvent(res, APP_EVENTS.gameRunning, { running }); } catch { /* the connection is closing */ }
+      try {
+        writeSseEvent(res, APP_EVENTS.gameRunning, {
+          running, autoOpen: !live.hasClients() && loadLiveSettings(context.sessionDb).autoOpen,
+        });
+      } catch { /* the connection is closing */ }
     };
     publishRunning();
     const stopRunning = live.events.on('game-running', next => {

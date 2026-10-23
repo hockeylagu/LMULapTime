@@ -17,6 +17,8 @@ export interface PlanReadout {
   value: string;
   unit?: string;
   note?: string;
+  /** Render tyre compound words in the note using their sidewall colours. */
+  compoundNote?: boolean;
   tone?: PlanTone;
   noteTone?: PlanTone;
   detail?: string;
@@ -36,8 +38,9 @@ export interface RacePlanView {
 /** The pit countdown leads from this many laps out; before that the per-lap use leads (mid-stint). */
 export const PIT_LEAD_LAPS = 2;
 
-/** `RAIN ~LAP 20 · 60%`, `RAIN ENDS ~LAP 25`: the forecast explains, it never recommends. */
+/** `RAIN ~LAP 20 · 60%`, `RAIN ENDS ~LAP 25`, `DRY` (no rain to the end): the forecast explains, it never recommends. */
 export function forecastText(forecast: LiveForecast): string {
+  if (forecast.change === 'none') return 'DRY';
   const lap = forecast.lap !== null ? `~LAP ${forecast.lap}` : null;
   return forecast.change === 'rain'
     ? ['RAIN', lap, `${forecast.chance}%`].filter(Boolean).join(' · ').replace('RAIN · ', 'RAIN ')
@@ -68,7 +71,7 @@ function tyresCell(tyres: LiveTyres | null): PlanReadout {
 }
 
 function forecastCell(forecast: LiveForecast | null, resource: LiveResourcePlan | null): PlanReadout {
-  if (forecast) {
+  if (forecast && forecast.change !== 'none') {
     return {
       label: forecast.change === 'rain' ? `RAIN · ${forecast.chance}%` : 'RAIN ENDS',
       value: forecast.lap !== null ? `~LAP ${forecast.lap}` : UNKNOWN,
@@ -196,7 +199,7 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
       ],
     };
   }
-  const estimate = resource.learning ? ' · LEARNED' : resource.perLapSource === 'game' ? ' · GAME EST.' : '';
+  const estimate = resource.learning ? ' · LEARNED' : resource.perLapSource === 'game' ? ' · GAME EST.' : resource.perLapSource === 'history' ? ' · YOUR RACES' : '';
   if (race.finishReachable) {
     return {
       mode: 'sprint',

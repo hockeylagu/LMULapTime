@@ -3,7 +3,8 @@ import { LIVE_BASELINE_MODEL_VERSION, LIVE_MODEL_VERSION } from '../../shared/do
 import { deriveLiveState, isLiveOnTrack, isLiveSessionLoaded } from '../../shared/domain/live/liveLifecycle.js';
 import type { LiveGameScreen, LiveScoringReading, LiveVehicleReading } from '../../shared/domain/live/liveLifecycle.js';
 import type { LiveCarReading } from '../../shared/domain/live/liveCarCondition.js';
-import type { LivePitState } from '../../shared/types/liveStrategy.js';
+import type { LivePitState, LiveRaceStrategies } from '../../shared/types/liveStrategy.js';
+import type { SessionStrategy } from '../../shared/types/session.js';
 import { LiveStrategyTracker } from '../../shared/domain/live/liveStrategyTracker.js';
 import { LiveResultTracker } from '../../shared/domain/live/liveResults.js';
 import type { LiveRestUpdate } from '../../shared/domain/live/liveStrategyTracker.js';
@@ -11,7 +12,7 @@ import type { PersonalBestLookup } from '../../shared/domain/live/liveIdentity.j
 import type { PitLaneLossRow } from '../core/live/dbPitLaneStore.js';
 import { LiveSessionTracker, NO_SESSION_DETAILS } from '../../shared/domain/live/liveSessionTracker.js';
 import { DEFAULT_LIVE_SETTINGS, LIVE_HEARTBEAT_MS, LIVE_STREAM_EVENTS } from '../../shared/types/live.js';
-import type { LiveLifecycle, LivePedalBatch, LivePedalSample, LiveSnapshot, LiveTiming } from '../../shared/types/live.js';
+import type { LiveLifecycle, LivePedalBatch, LivePedalSample, LiveSessionKind, LiveSnapshot, LiveTiming } from '../../shared/types/live.js';
 import { TypedEmitter } from '../core/typedEmitter.js';
 import { findWorkerBootstrap, isWorkerMessage } from '../core/workerThreads.js';
 import type { LiveReaderMessage } from './liveReader.js';
@@ -60,6 +61,10 @@ export interface LiveServiceOptions {
     read(layoutKey: string, carClass: string): number | null;
     record(row: PitLaneLossRow): void;
   };
+  /** Saves the race plan shown before the start with the race recording (`server/core/live/dbRacePlanStore.ts`). */
+  racePlan?: (recordingId: string, plan: LiveRaceStrategies) => void;
+  /** The player's earlier races on a layout in a class, measured (`readStrategyHistory`); none without it. */
+  raceHistory?: (layoutKey: string, carClass: string) => Promise<SessionStrategy[]>;
 }
 
 function offlineSnapshot(): LiveSnapshot {
@@ -103,6 +108,9 @@ export class LiveService {
   private readonly learning = new LiveLearningCapture();
   private pitLaneKey: string | null = null;
   private pitLaneSession = 0;
+  /** The race's plan from before the start, and the recording it was last saved with. */
+  private raceHistoryKey: string | null = null;
+  private racePlan: { plan: LiveRaceStrategies; json: string; savedFor: string | null } | null = null;
   private readonly pit: LivePitPoller;
   /** The last scoring reading, kept so a navigation notice or a REST answer can re-derive the snapshot without a new frame. */
   private lastReading: LiveScoringReading | null = null;
@@ -328,6 +336,45 @@ export class LiveService {
     }
   }
 
+  /**
+   * The race plan learns from the player's earlier races on the exact layout in the exact class, read once when they
+   * resolve (never a guess: none while either is unknown). An answer for a key no longer current is dropped; a failed
+   * read leaves the plan on the event's laps and the game's estimate.
+   */
+  private followRaceHistory(layoutKey: string | null, carClass: string | null): void {
+    const read = this.options.raceHistory;
+    const key = layoutKey && carClass ? `${layoutKey}|${carClass}` : null;
+    if (!read || key === this.raceHistoryKey) return;
+    this.raceHistoryKey = key;
+    this.strategy.setRaceHistory([]);
+    if (!layoutKey || !carClass) return;
+    read(layoutKey, carClass).then(races => {
+      if (this.raceHistoryKey === key) this.strategy.setRaceHistory(races);
+    }, (error: unknown) => console.warn('[Live] Race history read failed:', error));
+  }
+
+  /**
+   * The race plan shown before the start (it is null once the clock runs) is saved with the race recording, once it
+   * exists (it may begin only at the green) and whenever the plan changed; another session forgets it. A storage
+   * failure only loses the plan vs actual.
+   */
+  private followRacePlan(kind: LiveSessionKind | null, plan: LiveRaceStrategies | null): void {
+    if (kind !== 'race') {
+      this.racePlan = null;
+      return;
+    }
+    const json = plan ? JSON.stringify(plan) : null;
+    if (plan && json !== this.racePlan?.json) this.racePlan = { plan, json: json!, savedFor: null };
+    const recordingId = this.options.capture?.status().recordingId;
+    if (!this.racePlan || !recordingId || this.racePlan.savedFor === recordingId || !this.options.racePlan) return;
+    try {
+      this.options.racePlan(recordingId, this.racePlan.plan);
+      this.racePlan.savedFor = recordingId;
+    } catch (error) {
+      console.warn('[Live] Race plan store failed:', error);
+    }
+  }
+
   /** Recording, learning and diagnostics never stop the dashboard: a failure only ends the recording (NO REC). */
   private record(work: () => void): void {
     try { work(); } catch (error) { this.options.capture?.fail(error); }
@@ -380,6 +427,7 @@ export class LiveService {
     // The previous strategy: the planned stop it holds shortens the race distance (`LiveSessionTracker`).
     const details = this.tracker.apply(reading, state, previous.strategy ?? null);
     this.followPitLane(identity?.layoutKey ?? null, identity?.carClass ?? null);
+    this.followRaceHistory(identity?.layoutKey ?? null, identity?.carClass ?? null);
     const strategy = this.strategy.update(reading, state, {
       carClass: identity?.carClass ?? null,
       layoutKey: identity?.layoutKey ?? null,
@@ -393,6 +441,7 @@ export class LiveService {
       loadingProgress: state.lifecycle === 'loading' ? this.loadingProgress : null,
       strategy,
     };
+    this.followRacePlan(state.session?.kind ?? null, strategy?.garage?.raceStrategy ?? null);
     this.record(() => {
       this.options.capture?.update(reading, { ...next, sequence: previous.sequence + 1, receivedAt: Date.now() }, this.strategy.observations());
       const recordingId = this.options.capture?.status().recordingId;

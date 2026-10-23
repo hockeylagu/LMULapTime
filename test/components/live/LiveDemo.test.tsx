@@ -85,6 +85,14 @@ describe('offline live dashboard demo', () => {
     }
   });
 
+  it('plans the garage through the real live tracker: the use and wear from the earlier races, the game for the ratio', () => {
+    const strategy = createDemoState('garage-race', 'Hyper').snapshot?.strategy;
+    expect(strategy?.garage).toMatchObject({ perLap: 4, perLapSource: 'history', needed: 100, stops: 1 });
+    expect(strategy?.garage?.raceStrategy).toMatchObject({ laps: 39, chosen: { name: 'NO TYRE CHANGE', pitLap: 23, loadToFinish: 66 },
+      basis: { use: 'history', wear: 'history', races: 3 } });
+    expect(strategy?.fuelRatio).toMatchObject({ recommended: 0.95, source: 'game', garageSetting: 0.9 });
+  });
+
   it.each(['garage-qualifying', 'garage-sprint', 'garage-race'])('keeps the fuel ratio visible in %s', id => {
     window.location.hash = `#/live?demo=1&scenario=${id}`;
     render(<LiveDemoPage />);
@@ -141,7 +149,7 @@ describe('offline live dashboard demo', () => {
     render(<LiveDemoPage />);
     for (const [from, next] of [
       ['garage-practice', 'garage-practice-light'], ['garage-practice-light', 'practice-out-lap'], ['invalid-lap', 'garage-qualifying'],
-      ['garage-qualifying', 'qualifying-out-lap'], ['positive-delta', 'result-qualifying'],
+      ['garage-qualifying', 'garage-qualifying-sprint'], ['garage-qualifying-sprint', 'qualifying-out-lap'], ['positive-delta', 'result-qualifying'],
       ['result-qualifying', 'result-qualifying-settled'], ['start-0', 'start-3'],
       ['start-3', 'start-4'], ['pit-entering', 'pit-stopped'], ['pit-stopped', 'pit-exiting'],
       ['finished', 'result-race'],
@@ -164,6 +172,93 @@ describe('offline live dashboard demo', () => {
     pick(/Scenario/, 'race');
     expect(screen.getByTestId('live-race-plan')).toBeInTheDocument();
     expect(FakeEventSource.instances).toHaveLength(0);
+  });
+
+  it('plans the race before qualifying (stops, VE, race tyres), qualifying on soft only for a car that has it', () => {
+    window.location.hash = '#/live?demo=1&scenario=tyre-strategy-quali&carClass=Hyper';
+    render(<LiveDemoPage />);
+    const strategy = () => screen.getByTestId('live-race-strategy');
+    expect(strategy()).toHaveTextContent('RACE STRATEGY · NO TYRE CHANGE60 MIN · ~39 LAPS');
+    expect(strategy()).toHaveTextContent('STOPS1· LAP 23VE START100%VE TO FINISH66%');
+    expect(strategy()).toHaveTextContent('TYRES STARTNEW MEDTYRES AT STOPNO CHANGETREAD AT FLAG~69%');
+    expect(strategy()).toHaveTextContent('NEXT BEST · NEW TYRES AT THE STOP · +12.0 s · AT STOP NEW MED');
+    expect(screen.getByText('FIT SOFT')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('QUALIFYING · 10 MIN · ~7 LAPS');
+    cleanup();
+    window.location.hash = '#/live?demo=1&scenario=tyre-strategy-quali';
+    render(<LiveDemoPage />);
+    expect(screen.queryByText('FIT SOFT')).toBeNull();
+    expect(strategy()).toHaveTextContent('TYRES STARTNEW MED');
+  });
+
+  it('plans a sprint with no stop: only the VE to load, no next best', () => {
+    window.location.hash = '#/live?demo=1&scenario=garage-qualifying-sprint&carClass=Hyper';
+    render(<LiveDemoPage />);
+    const strategy = screen.getByTestId('live-race-strategy');
+    expect(strategy).toHaveTextContent('RACE STRATEGY · NO STOP20 MIN · ~14 LAPS · FROM YOUR LAST 3 RACES');
+    expect(strategy).toHaveTextContent('STOPSNONEVE START62%TYRES STARTNEW MEDTREAD AT FLAG~89%');
+    expect(strategy).not.toHaveTextContent('TYRES AT STOP');
+    expect(strategy).not.toHaveTextContent('NEXT BEST');
+  });
+
+  it('shows the race strategy in the real garage before the race too', () => {
+    window.location.hash = '#/live?demo=1&scenario=garage-race&carClass=Hyper';
+    render(<LiveDemoPage />);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('RACE · 60 MIN · ~39 LAPS');
+    expect(screen.getByTestId('live-race-strategy')).toHaveTextContent('RACE STRATEGY · NO TYRE CHANGE');
+    expect(screen.queryByTestId('live-preparation-laps')).toBeNull();
+  });
+
+  it('carries the call for the next stop on the tyre cell, and says when the plan changed and why', () => {
+    window.location.hash = '#/live?demo=1&scenario=strategy-changed&carClass=Hyper';
+    render(<LiveDemoPage />);
+    const cells = () => screen.getByTestId('live-race-plan');
+    expect(cells()).toHaveTextContent('MFD · NEW MEDIUMPLAN CHANGED');
+    // The demo stops on the straight after the line: the strip has the pedal trace's place.
+    expect(screen.getByTestId('demo-tyre-plan')).toHaveTextContent('PLAN CHANGEDTYRES WEARING FASTLAP 19 · VE 72% · NEW MED');
+    expect(screen.queryByTestId('pedal-trace')).toBeNull();
+  });
+
+  it('previews the next MFD setup mid-stint and expands it below three laps', () => {
+    render(<LiveDemoPage />);
+    for (const id of ['race', 'pit-three']) {
+      pick(/Scenario/, id);
+      const resource = createDemoState(id).snapshot!.strategy!.resource!;
+      expect(screen.getByTestId('live-race-plan')).toHaveAttribute('data-mode', 'stint');
+      expect(screen.getByTestId('live-race-cell-1')).toHaveTextContent(`MFD · VE ${resource.race!.neededAfterStop}%`);
+      const tyreCell = screen.getByTestId('live-race-cell-2');
+      expect(tyreCell).toHaveTextContent('MFD · NEW MEDIUM');
+      for (const compound of within(tyreCell).getAllByText('MEDIUM', { exact: true })) expect(compound).toHaveClass('text-lmu-warn');
+    }
+    for (const id of ['pit-soon', 'pit-one', 'pit-this-lap']) {
+      pick(/Scenario/, id);
+      expect(screen.getByTestId('live-race-plan')).toHaveAttribute('data-mode', 'pit');
+      expect(screen.getByTestId('live-race-cell-1')).toHaveTextContent('VE · MFD');
+      expect(screen.getByTestId('live-race-cell-1')).toHaveTextContent('SET 50%');
+      expect(screen.getByTestId('live-race-cell-1')).toHaveTextContent('RATIO 0.95');
+      expect(screen.getByTestId('live-race-cell-2')).toHaveTextContent('TYRES · MFDNEW MEDIUM');
+    }
+    pick('Car class', 'LMP2');
+    pick(/Scenario/, 'race');
+    expect(screen.getByTestId('live-race-cell-1')).toHaveTextContent('MFD · FUEL');
+    expect(screen.getByTestId('live-race-cell-1')).toHaveTextContent('L');
+    expect(screen.queryByText('FUEL RATIO')).not.toBeInTheDocument();
+  });
+
+  it('calls the whole stop when the VE plan changes, the tyres standing', () => {
+    window.location.hash = '#/live?demo=1&scenario=strategy-changed-ve&carClass=Hyper';
+    render(<LiveDemoPage />);
+    expect(screen.getByTestId('live-race-cell-1')).toHaveTextContent('PIT IN8LAPSMFD · VE 58%PLAN CHANGED');
+    expect(screen.getByTestId('live-race-plan')).toHaveTextContent('MFD · NO CHANGE');
+    expect(screen.getByTestId('demo-tyre-plan')).toHaveTextContent('PLAN CHANGEDUSING LESS VELAP 21 · VE 58% · NO CHANGE');
+  });
+
+  it('plans the race in the practice garage, no practice lap needed', () => {
+    window.location.hash = '#/live?demo=1&scenario=garage-practice&carClass=Hyper';
+    render(<LiveDemoPage />);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('PRACTICE · 60 MIN');
+    expect(screen.getByTestId('live-race-strategy')).toHaveTextContent('RACE STRATEGY · NO TYRE CHANGE');
+    expect(screen.getByTestId('live-race-strategy')).toHaveTextContent('STOPS1· LAP 23VE START100%VE TO FINISH66%');
   });
 
   it('shows the race layout: the place in the bar, the plan over the lap history, damage in the bar place', () => {
@@ -223,6 +318,7 @@ describe('offline live dashboard demo', () => {
     expect(screen.queryByText('FUEL RATIO')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     expect(window.location.hash).toContain('carClass=LMP3');
+    pick(/Scenario/, 'qualifying-out-lap');
     expect(screen.getByTestId('live-estimated-lap')).toHaveTextContent('OUT LAP');
     pick(/Scenario/, 'garage-sprint');
     pick('Car class', 'GT3');

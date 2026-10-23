@@ -8,6 +8,9 @@ import { LiveFrame } from '../LiveFrame.js';
 import { LiveDashboardView } from '../display/LiveDashboardView.js';
 import { PedalBuffer } from '../pedalBuffer.js';
 import { DemoCornerView } from './DemoCornerView.js';
+import { DemoTyrePlanView } from './DemoTyrePlanView.js';
+import { demoTyrePlanFor } from './demoTyrePlan.js';
+import { DEMO_STRAIGHT_SECONDS } from './strategyWindow.js';
 import { createDemoState, DEMO_SCENARIOS } from './demoScenarios.js';
 import { DEMO_CLASS_OPTIONS } from './demoClasses.js';
 import { knownCarClass } from '../../../../shared/domain/vehicleMapping.js';
@@ -20,7 +23,9 @@ function buildDemo(scenario: string, carClass: string, reserveLaps: number, peda
   const timing = new LiveTimingStore();
   timing.set(state.timing);
   const buffer = new PedalBuffer(pedalTraceSeconds);
-  buffer.push(Array.from({ length: pedalTraceSeconds * 50 + 1 }, (_, i) => pedalSample(i / 50)));
+  // The strategy scenarios on track stop on the straight after the line, where the strip shows.
+  const end = demoTyrePlanFor(scenario, carClass)?.cells ? Math.ceil(pedalTraceSeconds / 10) * 10 + DEMO_STRAIGHT_SECONDS : pedalTraceSeconds;
+  buffer.push(Array.from({ length: end * 50 + 1 }, (_, i) => pedalSample(i / 50)));
   return { state, timing, buffer };
 }
 
@@ -42,6 +47,7 @@ export default function LiveDemoPage() {
   const [demo, setDemo] = useState(() => ({ key: demoKey, ...buildDemo(selected.id, carClass, reserveLaps, pedalTraceSeconds) }));
   if (demo.key !== demoKey) setDemo({ key: demoKey, ...buildDemo(selected.id, carClass, reserveLaps, pedalTraceSeconds) });
   const { state, timing, buffer } = demo;
+  const tyrePlan = demoTyrePlanFor(selected.id, carClass);
 
   useEffect(() => {
     const previous = document.title;
@@ -65,7 +71,8 @@ export default function LiveDemoPage() {
   const choose = (id: string) => updateSearchParams(params, setParams, { scenario: id });
   return <>
     <LiveFrame>{selected.id === 'corners' && state.snapshot ? <DemoCornerView snapshot={state.snapshot} store={timing} buffer={buffer} />
-      : <LiveDashboardView snapshot={state.snapshot} connection={state.connection} timing={timing} buffer={buffer} />}</LiveFrame>
+      : tyrePlan && state.snapshot ? <DemoTyrePlanView snapshot={state.snapshot} store={timing} buffer={buffer} plan={tyrePlan} />
+        : <LiveDashboardView snapshot={state.snapshot} connection={state.connection} timing={timing} buffer={buffer} />}</LiveFrame>
     <aside aria-label="Offline demo controls" className="fixed bottom-3 left-1/2 z-50 w-max max-w-[calc(100vw-24px)] -translate-x-1/2 rounded-xl border border-lmu-border bg-lmu-card p-3 font-sans text-sm text-lmu-text shadow-lg">
       <div className="flex flex-wrap items-center gap-3">
         <strong className="text-lmu-warn">DEMO · SAMPLE DATA</strong>

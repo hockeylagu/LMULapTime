@@ -4,6 +4,7 @@ import type { LiveScoringReading } from '../../../shared/domain/live/liveLifecyc
 import { LiveStrategyTracker } from '../../../shared/domain/live/liveStrategyTracker.js';
 import type { LiveStrategyContext } from '../../../shared/domain/live/liveStrategyTracker.js';
 import { scoringReading, vehicleReading } from '../../helpers/liveReadings.js';
+import type { SessionStrategy } from '../../../shared/types/session.js';
 
 const LAP = 100;
 const VE_PER_LAP = 3;
@@ -35,6 +36,12 @@ function drive(tracker: LiveStrategyTracker, from: number, to: number, layoutKey
   }
   return strategy;
 }
+
+const pastRace = (vePerLap: number, wearPerLap: number, compound: string): SessionStrategy => ({
+  kind: 've', laps: 14, start: { fuel: 50, ve: 40 }, flag: { fuel: 5, ve: 3, laps: 1 }, perLap: { fuel: 3, ve: vePerLap, laps: 10 },
+  fuelRatio: { set: 1.2, needed: 1.2 }, tyres: { compound, corner: 'FL', wearPerLap, treadAtFlag: 0.7 }, stops: [],
+  pace: { clean: 75, first: 75, last: 75, laps: 10 },
+});
 
 describe('LiveStrategyTracker', () => {
   it('uses learned consumption for advice but freezes the original baseline and preserves raw measurements', () => {
@@ -164,7 +171,7 @@ describe('LiveStrategyTracker', () => {
     tracker.applyRest({ type: 'tireManagement', vePerLap: 2.5, fuelPerLap: 2.1, newSets: 40, selected: null });
     tracker.applyRest({ type: 'garage', veStart: 50, fuelStart: null });
     // The race garage before the start: the schedule's 15 minutes, twelve laps at 1:15 plus the formation lap.
-    tracker.applyRest({ type: 'schedule', raceMinutes: 15 });
+    tracker.applyRest({ type: 'schedule', raceMinutes: 15, hasQualifying: true });
     const garage = at(0, { inRealtime: false, gamePhase: 0, endEt: 64, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 75 }) });
     const strategy = context(tracker, garage, { lapsLeft: null });
     expect(strategy?.resource).toBeNull();
@@ -206,12 +213,85 @@ describe('LiveStrategyTracker', () => {
     const paused = at(0, { inRealtime: false, gamePhase: 9, endEt: 5, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 103 }) });
     expect(context(tracker, paused, { lapsLeft: null })?.garage).toMatchObject({ sessionMinutes: null, laps: null });
     // The event's schedule gives the race length: 5 minutes, three laps at 1:43 plus the formation lap.
-    tracker.applyRest({ type: 'schedule', raceMinutes: 5 });
+    tracker.applyRest({ type: 'schedule', raceMinutes: 5, hasQualifying: true });
     expect(context(tracker, paused, { lapsLeft: null })?.garage).toMatchObject({ sessionMinutes: 5, laps: 4 });
     expect(context(tracker, grid, { lapsLeft: null })?.garage).toMatchObject({ sessionMinutes: 5, laps: 4 });
     // Back in the garage with the race clock running: the formation lap is behind, 5 minutes left are three laps to the flag.
     const racing = at(60, { inRealtime: false, gamePhase: 5, endEt: 360, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 103 }) });
     expect(context(tracker, racing, { lapsLeft: null })?.garage).toMatchObject({ sessionMinutes: 5, laps: 3 });
+  });
+
+  it('plans the race from the qualifying garage, with the schedule and the game tyre change time, until the race runs', () => {
+    const tracker = new LiveStrategyTracker();
+    tracker.applyRest({ type: 'tireManagement', vePerLap: 2.5, fuelPerLap: 2.1, newSets: 3, selected: { compound: 'Medium', used: false, wear: 1 } });
+    tracker.applyRest({ type: 'pitStopTimes', fixRandom: 0, fuelRandom: 0, tireRandom: 0, veRandom: 0, fuelFillRate: 4, veFillRate: 2.5,
+      fuelInsert: 0, veInsert: 0, fourTyreChange: 12 });
+    const qualifying = at(5, { sessionCode: 5, inRealtime: false, endEt: 600, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 75 }) });
+    expect(context(tracker, qualifying, { lapsLeft: null })?.garage?.raceStrategy).toBeNull();
+    // 15 minutes at 1:15, a lap past the clock without the leader's pace: 13 racing laps and the formation lap on 2.5 % a lap.
+    tracker.applyRest({ type: 'schedule', raceMinutes: 15, hasQualifying: true });
+    expect(context(tracker, qualifying, { lapsLeft: null })?.garage?.raceStrategy).toMatchObject({ raceMinutes: 15, laps: 13,
+      chosen: { name: 'NO STOP', stops: 0, loadStart: 37, tyresStart: 'NEW MEDIUM', tyresStop: null }, nextBest: null });
+    const racing = at(60, { inRealtime: false, gamePhase: 5, endEt: 960, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 75 }) });
+    expect(context(tracker, racing, { lapsLeft: null })?.garage?.raceStrategy).toBeNull();
+  });
+
+  it('uses the actual weekend in practice: no race plan on practice servers, no qualifying set without qualifying', () => {
+    const tracker = new LiveStrategyTracker();
+    tracker.applyRest({ type: 'tireManagement', vePerLap: 4, fuelPerLap: 3, newSets: 2,
+      selected: { compound: 'Medium', used: false, wear: 1 } });
+    const practice = at(5, { sessionCode: 1, inRealtime: false, endEt: 7200,
+      player: vehicleReading({ totalLaps: 0, estimatedLapTime: 100 }) });
+    const garage = () => context(tracker, practice, { lapsLeft: null })?.garage;
+    expect(garage()?.raceStrategy).toBeNull();
+    tracker.applyRest({ type: 'schedule', raceMinutes: null, hasQualifying: false });
+    expect(garage()).toMatchObject({ sessionMinutes: 120, perLap: 4, raceStrategy: null });
+    // Practice then a race: both new sets belong to the race, so changing tyres at the one stop is possible.
+    tracker.applyRest({ type: 'schedule', raceMinutes: 60, hasQualifying: false });
+    expect(garage()?.raceStrategy).toMatchObject({ chosen: { stops: 1, tyresStart: 'NEW MEDIUM' },
+      nextBest: { tyresStop: 'NEW MEDIUM' } });
+    // The same race with qualifying: its set must be kept aside, leaving no new set for a race stop.
+    tracker.applyRest({ type: 'schedule', raceMinutes: 60, hasQualifying: true });
+    expect(garage()?.raceStrategy).toMatchObject({ chosen: { stops: 1 }, nextBest: null });
+    // Qualifying alone also has no race to plan.
+    tracker.applyRest({ type: 'schedule', raceMinutes: null, hasQualifying: true });
+    expect(garage()?.raceStrategy).toBeNull();
+  });
+
+  it('keeps the weekend through its sessions and waits for a new schedule after leaving a server', () => {
+    const tracker = new LiveStrategyTracker();
+    tracker.applyRest({ type: 'tireManagement', vePerLap: 4, fuelPerLap: 3, newSets: 3, selected: null });
+    tracker.applyRest({ type: 'schedule', raceMinutes: 20, hasQualifying: true });
+    const practice = at(5, { sessionCode: 1, inRealtime: false, endEt: 7200,
+      player: vehicleReading({ totalLaps: 0, estimatedLapTime: 100 }) });
+    expect(context(tracker, practice)?.garage?.raceStrategy).not.toBeNull();
+    const qualifying = { ...practice, sessionCode: 5 };
+    expect(context(tracker, qualifying)?.garage?.raceStrategy).not.toBeNull();
+    tracker.update(null, { lifecycle: 'menu', session: null }, { carClass: 'GT3', layoutKey: null,
+      lapsLeft: null, latestLap: null, reserveLaps: 0.5 });
+    // Another server with the same car and layout: no plan before its schedule, or after its practice-only answer.
+    expect(context(tracker, practice)?.garage?.raceStrategy).toBeNull();
+    tracker.applyRest({ type: 'schedule', raceMinutes: null, hasQualifying: false });
+    expect(context(tracker, practice)?.garage?.raceStrategy).toBeNull();
+  });
+
+  it('plans the race from earlier races on the layout before the event has a lap (the load too), the wear on the same compound only', () => {
+    const tracker = new LiveStrategyTracker();
+    tracker.applyRest({ type: 'tireManagement', vePerLap: 2.5, fuelPerLap: 2.1, newSets: 3, selected: { compound: 'Medium', used: false, wear: 1 } });
+    tracker.applyRest({ type: 'schedule', raceMinutes: 15, hasQualifying: true });
+    const qualifying = at(5, { sessionCode: 5, inRealtime: false, endEt: 600, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 75 }) });
+    expect(context(tracker, qualifying, { lapsLeft: null })?.garage?.raceStrategy).toMatchObject({
+      chosen: { loadStart: 37, treadAtFlag: null }, basis: { use: 'game', wear: null, races: 0 } });
+    // Three races here: 3 % a lap, and 2 % of tread a lap on mediums. The soft race's wear stays out.
+    tracker.setRaceHistory([pastRace(2.9, 0.019, 'Medium'), pastRace(3.1, 0.021, 'Medium'), pastRace(3, 0.05, 'Soft')]);
+    const garage = context(tracker, qualifying, { lapsLeft: null })?.garage;
+    expect(garage?.raceStrategy).toMatchObject({
+      chosen: { loadStart: 44, treadAtFlag: 0.74 }, basis: { use: 'history', wear: 'history', races: 3 } });
+    // The garage load and the whole dashboard use the same history, not the game's estimate.
+    expect(garage).toMatchObject({ perLap: 3, perLapSource: 'history' });
+    // Another layout or class: no history.
+    tracker.setRaceHistory([]);
+    expect(context(tracker, qualifying, { lapsLeft: null })?.garage?.raceStrategy?.basis).toEqual({ use: 'game', wear: null, races: 0 });
   });
 
   it('says the next forecast change of this session on the lap it lands', () => {

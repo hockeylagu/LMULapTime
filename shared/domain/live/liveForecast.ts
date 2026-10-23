@@ -25,7 +25,7 @@ export interface ForecastInput {
  * The next change of the forecast within the session: rain arriving when dry now, or ending when wet now.
  * Rain is interpolated between nodes (seen live 2026-10-16: it rose from the start toward the storm node and had
  * stopped before the next clear one), so a change is placed halfway between the node before it and its node.
- * Null when nothing changes before the end.
+ * `none` when nothing changes before the end; null without nodes or a session length (the forecast is unknown).
  */
 export function nextForecastChange(input: ForecastInput): LiveForecast | null {
   const { nodes, sessionSeconds, elapsedSeconds } = input;
@@ -44,5 +44,5 @@ export function nextForecastChange(input: ForecastInput): LiveForecast | null {
       : null;
     return { change: wet ? 'dry' : 'rain', chance: wet ? Math.round(sorted[i - 1].rainChance) : Math.round(node.rainChance), atSeconds, lap };
   }
-  return null;
+  return { change: 'none', chance: Math.round(sorted[sorted.length - 1].rainChance), atSeconds: sessionSeconds, lap: null };
 }

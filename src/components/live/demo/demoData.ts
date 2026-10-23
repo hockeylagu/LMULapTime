@@ -2,7 +2,8 @@ import type { LiveSnapshot, LiveTiming } from '../../../../shared/types/live.js'
 import type { LiveStrategy } from '../../../../shared/types/liveStrategy.js';
 import type { LiveSessionResult } from '../../../../shared/types/liveInsights.js';
 import { getCircuitSpecification } from '../../../../shared/domain/circuitSpecs.js';
-import { planGarage, planRace, sessionLaps } from '../../../../shared/domain/live/liveResourcePlan.js';
+import { planRace, sessionLaps } from '../../../../shared/domain/live/liveResourcePlan.js';
+import { demoGarageStrategy } from './demoGarage.js';
 
 /** Illustrative snapshots only; never persisted or mixed with recorded sessions. */
 export function demoSnapshot(): LiveSnapshot {
@@ -36,7 +37,7 @@ export function demoStrategy(): LiveStrategy {
     tyres: { compound: 'Medium', worst: 0.82, worstCorner: 'FR', wearPerLap: 0.008, newSets: 3 },
     fuelRatio: { recommended: 0.95, source: 'measured', pairedLaps: 5, garageSetting: 0.9,
       mfdSetting: 0.95, excessLitres: null, fuelBiasLaps: 0 },
-    damage: null, forecast: null, garage: null,
+    damage: null, forecast: { change: 'none', chance: 0, atSeconds: 3600, lap: null }, garage: null,
   };
 }
 
@@ -55,7 +56,8 @@ export function demoResult(): LiveSessionResult {
 export type DemoSprint = 'late' | 'early' | null;
 
 /** Keep illustrative clocks, history and resource plans consistent with the selected session. */
-export function configureDemoSession(snapshot: LiveSnapshot, timing: LiveTiming, sprint: DemoSprint, reserveLaps = 0.5): void {
+export function configureDemoSession(snapshot: LiveSnapshot, timing: LiveTiming, sprint: DemoSprint, reserveLaps = 0.5, raceMinutes = sprint ? 20 : 60,
+  setInGarage: number | null = null): void {
   const session = snapshot.session;
   if (!session) return;
   const qualifying = session.kind === 'qualifying';
@@ -121,10 +123,10 @@ export function configureDemoSession(snapshot: LiveSnapshot, timing: LiveTiming,
     snapshot.recentLaps = [];
     snapshot.sessionBest = null;
     snapshot.lapsLeft = null;
-    strategy.garage = { ...planGarage({ formationLap: session.kind === 'race', race: session.kind === 'race',
-      kind: resource?.kind ?? 've', sessionSeconds: session.endSeconds, lapSeconds: pace, perLap: 4,
-      perLapSource: 'game', lapsMeasured: 0, reserveLaps, capacity: 100, setInGarage: qualifying ? 20 : 75 }),
-      tyres: { compound: 'Medium', used: false, wear: 1, newSets: 3 } };
+    // The garage plan and the race strategy from the real live tracker, fed sample LMU answers (`demoGarage.ts`).
+    const planned = demoGarageStrategy(snapshot, { lapSeconds: pace, raceMinutes, reserveLaps, setInGarage: setInGarage ?? (qualifying ? 20 : 75) });
+    strategy.garage = planned?.garage ?? null;
+    if (planned?.fuelRatio) strategy.fuelRatio = planned.fuelRatio;
   }
   if (snapshot.result && qualifying) {
     session.elapsedSeconds = 680;

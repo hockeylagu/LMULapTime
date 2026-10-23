@@ -47,6 +47,20 @@ export class PedalBuffer {
     this.listeners.forEach((listener) => listener());
   }
 
+  /**
+   * Flat out (throttle at least 98 %, no brake) for the last `seconds`: on a straight, where a radio call does not
+   * land in a braking zone. False without that much history.
+   */
+  public flatOutFor(seconds: number): boolean {
+    const newest = this.latest;
+    if (newest === null || this.samples[0].t > newest - seconds) return false;
+    for (let index = this.samples.length - 1; index >= 0 && this.samples[index].t >= newest - seconds; index -= 1) {
+      const sample = this.samples[index];
+      if (sample.throttle < 0.98 || sample.brake > 0.05) return false;
+    }
+    return true;
+  }
+
   public clear(): void {
     this.samples = [];
     this.listeners.forEach((listener) => listener());

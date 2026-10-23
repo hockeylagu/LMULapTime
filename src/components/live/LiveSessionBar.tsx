@@ -78,7 +78,7 @@ export function LiveSessionBar({ snapshot, connection }: LiveSessionBarProps) {
         {/* Every slot is held for the whole session, showing the unknown mark until its value arrives, so nothing moves. */}
         {/* One weather slot of fixed width, first on the right so its unused width joins the free space between the groups:
             on a wet track its wetness and whether it is getting wetter or drying, else the forecast change, else the track
-            temperature. In a race the plan still shows the forecast. */}
+            temperature, after DRY when the forecast holds to the end. In a race the plan still shows the forecast. */}
         {showSession && (
           <span className="inline-block w-[520px] text-right">
             {wet ? (
@@ -87,10 +87,12 @@ export function LiveSessionBar({ snapshot, connection }: LiveSessionBarProps) {
                 <b className="font-mono font-normal">{Math.round(wet.avgPathWetness * 100)}%</b>{' '}
                 <span className="inline-block w-[1ch]">{TREND_ARROW[wet.wetnessTrend]}</span>
               </span>
-            ) : forecast ? (
+            ) : forecast && forecast.change !== 'none' ? (
               <span data-testid="live-forecast" className="text-lmu-blue">{forecastText(forecast)}</span>
             ) : (
               <span data-testid="live-track-temp" aria-label={weather ? `Track temperature, ${weather.trackTempTrend}` : 'Track temperature'}>
+                {/* Dry to the end of the session: said beside the temperature, so the slot still answers the weather. */}
+                {forecast && <><span data-testid="live-forecast">{forecastText(forecast)}</span> · </>}
                 <span className="text-lmu-muted">TRACK</span>{' '}
                 <b className="inline-block min-w-[3ch] text-right font-mono font-normal text-lmu-text-soft">{weather ? `${weather.trackTempC}°` : UNKNOWN}</b>{' '}
                 <span className="inline-block w-[1ch]">{weather ? TREND_ARROW[weather.trackTempTrend] : ''}</span>

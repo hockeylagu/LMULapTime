@@ -10,6 +10,8 @@ import { LiveService, PEDAL_FLUSH_MS, TIMING_MIN_INTERVAL_MS } from '../../../se
 import type { LiveServiceOptions, LiveWorker } from '../../../server/live/liveService.js';
 import type { RestAnswer } from '../../../server/live/lmuPitRest.js';
 import { LiveDiagnostics } from '../../../server/live/capture/diagnostics.js';
+import { LiveStrategyTracker } from '../../../shared/domain/live/liveStrategyTracker.js';
+import type { LiveRaceStrategies } from '../../../shared/types/liveStrategy.js';
 
 class FakeWorker extends EventEmitter {
   public postMessage = vi.fn();
@@ -152,6 +154,39 @@ describe('LiveService', () => {
     get.mockClear();
     await vi.advanceTimersByTimeAsync(60_000);
     expect(get).not.toHaveBeenCalled();
+    void service.stop();
+  });
+
+  it('saves the race plan shown before the start with the race recording, once it begins, and never outside a race', () => {
+    const writer = new FakeWorker();
+    const capture = new LiveCaptureController({ directory: 'unused', onPersist: () => {}, createWorker: () => writer as unknown as CaptureWorker });
+    const plan = { kind: 've', laps: 16, chosen: { name: 'NO TYRE CHANGE' } } as LiveRaceStrategies;
+    let shown: LiveRaceStrategies | null = plan;
+    type Update = LiveStrategyTracker['update'];
+    const update = Reflect.get(LiveStrategyTracker.prototype, 'update') as (this: LiveStrategyTracker, ...args: Parameters<Update>) => ReturnType<Update>;
+    const spy = vi.spyOn(LiveStrategyTracker.prototype, 'update').mockImplementation(function (this: LiveStrategyTracker, ...args) {
+      const strategy = update.apply(this, args);
+      return strategy && { ...strategy, garage: { ...strategy.garage!, raceStrategy: shown } };
+    });
+    const racePlan = vi.fn();
+    const { service, frame } = setup({ capture, racePlan });
+    // The race garage: no recording yet, nothing saved.
+    frame(reading({ sessionCode: 10, inRealtime: false, gamePhase: 0 }));
+    expect(racePlan).not.toHaveBeenCalled();
+    // The green: the plan is gone from the garage, the recording begins and gets the plan seen before.
+    shown = null;
+    frame(reading({ sessionCode: 10, currentEt: 20 }));
+    frame(reading({ sessionCode: 10, currentEt: 21 }));
+    expect(racePlan).toHaveBeenCalledTimes(1);
+    expect(racePlan).toHaveBeenLastCalledWith(capture.status().recordingId, plan);
+    frame(reading({ sessionCode: 10, currentEt: 22 }));
+    expect(racePlan).toHaveBeenCalledTimes(1);
+    // Qualifying shows a race plan too: never saved.
+    shown = plan;
+    frame(reading({ sessionCode: 5, currentEt: 30 }));
+    frame(reading({ sessionCode: 5, currentEt: 31 }));
+    expect(racePlan).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
     void service.stop();
   });
 
@@ -518,6 +553,23 @@ describe('LiveService', () => {
       expect(pitLane.read).toHaveBeenLastCalledWith('sarthe_full', 'LMP3');
       expect(pitLane.read).not.toHaveBeenCalledWith(null, expect.anything());
       expect(pitLane.record).not.toHaveBeenCalled();
+      void service.stop();
+    });
+
+    it('reads the earlier races of the exact layout and class once, for the race plan', async () => {
+      const readNavigation = vi.fn(() => Promise.resolve({ ok: true as const, navigation: { sceneDesc: 'LEMANSWEC', classes: [], vehFile: null } }));
+      const raceHistory = vi.fn(() => Promise.resolve([]));
+      const history = vi.spyOn(LiveStrategyTracker.prototype, 'setRaceHistory');
+      const { service, frame } = setup({ identity: { readNavigation }, raceHistory });
+      frame(lap(3, { vehicleName: 'Ginetta G61', vehicleClass: 'LMP3' }, { trackName: 'Circuit de la Sarthe' }));
+      await vi.advanceTimersByTimeAsync(0);
+      frame(lap(3, { vehicleName: 'Ginetta G61', vehicleClass: 'LMP3' }, { trackName: 'Circuit de la Sarthe', currentEt: 20 }));
+      frame(lap(3, { vehicleName: 'Ginetta G61', vehicleClass: 'LMP3' }, { trackName: 'Circuit de la Sarthe', currentEt: 21 }));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(raceHistory).toHaveBeenCalledTimes(1);
+      expect(raceHistory).toHaveBeenCalledWith('sarthe_full', 'LMP3');
+      expect(history).toHaveBeenLastCalledWith([]);
+      history.mockRestore();
       void service.stop();
     });
 
