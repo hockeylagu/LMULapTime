@@ -1,6 +1,7 @@
 import type { LiveGarageTyres, LiveRaceStrategies, LiveRaceStrategy, LiveResourceKind } from '../../types/liveStrategy.js';
 import { LIVE_TYRE_TREAD_FLOOR } from '../live/liveInsights.js';
-import { planGarage, planRace } from '../live/liveResourcePlan.js';
+import { formationLapUse, planGarage, planRace } from '../live/liveResourcePlan.js';
+import type { RefuelPart } from '../live/livePitTime.js';
 
 export interface RaceStrategyInput {
   kind: LiveResourceKind;
@@ -20,6 +21,10 @@ export interface RaceStrategyInput {
   wearPerLap: number | null;
   /** The game's time to change four tyres (`FourTireChange`); it adds to the refuel. */
   tyreChangeSeconds: number | null;
+  /** The stored pit lane loss of the layout and class; null without one (then the stops take no time off the clock). */
+  pitLaneSeconds: number | null;
+  /** The game's refuel rate and fixed part; null without the pit rules. */
+  refuel: Omit<RefuelPart, 'added'> | null;
 }
 
 type Option = LiveRaceStrategy & { lowest: number | null };
@@ -32,19 +37,32 @@ const settable = (value: number): number => Math.ceil(value - 1e-9);
  * without a stop. The tyres are then weighed: keep the starting set to the flag, or fit a new set at every stop, the
  * four-tyre time added to the stop (LMU adds it to the refuel). The chosen plan is the quickest whose tread stays
  * above the floor at every change and at the flag; the other is the next best, its cost in tyre time.
+ * The race runs to the leader's first crossing after the clock at the given pace, every car making the same stops:
+ * their time (lane loss and refuel) comes off the clock, often a lap (Le Mans race 2026-10-23: 19 laps planned
+ * without it, 17 run). The formation lap costs no VE (`formationLapUse`).
  * Not modelled: the pace of fresh tyres or a lighter car, two-tyre changes, an extra stop to save VE.
  */
 export function planRaceStrategies(input: RaceStrategyInput): LiveRaceStrategies | null {
   const { kind, raceMinutes, lapSeconds, perLap, reserveLaps, capacity, tyres } = input;
   if (raceMinutes === null || raceMinutes <= 0 || lapSeconds === null || perLap === null || perLap <= 0 || capacity === null) return null;
-  const garage = planGarage({ kind, sessionSeconds: raceMinutes * 60, race: true, formationLap: true, raceLeaderLapSeconds: null,
-    lapSeconds, perLap, perLapSource: null, lapsMeasured: 0, reserveLaps, capacity, setInGarage: null });
+  const garageFor = (stopsSeconds: number) => planGarage({ kind, sessionSeconds: raceMinutes * 60 - stopsSeconds, race: true,
+    formationLap: true, raceLeaderLapSeconds: lapSeconds, lapSeconds, perLap, perLapSource: null, lapsMeasured: 0, reserveLaps, capacity,
+    setInGarage: null });
+  const formationUse = formationLapUse(kind) * perLap;
+  // The stops' time: the lane and fixed refuel part each, and what they add (the racing laps and the reserve past a full start).
+  const stopsSeconds = (laps: number | null, stops: number | null): number => (laps === null || !stops || input.pitLaneSeconds === null ? 0
+    : stops * (input.pitLaneSeconds + (input.refuel?.base ?? 0))
+      + Math.max(0, (laps - 1 + reserveLaps) * perLap + formationUse - capacity) * (input.refuel?.secondsPerUnit ?? 0));
+  const bare = garageFor(0);
+  const timed = stopsSeconds(bare.laps, bare.stops) > 0 ? garageFor(stopsSeconds(bare.laps, bare.stops)) : bare;
+  // Fewer stops would give back their time: keep the stops the clock needs without it.
+  const garage = timed.stops === bare.stops ? timed : bare;
   if (garage.laps === null || garage.needed === null || garage.stops === null) return null;
   const laps = garage.laps - 1;
   const loadStart = garage.stops > 0 ? capacity : garage.needed;
   // The formation lap runs on the start load: the racing laps start with what it leaves. The stops are the race
   // plan's (the reserve kept at every pit entry), each a full tank after the one before.
-  const race = garage.stops > 0 ? planRace({ amount: loadStart - perLap, perLap, reserveLaps, capacity, lapsLeft: laps, lapFraction: 0, lapNumber: 1 }) : null;
+  const race = garage.stops > 0 ? planRace({ amount: loadStart - formationUse, perLap, reserveLaps, capacity, lapsLeft: laps, lapFraction: 0, lapNumber: 1 }) : null;
   const first = race?.pitLap ?? null;
   const stops = first === null ? 0 : 1 + race!.stopsAfterNext;
   const tankLaps = Math.max(1, Math.floor(capacity / perLap - reserveLaps));

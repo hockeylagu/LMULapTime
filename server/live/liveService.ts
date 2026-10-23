@@ -329,7 +329,9 @@ export class LiveService {
       if (key !== this.pitLaneKey || measured) {
         if (key !== this.pitLaneKey) this.pitLaneSession = Date.now();
         this.pitLaneKey = key;
-        this.tracker.setStoredLaneLoss(layoutKey && carClass ? store.read(layoutKey, carClass) : null);
+        const loss = layoutKey && carClass ? store.read(layoutKey, carClass) : null;
+        this.tracker.setStoredLaneLoss(loss);
+        this.strategy.setPitLaneLoss(loss);
       }
     } catch (error) {
       console.warn('[Live] Pit lane loss store failed:', error);

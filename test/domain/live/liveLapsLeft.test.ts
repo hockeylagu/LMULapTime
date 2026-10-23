@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computeLapsLeft } from '../../../shared/domain/live/liveLapsLeft.js';
+import type { LiveOwnPace } from '../../../shared/domain/live/liveLapsLeft.js';
 import { vehicleReading } from '../../helpers/liveReadings.js';
 import { VEHICLE_CLASS_OPTIONS } from '../../../shared/domain/vehicleMapping.js';
 
@@ -20,8 +21,7 @@ describe('laps left', () => {
     const overall = vehicleReading({ id: 1, vehicleClass: 'Hyper', lapStartEt: 2900, estimatedLapTime: 213 });
     const player = vehicleReading({ id: 7, vehicleClass: 'Hyper', lapStartEt: 2914, estimatedLapTime: 216 });
     const classLeader = vehicleReading({ id: 9, vehicleClass: 'Hyper', lapStartEt: 2800, estimatedLapTime: 210 });
-    const own = (patch: Partial<{ lapSeconds: number | null; stopSeconds: number; lapFraction: number | null }>) =>
-      ({ lapSeconds: null, stopSeconds: 0, lapFraction: null, ...patch });
+    const own = (patch: Partial<LiveOwnPace>): LiveOwnPace => ({ lapSeconds: null, stopSeconds: 0, stopCostSeconds: 0, lapFraction: null, ...patch });
     // The class leader's pace read 6, one too many; the car's own 216 s reads the 5 it ran.
     expect(computeLapsLeft(session, player, overall, classLeader)).toEqual({ laps: 6, estimated: true });
     expect(computeLapsLeft(session, player, overall, classLeader, own({ lapSeconds: 216 }))).toEqual({ laps: 5, estimated: true });
@@ -31,6 +31,20 @@ describe('laps left', () => {
     expect(computeLapsLeft({ ...session, elapsedSeconds: 3100 }, player, overall, classLeader, own({ lapSeconds: 210, lapFraction: 0.1 })))
       .toEqual({ laps: 5, estimated: true });
     expect(computeLapsLeft({ ...session, elapsedSeconds: 3100 }, player, overall, classLeader, own({ lapSeconds: 210 }))).toEqual({ laps: 6, estimated: true });
+  });
+  it('delays the flag by the stop the leader still makes', () => {
+    // Le Mans race 2026-10-23 on lap 11: the leader on lap 12 from 2501 s at 209.4 s, no stop yet; everyone ran 17.
+    const session = { kind: 'race' as const, endSeconds: 3789, elapsedSeconds: 2520, gamePhase: 5 };
+    const leader = vehicleReading({ id: 1, vehicleClass: 'Hyper', lapStartEt: 2501, estimatedLapTime: 209.4, pitStops: 0 });
+    const player = vehicleReading({ id: 7, vehicleClass: 'Hyper', lapStartEt: 2334, estimatedLapTime: 212, pitStops: 0 });
+    const own: LiveOwnPace = { lapSeconds: 212, stopSeconds: 49, stopCostSeconds: 49, lapFraction: 0.88 };
+    // Its stop puts the flag at 2501 + 6 x 209.4 + 49 = 3806 s, not 3967 s: laps 11 to 17, not to 18.
+    expect(computeLapsLeft(session, player, leader, leader, own)).toEqual({ laps: 7, estimated: true });
+    expect(computeLapsLeft(session, player, leader, leader, { ...own, stopCostSeconds: 0 })).toEqual({ laps: 8, estimated: true });
+    // Once the leader has stopped as often as the player will, its flag is the bare one again.
+    expect(computeLapsLeft(session, player, { ...leader, pitStops: 1 }, leader, own)).toEqual({ laps: 8, estimated: true });
+    // The player's stop behind it, the leader's still ahead: its cost still delays the flag.
+    expect(computeLapsLeft(session, { ...player, pitStops: 1 }, leader, leader, { ...own, stopSeconds: 0 })).toEqual({ laps: 7, estimated: true });
   });
   it('accepts canonical aliases and keeps WEC and ELMS LMP2 separate', () => {
     const overall = vehicleReading({ id: 1, vehicleClass: 'Hyper', lapStartEt: 2400, estimatedLapTime: 100 });

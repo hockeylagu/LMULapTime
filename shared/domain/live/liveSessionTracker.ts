@@ -16,7 +16,8 @@ export const NO_SESSION_DETAILS: LiveSessionDetails = { lapsLeft: null, weather:
 /**
  * Follows the player's laps, the weather and the race distance across scoring readings; no reading (offline) clears
  * them. The race distance counts the player's own pace and the planned stop: its pit lane loss (the stored median of
- * the layout and class, else this session's measured stop) plus the service the game estimates for it.
+ * the layout and class, else this session's measured stop) plus the service the game estimates for it. That cost is
+ * kept past the player's stop for the leader's, still to make.
  */
 export class LiveSessionTracker {
   private readonly laps = new LiveLapTiming();
@@ -26,6 +27,7 @@ export class LiveSessionTracker {
   private storedLaneLoss: number | null = null;
   private sessionLaneLoss: number | null = null;
   private measured: PitLaneMeasurement | null = null;
+  private stopCost: number | null = null;
 
   /** The stored pit lane loss of the loaded layout and class (median of the newest stops); null when none. */
   public setStoredLaneLoss(seconds: number | null): void { this.storedLaneLoss = seconds; }
@@ -57,9 +59,11 @@ export class LiveSessionTracker {
     const pit = strategy?.pit;
     const stopAhead = race?.finishReachable === false && (pit?.state === 'none' || pit?.state === 'request');
     const laneLoss = this.storedLaneLoss ?? this.sessionLaneLoss ?? 0;
+    if (stopAhead) this.stopCost = laneLoss + (pit?.serviceSeconds ?? 0);
     const own: LiveOwnPace = {
       lapSeconds: this.lane.pace(),
-      stopSeconds: stopAhead ? laneLoss + (pit?.serviceSeconds ?? 0) : 0,
+      stopSeconds: stopAhead ? this.stopCost ?? 0 : 0,
+      stopCostSeconds: this.stopCost ?? laneLoss,
       lapFraction: player && reading.trackLength > 0 ? player.lapDist / reading.trackLength : null,
     };
     return {
@@ -72,5 +76,5 @@ export class LiveSessionTracker {
 
   public timing(): LiveTiming | null { return this.laps.timing(); }
 
-  private resetLane(key: string | null): void { this.sessionKey = key; this.lane.reset(); this.sessionLaneLoss = null; this.measured = null; }
+  private resetLane(key: string | null): void { this.sessionKey = key; this.lane.reset(); this.sessionLaneLoss = null; this.measured = null; this.stopCost = null; }
 }

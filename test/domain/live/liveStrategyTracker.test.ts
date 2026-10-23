@@ -170,15 +170,15 @@ describe('LiveStrategyTracker', () => {
     const tracker = new LiveStrategyTracker();
     tracker.applyRest({ type: 'tireManagement', vePerLap: 2.5, fuelPerLap: 2.1, newSets: 40, selected: null });
     tracker.applyRest({ type: 'garage', veStart: 50, fuelStart: null });
-    // The race garage before the start: the schedule's 15 minutes, twelve laps at 1:15 plus the formation lap.
+    // The race garage before the start: the schedule's 15 minutes, twelve laps at 1:15 plus the formation lap (no VE on it).
     tracker.applyRest({ type: 'schedule', raceMinutes: 15, hasQualifying: true });
     const garage = at(0, { inRealtime: false, gamePhase: 0, endEt: 64, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 75 }) });
     const strategy = context(tracker, garage, { lapsLeft: null });
     expect(strategy?.resource).toBeNull();
-    expect(strategy?.garage).toMatchObject({ kind: 've', sessionMinutes: 15, laps: 13, lapSeconds: 75, perLap: 2.5, needed: 34, setInGarage: 50 });
+    expect(strategy?.garage).toMatchObject({ kind: 've', sessionMinutes: 15, laps: 13, lapSeconds: 75, perLap: 2.5, needed: 32, setInGarage: 50 });
     // On the grid the plan stays: the driver can still go back to the garage before the start.
     const grid = at(0, { gamePhase: 0, endEt: 64, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 75 }) });
-    expect(context(tracker, grid, { lapsLeft: null })?.garage).toMatchObject({ sessionMinutes: 15, laps: 13, needed: 34, setInGarage: 50 });
+    expect(context(tracker, grid, { lapsLeft: null })?.garage).toMatchObject({ sessionMinutes: 15, laps: 13, needed: 32, setInGarage: 50 });
     // Once the race runs there is no garage plan.
     expect(context(tracker, at(10, { gamePhase: 5 }))?.garage).toBeNull();
   });
@@ -228,10 +228,10 @@ describe('LiveStrategyTracker', () => {
       fuelInsert: 0, veInsert: 0, fourTyreChange: 12 });
     const qualifying = at(5, { sessionCode: 5, inRealtime: false, endEt: 600, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 75 }) });
     expect(context(tracker, qualifying, { lapsLeft: null })?.garage?.raceStrategy).toBeNull();
-    // 15 minutes at 1:15, a lap past the clock without the leader's pace: 13 racing laps and the formation lap on 2.5 % a lap.
+    // 15 minutes at 1:15, the leader at that pace: 12 racing laps on 2.5 % a lap, the formation lap on none.
     tracker.applyRest({ type: 'schedule', raceMinutes: 15, hasQualifying: true });
-    expect(context(tracker, qualifying, { lapsLeft: null })?.garage?.raceStrategy).toMatchObject({ raceMinutes: 15, laps: 13,
-      chosen: { name: 'NO STOP', stops: 0, loadStart: 37, tyresStart: 'NEW MEDIUM', tyresStop: null }, nextBest: null });
+    expect(context(tracker, qualifying, { lapsLeft: null })?.garage?.raceStrategy).toMatchObject({ raceMinutes: 15, laps: 12,
+      chosen: { name: 'NO STOP', stops: 0, loadStart: 32, tyresStart: 'NEW MEDIUM', tyresStop: null }, nextBest: null });
     const racing = at(60, { inRealtime: false, gamePhase: 5, endEt: 960, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 75 }) });
     expect(context(tracker, racing, { lapsLeft: null })?.garage?.raceStrategy).toBeNull();
   });
@@ -281,12 +281,12 @@ describe('LiveStrategyTracker', () => {
     tracker.applyRest({ type: 'schedule', raceMinutes: 15, hasQualifying: true });
     const qualifying = at(5, { sessionCode: 5, inRealtime: false, endEt: 600, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 75 }) });
     expect(context(tracker, qualifying, { lapsLeft: null })?.garage?.raceStrategy).toMatchObject({
-      chosen: { loadStart: 37, treadAtFlag: null }, basis: { use: 'game', wear: null, races: 0 } });
+      chosen: { loadStart: 32, treadAtFlag: null }, basis: { use: 'game', wear: null, races: 0 } });
     // Three races here: 3 % a lap, and 2 % of tread a lap on mediums. The soft race's wear stays out.
     tracker.setRaceHistory([pastRace(2.9, 0.019, 'Medium'), pastRace(3.1, 0.021, 'Medium'), pastRace(3, 0.05, 'Soft')]);
     const garage = context(tracker, qualifying, { lapsLeft: null })?.garage;
     expect(garage?.raceStrategy).toMatchObject({
-      chosen: { loadStart: 44, treadAtFlag: 0.74 }, basis: { use: 'history', wear: 'history', races: 3 } });
+      chosen: { loadStart: 38, treadAtFlag: 0.76 }, basis: { use: 'history', wear: 'history', races: 3 } });
     // The garage load and the whole dashboard use the same history, not the game's estimate.
     expect(garage).toMatchObject({ perLap: 3, perLapSource: 'history' });
     // Another layout or class: no history.

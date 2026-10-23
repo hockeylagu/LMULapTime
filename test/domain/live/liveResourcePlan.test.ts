@@ -79,8 +79,13 @@ describe('planGarage', () => {
   it('previews the first racing pit lap from the selected load, formation use and reserve', () => {
     const input = { kind: 've' as const, formationLap: true, sessionSeconds: 2700, raceLeaderLapSeconds: 121.4, lapSeconds: 121.4, perLap: 4.5,
       perLapSource: 'measured' as const, lapsMeasured: 8, reserveLaps: .5, capacity: 100, setInGarage: 100 };
-    expect(planGarage(input)).toMatchObject({ laps: 24, stops: 1, firstPitLap: 20 });
-    expect(planGarage({ ...input, setInGarage: 80 })).toMatchObject({ firstPitLap: 16 });
+    // VE: the formation lap costs none (Le Mans 2026-10-23), so 100 % lasts (100 - 2.25) / 4.5 = 21.7 racing laps.
+    expect(planGarage(input)).toMatchObject({ laps: 24, stops: 1, needed: 100, firstPitLap: 21 });
+    expect(planGarage({ ...input, setInGarage: 80 })).toMatchObject({ firstPitLap: 17 });
+    expect(planGarage({ ...input, sessionSeconds: 1200 })).toMatchObject({ laps: 11, needed: 48 });
+    // Fuel still spends a lap on it.
+    expect(planGarage({ ...input, kind: 'fuel' })).toMatchObject({ firstPitLap: 20 });
+    expect(planGarage({ ...input, kind: 'fuel', sessionSeconds: 1200 })).toMatchObject({ laps: 11, needed: 52 });
     expect(planGarage({ ...input, setInGarage: null }).firstPitLap).toBeNull();
     expect(planGarage({ ...input, perLap: null }).firstPitLap).toBeNull();
     expect(planGarage({ ...input, perLap: 0 }).firstPitLap).toBeNull();

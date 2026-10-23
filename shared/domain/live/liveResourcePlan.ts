@@ -11,6 +11,12 @@ export function liveResourceKind(carClass: string | null): LiveResourceKind {
 
 export const resourceUnit = (kind: LiveResourceKind): '%' | 'L' => (kind === 've' ? '%' : 'L');
 
+/**
+ * Laps of use the formation lap costs. VE held at 100 % from the grid to the green at Le Mans (2026-10-22 and
+ * 2026-10-23, first drop after the green); fuel is not yet measured on a fuel class, so a full lap is kept.
+ */
+export const formationLapUse = (kind: LiveResourceKind): number => (kind === 've' ? 0 : 1);
+
 const round = (value: number, digits: number): number => Math.round(value * 10 ** digits) / 10 ** digits;
 /** What to set on the MFD or in the garage: up to a whole percent or litre, never below what is needed. */
 const settable = (value: number): number => Math.ceil(value - 1e-9);
@@ -85,7 +91,8 @@ export function planRace(input: RacePlanInput): LiveRacePlan {
  * them), plus the formation lap of a race, run before its clock starts.
  */
 export function sessionLaps(sessionSeconds: number, lapSeconds: number, formationLap: boolean): number {
-  return Math.ceil(sessionSeconds / lapSeconds) + (formationLap ? 1 : 0);
+  // A flag projected at whole laps of the same pace divides back to a whole number: no rounding lap on top.
+  return settable(sessionSeconds / lapSeconds) + (formationLap ? 1 : 0);
 }
 
 export interface GaragePlanInput {
@@ -117,13 +124,14 @@ export function planGarage(input: GaragePlanInput): Omit<LiveGaragePlan, 'tyres'
       : lapSeconds !== null && lapSeconds > 0 ? sessionSeconds + lapSeconds : null;
   const laps = sessionSeconds !== null && lapSeconds !== null && sessionSeconds > 0 && lapSeconds > 0
     ? sessionLaps(flagSeconds ?? sessionSeconds, lapSeconds, input.formationLap) : null;
-  const total = laps !== null && perLap !== null ? (laps + reserveLaps) * perLap : null;
-  const selected = input.setInGarage;
   // A race's laps include the formation lap: deduct its estimated use before applying racing-lap numbering.
   const formation = input.formationLap ? 1 : 0;
+  const formationUse = input.formationLap ? formationLapUse(kind) : 0;
+  const total = laps !== null && perLap !== null ? (laps - formation + formationUse + reserveLaps) * perLap : null;
+  const selected = input.setInGarage;
   const firstPit = laps !== null && laps > formation && perLap !== null && Number.isFinite(perLap) && perLap > 0
-    && selected !== null && Number.isFinite(selected) && selected > perLap * (formation + reserveLaps)
-    ? planRace({ amount: Math.max(0, (capacity !== null ? Math.min(selected, capacity) : selected) - perLap * formation),
+    && selected !== null && Number.isFinite(selected) && selected > perLap * (formationUse + reserveLaps)
+    ? planRace({ amount: Math.max(0, (capacity !== null ? Math.min(selected, capacity) : selected) - perLap * formationUse),
       perLap, reserveLaps, capacity, lapsLeft: laps - formation, lapFraction: 0, lapNumber: 1 }) : null;
   return {
     kind,

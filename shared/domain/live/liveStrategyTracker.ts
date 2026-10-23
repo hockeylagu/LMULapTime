@@ -135,10 +135,17 @@ export class LiveStrategyTracker {
   private schedule: Extract<LiveRestUpdate, { type: 'schedule' }> | null = null;
   /** The player's earlier races on the layout in the class (`setRaceHistory`), for the race plan before event laps. */
   private raceHistory: SessionStrategy[] = [];
+  /** The stored pit lane loss of the layout and class (`setPitLaneLoss`), for the race plan's stop time. */
+  private pitLaneLoss: number | null = null;
 
   /** The player's earlier races on this layout in this class, newest first; empty on another layout or class. */
   public setRaceHistory(races: SessionStrategy[]): void {
     this.raceHistory = races;
+  }
+
+  /** The stored pit lane loss of the loaded layout and class (median of the newest stops); null when none. */
+  public setPitLaneLoss(seconds: number | null): void {
+    this.pitLaneLoss = seconds;
   }
 
   /** Forgets everything (the game closed). */
@@ -410,6 +417,13 @@ export class LiveStrategyTracker {
     return { ve: ve === null ? null : target - ve, fuel: ratio && fuel !== null ? target * ratio - fuel : null };
   }
 
+  /** Seconds per unit of a refuel and its fixed part (`RefuelPart`, nothing added yet); null without the fill rate. */
+  private refuelRate(kind: LiveResourceKind): Omit<RefuelPart, 'added'> | null {
+    const perUnit = this.fillSeconds(kind);
+    const insert = kind === 've' ? this.delays?.veInsert : this.delays?.fuelInsert;
+    return perUnit === null ? null : { secondsPerUnit: perUnit, base: this.refuelBases[kind] ?? insert ?? 0 };
+  }
+
   private fillSeconds(kind: LiveResourceKind): number | null {
     const rate = kind === 've' ? this.delays?.veFillRate : this.delays?.fuelFillRate;
     return rate && rate > 0 ? 1 / rate : null;
@@ -493,6 +507,7 @@ export class LiveStrategyTracker {
       kind, raceMinutes: this.schedule?.raceMinutes ?? null, lapSeconds, perLap: resource.perLap, reserveLaps, capacity: resource.capacity,
       qualifyingAhead, tyres, compound: this.eventCompound || tyres?.compound || null,
       wearPerLap: historyWear ?? this.eventTyreWear, tyreChangeSeconds: this.delays?.fourTyreChange ?? null,
+      pitLaneSeconds: this.pitLaneLoss, refuel: this.refuelRate(kind),
     });
     if (!strategy) return null;
     const source = resource.perLapSource;

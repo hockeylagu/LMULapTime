@@ -36,11 +36,16 @@ function ownLapsLeft(session: Pick<LiveSessionInfo, 'endSeconds' | 'elapsedSecon
   return flag === null ? null : { laps: Math.round((flag - start) / player.estimatedLapTime), estimated: true };
 }
 
-/** Overall leader's first estimated line crossing at/after the timed end. No class sets its own race end. */
-export function projectRaceFlagSeconds(endSeconds: number, lapStart: number, lapSeconds: number): number | null {
+/**
+ * Overall leader's first estimated line crossing at/after the timed end. No class sets its own race end. A stop the
+ * leader still makes (`stopSeconds`) moves its crossings later, often by a lap (Le Mans race 2026-10-23: 18 laps read
+ * until the leader stopped on lap 13, everyone ran 17).
+ */
+export function projectRaceFlagSeconds(endSeconds: number, lapStart: number, lapSeconds: number, stopSeconds = 0): number | null {
   if (!positive(endSeconds) || !Number.isFinite(lapStart) || lapStart < 0 || !positive(lapSeconds)) return null;
-  const laps = Math.ceil((endSeconds - lapStart) / lapSeconds);
-  return laps >= 1 ? lapStart + laps * lapSeconds : null;
+  if (Math.ceil((endSeconds - lapStart) / lapSeconds) < 1) return null;
+  const stop = Math.max(0, stopSeconds);
+  return lapStart + Math.max(1, Math.ceil((endSeconds - lapStart - stop) / lapSeconds)) * lapSeconds + stop;
 }
 
 /** The player's own side of the race distance (`LiveSessionTracker`). */
@@ -49,6 +54,8 @@ export interface LiveOwnPace {
   lapSeconds: number | null;
   /** Time a planned stop still costs before the flag (pit lane loss plus service); 0 without one. */
   stopSeconds: number;
+  /** What one stop costs (pit lane loss plus service), also once the player's is behind: the leader's still to make. */
+  stopCostSeconds: number;
   /** Share of the lap in progress already driven, 0..1; null when unknown. */
   lapFraction: number | null;
 }
@@ -64,6 +71,8 @@ export interface LiveOwnPace {
  *   a stop or a spin crosses later), and it has `1 + ceil((F - c - s) / p)` laps, or 1 when `c >= F`, with `s` the
  *   time its planned stop still costs (Le Mans race 2026-10-22: the class leader's pace and no stop read 17 laps to
  *   lap 11, the car ran 16). The leader itself counts the same way to `E`. Laps already lost never add extra laps.
+ *   The leader is taken to make the player's stops: while it has made fewer than the player's done and planned, one
+ *   more stop of the player's cost delays `F` (`projectRaceFlagSeconds`).
  *   Never fewer than the lap in progress. Marked `estimated`, since the lap time estimates move.
  * Null when it is not a race, the race clock does not run yet (`raceClockRunning`), the player has finished, there is no usable lap start or estimate, or the leader
  *   has no lap left to run (everyone is cooling down).
@@ -73,7 +82,7 @@ export function computeLapsLeft(
   player: LiveVehicleReading | null,
   leader: LiveVehicleReading | null,
   classLeader: LiveVehicleReading | null = null,
-  own: LiveOwnPace = { lapSeconds: null, stopSeconds: 0, lapFraction: null },
+  own: LiveOwnPace = { lapSeconds: null, stopSeconds: 0, stopCostSeconds: 0, lapFraction: null },
 ): LiveLapsLeft | null {
   if (!session || !player || player.finishStatus === FINISHED) return null;
   if (session.kind === 'qualifying') return ownLapsLeft(session, player);
@@ -92,7 +101,9 @@ export function computeLapsLeft(
     const pace = ownPace ?? leader.estimatedLapTime;
     return projectRaceFlagSeconds(session.endSeconds, leader.lapStartEt, pace) === null ? null : lapsTo(session.endSeconds, leader.lapStartEt, pace);
   }
-  const flag = projectRaceFlagSeconds(session.endSeconds, leader.lapStartEt, leader.estimatedLapTime);
+  const leaderStops = (leader.pitStops ?? 0) < (player.pitStops ?? 0) + (stop > 0 ? 1 : 0);
+  const leaderStop = leaderStops && Number.isFinite(own.stopCostSeconds) ? Math.max(0, own.stopCostSeconds) : 0;
+  const flag = projectRaceFlagSeconds(session.endSeconds, leader.lapStartEt, leader.estimatedLapTime, leaderStop);
   if (flag === null) return null;
   const pace = ownPace ?? classLeaderLapSeconds(player, classLeader) ?? player.estimatedLapTime;
   if (!(player.lapStartEt >= 0) || !positive(pace)) return null;

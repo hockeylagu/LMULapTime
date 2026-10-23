@@ -88,7 +88,7 @@ describe('offline live dashboard demo', () => {
   it('plans the garage through the real live tracker: the use and wear from the earlier races, the game for the ratio', () => {
     const strategy = createDemoState('garage-race', 'Hyper').snapshot?.strategy;
     expect(strategy?.garage).toMatchObject({ perLap: 4, perLapSource: 'history', needed: 100, stops: 1 });
-    expect(strategy?.garage?.raceStrategy).toMatchObject({ laps: 39, chosen: { name: 'NO TYRE CHANGE', pitLap: 23, loadToFinish: 66 },
+    expect(strategy?.garage?.raceStrategy).toMatchObject({ laps: 38, chosen: { name: 'NO TYRE CHANGE', pitLap: 24, loadToFinish: 58 },
       basis: { use: 'history', wear: 'history', races: 3 } });
     expect(strategy?.fuelRatio).toMatchObject({ recommended: 0.95, source: 'game', garageSetting: 0.9 });
   });
@@ -178,9 +178,9 @@ describe('offline live dashboard demo', () => {
     window.location.hash = '#/live?demo=1&scenario=tyre-strategy-quali&carClass=Hyper';
     render(<LiveDemoPage />);
     const strategy = () => screen.getByTestId('live-race-strategy');
-    expect(strategy()).toHaveTextContent('RACE STRATEGY · NO TYRE CHANGE60 MIN · ~39 LAPS');
-    expect(strategy()).toHaveTextContent('STOPS1· LAP 23VE START100%VE TO FINISH66%');
-    expect(strategy()).toHaveTextContent('TYRES STARTNEW MEDTYRES AT STOPNO CHANGETREAD AT FLAG~69%');
+    expect(strategy()).toHaveTextContent('RACE STRATEGY · NO TYRE CHANGE60 MIN · ~38 LAPS');
+    expect(strategy()).toHaveTextContent('STOPS1· LAP 24VE START100%VE TO FINISH58%');
+    expect(strategy()).toHaveTextContent('TYRES STARTNEW MEDTYRES AT STOPNO CHANGETREAD AT FLAG~70%');
     expect(strategy()).toHaveTextContent('NEXT BEST · NEW TYRES AT THE STOP · +12.0 s · AT STOP NEW MED');
     expect(screen.getByText('FIT SOFT')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('QUALIFYING · 10 MIN · ~7 LAPS');
@@ -195,8 +195,8 @@ describe('offline live dashboard demo', () => {
     window.location.hash = '#/live?demo=1&scenario=garage-qualifying-sprint&carClass=Hyper';
     render(<LiveDemoPage />);
     const strategy = screen.getByTestId('live-race-strategy');
-    expect(strategy).toHaveTextContent('RACE STRATEGY · NO STOP20 MIN · ~14 LAPS · FROM YOUR LAST 3 RACES');
-    expect(strategy).toHaveTextContent('STOPSNONEVE START62%TYRES STARTNEW MEDTREAD AT FLAG~89%');
+    expect(strategy).toHaveTextContent('RACE STRATEGY · NO STOP20 MIN · ~13 LAPS · FROM YOUR LAST 3 RACES');
+    expect(strategy).toHaveTextContent('STOPSNONEVE START54%TYRES STARTNEW MEDTREAD AT FLAG~90%');
     expect(strategy).not.toHaveTextContent('TYRES AT STOP');
     expect(strategy).not.toHaveTextContent('NEXT BEST');
   });
@@ -258,7 +258,7 @@ describe('offline live dashboard demo', () => {
     render(<LiveDemoPage />);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('PRACTICE · 60 MIN');
     expect(screen.getByTestId('live-race-strategy')).toHaveTextContent('RACE STRATEGY · NO TYRE CHANGE');
-    expect(screen.getByTestId('live-race-strategy')).toHaveTextContent('STOPS1· LAP 23VE START100%VE TO FINISH66%');
+    expect(screen.getByTestId('live-race-strategy')).toHaveTextContent('STOPS1· LAP 24VE START100%VE TO FINISH58%');
   });
 
   it('shows the race layout: the place in the bar, the plan over the lap history, damage in the bar place', () => {

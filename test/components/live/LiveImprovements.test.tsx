@@ -19,7 +19,7 @@ describe('live dashboard improvements', () => {
       perLapSource: 'measured', lapsMeasured: 8, reserveLaps: .5, capacity: 100, setInGarage: 100 }), tyres: null };
     const makeScreen = () => liveScreen(liveSnapshot({ lifecycle: 'garage', strategy: liveStrategy({ garage }) }));
     const { rerender } = render(<LiveStateScreen screen={makeScreen()} />);
-    expect(screen.getByText('45 MIN · 1 STOP PLANNED · PIT ~LAP 20')).toBeInTheDocument();
+    expect(screen.getByText('45 MIN · 1 STOP PLANNED · PIT ~LAP 21')).toBeInTheDocument();
     garage.firstPitLap = null;
     rerender(<LiveStateScreen screen={makeScreen()} />);
     expect(screen.getByText('45 MIN · 1 STOP PLANNED · PIT LAP UNKNOWN')).toBeInTheDocument();
@@ -29,7 +29,7 @@ describe('live dashboard improvements', () => {
       perLapSource: 'measured', lapsMeasured: 8, reserveLaps: .5, capacity: 100, setInGarage: 100 }), tyres: null };
     const snapshot = liveSnapshot({ lifecycle: 'starting', strategy: liveStrategy({ garage }) });
     snapshot.session!.gamePhase = 3;
-    expect(liveScreen(snapshot)).toMatchObject({ title: 'RACE STARTING', note: 'FORMATION LAP · 1 STOP PLANNED · PIT ~LAP 20', checks: [] });
+    expect(liveScreen(snapshot)).toMatchObject({ title: 'RACE STARTING', note: 'FORMATION LAP · 1 STOP PLANNED · PIT ~LAP 21', checks: [] });
   });
   it('omits repeated matching settings and routine counts while retaining actual mismatches and uncertainty', () => {
     const strategy = liveStrategy();
