@@ -44,9 +44,11 @@ export async function readSessionStrategy(sessionDb: SessionDatabase, sessionId:
 export async function readStrategyHistory(sessionDb: SessionDatabase, layoutKey: string, carClass: string): Promise<SessionStrategy[]> {
   const ids = sessionDb.getDb().prepare(`SELECT s.id FROM sessions s WHERE s.layout_key = ? AND s.player_car_class = ?
       AND s.session_type = 'Race' AND EXISTS (SELECT 1 FROM telemetry_metadata t WHERE t.matched_session_id = s.id)
-    ORDER BY s.timestamp DESC LIMIT ?`).all(layoutKey, carClass, STRATEGY_HISTORY_RACES) as Array<{ id: string }>;
+    ORDER BY s.timestamp DESC`).all(layoutKey, carClass) as Array<{ id: string }>;
   const races: SessionStrategy[] = [];
+  // A linked race whose telemetry no longer reads gives way to an older one.
   for (const { id } of ids) {
+    if (races.length === STRATEGY_HISTORY_RACES) break;
     // oxlint-disable-next-line eslint/no-await-in-loop -- One race at a time: the reads share the DuckDB files' I/O.
     const strategy = await readSessionStrategy(sessionDb, id);
     if (strategy) races.push(strategy);
