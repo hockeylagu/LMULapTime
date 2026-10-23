@@ -52,18 +52,20 @@ describe('app event stream', () => {
     expect(onGameStarted).toHaveBeenCalledTimes(1);
   });
 
-  it.each([true, false])('honors auto-open=%s when the first status says LMU is already running', async autoOpen => {
+  // The first game status of a page load decides auto-open once (module state): this is the file's first status.
+  // Auto-open on that status is covered in useAppEventsAutoOpen.test.tsx, a page load of its own.
+  it('does not auto-open when the first status says the server decided against it', async () => {
     const onGameStarted = vi.fn();
     const { result } = renderHook(() => useAppData({ onGameStarted }));
     await act(async () => {});
     const source = FakeEventSource.byUrl('/api/events');
-    act(() => source.emit('game-running', { running: true, autoOpen }));
+    act(() => source.emit('game-running', { running: true, autoOpen: false }));
     expect(result.current.gameRunning).toBe(true);
-    expect(onGameStarted).toHaveBeenCalledTimes(autoOpen ? 1 : 0);
+    expect(onGameStarted).not.toHaveBeenCalled();
     act(() => source.emit('error'));
     await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
     act(() => FakeEventSource.byUrl('/api/events').emit('game-running', { running: true, autoOpen: true }));
-    expect(onGameStarted).toHaveBeenCalledTimes(autoOpen ? 1 : 0);
+    expect(onGameStarted).not.toHaveBeenCalled();
   });
 
   it('keeps the game status through a stream error the reconnect answers, and clears it when none answers', async () => {

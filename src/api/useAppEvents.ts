@@ -29,6 +29,12 @@ function readGameStatus(data: unknown): { running: boolean; autoOpen: boolean } 
   }
 }
 
+/**
+ * Whether this page load has had its first game status. Auto-open answers only that one: the app is unmounted on the
+ * live page, and coming back to it must not switch straight back to the dashboard.
+ */
+let pageLoadStatusSeen = false;
+
 /** Listens to the app-wide server events (`GET /api/events`) while `enabled`; the browser reconnects by itself. */
 export function useAppEvents(handlers: AppEventHandlers, enabled: boolean): void {
   const scanStarted = useEffectEvent(() => handlers.onScanStarted());
@@ -42,8 +48,6 @@ export function useAppEvents(handlers: AppEventHandlers, enabled: boolean): void
     let silence: ReturnType<typeof setTimeout>;
     let retry: ReturnType<typeof setTimeout> | undefined;
     let stale: ReturnType<typeof setTimeout> | undefined;
-    // Survives stream reconnects: browsing away during a session must remain possible.
-    let receivedGameStatus = false;
     const heard = () => {
       clearTimeout(silence);
       silence = setTimeout(() => lost(0), APP_EVENT_SILENCE_MS);
@@ -75,8 +79,8 @@ export function useAppEvents(handlers: AppEventHandlers, enabled: boolean): void
         const status = readGameStatus(event.data);
         if (!status) return;
         gameRunning(status.running);
-        if (!receivedGameStatus && status.running && status.autoOpen) gameStarted();
-        receivedGameStatus = true;
+        if (!pageLoadStatusSeen && status.running && status.autoOpen) gameStarted();
+        pageLoadStatusSeen = true;
       });
       source.addEventListener('error', () => lost(APP_EVENT_ERROR_GRACE_MS));
     }
