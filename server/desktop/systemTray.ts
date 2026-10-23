@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { constants, setPriority } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 /** The helper owns the native Windows UI; its stdin closes when this server exits. */
@@ -17,11 +18,15 @@ export function startSystemTray(): (() => void) | undefined {
     return;
   }
 
-  const helper = spawn('powershell.exe', [
-    '-NoLogo', '-NoProfile', '-NonInteractive', '-STA', '-ExecutionPolicy', 'Bypass',
-    '-File', fileURLToPath(new URL('./systemTray.ps1', import.meta.url)),
-    '-WebsiteUrl', website.href,
-  ], { windowsHide: true, stdio: ['pipe', 'ignore', 'pipe'] });
+  const helper = spawn(fileURLToPath(new URL('./bin/systemTray-win32-x64.exe', import.meta.url)),
+    [website.href], { windowsHide: true, stdio: ['pipe', 'ignore', 'pipe'] });
+
+  // Native UI initialization must yield CPU to Vite, ingestion and the live reader.
+  if (helper.pid !== undefined) {
+    try {
+      setPriority(helper.pid, constants.priority.PRIORITY_BELOW_NORMAL);
+    } catch { /* Priority is best-effort; the helper may already have exited. */ }
+  }
 
   // Tray failures must not interrupt capture, ingestion, or HTTP serving.
   helper.on('error', error => console.warn(`System tray unavailable: ${error.message}`));

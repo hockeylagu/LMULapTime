@@ -1,13 +1,15 @@
 import { EventEmitter } from 'node:events';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { PassThrough } from 'node:stream';
+import { constants, setPriority } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { startSystemTray } from '../../../server/desktop/systemTray.js';
 
 vi.mock('node:child_process', () => ({ spawn: vi.fn() }));
+vi.mock('node:os', async importOriginal => ({ ...await importOriginal<typeof import('node:os')>(), setPriority: vi.fn() }));
 
 describe('Windows system tray lifecycle', () => {
-  let helper: EventEmitter & { stdin: PassThrough; stderr: PassThrough };
+  let helper: EventEmitter & { pid?: number; stdin: PassThrough; stderr: PassThrough };
 
   beforeEach(() => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
@@ -15,7 +17,7 @@ describe('Windows system tray lifecycle', () => {
     vi.stubEnv('LMU_TRAY', '');
     vi.stubEnv('LMU_UI_ORIGIN', '');
     vi.stubEnv('LMU_UI_PORT', '');
-    helper = Object.assign(new EventEmitter(), { stdin: new PassThrough(), stderr: new PassThrough() });
+    helper = Object.assign(new EventEmitter(), { pid: 12345, stdin: new PassThrough(), stderr: new PassThrough() });
     vi.mocked(spawn).mockReturnValue(helper as unknown as ChildProcess);
   });
 
@@ -29,9 +31,9 @@ describe('Windows system tray lifecycle', () => {
   it('starts a hidden helper for the default website and closes its lifetime pipe on shutdown', () => {
     const previousListeners = process.listenerCount('exit');
     const stop = startSystemTray();
-    expect(spawn).toHaveBeenCalledWith('powershell.exe', expect.arrayContaining([
-      '-STA', '-File', expect.stringMatching(/systemTray\.ps1$/), '-WebsiteUrl', 'http://localhost:5173/',
-    ]), { windowsHide: true, stdio: ['pipe', 'ignore', 'pipe'] });
+    expect(spawn).toHaveBeenCalledWith(expect.stringMatching(/systemTray-win32-x64\.exe$/),
+      ['http://localhost:5173/'], { windowsHide: true, stdio: ['pipe', 'ignore', 'pipe'] });
+    expect(setPriority).toHaveBeenCalledWith(helper.pid, constants.priority.PRIORITY_BELOW_NORMAL);
     expect(process.listenerCount('exit')).toBe(previousListeners + 1);
     stop?.();
     expect(helper.stdin.writableEnded).toBe(true);
@@ -66,10 +68,20 @@ describe('Windows system tray lifecycle', () => {
   });
 
   it('reports helper launch failures and tolerates a closed stdin pipe', () => {
+    helper.pid = undefined;
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     startSystemTray();
-    helper.emit('error', new Error('PowerShell unavailable'));
+    helper.emit('error', new Error('Native helper unavailable'));
     helper.stdin.emit('error', new Error('EPIPE'));
-    expect(warn).toHaveBeenCalledWith('System tray unavailable: PowerShell unavailable');
+    expect(warn).toHaveBeenCalledWith('System tray unavailable: Native helper unavailable');
+    expect(setPriority).not.toHaveBeenCalled();
+  });
+
+  it('keeps the tray lifecycle working if lowering its priority fails', () => {
+    vi.mocked(setPriority).mockImplementationOnce(() => { throw new Error('Process already exited'); });
+    const stop = startSystemTray();
+    expect(stop).toBeTypeOf('function');
+    stop?.();
+    expect(helper.stdin.writableEnded).toBe(true);
   });
 });

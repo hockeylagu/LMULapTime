@@ -120,6 +120,9 @@ See [live capture storage and channels](docs/LIVE_CAPTURE_FORMAT.md).
    or right-click and choose **Open LMU Lap Time Analyzer**, to open the website. The icon closes
    automatically when the backend stops or restarts. Set `LMU_TRAY=0` in `.env.local` to disable it.
    It opens `LMU_UI_ORIGIN` when configured, otherwise `http://localhost:5173` (or `LMU_UI_PORT`).
+   The bundled Windows x64 helper starts directly without PowerShell or .NET. After editing its
+   native source in `server/desktop/`, run `npm run build:tray` with Visual Studio C++ build tools
+   and the Windows SDK installed. Rebuilding is unnecessary for normal development startup.
 
 5. **Open your browser**:
    - Frontend UI: [http://localhost:5173](http://localhost:5173)

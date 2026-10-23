@@ -16,9 +16,13 @@ decode options in `server/replay/decode/replayTrajectoryTypes.ts`, telemetry cha
 
 Verification baseline: 3,267 tests passed, 56 intentionally skipped; production build clean (zero warnings, zero errors).
 
-Windows desktop integration: `server/desktop/systemTray.ts` starts the hidden PowerShell
-Windows Forms helper `systemTray.ps1` after HTTP listening succeeds. Its tray menu and double-click
-open the frontend (`LMU_UI_ORIGIN`, otherwise `LMU_UI_PORT` / 5173). Closing the server's stdin
+Windows desktop integration: `server/desktop/systemTray.ts` starts the bundled native Win32
+helper `bin/systemTray-win32-x64.exe` at below-normal CPU priority after HTTP listening succeeds.
+`systemTray.c` owns the hidden window, notification icon, Explorer restart recovery and lifetime
+pipe reader. `systemTray.rc` embeds `systemTray.ico`; `npm run build:tray` rebuilds the executable
+using Visual Studio C++ tools and the Windows SDK. Normal startup never compiles or loads PowerShell/.NET.
+Its tray menu and double-click open the frontend (`LMU_UI_ORIGIN`, otherwise `LMU_UI_PORT` / 5173).
+Closing the server's stdin
 pipe disposes the icon, including on crashes and watch restarts; `LMU_TRAY=0` disables it.
 
 ---
