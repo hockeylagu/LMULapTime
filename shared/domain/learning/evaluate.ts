@@ -56,22 +56,18 @@ export function evaluationMetrics(examples: EvaluationExample[]): EvaluationMetr
   };
 }
 
-export function evaluateLearningBaseline(
-  examples: EvaluationExample[],
-  holdoutFraction = 0.25,
-): LearningBaselineEvaluation {
-  if (!Number.isFinite(holdoutFraction) || holdoutFraction <= 0 || holdoutFraction >= 1) {
-    throw new RangeError('holdoutFraction must be finite and between 0 and 1');
-  }
-
-  const valid = examples.filter(isValidEvaluationExample);
+/**
+ * Whole sessions, oldest first, split near `trainCount(sessions)`; the boundary only falls between different start
+ * times, so sessions that started together are never split.
+ */
+export function splitSessions(examples: EvaluationExample[], trainCount: (sessions: number) => number) {
   const sessions = new Map<string, number>();
-  for (const example of valid) {
+  for (const example of examples) {
     const existing = sessions.get(example.sessionId);
     if (existing === undefined || example.startedAt < existing) sessions.set(example.sessionId, example.startedAt);
   }
   const ordered = [...sessions.entries()].sort(([aId, aTime], [bId, bTime]) => aTime - bTime || aId.localeCompare(bId));
-  const targetTrainCount = Math.max(1, Math.min(ordered.length - 1, Math.round(ordered.length * (1 - holdoutFraction))));
+  const targetTrainCount = trainCount(ordered.length);
   let split = ordered.length;
   if (ordered.length > 1) {
     const candidates: number[] = [];
@@ -82,8 +78,20 @@ export function evaluateLearningBaseline(
       Math.abs(candidate - targetTrainCount) < Math.abs(best - targetTrainCount) ? candidate : best,
     candidates[0] ?? ordered.length);
   }
-  const trainSessionIds = ordered.slice(0, split).map(([id]) => id);
-  const testSessionIds = ordered.slice(split).map(([id]) => id);
+  return { trainSessionIds: ordered.slice(0, split).map(([id]) => id), testSessionIds: ordered.slice(split).map(([id]) => id) };
+}
+
+export function evaluateLearningBaseline(
+  examples: EvaluationExample[],
+  holdoutFraction = 0.25,
+): LearningBaselineEvaluation {
+  if (!Number.isFinite(holdoutFraction) || holdoutFraction <= 0 || holdoutFraction >= 1) {
+    throw new RangeError('holdoutFraction must be finite and between 0 and 1');
+  }
+
+  const valid = examples.filter(isValidEvaluationExample);
+  const { trainSessionIds, testSessionIds } = splitSessions(valid,
+    sessions => Math.max(1, Math.min(sessions - 1, Math.round(sessions * (1 - holdoutFraction)))));
   const trainIds = new Set(trainSessionIds);
   const testIds = new Set(testSessionIds);
   const train = valid.filter(({ sessionId }) => trainIds.has(sessionId));

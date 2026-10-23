@@ -58,8 +58,9 @@ describe('offline learning calibration', () => {
     expect(sparse.state).toBe('insufficient-evidence');
     expect(sparse.model).toBeNull();
     expect(sparse.gates).toContain('insufficient-training-sessions');
-    const oneTestSession = dataset().map(row => row.startedAt >= 4 ? { ...row, sessionId: 'last', startedAt: 5 } : row);
-    const result = evaluateLearningCalibration(oneTestSession, 0.25).calibration.cohorts[0];
+    const twoSessions = dataset().filter(row => row.startedAt <= 2);
+    const result = evaluateLearningCalibration(twoSessions, 0.25).calibration.cohorts[0];
+    expect(result).toMatchObject({ trainSessions: 1, testSessions: 1 });
     expect(result.gates).toContain('insufficient-test-sessions');
     expect(result.state).toBe('insufficient-evidence');
     const fewLaps = evaluate(dataset().filter((_, index) => index % 10 === 0));
@@ -70,8 +71,24 @@ describe('offline learning calibration', () => {
     const examples = dataset().map(row => row.startedAt >= 4 ? { ...row, cohort: 'new-patch' } : row);
     const cohorts = evaluateLearningCalibration(examples, 0.4).calibration.cohorts;
     expect(cohorts).toHaveLength(2);
-    expect(cohorts.find(row => row.cohort === 'new-patch')).toMatchObject({ trainCount: 0, model: null, state: 'insufficient-evidence' });
-    expect(cohorts.find(row => row.cohort === 'exact')).toMatchObject({ testCount: 0, candidate: null, state: 'insufficient-evidence' });
+    expect(cohorts.find(row => row.cohort === 'new-patch')).toMatchObject({ trainSessions: 1, model: null, state: 'insufficient-evidence' });
+    expect(cohorts.find(row => row.cohort === 'exact')).toMatchObject({ trainSessions: 1, testSessions: 2, model: null, state: 'insufficient-evidence' });
+  });
+
+  it('holds out the newest sessions of each cohort sessions, so an older cohort is tested while newer events use other cars', () => {
+    // Race review 2026-10-23: Bahrain BMW over six sessions, then Le Mans 9x8 over the newest three. The global
+    // split held out only Le Mans, which had nothing to train on, and left Bahrain with nothing to test.
+    const bahrain = Array.from({ length: 6 }, (_, session) => Array.from({ length: 6 }, () => ({
+      sessionId: `bahrain${session}`, startedAt: session + 1, cohort: 'bahrain', resourceKind: 'fuel' as const, predicted: 2, actual: 2.1,
+    }))).flat();
+    const leMans = Array.from({ length: 3 }, (_, session) => Array.from({ length: 6 }, () => ({
+      sessionId: `lemans${session}`, startedAt: session + 10, cohort: 'lemans', resourceKind: 'fuel' as const, predicted: 6.5, actual: 6.6,
+    }))).flat();
+    const report = evaluateLearningCalibration([...bahrain, ...leMans]);
+    expect(report.baseline.testSessionIds).toEqual(['lemans1', 'lemans2']);
+    const cohorts = report.calibration.cohorts;
+    expect(cohorts.find(row => row.cohort === 'bahrain')).toMatchObject({ trainSessions: 4, testSessions: 2, state: 'passes-offline-gates' });
+    expect(cohorts.find(row => row.cohort === 'lemans')).toMatchObject({ trainSessions: 1, testSessions: 2, state: 'insufficient-evidence' });
   });
 
   it('never mixes fuel and VE even with the same cohort identifier', () => {

@@ -59,6 +59,7 @@ because active recordings can be exclusively locked on Windows.
 | `shared/domain/learning/capture.ts`, `examples.ts`, `evaluate.ts`, `calibration.ts`, `automatic.ts` | Frozen forecasts, examples, evaluation and correction gates |
 | `server/live/learning/service.ts`, `runtime.ts`, `automaticWorker.ts` | Projection refresh, persisted model lifecycle and exact live lookup |
 | `server/live/learning/readiness.ts`, `readinessReader.ts`, `server/routes/liveRoutes.ts` | Manual Settings evidence check |
+| `tools/analysis/evaluateLiveLearning.ts`, `listLearningErrors.ts`, `.claude/skills/race-review/` | Post-race review: calibration report, per-lap forecast errors, findings in `docs/RACE_REVIEW_LOG.md` |
 | `server/core/live/dbLiveLearningStore.ts`, `dbLearningModelStore.ts` | Compact learning facts and correction models |
 | `shared/domain/live/livePitLane.ts`, `server/core/live/dbPitLaneStore.ts`, `tools/analysis/backfillPitLaneLoss.ts` | Pit lane loss per race stop (in-lap + out-lap - 2 x pace - time stopped), stored per layout and class (`live_pit_lane_losses`), backfill from closed captures |
 

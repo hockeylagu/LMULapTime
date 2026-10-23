@@ -230,7 +230,7 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
   return {
     mode: 'stint',
     action: {
-      label: `${name} / LAP · LAST 3${estimate}`,
+      label: `${name} / LAP · LAST 5${estimate}`,
       value: formatPerLap(resource.perLap, unit),
       unit,
       tone: marginTone(race.sparePerLap),

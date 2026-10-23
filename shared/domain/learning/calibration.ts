@@ -1,14 +1,16 @@
 import {
-  evaluateLearningBaseline, evaluationMetrics, isValidEvaluationExample,
+  evaluateLearningBaseline, evaluationMetrics, isValidEvaluationExample, splitSessions,
   type EvaluationExample, type EvaluationMetrics,
 } from './evaluate.js';
 
 /**
  * Versioned policy shared by screening and prospective acceptance; screening alone never activates. Version 2 halved
- * the lap totals (sessions unchanged): 20 to 60 minute races give about 6 to 20 clean laps each.
+ * the lap totals (sessions unchanged): 20 to 60 minute races give about 6 to 20 clean laps each. Version 3 holds out
+ * each cohort's own newest sessions (at least `minTestSessions`): one car and layout per event meant the newest
+ * sessions overall never shared a cohort with older ones, so no cohort could pass (race review 2026-10-23).
  */
 export const CALIBRATION_POLICY = Object.freeze({
-  version: 2,
+  version: 3,
   minTrainSessions: 3,
   minTrainExamples: 15,
   minTestSessions: 2,
@@ -110,21 +112,26 @@ function evaluateCohort(cohort: string, resourceKind: EvaluationExample['resourc
   return result;
 }
 
-/** One chronological split shared with baseline evaluation, exact cohorts, no persistence or activation. */
+/**
+ * Each exact cohort is split on its own sessions: its newest `holdoutFraction`, and at least `minTestSessions`, test
+ * the candidate fitted on the rest. The baseline keeps one split across all sessions.
+ */
 export function evaluateLearningCalibration(examples: EvaluationExample[], holdoutFraction = 0.25) {
   const baseline = evaluateLearningBaseline(examples, holdoutFraction);
-  const trainIds = new Set(baseline.trainSessionIds);
-  const testIds = new Set(baseline.testSessionIds);
-  const groups = new Map<string, { cohort: string; resourceKind: EvaluationExample['resourceKind'];
-    train: EvaluationExample[]; test: EvaluationExample[] }>();
+  const groups = new Map<string, EvaluationExample[]>();
   for (const example of examples.filter(isValidEvaluationExample)) {
     const key = JSON.stringify([example.resourceKind, example.cohort]);
-    const group = groups.get(key) ?? { cohort: example.cohort, resourceKind: example.resourceKind, train: [], test: [] };
-    if (trainIds.has(example.sessionId)) group.train.push(example);
-    else if (testIds.has(example.sessionId)) group.test.push(example);
-    groups.set(key, group);
+    groups.set(key, [...(groups.get(key) ?? []), example]);
   }
-  const cohorts = [...groups.values()].map(group => evaluateCohort(group.cohort, group.resourceKind, group.train, group.test))
+  const testSessions = (sessions: number) => Math.min(sessions - 1,
+    Math.max(CALIBRATION_POLICY.minTestSessions, Math.round(sessions * holdoutFraction)));
+  const split = [...groups.values()].map(group => {
+    const { testSessionIds } = splitSessions(group, sessions => Math.max(1, sessions - testSessions(sessions)));
+    const testIds = new Set(testSessionIds);
+    return { cohort: group[0]!.cohort, resourceKind: group[0]!.resourceKind,
+      train: group.filter(row => !testIds.has(row.sessionId)), test: group.filter(row => testIds.has(row.sessionId)) };
+  });
+  const cohorts = split.map(group => evaluateCohort(group.cohort, group.resourceKind, group.train, group.test))
     .sort((a, b) => a.resourceKind.localeCompare(b.resourceKind) || a.cohort.localeCompare(b.cohort));
   return { baseline, calibration: {
     algorithm: 'session-median-residual-shrinkage' as const,

@@ -120,11 +120,12 @@ describe('LiveStrategyTracker', () => {
     expect(early?.resource).toMatchObject({ kind: 've', unit: '%', perLap: 2.9, perLapSource: 'game', lapsMeasured: 0 });
 
     const later = drive(tracker, 31, 450);
-    expect(later?.resource).toMatchObject({ kind: 've', perLap: 3, perLapSource: 'measured', lapsMeasured: 3, capacity: 100 });
-    // At 450 s, halfway round lap 5 with 26 laps left: 76.5% at 3%/lap covers the 25.5 laps to the flag exactly. The
-    // finish keeps no reserve, so there is no stop; one at the end of this lap would load 25 laps plus the reserve.
+    expect(later?.resource).toMatchObject({ kind: 've', perLap: 3.02, perLapSource: 'measured', lapsMeasured: 3, capacity: 100 });
+    // The 3 s samples measure the laps a few hundredths either side of 3 %; leaving out the lowest gives 3.02 %/lap.
+    // At 450 s, halfway round lap 5 with 26 laps left, 76.5 % covers 25.3 of the 25.5 laps to the flag: a stop at the
+    // end of lap 24 or, at the end of this lap, one that loads 25 laps plus the reserve.
     expect(later?.resource?.amount).toBe(76.5);
-    expect(later?.resource?.race).toMatchObject({ finishReachable: true, atFinish: 0, pitInLaps: null, sparePerLap: 0, neededStopNow: 77 });
+    expect(later?.resource?.race).toMatchObject({ finishReachable: false, atFinish: null, pitInLaps: 24, neededStopNow: 78 });
   });
 
   it('shows the stop-and-go while a penalty is pending, then the service with its random delays', () => {
@@ -319,7 +320,7 @@ describe('LiveStrategyTracker', () => {
     const menu = at(460);
     expect(tracker.update(menu, deriveLiveState(menu, 'driving', 'menu'), { carClass: 'GT3', layoutKey: null, lapsLeft: null, latestLap: null, reserveSeconds: LAP / 2 })).toBeNull();
     // Back from the menu with the same car on the same track: the event's measured use is kept.
-    expect(context(tracker, at(10))?.resource).toMatchObject({ perLap: 3, lapsMeasured: 3 });
+    expect(context(tracker, at(10))?.resource).toMatchObject({ perLap: 3.02, lapsMeasured: 3 });
     const other = at(10, { trackName: 'Bahrain International Circuit' });
     expect(context(tracker, other)?.resource).toMatchObject({ perLap: null, lapsMeasured: 0, amount: null });
   });
@@ -329,8 +330,8 @@ describe('LiveStrategyTracker', () => {
     drive(tracker, 0, 450, 'bahrain_gp');
     // The next session of the event: the layout is unresolved until the navigation read, then the same.
     const next = (layoutKey: string | null) => context(tracker, at(10, { sessionCode: 5 }), { layoutKey })?.resource;
-    expect(next(null)).toMatchObject({ perLap: 3, lapsMeasured: 3 });
-    expect(next('bahrain_gp')).toMatchObject({ perLap: 3, lapsMeasured: 3 });
+    expect(next(null)).toMatchObject({ perLap: 3.02, lapsMeasured: 3 });
+    expect(next('bahrain_gp')).toMatchObject({ perLap: 3.02, lapsMeasured: 3 });
     // Same track name and car, the other layout: nothing measured there yet.
     expect(next('bahrain_outer')).toMatchObject({ perLap: null, lapsMeasured: 0 });
   });

@@ -26,7 +26,7 @@ describe('racePlanView', () => {
   it('leads with the per-lap use mid-stint, with the spare per lap, the pit countdown, tyres and VE now', () => {
     expect(texts(withRace({}))).toEqual({
       mode: 'stint',
-      action: 'VE / LAP · LAST 3|2.5|%|+0.2 % SPARE / LAP',
+      action: 'VE / LAP · LAST 5|2.5|%|+0.2 % SPARE / LAP',
       cells: ['PIT IN|6|', 'TYRES · MEDIUM|91|', 'VE NOW|62|'],
     });
     expect(racePlanView(withRace({ sparePerLap: -0.3 })).action).toMatchObject({ tone: 'loss', note: '−0.3 % OVER / LAP' });

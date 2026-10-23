@@ -6,8 +6,12 @@ const MAX_BRACKET_SECONDS = 12;
 const MAX_SAMPLES = 120;
 /** Representative laps kept per event. */
 const MAX_USES = 30;
-/** The per-lap figure is the mean of this many most recent laps ("LAST 3"). */
-export const USAGE_WINDOW = 3;
+/**
+ * The per-lap figure is the mean of this many most recent laps ("LAST 5") with the lowest left out from three laps:
+ * traffic laps that are not pit or caution laps use less, and a run of them made the mean of the last three
+ * underpredict the next normal lap by 5.7 % (Le Mans race 2026-10-22, race review 2026-10-23).
+ */
+export const USAGE_WINDOW = 5;
 
 interface Sample { et: number; amount: number }
 interface Crossing {
@@ -41,10 +45,11 @@ export class LiveUsageMeter {
   /** Representative laps measured so far (oldest first). */
   public get laps(): readonly number[] { return this.uses; }
 
-  /** Mean of the last three representative laps, or null before the first. */
+  /** Mean of the last five representative laps less the lowest (from three laps), or null before the first. */
   public perLap(): number | null {
-    const recent = this.uses.slice(-USAGE_WINDOW);
-    return recent.length === 0 ? null : round(recent.reduce((sum, use) => sum + use, 0) / recent.length, 3);
+    const recent = this.uses.slice(-USAGE_WINDOW).sort((a, b) => a - b);
+    const kept = recent.length >= 3 ? recent.slice(1) : recent;
+    return kept.length === 0 ? null : round(kept.reduce((sum, use) => sum + use, 0) / kept.length, 3);
   }
 
   /** Clears everything, measured laps included (another layout or car). */

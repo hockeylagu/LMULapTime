@@ -42,6 +42,9 @@ describe('planRace', () => {
     // Le Mans race 2026-10-22, last lap: 11% VE at 7.67%/lap, under the 11.5% with the reserve; finished with 3%.
     expect(race({ amount: 11, perLap: 7.67, lapsLeft: 1, lapFraction: 0 })).toMatchObject({ finishReachable: true, atFinish: 3.3, pitInLaps: null });
     expect(race({ amount: 7, perLap: 7.67, lapsLeft: 1, lapFraction: 0 })).toMatchObject({ finishReachable: false, pitInLaps: 0 });
+    // Halfway round with 26 laps left, 76.5% at 3%/lap covers the 25.5 laps exactly: no stop, nothing left.
+    expect(race({ amount: 76.5, perLap: 3, lapsLeft: 26, lapFraction: 0.5 })).toMatchObject({
+      finishReachable: true, atFinish: 0, pitInLaps: null, sparePerLap: 0, neededStopNow: 77 });
   });
 
   it('caps the amount after the stop at a full tank and counts the further stops', () => {
@@ -114,7 +117,36 @@ describe('planGarage', () => {
   });
 });
 
+/** A meter fed one lap per `uses` entry: 100 s laps, the amount sampled every 2 s. */
+function meterOf(uses: number[]): LiveUsageMeter {
+  const meter = new LiveUsageMeter();
+  let amount = 100;
+  meter.addSample(0, amount);
+  meter.addCrossing(1, 0, false);
+  uses.forEach((use, index) => {
+    for (let step = 2; step <= 100; step += 2) meter.addSample(index * 100 + step, amount - (use * step) / 100);
+    amount -= use;
+    meter.addCrossing(index + 2, (index + 1) * 100, false);
+  });
+  return meter;
+}
+
 describe('LiveUsageMeter', () => {
+  it('leaves the lowest of the last five laps out, so a run of traffic laps does not pull the figure down', () => {
+    // Le Mans race 2026-10-22, fuel laps 6-12: laps 10-12 in traffic used less. The mean of the last three (6.26 L)
+    // underpredicted lap 15 (6.64 L) by 5.7 %; the last five less the lowest is within 2.5 %.
+    const meter = meterOf([6.617, 6.672, 6.644, 6.653, 6.389, 6.173, 6.219]);
+    expect(meter.laps).toHaveLength(7);
+    expect(meter.perLap()).toBeCloseTo(6.476, 3);
+    expect(Math.abs(meter.perLap()! - 6.637) / 6.637).toBeLessThan(0.025);
+  });
+
+  it('averages every lap until the third, then leaves the lowest out', () => {
+    expect(meterOf([3]).perLap()).toBe(3);
+    expect(meterOf([3, 2]).perLap()).toBe(2.5);
+    expect(meterOf([3, 2, 3.2]).perLap()).toBe(3.1);
+  });
+
   it('measures each lap between interpolated amounts at its two crossings', () => {
     const meter = new LiveUsageMeter();
     // 2.5% per lap of 75 s, sampled every 3 s with the crossings between samples.
@@ -126,7 +158,7 @@ describe('LiveUsageMeter', () => {
     expect(meter.perLap()).toBe(2.5);
   });
 
-  it('measures crossings that arrive before the samples around them, and keeps the last three for the figure', () => {
+  it('measures crossings that arrive before the samples around them, and leaves the lowest out of the figure', () => {
     const meter = new LiveUsageMeter();
     meter.addSample(0, 60);
     meter.addCrossing(1, 1.5, false);

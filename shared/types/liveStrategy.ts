@@ -21,7 +21,7 @@ export interface LiveResourcePlan {
   amount: number | null;
   /** A full tank in `unit` (100 for VE). */
   capacity: number | null;
-  /** Use per lap: the mean of the last three representative laps, or the game's estimate before the first. */
+  /** Use per lap: the mean of the last five representative laps less the lowest, or the game's estimate before the first. */
   perLap: number | null;
   perLapSource: LivePerLapSource | null;
   /** Historical calibration applied to the baseline; absent when ordinary estimation is used. */
