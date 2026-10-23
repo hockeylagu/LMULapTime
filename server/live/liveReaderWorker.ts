@@ -46,7 +46,9 @@ if (parentPort) {
     post: message => message.type === 'capture' ? port.postMessage(message, [message.batch.rows.buffer as ArrayBuffer]) : port.postMessage(message) });
   port.on('message', (message: unknown) => {
     if (!isWorkerMessage<{ type: 'stop' }>(message, ['stop'])) return;
+    // The reader posts its pending capture rows as it stops; `stopped` tells the service they have all arrived.
     reader.stop();
+    port.postMessage({ type: 'stopped' });
     port.close();
   });
   reader.start();

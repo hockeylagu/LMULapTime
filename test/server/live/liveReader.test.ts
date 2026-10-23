@@ -185,6 +185,18 @@ describe('LiveReader', () => {
     t.reader.stop();
   });
 
+  it('posts the capture rows it still holds when it stops', async () => {
+    const t = setup(() => Promise.resolve('session'), undefined, true);
+    t.available.value = true;
+    t.reader.start();
+    await vi.advanceTimersByTimeAsync(PROBE_MS + 50);
+    t.setTelemetry(telemetryBuffer(10, [{ id: 12, et: 400, throttle: 0, brake: 0 }]));
+    await vi.advanceTimersByTimeAsync(20);
+    t.posted.length = 0;
+    t.reader.stop();
+    expect(capturedRows(t.posted).map(row => row.elapsedSeconds)).toEqual([400]);
+  });
+
   it('detects startup before telemetry and closes stale mappings within 500 ms of exit', async () => {
     let running = false;
     const close = vi.fn();

@@ -115,7 +115,9 @@ export class LiveReader {
     if (!this.scoringMap && this.processRunning !== false) this.post({ type: 'closed' });
   }
 
+  /** Posts the capture rows still held, so a shutdown keeps the recording's last half second. */
   public stop(): void {
+    this.flushCapture();
     this.stopped = true;
     if (this.processTimer) clearTimeout(this.processTimer);
     this.processTimer = null;

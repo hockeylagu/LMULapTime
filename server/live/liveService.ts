@@ -34,6 +34,8 @@ const MAX_BUFFERED_PEDALS = 250;
 /** `timing` events go out at most this often (the scoring buffer itself updates 5 times a second). */
 export const TIMING_MIN_INTERVAL_MS = 100;
 const WORKER_RESTART_MS = 3000;
+/** How long a stop waits for the reader's last capture rows. */
+const READER_DRAIN_MS = 1000;
 
 export type LiveWorker = Pick<Worker, 'on' | 'postMessage' | 'terminate' | 'unref'>;
 
@@ -233,11 +235,34 @@ export class LiveService {
     this.pit.stop();
     const worker = this.worker;
     this.worker = null;
-    if (worker) {
+    const drained = worker ? this.drainReader(worker) : Promise.resolve();
+    return drained.then(() => this.options.capture?.stop());
+  }
+
+  /**
+   * The reader holds up to half a second of capture rows: they are taken before the recording closes. It answers
+   * `stopped` after posting them; an exit or a reader that does not answer in time ends the wait.
+   */
+  private drainReader(worker: LiveWorker): Promise<void> {
+    return new Promise<void>(resolve => {
+      let done = false;
+      const finish = (): void => {
+        if (done) return;
+        done = true;
+        clearTimeout(timeout);
+        void worker.terminate();
+        resolve();
+      };
+      const timeout = setTimeout(finish, READER_DRAIN_MS);
+      timeout.unref();
+      worker.on('message', (message: unknown) => {
+        if (done || !isWorkerMessage<{ type: 'capture' | 'stopped' }>(message, ['capture', 'stopped'])) return;
+        if (message.type === 'stopped') finish();
+        else this.handleMessage(message);
+      });
+      worker.on('exit', finish);
       worker.postMessage({ type: 'stop' });
-      void worker.terminate();
-    }
-    return this.options.capture?.stop() ?? Promise.resolve();
+    });
   }
 
   /** Registers a page: it gets the current snapshot now. Returns the function that removes it. */

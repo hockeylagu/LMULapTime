@@ -14,7 +14,11 @@ class FakeWorker extends EventEmitter {
   public readonly posted: unknown[] = [];
   public readonly unref = vi.fn();
   public readonly terminate = vi.fn(() => Promise.resolve(0));
-  public postMessage(message: unknown): void { this.posted.push(message); }
+  public postMessage(message: unknown): void {
+    this.posted.push(message);
+    // Like the reader worker: its last capture rows are posted, then `stopped`.
+    if ((message as { type?: string }).type === 'stop') this.emit('message', { type: 'stopped' });
+  }
 }
 
 class FakeCaptureWriter extends EventEmitter {
@@ -53,6 +57,7 @@ describe('LiveService capture integration', () => {
     expect(service.hasClients()).toBe(false);
     expect(capture.hasOpenRecordingHandle).toBe(true);
     const stopping = service.stop();
+    await Promise.resolve(); // The recording stops once the reader has drained.
     const forecasts = writer.batches().flatMap(batch => batch.observations).filter(event => event.kind === 'learning-forecast');
     expect(forecasts).toHaveLength(2);
     expect(forecasts[0].data).toMatchObject({ lapNumber: 2, forecastSeconds: 100, kind: 'fuel' });
@@ -98,6 +103,7 @@ describe('LiveService capture integration', () => {
     expect(capture.status().samples).toBe(1);
 
     const stopping = service.stop();
+    await Promise.resolve(); // The recording stops once the reader has drained.
     let stopResolved = false;
     void stopping.then(() => { stopResolved = true; });
     await Promise.resolve();
@@ -163,6 +169,7 @@ describe('LiveService capture integration', () => {
     expect(capture.status()).toMatchObject({ state: 'recording', samples: 1 });
 
     const stopping = service.stop();
+    await Promise.resolve(); // The recording stops once the reader has drained.
     writer.emit('exit', 0);
     await stopping;
   });

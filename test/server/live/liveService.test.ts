@@ -14,7 +14,10 @@ import { LiveStrategyTracker } from '../../../shared/domain/live/liveStrategyTra
 import type { LiveRaceStrategies } from '../../../shared/types/liveStrategy.js';
 
 class FakeWorker extends EventEmitter {
-  public postMessage = vi.fn();
+  /** Like the reader worker, a stop is answered once its pending capture rows are posted. */
+  public postMessage = vi.fn((message: { type: string; observations?: Array<{ kind: string }> }) => {
+    if (message.type === 'stop') queueMicrotask(() => this.emit('message', { type: 'stopped' }));
+  });
   public terminate = vi.fn(() => Promise.resolve(0));
   public unref = vi.fn();
 }
@@ -427,13 +430,39 @@ describe('LiveService', () => {
     expect(slow.data(writtenToSlow)).toMatchObject({ lifecycle: 'finished' });
   });
 
-  it('terminates the worker on stop and does not restart it', () => {
+  it('terminates the worker on stop and does not restart it', async () => {
     const { service, worker } = setup();
-    void service.stop();
+    await service.stop();
     expect(worker.postMessage).toHaveBeenCalledWith({ type: 'stop' });
     expect(worker.terminate).toHaveBeenCalled();
     worker.emit('exit', 0);
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('records the capture rows the reader posts as it stops, before the recording closes', async () => {
+    const capture = new LiveCaptureController({ directory: 'unused', onPersist: () => {} });
+    const order: string[] = [];
+    vi.spyOn(capture, 'samples').mockImplementation(() => { order.push('samples'); });
+    vi.spyOn(capture, 'stop').mockImplementation(() => { order.push('stop'); return Promise.resolve(); });
+    const { service, worker, frame } = setup({ capture });
+    try {
+      frame(reading({ inRealtime: true }));
+      worker.postMessage.mockImplementationOnce(() => queueMicrotask(() => {
+        worker.emit('message', { type: 'capture', batch: { rows: new Float64Array(14), sparse: [] } });
+        worker.emit('message', { type: 'stopped' });
+      }));
+      await service.stop();
+      expect(order).toEqual(['samples', 'stop']);
+    } finally { vi.restoreAllMocks(); }
+  });
+
+  it('stops anyway when the reader never answers', async () => {
+    const { service, worker } = setup();
+    worker.postMessage.mockImplementationOnce(() => {});
+    const stopped = service.stop();
+    await vi.advanceTimersByTimeAsync(1000);
+    await stopped;
+    expect(worker.terminate).toHaveBeenCalled();
   });
 
   describe('session details', () => {
