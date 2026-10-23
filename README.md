@@ -119,7 +119,15 @@ See [live capture storage and channels](docs/LIVE_CAPTURE_FORMAT.md).
    On Windows, a system tray gauge icon appears while the backend is running. Double-click it,
    or right-click and choose **Open LMU Lap Time Analyzer**, to open the website. The icon closes
    automatically when the backend stops or restarts. Set `LMU_TRAY=0` in `.env.local` to disable it.
+   Right-click → **Exit** stops the server after flushing live capture. It also stops the development
+   watcher and paired Vite server when launched with `npm run dev`, `npm start`, or the debug configuration.
    It opens `LMU_UI_ORIGIN` when configured, otherwise `http://localhost:5173` (or `LMU_UI_PORT`).
+   Choose **Settings → Live Dashboard → Browser monitor for tray double-click** to save the display
+   used by the tray. Double-click opens maximized on that display with no monitor chooser. The setting
+   applies immediately and persists across restarts. A disconnected display falls back to browser default.
+   Monitor placement opens a new window in Edge, Chrome, Firefox, Brave or Vivaldi; other browsers
+   use their normal placement. Auto-open also switches to the live dashboard on first load when LMU
+   is already running, if enabled and no dashboard is connected.
    The bundled Windows x64 helper starts directly without PowerShell or .NET. After editing its
    native source in `server/desktop/`, run `npm run build:tray` with Visual Studio C++ build tools
    and the Windows SDK installed. Rebuilding is unnecessary for normal development startup.

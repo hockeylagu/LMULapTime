@@ -67,6 +67,7 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
   })) add(id, url.split('?')[0], url);
   add('live-stream', '/api/live/stream', undefined, 'Server-sent event stream: stays open, has no response time.');
   add('app-events', '/api/events', undefined, 'Server-sent event stream: stays open, has no response time.');
+  add('desktop-browser', '/api/desktop/browser', undefined, 'Desktop display enumeration depends on the Windows host; covered by native helper integration tests.');
   add('reference-diff', '/api/reference-laptimes/diffs/:id', cohort.diffId ? `/api/reference-laptimes/diffs/${cohort.diffId}` : undefined);
   const geometry = cohort.boards.find(board => dataPlugin.trackGeometry(board.layout));
   add('track-geometry', '/api/data-plugin/tracks/:layoutKey', geometry ? `/api/data-plugin/tracks/${geometry.layout}` : undefined, 'No metric geometry for the fixed cohort.');

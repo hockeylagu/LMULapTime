@@ -182,19 +182,34 @@ app.use('/api', createLiveEvidenceRouter(serverContext, captureDirectory, undefi
 if (process.env.NODE_ENV !== 'test') {
   let stopSystemTray: (() => void) | undefined;
   const server = app.listen(PORT, '127.0.0.1', () => {
-    stopSystemTray = startSystemTray();
+    stopSystemTray = startSystemTray(() => shutdown(true));
     console.log(`LMU Lap Time Analyzer Server running on http://localhost:${PORT}`);
     console.log(formatPluginStatusLog(dataPlugin.status));
     startReferenceLaptimeRefresh();
   });
-  const shutdown = (): void => {
+  let shuttingDown = false;
+  const shutdown = (exitDevelopment = false): void => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     stopSystemTray?.();
     server.close();
-    void liveService.stop().finally(() => process.exit(0));
+    automaticLearning.cancel();
+    const finish = (code: number): void => {
+      const exitFile = process.env.LMU_DEV_EXIT_FILE;
+      if (exitDevelopment && exitFile) {
+        try { fs.writeFileSync(exitFile, 'exit'); }
+        catch (error) { console.error('Unable to stop the development watcher:', error); }
+      }
+      process.exit(code);
+    };
+    void liveService.stop().then(() => finish(0), error => {
+      console.error('Unable to finish live capture during shutdown:', error);
+      finish(1);
+    });
   };
   server.once('close', () => stopSystemTray?.());
-  process.once('SIGINT', shutdown);
-  process.once('SIGTERM', shutdown);
+  process.once('SIGINT', () => shutdown());
+  process.once('SIGTERM', () => shutdown());
 }
 
 export { app, sessionDb };

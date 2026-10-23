@@ -129,3 +129,9 @@ export interface ScanStatus extends ReplayScanStatus {
   allComplete?: boolean;
   allCached?: boolean;
 }
+/** Desktop-local preference used by the native Windows tray. */
+export interface DesktopBrowserSettings {
+  supported: boolean;
+  monitor: string;
+  monitors: { id: string; width: number; height: number; primary: boolean }[];
+}

@@ -18,13 +18,14 @@ export interface AppEventHandlers {
   onGameRunning?: (running: boolean) => void;
 }
 
-/** The `running` flag of a `game-running` message; false for anything else. */
-function readRunning(data: unknown): boolean {
+/** Validate the game status and the server's auto-open decision. */
+function readGameStatus(data: unknown): { running: boolean; autoOpen: boolean } | null {
   try {
     const parsed: unknown = typeof data === 'string' ? JSON.parse(data) : null;
-    return typeof parsed === 'object' && parsed !== null && 'running' in parsed && parsed.running === true;
+    if (typeof parsed !== 'object' || parsed === null || !('running' in parsed) || typeof parsed.running !== 'boolean') return null;
+    return { running: parsed.running, autoOpen: 'autoOpen' in parsed && parsed.autoOpen === true };
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -41,6 +42,8 @@ export function useAppEvents(handlers: AppEventHandlers, enabled: boolean): void
     let silence: ReturnType<typeof setTimeout>;
     let retry: ReturnType<typeof setTimeout> | undefined;
     let stale: ReturnType<typeof setTimeout> | undefined;
+    // Survives stream reconnects: browsing away during a session must remain possible.
+    let receivedGameStatus = false;
     const heard = () => {
       clearTimeout(silence);
       silence = setTimeout(() => lost(0), APP_EVENT_SILENCE_MS);
@@ -69,7 +72,11 @@ export function useAppEvents(handlers: AppEventHandlers, enabled: boolean): void
         heard();
         clearTimeout(stale);
         stale = undefined;
-        gameRunning(readRunning(event.data));
+        const status = readGameStatus(event.data);
+        if (!status) return;
+        gameRunning(status.running);
+        if (!receivedGameStatus && status.running && status.autoOpen) gameStarted();
+        receivedGameStatus = true;
       });
       source.addEventListener('error', () => lost(APP_EVENT_ERROR_GRACE_MS));
     }

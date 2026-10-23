@@ -23,8 +23,9 @@ if ($LASTEXITCODE -ne 0) { throw 'Tray resource compilation failed.' }
 & $compiler /nologo /W4 /WX /O2 /MT /DUNICODE /D_UNICODE `
     "/I$toolRoot/include" "/I$sdkRoot/Include/$sdkVersion/ucrt" `
     "/I$sdkRoot/Include/$sdkVersion/shared" "/I$sdkRoot/Include/$sdkVersion/um" `
-    (Join-Path $source 'systemTray.c') $resource "/Fo$temporary/systemTray.obj" `
-    "/Fe$output/systemTray-win32-x64.exe" /link /SUBSYSTEM:WINDOWS /INCREMENTAL:NO /Brepro `
+    (Join-Path $source 'systemTray.c') (Join-Path $source 'monitorBrowser.c') $resource "/Fo$temporary/" `
+    "/Fe$temporary/systemTray-win32-x64.exe" /link /SUBSYSTEM:WINDOWS /INCREMENTAL:NO /Brepro `
     "/LIBPATH:$toolRoot/lib/x64" "/LIBPATH:$sdkRoot/Lib/$sdkVersion/ucrt/x64" `
-    "/LIBPATH:$sdkRoot/Lib/$sdkVersion/um/x64" user32.lib shell32.lib
+    "/LIBPATH:$sdkRoot/Lib/$sdkVersion/um/x64" user32.lib shell32.lib shlwapi.lib advapi32.lib
 if ($LASTEXITCODE -ne 0) { throw 'Tray compilation failed.' }
+Copy-Item -LiteralPath (Join-Path $temporary 'systemTray-win32-x64.exe') -Destination $output -Force

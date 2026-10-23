@@ -22,8 +22,23 @@ helper `bin/systemTray-win32-x64.exe` at below-normal CPU priority after HTTP li
 pipe reader. `systemTray.rc` embeds `systemTray.ico`; `npm run build:tray` rebuilds the executable
 using Visual Studio C++ tools and the Windows SDK. Normal startup never compiles or loads PowerShell/.NET.
 Its tray menu and double-click open the frontend (`LMU_UI_ORIGIN`, otherwise `LMU_UI_PORT` / 5173).
+`monitorBrowser.c` enumerates displays, saves the desktop-local preference in HKCU, and places a
+new supported browser window maximized on that monitor. `SetWindowPlacement` queues the monitor's
+work area and maximized state together, with workspace coordinate conversion for taskbar offsets.
+A bounded startup check requires one second of stable maximization and retries delayed browser
+restores, keeping browser controls visible. Native hidden checks cover display placement and the
+maximize/restore/maximize startup sequence without opening a browser.
+The app's `BrowserMonitorSetting.tsx` edits it via
+`GET/POST /api/desktop/browser` and `server/desktop/browserSettings.ts`; the tray reads it on every
+open, with no chooser. Initial `/api/events` game status includes the auto-open decision, consumed
+once per mounted page by `useAppEvents` so an already-running LMU redirects on first load without
+redirecting again after stream reconnects.
 Closing the server's stdin
 pipe disposes the icon, including on crashes and watch restarts; `LMU_TRAY=0` disables it.
+Tray **Exit** sends `exit-requested` over stdout to the server's idempotent graceful shutdown.
+`tools/dev/runServer.mjs` owns the development watcher and a private temporary exit signal; the server
+writes that signal only after live capture stops. The launcher then stops its watcher, and
+concurrently's `--kill-others` stops the paired frontend, including the npm-based debugger launch.
 
 ---
 

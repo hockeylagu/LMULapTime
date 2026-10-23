@@ -132,6 +132,23 @@ describe('live routes', () => {
 
   const gameStarts = (chunks: string[]) => chunks.join('').match(/event: game-started/g)?.length ?? 0;
 
+  it.each([null, 'false'] as const)('sends the initial auto-open decision when LMU is already running (setting %s)', async stored => {
+    const { app, live } = setup(stored);
+    vi.spyOn(live, 'isGameRunning').mockReturnValue(true);
+    const { chunks } = await openStream(app, '/api/events');
+    await vi.waitFor(() => expect(chunks.join('')).toContain(
+      `event: game-running\ndata: ${JSON.stringify({ running: true, autoOpen: stored !== 'false' })}`));
+  });
+
+  it('does not auto-open another dashboard when one is already connected on initial load', async () => {
+    const { app, live } = setup();
+    vi.spyOn(live, 'isGameRunning').mockReturnValue(true);
+    await openStream(app, '/api/live/stream');
+    await vi.waitFor(() => expect(live.hasClients()).toBe(true));
+    const { chunks } = await openStream(app, '/api/events');
+    await vi.waitFor(() => expect(chunks.join('')).toContain('"running":true,"autoOpen":false'));
+  });
+
   it('tells open pages once per LMU launch, so they switch to the dashboard (the app never opens a window)', async () => {
     const { app, live } = setup();
     const { response, chunks } = await openStream(app, '/api/events');

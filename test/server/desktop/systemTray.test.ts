@@ -9,7 +9,7 @@ vi.mock('node:child_process', () => ({ spawn: vi.fn() }));
 vi.mock('node:os', async importOriginal => ({ ...await importOriginal<typeof import('node:os')>(), setPriority: vi.fn() }));
 
 describe('Windows system tray lifecycle', () => {
-  let helper: EventEmitter & { pid?: number; stdin: PassThrough; stderr: PassThrough };
+  let helper: EventEmitter & { pid?: number; stdin: PassThrough; stdout: PassThrough; stderr: PassThrough };
 
   beforeEach(() => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
@@ -17,7 +17,7 @@ describe('Windows system tray lifecycle', () => {
     vi.stubEnv('LMU_TRAY', '');
     vi.stubEnv('LMU_UI_ORIGIN', '');
     vi.stubEnv('LMU_UI_PORT', '');
-    helper = Object.assign(new EventEmitter(), { pid: 12345, stdin: new PassThrough(), stderr: new PassThrough() });
+    helper = Object.assign(new EventEmitter(), { pid: 12345, stdin: new PassThrough(), stdout: new PassThrough(), stderr: new PassThrough() });
     vi.mocked(spawn).mockReturnValue(helper as unknown as ChildProcess);
   });
 
@@ -32,7 +32,7 @@ describe('Windows system tray lifecycle', () => {
     const previousListeners = process.listenerCount('exit');
     const stop = startSystemTray();
     expect(spawn).toHaveBeenCalledWith(expect.stringMatching(/systemTray-win32-x64\.exe$/),
-      ['http://localhost:5173/'], { windowsHide: true, stdio: ['pipe', 'ignore', 'pipe'] });
+      ['http://localhost:5173/'], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
     expect(setPriority).toHaveBeenCalledWith(helper.pid, constants.priority.PRIORITY_BELOW_NORMAL);
     expect(process.listenerCount('exit')).toBe(previousListeners + 1);
     stop?.();
@@ -83,5 +83,22 @@ describe('Windows system tray lifecycle', () => {
     expect(stop).toBeTypeOf('function');
     stop?.();
     expect(helper.stdin.writableEnded).toBe(true);
+  });
+
+  it('requests shutdown once for an explicit Exit command, including split pipe messages', () => {
+    const shutdown = vi.fn();
+    startSystemTray(shutdown);
+    helper.stdout.write('tray-ready\nexit-');
+    expect(shutdown).not.toHaveBeenCalled();
+    helper.stdout.write('requested\nexit-requested\n');
+    expect(shutdown).toHaveBeenCalledOnce();
+  });
+
+  it('does not shut down the server when the tray crashes or its pipe closes', () => {
+    const shutdown = vi.fn();
+    startSystemTray(shutdown);
+    helper.stdout.end('tray-ready\n');
+    helper.emit('exit', 1);
+    expect(shutdown).not.toHaveBeenCalled();
   });
 });

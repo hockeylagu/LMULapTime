@@ -6,6 +6,7 @@ import { fetchLiveSettings, saveLiveSettings } from '../../api/liveStream.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import { Select } from '../common/dropdown/Select.js';
 import { FeedbackMessage, SettingsPanel, type SettingsFeedback } from './SettingsPanel.js';
+import { BrowserMonitorSetting } from './BrowserMonitorSetting.js';
 
 /** VE or fuel kept at the pit entry and in a stop's load, in seconds of driving (the server accepts these values only). */
 const RESERVE_OPTIONS = RESERVE_SECONDS_CHOICES.map(seconds => ({
@@ -108,6 +109,7 @@ export const LiveDashboardCard: React.FC = () => {
         </>
       )}
       <FeedbackMessage feedback={message} />
+      <BrowserMonitorSetting />
     </SettingsPanel>
   );
 };

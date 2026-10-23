@@ -4,6 +4,7 @@ import { folderPathProblem, normalizeFolderPath } from '../../shared/domain/fold
 import { loadReferenceLaptimesFromCache } from '../benchmarks/referenceLaptimes.js';
 import { ServerContext } from '../core/serverContext.js';
 import { dataPlugin } from '../plugins/dataPlugin.js';
+import { readBrowserSettings, saveBrowserMonitor } from '../desktop/browserSettings.js';
 
 const FOLDER_FIELDS = [
   { field: 'resultsDir', label: 'results folder' },
@@ -15,6 +16,28 @@ const CONTROL_CHARS = /\p{Cc}/gu;
 
 export function createSystemRouter(context: ServerContext): Router {
   const router = Router();
+
+  router.get('/desktop/browser', async (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    try { res.json(await readBrowserSettings()); }
+    catch { res.status(503).json({ error: 'Unable to read monitors. Rebuild the tray helper and try again.' }); }
+  });
+
+  router.post('/desktop/browser', async (req, res) => {
+    const body: unknown = req.body;
+    if (typeof body !== 'object' || body === null || !('monitor' in body) || typeof body.monitor !== 'string') {
+      return res.status(400).json({ error: 'Send a monitor identifier or an empty string for browser default.' });
+    }
+    try {
+      const settings = await readBrowserSettings();
+      if (!settings.supported) return res.status(400).json({ error: 'Browser monitor settings require Windows.' });
+      if (body.monitor !== '' && !settings.monitors.some(monitor => monitor.id === body.monitor)) {
+        return res.status(400).json({ error: 'That monitor is no longer connected. Refresh Settings and choose another monitor.' });
+      }
+      await saveBrowserMonitor(body.monitor);
+      return res.json({ ...settings, monitor: body.monitor });
+    } catch { return res.status(503).json({ error: 'Unable to save the browser monitor. Rebuild the tray helper and try again.' }); }
+  });
 
   router.get('/status', (_req, res) => {
     const resultsExist = fs.existsSync(context.resultsDir);

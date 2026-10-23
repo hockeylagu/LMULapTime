@@ -3,6 +3,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { LiveDashboardCard } from '../../../src/components/settings/LiveDashboardCard.js';
 import { requestBody } from '../../fixtures/requestUrl.js';
 
+// Desktop settings have their own request and state coverage in BrowserMonitorSetting.test.tsx.
+vi.mock('../../../src/components/settings/BrowserMonitorSetting.js', () => ({ BrowserMonitorSetting: () => null }));
+
 const reply = (body: unknown, ok = true) => Promise.resolve({ ok, status: ok ? 200 : 500, json: () => Promise.resolve(body) });
 
 describe('LiveDashboardCard', () => {

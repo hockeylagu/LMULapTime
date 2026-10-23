@@ -14,9 +14,9 @@
   ],
   "type": "module",
   "scripts": {
-    "start": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
-    "dev:server": "tsx watch --clear-screen=false --exclude \"server/lmu_cache.db*\" --exclude \"server/live-captures/**\" --env-file-if-exists=.env.local server/index.ts",
+    "start": "concurrently --kill-others --success first \"npm run dev:server\" \"npm run dev:client\"",
+    "dev": "concurrently --kill-others --success first \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "node tools/dev/runServer.mjs",
     "dev:client": "vite",
     "build:tray": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File tools/release/buildTray.ps1",
     "build": "npm run check:local-data && tsc && vite build && node tools/release/checkLocalData.mjs --built",

@@ -3,19 +3,18 @@
 #include <shellapi.h>
 #include <stdio.h>
 #include <wchar.h>
+#include "monitorBrowser.h"
 
 #define TRAY_EVENT (WM_APP + 1)
 #define SERVER_EXIT (WM_APP + 2)
 #define OPEN_WEBSITE 1
+#define EXIT_SERVER 2
 
 static NOTIFYICONDATAW tray;
 static const wchar_t *website;
 static UINT taskbarCreated;
 static BOOL hidden;
-
-static void openWebsite(HWND window) {
-    ShellExecuteW(window, L"open", website, NULL, NULL, SW_SHOWNORMAL);
-}
+static BOOL exiting;
 
 static BOOL addTray(void) {
     if (hidden) return TRUE;
@@ -34,21 +33,34 @@ static LRESULT CALLBACK windowProc(HWND window, UINT message, WPARAM wParam, LPA
         switch (LOWORD(lParam)) {
         case WM_LBUTTONDBLCLK:
         case NIN_KEYSELECT:
-            openWebsite(window);
+            openBrowser(window, website);
             break;
         case WM_CONTEXTMENU: {
             POINT cursor;
             HMENU menu = CreatePopupMenu();
             GetCursorPos(&cursor);
             AppendMenuW(menu, MF_STRING, OPEN_WEBSITE, L"Open LMU Lap Time Analyzer");
+            AppendMenuW(menu, MF_SEPARATOR, 0, NULL);
+            AppendMenuW(menu, MF_STRING | (exiting ? MF_GRAYED : 0), EXIT_SERVER, L"Exit");
             SetForegroundWindow(window);
             UINT selected = TrackPopupMenu(menu, TPM_RETURNCMD | TPM_RIGHTBUTTON,
                 cursor.x, cursor.y, 0, window, NULL);
-            if (selected == OPEN_WEBSITE) openWebsite(window);
+            if (selected == OPEN_WEBSITE) openBrowser(window, website);
+            if (selected == EXIT_SERVER) PostMessageW(window, WM_COMMAND, EXIT_SERVER, 0);
             PostMessageW(window, WM_NULL, 0, 0);
             DestroyMenu(menu);
             break;
         }
+        }
+        return 0;
+    case WM_TIMER:
+        positionBrowser(window);
+        return 0;
+    case WM_COMMAND:
+        if (LOWORD(wParam) == EXIT_SERVER && !exiting) {
+            exiting = TRUE;
+            fputs("exit-requested\n", stdout);
+            fflush(stdout);
         }
         return 0;
     case SERVER_EXIT:
@@ -66,7 +78,12 @@ static DWORD WINAPI waitForServer(LPVOID parameter) {
     HANDLE input = GetStdHandle(STD_INPUT_HANDLE);
     char buffer[64];
     DWORD bytes;
-    while (ReadFile(input, buffer, sizeof(buffer), &bytes, NULL) && bytes != 0) { }
+    while (ReadFile(input, buffer, sizeof(buffer), &bytes, NULL) && bytes != 0) {
+        // Hidden integration tests request the same command without interacting with the desktop.
+        if (hidden) for (DWORD i = 0; i < bytes; i++) {
+            if (buffer[i] == 'x') PostMessageW((HWND)parameter, WM_COMMAND, EXIT_SERVER, 0);
+        }
+    }
     PostMessageW((HWND)parameter, SERVER_EXIT, 0, 0);
     return 0;
 }
@@ -76,6 +93,12 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR command, int s
     int count;
     wchar_t **arguments = CommandLineToArgvW(GetCommandLineW(), &count);
     if (!arguments) return 1;
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+    if (count >= 2 && (wcscmp(arguments[1], L"--list-monitors") == 0 || wcscmp(arguments[1], L"--set-monitor") == 0)) {
+        int result = browserMonitorCommand(count, arguments);
+        LocalFree(arguments);
+        return result;
+    }
     if (count < 2 || (wcsncmp(arguments[1], L"http://", 7) != 0 &&
         wcsncmp(arguments[1], L"https://", 8) != 0)) {
         fputs("Expected an HTTP or HTTPS website URL.\n", stderr);
@@ -98,6 +121,12 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE previous, PWSTR command, int s
     HWND window = CreateWindowExW(0, windowClass.lpszClassName, L"", WS_OVERLAPPED,
         0, 0, 0, 0, NULL, NULL, instance, NULL);
     if (!window) {
+        LocalFree(arguments);
+        return 1;
+    }
+    if (hidden && !testMonitorPlacement(window)) {
+        fputs("Monitor placement check failed.\n", stderr);
+        DestroyWindow(window);
         LocalFree(arguments);
         return 1;
     }

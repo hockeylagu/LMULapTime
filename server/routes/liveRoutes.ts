@@ -91,7 +91,7 @@ export function createLiveRouter(context: ServerContext, live: LiveService,
   });
 
   // App-wide events: the server can start a scan by itself (after a game session), and pages reload their data when it ends.
-  // When LMU's process starts, an open app page switches to the dashboard if the setting is on and no
+  // On first page load or when LMU's process starts, switch to the dashboard if the setting is on and no
   // dashboard page is connected yet. The app never opens a browser window itself.
   router.get('/events', (req, res) => {
     openStream(res);

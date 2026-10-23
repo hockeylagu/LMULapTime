@@ -52,6 +52,20 @@ describe('app event stream', () => {
     expect(onGameStarted).toHaveBeenCalledTimes(1);
   });
 
+  it.each([true, false])('honors auto-open=%s when the first status says LMU is already running', async autoOpen => {
+    const onGameStarted = vi.fn();
+    const { result } = renderHook(() => useAppData({ onGameStarted }));
+    await act(async () => {});
+    const source = FakeEventSource.byUrl('/api/events');
+    act(() => source.emit('game-running', { running: true, autoOpen }));
+    expect(result.current.gameRunning).toBe(true);
+    expect(onGameStarted).toHaveBeenCalledTimes(autoOpen ? 1 : 0);
+    act(() => source.emit('error'));
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    act(() => FakeEventSource.byUrl('/api/events').emit('game-running', { running: true, autoOpen: true }));
+    expect(onGameStarted).toHaveBeenCalledTimes(autoOpen ? 1 : 0);
+  });
+
   it('keeps the game status through a stream error the reconnect answers, and clears it when none answers', async () => {
     const { result } = renderHook(() => useAppData());
     await act(async () => {});

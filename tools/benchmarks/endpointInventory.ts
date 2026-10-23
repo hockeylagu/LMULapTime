@@ -16,6 +16,7 @@ const exclusions: Record<string, string> = {
   '/api/reference-laptimes/refresh': 'Calls Google Sheets and changes benchmark targets.',
   '/api/rivals/pin': 'Changes the selected rival.',
   '/api/live/settings': 'Changes the live dashboard settings.',
+  '/api/desktop/browser': 'Changes the desktop-local browser monitor preference.',
 };
 
 /** Discover literal API routes so newly added endpoints cannot silently escape the sweep. */
