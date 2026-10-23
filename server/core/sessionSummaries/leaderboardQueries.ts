@@ -4,7 +4,7 @@ import type { ReferenceLaptimeEntry } from '../../../shared/types/index.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
 import { computeTheoreticalBest, getDisplayTrackName } from '../../../shared/domain/formatters.js';
 import { findLayoutBenchmark, type LeaderboardQuery } from '../../../shared/domain/leaderboard.js';
-import { AVAILABLE_REPLAY_LAP_SQL } from '../replay/replayLapAvailability.js';
+import { availableReplayLapSql } from '../replay/replayLapAvailability.js';
 
 interface SummaryRow {
   session_id: string; timestamp: number; session_type: string; session_name: string; recording_name: string | null;
@@ -34,7 +34,6 @@ function queryBoardDriverFacts(db: DatabaseType, query: LeaderboardQuery): Drive
       SELECT s.id session_id,s.timestamp,s.session_type,s.session_name,s.recording_name,
         d.driver_ordinal,coalesce(dn.name,'') driver_name,d.is_player,coalesce(v.car_type,'') car_type,c.best_lap_ordinal lap_ordinal,
         l.lap_number lap_number,c.best_lap_time lap_time,l.s1,l.s2,l.s3,
-        ${AVAILABLE_REPLAY_LAP_SQL} telemetry_available,
         row_number() OVER (PARTITION BY coalesce(dn.name,'') ORDER BY c.best_lap_time,s.timestamp,s.id,d.driver_ordinal,c.best_lap_ordinal) best_rank
       -- Keep the layout's sessions first even when a legacy driver-class index exists.
       FROM sessions s CROSS JOIN session_drivers d ON d.session_id=s.id
@@ -42,7 +41,8 @@ function queryBoardDriverFacts(db: DatabaseType, query: LeaderboardQuery): Drive
       LEFT JOIN drivers dn ON dn.driver_id=d.driver_id LEFT JOIN vehicles v ON v.vehicle_id=d.vehicle_id
       LEFT JOIN session_laps l ON l.session_id=c.session_id AND l.driver_ordinal=c.driver_ordinal AND l.lap_ordinal=c.best_lap_ordinal
       WHERE ${scopeSql} AND c.condition_group='dry' AND c.best_lap_time IS NOT NULL AND d.is_human=1
-    ) SELECT * FROM ranked WHERE best_rank=1`).all(...params) as SummaryRow[];
+    ) SELECT ranked.*,${availableReplayLapSql('ranked.recording_name', 'ranked.driver_name', 'ranked.lap_number')} telemetry_available
+    FROM ranked WHERE best_rank=1`).all(...params) as SummaryRow[];
   const facts = db.prepare(`WITH eligible AS MATERIALIZED (
       SELECT s.id,s.timestamp,d.driver_ordinal,coalesce(n.name,'') driver_name,d.is_player,c.clean_count,c.best_s1,c.best_s2,c.best_s3,
         c.fastest_three_count,c.fastest_three_time_sum,c.best_lap_time

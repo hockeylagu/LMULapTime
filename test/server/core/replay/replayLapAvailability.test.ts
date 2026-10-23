@@ -1,11 +1,11 @@
 import Database from 'better-sqlite3';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReplayMetadata } from '../../../../shared/types/index.js';
 import { initDbSchema } from '../../../../server/core/dbSchema.js';
 import { upsertReplayMetadataCache } from '../../../../server/core/replay/dbReplayMetadataStore.js';
 import { deleteReplayDriverLaps } from '../../../../server/core/replay/dbReplayIngestStore.js';
 import { upsertReplayTrajectoryCache } from '../../../../server/core/replay/dbReplayTrajectoryStore.js';
-import { AVAILABLE_REPLAY_LAP_SQL, backfillReplayDriverRosters } from '../../../../server/core/replay/replayLapAvailability.js';
+import { availableReplayLapSql, backfillReplayDriverRosters } from '../../../../server/core/replay/replayLapAvailability.js';
 
 const filename = 'retained.Vcr';
 const metadata: ReplayMetadata = {
@@ -13,7 +13,7 @@ const metadata: ReplayMetadata = {
   timeSliceCount: 0, totalEvents: 0, durationSec: 100,
   drivers: [{ slot: 7, name: ' ÉLODIE ' }],
 };
-const availabilitySql = `SELECT ${AVAILABLE_REPLAY_LAP_SQL} available
+const availabilitySql = `SELECT ${availableReplayLapSql('s.recording_name', 'dn.name', 'l.lap_number')} available
   FROM (SELECT ? recording_name) s CROSS JOIN (SELECT ? name) dn CROSS JOIN (SELECT ? lap_number) l`;
 
 describe('persisted replay lap availability', () => {
@@ -64,6 +64,17 @@ describe('persisted replay lap availability', () => {
     const plan = db.prepare(`EXPLAIN QUERY PLAN ${availabilitySql}`).all(filename, 'Élodie', 20) as Array<{ detail: string }>;
     expect(plan.some(row => row.detail.includes('SEARCH rr USING PRIMARY KEY'))).toBe(true);
     expect(plan.some(row => row.detail.includes('SEARCH rt USING INDEX'))).toBe(true);
+  });
+
+  it('marks unreadable pending metadata done with no roster instead of failing the start', () => {
+    storeLap();
+    db.prepare('UPDATE replay_metadata SET roster_version=0,metadata_br=?').run(Buffer.from('not brotli'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(() => backfillReplayDriverRosters(db)).not.toThrow();
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(available()).toBe(false);
+    expect((db.prepare('SELECT roster_version FROM replay_metadata').get() as { roster_version: number }).roster_version).toBe(1);
+    warn.mockRestore();
   });
 
   it('refreshes roster identities and rejects ambiguous normalized names', () => {

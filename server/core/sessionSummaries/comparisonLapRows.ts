@@ -5,7 +5,7 @@ import { LAP_FIELDS, TIRE_WEAR_FIELDS } from '../sessionRows/specs.js';
 import { group } from '../sessionRows/reader.js';
 import { createPaceCalculator } from '../../benchmarks/referenceLaptimes.js';
 import { toComparableLap } from '../../sessions/sessionAnalytics.js';
-import { AVAILABLE_REPLAY_LAP_SQL } from '../replay/replayLapAvailability.js';
+import { availableReplayLapSql } from '../replay/replayLapAvailability.js';
 
 export interface ComparisonLapLocator {
   session_id: string;
@@ -36,7 +36,7 @@ export function readComparisonLapRows(db: Database, locators: ComparisonLapLocat
       s.track_venue,s.track_course,s.track_length_meters,
       dn.name driver_name,v.car_type,v.car_class,d.best_lap_time,d.is_player,
       r.recording_name,r.path,r.file_size_bytes,r.has_rain,r.weather_condition,
-      ${AVAILABLE_REPLAY_LAP_SQL} telemetry_available
+      ${availableReplayLapSql('s.recording_name', 'dn.name', 'l.lap_number')} telemetry_available
     FROM json_each(?) picked
     JOIN session_laps l ON l.session_id=json_extract(picked.value,'$.session_id')
       AND l.driver_ordinal=json_extract(picked.value,'$.driver_ordinal')
