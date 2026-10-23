@@ -25,14 +25,17 @@ async function probeGame(): Promise<GameProbe> {
       try { body = JSON.parse(answer.body) as unknown; parser = 'accepted'; }
       catch { body = answer.body.slice(0, 8192); parser = 'invalid-json'; }
     }
+    // A good reply is the same one the pit poller logs: keep the body only for an error or an unreadable reply.
+    const good = answer.status === 'ok' && answer.statusCode === 200 && parser === 'accepted';
+    const long = answer.status === 'ok' && parser === 'accepted' && answer.body.length > 32768;
     parentPort?.postMessage({ type: 'diagnostic', event: { kind: 'reader-rest', at: finishedAt, data: {
       path: '/navigation/state', startedAt, finishedAt, durationMs: finishedAt - startedAt,
       outcome: answer.status === 'ok' && answer.statusCode !== 200 ? 'http-error' : answer.status,
       statusCode: answer.status === 'ok' ? answer.statusCode : undefined,
       ...(answer.status === 'ok' ? {} : answer.diagnostic),
-      // A good reply is the same one the pit poller logs: keep the body only for an error or an unreadable reply.
-      parser, disposition: 'probe', body: answer.status === 'ok' && answer.statusCode === 200 && parser === 'accepted' ? undefined : body,
-      bodyTruncated: answer.status === 'ok' ? parser === 'invalid-json' && answer.body.length > 8192 : answer.diagnostic?.bodyTruncated,
+      parser, disposition: 'probe', body: good ? undefined : long ? answer.body.slice(0, 32768) : body,
+      bodyTruncated: answer.status === 'ok' ? !good && answer.body.length > (parser === 'invalid-json' ? 8192 : 32768)
+        : answer.diagnostic?.bodyTruncated,
     } } });
   }
   if (answer.status === 'ok') return navigationProbe(answer.body);
