@@ -187,3 +187,44 @@ export interface LiveStrategy {
   garage: LiveGaragePlan | null;
   fuelRatio?: LiveFuelRatio | null;
 }
+
+/** One way to run the race: the stops the VE or fuel needs, what to load, and the race tyres. */
+export interface LiveRaceStrategy {
+  name: string;
+  stops: number;
+  /** Racing lap of the first stop; null without one. */
+  pitLap: number | null;
+  /** To load at the start, and at the last stop (what the finish needs), in the plan's unit. */
+  loadStart: number;
+  loadToFinish: number | null;
+  /** The race tyres in the game's words (`NEW MEDIUM`, `USED MEDIUM`; at the stop `NO CHANGE`). */
+  tyresStart: string;
+  tyresStop: string | null;
+  /** Tread left on the most worn tyre at the flag, 0..1; null before the event's wear is measured. */
+  treadAtFlag: number | null;
+  /** Seconds lost against the chosen plan (tyre changes): 0 for it, null when the game's change time is unknown. */
+  gapSeconds: number | null;
+}
+
+/**
+ * Where the plan's use per lap and wear come from: the event's own laps, the player's earlier races on the layout in
+ * the class (`races` of them), or the game's estimate; null when unknown.
+ */
+export interface LiveRaceStrategyBasis {
+  use: 'event' | 'history' | 'game' | null;
+  wear: 'event' | 'history' | null;
+  races: number;
+}
+
+/** The engine's pick for the race, and the next best. */
+export interface LiveRaceStrategies {
+  kind: LiveResourceKind;
+  unit: '%' | 'L';
+  raceMinutes: number;
+  /** Racing laps (the formation lap is not one). */
+  laps: number;
+  chosen: LiveRaceStrategy;
+  nextBest: LiveRaceStrategy | null;
+  /** Set by the live tracker; the demo leaves it out. */
+  basis?: LiveRaceStrategyBasis;
+}

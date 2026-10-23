@@ -147,6 +147,22 @@ describe('DuckDbReader', () => {
     await reader.close();
   });
 
+  it('reads the fuel, VE and tread at each line crossing, each channel at its own rate', async () => {
+    const reader = new DuckDbReader(testDbPath);
+    await reader.open();
+    try {
+      const states = await reader.getLapEndStates();
+      const round = (value: number | null) => (value === null ? null : Math.round(value * 1000) / 1000);
+      // The lap counter turns 1 at 10 s and 2 at 110 s: fuel and VE at 20 Hz, the wear in percent as 0..1 tread.
+      expect(states.map(state => ({ lap: state.lap, fuel: round(state.fuel), ve: round(state.ve), tread: state.tread?.map(round) }))).toEqual([
+        { lap: 1, fuel: 75.3, ve: 94.6, tread: [0.985, 0.982, 0.975, 0.973] },
+        { lap: 2, fuel: 73.3, ve: 90.6, tread: [0.985, 0.982, 0.975, 0.973] },
+      ]);
+    } finally {
+      await reader.close();
+    }
+  });
+
   it('can retry opening after a missing file becomes available', async () => {
     const filename = path.join(testDbDir, 'retry.duckdb');
     const reader = new DuckDbReader(filename);

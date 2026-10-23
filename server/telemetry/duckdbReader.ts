@@ -5,7 +5,7 @@ import {
   DuckDbLapSummary,
   DuckDbLapTelemetry,
 } from './duckdbTypes.js';
-import { ReplayTrajectoryPoint } from '../../shared/types/index.js';
+import { ReplayTrajectoryPoint, type StrategyLapState } from '../../shared/types/index.js';
 
 export interface DuckDbSessionMetadata {
   trackName?: string;
@@ -267,6 +267,69 @@ export class DuckDbReader {
     const rows = await this.queryAll<Record<string, number | null>>(`SELECT ${largest} FROM "${tableName}"`);
     const max = Math.max(0, ...Object.values(rows[0] ?? {}).map(value => Number(value ?? 0)));
     return max > 1.01 ? 1 : 100;
+  }
+
+  /**
+   * The fuel, VE and tread at each line crossing, for the strategy debrief: lap N's state is the one when the lap
+   * counter turns N (the end of lap N); lap 0 is the start of the recording, on the grid. Channel rows are found by
+   * their rate against the GPS time, as in `getLapTelemetry`. A whole race reads in about 0.2 s (Le Mans 2026-10-22).
+   */
+  public async getLapEndStates(): Promise<StrategyLapState[]> {
+    if (!(await this.hasTable('Lap')) || !(await this.hasTable('GPS Time'))) return [];
+    const firstTable = async (names: string[]) => {
+      for (const name of names) {
+        // oxlint-disable-next-line eslint/no-await-in-loop -- Stops at the first name the file uses.
+        if (await this.hasTable(name)) return name;
+      }
+      return null;
+    };
+    const [fuelTable, veTable, wearTable, channels, lapEvents, gps] = await Promise.all([
+      firstTable(['Fuel Level', 'FuelLevel', 'Fuel']),
+      firstTable(['Virtual Energy', 'VirtualEnergy']),
+      firstTable(['Tyres Wear', 'TyresWear', 'Tyre Wear', 'Tire Wear']),
+      this.getChannelsList(),
+      this.queryAll<{ ts: number; value: number }>('SELECT ts, value FROM "Lap" ORDER BY ts ASC'),
+      this.queryAll<{ value: number }>('SELECT value FROM "GPS Time"'),
+    ]);
+    const gpsHz = channels.find(channel => channel.channelName === 'GPS Time')?.frequency || 100;
+    const read = async (table: string | null, columns: string[]) => {
+      if (!table) return null;
+      const hz = channels.find(channel => channel.channelName.toLowerCase() === table.toLowerCase())?.frequency || gpsHz;
+      const [rows, scale] = await Promise.all([
+        this.queryAll<Record<string, number | null>>(`SELECT ${columns.map(column => `"${column}"`).join(', ')} FROM "${table}"`),
+        this.percentScale(table, columns),
+      ]);
+      return { rows, hz, scale };
+    };
+    const wearColumns = ['value1', 'value2', 'value3', 'value4'];
+    const [fuel, ve, wear] = await Promise.all([read(fuelTable, ['value']), read(veTable, ['value']), read(wearTable, wearColumns)]);
+    const times = gps.map(row => Number(row.value));
+    const indexAt = (ts: number) => {
+      let low = 0;
+      let high = times.length - 1;
+      while (low < high) {
+        const middle = (low + high) >> 1;
+        if (times[middle] < ts) low = middle + 1; else high = middle;
+      }
+      return low;
+    };
+    const rowAt = (channel: NonNullable<Awaited<ReturnType<typeof read>>>, index: number) =>
+      channel.rows[Math.min(channel.rows.length - 1, Math.floor((index * channel.hz) / gpsHz))];
+    const states: StrategyLapState[] = [];
+    for (const event of lapEvents) {
+      if (states.at(-1)?.lap === event.value) continue;
+      const index = indexAt(event.ts);
+      const fuelRow = fuel ? rowAt(fuel, index) : undefined;
+      const veRow = ve ? rowAt(ve, index) : undefined;
+      const wearRow = wear ? rowAt(wear, index) : undefined;
+      states.push({
+        lap: Number(event.value),
+        fuel: fuelRow?.value == null ? null : Number(fuelRow.value),
+        ve: veRow?.value == null || !ve ? null : Number(veRow.value) * ve.scale,
+        tread: wearRow && wear ? wearColumns.map(column => (Number(wearRow[column] ?? 0) * wear.scale) / 100) as StrategyLapState['tread'] : null,
+      });
+    }
+    return states;
   }
 
   public async getLapTelemetry(lapNumber: number, targetLapTimeSec?: number): Promise<DuckDbLapTelemetry | null> {

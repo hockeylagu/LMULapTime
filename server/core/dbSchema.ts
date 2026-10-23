@@ -380,6 +380,12 @@ export function initDbSchema(db: DatabaseType): void {
       measured_at INTEGER NOT NULL
     ) WITHOUT ROWID;
     CREATE INDEX IF NOT EXISTS idx_live_pit_lane_layout ON live_pit_lane_losses(layout_key, car_class, measured_at);
+    -- The race plan shown before the start, one per race recording (server/core/live/dbRacePlanStore.ts): plan vs actual.
+    CREATE TABLE IF NOT EXISTS live_race_plans (
+      recording_id TEXT PRIMARY KEY,
+      plan_json TEXT NOT NULL,
+      saved_at INTEGER NOT NULL
+    ) WITHOUT ROWID;
 
     CREATE TABLE IF NOT EXISTS ingest_errors (
       source_type TEXT NOT NULL,

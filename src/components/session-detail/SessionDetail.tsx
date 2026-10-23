@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { useSessionDetailData } from './useSessionDetailData.js';
 import { SessionDetailHeader } from './overview/SessionDetailHeader.js';
 import { DriverPerformancePanel } from './overview/DriverPerformancePanel.js';
-import { SessionDebriefCard } from './debrief/SessionDebriefCard.js';
+import { SessionDebriefSection } from './debrief/SessionDebriefSection.js';
 import { SessionTelemetryChart } from './chart/SessionTelemetryChart.js';
 import { SessionLapTable } from './table/SessionLapTable.js';
 import { SessionRaceStandings } from './standings/SessionRaceStandings.js';
@@ -106,9 +106,7 @@ export const SessionDetail: React.FC<SessionDetailProps> = ({
         allTimeCategoryTrackPB={allTimeCategoryTrackPB}
       />
 
-      {selectedDriver && session.matchingReplayFile && (
-        <SessionDebriefCard session={session} selectedDriver={selectedDriver} />
-      )}
+      {selectedDriver && <SessionDebriefSection session={session} selectedDriver={selectedDriver} />}
 
       {selectedDriver && selectedDriver.laps && selectedDriver.laps.length > 0 && (
         <SessionTelemetryChart

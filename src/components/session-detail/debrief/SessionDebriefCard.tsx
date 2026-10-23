@@ -67,11 +67,11 @@ export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session,
   const requestDebrief = () => setRequest({ key, attempt: attempt + 1 });
 
   return (
-    <div className="bg-lmu-card p-5 rounded-2xl border border-lmu-border space-y-3" data-testid="session-debrief">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-lmu-border/60 pb-3">
+    <section className="space-y-3" data-testid="session-debrief">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
         <div className="flex items-center gap-2">
-          <Crosshair className="w-4 h-4 text-lmu-warn" />
-          <h3 className="text-sm font-bold text-white uppercase tracking-wider">Debrief: Where the Time Goes</h3>
+          <Crosshair className="w-3.5 h-3.5 text-lmu-warn" />
+          <h4 className="text-xs font-bold text-white uppercase tracking-wider">Where the time goes</h4>
         </div>
         <span className="text-xs text-lmu-muted">vs other {selectedDriver.carType} laps on this layout</span>
       </div>
@@ -136,6 +136,6 @@ export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session,
           ))}
         </>
       )}
-    </div>
+    </section>
   );
 };

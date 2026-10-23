@@ -1,0 +1,55 @@
+import type { SessionStrategy, StrategyLapState } from '../../shared/types/index.js';
+import { measureSessionStrategy } from '../../shared/domain/strategy/sessionStrategy.js';
+import { STRATEGY_HISTORY_RACES } from '../../shared/domain/strategy/strategyHistory.js';
+import type { SessionDatabase } from '../core/db.js';
+import { DuckDbReader } from '../telemetry/duckdbReader.js';
+import { TelemetryLinks } from '../telemetry/telemetryLinks.js';
+
+/**
+ * The strategy a session measured, from the player's native telemetry files linked to it (online races write no
+ * fuel, VE or wear in their results XML). Read when asked, never stored: a race reads in about 0.2 s. A session
+ * spread over several files takes each lap's state from the first file, in recording order, that has it.
+ * `undefined` when the session does not exist; null without telemetry or a player.
+ */
+export async function readSessionStrategy(sessionDb: SessionDatabase, sessionId: string): Promise<SessionStrategy | null | undefined> {
+  const session = sessionDb.getSessionById(sessionId);
+  if (!session) return undefined;
+  const player = session.playerDriver ?? session.drivers.find(driver => driver.isPlayer);
+  if (!player) return null;
+  const links = TelemetryLinks.load(sessionDb, session.id);
+  const files = links.filesForSession(session).map(filename => links.row(filename)).filter(row => row !== undefined);
+  const states = new Map<number, StrategyLapState>();
+  for (const file of files) {
+    const reader = new DuckDbReader(file.filePath);
+    try {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- One file at a time: earlier files keep their laps.
+      await reader.open();
+      // oxlint-disable-next-line eslint/no-await-in-loop -- One file at a time: earlier files keep their laps.
+      for (const state of await reader.getLapEndStates()) if (!states.has(state.lap)) states.set(state.lap, state);
+    } catch (error) {
+      console.warn(`[DuckDB] Failed to read the strategy from ${file.filename}:`, error);
+      sessionDb.recordIngestError('duckdb', file.filePath, error);
+    } finally {
+      // oxlint-disable-next-line eslint/no-await-in-loop -- Closed before the next file opens.
+      await reader.close().catch(() => undefined);
+    }
+  }
+  return measureSessionStrategy([...states.values()].sort((a, b) => a.lap - b.lap), player.laps ?? []);
+}
+
+/**
+ * The player's newest races on one layout in one class that have a native telemetry recording, measured, newest
+ * first: what the live race plan uses before the event has a lap. Read once per layout and class (about 0.2 s a race).
+ */
+export async function readStrategyHistory(sessionDb: SessionDatabase, layoutKey: string, carClass: string): Promise<SessionStrategy[]> {
+  const ids = sessionDb.getDb().prepare(`SELECT s.id FROM sessions s WHERE s.layout_key = ? AND s.player_car_class = ?
+      AND s.session_type = 'Race' AND EXISTS (SELECT 1 FROM telemetry_metadata t WHERE t.matched_session_id = s.id)
+    ORDER BY s.timestamp DESC LIMIT ?`).all(layoutKey, carClass, STRATEGY_HISTORY_RACES) as Array<{ id: string }>;
+  const races: SessionStrategy[] = [];
+  for (const { id } of ids) {
+    // oxlint-disable-next-line eslint/no-await-in-loop -- One race at a time: the reads share the DuckDB files' I/O.
+    const strategy = await readSessionStrategy(sessionDb, id);
+    if (strategy) races.push(strategy);
+  }
+  return races;
+}

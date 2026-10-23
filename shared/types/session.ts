@@ -337,3 +337,49 @@ export interface ComparableLap {
   hasRain?: boolean;
   weatherCondition?: WeatherCondition;
 }
+
+/** The car at the end of a lap, from the native telemetry; lap 0 is the start of the recording (the grid). */
+export interface StrategyLapState {
+  lap: number;
+  /** Litres. */
+  fuel: number | null;
+  /** Percent of a full tank; null or 0 for a car without virtual energy. */
+  ve: number | null;
+  /** Tread left per corner FL, FR, RL, RR, 0..1 (0 is a flat). */
+  tread: [number, number, number, number] | null;
+}
+
+export type StrategyCorner = 'FL' | 'FR' | 'RL' | 'RR';
+
+/** A stop measured from the native telemetry: what went in and which tyres were changed. */
+export interface SessionStrategyStop {
+  /** The in-lap (the lap the parser marks as the pit stop). */
+  lap: number;
+  fuelAdded: number | null;
+  veAdded: number | null;
+  /** The VE (or fuel, in a fuel race) leaving the pit: the in-lap's end plus what was added (VE at most 100). */
+  levelAfter: number | null;
+  tyres: StrategyCorner[];
+}
+
+/**
+ * What a race measured for the strategy, from the player's native telemetry and the parsed laps: the use per lap,
+ * what was left at the flag, the fuel ratio, the tyre wear and the pace over the race. Every figure is deterministic
+ * (`shared/domain/strategy/sessionStrategy.ts`); unknown values are null.
+ */
+export interface SessionStrategy {
+  kind: 've' | 'fuel';
+  /** Race laps completed. */
+  laps: number;
+  start: { fuel: number | null; ve: number | null };
+  /** Left at the flag, and how many laps of use that is. */
+  flag: { fuel: number | null; ve: number | null; laps: number | null };
+  /** Medians over the clean laps, and how many laps they come from. */
+  perLap: { fuel: number | null; ve: number | null; laps: number };
+  /** Litres per % VE: as set (the start load), and the lowest that covers every clean lap. */
+  fuelRatio: { set: number | null; needed: number | null };
+  tyres: { compound: string | null; corner: StrategyCorner | null; wearPerLap: number | null; treadAtFlag: number | null };
+  stops: SessionStrategyStop[];
+  /** Median clean lap, and the median of the first and the last three. */
+  pace: { clean: number | null; first: number | null; last: number | null; laps: number };
+}
