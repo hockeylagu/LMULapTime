@@ -299,7 +299,8 @@ export class LiveStrategyTracker {
     }) : null;
     return {
       resource: state.lifecycle === 'garage' ? null : resource,
-      pit: state.lifecycle === 'garage' ? null : this.pit(state.session.kind === 'race' ? this.lapsToStop(resource, fraction) : null),
+      pit: state.lifecycle === 'garage' ? null : this.pit(state.session.kind === 'race' ? this.lapsToStop(resource, fraction) : null,
+        resource.race?.neededAfterStop ?? null),
       damage: this.damage.damage(player.totalLaps, state.session.kind === 'race' ? lapsLeft : null),
       tyres,
       forecast: this.nextForecast(reading, state.session.kind),
@@ -422,8 +423,7 @@ export class LiveStrategyTracker {
    * What each refuel part adds from these amounts up to the MFD target: VE and its fuel (`target x ratio` litres) on
    * a VE car, fuel on the others. Null parts are unknown.
    */
-  private refuelAdded(ve: number | null, fuel: number | null): Record<LiveResourceKind, number | null> {
-    const target = this.menu?.resourceValue ?? null;
+  private refuelAdded(ve: number | null, fuel: number | null, target = this.menu?.resourceValue ?? null): Record<LiveResourceKind, number | null> {
     if (target === null || this.kind === null) return { ve: null, fuel: null };
     if (this.kind === 'fuel') return { ve: null, fuel: fuel === null ? null : target - fuel };
     const ratio = this.menu?.fuelRatio ?? null;
@@ -453,9 +453,11 @@ export class LiveStrategyTracker {
 
   /**
    * The game's estimate is for a stop made now; the planned stop refuels from the amounts left at its pit entry,
-   * `lapsToStop` laps of use from now. In the pit lane (and outside a race) the game's estimate stands.
+   * `lapsToStop` laps of use from now, up to `target` (the MFD's by default). In the pit lane (and outside a race)
+   * the game's estimate stands.
    */
-  private service(estimate: Extract<LiveRestUpdate, { type: 'estimate' }>, lapsToStop: number | null): { seconds: number; refuels: boolean } {
+  private service(estimate: Extract<LiveRestUpdate, { type: 'estimate' }>, lapsToStop: number | null,
+    target = this.menu?.resourceValue ?? null): { seconds: number; refuels: boolean } {
     const game = { seconds: estimate.total, refuels: estimate.fuel > 0 || estimate.ve > 0 };
     if (lapsToStop === null || (this.pitState !== 'none' && this.pitState !== 'request')) return game;
     const fuelNow = this.car && this.car.fuelCapacityLiters > 0 ? this.car.fuelLiters : null;
@@ -463,7 +465,7 @@ export class LiveStrategyTracker {
       const perLap = this.perLap(kind).perLap;
       return now === null || perLap === null ? null : Math.max(0, now - perLap * lapsToStop);
     };
-    const added = this.refuelAdded(atEntry(this.ve, 've'), atEntry(fuelNow, 'fuel'));
+    const added = this.refuelAdded(atEntry(this.ve, 've'), atEntry(fuelNow, 'fuel'), target);
     const parts: RefuelPart[] = [];
     for (const kind of ['ve', 'fuel'] as const) {
       const perUnit = this.fillSeconds(kind);
@@ -474,10 +476,13 @@ export class LiveStrategyTracker {
       : { seconds: plannedServiceSeconds(estimate, parts), refuels: parts.some(part => refuelSeconds(part) > 0) };
   }
 
-  private pit(lapsToStop: number | null): LivePitInfo {
+  /** `neededAfterStop`: the plan's need after the next stop, which prices the planned stop whatever the MFD says. */
+  private pit(lapsToStop: number | null, neededAfterStop: number | null): LivePitInfo {
     const estimate = this.estimate;
     const penalties = Math.max(this.penalties, estimate?.penalties ? 1 : 0);
     const planned = estimate && penalties === 0 ? this.service(estimate, lapsToStop) : null;
+    const plannedStop = estimate && penalties === 0 && lapsToStop !== null && neededAfterStop !== null
+      ? this.service(estimate, lapsToStop, neededAfterStop).seconds : null;
     const service = planned?.seconds ?? null;
     const delays = this.delays;
     const random = estimate && delays
@@ -490,6 +495,7 @@ export class LiveStrategyTracker {
       penalties,
       serviceSeconds: service === null ? null : round(service, 0),
       serviceMaxSeconds: service === null ? null : round(service + random, 0),
+      plannedServiceSeconds: plannedStop === null ? null : round(plannedStop, 1),
       penaltySeconds: estimate && penalties > 0 ? round(estimate.penalties, 0) : null,
       mfd: this.menu,
     };

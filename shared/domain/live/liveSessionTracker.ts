@@ -16,7 +16,8 @@ export const NO_SESSION_DETAILS: LiveSessionDetails = { lapsLeft: null, weather:
 /**
  * Follows the player's laps, the weather and the race distance across scoring readings; no reading (offline) clears
  * them. The race distance counts the player's own pace and the planned stop: its pit lane loss (the stored median of
- * the layout and class, else this session's measured stop) plus the service the game estimates for it. That cost is
+ * the layout and class, else this session's measured stop) plus its planned service: the refuel to the plan's need
+ * after the stop (not whatever the MFD holds) and the game's other service. That cost is
  * kept past the player's stop for the leader's, still to make.
  */
 export class LiveSessionTracker {
@@ -59,7 +60,7 @@ export class LiveSessionTracker {
     const pit = strategy?.pit;
     const stopAhead = race?.finishReachable === false && (pit?.state === 'none' || pit?.state === 'request');
     const laneLoss = this.storedLaneLoss ?? this.sessionLaneLoss ?? 0;
-    if (stopAhead) this.stopCost = laneLoss + (pit?.serviceSeconds ?? 0);
+    if (stopAhead) this.stopCost = laneLoss + (pit?.plannedServiceSeconds ?? pit?.serviceSeconds ?? 0);
     const own: LiveOwnPace = {
       lapSeconds: this.lane.pace(),
       stopSeconds: stopAhead ? this.stopCost ?? 0 : 0,

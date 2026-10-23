@@ -36,7 +36,7 @@ export const liveStrategy = (patch: Partial<LiveStrategy> = {}): LiveStrategy =>
     race: { finishReachable: false, atFinish: null, pitInLaps: 6, pitLap: 19, sparePerLap: 0.2, neededAfterStop: 38, neededStopNow: 58, stopsAfterNext: 0 },
   },
   pit: {
-    state: 'none', penalties: 0, serviceSeconds: 34, serviceMaxSeconds: 41, penaltySeconds: null,
+    state: 'none', penalties: 0, serviceSeconds: 34, serviceMaxSeconds: 41, plannedServiceSeconds: 34, penaltySeconds: null,
     mfd: { resourceValue: 50, resourceText: '50% 20 laps', tyres: 'New Medium', repair: 'N/A' },
   },
   damage: null,

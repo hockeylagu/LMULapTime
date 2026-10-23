@@ -32,7 +32,7 @@ export function demoStrategy(): LiveStrategy {
       lapsMeasured: 5, reserveLaps: 0.5, lapsInTank: 15,
       race: { finishReachable: false, atFinish: null, pitInLaps: 6, pitLap: 19, sparePerLap: 0.2,
         neededAfterStop: 70, neededStopNow: 90, stopsAfterNext: 0 } },
-    pit: { state: 'none', penalties: 0, serviceSeconds: 34, serviceMaxSeconds: 41, penaltySeconds: null,
+    pit: { state: 'none', penalties: 0, serviceSeconds: 34, serviceMaxSeconds: 41, plannedServiceSeconds: 34, penaltySeconds: null,
       mfd: { resourceValue: 50, resourceText: '50%', tyres: 'New Medium', repair: 'N/A' } },
     tyres: { compound: 'Medium', worst: 0.82, worstCorner: 'FR', wearPerLap: 0.008, newSets: 3 },
     fuelRatio: { recommended: 0.95, source: 'measured', pairedLaps: 5, garageSetting: 0.9,

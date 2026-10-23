@@ -8,7 +8,7 @@ import { liveStrategy } from '../../helpers/liveSnapshot.js';
 const TRACK = 10_000;
 /** The planned stop still ahead, the game estimating 10 s of service. */
 const planned = liveStrategy();
-const strategy = (state: 'none' | 'entering') => liveStrategy({ pit: { ...planned.pit!, state, serviceSeconds: 10 } });
+const strategy = (state: 'none' | 'entering') => liveStrategy({ pit: { ...planned.pit!, state, serviceSeconds: 10, plannedServiceSeconds: 10 } });
 
 /**
  * The leader's race to a 1020 s clock at 100 s a lap, with a stop on lap 4: in the lane from 380 s (8000 m) to 425 s

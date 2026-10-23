@@ -133,7 +133,7 @@ describe('LiveStrategyTracker', () => {
     tracker.applyRest({ type: 'standings', veFraction: 0.5, fuelFraction: 0.4, pitState: 'request', penalties: 1 });
     tracker.applyRest({ type: 'estimate', total: 10, damage: 0, penalties: 10, fuel: 0, ve: 0, tires: 0 });
     expect(context(tracker, at(10))?.pit).toEqual({
-      state: 'request', penalties: 1, serviceSeconds: null, serviceMaxSeconds: null, penaltySeconds: 10, mfd: null,
+      state: 'request', penalties: 1, serviceSeconds: null, serviceMaxSeconds: null, plannedServiceSeconds: null, penaltySeconds: 10, mfd: null,
     });
     tracker.applyRest({ type: 'standings', veFraction: 0.5, fuelFraction: 0.4, pitState: 'none', penalties: 0 });
     tracker.applyRest({ type: 'estimate', total: 33.7, damage: 30, penalties: 0, fuel: 3.7, ve: 1.7, tires: 0 });
@@ -157,6 +157,9 @@ describe('LiveStrategyTracker', () => {
     const strategy = context(tracker, at(0));
     expect(strategy?.resource?.race).toMatchObject({ pitInLaps: 2 });
     expect(strategy?.pit).toMatchObject({ serviceSeconds: 7, serviceMaxSeconds: 9 });
+    // The race distance prices the stop the plan needs, whatever the MFD holds: 30 laps left want a full 100%, 95% to load.
+    expect(strategy?.resource?.race?.neededAfterStop).toBe(100);
+    expect(strategy?.pit?.plannedServiceSeconds).toBe(39.3);
     // Requested: the stop is at the end of this lap, from 29 - 8 = 21%: nothing to load.
     tracker.applyRest({ type: 'standings', veFraction: 0.29, fuelFraction: 0.4, pitState: 'request', penalties: 0 });
     expect(context(tracker, at(0))?.pit).toMatchObject({ serviceSeconds: 0, serviceMaxSeconds: 0 });

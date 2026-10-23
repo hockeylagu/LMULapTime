@@ -86,6 +86,12 @@ export interface LivePitInfo {
   serviceSeconds: number | null;
   /** The estimate plus the game's random delays (`pitStopTimes`), the top of the range. */
   serviceMaxSeconds: number | null;
+  /**
+   * The planned stop's service: the refuel to the plan's need after the stop (not the MFD target) and the game's
+   * other service (tyres, repairs) as the MFD sets them. With the pit lane loss it is the stop's whole time loss, for
+   * the race distance; null without the game's estimate, a stop to plan, or with a penalty.
+   */
+  plannedServiceSeconds: number | null;
   /** Stop-and-go hold while a penalty is pending. */
   penaltySeconds: number | null;
   mfd: LivePitMenu | null;
