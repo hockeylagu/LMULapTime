@@ -16,7 +16,8 @@ static RECT target;
 static RECT targetBounds;
 static wchar_t browserPath[MAX_PATH];
 static ULONGLONG deadline;
-static HWND existingWindows[512];
+// Top-level windows include hidden ones: a busy desktop has well over a thousand.
+static HWND existingWindows[4096];
 static UINT existingWindowCount;
 static wchar_t preferredMonitor[CCHDEVICENAME];
 static HWND launchedWindow;
@@ -125,8 +126,8 @@ static void openOnMonitor(HWND owner, const wchar_t *url, UINT index) {
     if (swprintf_s(parameters, ARRAYSIZE(parameters), L"--new-window \"%s\"", url) < 0) return;
     existingWindowCount = 0;
     if (!EnumWindows(rememberWindow, 0)) {
-        MessageBoxW(owner, L"Unable to identify existing browser windows. Select Browser default in the app's Settings and try again.",
-            L"LMU Lap Time Analyzer", MB_OK | MB_ICONINFORMATION);
+        // Without the list the new window cannot be told apart, so it opens where the browser puts it.
+        ShellExecuteW(owner, L"open", url, NULL, NULL, SW_SHOWNORMAL);
         return;
     }
     HINSTANCE launched = ShellExecuteW(owner, L"open", browserPath, parameters, NULL, SW_SHOWNORMAL);
