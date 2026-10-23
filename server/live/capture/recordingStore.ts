@@ -242,6 +242,8 @@ export class LiveCaptureRecordingStore {
   /** The open file's terrain dictionary, read once on its first terrain change. */
   private terrain: Map<string, number> | null = null;
   private closed = false;
+  /** One bounded SQL/parameter workspace, consumed before the next serialized write. */
+  private sampleInsert: { columns: number; count: number; sql: string; values: DuckDBValue[] } | null = null;
 
   public constructor(private readonly directory: string) {}
 
@@ -640,19 +642,29 @@ export class LiveCaptureRecordingStore {
     const width = channels.length + 3;
     for (let start = 0; start < rowCount; start += MAX_ROWS_PER_INSERT) {
       const count = Math.min(MAX_ROWS_PER_INSERT, rowCount - start);
-      const tuple = `(${Array(4 + channels.length).fill('?').join(', ')})`;
-      const sql = `INSERT INTO capture_samples VALUES ${Array(count).fill(tuple).join(', ')}`;
-      const values: DuckDBValue[] = [];
+      const columns = 4 + channels.length;
+      let insert = this.sampleInsert;
+      if (!insert || insert.columns !== columns || insert.count !== count) {
+        const tuple = `(${Array(columns).fill('?').join(', ')})`;
+        insert = { columns, count, sql: `INSERT INTO capture_samples VALUES ${Array(count).fill(tuple).join(', ')}`,
+          values: new Array<DuckDBValue>(count * columns) };
+        this.sampleInsert = insert;
+      }
+      const values = insert.values;
+      let parameter = 0;
       for (let row = start; row < start + count; row++) {
         const offset = row * width;
-        values.push(sampleOffset + row, batch.samples[offset], batch.samples[offset + 1], Number.isNaN(batch.samples[offset + 2]) ? null : batch.samples[offset + 2]);
+        values[parameter++] = sampleOffset + row;
+        values[parameter++] = batch.samples[offset];
+        values[parameter++] = batch.samples[offset + 1];
+        values[parameter++] = Number.isNaN(batch.samples[offset + 2]) ? null : batch.samples[offset + 2];
         for (let channel = 0; channel < channels.length; channel++) {
           const value = batch.samples[offset + 3 + channel];
-          values.push(!channels[channel].verified || Number.isNaN(value) ? null : value);
+          values[parameter++] = !channels[channel].verified || Number.isNaN(value) ? null : value;
         }
       }
       // oxlint-disable-next-line eslint/no-await-in-loop -- Rows are already batched; chunks stay under the per-statement parameter limit on one connection.
-      await connection.run(sql, values);
+      await connection.run(insert.sql, values);
     }
   }
 

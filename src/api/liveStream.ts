@@ -67,20 +67,27 @@ export function useLiveStream(options: LiveStreamOptions = {}): LiveStreamState 
   useEffect(() => {
     let source: EventSource | null = null;
     let silence: ReturnType<typeof setTimeout> | undefined;
+    let lastHeardAt = Date.now();
     let retry: ReturnType<typeof setTimeout> | undefined;
     // A lost stream (server restart, proxy error, silence) is closed and opened again until the server answers:
     // EventSource gives up by itself on an error status, and the page must recover mid-session without a reload.
     const lost = () => {
       clearTimeout(silence);
+      silence = undefined;
       timing.set(null);
       setConnection('disconnected');
       source?.close();
       clearTimeout(retry);
       retry = setTimeout(connect, LIVE_RETRY_MS);
     };
+    const checkSilence = () => {
+      const remaining = LIVE_SILENCE_MS - (Date.now() - lastHeardAt);
+      if (remaining <= 0) lost();
+      else silence = setTimeout(checkSilence, remaining);
+    };
     const heard = () => {
-      clearTimeout(silence);
-      silence = setTimeout(lost, LIVE_SILENCE_MS);
+      lastHeardAt = Date.now();
+      silence ??= setTimeout(checkSilence, LIVE_SILENCE_MS);
     };
     function connect(): void {
       source?.close();

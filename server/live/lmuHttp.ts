@@ -40,7 +40,8 @@ export function lmuHttpGet(url: string, deadlineMs: number, captureFailure = fal
         body += chunk;
         if (captureFailure) {
           partialTruncated ||= partialBody.length + chunk.length > 8192;
-          partialBody = (partialBody + chunk).slice(0, 8192);
+          const remaining = 8192 - partialBody.length;
+          if (remaining > 0) partialBody += chunk.length <= remaining ? chunk : chunk.slice(0, remaining);
         }
       });
       response.on('end', () => { complete = true; settle({ status: 'ok', statusCode: response.statusCode ?? 0, body }); });

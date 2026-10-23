@@ -1,4 +1,6 @@
+import { isDeepStrictEqual } from 'node:util';
 import type { LiveRestUpdate } from '../../shared/domain/live/liveStrategyTracker.js';
+import type { LivePitMenu } from '../../shared/types/liveStrategy.js';
 import type { LiveCaptureObservation } from '../../shared/types/liveCapture.js';
 import { captureRestEvidence } from './capture/evidence.js';
 import { parseReplayPlayback } from './lmuNavigation.js';
@@ -140,8 +142,8 @@ export class LivePitPoller {
   private readonly onceDone = new Set<string>();
   private pitActive = false;
   private sessionKey = '';
-  /** The last MFD read (serialized), so a change can bring the stop estimate forward. */
-  private lastMenu: string | null = null;
+  /** The last parsed MFD state, so a change can bring the stop estimate forward. */
+  private lastMenu: LivePitMenu | null = null;
 
   public constructor(private readonly options: LivePitPollerOptions) {}
 
@@ -241,6 +243,7 @@ export class LivePitPoller {
     this.inFlight = false;
     const done = this.now();
     const stale = generation !== this.generation || this.mode === 'off';
+    if (stale && !diagnostic) return;
     const parsed = answer.ok ? next.read ? next.read.parse(answer.body) : parseReplayPlayback(answer.body) : null;
     if (diagnostic) {
       const body = answer.ok ? diagnosticBody(next.path, answer.body) : undefined;
@@ -281,9 +284,8 @@ export class LivePitPoller {
     if (update) this.options.onUpdate(update);
     // The estimate's tyres and repairs follow the MFD: read it again once the menu changes, not up to a minute later.
     if (update?.type === 'pitMenu') {
-      const menu = JSON.stringify(update.menu);
-      if (this.lastMenu !== null && menu !== this.lastMenu) this.trigger('estimate');
-      this.lastMenu = menu;
+      if (this.lastMenu !== null && !isDeepStrictEqual(update.menu, this.lastMenu)) this.trigger('estimate');
+      this.lastMenu = update.menu;
     }
   }
 }

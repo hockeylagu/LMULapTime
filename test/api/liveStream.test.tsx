@@ -55,6 +55,20 @@ describe('useLiveStream', () => {
     expect(renders).toBe(before);
   });
 
+  it('does not recreate the silence timer for every incoming pedal batch', () => {
+    const { unmount } = renderHook(() => useLiveStream());
+    const source = FakeEventSource.byUrl('/api/live/stream');
+    const schedule = vi.spyOn(globalThis, 'setTimeout');
+    try {
+      act(() => {
+        for (let index = 0; index < 100; index++) source.emit('pedals', { samples: [] });
+      });
+      expect(schedule).not.toHaveBeenCalled();
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally { schedule.mockRestore(); }
+  });
+
   it('keeps timing events out of React state, and clears the timing off track and on a lost connection', () => {
     let renders = 0;
     const { result } = renderHook(() => { renders += 1; return useLiveStream(); });

@@ -94,8 +94,9 @@ export class LiveReader {
   private playerId: number | null = null;
   private slotHint = -1;
   private inRealtime = false;
-  private lastTerrainMaterials = '';
-  private lastImpact = '';
+  private lastTerrainMaterials: LiveCaptureSample['terrainMaterials'];
+  private lastImpact: LiveCaptureSample['impact'];
+  private readonly tickAction = (): void => this.tick();
 
   public constructor(private readonly deps: LiveReaderDeps) {}
 
@@ -164,6 +165,9 @@ export class LiveReader {
     this.pedalVersion = null;
     this.playerId = null;
     this.slotHint = -1;
+    this.lastCarAt = 0;
+    this.lastTerrainMaterials = undefined;
+    this.lastImpact = undefined;
     this.inRealtime = false;
     this.lastProbeAt = Date.now();
     this.openedAt = this.lastProbeAt;
@@ -200,7 +204,8 @@ export class LiveReader {
     }
 
     if (this.inRealtime && this.playerId !== null) {
-      const pedalRead = readPedalFrame(telemetryMap, this.playerId, this.pedalVersion, this.slotHint, this.deps.capture);
+      const pedalRead = readPedalFrame(telemetryMap, this.playerId, this.pedalVersion, this.slotHint,
+        this.deps.capture && this.captureConfirmed && !this.cue, now - this.lastCarAt >= CAR_POST_MS);
       if (pedalRead.status === 'ok') {
         this.pedalVersion = pedalRead.version;
         this.slotHint = pedalRead.value.slot;
@@ -220,21 +225,31 @@ export class LiveReader {
     if (!this.cue && (scoring || pedal || car)) {
       if (scoring) this.heldScoring = null;
       if (capture && this.captureConfirmed) {
-        const terrainKey = JSON.stringify(capture.terrainMaterials);
-        const impactKey = JSON.stringify(capture.impact);
+        const terrain = capture.terrainMaterials;
+        const impact = capture.impact;
+        const previous = this.lastTerrainMaterials;
+        let terrainChanged = terrain?.length !== previous?.length;
+        if (!terrainChanged && terrain && previous) {
+          for (let corner = 0; corner < terrain.length; corner++) {
+            if (terrain[corner] !== previous[corner]) { terrainChanged = true; break; }
+          }
+        }
+        const impactChanged = impact?.elapsedSeconds !== this.lastImpact?.elapsedSeconds
+          || impact?.magnitude !== this.lastImpact?.magnitude;
         // Send changes at capture cadence. A small car-rate checkpoint gives a new recording its initial
         // state even when a session transition kept the same material and last-impact values.
-        const terrainMaterials = car || terrainKey !== this.lastTerrainMaterials ? capture.terrainMaterials : undefined;
-        const impact = car || impactKey !== this.lastImpact ? capture.impact : undefined;
-        this.lastTerrainMaterials = terrainKey; this.lastImpact = impactKey;
-        capture = { ...capture, terrainMaterials, impact };
+        this.lastTerrainMaterials = terrain;
+        this.lastImpact = impact;
+        // This sample is owned by this poll; only its sparse fields are suppressed before posting.
+        if (!car && !terrainChanged) capture.terrainMaterials = undefined;
+        if (!car && !impactChanged) capture.impact = undefined;
       }
       this.deps.post({ type: 'frame', scoring, pedal, tyreSurfaceAvgC, car,
         ...(this.deps.capture ? { capture: this.captureConfirmed ? capture : null } : {}) });
     }
     const asking = this.screen === 'loading' || this.cue;
     if (now - this.lastProbeAt >= (asking ? CUE_PROBE_MS : PROBE_MS) && !this.probing) this.probe(now);
-    this.schedule(this.inRealtime ? REALTIME_INTERVAL_MS : IDLE_INTERVAL_MS, () => this.tick());
+    this.schedule(this.inRealtime ? REALTIME_INTERVAL_MS : IDLE_INTERVAL_MS, this.tickAction);
   }
 
   /** Any write on the menu, or a reading that is not the next one of the same session. */

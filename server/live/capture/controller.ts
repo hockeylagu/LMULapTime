@@ -42,6 +42,7 @@ export class LiveCaptureController {
   private manifest: LiveCaptureManifest | null = null;
   private worker: CaptureWorker | null = null;
   private buffer = new Float64Array(BATCH_SAMPLES * LIVE_CAPTURE_SAMPLE_WIDTH);
+  private readonly spareBuffers: ArrayBuffer[] = [];
   private sampleCount = 0;
   private observations: LiveCaptureObservation[] = [];
   private observationBytes = 0;
@@ -298,7 +299,10 @@ export class LiveCaptureController {
     worker.on('message', (message: unknown) => {
       if (!isWorkerMessage<LiveCaptureWriteResult>(message, ['persisted', 'failed', 'closed', 'linked', 'catalogued'])) return;
       if (message.type === 'persisted') {
-        this.pending.delete(message.sequence);
+        const expected = this.pending.delete(message.sequence);
+        const recycled = message.recycledSamples;
+        if (expected && recycled instanceof ArrayBuffer && recycled.byteLength === BATCH_SAMPLES * LIVE_CAPTURE_SAMPLE_WIDTH * 8
+          && this.spareBuffers.length < LIVE_CAPTURE_PENDING_BATCHES + LIVE_CAPTURE_FINALIZATION_SLOTS) this.spareBuffers.push(recycled);
         try { this.options.onPersist(message.manifest, message.bytes); }
         catch (error) { this.error = `Recording index: ${error instanceof Error ? error.message : String(error)}`; }
         this.pumpLinks();
@@ -369,7 +373,11 @@ export class LiveCaptureController {
       return;
     }
     if (!force && !this.sampleCount && !this.observations.length) return;
-    const samples = this.buffer.slice(0, this.sampleCount * LIVE_CAPTURE_SAMPLE_WIDTH);
+    const samples = this.sampleCount > 0 ? this.buffer.subarray(0, this.sampleCount * LIVE_CAPTURE_SAMPLE_WIDTH) : new Float64Array(0);
+    if (this.sampleCount > 0) {
+      const spare = this.spareBuffers.pop();
+      this.buffer = spare ? new Float64Array(spare) : new Float64Array(BATCH_SAMPLES * LIVE_CAPTURE_SAMPLE_WIDTH);
+    }
     const batch: LiveCaptureBatch = {
       type: 'batch', sequence: ++this.sequence,
       manifest: { ...this.manifest, anchors: this.manifest.anchors.map(anchor => ({ ...anchor })) },

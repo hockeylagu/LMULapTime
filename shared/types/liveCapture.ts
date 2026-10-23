@@ -84,7 +84,7 @@ export type LiveCaptureWriteMessage = LiveCaptureBatch | { type: 'close' }
   | { type: 'catalog' }
   | { type: 'link'; filename: string; recordingId: string; sessionId: string | null; gameVersion: string | null };
 export type LiveCaptureWriteResult =
-  | { type: 'persisted'; sequence: number; manifest: LiveCaptureManifest; bytes: number }
+  | { type: 'persisted'; sequence: number; manifest: LiveCaptureManifest; bytes: number; recycledSamples?: ArrayBuffer }
   | { type: 'failed'; error: string; sequence?: number; recordingId?: string; operation?: 'batch' | 'link' | 'catalog' | 'close' }
   | { type: 'linked'; recordingId: string }
   | { type: 'catalogued'; recordings: LiveCaptureCatalogEntry[]; errors: Array<{ filename: string; error: string }> }

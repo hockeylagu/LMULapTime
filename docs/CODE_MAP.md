@@ -34,6 +34,11 @@ reports the source version. See [wheel evidence and mappings](plans/WHEEL_CAPTUR
 
 Contracts and pipeline specifications: [Live capture reference](LIVE_CAPTURE_FORMAT.md) and [Live session evidence plan](plans/LIVE_SESSION_EVIDENCE.md).
 
+Shared-memory polling: `sharedMemory.ts` owns private native views and bounded `readInto` copies;
+`rf2Decode.ts` reuses per-mapping scratch buffers and decodes only coherent copies. `liveReader.ts`
+gates car-condition decoding to its 500 ms publication cadence and compares sparse capture state
+without JSON. Allocation/GC reproduction: `tools/benchmarks/livePerformance/allocations.mjs`.
+
 Vite and the TSX development watcher exclude `server/live-captures/`, including DuckDB WAL files,
 because active recordings can be exclusively locked on Windows.
 

@@ -19,7 +19,6 @@ export function decodeLiveCaptureSample(slot: Buffer): LiveCaptureSample | null 
   const lapNumber = slot.readInt32LE(at.lapNumber);
   const lapStart = slot.readDoubleLE(at.lapStartET);
   const values = new Float64Array(SAMPLE_VALUE_COUNT);
-  values.fill(Number.NaN);
 
   // The producer defines left/up/back in a left-handed frame; ISO is forward/left/up.
   values[0] = finiteOrNaN(-slot.readDoubleLE(at.localVel + 2 * 8));
@@ -43,10 +42,10 @@ export function decodeLiveCaptureSample(slot: Buffer): LiveCaptureSample | null 
     lapStartSeconds: Number.isFinite(lapStart) && lapStart >= 0 ? lapStart : null,
     values,
     terrainMaterials: Array.from({ length: 4 }, (_, corner) => {
-      const field = slot.subarray(at.wheels + corner * WHEEL.size + WHEEL.offsets.terrainName,
-        at.wheels + corner * WHEEL.size + WHEEL.offsets.terrainName + 16);
-      const end = field.indexOf(0);
-      return field.toString('latin1', 0, end < 0 ? field.length : end);
+      const start = at.wheels + corner * WHEEL.size + WHEEL.offsets.terrainName;
+      let end = start;
+      while (end < start + 16 && slot[end] !== 0) end++;
+      return slot.toString('latin1', start, end);
     }),
     ...(Number.isFinite(impactTime) && impactTime > 0 && impactTime <= elapsedSeconds ? {
       impact: { elapsedSeconds: impactTime, magnitude: Number.isFinite(impactMagnitude) && impactMagnitude >= 0 ? impactMagnitude : null },

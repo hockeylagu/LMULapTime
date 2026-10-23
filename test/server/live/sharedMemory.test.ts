@@ -25,11 +25,32 @@ describe('shared memory', () => {
       koffi.encode(writable, 8, 'double', 12.5);
       const mapping = openMapping(name, 256);
       expect(mapping).not.toBeNull();
-      expect(mapping?.readU32(0)).toBe(0xcafebabe);
-      expect(mapping?.read(8, 8).readDoubleLE(0)).toBe(12.5);
-      expect(openMapping(name, 65536)).toBeNull();
-      mapping?.close();
-      mapping?.close();
+      if (!mapping) throw new Error('Test mapping did not open');
+      try {
+        expect(mapping.readU32(0)).toBe(0xcafebabe);
+        const snapshot = mapping.read(8, 8);
+        const target = Buffer.alloc(24, 0xff);
+        mapping.readInto(8, target, 8, 8);
+        expect(target.readDoubleLE(8)).toBe(12.5);
+        expect(target.subarray(0, 8)).toEqual(Buffer.alloc(8, 0xff));
+        expect(target.subarray(16)).toEqual(Buffer.alloc(8, 0xff));
+        koffi.encode(writable, 8, 'double', 42.5);
+        expect(snapshot.readDoubleLE(0)).toBe(12.5);
+        expect(target.readDoubleLE(8)).toBe(12.5);
+        mapping.readInto(8, target, 8, 8);
+        expect(target.readDoubleLE(8)).toBe(42.5);
+        expect(() => mapping.readU32(253)).toThrow(RangeError);
+        expect(() => mapping.read(-1, 4)).toThrow(RangeError);
+        expect(() => mapping.readInto(252, target, 0, 8)).toThrow(RangeError);
+        expect(() => mapping.readInto(0, target, 20, 8)).toThrow(RangeError);
+        expect(() => mapping.readInto(0, target, -1, 8)).toThrow(RangeError);
+        expect(() => mapping.readInto(0, target, 0, -1)).toThrow(RangeError);
+        expect(openMapping(name, 65536)).toBeNull();
+      } finally { mapping.close(); }
+      mapping.close();
+      expect(() => mapping.readU32(0)).toThrow('closed');
+      expect(() => mapping.read(0, 8)).toThrow('closed');
+      expect(() => mapping.readInto(0, Buffer.alloc(8), 0, 8)).toThrow('closed');
     } finally {
       unmap(writable);
       close(owner);

@@ -2,6 +2,40 @@
 
 This is an isolated synthetic benchmark, not a recorder or a game REST load test. It uses the real binary layouts, coherent decoder, `LiveReader` in a worker, `LiveService`, SSE serializer, browser hook, React dashboard, pedal buffer and canvas. It does not access the application database or LMU. The source is a 64-car in-memory fixture; Windows mapping/Koffi and the game producer are excluded.
 
+## Reader allocation benchmark
+
+Run `node --expose-gc --import tsx tools/benchmarks/livePerformance/allocations.mjs` from the repository root.
+This separate synchronous workload uses private synthetic Windows mappings and the production
+`openMapping`/coherent decoders (ordinary buffers off Windows). It never opens the game's mappings,
+REST endpoints or application database. No browser or running backend is required.
+
+It warms 10,000 ticks, collects garbage, then measures 200,000 ticks: 50 Hz telemetry with capture,
+5 Hz scoring for 64 cars and a 2 Hz car-condition decode request. Set `LIVE_ALLOCATION_TICKS` to
+change the measured count. The original decoder ignores the car-cadence argument and decodes it
+at 50 Hz. A checksum consumes both streams. Minor collection counts/durations come from Node's
+GC performance observer; mapping read counters distinguish allocating copies from reused copies.
+
+On 2026-10-22, one before/after run on this Windows host (Node v24.21.0) produced:
+
+| Measurement | Before | After |
+|---|---:|---:|
+| Decode/FFI elapsed time | 2,553.83 ms | 1,011.47 ms |
+| Minor collections | 270 | 93 |
+| Minor collection duration | 23.27 ms | 7.87 ms |
+| Allocating mapping reads | 240,000 | 0 |
+| Bytes copied by allocating mapping reads | 1,136,320,000 | 0 |
+| Bytes copied into reused storage | 0 | 1,136,320,000 |
+| Checksum (warmup included) | 189,000 | 189,000 |
+
+This is about 60% less elapsed time and 66% fewer minor collections in the isolated workload.
+These counters exclude the original scoring `Buffer.concat` allocation and do not mean the whole
+pipeline is allocation-free. Independent decoded samples and worker/SSE transport still allocate.
+The loop compresses 4,000 seconds of nominal polling into a burst: GC heap sizing, wall-clock
+cadence, producer races, disk writes and browser behavior differ during an actual LMU session.
+It does not measure the reader's JSON suppression or navigation/cadence scheduling changes.
+
+## Dashboard harness
+
 From the repository root, run `npx tsx tools/benchmarks/livePerformance/harness.ts`. This builds a small production frontend and serves it on `127.0.0.1:3099`; its isolated WAL database and output live under `.cache/live-performance/`.
 
 In another PowerShell terminal:

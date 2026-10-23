@@ -69,7 +69,7 @@ describe('recording worker in process', () => {
     expect(harness.write).toHaveBeenCalledExactlyOnceWith(batch);
     expect(harness.link).toHaveBeenCalledExactlyOnceWith(batch.manifest.filename, batch.manifest.recordingId, 'xml-session', '2.0');
     expect(harness.post.mock.calls.map(([message]) => message)).toEqual([
-      { type: 'persisted', sequence: 0, manifest: batch.manifest, bytes: 100 },
+      { type: 'persisted', sequence: 0, manifest: batch.manifest, bytes: 100, recycledSamples: batch.samples.buffer },
       { type: 'linked', recordingId: batch.manifest.recordingId },
       { type: 'catalogued', recordings: [], errors: [] }, { type: 'closed' },
     ]);
@@ -112,7 +112,7 @@ describe('recording worker in process', () => {
     await finish();
     expect(harness.post).toHaveBeenCalledWith({ type: 'failed', operation: 'batch', sequence: 0,
       recordingId: makeBatch().manifest.recordingId, error: 'disk full' });
-    expect(harness.post).toHaveBeenCalledWith(expect.objectContaining({ type: 'persisted', sequence: 1 }));
+    expect(harness.post).toHaveBeenCalledWith(expect.objectContaining({ type: 'persisted', sequence: 1 }), expect.any(Array));
   });
 
   it('rejects new operations after close and closes the port even when the store fails to close', async () => {

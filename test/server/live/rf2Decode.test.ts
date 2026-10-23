@@ -120,6 +120,42 @@ describe('rF2 scoring decode', () => {
     // Attempt 1: begin 2, end 2, copy, then begin reads 3 -> retry; attempt 2 reads 3 throughout.
     expect(readScoringFrame(mapping, null)).toMatchObject({ status: 'ok', version: 3 });
   });
+
+  it('keeps retained scoring independent of reused storage and ignores stale slots when the field shrinks', () => {
+    let current = scoringBuffer(2, FIELD);
+    const mapping = source(() => current);
+    const first = readScoringFrame(mapping, null);
+    current = scoringBuffer(3, [{ ...FIELD[0], bytes: { finishStatus: 1 } }]);
+    expect(readScoringFrame(mapping, 2)).toMatchObject({ status: 'ok', value: { player: null, allDriversFinished: true } });
+    expect(first).toMatchObject({ status: 'ok', value: { player: { id: 12 }, allDriversFinished: false } });
+    current = scoringBuffer(4, []);
+    expect(readScoringFrame(mapping, 3)).toMatchObject({ status: 'ok', value: { player: null, leader: null, allDriversFinished: null } });
+  });
+
+  it('copies changing frames into fixed scratch buffers without allocating mapping snapshots', () => {
+    const scoring = scoringBuffer(2, FIELD);
+    const telemetry = telemetryBuffer(2, [{ id: 12, et: 100, throttle: 0.5, brake: 0 }]);
+    const destinations = new Set<Buffer>();
+    const mapping = (buffer: Buffer) => ({
+      readU32: (offset: number) => buffer.readUInt32LE(offset),
+      read: (): Buffer => { throw new Error('Allocating read on polling path'); },
+      readInto: (offset: number, target: Buffer, targetOffset: number, length: number) => {
+        destinations.add(target);
+        buffer.copy(target, targetOffset, offset, offset + length);
+      },
+    });
+    const scoringSource = mapping(scoring);
+    const telemetrySource = mapping(telemetry);
+    for (let version = 2; version <= 4; version++) {
+      scoring.writeUInt32LE(version, SCORING.versionBegin);
+      scoring.writeUInt32LE(version, SCORING.versionEnd);
+      telemetry.writeUInt32LE(version, TELEMETRY.versionBegin);
+      telemetry.writeUInt32LE(version, TELEMETRY.versionEnd);
+      expect(readScoringFrame(scoringSource, version - 1).status).toBe('ok');
+      expect(readPedalFrame(telemetrySource, 12, version - 1, 0).status).toBe('ok');
+    }
+    expect(destinations.size).toBe(2);
+  });
 });
 
 describe('rF2 pedal decode', () => {
@@ -177,5 +213,51 @@ describe('rF2 pedal decode', () => {
     const mapping = source(() => telemetryBuffer(4, slots));
     expect(readPedalFrame(mapping, 99, null, -1)).toMatchObject({ status: 'ok', value: { slot: -1, sample: null } });
     expect(readPedalFrame(mapping, 12, 4, 1)).toEqual({ status: 'unchanged' });
+  });
+
+  it('finds a moved player before or after its old hint, including an out-of-range hint', () => {
+    let current = telemetryBuffer(4, slots);
+    const mapping = source(() => current);
+    expect(readPedalFrame(mapping, 12, null, 1)).toMatchObject({ value: { slot: 1 } });
+    current = telemetryBuffer(5, [slots[1], slots[0]]);
+    expect(readPedalFrame(mapping, 12, 4, 1)).toMatchObject({ value: { slot: 0 } });
+    current = telemetryBuffer(6, slots);
+    expect(readPedalFrame(mapping, 12, 5, 0)).toMatchObject({ value: { slot: 1 } });
+    expect(readPedalFrame(mapping, 12, null, 128)).toMatchObject({ value: { slot: 1 } });
+  });
+
+  it('retains independent samples and capture arrays when its copy storage is reused', () => {
+    let current = telemetryBuffer(4, slots);
+    const mapping = source(() => current);
+    const first = readPedalFrame(mapping, 12, null, 1, true, false);
+    current = telemetryBuffer(5, [{ ...slots[1], et: 400, throttle: 0.25 }]);
+    current.writeDoubleLE(-88, TELEMETRY.vehicles + VEHICLE_TELEMETRY.offsets.localVel + 16);
+    const second = readPedalFrame(mapping, 12, 4, 1, true, true);
+    expect(first).toMatchObject({ value: { sample: { t: 321.25, throttle: 0.75 }, car: null,
+      capture: { elapsedSeconds: 321.25 } } });
+    expect(second).toMatchObject({ value: { sample: { t: 400, throttle: 0.25 }, car: { fuelLiters: 0 } } });
+    if (first.status !== 'ok' || second.status !== 'ok') throw new Error('Missing frames');
+    expect(first.value.capture?.values[0]).toBe(-0);
+    expect(second.value.capture?.values[0]).toBe(88);
+    expect(first.value.capture?.values).not.toBe(second.value.capture?.values);
+  });
+
+  it('keeps scratch buffers isolated between mappings', () => {
+    const first = source(() => telemetryBuffer(4, slots));
+    const second = source(() => telemetryBuffer(5, [{ ...slots[1], et: 999 }]));
+    expect(readPedalFrame(first, 12, null, 1)).toMatchObject({ value: { sample: { t: 321.25 } } });
+    expect(readPedalFrame(second, 12, null, 0)).toMatchObject({ value: { sample: { t: 999 } } });
+    expect(readPedalFrame(first, 12, null, 1)).toMatchObject({ value: { sample: { t: 321.25 } } });
+  });
+
+  it('rejects torn telemetry copies before decoding and retries the updated slot', () => {
+    let current = telemetryBuffer(4, slots);
+    const mapping = source(() => current, reads => {
+      // begin/end, vehicle count and hinted ID have been read; the copy is already done.
+      if (reads === 4) current = telemetryBuffer(5, [{ ...slots[1], et: 999 }]);
+    });
+    expect(readPedalFrame(mapping, 12, null, 1, true)).toMatchObject({ status: 'ok', version: 5,
+      value: { slot: 0, sample: { t: 999 }, capture: { elapsedSeconds: 999 } } });
+    expect(mapping.copies).toBe(2);
   });
 });

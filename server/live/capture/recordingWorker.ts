@@ -22,7 +22,8 @@ let closing = false;
 let queue = Promise.resolve();
 
 function post(result: LiveCaptureWriteResult): void {
-  port?.postMessage(result);
+  if (result.type === 'persisted' && result.recycledSamples) port?.postMessage(result, [result.recycledSamples]);
+  else port?.postMessage(result);
 }
 
 function errorText(error: unknown): string {
@@ -46,7 +47,8 @@ function enqueueBatch(batch: LiveCaptureBatch): void {
   queue = queue.then(async () => {
     try {
       const result = await store.write(batch);
-      post({ type: 'persisted', sequence: batch.sequence, manifest: result.manifest, bytes: result.bytes });
+      post({ type: 'persisted', sequence: batch.sequence, manifest: result.manifest, bytes: result.bytes,
+        recycledSamples: batch.samples.buffer as ArrayBuffer });
     } catch (error: unknown) {
       fail(errorText(error));
     } finally {

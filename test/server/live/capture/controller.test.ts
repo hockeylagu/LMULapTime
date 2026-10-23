@@ -93,6 +93,29 @@ describe('LiveCaptureController', () => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 
+  it('recycles only acknowledged batch storage without overwriting pending batches', () => {
+    const { controller, writer } = makeController();
+    start(controller);
+    const fill = (startTime: number) => {
+      for (let index = 0; index < 50; index++) controller.sample(sample(startTime + index / 50));
+      return writer.batches().at(-1)!;
+    };
+    const first = fill(101);
+    writer.emit('message', { type: 'persisted', sequence: first.sequence, manifest: first.manifest,
+      bytes: 128, recycledSamples: first.samples.buffer });
+    const pending = fill(102);
+    // A duplicate acknowledgement must not enqueue storage that is now in use again.
+    writer.emit('message', { type: 'persisted', sequence: first.sequence, manifest: first.manifest,
+      bytes: 128, recycledSamples: first.samples.buffer });
+    const reused = fill(103);
+    expect(reused.samples.buffer).toBe(first.samples.buffer);
+    expect(reused.samples.buffer).not.toBe(pending.samples.buffer);
+    expect(pending.samples[0]).toBe(102);
+    expect(pending.samples[49 * LIVE_CAPTURE_SAMPLE_WIDTH]).toBe(102.98);
+    expect(reused.samples[0]).toBe(103);
+    controller.pause();
+  });
+
   it('waits for discovery to repair filenames before sending queued XML links', async () => {
     const { controller, writer } = makeController();
     const discovery = controller.discover();

@@ -81,6 +81,9 @@ export function source(buffer: () => Buffer, onRead: (reads: number) => void = (
     copies: 0,
     readU32: (offset: number) => { onRead(fake.reads++); return buffer().readUInt32LE(offset); },
     read: (offset: number, length: number) => { fake.copies++; return Buffer.from(buffer().subarray(offset, offset + length)); },
+    readInto: (offset: number, target: Buffer, targetOffset: number, length: number) => {
+      fake.copies++; buffer().copy(target, targetOffset, offset, offset + length);
+    },
   };
   return fake;
 }

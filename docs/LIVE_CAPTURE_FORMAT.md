@@ -70,6 +70,51 @@ compares persisted manifests and byte counts so unchanged rediscovery does not c
 The explicitly selected `?demo` dashboard and isolated performance harness remain development tools;
 neither supplies substitute data to a connected dashboard.
 
+### Shared-memory allocation and snapshot ownership
+
+`sharedMemory.ts` keeps one private Koffi external view per open mapping. Counter reads retain native
+uint32 loads; `readInto` copies into caller-owned buffers, and `read` still returns an independent
+snapshot. Bounds and closed-handle checks run before accessing the view. No mapped view escapes to
+consumers or crosses a worker boundary.
+
+`rf2Decode.ts` reuses scoring and player-slot scratch buffers per mapping. The begin/end counters
+must match before and after each copy; only an accepted copy is decoded. Scoring copies include
+the header and declared vehicles without concatenating intermediate buffers. Player lookup tries
+the remembered slot before scanning the other IDs without constructing a candidate array.
+Decoded readings, including capture value arrays, retain their own data across subsequent polls.
+
+Car-condition objects are decoded at their existing 500 ms publication cadence. Capture decoding
+waits for navigation confirmation; pedals and tyre temperatures keep their existing cadence.
+Terrain/impact suppression compares values directly without per-sample JSON serialization and
+retains the car-rate checkpoints. The writer's bounded batching and exclusive DuckDB ownership
+are unchanged. See `tools/benchmarks/livePerformance/README.md` for the isolated allocation benchmark.
+
+### Allocations during a loaded game session
+
+The driving path also includes the recording worker, SQLite checkpoints, REST and SSE. These paths
+retain bounded queues and independent message ownership; pooling never exposes an in-flight batch
+to the producer. The following allocation controls apply:
+
+| Stage | Allocation control |
+|---|---|
+| Controller → recording worker | Transfer the filled buffer directly, with a view describing the used rows. After a successful commit the worker transfers its storage back in the acknowledgement. The controller accepts storage only for an outstanding sequence, checks its size and caps the spare pool at six buffers. Pending batches cannot be overwritten; duplicate acknowledgements cannot return active storage to the pool. Sparse-only batches do not take a full sample buffer. |
+| DuckDB numeric inserts | A single bounded workspace caches the last insert shape, its SQL string and fixed-size parameter array. Every parameter is overwritten before use; the serialized worker waits for the database call before reusing it. Row count or normalization-width changes replace the workspace. Transactions, NULL handling and sample indices remain authoritative. |
+| SQLite capture index | Cache the checkpoint SELECT and UPSERT statements per database with a WeakMap. Each acknowledgement still reads current XML ownership and persists the full current manifest; it never trusts a cached ownership decision. |
+| REST poller | Keep one request in flight and the existing replay safety checks, cadence and failure pauses. Compare parsed pit-menu state directly instead of creating JSON strings for change detection. Discard stale replies before domain parsing when no diagnostic sink needs them. HTTP failure excerpts stop concatenating after reaching their 8 KiB limit. |
+| HTTP SSE | Serialize each broadcast once and share its string among writable clients. Skip serialization when no client can receive it. Blocked clients retain the existing drop-until-drain behavior and receive the newest snapshot on drain. |
+
+Remaining allocations are intentional: worker message envelopes and independent decoded samples,
+manifest/observation serialization for durable provenance, native database bindings, REST body/JSON
+parsing, and one JSON string per delivered SSE event. Recording diagnostics add bounded serialization
+when enabled. Capture batching is still 50 samples or one second; no cadence was reduced to obtain
+these savings. Startup, off-track catalog discovery and learning projection refresh are separate from
+this driving path. The reader benchmark above does not quantify these additional changes; their
+regressions cover storage ownership, multi-chunk writes, XML link withdrawal and SSE backpressure.
+
+On the dashboard, stream messages update a last-received timestamp; one silence watchdog rechecks
+the remaining deadline instead of replacing a timer per event. The interpolated lap clock checks
+its published tenth before calling the React state setter. Pedal samples remain outside React state.
+
 ## Channels and clocks
 
 The recorder keeps only the 11 channels the app reads: ISO forward and left velocity (m/s) and yaw

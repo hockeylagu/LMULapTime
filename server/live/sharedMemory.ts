@@ -6,6 +6,8 @@ export interface MappedBuffer {
   readU32(offset: number): number;
   /** A copy of `length` bytes from `offset`. */
   read(offset: number, length: number): Buffer;
+  /** Copy into caller-owned storage without allocating a new buffer. */
+  readInto(offset: number, target: Buffer, targetOffset: number, length: number): void;
   close(): void;
 }
 
@@ -52,14 +54,41 @@ export function openMapping(name: string, size: number): MappedBuffer | null {
     return null;
   }
   const koffi = nodeRequire('koffi');
+  // Keep the external view private: no consumer can retain mapped memory after close().
+  // Snapshots still copy between the producer's version-counter checks.
+  let bytes: Buffer;
+  try { bytes = Buffer.from(koffi.view(view, size) as ArrayBuffer); }
+  catch (error: unknown) {
+    api.unmapViewOfFile(view);
+    api.closeHandle(handle);
+    throw error;
+  }
   let closed = false;
+  const checkRange = (offset: number, length: number): void => {
+    if (closed) throw new Error('Shared memory mapping is closed');
+    if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(length) || offset < 0 || length < 0 || offset > size - length) {
+      throw new RangeError('Shared memory read exceeds the mapping');
+    }
+  };
+  const readInto = (offset: number, target: Buffer, targetOffset: number, length: number): void => {
+    checkRange(offset, length);
+    if (!Number.isSafeInteger(targetOffset) || targetOffset < 0 || targetOffset > target.length - length) {
+      throw new RangeError('Shared memory read exceeds the destination');
+    }
+    bytes.copy(target, targetOffset, offset, offset + length);
+  };
   return {
     size,
-    readU32: offset => koffi.decode(view, offset, 'uint32_t') as number,
+    // Retain the native uint32 load for the producer's version counters rather than
+    // assembling a counter from separate byte reads while the producer may update it.
+    readU32: offset => { checkRange(offset, 4); return koffi.decode(view, offset, 'uint32_t') as number; },
     read: (offset, length) => {
-      const bytes = koffi.decode(view, offset, 'uint8_t', length) as Uint8Array;
-      return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.length);
+      checkRange(offset, length);
+      const result = Buffer.allocUnsafe(length);
+      readInto(offset, result, 0, length);
+      return result;
     },
+    readInto,
     close: () => {
       if (closed) return;
       closed = true;

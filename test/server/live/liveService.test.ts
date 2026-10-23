@@ -339,6 +339,23 @@ describe('LiveService', () => {
     expect(sink.events()).toEqual(['snapshot']);
   });
 
+  it('serializes each pedal broadcast once for multiple clients', () => {
+    const { service, frame } = setup();
+    const first = new FakeSink();
+    const second = new FakeSink();
+    service.addClient(first);
+    service.addClient(second);
+    frame(reading());
+    const stringify = vi.spyOn(JSON, 'stringify');
+    try {
+      frame(undefined, { t: 1, throttle: 0.5, brake: 0 });
+      vi.advanceTimersByTime(PEDAL_FLUSH_MS);
+      const pedalCalls = stringify.mock.calls.filter(([data]) => typeof data === 'object' && data !== null && 'samples' in data);
+      expect(pedalCalls).toHaveLength(1);
+      expect(first.chunks.at(-1)).toBe(second.chunks.at(-1));
+    } finally { stringify.mockRestore(); }
+  });
+
   it('sends a heartbeat to every page and stops its timers with the last one', () => {
     const { service } = setup();
     const sink = new FakeSink();

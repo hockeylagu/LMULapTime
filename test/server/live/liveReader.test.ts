@@ -393,7 +393,7 @@ describe('LiveReader', () => {
 
   it('closes a half-open pair when only one mapping exists', () => {
     const t = setup();
-    const scoringOnly = { size: 1, readU32: () => 0, read: () => Buffer.alloc(0), close: vi.fn() };
+    const scoringOnly = { size: 1, readU32: () => 0, read: () => Buffer.alloc(0), readInto: () => {}, close: vi.fn() };
     t.openMapping.mockImplementation(name => (name === SCORING_MAPPING_NAME ? scoringOnly : null));
     t.reader.start();
     expect(scoringOnly.close).toHaveBeenCalledTimes(1);

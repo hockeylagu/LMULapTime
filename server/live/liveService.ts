@@ -439,7 +439,7 @@ export class LiveService {
       this.pedals = [];
       this.pendingTiming = null;
     }
-    for (const sink of this.clients.keys()) this.send(sink, LIVE_STREAM_EVENTS.snapshot, this.snapshot);
+    this.broadcast(LIVE_STREAM_EVENTS.snapshot, this.snapshot);
     if (next.lifecycle !== previous.lifecycle) {
       this.followPitMode();
       this.events.emit('lifecycle', next.lifecycle);
@@ -496,7 +496,7 @@ export class LiveService {
     const batch: LivePedalBatch = { samples: this.pedals };
     this.pedals = [];
     if (!isLiveOnTrack(this.snapshot.lifecycle)) return;
-    for (const sink of this.clients.keys()) this.send(sink, LIVE_STREAM_EVENTS.pedals, batch);
+    this.broadcast(LIVE_STREAM_EVENTS.pedals, batch);
   }
 
   /** The newest current-lap progress, at most about 5 times a second, to pages that can take it. */
@@ -516,15 +516,24 @@ export class LiveService {
           lapStartEt: player.lapStartEt, timeIntoLap: player.timeIntoLap, lapDist: player.lapDist } : null,
       } }));
     }
-    for (const sink of this.clients.keys()) this.send(sink, LIVE_STREAM_EVENTS.timing, event);
+    this.broadcast(LIVE_STREAM_EVENTS.timing, event);
   }
 
   /** Writes to one page unless its buffer is full; a full buffer drops everything until it drains, then catches up with the snapshot. */
-  private send(sink: SseSink, event: string, data: unknown): void {
+  private broadcast(event: string, data: unknown): void {
+    let frame: string | undefined;
+    for (const [sink, client] of this.clients) {
+      if (client.blocked) continue;
+      frame ??= `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+      this.send(sink, event, data, frame);
+    }
+  }
+
+  private send(sink: SseSink, event: string, data: unknown, frame?: string): void {
     const client = this.clients.get(sink);
     if (!client || client.blocked) return;
     try {
-      if (writeSseEvent(sink, event, data)) return;
+      if (frame === undefined ? writeSseEvent(sink, event, data) : sink.write(frame)) return;
     } catch {
       this.removeClient(sink);
       return;
@@ -539,7 +548,7 @@ export class LiveService {
   private ensureTimers(): void {
     this.flushTimer ??= setInterval(() => { this.flushTiming(); this.flushPedals(); }, PEDAL_FLUSH_MS);
     this.heartbeatTimer ??= setInterval(() => {
-      for (const sink of this.clients.keys()) this.send(sink, LIVE_STREAM_EVENTS.heartbeat, { at: Date.now() });
+      this.broadcast(LIVE_STREAM_EVENTS.heartbeat, { at: Date.now() });
     }, LIVE_HEARTBEAT_MS);
     this.flushTimer.unref();
     this.heartbeatTimer.unref();

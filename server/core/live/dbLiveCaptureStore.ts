@@ -1,8 +1,11 @@
 import { isDeepStrictEqual } from 'node:util';
-import type { Database } from 'better-sqlite3';
+import type { Database, Statement } from 'better-sqlite3';
 import type { LiveCaptureManifest, SessionLiveCapture } from '../../../shared/types/liveCapture.js';
 
 export const LIVE_CAPTURE_MATCH_RULE_VERSION = 1;
+const checkpointStatements = new WeakMap<Database, {
+  current: Statement; write: Statement;
+}>();
 
 /** Available raw files only; retained provenance for deleted recordings is excluded. */
 export function getAvailableLiveCaptureCount(db: Database): number {
@@ -42,22 +45,29 @@ function manifestFromRow(row: IndexedRow): LiveCaptureManifest {
 /** Persists the manifest, preserving verified XML links; returns true for a newly available recording. */
 export function upsertLiveCapture(db: Database, manifest: LiveCaptureManifest, bytes: number, available = true): boolean {
   const filename = filenameOnly(manifest.filename);
-  const current = db.prepare('SELECT session_id, game_version, match_status, available FROM live_capture_index WHERE recording_id = ?')
+  let statements = checkpointStatements.get(db);
+  if (!statements) {
+    statements = {
+      current: db.prepare('SELECT session_id, game_version, match_status, available FROM live_capture_index WHERE recording_id = ?'),
+      write: db.prepare(`INSERT INTO live_capture_index
+        (recording_id, filename, manifest_json, bytes, available, session_id, game_version,
+         match_version, match_rule_version, match_status, started_at, ended_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)
+        ON CONFLICT(recording_id) DO UPDATE SET filename=excluded.filename, manifest_json=excluded.manifest_json,
+          bytes=excluded.bytes, available=excluded.available, session_id=excluded.session_id,
+          game_version=excluded.game_version, started_at=excluded.started_at, ended_at=excluded.ended_at,
+          updated_at=excluded.updated_at`),
+    };
+    checkpointStatements.set(db, statements);
+  }
+  const current = statements.current
     .get(manifest.recordingId) as { session_id: string | null; game_version: string | null; match_status: string; available: number } | undefined;
   // The persisted row is authoritative even when its link was explicitly withdrawn. A delayed writer
   // acknowledgement may update capture coverage, but it can never recreate a verified XML link.
   const sessionId = current?.session_id ?? null;
   const gameVersion = sessionId ? current?.game_version ?? null : null;
   const durable = { ...manifest, filename, sessionId, gameVersion };
-  db.prepare(`INSERT INTO live_capture_index
-    (recording_id, filename, manifest_json, bytes, available, session_id, game_version,
-     match_version, match_rule_version, match_status, started_at, ended_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)
-    ON CONFLICT(recording_id) DO UPDATE SET filename=excluded.filename, manifest_json=excluded.manifest_json,
-      bytes=excluded.bytes, available=excluded.available, session_id=excluded.session_id,
-      game_version=excluded.game_version,
-      started_at=excluded.started_at, ended_at=excluded.ended_at,
-      updated_at=excluded.updated_at`).run(
+  statements.write.run(
     manifest.recordingId, filename, JSON.stringify(durable), Math.max(0, Math.trunc(bytes)), Number(available),
     sessionId, gameVersion, LIVE_CAPTURE_MATCH_RULE_VERSION, current?.match_status ?? 'pending',
     manifest.startedAt, manifest.endedAt, Date.now(),

@@ -226,6 +226,7 @@ describe('telemetryRecorder tools', () => {
         size: 100,
         readU32: offset => (offset === 0 || offset === 4 ? 5 : 0),
         read: (offset, length) => mockBuf.subarray(offset, offset + length),
+        readInto: (offset, target, targetOffset, length) => { mockBuf.copy(target, targetOffset, offset, offset + length); },
         close: () => {},
       };
 
@@ -250,6 +251,7 @@ describe('telemetryRecorder tools', () => {
           return offset === 0 ? call : call + 1; // always mismatched
         },
         read: () => Buffer.alloc(100),
+        readInto: () => {},
         close: () => {},
       };
 
