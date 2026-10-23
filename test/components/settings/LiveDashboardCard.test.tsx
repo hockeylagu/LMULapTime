@@ -22,7 +22,7 @@ describe('LiveDashboardCard', () => {
   });
 
   it('loads and saves the shared pedal trace duration', async () => {
-    const fetchMock = vi.fn((_url: string, init?: RequestInit) => reply({ autoOpen: true, reserveLaps: 0.5, pedalTraceSeconds: 30,
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => reply({ autoOpen: true, reserveSeconds: 45, pedalTraceSeconds: 30,
       ...(init?.method === 'POST' ? JSON.parse(requestBody(init.body)) as Record<string, unknown> : {}) }));
     vi.stubGlobal('fetch', fetchMock);
     render(<LiveDashboardCard />);
@@ -35,7 +35,7 @@ describe('LiveDashboardCard', () => {
   });
 
   it('loads and saves the diagnostics setting, off by default', async () => {
-    const fetchMock = vi.fn((_url: string, init?: RequestInit) => reply({ autoOpen: true, reserveLaps: 0.5, pedalTraceSeconds: 30, diagnostics: false,
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => reply({ autoOpen: true, reserveSeconds: 45, pedalTraceSeconds: 30, diagnostics: false,
       ...(init?.method === 'POST' ? JSON.parse(requestBody(init.body)) as Record<string, unknown> : {}) }));
     vi.stubGlobal('fetch', fetchMock);
     render(<LiveDashboardCard />);

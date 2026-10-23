@@ -38,33 +38,34 @@ describe('live routes', () => {
   });
 
   it('reads the auto-open setting, on by default', async () => {
-    expect((await request(setup().app).get('/api/live/settings')).body).toEqual({ autoOpen: true, reserveLaps: 0.5, pedalTraceSeconds: 30, diagnostics: false });
-    expect((await request(setup('false').app).get('/api/live/settings')).body).toEqual({ autoOpen: false, reserveLaps: 0.5, pedalTraceSeconds: 30, diagnostics: false });
+    expect((await request(setup().app).get('/api/live/settings')).body).toEqual({ autoOpen: true, reserveSeconds: 45, pedalTraceSeconds: 30, diagnostics: false });
+    expect((await request(setup('false').app).get('/api/live/settings')).body).toEqual({ autoOpen: false, reserveSeconds: 45, pedalTraceSeconds: 30, diagnostics: false });
   });
 
   it('stores a valid auto-open setting', async () => {
     const { app, metadata } = setup();
     const response = await request(app).post('/api/live/settings').send({ autoOpen: false });
     expect(response.status).toBe(200);
-    expect(response.body).toEqual({ autoOpen: false, reserveLaps: 0.5, pedalTraceSeconds: 30, diagnostics: false });
+    expect(response.body).toEqual({ autoOpen: false, reserveSeconds: 45, pedalTraceSeconds: 30, diagnostics: false });
     expect(metadata.get('live_auto_open')).toBe('false');
   });
 
   it('stores the reserve alone, keeps auto-open, and hands the new reserve to the live service', async () => {
     const { app, live, metadata } = setup('false');
-    const reserve = vi.spyOn(live, 'setReserveLaps');
-    const response = await request(app).post('/api/live/settings').send({ reserveLaps: 1 });
-    expect(response.body).toEqual({ autoOpen: false, reserveLaps: 1, pedalTraceSeconds: 30, diagnostics: false });
-    expect(metadata.get('live_reserve_laps')).toBe('1');
-    expect(reserve).toHaveBeenCalledWith(1);
-    expect((await request(app).post('/api/live/settings').send({ reserveLaps: 0.3 })).status).toBe(400);
+    const reserve = vi.spyOn(live, 'setReserveSeconds');
+    const response = await request(app).post('/api/live/settings').send({ reserveSeconds: 30 });
+    expect(response.body).toEqual({ autoOpen: false, reserveSeconds: 30, pedalTraceSeconds: 30, diagnostics: false });
+    expect(metadata.get('live_reserve_seconds')).toBe('30');
+    expect(reserve).toHaveBeenCalledWith(30);
+    expect((await request(app).post('/api/live/settings').send({ reserveSeconds: 40 })).status).toBe(400);
+    expect((await request(app).post('/api/live/settings').send({ reserveLaps: 0.5 })).status).toBe(400);
   });
 
   it('persists trace duration independently and preserves the other settings', async () => {
     const { app, metadata } = setup('false');
-    metadata.set('live_reserve_laps', '1.5');
-    expect((await request(app).post('/api/live/settings').send({ pedalTraceSeconds: 60 })).body).toEqual({ autoOpen: false, reserveLaps: 1.5, pedalTraceSeconds: 60, diagnostics: false });
-    expect((await request(app).post('/api/live/settings').send({ pedalTraceSeconds: 25 })).body).toEqual({ autoOpen: false, reserveLaps: 1.5, pedalTraceSeconds: 25, diagnostics: false });
+    metadata.set('live_reserve_seconds', '90');
+    expect((await request(app).post('/api/live/settings').send({ pedalTraceSeconds: 60 })).body).toEqual({ autoOpen: false, reserveSeconds: 90, pedalTraceSeconds: 60, diagnostics: false });
+    expect((await request(app).post('/api/live/settings').send({ pedalTraceSeconds: 25 })).body).toEqual({ autoOpen: false, reserveSeconds: 90, pedalTraceSeconds: 25, diagnostics: false });
     expect(metadata.get('live_pedal_trace_seconds')).toBe('25');
     expect((await request(app).get('/api/live/settings')).body.pedalTraceSeconds).toBe(25);
     for (const pedalTraceSeconds of [0, -5, 31, 121, '60', null]) {
@@ -78,7 +79,7 @@ describe('live routes', () => {
     const capture = { directory: 'unused', status: () => ({ state: 'idle' }), diagnostics } as unknown as Pick<LiveCaptureController, 'directory' | 'status' | 'diagnostics'>;
     const { app, metadata } = setup(null, capture);
     const response = await request(app).post('/api/live/settings').send({ diagnostics: true });
-    expect(response.body).toEqual({ autoOpen: true, reserveLaps: 0.5, pedalTraceSeconds: 30, diagnostics: true });
+    expect(response.body).toEqual({ autoOpen: true, reserveSeconds: 45, pedalTraceSeconds: 30, diagnostics: true });
     expect(metadata.get('live_diagnostics')).toBe('true');
     expect(diagnostics.enabled).toBe(true);
     expect((await request(app).post('/api/live/settings').send({ diagnostics: 'yes' })).status).toBe(400);

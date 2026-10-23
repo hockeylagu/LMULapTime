@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { DEFAULT_LIVE_SETTINGS, PEDAL_TRACE_SECONDS_CHOICES, RESERVE_LAP_CHOICES } from '../../shared/types/live.js';
+import { DEFAULT_LIVE_SETTINGS, PEDAL_TRACE_SECONDS_CHOICES, RESERVE_SECONDS_CHOICES } from '../../shared/types/live.js';
 import { fetchLiveSettings } from './liveStream.js';
 
 /** Shared presentation preferences; the demo remains usable with defaults when the server is offline. */
@@ -16,9 +16,9 @@ export function useLiveDashboardSettings(enabled = true) {
       void fetchLiveSettings(current.signal).then(next => {
         if (current.signal.aborted) return;
         const pedalTraceSeconds = (PEDAL_TRACE_SECONDS_CHOICES as readonly number[]).includes(next.pedalTraceSeconds) ? next.pedalTraceSeconds : DEFAULT_LIVE_SETTINGS.pedalTraceSeconds;
-        const reserveLaps = (RESERVE_LAP_CHOICES as readonly number[]).includes(next.reserveLaps) ? next.reserveLaps : DEFAULT_LIVE_SETTINGS.reserveLaps;
-        if (latest.current.pedalTraceSeconds === pedalTraceSeconds && latest.current.reserveLaps === reserveLaps) return;
-        latest.current = { ...latest.current, pedalTraceSeconds, reserveLaps };
+        const reserveSeconds = (RESERVE_SECONDS_CHOICES as readonly number[]).includes(next.reserveSeconds) ? next.reserveSeconds : DEFAULT_LIVE_SETTINGS.reserveSeconds;
+        if (latest.current.pedalTraceSeconds === pedalTraceSeconds && latest.current.reserveSeconds === reserveSeconds) return;
+        latest.current = { ...latest.current, pedalTraceSeconds, reserveSeconds };
         setSettings(latest.current);
       }).catch(() => { /* Keep the last known preferences, or defaults while offline. */ });
     };

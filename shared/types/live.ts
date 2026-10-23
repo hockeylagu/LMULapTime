@@ -167,8 +167,11 @@ export interface LivePedalBatch {
 export interface LiveSettings {
   /** Switch an open app page to the dashboard when LMU starts. On by default. */
   autoOpen: boolean;
-  /** VE or fuel kept at the pit entry or the finish, in laps. Half a lap by default. */
-  reserveLaps: number;
+  /**
+   * VE or fuel kept at the pit entry and in what a stop loads, in seconds of driving: the plans turn it into laps at
+   * the player's pace (45 s is about a fifth of a Le Mans lap, two fifths of a 1:50 one). 45 s by default.
+   */
+  reserveSeconds: number;
   /** Seconds of throttle/brake history shown on the live dashboard and demo. */
   pedalTraceSeconds: number;
   /** Write a diagnostic JSONL file beside each recording, from the next session. Off by default. */
@@ -176,8 +179,8 @@ export interface LiveSettings {
 }
 
 export const PEDAL_TRACE_SECONDS_CHOICES = [5, 10, 15, 20, 25, 30, 45, 60, 90, 120] as const;
-export const RESERVE_LAP_CHOICES = [0, 0.25, 0.5, 0.75, 1, 1.5, 2] as const;
-export const DEFAULT_LIVE_SETTINGS: LiveSettings = { autoOpen: true, reserveLaps: 0.5, pedalTraceSeconds: 30, diagnostics: false };
+export const RESERVE_SECONDS_CHOICES = [0, 15, 30, 45, 60, 90, 120] as const;
+export const DEFAULT_LIVE_SETTINGS: LiveSettings = { autoOpen: true, reserveSeconds: 45, pedalTraceSeconds: 30, diagnostics: false };
 
 /** Server-sent event names on `GET /api/live/stream`. The data of each is JSON. */
 export const LIVE_STREAM_EVENTS = {

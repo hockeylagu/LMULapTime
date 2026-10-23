@@ -55,7 +55,7 @@ export interface LiveServiceOptions {
   /** Replaces the pit poller's REST read and clock (tests). */
   pit?: Pick<LivePitPollerOptions, 'get' | 'now'>;
   /** VE or fuel reserve in laps (the live settings); half a lap without it. Changed later with `setReserveLaps`. */
-  reserveLaps?: number;
+  reserveSeconds?: number;
   /** The stored pit lane loss per layout and class (`server/core/live/dbPitLaneStore.ts`); none without it. */
   pitLane?: {
     read(layoutKey: string, carClass: string): number | null;
@@ -123,7 +123,7 @@ export class LiveService {
   private replay = false;
   /** The last `session-loaded` value sent. */
   private sessionLoaded = false;
-  private reserveLaps: number;
+  private reserveSeconds: number;
   /** What keeps the pit in play for the poller (`setPitActive`): the standings' pit state and damage seen in the car. */
   private pitState: LivePitState = 'none';
   private carDamaged = false;
@@ -142,7 +142,7 @@ export class LiveService {
   public readonly firstReading = new Promise<void>(resolve => { this.markFirstReading = resolve; });
 
   public constructor(private readonly options: LiveServiceOptions = {}) {
-    this.reserveLaps = options.reserveLaps ?? DEFAULT_LIVE_SETTINGS.reserveLaps;
+    this.reserveSeconds = options.reserveSeconds ?? DEFAULT_LIVE_SETTINGS.reserveSeconds;
     this.identity = new LiveIdentityResolver({
       ...options.identity,
       personalBest: options.personalBest ?? (() => null),
@@ -176,9 +176,9 @@ export class LiveService {
     this.events.emit('game-running', running);
   }
 
-  /** The reserve setting changed: the plan follows at once. */
-  public setReserveLaps(laps: number): void {
-    this.reserveLaps = laps;
+  /** The reserve setting (seconds of driving) changed: the plan follows at once. */
+  public setReserveSeconds(seconds: number): void {
+    this.reserveSeconds = seconds;
     this.applyReading(this.lastReading);
   }
   public hasClients(): boolean { return this.clients.size > 0; }
@@ -435,7 +435,7 @@ export class LiveService {
       layoutKey: identity?.layoutKey ?? null,
       lapsLeft: details.lapsLeft,
       latestLap: details.recentLaps[details.recentLaps.length - 1] ?? null,
-      reserveLaps: this.reserveLaps,
+      reserveSeconds: this.reserveSeconds,
     });
     const next = {
       ...state, identity, ...details,

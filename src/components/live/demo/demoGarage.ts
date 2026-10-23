@@ -31,7 +31,7 @@ function player(snapshot: LiveSnapshot, lapSeconds: number): LiveVehicleReading 
  * garage, the race length (event schedule), the fuel ratio settings, the 12 s four-tyre change, and three earlier
  * races here. So the demo shows the real choice of source and the real plans, not figures set by hand.
  */
-export function demoGarageStrategy(snapshot: LiveSnapshot, input: { lapSeconds: number; raceMinutes: number; reserveLaps: number; setInGarage: number }): LiveStrategy | null {
+export function demoGarageStrategy(snapshot: LiveSnapshot, input: { lapSeconds: number; raceMinutes: number; reserveSeconds: number; setInGarage: number }): LiveStrategy | null {
   const session = snapshot.session;
   if (!session) return null;
   const carClass = snapshot.identity?.carClass ?? session.vehicleClass;
@@ -54,6 +54,6 @@ export function demoGarageStrategy(snapshot: LiveSnapshot, input: { lapSeconds: 
     raining: 0, avgPathWetness: 0, player: player(snapshot, input.lapSeconds), leader: null,
   };
   return tracker.update(reading, { lifecycle: snapshot.lifecycle, session }, {
-    carClass, layoutKey: snapshot.identity?.layoutKey ?? null, lapsLeft: null, latestLap: null, reserveLaps: input.reserveLaps,
+    carClass, layoutKey: snapshot.identity?.layoutKey ?? null, lapsLeft: null, latestLap: null, reserveSeconds: input.reserveSeconds,
   });
 }

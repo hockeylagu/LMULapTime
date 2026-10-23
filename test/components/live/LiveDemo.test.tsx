@@ -346,7 +346,7 @@ describe('offline live dashboard demo', () => {
 
   it('uses the saved trace duration in the corner demo and refreshes settings on focus', async () => {
     let seconds = 60;
-    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ autoOpen: true, reserveLaps: 1.5, pedalTraceSeconds: seconds }) })));
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ autoOpen: true, reserveSeconds: 90, pedalTraceSeconds: seconds }) })));
     window.location.hash = '#/live?demo=1&scenario=corners';
     render(<LiveDemoPage />);
     await waitFor(() => expect(screen.getByTestId('pedal-trace')).toHaveAttribute('data-window-seconds', '60'));
@@ -354,7 +354,8 @@ describe('offline live dashboard demo', () => {
     fireEvent(window, new Event('focus'));
     await waitFor(() => expect(screen.getByTestId('pedal-trace')).toHaveAttribute('data-window-seconds', '10'));
     pick(/Scenario/, 'garage-qualifying');
-    expect(screen.getByRole('region', { name: 'Session state' })).toHaveTextContent('30');
+    // The saved 90 s reserve, not the default 45 s: 28 % to set.
+    expect(screen.getByRole('region', { name: 'Session state' })).toHaveTextContent('TO SETIN GARAGEVEFROM YOUR RACES HERE28%');
     expect(FakeEventSource.instances).toHaveLength(0);
   });
 

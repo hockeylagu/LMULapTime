@@ -18,8 +18,8 @@ import { useLiveDashboardSettings } from '../../../api/useLiveDashboardSettings.
 
 const GROUPS = [...new Set(DEMO_SCENARIOS.map(s => s.group))];
 
-function buildDemo(scenario: string, carClass: string, reserveLaps: number, pedalTraceSeconds: number) {
-  const state = createDemoState(scenario, carClass, reserveLaps);
+function buildDemo(scenario: string, carClass: string, reserveSeconds: number, pedalTraceSeconds: number) {
+  const state = createDemoState(scenario, carClass, reserveSeconds);
   const timing = new LiveTimingStore();
   timing.set(state.timing);
   const buffer = new PedalBuffer(pedalTraceSeconds);
@@ -31,7 +31,7 @@ function buildDemo(scenario: string, carClass: string, reserveLaps: number, peda
 
 /** Explicit opt-in: mounts no game stream and needs no backend or recorded files. */
 export default function LiveDemoPage() {
-  const { reserveLaps, pedalTraceSeconds } = useLiveDashboardSettings();
+  const { reserveSeconds, pedalTraceSeconds } = useLiveDashboardSettings();
   const [params, setParams] = useSearchParams();
   const requested = params.get('scenario') ?? 'race';
   const requestedIndex = DEMO_SCENARIOS.findIndex(s => s.id === requested);
@@ -43,9 +43,9 @@ export default function LiveDemoPage() {
   const [animate, setAnimate] = useState(false);
   const [controls, setControls] = useState(params.get('controls') !== 'hidden');
   // The stores are mutable (the animation pushes pedal samples), so they live in state, rebuilt when the inputs change.
-  const demoKey = `${selected.id}|${carClass}|${reserveLaps}|${pedalTraceSeconds}`;
-  const [demo, setDemo] = useState(() => ({ key: demoKey, ...buildDemo(selected.id, carClass, reserveLaps, pedalTraceSeconds) }));
-  if (demo.key !== demoKey) setDemo({ key: demoKey, ...buildDemo(selected.id, carClass, reserveLaps, pedalTraceSeconds) });
+  const demoKey = `${selected.id}|${carClass}|${reserveSeconds}|${pedalTraceSeconds}`;
+  const [demo, setDemo] = useState(() => ({ key: demoKey, ...buildDemo(selected.id, carClass, reserveSeconds, pedalTraceSeconds) }));
+  if (demo.key !== demoKey) setDemo({ key: demoKey, ...buildDemo(selected.id, carClass, reserveSeconds, pedalTraceSeconds) });
   const { state, timing, buffer } = demo;
   const tyrePlan = demoTyrePlanFor(selected.id, carClass);
 

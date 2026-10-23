@@ -1,16 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import type { LiveSettings } from '../../../shared/types/live.js';
-import { DEFAULT_LIVE_SETTINGS, PEDAL_TRACE_SECONDS_CHOICES, RESERVE_LAP_CHOICES } from '../../../shared/types/live.js';
+import { DEFAULT_LIVE_SETTINGS, PEDAL_TRACE_SECONDS_CHOICES, RESERVE_SECONDS_CHOICES } from '../../../shared/types/live.js';
 import { apiErrorMessage, isAbortError } from '../../api/apiClient.js';
 import { fetchLiveSettings, saveLiveSettings } from '../../api/liveStream.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import { Select } from '../common/dropdown/Select.js';
 import { FeedbackMessage, SettingsPanel, type SettingsFeedback } from './SettingsPanel.js';
 
-/** VE or fuel kept at the pit entry or the finish (the server accepts these values only). */
-const RESERVE_OPTIONS = RESERVE_LAP_CHOICES.map(laps => ({
-  value: laps,
-  label: laps === 0 ? 'No reserve' : `${laps} ${laps === 1 ? 'lap' : 'laps'}`,
+/** VE or fuel kept at the pit entry and in a stop's load, in seconds of driving (the server accepts these values only). */
+const RESERVE_OPTIONS = RESERVE_SECONDS_CHOICES.map(seconds => ({
+  value: seconds,
+  label: seconds === 0 ? 'No reserve' : `${seconds} s of driving`,
 }));
 
 /** The live dashboard options: the page itself lives at `#/live`. */
@@ -70,11 +70,11 @@ export const LiveDashboardCard: React.FC = () => {
             Switch the open app to the live dashboard when LMU starts
           </label>
           <div className="flex items-center gap-3 text-sm text-lmu-text">
-            <label htmlFor="live-reserve">VE and fuel reserve at the pit entry and the finish</label>
+            <label htmlFor="live-reserve">VE and fuel reserve at the pit entry and in what a stop loads</label>
             <Select
               id="live-reserve"
-              value={settings?.reserveLaps ?? null}
-              onChange={(reserveLaps) => void save({ reserveLaps })}
+              value={settings?.reserveSeconds ?? null}
+              onChange={(reserveSeconds) => void save({ reserveSeconds })}
               options={RESERVE_OPTIONS}
               disabled={settings === null || isSaving}
               size="compact"

@@ -56,12 +56,14 @@ export function demoResult(): LiveSessionResult {
 export type DemoSprint = 'late' | 'early' | null;
 
 /** Keep illustrative clocks, history and resource plans consistent with the selected session. */
-export function configureDemoSession(snapshot: LiveSnapshot, timing: LiveTiming, sprint: DemoSprint, reserveLaps = 0.5, raceMinutes = sprint ? 20 : 60,
+export function configureDemoSession(snapshot: LiveSnapshot, timing: LiveTiming, sprint: DemoSprint, reserveSeconds = 45, raceMinutes = sprint ? 20 : 60,
   setInGarage: number | null = null): void {
   const session = snapshot.session;
   if (!session) return;
   const qualifying = session.kind === 'qualifying';
   const pace = snapshot.sessionBest?.lapSeconds ?? 96.6;
+  // The sample figures are set for half a lap; the setting's seconds are laps at the demo pace, as live.
+  const reserveLaps = Math.round(reserveSeconds / pace * 100) / 100;
   session.endSeconds = qualifying ? 600 : sprint ? 1200 : 3600;
   session.sessionCode = qualifying ? 5 : session.kind === 'race' ? 10 : 1;
   if (qualifying || sprint) {
@@ -124,7 +126,7 @@ export function configureDemoSession(snapshot: LiveSnapshot, timing: LiveTiming,
     snapshot.sessionBest = null;
     snapshot.lapsLeft = null;
     // The garage plan and the race strategy from the real live tracker, fed sample LMU answers (`demoGarage.ts`).
-    const planned = demoGarageStrategy(snapshot, { lapSeconds: pace, raceMinutes, reserveLaps, setInGarage: setInGarage ?? (qualifying ? 20 : 75) });
+    const planned = demoGarageStrategy(snapshot, { lapSeconds: pace, raceMinutes, reserveSeconds, setInGarage: setInGarage ?? (qualifying ? 20 : 75) });
     strategy.garage = planned?.garage ?? null;
     if (planned?.fuelRatio) strategy.fuelRatio = planned.fuelRatio;
   }

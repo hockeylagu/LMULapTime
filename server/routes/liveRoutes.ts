@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import type { Response } from 'express';
-import { APP_EVENTS, LIVE_HEARTBEAT_MS, PEDAL_TRACE_SECONDS_CHOICES, RESERVE_LAP_CHOICES } from '../../shared/types/live.js';
+import { APP_EVENTS, LIVE_HEARTBEAT_MS, PEDAL_TRACE_SECONDS_CHOICES, RESERVE_SECONDS_CHOICES } from '../../shared/types/live.js';
 import type { ServerContext } from '../core/serverContext.js';
 import type { LiveService } from '../live/liveService.js';
-import { isPedalTraceSeconds, isReserveLaps, loadLiveSettings, saveLiveSettings } from '../live/liveSettings.js';
+import { isPedalTraceSeconds, isReserveSeconds, loadLiveSettings, saveLiveSettings } from '../live/liveSettings.js';
 import { SSE_HEADERS, writeSseEvent } from '../live/sse.js';
 import type { LiveCaptureController } from '../live/capture/controller.js';
 import { LIVE_CAPTURE_CHANNELS } from '../live/capture/channels.js';
@@ -65,27 +65,27 @@ export function createLiveRouter(context: ServerContext, live: LiveService,
 
   // Any setting may be sent alone; the others keep their stored values.
   router.post('/live/settings', (req, res) => {
-    const body = (req.body ?? {}) as { autoOpen?: unknown; reserveLaps?: unknown; pedalTraceSeconds?: unknown; diagnostics?: unknown };
+    const body = (req.body ?? {}) as { autoOpen?: unknown; reserveSeconds?: unknown; pedalTraceSeconds?: unknown; diagnostics?: unknown };
     const current = loadLiveSettings(context.sessionDb);
-    if (body.autoOpen === undefined && body.reserveLaps === undefined && body.pedalTraceSeconds === undefined && body.diagnostics === undefined) {
-      return res.status(400).json({ error: 'Send autoOpen (true or false), reserveLaps, pedalTraceSeconds, or diagnostics (true or false).' });
+    if (body.autoOpen === undefined && body.reserveSeconds === undefined && body.pedalTraceSeconds === undefined && body.diagnostics === undefined) {
+      return res.status(400).json({ error: 'Send autoOpen (true or false), reserveSeconds, pedalTraceSeconds, or diagnostics (true or false).' });
     }
     if (body.autoOpen !== undefined && typeof body.autoOpen !== 'boolean') return res.status(400).json({ error: 'autoOpen must be true or false.' });
     if (body.diagnostics !== undefined && typeof body.diagnostics !== 'boolean') return res.status(400).json({ error: 'diagnostics must be true or false.' });
-    if (body.reserveLaps !== undefined && !isReserveLaps(body.reserveLaps)) {
-      return res.status(400).json({ error: `reserveLaps must be one of ${RESERVE_LAP_CHOICES.join(', ')}.` });
+    if (body.reserveSeconds !== undefined && !isReserveSeconds(body.reserveSeconds)) {
+      return res.status(400).json({ error: `reserveSeconds must be one of ${RESERVE_SECONDS_CHOICES.join(', ')}.` });
     }
     if (body.pedalTraceSeconds !== undefined && !isPedalTraceSeconds(body.pedalTraceSeconds)) {
       return res.status(400).json({ error: `pedalTraceSeconds must be one of ${PEDAL_TRACE_SECONDS_CHOICES.join(', ')}.` });
     }
     saveLiveSettings(context.sessionDb, {
       autoOpen: typeof body.autoOpen === 'boolean' ? body.autoOpen : current.autoOpen,
-      reserveLaps: isReserveLaps(body.reserveLaps) ? body.reserveLaps : current.reserveLaps,
+      reserveSeconds: isReserveSeconds(body.reserveSeconds) ? body.reserveSeconds : current.reserveSeconds,
       pedalTraceSeconds: isPedalTraceSeconds(body.pedalTraceSeconds) ? body.pedalTraceSeconds : current.pedalTraceSeconds,
       diagnostics: typeof body.diagnostics === 'boolean' ? body.diagnostics : current.diagnostics,
     });
     const saved = loadLiveSettings(context.sessionDb);
-    live.setReserveLaps(saved.reserveLaps);
+    live.setReserveSeconds(saved.reserveSeconds);
     if (capture?.diagnostics) capture.diagnostics.enabled = saved.diagnostics;
     res.json(saved);
   });

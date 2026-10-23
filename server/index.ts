@@ -140,7 +140,7 @@ async function refreshLiveCaptureLinks(discover = false): Promise<void> {
 const liveService = new LiveService({
   learning: automaticLearning,
   capture: liveCapture,
-  reserveLaps: loadLiveSettings(sessionDb).reserveLaps,
+  reserveSeconds: loadLiveSettings(sessionDb).reserveSeconds,
   personalBest: (layoutKey, carClass) =>
     queryLivePersonalBest(sessionDb.getDb(), serverContext.currentParser.configuredPlayerName, layoutKey, carClass),
   pitLane: {

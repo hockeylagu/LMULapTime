@@ -91,7 +91,7 @@ describe('LivePage', () => {
   });
 
   it('uses the saved pedal history duration in the real live dashboard', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ autoOpen: true, reserveLaps: 0.5, pedalTraceSeconds: 60 }) })));
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ autoOpen: true, reserveSeconds: 45, pedalTraceSeconds: 60 }) })));
     render(<LivePage />);
     send(snapshot({}));
     await waitFor(() => expect(screen.getByTestId('pedal-trace')).toHaveAttribute('data-window-seconds', '60'));

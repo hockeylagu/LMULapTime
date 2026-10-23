@@ -50,7 +50,8 @@ export interface LiveStrategyContext {
   lapsLeft: LiveLapsLeft | null;
   /** The newest completed lap of the session (it changes once per lap). */
   latestLap: LiveLapRecord | null;
-  reserveLaps: number;
+  /** The reserve setting, in seconds of driving (`LiveSettings.reserveSeconds`). */
+  reserveSeconds: number;
 }
 
 /** `sessions/weather` keys by session kind. */
@@ -275,7 +276,8 @@ export class LiveStrategyTracker {
     }
     const kind = liveResourceKind(context.carClass);
     this.kind = kind;
-    const resource = this.resource(kind, reading, state, context);
+    const reserveLaps = this.reserveLaps(context.reserveSeconds, reading);
+    const resource = this.resource(kind, reading, state, context, reserveLaps);
     const lapsLeft = context.lapsLeft?.laps ?? null;
     const tyres = this.tyres.tyres(this.car?.compound ?? null, this.condition, this.usage?.newSets ?? null);
     if (tyres.wearPerLap !== null && tyres.wearPerLap > 0) this.eventTyreWear = tyres.wearPerLap;
@@ -286,7 +288,7 @@ export class LiveStrategyTracker {
       tyres.coverage = tyreCoverage(tyres.worst, tyres.wearPerLap, toPit, lapsLeft - fraction, race?.finishReachable ? 'finish' : 'pit', tyres.newSets);
     }
     // The grid keeps the plan: before the start the driver can still go back to the garage and change the load.
-    const garage = state.lifecycle === 'garage' || state.lifecycle === 'starting' ? this.garagePlan(kind, reading, resource, context.reserveLaps) : null;
+    const garage = state.lifecycle === 'garage' || state.lifecycle === 'starting' ? this.garagePlan(kind, reading, resource, reserveLaps) : null;
     if (garage?.tyres && garage.laps !== null) garage.tyreCoverage = tyreCoverage(garage.tyres.wear, this.eventTyreWear, garage.laps, garage.laps, 'finish', garage.tyres.newSets);
     const fuelRatio = kind === 've' ? planFuelRatio({ ratios: this.ratios,
       fuelPerLap: this.ratios.length >= 3 ? this.perLap('fuel').perLap : this.gameEstimate('fuel'),
@@ -373,12 +375,23 @@ export class LiveStrategyTracker {
       ? { ...base, perLap: correction.perLap, learning: { baselinePerLap: base.perLap!, adjustment: correction.adjustment } } : base;
   }
 
-  private resource(kind: LiveResourceKind, reading: LiveScoringReading, state: LiveState, context: LiveStrategyContext): LiveResourcePlan {
+  /**
+   * The reserve setting as laps at the player's pace (the event's valid laps, else the game's estimate); half a lap
+   * while no lap time is known. Seconds keep a long lap from holding a large reserve (Le Mans race 2026-10-23: half a
+   * lap was 4 % VE, about 1.6 s of refuel, against a use that varied by 0.15 % a lap).
+   */
+  private reserveLaps(seconds: number, reading: LiveScoringReading): number {
+    const estimate = reading.player && reading.player.estimatedLapTime > 0 ? reading.player.estimatedLapTime : null;
+    const lapSeconds = median(this.eventLaps) ?? estimate;
+    return lapSeconds === null ? 0.5 : round(Math.max(0, seconds) / lapSeconds, 2);
+  }
+
+  private resource(kind: LiveResourceKind, reading: LiveScoringReading, state: LiveState, context: LiveStrategyContext,
+    reserveLaps: number): LiveResourcePlan {
     const player = reading.player;
     const amount = this.amount(kind);
     const capacity = this.capacity(kind);
     const usage = this.perLap(kind);
-    const reserveLaps = context.reserveLaps;
     const perLap = usage.perLap;
     const lapFraction = player && reading.trackLength > 0 ? Math.min(Math.max(player.lapDist / reading.trackLength, 0), 1) : 0;
     const lapsLeft = context.lapsLeft?.laps ?? null;

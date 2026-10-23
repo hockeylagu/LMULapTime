@@ -123,7 +123,7 @@ export const DEMO_SCENARIOS: readonly Scenario[] = [
   scenario('corners', 'Tentative previews', 'Corner speed · tentative', s => { s.session!.kind = 'practice'; }),
 ];
 
-export function createDemoState(id: string, carClass: string | null = 'GT3', reserveLaps = 0.5): DemoState {
+export function createDemoState(id: string, carClass: string | null = 'GT3', reserveSeconds = 45): DemoState {
   const selected = DEMO_SCENARIOS.find(s => s.id === id) ?? DEMO_SCENARIOS.find(s => s.id === 'race')!;
   const snapshot = demoSnapshot();
   snapshot.strategy = demoStrategy();
@@ -132,7 +132,7 @@ export function createDemoState(id: string, carClass: string | null = 'GT3', res
   configureDemoClass(snapshot, timing, carClass ?? 'GT3');
   const sprint: DemoSprint = selected.id === 'no-stop' ? 'early' : selected.id === 'sprint' || selected.id === 'garage-sprint' ? 'late' : null;
   // A light load for qualifying runs: practice says how many laps it holds instead of asking for more.
-  configureDemoSession(snapshot, timing, sprint, reserveLaps, sprint || selected.id === 'garage-qualifying-sprint' ? 20 : 60,
+  configureDemoSession(snapshot, timing, sprint, reserveSeconds, sprint || selected.id === 'garage-qualifying-sprint' ? 20 : 60,
     selected.id === 'garage-practice-light' ? 30 : null);
   const reference = snapshot.sessionBest?.lapSeconds;
   timing.lapEstimate = !timing.isOutLap && reference != null && timing.deltaSeconds != null ? {

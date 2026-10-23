@@ -21,7 +21,7 @@ function at(et: number, patch: Partial<LiveScoringReading> = {}): LiveScoringRea
 }
 
 const context = (tracker: LiveStrategyTracker, reading: LiveScoringReading, patch: Partial<LiveStrategyContext> = {}) =>
-  tracker.update(reading, deriveLiveState(reading, 'driving'), { carClass: 'GT3', layoutKey: null, lapsLeft: { laps: 30 - Math.floor(reading.currentEt / LAP), estimated: true }, latestLap: null, reserveLaps: 0.5, ...patch });
+  tracker.update(reading, deriveLiveState(reading, 'driving'), { carClass: 'GT3', layoutKey: null, lapsLeft: { laps: 30 - Math.floor(reading.currentEt / LAP), estimated: true }, latestLap: null, reserveSeconds: LAP / 2, ...patch });
 
 /** Drives from `from` to `to` seconds: a scoring reading each second, VE from standings every 3 s. */
 function drive(tracker: LiveStrategyTracker, from: number, to: number, layoutKey: string | null = null) {
@@ -166,6 +166,15 @@ describe('LiveStrategyTracker', () => {
     expect(context(tracker, at(0))?.pit).toMatchObject({ serviceSeconds: 6, serviceMaxSeconds: 8 });
   });
 
+  it('turns the reserve seconds into laps at the player pace, half a lap without a lap time', () => {
+    const tracker = new LiveStrategyTracker();
+    drive(tracker, 0, 450);
+    // Four 100 s laps measured: 45 s is 0.45 of a lap.
+    expect(context(tracker, at(460), { reserveSeconds: 45 })?.resource?.reserveLaps).toBe(0.45);
+    const garage = at(0, { inRealtime: false, gamePhase: 0, endEt: 64, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 0 }) });
+    expect(context(new LiveStrategyTracker(), garage, { reserveSeconds: 45, lapsLeft: null })?.garage?.reserveLaps).toBe(0.5);
+  });
+
   it('plans the garage load from the session length and the event lap time, beside the setting', () => {
     const tracker = new LiveStrategyTracker();
     tracker.applyRest({ type: 'tireManagement', vePerLap: 2.5, fuelPerLap: 2.1, newSets: 40, selected: null });
@@ -268,7 +277,7 @@ describe('LiveStrategyTracker', () => {
     const qualifying = { ...practice, sessionCode: 5 };
     expect(context(tracker, qualifying)?.garage?.raceStrategy).not.toBeNull();
     tracker.update(null, { lifecycle: 'menu', session: null }, { carClass: 'GT3', layoutKey: null,
-      lapsLeft: null, latestLap: null, reserveLaps: 0.5 });
+      lapsLeft: null, latestLap: null, reserveSeconds: LAP / 2 });
     // Another server with the same car and layout: no plan before its schedule, or after its practice-only answer.
     expect(context(tracker, practice)?.garage?.raceStrategy).toBeNull();
     tracker.applyRest({ type: 'schedule', raceMinutes: null, hasQualifying: false });
@@ -285,8 +294,9 @@ describe('LiveStrategyTracker', () => {
     // Three races here: 3 % a lap, and 2 % of tread a lap on mediums. The soft race's wear stays out.
     tracker.setRaceHistory([pastRace(2.9, 0.019, 'Medium'), pastRace(3.1, 0.021, 'Medium'), pastRace(3, 0.05, 'Soft')]);
     const garage = context(tracker, qualifying, { lapsLeft: null })?.garage;
+    // The 50 s reserve is two thirds of a 1:15 lap: (12 + 0.67) x 3 = 38.01, set as 39.
     expect(garage?.raceStrategy).toMatchObject({
-      chosen: { loadStart: 38, treadAtFlag: 0.76 }, basis: { use: 'history', wear: 'history', races: 3 } });
+      chosen: { loadStart: 39, treadAtFlag: 0.76 }, basis: { use: 'history', wear: 'history', races: 3 } });
     // The garage load and the whole dashboard use the same history, not the game's estimate.
     expect(garage).toMatchObject({ perLap: 3, perLapSource: 'history' });
     // Another layout or class: no history.
@@ -304,7 +314,7 @@ describe('LiveStrategyTracker', () => {
     const tracker = new LiveStrategyTracker();
     drive(tracker, 0, 450);
     const menu = at(460);
-    expect(tracker.update(menu, deriveLiveState(menu, 'driving', 'menu'), { carClass: 'GT3', layoutKey: null, lapsLeft: null, latestLap: null, reserveLaps: 0.5 })).toBeNull();
+    expect(tracker.update(menu, deriveLiveState(menu, 'driving', 'menu'), { carClass: 'GT3', layoutKey: null, lapsLeft: null, latestLap: null, reserveSeconds: LAP / 2 })).toBeNull();
     // Back from the menu with the same car on the same track: the event's measured use is kept.
     expect(context(tracker, at(10))?.resource).toMatchObject({ perLap: 3, lapsMeasured: 3 });
     const other = at(10, { trackName: 'Bahrain International Circuit' });

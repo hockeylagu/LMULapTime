@@ -134,7 +134,7 @@ Voice selection is left to the browser, with the original English (`en-GB`) lang
   page with the lifecycle states and the real pedal trace. No pit maths, damage or MFD figures.
 - **Per-lap target:** clean laps of the current event; until there are enough, the driver's
   past laps on the same layout, class and conditions, labelled as such.
-- **Reserve:** half a lap of VE or fuel by default, configurable in Settings.
+- **Reserve:** 45 s of driving by default (Settings: 0–120 s), turned into laps at the player's pace (the event's valid laps, else the game's estimate; half a lap while none is known). Seconds, not laps: at Le Mans (2026-10-23) half a lap was 4 % VE against a use that varied by 0.15 % a lap; 45 s is about 0.2 of a Le Mans lap and 0.4 of a 1:50 one.
 - **`· MFD` values:** show what is needed; switch to the MFD's own meaning (target after the
   stop or amount to add) once the garage reads verify it.
 - **Qualifying:** keeps next attempt and tyre surface temperature; fuel and VE cells dropped.
