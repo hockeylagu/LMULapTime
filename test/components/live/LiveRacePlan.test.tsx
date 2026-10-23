@@ -27,7 +27,7 @@ describe('racePlanView', () => {
     expect(texts(withRace({}))).toEqual({
       mode: 'stint',
       action: 'VE / LAP · LAST 5|2.5|%|+0.2 % SPARE / LAP',
-      cells: ['PIT IN|6|', 'TYRES · MEDIUM|91|', 'VE NOW|62|'],
+      cells: ['PIT IN|6|MFD · VE 38%', 'TYRES · MEDIUM|91|MFD · NEW MEDIUM', 'VE NOW|62|'],
     });
     expect(racePlanView(withRace({ sparePerLap: -0.3 })).action).toMatchObject({ tone: 'loss', note: '−0.3 % OVER / LAP' });
     // The compound word carries the sidewall colour; the tread figure stays plain.
@@ -44,6 +44,34 @@ describe('racePlanView', () => {
     expect(racePlanView(withRace({ pitInLaps: 0 })).action).toMatchObject({ label: 'PIT', value: 'THIS LAP' });
     const short = racePlanView(withRace({ pitInLaps: 1, neededAfterStop: 62 }));
     expect(short.cells[0]).toMatchObject({ value: '62', note: 'SET 50% · RAISE', noteTone: 'loss' });
+  });
+
+  it('keeps the next target and MFD tyre setting through pit exit, and retains extra-stop counts', () => {
+    const snapshot = structuredClone(withRace({ stopsAfterNext: 1 }));
+    snapshot.strategy!.pit!.state = 'exiting';
+    expect(racePlanView(snapshot).cells[0]).toMatchObject({ note: 'MFD · VE 38%', detail: '+1 MORE STOP' });
+    snapshot.strategy!.resource!.race!.stopsAfterNext = 2;
+    expect(racePlanView(snapshot).cells[0].detail).toBe('+2 MORE STOPS');
+    expect(racePlanView(snapshot).cells[1]).toMatchObject({ note: 'MFD · NEW MEDIUM', compoundNote: true });
+  });
+
+  it('uses litres for fuel targets and marks absent MFD tyre reads without inventing settings', () => {
+    const snapshot = structuredClone(withRace({ neededAfterStop: 42.5 }));
+    Object.assign(snapshot.strategy!.resource!, { kind: 'fuel', unit: 'L' });
+    snapshot.strategy!.pit!.mfd = null;
+    expect(racePlanView(snapshot).cells[0].note).toBe('MFD · FUEL 42.5L');
+    expect(racePlanView(snapshot).cells[1]).toMatchObject({ note: 'MFD NOT READ', noteTone: 'muted' });
+    snapshot.strategy!.pit!.mfd = { resourceValue: null, resourceText: null, tyres: null, repair: null };
+    expect(racePlanView(snapshot).cells[1].note).toBe('MFD NOT READ');
+  });
+
+  it('keeps tread and set warnings visible alongside the mid-stint MFD call', () => {
+    const snapshot = structuredClone(withRace({}));
+    snapshot.strategy!.tyres!.coverage = { target: 'pit', projectedTread: .35, setsNeeded: 2, availableSetsCover: false };
+    expect(racePlanView(snapshot).cells[1]).toMatchObject({ note: 'MFD · NEW MEDIUM', detail: 'LOW TREAD · SETS SHORT', tone: 'loss', detailTone: 'loss' });
+    snapshot.strategy!.tyres!.coverage = null;
+    snapshot.strategy!.tyres!.newSets = 0;
+    expect(racePlanView(snapshot).cells[1]).toMatchObject({ note: 'MFD · NEW MEDIUM', detail: 'NO NEW SETS' });
   });
 
   it('shows a pending penalty as a stop-and-go with the repair kept for the stop after', () => {
@@ -113,6 +141,8 @@ describe('race page with a plan', () => {
     const plan = screen.getByTestId('live-race-plan');
     expect(plan).toHaveAttribute('data-mode', 'stint');
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('2.5%');
+    expect(screen.getByTestId('live-race-cell-1')).toHaveTextContent('MFD · VE 38%');
+    expect(screen.getByTestId('live-race-cell-2')).toHaveTextContent('MFD · NEW MEDIUM');
     send({ ...withRace({ pitInLaps: 2 }), sequence: 2 });
     expect(screen.getByTestId('live-race-plan')).toBe(plan);
     expect(plan).toHaveAttribute('data-mode', 'pit');

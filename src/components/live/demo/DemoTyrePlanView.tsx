@@ -3,14 +3,14 @@ import type { LiveTimingStore } from '../../../api/liveStream.js';
 import type { LiveSnapshot } from '../../../../shared/types/live.js';
 import { LivePedalTrace } from '../LivePedalTrace.js';
 import { LivePracticeHistory } from '../LivePracticeHistory.js';
-import { LiveSessionBar } from '../LiveSessionBar.js';
+import { LiveSessionBar, liveStatus } from '../LiveSessionBar.js';
 import { LiveStateScreen } from '../LiveStateScreen.js';
 import { liveScreen } from '../liveScreens.js';
 import { LiveRacePlan } from '../race/LiveRacePlan.js';
 import { CompoundText } from '../race/CompoundText.js';
+import { LiveDamageRow } from '../race/LiveDamageRow.js';
 import type { PedalBuffer } from '../pedalBuffer.js';
 import { racePlanView } from '../race/raceAction.js';
-import { formatAmount, resourceName } from '../race/livePlanFormat.js';
 import { LiveStrategySpeech } from '../display/LiveStrategySpeech.js';
 import { planChangeCall, type DemoStopCall, type DemoTyrePlan } from './demoTyrePlan.js';
 import { demoLapStart, showsStrategy } from './strategyWindow.js';
@@ -47,20 +47,12 @@ function DemoStrategyDriving({ snapshot, store, buffer, plan }: { snapshot: Live
     () => showsStrategy(buffer.visible, demoLapStart(buffer.latest ?? 0)));
   const view = racePlanView(snapshot);
   const cells = view.cells.map(cell => ({ ...cell, ...plan.cells?.[cell.label] })) as typeof view.cells;
-  const resource = snapshot.strategy?.resource;
-  // Preview the next MFD target mid-stint; the shared pit view expands the setup below three laps.
-  if (view.mode === 'stint' && resource?.race) {
-    const countdown = cells.find(cell => cell.label === 'PIT IN');
-    if (countdown) {
-      const target = resource.kind === 've' && plan.next ? plan.next.ve : resource.race.neededAfterStop;
-      countdown.note = target === null && plan.next ? 'MFD · NO VE' : `MFD · ${resourceName(resource.kind)} ${formatAmount(target, resource.unit)}${resource.unit}`;
-      if (resource.race.stopsAfterNext > 0) countdown.detail ??= `+${resource.race.stopsAfterNext} MORE STOPS`;
-    }
-  }
+  const damage = snapshot.strategy?.damage?.significant ? snapshot.strategy.damage : null;
   return <>
-    <LiveSessionBar snapshot={snapshot} connection="live" />
+    {damage ? <LiveDamageRow damage={damage} lapsLeft={snapshot.lapsLeft?.laps ?? null} status={liveStatus(snapshot, 'live', true)} />
+      : <LiveSessionBar snapshot={snapshot} connection="live" />}
     <LiveRacePlan view={{ ...view, cells }} store={store} />
-    <LivePracticeHistory laps={snapshot.recentLaps} best={snapshot.sessionBest} store={store} completedRows={2} estimate />
+    <LivePracticeHistory laps={snapshot.recentLaps} best={snapshot.sessionBest} store={store} completedRows={damage ? 1 : 2} estimate />
     <div className="h-[294px] shrink-0 overflow-hidden border-t border-lmu-border pt-3">
       {strip && plan.next ? <PlanChangeStrip reason={plan.reason} next={plan.next} /> : <LivePedalTrace buffer={buffer} />}
     </div>

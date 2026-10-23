@@ -37,18 +37,16 @@ const QUALI_CHECK: Pick<DemoTyrePlan, 'check' | 'noSoft'> = {
 };
 
 export const DEMO_TYRE_PLANS: Record<string, DemoTyrePlan> = {
-  race: { cells: { TYRES: { note: 'MFD · NEW MEDIUM', compoundNote: true } } },
-  'pit-three': { cells: { TYRES: { note: 'MFD · NEW MEDIUM', compoundNote: true } } },
   'strategy-changed': {
     reason: 'TYRES WEARING FAST',
     next: { lap: 19, ve: 72, tyres: 'NEW MED', changed: 'tyres' },
-    cells: { TYRES: { note: 'MFD · NEW MEDIUM', compoundNote: true, detail: 'PLAN CHANGED', detailTone: 'warn' } },
+    cells: { 'PIT IN': { note: 'MFD · VE 72%' }, TYRES: { note: 'MFD · NEW MEDIUM', compoundNote: true, detail: 'PLAN CHANGED', detailTone: 'warn' } },
   },
   // Using less VE per lap than planned: the stop moves two laps and needs less, the tyres stand.
   'strategy-changed-ve': {
     reason: 'USING LESS VE',
     next: { lap: 21, ve: 58, tyres: 'NO CHANGE', changed: 've' },
-    cells: { 'PIT IN': { detail: 'PLAN CHANGED', detailTone: 'warn' }, TYRES: { note: 'MFD · NO CHANGE' } },
+    cells: { 'PIT IN': { note: 'MFD · VE 58%', detail: 'PLAN CHANGED', detailTone: 'warn' }, TYRES: { note: 'MFD · NO CHANGE' } },
   },
   'tyre-strategy-quali': QUALI_CHECK,
 };

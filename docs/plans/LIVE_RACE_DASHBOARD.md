@@ -51,13 +51,17 @@ green; qualifying plans are never saved). The session's strategy debrief reads i
 link and shows it beside what the native telemetry measured: stops and pit lap, the start load, the load leaving
 the last stop, the tyres at each stop, the racing laps and the tread at the flag. No verdict is drawn yet.
 
-## Next-stop MFD preview in the demo (2026-10-23)
+## Persistent next-stop MFD information (2026-10-23)
 
-Demo only: mid-stint (`race`) and three laps out (`pit-three`) show the next VE/fuel target beneath
-the pit countdown and the tyre call beneath current tread. At fewer than three laps, the existing
+Approved for the live dashboard: race stints with another stop planned (including pit exit) always show the next VE/fuel target beneath
+the pit countdown and the MFD tyre call beneath current tread. Compound words retain their sidewall colour.
+At fewer than three laps, the existing
 pit view expands to the resource target versus the current MFD setting, fuel ratio where applicable,
 tyres and estimated service time. `pit-soon`, `pit-one` and `pit-this-lap` preview that transition.
-Plan-change previews use the same VE target in the countdown and the change strip.
+Both information lines reserve their height even when empty, preventing labels and values from moving
+when an extra-stop count or warning appears. Spare per lap stays close beneath the consumption value.
+The shared race view serves live snapshots and ordinary demo scenarios; only tentative plan-change
+previews override the sample targets. Missing MFD tyre reads are explicit, and tread/set warnings remain visible.
 
 ## Strategy voice proof of concept (2026-10-22)
 
@@ -172,8 +176,10 @@ critique. The placement brief, at 2560 x 1440, read in glances:
 - **Race, pit coming:** `PIT IN 2 LAPS` (then `PIT THIS LAP`), `VE · MFD` or `FUEL · MFD`
   and `TYRES · MFD` (`NEW MEDIUM`, `NEW WET`, `NO CHANGE`, compound coloured, forecast note
   under it); then the history table as in practice.
-- **Race, mid-stint (accepted):** `VE / LAP · LAST 3` with spare per lap, `PIT IN 6 LAPS`, `TYRES TO
-  PIT OK`, rain lap when forecast. **No stop needed (sprint, most races):** the estimated lap
+- **Race, mid-stint (accepted 2026-10-23):** `VE / LAP · LAST 5` with spare per lap, `PIT IN 6 LAPS`
+  with the next VE/fuel MFD target beneath, tyre tread with the MFD tyre call in compound colours,
+  and fuel ratio where applicable (otherwise the no-stop target, forecast or resource now).
+  Extra stops and tyre warnings use the reserved second information line. **No stop needed (sprint, most races):** the estimated lap
   leads, with the projected resource at the finish and the tyres secondary. Every race mode is
   followed by the practice history table (2026-10-20); the place sits in the session bar.
 - **Damage:** a red alert row takes the session bar's place: `PACE LOSS · MEASURED` (median of laps either side),

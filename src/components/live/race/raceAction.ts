@@ -227,6 +227,15 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
       cells: executionCells(false),
     };
   }
+  const stintTyres = tyresCell(tyres);
+  const coverage = tyres?.coverage;
+  // The MFD call has its own line; keep tread/set warnings on the reserved second line.
+  stintTyres.detail = coverage && coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR && coverage.availableSetsCover === false
+    ? 'LOW TREAD · SETS SHORT' : stintTyres.detail ?? stintTyres.note;
+  stintTyres.detailTone = stintTyres.detail ? 'loss' : undefined;
+  stintTyres.note = pit?.mfd?.tyres ? `MFD · ${tyreCallText(pit.mfd.tyres)}` : 'MFD NOT READ';
+  stintTyres.noteTone = pit?.mfd?.tyres ? undefined : 'muted';
+  stintTyres.compoundNote = true;
   return {
     mode: 'stint',
     action: {
@@ -238,8 +247,10 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
       noteTone: marginTone(race.sparePerLap),
     },
     cells: [
-      { label: 'PIT IN', value: `${pitInLaps}`, unit: lapsUnit(pitInLaps), note: race.stopsAfterNext > 0 ? `+${race.stopsAfterNext} MORE ${race.stopsAfterNext === 1 ? 'STOP' : 'STOPS'}` : undefined },
-      tyresCell(tyres),
+      { label: 'PIT IN', value: `${pitInLaps}`, unit: lapsUnit(pitInLaps),
+        note: `MFD · ${name} ${formatAmount(race.neededAfterStop, unit)}${unit}`,
+        detail: race.stopsAfterNext > 0 ? `+${race.stopsAfterNext} MORE ${race.stopsAfterNext === 1 ? 'STOP' : 'STOPS'}` : undefined },
+      stintTyres,
       ratioCell ?? (saving && saving.savePercent > 0 ? { label: 'NO-STOP TARGET', value: saving.targetPerLap.toFixed(2), unit: `${unit}/lap`, note: `${saving.savePercent}% LESS USE`, detail: saving.source === 'game' ? 'GAME ESTIMATE' : undefined } : forecastCell(forecast, resource)),
     ],
   };

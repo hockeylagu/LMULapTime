@@ -221,7 +221,7 @@ describe('offline live dashboard demo', () => {
 
   it('previews the next MFD setup mid-stint and expands it below three laps', () => {
     render(<LiveDemoPage />);
-    for (const id of ['race', 'pit-three']) {
+    for (const id of ['race', 'pit-three', 'pit-exiting', 'overuse', 'multi-stop', 'rain']) {
       pick(/Scenario/, id);
       const resource = createDemoState(id).snapshot!.strategy!.resource!;
       expect(screen.getByTestId('live-race-plan')).toHaveAttribute('data-mode', 'stint');

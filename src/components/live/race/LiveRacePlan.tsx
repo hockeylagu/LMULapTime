@@ -4,6 +4,7 @@ import { LiveEstimatedLap } from '../LiveEstimatedLap.js';
 import { RACE_COLUMN, RACE_LEAD, RACE_ROW, RULED } from '../raceColumns.js';
 import type { RacePlanView, PlanReadout, PlanTone } from './raceAction.js';
 import { COMPOUND_CLASS } from './livePlanFormat.js';
+import { CompoundText } from './CompoundText.js';
 
 const TONE: Record<Exclude<PlanTone, null>, string> = {
   gain: 'text-lmu-gain',
@@ -27,7 +28,7 @@ function Readout({ readout, size, testId, children }: { readout: PlanReadout; si
   const Value = size === 'action' ? 'h1' : 'div';
   return (
     <div data-testid={testId} className="min-w-0">
-      {/* Label, value and note always hold their lines, so a mode change never moves the row. */}
+      {/* Reserve both info lines even when empty, keeping labels and values still as advice changes. */}
       <h2 className={LABEL}>
         {readout.label}{readout.labelAccent && <> · <span className={tone(readout.labelAccentTone)}>{readout.labelAccent}</span></>}
       </h2>
@@ -35,8 +36,10 @@ function Readout({ readout, size, testId, children }: { readout: PlanReadout; si
         {children ?? readout.value}
         {readout.unit && <span className="ml-3 text-[56px] font-normal text-lmu-text-soft">{readout.unit}</span>}
       </Value>
-      <p className={`${NOTE} ${tone(readout.noteTone)}`}>{readout.note ?? ''}</p>
-      {readout.detail && <p className={`whitespace-nowrap text-[40px] font-semibold ${tone(readout.detailTone ?? 'muted')}`}>{readout.detail}</p>}
+      <p className={`${NOTE} ${size === 'action' && !words ? 'relative -top-[48px]' : ''} ${tone(readout.noteTone)}`}>
+        {readout.compoundNote ? <CompoundText text={readout.note ?? ''} /> : readout.note ?? ''}
+      </p>
+      <p className={`h-[60px] whitespace-nowrap text-[40px] font-semibold ${tone(readout.detailTone ?? 'muted')}`}>{readout.detail ?? ''}</p>
     </div>
   );
 }
