@@ -1,5 +1,6 @@
 import type { SessionStrategy } from '../../types/index.js';
 import type { LiveResourceKind } from '../../types/liveStrategy.js';
+import { median } from '../pitStops.js';
 
 /** The player's newest races on a layout in a class the race strategy learns from. */
 export const STRATEGY_HISTORY_RACES = 5;
@@ -13,13 +14,6 @@ export interface StrategyHistoryEstimate {
   useRaces: number;
   wearRaces: number;
 }
-
-const median = (values: readonly number[]): number | null => {
-  if (values.length === 0) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = sorted.length >> 1;
-  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
-};
 
 /**
  * What earlier races on the same layout in the same class measured, for a race plan made before the event has a

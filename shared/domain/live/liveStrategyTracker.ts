@@ -11,6 +11,7 @@ import { liveResourceKind, planGarage, planRace, resourceUnit } from './liveReso
 import { LiveUsageMeter } from './liveUsage.js';
 import { planFuelRatio, savingToFinish, tyreCoverage } from './liveInsights.js';
 import { RAIN_WET_MIN } from '../lapConditions.js';
+import { median } from '../pitStops.js';
 import type { LiveUsageObservation } from '../../types/liveAudit.js';
 import { classLeaderLapSeconds, raceClockRunning } from './liveLapsLeft.js';
 import { plannedServiceSeconds, refuelBase, refuelSeconds } from './livePitTime.js';
@@ -65,12 +66,6 @@ const GREEN = 5;
 const DRY_AGAIN_MAX = 7;
 
 const round = (value: number, digits: number): number => Math.round(value * 10 ** digits) / 10 ** digits;
-const median = (values: readonly number[]): number | null => {
-  if (values.length === 0) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  const middle = sorted.length >> 1;
-  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
-};
 
 /**
  * Builds the `strategy` part of the snapshot from the scoring readings, the player's telemetry (fuel, damage,
