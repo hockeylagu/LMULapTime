@@ -249,7 +249,7 @@ export class LiveService {
   }
 
   private handleMessage(message: unknown): void {
-    if (!isWorkerMessage<LiveReaderMessage>(message, ['frame', 'navigation', 'closed', 'process', 'diagnostic'])) return;
+    if (!isWorkerMessage<LiveReaderMessage>(message, ['frame', 'capture', 'navigation', 'closed', 'process', 'diagnostic'])) return;
     if (message.type === 'diagnostic') {
       this.record(() => this.options.capture?.diagnostics?.record(message.event));
       return;
@@ -258,6 +258,11 @@ export class LiveService {
       this.record(() => this.options.capture?.diagnostics?.record({ kind: 'game-process', at: Date.now(), data: message }));
       this.processRunning = message.running;
       this.publishRunning();
+      return;
+    }
+    if (message.type === 'capture') {
+      const { batch } = message;
+      if (!this.isReplaying() && this.snapshot.session?.inRealtime) this.record(() => this.options.capture?.samples(batch));
       return;
     }
     this.markFirstReading();
@@ -291,15 +296,12 @@ export class LiveService {
     else if (message.car) this.applyReading(this.lastReading);
     if (message.scoring) this.followPlayer(before, message.scoring.player);
     if (message.pedal) this.bufferPedal(message.pedal);
-    const { capture, car } = message;
-    this.record(() => {
-      if (capture && this.snapshot.session?.inRealtime) this.options.capture?.sample(capture);
-      if (car) this.options.capture?.observe({ source: 'shared-memory', kind: 'car-condition',
-        elapsedSeconds: message.pedal?.t ?? this.lastReading?.currentEt ?? null, receivedAt: Date.now(), data: {
-          fuelCapacityLitres: car.fuelCapacityLiters,
-          dents: car.dentSeverity, detached: car.detached, lastImpactEt: car.lastImpactEt, compound: car.compound,
-        } });
-    });
+    const { car } = message;
+    if (car) this.record(() => this.options.capture?.observe({ source: 'shared-memory', kind: 'car-condition',
+      elapsedSeconds: message.pedal?.t ?? this.lastReading?.currentEt ?? null, receivedAt: Date.now(), data: {
+        fuelCapacityLitres: car.fuelCapacityLiters,
+        dents: car.dentSeverity, detached: car.detached, lastImpactEt: car.lastImpactEt, compound: car.compound,
+      } }));
   }
 
   /**
@@ -367,7 +369,8 @@ export class LiveService {
       const menu = { ...deriveLiveState(reading, previous.lifecycle, 'menu'), identity: null, ...NO_SESSION_DETAILS,
         loadingProgress: null, strategy: null, result: null, qualifyingResult: null, audit: previous.audit ?? null };
       this.pendingTiming = null;
-      if (contentKey(menu) !== this.snapshotKey) this.publish(menu);
+      const key = contentKey(menu);
+      if (key !== this.snapshotKey) this.publish(menu, key);
       return;
     }
     this.lastReading = reading;
@@ -421,19 +424,20 @@ export class LiveService {
       status: captureStatus.state === 'unavailable' ? 'unavailable' as const : 'recording' as const,
     } : null };
     this.pendingTiming = this.clients.size > 0 && isLiveOnTrack(state.lifecycle) ? this.tracker.timing() : null;
-    if (contentKey(audited) === this.snapshotKey) {
+    const key = contentKey(audited);
+    if (key === this.snapshotKey) {
       // The session clock moves every frame; it alone is not a change worth a snapshot.
       if (previous.session && next.session) previous.session = { ...previous.session, elapsedSeconds: next.session.elapsedSeconds };
       return;
     }
-    this.publish(audited);
+    this.publish(audited, key);
   }
 
-  /** Makes `next` the current snapshot and sends it to every page. */
-  private publish(next: Omit<LiveSnapshot, 'sequence' | 'receivedAt'>): void {
+  /** Makes `next` the current snapshot and sends it to every page; `key` is its content key when already built. */
+  private publish(next: Omit<LiveSnapshot, 'sequence' | 'receivedAt'>, key = contentKey(next)): void {
     const previous = this.snapshot;
     this.snapshot = { ...next, sequence: previous.sequence + 1, receivedAt: Date.now() };
-    this.snapshotKey = contentKey(next);
+    this.snapshotKey = key;
     this.publishRunning();
     if (!isLiveOnTrack(next.lifecycle)) {
       this.pedals = [];

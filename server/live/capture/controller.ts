@@ -8,7 +8,7 @@ import {
   LIVE_CAPTURE_PENDING_BATCHES, LIVE_CAPTURE_FINALIZATION_SLOTS,
 } from '../../../shared/types/liveCapture.js';
 import type {
-  LiveCaptureBatch, LiveCaptureManifest, LiveCaptureObservation, LiveCaptureSample, LiveCaptureStatus, LiveCaptureWriteResult,
+  LiveCaptureBatch, LiveCaptureManifest, LiveCaptureObservation, LiveCaptureSampleBatch, LiveCaptureStatus, LiveCaptureWriteResult,
   LiveCaptureCatalogEntry,
 } from '../../../shared/types/liveCapture.js';
 import { LiveAuditTracker } from '../../../shared/domain/live/liveAudit.js';
@@ -18,6 +18,7 @@ import type { LiveDiagnostics } from './diagnostics.js';
 import { resolvedCaptureFilename } from './maintenance/filenames.js';
 
 const BATCH_SAMPLES = 50;
+const TERRAIN_CORNERS = ['FL', 'FR', 'RL', 'RR'] as const;
 const MAX_OBSERVATIONS = 200;
 const MAX_OBSERVATION_BYTES = 256_000;
 const FLUSH_MS = 1000;
@@ -129,35 +130,46 @@ export class LiveCaptureController {
     if (usage) this.audit?.update(snapshot, reading, usage, this.now());
   }
 
-  public sample(sample: LiveCaptureSample): void {
-    const manifest = this.manifest;
-    if (!manifest || this.stopped || this.error) return;
-    if (!Number.isFinite(sample.elapsedSeconds) || sample.elapsedSeconds < 0 || sample.elapsedSeconds <= this.lastSample
-      || !Number.isSafeInteger(sample.lapNumber) || sample.lapNumber < 0 || sample.values.length !== LIVE_CAPTURE_SAMPLE_WIDTH - 3) return;
-    if (sample.impact) this.observe({ source: 'shared-memory', kind: 'impact',
-      elapsedSeconds: sample.impact.elapsedSeconds, receivedAt: this.now(),
-      data: { impactElapsedSeconds: sample.impact.elapsedSeconds, magnitude: sample.impact.magnitude } });
-    if (sample.terrainMaterials?.length === 4) sample.terrainMaterials.forEach((rawName, corner) => {
-      if (rawName === this.terrainMaterials[corner]) return;
-      this.observe({ source: 'shared-memory', kind: 'terrain-change', elapsedSeconds: sample.elapsedSeconds,
-        receivedAt: this.now(), data: { corner: ['FL', 'FR', 'RL', 'RR'][corner], rawName } });
-      this.terrainMaterials[corner] = rawName;
-    });
-    if (this.pending.size >= LIVE_CAPTURE_PENDING_BATCHES || this.sampleCount >= BATCH_SAMPLES) {
-      manifest.droppedSamples++;
-      return;
+  /** Takes the reader's rows in order; each row's sparse terrain and impact are observed even when the row itself is refused. */
+  public samples(batch: LiveCaptureSampleBatch): void {
+    const { rows, sparse } = batch;
+    let next = 0;
+    for (let row = 0, from = 0; from + LIVE_CAPTURE_SAMPLE_WIDTH <= rows.length; row++, from += LIVE_CAPTURE_SAMPLE_WIDTH) {
+      const manifest = this.manifest;
+      if (!manifest || this.stopped || this.error) return;
+      const elapsedSeconds = rows[from];
+      const lapNumber = rows[from + 1];
+      const changes = sparse[next]?.row === row ? sparse[next++] : undefined;
+      if (changes?.impact) this.observe({ source: 'shared-memory', kind: 'impact',
+        elapsedSeconds: changes.impact.elapsedSeconds, receivedAt: this.now(),
+        data: { impactElapsedSeconds: changes.impact.elapsedSeconds, magnitude: changes.impact.magnitude } });
+      if (changes?.terrainMaterials?.length === 4) this.observeTerrain(changes.terrainMaterials, elapsedSeconds);
+      if (!Number.isFinite(elapsedSeconds) || elapsedSeconds < 0 || elapsedSeconds <= this.lastSample
+        || !Number.isSafeInteger(lapNumber) || lapNumber < 0) continue;
+      if (this.pending.size >= LIVE_CAPTURE_PENDING_BATCHES || this.sampleCount >= BATCH_SAMPLES) {
+        manifest.droppedSamples++;
+        continue;
+      }
+      this.lastSample = elapsedSeconds;
+      const buffer = this.buffer;
+      const to = this.sampleCount * LIVE_CAPTURE_SAMPLE_WIDTH;
+      for (let index = 0; index < LIVE_CAPTURE_SAMPLE_WIDTH; index++) buffer[to + index] = rows[from + index];
+      this.sampleCount++;
+      manifest.samples++;
+      manifest.lastElapsedSeconds = Math.max(manifest.lastElapsedSeconds, elapsedSeconds);
+      manifest.updatedAt = Math.max(manifest.updatedAt, this.now());
+      if (this.sampleCount === BATCH_SAMPLES) this.flush();
     }
-    this.lastSample = sample.elapsedSeconds;
-    const at = this.sampleCount * LIVE_CAPTURE_SAMPLE_WIDTH;
-    this.buffer[at] = sample.elapsedSeconds;
-    this.buffer[at + 1] = sample.lapNumber;
-    this.buffer[at + 2] = sample.lapStartSeconds ?? NaN;
-    this.buffer.set(sample.values, at + 3);
-    this.sampleCount++;
-    manifest.samples++;
-    manifest.lastElapsedSeconds = Math.max(manifest.lastElapsedSeconds, sample.elapsedSeconds);
-    manifest.updatedAt = Math.max(manifest.updatedAt, this.now());
-    if (this.sampleCount === BATCH_SAMPLES) this.flush();
+  }
+
+  private observeTerrain(materials: string[], elapsedSeconds: number): void {
+    for (let corner = 0; corner < 4; corner++) {
+      const rawName = materials[corner];
+      if (rawName === this.terrainMaterials[corner]) continue;
+      this.observe({ source: 'shared-memory', kind: 'terrain-change', elapsedSeconds,
+        receivedAt: this.now(), data: { corner: TERRAIN_CORNERS[corner], rawName } });
+      this.terrainMaterials[corner] = rawName;
+    }
   }
 
   public observe(observation: LiveCaptureObservation): void {

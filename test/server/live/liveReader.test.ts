@@ -5,6 +5,9 @@ import { SCORING, SCORING_MAPPING_NAME, TELEMETRY, TELEMETRY_MAPPING_NAME, VEHIC
 import type { MappedBuffer } from '../../../server/live/sharedMemory.js';
 import { scoringBuffer, source, telemetryBuffer } from './rf2Fixtures.js';
 import type { GameProcessProbe } from '../../../server/live/gameProcess.js';
+import { LIVE_CAPTURE_ROW_CAPACITY } from '../../../server/live/capture/decode.js';
+import { LIVE_CAPTURE_SAMPLE_WIDTH } from '../../../shared/types/liveCapture.js';
+import type { LiveCaptureSparseRow } from '../../../shared/types/liveCapture.js';
 
 const PLAYER = { id: 12, isPlayer: true, place: 4, totalLaps: 8, name: 'Ferrari 296 GT3', className: 'GT3' };
 
@@ -20,11 +23,28 @@ function setup(probe: () => Promise<GameProbe> = () => Promise.resolve('session'
     return name === SCORING_MAPPING_NAME ? mappingOf(() => scoring, closes.scoring) : mappingOf(() => telemetry, closes.telemetry);
   });
   const reader = new LiveReader({ openMapping, probeGame: vi.fn(probe), process, capture, post: message => posted.push(message) });
+  let scoringVersion = 100;
   return {
     reader, posted, openMapping, closes, available,
     setScoring: (buffer: Buffer) => { scoring = buffer; },
+    /** A new scoring version of the same session: the pending capture rows go out before it. */
+    flushCapture: async () => { scoring = scoringBuffer(scoringVersion += 2, [PLAYER]); await vi.advanceTimersByTimeAsync(20); },
     setTelemetry: (buffer: Buffer) => { telemetry = buffer; },
   };
+}
+
+/** Every posted capture row: its session seconds and sparse changes, in posting order. */
+function capturedRows(posted: LiveReaderMessage[]): Array<Omit<LiveCaptureSparseRow, 'row'> & { elapsedSeconds: number }> {
+  return posted.flatMap(message => {
+    if (message.type !== 'capture') return [];
+    const { rows, sparse } = message.batch;
+    return Array.from({ length: rows.length / LIVE_CAPTURE_SAMPLE_WIDTH }, (_, row) => {
+      const change = sparse.find(item => item.row === row);
+      return { elapsedSeconds: rows[row * LIVE_CAPTURE_SAMPLE_WIDTH],
+        ...(change?.terrainMaterials ? { terrainMaterials: change.terrainMaterials } : {}),
+        ...(change?.impact ? { impact: change.impact } : {}) };
+    });
+  });
 }
 
 const lastNavigation = (posted: LiveReaderMessage[]): LiveReaderMessage | undefined =>
@@ -44,7 +64,7 @@ describe('LiveReader', () => {
     answer = 'session';
     t.setScoring(scoringBuffer(4, [PLAYER], { currentEt: 0, inRealtime: false }));
     await vi.advanceTimersByTimeAsync(PROBE_MS + 100);
-    expect(t.posted).toContainEqual(expect.objectContaining({ type: 'frame', capture: null,
+    expect(t.posted).toContainEqual(expect.objectContaining({ type: 'frame',
       scoring: expect.objectContaining({ currentEt: 0, inRealtime: false }) }));
     const frames = t.posted.filter(item => item.type === 'frame').length;
     await vi.advanceTimersByTimeAsync(PROBE_MS);
@@ -66,24 +86,26 @@ describe('LiveReader', () => {
         base + VEHICLE_TELEMETRY.offsets.wheels + corner * WHEEL.size + WHEEL.offsets.terrainName, 'latin1');
       t.setTelemetry(buffer);
       await vi.advanceTimersByTimeAsync(40);
-      const message = t.posted.findLast(item => item.type === 'frame' && item.capture?.elapsedSeconds === et);
-      if (!message || message.type !== 'frame') throw new Error('Missing capture frame');
-      return message;
+      await t.flushCapture();
+      const frame = t.posted.findLast(item => item.type === 'frame' && item.pedal?.t === et);
+      const row = capturedRows(t.posted).findLast(item => item.elapsedSeconds === et);
+      if (!frame || frame.type !== 'frame' || !row) throw new Error('Missing capture row');
+      return { car: frame.car, row };
     };
     try {
-      expect((await post(6, 101, 'ROAD', 100.9)).capture?.terrainMaterials).toEqual(['ROAD', 'ROAD', 'ROAD', 'ROAD']);
+      expect((await post(6, 101, 'ROAD', 100.9)).row.terrainMaterials).toEqual(['ROAD', 'ROAD', 'ROAD', 'ROAD']);
       const repeated = await post(8, 101.04, 'ROAD', 100.9);
       expect(repeated.car).toBeUndefined();
-      expect(repeated.capture?.terrainMaterials).toBeUndefined();
-      expect(repeated.capture?.impact).toBeUndefined();
+      expect(repeated.row.terrainMaterials).toBeUndefined();
+      expect(repeated.row.impact).toBeUndefined();
       const changed = await post(10, 101.08, 'GRVL', 101.07);
       expect(changed.car).toBeUndefined();
-      expect(changed.capture?.terrainMaterials).toEqual(['GRVL', 'GRVL', 'GRVL', 'GRVL']);
-      expect(changed.capture?.impact).toEqual({ elapsedSeconds: 101.07, magnitude: 12.5 });
+      expect(changed.row.terrainMaterials).toEqual(['GRVL', 'GRVL', 'GRVL', 'GRVL']);
+      expect(changed.row.impact).toEqual({ elapsedSeconds: 101.07, magnitude: 12.5 });
       await vi.advanceTimersByTimeAsync(500);
       const checkpoint = await post(12, 101.7, 'GRVL', 101.07);
       expect(checkpoint.car).toBeDefined();
-      expect(checkpoint.capture?.terrainMaterials).toEqual(['GRVL', 'GRVL', 'GRVL', 'GRVL']);
+      expect(checkpoint.row.terrainMaterials).toEqual(['GRVL', 'GRVL', 'GRVL', 'GRVL']);
     } finally { t.reader.stop(); }
   });
 
@@ -93,19 +115,23 @@ describe('LiveReader', () => {
     t.available.value = true;
     t.reader.start();
     await vi.advanceTimersByTimeAsync(PROBE_MS + 50);
-    expect(t.posted.filter(m => m.type === 'frame').every(m => m.type === 'frame' && !m.capture)).toBe(true);
+    await t.flushCapture();
+    expect(capturedRows(t.posted)).toEqual([]);
     answer = 'session';
     await vi.advanceTimersByTimeAsync(PROBE_MS);
     t.setTelemetry(telemetryBuffer(6, [{ id: 12, et: 101, throttle: 0, brake: 0 }]));
     await vi.advanceTimersByTimeAsync(40);
-    expect(t.posted.some(m => m.type === 'frame' && m.capture?.elapsedSeconds === 101)).toBe(true);
+    await t.flushCapture();
+    expect(capturedRows(t.posted).some(row => row.elapsedSeconds === 101)).toBe(true);
     t.posted.length = 0;
     answer = 'busy';
     t.setScoring(scoringBuffer(4, [PLAYER], { currentEt: 10 }));
     await vi.advanceTimersByTimeAsync(CUE_PROBE_MS + 100);
     t.setTelemetry(telemetryBuffer(8, [{ id: 12, et: 10, throttle: 0, brake: 0 }]));
     await vi.advanceTimersByTimeAsync(40);
-    expect(t.posted.filter(m => m.type === 'frame').every(m => m.type === 'frame' && !m.capture)).toBe(true);
+    t.setScoring(scoringBuffer(6, [PLAYER], { currentEt: 10 }));
+    await vi.advanceTimersByTimeAsync(20);
+    expect(capturedRows(t.posted)).toEqual([]);
     t.reader.stop();
   });
 
@@ -115,14 +141,47 @@ describe('LiveReader', () => {
     t.available.value = true;
     t.reader.start();
     await vi.advanceTimersByTimeAsync(PROBE_MS + 50);
-    expect(t.posted.some(m => m.type === 'frame' && m.scoring && m.capture === null)).toBe(true);
+    expect(t.posted.some(m => m.type === 'frame' && m.scoring)).toBe(true);
+    expect(capturedRows(t.posted)).toEqual([]);
     answer = 'session';
     await vi.advanceTimersByTimeAsync(PROBE_MS);
     answer = 'busy';
     await vi.advanceTimersByTimeAsync(PROBE_MS);
     t.setTelemetry(telemetryBuffer(6, [{ id: 12, et: 101, throttle: 0, brake: 0 }]));
     await vi.advanceTimersByTimeAsync(40);
-    expect(t.posted.some(m => m.type === 'frame' && m.capture?.elapsedSeconds === 101)).toBe(true);
+    await t.flushCapture();
+    expect(capturedRows(t.posted).some(row => row.elapsedSeconds === 101)).toBe(true);
+    t.reader.stop();
+  });
+
+  it('posts capture rows before the scoring change or notice that follows them, and when the batch is full', async () => {
+    let answer: GameProbe = 'session';
+    const t = setup(async () => answer, undefined, true);
+    t.available.value = true;
+    t.reader.start();
+    await vi.advanceTimersByTimeAsync(PROBE_MS + 50);
+    t.posted.length = 0;
+    for (let index = 0; index < LIVE_CAPTURE_ROW_CAPACITY; index++) {
+      t.setTelemetry(telemetryBuffer(10 + 2 * index, [{ id: 12, et: 200 + index, throttle: 0, brake: 0 }]));
+      await vi.advanceTimersByTimeAsync(20);
+    }
+    // Full: posted after the frame of its last row, without waiting for scoring.
+    expect(t.posted.slice(-2).map(message => message.type)).toEqual(['frame', 'capture']);
+    expect(capturedRows(t.posted)).toHaveLength(LIVE_CAPTURE_ROW_CAPACITY);
+
+    t.setTelemetry(telemetryBuffer(100, [{ id: 12, et: 300, throttle: 0, brake: 0 }]));
+    await vi.advanceTimersByTimeAsync(20);
+    t.posted.length = 0;
+    await t.flushCapture();
+    expect(t.posted.map(message => message.type)).toEqual(['capture', 'frame']);
+    expect(capturedRows(t.posted).map(row => row.elapsedSeconds)).toEqual([300]);
+
+    t.setTelemetry(telemetryBuffer(102, [{ id: 12, et: 301, throttle: 0, brake: 0 }]));
+    await vi.advanceTimersByTimeAsync(20);
+    t.posted.length = 0;
+    answer = 'replay';
+    await vi.advanceTimersByTimeAsync(PROBE_MS);
+    expect(t.posted.slice(0, 2).map(message => message.type)).toEqual(['capture', 'navigation']);
     t.reader.stop();
   });
 

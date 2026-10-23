@@ -7,7 +7,7 @@ import { expect, it } from 'vitest';
 import { LiveService } from '../../../../server/live/liveService.js';
 import type { LiveWorker } from '../../../../server/live/liveService.js';
 import { LiveCaptureController } from '../../../../server/live/capture/controller.js';
-import { decodeLiveCaptureSample } from '../../../../server/live/capture/decode.js';
+import { LiveCaptureRows } from '../../../../server/live/capture/decode.js';
 import { VEHICLE_TELEMETRY, WHEEL } from '../../../../server/live/rf2Layout.js';
 import { LIVE_CAPTURE_CHANNELS } from '../../../../server/live/capture/channels.js';
 import { SessionDatabase } from '../../../../server/core/db.js';
@@ -59,8 +59,10 @@ it('persists recorded memory values through service, real worker, rediscovery an
     const upgradePackHex = '004280ff000102030405060708090a0b';
     service.start();
     reader.emit('message', { type: 'frame', scoring: scoringReading({ currentEt: 69.2,
-      player: vehicleReading({ driverName: 'Fixture Driver', vehicleName: 'Ferrari 296 GT3', upgradePackHex }) }),
-    capture: decodeLiveCaptureSample(slot) });
+      player: vehicleReading({ driverName: 'Fixture Driver', vehicleName: 'Ferrari 296 GT3', upgradePackHex }) }) });
+    const rows = new LiveCaptureRows();
+    rows.add(slot, true);
+    reader.emit('message', { type: 'capture', batch: rows.take() });
     expect(service.hasClients()).toBe(false);
     expect(capture.status().samples).toBe(1);
     await service.stop();

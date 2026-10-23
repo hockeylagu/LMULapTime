@@ -8,15 +8,21 @@ export const LIVE_CAPTURE_SAMPLE_WIDTH = 14;
 export const LIVE_CAPTURE_PENDING_BATCHES = 4;
 export const LIVE_CAPTURE_FINALIZATION_SLOTS = 2;
 
-export interface LiveCaptureSample {
-  elapsedSeconds: number;
-  lapNumber: number;
-  lapStartSeconds: number | null;
-  /** Eleven values in LIVE_CAPTURE_CHANNELS order. NaN means unavailable, never measured zero. */
-  values: Float64Array;
-  /** Raw per-corner material names, preserving the source's truncation; omitted when unchanged. */
+/**
+ * Capture rows packed by the shared memory reader, in sample order. Each row is LIVE_CAPTURE_SAMPLE_WIDTH values:
+ * session seconds, lap number, lap-start seconds, then LIVE_CAPTURE_CHANNELS. NaN means unavailable, never measured zero.
+ */
+export interface LiveCaptureSampleBatch {
+  rows: Float64Array;
+  /** The rows whose sparse source state changed, or carry the periodic checkpoint, in row order. */
+  sparse: LiveCaptureSparseRow[];
+}
+
+export interface LiveCaptureSparseRow {
+  row: number;
+  /** Raw per-corner material names, preserving the source's truncation. */
   terrainMaterials?: string[];
-  /** Last source impact; omitted when unavailable/unchanged. Magnitude has no invented physical unit. */
+  /** Last source impact. Magnitude has no invented physical unit. */
   impact?: { elapsedSeconds: number; magnitude: number | null };
 }
 

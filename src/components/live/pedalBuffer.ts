@@ -36,9 +36,13 @@ export class PedalBuffer {
       const from = newest - this.windowSeconds - 1;
       let drop = 0;
       while (drop < this.samples.length - 1 && this.samples[drop].t < from) drop += 1;
-      if (drop > 0) this.samples.splice(0, drop);
       const maxSamples = this.windowSeconds * 100 + 600;
-      if (this.samples.length > maxSamples) this.samples.splice(0, this.samples.length - maxSamples);
+      drop = Math.max(drop, this.samples.length - maxSamples);
+      // Shifted in place: splice would allocate an array of the dropped samples on every batch.
+      if (drop > 0) {
+        this.samples.copyWithin(0, drop);
+        this.samples.length -= drop;
+      }
     }
     this.listeners.forEach((listener) => listener());
   }

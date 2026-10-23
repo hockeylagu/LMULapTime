@@ -42,7 +42,8 @@ async function probeGame(): Promise<GameProbe> {
 if (parentPort) {
   const port = parentPort;
   const reader = new LiveReader({ openMapping, probeGame, process: createGameProcessProbe(), capture: true,
-    post: message => port.postMessage(message) });
+    // Capture rows own their buffer: it is moved to the main thread, not copied.
+    post: message => message.type === 'capture' ? port.postMessage(message, [message.batch.rows.buffer as ArrayBuffer]) : port.postMessage(message) });
   port.on('message', (message: unknown) => {
     if (!isWorkerMessage<{ type: 'stop' }>(message, ['stop'])) return;
     reader.stop();

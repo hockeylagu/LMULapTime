@@ -9,10 +9,12 @@ This separate synchronous workload uses private synthetic Windows mappings and t
 `openMapping`/coherent decoders (ordinary buffers off Windows). It never opens the game's mappings,
 REST endpoints or application database. No browser or running backend is required.
 
-It warms 10,000 ticks, collects garbage, then measures 200,000 ticks: 50 Hz telemetry with capture,
-5 Hz scoring for 64 cars and a 2 Hz car-condition decode request. Set `LIVE_ALLOCATION_TICKS` to
-change the measured count. The original decoder ignores the car-cadence argument and decodes it
-at 50 Hz. A checksum consumes both streams. Minor collection counts/durations come from Node's
+Two phases each warm 10,000 ticks, collect garbage, then measure 200,000 ticks of 50 Hz telemetry,
+5 Hz scoring for 64 cars and a 2 Hz car-condition decode. Set `LIVE_ALLOCATION_TICKS` to change the
+measured count. `decode` calls the coherent decoders alone. `reader+transport` drives the production
+`LiveReader` tick (capture confirmed, no navigation probe) and passes every message through
+`structuredClone` with the worker's transfer list, so it includes the reader's message shaping and the
+worker boundary's serialization and deserialization. Minor collection counts/durations come from Node's
 GC performance observer; mapping read counters distinguish allocating copies from reused copies.
 
 On 2026-10-22, one before/after run on this Windows host (Node v24.21.0) produced:
@@ -33,6 +35,22 @@ pipeline is allocation-free. Independent decoded samples and worker/SSE transpor
 The loop compresses 4,000 seconds of nominal polling into a burst: GC heap sizing, wall-clock
 cadence, producer races, disk writes and browser behavior differ during an actual LMU session.
 It does not measure the reader's JSON suppression or navigation/cadence scheduling changes.
+
+Later on 2026-10-22, the capture rows were moved out of the 50 Hz frame into packed, transferred
+batches (see `docs/LIVE_CAPTURE_FORMAT.md`). The two-phase benchmark, two runs each on the same host:
+
+| `reader+transport` phase | Per-frame capture | Packed batches |
+|---|---:|---:|
+| Elapsed time | 2,294–2,380 ms | 1,710–1,767 ms |
+| Minor collections | 210 | 167–168 |
+| Minor collection duration | 17.7–18.4 ms | 14.8–15.6 ms |
+| Worker messages | 200,000 | 220,000 (200,000 frames + 20,000 batches) |
+| Transferred bytes | 0 | 56,000,000 |
+
+The `decode` phase (decoders without capture) stayed at 580–648 ms and 67–74 minor collections.
+In a CPU profile of the new code, `structuredClone` of the remaining frame messages is the largest
+single cost (about a quarter), followed by the 5 Hz scoring decode. Both runs simulate 4,000 seconds
+of driving, so the whole reader path costs well under 1 ms of CPU per second of real time.
 
 ## Dashboard harness
 

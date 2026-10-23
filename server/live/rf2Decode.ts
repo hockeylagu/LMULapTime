@@ -1,8 +1,6 @@
 import type { LiveCarReading } from '../../shared/domain/live/liveCarCondition.js';
 import type { LiveScoringReading, LiveVehicleReading } from '../../shared/domain/live/liveLifecycle.js';
 import type { LivePedalSample } from '../../shared/types/live.js';
-import type { LiveCaptureSample } from '../../shared/types/liveCapture.js';
-import { decodeLiveCaptureSample } from './capture/decode.js';
 import { knownCarClass } from '../../shared/domain/vehicleMapping.js';
 import { MAX_MAPPED_VEHICLES, SCORING, SCORING_BUFFER, SCORING_INFO, TELEMETRY, VEHICLE_SCORING, VEHICLE_TELEMETRY, WHEEL } from './rf2Layout.js';
 import type { MappedBuffer } from './sharedMemory.js';
@@ -169,17 +167,20 @@ function decodeCar(slot: Buffer): LiveCarReading {
 
 export interface PedalSlot {
   id: number; sample: LivePedalSample; tyreSurfaceAvgC: number | null; car: LiveCarReading | null;
-  capture?: LiveCaptureSample | null;
+}
+
+/** Takes the player's coherent slot for durable capture; `checkpoint` is set on the car cadence. */
+export interface CaptureSink {
+  add(slot: Buffer, checkpoint: boolean): void;
 }
 
 /** One telemetry vehicle slot (VEHICLE_TELEMETRY.size bytes): its id, the driver's unfiltered pedals at its session time, the tyre surface temperature and the car. */
-export function decodePedalSlot(slot: Buffer, capture = false, car = true): PedalSlot {
+export function decodePedalSlot(slot: Buffer, car = true): PedalSlot {
   const at = VEHICLE_TELEMETRY.offsets;
   return {
     id: slot.readInt32LE(at.id),
     tyreSurfaceAvgC: tyreSurfaceAverage(slot),
     car: car ? decodeCar(slot) : null,
-    ...(capture ? { capture: decodeLiveCaptureSample(slot) } : {}),
     sample: {
       t: slot.readDoubleLE(at.elapsedTime),
       throttle: clamp01(slot.readDoubleLE(at.unfilteredThrottle)),
@@ -217,9 +218,12 @@ export function readScoringFrame(source: FrameSource, lastVersion: number | null
   return result.status === 'ok' ? { status: 'ok', version: result.version, value: decodeScoring(target) } : result;
 }
 
-/** The player's pedal sample, tyre temperature and car; `slot` is where the player was found, to look there first next time. A missing player gives a null sample and car. */
+/**
+ * The player's pedal sample, tyre temperature and car; `slot` is where the player was found, to look there first next time.
+ * A missing player gives a null sample and car. The coherent slot also goes to `capture`, when given.
+ */
 export function readPedalFrame(source: FrameSource, playerId: number, lastVersion: number | null,
-  slotHint: number, capture = false, car = true): FrameRead<{ slot: number; sample: LivePedalSample | null; tyreSurfaceAvgC: number | null; car: LiveCarReading | null; capture?: LiveCaptureSample | null }> {
+  slotHint: number, capture: CaptureSink | null = null, car = true): FrameRead<{ slot: number; sample: LivePedalSample | null; tyreSurfaceAvgC: number | null; car: LiveCarReading | null }> {
   let buffer = telemetryCopies.get(source);
   if (!buffer) { buffer = Buffer.allocUnsafe(TELEMETRY.vehicleStride); telemetryCopies.set(source, buffer); }
   const target = buffer;
@@ -236,10 +240,11 @@ export function readPedalFrame(source: FrameSource, playerId: number, lastVersio
     return found;
   });
   if (result.status !== 'ok') return result;
-  // Decode only the accepted snapshot. Torn attempts never allocate domain objects or capture arrays.
-  const decoded = result.value >= 0 ? decodePedalSlot(target, capture, car) : null;
+  // Decode only the accepted snapshot. Torn attempts never allocate domain objects or capture rows.
+  const decoded = result.value >= 0 ? decodePedalSlot(target, car) : null;
+  if (decoded) capture?.add(target, car);
   return { status: 'ok', version: result.version, value: {
     slot: result.value, sample: decoded?.sample ?? null, tyreSurfaceAvgC: decoded?.tyreSurfaceAvgC ?? null,
-    car: decoded?.car ?? null, ...(capture ? { capture: decoded?.capture ?? null } : {}),
+    car: decoded?.car ?? null,
   } };
 }

@@ -5,7 +5,7 @@ import { LiveCaptureController } from '../../../../server/live/capture/controlle
 import type { CaptureWorker } from '../../../../server/live/capture/controller.js';
 import { LiveService } from '../../../../server/live/liveService.js';
 import type { LiveWorker } from '../../../../server/live/liveService.js';
-import type { LiveCaptureBatch, LiveCaptureSample } from '../../../../shared/types/liveCapture.js';
+import type { LiveCaptureBatch, LiveCaptureSampleBatch } from '../../../../shared/types/liveCapture.js';
 import { LIVE_CAPTURE_SAMPLE_WIDTH } from '../../../../shared/types/liveCapture.js';
 import type { RestAnswer } from '../../../../server/live/lmuPitRest.js';
 import type { SseSink } from '../../../../server/live/sse.js';
@@ -28,8 +28,11 @@ class FakeCaptureWriter extends EventEmitter {
   }
 }
 
-function sample(elapsedSeconds: number): LiveCaptureSample {
-  return { elapsedSeconds, lapNumber: 8, lapStartSeconds: 100, values: new Float64Array(LIVE_CAPTURE_SAMPLE_WIDTH - 3).fill(1) };
+/** One reader row at `elapsedSeconds` of lap 8 (started at 100 s), every channel 1. */
+function sample(elapsedSeconds: number): LiveCaptureSampleBatch {
+  const rows = new Float64Array(LIVE_CAPTURE_SAMPLE_WIDTH).fill(1);
+  rows.set([elapsedSeconds, 8, 100]);
+  return { rows, sparse: [] };
 }
 
 describe('LiveService capture integration', () => {
@@ -75,7 +78,8 @@ describe('LiveService capture integration', () => {
     reader.emit('message', { type: 'frame', scoring: scoringReading({
       trackName: 'Circuit de la Sarthe', sessionCode: 10, currentEt: 120,
       player: vehicleReading({ id: 4, driverName: 'Driver', vehicleName: 'Ferrari 296 GT3', totalLaps: 7, lapStartEt: 100 }),
-    }), capture: sample(120) });
+    }) });
+    reader.emit('message', { type: 'capture', batch: sample(120) });
     expect(service.hasClients()).toBe(false);
     expect(capture.status().state).toBe('recording');
     expect(capture.status().samples).toBe(1);
@@ -89,7 +93,8 @@ describe('LiveService capture integration', () => {
     expect(capture.status().state).toBe('recording');
 
     reader.emit('message', { type: 'navigation', screen: 'replay', loadingProgress: null });
-    reader.emit('message', { type: 'frame', scoring: scoringReading({ currentEt: 121 }), capture: sample(121) });
+    reader.emit('message', { type: 'frame', scoring: scoringReading({ currentEt: 121 }) });
+    reader.emit('message', { type: 'capture', batch: sample(121) });
     expect(capture.status().samples).toBe(1);
 
     const stopping = service.stop();
@@ -142,7 +147,8 @@ describe('LiveService capture integration', () => {
     expect(capture.status().recordingId).toBeNull();
     expect(service.getSnapshot().lifecycle).toBe('garage');
 
-    reader.emit('message', { type: 'frame', scoring: makeGarageReading(1, 121), capture: sample(121) });
+    reader.emit('message', { type: 'frame', scoring: makeGarageReading(1, 121) });
+    reader.emit('message', { type: 'capture', batch: sample(121) });
     expect(capture.status().recordingId).toBeNull();
     expect(service.getSnapshot().lifecycle).toBe('garage');
     expect(firstRequest.release).toBeTypeOf('function');
@@ -152,7 +158,8 @@ describe('LiveService capture integration', () => {
     reader.emit('message', { type: 'frame', scoring: scoringReading({
       trackName: 'Circuit de la Sarthe', sessionCode: 1, currentEt: 121.2,
       player: vehicleReading({ id: 4, driverName: 'Driver', vehicleName: 'Ferrari 296 GT3', totalLaps: 7, lapStartEt: 100 }),
-    }), capture: sample(121.2) });
+    }) });
+    reader.emit('message', { type: 'capture', batch: sample(121.2) });
     expect(capture.status()).toMatchObject({ state: 'recording', samples: 1 });
 
     const stopping = service.stop();

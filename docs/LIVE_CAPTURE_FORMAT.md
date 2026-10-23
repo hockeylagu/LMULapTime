@@ -81,12 +81,19 @@ consumers or crosses a worker boundary.
 must match before and after each copy; only an accepted copy is decoded. Scoring copies include
 the header and declared vehicles without concatenating intermediate buffers. Player lookup tries
 the remembered slot before scanning the other IDs without constructing a candidate array.
-Decoded readings, including capture value arrays, retain their own data across subsequent polls.
+Decoded readings retain their own data across subsequent polls.
 
-Car-condition objects are decoded at their existing 500 ms publication cadence. Capture decoding
-waits for navigation confirmation; pedals and tyre temperatures keep their existing cadence.
-Terrain/impact suppression compares values directly without per-sample JSON serialization and
-retains the car-rate checkpoints. The writer's bounded batching and exclusive DuckDB ownership
+Car-condition objects are decoded at their existing 500 ms publication cadence. Capture rows wait
+for navigation confirmation; pedals and tyre temperatures keep their existing cadence.
+
+The reader writes capture rows straight into one packed buffer (`LiveCaptureRows`,
+`capture/decode.ts`) instead of an object and array per sample. The 50 Hz dashboard frame no longer
+carries capture data: the rows go to the main thread as a separate `capture` message whose buffer is
+transferred, not copied, once the scoring changes (about 5 Hz), before any other reader notice, or at 25
+rows. Each row therefore arrives before the scoring or navigation that follows it, and the main thread
+gates it in the state it was read in. Terrain names and the last impact are compared on their raw
+source bytes/values and decoded only for a row where they change, or on the car-rate checkpoint.
+The controller still observes a row's sparse changes before validating its time. The writer's bounded batching and exclusive DuckDB ownership
 are unchanged. See `tools/benchmarks/livePerformance/README.md` for the isolated allocation benchmark.
 
 ### Allocations during a loaded game session
@@ -103,7 +110,8 @@ to the producer. The following allocation controls apply:
 | REST poller | Keep one request in flight and the existing replay safety checks, cadence and failure pauses. Compare parsed pit-menu state directly instead of creating JSON strings for change detection. Discard stale replies before domain parsing when no diagnostic sink needs them. HTTP failure excerpts stop concatenating after reaching their 8 KiB limit. |
 | HTTP SSE | Serialize each broadcast once and share its string among writable clients. Skip serialization when no client can receive it. Blocked clients retain the existing drop-until-drain behavior and receive the newest snapshot on drain. |
 
-Remaining allocations are intentional: worker message envelopes and independent decoded samples,
+Remaining allocations are intentional: worker message envelopes (the 50 Hz dashboard frame and
+its pedal sample), one capture row buffer per reader batch,
 manifest/observation serialization for durable provenance, native database bindings, REST body/JSON
 parsing, and one JSON string per delivered SSE event. Recording diagnostics add bounded serialization
 when enabled. Capture batching is still 50 samples or one second; no cadence was reduced to obtain

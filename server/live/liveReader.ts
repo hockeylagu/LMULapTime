@@ -1,7 +1,8 @@
 import type { LiveCarReading } from '../../shared/domain/live/liveCarCondition.js';
 import type { LiveScoringReading } from '../../shared/domain/live/liveLifecycle.js';
 import type { LivePedalSample } from '../../shared/types/live.js';
-import type { LiveCaptureSample } from '../../shared/types/liveCapture.js';
+import type { LiveCaptureSampleBatch } from '../../shared/types/liveCapture.js';
+import { LiveCaptureRows } from './capture/decode.js';
 import { readPedalFrame, readScoringFrame } from './rf2Decode.js';
 import { SCORING_BUFFER, SCORING_MAPPING_NAME, TELEMETRY_BUFFER, TELEMETRY_MAPPING_NAME } from './rf2Layout.js';
 import type { MappedBuffer } from './sharedMemory.js';
@@ -13,7 +14,12 @@ export type LiveReaderMessage =
   | { type: 'diagnostic'; event: DiagnosticEvent }
   | { type: 'process'; running: boolean | null }
   /** `car` (fuel, damage flags, compound) rides along at most every CAR_POST_MS. */
-  | { type: 'frame'; scoring?: LiveScoringReading; pedal?: LivePedalSample; tyreSurfaceAvgC?: number | null; car?: LiveCarReading; capture?: LiveCaptureSample | null }
+  | { type: 'frame'; scoring?: LiveScoringReading; pedal?: LivePedalSample; tyreSurfaceAvgC?: number | null; car?: LiveCarReading }
+  /**
+   * Durable capture rows of a confirmed live session, a few times a second (its rows own a transferable buffer).
+   * They are posted before the next scoring change or any other notice, so each row arrives in the state it was read in.
+   */
+  | { type: 'capture'; batch: LiveCaptureSampleBatch }
   /**
    * What LMU's navigation says when it changes: its main menu (the buffer still holds the last session, so this
    * decides the menu state), loading a session (with its progress 0..1 when known), a session, or a replay playing
@@ -94,18 +100,19 @@ export class LiveReader {
   private playerId: number | null = null;
   private slotHint = -1;
   private inRealtime = false;
-  private lastTerrainMaterials: LiveCaptureSample['terrainMaterials'];
-  private lastImpact: LiveCaptureSample['impact'];
+  private readonly captureRows: LiveCaptureRows | null;
   private readonly tickAction = (): void => this.tick();
 
-  public constructor(private readonly deps: LiveReaderDeps) {}
+  public constructor(private readonly deps: LiveReaderDeps) {
+    this.captureRows = deps.capture ? new LiveCaptureRows() : null;
+  }
 
   public start(): void {
     this.stopped = false;
     this.pollProcess();
     this.tryOpen();
     // The first answer is always posted, so the server knows the game state before its first file scan.
-    if (!this.scoringMap && this.processRunning !== false) this.deps.post({ type: 'closed' });
+    if (!this.scoringMap && this.processRunning !== false) this.post({ type: 'closed' });
   }
 
   public stop(): void {
@@ -122,14 +129,25 @@ export class LiveReader {
     const changed = running !== this.processRunning;
     this.processRunning = running;
     // Always publish the first result, including an unavailable detector.
-    if (changed || this.processTimer === null) this.deps.post({ type: 'process', running });
+    if (changed || this.processTimer === null) this.post({ type: 'process', running });
     if (changed && running === false) {
       this.releaseMappings();
-      this.deps.post({ type: 'closed' });
+      this.post({ type: 'closed' });
     } else if (running === true && !this.scoringMap) {
       this.tryOpen();
     }
     this.processTimer = setTimeout(() => this.pollProcess(), PROCESS_POLL_MS);
+  }
+
+  /** Pending capture rows go before any notice, which may change how the main thread takes them (tick flushes before a scoring change). */
+  private post(message: LiveReaderMessage): void {
+    if (message.type !== 'frame') this.flushCapture();
+    this.deps.post(message);
+  }
+
+  private flushCapture(): void {
+    const batch = this.captureRows?.take();
+    if (batch) this.deps.post({ type: 'capture', batch });
   }
 
   private schedule(delayMs: number, action: () => void): void {
@@ -166,8 +184,7 @@ export class LiveReader {
     this.playerId = null;
     this.slotHint = -1;
     this.lastCarAt = 0;
-    this.lastTerrainMaterials = undefined;
-    this.lastImpact = undefined;
+    this.captureRows?.reset();
     this.inRealtime = false;
     this.lastProbeAt = Date.now();
     this.openedAt = this.lastProbeAt;
@@ -190,10 +207,11 @@ export class LiveReader {
     let pedal: LivePedalSample | undefined;
     let tyreSurfaceAvgC: number | null | undefined;
     let car: LiveCarReading | undefined;
-    let capture: LiveCaptureSample | null | undefined;
 
     const scoringRead = readScoringFrame(scoringMap, this.scoringVersion);
     if (scoringRead.status === 'ok') {
+      // The rows read before this scoring change go out before it.
+      this.flushCapture();
       if (this.isCue(scoringRead.value)) { this.cue = true; this.captureConfirmed = false; }
       this.scoringVersion = scoringRead.version;
       scoring = scoringRead.value;
@@ -204,13 +222,13 @@ export class LiveReader {
     }
 
     if (this.inRealtime && this.playerId !== null) {
+      // Only the capture rows wait for the game to confirm a session; the dashboard frames never do.
       const pedalRead = readPedalFrame(telemetryMap, this.playerId, this.pedalVersion, this.slotHint,
-        this.deps.capture && this.captureConfirmed && !this.cue, now - this.lastCarAt >= CAR_POST_MS);
+        this.captureConfirmed && !this.cue ? this.captureRows : null, now - this.lastCarAt >= CAR_POST_MS);
       if (pedalRead.status === 'ok') {
         this.pedalVersion = pedalRead.version;
         this.slotHint = pedalRead.value.slot;
         pedal = pedalRead.value.sample ?? undefined;
-        capture = pedalRead.value.capture;
         tyreSurfaceAvgC = pedalRead.value.tyreSurfaceAvgC;
         if (pedalRead.value.car && now - this.lastCarAt >= CAR_POST_MS) {
           car = pedalRead.value.car;
@@ -221,32 +239,11 @@ export class LiveReader {
 
     // While a cue waits for the game's answer nothing goes out: the frames may be a replay's, or the last session
     // LMU writes again as it exits. The first scoring change after the answer carries the current reading.
-    // Only the capture sample waits for the game to confirm a session; the dashboard frames never do.
     if (!this.cue && (scoring || pedal || car)) {
       if (scoring) this.heldScoring = null;
-      if (capture && this.captureConfirmed) {
-        const terrain = capture.terrainMaterials;
-        const impact = capture.impact;
-        const previous = this.lastTerrainMaterials;
-        let terrainChanged = terrain?.length !== previous?.length;
-        if (!terrainChanged && terrain && previous) {
-          for (let corner = 0; corner < terrain.length; corner++) {
-            if (terrain[corner] !== previous[corner]) { terrainChanged = true; break; }
-          }
-        }
-        const impactChanged = impact?.elapsedSeconds !== this.lastImpact?.elapsedSeconds
-          || impact?.magnitude !== this.lastImpact?.magnitude;
-        // Send changes at capture cadence. A small car-rate checkpoint gives a new recording its initial
-        // state even when a session transition kept the same material and last-impact values.
-        this.lastTerrainMaterials = terrain;
-        this.lastImpact = impact;
-        // This sample is owned by this poll; only its sparse fields are suppressed before posting.
-        if (!car && !terrainChanged) capture.terrainMaterials = undefined;
-        if (!car && !impactChanged) capture.impact = undefined;
-      }
-      this.deps.post({ type: 'frame', scoring, pedal, tyreSurfaceAvgC, car,
-        ...(this.deps.capture ? { capture: this.captureConfirmed ? capture : null } : {}) });
+      this.post({ type: 'frame', scoring, pedal, tyreSurfaceAvgC, car });
     }
+    if (this.captureRows?.full) this.flushCapture();
     const asking = this.screen === 'loading' || this.cue;
     if (now - this.lastProbeAt >= (asking ? CUE_PROBE_MS : PROBE_MS) && !this.probing) this.probe(now);
     this.schedule(this.inRealtime ? REALTIME_INTERVAL_MS : IDLE_INTERVAL_MS, this.tickAction);
@@ -265,7 +262,7 @@ export class LiveReader {
     if (screen === this.screen && loadingProgress === this.loadingProgress) return;
     this.screen = screen;
     this.loadingProgress = loadingProgress;
-    this.deps.post({ type: 'navigation', screen, loadingProgress });
+    this.post({ type: 'navigation', screen, loadingProgress });
   }
 
   private probe(now: number): void {
@@ -293,8 +290,7 @@ export class LiveReader {
         // A garage can stop updating scoring immediately after loading. Publish the coherent frame
         // already held for this cue; waiting for another counter change would leave the dashboard stuck.
         if (answer === 'session' && this.heldScoring) {
-          this.deps.post({ type: 'frame', scoring: this.heldScoring,
-            ...(this.deps.capture ? { capture: null } : {}) });
+          this.post({ type: 'frame', scoring: this.heldScoring });
           this.heldScoring = null;
         }
       }
@@ -302,7 +298,7 @@ export class LiveReader {
       if (this.processRunning === true) return;
       if (!this.gameAnswered && Date.now() - this.openedAt < STARTUP_GRACE_MS) return;
       this.releaseMappings();
-      this.deps.post({ type: 'closed' });
+      this.post({ type: 'closed' });
       this.schedule(OPEN_RETRY_MS, () => this.tryOpen());
     }, () => { this.captureConfirmed = false; settle(); });
   }

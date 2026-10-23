@@ -6,7 +6,7 @@ import { scoringReading, vehicleReading } from '../../../helpers/liveReadings.js
 import { LiveCaptureController } from '../../../../server/live/capture/controller.js';
 import type { CaptureWorker } from '../../../../server/live/capture/controller.js';
 import type {
-  LiveCaptureBatch, LiveCaptureManifest, LiveCaptureSample,
+  LiveCaptureBatch, LiveCaptureManifest, LiveCaptureSampleBatch, LiveCaptureSparseRow,
 } from '../../../../shared/types/liveCapture.js';
 import { LIVE_CAPTURE_NORMALIZATION_VERSION, LIVE_CAPTURE_SAMPLE_WIDTH } from '../../../../shared/types/liveCapture.js';
 
@@ -53,11 +53,10 @@ function reading(currentEt: number, overrides: Partial<LiveScoringReading> = {})
   });
 }
 
-function sample(elapsedSeconds: number, value = 2): LiveCaptureSample {
-  return {
-    elapsedSeconds, lapNumber: 8, lapStartSeconds: 100,
-    values: Float64Array.from({ length: LIVE_CAPTURE_SAMPLE_WIDTH - 3 }, (_, index) => value + index),
-  };
+/** One reader row: session seconds, lap 8 started at 100 s, then `value + channel index`. */
+function sample(elapsedSeconds: number, value = 2, changes: Omit<LiveCaptureSparseRow, 'row'> = {}): LiveCaptureSampleBatch {
+  const rows = Float64Array.from({ length: LIVE_CAPTURE_SAMPLE_WIDTH }, (_, index) => index < 3 ? [elapsedSeconds, 8, 100][index] : value + index - 3);
+  return { rows, sparse: changes.terrainMaterials || changes.impact ? [{ row: 0, ...changes }] : [] };
 }
 
 function last<T>(values: readonly T[]): T | undefined { return values[values.length - 1]; }
@@ -97,7 +96,7 @@ describe('LiveCaptureController', () => {
     const { controller, writer } = makeController();
     start(controller);
     const fill = (startTime: number) => {
-      for (let index = 0; index < 50; index++) controller.sample(sample(startTime + index / 50));
+      for (let index = 0; index < 50; index++) controller.samples(sample(startTime + index / 50));
       return writer.batches().at(-1)!;
     };
     const first = fill(101);
@@ -149,12 +148,11 @@ describe('LiveCaptureController', () => {
     const source = reading(100);
     source.player!.upgradePackHex = '0123456789abcdeffedcba9876543210';
     controller.update(source, game);
-    const frame = { ...sample(100.02), terrainMaterials: ['ASPHALT', 'ASPHALT', 'RMBLFLAT', ''],
-      impact: { elapsedSeconds: 99.5, magnitude: 8896 } };
-    controller.sample(frame);
-    controller.sample({ ...frame, elapsedSeconds: 100.04 });
-    controller.sample({ ...frame, elapsedSeconds: 100.06, terrainMaterials: ['GRVL', 'ASPHALT', 'RMBLFLAT', ''],
-      impact: { elapsedSeconds: 100.05, magnitude: 8896 } });
+    const changes = { terrainMaterials: ['ASPHALT', 'ASPHALT', 'RMBLFLAT', ''], impact: { elapsedSeconds: 99.5, magnitude: 8896 } };
+    controller.samples(sample(100.02, 2, changes));
+    controller.samples(sample(100.04, 2, changes));
+    controller.samples(sample(100.06, 2, { terrainMaterials: ['GRVL', 'ASPHALT', 'RMBLFLAT', ''],
+      impact: { elapsedSeconds: 100.05, magnitude: 8896 } }));
     controller.update(source, game);
     vi.advanceTimersByTime(1000);
     const observations = writer.batches().flatMap(batch => batch.observations);
@@ -208,8 +206,8 @@ describe('LiveCaptureController', () => {
     });
 
     const values = sample(100.02);
-    values.values[6] = Number.NaN;
-    controller.sample(values);
+    values.rows[3 + 6] = Number.NaN;
+    controller.samples(values);
     vi.advanceTimersByTime(1000);
 
     const batch = last(writer.batches());
@@ -266,7 +264,7 @@ describe('LiveCaptureController', () => {
     const prior = priorManifest();
     const { controller, writer } = makeController({ existing: [prior] });
     start(controller, 101, snapshot('race', null));
-    controller.sample(sample(101.1));
+    controller.samples(sample(101.1));
     expect(controller.status()).toMatchObject({ state: 'idle', recordingId: null });
     expect(writer.batches()).toHaveLength(0);
 
@@ -275,7 +273,7 @@ describe('LiveCaptureController', () => {
     expect(controller.status().recordingId).toBe(prior.recordingId);
     expect(writer.batches().every(batch => batch.manifest.recordingId === prior.recordingId)).toBe(true);
     expect(writer.batches()[0].manifest.samples).toBe(prior.samples);
-    controller.sample(sample(201.1));
+    controller.samples(sample(201.1));
     controller.pause();
     expect(last(writer.batches())?.manifest.anchors).toEqual([
       { lapNumber: 8, startSeconds: 100, lapSeconds: 100 },
@@ -316,7 +314,7 @@ describe('LiveCaptureController', () => {
   it('pauses replay capture by flushing while keeping the recording open', () => {
     const { controller, writer } = makeController();
     start(controller);
-    controller.sample(sample(100.1));
+    controller.samples(sample(100.1));
     controller.pause();
     expect(controller.status().state).toBe('recording');
     expect(last(writer.batches())?.manifest.status).toBe('recording');
@@ -326,12 +324,12 @@ describe('LiveCaptureController', () => {
   it('rejects duplicate and nonfinite sample times without hiding the next valid gap', () => {
     const { controller, writer } = makeController();
     start(controller);
-    controller.sample(sample(100.02));
-    controller.sample(sample(100.02));
-    controller.sample(sample(Number.NaN));
-    controller.sample(sample(Number.POSITIVE_INFINITY));
-    controller.sample(sample(100.01));
-    controller.sample(sample(100.08));
+    controller.samples(sample(100.02));
+    controller.samples(sample(100.02));
+    controller.samples(sample(Number.NaN));
+    controller.samples(sample(Number.POSITIVE_INFINITY));
+    controller.samples(sample(100.01));
+    controller.samples(sample(100.08));
     controller.pause();
 
     expect(controller.status().samples).toBe(2);
@@ -344,13 +342,13 @@ describe('LiveCaptureController', () => {
     const { controller, writer } = makeController();
     start(controller);
     writer.acknowledge(writer.batches()[0]);
-    for (let index = 1; index <= 200; index++) controller.sample(sample(index));
+    for (let index = 1; index <= 200; index++) controller.samples(sample(index));
     expect(controller.status()).toMatchObject({ pendingBatches: 4, samples: 200, droppedSamples: 0 });
-    controller.sample(sample(201));
+    controller.samples(sample(201));
     expect(controller.status()).toMatchObject({ pendingBatches: 4, samples: 200, droppedSamples: 1 });
 
     writer.acknowledge(writer.batches().find(batch => batch.samples.length > 0)!);
-    controller.sample(sample(201));
+    controller.samples(sample(201));
     controller.pause();
     expect(controller.status()).toMatchObject({ pendingBatches: 4, samples: 201, droppedSamples: 1 });
   });
@@ -359,7 +357,7 @@ describe('LiveCaptureController', () => {
     const { controller, writer } = makeController();
     start(controller);
     writer.acknowledge(writer.batches()[0]);
-    for (let index = 1; index <= 200; index++) controller.sample(sample(index));
+    for (let index = 1; index <= 200; index++) controller.samples(sample(index));
     expect(controller.status().pendingBatches).toBe(4);
 
     controller.update(null, snapshot('race', 'sarthe:full', 'offline'));
@@ -379,7 +377,7 @@ describe('LiveCaptureController', () => {
     expect(last(firstWriter.posted)?.message).toEqual({ type: 'close' });
 
     start(controller, 101, snapshot('practice', 'sarthe:outer'));
-    controller.sample(sample(101.1));
+    controller.samples(sample(101.1));
     expect(createWorker).toHaveBeenCalledOnce();
     firstWriter.emit('exit', 0);
 
@@ -394,7 +392,7 @@ describe('LiveCaptureController', () => {
     const { controller, writer } = makeController();
     start(controller);
     writer.acknowledge(writer.batches()[0]);
-    controller.sample(sample(100.1));
+    controller.samples(sample(100.1));
     const stopping = controller.stop();
     let resolved = false;
     void stopping.then(() => { resolved = true; });
@@ -404,7 +402,7 @@ describe('LiveCaptureController', () => {
     expect(last(writer.batches())?.samples).toHaveLength(LIVE_CAPTURE_SAMPLE_WIDTH);
     expect(last(writer.posted)?.message).toEqual({ type: 'close' });
     const priorCount = controller.status().samples;
-    controller.sample(sample(100.2));
+    controller.samples(sample(100.2));
     expect(controller.status().samples).toBe(priorCount);
 
     writer.emit('message', { type: 'closed' });
@@ -420,7 +418,7 @@ describe('LiveCaptureController', () => {
     const { controller, writer } = makeController();
     start(controller);
     writer.emit('error', new Error('disk full'));
-    controller.sample(sample(100.2));
+    controller.samples(sample(100.2));
     expect(controller.status()).toMatchObject({ state: 'unavailable', error: 'disk full', samples: 0, pendingBatches: 0 });
   });
 });

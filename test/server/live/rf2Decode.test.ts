@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { decodePedalSlot, decodeScoring, readPedalFrame, readScoringFrame } from '../../../server/live/rf2Decode.js';
+import { LiveCaptureRows } from '../../../server/live/capture/decode.js';
+import { LIVE_CAPTURE_SAMPLE_WIDTH } from '../../../shared/types/liveCapture.js';
 import { SCORING, SCORING_INFO, TELEMETRY, VEHICLE_SCORING, VEHICLE_TELEMETRY, WHEEL } from '../../../server/live/rf2Layout.js';
 import { scoringBuffer, source, telemetryBuffer } from './rf2Fixtures.js';
 import type { ScoringVehicle } from './rf2Fixtures.js';
@@ -226,20 +228,21 @@ describe('rF2 pedal decode', () => {
     expect(readPedalFrame(mapping, 12, null, 128)).toMatchObject({ value: { slot: 1 } });
   });
 
-  it('retains independent samples and capture arrays when its copy storage is reused', () => {
+  it('retains independent samples and capture rows when its copy storage is reused', () => {
     let current = telemetryBuffer(4, slots);
     const mapping = source(() => current);
-    const first = readPedalFrame(mapping, 12, null, 1, true, false);
+    const rows = new LiveCaptureRows();
+    const first = readPedalFrame(mapping, 12, null, 1, rows, false);
     current = telemetryBuffer(5, [{ ...slots[1], et: 400, throttle: 0.25 }]);
     current.writeDoubleLE(-88, TELEMETRY.vehicles + VEHICLE_TELEMETRY.offsets.localVel + 16);
-    const second = readPedalFrame(mapping, 12, 4, 1, true, true);
-    expect(first).toMatchObject({ value: { sample: { t: 321.25, throttle: 0.75 }, car: null,
-      capture: { elapsedSeconds: 321.25 } } });
+    const second = readPedalFrame(mapping, 12, 4, 1, rows, true);
+    expect(first).toMatchObject({ value: { sample: { t: 321.25, throttle: 0.75 }, car: null } });
     expect(second).toMatchObject({ value: { sample: { t: 400, throttle: 0.25 }, car: { fuelLiters: 0 } } });
-    if (first.status !== 'ok' || second.status !== 'ok') throw new Error('Missing frames');
-    expect(first.value.capture?.values[0]).toBe(-0);
-    expect(second.value.capture?.values[0]).toBe(88);
-    expect(first.value.capture?.values).not.toBe(second.value.capture?.values);
+    const batch = rows.take()!;
+    const width = LIVE_CAPTURE_SAMPLE_WIDTH;
+    expect([batch.rows[0], batch.rows[3], batch.rows[width], batch.rows[width + 3]]).toEqual([321.25, -0, 400, 88]);
+    // The checkpoint (car cadence) carries the sparse state again.
+    expect(batch.sparse.map(change => change.row)).toEqual([0, 1]);
   });
 
   it('keeps scratch buffers isolated between mappings', () => {
@@ -256,8 +259,10 @@ describe('rF2 pedal decode', () => {
       // begin/end, vehicle count and hinted ID have been read; the copy is already done.
       if (reads === 4) current = telemetryBuffer(5, [{ ...slots[1], et: 999 }]);
     });
-    expect(readPedalFrame(mapping, 12, null, 1, true)).toMatchObject({ status: 'ok', version: 5,
-      value: { slot: 0, sample: { t: 999 }, capture: { elapsedSeconds: 999 } } });
+    const rows = new LiveCaptureRows();
+    expect(readPedalFrame(mapping, 12, null, 1, rows)).toMatchObject({ status: 'ok', version: 5,
+      value: { slot: 0, sample: { t: 999 } } });
     expect(mapping.copies).toBe(2);
+    expect(Array.from(rows.take()!.rows.subarray(0, 1))).toEqual([999]);
   });
 });
