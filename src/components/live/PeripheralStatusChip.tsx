@@ -25,8 +25,8 @@ export function PeripheralStatusChip() {
   }, []);
   return <>{statuses.filter(status => status.settings.enabled).map(status => {
     const health = peripheralStatusMessage(status);
-    return <span key={status.id} title={health.message} className={`inline-flex max-w-[360px] items-center gap-2 whitespace-normal text-base font-medium ${health.warning ? 'text-lmu-warn' : 'text-lmu-muted'}`}>
-      {health.warning && <AlertTriangle size={18} aria-hidden="true" />}{health.message}
+    return <span key={status.id} title={health.message} className={`inline-flex items-center gap-3 whitespace-nowrap text-[36px] font-semibold ${health.warning ? 'text-lmu-warn' : 'text-lmu-muted'}`}>
+      {health.warning && <AlertTriangle size={36} aria-hidden="true" className="shrink-0" />}{health.message}
     </span>;
   })}</>;
 }

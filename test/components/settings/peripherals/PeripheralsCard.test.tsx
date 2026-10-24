@@ -2,9 +2,11 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PeripheralsCard } from '../../../../src/components/settings/peripherals/PeripheralsCard.js';
 import { PeripheralStatusChip } from '../../../../src/components/live/PeripheralStatusChip.js';
+import { LiveSessionBar } from '../../../../src/components/live/LiveSessionBar.js';
 import { PresetMappingTable } from '../../../../src/components/settings/peripherals/PresetMappingTable.js';
 import { fetchPeripherals, fetchPresetCatalog, fetchPresetMappings, refreshPeripheralHealth } from '../../../../src/api/peripheralsApi.js';
 import type { PeripheralStatus } from '../../../../shared/types/peripherals/peripherals.js';
+import { liveSnapshot } from '../../../helpers/liveSnapshot.js';
 
 vi.mock('../../../../src/api/peripheralsApi.js', () => ({ fetchPeripherals: vi.fn(), refreshPeripheralHealth: vi.fn(), fetchLoadedPresets: vi.fn(async () => ({ devices: [], observedAt: 0 })), fetchPresetCatalog: vi.fn(async () => null), fetchPresetMappings: vi.fn(async () => ({ cars: [], mappings: [] })) }));
 const status: PeripheralStatus = { id: 'simagic', label: 'Simagic', install: 'not-installed', error: null, settings: { enabled: false, automatic: true, wheel: null }, health: null, observedAt: null, devices: [], lastRun: null, car: null, target: null, currentLoad: { key: '', generation: 0, phase: 'idle', skipReason: null }, busy: false, applyBlockedReason: null };
@@ -16,12 +18,18 @@ describe('peripheral interface', () => {
     expect(await screen.findByText('Simagic plugin is not installed')).toBeInTheDocument();
     expect(screen.getByRole('checkbox', { name: 'Enable plugin' })).toBeDisabled();
   });
-  it('shows passive dashboard health without actions', async () => {
+  it('shows passive dashboard health on idle screens only and hides it once in a session', async () => {
     vi.mocked(fetchPeripherals).mockResolvedValue([{ ...status, install: 'ready', settings: { ...status.settings, enabled: true }, health: { api: 'unavailable', process: 'absent' } }]);
-    render(<PeripheralStatusChip />);
-    expect(await screen.findByText('SimPro is not running')).toBeInTheDocument();
+    const { rerender } = render(<LiveSessionBar snapshot={liveSnapshot({ lifecycle: 'menu', session: null })} connection="live" peripherals={<PeripheralStatusChip />} />);
+    const chip = await screen.findByText('SimPro is not running');
+    expect(chip).toHaveClass('text-[36px]', 'font-semibold');
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+    rerender(<LiveSessionBar snapshot={liveSnapshot({ lifecycle: 'loading', session: null })} connection="live" peripherals={<PeripheralStatusChip />} />);
+    expect(screen.getByText('SimPro is not running')).toBeInTheDocument();
+    for (const lifecycle of ['garage', 'starting', 'driving', 'finished'] as const) {
+      rerender(<LiveSessionBar snapshot={liveSnapshot({ lifecycle })} connection="live" peripherals={<PeripheralStatusChip />} />);
+      expect(screen.queryByText('SimPro is not running')).not.toBeInTheDocument();
+    }
   });
   it('requires saving a Suggest preview before persisting assignments', async () => {
     const save = vi.fn();

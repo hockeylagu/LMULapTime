@@ -37,7 +37,7 @@ interface LiveSessionBarProps {
 /** Brand, session, track and class on the left; weather, laps left, PR and the data or pause status on the right. */
 export function LiveSessionBar({ snapshot, connection, peripherals }: LiveSessionBarProps) {
   const session = snapshot?.session ?? null;
-  const inSession = snapshot !== null && snapshot.lifecycle !== 'offline' && snapshot.lifecycle !== 'menu';
+  const inSession = snapshot !== null && snapshot.lifecycle !== 'offline' && snapshot.lifecycle !== 'menu' && snapshot.lifecycle !== 'loading';
   const showSession = session !== null && inSession && connection !== 'disconnected';
   const identity = snapshot?.identity ?? null;
   const carClass = showSession ? (identity?.carClass ?? liveCarClass(session.vehicleName, session.vehicleClass)) : null;
@@ -77,7 +77,7 @@ export function LiveSessionBar({ snapshot, connection, peripherals }: LiveSessio
         )}
       </div>
       <div className="flex items-center gap-9">
-        {peripherals}
+        {!inSession && peripherals}
         {/* Every slot is held for the whole session, showing the unknown mark until its value arrives, so nothing moves. */}
         {/* One weather slot of fixed width, first on the right so its unused width joins the free space between the groups:
             on a wet track its wetness and whether it is getting wetter or drying, else the forecast change, else the track
