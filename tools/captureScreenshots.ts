@@ -182,6 +182,18 @@ const TARGETS: TargetScreenshot[] = [
       if (toastBtn) toastBtn.click();
     `,
   },
+  {
+    name: 'Live Cockpit Dashboard (Monza Hypercar Race Mid-Stint & Live Pedals)',
+    url: 'http://localhost:5173/?demo=1#/live?demo=1&scenario=race&carClass=Hyper&controls=hidden',
+    outputPath: path.join(process.cwd(), 'assets', 'live_dashboard.png'),
+    waitMs: 4000,
+    evalBeforeCapture: `
+      const toastBtn = document.querySelector('button[aria-label="Dismiss toast"], button[aria-label="Close"]');
+      if (toastBtn) toastBtn.click();
+      const aside = document.querySelector('aside[aria-label="Offline demo controls"]');
+      if (aside) aside.style.display = 'none';
+    `,
+  },
 ];
 
 async function captureScreenshots(): Promise<void> {
