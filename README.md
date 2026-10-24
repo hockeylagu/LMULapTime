@@ -47,17 +47,13 @@ Telemetry analytics and lap comparison for **Le Mans Ultimate (LMU)**. It decode
 
 ![Dashboard Overview](assets/dashboard.png)
 
-### Live capture and learning evidence
-
-The backend records supplemental player data while LMU runs, independent of the dashboard. Each
-session recording uses its own DuckDB file, linked strictly to XML identity and lap clocks. Verified
-ISO 8855 dynamics augment yaw/body-slip charts; disposable response/error diagnostics support race
-debugging. Strategy audit checkpoints share the session DuckDB for direct inspection. Frozen fuel/VE forecasts and measured outcomes feed an offline baseline and bounded correction candidate evaluator.
-Settings → Learning includes a manual learning-evidence check with separate fuel/VE counts,
-exclusion reasons, offline readiness and automatic correction status. Corrections require fresh-session
-validation and an exact live identity/patch match; `LMU_LIVE_LEARNING=0` disables them. Real-game
-overhead validation is pending.
-See [live capture storage and channels](docs/LIVE_CAPTURE_FORMAT.md).
+### ⏱️ Live Race Dashboard
+![Live Race Dashboard - Race Stint, Pit Window & Pedals](assets/live_dashboard.png)
+- **Second-screen display**: a glanceable fullscreen page for the rig monitor, opened automatically when LMU runs (tray double-click puts it on the chosen display).
+- **Fuel & Virtual Energy strategy**: per-lap use from the last laps, spare per lap, laps to the pit window, and the MFD settings for the next stop (refuel / VE, tyres).
+- **Lap timing**: current lap and sector splits against your best, track conditions, and a live throttle & brake trace.
+- **Offline demo**: practice, qualifying and race scenarios to try it without driving (`#/live?demo=1`).
+- **Live capture & learning**: each session is recorded to its own DuckDB file, reconciled with the results XML, and feeds validated fuel/VE forecast corrections (`LMU_LIVE_LEARNING=0` disables them). See [live capture storage](docs/LIVE_CAPTURE_FORMAT.md).
 
 ### 🎯 Coaching
 - **Corner analysis**: entry (braking, trail brake), rotation (apex speed) and exit (throttle pick-up) for every turn, with consistency scoring.
@@ -66,6 +62,7 @@ See [live capture storage and channels](docs/LIVE_CAPTURE_FORMAT.md).
 
 ### 🔌 Plug & Play
 - Finds the LMU Steam install, results, replays and telemetry on its own; handles long multi-stint sessions and multi-file telemetry.
+- **Simagic wheel presets** (optional): with SimPro Manager running, switches the wheel to the preset mapped to your car once, in the garage, never on track. Map cars to presets in **Settings → Peripherals**.
 
 ---
 
@@ -116,21 +113,10 @@ See [live capture storage and channels](docs/LIVE_CAPTURE_FORMAT.md).
    ```
    *Windows users can also simply double-click `launch.bat`.*
 
-   On Windows, a system tray gauge icon appears while the backend is running. Double-click it,
-   or right-click and choose **Open LMU Lap Time Analyzer**, to open the website. The icon closes
-   automatically when the backend stops or restarts. Set `LMU_TRAY=0` in `.env.local` to disable it.
-   Right-click → **Exit** stops the server after flushing live capture. It also stops the development
-   watcher and paired Vite server when launched with `npm run dev`, `npm start`, or the debug configuration.
-   It opens `LMU_UI_ORIGIN` when configured, otherwise `http://localhost:5173` (or `LMU_UI_PORT`).
-   Choose **Settings → Live Dashboard → Browser monitor for tray double-click** to save the display
-   used by the tray. Double-click opens maximized on that display with no monitor chooser. The setting
-   applies immediately and persists across restarts. A disconnected display falls back to browser default.
-   Monitor placement opens a new window in Edge, Chrome, Firefox, Brave or Vivaldi; other browsers
-   use their normal placement. Auto-open also switches to the live dashboard on first load when LMU
-   is already running, if enabled and no dashboard is connected.
-   The bundled Windows x64 helper starts directly without PowerShell or .NET. After editing its
-   native source in `server/desktop/`, run `npm run build:tray` with Visual Studio C++ build tools
-   and the Windows SDK installed. Rebuilding is unnecessary for normal development startup.
+   On Windows, a tray gauge icon appears while the backend runs: double-click it to open the app
+   (on the display chosen in **Settings → Live Dashboard**), right-click → **Exit** to stop the server
+   after flushing live capture. Set `LMU_TRAY=0` in `.env.local` to disable it. After editing the
+   native helper in `server/desktop/`, rebuild it with `npm run build:tray` (Visual Studio C++ tools).
 
 5. **Open your browser**:
    - Frontend UI: [http://localhost:5173](http://localhost:5173)
