@@ -33,6 +33,8 @@ import { createLiveEvidenceRouter } from './routes/liveEvidenceRoutes.js';
 import { refreshLiveLearning } from './live/learning/service.js';
 import { AutomaticLearningRuntime } from './live/learning/runtime.js';
 import { startSystemTray } from './desktop/systemTray.js';
+import { PeripheralHost } from './peripherals/peripheralHost.js';
+import { createPeripheralRouter } from './routes/peripherals/peripheralRoutes.js';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
@@ -153,6 +155,8 @@ const liveService = new LiveService({
 liveService.events.on('session-loaded', loaded => serverContext.setLiveSessionLoaded(loaded));
 liveService.events.on('session-loaded', loaded => { if (loaded) automaticLearning.cancel(); });
 liveService.events.on('game-running', running => automaticLearning.gameRunning(running));
+const peripheralHost = new PeripheralHost(sessionDb, liveService);
+app.use('/api/peripherals', createPeripheralRouter(peripheralHost));
 
 if (process.env.NODE_ENV === 'test') {
   serverContext.runInitialSessionSyncInBackground();
@@ -160,6 +164,7 @@ if (process.env.NODE_ENV === 'test') {
   // The first scan waits for the live reader's first answer: a server started mid-session must not read
   // the files LMU is still writing. A reader that never answers delays it 5 s at most.
   liveService.start();
+  void peripheralHost.start();
   // Discover live files once the XML/replay/native telemetry discovery pass is complete.
   // The first reader answer only releases that pass; it must not start a second live catalog scan.
   serverContext.events.on('scan-finished', () => { void refreshLiveCaptureLinks(true); });
@@ -191,6 +196,7 @@ if (process.env.NODE_ENV !== 'test') {
   const shutdown = (exitDevelopment = false): void => {
     if (shuttingDown) return;
     shuttingDown = true;
+    peripheralHost.stop();
     stopSystemTray?.();
     server.close();
     automaticLearning.cancel();

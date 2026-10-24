@@ -86,7 +86,7 @@ const contentKey = (snapshot: Omit<LiveSnapshot, 'sequence' | 'receivedAt'>): st
  * and a heartbeat. A page that cannot keep up misses batches; the reader is never held back by it.
  */
 export class LiveService {
-  public readonly events = new TypedEmitter<{ lifecycle: [LiveLifecycle]; 'session-loaded': [boolean]; 'game-running': [boolean] }>();
+  public readonly events = new TypedEmitter<{ lifecycle: [LiveLifecycle]; 'session-loaded': [boolean]; 'game-running': [boolean]; snapshot: [LiveSnapshot] }>();
   private processRunning: boolean | null = null;
   private reportedRunning = false;
   private snapshot: LiveSnapshot = offlineSnapshot();
@@ -525,6 +525,7 @@ export class LiveService {
       this.events.emit('lifecycle', next.lifecycle);
     }
     this.followSessionLoaded();
+    this.events.emit('snapshot', this.snapshot);
   }
 
   private setReplay(active: boolean): void {

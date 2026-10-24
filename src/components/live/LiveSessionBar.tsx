@@ -4,6 +4,7 @@ import { CarClassBadge } from '../common/CarClassBadge.js';
 import { formatLapTime, UNKNOWN } from './liveFormat.js';
 import { liveCarClass, liveTrackName, sessionKindLabel, syncOnReturnToDashboard } from './liveScreens.js';
 import { forecastText } from './race/raceAction.js';
+import type { ReactNode } from 'react';
 
 const STATUS: Record<LiveConnection, { label: string; className: string }> = {
   live: { label: 'LIVE', className: 'text-lmu-gain' },
@@ -30,10 +31,11 @@ export function liveStatus(snapshot: LiveSnapshot | null, connection: LiveConnec
 interface LiveSessionBarProps {
   snapshot: LiveSnapshot | null;
   connection: LiveConnection;
+  peripherals?: ReactNode;
 }
 
 /** Brand, session, track and class on the left; weather, laps left, PR and the data or pause status on the right. */
-export function LiveSessionBar({ snapshot, connection }: LiveSessionBarProps) {
+export function LiveSessionBar({ snapshot, connection, peripherals }: LiveSessionBarProps) {
   const session = snapshot?.session ?? null;
   const inSession = snapshot !== null && snapshot.lifecycle !== 'offline' && snapshot.lifecycle !== 'menu';
   const showSession = session !== null && inSession && connection !== 'disconnected';
@@ -75,6 +77,7 @@ export function LiveSessionBar({ snapshot, connection }: LiveSessionBarProps) {
         )}
       </div>
       <div className="flex items-center gap-9">
+        {peripherals}
         {/* Every slot is held for the whole session, showing the unknown mark until its value arrives, so nothing moves. */}
         {/* One weather slot of fixed width, first on the right so its unused width joins the free space between the groups:
             on a wet track its wetness and whether it is getting wetter or drying, else the forecast change, else the track

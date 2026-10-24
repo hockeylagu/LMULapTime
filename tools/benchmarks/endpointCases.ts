@@ -54,7 +54,7 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
     id, route, ...(url ? { url } : { skip }), ...(collections[route] ? { requiredCollection: collections[route] } : {}),
   });
   for (const [id, url] of Object.entries({
-    status: '/api/status', scan: '/api/scan/status', 'ai-settings': '/api/ai/settings', 'ai-reports': '/api/ai/reports?limit=50',
+    status: '/api/status', peripherals: '/api/peripherals', scan: '/api/scan/status', 'ai-settings': '/api/ai/settings', 'ai-reports': '/api/ai/reports?limit=50',
     logos: '/api/data-plugin/vehicles/logos',
     references: '/api/reference-laptimes', 'reference-diffs': '/api/reference-laptimes/diffs',
     'sessions-page-1': '/api/sessions?page=1&pageSize=25&hideEmpty=true', 'sessions-page-2': '/api/sessions?page=2&pageSize=25&hideEmpty=true',
@@ -66,6 +66,7 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
     'live-capture': '/api/live/capture',
   })) add(id, url.split('?')[0], url);
   add('live-stream', '/api/live/stream', undefined, 'Server-sent event stream: stays open, has no response time.');
+  for (const resource of ['devices', 'presets', 'mappings', 'loaded-presets']) add(`peripheral-${resource}`, `/api/peripherals/:id/${resource}`, undefined, 'Requires enabled hardware integration; covered by fake-plugin route tests.');
   add('app-events', '/api/events', undefined, 'Server-sent event stream: stays open, has no response time.');
   add('desktop-browser', '/api/desktop/browser', undefined, 'Desktop display enumeration depends on the Windows host; covered by native helper integration tests.');
   add('reference-diff', '/api/reference-laptimes/diffs/:id', cohort.diffId ? `/api/reference-laptimes/diffs/${cohort.diffId}` : undefined);

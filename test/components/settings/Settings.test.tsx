@@ -325,7 +325,7 @@ describe('Settings component', () => {
     fireEvent.change(searchInput, { target: { value: 'gemini' } });
 
     await waitFor(() => {
-      expect(screen.getByText('2 of 8 sections match')).toBeInTheDocument();
+      expect(screen.getByText('2 of 9 sections match')).toBeInTheDocument();
       expect(screen.getByRole('heading', { name: 'AI Lap Reports' })).toBeInTheDocument();
       expect(screen.getByRole('heading', { name: 'AI Report History' })).toBeInTheDocument();
       
@@ -347,7 +347,7 @@ describe('Settings component', () => {
     await settled();
     expect(screen.getByRole('heading', { name: 'Learning', level: 3 })).toBeInTheDocument();
     fireEvent.change(screen.getByRole('textbox', { name: /search settings/i }), { target: { value: 'evidence' } });
-    expect(screen.getByText('1 of 8 sections match')).toBeInTheDocument();
+    expect(screen.getByText('1 of 9 sections match')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Learning', level: 3 })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Live Dashboard' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Check evidence' })).toBeInTheDocument();

@@ -1,4 +1,4 @@
-import { LucideIcon, LayoutDashboard, Film, BrainCircuit, History, Database, HardDrive, Radio, ChartNoAxesCombined } from 'lucide-react';
+import { LucideIcon, LayoutDashboard, Film, BrainCircuit, History, Database, HardDrive, Radio, ChartNoAxesCombined, Gamepad2 } from 'lucide-react';
 import { AppStatus } from '../../../shared/types/index.js';
 
 export interface SettingsSectionDef {
@@ -38,6 +38,11 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     icon: ChartNoAxesCombined,
     description: 'Recorded fuel and virtual energy evidence, exclusions and offline prediction readiness',
     keywords: ['learning', 'evidence', 'prediction', 'fuel', 'energy', 'consumption', 'calibration', 'measurements', 'exclusions', 'readiness'],
+  },
+  {
+    id: 'peripherals', title: 'Peripherals', icon: Gamepad2,
+    description: 'Simagic wheel profiles, SimPro connection and per-car preset mappings',
+    keywords: ['simagic', 'simpro', 'wheel', 'preset', 'led', 'profile', 'peripheral', 'mapping'],
   },
   {
     id: 'ai-settings',

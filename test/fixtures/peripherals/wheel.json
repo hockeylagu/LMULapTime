@@ -1,0 +1,227 @@
+{
+  "message": "",
+  "name": "",
+  "result": [
+    {
+      "createTime": 1775119914,
+      "deviceUUID": "33947648",
+      "factoryReset": false,
+      "gameName_list": [
+        "acc"
+      ],
+      "isOffical": true,
+      "presetName": "296 GT3",
+      "presetUUID": "3400000000000000001",
+      "productUUID": "33947648",
+      "selected": false,
+      "updateTime": 1785246547
+    },
+    {
+      "createTime": 1785258860,
+      "deviceUUID": "33947648",
+      "factoryReset": false,
+      "gameName_list": [
+        "acc"
+      ],
+      "isOffical": true,
+      "presetName": "992 GT3",
+      "presetUUID": "3400000000000000009",
+      "productUUID": "33947648",
+      "selected": false,
+      "updateTime": 1785258860
+    },
+    {
+      "createTime": 0,
+      "deviceUUID": "33947648",
+      "factoryReset": false,
+      "gameName_list": [
+        "ir"
+      ],
+      "isOffical": true,
+      "presetName": "Corvette C8.R",
+      "presetUUID": "3400000000000000015",
+      "productUUID": "33947648",
+      "selected": false,
+      "updateTime": 1776913055
+    },
+    {
+      "createTime": 1775119914,
+      "deviceUUID": "33947648",
+      "factoryReset": false,
+      "gameName_list": [],
+      "isOffical": true,
+      "presetName": "GT Neo Default",
+      "presetUUID": "3400000000000000025",
+      "productUUID": "33947648",
+      "selected": false,
+      "updateTime": 1790286169
+    },
+    {
+      "createTime": 1775119915,
+      "deviceUUID": "33947648",
+      "factoryReset": false,
+      "gameName_list": [
+        "acc"
+      ],
+      "isOffical": true,
+      "presetName": "M4 GT3",
+      "presetUUID": "3400000000000000031",
+      "productUUID": "33947648",
+      "selected": false,
+      "updateTime": 1785894046
+    },
+    {
+      "createTime": 1785258860,
+      "deviceUUID": "33947648",
+      "factoryReset": false,
+      "gameName_list": [
+        "lmu"
+      ],
+      "isOffical": false,
+      "presetName": "GT3 911",
+      "presetUUID": "3400000000000000043",
+      "productUUID": "33947648",
+      "selected": false,
+      "updateTime": 1791585913
+    },
+    {
+      "createTime": 1785894046,
+      "deviceUUID": "33947648",
+      "factoryReset": false,
+      "gameName_list": [
+        "lmu"
+      ],
+      "isOffical": false,
+      "presetName": "GT3 M4",
+      "presetUUID": "3400000000000000045",
+      "productUUID": "33947648",
+      "selected": false,
+      "updateTime": 1790181386
+    },
+    {
+      "createTime": 1786022074,
+      "deviceUUID": "33947648",
+      "factoryReset": false,
+      "gameName_list": [
+        "lmu"
+      ],
+      "isOffical": false,
+      "presetName": "GTE AMR",
+      "presetUUID": "3400000000000000046",
+      "productUUID": "33947648",
+      "selected": false,
+      "updateTime": 1787531444
+    },
+    {
+      "createTime": 1786996115,
+      "deviceUUID": "33947648",
+      "factoryReset": false,
+      "gameName_list": [
+        "lmu"
+      ],
+      "isOffical": false,
+      "presetName": "LMP3 Ginetta",
+      "presetUUID": "3400000000000000047",
+      "productUUID": "33947648",
+      "selected": false,
+      "updateTime": 1792687779
+    },
+    {
+      "createTime": 1787793380,
+      "deviceUUID": "33947648",
+      "factoryReset": false,
+      "gameName_list": [],
+      "isOffical": false,
+      "presetName": "My GT Neo Default",
+      "presetUUID": "3400000000000000049",
+      "productUUID": "33947648",
+      "selected": false,
+      "updateTime": 1791585484
+    },
+    {
+      "createTime": 1787941882,
+      "deviceUUID": "33947648",
+      "factoryReset": false,
+      "gameName_list": [
+        "lmu"
+      ],
+      "isOffical": false,
+      "presetName": "LM P2",
+      "presetUUID": "3400000000000000050",
+      "productUUID": "33947648",
+      "selected": false,
+      "updateTime": 1788440019
+    },
+    {
+      "createTime": 1787942686,
+      "deviceUUID": "33947648",
+      "factoryReset": false,
+      "gameName_list": [
+        "lmu"
+      ],
+      "isOffical": false,
+      "presetName": "WEC P2",
+      "presetUUID": "3400000000000000051",
+      "productUUID": "33947648",
+      "selected": false,
+      "updateTime": 1787942985
+    },
+    {
+      "createTime": 1787942985,
+      "deviceUUID": "33947648",
+      "factoryReset": false,
+      "gameName_list": [
+        "lmu"
+      ],
+      "isOffical": false,
+      "presetName": "HYP Cadillac",
+      "presetUUID": "3400000000000000052",
+      "productUUID": "33947648",
+      "selected": false,
+      "updateTime": 1791585957
+    },
+    {
+      "createTime": 1787947293,
+      "deviceUUID": "33947648",
+      "factoryReset": false,
+      "gameName_list": [
+        "lmu"
+      ],
+      "isOffical": false,
+      "presetName": "HYP Peugeot",
+      "presetUUID": "3400000000000000054",
+      "productUUID": "33947648",
+      "selected": true,
+      "updateTime": 1787947649
+    },
+    {
+      "createTime": 1790181386,
+      "deviceUUID": "33947648",
+      "factoryReset": false,
+      "gameName_list": [
+        "lmu"
+      ],
+      "isOffical": false,
+      "presetName": "GT3 Vette",
+      "presetUUID": "3400000000000000055",
+      "productUUID": "33947648",
+      "selected": false,
+      "updateTime": 1790181708
+    },
+    {
+      "createTime": 1790797125,
+      "deviceUUID": "33947648",
+      "factoryReset": false,
+      "gameName_list": [
+        "lmu"
+      ],
+      "isOffical": false,
+      "presetName": "GT3 296",
+      "presetUUID": "3400000000000000056",
+      "productUUID": "33947648",
+      "selected": false,
+      "updateTime": 1791557919
+    }
+  ],
+  "status": 200
+}

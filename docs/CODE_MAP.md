@@ -14,7 +14,32 @@ decode options in `server/replay/decode/replayTrajectoryTypes.ts`, telemetry cha
 `src/components/replay/telemetry/telemetryChartTypes.ts`, and map markers in
 `src/components/replay/map/gpsTrackMapTypes.ts`. Import these directly to avoid cycles through consumers.
 
-Verification baseline: 3,267 tests passed, 56 intentionally skipped; production build clean (zero warnings, zero errors).
+Verification baseline (2026-10-23): 3,551 tests passed, 56 intentionally skipped; lint and production build clean. The optional Simagic package separately passes six fake-server contract tests and its build/typecheck.
+
+Peripheral integrations: `server/peripherals/peripheralHost.ts` owns the optional Simagic package,
+health checks, lifecycle and guarded selection. `pluginRegistry.ts` dynamically loads contract v1;
+`sessionLoadDetector.ts` consumes one initial-garage opportunity per event, and
+`presetSwitchRunner.ts` performs active-preset comparison, wheel selection (the base is never switched) and
+one confirmation read without retries. `LiveService` publishes typed `snapshot` events even when
+no browser is connected. `stop()` unsubscribes and aborts outstanding plugin work.
+The host exposes the resolved wheel target and current load/skip status; selection results keep
+before/after UUIDs. Settings requests a deduplicated read-only health refresh on opening and renders
+the details in `PeripheralSelectionStatus.tsx`. `LoadedPresets.tsx` polls the read-only
+`/api/peripherals/:id/loaded-presets` observation endpoint while Settings is visible, showing actual
+base and wheel profiles independently of session assignments; session history stays collapsed.
+`REGISTERED_PERIPHERALS` declares allowed packages
+and `loadPeripheralPlugin` validates each configured factory against the versioned contract.
+`server/core/peripherals/peripheralStore.ts` stores catalog snapshots and mappings; plugin settings
+use SQLite metadata. DDL stays in `dbSchema.ts`. DTOs live in
+`shared/types/peripherals/peripherals.ts`; pure resolution, Suggest and display status live in
+`shared/domain/peripherals/`. Canonical car aliases remain in `vehicleMapping.ts`; `presetNames`
+affects suggestions only and never changes LMU identity resolution.
+`server/routes/peripherals/peripheralRoutes.ts` serves `/api/peripherals`; client calls use
+`src/api/peripheralsApi.ts`. `src/components/settings/peripherals/` renders device selection,
+catalog freshness, preview/save suggestions and guarded Apply. `PeripheralStatusChip.tsx` is
+injected only by `LiveConnectedPage`, so dashboard demos remain offline. The separately owned
+`../SimagicWheelDeamon` repository builds `lmu-peripheral-simagic` with no analyzer source imports.
+See [plugin setup](PLUGINS.md) and [integration plan](plans/SIMAGIC_PERIPHERAL_PLUGIN.md).
 
 Windows desktop integration: `server/desktop/systemTray.ts` starts the bundled native Win32
 helper `bin/systemTray-win32-x64.exe` at below-normal CPU priority after HTTP listening succeeds.

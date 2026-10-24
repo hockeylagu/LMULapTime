@@ -1,5 +1,24 @@
 # Endpoint performance history
 
+## Loaded peripheral presets — 2026-10-23
+
+Before/after isolated-cache sweeps kept cached `GET /api/peripherals` below 3 ms p95:
+1.21/1.57 ms median/p95 before, 1.80/2.16 ms after. Its implementation still reads in-memory status.
+The new `GET /api/peripherals/:id/loaded-presets` is classified separately and skipped in the
+hardware-free sweep; fake-plugin tests cover base/wheel reads, profiles without LMU tags,
+ambiguous selections, partial failures and zero hardware writes. Its five-second deadline bounds
+vendor reads; the settings page polls only while visible and does not poll during preset selection.
+
+## Optional peripheral integration — 2026-10-23
+
+The isolated-cache endpoint sweep now discovers nested routers and classifies peripheral writes.
+`GET /api/peripherals` reads cached host status only: five measured requests produced a **2.05 ms
+median and 2.29 ms p95** (2.49 ms first request). Device discovery and enabled-device catalog reads
+are covered by fake-plugin integration tests; the benchmark never selects real hardware presets.
+The initial pre-change run was blocked by sandbox loopback restrictions, so it provides no valid
+before/after latency comparison. The completed sweep ran with local-server permission against an
+isolated database snapshot; rankings remain in `.cache/endpoint-benchmarks/latest.md`.
+
 ## Persisted replay lap availability — 2026-10-22
 
 Before/after isolated-cache runs used production HTTP routers, five measured requests per scenario,

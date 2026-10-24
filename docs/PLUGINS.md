@@ -1,5 +1,64 @@
 # Optional local data packages
 
+## Peripheral plugins (separate from data packages)
+
+The analyzer also supports an optional executable peripheral integration. This is a separate contract
+from the immutable JSON data packages below: `LMU_PLUGIN_ROOT` still loads data only.
+
+`lmu-peripheral-simagic` is built from the sibling `../SimagicWheelDeamon` repository, now a
+TypeScript plugin package with no standalone daemon, Python runtime, tray or startup service.
+Run `npm install` and `npm run build` in that repository, then `npm install` in the analyzer.
+The optional `file:` dependency is loaded dynamically against peripheral contract version 1.
+An absent or incompatible package leaves analytics available and reports its status in Settings.
+The package is local development integration; release distribution must include/build that package
+or omit it deliberately. The frontend build does not bundle backend plugin code.
+
+Start SimPro Manager yourself. Open **Settings → Peripherals**, enable the plugin, discover and
+select your wheel, and refresh the preset catalog. Only presets tagged for Le Mans Ultimate in
+SimPro are offered, suggested or selected; tag a profile for LMU in SimPro to make it available. Use **Suggest mappings** to
+preview deterministic name/class matches, then save the proposed rows or choose presets manually.
+Existing assignments are preserved unless you explicitly request replacing them in the preview.
+Assignments use UUIDs, so preset renaming does not break them. Failed refreshes preserve cached
+lists and mappings; confirmed missing presets remain visibly unavailable. Complete SimPro device
+wheel profiles are selected (LEDs/buttons/paddles). The wheelbase is never switched: it keeps one
+profile for every car.
+
+Settings shows **Loaded presets** for connected wheelbases and wheels even without a live session.
+`GET /api/peripherals/:id/loaded-presets` reads SimPro directly with a five-second deadline; it does
+not select presets or update the assignment catalog. Exactly one selected profile is required per
+device; missing, ambiguous or failed reads are shown explicitly. Profiles without LMU tags can be
+displayed here. The visible panel refreshes every 15 seconds and offers a manual refresh, with the
+observation time beside it. Session switching details appear in a collapsed disclosure only when
+there is a session or a previous decision. Unassigned catalog presets are highlighted above the
+collapsed car assignments, with **Review assignments** opening and focusing that section.
+
+Session switching details show the detected car, resolved wheel target and whether the assignment
+comes from the car or its class default. The last decision includes the requested, previously active
+and confirmation-readback UUIDs when those reads occurred. Skipped loads keep their reason visible,
+including missing configuration or leaving the garage before the car could be identified. Opening
+Settings refreshes health immediately for an enabled plugin; concurrent health checks share one
+request. This refresh does not apply presets. `LM P2` and `WEC P2` are explicit Oreca suggestion
+aliases; when both are equally eligible, Suggest leaves the assignment ambiguous for manual choice.
+
+Automatic switching runs once in the first garage of a loaded event, after a three-second settling
+period and car resolution. Practice, qualifying, race and returns to the garage share that one load.
+The host reads each active preset first and sends no selection if it already matches. Unknown
+readback, failed selection and disconnects never cause selection retries. Leaving the garage aborts
+pending work; driving, historical sessions, replays and demo mode never trigger automation.
+An explicit **Apply** in Settings is refused on track and after that load has already been handled.
+Offline/menu Apply is available for deliberate configuration testing. The app does not reset profiles,
+enforce mappings during a drive, launch SimPro or change presets on reconnect.
+
+The connected live dashboard displays read-only SimPro health. It has no peripheral actions, and
+offline dashboard demos do not query plugin status. Backend health monitoring runs without browser
+clients while the plugin is enabled. Disabled plugins make no vendor requests.
+
+Disable the former daemon's Startup shortcut and stop its running copy before enabling this plugin.
+The migration preserves its private `local/` data but does not import legacy configuration.
+See [implementation plan and API contract](plans/SIMAGIC_PERIPHERAL_PLUGIN.md).
+
+## Track and vehicle data packages
+
 Basic track layouts are always bundled with the app as SVG illustrations. They provide
 orientation and thumbnails; they are never used as calibrated geometry for analysis.
 Detailed tracks and vehicle records come from an optional local JSON package.

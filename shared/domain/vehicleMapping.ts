@@ -67,13 +67,15 @@ interface VehicleModel {
   model: string;
   /** Other public names LMU writes for the car (`CarType`, `fullPathTree`), seasons apart. */
   names?: readonly string[];
+  /** Short profile labels used only by peripheral preset suggestions, never by vehicle resolution. */
+  presetNames?: readonly string[];
 }
 
 // One row per class and car name; the merged pairs (296 Evo, TR010) are 2026 updates of the same car.
-const VEHICLE_MODELS: readonly VehicleModel[] = [
+export const VEHICLE_MODELS: readonly VehicleModel[] = [
   { carName: 'AMR_LMGT3', carClass: 'GT3', model: 'Aston Martin Vantage AMR LMGT3' },
   { carName: 'BMW_M4_LMGT3', carClass: 'GT3', model: 'BMW M4 LMGT3' },
-  { carName: 'Corvette_Z06_LMGT3R', carClass: 'GT3', model: 'Chevrolet Corvette Z06 LMGT3.R' },
+  { carName: 'Corvette_Z06_LMGT3R', carClass: 'GT3', model: 'Chevrolet Corvette Z06 LMGT3.R', presetNames: ['Vette'] },
   { carName: 'Ferrari_296_LMGT3', carClass: 'GT3', model: 'Ferrari 296 LMGT3', names: ['Ferrari 296 LMGT3 Evo'] },
   { carName: 'Ford_Mustang_LMGT3', carClass: 'GT3', model: 'Ford Mustang LMGT3' },
   { carName: 'Lamborghini_Huracan_GT3_Evo2', carClass: 'GT3', model: 'Lamborghini Huracan LMGT3 Evo2' },
@@ -99,8 +101,8 @@ const VEHICLE_MODELS: readonly VehicleModel[] = [
   { carName: 'Porsche_963', carClass: 'Hyper', model: 'Porsche 963' },
   { carName: 'Toyota_GR010', carClass: 'Hyper', model: 'Toyota GR010', names: ['Toyota TR010'] },
   { carName: 'Vanwall_680', carClass: 'Hyper', model: 'Vanwall 680' },
-  { carName: 'Oreca_07', carClass: 'LMP2', model: 'Oreca 07' },
-  { carName: 'Oreca_07', carClass: 'LMP2_ELMS', model: 'Oreca 07' },
+  { carName: 'Oreca_07', carClass: 'LMP2', model: 'Oreca 07', presetNames: ['LM P2', 'WEC P2'] },
+  { carName: 'Oreca_07', carClass: 'LMP2_ELMS', model: 'Oreca 07', presetNames: ['LM P2', 'WEC P2'] },
   { carName: 'ADESS_AD25_LMP3', carClass: 'LMP3', model: 'ADESS AD25 LMP3' },
   { carName: 'Duqueine_D09_P3', carClass: 'LMP3', model: 'Duqueine D09 P3' },
   { carName: 'Ginetta_G61LTP3_Evo', carClass: 'LMP3', model: 'Ginetta G61-LT-P325 Evo' },

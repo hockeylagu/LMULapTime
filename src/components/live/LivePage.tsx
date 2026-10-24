@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router';
 import { useLiveStream } from '../../api/liveStream.js';
 import { LiveFrame } from './LiveFrame.js';
 import { LiveDashboardView } from './display/LiveDashboardView.js';
+import { PeripheralStatusChip } from './PeripheralStatusChip.js';
 import { PedalBuffer } from './pedalBuffer.js';
 import { useLiveDashboardSettings } from '../../api/useLiveDashboardSettings.js';
 const LiveDemoPage = lazy(() => import('./demo/LiveDemoPage.js'));
@@ -32,7 +33,7 @@ function LiveConnectedPage() {
 
   return (
     <LiveFrame>
-      <LiveDashboardView snapshot={snapshot} connection={connection} timing={timing} buffer={buffer} />
+      <LiveDashboardView snapshot={snapshot} connection={connection} timing={timing} buffer={buffer} peripherals={<PeripheralStatusChip />} />
     </LiveFrame>
   );
 }

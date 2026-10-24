@@ -90,6 +90,25 @@ CREATE TABLE IF NOT EXISTS ai_reports (
 `;
 
 export function initDbSchema(db: DatabaseType): void {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS peripheral_presets (
+      plugin_id TEXT NOT NULL, product_uuid TEXT NOT NULL, device_uuid TEXT NOT NULL,
+      preset_uuid TEXT NOT NULL, name TEXT NOT NULL, tags_json TEXT NOT NULL,
+      official INTEGER NOT NULL, available INTEGER NOT NULL,
+      PRIMARY KEY (plugin_id, product_uuid, device_uuid, preset_uuid)
+    ) WITHOUT ROWID;
+    CREATE TABLE IF NOT EXISTS peripheral_catalog_refreshes (
+      plugin_id TEXT NOT NULL, product_uuid TEXT NOT NULL, device_uuid TEXT NOT NULL,
+      refreshed_at INTEGER, last_error TEXT,
+      PRIMARY KEY (plugin_id, product_uuid, device_uuid)
+    ) WITHOUT ROWID;
+    CREATE TABLE IF NOT EXISTS peripheral_car_preset_mappings (
+      plugin_id TEXT NOT NULL,
+      scope_kind TEXT NOT NULL CHECK (scope_kind IN ('model', 'class')), scope_key TEXT NOT NULL,
+      product_uuid TEXT NOT NULL, device_uuid TEXT NOT NULL, preset_uuid TEXT NOT NULL, updated_at INTEGER NOT NULL,
+      PRIMARY KEY (plugin_id, scope_kind, scope_key)
+    ) WITHOUT ROWID;
+  `);
   // Match replay names the way replay driver resolution does: trimmed and lowercased.
   db.function('lmu_driver_key', { deterministic: true }, (name: unknown) => typeof name === 'string' ? name.trim().toLowerCase() : '');
   db.exec(LIVE_CAPTURE_INDEX_SCHEMA);
