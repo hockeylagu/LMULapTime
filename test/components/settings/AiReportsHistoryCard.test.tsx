@@ -65,4 +65,34 @@ describe('AiReportsHistoryCard', () => {
     fireEvent.click(screen.getByLabelText(/refresh ai report history/i));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   });
+
+  it('toggles collapse and expand when the header button is clicked', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve([
+        {
+          cacheKey: 'key-1',
+          sessionId: 'spa-session',
+          lapNumber: 5,
+          model: 'gemini-3.8-flash',
+          overallSummary: 'Brake later into Eau Rouge.',
+          tokensUsed: { prompt: 100, completion: 50, total: 150 },
+          generatedAt: Date.now(),
+        },
+      ]),
+    });
+
+    render(<AiReportsHistoryCard defaultOpen={false} />);
+    const toggle = screen.getByRole('button', { name: /^report history$/i });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Brake later into Eau Rouge.')).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(await screen.findByText('Brake later into Eau Rouge.')).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Brake later into Eau Rouge.')).not.toBeInTheDocument();
+  });
 });

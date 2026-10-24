@@ -12,7 +12,6 @@ import { PeripheralsCard } from './peripherals/PeripheralsCard.js';
 import { LiveLearningPanel } from './learning/LiveLearningPanel.js';
 import { AISettingsCard } from './AISettingsCard.js';
 import { ReplayCacheCard } from './ReplayCacheCard.js';
-import { AiReportsHistoryCard } from './AiReportsHistoryCard.js';
 import { SettingsSidebar } from './SettingsSidebar.js';
 import { useReplayCache } from './replays/useReplayCache.js';
 import { useAiSettings } from './hooks/useAiSettings.js';
@@ -111,8 +110,6 @@ export const Settings: React.FC<SettingsProps> = ({ status, onUpdatePaths, repla
         return <LiveLearningPanel />;
       case 'ai-settings':
         return <AISettingsCard ai={ai} />;
-      case 'ai-history':
-        return <AiReportsHistoryCard />;
       case 'reference-benchmarks':
         return (
           <ReferenceLaptimesCard

@@ -21,6 +21,9 @@ describe('AISettingsCard component', () => {
           json: () => Promise.resolve({ configured: true, model: 'gemini-3.8-flash', keySource: 'session' }),
         });
       }
+      if (url.includes('/api/ai/reports')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      }
       return Promise.reject(new Error('Unknown url'));
     });
 
@@ -34,7 +37,12 @@ describe('AISettingsCard component', () => {
   });
 
   it('displays error message when settings loading fails', async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/ai/reports')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      }
+      return Promise.reject(new Error('Network error'));
+    });
     render(<AISettingsCard />);
 
     await waitFor(() => {
@@ -49,6 +57,9 @@ describe('AISettingsCard component', () => {
           ok: true,
           json: () => Promise.resolve({ configured: true, model: 'gemini-3.8-flash', keySource: 'session' }),
         });
+      }
+      if (url.includes('/api/ai/reports')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
       }
       return Promise.resolve({
         ok: true,
@@ -86,6 +97,9 @@ describe('AISettingsCard component', () => {
           json: () => Promise.resolve({ error: 'Invalid API key provided' }),
         });
       }
+      if (url.includes('/api/ai/reports')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      }
       return Promise.resolve({
         ok: true,
         json: () => Promise.resolve({ configured: false, model: 'gemini-3.8-flash', keySource: null }),
@@ -107,9 +121,14 @@ describe('AISettingsCard component', () => {
   });
 
   it('prevents removing environment key', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ configured: true, model: 'gemini-3.8-flash', keySource: 'environment' }),
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/ai/reports')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ configured: true, model: 'gemini-3.8-flash', keySource: 'environment' }),
+      });
     });
 
     render(<AISettingsCard />);
@@ -128,6 +147,9 @@ describe('AISettingsCard component', () => {
           ok: true,
           json: () => Promise.resolve({ configured: false, model: 'gemini-3.8-flash', keySource: null }),
         });
+      }
+      if (url.includes('/api/ai/reports')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
       }
       return Promise.resolve({
         ok: true,
@@ -153,9 +175,14 @@ describe('AISettingsCard component', () => {
   });
 
   it('cancels key removal from the inline confirm without calling the server', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ configured: true, model: 'gemini-3.8-flash', keySource: 'session' }),
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/ai/reports')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ configured: true, model: 'gemini-3.8-flash', keySource: 'session' }),
+      });
     });
     global.fetch = fetchMock;
 
@@ -169,7 +196,44 @@ describe('AISettingsCard component', () => {
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
 
     expect(screen.queryByRole('button', { name: 'Remove key' })).not.toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledTimes(1); // Only the initial loadSettings
+    expect(fetchMock).toHaveBeenCalledTimes(2); // Initial loadSettings and loadReports
     expect(confirmSpy).not.toHaveBeenCalled();
+  });
+
+  it('renders report history inside the same card', async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/ai/reports')) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve([
+            {
+              cacheKey: 'test-report-1',
+              sessionId: 'monza-session',
+              lapNumber: 7,
+              model: 'gemini-3.8-flash',
+              overallSummary: 'Consistent turn 1 braking.',
+              tokensUsed: { total: 120 },
+              generatedAt: Date.now(),
+            },
+          ]),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ configured: true, model: 'gemini-3.8-flash', keySource: 'session' }),
+      });
+    });
+
+    render(<AISettingsCard />);
+    expect(await screen.findByRole('heading', { name: 'Report History' })).toBeInTheDocument();
+    const toggle = screen.getByRole('button', { name: /^report history$/i });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText(/monza-session · Lap 7/)).not.toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(await screen.findByText(/monza-session · Lap 7/)).toBeInTheDocument();
+    expect(screen.getByText('Consistent turn 1 braking.')).toBeInTheDocument();
+    expect(screen.getByText('120 tokens')).toBeInTheDocument();
   });
 });

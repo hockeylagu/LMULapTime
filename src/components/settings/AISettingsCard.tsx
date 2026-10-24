@@ -9,6 +9,7 @@ import { AiSettingsResponse, AiSettingsState, useAiSettings } from './hooks/useA
 import { FeedbackMessage, SettingsFeedback, SettingsPanel } from './SettingsPanel.js';
 import { FIELD_LABEL } from './labelStyles.js';
 import { Select } from '../common/dropdown/Select.js';
+import { AiReportsHistorySection } from './AiReportsHistoryCard.js';
 
 const AI_MODELS = ['gemini-3.8-flash'] as const;
 
@@ -22,7 +23,11 @@ export function aiStatusText(settings: AiSettingsResponse | null, loadError: str
   return settings.keySource === 'environment' ? 'Ready, key from the environment' : 'Ready, key set this session';
 }
 
-const AISettingsPanel: React.FC<{ ai: AiSettingsState }> = ({ ai }) => {
+const AISettingsPanel: React.FC<{ ai: AiSettingsState; showHistory?: boolean; defaultHistoryOpen?: boolean }> = ({
+  ai,
+  showHistory = true,
+  defaultHistoryOpen = false,
+}) => {
   const { settings, setSettings, loadError } = ai;
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState<string>(settings?.model ?? 'gemini-3.8-flash');
@@ -126,12 +131,23 @@ const AISettingsPanel: React.FC<{ ai: AiSettingsState }> = ({ ai }) => {
         <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className={`inline-flex items-center gap-1.5 h-8 rounded-lg border border-lmu-border px-3 text-xs font-semibold text-lmu-muted hover:text-lmu-text hover:border-lmu-rule transition-colors ${FOCUS_RING}`}><ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /> Get a Gemini key</a>
       </div>
       <FeedbackMessage feedback={message} />
+      {showHistory && <AiReportsHistorySection defaultOpen={defaultHistoryOpen} />}
     </SettingsPanel>
   );
 };
 
-const SelfLoadingAISettings: React.FC = () => <AISettingsPanel ai={useAiSettings()} />;
+export interface AISettingsCardProps {
+  ai?: AiSettingsState;
+  showHistory?: boolean;
+  defaultHistoryOpen?: boolean;
+}
 
-/** The Gemini key panel. Settings passes the shared state; on its own the card reads it itself. */
-export const AISettingsCard: React.FC<{ ai?: AiSettingsState }> = ({ ai }) =>
-  ai ? <AISettingsPanel ai={ai} /> : <SelfLoadingAISettings />;
+const SelfLoadingAISettings: React.FC<{ showHistory?: boolean; defaultHistoryOpen?: boolean }> = ({ showHistory, defaultHistoryOpen }) => (
+  <AISettingsPanel ai={useAiSettings()} showHistory={showHistory} defaultHistoryOpen={defaultHistoryOpen} />
+);
+
+/** The Gemini key and report history panel. Settings passes the shared state; on its own the card reads it itself. */
+export const AISettingsCard: React.FC<AISettingsCardProps> = ({ ai, showHistory = true, defaultHistoryOpen = false }) =>
+  ai ? <AISettingsPanel ai={ai} showHistory={showHistory} defaultHistoryOpen={defaultHistoryOpen} /> : <SelfLoadingAISettings showHistory={showHistory} defaultHistoryOpen={defaultHistoryOpen} />;
+
+

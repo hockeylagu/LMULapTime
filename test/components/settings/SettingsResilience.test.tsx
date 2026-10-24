@@ -124,9 +124,10 @@ describe('Gemini key handling', () => {
 
   it('offers Retry when the key state cannot be read, and recovers', async () => {
     let healthy = false;
-    global.fetch = vi.fn().mockImplementation(() =>
-      healthy ? json({ configured: false, model: 'gemini-3.8-flash', keySource: null }) : apiFailure(503, { error: 'Server is starting' })
-    );
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/api/ai/reports')) return json([]);
+      return healthy ? json({ configured: false, model: 'gemini-3.8-flash', keySource: null }) : apiFailure(503, { error: 'Server is starting' });
+    });
     render(<AISettingsCard />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Server is starting');
     healthy = true;

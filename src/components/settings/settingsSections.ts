@@ -1,4 +1,4 @@
-import { LucideIcon, LayoutDashboard, Film, BrainCircuit, History, Database, HardDrive, Radio, ChartNoAxesCombined, Gamepad2 } from 'lucide-react';
+import { LucideIcon, LayoutDashboard, Film, BrainCircuit, Database, HardDrive, Radio, ChartNoAxesCombined, Gamepad2 } from 'lucide-react';
 import { AppStatus } from '../../../shared/types/index.js';
 
 export interface SettingsSectionDef {
@@ -48,15 +48,8 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     id: 'ai-settings',
     title: 'AI Lap Reports',
     icon: BrainCircuit,
-    description: 'Google Gemini AI configuration, API key, and model selection',
-    keywords: ['ai', 'gemini', 'api key', 'race engineer', 'model', 'flash', 'coaching', 'tokens', 'google', 'prompt'],
-  },
-  {
-    id: 'ai-history',
-    title: 'AI Report History',
-    icon: History,
-    description: 'Cached Gemini lap reports and coaching debrief history',
-    keywords: ['ai', 'history', 'reports', 'cached reports', 'debriefs', 'coaching', 'gemini', 'saved', 'logs'],
+    description: 'Google Gemini AI configuration, API key, model selection, and cached report history',
+    keywords: ['ai', 'gemini', 'api key', 'race engineer', 'model', 'flash', 'coaching', 'tokens', 'google', 'prompt', 'history', 'reports', 'cached reports', 'debriefs', 'saved', 'logs'],
   },
   {
     id: 'replay-cache',
@@ -112,5 +105,6 @@ export function orderSettingsSections(sections: SettingsSectionDef[], setupNeede
 /** The section id a `?section=` value points at, or null when it names no section. */
 export function resolveSectionId(requested: string | null): string | null {
   if (!requested) return null;
+  if (requested === 'ai-history') return 'ai-settings';
   return SETTINGS_SECTIONS.some((section) => section.id === requested) ? requested : null;
 }

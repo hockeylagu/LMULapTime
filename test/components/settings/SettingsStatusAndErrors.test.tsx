@@ -80,7 +80,6 @@ describe('Settings overview card', () => {
       'Learning',
       'Peripherals',
       'AI Lap Reports',
-      'AI Report History',
       'Cached Replays',
       'Folder Paths & Driver',
     ]);

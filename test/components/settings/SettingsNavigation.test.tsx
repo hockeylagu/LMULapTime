@@ -75,7 +75,6 @@ describe('Settings navigation', () => {
       'Learning',
       'Peripherals',
       'AI Lap Reports',
-      'AI Report History',
       'Cached Replays',
       'Folder Paths & Driver',
     ]);
