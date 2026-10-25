@@ -21,8 +21,8 @@ new sets (one kept for qualifying before it), the selected set, the event's meas
 and the game's four-tyre time (`FourTireChange`, read with the pit rules on track). The race runs to the leader's
 first crossing after the clock at the event lap time, every car making the same stops: their time (the stored pit
 lane loss and the refuel at the game's fill rate) comes off the clock. The formation lap costs no VE
-(`formationLapUse`: VE held at 100 % to the green at Le Mans on 2026-10-22 and 2026-10-23; fuel keeps a lap until
-measured on a fuel class). Le Mans race 2026-10-23: the old rule (a lap past the clock, no stop time, a lap of VE on
+(`formationLapUse`: VE held at 100 % to the green at Le Mans on 2026-10-22 and 2026-10-23) and a quarter lap of
+fuel (0.4 L of a 2.3 L lap in the LMP3 Portimão race of 2026-10-24, 0.9 L of 6.6 L at Le Mans; model version 8). Le Mans race 2026-10-23: the old rule (a lap past the clock, no stop time, a lap of VE on
 the formation lap) planned 19 laps, the stop on lap 10 and 78 % after it; 17 were run, the stop on lap 12 with 49 %
 left 12 % at the flag. The new rule plans 17 laps, lap 11 and 54 %.
 
@@ -638,7 +638,7 @@ Preparation hierarchy: the estimated session lap count is a dedicated 180 px rea
 
 Subtitle audit: remove routine clean/paired sample counts, already-matching MFD selections, the duplicate tyre forecast, repair N/A, generic post-qualifying prompts and repeated lifecycle descriptions. Retain actual setting differences, missing-reading reasons, game-estimate qualifiers, tyre-floor/stock warnings, penalty-service restrictions, formation/countdown status, qualifying carryover and provisional/partial-result context. Race result consumption retains its recent-clean-lap horizon. The review gallery also includes a 45-minute / approximately 24-lap race with one planned stop, derived through planGarage at 4.5% VE per lap.
 
-Planned-stop preparation includes the estimated first racing pit lap (`LiveGaragePlan.firstPitLap`). `planGarage` delegates to canonical `planRace` using the selected garage load, reserve and consumption, after subtracting the formation lap's use (`formationLapUse`: none for VE, a lap for fuel) from the load and the formation lap from the session horizon. It does not count the formation lap as racing lap 1. Unknown load/use or an insufficient formation-and-reserve load gives no preview; a full-session load gives no pit lap. This is a resource-range preview, not an optimal pit window; tyre/forecast/damage advice still applies. The 45-minute fixture at 4.5% VE/lap previews lap 21 from a selected 100%, and lap 17 from 80% (lap 20 on fuel).
+Planned-stop preparation includes the estimated first racing pit lap (`LiveGaragePlan.firstPitLap`). `planGarage` delegates to canonical `planRace` using the selected garage load, reserve and consumption, after subtracting the formation lap's use (`formationLapUse`: none for VE, a quarter lap for fuel) from the load and the formation lap from the session horizon. It does not count the formation lap as racing lap 1. Unknown load/use or an insufficient formation-and-reserve load gives no preview; a full-session load gives no pit lap. This is a resource-range preview, not an optimal pit window; tyre/forecast/damage advice still applies. The 45-minute fixture at 4.5% VE/lap previews lap 21 from a selected 100%, and lap 17 from 80% (lap 21 on fuel).
 
 Race preparation treats the completed qualifying result carried into the race garage as settled for cockpit presentation, so its QUALI position/time line has no provisional suffix. The underlying source remains live scoring; this presentation change does not claim XML-result linkage or change the result-summary source semantics.
 

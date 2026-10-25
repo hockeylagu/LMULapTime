@@ -86,15 +86,26 @@ describe('planGarage', () => {
     expect(planGarage(input)).toMatchObject({ laps: 24, stops: 1, needed: 100, firstPitLap: 21 });
     expect(planGarage({ ...input, setInGarage: 80 })).toMatchObject({ firstPitLap: 17 });
     expect(planGarage({ ...input, sessionSeconds: 1200 })).toMatchObject({ laps: 11, needed: 48 });
-    // Fuel still spends a lap on it.
-    expect(planGarage({ ...input, kind: 'fuel' })).toMatchObject({ firstPitLap: 20 });
-    expect(planGarage({ ...input, kind: 'fuel', sessionSeconds: 1200 })).toMatchObject({ laps: 11, needed: 52 });
+    // Fuel spends a quarter lap on it: (100 - 1.125 - 2.25) / 4.5 = 21.5 racing laps.
+    expect(planGarage({ ...input, kind: 'fuel' })).toMatchObject({ firstPitLap: 21 });
+    expect(planGarage({ ...input, kind: 'fuel', sessionSeconds: 1200 })).toMatchObject({ laps: 11, needed: 49 });
     expect(planGarage({ ...input, setInGarage: null }).firstPitLap).toBeNull();
     expect(planGarage({ ...input, perLap: null }).firstPitLap).toBeNull();
     expect(planGarage({ ...input, perLap: 0 }).firstPitLap).toBeNull();
     expect(planGarage({ ...input, setInGarage: 2 }).firstPitLap).toBeNull();
     expect(planGarage({ ...input, sessionSeconds: 1200 })).toMatchObject({ stops: 0, firstPitLap: null });
   });
+  it('loads a quarter lap of fuel for the formation lap (Portimão LMP3 race 2026-10-24)', () => {
+    // 20 min at the leader's 100.45 s: 12 racing laps plus the formation lap. A full formation lap set 32 L; the car
+    // used 0.4 L on it and 2.30 L a lap, and finished with 4.3 L against a 0.45-lap (1 L) reserve.
+    const input = { kind: 'fuel' as const, formationLap: true, sessionSeconds: 1200, raceLeaderLapSeconds: 100.45, lapSeconds: 100.6,
+      perLap: 2.33, perLapSource: 'measured' as const, lapsMeasured: 8, reserveLaps: 0.45, capacity: 100, setInGarage: 32 };
+    const plan = planGarage(input);
+    expect(plan).toMatchObject({ laps: 13, needed: 30, stops: 0 });
+    // 30 L covers the 28.0 L the race used with the reserve still in the tank.
+    expect(plan.needed! - (0.4 + 12 * 2.3)).toBeGreaterThan(0.45 * 2.3);
+  });
+
   it('loads the session laps (laps started before the clock ends, plus a race formation lap) and the reserve', () => {
     // The out lap of practice is one of the laps the clock allows; a race adds its formation lap.
     expect(sessionLaps(900, 75, false)).toBe(12);

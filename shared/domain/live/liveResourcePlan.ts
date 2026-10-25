@@ -13,9 +13,11 @@ export const resourceUnit = (kind: LiveResourceKind): '%' | 'L' => (kind === 've
 
 /**
  * Laps of use the formation lap costs. VE held at 100 % from the grid to the green at Le Mans (2026-10-22 and
- * 2026-10-23, first drop after the green); fuel is not yet measured on a fuel class, so a full lap is kept.
+ * 2026-10-23, first drop after the green). Fuel: 0.9 L of a 6.6 L lap at Le Mans (13 %), 0.4 L of a 2.3 L lap
+ * at Portimão in LMP3 (2026-10-24, 17 %; the readings step 0.39 L), so a quarter lap keeps a margin. The full lap
+ * kept before left the LMP3 car 1.9 laps of fuel at the flag against a 0.45-lap reserve.
  */
-export const formationLapUse = (kind: LiveResourceKind): number => (kind === 've' ? 0 : 1);
+export const formationLapUse = (kind: LiveResourceKind): number => (kind === 've' ? 0 : 0.25);
 
 const round = (value: number, digits: number): number => Math.round(value * 10 ** digits) / 10 ** digits;
 /** What to set on the MFD or in the garage: up to a whole percent or litre, never below what is needed. */
