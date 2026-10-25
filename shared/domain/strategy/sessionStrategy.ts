@@ -3,7 +3,7 @@ import { selectCleanLapCandidates } from '../lapComparison.js';
 
 const CORNERS: StrategyCorner[] = ['FL', 'FR', 'RL', 'RR'];
 /** A rise in tread above this is a new tyre, not noise. */
-const NEW_TYRE_RISE = 0.005;
+export const NEW_TYRE_RISE = 0.005;
 
 const round = (value: number, digits: number): number => Math.round(value * 10 ** digits) / 10 ** digits;
 const median = (values: readonly number[]): number | null => {

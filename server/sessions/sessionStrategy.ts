@@ -5,28 +5,42 @@ import type { SessionDatabase } from '../core/db.js';
 import { DuckDbReader } from '../telemetry/duckdbReader.js';
 import { TelemetryLinks } from '../telemetry/telemetryLinks.js';
 
+export type SessionStrategySource = Pick<SessionDatabase, 'getDb' | 'getSessionById' | 'getTelemetryMetadata'
+  | 'getTelemetryLapCacheFilenames' | 'recordIngestError'>;
+
 /**
  * The strategy a session measured, from the player's native telemetry files linked to it (online races write no
  * fuel, VE or wear in their results XML). Read when asked, never stored: a race reads in about 0.2 s. A session
  * spread over several files takes each lap's state from the first file, in recording order, that has it.
  * `undefined` when the session does not exist; null without telemetry or a player.
  */
-export async function readSessionStrategy(sessionDb: SessionDatabase, sessionId: string): Promise<SessionStrategy | null | undefined> {
+export async function readSessionStrategy(sessionDb: SessionStrategySource, sessionId: string): Promise<SessionStrategy | null | undefined> {
   const session = sessionDb.getSessionById(sessionId);
   if (!session) return undefined;
   const player = session.playerDriver ?? session.drivers.find(driver => driver.isPlayer);
   if (!player) return null;
+  return measureSessionStrategy(await readSessionLapStates(sessionDb, sessionId), player.laps ?? []);
+}
+
+/** Native end states, shared by strategy history and tyre learning; earlier linked files own duplicate laps. */
+export async function readSessionLapStates(sessionDb: SessionStrategySource, sessionId: string, signal?: AbortSignal): Promise<StrategyLapState[]> {
+  signal?.throwIfAborted();
+  const session = sessionDb.getSessionById(sessionId);
+  if (!session) return [];
   const links = TelemetryLinks.load(sessionDb, session.id);
   const files = links.filesForSession(session).map(filename => links.row(filename)).filter(row => row !== undefined);
   const states = new Map<number, StrategyLapState>();
   for (const file of files) {
+    signal?.throwIfAborted();
     const reader = new DuckDbReader(file.filePath);
     try {
       // oxlint-disable-next-line eslint/no-await-in-loop -- One file at a time: earlier files keep their laps.
       await reader.open();
+      signal?.throwIfAborted();
       // oxlint-disable-next-line eslint/no-await-in-loop -- One file at a time: earlier files keep their laps.
       for (const state of await reader.getLapEndStates()) if (!states.has(state.lap)) states.set(state.lap, state);
     } catch (error) {
+      if (signal?.aborted) throw error;
       console.warn(`[DuckDB] Failed to read the strategy from ${file.filename}:`, error);
       sessionDb.recordIngestError('duckdb', file.filePath, error);
     } finally {
@@ -34,7 +48,8 @@ export async function readSessionStrategy(sessionDb: SessionDatabase, sessionId:
       await reader.close().catch(() => undefined);
     }
   }
-  return measureSessionStrategy([...states.values()].sort((a, b) => a.lap - b.lap), player.laps ?? []);
+  signal?.throwIfAborted();
+  return [...states.values()].sort((a, b) => a.lap - b.lap);
 }
 
 /**

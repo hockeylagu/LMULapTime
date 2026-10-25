@@ -160,10 +160,10 @@ export function parseTireManagement(body: unknown): Extract<LiveRestUpdate, { ty
  */
 function parseSelectedTyres(json: Json | null): LiveSelectedTyres | null {
   const selected = record(json?.tireInvGarageOptions)?.selectedTires;
-  if (!Array.isArray(selected) || selected.length === 0) return null;
+  if (!Array.isArray(selected) || selected.length !== 4) return null;
   const wheels = selected.map(record).filter((wheel): wheel is Json => wheel !== null);
   const wear = wheels.map(wheel => num(wheel.wearValue)).filter((value): value is number => value !== null);
-  if (wear.length === 0) return null;
+  if (wear.length !== 4 || wear.some(value => value < 0 || value > 100)) return null;
   const compounds = record(json?.optimalCompoundConditions)?.compounds;
   const index = num(wheels[0].compoundIndex);
   const compound = Array.isArray(compounds) && index !== null ? record(compounds[index])?.type : null;
@@ -171,6 +171,7 @@ function parseSelectedTyres(json: Json | null): LiveSelectedTyres | null {
     compound: typeof compound === 'string' ? compound : null,
     used: wheels.some(wheel => wheel.isUsed === true),
     wear: Math.min(...wear) / 100,
+    tread: [wear[0] / 100, wear[1] / 100, wear[2] / 100, wear[3] / 100],
   };
 }
 

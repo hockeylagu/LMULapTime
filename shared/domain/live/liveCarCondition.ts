@@ -39,7 +39,7 @@ const PACE_WINDOW = 3;
 /** A rise of the worst tyre's tread above this means new tyres: a new stint. */
 const NEW_TYRES_RISE = 0.05;
 /** More tread lost in one lap than this is damage, not wear (normal wear is well under 5% a lap). */
-const MAX_LAP_WEAR = 0.15;
+export const MAX_LAP_WEAR = 0.15;
 
 /** One slow lap (an off, traffic) among the window must not read as damage pace. */
 const median = (values: readonly number[]): number => {

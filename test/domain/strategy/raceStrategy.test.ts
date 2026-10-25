@@ -4,20 +4,31 @@ import { planRaceStrategies, type RaceStrategyInput } from '../../../shared/doma
 // 60 minutes at 1:36.6 on 4 % VE a lap: 38 racing laps after the formation lap (it costs no VE), one stop.
 const input = (over: Partial<RaceStrategyInput> = {}): RaceStrategyInput => ({
   kind: 've', raceMinutes: 60, lapSeconds: 96.6, perLap: 4, reserveLaps: 0.5, capacity: 100, qualifyingAhead: true,
-  tyres: { compound: 'Medium', used: false, wear: 1, newSets: 3 }, compound: 'Medium', wearPerLap: 0.008, tyreChangeSeconds: 12, pitLaneSeconds: null, refuel: null, ...over,
+  tyres: { compound: 'Medium', used: false, wear: 1, newSets: 3 }, compound: 'Medium', wearPerLap: [0.008, 0.008, 0.008, 0.008], tyreChangeSeconds: 12, pitLaneSeconds: null, refuel: null, ...over,
 });
 
 describe('race strategy before the race', () => {
+  it('projects every wheel, including a change of limiting corner across stints', () => {
+    const plan = planRaceStrategies(input({ qualifyingAhead: false,
+      tyres: { compound: 'Medium', used: true, wear: 0.7, tread: [0.7, 1, 1, 1], newSets: 2 },
+      wearPerLap: [0.001, 0.004, 0.02, 0.005] }));
+    expect(plan?.chosen).toMatchObject({ name: 'NEW TYRES AT THE STOP', treadCorner: 'RL', treadAtFlag: 0.72 });
+    expect(plan?.nextBest).toMatchObject({ treadCorner: 'RL', treadAtFlag: 0.24 });
+    const short = planRaceStrategies(input({ raceMinutes: 2, qualifyingAhead: false,
+      tyres: { compound: 'Medium', used: true, wear: 0.7, tread: [0.7, 1, 1, 1], newSets: 0 },
+      wearPerLap: [0.001, 0.004, 0.02, 0.005] }));
+    expect(short?.chosen.treadCorner).toBe('FL');
+  });
   it('stops for VE full at the start, loads what the finish needs, and keeps the set when its tread holds', () => {
     const plan = planRaceStrategies(input());
     expect(plan).toMatchObject({ raceMinutes: 60, laps: 38, unit: '%' });
     expect(plan?.chosen).toEqual({ name: 'NO TYRE CHANGE', stops: 1, pitLap: 24, loadStart: 100, loadToFinish: 58,
-      tyresStart: 'NEW MEDIUM', tyresStop: 'NO CHANGE', treadAtFlag: 0.696, gapSeconds: 0 });
+      tyresStart: 'NEW MEDIUM', tyresStop: 'NO CHANGE', treadAtFlag: 0.696, treadCorner: 'FL', gapSeconds: 0 });
     expect(plan?.nextBest).toMatchObject({ name: 'NEW TYRES AT THE STOP', tyresStop: 'NEW MEDIUM', treadAtFlag: 0.888, gapSeconds: 12 });
   });
 
   it('changes tyres when one set would go below the floor, the quicker plan said with its tread', () => {
-    const plan = planRaceStrategies(input({ wearPerLap: 0.02 }));
+    const plan = planRaceStrategies(input({ wearPerLap: [0.02, 0.02, 0.02, 0.02] }));
     expect(plan?.chosen).toMatchObject({ name: 'NEW TYRES AT THE STOP', treadAtFlag: 0.72 });
     expect(plan?.nextBest).toMatchObject({ name: 'NO TYRE CHANGE', treadAtFlag: 0.24, gapSeconds: -12 });
   });
@@ -47,7 +58,7 @@ describe('race strategy before the race', () => {
 
   it('takes the stops off the clock: every car loses their time (Le Mans race 2026-10-23, 17 laps run)', () => {
     const lemans = input({ lapSeconds: 208.858, perLap: 8.16, qualifyingAhead: false, tyres: { compound: 'Medium', used: true, wear: 1, newSets: 0 },
-      wearPerLap: 0.0126 });
+      wearPerLap: [0.0126, 0.0126, 0.0126, 0.0126] });
     // Without the stop's time 3600 s read 18 racing laps; the 30.7 s lane and 51 % at 2.5 %/s cost 51 s: 17.
     expect(planRaceStrategies(lemans)).toMatchObject({ laps: 18, chosen: { pitLap: 11, loadToFinish: 62 } });
     expect(planRaceStrategies({ ...lemans, pitLaneSeconds: 30.7, refuel: { secondsPerUnit: 0.4, base: 0 } }))

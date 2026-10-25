@@ -5,6 +5,7 @@ import { LiveStrategyTracker } from '../../../shared/domain/live/liveStrategyTra
 import type { LiveStrategyContext } from '../../../shared/domain/live/liveStrategyTracker.js';
 import { scoringReading, vehicleReading } from '../../helpers/liveReadings.js';
 import type { SessionStrategy } from '../../../shared/types/session.js';
+import { fitTyreWear } from '../../../shared/domain/strategy/tyreWear.js';
 
 const LAP = 100;
 const VE_PER_LAP = 3;
@@ -44,6 +45,25 @@ const pastRace = (vePerLap: number, wearPerLap: number, compound: string): Sessi
 });
 
 describe('LiveStrategyTracker', () => {
+  it('prefers learned per-wheel wear in both garage plans and falls back when withdrawn', () => {
+    const tracker = new LiveStrategyTracker();
+    tracker.applyRest({ type: 'tireManagement', vePerLap: 3, fuelPerLap: 2, newSets: 3,
+      selected: { compound: 'Medium', used: false, wear: 1, tread: [1, 1, 1, 1] } });
+    tracker.applyRest({ type: 'schedule', raceMinutes: 15, hasQualifying: true });
+    tracker.setRaceHistory([pastRace(3, 0.02, 'Medium')]);
+    tracker.setTyreWearProfile(fitTyreWear(Array.from({ length: 8 }, () => ({
+      sessionId: 'earlier-race', sessionKind: 'Race', gameVersion: '1.42', compound: 'Medium', lapNumber: 2,
+      loss: [0.002, 0.003, 0.004, 0.003], slip: [0, 0, 0, 0], exclusions: [],
+    }))));
+    const qualifying = at(5, { sessionCode: 5, inRealtime: false, endEt: 600, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 75 }) });
+    const garage = context(tracker, qualifying, { lapsLeft: null })?.garage;
+    expect(garage?.raceStrategy).toMatchObject({ chosen: { treadAtFlag: 0.952, treadCorner: 'RL' },
+      basis: { wear: 'learned', sessions: 1 } });
+    expect(garage?.tyreCoverage?.projectedTread).toBeGreaterThan(0.95);
+    tracker.setTyreWearProfile(null);
+    expect(context(tracker, qualifying, { lapsLeft: null })?.garage?.raceStrategy).toMatchObject({
+      chosen: { treadAtFlag: 0.76 }, basis: { wear: 'history' } });
+  });
   it('uses learned consumption for advice but freezes the original baseline and preserves raw measurements', () => {
     const tracker = new LiveStrategyTracker((_kind, predicted) => ({ perLap: predicted + 0.2, adjustment: 0.2 }));
     tracker.applyRest({ type: 'tireManagement', vePerLap: 3, fuelPerLap: 2, newSets: 2,

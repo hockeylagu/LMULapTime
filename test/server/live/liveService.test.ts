@@ -602,6 +602,38 @@ describe('LiveService', () => {
       void service.stop();
     });
 
+    it('reads tyre profiles only in the garage, caching by cohort and refreshing on imported data', async () => {
+      const readNavigation = vi.fn(() => Promise.resolve({ ok: true as const, navigation: { sceneDesc: 'LEMANSWEC', classes: [], vehFile: null } }));
+      const tyreWearProfile = vi.fn(() => Promise.resolve(null));
+      const compound = vi.spyOn(LiveStrategyTracker.prototype, 'tyreCompound').mockReturnValue('Medium');
+      let revision = '1';
+      const { service, frame } = setup({ identity: { readNavigation }, tyreWearProfile, tyreWearRevision: () => revision });
+      const send = (garage: boolean) => frame(lap(3, { driverName: 'Player', vehicleName: 'Ginetta G61-LT-P325 Evo', vehicleClass: 'LMP3' },
+        { trackName: 'Circuit de la Sarthe', inRealtime: !garage }));
+      send(false);
+      await vi.advanceTimersByTimeAsync(0);
+      send(false);
+      expect(tyreWearProfile).not.toHaveBeenCalled();
+      send(true);
+      await vi.advanceTimersByTimeAsync(0);
+      send(true);
+      expect(service.getSnapshot()).toMatchObject({ lifecycle: 'garage', identity: { layoutKey: 'sarthe_full', vehicleModel: 'Ginetta G61-LT-P325 Evo' } });
+      expect(tyreWearProfile).toHaveBeenCalledTimes(1);
+      expect(tyreWearProfile.mock.calls[0]?.slice(0, 3)).toEqual(['sarthe_full', 'Ginetta G61-LT-P325 Evo', 'Medium']);
+      revision = '2';
+      send(false);
+      expect(tyreWearProfile).toHaveBeenCalledTimes(1);
+      send(true);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(tyreWearProfile).toHaveBeenCalledTimes(2);
+      compound.mockReturnValue('Hard');
+      send(true);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(tyreWearProfile).toHaveBeenCalledTimes(3);
+      compound.mockRestore();
+      await service.stop();
+    });
+
     it('asks LMU for nothing in the menu', async () => {
       const readNavigation = vi.fn(() => Promise.resolve({ ok: false as const }));
       const { service, frame } = setup({ identity: { readNavigation } });

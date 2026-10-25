@@ -56,9 +56,9 @@ describe('LMU pit REST parsers', () => {
       tireInvGarageOptions: { newTiresRemaining: 55, selectedTires },
     });
     expect(parseTireManagement(body([wheel(true, 98), wheel(true, 99), wheel(true, 99), wheel(true, 99)]))?.selected)
-      .toEqual({ compound: 'Medium', used: true, wear: 0.98 });
+      .toEqual({ compound: 'Medium', used: true, wear: 0.98, tread: [0.98, 0.99, 0.99, 0.99] });
     expect(parseTireManagement(body(Array.from({ length: 4 }, () => wheel(false, 100))))?.selected)
-      .toEqual({ compound: 'Medium', used: false, wear: 1 });
+      .toEqual({ compound: 'Medium', used: false, wear: 1, tread: [1, 1, 1, 1] });
     expect(parseTireManagement(body([]))?.selected).toBeNull();
   });
 

@@ -26,6 +26,7 @@ import type { SseSink } from './sse.js';
 import type { LiveCaptureController } from './capture/controller.js';
 import { LiveLearningCapture } from '../../shared/domain/learning/capture.js';
 import type { AutomaticLearningRuntime } from './learning/runtime.js';
+import type { TyreWearProfile } from '../../shared/types/liveStrategy.js';
 
 /** How often buffered pedal samples go out to the pages (about 25 batches a second). */
 export const PEDAL_FLUSH_MS = 40;
@@ -67,6 +68,8 @@ export interface LiveServiceOptions {
   racePlan?: (recordingId: string, plan: LiveRaceStrategies) => void;
   /** The player's earlier races on a layout in a class, measured (`readStrategyHistory`); none without it. */
   raceHistory?: (layoutKey: string, carClass: string) => Promise<SessionStrategy[]>;
+  tyreWearProfile?: (layoutKey: string, carModel: string, compound: string, driverName: string, signal: AbortSignal) => Promise<TyreWearProfile | null>;
+  tyreWearRevision?: () => string;
 }
 
 function offlineSnapshot(): LiveSnapshot {
@@ -112,6 +115,10 @@ export class LiveService {
   private pitLaneSession = 0;
   /** The race's plan from before the start, and the recording it was last saved with. */
   private raceHistoryKey: string | null = null;
+  private tyreWearKey: string | null = null;
+  private readonly tyreWearCache = new Map<string, TyreWearProfile | null>();
+  private readonly tyreWearPending = new Set<string>();
+  private tyreWearRead: AbortController | null = null;
   private racePlan: { plan: LiveRaceStrategies; json: string; savedFor: string | null } | null = null;
   private readonly pit: LivePitPoller;
   /** The last scoring reading, kept so a navigation notice or a REST answer can re-derive the snapshot without a new frame. */
@@ -227,6 +234,7 @@ export class LiveService {
   }
 
   public stop(): Promise<void> {
+    this.tyreWearRead?.abort();
     this.stopped = true;
     if (this.restartTimer) clearTimeout(this.restartTimer);
     this.restartTimer = null;
@@ -380,6 +388,33 @@ export class LiveService {
     }, (error: unknown) => console.warn('[Live] Race history read failed:', error));
   }
 
+  /** Cohort reads only start in the garage; cached answers cannot cross layout, model, driver or compound. */
+  private followTyreWear(layoutKey: string | null, carModel: string | null, compound: string | null,
+    driverName: string | null, lifecycle: LiveLifecycle): void {
+    const read = this.options.tyreWearProfile;
+    const key = layoutKey && carModel && compound && driverName
+      ? JSON.stringify([layoutKey, carModel, compound, driverName, this.options.tyreWearRevision?.() ?? '']) : null;
+    if (lifecycle !== 'garage' || key !== this.tyreWearKey) this.tyreWearRead?.abort();
+    this.tyreWearKey = key;
+    this.strategy.setTyreWearProfile(key ? this.tyreWearCache.get(key) ?? null : null);
+    if (!read || !key || !layoutKey || !carModel || !compound || !driverName || lifecycle !== 'garage'
+      || this.tyreWearCache.has(key) || this.tyreWearPending.has(key)) return;
+    this.tyreWearPending.add(key);
+    const controller = new AbortController();
+    this.tyreWearRead = controller;
+    read(layoutKey, carModel, compound, driverName, controller.signal).then(profile => {
+      this.tyreWearPending.delete(key);
+      if (controller.signal.aborted) return;
+      this.tyreWearCache.set(key, profile);
+      if (this.tyreWearKey === key) this.strategy.setTyreWearProfile(profile);
+    }, (error: unknown) => {
+      this.tyreWearPending.delete(key);
+      if (controller.signal.aborted) return;
+      this.tyreWearCache.set(key, null);
+      console.warn('[Live] Tyre wear profile read failed:', error);
+    });
+  }
+
   /**
    * The race plan shown before the start (it is null once the clock runs) is saved with the race recording, once it
    * exists (it may begin only at the green) and whenever the plan changed; another session forgets it. A storage
@@ -455,6 +490,8 @@ export class LiveService {
     const details = this.tracker.apply(reading, state, previous.strategy ?? null);
     this.followPitLane(identity?.layoutKey ?? null, identity?.carClass ?? null);
     this.followRaceHistory(identity?.layoutKey ?? null, identity?.carClass ?? null);
+    this.followTyreWear(identity?.layoutKey ?? null, identity?.vehicleModel ?? null,
+      this.strategy.tyreCompound(), reading?.player?.driverName ?? null, state.lifecycle);
     const strategy = this.strategy.update(reading, state, {
       carClass: identity?.carClass ?? null,
       layoutKey: identity?.layoutKey ?? null,

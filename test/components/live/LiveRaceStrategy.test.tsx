@@ -10,6 +10,13 @@ const PLAN: LiveRaceStrategies = { kind: 've', unit: '%', raceMinutes: 20, laps:
 describe('race strategy source', () => {
   afterEach(cleanup);
 
+  it('names the learned source and the limiting corner', () => {
+    render(<LiveRaceStrategy strategies={{ ...PLAN, chosen: { ...PLAN.chosen, treadCorner: 'RL' },
+      basis: { use: 'event', wear: 'learned', sessions: 4, races: 0 } }} />);
+    expect(screen.getByTestId('live-race-strategy')).toHaveTextContent('WEAR LEARNED (4)');
+    expect(screen.getByTestId('live-race-strategy')).toHaveTextContent('~81% RL');
+  });
+
   it('says when the use or the wear comes from earlier races or the game, and nothing once the event measured both', () => {
     render(<LiveRaceStrategy strategies={{ ...PLAN, basis: { use: 'history', wear: 'history', races: 3 } }} />);
     expect(screen.getByTestId('live-race-strategy')).toHaveTextContent('20 MIN · ~14 LAPS · FROM YOUR LAST 3 RACES');

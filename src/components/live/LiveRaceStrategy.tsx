@@ -14,6 +14,7 @@ const Tyres = ({ text }: { text: string }) => <CompoundText text={text.replace('
 export function basisText(basis: LiveRaceStrategyBasis | undefined): string | null {
   if (!basis) return null;
   const races = basis.races === 1 ? 'YOUR LAST RACE' : `YOUR LAST ${basis.races} RACES`;
+  if (basis.wear === 'learned') return `WEAR LEARNED (${basis.sessions ?? 0})${basis.use === 'history' ? ` · USE FROM ${races}` : basis.use === 'game' ? ' · GAME ESTIMATE' : ''}`;
   if (basis.use === 'history' && basis.wear === 'history') return `FROM ${races}`;
   if (basis.use === 'history') return `USE FROM ${races}`;
   if (basis.wear === 'history') return `WEAR FROM ${races}${basis.use === 'game' ? ' · GAME ESTIMATE' : ''}`;
@@ -44,7 +45,7 @@ function StrategyCard({ strategy, resource, unit }: { strategy: Strategy; resour
       {strategy.loadToFinish !== null && <Stat label={`${resource} TO FINISH`} value={strategy.loadToFinish} unit={unit} large />}
       <Stat label="TYRES START" value={<Tyres text={strategy.tyresStart} />} />
       {strategy.tyresStop !== null && <Stat label="TYRES AT STOP" value={<Tyres text={strategy.tyresStop} />} />}
-      <Stat label="TREAD AT FLAG" value={tread === null ? '—' : `~${Math.round(tread * 100)}`} unit={tread === null ? undefined : '%'}
+      <Stat label="TREAD AT FLAG" value={tread === null ? '—' : `~${Math.round(tread * 100)}`} unit={tread === null ? undefined : `%${strategy.treadCorner ? ` ${strategy.treadCorner}` : ''}`}
         className={tread !== null && tread < LIVE_TYRE_TREAD_FLOOR ? 'text-lmu-loss' : ''} />
     </div>
   );

@@ -25,6 +25,7 @@ import { queryLivePersonalBest } from './core/sessionSummaries/contextQueries.js
 import { readPitLaneLoss, recordPitLaneLoss } from './core/live/dbPitLaneStore.js';
 import { saveRacePlan } from './core/live/dbRacePlanStore.js';
 import { readStrategyHistory } from './sessions/sessionStrategy.js';
+import { readTyreWearProfile } from './sessions/sessionTyreWear.js';
 import { LiveCaptureController } from './live/capture/controller.js';
 import { LiveDiagnostics } from './live/capture/diagnostics.js';
 import { getAvailableLiveCaptureCount, getLiveCaptureIndexRows, indexLiveCaptureCatalog, listLiveCaptureManifests, upsertLiveCapture } from './core/live/dbLiveCaptureStore.js';
@@ -151,6 +152,8 @@ const liveService = new LiveService({
   },
   racePlan: (recordingId, plan) => saveRacePlan(sessionDb.getDb(), recordingId, plan, Date.now()),
   raceHistory: (layoutKey, carClass) => readStrategyHistory(sessionDb, layoutKey, carClass),
+  tyreWearProfile: (layoutKey, carModel, compound, driverName, signal) => readTyreWearProfile(sessionDb, layoutKey, carModel, compound, driverName, signal),
+  tyreWearRevision: () => `${sessionDb.getSessionRevision()}:${sessionDb.getTelemetryMetadataRevision()}`,
 });
 liveService.events.on('session-loaded', loaded => serverContext.setLiveSessionLoaded(loaded));
 liveService.events.on('session-loaded', loaded => { if (loaded) automaticLearning.cancel(); });

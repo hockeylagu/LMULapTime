@@ -19,6 +19,7 @@ import { planRaceStrategies } from '../strategy/raceStrategy.js';
 import { estimateFromHistory } from '../strategy/strategyHistory.js';
 import type { StrategyHistoryEstimate } from '../strategy/strategyHistory.js';
 import type { RefuelPart } from './livePitTime.js';
+import type { TyreWearProfile, TyreWheelValues } from '../../types/liveStrategy.js';
 
 /** One parsed answer of LMU's local REST API (server/live/lmuPitRest.ts). */
 /** The garage's selected tyre set, as `TireManagement` reports it. */
@@ -131,6 +132,11 @@ export class LiveStrategyTracker {
   private schedule: Extract<LiveRestUpdate, { type: 'schedule' }> | null = null;
   /** The player's earlier races on the layout in the class (`setRaceHistory`), for the race plan before event laps. */
   private raceHistory: SessionStrategy[] = [];
+  private tyreProfile: TyreWearProfile | null = null;
+
+  public setTyreWearProfile(profile: TyreWearProfile | null): void { this.tyreProfile = profile; }
+
+  public tyreCompound(): string | null { return this.usage?.selected?.compound ?? this.car?.compound ?? null; }
   /** The stored pit lane loss of the layout and class (`setPitLaneLoss`), for the race plan's stop time. */
   private pitLaneLoss: number | null = null;
 
@@ -284,7 +290,12 @@ export class LiveStrategyTracker {
     }
     // The grid keeps the plan: before the start the driver can still go back to the garage and change the load.
     const garage = state.lifecycle === 'garage' || state.lifecycle === 'starting' ? this.garagePlan(kind, reading, resource, reserveLaps) : null;
-    if (garage?.tyres && garage.laps !== null) garage.tyreCoverage = tyreCoverage(garage.tyres.wear, this.eventTyreWear, garage.laps, garage.laps, 'finish', garage.tyres.newSets);
+    if (garage?.tyres && garage.laps !== null) {
+      const wear = this.planTyreWear(kind);
+      const coverage = wear?.map((value, index) => tyreCoverage(garage.tyres!.tread?.[index] ?? garage.tyres!.wear,
+        value, garage.laps!, garage.laps!, 'finish', garage.tyres!.newSets)).filter(value => value !== null) ?? [];
+      garage.tyreCoverage = coverage.sort((a, b) => a.projectedTread - b.projectedTread)[0] ?? null;
+    }
     const fuelRatio = kind === 've' ? planFuelRatio({ ratios: this.ratios,
       fuelPerLap: this.ratios.length >= 3 ? this.perLap('fuel').perLap : this.gameEstimate('fuel'),
       vePerLap: this.ratios.length >= 3 ? this.perLap('ve').perLap : this.gameEstimate('ve'),
@@ -512,7 +523,14 @@ export class LiveStrategyTracker {
     });
   }
 
-  /** The race plan, on the dashboard's use per lap; the wear is the event's once measured, else the earlier races'. */
+  /** The plan's wear per wheel: the learned profile when dry, else the event's measured wear, else the earlier races'. */
+  private planTyreWear(kind: LiveResourceKind): TyreWheelValues | null {
+    if (!this.wet && this.tyreProfile) return this.tyreProfile.wheels.map(wheel => wheel.wearPerLap) as TyreWheelValues;
+    const value = this.eventTyreWear ?? this.history(kind)?.wearPerLap ?? null;
+    return value === null ? null : [value, value, value, value];
+  }
+
+  /** The race plan, on the dashboard's use per lap and the plan's wear (`planTyreWear`). */
   private raceStrategy(kind: LiveResourceKind, lapSeconds: number | null, resource: LiveResourcePlan, reserveLaps: number,
     tyres: LiveGarageTyres | null, qualifyingAhead: boolean): LiveRaceStrategies | null {
     const history = this.history(kind);
@@ -520,14 +538,16 @@ export class LiveStrategyTracker {
     const strategy = planRaceStrategies({
       kind, raceMinutes: this.schedule?.raceMinutes ?? null, lapSeconds, perLap: resource.perLap, reserveLaps, capacity: resource.capacity,
       qualifyingAhead, tyres, compound: this.eventCompound || tyres?.compound || null,
-      wearPerLap: historyWear ?? this.eventTyreWear, tyreChangeSeconds: this.delays?.fourTyreChange ?? null,
+      wearPerLap: this.planTyreWear(kind), tyreChangeSeconds: this.delays?.fourTyreChange ?? null,
       pitLaneSeconds: this.pitLaneLoss, refuel: this.refuelRate(kind),
     });
     if (!strategy) return null;
     const source = resource.perLapSource;
     const races = Math.max(source === 'history' ? history?.useRaces ?? 0 : 0, historyWear !== null ? history?.wearRaces ?? 0 : 0);
     return { ...strategy, basis: {
-      use: source === 'measured' ? 'event' : source, wear: this.eventTyreWear !== null ? 'event' : historyWear !== null ? 'history' : null, races } };
+      use: source === 'measured' ? 'event' : source,
+      wear: !this.wet && this.tyreProfile ? 'learned' : this.eventTyreWear !== null ? 'event' : historyWear !== null ? 'history' : null,
+      sessions: !this.wet ? this.tyreProfile?.sessions : undefined, races } };
   }
 
   private garagePlan(kind: LiveResourceKind, reading: LiveScoringReading, resource: LiveResourcePlan, reserveLaps: number): LiveGaragePlan {

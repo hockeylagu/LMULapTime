@@ -99,6 +99,33 @@ export interface LivePitInfo {
 
 export type LiveCorner = 'FL' | 'FR' | 'RL' | 'RR';
 
+/** Wheel order throughout the tyre model: FL, FR, RL, RR. */
+export type TyreWheelValues = [number, number, number, number];
+
+export interface TyreWearLap {
+  sessionId: string;
+  sessionKind: string;
+  gameVersion: string | null;
+  compound: string;
+  lapNumber: number;
+  startSeconds?: number;
+  endSeconds?: number;
+  captureLapNumbers?: number[];
+  loss: TyreWheelValues;
+  slip: TyreWheelValues;
+  /** Empty for usable laps; retained for the read-only evaluation report. */
+  exclusions: string[];
+}
+
+export interface TyreWearProfile {
+  version: number;
+  wheels: Array<{ corner: LiveCorner; cleanWear: number; perSlipSecond: number | null;
+    usualSlip: number; wearPerLap: number; laps: number }>;
+  sessions: number;
+  laps: number;
+  gameVersions: string[];
+}
+
 export interface LiveDamage {
   /** A flat or lost wheel: pit now. */
   wheel: { problem: 'flat' | 'detached'; corner: LiveCorner } | null;
@@ -190,6 +217,7 @@ export interface LiveRaceStrategy {
   tyresStop: string | null;
   /** Tread left on the most worn tyre at the flag, 0..1; null before the event's wear is measured. */
   treadAtFlag: number | null;
+  treadCorner?: LiveCorner | null;
   /** Seconds lost against the chosen plan (tyre changes): 0 for it, null when the game's change time is unknown. */
   gapSeconds: number | null;
 }
@@ -200,7 +228,8 @@ export interface LiveRaceStrategy {
  */
 export interface LiveRaceStrategyBasis {
   use: 'event' | 'history' | 'game' | null;
-  wear: 'event' | 'history' | null;
+  wear: 'learned' | 'event' | 'history' | null;
+  sessions?: number;
   races: number;
 }
 
@@ -224,6 +253,8 @@ export interface LiveGarageTyres {
   used: boolean;
   /** Tread left on the most worn of the four, 0-1. */
   wear: number;
+  /** Absent on older saved plans; FL, FR, RL, RR when wheel identity is known. */
+  tread?: TyreWheelValues;
   newSets: number | null;
 }
 

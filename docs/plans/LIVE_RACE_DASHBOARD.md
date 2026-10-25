@@ -648,6 +648,15 @@ Multiclass horizon (forecast model version 3): the overall leader sets the timed
 
 ### Event transition validation (2026-10-16)
 
+Tyre learning Phase 1 (implemented 2026-10-25, independent acceptance pending): garage wear prioritizes the exact
+layout/model/driver/dry-compound learned profile, then measured event wear, then race history. The profile learns
+four separate clean-wear/slip slopes from native tread plus closed verified live recordings, with usual slip taken
+from race laps before practice or qualifying. Race options and garage tyre coverage project all four wheels;
+the race card shows the limiting corner and `WEAR LEARNED (n)` when applicable. Scalar fallbacks populate all
+four wheels, and older saved sets without individual tread retain their minimum-tread fallback. No new REST calls;
+the current live tracker and its per-lap condition trigger await the separate practice-gated Phase 2.
+See [tyre learning handoff](TYRE_WEAR_LEARNING.md).
+
 Automated validation uses decoded scoring and navigation fixtures; it does not constitute a recorded online or single-player LMU weekend. Online and single-player sequences share the same lifecycle engine and session-code mapping.
 
 | Transition | Expected dashboard behavior | Automated coverage |

@@ -1,4 +1,5 @@
-import type { LiveGarageTyres, LiveRaceStrategies, LiveRaceStrategy, LiveResourceKind } from '../../types/liveStrategy.js';
+import type { LiveGarageTyres, LiveRaceStrategies, LiveRaceStrategy, LiveResourceKind, TyreWheelValues } from '../../types/liveStrategy.js';
+import { CORNERS } from '../live/liveCarCondition.js';
 import { LIVE_TYRE_TREAD_FLOOR } from '../live/liveInsights.js';
 import { formationLapUse, planGarage, planRace } from '../live/liveResourcePlan.js';
 import type { RefuelPart } from '../live/livePitTime.js';
@@ -17,8 +18,8 @@ export interface RaceStrategyInput {
   tyres: LiveGarageTyres | null;
   /** The compound the wear was measured on, else the selected one. */
   compound: string | null;
-  /** Tread loss per lap of the most worn tyre, measured in the event; null before it is. */
-  wearPerLap: number | null;
+  /** Tread loss per lap in FL, FR, RL, RR order; null before wear is known. */
+  wearPerLap: TyreWheelValues | null;
   /** The game's time to change four tyres (`FourTireChange`); it adds to the refuel. */
   tyreChangeSeconds: number | null;
   /** The stored pit lane loss of the layout and class; null without one (then the stops take no time off the clock). */
@@ -75,7 +76,7 @@ export function planRaceStrategies(input: RaceStrategyInput): LiveRaceStrategies
   // Qualifying takes a new set first; in the race's own garage the selected set is the one the race starts on.
   const raceSets = Math.max(0, (tyres?.newSets ?? 0) - (input.qualifyingAhead ? 1 : 0));
   const startNew = input.qualifyingAhead || !tyres ? raceSets > 0 : !tyres.used;
-  const startTread = startNew ? 1 : tyres?.wear ?? 1;
+  const startTread = CORNERS.map((_, index) => startNew ? 1 : tyres?.tread?.[index] ?? tyres?.wear ?? 1);
   const setsAtStops = raceSets - (startNew ? 1 : 0);
   const stints = [...pits, laps].map((lap, index, ends) => lap - (index ? ends[index - 1] : 0));
   const wear = input.wearPerLap;
@@ -83,16 +84,18 @@ export function planRaceStrategies(input: RaceStrategyInput): LiveRaceStrategies
   const plan = (change: boolean): Option => {
     // The tread at each set's last lap: one set over the whole race, or a new one from every stop.
     const treads = wear === null ? null : change
-      ? stints.map((stint, index) => (index ? 1 : startTread) - wear * stint)
-      : [startTread - wear * laps];
+      ? stints.map((stint, index) => wear.map((loss, wheel) => (index ? 1 : startTread[wheel]) - loss * stint))
+      : [wear.map((loss, wheel) => startTread[wheel] - loss * laps)];
+    const flag = treads?.at(-1) ?? null;
     return {
       name: stops === 0 ? 'NO STOP' : change ? `NEW TYRES AT ${stops === 1 ? 'THE STOP' : 'EACH STOP'}` : 'NO TYRE CHANGE',
       stops, pitLap: pits[0] ?? null, loadStart, loadToFinish,
       tyresStart: named(startNew ? 'NEW' : 'USED'),
       tyresStop: stops === 0 ? null : change ? named('NEW') : 'NO CHANGE',
-      treadAtFlag: treads === null ? null : Math.round(Math.max(0, treads[treads.length - 1]) * 1000) / 1000,
+      treadAtFlag: flag === null ? null : Math.round(Math.max(0, Math.min(...flag)) * 1000) / 1000,
+      treadCorner: flag === null ? null : CORNERS[flag.indexOf(Math.min(...flag))],
       gapSeconds: input.tyreChangeSeconds === null ? null : (change ? stops : 0) * input.tyreChangeSeconds,
-      lowest: treads === null ? null : Math.min(...treads),
+      lowest: treads === null ? null : Math.min(...treads.flat()),
     };
   };
   const options = stops > 0 && setsAtStops >= stops ? [plan(false), plan(true)] : [plan(false)];

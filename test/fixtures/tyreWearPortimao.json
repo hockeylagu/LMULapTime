@@ -1,0 +1,737 @@
+[
+  {
+    "sessionId": "2026_10_24_16_51_08-73R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 1,
+    "startSeconds": 125.72250366210938,
+    "endSeconds": 235.5781707763672,
+    "captureLapNumbers": [
+      0
+    ],
+    "loss": [
+      0.0024945831298828214,
+      0.0010982513427734153,
+      0.004692687988281263,
+      0.003535079956054732
+    ],
+    "slip": [
+      0,
+      0,
+      0.4000000000000057,
+      0
+    ],
+    "exclusions": [
+      "start-lap"
+    ]
+  },
+  {
+    "sessionId": "2026_10_24_16_51_08-73R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 2,
+    "startSeconds": 235.5781707763672,
+    "endSeconds": 336.7833557128906,
+    "captureLapNumbers": [
+      1
+    ],
+    "loss": [
+      0.0027935791015625266,
+      0.001464996337890656,
+      0.0042047119140624645,
+      0.003763122558593679
+    ],
+    "slip": [
+      0,
+      0,
+      0,
+      0.09999999999999432
+    ],
+    "exclusions": []
+  },
+  {
+    "sessionId": "2026_10_24_16_51_08-73R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 3,
+    "startSeconds": 336.7833557128906,
+    "endSeconds": 437.233154296875,
+    "captureLapNumbers": [
+      2
+    ],
+    "loss": [
+      0.002471923828125,
+      0.0014060211181640137,
+      0.003977432250976576,
+      0.0035913848876953924
+    ],
+    "slip": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "exclusions": []
+  },
+  {
+    "sessionId": "2026_10_24_16_51_08-73R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 4,
+    "startSeconds": 437.233154296875,
+    "endSeconds": 538.85498046875,
+    "captureLapNumbers": [
+      3
+    ],
+    "loss": [
+      0.0027168273925781694,
+      0.0013948822021484508,
+      0.0038160705566406827,
+      0.0032453918457030495
+    ],
+    "slip": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "exclusions": []
+  },
+  {
+    "sessionId": "2026_10_24_16_51_08-73R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 5,
+    "startSeconds": 538.85498046875,
+    "endSeconds": 639.78076171875,
+    "captureLapNumbers": [
+      4
+    ],
+    "loss": [
+      0.002559967041015576,
+      0.0013664245605469194,
+      0.0038227844238281072,
+      0.003657302856445388
+    ],
+    "slip": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "exclusions": []
+  },
+  {
+    "sessionId": "2026_10_24_16_51_08-73R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 6,
+    "startSeconds": 639.78076171875,
+    "endSeconds": 740.882080078125,
+    "captureLapNumbers": [
+      4,
+      5
+    ],
+    "loss": [
+      0.002785415649414036,
+      0.001498336791992183,
+      0.004343338012695264,
+      0.003859786987304603
+    ],
+    "slip": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "exclusions": []
+  },
+  {
+    "sessionId": "2026_10_24_16_51_08-73R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 7,
+    "startSeconds": 740.882080078125,
+    "endSeconds": 841.8301391601562,
+    "captureLapNumbers": [
+      6
+    ],
+    "loss": [
+      0.0027212524414063077,
+      0.0015047454833984064,
+      0.0034585571289063033,
+      0.0033878326416015847
+    ],
+    "slip": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "exclusions": []
+  },
+  {
+    "sessionId": "2026_10_24_16_51_08-73R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 8,
+    "startSeconds": 841.8301391601562,
+    "endSeconds": 942.2980346679688,
+    "captureLapNumbers": [
+      7
+    ],
+    "loss": [
+      0.0028257751464842995,
+      0.0015206146240234197,
+      0.003807220458984295,
+      0.003334197998046906
+    ],
+    "slip": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "exclusions": []
+  },
+  {
+    "sessionId": "2026_10_24_16_51_08-73R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 9,
+    "startSeconds": 942.2980346679688,
+    "endSeconds": 1043.051025390625,
+    "captureLapNumbers": [
+      8
+    ],
+    "loss": [
+      0.002619018554687602,
+      0.001353225708007888,
+      0.003592147827148451,
+      0.0031986236572265625
+    ],
+    "slip": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "exclusions": []
+  },
+  {
+    "sessionId": "2026_10_24_16_51_08-73R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 10,
+    "startSeconds": 1043.051025390625,
+    "endSeconds": 1147.6192626953125,
+    "captureLapNumbers": [
+      9
+    ],
+    "loss": [
+      0.004007186889648406,
+      0.007823410034179634,
+      0.01688041687011721,
+      0.011907958984375022
+    ],
+    "slip": [
+      1.2199999999998,
+      1.0799999999999272,
+      2.180000000000291,
+      1.400000000000091
+    ],
+    "exclusions": []
+  },
+  {
+    "sessionId": "2026_10_24_16_51_08-73R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 11,
+    "startSeconds": 1147.6192626953125,
+    "endSeconds": 1248.34326171875,
+    "captureLapNumbers": [
+      10
+    ],
+    "loss": [
+      0.0026892852783202414,
+      0.0012360382080077725,
+      0.0035083007812499734,
+      0.0031142425537108442
+    ],
+    "slip": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "exclusions": []
+  },
+  {
+    "sessionId": "2026_10_24_16_51_08-73R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 12,
+    "startSeconds": 1248.34326171875,
+    "endSeconds": 1348.855224609375,
+    "captureLapNumbers": [
+      11
+    ],
+    "loss": [
+      0.0030035400390625577,
+      0.0016191864013672674,
+      0.00385284423828125,
+      0.003152618408203134
+    ],
+    "slip": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "exclusions": []
+  },
+  {
+    "sessionId": "2026_10_24_16_27_40-52Q1",
+    "sessionKind": "Qualifying",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 1,
+    "endSeconds": 170.8665008544922,
+    "captureLapNumbers": [],
+    "loss": [
+      0.009757690429687549,
+      0.004426651000976611,
+      0.02020057678222653,
+      0.016120300292968737
+    ],
+    "slip": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "exclusions": [
+      "no-lap-time",
+      "start-lap",
+      "unverified-clock"
+    ]
+  },
+  {
+    "sessionId": "2026_10_24_16_27_40-52Q1",
+    "sessionKind": "Qualifying",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 2,
+    "startSeconds": 170.8665008544922,
+    "endSeconds": 200.30966186523438,
+    "captureLapNumbers": [],
+    "loss": [
+      0.0014112091064453214,
+      0.001071929931640625,
+      0.0027439880371094016,
+      0.007242279052734335
+    ],
+    "slip": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "exclusions": [
+      "no-lap-time",
+      "unverified-clock"
+    ]
+  },
+  {
+    "sessionId": "2026_10_24_16_27_40-52Q1",
+    "sessionKind": "Qualifying",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 3,
+    "startSeconds": 200.30966186523438,
+    "endSeconds": 341.6249694824219,
+    "captureLapNumbers": [
+      2
+    ],
+    "loss": [
+      0.013018035888671897,
+      0.0035012817382812367,
+      0.02154357910156246,
+      0.011050033569335982
+    ],
+    "slip": [
+      0,
+      0.7400000000000091,
+      2.659999999999826,
+      2.800000000000125
+    ],
+    "exclusions": [
+      "capture-gap"
+    ]
+  },
+  {
+    "sessionId": "2026_10_24_16_27_40-52Q1",
+    "sessionKind": "Qualifying",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 4,
+    "startSeconds": 341.6249694824219,
+    "endSeconds": 442.599853515625,
+    "captureLapNumbers": [
+      3
+    ],
+    "loss": [
+      0.002983932495117192,
+      0.0015568542480468572,
+      0.00360870361328125,
+      0.003487472534179692
+    ],
+    "slip": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "exclusions": []
+  },
+  {
+    "sessionId": "2026_10_24_16_27_40-52Q1",
+    "sessionKind": "Qualifying",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 5,
+    "startSeconds": 442.599853515625,
+    "endSeconds": 544.019775390625,
+    "captureLapNumbers": [
+      4
+    ],
+    "loss": [
+      0.00748603820800775,
+      0.006394653320312527,
+      0.004561767578125098,
+      0.006069335937500031
+    ],
+    "slip": [
+      0.9800000000000182,
+      2.159999999999968,
+      0,
+      1.3600000000000136
+    ],
+    "exclusions": []
+  },
+  {
+    "sessionId": "2026_10_22_09_22_04-75R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 1,
+    "startSeconds": 125.5824966430664,
+    "endSeconds": 247.29783630371094,
+    "captureLapNumbers": [
+      0
+    ],
+    "loss": [
+      0.010326461791992259,
+      0.002291641235351527,
+      0.014618072509765656,
+      0.007109909057617214
+    ],
+    "slip": [
+      0.1599999999999966,
+      0.5999999999999943,
+      0.960000000000008,
+      1.9399999999999693
+    ],
+    "exclusions": [
+      "start-lap"
+    ]
+  },
+  {
+    "sessionId": "2026_10_22_09_22_04-75R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 2,
+    "startSeconds": 247.29783630371094,
+    "endSeconds": 349.788818359375,
+    "captureLapNumbers": [
+      1
+    ],
+    "loss": [
+      0.002535095214843741,
+      0.0015808105468749778,
+      0.0031909942626953125,
+      0.0028636169433593484
+    ],
+    "slip": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "exclusions": []
+  },
+  {
+    "sessionId": "2026_10_22_09_22_04-75R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 3,
+    "startSeconds": 349.788818359375,
+    "endSeconds": 452.8597106933594,
+    "captureLapNumbers": [
+      2
+    ],
+    "loss": [
+      0.005674285888671804,
+      0.009611206054687571,
+      0.0031206512451171786,
+      0.003229522705078147
+    ],
+    "slip": [
+      0.7799999999999727,
+      0.7800000000000296,
+      0,
+      0.45999999999997954
+    ],
+    "exclusions": []
+  },
+  {
+    "sessionId": "2026_10_22_09_22_04-75R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 4,
+    "startSeconds": 452.8597106933594,
+    "endSeconds": 554.982421875,
+    "captureLapNumbers": [
+      3
+    ],
+    "loss": [
+      0.0021922302246093484,
+      0.0011655426025389826,
+      0.0034940338134765714,
+      0.0030123901367187234
+    ],
+    "slip": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "exclusions": []
+  },
+  {
+    "sessionId": "2026_10_22_09_22_04-75R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 5,
+    "startSeconds": 554.982421875,
+    "endSeconds": 657.6429443359375,
+    "captureLapNumbers": [
+      3,
+      4
+    ],
+    "loss": [
+      0.0028901672363281783,
+      0.0012097930908203658,
+      0.0039048767089843173,
+      0.003394393920898464
+    ],
+    "slip": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "exclusions": []
+  },
+  {
+    "sessionId": "2026_10_22_09_22_04-75R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 6,
+    "startSeconds": 657.6429443359375,
+    "endSeconds": 759.0255126953125,
+    "captureLapNumbers": [
+      5
+    ],
+    "loss": [
+      0.0025389862060546387,
+      0.0012668609619140847,
+      0.0036648559570312544,
+      0.0032434082031249645
+    ],
+    "slip": [
+      0.05999999999994543,
+      0,
+      0.06000000000005912,
+      0
+    ],
+    "exclusions": []
+  },
+  {
+    "sessionId": "2026_10_22_09_22_04-75R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 7,
+    "startSeconds": 759.0255126953125,
+    "endSeconds": 860.6677856445312,
+    "captureLapNumbers": [
+      6
+    ],
+    "loss": [
+      0.002808151245117241,
+      0.0013124847412109286,
+      0.003227081298828094,
+      0.003165512084960964
+    ],
+    "slip": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "exclusions": []
+  },
+  {
+    "sessionId": "2026_10_22_09_22_04-75R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 8,
+    "startSeconds": 860.6677856445312,
+    "endSeconds": 961.7510986328125,
+    "captureLapNumbers": [
+      7
+    ],
+    "loss": [
+      0.002704315185546924,
+      0.0016902923583984597,
+      0.0036521148681640803,
+      0.003519287109374991
+    ],
+    "slip": [
+      0,
+      0,
+      0,
+      0.06000000000005912
+    ],
+    "exclusions": []
+  },
+  {
+    "sessionId": "2026_10_22_09_22_04-75R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 9,
+    "startSeconds": 961.7510986328125,
+    "endSeconds": 1063.8167724609375,
+    "captureLapNumbers": [
+      8
+    ],
+    "loss": [
+      0.002490844726562469,
+      0.0016835784912109242,
+      0.0034885406494140625,
+      0.003519134521484335
+    ],
+    "slip": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "exclusions": []
+  },
+  {
+    "sessionId": "2026_10_22_09_22_04-75R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 10,
+    "startSeconds": 1063.8167724609375,
+    "endSeconds": 1164.6697998046875,
+    "captureLapNumbers": [
+      9
+    ],
+    "loss": [
+      0.002382049560546884,
+      0.0013936614990234242,
+      0.0033495330810546786,
+      0.003180770874023464
+    ],
+    "slip": [
+      0.07999999999992724,
+      0,
+      0,
+      0
+    ],
+    "exclusions": []
+  },
+  {
+    "sessionId": "2026_10_22_09_22_04-75R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 11,
+    "startSeconds": 1164.6697998046875,
+    "endSeconds": 1266.479248046875,
+    "captureLapNumbers": [
+      10
+    ],
+    "loss": [
+      0.0023998260498047097,
+      0.0013423919677734153,
+      0.0036104583740235174,
+      0.0030873107910156516
+    ],
+    "slip": [
+      0.2799999999999727,
+      0,
+      0.10000000000013642,
+      0
+    ],
+    "exclusions": []
+  },
+  {
+    "sessionId": "2026_10_22_09_22_04-75R1",
+    "sessionKind": "Race",
+    "gameVersion": "1.42",
+    "compound": "Medium",
+    "lapNumber": 12,
+    "startSeconds": 1266.479248046875,
+    "endSeconds": 1368.262939453125,
+    "captureLapNumbers": [
+      11
+    ],
+    "loss": [
+      0.002828216552734353,
+      0.0015728759765625266,
+      0.0032840728759765403,
+      0.0029264068603515048
+    ],
+    "slip": [
+      0,
+      0,
+      0,
+      0
+    ],
+    "exclusions": []
+  }
+]

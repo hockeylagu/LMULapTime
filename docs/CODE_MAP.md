@@ -95,6 +95,7 @@ because active recordings can be exclusively locked on Windows.
 | `server/live/capture/evidenceService.ts`, `evidenceReader.ts`, `readRecording.ts` | Verified, off-track lap evidence reads |
 | `shared/domain/live/liveTelemetryFusion.ts`, `src/api/liveEvidenceApi.ts` | Aligned evidence consumption and coverage |
 | `shared/domain/live/wheelSlip.ts`, `tools/analysis/listWheelSlipEvents.ts` | Measured wheel slip ratio, lockup/wheelspin events, calibration rerun |
+| `server/sessions/sessionTyreWear.ts`, `shared/domain/strategy/tyreWear.ts`, `tools/analysis/evaluateTyreWear.ts` | Closed verified live slip + shared native lap-end states, deterministic per-wheel fit by exact layout/model/driver/dry compound; garage-only cached profiles, independent evaluation and compact regression extraction |
 | `shared/domain/live/liveAudit.ts` | Consolidated live strategy audit (checkpoints during capture) |
 | `shared/domain/learning/capture.ts`, `examples.ts`, `evaluate.ts`, `calibration.ts`, `automatic.ts` | Frozen forecasts, examples, evaluation and correction gates |
 | `server/live/learning/service.ts`, `runtime.ts`, `automaticWorker.ts` | Projection refresh, persisted model lifecycle and exact live lookup |
