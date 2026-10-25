@@ -9,6 +9,10 @@ import { loadedCar, SessionLoadDetector } from './sessionLoadDetector.js';
 import { runPresetSwitch } from './presetSwitchRunner.js';
 import { MAPPING_CARS } from '../../shared/domain/peripherals/suggestMappings.js';
 import { resolvePresetTarget } from '../../shared/domain/peripherals/presetMapping.js';
+import { peripheralStatusMessage } from '../../shared/domain/peripherals/peripheralStatus.js';
+
+export const HEALTH_CHECK_INTERVAL_MS = 15_000;
+export const HEALTH_CHECK_ERROR_INTERVAL_MS = 5_000;
 
 export class PeripheralError extends Error {
   public constructor(message: string, public readonly status = 409) { super(message); }
@@ -88,10 +92,14 @@ export class PeripheralHost {
     if (started !== null && (snapshot.lifecycle !== started || (started === 'garage' && previous !== this.detector.generation))) this.operation?.abort();
     this.tick();
   };
+  private hasHealthWarning(): boolean {
+    return peripheralStatusMessage(this.status()).warning;
+  }
   private tick(): void {
     if (this.stopped) return;
     if (this.settings.enabled && this.load.plugin && this.now() >= this.nextHealthAt && !this.healthController) {
-      this.nextHealthAt = this.now() + 15_000;
+      const interval = this.hasHealthWarning() ? HEALTH_CHECK_ERROR_INTERVAL_MS : HEALTH_CHECK_INTERVAL_MS;
+      this.nextHealthAt = this.now() + interval;
       void this.checkHealth();
     }
     if (!this.detector.ready(this.now()) || this.operation) return;
@@ -211,7 +219,8 @@ export class PeripheralHost {
     const plugin = this.load.plugin;
     const controller = new AbortController();
     this.healthController = controller;
-    this.nextHealthAt = this.now() + 15_000;
+    const initialInterval = this.hasHealthWarning() ? HEALTH_CHECK_ERROR_INTERVAL_MS : HEALTH_CHECK_INTERVAL_MS;
+    this.nextHealthAt = this.now() + initialInterval;
     this.healthRequest = (async () => {
       try {
         const signal = AbortSignal.any([controller.signal, AbortSignal.timeout(5000)]);
@@ -226,6 +235,8 @@ export class PeripheralHost {
       } catch { if (!controller.signal.aborted) { this.health = { api: 'unavailable', process: 'unknown' }; this.observedAt = this.now(); this.devices = []; } }
       finally {
         if (this.healthController === controller) { this.healthController = null; this.healthRequest = null; }
+        const interval = this.hasHealthWarning() ? HEALTH_CHECK_ERROR_INTERVAL_MS : HEALTH_CHECK_INTERVAL_MS;
+        this.nextHealthAt = this.now() + interval;
       }
     })();
     return this.healthRequest;

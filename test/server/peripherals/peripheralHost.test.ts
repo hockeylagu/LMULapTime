@@ -165,4 +165,27 @@ describe('one-shot peripheral host', () => {
     expect(detector.generation).toBeGreaterThan(first);
     expect(detector.ready(3400)).toBe(true);
   });
+  it('polls health more often (every 5 s instead of 15 s) when in warning or error', async () => {
+    const plugin = fakePlugin();
+    vi.mocked(plugin.checkHealth).mockResolvedValue({ api: 'unavailable', process: 'absent' });
+    const fixture = await setup(snapshot('offline'), plugin);
+    try {
+      vi.mocked(plugin.checkHealth).mockClear();
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(plugin.checkHealth).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(plugin.checkHealth).toHaveBeenCalledTimes(1);
+
+      vi.mocked(plugin.checkHealth).mockClear();
+      vi.mocked(plugin.checkHealth).mockResolvedValueOnce({ api: 'responsive', process: 'present' });
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(plugin.checkHealth).toHaveBeenCalledTimes(1);
+
+      vi.mocked(plugin.checkHealth).mockClear();
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(plugin.checkHealth).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(plugin.checkHealth).toHaveBeenCalledTimes(1);
+    } finally { fixture.close(); }
+  });
 });
