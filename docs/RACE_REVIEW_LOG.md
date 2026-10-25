@@ -3,6 +3,60 @@
 Written by the `race-review` skill (`.claude/skills/race-review/SKILL.md`). Newest first. Error = predicted − actual,
 in % of the lap's actual use; negative = underprediction (car runs short).
 
+## 2026-10-24 — LMP3 sprint, Portimão (Ginetta G61-LT-P325 Evo)
+
+**Sessions**: qualifying `52Q1`, race `73R1` (fuel only). First race on the forecast rule from 2026-10-23
+(model 4, last 5 laps less the lowest).
+
+**Buckets**: noise 2 (qualifying, race forecasts), data 1 (race learning exclusion).
+- Qualifying: one lap on the game estimate, −2.2 %. Noise.
+- Race: 7 forecasts, all within ±2.3 %, median +0.9 % (over, the safe side), worst under −0.8 % (lap 6).
+  Earlier Portimão race (`75R1`, old rule) was −1.1 % median; no steady bias.
+- **Data**: all 7 race laps excluded as `capture-drops`, so the race taught the learning nothing. The recording
+  lost 26 of 42,721 samples in a single 0.84 s gap at 21.8 s, on lap 0 before the start (recording worker
+  start-up). No measured lap was touched. The exclusion is per recording (`manifest.droppedSamples > 0`,
+  `shared/domain/learning/examples.ts`), while forecasts and outcomes come from the strategy tracker, not the
+  samples; a lost forecast event is already caught by `missing-forecast`.
+
+**Automatic learning**: 0 active, 0 validating; 25 cohorts insufficient evidence (expected: model 4 cohorts
+started 2026-10-23).
+
+**Applied (uncommitted)**: recording-wide `capture-drops` exclusion removed; a gap inside a lap is still excluded
+per lap (`capture-gap`, `shared/domain/learning/capture.ts`). `LEARNING_EXAMPLE_RULES_VERSION` 2 is part of the
+projection signature (`server/live/learning/inputs.ts`), so stored projections rebuild on the next off-track refresh
+(4 recordings per pass). Dry run on the race: 4 of 7 laps now eligible (laps 3, 8, 9, 11; the other 3 not clean).
+Regression test in `test/domain/learning/examples.test.ts`.
+
+**Open**: start-up drops are new (none in the 30 earlier recordings); watch whether they repeat.
+
+**Beyond fuel per lap** (from the race's strategy audit and standings):
+- Laps: 12 forecast from the green, 12 run. The 2026-10-23 laps-left fixes (`2ff511ae`) held.
+- Formation lap fuel: 32.16 → 31.76 L (0.4 L, ~17 % of a lap; Le Mans 2026-10-22 was ~13 %). The plan keeps a
+  full lap for it, so the car finished with 4.3 L (1.9 laps) against a 0.45-lap reserve: about 2 L carried for
+  nothing. Applied (`dc67cbbb`): fuel `formationLapUse` 0.25 lap, `LIVE_MODEL_VERSION` 8; the Portimão plan now
+  sets 30 L instead of 32 L (regression test in `test/domain/live/liveResourcePlan.test.ts`).
+- Tyres: garage plan 0.806 tread at the flag, actual 0.944. The plan used the qualifying wear (0.012–0.015 per lap:
+  out-lap and push laps); the race wore 0.0044–0.0053 per lap. Race started at tread 1.0, not the used 0.952.
+  Tyre wear is not in the learning (fuel and VE only). The driver: qualifying was an outlier (spins, lockups);
+  clean qualifying wear would have been close. So qualifying wear stays; slip-heavy laps must not set the wear.
+  Next: tyre wear learning that leaves slip-heavy laps out (design proposed to the user).
+- Wear against slip, all 24 recordings with wheel channels (229 laps): the live worst-tyre reading lags one lap (race lap 10's
+  5.9 s of lockup/spin, the impact at 1059 s, shows as 0.017 lost at the next crossing; the first racing lap reads
+  1.0). Pairing each lap's slip with the next crossing's loss: Ginetta r 0.87 (clean 0.0032/lap, +0.0021 per slip
+  second), Lexus r 0.73, Peugeot r 0.36; BMW and Ferrari have almost no slip laps. Big events (5–6 s) cost
+  0.015–0.020, four to five laps of wear. The driver suggested wear = clean wear + cost per slip second × the
+  driver's usual race slip: for this race 0.0032 + 0.0021 × ~0.5 s ≈ 0.0043/lap against 0.0044–0.0053 actual
+  (the plan used 0.012).
+- Per wheel: the live recordings keep only the worst tyre (0.001 steps). The native telemetry ("Tyres Wear", four
+  wheels, full precision, ~11 Hz) has no lag: the lap 9 event cost RL 1.74 %, RR 1.23 %, FR 0.80 %, FL 0.45 % in
+  that lap, against normal laps of RL 0.41, RR 0.37, FL 0.27, FR 0.15 %. The driver asked for tyre wear per wheel.
+- Native slip fallback checked against the shared-memory slip on this race: native "Wheel Speed" (m/s, 100 Hz) follows
+  the ground speed through a 76 % RL lockup (25.1 against 24.8 m/s at 1074.8 s); it is the hub's ground speed, not
+  the tyre surface speed. Native found 0 s of slip where shared memory found 6.86 s, so slip has no native fallback.
+- Applied: formation lap fuel committed `dc67cbbb`.
+  Wheel slip (`listWheelSlipEvents.ts`) backs it: qualifying 57 lockup/wheelspin events, 20.5 s over 6 laps
+  (~3.4 s a lap, the driver reported spins and lockups); race 18 events, 6.9 s over 13 laps (~0.5 s a lap).
+
 ## 2026-10-23 — first review (kick-start)
 
 **Data**: 29 verified captures, 252 lap examples, 185 eligible (63 not clean/representative, 10 damage).

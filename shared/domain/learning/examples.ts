@@ -1,6 +1,13 @@
 import { LIVE_LEARNING_VERSION, type LiveLearningExample, type StoredLearningEvent } from '../../types/liveLearning.js';
 import type { LiveCaptureManifest } from '../../types/liveCapture.js';
 
+/**
+ * Bump when the example rules change, so stored projections rebuild. Version 2 no longer excludes a whole recording
+ * for dropped samples: forecasts and outcomes come from the strategy tracker, not the samples, and a lost forecast
+ * event is caught as `missing-forecast` (Portimão LMP3 race 2026-10-24: 26 samples lost before the start).
+ */
+export const LEARNING_EXAMPLE_RULES_VERSION = 2;
+
 export interface LearningLap {
   driverOrdinal: number;
   lapOrdinal: number;
@@ -55,7 +62,6 @@ export function buildLearningExamples(
     if (forecastEvents.length > 1) exclusions.push('ambiguous-forecast');
     if (!lap.isClean || !lap.isRepresentative) exclusions.push('lap-not-clean-representative');
     if (lap.lapNumber <= 1) exclusions.push('start-lap');
-    if (manifest.droppedSamples > 0) exclusions.push('capture-drops');
     if (!manifest.gameVersion || !manifest.layoutKey || !manifest.vehicleModel) exclusions.push('manifest-identity-unknown');
 
     const anchorMatches = manifest.anchors.filter((anchor) => anchor.lapNumber === lap.lapNumber);

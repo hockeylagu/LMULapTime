@@ -67,8 +67,7 @@ describe('buildLearningExamples', () => {
     expect(example?.forecastObservationId).toBe(10);
   });
 
-  it('preserves outcome exclusions and adds timing, condition, flag, and capture-drop exclusions', () => {
-    const droppedManifest = { ...manifest, droppedSamples: 1 };
+  it('preserves outcome exclusions and adds timing, condition and flag exclusions', () => {
     const badLap = { ...lap, isClean: false, condition: 'unknown' };
     const events = eventSet();
     const outcome = events[1];
@@ -77,11 +76,18 @@ describe('buildLearningExamples', () => {
       ...outcome,
       event: { ...outcome.event, data: { ...outcome.event.data, exclusions: ['source-exclusion'] } },
     };
-    const [example] = buildLearningExamples(droppedManifest, 1, [badLap], [events[0]!, changedOutcome]);
+    const [example] = buildLearningExamples(manifest, 1, [badLap], [events[0]!, changedOutcome]);
     expect(example?.exclusions).toEqual(expect.arrayContaining([
-      'source-exclusion', 'capture-drops', 'lap-not-clean-representative', 'xml-condition-unknown',
+      'source-exclusion', 'lap-not-clean-representative', 'xml-condition-unknown',
       'forecast-condition-mismatch',
     ]));
+  });
+
+  it('keeps laps of a recording that dropped samples elsewhere', () => {
+    // Portimão LMP3 race 2026-10-24: 26 of 42,721 samples lost in one 0.84 s gap before the start excluded every
+    // lap of the race; the lap's forecast and outcome are intact.
+    const [example] = buildLearningExamples({ ...manifest, samples: 42_721, droppedSamples: 26 }, 1, [lap], eventSet());
+    expect(example?.exclusions).toEqual([]);
   });
 
   it('requires verified session ownership and unique observation IDs', () => {

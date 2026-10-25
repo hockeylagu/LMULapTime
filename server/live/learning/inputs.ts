@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { Database } from 'better-sqlite3';
 import { LIVE_LEARNING_VERSION } from '../../../shared/types/liveLearning.js';
-import type { LearningLap } from '../../../shared/domain/learning/examples.js';
+import { LEARNING_EXAMPLE_RULES_VERSION, type LearningLap } from '../../../shared/domain/learning/examples.js';
 import { LIVE_CAPTURE_MATCH_RULE_VERSION } from '../../core/live/dbLiveCaptureStore.js';
 import type { LiveCaptureIndexRow } from '../../core/live/dbLiveCaptureStore.js';
 import { findLiveCaptureCandidates } from '../capture/reconcile.js';
@@ -25,7 +25,7 @@ export function learningProjectionInputs(db: Database, entry: LiveCaptureIndexRo
       is_clean: number | null; is_representative: number | null; condition_group: string | null;
     }>;
   const signature = createHash('sha256').update(JSON.stringify({ version: LIVE_LEARNING_VERSION,
-    manifest, matchVersion: entry.matchVersion, rows })).digest('hex');
+    rules: LEARNING_EXAMPLE_RULES_VERSION, manifest, matchVersion: entry.matchVersion, rows })).digest('hex');
   return { signature, laps: rows.map(row => ({ driverOrdinal: row.driver_ordinal, lapOrdinal: row.lap_ordinal,
     lapNumber: row.lap_number, lapSeconds: row.lap_time, isClean: row.is_clean === 1,
     isRepresentative: row.is_representative === 1, condition: row.condition_group })) };

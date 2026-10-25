@@ -10,7 +10,6 @@ export const LEARNING_EXCLUSION_LABELS: Record<string, string> = {
   'unobserved-lap': 'Lap was not fully observed',
   'lap-not-clean-representative': 'Lap is not clean and representative',
   'start-lap': 'Standing-start lap',
-  'capture-drops': 'Recording has missing samples',
   'manifest-identity-unknown': 'Game patch, layout or car is unresolved',
   'stale-projection': 'Session evidence changed and needs reprocessing',
   'ambiguous-xml-lap': 'Lap identity is ambiguous',
