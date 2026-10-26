@@ -328,6 +328,8 @@ Two cases fail and must not be used:
 
 Desktop only and dense. The design width is 1500px: content sits in a centered 1500px column (`max-w-[1500px]`) with 32px side gutters (`px-8`), and the sticky navbar spans the full width with its contents in the same column. The column stays 1500px on wider monitors so one screen holds one question, and a little vertical scrolling beats spreading data left and right. Below the floor (`min-w-[1480px]` on the app root, a 1500px window less its scrollbar) the page scrolls sideways instead of reflowing. The one exception is the telemetry studio (`/telemetry`), a wide workspace designed for a minimum 1920px viewport.
 
+The live dashboard (`#/live`) is a separate surface with its own scale: a read-only 2560 x 1440 stage read from the seat at 50 inches or more, with 32px as the type floor, no controls while driving, and values that never move. The Timing Sheet Rule and the small type scale below do not apply to it; its rules are in the surface brief (`.impeccable/surfaces/src-components-live.md`).
+
 Spacing is tight and follows Tailwind's 4px scale, with half steps. Gaps between inline items are 4–8px (`gap-1`, `gap-1.5`, `gap-2`, the three most used values). Groups are 12–16px apart and panel padding is 16–24px. Chips and badges use 2px vertical padding. Laptops, tablets and phones are not the audience: new work needs no `sm`/`md`/`lg` variants, and the existing ones are inert above the floor.
 
 Toolbars sit directly on the page surface, not in a panel. Wide tables scroll horizontally inside their panel rather than widening the column.
