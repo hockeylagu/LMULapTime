@@ -1,5 +1,5 @@
 import type { NonRepresentativeReason } from './session.js';
-import type { VehicleDataRecord } from './dataPlugin.js';
+import type { VehicleDataRecord, VehicleHandlingCalibration } from './dataPlugin.js';
 import type { TrackKerbType, TrackTimingGates } from './trackGeometry.js';
 import type { WeatherCondition } from './session.js';
 import type { LiveCaptureOverlay, LiveDynamicsProvenance, LiveWheelSlip } from './liveEvidence.js';
@@ -139,6 +139,11 @@ export interface ReplayTrajectoryPoint {
   /** ISO vehicle Y acceleration in g: positive toward the vehicle's left. */
   accelLatG?: number;
   accelTotalG?: number;
+  /** Client dynamics provenance; measured native telemetry takes precedence over geometric estimates. */
+  accelerationProvenance?: {
+    lateral: 'telemetry' | 'derived';
+    longitudinal: 'telemetry' | 'derived';
+  };
   /** ISO yaw rate in degrees/s: positive left about the upward axis. */
   yawRateDeg?: number;
   /** Source sample retained when supplemental live dynamics replace computed estimates. */
@@ -274,6 +279,8 @@ export interface ReplayTrajectoryData {
   lapOrdinal?: number;
   vehicleIdentity?: { vehicleId?:string; carType?:string; carClass?:string };
   vehicleData?: VehicleDataRecord;
+  /** Applied client calibration; plugin steering uses base defaults, not a recorded setup. */
+  handlingCalibration?: VehicleHandlingCalibration;
   dataPluginRevision?: string;
   replayName: string;
   driverSlot?: number;

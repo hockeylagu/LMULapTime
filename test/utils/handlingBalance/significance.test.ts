@@ -20,6 +20,44 @@ function comparison(points: ReplayTrajectoryPoint[], localLoss = 0.2, initialLos
 }
 
 describe('handling events worth reviewing', () => {
+  it.each([0.01, 0.05, 0.1])('uses measured lateral response despite interpolated stable yaw at %s s sampling', step => {
+    for (const sign of [1, -1]) {
+      // Native G updates at 10 Hz even on a 100 Hz chart; both turn directions behave alike.
+      const points = corner(step, sign).map(p => ({ ...p, yawRateDeg: sign * 24,
+        accelLatG: sign * (1.8 - Math.floor((p.timeSec ?? 0) * 10 + 1e-9) * 0.1),
+        accelerationProvenance: { lateral: 'telemetry' as const, longitudinal: 'derived' as const },
+      }));
+      const events = detectHandlingBalanceEvents(points);
+      expect(events).toHaveLength(1);
+      expect(events[0].evidence).toBe('More steering but less measured lateral response');
+      expect(detectHandlingBalanceEvents(points.map(p => ({ ...p, accelerationProvenance: undefined })))).toEqual([]);
+    }
+  });
+
+  it('does not trust a yaw collapse when measured turning response stays stable', () => {
+    const points = corner().map(p => ({ ...p,
+      accelerationProvenance: { lateral: 'telemetry' as const, longitudinal: 'derived' as const },
+    }));
+    expect(detectHandlingBalanceEvents(points)).toEqual([]);
+  });
+
+  it('compensates lateral response for speed changes and rejects sensor spikes', () => {
+    const points = corner(0.01).map(p => ({ ...p, yawRateDeg: 24,
+      speedKmh: 108 - 30 * (p.timeSec ?? 0),
+      accelLatG: 1.8 * ((108 - 30 * (p.timeSec ?? 0)) / 108) ** 2,
+      accelerationProvenance: { lateral: 'telemetry' as const, longitudinal: 'derived' as const },
+    }));
+    expect(detectHandlingBalanceEvents(points)).toEqual([]);
+    expect(detectHandlingBalanceEvents(points.map((p, i) => ({ ...p, speedKmh: 108, accelLatG: i === 75 ? 0.8 : 1.8 })))).toEqual([]);
+  });
+
+  it('does not attribute a traction control intervention alone to tyre scrub', () => {
+    const points = corner().map(p => ({ ...p, steerYaw: 40, yawRateDeg: 20, throttle: 70,
+      accelLonG: -0.4, brake: 0, tcActive: true,
+    }));
+    expect(detectHandlingBalanceEvents(points)).toEqual([]);
+  });
+
   it.each([0.01, 0.05, 0.1])('keeps sustained loss-of-response events at %s s sampling', step => {
     const points = corner(step);
     const events = detectHandlingBalanceEvents(points);

@@ -29,7 +29,7 @@ export function parseVehicleCatalog(value: unknown): VehicleDataRecord[] {
   const aliases = new Set<string>(), ids = new Set<string>();
   return catalog.vehicles.map(item => {
     const row = object(item);
-    keys(row, ['id', 'model', 'carClass', 'vehicleIds', 'dimensions', 'outlineXZ', 'replayOriginOffsetXZ']);
+    keys(row, ['id', 'model', 'carClass', 'vehicleIds', 'dimensions', 'handling', 'outlineXZ', 'replayOriginOffsetXZ']);
     const id = text(row.id), model = text(row.model), carClass = text(row.carClass);
     if (!/^[a-zA-Z0-9_-]+$/.test(id) || ids.has(id) || !Array.isArray(row.vehicleIds) || row.vehicleIds.length > 5000) throw Error('Invalid vehicle record');
     ids.add(id);
@@ -43,6 +43,25 @@ export function parseVehicleCatalog(value: unknown): VehicleDataRecord[] {
       const d = object(row.dimensions); keys(d, ['lengthM', 'widthM', 'heightM']);
       if (typeof d.lengthM !== 'number' || d.lengthM < 3 || d.lengthM > 7 || typeof d.widthM !== 'number' || d.widthM < 1 || d.widthM > 3 || (d.heightM !== undefined && (typeof d.heightM !== 'number' || !Number.isFinite(d.heightM) || d.heightM < .3 || d.heightM > 3)) || !Number.isFinite(d.lengthM) || !Number.isFinite(d.widthM)) throw Error('Invalid dimensions');
       result.dimensions = {lengthM:d.lengthM, widthM:d.widthM, ...(d.heightM !== undefined ? {heightM:d.heightM as number} : {})};
+    }
+    if (row.handling !== undefined) {
+      const h = object(row.handling);
+      keys(h, ['wheelbaseM', 'steeringRatio', 'defaultSteeringWheelRangeDeg', 'defaultSteeringLockDeg']);
+      const bounds: Record<string, [number, number]> = {
+        wheelbaseM: [1.5, 4], steeringRatio: [3, 40],
+        defaultSteeringWheelRangeDeg: [90, 1440], defaultSteeringLockDeg: [2, 60],
+      };
+      if (!Object.keys(h).length) throw Error('Empty handling data');
+      for (const [name, value] of Object.entries(h)) {
+        const [low, high] = bounds[name];
+        if (typeof value !== 'number' || !Number.isFinite(value) || value < low || value > high) throw Error('Invalid handling data');
+      }
+      const { steeringRatio, defaultSteeringWheelRangeDeg, defaultSteeringLockDeg } = h;
+      const steering = [steeringRatio, defaultSteeringWheelRangeDeg, defaultSteeringLockDeg];
+      if (steering.some(v => v !== undefined) && !steering.every(v => typeof v === 'number')) throw Error('Incomplete steering data');
+      if (typeof steeringRatio === 'number' && typeof defaultSteeringWheelRangeDeg === 'number' && typeof defaultSteeringLockDeg === 'number' &&
+          Math.abs(defaultSteeringWheelRangeDeg / (2 * defaultSteeringLockDeg) - steeringRatio) > 0.01) throw Error('Inconsistent steering data');
+      result.handling = { ...h };
     }
     if (row.replayOriginOffsetXZ !== undefined) result.replayOriginOffsetXZ = pair(row.replayOriginOffsetXZ);
     if (row.outlineXZ !== undefined) {

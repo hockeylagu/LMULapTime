@@ -1,6 +1,8 @@
 import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../shared/types/index.js';
 import { computeVehicleDynamics } from './computedTelemetry.js';
 import { getSteerAngleDeg } from '../../shared/domain/formatters.js';
+import { resolveVehicleHandling } from '../../shared/domain/vehicles/handling.js';
+import type { VehicleHandlingCalibration } from '../../shared/types/dataPlugin.js';
 
 const MAX_PLAUSIBLE_SPEED_KMH = 400; // No LMU car exceeds ~370 km/h
 
@@ -87,7 +89,7 @@ function forEachRun(length: number, pred: (i: number) => boolean, fn: (i: number
  * array - the input is never mutated, so cached/raw server data stays untouched. Intended
  * to be called once, right after a trajectory is fetched, before it's used anywhere else.
  */
-export function applyTelemetryPostProcessing(points: ReplayTrajectoryPoint[]): ReplayTrajectoryPoint[] {
+export function applyTelemetryPostProcessing(points: ReplayTrajectoryPoint[], calibration?: VehicleHandlingCalibration): ReplayTrajectoryPoint[] {
   if (points.length === 0) return points;
 
   const times = sampleTimes(points);
@@ -149,7 +151,7 @@ export function applyTelemetryPostProcessing(points: ReplayTrajectoryPoint[]): R
   }));
 
   // 5. Compute vehicle dynamics: longitudinal & lateral G, combined G, slip angle, understeer/oversteer, and tire slip
-  return computeVehicleDynamics(denoisedPoints);
+  return computeVehicleDynamics(denoisedPoints, calibration);
 }
 
 /**
@@ -158,5 +160,6 @@ export function applyTelemetryPostProcessing(points: ReplayTrajectoryPoint[]): R
  */
 export function applyTelemetryPostProcessingToTrajectory<T extends ReplayTrajectoryData | null | undefined>(trajectory: T): T {
   if (!trajectory) return trajectory;
-  return { ...trajectory, points: applyTelemetryPostProcessing(trajectory.points) };
+  const handlingCalibration = resolveVehicleHandling(trajectory.vehicleData);
+  return { ...trajectory, handlingCalibration, points: applyTelemetryPostProcessing(trajectory.points, handlingCalibration) };
 }

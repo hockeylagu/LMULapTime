@@ -323,7 +323,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
 - **New vehicle mapping**: A new car is a `VEHICLE_MODELS` row in `shared/domain/vehicleMapping.ts` (class, LMU car name from `Classes`, public model). Then run `node tools/release/updateVehicleKeys.mjs <getAllVehicles.json> <.veh folder>` to add its vehicle files and entry names to the generated `VEHICLE_KEYS` block (keys are only added, so older game versions keep resolving). Class dimensions belong in `vehicleDimensions.ts`.
 - **New session list filter**: Add control to `narrow` slot of `DashboardFilterBar.tsx` and `TrackSessionsToolbar.tsx` → clear in filter resets (`resetFilters` in `Dashboard.tsx`, `resetSessionFilters` in `useTrackDetailState.ts`).
 - **Navigation link**: Use React Router `Link` with a concrete `to` prop. For custom click handling, pass `linkClickHandler` from `src/utils/linkClick.ts`.
-- **Vehicle dynamics channel**: Follow ISO 8855 (positive left for steering, yaw rate, lateral G, lateral offset). Convert LMU coordinate signs during ingestion (`replayTrajectory.ts`, `duckdbReader.ts`).
+- **Vehicle dynamics channel**: Follow ISO 8855 (positive left for steering, yaw rate, lateral G, lateral offset). Convert LMU coordinate signs during ingestion (`replayTrajectory.ts`, `duckdbReader.ts`). Handling calibration resolves selected-car plugin physics or historical approximate defaults in `shared/domain/vehicles/handling.ts`; `telemetryPostProcessing.ts` passes it to the canonical `computeUnderOversteer` implementation for both DuckDB and VCR.
 - **UI colors**: Use semantic `lmu-*` roles from `tailwind.config.js` (`text-lmu-gain`, `bg-lmu-warn-strong/20`). Chart colors come from `src/utils/themeColors.ts`.
 
 ---

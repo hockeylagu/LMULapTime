@@ -1,8 +1,8 @@
 import { ReplayTrajectoryPoint } from '../../shared/types/index.js';
+import { DEFAULT_VEHICLE_HANDLING } from '../../shared/domain/vehicles/handling.js';
+import type { VehicleHandlingCalibration } from '../../shared/types/dataPlugin.js';
 
 const G_CONST = 9.80665;
-const WHEELBASE_M = 2.7; // Standard GT3 / Prototype wheelbase (~2.7m)
-const STEERING_RATIO = 11.0; // Effective ratio mapping LMU 270-deg steerYaw (540 lock-to-lock) to ~24.5 deg road wheel lock
 
 /**
  * Normalizes an angle difference in radians to the range [-pi, pi].
@@ -220,7 +220,8 @@ export function computeSlipAngle(
  */
 export function computeUnderOversteer(
   points: ReplayTrajectoryPoint[],
-  yawRatesDeg: number[]
+  yawRatesDeg: number[],
+  calibration: VehicleHandlingCalibration = DEFAULT_VEHICLE_HANDLING
 ): number[] {
   const n = points.length;
   if (n === 0) return [];
@@ -239,11 +240,13 @@ export function computeUnderOversteer(
 
     const vMs = spd / 3.6;
     // Actual road wheel steer angle in degrees
-    const wheelAngleDeg = steer / STEERING_RATIO;
+    // steerYaw keeps the chart's normalized ±270° scale. Convert to the car's default
+    // physical wheel range before applying its ratio; chart percent consumers keep their contract.
+    const wheelAngleDeg = steer * (calibration.steeringWheelRangeDeg / 540) / calibration.steeringRatio;
 
     // Kinematic steering angle for neutral turning: delta_k = (L * yawRateRad / v) in degrees
     const yawRateRad = (yaw * Math.PI) / 180;
-    const kinematicAngleDeg = ((WHEELBASE_M * yawRateRad) / Math.max(1, vMs)) * (180 / Math.PI);
+    const kinematicAngleDeg = ((calibration.wheelbaseM * yawRateRad) / Math.max(1, vMs)) * (180 / Math.PI);
 
     // Reference cornering direction: determined by vehicle yaw rate when cornering,
     // falling back to driver steering angle if the car is just initiating turn.
@@ -351,16 +354,20 @@ export function computeTireSlipAndLockup(
 /**
  * Chains all vehicle dynamics calculations and augments the trajectory points.
  */
-export function computeVehicleDynamics(points: ReplayTrajectoryPoint[]): ReplayTrajectoryPoint[] {
+export function computeVehicleDynamics(points: ReplayTrajectoryPoint[], calibration: VehicleHandlingCalibration = DEFAULT_VEHICLE_HANDLING): ReplayTrajectoryPoint[] {
   if (points.length === 0) return points;
 
-  const lonG = computeLongitudinalG(points);
+  const derivedLonG = computeLongitudinalG(points);
+  const lonG = derivedLonG.map((value, index) =>
+    Number.isFinite(points[index].accelLonG) ? points[index].accelLonG! : value);
   const yawRates = computeYawRate(points).map((value, index) =>
     points[index].liveDynamics?.yawRate && Number.isFinite(points[index].yawRateDeg) ? points[index].yawRateDeg! : value);
-  const latG = computeLateralG(points, yawRates);
+  const derivedLatG = computeLateralG(points, yawRates);
+  const latG = derivedLatG.map((value, index) =>
+    Number.isFinite(points[index].accelLatG) ? points[index].accelLatG! : value);
   const slipAngles = computeSlipAngle(points, latG).map((value, index) =>
     points[index].liveDynamics?.slipAngle && Number.isFinite(points[index].slipAngleDeg) ? points[index].slipAngleDeg! : value);
-  const underOversteer = computeUnderOversteer(points, yawRates);
+  const underOversteer = computeUnderOversteer(points, yawRates, calibration);
   const { tireSlipPct, wheelLockActive } = computeTireSlipAndLockup(
     points,
     lonG,
@@ -372,13 +379,18 @@ export function computeVehicleDynamics(points: ReplayTrajectoryPoint[]): ReplayT
   return points.map((p, i) => {
     const gLon = lonG[i];
     const gLat = latG[i];
-    const gTotal = Number(Math.hypot(gLon, gLat).toFixed(2));
+    const gTotal = Number.isFinite(p.accelLonG) && Number.isFinite(p.accelLatG)
+      ? Math.hypot(gLon, gLat) : Number(Math.hypot(gLon, gLat).toFixed(2));
 
     return {
       ...p,
-      accelLonG: p.accelLonG ?? gLon,
-      accelLatG: p.accelLatG ?? gLat,
-      accelTotalG: p.accelTotalG ?? gTotal,
+      accelLonG: gLon,
+      accelLatG: gLat,
+      accelTotalG: gTotal,
+      accelerationProvenance: {
+        lateral: Number.isFinite(p.accelLatG) ? (p.accelerationProvenance?.lateral ?? 'telemetry') : 'derived',
+        longitudinal: Number.isFinite(p.accelLonG) ? (p.accelerationProvenance?.longitudinal ?? 'telemetry') : 'derived',
+      },
       yawRateDeg: yawRates[i],
       slipAngleDeg: slipAngles[i],
       understeerDeg: underOversteer[i],

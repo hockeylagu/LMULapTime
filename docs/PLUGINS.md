@@ -109,7 +109,19 @@ canonical classes (`Hyper`, `GT3`, `GTE`, `LMP2`, `LMP2_ELMS`, `LMP3`, `SafetyCa
 labels such as `LMGT3`: the app reads it as published and uses it as the replay driver's class.
 `model` only helps resolve a vehicle; the car name shown and filtered on stays the one the
 sessions record. Optional
-`dimensions` hold `lengthM`, `widthM`, `heightM`. Optional convex
+`dimensions` hold `lengthM`, `widthM`, `heightM`. Optional `handling` holds
+`wheelbaseM` and the complete steering trio `steeringRatio`, `defaultSteeringWheelRangeDeg`
+(total lock-to-lock wheel rotation) and `defaultSteeringLockDeg` (one-sided road-wheel lock).
+Wheelbase is the mean of the physics left/right axle distances, independent of collision-body length.
+Steering values describe the base HDV's selected default setting, including its steering fraction;
+they do not identify the setup or circuit-specific upgrade selected for a recorded lap.
+The ratio must agree with `defaultSteeringWheelRangeDeg / (2 * defaultSteeringLockDeg)`.
+Partial steering trios, nonfinite/out-of-range values and unknown handling fields invalidate the package.
+Geometry-only version-1 catalogs remain supported. Missing wheelbase or steering data independently
+uses the historical approximate fallback (2.7 m, 11:1, 540° lock-to-lock); no other model is substituted.
+The client exposes the applied `handlingCalibration` and its plugin/default/fallback sources.
+Both DuckDB and VCR handling calculations use this calibration while the steering chart retains
+its normalized ±270° display scale. Optional convex
 `outlineXZ` coordinates are metres with forward -Z. A validated
 `replayOriginOffsetXZ` establishes calibrated placement on replay poses. Without it,
 the map still displays the model envelope at its preserved local origin, explicitly labeled

@@ -286,6 +286,32 @@ describe('computedTelemetry physics engine', () => {
   });
 
   describe('computeVehicleDynamics integrated pipeline', () => {
+    it('uses measured telemetry G for combined load and grip inference', () => {
+      const points = Array.from({ length: 11 }, (_, i) => makePoint({
+        timeSec: i * 0.1, z: i * 3, speedKmh: 108,
+        accelLonG: -1, accelLatG: 2, accelTotalG: 99,
+      }));
+      const enriched = computeVehicleDynamics(points);
+      expect(enriched[5].accelTotalG).toBeCloseTo(Math.sqrt(5), 8);
+      expect(enriched[5].accelerationProvenance).toEqual({ lateral: 'telemetry', longitudinal: 'telemetry' });
+      expect(enriched[5].tireSlipPct).toBeGreaterThan(50);
+      expect(computeVehicleDynamics(points.map(p => ({ ...p,
+        accelLonG: undefined, accelLatG: undefined, accelTotalG: undefined,
+      })))[5].tireSlipPct).toBe(0);
+    });
+
+    it('falls back per axis for invalid values without promoting derived G on repeated processing', () => {
+      const points = Array.from({ length: 11 }, (_, i) => makePoint({
+        timeSec: i * 0.1, z: i * 3, speedKmh: 108, accelLonG: NaN, accelLatG: 0,
+      }));
+      const enriched = computeVehicleDynamics(points);
+      expect(enriched[5].accelLonG).toBe(0);
+      expect(enriched[5].accelLatG).toBe(0);
+      expect(enriched[5].accelerationProvenance).toEqual({ lateral: 'telemetry', longitudinal: 'derived' });
+      expect(computeVehicleDynamics(enriched)[5].accelerationProvenance).toEqual(enriched[5].accelerationProvenance);
+      expect(computeVehicleDynamics(points.map(p => ({ ...p, accelLatG: Infinity })))[5].accelerationProvenance?.lateral).toBe('derived');
+    });
+
     it('enriches points with all computed telemetry fields', () => {
       const points = [
         makePoint({ timeSec: 0.0, speedKmh: 150, steerYaw: 10, rotY: 0.0, x: 0, z: 0 }),

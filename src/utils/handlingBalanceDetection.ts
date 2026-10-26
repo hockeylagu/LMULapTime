@@ -3,6 +3,7 @@ import { CornerSegmentComparison } from './cornerAnalysis/types.js';
 import { PointComparison } from './replayComparison.js';
 import { getTrajectoryDistances } from './lapAlignment.js';
 import { evaluateHandlingEvidence, handlingAdvice, SIGNIFICANT_HANDLING_LOSS_SEC } from './handlingBalance/evidence.js';
+import { computeUnderOversteer } from './computedTelemetry.js';
 
 export type HandlingBalanceType = 'understeer' | 'oversteer';
 export type HandlingBalancePhase = 'E' | 'M' | 'X' | 'EM' | 'MX';
@@ -56,29 +57,7 @@ const OVERSTEER_THRESHOLD_DEG = -1.0;  // Point-level entry threshold for overst
 const OVERSTEER_PEAK_MIN_DEG = -1.6;   // Event must reach at least -1.6° or opposite lock
 
 /**
- * Derives dynamic handling balance (deg) if not pre-computed on the point.
- */
-function getOrComputeBalanceDeg(p: ReplayTrajectoryPoint): number {
-  if (p.understeerDeg !== undefined && Number.isFinite(p.understeerDeg)) return p.understeerDeg;
-
-  const spd = p.speedKmh ?? 0;
-  const steer = p.steerYaw ?? 0;
-  const yaw = p.yawRateDeg ?? 0;
-  if (spd < MIN_SPEED_KMH || (Math.abs(steer) < 3 && Math.abs(yaw) < 3)) {
-    return 0;
-  }
-
-  const vMs = spd / 3.6;
-  const wheelAngleDeg = steer / 11.0;
-  const yawRateRad = (yaw * Math.PI) / 180;
-  const kinematicAngleDeg = ((2.7 * yawRateRad) / Math.max(1, vMs)) * (180 / Math.PI);
-  const turnDir = Math.abs(yaw) >= 3 ? (yaw > 0 ? 1 : -1) : (steer > 0 ? 1 : -1);
-
-  return (wheelAngleDeg - kinematicAngleDeg) * turnDir;
-}
-
-/**
- * Resolves whether the vehicle is in an understeer or oversteer handling limit state.
+ * Classifies precomputed handling balance; raw points use the canonical approximate calibration.
  */
 function classifyPointBalance(p: ReplayTrajectoryPoint): {
   type: HandlingBalanceType | null;
@@ -95,7 +74,8 @@ function classifyPointBalance(p: ReplayTrajectoryPoint): {
   const yaw = p.yawRateDeg ?? 0;
   const slipAngle = Math.abs(p.slipAngleDeg ?? 0);
   const latG = Math.abs(p.accelLatG ?? 0);
-  const balance = getOrComputeBalanceDeg(p);
+  const balance = Number.isFinite(p.understeerDeg) ? p.understeerDeg!
+    : computeUnderOversteer([p], [yaw])[0];
 
   // 1. Countersteer / Catching opposite lock: steering opposes vehicle rotation
   const isCountersteer = steer * yaw < 0 && Math.abs(steer) >= 8 && Math.abs(yaw) >= 8;
@@ -360,6 +340,7 @@ export function detectHandlingBalanceEvents(
       scrubSeverityPct,
       timeLossSec: evidence.timeLossSec === null ? null : Number(evidence.timeLossSec.toFixed(3)),
       evidence: ev.type === 'oversteer' ? (ev.isCountersteer ? 'Rear slide with opposite lock' : 'Sustained rear slide')
+        : evidence.measuredResponseCollapse ? 'More steering but less measured lateral response'
         : evidence.responseCollapse ? 'More steering but less rotation'
         : evidence.scrubDrag ? 'Speed falling on throttle without braking'
         : 'More steering and less speed than the baseline',

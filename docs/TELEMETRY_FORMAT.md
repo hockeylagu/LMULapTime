@@ -96,6 +96,35 @@ Use a stable `session_id` plus `(channel_name, sample_index)` for continuous row
 
 ## Sign conventions (ISO 8855)
 
+### Handling detection inputs
+
+Client dynamics use finite native DuckDB G values before geometric estimates, independently per
+axis, including the combined-G and inferred grip calculations. `accelerationProvenance` identifies
+telemetry versus derived acceleration after processing; reprocessing does not promote estimates to
+measurements. Missing or nonfinite channels retain the VCR speed/yaw-based fallback.
+
+Understeer evidence uses sustained loss of lateral response (`abs(a_y) / v²`) while steering
+increases when native lateral G is available. This avoids relying only on replay heading interpolated
+onto the telemetry timeline. VCR-only evidence uses yaw/speed response. Both paths still require a
+steering-balance candidate, sustained evidence and, when comparing laps, a significant local deficit.
+Oversteer retains sideslip/rotation evidence, using native lateral G when available. TC intervention
+alone establishes neither oversteer nor scrub; deceleration during active TC is excluded from the
+scrub-drag test. These are handling hypotheses, not measured axle slip or causal time-loss estimates.
+
+The inspected 2026-10-24 Algarve and 2026-10-14 Laguna Seca native files provide 100 Hz steering,
+ground speed and wheel speed, and 10 Hz G channels; neither catalog contains lateral tyre slip.
+Wheel-speed differences alone are not treated as measured tyre slip. Rates and availability remain
+per-file catalog facts; no live recording is required for this detection path. Road banking and other
+force contributions can affect measured G, so it does not establish tyre saturation on its own.
+
+Both native-telemetry and VCR handling balance use the selected vehicle's optional plugin wheelbase
+and base-default steering calibration ([plugin contract](PLUGINS.md)). Steering input retains the
+normalized ±270° chart scale; road-wheel angle is `steerYaw / 270 * defaultSteeringLockDeg`,
+equivalently `steerYaw * defaultSteeringWheelRangeDeg / 540 / steeringRatio`. Wheelbase enters
+the kinematic turning demand. Missing plugin fields use the historical approximate calibration.
+The selected runtime setup/steering upgrade is not supplied by these files: plugin steering is
+explicitly labeled `plugin-default`, not a measured wheel angle. No per-class equality is assumed.
+
 Normalized vehicle dynamics follow ISO 8855:2011 vehicle axes (x forward, y left, z up), and ASAM OpenDRIVE's
 `t` (positive left of the reference line, the same sense as ISO 8855 y) for the offset from the track
 centerline. Views put the positive side up on charts and label it left.

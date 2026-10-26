@@ -15,6 +15,15 @@ import {trackRevisions} from '../../../server/plugins/trackPackage.js';
 const directories:string[]=[];
 afterEach(()=>{for(const dir of directories.splice(0))fs.rmSync(dir,{recursive:true,force:true,maxRetries:5,retryDelay:50});});
 const catalog={schemaVersion:1,coordinates:'local-xz-metres-forward-minus-z',vehicles:[{id:'synthetic',model:'Test Car',carClass:'Hyper',vehicleIds:['TEST_CAR'],dimensions:{lengthM:5,widthM:2},outlineXZ:[[-1,-2.5],[1,-2.5],[1,2.5],[-1,2.5]],replayOriginOffsetXZ:[0,0]}]};
+it('accepts bounded physics defaults while rejecting incomplete or inconsistent steering data',()=>{
+  const handling={wheelbaseM:3.1,steeringRatio:12,defaultSteeringWheelRangeDeg:480,defaultSteeringLockDeg:20};
+  const parse=(value:unknown)=>parseVehicleCatalog({...catalog,vehicles:[{...catalog.vehicles[0],handling:value}]});
+  expect(parse(handling)[0].handling).toEqual(handling);
+  expect(parse({wheelbaseM:3.1})[0].handling).toEqual({wheelbaseM:3.1});
+  for(const value of [{},null,{wheelbaseM:NaN},{wheelbaseM:6},{wheelbaseM:'3'},
+    {steeringRatio:12},{...handling,defaultSteeringLockDeg:10},{...handling,source:'private'},
+    {...handling,defaultSteeringWheelRangeDeg:Infinity}])expect(()=>parse(value)).toThrow();
+});
 function fixture(kind:'vehicles'|'tracks'|'both'='both') {
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'lmu-plugin-'));directories.push(dir);
   const write=(file:string,value:unknown)=>{fs.mkdirSync(path.dirname(path.join(dir,file)),{recursive:true});fs.writeFileSync(path.join(dir,file),JSON.stringify(value));};

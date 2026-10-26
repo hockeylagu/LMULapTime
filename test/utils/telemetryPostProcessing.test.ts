@@ -128,6 +128,26 @@ describe('applyTelemetryPostProcessing', () => {
 });
 
 describe('applyTelemetryPostProcessingToTrajectory', () => {
+  it.each(['duckdb', 'vcr'] as const)('applies the selected car physics to %s handling without changing steering chart percent', source => {
+    const trajectory: ReplayTrajectoryData = {
+      replayName: 'Test.Vcr', source, pointsCount: 11,
+      bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 30, spanX: 0, spanZ: 30 },
+      vehicleData: { id: 'test', model: 'Test', carClass: 'Hyper', vehicleIds: ['TEST'],
+        handling: { wheelbaseM: 3.1, steeringRatio: 12, defaultSteeringWheelRangeDeg: 480, defaultSteeringLockDeg: 20 } },
+      points: Array.from({ length: 11 }, (_, i) => point({ timeSec: i * 0.1,
+        speedKmh: 108, steerYaw: 0.5, z: i * 3, rotY: -i * 0.02 })),
+    };
+    const result = applyTelemetryPostProcessingToTrajectory(trajectory);
+    // Physical road wheel: half input * 20° lock = 10°. Rounded yaw is 11.5°/s.
+    expect(result.points[5].understeerDeg).toBeCloseTo(10 - 3.1 * 11.5 / 30, 2);
+    expect(result.points[5].steerYaw).toBe(135);
+    expect(result.handlingCalibration?.steeringSource).toBe('plugin-default');
+    const fallback = applyTelemetryPostProcessingToTrajectory({ ...trajectory, vehicleData: undefined });
+    expect(fallback.handlingCalibration?.steeringSource).toBe('fallback');
+    expect(fallback.points[5].understeerDeg).toBeGreaterThan(result.points[5].understeerDeg!);
+    expect(trajectory.points[5].steerYaw).toBe(0.5);
+  });
+
   it('passes through null/undefined without throwing', () => {
     expect(applyTelemetryPostProcessingToTrajectory(null)).toBeNull();
     expect(applyTelemetryPostProcessingToTrajectory(undefined)).toBeUndefined();
