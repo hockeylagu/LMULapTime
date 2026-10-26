@@ -26,6 +26,16 @@ describe('rF2 shared memory layout', () => {
     expect(VEHICLE_TELEMETRY.offsets.elapsedTime).toBe(12);
   });
 
+  it('follows LMU InternalsPlugin.hpp past the rF2 fields: deltaBest before the battery, then LMU energy fields', () => {
+    const at = VEHICLE_TELEMETRY.offsets;
+    expect(at.deltaBest).toBe(696);
+    expect(at.batteryChargeFraction).toBe(704);
+    expect(at.electricBoostMotorState).toBe(744);
+    expect(at.virtualEnergy).toBe(776);
+    expect(at.wheels).toBe(848);
+    expect(VEHICLE_SCORING.offsets.pitState).toBe(VEHICLE_SCORING.offsets.headlights + 1);
+  });
+
   it('aligns to at most four bytes (Pack = 4) and rejects duplicate names', () => {
     const layout = defineStruct([['a', 'u8'], ['b', 'f64'], ['c', 'u16']]);
     expect(layout.offsets).toEqual({ a: 0, b: 4, c: 12 });

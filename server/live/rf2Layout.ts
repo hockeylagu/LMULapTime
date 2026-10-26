@@ -2,6 +2,8 @@
  * Byte layout of the rFactor 2 shared memory plugin buffers (v3.x) with Pack = 4
  * (every member aligns to at most 4 bytes). A wrong or missing field shifts every later offset,
  * so the struct sizes are asserted against the plugin's published sizes in test/server/live/rf2Layout.test.ts.
+ * The plugin copies the game's records verbatim, so the vehicle records follow LMU's own `InternalsPlugin.hpp`
+ * (`Support/SharedMemoryInterface` in the game folder): LMU fills the rF2 expansion bytes with its own fields.
  */
 
 export type Rf2Primitive = 'i8' | 'u8' | 'i16' | 'u16' | 'i32' | 'u32' | 'f32' | 'f64';
@@ -52,7 +54,8 @@ export const WHEEL = defineStruct([
   ['surfaceType', 'u8'], ['flat', 'u8'], ['detached', 'u8'], ['staticUndeflectedRadius', 'u8'],
   ...doubles('verticalTireDeflection', 'wheelYLocation', 'toe', 'tireCarcassTemperature'),
   ['tireInnerLayerTemperature', 'f64', 3],
-  bytes('expansion', 24),
+  ['optimalTemp', 'f32'], ['compoundIndex', 'u8'], ['compoundType', 'u8'],
+  bytes('expansion', 18),
 ]);
 
 export const VEHICLE_TELEMETRY = defineStruct([
@@ -85,10 +88,17 @@ export const VEHICLE_TELEMETRY = defineStruct([
   ...doubles('rearBrakeBias', 'turboBoostPressure'),
   ['physicsToGraphicsOffset', 'f32', 3],
   ['physicalSteeringWheelRange', 'f32'],
-  ...doubles('batteryChargeFraction', 'electricBoostMotorTorque', 'electricBoostMotorRPM',
+  ...doubles('deltaBest', 'batteryChargeFraction', 'electricBoostMotorTorque', 'electricBoostMotorRPM',
     'electricBoostMotorTemperature', 'electricBoostWaterTemperature'),
-  ['electricBoostMotorState', 'u8'],
-  bytes('expansion', 111),
+  ...(['electricBoostMotorState', 'lapInvalidated', 'absActive', 'tcActive', 'speedLimiterActive', 'wiperState',
+    'tc', 'tcMax', 'tcSlip', 'tcSlipMax', 'tcCut', 'tcCutMax', 'abs', 'absMax', 'motorMap', 'motorMapMax',
+    'migration', 'migrationMax', 'frontAntiSway', 'frontAntiSwayMax', 'rearAntiSway', 'rearAntiSwayMax',
+    'liftAndCoastProgress', 'trackLimitsSteps'].map(name => [name, 'u8'] as const)),
+  ...(['regen', 'soc', 'virtualEnergy', 'timeGapCarAhead', 'timeGapCarBehind', 'timeGapPlaceAhead',
+    'timeGapPlaceBehind'].map(name => [name, 'f32'] as const)),
+  bytes('vehicleModel', 30),
+  ['vehicleClassId', 'u8'], ['vehicleChampionship', 'u8'],
+  bytes('expansion', 20),
   ['wheels', WHEEL, 4],
 ]);
 
@@ -114,7 +124,9 @@ export const VEHICLE_SCORING = defineStruct([
   ['flag', 'u8'], ['underYellow', 'u8'], ['countLapFlag', 'u8'], ['inGarageStall', 'u8'],
   bytes('upgradePack', 16),
   ['pitLapDist', 'f32'], ['bestLapSector1', 'f32'], ['bestLapSector2', 'f32'],
-  bytes('expansion', 48),
+  bytes('steamId', 8), bytes('vehFilename', 32),
+  ['attackMode', 'i16'], ['fuelFraction', 'u8'], ['drsState', 'u8'],
+  bytes('expansion', 4),
 ]);
 
 export const SCORING_INFO = defineStruct([
@@ -135,7 +147,10 @@ export const SCORING_INFO = defineStruct([
   bytes('serverName', 32),
   ['startET', 'f32'],
   ...doubles('avgPathWetness'),
-  bytes('expansion', 200),
+  ['sessionTimeRemaining', 'f32'], ['timeOfDay', 'f32'],
+  ['isFixedSetup', 'u8'], ['trackGripLevel', 'u8'], ['cloudCoverage', 'u8'],
+  ['trackLimitsStepsPerPenalty', 'u8'], ['trackLimitsStepsPerPoint', 'u8'],
+  bytes('expansion', 187),
   bytes('pointer2', 8),
 ]);
 

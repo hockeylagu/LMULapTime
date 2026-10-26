@@ -308,7 +308,9 @@ Session: ambient/track temperature, `darkCloud` (native CloudDarkness). Position
 - Electric boost motor torque/RPM/temperatures/state: zero, but **no Hyper live capture exists**;
   revisit with a Hyper recording before excluding for that class.
 - `batteryChargeFraction` is nonzero in the non-hybrid LMP3 with impossible values (-5.86 to 2.05):
-  treat as invalid outside verified hybrid classes; native SoC covers hybrids.
+  those were LMU's `mDeltaBest` (seconds). LMU's `InternalsPlugin.hpp` inserts it before the battery, so the
+  old layout read every battery/boost field 8 bytes early; fixed 2026-10-25 (`rf2Layout.ts` follows LMU's header,
+  incl. `mVirtualEnergy`, ABS/TC active and settings). The earlier readings of these fields are invalid.
 - `currentSector` sometimes holds the int32 sentinel (-2,147,483,648): writers must map it to unknown.
 - Constant: `ignitionStarter` = 1, `deltaTime` = 0.01 (not the 0.02 s sample spacing).
 
