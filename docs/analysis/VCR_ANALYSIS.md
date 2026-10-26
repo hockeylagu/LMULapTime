@@ -1,6 +1,6 @@
 # VCR Format — Analysis, Provenance & Future Work
 
-Companion to [VCR_FORMAT.md](VCR_FORMAT.md).
+Companion to [VCR_FORMAT.md](../VCR_FORMAT.md).
 
 **Division of responsibility:**
 
@@ -419,7 +419,7 @@ An exhaustive sweep across all 88 race replays on disk proved the fidelity of th
 
 ### 2.10 REST API as ground truth during replay playback (Sebring R1 15, 20260927)
 
-**Question:** can the embedded REST API (`:6397`, see [LMU_REST_API.md](LMU_REST_API.md)) act
+**Question:** can the embedded REST API (`:6397`, see [LMU_REST_API.md](../LMU_REST_API.md)) act
 as a ground-truth source while a replay plays, the way the shared-memory recorder does while
 driving (§1)? If it could, every `.Vcr` on disk would become a paired capture.
 
@@ -507,7 +507,7 @@ A blind sweep of every parameterless `GET` crashed the game during this investig
 hung for about 30 s and LMU went down, restarting to the main menu (`gameState: "Setup"`).
 Keep replay-mode probing to `/rest/watch/*` and `/rest/replay/*` reads: one request at a time,
 ≤ 1 Hz, stopping on the first non-200 or slow response. Details in
-[LMU_REST_API.md](LMU_REST_API.md) §4.1.
+[LMU_REST_API.md](../LMU_REST_API.md) §4.1.
 
 ### 2.11 Packet census & newly decoded events (Sebring R1 15, 20260927)
 
@@ -633,7 +633,7 @@ leaves them unresolved (`46_25_ADES…`, `12_25_WTM_…`, `11_25_EURO…`): a ve
 `shared/domain/vehicleMapping.ts`, not a VCR issue. Fixed: vehicle ids now resolve through a
 catalog built from the results logs at the time of that fix. Current exact aliases and vehicle
 records are supplied by an optional local package through `server/plugins/`; the generated
-`vehicleCatalog.ts` and `vehicles:catalog` command are no longer shipped. See [PLUGINS.md](PLUGINS.md).
+`vehicleCatalog.ts` and `vehicles:catalog` command are no longer shipped. See [PLUGINS.md](../PLUGINS.md).
 
 #### B. Ambient temperature: `°C = byte38 / 8 + 5.9`
 
@@ -877,7 +877,7 @@ Specification-ready material not yet surfaced in the app.
 - **Brake rotor temperatures (°C)** at offsets `+24..31` when `eventSize === 37`.
 
 ### 6.2 Track meteorology, precipitation & wetness (Class 1 Type 10) [ESTABLISHED]
-> **Resolution Note:** The earlier hypothesis that dynamic track meteorology was stored in the metadata 67-byte session block was superseded; that block stores static session rule multipliers (Damage, Fuel, Tire, Session Length). Dynamic track meteorology, precipitation, and sector surface wetness are fully established in **Class 1 Type 10 (`eventSize === 80`)**, detailed in §2.9 and [VCR_FORMAT.md](VCR_FORMAT.md) §4.
+> **Resolution Note:** The earlier hypothesis that dynamic track meteorology was stored in the metadata 67-byte session block was superseded; that block stores static session rule multipliers (Damage, Fuel, Tire, Session Length). Dynamic track meteorology, precipitation, and sector surface wetness are fully established in **Class 1 Type 10 (`eventSize === 80`)**, detailed in §2.9 and [VCR_FORMAT.md](../VCR_FORMAT.md) §4.
 - **Ambient temperature** at byte 38: `°C = byte / 8 + 5.9` (§2.12 B).
 - **9 sector track wetness / precipitation intensity channels** at bytes 42..77 (zero when dry, positive integers `0x01` to `0x18+` scaling with rainfall rate).
 - Enables real-time rain timeline charts and automatic wet-session classification in Replay Studio.

@@ -17,8 +17,8 @@ web
 A local telemetry analytics, lap comparison and race intelligence hub for Le Mans Ultimate. It reads LMU's own files (results XML, 100 Hz DuckDB telemetry, binary `.Vcr` replays) and turns them into clean laps, true pace, corner-by-corner analysis, comparisons, a leaderboard and a rival to chase.
 
 Supplemental player evidence is also recorded by the running backend into per-session DuckDB files.
-It augments measured dynamics and supplies fuel/VE learning examples; historical prediction
-corrections are not enabled. See [live capture](docs/LIVE_CAPTURE_FORMAT.md).
+It augments measured dynamics and supplies fuel/VE learning examples. Corrections are used only after
+calibration, prospective acceptance and current-run identity/patch gates pass. See [live capture](docs/LIVE_CAPTURE_FORMAT.md).
 
 Success means the driver leaves a session review knowing a few specific, correct things to work on, backed by numbers they can trust.
 
@@ -32,7 +32,7 @@ Success means the driver leaves a session review knowing a few specific, correct
 ## Operating Context
 
 - Desktop browser, opened after a session: the driver finishes driving, then runs the app to review. The design width is a fixed 1500px column on a large monitor (the driver uses 2560 wide); laptops, tablets and mobile are not targets.
-- One exception while driving: the live dashboard (`#/live`), a passive fullscreen page on a second monitor (2560 x 1440, read from 50 inches or more) that opens by itself when LMU starts. It gives advice only (pit lap, VE or fuel to set, damage pace loss beside repair time, pedal trace); the driver sets everything in the game. It never takes input while racing, and the app scans no game files while a session is loaded. Its scale is separate from the analysis pages ([LIVE_RACE_DASHBOARD.md](docs/plans/LIVE_RACE_DASHBOARD.md)).
+- One exception while driving: the live dashboard (`#/live`), a passive fullscreen page on a second monitor (2560 x 1440, read from 50 inches or more) that opens by itself when LMU starts. It gives advice only (pit lap, VE or fuel to set, damage pace loss beside repair time, pedal trace); the driver sets everything in the game. It never takes input while racing, and the app scans no game files while a session is loaded. Its scale is separate from the analysis pages; see [remaining acceptance](docs/plans/README.md#live-dashboard-and-learning).
 - Supplemental capture runs whenever the backend and LMU have an eligible loaded live session, even without the dashboard open.
 - A Node/Express server on port 3001 plus the Vite client; started with `npm run dev` / `launch.bat`.
 - Sources: `UserData/LOG/Results/*.xml`, `UserData/Telemetry/*.duckdb`, `UserData/Replays/*.Vcr`, plus shared memory and LMU's embedded REST API for live evidence. Replays can be several hundred MB to 1 GB and are decoded in workers and cached. The cache is the source of truth once replays are deleted.
@@ -66,3 +66,14 @@ Success means the driver leaves a session review knowing a few specific, correct
 2. **Real opponents, same conditions.** Compare against drivers actually met, on the same layout, class and conditions.
 3. **Answer first, detail on demand.** Lead with what cost time and what to do next; raw traces stay one step away for anyone who wants to verify.
 4. **It just finds your data.** No setup, accounts or uploads between the driver and their review.
+
+## Live display requirements
+
+The second-screen page is advice-only and changes state automatically. Timed races are the primary
+use. Keep one class-relevant resource (VE for GT3/Hypercar, fuel for other classes), with unknown
+values explicit. Pit/finish instructions and the full-width pedal trace take priority over detail;
+last completed lap/sector times and a small exact-layout/class personal record remain available.
+Practice prioritizes the last completed lap; healthy races retain live pace/sector feedback.
+Damage shows measured pace loss beside estimated repair time for the driver's decision, not an
+unsupported repair verdict. Detailed analysis belongs after driving. Remaining acceptance and
+unimplemented screen directions belong in the work queue, not in a retained prototype or delivery log.

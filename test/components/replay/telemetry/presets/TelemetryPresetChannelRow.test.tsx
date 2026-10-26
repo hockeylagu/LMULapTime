@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { TelemetryPresetChannelRow } from '../../../../src/components/replay/telemetry/presets/TelemetryPresetChannelRow.js';
-import { TelemetryChannelInfo } from '../../../../src/components/replay/telemetry/presets/telemetryPresets.js';
+import { TelemetryPresetChannelRow } from '../../../../../src/components/replay/telemetry/presets/TelemetryPresetChannelRow.js';
+import { TelemetryChannelInfo } from '../../../../../src/components/replay/telemetry/presets/telemetryPresets.js';
 
 describe('TelemetryPresetChannelRow', () => {
   const baseChannel: TelemetryChannelInfo = {

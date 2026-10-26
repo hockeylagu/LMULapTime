@@ -84,7 +84,7 @@ Telemetry analytics, lap comparison, and race intelligence hub for **Le Mans Ult
 - **Enforced by `npm run lint`**: no `any`, `.js` extensions on relative imports in `server/`, `shared/`, `test/`, no raw `fetch` in `src/`, `src/` and `shared/` never import `server/`, max 1,000 lines per file and 300 per `src/components/**/*.tsx`, no floating promises, React hooks rules.
 - **Types**: Use canonical models from `shared/types/`, telemetry reader contracts from `server/telemetry/duckdbTypes.ts`, or `unknown` with narrowing.
 - **Zero Warnings**: `npm run build`, `npm run lint` and `npm test` finish with zero warnings and zero errors (incl. rollup chunk and React `act(...)` warnings).
-- **Max 20 files per directory** (excluding `public/track-outlines/`); split into focused subdirectories when approaching it.
+- **Max 20 files per directory** (excluding the repository root and `public/track-outlines/`); split into focused subdirectories when approaching it.
 - **No re-exports or trivial forwarders**: import from the defining module (sole barrel: `shared/types/index.ts`); call canonical implementations directly and update all call sites during refactors.
 
 ### Database Patterns (`server/core/db.ts` & Modular Stores)
@@ -114,13 +114,13 @@ Telemetry analytics, lap comparison, and race intelligence hub for **Le Mans Ult
 - **Coverage report**: `npm run test:coverage` (enforces thresholds in `vitest.config.ts`; never lower thresholds).
 - **Typecheck & Build**: `npm run build`
 - **Test Placement**: Mirrors source tree (`test/server/`, `test/components/`, `test/domain/`, `test/utils/`). Use in-memory SQLite (`:memory:`) or isolated test fixtures.
-- **Endpoint Performance**: Run `npm run benchmark:endpoints` before and after changes affecting API performance; review rankings in `docs/ENDPOINT_BENCHMARKS.md`.
+- **Endpoint Performance**: Run `npm run benchmark:endpoints` before and after changes affecting API performance; review rankings in `docs/performance/ENDPOINT_BENCHMARKS.md`.
 
 ---
 
 ## 6. Development Workflow
 
 1. Identify affected layers (session parsing, replay decoding, telemetry, track geometry, SQLite store, UI).
-2. Maintain documentation and formulas (`docs/`). Follow [documentation lifecycle](docs/DOCUMENTATION.md); use the repository [doc-keeping skill](.agents/skills/doc-keeping/SKILL.md) for plan/decision reviews, documentation cleanup, and substantial changes to requirements or delivery status. Review and update the owning format spec alongside parser, reader/writer, schema, channel, unit, timing or compatibility changes; specs are the canonical written contracts, with unresolved observations kept in analysis. Keep durable rationale discoverable; retire redundant plans only after preserving unique content and checking Git history.
+2. Maintain documentation and formulas (`docs/`). Follow [documentation lifecycle](docs/DOCUMENTATION.md); use the repository [doc-keeping skill](.agents/skills/doc-keeping/SKILL.md) for plan/decision reviews, documentation cleanup, and substantial changes to requirements or delivery status. Review and update the owning format spec alongside parser, reader/writer, schema, channel, unit, timing or compatibility changes; specs are the canonical written contracts, with unresolved observations kept in analysis. Keep durable rationale discoverable; delete completed plans and one-off validation reports without continuing purpose after preserving still-needed content and checking Git history; code comments can own local rationale without a duplicate document.
 3. Adhere to track layout disambiguation via `shared/domain/circuitSpecs.ts`.
 4. Keep all test suites and builds passing with **zero warnings and zero errors**.

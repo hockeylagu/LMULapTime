@@ -445,7 +445,7 @@ A sticky top bar: `lmu-card` at 75% opacity with a blur (the one sanctioned blur
 - **Links:** titles that navigate (the circuit title) are native React Router links with a visible focus outline and keep the car-class context.
 
 ### Dropdowns
-One family for every control that opens a list or panel from a trigger (`common/dropdown/`). Behavior and inventory are in `docs/plans/archive/DROPDOWN_STANDARDIZATION.md`.
+One family for every control that opens a list or panel from a trigger (`common/dropdown/`). This section defines the maintained visual rules; the shared components and their tests define current behavior.
 - **Trigger:** `lmu-bg` well, `lmu-border` hairline, 8px radius, 32px high with 10px side padding, 12px semibold white text. An optional leading muted icon and a muted caption ("Sort:", "History:") precede the value; one muted 14px chevron ends it. Hover and the open state lift the fill to `lmu-card` and the hairline to `lmu-rule`; red is kept for keyboard focus. Disabled text drops to `lmu-faint`; loading swaps the chevron for a spinner.
 - **Filter-row trigger:** the same surface at 36px with a 12px radius and 12px side padding, level with the session search field: the sort and track dropdowns of the dashboard, Tracks and track-session filter rows.
 - **Compact trigger:** the same surface at 24px and 11px text, only where a row cannot take 32px: trace title rows and the telemetry toolbar (preset, steering scale, Beaten rivals).

@@ -1,89 +1,98 @@
-# Plans and remaining work
+# Work queue
 
-Live evidence status/archival reviewed 2026-10-18. General review: 2026-10-10; replay storage/ingestion entries updated and type refactoring archived 2026-10-12. This is the entry point for delivery status;
-[CODE_MAP.md](../CODE_MAP.md) describes the implementation. A proposal is not a shipped feature.
+Reviewed 2026-10-25 against source, Git and existing observations; no new real-game acceptance was run.
+Current implementation belongs in [CODE_MAP](../CODE_MAP.md), not in completed delivery plans.
 
-## Active work
+## Corner comparison
 
-| Plan | Status | Next useful step | Completion gate |
-|---|---|---|---|
-| [Live session learning and acceptance](LIVE_SESSION_EVIDENCE.md) | Accepted capture scope complete (34 numeric values plus sparse channels); automatic promotion/use/fallback/withdrawal implemented | Collect eligible sessions, validate real-game overhead and fresh-session correction behavior | Independently validated calibration and race-weekend acceptance |
-| [Replay storage and ingestion design](REPLAY_STORAGE_DESIGN.md) | [Binary lap codec](REPLAY_BINARY_LAP_CODEC.md) done 2026-10-22 (6.4 GB to 2.6 GB); POC candidates rejected on size | Prepared views and channel groups, if still worth it | Storage size first, app read response second, ingestion third; archived-data safety and domain parity required |
-| [Corner comparison rework](CORNER_COMPARISON_REWORK.md) | In progress on `corner-map`; not integrated into main | Read the worktree's hybrid handoff; complete M2 metric/sequence revalidation, then M3 inspector acceptance | Accepted shared action maps, independent events, swap symmetry and additive timing; visual/sequence gates and consumer integration verified before merging |
-| [Simplified 3D replay and camera controls](REPLAY_3D_PLAN.md) | Proposed; source analysis reviewed 2026-10-15 | Validate one exported plugin scene against cached replay poses | Simplified track, cars, cameras and comparison stay aligned with telemetry; layout/revision isolation, fallback and performance gates pass |
-| [Simagic peripheral plugin](SIMAGIC_PERIPHERAL_PLUGIN.md) | Steps 1–5 committed 2026-10-23 (`fe55db1e`, plugin `361f62b`): wheel-only preset switching, LMU-tagged presets, Suggest, Settings and dashboard chip | Drive one event with automatic switching on and record the result | First garage switches once, later sessions of the event do nothing; acceptance criteria in the plan |
-| [Tyre wear learning](TYRE_WEAR_LEARNING.md) | Phase 1 committed 2026-10-25 (`70591550`, model v2): per-wheel slip-aware garage wear, evaluator, fixtures; Phase 2 accepted 2026-10-25, uncommitted (live per-wheel tread from `mWear`, no per-lap condition call, median lap wear; standings call dropped) | Review the next race's tyres with the evaluator | Portimão race tread at the flag within 0.02 (was 0.806 vs 0.944); no cohort worse than the old rule; Phase 2 removes per-lap condition call |
-| [Live race dashboard](LIVE_RACE_DASHBOARD.md) | Built on `live-dashboard` 2026-10-16 (practice, qualifying, race plan, damage, garage checklist, wetness); reviewed for the merge to main | Race-weekend validation: race plan, fuel-class MFD line, race-garage tyre read, wet track, online forecast, readability from the seat | One passive page readable at 50+ inches on 27-inch 1440p; deterministic pit advice, full-width pedal trace and honest damage estimates |
+[Corner-map design](CORNER_COMPARISON_REWORK.md) remains a substantial unfinished plan on the
+separate `corner-map` worktree. At review it is `b2a5c44f`, not an ancestor of main. Read that
+worktree's current handoff before continuing; do not restart completed metric/map phases or infer
+visual acceptance from implemented code. Remaining work includes M2 metric/sequence revalidation,
+M3 inspector acceptance and shared consumer integration. Preserve the separate `debrief-first`
+worktree; its overlap has not been assessed here.
 
-The main corner engine still derives windows from the primary lap's speed trace. The separate
-`corner-map` worktree already implements geometry/class profiles, maps, measurements and several
-metric phases, plus six accepted hybrid maps and an opt-in timing/event adapter. Coaching, progress,
-quick references, shared consumer migration and final UI acceptance remain incomplete. Its handoff
-is authoritative for continuation; the main plan now distinguishes that branch work from shipped code.
-Do not restart completed phases or infer that implemented metrics have passed their user visual gates.
+## Live dashboard and learning
 
-Worktree inventory at review (main rechecked 2026-10-12): main at `25d1e988`, `corner-map` at `9a11f3fa`, and
-`debrief-first` at `80f8c56a`. The latter also has uncommitted debrief changes; its integration
-status and overlap with current main were not assessed. Preserve that work and review its
-behavior before deciding whether anything still needs porting. No worktree was merged or archived.
+Capture, learning lifecycle and the dashboard are implemented. [Live capture format](../LIVE_CAPTURE_FORMAT.md)
+owns channels, schema, clocks, recording ownership and correction gates; it supersedes old inventories.
+Keep these outstanding checks separate from implementation status:
 
-## Remaining work, in recommended order
+- Drive a normal practice/qualifying/race weekend; check session transitions, pause/garage/timing-line
+  behavior, HUD/sector agreement, genuine service/refuel/tyre changes and replay isolation.
+- Check the passive page from the seat on the 27-inch 1440p display at 50+ inches, including pit
+  instructions, class-relevant fuel/VE targets and the full-width pedal trace. Exercise wet-track and
+  online forecast states; unobserved states remain untested.
+- Verify recording with no dashboard and after reconnect. In isolated private practice/test fixtures,
+  check backend recovery and writer failures: bounded queues, readable committed data, explicit gaps
+  and strict continuity before resuming. Never fault-inject during a race or write to active recordings.
+- Check current wheel channels against native telemetry and producer definitions, accounting for
+  corner order, source cadence, finite/unavailable values and normalization version. Reintroduced
+  camber/toe/deflection/lateral channels need physical frame/units validation, not just nonzero values.
+- Compare game frame-time/CPU/disk with and without capture using matched conditions. Synthetic
+  benchmark headroom and zero reported drops do not establish actual game overhead.
+- Collect multiple independent compatible sessions and run `npm run learning:evaluate`. Check exact
+  cohorts, chronological holdout, prospective improvement, current-run XML patch trust, activation,
+  fallback and withdrawal. Offline holdouts alone do not prove real-world correction improvement.
 
-These are follow-ups, not authorization to change application behavior. Each needs a focused change
-with its own verification. Historical timings below identify candidates; remeasure before optimizing.
+For each acceptance run, identify commit, game/XML patch, exact layout/car/driver/compound and
+recording IDs; record what passed and what remains. Keep a concise conclusion with the requirement,
+not a permanent per-drive report. Damage/weather learning and automatic recording eviction remain
+separate future work; diagnostic deletion is manual.
 
-| Order | Work | Evidence / entry point | Done when |
-|---|---|---|---|
-| 1 | Reconcile multiclass rank, classification sorting and gain | `src/components/session-detail/standings/SessionRaceStandings.tsx`, `SessionRaceStandingsRow.tsx` | The chosen class/overall meaning is explicit and a regression covers differing class and overall gains, including unknown values |
-| 2 | Validate keyboard, focus and Escape in session detail and fullscreen map | `src/components/session-detail/standings/SessionRulesModal.tsx`, `src/components/replay/map/useMapFullscreenFocus.ts`, `src/components/replay/ReplayShortcutHelp.tsx` | Real recordings pass keyboard navigation, focus containment/restoration and nested Escape checks at the normal desktop viewport; record evidence |
-| 3 | Continue and validate the corner-map branch | [Current branch/main status](CORNER_COMPARISON_REWORK.md#current-implementation-review--2026-10-10) and its worktree handoff | Complete M2/M3 and the remaining visual/consumer gates; verify compatibility with newer main storage before integration |
-| 4 | Profile and improve comparison candidate queries | [Archived summary measurements](archive/PERSISTED_SESSION_SUMMARIES.md#implementation-verification), [normalized storage results](archive/NORMALIZED_SESSION_STORAGE.md#status-of-phase-2); `server/core/sessionSummaries/comparisonQueries.ts` | Repeatable before/after measurements and query plans show less broad count/best-lap work while preserving deterministic results and bounded hydration |
-| 5 | Review class identity rules | `shared/domain/lapPlaces.ts`; progression contract consolidation is [completed](archive/SRC_SIMPLIFICATION_AUDIT.md) | Class grouping follows canonical resolution with parity tests |
-| 6 | Measure remaining startup and telemetry preparation costs | [Cache audit](../SERVER_CACHE_AUDIT.md); package validation and telemetry preparation | Separate cold/warm startup, package validation and trajectory preparation measurements identify a concrete bottleneck before changing retention or loading |
+### Tyre follow-up
 
-200% browser zoom validation is deferred by user decision on 2026-10-10; it is not required to complete item 2.
+Per-wheel learned garage wear and live `mWear` tread are implemented (`70591550`, `5b976287`), with
+one-session practice acceptance. Review the next race using
+`npx tsx tools/analysis/evaluateTyreWear.ts`: preserve per-wheel/cohort isolation, the Portimao
+regression within 0.02 of actual flag tread and comparison against the old rule. Check no condition
+request at plain lap crossings and native/live per-wheel agreement within 0.001 per lap. Incident
+wear is already in current tread; do not extrapolate a spin as ordinary lap wear. Wet wear,
+fresh-tyre pace and two-tyre changes are not part of this delivered scope.
 
-The fullscreen turn selector was removed by user request. Keyboard panning remains; restoring that
-selector is not a pending task. A keyboard corner-navigation alternative requires a separate design decision.
-Pit repair inference remains a known data limitation, pending trustworthy recorded or REST evidence.
-Live capture and automatic learning are implemented; [remaining acceptance](LIVE_SESSION_EVIDENCE.md)
-covers real-race stability and prospective prediction improvement. Current pipeline, channel, storage
-and diagnostic retention contracts are in [Live capture reference](../LIVE_CAPTURE_FORMAT.md);
-[native telemetry enrichment](../TELEMETRY_FORMAT.md#complementary-live-capture) distinguishes native telemetry from the implemented supplemental vehicle/wheel channels.
-File and folder size limits are ongoing checks; split only along meaningful responsibilities.
+### Agreed next direction, not fresh delivery claims
 
-## Completed plans
+Prioritize deterministic saving targets (finish reserve versus avoiding a stop), fuel-ratio guidance
+for VE cars, tyre/set coverage and MFD-versus-intended service checks, including early/emergency
+stops and penalties. Retain insufficient-confidence states. Post-qualifying, pre-race and post-race
+screen refinements remain proposals: qualifying results may be provisional, garage settings should
+be checked against targets, and official XML owns final results. Multi-stint comparison and duplicate
+nearby-car traffic views are deferred. Strategy speech remains a demo-only experiment; do not
+silently enable it in the real dashboard.
 
-| Record | Outcome | Historical completion |
-|---|---|---|
-| [Live session evidence foundation](archive/LIVE_SESSION_EVIDENCE_FOUNDATION.md) | Historical capture/learning foundation; current behavior is in the live capture reference, remaining validation in the active plan | 2026-10-18 |
-| [Dropdown standardization](archive/DROPDOWN_STANDARDIZATION.md) | All 24 inventoried dropdowns and disclosures on one shared family (`common/dropdown/`): custom select-only `Select` replaces every native select; keyboard, typeahead, Escape layering and modal/fullscreen placement verified; tests/build clean | 2026-10-13 |
-| [Type refactoring](archive/TYPE_REFACTORING_PLAN.md) | One canonical type per model, one name and one place per fact in TypeScript, SQL and stored JSON; cache rewritten offline; follow-up fixes for driver selection, canonical package classes and server-side compare picker, chart history and Compare page bests | 2026-10-12 |
-| [Frontend simplification audit](archive/SRC_SIMPLIFICATION_AUDIT.md) | Ten fixes committed separately: direct imports, shared wheel rendering and modal focus, canonical progression type, fewer repeated calculations and requests, and removed forwarders; full tests/build passed | 2026-10-12 |
-| [Shared domain cleanup](archive/SHARED_DOMAIN_CLEANUP.md) | Eight audit findings fixed by Luna; independent review, 1,500-case parity, full tests/build and matching-dataset endpoint benchmarks passed | 2026-10-11 |
-| [Session reload recovery](archive/SESSION_RELOAD_RECOVERY.md) | Multiplayer player selection fixed; offline repair restored 739 sessions and canonicalized 132 benchmark entries while preserving retained data | 2026-10-11 |
-| [Exact identity matching cleanup](archive/EXACT_IDENTITY_MATCHING_CLEANUP.md) | Exact session IDs/types/layouts/drivers, versioned retained ownership reconciliation; full tests/build/coverage and same-dataset benchmark validated | 2026-10-11 |
-| [Replay cache normalization](archive/REPLAY_CACHE_NORMALIZATION.md) | Normalized replay facts/events/laps and completed cache migration; lap conditions also shipped | 2026-09-27; conditions follow-up 2026-09-28 |
-| [Smells cleanup](archive/SMELLS_CLEANUP.md) | Correctness fixes, domain extraction, module/component splits; optional folder splits deferred where no semantic grouping was clear | 2026-09-29 |
-| [Persisted session summaries](archive/PERSISTED_SESSION_SUMMARIES.md) | Compact server pages, SQL aggregates, session-based telemetry identity and bounded summary rebuilds | 2026-10-10 |
-| [Normalized session storage](archive/NORMALIZED_SESSION_STORAGE.md) | Normalized rows are authoritative; legacy JSON and temporary conversion code removed | 2026-10-10 |
+### Offline preview
 
-Archive files preserve design decisions, migration evidence and measurements from their delivery date.
-Their branch names, step instructions, old paths, schemas and test totals are historical, not current runbooks.
-Do not rerun completed migrations from these documents. Later changes are described in CODE_MAP.
+Open Settings -> Live Dashboard -> Open demo, or `#/live?demo=1` after the URL hash. It uses production
+components with labeled sample data; it checks presentation, not ingestion or strategy validity.
+Inspect normal, pit, damage, unavailable, session-transition and finish states through the scenario
+selector. Keep cockpit feedback authoritative over screenshot approval.
 
-## Maintenance rules
+## Peripheral acceptance
 
-- Keep one active plan per substantial change. Start it with status, review date, scope, dependencies,
-  next step and observable acceptance criteria. Use `Proposed`, `In progress`, `Blocked` (with a reason),
-  `Completed` or `Superseded`; do not infer completion from a branch name or a checklist alone.
-- On completion, promote current requirements, behavior and durable decisions to their owning docs;
-  carry remaining acceptance into active work. Follow the [documentation lifecycle](../DOCUMENTATION.md):
-  archive plans with unique useful evidence, or delete redundant plans after preserving useful content
-  and verifying the committed history. Update this index and inbound links in the same change.
-- Keep operational guidance in current reference docs. Label old measurements and audit findings
-  with their dates; mark resolved findings without erasing their original evidence.
-- Check claims against source, commands against `package.json`, relative links against the filesystem,
-  and relevant tests/builds. Distinguish source review, automated checks and live game/browser validation.
-- Refresh only measurements actually rerun. Private fixtures, live LMU APIs, coverage and browser
-  behavior must never be represented as freshly validated by an ordinary source review.
+The optional Simagic integration is implemented; [plugin setup](../PLUGINS.md) owns operation.
+The remaining hardware gate is one real LMU + SimPro event: the mapped wheel switches at most once
+in its first garage, only if different; qualifying, race, garage returns and reconnects do not cause
+another automatic switch. No track/replay/demo writes; no wheelbase switching. Suggest never touches
+hardware. Confirm absent/disconnected devices, rejected/unknown readback and missing/renamed presets
+are visible without automatic selection retries or blocking recording. Apply remains an explicit
+Settings action, refused on track. Existing fake-plugin tests do not replace this hardware event.
+
+## Analysis backlog
+
+- Reconcile class/overall ranking, sorting and gain in session standings; test differing class and
+  overall gains and unknowns. Review canonical class identity through `shared/domain/lapPlaces.ts`.
+- Verify keyboard/focus/Escape layering in session detail and fullscreen replay with real recordings.
+  The user deferred 200% zoom acceptance on 2026-10-10. The removed turn selector is not a pending task.
+- Profile broad count/special-best work in `server/core/sessionSummaries/comparisonQueries.ts` with
+  paired query plans and matching datasets; preserve condition/eligibility distinctions and bounded hydration.
+- Measure cold/warm startup, track-package validation and telemetry preparation before changing
+  cache retention. Keep work guards that prevent duplicate I/O or protect source ownership.
+- Do not replace `sameCar` in leaderboard/reference-lap logic with equality until all relevant model
+  producers demonstrably share canonical exact identity; resolve differences at source boundaries.
+- Pit repair benefit remains an inference limitation pending trustworthy recorded evidence.
+
+## Unstarted proposals
+
+- [Simplified 3D replay](proposed/REPLAY_3D_PLAN.md): validate one exported scene and replay pose first.
+- [Further replay preparation](proposed/REPLAY_STORAGE_DESIGN.md): storage size takes priority; measure
+  before revisiting prepared views or grouped columns.

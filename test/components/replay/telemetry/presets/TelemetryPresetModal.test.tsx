@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { TelemetryPresetModal } from '../../../../src/components/replay/telemetry/presets/TelemetryPresetModal.js';
-import { DEFAULT_TELEMETRY_PRESETS, TelemetryPreset } from '../../../../src/components/replay/telemetry/presets/telemetryPresets.js';
+import { TelemetryPresetModal } from '../../../../../src/components/replay/telemetry/presets/TelemetryPresetModal.js';
+import { DEFAULT_TELEMETRY_PRESETS, TelemetryPreset } from '../../../../../src/components/replay/telemetry/presets/telemetryPresets.js';
 
 describe('TelemetryPresetModal', () => {
   it('renders presets and channels when open', () => {

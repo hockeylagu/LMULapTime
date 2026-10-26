@@ -272,7 +272,7 @@ export function initDbSchema(db: DatabaseType): void {
       rain INTEGER,
       ambient_c REAL,
       flag_state INTEGER,
-      -- Raw bytes 1 and 2 of the flag packet, meaning unconfirmed (docs/VCR_ANALYSIS.md 2.6).
+      -- Raw bytes 1 and 2 of the flag packet, meaning unconfirmed (docs/analysis/VCR_ANALYSIS.md 2.6).
       sector_mask INTEGER,
       driver_flag INTEGER,
       PRIMARY KEY (filename, start_sec)

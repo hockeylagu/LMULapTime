@@ -1,7 +1,7 @@
 import zlib from 'node:zlib';
 
 /**
- * Binary storage of a lap's columns (replay_trajectories.trajectory_br), see docs/plans/REPLAY_BINARY_LAP_CODEC.md.
+ * Binary storage of a lap's columns (replay_trajectories.trajectory_br), see docs/REPLAY_CACHE_FORMAT.md.
  *
  * Layout, Brotli-compressed: magic `LMTB`, one byte encoding version, a u32 header length, the header JSON (the lap
  * without its columns, plus one descriptor per column), then each column's parts. Each column takes the smallest
@@ -202,7 +202,7 @@ export function encodeLapColumns<T extends StoredLapColumns>(lap: T): Buffer {
 export function decodeLapColumns<T extends StoredLapColumns>(buffer: Uint8Array, keys?: readonly string[]): T {
   const raw = zlib.brotliDecompressSync(buffer);
   if (raw.length < PREFIX_BYTES || !raw.subarray(0, MAGIC.length).equals(MAGIC)) {
-    throw new Error('Replay lap row is not in the binary lap format: run the replay cache rewrite (docs/plans/REPLAY_BINARY_LAP_CODEC.md)');
+    throw new Error('Replay lap row is not in the binary lap format: replay cache rewrite required (docs/REPLAY_CACHE_FORMAT.md)');
   }
   const version = raw.readUInt8(MAGIC.length);
   if (version !== ENCODING_VERSION) throw new Error(`Unknown replay lap encoding version ${version}`);

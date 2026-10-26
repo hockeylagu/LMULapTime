@@ -8,7 +8,7 @@ import {
   DEFAULT_TELEMETRY_PRESETS,
   AVAILABLE_TELEMETRY_CHANNELS,
   TelemetryPreset,
-} from '../../../../src/components/replay/telemetry/presets/telemetryPresets.js';
+} from '../../../../../src/components/replay/telemetry/presets/telemetryPresets.js';
 
 describe('telemetryPresets - Management and Storage', () => {
   let store: Record<string, string> = {};

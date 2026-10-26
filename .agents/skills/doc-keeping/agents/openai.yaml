@@ -1,4 +1,4 @@
 interface:
   display_name: "Documentation keeping"
-  short_description: "Keep plans, decisions and format contracts current"
-  default_prompt: "Use $doc-keeping to reconcile the affected docs, plans, decisions and format specifications with the current implementation."
+  short_description: "Organize docs and retire obsolete plans and reports"
+  default_prompt: "Use $doc-keeping to review the entire docs folder for current facts, correct placement, clear status and valid links; delete completed plans, old one-off validations and reports without continuing purpose."

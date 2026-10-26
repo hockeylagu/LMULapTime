@@ -160,7 +160,7 @@ The `/rest/watch` namespace provides real-time race engineering and broadcasting
 ### 4.1 Behaviour During Replay Playback (observed, build 14200)
 
 Measured on a replay loaded from the main menu. Evidence is in
-[VCR_ANALYSIS.md](VCR_ANALYSIS.md) §2.10.
+[VCR_ANALYSIS.md](analysis/VCR_ANALYSIS.md) §2.10.
 
 - **`/rest/watch/sessionInfo` follows the replay timeline** for `raining`, `ambientTemp`,
   `trackTemp`, `raceCompletion` and `timeRemainingInGamePhase`. `currentEventTime` stays `0.0`,

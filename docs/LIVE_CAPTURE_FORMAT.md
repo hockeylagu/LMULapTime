@@ -156,7 +156,11 @@ recorded until 2026-10-21 and removed because nothing read them. Re-adding one m
 
 Measured on the 2026-10-21 recordings, each dropped channel cost about 3.5 MB per driving hour after
 DuckDB compression; a recording now takes about 77 MB per driving hour, observations included.
-Sources and saved-recording verification: [wheel evidence assessment](plans/WHEEL_CAPTURE_EVIDENCE.md).
+Producer definitions: [rF2 shared-memory wheel contract](https://github.com/TheIronWolfModding/rF2SharedMemoryMapPlugin/blob/master/Monitor/rF2SMMonitor/rF2SMMonitor/rF2Data.cs).
+Saved-frame decoder/writer tests verify persistence, not independent physical calibration. Historical
+C# JSONL rounded values and replaced nonfinite input with zero, so a recorded zero alone is not proof
+of a valid physical zero. Current live normalization preserves the distinction above. Controlled
+wheel-frame/setup comparisons remain in the [work queue](plans/README.md#live-dashboard-and-learning).
 
 Additional shared-memory evidence is sparse:
 
@@ -361,8 +365,8 @@ evaluation. All per-frame use is an in-memory lookup with no database reads. Set
 These implementation gates are engineering defaults; actual improvement and overhead still require
 real-game acceptance. Audit checkpoints remain in the consolidated recording source;
 real-game validation remains in the
-[active plan](plans/LIVE_SESSION_EVIDENCE.md). The delivered foundation and original design are in the
-[archived implementation record](plans/archive/LIVE_SESSION_EVIDENCE_FOUNDATION.md).
+[active plan](plans/README.md#live-dashboard-and-learning). Current module ownership is described in the
+[current implementation map](CODE_MAP.md).
 
 ## Learning readiness in Settings
 

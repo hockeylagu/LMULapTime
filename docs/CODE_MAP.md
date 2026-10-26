@@ -39,7 +39,7 @@ affects suggestions only and never changes LMU identity resolution.
 catalog freshness, preview/save suggestions and guarded Apply. `PeripheralStatusChip.tsx` is
 injected only by `LiveConnectedPage`, so dashboard demos remain offline. The separately owned
 `../SimagicWheelDeamon` repository builds `lmu-peripheral-simagic` with no analyzer source imports.
-See [plugin setup](PLUGINS.md) and [integration plan](plans/SIMAGIC_PERIPHERAL_PLUGIN.md).
+See [plugin setup](PLUGINS.md) and [remaining hardware acceptance](plans/README.md#peripheral-acceptance).
 
 Windows desktop integration: `server/desktop/systemTray.ts` starts the bundled native Win32
 helper `bin/systemTray-win32-x64.exe` at below-normal CPU priority after HTTP listening succeeds.
@@ -74,9 +74,9 @@ concurrently's `--kill-others` stops the paired frontend, including the npm-base
 `capture/terrain.ts` interns terrain names into sparse dictionary definitions/change events in the writer;
 the controller also retains source-timed impact magnitudes and opaque player upgrade-pack configuration.
 Version-1 files remain unchanged; `readRecording.ts` normalizes their motion signs on read and
-reports the source version. See [wheel evidence and mappings](plans/WHEEL_CAPTURE_EVIDENCE.md).
+reports the source version. See [channel conventions and provenance](LIVE_CAPTURE_FORMAT.md).
 
-Contracts and pipeline specifications: [Live capture reference](LIVE_CAPTURE_FORMAT.md) and [Live session evidence plan](plans/LIVE_SESSION_EVIDENCE.md).
+Contracts: [Live capture reference](LIVE_CAPTURE_FORMAT.md). Remaining checks: [work queue](plans/README.md#live-dashboard-and-learning).
 
 Shared-memory polling: `sharedMemory.ts` owns private native views and bounded `readInto` copies;
 `rf2Decode.ts` reuses per-mapping scratch buffers and decodes only coherent copies. `liveReader.ts`
@@ -100,7 +100,7 @@ because active recordings can be exclusively locked on Windows.
 | `shared/domain/learning/capture.ts`, `examples.ts`, `evaluate.ts`, `calibration.ts`, `automatic.ts` | Frozen forecasts, examples, evaluation and correction gates |
 | `server/live/learning/service.ts`, `runtime.ts`, `automaticWorker.ts` | Projection refresh, persisted model lifecycle and exact live lookup |
 | `server/live/learning/readiness.ts`, `readinessReader.ts`, `server/routes/liveRoutes.ts` | Manual Settings evidence check |
-| `tools/analysis/evaluateLiveLearning.ts`, `listLearningErrors.ts`, `.claude/skills/race-review/` | Post-race review: calibration report, per-lap forecast errors, findings in `docs/RACE_REVIEW_LOG.md` |
+| `tools/analysis/evaluateLiveLearning.ts`, `listLearningErrors.ts`, `.claude/skills/race-review/` | Post-race review: calibration report, per-lap forecast errors, findings in `docs/evidence/RACE_REVIEW_LOG.md` |
 | `server/core/live/dbLiveLearningStore.ts`, `dbLearningModelStore.ts` | Compact learning facts and correction models |
 | `shared/domain/live/livePitLane.ts`, `server/core/live/dbPitLaneStore.ts`, `tools/analysis/backfillPitLaneLoss.ts` | Pit lane loss per race stop (in-lap + out-lap - 2 x pace - time stopped), stored per layout and class (`live_pit_lane_losses`), backfill from closed captures |
 
@@ -218,7 +218,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
    - Atomic commits of trajectory blobs, facts, and ingest markers via `server/core/replay/dbReplayDriverStore.ts`. Primary slot promotion via `resolveReplayPrimarySlot`.
 3. **Persisted replay facts**:
    - Facts: `replayFacts.ts` → stored via `server/core/replay/dbReplayLapStore.ts` (`replaceReplayDriverLapFacts`, `replaceReplayWideFacts`).
-   - Columnar trajectory blobs: stored via `dbReplayTrajectoryStore.ts` using `replayTrajectoryCodec.ts`, in the lossless binary lap format of `lapColumnsCodec.ts` (selected-column decode for `server/traffic/lapSamples.ts`). Rows already hold what the app serves (garage state, ISO 8855 steering, Virtual Energy): no read-time fixes; a rule change rewrites rows offline. Downsampler `trajectoryDownsampler.ts` preserves apex speed minimums, straight maximums, and braking onsets.
+   - Columnar trajectory blobs: stored via `dbReplayTrajectoryStore.ts` using `replayTrajectoryCodec.ts`, in the lossless binary lap format of `lapColumnsCodec.ts` ([current storage contract](REPLAY_CACHE_FORMAT.md); selected-column decode for `server/traffic/lapSamples.ts`). Rows already hold what the app serves (garage state, ISO 8855 steering, Virtual Energy): no read-time fixes; a rule change rewrites rows offline. Downsampler `trajectoryDownsampler.ts` preserves apex speed minimums, straight maximums, and braking onsets.
 4. **Telemetry fusion & track projection**:
    - `server/telemetry/telemetryFusion.ts`: fuses high-rate DuckDB channels with replay telemetry. Native status/weather take precedence; VCR supplies discrete flags and weather.
    - `server/tracks/`: interpolates timing line crossings (`lapLineCut.ts`), centerline projection (`trackProjection.ts`, reusing candidate segments during search), and glitch repair (`stationGlitches.ts`).
@@ -333,7 +333,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
 - **Full test suite**: `npm test`
 - **Single test file**: `npx vitest run <path>`
 - **Typecheck & production build**: `npm run build` (enforces zero warnings and zero errors standard).
-- **Endpoint performance benchmarks**: `npm run benchmark:endpoints` (runs HTTP benchmarks against fixed cohort; see `docs/ENDPOINT_BENCHMARKS.md`).
+- **Endpoint performance benchmarks**: `npm run benchmark:endpoints` (runs HTTP benchmarks against fixed cohort; see `docs/performance/ENDPOINT_BENCHMARKS.md`).
 - **Test placement**: Mirrors source layout (`test/server/`, `test/domain/`, `test/utils/`, `test/components/`).
 - **Fixtures**: `test/fixtures/{results,replays,telemetry}`; synthetic VCR in `test/utils/mockVcr.ts`.
 
@@ -344,7 +344,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
 - Documentation index: [`docs/README.md`](README.md).
 - Active proposals and design plans: [`docs/plans/README.md`](plans/README.md).
 - Data format specifications: [`docs/XML_FORMAT.md`](XML_FORMAT.md), [`docs/VCR_FORMAT.md`](VCR_FORMAT.md), [`docs/TELEMETRY_FORMAT.md`](TELEMETRY_FORMAT.md), [`docs/LMU_REST_API.md`](LMU_REST_API.md), [`docs/LIVE_CAPTURE_FORMAT.md`](LIVE_CAPTURE_FORMAT.md).
-- Replay performance notes: [`docs/VCR_PERFORMANCE_ANALYSIS.md`](VCR_PERFORMANCE_ANALYSIS.md).
+- Performance checks: [benchmark guidance](performance/ENDPOINT_BENCHMARKS.md).
 
 ---
 
@@ -372,3 +372,12 @@ Update this file in the same commit when you:
 2. Add or modify an API endpoint, SQLite table, client route, or cache version.
 3. Fix or discover an architectural smell (Section 9).
 4. Verify tests and build numbers (update the verification baseline at the top).
+
+### Refactoring boundaries
+
+Keep coupled replay selection/swap/retry transitions together unless an extraction preserves them
+with explicit transition tests. Debrief and consistency both load 400-point traces but have different
+lap/traffic eligibility and source rules; share loading only for identical inputs and failure semantics.
+Similar variance arithmetic does not make lap and corner consistency the same domain metric.
+Scalar telemetry channels have different ranges, overlays and empty states; share identical rendering
+responsibilities without hiding those differences in a broad configuration schema.

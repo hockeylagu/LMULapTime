@@ -165,7 +165,7 @@ Evidence (2026-10-05):
 
 Stored data: replay trajectory blobs and DuckDB lap-cache rows hold ISO 8855 steering and carry
 `signConvention: 'iso8855'`. Older right-positive rows were flipped once by the offline binary lap
-rewrite (2026-10, [plan](plans/REPLAY_BINARY_LAP_CODEC.md)) from their stored blobs, so deleted replays
+rewrite (2026-10, [current cache format](REPLAY_CACHE_FORMAT.md)) from their stored blobs, so deleted replays
 kept their only copy and no replay needed decoding again; reads apply no fix. Lateral offsets are not stored: they are reprojected whenever
 a trajectory is served.
 
@@ -184,8 +184,7 @@ events support analysis without inventing unavailable measurements.
 Capture only covers sessions driven while the backend records. XML identity, completed-lap anchors
 and XML game patch establish ownership. Unknown timing and coverage gaps remain explicit.
 See [Live capture format](LIVE_CAPTURE_FORMAT.md) for channels, clocks, schema, diagnostics and learning;
-[remaining work](plans/LIVE_SESSION_EVIDENCE.md) includes calibration and real-game validation.
-The [archived foundation](plans/archive/LIVE_SESSION_EVIDENCE_FOUNDATION.md) preserves the original analysis.
+[remaining work](plans/README.md#live-dashboard-and-learning) includes calibration and real-game validation.
 
 ## Versioning and provenance
 

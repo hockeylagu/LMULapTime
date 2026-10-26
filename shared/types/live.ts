@@ -1,7 +1,7 @@
 /**
  * Live dashboard contracts: the server's live service (`server/live/`) streams these to the
  * `#/live` page. Source: the rF2 shared memory plugin read in a worker thread
- * (docs/plans/LIVE_RACE_DASHBOARD.md). Unknown values are null, never zero-filled.
+ * (docs/LIVE_CAPTURE_FORMAT.md). Unknown values are null, never zero-filled.
  */
 
 /**

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { TelemetryPresetSelector } from '../../../../src/components/replay/telemetry/presets/TelemetryPresetSelector.js';
-import { DEFAULT_TELEMETRY_PRESETS } from '../../../../src/components/replay/telemetry/presets/telemetryPresets.js';
+import { TelemetryPresetSelector } from '../../../../../src/components/replay/telemetry/presets/TelemetryPresetSelector.js';
+import { DEFAULT_TELEMETRY_PRESETS } from '../../../../../src/components/replay/telemetry/presets/telemetryPresets.js';
 
 describe('TelemetryPresetSelector', () => {
   it('renders active preset name and opens menu on click', () => {

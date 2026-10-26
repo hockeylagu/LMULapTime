@@ -45,7 +45,7 @@ period and car resolution. Practice, qualifying, race and returns to the garage 
 The host reads each active preset first and sends no selection if it already matches. Unknown
 readback, failed selection and disconnects never cause selection retries. Leaving the garage aborts
 pending work; driving, historical sessions, replays and demo mode never trigger automation.
-An explicit **Apply** in Settings is refused on track and after that load has already been handled.
+An explicit **Apply** in Settings is allowed in the garage even after the load was handled, but refused on track.
 Offline/menu Apply is available for deliberate configuration testing. The app does not reset profiles,
 enforce mappings during a drive, launch SimPro or change presets on reconnect.
 
@@ -55,7 +55,8 @@ clients while the plugin is enabled. Disabled plugins make no vendor requests.
 
 Disable the former daemon's Startup shortcut and stop its running copy before enabling this plugin.
 The migration preserves its private `local/` data but does not import legacy configuration.
-See [implementation plan and API contract](plans/SIMAGIC_PERIPHERAL_PLUGIN.md).
+The host contract is defined in `server/peripherals/peripheralContract.ts`; the vendor contract is
+maintained by the sibling plugin repository. See [remaining acceptance](plans/README.md#peripheral-acceptance).
 
 ## Track and vehicle data packages
 

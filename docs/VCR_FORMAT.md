@@ -5,7 +5,7 @@ by **Le Mans Ultimate (LMU)** and the **rFactor 2 (rF2 / gMotor)** engine: byte 
 masks and payload layouts. It states only what is established.
 
 For how these fields were discovered, confidence levels, open leads, superseded hypotheses,
-implementation status and future work, see **[VCR_ANALYSIS.md](VCR_ANALYSIS.md)**. Keep the two
+implementation status and future work, see **[VCR_ANALYSIS.md](analysis/VCR_ANALYSIS.md)**. Keep the two
 separate: no evidence or speculation in this file.
 
 ---
@@ -533,15 +533,16 @@ Measurements include file reads but exclude worker startup, result transfer and
 SQLite persistence. Filesystem reads were comparable (103 ms before / 104 ms
 after); this measures warm-file parsing, not cold-disk or full-race ingestion.
 
-For worker handoff, compression and complete field import measurements, see
-[VCR performance analysis](VCR_PERFORMANCE_ANALYSIS.md).
+For measuring worker handoff, compression and complete field import costs, see
+[benchmark guidance](performance/ENDPOINT_BENCHMARKS.md#replay-ingestion).
 
 File-backed imports now persist directly from the decoding worker. Lossless
-quality-6 compression runs before the SQLite writer transaction; driver laps,
+binary lap encoding with Brotli quality 9 runs before the SQLite writer transaction; driver laps,
 normalized facts, linked-session conditions, defaults and completion markers
 commit atomically after source-identity checks. The worker acknowledges the save
 with a compact summary, then on-demand requests read their requested lap from the
-committed cache. This changes neither the cache format nor parser version.
+committed cache. The worker handoff itself does not change parser semantics; current app-owned
+storage is specified in [replay cache format](REPLAY_CACHE_FORMAT.md), separately from VCR bytes.
 
 Background sync and upgrades now use one frame-stream scan per replay for all
 pending drivers. `ReplayDriverSamples` copies each requested 65-byte pose payload,
@@ -550,7 +551,7 @@ Lossless level-1 deflate chunks live in a worker-owned SQLite TEMP table, outsid
 the application database. After the scan, one driver's chunks are consumed and
 deleted, decoded with the same pose decoder as direct requests, and finalized
 once using the complete timing, weather and incident history. Each finished lap
-is immediately encoded with the existing quality-6 Brotli codec; only compact
+is immediately encoded with the current binary lap codec (Brotli quality 9); only compact
 lap spans remain for fact persistence. Each driver still commits atomically.
 
 Closing or terminating the worker releases temporary storage. Peak temporary

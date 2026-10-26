@@ -8,8 +8,8 @@ import zlib from 'zlib';
 // v7: event classes read without the race-session bit (29), so practice / qualifying replays get
 //     weather, tyre compounds, contacts, Virtual Energy and flags; penalties decoded from class 3.
 // Stored rows of every version hold what the app serves (garage state, ISO 8855 steering, Virtual
-// Energy, calibrated ambient): a rule change rewrites the rows offline (as the 2026-10 binary lap
-// rewrite did, docs/plans/REPLAY_BINARY_LAP_CODEC.md) instead of adding a read-time adapter.
+// Energy, calibrated ambient): a rule change rewrites the rows offline instead of adding a
+// read-time adapter. The current storage contract is docs/REPLAY_CACHE_FORMAT.md.
 export const REPLAY_CACHE_VERSION = 'v7';
 export const COMPATIBLE_REPLAY_CACHE_VERSIONS: ReadonlySet<string> = new Set([
   REPLAY_CACHE_VERSION,
