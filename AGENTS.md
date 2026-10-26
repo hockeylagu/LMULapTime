@@ -121,6 +121,6 @@ Telemetry analytics, lap comparison, and race intelligence hub for **Le Mans Ult
 ## 6. Development Workflow
 
 1. Identify affected layers (session parsing, replay decoding, telemetry, track geometry, SQLite store, UI).
-2. Maintain documentation and formulas (`docs/`).
+2. Maintain documentation and formulas (`docs/`). Follow [documentation lifecycle](docs/DOCUMENTATION.md); use the repository [doc-keeping skill](.agents/skills/doc-keeping/SKILL.md) for plan/decision reviews, documentation cleanup, and substantial changes to requirements or delivery status. Review and update the owning format spec alongside parser, reader/writer, schema, channel, unit, timing or compatibility changes; specs are the canonical written contracts, with unresolved observations kept in analysis. Keep durable rationale discoverable; retire redundant plans only after preserving unique content and checking Git history.
 3. Adhere to track layout disambiguation via `shared/domain/circuitSpecs.ts`.
 4. Keep all test suites and builds passing with **zero warnings and zero errors**.

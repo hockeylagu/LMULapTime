@@ -1,0 +1,4 @@
+interface:
+  display_name: "Documentation keeping"
+  short_description: "Keep plans, decisions and format contracts current"
+  default_prompt: "Use $doc-keeping to reconcile the affected docs, plans, decisions and format specifications with the current implementation."

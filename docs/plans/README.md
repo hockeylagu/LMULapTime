@@ -77,8 +77,10 @@ Do not rerun completed migrations from these documents. Later changes are descri
 - Keep one active plan per substantial change. Start it with status, review date, scope, dependencies,
   next step and observable acceptance criteria. Use `Proposed`, `In progress`, `Blocked` (with a reason),
   `Completed` or `Superseded`; do not infer completion from a branch name or a checklist alone.
-- On completion, record the outcome and remaining work, move the plan into `archive/`, update this
-  index and repair inbound links in the same change. Preserve evidence rather than deleting the plan.
+- On completion, promote current requirements, behavior and durable decisions to their owning docs;
+  carry remaining acceptance into active work. Follow the [documentation lifecycle](../DOCUMENTATION.md):
+  archive plans with unique useful evidence, or delete redundant plans after preserving useful content
+  and verifying the committed history. Update this index and inbound links in the same change.
 - Keep operational guidance in current reference docs. Label old measurements and audit findings
   with their dates; mark resolved findings without erasing their original evidence.
 - Check claims against source, commands against `package.json`, relative links against the filesystem,
