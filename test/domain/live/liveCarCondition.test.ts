@@ -79,23 +79,34 @@ describe('LiveDamageTracker', () => {
 });
 
 describe('LiveTyreTracker', () => {
-  it('names the most worn tyre and measures its wear per lap over the stint, restarting on new tyres', () => {
+  it('measures each wheel over its stint, names the most worn tyre and restarts a wheel on a new tyre', () => {
     const tyres = new LiveTyreTracker();
-    for (const worst of [0.9, 0.895, 0.89]) tyres.lapCompleted(worst);
-    expect(tyres.tyres('Medium', condition({ tires: [0.9, 0.887, 0.91, 0.9] }), 54)).toEqual({
-      compound: 'Medium', worst: 0.887, worstCorner: 'FR', wearPerLap: 0.005, newSets: 54,
+    for (const tread of [[0.95, 0.9, 0.96, 0.95], [0.947, 0.894, 0.952, 0.948], [0.944, 0.887, 0.944, 0.946]]) tyres.lapCompleted(tread);
+    expect(tyres.tyres('Medium', [0.944, 0.887, 0.944, 0.946], 54)).toEqual({
+      compound: 'Medium', worst: 0.887, worstCorner: 'FR', wearPerLap: 0.008, newSets: 54,
+      wheels: [
+        { corner: 'FL', tread: 0.944, wearPerLap: 0.003 }, { corner: 'FR', tread: 0.887, wearPerLap: 0.0065 },
+        { corner: 'RL', tread: 0.944, wearPerLap: 0.008 }, { corner: 'RR', tread: 0.946, wearPerLap: 0.002 },
+      ],
     });
-    tyres.lapCompleted(1);
-    expect(tyres.tyres('Medium', null, null)).toEqual({ compound: 'Medium', worst: null, worstCorner: null, wearPerLap: null, newSets: null });
+    tyres.lapCompleted([1, 1, 1, 1]);
+    expect(tyres.tyres('Medium', undefined, null)).toMatchObject({ worst: null, worstCorner: null, wearPerLap: null });
   });
 
-  it('takes a puncture for damage, not wear, and measures the wear again on the tyres after it', () => {
+  it('restarts on fresh tyres after a short stint and projects the median lap, not a spin', () => {
+    // Silverstone 2026-10-25: fresh tyres after 5 laps rose only 0.015; a spin took 11% off RL in one lap.
+    const tyres = new LiveTyreTracker();
+    for (const rl of [0.998, 0.995, 0.992, 0.989, 0.982, 0.997, 0.994, 0.884, 0.881, 0.878]) tyres.lapCompleted([1, 1, rl, 1]);
+    expect(tyres.tyres('Medium', undefined, null).wheels?.[2].wearPerLap).toBe(0.003);
+  });
+
+  it('takes a puncture on one wheel for damage, not wear, and keeps measuring the other wheels', () => {
     // Seen live: a flat read 0 at the crossing into the pits, then the changed tyre read 93%.
     const tyres = new LiveTyreTracker();
-    for (const worst of [0.977, 0.973, 0, 0.93, 0.926]) tyres.lapCompleted(worst);
-    expect(tyres.tyres('Medium', null, null).wearPerLap).toBeNull();
-    tyres.lapCompleted(0.922);
-    expect(tyres.tyres('Medium', null, null).wearPerLap).toBe(0.004);
+    for (const fr of [0.977, 0.973, 0, 0.93, 0.926]) tyres.lapCompleted([0.99, fr, 0.99, 0.99]);
+    expect(tyres.tyres('Medium', undefined, null).wheels?.map(wheel => wheel.wearPerLap)).toEqual([0, null, 0, 0]);
+    tyres.lapCompleted([0.99, 0.922, 0.99, 0.99]);
+    expect(tyres.tyres('Medium', undefined, null).wheels?.[1].wearPerLap).toBe(0.004);
   });
 });
 

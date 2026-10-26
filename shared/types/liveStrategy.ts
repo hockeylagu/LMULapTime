@@ -153,11 +153,13 @@ export interface LiveTyres {
   coverage?: LiveTyreCoverage | null;
   /** Compound on the car (front), as the game names it. */
   compound: string | null;
-  /** Tread left on the most worn tyre, 0..1 (`getVehicleCondition.tireCondition`). */
+  /** Tread left on the most worn tyre, 0..1 (shared memory `mWear`). */
   worst: number | null;
   worstCorner: LiveCorner | null;
-  /** Measured loss of that figure per lap, from laps of this stint; null before two laps. */
+  /** The highest measured wear per lap of the four wheels, from laps of their stints; null before two laps. */
   wearPerLap: number | null;
+  /** Each wheel's tread and measured wear per lap (null before two laps of its stint). */
+  wheels?: { corner: LiveCorner; tread: number | null; wearPerLap: number | null }[];
   /** Complete new sets left: the game's new tyre count in whole fours. */
   newSets: number | null;
 }

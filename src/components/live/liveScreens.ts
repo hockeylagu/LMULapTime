@@ -117,7 +117,7 @@ function garageChecks(snapshot: LiveSnapshot, plan: LiveGaragePlan): GarageCheck
   const coverage = kind === 'qualifying' ? null : plan.tyreCoverage;
   if (coverage) {
     const tyres = checks[checks.length - 1];
-    tyres.target = `~${Math.round(coverage.projectedTread * 100)}% END`;
+    tyres.target = `~${Math.round(coverage.projectedTread * 100)}%${coverage.corner ? ` ${coverage.corner}` : ''} END`;
     tyres.note = coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR ? 'BELOW 40% MIN' : undefined;
     tyres.action = coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR ? plan.tyres?.newSets === 0 ? { text: 'NO NEW SETS', tone: 'warn' } : { text: 'FIT NEW', tone: 'change' } : coverage.availableSetsCover === false ? { text: 'SETS SHORT', tone: 'warn' } : null;
   }

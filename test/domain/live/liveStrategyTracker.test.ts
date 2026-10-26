@@ -114,6 +114,21 @@ describe('LiveStrategyTracker', () => {
     expect(context(tracker, garage)?.fuelRatio).toMatchObject({ recommended: 0.81, source: 'measured', pairedLaps: 3 });
     expect(context(tracker, at(1, { raining: 0.5 }))?.fuelRatio).toBeNull();
   });
+  it('measures each wheel from the shared-memory tread at the crossings and projects the limiting corner', () => {
+    const tracker = new LiveStrategyTracker();
+    // RL wears 0.6% a lap, the others 0.2-0.3%: no condition reply needed.
+    const car = (et: number) => ({ fuelLiters: 80, fuelCapacityLiters: 117, dentSeverity: [0,0,0,0,0,0,0,0], detached: false, lastImpactEt: 0,
+      wheels: Array.from({length:4}, () => ({flat:false,detached:false})), compound: 'Medium',
+      tread: [0.003, 0.002, 0.006, 0.003].map(wear => 1 - wear * (et / LAP)) });
+    let strategy = null;
+    for (let et = 0; et <= 450; et++) {
+      tracker.applyCar(car(et));
+      strategy = context(tracker, at(et));
+    }
+    expect(strategy?.tyres?.wheels?.map(wheel => wheel.wearPerLap)).toEqual([0.003, 0.002, 0.006, 0.003]);
+    expect(strategy?.tyres).toMatchObject({ worstCorner: 'RL', wearPerLap: 0.006 });
+    expect(strategy?.tyres?.coverage).toMatchObject({ target: 'pit', corner: 'RL' });
+  });
   it('measures a lap the game counts through a countLapFlag blip, and leaves out a lap it invalidates', () => {
     const tracker = new LiveStrategyTracker();
     const lap = (lapNumber: number, valid: boolean) => ({ lapNumber, lapSeconds: LAP, sectors: [null, null, null] as [null, null, null], valid });

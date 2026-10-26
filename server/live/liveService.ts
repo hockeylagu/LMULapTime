@@ -451,12 +451,11 @@ export class LiveService {
   }
 
   /**
-   * The condition is read once a lap, right after the line (the tyre tracker takes the tread at each crossing), and
-   * after a stop with the tyre screen (new sets, the set fitted). Nothing is triggered by a replay's frames.
+   * The condition is read after a stop with the tyre screen (new sets, the set fitted); the tread at each crossing
+   * comes from shared memory. Nothing is triggered by a replay's frames.
    */
   private followPlayer(before: LiveVehicleReading | null, player: LiveVehicleReading | null): void {
     if (this.isReplaying() || !before || !player || player.id !== before.id) return;
-    if (player.totalLaps > before.totalLaps) this.pit.trigger('condition');
     if (before.inPits && !player.inPits) {
       this.pit.trigger('condition');
       this.pit.trigger('tireManagement');

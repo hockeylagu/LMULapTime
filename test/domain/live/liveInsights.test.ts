@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planFuelRatio, savingToFinish, tyreCoverage } from '../../../shared/domain/live/liveInsights.js';
+import { limitingTyreCoverage, planFuelRatio, savingToFinish, tyreCoverage } from '../../../shared/domain/live/liveInsights.js';
 
 describe('saving scenarios', () => {
   it('targets the use that reaches the flag, with no reserve at the finish', () => {
@@ -34,6 +34,12 @@ describe('fuel ratio', () => {
 });
 
 describe('tyre projections', () => {
+  it('projects each wheel on its own wear and reports the lowest with its corner', () => {
+    // FL has the least tread but RL wears fastest: RL limits the stint.
+    expect(limitingTyreCoverage([0.8, 0.9, 0.85, 0.9], [0.01, 0.005, 0.02, null], 10, 10, 'finish', 1))
+      .toEqual({ target: 'finish', projectedTread: 0.65, setsNeeded: 0, availableSetsCover: true, corner: 'RL' });
+    expect(limitingTyreCoverage([0.8, 0.9, 0.85, 0.9], [null, null, null, null], 10, 10, 'finish', 1)).toBeNull();
+  });
   it('projects the fitted set to the next pit and the inventory across the race', () => {
     expect(tyreCoverage(0.8, 0.02, 10, 100, 'pit', 1)).toEqual({ target: 'pit', projectedTread: 0.6, setsNeeded: 3, availableSetsCover: false });
     expect(tyreCoverage(0.8, 0.02, 10, 100, 'pit', null)?.availableSetsCover).toBeNull();

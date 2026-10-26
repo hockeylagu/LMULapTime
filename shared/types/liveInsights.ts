@@ -1,4 +1,4 @@
-import type { LivePerLapSource } from './liveStrategy.js';
+import type { LiveCorner, LivePerLapSource } from './liveStrategy.js';
 import type { LiveSessionKind } from './live.js';
 
 export interface LiveSavingPlan {
@@ -26,6 +26,8 @@ export interface LiveTyreCoverage {
   projectedTread: number;
   setsNeeded: number;
   availableSetsCover: boolean | null;
+  /** The wheel that limits the stint, when each wheel was projected. */
+  corner?: LiveCorner;
 }
 export interface LiveSessionResult {
   /** Qualifying only: timer expired and the complete field reported finished/retired/disqualified. */

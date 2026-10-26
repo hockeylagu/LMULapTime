@@ -1,7 +1,7 @@
 import type { LiveLapsLeft, LiveLapRecord, LiveSessionKind } from '../../types/live.js';
 import type { LiveGaragePlan, LiveGarageTyres, LivePitInfo, LivePitMenu, LivePitState, LiveRaceStrategies, LiveResourceKind, LiveResourcePlan, LiveStrategy } from '../../types/liveStrategy.js';
 import type { SessionStrategy } from '../../types/session.js';
-import { LiveDamageTracker, LiveTyreTracker, worstTread } from './liveCarCondition.js';
+import { LiveDamageTracker, LiveTyreTracker } from './liveCarCondition.js';
 import type { LiveCarReading, LiveVehicleCondition } from './liveCarCondition.js';
 import { nextForecastChange } from './liveForecast.js';
 import type { LiveForecastNode } from './liveForecast.js';
@@ -9,7 +9,7 @@ import { liveSessionKind } from './liveLifecycle.js';
 import type { LiveScoringReading, LiveState } from './liveLifecycle.js';
 import { liveResourceKind, planGarage, planRace, resourceUnit } from './liveResourcePlan.js';
 import { LiveUsageMeter } from './liveUsage.js';
-import { planFuelRatio, savingToFinish, tyreCoverage } from './liveInsights.js';
+import { limitingTyreCoverage, planFuelRatio, savingToFinish } from './liveInsights.js';
 import { RAIN_WET_MIN } from '../lapConditions.js';
 import { median } from '../pitStops.js';
 import type { LiveUsageObservation } from '../../types/liveAudit.js';
@@ -99,7 +99,8 @@ export class LiveStrategyTracker {
   private wet: boolean | null = null;
   /** Raw 0-255 wetness of the last reading: corrections use the training rule (RAIN_WET_MIN), not the planner's hysteresis. */
   private wetness: number | null = null;
-  private eventTyreWear: number | null = null;
+  /** Each wheel's measured wear per lap this event (FL, FR, RL, RR). */
+  private eventTyreWear: TyreWheelValues | null = null;
   private eventCompound = '';
   private ratioOptions: number[] = [];
   private readonly damage = new LiveDamageTracker();
@@ -119,7 +120,6 @@ export class LiveStrategyTracker {
   private refuelBases: Record<LiveResourceKind, number | null> = { ve: null, fuel: null };
   private delays: Extract<LiveRestUpdate, { type: 'pitStopTimes' }> | null = null;
   private menu: LivePitMenu | null = null;
-  private condition: LiveVehicleCondition | null = null;
   private usage: Extract<LiveRestUpdate, { type: 'tireManagement' }> | null = null;
   /**
    * The game's last per-lap estimates for the event: the same car on the same layout, so a new session starts from
@@ -177,7 +177,6 @@ export class LiveStrategyTracker {
     this.estimate = null;
     this.refuelBases = { ve: null, fuel: null };
     this.menu = null;
-    this.condition = null;
     this.usage = null;
     this.garage = null;
   }
@@ -209,7 +208,6 @@ export class LiveStrategyTracker {
         if (update.menu.fuelRatioOptions) this.ratioOptions = update.menu.fuelRatioOptions;
         return;
       case 'condition':
-        this.condition = update.condition;
         this.damage.updateCondition(update.condition);
         return;
       case 'tireManagement':
@@ -280,21 +278,24 @@ export class LiveStrategyTracker {
     const reserveLaps = this.reserveLaps(context.reserveSeconds, reading);
     const resource = this.resource(kind, reading, state, context, reserveLaps);
     const lapsLeft = context.lapsLeft?.laps ?? null;
-    const tyres = this.tyres.tyres(this.car?.compound ?? null, this.condition, this.usage?.newSets ?? null);
-    if (tyres.wearPerLap !== null && tyres.wearPerLap > 0) this.eventTyreWear = tyres.wearPerLap;
+    const tyres = this.tyres.tyres(this.car?.compound ?? null, this.car?.tread, this.usage?.newSets ?? null);
+    const wheelWear = tyres.wheels?.map(wheel => wheel.wearPerLap) ?? [];
+    if (wheelWear.length === 4 && wheelWear.every(value => value !== null) && wheelWear.some(value => value > 0)) {
+      this.eventTyreWear = wheelWear as TyreWheelValues;
+    }
     const fraction = reading.trackLength > 0 ? Math.min(1, Math.max(0, player.lapDist / reading.trackLength)) : 0;
     if (lapsLeft !== null) {
       const race = resource.race;
       const toPit = race?.pitInLaps != null ? race.pitInLaps + 1 - fraction : lapsLeft - fraction;
-      tyres.coverage = tyreCoverage(tyres.worst, tyres.wearPerLap, toPit, lapsLeft - fraction, race?.finishReachable ? 'finish' : 'pit', tyres.newSets);
+      tyres.coverage = limitingTyreCoverage(tyres.wheels?.map(wheel => wheel.tread) ?? [], wheelWear, toPit, lapsLeft - fraction,
+        race?.finishReachable ? 'finish' : 'pit', tyres.newSets);
     }
     // The grid keeps the plan: before the start the driver can still go back to the garage and change the load.
     const garage = state.lifecycle === 'garage' || state.lifecycle === 'starting' ? this.garagePlan(kind, reading, resource, reserveLaps) : null;
     if (garage?.tyres && garage.laps !== null) {
       const wear = this.planTyreWear(kind);
-      const coverage = wear?.map((value, index) => tyreCoverage(garage.tyres!.tread?.[index] ?? garage.tyres!.wear,
-        value, garage.laps!, garage.laps!, 'finish', garage.tyres!.newSets)).filter(value => value !== null) ?? [];
-      garage.tyreCoverage = coverage.sort((a, b) => a.projectedTread - b.projectedTread)[0] ?? null;
+      const tread = garage.tyres.tread ?? [0, 1, 2, 3].map(() => garage.tyres!.wear);
+      garage.tyreCoverage = wear ? limitingTyreCoverage(tread, wear, garage.laps, garage.laps, 'finish', garage.tyres.newSets) : null;
     }
     const fuelRatio = kind === 've' ? planFuelRatio({ ratios: this.ratios,
       fuelPerLap: this.ratios.length >= 3 ? this.perLap('fuel').perLap : this.gameEstimate('fuel'),
@@ -327,7 +328,7 @@ export class LiveStrategyTracker {
       const invalid = latestLap !== null && (latestLap.lapNumber !== player.totalLaps || !latestLap.valid);
       const excluded = this.lapExcluded || player.inPits || invalid;
       for (const meter of Object.values(this.meters)) meter.addCrossing(player.totalLaps, player.lapStartEt, excluded);
-      this.tyres.lapCompleted(worstTread(this.condition));
+      this.tyres.lapCompleted(this.car?.tread);
       this.completedLaps = player.totalLaps;
       this.lapExcluded = player.inPits;
     }
@@ -526,7 +527,8 @@ export class LiveStrategyTracker {
   /** The plan's wear per wheel: the learned profile when dry, else the event's measured wear, else the earlier races'. */
   private planTyreWear(kind: LiveResourceKind): TyreWheelValues | null {
     if (!this.wet && this.tyreProfile) return this.tyreProfile.wheels.map(wheel => wheel.wearPerLap) as TyreWheelValues;
-    const value = this.eventTyreWear ?? this.history(kind)?.wearPerLap ?? null;
+    if (this.eventTyreWear) return this.eventTyreWear;
+    const value = this.history(kind)?.wearPerLap ?? null;
     return value === null ? null : [value, value, value, value];
   }
 

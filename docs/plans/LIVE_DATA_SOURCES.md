@@ -93,7 +93,7 @@ leaves the session, so it is not a live source.
 | Temps, pressure | `Wheel.Temperature[3]`, `TireCarcassTemperature`, `Pressure` (kPa) | `/rest/garage/tireinfo` (Kelvin, kPa, load) | **Live** (both) |
 | Sets remaining | — | `UIScreen/TireManagement` → `tireInventory` (56 new of 56) | **Live** |
 | Set fitted for the next run | — | `UIScreen/TireManagement` → `tireInvGarageOptions.selectedTires` (per wheel `isUsed`, `wearValue`); the qualifying set stays fitted for the race until a new one is picked (driver, 2026-10-16) | **Live** (practice); race garage to read |
-| Condition per tyre | `Wheel.Wear` | `getVehicleCondition.tireCondition` (0 = destroyed) | **Live** |
+| Condition per tyre | `Wheel.Wear` = tread left, read by the tyre tracker at each crossing (matched `tireCondition` within 0.0001, 2026-10-25) | `getVehicleCondition.tireCondition` (0 = destroyed): after impacts, stops and the 5-minute poll only | **Live** |
 | Puncture / lost wheel | `Wheel.Flat`, `Wheel.Detached` | — | Field |
 
 ### Damage and repairs

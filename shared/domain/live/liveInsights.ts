@@ -1,5 +1,6 @@
 import type { LiveFuelRatio, LiveSavingPlan, LiveTyreCoverage } from '../../types/liveInsights.js';
 import type { LivePerLapSource } from '../../types/liveStrategy.js';
+import { CORNERS } from './liveCarCondition.js';
 
 const round = (value: number, digits: number): number => Math.round(value * 10 ** digits) / 10 ** digits;
 /** Driver's minimum planned tread, not a universal grip/safety threshold. */
@@ -55,4 +56,14 @@ export function tyreCoverage(worst: number | null, wear: number | null, lapsToTa
   const setsNeeded = Math.max(0, Math.ceil(Math.max(0, raceLaps * wear - usable) / (1 - LIVE_TYRE_TREAD_FLOOR) - 1e-9));
   return { target, projectedTread: round(Math.max(0, worst - lapsToTarget * wear), 3),
     setsNeeded, availableSetsCover: newSets === null ? null : newSets >= setsNeeded };
+}
+
+/** Each wheel projected on its own wear (FL, FR, RL, RR): the lowest one, with its corner, limits the stint. */
+export function limitingTyreCoverage(tread: readonly (number | null)[], wear: readonly (number | null)[], lapsToTarget: number,
+  raceLaps: number, target: 'pit' | 'finish', newSets: number | null): LiveTyreCoverage | null {
+  const wheels = CORNERS.flatMap((corner, index) => {
+    const coverage = tyreCoverage(tread[index] ?? null, wear[index] ?? null, lapsToTarget, raceLaps, target, newSets);
+    return coverage ? [{ ...coverage, corner }] : [];
+  });
+  return wheels.sort((a, b) => a.projectedTread - b.projectedTread)[0] ?? null;
 }

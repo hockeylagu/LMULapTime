@@ -1,6 +1,6 @@
 # Tyre wear learning (per wheel, slip-aware)
 
-Status: In progress 2026-10-25: Phase 1 implemented and validated (model v2, below); not committed. Phase 2 waits for one practice validation (below). Reviewer: Claude
+Status: 2026-10-25: Phase 1 validated (model v2), committed `70591550`. Phase 2 implemented and accepted on one session (below), uncommitted. Reviewer: Claude
 (main session) validates each phase against the regression race and the practice logs; the implementer does not judge
 its own acceptance.
 
@@ -68,8 +68,25 @@ on the wheel) was checked against 3 laps with ≥ 0.25 s: two more slopes, one b
 FL), the rest unchanged; races have too few slip laps for the gate to matter, so it stays. Remaining known error: one
 incident lap in a short race (Portimão RL) is not predictable; COTA Ferrari plans more wear than run (safe side).
 
-Phase 2 has deliberately not changed live tread or REST triggers: its required practice evidence is not yet recorded
-here. Keep `tyre-check` diagnostics until that reviewer gate is satisfied.
+### Practice validation and Phase 2 (2026-10-25)
+
+Silverstone National practice, Ferrari 296 LMGT3 Evo (`silverstone_national_practice_2026-10-25T16-37-31`): 11
+`tyre-check` pairs. `mWear` is **tread left** (1 = new): it matched the condition reply's `tireCondition` within 0.0001 on
+every wheel (as wear done it was off by ~1), and it moved up to 0.0036 between replies, so REST is the one that lags.
+
+Phase 2 is implemented: `LiveCarReading.tread` (decoded from `mWear`, clamped 0..1; the raw `lmu-fields` log is removed),
+`LiveTyreTracker` keeps one stint per wheel fed at each crossing from it (new-tyre reset and puncture rule per wheel),
+`LiveTyres.wheels` carries each wheel's tread and wear per lap, `wearPerLap` is the highest of the four, and the live and
+garage coverage (`limitingTyreCoverage`) project every wheel and name the limiting corner on the dashboard (`~94% RL`).
+`eventTyreWear` is per wheel. The per-lap `getVehicleCondition` trigger and the `tyre-check` diagnostic are removed; the
+impact trigger, the pit-exit trigger and the poller's 5-minute read stay (damage still needs REST). `LIVE_MODEL_VERSION` 10.
+
+Acceptance session (Silverstone National `55P1`, 2026-10-25: three stops, a penalty, damage, a spin): no condition call
+at a plain crossing (12 calls, all after a pit exit, an impact or the 5-minute poll), and the live tread at each crossing
+equals the native lap-end tread per wheel (e.g. lap 13 0.944/0.984/0.888/0.947 both). Two tracker fixes followed
+(`LIVE_MODEL_VERSION` 11): a new tyre is any rise above `NEW_TYRE_RISE` (0.005, as the native measurement) instead of
+0.05, which missed fresh tyres after a 5-lap stint (rise 0.015) and read 0.0002 a lap; and each wheel's wear per lap is
+the median lap of its stint, so the spin lap (11% off RL, already in the tread) no longer read 0.027 a lap.
 
 Working rules for the implementer: read [`docs/CODE_MAP.md`](../CODE_MAP.md) and `AGENTS.md` first. `npm test`,
 `npm run lint`, `npm run build` finish with zero warnings; every test under 1000 ms in the full suite. **Do not commit**

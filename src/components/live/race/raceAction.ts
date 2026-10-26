@@ -54,7 +54,7 @@ function tyresCell(tyres: LiveTyres | null): PlanReadout {
   const coverage = tyres?.coverage;
   if (coverage) return {
     label: `TREAD AT ${coverage.target === 'finish' ? 'FINISH' : 'PIT'}`,
-    value: `~${Math.round(coverage.projectedTread * 100)}`, unit: '%',
+    value: `~${Math.round(coverage.projectedTread * 100)}`, unit: `%${coverage.corner ? ` ${coverage.corner}` : ''}`,
     note: coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR ? 'BELOW 40% MIN' : undefined,
     detail: coverage.availableSetsCover === false ? 'NOT ENOUGH SETS' : undefined,
     tone: coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR ? 'loss' : null,

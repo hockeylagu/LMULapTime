@@ -108,7 +108,7 @@ describe('LiveService', () => {
     void service.stop();
   });
 
-  it('asks for the condition after a line crossing, an impact or a stop, and for the tyre screen after a stop', async () => {
+  it('asks for the condition after an impact or a stop, never at a line crossing, and for the tyre screen after a stop', async () => {
     const paths: string[] = [];
     const get = vi.fn((path: string) => {
       paths.push(path);
@@ -128,17 +128,18 @@ describe('LiveService', () => {
     car(0);
     await vi.advanceTimersByTimeAsync(40_000);
     expect(count(CONDITION)).toBe(1);
+    // The tread at the line comes from shared memory.
     frame(reading({ currentEt: 50, player: player(4) }));
     await vi.advanceTimersByTimeAsync(5000);
-    expect(count(CONDITION)).toBe(2);
+    expect(count(CONDITION)).toBe(1);
     car(55);
     await vi.advanceTimersByTimeAsync(5000);
-    expect(count(CONDITION)).toBe(3);
+    expect(count(CONDITION)).toBe(2);
     const tyres = count(TYRES);
     frame(reading({ currentEt: 70, player: player(4, true) }));
     frame(reading({ currentEt: 90, player: player(4, false) }));
     await vi.advanceTimersByTimeAsync(6000);
-    expect(count(CONDITION)).toBe(4);
+    expect(count(CONDITION)).toBe(3);
     expect(count(TYRES)).toBe(tyres + 1);
     void service.stop();
   });

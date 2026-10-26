@@ -161,6 +161,7 @@ function decodeCar(slot: Buffer): LiveCarReading {
     detached: slot.readUInt8(at.detached) !== 0,
     wheels: [0, 1, 2, 3].map(index => ({ flat: wheel(index, 'flat'), detached: wheel(index, 'detached') })),
     lastImpactEt: finite(slot.readDoubleLE(at.lastImpactET)),
+    tread: [0, 1, 2, 3].map(index => clamp01(slot.readDoubleLE(at.wheels + index * WHEEL.size + WHEEL.offsets.wear))),
     compound: cString(slot, at.frontTireCompoundName, 18).trim(),
   };
 }

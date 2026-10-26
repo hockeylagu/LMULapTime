@@ -654,7 +654,8 @@ four separate clean-wear/slip slopes from native tread plus closed verified live
 from race laps before practice or qualifying. Race options and garage tyre coverage project all four wheels;
 the race card shows the limiting corner and `WEAR LEARNED (n)` when applicable. Scalar fallbacks populate all
 four wheels, and older saved sets without individual tread retain their minimum-tread fallback. No new REST calls;
-the current live tracker and its per-lap condition trigger await the separate practice-gated Phase 2.
+Phase 2 (2026-10-25): the live tracker reads each wheel's tread from shared memory at the crossings, without the
+per-lap condition call, and the tyre cell names the limiting corner.
 See [tyre learning handoff](TYRE_WEAR_LEARNING.md).
 
 Automated validation uses decoded scoring and navigation fixtures; it does not constitute a recorded online or single-player LMU weekend. Online and single-player sequences share the same lifecycle engine and session-code mapping.

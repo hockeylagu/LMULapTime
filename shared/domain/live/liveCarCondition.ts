@@ -1,5 +1,6 @@
 import type { LiveLapRecord } from '../../types/live.js';
 import type { LiveCorner, LiveDamage, LiveTyres } from '../../types/liveStrategy.js';
+import { NEW_TYRE_RISE } from '../strategy/sessionStrategy.js';
 
 export const CORNERS: readonly LiveCorner[] = ['FL', 'FR', 'RL', 'RR'];
 
@@ -14,6 +15,11 @@ export interface LiveCarReading {
   wheels: { flat: boolean; detached: boolean }[];
   /** Session time of the last impact (`mLastImpactET`; 0 before any): a change asks LMU for the condition. */
   lastImpactEt: number;
+  /**
+   * Tread left per tyre, 0..1 (`mWear`, 1 = new): the same figure as the condition reply's tread, within 0.0001
+   * (Silverstone practice 2026-10-25), read every frame without a REST call.
+   */
+  tread?: number[];
   /** Front compound name as the game reports it. */
   compound: string;
 }
@@ -36,8 +42,6 @@ const DAMAGE_EPSILON = 0.01;
 const PACE_LAPS = 2;
 /** Laps averaged each side. */
 const PACE_WINDOW = 3;
-/** A rise of the worst tyre's tread above this means new tyres: a new stint. */
-const NEW_TYRES_RISE = 0.05;
 /** More tread lost in one lap than this is damage, not wear (normal wear is well under 5% a lap). */
 export const MAX_LAP_WEAR = 0.15;
 
@@ -176,39 +180,48 @@ export class LiveDamageTracker {
   }
 }
 
-/** Tyre state: compound, the most worn tyre and its wear per lap over this stint. */
+/**
+ * Tyre state per wheel: compound, the most worn tyre, and each wheel's wear per lap: the median lap of its own stint, so
+ * a spin or lockup lap (11% off one tyre in a lap, Silverstone 2026-10-25), already in the tread, is not projected again.
+ */
 export class LiveTyreTracker {
-  private stint: number[] = [];
+  private stints: number[][] = [[], [], [], []];
 
-  public reset(): void { this.stint = []; }
+  public reset(): void { this.stints = [[], [], [], []]; }
 
-  /** At each line crossing, with the tread left on the most worn tyre. */
-  public lapCompleted(worst: number | null): void {
-    if (worst === null) return;
-    const last = this.stint[this.stint.length - 1];
-    if (last !== undefined && worst > last + NEW_TYRES_RISE) this.stint = [];
-    // A drop no lap of wear makes is a puncture or a lost wheel, not wear: the wear starts again from the next tyres
-    // (seen live 2026-10-16: a flat read 0, and its 49% a lap of "wear" left the fitted set at 0% to the finish).
-    else if (last !== undefined && last - worst > MAX_LAP_WEAR) { this.stint = []; return; }
-    this.stint.push(worst);
+  /** At each line crossing, with the tread left per wheel (FL, FR, RL, RR). */
+  public lapCompleted(tread: readonly number[] | undefined): void {
+    if (tread?.length !== 4) return;
+    tread.forEach((value, index) => {
+      const stint = this.stints[index];
+      const last = stint[stint.length - 1];
+      // Any rise is a new tyre: shared memory reads the tread exactly, so the native measurement's threshold applies
+      // (fresh tyres after a 5-lap stint rose only 0.015, Silverstone 2026-10-25).
+      if (last !== undefined && value > last + NEW_TYRE_RISE) this.stints[index] = [];
+      // A drop no lap of wear makes is a puncture or a lost wheel, not wear: that wheel's wear starts again from the
+      // next tyre (seen live 2026-10-16: a flat read 0, and its 49% a lap of "wear" left the fitted set at 0% to the finish).
+      else if (last !== undefined && last - value > MAX_LAP_WEAR) { this.stints[index] = []; return; }
+      this.stints[index].push(value);
+    });
   }
 
-  public tyres(compound: string | null, condition: LiveVehicleCondition | null, newSets: number | null): LiveTyres {
-    const tires = condition?.tires ?? [];
-    const worst = tires.length > 0 ? Math.min(...tires) : null;
-    const index = worst === null ? -1 : tires.indexOf(worst);
-    const laps = this.stint.length - 1;
+  public tyres(compound: string | null, tread: readonly number[] | undefined, newSets: number | null): LiveTyres {
+    const known = tread?.length === 4 ? tread : null;
+    const worst = known ? Math.min(...known) : null;
+    const index = known && worst !== null ? known.indexOf(worst) : -1;
+    const wheels = CORNERS.map((corner, i) => {
+      const stint = this.stints[i];
+      const losses = stint.slice(1).map((value, lap) => stint[lap] - value);
+      return { corner, tread: known ? round(known[i], 3) : null, wearPerLap: losses.length >= 2 ? round(median(losses), 4) : null };
+    });
+    const rates = wheels.flatMap(wheel => (wheel.wearPerLap === null ? [] : [wheel.wearPerLap]));
     return {
       compound: compound || null,
       worst: worst === null ? null : round(worst, 3),
-      worstCorner: index >= 0 && index < 4 ? CORNERS[index] : null,
-      wearPerLap: laps >= 2 ? round((this.stint[0] - this.stint[laps]) / laps, 4) : null,
+      worstCorner: index >= 0 ? CORNERS[index] : null,
+      wearPerLap: rates.length > 0 ? Math.max(...rates) : null,
+      wheels,
       newSets,
     };
   }
-}
-
-/** The tread left on the most worn tyre, 0..1, or null. */
-export function worstTread(condition: LiveVehicleCondition | null): number | null {
-  return condition && condition.tires.length > 0 ? Math.min(...condition.tires) : null;
 }
