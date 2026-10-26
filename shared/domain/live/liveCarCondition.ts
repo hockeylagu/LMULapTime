@@ -22,6 +22,8 @@ export interface LiveCarReading {
   tread?: number[];
   /** Front compound name as the game reports it. */
   compound: string;
+  /** LMU `mVirtualEnergy`, 0..1: the standings' `veFraction` within 0.0002 (Silverstone practice 2026-10-25). */
+  virtualEnergy?: number;
 }
 
 /** `getVehicleCondition` (wheels FL, FR, RL, RR). */

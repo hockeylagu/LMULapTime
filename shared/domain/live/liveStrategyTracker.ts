@@ -26,7 +26,6 @@ import type { TyreWearProfile, TyreWheelValues } from '../../types/liveStrategy.
 export type LiveSelectedTyres = Omit<LiveGarageTyres, 'newSets'>;
 
 export type LiveRestUpdate =
-  | { type: 'standings'; veFraction: number | null; fuelFraction: number | null; pitState: LivePitState; penalties: number }
   | { type: 'estimate'; total: number; damage: number; penalties: number; fuel: number; ve: number; tires: number }
   /** The pit rules: random delays (s), fill rates (litres or % VE a second) and the insert times of a refuel (s). */
   | { type: 'pitStopTimes'; fixRandom: number; fuelRandom: number; tireRandom: number; veRandom: number;
@@ -184,19 +183,15 @@ export class LiveStrategyTracker {
   public applyCar(car: LiveCarReading): void {
     this.car = car;
     if (car.fuelCapacityLiters > 0) this.meters.fuel.addSample(this.et, car.fuelLiters);
+    if (car.virtualEnergy !== undefined) {
+      this.ve = car.virtualEnergy * 100;
+      this.meters.ve.addSample(this.et, this.ve);
+    }
     this.damage.updateCar(car, (this.completedLaps ?? 0) + 1);
   }
 
   public applyRest(update: LiveRestUpdate): void {
     switch (update.type) {
-      case 'standings':
-        this.pitState = update.pitState;
-        this.penalties = update.penalties;
-        if (update.veFraction !== null) {
-          this.ve = update.veFraction * 100;
-          this.meters.ve.addSample(this.et, this.ve);
-        }
-        return;
       case 'estimate':
         this.estimate = update;
         this.learnRefuelBases(update);
@@ -252,6 +247,8 @@ export class LiveStrategyTracker {
       this.sessionKey = sessionKey;
     }
     this.et = reading.currentEt;
+    this.pitState = player.pitState ?? 'none';
+    this.penalties = player.penalties ?? 0;
     // Another compound wears differently but barely changes VE or fuel use: only the tyre wear starts again.
     const compound = this.car?.compound || this.usage?.selected?.compound || this.eventCompound;
     if (this.eventCompound && compound !== this.eventCompound) { this.eventTyreWear = null; this.tyres.reset(); }

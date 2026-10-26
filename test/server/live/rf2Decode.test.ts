@@ -70,12 +70,28 @@ describe('rF2 scoring decode', () => {
     expect(decoded.player).toEqual({
       upgradePackHex: '00000000000000000000000000000000',
       id: 12, place: 4, totalLaps: 8, vehicleName: 'Ferrari 296 GT3', vehicleClass: 'GT3',
-      pitStops: 0,
+      pitStops: 0, pitState: 'exiting', penalties: 0,
       lapDist: 4321.5, sector: 2, lastLapTime: 228.9, bestLapTime: 227.5, lastSector1: 35.9, lastSector2: 126.2,
       bestSector1: 35.5, bestSector2: 125.9, curSector1: 36.1, curSector2: 126.7, bestLapSector1: 35.5, bestLapSector2: 125.5,
       lapStartEt: 301.25, timeIntoLap: 20.5, estimatedLapTime: 229.5, inPits: true, countLapFlag: 1, lapsBehindLeader: 2, finishStatus: 1,
     });
     expect(decoded.leader).toMatchObject({ id: 7, place: 1, inPits: false, countLapFlag: 2 });
+  });
+
+  it('reads the pit state as LMU REST names it (4 in the box, 0 down the pit lane) and the outstanding penalties', () => {
+    const buffer = scoringBuffer(2, FIELD);
+    const base = SCORING.vehicles + VEHICLE_SCORING.size;
+    const at = VEHICLE_SCORING.offsets;
+    const state = (raw: number, inPits: boolean) => {
+      buffer.writeUInt8(raw, base + at.pitState);
+      buffer.writeUInt8(inPits ? 1 : 0, base + at.inPits);
+      return decodeScoring(buffer).player?.pitState;
+    };
+    buffer.writeInt16LE(2, base + at.numPenalties);
+    expect(decodeScoring(buffer).player?.penalties).toBe(2);
+    // Silverstone 2026-10-25, three stops: request, entering, 4 while stationary, 0 to the pit exit.
+    expect([state(1, false), state(2, true), state(4, true), state(3, true), state(0, true), state(0, false), state(9, false)])
+      .toEqual(['request', 'entering', 'stopped', 'stopped', 'exiting', 'none', 'none']);
   });
 
   it('has no player when none is flagged, and ignores vehicles beyond the count', () => {
@@ -171,7 +187,7 @@ describe('rF2 pedal decode', () => {
     const slot = buffer.subarray(TELEMETRY.vehicles + TELEMETRY.vehicleStride, TELEMETRY.vehicles + 2 * TELEMETRY.vehicleStride);
     expect(decodePedalSlot(slot)).toEqual({
       id: 12, sample: { t: 321.25, throttle: 0.75, brake: 1 }, tyreSurfaceAvgC: null,
-      car: { fuelLiters: 0, fuelCapacityLiters: 0, dentSeverity: [0, 0, 0, 0, 0, 0, 0, 0], detached: false, wheels: Array(4).fill({ flat: false, detached: false }), lastImpactEt: 0, tread: [0, 0, 0, 0], compound: '' },
+      car: { fuelLiters: 0, fuelCapacityLiters: 0, dentSeverity: [0, 0, 0, 0, 0, 0, 0, 0], detached: false, wheels: Array(4).fill({ flat: false, detached: false }), lastImpactEt: 0, tread: [0, 0, 0, 0], compound: '', virtualEnergy: 0 },
     });
   });
 
@@ -184,7 +200,7 @@ describe('rF2 pedal decode', () => {
     expect(decoded(undefined)).toBeNull();
   });
 
-  it('reads the car: fuel and capacity in litres, dents, lost parts, flat or lost wheels, the last impact, tread and the front compound', () => {
+  it('reads the car: fuel and capacity in litres, dents, lost parts, flat or lost wheels, the last impact, tread, the front compound and VE', () => {
     const buffer = telemetryBuffer(4, [{ id: 12, et: 1, throttle: 0, brake: 0 }]);
     const base = TELEMETRY.vehicles;
     const at = VEHICLE_TELEMETRY.offsets;
@@ -196,11 +212,12 @@ describe('rF2 pedal decode', () => {
     buffer.writeUInt8(1, base + at.wheels + 3 * WHEEL.size + WHEEL.offsets.detached);
     buffer.writeDoubleLE(812.5, base + at.lastImpactET);
     buffer.write('Medium', base + at.frontTireCompoundName, 'utf8');
+    buffer.writeFloatLE(0.625, base + at.virtualEnergy);
     [0.98, 0.9431234, 1.2, 0.95].forEach((tread, index) => buffer.writeDoubleLE(tread, base + at.wheels + index * WHEEL.size + WHEEL.offsets.wear));
     expect(decodePedalSlot(buffer.subarray(base, base + TELEMETRY.vehicleStride)).car).toEqual({
       fuelLiters: 32.2, fuelCapacityLiters: 117, dentSeverity: [0, 0, 0, 0, 0, 2, 0, 0], detached: true,
       wheels: [{ flat: false, detached: false }, { flat: false, detached: false }, { flat: true, detached: false }, { flat: false, detached: true }],
-      lastImpactEt: 812.5, tread: [0.98, 0.9431234, 1, 0.95], compound: 'Medium',
+      lastImpactEt: 812.5, tread: [0.98, 0.9431234, 1, 0.95], compound: 'Medium', virtualEnergy: 0.625,
     });
   });
 

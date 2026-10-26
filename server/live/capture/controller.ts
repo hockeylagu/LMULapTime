@@ -178,7 +178,7 @@ export class LiveCaptureController {
     if (json === undefined) return;
     const key = `${observation.source}:${observation.kind}`;
     // New timestamps remain explicit for REST measurements and failures; selections/configuration store changes.
-    const measured = observation.kind === 'condition' || observation.kind === 'standings' || observation.kind === 'failure';
+    const measured = observation.kind === 'condition' || observation.kind === 'failure';
     if (!measured && this.lastObservation.get(key) === json) return;
     if (this.observations.length >= MAX_OBSERVATIONS || this.observationBytes + json.length > MAX_OBSERVATION_BYTES) {
       this.manifest.droppedSamples++;

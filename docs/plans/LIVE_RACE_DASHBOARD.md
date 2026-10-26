@@ -245,7 +245,7 @@ Field-by-field source map and the validation run: [LIVE_DATA_SOURCES.md](LIVE_DA
 | Pedal inputs | Recorder exposes filtered and unfiltered throttle/brake | Choose driver-input channels; verify update rate and latency |
 | Session timing and pit state | Scoring structs (elapsed/end time, max laps, pit flags); lifecycle seen live online (phases 0, 3, 5, 8; `navigation/state`, `GetGameState`) | Displayed lap numbering, timed-race finish rule, phase 4 |
 | Damage indicators | Dents, impacts, `Flat` seen live (side hit, suspension hit) | Dent slot per body area, detached parts, overheating, pace loss |
-| Virtual energy | `/rest/watch/standings` `veFraction` (player only online) | Hypercar check |
+| Virtual energy | Shared memory `mVirtualEnergy` (LMU header; the standings' `veFraction` within 0.0002, 2026-10-25); the standings call is no longer made | Hypercar check |
 | Repair/service settings | Pit-menu GET endpoints in the retained schema | MFD values, repair options and tyre sets: the garage reads |
 | Stop estimate / usage | `pitstop-estimate` (seconds per service part, `damage` = repair time) and `usage` (per-lap fuel, VE, tyres) read live | Service overlap when several parts run |
 | Historic pit service | `shared/domain/pitStops.ts` separates service and lane timing | Use only matching-layout/car/condition evidence; unexplained stop time is not measured repair |

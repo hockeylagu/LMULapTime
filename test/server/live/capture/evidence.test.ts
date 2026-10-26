@@ -2,16 +2,6 @@ import { describe, expect, it } from 'vitest';
 import { captureRestEvidence } from '../../../../server/live/capture/evidence.js';
 
 describe('captureRestEvidence', () => {
-  it('keeps only the player standings row and its selected fields', () => {
-    expect(captureRestEvidence('/rest/watch/standings', [
-      { player: false, driverName: 'Opponent', veFraction: 0.9, fuelFraction: 0.8, penalties: 4 },
-      { player: true, veFraction: 0.375, fuelFraction: 0.278, pitState: 'NONE', penalties: 0, driverName: 'Player', position: 1 },
-    ])).toEqual({
-      kind: 'standings', data: { veFraction: 0.375, fuelFraction: 0.278, penalties: 0, pitState: 'NONE' },
-    });
-    expect(captureRestEvidence('/rest/watch/standings', [{ player: false }])).toBeNull();
-  });
-
   it('keeps all nine finite service estimate values without filling or clamping', () => {
     const estimates = { fuel: 2, ve: 1, tires: 3, damage: 4, brakes: 5, brakeDucts: 6, driverSwap: 7, penalties: 8, total: 36 };
     expect(captureRestEvidence('/rest/strategy/pitstop-estimate', { ...estimates, unrelated: 99 }))

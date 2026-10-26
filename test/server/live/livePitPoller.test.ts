@@ -4,7 +4,6 @@ import type { RestAnswer } from '../../../server/live/lmuPitRest.js';
 
 const STATE = '/navigation/state';
 const navState = (replay: boolean) => ({ state: { navigationState: 'NAV_EVENT', settingMode: replay ? 'SETTING_REPLAY_PLAYBACK' : 'SETTING_GRANDPRIX' } });
-const STANDINGS = [{ player: true, veFraction: 0.5, fuelFraction: 0.4, pitState: 'NONE', penalties: 0 }];
 
 function setup(replay: boolean | null = false, answer: (path: string) => RestAnswer | null = () => null) {
   const paths: string[] = [];
@@ -15,7 +14,6 @@ function setup(replay: boolean | null = false, answer: (path: string) => RestAns
     if (path === STATE) {
       return Promise.resolve(replay === null ? { ok: false, reason: 'status' } : { ok: true, body: navState(replay) });
     }
-    if (path === '/rest/watch/standings') return Promise.resolve({ ok: true, body: STANDINGS });
     return Promise.resolve({ ok: true, body: {} });
   });
   const onUpdate = vi.fn();
@@ -36,9 +34,9 @@ describe('LivePitPoller', () => {
     t.poller.setMode('track');
     await vi.advanceTimersByTimeAsync(10 * PIT_POLL_TICK_MS);
     expect(t.paths[0]).toBe(STATE);
-    expect(t.paths[1]).toBe('/rest/watch/standings');
+    // VE, pit state and penalties come from shared memory: no standings read.
+    expect(t.paths).not.toContain('/rest/watch/standings');
     expect(t.get.mock.calls.length).toBeLessThanOrEqual(11);
-    expect(t.onUpdate).toHaveBeenCalledWith({ type: 'standings', veFraction: 0.5, fuelFraction: 0.4, pitState: 'none', penalties: 0 });
     expect(t.paths).toContain('/rest/garage/getVehicleCondition');
     t.poller.stop();
   });
@@ -69,7 +67,6 @@ describe('LivePitPoller', () => {
     const t = setup(null);
     t.poller.setMode('track');
     await vi.advanceTimersByTimeAsync(60 * PIT_POLL_TICK_MS);
-    expect(t.paths).toContain('/rest/watch/standings');
     expect(t.paths).toContain('/rest/garage/PitMenu/receivePitMenu');
     expect(t.paths).not.toContain('/rest/garage/getVehicleCondition');
     t.poller.stop();
@@ -199,7 +196,6 @@ describe('LivePitPoller', () => {
     t.poller.setMode('garage');
     await vi.advanceTimersByTimeAsync(3 * PIT_POLL_TICK_MS);
     expect(t.paths).toContain('/rest/garage/getPlayerGarageData');
-    expect(t.paths).not.toContain('/rest/watch/standings');
     slow = false;
     const count = t.paths.length;
     // The slow answer came at 1 s: nothing until 11 s.
@@ -208,19 +204,5 @@ describe('LivePitPoller', () => {
     await vi.advanceTimersByTimeAsync(3 * PIT_POLL_TICK_MS);
     expect(t.paths.length).toBeGreaterThan(count);
     t.poller.stop();
-  });
-  it('logs the player standings row without its motion, and keeps the rest of it', async () => {
-    const rows = [{ ...STANDINGS[0], carPosition: { x: 1 }, carVelocity: { velocity: 2 }, carAcceleration: { x: 3 }, gamePhase: 'FORMATION' },
-      { player: false, veFraction: 0.9 }];
-    const events: Array<{ kind: string; data: unknown }> = [];
-    const poller = new LivePitPoller({
-      get: path => Promise.resolve(path === STATE ? { ok: true, body: navState(false) } : { ok: true, body: path === '/rest/watch/standings' ? rows : {} }),
-      onUpdate: vi.fn(), onReplay: vi.fn(), onNavigation: vi.fn(), diagnosticSink: () => event => events.push(event),
-    });
-    poller.setMode('track');
-    await vi.advanceTimersByTimeAsync(3 * PIT_POLL_TICK_MS);
-    const standings = events.find(event => (event.data as { path: string }).path === '/rest/watch/standings');
-    expect((standings?.data as { body: unknown } | undefined)?.body).toEqual([{ ...STANDINGS[0], gamePhase: 'FORMATION' }]);
-    poller.stop();
   });
 });

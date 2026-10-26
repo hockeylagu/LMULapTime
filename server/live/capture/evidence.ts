@@ -18,15 +18,6 @@ function nonempty(value: JsonRecord): boolean {
   return Object.keys(value).length > 0;
 }
 
-function standings(body: unknown): JsonRecord | null {
-  if (!Array.isArray(body)) return null;
-  const player = body.map(record).find(row => row?.player === true);
-  if (!player) return null;
-  const data = copyNumbers(player, ['veFraction', 'fuelFraction', 'penalties']);
-  if (typeof player.pitState === 'string') data.pitState = player.pitState;
-  return nonempty(data) ? data : null;
-}
-
 function estimate(body: unknown): JsonRecord | null {
   const source = record(body);
   if (!source) return null;
@@ -208,7 +199,6 @@ export function captureRestEvidence(path: string, body: unknown): { kind: string
   let kind: string;
   let data: unknown;
   switch (path) {
-    case '/rest/watch/standings': kind = 'standings'; data = standings(body); break;
     case '/rest/strategy/pitstop-estimate': kind = 'pit-estimate'; data = estimate(body); break;
     case '/rest/garage/getVehicleCondition': kind = 'condition'; data = condition(body); break;
     case '/rest/garage/PitMenu/receivePitMenu': kind = 'pit-menu'; data = pitMenu(body); break;

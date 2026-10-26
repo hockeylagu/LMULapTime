@@ -711,21 +711,23 @@ describe('LiveService', () => {
   describe('pit data', () => {
     const answers = (replay: boolean) => (path: string): Promise<RestAnswer> => {
       if (path === '/navigation/state') return Promise.resolve({ ok: true, body: { state: { settingMode: replay ? 'SETTING_REPLAY_PLAYBACK' : 'SETTING_GRANDPRIX' } } });
-      if (path === '/rest/watch/standings') return Promise.resolve({ ok: true, body: [{ player: true, veFraction: 0.62, fuelFraction: 0.5, pitState: 'NONE', penalties: 0 }] });
       if (path === '/rest/strategy/pitstop-estimate') return Promise.resolve({ ok: true, body: { total: 33.7, damage: 30, penalties: 0, fuel: 3.7, ve: 1.7, tires: 0 } });
       return Promise.resolve({ ok: false, reason: 'status' });
     };
 
     it('reads the pit data only while a dashboard is open and a session is loaded, into the snapshot strategy', async () => {
       const get = vi.fn(answers(false));
-      const { service, frame } = setup({ pit: { get } });
+      const { service, frame, worker } = setup({ pit: { get } });
       frame(reading());
       await vi.advanceTimersByTimeAsync(5000);
       expect(get).not.toHaveBeenCalled();
       const sink = new FakeSink();
       const remove = service.addClient(sink);
+      // The VE comes from shared memory, the stop estimate from LMU.
+      worker.emit('message', { type: 'frame', car: { fuelLiters: 0, fuelCapacityLiters: 0, dentSeverity: Array(8).fill(0), detached: false,
+        wheels: Array(4).fill({ flat: false, detached: false }), lastImpactEt: 0, compound: 'Medium', virtualEnergy: 0.62 } });
       await vi.advanceTimersByTimeAsync(5000);
-      expect(get).toHaveBeenCalledWith('/rest/watch/standings');
+      expect(get).toHaveBeenCalledWith('/rest/strategy/pitstop-estimate');
       expect(service.getSnapshot().strategy).toMatchObject({
         resource: { kind: 've', amount: 62 },
         pit: { serviceSeconds: 34, penalties: 0 },

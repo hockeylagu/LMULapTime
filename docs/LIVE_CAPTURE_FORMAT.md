@@ -244,6 +244,12 @@ recording), the tyre screen drops its copy of the pit menu (logged from its own 
 probe keeps its body only for an error or unreadable reply (the pit poller logs the same reply), `strategy`
 records omit the MFD fuel ratio choices, and `capture-health` is written when the writer's state, error, drops
 or backlog change (plus the 60 s checkpoint), not for the growing sample count.
+Recordings of 2026-10-25 may hold three validation records, since removed: `standings-check` (each standings
+reply beside shared memory VE, fuel, pit state and penalties), `lmu-fields` (the other raw LMU fields of
+`InternalsPlugin.hpp`) and `tyre-check` (condition reply tread beside `mWear`). They settled the shared-memory reads
+the app now uses instead of the standings call: `mVirtualEnergy` is the standings' `veFraction`, `mNumPenalties` its
+`penalties`, `mWear` the tread left, and `mPitState` reads 4 in the box and 0 down the pit lane (`rf2Decode.ts`).
+Older recordings also hold `standings` REST observations; new ones do not.
 `lap-timing` records producer output at most once per second: timing fields, the atomic
 `lapEstimate` (seconds, reference seconds, delta seconds and distance/sector source), subscriber
 count and source session/lap clocks and distance. This does not confirm browser receipt. The

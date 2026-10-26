@@ -71,7 +71,7 @@ observed departure; missing/future or stale crossing anchors do not fall back to
 | Dashboard need | Shared memory | REST | Level |
 |---|---|---|---|
 | Fuel litres, capacity | `Fuel` (101.6 L), `FuelCapacity` (117 L), also for GT3 | `/rest/watch/standings` → `fuelFraction` | **Live** |
-| **Virtual energy** | Not in the structs (`BatteryChargeFraction` 0 on GT3) | **`/rest/watch/standings` → `veFraction`** (0.978 one lap out) | **Live** (REST only) |
+| **Virtual energy** | LMU's `mVirtualEnergy` (0..1, in LMU's own `InternalsPlugin.hpp`; read by the app since 2026-10-25) | `/rest/watch/standings` → `veFraction` (no longer called) | **Live** (shared memory) |
 | Use per lap | Computed from fuel samples at line crossings | `standings.veFraction` / `fuelFraction` sampled at each line crossing (precise); `/rest/strategy/usage` per lap is stored in 1/255 steps (0.39 %), too coarse for one lap | **Live** |
 | Game's own per-lap estimate (fallback before any lap) | — | `UIScreen/TireManagement` → `expectedUsage` (VE 2.49 %, fuel 2.18 L per lap, updated while driving) | **Live** |
 | Start VE / fuel set in the garage | — | `getPlayerGarageData` → `VM_VIRTUAL_ENERGY` "50% (20.1 laps)", `VM_FUEL_LEVEL` (ratio); the car only takes it when it leaves the garage | **Live** |

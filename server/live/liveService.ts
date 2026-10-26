@@ -3,7 +3,7 @@ import { LIVE_BASELINE_MODEL_VERSION, LIVE_MODEL_VERSION } from '../../shared/do
 import { deriveLiveState, isLiveOnTrack, isLiveSessionLoaded } from '../../shared/domain/live/liveLifecycle.js';
 import type { LiveGameScreen, LiveScoringReading, LiveVehicleReading } from '../../shared/domain/live/liveLifecycle.js';
 import type { LiveCarReading } from '../../shared/domain/live/liveCarCondition.js';
-import type { LivePitState, LiveRaceStrategies } from '../../shared/types/liveStrategy.js';
+import type { LiveRaceStrategies } from '../../shared/types/liveStrategy.js';
 import type { SessionStrategy } from '../../shared/types/session.js';
 import { LiveStrategyTracker } from '../../shared/domain/live/liveStrategyTracker.js';
 import { LiveResultTracker } from '../../shared/domain/live/liveResults.js';
@@ -133,8 +133,6 @@ export class LiveService {
   /** The last `session-loaded` value sent. */
   private sessionLoaded = false;
   private reserveSeconds: number;
-  /** What keeps the pit in play for the poller (`setPitActive`): the standings' pit state and damage seen in the car. */
-  private pitState: LivePitState = 'none';
   private carDamaged = false;
   /** The car's last impact time; null until the first car reading, so an old impact triggers nothing. */
   private lastImpactEt: number | null = null;
@@ -311,7 +309,6 @@ export class LiveService {
       this.replay = false;
       this.screen = 'session';
       this.loadingProgress = null;
-      this.pitState = 'none';
       this.carDamaged = false;
       this.lastImpactEt = null;
       this.strategy.reset();
@@ -464,7 +461,9 @@ export class LiveService {
   }
 
   private followPitActive(): void {
-    this.pit.setPitActive(this.pitState !== 'none' || this.carDamaged || this.lastReading?.player?.inPits === true);
+    // What keeps the pit in play for the poller: the pit state, damage seen in the car, or the car in the pits.
+    const player = this.lastReading?.player;
+    this.pit.setPitActive((player?.pitState ?? 'none') !== 'none' || this.carDamaged || player?.inPits === true);
   }
 
   private applyReading(reading: LiveScoringReading | null): void {
@@ -579,10 +578,6 @@ export class LiveService {
   }
 
   private applyRest(update: LiveRestUpdate): void {
-    if (update.type === 'standings') {
-      this.pitState = update.pitState;
-      this.followPitActive();
-    }
     this.strategy.applyRest(update);
     this.applyReading(this.lastReading);
   }

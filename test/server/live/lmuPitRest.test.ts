@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  parseEstimate, parseForecast, parseGarageData, parsePitMenu, parsePitStopTimes, parseStandings,
+  parseEstimate, parseForecast, parseGarageData, parsePitMenu, parsePitStopTimes,
   parseSchedule, parseTireManagement, parseVehicleCondition,
 } from '../../../server/live/lmuPitRest.js';
 
@@ -8,15 +8,6 @@ import {
 const menuLine = (name: string, currentSetting: number, texts: string[]) => ({ name, currentSetting, default: 0, settings: texts.map(text => ({ text })) });
 
 describe('LMU pit REST parsers', () => {
-  it("reads the player's standings row: VE, fuel, pit state and pending penalties", () => {
-    expect(parseStandings([
-      { player: false, veFraction: 0.9, pitState: 'NONE', penalties: 0 },
-      { player: true, veFraction: 0.3759, fuelFraction: 0.2784, pitState: 'REQUEST', penalties: 2 },
-    ])).toEqual({ type: 'standings', veFraction: 0.3759, fuelFraction: 0.2784, pitState: 'request', penalties: 2 });
-    expect(parseStandings([{ player: false }])).toBeNull();
-    expect(parseStandings({})).toBeNull();
-  });
-
   it('reads the stop estimate and the random delays of the pit rules', () => {
     expect(parseEstimate({ brakeDucts: 0, brakes: 0, damage: 129.9, driverSwap: 0, fuel: 5.17, penalties: 0, tires: 4.5, total: 139.6, ve: 5.04 }))
       .toEqual({ type: 'estimate', total: 139.6, damage: 129.9, penalties: 0, fuel: 5.17, ve: 5.04, tires: 4.5 });

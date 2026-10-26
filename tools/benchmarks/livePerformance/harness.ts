@@ -31,7 +31,6 @@ worker.on('message', (message: { type?: string; benchmarkPostedAt?: number; peda
   if (message.pedal) sampleToMainMs.push(Date.now() - message.pedal.t * 1000);
 });
 const restCalls: Record<string, number> = {};
-const startedAt = Date.now();
 const live = new LiveService({
   createWorker: () => worker,
   capture,
@@ -39,7 +38,6 @@ const live = new LiveService({
   pit: { get: async route => {
     restCalls[route] = (restCalls[route] ?? 0) + 1;
     if (route === '/navigation/state') return { ok: true, body: { state: { settingMode: 'SETTING_GRANDPRIX' } } };
-    if (route === '/rest/watch/standings') return { ok: true, body: [{ player: true, veFraction: 0.8 - (Date.now() - startedAt) / 4_000_000, pitState: 'NONE', penalties: 0 }] };
     return { ok: false, reason: 'status' };
   } },
 });

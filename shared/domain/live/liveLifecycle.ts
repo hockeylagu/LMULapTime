@@ -1,4 +1,5 @@
 import type { LiveLifecycle, LiveSessionInfo, LiveSessionKind } from '../../types/live.js';
+import type { LivePitState } from '../../types/liveStrategy.js';
 
 /** The scoring fields the live page is derived from (the rF2 scoring buffer, decoded by the server). */
 export interface LiveScoringReading {
@@ -71,6 +72,10 @@ export interface LiveVehicleReading {
   /** rF2 `mFinishStatus`: 0 none, 1 finished, 2 DNF, 3 DQ. */
   finishStatus: number;
   pitStops?: number;
+  /** LMU `mPitState`, read as LMU's REST names the same moments (`pitState` in `rf2Decode.ts`). */
+  pitState?: LivePitState;
+  /** rF2 `mNumPenalties`: outstanding penalties. */
+  penalties?: number;
 }
 
 export interface LiveState {

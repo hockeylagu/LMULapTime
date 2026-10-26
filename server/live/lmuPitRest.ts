@@ -2,7 +2,7 @@ import { lmuHttpGet } from './lmuHttp.js';
 import type { LiveVehicleCondition } from '../../shared/domain/live/liveCarCondition.js';
 import type { LiveForecastNode } from '../../shared/domain/live/liveForecast.js';
 import type { LiveRestUpdate, LiveSelectedTyres } from '../../shared/domain/live/liveStrategyTracker.js';
-import type { LivePitMenu, LivePitState } from '../../shared/types/liveStrategy.js';
+import type { LivePitMenu } from '../../shared/types/liveStrategy.js';
 
 /**
  * LMU's local REST reads for the pit data (docs/LMU_REST_API.md section 4.3) and their parsers. `127.0.0.1`, never
@@ -48,24 +48,6 @@ const leadingNumber = (text: unknown): number | null => {
   const match = typeof text === 'string' ? /^\s*(-?\d+(?:\.\d+)?)/.exec(text) : null;
   return match ? Number(match[1]) : null;
 };
-
-const PIT_STATES: Record<string, LivePitState> = {
-  NONE: 'none', REQUEST: 'request', ENTERING: 'entering', STOPPED: 'stopped', EXITING: 'exiting',
-};
-
-/** `GET /rest/watch/standings`: the player's row. */
-export function parseStandings(body: unknown): Extract<LiveRestUpdate, { type: 'standings' }> | null {
-  if (!Array.isArray(body)) return null;
-  const row = body.map(record).find(item => item?.player === true);
-  if (!row) return null;
-  return {
-    type: 'standings',
-    veFraction: num(row.veFraction),
-    fuelFraction: num(row.fuelFraction),
-    pitState: PIT_STATES[String(row.pitState)] ?? 'none',
-    penalties: num(row.penalties) ?? 0,
-  };
-}
 
 /** `GET /rest/strategy/pitstop-estimate`: seconds per service part and the total. */
 export function parseEstimate(body: unknown): Extract<LiveRestUpdate, { type: 'estimate' }> | null {

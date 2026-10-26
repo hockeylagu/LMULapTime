@@ -5,6 +5,7 @@ import { LiveStrategyTracker } from '../../../shared/domain/live/liveStrategyTra
 import type { LiveStrategyContext } from '../../../shared/domain/live/liveStrategyTracker.js';
 import { scoringReading, vehicleReading } from '../../helpers/liveReadings.js';
 import type { SessionStrategy } from '../../../shared/types/session.js';
+import type { LivePitState } from '../../../shared/types/liveStrategy.js';
 import { fitTyreWear } from '../../../shared/domain/strategy/tyreWear.js';
 
 const LAP = 100;
@@ -21,17 +22,26 @@ function at(et: number, patch: Partial<LiveScoringReading> = {}): LiveScoringRea
   });
 }
 
+/** A shared-memory car reading with `ve` (0..1) of virtual energy and no fuel gauge. */
+const veCar = (ve: number) => ({ fuelLiters: 0, fuelCapacityLiters: 0, dentSeverity: [0, 0, 0, 0, 0, 0, 0, 0], detached: false, lastImpactEt: 0,
+  wheels: Array.from({ length: 4 }, () => ({ flat: false, detached: false })), compound: 'Medium', virtualEnergy: ve });
+/** The reading at `et` with the player's shared-memory pit state and outstanding penalties. */
+const inPit = (et: number, pitState: LivePitState, penalties = 0): LiveScoringReading => {
+  const reading = at(et);
+  return { ...reading, player: { ...reading.player!, pitState, penalties } };
+};
+
 const context = (tracker: LiveStrategyTracker, reading: LiveScoringReading, patch: Partial<LiveStrategyContext> = {}) =>
   tracker.update(reading, deriveLiveState(reading, 'driving'), { carClass: 'GT3', layoutKey: null, lapsLeft: { laps: 30 - Math.floor(reading.currentEt / LAP), estimated: true }, latestLap: null, reserveSeconds: LAP / 2, ...patch });
 
-/** Drives from `from` to `to` seconds: a scoring reading each second, VE from standings every 3 s. */
+/** Drives from `from` to `to` seconds: a scoring reading each second, a shared-memory VE reading every 3 s. */
 function drive(tracker: LiveStrategyTracker, from: number, to: number, layoutKey: string | null = null) {
   let strategy = null;
   for (let et = from; et <= to; et += 1) {
     const reading = at(et);
     strategy = context(tracker, reading, { layoutKey });
     if (et % 3 === 0) {
-      tracker.applyRest({ type: 'standings', veFraction: (90 - (VE_PER_LAP * et) / LAP) / 100, fuelFraction: 0.4, pitState: 'none', penalties: 0 });
+      tracker.applyCar(veCar((90 - (VE_PER_LAP * et) / LAP) / 100));
       strategy = context(tracker, reading, { layoutKey });
     }
   }
@@ -102,7 +112,7 @@ describe('LiveStrategyTracker', () => {
     for (let et = 0; et <= 450; et++) {
       context(tracker, at(et));
       tracker.applyCar(car(et));
-      if (et % 3 === 0) tracker.applyRest({ type: 'standings', veFraction: (90 - et * 0.03) / 100, fuelFraction: null, pitState: 'none', penalties: 0 });
+      if (et % 3 === 0) tracker.applyCar({ ...car(et), virtualEnergy: (90 - et * 0.03) / 100 });
       context(tracker, at(et));
     }
     // Asynchronous VE samples can raise the thirstiest crossing slightly; round conservatively up.
@@ -139,7 +149,7 @@ describe('LiveStrategyTracker', () => {
       const latestLap = laps === 0 ? null : lap(laps, laps !== 3);
       context(tracker, reading, { latestLap });
       if (et % 3 === 0) {
-        tracker.applyRest({ type: 'standings', veFraction: (90 - (VE_PER_LAP * et) / LAP) / 100, fuelFraction: 0.4, pitState: 'none', penalties: 0 });
+        tracker.applyCar(veCar((90 - (VE_PER_LAP * et) / LAP) / 100));
         context(tracker, reading, { latestLap });
       }
     }
@@ -166,12 +176,11 @@ describe('LiveStrategyTracker', () => {
   it('shows the stop-and-go while a penalty is pending, then the service with its random delays', () => {
     const tracker = new LiveStrategyTracker();
     tracker.applyRest({ type: 'pitStopTimes', fixRandom: 5, fuelRandom: 2, tireRandom: 1, veRandom: 0, fuelFillRate: 4, veFillRate: 2.5, fuelInsert: 1, veInsert: 0 });
-    tracker.applyRest({ type: 'standings', veFraction: 0.5, fuelFraction: 0.4, pitState: 'request', penalties: 1 });
+    tracker.applyCar(veCar(0.5));
     tracker.applyRest({ type: 'estimate', total: 10, damage: 0, penalties: 10, fuel: 0, ve: 0, tires: 0 });
-    expect(context(tracker, at(10))?.pit).toEqual({
+    expect(context(tracker, inPit(10, 'request', 1))?.pit).toEqual({
       state: 'request', penalties: 1, serviceSeconds: null, serviceMaxSeconds: null, plannedServiceSeconds: null, penaltySeconds: 10, mfd: null,
     });
-    tracker.applyRest({ type: 'standings', veFraction: 0.5, fuelFraction: 0.4, pitState: 'none', penalties: 0 });
     tracker.applyRest({ type: 'estimate', total: 33.7, damage: 30, penalties: 0, fuel: 3.7, ve: 1.7, tires: 0 });
     expect(context(tracker, at(11))?.pit).toMatchObject({ penalties: 0, serviceSeconds: 34, serviceMaxSeconds: 41, penaltySeconds: null });
   });
@@ -181,7 +190,7 @@ describe('LiveStrategyTracker', () => {
     const tracker = new LiveStrategyTracker();
     tracker.applyRest({ type: 'pitStopTimes', fixRandom: 5, fuelRandom: 2, tireRandom: 1, veRandom: 0, fuelFillRate: 4, veFillRate: 2.5, fuelInsert: 1, veInsert: 0 });
     tracker.applyRest({ type: 'tireManagement', vePerLap: 8, fuelPerLap: null, newSets: 0, selected: null });
-    tracker.applyRest({ type: 'standings', veFraction: 0.29, fuelFraction: 0.4, pitState: 'none', penalties: 0 });
+    tracker.applyCar(veCar(0.29));
     const menu = (target: number) => ({ type: 'pitMenu' as const, menu: { resourceValue: target, resourceText: `${target}%`, tyres: 'No Change', repair: 'N/A' } });
     context(tracker, at(0));
     // Filling to 100% from 29%: 71% at 0.4 s and a fixed 1.3 s, learned from the game's own estimate.
@@ -197,12 +206,10 @@ describe('LiveStrategyTracker', () => {
     expect(strategy?.resource?.race?.neededAfterStop).toBe(100);
     expect(strategy?.pit?.plannedServiceSeconds).toBe(39.3);
     // Requested: the stop is at the end of this lap, from 29 - 8 = 21%: nothing to load.
-    tracker.applyRest({ type: 'standings', veFraction: 0.29, fuelFraction: 0.4, pitState: 'request', penalties: 0 });
-    expect(context(tracker, at(0))?.pit).toMatchObject({ serviceSeconds: 0, serviceMaxSeconds: 0 });
+    expect(context(tracker, inPit(0, 'request'))?.pit).toMatchObject({ serviceSeconds: 0, serviceMaxSeconds: 0 });
     // In the pit lane the game's own estimate stands.
-    tracker.applyRest({ type: 'standings', veFraction: 0.29, fuelFraction: 0.4, pitState: 'entering', penalties: 0 });
     tracker.applyRest({ type: 'estimate', total: 6.1, damage: 0, penalties: 0, fuel: 4.2, ve: 6.1, tires: 0 });
-    expect(context(tracker, at(0))?.pit).toMatchObject({ serviceSeconds: 6, serviceMaxSeconds: 8 });
+    expect(context(tracker, inPit(0, 'entering'))?.pit).toMatchObject({ serviceSeconds: 6, serviceMaxSeconds: 8 });
   });
 
   it('turns the reserve seconds into laps at the player pace, half a lap without a lap time', () => {

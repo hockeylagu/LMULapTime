@@ -1,6 +1,7 @@
 import type { LiveCarReading } from '../../shared/domain/live/liveCarCondition.js';
 import type { LiveScoringReading, LiveVehicleReading } from '../../shared/domain/live/liveLifecycle.js';
 import type { LivePedalSample } from '../../shared/types/live.js';
+import type { LivePitState } from '../../shared/types/liveStrategy.js';
 import { knownCarClass } from '../../shared/domain/vehicleMapping.js';
 import { MAX_MAPPED_VEHICLES, SCORING, SCORING_BUFFER, SCORING_INFO, TELEMETRY, VEHICLE_SCORING, VEHICLE_TELEMETRY, WHEEL } from './rf2Layout.js';
 import type { MappedBuffer } from './sharedMemory.js';
@@ -25,6 +26,18 @@ function cString(buffer: Buffer, offset: number, length: number): string {
   const limit = offset + length;
   while (end < limit && buffer[end] !== 0) end++;
   return buffer.toString('utf8', offset, end);
+}
+
+/**
+ * LMU's `mPitState` as LMU's REST names the same moments (three stops, Silverstone 2026-10-25): 1 request, 2 entering,
+ * 4 while the car stands in the box (rF2's "exiting"; 3 never came), then 0 down the pit lane, where REST says exiting
+ * until the car leaves the pits (also out of the garage).
+ */
+function pitState(raw: number, inPits: boolean): LivePitState {
+  if (raw === 1) return 'request';
+  if (raw === 2) return 'entering';
+  if (raw === 3 || raw === 4) return 'stopped';
+  return inPits ? 'exiting' : 'none';
 }
 
 const clamp01 = (value: number): number => (Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : 0);
@@ -61,6 +74,8 @@ function decodeVehicle(buffer: Buffer, base: number): LiveVehicleReading {
     lapsBehindLeader: buffer.readInt32LE(base + at.lapsBehindLeader),
     finishStatus: buffer.readInt8(base + at.finishStatus),
     pitStops: buffer.readInt16LE(base + at.numPitstops),
+    pitState: pitState(buffer.readUInt8(base + at.pitState), buffer.readUInt8(base + at.inPits) !== 0),
+    penalties: buffer.readInt16LE(base + at.numPenalties),
   };
 }
 
@@ -134,6 +149,7 @@ export function decodeScoring(buffer: Buffer): LiveScoringReading {
   };
 }
 
+
 const KELVIN = 273.15;
 
 /** Mean tyre surface temperature of the four wheels (left, centre, right each), degrees Celsius; null when the game reports none. */
@@ -163,6 +179,7 @@ function decodeCar(slot: Buffer): LiveCarReading {
     lastImpactEt: finite(slot.readDoubleLE(at.lastImpactET)),
     tread: [0, 1, 2, 3].map(index => clamp01(slot.readDoubleLE(at.wheels + index * WHEEL.size + WHEEL.offsets.wear))),
     compound: cString(slot, at.frontTireCompoundName, 18).trim(),
+    virtualEnergy: finite(slot.readFloatLE(at.virtualEnergy)),
   };
 }
 
