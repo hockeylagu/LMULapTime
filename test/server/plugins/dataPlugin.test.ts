@@ -24,6 +24,12 @@ it('accepts bounded physics defaults while rejecting incomplete or inconsistent 
     {steeringRatio:12},{...handling,defaultSteeringLockDeg:10},{...handling,source:'private'},
     {...handling,defaultSteeringWheelRangeDeg:Infinity}])expect(()=>parse(value)).toThrow();
 });
+it('accepts an ascending kW deployment list and rejects malformed ones',()=>{
+  const parse=(value:unknown)=>parseVehicleCatalog({...catalog,vehicles:[{...catalog.vehicles[0],deploymentKw:value}]});
+  expect(parse([0,40,60,120])[0].deploymentKw).toEqual([0,40,60,120]);
+  expect(parseVehicleCatalog(catalog)[0].deploymentKw).toBeUndefined();
+  for(const value of [[],[60],[0,20,20],[0,40,20],[0,NaN],[-5,0],[0,600],['20',40],{}])expect(()=>parse(value)).toThrow();
+});
 function fixture(kind:'vehicles'|'tracks'|'both'='both') {
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'lmu-plugin-'));directories.push(dir);
   const write=(file:string,value:unknown)=>{fs.mkdirSync(path.dirname(path.join(dir,file)),{recursive:true});fs.writeFileSync(path.join(dir,file),JSON.stringify(value));};
@@ -48,6 +54,16 @@ describe('local data plugin snapshot',()=>{
   });
   it.each(['vehicles','tracks','both'] as const)('loads %s capabilities independently',kind=>{const {dir}=fixture(kind);const p=new DataPlugin(dir);expect(p.status.state).toBe('ready');expect(p.status.vehicles).toBe(kind!=='tracks');expect(p.status.tracks).toBe(kind!=='vehicles');});
   it('uses exact aliases, unambiguous model fallback and defensive snapshots',()=>{const {dir,write}=fixture();const p=new DataPlugin(dir);expect(p.vehicle({vehicleId:'test_car.veh'})?.model).toBe('Test Car');expect(p.vehicle({carType:'Test Car'})?.id).toBe('synthetic');expect(p.vehicle({carType:'Unknown'})).toBeNull();p.vehicles()[0].model='Changed';expect(p.vehicles()[0].model).toBe('Test Car');write('vehicles/index.json',{});expect(p.vehicle({vehicleId:'TEST_CAR'})?.id).toBe('synthetic');expect(new DataPlugin(dir).status.state).toBe('invalid');});
+  it('shares a deployment list across model variants only when they agree',()=>{
+    const {dir,write}=fixture('vehicles');const car={...catalog.vehicles[0],deploymentKw:[0,20,40]};
+    write('vehicles/index.json',{...catalog,vehicles:[car,{...car,id:'variant',vehicleIds:['TEST_VARIANT']}]});
+    expect(new DataPlugin(dir).deploymentKw({carType:'Test Car',carClass:'Hyper'})).toEqual([0,20,40]);
+    expect(new DataPlugin(dir).deploymentKw({carType:'Test Car',carClass:'GT3'})).toBeNull();
+    write('vehicles/index.json',{...catalog,vehicles:[car,{...car,id:'variant',vehicleIds:['TEST_VARIANT'],deploymentKw:[0,10,20]}]});
+    expect(new DataPlugin(dir).deploymentKw({carType:'Test Car',carClass:'Hyper'})).toBeNull();
+    write('vehicles/index.json',{...catalog,vehicles:[car,{...catalog.vehicles[0],id:'variant',vehicleIds:['TEST_VARIANT']}]});
+    expect(new DataPlugin(dir).deploymentKw({carType:'Test Car',carClass:'Hyper'})).toBeNull();
+  });
   it('does not choose arbitrary model variants',()=>{const {dir,write}=fixture('vehicles');write('vehicles/index.json',{...catalog,vehicles:[...catalog.vehicles,{...catalog.vehicles[0],id:'variant',vehicleIds:['TEST_VARIANT']}]});const p=new DataPlugin(dir);expect(p.vehicle({carType:'Test Car'})).toBeNull();expect(p.vehicle({vehicleId:'TEST_VARIANT'})?.id).toBe('variant');});
   it.each(['../outside.json','C:/outside.json','vehicles\\index.json'])('rejects resource escape %s',file=>{const {dir,write,manifest}=fixture('vehicles');write('manifest.json',{...manifest,vehicles:{catalog:file}});expect(new DataPlugin(dir).status.state).toBe('invalid');});
   it('rejects junction escapes and stale display pairs',()=>{const a=fixture('vehicles'),b=fixture('vehicles');fs.symlinkSync(path.join(b.dir,'vehicles'),path.join(a.dir,'escape'),'junction');a.write('manifest.json',{...a.manifest,vehicles:{catalog:'escape/index.json'}});expect(new DataPlugin(a.dir).status.state).toBe('invalid');const c=fixture();c.write('tracks-display/monza_gp.json',{layoutKey:'monza_gp',sourceRevision:'old',surfaces:{road:[],kerb:[],runoff:[],pit:[],otherRoad:[]}});expect(new DataPlugin(c.dir).status.state).toBe('invalid');});

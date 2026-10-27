@@ -29,7 +29,7 @@ export function parseVehicleCatalog(value: unknown): VehicleDataRecord[] {
   const aliases = new Set<string>(), ids = new Set<string>();
   return catalog.vehicles.map(item => {
     const row = object(item);
-    keys(row, ['id', 'model', 'carClass', 'vehicleIds', 'dimensions', 'handling', 'outlineXZ', 'replayOriginOffsetXZ']);
+    keys(row, ['id', 'model', 'carClass', 'vehicleIds', 'dimensions', 'handling', 'outlineXZ', 'replayOriginOffsetXZ', 'deploymentKw']);
     const id = text(row.id), model = text(row.model), carClass = text(row.carClass);
     if (!/^[a-zA-Z0-9_-]+$/.test(id) || ids.has(id) || !Array.isArray(row.vehicleIds) || row.vehicleIds.length > 5000) throw Error('Invalid vehicle record');
     ids.add(id);
@@ -64,6 +64,12 @@ export function parseVehicleCatalog(value: unknown): VehicleDataRecord[] {
       result.handling = { ...h };
     }
     if (row.replayOriginOffsetXZ !== undefined) result.replayOriginOffsetXZ = pair(row.replayOriginOffsetXZ);
+    if (row.deploymentKw !== undefined) {
+      const kw = row.deploymentKw;
+      if (!Array.isArray(kw) || kw.length < 2 || kw.length > 40 || !kw.every((v, i) => typeof v === 'number' && Number.isFinite(v)
+        && v >= 0 && v <= 500 && (i === 0 || v > (kw[i - 1] as number)))) throw Error('Invalid deployment settings');
+      result.deploymentKw = kw as number[];
+    }
     if (row.outlineXZ !== undefined) {
       if (!result.dimensions || !Array.isArray(row.outlineXZ) || row.outlineXZ.length < 3 || row.outlineXZ.length > 256) throw Error('Invalid outline');
       const outline = row.outlineXZ.map(pair);
@@ -183,6 +189,14 @@ export class DataPlugin {
     if (alias) {const match=this.records.find(r=>r.vehicleIds.includes(alias));if(match)return structuredClone(match);}
     const matches=this.records.filter(r=>r.model===identity.carType && (!identity.carClass || r.carClass===identity.carClass));
     return matches.length===1?structuredClone(matches[0]):null;
+  }
+  /**
+   * The deployment kW list of a model and class. Variants of one model (the Peugeot 9x8's two generations) may share
+   * it: the list counts when every matching record has the same one, unlike `vehicle()`, which needs a single record.
+   */
+  public deploymentKw(identity: {carType:string;carClass:string}): number[]|null {
+    const lists=this.records.filter(r=>r.model===identity.carType&&r.carClass===identity.carClass).map(r=>JSON.stringify(r.deploymentKw??null));
+    return new Set(lists).size===1&&lists[0]!=='null'?JSON.parse(lists[0]) as number[]:null;
   }
 }
 

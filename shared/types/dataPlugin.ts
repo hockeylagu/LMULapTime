@@ -27,6 +27,8 @@ export interface VehicleDataRecord {
   outlineXZ?: Array<[number, number]>;
   /** Translation from mesh-local to replay pose origin, established by the data provider. */
   replayOriginOffsetXZ?: [number, number];
+  /** Hybrid deployment settings in kW as the game's MFD labels them, ascending. */
+  deploymentKw?: number[];
 }
 export interface VehicleLogosCatalog {
   schemaVersion: 1;

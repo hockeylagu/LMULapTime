@@ -117,6 +117,12 @@ Steering values describe the base HDV's selected default setting, including its 
 they do not identify the setup or circuit-specific upgrade selected for a recorded lap.
 The ratio must agree with `defaultSteeringWheelRangeDeg / (2 * defaultSteeringLockDeg)`.
 Partial steering trios, nonfinite/out-of-range values and unknown handling fields invalidate the package.
+Optional `deploymentKw` lists a hybrid's deployment settings in kW, ascending, exactly as the game's
+MFD labels them (2–40 values, 0–500 kW); anything else invalidates the package. Hybrids without it
+get deployment advice as the game's map position instead of kW. The track pipeline fills it from each car's
+electric motor file (`ElectricMotorMapSpecial` labels, from personal-v18: 0–200 kW in 20 kW steps for the LMH hybrids,
+0–50 kW in 10 kW steps for the LMDh cars). Live advice looks it up by model and class; variants of one model
+(the Peugeot 9x8's two generations) share the list only when they agree.
 Geometry-only version-1 catalogs remain supported. Missing wheelbase or steering data independently
 uses the historical approximate fallback (2.7 m, 11:1, 540° lock-to-lock); no other model is substituted.
 The client exposes the applied `handlingCalibration` and its plugin/default/fallback sources.
