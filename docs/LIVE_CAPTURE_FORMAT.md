@@ -189,6 +189,7 @@ Additional shared-memory evidence is sparse:
 | `upgrade-pack` | Player scoring's exact 16-byte `rawHex`, including zero bytes; initial state and configuration changes. Contents remain opaque. |
 | `terrain-material` | Session-file dictionary definition `{materialId, rawName}`, untimed and recorder scoped. Raw names preserve all 16 source bytes up to NUL using Latin-1, including commas/truncation. |
 | `car-condition` | `{fuelCapacityLitres, dents, detached, lastImpactEt, compound}`: eight body-zone dent severities (0-2), detached parts, last contact time and tyre compound. Recorded at the start and on change only; fuel level is not repeated here (the learning events hold it). |
+| `track-surface` | `{trackGripLevel, raining, minPathWetness, avgPathWetness, maxPathWetness, trackTempC}` from scoring, from 2026-10-27: raw grip level, rain to 0.05, path wetness as reported (steps), track temperature to 1 °C. Stored at the start and on change only. Grip 2 Medium, 3 High; wetness 0.05 Damp, 0.4 Wet, 0.6 Very wet, 1.0 Extremely wet (see the `track-surface` diagnostics record). The game forecast is the REST `forecast` observation, stored on change (polled every 60 s). |
 | `terrain-change` | Initial state and changes `{corner, materialId}` at the sampled game elapsed time, with FL/FR/RL/RR indexing. An empty source name becomes a NULL material reference. |
 
 The reader worker sends sparse-state changes at capture cadence and small car-rate checkpoints

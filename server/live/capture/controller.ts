@@ -125,6 +125,12 @@ export class LiveCaptureController {
       inRealtime: reading.inRealtime, avgPathWetness: reading.avgPathWetness,
       maxPathWetness: reading.maxPathWetness ?? null,
     } });
+    // Grip and wetness come in steps; rain and track temperature are rounded so a row is stored only on a real change.
+    this.observe({ source: 'shared-memory', kind: 'track-surface', elapsedSeconds: reading.currentEt, receivedAt: this.now(), data: {
+      trackGripLevel: reading.trackGripLevel ?? null, raining: Math.round(reading.raining * 20) / 20,
+      minPathWetness: reading.minPathWetness ?? null, avgPathWetness: reading.avgPathWetness,
+      maxPathWetness: reading.maxPathWetness ?? null, trackTempC: Math.round(reading.trackTempC),
+    } });
     if (player.upgradePackHex !== undefined) this.observe({ source: 'shared-memory', kind: 'upgrade-pack',
       elapsedSeconds: reading.currentEt, receivedAt: this.now(), data: { rawHex: player.upgradePackHex } });
     if (usage) this.audit?.update(snapshot, reading, usage, this.now());

@@ -164,6 +164,22 @@ describe('LiveCaptureController', () => {
     expect(last(observations.filter(item => item.kind === 'terrain-change'))?.data).toEqual({ corner: 'FL', rawName: 'GRVL' });
   });
 
+  it('records the track surface at the start and only when a stepped value changes', () => {
+    const { controller, writer } = makeController();
+    const game = snapshot();
+    const surface = { trackGripLevel: 3, raining: 0.52, minPathWetness: 0, avgPathWetness: 0.6, maxPathWetness: 0.6, trackTempC: 14.7 };
+    controller.update(reading(100, surface), game);
+    // Rain and temperature drift inside their rounding: nothing new.
+    controller.update(reading(101, { ...surface, raining: 0.51, trackTempC: 14.6 }), game);
+    controller.update(reading(102, { ...surface, trackGripLevel: 2, avgPathWetness: 1 }), game);
+    vi.advanceTimersByTime(1000);
+    const rows = writer.batches().flatMap(batch => batch.observations).filter(item => item.kind === 'track-surface');
+    expect(rows.map(item => item.data)).toEqual([
+      { trackGripLevel: 3, raining: 0.5, minPathWetness: 0, avgPathWetness: 0.6, maxPathWetness: 0.6, trackTempC: 15 },
+      { trackGripLevel: 2, raining: 0.5, minPathWetness: 0, avgPathWetness: 1, maxPathWetness: 0.6, trackTempC: 15 },
+    ]);
+  });
+
   it.each([1, 2])('starts a new attempt instead of appending current values to a version-%i interrupted recording', version => {
     const previous = priorManifest({ normalizationVersion: version });
     const { controller, writer } = makeController({ existing: [previous] });
