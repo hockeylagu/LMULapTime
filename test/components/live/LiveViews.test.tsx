@@ -174,7 +174,7 @@ describe('live driving views', () => {
     it('takes the practice layout with laps left in place of the session best, and no place', () => {
       render(<LivePage />);
       send({ ...quali(), lapsLeft: { laps: 3, estimated: true } });
-      expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('ESTIMATED LAP');
+      expect(screen.getByRole('heading', { level: 2, name: 'ESTIMATED LAP' })).toBeInTheDocument();
       expect(screen.getByTestId('live-estimated-lap')).toHaveTextContent('—');
       timing(liveTiming({ deltaSeconds: -0.184 }));
       expect(screen.getByTestId('live-estimated-lap')).toHaveTextContent('2:01.222');

@@ -24,7 +24,7 @@ describe('DemoCornerView', () => {
     renderCorner();
     const filled = layout();
     expect(filled[filled.length - 1]).toContain('w-[5ch]');
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('T4');
+    expect(screen.getByRole('heading', { level: 2, name: 'T4' })).toBeInTheDocument();
     expect(screen.getByLabelText('Lost 0.24 seconds')).toHaveTextContent('+0.24s');
     expect(screen.getByLabelText('Minimum speed 84 kilometres per hour')).toHaveTextContent('84');
     expect(screen.getByLabelText('Reference speed 92 kilometres per hour')).toHaveTextContent('92');
@@ -32,7 +32,7 @@ describe('DemoCornerView', () => {
 
     renderCorner(null);
     expect(layout()).toEqual(filled);
-    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('—');
+    expect(screen.getByRole('heading', { level: 2, name: '—' })).toBeInTheDocument();
     expect(screen.getByLabelText('Loss unknown')).toHaveTextContent('—s');
     expect(screen.getByLabelText('Minimum speed unknown')).toHaveTextContent('—');
     expect(screen.getByLabelText('Reference speed unknown')).toHaveTextContent('—');

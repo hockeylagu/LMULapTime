@@ -260,6 +260,30 @@ export interface LiveGarageTyres {
   newSets: number | null;
 }
 
+/**
+ * Hybrid deployment advice (Hypercars, race and practice). Values are in display units: kW when the car's data plugin
+ * lists them, else the game's map index. The hybrid fields are unverified in LMU (docs/plans/README.md).
+ */
+export interface LiveDeployment {
+  unit: 'kW' | 'map';
+  /** The current setting; null while the game gives none. */
+  current: number | null;
+  /** The setting to move to (equal to `current` to hold); null while there is no advice. */
+  target: number | null;
+  /** The setting the next change will move to and the seconds until it is advised, in the last laps before it only. */
+  next: number | null;
+  changeSeconds: number | null;
+  /** Laps still settling after a change before advice resumes (a full lap is measured on the new setting). */
+  settlingLaps: number;
+  /** Battery charge, 0..100; null while the game gives none. */
+  chargePercent: number | null;
+  /** Net percentage points over the last lap of track, updated every reading; null until a full lap is measured. */
+  changePerLap: number | null;
+  /** The range edge (20 or 80 %) the lap-average charge is heading for, and seconds until it gets there (0 past it). */
+  edge: number | null;
+  edgeSeconds: number | null;
+}
+
 export interface LiveStrategy {
   resource: LiveResourcePlan | null;
   pit: LivePitInfo | null;
@@ -269,4 +293,6 @@ export interface LiveStrategy {
   /** Garage only. */
   garage: LiveGaragePlan | null;
   fuelRatio?: LiveFuelRatio | null;
+  /** Hybrid cars in race and practice, never in the garage; null otherwise. */
+  deployment?: LiveDeployment | null;
 }

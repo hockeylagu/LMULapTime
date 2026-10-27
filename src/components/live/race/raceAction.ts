@@ -1,6 +1,7 @@
 import type { LiveSnapshot } from '../../../../shared/types/live.js';
 import type { LiveForecast, LivePitInfo, LiveResourcePlan, LiveTyres } from '../../../../shared/types/liveStrategy.js';
 import { UNKNOWN } from '../liveFormat.js';
+import { deploymentReadout } from './deploymentReadout.js';
 import { LIVE_TYRE_TREAD_FLOOR } from '../../../../shared/domain/live/liveInsights.js';
 import {
   CORNER_NAMES, compoundTone, formatAmount, formatPerLap, formatSecondsRange, formatSignedPerLap, resourceName, tyreCallText,
@@ -236,6 +237,15 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
   stintTyres.note = pit?.mfd?.tyres ? `MFD · ${tyreCallText(pit.mfd.tyres)}` : 'MFD NOT READ';
   stintTyres.noteTone = pit?.mfd?.tyres ? undefined : 'muted';
   stintTyres.compoundNote = true;
+  const nextStop: PlanReadout = { label: 'PIT IN', value: `${pitInLaps}`, unit: lapsUnit(pitInLaps),
+    note: `MFD · ${name} ${formatAmount(race.neededAfterStop, unit)}${unit}`,
+    detail: race.stopsAfterNext > 0 ? `+${race.stopsAfterNext} MORE ${race.stopsAfterNext === 1 ? 'STOP' : 'STOPS'}` : undefined };
+  // A hybrid's deployment takes the fuel-ratio column; the ratio then rides with the next stop's MFD values.
+  const deployment = strategy?.deployment ?? null;
+  if (deployment && ratio) {
+    nextStop.detail = `MFD · RATIO ${ratio.recommended?.toFixed(2) ?? UNKNOWN}`;
+    nextStop.detailTone = ratio.recommended !== null && ratio.mfdSetting !== null && ratio.mfdSetting < ratio.recommended ? 'warn' : 'muted';
+  }
   return {
     mode: 'stint',
     action: {
@@ -247,11 +257,10 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
       noteTone: marginTone(race.sparePerLap),
     },
     cells: [
-      { label: 'PIT IN', value: `${pitInLaps}`, unit: lapsUnit(pitInLaps),
-        note: `MFD · ${name} ${formatAmount(race.neededAfterStop, unit)}${unit}`,
-        detail: race.stopsAfterNext > 0 ? `+${race.stopsAfterNext} MORE ${race.stopsAfterNext === 1 ? 'STOP' : 'STOPS'}` : undefined },
+      nextStop,
       stintTyres,
-      ratioCell ?? (saving && saving.savePercent > 0 ? { label: 'NO-STOP TARGET', value: saving.targetPerLap.toFixed(2), unit: `${unit}/lap`, note: `${saving.savePercent}% LESS USE`, detail: saving.source === 'game' ? 'GAME ESTIMATE' : undefined } : forecastCell(forecast, resource)),
+      deployment ? deploymentReadout(deployment)
+        : ratioCell ?? (saving && saving.savePercent > 0 ? { label: 'NO-STOP TARGET', value: saving.targetPerLap.toFixed(2), unit: `${unit}/lap`, note: `${saving.savePercent}% LESS USE`, detail: saving.source === 'game' ? 'GAME ESTIMATE' : undefined } : forecastCell(forecast, resource)),
     ],
   };
 }

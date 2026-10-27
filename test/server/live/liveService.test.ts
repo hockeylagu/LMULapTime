@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { LiveCarReading } from '../../../shared/domain/live/liveCarCondition.js';
 import type { LiveScoringReading, LiveVehicleReading } from '../../../shared/domain/live/liveLifecycle.js';
 import { LIVE_HEARTBEAT_MS } from '../../../shared/types/live.js';
 import type { LiveLifecycle } from '../../../shared/types/live.js';
@@ -632,6 +633,24 @@ describe('LiveService', () => {
       await vi.advanceTimersByTimeAsync(0);
       expect(tyreWearProfile).toHaveBeenCalledTimes(3);
       compound.mockRestore();
+      await service.stop();
+    });
+
+    it('passes the plugin kW list of the loaded car to the deployment advice, looked up once per car', async () => {
+      const deploymentKw = vi.fn(() => [0, 20, 40, 60, 80, 100, 120]);
+      const { worker, service, frame } = setup({ deploymentKw });
+      const hybridCar = (charge: number): LiveCarReading => ({ fuelLiters: 0, fuelCapacityLiters: 0, dentSeverity: [0, 0, 0, 0, 0, 0, 0, 0],
+        detached: false, lastImpactEt: 0, wheels: Array.from({ length: 4 }, () => ({ flat: false, detached: false })), compound: 'Medium',
+        hybrid: { batteryChargeFraction: charge, soc: 0, motorMap: 3, motorMapMax: 6, motorState: 2, regen: 0 } });
+      for (const [index, charge] of [0.188, 0.134, 0.08].entries()) {
+        const scoring = lap(index + 1, { driverName: 'Player', vehicleName: 'Ferrari 499P', vehicleClass: 'Hyper', lapStartEt: index * 100 },
+          { sessionCode: 10, trackName: 'Circuit de la Sarthe', currentEt: (index + 1) * 100 });
+        frame(scoring);
+        worker.emit('message', { type: 'frame', car: hybridCar(charge) });
+        frame({ ...scoring, player: { ...scoring.player!, totalLaps: index + 2 } });
+      }
+      expect(deploymentKw.mock.calls).toEqual([['Ferrari 499P', 'Hyper']]);
+      expect(service.getSnapshot().strategy?.deployment).toMatchObject({ unit: 'kW', current: 60, chargePercent: 8 });
       await service.stop();
     });
 

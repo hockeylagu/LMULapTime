@@ -9,6 +9,7 @@ import { liveSessionKind } from './liveLifecycle.js';
 import type { LiveScoringReading, LiveState } from './liveLifecycle.js';
 import { liveResourceKind, planGarage, planRace, resourceUnit } from './liveResourcePlan.js';
 import { LiveUsageMeter } from './liveUsage.js';
+import { DeploymentTracker } from './energy/deploymentTracker.js';
 import { limitingTyreCoverage, planFuelRatio, savingToFinish } from './liveInsights.js';
 import { RAIN_WET_MIN } from '../lapConditions.js';
 import { median } from '../pitStops.js';
@@ -104,6 +105,7 @@ export class LiveStrategyTracker {
   private ratioOptions: number[] = [];
   private readonly damage = new LiveDamageTracker();
   private readonly tyres = new LiveTyreTracker();
+  private readonly deployment = new DeploymentTracker();
   private et = 0;
   private completedLaps: number | null = null;
   private lapExcluded = false;
@@ -134,6 +136,9 @@ export class LiveStrategyTracker {
   private tyreProfile: TyreWearProfile | null = null;
 
   public setTyreWearProfile(profile: TyreWearProfile | null): void { this.tyreProfile = profile; }
+
+  /** The car's plugin deployment settings in kW (`deploymentKw`); null without any, then the advice uses map positions. */
+  public setDeploymentKw(kw: readonly number[] | null): void { this.deployment.setPluginKw(kw); }
 
   public tyreCompound(): string | null { return this.usage?.selected?.compound ?? this.car?.compound ?? null; }
   /** The stored pit lane loss of the layout and class (`setPitLaneLoss`), for the race plan's stop time. */
@@ -166,6 +171,7 @@ export class LiveStrategyTracker {
     this.meters.fuel.restart(); this.meters.ve.restart(); this.lastPair = null;
     this.damage.reset();
     this.tyres.reset();
+    this.deployment.reset();
     this.completedLaps = null;
     this.lapExcluded = false;
     this.lastLapSeen = null;
@@ -188,6 +194,7 @@ export class LiveStrategyTracker {
       this.meters.ve.addSample(this.et, this.ve);
     }
     this.damage.updateCar(car, (this.completedLaps ?? 0) + 1);
+    this.deployment.applyCar(car.hybrid);
   }
 
   public applyRest(update: LiveRestUpdate): void {
@@ -272,6 +279,7 @@ export class LiveStrategyTracker {
     }
     const kind = liveResourceKind(context.carClass);
     this.kind = kind;
+    const sessionKind = state.session.kind;
     const reserveLaps = this.reserveLaps(context.reserveSeconds, reading);
     const resource = this.resource(kind, reading, state, context, reserveLaps);
     const lapsLeft = context.lapsLeft?.laps ?? null;
@@ -301,6 +309,9 @@ export class LiveStrategyTracker {
       options: this.ratioOptions, veTarget: garage?.needed ?? resource.race?.neededAfterStop ?? null,
       fuelNow: state.lifecycle === 'garage' ? null : this.car?.fuelLiters ?? null, veNow: state.lifecycle === 'garage' ? null : this.ve,
     }) : null;
+    // Hybrid cars only, in race, practice and qualifying, never in the garage (null for the rest).
+    const deployment = this.deployment.deployment(state.lifecycle !== 'garage'
+      && (sessionKind === 'race' || sessionKind === 'practice' || sessionKind === 'qualifying'));
     return {
       resource: state.lifecycle === 'garage' ? null : resource,
       pit: state.lifecycle === 'garage' ? null : this.pit(state.session.kind === 'race' ? this.lapsToStop(resource, fraction) : null,
@@ -309,6 +320,7 @@ export class LiveStrategyTracker {
       tyres,
       forecast: this.nextForecast(reading, state.session.kind),
       garage, fuelRatio,
+      ...(deployment ? { deployment } : {}),
     };
   }
 
@@ -316,6 +328,8 @@ export class LiveStrategyTracker {
     const player = reading.player;
     if (!player) return;
     if (player.inPits || (reading.gamePhase !== GREEN && reading.gamePhase !== 9)) this.lapExcluded = true;
+    // Every reading feeds the battery measurement; yellow and safety car laps count, the pit lane does not.
+    this.deployment.sample(reading.currentEt, player.totalLaps * reading.trackLength + player.lapDist, reading.trackLength, player.inPits);
     if (this.completedLaps === null) {
       this.completedLaps = player.totalLaps;
       this.lapExcluded = player.inPits;

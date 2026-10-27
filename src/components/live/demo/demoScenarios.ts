@@ -2,6 +2,7 @@ import type { LiveConnection } from '../../../api/liveStream.js';
 import type { LiveSnapshot, LiveTiming } from '../../../../shared/types/live.js';
 import { configureDemoSession, demoResult, demoSnapshot, demoStrategy, demoTiming, type DemoSprint } from './demoData.js';
 import { configureDemoClass } from './demoClasses.js';
+import { demoDeployment } from './demoDeployment.js';
 
 interface DemoState { snapshot: LiveSnapshot | null; timing: LiveTiming | null; connection: LiveConnection }
 interface Scenario { id: string; group: string; label: string; apply: (s: LiveSnapshot, t: LiveTiming) => void }
@@ -86,6 +87,7 @@ export const DEMO_SCENARIOS: readonly Scenario[] = [
   scenario('rain', 'Alternative conditions and incidents', 'Rain forecast', s => { s.strategy!.forecast = { change: 'rain', chance: 80, atSeconds: 2100, lap: 20 }; }),
   scenario('wet', 'Alternative conditions and incidents', 'Wet · getting wetter', s => { Object.assign(s.weather!, { raining: 0.5, avgPathWetness: 0.65, wetnessTrend: 'rising', trackTempTrend: 'falling' }); s.strategy!.tyres!.compound = 'Wet'; }),
   scenario('drying', 'Alternative conditions and incidents', 'Drying · rain ending', s => { Object.assign(s.weather!, { avgPathWetness: 0.3, wetnessTrend: 'falling' }); s.strategy!.forecast = { change: 'dry', chance: 0, atSeconds: 2100, lap: 20 }; }),
+  scenario('deployment-change', 'Alternative conditions and incidents', 'Hypercar · deployment change', () => {}),
   scenario('not-recording', 'Alternative conditions and incidents', 'Recording stopped', s => { s.audit = { runId: 'demo', status: 'unavailable' }; }),
   scenario('tyres', 'Alternative conditions and incidents', 'Tread below minimum · sets short', s => { s.strategy!.tyres!.coverage = { target: 'pit', projectedTread: 0.32, setsNeeded: 2, availableSetsCover: false }; s.strategy!.tyres!.newSets = 0; }),
   scenario('tyres-mfd', 'Alternative conditions and incidents', 'Worn tyres · MFD no change', s => {
@@ -130,6 +132,10 @@ export function createDemoState(id: string, carClass: string | null = 'GT3', res
   const timing = demoTiming();
   selected.apply(snapshot, timing);
   configureDemoClass(snapshot, timing, carClass ?? 'GT3');
+  // Deployment advice runs the real controller on sample laps: a Hypercar on track in a race, practice or qualifying, as live.
+  const kind = snapshot.session?.kind;
+  const advised = snapshot.lifecycle !== 'garage' && (kind === 'race' || kind === 'practice' || kind === 'qualifying');
+  if (carClass === 'Hyper' && advised && snapshot.strategy) snapshot.strategy.deployment = demoDeployment(selected.id === 'deployment-change');
   const sprint: DemoSprint = selected.id === 'no-stop' ? 'early' : selected.id === 'sprint' || selected.id === 'garage-sprint' ? 'late' : null;
   // A light load for qualifying runs: practice says how many laps it holds instead of asking for more.
   configureDemoSession(snapshot, timing, sprint, reserveSeconds, sprint || selected.id === 'garage-qualifying-sprint' ? 20 : 60,

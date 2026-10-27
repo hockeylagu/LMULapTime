@@ -13,17 +13,20 @@ const TONE: Record<Exclude<PlanTone, null>, string> = {
   muted: 'text-lmu-muted',
   ...COMPOUND_CLASS,
 };
-const tone = (value: PlanTone | undefined): string => (value ? TONE[value] : '');
+export const tone = (value: PlanTone | undefined): string => (value ? TONE[value] : '');
 
 const LABEL = 'h-[58px] whitespace-nowrap text-[48px] font-semibold text-lmu-text-soft';
 const NOTE = 'h-[60px] whitespace-nowrap text-[44px] font-semibold';
 
-function Readout({ readout, size, testId, children }: { readout: PlanReadout; size: 'action' | 'cell'; testId: string; children?: ReactNode }) {
+/** One plan readout: label, value, note and detail on fixed lines, shared by the race plan and the practice timing. */
+export function PlanReadoutView({ readout, size, testId, children }: { readout: PlanReadout; size: 'action' | 'cell'; testId: string; children?: ReactNode }) {
   // Words (CALCULATING, THIS LAP, a tyre call) take a smaller size than figures so they fit the column.
   const words = /[A-Z]{2}/.test(readout.value);
+  // A lap time (1:36.600) is too wide for a column at the figure size.
+  const long = !words && readout.value.length > 6;
   const value = size === 'action'
     ? `h-[250px] ${words ? 'text-[104px] leading-[250px]' : 'text-[200px] leading-[1.2]'} tracking-[-0.04em]`
-    : `h-[150px] ${words ? 'text-[68px] leading-[150px]' : 'text-[120px] leading-[1.2]'} tracking-[-0.025em]`;
+    : `h-[150px] ${words ? 'text-[68px] leading-[150px]' : long ? 'text-[96px] leading-[150px]' : 'text-[120px] leading-[1.2]'} tracking-[-0.025em]`;
   // The lead value is the page's title while driving a race.
   const Value = size === 'action' ? 'h1' : 'div';
   return (
@@ -57,14 +60,14 @@ export function LiveRacePlan({ view, store }: { view: RacePlanView; store: LiveT
       className={`${RACE_ROW} min-h-0 flex-1 items-center`}
     >
       <div className={`${RACE_LEAD} ${view.mode === 'sprint' ? 'col-span-2' : ''}`}>
-        <Readout readout={view.action} size="action" testId="live-race-action">
+        <PlanReadoutView readout={view.action} size="action" testId="live-race-action">
           {/* Only this readout follows the timing stream; strategy and the page stay on snapshots. */}
           {view.mode === 'sprint' ? <LiveEstimatedLap store={store} /> : undefined}
-        </Readout>
+        </PlanReadoutView>
       </div>
       {view.cells.map((cell, index) => (
         <div key={index} className={`${RACE_COLUMN} ${RULED} self-center`}>
-          <Readout readout={cell} size="cell" testId={`live-race-cell-${index + 1}`} />
+          <PlanReadoutView readout={cell} size="cell" testId={`live-race-cell-${index + 1}`} />
         </div>
       ))}
     </section>

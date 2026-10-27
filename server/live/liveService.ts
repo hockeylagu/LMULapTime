@@ -70,6 +70,8 @@ export interface LiveServiceOptions {
   raceHistory?: (layoutKey: string, carClass: string) => Promise<SessionStrategy[]>;
   tyreWearProfile?: (layoutKey: string, carModel: string, compound: string, driverName: string, signal: AbortSignal) => Promise<TyreWearProfile | null>;
   tyreWearRevision?: () => string;
+  /** The data plugin's hybrid deployment settings in kW for a car model and class; none without a plugin record. */
+  deploymentKw?: (carModel: string, carClass: string) => readonly number[] | null;
 }
 
 function offlineSnapshot(): LiveSnapshot {
@@ -116,6 +118,7 @@ export class LiveService {
   /** The race's plan from before the start, and the recording it was last saved with. */
   private raceHistoryKey: string | null = null;
   private tyreWearKey: string | null = null;
+  private deploymentKey: string | null = null;
   private readonly tyreWearCache = new Map<string, TyreWearProfile | null>();
   private readonly tyreWearPending = new Set<string>();
   private tyreWearRead: AbortController | null = null;
@@ -385,6 +388,14 @@ export class LiveService {
     }, (error: unknown) => console.warn('[Live] Race history read failed:', error));
   }
 
+  /** The plugin's kW list for the loaded car, looked up once per car and class. */
+  private followDeploymentKw(carModel: string | null, carClass: string | null): void {
+    const key = carModel && carClass ? `${carModel}|${carClass}` : null;
+    if (key === this.deploymentKey) return;
+    this.deploymentKey = key;
+    this.strategy.setDeploymentKw(key && carModel && carClass ? this.options.deploymentKw?.(carModel, carClass) ?? null : null);
+  }
+
   /** Cohort reads only start in the garage; cached answers cannot cross layout, model, driver or compound. */
   private followTyreWear(layoutKey: string | null, carModel: string | null, compound: string | null,
     driverName: string | null, lifecycle: LiveLifecycle): void {
@@ -490,6 +501,7 @@ export class LiveService {
     this.followRaceHistory(identity?.layoutKey ?? null, identity?.carClass ?? null);
     this.followTyreWear(identity?.layoutKey ?? null, identity?.vehicleModel ?? null,
       this.strategy.tyreCompound(), reading?.player?.driverName ?? null, state.lifecycle);
+    this.followDeploymentKw(identity?.vehicleModel ?? null, identity?.carClass ?? null);
     const strategy = this.strategy.update(reading, state, {
       carClass: identity?.carClass ?? null,
       layoutKey: identity?.layoutKey ?? null,

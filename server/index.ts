@@ -153,6 +153,7 @@ const liveService = new LiveService({
   racePlan: (recordingId, plan) => saveRacePlan(sessionDb.getDb(), recordingId, plan, Date.now()),
   raceHistory: (layoutKey, carClass) => readStrategyHistory(sessionDb, layoutKey, carClass),
   tyreWearProfile: (layoutKey, carModel, compound, driverName, signal) => readTyreWearProfile(sessionDb, layoutKey, carModel, compound, driverName, signal),
+  deploymentKw: (carModel, carClass) => dataPlugin.deploymentKw({ carType: carModel, carClass }),
   tyreWearRevision: () => `${sessionDb.getSessionRevision()}:${sessionDb.getTelemetryMetadataRevision()}`,
 });
 liveService.events.on('session-loaded', loaded => serverContext.setLiveSessionLoaded(loaded));
