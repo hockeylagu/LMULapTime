@@ -1,0 +1,408 @@
+# Live voice calls (proposal)
+
+Proposed 2026-10-26. Nothing here is built beyond the existing demo-only experiment
+(`src/components/live/display/strategySpeech.ts`, `LiveStrategySpeech.tsx`, used by `DemoTyrePlanView`).
+
+## Outcome
+
+A spoken engineer that adds what the dashboard cannot say while the driver's eyes are on the road:
+decisions (box, set the MFD), consequences (repair costs 30 s) and threats (a Hypercar arriving in
+two corners). It never reads out values the driver can glance at, never talks in braking zones, and
+stays silent for most of a clean stint. Audio only at first; every call is kept in a radio log shown
+in the post-race debrief so the wording and timing can be refined.
+
+## Driver decisions (2026-10-26)
+
+- No Crew Chief: nothing else talks except LMU's own radio, which calls the lap time at the line.
+  Both stay available: a setting says whether LMU's lap-time call is on, and the after-line wait
+  follows it (see Timing).
+- Chrome, with a natural-sounding voice (see Voice).
+- Other cars: manufacturer, plus the class when it differs from the player's ("the Porsche", "Hyper Ferrari").
+- Quiet by default: decisions and safety only.
+- Strategy calls on a straight or just after the lap completes.
+- Audio only to start: no call text on the dashboard (it is read from 50+ inches and already full).
+- Every call saved as a radio log for the debrief.
+- Wheel button: nice to have, after the iterations.
+- Multiclass: the quiet rule below is fine (passes in a braking zone or corner, groups), both ways
+  (faster car behind, slower car ahead when in the faster class). The blue flag and mirrors cover
+  the rest, so no "Blue flag" call.
+- Silence means on plan: no confirmation calls ("On target", "fuel is fine"), at any level.
+
+## The driver's questions, answered unasked
+
+The test for every call: does it answer a question the driver would otherwise ask, at the moment they
+would ask it? Silence is an answer too: no call means "on plan", so nothing confirms routine values.
+
+| Question while driving | Answer | When |
+|---|---|---|
+| Will my energy/fuel last to the stop or the flag? | Silence = yes; "Energy use too high. Save to hold lap 18." | After the line, when the plan breaks |
+| When do I pit, and what do I set? | "Box in 2 laps." "Box this lap. Energy 62, new mediums." | After the line; last straight before pit entry |
+| Hypercar: should I change the deployment? | Silence = keep it; "Set deployment 40." | After the line, when the advice changes |
+| Is my pit menu right? | "Pit menu energy too low. Set 62." | When a stop is planned and the MFD is wrong |
+| Is the damage worth fixing? | "Repair 30 seconds, costs 12 to the flag. Stay out." | First straight after the damage read |
+| Will my tyres last? | "Tyres won't reach the flag. Plan a change." | After the line, once |
+| Wets or slicks? | "Wets in 2 laps." "Box this lap for slicks." | When the crossover window opens / pays off |
+| Is rain coming, is the track changing? | "Rain in 10 minutes, lap 14." "Track now damp." | When it changes |
+| What is that yellow, is my line blocked? | "Yellow, Turn 6. Car stopped, left, on your line." | Within ~15 s of reaching it |
+| Who is coming, when do they pass? | "Hyper Ferrari behind. Passes in 6 seconds." | Before the pass |
+| Am I catching / being caught? | "Gap to P4 1.2, closing." (normal level only) | After the line |
+| How long is left? Time for another quali lap? | "Ten minutes." "Last lap." "Time for one more lap." | At those moments |
+| Penalty? Limiter? | "Drive-through penalty." "Limiter!" | At once |
+| Am I on pace? | Not spoken: the dashboard delta | — |
+
+Load estimate, to check in step 1 on real captures and replays (calls at the quiet level):
+
+| Race | Expected calls |
+|---|---|
+| 20-30 min sprint, dry, no stop, single class | 2-4 (clock, maybe one save call) |
+| Same with one stop | 4-7 (box in 2, box now, MFD check, clock) |
+| Multiclass as GT3/LMP3 | Traffic dominates: a Hyper passes every few laps. Every pass called would be 10-20 calls; too many |
+| Changing weather | +3-6 (rain, condition, crossover) |
+
+Traffic is the overload risk. At the quiet level, call a faster car only when the pass lands in a
+braking zone or corner ahead, or when two or more arrive together; clean passes on a straight stay
+silent. The replay traffic index (`server/traffic/`) gives real pass counts per race to tune this
+before any drive.
+
+## Feasibility (checked against the code and data, 2026-10-26)
+
+### Ready: data and logic already in the live snapshot
+
+| Calls | Source |
+|---|---|
+| Box in N laps, box this lap with amount and tyres, pit menu energy/fuel/ratio/tyres wrong, save to skip the stop, over budget | `strategy.resource.race` (`pitInLaps`, `neededAfterStop`, `sparePerLap`, `saving`), `strategy.pit.mfd`, `strategy.fuelRatio`; most already in `strategySpeech.ts` |
+| Puncture / wheel lost; "Suspension damage" or "Aero damage", repair versus loss | `strategy.damage`: `wheel`, `suspension`, `body`, `partsDetached`, `repairSeconds`, `lossToFinish` |
+| Tyres won't last | `strategy.tyres.coverage` |
+| Hypercar deployment change | The deployment advice (`strategy.deployment`, built live and unverified: see the checklist in the [plans README](../README.md)); needs the first practice to confirm `motorMap`, `motorMapMax` and the battery charge decode |
+| Penalty pending ("stop and go next stop") | `strategy.pit.penalties` (a count; the type is not known live) |
+| Ten minutes, last lap, quali one more lap | session clock, `lapsLeft`, lap pace |
+| Rain starting/stopping, rain in N minutes, dry from lap N | `weather.raining`, `strategy.forecast` |
+
+### Small decode work: in shared memory, meaning known from rF2
+
+| Data | Where | For |
+|---|---|---|
+| `speedLimiterActive` | player telemetry | "Limiter!" |
+| `motorMap`, `motorMapMax`, `batteryChargeFraction` / `soc` | player telemetry | "Set deployment 40." (shared with the dashboard advice) |
+| `yellowFlagState`, `sectorFlag[3]` | scoring info | Sector yellow, "Green, sector 2", yellow far ahead |
+| Every car's lap distance, class, vehicle, `inPits`, speed (`localVel`), `pathLateral`, `trackEdge`, `timeBehindNext` | scoring vehicles (only player, leader and class leader are decoded today) | Traffic and incidents |
+
+Decoding the whole field at the scoring rate (~5 Hz, up to ~60 cars) is cheap; send only cars within
+a few seconds of the player to the call engine.
+
+### Possible, but needs data or a check first
+
+| Item | What is missing | How to get it |
+|---|---|---|
+| On or off track (`pathLateral` vs `trackEdge`) | Never checked in LMU | Replays: 132 files have a local-yellow flag state (VCR type 10 value 1, meaning not fully established) and every car's x/z at 5 Hz; project onto the plugin track boundaries. Live: one private practice with AI |
+| "On your line" | Player's `pathLateral` by lap distance; how approximate LMU's "center path" is | Record the player's `pathLateral` live; compare a few laps |
+| Pass lands in a braking zone | Braking zones by lap distance | The player's own brake trace by lap distance from this session's laps (pedals + lap distance are both live); flat-out fallback on the first lap |
+| Seconds to the pass | Closing rate | Lap distance rate of both cars; tune on replay positions (407 replays) |
+| "Box this lap" on the last straight before pit entry | Pit entry position | Learn from the player's own `inPits` switch-on lap distance; until then, call after the line |
+| Track condition wording | `mTrackGripLevel` meaning | Logged in diagnostics since 2026-10-26; map against the MFD label |
+| Wet/dry crossover pace | Pace by wetness | History has 72 sessions with wet laps (6,245 laps on wets, all drivers), but rain only, not path wetness; path wetness exists only live. First table from history, refined by one wet practice |
+| Online cars | Remote cars are interpolated; speed/lateral quality unknown | One online race with diagnostics on |
+| Natural voice | Piper/Kokoro downloads, CPU while LMU runs | Step 1 listening test |
+| "Turn 6" | No corner list on main | Seconds or "sector 2" until the corner-map work lands |
+| Rivals' VE or fuel | The REST standings `veFraction` read 0 online, but LMU's UI shows other cars' VE. Shared memory has `mFuelFraction` per car (u8, 0-255, "fuel or battery left"; laid out, not decoded). Unknown whether it is VE or fuel for VE cars, and whether fuel-class cars report fuel | Decode and log it in diagnostics; compare with the UI in an online VE race and a fuel-class race |
+
+### Not possible with the data we have
+
+- Predicting a crash before it happens; we only know it within about a second.
+- Who caused an incident, or contact between other cars: no impact data for other cars we can trust
+  (rF2 telemetry for remote cars is mostly empty online).
+- Penalty type and reason live: shared memory gives a count only (the replay has the type, after the
+  race).
+- Rivals' tyres online. (Their VE or fuel may be readable: see below.)
+- Exact debris location, or another driver's damage.
+
+## What the other tools do
+
+| Tool | Typical calls | Lesson for us |
+|---|---|---|
+| Crew Chief (rF2/LMU plugin) | Spotter "car left / right / three wide / clear"; "gap ahead 1.2, closing"; "faster car behind"; "box this lap"; fuel "about 4 laps of fuel left"; yellow sector ahead; blue flag; "5 minutes left", "last lap"; damage "you have front aero damage"; PB and lap times; penalties | Huge vocabulary, very configurable; drivers usually turn most of it off. Its proximity spotter is the reference and needs 20+ Hz car positions. |
+| LMU Engineer (`lmu-engineer.com`, compared 2026-10-18) | Fuel/VE laps left, pit window, damage, weather, lap and battle calls | Same game data; its strength is strategy, its weakness is volume. |
+| Real WEC radio | "Box, box, box"; "Hyper behind, will pass into turn 1"; "Gap to P5 1.8, they're on older tyres"; "Full course yellow, full course yellow"; "Repair is 25 seconds, we stay out"; "Last lap, bring it home" | Short, number-first, one fact per call, said on the straight, repeated only for box and safety. |
+
+## Proposed calls
+
+Each call speaks once per state change, has a priority and an expiry (a call that could not be said
+before it expires is dropped, never said late). P1 interrupts anything; P2 waits for its slot (see
+Timing); P3 also counts against the lap budget. The default "quiet" level speaks P1 and P2; "normal"
+adds P3.
+
+### Strategy and resources (data exists; current experiment covers most)
+
+| Call | Trigger | P |
+|---|---|---|
+| "Box this lap. Energy 62 percent, new mediums." | Plan pit lap is the current lap; on the last straight before pit entry | P1 |
+| "Box in 2 laps." / "Box next lap." | Plan pit lap changes to 2 / 1 laps away | P2 |
+| "Pit menu energy too low. Set 62." | MFD read below the needed amount while a stop is planned | P2 |
+| "Fuel ratio too low. Set 0.88." | MFD ratio below recommendation | P2 |
+| "Save 3 percent to skip the stop." | Saving target becomes reachable | P3 |
+| "Energy use too high. Save to hold lap 18." | Spare per lap below zero for 2 laps running | P3 |
+| "Set deployment 40." | Hypercar deployment advice moves to a new target (race and practice) | P2 |
+| "Stop and go. No service on this stop." | Penalty outstanding while in the pit lane | P1 |
+| "Limiter!" | Player enters the pit lane (`inPits` turns on) with `speedLimiterActive` off; once per entry | P1 |
+
+### Damage and tyres (data exists, via REST condition reads)
+
+| Call | Trigger | P |
+|---|---|---|
+| "Front left puncture. Box now." | Wheel flat/detached | P1 |
+| "Suspension damage. Repair 30 seconds, costs 12 to the flag. Stay out." | Significant damage with repair and projected loss known | P2 |
+| "Tyres won't reach the flag. Plan a change." | Projected tread below the floor | P3 |
+
+Repair seconds are LMU's estimate and the pace loss is our median measure; the call says which wins.
+Pit repair benefit remains an inference limitation (work queue).
+
+Deployment call (driver, 2026-10-27). It speaks the dashboard's advice, never its own logic: one call
+when the advice moves to a new target, which can be anywhere on the lap (the advice follows every reading). The
+setting is said as the game's display shows it, in kW from the plugin's `deploymentKw` ("Set
+deployment 40."); without plugin kW it says the game's map position ("Set deployment map 5.").
+- Once per target: no reminder if the driver does not change it (the dashboard keeps showing it), and
+  nothing while holding: no "hold" confirmation and no time to the edge (it stays on screen).
+- A new target only comes after the previous change has settled (one lap of track), so a normal stint
+  has a call every 8-30 laps; a change to the same value is never repeated.
+- The call is P2 and waits for its slot; the advice comes a lap before the edge, so a short wait is fine.
+- Silent in the pit lane and for the lap after it (no measurement then anyway) and in qualifying.
+- Expiry: 30 s; if the advice changed or was withdrawn by then, the call is dropped.
+
+### Weather and track condition (data exists: `LiveWeather`, `LiveForecast`)
+
+The MFD shows the track condition, but a call when it changes is easier than reading it.
+
+| Call | Trigger | P |
+|---|---|---|
+| "Rain starting." / "Rain stopping." | `raining` crosses a small threshold, held ~20 s | P2 |
+| "Track now damp." / "Track now wet." / "Track drying, now damp." | Path wetness moves into another condition band, with hysteresis | P2 |
+| "Rain in 10 minutes, 60 percent. Lap 14." | Forecast change to rain becomes known or its time moves by a lap; again ~5 min before | P2 |
+| "Dry from lap 20." | Forecast change to dry, same rule | P2 |
+
+- Bands: the MFD's own wording (dry / damp / wet / flooded, to confirm). Our thresholds come from
+  `avgPathWetness`; the wet-session check maps them to what the MFD says. Until then use the existing
+  learned-use hysteresis (wet >= 13, dry < 7 of 255) for the dry/damp edge only.
+- Surface grip: LMU's scoring info has `mTrackGripLevel` (u8, laid out in `rf2Layout.ts`, not decoded;
+  LMU's `InternalsPlugin.hpp` gives no meaning). The MFD Session page shows it as `Track: Low Grip,
+  43.0°C` (seen 2026-10-26). Decode and record it, then map each value to the MFD label over a dry
+  session (rubbering in) and a wet one. If it matches, it drives the
+  condition calls ("Grip now high", "Track now damp") instead of our wetness bands.
+- Forecast calls respect the existing minimum-rain-chance proposal (a 5 % node is not "rain").
+  Tyre choice for the change ("Box this lap for wets") comes from the strategy engine:
+  [LIVE_TYRE_CROSSOVER](LIVE_TYRE_CROSSOVER.md).
+
+### Flags, penalties and session clock (fields laid out in `rf2Layout.ts`, need decoding)
+
+| Call | Trigger | P |
+|---|---|---|
+| "Green, sector 2." | That sector's `sectorFlag` clears after a yellow call | P2 |
+| "Yellow, sector 2." | `sectorFlag` ahead of the player turns yellow | P1 |
+| "Drive-through penalty." | `penalties` increases | P2 |
+| "Ten minutes." / "Last lap." | Race clock crossings and flag projection | P3 |
+| Quali: "Time for one more lap." / "No time for another lap." | Remaining time versus current pace at the line | P2 |
+
+### Incident ahead (our own detection, richer than the game's flag)
+
+The game only says which sector is yellow. Shared-memory scoring (about 5 Hz) gives every car's
+`lapDist`, `pathLateral`, `trackEdge`, `pos`, `localVel`, `ori`, `inPits` and `underYellow`
+(`VEHICLE_SCORING` in `rf2Layout.ts`; not decoded yet), so we can find the incident ourselves, often
+before the yellow appears or the car is in sight. Crashes cannot be predicted; this is about knowing
+where and what as soon as it happens.
+
+Only incidents that affect the player get a full call. Relevance is the time until the player reaches
+the incident at their own pace (lap distance ahead, wrapping over the line), and whether it is on track:
+
+| Time to reach | On track / on your line | Off track |
+|---|---|---|
+| Under ~15 s | Full call, P1 | Short call, P2 ("car off right, clear") |
+| ~15-60 s | "Yellow far ahead, sector 3", P3, once | Silent |
+| Over ~60 s, or behind the player | Silent | Silent |
+
+A far incident still there when the player gets within ~15 s gets its full call then, so nothing is
+lost by staying quiet early. The game's sector yellow alone (no slow car found) is treated the same way
+by the sector's distance.
+
+| Call | Detection | P |
+|---|---|---|
+| "Yellow, Turn 6. Car stopped on track, left, on your line." | Car below ~40 % of the reference speed at its lap distance (or stopped), not in pits, within ~15 s ahead | P1 |
+| "Yellow, Turn 1. Two cars off right. Track clear." | Several slow cars within ~150 m, all `\|pathLateral\| > \|trackEdge\|`, within ~15 s | P2 |
+| "Slow car ahead, 6 seconds. Off your line, right." | Same, before any yellow, within ~10 s | P1 |
+| "Car rejoining, Turn 9, careful." | A car that was off track moves back inside the edge, within ~15 s ahead | P1 |
+| "Yellow far ahead, sector 3." | Incident or sector yellow 15-60 s ahead | P3 |
+| "Turn 6 clear." | Only after an "on track" call, once the car has moved off or away before the player arrives | P2 |
+
+- Where: lap distance to the incident, said as seconds at the player's pace; "Turn 6" once a corner
+  list by lap distance is on main.
+- On or off track: `|pathLateral|` against `trackEdge` on that side; later the plugin boundaries
+  (white line) for a sharper test.
+- Your line: the player's own `pathLateral` by lap distance from their last clean laps, compared in
+  the same frame as the stopped car's; within ~2.5 m is "on your line", otherwise "off your line, left
+  / right". No geometry needed.
+- Multiple cars: cluster slow cars by lap distance; say the count.
+- Exclusions: pit lane, garage stall, grid/formation. LMU has local yellows only (no full course
+  yellow or safety car, driver 2026-10-26); if a patch adds one, add its call and compare with nearby
+  cars then, since everyone is slow. Online cars are interpolated: require ~1 s of
+  slow readings before calling, still well before the driver arrives.
+- Validation: live captures hold the player only today. Replays already hold every car at 5 Hz
+  (`server/traffic/`), so past races with crashes can test the detector offline; add a light
+  other-car scoring stream to captures if replays are not enough.
+
+### Traffic and battle (needs `timeBehindNext`, positions, class and speed for every car)
+
+| Call | Trigger | P |
+|---|---|---|
+| "Hyper Ferrari behind, catching. Passes in 6 seconds." | Faster-class car within ~4 s and closing | P2 |
+| "Two Hypers behind." | Group of faster cars arriving together | P2 |
+| "GT3 Aston ahead, 3 seconds." (prototype drivers) | Slower class ahead within reach before the next braking zone | P3 |
+| "The Porsche behind, 0.6, closing." | Same-class car within 1 s and gaining over two laps | P3 |
+| "Gap to P4 1.2, closing." | Once per lap after the line, only while the gap changes by more than 0.2 s/lap | P3 |
+
+Naming (driver, 2026-10-26): the manufacturer, from the existing `resolveCarManufacturer`
+(`shared/domain/vehicleMapping.ts`), with the class word ("Hyper", "P2", "P3", "GT3") only when it
+differs from the player's: "the Ferrari behind", "Hyper Porsche behind" for a GT3 driver. A small
+spoken-name map shortens the long ones ("Mercedes-AMG" → "Mercedes", "Aston Martin" → "Aston",
+"Isotta Fraschini" → "Isotta"; driver, 2026-10-26).
+When the brand does not tell cars apart (LMP2 is all Oreca; two Ferraris together), say the position
+instead ("P5 behind"). Unknown cars fall back to the class, then to "car".
+
+"Passes in 6 seconds" can later become "in 2 corners" once a corner list by lap distance is on main
+(corner-map worktree or the reference lap's corner analysis).
+
+### Not proposed for now
+
+- Left/right proximity spotter. No Crew Chief, so nothing covers it, but it needs low-latency
+  positions and a late call is worse than none. Optional step 6 after measuring call latency.
+- Lap times, sector times, PB announcements, tyre temperatures: the dashboard and LMU's radio cover them.
+- Race start "Green, green": LMU's radio says it. Track limits: the HUD marker covers it (driver, 2026-10-26).
+- "Car ahead pitting": not for now.
+- Coaching calls: rejected on 2026-10-18.
+- Rival and undercut calls: a future phase (step 7), not rejected. They need `mFuelFraction` to prove
+  to be the UI's value ("P4 on 12 % energy, stops this lap").
+
+## Call catalogue and phrasing
+
+The tables above are the proposal. Once built, one catalogue in code is the single source for every
+call: `shared/domain/live/calls/catalogue.ts`, one entry per call:
+
+- `id` and family (strategy, damage, flags, incident, traffic, clock)
+- verbosity level (quiet / normal) and priority (P1-P3)
+- rule: the trigger in one sentence, plus its thresholds as named constants
+- template with typed slots, e.g. `Yellow, {where}. {count} {state}, {side}, {line}.`
+- slot (when to say it), expiry, repeat rule (what change allows the call again)
+- one or two example renderings
+
+Tests check every entry: the examples render from the template, at most ~8 words (P1 incident calls
+up to ~12), only words from the shared vocabulary, a rule and expiry present. The demo's call scenarios
+and Settings' "Play sample" read the examples, and the debrief's radio log shows the call `id` next to
+the text, so a call to refine is traced to its rule. Adding a call means adding one entry; this
+document then keeps only the phrasing rules below.
+
+Phrasing rules (consistent wording):
+- Order: what, where, side, line, action. "Yellow, Turn 6. Car stopped, left, on your line."
+- One verb for one action: "Box" (never "pit"), "Save", "Set", "Stay out", "Careful".
+- Places: "Turn 6" when the corner list exists, else "sector 2" or "{n} seconds"; never metres.
+- Sides: "left" / "right" in the direction of travel; lines: "on your line" / "off your line".
+- Cars: manufacturer, class word first only when it differs ("Hyper Ferrari"); position when the
+  brand does not tell them apart.
+- Numbers: gaps and seconds to one decimal under 10 ("one point two"), whole numbers above; energy in
+  percent, fuel in litres, fuel ratio to two decimals, deployment as the kW number or "map" plus its
+  position; no units the driver can infer.
+- Repeats: only P1 may double a word ("Box, box").
+- No filler ("okay", "so", "mate") and no opinions; the dashboard keeps the numbers that need reading.
+
+## Timing: not distracting
+
+1. One fact per call, number first, at most about 8 words; P1 may repeat once ("Box, box").
+2. Two slots for P2/P3: just after the lap completes (about 3 s after the line while the LMU
+   lap-time call setting is on, at once when it is off; then on the first straight), or any straight (1 s flat out on the pedals; later the
+   corner list gives the next straight ahead of time). Strategy calls prefer the after-the-line slot.
+3. Budget: at most 2 P3 calls per lap and 1 per straight; the rest drop.
+4. Hysteresis: a call key repeats only after its state really changes (existing 60 s guard plus
+   per-call thresholds, e.g. gaps move 0.2 s/lap).
+5. Expiry: each call has a deadline (box this lap = before pit entry; traffic = before the pass).
+6. Silence where it matters: no P2/P3 on the out-lap, the first lap of the race or in qualifying
+   flying laps except time-left calls.
+7. A short earcon before P1 calls only.
+8. Audio only: nothing is added to the dashboard. Voice on/off and options live in Settings; the
+   demo's control row stays demo-only.
+
+## Voice
+
+Chrome's local Windows voices (David, Zira) are robotic; its "Google UK English" voices are better but
+online. For a natural voice, synthesize on the server with a local neural model and play the audio
+in the page:
+- Piper (`en_GB` voices): very light on CPU, fast enough for short calls, good quality.
+- Kokoro (82M, ONNX): more natural, heavier; check its latency and CPU while LMU runs.
+Step 1 includes a listening test of both against Chrome's voices in the demo, on the same sample
+calls. Fixed phrases (earcon, "Box, box") are cached; calls with numbers are synthesized when made.
+Model and voice files are downloads: ask before fetching them.
+
+## Radio log for the debrief
+
+Every call the engine produces is stored, spoken or not: session and capture run, game time, lap,
+lap distance, key, priority, text, and outcome (spoken, dropped for budget, expired, replaced). The
+debrief of the reconciled session shows it as a radio timeline by lap, so wording, timing and
+too-chatty laps can be refined after each race. Dropped calls stay in the log; they show what the
+budget is hiding.
+
+## Architecture
+
+- `shared/domain/live/liveCalls.ts`: pure and deterministic. Snapshot, timing, traffic and the
+  previous call state in, candidate calls out (`key`, `text`, priority, expiry). Generalizes
+  `strategySpeech`.
+- The scheduler runs on the server in the live service (slots, budget, hysteresis, expiry), so the log
+  is complete even if the page fails, and sends a `call` stream event. The page plays it and reports
+  back spoken or failed.
+- Server: decode flags, gaps and per-car speed into `LiveVehicleReading`; spoken car names in
+  `shared/domain/`; radio log table in SQLite next to the live capture stores, linked through the
+  existing XML reconciliation.
+- TTS: server-side Piper or Kokoro behind one small interface; the page only plays audio.
+- Settings: voice on/off, voice, volume, rate, verbosity (quiet / normal), per-family toggles,
+  LMU lap-time call on/off (on by default),
+  "Play sample" for each family.
+
+## Iterations
+
+Each step ends with demo scenarios that play the calls, a replay of real `.live.duckdb` captures
+through `liveCalls` that counts calls per lap and per slot, and one drive in the car.
+
+1. Infrastructure: settings, server scheduler, slots, budget, radio log, voice listening test; move the
+   existing strategy calls into the real dashboard behind the setting. Measure calls per lap on the
+   Le Mans and COTA captures.
+2. Strategy and damage wording, the Hypercar deployment call once its live advice is built, plus the
+   radio log in the debrief.
+3. Flags, penalties and the session clock: decode the fields, check against an online race. Then the
+   incident detector, tested on replays with crashes before any drive.
+4. Multiclass traffic with car names: faster class closing with time to the pass.
+5. Same-class battle and gaps, only if steps 1-4 stay quiet enough.
+6. Optional: left/right spotter if latency allows; wheel button (below).
+7. Future: rival resource and undercut. Verify `mFuelFraction` against the UI first (VE and fuel
+   class, online), then rivals' expected pit laps and undercut/overcut calls.
+
+Targets to check in step 1: no P2/P3 inside a braking zone, P1 starts within 1 s, a clean race stint
+averages under one call per lap at the quiet level.
+
+## Wheel button: repeat and questions (nice to have, after the iterations)
+
+The app has no controller input today; the Simagic plugin only talks to SimPro (presets), not buttons.
+
+Reading the button. LMU keeps the focus, so the browser Gamepad API is a poor fit (Chromium stops
+gamepad updates for unfocused windows; to confirm). Read it on the server instead, in a small worker
+through koffi (already a dependency):
+- Windows `joyGetPosEx` (winmm): simplest, no new dependency, but only buttons 1-32. Check the wanted
+  button's number in `joy.cpl` first.
+- SDL joystick API with background events allowed: any button count and hot-plug; adds SDL3.dll.
+The button must be left unbound in LMU. Settings gets "Press the button" to learn device + button,
+stored by device GUID.
+
+Gestures, all deterministic: short press repeats the last call ("Nothing new" when there is none);
+double press gives a status from the current plan ("Box lap 18. Energy 4 laps. P4, gap 1.2."); hold
+is push-to-talk for a question from a fixed list (fuel/energy left, laps to the stop, tyres, damage
+and repair, gaps, who is behind, time left, weather, "what's the plan"), recognized locally with
+whisper.cpp only while held. AI may only reword an answer, never compute it (AGENTS rule C).
+
+## Still open
+
+- Voice: Piper or Kokoro, after the step 1 listening test.
+- Track condition labels: map `mTrackGripLevel` from the diagnostics (now logged).
+- Later, for the wheel button: which button, and whether to add push-to-talk.

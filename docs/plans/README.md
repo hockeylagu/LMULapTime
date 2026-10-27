@@ -147,5 +147,9 @@ Settings action, refused on track. Existing fake-plugin tests do not replace thi
 ## Unstarted proposals
 
 - [Simplified 3D replay](proposed/REPLAY_3D_PLAN.md): validate one exported scene and replay pose first.
+- [Live voice calls](proposed/LIVE_VOICE_CALLS.md): call catalogue, anti-distraction rules and iterations;
+  driver decisions first (Crew Chief overlap, voice, naming).
+- [Wet/dry tyre crossover](proposed/LIVE_TYRE_CROSSOVER.md): when to box for wets or slicks, on the
+  dashboard and as a call; needs one wet session to calibrate.
 - [Further replay preparation](proposed/REPLAY_STORAGE_DESIGN.md): storage size takes priority; measure
   before revisiting prepared views or grouped columns.
