@@ -48,6 +48,7 @@ describe('rF2 scoring decode', () => {
       playerClassPlace: 1,
       allDriversFinished: false,
       inRealtime: true, gamePhase: 5, trackLength: 13_626, trackTempC: 31.5, raining: 0, avgPathWetness: 0, maxPathWetness: 0,
+      minPathWetness: 0, trackGripLevel: 0,
       player: expect.objectContaining({ id: 12, place: 4, totalLaps: 8, vehicleName: 'Ferrari 296 GT3', vehicleClass: 'GT3' }),
       leader: expect.objectContaining({ id: 7, place: 1, totalLaps: 9 }),
       classLeader: expect.objectContaining({ id: 12, place: 4, vehicleClass: 'GT3' }),
@@ -65,8 +66,8 @@ describe('rF2 scoring decode', () => {
       bytes: { sector: 2, finishStatus: 1, countLapFlag: 1, inPits: 1 },
       lapsBehindLeader: 2,
     };
-    const decoded = decodeScoring(scoringBuffer(2, [FIELD[0], player], { trackTemp: 47.25, raining: 0.4, avgPathWetness: 1.5, lapDist: 13_626.5 }));
-    expect(decoded).toMatchObject({ trackLength: 13_626.5, trackTempC: 47.25, raining: 0.4, avgPathWetness: 1 });
+    const decoded = decodeScoring(scoringBuffer(2, [FIELD[0], player], { trackTemp: 47.25, raining: 0.4, avgPathWetness: 1.5, minPathWetness: 0.2, trackGripLevel: 3, lapDist: 13_626.5 }));
+    expect(decoded).toMatchObject({ trackLength: 13_626.5, trackTempC: 47.25, raining: 0.4, avgPathWetness: 1, minPathWetness: 0.2, trackGripLevel: 3 });
     expect(decoded.player).toEqual({
       upgradePackHex: '00000000000000000000000000000000',
       id: 12, place: 4, totalLaps: 8, vehicleName: 'Ferrari 296 GT3', vehicleClass: 'GT3',

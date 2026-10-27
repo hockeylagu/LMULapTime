@@ -304,6 +304,28 @@ describe('LiveService', () => {
     } finally { vi.restoreAllMocks(); }
   });
 
+  it('records the raw track grip level beside the rounded wetness for exploration', async () => {
+    const diagnostics = new LiveDiagnostics('unused');
+    vi.spyOn(diagnostics, 'begin').mockImplementation(() => {});
+    const record = vi.spyOn(diagnostics, 'record').mockImplementation(() => {});
+    vi.spyOn(diagnostics, 'sink').mockReturnValue(() => {});
+    const writer = new FakeWorker();
+    const capture = new LiveCaptureController({ directory: 'unused', onPersist: () => {}, diagnostics,
+      createWorker: () => writer as unknown as CaptureWorker });
+    const { service, frame } = setup({ capture });
+    try {
+      frame(reading({ trackGripLevel: 2, raining: 0.123, minPathWetness: 0.004, avgPathWetness: 0.456, trackTempC: 43.04 }));
+      const surface = record.mock.calls.map(([event]) => event).find(event => event.kind === 'track-surface');
+      expect(surface?.data).toEqual({ trackGripLevel: 2, raining: 0.12, minPathWetness: 0, avgPathWetness: 0.46,
+        maxPathWetness: null, trackTempC: 43 });
+    } finally {
+      const stopping = service.stop();
+      writer.emit('exit', 0);
+      await stopping;
+      vi.restoreAllMocks();
+    }
+  });
+
   it('records the emitted timing and source clocks at most once a second', async () => {
     const diagnostics = new LiveDiagnostics('unused');
     vi.spyOn(diagnostics, 'begin').mockImplementation(() => {});

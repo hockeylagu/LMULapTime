@@ -266,7 +266,14 @@ is repeated: the player's standings row drops `carPosition`/`carVelocity`/`carAc
 recording), the tyre screen drops its copy of the pit menu (logged from its own read), the reader's game-state
 probe keeps its body only for an error or unreadable reply (the pit poller logs the same reply), `strategy`
 records omit the MFD fuel ratio choices, and `capture-health` is written when the writer's state, error, drops
-or backlog change (plus the 60 s checkpoint), not for the growing sample count. Recordings of 2026-10-27 may hold `hybrid`
+or backlog change (plus the 60 s checkpoint), not for the growing sample count. `track-surface` is
+exploration: LMU's raw, undocumented `mTrackGripLevel` beside rain, min/avg/max path wetness (two
+decimals) and track temperature (0.1 °C), written when a value changes, to map the grip level to the
+MFD's track label (`Low Grip`, damp, wet) before anything interprets it. The game's HUD labels, in order,
+are Green, Low Grip, Medium Grip, High Grip, Saturated Grip (`Support/Languages/english.dic`, `#TG_*`), so likely
+0-4 in that order; 2 = Medium and 3 = High are confirmed on dry tracks (2026-10-27). Path wetness comes in steps
+(seen 0, 0.05, 0.4, 0.6, 1.0), shown as Dry, Damp, Wet, Very wet, Extremely wet; Slightly wet, probably 0.2, is
+unconfirmed. Recordings of 2026-10-27 may hold `hybrid`
 records (the raw hybrid fields on change), since removed once the Spa practice confirmed the decode; the capture
 channels keep the same values.
 Recordings of 2026-10-25 may hold three validation records, since removed: `standings-check` (each standings

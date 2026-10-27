@@ -81,6 +81,10 @@ function offlineSnapshot(): LiveSnapshot {
   };
 }
 
+/** Two decimals for the diagnostic track-surface line; null when the game gives no value. */
+const round2 = (value: number | undefined): number | null => value === undefined ? null : Math.round(value * 100) / 100;
+
+
 /** What makes two snapshots the same to a page: everything but the sequence, the receipt time and the moving session clock. */
 const contentKey = (snapshot: Omit<LiveSnapshot, 'sequence' | 'receivedAt'>): string =>
   JSON.stringify({ ...snapshot, session: snapshot.session && { ...snapshot.session, elapsedSeconds: 0 } });
@@ -528,6 +532,13 @@ export class LiveService {
       this.options.capture?.diagnostics?.record({ kind: 'app-state', at: Date.now(), data: {
         lifecycle: next.lifecycle, identity: next.identity, loadingProgress: next.loadingProgress,
         session: next.session ? { ...next.session, elapsedSeconds: undefined } : null,
+      } });
+      // Exploration: the MFD track label ("Low Grip") against LMU's raw grip level and the path wetness.
+      // Rounded and without a clock, so the sidecar writes a line only when a value changes (plus checkpoints).
+      if (reading) this.options.capture?.diagnostics?.record({ kind: 'track-surface', at: Date.now(), data: {
+        trackGripLevel: reading.trackGripLevel ?? null, raining: round2(reading.raining),
+        minPathWetness: round2(reading.minPathWetness), avgPathWetness: round2(reading.avgPathWetness),
+        maxPathWetness: round2(reading.maxPathWetness), trackTempC: Math.round(reading.trackTempC * 10) / 10,
       } });
       if (Date.now() - this.lastDiagnosticStrategyAt >= 10_000 || next.lifecycle !== previous.lifecycle) {
         this.lastDiagnosticStrategyAt = Date.now();

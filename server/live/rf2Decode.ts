@@ -143,6 +143,9 @@ export function decodeScoring(buffer: Buffer): LiveScoringReading {
     avgPathWetness: clamp01(buffer.readDoubleLE(info + infoAt.avgPathWetness)),
     maxPathWetness: Number.isFinite(buffer.readDoubleLE(info + infoAt.maxPathWetness))
       ? clamp01(buffer.readDoubleLE(info + infoAt.maxPathWetness)) : undefined,
+    minPathWetness: Number.isFinite(buffer.readDoubleLE(info + infoAt.minPathWetness))
+      ? clamp01(buffer.readDoubleLE(info + infoAt.minPathWetness)) : undefined,
+    trackGripLevel: buffer.readUInt8(info + infoAt.trackGripLevel),
     player,
     leader,
     classLeader,

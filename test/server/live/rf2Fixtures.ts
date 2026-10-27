@@ -13,7 +13,7 @@ export interface ScoringVehicle {
   floats?: { bestLapSector1?: number; bestLapSector2?: number };
 }
 
-export interface ScoringHeader { inRealtime?: boolean; currentEt?: number; phase?: number; trackTemp?: number; raining?: number; avgPathWetness?: number; lapDist?: number }
+export interface ScoringHeader { inRealtime?: boolean; currentEt?: number; phase?: number; trackTemp?: number; raining?: number; avgPathWetness?: number; minPathWetness?: number; trackGripLevel?: number; lapDist?: number }
 
 export function scoringBuffer(version: number, vehicles: ScoringVehicle[], info: ScoringHeader = {}): Buffer {
   const buffer = Buffer.alloc(SCORING_BUFFER.size);
@@ -30,6 +30,8 @@ export function scoringBuffer(version: number, vehicles: ScoringVehicle[], info:
   buffer.writeDoubleLE(info.trackTemp ?? 31.5, SCORING.info + at.trackTemp);
   buffer.writeDoubleLE(info.raining ?? 0, SCORING.info + at.raining);
   buffer.writeDoubleLE(info.avgPathWetness ?? 0, SCORING.info + at.avgPathWetness);
+  buffer.writeDoubleLE(info.minPathWetness ?? 0, SCORING.info + at.minPathWetness);
+  buffer.writeUInt8(info.trackGripLevel ?? 0, SCORING.info + at.trackGripLevel);
   buffer.writeUInt8(info.phase ?? 5, SCORING.info + at.gamePhase);
   buffer.writeUInt8(info.inRealtime === false ? 0 : 1, SCORING.info + at.inRealtime);
   const v = VEHICLE_SCORING.offsets;

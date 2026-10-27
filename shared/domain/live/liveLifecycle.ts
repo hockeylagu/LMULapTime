@@ -20,6 +20,12 @@ export interface LiveScoringReading {
   /** Average path wetness, 0..1. */
   avgPathWetness: number;
   maxPathWetness?: number;
+  minPathWetness?: number;
+  /**
+   * LMU `mTrackGripLevel`, raw. Undocumented: logged in diagnostics to map against the MFD's track label
+   * ("Low Grip", damp, wet...); not interpreted until that mapping is known (HUD labels in order: Green, Low, Medium, High, Saturated, likely 0-4; 2 = "Medium" and 3 = "High" confirmed dry, 2026-10-27).
+   */
+  trackGripLevel?: number;
   /** The scoring entry flagged as the player; null when none is. */
   player: LiveVehicleReading | null;
   /** The overall leader (place 1); null when none is listed. */
