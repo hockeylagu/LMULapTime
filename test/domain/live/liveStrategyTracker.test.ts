@@ -352,7 +352,7 @@ describe('LiveStrategyTracker', () => {
 
   it('says the next forecast change of this session on the lap it lands', () => {
     const tracker = new LiveStrategyTracker();
-    tracker.applyRest({ type: 'forecast', sessions: { RACE: [{ fraction: 0, rainChance: 0 }, { fraction: 0.5, rainChance: 60 }, { fraction: 1, rainChance: 60 }] } });
+    tracker.applyRest({ type: 'forecast', sessions: { RACE: [{ fraction: 0, rainChance: 0 }, { fraction: 0.25, rainChance: 0 }, { fraction: 0.5, rainChance: 60 }, { fraction: 1, rainChance: 60 }] } });
     expect(context(tracker, at(150))?.forecast).toEqual({ change: 'rain', chance: 60, atSeconds: 750, lap: 8 });
   });
 

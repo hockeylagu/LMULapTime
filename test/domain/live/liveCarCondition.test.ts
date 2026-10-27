@@ -118,13 +118,23 @@ describe('nextForecastChange', () => {
   ];
   const base = { nodes, sessionSeconds: 900, raining: 0, lapSeconds: 75, lapNumber: 1, lapFraction: 0 };
 
-  it('places rain halfway toward the rain node, on the lap it lands on', () => {
-    expect(nextForecastChange({ ...base, elapsedSeconds: 10 })).toEqual({ change: 'rain', chance: 100, atSeconds: 113, lap: 2 });
+  it('expects rain from the start of its window, on the lap it lands on, and now once the window is open', () => {
+    const later = [{ fraction: 0, rainChance: 0 }, { fraction: 0.25, rainChance: 0 }, { fraction: 0.5, rainChance: 80 }, { fraction: 1, rainChance: 0 }];
+    expect(nextForecastChange({ ...base, nodes: later, elapsedSeconds: 10 })).toEqual({ change: 'rain', chance: 80, atSeconds: 225, lap: 3 });
+    // Silverstone 2026-10-27: the window opened at the start and rain came 59 s in, well before the halfway point.
+    expect(nextForecastChange({ ...base, elapsedSeconds: 10 })).toEqual({ change: 'rain', chance: 100, atSeconds: 10, lap: 1 });
+    // Still dry after the rain node: that rain did not come, the next change is looked for.
+    expect(nextForecastChange({ ...base, nodes: later, elapsedSeconds: 460 })).toEqual({ change: 'none', chance: 0, atSeconds: 900, lap: null });
   });
 
-  it('places the end of the rain halfway toward the next dry node while it rains', () => {
+  it('places the end of the rain halfway toward the next dry node while it rains, with the dry chance', () => {
     expect(nextForecastChange({ ...base, elapsedSeconds: 200, raining: 0.9, lapNumber: 3, lapFraction: 0.5 }))
       .toEqual({ change: 'dry', chance: 100, atSeconds: 338, lap: 5 });
+    // Silverstone 2026-10-27, raining at the start under a 75 % node: the dry node is 100 % dry, not 75 %.
+    const wetStart = [{ fraction: 0, rainChance: 75 }, { fraction: 0.25, rainChance: 0 }, { fraction: 1, rainChance: 0 }];
+    expect(nextForecastChange({ ...base, nodes: wetStart, elapsedSeconds: 10, raining: 0.5 })).toMatchObject({ change: 'dry', chance: 100, atSeconds: 113 });
+    const partly = [{ fraction: 0, rainChance: 90 }, { fraction: 0.5, rainChance: 30 }, { fraction: 1, rainChance: 0 }];
+    expect(nextForecastChange({ ...base, nodes: partly, elapsedSeconds: 10, raining: 0.5 })).toMatchObject({ change: 'dry', chance: 100, atSeconds: 675 });
   });
 
   it('says the weather holds when the forecast does not change, and nothing without a session length', () => {

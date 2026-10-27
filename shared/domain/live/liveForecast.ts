@@ -23,8 +23,11 @@ export interface ForecastInput {
 
 /**
  * The next change of the forecast within the session: rain arriving when dry now, or ending when wet now.
- * Rain is interpolated between nodes (seen live 2026-10-16: it rose from the start toward the storm node and had
- * stopped before the next clear one), so a change is placed halfway between the node before it and its node.
+ * Rain is interpolated between nodes. It arrives early in its window: seen live 2026-10-16 rising from the start toward
+ * the storm node, and on 2026-10-27 (offline practice, light rain) 59 s into a window ending at 451 s, where the halfway
+ * point said 226 s. So rain is due from the node before the rain node (now, once that time has passed and it is still
+ * dry). It ends near halfway toward the next dry node (2026-10-27: 20 s off), so the end stays placed halfway. The
+ * chance is the forecast's: rain chance of the rain node, dry chance (100 - rain chance) of the dry one.
  * `none` when nothing changes before the end; null without nodes or a session length (the forecast is unknown).
  */
 export function nextForecastChange(input: ForecastInput): LiveForecast | null {
@@ -36,13 +39,14 @@ export function nextForecastChange(input: ForecastInput): LiveForecast | null {
     const node = sorted[i];
     const changes = wet ? node.rainChance === 0 : node.rainChance > 0;
     if (!changes) continue;
-    const atSeconds = Math.round(((sorted[i - 1].fraction + node.fraction) / 2) * sessionSeconds);
-    if (atSeconds <= elapsedSeconds) continue;
+    const due = wet ? (sorted[i - 1].fraction + node.fraction) / 2 : sorted[i - 1].fraction;
+    if (wet ? due * sessionSeconds <= elapsedSeconds : node.fraction * sessionSeconds <= elapsedSeconds) continue;
+    const atSeconds = Math.max(Math.round(due * sessionSeconds), Math.round(elapsedSeconds));
     const { lapSeconds, lapNumber } = input;
     const lap = lapSeconds !== null && lapSeconds > 0 && lapNumber !== null
       ? lapNumber + Math.floor(Math.min(Math.max(input.lapFraction, 0), 1) + (atSeconds - elapsedSeconds) / lapSeconds)
       : null;
-    return { change: wet ? 'dry' : 'rain', chance: wet ? Math.round(sorted[i - 1].rainChance) : Math.round(node.rainChance), atSeconds, lap };
+    return { change: wet ? 'dry' : 'rain', chance: Math.round(wet ? 100 - node.rainChance : node.rainChance), atSeconds, lap };
   }
   return { change: 'none', chance: Math.round(sorted[sorted.length - 1].rainChance), atSeconds: sessionSeconds, lap: null };
 }
