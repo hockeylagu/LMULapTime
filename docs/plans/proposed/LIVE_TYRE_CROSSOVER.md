@@ -18,7 +18,8 @@ deterministically, with the reason. Merge the change into a stop already planned
   Wetness is 0..1 in steps (seen 0, 0.05, 0.4, 0.6, 1.0; rain itself is continuous); the game's menus show
   `averagePathWetness × 100` as a percent (UI.zip `displayTrackWetness`). In-car labels (driver, Silverstone
   2026-10-27): 0 Dry, 0.05 Damp, 0.4 Wet, 0.6 Very wet, 1.0 Extremely wet; Slightly wet sits between Damp and
-  Wet, probably 0.2, to confirm in the next wet race (no practice runs for it).
+  Wet, most likely the 0.125 step seen on 2026-10-16, to confirm in the next wet race (no practice runs for it).
+  Damp counts as wet for pace, fuel/VE and learning (`liveTrackWet`, driver decision 2026-10-27).
   `raining`, and the 5-minute wetness trend (`LiveWeather`).
 - Forecast: next change to rain or dry, its chance, time and lap (`LiveForecast`).
 - Car: compound on the car, the MFD `TIRES:` setting (`New Wet`, `New Medium`), measured wheel slip,

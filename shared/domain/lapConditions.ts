@@ -8,6 +8,20 @@ import type { WeatherCondition } from '../types/session.js';
  */
 export const RAIN_WET_MIN = 13;
 
+/**
+ * Lowest live path wetness above dry (0..1): LMU reports it in steps, 0.05 shown in the car as Damp, 0.125 (likely
+ * Slightly wet), 0.4 Wet, 0.6 Very wet, 1.0 Extremely wet (driver, Silverstone 2026-10-27). Damp counts as wet (driver decision).
+ */
+export const DAMP_WETNESS = 0.05;
+
+/**
+ * A live track is wet from Damp on (half the Damp step, against float noise), or in rain from `rainMin` (raw 0-255,
+ * RAIN_WET_MIN by default; the planner holds wet down to a lower rain so a track near the line does not flip).
+ */
+export function liveTrackWet(raining: number, avgPathWetness: number, rainMin = RAIN_WET_MIN): boolean {
+  return avgPathWetness >= DAMP_WETNESS / 2 || raining * 255 >= rainMin;
+}
+
 /** The weather of a replay from its peak rain (raw 0-255), as the replay list and sessions show it. */
 export function replayWeatherCondition(maxRain: number): WeatherCondition {
   return maxRain > 16 ? 'Wet' : maxRain > 0 ? 'Dynamic Weather' : 'Dry';

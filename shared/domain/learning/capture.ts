@@ -1,5 +1,5 @@
 import { LIVE_BASELINE_MODEL_VERSION } from '../live/liveAudit.js';
-import { RAIN_WET_MIN } from '../lapConditions.js';
+import { liveTrackWet } from '../lapConditions.js';
 import type { LiveScoringReading } from '../live/liveLifecycle.js';
 import type { LiveSnapshot } from '../../types/live.js';
 import type { LiveUsageObservation } from '../../types/liveAudit.js';
@@ -31,7 +31,7 @@ export class LiveLearningCapture {
     const player = reading.player;
     if (!player || !Number.isFinite(reading.currentEt)) return [];
     const lap = player.totalLaps + 1;
-    const condition = Math.max(reading.raining, reading.avgPathWetness) * 255 >= RAIN_WET_MIN ? 'wet' : 'dry';
+    const condition = liveTrackWet(reading.raining, reading.avgPathWetness) ? 'wet' : 'dry';
     const compound = snapshot.strategy?.tyres?.compound ?? null;
     const regime = JSON.stringify([condition, compound, player.driverName, player.vehicleName, snapshot.identity?.layoutKey]);
     const reasons = this.excluded.get(lap) ?? new Set<string>();

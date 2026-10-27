@@ -11,7 +11,7 @@ import { liveResourceKind, planGarage, planRace, resourceUnit } from './liveReso
 import { LiveUsageMeter } from './liveUsage.js';
 import { DeploymentTracker } from './energy/deploymentTracker.js';
 import { limitingTyreCoverage, planFuelRatio, savingToFinish } from './liveInsights.js';
-import { RAIN_WET_MIN } from '../lapConditions.js';
+import { liveTrackWet, RAIN_WET_MIN } from '../lapConditions.js';
 import { median } from '../pitStops.js';
 import type { LiveUsageObservation } from '../../types/liveAudit.js';
 import { classLeaderLapSeconds, raceClockRunning } from './liveLapsLeft.js';
@@ -63,7 +63,7 @@ const FORECAST_SESSION: Record<LiveSessionKind, string | null> = {
 /** Valid laps kept per event for the garage plan's lap time. */
 const EVENT_LAPS = 20;
 const GREEN = 5;
-/** Raw 0-255 rain or path wetness below which a wet track counts as dry again (wet from RAIN_WET_MIN). */
+/** Raw 0-255 rain below which a wet track counts as dry again (wet from RAIN_WET_MIN or Damp, `liveTrackWet`). */
 const DRY_AGAIN_MAX = 7;
 
 const round = (value: number, digits: number): number => Math.round(value * 10 ** digits) / 10 ** digits;
@@ -97,8 +97,8 @@ export class LiveStrategyTracker {
   private lastPair: string | null = null;
   /** Wet or dry, with hysteresis (null before the first reading). */
   private wet: boolean | null = null;
-  /** Raw 0-255 wetness of the last reading: corrections use the training rule (RAIN_WET_MIN), not the planner's hysteresis. */
-  private wetness: number | null = null;
+  /** Conditions of the last reading by the training rule (`liveTrackWet`), not the planner's hysteresis; null before one. */
+  private wetness: 'wet' | 'dry' | null = null;
   /** Each wheel's measured wear per lap this event (FL, FR, RL, RR). */
   private eventTyreWear: TyreWheelValues | null = null;
   private eventCompound = '';
@@ -260,16 +260,16 @@ export class LiveStrategyTracker {
     const compound = this.car?.compound || this.usage?.selected?.compound || this.eventCompound;
     if (this.eventCompound && compound !== this.eventCompound) { this.eventTyreWear = null; this.tyres.reset(); }
     this.eventCompound = compound;
-    // Wet from RAIN_WET_MIN, dry again only below DRY_AGAIN_MAX, so a track drying near the line does not flip back and forth.
-    const level = Math.max(reading.raining, reading.avgPathWetness) * 255;
-    const wet = this.wet === true ? level >= DRY_AGAIN_MAX : level >= RAIN_WET_MIN;
+    // Wet from Damp or RAIN_WET_MIN rain; rain must then fall below DRY_AGAIN_MAX, so rain near the line does not flip back and forth.
+    const wet = liveTrackWet(reading.raining, reading.avgPathWetness, this.wet === true ? DRY_AGAIN_MAX : RAIN_WET_MIN);
+    // A dry/wet change keeps the fuel/VE use and ratios (they shift, not drastically: driver 2026-10-27); lap times and
+    // tyre wear start again, and the lap it happens on is not measured.
     if (this.wet !== null && wet !== this.wet) {
-      this.meters.fuel.clear(); this.meters.ve.clear(); this.ratios = []; this.eventLaps = []; this.lastPair = null; this.lapExcluded = true; this.eventTyreWear = null;
-      this.eventEstimate = null;
+      this.eventLaps = []; this.lapExcluded = true; this.eventTyreWear = null;
       this.tyres.reset();
     }
     this.wet = wet;
-    this.wetness = level;
+    this.wetness = liveTrackWet(reading.raining, reading.avgPathWetness) ? 'wet' : 'dry';
     this.followLaps(reading, context.latestLap);
     const fuelUse = this.meters.fuel.latestUse;
     const veUse = this.meters.ve.latestUse;
@@ -389,7 +389,7 @@ export class LiveStrategyTracker {
     const history = base.perLapSource === 'measured' ? null : this.history(kind)?.perLap ?? null;
     if (history !== null) return { perLap: history, perLapSource: 'history', lapsMeasured: 0 };
     const correction = base.perLap !== null && base.perLapSource !== null && base.perLapSource !== 'history' && this.wetness !== null && this.eventCompound
-      ? this.correct?.(kind, base.perLap, base.perLapSource, this.wetness >= RAIN_WET_MIN ? 'wet' : 'dry', this.eventCompound) : null;
+      ? this.correct?.(kind, base.perLap, base.perLapSource, this.wetness, this.eventCompound) : null;
     return correction && Number.isFinite(correction.perLap) && correction.perLap > 0
       ? { ...base, perLap: correction.perLap, learning: { baselinePerLap: base.perLap!, adjustment: correction.adjustment } } : base;
   }

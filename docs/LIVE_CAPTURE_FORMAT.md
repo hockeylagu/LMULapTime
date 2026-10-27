@@ -272,8 +272,8 @@ decimals) and track temperature (0.1 °C), written when a value changes, to map 
 MFD's track label (`Low Grip`, damp, wet) before anything interprets it. The game's HUD labels, in order,
 are Green, Low Grip, Medium Grip, High Grip, Saturated Grip (`Support/Languages/english.dic`, `#TG_*`), so likely
 0-4 in that order; 2 = Medium and 3 = High are confirmed on dry tracks (2026-10-27). Path wetness comes in steps
-(seen 0, 0.05, 0.4, 0.6, 1.0), shown as Dry, Damp, Wet, Very wet, Extremely wet; Slightly wet, probably 0.2, is
-unconfirmed. Recordings of 2026-10-27 may hold `hybrid`
+(seen 0, 0.05, 0.4, 0.6, 1.0), shown as Dry, Damp, Wet, Very wet, Extremely wet; Slightly wet is most likely the 0.125 step seen
+on 2026-10-16, unconfirmed. Recordings of 2026-10-27 may hold `hybrid`
 records (the raw hybrid fields on change), since removed once the Spa practice confirmed the decode; the capture
 channels keep the same values.
 Recordings of 2026-10-25 may hold three validation records, since removed: `standings-check` (each standings
@@ -380,7 +380,7 @@ recursive bias fitting; corrected advice/audits use model version 5 (4 before 20
 the finish, laps left at the class leader's pace without the planned stop, the pit timer for a stop made now). Resource/garage plans disclose
 the baseline and applied adjustment, and dashboard source text identifies learned advice.
 Exact layout, car, driver, XML patch, weather, compound and baseline source/version must match; weather
-uses the training rule (wet from `RAIN_WET_MIN`), not the planner's drying hysteresis.
+uses the training rule (`liveTrackWet`: wet from Damp path wetness or `RAIN_WET_MIN` rain), not the planner's drying hysteresis.
 Because shared memory has no verified patch, runtime patch trust requires a verified completed capture
 started during this observed continuous game run. Closing LMU clears trust; until a new result is
 matched after restart, ordinary estimation applies. No last-known patch is guessed across game runs.

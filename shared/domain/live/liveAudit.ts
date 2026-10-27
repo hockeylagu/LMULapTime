@@ -1,7 +1,7 @@
 import type { LiveSnapshot } from '../../types/live.js';
 import type { LiveAccuracyComparison, LiveAuditRecord, LiveUsageObservation } from '../../types/liveAudit.js';
 import type { LiveScoringReading } from './liveLifecycle.js';
-import { RAIN_WET_MIN } from '../lapConditions.js';
+import { liveTrackWet } from '../lapConditions.js';
 
 /** Bump when the forecasting formulas change; history keeps the version that produced each estimate. */
 export const LIVE_MODEL_VERSION = 11;
@@ -48,7 +48,7 @@ export class LiveAuditTracker {
     }
     const strategy = snapshot.strategy;
     const compound = strategy?.tyres?.compound ?? strategy?.garage?.tyres?.compound ?? '';
-    const regime = `${snapshot.identity?.layoutKey ?? ''}|${compound}|${reading.raining * 255 >= RAIN_WET_MIN || reading.avgPathWetness * 255 >= RAIN_WET_MIN ? 'wet' : 'dry'}`;
+    const regime = `${snapshot.identity?.layoutKey ?? ''}|${compound}|${liveTrackWet(reading.raining, reading.avgPathWetness) ? 'wet' : 'dry'}`;
     const lap = player.totalLaps;
     if (regime !== this.regime) this.baselines.clear();
     this.regime = regime;

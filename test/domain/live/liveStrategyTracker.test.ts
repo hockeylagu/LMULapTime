@@ -95,13 +95,16 @@ describe('LiveStrategyTracker', () => {
     const tracker = new LiveStrategyTracker((_kind, _predicted, _source, condition) => { conditions.push(condition); return null; });
     tracker.applyRest({ type: 'tireManagement', vePerLap: 3, fuelPerLap: 2, newSets: 2,
       selected: { compound: 'Wet', used: false, wear: 1 } });
-    context(tracker, at(0, { avgPathWetness: 20 / 255 }));
+    context(tracker, at(0, { raining: 20 / 255 }));
     expect(conditions[conditions.length - 1]).toBe('wet');
-    // 10/255 is still wet for the planner (dry again only below 7) but dry for the training labels (13).
-    context(tracker, at(1, { avgPathWetness: 10 / 255 }));
+    // Rain 10/255 is still wet for the planner (dry again only below 7) but dry for the training labels (13).
+    context(tracker, at(1, { raining: 10 / 255 }));
     expect(conditions[conditions.length - 1]).toBe('dry');
+    // A damp track (LMU's lowest wetness step, 0.05) is wet without rain.
+    context(tracker, at(2, { avgPathWetness: 0.05 }));
+    expect(conditions[conditions.length - 1]).toBe('wet');
   });
-  it('pairs fuel and VE on the same clean crossings, carries ratios into the garage, and resets on wet conditions', () => {
+  it('pairs fuel and VE on the same clean crossings, carries ratios into the garage, and keeps them on a wet track', () => {
     const tracker = new LiveStrategyTracker();
     const car = (et: number) => ({ fuelLiters: 80 - et * 0.024, fuelCapacityLiters: 117,
       dentSeverity: [0,0,0,0,0,0,0,0], detached: false, lastImpactEt: 0,
@@ -119,10 +122,10 @@ describe('LiveStrategyTracker', () => {
     expect(context(tracker, at(450))?.fuelRatio).toMatchObject({ recommended: 0.81, source: 'measured', pairedLaps: 3 });
     const garage = at(0, { sessionCode: 1, inRealtime: false, player: vehicleReading({ totalLaps: 0 }) });
     expect(context(tracker, garage)?.fuelRatio).toMatchObject({ recommended: 0.81, source: 'measured', pairedLaps: 3 });
-    // Another compound keeps the measured use (only the tyre wear starts again); a wet track clears it.
+    // Another compound keeps the measured use (only the tyre wear starts again), and so does a wet or damp track.
     tracker.applyCar({ ...car(450), compound: 'Soft' });
     expect(context(tracker, garage)?.fuelRatio).toMatchObject({ recommended: 0.81, source: 'measured', pairedLaps: 3 });
-    expect(context(tracker, at(1, { raining: 0.5 }))?.fuelRatio).toBeNull();
+    expect(context(tracker, at(460, { avgPathWetness: 0.05 }))?.fuelRatio).toMatchObject({ recommended: 0.81, source: 'measured', pairedLaps: 3 });
   });
   it('measures each wheel from the shared-memory tread at the crossings and projects the limiting corner', () => {
     const tracker = new LiveStrategyTracker();

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { annotateLapConditions, formatRain, replayWeatherCondition, lapConditionGroup, RAIN_WET_MIN } from '../../shared/domain/lapConditions.js';
+import { annotateLapConditions, formatRain, replayWeatherCondition, lapConditionGroup, liveTrackWet, RAIN_WET_MIN } from '../../shared/domain/lapConditions.js';
 import { markNonRepresentativeLaps } from '../../shared/domain/lapRepresentativeness.js';
 import { computeConsistencyRating } from '../../shared/domain/lapComparison.js';
 import type { LapConditions, NonRepresentativeReason } from '../../shared/types/index.js';
@@ -105,6 +105,16 @@ describe('the lap rules with changing conditions', () => {
 
     expect(rating.conditionGroups).toBeUndefined();
     expect(rating.stdDev).toBe(0.141);
+  });
+});
+
+describe('liveTrackWet', () => {
+  it('counts a live track wet from Damp on, or in rain from the threshold the caller holds', () => {
+    // LMU's wetness steps: 0 dry, 0.05 Damp, 0.4 Wet, 0.6 Very wet, 1.0 Extremely wet.
+    expect([0, 0.05, 0.4, 0.6, 1].map(wetness => liveTrackWet(0, wetness))).toEqual([false, true, true, true, true]);
+    expect(liveTrackWet(12 / 255, 0)).toBe(false);
+    expect(liveTrackWet(RAIN_WET_MIN / 255, 0)).toBe(true);
+    expect(liveTrackWet(10 / 255, 0, 7)).toBe(true);
   });
 });
 
