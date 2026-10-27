@@ -4,7 +4,7 @@ import type { TyreWearLap, TyreWearProfile, TyreWheelValues } from '../../shared
 import { getLiveCaptureIndexRows } from '../core/live/dbLiveCaptureStore.js';
 import { learningProjectionInputs } from '../live/learning/inputs.js';
 import { openVerifiedLiveRecording } from '../live/capture/recordingValidation.js';
-import { liveCaptureChannels } from '../live/capture/channels.js';
+import { liveCaptureChannels, type LiveCaptureChannel } from '../live/capture/channels.js';
 import { detectWheelSlipEvents, wheelSlipChannelIndexes, wheelSlipRatios, WHEEL_POSITIONS } from '../../shared/domain/live/wheelSlip.js';
 import { fitTyreWear } from '../../shared/domain/strategy/tyreWear.js';
 import { NEW_TYRE_RISE } from '../../shared/domain/strategy/sessionStrategy.js';
@@ -31,7 +31,7 @@ export async function readTyreWearLaps(sessionDb: SessionStrategySource, session
   if (states.size === 0) return null;
   const reader = await openVerifiedLiveRecording(directory(), entry.manifest);
   try {
-    const channels = liveCaptureChannels(entry.manifest.normalizationVersion).filter(channel => channel.frame === 'iso8855-wheel');
+    const channels = liveCaptureChannels(entry.manifest.normalizationVersion).filter((channel): channel is LiveCaptureChannel & { frame: 'iso8855-wheel' } => channel.frame === 'iso8855-wheel');
     const indexes = wheelSlipChannelIndexes(channels);
     if (!indexes) return null;
     const result: TyreWearLap[] = [];

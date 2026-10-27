@@ -170,6 +170,8 @@ function decodeCar(slot: Buffer): LiveCarReading {
   const at = VEHICLE_TELEMETRY.offsets;
   const wheel = (index: number, field: string): boolean => slot.readUInt8(at.wheels + index * WHEEL.size + WHEEL.offsets[field]) !== 0;
   const finite = (value: number): number => (Number.isFinite(value) ? value : 0);
+  const motorMapMax = slot.readUInt8(at.motorMapMax);
+  const motorState = slot.readUInt8(at.electricBoostMotorState);
   return {
     fuelLiters: finite(slot.readDoubleLE(at.fuel)),
     fuelCapacityLiters: finite(slot.readDoubleLE(at.fuelCapacity)),
@@ -180,6 +182,11 @@ function decodeCar(slot: Buffer): LiveCarReading {
     tread: [0, 1, 2, 3].map(index => clamp01(slot.readDoubleLE(at.wheels + index * WHEEL.size + WHEEL.offsets.wear))),
     compound: cString(slot, at.frontTireCompoundName, 18).trim(),
     virtualEnergy: finite(slot.readFloatLE(at.virtualEnergy)),
+    // Hybrid when the map range or the motor state says so (state 0 is unavailable; a GT3 is not checked yet).
+    ...(motorMapMax > 0 || motorState !== 0 ? { hybrid: {
+      batteryChargeFraction: finite(slot.readDoubleLE(at.batteryChargeFraction)), soc: finite(slot.readFloatLE(at.soc)),
+      motorMap: slot.readUInt8(at.motorMap), motorMapMax, motorState, regen: finite(slot.readFloatLE(at.regen)),
+    } } : {}),
   };
 }
 

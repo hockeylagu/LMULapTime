@@ -41,6 +41,13 @@ export function writeLiveCaptureRow(slot: Buffer, rows: Float64Array, offset: nu
     rows[values + 3 + corner] = finiteOrNaN(-slot.readDoubleLE(wheel + WHEEL.offsets.longitudinalPatchVel));
     rows[values + 7 + corner] = finiteOrNaN(-slot.readDoubleLE(wheel + WHEEL.offsets.longitudinalGroundVel));
   }
+  // Raw hybrid values (catalog version 4), in the channel order of channels.ts; not interpreted here.
+  rows[values + 11] = finiteOrNaN(slot.readDoubleLE(at.batteryChargeFraction));
+  rows[values + 12] = finiteOrNaN(slot.readFloatLE(at.soc));
+  rows[values + 13] = slot.readUInt8(at.motorMap);
+  rows[values + 14] = slot.readUInt8(at.motorMapMax);
+  rows[values + 15] = slot.readUInt8(at.electricBoostMotorState);
+  rows[values + 16] = finiteOrNaN(slot.readFloatLE(at.regen));
   return true;
 }
 

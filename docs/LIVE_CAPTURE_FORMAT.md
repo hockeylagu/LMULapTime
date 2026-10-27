@@ -125,19 +125,38 @@ its published tenth before calling the React state setter. Pedal samples remain 
 
 ## Channels and clocks
 
-The recorder keeps only the 11 channels the app reads: ISO forward and left velocity (m/s) and yaw
+The recorder keeps only the channels the app reads, 11 dynamics channels plus six raw hybrid values (below): ISO forward and left velocity (m/s) and yaw
 rate (rad/s) for body slip, plus FL/FR/RL/RR patch and ground longitudinal velocity (m/s) for wheel slip.
 The producer's left-handed local axes are left/up/back: forward velocity is `-z`, left velocity is `x`
 and yaw rate is the axial `-y`. Wheel longitudinal is back-positive in the source and negated to
 forward-positive. Patch velocity is not relabelled as wheel speed; the slip ratio is derived on read
 (below). Nonfinite input becomes SQL NULL; valid finite zero remains zero. Batch rows have three
-clocks/counters followed by the 11 values (14 float64 entries).
+clocks/counters followed by the 17 values (20 float64 entries; 14 entries and 11 values in recordings of version 3 and older).
 
 Version 1 had incorrect lateral/yaw signs: evidence reads correct those signs once without rewriting
 the source and disclose `sourceNormalizationVersion: 1` alongside response normalization version 3.
 Its wheel catalog stays unverified and its wheel columns unavailable. Versions 2 and 3 share the
-verified catalog. Older versions remain readable; new attempts use version 3 and do not resume an
-older-version file. On 2026-10-21 every existing recording was rewritten offline to this catalog.
+verified catalog. Older versions remain readable; new attempts use version 4 and do not resume an
+older-version file. On 2026-10-21 every existing recording was rewritten offline to the version 3 catalog.
+
+Version 4 (2026-10-27) appends six raw hybrid channels, kept for validating the live deployment advice
+(`strategy.deployment`, [checklist](plans/README.md#live-dashboard-and-learning)). They are stored as the
+game reports them, in this order, with frame `raw` (no ISO frame, no sign convention); a car without a hybrid
+system records zeros (non-finite floats are NULL):
+
+| Channel | Source field | Meaning (rFactor 2, UNVERIFIED in LMU) |
+|---|---|---|
+| `battery_charge_fraction` | `mBatteryChargeFraction` (double) | Battery charge, expected 0..1 |
+| `soc_raw` | `mSoc` (float) | State of charge, 0..1 or 0..100: which is unknown |
+| `motor_map` | `mMotorMap` (u8) | Current deployment setting, an index 0..`motor_map_max` |
+| `motor_map_max` | `mMotorMapMax` (u8) | Highest setting index; 0 on a car without a motor map |
+| `electric_motor_state` | `mElectricBoostMotorState` (u8) | 0 unavailable, 1 inactive, 2 propulsion, 3 regen |
+| `regen_raw` | `mRegen` (float) | Regenerated power; unit unknown |
+
+The live app maps them best effort (hybrid when `motor_map_max > 0` or the motor state is not 0; charge percent
+is `battery_charge_fraction * 100` when finite and in (0, 1], else `soc_raw`, x100 when at most 1). Raw hybrid channels are not part of the evidence reads:
+the evidence contract stays at normalization version 3 (the app's `readRecording` keeps its own constant), so it
+lists only the ISO channels. Version 1 to 3 catalogs are unchanged.
 
 ### Dropped channels (available for future analysis or coaching)
 
@@ -247,7 +266,9 @@ is repeated: the player's standings row drops `carPosition`/`carVelocity`/`carAc
 recording), the tyre screen drops its copy of the pit menu (logged from its own read), the reader's game-state
 probe keeps its body only for an error or unreadable reply (the pit poller logs the same reply), `strategy`
 records omit the MFD fuel ratio choices, and `capture-health` is written when the writer's state, error, drops
-or backlog change (plus the 60 s checkpoint), not for the growing sample count.
+or backlog change (plus the 60 s checkpoint), not for the growing sample count. Recordings of 2026-10-27 may hold `hybrid`
+records (the raw hybrid fields on change), since removed once the Spa practice confirmed the decode; the capture
+channels keep the same values.
 Recordings of 2026-10-25 may hold three validation records, since removed: `standings-check` (each standings
 reply beside shared memory VE, fuel, pit state and penalties), `lmu-fields` (the other raw LMU fields of
 `InternalsPlugin.hpp`) and `tyre-check` (condition reply tread beside `mWear`). They settled the shared-memory reads

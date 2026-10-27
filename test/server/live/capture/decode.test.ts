@@ -73,9 +73,10 @@ describe('writeLiveCaptureRow', () => {
     expect(Number.isNaN(sample!.values[0])).toBe(true);
     expect(Number.isNaN(sample!.values[1])).toBe(true);
     expect(sample!.values[2]).toBe(-0.3);
-    expect(sample!.values).toHaveLength(11);
-    expect(sample!.values.slice(3).every(Number.isNaN)).toBe(true);
-    expect(LIVE_CAPTURE_CHANNELS).toHaveLength(11);
+    expect(sample!.values).toHaveLength(17);
+    expect(sample!.values.slice(3, 11).every(Number.isNaN)).toBe(true);
+    expect(LIVE_CAPTURE_CHANNELS).toHaveLength(17);
+    expect(liveCaptureChannels(3)).toHaveLength(11);
   });
 
   it('uses ISO component signs at all four distinct corners', () => {
@@ -90,10 +91,25 @@ describe('writeLiveCaptureRow', () => {
     expect(Array.from(values.slice(3, 7))).toEqual([10, 11, 12, 13]);
     expect(Array.from(values.slice(7, 11))).toEqual([-30, -31, -32, -33]);
     // A valid stationary zero is available, unlike nonfinite input.
-    expect(decodeRow(vehicleSlot())!.values.slice(3).every((value: number) => value === 0)).toBe(true);
+    expect(decodeRow(vehicleSlot())!.values.every((value: number) => value === 0)).toBe(true);
     expect(LIVE_CAPTURE_CHANNELS.every(channel => channel.verified)).toBe(true);
     expect(liveCaptureChannels(1).slice(3).every(channel => !channel.verified)).toBe(true);
     expect(() => liveCaptureChannels(999)).toThrow('Unsupported');
+  });
+
+  it('records the raw hybrid fields in catalog order and keeps them out of the verified-meaning frames', () => {
+    const slot = vehicleSlot(); writeDouble(slot, 'elapsedTime', 1);
+    const at = VEHICLE_TELEMETRY.offsets;
+    slot.writeDoubleLE(0.625, at.batteryChargeFraction); slot.writeFloatLE(0.5, at.soc);
+    slot.writeUInt8(4, at.motorMap); slot.writeUInt8(10, at.motorMapMax);
+    slot.writeUInt8(2, at.electricBoostMotorState); slot.writeFloatLE(0.25, at.regen);
+    expect(Array.from(decodeRow(slot)!.values.slice(11))).toEqual([0.625, 0.5, 4, 10, 2, 0.25]);
+    expect(LIVE_CAPTURE_CHANNELS.slice(11).map(channel => [channel.name, channel.sourceField, channel.frame])).toEqual([
+      ['battery_charge_fraction', 'batteryChargeFraction', 'raw'], ['soc_raw', 'soc', 'raw'], ['motor_map', 'motorMap', 'raw'],
+      ['motor_map_max', 'motorMapMax', 'raw'], ['electric_motor_state', 'electricBoostMotorState', 'raw'], ['regen_raw', 'regen', 'raw'],
+    ]);
+    // Older recordings keep their own 11-channel catalogs.
+    for (const version of [1, 2, 3]) expect(liveCaptureChannels(version).some(channel => channel.frame === 'raw')).toBe(false);
   });
 
   it('rejects invalid elapsed time and truncated slots', () => {

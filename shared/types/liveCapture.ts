@@ -1,9 +1,9 @@
 /** App-owned complementary recordings; native LMU telemetry has a different schema/source identity. */
 export const LIVE_CAPTURE_SCHEMA_VERSION = 1;
-/** Version 2 fixes source signs and verifies the wheel channels; version 3 recordings share its catalog. */
-export const LIVE_CAPTURE_NORMALIZATION_VERSION = 3;
+/** Version 2 fixes source signs and verifies the wheel channels; version 3 recordings share its catalog; version 4 appends six raw hybrid channels (meaning unverified). */
+export const LIVE_CAPTURE_NORMALIZATION_VERSION = 4;
 export const LIVE_CAPTURE_SOURCE = 'live-capture' as const;
-export const LIVE_CAPTURE_SAMPLE_WIDTH = 14;
+export const LIVE_CAPTURE_SAMPLE_WIDTH = 20;
 /** Normal transport bound plus reserved slots for initialization/finalization. */
 export const LIVE_CAPTURE_PENDING_BATCHES = 4;
 export const LIVE_CAPTURE_FINALIZATION_SLOTS = 2;

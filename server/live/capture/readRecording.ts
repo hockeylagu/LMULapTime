@@ -3,15 +3,17 @@ import type { DuckDbReader } from '../../telemetry/duckdbReader.js';
 import { liveCaptureChannels } from './channels.js';
 
 import type { LiveCaptureObservation } from '../../../shared/types/liveCapture.js';
-import { LIVE_CAPTURE_NORMALIZATION_VERSION } from '../../../shared/types/liveCapture.js';
 import type { LiveEvidenceReadRequest, LiveLapEvidence, LiveEvidenceUnavailableReason, LiveEvidenceObservation } from '../../../shared/types/liveEvidence.js';
 import { LiveEvidenceReadError } from './readError.js';
 
+/** The evidence contract's own normalization: unchanged by the raw hybrid channels of recording version 4. */
+const EVIDENCE_NORMALIZATION_VERSION = 3;
 const MAX_SAMPLES = 50_000;
 const MAX_OBSERVATIONS = 1000;
 const MAX_OBSERVATION_BYTES = 1_000_000;
-/** Vehicle motion plus longitudinal wheel velocities (slip); a recording's own catalog decides what is verified. */
-const evidenceChannels = (normalizationVersion: number) => liveCaptureChannels(normalizationVersion).filter(channel => channel.verified);
+/** Vehicle motion plus longitudinal wheel velocities (slip); a recording's own catalog decides what is verified. Raw hybrid channels are not evidence. */
+const evidenceChannels = (normalizationVersion: number) => liveCaptureChannels(normalizationVersion)
+  .flatMap(channel => channel.verified && channel.frame !== 'raw' ? [{ ...channel, frame: channel.frame }] : []);
 
 function fail(reason: LiveEvidenceUnavailableReason, message: string): never { throw new LiveEvidenceReadError(reason, message); }
 
@@ -81,8 +83,8 @@ export async function readLiveRecording(request: LiveEvidenceReadRequest): Promi
     const timed = await readObservations(reader, startSeconds, end, false);
     const untimed = await readObservations(reader, startSeconds, end, true);
     return { source: 'live-capture', recordingId: manifest.recordingId, schemaVersion: manifest.schemaVersion,
-      normalizationVersion: LIVE_CAPTURE_NORMALIZATION_VERSION,
-      ...(manifest.normalizationVersion !== LIVE_CAPTURE_NORMALIZATION_VERSION ? { sourceNormalizationVersion: manifest.normalizationVersion } : {}),
+      normalizationVersion: EVIDENCE_NORMALIZATION_VERSION,
+      ...(manifest.normalizationVersion < EVIDENCE_NORMALIZATION_VERSION ? { sourceNormalizationVersion: manifest.normalizationVersion } : {}),
       signConvention: 'iso8855', gameVersion: manifest.gameVersion,
       lapNumber, startSeconds, durationSeconds, channels: channels.map(channel => ({ name: channel.name, unit: channel.unit,
         frame: channel.frame, sourceField: channel.sourceField })), points, observations: timed.observations,

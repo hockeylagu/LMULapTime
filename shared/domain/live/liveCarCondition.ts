@@ -4,6 +4,22 @@ import { NEW_TYRE_RISE } from '../strategy/sessionStrategy.js';
 
 export const CORNERS: readonly LiveCorner[] = ['FL', 'FR', 'RL', 'RR'];
 
+/**
+ * Raw hybrid fields of the telemetry slot, checked in the Spa practice of 2026-10-27 (docs/plans/README.md, "Hypercar
+ * deployment"): `motorMap` indexes the current setting (0..`motorMapMax`, higher deploys more); `motorState` is 0
+ * unavailable, 1 inactive, 2 propulsion, 3 regen; the charge fraction and `soc` (percent) carry the same charge.
+ */
+export interface LiveHybridReading {
+  /** `mBatteryChargeFraction`, expected 0..1. */
+  batteryChargeFraction: number;
+  /** `mSoc` (float), 0..1 or 0..100: which of the two is filled is unknown. */
+  soc: number;
+  motorMap: number;
+  motorMapMax: number;
+  motorState: number;
+  regen: number;
+}
+
 /** The player's car from the shared memory telemetry (wheels in the game's order: FL, FR, RL, RR). */
 export interface LiveCarReading {
   fuelLiters: number;
@@ -24,6 +40,8 @@ export interface LiveCarReading {
   compound: string;
   /** LMU `mVirtualEnergy`, 0..1: the standings' `veFraction` within 0.0002 (Silverstone practice 2026-10-25). */
   virtualEnergy?: number;
+  /** Present on a hybrid car (a motor map range or a motor state), absent otherwise. */
+  hybrid?: LiveHybridReading;
 }
 
 /** `getVehicleCondition` (wheels FL, FR, RL, RR). */

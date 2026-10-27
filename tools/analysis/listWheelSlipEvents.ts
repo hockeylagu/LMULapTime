@@ -3,13 +3,13 @@ import path from 'node:path';
 import { DuckDBInstance } from '@duckdb/node-api';
 import { detectWheelSlipEvents, WHEEL_POSITIONS, wheelSlipChannelIndexes, wheelSlipRatios } from '../../shared/domain/live/wheelSlip.js';
 import type { LiveEvidenceChannel } from '../../shared/types/liveEvidence.js';
-import { liveCaptureChannels } from '../../server/live/capture/channels.js';
+import { liveCaptureChannels, type LiveCaptureChannel } from '../../server/live/capture/channels.js';
 
 // Read-only calibration check: runs the app's lockup/wheelspin detection over every closed live recording.
 // Usage: tsx tools/analysis/listWheelSlipEvents.ts [captureDirectory]
 const directory = path.resolve(process.argv[2] ?? path.join('server', 'live-captures'));
 const channels: LiveEvidenceChannel[] = liveCaptureChannels(3)
-  .filter(channel => channel.frame === 'iso8855-wheel')
+  .filter((channel): channel is LiveCaptureChannel & { frame: 'iso8855-wheel' } => channel.frame === 'iso8855-wheel')
   .map(channel => ({ name: channel.name, unit: channel.unit, frame: channel.frame, sourceField: channel.sourceField }));
 const indexes = wheelSlipChannelIndexes(channels)!;
 

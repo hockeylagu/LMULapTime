@@ -221,6 +221,24 @@ describe('rF2 pedal decode', () => {
     });
   });
 
+  it('reads the raw hybrid fields only for a car with a motor map range or a motor state', () => {
+    const car = (write: (buffer: Buffer, base: number, at: typeof VEHICLE_TELEMETRY.offsets) => void) => {
+      const buffer = telemetryBuffer(4, [{ id: 12, et: 1, throttle: 0, brake: 0 }]);
+      write(buffer, TELEMETRY.vehicles, VEHICLE_TELEMETRY.offsets);
+      return decodePedalSlot(buffer.subarray(TELEMETRY.vehicles, TELEMETRY.vehicles + TELEMETRY.vehicleStride)).car;
+    };
+    expect(car(() => {})?.hybrid).toBeUndefined();
+    expect(car((buffer, base, at) => {
+      buffer.writeDoubleLE(0.625, base + at.batteryChargeFraction); buffer.writeFloatLE(0.5, base + at.soc);
+      buffer.writeUInt8(4, base + at.motorMap); buffer.writeUInt8(10, base + at.motorMapMax);
+      buffer.writeUInt8(2, base + at.electricBoostMotorState); buffer.writeFloatLE(0.25, base + at.regen);
+    })?.hybrid).toEqual({ batteryChargeFraction: 0.625, soc: 0.5, motorMap: 4, motorMapMax: 10, motorState: 2, regen: 0.25 });
+    // A motor state alone marks the hybrid; non-finite values read as zero.
+    expect(car((buffer, base, at) => {
+      buffer.writeUInt8(1, base + at.electricBoostMotorState); buffer.writeDoubleLE(Number.NaN, base + at.batteryChargeFraction);
+    })?.hybrid).toEqual({ batteryChargeFraction: 0, soc: 0, motorMap: 0, motorMapMax: 0, motorState: 1, regen: 0 });
+  });
+
   it('matches the player by id and remembers its slot', () => {
     const mapping = source(() => telemetryBuffer(4, slots));
     expect(readPedalFrame(mapping, 12, null, -1)).toEqual({

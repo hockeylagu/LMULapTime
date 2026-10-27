@@ -10,6 +10,7 @@ import { LiveCaptureController } from '../../../../server/live/capture/controlle
 import { LiveCaptureRows } from '../../../../server/live/capture/decode.js';
 import { VEHICLE_TELEMETRY, WHEEL } from '../../../../server/live/rf2Layout.js';
 import { LIVE_CAPTURE_CHANNELS } from '../../../../server/live/capture/channels.js';
+import { LIVE_CAPTURE_NORMALIZATION_VERSION } from '../../../../shared/types/liveCapture.js';
 import { SessionDatabase } from '../../../../server/core/db.js';
 import { getLiveCaptureIndexRows, upsertLiveCapture } from '../../../../server/core/live/dbLiveCaptureStore.js';
 import { reconcileLiveCaptures } from '../../../../server/live/capture/reconcile.js';
@@ -84,9 +85,9 @@ it('persists recorded memory values through service, real worker, rediscovery an
           instance.closeSync();
         }
       })().catch(error => { console.error(error); process.exitCode = 1; });`, filename], { encoding: 'utf8' });
-    const expected = [24.0998, 0.0003, 0.14548, 1.8818, 1.6297, 0.7526, 1.1636, 23.9723, 24.224, 23.9834, 24.2205];
+    const expected = [24.0998, 0.0003, 0.14548, 1.8818, 1.6297, 0.7526, 1.1636, 23.9723, 24.224, 23.9834, 24.2205, 0, 0, 0, 0, 0, 0];
     expect(JSON.parse(output)).toEqual([Object.fromEntries(LIVE_CAPTURE_CHANNELS.map((channel, index) => [channel.name, expected[index]]))]);
-    expect(indexed[0].manifest.normalizationVersion).toBe(3);
+    expect(indexed[0].manifest.normalizationVersion).toBe(LIVE_CAPTURE_NORMALIZATION_VERSION);
     const observations = execFileSync(process.execPath, ['-e', `
       const { DuckDBInstance } = require('@duckdb/node-api');
       (async () => {
