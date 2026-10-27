@@ -23,6 +23,35 @@ const texts = (snapshot: LiveSnapshot) => {
 };
 
 describe('racePlanView', () => {
+  it('shows crossover at a nearby planned stop, with the wetness reason', () => {
+    const crossover = { action: 'wets', compound: 'Wet', when: 'planned-stop', reason: 'slightly-wet', wetness: 0.125 } as const;
+    expect(racePlanView(withRace({ pitInLaps: 3 }, { crossover })).cells[1]).toMatchObject({ value: 'BOX FOR WETS', tone: 'loss', detail: 'TRACK SLIGHTLY WET · AT THE STOP' });
+  });
+  it('boxes this lap even with fuel to finish, and flags the MFD ahead of tread advice', () => {
+    const crossover = { action: 'wets', compound: 'Wet', when: 'now', reason: 'slightly-wet', wetness: 0.125 } as const;
+    const snapshot = structuredClone(withRace({ finishReachable: true, pitInLaps: null }, { crossover }));
+    snapshot.strategy!.pit!.mfd!.tyres = 'No Change';
+    snapshot.strategy!.tyres!.coverage = { target: 'finish', projectedTread: 0.3, setsNeeded: 1, availableSetsCover: false };
+    const view = racePlanView(snapshot);
+    expect(view).toMatchObject({ mode: 'pit', action: { label: 'PIT', value: 'THIS LAP' } });
+    expect(view.cells[1]).toMatchObject({ tone: 'loss', note: 'SET NEW WET', noteTone: 'loss' });
+    snapshot.strategy!.pit!.mfd!.tyres = 'New Wet';
+    expect(racePlanView(snapshot).cells[1].note).toBeUndefined();
+    snapshot.strategy!.resource = null;
+    expect(racePlanView(snapshot).mode).toBe('pit');
+  });
+  it('checks the named dry compound, rejects No Change, and accepts unnamed slicks', () => {
+    const snapshot = structuredClone(withRace({ pitInLaps: 2 }, { crossover: { action: 'slicks', compound: 'Medium', when: 'planned-stop', reason: 'dry', wetness: 0 } }));
+    for (const call of ['No Change', 'New Wet', 'New Soft', null]) {
+      snapshot.strategy!.pit!.mfd!.tyres = call;
+      expect(racePlanView(snapshot).cells[1]).toMatchObject({ tone: 'loss', note: 'SET NEW MEDIUM' });
+    }
+    snapshot.strategy!.pit!.mfd!.tyres = 'New Medium';
+    expect(racePlanView(snapshot).cells[1].note).toBeUndefined();
+    snapshot.strategy!.crossover!.compound = null;
+    snapshot.strategy!.pit!.mfd!.tyres = 'New Soft';
+    expect(racePlanView(snapshot).cells[1].note).toBeUndefined();
+  });
   it('leads with the per-lap use mid-stint, with the spare per lap, the pit countdown, tyres and VE now', () => {
     expect(texts(withRace({}))).toEqual({
       mode: 'stint',

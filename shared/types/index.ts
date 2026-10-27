@@ -22,5 +22,5 @@ export type {
 export { LIVE_STREAM_EVENTS, APP_EVENTS, LIVE_HEARTBEAT_MS } from './live.js';
 export type {
   LiveResourceKind, LivePerLapSource, LiveResourcePlan, LiveRacePlan, LivePitState, LivePitMenu, LivePitInfo,
-  LiveCorner, LiveDamage, LiveTyres, LiveForecast, LiveGaragePlan, LiveGarageTyres, LiveStrategy, LiveDeployment,
+  LiveCorner, LiveDamage, LiveTyres, LiveForecast, LiveGaragePlan, LiveGarageTyres, LiveStrategy, LiveDeployment, LiveTyreCrossover,
 } from './liveStrategy.js';

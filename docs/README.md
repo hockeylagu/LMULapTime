@@ -21,6 +21,6 @@ Format references are the written data contracts. Code comments own local implem
 plans hold unfinished requirements, not delivery diaries. VCR discovery notes remain because they
 contain unresolved byte meanings and evidence that is not derivable from the parser alone.
 
-The work queue links the remaining corner design and two unstarted proposals. Completed plans and
+The work queue links the remaining corner design and the unstarted proposals. Completed plans and
 one-off reports live in Git history. Historical observations retain their dates and do not establish
 compatibility with a new game build or completion of real-game acceptance.

@@ -61,7 +61,8 @@ export class LiveAuditTracker {
     const settingKey = JSON.stringify([strategy?.garage?.setInGarage, strategy?.garage?.tyres,
       strategy?.fuelRatio?.garageSetting, strategy?.pit?.mfd, strategy?.pit?.state,
       strategy?.resource?.reserveLaps, strategy?.garage?.reserveLaps, strategy?.resource?.perLap,
-      strategy?.garage?.needed, strategy?.fuelRatio?.recommended]);
+      strategy?.garage?.needed, strategy?.fuelRatio?.recommended,
+      strategy?.crossover?.action, strategy?.crossover?.compound, strategy?.crossover?.when, strategy?.crossover?.reason]);
     const observedKey = JSON.stringify([observation.fuel, observation.ve]);
     const measurement = observedKey !== this.observationKey && (observation.fuel !== null || observation.ve !== null);
     const completedLap = lap !== this.last?.session?.playerLapsCompleted;

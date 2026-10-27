@@ -381,3 +381,27 @@ describe('LiveStrategyTracker', () => {
     expect(next('bahrain_outer')).toMatchObject({ perLap: null, lapsMeasured: 0 });
   });
 });
+
+
+describe('live tyre crossover integration', () => {
+  it('remembers the last dry compound through a wet stint, but clears it for a new event', () => {
+    const tracker = new LiveStrategyTracker();
+    tracker.applyCar(veCar(0.9));
+    expect(context(tracker, at(0, { avgPathWetness: 0.125 }))?.crossover).toMatchObject({ action: 'wets' });
+    tracker.applyCar({ ...veCar(0.9), compound: 'Wet' });
+    expect(context(tracker, at(1, { avgPathWetness: 0.4 }))?.crossover).toBeNull();
+    expect(context(tracker, at(2, { avgPathWetness: 0 }))?.crossover).toMatchObject({ action: 'slicks', compound: 'Medium' });
+    tracker.reset();
+    tracker.applyCar({ ...veCar(0.9), compound: 'Wet' });
+    expect(context(tracker, at(3, { avgPathWetness: 0 }))?.crossover).toMatchObject({ action: 'slicks', compound: null });
+  });
+  it('keeps crossover silent in the garage and non-race sessions', () => {
+    const tracker = new LiveStrategyTracker();
+    tracker.applyCar(veCar(0.9));
+    const reading = at(0, { avgPathWetness: 0.4 });
+    const state = deriveLiveState(reading, 'driving');
+    const ctx = { carClass: 'GT3', layoutKey: null, lapsLeft: null, latestLap: null, reserveSeconds: 45 };
+    expect(tracker.update(reading, { ...state, lifecycle: 'garage' }, ctx)?.crossover).toBeNull();
+    expect(tracker.update(reading, { ...state, session: { ...state.session!, kind: 'practice' } }, ctx)?.crossover).toBeNull();
+  });
+});

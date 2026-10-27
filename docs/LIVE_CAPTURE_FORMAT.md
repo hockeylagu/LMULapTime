@@ -330,7 +330,11 @@ ORDER BY observation_id;
 ```
 
 The JSON payload contains the captured snapshot, usage observations and any forecast/actual
-comparison. It is diagnostic context; permanent frozen learning events and compact examples remain
+comparison. New snapshots may contain optional `strategy.crossover` (`LiveTyreCrossover` in
+`shared/types/liveStrategy.ts`): action wets/slicks, target compound (null for unknown dry compound), timing
+now/planned-stop, reason slightly-wet/dry and average path wetness (0..1). Advice action, compound, timing or
+reason changes create a `settings` checkpoint, including removal; wetness fluctuation alone does not.
+Older snapshots omit the field; no schema version change or reparse is needed. It is diagnostic context; permanent frozen learning events and compact examples remain
 separate. Disposable REST/error sidecars can be deleted without removing these checkpoints.
 Deleting a closed DuckDB recording removes its audit history; eligible compact learning facts can
 survive separately under the normal invalidation rules.

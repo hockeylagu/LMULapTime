@@ -151,3 +151,25 @@ describe('live dashboard improvements', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });
+
+
+describe('garage surface tyre checks', () => {
+  it.each([
+    ['race', 0.125, 'Medium', 'WET', 'FIT WETS'],
+    ['race', 0.4, 'Wet', 'WET', 'OK'],
+    ['race', 0, 'Wet', 'SLICKS', 'FIT SLICKS'],
+    ['race', 0.05, 'Medium', 'NEW', 'OK'],
+    ['race', 0.05, 'Wet', 'NEW', 'OK'],
+    ['practice', 0.4, 'Medium', 'ANY', undefined],
+    ['qualifying', 0.4, 'Medium', 'NEW', 'OK'],
+  ] as const)('%s at %s on %s', (kind, wetness, compound, target, action) => {
+    const snapshot = liveSnapshot({ lifecycle: 'garage', session: liveSession({ kind }) });
+    snapshot.strategy = liveStrategy({ garage: { kind: 've', unit: '%', sessionMinutes: 20, laps: 10, lapSeconds: 120,
+      perLap: 2.5, perLapSource: 'measured', lapsMeasured: 3, reserveLaps: 0.5, needed: 27, stops: 0, setInGarage: 30,
+      tyres: { compound, used: false, wear: 1, newSets: 0 } } });
+    snapshot.weather = { ...snapshot.weather!, avgPathWetness: wetness };
+    const check = liveScreen(snapshot).checks.find(row => row.label === 'TYRES');
+    expect(check?.target).toBe(target);
+    expect(check?.action?.text).toBe(action);
+  });
+});

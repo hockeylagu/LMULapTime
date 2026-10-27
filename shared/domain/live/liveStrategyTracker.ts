@@ -11,7 +11,8 @@ import { liveResourceKind, planGarage, planRace, resourceUnit } from './liveReso
 import { LiveUsageMeter } from './liveUsage.js';
 import { DeploymentTracker } from './energy/deploymentTracker.js';
 import { limitingTyreCoverage, planFuelRatio, savingToFinish } from './liveInsights.js';
-import { liveTrackWet, RAIN_WET_MIN } from '../lapConditions.js';
+import { tyreCrossover } from './liveTyreCrossover.js';
+import { isWetCompound, liveTrackWet, RAIN_WET_MIN } from '../lapConditions.js';
 import { median } from '../pitStops.js';
 import type { LiveUsageObservation } from '../../types/liveAudit.js';
 import { classLeaderLapSeconds, raceClockRunning } from './liveLapsLeft.js';
@@ -111,6 +112,8 @@ export class LiveStrategyTracker {
   private lapExcluded = false;
   private lastLapSeen: number | null = null;
   private car: LiveCarReading | null = null;
+  /** Last dry compound fitted in this event, retained through wet stints and session changes. */
+  private dryCompound: string | null = null;
   private ve: number | null = null;
   private pitState: LivePitState = 'none';
   private penalties = 0;
@@ -156,6 +159,7 @@ export class LiveStrategyTracker {
 
   /** Forgets everything (the game closed). */
   public reset(): void {
+    this.dryCompound = null;
     this.eventKey = null;
     this.eventLayout = null;
     this.schedule = null;
@@ -260,6 +264,7 @@ export class LiveStrategyTracker {
     const compound = this.car?.compound || this.usage?.selected?.compound || this.eventCompound;
     if (this.eventCompound && compound !== this.eventCompound) { this.eventTyreWear = null; this.tyres.reset(); }
     this.eventCompound = compound;
+    if (this.car?.compound && !isWetCompound(this.car.compound)) this.dryCompound = this.car.compound;
     // Wet from Damp or RAIN_WET_MIN rain; rain must then fall below DRY_AGAIN_MAX, so rain near the line does not flip back and forth.
     const wet = liveTrackWet(reading.raining, reading.avgPathWetness, this.wet === true ? DRY_AGAIN_MAX : RAIN_WET_MIN);
     // A dry/wet change keeps the fuel/VE use and ratios (they shift, not drastically: driver 2026-10-27); lap times and
@@ -320,6 +325,9 @@ export class LiveStrategyTracker {
       tyres,
       forecast: this.nextForecast(reading, state.session.kind),
       garage, fuelRatio,
+      crossover: state.lifecycle === 'driving' ? tyreCrossover({ avgPathWetness: reading.avgPathWetness,
+        compound: this.car?.compound ?? null, dryCompound: this.dryCompound,
+        pitInLaps: resource.race?.pitInLaps ?? null, lapsLeft, sessionKind }) : null,
       ...(deployment ? { deployment } : {}),
     };
   }

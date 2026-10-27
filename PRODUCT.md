@@ -77,3 +77,10 @@ Practice prioritizes the last completed lap; healthy races retain live pace/sect
 Damage shows measured pace loss beside estimated repair time for the driver's decision, not an
 unsupported repair verdict. Detailed analysis belongs after driving. Remaining acceptance and
 unimplemented screen directions belong in the work queue, not in a retained prototype or delivery log.
+
+Race tyre crossover uses wetness steps: advise wets from Slightly wet (average path wetness >= 0.125),
+and slicks only at Dry (exactly 0); Damp holds either tyre. Merge with a resource stop within three laps,
+otherwise pit this lap. Silent in the last two laps, where a stop cannot pay back. The tyre cell gives the reason and flags a mismatched MFD setting; return to the
+last dry compound run in the event, or unnamed slicks when unknown. Race garage checks follow the same
+surface thresholds. Practice and qualifying stay silent. No pace model or forecast term is used;
+refine thresholds only after several changing-weather race reviews agree.

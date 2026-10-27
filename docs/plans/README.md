@@ -16,6 +16,11 @@ worktree; its overlap has not been assessed here.
 
 Capture, learning lifecycle and the dashboard are implemented. [Live capture format](../LIVE_CAPTURE_FORMAT.md)
 owns channels, schema, clocks, recording ownership and correction gates; it supersedes old inventories.
+Tyre crossover is locally implemented (wetness-step rule, race plan/MFD, garage check and demo scenarios;
+see [code map](../CODE_MAP.md#live-race-dashboard)). Voice integration remains in the voice proposal.
+Confirm Slightly wet = 0.125 and the game's tyre-message timing in the next wet race; compare advice and actual
+stops/lap times using the race-review skill. Thresholds change only when several races agree.
+
 Keep these outstanding checks separate from implementation status:
 
 - Drive a normal practice/qualifying/race weekend; check session transitions, pause/garage/timing-line
@@ -149,7 +154,5 @@ Settings action, refused on track. Existing fake-plugin tests do not replace thi
 - [Simplified 3D replay](proposed/REPLAY_3D_PLAN.md): validate one exported scene and replay pose first.
 - [Live voice calls](proposed/LIVE_VOICE_CALLS.md): call catalogue, anti-distraction rules and iterations;
   driver decisions first (Crew Chief overlap, voice, naming).
-- [Wet/dry tyre crossover](proposed/LIVE_TYRE_CROSSOVER.md): when to box for wets or slicks, on the
-  dashboard and as a call; needs one wet session to calibrate.
 - [Further replay preparation](proposed/REPLAY_STORAGE_DESIGN.md): storage size takes priority; measure
   before revisiting prepared views or grouped columns.

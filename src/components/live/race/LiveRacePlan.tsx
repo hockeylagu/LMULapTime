@@ -26,7 +26,7 @@ export function PlanReadoutView({ readout, size, testId, children }: { readout: 
   const long = !words && readout.value.length > 6;
   const value = size === 'action'
     ? `h-[250px] ${words ? 'text-[104px] leading-[250px]' : 'text-[200px] leading-[1.2]'} tracking-[-0.04em]`
-    : `h-[150px] ${words ? 'text-[68px] leading-[150px]' : long ? 'text-[96px] leading-[150px]' : 'text-[120px] leading-[1.2]'} tracking-[-0.025em]`;
+    : `h-[150px] ${words ? `${readout.value.length > 12 ? 'text-[56px]' : 'text-[68px]'} leading-[150px]` : long ? 'text-[96px] leading-[150px]' : 'text-[120px] leading-[1.2]'} tracking-[-0.025em]`;
   // The lead value is the page's title while driving a race.
   const Value = size === 'action' ? 'h1' : 'div';
   return (
@@ -42,7 +42,7 @@ export function PlanReadoutView({ readout, size, testId, children }: { readout: 
       <p className={`${NOTE} ${size === 'action' && !words ? 'relative -top-[48px]' : ''} ${tone(readout.noteTone)}`}>
         {readout.compoundNote ? <CompoundText text={readout.note ?? ''} /> : readout.note ?? ''}
       </p>
-      <p className={`h-[60px] whitespace-nowrap text-[40px] font-semibold ${tone(readout.detailTone ?? 'muted')}`}>{readout.detail ?? ''}</p>
+      <p className={`h-[60px] whitespace-nowrap ${readout.detail && readout.detail.length > 26 ? 'text-[32px]' : 'text-[40px]'} font-semibold ${tone(readout.detailTone ?? 'muted')}`}>{readout.detail ?? ''}</p>
     </div>
   );
 }

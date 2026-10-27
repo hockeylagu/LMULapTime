@@ -1,5 +1,5 @@
 import type { LiveSnapshot } from '../../../../shared/types/live.js';
-import type { LiveForecast, LivePitInfo, LiveResourcePlan, LiveTyres } from '../../../../shared/types/liveStrategy.js';
+import type { LiveForecast, LivePitInfo, LiveResourcePlan, LiveTyreCrossover, LiveTyres } from '../../../../shared/types/liveStrategy.js';
 import { UNKNOWN } from '../liveFormat.js';
 import { deploymentReadout } from './deploymentReadout.js';
 import { LIVE_TYRE_TREAD_FLOOR } from '../../../../shared/domain/live/liveInsights.js';
@@ -98,12 +98,17 @@ function mfdResourceCell(resource: LiveResourcePlan, pit: LivePitInfo | null, no
   };
 }
 
-function tyreMfdCell(pit: LivePitInfo | null): PlanReadout {
+function tyreMfdCell(pit: LivePitInfo | null, crossover: LiveTyreCrossover | null): PlanReadout {
   const call = pit?.mfd?.tyres ?? null;
+  const matches = call !== null && !/no change/i.test(call) && (crossover?.action === 'wets'
+    ? /wet/i.test(call) : !/wet/i.test(call) && (!crossover?.compound || call.toLowerCase().includes(crossover.compound.toLowerCase())));
   return {
     label: 'TYRES · MFD',
     value: tyreCallText(call),
-    tone: compoundTone(call),
+    tone: crossover && !matches ? 'loss' : compoundTone(call),
+    note: crossover && !matches ? `SET NEW ${crossover.compound?.toUpperCase() ?? 'SLICKS'}` : undefined,
+    noteTone: crossover && !matches ? 'loss' : undefined,
+    detail: crossover ? `${crossover.reason === 'dry' ? 'TRACK DRY' : 'TRACK SLIGHTLY WET'}${crossover.when === 'planned-stop' ? ' · AT THE STOP' : ''}` : undefined,
   };
 }
 
@@ -131,11 +136,12 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
   const tyres = strategy?.tyres ?? null;
   const forecast = strategy?.forecast ?? null;
   const damage = strategy?.damage ?? null;
+  const crossover = strategy?.crossover ?? null;
   const unit = resource?.unit ?? '%';
   const name = resource ? resourceName(resource.kind) : 'VE';
   const pitCells = (now: boolean): [PlanReadout, PlanReadout, PlanReadout] => [
     resource && race ? mfdResourceCell(resource, pit, now) : { label: `${name} · MFD`, value: UNKNOWN },
-    tyreMfdCell(pit),
+    tyreMfdCell(pit, crossover),
     pitTimeCell(pit, damage?.repairSeconds ?? null),
   ];
   const ratio = strategy?.fuelRatio;
@@ -155,12 +161,12 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
     const coverage = tyres?.coverage;
     const needsNew = !!damage?.wheel || (coverage !== undefined && coverage !== null && coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR);
     const noChange = /no change/i.test(pit?.mfd?.tyres ?? '');
-    if (needsNew && noChange) {
+    if (!crossover && needsNew && noChange) {
       cells[1].value = tyres?.compound ? `NEW ${tyres.compound.toUpperCase()}` : 'NEW SET';
       cells[1].note = 'SET NO CHANGE';
       cells[1].noteTone = 'loss';
       cells[1].tone = 'warn';
-    } else if (coverage && coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR) {
+    } else if (!crossover && coverage && coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR) {
       cells[1].note = `TREAD ~${Math.round(coverage.projectedTread * 100)}% · 40% MIN`;
       cells[1].noteTone = 'loss';
     }
@@ -189,6 +195,9 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
       cells: executionCells(true),
     };
   }
+  if (crossover?.when === 'now') {
+    return { mode: 'pit', action: { label: 'PIT', value: 'THIS LAP', tone: 'loss' }, cells: executionCells(true) };
+  }
   if (!resource || !race || resource.perLap === null) {
     return {
       mode: 'calculating',
@@ -201,7 +210,7 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
     };
   }
   const estimate = resource.learning ? ' · LEARNED' : resource.perLapSource === 'game' ? ' · GAME EST.' : resource.perLapSource === 'history' ? ' · YOUR RACES' : '';
-  if (race.finishReachable) {
+  if (race.finishReachable && !crossover) {
     return {
       mode: 'sprint',
       action: {
@@ -212,7 +221,7 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
   }
   const saving = resource.saving;
   // This is a display cutoff for a modest scenario, not a claim that the saving is achievable.
-  if (saving && saving.savePercent > 0 && saving.savePercent <= 5 && resource.lapsMeasured >= 3 && saving.source === 'measured' && !damage && !pit?.penalties) {
+  if (!crossover && saving && saving.savePercent > 0 && saving.savePercent <= 5 && resource.lapsMeasured >= 3 && saving.source === 'measured' && !damage && !pit?.penalties) {
     return { mode: 'saving', action: { label: 'TO SKIP STOP', value: saving.targetPerLap.toFixed(2), unit: `${unit}/lap`,
       note: `SAVE ${saving.savePerLap.toFixed(2)} ${unit}/LAP`, noteTone: 'warn' },
       cells: [{ label: 'SHORT TO FINISH', value: formatAmount(saving.shortfall, unit), unit },
@@ -237,6 +246,13 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
   stintTyres.note = pit?.mfd?.tyres ? `MFD · ${tyreCallText(pit.mfd.tyres)}` : 'MFD NOT READ';
   stintTyres.noteTone = pit?.mfd?.tyres ? undefined : 'muted';
   stintTyres.compoundNote = true;
+  if (crossover) {
+    stintTyres.label = 'TYRES'; stintTyres.labelAccent = undefined; stintTyres.unit = undefined;
+    stintTyres.value = crossover.action === 'wets' ? 'BOX FOR WETS' : 'BOX FOR SLICKS';
+    stintTyres.tone = 'loss';
+    stintTyres.detail = `${crossover.reason === 'dry' ? 'TRACK DRY' : 'TRACK SLIGHTLY WET'} · AT THE STOP`;
+    stintTyres.detailTone = 'loss';
+  }
   const nextStop: PlanReadout = { label: 'PIT IN', value: `${pitInLaps}`, unit: lapsUnit(pitInLaps),
     note: `MFD · ${name} ${formatAmount(race.neededAfterStop, unit)}${unit}`,
     detail: race.stopsAfterNext > 0 ? `+${race.stopsAfterNext} MORE ${race.stopsAfterNext === 1 ? 'STOP' : 'STOPS'}` : undefined };

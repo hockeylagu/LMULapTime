@@ -14,6 +14,9 @@ export const RAIN_WET_MIN = 13;
  */
 export const DAMP_WETNESS = 0.05;
 
+/** Slightly wet (label awaiting race confirmation): first step advising wets; Damp holds either compound. */
+export const SLIGHTLY_WET_WETNESS = 0.125;
+
 /**
  * A live track is wet from Damp on (half the Damp step, against float noise), or in rain from `rainMin` (raw 0-255,
  * RAIN_WET_MIN by default; the planner holds wet down to a lower rain so a track near the line does not flip).
@@ -47,7 +50,7 @@ interface ConditionLap {
   conditions?: LapConditions;
 }
 
-const isWetCompound = (compound: string | undefined): boolean => compound === 'Wet';
+export const isWetCompound = (compound: string | undefined): boolean => compound === 'Wet';
 
 /**
  * Tags each lap run on wet tyres or in the rain, and clears the tag on the others. Rain comes from

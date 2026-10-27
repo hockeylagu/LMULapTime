@@ -65,3 +65,23 @@ describe('immutable live strategy history', () => {
     expect(records.filter(record => record.reason === 'end')).toHaveLength(2);
   });
 });
+
+
+it('checkpoints crossover changes immediately without logging every wetness fluctuation', () => {
+  const { tracker, records } = setup();
+  const snapshot = liveSnapshot({ strategy: liveStrategy() });
+  const reading = scoringReading();
+  snapshot.session!.playerLapsCompleted = reading.player!.totalLaps;
+  tracker.update(snapshot, reading, empty, 0);
+  snapshot.strategy!.crossover = { action: 'wets', compound: 'Wet', when: 'now', reason: 'slightly-wet', wetness: 0.125 };
+  tracker.update(snapshot, reading, empty, 1000);
+  expect(records.at(-1)).toMatchObject({ reason: 'settings', recordedAt: 1000, snapshot: { strategy: { crossover: { action: 'wets' } } } });
+  const count = records.length;
+  snapshot.strategy!.crossover!.wetness = 0.4;
+  tracker.update(snapshot, reading, empty, 2000);
+  expect(records).toHaveLength(count);
+  snapshot.strategy!.crossover = null;
+  tracker.update(snapshot, reading, empty, 3000);
+  expect(records.at(-1)?.snapshot.strategy?.crossover).toBeNull();
+  expect(records).toHaveLength(count + 1);
+});

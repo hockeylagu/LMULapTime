@@ -284,7 +284,21 @@ export interface LiveDeployment {
   edgeSeconds: number | null;
 }
 
+/** Wetness-step tyre advice for races; Damp holds either tyre, without a pace or forecast model. */
+export interface LiveTyreCrossover {
+  action: 'wets' | 'slicks';
+  /** Wet, or the last dry compound run in this event; null when that dry compound is unknown. */
+  compound: string | null;
+  /** Merge into a resource stop within three laps; otherwise box this lap. */
+  when: 'now' | 'planned-stop';
+  reason: 'slightly-wet' | 'dry';
+  /** Latest average path wetness, 0..1. */
+  wetness: number;
+}
+
 export interface LiveStrategy {
+  /** Race tyre advice on track; absent on older saved snapshots. */
+  crossover?: LiveTyreCrossover | null;
   resource: LiveResourcePlan | null;
   pit: LivePitInfo | null;
   damage: LiveDamage | null;

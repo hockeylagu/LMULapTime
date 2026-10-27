@@ -3,6 +3,7 @@ import type { LiveGaragePlan, LiveGarageTyres, LiveRaceStrategies } from '../../
 import { knownCarClass, resolveVehicle } from '../../../shared/domain/vehicleMapping.js';
 import { formatLapTime, UNKNOWN } from './liveFormat.js';
 import { formatAmount, resourceName } from './race/livePlanFormat.js';
+import { isWetCompound, SLIGHTLY_WET_WETNESS } from '../../../shared/domain/lapConditions.js';
 import { LIVE_TYRE_TREAD_FLOOR } from '../../../shared/domain/live/liveInsights.js';
 import { requestDirectoryScan } from '../../api/useAppData.js';
 
@@ -120,6 +121,18 @@ function garageChecks(snapshot: LiveSnapshot, plan: LiveGaragePlan): GarageCheck
     tyres.target = `~${Math.round(coverage.projectedTread * 100)}%${coverage.corner ? ` ${coverage.corner}` : ''} END`;
     tyres.note = coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR ? 'BELOW 40% MIN' : undefined;
     tyres.action = coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR ? plan.tyres?.newSets === 0 ? { text: 'NO NEW SETS', tone: 'warn' } : { text: 'FIT NEW', tone: 'change' } : coverage.availableSetsCover === false ? { text: 'SETS SHORT', tone: 'warn' } : null;
+  }
+  // Surface choice outranks tread/allocation: wets do not consume a dry set.
+  const wetness = snapshot.weather?.avgPathWetness;
+  if (kind === 'race' && plan.tyres?.compound && wetness != null) {
+    const fittedWet = isWetCompound(plan.tyres.compound);
+    const target = wetness >= SLIGHTLY_WET_WETNESS ? 'WET' : wetness === 0 && fittedWet ? 'SLICKS' : null;
+    if (target) {
+      const check = checks[checks.length - 1];
+      check.target = target;
+      check.action = target === 'WET' && fittedWet ? { text: 'OK', tone: 'ok' }
+        : { text: target === 'WET' ? 'FIT WETS' : 'FIT SLICKS', tone: 'change' };
+    }
   }
   return checks;
 }

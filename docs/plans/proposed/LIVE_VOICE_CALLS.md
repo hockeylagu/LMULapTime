@@ -41,7 +41,7 @@ would ask it? Silence is an answer too: no call means "on plan", so nothing conf
 | Is my pit menu right? | "Pit menu energy too low. Set 62." | When a stop is planned and the MFD is wrong |
 | Is the damage worth fixing? | "Repair 30 seconds, costs 12 to the flag. Stay out." | First straight after the damage read |
 | Will my tyres last? | "Tyres won't reach the flag. Plan a change." | After the line, once |
-| Wets or slicks? | "Wets in 2 laps." "Box this lap for slicks." | When the crossover window opens / pays off |
+| Wets or slicks? | "Box this lap for wets." "Box this lap for slicks." | When the track reaches Slightly wet / Dry |
 | Is rain coming, is the track changing? | "Rain in 10 minutes, lap 14." "Track now damp." | When it changes |
 | What is that yellow, is my line blocked? | "Yellow, Turn 6. Car stopped, left, on your line." | Within ~15 s of reaching it |
 | Who is coming, when do they pass? | "Hyper Ferrari behind. Passes in 6 seconds." | Before the pass |
@@ -76,7 +76,7 @@ before any drive.
 | Hypercar deployment change | The deployment advice (`strategy.deployment`, built live and unverified: see the checklist in the [plans README](../README.md)); needs the first practice to confirm `motorMap`, `motorMapMax` and the battery charge decode |
 | Penalty pending ("stop and go next stop") | `strategy.pit.penalties` (a count; the type is not known live) |
 | Ten minutes, last lap, quali one more lap | session clock, `lapsLeft`, lap pace |
-| Rain starting/stopping, rain in N minutes, dry from lap N | `weather.raining`, `strategy.forecast` |
+| Rain or dry expected around lap N, forecast changed | `strategy.forecast` |
 
 ### Small decode work: in shared memory, meaning known from rF2
 
@@ -99,8 +99,8 @@ a few seconds of the player to the call engine.
 | Pass lands in a braking zone | Braking zones by lap distance | The player's own brake trace by lap distance from this session's laps (pedals + lap distance are both live); flat-out fallback on the first lap |
 | Seconds to the pass | Closing rate | Lap distance rate of both cars; tune on replay positions (407 replays) |
 | "Box this lap" on the last straight before pit entry | Pit entry position | Learn from the player's own `inPits` switch-on lap distance; until then, call after the line |
-| Track condition wording | `mTrackGripLevel` meaning | Logged in diagnostics since 2026-10-26; map against the MFD label |
-| Wet/dry crossover pace | Pace by wetness | History has 72 sessions with wet laps (6,245 laps on wets, all drivers), but rain only, not path wetness; path wetness exists only live. First table from history, refined by one wet practice |
+| Track condition wording | `mTrackGripLevel` meaning | Mostly mapped 2026-10-27 (grip 2 Medium, 3 High; wetness steps to labels); recorded in every capture; confirm grip 0, 1, 4 and Slightly wet in races |
+| Wet/dry crossover pace | Pace by wetness | Not needed for the first version (wetness steps decide); race reviews of changing-weather races collect it. History has 72 sessions with wet laps (6,245 laps on wets, all drivers), but rain only, not path wetness |
 | Online cars | Remote cars are interpolated; speed/lateral quality unknown | One online race with diagnostics on |
 | Natural voice | Piper/Kokoro downloads, CPU while LMU runs | Step 1 listening test |
 | "Turn 6" | No corner list on main | Seconds or "sector 2" until the corner-map work lands |
@@ -168,28 +168,34 @@ deployment 40."); without plugin kW it says the game's map position ("Set deploy
 - Silent in the pit lane and for the lap after it (no measurement then anyway) and in qualifying.
 - Expiry: 30 s; if the advice changed or was withdrawn by then, the call is dropped.
 
-### Weather and track condition (data exists: `LiveWeather`, `LiveForecast`)
+### Weather and track condition (data exists: `LiveWeather`, `LiveForecast`, `track-surface` log)
 
-The MFD shows the track condition, but a call when it changes is easier than reading it.
+The car's display shows the track condition, but a call when it changes is easier than reading it.
+Calls look ahead: what the driver cannot see yet. Rain starting or stopping and the sky are visible
+from the car, so they get no call (driver, 2026-10-27). Each call is said once per change, after the
+line or on a straight:
 
-| Call | Trigger | P |
-|---|---|---|
-| "Rain starting." / "Rain stopping." | `raining` crosses a small threshold, held ~20 s | P2 |
-| "Track now damp." / "Track now wet." / "Track drying, now damp." | Path wetness moves into another condition band, with hysteresis | P2 |
-| "Rain in 10 minutes, 60 percent. Lap 14." | Forecast change to rain becomes known or its time moves by a lap; again ~5 min before | P2 |
-| "Dry from lap 20." | Forecast change to dry, same rule | P2 |
+| Change | Call | Trigger | P |
+|---|---|---|---|
+| Track grip (dry) | "Grip now high." / "Grip dropping, now medium." | `mTrackGripLevel` steps, held ~20 s; dry track only | P2 |
+| Track wetness | "Track now damp." / "Track now wet." / "Track drying, now damp." | Path wetness enters another label band | P2 |
+| Forecast | "Forecast changed. Rain likely, 60 percent." | The forecast nodes change mid-session (rain chance or sky) | P2 |
+| Forecast | "Rain expected around lap 14." / "Dry expected around lap 20." | Next forecast change becomes known or moves by a lap; again ~5 min before | P2 |
 
-- Bands: the MFD's own wording (dry / damp / wet / flooded, to confirm). Our thresholds come from
-  `avgPathWetness`; the wet-session check maps them to what the MFD says. Until then use the existing
-  learned-use hysteresis (wet >= 13, dry < 7 of 255) for the dry/damp edge only.
-- Surface grip: LMU's scoring info has `mTrackGripLevel` (u8, laid out in `rf2Layout.ts`, not decoded;
-  LMU's `InternalsPlugin.hpp` gives no meaning). The MFD Session page shows it as `Track: Low Grip,
-  43.0°C` (seen 2026-10-26). Decode and record it, then map each value to the MFD label over a dry
-  session (rubbering in) and a wet one. If it matches, it drives the
-  condition calls ("Grip now high", "Track now damp") instead of our wetness bands.
-- Forecast calls respect the existing minimum-rain-chance proposal (a 5 % node is not "rain").
-  Tyre choice for the change ("Box this lap for wets") comes from the strategy engine:
-  [LIVE_TYRE_CROSSOVER](LIVE_TYRE_CROSSOVER.md).
+Labels, from the 2026-10-27 sessions (see the grip mapping notes):
+- Grip `mTrackGripLevel`: 0 Green, 1 Low, 2 Medium, 3 High, 4 Saturated (2 and 3 confirmed by the
+  driver, the others likely). The display shows grip only when the track is dry.
+- Wetness (`avgPathWetness`, stepped): 0.05 Damp, 0.125 Slightly wet (to confirm), 0.4 Wet,
+  0.6 Very wet, 1.0 Extremely wet. A wet track shows this label instead of grip, so the calls do too.
+- Forecast timing is approximate: offline the nodes are spaced evenly over the session (online their
+  times are null) and rain came about 2.5 min before the predicted node at Silverstone. Say "expected
+  around", never an exact minute; give the lap, not the clock.
+- Forecast calls respect the minimum-rain-chance proposal (a 5 % node is not "rain").
+- Tyre choice for the change ("Box this lap for wets") comes from the strategy engine:
+  `strategy.crossover` ([implemented rule](../../CODE_MAP.md#live-race-dashboard)). First-version P1 calls:
+  "Box this lap for wets" when MFD matches, "Box for wets. Set new wets" when it does not, and
+  "Box this lap for slicks" on the dry return. For `when: planned-stop`, merge into that stop's call rather
+  than claiming the change is this lap.
 
 ### Flags, penalties and session clock (fields laid out in `rf2Layout.ts`, need decoding)
 

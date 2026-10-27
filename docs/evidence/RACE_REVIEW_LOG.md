@@ -3,6 +3,19 @@
 Written by the `race-review` skill (`.claude/skills/race-review/SKILL.md`). Newest first. Error = predicted − actual,
 in % of the lap's actual use; negative = underprediction (car runs short).
 
+## 2026-10-27 — changing-weather observations (offline, not race acceptance)
+
+Driver observations at Silverstone: light rain reached Damp and stayed there for 13+ minutes after rain;
+heavy rain reached Extremely wet, fell to Very wet within 14 s of rain ending, to Wet 11 minutes later,
+and still did not reach Dry in the following 10 minutes. `minPathWetness` stayed 0 even in full rain,
+so it does not establish a dry line. Wetness labels and forecast-window evidence are in the REST notes.
+Wets do not consume dry tyre allocation; returning to slicks uses a new or used dry set. The driver's
+classes have slicks and wets, no intermediates (driver, 2026-10-26).
+
+The first crossover rule deliberately waits for exactly Dry before returning to slicks, even if late.
+Open: confirm Slightly wet = 0.125 and compare the game's tyre message, the first displayed advice,
+actual stop/compound and lap times either side in the next wet race. No wet race acceptance is claimed.
+
 ## 2026-10-24 — LMP3 sprint, Portimão (Ginetta G61-LT-P325 Evo)
 
 **Sessions**: qualifying `52Q1`, race `73R1` (fuel only). First race on the forecast rule from 2026-10-23

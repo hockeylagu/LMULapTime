@@ -275,6 +275,13 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
 - **Session cards**: `session-list/SessionGridCard.tsx` renders bundled SVG outlines from `/track-outlines/<layoutKey>.svg` without fetching heavy metric geometry.
 
 ### Live Race Dashboard
+- **Tyre crossover**: `shared/domain/live/liveTyreCrossover.ts` supplies optional `LiveStrategy.crossover`
+  (`shared/types/liveStrategy.ts`) through `LiveStrategyTracker`. Races on track only: slicks switch at path wetness
+  >= 0.125, wets switch at exactly Dry, Damp holds either. A resource stop within three laps takes the change;
+  otherwise pit this lap; silent in the last two laps (`CROSSOVER_LAST_LAPS`). The tracker remembers the event's last dry compound. `race/raceAction.ts` gives the tyre
+  advice/MFD mismatch priority over tread advice; `liveScreens.ts` checks starting tyres in the race garage.
+  Demo scenarios `crossover-wets` and `crossover-slicks` exercise both directions. Crossover action/compound/timing/
+  reason changes trigger strategy audit checkpoints for race reviews; continuous wetness changes alone do not.
 - **Client** (`#/live`, contracts in `shared/types/live.ts`, `liveStrategy.ts`):
   - `src/api/liveStream.ts` (`useLiveStream`): manages SSE stream (`/api/live/stream`) with reconnect backoff.
   - `LiveTimingStore`: separate `useSyncExternalStore` subscription for high-frequency (5 Hz) timing updates.
