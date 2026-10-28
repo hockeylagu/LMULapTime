@@ -34,16 +34,17 @@ describe('offline live dashboard demo', () => {
     expect(vi.mocked(global.fetch).mock.calls.every(([url]) => url === '/api/live/settings')).toBe(true);
   });
 
-  it('renders every catalogued scenario through the shared dashboard', () => {
+  it('catalogues each scenario once', () => {
     expect(new Set(DEMO_SCENARIOS.map(s => s.id)).size).toBe(DEMO_SCENARIOS.length);
-    for (const scenario of DEMO_SCENARIOS) {
-      window.location.hash = `#/live?demo=1&scenario=${scenario.id}`;
-      render(<LiveDemoPage />);
-      expect(picker(/Scenario/)).toHaveAttribute('data-value', scenario.id);
-      expect(screen.getByTestId('live-frame')).toBeInTheDocument();
-      expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
-      cleanup();
-    }
+  });
+
+  // One test per scenario keeps each render under the 1 s test budget.
+  it.each(DEMO_SCENARIOS.map(s => s.id))('renders the %s scenario through the shared dashboard', id => {
+    window.location.hash = `#/live?demo=1&scenario=${id}`;
+    render(<LiveDemoPage />);
+    expect(picker(/Scenario/)).toHaveAttribute('data-value', id);
+    expect(screen.getByTestId('live-frame')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toBeInTheDocument();
     expect(FakeEventSource.instances).toHaveLength(0);
     expect(vi.mocked(global.fetch).mock.calls.every(([url]) => url === '/api/live/settings')).toBe(true);
   });
