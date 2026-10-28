@@ -90,7 +90,8 @@ export const SessionLapTableRow: React.FC<SessionLapTableRowProps> = ({
     if (Math.abs(delta) < 0.0005 && isRacing) {
       deltaStr = isLapAllTimePB ? 'Personal best' : 'Session best';
     } else {
-      deltaStr = `+${delta.toFixed(3)}s`;
+      // An inferred lap can beat the best valid lap: it gets a minus, never `+-`.
+      deltaStr = `${delta < 0 ? '−' : '+'}${Math.abs(delta).toFixed(3)}s`;
     }
   }
 

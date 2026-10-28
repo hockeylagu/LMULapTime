@@ -82,6 +82,8 @@ describe('SessionLapTable inferred timing', () => {
           elapsedSeconds: 213, s1: 30, s2: 34, s3: 39, isInferred: true,
         },
         { ...mockDetailedSession.playerDriver.laps[2], lapNumber: 3, lapTime: null, elapsedSeconds: null },
+        // An estimate can beat the best valid lap (Silverstone race 2026-10-28, lap 26): a minus, never `+-`.
+        { ...mockDetailedSession.playerDriver.laps[0], lapNumber: 4, lapTime: 99.986, elapsedSeconds: 323, isInferred: true },
       ],
     } as unknown as DriverData;
     const session = {
@@ -103,10 +105,13 @@ describe('SessionLapTable inferred timing', () => {
     );
 
     expect(screen.getByText('~1:43.000')).toBeInTheDocument();
+    expect(screen.getByText('−0.014s')).toBeInTheDocument();
+    expect(screen.queryByText(/\+-/)).toBeNull();
 
     fireEvent.click(screen.getByTitle('Sort by Lap Time'));
 
     expect(screen.getAllByTitle(/Details for Lap/).map(row => row.getAttribute('title'))).toEqual([
+      'Details for Lap 4',
       'Details for Lap 2',
       'Details for Lap 1',
       'Details for Lap 3',
