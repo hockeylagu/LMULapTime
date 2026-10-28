@@ -1,11 +1,11 @@
-import { Worker } from 'node:worker_threads';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { readLearningEventsInWorker } from '../../../../server/live/learning/reader.js';
-import { parseLearningEvent } from '../../../../server/live/learning/readEvents.js';
-import type { LiveCaptureBatch, LiveCaptureManifest, LiveCaptureWriteResult } from '../../../../shared/types/liveCapture.js';
+import { parseLearningEvent, readLearningEvents } from '../../../../server/live/learning/readEvents.js';
+import { LiveCaptureRecordingStore } from '../../../../server/live/capture/recordingStore.js';
+import type { LiveCaptureBatch, LiveCaptureManifest } from '../../../../shared/types/liveCapture.js';
 
 const folders: string[] = [];
 afterEach(async () => { for (const folder of folders.splice(0)) await rm(folder, { recursive: true, force: true }); });
@@ -34,16 +34,10 @@ async function recording(invalid = false) {
     } },
     { elapsedSeconds: 150, receivedAt: 3, source: 'shared-memory', kind: 'car-condition', data: { fuelLitres: 20 } },
   ] };
-  const worker = new Worker(new URL('../../../../server/live/capture/recordingWorkerBootstrap.mjs', import.meta.url), { workerData: { directory } });
-  await new Promise<void>((resolve, reject) => {
-    worker.on('error', reject);
-    worker.on('message', (answer: LiveCaptureWriteResult) => {
-      if (answer.type === 'persisted') worker.postMessage({ type: 'close' });
-      if (answer.type === 'failed') { reject(new Error(answer.error)); void worker.terminate(); }
-    });
-    worker.on('exit', code => code === 0 ? resolve() : reject(new Error(`Writer exited ${code}`)));
-    worker.postMessage(batch);
-  });
+  // Written in process: a real recording worker start would add ~260 ms per fixture.
+  const store = new LiveCaptureRecordingStore(directory);
+  try { await store.write(batch); }
+  finally { await store.close(); }
   return { directory, manifest };
 }
 
@@ -55,13 +49,13 @@ describe('learning observation reader', () => {
     expect(events.map(row => row.event.kind)).toEqual(['learning-forecast', 'learning-outcome']);
     expect(events[0].event.data).toMatchObject({ predicted: 2.1 });
     expect(events[1].event.data).toMatchObject({ actual: 2.2 });
-    await expect(readLearningEventsInWorker({ ...request, manifest: { ...request.manifest, driverName: 'Wrong' } })).rejects.toThrow('identity');
+    await expect(readLearningEvents({ ...request, manifest: { ...request.manifest, driverName: 'Wrong' } })).rejects.toThrow('identity');
     await rm(path.join(request.directory, request.manifest.filename));
-    await expect(readLearningEventsInWorker(request)).rejects.toThrow('removed');
+    await expect(readLearningEvents(request)).rejects.toThrow('removed');
   });
 
   it('rejects unsupported or corrupt event schemas rather than training on partial evidence', async () => {
-    await expect(readLearningEventsInWorker(await recording(true))).rejects.toThrow('unsupported');
+    await expect(readLearningEvents(await recording(true))).rejects.toThrow('unsupported');
     expect(parseLearningEvent('learning-outcome', { version: 1, lapNumber: 2, kind: 'fuel', actual: 2 })).toBeNull();
   });
 });

@@ -1,8 +1,8 @@
 import { EventEmitter } from 'node:events';
-import { execFileSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { DuckDBInstance } from '@duckdb/node-api';
 import { expect, it } from 'vitest';
 import { LiveService } from '../../../../server/live/liveService.js';
 import type { LiveWorker } from '../../../../server/live/liveService.js';
@@ -17,7 +17,10 @@ import { reconcileLiveCaptures } from '../../../../server/live/capture/reconcile
 import { scoringReading, vehicleReading } from '../../../helpers/liveReadings.js';
 
 class Reader extends EventEmitter {
-  public postMessage(): void {}
+  // Answers like the real reader, or the service waits out its 1 s drain timeout.
+  public postMessage(message: { type: string }): void {
+    if (message.type === 'stop') queueMicrotask(() => this.emit('message', { type: 'stopped' }));
+  }
   public unref(): void {}
   public terminate(): Promise<number> { return Promise.resolve(0); }
 }
@@ -72,36 +75,24 @@ it('persists recorded memory values through service, real worker, rediscovery an
     expect(indexed).toHaveLength(1);
     expect(indexed[0].manifest).toMatchObject({ status: 'interrupted', samples: 1, sessionId: null, gameVersion: null });
     const filename = path.join(directory, indexed[0].filename);
-    const output = execFileSync(process.execPath, ['-e', `
-      const { DuckDBInstance } = require('@duckdb/node-api');
-      (async () => {
-        const instance = await DuckDBInstance.create(process.argv[1], { access_mode: 'READ_ONLY' });
-        const connection = await instance.connect();
-        try {
-          const rows = (await connection.runAndReadAll('SELECT ${LIVE_CAPTURE_CHANNELS.map(channel => channel.name).join(', ')} FROM capture_samples')).getRowObjects();
-          process.stdout.write(JSON.stringify(rows));
-        } finally {
-          connection.closeSync();
-          instance.closeSync();
-        }
-      })().catch(error => { console.error(error); process.exitCode = 1; });`, filename], { encoding: 'utf8' });
+    // The worker has closed the file, so this process can open it read-only (a child process cost ~200 ms).
+    const instance = await DuckDBInstance.create(filename, { access_mode: 'READ_ONLY' });
+    let readback: { samples: Record<string, number>[]; observations: { kind: string; elapsed_seconds: number | null; data: string }[] };
+    try {
+      const connection = await instance.connect();
+      try {
+        readback = {
+          samples: (await connection.runAndReadAll(`SELECT ${LIVE_CAPTURE_CHANNELS.map(channel => channel.name).join(', ')} FROM capture_samples`))
+            .getRowObjectsJson() as Record<string, number>[],
+          observations: (await connection.runAndReadAll('SELECT kind, elapsed_seconds, data FROM capture_observations ORDER BY observation_id'))
+            .getRowObjectsJson() as typeof readback.observations,
+        };
+      } finally { connection.closeSync(); }
+    } finally { instance.closeSync(); }
     const expected = [24.0998, 0.0003, 0.14548, 1.8818, 1.6297, 0.7526, 1.1636, 23.9723, 24.224, 23.9834, 24.2205, 0, 0, 0, 0, 0, 0];
-    expect(JSON.parse(output)).toEqual([Object.fromEntries(LIVE_CAPTURE_CHANNELS.map((channel, index) => [channel.name, expected[index]]))]);
+    expect(readback.samples).toEqual([Object.fromEntries(LIVE_CAPTURE_CHANNELS.map((channel, index) => [channel.name, expected[index]]))]);
     expect(indexed[0].manifest.normalizationVersion).toBe(LIVE_CAPTURE_NORMALIZATION_VERSION);
-    const observations = execFileSync(process.execPath, ['-e', `
-      const { DuckDBInstance } = require('@duckdb/node-api');
-      (async () => {
-        const instance = await DuckDBInstance.create(process.argv[1], { access_mode: 'READ_ONLY' });
-        const connection = await instance.connect();
-        try {
-          const rows = (await connection.runAndReadAll('SELECT kind, elapsed_seconds, data FROM capture_observations ORDER BY observation_id')).getRowObjects();
-          process.stdout.write(JSON.stringify(rows));
-        } finally {
-          connection.closeSync();
-          instance.closeSync();
-        }
-      })().catch(error => { console.error(error); process.exitCode = 1; });`, filename], { encoding: 'utf8' });
-    const stored: { kind: string; elapsed_seconds: number | null; data: string }[] = JSON.parse(observations);
+    const stored = readback.observations;
     const byKind = (kind: string) => stored.filter(item => item.kind === kind).map(item => JSON.parse(item.data) as unknown);
     expect(byKind('impact')).toEqual([{ impactElapsedSeconds: 69.4, magnitude: 8896.196 }]);
     expect(stored.find(item => item.kind === 'impact')?.elapsed_seconds).toBe(69.4);
