@@ -50,24 +50,35 @@ function toPlanes(values: Int32Array): Buffer {
   const bytes = new Uint8Array(values.buffer, values.byteOffset, values.byteLength);
   const out = Buffer.allocUnsafe(bytes.length);
   const n = values.length;
-  for (let i = 0; i < n; i++) for (let b = 0; b < 4; b++) out[b * n + i] = bytes[i * 4 + b];
+  for (let i = 0; i < n; i++) {
+    const offset = i * 4;
+    out[i] = bytes[offset];
+    out[n + i] = bytes[offset + 1];
+    out[2 * n + i] = bytes[offset + 2];
+    out[3 * n + i] = bytes[offset + 3];
+  }
   return out;
 }
 
 function fromPlanes(planes: Buffer): Int32Array {
   const n = planes.length / 4;
   const bytes = new Uint8Array(planes.length);
-  for (let i = 0; i < n; i++) for (let b = 0; b < 4; b++) bytes[i * 4 + b] = planes[b * n + i];
+  for (let i = 0; i < n; i++) {
+    const offset = i * 4;
+    bytes[offset] = planes[i];
+    bytes[offset + 1] = planes[n + i];
+    bytes[offset + 2] = planes[2 * n + i];
+    bytes[offset + 3] = planes[3 * n + i];
+  }
   return new Int32Array(bytes.buffer);
 }
 
 const scale = (decimals: number) => 10 ** decimals;
-const unscale = (scaled: number, decimals: number) => scaled / scale(decimals) + 0;
 
 function numberKind(values: ReadonlyArray<number | null>): NumberKind {
   for (let decimals = 0; decimals <= MAX_DECIMALS; decimals++) {
     const factor = scale(decimals);
-    if (values.every(v => v === null || (Math.abs(v * factor) < MAX_SCALED && Object.is(unscale(Math.round(v * factor), decimals), v)))) {
+    if (values.every(v => v === null || (Math.abs(v * factor) < MAX_SCALED && Object.is(Math.round(v * factor) / factor + 0, v)))) {
       return { kind: 'scaled', decimals };
     }
   }
@@ -141,10 +152,11 @@ function decodeNumbers(descriptor: NumberKind & { nullable: boolean }, length: n
   const out = new Array<number | null>(length);
   if (descriptor.kind === 'scaled') {
     const deltas = fromPlanes(data);
+    const factor = scale(descriptor.decimals);
     let scaled = 0;
     for (let i = 0; i < length; i++) {
       scaled += deltas[i];
-      out[i] = mask && mask[i] ? null : unscale(scaled, descriptor.decimals);
+      out[i] = mask && mask[i] ? null : scaled / factor + 0;
     }
   } else {
     const copy = new Uint8Array(data);
@@ -173,7 +185,9 @@ function decodeColumn(descriptor: Descriptor, length: number, take: () => Buffer
     }
     case 'json':
       return JSON.parse(take().toString('utf8')) as LapColumn;
-    default:
+    case 'scaled':
+    case 'f32':
+    case 'f64':
       return decodeNumbers(descriptor, length, take);
   }
 }

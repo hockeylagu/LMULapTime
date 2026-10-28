@@ -46,6 +46,24 @@ describe('binary lap columns', () => {
     expect(decoded).toStrictEqual(stored.columns.v);
   });
 
+  it('preserves null runs and signed deltas at each decimal scale and the scaled limit', () => {
+    const columns: Record<string, LapColumn> = {};
+    for (let decimals = 0; decimals <= 4; decimals++) {
+      const factor = 10 ** decimals;
+      columns[`scale${decimals}`] = [
+        null, (2 ** 30 - 1) / factor, null, null, -(2 ** 30 - 1) / factor,
+        1 / factor, -1 / factor, 0, null,
+      ];
+    }
+    columns.beyondLimit = [2 ** 30, -(2 ** 30), null, null, 0, 1, 2, 3, 4];
+    const stored = lap(columns);
+    const buffer = encodeLapColumns(stored);
+    expect(decodeLapColumns<TestLap>(buffer)).toStrictEqual(stored);
+    expect(kinds(buffer)).toEqual({
+      scale0: 'scaled0', scale1: 'scaled1', scale2: 'scaled2', scale3: 'scaled3', scale4: 'scaled4', beyondLimit: 'f32',
+    });
+  });
+
   it('stores a four-wheel tuple with a missing wheel without changing it', () => {
     const stored = lap({ w: [[1, 2, 3, 4], [1, null, 3, 4] as unknown as [number, number, number, number]] });
     expect(decodeLapColumns<TestLap>(encodeLapColumns(stored))).toStrictEqual(stored);
