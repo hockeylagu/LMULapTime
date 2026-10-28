@@ -3,6 +3,106 @@
 Written by the `race-review` skill (`.claude/skills/race-review/SKILL.md`). Newest first. Error = predicted − actual,
 in % of the lap's actual use; negative = underprediction (car runs short).
 
+## 2026-10-28 — GT3 sprint, Silverstone International (Aston Martin Vantage AMR LMGT3)
+
+**Sessions**: Interlagos practice `78P1`; Silverstone practice `90P1`, qualifying `10Q1`, race `92R1` (Medium, dry).
+Earlier test sessions (2026-10-25 to 10-27) not reviewed here.
+
+**Buckets** (session × fuel/VE): noise 6, mechanism 2 (race fuel and VE), steady bias 0, data 0.
+- Practice/qualifying: medians −0.4 to +0.8 %, worst −2.8 % VE on the first measured lap. Noise.
+- Race: median −0.9 % fuel and VE; laps 16–19 short by up to −3.4 % fuel / −3.5 % VE (lap 19).
+
+**Mechanism**: laps 13–15 were tow laps 0.2–0.4 s behind another GT3 (one contact), 1.72–1.74 L against
+~1.81 L clean. Three of the five meter laps were low and "drop the lowest" leaves out only one.
+Same pattern as Le Mans 2026-10-22, milder.
+
+**Data finding**: stored forecasts were one lap old. The forecast froze within 2 s of the line, before the meter had
+measured the lap just ended (it needs a sample after the line), so every stored measured forecast left that lap out;
+the live display already counted it. The replay of the meter over stored examples reproduces 94/97 fuel forecasts.
+
+| Rule (fuel / VE, measured laps) | MAE | p95 | Worst under | Under > 2 % |
+|---|---|---|---|---|
+| Stored (one lap old) | 1.30 / 1.26 % | 4.11 / 3.70 % | −5.6 / −3.8 % | 9 / 10 |
+| Lap just ended counted | 1.18 / 1.22 % | 3.56 / 3.56 % | −3.5 / −2.9 % | 8 / 8 |
+| Same, lowest 2 of 5 left out | 1.25 / 1.21 % | 3.84 / 3.67 % | −3.5 / −2.9 % | 3 / 3 |
+
+**Automatic learning**: 0 active, 0 validating. Silverstone International measured cohort has evidence but the
+correction fails `mae-not-improved` / `p95-regressed`: no bias to learn, the right answer.
+
+**Formation lap**: fuel 53.36 → 53.02 L from formation to green (0.19 lap of 1.78 L), VE held 58 %. The driver confirmed
+in game: the formation lap takes fuel, not VE. Measured 0.135–0.19 lap over three races; `formationLapUse` (VE 0,
+fuel 0.25 lap) stays.
+
+**Applied (uncommitted), app output**: an inferred lap now runs from its own `et` to the next lap's
+(`server/sessions/sessionLapTiming.ts`; all 32,854 stored consecutive lap pairs agree that `et` is the lap start; the
+last lap stays without a time), `DB_PARSER_VERSION` 2.24, all 1,089 sessions reparsed. The lap table shows an inferred
+lap faster than the best with a minus (`SessionLapTableRow.tsx`). Three parser fixtures that had `et` as the lap end
+were corrected; regression tests from race laps 5–7 and 26.
+
+**Applied (uncommitted)**: the forecast freezes once the lap just ended is measured, at most `FORECAST_WAIT_SECONDS`
+(12 s; laps with no measured use freeze from 10 s), `shared/domain/learning/capture.ts`; the example check allows the
+same window. `LIVE_BASELINE_MODEL_VERSION` 5, so learning cohorts restart. Regression test from race lap 19 in
+`test/domain/learning/capture.test.ts`. Meter rule unchanged.
+
+**Tyre wear** (`evaluateTyreWear.ts`, race held out, 4 training sessions):
+- The last new set was fitted on the grid (new sets 1 → 0). The garage plan showed ~88 % at the flag for 29 laps; the
+  worst tyre, rear left, finished at 84.4 %.
+- Clean race laps wore FL 0.0037, FR 0.0029, RL 0.0040, RR 0.0039 per lap, so the plan (about 0.0040 per lap) was right
+  for clean laps. Qualifying push laps wore 0.0045–0.0060.
+- Lap 5 (contact, 82 s, 3.2 s of rear wheelspin) cost FL 3.4 %, RL 3.4 %, RR 1.8 %: about eight clean laps in one lap,
+  3 of the 3.6 points the plan missed. Lap 1 (formation and start) cost 1.5–1.6 % a wheel, about 1.2 points more
+  than a clean lap.
+- The held-out model (0.859) and the old rule (0.840) bracket the actual. No slip slope was learned (no slip laps in
+  the Aston training). Bucket: incident, nothing to change.
+
+**Scorecard** (first review with the checklist; `reviewRaceStrategy.ts` added):
+
+| # | Box | Result |
+|---|---|---|
+| 1 | Fuel/VE per lap | Miss, mechanism: tow laps 13–15 in the meter window, −3.4 % on laps 18–19 |
+| 2 | Laps | OK: 28 planned, 28 run |
+| 3 | Start load | OK: VE 2.3 % (1.14 laps) and fuel 2.85 L (1.59 laps) at the flag, reserve 0.7 lap |
+| 4 | Formation lap | OK: fuel 0.19 lap, VE unchanged (driver confirmed in game) |
+| 5 | Stops | n/a: no stop planned or made |
+| 6 | Tyre wear | Miss, incident: plan ~88 %, actual 84.4 % (RL); lap 5 contact cost 3 points, clean laps as planned |
+| 7 | Incidents | OK: lap 5 contact (+18 s, 3.4 % tread FL/RL, 3.2 s rear wheelspin); lap 13 contact in the tow run |
+| 8 | Weather | n/a: dry |
+| 9 | Data | Miss, data: stored forecasts one lap old (fixed) |
+| 10 | Learning | OK: Silverstone cohort gated on `mae-not-improved` / `p95-regressed`, no bias to learn |
+| 11 | Result | OK: grid P16, peak P12, P14 on lap 4; lap 5 contact (+18.8 s) dropped to P31; recovered to P19 (−3), lapped |
+| 12 | Traffic | OK: laps 3, 8, 10, 11, 14, 15 flagged (cars within 0.2–1.8 s), about 5.4 s against the clean median 63.63 s; plus lap 13 contact in the tow (+1.3 s) |
+| 13 | Driving | Best 1:03.274 (lap 25) against qualifying/PB 1:03.096 and theoretical 1:03.201; clean median 26th of 33 in GT3, +1.17 s on the class median leader; sector gaps to the class bests S1 +0.61, S2 +0.50, S3 +0.27 s; 9 track limits, 6 incidents, 7.4 s of lockup/wheelspin (laps 4–5) |
+| 14 | App output | Miss, app (fixed): inferred laps took the previous lap's time (lap 6 showed ~1:22.360, the lap 5 contact; now ~1:04.200); lap 26 showed `+-0.014s` |
+
+**Damage** (recording `impact` / `car-condition`, strategy snapshots): nine impacts, three minor body dents (parts 0, 3, 4,
+level 1), no suspension damage, nothing detached; body 0.02 after lap 5, 0.06 after lap 16. No pace cost: clean laps
+before (lap 9 1:03.511, lap 12 1:03.689) match those after (median 1:03.59, best 1:03.274 on lap 25 with all dents),
+top speed unchanged (248.8–249.3 km/h). **Mechanism found**: at the start of lap 9 the dashboard showed damage costing
+8 s a lap (168 s to the flag) for one lap: `LiveDamageTracker` measures from 2 laps after the impact (`PACE_LAPS`), and
+the median of 2 is their mean, so the lap 5 contact (1:22.36) and lap 6 (1:04.20) read as 73.3 s against 65.3 s before.
+The same flag made the learning exclude lap 9 as `damage`. Applied (uncommitted): the pace after the impact waits for 3
+laps (`PACE_WINDOW`, `shared/domain/live/liveCarCondition.ts`), so the median drops one slow lap; on this race it reads
+0 from lap 8. Real damage shows one lap later. `LIVE_MODEL_VERSION` 12; regression test from race laps 2–7.
+
+**S1 corner by corner** (replay traces at 5 m, best race lap 1:03.274 against Dom Wah's S1-best lap, Enzo Syl's best,
+VVV GG's best and the qualifying best): of the 0.49–0.66 s lost in S1, 0.36–0.46 s is the slow corner at ~780 m before
+the S1 line: 85 km/h minimum against 88 (Enzo Syl) and 93 (Dom Wah), braking ~12 m earlier (651 against 663 m) and full
+throttle ~29 m later (815 against 786 m). The fast corner at ~290 m costs 0.10 s (183 against 192 km/h, braking 13 m
+earlier). VVV GG, at your pace, gains 0.21 s at the same slow corner. Race S1 matches qualifying (−0.06 s), so it is a
+habit, not tyres or damage.
+
+**Watch list** (recheck at every review):
+- Meter: a third tow-lap run (Le Mans 10-22, Silverstone 10-28) decides "lowest 2 of 5".
+- Forecast freeze: stored forecasts 1–2 s after lap start, including the lap just ended (fixed 10-28).
+- Tyre wear, qualifying vs race: qualifying laps wore 0.45–0.60 %, clean race laps 0.29–0.40 %; a second race with the
+  same gap means weighting race laps when planning a race.
+- Tyre wear, lap 1: formation and start cost about four clean laps a wheel (1.5–1.6 %); the plan counts two.
+- Capture start-up drops (Portimão 10-24): none at Silverstone.
+- Wet: confirm Slightly wet = 0.125 and the crossover advice in the next wet race.
+- Driving: S1's slow corner at ~780 m (85 km/h, brake ~12 m early, throttle ~29 m late) costs 0.36–0.46 s a lap;
+  recheck at the next Silverstone race.
+- Damage pace now waits for 3 laps after the impact (fixed 10-28): check the next real damage still shows its cost.
+
 ## 2026-10-27 — changing-weather observations (offline, not race acceptance)
 
 Driver observations at Silverstone: light rain reached Damp and stayed there for 13+ minutes after rain;

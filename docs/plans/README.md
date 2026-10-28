@@ -154,5 +154,7 @@ Settings action, refused on track. Existing fake-plugin tests do not replace thi
 - [Simplified 3D replay](proposed/REPLAY_3D_PLAN.md): validate one exported scene and replay pose first.
 - [Live voice calls](proposed/LIVE_VOICE_CALLS.md): call catalogue, anti-distraction rules and iterations;
   driver decisions first (Crew Chief overlap, voice, naming).
+- [Debrief corner tracking](proposed/DEBRIEF_CORNER_TRACKING.md): each debrief corner against the driver's own
+  previous session at the layout (corner time and cues), to see whether a habit is being corrected.
 - [Further replay preparation](proposed/REPLAY_STORAGE_DESIGN.md): storage size takes priority; measure
   before revisiting prepared views or grouped columns.
