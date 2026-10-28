@@ -28,6 +28,9 @@ export default defineConfig({
           pool: 'vmThreads',
           include: ['test/**/*.test.tsx'],
           setupFiles: ['./test/setup.ts'],
+          // vmThreads loads externals again in every file: lucide-react's CommonJS build cost ~80 ms
+          // per file, about half that pre-bundled. Bundling jest-dom or Testing Library cost more.
+          deps: { optimizer: { client: { enabled: true, include: ['lucide-react'] } } },
         },
       },
     ],
