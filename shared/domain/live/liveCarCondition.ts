@@ -58,9 +58,13 @@ export const PACE_LOSS_SIGNIFICANT = 0.3;
 export const REPAIR_SIGNIFICANT = 30;
 /** Damage below this (body, suspension) is noise. */
 const DAMAGE_EPSILON = 0.01;
-/** Laps each side of the impact the pace loss needs. */
+/** Laps before the impact the pace loss needs. */
 const PACE_LAPS = 2;
-/** Laps averaged each side. */
+/**
+ * Laps averaged each side; the pace after the impact waits for all of them, so the median drops one slow lap. From two
+ * laps the median is their mean: the lap 5 contact (1:22.4) and lap 6 (1:04.2) read as 8 s a lap of damage
+ * (Silverstone race 2026-10-28, race review 2026-10-28).
+ */
 const PACE_WINDOW = 3;
 /** More tread lost in one lap than this is damage, not wear (normal wear is well under 5% a lap). */
 export const MAX_LAP_WEAR = 0.15;
@@ -181,7 +185,7 @@ export class LiveDamageTracker {
   /** Null while undamaged. `lapsLeft` is the race laps left (null outside races). */
   public damage(completedLaps: number, lapsLeft: number | null): LiveDamage | null {
     if (this.impactLap === null) return null;
-    const pace = this.before.length >= PACE_LAPS && this.after.length >= PACE_LAPS
+    const pace = this.before.length >= PACE_LAPS && this.after.length >= PACE_WINDOW
       ? Math.max(0, round(median(this.after) - median(this.before), 1)) : null;
     const wheel = this.wheel();
     const condition = this.condition;

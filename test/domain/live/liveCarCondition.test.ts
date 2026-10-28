@@ -28,9 +28,11 @@ describe('LiveDamageTracker', () => {
     damage.lapCompleted(liveLap(5, 76.4, [null, null, null]));
     expect(damage.damage(5, 8)).toMatchObject({ impactLap: 4, lapsSinceImpact: 2, paceLossPerLap: null, repairSeconds: 30, significant: true });
     damage.lapCompleted(liveLap(6, 76.6, [null, null, null]));
-    expect(damage.damage(6, 7)).toEqual({
-      wheel: null, body: 0.4, suspension: 0.11, partsDetached: false, impactLap: 4, lapsSinceImpact: 3,
-      paceLossPerLap: 1, lossToFinish: 7, repairSeconds: 30, significant: true,
+    expect(damage.damage(6, 7)).toMatchObject({ paceLossPerLap: null });
+    damage.lapCompleted(liveLap(7, 76.5, [null, null, null]));
+    expect(damage.damage(7, 6)).toEqual({
+      wheel: null, body: 0.4, suspension: 0.11, partsDetached: false, impactLap: 4, lapsSinceImpact: 4,
+      paceLossPerLap: 1, lossToFinish: 6, repairSeconds: 30, significant: true,
     });
   });
 
@@ -40,6 +42,20 @@ describe('LiveDamageTracker', () => {
     damage.updateCondition(condition({ body: 0.03 }));
     for (const [lap, time] of [[5, 132.3], [6, 131.4], [7, 132.3], [8, 145.2]] as const) damage.lapCompleted(liveLap(lap, time, [null, null, null]));
     expect(damage.damage(8, 6)).toMatchObject({ paceLossPerLap: 0, significant: false });
+  });
+
+  it('waits for three laps after the impact, so a contact lap is not damage pace (Silverstone race 2026-10-28)', () => {
+    // Body dent on lap 4; laps 2-3 before it, then the lap 5 contact (82.356 s) and laps 6-8. From two laps the median
+    // was their mean: 73.3 s against 65.3 s read as 8 s a lap for the rest of the race.
+    const damage = new LiveDamageTracker();
+    damage.updateCar(car(), 2);
+    for (const [lap, time] of [[2, 65.709], [3, 64.807]] as const) damage.lapCompleted(liveLap(lap, time, [null, null, null]));
+    damage.updateCar(car({ dentSeverity: [0, 0, 0, 1, 0, 0, 0, 0] }), 4);
+    damage.updateCondition(condition({ body: 0.01 }));
+    for (const [lap, time] of [[4, 64.58], [5, 82.356], [6, 64.2]] as const) damage.lapCompleted(liveLap(lap, time, [null, null, null]));
+    expect(damage.damage(6, 22)).toMatchObject({ impactLap: 4, paceLossPerLap: null, significant: false });
+    damage.lapCompleted(liveLap(7, 64.48, [null, null, null]));
+    expect(damage.damage(7, 21)).toMatchObject({ paceLossPerLap: 0, lossToFinish: 0, significant: false });
   });
 
   it('moves the impact to a later hit that breaks the suspension (COTA race 2026-10-21)', () => {
@@ -53,8 +69,8 @@ describe('LiveDamageTracker', () => {
 
     damage.updateCondition(condition({ body: 0.23, suspension: [0, 0, 0, 0.12] }));
     damage.updateEstimate(30, 0);
-    for (const [lap, time] of [[5, 80], [6, 76], [7, 76.2]] as const) damage.lapCompleted(liveLap(lap, time, [null, null, null]));
-    expect(damage.damage(7, 3)).toMatchObject({ impactLap: 5, lapsSinceImpact: 3, paceLossPerLap: 1, lossToFinish: 3, repairSeconds: 30 });
+    for (const [lap, time] of [[5, 80], [6, 76], [7, 76.2], [8, 76.1]] as const) damage.lapCompleted(liveLap(lap, time, [null, null, null]));
+    expect(damage.damage(8, 2)).toMatchObject({ impactLap: 5, lapsSinceImpact: 4, paceLossPerLap: 1, lossToFinish: 2, repairSeconds: 30 });
   });
 
   it('keeps the repair estimate while a penalty hides it, and clears everything once repaired', () => {
