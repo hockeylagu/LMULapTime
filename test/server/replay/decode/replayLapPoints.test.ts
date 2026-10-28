@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildTrajectoryPoints, lapEdgesFromNeighbours, LAP_EDGE_PADDING_SEC } from '../../../../server/replay/decode/replayLapPoints.js';
+import { buildTrajectoryPoints, lapEdgesFromNeighbours, LAP_EDGE_PADDING_SEC, roundFixed } from '../../../../server/replay/decode/replayLapPoints.js';
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 
 // 50 m/s, one sample every 0.1 s (5 m); sample i is at time 100 + i * 0.1.
@@ -15,6 +15,18 @@ it('retains the decoder rotation precision and positive zero after a single roun
   ], [], []);
   expect(point.rotX).toBe(0);
   expect(point.rotZ).toBe(0.1235);
+});
+
+it('rounds exactly like Number(toFixed), including half steps, signed zeros and non-finite values', () => {
+  const edges = [0, -0, 1.00005, -1.00005, 1.000049999, 0.00005, -0.00004, 2.675, 1.005, 12345.67895,
+    -19999.99995, 0.1 + 0.2, NaN, Infinity, -Infinity];
+  // Floats as the decoder reads them, at track coordinate and session clock magnitudes.
+  const floats = new Float32Array(Array.from({ length: 20_000 }, (_, i) => Math.sin(i * 7.31) * 10 ** (i % 5)));
+  for (const value of [...edges, ...floats, ...floats.map(v => v + 86_400)]) {
+    for (const digits of [2, 4]) {
+      expect(Object.is(roundFixed(value, digits), Number(value.toFixed(digits)))).toBe(true);
+    }
+  }
 });
 
 describe('lapEdgesFromNeighbours', () => {

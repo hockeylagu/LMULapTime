@@ -1,14 +1,16 @@
 import type { RawTrajectoryPoint } from './replayLapBuilder.js';
+import { roundFixed } from './replayLapPoints.js';
 
 export type ReplayPoseState = Pick<RawTrajectoryPoint, 'wheelSpeeds' | 'brakeTemps' | 'virtualEnergy' | 'rainIntensity' | 'ambientTemp' | 'tireCompoundIndices'>;
+
+function signed(low: number, high: number): number {
+  const value = low | (high << 8);
+  return value & 0x8000 ? value - 0x10000 : value;
+}
 
 function packetSpeed(payload: Buffer, offset: number): number | undefined {
   const b0 = payload[offset], b1 = payload[offset + 1], b2 = payload[offset + 2], b3 = payload[offset + 3], b4 = payload[offset + 4];
   if ((b0 | b1 | b2 | b3 | b4) === 0) return undefined;
-  const signed = (low: number, high: number): number => {
-    const value = low | (high << 8);
-    return value & 0x8000 ? value - 0x10000 : value;
-  };
   const high1 = (b1 & 0x20) ? (b1 & 0x3f) + 192 : b1 & 0x3f;
   const low2 = (b1 >> 6) + ((b2 & 0x3f) << 2);
   const high2 = (b2 >> 6) + ((b3 & 1) << 2) + ((b3 & 2) ? 248 : 0);
@@ -29,7 +31,7 @@ export function decodeReplayPose(payload: Buffer, offset: number, sTime: number,
   return {
     sTime, x, y, z,
     rotX: payload.readFloatLE(offset + 53), rotY: payload.readFloatLE(offset + 57), rotZ: payload.readFloatLE(offset + 61),
-    steerYaw: parseFloat(((512 - steer10) / 512).toFixed(4)),
+    steerYaw: roundFixed((512 - steer10) / 512, 4),
     rawThrottle: throttle <= 1 ? 0 : Math.min(100, Math.round(((throttle - 1) / 248) * 100)),
     rawBrake: brake === 0 ? 0 : Math.min(100, Math.round(((brake & 0x3f) / 63) * 100)),
     tcActive: Boolean(brake & 0x80), absActive: Boolean(brake & 0x40), pitLimiter: Boolean(status & 0x04),

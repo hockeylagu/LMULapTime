@@ -10,6 +10,19 @@ const MAX_PLAUSIBLE_SPEED_KMH = 400;
 const MAX_SAMPLE_JUMP_M = 60;
 
 /**
+ * Number(value.toFixed(digits)) without building a string per value. The scaled value is off by at
+ * most one rounding step, so only a value within that of a half step can round the other way: those
+ * few take toFixed. Zero returns +0 like toFixed does for -0.
+ */
+export function roundFixed(value: number, digits: number): number {
+  if (value === 0) return 0;
+  const scale = 10 ** digits;
+  const scaled = value * scale;
+  const rounded = Math.round(scaled);
+  return Math.abs(Math.abs(scaled - rounded) - 0.5) > 1e-6 ? rounded / scale : Number(value.toFixed(digits));
+}
+
+/**
  * Converts raw replay samples to trajectory points. Speed comes from the packet when it
  * decodes to a plausible value, otherwise from the distance to the previous sample. The garage
  * state comes from the driver's pit events (applyGarageState), the same way a stored lap gets it.
@@ -34,15 +47,15 @@ export function buildTrajectoryPoints(
     const inPit = Boolean(cur.inPit) || isTimeInIntervals(cur.sTime, pitIntervals);
 
     return {
-      x: Number(cur.x.toFixed(4)),
-      y: Number(cur.y.toFixed(4)),
-      z: Number(cur.z.toFixed(4)),
+      x: roundFixed(cur.x, 4),
+      y: roundFixed(cur.y, 4),
+      z: roundFixed(cur.z, 4),
       // The old decoder rounded X/Z before this conversion, turning rounded -0 into
       // +0 on the second pass. Keep that output while rounding each value only once.
-      rotX: cur.rotX !== undefined ? Number(cur.rotX.toFixed(4)) + 0 : undefined,
-      rotY: Number(cur.rotY.toFixed(4)),
-      rotZ: cur.rotZ !== undefined ? Number(cur.rotZ.toFixed(4)) + 0 : undefined,
-      speedKmh: Number(rawSpeed.toFixed(2)),
+      rotX: cur.rotX !== undefined ? roundFixed(cur.rotX, 4) + 0 : undefined,
+      rotY: roundFixed(cur.rotY, 4),
+      rotZ: cur.rotZ !== undefined ? roundFixed(cur.rotZ, 4) + 0 : undefined,
+      speedKmh: roundFixed(rawSpeed, 2),
       throttle: cur.rawThrottle ?? 0,
       brake: cur.rawBrake ?? 0,
       steerYaw: cur.steerYaw ?? 0,
@@ -51,7 +64,7 @@ export function buildTrajectoryPoints(
       isOffTrack: cur.isOffTrack,
       inGarage: false,
       isTeleport: false,
-      timeSec: Number(cur.sTime.toFixed(4)),
+      timeSec: roundFixed(cur.sTime, 4),
       tcActive: cur.tcActive,
       absActive: cur.absActive,
       pitLimiter: cur.pitLimiter,
