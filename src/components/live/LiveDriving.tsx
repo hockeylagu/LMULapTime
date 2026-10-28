@@ -7,6 +7,11 @@ import { LiveRaceView } from './LiveRaceView.js';
 export function LiveDriving({ snapshot, store }: { snapshot: LiveSnapshot; store: LiveTimingStore }) {
   switch (snapshot.session?.kind) {
     case 'race': return <LiveRaceView snapshot={snapshot} store={store} />;
-    default: return <LivePracticeView snapshot={snapshot} store={store} />;
+    case 'practice':
+    case 'qualifying':
+    case 'unknown':
+    case 'warmup':
+    case undefined:
+      return <LivePracticeView snapshot={snapshot} store={store} />;
   }
 }

@@ -128,7 +128,7 @@ export function matchesShow(replay: ReplayCacheSummary, show: ReplayShow, curren
     case 'disk': return !isArchived(replay);
     case 'archived': return isArchived(replay);
     case 'outdated': return isOutdated(replay, currentVersion);
-    default: return true;
+    case 'all': return true;
   }
 }
 

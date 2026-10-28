@@ -20,7 +20,7 @@ function countFor(show: ReplayShow, counts: ReplayCounts | null): number | null 
     case 'disk': return counts.onDisk;
     case 'archived': return counts.archived;
     case 'outdated': return counts.outdated;
-    default: return counts.total;
+    case 'all': return counts.total;
   }
 }
 

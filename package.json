@@ -32,7 +32,7 @@
     "learning:evaluate": "tsx tools/analysis/evaluateLiveLearning.ts",
     "screenshots": "tsx tools/captureScreenshots.ts",
     "check:local-data": "node tools/release/checkLocalData.mjs",
-    "lint": "oxlint --type-aware --max-warnings 0 --report-unused-disable-directives && node tools/release/checkLintReasons.mjs"
+    "lint": "oxlint --type-aware --max-warnings 0 --report-unused-disable-directives && oxlint --vitest-plugin -A all -D vitest/no-focused-tests --max-warnings 0 test && node tools/release/checkLintReasons.mjs"
   },
   "dependencies": {
     "@duckdb/node-api": "^1.5.6-r.1",

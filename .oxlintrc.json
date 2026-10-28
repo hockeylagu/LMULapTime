@@ -8,6 +8,8 @@
     "typescript/no-floating-promises": "error",
     "typescript/no-misused-promises": "error",
     "typescript/await-thenable": "error",
+    "typescript/switch-exhaustiveness-check": "error",
+    "import/no-cycle": "error",
     "react/rules-of-hooks": "error",
     "react/exhaustive-deps": "error",
     "react/set-state-in-effect": "error",
