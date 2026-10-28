@@ -58,9 +58,11 @@ export function createLeaderboardRouter(context: ServerContext): Router {
 
   // The player picks their rival: any driver ahead on the board.
   router.post('/rivals/pin', (req, res) => {
-    const query = withBoardQuery(req.body ?? {}, res);
+    const body: unknown = req.body;
+    const input = body && typeof body === 'object' && !Array.isArray(body) ? body as Record<string, unknown> : {};
+    const query = withBoardQuery(input, res);
     if (!query) return;
-    const driverName = queryString(req.body?.driverName);
+    const driverName = queryString(input.driverName);
     const board = boardFor(query);
     const target = driverName ? pinnedTarget(board, driverName, Date.now()) : null;
     if (!target) {

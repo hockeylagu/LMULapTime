@@ -322,7 +322,7 @@ describe('ServerContext background session sync', () => {
     context.requestSessionRefresh(true);
 
     expect(sessionDbMock.syncSessionsFromDir).not.toHaveBeenCalled();
-    expect(sessionDbMock.syncSessionsAsyncIterator).toHaveBeenCalledWith('', expect.objectContaining({ parseSessionXmlAsync: expect.any(Function) }), true);
+    expect(sessionDbMock.syncSessionsAsyncIterator).toHaveBeenCalledWith('', expect.objectContaining({ parseSessionXmlAsync: expect.any(Function) as unknown }), true);
   });
 
   it('rescans the DuckDB folder on Refresh and matches the new files to the sessions', async () => {
@@ -403,7 +403,7 @@ describe('ServerContext background session sync', () => {
     await vi.runAllTimersAsync();
 
     expect(sessionDbMock.syncSessionsAsyncIterator).toHaveBeenCalledTimes(1);
-    expect(sessionDbMock.syncSessionsAsyncIterator).toHaveBeenCalledWith('', expect.objectContaining({ parseSessionXmlAsync: expect.any(Function) }), true);
+    expect(sessionDbMock.syncSessionsAsyncIterator).toHaveBeenCalledWith('', expect.objectContaining({ parseSessionXmlAsync: expect.any(Function) as unknown }), true);
   });
 });
 
@@ -629,7 +629,10 @@ describe('telemetry ownership catalog lifetime', () => {
       expect(metadata.mock.calls.filter(args => args[0] === undefined)).toHaveLength(1);
       // Two files two days apart: two windows, neither holding the whole history.
       expect(candidates).toHaveBeenCalledTimes(2);
-      for (const result of candidates.mock.results) expect(result.value.length).toBeLessThan(25);
+      for (const result of candidates.mock.results) {
+        if (result.type !== 'return') throw new Error('Candidate query did not return');
+        expect(result.value.length).toBeLessThan(25);
+      }
       expect(fullSessionsByWindow).not.toHaveBeenCalled();
       expect(fullSessionsById).not.toHaveBeenCalled();
       expect(db.getTelemetryMetadata().map(row => [row.filename, row.matchedSessionId])).toEqual([
@@ -695,7 +698,7 @@ describe('ServerContext reference laptime refresh', () => {
     context.refreshBenchmarkDiffImpacts();
 
     expect(sessionDbMock.updateBenchmarkDiffImpact).toHaveBeenCalledWith(7, expect.objectContaining({
-      id: 7, totalAffectedSessions: 0, totalCategoryShifts: 0, impactRule: expect.any(Number),
+      id: 7, totalAffectedSessions: 0, totalCategoryShifts: 0, impactRule: expect.any(Number) as unknown,
     }));
     db.close();
   });

@@ -15,7 +15,8 @@ export function createGameProcessProbe(executable = 'Le Mans Ultimate.exe'): Gam
   if (process.platform !== 'win32') return { read: () => null, close: () => {} };
   const nodeRequire = createRequire(import.meta.url);
   try {
-    const lib = nodeRequire('koffi').load('kernel32.dll');
+    const koffi = nodeRequire('koffi') as typeof import('koffi');
+    const lib = koffi.load('kernel32.dll');
     const snapshot = lib.func('void* __stdcall CreateToolhelp32Snapshot(uint32 flags, uint32 pid)') as (flags: number, pid: number) => bigint | null;
     const first = lib.func('int __stdcall Process32FirstW(void* snapshot, void* entry)') as (handle: bigint, entry: Buffer) => number;
     const next = lib.func('int __stdcall Process32NextW(void* snapshot, void* entry)') as typeof first;

@@ -80,7 +80,7 @@ export const TrackSummaries: React.FC<TrackSummariesProps> = ({
     if (!lapTime || !Number.isFinite(lapTime) || lapTime <= 0 || !refEntry || !Number.isFinite(refEntry.targets.alienSec) || refEntry.targets.alienSec <= 0) return null;
     const pct = (lapTime / refEntry.targets.alienSec) * 100;
     if (!Number.isFinite(pct)) return null;
-    return { category: getPaceCategoryFromPercentage(pct) as PaceCategory, pct };
+    return { category: getPaceCategoryFromPercentage(pct), pct };
   };
 
   const paceByTrack = useMemo(() => {

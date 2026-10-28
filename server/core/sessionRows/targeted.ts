@@ -1,7 +1,7 @@
 import type { Database as DatabaseType } from 'better-sqlite3';
 import type { DetailedSession, SessionMetadata } from '../../../shared/types/index.js';
 import { RECORDING_FIELDS } from './specs.js';
-import { packFields, type Row, type SqlValue } from './fields.js';
+import { packFields, type SqlValue } from './fields.js';
 import { buildSessionSummaryProjection } from '../../../shared/domain/sessionSummaries/buildSessionSummaryProjection.js';
 import { persistSessionAggregate } from '../sessionSummaries/aggregateStore.js';
 import { updateDerivedColumns } from './writer.js';
@@ -28,7 +28,7 @@ export function upsertTargetedReplayLink(
   updatedAt = Date.now()
 ): void {
   const params: Record<string, SqlValue> = { session_id: sessionId };
-  packFields(params, link as unknown as Row, RECORDING_FIELDS);
+  packFields(params, link, RECORDING_FIELDS);
 
   db.transaction(() => {
     db.prepare(`

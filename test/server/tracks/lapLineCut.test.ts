@@ -59,8 +59,8 @@ describe('cutLapAtLine', () => {
     // The lap itself is fused with DuckDB (tyre temps, ride height); the recording either side is
     // the replay file's, without them. The slice starts 11 m late and ends 1 m early.
     const lapEndIdx = samples.findIndex(p => Math.abs((p.throttle ?? 0) - 199) < 1e-9);
-    const fused = samples.map((p, i) => (i >= sliceStart && i <= lapEndIdx
-      ? { ...p, tireTemps: [80, 81, 82, i], rideHeight: [0.05, 0.05, 0.06, 0.06] } as ReplayTrajectoryPoint
+    const fused = samples.map((p, i): ReplayTrajectoryPoint => (i >= sliceStart && i <= lapEndIdx
+      ? { ...p, tireTemps: [80, 81, 82, i], rideHeight: [0.05, 0.05, 0.06, 0.06] }
       : p));
     const result = cut(fused, sliceStart, lapEndIdx);
     expect([result.start, result.end]).toEqual(['line', 'line']);

@@ -19,7 +19,7 @@ export function lap(lapNumber: number, lapTime: number, extra: Partial<LapData> 
     isValid: true,
     isPitStop: false,
     ...extra,
-  } as LapData;
+  };
 }
 
 /** A driver whose lap 1 is a slow start lap (never counted), followed by the given laps. */
@@ -67,5 +67,5 @@ export function session(
     playerDriver: player,
     drivers,
     ...rest,
-  } as DetailedSession;
+  };
 }

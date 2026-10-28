@@ -11,6 +11,7 @@ vi.mock('../../../server/benchmarks/referenceLaptimes.js', async importOriginal 
 import { createLeaderboardRouter } from '../../../server/routes/leaderboardRoutes.js';
 import { ServerContext } from '../../../server/core/serverContext.js';
 import { SessionDatabase } from '../../../server/core/db.js';
+import type { LeaderboardWithRival, LeaderboardLayout } from '../../../shared/types/leaderboard.js';
 import { DetailedSession } from '../../../shared/types/index.js';
 import { driver, lap, session } from '../../domain/leaderboardFixtures.js';
 
@@ -47,7 +48,7 @@ describe('leaderboardRoutes', () => {
     const first = await request(app).get('/api/leaderboard/layouts');
     expect(first.status).toBe(200);
     expect(first.body).toMatchObject([{ layoutKey: 'monza_gp', lastCarClass: 'GT3', classes: [{ playerRank: 2, fieldSize: 2 }] }]);
-    expect(first.body[0]).not.toHaveProperty('outlinePath');
+    expect((first.body as LeaderboardLayout[])[0]).not.toHaveProperty('outlinePath');
     const second = await request(app).get('/api/leaderboard/layouts');
     expect(second.body).toEqual(first.body);
   });
@@ -55,25 +56,26 @@ describe('leaderboardRoutes', () => {
   it('answers the board of a layout and class, with its benchmark', async () => {
     const res = await request(app).get('/api/leaderboard?layout=monza_gp&carClass=GT3');
     expect(res.status).toBe(200);
-    expect(res.body.entries.map((e: { driverName: string }) => e.driverName)).toEqual(['Rival', 'Me']);
-    expect(res.body.entries.find((e: { isPlayer: boolean }) => e.isPlayer)).toMatchObject({ rank: 2, gapToLeader: 0.3 });
+    const board = res.body as LeaderboardWithRival;
+    expect(board.entries.map(e => e.driverName)).toEqual(['Rival', 'Me']);
+    expect(board.entries.find(e => e.isPlayer)).toMatchObject({ rank: 2, gapToLeader: 0.3 });
     expect(res.body).not.toHaveProperty('player');
-    expect(res.body.benchmark).toMatchObject({ carClass: 'GT3', targets: { alienSec: 106 } });
+    expect(res.body).toHaveProperty('benchmark', expect.objectContaining({ carClass: 'GT3', targets: { alienSec: 106 } }));
   });
 
   it('refuses a board without a layout or a class', async () => {
     const res = await request(app).get('/api/leaderboard?layout=monza_gp');
     expect(res.status).toBe(400);
-    expect(res.body.error).toMatch(/required/);
+    expect(res.body).toHaveProperty('error', expect.stringMatching(/required/));
     expect((await request(app).get('/api/leaderboard?carClass=GT3&includeRival=true')).status).toBe(400);
   });
 
   it('returns one consistent board and rival snapshot when requested', async () => {
     const res = await request(app).get('/api/leaderboard?layout=monza_gp&carClass=GT3&includeRival=true');
     expect(res.status).toBe(200);
-    expect(res.body.entries[1]).toMatchObject({ driverName: 'Me', rank: 2, isPlayer: true });
-    expect(res.body.rivalStatus).toMatchObject({ gap: 0.3 });
-    expect(res.body.rivalStatus).not.toHaveProperty('rivalEntry');
+    expect(res.body).toHaveProperty('entries.1', expect.objectContaining({ driverName: 'Me', rank: 2, isPlayer: true }));
+    expect(res.body).toHaveProperty('rivalStatus', expect.objectContaining({ gap: 0.3 }));
+    expect(res.body).not.toHaveProperty('rivalStatus.rivalEntry');
     expect(referenceCache.load).toHaveBeenCalledTimes(1);
     expect((await request(app).get('/api/leaderboard?layout=monza_gp&carClass=GT3')).body).not.toHaveProperty('rivalStatus');
   });
@@ -84,7 +86,7 @@ describe('leaderboardRoutes', () => {
     it('sets the driver about 0.3 s ahead as the rival, and keeps it on the next visit', async () => {
       const first = await request(app).get('/api/leaderboard?layout=monza_gp&carClass=GT3&includeRival=true');
       expect(first.status).toBe(200);
-      expect(first.body.rivalStatus).toMatchObject({
+      expect((first.body as LeaderboardWithRival).rivalStatus).toMatchObject({
         rival: { kind: 'driver', driverName: 'Rival', targetTime: 107.7, startTime: 108, status: 'active' },
         gap: 0.3,
         progress: 0,
@@ -92,16 +94,16 @@ describe('leaderboardRoutes', () => {
         trend: [{ sessionId: 'r1', best: 108, gap: 0.3 }],
       });
       const again = await request(app).get('/api/leaderboard?layout=monza_gp&carClass=GT3&includeRival=true');
-      expect(again.body.rivalStatus.rival.id).toBe(first.body.rivalStatus.rival.id);
+      expect(again.body).toHaveProperty('rivalStatus.rival.id', (first.body as LeaderboardWithRival).rivalStatus.rival?.id);
     });
 
     it('pins a driver ahead as the rival, and refuses one who is not ahead', async () => {
       const pinned = await request(app).post('/api/rivals/pin').send({ ...BOARD, driverName: 'Rival' });
-      expect(pinned.body.rival).toMatchObject({ driverName: 'Rival', pinned: true });
+      expect(pinned.body).toHaveProperty('rival', expect.objectContaining({ driverName: 'Rival', pinned: true }));
 
       const refused = await request(app).post('/api/rivals/pin').send({ ...BOARD, driverName: 'Me' });
       expect(refused.status).toBe(400);
-      expect(refused.body.error).toMatch(/ahead of you/);
+      expect(refused.body).toHaveProperty('error', expect.stringMatching(/ahead of you/));
     });
   });
 });

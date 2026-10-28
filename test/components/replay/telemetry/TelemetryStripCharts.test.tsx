@@ -223,7 +223,7 @@ describe('TelemetryStripCharts', () => {
       timeSec: i * 0.1,
     }));
 
-    const handleZoomChange = vi.fn();
+    const handleZoomChange = vi.fn<(range: { start: number; end: number } | null) => void>();
     const handleSelectIndex = vi.fn();
 
     const { container } = render(
@@ -261,8 +261,8 @@ describe('TelemetryStripCharts', () => {
     expect(handleZoomChange).toHaveBeenCalled();
     const zoomedCall = handleZoomChange.mock.calls[0][0];
     expect(zoomedCall).not.toBeNull();
-    expect(zoomedCall.start).toBeGreaterThanOrEqual(3);
-    expect(zoomedCall.end).toBeLessThanOrEqual(16);
+    expect(zoomedCall?.start).toBeGreaterThanOrEqual(3);
+    expect(zoomedCall?.end).toBeLessThanOrEqual(16);
 
     // Should display Zoomed indicator and Reset Lap button
     expect(screen.getByText(/Zoomed:/i)).toBeInTheDocument();
@@ -287,7 +287,7 @@ describe('TelemetryStripCharts', () => {
       timeSec: i * 0.1,
     }));
 
-    const handleZoomChange = vi.fn();
+    const handleZoomChange = vi.fn<(range: { start: number; end: number } | null) => void>();
     const { container } = render(
       <TelemetryStripCharts
         points={longerPoints}

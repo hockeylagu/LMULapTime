@@ -41,10 +41,10 @@ beforeEach(() => {
     { lap: 2, fuel: null, ve: null, tread: [0.996, 0.996, 0.996, 0.996] },
   ]);
   vi.mocked(openVerifiedLiveRecording).mockResolvedValue({ queryAll: query, close } as unknown as DuckDbReader);
-  query.mockResolvedValue(Array.from({ length: 100 }, (_, i) => Object.fromEntries([
+  query.mockResolvedValue(Array.from({ length: 100 }, (_, i) => Object.fromEntries<number>([
     ['elapsed_seconds', 10 + i * 0.04], ['lap_number', 1],
     ...liveCaptureChannels(3).filter(channel => channel.frame === 'iso8855-wheel')
-      .map(channel => [channel.name, channel.name.includes('ground') ? 30 : 0]),
+      .map((channel): [string, number] => [channel.name, channel.name.includes('ground') ? 30 : 0]),
   ])));
 });
 

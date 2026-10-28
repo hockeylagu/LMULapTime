@@ -64,7 +64,7 @@ describe('LiveCaptureRecordingStore in process', () => {
     const filename = path.join(directory, batch.manifest.filename);
     await fs.rename(filename, `${filename}.closed`);
     await fs.rename(`${filename}.closed`, filename);
-    expect(await createStore().catalog()).toEqual({ recordings: [{ manifest: batch.manifest, bytes: expect.any(Number) }], errors: [] });
+    expect(await createStore().catalog()).toEqual({ recordings: [{ manifest: batch.manifest, bytes: expect.any(Number) as unknown }], errors: [] });
   });
 
   it('resumes interrupted files using committed counters and rejects duplicate sequences and completed files', async () => {
@@ -137,7 +137,7 @@ describe('LiveCaptureRecordingStore in process', () => {
       expect((await connection.runAndReadAll(`SELECT fl_patch_longitudinal_mps IS NULL AND fr_patch_longitudinal_mps IS NULL AS "wheelNull",
         (SELECT CAST(manifest_json AS VARCHAR) FROM capture_manifest WHERE singleton = TRUE) AS manifest FROM capture_samples ORDER BY sample_index LIMIT 1`))
         .getRowObjectsJson().map(row => ({ wheelNull: row.wheelNull, manifest: JSON.parse(row.manifest as string) as unknown })))
-        .toEqual([{ wheelNull: true, manifest: expect.objectContaining({ normalizationVersion: 1 }) }]);
+        .toEqual([{ wheelNull: true, manifest: expect.objectContaining({ normalizationVersion: 1 }) as unknown }]);
     });
   });
 

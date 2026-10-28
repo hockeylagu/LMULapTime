@@ -128,7 +128,7 @@ export function evaluateLearningCalibration(examples: EvaluationExample[], holdo
   const split = [...groups.values()].map(group => {
     const { testSessionIds } = splitSessions(group, sessions => Math.max(1, sessions - testSessions(sessions)));
     const testIds = new Set(testSessionIds);
-    return { cohort: group[0]!.cohort, resourceKind: group[0]!.resourceKind,
+    return { cohort: group[0].cohort, resourceKind: group[0].resourceKind,
       train: group.filter(row => !testIds.has(row.sessionId)), test: group.filter(row => testIds.has(row.sessionId)) };
   });
   const cohorts = split.map(group => evaluateCohort(group.cohort, group.resourceKind, group.train, group.test))

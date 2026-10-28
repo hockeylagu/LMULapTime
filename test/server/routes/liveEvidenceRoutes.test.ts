@@ -56,14 +56,14 @@ describe('session live evidence API', () => {
 
   it('keeps opponent, missing, incomplete and loaded-session evidence unavailable', async () => {
     const t = fixture();
-    expect((await request(t.app).get(url)).body.reason).toBe('unlinked');
+    expect((await request(t.app).get(url)).body).toHaveProperty('reason', 'unlinked');
     t.link();
-    expect((await request(t.app).get(url.replace('driverOrdinal=0', 'driverOrdinal=1'))).body.reason).toBe('not-player');
-    expect((await request(t.app).get(url.replace('lapOrdinal=0', 'lapOrdinal=2'))).body.reason).toBe('incomplete-lap');
+    expect((await request(t.app).get(url.replace('driverOrdinal=0', 'driverOrdinal=1'))).body).toHaveProperty('reason', 'not-player');
+    expect((await request(t.app).get(url.replace('lapOrdinal=0', 'lapOrdinal=2'))).body).toHaveProperty('reason', 'incomplete-lap');
     t.db.prepare('UPDATE live_capture_index SET available=0').run();
-    expect((await request(t.app).get(url)).body.reason).toBe('missing');
+    expect((await request(t.app).get(url)).body).toHaveProperty('reason', 'missing');
     t.load();
-    expect((await request(t.app).get(url)).body.reason).toBe('session-loaded');
+    expect((await request(t.app).get(url)).body).toHaveProperty('reason', 'session-loaded');
     expect(t.read).not.toHaveBeenCalled();
   });
 
@@ -83,7 +83,7 @@ describe('session live evidence API', () => {
     expect(response.body).toMatchObject({ state: 'available', sessionId: 'session', driverOrdinal: 0, lapOrdinal: 0,
       evidence: { gameVersion: 'Build-42', startSeconds: 100, durationSeconds: 90 } });
     expect(t.read).toHaveBeenCalledWith(expect.objectContaining({ lapNumber: 2, startSeconds: 100, durationSeconds: 90,
-      manifest: expect.objectContaining({ sessionId: 'session', gameVersion: 'Build-42' }) }));
+      manifest: expect.objectContaining({ sessionId: 'session', gameVersion: 'Build-42' }) as unknown }));
   });
 
   it('withdraws a response when ownership changes while the reader is working', async () => {
@@ -92,13 +92,13 @@ describe('session live evidence API', () => {
       setLiveCaptureMatch(t.db, 'capture', null, null, 'pending');
       return t.evidence;
     });
-    expect((await request(t.app).get(url)).body.reason).toBe('changed');
+    expect((await request(t.app).get(url)).body).toHaveProperty('reason', 'changed');
   });
 
   it('does not trust a stale link after XML lap timing or player identity changes', async () => {
     const t = fixture(); t.link();
     t.db.prepare('UPDATE drivers SET name=? WHERE driver_id=1').run('Another Player');
-    expect((await request(t.app).get(url)).body.reason).toBe('changed');
+    expect((await request(t.app).get(url)).body).toHaveProperty('reason', 'changed');
     expect(t.read).not.toHaveBeenCalled();
   });
 
@@ -108,7 +108,7 @@ describe('session live evidence API', () => {
       t.db.prepare('UPDATE session_laps SET lap_time=100 WHERE driver_ordinal=0 AND lap_ordinal=0').run();
       return t.evidence;
     });
-    expect((await request(t.app).get(url)).body.reason).toBe('changed');
+    expect((await request(t.app).get(url)).body).toHaveProperty('reason', 'changed');
   });
 
   it('rejects a lap ordinal reassigned during the read even when all original timing anchors still match', async () => {
@@ -120,7 +120,7 @@ describe('session live evidence API', () => {
           VALUES('session',0,0,1,100,1);`);
       return t.evidence;
     });
-    expect((await request(t.app).get(url)).body.reason).toBe('changed');
+    expect((await request(t.app).get(url)).body).toHaveProperty('reason', 'changed');
   });
 
   it('rejects a removed lap ordinal while preserving other matching anchors', async () => {
@@ -129,7 +129,7 @@ describe('session live evidence API', () => {
       t.db.prepare('UPDATE session_laps SET lap_ordinal=9 WHERE driver_ordinal=0 AND lap_ordinal=0').run();
       return t.evidence;
     });
-    expect((await request(t.app).get(url)).body.reason).toBe('changed');
+    expect((await request(t.app).get(url)).body).toHaveProperty('reason', 'changed');
   });
 
   it('rejects player driver ordinals exchanged by a reparse while the read is pending', async () => {
@@ -141,6 +141,6 @@ describe('session live evidence API', () => {
         UPDATE ${table} SET driver_ordinal=1 WHERE driver_ordinal=10;`);
       return t.evidence;
     });
-    expect((await request(t.app).get(url)).body.reason).toBe('changed');
+    expect((await request(t.app).get(url)).body).toHaveProperty('reason', 'changed');
   });
 });

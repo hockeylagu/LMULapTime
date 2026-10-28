@@ -44,7 +44,7 @@ function mockServer(onScan: (call: ScanCall) => Promise<unknown>) {
 
 const settled = () =>
   waitFor(() => expect(within(screen.getByRole('group', { name: 'Settings status' })).getByText('No replays cached yet')).toBeInTheDocument());
-const resultsInput = () => screen.getByLabelText('Results logs') as HTMLInputElement;
+const resultsInput = () => screen.getByLabelText<HTMLInputElement>('Results logs');
 const rescan = () => screen.getByRole('button', { name: /save changes|scan in progress|saving/i });
 const renameDriver = (value = 'Edited Driver') => fireEvent.change(screen.getByLabelText('Driver name'), { target: { value } });
 
@@ -182,7 +182,7 @@ describe('Settings save and discard', () => {
     fireEvent.click(screen.getByRole('button', { name: /discard/i }));
 
     expect(resultsInput().value).toBe('C:\\LMU\\Results');
-    expect((screen.getByLabelText('Driver name') as HTMLInputElement).value).toBe('Player1');
+    expect(screen.getByLabelText<HTMLInputElement>('Driver name').value).toBe('Player1');
     expect(screen.queryByRole('button', { name: /save changes/i })).not.toBeInTheDocument();
   });
 

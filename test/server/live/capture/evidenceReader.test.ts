@@ -108,7 +108,7 @@ describe('live evidence reader', () => {
 
   it('queues a few reads behind two running ones, asks the rest to retry and reports worker failures', async () => {
     const answers: Array<(answer: LiveEvidenceWorkerResult) => void> = [];
-    vi.mocked(runWorkerOnce).mockImplementation(() => new Promise(resolve => { answers.push(resolve as (answer: LiveEvidenceWorkerResult) => void); }));
+    vi.mocked(runWorkerOnce).mockImplementation(() => new Promise(resolve => { answers.push(resolve); }));
     const request: LiveEvidenceReadRequest = { directory: 'unused', manifest: {} as LiveCaptureManifest, lapNumber: 2, startSeconds: 100, durationSeconds: 1 };
     const evidence = { recordingId: 'queued' } as LiveLapEvidence;
     const reader = new LiveEvidenceReader();

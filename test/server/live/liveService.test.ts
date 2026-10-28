@@ -167,8 +167,7 @@ describe('LiveService', () => {
     const capture = new LiveCaptureController({ directory: 'unused', onPersist: () => {}, createWorker: () => writer as unknown as CaptureWorker });
     const plan = { kind: 've', laps: 16, chosen: { name: 'NO TYRE CHANGE' } } as LiveRaceStrategies;
     let shown: LiveRaceStrategies | null = plan;
-    type Update = LiveStrategyTracker['update'];
-    const update = Reflect.get(LiveStrategyTracker.prototype, 'update') as (this: LiveStrategyTracker, ...args: Parameters<Update>) => ReturnType<Update>;
+    const update = Reflect.get(LiveStrategyTracker.prototype, 'update');
     const spy = vi.spyOn(LiveStrategyTracker.prototype, 'update').mockImplementation(function (this: LiveStrategyTracker, ...args) {
       const strategy = update.apply(this, args);
       return strategy && { ...strategy, garage: { ...strategy.garage!, raceStrategy: shown } };

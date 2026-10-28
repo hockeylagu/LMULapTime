@@ -36,7 +36,7 @@ describe('Gemini key handling', () => {
   });
   afterEach(() => vi.restoreAllMocks());
 
-  const keyInput = () => screen.getByLabelText('Gemini API key') as HTMLInputElement;
+  const keyInput = () => screen.getByLabelText<HTMLInputElement>('Gemini API key');
   const save = () => screen.getByRole('button', { name: /save key/i });
   async function renderLoaded() {
     render(<AISettingsCard />);

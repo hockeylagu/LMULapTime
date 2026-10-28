@@ -203,10 +203,10 @@ describe('LiveCaptureController', () => {
       .filter(item => item.kind === 'strategy-audit-v1')
       .map(item => ({ owner: batch.manifest.recordingId, record: item.data as { runId: string; reason: string } })));
     expect(audits).toEqual([
-      { owner: oldId, record: expect.objectContaining({ runId: oldId, reason: 'start' }) },
-      { owner: oldId, record: expect.objectContaining({ runId: oldId, reason: 'end' }) },
-      { owner: newId, record: expect.objectContaining({ runId: newId, reason: 'start' }) },
-      { owner: newId, record: expect.objectContaining({ runId: newId, reason: 'end' }) },
+      { owner: oldId, record: expect.objectContaining({ runId: oldId, reason: 'start' }) as unknown },
+      { owner: oldId, record: expect.objectContaining({ runId: oldId, reason: 'end' }) as unknown },
+      { owner: newId, record: expect.objectContaining({ runId: newId, reason: 'start' }) as unknown },
+      { owner: newId, record: expect.objectContaining({ runId: newId, reason: 'end' }) as unknown },
     ]);
     expect(writer.batches().flatMap(batch => batch.observations).some(item => item.kind === 'strategy-prediction')).toBe(false);
   });
@@ -414,7 +414,7 @@ describe('LiveCaptureController', () => {
     void stopping.then(() => { resolved = true; });
     await Promise.resolve();
     expect(resolved).toBe(false);
-    expect(last(writer.batches())).toMatchObject({ manifest: { status: 'interrupted', endedAt: null }, samples: expect.any(Float64Array) });
+    expect(last(writer.batches())).toMatchObject({ manifest: { status: 'interrupted', endedAt: null }, samples: expect.any(Float64Array) as unknown });
     expect(last(writer.batches())?.samples).toHaveLength(LIVE_CAPTURE_SAMPLE_WIDTH);
     expect(last(writer.posted)?.message).toEqual({ type: 'close' });
     const priorCount = controller.status().samples;

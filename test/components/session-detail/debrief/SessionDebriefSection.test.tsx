@@ -27,13 +27,13 @@ describe('SessionDebriefSection', () => {
   });
 
   it('leaves the strategy out of another driver or a non-race session, and shows nothing with neither part', () => {
-    render(<SessionDebriefSection session={{ ...race, sessionType: 'Qualifying' } as DetailedSession} selectedDriver={player} />);
+    render(<SessionDebriefSection session={{ ...race, sessionType: 'Qualifying' }} selectedDriver={player} />);
     fireEvent.click(screen.getByRole('button', { name: /Debrief/ }));
     expect(screen.queryByTestId('session-strategy')).toBeNull();
     expect(screen.getByTestId('session-debrief')).toBeInTheDocument();
     cleanup();
     const { container } = render(<SessionDebriefSection session={{ ...race, matchingReplayFile: null } as unknown as DetailedSession}
-      selectedDriver={{ ...player, driverOrdinal: 3 } as DriverData} />);
+      selectedDriver={{ ...player, driverOrdinal: 3 }} />);
     expect(container).toBeEmptyDOMElement();
   });
 });

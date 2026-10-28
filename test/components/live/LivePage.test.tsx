@@ -139,6 +139,6 @@ describe('the /live route', () => {
     expect(screen.queryByText(/Loading LMU Replay/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Built for Le Mans Ultimate/)).not.toBeInTheDocument();
     expect(FakeEventSource.instances.map((s) => s.url)).toEqual(['/api/live/stream']);
-    expect(global.fetch).toHaveBeenCalledWith('/api/live/settings', expect.objectContaining({ signal: expect.any(AbortSignal) }));
+    expect(global.fetch).toHaveBeenCalledWith('/api/live/settings', expect.objectContaining({ signal: expect.any(AbortSignal) as unknown }));
   });
 });

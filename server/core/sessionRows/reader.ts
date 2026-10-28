@@ -1,6 +1,6 @@
 import type { Database as DatabaseType } from 'better-sqlite3';
-import type { DetailedSession, DriverData, LapData, SessionMetadata } from '../../../shared/types/index.js';
-import type { TrafficGap, LapTraffic } from '../../../shared/types/raceTraffic.js';
+import type { DetailedSession, DriverData, LapData } from '../../../shared/types/index.js';
+import type { TrafficGap } from '../../../shared/types/raceTraffic.js';
 import { anyPresent, unpackFields, type Field, type Row } from './fields.js';
 import {
   BEST_SESSION_LAP_FIELDS, CONDITION_FIELDS, DRIVER_DICTIONARY_FIELDS, DRIVER_FIELDS, EVENT_LISTS, LAP_FIELDS, RECORDING_FIELDS,
@@ -53,7 +53,7 @@ function lapOf(row: Row, passes: Row[], laps: LapData[]): void {
     if (row.traffic_pressured !== null) traffic.pressured = row.traffic_pressured !== 0;
     traffic.passed = passes.filter(pass => pass.direction === 'passed').map(carOf);
     traffic.passedBy = passes.filter(pass => pass.direction === 'passedBy').map(carOf);
-    lap.traffic = traffic as unknown as LapTraffic;
+    lap.traffic = traffic;
   }
   lap.lapOrdinal = row.lap_ordinal;
   laps.push(lap as unknown as LapData);
@@ -107,7 +107,7 @@ export function readSession(db: DatabaseType, id: string): DetailedSession | nul
   const session = sessionScalars(row);
 
   const recording = db.prepare('SELECT * FROM session_recordings WHERE session_id = ?').get(id) as Row | undefined;
-  if (recording) session.matchingReplayFile = unpackFields(recording, RECORDING_FIELDS) as SessionMetadata['matchingReplayFile'];
+  if (recording) session.matchingReplayFile = unpackFields(recording, RECORDING_FIELDS);
 
   const driverRows = db.prepare(`${DRIVER_WITH_DICTIONARIES} WHERE d.session_id = ? ORDER BY d.driver_ordinal`).all(id) as Row[];
   const lapRows = groupBy(db.prepare('SELECT * FROM session_laps WHERE session_id = ? ORDER BY driver_ordinal, lap_ordinal').all(id) as Row[], lap => String(lap.driver_ordinal));

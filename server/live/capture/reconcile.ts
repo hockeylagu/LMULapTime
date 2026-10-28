@@ -182,7 +182,7 @@ export async function reconcileLiveCaptures(db: Database, directory: string): Pr
   db.transaction(() => {
     for (const entry of entries) {
       const matches = edges.get(entry.manifest.recordingId) ?? [];
-      const sessionId = matches.length === 1 && sessionOwners.get(matches[0]!)?.length === 1 ? matches[0]! : null;
+      const sessionId = matches.length === 1 && sessionOwners.get(matches[0])?.length === 1 ? matches[0] : null;
       const gameVersion = sessionId
         ? (db.prepare('SELECT game_version FROM sessions WHERE id = ?').get(sessionId) as { game_version: string | null } | undefined)?.game_version ?? null
         : null;

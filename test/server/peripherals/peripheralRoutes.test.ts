@@ -14,7 +14,7 @@ describe('peripheral API', () => {
       expect((await request(app).get('/api/peripherals')).body).toHaveLength(1);
       const loaded = await request(app).get('/api/peripherals/simagic/loaded-presets');
       expect(loaded.status).toBe(200);
-      expect(loaded.body.devices).toHaveLength(1);
+      expect(loaded.body).toHaveProperty('devices', expect.objectContaining({ length: 1 }));
       expect((await request(app).put('/api/peripherals/simagic/settings').send({ enabled: true })).status).toBe(400);
       expect((await request(app).get('/api/peripherals/other/devices')).status).toBe(404);
       expect((await request(app).put('/api/peripherals/simagic/mappings').send([{ scopeKind: 'model', scopeKey: 'Not a car', presetUuid: '1' }])).status).toBe(400);

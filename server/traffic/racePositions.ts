@@ -1,5 +1,4 @@
 import { CenterlineSpatialIndex, projectTrajectoryToCenterline } from '../tracks/trackProjection.js';
-import type { ReplayTrajectoryPoint } from '../../shared/types/index.js';
 
 /**
  * Every car's place on the track through a replay, at a low rate: enough to tell who was right
@@ -63,7 +62,7 @@ export function buildDriverPositions(slot: number, laps: LapSamples[], centerlin
     lapSpans.push({ lapNumber: lap.lapNumber, startSec: lap.times[0], endSec: lap.times[lap.times.length - 1] });
     const kept = lap.times.map((_, i) => i).filter((i) => lap.onTrack[i]);
     if (kept.length < 2) continue;
-    const points = kept.map((i) => ({ x: lap.x[i], y: 0, z: lap.z[i] }) as ReplayTrajectoryPoint);
+    const points = kept.map((i) => ({ x: lap.x[i], y: 0, z: lap.z[i] }));
     const { stations } = projectTrajectoryToCenterline(points, centerline, { clampSeam: false });
     kept.forEach((sampleIndex, k) => {
       const time = lap.times[sampleIndex];

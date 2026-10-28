@@ -56,7 +56,7 @@ export const CompareSectorTooltip: React.FC<CompareSectorTooltipProps> = ({
 }) => {
   if (!active || !payload || !payload.length || !baselineLap) return null;
   const metricItem = chartData.find((d) => d.metric === label);
-  const metricKey = metricItem?.metricKey as 's1' | 's2' | 's3' | 'lapTime' | undefined;
+  const metricKey = metricItem?.metricKey;
 
   const seen = new Set<string>();
   const uniquePayload = payload.filter((p) => {
@@ -162,7 +162,7 @@ export const CompareSectorChart: React.FC<CompareSectorChartProps> = ({
             <YAxis
               stroke={CHART_COLORS.axis}
               tick={{ fill: LMU_COLORS.muted, fontSize: 11 }}
-              tickFormatter={(val) =>
+              tickFormatter={(val: number) =>
                 val === 0 ? '0.000s' : val > 0 ? `+${val.toFixed(3)}s` : `${val.toFixed(3)}s`
               }
             />

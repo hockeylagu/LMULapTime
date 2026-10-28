@@ -107,7 +107,7 @@ describe('ImprovementPaceTooltip component', () => {
           weather: undefined,
           pacePercentage: null,
           lapPrDelta: 0.5,
-        } as unknown as ImprovementChartPoint,
+        },
       },
     ];
 

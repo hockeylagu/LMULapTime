@@ -30,7 +30,7 @@ describe('learning evidence status', () => {
     expect(screen.getByText('Lap is not clean and representative')).toBeInTheDocument();
     expect(screen.getByText('No forecast was recorded at lap start')).toBeInTheDocument();
     expect(screen.getByText(/0 validated corrections available/)).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledWith('/api/live/learning', expect.objectContaining({ cache: 'no-store', signal: expect.any(AbortSignal) }));
+    expect(fetch).toHaveBeenCalledWith('/api/live/learning', expect.objectContaining({ cache: 'no-store', signal: expect.any(AbortSignal) as unknown }));
     fireEvent.click(screen.getByText('Minimum evidence and offline checks'));
     expect(screen.getByText(/Too few earlier sessions/)).toBeVisible();
   });

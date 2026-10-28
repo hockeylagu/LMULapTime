@@ -41,7 +41,7 @@ export function parseNavigationState(body: unknown): LiveNavigation | null {
 
 /** One GET of the navigation state. Never throws: any failure, non-200 status or answer slower than 2 s is `ok: false`. */
 export async function readNavigationState(
-  fetchState: NavigationFetch = fetch as unknown as NavigationFetch,
+  fetchState: NavigationFetch = fetch,
   timeoutMs = NAVIGATION_TIMEOUT_MS,
 ): Promise<NavigationRead> {
   const controller = new AbortController();

@@ -49,7 +49,7 @@ describe('emptyChartPaths', () => {
 
 describe('computeChartBounds', () => {
   const makePoint = (speedKmh: number): ReplayTrajectoryPoint =>
-    ({ timeSec: 0, x: 0, y: 0, z: 0, speedKmh } as ReplayTrajectoryPoint);
+    ({ timeSec: 0, x: 0, y: 0, z: 0, speedKmh });
 
   it('pads speed to the next multiple of 5 above peak speed with a 260 floor', () => {
     // 298 km/h -> 300 km/h (next multiple of 5)
@@ -87,7 +87,7 @@ describe('computeChartBounds', () => {
 
   it('determines maxGear as 6 when car has no 7th gear, and 7 when 7th gear is present', () => {
     const makeGearPoint = (gear: number): ReplayTrajectoryPoint =>
-      ({ timeSec: 0, x: 0, y: 0, z: 0, speedKmh: 200, gear } as ReplayTrajectoryPoint);
+      ({ timeSec: 0, x: 0, y: 0, z: 0, speedKmh: 200, gear });
 
     // Car with 6 gears (e.g. GT3 or LMP2) -> maxGear 6
     expect(computeChartBounds([makeGearPoint(6), makeGearPoint(5)], []).maxGear).toBe(6);

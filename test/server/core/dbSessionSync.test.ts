@@ -63,7 +63,7 @@ describe('session parser-version migration writes', () => {
     });
     const run = () => new Promise<void>((resolve, reject) => {
       pumpScanInBackground(database.syncSessionsAsyncIterator(dir, parser), startedScanStatus(), outcome => {
-        if ('error' in outcome) reject(outcome.error);
+        if ('error' in outcome) reject(outcome.error instanceof Error ? outcome.error : new Error(String(outcome.error)));
         else resolve();
       });
     });

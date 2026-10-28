@@ -117,7 +117,7 @@ describe('replay trajectory worker in process', () => {
     expect(decompressTrajectory(encoded.blob).points).toEqual(trajectory().points);
     expect(harness.post).toHaveBeenCalledWith({ type: 'progress', progress: expect.objectContaining({
       stage: 'caching', driverStored: true, driversDone: 1, driversTotal: 2,
-    }) });
+    }) as unknown });
     expect(harness.post).toHaveBeenLastCalledWith({ type: 'storedDrivers', summary: {
       drivers: [{ driverSlotKey: 1, isPrimary: true, driverSlot: 1, currentLap: 2 }], failures: [],
     } });
@@ -169,6 +169,7 @@ describe('replay trajectory worker in process', () => {
     [Object.assign(new Error('locked'), { code: 'EBUSY' }), { message: 'locked', code: 'EBUSY' }],
     ['unexpected failure', { message: 'unexpected failure' }],
   ])('preserves decoder failure details: %s', async (error, expected) => {
+    // oxlint-disable-next-line typescript/only-throw-error -- The string case checks how the worker reports a decoder that throws a non-Error.
     harness.single.mockImplementation(() => { throw error; });
     await run();
     expect(harness.post).toHaveBeenLastCalledWith({ type: 'error', ...expected });

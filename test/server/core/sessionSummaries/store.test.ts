@@ -97,7 +97,7 @@ describe('session summary persistence', () => {
     expect(readCompactSession(db, 'one')).toMatchObject({ id: 'one', isEmpty: true });
     expect(readCompactSession(db, 'one')?.playerDriver).toBeUndefined();
     expect(db.prepare("SELECT count(*) AS count FROM session_drivers WHERE session_id='one' AND clean_laps_count IS NOT NULL").get()).toEqual({ count: 0 });
-    expect(db.prepare("SELECT projection_error FROM sessions WHERE id='one'").get()).toMatchObject({ projection_error: expect.any(String) });
+    expect(db.prepare("SELECT projection_error FROM sessions WHERE id='one'").get()).toMatchObject({ projection_error: expect.any(String) as unknown });
     expect(querySessionPage(db, {}).sessions.map(card => card.id)).toEqual(['two', 'one']);
     db.close();
   });

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { ApiError, GoogleGenAI, ThinkingLevel } from '@google/genai';
+import { ApiError, FinishReason, GoogleGenAI, ThinkingLevel } from '@google/genai';
 import {
   AiAnalyzeRequest,
   AiAnalyzeResponse,
@@ -245,7 +245,7 @@ async function generateReport(evidence: AiLapEvidence): Promise<AiAnalyzeRespons
     try {
       parsed = parseAiJsonContent(content);
     } catch (parseErr) {
-      const isMaxTokens = finishReason === 'MAX_TOKENS';
+      const isMaxTokens = finishReason === FinishReason.MAX_TOKENS;
       console.error(
         `[AI] Invalid JSON from model (model: ${sessionModel}, finishReason: ${finishReason || 'unknown'}, length: ${content.length}):\n${content}`
       );
@@ -268,7 +268,7 @@ async function generateReport(evidence: AiLapEvidence): Promise<AiAnalyzeRespons
       console.error(
         `[AI] Model JSON response failed schema validation (model: ${sessionModel}, error: ${valErr instanceof Error ? valErr.message : String(valErr)}):\n${content}`
       );
-      if (valErr && typeof valErr === 'object') {
+      if (valErr instanceof Error) {
         throw Object.assign(valErr, { rawResponse: content, finishReason });
       }
       throw valErr;

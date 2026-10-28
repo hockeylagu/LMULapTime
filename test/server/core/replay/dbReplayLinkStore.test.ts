@@ -39,7 +39,7 @@ describe('rejected replay links', () => {
   it('removes the link from the session row and records what it held', () => {
     const rejected = db.rejectSessionReplayLink(session.id, replayLink, 'time-window');
 
-    expect(rejected).toEqual({ replayName: replayLink.name, reason: 'time-window', rejectedAt: expect.any(Number) });
+    expect(rejected).toEqual({ replayName: replayLink.name, reason: 'time-window', rejectedAt: expect.any(Number) as unknown });
     db.markSessionDataChanged();
     expect(db.getSessionById(session.id)?.matchingReplayFile).toBeUndefined();
     expect(querySessionPage(db.getDb(), { page: 1, pageSize: db.getSessionsCount() }).sessions[0].matchingReplayFile).toBeUndefined();
@@ -70,7 +70,7 @@ describe('rejected replay links', () => {
     db.rejectSessionReplayLink(session.id, replayLink, 'time-window');
     const other = { ...replayLink, name: 'Bahrain Paddock Circuit P1 19.Vcr' };
 
-    db.upsertSession({ ...session, matchingReplayFile: other } as DetailedSession, 'C:\\results\\2026_06_28_18_29_32-98P1.xml', 2, 1);
+    db.upsertSession({ ...session, matchingReplayFile: other }, 'C:\\results\\2026_06_28_18_29_32-98P1.xml', 2, 1);
 
     db.markSessionDataChanged();
     expect(db.getSessionById(session.id)?.matchingReplayFile?.name).toBe(other.name);

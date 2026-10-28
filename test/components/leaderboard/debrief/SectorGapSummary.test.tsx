@@ -26,7 +26,7 @@ describe('SectorGapSummary', () => {
 
 describe('worstSector', () => {
   it('finds the sector losing the most, or none', () => {
-    expect(worstSector(yours, theirs)).toEqual({ label: 'S3', gap: expect.closeTo(0.25, 5) });
+    expect(worstSector(yours, theirs)).toEqual({ label: 'S3', gap: expect.closeTo(0.25, 5) as unknown });
     expect(worstSector(theirs, { s1: 31, s2: 41, s3: 31 })).toBeNull();
     expect(worstSector(yours, null)).toBeNull();
   });

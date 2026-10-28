@@ -4,7 +4,7 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { MemoryRouter, useSearchParams } from 'react-router';
 import { useTrackDetailState } from '../../../src/components/track-detail/useTrackDetailState.js';
 
-const mockNavigate = vi.fn();
+const mockNavigate = vi.fn<(to: string) => void>();
 vi.mock('react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-router')>();
   return {
@@ -80,7 +80,7 @@ describe('useTrackDetailState', () => {
     expect(result.current.data?.trackName).toBe('Autodromo Nazionale Monza');
     expect(fetchSpy).toHaveBeenCalledWith(
       '/api/track/Monza?carClass=Hyper&car=All&pageSize=25&hideEmpty=true',
-      expect.objectContaining({ signal: expect.any(AbortSignal) })
+      expect.objectContaining({ signal: expect.any(AbortSignal) as unknown })
     );
 
     // Test setters

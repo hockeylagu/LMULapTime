@@ -111,8 +111,9 @@ export interface RawStreamXmlNode {
 export interface RawSessionXmlNode {
   Driver?: RawDriverXmlNode | RawDriverXmlNode[];
   Stream?: RawStreamXmlNode;
-  Setting?: unknown;
-  ServerName?: unknown;
+  Setting?: string | number | boolean;
+  ServerName?: string | number;
+  Weather?: string | number;
   DamageMult?: unknown;
   FuelMult?: unknown;
   TireMult?: unknown;
@@ -125,8 +126,23 @@ export interface RawSessionXmlNode {
   Minutes?: unknown;
   RaceTime?: unknown;
   RaceLaps?: unknown;
-  VehiclesAllowed?: unknown;
+  VehiclesAllowed?: string | number;
   [key: string]: unknown;
+}
+
+/** fast-xml-parser output for the LMU results document consumed by LmuParser. */
+export interface RawRaceResultsXmlNode extends RawSessionXmlNode {
+  TrackVenue?: string;
+  TrackCourse?: string;
+  TrackEvent?: string;
+  TrackLength?: string | number;
+  TimeString?: string;
+  DateTime?: string | number;
+  GameVersion?: string;
+  Qualify?: RawSessionXmlNode;
+  Race?: RawSessionXmlNode;
+  Practice1?: RawSessionXmlNode;
+  Practice?: RawSessionXmlNode;
 }
 
 export interface ReplayFileEntry {

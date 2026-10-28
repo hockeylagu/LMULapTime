@@ -64,7 +64,7 @@ export function toColumnarTrajectory(trajectory: ReplayTrajectoryData): Columnar
 export function fromColumnarTrajectory(stored: ColumnarTrajectory, indices?: number[]): ReplayTrajectoryData {
   const { pointsFormat: _format, pointsLength, constants, columns, ...rest } = stored;
   const length = indices?.length ?? pointsLength;
-  const points: Record<string, LapValue>[] = new Array(length);
+  const points = new Array<Record<string, LapValue>>(length);
 
   for (let index = 0; index < length; index++) {
     points[index] = { ...constants };

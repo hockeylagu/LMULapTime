@@ -129,7 +129,7 @@ describe('replayWeather - Class 1 Type 10 meteorology decoding', () => {
           rawEvents: [
             // Header-shaped data whose rain slots disagree: not a weather packet.
             { evClass: 0, evType: 10, slot: 255, payload: weatherPayload(40, [250, 0, 3, 0, 0, 9, 0, 0, 0]) },
-            { evClass: 0, evType: 10, slot: 255, payload: weatherPayload(153, Array(9).fill(20)) },
+            { evClass: 0, evType: 10, slot: 255, payload: weatherPayload(153, Array<number>(9).fill(20)) },
           ],
         },
         { sTime: 10.1, driverSlot: 1, x: 20, y: 0, z: 20 },

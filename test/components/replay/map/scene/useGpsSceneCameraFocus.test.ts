@@ -8,9 +8,10 @@ const cornerMarkers = [{ cornerNumber: 1, actualSx: 10, actualSy: 20 }, { corner
 describe('useGpsSceneCameraFocus', () => {
   it('refits only when the layout changes after the first one', () => {
     const resetPanZoom = vi.fn();
+    const initialProps: { layoutKey: string | null } = { layoutKey: 'monza_gp' };
     const { rerender } = renderHook(({ layoutKey }) => useGpsSceneCameraFocus({
       layoutKey, selectedCornerNumber: null, cornerMarkers, focusOnPoint: vi.fn(), resetPanZoom,
-    }), { initialProps: { layoutKey: 'monza_gp' as string | null } });
+    }), { initialProps });
     expect(resetPanZoom).not.toHaveBeenCalled();
     rerender({ layoutKey: 'monza_gp' });
     rerender({ layoutKey: null });

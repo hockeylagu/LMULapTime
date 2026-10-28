@@ -40,7 +40,10 @@ async function main() {
     console.log('Taking a consistent SQLite snapshot; the source database stays unchanged...');
     await snapshotDatabase(source, snapshot);
     const digest = createHash('sha256');
-    for await (const chunk of fs.createReadStream(snapshot)) digest.update(chunk);
+    for await (const chunk of fs.createReadStream(snapshot)) {
+      if (!Buffer.isBuffer(chunk)) throw new Error('Expected binary snapshot chunk');
+      digest.update(chunk);
+    }
     const datasetHash = digest.digest('hex');
     server = await startBenchmarkServer(snapshot);
     const cohortFile = path.join(output, 'cohort.json');

@@ -35,10 +35,10 @@ CanvasRenderingContext2D.prototype.clearRect = function (...args: Parameters<typ
   drawStart = performance.now();
   return clear.apply(this, args);
 };
-const stroke = CanvasRenderingContext2D.prototype.stroke as (this: CanvasRenderingContext2D, path?: Path2D) => void;
+const stroke = CanvasRenderingContext2D.prototype.stroke;
 let strokes = 0;
 CanvasRenderingContext2D.prototype.stroke = function (path?: Path2D) {
-  if (path) stroke.call(this, path); else stroke.call(this);
+  Reflect.apply(stroke, this, path ? [path] : []);
   if (++strokes % 3 === 0 && newestAt) {
     window.livePerf.drawAgeMs.push(Date.now() - newestAt);
     window.livePerf.drawMs.push(performance.now() - drawStart);

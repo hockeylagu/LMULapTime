@@ -52,7 +52,7 @@ function lapTimes(cornerNumber: number, times: number[]): CornerConsistencyStat 
     entrySpeedKmh: null,
     apexSpeedKmh: null,
     exitSpeedKmh: null,
-  } as CornerConsistencyStat;
+  };
 }
 
 describe('rankDebriefCorners', () => {

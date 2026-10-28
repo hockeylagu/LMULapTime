@@ -133,7 +133,7 @@ export function anonymizePayload<T>(data: T): T {
   }
 
   if (Array.isArray(data)) {
-    return data.map(item => anonymizePayload(item)) as unknown as T;
+    return data.map((item: unknown) => anonymizePayload(item)) as unknown as T;
   }
 
   const obj = data as Record<string, unknown>;

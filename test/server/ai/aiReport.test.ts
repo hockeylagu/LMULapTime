@@ -5,6 +5,7 @@ import { AiLapEvidence } from '../../../shared/types/index.js';
 const { generateContentMock } = vi.hoisted(() => ({ generateContentMock: vi.fn() }));
 vi.mock('@google/genai', () => ({
   ThinkingLevel: { LOW: 'LOW' },
+  FinishReason: { MAX_TOKENS: 'MAX_TOKENS' },
   ApiError: class ApiError extends Error {
     status: number;
     constructor(status: number, message: string) {
@@ -49,7 +50,7 @@ describe('Gemini AI adapter', () => {
     expect(result.tokensUsed?.total).toBe(150);
     expect(generateContentMock).toHaveBeenCalledWith(expect.objectContaining({
       model: 'gemini-3.8-flash',
-      config: expect.objectContaining({ responseMimeType: 'application/json', responseJsonSchema: expect.any(Object) }),
+      config: expect.objectContaining({ responseMimeType: 'application/json', responseJsonSchema: expect.any(Object) as unknown }) as unknown,
     }));
   });
 
@@ -75,7 +76,7 @@ describe('Gemini AI adapter', () => {
     generateContentMock.mockResolvedValue({ candidates: [{ finishReason: 'MAX_TOKENS' }] });
     await expect(analyzeLap({ evidence, forceRegenerate: true })).rejects.toMatchObject({
       code: 'malformed_model_response',
-      message: expect.stringContaining('finish reason: MAX_TOKENS'),
+      message: expect.stringContaining('finish reason: MAX_TOKENS') as unknown,
     });
     expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Model returned no JSON content'));
     consoleErrorSpy.mockRestore();
@@ -86,7 +87,7 @@ describe('Gemini AI adapter', () => {
     generateContentMock.mockResolvedValue({ text: JSON.stringify({ overallSummary: 'Bad', improvements: [{ title: 'Bad', action: 42, why: 'Bad', executionCue: 'Bad', verify: 'Bad', evidence: [] }] }) });
     await expect(analyzeLap({ evidence, forceRegenerate: true })).rejects.toMatchObject({
       code: 'malformed_model_response',
-      rawResponse: expect.stringContaining('"overallSummary":"Bad"'),
+      rawResponse: expect.stringContaining('"overallSummary":"Bad"') as unknown,
     });
     expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('Model JSON response failed schema validation'));
     consoleErrorSpy.mockRestore();
@@ -112,7 +113,7 @@ describe('Gemini AI adapter', () => {
     generateContentMock.mockRejectedValue(new (class extends Error { status = 503; })('model overloaded'));
     await expect(analyzeLap({ evidence, forceRegenerate: true })).rejects.toMatchObject({
       code: 'upstream_unavailable',
-      message: expect.stringContaining('model overloaded'),
+      message: expect.stringContaining('model overloaded') as unknown,
     });
   });
 

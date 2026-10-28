@@ -37,7 +37,9 @@ let timer;
 let result;
 try {
   db.upsertReplayMetadataCache(filename, filePath, mtimeMs, fileSizeBytes, metadata);
-  const delays = [], phases = [], batches = [];
+  /** @type {number[]} */
+  const delays = [];
+  const phases = [], batches = [];
   let temporaryBytes = 0, firstDriverStoredMs;
   let last = performance.now();
   timer = setInterval(() => {
@@ -61,7 +63,7 @@ try {
       if (phases.at(-1)?.stage !== step.value.stage) phases.push({ stage: step.value.stage, ms: performance.now() - started });
       step = await extraction.next();
     }
-    if (mode === 'once' && step.value.failures.length) throw new Error(JSON.stringify(step.value.failures));
+    if (mode === 'once' && 'failures' in step.value && Array.isArray(step.value.failures) && step.value.failures.length) throw new Error(JSON.stringify(step.value.failures));
     if (mode === 'raw') db.replaceReplayDriverLaps(filename, filePath, mtimeMs, fileSizeBytes, slot, step.value, save.isPrimary);
     firstDriverStoredMs ??= performance.now() - started;
     batches.push({ slot, ms: performance.now() - start });

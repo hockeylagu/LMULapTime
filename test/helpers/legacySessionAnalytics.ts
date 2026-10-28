@@ -99,9 +99,9 @@ export function extractComparableLaps(
   let allTimeBestLap: ComparableLap | null = null;
   let playerBestLap: ComparableLap | null = null;
   let overallTrackBestLap: ComparableLap | null = null;
-  let bestS1: number | null = null;
-  let bestS2: number | null = null;
-  let bestS3: number | null = null;
+  let bestS1 = null as number | null;
+  let bestS2 = null as number | null;
+  let bestS3 = null as number | null;
 
   matchingSessions.forEach(s => {
     if (filters.sessionId && s.id !== filters.sessionId) {

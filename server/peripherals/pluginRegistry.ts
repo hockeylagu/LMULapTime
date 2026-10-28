@@ -1,5 +1,5 @@
 import { PERIPHERAL_CONTRACT_VERSION } from './peripheralContract.js';
-import type { PeripheralPlugin } from './peripheralContract.js';
+import type { PeripheralHostContext, PeripheralPlugin } from './peripheralContract.js';
 import type { PeripheralStatus } from '../../shared/types/peripherals/peripherals.js';
 
 export interface PluginLoad { install: PeripheralStatus['install']; plugin: PeripheralPlugin | null; error: string | null }
@@ -23,7 +23,8 @@ export async function loadPeripheralPlugin(entry: PeripheralRegistration, import
     }
     const factory = module[entry.factory];
     if (typeof factory !== 'function') return { install: 'incompatible', plugin: null, error: 'Peripheral factory is unavailable.' };
-    const candidate: unknown = factory({ now: Date.now, log: (level: 'info' | 'warn' | 'error', message: string) => console[level](`[${entry.id}] ${message}`) });
+    const create = factory as (options: PeripheralHostContext) => unknown;
+    const candidate: unknown = create({ now: Date.now, log: (level: 'info' | 'warn' | 'error', message: string) => console[level](`[${entry.id}] ${message}`) });
     return isPlugin(candidate, entry.id) ? { install: 'ready', plugin: candidate, error: null }
       : { install: 'incompatible', plugin: null, error: 'Invalid peripheral plugin.' };
   } catch (error) {

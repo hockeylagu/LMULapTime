@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import request from 'supertest';
+import type { ScanStatus } from '../../../shared/types/status.js';
+import type { ReplayCacheSummary } from '../../../shared/types/replay.js';
+import type { DetailedSession } from '../../../shared/types/session.js';
 import path from 'path';
 import fs from 'fs';
 import { dataPlugin } from '../../../server/plugins/dataPlugin.js';
@@ -18,7 +21,7 @@ describe('Server API wiring', () => {
   const waitForFileScans = async (): Promise<void> => {
     for (let attempt = 0; attempt < 100; attempt++) {
       const status = await request(app).get('/api/scan/status');
-      if (status.body.allComplete) return;
+      if ((status.body as ScanStatus).allComplete) return;
       await new Promise((resolve) => setTimeout(resolve, 10));
     }
     throw new Error('File scans did not finish during the test setup window');
@@ -53,7 +56,7 @@ describe('Server API wiring', () => {
       expect((await request(app).get('/api/ai/settings')).status).toBe(200);
       expect((await request(app).get('/api/ai/reports')).status).toBe(200);
       const response=await request(app).post('/api/ai/analyze-lap').send({});
-      expect(response.status).toBe(400);expect(response.body.errorCode).toBe('invalid_request');
+      expect(response.status).toBe(400);expect(response.body).toHaveProperty('errorCode', 'invalid_request');
     } finally {dataPlugin.status.state=previous;}
   });
 
@@ -69,8 +72,8 @@ describe('Server API wiring', () => {
   it('reads the fixture sessions from the results folder at start-up', async () => {
     const res = await request(app).get('/api/session/2026_05_28_P1');
     expect(res.status).toBe(200);
-    expect(res.body.trackVenue).toBe('Spa');
-    expect(res.body.drivers.length).toBeGreaterThan(0);
+    expect(res.body).toHaveProperty('trackVenue', 'Spa');
+    expect((res.body as DetailedSession).drivers.length).toBeGreaterThan(0);
   });
 
   it('refuses to clear the cache while the scan it just started is running, then clears it', async () => {
@@ -83,7 +86,7 @@ describe('Server API wiring', () => {
     await waitForFileScans();
     const cleared = await request(app).post('/api/cache/clear');
     expect(cleared.status).toBe(200);
-    expect(cleared.body.sqliteCache.sessionsCount).toBe(0);
+    expect(cleared.body).toHaveProperty('sqliteCache.sessionsCount', 0);
 
   });
 
@@ -110,24 +113,24 @@ describe('Server API wiring', () => {
           playerName: 'Api Test Driver',
         });
       expect(scanRes.status).toBe(200);
-      expect(scanRes.body.replayScanStarted).toBe(true);
+      expect(scanRes.body).toHaveProperty('replayScanStarted', true);
 
       // Replay trajectory extraction runs in the background - poll the scan status
       // endpoint until it finishes instead of asserting on the immediate scan response.
-      let status;
+      let status: ScanStatus | undefined;
       for (let i = 0; i < 50; i++) {
-        status = (await request(app).get('/api/scan/status')).body;
+        status = (await request(app).get('/api/scan/status')).body as ScanStatus;
         if (status.allComplete) break;
         await new Promise(resolve => setTimeout(resolve, 5));
       }
-      expect(status.allComplete).toBe(true);
-      expect(status.result).toEqual(expect.objectContaining({ added: 1 }));
+      expect(status?.allComplete).toBe(true);
+      expect(status?.result).toEqual(expect.objectContaining({ added: 1 }));
 
       const cacheListRes = await request(app).get('/api/replays/cache');
       expect(cacheListRes.status).toBe(200);
-      const cached = cacheListRes.body.find((r: { filename: string }) => r.filename === 'Api_Cache_Test_P1.Vcr');
+      const cached = (cacheListRes.body as ReplayCacheSummary[]).find(r => r.filename === 'Api_Cache_Test_P1.Vcr');
       expect(cached).toBeDefined();
-      expect(cached.driversCount).toBe(1);
+      expect(cached?.driversCount).toBe(1);
 
       const metadataRes = await request(app).get('/api/replays/Api_Cache_Test_P1.Vcr/metadata');
       expect(metadataRes.status).toBe(404);

@@ -13,7 +13,7 @@ const replayName = 'Daytona R1 6.Vcr';
 const laps = (): LapData[] => [1, 2, 3, 4].map((lapNumber) => ({
   lapNumber, position: 1, lapTime: 100, s1: null, s2: null, s3: null, topSpeed: null,
   fCompound: 'Medium', rCompound: 'Medium', elapsedSeconds: (lapNumber - 1) * 100, isPitStop: lapNumber === 2, isValid: true,
-} as LapData));
+}));
 
 const driver = (name: string, carClass = 'GT3') => ({ name, carClass, laps: laps() } as unknown as DriverData);
 

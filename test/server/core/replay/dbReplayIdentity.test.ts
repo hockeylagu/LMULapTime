@@ -5,7 +5,6 @@ import { readCompactSession } from '../../../../server/core/sessionSummaries/sto
 import { getReplayFactsVersion, getReplayLaps, replaceReplayDriverLapFacts, replaceReplayWideFacts } from '../../../../server/core/replay/dbReplayLapStore.js';
 import { emptyLapFact } from '../../../../server/replay/decode/replayFacts.js';
 import type { DetailedSession, ReplayMetadata, ReplayTrajectoryData } from '../../../../shared/types/index.js';
-import type { DuckDbFileInfo } from '../../../../server/telemetry/telemetryMatcher.js';
 
 const name = 'Bahrain Paddock Circuit P1 18.Vcr';
 const replayPath = `C:\\replays\\${name}`;
@@ -71,7 +70,7 @@ describe('replay identity', () => {
     db.upsertSession(session('owner'), 'C:\\results\\owner.xml', 1, 1);
     db.upsertSession(session('withdrawn'), 'C:\\results\\withdrawn.xml', 1, 1);
     db.rejectSessionReplayLink('withdrawn', { name, path: replayPath, fileSizeBytes: 6863306 }, 'owned-by-other-session');
-    db.upsertTelemetryMetadata({ filename: 'Bahrain_P.duckdb', filePath: 'C:\\t\\Bahrain_P.duckdb', mtimeMs: 1, fileSizeBytes: 1, trackName: 'Bahrain', sessionType: 'P', timestampStr: '', timestampEpochMs: 0 } as DuckDbFileInfo, 'owner', name);
+    db.upsertTelemetryMetadata({ filename: 'Bahrain_P.duckdb', filePath: 'C:\\t\\Bahrain_P.duckdb', mtimeMs: 1, fileSizeBytes: 1, trackName: 'Bahrain', sessionType: 'P', timestampStr: '', timestampEpochMs: 0 }, 'owner', name);
     db.saveAiReport({ cacheKey: 'k', sessionId: 'owner', driverOrdinal: 0, lapOrdinal: 1, lapNumber: 2, baselineSessionId: 'owner', baselineDriverOrdinal: 0, baselineLapOrdinal: 0, baselineLapNumber: 1, model: 'm', promptVersion: 1, report: { overallSummary: '', improvements: [] }, generatedAt: 1 });
 
     // Three hours later LMU writes another recording under the same name.

@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {it,expect} from 'vitest';
-// @ts-expect-error Node release script has no declaration file.
 import {findMissingLintReasons} from '../../../tools/release/checkLintReasons.mjs';
 // Directive text is assembled so the fixtures are not read as real lint directives.
 const directive=(kind:string)=>`oxlint-${kind}`;

@@ -30,8 +30,8 @@ const CUT_HIGH_THROTTLE_PCT = 70;
 function sampleTimes(points: ReplayTrajectoryPoint[]): number[] {
   const times = points.map(p => p.timeSec);
   const usable = times.every((t): t is number => typeof t === 'number' && Number.isFinite(t))
-    && times.length > 1 && (times[times.length - 1] as number) > (times[0] as number);
-  return usable ? (times as number[]) : points.map((_, i) => i * FALLBACK_FRAME_SEC);
+    && times.length > 1 && (times[times.length - 1]) > (times[0]);
+  return usable ? (times) : points.map((_, i) => i * FALLBACK_FRAME_SEC);
 }
 
 /**

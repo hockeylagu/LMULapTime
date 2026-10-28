@@ -39,7 +39,7 @@ function playerExtras(summary: Row | undefined): Pick<CardPlayer, 'driverOrdinal
 
 function cardOf(session: Row, recording: Row | undefined, drivers: Row[]): SessionCard {
   const card = sessionScalars(session);
-  if (recording) card.matchingReplayFile = unpackFields(recording, RECORDING_FIELDS) as SessionCard['matchingReplayFile'];
+  if (recording) card.matchingReplayFile = unpackFields(recording, RECORDING_FIELDS);
   card.isEmpty = session.is_empty === 1;
   const playerOrdinal = session.player_driver_ordinal;
   const base = typeof playerOrdinal === 'number' && session.projection_error === null
@@ -48,7 +48,7 @@ function cardOf(session: Row, recording: Row | undefined, drivers: Row[]): Sessi
     // The projection's summary row is the marked player, else the primary driver.
     const summary = drivers.filter(driver => driver.is_player === 1).sort((a, b) => (a.driver_ordinal as number) - (b.driver_ordinal as number))[0]
       ?? drivers.find(driver => driver.driver_ordinal === session.primary_driver_ordinal);
-    card.playerDriver = { ...driverScalars(base), ...playerExtras(summary) } as unknown as CardPlayer;
+    card.playerDriver = { ...driverScalars(base), ...playerExtras(summary) };
   }
   return card as unknown as SessionCard;
 }

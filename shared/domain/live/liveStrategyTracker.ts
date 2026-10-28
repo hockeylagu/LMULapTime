@@ -472,7 +472,7 @@ export class LiveStrategyTracker {
     const added = this.refuelAdded(this.ve, this.car && this.car.fuelCapacityLiters > 0 ? this.car.fuelLiters : null);
     for (const kind of ['ve', 'fuel'] as const) {
       const perUnit = this.fillSeconds(kind);
-      const base = perUnit !== null && added[kind] !== null ? refuelBase(estimate[kind], added[kind]!, perUnit) : null;
+      const base = perUnit !== null && added[kind] !== null ? refuelBase(estimate[kind], added[kind], perUnit) : null;
       if (base !== null) this.refuelBases[kind] = base;
     }
   }
@@ -496,7 +496,7 @@ export class LiveStrategyTracker {
     for (const kind of ['ve', 'fuel'] as const) {
       const perUnit = this.fillSeconds(kind);
       const insert = kind === 've' ? this.delays?.veInsert : this.delays?.fuelInsert;
-      if (perUnit !== null && added[kind] !== null) parts.push({ added: added[kind]!, secondsPerUnit: perUnit, base: this.refuelBases[kind] ?? insert ?? 0 });
+      if (perUnit !== null && added[kind] !== null) parts.push({ added: added[kind], secondsPerUnit: perUnit, base: this.refuelBases[kind] ?? insert ?? 0 });
     }
     return parts.length === 0 ? game
       : { seconds: plannedServiceSeconds(estimate, parts), refuels: parts.some(part => refuelSeconds(part) > 0) };

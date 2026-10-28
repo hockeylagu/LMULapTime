@@ -36,7 +36,7 @@ function projectDriver(session: DetailedSession, driver: DriverData, driverOrdin
     const eligible = clean.filter(l => lapConditionGroup(l) === group);
     const times = eligible.map(l => l.lapTime as number).sort((a, b) => a - b);
     const groupBest = eligible.reduce<LapData | undefined>((acc, lap) => !acc || (lap.lapTime ?? Infinity) < (acc.lapTime ?? Infinity) ? lap : acc, undefined);
-    const min = (key: 's1' | 's2' | 's3') => eligible.reduce<number | null>((value, lap) => lap[key] !== null && (lap[key] as number) > 0 && (value === null || (lap[key] as number) < value) ? lap[key] : value, null);
+    const min = (key: 's1' | 's2' | 's3') => eligible.reduce<number | null>((value, lap) => lap[key] !== null && (lap[key]) > 0 && (value === null || (lap[key]) < value) ? lap[key] : value, null);
     return { sessionId: session.id, driverOrdinal, conditionGroup: group, cleanCount: times.length,
       cleanTimeSum: times.reduce((a, b) => a + b, 0), cleanTimeSquareSum: times.reduce((a, b) => a + b * b, 0),
       bestLapOrdinal: bestOrdinal(groupBest), bestLapTime: groupBest?.lapTime ?? null, bestS1: min('s1'), bestS2: min('s2'), bestS3: min('s3'),

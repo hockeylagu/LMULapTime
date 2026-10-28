@@ -3,7 +3,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-// @ts-expect-error The Node development launcher is an executable JavaScript module.
 import { runDevelopmentServer } from '../../../tools/dev/runServer.mjs';
 
 vi.mock('node:child_process', () => ({ spawn: vi.fn() }));
@@ -17,7 +16,7 @@ describe('development server shutdown', () => {
   afterEach(() => vi.clearAllMocks());
 
   it('stops its watcher only after the server signals a completed tray shutdown', async () => {
-    const finished = runDevelopmentServer() as Promise<number>;
+    const finished = runDevelopmentServer();
     const options = vi.mocked(spawn).mock.calls[0]?.[2];
     const exitFile = options?.env?.LMU_DEV_EXIT_FILE;
     expect(exitFile).toBeTypeOf('string');
@@ -32,14 +31,14 @@ describe('development server shutdown', () => {
   });
 
   it('preserves an unexpected watcher exit code', async () => {
-    const finished = runDevelopmentServer() as Promise<number>;
+    const finished = runDevelopmentServer();
     child.emit('close', 7);
     expect(await finished).toBe(7);
     expect(child.kill).not.toHaveBeenCalled();
   });
 
   it('cleans up and reports a failed watcher launch even if close follows error', async () => {
-    const finished = runDevelopmentServer() as Promise<number>;
+    const finished = runDevelopmentServer();
     const rejection = expect(finished).rejects.toThrow('Unable to launch watcher');
     child.emit('error', new Error('Unable to launch watcher'));
     child.emit('close', -1);

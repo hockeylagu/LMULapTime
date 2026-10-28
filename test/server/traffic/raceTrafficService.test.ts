@@ -103,7 +103,7 @@ describe('RaceTrafficService', () => {
     const old = db.getRacePositions(REPLAY, previousSignature);
     projectionRevision = 'projection-two';
     vi.spyOn(db, 'listReplayLapRows').mockReturnValue([]);
-    expect(await traffic.getDriverTraffic(request)).toMatchObject({ available: false, reason: expect.stringContaining('retained replay samples') });
+    expect(await traffic.getDriverTraffic(request)).toMatchObject({ available: false, reason: expect.stringContaining('retained replay samples') as unknown });
     expect(saved).toHaveBeenCalledTimes(1);
     expect(db.getRacePositions(REPLAY, previousSignature)).toEqual(old);
     expect(build).toHaveBeenCalledTimes(1);
@@ -119,7 +119,7 @@ describe('RaceTrafficService', () => {
 
   it('says why there is no traffic to show', async () => {
     const noCentreline = new RaceTrafficService(db, build, () => null);
-    expect(await noCentreline.getDriverTraffic(request)).toMatchObject({ available: false, reason: expect.stringContaining('centreline') });
+    expect(await noCentreline.getDriverTraffic(request)).toMatchObject({ available: false, reason: expect.stringContaining('centreline') as unknown });
     expect(await service().getDriverTraffic({ ...request, replayName: 'Daytona International Speedway Road Course R1 2.Vcr' }))
       .toMatchObject({ available: false, reason: 'The replay has no stored laps yet.' });
     expect(await service().getDriverTraffic({ ...request, driverSlot: 9 }))

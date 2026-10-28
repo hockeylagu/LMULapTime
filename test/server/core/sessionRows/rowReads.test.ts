@@ -144,7 +144,7 @@ describe('session cards built from columns', () => {
       expect(card.trackVenue).toBe(sess.trackVenue);
       expect(card.trackCourse).toBe(sess.trackCourse);
     }
-    expect(cards[1].playerDriver).toMatchObject({ lapsCount: 3, cleanLapsCount: expect.any(Number), pitStopsCount: 1 });
+    expect(cards[1].playerDriver).toMatchObject({ lapsCount: 3, cleanLapsCount: expect.any(Number) as unknown, pitStopsCount: 1 });
     expect(cards[1].playerDriver).not.toHaveProperty('laps');
     expect(cards[1].playerDriver).not.toHaveProperty('incidents');
     expect(cards[0].playerDriver).toBeUndefined();

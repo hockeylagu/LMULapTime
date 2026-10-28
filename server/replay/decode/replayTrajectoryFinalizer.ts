@@ -130,7 +130,7 @@ export function finalizeReplayDriver(
 
   const allLapsData = options.allLaps ? detectedLaps.map(l => buildLapResult(l)) : undefined;
   const result = allLapsData
-    ? allLapsData.find(r => r.currentLap === chosen!.lapNumber)!
+    ? allLapsData.find(r => r.currentLap === chosen.lapNumber)!
     : buildLapResult(chosen);
 
   if (allLapsData) {

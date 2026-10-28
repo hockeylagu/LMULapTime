@@ -58,8 +58,8 @@ describe('buildLearningExamples', () => {
 
   it('marks duplicate outcome and forecast events ambiguous without dropping provenance', () => {
     const events = eventSet();
-    const duplicateForecast = { ...events[0]!, observationId: 12 };
-    const duplicateOutcome = { ...events[1]!, observationId: 22 };
+    const duplicateForecast = { ...events[0], observationId: 12 };
+    const duplicateOutcome = { ...events[1], observationId: 22 };
     const [example] = buildLearningExamples(manifest, 1, [lap], [...events, duplicateForecast, duplicateOutcome]);
     expect(example?.exclusions).toContain('ambiguous-outcome');
     expect(example?.exclusions).toContain('ambiguous-forecast');
@@ -76,7 +76,7 @@ describe('buildLearningExamples', () => {
       ...outcome,
       event: { ...outcome.event, data: { ...outcome.event.data, exclusions: ['source-exclusion'] } },
     };
-    const [example] = buildLearningExamples(manifest, 1, [badLap], [events[0]!, changedOutcome]);
+    const [example] = buildLearningExamples(manifest, 1, [badLap], [events[0], changedOutcome]);
     expect(example?.exclusions).toEqual(expect.arrayContaining([
       'source-exclusion', 'lap-not-clean-representative', 'xml-condition-unknown',
       'forecast-condition-mismatch',
@@ -93,6 +93,6 @@ describe('buildLearningExamples', () => {
   it('requires verified session ownership and unique observation IDs', () => {
     expect(() => buildLearningExamples({ ...manifest, sessionId: null }, 1, [lap], eventSet())).toThrow(/sessionId/);
     const events = eventSet();
-    expect(() => buildLearningExamples(manifest, 1, [lap], [events[0]!, { ...events[1]!, observationId: 10 }])).toThrow(/unique/);
+    expect(() => buildLearningExamples(manifest, 1, [lap], [events[0], { ...events[1], observationId: 10 }])).toThrow(/unique/);
   });
 });

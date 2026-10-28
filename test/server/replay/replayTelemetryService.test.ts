@@ -157,7 +157,7 @@ describe('ReplayTelemetryService', () => {
     db.upsertTelemetryLapCache(mockDuckFile.filename, 1, mockDuckLap);
     const revision = db.getTelemetryMetadataRevision();
 
-    const result = await request({ matchedSession: session, metadata: { ...mockMetadata, duckdbFilename: mockDuckFile.filename } as ReplayMetadata });
+    const result = await request({ matchedSession: session, metadata: { ...mockMetadata, duckdbFilename: mockDuckFile.filename } });
 
     expect(result.fused).toBe(false);
     expect(result.trajectory.source).toBe('vcr');

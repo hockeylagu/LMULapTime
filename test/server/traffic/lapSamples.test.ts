@@ -34,7 +34,7 @@ describe('readLapSamples', () => {
     const lap = storedLap(7, 500, 2, 0);
     lap.points.forEach((p, i) => { p.inGarage = i < 50; });
 
-    expect(readLapSamples(7, compressTrajectory(lap)).onTrack).toEqual([...new Array(5).fill(false), ...new Array(6).fill(true)]);
+    expect(readLapSamples(7, compressTrajectory(lap)).onTrack).toEqual([...new Array<boolean>(5).fill(false), ...new Array<boolean>(6).fill(true)]);
   });
 });
 

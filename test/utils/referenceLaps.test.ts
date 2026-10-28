@@ -24,7 +24,7 @@ function lap(replay: string, lapNumber: number, lapTime: number, extra: Partial<
     isValid: true,
     matchingReplayFile: replay,
     ...extra,
-  } as ComparableLap;
+  };
 }
 
 const myLaps = [

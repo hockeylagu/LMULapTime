@@ -113,7 +113,7 @@ describe('ReplayRecordingService', () => {
     db.upsertReplayMetadataCache('Legacy_P1.Vcr', 'C:/replays/Legacy_P1.Vcr', 100, 200, {
       filename: 'Legacy_P1.Vcr', filePath: 'C:/replays/Legacy_P1.Vcr', fileSizeBytes: 200, mtimeMs: 100,
       timeSliceCount: 2, totalEvents: 1, durationSec: 1, drivers: [{ slot: 1, name: 'Player', isPlayer: true }],
-    } as never);
+    });
     db.setReplayTrajectoryDefaults('Legacy_P1.Vcr', -1, 1, 1);
 
     db.invalidateUnresolvedReplayDefaults();

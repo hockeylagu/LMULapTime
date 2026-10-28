@@ -108,7 +108,7 @@ describe('ReplayInspectorModal - Comparison & Source Modes', () => {
 
     // Baseline should still request Lap 2 and compare mode must remain active.
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('lapOrdinal=2'), expect.objectContaining({ signal: expect.any(AbortSignal) }));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('lapOrdinal=2'), expect.objectContaining({ signal: expect.any(AbortSignal) as unknown }));
     });
   });
 

@@ -36,7 +36,7 @@ describe('LMU navigation state', () => {
     const fetchState = vi.fn<NavigationFetch>(() => answer(200, NAVIGATION_STATE_LE_MANS));
     await expect(readNavigationState(fetchState)).resolves.toMatchObject({ ok: true, navigation: { sceneDesc: 'LEMANSWEC' } });
     expect(fetchState).toHaveBeenCalledTimes(1);
-    expect(fetchState).toHaveBeenCalledWith('http://127.0.0.1:6397/navigation/state', { signal: expect.any(AbortSignal) });
+    expect(fetchState).toHaveBeenCalledWith('http://127.0.0.1:6397/navigation/state', { signal: expect.any(AbortSignal) as unknown });
     expect(LMU_NAVIGATION_URL).toBe('http://127.0.0.1:6397/navigation/state');
   });
 

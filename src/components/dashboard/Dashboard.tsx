@@ -16,7 +16,6 @@ import type { DetailedSession } from '../../../shared/types/session.js';
 import { useSessionViewMode } from '../session-list/useSessionViewMode.js';
 import { FOCUS_RING } from '../common/buttonStyles.js';
 import { useDashboardData } from './useDashboardData.js';
-import type { DashboardTrends } from '../../../shared/types/dashboard.js';
 
 export interface DashboardProps {
   sessions?: (SessionCard | DetailedSession)[];
@@ -166,7 +165,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const displayEmptyCount = dashboardData?.emptyCount ?? emptyCount;
   const displayReplayCount = dashboardData?.replayCount ?? replayCount;
   const displayMetrics = dashboardData?.metrics;
-  const displayTrends = dashboardData?.trends as DashboardTrends | undefined;
+  const displayTrends = dashboardData?.trends;
   const dashboardHasSessions = (displayMetrics?.sessionsCount ?? sessions.length) > 0;
   const expandSummaries = isExpanded;
   const displayRankedTracks = displayMetrics?.rankedTracks ?? rankedTracks;

@@ -13,7 +13,7 @@ function lap(sessionId: string, lapNumber: number, lapTime: number, extra: Parti
     id: `${sessionId}_${lapNumber}`, sessionId, driverName: ME, carType: 'Peugeot 9x8', carClass: 'Hyper',
     lapNumber, lapTime, s1: null, s2: null, s3: null, topSpeed: null, isValid: true, matchingReplayFile: `${sessionId}.Vcr`,
     ...extra,
-  } as ComparableLap;
+  };
 }
 
 const driver: ReplayDriverEntry = { slot: 1, name: ME, isPlayer: true, carType: 'Peugeot 9x8', carClass: 'Hyper', sessionDriverOrdinal: 0 };

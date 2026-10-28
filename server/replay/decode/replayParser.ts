@@ -42,8 +42,11 @@ export function detectPlayerName(baseDirOrFile?: string): string | undefined {
       for (const sp of settingsPaths) {
         if (fs.existsSync(sp)) {
           const raw = fs.readFileSync(sp, 'utf8');
-          const parsed = JSON.parse(raw);
-          const pName = parsed?.DRIVER?.['Player Name'] || parsed?.DRIVER?.PlayerName;
+          const parsed: unknown = JSON.parse(raw);
+          const driver: unknown = parsed && typeof parsed === 'object' && 'DRIVER' in parsed ? parsed.DRIVER : null;
+          const pName = driver && typeof driver === 'object'
+            ? ('Player Name' in driver && driver['Player Name']) || ('PlayerName' in driver && driver.PlayerName)
+            : undefined;
           if (pName && typeof pName === 'string' && pName.trim()) {
             return pName.trim();
           }
@@ -214,7 +217,7 @@ export function parseReplayMetadata(
     let eventScene: string | undefined;
     if (eventJsonStr) {
       try {
-        eventInfo = JSON.parse(eventJsonStr);
+        eventInfo = JSON.parse(eventJsonStr) as ReplayEventInfo | null;
         // The scene and session live once, as `sceneDesc` and `sessionType` on the metadata.
         if (eventInfo) {
           if (typeof eventInfo.sceneDesc === 'string') eventScene = eventInfo.sceneDesc;

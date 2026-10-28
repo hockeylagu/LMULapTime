@@ -15,10 +15,10 @@ try {
     groups.set(key, [...(groups.get(key) ?? []), example]);
   }
   for (const [key, examples] of groups) {
-    const first = examples[0]!;
+    const first = examples[0];
     const errors = examples.filter(row => row.exclusions.length === 0 && row.predicted !== null)
       .map(row => (row.predicted! - row.actual) / row.actual * 100).sort((a, b) => a - b);
-    const median = errors.length ? errors[Math.floor(errors.length / 2)]!.toFixed(1) : '-';
+    const median = errors.length ? errors[Math.floor(errors.length / 2)].toFixed(1) : '-';
     console.log(`\n${key}  ${first.layoutKey} | ${first.vehicleModel} | ${first.compound ?? '?'} | ${first.condition ?? '?'}`
       + `  eligible ${errors.length}/${examples.length}  median error ${median} %`);
     for (const row of examples) {

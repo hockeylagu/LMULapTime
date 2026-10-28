@@ -35,7 +35,7 @@ function errorText(error: unknown): string {
 // Loaded on first open, so modules that only import the store (routes, startup) skip the native addon.
 async function createDatabase(target: string, options?: Record<string, string>): Promise<DuckDBInstance> {
   const { DuckDBInstance } = await import('@duckdb/node-api');
-  return await DuckDBInstance.create(target, options);
+  return DuckDBInstance.create(target, options);
 }
 
 async function all(connection: DuckDBConnection, sql: string, values: DuckDBValue[] = []): Promise<DbRow[]> {
@@ -748,7 +748,7 @@ export class LiveCaptureRecordingStore {
       try { database.closeSync(); }
       catch (error: unknown) { failure ??= error; }
     }
-    if (failure) throw failure;
+    if (failure) throw failure instanceof Error ? failure : new Error(errorText(failure));
   }
 
   public async close(): Promise<void> {

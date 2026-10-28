@@ -170,14 +170,14 @@ export function writeSessionRows(db: DatabaseType, session: DetailedSession, pro
     packFields(params, session as unknown as Row, SESSION_FIELDS);
     packFields(params, session.weather as unknown as Row | undefined, WEATHER_FIELDS);
     packFields(params, session.settings as unknown as Row | undefined, SETTINGS_FIELDS);
-    packFields(params, session.bestSessionLap as unknown as Row | undefined, BEST_SESSION_LAP_FIELDS);
+    packFields(params, session.bestSessionLap, BEST_SESSION_LAP_FIELDS);
     params.player_driver_ordinal = playerDriverOrdinal(session);
     const updated = statements.update.run(params);
     if (updated.changes === 0) throw new Error(`Cannot write rows of unknown session ${session.id}`);
 
     if (session.matchingReplayFile) {
       const recording: Params = { session_id: session.id };
-      packFields(recording, session.matchingReplayFile as unknown as Row, RECORDING_FIELDS);
+      packFields(recording, session.matchingReplayFile, RECORDING_FIELDS);
       statements.recording.run(recording);
     }
     session.drivers.forEach((driver, driverOrdinal) => {

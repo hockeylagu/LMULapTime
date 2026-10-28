@@ -81,9 +81,10 @@ describe('useRequest', () => {
   it('keeps the answer on screen while a refresh or, with keepPrevious, another request loads', async () => {
     const answers: Array<ReturnType<typeof deferred<string>>> = [];
     const load = vi.fn(() => { const next = deferred<string>(); answers.push(next); return next.promise; });
+    const initialProps: { request: string; options: RequestOptions } = { request: 'a', options: { refresh: 1 } };
     const { result, rerender } = renderHook(
       ({ request, options }: { request: string; options: RequestOptions }) => useRequest(request, load, options),
-      { initialProps: { request: 'a', options: { refresh: 1 } as RequestOptions } });
+      { initialProps });
     await act(async () => { answers[0].resolve('A1'); });
 
     rerender({ request: 'a', options: { refresh: 2 } });

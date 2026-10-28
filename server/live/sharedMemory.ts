@@ -29,12 +29,13 @@ function loadKernel32(): Kernel32 | null {
   kernel32 = null;
   if (process.platform !== 'win32') return kernel32;
   try {
-    const lib = nodeRequire('koffi').load('kernel32.dll');
+    const koffi = nodeRequire('koffi') as typeof import('koffi');
+    const lib = koffi.load('kernel32.dll');
     kernel32 = {
-      openFileMapping: lib.func('void* __stdcall OpenFileMappingW(uint32 access, int inherit, str16 name)'),
-      mapViewOfFile: lib.func('void* __stdcall MapViewOfFile(void* handle, uint32 access, uint32 high, uint32 low, size_t bytes)'),
-      unmapViewOfFile: lib.func('int __stdcall UnmapViewOfFile(void* view)'),
-      closeHandle: lib.func('int __stdcall CloseHandle(void* handle)'),
+      openFileMapping: lib.func('void* __stdcall OpenFileMappingW(uint32 access, int inherit, str16 name)') as Kernel32['openFileMapping'],
+      mapViewOfFile: lib.func('void* __stdcall MapViewOfFile(void* handle, uint32 access, uint32 high, uint32 low, size_t bytes)') as Kernel32['mapViewOfFile'],
+      unmapViewOfFile: lib.func('int __stdcall UnmapViewOfFile(void* view)') as Kernel32['unmapViewOfFile'],
+      closeHandle: lib.func('int __stdcall CloseHandle(void* handle)') as Kernel32['closeHandle'],
     };
   } catch (error: unknown) {
     console.warn('[Live] Windows shared memory is unavailable:', error);
@@ -53,11 +54,11 @@ export function openMapping(name: string, size: number): MappedBuffer | null {
     api.closeHandle(handle);
     return null;
   }
-  const koffi = nodeRequire('koffi');
+  const koffi = nodeRequire('koffi') as typeof import('koffi');
   // Keep the external view private: no consumer can retain mapped memory after close().
   // Snapshots still copy between the producer's version-counter checks.
   let bytes: Buffer;
-  try { bytes = Buffer.from(koffi.view(view, size) as ArrayBuffer); }
+  try { bytes = Buffer.from(koffi.view(view, size)); }
   catch (error: unknown) {
     api.unmapViewOfFile(view);
     api.closeHandle(handle);

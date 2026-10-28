@@ -11,12 +11,12 @@ describe('shared memory', () => {
 
   // A mapping this test creates itself (not the game's), to exercise the real Windows calls.
   it.skipIf(process.platform !== 'win32')('reads a named mapping through the Windows API and closes it', () => {
-    const koffi = nodeRequire('koffi');
+    const koffi = nodeRequire('koffi') as typeof import('koffi');
     const kernel32 = koffi.load('kernel32.dll');
-    const create = kernel32.func('void* __stdcall CreateFileMappingW(intptr_t file, void* attributes, uint32 protect, uint32 high, uint32 low, str16 name)');
-    const mapView = kernel32.func('void* __stdcall MapViewOfFile(void* handle, uint32 access, uint32 high, uint32 low, size_t bytes)');
-    const unmap = kernel32.func('int __stdcall UnmapViewOfFile(void* view)');
-    const close = kernel32.func('int __stdcall CloseHandle(void* handle)');
+    const create = kernel32.func('void* __stdcall CreateFileMappingW(intptr_t file, void* attributes, uint32 protect, uint32 high, uint32 low, str16 name)') as (file: number, attributes: null, protect: number, high: number, low: number, name: string) => bigint;
+    const mapView = kernel32.func('void* __stdcall MapViewOfFile(void* handle, uint32 access, uint32 high, uint32 low, size_t bytes)') as (handle: bigint, access: number, high: number, low: number, bytes: number) => bigint;
+    const unmap = kernel32.func('int __stdcall UnmapViewOfFile(void* view)') as (view: bigint) => number;
+    const close = kernel32.func('int __stdcall CloseHandle(void* handle)') as (handle: bigint) => number;
     const name = `$lmu-live-test-${process.pid}$`;
     const owner = create(-1, null, 4, 0, 256, name);
     const writable = mapView(owner, 2, 0, 0, 256);

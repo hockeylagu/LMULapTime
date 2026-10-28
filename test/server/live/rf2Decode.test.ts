@@ -49,9 +49,9 @@ describe('rF2 scoring decode', () => {
       allDriversFinished: false,
       inRealtime: true, gamePhase: 5, trackLength: 13_626, trackTempC: 31.5, raining: 0, avgPathWetness: 0, maxPathWetness: 0,
       minPathWetness: 0, trackGripLevel: 0,
-      player: expect.objectContaining({ id: 12, place: 4, totalLaps: 8, vehicleName: 'Ferrari 296 GT3', vehicleClass: 'GT3' }),
-      leader: expect.objectContaining({ id: 7, place: 1, totalLaps: 9 }),
-      classLeader: expect.objectContaining({ id: 12, place: 4, vehicleClass: 'GT3' }),
+      player: expect.objectContaining({ id: 12, place: 4, totalLaps: 8, vehicleName: 'Ferrari 296 GT3', vehicleClass: 'GT3' }) as unknown,
+      leader: expect.objectContaining({ id: 7, place: 1, totalLaps: 9 }) as unknown,
+      classLeader: expect.objectContaining({ id: 12, place: 4, vehicleClass: 'GT3' }) as unknown,
     });
   });
 
@@ -243,7 +243,7 @@ describe('rF2 pedal decode', () => {
   it('matches the player by id and remembers its slot', () => {
     const mapping = source(() => telemetryBuffer(4, slots));
     expect(readPedalFrame(mapping, 12, null, -1)).toEqual({
-      status: 'ok', version: 4, value: { slot: 1, sample: { t: 321.25, throttle: 0.75, brake: 1 }, tyreSurfaceAvgC: null, car: expect.objectContaining({ fuelLiters: 0 }) },
+      status: 'ok', version: 4, value: { slot: 1, sample: { t: 321.25, throttle: 0.75, brake: 1 }, tyreSurfaceAvgC: null, car: expect.objectContaining({ fuelLiters: 0 }) as unknown },
     });
     expect(readPedalFrame(mapping, 12, 3, 1)).toMatchObject({ value: { slot: 1 } });
   });

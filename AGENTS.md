@@ -81,7 +81,7 @@ Telemetry analytics, lap comparison, and race intelligence hub for **Le Mans Ult
 ## 4. Coding & Architecture Conventions
 
 ### TypeScript & Modules
-- **Enforced by `npm run lint`**: no `any`, `.js` extensions on relative imports in `server/`, `shared/`, `test/`, no raw `fetch` in `src/`, `src/` and `shared/` never import `server/`, no import cycles, exhaustive switches over union types, no focused Vitest tests in `test/`, max 1,000 lines per file and 300 per `src/components/**/*.tsx`, no floating promises, React hooks rules.
+- **`npm run lint`** enforces type safety and promise handling; its errors say how to fix them. Design rules it also enforces: `src/` and `shared/` never import `server/`, no import cycles, exhaustive switches over unions, max 1,000 lines per file and 300 per `src/components/**/*.tsx`.
 - **Types**: Use canonical models from `shared/types/`, telemetry reader contracts from `server/telemetry/duckdbTypes.ts`, or `unknown` with narrowing.
 - **Zero Warnings**: `npm run build`, `npm run lint` and `npm test` finish with zero warnings and zero errors (incl. rollup chunk and React `act(...)` warnings).
 - **Max 20 files per directory** (excluding the repository root and `public/track-outlines/`); split into focused subdirectories when approaching it.

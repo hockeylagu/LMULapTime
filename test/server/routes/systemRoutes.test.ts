@@ -73,7 +73,7 @@ describe('system routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body).toMatchObject({
-        serverInstanceId: 'instance-test', dataPlugin: { revision: expect.any(String) },
+        serverInstanceId: 'instance-test', dataPlugin: { revision: expect.any(String) as unknown },
         resultsExist: true, replaysExist: false, telemetryExist: true,
         playerName: 'Test Player', sessionsCount: 3, tracksCount: 2,
         referenceLaptimes: { lastUpdated: null, entriesCount: 0, lastUpdateDiff: null },
@@ -85,7 +85,7 @@ describe('system routes', () => {
     it('reports the downloaded benchmark table', async () => {
       referenceCache.load.mockReturnValue({ lastUpdated: '2026-09-20T00:00:00.000Z', entriesCount: 42, lastUpdateDiff: { updatedCount: 2 } });
       const res = await request(app).get('/api/status');
-      expect(res.body.referenceLaptimes).toEqual({ lastUpdated: '2026-09-20T00:00:00.000Z', entriesCount: 42, lastUpdateDiff: { updatedCount: 2 } });
+      expect(res.body).toHaveProperty('referenceLaptimes', { lastUpdated: '2026-09-20T00:00:00.000Z', entriesCount: 42, lastUpdateDiff: { updatedCount: 2 } });
     });
   });
 
@@ -101,7 +101,7 @@ describe('system routes', () => {
       context.hasActiveFileScan.mockReturnValue(true);
       const res = await request(app).post('/api/cache/clear');
       expect(res.status).toBe(409);
-      expect(res.body.error).toMatch(/file scan is already running/i);
+      expect(res.body).toHaveProperty('error', expect.stringMatching(/file scan is already running/i));
       expect(context.sessionDb.clearCache).not.toHaveBeenCalled();
     });
 
@@ -141,7 +141,7 @@ describe('system routes', () => {
       const missingDir = path.join(dir, 'nope');
       const res = await request(app).post('/api/scan').send({ replaysDir: missingDir });
       expect(res.status).toBe(200);
-      expect(res.body.success).toBe(true);
+      expect(res.body).toHaveProperty('success', true);
       expect(context.configureDirectories).toHaveBeenCalledWith({ replaysDir: missingDir });
     });
 

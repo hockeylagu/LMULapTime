@@ -77,18 +77,18 @@ async function* acquireReplaySaveLease(key: string): AsyncGenerator<ReplayStream
   const release = (failures?: Map<number, ReplaySaveFailure>): void => {
     if (!owner.granted) {
       owner.canceled = true;
-      queue!.waiting = queue!.waiting.filter(waiter => waiter !== owner);
-      if (!queue!.locked && queue!.waiting.length === 0) replaySaveQueues.delete(key);
+      queue.waiting = queue.waiting.filter(waiter => waiter !== owner);
+      if (!queue.locked && queue.waiting.length === 0) replaySaveQueues.delete(key);
       return;
     }
-    let granted = queue!.waiting.shift();
-    while (granted?.canceled) granted = queue!.waiting.shift();
+    let granted = queue.waiting.shift();
+    while (granted?.canceled) granted = queue.waiting.shift();
     if (granted) {
       granted.previousFailures = new Map([...(owner.previousFailures ?? []), ...(failures ?? [])]);
       granted.resolve();
     }
     else {
-      queue!.locked = false;
+      queue.locked = false;
       replaySaveQueues.delete(key);
     }
   };

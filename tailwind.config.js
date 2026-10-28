@@ -5,7 +5,9 @@
  * 4.5:1 on lmu-bg, unlike an opacity fade). The hue values are Tailwind v4's own, so a role renders exactly
  * as the hue it replaced; retune a role here, never in a component.
  */
+/** @param {string} oklch */
 const hueOf = (oklch) => oklch.match(/([\d.]+)\)$/)[1];
+/** @param {string[]} steps */
 const family = ([soft, base, strong, deep]) => ({ soft, DEFAULT: base, strong, deep, faded: `oklch(62% 0.06 ${hueOf(base)})` });
 
 // [soft, base, strong, deep] = Tailwind v4 [300, 400, 500, 950] of the hue named in the comment

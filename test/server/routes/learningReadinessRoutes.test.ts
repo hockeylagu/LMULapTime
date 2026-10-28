@@ -38,10 +38,10 @@ describe('learning readiness status API', () => {
 
   it('defers without starting evaluation while a game session is loaded', async () => {
     const { app, live, reader, capture } = setup(); const loaded = vi.spyOn(live, 'isSessionLoaded').mockReturnValue(true);
-    expect((await request(app).get('/api/live/learning')).body.state).toBe('deferred');
+    expect((await request(app).get('/api/live/learning')).body).toHaveProperty('state', 'deferred');
     expect(reader).not.toHaveBeenCalled();
     loaded.mockReturnValue(false); capture.hasOpenRecordingHandle = true;
-    expect((await request(app).get('/api/live/learning')).body.state).toBe('deferred');
+    expect((await request(app).get('/api/live/learning')).body).toHaveProperty('state', 'deferred');
     expect(reader).not.toHaveBeenCalled();
   });
 
@@ -55,12 +55,12 @@ describe('learning readiness status API', () => {
     });
     live = instance;
     const response = await request(app).get('/api/live/learning');
-    expect(response.body.state).toBe('deferred'); expect(reader).toHaveBeenCalledOnce();
+    expect(response.body).toHaveProperty('state', 'deferred'); expect(reader).toHaveBeenCalledOnce();
   });
 
   it('returns a retryable worker-busy error rather than a success with no evidence', async () => {
     const { app } = setup(async () => { throw new LearningReadinessError(503, 'Check already running.'); });
     const response = await request(app).get('/api/live/learning');
-    expect(response.status).toBe(503); expect(response.body.error).toBe('Check already running.');
+    expect(response.status).toBe(503); expect(response.body).toHaveProperty('error', 'Check already running.');
   });
 });

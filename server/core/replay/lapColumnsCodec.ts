@@ -116,7 +116,7 @@ function encodeCandidate(values: LapColumn, numberForm?: NumberKind): Encoded {
     return { descriptor: { kind: 'bool', parts: [part.length] }, parts: [part] };
   }
   if (values.every(v => v === null || isNumber(v))) {
-    const numbers = values as Array<number | null>;
+    const numbers = values;
     return encodeNumbers(numbers, numberForm ?? numberKind(numbers));
   }
   if (values.every(v => v === null || isTuple(v))) {

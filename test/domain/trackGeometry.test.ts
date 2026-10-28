@@ -199,7 +199,7 @@ describe('track map display validation', () => {
   });
 
   it('accepts optional braking markers and preserves legacy displays without them', () => {
-    const display = mapDisplay() as TrackMapDisplay;
+    const display = mapDisplay();
     display.brakeMarkers = [
       { id: 'brake-150', center: [12, 34], label: '150', stationM: 900, side: 'left' },
       { id: 'brake-unknown', center: [56, 78], stationM: 1200, side: 'right' },

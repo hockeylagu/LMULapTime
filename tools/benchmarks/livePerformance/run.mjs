@@ -3,13 +3,23 @@ import { writeFileSync } from 'node:fs';
 const packageRoot = process.env.LIVE_PERF_NODE_MODULES;
 if (!packageRoot) throw new Error('Set LIVE_PERF_NODE_MODULES to the directory containing playwright.');
 const require = createRequire(`${packageRoot.replaceAll('\\', '/')}/package.json`);
-const { chromium } = require('playwright');
+/** @typedef {{events: Record<string, number>, deliveryMs: number[], drawAgeMs: number[], drawMs: number[], longTasks: number[]}} ClientMetrics
+ * @typedef {{metrics: {name: string, value: number}[]}} PerformanceMetrics
+ * @typedef {{send(method: string): Promise<PerformanceMetrics>}} MetricsSession
+ * @typedef {{on(event: string, listener: (error: Error) => void): void, context(): {newCDPSession(page: MetricsPage): Promise<MetricsSession>}, goto(url: string): Promise<unknown>, waitForSelector(selector: string): Promise<unknown>, evaluate<T>(callback: () => T): Promise<T>}} MetricsPage
+ * @typedef {{newPage(options: {viewport: {width: number, height: number}, deviceScaleFactor: number}): Promise<MetricsPage>, version(): string, close(): Promise<void>}} MetricsBrowser
+ */
+// Playwright is supplied externally through LIVE_PERF_NODE_MODULES; this is the API the probe uses.
+const { chromium } = /** @type {{chromium: {launch(options: {headless: boolean, channel: string}): Promise<MetricsBrowser>}}} */ (require('playwright'));
 const browser = await chromium.launch({ headless: true, channel: process.env.LIVE_PERF_BROWSER || 'msedge' });
 const base = 'http://127.0.0.1:3099';
 const results = [];
+/** @type {{current: MetricsPage, session: MetricsSession}[]} */
 const pages = [];
 const errors = [];
+/** @param {number} ms */
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+/** @param {number[]} values */
 const summary = values => {
   const sorted = [...values].sort((a, b) => a - b);
   return { count: sorted.length, p50: sorted[Math.floor(sorted.length * .5)] ?? null,
@@ -24,21 +34,23 @@ async function page() {
   await current.waitForSelector('[data-testid="pedal-trace"]');
   pages.push({ current, session });
 }
+/** @param {string} name @param {number} durationMs */
 async function phase(name, durationMs) {
   await fetch(`${base}/metrics`);
   const before = [];
   for (const { current, session } of pages) {
     before.push(await session.send('Performance.getMetrics'));
-    await current.evaluate(() => { window.livePerf = { events: {}, deliveryMs: [], drawAgeMs: [], drawMs: [], longTasks: [] }; });
+    await current.evaluate(() => { /** @type {Window & {livePerf?: ClientMetrics}} */ (window).livePerf = { events: {}, deliveryMs: [], drawAgeMs: [], drawMs: [], longTasks: [] }; });
   }
   await pause(durationMs);
-  const server = await (await fetch(`${base}/metrics`)).json();
+  const server = /** @type {unknown} */ (await (await fetch(`${base}/metrics`)).json());
   const clients = [];
   for (let i = 0; i < pages.length; i++) {
     const { current, session } = pages[i];
     const after = await session.send('Performance.getMetrics');
+    /** @param {PerformanceMetrics} list @param {string} key */
     const get = (list, key) => list.metrics.find(item => item.name === key)?.value ?? 0;
-    const metrics = await current.evaluate(() => window.livePerf);
+    const metrics = await current.evaluate(() => /** @type {Window & {livePerf: ClientMetrics}} */ (window).livePerf);
     clients.push({ events: metrics.events, deliveryMs: summary(metrics.deliveryMs),
       drawAgeMs: summary(metrics.drawAgeMs), drawMs: summary(metrics.drawMs),
       longTasks: summary(metrics.longTasks),

@@ -138,7 +138,7 @@ export function queryProgression(db: Database, options: SessionQuery): SessionPr
     const theoreticalBest=computeTheoreticalBest(r.best_s1,r.best_s2,r.best_s3);
     return {sessionId:r.id,timestamp:r.timestamp,timeString:r.time_string,sessionType:r.session_type,sessionName:r.session_name,
       trackVenue:r.track_venue,trackCourse:r.track_course,displayTrack:getDisplayTrackName(r.track_venue,r.track_course),
-      weather:group(r,WEATHER_FIELDS) as SessionProgressionPoint['weather'] | undefined, settings:group(r,SETTINGS_FIELDS) as SessionProgressionPoint['settings'] | undefined,
+      weather:group(r,WEATHER_FIELDS) as SessionProgressionPoint['weather'] | undefined, settings:group(r,SETTINGS_FIELDS),
       carType:r.car_type || 'Unknown Car',carClass:r.car_class || 'General',driverName:r.driver_name || 'Unknown',bestLapTime:r.best_lap_time ?? null,bestS1:r.best_s1 ?? null,bestS2:r.best_s2 ?? null,bestS3:r.best_s3 ?? null,
       theoreticalBest,theoreticalGap:computeTheoreticalGap(r.best_lap_time,theoreticalBest),cleanLapsCount:r.clean_laps_count ?? 0,
       declaredLapsCount:r.declared_laps_count ?? 0,avgLapTime:r.has_lap_rows ? r.avg_lap_time : null,top3Average:r.top3_average ?? null,consistencyScore:r.consistency_score ?? null};

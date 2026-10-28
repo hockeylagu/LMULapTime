@@ -185,7 +185,7 @@ describe('ReplayInspectorModal', () => {
     chooseValue(screen.getByLabelText(/Select Driver/i), '2');
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('driverOrdinal=1'), expect.objectContaining({ signal: expect.any(AbortSignal) }));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('driverOrdinal=1'), expect.objectContaining({ signal: expect.any(AbortSignal) as unknown }));
     });
   });
 
@@ -250,7 +250,7 @@ describe('ReplayInspectorModal', () => {
 
     // Verify it called trajectory fetch with driverOrdinal=1
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('driverOrdinal=1'), expect.objectContaining({ signal: expect.any(AbortSignal) }));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('driverOrdinal=1'), expect.objectContaining({ signal: expect.any(AbortSignal) as unknown }));
     });
   });
 
@@ -483,7 +483,7 @@ describe('ReplayInspectorModal', () => {
 
     // After swap, baseline loading should request the other lap.
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('lapOrdinal=0'), expect.objectContaining({ signal: expect.any(AbortSignal) }));
+      expect(global.fetch).toHaveBeenCalledWith(expect.stringContaining('lapOrdinal=0'), expect.objectContaining({ signal: expect.any(AbortSignal) as unknown }));
     });
   });
 });

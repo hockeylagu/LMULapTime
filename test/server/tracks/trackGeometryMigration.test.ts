@@ -101,7 +101,7 @@ describe('geometry revision migration', () => {
       expect(served.projectionRevision).toEqual(expect.any(String));
       expect(served.geometryRevision).not.toBe(lap.geometryRevision);
       expect(served.projectionRevision).not.toBe(lap.projectionRevision);
-      expect(served.laps).toEqual(lap.laps?.map(summary => expect.objectContaining(summary)));
+      expect(served.laps).toEqual(lap.laps?.map(summary => expect.objectContaining(summary) as unknown));
       expect(db.getStoredReplayTrajectory(lap.replayName, 0, 1)).toEqual(retained);
     } finally {
       db.close();

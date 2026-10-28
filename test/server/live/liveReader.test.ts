@@ -65,7 +65,7 @@ describe('LiveReader', () => {
     t.setScoring(scoringBuffer(4, [PLAYER], { currentEt: 0, inRealtime: false }));
     await vi.advanceTimersByTimeAsync(PROBE_MS + 100);
     expect(t.posted).toContainEqual(expect.objectContaining({ type: 'frame',
-      scoring: expect.objectContaining({ currentEt: 0, inRealtime: false }) }));
+      scoring: expect.objectContaining({ currentEt: 0, inRealtime: false }) as unknown }));
     const frames = t.posted.filter(item => item.type === 'frame').length;
     await vi.advanceTimersByTimeAsync(PROBE_MS);
     expect(t.posted.filter(item => item.type === 'frame')).toHaveLength(frames);
@@ -266,10 +266,10 @@ describe('LiveReader', () => {
     expect(t.openMapping).toHaveBeenCalledWith(TELEMETRY_MAPPING_NAME, expect.any(Number));
     expect(t.posted).toEqual([{
       type: 'frame',
-      scoring: expect.objectContaining({ numVehicles: 1, inRealtime: true, player: expect.objectContaining({ id: 12 }) }),
+      scoring: expect.objectContaining({ numVehicles: 1, inRealtime: true, player: expect.objectContaining({ id: 12 }) as unknown }) as unknown,
       pedal: { t: 100, throttle: 0.5, brake: 0 },
       tyreSurfaceAvgC: null,
-      car: expect.objectContaining({ fuelLiters: 0, compound: '' }),
+      car: expect.objectContaining({ fuelLiters: 0, compound: '' }) as unknown,
     }]);
     t.reader.stop();
   });

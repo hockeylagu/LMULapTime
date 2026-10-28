@@ -12,7 +12,9 @@ const server = http.createServer((req, res) => {
   setTimeout(() => { clearInterval(drip); res.end('{}'); }, 1500);
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-const port = server.address().port;
+const address = server.address();
+if (!address || typeof address === 'string') throw new Error('Expected local TCP address');
+const port = address.port;
 const original = http.get;
 http.get = (url, options, callback) => original(`http://127.0.0.1:${port}${new URL(url).pathname}`, options, response => {
   // Observe the response error so the probe can report a pending promise instead of exiting on an unhandled error.
@@ -24,7 +26,9 @@ try {
   for (const path of ['/trickle', '/abort']) {
     const start = performance.now();
     let timer;
-    const result = await Promise.race([lmuGet(path), new Promise(resolve => { timer = setTimeout(() => resolve('unsettled after 2200ms'), 2200); })]);
+    /** @type {Promise<string>} */
+    const timeout = new Promise(resolve => { timer = setTimeout(() => resolve('unsettled after 2200ms'), 2200); });
+    const result = await Promise.race([lmuGet(path), timeout]);
     clearTimeout(timer);
     results.push({ path, elapsedMs: performance.now() - start, result });
   }

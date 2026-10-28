@@ -107,7 +107,7 @@ export function Select<T extends SelectValue>({
     const order = [...flat.keys()].map(offset => (start + 1 + offset) % flat.length);
     // A repeated single letter cycles; a longer prefix keeps the current match if it still fits.
     const candidates = prefix.length > 1 ? [start, ...order] : order;
-    return candidates.find(index => index >= 0 && !flat[index]?.disabled && textOf(flat[index]!).toLowerCase().startsWith(prefix)) ?? -1;
+    return candidates.find(index => index >= 0 && !flat[index]?.disabled && textOf(flat[index]).toLowerCase().startsWith(prefix)) ?? -1;
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {

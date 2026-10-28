@@ -13,19 +13,22 @@ const ticks = Number(process.env.LIVE_ALLOCATION_TICKS ?? 200_000);
 if (!Number.isSafeInteger(ticks) || ticks < 1) throw new Error('LIVE_ALLOCATION_TICKS must be a positive integer');
 if (!global.gc) throw new Error('Run this benchmark with --expose-gc');
 const require = createRequire(import.meta.url);
-const koffi = process.platform === 'win32' ? require('koffi') : null;
+const koffi = process.platform === 'win32' ? /** @type {typeof import('koffi')} */ (require('koffi')) : null;
 const api = koffi?.load('kernel32.dll');
-const create = api?.func('void* __stdcall CreateFileMappingW(intptr_t file, void* attributes, uint32 protect, uint32 high, uint32 low, str16 name)');
-const map = api?.func('void* __stdcall MapViewOfFile(void* handle, uint32 access, uint32 high, uint32 low, size_t bytes)');
-const unmap = api?.func('int __stdcall UnmapViewOfFile(void* view)');
-const close = api?.func('int __stdcall CloseHandle(void* handle)');
+const create = /** @type {(file: number, attributes: null, protect: number, high: number, low: number, name: string) => bigint | null} */ (api?.func('void* __stdcall CreateFileMappingW(intptr_t file, void* attributes, uint32 protect, uint32 high, uint32 low, str16 name)'));
+const map = /** @type {(handle: bigint, access: number, high: number, low: number, bytes: number) => bigint | null} */ (api?.func('void* __stdcall MapViewOfFile(void* handle, uint32 access, uint32 high, uint32 low, size_t bytes)'));
+const unmap = /** @type {(view: bigint) => number} */ (api?.func('int __stdcall UnmapViewOfFile(void* view)'));
+const close = /** @type {(handle: bigint) => number} */ (api?.func('int __stdcall CloseHandle(void* handle)'));
+/** @type {(() => void)[]} */
 const cleanup = [];
 let allocatingCopies = 0;
 let allocatingCopyBytes = 0;
 let reusedCopyBytes = 0;
 
+/** @param {Buffer} initial @param {string} label */
 function mapping(initial, label) {
   let writer = initial;
+  /** @type {Pick<import('../../../server/live/sharedMemory.ts').MappedBuffer, 'readU32' | 'read' | 'readInto'>} */
   let source;
   if (koffi) {
     const name = `$lmu-allocation-benchmark-${process.pid}-${label}$`;
@@ -37,9 +40,10 @@ function mapping(initial, label) {
     cleanup.push(() => unmap(view));
     writer = Buffer.from(koffi.view(view, initial.length));
     initial.copy(writer);
-    source = openMapping(name, initial.length);
-    if (!source) throw new Error('Cannot open benchmark reader');
-    cleanup.push(() => source.close());
+    const nativeSource = openMapping(name, initial.length);
+    if (!nativeSource) throw new Error('Cannot open benchmark reader');
+    source = nativeSource;
+    cleanup.push(() => nativeSource.close());
   } else {
     source = {
       readU32: offset => writer.readUInt32LE(offset),
@@ -49,11 +53,11 @@ function mapping(initial, label) {
   }
   return { writer, source: {
     readU32: source.readU32,
-    read: (offset, length) => {
+    read: (/** @type {number} */ offset, /** @type {number} */ length) => {
       allocatingCopies++; allocatingCopyBytes += length;
       return source.read(offset, length);
     },
-    readInto: (offset, target, targetOffset, length) => {
+    readInto: (/** @type {number} */ offset, /** @type {Buffer} */ target, /** @type {number} */ targetOffset, /** @type {number} */ length) => {
       reusedCopyBytes += length;
       source.readInto(offset, target, targetOffset, length);
     },
@@ -65,11 +69,14 @@ let gcMs = 0;
 let checksum = 0;
 const observer = new PerformanceObserver(list => {
   for (const entry of list.getEntries()) {
-    if (entry.detail.kind === constants.NODE_PERFORMANCE_GC_MINOR) { gcCount++; gcMs += entry.duration; }
+    const detail = /** @type {unknown} */ (entry.detail);
+    if (detail && typeof detail === 'object' && 'kind' in detail && detail.kind === constants.NODE_PERFORMANCE_GC_MINOR) { gcCount++; gcMs += entry.duration; }
   }
 });
 
-/** Warms, collects, then measures `run(ticks)` alone: elapsed time, minor GCs and mapping copies. */
+/** Warms, collects, then measures `run(ticks)` alone: elapsed time, minor GCs and mapping copies.
+ * @param {string} label @param {(ticks: number) => void} run @param {() => Record<string, number>} [extra]
+ */
 async function measure(label, run, extra = () => ({})) {
   run(10_000);
   global.gc();
@@ -108,7 +115,9 @@ try {
     telemetry.writer.writeDoubleLE(version / 50, TELEMETRY.vehicles + VEHICLE_TELEMETRY.offsets.elapsedTime);
   }
 
+  /** @type {number | null} */
   let scoringVersion = null;
+  /** @type {number | null} */
   let telemetryVersion = null;
   let slot = -1;
   const decode = await measure('decode', count => {

@@ -319,6 +319,8 @@ original identity evidence is no longer available.
 ## 6. Current Parser Implementation
 
 The application's parser is implemented in [`server/sessions/parser.ts`](../server/sessions/parser.ts) using `fast-xml-parser`.
+Its raw document and session contracts live in [`sessionXmlTypes.ts`](../server/sessions/sessionXmlTypes.ts).
+Tag and attribute value parsing are enabled, so numeric XML text can arrive as numbers before normalization.
 
 ### 6.1 Parsing Pipeline
 ```mermaid

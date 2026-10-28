@@ -279,7 +279,7 @@ describe('App component', () => {
     fireEvent.click(refreshBtn);
 
     await waitFor(() => {
-      expect(global.fetch).toHaveBeenCalledWith('/api/scan', expect.objectContaining({ method: 'POST', signal: expect.any(AbortSignal) }));
+      expect(global.fetch).toHaveBeenCalledWith('/api/scan', expect.objectContaining({ method: 'POST', signal: expect.any(AbortSignal) as unknown }) as unknown);
       expect(screen.getByText('Totals')).toBeInTheDocument();
     });
   });

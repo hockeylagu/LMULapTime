@@ -16,7 +16,7 @@ describe('SessionDebriefCard', () => {
 
   it('waits to be asked before reading the replays', () => {
     const fetchMock = vi.fn();
-    global.fetch = fetchMock as unknown as typeof fetch;
+    global.fetch = fetchMock;
 
     render(<SessionDebriefCard session={session} selectedDriver={me} />);
 

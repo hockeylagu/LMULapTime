@@ -6,7 +6,7 @@ import { lapEventTime } from '../../../src/components/session-detail/table/Sessi
 const lap = (overrides: Partial<LapData>): LapData => ({
   lapNumber: 9, position: 5, lapTime: 100.358, s1: null, s2: null, s3: null, topSpeed: null,
   fCompound: 'Soft', rCompound: 'Soft', isPitStop: false, isValid: true, ...overrides,
-} as LapData);
+});
 
 describe('lapDetailSections', () => {
   it('reports timing-line position changes even without traffic evidence', () => {
@@ -31,7 +31,7 @@ describe('lapDetailSections', () => {
     const sections = lapDetailSections(lap({
       nonRepresentativeReason: 'contact',
       traffic: { ahead: null, behind: null, following: false, passed: [{ name: 'Rui Paiva', carClass: 'GT3', sameClass: false }], passedBy: [] },
-    } as Partial<LapData>), {
+    }), {
       events: {
         incidents: [{ type: 'contact', description: 'Contact with another car (326N)' }],
         trackLimits: [{ description: 'Track limits violation (+0.25 pts)' }], penalties: [],

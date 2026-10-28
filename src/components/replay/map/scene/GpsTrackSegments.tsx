@@ -118,7 +118,7 @@ export const GpsTrackSegments: React.FC<GpsTrackSegmentsProps> = React.memo(({
 
   // setState with the same point object bails out, so a move within one vertex's reach costs nothing.
   const handlePointerHover = useCallback((run: TrackLineRun, e: React.PointerEvent<SVGPathElement>) => {
-    const at = toSvgCoords(e as unknown as React.MouseEvent<SVGPathElement>);
+    const at = toSvgCoords(e);
     if (!at) return;
     const pts = svgPointsRef.current;
     setHoveredPoint(pts[nearestRunVertex(pts, run.from, run.to, at.sx, at.sy)]);

@@ -141,7 +141,7 @@ export class ReplayTelemetryService {
         : [];
 
       if (files.length > 0) {
-        trajectory.duckdbFilename = links.forSession(session!);
+        trajectory.duckdbFilename = links.forSession(session);
 
         const chosenLapNumber = trajectory.currentLap || input.lapNumber || 1;
         const targetLapTimeSec = trajectory.laps?.find(lap => lap.lapNumber === chosenLapNumber)?.lapTimeSec;

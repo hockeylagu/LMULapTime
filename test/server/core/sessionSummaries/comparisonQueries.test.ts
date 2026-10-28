@@ -152,7 +152,9 @@ describe('SQL comparison query', () => {
     expect(result.laps).toHaveLength(50);
     expect(result.playerBestLap?.lapNumber).toBe(1000);
     expect(reads).toHaveBeenCalledTimes(1);
-    expect(reads.mock.results[0].value.size).toBe(51);
+    const read = reads.mock.results[0];
+    if (read.type !== 'return') throw new Error('Comparison row query did not return');
+    expect(read.value.size).toBe(51);
     expect(queries.mock.calls.some(([sql]) => sql.includes('session_events') || sql.includes('session_lap_passes'))).toBe(false);
     reads.mockRestore();
     queries.mockRestore();

@@ -58,7 +58,7 @@ describe('session summary projection', () => {
     expect(projected.drivers[1]).toMatchObject({ lapsCount: 7, cleanLapsCount: 7, drivingTimeSeconds: 644, avgLapTime: 92 });
     expect(projected.drivers[1].top3Average).toBeNull();
     expect(projected.isEmpty).toBe(false);
-    const empty = buildSessionSummaryProjection({ ...duplicate, playerDriver: { ...duplicate.playerDriver!, bestLapTime: null, declaredLapsCount: 0 }, driversCount: 0 }, 2);
+    const empty = buildSessionSummaryProjection({ ...duplicate, playerDriver: { ...duplicate.playerDriver, bestLapTime: null, declaredLapsCount: 0 }, driversCount: 0 }, 2);
     expect(empty.isEmpty).toBe(true);
   });
 

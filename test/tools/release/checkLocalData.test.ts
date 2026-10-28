@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {it,expect} from 'vitest';
-// @ts-expect-error Node release script has no declaration file.
 import {checkLocalData} from '../../../tools/release/checkLocalData.mjs';
 it('allows bundled basic layouts and rejects seeded detailed assets in inputs and output',()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'local-data-guard-'));

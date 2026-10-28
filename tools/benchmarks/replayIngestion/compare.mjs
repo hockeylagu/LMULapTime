@@ -9,15 +9,22 @@ if (!leftPrefix || !rightPrefix) throw new Error('Usage: node tools/benchmarks/r
 const databases = [leftPrefix, rightPrefix].map(prefix => new Database(path.resolve(`${prefix}.db`), { readonly: true, fileMustExist: true }));
 let result;
 try {
-  const blobs = database => [...database.prepare(`SELECT driver_slot, lap_key, points_count, trajectory_br
-    FROM replay_trajectories ORDER BY driver_slot, lap_key`).iterate()].map(row => ({
-    slot: row.driver_slot, lap: row.lap_key, points: row.points_count,
-    jsonSha256: createHash('sha256').update(brotliDecompressSync(row.trajectory_br)).digest('hex'),
-  }));
+  /** @param {import('better-sqlite3').Database} database */
+  const blobs = database => {
+    /** @type {import('better-sqlite3').Statement<[], {driver_slot: number, lap_key: number, points_count: number, trajectory_br: Buffer}>} */
+    const statement = database.prepare(`SELECT driver_slot, lap_key, points_count, trajectory_br
+      FROM replay_trajectories ORDER BY driver_slot, lap_key`);
+    return [...statement.iterate()].map(row => ({
+      slot: row.driver_slot, lap: row.lap_key, points: row.points_count,
+      jsonSha256: createHash('sha256').update(brotliDecompressSync(row.trajectory_br)).digest('hex'),
+    }));
+  };
   const [left, right] = databases.map(blobs);
+  /** @type {Record<string, {beforeRows: number, afterRows: number, equal: boolean}>} */
   const normalized = {};
   for (const table of ['replay_trajectory_defaults', 'replay_laps', 'replay_conditions', 'replay_driver_events',
     'replay_running_order', 'replay_facts', 'replay_ingest_drivers']) {
+    /** @param {import('better-sqlite3').Database} database */
     const read = database => database.prepare(`SELECT * FROM ${table}`).all().map(row => {
       delete row.updated_at;
       delete row.attempted_at;

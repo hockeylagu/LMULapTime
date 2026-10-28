@@ -47,7 +47,7 @@ export function repairSessionReload(store: SessionDatabase, playerName: string) 
 }
 
 async function serverIsRunning(): Promise<boolean> {
-  return await new Promise(resolve => {
+  return new Promise(resolve => {
     const socket = net.createConnection({ host: '127.0.0.1', port: 3001 });
     const finish = (running: boolean) => { socket.destroy(); resolve(running); };
     socket.once('connect', () => finish(true));

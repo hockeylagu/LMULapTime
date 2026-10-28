@@ -23,6 +23,7 @@ import {
   RawLapXmlNode,
   RawDriverXmlNode,
   RawSessionXmlNode,
+  RawRaceResultsXmlNode,
   ReplayFileEntry,
 } from './sessionXmlTypes.js';
 import { parseStreamEvents } from './sessionXmlStream.js';
@@ -136,7 +137,7 @@ export class LmuParser {
   public parseSessionXml(filePath: string): DetailedSession | null {
     try {
       const xmlContent = fs.readFileSync(filePath, 'utf-8');
-      const parsed = xmlParser.parse(xmlContent);
+      const parsed = xmlParser.parse(xmlContent) as { rFactorXML?: { RaceResults?: RawRaceResultsXmlNode } };
       if (!parsed?.rFactorXML?.RaceResults) {
         return null;
       }
@@ -145,7 +146,7 @@ export class LmuParser {
       const trackVenue = raceResults.TrackVenue || raceResults.TrackCourse || 'Unknown Track';
       const trackCourse = raceResults.TrackCourse || trackVenue;
       const trackEvent = raceResults.TrackEvent || '';
-      const trackLengthMeters = parseFloat(raceResults.TrackLength) || null;
+      const trackLengthMeters = parseFloat(String(raceResults.TrackLength)) || null;
       const timeString = raceResults.TimeString || '';
       const filename = path.basename(filePath);
 
@@ -165,7 +166,7 @@ export class LmuParser {
       } else if (raceResults.Practice1 || raceResults.Practice) {
         sessionType = 'Practice';
         sessionName = 'P1';
-        sessionDataNode = raceResults.Practice1 || raceResults.Practice;
+        sessionDataNode = raceResults.Practice1 || raceResults.Practice || null;
       } else {
         const fnMatch = filename.match(/([PQR]\d+)\.xml$/i);
         if (fnMatch) {
@@ -176,7 +177,7 @@ export class LmuParser {
         }
       }
 
-      let baseTimestamp = raceResults.DateTime ? parseInt(raceResults.DateTime, 10) * 1000 : 0;
+      let baseTimestamp = raceResults.DateTime ? parseInt(String(raceResults.DateTime), 10) * 1000 : 0;
       if (!baseTimestamp && timeString) {
         baseTimestamp = parseDateStringToTimestamp(timeString);
       }
@@ -488,7 +489,7 @@ export class LmuParser {
     const bestLap = validLaps.length > 0
       ? validLaps.reduce((best, cur) => ((cur.lapTime as number) < (best.lapTime as number) ? cur : best))
       : null;
-    const bestLapTime: number | null = bestLap ? (bestLap.lapTime as number) : null;
+    const bestLapTime: number | null = bestLap ? (bestLap.lapTime) : null;
     const bestLapNumber: number | null = bestLap ? bestLap.lapNumber : null;
 
     let bestS1: number | null = null;

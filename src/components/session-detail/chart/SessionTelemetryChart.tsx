@@ -177,7 +177,7 @@ export const SessionTelemetryChart: React.FC<SessionTelemetryChartProps> = ({
               fontSize={11}
               tickLine={false}
               axisLine={false}
-              tickFormatter={(val) => {
+              tickFormatter={(val: number) => {
                 if (activeChartMetric === 'positions') return `P${val}`;
                 if (activeChartMetric === 'topSpeed') return `${val} km/h`;
                 if (activeChartMetric === 'tireWear' || activeChartMetric === 'fuelEnergy') return `${val}%`;

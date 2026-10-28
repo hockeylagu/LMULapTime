@@ -15,7 +15,7 @@ export function cornerLap(stepSecInCorner: number): ReplayTrajectoryPoint[] {
   return speeds.map((speedKmh, i) => {
     const distM = i * 10;
     t += distM > 30 && distM <= 110 ? stepSecInCorner : 0.3;
-    return { x: distM, y: 0, z: 0, speedKmh, throttle: 0, brake: 0, steerYaw: 0, timeSec: t } as ReplayTrajectoryPoint;
+    return { x: distM, y: 0, z: 0, speedKmh, throttle: 0, brake: 0, steerYaw: 0, timeSec: t };
   });
 }
 

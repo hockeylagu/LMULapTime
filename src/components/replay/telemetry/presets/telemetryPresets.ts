@@ -411,16 +411,18 @@ export function loadTelemetryPresets(): TelemetryPreset[] {
     }
 
     if (!raw) return DEFAULT_TELEMETRY_PRESETS;
-    const parsed = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed) || parsed.length === 0) return DEFAULT_TELEMETRY_PRESETS;
+    const presets = (parsed as unknown[]).filter((value): value is Record<string, unknown> =>
+      value !== null && typeof value === 'object' && !Array.isArray(value));
 
     // When migrating, include newly added default presets while preserving custom presets
     const customPresets = isMigrating
-      ? parsed.filter((p: Record<string, unknown>) => !p.isBuiltIn)
+      ? presets.filter(p => !p.isBuiltIn)
       : [];
     
     // Ensure all presets have valid channels and non-empty name (and filter legacy driver-inputs)
-    const baseList = isMigrating ? [...DEFAULT_TELEMETRY_PRESETS, ...customPresets] : parsed;
+    const baseList = isMigrating ? [...DEFAULT_TELEMETRY_PRESETS, ...customPresets] : presets;
     const validated: TelemetryPreset[] = (baseList as Record<string, unknown>[])
       .filter((p) => p.id !== 'driver-inputs')
       .map((p, idx) => {

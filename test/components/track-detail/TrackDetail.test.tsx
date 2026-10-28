@@ -197,9 +197,9 @@ describe('TrackDetail component', () => {
   it('shows a retry warning with existing track data after a refresh fails', async () => {
     let revision = 0;
     global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockTrackDataWithMultipleClasses) } as Response)
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockTrackDataWithMultipleClasses) })
       .mockRejectedValueOnce(new Error('refresh offline'))
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockTrackDataWithMultipleClasses) } as Response);
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockTrackDataWithMultipleClasses) });
     const content = () => (
       <SessionDataContext.Provider value={{ revision, scan: null }}>
         <TrackDetail trackName="Spa" onBack={vi.fn()} onSelectSession={vi.fn()} selectedCarClass="Hyper" setSelectedCarClass={vi.fn()} trackGeometry={null} />

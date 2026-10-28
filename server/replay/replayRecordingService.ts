@@ -60,10 +60,10 @@ export class ReplayRecordingService {
     }
     const explicitDriver = typeof options.driverSlot === 'number' || Boolean(options.driverName?.trim());
     let metadata = options.metadata;
-    let metadataError: unknown;
+    let metadataError: Error | undefined;
     if (!metadata) {
       try { metadata = this.getMetadata(filePath, replayName, options.playerName); }
-      catch (error) { metadataError = error; }
+      catch (error) { metadataError = error instanceof Error ? error : new Error(String(error)); }
     }
     if (!explicitDriver && !fs.existsSync(filePath) && !metadata) {
       throw new Error(`Replay file and cached trajectory not found: ${replayName}`);

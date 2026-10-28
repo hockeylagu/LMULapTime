@@ -72,13 +72,13 @@ describe('app scan freshness', () => {
 
   it('shows a reference update once per completion, even across reloads', async () => {
     localStorage.removeItem('lmu.referenceUpdateSeen');
-    scan.referenceLaptimes = { ...scan.referenceLaptimes!, completedAt: 'ref-1', diff: diffWith(3) };
+    scan.referenceLaptimes = { ...scan.referenceLaptimes, completedAt: 'ref-1', diff: diffWith(3) };
     const first = await mount();
     expect(first.result.current.referenceUpdateCount).toBe(3);
     first.unmount();
     const second = await mount();
     expect(second.result.current.referenceUpdateCount).toBeNull();
-    scan.referenceLaptimes = { ...scan.referenceLaptimes!, completedAt: 'ref-2', diff: diffWith(1) };
+    scan.referenceLaptimes = { ...scan.referenceLaptimes, completedAt: 'ref-2', diff: diffWith(1) };
     second.unmount();
     const third = await mount();
     expect(third.result.current.referenceUpdateCount).toBe(1);

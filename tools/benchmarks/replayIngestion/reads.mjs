@@ -12,16 +12,16 @@ if (prefixes.length !== 2) throw new Error('Usage: node tools/benchmarks/replayI
 const databases = prefixes.map(prefix => new Database(path.resolve(`${prefix}.db`), { readonly: true, fileMustExist: true }));
 const rows = [];
 try {
-  const primary = databases[0].prepare('SELECT filename, resolved_driver_slot slot FROM replay_trajectory_defaults WHERE driver_slot = -1 LIMIT 1').get();
+  const primary = /** @type {{filename: string, slot: number} | undefined} */ (databases[0].prepare('SELECT filename, resolved_driver_slot slot FROM replay_trajectory_defaults WHERE driver_slot = -1 LIMIT 1').get());
   if (!primary) throw new Error('No default trajectory.');
-  const rival = databases[0].prepare('SELECT DISTINCT driver_slot slot FROM replay_trajectories WHERE filename = ? AND driver_slot != ? ORDER BY driver_slot LIMIT 1')
-    .get(primary.filename, primary.slot);
-  const lap = databases[0].prepare('SELECT lap_key lap FROM replay_trajectories WHERE filename = ? AND driver_slot = ? ORDER BY lap_key LIMIT 1')
-    .get(primary.filename, primary.slot);
+  const rival = /** @type {{slot: number} | undefined} */ (databases[0].prepare('SELECT DISTINCT driver_slot slot FROM replay_trajectories WHERE filename = ? AND driver_slot != ? ORDER BY driver_slot LIMIT 1')
+    .get(primary.filename, primary.slot));
+  const lap = /** @type {{lap: number} | undefined} */ (databases[0].prepare('SELECT lap_key lap FROM replay_trajectories WHERE filename = ? AND driver_slot = ? ORDER BY lap_key LIMIT 1')
+    .get(primary.filename, primary.slot));
   const cases = [{ slot: primary.slot, lap: -1 }, ...(rival ? [{ slot: rival.slot, lap: -1 }] : []),
     ...(lap ? [{ slot: primary.slot, lap: lap.lap }] : [])];
   for (const testCase of cases) {
-    const results = prefixes.map(prefix => ({ prefix, ...testCase, ms: [], hashes: new Set() }));
+    const results = prefixes.map(prefix => ({ prefix, ...testCase, ms: /** @type {number[]} */ ([]), hashes: new Set(/** @type {string[]} */ ([])) }));
     for (let run = 0; run <= 10; run++) {
       for (const index of run % 2 === 0 ? [0, 1] : [1, 0]) {
         const started = performance.now();

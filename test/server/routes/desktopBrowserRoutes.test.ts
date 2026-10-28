@@ -28,7 +28,7 @@ describe('desktop browser routes', () => {
   it.each([display, ''])('saves monitor %s', async monitor => {
     const response = await request(app).post('/api/desktop/browser').send({ monitor });
     expect(response.status).toBe(200);
-    expect(response.body.monitor).toBe(monitor);
+    expect(response.body).toHaveProperty('monitor', monitor);
     expect(saveBrowserMonitor).toHaveBeenCalledWith(monitor);
   });
 
@@ -41,7 +41,7 @@ describe('desktop browser routes', () => {
     vi.mocked(readBrowserSettings).mockRejectedValue(new Error('private helper path'));
     const response = await request(app).get('/api/desktop/browser');
     expect(response.status).toBe(503);
-    expect(response.body.error).toContain('Rebuild the tray helper');
-    expect(response.body.error).not.toContain('private');
+    expect(response.body).toHaveProperty('error', expect.stringContaining('Rebuild the tray helper'));
+    expect(response.body).not.toHaveProperty('error', expect.stringContaining('private'));
   });
 });

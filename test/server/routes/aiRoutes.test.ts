@@ -46,19 +46,19 @@ describe('AI routes', () => {
 
     const invalidModel = await request(app).post('/api/ai/settings').send({ model: 'invalid' });
     expect(invalidModel.status).toBe(400);
-    expect(invalidModel.body.errorCode).toBe('invalid_model');
+    expect(invalidModel.body).toHaveProperty('errorCode', 'invalid_model');
 
     const retiredModel = await request(app).post('/api/ai/settings').send({ model: 'gemini-3.7-flash' });
     expect(retiredModel.status).toBe(400);
-    expect(retiredModel.body.errorCode).toBe('invalid_model');
+    expect(retiredModel.body).toHaveProperty('errorCode', 'invalid_model');
 
     const invalidKey = await request(app).post('/api/ai/settings').send({ apiKey: 42 });
     expect(invalidKey.status).toBe(400);
-    expect(invalidKey.body.errorCode).toBe('invalid_request');
+    expect(invalidKey.body).toHaveProperty('errorCode', 'invalid_request');
 
     const blankKey = await request(app).post('/api/ai/settings').send({ apiKey: '   ' });
     expect(blankKey.status).toBe(400);
-    expect(blankKey.body.errorCode).toBe('invalid_request');
+    expect(blankKey.body).toHaveProperty('errorCode', 'invalid_request');
 
     const configured = await request(app).post('/api/ai/settings').send({ apiKey: 'session-key', model: 'gemini-3.8-flash' });
     expect(configured.status).toBe(200);
@@ -71,15 +71,15 @@ describe('AI routes', () => {
   it('rejects missing, oversized, and unconfigured analysis requests', async () => {
     const missing = await request(app).post('/api/ai/analyze-lap').send({});
     expect(missing.status).toBe(400);
-    expect(missing.body.errorCode).toBe('invalid_request');
+    expect(missing.body).toHaveProperty('errorCode', 'invalid_request');
 
     const oversized = await request(app).post('/api/ai/analyze-lap').send({ evidence: 'x'.repeat(64 * 1024 + 1) });
     expect(oversized.status).toBe(413);
-    expect(oversized.body.errorCode).toBe('payload_too_large');
+    expect(oversized.body).toHaveProperty('errorCode', 'payload_too_large');
 
     const unconfigured = await request(app).post('/api/ai/analyze-lap').send({ evidence });
     expect(unconfigured.status).toBe(400);
-    expect(unconfigured.body.errorCode).toBe('not_configured');
+    expect(unconfigured.body).toHaveProperty('errorCode', 'not_configured');
   });
 
   it('rejects filename-only or invalid session locators before reading the report cache', async () => {
@@ -89,7 +89,7 @@ describe('AI routes', () => {
       { ...evidence.lap, driverOrdinal: -1 }, { ...evidence.lap, lapOrdinal: 0.5 }]) {
       const result = await request(app).post('/api/ai/analyze-lap').send({ evidence: { ...evidence, lap } });
       expect(result.status).toBe(400);
-      expect(result.body.errorCode).toBe('invalid_request');
+      expect(result.body).toHaveProperty('errorCode', 'invalid_request');
     }
     expect(cache).not.toHaveBeenCalled();
   });
@@ -105,8 +105,8 @@ describe('AI routes', () => {
 
     const cached = await request(app).post('/api/ai/analyze-lap').send({ evidence });
     expect(cached.status).toBe(200);
-    expect(cached.body.cached).toBe(true);
-    expect(cached.body.tokensUsed).toBeUndefined();
+    expect(cached.body).toHaveProperty('cached', true);
+    expect(cached.body).not.toHaveProperty('tokensUsed');
     expect(analyze).toHaveBeenCalledTimes(1);
 
     const forced = await request(app).post('/api/ai/analyze-lap').send({ evidence, forceRegenerate: true });
@@ -125,7 +125,7 @@ describe('AI routes', () => {
 
     const response = await request(app).post('/api/ai/analyze-lap').send({ evidence, forceRegenerate: true });
     expect(response.status).toBe(status);
-    expect(response.body).toMatchObject({ errorCode: code, requestId: expect.any(String) });
+    expect(response.body).toMatchObject({ errorCode: code, requestId: expect.any(String) as unknown });
   });
 
   it('logs raw model response when malformed_model_response includes rawResponse', async () => {
@@ -151,6 +151,6 @@ describe('AI routes', () => {
     vi.spyOn(db, 'getAiReportsList').mockImplementation(() => { throw new Error('database unavailable'); });
     const failed = await request(app).get('/api/ai/reports');
     expect(failed.status).toBe(500);
-    expect(failed.body.error).toBe('database unavailable');
+    expect(failed.body).toHaveProperty('error', 'database unavailable');
   });
 });

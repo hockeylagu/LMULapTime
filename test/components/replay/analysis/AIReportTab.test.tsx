@@ -34,10 +34,10 @@ const reportResponse = {
 };
 
 describe('AIReportTab', () => {
-  let fetchMock: ReturnType<typeof vi.fn>;
+  let fetchMock: ReturnType<typeof vi.fn<(url: string, init?: RequestInit) => Promise<{ ok: boolean; status?: number; json: () => Promise<unknown> }>>>;
 
   beforeEach(() => {
-    fetchMock = vi.fn();
+    fetchMock = vi.fn<(url: string, init?: RequestInit) => Promise<{ ok: boolean; status?: number; json: () => Promise<unknown> }>>();
     vi.stubGlobal('fetch', fetchMock);
   });
 
@@ -94,9 +94,11 @@ describe('AIReportTab', () => {
     expect(screen.getByText(/report will use the available lap and sector evidence/i)).toBeInTheDocument();
     fireEvent.click(button);
     await screen.findByText('Only lap and sector evidence is available.');
-    const body=JSON.parse(fetchMock.mock.calls[1][1].body);
-    expect(body.evidence.lap.lapTimeSec).toBe(95.25);expect(body.evidence.segments).toEqual([]);
-    expect(body.evidence).not.toHaveProperty('geometry');expect(body.evidence).not.toHaveProperty('points');
+    const serialized = fetchMock.mock.calls[1][1]?.body;
+    if (typeof serialized !== 'string') throw new Error('Expected serialized AI request');
+    const body: unknown = JSON.parse(serialized);
+    expect(body).toMatchObject({ evidence: { lap: { lapTimeSec: 95.25 }, segments: [] } });
+    expect(body).not.toHaveProperty('evidence.geometry');expect(body).not.toHaveProperty('evidence.points');
   });
 
   it('generates and regenerates a report when configured', async () => {
@@ -130,7 +132,7 @@ describe('AIReportTab', () => {
     fireEvent.click(screen.getByRole('button', { name: /regenerate/i }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
     expect(fetchMock.mock.calls[2]?.[1]).toEqual(expect.objectContaining({
-      body: expect.stringContaining('"forceRegenerate":true'),
+      body: expect.stringContaining('"forceRegenerate":true') as unknown,
     }));
   });
 

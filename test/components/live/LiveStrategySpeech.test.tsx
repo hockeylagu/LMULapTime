@@ -11,7 +11,7 @@ const empty = new PedalBuffer();
 const pedals = (buffer: PedalBuffer, end: number, seconds: number, throttle: number, brake: number) => act(() => {
   buffer.push(Array.from({ length: seconds * 20 }, (_, index) => ({ t: end - seconds + (index + 1) / 20, throttle, brake })));
 });
-const speak = vi.fn();
+const speak = vi.fn<(utterance: SpeechSynthesisUtterance) => void>();
 const cancel = vi.fn();
 const snapshot = () => liveSnapshot({ strategy: liveStrategy() });
 const warningSnapshot = () => {

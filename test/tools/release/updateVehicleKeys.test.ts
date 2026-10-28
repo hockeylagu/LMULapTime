@@ -2,7 +2,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-// @ts-expect-error Node release script has no declaration file.
 import { mergeKeys, readEntries, readMapping, writeMapping } from '../../../tools/release/updateVehicleKeys.mjs';
 
 // A cut-down vehicleMapping.ts: rows plus the generated keys block. Names are made up.
@@ -24,14 +23,26 @@ interface TestEntry { source: string; keys: string[]; classes: string[] }
 const entry = (keys: string[], classes: string[]): TestEntry => ({ source: 'test', keys, classes });
 
 describe('vehicle key generator', () => {
+  it.each([{}, [null], [{ vehFile: 'test.veh', desc: 'Test', classes: [42] }]])('rejects malformed vehicle catalog data: %j', value => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'vehicle-keys-invalid-'));
+    try {
+      const catalog = path.join(root, 'getAllVehicles.json');
+      fs.writeFileSync(catalog, JSON.stringify(value));
+      expect(() => readEntries([catalog])).toThrow(/vehicle catalog/);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('rejects non-string keys in the mapping source', () => {
+    expect(() => readMapping(SOURCE.replace('"OLD_GT_KEY"', '42'))).toThrow('Invalid vehicle keys');
+  });
   it('adds keys by class and car name, keeps old keys, and rewrites the block it reads back', () => {
     const mapping = readMapping(SOURCE);
     const merged = mergeKeys(mapping, [
       entry(['NEW_GT_KEY', 'TEST TEAM 2026 #1:LM'], ['WEC2026', 'GT3', 'Test_GT']),
       entry(['P2_WEC'], ['WEC2026', 'LMP2', 'Test_P2', 'Extra_Token']),
       entry(['P2_ELMS'], ['ELMS2026', 'LMP2_ELMS', 'Test_P2', 'Default_Custom_Livery']),
-    ]) as Map<string, Set<string>>;
-    const written = writeMapping(SOURCE, merged) as string;
+    ]);
+    const written = writeMapping(SOURCE, merged);
     expect(readMapping(written).keys).toEqual(new Map([
       ['GT3/Test_GT', new Set(['NEW_GT_KEY', 'OLD_GT_KEY', 'TEST TEAM 2026 #1:LM'])],
       ['LMP2/Test_P2', new Set(['P2_WEC'])],

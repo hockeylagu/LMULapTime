@@ -1,11 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+/** @param {string} root @param {boolean} [built] */
 export function checkLocalData(root, built=false) {
   const forbidden=['public/tracks','public/tracks-display','shared/domain/vehicleCatalog.ts','test/utils/lapAlignment/__snapshots__/lapAlignmentGolden.test.ts.snap',...(built?['dist/tracks','dist/tracks-display']:[])];
   for(const relative of forbidden)if(fs.existsSync(path.join(root,relative)))throw Error('Detailed data must stay local: '+relative);
   const replayFixtures=path.join(root,'test/fixtures/replays');
   if(fs.existsSync(replayFixtures)&&fs.readdirSync(replayFixtures).some(file=>file.endsWith('.json')))throw Error('Captured replay data must stay local');
+  /** @type {(dir: string) => string[]} */
   const walk=dir=>fs.existsSync(dir)?fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?walk(path.join(dir,e.name)):[path.join(dir,e.name)]):[];
   for(const file of [...walk(path.join(root,'public')), ...(built?walk(path.join(root,'dist')):[])]) {
     if(!file.endsWith('.json'))continue;

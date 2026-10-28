@@ -2,8 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 // Every lint opt-out must say why: disable comments end with "-- reason" and each "off" in .oxlintrc.json carries a trailing comment.
+/** @param {string} root @returns {string[]} */
 export function findMissingLintReasons(root) {
+  /** @type {string[]} */
   const missing=[];
+  /** @type {(dir: string) => string[]} */
   const walk=dir=>fs.existsSync(dir)?fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.name==='node_modules'?[]:e.isDirectory()?walk(path.join(dir,e.name)):[path.join(dir,e.name)]):[];
   for(const dir of ['src','server','shared','test','tools'])for(const file of walk(path.join(root,dir))) {
     if(!/\.(?:ts|tsx|mjs|js)$/.test(file))continue;

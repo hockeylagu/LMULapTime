@@ -206,15 +206,11 @@ describe('telemetryRecorder tools', () => {
         avgPathWetness: 0,
       };
 
-      const meta = JSON.parse(formatMetaRecord(info, 'Spa', { offset: 16, stride: 1888, sampleCount: 1 }, { offset: 560, stride: 584, sampleCount: 1 }));
-      expect(meta.t).toBe('meta');
-      expect(meta.track).toBe('Spa');
-      expect(meta.scoringVehicleOffset).toBe(560);
+    const meta: unknown = JSON.parse(formatMetaRecord(info, 'Spa', { offset: 16, stride: 1888, sampleCount: 1 }, { offset: 560, stride: 584, sampleCount: 1 }));
+    expect(meta).toMatchObject({ t: 'meta', track: 'Spa', scoringVehicleOffset: 560 });
 
-      const sco = JSON.parse(formatScoringRecord(info, []));
-      expect(sco.t).toBe('sco');
-      expect(sco.et).toBe(50.123);
-      expect(sco.veh).toEqual([]);
+    const sco: unknown = JSON.parse(formatScoringRecord(info, []));
+    expect(sco).toMatchObject({ t: 'sco', et: 50.123, veh: [] });
     });
   });
 

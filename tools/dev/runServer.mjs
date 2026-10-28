@@ -5,7 +5,9 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
-/** Owns the watcher so a deliberate tray exit also ends debug/watch mode. */
+/** Owns the watcher so a deliberate tray exit also ends debug/watch mode.
+ * @param {string} [entry] @returns {Promise<number>}
+ */
 export function runDevelopmentServer(entry = 'server/index.ts') {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'lmu-dev-'));
   const exitFile = path.join(directory, 'exit');

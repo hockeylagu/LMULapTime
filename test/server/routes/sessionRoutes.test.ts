@@ -242,14 +242,14 @@ describe('sessionRoutes and filterSessions', () => {
     it('GET /api/sessions returns a compact filtered page and total count', async () => {
       const res = await request(app).get('/api/sessions?track=Spa&page=1&pageSize=1');
       expect(res.status).toBe(200);
-      expect(res.body.total).toBe(1);
-      expect(res.body.sessions).toHaveLength(1);
-      expect(res.body.sessions[0].id).toBe('sess_1');
-      expect(res.body.sessions[0].drivers).toBeUndefined();
-      expect(res.body.sessions[0].playerDriver).not.toHaveProperty('laps');
-      expect(res.body.sessions[0].playerDriver).toHaveProperty('lapsCount');
-      expect(res.body.page).toBe(1);
-      expect(res.body.pageSize).toBe(1);
+      expect(res.body).toHaveProperty('total', 1);
+      expect(res.body).toHaveProperty('sessions', expect.objectContaining({ length: 1 }));
+      expect(res.body).toHaveProperty('sessions.0.id', 'sess_1');
+      expect(res.body).not.toHaveProperty('sessions.0.drivers');
+      expect(res.body).not.toHaveProperty('sessions.0.playerDriver.laps');
+      expect(res.body).toHaveProperty('sessions.0.playerDriver.lapsCount');
+      expect(res.body).toHaveProperty('page', 1);
+      expect(res.body).toHaveProperty('pageSize', 1);
     });
 
     it('GET /api/sessions leaves out lap stewards and traffic records without touching the cached session', () => {
@@ -275,14 +275,14 @@ describe('sessionRoutes and filterSessions', () => {
     it('GET /api/sessions safely ignores repeated filters', async () => {
       const res = await request(app).get('/api/sessions?track=Spa&track=Monza&driver=Alpha&driver=Beta');
       expect(res.status).toBe(200);
-      expect(res.body.sessions).toHaveLength(3);
-      expect(res.body.total).toBe(3);
+      expect(res.body).toHaveProperty('sessions', expect.objectContaining({ length: 3 }));
+      expect(res.body).toHaveProperty('total', 3);
     });
 
     it('GET /api/track/:trackName reads a name containing % as sent', async () => {
       const res = await request(app).get(`/api/track/${encodeURIComponent('Spa 100%')}`);
       expect(res.status).toBe(200);
-      expect(res.body.trackName).toBe('Spa 100%');
+      expect(res.body).toHaveProperty('trackName', 'Spa 100%');
     });
 
   });
@@ -299,12 +299,12 @@ describe('sessionRoutes and filterSessions', () => {
     it('reads one retained detail without discovering files or rematching recordings',async()=>{
       const response=await request(app).get('/api/session/sess_1');
       expect(response.status).toBe(200);
-      expect(response.body.id).toBe('sess_1');
-      expect(response.body.drivers).toHaveLength(1);
-      expect(response.body.playerDriver?.driverOrdinal).toBe(0);
-      expect(response.body.drivers[0].driverOrdinal).toBe(0);
-      expect(response.body.drivers[0].laps[0].lapOrdinal).toBe(0);
-      expect(response.body.historyContext.personalBests).toEqual([{driverOrdinal:0,bestLapTime:120}]);
+      expect(response.body).toHaveProperty('id', 'sess_1');
+      expect(response.body).toHaveProperty('drivers', expect.objectContaining({ length: 1 }));
+      expect(response.body).toHaveProperty('playerDriver.driverOrdinal', 0);
+      expect(response.body).toHaveProperty('drivers.0.driverOrdinal', 0);
+      expect(response.body).toHaveProperty('drivers.0.laps.0.lapOrdinal', 0);
+      expect(response.body).toHaveProperty('historyContext.personalBests', [{driverOrdinal:0,bestLapTime:120}]);
       expect(response.headers['cache-control']).toBe('no-store');
     });
     it('returns 404 for a source not yet ingested',async()=>{
@@ -332,7 +332,7 @@ describe('sessionRoutes and filterSessions', () => {
       expect((await request(app).get('/api/session/missing/personal-best/0')).status).toBe(404);
       expect((await request(app).get('/api/session/missing/personal-best/abc')).status).toBe(404);
       sessionDb.getDb().prepare('UPDATE sessions SET projection_version=0').run();
-      expect((await request(app).get('/api/session/sess_1/personal-best/0')).body.ready).toBe(false);
+      expect((await request(app).get('/api/session/sess_1/personal-best/0')).body).toHaveProperty('ready', false);
     });
     it('does not report incomplete summaries as complete totals',async()=>{
       sessionDb.getDb().prepare('UPDATE sessions SET projection_version=0 WHERE id=?').run('sess_1');
@@ -373,10 +373,10 @@ describe('sessionRoutes and filterSessions', () => {
       const res = await request(app).get('/api/track/Monza');
 
       expect(res.status).toBe(200);
-      expect(res.body.sessionsCount).toBe(1);
-      expect(res.body.sessions.map((s: DetailedSession) => s.id)).toEqual(['sess_2']);
-      expect(res.body.sessions[0].drivers).toBeUndefined();
-      expect(res.body.benchmarks.map((b: ReferenceLaptimeEntry) => b.trackName)).toEqual(['Monza']);
+      expect(res.body).toHaveProperty('sessionsCount', 1);
+      expect(res.body).toHaveProperty('sessions', [expect.objectContaining({ id: 'sess_2' })]);
+      expect(res.body).not.toHaveProperty('sessions.0.drivers');
+      expect(res.body).toHaveProperty('benchmarks', [expect.objectContaining({ trackName: 'Monza' })]);
     });
 
     it('GET /api/track/:trackName returns every progression point, not one page of them', async () => {
@@ -390,18 +390,18 @@ describe('sessionRoutes and filterSessions', () => {
       bigApp.use('/api', createSessionRouter({ sessionDb: bigDb, getScanStatus: () => ({ dataRevision: 'test:2' }) } as unknown as ServerContext));
       try {
         const res = await request(bigApp).get('/api/track/Spa');
-        expect(res.body.sessions).toHaveLength(25);
-        expect(res.body.progression).toHaveLength(230);
-        expect(res.body.progression[0].sessionId).toBe('spa_many_0');
-        expect(res.body.progression[229].sessionId).toBe('spa_many_229');
+        expect(res.body).toHaveProperty('sessions', expect.objectContaining({ length: 25 }));
+        expect(res.body).toHaveProperty('progression', expect.objectContaining({ length: 230 }));
+        expect(res.body).toHaveProperty('progression.0.sessionId', 'spa_many_0');
+        expect(res.body).toHaveProperty('progression.229.sessionId', 'spa_many_229');
       } finally { bigDb.close(); }
     });
 
     it('GET /api/track/:trackName has no benchmarks before the table is first downloaded', async () => {
       referenceCache.load.mockReturnValue(null);
       const res = await request(app).get('/api/track/Spa');
-      expect(res.body.sessionsCount).toBe(1);
-      expect(res.body.benchmarks).toEqual([]);
+      expect(res.body).toHaveProperty('sessionsCount', 1);
+      expect(res.body).toHaveProperty('benchmarks', []);
     });
 
     it("GET /api/compare/laps keeps only the player's laps unless playerOnly=false", async () => {
@@ -409,15 +409,15 @@ describe('sessionRoutes and filterSessions', () => {
       const everyone = await request(app).get('/api/compare/laps?track=Monza&playerOnly=false');
 
       expect(playerOnly.status).toBe(200);
-      expect(playerOnly.body.laps).toEqual([]);
-      expect(everyone.body.laps.map((l: { driverName: string }) => l.driverName)).toEqual(['Driver Beta']);
-      expect(everyone.body.benchmarks.map((b: ReferenceLaptimeEntry) => b.trackName)).toEqual(['Monza']);
+      expect(playerOnly.body).toHaveProperty('laps', []);
+      expect(everyone.body).toHaveProperty('laps', [expect.objectContaining({ driverName: 'Driver Beta' })]);
+      expect(everyone.body).toHaveProperty('benchmarks', [expect.objectContaining({ trackName: 'Monza' })]);
     });
 
     it.each(['-1', '1.5', 'NaN', ''])('GET /api/compare/laps rejects invalid driver ordinals (%s)', async ordinal => {
       const response = await request(app).get(`/api/compare/laps?driverOrdinal=${encodeURIComponent(ordinal)}`);
       expect(response.status).toBe(400);
-      expect(response.body.error).toMatch(/driverOrdinal/);
+      expect(response.body).toHaveProperty('error', expect.stringMatching(/driverOrdinal/));
     });
 
     it('GET /api/compare/laps telemetry picker returns only its page without loading sessions or benchmarks', async () => {
@@ -435,7 +435,7 @@ describe('sessionRoutes and filterSessions', () => {
     it.each(['sort=best', 'sessionType=Race', 'condition=Foggy'])('GET /api/compare/laps rejects unknown picker params (%s)', async param => {
       const response = await request(app).get(`/api/compare/laps?track=Spa&telemetryOnly=true&${param}`);
       expect(response.status).toBe(400);
-      expect(response.body.error).toMatch(param.split('=')[0]);
+      expect(response.body).toHaveProperty('error', expect.stringMatching(param.split('=')[0]));
     });
 
     it('GET /api/compare/laps accepts the telemetry picker sort and filters and lists car types', async () => {
@@ -447,14 +447,14 @@ describe('sessionRoutes and filterSessions', () => {
     it('GET /api/compare/laps accepts the exact-driver and excluded-lap options of the reference suggestion', async () => {
       const response = await request(app).get('/api/compare/laps?track=Spa&telemetryOnly=true&driver=Driver%20Alpha&driverExact=true&excludeSessionId=sess_1&excludeLapOrdinal=0&pageSize=1&page=2');
       expect(response.status).toBe(200);
-      expect(response.body.carTypes).toBeUndefined();
+      expect(response.body).not.toHaveProperty('carTypes');
       expect((await request(app).get('/api/compare/laps?track=Spa&telemetryOnly=true&excludeLapOrdinal=-1')).status).toBe(400);
     });
 
     it('GET /api/compare/laps without a track has no benchmarks', async () => {
       const res = await request(app).get('/api/compare/laps?playerOnly=false');
       expect(res.status).toBe(200);
-      expect(res.body.benchmarks).toEqual([]);
+      expect(res.body).toHaveProperty('benchmarks', []);
     });
   });
 });

@@ -8,11 +8,13 @@ const originalClear = globalThis.clearInterval;
 const results = {};
 try {
   for (const mode of ['track', 'garage']) {
+    /** @type {() => void} */
     let tick;
     let now = 1_800_000_000_000;
     const start = now;
+    /** @type {{path: string, seconds: number}[]} */
     const calls = [];
-    globalThis.setInterval = callback => { tick = callback; return { unref() {} }; };
+    globalThis.setInterval = (/** @type {() => void} */ callback) => { tick = callback; return /** @type {ReturnType<typeof setInterval>} */ ({ unref() {} }); };
     globalThis.clearInterval = () => {};
     const poller = new LivePitPoller({ now: () => now, onReplay: () => {}, onUpdate: () => {},
       get: async path => {

@@ -88,11 +88,11 @@ describe('session telemetry routes', () => {
 
     expect(response.status).toBe(200);
     expect(response.body).toMatchObject({ filename: 'Route_Test_P1.Vcr', trackVenue: 'Test Venue' });
-    expect(response.body.drivers[0]).toMatchObject({
+    expect(response.body).toHaveProperty('drivers.0', expect.objectContaining({
       name: 'Route Driver',
       sessionDriverOrdinal: 0,
       sessionLapOrdinals: { '1': 0 },
-    });
+    }));
     expect(getSessionById).not.toHaveBeenCalled();
   });
 
@@ -149,13 +149,13 @@ describe('session telemetry routes', () => {
     upsertLiveCapture(db.getDb(), capture, 100);
     setLiveCaptureMatch(db.getDb(), 'capture', 'session-1', 'Build-42', 'verified');
     const url = '/api/session/session-1/telemetry?driverOrdinal=0&lapOrdinal=0';
-    expect((await request(app).get(url)).body.hasLiveCapture).toBe(true);
+    expect((await request(app).get(url)).body).toHaveProperty('hasLiveCapture', true);
     expect(retained.hasLiveCapture).toBeUndefined();
     db.getDb().prepare('UPDATE session_drivers SET is_player=0 WHERE session_id=?').run('session-1');
-    expect((await request(app).get(url)).body.hasLiveCapture).toBeUndefined();
+    expect((await request(app).get(url)).body).not.toHaveProperty('hasLiveCapture');
     db.getDb().prepare('UPDATE session_drivers SET is_player=1 WHERE session_id=?').run('session-1');
     db.getDb().prepare('UPDATE live_capture_index SET available=0').run();
-    expect((await request(app).get(url)).body.hasLiveCapture).toBeUndefined();
+    expect((await request(app).get(url)).body).not.toHaveProperty('hasLiveCapture');
   });
 
   it('keeps replay cache and upgrade controls available for maintenance', async () => {

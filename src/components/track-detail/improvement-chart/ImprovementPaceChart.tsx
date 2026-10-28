@@ -151,7 +151,7 @@ export const ImprovementPaceChart: React.FC<ImprovementPaceChartProps> = ({
             angle={chartData.length > 5 ? -18 : 0}
             textAnchor={chartData.length > 5 ? 'end' : 'middle'}
             dy={chartData.length > 5 ? 4 : 0}
-            tickFormatter={(val) => {
+            tickFormatter={(val: string) => {
               const item = chartData.find((c) => c.chartKey === val);
               return item ? item.axisLabel ?? item.shortSession : val;
             }}
@@ -162,7 +162,7 @@ export const ImprovementPaceChart: React.FC<ImprovementPaceChartProps> = ({
             tickLine={false}
             stroke={LMU_COLORS.muted}
             tick={{ fill: LMU_COLORS.muted, fontSize: 11 }}
-            tickFormatter={(val) => (metric === 'consistency' ? `${val}%` : formatTime(val))}
+            tickFormatter={(val: number) => (metric === 'consistency' ? `${val}%` : formatTime(val))}
           />
           <Tooltip content={<ImprovementPaceTooltip metric={metric} onSelectSession={onSelectSession} />} />
           <Legend

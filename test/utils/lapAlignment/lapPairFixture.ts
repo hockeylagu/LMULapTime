@@ -205,7 +205,7 @@ export function computePairConsistency(pair: LoadedLapPair) {
 /** Rounds every number (deeply) so snapshots are stable against float noise and readable. */
 export function roundDeep<T>(value: T, decimals = 3): T {
   if (typeof value === 'number') return (Number.isFinite(value) ? Number(value.toFixed(decimals)) : value) as T;
-  if (Array.isArray(value)) return value.map(v => roundDeep(v, decimals)) as T;
+  if (Array.isArray(value)) return value.map((v: unknown) => roundDeep(v, decimals)) as T;
   if (value && typeof value === 'object') {
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(value)) out[k] = roundDeep(v, decimals);

@@ -141,7 +141,9 @@ async function loadTelemetry(filePath: string): Promise<TelSample[]> {
     if (!line.trim()) continue;
     let o: Record<string, unknown>;
     try {
-      o = JSON.parse(line);
+      const parsed: unknown = JSON.parse(line);
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+      o = parsed as Record<string, unknown>;
     } catch {
       continue;
     }
@@ -204,7 +206,7 @@ class Residualizer {
   constructor(cols: Float64Array[], private readonly n: number) {
     this.cols = cols;
     const k = cols.length;
-    const gram: number[][] = Array.from({ length: k }, () => new Array(k).fill(0));
+    const gram: number[][] = Array.from({ length: k }, () => new Array<number>(k).fill(0));
     for (let a = 0; a < k; a++) {
       for (let b = a; b < k; b++) {
         let s = 0;
@@ -233,20 +235,20 @@ class Residualizer {
 
   apply(v: Float64Array): void {
     const k = this.cols.length;
-    const rhs = new Array(k).fill(0);
+    const rhs = new Array<number>(k).fill(0);
     for (let a = 0; a < k; a++) {
       let s = 0;
       for (let i = 0; i < this.n; i++) s += this.cols[a][i] * v[i];
       rhs[a] = s;
     }
 
-    const y = new Array(k).fill(0);
+    const y = new Array<number>(k).fill(0);
     for (let r = 0; r < k; r++) {
       let s = rhs[this.pivot[r]];
       for (let c = 0; c < r; c++) s -= this.gramLu[r][c] * y[c];
       y[r] = s;
     }
-    const beta = new Array(k).fill(0);
+    const beta = new Array<number>(k).fill(0);
     for (let r = k - 1; r >= 0; r--) {
       let s = y[r];
       for (let c = r + 1; c < k; c++) s -= this.gramLu[r][c] * beta[c];
@@ -355,7 +357,7 @@ function buildTargets(): Target[] {
     const v = w?.[key];
     return typeof v === 'number' ? v : undefined;
   };
-  const num = (key: string) => (s: TelSample) => (typeof s[key] === 'number' ? (s[key] as number) : undefined);
+  const num = (key: string) => (s: TelSample) => (typeof s[key] === 'number' ? (s[key]) : undefined);
 
   return [
     { name: 'speedKmh', get: num('speedKmh'), known: 'offset 8 (5-byte velocity)' },

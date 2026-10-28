@@ -54,6 +54,6 @@ describe('durable learning capture', () => {
     const outcome = events.find(event => event.kind === 'learning-outcome');
     expect(outcome?.data).toMatchObject({ exclusions: expect.arrayContaining([
       'capture-gap', 'resource-increased', 'context-changed', 'pit-lap', 'caution-or-start',
-    ]) });
+    ]) as unknown });
   });
 });

@@ -96,6 +96,19 @@ describe('telemetryPresets - Management and Storage', () => {
     expect(loaded[0].channels).toEqual(['speed', 'rpm', 'lateral-offset']);
   });
 
+  it('ignores non-object stored entries while retaining a valid custom preset', () => {
+    store['lmu_telemetry_presets_v9'] = JSON.stringify([
+      null, 42, 'invalid', ['speed'],
+      { id: 'custom', name: 'Custom', channels: ['rpm'] },
+    ]);
+    expect(loadTelemetryPresets()).toEqual([{ id: 'custom', name: 'Custom', isBuiltIn: false, channels: ['rpm'] }]);
+  });
+
+  it('uses defaults when every stored preset entry is invalid', () => {
+    store['lmu_telemetry_presets_v9'] = JSON.stringify([null, 42, 'invalid', []]);
+    expect(loadTelemetryPresets()).toEqual(DEFAULT_TELEMETRY_PRESETS);
+  });
+
   it('persists and reloads the active preset ID', () => {
     const presets = loadTelemetryPresets();
     expect(loadActivePresetId(presets)).toBe('default');

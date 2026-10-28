@@ -19,8 +19,10 @@ function text(value: unknown): string {
   return value;
 }
 function pair(value: unknown): [number, number] {
-  if (!Array.isArray(value) || value.length !== 2 || !value.every(n => typeof n === 'number' && Number.isFinite(n) && Math.abs(n) < 10)) throw Error('Invalid local coordinate');
-  return [value[0], value[1]];
+  if (!Array.isArray(value) || value.length !== 2) throw Error('Invalid local coordinate');
+  const x: unknown = value[0], z: unknown = value[1];
+  if (typeof x !== 'number' || typeof z !== 'number' || !Number.isFinite(x) || !Number.isFinite(z) || Math.abs(x) >= 10 || Math.abs(z) >= 10) throw Error('Invalid local coordinate');
+  return [x, z];
 }
 export function parseVehicleCatalog(value: unknown): VehicleDataRecord[] {
   const catalog = object(value);
@@ -42,7 +44,7 @@ export function parseVehicleCatalog(value: unknown): VehicleDataRecord[] {
     if (row.dimensions !== undefined) {
       const d = object(row.dimensions); keys(d, ['lengthM', 'widthM', 'heightM']);
       if (typeof d.lengthM !== 'number' || d.lengthM < 3 || d.lengthM > 7 || typeof d.widthM !== 'number' || d.widthM < 1 || d.widthM > 3 || (d.heightM !== undefined && (typeof d.heightM !== 'number' || !Number.isFinite(d.heightM) || d.heightM < .3 || d.heightM > 3)) || !Number.isFinite(d.lengthM) || !Number.isFinite(d.widthM)) throw Error('Invalid dimensions');
-      result.dimensions = {lengthM:d.lengthM, widthM:d.widthM, ...(d.heightM !== undefined ? {heightM:d.heightM as number} : {})};
+      result.dimensions = {lengthM:d.lengthM, widthM:d.widthM, ...(d.heightM !== undefined ? {heightM:d.heightM} : {})};
     }
     if (row.handling !== undefined) {
       const h = object(row.handling);
@@ -157,7 +159,7 @@ export class DataPlugin {
           if (!/^[a-z0-9_]+$/.test(key) || !CIRCUIT_SPECIFICATIONS[key] || this.tracks.has(key)) throw Error('Invalid layout identity');
           const raw=object(read(path.posix.join(path.posix.dirname(catalogPath), key+'.json')));
           const geometry=validateTrackPackage(raw,key), spec=CIRCUIT_SPECIFICATIONS[key];
-          if (geometry.circuitId!==spec.circuitId || ![spec.layoutId, ({daytona_road_course:'road_course',portimao_wec:'wec',laguna_seca:'full'} as Record<string,string>)[key]].includes(geometry.layoutId!) || row.circuitId!==spec.circuitId || row.layoutId!==geometry.layoutId || row.lengthM!==geometry.lengthM || row.pointsCount!==geometry.centerline.length || !geometry.geometryRevision || !geometry.projectionRevision) throw Error('Layout/catalog mismatch');
+          if (geometry.circuitId!==spec.circuitId || ![spec.layoutId, ({daytona_road_course:'road_course',portimao_wec:'wec',laguna_seca:'full'} as Record<string,string>)[key]].includes(geometry.layoutId) || row.circuitId!==spec.circuitId || row.layoutId!==geometry.layoutId || row.lengthM!==geometry.lengthM || row.pointsCount!==geometry.centerline.length || !geometry.geometryRevision || !geometry.projectionRevision) throw Error('Layout/catalog mismatch');
           let display: TrackMapDisplay|null=null;
           const displayPath=`tracks-display/${key}.json`;
           if (fs.existsSync(path.join(base,displayPath))) {const sidecar=object(read(displayPath));keys(sidecar,['layoutKey','surfaces','brakeMarkers','sourceRevision']);display=parseTrackMapDisplay(sidecar,key,geometry.geometryRevision);}

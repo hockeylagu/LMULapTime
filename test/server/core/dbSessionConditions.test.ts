@@ -13,7 +13,7 @@ function lap(lapNumber: number): LapData {
   return {
     lapNumber, position: 1, lapTime: lapNumber >= 5 ? 130 : 120, s1: null, s2: null, s3: null, topSpeed: null,
     fCompound: 'Medium', rCompound: 'Medium', elapsedSeconds: (lapNumber - 1) * 120, isPitStop: false, isValid: true,
-  } as LapData;
+  };
 }
 
 const driver = { name: 'Samuel Lague', isPlayer: true, laps: [1, 2, 3, 4, 5, 6].map(lap) } as unknown as DriverData;
@@ -135,9 +135,9 @@ describe('replay rain on the laps of a linked session', () => {
           return target.prepare(sql);
         };
         const value: unknown = Reflect.get(target, property, target);
-        return typeof value === 'function' ? value.bind(target) : value;
+        return typeof value === 'function' ? (value as (...args: unknown[]) => unknown).bind(target) : value;
       },
-    }) as DatabaseType;
+    });
     reclassifyStoredSessions(countedDb, { replayName });
 
     expect(conditionReads).toHaveLength(1);

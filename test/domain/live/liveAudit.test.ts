@@ -77,7 +77,7 @@ it('checkpoints crossover changes immediately without logging every wetness fluc
   tracker.update(snapshot, reading, empty, 1000);
   expect(records.at(-1)).toMatchObject({ reason: 'settings', recordedAt: 1000, snapshot: { strategy: { crossover: { action: 'wets' } } } });
   const count = records.length;
-  snapshot.strategy!.crossover!.wetness = 0.4;
+  snapshot.strategy!.crossover.wetness = 0.4;
   tracker.update(snapshot, reading, empty, 2000);
   expect(records).toHaveLength(count);
   snapshot.strategy!.crossover = null;
