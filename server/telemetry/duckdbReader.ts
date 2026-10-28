@@ -1,4 +1,4 @@
-import { DuckDBInstance, type DuckDBConnection, type DuckDBValue } from '@duckdb/node-api';
+import type { DuckDBConnection, DuckDBInstance, DuckDBValue } from '@duckdb/node-api';
 import {
   DuckDbChannelEntry,
   DuckDbEventEntry,
@@ -53,6 +53,8 @@ export class DuckDbReader {
     if (this.connection) return;
     if (this.opening) return this.opening;
     this.opening = (async () => {
+      // Loaded on first open, so modules that only import the reader skip the native addon.
+      const { DuckDBInstance } = await import('@duckdb/node-api');
       const database = await DuckDBInstance.create(this.filePath, { access_mode: 'READ_ONLY' });
       try {
         this.connection = await database.connect();

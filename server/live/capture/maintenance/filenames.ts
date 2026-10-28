@@ -1,6 +1,5 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { DuckDBInstance } from '@duckdb/node-api';
 import type { LiveCaptureManifest } from '../../../../shared/types/liveCapture.js';
 
 /** Only completed attempts can move: interrupted attempts may still resume by filename. */
@@ -31,6 +30,7 @@ export async function finalizeCaptureFilename(
   }
   const updated = { ...manifest, filename };
   // If the process exits after the move, discovery recognizes this exact filename transition.
+  const { DuckDBInstance } = await import('@duckdb/node-api');
   const database = await DuckDBInstance.create(target);
   try {
     const connection = await database.connect();

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { DuckDBInstance, type DuckDBConnection, type DuckDBValue } from '@duckdb/node-api';
+import type { DuckDBConnection, DuckDBInstance, DuckDBValue } from '@duckdb/node-api';
 import {
   LIVE_CAPTURE_NORMALIZATION_VERSION,
   LIVE_CAPTURE_SCHEMA_VERSION,
@@ -30,6 +30,12 @@ type WriteAnswer = { manifest: LiveCaptureManifest; bytes: number };
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+// Loaded on first open, so modules that only import the store (routes, startup) skip the native addon.
+async function createDatabase(target: string, options?: Record<string, string>): Promise<DuckDBInstance> {
+  const { DuckDBInstance } = await import('@duckdb/node-api');
+  return await DuckDBInstance.create(target, options);
 }
 
 async function all(connection: DuckDBConnection, sql: string, values: DuckDBValue[] = []): Promise<DbRow[]> {
@@ -298,7 +304,7 @@ export class LiveCaptureRecordingStore {
   }
 
   private async readCatalogFile(target: string, filename: string): Promise<LiveCaptureManifest> {
-    const database = await DuckDBInstance.create(target, { access_mode: 'READ_ONLY' });
+    const database = await createDatabase(target, { access_mode: 'READ_ONLY' });
     let connection: DuckDBConnection;
     try { connection = await database.connect(); }
     catch (error: unknown) {
@@ -475,7 +481,7 @@ export class LiveCaptureRecordingStore {
   private async open(target: string, incoming: LiveCaptureManifest): Promise<void> {
     const existingPath = await fs.promises.lstat(target).catch((error: NodeJS.ErrnoException) => error.code === 'ENOENT' ? null : Promise.reject(error));
     if (existingPath?.isSymbolicLink() || (existingPath && !existingPath.isFile())) throw new Error('Live capture path must be a regular file');
-    const database = await DuckDBInstance.create(target);
+    const database = await createDatabase(target);
     let connection: DuckDBConnection;
     try { connection = await database.connect(); }
     catch (error: unknown) {
@@ -562,7 +568,7 @@ export class LiveCaptureRecordingStore {
   }
 
   private async openExisting(target: string): Promise<void> {
-    const database = await DuckDBInstance.create(target);
+    const database = await createDatabase(target);
     let connection: DuckDBConnection;
     try { connection = await database.connect(); }
     catch (error: unknown) {
