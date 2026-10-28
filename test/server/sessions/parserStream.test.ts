@@ -100,12 +100,13 @@ describe('parser server module - stream events and timing timestamps', () => {
       const session = parser.parseSessionXml('no_sectors_test.xml');
       expect(session).not.toBeNull();
       const laps = session?.drivers[0].laps || [];
-      expect(laps[0].lapTime).toBeNull();
+      // `et` is each lap's start: lap 1 ran 130.5 -> 240.2 (109.7 s), inferred but invalid/incomplete
+      expect(laps[0].lapTime).toBe(109.7);
+      expect(laps[0].isInferred).toBe(true);
       expect(laps[0].isValid).toBe(false);
       expect(laps[0].elapsedSeconds).toBe(130.5);
-      // Lap 2 elapsed time delta (240.2 - 130.5 = 109.7s) is inferred, but marked invalid/incomplete
-      expect(laps[1].lapTime).toBe(109.7);
-      expect(laps[1].isInferred).toBe(true);
+      // Lap 2 has no next start: no time is fabricated
+      expect(laps[1].lapTime).toBeNull();
       expect(laps[1].isValid).toBe(false);
       expect(laps[1].elapsedSeconds).toBe(240.2);
     });
@@ -211,9 +212,10 @@ describe('parser server module - stream events and timing timestamps', () => {
         <CarType>Ferrari 499P</CarType>
         <CarClass>Hypercar</CarClass>
         <Lap num="1" et="200.000" s1="33.000" s2="82.000" s3="95.000">210.000</Lap>
-        <Lap num="2" et="410.500" s1="33.200" s2="82.800">--.----</Lap>
-        <Lap num="3" et="620.000" s1="33.100" s2="82.500" s3="94.400">210.000</Lap>
-        <Lap num="4" et="2000.000" s1="33.000">--.----</Lap>
+        <Lap num="2" et="410.000" s1="33.200" s2="82.800">--.----</Lap>
+        <Lap num="3" et="620.500" s1="33.100" s2="82.500" s3="94.400">210.000</Lap>
+        <Lap num="4" et="830.500" s1="33.000">--.----</Lap>
+        <Lap num="5" et="2210.500" s1="33.000">--.----</Lap>
       </Driver>
     </Race>
   </RaceResults>
@@ -228,22 +230,24 @@ describe('parser server module - stream events and timing timestamps', () => {
       expect(driver).toBeDefined();
 
       const laps = driver!.laps;
-      expect(laps.length).toBe(4);
+      expect(laps.length).toBe(5);
 
       // Lap 1: Normal valid lap
       expect(laps[0].lapTime).toBe(210.0);
       expect(laps[0].isValid).toBe(true);
       expect(laps[0].isInferred).toBeUndefined();
 
-      // Lap 2: Incomplete lap (--.----) with et=410.500 vs prev et=200.000 -> inferred = 210.500s
+      // Lap 2: Incomplete lap (--.----) starting at et=410.000, next lap starts at 620.500 -> inferred = 210.500s
       expect(laps[1].lapTime).toBe(210.5);
       expect(laps[1].isInferred).toBe(true);
       expect(laps[1].isValid).toBe(false);
       expect(laps[1].s3).toBe(94.5);
 
-      // Lap 4: Incomplete lap with et=2000.000 (1380s delta - 23 minutes in garage) -> does NOT make sense to infer
+      // Lap 4: Incomplete lap from et=830.500 to 2210.500 (1380 s - 23 minutes in garage) -> does NOT make sense to infer
       expect(laps[3].lapTime).toBeNull();
       expect(laps[3].isInferred).toBeUndefined();
+      // Lap 5: the last lap has no next start
+      expect(laps[4].lapTime).toBeNull();
 
       expect(driver?.bestLapTime).toBe(210.0);
     });
@@ -313,10 +317,10 @@ describe('parser server module - stream events and timing timestamps', () => {
       <CarClass>LMGT3</CarClass>
       <isPlayer>1</isPlayer>
       <Position>1</Position>
-      <Lap num="1" p="1" et="120.000" s1="35.000" s2="40.000" s3="45.000">120.000</Lap>
-      <Lap num="2" p="1" et="241.000" s1="35.500" s2="40.000" s3="45.500">121.000</Lap>
-      <Lap num="3" p="1" et="380.000" pit="1">--.----</Lap>
-      <Lap num="4" p="1" et="500.500" s1="35.000" s2="40.000" s3="45.500">120.500</Lap>
+      <Lap num="1" p="1" et="0.500" s1="35.000" s2="40.000" s3="45.000">120.000</Lap>
+      <Lap num="2" p="1" et="120.500" s1="35.500" s2="40.000" s3="45.500">121.000</Lap>
+      <Lap num="3" p="1" et="241.500" pit="1">--.----</Lap>
+      <Lap num="4" p="1" et="380.500" s1="35.000" s2="40.000" s3="45.500">120.500</Lap>
     </Driver>
   </RaceResults>
 </rFactorXML>`;

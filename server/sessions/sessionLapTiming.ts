@@ -15,7 +15,11 @@ export function applyLapTiming(laps: LapData[], bestLapTime: number | null): voi
   applyPitLoss(laps, bestLapTime);
 }
 
-/** Fills a missing lap time from the sectors or from the elapsed time since the previous lap, when that is plausible. */
+/**
+ * Fills a missing lap time from the sectors, or from the elapsed time to the next lap's start when that is plausible:
+ * a lap's `et` is its start (the previous crossing, `docs/XML_FORMAT.md`), so the lap runs from its own `et` to the next
+ * lap's. The last lap has no next start and stays without a time.
+ */
 function inferMissingLapTimes(laps: LapData[], bestLapTime: number | null): void {
   for (let i = 0; i < laps.length; i++) {
     const curLap = laps[i];
@@ -27,11 +31,11 @@ function inferMissingLapTimes(laps: LapData[], bestLapTime: number | null): void
       inferredTime = parseFloat((curLap.s1 + curLap.s2 + curLap.s3).toFixed(3));
     }
 
-    // Case 2: Infer from session elapsed time delta vs previous lap
+    // Case 2: Infer from the session elapsed time between this lap's start and the next lap's
     if (inferredTime === null && typeof curLap.elapsedSeconds === 'number' && curLap.elapsedSeconds > 0) {
-      const prevLapEt = i > 0 ? laps[i - 1].elapsedSeconds : null;
-      if (typeof prevLapEt === 'number' && prevLapEt > 0) {
-        const deltaEt = parseFloat((curLap.elapsedSeconds - prevLapEt).toFixed(3));
+      const nextLapEt = laps[i + 1]?.elapsedSeconds ?? null;
+      if (typeof nextLapEt === 'number' && nextLapEt > 0) {
+        const deltaEt = parseFloat((nextLapEt - curLap.elapsedSeconds).toFixed(3));
 
         if (deltaEt > 0) {
           const knownSectors = (curLap.s1 || 0) + (curLap.s2 || 0) + (curLap.s3 || 0);
