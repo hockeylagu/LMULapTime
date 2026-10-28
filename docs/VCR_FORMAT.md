@@ -547,15 +547,17 @@ storage is specified in [replay cache format](REPLAY_CACHE_FORMAT.md), separatel
 Background sync and upgrades now use one frame-stream scan per replay for all
 pending drivers. `ReplayDriverSamples` copies each requested 65-byte pose payload,
 its session clock and channel-state reference into bounded 4,096-sample chunks.
-Lossless level-1 deflate chunks live in a worker-owned SQLite TEMP table, outside
-the application database. After the scan, one driver's chunks are consumed and
+Uncompressed chunks live in a worker-owned SQLite TEMP table, outside the
+application database (deflate cost ~40 % of the decode time for 2–2.7× less
+temporary disk). After the scan, one driver's chunks are consumed and
 deleted, decoded with the same pose decoder as direct requests, and finalized
 once using the complete timing, weather and incident history. Each finished lap
 is immediately encoded with the current binary lap codec (Brotli quality 9); only compact
 lap spans remain for fact persistence. Each driver still commits atomically.
 
 Closing or terminating the worker releases temporary storage. Peak temporary
-allocation was 421 MiB for the measured 946 MB / 61-driver replay; this is an
+allocation was 1.2 GB for a 997 MB / 63-driver Le Mans replay (2026-10-27,
+decode 49 s → 18 s with pose rounding without strings); this is an
 ingestion working-space cost, not additional archive data. Single-driver
 on-demand extraction retains the direct path without temporary packet staging.
 

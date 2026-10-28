@@ -1,6 +1,5 @@
 import Database from 'better-sqlite3';
 import { serialize, deserialize } from 'node:v8';
-import { deflateRawSync, inflateRawSync } from 'node:zlib';
 import type { RawTrajectoryPoint } from './replayLapBuilder.js';
 import { decodeReplayPose, type ReplayPoseState } from './replayPose.js';
 
@@ -51,7 +50,7 @@ export class ReplayDriverSamples {
 
   private save(slot: number, buffer: DriverBuffer): void {
     if (!buffer.length) return;
-    this.insert.run(slot, deflateRawSync(serialize({ records: buffer.records.subarray(0, buffer.length * RECORD_BYTES), states: buffer.states }), { level: 1 }));
+    this.insert.run(slot, serialize({ records: buffer.records.subarray(0, buffer.length * RECORD_BYTES), states: buffer.states }));
     buffer.length = 0;
     buffer.states = [];
   }
@@ -73,7 +72,7 @@ export class ReplayDriverSamples {
     const result: RawTrajectoryPoint[] = [];
     for (const { id } of ids) {
       const row = select.get(id) as { data: Buffer };
-      const chunk = deserialize(inflateRawSync(row.data)) as SampleChunk;
+      const chunk = deserialize(row.data) as SampleChunk;
       for (let position = 0; position < chunk.records.length; position += RECORD_BYTES) {
         const point = decodeReplayPose(chunk.records, position + 13, chunk.records.readDoubleLE(position),
           chunk.records[position + 12], chunk.states[chunk.records.readUInt32LE(position + 8)]);
