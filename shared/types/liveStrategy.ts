@@ -219,7 +219,6 @@ export interface LiveRaceStrategy {
   tyresStop: string | null;
   /** Tread left on the most worn tyre at the flag, 0..1; null before the event's wear is measured. */
   treadAtFlag: number | null;
-  treadCorner?: LiveCorner | null;
   /** Seconds lost against the chosen plan (tyre changes): 0 for it, null when the game's change time is unknown. */
   gapSeconds: number | null;
 }

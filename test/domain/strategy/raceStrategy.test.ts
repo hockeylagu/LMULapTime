@@ -8,22 +8,23 @@ const input = (over: Partial<RaceStrategyInput> = {}): RaceStrategyInput => ({
 });
 
 describe('race strategy before the race', () => {
-  it('projects every wheel, including a change of limiting corner across stints', () => {
+  it('projects every wheel, including a change of limiting wheel across stints', () => {
     const plan = planRaceStrategies(input({ qualifyingAhead: false,
       tyres: { compound: 'Medium', used: true, wear: 0.7, tread: [0.7, 1, 1, 1], newSets: 2 },
       wearPerLap: [0.001, 0.004, 0.02, 0.005] }));
-    expect(plan?.chosen).toMatchObject({ name: 'NEW TYRES AT THE STOP', treadCorner: 'RL', treadAtFlag: 0.72 });
-    expect(plan?.nextBest).toMatchObject({ treadCorner: 'RL', treadAtFlag: 0.24 });
+    expect(plan?.chosen).toMatchObject({ name: 'NEW TYRES AT THE STOP', treadAtFlag: 0.72 });
+    expect(plan?.nextBest).toMatchObject({ treadAtFlag: 0.24 });
     const short = planRaceStrategies(input({ raceMinutes: 2, qualifyingAhead: false,
       tyres: { compound: 'Medium', used: true, wear: 0.7, tread: [0.7, 1, 1, 1], newSets: 0 },
       wearPerLap: [0.001, 0.004, 0.02, 0.005] }));
-    expect(short?.chosen.treadCorner).toBe('FL');
+    // The used front-left (0.7) limits a short race, not the fast-wearing rear-left.
+    expect(short?.chosen.treadAtFlag).toBeLessThan(0.7);
   });
   it('stops for VE full at the start, loads what the finish needs, and keeps the set when its tread holds', () => {
     const plan = planRaceStrategies(input());
     expect(plan).toMatchObject({ raceMinutes: 60, laps: 38, unit: '%' });
     expect(plan?.chosen).toEqual({ name: 'NO TYRE CHANGE', stops: 1, pitLap: 24, loadStart: 100, loadToFinish: 58,
-      tyresStart: 'NEW MEDIUM', tyresStop: 'NO CHANGE', treadAtFlag: 0.696, treadCorner: 'FL', gapSeconds: 0 });
+      tyresStart: 'NEW MEDIUM', tyresStop: 'NO CHANGE', treadAtFlag: 0.696, gapSeconds: 0 });
     expect(plan?.nextBest).toMatchObject({ name: 'NEW TYRES AT THE STOP', tyresStop: 'NEW MEDIUM', treadAtFlag: 0.888, gapSeconds: 12 });
   });
 

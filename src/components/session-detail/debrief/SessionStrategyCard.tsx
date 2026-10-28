@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Fuel, Loader2 } from 'lucide-react';
 import type { SessionStrategy } from '../../../../shared/types/index.js';
 import { formatTime } from '../../../../shared/domain/formatters.js';
-import { LIVE_TYRE_TREAD_FLOOR } from '../../../../shared/domain/live/liveInsights.js';
+import { treadTone } from '../../../../shared/domain/live/liveInsights.js';
 import { apiErrorMessage } from '../../../api/apiClient.js';
 import { fetchSessionStrategy } from '../../../api/sessionStrategyApi.js';
 import { useRequest } from '../../../api/useRequest.js';
@@ -49,7 +49,7 @@ function StrategyBody({ strategy }: { strategy: SessionStrategy }) {
           {tyres.wearPerLap === null ? '—' : `${(tyres.wearPerLap * 100).toFixed(2)} % / lap`}
         </Stat>
         <Stat label="Tread at the flag">
-          <span className={tyres.treadAtFlag !== null && tyres.treadAtFlag < LIVE_TYRE_TREAD_FLOOR ? 'text-lmu-loss' : ''}>
+          <span className={{ loss: 'text-lmu-loss', warn: 'text-lmu-warn', none: '' }[treadTone(tyres.treadAtFlag) ?? 'none']}>
             {tyres.treadAtFlag === null ? '—' : `${Math.round(tyres.treadAtFlag * 100)} %`}
           </span>
         </Stat>

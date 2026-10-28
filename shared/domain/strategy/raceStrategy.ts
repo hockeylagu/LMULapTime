@@ -1,6 +1,6 @@
 import type { LiveGarageTyres, LiveRaceStrategies, LiveRaceStrategy, LiveResourceKind, TyreWheelValues } from '../../types/liveStrategy.js';
 import { CORNERS } from '../live/liveCarCondition.js';
-import { LIVE_TYRE_TREAD_FLOOR } from '../live/liveInsights.js';
+import { LIVE_TYRE_CHANGE_TREAD } from '../live/liveInsights.js';
 import { formationLapUse, planGarage, planRace } from '../live/liveResourcePlan.js';
 import type { RefuelPart } from '../live/livePitTime.js';
 
@@ -93,14 +93,13 @@ export function planRaceStrategies(input: RaceStrategyInput): LiveRaceStrategies
       tyresStart: named(startNew ? 'NEW' : 'USED'),
       tyresStop: stops === 0 ? null : change ? named('NEW') : 'NO CHANGE',
       treadAtFlag: flag === null ? null : Math.round(Math.max(0, Math.min(...flag)) * 1000) / 1000,
-      treadCorner: flag === null ? null : CORNERS[flag.indexOf(Math.min(...flag))],
       gapSeconds: input.tyreChangeSeconds === null ? null : (change ? stops : 0) * input.tyreChangeSeconds,
       lowest: treads === null ? null : Math.min(...treads.flat()),
     };
   };
   const options = stops > 0 && setsAtStops >= stops ? [plan(false), plan(true)] : [plan(false)];
   // Unknown wear passes: the tread shows unknown and the driver judges it. When none holds, the most tread left wins.
-  const holds = (option: Option) => option.lowest === null || option.lowest >= LIVE_TYRE_TREAD_FLOOR;
+  const holds = (option: Option) => option.lowest === null || option.lowest >= LIVE_TYRE_CHANGE_TREAD;
   const [chosen, next] = [...options].sort((a, b) => Number(holds(b)) - Number(holds(a))
     || (holds(a) ? (a.gapSeconds ?? 0) - (b.gapSeconds ?? 0) : (b.lowest ?? 0) - (a.lowest ?? 0)));
   const strategy = ({ lowest: _lowest, ...option }: Option, gapSeconds: number | null): LiveRaceStrategy => ({ ...option, gapSeconds });

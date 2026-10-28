@@ -4,7 +4,7 @@ import { knownCarClass, resolveVehicle } from '../../../shared/domain/vehicleMap
 import { formatLapTime, UNKNOWN } from './liveFormat.js';
 import { formatAmount, resourceName } from './race/livePlanFormat.js';
 import { isWetCompound, SLIGHTLY_WET_WETNESS } from '../../../shared/domain/lapConditions.js';
-import { LIVE_TYRE_TREAD_FLOOR } from '../../../shared/domain/live/liveInsights.js';
+import { LIVE_TYRE_CHANGE_TREAD, LIVE_TYRE_TREAD_FLOOR } from '../../../shared/domain/live/liveInsights.js';
 import { requestDirectoryScan } from '../../api/useAppData.js';
 
 /**
@@ -118,9 +118,10 @@ function garageChecks(snapshot: LiveSnapshot, plan: LiveGaragePlan): GarageCheck
   const coverage = kind === 'qualifying' ? null : plan.tyreCoverage;
   if (coverage) {
     const tyres = checks[checks.length - 1];
-    tyres.target = `~${Math.round(coverage.projectedTread * 100)}%${coverage.corner ? ` ${coverage.corner}` : ''} END`;
-    tyres.note = coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR ? 'BELOW 40% MIN' : undefined;
-    tyres.action = coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR ? plan.tyres?.newSets === 0 ? { text: 'NO NEW SETS', tone: 'warn' } : { text: 'FIT NEW', tone: 'change' } : coverage.availableSetsCover === false ? { text: 'SETS SHORT', tone: 'warn' } : null;
+    // The worst tyre's tread without its corner: `~90% FL END` ran into the garage column.
+    tyres.target = `~${Math.round(coverage.projectedTread * 100)}% END`;
+    tyres.note = coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR ? 'BELOW 40% MIN' : coverage.projectedTread < LIVE_TYRE_CHANGE_TREAD ? 'BELOW 50% CHANGE' : undefined;
+    tyres.action = coverage.projectedTread < LIVE_TYRE_CHANGE_TREAD ? plan.tyres?.newSets === 0 ? { text: 'NO NEW SETS', tone: 'warn' } : { text: 'FIT NEW', tone: 'change' } : coverage.availableSetsCover === false ? { text: 'SETS SHORT', tone: 'warn' } : null;
   }
   // Surface choice outranks tread/allocation: wets do not consume a dry set.
   const wetness = snapshot.weather?.avgPathWetness;

@@ -60,6 +60,8 @@ describe('live dashboard improvements', () => {
     expect(view.cells[1]).toMatchObject({ label: 'TREAD AT FINISH', value: '~87' });
     expect(view.cells[1].note).toBeUndefined();
     expect(view.cells[1].detail).toBeUndefined();
+    strategy.tyres!.coverage.projectedTread = .45;
+    expect(racePlanView(liveSnapshot({ strategy })).cells[1]).toMatchObject({ note: 'BELOW 50% CHANGE', tone: 'warn' });
     strategy.tyres!.coverage.projectedTread = .39;
     expect(racePlanView(liveSnapshot({ strategy })).cells[1]).toMatchObject({ note: 'BELOW 40% MIN', tone: 'loss' });
   });

@@ -138,7 +138,7 @@ describe('strategy voice POC', () => {
   it('explains tyre coverage and a penalty service limitation', () => {
     const tyres = snapshot();
     tyres.strategy!.tyres!.coverage = { target: 'pit', projectedTread: 0.3, setsNeeded: 2, availableSetsCover: true };
-    expect(strategySpeech(tyres, 'live')?.text).toBe('Tyres projected below our limit before the stop. Plan a tyre change.');
+    expect(strategySpeech(tyres, 'live')?.text).toBe('Tyres projected below fifty percent before the stop. Plan a tyre change.');
     tyres.strategy!.pit!.state = 'entering';
     tyres.strategy!.pit!.penalties = 1;
     expect(strategySpeech(tyres, 'live')?.text).toBe('Stop and go. No service on this stop.');
@@ -166,7 +166,7 @@ describe('strategy voice POC', () => {
     value.strategy!.resource!.race!.pitInLaps = 1;
     value.strategy!.tyres!.coverage = { target: 'pit', projectedTread: 0.3, setsNeeded: 2, availableSetsCover: true };
     value.strategy!.pit!.mfd!.tyres = 'No Change';
-    expect(strategySpeech(value, 'live')?.text).toBe('Tyres projected below our limit. Your pit menu is set to no change.');
+    expect(strategySpeech(value, 'live')?.text).toBe('Tyres projected below fifty percent. Your pit menu is set to no change.');
   });
 
   it('explains when fuel limits an otherwise covered energy plan', () => {

@@ -67,7 +67,7 @@ describe('LiveStrategyTracker', () => {
     }))));
     const qualifying = at(5, { sessionCode: 5, inRealtime: false, endEt: 600, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 75 }) });
     const garage = context(tracker, qualifying, { lapsLeft: null })?.garage;
-    expect(garage?.raceStrategy).toMatchObject({ chosen: { treadAtFlag: 0.952, treadCorner: 'RL' },
+    expect(garage?.raceStrategy).toMatchObject({ chosen: { treadAtFlag: 0.952 },
       basis: { wear: 'learned', sessions: 1 } });
     expect(garage?.tyreCoverage?.projectedTread).toBeGreaterThan(0.95);
     tracker.setTyreWearProfile(null);

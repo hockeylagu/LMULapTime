@@ -2,7 +2,7 @@ import type { LiveSnapshot } from '../../../../shared/types/live.js';
 import type { LiveForecast, LivePitInfo, LiveResourcePlan, LiveTyreCrossover, LiveTyres } from '../../../../shared/types/liveStrategy.js';
 import { UNKNOWN } from '../liveFormat.js';
 import { deploymentReadout } from './deploymentReadout.js';
-import { LIVE_TYRE_TREAD_FLOOR } from '../../../../shared/domain/live/liveInsights.js';
+import { LIVE_TYRE_CHANGE_TREAD, LIVE_TYRE_TREAD_FLOOR, treadTone } from '../../../../shared/domain/live/liveInsights.js';
 import {
   CORNER_NAMES, compoundTone, formatAmount, formatPerLap, formatSecondsRange, formatSignedPerLap, resourceName, tyreCallText,
   type CompoundTone,
@@ -56,9 +56,9 @@ function tyresCell(tyres: LiveTyres | null): PlanReadout {
   if (coverage) return {
     label: `TREAD AT ${coverage.target === 'finish' ? 'FINISH' : 'PIT'}`,
     value: `~${Math.round(coverage.projectedTread * 100)}`, unit: `%${coverage.corner ? ` ${coverage.corner}` : ''}`,
-    note: coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR ? 'BELOW 40% MIN' : undefined,
+    note: coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR ? 'BELOW 40% MIN' : coverage.projectedTread < LIVE_TYRE_CHANGE_TREAD ? 'BELOW 50% CHANGE' : undefined,
     detail: coverage.availableSetsCover === false ? 'NOT ENOUGH SETS' : undefined,
-    tone: coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR ? 'loss' : null,
+    tone: treadTone(coverage.projectedTread),
   };
   const worst = tyres?.worst ?? null;
   return {
@@ -159,16 +159,16 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
       cells[0].detailTone = ratio.recommended !== null && ratio.mfdSetting !== null && ratio.mfdSetting < ratio.recommended ? 'loss' : 'muted';
     }
     const coverage = tyres?.coverage;
-    const needsNew = !!damage?.wheel || (coverage !== undefined && coverage !== null && coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR);
+    const needsNew = !!damage?.wheel || (coverage !== undefined && coverage !== null && coverage.projectedTread < LIVE_TYRE_CHANGE_TREAD);
     const noChange = /no change/i.test(pit?.mfd?.tyres ?? '');
     if (!crossover && needsNew && noChange) {
       cells[1].value = tyres?.compound ? `NEW ${tyres.compound.toUpperCase()}` : 'NEW SET';
       cells[1].note = 'SET NO CHANGE';
       cells[1].noteTone = 'loss';
       cells[1].tone = 'warn';
-    } else if (!crossover && coverage && coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR) {
-      cells[1].note = `TREAD ~${Math.round(coverage.projectedTread * 100)}% · 40% MIN`;
-      cells[1].noteTone = 'loss';
+    } else if (!crossover && coverage && coverage.projectedTread < LIVE_TYRE_CHANGE_TREAD) {
+      cells[1].note = `TREAD ~${Math.round(coverage.projectedTread * 100)}% · ${coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR ? '40% MIN' : '50% CHANGE'}`;
+      cells[1].noteTone = treadTone(coverage.projectedTread);
     }
     if (!pit?.penalties) cells[2].note = pit?.mfd?.repair
       ? /^N\/A$/i.test(pit.mfd.repair) ? undefined : `REPAIR: ${pit.mfd.repair.replace(/^Repair /i, '').toUpperCase()}`
@@ -240,9 +240,9 @@ export function racePlanView(snapshot: LiveSnapshot): RacePlanView {
   const stintTyres = tyresCell(tyres);
   const coverage = tyres?.coverage;
   // The MFD call has its own line; keep tread/set warnings on the reserved second line.
-  stintTyres.detail = coverage && coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR && coverage.availableSetsCover === false
+  stintTyres.detail = coverage && coverage.projectedTread < LIVE_TYRE_CHANGE_TREAD && coverage.availableSetsCover === false
     ? 'LOW TREAD · SETS SHORT' : stintTyres.detail ?? stintTyres.note;
-  stintTyres.detailTone = stintTyres.detail ? 'loss' : undefined;
+  stintTyres.detailTone = stintTyres.detail ? treadTone(coverage?.projectedTread) ?? 'loss' : undefined;
   stintTyres.note = pit?.mfd?.tyres ? `MFD · ${tyreCallText(pit.mfd.tyres)}` : 'MFD NOT READ';
   stintTyres.noteTone = pit?.mfd?.tyres ? undefined : 'muted';
   stintTyres.compoundNote = true;

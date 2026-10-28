@@ -2,7 +2,7 @@ import type { LiveSnapshot } from '../../../../shared/types/live.js';
 import type { LiveConnection } from '../../../api/liveStream.js';
 import { racePlanView } from '../race/raceAction.js';
 import { CORNER_NAMES, formatAmount } from '../race/livePlanFormat.js';
-import { LIVE_TYRE_TREAD_FLOOR } from '../../../../shared/domain/live/liveInsights.js';
+import { LIVE_TYRE_CHANGE_TREAD } from '../../../../shared/domain/live/liveInsights.js';
 
 /** A radio call; `urgent` ones interrupt at once, the others wait for a straight. */
 export interface StrategyCall { key: string; text: string; urgent?: boolean }
@@ -50,12 +50,12 @@ export function strategySpeech(snapshot: LiveSnapshot | null, connection: LiveCo
     }
   }
   const coverage = tyres?.coverage;
-  if (coverage && coverage.projectedTread < LIVE_TYRE_TREAD_FLOOR) {
+  if (coverage && coverage.projectedTread < LIVE_TYRE_CHANGE_TREAD) {
     if (view.mode === 'pit' && /no change/i.test(pit?.mfd?.tyres ?? '')) {
-      return call('pit-tyres-unchanged', 'Tyres projected below our limit. Your pit menu is set to no change.');
+      return call('pit-tyres-unchanged', 'Tyres projected below fifty percent. Your pit menu is set to no change.');
     }
     return call(`tyre-coverage-${coverage.target}`,
-      `Tyres projected below our limit before the ${coverage.target === 'finish' ? 'flag' : 'stop'}. Plan a tyre change.`);
+      `Tyres projected below fifty percent before the ${coverage.target === 'finish' ? 'flag' : 'stop'}. Plan a tyre change.`);
   }
   if (view.mode === 'pit' && fuelRatio?.recommended != null && fuelRatio.mfdSetting != null
     && fuelRatio.mfdSetting < fuelRatio.recommended) {

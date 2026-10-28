@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { limitingTyreCoverage, planFuelRatio, savingToFinish, tyreCoverage } from '../../../shared/domain/live/liveInsights.js';
+import { limitingTyreCoverage, planFuelRatio, savingToFinish, tyreCoverage, treadTone } from '../../../shared/domain/live/liveInsights.js';
 
 describe('saving scenarios', () => {
   it('targets the use that reaches the flag, with no reserve at the finish', () => {
@@ -41,7 +41,7 @@ describe('tyre projections', () => {
     expect(limitingTyreCoverage([0.8, 0.9, 0.85, 0.9], [null, null, null, null], 10, 10, 'finish', 1)).toBeNull();
   });
   it('projects the fitted set to the next pit and the inventory across the race', () => {
-    expect(tyreCoverage(0.8, 0.02, 10, 100, 'pit', 1)).toEqual({ target: 'pit', projectedTread: 0.6, setsNeeded: 3, availableSetsCover: false });
+    expect(tyreCoverage(0.8, 0.02, 10, 100, 'pit', 1)).toEqual({ target: 'pit', projectedTread: 0.6, setsNeeded: 4, availableSetsCover: false });
     expect(tyreCoverage(0.8, 0.02, 10, 100, 'pit', null)?.availableSetsCover).toBeNull();
     expect(tyreCoverage(0.1, 0.02, 10, 10, 'finish', 1)?.projectedTread).toBe(0);
   });
@@ -50,9 +50,12 @@ describe('tyre projections', () => {
     expect(tyreCoverage(0.8, 0, 10, 10, 'finish', 1)).toBeNull();
     expect(tyreCoverage(0.8, -0.02, 10, 10, 'finish', 1)).toBeNull();
   });
-  it('plans replacement sets against a 40% tread floor, including the exact boundary', () => {
-    expect(tyreCoverage(0.8, 0.02, 20, 20, 'finish', 0)).toMatchObject({ projectedTread: 0.4, setsNeeded: 0, availableSetsCover: true });
-    expect(tyreCoverage(0.8, 0.02, 21, 21, 'finish', 0)).toMatchObject({ projectedTread: 0.38, setsNeeded: 1, availableSetsCover: false });
-    expect(tyreCoverage(0.35, 0.02, 1, 1, 'finish', 1)).toMatchObject({ setsNeeded: 1, availableSetsCover: true });
+  it('plans replacement sets against the 50% change point, including the exact boundary', () => {
+    expect(tyreCoverage(0.8, 0.02, 15, 15, 'finish', 0)).toMatchObject({ projectedTread: 0.5, setsNeeded: 0, availableSetsCover: true });
+    expect(tyreCoverage(0.8, 0.02, 16, 16, 'finish', 0)).toMatchObject({ projectedTread: 0.48, setsNeeded: 1, availableSetsCover: false });
+    expect(tyreCoverage(0.45, 0.02, 1, 1, 'finish', 1)).toMatchObject({ setsNeeded: 1, availableSetsCover: true });
+  });
+  it('colours tread red below the 40% floor and amber below the 50% change point', () => {
+    expect([0.39, 0.4, 0.49, 0.5, null].map(treadTone)).toEqual(['loss', 'warn', 'warn', null, null]);
   });
 });

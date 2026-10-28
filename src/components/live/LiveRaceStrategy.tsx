@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react';
 import type { LiveRaceStrategies, LiveRaceStrategyBasis, LiveRaceStrategy as Strategy } from '../../../shared/types/liveStrategy.js';
-import { LIVE_TYRE_TREAD_FLOOR } from '../../../shared/domain/live/liveInsights.js';
+import { LIVE_TYRE_CHANGE_TREAD, treadTone } from '../../../shared/domain/live/liveInsights.js';
 import { CompoundText } from './race/CompoundText.js';
 
+/** Projected tread: red below the 40% floor, amber below the 50% change point. */
+const TREAD_CLASS = { loss: 'text-lmu-loss', warn: 'text-lmu-warn', none: '' } as const;
 const LABEL = 'whitespace-nowrap text-[32px] font-semibold text-lmu-text-soft';
 
 const UNIT = 'ml-2 font-sans text-[44px] font-semibold text-lmu-text-soft';
@@ -45,8 +47,8 @@ function StrategyCard({ strategy, resource, unit }: { strategy: Strategy; resour
       {strategy.loadToFinish !== null && <Stat label={`${resource} TO FINISH`} value={strategy.loadToFinish} unit={unit} large />}
       <Stat label="TYRES START" value={<Tyres text={strategy.tyresStart} />} />
       {strategy.tyresStop !== null && <Stat label="TYRES AT STOP" value={<Tyres text={strategy.tyresStop} />} />}
-      <Stat label="TREAD AT FLAG" value={tread === null ? '—' : `~${Math.round(tread * 100)}`} unit={tread === null ? undefined : `%${strategy.treadCorner ? ` ${strategy.treadCorner}` : ''}`}
-        className={tread !== null && tread < LIVE_TYRE_TREAD_FLOOR ? 'text-lmu-loss' : ''} />
+      <Stat label="TREAD AT FLAG" value={tread === null ? '—' : `~${Math.round(tread * 100)}`} unit={tread === null ? undefined : '%'}
+        className={TREAD_CLASS[treadTone(tread) ?? 'none']} />
     </div>
   );
 }
@@ -77,7 +79,7 @@ export function LiveRaceStrategy({ strategies, quali }: { strategies: LiveRaceSt
         {next.tyresStart !== chosen.tyresStart && <> · START <Tyres text={next.tyresStart} /></>}
         {next.tyresStop !== null && next.tyresStop !== chosen.tyresStop && <> · AT STOP <Tyres text={next.tyresStop} /></>}
         {/* Quicker but not chosen: the tyres would not last. */}
-        {next.treadAtFlag !== null && next.treadAtFlag < LIVE_TYRE_TREAD_FLOOR && <> · <span className="text-lmu-loss">TREAD AT FLAG ~{Math.round(next.treadAtFlag * 100)}%</span></>}
+        {next.treadAtFlag !== null && next.treadAtFlag < LIVE_TYRE_CHANGE_TREAD && <> · <span className={TREAD_CLASS[treadTone(next.treadAtFlag) ?? 'none']}>TREAD AT FLAG ~{Math.round(next.treadAtFlag * 100)}%</span></>}
       </p>}
     </section>
   );

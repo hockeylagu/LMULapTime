@@ -3,8 +3,13 @@ import type { LivePerLapSource } from '../../types/liveStrategy.js';
 import { CORNERS } from './liveCarCondition.js';
 
 const round = (value: number, digits: number): number => Math.round(value * 10 ** digits) / 10 ** digits;
-/** Driver's minimum planned tread, not a universal grip/safety threshold. */
+/** Driver's critical tread: below it the tyres must come off (red), not a universal grip/safety threshold. */
 export const LIVE_TYRE_TREAD_FLOOR = 0.4;
+/** Driver's planned change point: stints and sets are planned to end at or above it; 40-50% shows amber (driver, 2026-10-28). */
+export const LIVE_TYRE_CHANGE_TREAD = 0.5;
+/** Tone of a projected tread: red below the critical floor, amber below the change point. */
+export const treadTone = (tread: number | null | undefined): 'loss' | 'warn' | null =>
+  tread == null ? null : tread < LIVE_TYRE_TREAD_FLOOR ? 'loss' : tread < LIVE_TYRE_CHANGE_TREAD ? 'warn' : null;
 
 /** A mathematical no-stop scenario to the flag (no reserve: the finish needs none), not a claim that the driver can achieve the saving. */
 export function savingToFinish(amount: number, perLap: number, laps: number, source: LivePerLapSource): LiveSavingPlan | null {
@@ -52,8 +57,8 @@ export function planFuelRatio(input: FuelRatioInput): LiveFuelRatio | null {
 /** Extrapolates tread only. A positive estimate does not guarantee useful grip. */
 export function tyreCoverage(worst: number | null, wear: number | null, lapsToTarget: number, raceLaps: number, target: 'pit' | 'finish', newSets: number | null): LiveTyreCoverage | null {
   if (worst === null || wear === null || ![worst, wear, lapsToTarget, raceLaps].every(Number.isFinite) || worst < 0 || worst > 1 || wear <= 0 || lapsToTarget < 0 || raceLaps <= 0) return null;
-  const usable = Math.max(0, worst - LIVE_TYRE_TREAD_FLOOR);
-  const setsNeeded = Math.max(0, Math.ceil(Math.max(0, raceLaps * wear - usable) / (1 - LIVE_TYRE_TREAD_FLOOR) - 1e-9));
+  const usable = Math.max(0, worst - LIVE_TYRE_CHANGE_TREAD);
+  const setsNeeded = Math.max(0, Math.ceil(Math.max(0, raceLaps * wear - usable) / (1 - LIVE_TYRE_CHANGE_TREAD) - 1e-9));
   return { target, projectedTread: round(Math.max(0, worst - lapsToTarget * wear), 3),
     setsNeeded, availableSetsCover: newSets === null ? null : newSets >= setsNeeded };
 }
