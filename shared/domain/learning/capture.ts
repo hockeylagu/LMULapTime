@@ -8,6 +8,12 @@ import { LIVE_LEARNING_VERSION } from '../../types/liveLearning.js';
 import type { LiveLearningEvent } from '../../types/liveLearning.js';
 
 export interface ResourceForecast { perLap: number | null; perLapSource: LivePerLapSource | null }
+/**
+ * Latest a forecast is frozen after its lap starts. It waits for the meter to measure the lap just ended (a sample
+ * after the line, 1-2 s), or a stored forecast is one lap old: it left out three tow laps the live display already
+ * counted (Silverstone race 2026-10-28, race review 2026-10-28). Laps with no measured use (pit, caution) freeze at this limit.
+ */
+export const FORECAST_WAIT_SECONDS = 12;
 /** Freeze before outcomes arrive; separate observations for both fuel and VE, independent of any dashboard. */
 export class LiveLearningCapture {
   private recording = '';
@@ -57,9 +63,11 @@ export class LiveLearningCapture {
     const events: LiveLearningEvent[] = [];
     for (const kind of ['fuel', 've'] as const) {
       const key = `${lap}:${kind}`;
+      const intoLap = reading.currentEt - player.lapStartEt;
+      const previousMeasured = (observations[kind]?.lap ?? -Infinity) >= lap - 1;
       if (!this.forecasts.has(key) && snapshot.lifecycle === 'driving' && !snapshot.result
-        && Number.isFinite(player.lapStartEt) && reading.currentEt >= player.lapStartEt
-        && reading.currentEt - player.lapStartEt <= 2) {
+        && Number.isFinite(player.lapStartEt) && intoLap >= 0 && intoLap <= FORECAST_WAIT_SECONDS
+        && (previousMeasured || intoLap >= FORECAST_WAIT_SECONDS - 2)) {
         this.forecasts.add(key);
         events.push({ kind: 'learning-forecast', data: { version: LIVE_LEARNING_VERSION,
           lapNumber: lap, lapStartSeconds: player.lapStartEt, forecastSeconds: reading.currentEt, kind,

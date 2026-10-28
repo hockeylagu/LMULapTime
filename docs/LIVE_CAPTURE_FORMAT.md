@@ -345,7 +345,10 @@ Fresh databases do not create `live_strategy_audit`; no automatic deletion migra
 ## Learning: implemented scope and remaining gates
 
 Versioned events freeze fuel/VE forecasts at lap start and pair them with independently measured
-outcomes, without requiring a dashboard client. An off-track worker validates events; the coordinator
+outcomes, without requiring a dashboard client. A forecast waits until the meter has measured the lap just
+ended (1-2 s after the line), at most `FORECAST_WAIT_SECONDS` (12 s; a lap with no measured use, such as a
+pit or caution lap, freezes from 10 s). Before baseline version 5 it froze within 2 s and so left out the
+lap just ended. An off-track worker validates events; the coordinator
 rechecks canonical XML/link state before building deduplicated compact SQLite examples.
 Eligibility excludes stale/ambiguous ownership, unsuitable lap classification, incompatible source
 versions and missing predictions. Deleted raw recordings do not automatically delete valid compact
@@ -380,7 +383,7 @@ The candidate is not refitted on acceptance data. Further off-track evaluations 
 changes, acceptance evidence disappears or prospective error gates regress; replacements start validation again.
 
 The live planner uses eligible active corrections, bounded to ±10%, over its rolling estimator/game
-fallback. Lap-start training events still freeze the uncorrected baseline (version 3), preventing
+fallback. Lap-start training events still freeze the uncorrected baseline (version 5), preventing
 recursive bias fitting; corrected advice/audits use model version 5 (4 before 2026-10-22: reserve kept at
 the finish, laps left at the class leader's pace without the planned stop, the pit timer for a stop made now). Resource/garage plans disclose
 the baseline and applied adjustment, and dashboard source text identifies learned advice.

@@ -4,9 +4,9 @@ import type { LiveScoringReading } from './liveLifecycle.js';
 import { liveTrackWet } from '../lapConditions.js';
 
 /** Bump when the forecasting formulas change; history keeps the version that produced each estimate. */
-export const LIVE_MODEL_VERSION = 11;
+export const LIVE_MODEL_VERSION = 12;
 /** Uncorrected estimator recorded for training and used as the exact calibration compatibility version. */
-export const LIVE_BASELINE_MODEL_VERSION = 4;
+export const LIVE_BASELINE_MODEL_VERSION = 5;
 interface Baseline { snapshot: LiveSnapshot; regime: string; et: number }
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 const difference = (actual: number | null, predicted: number | null): number | null =>

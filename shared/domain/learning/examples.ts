@@ -1,5 +1,6 @@
 import { LIVE_LEARNING_VERSION, type LiveLearningExample, type StoredLearningEvent } from '../../types/liveLearning.js';
 import type { LiveCaptureManifest } from '../../types/liveCapture.js';
+import { FORECAST_WAIT_SECONDS } from './capture.js';
 
 /**
  * Bump when the example rules change, so stored projections rebuild. Version 2 no longer excludes a whole recording
@@ -86,7 +87,7 @@ export function buildLearningExamples(
       if (forecast.condition !== lap.condition) exclusions.push('forecast-condition-mismatch');
       if (!forecast.compound) exclusions.push('missing-compound');
       if (!Number.isFinite(forecast.forecastSeconds) || lapStart === undefined
-        || forecast.forecastSeconds < lapStart || forecast.forecastSeconds - lapStart > 2) exclusions.push('forecast-time-invalid');
+        || forecast.forecastSeconds < lapStart || forecast.forecastSeconds - lapStart > FORECAST_WAIT_SECONDS) exclusions.push('forecast-time-invalid');
       if (lapStart === undefined || !metricClose(forecast.lapStartSeconds, lapStart, 0.05)) exclusions.push('forecast-anchor-start-mismatch');
     }
     const crossingSeconds = outcome.event.data.crossingSeconds;

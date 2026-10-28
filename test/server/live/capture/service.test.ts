@@ -52,7 +52,8 @@ describe('LiveService capture integration', () => {
       identity: { readNavigation: async () => ({ ok: false }) },
       pit: { get: async () => ({ ok: false, reason: 'status' }) } });
     service.start();
-    for (const currentEt of [100, 101]) reader.emit('message', { type: 'frame', scoring: scoringReading({ currentEt,
+    // Nothing measured before lap 2: the forecasts freeze by the wait limit.
+    for (const currentEt of [100, 101, 110, 111]) reader.emit('message', { type: 'frame', scoring: scoringReading({ currentEt,
       player: vehicleReading({ totalLaps: 1, lapStartEt: 100, driverName: 'Driver' }) }) });
     expect(service.hasClients()).toBe(false);
     expect(capture.hasOpenRecordingHandle).toBe(true);
@@ -60,8 +61,8 @@ describe('LiveService capture integration', () => {
     await Promise.resolve(); // The recording stops once the reader has drained.
     const forecasts = writer.batches().flatMap(batch => batch.observations).filter(event => event.kind === 'learning-forecast');
     expect(forecasts).toHaveLength(2);
-    expect(forecasts[0].data).toMatchObject({ lapNumber: 2, forecastSeconds: 100, kind: 'fuel' });
-    expect(forecasts[1].data).toMatchObject({ lapNumber: 2, forecastSeconds: 100, kind: 've' });
+    expect(forecasts[0].data).toMatchObject({ lapNumber: 2, forecastSeconds: 110, kind: 'fuel' });
+    expect(forecasts[1].data).toMatchObject({ lapNumber: 2, forecastSeconds: 110, kind: 've' });
     for (const batch of writer.batches()) writer.emit('message', { type: 'persisted', sequence: batch.sequence, manifest: batch.manifest, bytes: 1 });
     writer.emit('exit', 0);
     await stopping;
