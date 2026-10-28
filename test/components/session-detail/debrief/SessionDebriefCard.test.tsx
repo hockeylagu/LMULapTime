@@ -84,6 +84,19 @@ describe('SessionDebriefCard', () => {
     await waitFor(() => expect(window.location.hash).toContain('compareDriver=Davide+Catani'));
   });
 
+  it('names the car of a reference from another car of the class', async () => {
+    const timed = (lapNumber: number, lapTime: number) => ({ ...me.laps[1], lapNumber, lapTime });
+    const rival = { ...me, name: 'Enzo Syl', carType: 'Porsche 963', laps: [timed(1, 110), timed(2, 95.41), timed(3, 93.974)] };
+    mockDebriefServer([]);
+
+    render(<SessionDebriefCard session={{ ...session, drivers: [me, rival] }} selectedDriver={me} />);
+    fireEvent.click(screen.getByRole('button', { name: /Show where the time goes/ }));
+
+    expect(await screen.findByText(/realistic target/)).toHaveTextContent('Enzo Syl Porsche 963');
+    expect(screen.getByText('vs faster Hyper cars in this session')).toBeInTheDocument();
+    expect(screen.getByText(/part of each gap can be the car/)).toBeInTheDocument();
+  });
+
   it('explains when there is nothing to compare with yet', async () => {
     mockDebriefServer([]);
 

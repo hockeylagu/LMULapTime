@@ -18,11 +18,13 @@ function formatDelta(delta: number | null): string {
   return `${delta > 0 ? '+' : ''}${delta.toFixed(3)}s`;
 }
 
-function LapLabel({ lap }: { lap: ComparableLap }) {
+/** A reference lap: driver, car when it is not the driver's own, time and session. */
+function LapLabel({ lap, ownCar }: { lap: ComparableLap; ownCar: string }) {
   const when = [lap.sessionType, lap.timeString?.split(' ')[0]].filter(Boolean).join(' ');
   return (
     <>
       <span className="text-white">{lap.driverName}</span>{' '}
+      {lap.carType !== ownCar && <span className="text-lmu-text-soft">{lap.carType} </span>}
       <span className="font-mono text-white">{formatTime(lap.lapTime)}</span>
       {when ? ` (${when})` : ''}
     </>
@@ -35,16 +37,16 @@ function Delta({ delta }: { delta: number | null }) {
 }
 
 /** The analysed lap, the realistic target the corners are ranked against, and the fastest lap for technique. */
-function ReferenceLines({ debrief }: { debrief: SessionDebrief }) {
+function ReferenceLines({ debrief, ownCar }: { debrief: SessionDebrief; ownCar: string }) {
   return (
     <div className="space-y-0.5 text-xs text-lmu-muted">
       <p>
         Lap {debrief.lapNumber} <span className="font-mono text-white">{formatTime(debrief.lapTimeSec)}</span>
-        <Delta delta={debrief.lapDeltaSec} /> vs {debrief.technique ? 'realistic target ' : ''}<LapLabel lap={debrief.reference} />
+        <Delta delta={debrief.lapDeltaSec} /> vs {debrief.technique ? 'realistic target ' : ''}<LapLabel lap={debrief.reference} ownCar={ownCar} />
       </p>
       {debrief.technique && (
         <p>
-          Technique from the fastest: <LapLabel lap={debrief.technique} /><Delta delta={debrief.techniqueDeltaSec} />
+          Technique from the fastest: <LapLabel lap={debrief.technique} ownCar={ownCar} /><Delta delta={debrief.techniqueDeltaSec} />
         </p>
       )}
     </div>
@@ -54,7 +56,7 @@ function ReferenceLines({ debrief }: { debrief: SessionDebrief }) {
 /**
  * The first thing to read after a session: the corners of the best lap that cost the most
  * against a realistic same-car target (about 0.5% faster), with how the fastest same-car lap
- * drives them, ranked deterministically (time lost x how often it happens x comparison
+ * drives them (the faster cars of the class in this session when no same-car lap is clearly faster), ranked deterministically (time lost x how often it happens x comparison
  * confidence), each one a click away in telemetry.
  */
 export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session, selectedDriver }) => {
@@ -73,7 +75,11 @@ export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session,
           <Crosshair className="w-3.5 h-3.5 text-lmu-warn" />
           <h4 className="text-xs font-bold text-white uppercase tracking-wider">Where the time goes</h4>
         </div>
-        <span className="text-xs text-lmu-muted">vs other {selectedDriver.carType} laps on this layout</span>
+        <span className="text-xs text-lmu-muted">
+          {state.status === 'ready' && state.debrief.pool === 'class'
+            ? `vs faster ${state.debrief.reference.carClass} cars in this session`
+            : `vs other ${selectedDriver.carType} laps on this layout`}
+        </span>
       </div>
 
       <p role="status" aria-atomic="true" className="sr-only">
@@ -82,7 +88,7 @@ export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session,
       {state.status === 'idle' && (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 py-1">
           <p className="text-xs text-lmu-muted">
-            Ranks the corners of your best lap that cost the most against a realistic {selectedDriver.carType} target, with what the fastest lap does there.
+            Ranks the corners of your best lap that cost the most against a realistic {selectedDriver.carType} target (or the faster cars of your class in this session when none is faster), with what the fastest lap does there.
           </p>
           <button
             type="button"
@@ -110,7 +116,7 @@ export const SessionDebriefCard: React.FC<SessionDebriefCardProps> = ({ session,
 
       {state.status === 'ready' && (
         <>
-          <ReferenceLines debrief={state.debrief} />
+          <ReferenceLines debrief={state.debrief} ownCar={selectedDriver.carType} />
           {state.debrief.corners.length > 0 ? (
             <ol>
               {state.debrief.corners.map((corner, i) => (

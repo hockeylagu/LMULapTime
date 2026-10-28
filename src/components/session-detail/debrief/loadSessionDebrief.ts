@@ -8,7 +8,7 @@ import { fetchJson, isAbortError } from '../../../api/apiClient.js';
 import { fetchSessionTelemetry, fetchSessionTraffic } from '../../../api/replayApi.js';
 import { computeLapSegmentComparisons } from '../../../utils/cornerAnalysis/segmentComparisons.js';
 import { computeCornerConsistencyStats, CornerConsistencyLapInput } from '../../../utils/cornerConsistency.js';
-import { pickAttainableSameCarLap, pickFastestSameCarLap } from '../../../utils/referenceLaps.js';
+import { pickReferenceLaps } from '../../../utils/referenceLaps.js';
 import { describeLapTraffic } from '../../../utils/lapTrafficText.js';
 import { comparisonConfidence, DebriefCorner, DebriefTraffic, rankDebriefCorners } from '../../../utils/sessionDebrief.js';
 import { applyTelemetryPostProcessing, applyTelemetryPostProcessingToTrajectory } from '../../../utils/telemetryPostProcessing.js';
@@ -27,8 +27,10 @@ export interface SessionDebrief {
   lapTimeSec: number | null;
   /** The realistic reference: about 0.5% faster than the analysed lap. Time loss and ranking are against it. */
   reference: ComparableLap;
-  /** The technique reference: the fastest same-car lap, when it is not the reference itself. */
+  /** The technique reference: the fastest lap, when it is not the reference itself. */
   technique: ComparableLap | null;
+  /** `class`: no lap in the driver's car was clearly faster, so both references are other cars of the class in this session. */
+  pool: 'car' | 'class';
   /** Analysed lap time minus the reference lap time (seconds). */
   lapDeltaSec: number | null;
   /** Analysed lap time minus the technique lap time (seconds). */
@@ -73,10 +75,30 @@ function repeatabilityLaps(laps: LapData[], trafficKnown: boolean): LapData[] {
   return selectCleanLapCandidates(candidates);
 }
 
+/** This session's laps in the driver's class, any car, as comparison laps. */
+function sessionClassLaps(session: DetailedSession, carClass: string | null): ComparableLap[] {
+  if (!carClass) return [];
+  return session.drivers.flatMap((driver, driverOrdinal) => resolveDriverCarClass(driver) !== carClass ? [] :
+    driver.laps.map((lap, lapOrdinal): ComparableLap => ({
+      ...lap,
+      id: `${session.id}_${driverOrdinal}_${lap.lapNumber}`,
+      sessionId: session.id,
+      driverOrdinal,
+      lapOrdinal,
+      sessionType: session.sessionType,
+      timeString: session.timeString,
+      driverName: driver.name,
+      carType: driver.carType,
+      carClass,
+      matchingReplayFile: session.matchingReplayFile?.name,
+    })));
+}
+
 /**
  * Compares the driver's best lap of the session with two same-car laps on this layout: a
  * realistic one about 0.5% faster (what to expect to gain, and the ranking) and the fastest
- * there is (how to drive each corner). The laps are loaded exactly as the telemetry view loads
+ * there is (how to drive each corner). When no same-car lap is clearly faster, both come from
+ * the other cars of the class in this session. The laps are loaded exactly as the telemetry view loads
  * them, so a debrief corner opens there with the same numbers; the session's other clean laps
  * are timed through the same corners for repeatability, leaving out passes with traffic.
  */
@@ -102,12 +124,10 @@ export async function loadSessionDebrief(session: DetailedSession, driver: Drive
   if (carClass) query.set('carClass', carClass);
   const { laps = [] } = await fetchJson<{ laps?: ComparableLap[] }>(`/api/compare/laps?${query.toString()}`, { signal });
   const analysed = { sessionId: session.id, driverName: driver.name, lapNumber, carType: driver.carType, lapTime: lap.lapTime };
-  const fastest = pickFastestSameCarLap(laps, analysed);
-  const reference = pickAttainableSameCarLap(laps, analysed) ?? fastest;
+  const { reference, technique, pool } = pickReferenceLaps(laps, sessionClassLaps(session, carClass), analysed);
   if (!reference?.sessionId || reference.driverOrdinal === undefined || reference.lapOrdinal === undefined) {
     throw new DebriefUnavailableError(`No other ${driver.carType} lap with replay data on this layout to compare with yet.`);
   }
-  const technique = fastest && fastest !== reference && (fastest.lapTime as number) < (reference.lapTime as number) ? fastest : null;
 
   const resolutionQuery = trajectoryResolutionQuery(DEFAULT_TELEMETRY_RESOLUTION);
   const loadLap = (ref: ComparableLap) =>
@@ -160,13 +180,18 @@ export async function loadSessionDebrief(session: DetailedSession, driver: Drive
     lapTimeSec: lap.lapTime,
     reference,
     technique,
+    pool,
     lapDeltaSec: deltaTo(lap.lapTime, reference),
     techniqueDeltaSec: deltaTo(lap.lapTime, technique),
     corners: rankDebriefCorners(segments, cornerStats, confidence, undefined, { technique: techniqueSegments, traffic, lapNumber }),
     lapsTimed: timedLaps.length,
     confidence,
     // With the replay's traffic, each corner says whether a car was close; otherwise warn for the lap.
-    caveats: [...describeComparisonCaveats(target, referenceTrajectory), ...(traffic ? [] : describeLapTrafficCaveat(lap.traffic))],
+    caveats: [
+      ...(pool === 'class' ? [`No ${driver.carType} lap on this layout is clearly faster, so the references are faster ${carClass} cars from this session: part of each gap can be the car.`] : []),
+      ...describeComparisonCaveats(target, referenceTrajectory),
+      ...(traffic ? [] : describeLapTrafficCaveat(lap.traffic)),
+    ],
     trafficKnown: traffic !== null,
   };
 }

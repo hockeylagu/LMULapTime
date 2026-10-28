@@ -4,6 +4,7 @@ import {
   DebriefUnavailableError,
   loadSessionDebrief,
 } from '../../../../src/components/session-detail/debrief/loadSessionDebrief.js';
+import type { DriverData } from '../../../../shared/types/index.js';
 import { me, mockDebriefServer, realisticLap, referenceLap, session } from './debriefFixtures.js';
 
 describe('loadSessionDebrief', () => {
@@ -93,6 +94,20 @@ describe('loadSessionDebrief', () => {
     expect(debrief.corners[0]).toMatchObject({ cornerNumber: 1, timeLossSec: 0.24, techniqueLossSec: 0.4 });
     expect(new URLSearchParams(debriefCornerLink(debrief, 1, 'technique').split('?')[1]).get('compareDriver')).toBe('Davide Catani');
     expect(new URLSearchParams(debriefCornerLink(debrief, 1).split('?')[1]).get('compareDriver')).toBe('Near Rival');
+  });
+
+  it('falls back to the faster cars of the class in this session when no same-car lap is faster, naming the car', async () => {
+    const timed = (lapNumber: number, lapTime: number) => ({ ...me.laps[1], lapNumber, lapTime });
+    const rival = { ...me, name: 'Enzo Syl', carType: 'Porsche 963', laps: [timed(1, 110), timed(2, 95.41), timed(3, 93.974)] } as DriverData;
+    const gt3 = { ...rival, name: 'Fast GT3', carType: 'Porsche 911 GT3 R', carClass: 'GT3', laps: [timed(1, 110), timed(2, 90), timed(3, 90)] } as DriverData;
+    mockDebriefServer([]);
+
+    const debrief = await loadSessionDebrief({ ...session, drivers: [me, rival, gt3] }, me);
+
+    expect(debrief.pool).toBe('class');
+    expect(debrief.reference).toMatchObject({ driverName: 'Enzo Syl', carType: 'Porsche 963', sessionId: 'R1', driverOrdinal: 1, lapOrdinal: 1 });
+    expect(debrief.technique).toMatchObject({ driverName: 'Enzo Syl', lapOrdinal: 2 });
+    expect(debrief.caveats[0]).toBe('No Peugeot 9x8 lap on this layout is clearly faster, so the references are faster Hyper cars from this session: part of each gap can be the car.');
   });
 
   it('leaves out the corner passes run in traffic, times laps flagged for traffic, and ranks a corner of this lap in traffic lower', async () => {
