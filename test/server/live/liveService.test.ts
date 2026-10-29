@@ -303,7 +303,7 @@ describe('LiveService', () => {
     } finally { vi.restoreAllMocks(); }
   });
 
-  it('records the raw track grip level beside the rounded wetness for exploration', async () => {
+  it('records the flags and entries on change, every car once a second and the limiter for exploration', async () => {
     const diagnostics = new LiveDiagnostics('unused');
     vi.spyOn(diagnostics, 'begin').mockImplementation(() => {});
     const record = vi.spyOn(diagnostics, 'record').mockImplementation(() => {});
@@ -311,12 +311,23 @@ describe('LiveService', () => {
     const writer = new FakeWorker();
     const capture = new LiveCaptureController({ directory: 'unused', onPersist: () => {}, diagnostics,
       createWorker: () => writer as unknown as CaptureWorker });
-    const { service, frame } = setup({ capture });
+    const { service, frame, worker } = setup({ capture });
+    const kinds = (kind: string) => record.mock.calls.map(([event]) => event).filter(event => event.kind === kind);
+    const field = [{ id: 1, driverName: 'Me', vehicleName: 'Ferrari 296 GT3', vehicleFile: 'ferrari.veh', vehicleClass: 'GT3', place: 1, totalLaps: 2,
+      lapDist: 10, x: 0, z: 0, speed: 50, pathLateral: 0, trackEdge: 5, timeBehindNext: 0, lapsBehindNext: 0, inPits: false,
+      pitState: 0, control: 0, finishStatus: 0 }];
     try {
-      frame(reading({ trackGripLevel: 2, raining: 0.123, minPathWetness: 0.004, avgPathWetness: 0.456, trackTempC: 43.04 }));
-      const surface = record.mock.calls.map(([event]) => event).find(event => event.kind === 'track-surface');
-      expect(surface?.data).toEqual({ trackGripLevel: 2, raining: 0.12, minPathWetness: 0, avgPathWetness: 0.46,
-        maxPathWetness: null, trackTempC: 43 });
+      frame(reading({ field, yellowFlagState: 0, sectorFlags: [0, 1, 0] }));
+      frame(reading({ field, yellowFlagState: 0, sectorFlags: [0, 1, 0], currentEt: 10.2 }));
+      expect(kinds('flags')[0]?.data).toEqual({ gamePhase: 5, yellowFlagState: 0, sectorFlags: [0, 1, 0] });
+      expect(kinds('field-entries')[0]?.data).toEqual({ cars: [[1, 'Me', 'Ferrari 296 GT3', 'ferrari.veh', 'GT3']] });
+      expect(kinds('field')).toHaveLength(1);
+      vi.advanceTimersByTime(1000);
+      frame(reading({ field, currentEt: 11.2 }));
+      expect(kinds('field')).toHaveLength(2);
+      worker.emit('message', { type: 'frame', car: { fuelLiters: 0, fuelCapacityLiters: 0, dentSeverity: [], detached: false,
+        wheels: [], lastImpactEt: 0, compound: '', limiter: { speedLimiter: 1, speedLimiterActive: 1 } } });
+      expect(kinds('player-limiter')[0]?.data).toEqual({ speedLimiter: 1, speedLimiterActive: 1 });
     } finally {
       const stopping = service.stop();
       writer.emit('exit', 0);

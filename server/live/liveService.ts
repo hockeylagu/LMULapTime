@@ -24,6 +24,7 @@ import type { LivePitPollerOptions, PitPollMode } from './livePitPoller.js';
 import { writeSseEvent } from './sse.js';
 import type { SseSink } from './sse.js';
 import type { LiveCaptureController } from './capture/controller.js';
+import { FieldDiagnosticsLog } from './capture/fieldDiagnostics.js';
 import { LiveLearningCapture } from '../../shared/domain/learning/capture.js';
 import type { AutomaticLearningRuntime } from './learning/runtime.js';
 import type { TyreWearProfile } from '../../shared/types/liveStrategy.js';
@@ -81,9 +82,6 @@ function offlineSnapshot(): LiveSnapshot {
   };
 }
 
-/** Two decimals for the diagnostic track-surface line; null when the game gives no value. */
-const round2 = (value: number | undefined): number | null => value === undefined ? null : Math.round(value * 100) / 100;
-
 
 /** What makes two snapshots the same to a page: everything but the sequence, the receipt time and the moving session clock. */
 const contentKey = (snapshot: Omit<LiveSnapshot, 'sequence' | 'receivedAt'>): string =>
@@ -116,6 +114,9 @@ export class LiveService {
   });
   private readonly results = new LiveResultTracker();
   private lastDiagnosticStrategyAt = -Infinity;
+  private readonly fieldLog = new FieldDiagnosticsLog();
+  /** The latest car reading, for the player's gap fields in the diagnostic field line. */
+  private lastCar: LiveCarReading | null = null;
   private readonly learning = new LiveLearningCapture();
   private pitLaneKey: string | null = null;
   private pitLaneSession = 0;
@@ -333,6 +334,7 @@ export class LiveService {
     if (this.isReplaying()) return;
     if (message.tyreSurfaceAvgC !== undefined) this.tyreSurfaceAvgC = message.tyreSurfaceAvgC;
     if (message.car) {
+      this.lastCar = message.car;
       this.strategy.applyCar(message.car);
       this.followCar(message.car);
     }
@@ -347,6 +349,8 @@ export class LiveService {
         fuelCapacityLitres: car.fuelCapacityLiters,
         dents: car.dentSeverity, detached: car.detached, lastImpactEt: car.lastImpactEt, compound: car.compound,
       } }));
+    // Exploration: the limiter as the game reports it, a line only when it changes.
+    if (car?.limiter) this.record(() => this.options.capture?.diagnostics?.record({ kind: 'player-limiter', at: Date.now(), data: car.limiter }));
   }
 
   /**
@@ -533,13 +537,8 @@ export class LiveService {
         lifecycle: next.lifecycle, identity: next.identity, loadingProgress: next.loadingProgress,
         session: next.session ? { ...next.session, elapsedSeconds: undefined } : null,
       } });
-      // Exploration: the MFD track label ("Low Grip") against LMU's raw grip level and the path wetness.
-      // Rounded and without a clock, so the sidecar writes a line only when a value changes (plus checkpoints).
-      if (reading) this.options.capture?.diagnostics?.record({ kind: 'track-surface', at: Date.now(), data: {
-        trackGripLevel: reading.trackGripLevel ?? null, raining: round2(reading.raining),
-        minPathWetness: round2(reading.minPathWetness), avgPathWetness: round2(reading.avgPathWetness),
-        maxPathWetness: round2(reading.maxPathWetness), trackTempC: Math.round(reading.trackTempC * 10) / 10,
-      } });
+      const diagnostics = this.options.capture?.diagnostics;
+      if (reading && diagnostics) this.fieldLog.update(reading, this.lastCar, Date.now(), event => diagnostics.record(event));
       if (Date.now() - this.lastDiagnosticStrategyAt >= 10_000 || next.lifecycle !== previous.lifecycle) {
         this.lastDiagnosticStrategyAt = Date.now();
         // The MFD's fuel ratio choices never change in a session: the pit menu reads log them, not every strategy record.

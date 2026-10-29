@@ -22,10 +22,15 @@ export interface LiveScoringReading {
   maxPathWetness?: number;
   minPathWetness?: number;
   /**
-   * LMU `mTrackGripLevel`, raw. Undocumented: logged in diagnostics to map against the MFD's track label
-   * ("Low Grip", damp, wet...); not interpreted until that mapping is known (HUD labels in order: Green, Low, Medium, High, Saturated, likely 0-4; 2 = "Medium" and 3 = "High" confirmed dry, 2026-10-27).
+   * LMU `mTrackGripLevel`, raw. Undocumented: stored in the recording's `track-surface` observation; not
+   * interpreted yet (HUD labels in order: Green, Low, Medium, High, Saturated, likely 0-4; 2 = "Medium" and 3 = "High" confirmed dry, 2026-10-27; 4 = "Saturated", 2026-10-29).
    */
   trackGripLevel?: number;
+  /** rF2 `mYellowFlagState` and `mSectorFlag[3]`, raw (exploration: logged in diagnostics, not interpreted yet). */
+  yellowFlagState?: number;
+  sectorFlags?: number[];
+  /** Every scoring entry, raw, for the diagnostics field log (voice-call exploration). */
+  field?: LiveFieldCar[];
   /** The scoring entry flagged as the player; null when none is. */
   player: LiveVehicleReading | null;
   /** The overall leader (place 1); null when none is listed. */
@@ -35,6 +40,39 @@ export interface LiveScoringReading {
   playerClassPlace?: number | null;
   /** Every scoring entry has a terminal finish status; null when the full field was not copied. */
   allDriversFinished?: boolean | null;
+}
+
+/**
+ * One scoring entry's raw position, speed and state, for exploration only (docs/plans/proposed/LIVE_VOICE_CALLS.md):
+ * nothing interprets these yet. `pitState` and `control` keep the game's raw codes.
+ * Not read (Portimão online, 2026-10-29): LMU `mFuelFraction` is the fuel tank (0-255) and 0 for every remote car;
+ * `mUnderYellow` was never set; `mFlag` shows only the blue flag, which needs no call.
+ */
+export interface LiveFieldCar {
+  id: number;
+  driverName: string;
+  vehicleName: string;
+  /** LMU `mVehFilename`: the car's vehicle file, raw. The entry name is the livery ("Iron Lynx 2026 #63:ELMS"). */
+  vehicleFile: string;
+  vehicleClass: string;
+  place: number;
+  totalLaps: number;
+  lapDist: number;
+  /** World position (rF2 `mPos` x and z), metres. */
+  x: number;
+  z: number;
+  /** Speed from `mLocalVel`, m/s. */
+  speed: number;
+  /** rF2 `mPathLateral` and `mTrackEdge`, metres from the approximate centre path. */
+  pathLateral: number;
+  trackEdge: number;
+  timeBehindNext: number;
+  lapsBehindNext: number;
+  inPits: boolean;
+  pitState: number;
+  /** rF2 `mControl`: -1 nobody, 0 local player, 1 local AI, 2 remote, 3 replay. */
+  control: number;
+  finishStatus: number;
 }
 
 /**

@@ -48,7 +48,8 @@ describe('rF2 scoring decode', () => {
       playerClassPlace: 1,
       allDriversFinished: false,
       inRealtime: true, gamePhase: 5, trackLength: 13_626, trackTempC: 31.5, raining: 0, avgPathWetness: 0, maxPathWetness: 0,
-      minPathWetness: 0, trackGripLevel: 0,
+      minPathWetness: 0, trackGripLevel: 0, yellowFlagState: 0, sectorFlags: [0, 0, 0],
+      field: [expect.objectContaining({ id: 7, place: 1 }), expect.objectContaining({ id: 12, place: 4 })] as unknown,
       player: expect.objectContaining({ id: 12, place: 4, totalLaps: 8, vehicleName: 'Ferrari 296 GT3', vehicleClass: 'GT3' }) as unknown,
       leader: expect.objectContaining({ id: 7, place: 1, totalLaps: 9 }) as unknown,
       classLeader: expect.objectContaining({ id: 12, place: 4, vehicleClass: 'GT3' }) as unknown,
@@ -177,6 +178,34 @@ describe('rF2 scoring decode', () => {
   });
 });
 
+describe('rF2 field decode', () => {
+  it('reads every car and the session flags raw', () => {
+    const buffer = scoringBuffer(2, [FIELD[0], { ...FIELD[1], doubles: { lapDist: 1234.5, pathLateral: -3.25, trackEdge: 6.5, timeBehindNext: 0.8 } }]);
+    const v = VEHICLE_SCORING.offsets;
+    const second = SCORING.vehicles + SCORING.vehicleStride;
+    buffer.write('Driver Two', second + v.driverName, 'utf8');
+    buffer.writeDoubleLE(100, second + v.pos);
+    buffer.writeDoubleLE(-50, second + v.pos + 16);
+    buffer.writeDoubleLE(3, second + v.localVel);
+    buffer.writeDoubleLE(4, second + v.localVel + 16);
+    buffer.writeUInt8(2, second + v.pitState);
+    buffer.writeInt8(2, second + v.control);
+    buffer.write('LMU_Ferrari_296_GT3.veh', second + v.vehFilename, 'utf8');
+    buffer.writeInt32LE(1, second + v.lapsBehindNext);
+    const at = SCORING_INFO.offsets;
+    buffer.writeInt8(1, SCORING.info + at.yellowFlagState);
+    buffer.writeInt8(1, SCORING.info + at.sectorFlag + 1);
+    const decoded = decodeScoring(buffer);
+    expect(decoded.yellowFlagState).toBe(1);
+    expect(decoded.sectorFlags).toEqual([0, 1, 0]);
+    expect(decoded.field?.[1]).toEqual({
+      id: 12, driverName: 'Driver Two', vehicleName: 'Ferrari 296 GT3', vehicleFile: 'LMU_Ferrari_296_GT3.veh',
+      vehicleClass: 'GT3', place: 4, totalLaps: 8, lapDist: 1234.5, x: 100, z: -50, speed: 5, pathLateral: -3.25, trackEdge: 6.5, timeBehindNext: 0.8, lapsBehindNext: 1,
+      inPits: false, pitState: 2, control: 2, finishStatus: 0,
+    });
+  });
+});
+
 describe('rF2 pedal decode', () => {
   const slots = [
     { id: 7, et: 100, throttle: 0.2, brake: 0 },
@@ -188,7 +217,8 @@ describe('rF2 pedal decode', () => {
     const slot = buffer.subarray(TELEMETRY.vehicles + TELEMETRY.vehicleStride, TELEMETRY.vehicles + 2 * TELEMETRY.vehicleStride);
     expect(decodePedalSlot(slot)).toEqual({
       id: 12, sample: { t: 321.25, throttle: 0.75, brake: 1 }, tyreSurfaceAvgC: null,
-      car: { fuelLiters: 0, fuelCapacityLiters: 0, dentSeverity: [0, 0, 0, 0, 0, 0, 0, 0], detached: false, wheels: Array(4).fill({ flat: false, detached: false }), lastImpactEt: 0, tread: [0, 0, 0, 0], compound: '', virtualEnergy: 0 },
+      car: { fuelLiters: 0, fuelCapacityLiters: 0, dentSeverity: [0, 0, 0, 0, 0, 0, 0, 0], detached: false, wheels: Array(4).fill({ flat: false, detached: false }), lastImpactEt: 0, tread: [0, 0, 0, 0], compound: '', virtualEnergy: 0,
+        limiter: { speedLimiter: 0, speedLimiterActive: 0 }, timeGaps: { carAhead: 0, carBehind: 0, placeAhead: 0, placeBehind: 0 } },
     });
   });
 
@@ -219,7 +249,21 @@ describe('rF2 pedal decode', () => {
       fuelLiters: 32.2, fuelCapacityLiters: 117, dentSeverity: [0, 0, 0, 0, 0, 2, 0, 0], detached: true,
       wheels: [{ flat: false, detached: false }, { flat: false, detached: false }, { flat: true, detached: false }, { flat: false, detached: true }],
       lastImpactEt: 812.5, tread: [0.98, 0.9431234, 1, 0.95], compound: 'Medium', virtualEnergy: 0.625,
+      limiter: { speedLimiter: 0, speedLimiterActive: 0 }, timeGaps: { carAhead: 0, carBehind: 0, placeAhead: 0, placeBehind: 0 },
     });
+  });
+
+  it('reads the raw limiter and LMU gap fields for the diagnostics', () => {
+    const buffer = telemetryBuffer(4, [{ id: 12, et: 1, throttle: 0, brake: 0 }]);
+    const base = TELEMETRY.vehicles;
+    const at = VEHICLE_TELEMETRY.offsets;
+    buffer.writeUInt8(1, base + at.speedLimiter);
+    buffer.writeUInt8(1, base + at.speedLimiterActive);
+    buffer.writeFloatLE(1.5, base + at.timeGapCarAhead);
+    buffer.writeFloatLE(Number.NaN, base + at.timeGapCarBehind);
+    const car = decodePedalSlot(buffer.subarray(base, base + TELEMETRY.vehicleStride)).car;
+    expect(car?.limiter).toEqual({ speedLimiter: 1, speedLimiterActive: 1 });
+    expect(car?.timeGaps).toEqual({ carAhead: 1.5, carBehind: 0, placeAhead: 0, placeBehind: 0 });
   });
 
   it('reads the raw hybrid fields only for a car with a motor map range or a motor state', () => {

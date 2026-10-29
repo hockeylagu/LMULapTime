@@ -1,5 +1,5 @@
 import type { LiveCarReading } from '../../shared/domain/live/liveCarCondition.js';
-import type { LiveScoringReading, LiveVehicleReading } from '../../shared/domain/live/liveLifecycle.js';
+import type { LiveFieldCar, LiveScoringReading, LiveVehicleReading } from '../../shared/domain/live/liveLifecycle.js';
 import type { LivePedalSample } from '../../shared/types/live.js';
 import type { LivePitState } from '../../shared/types/liveStrategy.js';
 import { knownCarClass } from '../../shared/domain/vehicleMapping.js';
@@ -79,6 +79,39 @@ function decodeVehicle(buffer: Buffer, base: number): LiveVehicleReading {
   };
 }
 
+/** Every copied scoring entry, raw (diagnostics exploration; `LiveFieldCar`). */
+function decodeField(buffer: Buffer, count: number): LiveFieldCar[] {
+  const at = VEHICLE_SCORING.offsets;
+  const field: LiveFieldCar[] = [];
+  for (let i = 0; i < count; i++) {
+    const base = SCORING.vehicles + i * SCORING.vehicleStride;
+    const double = (name: string): number => buffer.readDoubleLE(base + at[name]);
+    const vx = double('localVel'), vy = buffer.readDoubleLE(base + at.localVel + 8), vz = buffer.readDoubleLE(base + at.localVel + 16);
+    field.push({
+      id: buffer.readInt32LE(base + at.id),
+      driverName: cString(buffer, base + at.driverName, 32),
+      vehicleName: cString(buffer, base + at.vehicleName, 64),
+      vehicleFile: cString(buffer, base + at.vehFilename, 32),
+      vehicleClass: cString(buffer, base + at.vehicleClass, 32),
+      place: buffer.readUInt8(base + at.place),
+      totalLaps: buffer.readInt16LE(base + at.totalLaps),
+      lapDist: double('lapDist'),
+      x: double('pos'),
+      z: buffer.readDoubleLE(base + at.pos + 16),
+      speed: Math.hypot(vx, vy, vz),
+      pathLateral: double('pathLateral'),
+      trackEdge: double('trackEdge'),
+      timeBehindNext: double('timeBehindNext'),
+      lapsBehindNext: buffer.readInt32LE(base + at.lapsBehindNext),
+      inPits: buffer.readUInt8(base + at.inPits) !== 0,
+      pitState: buffer.readUInt8(base + at.pitState),
+      control: buffer.readInt8(base + at.control),
+      finishStatus: buffer.readInt8(base + at.finishStatus),
+    });
+  }
+  return field;
+}
+
 /**
  * The scoring header and info followed by the vehicles that were copied, at their buffer offsets.
  * The player is the vehicle with `isPlayer` set, the leader the one in place 1.
@@ -146,6 +179,9 @@ export function decodeScoring(buffer: Buffer): LiveScoringReading {
     minPathWetness: Number.isFinite(buffer.readDoubleLE(info + infoAt.minPathWetness))
       ? clamp01(buffer.readDoubleLE(info + infoAt.minPathWetness)) : undefined,
     trackGripLevel: buffer.readUInt8(info + infoAt.trackGripLevel),
+    yellowFlagState: buffer.readInt8(info + infoAt.yellowFlagState),
+    sectorFlags: [0, 1, 2].map(index => buffer.readInt8(info + infoAt.sectorFlag + index)),
+    field: decodeField(buffer, count),
     player,
     leader,
     classLeader,
@@ -185,6 +221,11 @@ function decodeCar(slot: Buffer): LiveCarReading {
     tread: [0, 1, 2, 3].map(index => clamp01(slot.readDoubleLE(at.wheels + index * WHEEL.size + WHEEL.offsets.wear))),
     compound: cString(slot, at.frontTireCompoundName, 18).trim(),
     virtualEnergy: finite(slot.readFloatLE(at.virtualEnergy)),
+    limiter: { speedLimiter: slot.readUInt8(at.speedLimiter), speedLimiterActive: slot.readUInt8(at.speedLimiterActive) },
+    timeGaps: {
+      carAhead: finite(slot.readFloatLE(at.timeGapCarAhead)), carBehind: finite(slot.readFloatLE(at.timeGapCarBehind)),
+      placeAhead: finite(slot.readFloatLE(at.timeGapPlaceAhead)), placeBehind: finite(slot.readFloatLE(at.timeGapPlaceBehind)),
+    },
     // Hybrid when the map range or the motor state says so (state 0 is unavailable; a GT3 is not checked yet).
     ...(motorMapMax > 0 || motorState !== 0 ? { hybrid: {
       batteryChargeFraction: finite(slot.readDoubleLE(at.batteryChargeFraction)), soc: finite(slot.readFloatLE(at.soc)),

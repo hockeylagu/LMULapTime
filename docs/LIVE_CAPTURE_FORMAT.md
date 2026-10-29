@@ -189,7 +189,7 @@ Additional shared-memory evidence is sparse:
 | `upgrade-pack` | Player scoring's exact 16-byte `rawHex`, including zero bytes; initial state and configuration changes. Contents remain opaque. |
 | `terrain-material` | Session-file dictionary definition `{materialId, rawName}`, untimed and recorder scoped. Raw names preserve all 16 source bytes up to NUL using Latin-1, including commas/truncation. |
 | `car-condition` | `{fuelCapacityLitres, dents, detached, lastImpactEt, compound}`: eight body-zone dent severities (0-2), detached parts, last contact time and tyre compound. Recorded at the start and on change only; fuel level is not repeated here (the learning events hold it). |
-| `track-surface` | `{trackGripLevel, raining, minPathWetness, avgPathWetness, maxPathWetness, trackTempC}` from scoring, from 2026-10-27: raw grip level, rain to 0.05, path wetness as reported (steps), track temperature to 1 °C. Stored at the start and on change only. Grip 2 Medium, 3 High; wetness 0.05 Damp, 0.4 Wet, 0.6 Very wet, 1.0 Extremely wet (see the `track-surface` diagnostics record). The game forecast is the REST `forecast` observation, stored on change (polled every 60 s). |
+| `track-surface` | `{trackGripLevel, raining, minPathWetness, avgPathWetness, maxPathWetness, trackTempC}` from scoring, from 2026-10-27: raw grip level, rain to 0.05, path wetness as reported (steps), track temperature to 1 °C. Stored at the start and on change only. Grip 2 Medium, 3 High, 4 Saturated; wetness 0.05 Damp, 0.4 Wet, 0.6 Very wet, 1.0 Extremely wet. The game forecast is the REST `forecast` observation, stored on change (polled every 60 s). |
 | `terrain-change` | Initial state and changes `{corner, materialId}` at the sampled game elapsed time, with FL/FR/RL/RR indexing. An empty source name becomes a NULL material reference. |
 
 The reader worker sends sparse-state changes at capture cadence and small car-rate checkpoints
@@ -267,16 +267,33 @@ is repeated: the player's standings row drops `carPosition`/`carVelocity`/`carAc
 recording), the tyre screen drops its copy of the pit menu (logged from its own read), the reader's game-state
 probe keeps its body only for an error or unreadable reply (the pit poller logs the same reply), `strategy`
 records omit the MFD fuel ratio choices, and `capture-health` is written when the writer's state, error, drops
-or backlog change (plus the 60 s checkpoint), not for the growing sample count. `track-surface` is
-exploration: LMU's raw, undocumented `mTrackGripLevel` beside rain, min/avg/max path wetness (two
-decimals) and track temperature (0.1 °C), written when a value changes, to map the grip level to the
-MFD's track label (`Low Grip`, damp, wet) before anything interprets it. The game's HUD labels, in order,
+or backlog change (plus the 60 s checkpoint), not for the growing sample count. Sidecars of 2026-10-27 to 10-29 may
+hold a `track-surface` record (raw grip level, rain, min/avg/max path wetness to two decimals, track temperature to
+0.1 °C), since removed: the recording's own `track-surface` observation keeps the same steps. The game's HUD grip labels, in order,
 are Green, Low Grip, Medium Grip, High Grip, Saturated Grip (`Support/Languages/english.dic`, `#TG_*`), so likely
-0-4 in that order; 2 = Medium and 3 = High are confirmed on dry tracks (2026-10-27). Path wetness comes in steps
+0-4 in that order; 2 = Medium and 3 = High are confirmed on dry tracks (2026-10-27), 4 = Saturated (dry Portimão race, 2026-10-29). Path wetness comes in steps
 (seen 0, 0.05, 0.4, 0.6, 1.0), shown as Dry, Damp, Wet, Very wet, Extremely wet; Slightly wet is most likely the 0.125 step seen
 on 2026-10-16, unconfirmed. Recordings of 2026-10-27 may hold `hybrid`
 records (the raw hybrid fields on change), since removed once the Spa practice confirmed the decode; the capture
 channels keep the same values.
+Voice-call exploration (from 2026-10-28; `server/live/capture/fieldDiagnostics.ts`, plan
+`docs/plans/proposed/LIVE_VOICE_CALLS.md`), raw values nothing interprets yet:
+`field` once a second, every scoring entry as a positional row named by `columns` (id, place, laps,
+lap distance, world x/z, speed from `mLocalVel`, `mPathLateral`, `mTrackEdge`, `mTimeBehindNext`,
+`mLapsBehindNext`, in pits, raw `mPitState`, `mControl`, finish status; sidecars of 2026-10-28 and 10-29
+also hold `mFlag`, `mUnderYellow` and `mFuelFraction`), plus the session clock and the player's LMU gaps (`mTimeGapCarAhead/Behind`,
+`mTimeGapPlaceAhead/Behind`); about 3-4 KB a second with 40 cars. Around an incident (a flag change, or,
+under green, a car on track below half the field's median speed at its lap distance (25 m bins, last 50
+speeds, judged from 10) or more than 3 m beyond `mTrackEdge`; from 2026-10-29, a fixed 15 m/s before)
+every scoring update (~5 Hz) is written, `burst: true`, until
+20 s after the last cause, to place the cars for the yellow calls. `field-entries` (id, driver, entry name,
+`mVehFilename` from 2026-10-29, class), `flags` (`gamePhase`, `mYellowFlagState`, `mSectorFlag[3]`) and `player-limiter` (`mSpeedLimiter`,
+`mSpeedLimiterActive`) carry no clock, so a line is written only on change (plus checkpoints); place them
+in time by `at` against the clocked records. Open questions they serve: on/off track from lateral versus edge, sector flag codes in LMU, remote cars' data
+quality online. Settled on the Portimão race of 2026-10-29: `mFuelFraction` is the fuel tank, not VE (the player's
+79 → 16 of 255 followed 37 → 7.5 L of 120 L), and 0 for every remote car online, so it is no longer logged. `mUnderYellow` was never set online and
+`mFlag` shows only the blue flag (6), so they are dropped too; the entry name is the livery ("Iron Lynx 2026
+#63:ELMS"), so `mVehFilename` is logged to name the car.
 Recordings of 2026-10-25 may hold three validation records, since removed: `standings-check` (each standings
 reply beside shared memory VE, fuel, pit state and penalties), `lmu-fields` (the other raw LMU fields of
 `InternalsPlugin.hpp`) and `tyre-check` (condition reply tread beside `mWear`). They settled the shared-memory reads
