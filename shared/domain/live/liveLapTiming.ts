@@ -67,6 +67,9 @@ function timeAt(trace: readonly TracePoint[], dist: number): number | null {
  * - `deltaSeconds` = session elapsed time minus the lap-start anchor, minus the reference time at the same lap distance (linear interpolation).
  *   It is null without a reference, in the pit lane and on a lap that started in the pits (an out lap is not
  *   comparable). A lap that lost its time still shows a delta: the driver keeps driving it.
+ * - `lapEstimate` = the reference lap time plus the delta. Before any valid lap with a whole trace, its reference is
+ *   the fastest whole lap that lost its game time (track limits), timed from the lap-start clocks; `deltaSeconds` and
+ *   the session best still come from valid laps only.
  * - `sectorDeltas` = the completed split sectors of the current lap minus those of the session-best lap.
  * - A new session (session code or track change, clock regression, fewer laps, no player) clears everything.
  */
@@ -79,6 +82,8 @@ export class LiveLapTiming {
   private records: LiveLapRecord[] = [];
   private best: LiveSessionBest | null = null;
   private reference: TracePoint[] | null = null;
+  /** The fastest whole lap timed from the lap-start clocks, valid or not: the estimate's reference until a valid one exists. */
+  private estimateReference: { seconds: number; trace: TracePoint[] } | null = null;
 
   public get recentLaps(): LiveLapRecord[] { return this.records.slice(-LIVE_RECENT_LAP_COUNT); }
   public get sessionBest(): LiveSessionBest | null { return this.best; }
@@ -91,6 +96,7 @@ export class LiveLapTiming {
     this.records = [];
     this.best = null;
     this.reference = null;
+    this.estimateReference = null;
   }
 
   public update(reading: LiveScoringReading | null): void {
@@ -114,7 +120,7 @@ export class LiveLapTiming {
     const player = this.latest;
     const lap = this.current;
     if (!player || !lap) return null;
-    const delta = this.delta(player, lap);
+    const delta = this.delta(player, lap, this.reference);
     const sector = player.sector === 0 ? 3 : player.sector === 2 ? 2 : 1;
     // Gate by progress: the game's current-sector fields can still hold the previous lap's splits at the line.
     const done = lap.startedInPits ? [null, null, null] as Sectors : splitSectors(
@@ -126,12 +132,15 @@ export class LiveLapTiming {
     const splitDelta = !player.inPits && !lap.startedInPits && this.best?.lapSeconds != null
       && completed.length > 0 && completed.every(value => value !== null)
       ? ms(completed.reduce<number>((sum, value) => sum + (value ?? 0), 0)) : null;
-    const estimateDelta = delta ?? splitDelta;
-    const referenceSeconds = this.best?.lapSeconds;
+    // Without a valid reference, the fastest whole lap that lost its time still says where the lap stands.
+    const fallbackDelta = delta === null && splitDelta === null && this.estimateReference
+      ? this.delta(player, lap, this.estimateReference.trace) : null;
+    const estimateDelta = delta ?? splitDelta ?? fallbackDelta;
+    const referenceSeconds = fallbackDelta !== null ? this.estimateReference?.seconds : this.best?.lapSeconds;
     const lapEstimate: LiveTiming['lapEstimate'] = referenceSeconds != null && estimateDelta !== null
       && Number.isFinite(estimateDelta) && referenceSeconds + estimateDelta > 0
       ? { seconds: ms(referenceSeconds + estimateDelta), referenceSeconds, deltaSeconds: estimateDelta,
-        source: delta !== null ? 'distance' : 'sector' } : null;
+        source: splitDelta !== null && delta === null ? 'sector' : 'distance' } : null;
     return {
       lapNumber: player.totalLaps + 1,
       isOutLap: lap.startedInPits,
@@ -144,9 +153,9 @@ export class LiveLapTiming {
     };
   }
 
-  private delta(player: LiveVehicleReading, lap: CurrentLap): number | null {
-    if (!this.reference || lap.startedInPits || player.inPits || this.elapsedSeconds === null || player.lapDist < 0) return null;
-    const reference = timeAt(this.reference, player.lapDist);
+  private delta(player: LiveVehicleReading, lap: CurrentLap, trace: readonly TracePoint[] | null): number | null {
+    if (!trace || lap.startedInPits || player.inPits || this.elapsedSeconds === null || player.lapDist < 0) return null;
+    const reference = timeAt(trace, player.lapDist);
     return reference === null ? null : ms(this.elapsedSeconds - reference);
   }
 
@@ -237,6 +246,11 @@ export class LiveLapTiming {
     this.records.push(record);
     if (this.records.length > LIVE_RECENT_LAP_COUNT) this.records.shift();
     if (record.valid && seconds !== null) this.acceptValidLap(record, seconds, lap, trackLength);
+    if (seconds !== null && !lap.startedInPits && !lap.lastInPits
+      && (this.estimateReference === null || seconds < this.estimateReference.seconds)) {
+      const trace = this.finishedTrace(lap, seconds, trackLength);
+      if (trace) this.estimateReference = { seconds, trace };
+    }
     this.current = this.newLap(player, false, lap.startSeconds);
   }
 

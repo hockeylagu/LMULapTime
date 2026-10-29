@@ -261,6 +261,26 @@ describe('LiveLapTiming', () => {
     expect(timing.timing()?.deltaSeconds).toBeCloseTo(1, 5);
   });
 
+  it('estimates the lap from a whole lap that lost its time until a valid lap exists (Portimão qualifying 2026-10-29)', () => {
+    // Out lap, then a flying lap the game left untimed (track limits): the next lap still gets an estimate.
+    const timing = new LiveLapTiming();
+    driveLap(timing, { seconds: 120, completed: 0, inPits: true });
+    driveLap(timing, { seconds: 108.8, completed: 1, loseFlagAt: 30 });
+    expect(timing.sessionBest).toBeNull();
+    timing.update(reading({ totalLaps: 2, lapDist: 5_000, timeIntoLap: 55.4 }));
+    expect(timing.timing()?.deltaSeconds).toBeNull();
+    expect(timing.timing()?.lapEstimate).toMatchObject({ seconds: 109.8, referenceSeconds: 108.8, deltaSeconds: 1, source: 'distance' });
+    // A valid lap takes over, even a slower one.
+    clock = 1000;
+    anchors.clear();
+    const later = new LiveLapTiming();
+    driveLap(later, { seconds: 120, completed: 0, inPits: true });
+    driveLap(later, { seconds: 108.8, completed: 1, loseFlagAt: 30 });
+    driveLap(later, { seconds: 110, completed: 2 });
+    later.update(reading({ totalLaps: 3, lapDist: 5_000, timeIntoLap: 55 }));
+    expect(later.timing()?.lapEstimate).toMatchObject({ seconds: 110, referenceSeconds: 110, deltaSeconds: 0 });
+  });
+
   it('sector deltas compare the completed split sectors with the session-best lap', () => {
     const timing = new LiveLapTiming();
     driveLap(timing, { seconds: 100, completed: 0, s2Cumulative: 62 });
