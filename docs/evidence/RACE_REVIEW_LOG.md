@@ -3,6 +3,52 @@
 Written by the `race-review` skill (`.claude/skills/race-review/SKILL.md`). Newest first. Error = predicted − actual,
 in % of the lap's actual use; negative = underprediction (car runs short).
 
+## 2026-10-29 — GT3 sprint, Silverstone International (Aston Martin Vantage AMR LMGT3)
+
+**Sessions**: practice `80P1`, qualifying `60Q1`, race `74R1` (30 min, 29 laps, Medium, dry, multi-make GT3 field of 30).
+
+**Scorecard**:
+
+| # | Box | Result |
+|---|---|---|
+| 1 | Fuel/VE per lap | OK: median +0.2 % fuel, +0.3 % VE; lap 11 −2.7 % and lap 16 −2.4 % VE alone; laps 23–27 over by 3–5 % (following Gensch, then Duggan) |
+| 2 | Laps | OK: garage 29 racing laps, 29 run (the race plan card said 28, below) |
+| 3 | Start load | Miss, noise: VE 3.0 % (1.51 laps) at the flag against reserve 0.7 + 0.5; race 1.997 %/lap against 2.04 from qualifying (+0.6 lap), 60.6 rounded to 61 (+0.2 lap) |
+| 4 | Formation lap | OK: fuel 55.51 → 55.10 L (0.23 lap), VE 61 % unchanged |
+| 5 | Stops | n/a: no stop planned or made |
+| 6 | Tyre wear | Miss, incident: plan 0.843, actual 0.805 (RL); 0.859 projected before the last lap, whose contact cost RL 5.8, RR 4.0, FL 1.7 points; clean laps 0.3–0.5 a lap |
+| 7 | Incidents | OK: lap 6 contact with Heberle (impact 599, no dents, ~+1.5 s, P8 → P9); lap 29 contact with Duggan (1349, 0.10 s behind) then Bonanno: +19 s, P6 → P10, 1.5 s RL wheelspin (436 %), one minor dent; neither fed a plan |
+| 8 | Weather | n/a: dry |
+| 9 | Data | OK: telemetry and replay linked; forecasts 0.1–0.6 s after the line (10 s on laps 1–2, no measured use); 8 laps lost their game time (track limits), no measurement |
+| 10 | Learning | OK: v5 Silverstone cohort `insufficient-training-*` after the version bump |
+| 11 | Result | OK: grid 8 → P10 (−2): P9 at the start, P8 lap 3, P9 at the lap 6 contact, P6 by lap 13 (Lima Junior, Antunes, Savko out); last lap lost to Bonanno, Nyland, Buntsma, Winkler |
+| 12 | Traffic | OK: laps 2–5, 9, 24–27 flagged (cars 0.2–0.9 s), ~7.0 s against the clean median 1:03.160 |
+| 13 | Driving | Best 1:02.754 (lap 16) against qualifying 1:02.662 (new PB, −0.43 s), theoretical 1:02.664; clean median 9th of 29, +0.32 s on Heberle's; class-best sector gaps S1 +0.30, S2 +0.13, S3 +0.11 s; 99.6 % consistency; 12 track limit events (7 warnings, 2.75 points) |
+| 14 | App output | Miss, app: the debrief's plan vs actual read VE at the start 59 % against 61 % and ~28 laps against 29 (below) |
+
+**Mechanism / app finding**: the garage plan projects the flag from the leader's estimated lap (`planGarage`,
+`raceLeaderLapSeconds`) and asked for 61 % for 29 racing laps; the race plan (`planRaceStrategies`) took the player's
+64.495 s as the leader's pace, so the flag fell at 28 laps and the "NO STOP" card and debrief said 59 %. Loaded at 59 %,
+the car would have finished with 0.55 lap, under the 0.7 reserve. 10-28 and Portimão agreed by chance (both paces on
+the same side of a lap). Applied (uncommitted): the race plan takes the leader's pace (`raceStrategy.ts`,
+`liveStrategyTracker.ts`), `LIVE_MODEL_VERSION` 14; regression test from this race in
+`test/domain/strategy/raceStrategy.test.ts` (28 laps / 59 % at our pace, 29 / 61 % at the leader's 1:02.6). The leader's
+pace is not in the audit snapshots, so earlier races cannot be replayed.
+
+**Watch list** (recheck at every review):
+- Start load: Silverstone left 1.14 (10-28) and 1.51 laps (10-29); race VE ~2 % under the qualifying measure. Third race decides.
+- Laps left mid-race: laps 8–18 read 30 total (29 run), VE at the flag shown 0.4–1.1 % against 3.0 % actual; cause not
+  visible in the snapshots, recheck next race.
+- Tyre wear, qualifying vs race: second Silverstone race agrees (race RL 0.0044 against the learned 0.0052, −15 %);
+  Portimão did not. Open.
+- Meter: a third tow-lap run (Le Mans 10-22, Silverstone 10-28) decides "lowest 2 of 5"; none here (laps 23–27 over-forecast).
+- Race plan from the leader's pace (applied 10-29): the next race's plan card and garage should agree on laps and load.
+- Wet: confirm Slightly wet = 0.125 and the crossover advice in the next wet race; grip 0 and 1 unconfirmed.
+- Driving: Silverstone S1 (+0.30 s, was +0.61); track limits (8 laps without a time); Portimão S2 (+0.81 s).
+- Damage pace waits 3 laps after the impact (10-28): only dent came on the last lap; check the next one.
+- Closed: grid tyre plan from the car (held, 0.988); lap estimate from a lap that lost its time (qualifying estimate
+  from lap 3); lap 1 tyre cost (one clean lap here, Portimão one).
+
 ## 2026-10-29 — GT3 sprint, Portimão (Aston Martin Vantage AMR LMGT3)
 
 **Sessions**: qualifying `02Q1`, race `18R1` (20 min, 12 laps, Medium, dry, grip 4 = Saturated, VE-limited).
