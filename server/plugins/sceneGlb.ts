@@ -20,7 +20,7 @@ function noExternalResources(value: unknown, depth = 0): void {
   }
 }
 
-export function validateSceneGlb(bytes: Buffer): { triangles: number; min: number[]; max: number[] } {
+export function validateSceneGlb(bytes: Buffer, wheelPivots = false): { triangles: number; min: number[]; max: number[] } {
   if (bytes.length < 28 || bytes.length > 64_000_000 || bytes.readUInt32LE(0) !== 0x46546c67 || bytes.readUInt32LE(4) !== 2 || bytes.readUInt32LE(8) !== bytes.length) throw Error('Invalid GLB header');
   const jsonLength = bytes.readUInt32LE(12), binHeader = 20 + jsonLength;
   if (jsonLength > 1_000_000 || jsonLength % 4 || binHeader + 8 > bytes.length || bytes.readUInt32LE(16) !== 0x4e4f534a || bytes.readUInt32LE(binHeader + 4) !== 0x004e4942) throw Error('Invalid GLB chunks');
@@ -72,7 +72,14 @@ export function validateSceneGlb(bytes: Buffer): { triangles: number; min: numbe
   const nodes = list(json.nodes, 32);
   for (const value of nodes) {
     const node = record(value);
-    if (Object.keys(node).some(key => !['mesh', 'name'].includes(key))) throw Error('Unsupported GLB transform');
+    if (Object.keys(node).some(key => !['mesh', 'name', ...(wheelPivots ? ['extras'] : [])].includes(key))) throw Error('Unsupported GLB transform');
+    if (node.extras !== undefined) {
+      const extras = record(node.extras), pivot = extras.wheelPivot;
+      const corner = typeof node.name === 'string' ? /^(?:tyres|rims)-(FL|FR|RL|RR)$/.exec(node.name)?.[1] : undefined;
+      if (!corner || Object.keys(extras).length !== 1 || !Array.isArray(pivot) || pivot.length !== 3
+        || !pivot.every((n: unknown) => typeof n === 'number' && Number.isFinite(n) && Math.abs(n) < 4)
+        || ((pivot[0] as number) > 0) !== corner.endsWith('L') || ((pivot[2] as number) < 0) !== corner.startsWith('F')) throw Error('Invalid GLB wheel pivot');
+    }
     integer(node.mesh, meshes.length - 1);
   }
   if (nodes.length !== meshes.length || new Set(nodes.map(value => record(value).mesh)).size !== meshes.length) throw Error('Repeated GLB mesh instance');

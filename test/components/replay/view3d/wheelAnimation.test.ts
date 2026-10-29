@@ -4,6 +4,7 @@ import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
 import { makeCar } from '../../../../src/components/replay/view3d/sceneObjects.js';
 import { createWheelAnimation } from '../../../../src/components/replay/view3d/wheelAnimation.js';
 import { sampleRenderPose } from '../../../../src/components/replay/view3d/replayPose.js';
+import { attachWheelRigs } from '../../../../src/components/replay/view3d/wheelGeometry.js';
 
 function model(): Group {
   const source = new Group();
@@ -95,3 +96,50 @@ it('gives the estimated body four grounded wheels and steers only the fronts fro
   expect(car.getObjectByName('wheel-FL')!.getWorldPosition(new Vector3()).z).toBeCloseTo(-1.4);
   expect(animation.description).toContain('Recorded steering');
 });
+
+function pivotModel(): Group {
+  const source = new Group();
+  for (const [corner, x, z] of [['FL', 0.8, -1.4], ['FR', -0.8, -1.4], ['RL', 0.8, 1.4], ['RR', -0.8, 1.4]] as const) {
+    for (const name of ['tyres', 'rims']) {
+      const geometry = new BoxGeometry(0.2, name === 'tyres' ? 0.66 : 0.4, name === 'tyres' ? 0.66 : 0.4);
+      // The source hub is deliberately offset from the bounding-box center.
+      geometry.translate(x, 0.3, z + 0.01);
+      const mesh = new Mesh(geometry, new MeshStandardMaterial()); mesh.name = `${name}-${corner}`;
+      mesh.userData.wheelPivot = [x, 0.3, z]; source.add(mesh);
+    }
+  }
+  return source;
+}
+
+it('uses exported rolling hubs instead of box centers and preserves every vertex at rest', () => {
+  const source = pivotModel(), original = source.children[0] as Mesh;
+  const before = new Vector3().fromBufferAttribute(original.geometry.getAttribute('position'), 0);
+  const rigs = attachWheelRigs(source);
+  expect(rigs).toHaveLength(4);
+  expect(rigs[0].hub.z).toBe(-1.4);
+  source.updateMatrixWorld(true);
+  const tyre = rigs[0].pivot.children[0] as Mesh;
+  const after = new Vector3().fromBufferAttribute(tyre.geometry.getAttribute('position'), 0).applyMatrix4(tyre.matrixWorld);
+  expect(after.distanceTo(before)).toBeLessThan(1e-6);
+  const radius = before.distanceTo(rigs[0].hub);
+  rigs[0].pivot.rotation.set(1.7, 0.4, 0, 'YXZ'); source.updateMatrixWorld(true);
+  const spun = new Vector3().fromBufferAttribute(tyre.geometry.getAttribute('position'), 0).applyMatrix4(tyre.matrixWorld);
+  expect(spun.distanceTo(rigs[0].hub)).toBeCloseTo(radius);
+  expect(rigs[0].pivot.position.distanceTo(rigs[0].hub)).toBe(0);
+});
+
+it.each(['nonfinite', 'wrong-corner', 'mismatch', 'missing-rim', 'detached'])(
+  'leaves malformed exported pivots unchanged: %s', failure => {
+    const source = pivotModel();
+    if (failure === 'nonfinite') source.children[0].userData.wheelPivot = [NaN, 0.3, -1.4];
+    if (failure === 'wrong-corner') source.children[0].userData.wheelPivot = [-0.8, 0.3, -1.4];
+    if (failure === 'mismatch') source.children[1].userData.wheelPivot = [0.8, 0.3, -1.3];
+    if (failure === 'missing-rim') source.remove(source.children[1]);
+    if (failure === 'detached') {
+      source.children[0].userData.wheelPivot = [0.8, 0.8, -1.4];
+      source.children[1].userData.wheelPivot = [0.8, 0.8, -1.4];
+    }
+    const children = [...source.children];
+    expect(attachWheelRigs(source)).toEqual([]); expect(source.children).toEqual(children);
+  },
+);

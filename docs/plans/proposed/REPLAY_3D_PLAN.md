@@ -45,6 +45,14 @@ a rough generated estimate by choice: the track is what matters, so game terrain
 
 Remaining requirements:
 
+The accepted personal-v19 package carries the full installed car catalog: 676 aliases from 38
+original records resolve to 80 content-bound visual variants, including exterior glass and panel
+differences, all rendered front and rear in review. Per-corner geometry and source rolling pivots
+support four-wheel animation rigs for all 80 variants. Visual contact and suspension acceptance
+across the catalog remain pending.
+
+- Ligier alternative-body meshes remain unselected; decode and inspect their visual impact.
+
 - Validate corrected corner handedness, camera switching, scrubbing, lap loops, ghost placement,
   fullscreen focus/Escape, context-loss recovery and repeated enter/leave cleanup on real laps.
 - Measure frame pacing, load time and GPU/memory lifetime on the intended PC; the production

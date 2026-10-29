@@ -14,13 +14,13 @@ function resource(root: string, relative: string): string {
   return file;
 }
 
-export function registerMeshAsset<T extends MeshAsset>(root: string, metadata: T): RegisteredMesh<T> {
+export function registerMeshAsset<T extends MeshAsset>(root: string, metadata: T, wheelPivots = false): RegisteredMesh<T> {
   if (typeof metadata.asset !== 'string' || !metadata.asset.endsWith('.glb') || !/^[a-f0-9]{64}$/.test(metadata.sha256)) throw Error('Invalid mesh asset');
   const file = resource(root, metadata.asset), stat = fs.statSync(file);
   if (!stat.isFile() || stat.size !== metadata.byteLength || stat.size > 64_000_000) throw Error('Mesh budget exceeded');
   const bytes = fs.readFileSync(file);
   if (createHash('sha256').update(bytes).digest('hex') !== metadata.sha256) throw Error('Mesh hash mismatch');
-  const checked = validateSceneGlb(bytes);
+  const checked = validateSceneGlb(bytes, wheelPivots);
   if (checked.triangles !== metadata.triangles || !metadata.bounds || !Array.isArray(metadata.bounds.min) || !Array.isArray(metadata.bounds.max) || metadata.bounds.min.length !== 3 || metadata.bounds.max.length !== 3 || checked.min.some((n, i) => n !== metadata.bounds.min[i]) || checked.max.some((n, i) => n !== metadata.bounds.max[i])) throw Error('Mesh bounds mismatch');
   return {metadata: structuredClone(metadata), file};
 }

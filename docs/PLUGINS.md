@@ -208,6 +208,19 @@ render model is 1–3.5 m wide, 0.3–4 m high and 3–7 m long, with local boun
 The same static GLB, byte/hash/path validation applies, with a separate 256 MB catalog budget.
 This capability needs vehicle identities; scene or class names cannot supply the binding.
 
+Vehicle GLBs additionally support per-corner `tyres-FL/FR/RL/RR` and `rims-FL/FR/RL/RR`
+root meshes. Each carries only `extras: { "wheelPivot": [x, y, z] }`, a finite rolling hub
+in the same body-local metres, with each coordinate strictly within ±4 m and the correct
+left/right and front/rear signs. Track GLBs continue to reject node extras. The viewer requires
+all eight wheel parts, matching tyre/rim pivots and plausible tyre bounds around each hub
+before enabling animation; malformed sets stay static. Legacy combined `tyres`/`rims` nodes
+retain bounds-derived hubs. Source hubs define rolling axes; rest-height and replay-origin
+calibration remain separate from this metadata.
+
+The `glass` material role denotes exterior cabin windows, including exact source-selected
+window variants. It uses simplified dark opaque shading. Source glass transparency, tint,
+reflection/transmission shaders and alpha-masked light-cover overlays are not reproduced.
+
 `GET /api/data-plugin/vehicle-meshes/:recordId` returns public metadata without local asset paths;
 `GET /api/data-plugin/vehicle-meshes/:recordId/:revision/asset` serves only the registered GLB.
 Missing models return 404 and retain a labelled estimated body; changed assets return 409.

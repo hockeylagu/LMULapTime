@@ -9,6 +9,7 @@ import { DataPlugin } from '../../../server/plugins/dataPlugin.js';
 import { createDataPluginRouter } from '../../../server/routes/dataPluginRoutes.js';
 import { syntheticGlb } from '../../helpers/scenes/syntheticGlb.js';
 import type { VehicleMesh } from '../../../shared/types/scenes/vehicleMesh.js';
+import { validateSceneGlb } from '../../../server/plugins/sceneGlb.js';
 
 const directories: string[] = [];
 afterEach(() => { for (const dir of directories.splice(0)) fs.rmSync(dir, {recursive: true, force: true}); });
@@ -24,6 +25,24 @@ function fixture() {
   write('vehicle-meshes/index.json', [mesh]); fs.writeFileSync(path.join(root, mesh.asset), bytes);
   return {root, write, mesh, bytes};
 }
+
+it('accepts only bounded corner-specific pivot extras on vehicle assets and preserves strict track validation', () => {
+  const bytes = syntheticGlb(json => { json.nodes = [{mesh: 0, name: 'tyres-FL', extras: {wheelPivot: [0.8, 0.3, -1.4]}}]; });
+  expect(() => validateSceneGlb(bytes, true)).not.toThrow();
+  expect(() => validateSceneGlb(bytes)).toThrow('transform');
+});
+
+it.each([
+  {name: 'body', extras: {wheelPivot: [0.8, 0.3, -1.4]}},
+  {name: 'tyres-FL', extras: {wheelPivot: [-0.8, 0.3, -1.4]}},
+  {name: 'tyres-FL', extras: {wheelPivot: [0.8, 0.3, 1.4]}},
+  {name: 'tyres-FL', extras: {wheelPivot: [0.8, null, -1.4]}},
+  {name: 'tyres-FL', extras: {wheelPivot: [0.8, 0.3]}},
+  {name: 'tyres-FL', extras: {wheelPivot: [0.8, 0.3, -40]}},
+  {name: 'tyres-FL', extras: {wheelPivot: [0.8, 0.3, -1.4], uri: 'external'}},
+])('rejects malformed wheel pivot metadata %j', node => {
+  expect(() => validateSceneGlb(syntheticGlb(json => { json.nodes = [{mesh: 0, ...node}]; }), true)).toThrow();
+});
 
 it('binds a visible car mesh and tyres to its own exact vehicle record', () => {
   const f = fixture(), plugin = new DataPlugin(f.root);

@@ -12,7 +12,7 @@ export function loadVehicleMeshPackage(root: string, catalog: unknown, vehicles:
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('Invalid vehicle mesh');
     const mesh = value as VehicleMesh;
     if (Object.keys(mesh).some(key => !fields.has(key)) || mesh.schemaVersion !== 1 || !ids.has(mesh.vehicleRecordId) || result.has(mesh.vehicleRecordId) || mesh.coordinates !== 'vehicle-local-xyz-metres-forward-minus-z' || mesh.representation !== 'render' || mesh.originCalibration !== 'unverified' || mesh.revision !== `mesh-${mesh.sha256}` || !Array.isArray(mesh.parts) || !mesh.parts.includes('body') || mesh.parts.some(part => !parts.has(part)) || new Set(mesh.parts).size !== mesh.parts.length) throw Error('Invalid vehicle mesh binding');
-    const registered = registerMeshAsset(root, mesh);
+    const registered = registerMeshAsset(root, mesh, true);
     const size = mesh.bounds.max.map((n, i) => n - mesh.bounds.min[i]);
     if (size[0] < 1 || size[0] > 3.5 || size[1] < 0.3 || size[1] > 4 || size[2] < 3 || size[2] > 7 || [...mesh.bounds.min, ...mesh.bounds.max].some(n => Math.abs(n) > 10)) throw Error('Invalid vehicle mesh dimensions');
     bytes += mesh.byteLength;
