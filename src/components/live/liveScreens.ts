@@ -139,7 +139,7 @@ function garageChecks(snapshot: LiveSnapshot, plan: LiveGaragePlan): GarageCheck
 }
 
 /** The session laps, length and (races) stop plan the garage load is worked out for. */
-function garagePreparation(kind: LiveSessionKind | undefined, plan: LiveGaragePlan): NonNullable<LiveScreen['preparation']> {
+export function garagePreparation(kind: LiveSessionKind | undefined, plan: LiveGaragePlan): NonNullable<LiveScreen['preparation']> {
   // Before the green flag LMU's clock is the countdown to the start: the race length (and its laps) come with it.
   return { laps: kind === 'race' && plan.laps !== null ? Math.max(0, plan.laps - 1) : plan.laps,
     length: plan.sessionMinutes !== null ? `${plan.sessionMinutes} MIN` : kind === 'race' ? 'LAPS AT THE START' : 'SESSION LENGTH UNKNOWN',

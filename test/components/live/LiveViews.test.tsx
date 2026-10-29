@@ -64,6 +64,23 @@ describe('live driving views', () => {
       expect(screen.getByText('Circuit de la Sarthe')).toBeInTheDocument();
     });
 
+    it('shows the planned race laps on the grid, before the race clock runs', () => {
+      render(<LivePage />);
+      const strategy = liveStrategy();
+      send(liveSnapshot({ lifecycle: 'starting', session: liveSession({ kind: 'race', gamePhase: 2 }), strategy: { ...strategy,
+        garage: { kind: 've', unit: '%', sessionMinutes: 20, laps: 10, lapSeconds: 120, perLap: 2.5, perLapSource: 'measured', lapsMeasured: 3,
+          reserveLaps: 0.5, needed: 27, stops: 0, setInGarage: 30, tyres: null } } }));
+      // The plan's laps include the formation lap.
+      expect(screen.getByTestId('live-laps-left')).toHaveTextContent('LAPS LEFT ~9');
+    });
+
+    it('lets a long track name give way so the status is never cut off', () => {
+      render(<LivePage />);
+      send(liveSnapshot({ session: liveSession({ kind: 'race', trackName: 'Silverstone International Circuit' }) }));
+      expect(screen.getByText('Silverstone International Circuit')).toHaveClass('truncate', 'min-w-0');
+      expect(screen.getByTestId('live-status').parentElement).toHaveClass('shrink-0');
+    });
+
     it.each([['rising', '↑'], ['steady', '→']] as const)('marks a %s track temperature', (trend, arrow) => {
       render(<LivePage />);
       send(liveSnapshot({ weather: { trackTempC: 41, trackTempTrend: trend, raining: 0, avgPathWetness: 0, wetnessTrend: 'steady' } }));

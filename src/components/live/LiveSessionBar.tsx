@@ -2,7 +2,7 @@ import type { LiveConnection } from '../../api/liveStream.js';
 import type { LiveSnapshot, LiveWeather } from '../../../shared/types/live.js';
 import { CarClassBadge } from '../common/CarClassBadge.js';
 import { formatLapTime, UNKNOWN } from './liveFormat.js';
-import { liveCarClass, liveTrackName, sessionKindLabel, syncOnReturnToDashboard } from './liveScreens.js';
+import { garagePreparation, liveCarClass, liveTrackName, sessionKindLabel, syncOnReturnToDashboard } from './liveScreens.js';
 import { forecastText } from './race/raceAction.js';
 import type { ReactNode } from 'react';
 
@@ -42,7 +42,10 @@ export function LiveSessionBar({ snapshot, connection, peripherals }: LiveSessio
   const identity = snapshot?.identity ?? null;
   const carClass = showSession ? (identity?.carClass ?? liveCarClass(session.vehicleName, session.vehicleClass)) : null;
   const layout = snapshot ? liveTrackName(snapshot) : '';
-  const lapsLeft = showSession ? snapshot.lapsLeft : null;
+  // Before the green flag the race clock is not running yet: the garage plan's race laps stand in.
+  const garage = snapshot?.strategy?.garage ?? null;
+  const plannedLaps = snapshot?.lifecycle === 'starting' && garage ? garagePreparation(session?.kind, garage).laps : null;
+  const lapsLeft = showSession ? snapshot.lapsLeft ?? (plannedLaps !== null ? { laps: plannedLaps, estimated: true } : null) : null;
   const personalBest = showSession ? (identity?.personalBestSeconds ?? null) : null;
   const weather = showSession ? snapshot.weather : null;
   const wet = wetWeather(weather);
@@ -50,7 +53,7 @@ export function LiveSessionBar({ snapshot, connection, peripherals }: LiveSessio
   const status = liveStatus(snapshot, connection, showSession);
   return (
     <header className="flex h-[88px] shrink-0 items-center justify-between whitespace-nowrap border-b border-lmu-border pb-5 text-[48px] font-semibold">
-      <div className="flex items-center gap-7">
+      <div className="flex min-w-0 items-center gap-7">
         {/* A plain hash link: the dashboard page renders without a router of its own (HashRouter follows the hash). */}
         {/* The bar stands on the baseline at the capitals' height (0.71em), so it lines up with the letters. */}
         <a href="#/dashboard" title="Back to the dashboard" onClick={syncOnReturnToDashboard} className="flex items-baseline gap-5 font-black tracking-tight text-lmu-text hover:text-lmu-text-soft">
@@ -60,7 +63,8 @@ export function LiveSessionBar({ snapshot, connection, peripherals }: LiveSessio
         {showSession && (
           <>
             <span>{snapshot.lifecycle === 'garage' ? 'GARAGE' : sessionKindLabel(session.kind)}</span>
-            {layout && <span className="font-normal text-lmu-muted">{layout}</span>}
+            {/* A long track name gives way, so the status on the right is never cut off. */}
+            {layout && <span className="min-w-0 truncate font-normal text-lmu-muted">{layout}</span>}
             {carClass && (
               // The badge is sized for a dense page; zoom brings it to cockpit scale without a second copy of it.
               <span className="flex shrink-0 items-center" style={{ zoom: 2.75 }}>
@@ -76,7 +80,7 @@ export function LiveSessionBar({ snapshot, connection, peripherals }: LiveSessio
           </>
         )}
       </div>
-      <div className="flex items-center gap-9">
+      <div className="flex shrink-0 items-center gap-9">
         {!inSession && peripherals}
         {/* Every slot is held for the whole session, showing the unknown mark until its value arrives, so nothing moves. */}
         {/* One weather slot of fixed width, first on the right so its unused width joins the free space between the groups:
