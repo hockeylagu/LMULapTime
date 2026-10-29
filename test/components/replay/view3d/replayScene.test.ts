@@ -24,3 +24,13 @@ it('extends a wall down to lower ground and leaves its flat top and grounded wal
   groundBarriers(root, () => 9); // Ground above the base never lifts it.
   expect(geometry.getAttribute('position').getY(0)).toBeCloseTo(1.7);
 });
+
+it('extends both bottom corners of a wall quad, so a long wall never hangs in a sawtooth', () => {
+  // The scene's wall pieces: bottom/top vertex pairs, triangles (v, v+2, v+3) and (v, v+3, v+1).
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new Float32BufferAttribute([0, 5, 0, 0, 6, 0, 4, 5, 0, 4, 6, 0], 3));
+  geometry.setIndex([0, 2, 3, 0, 3, 1]);
+  const root = new Group(); root.add(new Mesh(geometry, new MeshBasicMaterial()));
+  groundBarriers(root, () => 2);
+  expect(Array.from({length: 4}, (_, i) => Number(geometry.getAttribute('position').getY(i).toFixed(2)))).toEqual([1.7, 6, 1.7, 6]);
+});

@@ -1,6 +1,6 @@
 import { BufferAttribute, BufferGeometry, Float32BufferAttribute, InterleavedBufferAttribute, Mesh, MeshStandardMaterial, Vector3, type Object3D } from 'three';
 
-const MARGIN_M = 1500, FADE_M = 700, MAX_GRID = 256, MIN_CELL_M = 12;
+const MARGIN_M = 1500, FADE_M = 700, MAX_GRID = 768, MIN_CELL_M = 6;
 /** Clearance below the lowest vertex of every scanned triangle above a terrain cell. */
 const BELOW_SURFACE_M = 0.2;
 const SMOOTHING_PASSES = 12;
@@ -15,8 +15,8 @@ export interface DefaultTerrain {
  * Generic ground that follows the scanned surfaces' elevation so raised sections never hover over
  * void. Each grid corner under a scanned triangle sits below that triangle's lowest vertex, so no
  * cell can rise through a surface; away from the track it fades smoothly to `edgeY`, the flat
- * horizon level. It is filler, not measured terrain. `surfaces` (road sheets and roadside structure,
- * so walls stand on the ground rather than float above it) must still be in native coordinates;
+ * horizon level. It is filler, not measured terrain. `surfaces` (the scanned sheets: structure stands on
+ * them, and a buried wall would drag the ground down) must still be in native coordinates;
  * the mesh is built origin-relative, for the same reflected group as the scene.
  */
 export function createDefaultTerrain(
@@ -38,15 +38,22 @@ export function createDefaultTerrain(
       a.fromBufferAttribute(positions, index?.getX(t) ?? t).applyMatrix4(object.matrixWorld);
       b.fromBufferAttribute(positions, index?.getX(t + 1) ?? t + 1).applyMatrix4(object.matrixWorld);
       c.fromBufferAttribute(positions, index?.getX(t + 2) ?? t + 2).applyMatrix4(object.matrixWorld);
-      const floor = Math.min(a.y, b.y, c.y) - BELOW_SURFACE_M;
-      if (!Number.isFinite(floor)) continue;
-      // Every corner of every grid cell the triangle touches: both terrain triangles of a cell stay below it.
-      const i0 = Math.max(0, Math.floor((Math.min(a.x, b.x, c.x) - x0) / dx)), i1 = Math.min(nx - 1, Math.ceil((Math.max(a.x, b.x, c.x) - x0) / dx));
-      const j0 = Math.max(0, Math.floor((Math.min(a.z, b.z, c.z) - z0) / dz)), j1 = Math.min(nz - 1, Math.ceil((Math.max(a.z, b.z, c.z) - z0) / dz));
+      const lowest = Math.min(a.y, b.y, c.y);
+      if (!Number.isFinite(lowest)) continue;
+      // The triangle's plane, so a long strip on a slope holds each cell at its own height, not its lowest corner.
+      const ux = b.x - a.x, uy = b.y - a.y, uz = b.z - a.z, vx = c.x - a.x, vy = c.y - a.y, vz = c.z - a.z, ny = uz * vx - ux * vz;
+      const gx = Math.abs(ny) > 1e-6 ? (uy * vz - uz * vy) / -ny : 0, gz = Math.abs(ny) > 1e-6 ? (ux * vy - uy * vx) / -ny : 0;
+      // Every corner of every grid cell the triangle touches sits under the plane across that cell (never under its lowest vertex).
+      const i0 = Math.max(0, Math.floor((Math.min(a.x, b.x, c.x) - x0) / dx)), i1 = Math.min(nx - 2, Math.floor((Math.max(a.x, b.x, c.x) - x0) / dx));
+      const j0 = Math.max(0, Math.floor((Math.min(a.z, b.z, c.z) - z0) / dz)), j1 = Math.min(nz - 2, Math.floor((Math.max(a.z, b.z, c.z) - z0) / dz));
       for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-        const k = j * nx + i;
-        if (floor < heights[k]) heights[k] = floor;
-        known[k] = 1;
+        const cx = x0 + i * dx - a.x, cz = z0 + j * dz - a.z;
+        const plane = Math.abs(ny) > 1e-6 ? a.y + Math.min(0, gx * dx) + Math.min(0, gz * dz) + gx * cx + gz * cz : lowest;
+        const floor = Math.max(lowest, plane) - BELOW_SURFACE_M;
+        for (const k of [j * nx + i, j * nx + i + 1, (j + 1) * nx + i, (j + 1) * nx + i + 1]) {
+          if (floor < heights[k]) heights[k] = floor;
+          known[k] = 1;
+        }
       }
     }
   });

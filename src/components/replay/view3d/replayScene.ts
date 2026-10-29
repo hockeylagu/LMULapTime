@@ -54,7 +54,7 @@ function faceUp(geometry: BufferGeometry): void {
   index.needsUpdate = true;
 }
 
-/** Barriers, pit wall, pit building and walls: structure, not ground, so they stay out of road heights; the relief rises to their base. */
+/** Barriers, pit wall, pit building and walls: structure, not ground, so they stay out of road heights and the relief. */
 const BARRIER_KINDS = new Set(['barrier', 'tyreBarrier', 'tecpro', 'pitWall', 'building', 'wall', 'armco']);
 
 export function detachBarriers(root: Object3D): Group {
@@ -66,7 +66,7 @@ export function detachBarriers(root: Object3D): Group {
 
 /**
  * Extends each structure down to the relief where the ground under it is lower, so no wall shows sky
- * beneath it. Base vertices are the lowest corner of a triangle that stands up (flat caps stay put).
+ * beneath it. Base vertices are the bottom corners (within 20 cm of its lowest) of a triangle that stands up; flat caps stay put.
  * `barriers` must still be in native coordinates; `groundAt` takes and returns native metres.
  */
 export function groundBarriers(barriers: Object3D, groundAt: (x: number, z: number) => number): void {
@@ -78,7 +78,9 @@ export function groundBarriers(barriers: Object3D, groundAt: (x: number, z: numb
     const bases = new Set<number>(), count = index?.count ?? position.count;
     for (let t = 0; t + 2 < count; t += 3) {
       const corners = [0, 1, 2].map(c => index?.getX(t + c) ?? t + c), ys = corners.map(v => position.getY(v));
-      if (Math.max(...ys) - Math.min(...ys) > STANDING_M) bases.add(corners[ys.indexOf(Math.min(...ys))]);
+      // Every bottom corner: a wall quad's triangle has two, and extending one leaves a sawtooth.
+      const low = Math.min(...ys);
+      if (Math.max(...ys) - low > STANDING_M) corners.forEach((v, c) => { if (ys[c] - low <= STANDING_M) bases.add(v); });
     }
     for (const v of bases) position.setY(v, Math.min(position.getY(v), groundAt(position.getX(v), position.getZ(v)) - BURY_M));
     if (bases.size) { position.needsUpdate = true; object.geometry.computeBoundingBox(); object.geometry.computeBoundingSphere(); }
@@ -130,7 +132,7 @@ export async function createReplayScene(
   const origin = new Vector3(...metadata.bounds.min).add(new Vector3(...metadata.bounds.max)).multiplyScalar(0.5);
   const barriers = detachBarriers(gltf.scene);
   const surfaceHeight = createSurfaceHeight(gltf.scene);
-  const terrain = createDefaultTerrain([gltf.scene, barriers], metadata.bounds, origin, metadata.bounds.min[1] - 0.6, TERRAIN_COLOR);
+  const terrain = createDefaultTerrain([gltf.scene], metadata.bounds, origin, metadata.bounds.min[1] - 0.6, TERRAIN_COLOR);
   groundBarriers(barriers, (x, z) => terrain.heightAt(x - origin.x, z - origin.z) + origin.y);
   gltf.scene.position.copy(origin).negate(); barriers.position.copy(gltf.scene.position);
   gltf.scene.traverse(object => {

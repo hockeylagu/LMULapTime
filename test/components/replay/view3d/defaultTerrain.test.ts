@@ -31,13 +31,14 @@ it('follows raised track surfaces from below, never rising through them, and fad
   expect(terrain.mesh.receiveShadow).toBe(false);
 });
 
-it('rises to the base of a wall standing off the road, so it never floats', () => {
-  // A road sheet at 10 m and, 60 m to its side, a wall standing from 14 m to 15 m.
-  const road = surface([0, 10, 0, 40, 10, 0, 0, 10, 200, 40, 10, 0, 40, 10, 200, 0, 10, 200]);
-  const wall = surface([100, 14, 0, 100, 14, 200, 100, 15, 0, 100, 14, 200, 100, 15, 200, 100, 15, 0]);
-  const bounds = {min: [0, 10, 0], max: [100, 15, 200]}, origin = new Vector3(50, 12, 100);
-  const height = (x: number) => createDefaultTerrain([road, wall], bounds, origin, 9.4, '#76734f').heightAt(x - origin.x, 100 - origin.z) + origin.y;
-  expect(height(100)).toBeLessThan(14);
-  expect(height(100)).toBeGreaterThan(13.5);
-  expect(createDefaultTerrain([road], bounds, origin, 9.4, '#76734f').heightAt(100 - origin.x, 0)).toBeLessThan(height(100) - origin.y - 1); // Road-only relief left it hovering.
+it('follows one long sloping triangle along its slope, not down to its lowest corner', () => {
+  // A 200 m road of two triangles climbing from 10 m to 30 m: its high end must not show a cliff to the ground.
+  const road = surface([0, 10, 0, 40, 10, 0, 0, 30, 200, 40, 10, 0, 40, 30, 200, 0, 30, 200]);
+  const bounds = {min: [0, 10, 0], max: [40, 30, 200]}, origin = new Vector3(20, 20, 100);
+  const terrain = createDefaultTerrain([road], bounds, origin, 9.4, '#76734f');
+  for (const z of [50, 150, 195]) {
+    const height = terrain.heightAt(20 - origin.x, z - origin.z) + origin.y, y = 10 + z / 10;
+    expect(height).toBeLessThan(y);
+    expect(height).toBeGreaterThan(y - 2);
+  }
 });
