@@ -63,9 +63,13 @@ class FieldSpeedProfile {
   private lastEt: number | null = null;
   private incidentAtLastEt = false;
   private readonly bins = new Map<number, number[]>();
+  /** Cars slow or off track at the last update: only a car joining them is a new incident. */
+  private incidentCars = new Set<number>();
 
   /**
-   * True when a car on track is crawling or stopped, or off track, while the session is green; then adds the speeds.
+   * True when a car on track starts crawling or stops, or leaves the track, while the session is green; then adds the
+   * speeds. A car that stays there (a driverless car parked off track for the whole race, Silverstone 2026-10-29) is
+   * one incident, not one per update.
    * A re-applied reading (same clock) returns the same answer without adding them again.
    */
   public incident(reading: LiveScoringReading): boolean {
@@ -76,6 +80,7 @@ class FieldSpeedProfile {
       this.bins.clear();
     }
     let incident = false;
+    const incidentCars = new Set<number>();
     for (const entry of reading.field ?? []) {
       if (entry.inPits || entry.finishStatus !== 0 || entry.control < 0) continue;
       const bin = Math.floor(entry.lapDist / SPEED_BIN_METERS);
@@ -83,12 +88,18 @@ class FieldSpeedProfile {
       if (reading.gamePhase === 5 && speeds.length >= SPEED_BIN_MIN_SAMPLES) {
         const median = [...speeds].sort((a, b) => a - b)[speeds.length >> 1];
         if (entry.speed < INCIDENT_SPEED_SHARE * median
-          || Math.abs(entry.pathLateral) > Math.abs(entry.trackEdge) + OFF_TRACK_MARGIN_METERS) incident = true;
+          || Math.abs(entry.pathLateral) > Math.abs(entry.trackEdge) + OFF_TRACK_MARGIN_METERS) {
+          incidentCars.add(entry.id);
+          if (!this.incidentCars.has(entry.id)) incident = true;
+          // Kept out of the profile, so a parked car does not make stopping normal at its spot.
+          continue;
+        }
       }
       speeds.push(entry.speed);
       if (speeds.length > SPEED_BIN_SAMPLES) speeds.shift();
       this.bins.set(bin, speeds);
     }
+    this.incidentCars = incidentCars;
     this.incidentAtLastEt = incident;
     return incident;
   }

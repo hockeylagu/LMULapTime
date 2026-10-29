@@ -74,4 +74,18 @@ describe('field diagnostics', () => {
     // Nothing is judged before the spot has enough samples.
     expect(bursts([], { ...car, speed: 0 })).toBe(false);
   });
+
+  it('starts one burst for a car that stays stopped, and another when a second car stops there', () => {
+    const log = new FieldDiagnosticsLog();
+    const events: DiagnosticEvent[] = [];
+    const at = (et: number, cars: LiveFieldCar[]) => log.update({ ...reading(cars), currentEt: et, sectorFlags: [11, 11, 11] }, null, et * 1000,
+      event => events.push(event));
+    for (let i = 0; i < 10; i++) at(i, [car]);
+    const parked = { ...car, id: 9, speed: 0, control: 3 };
+    at(10, [car, parked]);
+    // Past the burst, still parked: no new burst.
+    at(10 + FIELD_BURST_SECONDS + 1, [car, parked]);
+    at(10 + FIELD_BURST_SECONDS + 2, [car, parked, { ...parked, id: 10 }]);
+    expect(events.filter(event => event.kind === 'field').slice(-3).map(event => (event.data as { burst: boolean }).burst)).toEqual([true, false, true]);
+  });
 });
