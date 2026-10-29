@@ -17,6 +17,8 @@ export interface UseGpsMapShortcutsOptions {
   onToggleExpanded?: () => void;
   /** Fullscreen only: hide or show the telemetry trace under the map. */
   onToggleTrace?: () => void;
+  onCenter?: () => void;
+  onToggleFollow?: () => void;
 }
 
 /**
@@ -46,10 +48,18 @@ export function useGpsMapShortcuts({
   onPan,
   onToggleExpanded,
   onToggleTrace,
+  onCenter,
+  onToggleFollow,
 }: UseGpsMapShortcutsOptions): void {
   const handleKeyDown = useEffectEvent((event: KeyboardEvent) => {
     if (replayShortcutBlocked(event)) return;
     const container = containerRef.current;
+    const cameraAction = event.key.toLowerCase() === 'c' ? onCenter : event.key.toLowerCase() === 'f' ? onToggleFollow : undefined;
+    if (cameraAction) {
+      const expandedMap = document.querySelector('[data-map-expanded]');
+      if (event.repeat || !container || container.closest('[inert]') || !isReplaySurfaceTarget(event) || expandedMap && expandedMap !== container) return;
+      event.preventDefault(); cameraAction(); return;
+    }
     if (event.key.toLowerCase() === 'm' && onToggleExpanded) {
       // M works from any replay surface, but only for this live map and never while another map is expanded.
       if (event.repeat || !container || container.closest('[inert]') || !isReplaySurfaceTarget(event)) return;
@@ -113,9 +123,9 @@ export function useGpsMapShortcuts({
     } else if (event.key === '0' || event.key.toLowerCase() === 'r') {
       event.preventDefault();
       onResetZoom();
-    } else if (event.key === ' ' && isExpanded) {
+    } else if (event.key === ' ') {
       event.preventDefault();
-      onTogglePlay?.();
+      if (!event.repeat) onTogglePlay?.();
     } else if (event.key.toLowerCase() === 'g') {
       event.preventDefault();
       onToggleGForce?.();

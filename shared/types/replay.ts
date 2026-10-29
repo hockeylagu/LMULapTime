@@ -111,7 +111,9 @@ export interface ReplayTrajectoryPoint {
   tireTemps?: [number, number, number, number];
   tireWear?: [number, number, number, number];
   tirePressures?: [number, number, number, number];
+  /** Measured FL/FR/RL/RR ride height in millimetres; not an offset to add to world body Y. */
   rideHeight?: [number, number, number, number];
+  /** Measured FL/FR/RL/RR linear tyre speeds in km/h. Finite zero is valid (including lockup). */
   wheelSpeeds?: [number, number, number, number];
   brakeTemps?: [number, number, number, number];
   engineRpm?: number;

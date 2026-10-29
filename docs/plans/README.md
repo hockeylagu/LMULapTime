@@ -149,9 +149,13 @@ Settings action, refused on track. Existing fake-plugin tests do not replace thi
   producers demonstrably share canonical exact identity; resolve differences at source boundaries.
 - Pit repair benefit remains an inference limitation pending trustworthy recorded evidence.
 
+## 3D replay
+
+[Simplified 3D replay](proposed/REPLAY_3D_PLAN.md) is in progress: every layout has a 3D scene in the
+data package; car models for every record, camera/comparison acceptance and performance remain.
+
 ## Unstarted proposals
 
-- [Simplified 3D replay](proposed/REPLAY_3D_PLAN.md): validate one exported scene and replay pose first.
 - [Live voice calls](proposed/LIVE_VOICE_CALLS.md): call catalogue, anti-distraction rules and iterations;
   driver decisions first (Crew Chief overlap, voice, naming).
 - [Debrief corner tracking](proposed/DEBRIEF_CORNER_TRACKING.md): each debrief corner against the driver's own

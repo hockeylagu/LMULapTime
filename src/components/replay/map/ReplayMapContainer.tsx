@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { lazy, Suspense, useMemo, useState } from 'react';
 import { CircleDot } from 'lucide-react';
 import { ReplayTrajectoryPoint, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { GpsTrackMapScene } from './scene/GpsTrackMapScene.js';
@@ -9,6 +9,8 @@ import { TrackBoundaryGeometry } from '../../../../shared/types/trackGeometry.js
 import { ReplayFrictionCircle } from './ReplayFrictionCircle.js';
 import { TrackCircuitLayout } from '../../track-detail/TrackCircuitLayout.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
+
+const Replay3DView = lazy(() => import('../view3d/Replay3DView.js'));
 
 export interface ReplayMapContainerProps {
   trajectory: ReplayTrajectoryData | null;
@@ -62,6 +64,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
   const baselineOpacity = fadedLine === 'baseline' ? 0.12 : 1;
   const [showPedalMarkers, setShowPedalMarkers] = useState<boolean>(false);
   const [showFrictionCircle, setShowFrictionCircle] = useState<boolean>(false);
+  const [view, setView] = useState<'2d' | '3d'>('2d');
 
   const pedalMarkers = useMemo(() => {
     if (!corners || corners.length === 0) return [];
@@ -95,9 +98,16 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
 
   if (!trajectory) return null;
 
+  if (view === '3d') return <Suspense fallback={<div role="status" className="p-4 text-lmu-muted">Loading 3D viewer…</div>}>
+    <Replay3DView trajectory={trajectory} baseline={isCompareMode ? baselineTrajectory ?? null : null}
+      currentIndex={currentIndex} onSelectIndex={onSelectIndex} isPlaying={isPlaying} onTogglePlay={onTogglePlay} onReturnTo2D={() => setView('2d')}
+      colorBy={colorBy} onChangeColorBy={onChangeColorBy} />
+  </Suspense>;
+
   return (
     <>
       <div className="flex flex-wrap items-center justify-between px-2 py-1 gap-2 shrink-0 text-xs">
+        <button type="button" onClick={() => setView('3d')} className={`px-2 py-1 rounded bg-lmu-raised/50 text-lmu-text-soft hover:bg-lmu-raised ${FOCUS_RING}`}>3D view</button>
         <div className="flex items-center gap-1.5">
           {onChangeColorBy && (
             <div className="flex items-center gap-1">

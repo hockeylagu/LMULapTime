@@ -145,6 +145,19 @@ The SVG map draws native `x` right and `z` up (screen y is inverted); native
 forward tangent `(tx, tz)` has left normal `(-tz, tx)`, used for positive centerline offset.
 `rotY = 0` is a valid body orientation, not a missing-data sentinel.
 
+The 3D viewer converts the native left-handed frame to Three.js's right-handed frame with
+the display-only mapping `(X, Y, Z) = (x, y, -z)`, after subtracting a common origin. The same
+reflection applies to surfaces, cars, trails and camera targets. Its overhead projection agrees
+with the SVG map (+X right, native +Z up). Stored telemetry, station distances and timing remain
+native; this renderer conversion requires no parser/cache version change.
+
+The 3D car uses available native yaw/pitch/roll as Y-X-Z body attitude, interpolating rotations
+with quaternions only across continuous poses. Recorded body Y is preserved, including heave;
+road elevation is not substituted for it. `rideHeight` is FL/FR/RL/RR in millimetres and is shown
+separately when present. Adding it to body Y would count vertical motion twice. Missing attitude
+channels retain the available orientation; individual wheel contact and model-origin calibration
+remain approximate. This display behavior does not change stored channels or derived metrics.
+
 The car's map arrow shows **inertial load transfer**, opposite the acceleration vector: left-turn
 acceleration moves load right, and braking moves load forward. Its numeric tooltip uses ISO
 acceleration signs. Screen coordinates are display coordinates, not vehicle axes.

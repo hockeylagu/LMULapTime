@@ -298,6 +298,30 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
 
 ### Local Data Packages (`server/plugins/`)
 - `dataPlugin.ts` loads external track geometry, physical profiles, and manufacturer assets from backend-only `LMU_PLUGIN_ROOT`.
+  Optional v2 surface scenes use `scenePackage.ts` and the bounded static GLB validator `sceneGlb.ts`;
+  `/api/data-plugin/scenes/:layoutKey` returns metadata and `/:revision/asset` serves hash-verified
+  binary content. [Plugin contracts](PLUGINS.md#3d-track-scenes-package-version-2) own limits.
+  `src/components/replay/view3d/` owns the lazy Three.js viewer, scene resources, cameras and
+  discontinuity-safe XYZ/quaternion attitude sampling in `replayPose.ts`, preserving recorded body
+  height and available pitch/roll. `sceneFrame.ts` owns native-to-render handedness.
+  `sceneEnvironment.ts` owns sky, fog, the flat horizon ground and the car-following shadow sun;
+  `defaultTerrain.ts` builds filler relief under the scanned surfaces; `brakeBoards.ts` stands
+  exported brake markers as labelled signs; `racingLine.ts` drapes the 2D-coloured line ribbons;
+  `kerbStripes.ts` bands kerbs by lap distance; `tracksideCameras.ts` places the fixed trackside spots;
+  `wheelAnimation.ts` fits the model origin to the lap median and drives roll/steer/travel per corner.
+  `cameraNavigation.ts` owns projection-aware keyboard pan/zoom. The 3D view shares
+  `useGpsMapShortcuts.ts` with 2D; OrbitControls handles pointer input without consuming replay arrows.
+  `cameraModes.ts` owns mode labels/keys and `cameraTracking.ts` preserves user camera/focus offsets
+  during Follow/Chase updates; manual camera movement does not change the selected mode.
+  `surfaceProjection.ts` drapes depth-tested racing lines on the nearby native road layer; measured
+  coordinates and analytics stay native. `ReplayMapContainer` switches 2D/3D, and `trackSceneApi.ts`
+  loads metadata/binary through the API client. The existing replay cursor owns time in both views.
+  `vehicleMeshPackage.ts` binds optional visible models to exact vehicle catalog record IDs;
+  `meshAsset.ts` owns shared GLB/hash/containment validation and request-time integrity checks.
+  `/api/data-plugin/vehicle-meshes/:recordId` and `/:revision/asset` expose those resources.
+  `vehicleMeshApi.ts` verifies identity/package revisions, and the 3D viewer assembles native body,
+  tyre and rim geometry with independent primary/ghost materials. Unavailable models retain
+  labelled estimates. [Vehicle mesh contract](PLUGINS.md#optional-visible-vehicle-meshes) owns semantics.
 - `trackPackage.ts` validates geometry revisions and route lengths within 0.01m. Routes in `dataPluginRoutes.ts` serve geometry and vehicle logos (`/api/data-plugin/vehicles/logos`).
 - Geometry validation: `hasCompatibleTrackStations` (`shared/domain/trackGeometry.ts`) requires matching geometry revisions before computing geometry-dependent corner analysis; missing geometry leaves recorded-channel analysis available.
 - Vehicle logos: `resolveCarManufacturer` (`shared/domain/vehicleMapping.ts`) matches names against a word-bounded rule table. Client loads logos via `src/api/vehicleLogosApi.ts` and renders `CarLogo.tsx` and `CarIdentity.tsx`.

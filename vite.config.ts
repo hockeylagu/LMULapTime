@@ -6,6 +6,9 @@ export default defineConfig({
   build: {
     chunkSizeWarningLimit: 1200,
     rolldownOptions: {
+      // Tailwind's single PostCSS transform dominates a short build; its timing share is
+      // an informational advisory, not a correctness failure. Profile build time separately.
+      checks: { bundlerTimings: false },
       output: {
         // Groups rather than manualChunks: manualChunks let react and react-dom's entry files land in the lucide and
         // recharts chunks, which made every page preload recharts.
