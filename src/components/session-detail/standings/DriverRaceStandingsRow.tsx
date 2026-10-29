@@ -26,6 +26,8 @@ export const DriverRaceStandingsRow: React.FC<DriverRaceStandingsRowProps> = ({ 
   const incidents = d.incidents?.length ?? 0;
   const penalties = d.penalties?.length ?? 0;
   const trackLimits = d.trackLimits?.length ?? 0;
+  // Most track limit events end in "No Further Action"; only a warning adds points.
+  const warnings = d.trackLimits?.filter(limit => limit.action === 'Warning').length ?? 0;
   const lapsLed = d.lapsLedCount ?? 0;
 
   return (
@@ -57,8 +59,8 @@ export const DriverRaceStandingsRow: React.FC<DriverRaceStandingsRowProps> = ({ 
           label="Track limits"
           value={trackLimits}
           valueClass={trackLimits > 0 ? 'text-lmu-warn' : 'text-white'}
-          hint="warnings"
-          title="Track limit warnings from the race log"
+          hint={`${warnings} ${warnings === 1 ? 'warning' : 'warnings'}`}
+          title={`Track limit events from the race log: ${trackLimits}\nWarnings: ${warnings}`}
         />
       </div>
     </div>
