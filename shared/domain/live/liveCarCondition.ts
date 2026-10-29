@@ -43,10 +43,8 @@ export interface LiveCarReading {
   /** Present on a hybrid car (a motor map range or a motor state), absent otherwise. */
   hybrid?: LiveHybridReading;
   /**
-   * Exploration for the voice calls, logged in diagnostics only: rF2 `mSpeedLimiter`, LMU `mSpeedLimiterActive`, and
-   * LMU's gaps (`mTimeGapCarAhead/Behind`, `mTimeGapPlaceAhead/Behind`, seconds), raw.
+   * Exploration for the voice calls, logged in diagnostics only: LMU's gaps (`mTimeGapCarAhead/Behind`, `mTimeGapPlaceAhead/Behind`, seconds), raw.
    */
-  limiter?: { speedLimiter: number; speedLimiterActive: number };
   timeGaps?: { carAhead: number; carBehind: number; placeAhead: number; placeBehind: number };
 }
 

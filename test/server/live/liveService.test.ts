@@ -303,7 +303,7 @@ describe('LiveService', () => {
     } finally { vi.restoreAllMocks(); }
   });
 
-  it('records the flags and entries on change, every car once a second and the limiter for exploration', async () => {
+  it('records the flags and entries on change, and every car once a second', async () => {
     const diagnostics = new LiveDiagnostics('unused');
     vi.spyOn(diagnostics, 'begin').mockImplementation(() => {});
     const record = vi.spyOn(diagnostics, 'record').mockImplementation(() => {});
@@ -311,7 +311,7 @@ describe('LiveService', () => {
     const writer = new FakeWorker();
     const capture = new LiveCaptureController({ directory: 'unused', onPersist: () => {}, diagnostics,
       createWorker: () => writer as unknown as CaptureWorker });
-    const { service, frame, worker } = setup({ capture });
+    const { service, frame } = setup({ capture });
     const kinds = (kind: string) => record.mock.calls.map(([event]) => event).filter(event => event.kind === kind);
     const field = [{ id: 1, driverName: 'Me', vehicleName: 'Ferrari 296 GT3', vehicleFile: 'ferrari.veh', vehicleClass: 'GT3', place: 1, totalLaps: 2,
       lapDist: 10, x: 0, z: 0, speed: 50, pathLateral: 0, trackEdge: 5, timeBehindNext: 0, lapsBehindNext: 0, inPits: false,
@@ -325,9 +325,6 @@ describe('LiveService', () => {
       vi.advanceTimersByTime(1000);
       frame(reading({ field, currentEt: 11.2 }));
       expect(kinds('field')).toHaveLength(2);
-      worker.emit('message', { type: 'frame', car: { fuelLiters: 0, fuelCapacityLiters: 0, dentSeverity: [], detached: false,
-        wheels: [], lastImpactEt: 0, compound: '', limiter: { speedLimiter: 1, speedLimiterActive: 1 } } });
-      expect(kinds('player-limiter')[0]?.data).toEqual({ speedLimiter: 1, speedLimiterActive: 1 });
     } finally {
       const stopping = service.stop();
       writer.emit('exit', 0);
@@ -474,7 +471,8 @@ describe('LiveService', () => {
   });
 
   it('records the capture rows the reader posts as it stops, before the recording closes', async () => {
-    const capture = new LiveCaptureController({ directory: 'unused', onPersist: () => {} });
+    const capture = new LiveCaptureController({ directory: 'unused', onPersist: () => {},
+      createWorker: () => new FakeWorker() as unknown as CaptureWorker });
     const order: string[] = [];
     vi.spyOn(capture, 'samples').mockImplementation(() => { order.push('samples'); });
     vi.spyOn(capture, 'stop').mockImplementation(() => { order.push('stop'); return Promise.resolve(); });

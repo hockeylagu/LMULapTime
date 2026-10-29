@@ -218,7 +218,7 @@ describe('rF2 pedal decode', () => {
     expect(decodePedalSlot(slot)).toEqual({
       id: 12, sample: { t: 321.25, throttle: 0.75, brake: 1 }, tyreSurfaceAvgC: null,
       car: { fuelLiters: 0, fuelCapacityLiters: 0, dentSeverity: [0, 0, 0, 0, 0, 0, 0, 0], detached: false, wheels: Array(4).fill({ flat: false, detached: false }), lastImpactEt: 0, tread: [0, 0, 0, 0], compound: '', virtualEnergy: 0,
-        limiter: { speedLimiter: 0, speedLimiterActive: 0 }, timeGaps: { carAhead: 0, carBehind: 0, placeAhead: 0, placeBehind: 0 } },
+        timeGaps: { carAhead: 0, carBehind: 0, placeAhead: 0, placeBehind: 0 } },
     });
   });
 
@@ -249,20 +249,17 @@ describe('rF2 pedal decode', () => {
       fuelLiters: 32.2, fuelCapacityLiters: 117, dentSeverity: [0, 0, 0, 0, 0, 2, 0, 0], detached: true,
       wheels: [{ flat: false, detached: false }, { flat: false, detached: false }, { flat: true, detached: false }, { flat: false, detached: true }],
       lastImpactEt: 812.5, tread: [0.98, 0.9431234, 1, 0.95], compound: 'Medium', virtualEnergy: 0.625,
-      limiter: { speedLimiter: 0, speedLimiterActive: 0 }, timeGaps: { carAhead: 0, carBehind: 0, placeAhead: 0, placeBehind: 0 },
+      timeGaps: { carAhead: 0, carBehind: 0, placeAhead: 0, placeBehind: 0 },
     });
   });
 
-  it('reads the raw limiter and LMU gap fields for the diagnostics', () => {
+  it('reads the raw LMU gap fields for the diagnostics', () => {
     const buffer = telemetryBuffer(4, [{ id: 12, et: 1, throttle: 0, brake: 0 }]);
     const base = TELEMETRY.vehicles;
     const at = VEHICLE_TELEMETRY.offsets;
-    buffer.writeUInt8(1, base + at.speedLimiter);
-    buffer.writeUInt8(1, base + at.speedLimiterActive);
     buffer.writeFloatLE(1.5, base + at.timeGapCarAhead);
     buffer.writeFloatLE(Number.NaN, base + at.timeGapCarBehind);
     const car = decodePedalSlot(buffer.subarray(base, base + TELEMETRY.vehicleStride)).car;
-    expect(car?.limiter).toEqual({ speedLimiter: 1, speedLimiterActive: 1 });
     expect(car?.timeGaps).toEqual({ carAhead: 1.5, carBehind: 0, placeAhead: 0, placeBehind: 0 });
   });
 

@@ -221,7 +221,6 @@ function decodeCar(slot: Buffer): LiveCarReading {
     tread: [0, 1, 2, 3].map(index => clamp01(slot.readDoubleLE(at.wheels + index * WHEEL.size + WHEEL.offsets.wear))),
     compound: cString(slot, at.frontTireCompoundName, 18).trim(),
     virtualEnergy: finite(slot.readFloatLE(at.virtualEnergy)),
-    limiter: { speedLimiter: slot.readUInt8(at.speedLimiter), speedLimiterActive: slot.readUInt8(at.speedLimiterActive) },
     timeGaps: {
       carAhead: finite(slot.readFloatLE(at.timeGapCarAhead)), carBehind: finite(slot.readFloatLE(at.timeGapCarBehind)),
       placeAhead: finite(slot.readFloatLE(at.timeGapPlaceAhead)), placeBehind: finite(slot.readFloatLE(at.timeGapPlaceBehind)),

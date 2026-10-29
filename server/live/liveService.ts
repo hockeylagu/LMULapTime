@@ -349,8 +349,6 @@ export class LiveService {
         fuelCapacityLitres: car.fuelCapacityLiters,
         dents: car.dentSeverity, detached: car.detached, lastImpactEt: car.lastImpactEt, compound: car.compound,
       } }));
-    // Exploration: the limiter as the game reports it, a line only when it changes.
-    if (car?.limiter) this.record(() => this.options.capture?.diagnostics?.record({ kind: 'player-limiter', at: Date.now(), data: car.limiter }));
   }
 
   /**
