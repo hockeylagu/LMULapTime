@@ -45,6 +45,13 @@ export function postJson<T>(path: string, body?: unknown, init?: RequestInit): P
   });
 }
 
+/** Binary plugin resources use the same error and cancellation contract as JSON requests. */
+export async function fetchBinary(path: string, init?: RequestInit): Promise<ArrayBuffer> {
+  const response = await fetch(path, { cache: 'no-store', ...init });
+  if (!response.ok) throw await toApiError(response, path);
+  return response.arrayBuffer();
+}
+
 /** True for the rejection of a request its AbortController cancelled: not an error to show. */
 export function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'AbortError';

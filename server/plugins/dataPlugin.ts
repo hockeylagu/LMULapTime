@@ -6,6 +6,12 @@ import { parseTrackMapDisplay } from '../../shared/domain/trackGeometry.js';
 import type { TrackBoundaryGeometry, TrackMapDisplay } from '../../shared/types/trackGeometry.js';
 import type { DataPluginStatus, VehicleDataRecord } from '../../shared/types/dataPlugin.js';
 import { validateTrackPackage } from './trackPackage.js';
+import { loadScenePackage } from './scenePackage.js';
+import { readMeshAsset, type RegisteredMesh } from './meshAsset.js';
+import { loadVehicleMeshPackage } from './vehicleMeshPackage.js';
+import type { TrackScene } from '../../shared/types/scenes/trackScene.js';
+import type { VehicleMesh, VehicleMeshResource } from '../../shared/types/scenes/vehicleMesh.js';
+import type { TrackSceneResource } from '../../shared/types/scenes/trackScene.js';
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('Expected object');
@@ -130,11 +136,15 @@ export class DataPlugin {
   private readonly tracks = new Map<string, {geometry:TrackBoundaryGeometry; display:TrackMapDisplay|null}>();
   private readonly records: VehicleDataRecord[] = [];
   private readonly logoRecords = new Map<string, string>();
+  private scenes = new Map<string, RegisteredMesh<TrackScene>>();
+  private vehicleMeshes = new Map<string, RegisteredMesh<VehicleMesh>>();
+  private root = '';
   public constructor(root?: string) {
     this.status = {state:root?'invalid':'absent',revision:'none',tracks:false,vehicles:false};
     if (!root) return;
     try {
       const base = fs.realpathSync(root), digest=createHash('sha256'); let bytes=0;
+      this.root = base;
       const read = (relative: string, max=16_000_000): unknown => {
         if (path.isAbsolute(relative) || relative.includes('\\') || relative.includes(':') || relative.split('/').some(p=>!p||p==='.'||p==='..') || !relative.endsWith('.json')) throw Error('Invalid resource path');
         const file=fs.realpathSync(path.join(base,relative));
@@ -145,8 +155,8 @@ export class DataPlugin {
         const buffer=fs.readFileSync(file); digest.update(relative).update(buffer); return JSON.parse(buffer.toString('utf8'));
       };
       const manifest=object(read('manifest.json',64_000));
-      keys(manifest,['schemaVersion','id','version','tracks','vehicles']);
-      if (manifest.schemaVersion!==1) throw Error('Unsupported schema');
+      keys(manifest,['schemaVersion','id','version','tracks','vehicles', ...(manifest.schemaVersion === 2 ? ['scenes', 'vehicleMeshes'] : [])]);
+      if (manifest.schemaVersion!==1 && manifest.schemaVersion!==2) throw Error('Unsupported schema');
       text(manifest.id); text(manifest.version);
       for (const capability of ['tracks','vehicles']) if (manifest[capability] !== undefined) object(manifest[capability]);
       if (!manifest.tracks && !manifest.vehicles) throw Error('Empty package');
@@ -177,8 +187,37 @@ export class DataPlugin {
           for (const [k, v] of Object.entries(parseVehicleLogos(logoFile))) this.logoRecords.set(k, v);
         }
       }
-      this.status={state:'ready',revision:digest.digest('hex'),tracks:!!manifest.tracks,vehicles:!!manifest.vehicles, ...(this.logoRecords.size > 0 ? {logos: true} : {})};
-    } catch {this.tracks.clear(); this.records.length=0; this.logoRecords.clear(); /* Generic status never discloses local paths. */}
+      if (manifest.scenes !== undefined) {
+        const scenes = object(manifest.scenes); keys(scenes, ['catalog']);
+        this.scenes = loadScenePackage(base, read(text(scenes.catalog)), key => this.trackGeometry(key));
+      }
+      if (manifest.vehicleMeshes !== undefined) {
+        const meshes = object(manifest.vehicleMeshes); keys(meshes, ['catalog']);
+        this.vehicleMeshes = loadVehicleMeshPackage(base, read(text(meshes.catalog)), this.records);
+      }
+      this.status={state:'ready',revision:digest.digest('hex'),tracks:!!manifest.tracks,vehicles:!!manifest.vehicles, ...(this.logoRecords.size > 0 ? {logos: true} : {}), ...(this.scenes.size ? {scenes: true} : {}), ...(this.vehicleMeshes.size ? {vehicleMeshes: true} : {})};
+    } catch {this.tracks.clear(); this.records.length=0; this.logoRecords.clear(); this.scenes.clear(); this.vehicleMeshes.clear(); /* Generic status never discloses local paths. */}
+  }
+  public scene(key: string): TrackSceneResource | null {
+    const registered = this.scenes.get(key);
+    if (!registered) return null;
+    const { asset: _asset, ...metadata } = registered.metadata;
+    return { ...structuredClone(metadata), packageRevision: this.status.revision };
+  }
+  public sceneAsset(key: string, revision: string): Buffer | null {
+    const registered = this.scenes.get(key);
+    if (!registered || registered.metadata.revision !== revision) return null;
+    return readMeshAsset(this.root, registered);
+  }
+  public vehicleMesh(recordId: string): VehicleMeshResource | null {
+    const mesh = this.vehicleMeshes.get(recordId);
+    if (!mesh) return null;
+    const {asset: _asset, ...metadata} = mesh.metadata;
+    return {...structuredClone(metadata), packageRevision: this.status.revision};
+  }
+  public vehicleMeshAsset(recordId: string, revision: string): Buffer | null {
+    const mesh = this.vehicleMeshes.get(recordId);
+    return mesh?.metadata.revision === revision ? readMeshAsset(this.root, mesh) : null;
   }
   public track(key:string) {const row=this.tracks.get(key);return row?structuredClone(row):null;}
   /** Internal immutable geometry view; API callers use the defensive track() snapshot. */

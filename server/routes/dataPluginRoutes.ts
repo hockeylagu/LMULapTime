@@ -13,5 +13,29 @@ export function createDataPluginRouter(provider:DataPlugin=dataPlugin):Router {
     if(!record){res.status(404).json({error:'Track data unavailable'});return;}
     res.json({packageRevision:provider.status.revision,...record});
   });
+  router.get('/scenes/:layoutKey', (req, res) => {
+    const scene = provider.scene(req.params.layoutKey);
+    if (!scene) { res.status(404).json({error: '3D track scene unavailable for this layout'}); return; }
+    res.json(scene);
+  });
+  router.get('/scenes/:layoutKey/:revision/asset', (req, res) => {
+    try {
+      const bytes = provider.sceneAsset(req.params.layoutKey, req.params.revision);
+      if (!bytes) { res.status(404).json({error: '3D scene revision unavailable'}); return; }
+      res.type('model/gltf-binary').send(bytes);
+    } catch { res.status(409).json({error: '3D scene changed on disk. Restore the package or restart the backend.'}); }
+  });
+  router.get('/vehicle-meshes/:recordId', (req, res) => {
+    const mesh = provider.vehicleMesh(req.params.recordId);
+    if (!mesh) { res.status(404).json({error: '3D vehicle mesh unavailable'}); return; }
+    res.json(mesh);
+  });
+  router.get('/vehicle-meshes/:recordId/:revision/asset', (req, res) => {
+    try {
+      const bytes = provider.vehicleMeshAsset(req.params.recordId, req.params.revision);
+      if (!bytes) { res.status(404).json({error: '3D vehicle mesh revision unavailable'}); return; }
+      res.type('model/gltf-binary').send(bytes);
+    } catch { res.status(409).json({error: '3D vehicle mesh changed on disk. Restore the package or restart the backend.'}); }
+  });
   return router;
 }

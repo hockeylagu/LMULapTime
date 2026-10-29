@@ -35,11 +35,13 @@ export interface VehicleLogosCatalog {
   logos: Record<string, string>;
 }
 export interface DataPluginManifest {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   id: string;
   version: string;
   tracks?: { catalog: string };
   vehicles?: { catalog: string; logos?: string };
+  scenes?: { catalog: string };
+  vehicleMeshes?: { catalog: string };
 }
 export interface DataPluginStatus {
   state: 'absent' | 'invalid' | 'ready';
@@ -47,6 +49,8 @@ export interface DataPluginStatus {
   tracks: boolean;
   vehicles: boolean;
   logos?: boolean;
+  scenes?: boolean;
+  vehicleMeshes?: boolean;
 }
 export interface PluginTrackResource {
   packageRevision: string;

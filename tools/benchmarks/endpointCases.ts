@@ -72,6 +72,11 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
   add('reference-diff', '/api/reference-laptimes/diffs/:id', cohort.diffId ? `/api/reference-laptimes/diffs/${cohort.diffId}` : undefined);
   const geometry = cohort.boards.find(board => dataPlugin.trackGeometry(board.layout));
   add('track-geometry', '/api/data-plugin/tracks/:layoutKey', geometry ? `/api/data-plugin/tracks/${geometry.layout}` : undefined, 'No metric geometry for the fixed cohort.');
+  const scene = cohort.boards.map(board => dataPlugin.scene(board.layout)).find(value => value !== null);
+  add('track-scene', '/api/data-plugin/scenes/:layoutKey', scene ? `/api/data-plugin/scenes/${scene.layoutKey}` : undefined, 'No 3D scene for the fixed cohort; synthetic scene routes are tested.');
+  add('track-scene-asset', '/api/data-plugin/scenes/:layoutKey/:revision/asset', undefined, 'Binary GLB delivery is measured separately from the JSON benchmark.');
+  add('vehicle-mesh', '/api/data-plugin/vehicle-meshes/:recordId', undefined, 'Optional private vehicle mesh capability; exact identity and revisions are covered by synthetic route tests.');
+  add('vehicle-mesh-asset', '/api/data-plugin/vehicle-meshes/:recordId/:revision/asset', undefined, 'Binary vehicle delivery is measured separately from the JSON benchmark.');
   for (const [index, board] of cohort.boards.entries()) {
     const query = new URLSearchParams(board).toString();
     const track = encodeURIComponent(board.layout);

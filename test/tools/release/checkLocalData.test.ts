@@ -11,3 +11,12 @@ it('allows bundled basic layouts and rejects seeded detailed assets in inputs an
   fs.mkdirSync(path.join(root,'dist'),{recursive:true});fs.writeFileSync(path.join(root,'dist/leak.json'),JSON.stringify({surfaceProfile:{bankDeg:[3]}}));expect(()=>checkLocalData(root,true)).toThrow('Detailed data');
  }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
+it('rejects binary scenes and v2 scene manifests from release inputs', () => {
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'scene-data-guard-'));
+ try {
+  fs.mkdirSync(path.join(root,'public'),{recursive:true}); fs.writeFileSync(path.join(root,'public/track.glb'),Buffer.alloc(4));
+  expect(()=>checkLocalData(root)).toThrow('3D scene data'); fs.unlinkSync(path.join(root,'public/track.glb'));
+  fs.mkdirSync(path.join(root,'src'),{recursive:true}); fs.writeFileSync(path.join(root,'src/package.json'),JSON.stringify({schemaVersion:2,scenes:{catalog:'scenes/index.json'}}));
+  expect(()=>checkLocalData(root)).toThrow('Local package');
+ } finally { fs.rmSync(root,{recursive:true,force:true}); }
+});

@@ -10,6 +10,7 @@ export function checkLocalData(root, built=false) {
   /** @type {(dir: string) => string[]} */
   const walk=dir=>fs.existsSync(dir)?fs.readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?walk(path.join(dir,e.name)):[path.join(dir,e.name)]):[];
   for(const file of [...walk(path.join(root,'public')), ...(built?walk(path.join(root,'dist')):[])]) {
+    if (/\.(?:glb|gltf)$/i.test(file)) throw Error('3D scene data must stay in local packages: '+path.relative(root,file));
     if(!file.endsWith('.json'))continue;
     const text=fs.readFileSync(file,'utf8');
     if(/"(?:centerline|surfaceProfile|outlineXZ|replayOriginOffsetXZ|vehicleIds|geometryRevision|sourceRevision)"\s*:/.test(text))throw Error('Detailed data in static assets: '+path.relative(root,file));
@@ -18,7 +19,7 @@ export function checkLocalData(root, built=false) {
   for(const dir of ['src','server','shared','public','test'])for(const file of walk(path.join(root,dir))) {
     if(!file.endsWith('.json'))continue;
     const text=fs.readFileSync(file,'utf8');
-    if(/"coordinates"\s*:\s*"local-xz-metres-forward-minus-z"/.test(text)||(/"schemaVersion"\s*:\s*1/.test(text)&&/"(?:tracks|vehicles)"\s*:\s*\{\s*"catalog"/.test(text)))throw Error('Local package in release inputs: '+path.relative(root,file));
+    if(/"coordinates"\s*:\s*"(?:local-xz-metres-forward-minus-z|lmu-local-xyz-metres|vehicle-local-xyz-metres-forward-minus-z)"/.test(text)||(/"schemaVersion"\s*:\s*[12]/.test(text)&&/"(?:tracks|vehicles|scenes|vehicleMeshes)"\s*:\s*\{\s*"catalog"/.test(text)))throw Error('Local package in release inputs: '+path.relative(root,file));
   }
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {checkLocalData(path.resolve(import.meta.dirname,'../..'),process.argv.includes('--built'));console.log('Local data guard passed; bundled basic SVG layouts are allowed.');}

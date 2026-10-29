@@ -135,6 +135,96 @@ as approximate placement. It does not recenter the outline or invent a provider 
 Exact aliases win; ambiguous model matches remain unresolved. Primary and comparison
 vehicles resolve independently. Body direction continues to use replay yaw.
 
+## 3D track scenes (package version 2)
+
+An optional `scenes: { "catalog": "scenes/index.json" }` capability on manifest `schemaVersion: 2`
+adds a 3D scene per layout. Version 1 remains supported; old app versions reject v2.
+Scenes require the exact analytical layout and matching `sourceGeometryRevision`. Vehicle-only
+or scene-only packages do not establish a road coordinate frame. Existing packages are not modified.
+
+Scene catalog entries use `schemaVersion: 1`, `layoutKey`,
+`coordinates: "lmu-local-xyz-metres"`, `sourceGeometryRevision`, `revision`, `asset`, `sha256`,
+`byteLength`, `bounds: { min: [x,y,z], max: [x,y,z] }`, `triangles` and `coverage: "surfaces"` or `"surfaces+barriers"`. The latter adds roadside
+structure as nodes `barrier`, `tyreBarrier`, `tecpro` and `pitWall` (collision proxies, which stand
+~10 m tall, capped by the exporter to about a metre over the wall beneath, dropping catch fences), and `building`, `wall` and `armco` (the game's own render
+meshes at their real height; `armco` is the low-LOD guard rail); the viewer keeps them out of road heights, and the generated relief rises to their base.
+Primitives may share one position accessor; validation budgets and scans it once.
+`revision` is `scene-<sha256>` over the GLB bytes. Positions are native LMU XYZ metres, Y up,
+without model transforms. These native positions are left-handed: the viewer reflects Z once
+for Three.js, including car bodies, trails and camera targeting. An overhead view then matches the
+2D map's handedness (+X right, +Z up). No timing/station or analytical revisions change for scenery.
+
+The first supported GLB subset is static indexed triangles, float32 XYZ, uint32 indices, simple
+untextured materials and one root node per mesh. External resources, extensions, transforms,
+animation, textures and oversized/invalid buffers are rejected. Limits are 64 MB per scene,
+512 MB total, two million triangles and three million visited vertices across primitives, and
+100 catalog rows. Layouts of one venue whose scenes are identical name the same content-named file
+(`scenes/<sha256>.glb`); it is read, validated and counted once, and its rows must agree.
+Catalog and binary paths remain package-contained, including junction checks. An invalid scene
+invalidates the package under the existing all-or-nothing snapshot rule. No last-good fallback
+silently supplies another package's geometry.
+
+`GET /api/data-plugin/scenes/:layoutKey` returns public metadata without local asset paths;
+`GET /api/data-plugin/scenes/:layoutKey/:revision/asset` returns only that registered GLB.
+Bytes are hash-checked on each request; changed files return 409 and unknown layouts/revisions 404.
+The API client loads the binary with cancellation and `ApiError` handling. Detailed GLBs/catalogs
+remain outside static builds and committed data. Synthetic scene fixtures test the contract.
+
+In the replay inspector choose **3D view**. Orbit, follow, chase, fixed trackside and orthographic
+overhead cameras share the existing playhead; a comparison ghost uses the same track station.
+Follow is the default. Dragging, panning, centering or zooming preserves the selected mode;
+Follow retains the adjusted camera/focus offsets as the car moves. Chase carries those offsets
+with the car's heading. Use 1 Follow, 2 Chase, 3 Orbit, 4 Trackside or 5 Overhead to select a mode.
+The focused 3D scene supports Left/Right sample steps, Shift+Left/Right half-second jumps,
+Home/End, Space playback, +/- zoom, W/A/S/D pan, C center, F follow, R/0 reset and M fullscreen.
+Escape exits fullscreen; ? opens the 3D-specific shortcut list and Escape closes that list first.
+Camera dropdowns, typing, browser modifiers and other dialogs retain their own keys.
+Racing lines follow the matching exported surface with a small lift to avoid flicker. Cars and
+nearer terrain occlude them; translucent ghosts blend over them. Missing surfaces or an unrelated
+road layer leave a gap in the line. This visual projection never changes measured poses or analytics.
+Car bodies use recorded XYZ and available yaw/pitch/roll, with quaternion interpolation between
+continuous samples. Recorded body Y already carries vertical motion; four-corner ride-height
+measurements, when available, are displayed in millimetres and are never added to Y again.
+Missing attitude channels remain partial. Body-origin placement and individual wheel contact
+are not calibrated: the display origin is fitted to the lap-median road contact, wheels follow
+ride height (else the road surface) within ±0.15 m, and the generic sky, fog and generated relief
+terrain (kept under every scanned triangle) are filler, not exported scenery. Scenes contain native road,
+kerbs, runoff, pit, paint, grass and gravel with simple colors, plus the roadside structure each
+venue's SCN names (coverage varies by venue). Textures are not included. A missing scene or WebGL
+context offers a return to 2D.
+
+The sibling pipeline's `export:plugin --scenes` adds every layout's scene to a new package from the
+same validated build and decoded GMT buffers. See the [remaining 3D work](plans/proposed/REPLAY_3D_PLAN.md).
+
+### Optional visible vehicle meshes
+
+A v2 manifest may also declare `vehicleMeshes: { "catalog": "vehicle-meshes/index.json" }`.
+Each entry contains the common binary fields (`asset`, `sha256`, `revision`, `byteLength`,
+`bounds`, `triangles`), `schemaVersion: 1`, an exact `vehicleRecordId` from the vehicle catalog,
+`coordinates: "vehicle-local-xyz-metres-forward-minus-z"`, `representation: "render"`,
+`originCalibration: "unverified"` and unique `parts` drawn from `body`, `chassis`, `exterior`,
+`wing`, `glass`, `tyres`, `rims`. The body is required. Revision is `mesh-<sha256>`. A bounded
+render model is 1–3.5 m wide, 0.3–4 m high and 3–7 m long, with local bounds within 10 m.
+The same static GLB, byte/hash/path validation applies, with a separate 256 MB catalog budget.
+This capability needs vehicle identities; scene or class names cannot supply the binding.
+
+`GET /api/data-plugin/vehicle-meshes/:recordId` returns public metadata without local asset paths;
+`GET /api/data-plugin/vehicle-meshes/:recordId/:revision/asset` serves only the registered GLB.
+Missing models return 404 and retain a labelled estimated body; changed assets return 409.
+The client checks both record and package revision, deduplicates a matching primary/ghost load,
+and gives each car independent materials. Primary body tint and translucent comparison tint
+preserve tyre/rim material roles. Model coordinates are neither recentered nor scaled to the
+collision envelope; declared XZ replay-origin offsets remain applicable. Vertical calibration
+remains unverified and is labelled as approximate placement.
+
+The first private render export is the Duqueine D09 P3 at exterior LOD1: body, chassis, external
+parts, wing, glass, all four tyres and four rims. The pipeline preserves bounded part translations,
+binds installed VEH/GEN references and emits a separate review candidate through
+`export:vehicle-scene`. The app splits the static tyre/rim geometry per corner to roll, steer and
+move it from recorded data; damage, liveries and textures are not inferred. Other models retain their existing estimated body until
+their own exact render data is available. Analytical vehicle records and accepted packages stay
+unchanged; this is not publication of a new accepted dataset.
+
 ## Behavior without detailed data
 
 Bundled layouts, recorded trajectories and channel-based analysis remain available.
