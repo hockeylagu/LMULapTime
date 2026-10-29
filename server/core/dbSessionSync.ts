@@ -7,7 +7,7 @@ import type { ReplayFileEntry } from '../sessions/sessionXmlTypes.js';
 import type { ReplayMatchTarget } from '../sessions/replayMatching.js';
 
 /** Bumping this re-parses every stored session from its XML. */
-export const DB_PARSER_VERSION = '2.24_inferred_lap_from_own_start';
+export const DB_PARSER_VERSION = '2.25_finish_time';
 
 export interface SessionXmlSyncParser {
   setReplayLookup(lookup: (target: ReplayMatchTarget) => ReplayFileEntry[]): void;

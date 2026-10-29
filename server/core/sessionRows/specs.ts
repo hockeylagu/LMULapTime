@@ -97,6 +97,7 @@ export const DRIVER_FIELDS: readonly Field[] = [
   int('lowestPosition', 'lowest_position'),
   int('top3LapsCount', 'top3_laps_count'),
   int('declaredLapsCount', 'declared_laps_count'),
+  real('finishTime', 'finish_time'),
 ];
 
 /** Every scalar of a driver, for the canonical form. */

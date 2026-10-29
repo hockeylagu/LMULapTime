@@ -200,7 +200,7 @@ maps to one public model stored as `car_type` ("Ferrari 296 LMGT3 Evo" is stored
 | `<ClassGridPos>` | Integer | Starting grid rank within the car class. |
 | `<FinishStatus>` | String | `Finished`, `DNF`, `DQ`, `None`. |
 | `<DNFReason>` | String | Explanation if not finishing (`Accident`, `Mechanical`, etc.). |
-| `<FinishTime>` | Float | Total elapsed race duration in seconds at checkered flag. |
+| `<FinishTime>` | Float | Seconds from the race start (lap 1's `et`) to the driver's flag; absent for retirements. Stored as `session_drivers.finish_time` (parser 2.25) and used for the classification's race time and gaps: the last `<Lap>` `et` is that lap's start, a lap early. Portimão 2026-10-29: last lap `et` + lap time − lap 1 `et` matched it within 0.02 s for every finisher; two drivers can share one value (Leger, Scholz). |
 | `<BestLapTime>` | Float | Official fastest personal lap time in seconds (4 decimal precision). |
 | `<Laps>` | Integer | Total count of recorded lap entries. |
 | `<Pitstops>` | Integer | Official count of pit lane stops served. |

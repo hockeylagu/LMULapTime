@@ -3,6 +3,7 @@ import { DriverSafetySummary } from './DriverSafetySummary.js';
 import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import { CarIdentity } from '../../vehicle/CarIdentity.js';
 import { formatElapsedSeconds, formatTime } from '../../../../shared/domain/formatters.js';
+import { raceFinishSeconds } from './raceFinish.js';
 
 export interface SessionRaceStandingsRowProps {
   driver: DriverData;
@@ -12,6 +13,8 @@ export interface SessionRaceStandingsRowProps {
   isMultiClass: boolean;
   sessionBestSectors: { s1: number | null; s2: number | null; s3: number | null };
   leaderFinishTime?: number | null;
+  /** The finish is the game's `<FinishTime>` (the leader has one), else the end of the last lap; see raceFinish.ts. */
+  finishFromXml: boolean;
   leaderLaps: number;
   /** A race shows the grid gain and the finish; practice and qualifying the gap of the best lap. */
   isRace: boolean;
@@ -31,6 +34,7 @@ export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = (
   isMultiClass,
   sessionBestSectors,
   leaderFinishTime,
+  finishFromXml,
   leaderLaps,
   isRace,
   fastestInClass,
@@ -44,16 +48,14 @@ export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = (
   const overallPosition = d.position > 0 ? `P${d.position}` : '-';
   const hasClassPosition = isMultiClass && d.classPosition > 0;
   const primaryPosition = hasClassPosition ? `P${d.classPosition}` : overallPosition;
-  const finishLap = [...d.laps].reverse().find((lap) => typeof lap.elapsedSeconds === 'number');
-  const raceTime = finishLap?.elapsedSeconds !== undefined && finishLap?.elapsedSeconds !== null
-    ? formatElapsedSeconds(finishLap.elapsedSeconds)
-    : '-';
+  const finish = raceFinishSeconds(d, finishFromXml);
+  const raceTime = finish !== null ? formatElapsedSeconds(finish) : '-';
   const finishStatus = d.finishStatus || (d.position > 0 ? 'Finished' : 'Unknown');
   const isNonFinisher = /dnf|dns|dq|retired|disqual/i.test(finishStatus);
-  const finishGap = !isNonFinisher && d.position !== 1 && typeof leaderFinishTime === 'number' && typeof finishLap?.elapsedSeconds === 'number'
+  const finishGap = !isNonFinisher && d.position !== 1 && typeof leaderFinishTime === 'number' && finish !== null
     ? d.declaredLapsCount < leaderLaps
       ? `+${leaderLaps - d.declaredLapsCount} Lap${leaderLaps - d.declaredLapsCount === 1 ? '' : 's'}`
-      : `+${Math.max(0, finishLap.elapsedSeconds - leaderFinishTime).toFixed(3)}s`
+      : `+${Math.max(0, finish - leaderFinishTime).toFixed(3)}s`
     : '-';
   const raceTimeOrGap = d.position === 1 && !isNonFinisher ? raceTime : isNonFinisher ? finishStatus : finishGap;
   const lapGap = d.bestLapTime !== null && d.bestLapTime > 0 && fastestInClass !== null

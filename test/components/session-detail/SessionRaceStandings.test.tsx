@@ -169,6 +169,33 @@ describe('SessionRaceStandings', () => {
     expect(numberButton.querySelector('svg')).not.toBeNull();
   });
 });
+
+describe('SessionRaceStandings finish', () => {
+  // Portimão 2026-10-29: Scholz lost 5.2 s on his last lap; at its start he led Leger by 5.2 s, at the flag they tied.
+  const lastLaps = (lap12Start: number, lap12Time: number) => [makeLap({ lapNumber: 1, elapsedSeconds: 125.58, lapTime: 118 }),
+    makeLap({ lapNumber: 12, elapsedSeconds: lap12Start, lapTime: lap12Time })];
+  const race = (finishTimes: boolean) => makeSession([
+    makeDriver({ name: 'Milanovic', declaredLapsCount: 12, laps: lastLaps(1285.46, 105.46), finishTime: finishTimes ? 1265.3374 : null }),
+    makeDriver({ name: 'Leger', position: 8, classPosition: 8, declaredLapsCount: 12, laps: lastLaps(1333.58, 108.21), finishTime: finishTimes ? 1316.2176 : null }),
+    makeDriver({ name: 'Scholz', position: 9, classPosition: 9, declaredLapsCount: 12, laps: lastLaps(1328.36, 113.45), finishTime: finishTimes ? 1316.2176 : null }),
+  ]);
+  const render_ = (finishTimes: boolean) => render(<SessionRaceStandings session={race(finishTimes)} selectedDriverOrdinal={null}
+    setSelectedDriverOrdinal={vi.fn()} isMultiClass={false} />);
+
+  it('takes the race time and the gaps from the game\'s FinishTime', () => {
+    render_(true);
+    expect(screen.getByText('21:05.3')).toBeInTheDocument();
+    expect(screen.getAllByText('+50.880s')).toHaveLength(2);
+  });
+
+  it('without FinishTime ends each driver at the end of the last lap, not its start', () => {
+    render_(false);
+    expect(screen.getByText('21:05.3')).toBeInTheDocument();
+    expect(screen.getByText('+50.870s')).toBeInTheDocument();
+    expect(screen.getByText('+50.890s')).toBeInTheDocument();
+  });
+});
+
 describe('SessionRaceStandings outside a race', () => {
   const qualifying = (drivers: DriverData[]): DetailedSession => ({ ...makeSession(drivers), sessionType: 'Qualifying', sessionName: 'Q1' });
 

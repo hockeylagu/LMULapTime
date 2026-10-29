@@ -548,6 +548,9 @@ export class LmuParser {
     const rawFinishStatus = d.FinishStatus ? String(d.FinishStatus).trim() : '';
     const dnfReason = d.Reason ? String(d.Reason).trim() : undefined;
     const finishStatus = rawFinishStatus || (dnfReason ? `DNF (${dnfReason})` : (position > 0 ? 'Finished' : undefined));
+    // The game's own race time to the flag; absent for drivers who retired and in practice and qualifying.
+    const rawFinishTime = parseFloat(String(d.FinishTime ?? ''));
+    const finishTime = Number.isFinite(rawFinishTime) && rawFinishTime > 0 ? rawFinishTime : null;
 
     const rawPitstops = parseInt(String(d.Pitstops ?? d.PitStops ?? d.NumPitstops ?? ''), 10);
     const declaredPitStopsCount = !isNaN(rawPitstops) && rawPitstops >= 0
@@ -578,6 +581,7 @@ export class LmuParser {
       positionGain,
       classPositionGain,
       finishStatus,
+      finishTime,
       dnfReason,
       declaredPitStopsCount,
       lapsLedCount,

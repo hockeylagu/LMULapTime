@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowDown, ArrowUp, Trophy } from 'lucide-react';
 import { DetailedSession, DriverData } from '../../../../shared/types/index.js';
 import { SessionRaceStandingsRow } from './SessionRaceStandingsRow.js';
+import { raceFinishSeconds } from './raceFinish.js';
 
 export interface SessionRaceStandingsProps {
   session: DetailedSession;
@@ -113,10 +114,8 @@ export const SessionRaceStandings: React.FC<SessionRaceStandingsProps> = ({
     return fastest;
   }, {});
   const overallWinner = session.drivers.find((driver) => driver.position === 1) ?? sortedDrivers[0];
-  const leaderFinishLap = overallWinner?.laps
-    ? [...overallWinner.laps].reverse().find((lap) => typeof lap.elapsedSeconds === 'number')
-    : undefined;
-  const leaderFinishTime = leaderFinishLap?.elapsedSeconds;
+  const finishFromXml = typeof overallWinner?.finishTime === 'number';
+  const leaderFinishTime = overallWinner ? raceFinishSeconds(overallWinner, finishFromXml) : null;
   const leaderLaps = overallWinner?.declaredLapsCount ?? 0;
   const sessionBestSectors = session.drivers.reduce(
     (best, driver) => {
@@ -173,6 +172,7 @@ export const SessionRaceStandings: React.FC<SessionRaceStandingsProps> = ({
                 isMultiClass={isMultiClass}
                 sessionBestSectors={sessionBestSectors}
                 leaderFinishTime={leaderFinishTime}
+                finishFromXml={finishFromXml}
                 leaderLaps={leaderLaps}
                 isRace={isRace}
                 fastestInClass={fastestByClass[isMultiClass ? d.carClass : ''] ?? null}

@@ -126,6 +126,7 @@ export interface DriverData {
   positionGain?: number | null;
   classPositionGain?: number | null;
   finishStatus?: string; // e.g. "Finished Normally", "DNF", "DQ", "DNS"
+  finishTime?: number | null; // XML <FinishTime>: seconds from the race start to the driver's flag; races only
   dnfReason?: string;
   declaredPitStopsCount?: number;
   lapsLedCount?: number;

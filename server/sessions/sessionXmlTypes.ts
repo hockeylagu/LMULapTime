@@ -56,6 +56,7 @@ export interface RawDriverXmlNode {
   ClassGridPosition?: string | number;
   ClassGrid?: string | number;
   FinishStatus?: string;
+  FinishTime?: string | number;
   Reason?: string;
   Pitstops?: string | number;
   PitStops?: string | number;

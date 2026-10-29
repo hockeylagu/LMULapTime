@@ -141,6 +141,13 @@ describe('parser server module', () => {
       expect(session?.sessionType).toBe('Race');
       expect(session?.sessionName).toBe('R1');
       expect(session?.weather).toBeUndefined();
+      expect(session?.drivers[0].finishTime).toBeNull();
+    });
+
+    it('keeps the game\'s finish time of a race (Portimão 2026-10-29)', () => {
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(sampleRaceXml.replace('<BestLapTime>', '<FinishTime>1304.7426</FinishTime><BestLapTime>'));
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
+      expect(parser.parseSessionXml('dummy_race.xml')?.drivers[0].finishTime).toBe(1304.7426);
     });
 
     it('parses weather when explicit Weather tag is present in XML', () => {
