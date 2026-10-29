@@ -552,12 +552,12 @@ export class LiveStrategyTracker {
   }
 
   /** The race plan, on the dashboard's use per lap and the plan's wear (`planTyreWear`). */
-  private raceStrategy(kind: LiveResourceKind, lapSeconds: number | null, resource: LiveResourcePlan, reserveLaps: number,
-    tyres: LiveGarageTyres | null, qualifyingAhead: boolean): LiveRaceStrategies | null {
+  private raceStrategy(kind: LiveResourceKind, lapSeconds: number | null, raceLeaderLapSeconds: number | null,
+    resource: LiveResourcePlan, reserveLaps: number, tyres: LiveGarageTyres | null, qualifyingAhead: boolean): LiveRaceStrategies | null {
     const history = this.history(kind);
     const historyWear = this.eventTyreWear === null ? history?.wearPerLap ?? null : null;
     const strategy = planRaceStrategies({
-      kind, raceMinutes: this.schedule?.raceMinutes ?? null, lapSeconds, perLap: resource.perLap, reserveLaps, capacity: resource.capacity,
+      kind, raceMinutes: this.schedule?.raceMinutes ?? null, lapSeconds, raceLeaderLapSeconds, perLap: resource.perLap, reserveLaps, capacity: resource.capacity,
       qualifyingAhead, tyres, compound: this.eventCompound || tyres?.compound || null,
       wearPerLap: this.planTyreWear(kind), tyreChangeSeconds: this.delays?.fourTyreChange ?? null,
       pitLaneSeconds: this.pitLaneLoss, refuel: this.refuelRate(kind),
@@ -583,13 +583,14 @@ export class LiveStrategyTracker {
     const estimated = reading.player && reading.player.estimatedLapTime > 0 ? reading.player.estimatedLapTime : null;
     const lapSeconds = classLeaderLapSeconds(reading.player, reading.classLeader) ?? median(this.eventLaps) ?? estimated;
     const tyres = this.garageTyres(race && !clockRunning && reading.player?.inPits === false);
+    const leaderLapSeconds = race ? reading.leader?.estimatedLapTime ?? null : null;
     const plan = planGarage({
       kind,
       sessionSeconds,
       race,
       // Once the race clock runs the formation lap is behind: the time left holds racing laps only.
       formationLap: race && !clockRunning,
-      raceLeaderLapSeconds: race ? reading.leader?.estimatedLapTime ?? null : null,
+      raceLeaderLapSeconds: leaderLapSeconds,
       lapSeconds: lapSeconds === null ? null : round(lapSeconds, 3),
       perLap: resource.perLap,
       perLapSource: resource.perLapSource,
@@ -600,7 +601,7 @@ export class LiveStrategyTracker {
     });
     const sessionKind = liveSessionKind(reading.sessionCode);
     // Planned from any garage before the race; once the race clock runs it is the race plan's job.
-    const raceStrategy = race && clockRunning ? null : this.raceStrategy(kind, plan.lapSeconds, resource, reserveLaps, tyres,
+    const raceStrategy = race && clockRunning ? null : this.raceStrategy(kind, plan.lapSeconds, leaderLapSeconds, resource, reserveLaps, tyres,
       sessionKind === 'qualifying' || (sessionKind === 'practice' && this.schedule?.hasQualifying === true));
     return { ...plan, ...(resource.learning ? { learning: resource.learning } : {}), tyres, tyreCoverage: null, raceStrategy };
   }

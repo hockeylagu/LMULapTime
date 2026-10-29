@@ -53,6 +53,14 @@ describe('race strategy before the race', () => {
     expect(planRaceStrategies(input({ perLap: null }))).toBeNull();
   });
 
+  it('ends the race at the leader\'s flag (Silverstone race 2026-10-29: 28 planned at our pace, 29 run)', () => {
+    const silverstone = input({ raceMinutes: 30, lapSeconds: 64.495, perLap: 2.04, reserveLaps: 0.7, qualifyingAhead: false,
+      tyres: { compound: 'Medium', used: true, wear: 0.988, newSets: 0 } });
+    expect(planRaceStrategies(silverstone)).toMatchObject({ laps: 28, chosen: { loadStart: 59 } });
+    // The leader's 1:02.6 reaches the flag at 1815 s, so our 29th lap starts before it.
+    expect(planRaceStrategies({ ...silverstone, raceLeaderLapSeconds: 62.6 })).toMatchObject({ laps: 29, chosen: { loadStart: 61 } });
+  });
+
   it('spaces further stops a full tank apart', () => {
     expect(planRaceStrategies(input({ raceMinutes: 120, perLap: 5 }))?.chosen).toMatchObject({ stops: 3, pitLap: 19, loadToFinish: 93 });
   });

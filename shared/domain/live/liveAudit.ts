@@ -4,7 +4,7 @@ import type { LiveScoringReading } from './liveLifecycle.js';
 import { liveTrackWet } from '../lapConditions.js';
 
 /** Bump when the forecasting formulas change; history keeps the version that produced each estimate. */
-export const LIVE_MODEL_VERSION = 13;
+export const LIVE_MODEL_VERSION = 14;
 /** Uncorrected estimator recorded for training and used as the exact calibration compatibility version. */
 export const LIVE_BASELINE_MODEL_VERSION = 5;
 interface Baseline { snapshot: LiveSnapshot; regime: string; et: number }

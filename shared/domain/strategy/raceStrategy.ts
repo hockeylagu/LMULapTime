@@ -9,6 +9,8 @@ export interface RaceStrategyInput {
   /** The race length set for the event (`GetSessionsInfoForEvent`). */
   raceMinutes: number | null;
   lapSeconds: number | null;
+  /** The overall leader's pace, which sets the flag; the player's `lapSeconds` when absent. */
+  raceLeaderLapSeconds?: number | null;
   perLap: number | null;
   reserveLaps: number;
   capacity: number | null;
@@ -38,7 +40,8 @@ const settable = (value: number): number => Math.ceil(value - 1e-9);
  * without a stop. The tyres are then weighed: keep the starting set to the flag, or fit a new set at every stop, the
  * four-tyre time added to the stop (LMU adds it to the refuel). The chosen plan is the quickest whose tread stays
  * above the floor at every change and at the flag; the other is the next best, its cost in tyre time.
- * The race runs to the leader's first crossing after the clock at the given pace, every car making the same stops:
+ * The race runs to the leader's first crossing after the clock at the leader's pace (the player's when unknown: one
+ * lap short at Silverstone 2026-10-29, 28 planned and 29 run), every car making the same stops:
  * their time (lane loss and refuel) comes off the clock, often a lap (Le Mans race 2026-10-23: 19 laps planned
  * without it, 17 run). The formation lap costs no VE (`formationLapUse`).
  * Not modelled: the pace of fresh tyres or a lighter car, two-tyre changes, an extra stop to save VE.
@@ -47,7 +50,7 @@ export function planRaceStrategies(input: RaceStrategyInput): LiveRaceStrategies
   const { kind, raceMinutes, lapSeconds, perLap, reserveLaps, capacity, tyres } = input;
   if (raceMinutes === null || raceMinutes <= 0 || lapSeconds === null || perLap === null || perLap <= 0 || capacity === null) return null;
   const garageFor = (stopsSeconds: number) => planGarage({ kind, sessionSeconds: raceMinutes * 60 - stopsSeconds, race: true,
-    formationLap: true, raceLeaderLapSeconds: lapSeconds, lapSeconds, perLap, perLapSource: null, lapsMeasured: 0, reserveLaps, capacity,
+    formationLap: true, raceLeaderLapSeconds: input.raceLeaderLapSeconds ?? lapSeconds, lapSeconds, perLap, perLapSource: null, lapsMeasured: 0, reserveLaps, capacity,
     setInGarage: null });
   const formationUse = formationLapUse(kind) * perLap;
   // The stops' time: the lane and fixed refuel part each, and what they add (the racing laps and the reserve past a full start).
