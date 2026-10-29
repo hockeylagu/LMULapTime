@@ -49,7 +49,7 @@ would ask it? Silence is an answer too: no call means "on plan", so nothing conf
 | Who is coming, when do they pass? | "Hyper Ferrari behind. Passes in 6 seconds." | Before the pass |
 | Am I catching / being caught? | "Gap to P4 1.2, closing." (normal level only) | After the line |
 | How long is left? Time for another quali lap? | "Ten minutes." "Last lap." "Time for one more lap." | At those moments |
-| Penalty? Limiter? | "Drive-through penalty." "Limiter!" | At once |
+| Penalty? | "Drive-through penalty." | At once |
 | Am I on pace? | Not spoken: the dashboard delta | — |
 
 Load measured off the car (2026-10-28, quiet level; scripts in the gitignored `.tmp/voice-load/`):
@@ -102,8 +102,6 @@ list replace them.
 
 | Data | Where | For |
 |---|---|---|
-| `speedLimiterActive` | player telemetry | "Rejoin P6, behind the BMW, ahead of two Hypers." | Joined to "Box in 2 laps" and the box-lap call: the field's race-time positions, plus the pit lane loss (`livePitLane.ts`) and the service time, give the place and the cars around the exit. Same-class place; other-class cars named only when they arrive at the exit within ~3 s. P5+ or no car within 3 s: the place alone | P2 |
-| "Limiter!" |
 | `motorMap`, `motorMapMax`, `batteryChargeFraction` / `soc` | player telemetry | "Set deployment 40." (shared with the dashboard advice) |
 | `yellowFlagState`, `sectorFlag[3]` | scoring info | Sector yellow, "Green, sector 2", yellow far ahead |
 | Every car's lap distance, class, vehicle, `inPits`, speed (`localVel`), `pathLateral`, `trackEdge`, `timeBehindNext` | scoring vehicles (only player, leader and class leader are decoded today) | Traffic and incidents |
@@ -122,7 +120,7 @@ a few seconds of the player to the call engine.
 | "Box this lap" on the last straight before pit entry | Pit entry position | Learn from the player's own `inPits` switch-on lap distance; until then, call after the line |
 | Track condition wording | `mTrackGripLevel` meaning | Mostly mapped (grip 2 Medium, 3 High 2026-10-27, 4 Saturated 2026-10-29; wetness steps to labels); recorded in every capture; confirm grip 0, 1 and Slightly wet in races |
 | Wet/dry crossover pace | Pace by wetness | Not needed for the first version (wetness steps decide); race reviews of changing-weather races collect it. History has 72 sessions with wet laps (6,245 laps on wets, all drivers), but rain only, not path wetness |
-| Online cars | Checked 2026-10-29 (above): positions, speeds and gaps are clean; lateral needs a ~3 m off-track margin | One online race with diagnostics on: the `field`, `flags` and `player-limiter` diagnostics lines (from 2026-10-28) hold every car's raw position, speed, lateral/edge, gaps and flags for analysis after the event |
+| Online cars | Checked 2026-10-29 (two races above): positions, speeds and gaps are clean; lateral needs a ~3 m off-track margin | One online race with diagnostics on: the `field` and `flags` diagnostics lines (from 2026-10-28) hold every car's raw position, speed, lateral/edge, gaps and flags for analysis after the event |
 | Natural voice | Piper/Kokoro downloads, CPU while LMU runs | Step 1 listening test |
 | "Turn 6" | No corner list on main | Seconds or "sector 2" until the corner-map work lands |
 | Rivals' VE or fuel | The REST standings `veFraction` read 0 online, but LMU's UI shows other cars' VE. Shared memory has `mFuelFraction` per car (u8, 0-255, "fuel or battery left"; logged in the `field` diagnostics line from 2026-10-28). Settled 2026-10-29 (online GT3 VE race at Portimão): it is the fuel tank, not VE, and 0 for every remote car online, so it is no longer logged | Rivals' VE needs another source; none known online |
@@ -145,7 +143,19 @@ One online race, 19 GT3 cars, 26 min, diagnostics on (`field` 5,281 lines, `flag
 | Lateral side | Positive `pathLateral` is right of the path, negative left (757 of 757 car pairs) |
 | Rivals' fuel or VE | `mFuelFraction` is 0 for every remote car online. The player's value tracks fuel, not VE (79 → 7 while VE went 42 → 6). Not a source for step 7 |
 | Grip level | `trackGripLevel` 4 all race, dry, 20-22 °C: the MFD showed Saturated (driver) |
-| Not covered | Limiter call (no pit stop), multiclass traffic, wet conditions |
+| Not covered | Pit stop, multiclass traffic, wet conditions |
+
+### Online race check (Silverstone International GT3, 2026-10-29)
+
+One online race, 30 GT3 cars, 35 min, no pit stop, dry, diagnostics on (`field` 8,800 lines, `flags` 121):
+
+| Check | Result |
+|---|---|
+| Car names | `mVehFilename` is the livery file id (`23_26_THOR64591293`), not the car: only the 4 "Custom Team" files (`397_25_BMW`) name a make. The data package's vehicle list (`vehicleIds`, looked up in `server/plugins/dataPlugin.ts`) maps all 23 files in the race to a model, 2026 liveries included: "the Ferrari behind" is possible from the file id |
+| Incident burst | 83 % of the race in burst: a driverless car (`control` 3, left after a disconnect) sat 33 m off track at 3,093 m from the start, and every update re-triggered it. From 2026-10-29 only a car starting an incident triggers, and cars in an incident stay out of the speed profile: 61 % on this race, 62 % on Portimão (unchanged there), the rest from the race's 104 sector flag changes |
+| Driverless cars | A parked car with `control` 3 stays in the field with `finishStatus` 0. The incident call must say it once, not every lap |
+| Grip level | `trackGripLevel` 3 in practice, 4 from qualifying on (20-23 °C, dry): matches the rubber building up |
+| Not covered | Pit entry (no pit stop), multiclass traffic, wet conditions |
 
 ### Not possible with the data we have
 
@@ -184,7 +194,7 @@ adds P3.
 | "Energy use too high. Save to hold lap 18." | Spare per lap below zero for 2 laps running | P3 |
 | "Set deployment 40." | Hypercar deployment advice moves to a new target (race and practice) | P2 |
 | "Stop and go. No service on this stop." | Penalty outstanding while in the pit lane | P1 |
-| "Limiter!" | Player enters the pit lane (`inPits` turns on) with `speedLimiterActive` off; once per entry | P1 |
+| "Rejoin P6, behind the BMW, ahead of two Hypers." | Joined to "Box in 2 laps" and the box-lap call: the field's race-time positions, plus the pit lane loss (`livePitLane.ts`) and the service time, give the place and the cars around the exit. Same-class place; other-class cars named only when they arrive at the exit within ~3 s. P5+ or no car within 3 s: the place alone | P2 |
 
 ### Damage and tyres (data exists, via REST condition reads)
 
@@ -331,6 +341,7 @@ instead ("P5 behind"). Unknown cars fall back to the class, then to "car".
 - "Energy to spare, push": dropped for now (driver, 2026-10-28).
 - Stop check ("Tyres not changed"): the stop always does what the MFD says (driver, 2026-10-28).
 - "Penalty served": the game makes it clear already (driver, 2026-10-28).
+- "Limiter!" on pit entry: dropped (driver, 2026-10-29); its `player-limiter` log line went with it.
 - Rival and undercut calls: a future phase (step 7), not rejected. They need rivals' VE or fuel
   ("P4 on 12 % energy, stops this lap"); `mFuelFraction` reads 0 for remote cars online (2026-10-29).
 

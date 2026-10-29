@@ -284,16 +284,18 @@ lap distance, world x/z, speed from `mLocalVel`, `mPathLateral`, `mTrackEdge`, `
 also hold `mFlag`, `mUnderYellow` and `mFuelFraction`), plus the session clock and the player's LMU gaps (`mTimeGapCarAhead/Behind`,
 `mTimeGapPlaceAhead/Behind`); about 3-4 KB a second with 40 cars. Around an incident (a flag change, or,
 under green, a car on track below half the field's median speed at its lap distance (25 m bins, last 50
-speeds, judged from 10) or more than 3 m beyond `mTrackEdge`; from 2026-10-29, a fixed 15 m/s before)
+speeds, judged from 10) or more than 3 m beyond `mTrackEdge`; from 2026-10-29, a fixed 15 m/s before; only a car
+starting an incident counts, and cars in one stay out of the speed profile, so a driverless car parked off track
+does not keep the burst on)
 every scoring update (~5 Hz) is written, `burst: true`, until
 20 s after the last cause, to place the cars for the yellow calls. `field-entries` (id, driver, entry name,
-`mVehFilename` from 2026-10-29, class), `flags` (`gamePhase`, `mYellowFlagState`, `mSectorFlag[3]`) and `player-limiter` (`mSpeedLimiter`,
-`mSpeedLimiterActive`) carry no clock, so a line is written only on change (plus checkpoints); place them
+`mVehFilename` from 2026-10-29, class) and `flags` (`gamePhase`, `mYellowFlagState`, `mSectorFlag[3]`) carry no clock (`player-limiter`, the limiter state,
+was logged 2026-10-28 to 2026-10-29 for a call since dropped), so a line is written only on change (plus checkpoints); place them
 in time by `at` against the clocked records. Open questions they serve: on/off track from lateral versus edge, sector flag codes in LMU, remote cars' data
 quality online. Settled on the Portimão race of 2026-10-29: `mFuelFraction` is the fuel tank, not VE (the player's
 79 → 16 of 255 followed 37 → 7.5 L of 120 L), and 0 for every remote car online, so it is no longer logged. `mUnderYellow` was never set online and
 `mFlag` shows only the blue flag (6), so they are dropped too; the entry name is the livery ("Iron Lynx 2026
-#63:ELMS"), so `mVehFilename` is logged to name the car.
+#63:ELMS"), so `mVehFilename` is logged to name the car. It is the livery file id (`23_26_THOR64591293`, Silverstone 2026-10-29), which the data package's `vehicleIds` map to a model.
 Recordings of 2026-10-25 may hold three validation records, since removed: `standings-check` (each standings
 reply beside shared memory VE, fuel, pit state and penalties), `lmu-fields` (the other raw LMU fields of
 `InternalsPlugin.hpp`) and `tyre-check` (condition reply tread beside `mWear`). They settled the shared-memory reads
