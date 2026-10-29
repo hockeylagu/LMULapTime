@@ -582,7 +582,7 @@ export class LiveStrategyTracker {
       : !(reading.endEt > 0 && reading.endEt < 1_000_000) ? null : Math.max(0, reading.endEt - Math.max(0, reading.currentEt));
     const estimated = reading.player && reading.player.estimatedLapTime > 0 ? reading.player.estimatedLapTime : null;
     const lapSeconds = classLeaderLapSeconds(reading.player, reading.classLeader) ?? median(this.eventLaps) ?? estimated;
-    const tyres = this.garageTyres();
+    const tyres = this.garageTyres(race && !clockRunning && reading.player?.inPits === false);
     const plan = planGarage({
       kind,
       sessionSeconds,
@@ -605,8 +605,18 @@ export class LiveStrategyTracker {
     return { ...plan, ...(resource.learning ? { learning: resource.learning } : {}), tyres, tyreCoverage: null, raceStrategy };
   }
 
-  private garageTyres(): LiveGarageTyres | null {
+  /**
+   * The garage's selected set, or on the grid the set on the car: once the new set is fitted there the selection can
+   * still show the used qualifying set (97 % at Portimão 2026-10-29 and 95 % on 10-24, against 100 % on the car).
+   */
+  private garageTyres(onGrid: boolean): LiveGarageTyres | null {
     const selected = this.usage?.selected ?? null;
-    return selected ? { ...selected, newSets: this.usage?.newSets ?? null } : null;
+    const newSets = this.usage?.newSets ?? null;
+    const tread = this.car?.tread;
+    if (onGrid && tread?.length === 4) {
+      return { compound: this.car?.compound || selected?.compound || null, used: tread.some(value => value < 1),
+        wear: Math.min(...tread), tread: [tread[0], tread[1], tread[2], tread[3]], newSets };
+    }
+    return selected ? { ...selected, newSets } : null;
   }
 }

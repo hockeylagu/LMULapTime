@@ -294,6 +294,21 @@ describe('LiveStrategyTracker', () => {
     expect(context(tracker, racing, { lapsLeft: null })?.garage?.raceStrategy).toBeNull();
   });
 
+  it('plans from the tyres on the car once it is on the grid (Portimão 2026-10-29)', () => {
+    // The new set is fitted on the grid, but the garage selection still shows the used qualifying set (97-98 %).
+    const tracker = new LiveStrategyTracker();
+    tracker.applyRest({ type: 'tireManagement', vePerLap: 3.36, fuelPerLap: 2.78, newSets: 0,
+      selected: { compound: 'Medium', used: true, wear: 0.97, tread: [0.97, 0.98, 0.97, 0.97] } });
+    tracker.applyRest({ type: 'schedule', raceMinutes: 20, hasQualifying: true });
+    tracker.applyCar({ ...veCar(0.42), tread: [1, 1, 1, 1] });
+    const garage = at(0, { inRealtime: false, gamePhase: 0, endEt: 64, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 106, inPits: true }) });
+    expect(context(tracker, garage, { lapsLeft: null })?.garage?.tyres).toMatchObject({ used: true, wear: 0.97 });
+    const grid = at(0, { gamePhase: 3, endEt: 64, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 106, inPits: false }) });
+    const plan = context(tracker, grid, { lapsLeft: null })?.garage;
+    expect(plan?.tyres).toEqual({ compound: 'Medium', used: false, wear: 1, tread: [1, 1, 1, 1], newSets: 0 });
+    expect(plan?.raceStrategy?.chosen.tyresStart).toBe('NEW MEDIUM');
+  });
+
   it('uses the actual weekend in practice: no race plan on practice servers, no qualifying set without qualifying', () => {
     const tracker = new LiveStrategyTracker();
     tracker.applyRest({ type: 'tireManagement', vePerLap: 4, fuelPerLap: 3, newSets: 2,
