@@ -3,6 +3,69 @@
 Written by the `race-review` skill (`.claude/skills/race-review/SKILL.md`). Newest first. Error = predicted − actual,
 in % of the lap's actual use; negative = underprediction (car runs short).
 
+## 2026-10-29 — GT3 sprint, Portimão (Aston Martin Vantage AMR LMGT3)
+
+**Sessions**: qualifying `02Q1`, race `18R1` (20 min, 12 laps, Medium, dry, grip 4 = Saturated, VE-limited).
+First Aston event at Portimão.
+
+**Scorecard**:
+
+| # | Box | Result |
+|---|---|---|
+| 1 | Fuel/VE per lap | OK: median −0.8 % fuel and VE; lap 6 −3.0 / −3.1 % alone (first fast clean lap after the slow traffic laps 4–5) |
+| 2 | Laps | OK: 12 planned, 12 run |
+| 3 | Start load | OK: VE 1.75 % (0.52 lap) at the flag against a 0.42-lap reserve; fuel 3.1 L (1.1 laps) |
+| 4 | Formation lap | OK: fuel 36.96 → 36.63 L (0.12 lap), VE 42 % unchanged |
+| 5 | Stops | n/a: no stop planned or made |
+| 6 | Tyre wear | OK: plan 0.908 (0.878 after the grid switch, below), actual worst 0.903 (RR); clean laps 0.0059–0.0077 a lap, as planned |
+| 7 | Incidents | OK: contact with Yoo Hyunwon at 1208 s, ~1 s before the end of lap 10: P5 → P6, then lap 11 spin (6.3 s of four-wheel spin, 450–500 %), +8.4 s against the clean median, RR tread −2.0 points (0.7 clean), no damage (impact 354, no dents); lap 11 lost its time, fed no plan |
+| 8 | Weather | n/a: dry |
+| 9 | Data | OK: no drops, telemetry and replay linked, forecasts 0.2–0.6 s after the line; laps 3 and 11 lost their game time (track limits), so no measurement and the 10 s freeze |
+| 10 | Learning | OK: new Portimão Aston cohort, `insufficient-*` gates |
+| 11 | Result | OK: grid 13 → P6 (+7): one pass at the start; Dankert, Simoes, Schmidt retired; Idris and Mister Donut stopped; Scholz drive-through; lost to Gendron (lap 7, recovering from P16) and to Yoo at the contact |
+| 12 | Traffic | OK: laps 2, 5, 7 flagged, 4.4 s against the clean median 1:46.33 |
+| 13 | Driving | Best 1:46.086 (lap 8) against qualifying 1:47.565, GT3 PB 1:45.770 (BMW), theoretical 1:45.755; clean median 8th of 18, +1.73 s on the class leader; class-best sector gaps S1 +0.38, S2 +0.81, S3 +0.59 s; 99.3 % consistency; 11 track limit events (2 warnings, 1.25 points) |
+| 14 | App output | Miss, app: classification gaps one lap stale (below); "11 track limits · warnings" with 2 warnings |
+
+**App finding**: the classification took a driver's finish from the last lap's `et`, which since parser 2.24 is that
+lap's start. Every gap was the gap a lap earlier: P9 Scholz +42.900 above P8 Leger +48.120 (tied in the XML), the
+player +38.520 against +39.41, the winner's time 21:25.5 against 21:05.3. Applied (uncommitted, the driver's choice):
+the parser keeps `<FinishTime>` (`session_drivers.finish_time`, column added offline), `DB_PARSER_VERSION` 2.25, all
+sessions reparsed; the standings use it (`standings/raceFinish.ts`), and without it (25 races whose XML has none) the
+end of the last lap. Verified on the page: 21:05.3, +39.405 s, Leger and Scholz both +50.880 s.
+
+**Mechanism, three races (Portimão 10-24, Silverstone 10-28, Portimão 10-29)**: when the new set is fitted on the
+grid (new sets 1 → 0) the garage selection still shows the used qualifying set (95–97 %) while the car has 100 %, so
+the plan read "USED MEDIUM" (today 0.908 → 0.878, the debrief's "planned 88 %"). Applied (uncommitted): before the
+green, with the car out of the pits, the garage plan takes the tread on the car (`liveStrategyTracker.ts`
+`garageTyres`), `LIVE_MODEL_VERSION` 13; regression test from this race.
+
+**Lap estimate** (from the sidecar's `lap-timing`): no estimate on race lap 2 (lap 1 from the grid counts as an
+out lap) nor on qualifying laps 2–3 (out lap, then a lap that lost its time). Applied (uncommitted): a whole lap
+that lost its game time, timed from the lap-start clocks, is the estimate's reference until a valid lap exists
+(`liveLapTiming.ts`); session best and delta stay on valid laps. Qualifying would have had an estimate from lap 3.
+No estimate on race lap 2 for now (driver, 2026-10-29; open to revisit): the standing-start lap as the reference
+would read 2–3 s off for the whole lap, and lap 3 has a proper one. A later fix: restart the lap at the green's
+lap-start time, with a better reference than lap 1 (e.g. history). Open: a first-flying-lap estimate from history (design first).
+
+**Applied (uncommitted), app output**: the summary shows the track limit warnings apart ("11 · 2 warnings").
+
+**Diagnostics**: `mFuelFraction` is the fuel tank (79 → 16 of 255 for 37 → 7.5 L of 120 L) and 0 for every remote
+car online; dropped from the `field` record. The sidecar's `track-surface` record duplicated the recording's and was
+removed.
+
+**Watch list** (recheck at every review):
+- Meter: a third tow-lap run (Le Mans 10-22, Silverstone 10-28) decides "lowest 2 of 5"; Portimão had one low lap, no run.
+- Tyre wear, qualifying vs race: Silverstone's gap (qualifying 0.45–0.60 %, race 0.29–0.40 %) not seen at Portimão
+  (qualifying 0.73 %, race 0.59–0.77 %); one race so far.
+- Tyre wear, lap 1: Silverstone's formation and start cost about four clean laps; Portimão one. Open.
+- Grid tyre plan from the car (applied 10-29): the next race's plan should hold the new set's tread.
+- Lap estimate from a lap that lost its time (applied 10-29): check the sidecar's `lap-timing` in the next qualifying.
+- Wet: confirm Slightly wet = 0.125 and the crossover advice in the next wet race; grip 0 and 1 unconfirmed.
+- Driving: Silverstone S1 slow corner (~780 m), recheck at the next Silverstone race; Portimão S2 (+0.81 s).
+- Damage pace waits 3 laps after the impact (10-28): no real damage at Portimão; check the next one.
+- Closed: forecast freeze (held at Portimão); capture start-up drops (none in two races).
+
 ## 2026-10-28 — GT3 sprint, Silverstone International (Aston Martin Vantage AMR LMGT3)
 
 **Sessions**: Interlagos practice `78P1`; Silverstone practice `90P1`, qualifying `10Q1`, race `92R1` (Medium, dry).
