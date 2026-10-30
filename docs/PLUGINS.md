@@ -304,3 +304,27 @@ regressions use `LMU_PERSONAL_REGRESSION_ROOT` for a package and
 `LMU_PERSONAL_FIXTURES` for a private folder containing `replays/` and
 `__snapshots__/`. These folders must stay outside committed release inputs.
 Use `LMU_PLUGIN_ROOT` too when testing recording enrichment with that package.
+
+### Exact ground-grid scene storage
+
+Scene rows may name an uncompressed `.lmg` file and include
+`storage: {encoding: "ground-grid-v1", sha256, byteLength}`. The existing row hash,
+byte length, bounds, triangle count and revision describe the reconstructed GLB;
+storage fields describe the physical file. Ordinary GLBs remain supported. Vehicle
+files remain GLBs and multiple distinct vehicle records may reference one identical file.
+
+All integers and float32 payloads are little-endian. LMG1 contains a 20-byte header:
+magic `LMG1`, original GLB length, original-prefix length, compact-GLB length, grid length
+(four uint32 values). Payloads follow in that order. The original prefix is the complete
+GLB JSON and binary chunk header. The compact GLB retains every non-ground mesh and
+its referenced vertices. The grid contains `LGF1`, uint32 X/Z dimensions (2–768), exact
+float32 X coordinates, Z coordinates, then row-major heights. Each cell is triangulated
+`k,k+nx,k+1; k+1,k+nx,k+nx+1`. The decoder merges the byte-sorted compact vertices
+and grid vertices, restoring original indices and original GLB bytes. Original materials,
+node bindings and metadata are preserved. Filler ground remains an exported estimate;
+the app does not generate replacement terrain or use it as measured road geometry.
+
+The server checks physical containment, size and hash, bounds all reconstruction allocations,
+validates the reconstructed GLB under the existing scene limits, and verifies its original hash.
+Asset endpoints still return GLB bytes. Older app loaders reject this optional storage layout;
+upgrade the app before selecting such a package. Manifest schema 2 is unchanged.

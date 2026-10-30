@@ -65,7 +65,7 @@ describe('3D plugin surfaces', () => {
   });
   it.each([
     {layoutKey: 'monza_curva_grande'}, {sourceGeometryRevision: 'wrong'}, {sha256: 'bad'},
-    {triangles: 2}, {byteLength: 1}, {bounds: {min: [0, 0, 0], max: [5, 7, 5]}},
+    {storage: null}, {storage: false}, {storage: {encoding: 'unknown'}}, {triangles: 2}, {byteLength: 1}, {bounds: {min: [0, 0, 0], max: [5, 7, 5]}},
     {asset: '../escape.glb'}, {asset: 'C:/escape.glb'}, {asset: 'scenes\\escape.glb'}, {coverage: 'invented'},
   ])('rejects invalid metadata %j without serving partial packages', patch => {
     const f = fixture(); f.write('scenes/index.json', [{...f.scene, ...patch}]);

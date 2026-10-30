@@ -324,6 +324,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   loads metadata/binary through the API client. The existing replay cursor owns time in both views.
   `vehicleMeshPackage.ts` binds optional visible models to exact vehicle catalog record IDs;
   `meshAsset.ts` owns shared GLB/hash/containment validation and request-time integrity checks.
+  `groundGrid.ts` reconstructs uncompressed exact ground-grid scene storage before the GLB validator and asset endpoints.
   `/api/data-plugin/vehicle-meshes/:recordId` and `/:revision/asset` expose those resources.
   `vehicleMeshApi.ts` verifies identity/package revisions, and the 3D viewer assembles native body,
   tyre and rim geometry with independent primary/ghost materials. Unavailable models retain
