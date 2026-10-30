@@ -17,10 +17,9 @@ function resource(root: string, relative: string): string {
 
 function storedBytes(metadata: MeshAsset): number { return metadata.storage?.byteLength ?? metadata.byteLength; }
 function decode(bytes: Buffer, metadata: MeshAsset): Buffer {
-  const digest = (value: Buffer) => createHash('sha256').update(value).digest('hex');
-  if (digest(bytes) !== (metadata.storage?.sha256 ?? metadata.sha256)) throw Error('Mesh hash mismatch');
-  const result = metadata.storage ? decodeGroundGrid(bytes, metadata.byteLength) : bytes;
-  if (digest(result) !== metadata.sha256) throw Error('Decoded mesh hash mismatch');
+  if (!metadata.storage) return bytes;
+  const result = decodeGroundGrid(bytes, metadata.byteLength);
+  if (createHash('sha256').update(result).digest('hex') !== metadata.sha256) throw Error('Decoded mesh hash mismatch');
   return result;
 }
 
@@ -30,7 +29,9 @@ export function registerMeshAsset<T extends MeshAsset>(root: string, metadata: T
   if (typeof metadata.asset !== 'string' || !metadata.asset.endsWith(storage ? '.lmg' : '.glb') || !/^[a-f0-9]{64}$/.test(metadata.sha256) || !Number.isSafeInteger(metadata.byteLength) || metadata.byteLength < 28 || metadata.byteLength > 128_000_000) throw Error('Invalid mesh asset');
   const file = resource(root, metadata.asset), stat = fs.statSync(file);
   if (!stat.isFile() || stat.size !== storedBytes(metadata) || stat.size > 128_000_000) throw Error('Mesh budget exceeded');
-  const bytes = decode(fs.readFileSync(file), metadata);
+  const stored = fs.readFileSync(file);
+  if (createHash('sha256').update(stored).digest('hex') !== (metadata.storage?.sha256 ?? metadata.sha256)) throw Error('Mesh hash mismatch');
+  const bytes = decode(stored, metadata);
   const checked = validateSceneGlb(bytes, wheelPivots);
   if (checked.triangles !== metadata.triangles || !metadata.bounds || !Array.isArray(metadata.bounds.min) || !Array.isArray(metadata.bounds.max) || metadata.bounds.min.length !== 3 || metadata.bounds.max.length !== 3 || checked.min.some((n, i) => n !== metadata.bounds.min[i]) || checked.max.some((n, i) => n !== metadata.bounds.max[i])) throw Error('Mesh bounds mismatch');
   return {metadata: structuredClone(metadata), file};
