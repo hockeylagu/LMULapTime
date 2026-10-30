@@ -20,6 +20,7 @@ vi.mock('three', async importOriginal => {
   }};
 });
 vi.mock('three/addons/loaders/GLTFLoader.js', () => ({GLTFLoader: class {
+  setMeshoptDecoder() { return this; }
   async parseAsync() {
     const root = new Group(), road = new Mesh(new BoxGeometry(200, 1, 200), new MeshBasicMaterial());
     road.name = 'road'; road.position.y = -0.5; root.add(road);

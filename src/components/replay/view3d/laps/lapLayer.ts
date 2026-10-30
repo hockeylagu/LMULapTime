@@ -1,3 +1,4 @@
+import {MeshoptDecoder} from 'meshoptimizer/decoder';
 import { BufferGeometry, Group, Mesh, type Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
@@ -21,7 +22,7 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     if (!asset) return Promise.resolve(null);
     let pending = models.get(asset.bytes);
     if (!pending) {
-      pending = new GLTFLoader().parseAsync(asset.bytes, '').then(result => {
+      pending = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(asset.bytes, '').then(result => {
         result.scene.traverse(object => {
           if (object instanceof Mesh && object.geometry instanceof BufferGeometry) object.geometry.computeVertexNormals();
         });

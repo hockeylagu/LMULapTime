@@ -11,13 +11,12 @@ export function loadScenePackage(root: string, catalog: unknown, geometry: (key:
   for (const value of catalog as unknown[]) {
     if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('Invalid scene metadata');
     const row = value as TrackScene;
-    const allowed = new Set(['schemaVersion', 'layoutKey', 'coordinates', 'sourceGeometryRevision', 'revision', 'asset', 'sha256', 'byteLength', 'bounds', 'triangles', 'coverage', 'storage']);
-    if (Object.keys(row).some(key => !allowed.has(key)) || row.schemaVersion !== 1 || row.coordinates !== 'lmu-local-xyz-metres' || (row.coverage !== 'surfaces' && row.coverage !== 'surfaces+barriers') || typeof row.layoutKey !== 'string' || typeof row.asset !== 'string' || !row.asset.endsWith(row.storage ? '.lmg' : '.glb') || !/^[a-f0-9]{64}$/.test(row.sha256) || row.revision !== `scene-${row.sha256}`) throw Error('Invalid scene contract');
-    if (Object.hasOwn(row, 'storage') && (!row.storage || typeof row.storage !== 'object' || Array.isArray(row.storage))) throw Error('Invalid scene storage');
+    const allowed = new Set(['schemaVersion', 'layoutKey', 'coordinates', 'sourceGeometryRevision', 'revision', 'asset', 'sha256', 'byteLength', 'bounds', 'triangles', 'coverage']);
+    if (Object.keys(row).some(key => !allowed.has(key)) || row.schemaVersion !== 1 || row.coordinates !== 'lmu-local-xyz-metres' || (row.coverage !== 'surfaces' && row.coverage !== 'surfaces+barriers') || typeof row.layoutKey !== 'string' || typeof row.asset !== 'string' || !row.asset.endsWith('.glb') || !/^[a-f0-9]{64}$/.test(row.sha256) || row.revision !== `scene-${row.sha256}`) throw Error('Invalid scene contract');
     const track = geometry(row.layoutKey);
     if (!track || track.geometryRevision !== row.sourceGeometryRevision || result.has(row.layoutKey)) throw Error('Scene geometry mismatch');
     const shared = files.get(row.asset);
-    if (shared && JSON.stringify([shared.metadata.sha256, shared.metadata.byteLength, shared.metadata.triangles, shared.metadata.bounds, shared.metadata.storage]) !== JSON.stringify([row.sha256, row.byteLength, row.triangles, row.bounds, row.storage])) throw Error('Scene asset conflict');
+    if (shared && JSON.stringify([shared.metadata.sha256, shared.metadata.byteLength, shared.metadata.triangles, shared.metadata.bounds]) !== JSON.stringify([row.sha256, row.byteLength, row.triangles, row.bounds])) throw Error('Scene asset conflict');
     if (!shared) {
       files.set(row.asset, registerMeshAsset(root, row));
       totalBytes += row.byteLength;

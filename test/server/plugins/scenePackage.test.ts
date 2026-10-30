@@ -40,6 +40,23 @@ describe('3D plugin surfaces', () => {
     expect(plugin.sceneAsset('monza_gp', f.scene.revision)).toEqual(f.bytes);
     expect(plugin.sceneAsset('monza_gp', 'stale')).toBeNull();
   });
+  it('serves standard Meshopt GLBs directly and detects mutation', async () => {
+    const f = fixture();
+    const sample = JSON.parse(fs.readFileSync(new URL('../../fixtures/scenes/meshopt-glb.json', import.meta.url), 'utf8')) as {meshopt: string};
+    const bytes = Buffer.from(sample.meshopt, 'base64'), sha256 = createHash('sha256').update(bytes).digest('hex');
+    const scene = {...f.scene, sha256, revision: 'scene-'+sha256, byteLength: bytes.length};
+    fs.writeFileSync(path.join(f.root, scene.asset), bytes); f.write('scenes/index.json', [scene]);
+    const plugin = new DataPlugin(f.root);
+    expect(plugin.status.state).toBe('ready');
+    expect(plugin.sceneAsset(scene.layoutKey, scene.revision)).toEqual(bytes);
+    const app = express(); app.use('/api/data-plugin', createDataPluginRouter(plugin));
+    const response = await request(app).get(`/api/data-plugin/scenes/${scene.layoutKey}/${scene.revision}/asset`).expect(200);
+    expect(response.headers['content-type']).toContain('model/gltf-binary');
+    expect(Number(response.headers['content-length'])).toBe(bytes.length);
+    const changed = Buffer.from(bytes); changed[changed.length - 1] ^= 1;
+    fs.writeFileSync(path.join(f.root, scene.asset), changed);
+    expect(() => plugin.sceneAsset(scene.layoutKey, scene.revision)).toThrow('changed');
+  });
   it('accepts scenes that also carry barriers', () => {
     const f = fixture(); f.write('scenes/index.json', [{...f.scene, coverage: 'surfaces+barriers'}]);
     expect(new DataPlugin(f.root).scene('monza_gp')?.coverage).toBe('surfaces+barriers');
@@ -65,7 +82,7 @@ describe('3D plugin surfaces', () => {
   });
   it.each([
     {layoutKey: 'monza_curva_grande'}, {sourceGeometryRevision: 'wrong'}, {sha256: 'bad'},
-    {storage: null}, {storage: false}, {storage: {encoding: 'unknown'}}, {triangles: 2}, {byteLength: 1}, {bounds: {min: [0, 0, 0], max: [5, 7, 5]}},
+    {triangles: 2}, {byteLength: 1}, {bounds: {min: [0, 0, 0], max: [5, 7, 5]}},
     {asset: '../escape.glb'}, {asset: 'C:/escape.glb'}, {asset: 'scenes\\escape.glb'}, {coverage: 'invented'},
   ])('rejects invalid metadata %j without serving partial packages', patch => {
     const f = fixture(); f.write('scenes/index.json', [{...f.scene, ...patch}]);

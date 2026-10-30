@@ -1,3 +1,6 @@
+import {MeshoptDecoder} from 'meshoptimizer/decoder';
+await MeshoptDecoder.ready;
+
 /** Deliberately small glTF subset: static indexed surfaces, embedded binary, no URLs/extensions. */
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('Invalid GLB object');
@@ -20,13 +23,50 @@ function noExternalResources(value: unknown, depth = 0): void {
   }
 }
 
+/** Only the ratified Meshopt extension is allowed; all decoded data keeps the existing budgets. */
+function meshoptBuffer(json: Record<string, unknown>, binary: Buffer): Buffer {
+  if (json.extensionsUsed === undefined && json.extensionsRequired === undefined) return binary;
+  const name = 'EXT_meshopt_compression';
+  for (const field of ['extensionsUsed', 'extensionsRequired']) {
+    const values = list(json[field], 1);
+    if (values.length !== 1 || values[0] !== name) throw Error('Unsupported GLB extension');
+  }
+  const buffers = list(json.buffers, 2).map(record);
+  if (buffers.length !== 2 || integer(buffers[0].byteLength, binary.length) < binary.length - 3) throw Error('Invalid Meshopt buffers');
+  const fallback = record(buffers[1].extensions);
+  const marker = record(fallback[name]);
+  if (Object.keys(fallback).length !== 1 || Object.keys(marker).length !== 1 || marker.fallback !== true || buffers.some(buffer => Object.keys(buffer).some(key => !['byteLength', 'extensions'].includes(key))) || buffers[0].extensions !== undefined) throw Error('Invalid Meshopt fallback');
+  const decoded = Buffer.alloc(integer(buffers[1].byteLength, 128_000_000));
+  let total = 0;
+  for (const item of list(json.bufferViews, 256)) {
+    const view = record(item), extensions = record(view.extensions), encoding = record(extensions[name]);
+    if (Object.keys(extensions).length !== 1 || Object.keys(encoding).some(key => !['buffer', 'byteOffset', 'byteLength', 'byteStride', 'count', 'mode', 'filter'].includes(key))) throw Error('Unsupported Meshopt view');
+    const count = integer(encoding.count, 12_000_000), stride = integer(encoding.byteStride, 12);
+    const offset = integer(view.byteOffset ?? 0, decoded.length), length = integer(view.byteLength, decoded.length);
+    const sourceOffset = integer(encoding.byteOffset ?? 0, binary.length), sourceLength = integer(encoding.byteLength, binary.length);
+    const mode = encoding.mode;
+    if (view.buffer !== 1 || encoding.buffer !== 0 || offset % 4 || sourceOffset % 4 || offset + length > decoded.length || sourceOffset + sourceLength > binary.length || count * stride !== length
+      || (encoding.filter !== undefined && encoding.filter !== 'NONE')
+      || !((mode === 'ATTRIBUTES' && stride === 12) || ((mode === 'TRIANGLES' || mode === 'INDICES') && stride === 4))
+      || (view.byteStride !== undefined && (mode !== 'ATTRIBUTES' || view.byteStride !== stride)) || (mode === 'TRIANGLES' && count % 3)) throw Error('Invalid Meshopt view');
+    total += length;
+    if (total > 128_000_000) throw Error('Meshopt decoded budget exceeded');
+    MeshoptDecoder.decodeGltfBuffer(decoded.subarray(offset, offset + length), count, stride, binary.subarray(sourceOffset, sourceOffset + sourceLength), mode, 'NONE');
+    delete view.extensions; delete view.byteStride; view.buffer = 0;
+  }
+  delete json.extensionsUsed; delete json.extensionsRequired;
+  json.buffers = [{byteLength: decoded.length}];
+  return decoded;
+}
+
 export function validateSceneGlb(bytes: Buffer, wheelPivots = false): { triangles: number; min: number[]; max: number[] } {
   if (bytes.length < 28 || bytes.length > 128_000_000 || bytes.readUInt32LE(0) !== 0x46546c67 || bytes.readUInt32LE(4) !== 2 || bytes.readUInt32LE(8) !== bytes.length) throw Error('Invalid GLB header');
   const jsonLength = bytes.readUInt32LE(12), binHeader = 20 + jsonLength;
   if (jsonLength > 1_000_000 || jsonLength % 4 || binHeader + 8 > bytes.length || bytes.readUInt32LE(16) !== 0x4e4f534a || bytes.readUInt32LE(binHeader + 4) !== 0x004e4942) throw Error('Invalid GLB chunks');
-  const bin = bytes.subarray(binHeader + 8);
+  let bin = bytes.subarray(binHeader + 8);
   if (bytes.readUInt32LE(binHeader) !== bin.length || bin.length % 4) throw Error('Invalid GLB binary');
   const json = record(JSON.parse(bytes.toString('utf8', 20, binHeader)) as unknown);
+  bin = meshoptBuffer(json, bin);
   noExternalResources(json);
   if (record(json.asset).version !== '2.0') throw Error('Unsupported glTF');
   const buffers = list(json.buffers, 1);

@@ -305,26 +305,22 @@ regressions use `LMU_PERSONAL_REGRESSION_ROOT` for a package and
 `__snapshots__/`. These folders must stay outside committed release inputs.
 Use `LMU_PLUGIN_ROOT` too when testing recording enrichment with that package.
 
-### Exact ground-grid scene storage
+### Standard Meshopt GLBs
 
-Scene rows may name an uncompressed `.lmg` file and include
-`storage: {encoding: "ground-grid-v1", sha256, byteLength}`. The existing row hash,
-byte length, bounds, triangle count and revision describe the reconstructed GLB;
-storage fields describe the physical file. Ordinary GLBs remain supported. Vehicle
-files remain GLBs and multiple distinct vehicle records may reference one identical file.
+Track scenes and car meshes may use the ratified `EXT_meshopt_compression` extension.
+Files remain GLBs; asset hashes, byte lengths and revisions describe the physical GLB served
+unchanged by the server. No custom container or storage metadata is used. Existing uncompressed
+GLBs remain supported. Upgrade the app before selecting a Meshopt package.
 
-All integers and float32 payloads are little-endian. LMG1 contains a 20-byte header:
-magic `LMG1`, original GLB length, original-prefix length, compact-GLB length, grid length
-(four uint32 values). Payloads follow in that order. The original prefix is the complete
-GLB JSON and binary chunk header. The compact GLB retains every non-ground mesh and
-its referenced vertices. The grid contains `LGF1`, uint32 X/Z dimensions (2–768), exact
-float32 X coordinates, Z coordinates, then row-major heights. Each cell is triangulated
-`k,k+nx,k+1; k+1,k+nx,k+nx+1`. The decoder merges the byte-sorted compact vertices
-and grid vertices, restoring original indices and original GLB bytes. Original materials,
-node bindings and metadata are preserved. Filler ground remains an exported estimate;
-the app does not generate replacement terrain or use it as measured road geometry.
+The supported static subset uses embedded compressed data plus the extension's declared fallback
+buffer, float32 XYZ and uint32 triangle indices. `ATTRIBUTES`, `TRIANGLES` and `INDICES` modes
+with no lossy filters are accepted. The server bounds compressed ranges and decoded allocation
+before calling the standard Meshoptimizer decoder, then applies the existing coordinate, mesh,
+triangle, vertex, wheel-pivot and scene limits to the decoded data. External resources and other
+extensions remain rejected. Three.js uses its Meshopt decoder for both track and car loading.
 
-The server checks physical containment, size and hash, bounds all reconstruction allocations,
-validates the reconstructed GLB under the existing scene limits, and verifies its original hash.
-Asset endpoints still return GLB bytes. Older app loaders reject this optional storage layout;
-upgrade the app before selecting such a package. Manifest schema 2 is unchanged.
+The exporter uses glTF Transform's standard extension writer without quantization or simplification.
+Coordinates retain exact float32 bits; triangle ordering, topology and winding are preserved,
+allowing the triangle codec's cyclic rotation of the three corners. Materials, node bindings,
+transforms and wheel pivots are checked before publishing. Identical car GLBs share a physical
+file while all vehicle records and aliases retain their own identities.

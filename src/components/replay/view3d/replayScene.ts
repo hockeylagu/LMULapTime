@@ -1,3 +1,4 @@
+import {MeshoptDecoder} from 'meshoptimizer/decoder';
 import { BufferGeometry, FrontSide, Group, Mesh, type Material, OrthographicCamera, PerspectiveCamera, Quaternion, Scene, Vector3, WebGLRenderer, type Object3D } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
@@ -77,7 +78,7 @@ export async function createReplayScene(
   colorBy: MapColorMode = 'default',
   boardArtwork: LoadedBrakeBoardArtwork[] = [],
 ): Promise<ReplaySceneHandle> {
-  const gltf = await new GLTFLoader().parseAsync(bytes, '');
+  const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(bytes, '');
   const origin = new Vector3(...metadata.bounds.min).add(new Vector3(...metadata.bounds.max)).multiplyScalar(0.5);
   const barriers = detachBarriers(gltf.scene);
   // Road heights exclude the filler ground and walls.
