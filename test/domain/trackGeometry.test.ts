@@ -202,7 +202,7 @@ describe('track map display validation', () => {
     const display = mapDisplay();
     display.brakeMarkers = [
       { id: 'brake-150', center: [12, 34], label: '150', stationM: 900, side: 'left' },
-      { id: 'brake-unknown', center: [56, 78], stationM: 1200, side: 'right' },
+      { id: 'brake-unknown', center: [56, 78], stationM: 1200, side: 'right', baseY: 13.45 },
     ];
     expect(parseTrackMapDisplay(display, 'test_gp', 'mesh-v2').brakeMarkers).toEqual(display.brakeMarkers);
     expect(parseTrackMapDisplay(mapDisplay(), 'test_gp', 'mesh-v2')).not.toHaveProperty('brakeMarkers');

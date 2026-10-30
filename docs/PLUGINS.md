@@ -98,7 +98,7 @@ escapes are rejected. The whole package is validated before activation.
 Track catalogs use the existing canonical layout identities. Geometry files sit beside
 the catalog as `<layoutKey>.json`; optional display files are
 `tracks-display/<layoutKey>.json`. Geometry and projection revisions must match their
-contents; a display's `sourceRevision` must match its geometry revision. The same
+contents; a display's `sourceRevision` must match its geometry revision. Display brake markers may carry `baseY`, the native height of the board bottom where the game bounds are measured. The same
 provider supplies backend projection, profiles and frontend geometry. Null samples
 remain unavailable, including measured widths, kerb profiles and banking.
 
@@ -147,7 +147,9 @@ Scene catalog entries use `schemaVersion: 1`, `layoutKey`,
 `byteLength`, `bounds: { min: [x,y,z], max: [x,y,z] }`, `triangles` and `coverage: "surfaces"` or `"surfaces+barriers"`. The latter adds roadside
 structure as nodes `barrier`, `tyreBarrier`, `tecpro` and `pitWall` (collision proxies, which stand
 ~10 m tall, capped by the exporter to about a metre over the wall beneath, dropping catch fences), and `building`, `wall` and `armco` (the game's own render
-meshes at their real height; `armco` is the low-LOD guard rail); the viewer keeps them out of road heights, and the generated relief rises to their base.
+meshes at their real height; `armco` is the low-LOD guard rail), standing down to the filler ground; the viewer keeps them out of road heights.
+New ground-bearing exports also have a `ground` node: the exporter's filler ground, a 6 m (or coarser, at most 768 corners a side) grid
+0.2 m under the scanned surfaces, fading to a flat level 700 m out. Ground sheets are wound face up.
 Primitives may share one position accessor; validation budgets and scans it once.
 `revision` is `scene-<sha256>` over the GLB bytes. Positions are native LMU XYZ metres, Y up,
 without model transforms. These native positions are left-handed: the viewer reflects Z once
@@ -156,8 +158,8 @@ for Three.js, including car bodies, trails and camera targeting. An overhead vie
 
 The first supported GLB subset is static indexed triangles, float32 XYZ, uint32 indices, simple
 untextured materials and one root node per mesh. External resources, extensions, transforms,
-animation, textures and oversized/invalid buffers are rejected. Limits are 64 MB per scene,
-512 MB total, two million triangles and three million visited vertices across primitives, and
+animation, textures and oversized/invalid buffers are rejected. Limits are 128 MB per scene,
+1 GB total, four million triangles and six million visited vertices across primitives, and
 100 catalog rows. Layouts of one venue whose scenes are identical name the same content-named file
 (`scenes/<sha256>.glb`); it is read, validated and counted once, and its rows must agree.
 Catalog and binary paths remain package-contained, including junction checks. An invalid scene
@@ -187,14 +189,48 @@ continuous samples. Recorded body Y already carries vertical motion; four-corner
 measurements, when available, are displayed in millimetres and are never added to Y again.
 Missing attitude channels remain partial. Body-origin placement and individual wheel contact
 are not calibrated: the display origin is fitted to the lap-median road contact, wheels follow
-ride height (else the road surface) within ±0.15 m, and the generic sky, fog and generated relief
-terrain (kept under every scanned triangle) are filler, not exported scenery. Scenes contain native road,
+ride height (else the road surface) within ±0.15 m, and the generic sky, fog and the package's filler
+ground (kept under every scanned triangle) are estimates, not the game's scenery. Scenes contain native road,
 kerbs, runoff, pit, paint, grass and gravel with simple colors, plus the roadside structure each
 venue's SCN names (coverage varies by venue). Textures are not included. A missing scene or WebGL
 context offers a return to 2D.
 
+Source-coloured packages bake a small palette from each layout's primary albedo/UV0 into flat
+materials. `kerb-source-*` groups retain those colours and kerb shadows; only legacy `kerb` groups
+receive the generic red/white stripes. Runoff without usable source colour uses a neutral fallback.
+This is a simplified colour bake, not full source shading: layered textures, wetness and decals are
+not reproduced, and small atlas-boundary artifacts can remain. Analytical revisions do not change.
+Static packages without a packaged `ground` mesh remain supported: their surface winding is
+repaired for display and the scene uses the horizon ground. Packaged filler, when present, stays
+separate from road-height sampling for cars, racing lines and braking boards.
+
 The sibling pipeline's `export:plugin --scenes` adds every layout's scene to a new package from the
 same validated build and decoded GMT buffers. See the [remaining 3D work](plans/proposed/REPLAY_3D_PLAN.md).
+
+### Optional brake-board artwork
+
+Version 2 packages may add `scenes.brakeBoardArtwork: "brake-board-artwork/index.json"`.
+This is a separate PNG catalog; the static GLB subset still rejects embedded textures/images.
+Each entry contains `layoutKey`, `sourceGeometryRevision`, `markerIds`, the published `label`,
+`revision: "artwork-<sha256>"`, `sha256`, `asset`, `byteLength`, `widthPx`, `heightPx`, `widthM` and
+`heightM`. IDs and label must match the exact layout's display markers and analytical revision.
+One marker cannot have two artwork bindings. Measured panel sizes are 0.05–5 m per side.
+
+Assets are content-named `brake-board-artwork/<sha256>.png` files contained inside the package,
+including junction checks. Validation checks PNG signature/header/end, exact dimensions and hash;
+only non-interlaced 8-bit grayscale/RGB images (with optional alpha) and IHDR/IDAT/IEND chunks
+are accepted; animated images are excluded. Limits are 1 MB per image, 1024 pixels per side,
+16 MB of distinct images and 2048 catalog entries.
+Files are checked again on requests. `GET /api/data-plugin/brake-board-artwork/:layoutKey` returns
+metadata without asset paths; `GET /api/data-plugin/brake-board-artwork/:layoutKey/:revision/asset`
+serves only the registered PNG with `nosniff`. Stale or changed assets fail closed.
+
+The renderer matches marker IDs and labels, preserves source panel proportions, and shares an image
+texture across repeated signs. Source UV corners are rectified for readable artwork before export;
+board faces remain outside the reflected world so text does not mirror. Missing artwork or an older
+package retains generated labels. Optional image loading errors never prevent the track from opening.
+These crops reproduce static board artwork, not dynamic digital flag states or a full game shader.
+Packages declaring this field require an app version that supports it; older strict loaders reject it.
 
 ### Optional visible vehicle meshes
 

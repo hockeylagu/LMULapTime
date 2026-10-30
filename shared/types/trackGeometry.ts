@@ -39,6 +39,8 @@ export interface TrackBrakeMarker {
   stationM: number;
   side: 'left' | 'right';
   normal?: [number, number];
+  /** Native height of the board's bottom edge, when the game's board bounds are known. */
+  baseY?: number;
 }
 
 export interface TrackMapDisplay {

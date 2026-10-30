@@ -218,6 +218,7 @@ export function parseTrackMapDisplay(value: unknown, layoutKey: string, sourceRe
         const normal = array(marker.normal, `${path}.normal`, 2);
         finite(normal[0], `${path}.normal[0]`); finite(normal[1], `${path}.normal[1]`);
       }
+      if (marker.baseY !== undefined) finite(marker.baseY, `${path}.baseY`);
     }
   }
   return value as TrackMapDisplay;

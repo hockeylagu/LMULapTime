@@ -40,7 +40,7 @@ export interface DataPluginManifest {
   version: string;
   tracks?: { catalog: string };
   vehicles?: { catalog: string; logos?: string };
-  scenes?: { catalog: string };
+  scenes?: { catalog: string; brakeBoardArtwork?: string };
   vehicleMeshes?: { catalog: string };
 }
 export interface DataPluginStatus {

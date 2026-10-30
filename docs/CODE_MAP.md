@@ -298,6 +298,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
 
 ### Local Data Packages (`server/plugins/`)
 - `dataPlugin.ts` loads external track geometry, physical profiles, and manufacturer assets from backend-only `LMU_PLUGIN_ROOT`.
+- `brakeBoardArtwork.ts` registers optional marker-bound PNGs with layout/revision, hash and containment checks. `src/api/scenes/brakeBoardArtworkApi.ts` loads their images; `view3d/brakeBoards.ts` shares source textures and retains generated labels when artwork is unavailable. The contract is in `docs/PLUGINS.md`.
   Optional v2 surface scenes use `scenePackage.ts` and the bounded static GLB validator `sceneGlb.ts`;
   `/api/data-plugin/scenes/:layoutKey` returns metadata and `/:revision/asset` serves hash-verified
   binary content. [Plugin contracts](PLUGINS.md#3d-track-scenes-package-version-2) own limits.

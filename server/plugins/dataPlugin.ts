@@ -12,6 +12,8 @@ import { loadVehicleMeshPackage } from './vehicleMeshPackage.js';
 import type { TrackScene } from '../../shared/types/scenes/trackScene.js';
 import type { VehicleMesh, VehicleMeshResource } from '../../shared/types/scenes/vehicleMesh.js';
 import type { TrackSceneResource } from '../../shared/types/scenes/trackScene.js';
+import type { BrakeBoardArtworkResource } from '../../shared/types/scenes/brakeBoardArtwork.js';
+import { loadBoardArtwork, readBoardArtwork, type RegisteredBoardArtwork } from './brakeBoardArtwork.js';
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('Expected object');
@@ -138,6 +140,7 @@ export class DataPlugin {
   private readonly logoRecords = new Map<string, string>();
   private scenes = new Map<string, RegisteredMesh<TrackScene>>();
   private vehicleMeshes = new Map<string, RegisteredMesh<VehicleMesh>>();
+  private boardArtwork = new Map<string, RegisteredBoardArtwork[]>();
   private root = '';
   public constructor(root?: string) {
     this.status = {state:root?'invalid':'absent',revision:'none',tracks:false,vehicles:false};
@@ -188,15 +191,16 @@ export class DataPlugin {
         }
       }
       if (manifest.scenes !== undefined) {
-        const scenes = object(manifest.scenes); keys(scenes, ['catalog']);
+        const scenes = object(manifest.scenes); keys(scenes, ['catalog', 'brakeBoardArtwork']);
         this.scenes = loadScenePackage(base, read(text(scenes.catalog)), key => this.trackGeometry(key));
+        if (scenes.brakeBoardArtwork !== undefined) this.boardArtwork = loadBoardArtwork(base, read(text(scenes.brakeBoardArtwork)), key => this.tracks.get(key) ?? null);
       }
       if (manifest.vehicleMeshes !== undefined) {
         const meshes = object(manifest.vehicleMeshes); keys(meshes, ['catalog']);
         this.vehicleMeshes = loadVehicleMeshPackage(base, read(text(meshes.catalog)), this.records);
       }
       this.status={state:'ready',revision:digest.digest('hex'),tracks:!!manifest.tracks,vehicles:!!manifest.vehicles, ...(this.logoRecords.size > 0 ? {logos: true} : {}), ...(this.scenes.size ? {scenes: true} : {}), ...(this.vehicleMeshes.size ? {vehicleMeshes: true} : {})};
-    } catch {this.tracks.clear(); this.records.length=0; this.logoRecords.clear(); this.scenes.clear(); this.vehicleMeshes.clear(); /* Generic status never discloses local paths. */}
+    } catch {this.tracks.clear(); this.records.length=0; this.logoRecords.clear(); this.scenes.clear(); this.vehicleMeshes.clear(); this.boardArtwork.clear(); /* Generic status never discloses local paths. */}
   }
   public scene(key: string): TrackSceneResource | null {
     const registered = this.scenes.get(key);
@@ -214,6 +218,16 @@ export class DataPlugin {
     if (!mesh) return null;
     const {asset: _asset, ...metadata} = mesh.metadata;
     return {...structuredClone(metadata), packageRevision: this.status.revision};
+  }
+  public brakeBoardArtwork(layoutKey: string): BrakeBoardArtworkResource[] {
+    return (this.boardArtwork.get(layoutKey) ?? []).map(row => {
+      const {asset: _asset, ...metadata} = row.metadata;
+      return {...structuredClone(metadata), packageRevision: this.status.revision};
+    });
+  }
+  public brakeBoardImage(layoutKey: string, revision: string): Buffer | null {
+    const row = this.boardArtwork.get(layoutKey)?.find(image => image.metadata.revision === revision);
+    return row ? readBoardArtwork(this.root, row) : null;
   }
   public vehicleMeshAsset(recordId: string, revision: string): Buffer | null {
     const mesh = this.vehicleMeshes.get(recordId);

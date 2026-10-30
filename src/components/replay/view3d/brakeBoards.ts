@@ -1,8 +1,9 @@
-import { BoxGeometry, CanvasTexture, Group, Mesh, MeshStandardMaterial, PlaneGeometry, SRGBColorSpace, type Vector3 } from 'three';
+import { BoxGeometry, CanvasTexture, Group, Mesh, MeshStandardMaterial, PlaneGeometry, SRGBColorSpace, Texture, type Vector3 } from 'three';
 import type { TrackBrakeMarker } from '../../../../shared/types/trackGeometry.js';
 import type { ReplayTrajectoryPoint } from '../../../../shared/types/replay.js';
 import { nativeToScene } from './sceneFrame.js';
 import type { SurfaceHeight } from './surfaceProjection.js';
+import type { LoadedBrakeBoardArtwork } from '../../../api/scenes/brakeBoardArtworkApi.js';
 
 /** Distance boards follow the game's Portimão signs: tall white portrait panels, digits stacked, on steel posts. */
 const DISTANCE_BOARD = {widthM: 0.9, heightM: 1.6, liftM: 0.45};
@@ -46,20 +47,30 @@ function nearestTravel(points: ReplayTrajectoryPoint[], x: number, z: number): {
  * Exported roadside brake boards as upright labelled signs in scene space (outside the reflected
  * world group, so text never mirrors). Boards with no recorded lap within 80 m stay out.
  */
-export function makeBrakeBoards(markers: TrackBrakeMarker[], points: ReplayTrajectoryPoint[], origin: Vector3, surfaceHeight: SurfaceHeight): Group {
+export function makeBrakeBoards(markers: TrackBrakeMarker[], points: ReplayTrajectoryPoint[], origin: Vector3, surfaceHeight: SurfaceHeight, artwork: LoadedBrakeBoardArtwork[] = []): Group {
   const boards = new Group(); boards.name = 'brake-boards';
   const frame = new MeshStandardMaterial({color: '#2b3038', roughness: 0.8});
   const steel = new MeshStandardMaterial({color: '#a9aeb3', roughness: 0.5, metalness: 0.6});
-  const textures = new Map<string, CanvasTexture | null>();
+  const textures = new Map<string, Texture | null>();
+  const byMarker = new Map(artwork.flatMap(row => row.metadata.markerIds.map(id => [id, row] as const)));
   for (const marker of markers) {
     const [x, z] = marker.center, label = marker.label ?? '';
     const travel = nearestTravel(points, x, z);
     if (!label || !travel) continue;
-    const distance = /^\d+$/.test(label), size = distance ? DISTANCE_BOARD : OTHER_BOARD;
+    const matched = byMarker.get(marker.id), source = matched?.metadata.label === label ? matched : undefined;
+    const distance = /^\d+$/.test(label), fallbackSize = distance ? DISTANCE_BOARD : OTHER_BOARD;
     const roadY = travel.y - BODY_ORIGIN_HEIGHT_M;
     const ground = surfaceHeight({x, y: roadY + 3, z}, 8) ?? roadY;
-    if (!textures.has(label)) textures.set(label, labelTexture(label, distance));
-    const texture = textures.get(label) ?? null;
+    // A board the game hangs high (Daytona's bus stop boards sit on the catch fence) keeps its height on longer posts.
+    const liftM = marker.baseY === undefined ? fallbackSize.liftM : Math.max(fallbackSize.liftM, marker.baseY - ground);
+    const size = source ? {...fallbackSize, liftM, widthM: source.metadata.widthM, heightM: source.metadata.heightM} : {...fallbackSize, liftM};
+    const textureKey = source?.metadata.revision ?? label;
+    if (!textures.has(textureKey)) {
+      const texture = source ? new Texture(source.image) : labelTexture(label, distance);
+      if (texture) { texture.colorSpace = SRGBColorSpace; texture.anisotropy = 8; texture.needsUpdate = true; }
+      textures.set(textureKey, texture);
+    }
+    const texture = textures.get(textureKey) ?? null;
     const board = new Group(); board.name = `brake-board-${label}`;
     const centreY = size.liftM + size.heightM / 2;
     const face = new Mesh(new PlaneGeometry(size.widthM, size.heightM), new MeshStandardMaterial({map: texture, color: texture ? '#ffffff' : '#eceeee', roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1}));
