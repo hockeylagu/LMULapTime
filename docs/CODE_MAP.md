@@ -305,14 +305,19 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   `src/components/replay/view3d/` owns the lazy Three.js viewer, scene resources, cameras and
   discontinuity-safe XYZ/quaternion attitude sampling in `replayPose.ts`, preserving recorded body
   height and available pitch/roll. `sceneFrame.ts` owns native-to-render handedness.
+  `laps/useReplayScene.ts` retains the scene for a layout/geometry/package revision; selecting
+  either lap replaces only `laps/lapLayer.ts` cars, wheel animation and racing lines, preserving
+  the camera and track. Cancelled or superseded builds are discarded and retired lap buffers released.
+  Canvas resizes repaint before the browser paints, avoiding a black frame when embedded toolbars change height.
   `sceneEnvironment.ts` owns sky, fog, the flat horizon ground and the car-following shadow sun;
-  `defaultTerrain.ts` builds filler relief under the scanned surfaces; `brakeBoards.ts` stands
+  the package's `ground` node is the filler under the scanned surfaces; `brakeBoards.ts` stands
   exported brake markers as labelled signs; `racingLine.ts` drapes the 2D-coloured line ribbons;
   `kerbStripes.ts` bands kerbs by lap distance; `tracksideCameras.ts` places the fixed trackside spots;
   `wheelAnimation.ts` fits the model origin to the lap median and drives roll/steer/travel per corner.
   `cameraNavigation.ts` owns projection-aware keyboard pan/zoom. The 3D view shares
   `useGpsMapShortcuts.ts` with 2D; OrbitControls handles pointer input without consuming replay arrows.
-  `cameraModes.ts` owns mode labels/keys and `cameraTracking.ts` preserves user camera/focus offsets
+  `cameraModes.ts` owns mode labels/keys and `cameraTracking.ts` provides velocity-blended target
+  yaw with rotational/vertical damping for Chase mode while preserving user camera/focus offsets
   during Follow/Chase updates; manual camera movement does not change the selected mode.
   `surfaceProjection.ts` drapes depth-tested racing lines on the nearby native road layer; measured
   coordinates and analytics stay native. `ReplayMapContainer` switches 2D/3D, and `trackSceneApi.ts`

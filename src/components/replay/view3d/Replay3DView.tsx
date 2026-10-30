@@ -1,20 +1,29 @@
-import { useContext, useEffect, useEffectEvent, useRef, useState } from 'react';
-import { Pause, Play, RotateCcw } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
-import { fetchTrackScene } from '../../../api/trackSceneApi.js';
-import { fetchVehicleMesh, type LoadedVehicleMesh } from '../../../api/vehicleMeshApi.js';
-import { loadTrackBoundaryGeometry, loadTrackMapDisplay } from '../../../api/trackGeometryApi.js';
-import type { TrackBoundaryGeometry, TrackMapDisplay } from '../../../../shared/types/trackGeometry.js';
-import { apiErrorMessage, isAbortError } from '../../../api/apiClient.js';
-import { ReplayPlaybackCursorContext } from '../inspector/replayPlaybackCursor.js';
+import type { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
+import type { TrackBoundaryGeometry } from '../../../../shared/types/trackGeometry.js';
 import { MapFullscreenButton } from '../map/display/MapFullscreenButton.js';
-import { Select } from '../../common/dropdown/Select.js';
+import { MapViewSwitchButton } from '../map/display/MapViewSwitchButton.js';
+import { MapControlsOverlay } from '../map/MapControlsOverlay.js';
+import { GpsCircuitMinimap } from '../map/GpsCircuitMinimap.js';
+import { ReplayTelemetryHud } from '../inspector/ReplayTelemetryHud.js';
+import { GpsMapTelemetryHud } from '../map/display/GpsMapTelemetryHud.js';
+import { GpsMapTelemetryDock } from '../map/telemetry/GpsMapTelemetryDock.js';
+import { GpsMapExpandedOverlays } from '../map/display/GpsMapExpandedOverlays.js';
+import { ReplayFrictionCircle } from '../map/ReplayFrictionCircle.js';
+import { HeatmapLegendBar } from '../map/HeatmapLegendBar.js';
+import { useGpsSceneDynamics } from '../map/scene/useGpsSceneDynamics.js';
+import { GpsMapModeBar } from '../map/display/GpsMapModeBar.js';
+import { useStoredToggle } from '../map/useStoredToggle.js';
+import {
+  projectTrajectoryPoints, projectBoundaryPoints, computeTrackBoundaryPathD, buildContinuousSvgPath,
+  type MapColorMode,
+} from '../map/replayMapUtils.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
-import { createReplayScene, type ReplaySceneHandle } from './replayScene.js';
-import { CAMERA_MODES, useCameraModeShortcuts, type CameraMode } from './cameraModes.js';
+import { useReplayScene } from './laps/useReplayScene.js';
+import { CameraModeControl, useCameraModeShortcuts, type CameraMode } from './cameraModes.js';
 import { useGpsMapShortcuts } from '../map/useGpsMapShortcuts.js';
 import { ReplayShortcutHelp } from '../ReplayShortcutHelp.js';
-import type { MapColorMode } from '../map/replayMapUtils.js';
 
 interface Props {
   trajectory: ReplayTrajectoryData;
@@ -27,108 +36,118 @@ interface Props {
   /** The 2D map's line colouring, shared so both views show the same line. */
   colorBy?: MapColorMode;
   onChangeColorBy?: (mode: MapColorMode) => void;
+  currentPoint?: ReplayTrajectoryPoint | null;
+  fadedLine?: 'none' | 'primary' | 'baseline';
+  onToggleFadedLine?: (line: 'primary' | 'baseline') => void;
+  trackGeometry?: TrackBoundaryGeometry | null;
+  showFrictionCircle?: boolean;
+  onToggleFrictionCircle?: () => void;
+  isExpanded?: boolean;
+  onToggleExpanded?: (expanded: boolean) => void;
 }
-const modes = CAMERA_MODES.map(option => ({...option, detail: option.shortcut}));
-const LINE_COLORS: Array<{value: MapColorMode; label: string; compare?: boolean}> = [
-  {value: 'default', label: 'Plain line'}, {value: 'pedal', label: 'Pedal'}, {value: 'speed', label: 'Speed'},
-  {value: 'delta', label: 'Delta', compare: true}, {value: 'gainLoss', label: 'Gain / Loss', compare: true},
-];
 
-export default function Replay3DView({trajectory, baseline, currentIndex, onSelectIndex, isPlaying, onTogglePlay, onReturnTo2D, colorBy = 'default', onChangeColorBy}: Props) {
-  const map = useRef<HTMLDivElement>(null);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const host = useRef<HTMLDivElement>(null), scene = useRef<ReplaySceneHandle | null>(null);
-  const cursor = useContext(ReplayPlaybackCursorContext);
+export default function Replay3DView({trajectory, baseline, currentIndex, onSelectIndex, isPlaying, onTogglePlay, onReturnTo2D, colorBy = 'default', onChangeColorBy, currentPoint, fadedLine, onToggleFadedLine, trackGeometry, showFrictionCircle, onToggleFrictionCircle, isExpanded: controlledExpanded, onToggleExpanded}: Props) {
+  const map = useRef<HTMLDivElement>(null), [internalExpanded, setInternalExpanded] = useState(false);
+  const isExpanded = controlledExpanded ?? internalExpanded;
+  const handleToggleExpanded = (expanded?: boolean) => {
+    const next = typeof expanded === 'boolean' ? expanded : !isExpanded;
+    if (onToggleExpanded) onToggleExpanded(next);
+    else setInternalExpanded(next);
+  };
+  const host = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<CameraMode>('follow'), [retry, setRetry] = useState(0);
+  const [internalFadedLine, setInternalFadedLine] = useState<'none' | 'primary' | 'baseline'>('none');
+  const [isTraceHidden, toggleTrace] = useStoredToggle('lmu-map-trace-collapsed-v1', false);
+  const activeFadedLine = fadedLine ?? internalFadedLine;
+  const {scene, state} = useReplayScene({host, trajectory, baseline, currentIndex, mode, colorBy, fadedLine: activeFadedLine, retry});
+  const handleToggleFadedLine = onToggleFadedLine ?? ((line: 'primary' | 'baseline') => setInternalFadedLine(f => (f === line ? 'none' : line)));
+
+  const [localShowFriction, toggleLocalFriction] = useState(false);
+  const effectiveShowFriction = showFrictionCircle ?? localShowFriction;
+  const handleToggleFriction = onToggleFrictionCircle ?? (() => toggleLocalFriction(value => !value));
+  const baselinePoints = useMemo(() => baseline?.points ?? [], [baseline]);
+  const svgPoints = useMemo(() => projectTrajectoryPoints(trajectory.points, trajectory.bounds, 800, 60), [trajectory.points, trajectory.bounds]);
+  const { activeIndex, currentPos, baselineGhostPos, comparisons, currentPrimaryPoint, currentDeltaTimeSec, currentLineDistM } = useGpsSceneDynamics({
+    points: trajectory.points, baselinePoints, svgPoints, bounds: trajectory.bounds, currentIndex, trackLengthM: trajectory.trackLengthM,
+  });
+  const activePrimaryPoint = currentPrimaryPoint ?? currentPoint ?? null;
+  const primaryLapSummary = trajectory.laps?.find(l => l.lapNumber === trajectory.currentLap) ?? trajectory.laps?.[0];
+  const baselineLapSummary = baseline?.laps?.find(l => l.lapNumber === baseline.currentLap) ?? baseline?.laps?.[0];
+
+  const trackBoundaryPathD = useMemo(() => {
+    if (trackGeometry?.centerline?.length) {
+      const centerSvg = projectBoundaryPoints(trackGeometry.centerline, trajectory.bounds, 800, 60);
+      const leftSvg = trackGeometry.leftBoundary ? projectBoundaryPoints(trackGeometry.leftBoundary, trajectory.bounds, 800, 60) : [];
+      const rightSvg = trackGeometry.rightBoundary ? projectBoundaryPoints(trackGeometry.rightBoundary, trajectory.bounds, 800, 60) : [];
+      return computeTrackBoundaryPathD(centerSvg, leftSvg, rightSvg);
+    }
+    return buildContinuousSvgPath(svgPoints);
+  }, [trackGeometry, trajectory.bounds, svgPoints]);
+
   useCameraModeShortcuts(map, setMode);
   useGpsMapShortcuts({isExpanded, containerRef: map, points: trajectory.points, currentIndex, onSelectIndex,
     onZoomIn: () => scene.current?.zoom(1), onZoomOut: () => scene.current?.zoom(-1), onResetZoom: () => scene.current?.reset(),
-    // Follow, chase and trackside stay locked on the car, so a keyboard pan hands the camera over to free orbit.
-    onPan: (horizontal, vertical) => { if (mode === 'follow' || mode === 'chase' || mode === 'trackside') setMode('orbit'); scene.current?.pan(horizontal, vertical); },
+    // Follow, chase, cockpit and trackside stay locked on the car, so a keyboard pan hands the camera over to free orbit.
+    onPan: (horizontal, vertical) => { if (mode === 'follow' || mode === 'chase' || mode === 'trackside' || mode === 'cockpit') setMode('orbit'); scene.current?.pan(horizontal, vertical); },
     onCenter: () => scene.current?.center(),
-    onToggleFollow: () => setMode(value => value === 'follow' || value === 'chase' ? 'orbit' : 'follow'),
-    onTogglePlay, onToggleExpanded: () => setIsExpanded(value => !value)});
+    onToggleFollow: () => setMode(value => value === 'follow' || value === 'chase' || value === 'cockpit' ? 'orbit' : 'follow'),
+    onToggleTrace: toggleTrace, onTogglePlay, onToggleExpanded: () => handleToggleExpanded()});
   useEffect(() => { map.current?.focus({preventScroll: true}); }, []);
-  const [result, setResult] = useState<{key: string; trajectory: ReplayTrajectoryData; baseline: ReplayTrajectoryData | null; error?: string; ready?: boolean; cars?: string; warning?: string; wheelMotion?: string} | null>(null);
-  const key = `${trajectory.layoutKey ?? ''}:${trajectory.dataPluginRevision ?? ''}:${retry}`;
-  const latestIndex = useEffectEvent(() => currentIndex);
-  const latestMode = useEffectEvent(() => mode);
-  const latestColorBy = useEffectEvent(() => colorBy);
-  const drawCursor = useEffectEvent(() => {
-    const position = cursor?.getSnapshot();
-    scene.current?.cursor(position?.points === trajectory.points ? position.index : currentIndex, position?.points === trajectory.points ? position.fraction : 0);
-  });
-  useEffect(() => {
-    const container = host.current;
-    if (!container) return;
-    const abort = new AbortController(); let active = true;
-    const load = async () => {
-      try {
-        if (!trajectory.layoutKey) throw Error('This recording has no resolved circuit layout. Use the 2D map.');
-        const first = trajectory.points[0];
-        if (!first || !trajectory.points.some(point => Math.hypot(point.x - first.x, point.z - first.z) > 1)) throw Error('Recorded spatial positions are unavailable. Use the 2D map.');
-        if (baseline && (baseline.layoutKey !== trajectory.layoutKey || baseline.geometryRevision !== trajectory.geometryRevision)) throw Error('Comparison lap and 3D scene must use the same layout and geometry revision.');
-        const requests = new Map<string, Promise<LoadedVehicleMesh | null>>();
-        const warnings: string[] = [];
-        const loadCar = (lap: ReplayTrajectoryData | null): Promise<LoadedVehicleMesh | null> => {
-          const id = lap?.vehicleData?.id;
-          if (!id || !lap) return Promise.resolve(null);
-          const requestKey = `${id}:${lap.dataPluginRevision ?? ''}`;
-          let pending = requests.get(requestKey);
-          if (!pending) {
-            pending = fetchVehicleMesh(id, lap.dataPluginRevision, abort.signal).catch(error => {
-              if (isAbortError(error)) throw error;
-              warnings.push(apiErrorMessage(error, 'Vehicle mesh unavailable')); return null;
-            });
-            requests.set(requestKey, pending);
-          }
-          return pending;
-        };
-        const layoutKey = trajectory.layoutKey;
-        // The 2D layout (white lines, brake boards, active road outline) is optional: a missing or stale one never blocks the scene.
-        const loadTrack = async (): Promise<{geometry: TrackBoundaryGeometry; display: TrackMapDisplay | null} | null> => {
-          const geometry = await loadTrackBoundaryGeometry(layoutKey);
-          if (geometry.geometryRevision !== trajectory.geometryRevision) return null;
-          return {geometry, display: await loadTrackMapDisplay(geometry, abort.signal).catch((error: unknown) => { if (isAbortError(error)) throw error; return null; })};
-        };
-        const pendingTrack = loadTrack().catch((error: unknown) => { if (isAbortError(error)) throw error; return null; });
-        const [data, primaryMesh, baselineMesh, track] = await Promise.all([fetchTrackScene(layoutKey, abort.signal), loadCar(trajectory), loadCar(baseline), pendingTrack]);
-        if (!active) return;
-        if (data.metadata.sourceGeometryRevision !== trajectory.geometryRevision) throw Error('3D scene and lap geometry revisions differ. Reload the recording with its matching package.');
-        const handle = await createReplayScene(container, data.bytes, data.metadata, trajectory, baseline, message => setResult({key, trajectory, baseline, error: message}), {primary: primaryMesh, baseline: baselineMesh}, track, latestColorBy());
-        if (!active) { handle.dispose(); return; }
-        scene.current = handle; handle.cursor(latestIndex(), 0); handle.mode(latestMode()); drawCursor();
-        const label = (mesh: LoadedVehicleMesh | null) => mesh ? (mesh.metadata.parts.includes('tyres') ? 'Game body + tyres' : 'Game body mesh') : 'Estimated body';
-        setResult({key, trajectory, baseline, ready: true, cars: `${label(primaryMesh)}${baseline ? ` · Ghost: ${label(baselineMesh)}` : ''}`, warning: warnings.join('; '), wheelMotion: handle.wheelMotion});
-      } catch (error) { if (active && !isAbortError(error)) setResult({key, trajectory, baseline, error: apiErrorMessage(error, 'Unable to load 3D scene')}); }
-    };
-    void load();
-    return () => { active = false; abort.abort(); scene.current?.dispose(); scene.current = null; };
-  }, [key, trajectory, baseline]);
-  useEffect(() => { drawCursor(); return cursor?.subscribe(() => drawCursor()); }, [cursor, currentIndex, trajectory]);
-  useEffect(() => { scene.current?.mode(mode); drawCursor(); }, [mode]);
-  useEffect(() => { scene.current?.colorLines(colorBy); }, [colorBy]);
-  const state = result?.key === key && result.trajectory === trajectory && result.baseline === baseline ? result : null;
-  // What drives the car and wheels, for the curious: hover the title rather than read it under every frame.
+  // What drives the car and wheels, for the curious: hover the toolbar rather than read it under every frame.
   const sources = state?.ready ? [state.cars, state.wheelMotion, baseline ? 'Same-station ghost' : ''].filter(Boolean).join(' · ') : undefined;
-  return <div ref={map} data-replay-surface="map" data-replay-view="3d" tabIndex={0}
-    className={`relative flex flex-col w-full h-full min-h-[360px] bg-lmu-deep overflow-hidden [&[data-map-expanded]]:fixed [&[data-map-expanded]]:inset-0 [&[data-map-expanded]]:z-[1000] [&[data-map-expanded]]:w-screen [&[data-map-expanded]]:h-screen outline-none`}>
-    <div className="flex items-center gap-2 px-3 py-2 border-b border-lmu-border text-xs shrink-0">
-      <span className="font-semibold text-lmu-text mr-auto" title={sources}>3D racing line</span>
-      {onChangeColorBy && <Select aria-label="Line colour" value={colorBy} onChange={onChangeColorBy} options={LINE_COLORS.filter(option => !option.compare || baseline)} size="compact" />}
-      <Select aria-label="3D camera" value={mode} onChange={setMode} options={modes} size="compact" />
-      <button type="button" onClick={() => scene.current?.reset()} aria-label="Reset 3D camera" title="Reset camera" className={`p-1.5 rounded hover:bg-lmu-raised ${FOCUS_RING}`}><RotateCcw size={15} /></button>
-      {onTogglePlay && <button type="button" onClick={onTogglePlay} aria-label={isPlaying ? 'Pause replay' : 'Play replay'} className={`p-1.5 rounded hover:bg-lmu-raised ${FOCUS_RING}`}>{isPlaying ? <Pause size={15} /> : <Play size={15} />}</button>}
-      <ReplayShortcutHelp view="3d" />
-      <MapFullscreenButton isExpanded={isExpanded} onToggleExpanded={setIsExpanded} />
-      <button type="button" onClick={onReturnTo2D} className={`px-2 py-1 rounded hover:bg-lmu-raised ${FOCUS_RING}`}>2D map</button>
+
+  return (
+    <div ref={map} data-replay-surface="map" data-replay-view="3d" data-map-expanded={isExpanded ? '' : undefined} tabIndex={0}
+      className="relative flex flex-col w-full h-full min-h-[360px] bg-lmu-deep overflow-hidden [&[data-map-expanded]]:fixed [&[data-map-expanded]]:inset-0 [&[data-map-expanded]]:z-[1000] [&[data-map-expanded]]:w-screen [&[data-map-expanded]]:h-screen outline-none">
+      {!isExpanded && (
+        <div data-testid="replay-3d-toolbar" title={sources} className="flex items-start justify-between px-2 py-1 gap-2 shrink-0 text-xs border-b border-lmu-border bg-lmu-deep">
+
+          <GpsMapModeBar embedded className="min-w-0 flex-1" colorBy={colorBy} onChangeColorBy={onChangeColorBy} hasBaseline={Boolean(baseline)}
+            isCompareMode={Boolean(baseline)} fadedLine={activeFadedLine} onToggleFadedLine={handleToggleFadedLine}
+            showFrictionCircle={effectiveShowFriction} onToggleFrictionCircle={handleToggleFriction} />
+        </div>
+      )}
+      <div className="relative flex-1 min-h-0 overflow-hidden">
+        <div ref={host} tabIndex={0} onPointerDown={event => event.currentTarget.focus({preventScroll: true})}
+          aria-label="3D track. Drag to orbit, scroll to zoom. Left/Right: step replay. WASD: pan camera." className="relative w-full h-full outline-none" />
+        <GpsCircuitMinimap trackBoundaryPathD={trackBoundaryPathD} layoutPathD={trackBoundaryPathD} currentPos={currentPos} baselineGhostPos={baselineGhostPos} isExpanded={isExpanded}
+          className="rounded-xl border border-lmu-border bg-lmu-strip/70 p-2" />
+        <MapControlsOverlay onZoomIn={() => scene.current?.zoom(1)} onZoomOut={() => scene.current?.zoom(-1)} onReset={() => scene.current?.reset()}
+          followCar={mode === 'follow' || mode === 'chase' || mode === 'cockpit'} onToggleFollowCar={() => setMode(value => (value === 'follow' || value === 'chase' || value === 'cockpit' ? 'orbit' : 'follow'))}
+          onCenterCar={() => scene.current?.center()} isPlaying={isPlaying} onTogglePlay={onTogglePlay}
+          orientation={isExpanded ? 'horizontal' : 'vertical'} className="top-2 right-3 bottom-auto">
+          <CameraModeControl mode={mode} onChange={setMode} />
+          <ReplayShortcutHelp view="3d" />
+          <MapViewSwitchButton view="3d" onToggleView={onReturnTo2D} />
+          <MapFullscreenButton isExpanded={isExpanded} onToggleExpanded={handleToggleExpanded} />
+        </MapControlsOverlay>
+        <HeatmapLegendBar colorBy={colorBy} />
+        {isExpanded && <GpsMapExpandedOverlays points={trajectory.points} currentIndex={activeIndex}
+          primaryLapSummary={primaryLapSummary} baselineLapSummary={baselineLapSummary} comparisons={comparisons}
+          sectors={trajectory.sectors} deltaTimeSec={currentDeltaTimeSec} primaryPoint={activePrimaryPoint ?? undefined}
+          baselinePoint={baselineGhostPos?.point ?? null} baselinePoints={baselinePoints}
+          colorBy={colorBy} onChangeColorBy={onChangeColorBy} isCompareMode={Boolean(baseline)} hasBaseline={Boolean(baseline)}
+          fadedLine={activeFadedLine} onToggleFadedLine={handleToggleFadedLine}
+          showFrictionCircle={effectiveShowFriction} onToggleFrictionCircle={handleToggleFriction} />}
+        {!state?.ready && <div className="absolute inset-x-0 top-1/3 px-8 text-center text-sm text-lmu-text-soft pointer-events-auto" role={state?.error ? 'alert' : 'status'}>
+          <p>{state?.error ?? 'Loading 3D track surfaces…'}</p>
+          {state?.error && <button type="button" onClick={() => setRetry(value => value + 1)} className={`mt-3 px-3 py-1.5 rounded bg-lmu-raised ${FOCUS_RING}`}>Retry 3D scene</button>}
+        </div>}
+        {state?.warning && <p role="status" className="absolute bottom-12 left-2 z-30 px-3 py-1 rounded bg-lmu-strip/80 backdrop-blur-sm text-xs text-lmu-warn">Using estimated car geometry: {state.warning}</p>}
+      </div>
+      {isExpanded && onSelectIndex ? (
+        <GpsMapTelemetryDock points={trajectory.points} baselinePoints={baseline?.points} comparisons={comparisons} currentIndex={currentIndex}
+          onSelectIndex={onSelectIndex} trackLengthM={trajectory.trackLengthM} source={trajectory.source} sectors={trajectory.sectors}
+          isPlaying={isPlaying} onTogglePlay={onTogglePlay} traceHidden={isTraceHidden} onToggleTrace={toggleTrace}
+          hud={<GpsMapTelemetryHud primaryPoint={activePrimaryPoint} baselinePoint={baselineGhostPos?.point} deltaTimeSec={currentDeltaTimeSec} lineDistanceM={currentLineDistM} />} />
+      ) : (
+        <div className="shrink-0 bg-lmu-deep">
+          {effectiveShowFriction && <ReplayFrictionCircle points={trajectory.points} currentIndex={activeIndex}
+            primaryPoint={activePrimaryPoint} baselinePoint={baselineGhostPos?.point ?? null} baselinePoints={baselinePoints}
+            onClose={handleToggleFriction} />}
+          <ReplayTelemetryHud currentPoint={activePrimaryPoint} />
+        </div>
+      )}
     </div>
-    <div ref={host} tabIndex={0} onPointerDown={event => event.currentTarget.focus({preventScroll: true})}
-      aria-label="3D track. Drag to orbit, right drag to pan, scroll to zoom. Left/Right: step replay. WASD: pan camera." className="relative flex-1 min-h-0 outline-none" />
-    {!state?.ready && <div className="absolute inset-x-0 top-1/3 px-8 text-center text-sm text-lmu-text-soft" role={state?.error ? 'alert' : 'status'}>
-      <p>{state?.error ?? 'Loading 3D track surfaces…'}</p>
-      {state?.error && <button type="button" onClick={() => setRetry(value => value + 1)} className={`mt-3 px-3 py-1.5 rounded bg-lmu-raised ${FOCUS_RING}`}>Retry 3D scene</button>}
-    </div>}
-    {state?.warning && <p role="status" className="px-3 pb-2 text-xs text-lmu-warn">Using estimated car geometry: {state.warning}</p>}
-  </div>;
+  );
 }

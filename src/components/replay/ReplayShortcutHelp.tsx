@@ -59,7 +59,7 @@ export function ReplayShortcutHelp({view = 'telemetry'}: {view?: 'telemetry' | '
         <dl className="grid grid-cols-[150px_1fr] gap-x-3 gap-y-2 text-xs">{(view === '3d' ? shortcuts3d : shortcuts).map(([key, action]) =>
           <div key={key} className="contents"><dt className="font-mono text-lmu-text-soft">{key}</dt><dd className="text-lmu-muted">{action}</dd></div>)}</dl>
         <p className="mt-4 text-xs text-lmu-muted">{view === '3d'
-          ? 'Follow is the default. Drag, pan or zoom without leaving Follow. Choose a mode with 1–5; camera controls and typing keep their own keys.'
+          ? 'Follow is the default. Drag, pan or zoom without leaving Follow. Choose a mode with 1–6; camera controls and typing keep their own keys.'
           : 'Click the chart to use chart shortcuts. C, F, M and Space work from the chart or map. Dragging the map pauses following.'}</p>
       </section>
     </div>, document.body)}

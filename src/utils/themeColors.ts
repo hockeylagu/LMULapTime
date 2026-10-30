@@ -82,6 +82,7 @@ export const WHEEL_CORNER_COLORS = {
 } as const;
 
 export const MAP_COLORS = {
+  carBody: '#E2DED5',
   roadSurface: '#0C121E',
   roadBorder: '#1A2234',
   physicalRoadSurface: '#253448',
