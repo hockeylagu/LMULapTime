@@ -20,7 +20,7 @@ export function loadScenePackage(root: string, catalog: unknown, geometry: (key:
     if (!shared) {
       files.set(row.asset, registerMeshAsset(root, row));
       totalBytes += row.byteLength;
-      if (totalBytes > 512_000_000) throw Error('Scene budget exceeded');
+      if (totalBytes > 1_000_000_000) throw Error('Scene budget exceeded');
     }
     result.set(row.layoutKey, {metadata: structuredClone(row), file: files.get(row.asset)!.file});
   }

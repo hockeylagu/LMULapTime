@@ -14,3 +14,15 @@ it('gives each kerb vertex its continuous lap distance, and leaves kerbs beyond 
   expect(stations.getX(0)).toBeCloseTo(105); expect(stations.getX(1)).toBeCloseTo(107.5); expect(stations.getX(2)).toBe(-1);
   expect(Object.hasOwn(kerb.material, 'onBeforeCompile')).toBe(true); // Striped by the shader patch.
 });
+
+it('retains source-painted kerb colours instead of replacing them with generic red/white stripes', () => {
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new Float32BufferAttribute([3, 0, 5, 3, 0, 7.5, 5, 0, 5], 3));
+  const material = new MeshStandardMaterial({color: '#dec035'});
+  const kerb = new Mesh(geometry, material); kerb.name = 'kerb-source-yellow';
+  const root = new Group(); root.add(kerb);
+  applyKerbStripes(root, [{x: 0, y: 0, z: 0}, {x: 0, y: 0, z: 10}], [0, 10]);
+  expect(material.color.getHexString()).toBe('dec035');
+  expect(geometry.getAttribute('kerbStation')).toBeUndefined();
+  expect(Object.hasOwn(material, 'onBeforeCompile')).toBe(false);
+});

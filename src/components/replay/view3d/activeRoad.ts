@@ -5,6 +5,18 @@ import type { TrackSurfacePolygon } from '../../../../shared/types/trackGeometry
 export const ACTIVE_ROAD_COLOR = '#3b3f45', OTHER_ROAD_COLOR = '#6d7176';
 const MASK_M_PER_PX = 0.25, MASK_MAX_PX = 8192;
 
+/**
+ * The mask's native x/z extent: the road outline plus 2 m, not the scene, whose filler ground reaches 700 m
+ * out and would coarsen the mask. Road past it samples the empty edge texels: an other-road colour.
+ */
+export function activeRoadBounds(polygons: TrackSurfacePolygon[], fallback: {min: number[]; max: number[]}): {min: number[]; max: number[]} {
+  const min = [Infinity, fallback.min[1], Infinity], max = [-Infinity, fallback.max[1], -Infinity];
+  for (const polygon of polygons) for (const ring of polygon) for (const [x, z] of ring) {
+    min[0] = Math.min(min[0], x - 2); min[2] = Math.min(min[2], z - 2); max[0] = Math.max(max[0], x + 2); max[2] = Math.max(max[2], z + 2);
+  }
+  return Number.isFinite(min[0]) ? {min, max} : fallback;
+}
+
 /** Rasterises the 2D map's active-layout road polygons (native x/z) over the scene bounds; one byte per texel. */
 export function rasterizeActiveRoad(polygons: TrackSurfacePolygon[], bounds: {min: number[]; max: number[]}): DataTexture | null {
   const spanX = bounds.max[0] - bounds.min[0], spanZ = bounds.max[2] - bounds.min[2];

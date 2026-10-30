@@ -52,7 +52,7 @@ export function makeRacingLine(lap: ReplayTrajectoryData, origin: Vector3, color
   geometry.setAttribute('color', new Float32BufferAttribute(new Float32Array(points.length * 6), 3));
   geometry.setIndex(indices);
   // Unlit, so pedal/speed colours read exactly as on the 2D map; the offset keeps it above the road it lies on.
-  const line = new Mesh(geometry, new MeshBasicMaterial({vertexColors: true, side: DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2}));
+  const line = new Mesh(geometry, new MeshBasicMaterial({vertexColors: true, side: DoubleSide, transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2}));
   line.name = 'racing-line';
   colorRacingLine(line, colors);
   return line;

@@ -17,7 +17,7 @@ function resource(root: string, relative: string): string {
 export function registerMeshAsset<T extends MeshAsset>(root: string, metadata: T, wheelPivots = false): RegisteredMesh<T> {
   if (typeof metadata.asset !== 'string' || !metadata.asset.endsWith('.glb') || !/^[a-f0-9]{64}$/.test(metadata.sha256)) throw Error('Invalid mesh asset');
   const file = resource(root, metadata.asset), stat = fs.statSync(file);
-  if (!stat.isFile() || stat.size !== metadata.byteLength || stat.size > 64_000_000) throw Error('Mesh budget exceeded');
+  if (!stat.isFile() || stat.size !== metadata.byteLength || stat.size > 128_000_000) throw Error('Mesh budget exceeded');
   const bytes = fs.readFileSync(file);
   if (createHash('sha256').update(bytes).digest('hex') !== metadata.sha256) throw Error('Mesh hash mismatch');
   const checked = validateSceneGlb(bytes, wheelPivots);

@@ -1,4 +1,4 @@
-import { BackSide, Color, DirectionalLight, Fog, HemisphereLight, Mesh, MeshStandardMaterial, PCFSoftShadowMap, PlaneGeometry, ShaderMaterial, SphereGeometry, Vector3, type Camera, type Scene, type WebGLRenderer } from 'three';
+import { BackSide, Color, DirectionalLight, Fog, HemisphereLight, Mesh, MeshStandardMaterial, PCFShadowMap, PlaneGeometry, ShaderMaterial, SphereGeometry, Vector3, type Camera, type Scene, type WebGLRenderer } from 'three';
 
 // Matched to LMU daytime: pale hazy horizon, soft blue zenith, dry olive ground (reads at Portimao and Spa alike).
 const ZENITH = '#6a97c8', HORIZON = '#dfe3e4';
@@ -35,7 +35,7 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, lowes
   const ground = new Mesh(new PlaneGeometry(GROUND_HALF_SIZE_M * 2, GROUND_HALF_SIZE_M * 2), new MeshStandardMaterial({color: TERRAIN_COLOR, roughness: 1}));
   ground.name = 'default-terrain'; ground.rotation.x = -Math.PI / 2; ground.position.y = groundY; ground.receiveShadow = true;
   scene.add(sky, ground, new HemisphereLight('#ffffff', '#4f543c', 1.6));
-  renderer.shadowMap.enabled = true; renderer.shadowMap.type = PCFSoftShadowMap;
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = PCFShadowMap;
   const sun = new DirectionalLight('#fff6e8', 2.4);
   sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
   // The frustum follows the car: wide enough for nearby walls and kerbs to shade the road,

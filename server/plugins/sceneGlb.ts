@@ -21,7 +21,7 @@ function noExternalResources(value: unknown, depth = 0): void {
 }
 
 export function validateSceneGlb(bytes: Buffer, wheelPivots = false): { triangles: number; min: number[]; max: number[] } {
-  if (bytes.length < 28 || bytes.length > 64_000_000 || bytes.readUInt32LE(0) !== 0x46546c67 || bytes.readUInt32LE(4) !== 2 || bytes.readUInt32LE(8) !== bytes.length) throw Error('Invalid GLB header');
+  if (bytes.length < 28 || bytes.length > 128_000_000 || bytes.readUInt32LE(0) !== 0x46546c67 || bytes.readUInt32LE(4) !== 2 || bytes.readUInt32LE(8) !== bytes.length) throw Error('Invalid GLB header');
   const jsonLength = bytes.readUInt32LE(12), binHeader = 20 + jsonLength;
   if (jsonLength > 1_000_000 || jsonLength % 4 || binHeader + 8 > bytes.length || bytes.readUInt32LE(16) !== 0x4e4f534a || bytes.readUInt32LE(binHeader + 4) !== 0x004e4942) throw Error('Invalid GLB chunks');
   const bin = bytes.subarray(binHeader + 8);
@@ -40,7 +40,7 @@ export function validateSceneGlb(bytes: Buffer, wheelPivots = false): { triangle
   });
   const accessors = list(json.accessors, 256).map(value => {
     const accessor = record(value), view = views[integer(accessor.bufferView, views.length - 1)];
-    const count = integer(accessor.count, 3_000_000), offset = integer(accessor.byteOffset ?? 0, view.length);
+    const count = integer(accessor.count, 12_000_000), offset = integer(accessor.byteOffset ?? 0, view.length);
     const components = accessor.type === 'VEC3' ? 3 : accessor.type === 'SCALAR' ? 1 : 0;
     if (!components || ![5126, 5125].includes(accessor.componentType as number) || offset % 4 || offset + count * components * 4 > view.length || accessor.normalized) throw Error('Invalid GLB accessor');
     return { count, components, componentType: accessor.componentType, offset: view.offset + offset };
@@ -61,7 +61,7 @@ export function validateSceneGlb(bytes: Buffer, wheelPivots = false): { triangle
     triangles += indices.count / 3;
     const firstUse = !scannedPositions.has(positionIndex); scannedPositions.add(positionIndex);
     if (firstUse) visitedVertices += position.count;
-    if (triangles > 2_000_000 || visitedVertices > 3_000_000) throw Error('GLB geometry budget exceeded');
+    if (triangles > 4_000_000 || visitedVertices > 6_000_000) throw Error('GLB geometry budget exceeded');
     if (firstUse) for (let i = 0; i < position.count * 3; i++) {
       const value = bin.readFloatLE(position.offset + i * 4), axis = i % 3;
       if (!Number.isFinite(value) || Math.abs(value) > 30_000) throw Error('Invalid GLB coordinate');

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { BufferGeometry, Color, DataTexture, Group, Mesh, MeshStandardMaterial, type WebGLProgramParametersWithUniforms } from 'three';
-import { ACTIVE_ROAD_COLOR, applyActiveRoad } from '../../../../src/components/replay/view3d/activeRoad.js';
+import { ACTIVE_ROAD_COLOR, activeRoadBounds, applyActiveRoad } from '../../../../src/components/replay/view3d/activeRoad.js';
 
 const bounds = {min: [0, 0, 0], max: [100, 10, 50]};
 function scene(): {root: Group; material: MeshStandardMaterial} {
@@ -26,4 +26,10 @@ it('samples the outline mask by native x/z across the scene bounds', () => {
   expect(shader.uniforms.activeRoadSpan.value).toEqual([100, 50]);
   expect(shader.vertexShader).toContain('position.xz');
   expect(shader.fragmentShader).toContain('texture2D(activeRoad');
+});
+
+it('sizes the mask to the road outline plus 2 m, not to the scene and its far filler ground', () => {
+  const scene = {min: [-700, 0, -700], max: [800, 10, 750]};
+  expect(activeRoadBounds([[[[0, 0], [100, 0], [100, 50]]]], scene)).toEqual({min: [-2, 0, -2], max: [102, 10, 52]});
+  expect(activeRoadBounds([], scene)).toBe(scene);
 });

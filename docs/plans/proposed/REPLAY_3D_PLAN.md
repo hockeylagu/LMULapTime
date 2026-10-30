@@ -29,14 +29,14 @@ tyres. Every car's wheels roll (telemetry wheel speed, else replay travel, scale
 from the live capture so lockups stop and wheelspin overruns; native wheel speed tracks ground speed and
 never shows either), steer (recorded steering over the plugin ratio) and move vertically (ride height, else road contact); the model origin is fitted
 to the lap median. Over a Portimao lap the tyres stay within ±2 cm of the road, which is a visual fit,
-not calibrated contact. The scene has a sky dome, horizon fog, sun shadows from the car, walls, boards and kerbs within 60 m of the car, and a generated relief
-terrain: each grid corner sits 0.2 m under the lowest scanned triangle above it, fading to a flat
-horizon level. Ground sheets are turned face-up and drawn one-sided, so no underside shows past a
-hillside edge; the camera cannot go below road, relief or ground. Follow/chase stay locked on the car.
+not calibrated contact. The scene has a sky dome, horizon fog, sun shadows from the car, walls, boards and kerbs within 60 m of the car, and the package's filler
+ground: each grid corner sits 0.2 m under the scanned triangles above it, fading to a flat
+horizon level; the exporter stands walls down to it. Ground sheets come wound face up and are drawn one-sided, so no underside shows past a
+hillside edge; the camera cannot go below road, filler or horizon ground, nor look at the car from under a banking edge. Follow/chase stay locked on the car.
 The racing line is a 0.6 m ribbon draped on the road in the 2D map's colours (pedal, speed, delta,
 gain/loss, plain); the comparison lap lies on top at 0.3 m. Kerbs carry red/white bands by lap
 distance. The road inside the 2D map's active-layout outline is dark (a 0.25 m mask with a per-pixel edge); other roads stay lighter grey. The layout's boundaries (the painted white lines, the track limits) are draped as sharp 0.25 m white ribbons. Exported brake boards stand as tall white portrait signs with stacked digits on steel posts,
-like the game's Portimão boards, facing approaching cars. Barriers come from the scene's collision-only
+like the game's Portimão boards, facing approaching cars; a marker with a measured `baseY` keeps the game's height on longer posts (Daytona's bus stop boards hang on the catch fence). Barriers come from the scene's collision-only
 `COL_*` meshes (armco, tyre walls, TecPro, closed-road walls), capped to display height; the pit wall is
 `PitWall_Col` capped to 1.2 m. The main pit-building shell and perimeter/brick walls are the game's
 render meshes, flat-coloured; pit details, lights and ad panels stay out. Cameras: follow, chase,
