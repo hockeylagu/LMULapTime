@@ -23,10 +23,10 @@ export function GpsMapPlaybackStrip({ isPlaying = false, onTogglePlay, elapsedSe
     </button>}
     {playback && <Select<number> aria-label="Playback speed" value={playback.speed} onChange={playback.onChangeSpeed} mono
       options={playback.speeds.map(speed => ({ value: speed, label: `${speed}×` }))} />}
-    <span className="font-mono text-xs tabular-nums text-lmu-text" title="Lap time at the cursor">
+    <span className="font-mono text-[13px] tabular-nums text-lmu-text" title="Lap time at the cursor">
       {elapsedSec > 0 ? formatTime(elapsedSec) : '0:00.000'}
     </span>
-    <span className="font-mono text-[11px] tabular-nums text-lmu-muted" title="Distance from the start line at the cursor">
+    <span className="font-mono text-xs tabular-nums text-lmu-muted" title="Distance from the start line at the cursor">
       {Math.max(0, Math.round(distanceM)).toLocaleString('en-US')} m
     </span>
   </div>;

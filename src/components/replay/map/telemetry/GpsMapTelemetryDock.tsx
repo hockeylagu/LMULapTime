@@ -80,7 +80,7 @@ export function GpsMapTelemetryDock({ points, baselinePoints, comparisons: scene
     setChannel(next);
     try { localStorage.setItem(CHANNEL_KEY, next); } catch { /* Storage may be disabled. */ }
   };
-  const buttonClass = `inline-flex h-7 items-center gap-1.5 rounded px-2 text-[11px] text-lmu-muted hover:text-lmu-text hover:bg-lmu-raised transition-colors ${FOCUS_RING}`;
+  const buttonClass = `inline-flex h-7 items-center gap-1.5 rounded px-2 text-xs text-lmu-muted hover:text-lmu-text hover:bg-lmu-raised transition-colors ${FOCUS_RING}`;
 
   return <section aria-label="Fullscreen telemetry" data-map-control
     className="w-full shrink-0 border-t border-lmu-border bg-lmu-strip cursor-default"
@@ -115,11 +115,11 @@ export function GpsMapTelemetryDock({ points, baselinePoints, comparisons: scene
         </button>
         {isZoomed && <button type="button" className={buttonClass}
           onClick={handleResetZoom}>Full lap</button>}
-        {activeChannel === 'pedals' && <span className="flex gap-3 text-[10px] text-lmu-muted">
+        {activeChannel === 'pedals' && <span className="flex gap-3 text-[11px] text-lmu-muted">
           <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="w-3 border-t-2" style={{ borderColor: TELEMETRY_COLORS.throttle }} />Throttle</span>
           <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="w-3 border-t-2" style={{ borderColor: TELEMETRY_COLORS.brake }} />Brake</span>
         </span>}
-        {activeChannel === 'delta' && <span className="text-[10px] text-lmu-muted" title="Green shading shows time gained; red shading shows time lost.">− ahead / + behind</span>}
+        {activeChannel === 'delta' && <span className="text-[11px] text-lmu-muted" title="Green shading shows time gained; red shading shows time lost.">− ahead / + behind</span>}
       </>}
       <div className="ml-auto flex shrink-0 items-center gap-3">
       <GpsMapPlaybackStrip isPlaying={isPlaying} onTogglePlay={onTogglePlay} elapsedSec={elapsedSec} distanceM={distanceM} />
@@ -147,7 +147,7 @@ export function GpsMapTelemetryDock({ points, baselinePoints, comparisons: scene
         isCursorInView={isCursorInView} cursorPct={cursorPct} cumDists={cumDists} viewStart={viewStart} viewEnd={viewEnd} />}
       {sectorLines.map(sector => <div key={sector.label} data-testid={`trace-sector-${sector.label}`} style={{ left: `${pctForIndex(sector.frame)}%` }}
         className={`absolute inset-y-0 z-10 w-px pointer-events-none ${sector.line}`}>
-        <span className={`absolute top-1 left-1 rounded px-1 py-0.5 font-mono text-[10px] font-bold ${sector.tag}`}>{sector.label}</span>
+        <span className={`absolute top-1 left-1 rounded px-1 py-0.5 font-mono text-[11px] font-bold ${sector.tag}`}>{sector.label}</span>
       </div>)}
       {isCursorInView && <TelemetryScrubCursor cursorPct={cursorPct} />}
       {dragSelection && <div className="absolute inset-y-0 bg-lmu-info-strong/25 border-x border-lmu-info pointer-events-none"

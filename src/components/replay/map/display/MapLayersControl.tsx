@@ -30,7 +30,6 @@ export const MapLayersControl: React.FC<Props> = ({ layers, onChange, available,
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
-  const isPointerDownInside = useRef(false);
   const id = useId();
   useEffect(() => {
     if (!open) return;
@@ -48,26 +47,22 @@ export const MapLayersControl: React.FC<Props> = ({ layers, onChange, available,
     const dismiss = (event: PointerEvent) => {
       if (event.target instanceof Node && !root.current?.contains(event.target)) setOpen(false);
     };
-    const onPointerUp = () => {
-      isPointerDownInside.current = false;
-    };
     // Other map controls stop bubbling pointer events; capture still observes outside clicks.
     document.addEventListener('pointerdown', dismiss, true);
-    document.addEventListener('pointerup', onPointerUp);
     return () => {
       observer?.disconnect();
       window.removeEventListener('resize', resize);
       document.removeEventListener('pointerdown', dismiss, true);
-      document.removeEventListener('pointerup', onPointerUp);
     };
   }, [open]);
   return <div ref={root} className="relative" data-map-control="layers"
     onBlur={e => {
-      if (isPointerDownInside.current) return;
       if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget)) setOpen(false);
     }}
     onPointerDown={e => {
-      isPointerDownInside.current = true;
+      // Label text otherwise blurs the checkbox to the page before forwarding its click.
+      // Keep focus inside the panel without a pointer flag that can get stuck.
+      if (e.target instanceof Element && !(e.target instanceof HTMLInputElement) && e.target.closest('label')) e.preventDefault();
       e.stopPropagation();
     }} onClick={e => e.stopPropagation()}
     onDoubleClick={e => e.stopPropagation()} onWheel={e => e.stopPropagation()}

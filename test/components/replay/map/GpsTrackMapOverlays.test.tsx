@@ -196,6 +196,7 @@ describe('GpsTrackMapScene overlays and geometry', () => {
     expect(minimap).toBeInTheDocument();
     expect(minimap.className).toContain('absolute');
     expect(minimap.className).toContain('top-2.5');
+    expect(screen.getByTestId('map-controls-overlay').className).toContain('flex-col');
     expect(minimap.className).toContain('left-2.5');
 
     rerender(

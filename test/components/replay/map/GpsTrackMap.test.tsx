@@ -289,7 +289,8 @@ describe('GpsTrackMapScene', () => {
     expect(resetBtn.className).toContain('h-7');
     expect(resetBtn.className).toContain('shrink-0');
 
-    expect(zoomText.className).toContain('w-11');
+    // The inline map stacks its controls vertically, like the 3D view; the zoom readout keeps the column width.
+    expect(zoomText.className).toContain('w-7');
     expect(zoomText.className).toContain('tabular-nums');
     expect(zoomText.className).toContain('shrink-0');
 

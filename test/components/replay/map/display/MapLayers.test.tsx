@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { GpsTrackMapScene } from '../../../../../src/components/replay/map/scene/GpsTrackMapScene.js';
 import { MAP_LAYERS_STORAGE_KEY } from '../../../../../src/components/replay/map/display/mapLayers.js';
@@ -346,6 +346,27 @@ describe('GPS map display layers', () => {
     expect(screen.queryByRole('group', { name: 'Map layers' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Layers' })).toHaveAttribute('aria-expanded', 'false');
     expect(reset).toHaveFocus();
+  });
+
+  it('closes when tabbing out after opening with the pointer', async () => {
+    const user = userEvent.setup();
+    renderMap();
+    await user.click(screen.getByRole('button', { name: 'Layers' }));
+    expect(screen.getByRole('group', { name: 'Map layers' })).toBeInTheDocument();
+    act(() => screen.getByRole('button', { name: 'Restore defaults' }).focus());
+    await user.tab();
+    expect(screen.queryByRole('group', { name: 'Map layers' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Layers' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('still closes on focus leaving after an inside pointer gesture is canceled', () => {
+    renderMap();
+    openLayers();
+    const layer = screen.getByRole('checkbox', { name: 'Active track' });
+    fireEvent.pointerDown(layer);
+    fireEvent.pointerCancel(layer);
+    act(() => screen.getByRole('button', { name: 'Reset zoom and pan' }).focus());
+    expect(screen.queryByRole('group', { name: 'Map layers' })).not.toBeInTheDocument();
   });
 
   it('provides sub-toggles for distance, sponsor ads, and digi boards and offsets overlapping digi boards', () => {

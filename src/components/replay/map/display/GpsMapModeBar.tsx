@@ -15,6 +15,7 @@ export interface GpsMapModeBarProps {
   showFrictionCircle?: boolean;
   onToggleFrictionCircle?: () => void;
   className?: string;
+  embedded?: boolean;
 }
 
 export const GpsMapModeBar: React.FC<GpsMapModeBarProps> = ({
@@ -29,6 +30,7 @@ export const GpsMapModeBar: React.FC<GpsMapModeBarProps> = ({
   showFrictionCircle = false,
   onToggleFrictionCircle,
   className = '',
+  embedded = false,
 }) => {
   const modes = ['pedal', 'speed', ...(isCompareMode && hasBaseline ? (['delta', 'gainLoss'] as const) : [])] as const;
 
@@ -38,7 +40,7 @@ export const GpsMapModeBar: React.FC<GpsMapModeBarProps> = ({
       onClick={e => e.stopPropagation()}
       onPointerDown={e => e.stopPropagation()}
       onDoubleClick={e => e.stopPropagation()}
-      className={`relative z-30 flex w-max max-w-full flex-wrap items-center justify-center gap-1.5 px-2 py-1 rounded-xl bg-lmu-strip/95 border border-lmu-border backdrop-blur-md shadow-xl select-none pointer-events-auto ${className}`}
+      className={`relative z-30 flex w-max max-w-full flex-wrap items-center justify-center gap-1.5 select-none pointer-events-auto ${embedded ? '' : 'px-2 py-1 rounded-xl bg-lmu-strip/95 border border-lmu-border backdrop-blur-md shadow-xl'} ${className}`}
     >
       {onChangeColorBy && (
         <div className="flex items-center gap-1">
@@ -82,6 +84,7 @@ export const GpsMapModeBar: React.FC<GpsMapModeBarProps> = ({
           type="button"
           onClick={onToggleFrictionCircle}
           aria-pressed={showFrictionCircle}
+          aria-label={showFrictionCircle ? 'Hide friction circle' : 'Show friction circle'}
           title={showFrictionCircle ? 'Hide friction circle' : 'Show friction circle'}
           className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-semibold transition-colors cursor-pointer ${
             showFrictionCircle

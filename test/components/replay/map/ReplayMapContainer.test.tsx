@@ -4,6 +4,16 @@ import { ReplayMapContainer } from '../../../../src/components/replay/map/Replay
 import { ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { CornerSegmentComparison } from '../../../../src/utils/cornerAnalysis/types.js';
 
+vi.mock('../../../../src/components/replay/view3d/Replay3DView.js', () => ({
+  default: ({ onReturnTo2D, isExpanded, onToggleExpanded }: { onReturnTo2D: () => void; isExpanded?: boolean; onToggleExpanded?: (e: boolean) => void }) => (
+    <div data-testid="mock-3d-view" data-map-expanded={isExpanded ? '' : undefined}>
+      <button type="button" aria-label="Switch to 2D view" onClick={onReturnTo2D}>2D</button>
+      <button type="button" aria-label={isExpanded ? 'Exit full screen (Esc)' : 'Full screen map'}
+        onClick={() => onToggleExpanded?.(!isExpanded)}>FS</button>
+    </div>
+  ),
+}));
+
 describe('ReplayMapContainer', () => {
   const trajectory: ReplayTrajectoryData = {
     replayName: 'Test_Replay.vcr',
@@ -204,5 +214,28 @@ describe('ReplayMapContainer', () => {
     // Click Baseline button to fade
     fireEvent.click(baselineBtn);
     expect(baselineBtn).toHaveAttribute('title', 'Restore baseline line');
+  });
+
+  it('switches between 2D and 3D in fullscreen via the button HUD while maintaining fullscreen', async () => {
+    render(<ReplayMapContainer {...baseProps} />);
+    // Expand to fullscreen
+    fireEvent.click(screen.getByRole('button', { name: 'Full screen map' }));
+    expect(screen.getByRole('button', { name: /Exit full screen/i })).toBeInTheDocument();
+
+    // Click 3D in the button HUD
+    const to3DBtn = screen.getByRole('button', { name: 'Switch to 3D view' });
+    expect(to3DBtn).toHaveTextContent('3D');
+    fireEvent.click(to3DBtn);
+
+    // Now 3D view should be loading or active, still in fullscreen
+    expect(await screen.findByRole('button', { name: 'Switch to 2D view' })).toBeInTheDocument();
+    const to2DBtn = screen.getByRole('button', { name: 'Switch to 2D view' });
+    expect(to2DBtn).toHaveTextContent('2D');
+    expect(screen.getByRole('button', { name: /Exit full screen/i })).toBeInTheDocument();
+
+    // Click 2D in the button HUD to switch back to 2D
+    fireEvent.click(to2DBtn);
+    expect(screen.getByRole('button', { name: 'Switch to 3D view' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Exit full screen/i })).toBeInTheDocument();
   });
 });

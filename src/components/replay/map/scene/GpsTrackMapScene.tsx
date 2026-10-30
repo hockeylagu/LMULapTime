@@ -43,12 +43,20 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
     trackLengthM, isPlaying, onTogglePlay,
     onChangeColorBy, onTogglePedalMarkers, fadedLine, onToggleFadedLine, showFrictionCircle, onToggleFrictionCircle,
   } = props;
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [internalExpanded, setInternalExpanded] = useState(false);
+  const isExpanded = props.isExpanded ?? internalExpanded;
+  const handleToggleExpanded = (expanded?: boolean) => {
+    const next = typeof expanded === 'boolean' ? expanded : !isExpanded;
+    if (props.onToggleExpanded) props.onToggleExpanded(next);
+    else setInternalExpanded(next);
+  };
   const [localShowFriction, setLocalShowFriction] = useState(false);
   const effectiveShowFriction = showFrictionCircle ?? localShowFriction;
   const handleToggleFriction = onToggleFrictionCircle ?? (() => setLocalShowFriction(v => !v));
   const { layers, changeLayers } = useMapLayers();
-  const [showGForce, handleToggleGForce] = useStoredToggle('lmu-map-gforce-v1', true);
+  const [localShowGForce, toggleLocalGForce] = useStoredToggle('lmu-map-gforce-v1', true);
+  const showGForce = props.showGForce ?? localShowGForce;
+  const handleToggleGForce = props.onToggleGForce ?? toggleLocalGForce;
   const [isTraceHidden, toggleTrace] = useStoredToggle('lmu-map-trace-collapsed-v1', false);
 
   const {
@@ -81,7 +89,9 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
     onToggleGForce: handleToggleGForce,
     onToggleTrace: toggleTrace,
     onPan: panBy,
-    onToggleExpanded: () => setIsExpanded(expanded => !expanded),
+    onCenter: camera.centerOnCar,
+    onToggleFollow: () => camera.setFollowCar(value => !value),
+    onToggleExpanded: () => handleToggleExpanded(),
   });
   const cullViewBox = useStableCullViewBox(currentViewBox, zoomLevel >= 2.5);
 
@@ -147,8 +157,9 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
           display={display} error={displayError} bounds={effectiveBounds} left={leftSvgPoints} right={rightSvgPoints}
           center={centerlineSvgPoints} trajectory={svgPoints} hasSectors={sectorMarkers.length > 0} hasTurns={cornerMarkers.length > 0}
           pedalPoints={onTogglePedalMarkers ? { visible: showPedalMarkers, available: Boolean(pedalMarkers?.length), onToggle: onTogglePedalMarkers } : undefined}
-          orientation={controlsOrientation ?? (isExpanded ? 'horizontal' : (dimNonSelectedTrack ? 'vertical' : 'horizontal'))}
-          isPlaying={isPlaying} onTogglePlay={onTogglePlay} isExpanded={isExpanded} onToggleExpanded={setIsExpanded} />
+          orientation={controlsOrientation ?? (isExpanded ? 'horizontal' : 'vertical')}
+          isPlaying={isPlaying} onTogglePlay={onTogglePlay} isExpanded={isExpanded} onToggleExpanded={handleToggleExpanded}
+          onToggleView={props.onToggleView} />
       )}
 
       {showMinimap && (

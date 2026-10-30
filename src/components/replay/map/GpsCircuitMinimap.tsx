@@ -74,7 +74,7 @@ export const GpsCircuitMinimap: React.FC<GpsCircuitMinimapProps> = ({
       onClick={e => e.stopPropagation()}
       onPointerDown={e => e.stopPropagation()}
       onDoubleClick={e => e.stopPropagation()}
-      className={`absolute z-20 ${sizeClass} select-none flex items-center justify-center cursor-crosshair active:cursor-grabbing ${className}`}
+      className={`absolute z-20 ${sizeClass} select-none flex items-center justify-center ${onPanTo ? 'cursor-crosshair active:cursor-grabbing' : 'pointer-events-none'} ${className}`}
     >
       <svg
         viewBox="0 0 800 800"
@@ -94,7 +94,7 @@ export const GpsCircuitMinimap: React.FC<GpsCircuitMinimapProps> = ({
         />
         <path
           d={activePathD}
-          stroke="#64748B"
+          stroke={MAP_COLORS.markerMuted}
           strokeWidth="7"
           strokeLinecap="round"
           strokeLinejoin="round"

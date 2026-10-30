@@ -1,5 +1,4 @@
 import React, { lazy, Suspense, useMemo, useState } from 'react';
-import { CircleDot } from 'lucide-react';
 import { ReplayTrajectoryPoint, ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { GpsTrackMapScene } from './scene/GpsTrackMapScene.js';
 import { ReplayTelemetryHud } from '../inspector/ReplayTelemetryHud.js';
@@ -8,7 +7,8 @@ import { CornerSegmentComparison } from '../../../utils/cornerAnalysis/types.js'
 import { TrackBoundaryGeometry } from '../../../../shared/types/trackGeometry.js';
 import { ReplayFrictionCircle } from './ReplayFrictionCircle.js';
 import { TrackCircuitLayout } from '../../track-detail/TrackCircuitLayout.js';
-import { FOCUS_RING } from '../../common/buttonStyles.js';
+import { GpsMapModeBar } from './display/GpsMapModeBar.js';
+import { useStoredToggle } from './useStoredToggle.js';
 
 const Replay3DView = lazy(() => import('../view3d/Replay3DView.js'));
 
@@ -64,7 +64,9 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
   const baselineOpacity = fadedLine === 'baseline' ? 0.12 : 1;
   const [showPedalMarkers, setShowPedalMarkers] = useState<boolean>(false);
   const [showFrictionCircle, setShowFrictionCircle] = useState<boolean>(false);
+  const [showGForce, toggleGForce] = useStoredToggle('lmu-map-gforce-v1', true);
   const [view, setView] = useState<'2d' | '3d'>('2d');
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const pedalMarkers = useMemo(() => {
     if (!corners || corners.length === 0) return [];
@@ -101,81 +103,21 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
   if (view === '3d') return <Suspense fallback={<div role="status" className="p-4 text-lmu-muted">Loading 3D viewer…</div>}>
     <Replay3DView trajectory={trajectory} baseline={isCompareMode ? baselineTrajectory ?? null : null}
       currentIndex={currentIndex} onSelectIndex={onSelectIndex} isPlaying={isPlaying} onTogglePlay={onTogglePlay} onReturnTo2D={() => setView('2d')}
-      colorBy={colorBy} onChangeColorBy={onChangeColorBy} />
+      colorBy={colorBy} onChangeColorBy={onChangeColorBy} currentPoint={currentPoint} fadedLine={fadedLine}
+      onToggleFadedLine={line => setFadedLine(f => (f === line ? 'none' : line))} trackGeometry={trackGeometry}
+      isExpanded={isExpanded} onToggleExpanded={setIsExpanded}
+      showFrictionCircle={showFrictionCircle} onToggleFrictionCircle={() => setShowFrictionCircle(value => !value)} />
   </Suspense>;
 
   return (
     <>
-      <div className="flex flex-wrap items-center justify-between px-2 py-1 gap-2 shrink-0 text-xs">
-        <button type="button" onClick={() => setView('3d')} className={`px-2 py-1 rounded bg-lmu-raised/50 text-lmu-text-soft hover:bg-lmu-raised ${FOCUS_RING}`}>3D view</button>
-        <div className="flex items-center gap-1.5">
-          {onChangeColorBy && (
-            <div className="flex items-center gap-1">
-              {(['pedal', 'speed', ...(isCompareMode && baselinePoints ? (['delta', 'gainLoss'] as const) : [])] as const).map(mode => (
-                <button
-                  key={mode}
-                  onClick={() => onChangeColorBy(colorBy === mode ? 'default' : mode)}
-                  title={colorBy === mode ? 'Turn off heat map and show normal line colors'
-                    : mode === 'gainLoss' ? 'Local time gained or lost against baseline' : `Color by ${mode}`}
-                  aria-pressed={colorBy === mode}
-                  className={`px-2 py-0.5 rounded text-[11px] font-semibold capitalize transition-all cursor-pointer ${
-                    colorBy === mode ? 'bg-lmu-raised text-white' : 'text-lmu-muted hover:text-white'
-                  } ${FOCUS_RING}`}
-                >
-                  {mode === 'pedal' ? 'Pedal' : mode === 'speed' ? 'Speed' : mode === 'delta' ? 'Delta' : 'Gain / Loss'}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="flex items-center gap-1.5">
-          {baselinePoints ? (
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setFadedLine(f => (f === 'primary' ? 'none' : 'primary'))}
-                aria-label={fadedLine === 'primary' ? 'Restore primary line' : 'Fade primary line'}
-                title={fadedLine === 'primary' ? 'Restore primary line' : 'Fade primary line'}
-                className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
-                  fadedLine === 'primary'
-                    ? 'text-lmu-faint bg-lmu-raised/40 hover:text-lmu-text-soft'
-                    : 'text-lmu-text-soft hover:text-white hover:bg-lmu-raised/50'
-                } ${FOCUS_RING}`}
-              >
-                <span className="w-2.5 h-1 rounded-sm bg-lmu-info shrink-0" />
-                Primary
-              </button>
-              <button
-                onClick={() => setFadedLine(f => (f === 'baseline' ? 'none' : 'baseline'))}
-                aria-label={fadedLine === 'baseline' ? 'Restore baseline line' : 'Fade baseline line'}
-                title={fadedLine === 'baseline' ? 'Restore baseline line' : 'Fade baseline line'}
-                className={`flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
-                  fadedLine === 'baseline'
-                    ? 'text-lmu-faint bg-lmu-raised/40 hover:text-lmu-text-soft'
-                    : 'text-lmu-text-soft hover:text-white hover:bg-lmu-raised/50'
-                } ${FOCUS_RING}`}
-              >
-                <span className="w-2.5 h-0 border-b-2 border-dashed border-lmu-warn shrink-0" />
-                Baseline
-              </button>
-            </div>
-          ) : null}
-          <button
-            type="button"
-            onClick={() => setShowFrictionCircle(value => !value)}
-            title={showFrictionCircle ? 'Hide friction circle' : 'Show friction circle'}
-            aria-label={showFrictionCircle ? 'Hide friction circle' : 'Show friction circle'}
-            aria-pressed={showFrictionCircle}
-            className={`h-7 px-2 flex items-center justify-center gap-1.5 rounded text-[11px] font-semibold transition-all cursor-pointer ${
-              showFrictionCircle
-                ? 'bg-lmu-raised text-white'
-                : 'text-lmu-muted hover:text-white hover:bg-lmu-raised/50'
-            } ${FOCUS_RING}`}
-          >
-            <CircleDot className="w-4 h-4" />
-            <span>Friction</span>
-          </button>
-        </div>
-      </div>
+      {!isExpanded && <div className="flex items-start justify-end px-2 py-1 gap-2 shrink-0 text-xs">
+        <GpsMapModeBar embedded className="min-w-0 flex-1" colorBy={colorBy} onChangeColorBy={onChangeColorBy}
+          isCompareMode={isCompareMode} hasBaseline={Boolean(baselinePoints)} fadedLine={fadedLine}
+          onToggleFadedLine={line => setFadedLine(value => value === line ? 'none' : line)}
+          showGForce={showGForce} onToggleGForce={toggleGForce}
+          showFrictionCircle={showFrictionCircle} onToggleFrictionCircle={() => setShowFrictionCircle(value => !value)} />
+      </div>}
 
       {trajectory.stationSource === 'odometer' && <div className="flex items-center gap-2 px-2 text-xs text-lmu-muted"><TrackCircuitLayout trackName={trackVenue || ''} trackCourse={trackCourse} layoutKey={layoutKey} size="session" /><p>Basic layout and recorded trajectory. Detailed road, kerb, banking and corner analysis need local track data.</p></div>}
       {/* SINGLE UNIFIED MAP PANE */}
@@ -210,6 +152,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
             onTogglePedalMarkers={() => setShowPedalMarkers(v => !v)}
             fadedLine={fadedLine}
             onToggleFadedLine={line => setFadedLine(f => (f === line ? 'none' : line))}
+            showGForce={showGForce} onToggleGForce={toggleGForce}
             showFrictionCircle={showFrictionCircle}
             onToggleFrictionCircle={() => setShowFrictionCircle(v => !v)}
             dimNonSelectedTrack={Boolean(selectedCorner)}
@@ -220,19 +163,22 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
             dataPluginRevision={trajectory.dataPluginRevision}
             trackGeometry={trackGeometry}
             trackLengthM={trajectory.trackLengthM}
+            isExpanded={isExpanded}
+            onToggleExpanded={setIsExpanded}
+            onToggleView={() => setView('3d')}
           />
         </div>
       </div>
 
-      {showFrictionCircle && (
+      {showFrictionCircle && !isExpanded && (
         <ReplayFrictionCircle
           points={trajectory.points}
           currentIndex={currentIndex}
-          primaryPoint={currentPoint}
+          primaryPoint={currentPoint ?? trajectory.points[currentIndex]}
           baselinePoints={baselinePoints}
         />
       )}
-      <ReplayTelemetryHud currentPoint={currentPoint} />
+      {!isExpanded && <ReplayTelemetryHud currentPoint={currentPoint ?? trajectory.points[currentIndex]} />}
     </>
   );
 };

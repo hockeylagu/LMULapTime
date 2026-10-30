@@ -11,6 +11,7 @@ export interface GpsMapLapTimingPanelProps {
   primaryLapSummary?: ReplayLapSummary;
   baselineLapSummary?: ReplayLapSummary;
   liveSplit?: LiveSectorSplit | null;
+  className?: string;
 }
 
 const deltaColor = (delta: number | null) => delta === null ? 'text-lmu-muted'
@@ -18,7 +19,7 @@ const deltaColor = (delta: number | null) => delta === null ? 'text-lmu-muted'
 const signed = (delta: number) => `${delta > 0 ? '+' : ''}${delta.toFixed(3)}s`;
 
 /** Recorded whole-lap and individual sector times, plus the live change within the cursor's sector. */
-export function GpsMapLapTimingPanel({ primaryLapSummary: primary, baselineLapSummary: baseline, liveSplit }: GpsMapLapTimingPanelProps) {
+export function GpsMapLapTimingPanel({ primaryLapSummary: primary, baselineLapSummary: baseline, liveSplit, className }: GpsMapLapTimingPanelProps) {
   const [collapsed, toggleCollapsed] = useStoredToggle('lmu-map-timing-collapsed-v1', false);
   const id = useId();
   const rows = [
@@ -30,7 +31,7 @@ export function GpsMapLapTimingPanel({ primaryLapSummary: primary, baselineLapSu
   const currentLabel = liveSplit ? `S${liveSplit.sector}` : null;
   return <aside aria-label="Lap and sector timing" data-map-control
     onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()}
-    className="pointer-events-auto w-[340px] max-w-full rounded-xl bg-lmu-strip/95 border border-lmu-border 2xl:absolute 2xl:right-0 2xl:top-13">
+    className={`pointer-events-auto w-[340px] max-w-full rounded-xl bg-lmu-strip/95 border border-lmu-border ${className ?? '2xl:absolute 2xl:right-0 2xl:top-13'}`}>
     {/* One header line: the collapse toggle fills the row-label column, the lap selectors sit over their times. */}
     <GpsMapLapSelectors primaryLapNumber={primary?.lapNumber} baselineLapNumber={baseline?.lapNumber}
       toggle={<button type="button" aria-label="Timing" title={collapsed ? 'Show timing' : 'Hide timing'}

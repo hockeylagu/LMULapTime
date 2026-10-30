@@ -49,6 +49,8 @@ export interface GpsTrackMapProps {
   onToggleFadedLine?: (line: 'primary' | 'baseline') => void;
   showFrictionCircle?: boolean;
   onToggleFrictionCircle?: () => void;
+  showGForce?: boolean;
+  onToggleGForce?: () => void;
   showMinimap?: boolean;
   showLegend?: boolean;
   showControls?: boolean;
@@ -65,6 +67,9 @@ export interface GpsTrackMapProps {
   // Length of the track the trajectories' stations are measured on (trajectory.trackLengthM):
   // the map aligns laps with it exactly as the telemetry channels and corner analysis do.
   trackLengthM?: number;
+  isExpanded?: boolean;
+  onToggleExpanded?: (expanded: boolean) => void;
+  onToggleView?: () => void;
 }
 
 export interface PedalMarkerPoint {

@@ -36,25 +36,25 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
     const status = getStatusLabel(point);
     const statusDetail = getStatusSubtext(point);
     return <div data-testid={baseline ? 'telemetry-hud-baseline' : 'telemetry-hud-primary'}
-      className="grid shrink-0 grid-cols-[56px_60px_44px_56px_56px_80px_46px_64px] items-center gap-x-2 whitespace-nowrap text-[11px] 2xl:text-xs">
-      <span className="inline-flex items-center gap-1.5 text-[10px] text-lmu-muted"
+      className="grid shrink-0 grid-cols-[60px_68px_52px_64px_64px_88px_52px_72px] items-center gap-x-2 whitespace-nowrap text-xs 2xl:text-[13px]">
+      <span className="inline-flex items-center gap-1.5 text-[11px] text-lmu-muted"
         title={baseline ? 'Reference lap; dashed telemetry traces.' : 'Selected lap; solid telemetry traces.'}>
         <span aria-hidden="true" className={baseline ? 'w-3 border-t border-dashed border-lmu-warn' : 'w-3 border-t border-lmu-info'} />
         {baseline ? 'Baseline' : 'Primary'}
       </span>
       <span className="font-mono tabular-nums"><span className="font-semibold">{formatReading(point.speedKmh)}</span> <span className="text-lmu-muted">km/h</span></span>
       <span className="font-mono tabular-nums" title="Selected gear">GEAR {formatGear(point.gear)}</span>
-      <span className="inline-flex items-baseline gap-1 font-mono tabular-nums"><span className="text-lmu-muted font-sans text-[10px]">THR</span><span style={{ color: TELEMETRY_COLORS.throttle }}>{formatReading(point.throttle, 0)}%</span>
-        {point.tcActive && <span className="text-[10px] text-lmu-warn">TC</span>}
+      <span className="inline-flex items-baseline gap-1 font-mono tabular-nums"><span className="text-lmu-muted font-sans text-[11px]">THR</span><span style={{ color: TELEMETRY_COLORS.throttle }}>{formatReading(point.throttle, 0)}%</span>
+        {point.tcActive && <span className="text-[11px] text-lmu-warn">TC</span>}
       </span>
-      <span className="inline-flex items-baseline gap-1 font-mono tabular-nums"><span className="text-lmu-muted font-sans text-[10px]">BRK</span><span style={{ color: TELEMETRY_COLORS.brake }}>{formatReading(point.brake, 0)}%</span>
-        {point.absActive && <span className="text-[10px] text-lmu-info">ABS</span>}
+      <span className="inline-flex items-baseline gap-1 font-mono tabular-nums"><span className="text-lmu-muted font-sans text-[11px]">BRK</span><span style={{ color: TELEMETRY_COLORS.brake }}>{formatReading(point.brake, 0)}%</span>
+        {point.absActive && <span className="text-[11px] text-lmu-info">ABS</span>}
       </span>
-      <span className="inline-flex items-baseline gap-1"><span className="text-lmu-muted text-[10px]">STEER</span><span className="font-mono tabular-nums">{steering}</span></span>
+      <span className="inline-flex items-baseline gap-1"><span className="text-lmu-muted text-[11px]">STEER</span><span className="font-mono tabular-nums">{steering}</span></span>
       <span className="font-mono tabular-nums" title={`G-force: ${accelerationDetail}`} aria-label={`G-force: ${accelerationDetail}`}>
         {hasReading(totalG) ? `${totalG.toFixed(2)}G` : '--'}
       </span>
-      <span className="text-[10px] text-lmu-muted" title={statusDetail} aria-label={`${status}, ${statusDetail}`}>{status}</span>
+      <span className="text-[11px] text-lmu-muted" title={statusDetail} aria-label={`${status}, ${statusDetail}`}>{status}</span>
     </div>;
   };
 
@@ -65,9 +65,9 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
       {renderLap(primaryPoint)}
       {comparing && <>
         <div className="flex shrink-0 flex-col items-center justify-center gap-0.5 font-mono tabular-nums">
-          <span className={`text-sm leading-none font-semibold ${deltaColor}`} title={`Live delta: ${deltaState}. Primary lap time minus baseline lap time at the same track distance; negative is ahead.`}
+          <span className={`text-[15px] leading-none font-semibold ${deltaColor}`} title={`Live delta: ${deltaState}. Primary lap time minus baseline lap time at the same track distance; negative is ahead.`}
             aria-label={`Live delta: ${deltaState}`}>{delta !== null ? `${delta > 0 ? '+' : ''}${delta.toFixed(2)}s` : '--'}</span>
-          <span className="text-[10px] leading-none text-lmu-muted" title="Distance between racing lines at the same track distance, not a race gap.">
+          <span className="text-[11px] leading-none text-lmu-muted" title="Distance between racing lines at the same track distance, not a race gap.">
             {hasReading(lineDist) ? lineDist.toFixed(1) : '--'} m line
           </span>
         </div>

@@ -5,6 +5,7 @@ import { useGpsMapPanZoom } from '../useGpsMapPanZoom.js';
 import { projectBoundaryPoints } from '../replayMapUtils.js';
 import { MapLayersControl, type PedalPointsControl } from './MapLayersControl.js';
 import { MapFullscreenButton } from './MapFullscreenButton.js';
+import { MapViewSwitchButton } from './MapViewSwitchButton.js';
 import { ReplayShortcutHelp } from '../../ReplayShortcutHelp.js';
 import { RUNOFF_GROUP, visibleSurfacePoints, type MapLayers } from './mapLayers.js';
 import { projectedPointBounds } from './useMapLayers.js';
@@ -28,10 +29,11 @@ interface Props {
   hasSectors?: boolean;
   hasTurns?: boolean;
   pedalPoints?: PedalPointsControl;
+  onToggleView?: () => void;
 }
 
 export const GpsMapControls: React.FC<Props> = ({ camera, layers, onChange, geometry, display, error,
-  bounds, left, right, center, trajectory, orientation, isPlaying, onTogglePlay, isExpanded, onToggleExpanded, showPlayPause, hasSectors, hasTurns, pedalPoints }) => {
+  bounds, left, right, center, trajectory, orientation, isPlaying, onTogglePlay, isExpanded, onToggleExpanded, showPlayPause, hasSectors, hasTurns, pedalPoints, onToggleView }) => {
   const fit = (points: Point[]) => { const rectangle = projectedPointBounds(points); if (rectangle) camera.fitBounds(rectangle); };
   const active = left.length && right.length ? [...left, ...right] : trajectory;
   const shouldShowPlayPause = showPlayPause ?? Boolean(isExpanded);
@@ -39,7 +41,7 @@ export const GpsMapControls: React.FC<Props> = ({ camera, layers, onChange, geom
     zoomDisplay={`${Number(camera.zoomLevel.toFixed(1))}x`} followCar={camera.followCar}
     onToggleFollowCar={() => camera.setFollowCar(value => !value)} onCenterCar={camera.centerOnCar}
     isPlaying={isPlaying} onTogglePlay={shouldShowPlayPause ? onTogglePlay : undefined}
-    orientation={orientation} className="top-2 right-2 bottom-auto">
+    orientation={orientation} className="top-2 right-3 bottom-auto">
     <MapLayersControl layers={layers} onChange={onChange} error={error} pedalPoints={pedalPoints}
       available={{ road: true, kerb: Boolean(display?.surfaces.kerb.length || display?.surfaces.raisedKerb?.length || geometry?.surfaceProfile && geometry.mapSurfaces?.kerb.length),
         runoff: RUNOFF_GROUP.some(key => display?.surfaces[key]?.length || geometry?.mapSurfaces?.[key]?.length),
@@ -52,6 +54,7 @@ export const GpsMapControls: React.FC<Props> = ({ camera, layers, onChange, geom
         ...projectBoundaryPoints(visibleSurfacePoints(display?.surfaces ?? geometry?.mapSurfaces,
           { ...layers, road: Boolean(display) && layers.road, kerb: Boolean(display) && layers.kerb }), bounds, 800, 60)])} />
     <ReplayShortcutHelp />
+    {onToggleView && <MapViewSwitchButton view="2d" onToggleView={onToggleView} />}
     <MapFullscreenButton isExpanded={isExpanded} onToggleExpanded={onToggleExpanded} />
   </MapControlsOverlay>;
 };
