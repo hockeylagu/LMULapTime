@@ -65,6 +65,31 @@ it('estimates corner movement from replay heave and road, bounds visual travel, 
   animation.update({...pose, y: pose.y + 1}); expect(car.getObjectByName('wheel-FL')!.position.y).toBeCloseTo(0.15);
 });
 
+it('preserves ghost depth handling and stable tyre/rim ordering when splitting animated wheels', () => {
+  const ghost = makeCar(lap, '#ffb703', true, model());
+  const tyre = ghost.getObjectByName('tyres') as Mesh<BufferGeometry, MeshStandardMaterial>;
+  const rim = ghost.getObjectByName('rims') as Mesh<BufferGeometry, MeshStandardMaterial>;
+  const tyreOrder = tyre.renderOrder, rimOrder = rim.renderOrder;
+  expect(tyreOrder).not.toBe(rimOrder);
+  const animation = createWheelAnimation(ghost, lap, () => 0);
+  for (const fraction of [0, 0.25, 0.5, 0.75, 1]) {
+    animation.update(sampleRenderPose(lap.points, 0, fraction)!);
+    for (const corner of ['FL', 'FR', 'RL', 'RR']) {
+      const wheelTyre = ghost.getObjectByName(`tyres-${corner}`) as Mesh<BufferGeometry, MeshStandardMaterial>;
+      const wheelRim = ghost.getObjectByName(`rims-${corner}`) as Mesh<BufferGeometry, MeshStandardMaterial>;
+      expect(wheelTyre.renderOrder).toBe(tyreOrder);
+      expect(wheelRim.renderOrder).toBe(rimOrder);
+      expect(wheelTyre.material).toBe(tyre.material);
+      expect(wheelRim.material).toBe(rim.material);
+      for (const part of [wheelTyre, wheelRim]) {
+        expect(part.material.depthTest).toBe(true);
+        expect(part.material.depthWrite).toBe(false);
+        expect(part.material.customProgramCacheKey()).toBe('replay-ghost-depth-v1');
+      }
+    }
+  }
+});
+
 it('leaves unsupported wheel geometry static and never invents a ground fit without road coverage', () => {
   const unsupported = new Group(); unsupported.add(new Mesh(new BoxGeometry(2, 1, 4), new MeshStandardMaterial()));
   expect(createWheelAnimation(makeCar(lap, '#38bdf8', false, unsupported), lap, () => 0).description).toBe('Wheel animation unavailable');

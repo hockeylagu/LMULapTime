@@ -11,13 +11,13 @@ export function makeCar(trajectory: ReplayTrajectoryData, color: string, ghost: 
     envelope.traverse(object => {
       if (!(object instanceof Mesh) || !(object.geometry instanceof BufferGeometry)) return;
       const mesh = object as Mesh<BufferGeometry, Material | Material[]>;
+      // Each lap owns its buffers, so replacing a lap cannot dispose a cached vehicle template or the other car.
+      mesh.geometry = mesh.geometry.clone();
       const originals = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       const copies = originals.map(source => {
         const copy = source.clone();
         if (copy instanceof MeshStandardMaterial && copy.name === 'body') copy.color.set(color);
         copy.transparent = ghost; copy.opacity = ghost ? 0.45 : 1; copy.depthWrite = !ghost;
-        // Same-station laps can overlap exactly. Bias only fragment depth, never model coordinates.
-        copy.polygonOffset = ghost; copy.polygonOffsetFactor = -1; copy.polygonOffsetUnits = -1;
         return copy;
       });
       mesh.material = Array.isArray(mesh.material) ? copies : copies[0];
@@ -27,6 +27,7 @@ export function makeCar(trajectory: ReplayTrajectoryData, color: string, ghost: 
     const body = new Mesh(new BoxGeometry(width * 0.78, 0.5, length), material);
     body.position.y = 0.2;
     const cabin = new Mesh(new BoxGeometry(width * 0.55, 0.4, length * 0.37), material);
+    cabin.name = 'cabin';
     cabin.position.set(0, 0.62, 0.1);
     const nose = new Mesh(new BoxGeometry(width * 0.6, 0.03, 0.45), new MeshStandardMaterial({color: '#f8f9fa', transparent: ghost, opacity: ghost ? 0.5 : 1, depthWrite: !ghost}));
     nose.position.set(0, 0.46, -length * 0.35); envelope.add(body, cabin, nose);
@@ -36,6 +37,33 @@ export function makeCar(trajectory: ReplayTrajectoryData, color: string, ghost: 
   envelope.position.set(offset[0], 0, offset[1]);
   const marker = new Mesh(new SphereGeometry(0.65, 12, 8), material); marker.name = 'pose-marker'; marker.visible = false;
   envelope.name = 'body-envelope'; car.add(envelope, marker);
+  if (ghost) {
+    let order = 1;
+    car.traverse(object => {
+      if (!(object instanceof Mesh)) return;
+      // Camera-distance sorting can swap intersecting transparent body/tyre parts each frame.
+      object.renderOrder = order++;
+      const mesh = object as Mesh<BufferGeometry, Material | Material[]>;
+      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      for (const ghostMaterial of materials) {
+        ghostMaterial.polygonOffset = true; ghostMaterial.polygonOffsetFactor = -1; ghostMaterial.polygonOffsetUnits = -1;
+        // gl_FragDepth replaces polygonOffset in the perspective logarithmic-depth pass.
+        // Give coincident laps 2 cm of depth clearance without shifting either recorded pose;
+        // retain depth testing so terrain and walls still occlude the ghost.
+        ghostMaterial.onBeforeCompile = shader => {
+          shader.fragmentShader = shader.fragmentShader.replace('#include <logdepthbuf_fragment>', `
+            #include <logdepthbuf_fragment>
+            #ifdef USE_LOGARITHMIC_DEPTH_BUFFER
+              if (vIsPerspective != 0.0) {
+                gl_FragDepth = log2(max(1.0, vFragDepth - 0.02)) * logDepthBufFC * 0.5;
+              }
+            #endif
+          `);
+        };
+        ghostMaterial.customProgramCacheKey = () => 'replay-ghost-depth-v1';
+      }
+    });
+  }
   return car;
 }
 

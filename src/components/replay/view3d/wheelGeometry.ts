@@ -70,6 +70,7 @@ export function attachWheelRigs(envelope: Group): WheelRig[] {
       geometry.setIndex(part.indices[rig.corner]);
       geometry.boundingBox = part.bounds[rig.corner]; geometry.boundingSphere = geometry.boundingBox.getBoundingSphere(new Sphere());
       const mesh = new Mesh(geometry, part.mesh.material); mesh.name = part.mesh.name.endsWith(`-${CORNERS[rig.corner]}`) ? part.mesh.name : `${part.mesh.name}-${CORNERS[rig.corner]}`;
+      mesh.renderOrder = part.mesh.renderOrder;
       mesh.position.copy(rig.hub).negate(); rig.pivot.add(mesh);
     }
     envelope.remove(part.mesh);

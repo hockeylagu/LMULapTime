@@ -15,6 +15,7 @@ it('preserves real model and tyre placement and gives primary/ghost independent 
   const actualBody = primary.getObjectByName('body') as Mesh<BoxGeometry, MeshStandardMaterial>;
   const ghostBody = ghost.getObjectByName('body') as Mesh<BoxGeometry, MeshStandardMaterial>;
   expect(actualBody.material).not.toBe(ghostBody.material); expect(actualBody.material).not.toBe(bodyMaterial);
+  expect(actualBody.geometry).not.toBe(ghostBody.geometry); expect(actualBody.geometry).not.toBe(body.geometry);
   expect(actualBody.material.color.getHexString()).toBe('38bdf8'); expect(ghostBody.material.color.getHexString()).toBe('ffb703');
   expect(actualBody.material.opacity).toBe(1); expect(ghostBody.material.opacity).toBe(0.45); expect(bodyMaterial.opacity).toBe(1);
   expect(actualBody.material.polygonOffset).toBe(false); expect(ghostBody.material.polygonOffset).toBe(true);
