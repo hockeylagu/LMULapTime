@@ -58,7 +58,7 @@ it('applies the latest laps if selection changes while the initial scene is stil
   await act(async () => release(scene));
   await waitFor(() => expect(screen.getByTestId('replay-3d-toolbar').title).toContain('Ghost: Estimated body'));
   expect(createReplayScene).toHaveBeenCalledOnce(); expect(fetchTrackScene).toHaveBeenCalledOnce();
-  expect(scene.updateLaps).toHaveBeenCalledWith(next, comparison, {primary: null, baseline: null}, expect.any(AbortSignal));
+  expect(scene.updateLaps).toHaveBeenCalledWith(next, comparison, {primary: null, baseline: null, primaryLivery: null, baselineLivery: null}, expect.any(AbortSignal));
   expect(scene.dispose).not.toHaveBeenCalled();
 });
 

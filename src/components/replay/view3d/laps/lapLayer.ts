@@ -1,8 +1,10 @@
 import {MeshoptDecoder} from 'meshoptimizer/decoder';
-import { BufferGeometry, Group, Mesh, type Vector3 } from 'three';
+import { BufferGeometry, Group, Mesh, type Texture, type Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import type { LoadedVehicleMesh } from '../../../../api/vehicleMeshApi.js';
+import type { LoadedVehicleLivery } from '../../../../api/vehicleLiveryApi.js';
+import { createLiveryTexture } from '../liveryTexture.js';
 import { MAP_COLORS, TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../../../utils/lapAlignment.js';
 import type { MapColorMode } from '../../map/replayMapUtils.js';
@@ -12,12 +14,27 @@ import { BASELINE_LINE, colorRacingLine, makeRacingLine, racingLineColors } from
 import type { SurfaceHeight } from '../surfaceProjection.js';
 import { disposeObjects } from './disposeObjects.js';
 
-export interface LapVehicleModels {primary: LoadedVehicleMesh | null; baseline: LoadedVehicleMesh | null}
+export interface LapVehicleModels {
+  primary: LoadedVehicleMesh | null;
+  baseline: LoadedVehicleMesh | null;
+  primaryLivery?: LoadedVehicleLivery | null;
+  baselineLivery?: LoadedVehicleLivery | null;
+}
 
 /** Lap objects own their geometry; replacing them cannot release the track's GPU buffers. */
 export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeight) {
   // Only buffers retained by the bounded asset cache keep these parsed templates alive.
   const models = new WeakMap<ArrayBuffer, Promise<Group>>();
+  const textures = new WeakMap<HTMLImageElement, Texture>();
+  const getTexture = (livery: LoadedVehicleLivery | null | undefined): Texture | null => {
+    if (!livery) return null;
+    let texture = textures.get(livery.image);
+    if (!texture) {
+      texture = createLiveryTexture(livery.image);
+      textures.set(livery.image, texture);
+    }
+    return texture;
+  };
   const loadModel = (asset: LoadedVehicleMesh | null): Promise<Group | null> => {
     if (!asset) return Promise.resolve(null);
     let pending = models.get(asset.bytes);
@@ -34,8 +51,14 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
   };
   return async (trajectory: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null, assets: LapVehicleModels, colorBy: MapColorMode) => {
     const [primaryModel, baselineModel] = await Promise.all([loadModel(assets.primary), loadModel(assets.baseline)]);
-    const primary = makeCar(trajectory, MAP_COLORS.carBody, false, primaryModel);
-    const ghost = baseline ? makeCar(baseline, TELEMETRY_COLORS.baseline, true, baselineModel) : new Group();
+    const primaryTexture = (assets.primary && assets.primaryLivery && assets.primary.metadata.vehicleRecordId === assets.primaryLivery.metadata.vehicleRecordId)
+      ? getTexture(assets.primaryLivery)
+      : null;
+    const baselineTexture = (assets.baseline && assets.baselineLivery && assets.baseline.metadata.vehicleRecordId === assets.baselineLivery.metadata.vehicleRecordId)
+      ? getTexture(assets.baselineLivery)
+      : null;
+    const primary = makeCar(trajectory, MAP_COLORS.carBody, false, primaryModel, primaryTexture);
+    const ghost = baseline ? makeCar(baseline, TELEMETRY_COLORS.baseline, true, baselineModel, baselineTexture) : new Group();
     const primaryWheels = createWheelAnimation(primary, trajectory, surfaceHeight);
     const ghostWheels = baseline ? createWheelAnimation(ghost, baseline, surfaceHeight) : null;
     // Only the primary car casts a contact shadow, including its animated tyres.

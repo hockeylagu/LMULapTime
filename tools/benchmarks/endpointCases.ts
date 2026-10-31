@@ -77,6 +77,8 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
   add('track-scene-asset', '/api/data-plugin/scenes/:layoutKey/:revision/asset', undefined, 'Binary GLB delivery is measured separately from the JSON benchmark.');
   add('vehicle-mesh', '/api/data-plugin/vehicle-meshes/:recordId', undefined, 'Optional private vehicle mesh capability; exact identity and revisions are covered by synthetic route tests.');
   add('vehicle-mesh-asset', '/api/data-plugin/vehicle-meshes/:recordId/:revision/asset', undefined, 'Binary vehicle delivery is measured separately from the JSON benchmark.');
+  add('vehicle-livery', '/api/data-plugin/vehicle-liveries/:identity', undefined, 'Optional private vehicle livery capability; exact identity and revisions are covered by synthetic route tests.');
+  add('vehicle-livery-asset', '/api/data-plugin/vehicle-liveries/:liveryKey/:revision/asset', undefined, 'Binary WebP delivery is measured separately from the JSON benchmark.');
   add('brake-board-artwork', '/api/data-plugin/brake-board-artwork/:layoutKey', geometry ? `/api/data-plugin/brake-board-artwork/${geometry.layout}` : undefined, 'No resolved layout in the fixed cohort.');
   add('brake-board-artwork-asset', '/api/data-plugin/brake-board-artwork/:layoutKey/:revision/asset', undefined, 'Binary PNG delivery is checked separately; JSON benchmark covers artwork metadata.');
   for (const [index, board] of cohort.boards.entries()) {

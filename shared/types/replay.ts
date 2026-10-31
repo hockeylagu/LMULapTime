@@ -279,7 +279,7 @@ export interface ReplayTrajectoryData {
   sessionId?: string;
   driverOrdinal?: number;
   lapOrdinal?: number;
-  vehicleIdentity?: { vehicleId?:string; carType?:string; carClass?:string };
+  vehicleIdentity?: { vehicleId?: string; carType?: string; carClass?: string; livery?: string };
   vehicleData?: VehicleDataRecord;
   /** Applied client calibration; plugin steering uses base defaults, not a recorded setup. */
   handlingCalibration?: VehicleHandlingCalibration;

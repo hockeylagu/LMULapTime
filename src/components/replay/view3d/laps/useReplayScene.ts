@@ -3,6 +3,7 @@ import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js
 import { fetchTrackScene } from '../../../../api/trackSceneApi.js';
 import { fetchBrakeBoardArtwork } from '../../../../api/scenes/brakeBoardArtworkApi.js';
 import { fetchVehicleMesh, type LoadedVehicleMesh } from '../../../../api/vehicleMeshApi.js';
+import { fetchVehicleLivery, type LoadedVehicleLivery } from '../../../../api/vehicleLiveryApi.js';
 import { loadTrackBoundaryGeometry, loadTrackMapDisplay } from '../../../../api/trackGeometryApi.js';
 import { apiErrorMessage, isAbortError } from '../../../../api/apiClient.js';
 import { ReplayPlaybackCursorContext } from '../../inspector/replayPlaybackCursor.js';
@@ -21,8 +22,12 @@ interface Options {
   retry: number;
 }
 interface SceneResult {key: string; error?: string; ready?: boolean; cars?: string; warning?: string; wheelMotion?: string}
-interface CarAsset {mesh: LoadedVehicleMesh | null; warning?: string}
+interface CarAsset {mesh: LoadedVehicleMesh | null; livery: LoadedVehicleLivery | null; warning?: string}
 interface Runtime {handle: ReplaySceneHandle; trajectory: ReplayTrajectoryData; baseline: ReplayTrajectoryData | null}
+
+function isCustomLivery(livery?: string): boolean {
+  return typeof livery === 'string' && /^[0-9a-f]{24}$/i.test(livery.trim());
+}
 
 function validateLaps(lap: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null) {
   if (!lap.layoutKey) throw Error('This recording has no resolved circuit layout. Use the 2D map.');
@@ -52,15 +57,38 @@ export function useReplayScene({host, trajectory, baseline, currentIndex, mode, 
     let active = true, created: ReplaySceneHandle | null = null;
     const requests = new Map<string, Promise<CarAsset>>();
     const loadCar = (lap: ReplayTrajectoryData | null): Promise<CarAsset> => {
-      const id = lap?.vehicleData?.id;
-      if (!id || !lap) return Promise.resolve({mesh: null});
-      const requestKey = `${id}:${lap.dataPluginRevision ?? ''}`;
+      if (!lap) return Promise.resolve({mesh: null, livery: null});
+      const id = lap.vehicleData?.id;
+      const liveryId = !isCustomLivery(lap.vehicleIdentity?.livery) ? lap.vehicleIdentity?.vehicleId : undefined;
+      const requestKey = `${id ?? 'none'}:${liveryId ?? 'none'}:${lap.dataPluginRevision ?? ''}`;
       let pending = requests.get(requestKey);
       if (!pending) {
-        pending = fetchVehicleMesh(id, lap.dataPluginRevision, abort.signal).then(mesh => ({mesh})).catch((error: unknown) => {
-          if (isAbortError(error)) throw error;
-          return {mesh: null, warning: apiErrorMessage(error, 'Vehicle mesh unavailable')};
-        });
+        pending = (async () => {
+          const [meshResult, liveryResult] = await Promise.allSettled([
+            id ? fetchVehicleMesh(id, lap.dataPluginRevision, abort.signal) : Promise.resolve(null),
+            liveryId ? fetchVehicleLivery(liveryId, lap.dataPluginRevision, abort.signal) : Promise.resolve(null),
+          ]);
+          if (abort.signal.aborted) throw new DOMException('Car asset request aborted', 'AbortError');
+          const warnings: string[] = [];
+          let mesh: LoadedVehicleMesh | null = null;
+          if (meshResult.status === 'fulfilled') {
+            mesh = meshResult.value;
+          } else if (isAbortError(meshResult.reason)) {
+            throw meshResult.reason;
+          } else {
+            warnings.push(apiErrorMessage(meshResult.reason, 'Vehicle mesh unavailable'));
+          }
+          let livery: LoadedVehicleLivery | null = null;
+          if (liveryResult.status === 'fulfilled') {
+            livery = liveryResult.value;
+          } else if (isAbortError(liveryResult.reason)) {
+            throw liveryResult.reason;
+          } else {
+            warnings.push(apiErrorMessage(liveryResult.reason, 'Vehicle livery unavailable'));
+          }
+          const warning = warnings.length > 0 ? warnings.join('; ') : undefined;
+          return {mesh, livery, ...(warning ? {warning} : {})};
+        })();
       }
       requests.delete(requestKey); requests.set(requestKey, pending);
       const oldest = requests.keys().next().value;
@@ -84,7 +112,9 @@ export function useReplayScene({host, trajectory, baseline, currentIndex, mode, 
         .catch((error: unknown) => { if (isAbortError(error)) throw error; return []; });
       abort.signal.throwIfAborted();
       const handle = await createReplayScene(container, data.bytes, data.metadata, selected.trajectory, selected.baseline,
-        message => { if (active) setResult({key, error: message}); }, {primary: primary.mesh, baseline: comparison.mesh}, boundaries, latest().colorBy, artwork);
+        message => { if (active) setResult({key, error: message}); },
+        {primary: primary.mesh, baseline: comparison.mesh, primaryLivery: primary.livery, baselineLivery: comparison.livery},
+        boundaries, latest().colorBy, artwork);
       if (!active) { handle.dispose(); abort.signal.throwIfAborted(); }
       created = handle; scene.current = handle; handle.mode(latest().mode);
       return {handle, trajectory: selected.trajectory, baseline: selected.baseline};
@@ -107,7 +137,12 @@ export function useReplayScene({host, trajectory, baseline, currentIndex, mode, 
         const [primary, comparison] = await Promise.all([owner.loadCar(trajectory), owner.loadCar(baseline)]);
         if (abort.signal.aborted) return;
         if (current.trajectory !== trajectory || current.baseline !== baseline) {
-          if (!await current.handle.updateLaps(trajectory, baseline, {primary: primary.mesh, baseline: comparison.mesh}, abort.signal)) return;
+          if (!await current.handle.updateLaps(trajectory, baseline, {
+            primary: primary.mesh,
+            baseline: comparison.mesh,
+            primaryLivery: primary.livery,
+            baselineLivery: comparison.livery,
+          }, abort.signal)) return;
           current.trajectory = trajectory; current.baseline = baseline;
         }
         if (abort.signal.aborted) return;
@@ -115,8 +150,11 @@ export function useReplayScene({host, trajectory, baseline, currentIndex, mode, 
         current.handle.colorLines(settings.colorBy);
         current.handle.fadeLines(settings.fadedLine === 'primary' ? 0.12 : 1, settings.fadedLine === 'baseline' ? 0.12 : 1);
         drawCursor();
-        const label = (mesh: LoadedVehicleMesh | null) => mesh ? (mesh.metadata.parts.includes('tyres') ? 'Game body + tyres' : 'Game body mesh') : 'Estimated body';
-        setResult({key, ready: true, cars: `${label(primary.mesh)}${baseline ? ` · Ghost: ${label(comparison.mesh)}` : ''}`,
+        const label = (car: CarAsset) => {
+          const body = car.mesh ? (car.mesh.metadata.parts.includes('tyres') ? 'Game body + tyres' : 'Game body mesh') : 'Estimated body';
+          return car.livery ? `${body} + livery` : body;
+        };
+        setResult({key, ready: true, cars: `${label(primary)}${baseline ? ` · Ghost: ${label(comparison)}` : ''}`,
           warning: [...new Set([primary.warning, comparison.warning].filter(Boolean))].join('; '), wheelMotion: current.handle.wheelMotion});
       } catch (error) {
         if (!abort.signal.aborted && !isAbortError(error)) setResult({key, error: apiErrorMessage(error, 'Unable to load 3D scene')});

@@ -274,6 +274,27 @@ move it from recorded data; damage, liveries and textures are not inferred. Othe
 their own exact render data is available. Analytical vehicle records and accepted packages stay
 unchanged; this is not publication of a new accepted dataset.
 
+### Optional vehicle liveries
+
+A v2 manifest may declare `vehicleLiveries: { "catalog": "vehicle-liveries/index.json" }`.
+The catalog is a flat array of entries:
+`{ liveryKey, vehicleRecordId, vehicleIds, asset, sha256, byteLength, width, height, revision }`.
+Each livery entry binds a specific visual mesh variant (`vehicleRecordId`) and its driving vehicle aliases (`vehicleIds`).
+Assets are content-addressed WebP files under `vehicle-liveries/<sha256>.webp` with `RIFF....WEBP` container headers,
+matching hashes, and dimensions within 4096 px. The catalog budget is 256 MB total.
+
+`GET /api/data-plugin/vehicle-liveries/:vehicleId` resolves a vehicle alias (case-insensitive) and
+returns public metadata with `packageRevision`. Each alias may appear in at most one entry; one image may serve
+several mesh variants under the same `liveryKey` and revision.
+`GET /api/data-plugin/vehicle-liveries/:liveryKey/:revision/asset` serves only the registered WebP image.
+
+In the 3D replay inspector, cars load their matching livery texture for primary and comparison
+vehicles. Textures use direct vertical orientation (`flipY = false`) and repeat wrapping (`wrapS = wrapT = RepeatWrapping`)
+to match source UV coordinates. Textures apply strictly to the `livery` material on meshes with native `TEXCOORD_0`
+whose `vehicleRecordId` matches.
+Drivers in replays with a custom skin hash (a 24-character hex identifier) and the 14 vehicle records without the paint
+binding (`WCCARBODY` + `L2IBLCARBODY`) retain the neutral body without texture.
+
 ## Behavior without detailed data
 
 Bundled layouts, recorded trajectories and channel-based analysis remain available.

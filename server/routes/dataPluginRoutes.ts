@@ -45,5 +45,17 @@ export function createDataPluginRouter(provider:DataPlugin=dataPlugin):Router {
       res.type('model/gltf-binary').send(bytes);
     } catch { res.status(409).json({error: '3D vehicle mesh changed on disk. Restore the package or restart the backend.'}); }
   });
+  router.get('/vehicle-liveries/:identity', (req, res) => {
+    const livery = provider.vehicleLivery(req.params.identity);
+    if (!livery) { res.status(404).json({error: 'Vehicle livery unavailable'}); return; }
+    res.json(livery);
+  });
+  router.get('/vehicle-liveries/:liveryKey/:revision/asset', (req, res) => {
+    try {
+      const bytes = provider.vehicleLiveryAsset(req.params.liveryKey, req.params.revision);
+      if (!bytes) { res.status(404).json({error: 'Vehicle livery unavailable'}); return; }
+      res.setHeader('X-Content-Type-Options', 'nosniff'); res.type('image/webp').send(bytes);
+    } catch { res.status(409).json({error: 'Vehicle livery changed on disk. Restore the package or restart the backend.'}); }
+  });
   return router;
 }

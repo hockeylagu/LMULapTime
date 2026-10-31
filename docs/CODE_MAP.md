@@ -329,6 +329,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   `vehicleMeshApi.ts` verifies identity/package revisions, and the 3D viewer assembles native body,
   tyre and rim geometry with independent primary/ghost materials. Unavailable models retain
   labelled estimates. [Vehicle mesh contract](PLUGINS.md#optional-visible-vehicle-meshes) owns semantics.
+  `vehicleLiveryPackage.ts` validates WebP textures and alias mappings; `/api/data-plugin/vehicle-liveries/:vehicleId` and `/:liveryKey/:revision/asset` serve them. [Vehicle livery contract](PLUGINS.md#optional-vehicle-liveries) owns semantics.
 - `trackPackage.ts` validates geometry revisions and route lengths within 0.01m. Routes in `dataPluginRoutes.ts` serve geometry and vehicle logos (`/api/data-plugin/vehicles/logos`).
 - Geometry validation: `hasCompatibleTrackStations` (`shared/domain/trackGeometry.ts`) requires matching geometry revisions before computing geometry-dependent corner analysis; missing geometry leaves recorded-channel analysis available.
 - Vehicle logos: `resolveCarManufacturer` (`shared/domain/vehicleMapping.ts`) matches names against a word-bounded rule table. Client loads logos via `src/api/vehicleLogosApi.ts` and renders `CarLogo.tsx` and `CarIdentity.tsx`.

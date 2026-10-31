@@ -13,7 +13,9 @@ import type { TrackScene } from '../../shared/types/scenes/trackScene.js';
 import type { VehicleMesh, VehicleMeshResource } from '../../shared/types/scenes/vehicleMesh.js';
 import type { TrackSceneResource } from '../../shared/types/scenes/trackScene.js';
 import type { BrakeBoardArtworkResource } from '../../shared/types/scenes/brakeBoardArtwork.js';
+import type { VehicleLiveryResource } from '../../shared/types/scenes/vehicleLivery.js';
 import { loadBoardArtwork, readBoardArtwork, type RegisteredBoardArtwork } from './brakeBoardArtwork.js';
+import { loadVehicleLiveryPackage, readVehicleLivery, type VehicleLiveriesStore } from './vehicleLiveryPackage.js';
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('Expected object');
@@ -141,6 +143,7 @@ export class DataPlugin {
   private scenes = new Map<string, RegisteredMesh<TrackScene>>();
   private vehicleMeshes = new Map<string, RegisteredMesh<VehicleMesh>>();
   private boardArtwork = new Map<string, RegisteredBoardArtwork[]>();
+  private vehicleLiveries: VehicleLiveriesStore | null = null;
   private root = '';
   public constructor(root?: string) {
     this.status = {state:root?'invalid':'absent',revision:'none',tracks:false,vehicles:false};
@@ -158,7 +161,7 @@ export class DataPlugin {
         const buffer=fs.readFileSync(file); digest.update(relative).update(buffer); return JSON.parse(buffer.toString('utf8'));
       };
       const manifest=object(read('manifest.json',64_000));
-      keys(manifest,['schemaVersion','id','version','tracks','vehicles', ...(manifest.schemaVersion === 2 ? ['scenes', 'vehicleMeshes'] : [])]);
+      keys(manifest,['schemaVersion','id','version','tracks','vehicles', ...(manifest.schemaVersion === 2 ? ['scenes', 'vehicleMeshes', 'vehicleLiveries'] : [])]);
       if (manifest.schemaVersion!==1 && manifest.schemaVersion!==2) throw Error('Unsupported schema');
       text(manifest.id); text(manifest.version);
       for (const capability of ['tracks','vehicles']) if (manifest[capability] !== undefined) object(manifest[capability]);
@@ -199,8 +202,12 @@ export class DataPlugin {
         const meshes = object(manifest.vehicleMeshes); keys(meshes, ['catalog']);
         this.vehicleMeshes = loadVehicleMeshPackage(base, read(text(meshes.catalog)), this.records);
       }
-      this.status={state:'ready',revision:digest.digest('hex'),tracks:!!manifest.tracks,vehicles:!!manifest.vehicles, ...(this.logoRecords.size > 0 ? {logos: true} : {}), ...(this.scenes.size ? {scenes: true} : {}), ...(this.vehicleMeshes.size ? {vehicleMeshes: true} : {})};
-    } catch {this.tracks.clear(); this.records.length=0; this.logoRecords.clear(); this.scenes.clear(); this.vehicleMeshes.clear(); this.boardArtwork.clear(); /* Generic status never discloses local paths. */}
+      if (manifest.vehicleLiveries !== undefined) {
+        const liveries = object(manifest.vehicleLiveries); keys(liveries, ['catalog']);
+        this.vehicleLiveries = loadVehicleLiveryPackage(base, read(text(liveries.catalog)), this.vehicleMeshes);
+      }
+      this.status={state:'ready',revision:digest.digest('hex'),tracks:!!manifest.tracks,vehicles:!!manifest.vehicles, ...(this.logoRecords.size > 0 ? {logos: true} : {}), ...(this.scenes.size ? {scenes: true} : {}), ...(this.vehicleMeshes.size ? {vehicleMeshes: true} : {}), ...(this.vehicleLiveries && this.vehicleLiveries.size ? {vehicleLiveries: true} : {})};
+    } catch {this.tracks.clear(); this.records.length=0; this.logoRecords.clear(); this.scenes.clear(); this.vehicleMeshes.clear(); this.boardArtwork.clear(); this.vehicleLiveries = null; /* Generic status never discloses local paths. */}
   }
   public scene(key: string): TrackSceneResource | null {
     const registered = this.scenes.get(key);
@@ -232,6 +239,17 @@ export class DataPlugin {
   public vehicleMeshAsset(recordId: string, revision: string): Buffer | null {
     const mesh = this.vehicleMeshes.get(recordId);
     return mesh?.metadata.revision === revision ? readMeshAsset(this.root, mesh) : null;
+  }
+  public vehicleLivery(identity: string): VehicleLiveryResource | null {
+    const row = this.vehicleLiveries?.resolve(identity);
+    if (!row) return null;
+    const { asset: _asset, ...metadata } = row.metadata;
+    return { ...structuredClone(metadata), packageRevision: this.status.revision };
+  }
+  public vehicleLiveryAsset(liveryKey: string, revision: string): Buffer | null {
+    const row = this.vehicleLiveries?.get(liveryKey, revision);
+    if (!row) return null;
+    return readVehicleLivery(this.root, row);
   }
   public track(key:string) {const row=this.tracks.get(key);return row?structuredClone(row):null;}
   /** Internal immutable geometry view; API callers use the defensive track() snapshot. */

@@ -47,7 +47,7 @@ function meshoptBuffer(json: Record<string, unknown>, binary: Buffer): Buffer {
     const mode = encoding.mode;
     if (view.buffer !== 1 || encoding.buffer !== 0 || offset % 4 || sourceOffset % 4 || offset + length > decoded.length || sourceOffset + sourceLength > binary.length || count * stride !== length
       || (encoding.filter !== undefined && encoding.filter !== 'NONE')
-      || !((mode === 'ATTRIBUTES' && stride === 12) || ((mode === 'TRIANGLES' || mode === 'INDICES') && stride === 4))
+      || !((mode === 'ATTRIBUTES' && (stride === 12 || stride === 8)) || ((mode === 'TRIANGLES' || mode === 'INDICES') && stride === 4))
       || (view.byteStride !== undefined && (mode !== 'ATTRIBUTES' || view.byteStride !== stride)) || (mode === 'TRIANGLES' && count % 3)) throw Error('Invalid Meshopt view');
     total += length;
     if (total > 128_000_000) throw Error('Meshopt decoded budget exceeded');
@@ -81,7 +81,7 @@ export function validateSceneGlb(bytes: Buffer, wheelPivots = false): { triangle
   const accessors = list(json.accessors, 256).map(value => {
     const accessor = record(value), view = views[integer(accessor.bufferView, views.length - 1)];
     const count = integer(accessor.count, 12_000_000), offset = integer(accessor.byteOffset ?? 0, view.length);
-    const components = accessor.type === 'VEC3' ? 3 : accessor.type === 'SCALAR' ? 1 : 0;
+    const components = accessor.type === 'VEC3' ? 3 : accessor.type === 'VEC2' ? 2 : accessor.type === 'SCALAR' ? 1 : 0;
     if (!components || ![5126, 5125].includes(accessor.componentType as number) || offset % 4 || offset + count * components * 4 > view.length || accessor.normalized) throw Error('Invalid GLB accessor');
     return { count, components, componentType: accessor.componentType, offset: view.offset + offset };
   });
@@ -93,9 +93,18 @@ export function validateSceneGlb(bytes: Buffer, wheelPivots = false): { triangle
   const scannedPositions = new Set<number>();
   for (const mesh of meshes) for (const item of list(record(mesh).primitives, 32)) {
     const primitive = record(item), attributes = record(primitive.attributes);
-    if (Object.keys(attributes).some(key => key !== 'POSITION') || (primitive.mode !== undefined && primitive.mode !== 4) || primitive.targets) throw Error('Unsupported GLB primitive');
+    const allowedAttributes = wheelPivots ? ['POSITION', 'NORMAL', 'TEXCOORD_0'] : ['POSITION'];
+    if (Object.keys(attributes).some(key => !allowedAttributes.includes(key)) || (primitive.mode !== undefined && primitive.mode !== 4) || primitive.targets) throw Error('Unsupported GLB primitive');
     integer(primitive.material, materials.length - 1);
     const positionIndex = integer(attributes.POSITION, accessors.length - 1), position = accessors[positionIndex];
+    if (attributes.NORMAL !== undefined) {
+      const normal = accessors[integer(attributes.NORMAL, accessors.length - 1)];
+      if (normal.components !== 3 || normal.componentType !== 5126 || normal.count !== position.count) throw Error('Invalid GLB normals');
+    }
+    if (attributes.TEXCOORD_0 !== undefined) {
+      const texcoord = accessors[integer(attributes.TEXCOORD_0, accessors.length - 1)];
+      if (texcoord.components !== 2 || texcoord.componentType !== 5126 || texcoord.count !== position.count) throw Error('Invalid GLB texture coordinates');
+    }
     const indices = accessors[integer(primitive.indices, accessors.length - 1)];
     if (position.components !== 3 || position.componentType !== 5126 || indices.components !== 1 || indices.componentType !== 5125 || indices.count % 3) throw Error('Invalid GLB triangles');
     triangles += indices.count / 3;
