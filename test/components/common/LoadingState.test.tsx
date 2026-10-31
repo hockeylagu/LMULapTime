@@ -74,6 +74,39 @@ describe('LoadingState', () => {
     const root = container.firstElementChild as HTMLElement;
     expect(root.className).toContain('py-16');
   });
+
+  it('renders flat/flush without card borders or rounded corners when card is false', () => {
+    const { container } = render(
+      <LoadingState
+        card={false}
+        title="Flush Loading"
+      />
+    );
+
+    const root = container.firstElementChild as HTMLElement;
+    expect(root.className).toContain('rounded-none');
+    expect(root.className).toContain('bg-transparent');
+    expect(root.className).not.toContain('rounded-2xl');
+    expect(root.className).not.toContain('border-lmu-border');
+  });
+
+  it('supports explicit rounded and border overrides', () => {
+    const { container: roundedNone } = render(
+      <LoadingState
+        rounded={false}
+        title="Custom rounded"
+      />
+    );
+    expect((roundedNone.firstElementChild as HTMLElement).className).toContain('rounded-none');
+
+    const { container: borderNone } = render(
+      <LoadingState
+        border={false}
+        title="Custom border"
+      />
+    );
+    expect((borderNone.firstElementChild as HTMLElement).className).not.toContain('border-lmu-border');
+  });
 });
 
 describe('loadingQuotes', () => {

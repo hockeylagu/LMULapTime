@@ -161,12 +161,13 @@ function AnalysisApp() {
       <main className={isTelemetryRoute ? 'flex-1 min-h-0 w-full' : 'flex-1 max-w-[1500px] w-full mx-auto px-8 py-6'}>
 
         {/* Above the loading switch so a page still downloading keeps the loading screen up (see startTransition). */}
-        <Suspense fallback={<LoadingState size="compact" showQuote={false} title="Loading page" dataTestId="route-loading-state" />}>
+        <Suspense fallback={<LoadingState size="compact" showQuote={false} title="Loading page" dataTestId="route-loading-state" card={!isTelemetryRoute} />}>
         {loading ? (
           <LoadingState
             title="Loading LMU Replay & Timing Database"
             subtitle="Scanning UserData\LOG\Results and UserData\Replays..."
             dataTestId="app-loading-state"
+            card={!isTelemetryRoute}
           />
         ) : (
           <Routes>

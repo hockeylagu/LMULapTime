@@ -34,6 +34,21 @@ export interface LoadingStateProps {
    * Optional data-testid attribute for testing.
    */
   dataTestId?: string;
+  /**
+   * Whether to render with card styling (background, border, rounded-2xl).
+   * When false, renders without outer card borders or border-radius,
+   * keeping full-bleed studio views (like the telemetry inspector) coherent with their loaded state.
+   * Defaults to true.
+   */
+  card?: boolean;
+  /**
+   * Explicit override for rounded corners. Defaults to `card ? '2xl' : 'none'`.
+   */
+  rounded?: boolean;
+  /**
+   * Explicit override for the container border. Defaults to `card`.
+   */
+  border?: boolean;
 }
 
 export const LoadingState: React.FC<LoadingStateProps> = ({
@@ -44,16 +59,27 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
   quote: explicitQuote,
   className = '',
   dataTestId = 'loading-state',
+  card = true,
+  rounded,
+  border,
 }) => {
   // Stable quote selection for the lifecycle of this loading mount
   const activeQuote = useMemo(() => explicitQuote || getRandomLoadingQuote(), [explicitQuote]);
 
   const isPage = size === 'page';
+  const hasBorder = border ?? card;
+  const isRounded = rounded ?? card;
+
+  const frameClasses = [
+    card ? 'bg-lmu-card' : 'bg-transparent',
+    hasBorder ? 'border border-lmu-border' : '',
+    isRounded ? 'rounded-2xl' : 'rounded-none',
+  ].filter(Boolean).join(' ');
 
   return (
     <div
       data-testid={dataTestId}
-      className={`w-full flex flex-col items-center justify-center text-center bg-lmu-card border border-lmu-border rounded-2xl select-none ${
+      className={`w-full flex flex-col items-center justify-center text-center select-none ${frameClasses} ${
         isPage ? 'py-16 sm:py-24 px-6 min-h-[300px]' : 'py-8 sm:py-12 px-4 min-h-[160px]'
       } ${className}`}
     >

@@ -155,6 +155,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
       title="Loading Telemetry"
       subtitle="Synchronizing high-frequency channels..."
       dataTestId="telemetry-strip-loading"
+      card={false}
       className="h-full"
     />
   );
