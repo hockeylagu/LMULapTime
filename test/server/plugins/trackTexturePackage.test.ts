@@ -95,6 +95,16 @@ it('rejects unknown layoutKey in texture catalog', () => {
   expect(() => loadTrackTexturePackage(f.root, f.rows, f.trackKeys)).toThrow(/unknown layoutKey/);
 });
 
+it('prefers layout textures over shared fallbacks with the same case-insensitive key', () => {
+  const f = fixture();
+  const sharedRoad = { ...f.rows[1], textureKey: f.rows[0].textureKey.toLowerCase(), material: 'asphalt' };
+  const store = loadTrackTexturePackage(f.root, [sharedRoad, ...f.rows], f.trackKeys);
+
+  expect(store.byLayout('monza_gp').map(row => row.metadata)).toEqual(f.rows);
+  expect(store.byLayout('sebring_full').map(row => row.metadata)).toEqual([sharedRoad, f.rows[1]]);
+  expect(store.byLayout('shared').map(row => row.metadata)).toEqual([sharedRoad, f.rows[1]]);
+});
+
 it('rejects texture revision mismatch', () => {
   const f = fixture();
   f.rows[0].revision = 'texture-wronghash';

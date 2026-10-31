@@ -73,3 +73,60 @@ it('rejects mismatched package revision', async () => {
   await expect(fetchVehicleWheels('REC_CAR_1', 'wrong-rev', new AbortController().signal))
     .rejects.toThrow('revision');
 });
+
+it.each(['first', 'second'])('cancels only the %s caller while shared textures are decoding', async caller => {
+  const releases: (() => void)[] = [];
+  const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL');
+  vi.stubGlobal('Image', class {
+    src = '';
+    naturalWidth = 1024;
+    naturalHeight = 1024;
+    decode() {
+      return new Promise<void>(resolve => { releases.push(resolve); });
+    }
+  });
+  const network = vi.spyOn(globalThis, 'fetch').mockImplementation(async input =>
+    typeof input === 'string' && input.endsWith('/asset') ? new Response(new Uint8Array(24)) : Response.json(metadata));
+  const first = new AbortController();
+  const second = new AbortController();
+  const firstResult = fetchVehicleWheels('REC_CAR_1', 'pkg-rev-1', first.signal);
+  await vi.waitFor(() => expect(releases).toHaveLength(2));
+  const secondResult = fetchVehicleWheels('REC_CAR_1', 'pkg-rev-1', second.signal);
+  await vi.waitFor(() => expect(network).toHaveBeenCalledTimes(4));
+
+  const cancelled = caller === 'first' ? firstResult : secondResult;
+  const surviving = caller === 'first' ? secondResult : firstResult;
+  const rejection = expect(cancelled).rejects.toMatchObject({ name: 'AbortError' });
+  (caller === 'first' ? first : second).abort();
+  await rejection;
+  for (const release of releases) release();
+  await expect(surviving).resolves.toMatchObject({ metadata });
+
+  const cached = await fetchVehicleWheels('REC_CAR_1', 'pkg-rev-1', new AbortController().signal);
+  expect(cached?.rim.sha256).toBe(metadata.rim.sha256);
+  expect(network).toHaveBeenCalledTimes(5);
+  expect(revokeObjectURL).toHaveBeenCalledTimes(2);
+});
+
+it('evicts failed shared texture loads so a later caller can retry', async () => {
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async input =>
+    typeof input === 'string' && input.endsWith('/asset') ? new Response(new Uint8Array(24)) : Response.json(metadata));
+  vi.stubGlobal('Image', class {
+    src = '';
+    naturalWidth = 1024;
+    naturalHeight = 1024;
+    decode() {
+      return Promise.reject(Error('Decode failed'));
+    }
+  });
+  await expect(fetchVehicleWheels('REC_CAR_1', 'pkg-rev-1', new AbortController().signal))
+    .rejects.toThrow('Decode failed');
+  vi.stubGlobal('Image', class {
+    src = '';
+    naturalWidth = 1024;
+    naturalHeight = 1024;
+    async decode() {}
+  });
+  await expect(fetchVehicleWheels('REC_CAR_1', 'pkg-rev-1', new AbortController().signal))
+    .resolves.toMatchObject({ metadata });
+});

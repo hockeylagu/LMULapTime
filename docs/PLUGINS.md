@@ -230,6 +230,13 @@ package retains generated labels. Optional image loading errors never prevent th
 These crops reproduce static board artwork, not dynamic digital flag states or a full game shader.
 Packages declaring this field require an app version that supports it; older strict loaders reject it.
 
+### Optional track textures
+
+Version 2 packages may add `scenes.trackTextures: "track-textures/index.json"`.
+Layout-specific entries take precedence over `shared` entries with the same
+case-insensitive `textureKey`; shared entries supply only missing keys for that layout.
+The renderer matches these keys to track mesh names.
+
 ### Optional visible vehicle meshes
 
 A v2 manifest may also declare `vehicleMeshes: { "catalog": "vehicle-meshes/index.json" }`.
@@ -300,6 +307,13 @@ to match source UV coordinates. Textures apply strictly to the `livery` material
 whose `vehicleRecordId` matches.
 Drivers in replays with a custom skin hash (a 24-character hex identifier) and the 14 vehicle records without the paint
 binding (`WCCARBODY` + `L2IBLCARBODY`) retain the neutral body without texture.
+
+### Optional vehicle wheel textures
+
+A v2 manifest may declare `vehicleWheels: { "catalog": "vehicle-wheels/index.json" }`.
+Rim and tyre images are cached by content hash across 3D scenes. Cancelling one scene
+stops only that caller's wait, not the shared fetch or decode. Failed loads are evicted
+so subsequent requests can retry.
 
 ## Behavior without detailed data
 

@@ -19,17 +19,18 @@ export function clearCachedWheelTextures(): void {
 }
 
 async function loadTexture(sha256: string, byteLength: number, width: number, height: number, signal: AbortSignal): Promise<LoadedWheelTexture> {
+  signal.throwIfAborted();
   let pending = textureCache.get(sha256);
   if (!pending) {
     pending = (async () => {
-      const bytes = await fetchBinary(`/api/data-plugin/vehicle-wheels/${encodeURIComponent(sha256)}/asset`, { signal });
+      // Shared loads outlive individual scenes; cancellation only stops the caller's wait.
+      const bytes = await fetchBinary(`/api/data-plugin/vehicle-wheels/${encodeURIComponent(sha256)}/asset`);
       if (bytes.byteLength !== byteLength) throw Error('Incomplete vehicle wheel texture');
       const url = URL.createObjectURL(new Blob([bytes], { type: 'image/webp' }));
       try {
         const image = new Image();
         image.src = url;
         await image.decode();
-        if (signal.aborted) throw new DOMException('Vehicle wheel texture request aborted', 'AbortError');
         if (image.naturalWidth !== width || image.naturalHeight !== height) {
           throw Error('Vehicle wheel texture dimensions mismatch');
         }
@@ -45,7 +46,20 @@ async function loadTexture(sha256: string, byteLength: number, width: number, he
       }
     });
   }
-  return pending;
+  return new Promise((resolve, reject) => {
+    const onAbort = () => reject(new DOMException('Vehicle wheel texture request aborted', 'AbortError'));
+    signal.addEventListener('abort', onAbort, { once: true });
+    pending.then(
+      texture => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(texture);
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error instanceof Error ? error : Error('Unable to load vehicle wheel texture', { cause: error }));
+      },
+    );
+  });
 }
 
 export async function fetchVehicleWheels(

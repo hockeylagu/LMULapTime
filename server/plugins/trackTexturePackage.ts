@@ -116,7 +116,8 @@ export function loadTrackTexturePackage(
     byLayout(layoutKey: string): RegisteredTrackTexture[] {
       const specific = byLayoutMap.get(layoutKey) ?? [];
       const shared = layoutKey !== 'shared' ? (byLayoutMap.get('shared') ?? []) : [];
-      return [...specific, ...shared];
+      const specificKeys = new Set(specific.map(row => row.metadata.textureKey.toUpperCase()));
+      return [...specific, ...shared.filter(row => !specificKeys.has(row.metadata.textureKey.toUpperCase()))];
     },
     get(layoutKey: string, textureKey: string, revision: string): RegisteredTrackTexture | null {
       return byKeyMap.get(`${layoutKey}:${textureKey}:${revision}`)
