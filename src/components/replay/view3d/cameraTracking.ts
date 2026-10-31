@@ -167,8 +167,8 @@ export function computeCockpitPose(
   bodyYaw?: number,
   modelOffset: Readonly<{x: number; y: number; z: number}> = {x: 0, y: 0, z: 0},
 ): CockpitPose {
-  const localEye = new Vector3(modelOffset.x + 0.28, modelOffset.y + 0.78, modelOffset.z - 0.20);
-  const localTarget = new Vector3(modelOffset.x + 0.28, modelOffset.y + 0.70, modelOffset.z - 40.20);
+  const localEye = new Vector3(modelOffset.x + 0.28, modelOffset.y + 1.00, modelOffset.z - 0.70);
+  const localTarget = new Vector3(modelOffset.x + 0.28, modelOffset.y + 0.90, modelOffset.z - 40.70);
   const localUp = new Vector3(0, 1, 0);
 
   if (orientation) {

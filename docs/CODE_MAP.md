@@ -309,7 +309,9 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   either lap replaces only `laps/lapLayer.ts` cars, wheel animation and racing lines, preserving
   the camera and track. Cancelled or superseded builds are discarded and retired lap buffers released.
   Canvas resizes repaint before the browser paints, avoiding a black frame when embedded toolbars change height.
-  `sceneEnvironment.ts` owns sky, fog, the flat horizon ground and the car-following shadow sun;
+  `sceneEnvironment.ts` owns the Three.js daylight sky, its shared PMREM reflection environment,
+  fog, flat horizon ground and car-following shadow sun. Vehicle normals, winding and PBR roles
+  come from the package exporter; `sceneObjects.ts` only applies livery/body tint and ghost styling;
   the package's `ground` node is the filler under the scanned surfaces; `brakeBoards.ts` stands
   exported brake markers as labelled signs; `racingLine.ts` drapes the 2D-coloured line ribbons;
   `kerbStripes.ts` bands kerbs by lap distance; `tracksideCameras.ts` places the fixed trackside spots;

@@ -8,7 +8,10 @@ import type { TrackSceneResource } from '../../../../../shared/types/scenes/trac
 const gpu = vi.hoisted(() => ({render: vi.fn<(scene: Scene, camera: PerspectiveCamera | OrthographicCamera) => void>(), dispose: vi.fn(), constructed: vi.fn(), setSize: vi.fn()}));
 vi.mock('three', async importOriginal => {
   const actual = await importOriginal<typeof import('three')>();
-  return {...actual, WebGLRenderer: class {
+  return {...actual, PMREMGenerator: class {
+    fromScene() { return {texture: new actual.Texture(), dispose() {}}; }
+    dispose() {}
+  }, WebGLRenderer: class {
     domElement = document.createElement('canvas');
     shadowMap = {enabled: false, type: 0};
     render = gpu.render;
@@ -76,6 +79,7 @@ it('retains terrain, canvas and camera settings, releases old laps, and draws th
   const handle = await createReplayScene(host, new ArrayBuffer(0), metadata, lap, null, vi.fn(), assets);
   handle.cursor(2, 0); handle.mode('orbit'); handle.zoom(1); draw();
   const [scene, camera] = gpu.render.mock.calls.at(-1)!;
+  const lightingEnvironment = scene.environment;
   const eye = camera.position.clone(), zoom = camera.zoom, canvas = host.firstChild;
   const road = scene.getObjectByName('road') as Mesh;
   const world = road.parent!.parent!;
@@ -87,7 +91,8 @@ it('retains terrain, canvas and camera settings, releases old laps, and draws th
   expect(await handle.updateLaps(next, lap, assets)).toBe(true);
   handle.cursor(2, 0); draw();
   expect(host.firstChild).toBe(canvas); expect(gpu.constructed).toHaveBeenCalledOnce(); expect(gpu.dispose).not.toHaveBeenCalled();
-  expect(scene.getObjectByName('road')).toBe(road); expect(roadDispose).not.toHaveBeenCalled(); expect(carDispose).toHaveBeenCalledOnce();
+  expect(scene.getObjectByName('road')).toBe(road); expect(scene.environment).toBe(lightingEnvironment);
+  expect(roadDispose).not.toHaveBeenCalled(); expect(carDispose).toHaveBeenCalledOnce();
   expect(oldLayer.parent).toBeNull();
   expect(gpu.render.mock.calls.at(-1)![1]).toBe(camera); expect(camera.position).toEqual(eye); expect(camera.zoom).toBe(zoom);
   const layer = world.children.at(-1)!;
@@ -96,7 +101,8 @@ it('retains terrain, canvas and camera settings, releases old laps, and draws th
   expect(await handle.updateLaps(next, null, assets)).toBe(true); handle.cursor(2, 0);
   expect(world.children.at(-1)!.children).toHaveLength(3);
   expect(world.children.at(-1)!.children[1].visible).toBe(false);
-  handle.dispose(); expect(roadDispose).toHaveBeenCalledOnce(); expect(gpu.dispose).toHaveBeenCalledOnce(); expect(host.childNodes).toHaveLength(0);
+  handle.dispose(); expect(scene.environment).toBeNull();
+  expect(roadDispose).toHaveBeenCalledOnce(); expect(gpu.dispose).toHaveBeenCalledOnce(); expect(host.childNodes).toHaveLength(0);
 });
 
 it('rejects layout, geometry and package mismatches, and discards cancelled or superseded lap builds', async () => {
@@ -130,15 +136,15 @@ it('hides the fallback cabin in cockpit mode, locks the eye to the driver seat a
   const modelOffset = scene.getObjectByName('body-envelope')!.position;
   // Switching modes must already be correct while paused, before another cursor update.
   expect(camera.position.x).toBeCloseTo(0.28, 2);
-  expect(camera.position.y).toBeCloseTo(0.3 + modelOffset.y + 0.78, 2);
-  expect(camera.getWorldDirection(new Vector3()).y).toBeCloseTo(-0.08 / 40, 4);
+  expect(camera.position.y).toBeCloseTo(0.3 + modelOffset.y + 1.00, 2);
+  expect(camera.getWorldDirection(new Vector3()).y).toBeCloseTo(-0.10 / 40, 4);
   handle.cursor(1, 0); draw();
   expect(cabin!.visible).toBe(false);
 
-  // Driver eye position in cockpit mode: near car position + 0.28m lateral, +0.78m height
+  // Driver eye position in cockpit mode: near car position + 0.28m lateral, +1.00m height
   const eye = camera.position.clone();
   expect(eye.x).toBeCloseTo(1.28, 2);
-  expect(eye.y).toBeCloseTo(0.3 + modelOffset.y + 0.78, 2);
+  expect(eye.y).toBeCloseTo(0.3 + modelOffset.y + 1.00, 2);
 
   // Zooming in cockpit mode adjusts camera.zoom rather than shifting camera position
   handle.zoom(1);

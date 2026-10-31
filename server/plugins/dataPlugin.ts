@@ -163,7 +163,7 @@ export class DataPlugin {
       const manifest=object(read('manifest.json',64_000));
       keys(manifest,['schemaVersion','id','version','tracks','vehicles', ...(manifest.schemaVersion === 2 ? ['scenes', 'vehicleMeshes', 'vehicleLiveries'] : [])]);
       if (manifest.schemaVersion!==1 && manifest.schemaVersion!==2) throw Error('Unsupported schema');
-      text(manifest.id); text(manifest.version);
+      const packageId = text(manifest.id), packageVersion = text(manifest.version);
       for (const capability of ['tracks','vehicles']) if (manifest[capability] !== undefined) object(manifest[capability]);
       if (!manifest.tracks && !manifest.vehicles) throw Error('Empty package');
       if (manifest.tracks) {
@@ -206,7 +206,28 @@ export class DataPlugin {
         const liveries = object(manifest.vehicleLiveries); keys(liveries, ['catalog']);
         this.vehicleLiveries = loadVehicleLiveryPackage(base, read(text(liveries.catalog)), this.vehicleMeshes);
       }
-      this.status={state:'ready',revision:digest.digest('hex'),tracks:!!manifest.tracks,vehicles:!!manifest.vehicles, ...(this.logoRecords.size > 0 ? {logos: true} : {}), ...(this.scenes.size ? {scenes: true} : {}), ...(this.vehicleMeshes.size ? {vehicleMeshes: true} : {}), ...(this.vehicleLiveries && this.vehicleLiveries.size ? {vehicleLiveries: true} : {})};
+      const totalBrakeBoards = [...this.boardArtwork.values()].reduce((sum, list) => sum + list.length, 0);
+      this.status = {
+        state: 'ready',
+        revision: digest.digest('hex'),
+        packageId,
+        packageVersion,
+        tracks: !!manifest.tracks,
+        vehicles: !!manifest.vehicles,
+        ...(this.logoRecords.size > 0 ? { logos: true } : {}),
+        ...(this.scenes.size ? { scenes: true } : {}),
+        ...(this.vehicleMeshes.size ? { vehicleMeshes: true } : {}),
+        ...(this.vehicleLiveries && this.vehicleLiveries.size ? { vehicleLiveries: true } : {}),
+        counts: {
+          tracks: this.tracks.size,
+          vehicles: this.records.length,
+          ...(this.logoRecords.size > 0 ? { logos: this.logoRecords.size } : {}),
+          ...(this.scenes.size > 0 ? { scenes: this.scenes.size } : {}),
+          ...(totalBrakeBoards > 0 ? { brakeBoards: totalBrakeBoards } : {}),
+          ...(this.vehicleMeshes.size > 0 ? { vehicleMeshes: this.vehicleMeshes.size } : {}),
+          ...(this.vehicleLiveries && this.vehicleLiveries.size > 0 ? { vehicleLiveries: this.vehicleLiveries.size } : {}),
+        },
+      };
     } catch {this.tracks.clear(); this.records.length=0; this.logoRecords.clear(); this.scenes.clear(); this.vehicleMeshes.clear(); this.boardArtwork.clear(); this.vehicleLiveries = null; /* Generic status never discloses local paths. */}
   }
   public scene(key: string): TrackSceneResource | null {
@@ -252,6 +273,7 @@ export class DataPlugin {
     return readVehicleLivery(this.root, row);
   }
   public track(key:string) {const row=this.tracks.get(key);return row?structuredClone(row):null;}
+  public trackKeys(): string[] { return Array.from(this.tracks.keys()); }
   /** Internal immutable geometry view; API callers use the defensive track() snapshot. */
   public trackGeometry(key: string): TrackBoundaryGeometry | null { return this.tracks.get(key)?.geometry ?? null; }
   public vehicles(): VehicleDataRecord[] {return structuredClone(this.records);}
@@ -275,10 +297,22 @@ export class DataPlugin {
 
 export function formatPluginStatusLog(status: DataPluginStatus): string {
   if (status.state === 'ready') {
+    const counts = status.counts;
+    const trackDetail = !status.tracks
+      ? 'tracks: no'
+      : counts?.tracks !== undefined
+        ? `tracks: ${counts.tracks}`
+        : 'tracks: yes';
+    const vehicleDetail = !status.vehicles
+      ? 'vehicles: no'
+      : counts?.vehicles !== undefined
+        ? `vehicles: ${counts.vehicles}`
+        : 'vehicles: yes';
     const details = [
-      `tracks: ${status.tracks ? 'yes' : 'no'}`,
-      `vehicles: ${status.vehicles ? 'yes' : 'no'}`,
-      ...(status.logos ? ['logos: yes'] : []),
+      trackDetail,
+      vehicleDetail,
+      ...(status.logos ? [`logos: ${counts?.logos !== undefined ? counts.logos : 'yes'}`] : []),
+      ...(status.scenes ? [`scenes: ${counts?.scenes !== undefined ? counts.scenes : 'yes'}`] : []),
       `revision: ${status.revision.slice(0, 8)}`,
     ].join(', ');
     return `[Data Plugin] Plugins loaded: yes (${details})`;

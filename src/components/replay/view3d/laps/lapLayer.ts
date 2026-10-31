@@ -1,5 +1,5 @@
 import {MeshoptDecoder} from 'meshoptimizer/decoder';
-import { BufferGeometry, Group, Mesh, type Texture, type Vector3 } from 'three';
+import { Group, Mesh, type Texture, type Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import type { LoadedVehicleMesh } from '../../../../api/vehicleMeshApi.js';
@@ -39,12 +39,7 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     if (!asset) return Promise.resolve(null);
     let pending = models.get(asset.bytes);
     if (!pending) {
-      pending = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(asset.bytes, '').then(result => {
-        result.scene.traverse(object => {
-          if (object instanceof Mesh && object.geometry instanceof BufferGeometry) object.geometry.computeVertexNormals();
-        });
-        return result.scene;
-      });
+      pending = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(asset.bytes, '').then(result => result.scene);
       models.set(asset.bytes, pending);
     }
     return pending;
@@ -61,8 +56,12 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     const ghost = baseline ? makeCar(baseline, TELEMETRY_COLORS.baseline, true, baselineModel, baselineTexture) : new Group();
     const primaryWheels = createWheelAnimation(primary, trajectory, surfaceHeight);
     const ghostWheels = baseline ? createWheelAnimation(ghost, baseline, surfaceHeight) : null;
-    // Only the primary car casts a contact shadow, including its animated tyres.
-    primary.traverse(object => { if (object instanceof Mesh) object.castShadow = true; });
+    // Bodywork must occlude sunlight on the wheels as well as on the road.
+    primary.traverse(object => {
+      if (!(object instanceof Mesh)) return;
+      object.castShadow = true; object.receiveShadow = true;
+    });
+    ghost.traverse(object => { if (object instanceof Mesh) { object.castShadow = false; object.receiveShadow = false; } });
     const colors = racingLineColors(trajectory, baseline, colorBy);
     const primaryLine = makeRacingLine(trajectory, origin, colors.primary, surfaceHeight);
     const baselineLine = baseline ? makeRacingLine(baseline, origin, colors.baseline, surfaceHeight, BASELINE_LINE.widthM, BASELINE_LINE.liftM) : null;

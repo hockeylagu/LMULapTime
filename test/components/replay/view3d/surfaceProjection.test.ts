@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { BufferGeometry, Float32BufferAttribute, Group, Mesh, MeshBasicMaterial, Vector3 } from 'three';
-import { createSurfaceHeight } from '../../../../src/components/replay/view3d/surfaceProjection.js';
+import { createSurfaceHeight, prepareSurfaceLayers } from '../../../../src/components/replay/view3d/surfaceProjection.js';
 import { colorRacingLine, makeRacingLine, racingLineColors, RACING_LINE_WIDTH_M } from '../../../../src/components/replay/view3d/racingLine.js';
 import { getHeatmapColor } from '../../../../src/components/replay/map/replayMapUtils.js';
 import { TELEMETRY_COLORS } from '../../../../src/utils/themeColors.js';
@@ -55,4 +55,21 @@ it('colours the ribbon with the 2D map modes', () => {
   expect(racingLineColors(lap, null, 'pedal').primary).toEqual(lap.points.map(p => getHeatmapColor(p, 'pedal')));
   expect(racingLineColors(lap, null, 'default').primary).toEqual([TELEMETRY_COLORS.primary, TELEMETRY_COLORS.primary]);
   expect(racingLineColors(lap, lap, 'default').baseline).toEqual([TELEMETRY_COLORS.baseline, TELEMETRY_COLORS.baseline]);
+});
+
+it('keeps packaged filler out of road contact and retains its authored geometry', () => {
+  const sheet = (y: number, name: string) => {
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new Float32BufferAttribute([0, y, 0, 10, y, 0, 0, y, 10], 3));
+    geometry.setIndex([0, 1, 2]);
+    const mesh = new Mesh(geometry, new MeshBasicMaterial()); mesh.name = name;
+    return mesh;
+  };
+  const root = new Group(), road = sheet(2, 'road'), filler = sheet(0, 'ground'); root.add(road, filler);
+  const layers = prepareSurfaceLayers(root);
+  expect(layers.fillerGround).toBe(filler);
+  expect(root.children).toContain(filler);
+  expect(layers.surfaceHeight({x: 1, y: 1, z: 1})).toBeNull();
+  expect(layers.groundHeight({x: 1, y: 1, z: 1})).toBe(0);
+  expect(Array.from(road.geometry.index!.array)).toEqual([0, 1, 2]);
 });

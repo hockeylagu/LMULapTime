@@ -6,7 +6,7 @@ import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
 const lap: ReplayTrajectoryData = {replayName: 'test', points: [], pointsCount: 0, bounds: {minX: 0, maxX: 1, minZ: 0, maxZ: 1, spanX: 1, spanZ: 1}};
 
 it('preserves real model and tyre placement and gives primary/ghost independent materials', () => {
-  const source = new Group(), bodyMaterial = new MeshStandardMaterial({color: '#ffffff'}); bodyMaterial.name = 'body';
+  const source = new Group(), bodyMaterial = new MeshStandardMaterial({color: '#ffffff', roughness: 0.27, metalness: 0.12}); bodyMaterial.name = 'body';
   const body = new Mesh(new BoxGeometry(2, 1, 4), bodyMaterial); body.name = 'body';
   const rubberMaterial = new MeshStandardMaterial({color: '#111111'}); rubberMaterial.name = 'tyres';
   const tyre = new Mesh(new BoxGeometry(0.3, 0.65, 0.65), rubberMaterial); tyre.name = 'tyres'; tyre.position.set(0.8, 0.27, -1.4);
@@ -19,8 +19,9 @@ it('preserves real model and tyre placement and gives primary/ghost independent 
   expect(actualBody.material.color.getHexString()).toBe('38bdf8'); expect(ghostBody.material.color.getHexString()).toBe('ffb703');
   expect(actualBody.material.opacity).toBe(1); expect(ghostBody.material.opacity).toBe(0.45); expect(bodyMaterial.opacity).toBe(1);
   expect(actualBody.material.polygonOffset).toBe(false); expect(ghostBody.material.polygonOffset).toBe(true);
-  expect(actualBody.material.roughness).toBe(0.32); expect(actualBody.material.metalness).toBe(0.05);
-  expect(actualBody.material.envMap).not.toBeNull(); expect(actualBody.material.envMapIntensity).toBe(0.45);
+  expect(actualBody.material.flatShading).toBe(false);
+  expect(actualBody.material.roughness).toBe(0.27); expect(actualBody.material.metalness).toBe(0.12);
+  expect(actualBody.material.envMap).toBeNull(); expect(actualBody.material.envMapIntensity).toBe(1);
   expect(ghostBody.material.roughness).toBe(0.7); expect(ghostBody.material.envMap).toBeNull();
   expect(primary.getObjectByName('tyres')?.position.toArray()).toEqual([0.8, 0.27, -1.4]);
   const actualTyre = primary.getObjectByName('tyres') as Mesh<BoxGeometry, MeshStandardMaterial>;
@@ -68,11 +69,11 @@ it('leaves livery material untextured when UV coordinates are absent', () => {
   expect(actualLivery.geometry.attributes.uv).toBeUndefined();
 });
 
-it('configures glass and paint reflection properties and strips them from ghost cars', () => {
+it('preserves authored glass and paint materials and lets ghosts opt out of scene reflections', () => {
   const source = new Group();
-  const glassMaterial = new MeshStandardMaterial({color: '#111111'}); glassMaterial.name = 'glass';
+  const glassMaterial = new MeshStandardMaterial({color: '#111111', roughness: 0.18, metalness: 0.05}); glassMaterial.name = 'glass';
   const glassMesh = new Mesh(new BoxGeometry(1, 1, 1), glassMaterial); glassMesh.name = 'glass';
-  const liveryMaterial = new MeshStandardMaterial({color: '#ffffff'}); liveryMaterial.name = 'livery';
+  const liveryMaterial = new MeshStandardMaterial({color: '#ffffff', roughness: 0.35, metalness: 0.03}); liveryMaterial.name = 'livery';
   const liveryMesh = new Mesh(new BoxGeometry(1, 1, 1), liveryMaterial); liveryMesh.name = 'livery';
   source.add(glassMesh, liveryMesh);
 
@@ -84,17 +85,18 @@ it('configures glass and paint reflection properties and strips them from ghost 
   const primaryLivery = primary.getObjectByName('livery') as Mesh<BoxGeometry, MeshStandardMaterial>;
   const ghostLivery = ghost.getObjectByName('livery') as Mesh<BoxGeometry, MeshStandardMaterial>;
 
-  expect(primaryGlass.material.roughness).toBe(0.1);
-  expect(primaryGlass.material.metalness).toBe(0.1);
-  expect(primaryGlass.material.envMap).not.toBeNull();
-  expect(primaryGlass.material.envMapIntensity).toBe(0.9);
+  expect(primaryGlass.material.roughness).toBe(0.18);
+  expect(primaryGlass.material.metalness).toBe(0.05);
+  expect(primaryGlass.material.envMap).toBeNull();
+  expect(primaryGlass.material.envMapIntensity).toBe(1);
   expect(ghostGlass.material.roughness).toBe(0.7);
   expect(ghostGlass.material.envMap).toBeNull();
+  expect(ghostGlass.material.envMapIntensity).toBe(0);
 
-  expect(primaryLivery.material.roughness).toBe(0.32);
-  expect(primaryLivery.material.metalness).toBe(0.05);
-  expect(primaryLivery.material.envMap).not.toBeNull();
-  expect(primaryLivery.material.envMapIntensity).toBe(0.45);
+  expect(primaryLivery.material.roughness).toBe(0.35);
+  expect(primaryLivery.material.metalness).toBe(0.03);
+  expect(primaryLivery.material.envMap).toBeNull();
+  expect(primaryLivery.material.envMapIntensity).toBe(1);
   expect(ghostLivery.material.roughness).toBe(0.7);
   expect(ghostLivery.material.envMap).toBeNull();
 
@@ -105,12 +107,12 @@ it('configures glass and paint reflection properties and strips them from ghost 
   const ghostFallbackBody = fallbackGhost.getObjectByName('body') as Mesh<BoxGeometry, MeshStandardMaterial>;
   const ghostFallbackCabin = fallbackGhost.getObjectByName('cabin') as Mesh<BoxGeometry, MeshStandardMaterial>;
 
-  expect(fallbackBody.material.roughness).toBe(0.32);
-  expect(fallbackBody.material.envMap).not.toBeNull();
-  expect(fallbackBody.material.envMapIntensity).toBe(0.45);
-  expect(fallbackCabin.material.roughness).toBe(0.1);
-  expect(fallbackCabin.material.envMap).not.toBeNull();
-  expect(fallbackCabin.material.envMapIntensity).toBe(0.9);
+  expect(fallbackBody.material.roughness).toBe(0.35);
+  expect(fallbackBody.material.envMap).toBeNull();
+  expect(fallbackBody.material.envMapIntensity).toBe(1);
+  expect(fallbackCabin.material.roughness).toBe(0.18);
+  expect(fallbackCabin.material.envMap).toBeNull();
+  expect(fallbackCabin.material.envMapIntensity).toBe(1);
 
   expect(ghostFallbackBody.material.roughness).toBe(0.7);
   expect(ghostFallbackBody.material.envMap).toBeNull();

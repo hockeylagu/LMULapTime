@@ -51,6 +51,29 @@ describe('local data plugin snapshot',()=>{
       .toBe('[Data Plugin] Plugins loaded: yes (tracks: yes, vehicles: yes, revision: 01234567)');
     expect(formatPluginStatusLog({ state: 'ready', revision: '0123456789abcdef', tracks: false, vehicles: true }))
       .toBe('[Data Plugin] Plugins loaded: yes (tracks: no, vehicles: yes, revision: 01234567)');
+    expect(formatPluginStatusLog({
+      state: 'ready',
+      revision: '0123456789abcdef',
+      tracks: true,
+      vehicles: true,
+      logos: true,
+      scenes: true,
+      counts: {
+        tracks: 32,
+        vehicles: 80,
+        logos: 25,
+        scenes: 32,
+      },
+    })).toBe('[Data Plugin] Plugins loaded: yes (tracks: 32, vehicles: 80, logos: 25, scenes: 32, revision: 01234567)');
+    const { dir } = fixture('both');
+    const plugin = new DataPlugin(dir);
+    expect(plugin.status.packageId).toBe('synthetic');
+    expect(plugin.status.packageVersion).toBe('1');
+    expect(plugin.status.counts).toEqual({ tracks: 1, vehicles: 1 });
+    expect(plugin.trackKeys()).toEqual(['monza_gp']);
+    expect(formatPluginStatusLog(plugin.status)).toBe(
+      `[Data Plugin] Plugins loaded: yes (tracks: 1, vehicles: 1, revision: ${plugin.status.revision.slice(0, 8)})`
+    );
   });
   it.each(['vehicles','tracks','both'] as const)('loads %s capabilities independently',kind=>{const {dir}=fixture(kind);const p=new DataPlugin(dir);expect(p.status.state).toBe('ready');expect(p.status.vehicles).toBe(kind!=='tracks');expect(p.status.tracks).toBe(kind!=='vehicles');});
   it('uses exact aliases, unambiguous model fallback and defensive snapshots',()=>{const {dir,write}=fixture();const p=new DataPlugin(dir);expect(p.vehicle({vehicleId:'test_car.veh'})?.model).toBe('Test Car');expect(p.vehicle({carType:'Test Car'})?.id).toBe('synthetic');expect(p.vehicle({carType:'Unknown'})).toBeNull();p.vehicles()[0].model='Changed';expect(p.vehicles()[0].model).toBe('Test Car');write('vehicles/index.json',{});expect(p.vehicle({vehicleId:'TEST_CAR'})?.id).toBe('synthetic');expect(new DataPlugin(dir).status.state).toBe('invalid');});

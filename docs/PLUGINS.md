@@ -200,9 +200,7 @@ materials. `kerb-source-*` groups retain those colours and kerb shadows; only le
 receive the generic red/white stripes. Runoff without usable source colour uses a neutral fallback.
 This is a simplified colour bake, not full source shading: layered textures, wetness and decals are
 not reproduced, and small atlas-boundary artifacts can remain. Analytical revisions do not change.
-Static packages without a packaged `ground` mesh remain supported: their surface winding is
-repaired for display and the scene uses the horizon ground. Packaged filler, when present, stays
-separate from road-height sampling for cars, racing lines and braking boards.
+Packaged filler stays separate from road-height sampling for cars, racing lines and braking boards.
 
 The sibling pipeline's `export:plugin --scenes` adds every layout's scene to a new package from the
 same validated build and decoded GMT buffers. See the [remaining 3D work](plans/proposed/REPLAY_3D_PLAN.md).
@@ -256,6 +254,14 @@ calibration remain separate from this metadata.
 The `glass` material role denotes exterior cabin windows, including exact source-selected
 window variants. It uses simplified dark opaque shading. Source glass transparency, tint,
 reflection/transmission shaders and alpha-masked light-cover overlays are not reproduced.
+
+Vehicle packages should supply outward CCW faces, float32 `NORMAL` attributes aligned with
+`POSITION`, and PBR roughness/metalness for each material role. The viewer preserves these
+properties: it does not reverse faces, regenerate normals or override primary material roles.
+Rebuild older exports without normals in the pipeline; the app does not repair them at runtime.
+The visible Three.js daylight sky also supplies the shared prefiltered reflection environment;
+the directional sun supplies direct lighting and shadows. No separate car reflection texture
+or per-car brightness correction is applied. This is simplified daylight, not LMU's renderer.
 
 `GET /api/data-plugin/vehicle-meshes/:recordId` returns public metadata without local asset paths;
 `GET /api/data-plugin/vehicle-meshes/:recordId/:revision/asset` serves only the registered GLB.

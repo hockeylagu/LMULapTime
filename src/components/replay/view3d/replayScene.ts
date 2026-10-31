@@ -12,7 +12,7 @@ import { nativeToScene } from './sceneFrame.js';
 import { createLapLayerLoader, type LapVehicleModels } from './laps/lapLayer.js';
 import { disposeObjects } from './laps/disposeObjects.js';
 import type { SurfaceHeight } from './surfaceProjection.js';
-import { prepareSurfaceLayers } from './compatibility/sceneSurfaces.js';
+import { prepareSurfaceLayers } from './surfaceProjection.js';
 import { MIN_CAMERA_DISTANCE, MAX_CAMERA_DISTANCE, panCamera, zoomCamera } from './cameraNavigation.js';
 import type { CameraMode } from './cameraModes.js';
 import { computeCockpitPose, createChaseCameraTracker, trackCamera } from './cameraTracking.js';
@@ -25,6 +25,9 @@ import { makeTrackLimits } from './trackLimits.js';
 
 /** Eye height kept above the road, filler ground and horizon ground. */
 const CAMERA_CLEARANCE_M = 1.2;
+const DEFAULT_CHASE_DISTANCE_M = 7.8;
+const DEFAULT_CHASE_HEIGHT_M = 2.2;
+const CHASE_LOOK_ELEVATION_M = 0.5;
 
 export interface ReplaySceneHandle {
   wheelMotion: string;
@@ -169,7 +172,12 @@ export async function createReplayScene(
     if (mode === 'top') camera.position.copy(target).add(new Vector3(0, 180, 0.01));
     if (mode === 'chase') {
       chaseTracker.reset(target, currentYaw, currentTime);
-      camera.position.copy(target).add(new Vector3(17 * Math.sin(currentYaw), 6, -17 * Math.cos(currentYaw)));
+      controls.target.copy(target).add(new Vector3(0, CHASE_LOOK_ELEVATION_M, 0));
+      camera.position.copy(target).add(new Vector3(
+        DEFAULT_CHASE_DISTANCE_M * Math.sin(currentYaw),
+        DEFAULT_CHASE_HEIGHT_M,
+        -DEFAULT_CHASE_DISTANCE_M * Math.cos(currentYaw),
+      ));
     }
     camera.lookAt(target); controls.update(); invalidate();
   };
@@ -214,8 +222,10 @@ export async function createReplayScene(
       currentTime = (sample.timeSec ?? pose.index / 40) + ((nextSample?.timeSec ?? sample.timeSec ?? 0) - (sample.timeSec ?? 0)) * pose.fraction;
       primary.getObjectByName('body-envelope')!.visible = pose.yaw !== undefined;
       primary.getObjectByName('pose-marker')!.visible = pose.yaw === undefined;
-      const cabin = primary.getObjectByName('cabin');
-      if (cabin) cabin.visible = mode !== 'cockpit';
+      primary.traverse(obj => {
+        if (obj.name === 'cabin' || obj.name === 'glass') obj.visible = mode !== 'cockpit';
+      });
+
       const station = (primaryDistances[index] ?? 0) + ((primaryDistances[index + 1] ?? primaryDistances[index] ?? 0) - (primaryDistances[index] ?? 0)) * fraction;
       const other = baseline ? sampleStationPose(baseline.points, baselineDistances, station) : null;
       ghost.visible = other !== null;
@@ -255,8 +265,10 @@ export async function createReplayScene(
       camera = mode === 'top' ? overhead : perspective; controls.object = camera;
       controls.enabled = mode !== 'cockpit';
       if (wasCockpit && mode !== 'cockpit') camera.up.set(0, 1, 0);
-      const cabin = layer.primary.getObjectByName('cabin');
-      if (cabin) cabin.visible = mode !== 'cockpit';
+      layer.primary.traverse(obj => {
+        if (obj.name === 'cabin' || obj.name === 'glass') obj.visible = mode !== 'cockpit';
+      });
+
       // Follow, chase, cockpit and trackside stay locked on the car; panning belongs to orbit and overhead.
       controls.enablePan = mode === 'orbit' || mode === 'top';
       controls.enableRotate = mode !== 'top' && mode !== 'trackside' && mode !== 'cockpit';
@@ -272,7 +284,10 @@ export async function createReplayScene(
       if (mode === 'cockpit') { reset(); return; }
       camera.position.add(new Vector3().subVectors(target, controls.target));
       controls.target.copy(target);
-      if (mode === 'chase') chaseTracker.reset(target, currentYaw, currentTime);
+      if (mode === 'chase') {
+        controls.target.add(new Vector3(0, CHASE_LOOK_ELEVATION_M, 0));
+        chaseTracker.reset(target, currentYaw, currentTime);
+      }
       controls.update(); invalidate();
     },
     zoom(direction) {
@@ -298,7 +313,7 @@ export async function createReplayScene(
     dispose() {
       disposed = true; cancelAnimationFrame(frame); observer.disconnect(); controls.dispose();
       renderer.domElement.removeEventListener('webglcontextlost', contextLost);
-      document.removeEventListener('visibilitychange', invalidate); disposeObjects(scene); activeRoad?.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
+      document.removeEventListener('visibilitychange', invalidate); disposeObjects(scene); activeRoad?.dispose(); environment.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
     },
   };
 }

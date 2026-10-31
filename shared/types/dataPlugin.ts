@@ -44,6 +44,16 @@ export interface DataPluginManifest {
   vehicleMeshes?: { catalog: string };
   vehicleLiveries?: { catalog: string };
 }
+export interface DataPluginCounts {
+  tracks?: number;
+  vehicles?: number;
+  logos?: number;
+  scenes?: number;
+  brakeBoards?: number;
+  vehicleMeshes?: number;
+  vehicleLiveries?: number;
+}
+
 export interface DataPluginStatus {
   state: 'absent' | 'invalid' | 'ready';
   revision: string;
@@ -53,6 +63,9 @@ export interface DataPluginStatus {
   scenes?: boolean;
   vehicleMeshes?: boolean;
   vehicleLiveries?: boolean;
+  packageId?: string;
+  packageVersion?: string;
+  counts?: DataPluginCounts;
 }
 export interface PluginTrackResource {
   packageRevision: string;

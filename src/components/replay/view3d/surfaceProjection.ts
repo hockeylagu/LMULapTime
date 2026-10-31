@@ -56,3 +56,18 @@ export function createSurfaceHeight(surface: Object3D): SurfaceHeight {
     return best;
   };
 }
+
+/** Road heights exclude the filler ground; filler ground provides terrain height for camera clearance. */
+export function prepareSurfaceLayers(root: Object3D): {
+  fillerGround: Object3D | undefined;
+  surfaceHeight: SurfaceHeight;
+  groundHeight: SurfaceHeight;
+} {
+  const fillerGround = root.getObjectByName('ground');
+  if (fillerGround) root.remove(fillerGround);
+  const surfaceHeight = createSurfaceHeight(root);
+  const groundHeight = fillerGround ? createSurfaceHeight(fillerGround) : surfaceHeight;
+  if (fillerGround) root.add(fillerGround);
+  return { fillerGround, surfaceHeight, groundHeight };
+}
+
