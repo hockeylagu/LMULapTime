@@ -71,6 +71,7 @@ export function useTrackDetailState(trackName: string, selectedCarClass: string)
     replayParams.set('sessionId', session.id);
     replayParams.set('driverOrdinal', String(driverOrdinal));
     replayParams.set('lapOrdinal', String(lapOrdinal));
+    if (!replayParams.has('view')) replayParams.set('view', '2d');
     void navigate(`/telemetry?${replayParams.toString()}`);
   };
 

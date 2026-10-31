@@ -95,6 +95,8 @@ export interface ReplayInspectorModalBodyProps {
   duckdbUnavailableReason?: string;
   selectedSource?: 'duckdb' | 'vcr';
   onSelectSource?: (source: 'duckdb' | 'vcr') => void;
+  view?: '2d' | '3d';
+  onChangeView?: (view: '2d' | '3d') => void;
 }
 
 export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> = ({
@@ -171,6 +173,8 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
   hasDuckDbTelemetry,
   duckdbUnavailableReason,
   onSelectSource,
+  view,
+  onChangeView,
 }) => {
   return (
     <main className="h-dvh min-h-0 flex flex-col bg-lmu-dark text-white w-full overflow-hidden select-none overscroll-none animate-fade-in">
@@ -281,13 +285,11 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
           consistencyStats={consistencyStats}
           cornerConsistencyStats={cornerConsistencyStats}
           isCornerConsistencyLoading={isCornerConsistencyLoading}
-          handleSelectBaselineLap={handleSelectBaselineLap}
-          formatLapTime={formatLapTime}
-          availableConsistencyLaps={availableConsistencyLaps}
-          excludedConsistencyLaps={excludedConsistencyLaps}
+          handleSelectBaselineLap={handleSelectBaselineLap} formatLapTime={formatLapTime}
+          availableConsistencyLaps={availableConsistencyLaps} excludedConsistencyLaps={excludedConsistencyLaps}
           toggleConsistencyLap={toggleConsistencyLap}
-          trackVenue={metadata?.trackVenue}
-          trackCourse={metadata?.trackCourse}
+          trackVenue={metadata?.trackVenue} trackCourse={metadata?.trackCourse}
+          view={view} onChangeView={onChangeView}
         /></ReplayFullscreenControlsContext.Provider>
       </div>
     </main>

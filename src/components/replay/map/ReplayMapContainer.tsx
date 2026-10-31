@@ -33,6 +33,8 @@ export interface ReplayMapContainerProps {
   onOpenCornersTab?: () => void;
   isPlaying?: boolean;
   onTogglePlay?: () => void;
+  view?: '2d' | '3d';
+  onChangeView?: (view: '2d' | '3d') => void;
 }
 
 export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
@@ -55,6 +57,8 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
   trackGeometry,
   isPlaying,
   onTogglePlay,
+  view: controlledView,
+  onChangeView,
 }) => {
   const baselinePoints = isCompareMode && baselineTrajectory ? baselineTrajectory.points : undefined;
 
@@ -65,8 +69,14 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
   const [showPedalMarkers, setShowPedalMarkers] = useState<boolean>(false);
   const [showFrictionCircle, setShowFrictionCircle] = useState<boolean>(false);
   const [showGForce, toggleGForce] = useStoredToggle('lmu-map-gforce-v1', true);
-  const [view, setView] = useState<'2d' | '3d'>('2d');
+  const [uncontrolledView, setUncontrolledView] = useState<'2d' | '3d'>('2d');
   const [isExpanded, setIsExpanded] = useState(false);
+  const activeView = controlledView ?? uncontrolledView;
+
+  const handleToggleView = (nextView: '2d' | '3d') => {
+    if (controlledView === undefined) setUncontrolledView(nextView);
+    onChangeView?.(nextView);
+  };
 
   const pedalMarkers = useMemo(() => {
     if (!corners || corners.length === 0) return [];
@@ -100,9 +110,9 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
 
   if (!trajectory) return null;
 
-  if (view === '3d') return <Suspense fallback={<div role="status" className="p-4 text-lmu-muted">Loading 3D viewer…</div>}>
+  if (activeView === '3d') return <Suspense fallback={<div role="status" className="p-4 text-lmu-muted">Loading 3D viewer…</div>}>
     <Replay3DView trajectory={trajectory} baseline={isCompareMode ? baselineTrajectory ?? null : null}
-      currentIndex={currentIndex} onSelectIndex={onSelectIndex} isPlaying={isPlaying} onTogglePlay={onTogglePlay} onReturnTo2D={() => setView('2d')}
+      currentIndex={currentIndex} onSelectIndex={onSelectIndex} isPlaying={isPlaying} onTogglePlay={onTogglePlay} onReturnTo2D={() => handleToggleView('2d')}
       colorBy={colorBy} onChangeColorBy={onChangeColorBy} currentPoint={currentPoint} fadedLine={fadedLine}
       onToggleFadedLine={line => setFadedLine(f => (f === line ? 'none' : line))} trackGeometry={trackGeometry}
       isExpanded={isExpanded} onToggleExpanded={setIsExpanded}
@@ -165,7 +175,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
             trackLengthM={trajectory.trackLengthM}
             isExpanded={isExpanded}
             onToggleExpanded={setIsExpanded}
-            onToggleView={() => setView('3d')}
+            onToggleView={() => handleToggleView('3d')}
           />
         </div>
       </div>

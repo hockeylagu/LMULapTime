@@ -28,6 +28,8 @@ export interface ReplayInspectorContentProps {
   initialBaselineLapOrdinal?: number | null;
   /** A corner to open on the Corners tab once the lap (and its comparison lap) are loaded. */
   initialCornerNumber?: number | null;
+  view?: '2d' | '3d';
+  onViewChange?: (view: '2d' | '3d') => void;
 }
 
 export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
@@ -42,6 +44,8 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
   initialBaselineDriverOrdinal,
   initialBaselineLapOrdinal,
   initialCornerNumber,
+  view: controlledView,
+  onViewChange,
 }) => {
   const {
     metadata,
@@ -104,6 +108,12 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     initialBaselineLapOrdinal,
   });
 
+  const [uncontrolledView, setUncontrolledView] = useState<'2d' | '3d'>('2d');
+  const activeView = controlledView ?? uncontrolledView;
+  const handleViewChange = (nextView: '2d' | '3d') => {
+    if (controlledView === undefined) setUncontrolledView(nextView);
+    onViewChange?.(nextView);
+  };
   const [activeTab, setActiveTab] = useState<'map' | 'corners' | 'ai-report'>('map');
   const [cornerSubView, setCornerSubView] = useState<'compare' | 'consistency'>('compare');
   const [colorBy, setColorBy] = useState<MapColorMode>('pedal');
@@ -204,50 +214,31 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     <ReplayPlaybackCursorContext.Provider value={playbackCursor}>
     <ReplayInspectorModalBody
       onClose={onClose}
-      sessionId={activeSessionId}
-      metadata={metadata}
-      trajectory={trajectory}
-      currentIndex={currentIndex}
-      baselineTrajectory={baselineTrajectory}
-      selectedDriverSlot={selectedDriverSlot}
-      isLoading={isLoading}
-      isTrajLoading={isTrajLoading}
-      error={error}
-      handleRetryLoad={handleRetryLoad}
+      sessionId={activeSessionId} metadata={metadata}
+      trajectory={trajectory} currentIndex={currentIndex}
+      baselineTrajectory={baselineTrajectory} selectedDriverSlot={selectedDriverSlot}
+      isLoading={isLoading} isTrajLoading={isTrajLoading}
+      error={error} handleRetryLoad={handleRetryLoad}
       comparePagination={comparePagination}
       compareLapsError={compareLapsError}
       handleRetryCompareLaps={handleRetryCompareLaps}
       handleRetryBaseline={handleRetryBaseline}
       isCompareMode={isCompareMode}
       handleToggleCompare={handleToggleCompare}
-      baselineSessionId={baselineSessionId}
-      baselineLapNumber={baselineLapNumber}
-      baselineDriverOrdinal={baselineDriverOrdinal}
-      baselineLapOrdinal={baselineLapOrdinal}
-      baselineDriverName={baselineDriverName}
-      isComparePickerOpen={isComparePickerOpen}
-      handleCloseComparePicker={handleCloseComparePicker}
-      availableCompareLaps={availableCompareLaps}
-      compareLapFilter={compareLapFilter}
-      compareControls={compareControls}
-      compareCarTypes={compareCarTypes}
-      setCompareControls={setCompareControls}
-      isCompareLapsLoading={isCompareLapsLoading}
-      setCompareLapFilter={setCompareLapFilter}
-      handleSelectCompareLap={handleSelectCompareLap}
-      isBaselineLoading={isBaselineLoading}
+      baselineSessionId={baselineSessionId} baselineLapNumber={baselineLapNumber}
+      baselineDriverOrdinal={baselineDriverOrdinal} baselineLapOrdinal={baselineLapOrdinal}
+      baselineDriverName={baselineDriverName} isComparePickerOpen={isComparePickerOpen}
+      handleCloseComparePicker={handleCloseComparePicker} availableCompareLaps={availableCompareLaps}
+      compareLapFilter={compareLapFilter} compareControls={compareControls}
+      compareCarTypes={compareCarTypes} setCompareControls={setCompareControls}
+      isCompareLapsLoading={isCompareLapsLoading} setCompareLapFilter={setCompareLapFilter}
+      handleSelectCompareLap={handleSelectCompareLap} isBaselineLoading={isBaselineLoading}
       baselineError={baselineError}
-      setCurrentIndex={setCurrentIndex}
-      isPlaying={isPlaying}
-      setIsPlaying={setIsPlaying}
-      playbackSpeed={playbackSpeed}
-      setPlaybackSpeed={setPlaybackSpeed}
-      chartZoomRange={chartZoomRange}
-      setChartZoomRange={setChartZoomRange}
-      telemetryResolution={telemetryResolution}
-      handleChangeResolution={handleChangeResolution}
-      handleSelectDriver={handleSelectDriver}
-      handleSelectLap={handleSelectLap}
+      setCurrentIndex={setCurrentIndex} isPlaying={isPlaying} setIsPlaying={setIsPlaying}
+      playbackSpeed={playbackSpeed} setPlaybackSpeed={setPlaybackSpeed}
+      chartZoomRange={chartZoomRange} setChartZoomRange={setChartZoomRange}
+      telemetryResolution={telemetryResolution} handleChangeResolution={handleChangeResolution}
+      handleSelectDriver={handleSelectDriver} handleSelectLap={handleSelectLap}
       currentPoint={currentPoint}
       currentLapSummary={currentLapSummary}
       lapDeltas={lapDeltas}
@@ -281,6 +272,8 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
       duckdbUnavailableReason={duckdbUnavailableReason}
       selectedSource={selectedSource}
       onSelectSource={handleSelectSource}
+      view={activeView}
+      onChangeView={handleViewChange}
     />
     </ReplayPlaybackCursorContext.Provider>
   );

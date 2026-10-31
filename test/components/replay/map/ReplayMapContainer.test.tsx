@@ -238,4 +238,19 @@ describe('ReplayMapContainer', () => {
     expect(screen.getByRole('button', { name: 'Switch to 3D view' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Exit full screen/i })).toBeInTheDocument();
   });
+
+  it('notifies onChangeView and respects controlled view prop', async () => {
+    const onChangeView = vi.fn();
+    const { rerender } = render(<ReplayMapContainer {...baseProps} view="2d" onChangeView={onChangeView} />);
+
+    const to3DBtn = screen.getByRole('button', { name: 'Switch to 3D view' });
+    fireEvent.click(to3DBtn);
+    expect(onChangeView).toHaveBeenCalledWith('3d');
+
+    rerender(<ReplayMapContainer {...baseProps} view="3d" onChangeView={onChangeView} />);
+    expect(await screen.findByRole('button', { name: 'Switch to 2D view' })).toBeInTheDocument();
+    const to2DBtn = screen.getByRole('button', { name: 'Switch to 2D view' });
+    fireEvent.click(to2DBtn);
+    expect(onChangeView).toHaveBeenCalledWith('2d');
+  });
 });

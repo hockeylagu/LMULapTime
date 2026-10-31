@@ -52,6 +52,8 @@ export interface ReplayInspectorSidebarProps {
   layoutKey?: string;
   isPlaying?: boolean;
   onTogglePlay?: () => void;
+  view?: '2d' | '3d';
+  onChangeView?: (view: '2d' | '3d') => void;
 }
 
 export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
@@ -69,6 +71,8 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
   setCurrentIndex,
   isPlaying,
   onTogglePlay,
+  view,
+  onChangeView,
   currentPoint,
   cornerSegments,
   selectedCornerNumber,
@@ -136,6 +140,8 @@ export const ReplayInspectorSidebar: React.FC<ReplayInspectorSidebarProps> = ({
       trackCourse={trackCourse}
       layoutKey={layoutKey}
       onOpenCornersTab={() => setActiveTab('corners')}
+      view={view}
+      onChangeView={onChangeView}
     />
   );
 

@@ -65,6 +65,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     replayParams.set('sessionId', id);
     replayParams.set('driverOrdinal', String(driverOrdinal));
     replayParams.set('lapOrdinal', String(lapOrdinal));
+    if (!replayParams.has('view')) replayParams.set('view', '2d');
     void navigate(`/telemetry?${replayParams.toString()}`);
   };
   const selectedTrack = searchParams.get('track') || initialSelectedTrack;

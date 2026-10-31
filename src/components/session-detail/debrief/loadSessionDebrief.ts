@@ -217,6 +217,7 @@ export function debriefCornerLink(debrief: SessionDebrief, cornerNumber: number,
     baselineLapOrdinal: String(lap.lapOrdinal ?? ''),
     compareDriver: lap.driverName,
     corner: String(cornerNumber),
+    view: '2d',
   });
   return `/telemetry?${params.toString()}`;
 }

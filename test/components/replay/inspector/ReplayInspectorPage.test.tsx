@@ -12,6 +12,8 @@ interface MockInspectorProps {
   initialBaselineDriverOrdinal?: number;
   initialBaselineLapOrdinal?: number | null;
   initialCornerNumber?: number;
+  view?: '2d' | '3d';
+  onViewChange?: (view: '2d' | '3d') => void;
   onClose: () => void;
   onLocatorChange: (driverOrdinal: number, lapOrdinal: number) => void;
 }
@@ -27,7 +29,10 @@ vi.mock('../../../../src/components/replay/inspector/ReplayInspectorContent.js',
       <span data-testid="baseline-driver">{props.initialBaselineDriverOrdinal}</span>
       <span data-testid="baseline-lap">{props.initialBaselineLapOrdinal ?? 'none'}</span>
       <span data-testid="corner">{props.initialCornerNumber ?? 'none'}</span>
+      <span data-testid="view-mode">{props.view ?? 'none'}</span>
       <button type="button" onClick={() => props.onLocatorChange(2, 8)}>Change locator</button>
+      <button type="button" onClick={() => props.onViewChange?.('3d')}>Switch to 3D</button>
+      <button type="button" onClick={() => props.onViewChange?.('2d')}>Switch to 2D</button>
       <button type="button" onClick={props.onClose}>Close</button>
     </div>
   ),
@@ -70,6 +75,36 @@ describe('ReplayInspectorPage', () => {
     expect(screen.getByTestId('baseline-driver')).toHaveTextContent('2');
     expect(screen.getByTestId('baseline-lap')).toHaveTextContent('5');
     expect(screen.getByTestId('corner')).toHaveTextContent('7');
+  });
+
+  it('defaults to 2d view and sets view in URL when missing', async () => {
+    window.location.hash = '#/telemetry?sessionId=session-1';
+    render(<ReplayInspectorPage />);
+
+    expect(screen.getByTestId('view-mode')).toHaveTextContent('2d');
+    await waitFor(() => {
+      const params = new URLSearchParams(window.location.hash.split('?')[1]);
+      expect(params.get('view')).toBe('2d');
+    });
+  });
+
+  it('reads 3d view from the URL and allows switching views via onViewChange', async () => {
+    window.location.hash = '#/telemetry?sessionId=session-1&view=3d';
+    render(<ReplayInspectorPage />);
+
+    expect(screen.getByTestId('view-mode')).toHaveTextContent('3d');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to 2D' }));
+    await waitFor(() => {
+      const params = new URLSearchParams(window.location.hash.split('?')[1]);
+      expect(params.get('view')).toBe('2d');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to 3D' }));
+    await waitFor(() => {
+      const params = new URLSearchParams(window.location.hash.split('?')[1]);
+      expect(params.get('view')).toBe('3d');
+    });
   });
 
   it('navigates back when the inspector closes', async () => {
