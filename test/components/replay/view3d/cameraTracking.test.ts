@@ -194,15 +194,15 @@ it.each([30, 60, 144])('keeps the chosen following distance on play and resume a
 it('places cockpit camera at driver position looking forward down the track for an unrotated car', () => {
   const car = new Vector3(100, 10, 200);
   const pose = computeCockpitPose(car);
-  // Driver sits on the left (+0.28m X), eye level at +0.78m Y, cockpit front (+0.20m scene Z from native -0.20m forward)
+  // Driver sits on the left (+0.28m X), eye level at +1.00m Y, cockpit front (+0.70m scene Z from native -0.70m forward)
   expect(pose.eye.x - car.x).toBeCloseTo(0.28, 4);
-  expect(pose.eye.y - car.y).toBeCloseTo(0.78, 4);
-  expect(pose.eye.z - car.z).toBeCloseTo(0.20, 4);
+  expect(pose.eye.y - car.y).toBeCloseTo(1.00, 4);
+  expect(pose.eye.z - car.z).toBeCloseTo(0.70, 4);
 
   // Focus point 40m down the track in scene forward (+Z) direction, angled slightly down
   expect(pose.target.x - car.x).toBeCloseTo(0.28, 4);
-  expect(pose.target.y - car.y).toBeCloseTo(0.70, 4);
-  expect(pose.target.z - car.z).toBeCloseTo(40.20, 4);
+  expect(pose.target.y - car.y).toBeCloseTo(0.90, 4);
+  expect(pose.target.z - car.z).toBeCloseTo(40.70, 4);
 
   // Up vector matches world Y for level vehicle
   expect(pose.up.x).toBeCloseTo(0, 4);
@@ -229,7 +229,7 @@ it('tilts cockpit view with vehicle pitch and roll from 3D orientation', () => {
   const pose = computeCockpitPose(car, orientation);
 
   // Nose dips under braking: look target Y drops lower than level target
-  expect(pose.target.y).toBeLessThan(0.70);
+  expect(pose.target.y).toBeLessThan(0.90);
   // Roll tilts up vector laterally
   expect(pose.up.x).not.toBe(0);
 });
@@ -238,8 +238,8 @@ it('applies vehicle origin offsets from calibrated model packages and falls back
   const car = new Vector3(50, 5, -100);
   const poseWithOffset = computeCockpitPose(car, undefined, 0, new Vector3(0.1, -0.25, 0.5));
   expect(poseWithOffset.eye.x - car.x).toBeCloseTo(0.38, 4);
-  expect(poseWithOffset.eye.y - car.y).toBeCloseTo(0.53, 4);
-  expect(poseWithOffset.eye.z - car.z).toBeCloseTo(-0.30, 4); // native +0.30m rearward mirrors to scene -0.30m
+  expect(poseWithOffset.eye.y - car.y).toBeCloseTo(0.75, 4);
+  expect(poseWithOffset.eye.z - car.z).toBeCloseTo(0.20, 4); // native -0.20m forward mirrors to scene +0.20m
 
   // Fallback to scalar bodyYaw when orientation quaternion is absent
   const poseYaw = computeCockpitPose(car, undefined, Math.PI);
@@ -251,9 +251,9 @@ it('rotates the fitted model height with the body and reflects the cockpit direc
   const car = new Vector3(50, 5, -100), offset = new Vector3(0.1, -0.25, 0.5);
   const orientation = new Quaternion().setFromEuler(new Euler(-0.08, 2.85, 0.04, 'YXZ'));
   const pose = computeCockpitPose(car, orientation, undefined, offset);
-  const nativeEye = new Vector3(0.38, 0.53, 0.3).applyQuaternion(orientation);
+  const nativeEye = new Vector3(0.38, 0.75, -0.2).applyQuaternion(orientation);
   expect(pose.eye.distanceTo(car.clone().add(new Vector3(nativeEye.x, nativeEye.y, -nativeEye.z)))).toBeLessThan(1e-10);
-  const direction = new Vector3(0, -0.08, -40).applyQuaternion(orientation);
+  const direction = new Vector3(0, -0.10, -40).applyQuaternion(orientation);
   direction.z *= -1; direction.normalize();
   expect(pose.target.clone().sub(pose.eye).normalize().distanceTo(direction)).toBeLessThan(1e-10);
 });
