@@ -1,5 +1,5 @@
 import {MeshoptDecoder} from 'meshoptimizer/decoder';
-import { Group, Mesh, type Texture, type Vector3 } from 'three';
+import { BufferGeometry, Group, Mesh, type Texture, type Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import type { LoadedVehicleMesh } from '../../../../api/vehicleMeshApi.js';
@@ -31,6 +31,7 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     let texture = textures.get(livery.image);
     if (!texture) {
       texture = createLiveryTexture(livery.image);
+      texture.userData.sharedAsset = true;
       textures.set(livery.image, texture);
     }
     return texture;
@@ -39,7 +40,14 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     if (!asset) return Promise.resolve(null);
     let pending = models.get(asset.bytes);
     if (!pending) {
-      pending = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(asset.bytes, '').then(result => result.scene);
+      pending = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(asset.bytes, '').then(result => {
+        result.scene.traverse(object => {
+          if (object instanceof Mesh && object.geometry instanceof BufferGeometry) {
+            object.geometry.userData.sharedAsset = true;
+          }
+        });
+        return result.scene;
+      });
       models.set(asset.bytes, pending);
     }
     return pending;

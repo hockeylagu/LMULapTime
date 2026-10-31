@@ -1,12 +1,13 @@
-import { expect, it } from 'vitest';
-import { BoxGeometry, Group, Mesh, MeshStandardMaterial, Texture, Vector3 } from 'three';
+import { expect, it, vi } from 'vitest';
+import { BoxGeometry, DoubleSide, FrontSide, Group, Mesh, MeshStandardMaterial, Texture, Vector3 } from 'three';
 import { makeCar } from '../../../../src/components/replay/view3d/sceneObjects.js';
+import { disposeObjects } from '../../../../src/components/replay/view3d/laps/disposeObjects.js';
 import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
 
 const lap: ReplayTrajectoryData = {replayName: 'test', points: [], pointsCount: 0, bounds: {minX: 0, maxX: 1, minZ: 0, maxZ: 1, spanX: 1, spanZ: 1}};
 
 it('preserves real model and tyre placement and gives primary/ghost independent materials', () => {
-  const source = new Group(), bodyMaterial = new MeshStandardMaterial({color: '#ffffff', roughness: 0.27, metalness: 0.12}); bodyMaterial.name = 'body';
+  const source = new Group(), bodyMaterial = new MeshStandardMaterial({color: '#ffffff', roughness: 0.27, metalness: 0.12, side: DoubleSide}); bodyMaterial.name = 'body';
   const body = new Mesh(new BoxGeometry(2, 1, 4), bodyMaterial); body.name = 'body';
   const rubberMaterial = new MeshStandardMaterial({color: '#111111'}); rubberMaterial.name = 'tyres';
   const tyre = new Mesh(new BoxGeometry(0.3, 0.65, 0.65), rubberMaterial); tyre.name = 'tyres'; tyre.position.set(0.8, 0.27, -1.4);
@@ -18,6 +19,7 @@ it('preserves real model and tyre placement and gives primary/ghost independent 
   expect(actualBody.geometry).not.toBe(ghostBody.geometry); expect(actualBody.geometry).not.toBe(body.geometry);
   expect(actualBody.material.color.getHexString()).toBe('38bdf8'); expect(ghostBody.material.color.getHexString()).toBe('ffb703');
   expect(actualBody.material.opacity).toBe(1); expect(ghostBody.material.opacity).toBe(0.45); expect(bodyMaterial.opacity).toBe(1);
+  expect(actualBody.material.side).toBe(FrontSide); expect(ghostBody.material.side).toBe(FrontSide);
   expect(actualBody.material.polygonOffset).toBe(false); expect(ghostBody.material.polygonOffset).toBe(true);
   expect(actualBody.material.flatShading).toBe(false);
   expect(actualBody.material.roughness).toBe(0.27); expect(actualBody.material.metalness).toBe(0.12);
@@ -118,4 +120,24 @@ it('preserves authored glass and paint materials and lets ghosts opt out of scen
   expect(ghostFallbackBody.material.envMap).toBeNull();
   expect(ghostFallbackCabin.material.roughness).toBe(0.7);
   expect(ghostFallbackCabin.material.envMap).toBeNull();
+});
+
+it('shares geometry when sharedAsset is true and respects includeShared on disposal', () => {
+  const source = new Group();
+  const geom = new BoxGeometry(2, 1, 4);
+  geom.userData.sharedAsset = true;
+  const mat = new MeshStandardMaterial({color: '#ffffff'}); mat.name = 'body';
+  const mesh = new Mesh(geom, mat); mesh.name = 'body';
+  source.add(mesh);
+
+  const car = makeCar(lap, '#38bdf8', false, source);
+  const carBody = car.getObjectByName('body') as Mesh;
+  expect(carBody.geometry).toBe(geom);
+
+  const geomDispose = vi.spyOn(geom, 'dispose');
+  disposeObjects(car, false);
+  expect(geomDispose).not.toHaveBeenCalled();
+
+  disposeObjects(car, true);
+  expect(geomDispose).toHaveBeenCalledOnce();
 });

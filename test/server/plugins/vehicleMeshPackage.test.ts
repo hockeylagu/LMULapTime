@@ -11,25 +11,31 @@ import { syntheticGlb } from '../../helpers/scenes/syntheticGlb.js';
 import type { VehicleMesh } from '../../../shared/types/scenes/vehicleMesh.js';
 import { validateSceneGlb } from '../../../server/plugins/sceneGlb.js';
 
+const UNIT_NORMALS = [0, 1, 0, 0, 1, 0, 0, 1, 0];
 const directories: string[] = [];
 afterEach(() => { for (const dir of directories.splice(0)) fs.rmSync(dir, {recursive: true, force: true}); });
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'vehicle-mesh-')); directories.push(root);
   const write = (file: string, value: unknown) => { fs.mkdirSync(path.dirname(path.join(root, file)), {recursive: true}); fs.writeFileSync(path.join(root, file), JSON.stringify(value)); };
-  const bytes = syntheticGlb(undefined, [-1, 0, -2, 1, 1, 2, -1, 1, 2]);
+  const bytes = syntheticGlb(undefined, [-1, 0, -2, 1, 1, 2, -1, 1, 2], UNIT_NORMALS);
   const sha256 = createHash('sha256').update(bytes).digest('hex');
   const mesh: VehicleMesh = {schemaVersion: 1, vehicleRecordId: 'car-a', coordinates: 'vehicle-local-xyz-metres-forward-minus-z', representation: 'render', originCalibration: 'unverified', parts: ['body', 'tyres', 'rims'],
     revision: `mesh-${sha256}`, asset: 'vehicle-meshes/car-a.glb', sha256, byteLength: bytes.length, bounds: {min: [-1, 0, -2], max: [1, 1, 2]}, triangles: 1};
   write('manifest.json', {schemaVersion: 2, id: 'test', version: '1', vehicles: {catalog: 'vehicles/index.json'}, vehicleMeshes: {catalog: 'vehicle-meshes/index.json'}});
   write('vehicles/index.json', {schemaVersion: 1, coordinates: 'local-xz-metres-forward-minus-z', vehicles: [{id: 'car-a', model: 'Test', carClass: 'GT3', vehicleIds: ['TEST_A']}]});
-  write('vehicle-meshes/index.json', [mesh]); fs.writeFileSync(path.join(root, mesh.asset), bytes);
+  write('vehicle-meshes/index.json', [mesh]); fs.writeFileSync(path.join(root, fPath(mesh.asset)), bytes);
   return {root, write, mesh, bytes};
 }
+const fPath = (asset: string) => asset;
 
-it('accepts only bounded corner-specific pivot extras on vehicle assets and preserves strict track validation', () => {
-  const bytes = syntheticGlb(json => { json.nodes = [{mesh: 0, name: 'tyres-FL', extras: {wheelPivot: [0.8, 0.3, -1.4]}}]; });
+it('accepts only bounded corner-specific pivot extras and unit normals on vehicle assets and preserves strict track validation', () => {
+  const nodes = (json: Record<string, unknown>) => { json.nodes = [{mesh: 0, name: 'tyres-FL', extras: {wheelPivot: [0.8, 0.3, -1.4]}}]; };
+  const bytes = syntheticGlb(nodes, undefined, UNIT_NORMALS);
   expect(() => validateSceneGlb(bytes, true)).not.toThrow();
-  expect(() => validateSceneGlb(bytes)).toThrow('transform');
+  expect(() => validateSceneGlb(bytes)).toThrow('primitive');
+  expect(() => validateSceneGlb(syntheticGlb(), true)).toThrow('Missing GLB normals');
+  expect(() => validateSceneGlb(syntheticGlb(undefined, undefined, [0, 2, 0, 0, 1, 0, 0, 1, 0]), true)).toThrow('Invalid GLB normals');
+  expect(() => validateSceneGlb(syntheticGlb(nodes, undefined, UNIT_NORMALS, true), true)).toThrow('Invalid GLB material side');
 });
 
 it.each([
@@ -41,7 +47,7 @@ it.each([
   {name: 'tyres-FL', extras: {wheelPivot: [0.8, 0.3, -40]}},
   {name: 'tyres-FL', extras: {wheelPivot: [0.8, 0.3, -1.4], uri: 'external'}},
 ])('rejects malformed wheel pivot metadata %j', node => {
-  expect(() => validateSceneGlb(syntheticGlb(json => { json.nodes = [{mesh: 0, ...node}]; }), true)).toThrow();
+  expect(() => validateSceneGlb(syntheticGlb(json => { json.nodes = [{mesh: 0, ...node}]; }, undefined, UNIT_NORMALS), true)).toThrow();
 });
 
 it('binds a visible car mesh and tyres to its own exact vehicle record', () => {

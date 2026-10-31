@@ -84,7 +84,7 @@ it('preserves ghost depth handling and stable tyre/rim ordering when splitting a
       for (const part of [wheelTyre, wheelRim]) {
         expect(part.material.depthTest).toBe(true);
         expect(part.material.depthWrite).toBe(false);
-        expect(part.material.customProgramCacheKey()).toBe('replay-ghost-depth-v1');
+        expect(part.material.polygonOffset).toBe(true);
       }
     }
   }
@@ -144,6 +144,7 @@ it('uses exported rolling hubs instead of box centers and preserves every vertex
   expect(rigs[0].hub.z).toBe(-1.4);
   source.updateMatrixWorld(true);
   const tyre = rigs[0].pivot.children[0] as Mesh;
+  expect(tyre.geometry).toBe(original.geometry);
   const after = new Vector3().fromBufferAttribute(tyre.geometry.getAttribute('position'), 0).applyMatrix4(tyre.matrixWorld);
   expect(after.distanceTo(before)).toBeLessThan(1e-6);
   const radius = before.distanceTo(rigs[0].hub);

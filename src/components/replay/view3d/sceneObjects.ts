@@ -2,6 +2,7 @@ import {
   BoxGeometry,
   BufferGeometry,
   CylinderGeometry,
+  FrontSide,
   Group,
   Mesh,
   MeshStandardMaterial,
@@ -15,28 +16,25 @@ import { defaultVehicleSize } from '../../../../shared/domain/vehicleDimensions.
 
 export function makeCar(trajectory: ReplayTrajectoryData, color: string, ghost: boolean, model: Group | null = null, liveryTexture: Texture | null = null): Group {
   const car = new Group(), dimensions = trajectory.vehicleData?.dimensions ?? defaultVehicleSize(trajectory.vehicleIdentity?.carClass);
-  const material = new MeshStandardMaterial({ color, transparent: ghost, opacity: ghost ? 0.5 : 1, depthWrite: !ghost, roughness: ghost ? 0.7 : 0.35 });
+  const material = new MeshStandardMaterial({ color, transparent: ghost, opacity: ghost ? 0.5 : 1, depthWrite: !ghost, roughness: 0.35 });
   const envelope = model ? model.clone(true) : new Group();
   if (model) {
     envelope.traverse(object => {
       if (!(object instanceof Mesh) || !(object.geometry instanceof BufferGeometry)) return;
       const mesh = object as Mesh<BufferGeometry, Material | Material[]>;
       // Each lap owns its buffers, so replacing a lap cannot dispose a cached vehicle template or the other car.
-      mesh.geometry = mesh.geometry.clone();
+      if (!mesh.geometry.userData?.sharedAsset) mesh.geometry = mesh.geometry.clone();
       const hasUv = !!mesh.geometry.attributes.uv;
       const originals = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       const copies = originals.map(source => {
         const copy = source.clone();
+        copy.side = FrontSide;
         if (copy instanceof MeshStandardMaterial) {
           if (copy.name === 'livery') {
             copy.map = liveryTexture && hasUv ? liveryTexture : copy.map;
             copy.color.set(liveryTexture && hasUv ? '#ffffff' : color);
           } else if (copy.name === 'body') {
             copy.color.set(color);
-          }
-          if (ghost) {
-            copy.roughness = 0.7;
-            copy.metalness = 0;
           }
         }
         copy.transparent = ghost; copy.opacity = ghost ? 0.45 : 1; copy.depthWrite = !ghost;
@@ -51,12 +49,11 @@ export function makeCar(trajectory: ReplayTrajectoryData, color: string, ghost: 
       transparent: ghost,
       opacity: ghost ? 0.5 : 1,
       depthWrite: !ghost,
-      roughness: ghost ? 0.7 : 0.35,
-      metalness: ghost ? 0 : 0.03,
+      roughness: 0.35,
+      metalness: 0.03,
     });
     bodyMaterial.name = 'body';
-    const bodyGeometry = new BoxGeometry(width * 0.78, 0.5, length);
-    const body = new Mesh(bodyGeometry, bodyMaterial);
+    const body = new Mesh(new BoxGeometry(width * 0.78, 0.5, length), bodyMaterial);
     body.name = 'body';
     body.position.y = 0.2;
     const cabinMaterial = new MeshStandardMaterial({
@@ -64,8 +61,8 @@ export function makeCar(trajectory: ReplayTrajectoryData, color: string, ghost: 
       transparent: ghost,
       opacity: ghost ? 0.5 : 1,
       depthWrite: !ghost,
-      roughness: ghost ? 0.7 : 0.18,
-      metalness: ghost ? 0 : 0.05,
+      roughness: 0.18,
+      metalness: 0.05,
     });
     cabinMaterial.name = 'cabin';
     const cabin = new Mesh(new BoxGeometry(width * 0.55, 0.4, length * 0.37), cabinMaterial);
@@ -89,23 +86,10 @@ export function makeCar(trajectory: ReplayTrajectoryData, color: string, ghost: 
       const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
       for (const ghostMaterial of materials) {
         if (ghostMaterial instanceof MeshStandardMaterial) {
+          ghostMaterial.roughness = 0.7; ghostMaterial.metalness = 0;
           ghostMaterial.envMap = null; ghostMaterial.envMapIntensity = 0;
         }
         ghostMaterial.polygonOffset = true; ghostMaterial.polygonOffsetFactor = -1; ghostMaterial.polygonOffsetUnits = -1;
-        // gl_FragDepth replaces polygonOffset in the perspective logarithmic-depth pass.
-        // Give coincident laps 2 cm of depth clearance without shifting either recorded pose;
-        // retain depth testing so terrain and walls still occlude the ghost.
-        ghostMaterial.onBeforeCompile = shader => {
-          shader.fragmentShader = shader.fragmentShader.replace('#include <logdepthbuf_fragment>', `
-            #include <logdepthbuf_fragment>
-            #ifdef USE_LOGARITHMIC_DEPTH_BUFFER
-              if (vIsPerspective != 0.0) {
-                gl_FragDepth = log2(max(1.0, vFragDepth - 0.02)) * logDepthBufFC * 0.5;
-              }
-            #endif
-          `);
-        };
-        ghostMaterial.customProgramCacheKey = () => 'replay-ghost-depth-v1';
       }
     });
   }

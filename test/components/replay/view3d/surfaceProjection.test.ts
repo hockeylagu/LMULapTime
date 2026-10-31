@@ -39,7 +39,7 @@ it('drapes the racing ribbon just above the ground, breaks it where the road is 
   const line = makeRacingLine(lap, new Vector3(0, 1, 0), ['#ff0000', '#00ff00', '#0000ff'], createSurfaceHeight(surface));
   expect(line.geometry.index?.count).toBe(6); // One quad: no floating continuation where the road surface is missing.
   const positions = line.geometry.getAttribute('position');
-  expect(positions.getY(0)).toBeCloseTo(0.04); expect(positions.getY(3)).toBeCloseTo(0.04);
+  expect(positions.getY(0)).toBeCloseTo(0.01); expect(positions.getY(3)).toBeCloseTo(0.01);
   expect(Math.abs(positions.getZ(0) - positions.getZ(1))).toBeCloseTo(RACING_LINE_WIDTH_M);
   const colors = line.geometry.getAttribute('color');
   expect([colors.getX(0), colors.getY(2)]).toEqual([1, 1]);

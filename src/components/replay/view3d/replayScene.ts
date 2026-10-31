@@ -51,7 +51,14 @@ const BARRIER_KINDS = new Set(['barrier', 'tyreBarrier', 'tecpro', 'pitWall', 'b
 export function detachBarriers(root: Object3D): Group {
   const barriers = new Group(); barriers.name = 'barriers';
   for (const child of root.children.filter(child => BARRIER_KINDS.has(child.name))) barriers.add(child);
-  barriers.traverse(object => { if (object instanceof Mesh) { object.castShadow = true; object.receiveShadow = true; } });
+  barriers.traverse(object => {
+    if (!(object instanceof Mesh)) return;
+    if (object.geometry instanceof BufferGeometry && !object.geometry.getAttribute('normal')) {
+      object.geometry.computeVertexNormals();
+    }
+    object.castShadow = true;
+    object.receiveShadow = true;
+  });
   return barriers;
 }
 
@@ -92,38 +99,47 @@ export async function createReplayScene(
   catch (error) { disposeObjects(gltf.scene); disposeObjects(barriers); throw error; }
   let lineMode = colorBy, primaryOpacity = 1, baselineOpacity = 1, lapRequest = 0;
   let renderer: WebGLRenderer;
-  // Logarithmic depth: terrain sits 0.2 m under the road, which a linear 0.2 m–30 km buffer cannot separate past ~700 m.
-  try { renderer = new WebGLRenderer({antialias: true, alpha: false, logarithmicDepthBuffer: true}); }
+  try { renderer = new WebGLRenderer({antialias: true, alpha: false}); }
   catch { layer.dispose(); disposeObjects(gltf.scene); disposeObjects(barriers); throw Error('WebGL 2 is unavailable. Use the 2D map.'); }
   const scene = new Scene();
+  const environment = addSceneEnvironment(scene, renderer, metadata.bounds.min[1] - origin.y);
   gltf.scene.position.copy(origin).negate(); barriers.position.copy(gltf.scene.position);
   gltf.scene.traverse(object => {
     if (!(object instanceof Mesh) || !(object.geometry instanceof BufferGeometry)) return;
     const mesh = object as Mesh<BufferGeometry, Material | Material[]>;
     // The filler ground sits just under the road: a car shadow on it would show through from below road level.
-    mesh.geometry.computeVertexNormals(); mesh.receiveShadow = mesh !== fillerGround;
+    if (!mesh.geometry.getAttribute('normal')) mesh.geometry.computeVertexNormals();
+    mesh.receiveShadow = mesh !== fillerGround;
     // Raised kerbs throw a strip of shade on the road; flat sheets would only cost shadow-map time.
     mesh.castShadow = mesh.name === 'kerb' || mesh.name.startsWith('kerb-source-');
     // Ground sheets are one-sided (the package winds them face up): an underside seen past a hillside edge is never drawn.
-    for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) material.side = FrontSide;
+    for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      material.side = FrontSide;
+      if (mesh === fillerGround) { material.polygonOffset = true; material.polygonOffsetFactor = 1; material.polygonOffsetUnits = 1; }
+    }
   });
   // Convert the native left-handed frame once, including meshes, car bodies and trails.
   // Camera targets/offsets use the same reflection. Mirroring only terrain misaligns poses.
   const world = new Group(); world.scale.z = -1; world.add(gltf.scene, barriers); scene.add(world);
-  const environment = addSceneEnvironment(scene, renderer, metadata.bounds.min[1] - origin.y);
   const display = track?.display ?? null, roadBounds = activeRoadBounds(display?.surfaces.road ?? [], metadata.bounds);
   const activeRoad = rasterizeActiveRoad(display?.surfaces.road ?? [], roadBounds);
   applyActiveRoad(gltf.scene, activeRoad, roadBounds);
   scene.add(makeBrakeBoards(display?.brakeMarkers ?? [], trajectory.points, origin, surfaceHeight, boardArtwork));
   if (track) world.add(makeTrackLimits([track.geometry.leftBoundary, track.geometry.rightBoundary], trajectory.points, origin, surfaceHeight));
   world.add(layer.root);
-  const perspective = new PerspectiveCamera(48, 1, 0.2, 30000);
-  const overhead = new OrthographicCamera(-80, 80, 80, -80, 0.2, 30000);
+  const perspective = new PerspectiveCamera(48, 1, 0.5, 15000);
+  const overhead = new OrthographicCamera(-80, 80, 80, -80, 0.5, 15000);
   let camera: PerspectiveCamera | OrthographicCamera = perspective;
   const controls = new OrbitControls<PerspectiveCamera | OrthographicCamera>(camera, renderer.domElement);
   controls.enableDamping = false; controls.enablePan = false; controls.maxPolarAngle = Math.PI * 0.49; controls.minDistance = MIN_CAMERA_DISTANCE; controls.maxDistance = MAX_CAMERA_DISTANCE;
   // Replay owns Left/Right; WASD camera pan is dispatched through the shared shortcut guard.
   let mode: CameraMode = 'follow', frame = 0, disposed = false, initialized = false, currentYaw = 0, currentTime = 0;
+  const syncCockpitVisibility = () => {
+    layer.primary.traverse(obj => {
+      if (obj.name === 'cabin' || obj.name === 'glass') obj.visible = mode !== 'cockpit';
+    });
+  };
+  syncCockpitVisibility();
   let currentOrientation: Quaternion | undefined;
   const target = new Vector3(), previousTarget = new Vector3();
   const chaseTracker = createChaseCameraTracker();
@@ -205,6 +221,7 @@ export async function createReplayScene(
       if (disposed || signal?.aborted || request !== lapRequest) { replacement.dispose(); return false; }
       replacement.colorLines(lineMode); replacement.fadeLines(primaryOpacity, baselineOpacity);
       layer.dispose(); layer = replacement; world.add(layer.root);
+      syncCockpitVisibility();
       trackside = createTracksideCameras(next.points, layer.primaryDistances, origin);
       return true;
     },
@@ -222,9 +239,6 @@ export async function createReplayScene(
       currentTime = (sample.timeSec ?? pose.index / 40) + ((nextSample?.timeSec ?? sample.timeSec ?? 0) - (sample.timeSec ?? 0)) * pose.fraction;
       primary.getObjectByName('body-envelope')!.visible = pose.yaw !== undefined;
       primary.getObjectByName('pose-marker')!.visible = pose.yaw === undefined;
-      primary.traverse(obj => {
-        if (obj.name === 'cabin' || obj.name === 'glass') obj.visible = mode !== 'cockpit';
-      });
 
       const station = (primaryDistances[index] ?? 0) + ((primaryDistances[index + 1] ?? primaryDistances[index] ?? 0) - (primaryDistances[index] ?? 0)) * fraction;
       const other = baseline ? sampleStationPose(baseline.points, baselineDistances, station) : null;
@@ -265,9 +279,7 @@ export async function createReplayScene(
       camera = mode === 'top' ? overhead : perspective; controls.object = camera;
       controls.enabled = mode !== 'cockpit';
       if (wasCockpit && mode !== 'cockpit') camera.up.set(0, 1, 0);
-      layer.primary.traverse(obj => {
-        if (obj.name === 'cabin' || obj.name === 'glass') obj.visible = mode !== 'cockpit';
-      });
+      syncCockpitVisibility();
 
       // Follow, chase, cockpit and trackside stay locked on the car; panning belongs to orbit and overhead.
       controls.enablePan = mode === 'orbit' || mode === 'top';
@@ -313,7 +325,7 @@ export async function createReplayScene(
     dispose() {
       disposed = true; cancelAnimationFrame(frame); observer.disconnect(); controls.dispose();
       renderer.domElement.removeEventListener('webglcontextlost', contextLost);
-      document.removeEventListener('visibilitychange', invalidate); disposeObjects(scene); activeRoad?.dispose(); environment.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
+      document.removeEventListener('visibilitychange', invalidate); disposeObjects(scene, true); activeRoad?.dispose(); environment.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
     },
   };
 }

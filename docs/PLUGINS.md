@@ -255,10 +255,10 @@ The `glass` material role denotes exterior cabin windows, including exact source
 window variants. It uses simplified dark opaque shading. Source glass transparency, tint,
 reflection/transmission shaders and alpha-masked light-cover overlays are not reproduced.
 
-Vehicle packages should supply outward CCW faces, float32 `NORMAL` attributes aligned with
+Vehicle packages must supply outward CCW faces, unit float32 `NORMAL` attributes aligned with
 `POSITION`, and PBR roughness/metalness for each material role. The viewer preserves these
 properties: it does not reverse faces, regenerate normals or override primary material roles.
-Rebuild older exports without normals in the pipeline; the app does not repair them at runtime.
+Rebuild older exports without normals in the pipeline; the validator rejects vehicle GLBs without finite unit normals.
 The visible Three.js daylight sky also supplies the shared prefiltered reflection environment;
 the directional sun supplies direct lighting and shadows. No separate car reflection texture
 or per-car brightness correction is applied. This is simplified daylight, not LMU's renderer.

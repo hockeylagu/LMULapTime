@@ -7,6 +7,7 @@ interface WheelPart {
   normal: BufferAttribute | InterleavedBufferAttribute | null;
   indices: number[][];
   bounds: Box3[];
+  assigned: number | null;
 }
 const CORNERS = ['FL', 'FR', 'RL', 'RR'];
 const cornerAt = (x: number, z: number) => (z < 0 ? 0 : 2) + (x > 0 ? 0 : 1);
@@ -48,7 +49,7 @@ export function attachWheelRigs(envelope: Group): WheelRig[] {
     if (tyre) bounds.forEach((box, corner) => tyreBounds[corner].union(box));
     parts.push({mesh: object as Mesh<BufferGeometry, Material>, position,
       normal: normal instanceof BufferAttribute || normal instanceof InterleavedBufferAttribute ? normal : null,
-      indices, bounds});
+      indices, bounds, assigned});
   }
   if (namedParts.size && namedParts.size !== 8) return [];
   const rigs: WheelRig[] = [];
@@ -65,10 +66,17 @@ export function attachWheelRigs(envelope: Group): WheelRig[] {
   for (const part of parts) {
     for (const rig of rigs) {
       if (!part.indices[rig.corner].length) continue;
-      const geometry = new BufferGeometry(); geometry.setAttribute('position', part.position);
-      if (part.normal) geometry.setAttribute('normal', part.normal);
-      geometry.setIndex(part.indices[rig.corner]);
-      geometry.boundingBox = part.bounds[rig.corner]; geometry.boundingSphere = geometry.boundingBox.getBoundingSphere(new Sphere());
+      let geometry: BufferGeometry;
+      if (part.assigned !== null) {
+        geometry = part.mesh.geometry;
+        geometry.boundingBox = part.bounds[rig.corner];
+        geometry.boundingSphere = geometry.boundingBox.getBoundingSphere(new Sphere());
+      } else {
+        geometry = new BufferGeometry(); geometry.setAttribute('position', part.position);
+        if (part.normal) geometry.setAttribute('normal', part.normal);
+        geometry.setIndex(part.indices[rig.corner]);
+        geometry.boundingBox = part.bounds[rig.corner]; geometry.boundingSphere = geometry.boundingBox.getBoundingSphere(new Sphere());
+      }
       const mesh = new Mesh(geometry, part.mesh.material); mesh.name = part.mesh.name.endsWith(`-${CORNERS[rig.corner]}`) ? part.mesh.name : `${part.mesh.name}-${CORNERS[rig.corner]}`;
       mesh.renderOrder = part.mesh.renderOrder;
       mesh.position.copy(rig.hub).negate(); rig.pivot.add(mesh);

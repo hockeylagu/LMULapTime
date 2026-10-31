@@ -9,8 +9,8 @@ import type { SurfaceHeight } from './surfaceProjection.js';
 /** Ribbon width: wide enough to read from chase height, narrow enough to show the line through a corner. */
 export const RACING_LINE_WIDTH_M = 0.6;
 /** The comparison lap lies on top, narrower, so both lines stay visible where they overlap. */
-export const BASELINE_LINE = {widthM: 0.3, liftM: 0.07};
-const LIFT_M = 0.04;
+export const BASELINE_LINE = {widthM: 0.3, liftM: 0.015};
+const LIFT_M = 0.01;
 
 /** Per-point line colours, the same as the 2D map's heat-map modes (deltas need a comparison lap). */
 export function racingLineColors(lap: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null, colorBy: MapColorMode): {primary: string[]; baseline: string[]} {
@@ -54,6 +54,7 @@ export function makeRacingLine(lap: ReplayTrajectoryData, origin: Vector3, color
   // Unlit, so pedal/speed colours read exactly as on the 2D map; the offset keeps it above the road it lies on.
   const line = new Mesh(geometry, new MeshBasicMaterial({vertexColors: true, side: DoubleSide, transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2}));
   line.name = 'racing-line';
+  line.renderOrder = liftM > LIFT_M ? 3 : 2;
   colorRacingLine(line, colors);
   return line;
 }

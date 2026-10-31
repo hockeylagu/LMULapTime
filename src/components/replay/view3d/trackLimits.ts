@@ -158,5 +158,6 @@ export function makeTrackLimits(boundaries: Array<Array<[number, number]>>, lap:
   // Below the racing line's offset, above the road and kerbs it lies on.
   const lines = new Mesh(geometry, new MeshBasicMaterial({color: '#f4f4ef', side: DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1}));
   lines.name = 'track-limits';
+  lines.renderOrder = 1;
   return lines;
 }

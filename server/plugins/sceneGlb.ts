@@ -86,20 +86,30 @@ export function validateSceneGlb(bytes: Buffer, wheelPivots = false): { triangle
     return { count, components, componentType: accessor.componentType, offset: view.offset + offset };
   });
   const materials = list(json.materials, 32);
+  if (wheelPivots && materials.some(material => record(material).doubleSided === true)) throw Error('Invalid GLB material side');
   const meshes = list(json.meshes, 32);
   let triangles = 0, visitedVertices = 0;
   const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
-  // Primitives may share one position accessor: budget and scan its vertices once.
-  const scannedPositions = new Set<number>();
+  // Primitives may share one position/normal accessor: budget and scan its vertices once.
+  const scannedPositions = new Set<number>(), scannedNormals = new Set<number>();
   for (const mesh of meshes) for (const item of list(record(mesh).primitives, 32)) {
     const primitive = record(item), attributes = record(primitive.attributes);
     const allowedAttributes = wheelPivots ? ['POSITION', 'NORMAL', 'TEXCOORD_0'] : ['POSITION'];
     if (Object.keys(attributes).some(key => !allowedAttributes.includes(key)) || (primitive.mode !== undefined && primitive.mode !== 4) || primitive.targets) throw Error('Unsupported GLB primitive');
     integer(primitive.material, materials.length - 1);
     const positionIndex = integer(attributes.POSITION, accessors.length - 1), position = accessors[positionIndex];
+    if (wheelPivots && attributes.NORMAL === undefined) throw Error('Missing GLB normals');
     if (attributes.NORMAL !== undefined) {
-      const normal = accessors[integer(attributes.NORMAL, accessors.length - 1)];
+      const normalIndex = integer(attributes.NORMAL, accessors.length - 1), normal = accessors[normalIndex];
       if (normal.components !== 3 || normal.componentType !== 5126 || normal.count !== position.count) throw Error('Invalid GLB normals');
+      if (!scannedNormals.has(normalIndex)) {
+        scannedNormals.add(normalIndex);
+        for (let i = 0; i < normal.count; i++) {
+          const offset = normal.offset + i * 12;
+          const nx = bin.readFloatLE(offset), ny = bin.readFloatLE(offset + 4), nz = bin.readFloatLE(offset + 8);
+          if (!Number.isFinite(nx + ny + nz) || Math.abs(Math.hypot(nx, ny, nz) - 1) > 0.02) throw Error('Invalid GLB normals');
+        }
+      }
     }
     if (attributes.TEXCOORD_0 !== undefined) {
       const texcoord = accessors[integer(attributes.TEXCOORD_0, accessors.length - 1)];
