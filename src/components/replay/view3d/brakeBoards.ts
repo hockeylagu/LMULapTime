@@ -17,15 +17,55 @@ function labelTexture(label: string, distance: boolean): CanvasTexture | null {
   const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = distance ? 456 : 160;
   const context = canvas.getContext('2d');
   if (!context) return null;
-  context.fillStyle = distance ? '#eceeee' : '#1f2933'; context.fillRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = distance ? '#16191c' : '#f8f9fa'; context.textAlign = 'center'; context.textBaseline = 'middle';
+  
   if (distance) {
-    // One digit per row, as on the real boards.
-    const digits = label.split(''), row = canvas.height / Math.max(3, digits.length);
-    context.font = `bold ${Math.round(row * 0.9)}px "Arial Narrow", Arial, sans-serif`;
-    digits.forEach((digit, i) => context.fillText(digit, 128, row * (i + 0.5) + (canvas.height - row * digits.length) / 2));
+    // Official FIA distance board: high-contrast white panel, red top stripe, stacked black digits, dark outer border.
+    context.fillStyle = '#f8f9fa'; context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = '#dc2626'; context.fillRect(0, 0, canvas.width, 18);
+    context.strokeStyle = '#181a1d'; context.lineWidth = 8; context.strokeRect(4, 4, canvas.width - 8, canvas.height - 8);
+    context.fillStyle = '#111315'; context.textAlign = 'center'; context.textBaseline = 'middle';
+    const digits = label.split(''), row = (canvas.height - 24) / Math.max(3, digits.length);
+    context.font = `bold ${Math.round(row * 0.92)}px "Arial Narrow", Arial, sans-serif`;
+    digits.forEach((digit, i) => context.fillText(digit, 128, 24 + row * (i + 0.5) + (canvas.height - 24 - row * digits.length) / 2));
   } else {
-    context.font = 'bold 64px sans-serif'; context.fillText(label, 128, 84, 236);
+    // Authentic sponsor ads board branding for trackside visual references.
+    const upper = label.toUpperCase();
+    if (upper.includes('DHL')) {
+      context.fillStyle = '#ffcc00'; context.fillRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = '#d40511';
+      context.fillRect(16, 20, 36, 12); context.fillRect(204, 128, 36, 12);
+      context.font = 'italic bold 76px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
+      context.fillText('DHL', 128, 80);
+    } else if (upper.includes('MOTUL')) {
+      context.fillStyle = '#dc2626'; context.fillRect(0, 0, canvas.width, canvas.height);
+      context.strokeStyle = '#ffffff'; context.lineWidth = 6; context.strokeRect(10, 10, canvas.width - 20, canvas.height - 20);
+      context.fillStyle = '#ffffff'; context.font = 'bold 54px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
+      context.fillText('MOTUL', 128, 80);
+    } else if (upper.includes('ROLX') || upper.includes('ROLEX')) {
+      context.fillStyle = '#006039'; context.fillRect(0, 0, canvas.width, canvas.height);
+      context.strokeStyle = '#c5a059'; context.lineWidth = 4; context.strokeRect(8, 8, canvas.width - 16, canvas.height - 16);
+      context.fillStyle = '#c5a059'; context.font = 'bold 50px serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
+      context.fillText('ROLEX', 128, 82);
+    } else if (upper.includes('MICH')) {
+      context.fillStyle = '#00205b'; context.fillRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = '#ffde00'; context.fillRect(12, 134, canvas.width - 24, 10);
+      context.fillStyle = '#ffde00'; context.font = 'italic bold 44px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
+      context.fillText('MICHELIN', 128, 72);
+    } else if (upper.includes('TOT')) {
+      context.fillStyle = '#003380'; context.fillRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = '#e52421'; context.fillRect(12, 134, canvas.width - 24, 10);
+      context.fillStyle = '#ffffff'; context.font = 'bold 46px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
+      context.fillText('TOTAL', 128, 72);
+    } else if (upper.includes('GY') || upper.includes('GOODYEAR')) {
+      context.fillStyle = '#002b66'; context.fillRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = '#ffd100'; context.font = 'bold italic 42px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
+      context.fillText('GOODYEAR', 128, 80);
+    } else {
+      context.fillStyle = '#1e293b'; context.fillRect(0, 0, canvas.width, canvas.height);
+      context.fillStyle = '#38bdf8'; context.fillRect(0, 0, canvas.width, 8);
+      context.fillStyle = '#f8fafc'; context.font = 'bold 56px sans-serif'; context.textAlign = 'center'; context.textBaseline = 'middle';
+      context.fillText(label, 128, 84, 236);
+    }
   }
   const texture = new CanvasTexture(canvas); texture.colorSpace = SRGBColorSpace; texture.anisotropy = 8;
   return texture;
@@ -51,6 +91,7 @@ export function makeBrakeBoards(markers: TrackBrakeMarker[], points: ReplayTraje
   const boards = new Group(); boards.name = 'brake-boards';
   const frame = new MeshStandardMaterial({color: '#2b3038', roughness: 0.8});
   const steel = new MeshStandardMaterial({color: '#a9aeb3', roughness: 0.5, metalness: 0.6});
+  const concrete = new MeshStandardMaterial({color: '#64748b', roughness: 0.92, metalness: 0.05});
   const textures = new Map<string, Texture | null>();
   const byMarker = new Map(artwork.flatMap(row => row.metadata.markerIds.map(id => [id, row] as const)));
   for (const marker of markers) {
@@ -78,11 +119,41 @@ export function makeBrakeBoards(markers: TrackBrakeMarker[], points: ReplayTraje
     const back = new Mesh(new BoxGeometry(size.widthM + 0.06, size.heightM + 0.06, 0.04), distance ? steel : frame);
     back.position.set(0, centreY, 0);
     board.add(back, face);
-    // Two posts under the panel, to the ground.
+
+    // Two ground-penetrating posts under the panel, anchored into concrete footings.
+    // Penetrates 1.2m into the terrain so posts never float on slopes or banked verges.
+    const PENETRATION_M = 1.2;
+    const totalPostH = size.liftM + 0.2 + PENETRATION_M;
+    const postCenterY = (size.liftM + 0.2 - PENETRATION_M) / 2;
+
     for (const side of [-1, 1]) {
-      const post = new Mesh(new BoxGeometry(0.07, size.liftM + 0.2, 0.07), steel);
-      post.position.set(side * size.widthM * 0.3, (size.liftM + 0.2) / 2, -0.06); board.add(post);
+      const post = new Mesh(new BoxGeometry(0.07, totalPostH, 0.07), steel);
+      post.position.set(side * size.widthM * 0.3, postCenterY, -0.06);
+      board.add(post);
+
+      // Concrete foundation footing at ground level
+      const pad = new Mesh(new BoxGeometry(0.22, 0.14, 0.22), concrete);
+      pad.position.set(side * size.widthM * 0.3, 0.07, -0.06);
+      board.add(pad);
+
+      // Diagonal rear kickstand brace (A-frame wind brace anchoring to ground)
+      if (size.liftM >= 0.35) {
+        const braceReachZ = Math.min(0.85, size.liftM * 0.9);
+        const braceLen = Math.hypot(size.liftM * 0.8, braceReachZ);
+        const brace = new Mesh(new BoxGeometry(0.05, braceLen, 0.05), steel);
+        brace.position.set(side * size.widthM * 0.3, size.liftM * 0.4, -0.06 - braceReachZ / 2);
+        brace.rotation.x = -Math.atan2(braceReachZ, size.liftM * 0.8);
+        board.add(brace);
+      }
     }
+
+    // Horizontal mounting rails behind the panel
+    for (const h of [centreY - size.heightM * 0.28, centreY + size.heightM * 0.28]) {
+      const rail = new Mesh(new BoxGeometry(size.widthM * 0.88, 0.04, 0.04), steel);
+      rail.position.set(0, h, -0.04);
+      board.add(rail);
+    }
+
     board.traverse(object => { if (object instanceof Mesh) object.castShadow = true; });
     board.position.set(...nativeToScene({x, y: ground, z}, origin));
     // Scene Z is native -Z; the face points back along the scene travel direction.

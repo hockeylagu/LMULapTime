@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { fetchVehicleLivery } from '../../src/api/vehicleLiveryApi.js';
-import type { VehicleLiveryResource } from '../../shared/types/scenes/vehicleLivery.js';
+import { fetchVehicleLivery } from '../../../src/api/vehicles/vehicleLiveryApi.js';
+import type { VehicleLiveryResource } from '../../../shared/types/scenes/vehicleLivery.js';
 
 afterEach(() => vi.restoreAllMocks());
 

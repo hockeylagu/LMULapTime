@@ -15,6 +15,9 @@ export function disposeObjects(root: Object3D, includeShared = false): void {
     if ('map' in material && material.map instanceof Texture) {
       if (includeShared || material.map.userData?.sharedAsset !== true) textures.add(material.map as Texture);
     }
+    if ('normalMap' in material && material.normalMap instanceof Texture) {
+      if (includeShared || material.normalMap.userData?.sharedAsset !== true) textures.add(material.normalMap as Texture);
+    }
     material.dispose();
   });
   textures.forEach(texture => texture.dispose());

@@ -1,5 +1,5 @@
 import {MeshoptDecoder} from 'meshoptimizer/decoder';
-import { BufferGeometry, FrontSide, Group, Mesh, type Material, OrthographicCamera, PerspectiveCamera, Quaternion, Scene, Vector3, WebGLRenderer, type Object3D } from 'three';
+import { BufferGeometry, FrontSide, Group, Mesh, MeshStandardMaterial, type Material, OrthographicCamera, PerspectiveCamera, Quaternion, Scene, Vector3, WebGLRenderer, type Object3D } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { TrackSceneResource } from '../../../../shared/types/scenes/trackScene.js';
@@ -16,12 +16,14 @@ import { prepareSurfaceLayers } from './surfaceProjection.js';
 import { MIN_CAMERA_DISTANCE, MAX_CAMERA_DISTANCE, panCamera, zoomCamera } from './cameraNavigation.js';
 import type { CameraMode } from './cameraModes.js';
 import { computeCockpitPose, createChaseCameraTracker, trackCamera } from './cameraTracking.js';
-import { addSceneEnvironment } from './sceneEnvironment.js';
+import { addSceneEnvironment, TERRAIN_COLOR } from './sceneEnvironment.js';
 import { makeBrakeBoards } from './brakeBoards.js';
 import type { LoadedBrakeBoardArtwork } from '../../../api/scenes/brakeBoardArtworkApi.js';
 import { activeRoadBounds, applyActiveRoad, rasterizeActiveRoad } from './activeRoad.js';
 import type { TrackBoundaryGeometry, TrackMapDisplay } from '../../../../shared/types/trackGeometry.js';
 import { makeTrackLimits } from './trackLimits.js';
+import { applyTrackTextures } from './trackTextures.js';
+import type { LoadedTrackTexture } from '../../../api/scenes/trackTextureApi.js';
 
 /** Eye height kept above the road, filler ground and horizon ground. */
 const CAMERA_CLEARANCE_M = 1.2;
@@ -87,6 +89,7 @@ export async function createReplayScene(
   track: {geometry: TrackBoundaryGeometry; display: TrackMapDisplay | null} | null = null,
   colorBy: MapColorMode = 'default',
   boardArtwork: LoadedBrakeBoardArtwork[] = [],
+  trackTextures: LoadedTrackTexture[] = [],
 ): Promise<ReplaySceneHandle> {
   const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(bytes, '');
   const origin = new Vector3(...metadata.bounds.min).add(new Vector3(...metadata.bounds.max)).multiplyScalar(0.5);
@@ -111,13 +114,17 @@ export async function createReplayScene(
     if (!mesh.geometry.getAttribute('normal')) mesh.geometry.computeVertexNormals();
     mesh.receiveShadow = mesh !== fillerGround;
     // Raised kerbs throw a strip of shade on the road; flat sheets would only cost shadow-map time.
-    mesh.castShadow = mesh.name === 'kerb' || mesh.name.startsWith('kerb-source-');
+    mesh.castShadow = mesh.name === 'kerb' || mesh.name.startsWith('kerb-source-') || /curb|kerb/i.test(mesh.name);
     // Ground sheets are one-sided (the package winds them face up): an underside seen past a hillside edge is never drawn.
     for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
       material.side = FrontSide;
-      if (mesh === fillerGround) { material.polygonOffset = true; material.polygonOffsetFactor = 1; material.polygonOffsetUnits = 1; }
+      if (mesh === fillerGround) {
+        material.polygonOffset = true; material.polygonOffsetFactor = 1; material.polygonOffsetUnits = 1;
+        if (material instanceof MeshStandardMaterial) material.color.set(TERRAIN_COLOR);
+      }
     }
   });
+  applyTrackTextures(gltf.scene, trackTextures);
   // Convert the native left-handed frame once, including meshes, car bodies and trails.
   // Camera targets/offsets use the same reflection. Mirroring only terrain misaligns poses.
   const world = new Group(); world.scale.z = -1; world.add(gltf.scene, barriers); scene.add(world);

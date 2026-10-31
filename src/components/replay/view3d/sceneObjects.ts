@@ -14,7 +14,15 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
 import { defaultVehicleSize } from '../../../../shared/domain/vehicleDimensions.js';
 
-export function makeCar(trajectory: ReplayTrajectoryData, color: string, ghost: boolean, model: Group | null = null, liveryTexture: Texture | null = null): Group {
+export function makeCar(
+  trajectory: ReplayTrajectoryData,
+  color: string,
+  ghost: boolean,
+  model: Group | null = null,
+  liveryTexture: Texture | null = null,
+  rimTexture: Texture | null = null,
+  tyreTexture: Texture | null = null
+): Group {
   const car = new Group(), dimensions = trajectory.vehicleData?.dimensions ?? defaultVehicleSize(trajectory.vehicleIdentity?.carClass);
   const material = new MeshStandardMaterial({ color, transparent: ghost, opacity: ghost ? 0.5 : 1, depthWrite: !ghost, roughness: 0.35 });
   const envelope = model ? model.clone(true) : new Group();
@@ -35,6 +43,16 @@ export function makeCar(trajectory: ReplayTrajectoryData, color: string, ghost: 
             copy.color.set(liveryTexture && hasUv ? '#ffffff' : color);
           } else if (copy.name === 'body') {
             copy.color.set(color);
+          } else if (copy.name === 'rims' || mesh.name.startsWith('rims-')) {
+            if (rimTexture && hasUv) {
+              copy.map = rimTexture;
+              copy.color.set('#ffffff');
+            }
+          } else if (copy.name === 'tyres' || mesh.name.startsWith('tyres-')) {
+            if (tyreTexture && hasUv) {
+              copy.map = tyreTexture;
+              copy.color.set('#ffffff');
+            }
           }
         }
         copy.transparent = ghost; copy.opacity = ghost ? 0.45 : 1; copy.depthWrite = !ghost;

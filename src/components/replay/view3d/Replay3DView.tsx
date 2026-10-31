@@ -110,6 +110,7 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
       <div className="relative flex-1 min-h-0 overflow-hidden">
         <div ref={host} tabIndex={0} onPointerDown={event => event.currentTarget.focus({preventScroll: true})}
           aria-label="3D track. Drag to orbit, scroll to zoom. Left/Right: step replay. WASD: pan camera." className="relative w-full h-full outline-none" />
+        <div className="pointer-events-none absolute inset-0 shadow-[inset_0_0_24px_rgba(6,9,16,0.35)]" />
         <GpsCircuitMinimap trackBoundaryPathD={trackBoundaryPathD} layoutPathD={trackBoundaryPathD} currentPos={currentPos} baselineGhostPos={baselineGhostPos} isExpanded={isExpanded}
           className="rounded-xl border border-lmu-border bg-lmu-strip/70 p-2" />
         <MapControlsOverlay onZoomIn={() => scene.current?.zoom(1)} onZoomOut={() => scene.current?.zoom(-1)} onReset={() => scene.current?.reset()}

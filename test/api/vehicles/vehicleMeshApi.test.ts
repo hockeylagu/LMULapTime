@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { fetchVehicleMesh } from '../../src/api/vehicleMeshApi.js';
-import type { VehicleMeshResource } from '../../shared/types/scenes/vehicleMesh.js';
+import { fetchVehicleMesh } from '../../../src/api/vehicles/vehicleMeshApi.js';
+import type { VehicleMeshResource } from '../../../shared/types/scenes/vehicleMesh.js';
 
 afterEach(() => vi.restoreAllMocks());
 const metadata: VehicleMeshResource = {schemaVersion: 1, vehicleRecordId: 'car-a', coordinates: 'vehicle-local-xyz-metres-forward-minus-z', representation: 'render', originCalibration: 'unverified', parts: ['body', 'tyres'],

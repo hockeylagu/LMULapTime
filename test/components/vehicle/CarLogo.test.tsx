@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { CarLogo } from '../../../src/components/vehicle/CarLogo.js';
 import { useVehicleLogos } from '../../../src/components/vehicle/useVehicleLogos.js';
-import * as vehicleLogosApi from '../../../src/api/vehicleLogosApi.js';
+import * as vehicleLogosApi from '../../../src/api/vehicles/vehicleLogosApi.js';
 
 describe('CarLogo component', () => {
   beforeEach(() => {

@@ -2,7 +2,7 @@ import { useState, useEffect, useEffectEvent, useCallback, useRef, startTransiti
 import type { AppStatus, ScanStatus } from '../../shared/types/index.js';
 import { fetchJson, postJson, isAbortError, apiErrorMessage } from './apiClient.js';
 import { invalidateReferenceLaptimes } from './referenceApi.js';
-import { setVehicleLogoSource } from './vehicleLogosApi.js';
+import { setVehicleLogoSource } from './vehicles/vehicleLogosApi.js';
 import { isDemoMode } from './anonymizeData.js';
 import { useAppEvents } from './useAppEvents.js';
 

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vite
 import { act, renderHook } from '@testing-library/react';
 import { serverRetryDelay, useAppData } from '../../src/api/useAppData.js';
 import type { ReferenceBenchmarkDiff, ScanStatus } from '../../shared/types/index.js';
-import { getCachedVehicleLogos, setCachedVehicleLogos } from '../../src/api/vehicleLogosApi.js';
+import { getCachedVehicleLogos, setCachedVehicleLogos } from '../../src/api/vehicles/vehicleLogosApi.js';
 
 const idle = (revision = 'server:0'): ScanStatus => ({ running: false, processed: 0, total: 0, currentFile: null,
   startedAt: null, finishedAt: null, result: null, error: null, dataRevision: revision,

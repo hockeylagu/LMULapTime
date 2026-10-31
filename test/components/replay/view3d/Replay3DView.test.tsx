@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import Replay3DView from '../../../../src/components/replay/view3d/Replay3DView.js';
 import { createReplayScene } from '../../../../src/components/replay/view3d/replayScene.js';
 import { fetchTrackScene } from '../../../../src/api/trackSceneApi.js';
-import { fetchVehicleMesh } from '../../../../src/api/vehicleMeshApi.js';
+import { fetchVehicleMesh } from '../../../../src/api/vehicles/vehicleMeshApi.js';
 import { CAMERA_MODES } from '../../../../src/components/replay/view3d/cameraModes.js';
 import { ReplayShortcutHelp } from '../../../../src/components/replay/ReplayShortcutHelp.js';
 import { replayShortcutBlocked } from '../../../../src/utils/replayShortcuts.js';
@@ -13,7 +13,7 @@ import { createPlaybackCursor, ReplayPlaybackCursorContext } from '../../../../s
 const scene = vi.hoisted(() => ({wheelMotion: 'Replay-estimated wheel roll', cursor: vi.fn(), mode: vi.fn(), reset: vi.fn(), center: vi.fn(), zoom: vi.fn(), pan: vi.fn(), dispose: vi.fn(), colorLines: vi.fn(), fadeLines: vi.fn(), updateLaps: vi.fn(async () => true)}));
 vi.mock('../../../../src/components/replay/view3d/replayScene.js', () => ({createReplayScene: vi.fn(async () => scene)}));
 vi.mock('../../../../src/api/trackSceneApi.js', () => ({fetchTrackScene: vi.fn(async () => ({metadata: {sourceGeometryRevision: 'g'}, bytes: new ArrayBuffer(0)}))}));
-vi.mock('../../../../src/api/vehicleMeshApi.js', () => ({fetchVehicleMesh: vi.fn(async () => null)}));
+vi.mock('../../../../src/api/vehicles/vehicleMeshApi.js', () => ({fetchVehicleMesh: vi.fn(async () => null)}));
 const boards = vi.hoisted(() => [{id: 'b', center: [3, 0] as [number, number], label: '100', stationM: 3, side: 'left' as const}]);
 vi.mock('../../../../src/api/trackGeometryApi.js', () => ({
   loadTrackBoundaryGeometry: vi.fn(async () => ({geometryRevision: 'g'})),
@@ -58,7 +58,7 @@ it('applies the latest laps if selection changes while the initial scene is stil
   await act(async () => release(scene));
   await waitFor(() => expect(screen.getByTestId('replay-3d-toolbar').title).toContain('Ghost: Estimated body'));
   expect(createReplayScene).toHaveBeenCalledOnce(); expect(fetchTrackScene).toHaveBeenCalledOnce();
-  expect(scene.updateLaps).toHaveBeenCalledWith(next, comparison, {primary: null, baseline: null, primaryLivery: null, baselineLivery: null}, expect.any(AbortSignal));
+  expect(scene.updateLaps).toHaveBeenCalledWith(next, comparison, {primary: null, baseline: null, primaryLivery: null, baselineLivery: null, primaryWheels: null, baselineWheels: null}, expect.any(AbortSignal));
   expect(scene.dispose).not.toHaveBeenCalled();
 });
 

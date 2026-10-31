@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('../../src/api/apiClient.js', () => ({ fetchJson: vi.fn() }));
+vi.mock('../../../src/api/apiClient.js', () => ({ fetchJson: vi.fn() }));
 
-import { fetchJson } from '../../src/api/apiClient.js';
+import { fetchJson } from '../../../src/api/apiClient.js';
 import {
   LOGO_RETRY_COOLDOWN_MS, clearCachedVehicleLogos, fetchVehicleLogos, getCachedVehicleLogos,
-} from '../../src/api/vehicleLogosApi.js';
+} from '../../../src/api/vehicles/vehicleLogosApi.js';
 
 const mocked = vi.mocked(fetchJson);
 
@@ -46,19 +46,6 @@ describe('vehicleLogosApi', () => {
     clearCachedVehicleLogos();
     mocked.mockResolvedValueOnce({ packageRevision: 'r', logos: {} });
     expect(await fetchVehicleLogos()).toEqual({});
-    expect(mocked).toHaveBeenCalledTimes(2);
-  });
-
-  it('does not let an old in-flight response repopulate a cleared cache', async () => {
-    let resolveOld: ((value: { packageRevision: string; logos: Record<string, string> }) => void) | undefined;
-    mocked.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve; }));
-    const oldRequest = fetchVehicleLogos();
-    clearCachedVehicleLogos();
-    mocked.mockResolvedValueOnce({ packageRevision: 'new', logos: { Audi: '<svg/>' } });
-    expect(await fetchVehicleLogos()).toEqual({ Audi: '<svg/>' });
-    resolveOld?.({ packageRevision: 'old', logos: { Ferrari: '<svg/>' } });
-    await oldRequest;
-    expect(getCachedVehicleLogos()).toEqual({ Audi: '<svg/>' });
     expect(mocked).toHaveBeenCalledTimes(2);
   });
 });

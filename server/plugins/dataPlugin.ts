@@ -14,8 +14,12 @@ import type { VehicleMesh, VehicleMeshResource } from '../../shared/types/scenes
 import type { TrackSceneResource } from '../../shared/types/scenes/trackScene.js';
 import type { BrakeBoardArtworkResource } from '../../shared/types/scenes/brakeBoardArtwork.js';
 import type { VehicleLiveryResource } from '../../shared/types/scenes/vehicleLivery.js';
+import type { TrackTextureResource } from '../../shared/types/scenes/trackTexture.js';
 import { loadBoardArtwork, readBoardArtwork, type RegisteredBoardArtwork } from './brakeBoardArtwork.js';
 import { loadVehicleLiveryPackage, readVehicleLivery, type VehicleLiveriesStore } from './vehicleLiveryPackage.js';
+import { loadTrackTexturePackage, readTrackTexture, type TrackTexturesStore } from './trackTexturePackage.js';
+import { loadVehicleWheelPackage, readVehicleWheelTexture, type VehicleWheelsStore } from './vehicleWheelPackage.js';
+import type { VehicleWheelResource } from '../../shared/types/scenes/vehicleWheel.js';
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('Expected object');
@@ -144,6 +148,8 @@ export class DataPlugin {
   private vehicleMeshes = new Map<string, RegisteredMesh<VehicleMesh>>();
   private boardArtwork = new Map<string, RegisteredBoardArtwork[]>();
   private vehicleLiveries: VehicleLiveriesStore | null = null;
+  private trackTexturesStore: TrackTexturesStore | null = null;
+  private vehicleWheelsStore: VehicleWheelsStore | null = null;
   private root = '';
   public constructor(root?: string) {
     this.status = {state:root?'invalid':'absent',revision:'none',tracks:false,vehicles:false};
@@ -161,7 +167,7 @@ export class DataPlugin {
         const buffer=fs.readFileSync(file); digest.update(relative).update(buffer); return JSON.parse(buffer.toString('utf8'));
       };
       const manifest=object(read('manifest.json',64_000));
-      keys(manifest,['schemaVersion','id','version','tracks','vehicles', ...(manifest.schemaVersion === 2 ? ['scenes', 'vehicleMeshes', 'vehicleLiveries'] : [])]);
+      keys(manifest,['schemaVersion','id','version','tracks','vehicles', ...(manifest.schemaVersion === 2 ? ['scenes', 'vehicleMeshes', 'vehicleLiveries', 'vehicleWheels'] : [])]);
       if (manifest.schemaVersion!==1 && manifest.schemaVersion!==2) throw Error('Unsupported schema');
       const packageId = text(manifest.id), packageVersion = text(manifest.version);
       for (const capability of ['tracks','vehicles']) if (manifest[capability] !== undefined) object(manifest[capability]);
@@ -194,9 +200,10 @@ export class DataPlugin {
         }
       }
       if (manifest.scenes !== undefined) {
-        const scenes = object(manifest.scenes); keys(scenes, ['catalog', 'brakeBoardArtwork']);
+        const scenes = object(manifest.scenes); keys(scenes, ['catalog', 'brakeBoardArtwork', 'trackTextures']);
         this.scenes = loadScenePackage(base, read(text(scenes.catalog)), key => this.trackGeometry(key));
         if (scenes.brakeBoardArtwork !== undefined) this.boardArtwork = loadBoardArtwork(base, read(text(scenes.brakeBoardArtwork)), key => this.tracks.get(key) ?? null);
+        if (scenes.trackTextures !== undefined) this.trackTexturesStore = loadTrackTexturePackage(base, read(text(scenes.trackTextures)), this.tracks);
       }
       if (manifest.vehicleMeshes !== undefined) {
         const meshes = object(manifest.vehicleMeshes); keys(meshes, ['catalog']);
@@ -205,6 +212,11 @@ export class DataPlugin {
       if (manifest.vehicleLiveries !== undefined) {
         const liveries = object(manifest.vehicleLiveries); keys(liveries, ['catalog']);
         this.vehicleLiveries = loadVehicleLiveryPackage(base, read(text(liveries.catalog)), this.vehicleMeshes);
+      }
+      if (manifest.vehicleWheels !== undefined) {
+        const wheels = object(manifest.vehicleWheels); keys(wheels, ['catalog']);
+        const validIds = new Set([...this.records.map(r => r.id), ...this.vehicleMeshes.keys()]);
+        this.vehicleWheelsStore = loadVehicleWheelPackage(base, read(text(wheels.catalog)), validIds);
       }
       const totalBrakeBoards = [...this.boardArtwork.values()].reduce((sum, list) => sum + list.length, 0);
       this.status = {
@@ -218,6 +230,8 @@ export class DataPlugin {
         ...(this.scenes.size ? { scenes: true } : {}),
         ...(this.vehicleMeshes.size ? { vehicleMeshes: true } : {}),
         ...(this.vehicleLiveries && this.vehicleLiveries.size ? { vehicleLiveries: true } : {}),
+        ...(this.trackTexturesStore && this.trackTexturesStore.size ? { trackTextures: true } : {}),
+        ...(this.vehicleWheelsStore && this.vehicleWheelsStore.size ? { vehicleWheels: true } : {}),
         counts: {
           tracks: this.tracks.size,
           vehicles: this.records.length,
@@ -226,9 +240,11 @@ export class DataPlugin {
           ...(totalBrakeBoards > 0 ? { brakeBoards: totalBrakeBoards } : {}),
           ...(this.vehicleMeshes.size > 0 ? { vehicleMeshes: this.vehicleMeshes.size } : {}),
           ...(this.vehicleLiveries && this.vehicleLiveries.size > 0 ? { vehicleLiveries: this.vehicleLiveries.size } : {}),
+          ...(this.trackTexturesStore && this.trackTexturesStore.size > 0 ? { trackTextures: this.trackTexturesStore.size } : {}),
+          ...(this.vehicleWheelsStore && this.vehicleWheelsStore.size > 0 ? { vehicleWheels: this.vehicleWheelsStore.size } : {}),
         },
       };
-    } catch {this.tracks.clear(); this.records.length=0; this.logoRecords.clear(); this.scenes.clear(); this.vehicleMeshes.clear(); this.boardArtwork.clear(); this.vehicleLiveries = null; /* Generic status never discloses local paths. */}
+    } catch {this.tracks.clear(); this.records.length=0; this.logoRecords.clear(); this.scenes.clear(); this.vehicleMeshes.clear(); this.boardArtwork.clear(); this.vehicleLiveries = null; this.trackTexturesStore = null; this.vehicleWheelsStore = null; /* Generic status never discloses local paths. */}
   }
   public scene(key: string): TrackSceneResource | null {
     const registered = this.scenes.get(key);
@@ -271,6 +287,49 @@ export class DataPlugin {
     const row = this.vehicleLiveries?.get(liveryKey, revision);
     if (!row) return null;
     return readVehicleLivery(this.root, row);
+  }
+  public vehicleWheels(identity: string): VehicleWheelResource | null {
+    if (!this.vehicleWheelsStore) return null;
+    let row = this.vehicleWheelsStore.get(identity);
+    if (!row) {
+      const v = this.vehicle({ vehicleId: identity });
+      if (v) row = this.vehicleWheelsStore.get(v.id);
+    }
+    if (!row) return null;
+    return {
+      vehicleRecordId: row.vehicleRecordId,
+      rim: {
+        revision: row.rim.sha256,
+        width: row.rim.width,
+        height: row.rim.height,
+        byteLength: row.rim.byteLength,
+        sha256: row.rim.sha256,
+      },
+      tyre: {
+        revision: row.tyre.sha256,
+        width: row.tyre.width,
+        height: row.tyre.height,
+        byteLength: row.tyre.byteLength,
+        sha256: row.tyre.sha256,
+      },
+      packageRevision: this.status.revision,
+    };
+  }
+  public vehicleWheelAsset(sha256: string): Buffer | null {
+    const row = this.vehicleWheelsStore?.texture(sha256);
+    if (!row) return null;
+    return readVehicleWheelTexture(this.root, row);
+  }
+  public trackTextures(layoutKey: string): TrackTextureResource[] {
+    if (!this.trackTexturesStore) return [];
+    return this.trackTexturesStore.byLayout(layoutKey).map(row => {
+      const { asset: _asset, ...metadata } = row.metadata;
+      return { ...structuredClone(metadata), packageRevision: this.status.revision };
+    });
+  }
+  public trackTextureAsset(layoutKey: string, textureKey: string, revision: string): Buffer | null {
+    const row = this.trackTexturesStore?.get(layoutKey, textureKey, revision);
+    return row ? readTrackTexture(this.root, row) : null;
   }
   public track(key:string) {const row=this.tracks.get(key);return row?structuredClone(row):null;}
   public trackKeys(): string[] { return Array.from(this.tracks.keys()); }

@@ -5,6 +5,7 @@ interface WheelPart {
   mesh: Mesh<BufferGeometry, Material>;
   position: BufferAttribute | InterleavedBufferAttribute;
   normal: BufferAttribute | InterleavedBufferAttribute | null;
+  uv: BufferAttribute | InterleavedBufferAttribute | null;
   indices: number[][];
   bounds: Box3[];
   assigned: number | null;
@@ -34,7 +35,9 @@ export function attachWheelRigs(envelope: Group): WheelRig[] {
     if (!(object.geometry instanceof BufferGeometry) || Array.isArray(object.material)
       || object.position.lengthSq() !== 0 || object.quaternion.x !== 0 || object.quaternion.y !== 0 || object.quaternion.z !== 0
       || object.scale.x !== 1 || object.scale.y !== 1 || object.scale.z !== 1) return [];
-    const position: unknown = object.geometry.getAttribute('position'), normal: unknown = object.geometry.getAttribute('normal');
+    const position: unknown = object.geometry.getAttribute('position'),
+      normal: unknown = object.geometry.getAttribute('normal'),
+      uv: unknown = object.geometry.getAttribute('uv');
     if (!(position instanceof BufferAttribute) && !(position instanceof InterleavedBufferAttribute)) return [];
     const indices = CORNERS.map(() => [] as number[]), bounds = CORNERS.map(() => new Box3());
     const index = object.geometry.index, count = index?.count ?? position.count;
@@ -49,6 +52,7 @@ export function attachWheelRigs(envelope: Group): WheelRig[] {
     if (tyre) bounds.forEach((box, corner) => tyreBounds[corner].union(box));
     parts.push({mesh: object as Mesh<BufferGeometry, Material>, position,
       normal: normal instanceof BufferAttribute || normal instanceof InterleavedBufferAttribute ? normal : null,
+      uv: uv instanceof BufferAttribute || uv instanceof InterleavedBufferAttribute ? uv : null,
       indices, bounds, assigned});
   }
   if (namedParts.size && namedParts.size !== 8) return [];
@@ -74,6 +78,7 @@ export function attachWheelRigs(envelope: Group): WheelRig[] {
       } else {
         geometry = new BufferGeometry(); geometry.setAttribute('position', part.position);
         if (part.normal) geometry.setAttribute('normal', part.normal);
+        if (part.uv) geometry.setAttribute('uv', part.uv);
         geometry.setIndex(part.indices[rig.corner]);
         geometry.boundingBox = part.bounds[rig.corner]; geometry.boundingSphere = geometry.boundingBox.getBoundingSphere(new Sphere());
       }

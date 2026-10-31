@@ -47,7 +47,7 @@ function meshoptBuffer(json: Record<string, unknown>, binary: Buffer): Buffer {
     const mode = encoding.mode;
     if (view.buffer !== 1 || encoding.buffer !== 0 || offset % 4 || sourceOffset % 4 || offset + length > decoded.length || sourceOffset + sourceLength > binary.length || count * stride !== length
       || (encoding.filter !== undefined && encoding.filter !== 'NONE')
-      || !((mode === 'ATTRIBUTES' && (stride === 12 || stride === 8)) || ((mode === 'TRIANGLES' || mode === 'INDICES') && stride === 4))
+      || !((mode === 'ATTRIBUTES' && (stride === 12 || stride === 8 || stride === 4)) || ((mode === 'TRIANGLES' || mode === 'INDICES') && stride === 4))
       || (view.byteStride !== undefined && (mode !== 'ATTRIBUTES' || view.byteStride !== stride)) || (mode === 'TRIANGLES' && count % 3)) throw Error('Invalid Meshopt view');
     total += length;
     if (total > 128_000_000) throw Error('Meshopt decoded budget exceeded');
@@ -85,16 +85,16 @@ export function validateSceneGlb(bytes: Buffer, wheelPivots = false): { triangle
     if (!components || ![5126, 5125].includes(accessor.componentType as number) || offset % 4 || offset + count * components * 4 > view.length || accessor.normalized) throw Error('Invalid GLB accessor');
     return { count, components, componentType: accessor.componentType, offset: view.offset + offset };
   });
-  const materials = list(json.materials, 32);
+  const materials = list(json.materials, 64);
   if (wheelPivots && materials.some(material => record(material).doubleSided === true)) throw Error('Invalid GLB material side');
-  const meshes = list(json.meshes, 32);
+  const meshes = list(json.meshes, 64);
   let triangles = 0, visitedVertices = 0;
   const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
   // Primitives may share one position/normal accessor: budget and scan its vertices once.
   const scannedPositions = new Set<number>(), scannedNormals = new Set<number>();
   for (const mesh of meshes) for (const item of list(record(mesh).primitives, 32)) {
     const primitive = record(item), attributes = record(primitive.attributes);
-    const allowedAttributes = wheelPivots ? ['POSITION', 'NORMAL', 'TEXCOORD_0'] : ['POSITION'];
+    const allowedAttributes = wheelPivots ? ['POSITION', 'NORMAL', 'TEXCOORD_0'] : ['POSITION', 'TEXCOORD_0'];
     if (Object.keys(attributes).some(key => !allowedAttributes.includes(key)) || (primitive.mode !== undefined && primitive.mode !== 4) || primitive.targets) throw Error('Unsupported GLB primitive');
     integer(primitive.material, materials.length - 1);
     const positionIndex = integer(attributes.POSITION, accessors.length - 1), position = accessors[positionIndex];
@@ -128,7 +128,7 @@ export function validateSceneGlb(bytes: Buffer, wheelPivots = false): { triangle
     }
     for (let i = 0; i < indices.count; i++) if (bin.readUInt32LE(indices.offset + i * 4) >= position.count) throw Error('Invalid GLB index');
   }
-  const nodes = list(json.nodes, 32);
+  const nodes = list(json.nodes, 64);
   for (const value of nodes) {
     const node = record(value);
     if (Object.keys(node).some(key => !['mesh', 'name', ...(wheelPivots ? ['extras'] : [])].includes(key))) throw Error('Unsupported GLB transform');

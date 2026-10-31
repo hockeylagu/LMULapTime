@@ -251,4 +251,79 @@ describe('useReplayInspectorData session locators', () => {
     expect(params.get('baselineDriverOrdinal')).toBe('2');
     expect(params.get('baselineLapOrdinal')).toBe('4');
   });
+
+  it('preserves the interpolated playback position when pausing so the car does not rewind', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = requestUrl(input);
+      if (url.endsWith('/telemetry/metadata')) return response(metadata);
+      if (url.includes('/compare/laps')) return response({ laps: [] });
+      return response({
+        ...trajectory,
+        points: [
+          { x: 0, y: 0, z: 0, speedKmh: 100, timeSec: 0 },
+          { x: 5, y: 0, z: 0, speedKmh: 150, timeSec: 1 },
+          { x: 10, y: 0, z: 0, speedKmh: 200, timeSec: 2 },
+        ],
+      });
+    });
+
+    const rafCallbacks: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
+      rafCallbacks.push(cb);
+      return rafCallbacks.length;
+    });
+
+    const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, sessionId: 'session-1' }), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+
+    vi.spyOn(performance, 'now').mockReturnValue(1000);
+
+    // Start playback
+    act(() => {
+      result.current.setIsPlaying(true);
+    });
+
+    // Advance 500ms (halfway between sample 0 and 1)
+    act(() => {
+      const nextFrame = rafCallbacks.shift();
+      nextFrame?.(1500);
+    });
+
+    // Check position during playback: index 0, fraction ~0.5
+    const snapshotDuringPlay = result.current.playbackCursor.getSnapshot();
+    expect(snapshotDuringPlay).not.toBeNull();
+    expect(snapshotDuringPlay?.index).toBe(0);
+    expect(snapshotDuringPlay?.fraction).toBeCloseTo(0.5, 1);
+
+    // Pause playback
+    act(() => {
+      result.current.setIsPlaying(false);
+    });
+
+    // The cursor snapshot MUST NOT be cleared or rewound to fraction 0!
+    const snapshotAfterPause = result.current.playbackCursor.getSnapshot();
+    expect(snapshotAfterPause).not.toBeNull();
+    expect(snapshotAfterPause?.index).toBe(0);
+    expect(snapshotAfterPause?.fraction).toBeCloseTo(0.5, 1);
+
+    // Resuming playback continues from the exact fractional position rather than resetting to 0
+    act(() => {
+      vi.spyOn(performance, 'now').mockReturnValue(2000);
+      result.current.setIsPlaying(true);
+    });
+    act(() => {
+      const nextFrame = rafCallbacks.shift();
+      nextFrame?.(2250); // advance 250ms more (total 750ms -> fraction 0.75)
+    });
+    const snapshotAfterResume = result.current.playbackCursor.getSnapshot();
+    expect(snapshotAfterResume?.index).toBe(0);
+    expect(snapshotAfterResume?.fraction).toBeCloseTo(0.75, 1);
+
+    // Manually scrubbing (selecting an index) clears the cursor back to the discrete sample
+    act(() => {
+      result.current.setCurrentIndex(2);
+    });
+    expect(result.current.playbackCursor.getSnapshot()).toBeNull();
+    expect(result.current.currentIndex).toBe(2);
+  });
 });

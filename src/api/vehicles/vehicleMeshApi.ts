@@ -1,5 +1,5 @@
-import type { VehicleMeshResource } from '../../shared/types/scenes/vehicleMesh.js';
-import { ApiError, fetchBinary, fetchJson } from './apiClient.js';
+import type { VehicleMeshResource } from '../../../shared/types/scenes/vehicleMesh.js';
+import { ApiError, fetchBinary, fetchJson } from '../apiClient.js';
 
 export interface LoadedVehicleMesh { metadata: VehicleMeshResource; bytes: ArrayBuffer }
 

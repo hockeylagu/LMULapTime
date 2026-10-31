@@ -1,5 +1,5 @@
-import type { VehicleLiveryResource } from '../../shared/types/scenes/vehicleLivery.js';
-import { ApiError, fetchBinary, fetchJson } from './apiClient.js';
+import type { VehicleLiveryResource } from '../../../shared/types/scenes/vehicleLivery.js';
+import { ApiError, fetchBinary, fetchJson } from '../apiClient.js';
 
 export interface LoadedVehicleLivery {
   metadata: VehicleLiveryResource;

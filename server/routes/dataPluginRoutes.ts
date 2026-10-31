@@ -57,5 +57,25 @@ export function createDataPluginRouter(provider:DataPlugin=dataPlugin):Router {
       res.setHeader('X-Content-Type-Options', 'nosniff'); res.type('image/webp').send(bytes);
     } catch { res.status(409).json({error: 'Vehicle livery changed on disk. Restore the package or restart the backend.'}); }
   });
+  router.get('/vehicle-wheels/:identity', (req, res) => {
+    const wheels = provider.vehicleWheels(req.params.identity);
+    if (!wheels) { res.status(404).json({error: 'Vehicle wheels unavailable'}); return; }
+    res.json(wheels);
+  });
+  router.get('/vehicle-wheels/:sha256/asset', (req, res) => {
+    try {
+      const bytes = provider.vehicleWheelAsset(req.params.sha256);
+      if (!bytes) { res.status(404).json({error: 'Vehicle wheel texture unavailable'}); return; }
+      res.setHeader('X-Content-Type-Options', 'nosniff'); res.type('image/webp').send(bytes);
+    } catch { res.status(409).json({error: 'Vehicle wheel texture changed on disk. Restore the package or restart the backend.'}); }
+  });
+  router.get('/track-textures/:layoutKey', (req, res) => res.json(provider.trackTextures(req.params.layoutKey)));
+  router.get('/track-textures/:layoutKey/:textureKey/:revision/asset', (req, res) => {
+    try {
+      const bytes = provider.trackTextureAsset(req.params.layoutKey, req.params.textureKey, req.params.revision);
+      if (!bytes) { res.status(404).json({error: 'Track texture unavailable'}); return; }
+      res.setHeader('X-Content-Type-Options', 'nosniff'); res.type('image/webp').send(bytes);
+    } catch { res.status(409).json({error: 'Track texture changed on disk. Restore the package or restart the backend.'}); }
+  });
   return router;
 }

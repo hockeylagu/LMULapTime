@@ -58,7 +58,7 @@ export function applyKerbStripes(root: Object3D, points: ReplayTrajectoryPoint[]
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvKerbStation = kerbStation;');
     shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vKerbStation;')
       .replace('#include <color_fragment>', `#include <color_fragment>
-      diffuseColor.rgb *= vKerbStation < 0.0 ? vec3(0.78, 0.72, 0.60) : mod(floor(vKerbStation / ${KERB_STRIPE_M.toFixed(2)}), 2.0) < 1.0 ? vec3(0.78, 0.12, 0.12) : vec3(0.92, 0.92, 0.90);`);
+      diffuseColor.rgb *= vKerbStation < 0.0 ? vec3(0.70, 0.67, 0.62) : mod(floor(vKerbStation / ${KERB_STRIPE_M.toFixed(2)}), 2.0) < 1.0 ? vec3(0.74, 0.12, 0.10) : vec3(0.88, 0.88, 0.86);`);
   };
   material.needsUpdate = true;
 }

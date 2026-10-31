@@ -2,7 +2,7 @@ import { DataTexture, LinearFilter, RedFormat, Color, Mesh, MeshStandardMaterial
 import type { TrackSurfacePolygon } from '../../../../shared/types/trackGeometry.js';
 
 /** The lap's layout reads dark; roads it never uses stay a lighter grey, like the 2D map's other roads. */
-export const ACTIVE_ROAD_COLOR = '#3b3f45', OTHER_ROAD_COLOR = '#6d7176';
+export const ACTIVE_ROAD_COLOR = '#32373e', OTHER_ROAD_COLOR = '#505660';
 const MASK_M_PER_PX = 0.25, MASK_MAX_PX = 8192;
 
 /**

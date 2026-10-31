@@ -40,9 +40,10 @@ export interface DataPluginManifest {
   version: string;
   tracks?: { catalog: string };
   vehicles?: { catalog: string; logos?: string; liveries?: string };
-  scenes?: { catalog: string; brakeBoardArtwork?: string };
+  scenes?: { catalog: string; brakeBoardArtwork?: string; trackTextures?: string };
   vehicleMeshes?: { catalog: string };
   vehicleLiveries?: { catalog: string };
+  vehicleWheels?: { catalog: string };
 }
 export interface DataPluginCounts {
   tracks?: number;
@@ -50,8 +51,10 @@ export interface DataPluginCounts {
   logos?: number;
   scenes?: number;
   brakeBoards?: number;
+  trackTextures?: number;
   vehicleMeshes?: number;
   vehicleLiveries?: number;
+  vehicleWheels?: number;
 }
 
 export interface DataPluginStatus {
@@ -61,8 +64,10 @@ export interface DataPluginStatus {
   vehicles: boolean;
   logos?: boolean;
   scenes?: boolean;
+  trackTextures?: boolean;
   vehicleMeshes?: boolean;
   vehicleLiveries?: boolean;
+  vehicleWheels?: boolean;
   packageId?: string;
   packageVersion?: string;
   counts?: DataPluginCounts;

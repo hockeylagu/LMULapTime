@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { CarsSummaryCard } from '../../../src/components/dashboard/CarsSummaryCard.js';
-import { setCachedVehicleLogos } from '../../../src/api/vehicleLogosApi.js';
+import { setCachedVehicleLogos } from '../../../src/api/vehicles/vehicleLogosApi.js';
 
 describe('CarsSummaryCard', () => {
   const rankedCars = [

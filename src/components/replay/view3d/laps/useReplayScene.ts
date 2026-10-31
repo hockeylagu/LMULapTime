@@ -2,8 +2,10 @@ import { useContext, useEffect, useEffectEvent, useRef, useState, type RefObject
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import { fetchTrackScene } from '../../../../api/trackSceneApi.js';
 import { fetchBrakeBoardArtwork } from '../../../../api/scenes/brakeBoardArtworkApi.js';
-import { fetchVehicleMesh, type LoadedVehicleMesh } from '../../../../api/vehicleMeshApi.js';
-import { fetchVehicleLivery, type LoadedVehicleLivery } from '../../../../api/vehicleLiveryApi.js';
+import { fetchTrackTextures } from '../../../../api/scenes/trackTextureApi.js';
+import { fetchVehicleMesh, type LoadedVehicleMesh } from '../../../../api/vehicles/vehicleMeshApi.js';
+import { fetchVehicleLivery, type LoadedVehicleLivery } from '../../../../api/vehicles/vehicleLiveryApi.js';
+import { fetchVehicleWheels, type LoadedVehicleWheels } from '../../../../api/vehicles/vehicleWheelApi.js';
 import { loadTrackBoundaryGeometry, loadTrackMapDisplay } from '../../../../api/trackGeometryApi.js';
 import { apiErrorMessage, isAbortError } from '../../../../api/apiClient.js';
 import { ReplayPlaybackCursorContext } from '../../inspector/replayPlaybackCursor.js';
@@ -22,7 +24,7 @@ interface Options {
   retry: number;
 }
 interface SceneResult {key: string; error?: string; ready?: boolean; cars?: string; warning?: string; wheelMotion?: string}
-interface CarAsset {mesh: LoadedVehicleMesh | null; livery: LoadedVehicleLivery | null; warning?: string}
+interface CarAsset {mesh: LoadedVehicleMesh | null; livery: LoadedVehicleLivery | null; wheels: LoadedVehicleWheels | null; warning?: string}
 interface Runtime {handle: ReplaySceneHandle; trajectory: ReplayTrajectoryData; baseline: ReplayTrajectoryData | null}
 
 function isCustomLivery(livery?: string): boolean {
@@ -57,16 +59,17 @@ export function useReplayScene({host, trajectory, baseline, currentIndex, mode, 
     let active = true, created: ReplaySceneHandle | null = null;
     const requests = new Map<string, Promise<CarAsset>>();
     const loadCar = (lap: ReplayTrajectoryData | null): Promise<CarAsset> => {
-      if (!lap) return Promise.resolve({mesh: null, livery: null});
+      if (!lap) return Promise.resolve({mesh: null, livery: null, wheels: null});
       const id = lap.vehicleData?.id;
       const liveryId = !isCustomLivery(lap.vehicleIdentity?.livery) ? lap.vehicleIdentity?.vehicleId : undefined;
       const requestKey = `${id ?? 'none'}:${liveryId ?? 'none'}:${lap.dataPluginRevision ?? ''}`;
       let pending = requests.get(requestKey);
       if (!pending) {
         pending = (async () => {
-          const [meshResult, liveryResult] = await Promise.allSettled([
+          const [meshResult, liveryResult, wheelsResult] = await Promise.allSettled([
             id ? fetchVehicleMesh(id, lap.dataPluginRevision, abort.signal) : Promise.resolve(null),
             liveryId ? fetchVehicleLivery(liveryId, lap.dataPluginRevision, abort.signal) : Promise.resolve(null),
+            id ? fetchVehicleWheels(id, lap.dataPluginRevision, abort.signal) : Promise.resolve(null),
           ]);
           if (abort.signal.aborted) throw new DOMException('Car asset request aborted', 'AbortError');
           const warnings: string[] = [];
@@ -86,8 +89,16 @@ export function useReplayScene({host, trajectory, baseline, currentIndex, mode, 
           } else {
             warnings.push(apiErrorMessage(liveryResult.reason, 'Vehicle livery unavailable'));
           }
+          let wheels: LoadedVehicleWheels | null = null;
+          if (wheelsResult.status === 'fulfilled') {
+            wheels = wheelsResult.value;
+          } else if (isAbortError(wheelsResult.reason)) {
+            throw wheelsResult.reason;
+          } else {
+            warnings.push(apiErrorMessage(wheelsResult.reason, 'Vehicle wheels unavailable'));
+          }
           const warning = warnings.length > 0 ? warnings.join('; ') : undefined;
-          return {mesh, livery, ...(warning ? {warning} : {})};
+          return {mesh, livery, wheels, ...(warning ? {warning} : {})};
         })();
       }
       requests.delete(requestKey); requests.set(requestKey, pending);
@@ -108,13 +119,24 @@ export function useReplayScene({host, trajectory, baseline, currentIndex, mode, 
       ]);
       if (data.metadata.sourceGeometryRevision !== selected.trajectory.geometryRevision) throw Error('3D scene and lap geometry revisions differ. Reload the recording with its matching package.');
       if (selected.trajectory.dataPluginRevision && data.metadata.packageRevision !== selected.trajectory.dataPluginRevision) throw Error('3D scene and lap package revisions differ. Reload the recording with its matching package.');
-      const artwork = await fetchBrakeBoardArtwork(layoutKey, data.metadata.sourceGeometryRevision, data.metadata.packageRevision, abort.signal)
-        .catch((error: unknown) => { if (isAbortError(error)) throw error; return []; });
+      const [artwork, textures] = await Promise.all([
+        fetchBrakeBoardArtwork(layoutKey, data.metadata.sourceGeometryRevision, data.metadata.packageRevision, abort.signal)
+          .catch((error: unknown) => { if (isAbortError(error)) throw error; return []; }),
+        fetchTrackTextures(layoutKey, data.metadata.packageRevision, abort.signal)
+          .catch((error: unknown) => { if (isAbortError(error)) throw error; return []; }),
+      ]);
       abort.signal.throwIfAborted();
       const handle = await createReplayScene(container, data.bytes, data.metadata, selected.trajectory, selected.baseline,
         message => { if (active) setResult({key, error: message}); },
-        {primary: primary.mesh, baseline: comparison.mesh, primaryLivery: primary.livery, baselineLivery: comparison.livery},
-        boundaries, latest().colorBy, artwork);
+        {
+          primary: primary.mesh,
+          baseline: comparison.mesh,
+          primaryLivery: primary.livery,
+          baselineLivery: comparison.livery,
+          primaryWheels: primary.wheels,
+          baselineWheels: comparison.wheels,
+        },
+        boundaries, latest().colorBy, artwork, textures);
       if (!active) { handle.dispose(); abort.signal.throwIfAborted(); }
       created = handle; scene.current = handle; handle.mode(latest().mode);
       return {handle, trajectory: selected.trajectory, baseline: selected.baseline};
@@ -142,6 +164,8 @@ export function useReplayScene({host, trajectory, baseline, currentIndex, mode, 
             baseline: comparison.mesh,
             primaryLivery: primary.livery,
             baselineLivery: comparison.livery,
+            primaryWheels: primary.wheels,
+            baselineWheels: comparison.wheels,
           }, abort.signal)) return;
           current.trajectory = trajectory; current.baseline = baseline;
         }

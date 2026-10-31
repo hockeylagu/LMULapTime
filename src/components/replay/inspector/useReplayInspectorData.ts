@@ -79,6 +79,7 @@ export function useReplayInspectorData({
   const setCurrentIndex = useCallback((index: number) => {
     setIsPlaying(false);
     playbackCursor.clear();
+    playbackClockRef.current = null;
     currentIndexRef.current = index;
     setCurrentIndexState(index);
   }, [playbackCursor]);
@@ -527,14 +528,29 @@ export function useReplayInspectorData({
   // Playback animation loop
   useEffect(() => {
     if (!isPlaying || !trajectory || trajectory.points.length === 0) {
-      playbackCursor.clear();
-      if (animRef.current) cancelAnimationFrame(animRef.current);
+      if (animRef.current) {
+        cancelAnimationFrame(animRef.current);
+        animRef.current = null;
+      }
+      if (!trajectory || trajectory.points.length === 0 || playbackCursor.getSnapshot()?.points !== trajectory.points) {
+        playbackCursor.clear();
+        playbackClockRef.current = null;
+      } else if (playbackClockRef.current && currentIndexRef.current !== playbackClockRef.current.index) {
+        // Keep React state in sync with the paused sample index so
+        // timeline and other integer-sample views match where the car stopped.
+        currentIndexRef.current = playbackClockRef.current.index;
+        setCurrentIndexState(playbackClockRef.current.index);
+      }
       return;
     }
     // Playback follows the lap's clock (see replayPlaybackClock), not the sample count.
     const points = trajectory.points;
     lastTimeRef.current = performance.now();
-    playbackClockRef.current = playbackClockAt(points, currentIndexRef.current);
+    let currentClock = playbackClockRef.current;
+    if (!currentClock || currentClock.index !== currentIndexRef.current) {
+      currentClock = playbackClockAt(points, currentIndexRef.current);
+      playbackClockRef.current = currentClock;
+    }
     const loop = (now: number) => {
       const elapsedMs = now - lastTimeRef.current;
       lastTimeRef.current = now;
@@ -558,7 +574,12 @@ export function useReplayInspectorData({
       animRef.current = requestAnimationFrame(loop);
     };
     animRef.current = requestAnimationFrame(loop);
-    return () => { if (animRef.current) cancelAnimationFrame(animRef.current); playbackCursor.clear(); };
+    return () => {
+      if (animRef.current) {
+        cancelAnimationFrame(animRef.current);
+        animRef.current = null;
+      }
+    };
   }, [isPlaying, trajectory, playbackSpeed, playbackCursor, setCurrentIndex]);
 
   const selectedDriver = metadata?.drivers?.find(d => d.slot === selectedDriverSlot) || metadata?.drivers?.find(d => d.name === trajectory?.driverName);

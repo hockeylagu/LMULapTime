@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import {afterEach,describe,it,expect} from 'vitest';
 import express from 'express';
 import request from 'supertest';
@@ -183,5 +184,72 @@ describe('local data plugin snapshot',()=>{
     const { dir, manifest } = fixture('both');
     fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify({ ...manifest, vehicles: { ...manifest.vehicles, logos: '../logos.json' } }));
     expect(new DataPlugin(dir).status.state).toBe('invalid');
+  });
+  it('serves vehicle wheels metadata and assets over HTTP', async () => {
+    const { dir, write } = fixture('both');
+    const makeWebp = (marker: number) => {
+      const buf = Buffer.alloc(30);
+      buf.write('RIFF', 0, 'ascii');
+      buf.writeUInt32LE(buf.length - 8, 4);
+      buf.write('WEBP', 8, 'ascii');
+      buf.write('VP8 ', 12, 'ascii');
+      buf.writeUInt32LE(10, 16);
+      buf.writeUInt8(marker, 20);
+      return buf;
+    };
+    const rimBytes = makeWebp(1);
+    const tyreBytes = makeWebp(2);
+    const rimSha = crypto.createHash('sha256').update(rimBytes).digest('hex');
+    const tyreSha = crypto.createHash('sha256').update(tyreBytes).digest('hex');
+    fs.mkdirSync(path.join(dir, 'vehicle-wheels'), { recursive: true });
+    fs.writeFileSync(path.join(dir, `vehicle-wheels/${rimSha}.webp`), rimBytes);
+    fs.writeFileSync(path.join(dir, `vehicle-wheels/${tyreSha}.webp`), tyreBytes);
+
+    const wheelsCatalog = [
+      {
+        vehicleRecordId: 'synthetic',
+        rim: { asset: `vehicle-wheels/${rimSha}.webp`, sha256: rimSha, byteLength: rimBytes.length, width: 1024, height: 1024 },
+        tyre: { asset: `vehicle-wheels/${tyreSha}.webp`, sha256: tyreSha, byteLength: tyreBytes.length, width: 1024, height: 1024 },
+      },
+    ];
+    write('vehicle-wheels/index.json', wheelsCatalog);
+
+    const manifestV2 = {
+      schemaVersion: 2,
+      id: 'synthetic-v2',
+      version: '2',
+      tracks: { catalog: 'tracks/index.json' },
+      vehicles: { catalog: 'vehicles/index.json' },
+      vehicleWheels: { catalog: 'vehicle-wheels/index.json' },
+    };
+    write('manifest.json', manifestV2);
+
+    const plugin = new DataPlugin(dir);
+    expect(plugin.status.state).toBe('ready');
+    expect(plugin.status.vehicleWheels).toBe(true);
+    expect(plugin.status.counts?.vehicleWheels).toBe(1);
+
+    const resolved = plugin.vehicleWheels('synthetic');
+    expect(resolved?.vehicleRecordId).toBe('synthetic');
+    expect(resolved?.rim.sha256).toBe(rimSha);
+    expect(resolved?.tyre.sha256).toBe(tyreSha);
+
+    const app = express();
+    app.use('/api/data-plugin', createDataPluginRouter(plugin));
+
+    const metaRes = await request(app).get('/api/data-plugin/vehicle-wheels/synthetic');
+    expect(metaRes.status).toBe(200);
+    const metaBody = metaRes.body as { vehicleRecordId: string; rim: { sha256: string } };
+    expect(metaBody.vehicleRecordId).toBe('synthetic');
+    expect(metaBody.rim.sha256).toBe(rimSha);
+
+    const assetRes = await request(app).get(`/api/data-plugin/vehicle-wheels/${rimSha}/asset`);
+    expect(assetRes.status).toBe(200);
+    expect(assetRes.headers['content-type']).toContain('image/webp');
+    expect(assetRes.headers['x-content-type-options']).toBe('nosniff');
+    expect(assetRes.body).toEqual(rimBytes);
+
+    const missingRes = await request(app).get('/api/data-plugin/vehicle-wheels/unknown');
+    expect(missingRes.status).toBe(404);
   });
 });

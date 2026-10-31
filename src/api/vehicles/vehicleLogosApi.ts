@@ -1,4 +1,4 @@
-import { fetchJson } from './apiClient.js';
+import { fetchJson } from '../apiClient.js';
 
 let cachedLogos: Record<string, string> | null = null;
 let pendingPromise: Promise<Record<string, string> | null> | null = null;
@@ -49,10 +49,16 @@ export async function fetchVehicleLogos(): Promise<Record<string, string> | null
       notifyChanged();
       return cachedLogos;
     } catch {
-      if (requestGeneration === cacheGeneration) failedAt = Date.now();
+      if (requestGeneration === cacheGeneration) {
+        failedAt = Date.now();
+        cachedLogos = null;
+        notifyChanged();
+      }
       return null;
     } finally {
-      if (requestGeneration === cacheGeneration) pendingPromise = null;
+      if (requestGeneration === cacheGeneration) {
+        pendingPromise = null;
+      }
     }
   })();
   return pendingPromise;
@@ -63,17 +69,17 @@ export function getCachedVehicleLogos(): Record<string, string> | null {
 }
 
 export function setCachedVehicleLogos(logos: Record<string, string> | null): void {
-  cacheGeneration++;
   cachedLogos = logos;
   pendingPromise = null;
   failedAt = null;
+  cacheGeneration++;
   notifyChanged();
 }
 
 export function clearCachedVehicleLogos(): void {
-  cacheGeneration++;
   cachedLogos = null;
   pendingPromise = null;
   failedAt = null;
+  cacheGeneration++;
   notifyChanged();
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { fetchVehicleLogos, getCachedVehicleLogos, getVehicleLogoCacheGeneration, subscribeVehicleLogos } from '../../api/vehicleLogosApi.js';
+import { fetchVehicleLogos, getCachedVehicleLogos, getVehicleLogoCacheGeneration, subscribeVehicleLogos } from '../../api/vehicles/vehicleLogosApi.js';
 import { resolveCarManufacturer } from '../../../shared/domain/vehicleMapping.js';
 
 export function useVehicleLogos(): {

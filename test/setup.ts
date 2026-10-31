@@ -138,7 +138,7 @@ vi.mock('recharts', () => {
 });
 
 import { cleanup } from '@testing-library/react';
-import { setCachedVehicleLogos } from '../src/api/vehicleLogosApi.js';
+import { setCachedVehicleLogos } from '../src/api/vehicles/vehicleLogosApi.js';
 
 if (typeof window !== 'undefined') {
   setCachedVehicleLogos({});

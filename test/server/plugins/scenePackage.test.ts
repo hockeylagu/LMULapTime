@@ -112,6 +112,64 @@ describe('3D plugin surfaces', () => {
     fs.writeFileSync(path.join(f.root, f.scene.asset), Buffer.alloc(f.bytes.length));
     await request(app).get(`/api/data-plugin/scenes/monza_gp/${f.scene.revision}/asset`).expect(409);
   });
+  it('loads track textures and serves them through the router', async () => {
+    const f = fixture();
+    const webpBytes = Buffer.alloc(32);
+    webpBytes.write('RIFF', 0, 'ascii');
+    webpBytes.writeUInt32LE(webpBytes.length - 8, 4);
+    webpBytes.write('WEBP', 8, 'ascii');
+    webpBytes.write('VP8X', 12, 'ascii');
+    webpBytes.writeUInt32LE(10, 16);
+    webpBytes.writeUIntLE(255, 24, 3);
+    webpBytes.writeUIntLE(255, 27, 3);
+
+    const sha256 = createHash('sha256').update(webpBytes).digest('hex');
+    const assetPath = `track-textures/${sha256}.webp`;
+    fs.mkdirSync(path.join(f.root, 'track-textures'), { recursive: true });
+    fs.writeFileSync(path.join(f.root, assetPath), webpBytes);
+
+    f.write('track-textures/index.json', [
+      {
+        layoutKey: 'monza_gp',
+        textureKey: 'Track_RoadA_Albr',
+        material: 'asphalt',
+        asset: assetPath,
+        sha256,
+        byteLength: webpBytes.length,
+        width: 256,
+        height: 256,
+        revision: `texture-${sha256}`,
+      },
+    ]);
+    f.write('manifest.json', {
+      ...f.manifest,
+      scenes: {
+        ...f.manifest.scenes,
+        trackTextures: 'track-textures/index.json',
+      },
+    });
+
+    const plugin = new DataPlugin(f.root);
+    expect(plugin.status.state).toBe('ready');
+    expect(plugin.status.trackTextures).toBe(true);
+    expect(plugin.status.counts?.trackTextures).toBe(1);
+
+    const textures = plugin.trackTextures('monza_gp');
+    expect(textures).toHaveLength(1);
+    expect(textures[0].textureKey).toBe('Track_RoadA_Albr');
+
+    const asset = plugin.trackTextureAsset('monza_gp', 'Track_RoadA_Albr', `texture-${sha256}`);
+    expect(asset).toEqual(webpBytes);
+
+    const app = express();
+    app.use('/api/data-plugin', createDataPluginRouter(plugin));
+    const listRes = await request(app).get('/api/data-plugin/track-textures/monza_gp').expect(200);
+    expect(listRes.body).toHaveLength(1);
+
+    const assetRes = await request(app).get(`/api/data-plugin/track-textures/monza_gp/Track_RoadA_Albr/texture-${sha256}/asset`).expect(200);
+    expect(assetRes.headers['content-type']).toContain('image/webp');
+    expect(assetRes.body).toEqual(webpBytes);
+  });
 });
 
 describe('static GLB subset', () => {

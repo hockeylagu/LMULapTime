@@ -81,6 +81,10 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
   add('vehicle-livery-asset', '/api/data-plugin/vehicle-liveries/:liveryKey/:revision/asset', undefined, 'Binary WebP delivery is measured separately from the JSON benchmark.');
   add('brake-board-artwork', '/api/data-plugin/brake-board-artwork/:layoutKey', geometry ? `/api/data-plugin/brake-board-artwork/${geometry.layout}` : undefined, 'No resolved layout in the fixed cohort.');
   add('brake-board-artwork-asset', '/api/data-plugin/brake-board-artwork/:layoutKey/:revision/asset', undefined, 'Binary PNG delivery is checked separately; JSON benchmark covers artwork metadata.');
+  add('track-textures', '/api/data-plugin/track-textures/:layoutKey', geometry ? `/api/data-plugin/track-textures/${geometry.layout}` : undefined, 'No resolved layout in the fixed cohort.');
+  add('track-textures-asset', '/api/data-plugin/track-textures/:layoutKey/:textureKey/:revision/asset', undefined, 'Binary WebP delivery is checked separately; JSON benchmark covers track textures metadata.');
+  add('vehicle-wheels', '/api/data-plugin/vehicle-wheels/:identity', undefined, 'Optional private vehicle wheels capability; exact identity and revisions are covered by synthetic route tests.');
+  add('vehicle-wheels-asset', '/api/data-plugin/vehicle-wheels/:sha256/asset', undefined, 'Binary WebP wheel delivery is measured separately from the JSON benchmark.');
   for (const [index, board] of cohort.boards.entries()) {
     const query = new URLSearchParams(board).toString();
     const track = encodeURIComponent(board.layout);
