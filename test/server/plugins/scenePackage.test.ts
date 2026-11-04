@@ -1,197 +1,178 @@
-import { syntheticGlb } from '../../helpers/scenes/syntheticGlb.js';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
-import { createHash } from 'node:crypto';
+import { afterEach, describe, expect, it } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import { afterEach, describe, expect, it } from 'vitest';
 import { DataPlugin } from '../../../server/plugins/dataPlugin.js';
-import { validateSceneGlb } from '../../../server/plugins/sceneGlb.js';
 import { createDataPluginRouter } from '../../../server/routes/dataPluginRoutes.js';
-import { syntheticTrack } from '../../helpers/syntheticTrack.js';
-import type { TrackScene } from '../../../shared/types/scenes/trackScene.js';
+import { glb, syntheticPackage } from '../../helpers/scenes/syntheticPackage.js';
 
-const directories: string[] = [];
-afterEach(() => { for (const dir of directories.splice(0)) fs.rmSync(dir, {recursive: true, force: true}); });
+type Package = ReturnType<typeof syntheticPackage>;
+const packages: Package[] = [];
+const build = () => { const built = syntheticPackage(); packages.push(built); return built; };
+afterEach(() => { for (const built of packages.splice(0)) fs.rmSync(built.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }); });
+const state = (built: Package) => new DataPlugin(built.dir).status.state;
 
-function fixture() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'scene-plugin-')); directories.push(root);
-  const write = (name: string, value: unknown) => { fs.mkdirSync(path.dirname(path.join(root, name)), {recursive: true}); fs.writeFileSync(path.join(root, name), JSON.stringify(value)); };
-  const geometry = syntheticTrack(), bytes = syntheticGlb(), sha256 = createHash('sha256').update(bytes).digest('hex');
-  const scene: TrackScene = {schemaVersion: 1, layoutKey: 'monza_gp', coordinates: 'lmu-local-xyz-metres', sourceGeometryRevision: geometry.geometryRevision!,
-    revision: `scene-${sha256}`, asset: 'scenes/monza_gp.glb', sha256, byteLength: bytes.length, bounds: {min: [0, 4, 0], max: [5, 7, 5]}, triangles: 1, coverage: 'surfaces'};
-  const manifest = {schemaVersion: 2, id: 'synthetic', version: '1', tracks: {catalog: 'tracks/index.json'}, scenes: {catalog: 'scenes/index.json'}};
-  write('manifest.json', manifest); write('tracks/monza_gp.json', geometry);
-  write('tracks/index.json', [{layoutKey: 'monza_gp', circuitId: 'monza', layoutId: 'gp', lengthM: geometry.lengthM, pointsCount: geometry.centerline.length}]);
-  write('scenes/index.json', [scene]); fs.writeFileSync(path.join(root, scene.asset), bytes);
-  return {root, write, manifest, scene, bytes};
-}
-
-describe('3D plugin surfaces', () => {
-  it('validates native XYZ, exact layout/revision and defensive public metadata', () => {
-    const f = fixture(), plugin = new DataPlugin(f.root);
-    expect(plugin.status.state).toBe('ready'); expect(plugin.status.scenes).toBe(true);
-    expect(plugin.scene('monza_gp')).not.toHaveProperty('asset');
-    expect(plugin.scene('monza_gp')?.bounds.min).toEqual([0, 4, 0]);
-    plugin.scene('monza_gp')!.bounds.min[0] = 999;
-    expect(plugin.scene('monza_gp')!.bounds.min[0]).toBe(0);
-    expect(plugin.scene('monza_curva_grande')).toBeNull();
-    expect(plugin.sceneAsset('monza_gp', f.scene.revision)).toEqual(f.bytes);
-    expect(plugin.sceneAsset('monza_gp', 'stale')).toBeNull();
-  });
-  it('serves standard Meshopt GLBs directly and detects mutation', async () => {
-    const f = fixture();
-    const sample = JSON.parse(fs.readFileSync(new URL('../../fixtures/scenes/meshopt-glb.json', import.meta.url), 'utf8')) as {meshopt: string};
-    const bytes = Buffer.from(sample.meshopt, 'base64'), sha256 = createHash('sha256').update(bytes).digest('hex');
-    const scene = {...f.scene, sha256, revision: 'scene-'+sha256, byteLength: bytes.length};
-    fs.writeFileSync(path.join(f.root, scene.asset), bytes); f.write('scenes/index.json', [scene]);
-    const plugin = new DataPlugin(f.root);
+describe('schema 3 manifest', () => {
+  it('loads scenery and cars next to tracks and vehicles', () => {
+    const built = build(), plugin = new DataPlugin(built.dir);
     expect(plugin.status.state).toBe('ready');
-    expect(plugin.sceneAsset(scene.layoutKey, scene.revision)).toEqual(bytes);
-    const app = express(); app.use('/api/data-plugin', createDataPluginRouter(plugin));
-    const response = await request(app).get(`/api/data-plugin/scenes/${scene.layoutKey}/${scene.revision}/asset`).expect(200);
-    expect(response.headers['content-type']).toContain('model/gltf-binary');
-    expect(Number(response.headers['content-length'])).toBe(bytes.length);
-    const changed = Buffer.from(bytes); changed[changed.length - 1] ^= 1;
-    fs.writeFileSync(path.join(f.root, scene.asset), changed);
-    expect(() => plugin.sceneAsset(scene.layoutKey, scene.revision)).toThrow('changed');
+    expect(plugin.status).toMatchObject({ scenery: true, cars: true, counts: { tracks: 1, vehicles: 1, scenery: 1, cars: 1 } });
+    const layout = plugin.sceneryLayout('monza_gp')!;
+    expect(layout.packageRevision).toBe(plugin.status.revision);
+    expect(layout.sectors.map(sector => sector.id)).toEqual(['s0', 's1']);
+    expect(plugin.sceneryLayout('spa_wec')).toBeNull();
+    expect(plugin.sceneryFile(built.scenery.horizon.asset)).toEqual(glb('horizon'));
+    expect(plugin.sceneryFile(built.sceneryTexture.asset)).not.toBeNull();
+    expect(plugin.sceneryFile('scenery/unlisted.glb')).toBeNull();
+    expect(plugin.car('test_car.veh')?.vehicleFolder).toBe('Test_Car');
+    expect(plugin.car('TEST_CAR')?.packageRevision).toBe(plugin.status.revision);
+    expect(plugin.car('OTHER')).toBeNull();
+    expect(JSON.parse(plugin.carFile('cars/Test_Car.json')!.toString())).toHaveProperty('wheelRig.passed', true);
+    expect(plugin.carFile(built.car.asset)).toEqual(glb('car'));
   });
-  it('accepts scenes that also carry barriers', () => {
-    const f = fixture(); f.write('scenes/index.json', [{...f.scene, coverage: 'surfaces+barriers'}]);
-    expect(new DataPlugin(f.root).scene('monza_gp')?.coverage).toBe('surfaces+barriers');
-  });
-  it('lets layouts share one scene file and rejects a conflicting row for it', () => {
-    const f = fixture(), other = syntheticTrack('daytona_road_course');
-    f.write('tracks/daytona_road_course.json', other);
-    f.write('tracks/index.json', [{layoutKey: 'monza_gp', circuitId: 'monza', layoutId: 'gp', lengthM: other.lengthM, pointsCount: other.centerline.length},
-      {layoutKey: 'daytona_road_course', circuitId: 'daytona', layoutId: 'road', lengthM: other.lengthM, pointsCount: other.centerline.length}]);
-    const shared = {...f.scene, layoutKey: 'daytona_road_course', sourceGeometryRevision: other.geometryRevision!};
-    f.write('scenes/index.json', [f.scene, shared]);
-    const plugin = new DataPlugin(f.root);
+
+  it('accepts schema 3 without scenery and cars', () => {
+    const built = build();
+    delete built.manifest.scenery; delete built.manifest.cars; built.commit();
+    const plugin = new DataPlugin(built.dir);
     expect(plugin.status.state).toBe('ready');
-    expect(plugin.sceneAsset('daytona_road_course', f.scene.revision)).toEqual(f.bytes);
-    f.write('scenes/index.json', [f.scene, {...shared, triangles: 2}]);
-    expect(new DataPlugin(f.root).status.state).toBe('invalid');
+    expect(plugin.sceneryLayout('monza_gp')).toBeNull(); expect(plugin.car('TEST_CAR')).toBeNull();
   });
-  it('requires version 2 for scene capabilities and retains version 1 analytical packages', () => {
-    const f = fixture(); f.write('manifest.json', {...f.manifest, schemaVersion: 1});
-    expect(new DataPlugin(f.root).status.state).toBe('invalid');
-    f.write('manifest.json', {schemaVersion: 1, id: 'synthetic', version: '1', tracks: f.manifest.tracks});
-    expect(new DataPlugin(f.root).status.state).toBe('ready');
-  });
-  it.each([
-    {layoutKey: 'monza_curva_grande'}, {sourceGeometryRevision: 'wrong'}, {sha256: 'bad'},
-    {triangles: 2}, {byteLength: 1}, {bounds: {min: [0, 0, 0], max: [5, 7, 5]}},
-    {asset: '../escape.glb'}, {asset: 'C:/escape.glb'}, {asset: 'scenes\\escape.glb'}, {coverage: 'invented'},
-  ])('rejects invalid metadata %j without serving partial packages', patch => {
-    const f = fixture(); f.write('scenes/index.json', [{...f.scene, ...patch}]);
-    expect(new DataPlugin(f.root).status.state).toBe('invalid');
-  });
-  it('rejects changed binary bytes after validation even if their length is unchanged', () => {
-    const f = fixture(), plugin = new DataPlugin(f.root);
-    const changed = Buffer.from(f.bytes); changed[changed.length - 1] ^= 1; fs.writeFileSync(path.join(f.root, f.scene.asset), changed);
-    expect(() => plugin.sceneAsset('monza_gp', f.scene.revision)).toThrow('changed');
-    expect(new DataPlugin(f.root).status.state).toBe('invalid');
-  });
-  it('rejects junction escapes', () => {
-    const f = fixture(), outside = fixture();
-    fs.symlinkSync(path.join(outside.root, 'scenes'), path.join(f.root, 'escape'), 'junction');
-    f.write('scenes/index.json', [{...f.scene, asset: 'escape/monza_gp.glb'}]);
-    expect(new DataPlugin(f.root).status.state).toBe('invalid');
-  });
-  it('serves only the registered layout and revision, without local paths', async () => {
-    const f = fixture(), app = express(); app.use('/api/data-plugin', createDataPluginRouter(new DataPlugin(f.root)));
-    const metadata = await request(app).get('/api/data-plugin/scenes/monza_gp').expect(200);
-    expect(metadata.text).not.toContain(f.root); expect(metadata.text).not.toContain('monza_gp.glb');
-    const asset = await request(app).get(`/api/data-plugin/scenes/monza_gp/${f.scene.revision}/asset`).expect(200);
-    expect(asset.headers['content-type']).toContain('model/gltf-binary');
-    expect(Number(asset.headers['content-length'])).toBe(f.bytes.length);
-    await request(app).get('/api/data-plugin/scenes/monza_curva_grande').expect(404);
-    await request(app).get('/api/data-plugin/scenes/monza_gp/stale/asset').expect(404);
-    fs.writeFileSync(path.join(f.root, f.scene.asset), Buffer.alloc(f.bytes.length));
-    await request(app).get(`/api/data-plugin/scenes/monza_gp/${f.scene.revision}/asset`).expect(409);
-  });
-  it('loads track textures and serves them through the router', async () => {
-    const f = fixture();
-    const webpBytes = Buffer.alloc(32);
-    webpBytes.write('RIFF', 0, 'ascii');
-    webpBytes.writeUInt32LE(webpBytes.length - 8, 4);
-    webpBytes.write('WEBP', 8, 'ascii');
-    webpBytes.write('VP8X', 12, 'ascii');
-    webpBytes.writeUInt32LE(10, 16);
-    webpBytes.writeUIntLE(255, 24, 3);
-    webpBytes.writeUIntLE(255, 27, 3);
 
-    const sha256 = createHash('sha256').update(webpBytes).digest('hex');
-    const assetPath = `track-textures/${sha256}.webp`;
-    fs.mkdirSync(path.join(f.root, 'track-textures'), { recursive: true });
-    fs.writeFileSync(path.join(f.root, assetPath), webpBytes);
+  it.each([1, 2, 4, '3', undefined])('rejects manifest schema %s: only schema 3 is supported', schemaVersion => {
+    const built = build();
+    built.manifest.schemaVersion = schemaVersion; built.commit();
+    expect(state(built)).toBe('invalid');
+  });
 
-    f.write('track-textures/index.json', [
-      {
-        layoutKey: 'monza_gp',
-        textureKey: 'Track_RoadA_Albr',
-        material: 'asphalt',
-        asset: assetPath,
-        sha256,
-        byteLength: webpBytes.length,
-        width: 256,
-        height: 256,
-        revision: `texture-${sha256}`,
-      },
-    ]);
-    f.write('manifest.json', {
-      ...f.manifest,
-      scenes: {
-        ...f.manifest.scenes,
-        trackTextures: 'track-textures/index.json',
-      },
-    });
+  it.each(['scenes', 'vehicleMeshes', 'vehicleLiveries', 'vehicleWheels', 'trackTextures', 'unknown'])('rejects the key %s', key => {
+    const built = build();
+    built.manifest[key] = { catalog: 'tracks/index.json' }; built.commit();
+    expect(state(built)).toBe('invalid');
+  });
 
-    const plugin = new DataPlugin(f.root);
+  it('knows brakeBoardArtwork but never reads it', () => {
+    const built = build();
+    built.manifest.brakeBoardArtwork = { catalog: 'brake-board-artwork/missing.json' }; built.commit();
+    const plugin = new DataPlugin(built.dir);
     expect(plugin.status.state).toBe('ready');
-    expect(plugin.status.trackTextures).toBe(true);
-    expect(plugin.status.counts?.trackTextures).toBe(1);
+    expect(plugin.status).not.toHaveProperty('brakeBoardArtwork');
+  });
 
-    const textures = plugin.trackTextures('monza_gp');
-    expect(textures).toHaveLength(1);
-    expect(textures[0].textureKey).toBe('Track_RoadA_Albr');
-
-    const asset = plugin.trackTextureAsset('monza_gp', 'Track_RoadA_Albr', `texture-${sha256}`);
-    expect(asset).toEqual(webpBytes);
-
-    const app = express();
-    app.use('/api/data-plugin', createDataPluginRouter(plugin));
-    const listRes = await request(app).get('/api/data-plugin/track-textures/monza_gp').expect(200);
-    expect(listRes.body).toHaveLength(1);
-
-    const assetRes = await request(app).get(`/api/data-plugin/track-textures/monza_gp/Track_RoadA_Albr/texture-${sha256}/asset`).expect(200);
-    expect(assetRes.headers['content-type']).toContain('image/webp');
-    expect(assetRes.body).toEqual(webpBytes);
+  it.each(['../outside.json', 'C:/outside.json', 'scenery\\index.json'])('rejects a scenery catalog path escaping the package: %s', file => {
+    const built = build();
+    built.manifest.scenery = { catalog: file }; built.commit();
+    expect(state(built)).toBe('invalid');
   });
 });
 
-describe('static GLB subset', () => {
-  it('budgets a position accessor shared by several meshes once, as exported surface kinds share one', () => {
-    const shared = syntheticGlb(json => {
-      json.meshes = Array.from({length: 4}, () => ({primitives: [{attributes: {POSITION: 0}, indices: 1, material: 0}]}));
-      json.nodes = [0, 1, 2, 3].map(mesh => ({mesh})); json.scenes = [{nodes: [0, 1, 2, 3]}];
-    });
-    expect(validateSceneGlb(shared)).toEqual({triangles: 4, min: [0, 4, 0], max: [5, 7, 5]});
+describe('scenery validation', () => {
+  const mutate = (change: (built: Package) => void) => { const built = build(); change(built); built.commit(); return state(built); };
+
+  it.each([
+    ['an unknown row field', (built: Package) => { (built.scenery as Record<string, unknown>).extra = 1; }],
+    ['an old index version', (built: Package) => { built.scenery.schemaVersion = 1; }],
+    ['a stale geometry revision', (built: Package) => { built.scenery.sourceGeometryRevision = 'old'; }],
+    ['a chunk asset that is not content-named', (built: Package) => { built.scenery.sectors[0].asset = 'scenery/s0.glb'; }],
+    ['a chunk of the wrong size', (built: Package) => { built.scenery.sectors[0].byteLength += 1; }],
+    ['a missing chunk file', (built: Package) => { fs.rmSync(path.join(built.dir, built.scenery.sectors[1].asset)); }],
+    ['sectors out of lap order', (built: Package) => { built.scenery.sectors.reverse(); }],
+    ['broken prev/next links', (built: Package) => { built.scenery.sectors[0].next = 's0'; }],
+    ['a sector beyond the route', (built: Package) => { built.scenery.sectors[1].lapEndM = built.scenery.routeLengthM + 10; }],
+    ['duplicate chunk ids', (built: Package) => { built.scenery.sectors[1].id = 's0'; }],
+    ['a texture missing from the layout list', (built: Package) => { built.scenery.sectors[0].textures = ['scenery/textures/' + '0'.repeat(64) + '.ktx2']; }],
+    ['a texture file of the wrong size', (built: Package) => { built.scenery.textures[0].byteLength += 1; }],
+    ['non-finite bounds', (built: Package) => { built.scenery.horizon.bounds.min[0] = Infinity; }],
+    ['a layout without track geometry', (built: Package) => { built.scenery.layoutKey = 'spa_wec'; }],
+  ])('rejects %s', (_name, change) => { expect(mutate(change)).toBe('invalid'); });
+
+  it('rejects an empty catalog', () => {
+    const built = build();
+    built.commit(); built.write('scenery/index.json', []);
+    expect(state(built)).toBe('invalid');
   });
-  it('rejects external resources, transforms, invalid ranges and allocation bombs', () => {
-    expect(validateSceneGlb(syntheticGlb())).toEqual({triangles: 1, min: [0, 4, 0], max: [5, 7, 5]});
-    const changes: Array<(json: Record<string, unknown>) => void> = [
-      json => { json.buffers = [{uri: 'https://example.com/private', byteLength: 48}]; },
-      json => { json.extensionsUsed = ['unknown']; },
-      json => { json.nodes = [{mesh: 0, translation: [1, 0, 0]}]; },
-      json => { json.accessors = [{bufferView: 0, count: 10_000_000, type: 'VEC3', componentType: 5126}]; },
-      json => { json.bufferViews = [{buffer: 0, byteOffset: 4000, byteLength: 48}]; },
-      json => { json.scenes = [{nodes: [99]}]; },
-    ];
-    for (const change of changes) expect(() => validateSceneGlb(syntheticGlb(change))).toThrow();
-    const badIndex = syntheticGlb(); badIndex.writeUInt32LE(999, badIndex.length - 4); expect(() => validateSceneGlb(badIndex)).toThrow('index');
-    const invalidPosition = syntheticGlb(); invalidPosition.writeFloatLE(NaN, invalidPosition.length - 48); expect(() => validateSceneGlb(invalidPosition)).toThrow('coordinate');
+
+  it('refuses bytes that differ from their hash or their extension when served', () => {
+    const built = build(), plugin = new DataPlugin(built.dir);
+    expect(plugin.status.state).toBe('ready');
+    const file = path.join(built.dir, built.scenery.sectors[0].asset), bytes = fs.readFileSync(file);
+    bytes[bytes.length - 1] ^= 0xff; fs.writeFileSync(file, bytes);
+    expect(() => plugin.sceneryFile(built.scenery.sectors[0].asset)).toThrow('Package resource changed');
+    expect(plugin.sceneryFile(built.scenery.sectors[1].asset)).not.toBeNull();
+  });
+
+  it('rejects a chunk whose content is not a GLB when served', () => {
+    const built = build();
+    const bytes = Buffer.from('not a glb at all'), row = built.scenery.sectors[0], stored = built.store('scenery', 'glb', bytes);
+    Object.assign(row, stored); built.commit();
+    expect(() => new DataPlugin(built.dir).sceneryFile(stored.asset)).toThrow('not the expected file type');
+  });
+});
+
+describe('car validation', () => {
+  const mutate = (change: (built: Package) => void) => { const built = build(); change(built); built.commit(); return state(built); };
+
+  it.each([
+    ['a vehicle id missing from the vehicle catalog', (built: Package) => { built.car.vehicleIds = ['OTHER_CAR']; built.descriptor.aliases = ['OTHER_CAR']; (built.descriptor.appearances as Array<{ alias: string }>)[0].alias = 'OTHER_CAR'; }],
+    ['aliases that differ from the row', (built: Package) => { built.descriptor.aliases = ['TEST_CAR', 'EXTRA']; }],
+    ['appearances that do not cover the aliases', (built: Package) => { built.descriptor.appearances = []; }],
+    ['a wheel rig that did not pass', (built: Package) => { built.descriptor.wheelRig = { passed: false, rigs: 4, maxRestVertexErrorM: 0 }; }],
+    ['a wheel rig with rest-vertex error', (built: Package) => { built.descriptor.wheelRig = { passed: true, rigs: 4, maxRestVertexErrorM: 0.01 }; }],
+    ['a missing wheel pivot', (built: Package) => { delete (built.descriptor.wheelPivots as Record<string, unknown>).rr; }],
+    ['an undeclared texture', (built: Package) => { (built.descriptor.appearances as Array<{ materialTextures?: unknown }>)[0].materialTextures = { body: 'textures/' + '1'.repeat(64) + '.ktx2' }; }],
+    ['a descriptor of another car', (built: Package) => { built.descriptor.vehicleFolder = 'Other'; }],
+    ['an unknown descriptor field', (built: Package) => { built.descriptor.extra = true; }],
+    ['a non-boolean paint flag', (built: Package) => { (built.descriptor.materials as Array<{ paint: unknown }>)[0].paint = 'yes'; }],
+    ['an asset that is not content-named', (built: Package) => { built.car.asset = 'cars/Test_Car.glb'; }],
+    ['a car texture of the wrong size', (built: Package) => { built.car.textures[0].byteLength += 1; }],
+  ])('rejects %s', (_name, change) => { expect(mutate(change)).toBe('invalid'); });
+
+  it('rejects two cars serving one vehicle id', () => {
+    const built = build();
+    const other = { ...built.car, vehicleFolder: 'Other_Car', descriptor: 'cars/Other_Car.json' };
+    built.write('cars/index.json', [built.car, other]);
+    expect(state(built)).toBe('invalid');
+  });
+
+  it('serves a car without a vehicle catalog bound to it', () => {
+    const built = build();
+    delete built.manifest.vehicles; built.commit();
+    expect(new DataPlugin(built.dir).car('TEST_CAR')).not.toBeNull();
+  });
+});
+
+describe('scenery and car routes', () => {
+  it('serves layouts, content-named files and car resources with immutable caching and nosniff', async () => {
+    const built = build(), app = express();
+    app.use('/api/data-plugin', createDataPluginRouter(new DataPlugin(built.dir)));
+    const layout = await request(app).get('/api/data-plugin/scenery/monza_gp');
+    expect(layout.status).toBe(200); expect(layout.body).toHaveProperty('horizon.id', 'horizon'); expect(layout.body).toHaveProperty('packageRevision');
+    expect((await request(app).get('/api/data-plugin/scenery/spa_wec')).status).toBe(404);
+
+    const chunk = await request(app).get('/api/data-plugin/scenery/files/' + path.basename(built.scenery.sectors[0].asset)).buffer().parse((res, done) => { const parts: Buffer[] = []; res.on('data', (part: Buffer) => parts.push(part)); res.on('end', () => done(null, Buffer.concat(parts))); });
+    expect(chunk.status).toBe(200); expect(chunk.headers['content-type']).toContain('model/gltf-binary');
+    expect(chunk.headers['x-content-type-options']).toBe('nosniff'); expect(chunk.headers['cache-control']).toBe('private, max-age=31536000, immutable');
+    expect(chunk.body).toEqual(glb('sector 0'));
+    const texture = await request(app).get('/api/data-plugin/scenery/files/textures/' + path.basename(built.sceneryTexture.asset));
+    expect(texture.status).toBe(200); expect(texture.headers['content-type']).toContain('image/ktx2');
+    expect((await request(app).get('/api/data-plugin/scenery/files/' + '0'.repeat(64) + '.glb')).status).toBe(404);
+    expect((await request(app).get('/api/data-plugin/scenery/files/..%2Fmanifest.json')).status).toBe(404);
+
+    const car = await request(app).get('/api/data-plugin/cars/test_car.veh');
+    expect(car.status).toBe(200); expect(car.body).toMatchObject({ vehicleFolder: 'Test_Car', sha256: built.car.sha256 });
+    expect((await request(app).get('/api/data-plugin/cars/unknown')).status).toBe(404);
+    expect((await request(app).get('/api/data-plugin/cars/files/Test_Car.json')).body).toHaveProperty('vehicleFolder', 'Test_Car');
+    expect((await request(app).get('/api/data-plugin/cars/files/' + path.basename(built.car.asset))).headers['content-type']).toContain('model/gltf-binary');
+    expect((await request(app).get('/api/data-plugin/cars/files/textures/' + path.basename(built.carTexture.asset))).status).toBe(200);
+    expect((await request(app).get('/api/data-plugin/cars/files/textures/' + '0'.repeat(64) + '.ktx2')).status).toBe(404);
+  });
+
+  it('reports a package file changed on disk as a conflict instead of serving it', async () => {
+    const built = build(), app = express();
+    app.use('/api/data-plugin', createDataPluginRouter(new DataPlugin(built.dir)));
+    fs.writeFileSync(path.join(built.dir, built.scenery.sectors[0].asset), glb('tampered'.padEnd(Buffer.from('sector 0').length, '!')));
+    expect((await request(app).get('/api/data-plugin/scenery/files/' + path.basename(built.scenery.sectors[0].asset))).status).toBe(409);
+    expect((await request(app).get('/api/data-plugin/scenery/files/' + path.basename(built.scenery.sectors[1].asset))).status).toBe(200);
   });
 });

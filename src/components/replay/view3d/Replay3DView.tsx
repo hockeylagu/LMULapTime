@@ -134,7 +134,6 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
           <p>{state?.error ?? 'Loading 3D track surfaces…'}</p>
           {state?.error && <button type="button" onClick={() => setRetry(value => value + 1)} className={`mt-3 px-3 py-1.5 rounded bg-lmu-raised ${FOCUS_RING}`}>Retry 3D scene</button>}
         </div>}
-        {state?.warning && <p role="status" className="absolute bottom-12 left-2 z-30 px-3 py-1 rounded bg-lmu-strip/80 backdrop-blur-sm text-xs text-lmu-warn">Using estimated car geometry: {state.warning}</p>}
       </div>
       {isExpanded && onSelectIndex ? (
         <GpsMapTelemetryDock points={trajectory.points} baselinePoints={baseline?.points} comparisons={comparisons} currentIndex={currentIndex}

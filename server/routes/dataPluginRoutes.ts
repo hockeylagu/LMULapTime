@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import { DataPlugin, dataPlugin } from '../plugins/dataPlugin.js';
 
 export function createDataPluginRouter(provider:DataPlugin=dataPlugin):Router {
@@ -13,69 +13,27 @@ export function createDataPluginRouter(provider:DataPlugin=dataPlugin):Router {
     if(!record){res.status(404).json({error:'Track data unavailable'});return;}
     res.json({packageRevision:provider.status.revision,...record});
   });
-  router.get('/scenes/:layoutKey', (req, res) => {
-    const scene = provider.scene(req.params.layoutKey);
-    if (!scene) { res.status(404).json({error: '3D track scene unavailable for this layout'}); return; }
-    res.json(scene);
+  router.get('/scenery/:layoutKey', (req, res) => {
+    const layout = provider.sceneryLayout(req.params.layoutKey);
+    if (!layout) { res.status(404).json({error: '3D scenery unavailable for this layout'}); return; }
+    res.json(layout);
   });
-  router.get('/scenes/:layoutKey/:revision/asset', (req, res) => {
+  // Scenery and car files are content-named (sha256), so the bytes at a URL never change.
+  const sendFile = (res: Response, read: () => Buffer | null, type: string, label: string) => {
     try {
-      const bytes = provider.sceneAsset(req.params.layoutKey, req.params.revision);
-      if (!bytes) { res.status(404).json({error: '3D scene revision unavailable'}); return; }
-      res.type('model/gltf-binary').send(bytes);
-    } catch { res.status(409).json({error: '3D scene changed on disk. Restore the package or restart the backend.'}); }
+      const bytes = read();
+      if (!bytes) { res.status(404).json({error: `${label} unavailable`}); return; }
+      res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('Cache-Control', 'private, max-age=31536000, immutable'); res.type(type).send(bytes);
+    } catch { res.status(409).json({error: `${label} changed on disk. Restore the package or restart the backend.`}); }
+  };
+  router.get('/scenery/files/:file', (req, res) => sendFile(res, () => provider.sceneryFile(`scenery/${req.params.file}`), req.params.file.endsWith('.glb') ? 'model/gltf-binary' : 'application/octet-stream', '3D scenery file'));
+  router.get('/scenery/files/textures/:file', (req, res) => sendFile(res, () => provider.sceneryFile(`scenery/textures/${req.params.file}`), 'image/ktx2', '3D scenery texture'));
+  router.get('/cars/:identity', (req, res) => {
+    const car = provider.car(req.params.identity);
+    if (!car) { res.status(404).json({error: 'Textured car unavailable for this vehicle'}); return; }
+    res.json(car);
   });
-  router.get('/vehicle-meshes/:recordId', (req, res) => {
-    const mesh = provider.vehicleMesh(req.params.recordId);
-    if (!mesh) { res.status(404).json({error: '3D vehicle mesh unavailable'}); return; }
-    res.json(mesh);
-  });
-  router.get('/brake-board-artwork/:layoutKey', (req, res) => res.json(provider.brakeBoardArtwork(req.params.layoutKey)));
-  router.get('/brake-board-artwork/:layoutKey/:revision/asset', (req, res) => {
-    try {
-      const bytes = provider.brakeBoardImage(req.params.layoutKey, req.params.revision);
-      if (!bytes) { res.status(404).json({error: 'Brake-board image unavailable'}); return; }
-      res.setHeader('X-Content-Type-Options', 'nosniff'); res.type('png').send(bytes);
-    } catch { res.status(409).json({error: 'Brake-board image changed on disk. Restore the package or restart the backend.'}); }
-  });
-  router.get('/vehicle-meshes/:recordId/:revision/asset', (req, res) => {
-    try {
-      const bytes = provider.vehicleMeshAsset(req.params.recordId, req.params.revision);
-      if (!bytes) { res.status(404).json({error: '3D vehicle mesh revision unavailable'}); return; }
-      res.type('model/gltf-binary').send(bytes);
-    } catch { res.status(409).json({error: '3D vehicle mesh changed on disk. Restore the package or restart the backend.'}); }
-  });
-  router.get('/vehicle-liveries/:identity', (req, res) => {
-    const livery = provider.vehicleLivery(req.params.identity);
-    if (!livery) { res.status(404).json({error: 'Vehicle livery unavailable'}); return; }
-    res.json(livery);
-  });
-  router.get('/vehicle-liveries/:liveryKey/:revision/asset', (req, res) => {
-    try {
-      const bytes = provider.vehicleLiveryAsset(req.params.liveryKey, req.params.revision);
-      if (!bytes) { res.status(404).json({error: 'Vehicle livery unavailable'}); return; }
-      res.setHeader('X-Content-Type-Options', 'nosniff'); res.type('image/webp').send(bytes);
-    } catch { res.status(409).json({error: 'Vehicle livery changed on disk. Restore the package or restart the backend.'}); }
-  });
-  router.get('/vehicle-wheels/:identity', (req, res) => {
-    const wheels = provider.vehicleWheels(req.params.identity);
-    if (!wheels) { res.status(404).json({error: 'Vehicle wheels unavailable'}); return; }
-    res.json(wheels);
-  });
-  router.get('/vehicle-wheels/:sha256/asset', (req, res) => {
-    try {
-      const bytes = provider.vehicleWheelAsset(req.params.sha256);
-      if (!bytes) { res.status(404).json({error: 'Vehicle wheel texture unavailable'}); return; }
-      res.setHeader('X-Content-Type-Options', 'nosniff'); res.type('image/webp').send(bytes);
-    } catch { res.status(409).json({error: 'Vehicle wheel texture changed on disk. Restore the package or restart the backend.'}); }
-  });
-  router.get('/track-textures/:layoutKey', (req, res) => res.json(provider.trackTextures(req.params.layoutKey)));
-  router.get('/track-textures/:layoutKey/:textureKey/:revision/asset', (req, res) => {
-    try {
-      const bytes = provider.trackTextureAsset(req.params.layoutKey, req.params.textureKey, req.params.revision);
-      if (!bytes) { res.status(404).json({error: 'Track texture unavailable'}); return; }
-      res.setHeader('X-Content-Type-Options', 'nosniff'); res.type('image/webp').send(bytes);
-    } catch { res.status(409).json({error: 'Track texture changed on disk. Restore the package or restart the backend.'}); }
-  });
+  router.get('/cars/files/:file', (req, res) => sendFile(res, () => provider.carFile(`cars/${req.params.file}`), req.params.file.endsWith('.glb') ? 'model/gltf-binary' : 'application/json', '3D car file'));
+  router.get('/cars/files/textures/:file', (req, res) => sendFile(res, () => provider.carFile(`cars/textures/${req.params.file}`), 'image/ktx2', '3D car texture'));
   return router;
 }

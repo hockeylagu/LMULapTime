@@ -24,11 +24,3 @@ export type {
   LiveResourceKind, LivePerLapSource, LiveResourcePlan, LiveRacePlan, LivePitState, LivePitMenu, LivePitInfo,
   LiveCorner, LiveDamage, LiveTyres, LiveForecast, LiveGaragePlan, LiveGarageTyres, LiveStrategy, LiveDeployment, LiveTyreCrossover,
 } from './liveStrategy.js';
-export type { VehicleLiveryMetadata, VehicleLiveryResource } from './scenes/vehicleLivery.js';
-export type { TrackTextureMetadata, TrackTextureResource } from './scenes/trackTexture.js';
-export type {
-  VehicleWheelTextureMetadata,
-  VehicleWheelRecord,
-  VehicleWheelTextureResource,
-  VehicleWheelResource,
-} from './scenes/vehicleWheel.js';

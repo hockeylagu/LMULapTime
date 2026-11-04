@@ -1,39 +1,36 @@
-import {MeshoptDecoder} from 'meshoptimizer/decoder';
-import { BufferGeometry, FrontSide, Group, Mesh, MeshStandardMaterial, type Material, OrthographicCamera, PerspectiveCamera, Quaternion, Scene, Vector3, WebGLRenderer, type Object3D } from 'three';
+import { Group, OrthographicCamera, PerspectiveCamera, Quaternion, Scene, Vector3, WebGLRenderer, Mesh, type Material, type Object3D, type Texture } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import type { TrackSceneResource } from '../../../../shared/types/scenes/trackScene.js';
+import type { SceneryLayoutResource } from '../../../../shared/types/scenes/scenery.js';
 import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
+import { CAR_FILES } from '../../../api/vehicles/carApi.js';
 import { createTracksideCameras } from './tracksideCameras.js';
-import { applyKerbStripes } from './kerbStripes.js';
 import type { MapColorMode } from '../map/replayMapUtils.js';
 import { sampleRenderPose, sampleStationPose } from './replayPose.js';
 import { nativeToScene } from './sceneFrame.js';
-import { createLapLayerLoader, type LapVehicleModels } from './laps/lapLayer.js';
+import { createLapLayerLoader, type LapCars, type LapLayer } from './laps/lapLayer.js';
 import { disposeObjects } from './laps/disposeObjects.js';
-import type { SurfaceHeight } from './surfaceProjection.js';
-import { prepareSurfaceLayers } from './surfaceProjection.js';
 import { MIN_CAMERA_DISTANCE, MAX_CAMERA_DISTANCE, panCamera, zoomCamera } from './cameraNavigation.js';
 import type { CameraMode } from './cameraModes.js';
 import { computeCockpitPose, createChaseCameraTracker, trackCamera } from './cameraTracking.js';
-import { addSceneEnvironment, TERRAIN_COLOR } from './sceneEnvironment.js';
-import { makeBrakeBoards } from './brakeBoards.js';
-import type { LoadedBrakeBoardArtwork } from '../../../api/scenes/brakeBoardArtworkApi.js';
-import { activeRoadBounds, applyActiveRoad, rasterizeActiveRoad } from './activeRoad.js';
-import type { TrackBoundaryGeometry, TrackMapDisplay } from '../../../../shared/types/trackGeometry.js';
-import { makeTrackLimits } from './trackLimits.js';
-import { applyTrackTextures } from './trackTextures.js';
-import type { LoadedTrackTexture } from '../../../api/scenes/trackTextureApi.js';
+import { addSceneEnvironment } from './sceneEnvironment.js';
+import { setCockpitView } from './sceneObjects.js';
+import { CachedKtx2Loader } from './scenery/cachedKtx2Loader.js';
+import { createChunkLoader } from './scenery/chunkLoader.js';
+import { createSceneryHeights } from './scenery/sceneryHeights.js';
+import {createCameraCollision} from './scenery/cameraCollision.js';
+import { surfaceTextureMaps } from './scenery/materials/configureSurfaceMaterial.js';
+import type { StreamView } from './scenery/residency.js';
+import { createSceneryStream } from './scenery/sceneryStream.js';
+import { createGeometryWarmup } from './scenery/geometryWarmup.js';
+import { isFreeCameraMode, stationAt, viewMoved } from './scenery/streamView.js';
 
-/** Eye height kept above the road, filler ground and horizon ground. */
-const CAMERA_CLEARANCE_M = 1.2;
 const DEFAULT_CHASE_DISTANCE_M = 7.8;
 const DEFAULT_CHASE_HEIGHT_M = 2.2;
 const CHASE_LOOK_ELEVATION_M = 0.5;
 
 export interface ReplaySceneHandle {
   wheelMotion: string;
-  updateLaps(trajectory: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null, models: LapVehicleModels, signal?: AbortSignal): Promise<boolean>;
+  updateLaps(trajectory: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null, assets: LapCars, signal?: AbortSignal): Promise<boolean>;
   cursor(index: number, fraction: number): void;
   mode(mode: CameraMode): void;
   reset(): void;
@@ -47,124 +44,162 @@ export interface ReplaySceneHandle {
   dispose(): void;
 }
 
-/** Barriers, pit wall, pit building and walls: structure, not ground, so they stay out of road heights. */
-const BARRIER_KINDS = new Set(['barrier', 'tyreBarrier', 'tecpro', 'pitWall', 'building', 'wall', 'armco']);
-
-export function detachBarriers(root: Object3D): Group {
-  const barriers = new Group(); barriers.name = 'barriers';
-  for (const child of root.children.filter(child => BARRIER_KINDS.has(child.name))) barriers.add(child);
-  barriers.traverse(object => {
-    if (!(object instanceof Mesh)) return;
-    if (object.geometry instanceof BufferGeometry && !object.geometry.getAttribute('normal')) {
-      object.geometry.computeVertexNormals();
-    }
-    object.castShadow = true;
-    object.receiveShadow = true;
-  });
-  return barriers;
-}
-
-/**
- * Lowest eye height (scene frame) that keeps the sight line to `look` over the scanned surfaces between
- * them: past a banking's top, an eye below the road edge saw the car through the culled road.
- */
-export function sightLineFloor(eye: Vector3, look: Vector3, origin: Vector3, surfaceHeight: SurfaceHeight): number {
-  const CLEARANCE_M = 0.1, SAMPLES = 8;
-  let floor = -Infinity;
-  for (let k = 1; k < SAMPLES; k++) {
-    const s = k / SAMPLES;
-    const x = look.x + (eye.x - look.x) * s + origin.x, z = origin.z - (look.z + (eye.z - look.z) * s);
-    const height = surfaceHeight({x, y: look.y + (eye.y - look.y) * s + origin.y + 3, z}, 400);
-    if (height !== null) floor = Math.max(floor, look.y + (height - origin.y + CLEARANCE_M - look.y) / s);
-  }
-  return floor;
-}
-
 export async function createReplayScene(
-  host: HTMLDivElement, bytes: ArrayBuffer, metadata: TrackSceneResource,
+  host: HTMLDivElement, layout: SceneryLayoutResource,
   trajectory: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null,
   onFailure: (message: string) => void,
-  vehicleModels: LapVehicleModels,
-  /** The 2D map's layout: white-line limits, plus display layers (brake boards, active road outline). */
-  track: {geometry: TrackBoundaryGeometry; display: TrackMapDisplay | null} | null = null,
+  cars: LapCars,
   colorBy: MapColorMode = 'default',
-  boardArtwork: LoadedBrakeBoardArtwork[] = [],
-  trackTextures: LoadedTrackTexture[] = [],
 ): Promise<ReplaySceneHandle> {
-  const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(bytes, '');
-  const origin = new Vector3(...metadata.bounds.min).add(new Vector3(...metadata.bounds.max)).multiplyScalar(0.5);
-  const barriers = detachBarriers(gltf.scene);
-  // Road heights exclude the filler ground and walls.
-  const {fillerGround, surfaceHeight, groundHeight} = prepareSurfaceLayers(gltf.scene);
-  const loadLaps = createLapLayerLoader(origin, surfaceHeight);
-  let layer: Awaited<ReturnType<typeof loadLaps>>;
-  try { layer = await loadLaps(trajectory, baseline, vehicleModels, colorBy); }
-  catch (error) { disposeObjects(gltf.scene); disposeObjects(barriers); throw error; }
-  let lineMode = colorBy, primaryOpacity = 1, baselineOpacity = 1, lapRequest = 0;
   let renderer: WebGLRenderer;
   try { renderer = new WebGLRenderer({antialias: true, alpha: false}); }
-  catch { layer.dispose(); disposeObjects(gltf.scene); disposeObjects(barriers); throw Error('WebGL 2 is unavailable. Use the 2D map.'); }
-  const scene = new Scene();
-  const environment = addSceneEnvironment(scene, renderer, metadata.bounds.min[1] - origin.y);
-  gltf.scene.position.copy(origin).negate(); barriers.position.copy(gltf.scene.position);
-  gltf.scene.traverse(object => {
-    if (!(object instanceof Mesh) || !(object.geometry instanceof BufferGeometry)) return;
-    const mesh = object as Mesh<BufferGeometry, Material | Material[]>;
-    // The filler ground sits just under the road: a car shadow on it would show through from below road level.
-    if (!mesh.geometry.getAttribute('normal')) mesh.geometry.computeVertexNormals();
-    mesh.receiveShadow = mesh !== fillerGround;
-    // Raised kerbs throw a strip of shade on the road; flat sheets would only cost shadow-map time.
-    mesh.castShadow = mesh.name === 'kerb' || mesh.name.startsWith('kerb-source-') || /curb|kerb/i.test(mesh.name);
-    // Ground sheets are one-sided (the package winds them face up): an underside seen past a hillside edge is never drawn.
-    for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
-      material.side = FrontSide;
-      if (mesh === fillerGround) {
-        material.polygonOffset = true; material.polygonOffsetFactor = 1; material.polygonOffsetUnits = 1;
-        if (material instanceof MeshStandardMaterial) material.color.set(TERRAIN_COLOR);
+  catch { throw Error('WebGL 2 is unavailable. Use the 2D map.'); }
+  const {min, max} = layout.horizon.bounds, origin = new Vector3(...min).add(new Vector3(...max)).multiplyScalar(0.5);
+  const loader = createChunkLoader(renderer), carTextures = new CachedKtx2Loader(renderer), heights = createSceneryHeights(() => { scheduleRefresh(); invalidate(); });
+  const {surfaceHeight} = heights;
+  const collision = createCameraCollision();
+  // Scenery chunks live in native coordinates under one group, shifted by the scene origin.
+  const sceneryRoot = new Group(); sceneryRoot.position.copy(origin).negate();
+  let layer: LapLayer, layerReady = false;
+  let disposed = false, refreshTimer = 0, invalidate: () => void = () => {};
+  // Lines are draped on the road: when the resident chunks change, re-drape them (coalesced).
+  let freezeScenery = () => {};
+  let prepareShadows = (_root: Object3D) => {};
+  const scheduleRefresh = () => {
+    if (refreshTimer || !layerReady) return;
+    refreshTimer = window.setTimeout(() => { refreshTimer = 0; if (disposed) return; layer.refreshHeights(); invalidate(); }, 250);
+  };
+  // A chunk compiles its programs and uploads its textures before it joins the scene, a texture per frame, so its first draw does
+  // not stall playback. Chunks loaded before the scene exists (the first view) are drawn behind the loading screen anyway.
+  let warmTarget: {scene: Scene; camera?: PerspectiveCamera} | null = null;
+  const UPLOAD_SLICE_MS = 1;
+  const nextFrame = () => new Promise<void>(resolve => { requestAnimationFrame(() => resolve()); });
+  const geometryWarmup = createGeometryWarmup(renderer, nextFrame, UPLOAD_SLICE_MS);
+  const warmUp = async (root: Object3D, signal: AbortSignal) => {
+    const target = warmTarget;
+    if (!target?.camera) return;
+    await renderer.compileAsync(root, target.camera, target.scene);
+    const textures = new Set<Texture>();
+    root.traverse(object => {
+      if (!(object instanceof Mesh)) return;
+      const own = (object as Mesh).material, materials: Material[] = Array.isArray(own) ? own : [own];
+      for (const material of materials) {
+        for (const value of Object.values(material as unknown as Record<string, unknown>)) if (value && (value as Texture).isTexture) textures.add(value as Texture);
+        for (const texture of surfaceTextureMaps.get(material) ?? []) textures.add(texture);
       }
+    });
+    // Upload in per-frame slices: a whole chunk at once is the stall this avoids.
+    const uploadBudgetMs = root === target.scene ? 12 : UPLOAD_SLICE_MS;
+    let sliceEnd = performance.now() + uploadBudgetMs;
+    for (const texture of textures) {
+      signal.throwIfAborted();
+      renderer.initTexture(texture);
+      // eslint-disable-next-line no-await-in-loop -- yields a frame between upload slices
+      if (performance.now() >= sliceEnd) { await nextFrame(); sliceEnd = performance.now() + uploadBudgetMs; }
     }
+    await geometryWarmup.upload(root, target.camera, signal, uploadBudgetMs);
+  };
+  let warming = Promise.resolve();
+  const stream = createSceneryStream(layout, sceneryRoot, {
+    load: async (chunk, signal) => {
+      const root = await loader.load(chunk, signal);
+      const ready = warming.then(async () => { signal.throwIfAborted(); prepareShadows(root); await warmUp(root, signal); await collision.add(chunk.id, root); signal.throwIfAborted(); });
+      warming = ready.catch(() => {});
+      try { await ready; return root; }
+      catch (error) { collision.remove(chunk.id); loader.releaseChunk(root); throw error; }
+    },
+    prepare: (chunk, root) => {
+      // The filler ground sits just under the road: a car shadow on it would show through from below road level.
+      root.traverse(object => { if (object instanceof Mesh) object.receiveShadow = !object.name.startsWith('FILLER_GROUND'); });
+      heights.add(chunk.id, root, chunk.bounds);
+    },
+    unload: (chunk, root) => { heights.remove(chunk.id); collision.remove(chunk.id); loader.releaseChunk(root); },
+    releaseTexture: asset => loader.releaseTexture(asset),
+    changed: () => { freezeScenery(); scheduleRefresh(); invalidate(); },
+    failed: (chunk, error) => { if (!disposed) onFailure(`3D scenery chunk ${chunk.id} failed: ${error.message}`); },
   });
-  applyTrackTextures(gltf.scene, trackTextures);
+  const cleanup = () => {
+    disposed = true; window.clearTimeout(refreshTimer); heights.dispose(); stream.dispose(); loader.dispose(); carTextures.dispose();
+    collision.dispose(); geometryWarmup.dispose(); renderer.dispose(); renderer.forceContextLoss();
+  };
+  const route = layout.routeLengthM;
+  const firstStation = stationAt(trajectory.points, 0, 0, route);
+  if (firstStation === undefined) { cleanup(); throw Error('This recording has no track stations. Use the 2D map.'); }
+  let currentStation = firstStation, mode: CameraMode = 'follow', streamView: StreamView | null = null;
+  const loadLaps = createLapLayerLoader(origin, surfaceHeight, path => carTextures.loadAsync(`${CAR_FILES}${path}`));
+  // The horizon and the chunks under the first pose must be resident before cars and lines are draped on them.
+  try {
+    streamView = {kind: 'lap', lapDistanceM: currentStation}; stream.update(streamView);
+    await stream.whenUnderView();
+    await heights.whenReady();
+    layer = await loadLaps(trajectory, baseline, cars, colorBy); layerReady = true;
+  } catch (error) { cleanup(); throw error; }
+  let lineMode = colorBy, primaryOpacity = 1, baselineOpacity = 1, lapRequest = 0;
+  const scene = new Scene();
+  warmTarget = {scene};
+  const environment = addSceneEnvironment(scene, renderer, layout.daylight);
+  prepareShadows = root => environment.prepareObject(root);
   // Convert the native left-handed frame once, including meshes, car bodies and trails.
   // Camera targets/offsets use the same reflection. Mirroring only terrain misaligns poses.
-  const world = new Group(); world.scale.z = -1; world.add(gltf.scene, barriers); scene.add(world);
-  const display = track?.display ?? null, roadBounds = activeRoadBounds(display?.surfaces.road ?? [], metadata.bounds);
-  const activeRoad = rasterizeActiveRoad(display?.surfaces.road ?? [], roadBounds);
-  applyActiveRoad(gltf.scene, activeRoad, roadBounds);
-  scene.add(makeBrakeBoards(display?.brakeMarkers ?? [], trajectory.points, origin, surfaceHeight, boardArtwork));
-  if (track) world.add(makeTrackLimits([track.geometry.leftBoundary, track.geometry.rightBoundary], trajectory.points, origin, surfaceHeight));
+  const world = new Group(); world.scale.z = -1; world.add(sceneryRoot); scene.add(world);
+  freezeScenery = () => {
+    sceneryRoot.traverse(object => { object.matrixWorldAutoUpdate = true; });
+    sceneryRoot.updateWorldMatrix(true, true);
+    sceneryRoot.traverse(object => { object.matrixAutoUpdate = false; object.matrixWorldAutoUpdate = false; });
+  };
+  freezeScenery();
   world.add(layer.root);
   const perspective = new PerspectiveCamera(48, 1, 0.5, 15000);
+  warmTarget = {scene, camera: perspective};
+  environment.setCamera(perspective);
+  // The first view's chunks loaded before the camera existed: compile and upload them (and the cars) behind the loading screen.
+  try { await warmUp(scene, new AbortController().signal); } catch (error) { cleanup(); throw error; }
   const overhead = new OrthographicCamera(-80, 80, 80, -80, 0.5, 15000);
   let camera: PerspectiveCamera | OrthographicCamera = perspective;
   const controls = new OrbitControls<PerspectiveCamera | OrthographicCamera>(camera, renderer.domElement);
   controls.enableDamping = false; controls.enablePan = false; controls.maxPolarAngle = Math.PI * 0.49; controls.minDistance = MIN_CAMERA_DISTANCE; controls.maxDistance = MAX_CAMERA_DISTANCE;
   // Replay owns Left/Right; WASD camera pan is dispatched through the shared shortcut guard.
-  let mode: CameraMode = 'follow', frame = 0, disposed = false, initialized = false, currentYaw = 0, currentTime = 0;
+  let frame = 0, initialized = false, currentYaw = 0, currentTime = 0;
   const syncCockpitVisibility = () => {
-    layer.primary.traverse(obj => {
-      if (obj.name === 'cabin' || obj.name === 'glass') obj.visible = mode !== 'cockpit';
-    });
+    setCockpitView(layer.primary, mode === 'cockpit' ? 'in' : 'out');
   };
   syncCockpitVisibility();
   let currentOrientation: Quaternion | undefined;
   const target = new Vector3(), previousTarget = new Vector3();
   const chaseTracker = createChaseCameraTracker();
-  applyKerbStripes(gltf.scene, trajectory.points, layer.primaryDistances);
   let trackside = createTracksideCameras(trajectory.points, layer.primaryDistances, origin);
-  const ground = {x: 0, y: 0, z: 0};
-  /** Lift a perspective eye that orbit, zoom or follow pushed below the road, hills or default ground. */
-  const keepAboveGround = () => {
-    if (camera !== perspective || mode === 'cockpit') return;
-    const eye = camera.position;
-    ground.x = eye.x + origin.x; ground.y = eye.y + origin.y + 60; ground.z = origin.z - eye.z;
-    const surface = surfaceHeight(ground, 400), filler = groundHeight(ground, 400);
-    const floor = Math.max(environment.groundY, ...[surface, filler].map(height => height === null ? -Infinity : height - origin.y)) + CAMERA_CLEARANCE_M;
-    const lowest = Math.max(floor, sightLineFloor(eye, controls.target, origin, surfaceHeight));
-    if (eye.y < lowest) { eye.y = lowest; camera.lookAt(controls.target); }
+  /** Stream scenery around the car (lap distance) or, for the panned orbit and overhead cameras, around the camera. */
+  const updateStream = () => {
+    const next: StreamView = isFreeCameraMode(mode)
+      ? {kind: 'free', x: camera.position.x + origin.x, z: origin.z - camera.position.z}
+      : {kind: 'lap', lapDistanceM: currentStation};
+    if (!viewMoved(streamView, next, route)) return;
+    streamView = next; stream.update(next);
   };
-  const draw = () => { if (!disposed) { keepAboveGround(); renderer.render(scene, camera); } };
-  const invalidate = () => {
+  const eyeRotation = new Quaternion(), desiredEye = new Vector3(), correctedEye = new Vector3();
+  const draw = () => {
+    if (disposed) return;
+    updateStream();
+    desiredEye.copy(camera.position);
+    if (camera === perspective && mode !== 'cockpit') collision.resolve(desiredEye, controls.target, origin, correctedEye);
+    else correctedEye.copy(desiredEye);
+    const corrected = !correctedEye.equals(desiredEye);
+    if (corrected) {
+      eyeRotation.copy(camera.quaternion);
+      camera.position.copy(correctedEye);
+      camera.lookAt(controls.target);
+    }
+    try {
+      environment.update(); renderer.render(scene, camera);
+    } finally {
+      if (corrected) {
+        camera.position.copy(desiredEye);
+        camera.quaternion.copy(eyeRotation);
+        camera.updateMatrixWorld();
+      }
+    }
+  };
+  invalidate = () => {
     if (disposed || frame || document.hidden) return;
     frame = requestAnimationFrame(() => { frame = 0; draw(); });
   };
@@ -220,12 +255,13 @@ export async function createReplayScene(
     get wheelMotion() { return layer.primaryWheels.description; },
     async updateLaps(next, comparison, assets, signal) {
       if (disposed || signal?.aborted) return false;
-      const compatible = (lap: ReplayTrajectoryData) => lap.layoutKey === metadata.layoutKey && lap.geometryRevision === metadata.sourceGeometryRevision
-        && lap.dataPluginRevision === trajectory.dataPluginRevision;
+      const compatible = (lap: ReplayTrajectoryData) => lap.layoutKey === layout.layoutKey && lap.geometryRevision === layout.sourceGeometryRevision
+        && lap.dataPluginRevision === layout.packageRevision;
       if (!compatible(next) || (comparison && !compatible(comparison))) throw Error('Lap and 3D scene must use the same layout, geometry and package revision.');
       const request = ++lapRequest;
       const replacement = await loadLaps(next, comparison, assets, lineMode);
       if (disposed || signal?.aborted || request !== lapRequest) { replacement.dispose(); return false; }
+      environment.prepareObject(replacement.root);
       replacement.colorLines(lineMode); replacement.fadeLines(primaryOpacity, baselineOpacity);
       layer.dispose(); layer = replacement; world.add(layer.root);
       syncCockpitVisibility();
@@ -247,6 +283,8 @@ export async function createReplayScene(
       primary.getObjectByName('body-envelope')!.visible = pose.yaw !== undefined;
       primary.getObjectByName('pose-marker')!.visible = pose.yaw === undefined;
 
+      const lapStation = stationAt(trajectory.points, pose.index, pose.fraction, route);
+      if (lapStation !== undefined) currentStation = lapStation;
       const station = (primaryDistances[index] ?? 0) + ((primaryDistances[index + 1] ?? primaryDistances[index] ?? 0) - (primaryDistances[index] ?? 0)) * fraction;
       const other = baseline ? sampleStationPose(baseline.points, baselineDistances, station) : null;
       ghost.visible = other !== null;
@@ -257,7 +295,7 @@ export async function createReplayScene(
         ghost.getObjectByName('body-envelope')!.visible = other.yaw !== undefined;
         ghost.getObjectByName('pose-marker')!.visible = other.yaw === undefined;
       }
-      previousTarget.copy(target); target.set(...nativeToScene(pose, origin)); environment.follow(target);
+      previousTarget.copy(target); target.set(...nativeToScene(pose, origin));
       // The first pose places the camera; tracking from the zero previous target would shift it by the car's whole offset.
       if (!initialized) { initialized = true; reset(); }
       else if (mode === 'trackside') {
@@ -283,7 +321,7 @@ export async function createReplayScene(
     mode(next) {
       if (next === mode) return;
       const wasTop = mode === 'top', wasCockpit = mode === 'cockpit'; mode = next;
-      camera = mode === 'top' ? overhead : perspective; controls.object = camera;
+      camera = mode === 'top' ? overhead : perspective; controls.object = camera; environment.setCamera(camera);
       controls.enabled = mode !== 'cockpit';
       if (wasCockpit && mode !== 'cockpit') camera.up.set(0, 1, 0);
       syncCockpitVisibility();
@@ -332,7 +370,7 @@ export async function createReplayScene(
     dispose() {
       disposed = true; cancelAnimationFrame(frame); observer.disconnect(); controls.dispose();
       renderer.domElement.removeEventListener('webglcontextlost', contextLost);
-      document.removeEventListener('visibilitychange', invalidate); disposeObjects(scene, true); activeRoad?.dispose(); environment.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
+      document.removeEventListener('visibilitychange', invalidate); clearTimeout(refreshTimer); heights.dispose(); stream.dispose(); collision.dispose(); disposeObjects(scene, true); loader.dispose(); carTextures.dispose(); environment.dispose(); geometryWarmup.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
     },
   };
 }

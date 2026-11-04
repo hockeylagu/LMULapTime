@@ -1,7 +1,7 @@
 import { Mesh, Texture, type Object3D, type Material, type BufferGeometry } from 'three';
 
 /** Dispose each GPU allocation once, including geometry shared by wheel parts. */
-export function disposeObjects(root: Object3D, includeShared = false): void {
+export function disposeObjects(root: Object3D, includeShared = false, disposeTextures = true): void {
   const materials = new Set<Material>(), geometries = new Set<BufferGeometry>(), textures = new Set<Texture>();
   root.traverse(object => {
     if (object instanceof Mesh || 'isLineSegments' in object) {
@@ -20,5 +20,5 @@ export function disposeObjects(root: Object3D, includeShared = false): void {
     }
     material.dispose();
   });
-  textures.forEach(texture => texture.dispose());
+  if (disposeTextures) textures.forEach(texture => texture.dispose());
 }

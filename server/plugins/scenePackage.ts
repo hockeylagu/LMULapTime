@@ -1,29 +1,153 @@
 import type { TrackBoundaryGeometry } from '../../shared/types/trackGeometry.js';
-import type { TrackScene } from '../../shared/types/scenes/trackScene.js';
-import { registerMeshAsset, type RegisteredMesh } from './meshAsset.js';
+import type { SceneryBounds, SceneryChunk, SceneryDaylight, SceneryLayout, SceneryTexture } from '../../shared/types/scenes/scenery.js';
+import { registerPackageFile, type PackageFile } from './packageFiles.js';
+import { array, count, exactKeys, finite, knownKeys, nonNegative, record, sha256, text, vec3 } from './strict.js';
 
-export function loadScenePackage(root: string, catalog: unknown, geometry: (key: string) => TrackBoundaryGeometry | null): Map<string, RegisteredMesh<TrackScene>> {
-  if (!Array.isArray(catalog) || !catalog.length || catalog.length > 100) throw Error('Invalid scene catalog');
-  const result = new Map<string, RegisteredMesh<TrackScene>>();
-  // Layouts of one venue often share every triangle: their rows name one file, read and counted once.
-  const files = new Map<string, RegisteredMesh>();
-  let totalBytes = 0;
-  for (const value of catalog as unknown[]) {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('Invalid scene metadata');
-    const row = value as TrackScene;
-    const allowed = new Set(['schemaVersion', 'layoutKey', 'coordinates', 'sourceGeometryRevision', 'revision', 'asset', 'sha256', 'byteLength', 'bounds', 'triangles', 'coverage']);
-    if (Object.keys(row).some(key => !allowed.has(key)) || row.schemaVersion !== 1 || row.coordinates !== 'lmu-local-xyz-metres' || (row.coverage !== 'surfaces' && row.coverage !== 'surfaces+barriers') || typeof row.layoutKey !== 'string' || typeof row.asset !== 'string' || !row.asset.endsWith('.glb') || !/^[a-f0-9]{64}$/.test(row.sha256) || row.revision !== `scene-${row.sha256}`) throw Error('Invalid scene contract');
-    const track = geometry(row.layoutKey);
-    if (!track || track.geometryRevision !== row.sourceGeometryRevision || result.has(row.layoutKey)) throw Error('Scene geometry mismatch');
-    const shared = files.get(row.asset);
-    if (shared && JSON.stringify([shared.metadata.sha256, shared.metadata.byteLength, shared.metadata.triangles, shared.metadata.bounds]) !== JSON.stringify([row.sha256, row.byteLength, row.triangles, row.bounds])) throw Error('Scene asset conflict');
-    if (!shared) {
-      files.set(row.asset, registerMeshAsset(root, row));
-      totalBytes += row.byteLength;
-      if (totalBytes > 1_000_000_000) throw Error('Scene budget exceeded');
-    }
-    result.set(row.layoutKey, {metadata: structuredClone(row), file: files.get(row.asset)!.file});
-  }
-  return result;
+/** Validated scenery of a package: layout indexes by layout key, and every chunk and texture file by package-relative path. */
+export interface SceneryStore { layouts: Map<string, SceneryLayout>; files: Map<string, PackageFile> }
+
+const MAX_GLB_BYTES = 128_000_000, MAX_TEXTURE_BYTES = 64_000_000, MAX_CHUNKS = 4096, MAX_TEXTURES = 8192;
+const CHUNKING = ['sectorLengthM', 'minSectorLengthM', 'maxSectorTriangles', 'horizonDistanceM', 'skylineHeightM', 'skylineMinDistanceM', 'terrainScaleExtentM', 'pitBandM'];
+const STREAMING = ['residentBehindM', 'residentAheadM', 'freeCameraRadiusM'];
+const TOTALS = ['triangles', 'vertices', 'drawCalls', 'glbBytes', 'geometryBytes', 'textureBytes', 'textureGpuBytes'];
+const CHUNK_COMMON = ['id', 'kind', 'bounds', 'asset', 'sha256', 'byteLength', 'triangles', 'vertices', 'drawCalls', 'geometryBytes', 'meshes', 'materials', 'textures'];
+const SESSIONS = ['race', 'qualify', 'practice1', 'practice2'];
+const TEXTURE = ['asset', 'sha256', 'byteLength', 'width', 'height', 'levels', 'format', 'srgb', 'gpuBytes'];
+
+function bounds(value: unknown, what: string): SceneryBounds {
+  const box = record(value, what);
+  exactKeys(box, ['min', 'max'], what);
+  const min = vec3(box.min, `${what}.min`), max = vec3(box.max, `${what}.max`);
+  if (min.some((n, i) => n > max[i])) throw Error(`${what}: min exceeds max`);
+  return { min, max };
 }
 
+function numbers(value: unknown, keys: string[], what: string, positive: boolean): void {
+  const row = record(value, what);
+  exactKeys(row, keys, what);
+  for (const key of keys) {
+    const n = finite(row[key], `${what}.${key}`);
+    if (positive ? n <= 0 : n < 0) throw Error(`${what}.${key}: out of range`);
+  }
+}
+
+function parseDaylight(value: unknown, what: string): SceneryDaylight {
+  const row = record(value, what);
+  exactKeys(row, ['date', 'sessions', 'airPollution', 'hazeBaseScale'], what);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text(row.date, `${what}.date`, 10))) throw Error(`${what}.date: expected YYYY-MM-DD`);
+  const sessions = array(row.sessions, `${what}.sessions`, SESSIONS.length);
+  if (sessions.length !== SESSIONS.length) throw Error(`${what}.sessions: expected ${SESSIONS.join(', ')}`);
+  sessions.forEach((value, i) => {
+    const session = record(value, `${what}.sessions[${i}]`);
+    knownKeys(session, ['id', 'localTime', 'sunElevationDeg'], ['sunBearingDeg'], `${what}.sessions[${i}]`);
+    if (session.id !== SESSIONS[i]) throw Error(`${what}.sessions[${i}]: expected ${SESSIONS[i]}`);
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(text(session.localTime, `${what}.sessions[${i}].localTime`, 5))) throw Error(`${what}.sessions[${i}].localTime: expected HH:MM`);
+    if (Math.abs(finite(session.sunElevationDeg, `${what}.sessions[${i}].sunElevationDeg`)) > 90) throw Error(`${what}.sessions[${i}].sunElevationDeg: out of range`);
+    if (session.sunBearingDeg !== undefined) {
+      const bearing = finite(session.sunBearingDeg, `${what}.sessions[${i}].sunBearingDeg`);
+      if (bearing < 0 || bearing >= 360) throw Error(`${what}.sessions[${i}].sunBearingDeg: out of range`);
+    }
+  });
+  nonNegative(row.airPollution, `${what}.airPollution`);
+  if (finite(row.hazeBaseScale, `${what}.hazeBaseScale`) <= 0) throw Error(`${what}.hazeBaseScale: must be positive`);
+  return structuredClone(row) as unknown as SceneryDaylight;
+}
+
+function parseChunk(value: unknown, what: string): SceneryChunk {
+  const row = record(value, what), kind = row.kind;
+  if (kind !== 'horizon' && kind !== 'main' && kind !== 'pit') throw Error(`${what}: unknown chunk kind`);
+  exactKeys(row, [...CHUNK_COMMON, ...(kind === 'horizon' ? [] : kind === 'main' ? ['lapStartM', 'lapEndM', 'prev', 'next'] : ['lapStartM', 'lapEndM', 'pitStartM', 'pitEndM', 'prev', 'next'])], what);
+  const hash = sha256(row.sha256, `${what}.sha256`);
+  if (row.asset !== `scenery/${hash}.glb`) throw Error(`${what}: asset is not the content-named GLB`);
+  for (const key of ['byteLength', 'triangles', 'vertices', 'drawCalls', 'geometryBytes', 'meshes', 'materials']) count(row[key], `${what}.${key}`);
+  if (!row.byteLength || !row.triangles || !row.drawCalls) throw Error(`${what}: empty chunk`);
+  text(row.id, `${what}.id`, 32); bounds(row.bounds, `${what}.bounds`);
+  array(row.textures, `${what}.textures`, MAX_TEXTURES).forEach((asset, i) => text(asset, `${what}.textures[${i}]`, 160));
+  if (kind !== 'horizon') {
+    nonNegative(row.lapStartM, `${what}.lapStartM`); nonNegative(row.lapEndM, `${what}.lapEndM`);
+    if ((row.lapStartM as number) >= (row.lapEndM as number)) throw Error(`${what}: invalid lap range`);
+    for (const key of ['prev', 'next']) if (row[key] !== null) text(row[key], `${what}.${key}`, 32);
+    if (kind === 'pit') {
+      nonNegative(row.pitStartM, `${what}.pitStartM`); nonNegative(row.pitEndM, `${what}.pitEndM`);
+      if ((row.pitStartM as number) >= (row.pitEndM as number)) throw Error(`${what}: invalid pit range`);
+    }
+  }
+  return structuredClone(row) as unknown as SceneryChunk;
+}
+
+function parseTexture(value: unknown, what: string): SceneryTexture {
+  const row = record(value, what);
+  exactKeys(row, TEXTURE, what);
+  const hash = sha256(row.sha256, `${what}.sha256`);
+  if (row.asset !== `scenery/textures/${hash}.ktx2`) throw Error(`${what}: asset is not the content-named KTX2`);
+  for (const key of ['byteLength', 'width', 'height', 'levels', 'gpuBytes']) if (count(row[key], `${what}.${key}`) === 0) throw Error(`${what}.${key}: must be positive`);
+  text(row.format, `${what}.format`, 64);
+  if (typeof row.srgb !== 'boolean') throw Error(`${what}.srgb: expected a boolean`);
+  return structuredClone(row) as unknown as SceneryTexture;
+}
+
+/** Lap ranges of the main sectors are ordered, inside the route and linked circularly; pit chunks chain in pit lane order. */
+function checkSectorOrder(layout: SceneryLayout): void {
+  const main = layout.sectors.filter(sector => sector.kind === 'main'), pit = layout.sectors.filter(sector => sector.kind === 'pit');
+  if (!main.length) throw Error(`${layout.layoutKey}: no main sectors`);
+  main.forEach((sector, i) => {
+    if (sector.lapEndM > layout.routeLengthM + 1e-6) throw Error(`${sector.id}: lap range exceeds the route`);
+    if (i && sector.lapStartM < main[i - 1].lapEndM) throw Error(`${sector.id}: overlaps ${main[i - 1].id}`);
+    if (sector.prev !== main[(i + main.length - 1) % main.length].id || sector.next !== main[(i + 1) % main.length].id) throw Error(`${sector.id}: prev/next do not follow the lap order`);
+  });
+  pit.forEach((sector, i) => {
+    if (sector.prev !== (i ? pit[i - 1].id : null) || sector.next !== (i + 1 < pit.length ? pit[i + 1].id : null)) throw Error(`${sector.id}: prev/next do not follow the pit lane order`);
+  });
+}
+
+function parseLayout(value: unknown, what: string): SceneryLayout {
+  const row = record(value, what);
+  exactKeys(row, ['schemaVersion', 'layoutKey', 'sourceGeometryRevision', 'routeLengthM', 'pitLaneLengthM', 'chunking', 'streaming', 'daylight', 'horizon', 'sectors', 'textures', 'totals'], what);
+  if (row.schemaVersion !== 2) throw Error(`${what}: unsupported scenery index version`);
+  text(row.layoutKey, `${what}.layoutKey`); text(row.sourceGeometryRevision, `${what}.sourceGeometryRevision`);
+  if (finite(row.routeLengthM, `${what}.routeLengthM`) <= 0) throw Error(`${what}: invalid route length`);
+  nonNegative(row.pitLaneLengthM, `${what}.pitLaneLengthM`);
+  numbers(row.chunking, CHUNKING, `${what}.chunking`, true);
+  numbers(row.streaming, STREAMING, `${what}.streaming`, true);
+  parseDaylight(row.daylight, `${what}.daylight`);
+  numbers(row.totals, TOTALS, `${what}.totals`, false);
+  const horizon = parseChunk(row.horizon, `${what}.horizon`);
+  if (horizon.kind !== 'horizon') throw Error(`${what}: the horizon chunk is not a horizon`);
+  const sectors = array(row.sectors, `${what}.sectors`, MAX_CHUNKS).map((sector, i) => {
+    const chunk = parseChunk(sector, `${what}.sectors[${i}]`);
+    if (chunk.kind === 'horizon') throw Error(`${what}.sectors[${i}]: a sector cannot be the horizon`);
+    return chunk;
+  });
+  const textures = array(row.textures, `${what}.textures`, MAX_TEXTURES).map((texture, i) => parseTexture(texture, `${what}.textures[${i}]`));
+  const layout = { ...structuredClone(row), horizon, sectors, textures } as unknown as SceneryLayout;
+  const ids = [horizon.id, ...sectors.map(sector => sector.id)], known = new Set(textures.map(texture => texture.asset));
+  if (new Set(ids).size !== ids.length) throw Error(`${what}: duplicate chunk ids`);
+  if (known.size !== textures.length) throw Error(`${what}: duplicate textures`);
+  for (const chunk of [horizon, ...sectors]) for (const asset of chunk.textures) if (!known.has(asset)) throw Error(`${chunk.id}: texture ${asset} is not in the layout texture list`);
+  checkSectorOrder(layout);
+  return layout;
+}
+
+export function loadScenePackage(root: string, catalog: unknown, geometry: (key: string) => TrackBoundaryGeometry | null): SceneryStore {
+  const rows = array(catalog, 'scenery catalog', 100);
+  if (!rows.length) throw Error('scenery catalog: empty');
+  const layouts = new Map<string, SceneryLayout>(), files = new Map<string, PackageFile>();
+  const register = (asset: string, hash: string, byteLength: number, max: number) => {
+    const known = files.get(asset);
+    if (known) {
+      if (known.sha256 !== hash || known.byteLength !== byteLength) throw Error(`Conflicting scenery file ${asset}`);
+      return;
+    }
+    files.set(asset, registerPackageFile(root, asset, hash, byteLength, max));
+  };
+  rows.forEach((value, i) => {
+    const layout = parseLayout(value, `scenery[${i}]`);
+    const track = geometry(layout.layoutKey);
+    if (!track || track.geometryRevision !== layout.sourceGeometryRevision) throw Error(`${layout.layoutKey}: scenery does not match the track geometry`);
+    if (layouts.has(layout.layoutKey)) throw Error(`${layout.layoutKey}: scenery listed twice`);
+    for (const chunk of [layout.horizon, ...layout.sectors]) register(chunk.asset, chunk.sha256, chunk.byteLength, MAX_GLB_BYTES);
+    for (const texture of layout.textures) register(texture.asset, texture.sha256, texture.byteLength, MAX_TEXTURE_BYTES);
+    layouts.set(layout.layoutKey, layout);
+  });
+  return { layouts, files };
+}

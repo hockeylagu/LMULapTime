@@ -2,8 +2,8 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import Replay3DView from '../../../../src/components/replay/view3d/Replay3DView.js';
 import { createReplayScene } from '../../../../src/components/replay/view3d/replayScene.js';
-import { fetchTrackScene } from '../../../../src/api/trackSceneApi.js';
-import { fetchVehicleMesh } from '../../../../src/api/vehicles/vehicleMeshApi.js';
+import { fetchSceneryLayout } from '../../../../src/api/sceneryApi.js';
+import { fetchCar } from '../../../../src/api/vehicles/carApi.js';
 import { CAMERA_MODES } from '../../../../src/components/replay/view3d/cameraModes.js';
 import { ReplayShortcutHelp } from '../../../../src/components/replay/ReplayShortcutHelp.js';
 import { replayShortcutBlocked } from '../../../../src/utils/replayShortcuts.js';
@@ -12,18 +12,15 @@ import { createPlaybackCursor, ReplayPlaybackCursorContext } from '../../../../s
 
 const scene = vi.hoisted(() => ({wheelMotion: 'Replay-estimated wheel roll', cursor: vi.fn(), mode: vi.fn(), reset: vi.fn(), center: vi.fn(), zoom: vi.fn(), pan: vi.fn(), dispose: vi.fn(), colorLines: vi.fn(), fadeLines: vi.fn(), updateLaps: vi.fn(async () => true)}));
 vi.mock('../../../../src/components/replay/view3d/replayScene.js', () => ({createReplayScene: vi.fn(async () => scene)}));
-vi.mock('../../../../src/api/trackSceneApi.js', () => ({fetchTrackScene: vi.fn(async () => ({metadata: {sourceGeometryRevision: 'g'}, bytes: new ArrayBuffer(0)}))}));
-vi.mock('../../../../src/api/vehicles/vehicleMeshApi.js', () => ({fetchVehicleMesh: vi.fn(async () => null)}));
-const boards = vi.hoisted(() => [{id: 'b', center: [3, 0] as [number, number], label: '100', stationM: 3, side: 'left' as const}]);
-vi.mock('../../../../src/api/trackGeometryApi.js', () => ({
-  loadTrackBoundaryGeometry: vi.fn(async () => ({geometryRevision: 'g'})),
-  loadTrackMapDisplay: vi.fn(async () => ({brakeMarkers: boards})),
-}));
+const layout = vi.hoisted(() => ({sourceGeometryRevision: 'g', packageRevision: 'p'}));
+vi.mock('../../../../src/api/sceneryApi.js', () => ({fetchSceneryLayout: vi.fn(async () => layout)}));
+vi.mock('../../../../src/api/vehicles/carApi.js', () => ({fetchCar: vi.fn(async (vehicleId: string) => ({vehicleId}))}));
 
-const trajectory: ReplayTrajectoryData = {replayName: 'test', pointsCount: 7, layoutKey: 'portimao_wec', geometryRevision: 'g',
+const trajectory: ReplayTrajectoryData = {replayName: 'test', pointsCount: 7, layoutKey: 'portimao_wec', geometryRevision: 'g', vehicleIdentity: {vehicleId: 'CAR_VEH'},
   bounds: {minX: 0, maxX: 6, minZ: 0, maxZ: 0, spanX: 6, spanZ: 0},
-  points: Array.from({length: 7}, (_, i) => ({x: i, y: 1, z: 0, timeSec: i * 0.2, rotY: 0, speedKmh: 150 + i * 10, throttle: 80, brake: 0, gear: 4})),
+  points: Array.from({length: 7}, (_, i) => ({x: i, y: 1, z: 0, timeSec: i * 0.2, rotY: 0, speedKmh: 150 + i * 10, throttle: 80, brake: 0, gear: 4, stationM: i * 10})),
 };
+const carMatch: unknown = expect.objectContaining({vehicleId: 'CAR_VEH'});
 beforeEach(() => { vi.clearAllMocks(); });
 
 it('keeps the track and camera when changing either lap, removing comparison, or reusing a vehicle', async () => {
@@ -34,14 +31,14 @@ it('keeps the track and camera when changing either lap, removing comparison, or
   const view = (primary: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null) => <Replay3DView trajectory={primary} baseline={baseline}
     currentIndex={2} onSelectIndex={vi.fn()} onReturnTo2D={vi.fn()} />;
   const {rerender, unmount} = render(view(lap, null));
-  await waitFor(() => expect(screen.getByTestId('replay-3d-toolbar').title).toContain('Estimated body'));
+  await waitFor(() => expect(screen.getByTestId('replay-3d-toolbar').title).toContain('Textured car'));
   scene.mode.mockClear();
   await act(async () => rerender(view(lap, comparison)));
   await act(async () => rerender(view(lap, otherComparison)));
   await act(async () => rerender(view(next, otherComparison)));
   await act(async () => rerender(view(next, null)));
   expect(scene.updateLaps.mock.calls.map(call => call.slice(0, 2))).toEqual([[lap, comparison], [lap, otherComparison], [next, otherComparison], [next, null]]);
-  expect(createReplayScene).toHaveBeenCalledOnce(); expect(fetchTrackScene).toHaveBeenCalledOnce(); expect(fetchVehicleMesh).toHaveBeenCalledOnce();
+  expect(createReplayScene).toHaveBeenCalledOnce(); expect(fetchSceneryLayout).toHaveBeenCalledOnce(); expect(fetchCar).toHaveBeenCalledOnce();
   expect(scene.mode).not.toHaveBeenCalled(); expect(scene.reset).not.toHaveBeenCalled(); expect(scene.dispose).not.toHaveBeenCalled();
   unmount(); expect(scene.dispose).toHaveBeenCalledOnce();
 });
@@ -56,9 +53,9 @@ it('applies the latest laps if selection changes while the initial scene is stil
   const next = {...trajectory, currentLap: 3}, comparison = {...trajectory, currentLap: 4};
   rerender(view(next, comparison));
   await act(async () => release(scene));
-  await waitFor(() => expect(screen.getByTestId('replay-3d-toolbar').title).toContain('Ghost: Estimated body'));
-  expect(createReplayScene).toHaveBeenCalledOnce(); expect(fetchTrackScene).toHaveBeenCalledOnce();
-  expect(scene.updateLaps).toHaveBeenCalledWith(next, comparison, {primary: null, baseline: null, primaryLivery: null, baselineLivery: null, primaryWheels: null, baselineWheels: null}, expect.any(AbortSignal));
+  await waitFor(() => expect(screen.getByTestId('replay-3d-toolbar').title).toContain('Ghost: Textured car'));
+  expect(createReplayScene).toHaveBeenCalledOnce(); expect(fetchSceneryLayout).toHaveBeenCalledOnce();
+  expect(scene.updateLaps).toHaveBeenCalledWith(next, comparison, {primary: carMatch, baseline: carMatch}, expect.any(AbortSignal));
   expect(scene.dispose).not.toHaveBeenCalled();
 });
 
@@ -66,14 +63,14 @@ it('rebuilds for another layout and rejects a comparison from a different geomet
   const view = (lap: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null) => <Replay3DView trajectory={lap} baseline={baseline}
     currentIndex={0} onSelectIndex={vi.fn()} onReturnTo2D={vi.fn()} />;
   const {rerender} = render(view(trajectory, null));
-  await waitFor(() => expect(screen.getByTestId('replay-3d-toolbar').title).toContain('Estimated body'));
+  await waitFor(() => expect(screen.getByTestId('replay-3d-toolbar').title).toContain('Textured car'));
   await act(async () => rerender(view(trajectory, {...trajectory, geometryRevision: 'wrong'})));
   expect(screen.getByText(/Comparison lap and 3D scene must use the same layout/)).toBeInTheDocument();
   expect(scene.updateLaps).not.toHaveBeenCalled(); expect(createReplayScene).toHaveBeenCalledOnce();
   const other = {...trajectory, layoutKey: 'spa_wec'};
   await act(async () => rerender(view(other, null)));
   await waitFor(() => expect(createReplayScene).toHaveBeenCalledTimes(2));
-  expect(fetchTrackScene).toHaveBeenCalledTimes(2); expect(scene.dispose).toHaveBeenCalledOnce();
+  expect(fetchSceneryLayout).toHaveBeenCalledTimes(2); expect(scene.dispose).toHaveBeenCalledOnce();
 });
 
 async function setup(onReturnTo2D = vi.fn(), onChangeColorBy = vi.fn()) {
@@ -81,7 +78,7 @@ async function setup(onReturnTo2D = vi.fn(), onChangeColorBy = vi.fn()) {
   const result = render(<><div data-replay-surface="chart" tabIndex={0} data-testid="chart"><ReplayShortcutHelp /></div>
     <Replay3DView trajectory={trajectory} baseline={null} currentIndex={2} onSelectIndex={onSelectIndex}
       onTogglePlay={onTogglePlay} onReturnTo2D={onReturnTo2D} onChangeColorBy={onChangeColorBy} /></>);
-  await waitFor(() => expect(screen.getByTestId('replay-3d-toolbar').title).toMatch(/Estimated body/));
+  await waitFor(() => expect(screen.getByTestId('replay-3d-toolbar').title).toMatch(/Textured car/));
   const map = result.container.querySelector<HTMLElement>('[data-replay-view="3d"]')!;
   return {...result, map, chart: screen.getByTestId('chart'), onSelectIndex, onTogglePlay, onReturnTo2D, onChangeColorBy};
 }
@@ -180,9 +177,9 @@ it('removes shortcut listeners and fullscreen isolation on leaving 3D', async ()
   fireEvent.keyDown(window, {key: '+'}); expect(scene.zoom).not.toHaveBeenCalled();
 });
 
-it('passes the layout (white lines, brake boards, active road) to the scene and draws no focus outline on the 3D map', async () => {
+it('passes the fetched scenery layout to the scene and draws no focus outline on the 3D map', async () => {
   const {map} = await setup();
-  expect(vi.mocked(createReplayScene).mock.calls[0][7]).toEqual({geometry: {geometryRevision: 'g'}, display: {brakeMarkers: boards}});
+  expect(vi.mocked(createReplayScene).mock.calls[0][1]).toBe(layout);
   expect(map.className).not.toContain('focus-visible:outline-2');
 });
 

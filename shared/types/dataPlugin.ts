@@ -34,27 +34,23 @@ export interface VehicleLogosCatalog {
   schemaVersion: 1;
   logos: Record<string, string>;
 }
+/** Package manifest schema 3, the only supported schema. `brakeBoardArtwork` is orphaned in v1 packages (unused by the app, removed from the package in v2). */
 export interface DataPluginManifest {
-  schemaVersion: 1 | 2;
+  schemaVersion: 3;
   id: string;
   version: string;
   tracks?: { catalog: string };
-  vehicles?: { catalog: string; logos?: string; liveries?: string };
-  scenes?: { catalog: string; brakeBoardArtwork?: string; trackTextures?: string };
-  vehicleMeshes?: { catalog: string };
-  vehicleLiveries?: { catalog: string };
-  vehicleWheels?: { catalog: string };
+  vehicles?: { catalog: string; logos?: string };
+  scenery?: { catalog: string };
+  cars?: { catalog: string };
+  brakeBoardArtwork?: unknown;
 }
 export interface DataPluginCounts {
   tracks?: number;
   vehicles?: number;
   logos?: number;
-  scenes?: number;
-  brakeBoards?: number;
-  trackTextures?: number;
-  vehicleMeshes?: number;
-  vehicleLiveries?: number;
-  vehicleWheels?: number;
+  scenery?: number;
+  cars?: number;
 }
 
 export interface DataPluginStatus {
@@ -63,11 +59,8 @@ export interface DataPluginStatus {
   tracks: boolean;
   vehicles: boolean;
   logos?: boolean;
-  scenes?: boolean;
-  trackTextures?: boolean;
-  vehicleMeshes?: boolean;
-  vehicleLiveries?: boolean;
-  vehicleWheels?: boolean;
+  scenery?: boolean;
+  cars?: boolean;
   packageId?: string;
   packageVersion?: string;
   counts?: DataPluginCounts;

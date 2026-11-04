@@ -6,20 +6,11 @@ import { parseTrackMapDisplay } from '../../shared/domain/trackGeometry.js';
 import type { TrackBoundaryGeometry, TrackMapDisplay } from '../../shared/types/trackGeometry.js';
 import type { DataPluginStatus, VehicleDataRecord } from '../../shared/types/dataPlugin.js';
 import { validateTrackPackage } from './trackPackage.js';
-import { loadScenePackage } from './scenePackage.js';
-import { readMeshAsset, type RegisteredMesh } from './meshAsset.js';
-import { loadVehicleMeshPackage } from './vehicleMeshPackage.js';
-import type { TrackScene } from '../../shared/types/scenes/trackScene.js';
-import type { VehicleMesh, VehicleMeshResource } from '../../shared/types/scenes/vehicleMesh.js';
-import type { TrackSceneResource } from '../../shared/types/scenes/trackScene.js';
-import type { BrakeBoardArtworkResource } from '../../shared/types/scenes/brakeBoardArtwork.js';
-import type { VehicleLiveryResource } from '../../shared/types/scenes/vehicleLivery.js';
-import type { TrackTextureResource } from '../../shared/types/scenes/trackTexture.js';
-import { loadBoardArtwork, readBoardArtwork, type RegisteredBoardArtwork } from './brakeBoardArtwork.js';
-import { loadVehicleLiveryPackage, readVehicleLivery, type VehicleLiveriesStore } from './vehicleLiveryPackage.js';
-import { loadTrackTexturePackage, readTrackTexture, type TrackTexturesStore } from './trackTexturePackage.js';
-import { loadVehicleWheelPackage, readVehicleWheelTexture, type VehicleWheelsStore } from './vehicleWheelPackage.js';
-import type { VehicleWheelResource } from '../../shared/types/scenes/vehicleWheel.js';
+import { loadScenePackage, type SceneryStore } from './scenePackage.js';
+import { loadCarPackage, normalizeVehicleId, type CarStore } from './carPackage.js';
+import { readPackageFile } from './packageFiles.js';
+import type { SceneryLayoutResource } from '../../shared/types/scenes/scenery.js';
+import type { CarResource } from '../../shared/types/scenes/car.js';
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('Expected object');
@@ -138,18 +129,23 @@ function freezeGeometry(value: unknown): void {
   Object.freeze(value);
 }
 
+const GLB_MAGIC = 0x46546c67, KTX2_MAGIC = Buffer.from('ab4b5458203230bb0d0a1a0a', 'hex');
+/** Served binaries must be what their extension says; the pipeline validates their contents, the sha256 proves they are unchanged. */
+function checkedFile(bytes: Buffer, relative: string): Buffer {
+  const ok = relative.endsWith('.glb') ? bytes.length >= 12 && bytes.readUInt32LE(0) === GLB_MAGIC && bytes.readUInt32LE(8) === bytes.length
+    : relative.endsWith('.ktx2') ? bytes.length > 12 && bytes.subarray(0, 12).equals(KTX2_MAGIC) : relative.endsWith('.json');
+  if (!ok) throw Error('Package resource is not the expected file type');
+  return bytes;
+}
+
 /** A fully validated startup snapshot. Package files are never served directly. */
 export class DataPlugin {
   public readonly status: DataPluginStatus;
   private readonly tracks = new Map<string, {geometry:TrackBoundaryGeometry; display:TrackMapDisplay|null}>();
   private readonly records: VehicleDataRecord[] = [];
   private readonly logoRecords = new Map<string, string>();
-  private scenes = new Map<string, RegisteredMesh<TrackScene>>();
-  private vehicleMeshes = new Map<string, RegisteredMesh<VehicleMesh>>();
-  private boardArtwork = new Map<string, RegisteredBoardArtwork[]>();
-  private vehicleLiveries: VehicleLiveriesStore | null = null;
-  private trackTexturesStore: TrackTexturesStore | null = null;
-  private vehicleWheelsStore: VehicleWheelsStore | null = null;
+  private scenery: SceneryStore | null = null;
+  private cars: CarStore | null = null;
   private root = '';
   public constructor(root?: string) {
     this.status = {state:root?'invalid':'absent',revision:'none',tracks:false,vehicles:false};
@@ -167,8 +163,9 @@ export class DataPlugin {
         const buffer=fs.readFileSync(file); digest.update(relative).update(buffer); return JSON.parse(buffer.toString('utf8'));
       };
       const manifest=object(read('manifest.json',64_000));
-      keys(manifest,['schemaVersion','id','version','tracks','vehicles', ...(manifest.schemaVersion === 2 ? ['scenes', 'vehicleMeshes', 'vehicleLiveries', 'vehicleWheels'] : [])]);
-      if (manifest.schemaVersion!==1 && manifest.schemaVersion!==2) throw Error('Unsupported schema');
+      if (manifest.schemaVersion !== 3) throw Error('Unsupported schema: only package manifest schema 3 is supported');
+      // brakeBoardArtwork is orphaned in v1 packages: known so the manifest validates, never read. The package drops it in v2.
+      keys(manifest,['schemaVersion','id','version','tracks','vehicles','scenery','cars','brakeBoardArtwork']);
       const packageId = text(manifest.id), packageVersion = text(manifest.version);
       for (const capability of ['tracks','vehicles']) if (manifest[capability] !== undefined) object(manifest[capability]);
       if (!manifest.tracks && !manifest.vehicles) throw Error('Empty package');
@@ -199,26 +196,14 @@ export class DataPlugin {
           for (const [k, v] of Object.entries(parseVehicleLogos(logoFile))) this.logoRecords.set(k, v);
         }
       }
-      if (manifest.scenes !== undefined) {
-        const scenes = object(manifest.scenes); keys(scenes, ['catalog', 'brakeBoardArtwork', 'trackTextures']);
-        this.scenes = loadScenePackage(base, read(text(scenes.catalog)), key => this.trackGeometry(key));
-        if (scenes.brakeBoardArtwork !== undefined) this.boardArtwork = loadBoardArtwork(base, read(text(scenes.brakeBoardArtwork)), key => this.tracks.get(key) ?? null);
-        if (scenes.trackTextures !== undefined) this.trackTexturesStore = loadTrackTexturePackage(base, read(text(scenes.trackTextures)), this.tracks);
+      if (manifest.scenery !== undefined) {
+        const scenery = object(manifest.scenery); keys(scenery, ['catalog']);
+        this.scenery = loadScenePackage(base, read(text(scenery.catalog), 32_000_000), key => this.trackGeometry(key));
       }
-      if (manifest.vehicleMeshes !== undefined) {
-        const meshes = object(manifest.vehicleMeshes); keys(meshes, ['catalog']);
-        this.vehicleMeshes = loadVehicleMeshPackage(base, read(text(meshes.catalog)), this.records);
+      if (manifest.cars !== undefined) {
+        const cars = object(manifest.cars); keys(cars, ['catalog']);
+        this.cars = loadCarPackage(base, read(text(cars.catalog)), manifest.vehicles ? new Set(this.records.flatMap(r => r.vehicleIds)) : null);
       }
-      if (manifest.vehicleLiveries !== undefined) {
-        const liveries = object(manifest.vehicleLiveries); keys(liveries, ['catalog']);
-        this.vehicleLiveries = loadVehicleLiveryPackage(base, read(text(liveries.catalog)), this.vehicleMeshes);
-      }
-      if (manifest.vehicleWheels !== undefined) {
-        const wheels = object(manifest.vehicleWheels); keys(wheels, ['catalog']);
-        const validIds = new Set([...this.records.map(r => r.id), ...this.vehicleMeshes.keys()]);
-        this.vehicleWheelsStore = loadVehicleWheelPackage(base, read(text(wheels.catalog)), validIds);
-      }
-      const totalBrakeBoards = [...this.boardArtwork.values()].reduce((sum, list) => sum + list.length, 0);
       this.status = {
         state: 'ready',
         revision: digest.digest('hex'),
@@ -227,109 +212,36 @@ export class DataPlugin {
         tracks: !!manifest.tracks,
         vehicles: !!manifest.vehicles,
         ...(this.logoRecords.size > 0 ? { logos: true } : {}),
-        ...(this.scenes.size ? { scenes: true } : {}),
-        ...(this.vehicleMeshes.size ? { vehicleMeshes: true } : {}),
-        ...(this.vehicleLiveries && this.vehicleLiveries.size ? { vehicleLiveries: true } : {}),
-        ...(this.trackTexturesStore && this.trackTexturesStore.size ? { trackTextures: true } : {}),
-        ...(this.vehicleWheelsStore && this.vehicleWheelsStore.size ? { vehicleWheels: true } : {}),
+        ...(this.scenery ? { scenery: true } : {}),
+        ...(this.cars ? { cars: true } : {}),
         counts: {
           tracks: this.tracks.size,
           vehicles: this.records.length,
           ...(this.logoRecords.size > 0 ? { logos: this.logoRecords.size } : {}),
-          ...(this.scenes.size > 0 ? { scenes: this.scenes.size } : {}),
-          ...(totalBrakeBoards > 0 ? { brakeBoards: totalBrakeBoards } : {}),
-          ...(this.vehicleMeshes.size > 0 ? { vehicleMeshes: this.vehicleMeshes.size } : {}),
-          ...(this.vehicleLiveries && this.vehicleLiveries.size > 0 ? { vehicleLiveries: this.vehicleLiveries.size } : {}),
-          ...(this.trackTexturesStore && this.trackTexturesStore.size > 0 ? { trackTextures: this.trackTexturesStore.size } : {}),
-          ...(this.vehicleWheelsStore && this.vehicleWheelsStore.size > 0 ? { vehicleWheels: this.vehicleWheelsStore.size } : {}),
+          ...(this.scenery ? { scenery: this.scenery.layouts.size } : {}),
+          ...(this.cars ? { cars: this.cars.folders.size } : {}),
         },
       };
-    } catch {this.tracks.clear(); this.records.length=0; this.logoRecords.clear(); this.scenes.clear(); this.vehicleMeshes.clear(); this.boardArtwork.clear(); this.vehicleLiveries = null; this.trackTexturesStore = null; this.vehicleWheelsStore = null; /* Generic status never discloses local paths. */}
+    } catch {this.tracks.clear(); this.records.length=0; this.logoRecords.clear(); this.scenery = null; this.cars = null; /* Generic status never discloses local paths. */}
   }
-  public scene(key: string): TrackSceneResource | null {
-    const registered = this.scenes.get(key);
-    if (!registered) return null;
-    const { asset: _asset, ...metadata } = registered.metadata;
-    return { ...structuredClone(metadata), packageRevision: this.status.revision };
+  /** The layout index of a layout's scenery; chunk and texture bytes come from `sceneryFile`. */
+  public sceneryLayout(key: string): SceneryLayoutResource | null {
+    const layout = this.scenery?.layouts.get(key);
+    return layout ? { ...structuredClone(layout), packageRevision: this.status.revision } : null;
   }
-  public sceneAsset(key: string, revision: string): Buffer | null {
-    const registered = this.scenes.get(key);
-    if (!registered || registered.metadata.revision !== revision) return null;
-    return readMeshAsset(this.root, registered);
+  /** Bytes of a catalogued scenery GLB or KTX2 (hash-verified), or null when the package does not list that file. */
+  public sceneryFile(relative: string): Buffer | null {
+    const entry = this.scenery?.files.get(relative);
+    return entry ? checkedFile(readPackageFile(this.root, entry), relative) : null;
   }
-  public vehicleMesh(recordId: string): VehicleMeshResource | null {
-    const mesh = this.vehicleMeshes.get(recordId);
-    if (!mesh) return null;
-    const {asset: _asset, ...metadata} = mesh.metadata;
-    return {...structuredClone(metadata), packageRevision: this.status.revision};
+  public car(identity: string): CarResource | null {
+    const row = this.cars?.rows.get(normalizeVehicleId(identity));
+    return row ? { ...structuredClone(row), packageRevision: this.status.revision } : null;
   }
-  public brakeBoardArtwork(layoutKey: string): BrakeBoardArtworkResource[] {
-    return (this.boardArtwork.get(layoutKey) ?? []).map(row => {
-      const {asset: _asset, ...metadata} = row.metadata;
-      return {...structuredClone(metadata), packageRevision: this.status.revision};
-    });
-  }
-  public brakeBoardImage(layoutKey: string, revision: string): Buffer | null {
-    const row = this.boardArtwork.get(layoutKey)?.find(image => image.metadata.revision === revision);
-    return row ? readBoardArtwork(this.root, row) : null;
-  }
-  public vehicleMeshAsset(recordId: string, revision: string): Buffer | null {
-    const mesh = this.vehicleMeshes.get(recordId);
-    return mesh?.metadata.revision === revision ? readMeshAsset(this.root, mesh) : null;
-  }
-  public vehicleLivery(identity: string): VehicleLiveryResource | null {
-    const row = this.vehicleLiveries?.resolve(identity);
-    if (!row) return null;
-    const { asset: _asset, ...metadata } = row.metadata;
-    return { ...structuredClone(metadata), packageRevision: this.status.revision };
-  }
-  public vehicleLiveryAsset(liveryKey: string, revision: string): Buffer | null {
-    const row = this.vehicleLiveries?.get(liveryKey, revision);
-    if (!row) return null;
-    return readVehicleLivery(this.root, row);
-  }
-  public vehicleWheels(identity: string): VehicleWheelResource | null {
-    if (!this.vehicleWheelsStore) return null;
-    let row = this.vehicleWheelsStore.get(identity);
-    if (!row) {
-      const v = this.vehicle({ vehicleId: identity });
-      if (v) row = this.vehicleWheelsStore.get(v.id);
-    }
-    if (!row) return null;
-    return {
-      vehicleRecordId: row.vehicleRecordId,
-      rim: {
-        revision: row.rim.sha256,
-        width: row.rim.width,
-        height: row.rim.height,
-        byteLength: row.rim.byteLength,
-        sha256: row.rim.sha256,
-      },
-      tyre: {
-        revision: row.tyre.sha256,
-        width: row.tyre.width,
-        height: row.tyre.height,
-        byteLength: row.tyre.byteLength,
-        sha256: row.tyre.sha256,
-      },
-      packageRevision: this.status.revision,
-    };
-  }
-  public vehicleWheelAsset(sha256: string): Buffer | null {
-    const row = this.vehicleWheelsStore?.texture(sha256);
-    if (!row) return null;
-    return readVehicleWheelTexture(this.root, row);
-  }
-  public trackTextures(layoutKey: string): TrackTextureResource[] {
-    if (!this.trackTexturesStore) return [];
-    return this.trackTexturesStore.byLayout(layoutKey).map(row => {
-      const { asset: _asset, ...metadata } = row.metadata;
-      return { ...structuredClone(metadata), packageRevision: this.status.revision };
-    });
-  }
-  public trackTextureAsset(layoutKey: string, textureKey: string, revision: string): Buffer | null {
-    const row = this.trackTexturesStore?.get(layoutKey, textureKey, revision);
-    return row ? readTrackTexture(this.root, row) : null;
+  /** Bytes of a catalogued car GLB, descriptor JSON or KTX2 (hash-verified), or null when the package does not list that file. */
+  public carFile(relative: string): Buffer | null {
+    const entry = this.cars?.files.get(relative);
+    return entry ? checkedFile(readPackageFile(this.root, entry), relative) : null;
   }
   public track(key:string) {const row=this.tracks.get(key);return row?structuredClone(row):null;}
   public trackKeys(): string[] { return Array.from(this.tracks.keys()); }
@@ -371,7 +283,8 @@ export function formatPluginStatusLog(status: DataPluginStatus): string {
       trackDetail,
       vehicleDetail,
       ...(status.logos ? [`logos: ${counts?.logos !== undefined ? counts.logos : 'yes'}`] : []),
-      ...(status.scenes ? [`scenes: ${counts?.scenes !== undefined ? counts.scenes : 'yes'}`] : []),
+      ...(status.scenery ? [`scenery: ${counts?.scenery !== undefined ? counts.scenery : 'yes'}`] : []),
+      ...(status.cars ? [`cars: ${counts?.cars !== undefined ? counts.cars : 'yes'}`] : []),
       `revision: ${status.revision.slice(0, 8)}`,
     ].join(', ');
     return `[Data Plugin] Plugins loaded: yes (${details})`;

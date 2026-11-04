@@ -72,19 +72,13 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
   add('reference-diff', '/api/reference-laptimes/diffs/:id', cohort.diffId ? `/api/reference-laptimes/diffs/${cohort.diffId}` : undefined);
   const geometry = cohort.boards.find(board => dataPlugin.trackGeometry(board.layout));
   add('track-geometry', '/api/data-plugin/tracks/:layoutKey', geometry ? `/api/data-plugin/tracks/${geometry.layout}` : undefined, 'No metric geometry for the fixed cohort.');
-  const scene = cohort.boards.map(board => dataPlugin.scene(board.layout)).find(value => value !== null);
-  add('track-scene', '/api/data-plugin/scenes/:layoutKey', scene ? `/api/data-plugin/scenes/${scene.layoutKey}` : undefined, 'No 3D scene for the fixed cohort; synthetic scene routes are tested.');
-  add('track-scene-asset', '/api/data-plugin/scenes/:layoutKey/:revision/asset', undefined, 'Binary GLB delivery is measured separately from the JSON benchmark.');
-  add('vehicle-mesh', '/api/data-plugin/vehicle-meshes/:recordId', undefined, 'Optional private vehicle mesh capability; exact identity and revisions are covered by synthetic route tests.');
-  add('vehicle-mesh-asset', '/api/data-plugin/vehicle-meshes/:recordId/:revision/asset', undefined, 'Binary vehicle delivery is measured separately from the JSON benchmark.');
-  add('vehicle-livery', '/api/data-plugin/vehicle-liveries/:identity', undefined, 'Optional private vehicle livery capability; exact identity and revisions are covered by synthetic route tests.');
-  add('vehicle-livery-asset', '/api/data-plugin/vehicle-liveries/:liveryKey/:revision/asset', undefined, 'Binary WebP delivery is measured separately from the JSON benchmark.');
-  add('brake-board-artwork', '/api/data-plugin/brake-board-artwork/:layoutKey', geometry ? `/api/data-plugin/brake-board-artwork/${geometry.layout}` : undefined, 'No resolved layout in the fixed cohort.');
-  add('brake-board-artwork-asset', '/api/data-plugin/brake-board-artwork/:layoutKey/:revision/asset', undefined, 'Binary PNG delivery is checked separately; JSON benchmark covers artwork metadata.');
-  add('track-textures', '/api/data-plugin/track-textures/:layoutKey', geometry ? `/api/data-plugin/track-textures/${geometry.layout}` : undefined, 'No resolved layout in the fixed cohort.');
-  add('track-textures-asset', '/api/data-plugin/track-textures/:layoutKey/:textureKey/:revision/asset', undefined, 'Binary WebP delivery is checked separately; JSON benchmark covers track textures metadata.');
-  add('vehicle-wheels', '/api/data-plugin/vehicle-wheels/:identity', undefined, 'Optional private vehicle wheels capability; exact identity and revisions are covered by synthetic route tests.');
-  add('vehicle-wheels-asset', '/api/data-plugin/vehicle-wheels/:sha256/asset', undefined, 'Binary WebP wheel delivery is measured separately from the JSON benchmark.');
+  const scenery = cohort.boards.map(board => dataPlugin.sceneryLayout(board.layout)).find(value => value !== null);
+  add('track-scenery', '/api/data-plugin/scenery/:layoutKey', scenery ? `/api/data-plugin/scenery/${scenery.layoutKey}` : undefined, 'No 3D scenery for the fixed cohort; synthetic scenery routes are tested.');
+  add('scenery-file', '/api/data-plugin/scenery/files/:file', undefined, 'Binary GLB and KTX2 delivery is measured separately from the JSON benchmark.');
+  add('scenery-texture', '/api/data-plugin/scenery/files/textures/:file', undefined, 'Binary KTX2 delivery is measured separately from the JSON benchmark.');
+  add('car', '/api/data-plugin/cars/:identity', undefined, 'Optional private textured car capability; exact identity is covered by synthetic route tests.');
+  add('car-file', '/api/data-plugin/cars/files/:file', undefined, 'Binary car GLB and KTX2 delivery is measured separately from the JSON benchmark.');
+  add('car-texture', '/api/data-plugin/cars/files/textures/:file', undefined, 'Binary car KTX2 delivery is measured separately from the JSON benchmark.');
   for (const [index, board] of cohort.boards.entries()) {
     const query = new URLSearchParams(board).toString();
     const track = encodeURIComponent(board.layout);

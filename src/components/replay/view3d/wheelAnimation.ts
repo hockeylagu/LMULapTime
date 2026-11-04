@@ -2,10 +2,10 @@ import { Quaternion, Vector3, type Group } from 'three';
 import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
 import { attachWheelRigs, type WheelRig } from './wheelGeometry.js';
 import { createSteerAngle, createWheelTravel } from './wheelMotion.js';
-import { sampleRenderPose, type RenderPose } from './replayPose.js';
+import { isContinuousPose, sampleRenderPose, type RenderPose } from './replayPose.js';
 import type { SurfaceHeight } from './surfaceProjection.js';
 
-export interface WheelAnimation { update(pose: RenderPose): void; description: string }
+export interface WheelAnimation { update(pose: RenderPose): void; refreshHeights(): void; description: string }
 const MAX_TRAVEL_M = 0.15, MAX_FIT_M = 0.75, FIT_SAMPLES = 200;
 
 function median(values: number[]): number | undefined {
@@ -16,8 +16,8 @@ function median(values: number[]): number | undefined {
 
 export function createWheelAnimation(car: Group, lap: ReplayTrajectoryData, surfaceHeight: SurfaceHeight): WheelAnimation {
   const envelope = car.getObjectByName('body-envelope');
-  const rigs = envelope && 'isGroup' in envelope ? attachWheelRigs(envelope as Group) : [];
-  if (!envelope || rigs.length !== 4) return {update() {}, description: 'Wheel animation unavailable'};
+  if (!envelope || !('isGroup' in envelope)) throw Error('Car has no body envelope');
+  const rigs = attachWheelRigs(envelope as Group);
   const travel = createWheelTravel(lap.points), steer = createSteerAngle(lap);
   const hub = new Vector3(), body = new Vector3(), inverse = new Quaternion();
   /** Body-frame hub movement that puts this tyre on the road at the pose; null without road coverage. */
@@ -43,14 +43,26 @@ export function createWheelAnimation(car: Group, lap: ReplayTrajectoryData, surf
   const fit = median(offsets);
   if (fit !== undefined) envelope.position.y += fit;
   const referenceRideHeights = rigs.map(rig => median(lap.points.map(point => point.rideHeight?.[rig.corner]).filter((value): value is number => Number.isFinite(value))));
-  const hasWheelTelemetry = lap.points.some(point => point.wheelSpeeds?.some(Number.isFinite));
   const hasWheelSlip = lap.points.some(point => point.liveWheelSlip !== undefined);
   const hasRideHeight = referenceRideHeights.some(value => value !== undefined);
   const hasSteering = lap.handlingCalibration !== undefined && lap.points.some(point => Number.isFinite(point.steerYaw));
+  const contacts = new Map<number, Array<number | null>>();
+  const contactAt = (index: number, corner: number): number | null => {
+    let cached = contacts.get(index);
+    if (!cached) {
+      const sample = sampleRenderPose(lap.points, index, 0);
+      cached = rigs.map(rig => sample?.orientation ? roadTravel(rig, sample, sample.orientation) : null);
+      contacts.set(index, cached);
+    }
+    return cached[corner];
+  };
   return {
-    description: [`${hasWheelTelemetry ? 'Telemetry' : 'Replay-estimated'} wheel roll${hasWheelSlip ? ' with measured slip' : ''}`,
+    description: [`Replay-estimated wheel roll${hasWheelSlip ? ' with measured slip' : ''}`,
       `${hasRideHeight ? 'Ride-height-driven' : 'Road-contact'} suspension`,
       ...(hasSteering ? ['Recorded steering'] : []), ...(fit !== undefined ? ['Estimated ground fit'] : [])].join(' · '),
+    refreshHeights() {
+      for (const [index, cached] of contacts) if (cached.some(value => value === null)) contacts.delete(index);
+    },
     update(pose) {
       if (!pose.orientation) return;
       const a = lap.points[pose.index], b = lap.points[pose.index + 1], steerAngle = steer(pose.index, pose.fraction);
@@ -61,12 +73,20 @@ export function createWheelAnimation(car: Group, lap: ReplayTrajectoryData, surf
         if (reference !== undefined && heightA !== undefined && Number.isFinite(heightA)) {
           const height = heightB !== undefined && Number.isFinite(heightB) ? heightA + (heightB - heightA) * pose.fraction : heightA;
           displacement = (reference - height) / 1000;
-        } else displacement = roadTravel(rig, pose, pose.orientation);
+        } else {
+          const current = contactAt(pose.index, corner);
+          displacement = current;
+          if (pose.fraction > 0 && isContinuousPose(a, b)) {
+            const next = contactAt(pose.index + 1, corner);
+            displacement = current !== null && next !== null ? current + (next - current) * pose.fraction : null;
+          }
+        }
         rig.pivot.position.copy(rig.hub);
         // A bounded visual proxy, not a calibrated suspension solver or an airborne ground constraint.
         if (displacement !== null) rig.pivot.position.y += Math.max(-MAX_TRAVEL_M, Math.min(MAX_TRAVEL_M, displacement));
         // Spin about the axle, then steer the fronts; vehicle-local +X is left, so a left (ISO +) steer is -Y.
-        rig.pivot.rotation.set(-(travel(pose.index, pose.fraction, corner) / rig.radiusM) % (Math.PI * 2), corner < 2 ? -steerAngle : 0, 0, 'YXZ');
+        rig.spin.rotation.x = -(travel(pose.index, pose.fraction, corner) / rig.radiusM) % (Math.PI * 2);
+        rig.steer.rotation.y = corner < 2 ? -steerAngle : 0;
       }
     },
   };

@@ -19,15 +19,16 @@ yaw direction. At 99 mesh intersections the body origin sits 0.306–0.386 m abo
 that establishes registration for this recording, not calibrated wheel contact or every track.
 The viewer renders recorded XYZ and available yaw/pitch/roll, labels approximate body placement, uses the existing
 playhead and offers orbit/follow/chase/fixed/top cameras. A station-aligned ghost is implemented;
-full comparison and lifecycle acceptance remains. See [the package contract](../../PLUGINS.md#3d-track-scenes-package-version-2).
+full comparison and lifecycle acceptance remains. See [the package contract](../../PLUGINS.md#3d-scenery-and-textured-cars-package-manifest-schema-3).
 
 The Duqueine D09 P3 now has an exact-record optional render mesh with native body, chassis,
 exterior, wing, glass, four tyres and four rims. The 2 MB private export uses one exterior LOD;
 primary and ghost load independently tinted copies. It remains untextured and labelled
 as approximate placement. Other vehicle records fall back to an estimated body with class-sized
-tyres. Every car's wheels roll (telemetry wheel speed, else replay travel, scaled by `1 + slip ratio`
-from the live capture so lockups stop and wheelspin overruns; native wheel speed tracks ground speed and
-never shows either), steer (recorded steering over the plugin ratio) and move vertically (ride height, else road contact); the model origin is fitted
+tyres. Every car's wheels roll with the displayed horizontal travel, scaled by `1 + slip ratio`
+from live capture when available. This holds locked tyres still and lets spinning tyres overrun.
+The front wheels steer using the recorded steering and plugin ratio. Suspension uses ride height
+where available and road contact otherwise. The model origin is fitted
 to the lap median. Over a Portimao lap the tyres stay within ±2 cm of the road, which is a visual fit,
 not calibrated contact. The scene has a sky dome, horizon fog, sun shadows from the car, walls, boards and kerbs within 60 m of the car, and the package's filler
 ground: each grid corner sits 0.2 m under the scanned triangles above it, fading to a flat

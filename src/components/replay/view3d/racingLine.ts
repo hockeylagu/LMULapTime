@@ -30,9 +30,8 @@ export function racingLineColors(lap: ReplayTrajectoryData, baseline: ReplayTraj
  * The lap as a flat ribbon draped on the scanned road, two vertices per sample so colours can change
  * without rebuilding. Gaps (teleports, time jumps, no road below) break the ribbon instead of bridging.
  */
-export function makeRacingLine(lap: ReplayTrajectoryData, origin: Vector3, colors: string[], surfaceHeight: SurfaceHeight, widthM = RACING_LINE_WIDTH_M, liftM = LIFT_M): Mesh<BufferGeometry, MeshBasicMaterial> {
+function racingLineGeometry(lap: ReplayTrajectoryData, origin: Vector3, heights: Array<number | null>, widthM: number, liftM: number): BufferGeometry {
   const points = lap.points, half = widthM / 2;
-  const heights = points.map(point => surfaceHeight(point));
   const positions = new Float32Array(points.length * 6), indices: number[] = [];
   const joined = (i: number) => {
     const a = points[i - 1], b = points[i], dt = (b.timeSec ?? 0) - (a.timeSec ?? 0);
@@ -51,10 +50,27 @@ export function makeRacingLine(lap: ReplayTrajectoryData, origin: Vector3, color
   geometry.setAttribute('position', new Float32BufferAttribute(positions, 3));
   geometry.setAttribute('color', new Float32BufferAttribute(new Float32Array(points.length * 6), 3));
   geometry.setIndex(indices);
+  return geometry;
+}
+
+/** Road heights under each lap point. The road does not move: a height once found is kept when its chunk unloads, and only points
+ * still without one are looked up again, so a re-drape after streaming costs a few lookups instead of the whole lap. */
+const lineHeights = new WeakMap<Mesh, Array<number | null>>();
+function fillHeights(heights: Array<number | null>, lap: ReplayTrajectoryData, surfaceHeight: SurfaceHeight): boolean {
+  let found = false;
+  lap.points.forEach((point, i) => { if (heights[i] === null) { heights[i] = surfaceHeight(point); found ||= heights[i] !== null; } });
+  return found;
+}
+
+export function makeRacingLine(lap: ReplayTrajectoryData, origin: Vector3, colors: string[], surfaceHeight: SurfaceHeight, widthM = RACING_LINE_WIDTH_M, liftM = LIFT_M): Mesh<BufferGeometry, MeshBasicMaterial> {
+  const heights: Array<number | null> = lap.points.map(() => null);
+  fillHeights(heights, lap, surfaceHeight);
+  const geometry = racingLineGeometry(lap, origin, heights, widthM, liftM);
   // Unlit, so pedal/speed colours read exactly as on the 2D map; the offset keeps it above the road it lies on.
   const line = new Mesh(geometry, new MeshBasicMaterial({vertexColors: true, side: DoubleSide, transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2}));
   line.name = 'racing-line';
   line.renderOrder = liftM > LIFT_M ? 3 : 2;
+  lineHeights.set(line, heights);
   colorRacingLine(line, colors);
   return line;
 }
@@ -66,4 +82,14 @@ export function colorRacingLine(line: Mesh<BufferGeometry, MeshBasicMaterial>, c
     attribute.setXYZ(i * 2, color.r, color.g, color.b); attribute.setXYZ(i * 2 + 1, color.r, color.g, color.b);
   }
   attribute.needsUpdate = true;
+}
+
+/** Re-drapes the ribbon on the road now resident (scenery streams in after the line was built), keeping its colours. */
+export function refreshRacingLine(line: Mesh<BufferGeometry, MeshBasicMaterial>, lap: ReplayTrajectoryData, origin: Vector3, colors: string[], surfaceHeight: SurfaceHeight, widthM = RACING_LINE_WIDTH_M, liftM = LIFT_M): void {
+  const heights = lineHeights.get(line);
+  if (!heights) throw Error('Racing line was not built by makeRacingLine');
+  if (!fillHeights(heights, lap, surfaceHeight)) return;
+  line.geometry.dispose();
+  line.geometry = racingLineGeometry(lap, origin, heights, widthM, liftM);
+  colorRacingLine(line, colors);
 }

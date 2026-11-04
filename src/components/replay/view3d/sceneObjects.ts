@@ -1,99 +1,36 @@
-import {
-  BoxGeometry,
-  BufferGeometry,
-  CylinderGeometry,
-  FrontSide,
-  Group,
-  Mesh,
-  MeshStandardMaterial,
-  SphereGeometry,
-  type Material,
-  type Texture,
-} from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { Group, Mesh, MeshStandardMaterial, SphereGeometry, type BufferGeometry, type Material, type Object3D } from 'three';
 import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
-import { defaultVehicleSize } from '../../../../shared/domain/vehicleDimensions.js';
 
-export function makeCar(
-  trajectory: ReplayTrajectoryData,
-  color: string,
-  ghost: boolean,
-  model: Group | null = null,
-  liveryTexture: Texture | null = null,
-  rimTexture: Texture | null = null,
-  tyreTexture: Texture | null = null
-): Group {
-  const car = new Group(), dimensions = trajectory.vehicleData?.dimensions ?? defaultVehicleSize(trajectory.vehicleIdentity?.carClass);
-  const material = new MeshStandardMaterial({ color, transparent: ghost, opacity: ghost ? 0.5 : 1, depthWrite: !ghost, roughness: 0.35 });
-  const envelope = model ? model.clone(true) : new Group();
-  if (model) {
-    envelope.traverse(object => {
-      if (!(object instanceof Mesh) || !(object.geometry instanceof BufferGeometry)) return;
-      const mesh = object as Mesh<BufferGeometry, Material | Material[]>;
-      // Each lap owns its buffers, so replacing a lap cannot dispose a cached vehicle template or the other car.
-      if (!mesh.geometry.userData?.sharedAsset) mesh.geometry = mesh.geometry.clone();
-      const hasUv = !!mesh.geometry.attributes.uv;
-      const originals = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      const copies = originals.map(source => {
-        const copy = source.clone();
-        copy.side = FrontSide;
-        if (copy instanceof MeshStandardMaterial) {
-          if (copy.name === 'livery') {
-            copy.map = liveryTexture && hasUv ? liveryTexture : copy.map;
-            copy.color.set(liveryTexture && hasUv ? '#ffffff' : color);
-          } else if (copy.name === 'body') {
-            copy.color.set(color);
-          } else if (copy.name === 'rims' || mesh.name.startsWith('rims-')) {
-            if (rimTexture && hasUv) {
-              copy.map = rimTexture;
-              copy.color.set('#ffffff');
-            }
-          } else if (copy.name === 'tyres' || mesh.name.startsWith('tyres-')) {
-            if (tyreTexture && hasUv) {
-              copy.map = tyreTexture;
-              copy.color.set('#ffffff');
-            }
-          }
-        }
-        copy.transparent = ghost; copy.opacity = ghost ? 0.45 : 1; copy.depthWrite = !ghost;
-        return copy;
-      });
-      mesh.material = Array.isArray(mesh.material) ? copies : copies[0];
-    });
-  } else {
-    const width = dimensions.widthM, length = dimensions.lengthM;
-    const bodyMaterial = new MeshStandardMaterial({
-      color,
-      transparent: ghost,
-      opacity: ghost ? 0.5 : 1,
-      depthWrite: !ghost,
-      roughness: 0.35,
-      metalness: 0.03,
-    });
-    bodyMaterial.name = 'body';
-    const body = new Mesh(new BoxGeometry(width * 0.78, 0.5, length), bodyMaterial);
-    body.name = 'body';
-    body.position.y = 0.2;
-    const cabinMaterial = new MeshStandardMaterial({
-      color: '#1a2332',
-      transparent: ghost,
-      opacity: ghost ? 0.5 : 1,
-      depthWrite: !ghost,
-      roughness: 0.18,
-      metalness: 0.05,
-    });
-    cabinMaterial.name = 'cabin';
-    const cabin = new Mesh(new BoxGeometry(width * 0.55, 0.4, length * 0.37), cabinMaterial);
-    cabin.name = 'cabin';
-    cabin.position.set(0, 0.62, 0.1);
-    const nose = new Mesh(new BoxGeometry(width * 0.6, 0.03, 0.45), new MeshStandardMaterial({color: '#f8f9fa', transparent: ghost, opacity: ghost ? 0.5 : 1, depthWrite: !ghost}));
-    nose.position.set(0, 0.46, -length * 0.35); envelope.add(body, cabin, nose);
-    envelope.add(...estimatedWheels(trajectory.handlingCalibration?.wheelbaseM ?? length * 0.6, width, ghost));
-  }
+export type CockpitView = 'in' | 'out';
+
+/** Driver-camera (`in`) and exterior (`out`) cockpit meshes are alternatives: the GLB marks them with `extras.cockpitView`. */
+export function setCockpitView(car: Object3D, view: CockpitView): void {
+  car.traverse(object => {
+    const marked: unknown = object.userData.cockpitView;
+    if (marked === 'in' || marked === 'out') object.visible = marked === view;
+  });
+}
+
+/**
+ * One car for a lap: a parsed textured car whose materials the caller already created per native material,
+ * placed by the vehicle's replay origin offset, with a pose marker for samples without a heading.
+ * `model` is a clone that shares its geometry with the parsed template (marked `sharedAsset`).
+ */
+export function makeCar(trajectory: ReplayTrajectoryData, color: string, ghost: boolean, model: Group): Group {
+  const car = new Group(), envelope = model;
+  envelope.traverse(object => {
+    if (!(object instanceof Mesh)) return;
+    const mesh = object as Mesh<BufferGeometry, Material | Material[]>;
+    for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      if (ghost) { material.transparent = true; material.opacity = 0.45; material.depthWrite = false; }
+    }
+  });
   const offset = trajectory.vehicleData?.replayOriginOffsetXZ ?? [0, 0];
   envelope.position.set(offset[0], 0, offset[1]);
-  const marker = new Mesh(new SphereGeometry(0.65, 12, 8), material); marker.name = 'pose-marker'; marker.visible = false;
+  const marker = new Mesh(new SphereGeometry(0.65, 12, 8), new MeshStandardMaterial({ color, transparent: ghost, opacity: ghost ? 0.5 : 1, depthWrite: !ghost, roughness: 0.35 }));
+  marker.name = 'pose-marker'; marker.visible = false;
   envelope.name = 'body-envelope'; car.add(envelope, marker);
+  setCockpitView(car, 'out');
   if (ghost) {
     let order = 1;
     car.traverse(object => {
@@ -101,8 +38,7 @@ export function makeCar(
       // Camera-distance sorting can swap intersecting transparent body/tyre parts each frame.
       object.renderOrder = order++;
       const mesh = object as Mesh<BufferGeometry, Material | Material[]>;
-      const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
-      for (const ghostMaterial of materials) {
+      for (const ghostMaterial of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
         if (ghostMaterial instanceof MeshStandardMaterial) {
           ghostMaterial.roughness = 0.7; ghostMaterial.metalness = 0;
           ghostMaterial.envMap = null; ghostMaterial.envMapIntensity = 0;
@@ -112,30 +48,4 @@ export function makeCar(
     });
   }
   return car;
-}
-
-const ESTIMATED_TYRE_RADIUS_M = 0.34, ESTIMATED_TYRE_WIDTH_M = 0.3;
-
-/** Class-sized tyres/rims baked at the four corners, in the same layout as exported game meshes,
- * so the shared wheel rig spins, steers and grounds them. The hexagonal rim makes rotation visible. */
-function estimatedWheels(wheelbaseM: number, widthM: number, ghost: boolean): Mesh[] {
-  const parts = [
-    {name: 'tyres', radius: ESTIMATED_TYRE_RADIUS_M, width: ESTIMATED_TYRE_WIDTH_M, segments: 20, color: '#111316', roughness: 0.88, metalness: 0.02},
-    {name: 'rims', radius: ESTIMATED_TYRE_RADIUS_M * 0.62, width: ESTIMATED_TYRE_WIDTH_M + 0.01, segments: 6, color: '#3a3e44', roughness: 0.40, metalness: 0.70},
-  ];
-  return parts.map(part => {
-    const corners: BufferGeometry[] = [];
-    for (const z of [-wheelbaseM / 2, wheelbaseM / 2]) for (const x of [1, -1]) {
-      const wheel = new CylinderGeometry(part.radius, part.radius, part.width, part.segments).toNonIndexed();
-      wheel.rotateZ(Math.PI / 2); wheel.translate(x * (widthM / 2 - ESTIMATED_TYRE_WIDTH_M / 2), 0, z);
-      corners.push(wheel);
-    }
-    const geometry = mergeGeometries(corners); corners.forEach(corner => corner.dispose());
-    const mesh = new Mesh(geometry, new MeshStandardMaterial({
-      color: part.color, roughness: part.roughness, metalness: part.metalness,
-      transparent: ghost, opacity: ghost ? 0.5 : 1, depthWrite: !ghost,
-    }));
-    mesh.name = part.name;
-    return mesh;
-  });
 }

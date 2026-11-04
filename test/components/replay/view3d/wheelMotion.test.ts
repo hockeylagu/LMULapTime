@@ -5,15 +5,16 @@ import { createWheelTravel } from '../../../../src/components/replay/view3d/whee
 const a: ReplayTrajectoryPoint = {x: 0, y: 1, z: 0, rotY: 0, timeSec: 0};
 const b: ReplayTrajectoryPoint = {...a, z: -10, timeSec: 1};
 
-it('prioritizes independent wheel telemetry, retaining zero/lockup and integrating the speed ramp in km/h', () => {
+it('matches the displayed car travel at fractional and whole frames even when wheel speed telemetry disagrees', () => {
   const travel = createWheelTravel([{...a, wheelSpeeds: [36, 0, 18, 72]}, {...b, wheelSpeeds: [72, 0, 18, 36]}]);
-  expect(travel(1, 0, 0)).toBeCloseTo(15); expect(travel(0, 0.5, 0)).toBeCloseTo(6.25);
-  expect(travel(1, 0, 1)).toBe(0); expect(travel(1, 0, 2)).toBeCloseTo(5); expect(travel(1, 0, 3)).toBeCloseTo(15);
+  for (const corner of [0, 1, 2, 3]) {
+    expect(travel(0, 0.5, corner)).toBeCloseTo(5);
+    expect(travel(0, 1, corner)).toBeCloseTo(10);
+    expect(travel(1, 0, corner)).toBeCloseTo(10);
+  }
 });
 
-it('falls back per missing corner to replay travel, including reverse and vertical heave at a standstill', () => {
-  const travel = createWheelTravel([{...a, wheelSpeeds: [0, NaN, NaN, NaN]}, {...b, wheelSpeeds: [0, NaN, NaN, NaN]}]);
-  expect(travel(1, 0, 0)).toBe(0); expect(travel(1, 0, 1)).toBeCloseTo(10);
+it('rolls backward in reverse and stays still during vertical heave', () => {
   expect(createWheelTravel([a, {...b, z: 10}])(1, 0, 0)).toBeCloseTo(-10);
   expect(createWheelTravel([a, {...b, z: 0, y: 1.05}])(1, 0, 0)).toBe(0);
 });

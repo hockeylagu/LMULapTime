@@ -13,15 +13,9 @@ function rollFactor(point: ReplayTrajectoryPoint, corner: number): number | unde
 function wheelTravel(a: ReplayTrajectoryPoint, b: ReplayTrajectoryPoint, corner: number, fraction: number): number {
   // A sample without a ratio takes its neighbour's, so a lone gap never spins a locked tyre back up.
   const ka = rollFactor(a, corner) ?? rollFactor(b, corner) ?? 1, kb = rollFactor(b, corner) ?? ka;
-  const va = a.wheelSpeeds?.[corner], vb = b.wheelSpeeds?.[corner];
-  if (va !== undefined && vb !== undefined && Number.isFinite(va) && Number.isFinite(vb)) {
-    // Canonical wheel speeds are km/h. Integrate a linear speed ramp, retaining measured zero/lockup.
-    const sa = va * ka, sb = vb * kb;
-    return (sa * fraction + (sb - sa) * fraction * fraction / 2) * (b.timeSec! - a.timeSec!) / 3.6;
-  }
   const dx = b.x - a.x, dz = b.z - a.z;
   const forward = Number.isFinite(a.rotY) ? -dx * Math.sin(a.rotY!) - dz * Math.cos(a.rotY!) : 1;
-  // Replay fallback ignores vertical heave, and reverses when motion opposes the recorded body heading.
+  // Match the interpolated body's horizontal travel, including reverse. Integrate slip over that travel.
   return Math.hypot(dx, dz) * (forward < 0 ? -1 : 1) * (ka * fraction + (kb - ka) * fraction * fraction / 2);
 }
 

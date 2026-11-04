@@ -1,11 +1,19 @@
 // @vitest-environment happy-dom
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
-import { BoxGeometry, Group, Mesh, MeshBasicMaterial, Vector3, type BufferGeometry, type PerspectiveCamera, type OrthographicCamera, type Scene } from 'three';
+import { BoxGeometry, DoubleSide, Group, Material, Mesh, MeshBasicMaterial, Texture, Vector3, type BufferGeometry, type Object3D, type PerspectiveCamera, type OrthographicCamera, type Scene } from 'three';
 import { createReplayScene } from '../../../../../src/components/replay/view3d/replayScene.js';
+import { disposeObjects } from '../../../../../src/components/replay/view3d/laps/disposeObjects.js';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
-import type { TrackSceneResource } from '../../../../../shared/types/scenes/trackScene.js';
+import type { SceneryChunk, SceneryLayoutResource, ScenerySectorChunk } from '../../../../../shared/types/scenes/scenery.js';
+import type { LoadedCar } from '../../../../../src/api/vehicles/carApi.js';
 
-const gpu = vi.hoisted(() => ({render: vi.fn<(scene: Scene, camera: PerspectiveCamera | OrthographicCamera) => void>(), dispose: vi.fn(), constructed: vi.fn(), setSize: vi.fn()}));
+const gpu = vi.hoisted(() => ({render: vi.fn<(scene: Scene, camera: PerspectiveCamera | OrthographicCamera) => void>(), dispose: vi.fn(), constructed: vi.fn(), setSize: vi.fn(), upload: vi.fn<() => Promise<void>>()}));
+const chunks = vi.hoisted(() => ({roots: new Map<string, Object3D>(), loads: [] as string[], obstacleName: ''}));
+vi.mock('three-mesh-bvh/worker', async () => {
+  const {MeshBVH} = await import('three-mesh-bvh');
+  return {GenerateMeshBVHWorker: class {async generate(geometry: BufferGeometry) { return new MeshBVH(geometry, {indirect: true}); } dispose() {}}};
+});
+vi.mock('../../../../../src/components/replay/view3d/scenery/geometryWarmup.js', () => ({createGeometryWarmup: () => ({upload: gpu.upload, dispose() {}})}));
 vi.mock('three', async importOriginal => {
   const actual = await importOriginal<typeof import('three')>();
   return {...actual, PMREMGenerator: class {
@@ -19,33 +27,70 @@ vi.mock('three', async importOriginal => {
     constructor() { gpu.constructed(); }
     setSize = gpu.setSize;
     setPixelRatio() {}
+    compileAsync() { return Promise.resolve(); }
+    initTexture() {}
     forceContextLoss() {}
   }};
 });
-vi.mock('three/addons/loaders/GLTFLoader.js', () => ({GLTFLoader: class {
-  setMeshoptDecoder() { return this; }
-  async parseAsync() {
-    const root = new Group(), road = new Mesh(new BoxGeometry(200, 1, 200), new MeshBasicMaterial());
-    road.name = 'road'; road.position.y = -0.5; root.add(road);
-    return {scene: root};
-  }
+vi.mock('three/addons/loaders/GLTFLoader.js', async () => {
+  const {rigModel} = await import('../../../../helpers/scenes/rigModel.js');
+  return {GLTFLoader: class {
+    setMeshoptDecoder() { return this; }
+    async parseAsync() {
+      const root = rigModel(), cockpit = new Group();
+      root.traverse(object => { if (object instanceof Mesh) { const material = object.material as Material; material.userData.nativeMaterialId = 'm1'; material.name = 'body'; } });
+      cockpit.name = 'cockpit-in'; cockpit.userData.cockpitView = 'in'; root.add(cockpit);
+      return {scene: root};
+    }
+  }};
+});
+vi.mock('../../../../../src/components/replay/view3d/scenery/chunkLoader.js', () => ({createChunkLoader: () => ({
+  async load(chunk: SceneryChunk) {
+    chunks.loads.push(chunk.id);
+    const root = new Group(), mesh = new Mesh(new BoxGeometry(200, 1, 200), new MeshBasicMaterial());
+    mesh.name = chunk.kind === 'horizon' ? 'FILLER_GROUND__OPAQUE' : 'road__OPAQUE'; mesh.position.y = chunk.kind === 'horizon' ? -5.5 : -0.5;
+    root.add(mesh);
+    if (chunk.kind !== 'horizon' && chunks.obstacleName) {
+      const obstacle = new Mesh(new BoxGeometry(2, 1, 8), new MeshBasicMaterial());
+      obstacle.name = chunks.obstacleName;
+      obstacle.position.set(24, 25.5, -35);
+      root.add(obstacle);
+    }
+    chunks.roots.set(chunk.id, root);
+    return root;
+  },
+  releaseChunk: (root: Object3D) => disposeObjects(root, true), releaseTexture() {}, dispose() {},
+})}));
+vi.mock('../../../../../src/components/replay/view3d/scenery/cachedKtx2Loader.js', () => ({CachedKtx2Loader: class {
+  async loadAsync() { return new Texture(); }
+  release() {}
+  dispose() {}
 }}));
 
 const lap: ReplayTrajectoryData = {
   replayName: 'test', layoutKey: 'portimao_wec', geometryRevision: 'g', dataPluginRevision: 'p', pointsCount: 7,
   bounds: {minX: 0, maxX: 6, minZ: 0, maxZ: 0, spanX: 6, spanZ: 0},
-  points: Array.from({length: 7}, (_, i) => ({x: i, y: 0.3, z: 0, timeSec: i * 0.2, rotY: 0, speedKmh: 30})),
+  points: Array.from({length: 7}, (_, i) => ({x: i, y: 0.3, z: 0, timeSec: i * 0.2, rotY: 0, speedKmh: 30, stationM: i * 10})),
 };
-const metadata: TrackSceneResource = {
-  schemaVersion: 1, layoutKey: 'portimao_wec', coordinates: 'lmu-local-xyz-metres', sourceGeometryRevision: 'g', coverage: 'surfaces',
-  packageRevision: 'p', revision: 'scene-s', sha256: 's', byteLength: 0, triangles: 12, bounds: {min: [-100, 0, -100], max: [100, 0, 100]},
-};
-const assets = {primary: null, baseline: null};
+const box = (min: number, max: number) => ({min: [-100, min, -100] as [number, number, number], max: [100, max, 100] as [number, number, number]});
+const base = {sha256: 'x', byteLength: 1, triangles: 1, vertices: 1, drawCalls: 1, geometryBytes: 1, meshes: 1, materials: 1, textures: [] as string[], bounds: box(0, 0)};
+const sector = (index: number): ScenerySectorChunk => ({...base, id: `s${index}`, kind: 'main', asset: `scenery/s${index}.glb`, lapStartM: index * 1000, lapEndM: (index + 1) * 1000, prev: `s${(index + 3) % 4}`, next: `s${(index + 1) % 4}`});
+const layout = {
+  schemaVersion: 2, layoutKey: 'portimao_wec', sourceGeometryRevision: 'g', packageRevision: 'p', routeLengthM: 4000, pitLaneLengthM: 0,
+  streaming: {residentBehindM: 300, residentAheadM: 1500, freeCameraRadiusM: 1500},
+  daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55 },
+  horizon: {...base, id: 'horizon', kind: 'horizon', asset: 'scenery/h.glb'}, sectors: [0, 1, 2, 3].map(sector), textures: [],
+} as unknown as SceneryLayoutResource;
+const car = {
+  resource: {}, bytes: new ArrayBuffer(0), vehicleId: 'veh',
+  descriptor: {appearances: [{alias: 'VEH', albedo: 'textures/a.ktx2', paint: {kind: 'carPaint', maps: {}}}], materials: [{id: 'm1', name: 'body', paint: true}]},
+} as unknown as LoadedCar;
+const assets = {primary: car, baseline: null}, withGhost = {primary: car, baseline: car};
 let frames: FrameRequestCallback[];
 let resizeCallbacks: Array<() => void>;
 const draw = () => { frames.splice(0).forEach(callback => callback(0)); };
 beforeEach(() => {
-  vi.clearAllMocks(); frames = []; resizeCallbacks = [];
+  vi.resetAllMocks(); frames = []; resizeCallbacks = []; chunks.roots.clear(); chunks.loads.length = 0; chunks.obstacleName = '';
   vi.stubGlobal('ResizeObserver', class implements ResizeObserver {
     constructor(callback: ResizeObserverCallback) { resizeCallbacks.push(() => callback([], this)); }
     observe() {}
@@ -57,11 +102,62 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
+it.each([
+  ['overpass__OPAQUE', 22.3],
+  ['terrain__OPAQUE', 27.2],
+])('uses ground clearance without carrying a camera lift past %s', async (name, expectedHeight) => {
+  chunks.obstacleName = name;
+  const renderedHeights: number[] = [];
+  gpu.render.mockImplementation((_scene, camera) => { renderedHeights.push(camera.position.y); });
+  const handle = await createReplayScene(document.createElement('div'), layout, lap, null, vi.fn(), assets);
+  handle.cursor(0, 0); draw();
+  expect(renderedHeights.at(-1)).toBeCloseTo(expectedHeight);
+  handle.cursor(3, 0); draw();
+  expect(renderedHeights.at(-1)).toBeCloseTo(22.3);
+  handle.dispose();
+});
+
+it('serializes GPU warm-ups when several new sectors load together', async () => {
+  const sectors = Array.from({length: 8}, (_, index) => ({...sector(index), prev: `s${(index + 7) % 8}`, next: `s${(index + 1) % 8}`}));
+  const extended = {...layout, routeLengthM: 8000, sectors};
+  const moving = {...lap, points: lap.points.map((point, index) => ({...point, stationM: index * 1000}))};
+  const handle = await createReplayScene(document.createElement('div'), extended, moving, null, vi.fn(), assets);
+  const releases: (() => void)[] = [];
+  gpu.upload.mockClear().mockImplementation(() => new Promise<void>(resolve => { releases.push(resolve); }));
+  try {
+    handle.cursor(4, 0); draw();
+    await vi.waitFor(() => expect(gpu.upload).toHaveBeenCalledOnce());
+    releases[0]();
+    await vi.waitFor(() => expect(gpu.upload).toHaveBeenCalledTimes(2));
+    releases[1]();
+    await vi.waitFor(() => expect(gpu.upload).toHaveBeenCalledTimes(3));
+    releases[2]();
+  } finally { releases.forEach(release => release()); handle.dispose(); }
+});
+
+it('caches static scenery matrices after the scene reflection without freezing the moving car', async () => {
+  const handle = await createReplayScene(document.createElement('div'), layout, lap, null, vi.fn(), assets);
+  try {
+    for (const root of chunks.roots.values()) {
+      expect(root.matrixWorldAutoUpdate).toBe(false);
+      expect(root.matrixWorld.determinant()).toBeCloseTo(-1);
+      root.traverse(object => { expect(object.matrixAutoUpdate).toBe(false); });
+    }
+    handle.cursor(0, 0); draw();
+    const scene = gpu.render.mock.calls.at(-1)![0];
+    const primary = scene.getObjectByName('body-envelope')!.parent!;
+    const first = primary.position.clone();
+    handle.cursor(3, 0); draw();
+    expect(primary.position.distanceTo(first)).toBeGreaterThan(0);
+    expect(primary.matrixAutoUpdate).toBe(true);
+  } finally { handle.dispose(); }
+});
+
 it('repaints a resized embedded canvas before paint, skipping notifications with unchanged dimensions', async () => {
   const host = document.createElement('div');
   let height = 540;
   Object.defineProperties(host, {clientWidth: {get: () => 460}, clientHeight: {get: () => height}});
-  const handle = await createReplayScene(host, new ArrayBuffer(0), metadata, lap, null, vi.fn(), assets);
+  const handle = await createReplayScene(host, layout, lap, null, vi.fn(), assets);
   handle.cursor(0, 0); draw();
   const camera = gpu.render.mock.calls.at(-1)![1], eye = camera.position.clone();
   gpu.render.mockClear(); gpu.setSize.mockClear();
@@ -74,25 +170,27 @@ it('repaints a resized embedded canvas before paint, skipping notifications with
   handle.dispose();
 });
 
-it('retains terrain, canvas and camera settings, releases old laps, and draws the new primary and ghost', async () => {
+it('retains scenery, canvas and camera settings, releases old laps, and draws the new primary and ghost', async () => {
   const host = document.createElement('div');
-  const handle = await createReplayScene(host, new ArrayBuffer(0), metadata, lap, null, vi.fn(), assets);
+  const handle = await createReplayScene(host, layout, lap, null, vi.fn(), assets);
   handle.cursor(2, 0); handle.mode('orbit'); handle.zoom(1); draw();
   const [scene, camera] = gpu.render.mock.calls.at(-1)!;
   const lightingEnvironment = scene.environment;
   const eye = camera.position.clone(), zoom = camera.zoom, canvas = host.firstChild;
-  const road = scene.getObjectByName('road') as Mesh;
-  const world = road.parent!.parent!;
+  const road = scene.getObjectByName('road__OPAQUE') as Mesh;
+  const world = road.parent!.parent!.parent!;
   const oldLayer = world.children.at(-1)!;
-  const oldCar = oldLayer.children[0], oldBody = oldCar.getObjectByName('body-envelope')!.children[0] as Mesh;
-  const roadDispose = vi.spyOn(road.geometry, 'dispose'), carDispose = vi.spyOn(oldBody.geometry, 'dispose');
+  const oldCar = oldLayer.children[0], oldBody = oldCar.getObjectByName('body-envelope')!.getObjectByName('body') as Mesh<BufferGeometry, Material>;
+  expect(oldBody.material.shadowSide).toBe(DoubleSide);
+  const roadDispose = vi.spyOn(road.geometry, 'dispose'), carDispose = vi.spyOn(oldBody.geometry, 'dispose'), materialDispose = vi.spyOn(oldBody.material, 'dispose');
   handle.colorLines('speed'); handle.fadeLines(0.12, 1);
   const next = {...lap, points: lap.points.map(point => ({...point, x: point.x + 5}))};
-  expect(await handle.updateLaps(next, lap, assets)).toBe(true);
+  expect(await handle.updateLaps(next, lap, withGhost)).toBe(true);
   handle.cursor(2, 0); draw();
   expect(host.firstChild).toBe(canvas); expect(gpu.constructed).toHaveBeenCalledOnce(); expect(gpu.dispose).not.toHaveBeenCalled();
-  expect(scene.getObjectByName('road')).toBe(road); expect(scene.environment).toBe(lightingEnvironment);
-  expect(roadDispose).not.toHaveBeenCalled(); expect(carDispose).toHaveBeenCalledOnce();
+  expect(scene.getObjectByName('road__OPAQUE')).toBe(road); expect(scene.environment).toBe(lightingEnvironment);
+  // The car geometry is shared with the cached template; only the lap's materials are released.
+  expect(roadDispose).not.toHaveBeenCalled(); expect(carDispose).not.toHaveBeenCalled(); expect(materialDispose).toHaveBeenCalled();
   expect(oldLayer.parent).toBeNull();
   expect(gpu.render.mock.calls.at(-1)![1]).toBe(camera); expect(camera.position).toEqual(eye); expect(camera.zoom).toBe(zoom);
   const layer = world.children.at(-1)!;
@@ -107,30 +205,29 @@ it('retains terrain, canvas and camera settings, releases old laps, and draws th
 
 it('rejects layout, geometry and package mismatches, and discards cancelled or superseded lap builds', async () => {
   const host = document.createElement('div');
-  const handle = await createReplayScene(host, new ArrayBuffer(0), metadata, lap, null, vi.fn(), assets);
+  const handle = await createReplayScene(host, layout, lap, null, vi.fn(), assets);
   handle.cursor(0, 0); draw();
-  const scene = gpu.render.mock.calls.at(-1)![0], road = scene.getObjectByName('road')!;
-  const world = road.parent!.parent!, original = world.children.at(-1);
+  const scene = gpu.render.mock.calls.at(-1)![0], road = scene.getObjectByName('road__OPAQUE')!;
+  const world = road.parent!.parent!.parent!, original = world.children.at(-1);
   for (const invalid of [{...lap, layoutKey: 'spa_wec'}, {...lap, geometryRevision: 'g2'}, {...lap, dataPluginRevision: 'p2'}]) {
     await expect(handle.updateLaps(invalid, null, assets)).rejects.toThrow(/same layout, geometry and package/);
-    await expect(handle.updateLaps(lap, invalid, assets)).rejects.toThrow(/same layout, geometry and package/);
+    await expect(handle.updateLaps(lap, invalid, withGhost)).rejects.toThrow(/same layout, geometry and package/);
   }
-  const abort = new AbortController(), cancelled = handle.updateLaps(lap, lap, assets, abort.signal);
+  const abort = new AbortController(), cancelled = handle.updateLaps(lap, lap, withGhost, abort.signal);
   abort.abort(); expect(await cancelled).toBe(false); expect(world.children.at(-1)).toBe(original);
-  const stale = handle.updateLaps(lap, lap, assets), current = handle.updateLaps(lap, null, assets);
+  const stale = handle.updateLaps(lap, lap, withGhost), current = handle.updateLaps(lap, null, assets);
   expect(await stale).toBe(false); expect(await current).toBe(true); expect(world.children.at(-1)!.children).toHaveLength(3);
-  const late = handle.updateLaps(lap, lap, assets); handle.dispose();
+  const late = handle.updateLaps(lap, lap, withGhost); handle.dispose();
   expect(await late).toBe(false); expect(host.childNodes).toHaveLength(0);
 });
 
-it('hides the fallback cabin in cockpit mode, locks the eye to the driver seat and zooms via projection matrix', async () => {
+it('shows the driver-camera cockpit mesh in cockpit mode, locks the eye to the driver seat and zooms via projection matrix', async () => {
   const host = document.createElement('div');
-  const handle = await createReplayScene(host, new ArrayBuffer(0), metadata, lap, null, vi.fn(), assets);
+  const handle = await createReplayScene(host, layout, lap, null, vi.fn(), assets);
   handle.cursor(0, 0); draw();
   const [scene, camera] = gpu.render.mock.calls.at(-1)!;
-  const cabin = scene.getObjectByName('cabin');
-  expect(cabin).not.toBeNull();
-  expect(cabin!.visible).toBe(true);
+  const cockpit = scene.getObjectByName('cockpit-in')!;
+  expect(cockpit.visible).toBe(false);
 
   handle.mode('cockpit'); draw();
   const modelOffset = scene.getObjectByName('body-envelope')!.position;
@@ -139,7 +236,7 @@ it('hides the fallback cabin in cockpit mode, locks the eye to the driver seat a
   expect(camera.position.y).toBeCloseTo(0.3 + modelOffset.y + 1.00, 2);
   expect(camera.getWorldDirection(new Vector3()).y).toBeCloseTo(-0.10 / 40, 4);
   handle.cursor(1, 0); draw();
-  expect(cabin!.visible).toBe(false);
+  expect(cockpit.visible).toBe(true);
 
   // Driver eye position in cockpit mode: near car position + 0.28m lateral, +1.00m height
   const eye = camera.position.clone();
@@ -151,11 +248,27 @@ it('hides the fallback cabin in cockpit mode, locks the eye to the driver seat a
   expect(camera.zoom).toBeGreaterThan(1);
   expect(camera.position).toEqual(eye);
 
-  // Exiting cockpit mode restores cabin visibility and Y-up vector
+  // Exiting cockpit mode restores the exterior mesh and Y-up vector
   handle.mode('follow');
-  expect(cabin!.visible).toBe(true);
+  expect(cockpit.visible).toBe(false);
   expect(camera.up.y).toBe(1);
   expect(camera.zoom).toBe(1);
   expect(camera.position.distanceTo(eye)).toBeGreaterThan(10);
   handle.dispose();
+});
+
+it('streams sectors around the car: loads the window, unloads what left it, and follows a free camera', async () => {
+  const host = document.createElement('div'), far = {...lap, points: [...lap.points.slice(0, 6), {...lap.points[6], stationM: 3000}]};
+  const handle = await createReplayScene(host, layout, far, null, vi.fn(), assets);
+  // At station 0 the window [-300, 1500] covers s0, s1 and the end of s3, never s2.
+  await vi.waitFor(() => expect([...chunks.roots.keys()].sort()).toEqual(['horizon', 's0', 's1', 's3']));
+  handle.cursor(6, 0); draw();
+  // At station 3000 the window [2700, 4500) covers s2, s3 and the start of s0; s1 left it plus the hysteresis margin.
+  await vi.waitFor(() => expect(chunks.loads).toContain('s2'));
+  expect(chunks.roots.get('s1')!.parent).toBeNull(); expect(chunks.roots.get('s3')!.parent).not.toBeNull();
+  expect(chunks.roots.get('horizon')!.parent).not.toBeNull();
+  // An orbit camera is planned around its own position, not the lap distance.
+  handle.mode('orbit'); draw();
+  handle.dispose();
+  expect(chunks.roots.get('horizon')!.parent).toBeNull();
 });
