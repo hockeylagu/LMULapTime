@@ -28,6 +28,8 @@ export interface ReplayInspectorContentProps {
   initialBaselineLapOrdinal?: number | null;
   /** A corner to open on the Corners tab once the lap (and its comparison lap) are loaded. */
   initialCornerNumber?: number | null;
+  isExpanded?: boolean;
+  onToggleExpanded?: (expanded: boolean) => void;
   view?: '2d' | '3d';
   onViewChange?: (view: '2d' | '3d') => void;
 }
@@ -44,6 +46,8 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
   initialBaselineDriverOrdinal,
   initialBaselineLapOrdinal,
   initialCornerNumber,
+  isExpanded,
+  onToggleExpanded,
   view: controlledView,
   onViewChange,
 }) => {
@@ -272,6 +276,7 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
       duckdbUnavailableReason={duckdbUnavailableReason}
       selectedSource={selectedSource}
       onSelectSource={handleSelectSource}
+      isExpanded={isExpanded} onToggleExpanded={onToggleExpanded}
       view={activeView}
       onChangeView={handleViewChange}
     />

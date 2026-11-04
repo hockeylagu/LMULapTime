@@ -13,6 +13,8 @@ interface MockInspectorProps {
   initialBaselineLapOrdinal?: number | null;
   initialCornerNumber?: number;
   view?: '2d' | '3d';
+  isExpanded?: boolean;
+  onToggleExpanded?: (expanded: boolean) => void;
   onViewChange?: (view: '2d' | '3d') => void;
   onClose: () => void;
   onLocatorChange: (driverOrdinal: number, lapOrdinal: number) => void;
@@ -30,6 +32,8 @@ vi.mock('../../../../src/components/replay/inspector/ReplayInspectorContent.js',
       <span data-testid="baseline-lap">{props.initialBaselineLapOrdinal ?? 'none'}</span>
       <span data-testid="corner">{props.initialCornerNumber ?? 'none'}</span>
       <span data-testid="view-mode">{props.view ?? 'none'}</span>
+      <button type="button" aria-pressed={props.isExpanded}
+        onClick={() => props.onToggleExpanded?.(!props.isExpanded)}>Fullscreen</button>
       <button type="button" onClick={() => props.onLocatorChange(2, 8)}>Change locator</button>
       <button type="button" onClick={() => props.onViewChange?.('3d')}>Switch to 3D</button>
       <button type="button" onClick={() => props.onViewChange?.('2d')}>Switch to 2D</button>
@@ -105,6 +109,25 @@ describe('ReplayInspectorPage', () => {
       const params = new URLSearchParams(window.location.hash.split('?')[1]);
       expect(params.get('view')).toBe('3d');
     });
+  });
+
+  it('restores fullscreen from the URL and keeps it independent of the view', async () => {
+    window.location.hash = '#/telemetry?sessionId=session-1&view=3d&fullscreen=true';
+    render(<ReplayInspectorPage />);
+
+    const fullscreen = screen.getByRole('button', { name: 'Fullscreen' });
+    expect(fullscreen).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to 2D' }));
+    await waitFor(() => expect(window.location.hash).toContain('view=2d&fullscreen=true'));
+    expect(fullscreen).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(fullscreen);
+    await waitFor(() => expect(window.location.hash).toBe('#/telemetry?sessionId=session-1&view=2d'));
+    expect(fullscreen).toHaveAttribute('aria-pressed', 'false');
+
+    fireEvent.click(fullscreen);
+    await waitFor(() => expect(window.location.hash).toContain('view=2d&fullscreen=true'));
+    expect(fullscreen).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('navigates back when the inspector closes', async () => {

@@ -35,6 +35,8 @@ export interface ReplayMapContainerProps {
   onTogglePlay?: () => void;
   view?: '2d' | '3d';
   onChangeView?: (view: '2d' | '3d') => void;
+  isExpanded?: boolean;
+  onToggleExpanded?: (expanded: boolean) => void;
 }
 
 export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
@@ -59,6 +61,8 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
   onTogglePlay,
   view: controlledView,
   onChangeView,
+  isExpanded: controlledExpanded,
+  onToggleExpanded,
 }) => {
   const baselinePoints = isCompareMode && baselineTrajectory ? baselineTrajectory.points : undefined;
 
@@ -70,12 +74,19 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
   const [showFrictionCircle, setShowFrictionCircle] = useState<boolean>(false);
   const [showGForce, toggleGForce] = useStoredToggle('lmu-map-gforce-v1', true);
   const [uncontrolledView, setUncontrolledView] = useState<'2d' | '3d'>('2d');
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [uncontrolledExpanded, setUncontrolledExpanded] = useState(false);
   const activeView = controlledView ?? uncontrolledView;
+  const isExpanded = controlledExpanded ?? uncontrolledExpanded;
 
   const handleToggleView = (nextView: '2d' | '3d') => {
     if (controlledView === undefined) setUncontrolledView(nextView);
     onChangeView?.(nextView);
+  };
+
+  const handleToggleExpanded = (expanded?: boolean) => {
+    const next = typeof expanded === 'boolean' ? expanded : !isExpanded;
+    if (controlledExpanded === undefined) setUncontrolledExpanded(next);
+    onToggleExpanded?.(next);
   };
 
   const pedalMarkers = useMemo(() => {
@@ -115,7 +126,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
       currentIndex={currentIndex} onSelectIndex={onSelectIndex} isPlaying={isPlaying} onTogglePlay={onTogglePlay} onReturnTo2D={() => handleToggleView('2d')}
       colorBy={colorBy} onChangeColorBy={onChangeColorBy} currentPoint={currentPoint} fadedLine={fadedLine}
       onToggleFadedLine={line => setFadedLine(f => (f === line ? 'none' : line))} trackGeometry={trackGeometry}
-      isExpanded={isExpanded} onToggleExpanded={setIsExpanded}
+      isExpanded={isExpanded} onToggleExpanded={handleToggleExpanded}
       showFrictionCircle={showFrictionCircle} onToggleFrictionCircle={() => setShowFrictionCircle(value => !value)} />
   </Suspense>;
 
@@ -174,7 +185,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
             trackGeometry={trackGeometry}
             trackLengthM={trajectory.trackLengthM}
             isExpanded={isExpanded}
-            onToggleExpanded={setIsExpanded}
+            onToggleExpanded={handleToggleExpanded}
             onToggleView={() => handleToggleView('3d')}
           />
         </div>

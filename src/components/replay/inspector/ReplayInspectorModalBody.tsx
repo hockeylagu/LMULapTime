@@ -95,6 +95,8 @@ export interface ReplayInspectorModalBodyProps {
   duckdbUnavailableReason?: string;
   selectedSource?: 'duckdb' | 'vcr';
   onSelectSource?: (source: 'duckdb' | 'vcr') => void;
+  isExpanded?: boolean;
+  onToggleExpanded?: (expanded: boolean) => void;
   view?: '2d' | '3d';
   onChangeView?: (view: '2d' | '3d') => void;
 }
@@ -173,8 +175,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
   hasDuckDbTelemetry,
   duckdbUnavailableReason,
   onSelectSource,
-  view,
-  onChangeView,
+  isExpanded, onToggleExpanded, view, onChangeView,
 }) => {
   return (
     <main className="h-dvh min-h-0 flex flex-col bg-lmu-dark text-white w-full overflow-hidden select-none overscroll-none animate-fade-in">
@@ -231,7 +232,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
       )}
 
       <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
-        <ReplayInspectorTelemetryColumn
+        {!isExpanded && <ReplayInspectorTelemetryColumn
           metadata={metadata}
           trajectory={trajectory}
           baselineTrajectory={baselineTrajectory}
@@ -255,7 +256,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
           hasDuckDbTelemetry={hasDuckDbTelemetry}
           duckdbUnavailableReason={duckdbUnavailableReason}
           onSelectSource={onSelectSource}
-        />
+        />}
 
         <ReplayFullscreenControlsContext.Provider value={fullscreenControls ?? null}><ReplayInspectorSidebar
           activeTab={activeTab}
@@ -289,6 +290,7 @@ export const ReplayInspectorModalBody: React.FC<ReplayInspectorModalBodyProps> =
           availableConsistencyLaps={availableConsistencyLaps} excludedConsistencyLaps={excludedConsistencyLaps}
           toggleConsistencyLap={toggleConsistencyLap}
           trackVenue={metadata?.trackVenue} trackCourse={metadata?.trackCourse}
+          isExpanded={isExpanded} onToggleExpanded={onToggleExpanded}
           view={view} onChangeView={onChangeView}
         /></ReplayFullscreenControlsContext.Provider>
       </div>

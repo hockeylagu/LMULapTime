@@ -7,6 +7,7 @@ export const ReplayInspectorPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const sessionId = searchParams.get('sessionId');
+  const fullscreen = searchParams.get('fullscreen') ?? searchParams.get('fullScreen');
   const viewParam = searchParams.get('view');
   const view: '2d' | '3d' = viewParam === '3d' ? '3d' : '2d';
 
@@ -45,6 +46,8 @@ export const ReplayInspectorPage: React.FC = () => {
       initialBaselineDriverOrdinal={Number.isInteger(baselineDriverOrdinal) && baselineDriverOrdinal >= 0 ? baselineDriverOrdinal : 0}
       initialBaselineLapOrdinal={Number.isInteger(baselineLapOrdinal) && baselineLapOrdinal >= 0 ? baselineLapOrdinal : undefined}
       initialCornerNumber={corner ? parseInt(corner, 10) : undefined}
+      isExpanded={fullscreen === 'true' || fullscreen === '1'}
+      onToggleExpanded={(expanded) => updateSearchParams(searchParams, setSearchParams, { fullscreen: expanded })}
       view={view}
       onViewChange={(newView) => updateSearchParams(searchParams, setSearchParams, { view: newView })}
     />
