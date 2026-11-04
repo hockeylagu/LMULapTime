@@ -252,6 +252,45 @@ describe('useReplayInspectorData session locators', () => {
     expect(params.get('baselineLapOrdinal')).toBe('4');
   });
 
+  it('samples React playback updates while keeping the cursor exact and synchronizing on pause', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = requestUrl(input);
+      if (url.endsWith('/telemetry/metadata')) return response(metadata);
+      if (url.includes('/compare/laps')) return response({ laps: [] });
+      return response({ ...trajectory, pointsCount: 101,
+        points: Array.from({ length: 101 }, (_, index) => ({ x: index, y: 0, z: 0, timeSec: index / 100 })),
+      });
+    });
+    let frame: FrameRequestCallback | undefined;
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => { frame = callback; return 1; });
+    vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => { frame = undefined; });
+    const { result } = renderHook(() => useReplayInspectorData({ isOpen: true, sessionId: 'session-1' }), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    vi.spyOn(performance, 'now').mockReturnValue(1000);
+    act(() => result.current.setIsPlaying(true));
+    act(() => frame?.(1015));
+    expect(result.current.currentIndex).toBe(1);
+    act(() => frame?.(1035));
+    expect(result.current.currentIndex).toBe(1);
+    expect(result.current.playbackCursor.getSnapshot()?.index).toBe(3);
+    expect(result.current.playbackCursor.getReactSnapshot()?.index).toBe(1);
+    act(() => result.current.setIsPlaying(false));
+    expect(result.current.currentIndex).toBe(3);
+    expect(result.current.playbackCursor.getReactSnapshot()?.index).toBe(3);
+    expect(result.current.playbackCursor.getSnapshot()?.fraction).toBeCloseTo(0.5);
+    vi.spyOn(performance, 'now').mockReturnValue(2000);
+    act(() => result.current.setIsPlaying(true));
+    act(() => frame?.(2010));
+    expect(result.current.playbackCursor.getSnapshot()?.index).toBe(4);
+    expect(result.current.playbackCursor.getSnapshot()?.fraction).toBeCloseTo(0.5);
+    act(() => frame?.(2020));
+    act(() => frame?.(2060));
+    expect(result.current.currentIndex).toBe(9);
+    act(() => result.current.setCurrentIndex(20));
+    expect(result.current.currentIndex).toBe(20);
+    expect(result.current.playbackCursor.getSnapshot()).toBeNull();
+  });
+
   it('preserves the interpolated playback position when pausing so the car does not rewind', async () => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       const url = requestUrl(input);

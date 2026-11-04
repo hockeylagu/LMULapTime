@@ -1,9 +1,28 @@
 import { createElement } from 'react';
 import { act, renderHook } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createPlaybackCursor, ReplayPlaybackCursorContext, usePlaybackPosition } from '../../../../src/components/replay/inspector/replayPlaybackCursor.js';
 
 describe('playback visual cursor', () => {
+  it('updates imperative visuals every frame without rerendering sampled React subscribers', () => {
+    const points = [0, 0.2, 1].map(timeSec => ({ x: 0, y: 0, z: 0, timeSec, speedKmh: 100 }));
+    const cursor = createPlaybackCursor(), draw = vi.fn();
+    cursor.subscribe(draw);
+    const { result } = renderHook(() => usePlaybackPosition(points), {
+      wrapper: ({ children }) => createElement(ReplayPlaybackCursorContext.Provider, { value: cursor }, children),
+    });
+    act(() => cursor.publish(points, { index: 0, timeSec: 0.05 }));
+    const sampled = result.current;
+    act(() => cursor.publish(points, { index: 0, timeSec: 0.1 }, false));
+    expect(draw).toHaveBeenCalledTimes(2);
+    expect(cursor.getSnapshot()?.fraction).toBeCloseTo(0.5);
+    expect(result.current).toBe(sampled);
+    act(() => cursor.publish(points, { index: 0, timeSec: 0.1 }));
+    expect(result.current?.fraction).toBeCloseTo(0.5);
+    act(() => cursor.clear());
+    expect(result.current).toBeNull();
+  });
+
   it('updates between samples and clears on stop, ignoring other laps and stale indices', () => {
     const points = [0, 0.2, 1].map(timeSec => ({ x: 0, y: 0, z: 0, timeSec, speedKmh: 100 }));
     const cursor = createPlaybackCursor();

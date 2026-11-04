@@ -541,6 +541,7 @@ export function useReplayInspectorData({
         currentIndexRef.current = playbackClockRef.current.index;
         setCurrentIndexState(playbackClockRef.current.index);
       }
+      if (trajectory && playbackClockRef.current) playbackCursor.publish(trajectory.points, playbackClockRef.current);
       return;
     }
     // Playback follows the lap's clock (see replayPlaybackClock), not the sample count.
@@ -551,12 +552,13 @@ export function useReplayInspectorData({
       currentClock = playbackClockAt(points, currentIndexRef.current);
       playbackClockRef.current = currentClock;
     }
+    let lastUiTime = -Infinity;
     const loop = (now: number) => {
       const elapsedMs = now - lastTimeRef.current;
       lastTimeRef.current = now;
       let clock = playbackClockRef.current;
       // The cursor was moved (scrub, corner jump) while playing: carry on from there.
-      if (!clock || clock.index !== currentIndexRef.current) clock = playbackClockAt(points, currentIndexRef.current);
+      if (!clock) clock = playbackClockAt(points, currentIndexRef.current);
       const next = advancePlaybackClock(points, clock, elapsedMs, playbackSpeed);
       if (!next) {
         playbackCursor.clear();
@@ -566,8 +568,10 @@ export function useReplayInspectorData({
         return;
       }
       playbackClockRef.current = next;
-      playbackCursor.publish(points, next);
-      if (next.index !== clock.index) {
+      const updateReact = now - lastUiTime >= 50;
+      playbackCursor.publish(points, next, updateReact);
+      if (updateReact) {
+        lastUiTime = now;
         currentIndexRef.current = next.index;
         setCurrentIndexState(next.index);
       }
