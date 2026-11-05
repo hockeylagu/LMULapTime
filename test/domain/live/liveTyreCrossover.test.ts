@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { tyreCrossover } from '../../../shared/domain/live/liveTyreCrossover.js';
 
-const base = { avgPathWetness: 0.125, compound: 'Medium', dryCompound: 'Medium', pitInLaps: null, lapsLeft: null, sessionKind: 'race' } as const;
+const base = { avgPathWetness: 0.125, raining: 0, compound: 'Medium', dryCompound: 'Medium', pitInLaps: null, lapsLeft: null, sessionKind: 'race' } as const;
 describe('tyreCrossover', () => {
   it.each([0.125, 0.4, 0.6, 1])('boxes slicks for wets at wetness %s', avgPathWetness => {
     expect(tyreCrossover({ ...base, avgPathWetness })).toEqual({ action: 'wets', compound: 'Wet', when: 'now', reason: 'slightly-wet', wetness: avgPathWetness });
@@ -21,6 +21,11 @@ describe('tyreCrossover', () => {
   it('names the previous dry compound, retaining unknown when starting on wets', () => {
     expect(tyreCrossover({ ...base, compound: 'Wet', avgPathWetness: 0 })).toMatchObject({ action: 'slicks', compound: 'Medium', reason: 'dry' });
     expect(tyreCrossover({ ...base, compound: 'Wet', avgPathWetness: 0, dryCompound: null })?.compound).toBeNull();
+  });
+  it('holds freshly fitted wets while rain falls on a path still dry', () => {
+    // Daytona race 2026-11-05: rain 0.05, path 0 for 13 s after the wets went on, then Damp.
+    expect(tyreCrossover({ ...base, compound: 'Wet', avgPathWetness: 0, raining: 0.05 })).toBeNull();
+    expect(tyreCrossover({ ...base, compound: 'Wet', avgPathWetness: 0, raining: 0 })?.action).toBe('slicks');
   });
   it.each(['practice', 'qualifying', 'warmup', 'unknown'] as const)('is silent in %s', sessionKind => {
     expect(tyreCrossover({ ...base, sessionKind })).toBeNull();

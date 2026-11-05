@@ -325,7 +325,7 @@ export class LiveStrategyTracker {
       tyres,
       forecast: this.nextForecast(reading, state.session.kind),
       garage, fuelRatio,
-      crossover: state.lifecycle === 'driving' ? tyreCrossover({ avgPathWetness: reading.avgPathWetness,
+      crossover: state.lifecycle === 'driving' ? tyreCrossover({ avgPathWetness: reading.avgPathWetness, raining: reading.raining,
         compound: this.car?.compound ?? null, dryCompound: this.dryCompound,
         pitInLaps: resource.race?.pitInLaps ?? null, lapsLeft, sessionKind }) : null,
       ...(deployment ? { deployment } : {}),

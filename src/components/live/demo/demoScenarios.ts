@@ -88,11 +88,11 @@ export const DEMO_SCENARIOS: readonly Scenario[] = [
   scenario('rain', 'Alternative conditions and incidents', 'Rain forecast', s => { s.strategy!.forecast = { change: 'rain', chance: 80, atSeconds: 2100, lap: 20 }; }),
   scenario('crossover-wets', 'Alternative conditions and incidents', 'Crossover · box for wets, MFD mismatch', s => {
     s.weather!.avgPathWetness = 0.125; s.strategy!.tyres!.compound = 'Medium'; s.strategy!.pit!.mfd!.tyres = 'No Change';
-    s.strategy!.crossover = tyreCrossover({ avgPathWetness: 0.125, compound: 'Medium', dryCompound: 'Medium', pitInLaps: 6, lapsLeft: null, sessionKind: 'race' });
+    s.strategy!.crossover = tyreCrossover({ avgPathWetness: 0.125, raining: 0.15, compound: 'Medium', dryCompound: 'Medium', pitInLaps: 6, lapsLeft: null, sessionKind: 'race' });
   }),
   scenario('crossover-slicks', 'Alternative conditions and incidents', 'Crossover · slicks at the stop', s => {
     s.weather!.avgPathWetness = 0; s.strategy!.tyres!.compound = 'Wet'; s.strategy!.resource!.race!.pitInLaps = 2;
-    s.strategy!.crossover = tyreCrossover({ avgPathWetness: 0, compound: 'Wet', dryCompound: 'Medium', pitInLaps: 2, lapsLeft: null, sessionKind: 'race' });
+    s.strategy!.crossover = tyreCrossover({ avgPathWetness: 0, raining: 0, compound: 'Wet', dryCompound: 'Medium', pitInLaps: 2, lapsLeft: null, sessionKind: 'race' });
   }),
   scenario('wet', 'Alternative conditions and incidents', 'Wet · getting wetter', s => { Object.assign(s.weather!, { raining: 0.5, avgPathWetness: 0.65, wetnessTrend: 'rising', trackTempTrend: 'falling' }); s.strategy!.tyres!.compound = 'Wet'; }),
   scenario('drying', 'Alternative conditions and incidents', 'Drying · rain ending', s => { Object.assign(s.weather!, { avgPathWetness: 0.3, wetnessTrend: 'falling' }); s.strategy!.forecast = { change: 'dry', chance: 0, atSeconds: 2100, lap: 20 }; }),
