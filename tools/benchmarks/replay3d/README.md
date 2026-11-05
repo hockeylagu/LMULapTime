@@ -3,7 +3,30 @@
 Opens one lap in the running app's fullscreen 3D view in headless Edge on the real GPU, measures load, plays the lap and reports
 frame-time percentiles. Targets and the plan it measures: [`docs/plans/proposed/REPLAY_3D_PERFORMANCE.md`](../../../docs/plans/proposed/REPLAY_3D_PERFORMANCE.md).
 
-## Run
+## Reference suite (compare packages and builds)
+
+```bash
+PLAYWRIGHT_NODE_MODULES=C:/Documents/LMUTrackPipeline npm run benchmark:replay3d:suite -- --package personal-v2
+```
+
+Start only the backend first (`npm run dev:server`, with `LMU_PLUGIN_ROOT` on the package to measure); the suite does the rest.
+Method:
+
+- **Build**: production. The suite runs `vite build` into `.cache/replay-3d-performance/dist` and serves it with `vite preview` on
+  port 4173, which proxies `/api` to the backend like the dev server. Never compare against dev-server numbers: React's
+  development build adds a 20 Hz tail during playback.
+- **Laps**: the reference laps below (`--laps fuji,silverstone` by default). Before measuring, the suite checks that the backend's
+  package has scenery for each layout.
+- **Runs**: `--runs` (default 3) runs per lap, interleaved (fuji, silverstone, fuji, …), 40 s of playback each. A fresh headless Edge per
+  run, so every load is cold in the browser (package files are served `no-store`; the OS file cache stays warm after the first run).
+- **Device**: headless Edge, ANGLE D3D11, vsync and frame-rate limit off, 1920×1080 at device pixel ratio 1, on whatever GPU the
+  machine has (recorded in the result). Only compare suites from the same machine.
+- **Output**: per lap, the medians of time to first frame, when the last package file finished, MiB of package files, main-thread
+  WebAssembly time during load (texture decoding: meshes decode in workers), long-task time during load, played-frame p50/p99,
+  frames over 16 ms and JS heap. The load is CPU-profiled; the played frames are not. Saved with the method and every run to
+  `.cache/replay-3d-performance/suite-<package>-<time>.json`.
+
+## Run one lap
 
 Start the app (`npm run dev`, UI on 5173, a data package with scenery for the layout in `LMU_PLUGIN_ROOT`), then:
 
