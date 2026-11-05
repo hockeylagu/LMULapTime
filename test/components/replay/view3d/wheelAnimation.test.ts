@@ -1,4 +1,5 @@
 import { expect, it, vi } from 'vitest';
+import { Group, Quaternion, Vector3 } from 'three';
 import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
 import { makeCar } from '../../../../src/components/replay/view3d/sceneObjects.js';
 import { createWheelAnimation } from '../../../../src/components/replay/view3d/wheelAnimation.js';
@@ -42,6 +43,22 @@ it('steers only the fronts from recorded steering', () => {
   expect(rig('fr', car).steer.rotation.y).toBeCloseTo(-10 * Math.PI / 180);
   expect(rig('rl', car).steer.rotation.y).toBe(0);
   expect(animation.description).toContain('Recorded steering');
+});
+
+it('turns the steering wheel about the game column axis by the recorded wheel angle', () => {
+  const steered: ReplayTrajectoryData = {...lap, handlingCalibration: {wheelbaseM: 2.8, steeringRatio: 12, steeringWheelRangeDeg: 540, wheelbaseSource: 'plugin', steeringSource: 'plugin-default'},
+    points: lap.points.map(point => ({...point, steerYaw: 90}))};
+  const model = rigModel(), wheel = new Group(), axis = new Vector3(0, 0.2, 1).normalize();
+  const pivot = new Vector3(0.3, 0.7, -0.3), hub = new Group(); hub.position.copy(pivot); wheel.add(hub);
+  wheel.name = 'steering_wheel'; wheel.userData.steeringWheelAxis = axis.toArray(); wheel.userData.steeringWheelPivot = pivot.toArray(); model.add(wheel);
+  const car = makeCar(steered, '#38bdf8', false, model), animation = createWheelAnimation(car, steered, () => 0);
+  animation.update(sampleRenderPose(steered.points, 0, 0.5)!);
+  // 90 on the ±270 scale of a 540° wheel: a quarter turn left, a negative rotation about the column in the native frame.
+  expect(wheel.quaternion.angleTo(new Quaternion().setFromAxisAngle(axis, -Math.PI / 2))).toBeCloseTo(0, 6);
+  // Turning about the pivot leaves the hub where it is.
+  wheel.updateMatrixWorld(true);
+  expect(hub.getWorldPosition(new Vector3()).distanceTo(car.getObjectByName('body-envelope')!.localToWorld(pivot.clone()))).toBeLessThan(1e-9);
+  expect(animation.description).toContain('Recorded steering (wheel and tyres)');
 });
 
 it('keeps the model where it is without road coverage', () => {

@@ -34,16 +34,22 @@ export function createWheelTravel(points: ReplayTrajectoryPoint[]): (index: numb
   };
 }
 
-/** Front road-wheel angle in radians (ISO positive-left) from the recorded steering and the plugin ratio. */
-export function createSteerAngle(lap: ReplayTrajectoryData): (index: number, fraction: number) => number {
+/** Steering-wheel rotation in radians (ISO positive-left, counter-clockwise from the driver's seat) from the recorded steering. */
+export function createSteeringWheelAngle(lap: ReplayTrajectoryData): (index: number, fraction: number) => number {
   const calibration = lap.handlingCalibration, points = lap.points;
   if (!calibration) return () => 0;
   // steerYaw keeps the chart's ±270° scale; see computeUnderOversteer for the same conversion.
-  const scale = calibration.steeringWheelRangeDeg / 540 / calibration.steeringRatio * Math.PI / 180;
+  const scale = calibration.steeringWheelRangeDeg / 540 * Math.PI / 180;
   return (index, fraction) => {
     const a = points[index], b = points[index + 1], start = a?.steerYaw;
     if (start === undefined || !Number.isFinite(start)) return 0;
     const end = isContinuousPose(a, b) && b.steerYaw !== undefined && Number.isFinite(b.steerYaw) ? b.steerYaw : start;
     return (start + (end - start) * (Number.isFinite(fraction) ? fraction : 0)) * scale;
   };
+}
+
+/** Front road-wheel angle in radians (ISO positive-left): the steering-wheel rotation over the plugin ratio. */
+export function createSteerAngle(lap: ReplayTrajectoryData): (index: number, fraction: number) => number {
+  const wheel = createSteeringWheelAngle(lap), ratio = lap.handlingCalibration?.steeringRatio ?? 1;
+  return (index, fraction) => wheel(index, fraction) / ratio;
 }

@@ -1,12 +1,25 @@
-import { Quaternion, Vector3, type Group } from 'three';
+import { Quaternion, Vector3, type Group, type Object3D } from 'three';
 import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
 import { attachWheelRigs, type WheelRig } from './wheelGeometry.js';
-import { createSteerAngle, createWheelTravel } from './wheelMotion.js';
+import { createSteerAngle, createSteeringWheelAngle, createWheelTravel } from './wheelMotion.js';
 import { isContinuousPose, sampleRenderPose, type RenderPose } from './replayPose.js';
 import type { SurfaceHeight } from './surfaceProjection.js';
 
 export interface WheelAnimation { update(pose: RenderPose): void; refreshHeights(): void; description: string }
 const MAX_TRAVEL_M = 0.15, MAX_FIT_M = 0.75, FIT_SAMPLES = 200;
+
+const vector = (value: unknown): Vector3 | null =>
+  Array.isArray(value) && value.length === 3 && value.every(Number.isFinite) ? new Vector3(...(value as number[])) : null;
+
+/**
+ * The exporter's `steering_wheel` node rests at the car origin and turns about the game's SteeringWheelAxis (unit) through
+ * `steeringWheelPivot`, both in the native car frame.
+ */
+function steeringWheelRig(envelope: Object3D): {node: Object3D; axis: Vector3; pivot: Vector3} | null {
+  const node = envelope.getObjectByName('steering_wheel');
+  const axis = vector(node?.userData.steeringWheelAxis), pivot = vector(node?.userData.steeringWheelPivot);
+  return node && axis && pivot ? {node, axis: axis.normalize(), pivot} : null;
+}
 
 function median(values: number[]): number | undefined {
   if (!values.length) return undefined;
@@ -18,7 +31,8 @@ export function createWheelAnimation(car: Group, lap: ReplayTrajectoryData, surf
   const envelope = car.getObjectByName('body-envelope');
   if (!envelope || !('isGroup' in envelope)) throw Error('Car has no body envelope');
   const rigs = attachWheelRigs(envelope as Group);
-  const travel = createWheelTravel(lap.points), steer = createSteerAngle(lap);
+  const travel = createWheelTravel(lap.points), steer = createSteerAngle(lap), steeringWheel = steeringWheelRig(envelope);
+  const wheelAngle = createSteeringWheelAngle(lap);
   const hub = new Vector3(), body = new Vector3(), inverse = new Quaternion();
   /** Body-frame hub movement that puts this tyre on the road at the pose; null without road coverage. */
   const roadTravel = (rig: WheelRig, pose: RenderPose, orientation: Quaternion): number | null => {
@@ -59,13 +73,19 @@ export function createWheelAnimation(car: Group, lap: ReplayTrajectoryData, surf
   return {
     description: [`Replay-estimated wheel roll${hasWheelSlip ? ' with measured slip' : ''}`,
       `${hasRideHeight ? 'Ride-height-driven' : 'Road-contact'} suspension`,
-      ...(hasSteering ? ['Recorded steering'] : []), ...(fit !== undefined ? ['Estimated ground fit'] : [])].join(' · '),
+      ...(hasSteering ? [steeringWheel ? 'Recorded steering (wheel and tyres)' : 'Recorded steering'] : []), ...(fit !== undefined ? ['Estimated ground fit'] : [])].join(' · '),
     refreshHeights() {
       for (const [index, cached] of contacts) if (cached.some(value => value === null)) contacts.delete(index);
     },
     update(pose) {
       if (!pose.orientation) return;
       const a = lap.points[pose.index], b = lap.points[pose.index + 1], steerAngle = steer(pose.index, pose.fraction);
+      // Native +x is left, so a left (ISO +) turn is a negative rotation about the column axis, as for the road wheels about +Y.
+      if (steeringWheel) {
+        const {node, axis, pivot} = steeringWheel;
+        node.quaternion.setFromAxisAngle(axis, -wheelAngle(pose.index, pose.fraction));
+        node.position.copy(pivot).applyQuaternion(node.quaternion).negate().add(pivot);
+      }
       for (const rig of rigs) {
         const corner = rig.corner, reference = referenceRideHeights[corner];
         const heightA = a.rideHeight?.[corner], heightB = b?.rideHeight?.[corner];
