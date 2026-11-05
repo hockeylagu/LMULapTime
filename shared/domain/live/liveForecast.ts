@@ -27,7 +27,9 @@ export interface ForecastInput {
  * the storm node, and on 2026-10-27 (offline practice, light rain) 59 s into a window ending at 451 s, where the halfway
  * point said 226 s. So rain is due from the node before the rain node (now, once that time has passed and it is still
  * dry). It ends near halfway toward the next dry node (2026-10-27: 20 s off), so the end stays placed halfway. The
- * chance is the forecast's: rain chance of the rain node, dry chance (100 - rain chance) of the dry one.
+ * chance is the forecast's: rain chance of the rain node, dry chance (100 - rain chance) of the dry one. Rain with no
+ * rain node behind is the next rain node arriving early, so the dry nodes before it do not end it (Daytona 2026-11-05:
+ * rain from 59 % of the race, dry nodes to 75 %, 75 % rain at the finish: "dry, 100 %" read for the rain that stayed).
  * `none` when nothing changes before the end; null without nodes or a session length (the forecast is unknown).
  */
 export function nextForecastChange(input: ForecastInput): LiveForecast | null {
@@ -35,7 +37,10 @@ export function nextForecastChange(input: ForecastInput): LiveForecast | null {
   if (!(sessionSeconds > 0) || nodes.length === 0) return null;
   const sorted = [...nodes].sort((a, b) => a.fraction - b.fraction);
   const wet = input.raining > WET_NOW;
-  for (let i = 1; i < sorted.length; i++) {
+  const passed = (node: LiveForecastNode) => node.fraction * sessionSeconds <= elapsedSeconds;
+  const arriving = wet && !sorted.some(node => node.rainChance > 0 && passed(node))
+    ? sorted.findIndex(node => node.rainChance > 0) : -1;
+  for (let i = Math.max(1, arriving + 1); i < sorted.length; i++) {
     const node = sorted[i];
     const changes = wet ? node.rainChance === 0 : node.rainChance > 0;
     if (!changes) continue;

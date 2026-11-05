@@ -327,11 +327,13 @@ storm. `WNV_SKY` values seen: 0 Clear, 1 Light Clouds, 10 Overcast & Storm. All 
 forecast. The in-game forecast showed "clear" during the storm, presumably the next node.
 
 Two more offline Silverstone practices (2026-10-27) agree. Wetness steps seen: 0.05, 0.125 (10-16 only; LMU's own telemetry, Minimum Path Wetness 12.5 %), 0.40, 0.60,
-1.00; the in-car labels are 0.05 Damp, 0.40 Wet, 0.60 Very wet, 1.00 Extremely wet, so 0.125 is most likely Slightly wet
-(unconfirmed). Rain arrives early in its window: light rain under a 0 → 100 % node pair began 59 s into a 451 s window,
+1.00; the in-car labels are 0.05 Damp, 0.125 Slightly wet (confirmed in the Daytona online races of 2026-11-05), 0.40 Wet,
+0.60 Very wet, 1.00 Extremely wet. Rain arrives early in its window: light rain under a 0 → 100 % node pair began 59 s into a 451 s window,
 so the live forecast expects rain from the node before the rain node, not halfway. Rain ended within 20 s of halfway
 toward the next dry node, which the forecast keeps. Online `sessions/weather` has the same nodes with `StartTime` and
-`Duration` null (offline 0); no online rain has been recorded yet.
+`Duration` null (offline 0). Online rain can come far earlier still: Daytona 2026-11-05 (60 min, dry nodes to 75 %,
+75 % at the finish) rained from 59 % and 63 % of the race to the flag, so rain with no rain node behind it is read as
+the next rain node arriving, and the dry nodes before it do not end it.
 
 **Session files** (stat only, never opened while LMU runs). The replay is written as a growing
 `Replays/_vcr*.tmp` during the session. The DuckDB telemetry file and its `.wal` appear when the

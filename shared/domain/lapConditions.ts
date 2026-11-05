@@ -9,12 +9,12 @@ import type { WeatherCondition } from '../types/session.js';
 export const RAIN_WET_MIN = 13;
 
 /**
- * Lowest live path wetness above dry (0..1): LMU reports it in steps, 0.05 shown in the car as Damp, 0.125 (likely
- * Slightly wet), 0.4 Wet, 0.6 Very wet, 1.0 Extremely wet (driver, Silverstone 2026-10-27). Damp counts as wet (driver decision).
+ * Lowest live path wetness above dry (0..1): LMU reports it in steps, 0.05 shown in the car as Damp, 0.125 Slightly wet
+ * (confirmed Daytona race 2026-11-05, where audit snapshots round it to 0.15), 0.4 Wet, 0.6 Very wet, 1.0 Extremely wet (driver, Silverstone 2026-10-27). Damp counts as wet (driver decision).
  */
 export const DAMP_WETNESS = 0.05;
 
-/** Slightly wet (label awaiting race confirmation): first step advising wets; Damp holds either compound. */
+/** Slightly wet: first step advising wets; Damp holds either compound. */
 export const SLIGHTLY_WET_WETNESS = 0.125;
 
 /**

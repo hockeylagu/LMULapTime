@@ -153,6 +153,14 @@ describe('nextForecastChange', () => {
     expect(nextForecastChange({ ...base, nodes: partly, elapsedSeconds: 10, raining: 0.5 })).toMatchObject({ change: 'dry', chance: 100, atSeconds: 675 });
   });
 
+  it('reads early rain as the next rain node arriving, not as rain the dry nodes before it end', () => {
+    // Daytona race 2026-11-05 (3780 s): dry nodes to 75 %, 75 % rain at the finish; rain from 2237 s. It rained to the
+    // flag, where "dry, 100 % at 2361 s" was read at 2251 s.
+    const daytona = [0, 0.25, 0.5, 0.75].map(fraction => ({ fraction, rainChance: 0 })).concat({ fraction: 1, rainChance: 75 });
+    expect(nextForecastChange({ ...base, nodes: daytona, sessionSeconds: 3780, elapsedSeconds: 2251, raining: 0.05000000074505806 }))
+      .toEqual({ change: 'none', chance: 75, atSeconds: 3780, lap: null });
+  });
+
   it('says the weather holds when the forecast does not change, and nothing without a session length', () => {
     expect(nextForecastChange({ ...base, elapsedSeconds: 400 })).toEqual({ change: 'none', chance: 0, atSeconds: 900, lap: null });
     expect(nextForecastChange({ ...base, elapsedSeconds: 10, sessionSeconds: 0 })).toBeNull();
