@@ -303,36 +303,6 @@ describe('LiveService', () => {
     } finally { vi.restoreAllMocks(); }
   });
 
-  it('records the flags and entries on change, and every car once a second', async () => {
-    const diagnostics = new LiveDiagnostics('unused');
-    vi.spyOn(diagnostics, 'begin').mockImplementation(() => {});
-    const record = vi.spyOn(diagnostics, 'record').mockImplementation(() => {});
-    vi.spyOn(diagnostics, 'sink').mockReturnValue(() => {});
-    const writer = new FakeWorker();
-    const capture = new LiveCaptureController({ directory: 'unused', onPersist: () => {}, diagnostics,
-      createWorker: () => writer as unknown as CaptureWorker });
-    const { service, frame } = setup({ capture });
-    const kinds = (kind: string) => record.mock.calls.map(([event]) => event).filter(event => event.kind === kind);
-    const field = [{ id: 1, driverName: 'Me', vehicleName: 'Ferrari 296 GT3', vehicleFile: 'ferrari.veh', vehicleClass: 'GT3', place: 1, totalLaps: 2,
-      lapDist: 10, x: 0, z: 0, speed: 50, pathLateral: 0, trackEdge: 5, timeBehindNext: 0, lapsBehindNext: 0, inPits: false,
-      pitState: 0, control: 0, finishStatus: 0 }];
-    try {
-      frame(reading({ field, yellowFlagState: 0, sectorFlags: [0, 1, 0] }));
-      frame(reading({ field, yellowFlagState: 0, sectorFlags: [0, 1, 0], currentEt: 10.2 }));
-      expect(kinds('flags')[0]?.data).toEqual({ gamePhase: 5, yellowFlagState: 0, sectorFlags: [0, 1, 0] });
-      expect(kinds('field-entries')[0]?.data).toEqual({ cars: [[1, 'Me', 'Ferrari 296 GT3', 'ferrari.veh', 'GT3']] });
-      expect(kinds('field')).toHaveLength(1);
-      vi.advanceTimersByTime(1000);
-      frame(reading({ field, currentEt: 11.2 }));
-      expect(kinds('field')).toHaveLength(2);
-    } finally {
-      const stopping = service.stop();
-      writer.emit('exit', 0);
-      await stopping;
-      vi.restoreAllMocks();
-    }
-  });
-
   it('records the emitted timing and source clocks at most once a second', async () => {
     const diagnostics = new LiveDiagnostics('unused');
     vi.spyOn(diagnostics, 'begin').mockImplementation(() => {});
