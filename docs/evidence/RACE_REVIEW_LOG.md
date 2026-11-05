@@ -3,6 +3,64 @@
 Written by the `race-review` skill (`.claude/skills/race-review/SKILL.md`). Newest first. Error = predicted − actual,
 in % of the lap's actual use; negative = underprediction (car runs short).
 
+## 2026-11-05 — Hypercar, Daytona road course, two races (Genesis GMR-001)
+
+**Sessions**: practice `90P1`, `14P1`, qualifying `07Q1`, `43Q1`; race 1 `02R1` (60 min, 53 cars, game crash on lap 2,
+two recordings), race 2 `32R1` (60 min, 62 cars, one recording). Both VE-limited, rain from about 60 % of the race.
+First Genesis event at Daytona.
+
+**Scorecard** (race 1 / race 2):
+
+| # | Box | Result |
+|---|---|---|
+| 1 | Fuel/VE per lap | OK / OK: median +1.1 / +0.3 % (race 1), +0.5 / +0.7 % (race 2); wet laps over-forecast 4–7 % (slower laps use less) |
+| 2 | Laps | Miss, weather + incident / same: 38 planned, 30 run (crash ~280 s, repair ~210 s, leader 36); 39 planned, 34 run (repair ~155 s, leader 35) |
+| 3 | Start load | Miss, incident / same: 33 % (7.3 laps) and 21 % (4.7 laps) at the flag after the repair stops and wet pace; the dry stop loads were right |
+| 4 | Formation lap | OK / OK: fuel 0.47 L and 0.41 L (0.14 lap), VE unchanged |
+| 5 | Stops | Miss, incident / Miss, mechanism: both planned stops made on plan; unplanned repair stops (race 1 lap 25, ~300 s standing; race 2 lap 22, 182 s). Race 2: the box read 81 % needed for 76 % (laps left +1 in the pit lane) |
+| 6 | Tyre wear | n/a / n/a: no Genesis model yet, compounds changed at the stops |
+| 7 | Incidents | Race 1: crash at 437 s (rejoin 582 s), lap 6 contact, laps 12–14 damage, lap 25 impact; race 2: lap 22 out-lap wall hit on Mediums in light rain (2876 N, flat FR, parts off), lap 30 cone |
+| 8 | Weather | Miss, app / Miss, app: "slicks now" on freshly fitted wets while rain fell on a dry path (17 s, 13 s); race 2 forecast "dry, 100 %" at 2251 s for rain that stayed to the flag. Slightly wet = 0.125 confirmed (snapshots round it to 0.15) |
+| 9 | Data | Miss, data / OK: race 1 split in two recordings by the crash, native linked to the second only, 165 formation-lap checkpoints from unrounded grid tread; race 2 clean |
+| 10 | Learning | OK / OK: Daytona Genesis cohorts insufficient (first event); race 1 lap 3 game forecast +65 % from the session-start placeholder |
+| 11 | Result | Race 1: class P17 → P18 (crash to 51st overall, back to 38th by lap 23, repair lost two); race 2: P21 → P9 (P5 by lap 20 with 18 Hyper DNFs, P12 after the repair, 6th-fastest of 14 on wets) |
+| 12 | Traffic | OK / OK: flagged where the gaps say so |
+| 13 | Driving | Race 1 best 1:35.832 (+1.59 s on the class); race 2 new PB 1:35.153 (+0.79 s on the class best, qualifying 1:35.45), dry median 11th of 21, sector gaps S1 0.40, S2 0.13, S3 0.40 s; consistency 98.8 / 99.1 % |
+| 14 | App output | Miss, app / OK: race 1 garage showed no fuel ratio and "fuel short 6.9 laps" (game placeholder 4.74 L, ratio 1.05 beyond the 0.72 maximum); race 2 recommended 0.67 (set 0.68). Session pages not opened |
+
+**Mechanism / app findings and changes** (applied, uncommitted; `LIVE_MODEL_VERSION` 15, a regression test from these
+races with each):
+- Laps left gained a lap in the pit lane: the planned stop stopped counting on lane entry before the lost time showed
+  (both races; race 2 18 laps in the box for 17). `liveSessionTracker.ts` counts what is left of the stop in progress
+  (`test/domain/live/liveSessionTracker.test.ts`).
+- "Slicks now" while raining on a path still dry (both races). `liveTyreCrossover.ts` holds wets while rain falls.
+- Forecast "dry, 100 %" for early rain under dry nodes with a rain node at the finish (race 2; race 1 hit it just after
+  the dry node's window). `liveForecast.ts` reads rain with no rain node behind as the next rain node arriving
+  (`test/domain/live/liveCarCondition.test.ts`).
+- Race garage ratio: a game estimate beyond every setting now recommends the highest setting, with no fuel bias
+  (`liveInsights.ts`); a measured lap beyond them still gives none.
+- Deployment advice half a lap late: the lap average lags the charge by half a lap; it is carried forward by half the
+  lap's change (`deploymentGuidance.ts`). Replayed over both races and Spa practice: race 1 drain advice lap 3 for 4,
+  race 2 wet charge advice at 70 % in the lap for 80 %; one extra advice in race 2 just before the stop; Spa unchanged.
+  The lap low/high point instead advised up to a lap earlier but fired on swings that turned by themselves (rejected).
+- Not applied (user): history keyed by car model; after the race 1 crash the plan used the Peugeot 9x8's Daytona VE
+  history (3.54 %/lap for 4.66 measured), pit lap 27 for 21, "save 20.6 %" on laps 2–3.
+
+**Watch list** (recheck at every review):
+- History by class, not car (not applied): recheck when a car's first race at a layout follows another car's there.
+- Game crash clears the event meters ('offline' reset); with the history above it fell to the other car's history.
+- Formation-lap checkpoint flood from unrounded grid tread (race 1: 165; race 2 none).
+- Game session-start placeholder estimate (4.7 L) feeding the game-forecast learning (race 1 lap 3, +65 %).
+- Tyres picked in the MFD after service starts are not fitted (race 2 lap 20, game behaviour); a warning could help.
+- Grid forecast "rain in 47 s" for 45 s while the session length read 63 s (before the start).
+- Wets on forecast rain (race 1 fitted at lap 20 on a dry path): forecast term needs several races. Grip 0 and 1 unconfirmed.
+- Deployment: driver changes several laps after the advice (race 1 lap 4 → 9, race 2 lap 26 → 29); check the earlier advice.
+- Driving: Daytona S1 and S3 (+0.40 s each); out-lap on cold Mediums in light rain (race 2 wall hit).
+- Carried: start load bias (Silverstone); laps left mid-race 30 vs 29 (Silverstone; the pit-lane fix is a different
+  case); race vs qualifying tyre wear; "lowest 2 of 5" meter; race plan from the leader's pace (Daytona: garage and plan
+  card agreed, 38/39 and 39/40); damage pace after impact.
+- Closed: Slightly wet = 0.125 (Daytona, both races).
+
 ## 2026-10-29 — GT3 sprint, Silverstone International (Aston Martin Vantage AMR LMGT3)
 
 **Sessions**: practice `80P1`, qualifying `60Q1`, race `74R1` (30 min, 29 laps, Medium, dry, multi-make GT3 field of 30).
