@@ -29,6 +29,8 @@ export class LiveSessionTracker {
   private sessionLaneLoss: number | null = null;
   private measured: PitLaneMeasurement | null = null;
   private stopCost: number | null = null;
+  /** Clock and lap share at the pit lane entry of the stop in progress; null outside the lane. */
+  private laneEntry: { et: number; fraction: number } | null = null;
 
   /** The stored pit lane loss of the loaded layout and class (median of the newest stops); null when none. */
   public setStoredLaneLoss(seconds: number | null): void { this.storedLaneLoss = seconds; }
@@ -61,11 +63,13 @@ export class LiveSessionTracker {
     const stopAhead = race?.finishReachable === false && (pit?.state === 'none' || pit?.state === 'request');
     const laneLoss = this.storedLaneLoss ?? this.sessionLaneLoss ?? 0;
     if (stopAhead) this.stopCost = laneLoss + (pit?.plannedServiceSeconds ?? pit?.serviceSeconds ?? 0);
+    const lapFraction = player && reading.trackLength > 0 ? player.lapDist / reading.trackLength : null;
+    const lapSeconds = this.lane.pace();
     const own: LiveOwnPace = {
-      lapSeconds: this.lane.pace(),
-      stopSeconds: stopAhead ? this.stopCost ?? 0 : 0,
+      lapSeconds,
+      stopSeconds: stopAhead ? this.stopCost ?? 0 : this.stopLeft(pit?.state, reading.currentEt, lapFraction, lapSeconds ?? player?.estimatedLapTime ?? null),
       stopCostSeconds: this.stopCost ?? laneLoss,
-      lapFraction: player && reading.trackLength > 0 ? player.lapDist / reading.trackLength : null,
+      lapFraction,
     };
     return {
       lapsLeft: computeLapsLeft(state.session, player, reading.leader, reading.classLeader, own),
@@ -77,5 +81,19 @@ export class LiveSessionTracker {
 
   public timing(): LiveTiming | null { return this.laps.timing(); }
 
-  private resetLane(key: string | null): void { this.sessionKey = key; this.lane.reset(); this.sessionLaneLoss = null; this.measured = null; this.stopCost = null; }
+  /**
+   * What the stop in progress still costs: its cost less the time lost so far, the time since the lane entry beyond
+   * driving that distance at pace. Without it the race distance gained a lap in the lane (Daytona 2026-11-05: 18 laps
+   * read in the box, 17 before and after, so the stop showed 81 % needed for 76 %).
+   */
+  private stopLeft(state: NonNullable<LiveStrategy['pit']>['state'] | undefined, et: number, fraction: number | null, pace: number | null): number {
+    const inLane = state === 'entering' || state === 'stopped' || state === 'exiting';
+    if (!inLane || fraction === null) { this.laneEntry = null; return 0; }
+    this.laneEntry ??= { et, fraction };
+    if (this.stopCost === null || pace === null || !(pace > 0)) return 0;
+    const driven = fraction >= this.laneEntry.fraction ? fraction - this.laneEntry.fraction : fraction + 1 - this.laneEntry.fraction;
+    return Math.max(0, this.stopCost - Math.max(0, et - this.laneEntry.et - driven * pace));
+  }
+
+  private resetLane(key: string | null): void { this.sessionKey = key; this.lane.reset(); this.sessionLaneLoss = null; this.measured = null; this.stopCost = null; this.laneEntry = null; }
 }

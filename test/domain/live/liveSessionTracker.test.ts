@@ -65,6 +65,16 @@ describe('LiveSessionTracker race distance', () => {
     expect(drive(tracker, 542, 600)).toEqual({ laps: 5, estimated: true });
   });
 
+  it('keeps the race distance through the pit lane: the stop in progress still costs what is left of it', () => {
+    // Daytona race 2026-11-05: 17 laps before the stop, 18 read standing in the box, 17 again after the line.
+    const tracker = new LiveSessionTracker();
+    tracker.setStoredLaneLoss(40);
+    // At 370 s, lap 3 at 70 %: next line at 400, the 40 + 10 s stop ahead: 1 + ceil((1020 - 400 - 50) / 100).
+    expect(drive(tracker, 0, 370)).toEqual({ laps: 7, estimated: true });
+    // Entering at 380, in the box at 400 (85 %) and 405, and on the exit road at 415: still 7, never 8.
+    for (const et of [385, 400, 405, 415]) expect(drive(tracker, et, et)).toEqual({ laps: 7, estimated: true });
+  });
+
   it('does not measure a stop with damage from its pace laps on, and a stored loss leads the measured one', () => {
     const withDamage = (impactLap: number) => {
       const tracker = new LiveSessionTracker();
