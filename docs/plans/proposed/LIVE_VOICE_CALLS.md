@@ -157,6 +157,21 @@ One online race, 30 GT3 cars, 35 min, no pit stop, dry, diagnostics on (`field` 
 | Grip level | `trackGripLevel` 3 in practice, 4 from qualifying on (20-23 °C, dry): matches the rubber building up |
 | Not covered | Pit entry (no pit stop), multiclass traffic, wet conditions |
 
+### Online race check (Daytona Hypercar in a Hypercar + GT3 field, 2026-11-05)
+
+Two online races, 53 and 62 cars, 56 and 64 min, two stops each, the player in a Hypercar (`.tmp/voice-load/passDiag.mjs`):
+
+| Check | Result |
+|---|---|
+| Passes on slower cars | 2.3-2.4 GT3s passed per lap (69 and 81 calls once passes within 4 s are grouped): one call per pass is too many. Passes below 75 % of the player's top speed (braking zones and corners): 0.9-1.3 per lap; below 60 %: 0.4-0.9 per lap |
+| Seconds to the pass | Gap over closing speed, taken 3 s before: median error 0.1-0.4 s; 6 s before: 0.6-1.2 s; 10 s before: 1.8-4.1 s. p90 is 5-8 s at every lead (a car pitting or the player lifting), so say seconds only up to ~6 s and drop the call when the closing rate collapses |
+| Car names | All 73 car files (34 Hypercar, 39 GT3) map to a model through the installed data package |
+| Pit entry | `inPits` turned on at 5,507 m on all four stops (lap 5,729 m): "box this lap" can be placed from the player's own first stop at a layout |
+| Incident burst | 91-92 % of each race in burst: with 53-62 cars there is always an incident somewhere (~310-380 flag changes and ~700-800 car incidents per race). About 14 MB of log an hour |
+| Rejoin | Every car's position at 5 Hz around both pit exits is in the logs, to test the rejoin prediction off the car once it is built |
+
+The exploration log answered what it was added for (flags, online car data, names, passes, pit entry) and was removed on 2026-11-05 with the decode that fed it (every car's row, the sector flags, the player's LMU gaps); the voice calls decode what they use. The sidecars of 2026-10-28 to 2026-11-05 keep the data for testing the calls off the car. Grip and wetness come from the capture's `track-surface` rows.
+
 ### Not possible with the data we have
 
 - Predicting a crash before it happens; we only know it within about a second.
@@ -303,11 +318,9 @@ by the sector's distance.
 - Level: not Crew Chief's volume (no call for every far yellow), but when the incident is close and
   affects the driver, the same kind of call Crew Chief makes: where, which side, on track or off,
   how many cars (driver, 2026-10-28).
-- Validation: the diagnostics `field` line (from 2026-10-28) writes every car at the scoring rate
-  (~5 Hz) from a flag change, a slow car (below half the field's speed at that spot) or a car more
-  than 3 m off track until 20 s after, with position, speed, lateral
-  and edge and the sector flags, so each online yellow can be replayed against the
-  detector after the event. Replays (`server/traffic/`, every car at 5 Hz) cover past races.
+- Validation: the diagnostics sidecars of 2026-10-28 to 2026-11-05 (`field` lines: every car at ~5 Hz
+  around each incident, with position, speed, lateral and edge, and the sector flags) replay each online
+  yellow against the detector off the car. Replays (`server/traffic/`, every car at 5 Hz) cover past races.
 
 ### Traffic and battle (needs `timeBehindNext`, positions, class and speed for every car)
 
