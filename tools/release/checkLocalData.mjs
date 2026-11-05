@@ -19,7 +19,7 @@ export function checkLocalData(root, built=false) {
   for(const dir of ['src','server','shared','public','test'])for(const file of walk(path.join(root,dir))) {
     if(!file.endsWith('.json'))continue;
     const text=fs.readFileSync(file,'utf8');
-    if(/"coordinates"\s*:\s*"(?:local-xz-metres-forward-minus-z|lmu-local-xyz-metres|vehicle-local-xyz-metres-forward-minus-z)"/.test(text)||(/"schemaVersion"\s*:\s*[123]/.test(text)&&/"(?:tracks|vehicles|scenery|cars)"\s*:\s*\{\s*"catalog"/.test(text)))throw Error('Local package in release inputs: '+path.relative(root,file));
+    if(/"coordinates"\s*:\s*"(?:local-xz-metres-forward-minus-z|lmu-local-xyz-metres|vehicle-local-xyz-metres-forward-minus-z)"/.test(text)||(/"schemaVersion"\s*:\s*[1234]/.test(text)&&/"(?:tracks|vehicles|scenery|cars)"\s*:\s*\{\s*"catalog"/.test(text)))throw Error('Local package in release inputs: '+path.relative(root,file));
   }
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {checkLocalData(path.resolve(import.meta.dirname,'../..'),process.argv.includes('--built'));console.log('Local data guard passed; bundled basic SVG layouts are allowed.');}

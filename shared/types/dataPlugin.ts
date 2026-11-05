@@ -1,4 +1,4 @@
-import type { TrackBoundaryGeometry, TrackMapDisplay } from './trackGeometry.js';
+import type { TrackBoundaryGeometry } from './trackGeometry.js';
 
 /** Base physics defaults, not the setup or upgrade selected for a recorded lap. */
 export interface VehicleHandlingData {
@@ -31,19 +31,16 @@ export interface VehicleDataRecord {
   deploymentKw?: number[];
 }
 export interface VehicleLogosCatalog {
-  schemaVersion: 1;
   logos: Record<string, string>;
 }
-/** Package manifest schema 3, the only supported schema. `brakeBoardArtwork` is orphaned in v1 packages (unused by the app, removed from the package in v2). */
+/** Package manifest schema 4, the only supported schema. */
 export interface DataPluginManifest {
-  schemaVersion: 3;
+  schemaVersion: 4;
   id: string;
   version: string;
   tracks?: { catalog: string };
   vehicles?: { catalog: string; logos?: string };
   scenery?: { catalog: string };
-  cars?: { catalog: string };
-  brakeBoardArtwork?: unknown;
 }
 export interface DataPluginCounts {
   tracks?: number;
@@ -67,6 +64,6 @@ export interface DataPluginStatus {
 }
 export interface PluginTrackResource {
   packageRevision: string;
+  /** Includes the map `surfaces` and `brakeMarkers`. */
   geometry: TrackBoundaryGeometry;
-  display: TrackMapDisplay | null;
 }

@@ -5,7 +5,7 @@ import { createSurfaceTexturePool } from '../../../../../src/components/replay/v
 import type { SurfaceMap } from '../../../../../src/components/replay/view3d/scenery/materials/surfaceConfig.js';
 
 const map: SurfaceMap = {texture: 'ROAD', uv: 'UV_A', srgb: true};
-const uris = new Map([['ROAD__srgb.ktx2', 'textures/road.ktx2']]);
+const uris = new Map([['ROAD__srgb.ktx2.zst', 'textures/road.ktx2.zst']]);
 const renderer = {capabilities: {getMaxAnisotropy: () => 16}} as unknown as WebGLRenderer;
 
 it('shares a GPU texture across chunks and retains it until its final chunk unloads', async () => {
@@ -16,7 +16,7 @@ it('shares a GPU texture across chunks and retains it until its final chunk unlo
     const [texture, other] = await Promise.all([first.load(map), second.load(map)]);
     expect(other).toBe(texture);
     expect(await first.load(map)).toBe(texture);
-    expect(loadAsync).toHaveBeenCalledExactlyOnceWith('/scenery/textures/road.ktx2');
+    expect(loadAsync).toHaveBeenCalledExactlyOnceWith('/scenery/textures/road.ktx2.zst');
     const dispose = vi.spyOn(texture, 'dispose');
     first.dispose();
     await Promise.resolve();
@@ -33,7 +33,7 @@ it('shares a GPU texture across chunks and retains it until its final chunk unlo
 it('keeps content identities distinct and rejects loads after release', async () => {
   const loadAsync = vi.fn(async () => new CompressedTexture([], 1, 1));
   const pool = createSurfaceTexturePool({loadAsync} as unknown as CachedKtx2Loader, renderer, '/scenery/');
-  const first = pool.source(uris), other = pool.source(new Map([['ROAD__srgb.ktx2', 'textures/other.ktx2']]));
+  const first = pool.source(uris), other = pool.source(new Map([['ROAD__srgb.ktx2.zst', 'textures/other.ktx2.zst']]));
   try {
     const texture = await first.load(map), different = await other.load(map);
     expect(different).not.toBe(texture);

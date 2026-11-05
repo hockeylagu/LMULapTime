@@ -2,13 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { CIRCUIT_SPECIFICATIONS } from '../../shared/domain/circuitDefinitions.js';
-import { parseTrackMapDisplay } from '../../shared/domain/trackGeometry.js';
-import type { TrackBoundaryGeometry, TrackMapDisplay } from '../../shared/types/trackGeometry.js';
+import type { TrackBoundaryGeometry } from '../../shared/types/trackGeometry.js';
 import type { DataPluginStatus, VehicleDataRecord } from '../../shared/types/dataPlugin.js';
 import { validateTrackPackage } from './trackPackage.js';
 import { loadScenePackage, type SceneryStore } from './scenePackage.js';
 import { loadCarPackage, normalizeVehicleId, type CarStore } from './carPackage.js';
-import { readPackageFile } from './packageFiles.js';
 import type { SceneryLayoutResource } from '../../shared/types/scenes/scenery.js';
 import type { CarResource } from '../../shared/types/scenes/car.js';
 
@@ -29,14 +27,15 @@ function pair(value: unknown): [number, number] {
   if (typeof x !== 'number' || typeof z !== 'number' || !Number.isFinite(x) || !Number.isFinite(z) || Math.abs(x) >= 10 || Math.abs(z) >= 10) throw Error('Invalid local coordinate');
   return [x, z];
 }
+/** The vehicle records; their `bodies` are validated by `loadCarPackage`, which receives the same raw rows. */
 export function parseVehicleCatalog(value: unknown): VehicleDataRecord[] {
   const catalog = object(value);
-  keys(catalog, ['schemaVersion', 'coordinates', 'vehicles']);
-  if (catalog.schemaVersion !== 1 || catalog.coordinates !== 'local-xz-metres-forward-minus-z' || !Array.isArray(catalog.vehicles) || catalog.vehicles.length > 2000) throw Error('Invalid vehicle catalog');
+  keys(catalog, ['vehicles']);
+  if (!Array.isArray(catalog.vehicles) || catalog.vehicles.length > 2000) throw Error('Invalid vehicle catalog');
   const aliases = new Set<string>(), ids = new Set<string>();
   return catalog.vehicles.map(item => {
     const row = object(item);
-    keys(row, ['id', 'model', 'carClass', 'vehicleIds', 'dimensions', 'handling', 'outlineXZ', 'replayOriginOffsetXZ', 'deploymentKw']);
+    keys(row, ['id', 'model', 'carClass', 'vehicleIds', 'dimensions', 'handling', 'outlineXZ', 'replayOriginOffsetXZ', 'deploymentKw', 'bodies']);
     const id = text(row.id), model = text(row.model), carClass = text(row.carClass);
     if (!/^[a-zA-Z0-9_-]+$/.test(id) || ids.has(id) || !Array.isArray(row.vehicleIds) || row.vehicleIds.length > 5000) throw Error('Invalid vehicle record');
     ids.add(id);
@@ -112,7 +111,7 @@ export function parseVehicleLogos(value: unknown): Record<string, string> {
   const result: Record<string, string> = {};
   if (!value || typeof value !== 'object' || Array.isArray(value)) return result;
   const catalog = value as Record<string, unknown>;
-  if (catalog.schemaVersion !== 1 || !catalog.logos || typeof catalog.logos !== 'object' || Array.isArray(catalog.logos)) return result;
+  if (!catalog.logos || typeof catalog.logos !== 'object' || Array.isArray(catalog.logos)) return result;
   for (const [key, svg] of Object.entries(catalog.logos as Record<string, unknown>)) {
     if (!/^[a-zA-Z0-9_ -]+$/.test(key) || typeof svg !== 'string') continue;
     const trimmed = svg.trim();
@@ -129,19 +128,10 @@ function freezeGeometry(value: unknown): void {
   Object.freeze(value);
 }
 
-const GLB_MAGIC = 0x46546c67, KTX2_MAGIC = Buffer.from('ab4b5458203230bb0d0a1a0a', 'hex');
-/** Served binaries must be what their extension says; the pipeline validates their contents, the sha256 proves they are unchanged. */
-function checkedFile(bytes: Buffer, relative: string): Buffer {
-  const ok = relative.endsWith('.glb') ? bytes.length >= 12 && bytes.readUInt32LE(0) === GLB_MAGIC && bytes.readUInt32LE(8) === bytes.length
-    : relative.endsWith('.ktx2') ? bytes.length > 12 && bytes.subarray(0, 12).equals(KTX2_MAGIC) : relative.endsWith('.json');
-  if (!ok) throw Error('Package resource is not the expected file type');
-  return bytes;
-}
-
-/** A fully validated startup snapshot. Package files are never served directly. */
+/** A fully validated startup snapshot. Scenery and car files are served as is from `filesRoot()`. */
 export class DataPlugin {
   public readonly status: DataPluginStatus;
-  private readonly tracks = new Map<string, {geometry:TrackBoundaryGeometry; display:TrackMapDisplay|null}>();
+  private readonly tracks = new Map<string, {geometry:TrackBoundaryGeometry}>();
   private readonly records: VehicleDataRecord[] = [];
   private readonly logoRecords = new Map<string, string>();
   private scenery: SceneryStore | null = null;
@@ -163,9 +153,8 @@ export class DataPlugin {
         const buffer=fs.readFileSync(file); digest.update(relative).update(buffer); return JSON.parse(buffer.toString('utf8'));
       };
       const manifest=object(read('manifest.json',64_000));
-      if (manifest.schemaVersion !== 3) throw Error('Unsupported schema: only package manifest schema 3 is supported');
-      // brakeBoardArtwork is orphaned in v1 packages: known so the manifest validates, never read. The package drops it in v2.
-      keys(manifest,['schemaVersion','id','version','tracks','vehicles','scenery','cars','brakeBoardArtwork']);
+      if (manifest.schemaVersion !== 4) throw Error('Unsupported schema: only package manifest schema 4 is supported');
+      keys(manifest,['schemaVersion','id','version','tracks','vehicles','scenery']);
       const packageId = text(manifest.id), packageVersion = text(manifest.version);
       for (const capability of ['tracks','vehicles']) if (manifest[capability] !== undefined) object(manifest[capability]);
       if (!manifest.tracks && !manifest.vehicles) throw Error('Empty package');
@@ -174,21 +163,21 @@ export class DataPlugin {
         const catalogPath=text(resource.catalog), catalog=read(catalogPath);
         if (!Array.isArray(catalog) || !catalog.length || catalog.length>100) throw Error('Invalid track catalog');
         for (const entry of catalog) {
-          const row=object(entry), key=text(row.layoutKey);
+          const row=object(entry); keys(row,['layoutKey','circuitId','layoutId','trackVenue','trackCourse','hasElevation','hasPitLane']);
+          const key=text(row.layoutKey);
           if (!/^[a-z0-9_]+$/.test(key) || !CIRCUIT_SPECIFICATIONS[key] || this.tracks.has(key)) throw Error('Invalid layout identity');
           const raw=object(read(path.posix.join(path.posix.dirname(catalogPath), key+'.json')));
           const geometry=validateTrackPackage(raw,key), spec=CIRCUIT_SPECIFICATIONS[key];
-          if (geometry.circuitId!==spec.circuitId || ![spec.layoutId, ({daytona_road_course:'road_course',portimao_wec:'wec',laguna_seca:'full'} as Record<string,string>)[key]].includes(geometry.layoutId) || row.circuitId!==spec.circuitId || row.layoutId!==geometry.layoutId || row.lengthM!==geometry.lengthM || row.pointsCount!==geometry.centerline.length || !geometry.geometryRevision || !geometry.projectionRevision) throw Error('Layout/catalog mismatch');
-          let display: TrackMapDisplay|null=null;
-          const displayPath=`tracks-display/${key}.json`;
-          if (fs.existsSync(path.join(base,displayPath))) {const sidecar=object(read(displayPath));keys(sidecar,['layoutKey','surfaces','brakeMarkers','sourceRevision']);display=parseTrackMapDisplay(sidecar,key,geometry.geometryRevision);}
+          if (geometry.circuitId!==spec.circuitId || ![spec.layoutId, ({daytona_road_course:'road_course',portimao_wec:'wec',laguna_seca:'full'} as Record<string,string>)[key]].includes(geometry.layoutId) || row.circuitId!==spec.circuitId || row.layoutId!==geometry.layoutId || !geometry.geometryRevision || !geometry.projectionRevision) throw Error('Layout/catalog mismatch');
           freezeGeometry(geometry);
-          this.tracks.set(key,{geometry,display});
+          this.tracks.set(key,{geometry});
         }
       }
       if (manifest.vehicles) {
         const resource=object(manifest.vehicles); keys(resource,['catalog','logos']);
-        this.records.push(...parseVehicleCatalog(read(text(resource.catalog))));
+        const vehicleCatalog=read(text(resource.catalog));
+        this.records.push(...parseVehicleCatalog(vehicleCatalog));
+        this.cars = loadCarPackage(base, object(vehicleCatalog).vehicles as unknown[]);
         if (resource.logos !== undefined) {
           // A bad logos file never invalidates tracks or vehicles; a path escaping the package still does.
           let logoFile: unknown = null;
@@ -199,10 +188,6 @@ export class DataPlugin {
       if (manifest.scenery !== undefined) {
         const scenery = object(manifest.scenery); keys(scenery, ['catalog']);
         this.scenery = loadScenePackage(base, read(text(scenery.catalog), 32_000_000), key => this.trackGeometry(key));
-      }
-      if (manifest.cars !== undefined) {
-        const cars = object(manifest.cars); keys(cars, ['catalog']);
-        this.cars = loadCarPackage(base, read(text(cars.catalog)), manifest.vehicles ? new Set(this.records.flatMap(r => r.vehicleIds)) : null);
       }
       this.status = {
         state: 'ready',
@@ -229,19 +214,14 @@ export class DataPlugin {
     const layout = this.scenery?.layouts.get(key);
     return layout ? { ...structuredClone(layout), packageRevision: this.status.revision } : null;
   }
-  /** Bytes of a catalogued scenery GLB or KTX2 (hash-verified), or null when the package does not list that file. */
-  public sceneryFile(relative: string): Buffer | null {
-    const entry = this.scenery?.files.get(relative);
-    return entry ? checkedFile(readPackageFile(this.root, entry), relative) : null;
-  }
+  /**
+   * The package folder that scenery (`scenery/`) and car (`vehicles/`) files are served from, or null without a valid package.
+   * They are pregenerated, content-named and published by folder swap, so they are served as is: no hash or change check.
+   */
+  public filesRoot(): string | null { return this.status.state === 'ready' ? this.root : null; }
   public car(identity: string): CarResource | null {
     const row = this.cars?.rows.get(normalizeVehicleId(identity));
     return row ? { ...structuredClone(row), packageRevision: this.status.revision } : null;
-  }
-  /** Bytes of a catalogued car GLB, descriptor JSON or KTX2 (hash-verified), or null when the package does not list that file. */
-  public carFile(relative: string): Buffer | null {
-    const entry = this.cars?.files.get(relative);
-    return entry ? checkedFile(readPackageFile(this.root, entry), relative) : null;
   }
   public track(key:string) {const row=this.tracks.get(key);return row?structuredClone(row):null;}
   public trackKeys(): string[] { return Array.from(this.tracks.keys()); }

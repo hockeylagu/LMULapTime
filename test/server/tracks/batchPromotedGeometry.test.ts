@@ -48,7 +48,6 @@ describe.skipIf(!process.env.LMU_PERSONAL_REGRESSION_ROOT)('Promoted native surf
     const publicRaw = fs.readFileSync(publicPath, 'utf8');
 
     const data = JSON.parse(publicRaw) as TrackBoundaryGeometry;
-    expect(data.schemaVersion).toBe(2);
     expect(data.projectionRevision).toMatch(/^projection-[a-f0-9]{32,}$/);
     expect(data.geometryRevision).toMatch(/^geometry-[a-f0-9]{32,}$/);
 
@@ -75,9 +74,9 @@ describe.skipIf(!process.env.LMU_PERSONAL_REGRESSION_ROOT)('Promoted native surf
     }
 
     // Map surfaces checks
-    expect(data.mapSurfaces).toBeDefined();
-    expect(data.mapSurfaces?.road?.length).toBeGreaterThan(0);
-    expect(data.mapSurfaces?.kerb?.length).toBeGreaterThan(0);
+    expect(data.surfaces).toBeDefined();
+    expect(data.surfaces?.road?.length).toBeGreaterThan(0);
+    expect(data.surfaces?.kerb?.length).toBeGreaterThan(0);
 
     // Store loading and projection sanity
     const cached = store.get(layoutKey);

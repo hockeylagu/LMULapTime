@@ -26,7 +26,7 @@ export function prepareSceneryMesh(mesh: Mesh): void {
 }
 
 /**
- * Streams scenery chunk GLBs; their `textures/<sha256>.ktx2` image URIs resolve beside the chunk file. Every mesh's native
+ * Streams scenery chunk GLBs; their `textures/<sha256>.ktx2.zst` image URIs resolve beside the chunk file. Every mesh's native
  * material is rebuilt from the GLB's surface description before the chunk is handed over.
  */
 /** Meshopt decoding runs in workers (where the runtime has them): decoding a chunk's geometry on the main thread stalled playback. */

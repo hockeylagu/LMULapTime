@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 
-/** A content-addressed package file: registered at load (existence and size), hash-verified on every read. */
+/** A content-addressed package file: registered at load (existence and size). */
 export interface PackageFile { relative: string; file: string; sha256: string; byteLength: number }
 
 /** Containment is checked again on every read: replacing a junction cannot change the resource. */
@@ -14,8 +14,8 @@ function contained(root: string, relative: string): string {
 }
 
 /**
- * Registers a file the catalog names. Startup checks existence, type and size only: a layout holds hundreds of MB, so the sha256
- * is verified when the bytes are served (`readPackageFile`), where a mismatch fails that request.
+ * Registers a file the catalog names. Startup checks existence, type and size only: a layout holds hundreds of MB. Scenery and
+ * car files are then served as is (`dataPluginRoutes.ts`); only the small files read at load go through `readPackageFile`.
  */
 export function registerPackageFile(root: string, relative: string, sha256: string, byteLength: number | null, maxBytes: number): PackageFile {
   const file = contained(root, relative), stat = fs.statSync(file);

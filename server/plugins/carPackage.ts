@@ -1,43 +1,46 @@
-import type { CarCatalogRow } from '../../shared/types/scenes/car.js';
+import type { CarBody } from '../../shared/types/scenes/car.js';
 import { readPackageFile, registerPackageFile, type PackageFile } from './packageFiles.js';
 import { array, count, exactKeys, finite, record, sha256, text, vec3 } from './strict.js';
 
-/** Validated textured cars of a package: catalog rows by upper-case VEH id and by folder, and every file by package-relative path. */
-export interface CarStore { rows: Map<string, CarCatalogRow>; folders: Map<string, CarCatalogRow>; files: Map<string, PackageFile> }
+/** Validated textured car bodies of a package: by upper-case VEH id and by folder, and every file by package-relative path. */
+export interface CarStore { rows: Map<string, CarBody>; folders: Map<string, CarBody> }
 
 const MAX_GLB_BYTES = 256_000_000, MAX_TEXTURE_BYTES = 64_000_000, MAX_DESCRIPTOR_BYTES = 8_000_000;
 const CORNERS = ['fl', 'fr', 'rl', 'rr'];
-const TEXTURE_PATH = /^textures\/[a-f0-9]{64}\.ktx2$/;
+const TEXTURE_PATH = /^textures\/[a-f0-9]{64}\.ktx2\.zst$/;
+const FOLDER = /^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$/;
 
 export const normalizeVehicleId = (id: string): string => id.trim().replace(/\.veh$/i, '').toUpperCase();
 
-function parseRow(value: unknown, what: string): CarCatalogRow {
+/** One body as a vehicle record lists it: `vehicleIds` is the part of the record's ids this body serves. */
+function parseBody(value: unknown, what: string): CarBody {
   const row = record(value, what);
-  exactKeys(row, ['schemaVersion', 'vehicleFolder', 'vehicleIds', 'descriptor', 'descriptorSha256', 'asset', 'sha256', 'byteLength', 'triangles', 'vertices', 'textures'], what);
-  if (row.schemaVersion !== 1) throw Error(`${what}: unsupported car row version`);
-  const folder = text(row.vehicleFolder, `${what}.vehicleFolder`, 120);
-  if (!/^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$/.test(folder)) throw Error(`${what}: invalid vehicle folder`);
-  if (row.descriptor !== `cars/${folder}.json`) throw Error(`${what}: descriptor is not cars/<vehicleFolder>.json`);
+  exactKeys(row, ['folder', 'vehicleIds', 'descriptor', 'descriptorSha256', 'asset', 'sha256', 'byteLength', 'triangles', 'vertices', 'textures'], what);
+  const folder = text(row.folder, `${what}.folder`, 120);
+  if (!FOLDER.test(folder)) throw Error(`${what}: invalid body folder`);
+  if (row.descriptor !== `vehicles/bodies/${folder}.json`) throw Error(`${what}: descriptor is not vehicles/bodies/<folder>.json`);
   sha256(row.descriptorSha256, `${what}.descriptorSha256`);
-  if (row.asset !== `cars/${sha256(row.sha256, `${what}.sha256`)}.glb`) throw Error(`${what}: asset is not the content-named GLB`);
+  if (row.asset !== `vehicles/${sha256(row.sha256, `${what}.sha256`)}.glb`) throw Error(`${what}: asset is not the content-named GLB`);
   for (const key of ['byteLength', 'triangles', 'vertices']) if (count(row[key], `${what}.${key}`) === 0) throw Error(`${what}.${key}: must be positive`);
-  const ids = array(row.vehicleIds, `${what}.vehicleIds`, 5000).map((id, i) => text(id, `${what}.vehicleIds[${i}]`, 160));
-  if (!ids.length || ids.some(id => !/^[A-Za-z0-9_-]+$/.test(id))) throw Error(`${what}: invalid vehicle ids`);
+  const ids = array(row.vehicleIds, `${what}.vehicleIds`, 5000).map((id, i) => normalizeVehicleId(text(id, `${what}.vehicleIds[${i}]`, 160)));
+  if (!ids.length || ids.some(id => !/^[A-Z0-9_-]+$/.test(id)) || new Set(ids).size !== ids.length) throw Error(`${what}: invalid vehicle ids`);
   array(row.textures, `${what}.textures`, 4096).forEach((value, i) => {
     const texture = record(value, `${what}.textures[${i}]`);
     exactKeys(texture, ['asset', 'sha256', 'byteLength'], `${what}.textures[${i}]`);
-    if (texture.asset !== `cars/textures/${sha256(texture.sha256, `${what}.textures[${i}].sha256`)}.ktx2`) throw Error(`${what}.textures[${i}]: asset is not the content-named KTX2`);
+    if (texture.asset !== `vehicles/textures/${sha256(texture.sha256, `${what}.textures[${i}].sha256`)}.ktx2.zst`) throw Error(`${what}.textures[${i}]: asset is not the content-named KTX2`);
     if (count(texture.byteLength, `${what}.textures[${i}].byteLength`) === 0) throw Error(`${what}.textures[${i}]: empty texture`);
   });
-  return structuredClone(row) as unknown as CarCatalogRow;
+  return { ...structuredClone(row), vehicleIds: ids } as unknown as CarBody;
 }
 
 /** The descriptor fields the viewer reads, checked against the catalog row (docs/VEHICLE_PIPELINE.md: four wheel rigs, zero rest-vertex error). */
-export function validateCarDescriptor(bytes: Buffer, row: CarCatalogRow): void {
-  const what = `${row.vehicleFolder} descriptor`, descriptor = record(JSON.parse(bytes.toString('utf8')) as unknown, what);
-  exactKeys(descriptor, ['schemaVersion', 'vehicleFolder', 'aliases', 'wheelPivots', 'wheelRig', 'appearances', 'materials', 'cameras'], what);
-  if (descriptor.schemaVersion !== 1 || descriptor.vehicleFolder !== row.vehicleFolder) throw Error(`${what}: describes another car`);
-  if (JSON.stringify(descriptor.aliases) !== JSON.stringify(row.vehicleIds)) throw Error(`${what}: aliases differ from the catalog row`);
+export function validateCarDescriptor(bytes: Buffer, row: CarBody): void {
+  const what = `${row.folder} descriptor`, descriptor = record(JSON.parse(bytes.toString('utf8')) as unknown, what);
+  exactKeys(descriptor, ['vehicleFolder', 'aliases', 'wheelPivots', 'wheelRig', 'appearances', 'materials', 'cameras'], what);
+  // A further geometry of an installed folder is `<folder>.<hash>`; the descriptor names the installed folder.
+  if (typeof descriptor.vehicleFolder !== 'string' || (row.folder !== descriptor.vehicleFolder && !row.folder.startsWith(`${descriptor.vehicleFolder}.`))) throw Error(`${what}: describes another car`);
+  const sorted = (ids: string[]) => JSON.stringify([...ids].sort());
+  if (!Array.isArray(descriptor.aliases) || sorted(descriptor.aliases as string[]) !== sorted(row.vehicleIds)) throw Error(`${what}: aliases differ from the vehicle catalog`);
   const pivots = record(descriptor.wheelPivots, `${what}.wheelPivots`);
   exactKeys(pivots, CORNERS, `${what}.wheelPivots`);
   for (const corner of CORNERS) vec3(pivots[corner], `${what}.wheelPivots.${corner}`, 10);
@@ -56,7 +59,7 @@ export function validateCarDescriptor(bytes: Buffer, row: CarCatalogRow): void {
     }
     return alias;
   });
-  if (JSON.stringify([...aliases].sort()) !== JSON.stringify([...row.vehicleIds].sort())) throw Error(`${what}: appearances do not cover exactly the catalog aliases`);
+  if (sorted(aliases) !== sorted(row.vehicleIds)) throw Error(`${what}: appearances do not cover exactly the body's vehicle ids`);
   array(descriptor.materials, `${what}.materials`, 4096).forEach((value, i) => {
     const material = record(value, `${what}.materials[${i}]`);
     text(material.id, `${what}.materials[${i}].id`, 200); text(material.name, `${what}.materials[${i}].name`, 200);
@@ -66,13 +69,28 @@ export function validateCarDescriptor(bytes: Buffer, row: CarCatalogRow): void {
       text(surface.kind, `${what}.materials[${i}].surface.kind`); record(surface.maps, `${what}.materials[${i}].surface.maps`);
     }
   });
+  const cameras = array(record(descriptor.cameras, `${what}.cameras`).list, `${what}.cameras.list`, 64).map((value, i) => {
+    const camera = record(value, `${what}.cameras.list[${i}]`), at = `${what}.cameras.list[${i}]`;
+    vec3(camera.position, `${at}.position`, 10); vec3(camera.orientation, `${at}.orientation`, 10);
+    const fov = array(camera.fov, `${at}.fov`, 2).map(degrees => finite(degrees, `${at}.fov`));
+    const clip = array(camera.clipPlanes, `${at}.clipPlanes`, 2).map(metres => finite(metres, `${at}.clipPlanes`));
+    if (fov.length !== 2 || fov.some(degrees => degrees <= 5 || degrees >= 175)) throw Error(`${at}.fov: expected two angles in degrees`);
+    if (clip.length !== 2 || !(clip[0] > 0 && clip[1] > clip[0])) throw Error(`${at}.clipPlanes: expected near < far`);
+    if (camera.cockpitView !== 'in' && camera.cockpitView !== 'out') throw Error(`${at}.cockpitView: expected in or out`);
+    return text(camera.name, `${at}.name`, 64);
+  });
+  if (!cameras.includes('COCKPIT')) throw Error(`${what}: no COCKPIT camera`);
   const declared = new Set(row.textures.map(texture => texture.asset));
-  for (const match of bytes.toString('utf8').match(/textures\/[0-9a-f]{64}\.ktx2/g) ?? []) if (!declared.has(`cars/${match}`)) throw Error(`${what}: uses undeclared texture ${match}`);
+  for (const match of bytes.toString('utf8').match(/textures\/[0-9a-f]{64}\.ktx2\.zst/g) ?? []) if (!declared.has(`vehicles/${match}`)) throw Error(`${what}: uses undeclared texture ${match}`);
 }
 
-/** `knownVehicleIds` (upper-case catalog aliases) is null when the package has no vehicle catalog to bind to. */
-export function loadCarPackage(root: string, catalog: unknown, knownVehicleIds: Set<string> | null): CarStore {
-  const rows = new Map<string, CarCatalogRow>(), folders = new Map<string, CarCatalogRow>(), files = new Map<string, PackageFile>();
+/**
+ * Loads the bodies of the vehicle records (the raw `vehicles` rows of the catalog, already validated as records).
+ * A body listed under several records (one car folder serving two models) loads once, with the union of its ids; every record id
+ * belongs to exactly one body of its record, and no id to two bodies.
+ */
+export function loadCarPackage(root: string, vehicles: unknown[]): CarStore {
+  const rows = new Map<string, CarBody>(), folders = new Map<string, CarBody>(), files = new Map<string, PackageFile>();
   const register = (asset: string, hash: string, byteLength: number | null, max: number) => {
     const known = files.get(asset);
     if (known) {
@@ -81,21 +99,30 @@ export function loadCarPackage(root: string, catalog: unknown, knownVehicleIds: 
     }
     files.set(asset, registerPackageFile(root, asset, hash, byteLength, max));
   };
-  const list = array(catalog, 'car catalog', 256);
-  if (!list.length) throw Error('car catalog: empty');
-  list.forEach((value, i) => {
-    const row = parseRow(value, `cars[${i}]`);
-    if (folders.has(row.vehicleFolder)) throw Error(`${row.vehicleFolder}: car listed twice`);
-    for (const id of row.vehicleIds.map(normalizeVehicleId)) {
-      if (rows.has(id)) throw Error(`${id}: vehicle id served by two cars`);
-      if (knownVehicleIds && !knownVehicleIds.has(id)) throw Error(`${row.vehicleFolder}: ${id} is not in the vehicle catalog`);
-      rows.set(id, row);
+  vehicles.forEach((value, i) => {
+    const what = `vehicles[${i}]`, vehicle = record(value, what);
+    const recordIds = array(vehicle.vehicleIds, `${what}.vehicleIds`, 5000).map(id => normalizeVehicleId(text(id, `${what}.vehicleIds`, 160)));
+    const bodies = array(vehicle.bodies, `${what}.bodies`, 256).map((body, j) => parseBody(body, `${what}.bodies[${j}]`));
+    if (!bodies.length) throw Error(`${what}: no car bodies`);
+    const listed = bodies.flatMap(body => body.vehicleIds);
+    if (listed.length !== recordIds.length || new Set(listed).size !== listed.length || listed.some(id => !recordIds.includes(id))) throw Error(`${what}: bodies do not partition the vehicle ids`);
+    for (const body of bodies) {
+      const known = folders.get(body.folder);
+      if (!known) { folders.set(body.folder, body); continue; }
+      const same = (a: CarBody, b: CarBody) => JSON.stringify({ ...a, vehicleIds: 0 }) === JSON.stringify({ ...b, vehicleIds: 0 });
+      if (!same(known, body)) throw Error(`${body.folder}: listed with different files`);
+      known.vehicleIds.push(...body.vehicleIds);
     }
-    register(row.asset, row.sha256, row.byteLength, MAX_GLB_BYTES);
-    for (const texture of row.textures) register(texture.asset, texture.sha256, texture.byteLength, MAX_TEXTURE_BYTES);
-    register(row.descriptor, row.descriptorSha256, null, MAX_DESCRIPTOR_BYTES);
-    validateCarDescriptor(readPackageFile(root, files.get(row.descriptor)!), row);
-    folders.set(row.vehicleFolder, row);
   });
-  return { rows, folders, files };
+  for (const body of folders.values()) {
+    for (const id of body.vehicleIds) {
+      if (rows.has(id)) throw Error(`${id}: vehicle id served by two car bodies`);
+      rows.set(id, body);
+    }
+    register(body.asset, body.sha256, body.byteLength, MAX_GLB_BYTES);
+    for (const texture of body.textures) register(texture.asset, texture.sha256, texture.byteLength, MAX_TEXTURE_BYTES);
+    register(body.descriptor, body.descriptorSha256, null, MAX_DESCRIPTOR_BYTES);
+    validateCarDescriptor(readPackageFile(root, files.get(body.descriptor)!), body);
+  }
+  return { rows, folders };
 }

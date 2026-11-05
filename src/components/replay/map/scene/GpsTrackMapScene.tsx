@@ -60,7 +60,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
   const [isTraceHidden, toggleTrace] = useStoredToggle('lmu-map-trace-collapsed-v1', false);
 
   const {
-    geometry: effectiveGeometry, display, displayError, effectiveBaselinePoints, effectiveBounds, svgPoints, baselineSvgPoints,
+    geometry: effectiveGeometry, effectiveBaselinePoints, effectiveBounds, svgPoints, baselineSvgPoints,
     leftSvgPoints, rightSvgPoints, centerlineSvgPoints, trackBoundaryPathD, gateLeftSvg, gateRightSvg, pathD, sectorMarkers,
   } = useGpsSceneProjection(props);
   const {
@@ -112,10 +112,10 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
   const markerTrajectories = useMemo(() => [svgPoints, baselineSvgPoints], [svgPoints, baselineSvgPoints]);
   const ribbonIndex = useMemo(() => buildRibbonIndex(leftSvgPoints, rightSvgPoints, markerTrajectories),
     [leftSvgPoints, rightSvgPoints, markerTrajectories]);
-  const placedBrakes = useMemo(() => layers.brakeMarkers ? placeBrakeMarkers({ markers: display?.brakeMarkers ?? [],
+  const placedBrakes = useMemo(() => layers.brakeMarkers ? placeBrakeMarkers({ markers: effectiveGeometry?.brakeMarkers ?? [],
     bounds: effectiveBounds, viewBoxSize: VIEWBOX_SIZE, padding: PADDING, markerScale, ribbon: ribbonIndex,
     showDistance: layers.brakeDistance, showAds: layers.brakeAds, showDigi: layers.brakeDigi }) : [],
-  [layers.brakeMarkers, layers.brakeDistance, layers.brakeAds, layers.brakeDigi, display?.brakeMarkers, effectiveBounds, markerScale, ribbonIndex]);
+  [layers.brakeMarkers, layers.brakeDistance, layers.brakeAds, layers.brakeDigi, effectiveGeometry?.brakeMarkers, effectiveBounds, markerScale, ribbonIndex]);
   const brakeBoxes = useMemo(() => showsFullBrakeBoards(markerScale) ? placedBrakes.map(board => ({
     x: board.posX, y: board.posY, hw: (board.width / 2 + 0.7) * markerScale, hh: (board.height / 2 + 0.7) * markerScale,
   })) : [], [placedBrakes, markerScale]);
@@ -154,7 +154,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
       <div ref={viewportRef} className="relative w-full flex-1 min-h-0 overflow-hidden">
       {showControls && (
         <GpsMapControls camera={camera} layers={layers} onChange={changeLayers} geometry={effectiveGeometry}
-          display={display} error={displayError} bounds={effectiveBounds} left={leftSvgPoints} right={rightSvgPoints}
+          bounds={effectiveBounds} left={leftSvgPoints} right={rightSvgPoints}
           center={centerlineSvgPoints} trajectory={svgPoints} hasSectors={sectorMarkers.length > 0} hasTurns={cornerMarkers.length > 0}
           pedalPoints={onTogglePedalMarkers ? { visible: showPedalMarkers, available: Boolean(pedalMarkers?.length), onToggle: onTogglePedalMarkers } : undefined}
           orientation={controlsOrientation ?? (isExpanded ? 'horizontal' : 'vertical')}
@@ -171,7 +171,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
       <div className="relative w-full h-full">
         {/* No compositor layer or filter here: a layer keeps its old raster scale after a viewBox zoom, which blurs the badges. */}
         <svg viewBox={currentViewBox} className="w-full h-full" data-testid="gps-map-scene">
-          <GpsMapBackground geometry={effectiveGeometry} display={display} bounds={effectiveBounds} layers={layers}
+          <GpsMapBackground geometry={effectiveGeometry} bounds={effectiveBounds} layers={layers}
             left={leftSvgPoints} right={rightSvgPoints} center={centerlineSvgPoints} pathD={pathD} />
 
           {placedBrakes.length ? <GpsBrakeMarkers placement={placedBrakes} markerScale={markerScale}

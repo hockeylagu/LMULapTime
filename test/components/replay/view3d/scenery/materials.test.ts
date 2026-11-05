@@ -46,14 +46,14 @@ describe('terrain layers', () => {
 
 describe('texture resolution', () => {
   it('names an image by stem and colour role', () => {
-    expect(textureAsset('ROAD_ALB', true)).toBe('ROAD_ALB__srgb.ktx2'); expect(textureAsset('ROAD_NRM', false)).toBe('ROAD_NRM__linear.ktx2');
+    expect(textureAsset('ROAD_ALB', true)).toBe('ROAD_ALB__srgb.ktx2.zst'); expect(textureAsset('ROAD_NRM', false)).toBe('ROAD_NRM__linear.ktx2.zst');
     expect(() => textureAsset('a/b', true)).toThrow('Invalid source texture stem');
   });
   it('maps a declared image to its content-named file and throws for an undeclared one', () => {
-    const uris = imageUriMap({ images: [{ name: 'ROAD_ALB__srgb.ktx2', uri: 'textures/abc.ktx2' }, { name: 'nameless' }] });
+    const uris = imageUriMap({ images: [{ name: 'ROAD_ALB__srgb.ktx2.zst', uri: 'textures/abc.ktx2.zst' }, { name: 'nameless' }] });
     expect(uris.size).toBe(1);
-    expect(resolveMapUri(map('ROAD_ALB', true), uris)).toBe('textures/abc.ktx2');
-    expect(() => resolveMapUri(map('ROAD_ALB', false), uris)).toThrow('ROAD_ALB__linear.ktx2 is not declared');
+    expect(resolveMapUri(map('ROAD_ALB', true), uris)).toBe('textures/abc.ktx2.zst');
+    expect(() => resolveMapUri(map('ROAD_ALB', false), uris)).toThrow('ROAD_ALB__linear.ktx2.zst is not declared');
   });
 });
 

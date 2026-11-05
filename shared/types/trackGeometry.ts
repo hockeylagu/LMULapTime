@@ -18,9 +18,9 @@ export type TrackSurfacePolygon = Array<Array<[number, number]>>;
 export interface TrackMapSurfaces {
   road: TrackSurfacePolygon[];
   kerb: TrackSurfacePolygon[];
-  /** Named anti-cut/sausage kerbs, drawn over the combined kerb layer; absent in older packages. */
+  /** Named anti-cut/sausage kerbs, drawn over the combined kerb layer. */
   raisedKerb?: TrackSurfacePolygon[];
-  /** Kerbs belonging to other roads, outside `kerb`; shown with other roads. Absent in older packages. */
+  /** Kerbs belonging to other roads, outside `kerb`; shown with other roads. */
   otherRoadKerb?: TrackSurfacePolygon[];
   runoff: TrackSurfacePolygon[];
   /** Painted and artificial-turf runoff, split from `runoff` for display only. */
@@ -31,7 +31,7 @@ export interface TrackMapSurfaces {
   otherRoad?: TrackSurfacePolygon[];
 }
 
-/** Optional display-only layers bound to the source geometry revision; road/kerb are active-layout only. */
+/** A brake-board marker of the 2D map; display only. */
 export interface TrackBrakeMarker {
   id: string;
   center: [number, number];
@@ -41,13 +41,6 @@ export interface TrackBrakeMarker {
   normal?: [number, number];
   /** Native height of the board's bottom edge, when the game's board bounds are known. */
   baseY?: number;
-}
-
-export interface TrackMapDisplay {
-  layoutKey: string;
-  sourceRevision: string;
-  surfaces: TrackMapSurfaces & { pit: TrackSurfacePolygon[]; otherRoad: TrackSurfacePolygon[] };
-  brakeMarkers?: TrackBrakeMarker[];
 }
 
 export interface TrackGeometryQuality {
@@ -120,11 +113,8 @@ export interface TrackBoundaryGeometry {
   rightBoundary: Array<[number, number]>;
   centerline: Array<[number, number]>;
   nominalWidthM?: number;
-  /** Display surfaces only; timing and lap projection continue to use the centerline. */
-  mapSurfaces?: TrackMapSurfaces;
   startFinish?: [number, number];
   timingGates?: TrackTimingGates;
-  elevationProfile?: number[];
   pitLane?: {
     centerline: Array<[number, number]>;
     elevation?: number[];
@@ -139,10 +129,12 @@ export interface TrackBoundaryGeometry {
     slot: number;
     center: [number, number];
   }>;
-  schemaVersion?: 2;
   geometryRevision?: string;
   projectionRevision?: string;
-  coordinates?: { frame: 'lmu-local'; unit: 'm'; axes: 'xyz' };
   quality?: TrackGeometryQuality;
   surfaceProfile?: TrackSurfaceProfile;
+  /** Map display surfaces (road and kerb are active-layout only); timing and lap projection use the centerline. Not part of `geometryRevision`. */
+  surfaces?: TrackMapSurfaces;
+  /** Brake-board markers of the 2D map. Not part of `geometryRevision`. */
+  brakeMarkers?: TrackBrakeMarker[];
 }

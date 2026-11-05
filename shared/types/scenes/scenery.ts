@@ -1,5 +1,5 @@
 /**
- * Scenery layout index of package manifest schema 3 (one row per layout; the pipeline's docs/SCENE_PACKAGE.md is the authority).
+ * Scenery layout of package schema 4 (one catalog row per layout plus the catalog's shared chunking and streaming; the pipeline's docs/SCENE_PACKAGE.md is the authority).
  * The horizon chunk is always resident; sector chunks are loaded by lap distance around the replay car.
  */
 export type Vec3 = [number, number, number];
@@ -107,14 +107,14 @@ export interface SceneryTotals {
 }
 
 export interface SceneryLayout {
-  schemaVersion: 2;
   layoutKey: string;
   sourceGeometryRevision: string;
   routeLengthM: number;
   pitLaneLengthM: number;
+  /** The catalog's shared parameters, attached to each layout. */
   chunking: SceneryChunkingParameters;
   streaming: SceneryStreaming;
-  daylight: SceneryDaylight;
+  daylight?: SceneryDaylight;
   horizon: SceneryHorizonChunk;
   sectors: ScenerySectorChunk[];
   textures: SceneryTexture[];

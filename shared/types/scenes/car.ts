@@ -1,17 +1,18 @@
-/** Textured car of package manifest schema 3: a GLB with four wheel rigs, a descriptor JSON and KTX2 textures. */
+/** Textured car of package schema 4: a GLB with four wheel rigs, a descriptor JSON and KTX2 textures. */
 import type { Vec3 } from './scenery.js';
 
 export interface CarTextureRef { asset: string; sha256: string; byteLength: number }
 
-export interface CarCatalogRow {
-  schemaVersion: 1;
-  vehicleFolder: string;
-  /** Installed VEH ids (original case) this model serves. */
+/** A textured car body: the union of the VEH ids it serves across the vehicle records that list it. */
+export interface CarBody {
+  /** The installed car folder, or `<folder>.<hash>` for a further geometry of that folder. */
+  folder: string;
+  /** Upper-case VEH ids this body serves. */
   vehicleIds: string[];
-  /** Package-relative `cars/<vehicleFolder>.json`. */
+  /** Package-relative `vehicles/bodies/<folder>.json`. */
   descriptor: string;
   descriptorSha256: string;
-  /** Package-relative `cars/<sha256>.glb`. */
+  /** Package-relative `vehicles/<sha256>.glb`. */
   asset: string;
   sha256: string;
   byteLength: number;
@@ -20,13 +21,13 @@ export interface CarCatalogRow {
   textures: CarTextureRef[];
 }
 
-export interface CarResource extends CarCatalogRow { packageRevision: string }
+export interface CarResource extends CarBody { packageRevision: string }
 
 export type CarCorner = 'fl' | 'fr' | 'rl' | 'rr';
 
 /** One map of a native material recipe (only the fields the viewer reads). */
 export interface CarMapRef {
-  /** `textures/<sha256>.ktx2`, relative to the cars folder; absent for a constant map. */
+  /** `textures/<sha256>.ktx2.zst`, relative to the vehicles folder; absent for a constant map. */
   texture?: string;
   uv: string;
   scale: [number, number];
@@ -54,19 +55,34 @@ export interface CarMaterialRecipe {
 
 export interface CarAppearance {
   alias: string;
-  /** Albedo of the paint material, `textures/<sha256>.ktx2` relative to the cars folder. */
+  /** Albedo of the paint material, `textures/<sha256>.ktx2.zst` relative to the vehicles folder. */
   albedo: string;
   paint: CarSurface;
   /** Livery files replacing the albedo of the same-named material. */
   materialTextures?: Record<string, string>;
 }
 
+/** A game camera of the car (VEH `Cameras=` LocalCam), in the native car frame of the GLB (+x left, +y up, -z forward). */
+export interface CarCamera {
+  /** LocalCam name: `COCKPIT` is the driver's eye, `NOSECAM` the bonnet camera. */
+  name: string;
+  position: Vec3;
+  /** Pitch, yaw, roll offsets in radians. */
+  orientation: Vec3;
+  /** Horizontal and vertical field of view in degrees (the vertical one is used). */
+  fov: [number, number];
+  clipPlanes: [number, number];
+  /** Which cockpit mesh variant the game shows: `in` for driver-eye cameras. */
+  cockpitView: 'in' | 'out';
+}
+
 export interface CarDescriptor {
-  schemaVersion: 1;
   vehicleFolder: string;
   aliases: string[];
   wheelPivots: Record<CarCorner, Vec3>;
   wheelRig: { passed: true; rigs: 4; maxRestVertexErrorM: number };
   appearances: CarAppearance[];
   materials: CarMaterialRecipe[];
+  /** The car's game cameras; always includes `COCKPIT`. */
+  cameras: { list: CarCamera[] };
 }

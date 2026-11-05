@@ -20,17 +20,24 @@ const geometry: TrackBoundaryGeometry = {
   bounds: { minX: 80, maxX: 220, minZ: 180, maxZ: 260, spanX: 140, spanZ: 80 },
   leftBoundary: [[90, 190], [140, 210], [190, 230]], rightBoundary: [[110, 210], [160, 230], [210, 250]],
   centerline: [[100, 200], [150, 220], [200, 240]], geometryRevision: 'geometry-v1', surfaceProfile,
-  mapSurfaces: { road: [polygon(100)], kerb: [polygon(110)], runoff: [polygon(120)],
+  surfaces: { road: [polygon(100)], kerb: [polygon(110)], runoff: [polygon(120)],
     apron: [polygon(150)], gravel: [polygon(160)], grass: [polygon(170)] },
 };
 
-describe('GpsMapBackground legacy surfaces', () => {
-  it('draws outer surfaces once and only kerbs inside the kerb clip', () => {
+describe('GpsMapBackground surfaces', () => {
+  it('draws each surface layer once', () => {
     const layers = { ...DEFAULT_MAP_LAYERS, runoff: true, apron: true, gravel: true, grass: true };
     const { container } = render(<svg><GpsMapBackground geometry={geometry} bounds={geometry.bounds} layers={layers}
       left={[]} right={[]} center={[]} pathD="" /></svg>);
     const drawn = [...container.querySelectorAll('[data-surface]')].map(path => path.getAttribute('data-surface'));
-    expect(drawn).toEqual(['grass', 'gravel', 'runoff', 'apron', 'kerb']);
-    expect(container.querySelector('[clip-path] [data-surface]')?.getAttribute('data-surface')).toBe('kerb');
+    expect(drawn).toEqual(['grass', 'gravel', 'runoff', 'apron', 'road', 'kerb']);
+    expect(container.querySelector('[clip-path]')).toBeNull();
+  });
+
+  it('falls back to the measured ribbon when the track has no surfaces', () => {
+    const { container } = render(<svg><GpsMapBackground geometry={{ ...geometry, surfaces: undefined }} bounds={geometry.bounds}
+      layers={DEFAULT_MAP_LAYERS} left={[]} right={[]} center={[]} pathD="M0 0 L1 1" /></svg>);
+    expect(container.querySelectorAll('[data-surface]')).toHaveLength(0);
+    expect(container.querySelector('path[d="M0 0 L1 1"]')).not.toBeNull();
   });
 });

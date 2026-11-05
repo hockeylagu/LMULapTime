@@ -30,7 +30,7 @@ function fixture(): TrackBoundaryGeometry {
   return {
     layoutKey: 'monza_gp', circuitId: 'monza', layoutId: 'gp',
     trackVenue: 'Autodromo Nazionale Monza', trackCourse: 'Monza GP',
-    schemaVersion: 2, geometryRevision: 'geometry-one', projectionRevision: 'projection-one',
+    geometryRevision: 'geometry-one', projectionRevision: 'projection-one',
     lengthM: 400, bounds: { minX: 0, maxX: 100, minZ: 0, maxZ: 100, spanX: 100, spanZ: 100 },
     centerline: [[0, 0], [0, 100], [100, 100], [100, 0]],
     leftBoundary: [[-5, 0], [-5, 100]], rightBoundary: [[8, 0], [8, 100]],

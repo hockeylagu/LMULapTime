@@ -74,11 +74,7 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
   add('track-geometry', '/api/data-plugin/tracks/:layoutKey', geometry ? `/api/data-plugin/tracks/${geometry.layout}` : undefined, 'No metric geometry for the fixed cohort.');
   const scenery = cohort.boards.map(board => dataPlugin.sceneryLayout(board.layout)).find(value => value !== null);
   add('track-scenery', '/api/data-plugin/scenery/:layoutKey', scenery ? `/api/data-plugin/scenery/${scenery.layoutKey}` : undefined, 'No 3D scenery for the fixed cohort; synthetic scenery routes are tested.');
-  add('scenery-file', '/api/data-plugin/scenery/files/:file', undefined, 'Binary GLB and KTX2 delivery is measured separately from the JSON benchmark.');
-  add('scenery-texture', '/api/data-plugin/scenery/files/textures/:file', undefined, 'Binary KTX2 delivery is measured separately from the JSON benchmark.');
   add('car', '/api/data-plugin/cars/:identity', undefined, 'Optional private textured car capability; exact identity is covered by synthetic route tests.');
-  add('car-file', '/api/data-plugin/cars/files/:file', undefined, 'Binary car GLB and KTX2 delivery is measured separately from the JSON benchmark.');
-  add('car-texture', '/api/data-plugin/cars/files/textures/:file', undefined, 'Binary car KTX2 delivery is measured separately from the JSON benchmark.');
   for (const [index, board] of cohort.boards.entries()) {
     const query = new URLSearchParams(board).toString();
     const track = encodeURIComponent(board.layout);

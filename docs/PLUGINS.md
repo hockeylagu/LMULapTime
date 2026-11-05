@@ -163,15 +163,17 @@ One row per layout (`schemaVersion: 2`): `layoutKey`, `sourceGeometryRevision`, 
 practice2 in that order with `localTime` `HH:MM`, `sunElevationDeg` and optional `sunBearingDeg` (degrees clockwise from true north in [0, 360)), `airPollution`, `hazeBaseScale`), one `horizon` chunk, `sectors` (main chunks ordered by lap
 range, then pit chunks), the layout's `textures` and `totals`. Rows and chunks have exactly the documented keys. The layout must
 exist in the track catalog and its `sourceGeometryRevision` must equal that geometry's revision. Chunk GLBs are `scenery/<sha256>.glb`
-and textures `scenery/textures/<sha256>.ktx2`; main sector lap ranges are ordered, inside the route and linked circularly by
+and textures `scenery/textures/<sha256>.ktx2.zst` (a KTX2 without supercompression, compressed as one zstd file); main sector lap ranges are ordered, inside the route and linked circularly by
 `prev`/`next`; pit chunks chain in pit-lane order; every chunk texture is in the layout's texture list.
 
-Startup checks that each listed file exists and has its catalogued size. The sha256 is verified every time a file is served: a file
-changed on disk answers 409 and the backend must be restarted with the package restored. Hashing the whole scenery at startup
-(several GB) is deliberately not done.
+Startup checks that each listed file exists and has its catalogued size; it does not hash the scenery (several GB). Package files
+are pregenerated, content-named and published by folder swap, so they are never rewritten in place: the backend serves them as is,
+with no hash or change check. A hash check can come back if a real failure ever needs one.
 
-`GET /api/data-plugin/scenery/:layoutKey` returns the layout row plus `packageRevision`. `GET /api/data-plugin/scenery/files/:file`
-and `/scenery/files/textures/:file` serve only catalogued files (immutable, content-named).
+`GET /api/data-plugin/scenery/:layoutKey` returns the layout row plus `packageRevision`. `/api/data-plugin/scenery/files/` serves the
+package's `scenery/` folder and `/api/data-plugin/cars/files/` its `vehicles/` folder as static files with `Cache-Control: no-store`
+(a local server: a browser cache would only duplicate the package on disk); a missing file is a 404. A `.ktx2.zst` texture goes out
+as `Content-Type: image/ktx2` with `Content-Encoding: zstd`, so the browser decompresses it while downloading, off the main thread.
 
 The viewer always keeps the horizon chunk loaded and streams the sector chunks by the resident-set rule: at lap distance `L`, a main
 sector is resident while its lap range meets `[L - residentBehindM, L + residentAheadM]` (circular; a pit chunk uses its main lap
@@ -191,12 +193,15 @@ One row per car folder (`schemaVersion: 1`): `vehicleFolder`, `vehicleIds` (the 
 (`cars/<vehicleFolder>.json`) with `descriptorSha256`, `asset` (`cars/<sha256>.glb`), `triangles`, `vertices` and `textures`
 (`cars/textures/<sha256>.ktx2`). When the manifest has a vehicle catalog, every `vehicleIds` entry must be one of its ids; two
 cars may not serve one id. The descriptor is read and validated at startup: its aliases equal the row's, `wheelRig` passed with four
-rigs and rest-vertex error below 1e-5, there is one appearance per alias, and every texture it names is declared by the row.
+rigs and rest-vertex error below 1e-5, there is one appearance per alias, every texture it names is declared by the row, and its
+`cameras.list` holds well-formed game cameras including `COCKPIT`.
 
 `GET /api/data-plugin/cars/:identity` (a VEH id with or without `.veh`) returns the row plus `packageRevision`;
-`/cars/files/:file` and `/cars/files/textures/:file` serve the catalogued GLB, descriptor and textures. The viewer selects the
+`/cars/files/` serves the car GLB, descriptor and textures. The viewer selects the
 lap's appearance by `vehicleIdentity.vehicleId`, creates one material per native material from the descriptor and animates the four
-wheel rigs (`wheel_`, `steer_` and `spin_` nodes at the rolling hub). A lap without a vehicle id, or a vehicle without a car, is an
+wheel rigs (`wheel_`, `steer_` and `spin_` nodes at the rolling hub) and the `steering_wheel` node about its `extras.steeringWheelPivot` and
+`extras.steeringWheelAxis`, by the recorded steering times the wheel range. The Cockpit and Hood views sit on the descriptor's
+`COCKPIT` and `NOSECAM` cameras (position, pitch, vertical FOV, near clip) and show the cockpit mesh variant the camera names. A lap without a vehicle id, or a vehicle without a car, is an
 error shown with the 2D map as the alternative; there is no estimated car.
 
 Textures are KTX2 with raw GPU block data (no Basis transcoder). Scenery and cars are Meshopt-compressed GLBs decoded by three.js.

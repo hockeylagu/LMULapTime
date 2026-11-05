@@ -3,10 +3,9 @@ import {
   hasCompatibleTrackStations,
   getTrackRoadEdgeDistances,
   parseTrackBoundaryGeometry,
-  parseTrackMapDisplay,
   sampleTrackSurfaceProfile,
 } from '../../shared/domain/trackGeometry.js';
-import type { TrackBoundaryGeometry, TrackMapDisplay, TrackSurfaceProfile } from '../../shared/types/trackGeometry.js';
+import type { TrackBoundaryGeometry, TrackMapSurfaces, TrackSurfaceProfile } from '../../shared/types/trackGeometry.js';
 
 function legacy(): TrackBoundaryGeometry {
   return {
@@ -31,20 +30,15 @@ function surfaceProfile(): TrackSurfaceProfile {
 
 function native(): TrackBoundaryGeometry {
   return {
-    ...legacy(), schemaVersion: 2, geometryRevision: 'mesh-v2', projectionRevision: 'centerline-v1',
-    coordinates: { frame: 'lmu-local', unit: 'm', axes: 'xyz' },
+    ...legacy(), geometryRevision: 'mesh-v2', projectionRevision: 'centerline-v1',
     quality: { surfaces: 'native', boundaries: 'partial', elevation: 'native', banking: 'partial', legalLimits: 'unavailable' },
     surfaceProfile: surfaceProfile(),
   };
 }
 
-function mapDisplay(): TrackMapDisplay {
+function mapSurfaces(): TrackMapSurfaces {
   const ring: Array<[number, number]> = [[0, 0], [10, 0], [10, 10], [0, 0]];
-  const polygon = [[ring]];
-  return {
-    layoutKey: 'test_gp', sourceRevision: 'mesh-v2',
-    surfaces: { road: polygon, kerb: [], runoff: [], pit: [], otherRoad: [] },
-  };
+  return { road: [[ring]], kerb: [], runoff: [], pit: [], otherRoad: [] };
 }
 
 describe('native surface sampling', () => {
@@ -114,17 +108,16 @@ describe('track geometry runtime validation', () => {
 
   it('retains native fields and polygon holes without flattening or rewriting coordinates', () => {
     const geometry = native();
-    geometry.mapSurfaces = {
+    geometry.surfaces = {
       road: [[[[0, 0], [20, 0], [20, 20], [0, 0]], [[5, 5], [6, 5], [6, 6], [5, 5]]]],
       kerb: [], runoff: [],
     };
     expect(parseTrackBoundaryGeometry(geometry)).toBe(geometry);
-    expect(geometry.mapSurfaces.road[0]).toHaveLength(2);
+    expect(geometry.surfaces.road[0]).toHaveLength(2);
   });
 
-  it('validates optional legacy timing, elevation, pit and grid geometry', () => {
+  it('validates optional legacy timing, pit and grid geometry', () => {
     const geometry = legacy();
-    geometry.elevationProfile = [0, 1, 0];
     geometry.pitLane = { centerline: [[0, 0], [1, 0]], elevation: [0, 1] };
     geometry.pitStalls = [{ id: 0, center: [0, 0], widthM: 3, angleDeg: -30 }];
     geometry.gridSlots = [{ slot: 1, center: [1, 0] }];
@@ -142,11 +135,9 @@ describe('track geometry runtime validation', () => {
     { ...legacy(), centerline: [[0, 0, 0], [1, 1]] },
     { ...legacy(), startFinish: [0, 2_000_000] },
     { ...legacy(), bounds: { ...legacy().bounds, minX: 21 } },
-    { ...native(), coordinates: { frame: 'gps', unit: 'm', axes: 'xyz' } },
-    { ...native(), schemaVersion: 3 },
     { ...native(), geometryRevision: '' },
     { ...native(), quality: { ...native().quality, banking: 'estimated' } },
-    { ...legacy(), mapSurfaces: { road: [[[0, 0], [1, 1]]], kerb: [], runoff: [] } },
+    { ...legacy(), surfaces: { road: [[[0, 0], [1, 1]]], kerb: [], runoff: [] } },
   ])('rejects malformed, unbounded and unsupported geometry %#', value => {
     expect(() => parseTrackBoundaryGeometry(value)).toThrow('Invalid track geometry');
   });
@@ -191,45 +182,46 @@ describe('track geometry runtime validation', () => {
   });
 });
 
-describe('track map display validation', () => {
-  it('accepts a matching layout and geometry revision without rewriting its polygons', () => {
-    const display = mapDisplay();
-    expect(parseTrackMapDisplay(display, 'test_gp', 'mesh-v2')).toBe(display);
-    expect(display.surfaces.road[0][0]).toEqual([[0, 0], [10, 0], [10, 10], [0, 0]]);
-  });
-
-  it('accepts optional braking markers and preserves legacy displays without them', () => {
-    const display = mapDisplay();
-    display.brakeMarkers = [
+describe('track map surfaces and brake markers', () => {
+  const withSurfaces = (surfaces: unknown) => ({ ...legacy(), surfaces });
+  it('accepts the surface set and brake markers without rewriting them', () => {
+    const geometry = { ...legacy(), surfaces: mapSurfaces(), brakeMarkers: [
       { id: 'brake-150', center: [12, 34], label: '150', stationM: 900, side: 'left' },
-      { id: 'brake-unknown', center: [56, 78], stationM: 1200, side: 'right', baseY: 13.45 },
-    ];
-    expect(parseTrackMapDisplay(display, 'test_gp', 'mesh-v2').brakeMarkers).toEqual(display.brakeMarkers);
-    expect(parseTrackMapDisplay(mapDisplay(), 'test_gp', 'mesh-v2')).not.toHaveProperty('brakeMarkers');
+      { id: 'brake-unknown', center: [56, 78], stationM: 1200, side: 'right', baseY: 13.45, normal: [0, 1] },
+    ] } as TrackBoundaryGeometry;
+    expect(parseTrackBoundaryGeometry(geometry)).toBe(geometry);
+    expect(geometry.surfaces?.road[0][0]).toEqual([[0, 0], [10, 0], [10, 10], [0, 0]]);
   });
 
-  it('accepts optional apron, gravel and grass layers and displays without them', () => {
-    const display = mapDisplay();
-    display.surfaces = { ...display.surfaces, apron: display.surfaces.road, gravel: [], grass: display.surfaces.road };
-    expect(parseTrackMapDisplay(display, 'test_gp', 'mesh-v2')).toBe(display);
-    expect(parseTrackMapDisplay(mapDisplay(), 'test_gp', 'mesh-v2').surfaces).not.toHaveProperty('grass');
+  it('accepts a track without surfaces or markers', () => {
+    expect(parseTrackBoundaryGeometry(legacy())).not.toHaveProperty('surfaces');
+  });
+
+  it('accepts optional apron, gravel, grass, raised kerb and other-road kerb layers', () => {
+    const surfaces = mapSurfaces();
+    const geometry = withSurfaces({ road: surfaces.road, kerb: [], runoff: [], apron: surfaces.road, gravel: [], grass: surfaces.road, raisedKerb: [], otherRoadKerb: [] });
+    expect(parseTrackBoundaryGeometry(geometry)).toBe(geometry);
   });
 
   it.each([
-    ['wrong layout', { ...mapDisplay(), layoutKey: 'test_short' }, 'test_gp', 'mesh-v2'],
-    ['wrong revision', { ...mapDisplay(), sourceRevision: 'old-mesh' }, 'test_gp', 'mesh-v2'],
-    ['malformed polygon ring', { ...mapDisplay(), surfaces: { ...mapDisplay().surfaces, road: [[[[0, 0], [1, 1]]]] } }, 'test_gp', 'mesh-v2'],
-    ['nonfinite coordinate', { ...mapDisplay(), surfaces: { ...mapDisplay().surfaces, road: [[[[0, 0], [10, 0], [Infinity, 10]]]] } }, 'test_gp', 'mesh-v2'],
-    ['malformed raised kerb ring', { ...mapDisplay(), surfaces: { ...mapDisplay().surfaces, raisedKerb: [[[[0, 0], [1, 1]]]] } }, 'test_gp', 'mesh-v2'],
-    ['malformed grass ring', { ...mapDisplay(), surfaces: { ...mapDisplay().surfaces, grass: [[[[0, 0], [1, 1]]]] } }, 'test_gp', 'mesh-v2'],
-    ['apron that is not an array', { ...mapDisplay(), surfaces: { ...mapDisplay().surfaces, apron: {} } }, 'test_gp', 'mesh-v2'],
-    ['malformed braking marker', { ...mapDisplay(), brakeMarkers: [{ id: 'bad', center: [0, 0], stationM: -5, side: 'left' }] }, 'test_gp', 'mesh-v2'],
-    ['unknown marker side', { ...mapDisplay(), brakeMarkers: [{ id: 'bad', center: [0, 0], stationM: 5, side: 'center' }] }, 'test_gp', 'mesh-v2'],
-  ])('rejects sidecar data with %s', (_label, value, layoutKey, revision) => {
-    expect(() => parseTrackMapDisplay(value, layoutKey, revision)).toThrow('Invalid track geometry');
+    ['a missing required layer', { road: [], kerb: [] }],
+    ['a malformed polygon ring', { ...mapSurfaces(), road: [[[[0, 0], [1, 1]]]] }],
+    ['a nonfinite coordinate', { ...mapSurfaces(), road: [[[[0, 0], [10, 0], [Infinity, 10]]]] }],
+    ['a malformed raised kerb ring', { ...mapSurfaces(), raisedKerb: [[[[0, 0], [1, 1]]]] }],
+    ['a malformed grass ring', { ...mapSurfaces(), grass: [[[[0, 0], [1, 1]]]] }],
+    ['an apron that is not an array', { ...mapSurfaces(), apron: {} }],
+  ])('rejects surfaces with %s', (_label, surfaces) => {
+    expect(() => parseTrackBoundaryGeometry(withSurfaces(surfaces))).toThrow('Invalid track geometry');
+  });
+
+  it.each([
+    ['a negative station', [{ id: 'bad', center: [0, 0], stationM: -5, side: 'left' }]],
+    ['an unknown side', [{ id: 'bad', center: [0, 0], stationM: 5, side: 'center' }]],
+    ['a malformed centre', [{ id: 'bad', center: [0], stationM: 5, side: 'left' }]],
+  ])('rejects a brake marker with %s', (_label, brakeMarkers) => {
+    expect(() => parseTrackBoundaryGeometry({ ...legacy(), brakeMarkers })).toThrow('Invalid track geometry');
   });
 });
-
 
 describe('canonical station availability',()=>{
  it('rejects odometer and mixed geometry frames while accepting a shared track revision',()=>{

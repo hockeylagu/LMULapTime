@@ -6,7 +6,7 @@ export function syntheticTrack(layoutKey='monza_gp'):TrackBoundaryGeometry {
   const ring=(r:number):Array<[number,number]>=>Array.from({length:n},(_,i)=>{const t=i/n*Math.PI*2;return [radius-r*Math.cos(t),-r*Math.sin(t)];});
   const values=(value:number|null)=>Array.from({length:n},()=>value);
   const geometry:TrackBoundaryGeometry = {trackVenue:'Synthetic venue',trackCourse:'Synthetic layout',layoutKey,circuitId:layoutKey==='monza_gp'?'monza':'daytona',layoutId:layoutKey==='monza_gp'?'gp':'road',
-    schemaVersion:2,geometryRevision:'synthetic-geometry',projectionRevision:'synthetic-projection',
+    geometryRevision:'synthetic-geometry',projectionRevision:'synthetic-projection',
     lengthM:Math.PI*2*radius,centerline:ring(radius),leftBoundary:ring(radius-6),rightBoundary:ring(radius+7),
     bounds:{minX:0,maxX:2000,minZ:-1000,maxZ:1000,spanX:2000,spanZ:2000},
     timingGates:{startFinish:{name:'Synthetic start',center:[0,0],left:[-6,0],right:[7,0],stationM:0}},

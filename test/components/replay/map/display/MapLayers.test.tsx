@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { GpsTrackMapScene } from '../../../../../src/components/replay/map/scene/GpsTrackMapScene.js';
 import { MAP_LAYERS_STORAGE_KEY } from '../../../../../src/components/replay/map/display/mapLayers.js';
-import type { TrackBoundaryGeometry, TrackMapDisplay, TrackSurfacePolygon } from '../../../../../shared/types/trackGeometry.js';
+import type { TrackBoundaryGeometry, TrackSurfacePolygon } from '../../../../../shared/types/trackGeometry.js';
 import { mockBounds, mockPoints } from '../gpsTrackMapFixtures.js';
 
 const polygon = (offset: number): TrackSurfacePolygon => [[
@@ -17,9 +17,11 @@ const geometry: TrackBoundaryGeometry = {
   geometryRevision: 'geometry-v1',
 };
 
-function mapDisplay(overrides: Partial<TrackMapDisplay['surfaces']> = {}): TrackMapDisplay {
+/** The map display data a track carries. */
+type MapDisplay = Pick<TrackBoundaryGeometry, 'surfaces' | 'brakeMarkers'>;
+
+function mapDisplay(overrides: Partial<NonNullable<TrackBoundaryGeometry['surfaces']>> = {}): MapDisplay {
   return {
-    layoutKey: 'test_gp', sourceRevision: 'geometry-v1',
     surfaces: {
       road: [polygon(100)], kerb: [polygon(110)], runoff: [polygon(120)], pit: [polygon(130)], otherRoad: [polygon(140)],
       ...overrides,
@@ -27,7 +29,7 @@ function mapDisplay(overrides: Partial<TrackMapDisplay['surfaces']> = {}): Track
   };
 }
 
-const displayWithBrakeMarkers: TrackMapDisplay = {
+const displayWithBrakeMarkers: MapDisplay = {
   ...mapDisplay(),
   brakeMarkers: [
     { id: 'brake-150', center: [120, 205], label: '150', stationM: 325, side: 'left' },
@@ -36,7 +38,7 @@ const displayWithBrakeMarkers: TrackMapDisplay = {
 };
 
 function renderMap(display = mapDisplay()) {
-  return render(<GpsTrackMapScene points={mockPoints} bounds={mockBounds} currentIndex={0} trackGeometry={geometry} mapDisplay={display} />);
+  return render(<GpsTrackMapScene points={mockPoints} bounds={mockBounds} currentIndex={0} trackGeometry={{ ...geometry, ...display }} />);
 }
 
 function openLayers() {
@@ -92,7 +94,7 @@ describe('GPS map display layers', () => {
 
   it('toggles sector, turn and start markers independently and remembers map preferences', () => {
     const props = { points: [...mockPoints, { ...mockPoints[0], timeSec: 1.5 }], bounds: mockBounds, currentIndex: 0,
-      trackGeometry: geometry, mapDisplay: mapDisplay(), sectors: { s1Frame: 1, s2Frame: 2 },
+      trackGeometry: { ...geometry, ...mapDisplay() }, sectors: { s1Frame: 1, s2Frame: 2 },
       corners: [{ cornerNumber: 1, minDistM: 0 }], onSelectIndex: vi.fn() };
     const first = render(<GpsTrackMapScene {...props} />);
     openLayers();
@@ -122,7 +124,7 @@ describe('GPS map display layers', () => {
 
   it('disables missing sector and turn data without inventing map markers', () => {
     render(<GpsTrackMapScene points={mockPoints} bounds={mockBounds} currentIndex={0}
-      trackGeometry={geometry} mapDisplay={mapDisplay()} sectors={{ s1Frame: NaN, s2Frame: 100 }} />);
+      trackGeometry={{ ...geometry, ...mapDisplay() }} sectors={{ s1Frame: NaN, s2Frame: 100 }} />);
     openLayers();
     expect(screen.getByRole('checkbox', { name: 'Sector markers' })).toBeDisabled();
     expect(screen.getByRole('checkbox', { name: 'Turns' })).toBeDisabled();
@@ -133,8 +135,8 @@ describe('GPS map display layers', () => {
   it('uses canonical sector gates even without replay sector frames', () => {
     const gate = { name: 'S1', center: [120, 200] as [number, number], left: [110, 190] as [number, number],
       right: [130, 210] as [number, number], stationM: 40 };
-    render(<GpsTrackMapScene points={mockPoints} bounds={mockBounds} currentIndex={0} mapDisplay={mapDisplay()}
-      trackGeometry={{ ...geometry, timingGates: { startFinish: gate, sector1: gate } }} />);
+    render(<GpsTrackMapScene points={mockPoints} bounds={mockBounds} currentIndex={0}
+      trackGeometry={{ ...geometry, ...mapDisplay(), timingGates: { startFinish: gate, sector1: gate } }} />);
     openLayers();
     expect(screen.getByRole('checkbox', { name: 'Sector markers' })).toBeEnabled();
     expect(screen.getByTestId('map-sector-s1').querySelector('line')).toBeInTheDocument();
@@ -145,9 +147,8 @@ describe('GPS map display layers', () => {
     const gate = { name: 'S1', center: [110, 205] as [number, number], left: [100, 205] as [number, number],
       right: [120, 205] as [number, number], stationM: 40 };
     const { container } = render(<GpsTrackMapScene points={mockPoints} bounds={mockBounds} currentIndex={0}
-      initialZoom={8} trackGeometry={{ ...geometry, timingGates: { startFinish: gate, sector1: gate } }}
-      mapDisplay={{ ...mapDisplay(), brakeMarkers: [{ id: 'sector-board', center: [120, 205], label: '150',
-        stationM: 40, side: 'right', normal: [1, 0] }] }} />);
+      initialZoom={8} trackGeometry={{ ...geometry, ...mapDisplay(), timingGates: { startFinish: gate, sector1: gate },
+        brakeMarkers: [{ id: 'sector-board', center: [120, 205], label: '150', stationM: 40, side: 'right', normal: [1, 0] }] }} />);
     const sectorPosition = () => screen.getByTestId('map-sector-s1').querySelector('g[transform]')?.getAttribute('transform');
     const before = sectorPosition();
     openLayers();
@@ -260,7 +261,7 @@ describe('GPS map display layers', () => {
     expect(container.querySelectorAll('[data-testid="gps-brake-markers"] rect')).toHaveLength(2);
     expect(container.querySelectorAll('[data-testid="gps-brake-markers"] circle')).toHaveLength(0);
 
-    rerender(<GpsTrackMapScene points={mockPoints} bounds={mockBounds} currentIndex={0} trackGeometry={geometry} mapDisplay={mapDisplay()} />);
+    rerender(<GpsTrackMapScene points={mockPoints} bounds={mockBounds} currentIndex={0} trackGeometry={{ ...geometry, ...mapDisplay() }} />);
     expect(screen.getByRole('checkbox', { name: 'Braking markers' })).toBeDisabled();
     expect(container.querySelector('[data-testid="gps-brake-markers"]')).toBeNull();
   });
@@ -370,7 +371,7 @@ describe('GPS map display layers', () => {
   });
 
   it('provides sub-toggles for distance, sponsor ads, and digi boards and offsets overlapping digi boards', () => {
-    const displayWithMixed: TrackMapDisplay = {
+    const displayWithMixed: MapDisplay = {
       ...mapDisplay(),
       brakeMarkers: [
         { id: 'm-dist', center: [120, 205], label: '100', stationM: 300, side: 'left' },

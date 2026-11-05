@@ -3,7 +3,9 @@ import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 
 /**
  * KTX2 loader that fetches each URL once. The package's KTX2 files hold the game's GPU blocks (BCn, R8, RGBA8), which the
- * loader uploads directly, so no Basis transcoder is configured: a Basis-compressed file would fail loudly.
+ * loader uploads directly, so no Basis transcoder is configured: a Basis-compressed file would fail loudly. Each file is
+ * compressed as a whole (`.ktx2.zst`, served with `Content-Encoding: zstd`), so the browser decompresses it while downloading
+ * and the KTX2 itself has no supercompression to decode on the main thread.
  * Chunks and cars share textures; GLTFLoader clones what it gets, so the cached original is only the source of mip data.
  */
 export class CachedKtx2Loader extends KTX2Loader {

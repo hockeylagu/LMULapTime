@@ -7,8 +7,8 @@ const MAX_ANISOTROPY = 8;
 interface GlbImage { name?: string; uri?: string }
 
 /**
- * The chunk GLB's declared images by name. The exporter names each image `<stem>__srgb.ktx2` or `<stem>__linear.ktx2` (the surface
- * map's `textureAsset`) and gives it the content-named `textures/<sha256>.ktx2` URI, which is how a surface map finds its file.
+ * The chunk GLB's declared images by name. The exporter names each image `<stem>__srgb.ktx2.zst` or `<stem>__linear.ktx2.zst` (the surface
+ * map's `textureAsset`) and gives it the content-named `textures/<sha256>.ktx2.zst` URI, which is how a surface map finds its file.
  */
 export function imageUriMap(json: { images?: GlbImage[] }): Map<string, string> {
   const uris = new Map<string, string>();

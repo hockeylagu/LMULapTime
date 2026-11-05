@@ -9,7 +9,7 @@ describe('GpsTrackMapScene overlays and geometry', () => {
   it('keeps fullscreen scrub and pan operable without a turn selector', () => {
     const onSelectIndex = vi.fn(), onSelectCornerNumber = vi.fn();
     render(<GpsTrackMapScene points={mockPoints} bounds={mockBounds} currentIndex={0}
-      trackGeometry={null} mapDisplay={null} corners={[{ cornerNumber: 1, minDistM: 0 }]}
+      trackGeometry={null} corners={[{ cornerNumber: 1, minDistM: 0 }]}
       onSelectIndex={onSelectIndex} onSelectCornerNumber={onSelectCornerNumber} />);
     fireEvent.click(screen.getByRole('button', { name: 'Full screen map' }));
     const map = screen.getByRole('dialog', { name: 'Track map' });

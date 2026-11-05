@@ -136,6 +136,10 @@ fallback is cascades with staggered far-cascade updates. After step 1, any shado
 Done in a simpler form (see "Results"): a single texel-snapped sun map replaced CSM and took the offscreen draws from ~660 to
 ~260 at Silverstone. Caching the static part is not needed for the targets now. Revisit it only if a denser layout misses them.
 
+Compared with CSM (3 × 2048 px up to 150 m), the sun map is coarser right at the camera (about 4 cm per texel against roughly 2 cm in
+CSM's nearest cascade) and does not cover walls more than 80 m to the side. If cockpit shadows look soft, add a second, smaller
+sun map around the car (decided 2026-11-04: only when needed).
+
 ### 3. Load: move texture decode off the main thread, fix serving (client, server, exporter)
 
 - **Server:** verify package files once (at load, or first read then size + mtime), then `res.sendFile` (async, streaming).

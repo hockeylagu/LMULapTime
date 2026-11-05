@@ -1,7 +1,6 @@
 import { ReplayTrajectoryPoint, type ReplayLapSummary, type ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import { MapColorMode } from './replayMapUtils.js';
 import { TrackBoundaryGeometry } from '../../../../shared/types/trackGeometry.js';
-import type { TrackMapDisplay } from '../../../../shared/types/trackGeometry.js';
 
 export interface GpsTrackMapCorner {
   cornerNumber: number;
@@ -63,7 +62,6 @@ export interface GpsTrackMapProps {
   layoutKey?: string;
   dataPluginRevision?: string;
   trackGeometry?: TrackBoundaryGeometry | null;
-  mapDisplay?: TrackMapDisplay | null;
   // Length of the track the trajectories' stations are measured on (trajectory.trackLengthM):
   // the map aligns laps with it exactly as the telemetry channels and corner analysis do.
   trackLengthM?: number;

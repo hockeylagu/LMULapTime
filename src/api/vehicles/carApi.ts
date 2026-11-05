@@ -1,7 +1,7 @@
 import type { CarDescriptor, CarResource } from '../../../shared/types/scenes/car.js';
 import { fetchBinary, fetchJson } from '../apiClient.js';
 
-/** Content-named car files: the GLB at `<sha256>.glb`, the descriptor at `<vehicleFolder>.json`, textures at `textures/<sha256>.ktx2`. */
+/** Content-named car files: the GLB at `<sha256>.glb`, the descriptor at `bodies/<folder>.json`, textures at `textures/<sha256>.ktx2.zst`. */
 export const CAR_FILES = '/api/data-plugin/cars/files/';
 
 export interface LoadedCar {
@@ -18,10 +18,9 @@ export async function fetchCar(vehicleId: string, packageRevision: string | unde
   if (packageRevision && resource.packageRevision !== packageRevision) throw Error('Car package revision differs from the selected lap');
   const [bytes, descriptor] = await Promise.all([
     fetchBinary(`${CAR_FILES}${resource.sha256}.glb`, { signal, cache: 'default' }),
-    fetchJson<CarDescriptor>(`${CAR_FILES}${resource.vehicleFolder}.json`, { signal }),
+    fetchJson<CarDescriptor>(`${CAR_FILES}bodies/${resource.folder}.json`, { signal }),
   ]);
   if (bytes.byteLength !== resource.byteLength) throw Error('Incomplete 3D car');
-  if (descriptor.vehicleFolder !== resource.vehicleFolder) throw Error('3D car descriptor mismatch');
   return { resource, bytes, descriptor, vehicleId };
 }
 

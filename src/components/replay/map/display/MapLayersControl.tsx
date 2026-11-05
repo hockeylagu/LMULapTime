@@ -19,13 +19,12 @@ interface Props {
   /** Runoff kinds this layout has, keyed for the colour legend. */
   runoffKinds?: readonly MapLayerKey[];
   hasRaisedKerbs?: boolean;
-  error?: string | null;
   onFitTrack: () => void;
   onFitVisible: () => void;
   pedalPoints?: PedalPointsControl;
 }
 
-export const MapLayersControl: React.FC<Props> = ({ layers, onChange, available, runoffKinds = EMPTY_ARRAY, hasRaisedKerbs = false, error, onFitTrack, onFitVisible, pedalPoints }) => {
+export const MapLayersControl: React.FC<Props> = ({ layers, onChange, available, runoffKinds = EMPTY_ARRAY, hasRaisedKerbs = false, onFitTrack, onFitVisible, pedalPoints }) => {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
@@ -139,7 +138,6 @@ export const MapLayersControl: React.FC<Props> = ({ layers, onChange, available,
       ))}
       {(available.pit === false || available.runoff === false || available.brakeMarkers === false) && <p className="text-xs text-lmu-muted mt-2">
         Some optional map layers are unavailable for this layout.</p>}
-      {error && <p role="status" className="text-xs text-lmu-warn mt-2">{error}</p>}
       <div className="flex flex-col items-start gap-2 mt-3 pt-3 border-t border-lmu-border">
         <button type="button" onClick={onFitTrack} className={`text-xs text-lmu-text-soft hover:text-lmu-text cursor-pointer ${FOCUS_RING}`}>Fit track</button>
         <button type="button" onClick={onFitVisible} className={`text-xs text-lmu-text-soft hover:text-lmu-text cursor-pointer ${FOCUS_RING}`}>Fit visible layers</button>

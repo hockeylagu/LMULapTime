@@ -16,7 +16,7 @@ it('rejects binary scenes and schema 3 scenery manifests from release inputs', (
  try {
   fs.mkdirSync(path.join(root,'public'),{recursive:true}); fs.writeFileSync(path.join(root,'public/track.glb'),Buffer.alloc(4));
   expect(()=>checkLocalData(root)).toThrow('3D scene data'); fs.unlinkSync(path.join(root,'public/track.glb'));
-  fs.mkdirSync(path.join(root,'src'),{recursive:true}); fs.writeFileSync(path.join(root,'src/package.json'),JSON.stringify({schemaVersion:3,scenery:{catalog:'scenery/index.json'}}));
+  fs.mkdirSync(path.join(root,'src'),{recursive:true}); fs.writeFileSync(path.join(root,'src/package.json'),JSON.stringify({schemaVersion:4,scenery:{catalog:'scenery/index.json'}}));
   expect(()=>checkLocalData(root)).toThrow('Local package');
  } finally { fs.rmSync(root,{recursive:true,force:true}); }
 });

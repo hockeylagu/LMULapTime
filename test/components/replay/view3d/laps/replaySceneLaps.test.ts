@@ -76,7 +76,7 @@ const box = (min: number, max: number) => ({min: [-100, min, -100] as [number, n
 const base = {sha256: 'x', byteLength: 1, triangles: 1, vertices: 1, drawCalls: 1, geometryBytes: 1, meshes: 1, materials: 1, textures: [] as string[], bounds: box(0, 0)};
 const sector = (index: number): ScenerySectorChunk => ({...base, id: `s${index}`, kind: 'main', asset: `scenery/s${index}.glb`, lapStartM: index * 1000, lapEndM: (index + 1) * 1000, prev: `s${(index + 3) % 4}`, next: `s${(index + 1) % 4}`});
 const layout = {
-  schemaVersion: 2, layoutKey: 'portimao_wec', sourceGeometryRevision: 'g', packageRevision: 'p', routeLengthM: 4000, pitLaneLengthM: 0,
+  layoutKey: 'portimao_wec', sourceGeometryRevision: 'g', packageRevision: 'p', routeLengthM: 4000, pitLaneLengthM: 0,
   streaming: {residentBehindM: 300, residentAheadM: 1500, freeCameraRadiusM: 1500},
   daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55 },
   horizon: {...base, id: 'horizon', kind: 'horizon', asset: 'scenery/h.glb'}, sectors: [0, 1, 2, 3].map(sector), textures: [],

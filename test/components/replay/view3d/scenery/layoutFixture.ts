@@ -12,7 +12,7 @@ export function testLayout(): SceneryLayout {
   const pit: ScenerySectorChunk = { ...base, id: 'p0', kind: 'pit', asset: 'scenery/p0.glb', bounds: box(0, 500), textures: ['shared'], lapStartM: 0, lapEndM: 500, pitStartM: 0, pitEndM: 400, prev: null, next: null };
   const horizon: SceneryChunk = { ...base, id: 'horizon', kind: 'horizon', asset: 'scenery/h.glb', bounds: box(-5000, -5000), textures: [] };
   return {
-    schemaVersion: 2, layoutKey: 'test', sourceGeometryRevision: 'g', routeLengthM: 4000, pitLaneLengthM: 400,
+    layoutKey: 'test', sourceGeometryRevision: 'g', routeLengthM: 4000, pitLaneLengthM: 400,
     chunking: { sectorLengthM: 1000, minSectorLengthM: 100, maxSectorTriangles: 1, horizonDistanceM: 1, skylineHeightM: 1, skylineMinDistanceM: 1, terrainScaleExtentM: 1, pitBandM: 1 },
     streaming: { residentBehindM: 300, residentAheadM: 1500, freeCameraRadiusM: 1500 },
     daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55 },

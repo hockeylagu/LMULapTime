@@ -82,7 +82,7 @@ describe('TrackCircuitLayout', () => {
     const onClick = vi.fn();
     const geometryWithSurfaces: TrackBoundaryGeometry = {
       ...mockGeometry,
-      mapSurfaces: {
+      surfaces: {
         road: [[[[100, 100], [400, 100], [400, 400], [100, 100]]]],
         runoff: [[[[80, 80], [420, 80], [420, 420], [80, 80]]]],
         kerb: [[[[120, 120], [180, 120], [180, 180], [120, 120]]]],

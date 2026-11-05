@@ -18,7 +18,7 @@ export interface LapCars {
   baseline: LoadedCar | null;
 }
 
-/** Loads a shared car texture by its `textures/<sha256>.ktx2` path under the cars folder. */
+/** Loads a shared car texture by its `textures/<sha256>.ktx2.zst` path under the cars folder. */
 export type CarTextureLoader = (path: string) => Promise<Texture>;
 
 /** Lap objects own their geometry; replacing them cannot release the track's GPU buffers. */

@@ -1,7 +1,7 @@
 import type { SceneryChunk, SceneryLayoutResource } from '../../shared/types/scenes/scenery.js';
 import { fetchBinary, fetchJson } from './apiClient.js';
 
-/** Content-named scenery files: a chunk GLB at `<sha256>.glb` and the KTX2 textures it names at `textures/<sha256>.ktx2` beside it. */
+/** Content-named scenery files: a chunk GLB at `<sha256>.glb` and the KTX2 textures it names at `textures/<sha256>.ktx2.zst` beside it. */
 export const SCENERY_FILES = '/api/data-plugin/scenery/files/';
 
 export async function fetchSceneryLayout(layoutKey: string, signal: AbortSignal): Promise<SceneryLayoutResource> {

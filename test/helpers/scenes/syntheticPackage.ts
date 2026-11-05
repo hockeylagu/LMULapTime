@@ -1,8 +1,10 @@
+import { zstdCompressSync } from 'node:zlib';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { syntheticTrack } from '../syntheticTrack.js';
+import type { TrackBoundaryGeometry } from '../../../shared/types/trackGeometry.js';
 
 const sha = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 /** A byte-exact GLB header (magic, version 2, total length) plus a marker: all the app checks of a GLB itself. */
@@ -13,7 +15,8 @@ export const glb = (marker: string) => {
 };
 export const ktx2 = (marker: string) => Buffer.concat([Buffer.from('ab4b5458203230bb0d0a1a0a', 'hex'), Buffer.from(marker)]);
 
-const catalog = { schemaVersion: 1, coordinates: 'local-xz-metres-forward-minus-z', vehicles: [{ id: 'synthetic', model: 'Test Car', carClass: 'Hyper', vehicleIds: ['TEST_CAR'], dimensions: { lengthM: 5, widthM: 2 }, outlineXZ: [[-1, -2.5], [1, -2.5], [1, 2.5], [-1, 2.5]], replayOriginOffsetXZ: [0, 0] }] };
+/** A vehicle record of the package: `vehicleIds` are the ids of the record, all served by the package's one car body. */
+export interface VehicleSpec { id: string; vehicleIds: string[]; extra?: Record<string, unknown> }
 
 export interface ChunkRow {
   id: string; kind: string; bounds: { min: number[]; max: number[] }; asset: string; sha256: string; byteLength: number;
@@ -22,8 +25,8 @@ export interface ChunkRow {
 }
 
 /**
- * A schema-3 package on disk: one track, one vehicle, scenery with a horizon and two main sectors, and one textured car.
- * Every row, descriptor and the manifest is a plain object a test may change before `commit()` writes them.
+ * A schema-4 package on disk: one track with map surfaces and a brake marker, one vehicle record with its textured car body, and scenery
+ * with a horizon and two main sectors. Every row, descriptor and the manifest is a plain object a test may change before `commit()` writes them.
  */
 export function syntheticPackage() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lmu-plugin-'));
@@ -38,20 +41,23 @@ export function syntheticPackage() {
     return { asset, sha256: hash, byteLength: bytes.length };
   };
   const geometry = syntheticTrack(), L = geometry.lengthM;
-  write('tracks/monza_gp.json', geometry);
-  write('tracks/index.json', [{ layoutKey: 'monza_gp', circuitId: 'monza', layoutId: 'gp', lengthM: L, pointsCount: geometry.centerline.length }]);
-  write('tracks-display/monza_gp.json', { layoutKey: 'monza_gp', sourceRevision: geometry.geometryRevision, surfaces: { road: [], kerb: [], runoff: [], pit: [], otherRoad: [] } });
-  write('vehicles/index.json', catalog);
+  // Map surfaces and brake markers are outside geometryRevision, so adding them keeps the synthetic revisions valid.
+  const track: TrackBoundaryGeometry = { ...geometry, surfaces: { road: [], kerb: [], runoff: [], pit: [], otherRoad: [] },
+    brakeMarkers: [{ id: 'brake-150', center: [10, 20], label: '150', stationM: 100, side: 'left' }] };
+  write('tracks/monza_gp.json', track);
+  write('tracks/index.json', [{ layoutKey: 'monza_gp', circuitId: 'monza', layoutId: 'gp', trackVenue: 'Synthetic venue', trackCourse: 'Synthetic layout', hasElevation: true, hasPitLane: false }]);
 
-  const sceneryTexture = store('scenery/textures', 'ktx2', ktx2('scenery texture'));
+  const sceneryTexture = store('scenery/textures', 'ktx2.zst', zstdCompressSync(ktx2('scenery texture')));
   const chunk = (id: string, marker: string, extra: Partial<ChunkRow>): ChunkRow => ({
     id, kind: 'main', ...extra, bounds: { min: [-10, 0, -10], max: [10, 5, 10] }, ...store('scenery', 'glb', glb(marker)),
     triangles: 10, vertices: 30, drawCalls: 2, geometryBytes: 100, meshes: 2, materials: 1, textures: [sceneryTexture.asset],
   });
-  const scenery = {
-    schemaVersion: 2, layoutKey: 'monza_gp', sourceGeometryRevision: geometry.geometryRevision, routeLengthM: L, pitLaneLengthM: 0,
+  const sceneryShared = {
     chunking: { sectorLengthM: 1000, minSectorLengthM: 100, maxSectorTriangles: 400000, horizonDistanceM: 2000, skylineHeightM: 30, skylineMinDistanceM: 500, terrainScaleExtentM: 50, pitBandM: 100 },
     streaming: { residentBehindM: 300, residentAheadM: 1500, freeCameraRadiusM: 1500 },
+  };
+  const scenery = {
+    layoutKey: 'monza_gp', sourceGeometryRevision: geometry.geometryRevision, routeLengthM: L, pitLaneLengthM: 0,
     daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55 },
     horizon: chunk('horizon', 'horizon', { kind: 'horizon' }),
     sectors: [
@@ -62,32 +68,50 @@ export function syntheticPackage() {
     totals: { triangles: 30, vertices: 90, drawCalls: 6, glbBytes: 100, geometryBytes: 300, textureBytes: 20, textureGpuBytes: 340 },
   };
 
-  const carTexture = store('cars/textures', 'ktx2', ktx2('car texture'));
-  const texturePath = carTexture.asset.replace(/^cars\//, '');
+  const carTexture = store('vehicles/textures', 'ktx2.zst', zstdCompressSync(ktx2('car texture')));
+  const texturePath = carTexture.asset.replace(/^vehicles\//, '');
   const descriptor: Record<string, unknown> = {
-    schemaVersion: 1, vehicleFolder: 'Test_Car', aliases: ['TEST_CAR'],
+    vehicleFolder: 'Test_Car', aliases: ['TEST_CAR'],
     wheelPivots: { fl: [0.8, 0.33, -1.4], fr: [-0.8, 0.33, -1.4], rl: [0.8, 0.33, 1.4], rr: [-0.8, 0.33, 1.4] },
     wheelRig: { passed: true, rigs: 4, maxRestVertexErrorM: 0 },
     appearances: [{ alias: 'TEST_CAR', albedo: texturePath, paint: { kind: 'carPaint', maps: {} } }],
     materials: [{ id: 'm1', name: 'body', paint: true }],
-    cameras: [],
+    cameras: { list: [
+      { name: 'COCKPIT', position: [0.3, 0.95, 0.3], orientation: [-0.02, 0, 0], fov: [89, 49], clipPlanes: [0.13, 700], cockpitView: 'in' },
+      { name: 'NOSECAM', position: [0.3, 0.92, -0.96], orientation: [-0.02, 0, 0], fov: [89, 49], clipPlanes: [0.5, 800], cockpitView: 'out' },
+    ] },
   };
+  /** The car body as every record lists it; `vehicleIds` is replaced by each record's own part. */
   const car = {
-    schemaVersion: 1, vehicleFolder: 'Test_Car', vehicleIds: ['TEST_CAR'], descriptor: 'cars/Test_Car.json', descriptorSha256: '',
-    ...store('cars', 'glb', glb('car')), triangles: 100, vertices: 300, textures: [carTexture],
+    folder: 'Test_Car', vehicleIds: ['TEST_CAR'], descriptor: 'vehicles/bodies/Test_Car.json', descriptorSha256: '',
+    ...store('vehicles', 'glb', glb('car')), triangles: 100, vertices: 300, textures: [carTexture],
+  };
+  const vehicles: VehicleSpec[] = [{ id: 'synthetic', vehicleIds: ['TEST_CAR'] }];
+  const record = (spec: VehicleSpec, body: object = { ...car, vehicleIds: spec.vehicleIds }) => ({
+    id: spec.id, model: 'Test Car', carClass: 'Hyper', vehicleIds: spec.vehicleIds, dimensions: { lengthM: 5, widthM: 2 },
+    outlineXZ: [[-1, -2.5], [1, -2.5], [1, 2.5], [-1, 2.5]], replayOriginOffsetXZ: [0, 0], ...spec.extra, bodies: [body],
+  });
+  /** Replaces the vehicle records and makes the descriptor describe the union of their ids, as the body they share does. */
+  const setVehicles = (specs: VehicleSpec[]) => {
+    vehicles.splice(0, vehicles.length, ...specs);
+    const ids = specs.flatMap(spec => spec.vehicleIds);
+    descriptor.aliases = ids;
+    descriptor.appearances = ids.map(alias => ({ alias, albedo: texturePath, paint: { kind: 'carPaint', maps: {} } }));
   };
   const manifest: Record<string, unknown> = {
-    schemaVersion: 3, id: 'synthetic', version: '1',
+    schemaVersion: 4, id: 'synthetic', version: '1',
     tracks: { catalog: 'tracks/index.json' }, vehicles: { catalog: 'vehicles/index.json' },
-    scenery: { catalog: 'scenery/index.json' }, cars: { catalog: 'cars/index.json' },
+    scenery: { catalog: 'scenery/index.json' },
   };
   /** Writes the manifest, catalogs and descriptor as they are now. */
   const commit = () => {
     const descriptorBytes = Buffer.from(JSON.stringify(descriptor));
     car.descriptorSha256 = sha(descriptorBytes);
     write(car.descriptor, descriptorBytes);
-    write('scenery/index.json', [scenery]); write('cars/index.json', [car]); write('manifest.json', manifest);
+    write('scenery/index.json', { ...sceneryShared, layouts: [scenery] });
+    write('vehicles/index.json', { vehicles: vehicles.map(spec => record(spec)) });
+    write('manifest.json', manifest);
   };
   commit();
-  return { dir, write, store, commit, geometry, manifest, scenery, car, descriptor, texturePath, sceneryTexture, carTexture };
+  return { dir, write, store, commit, geometry: track, manifest, scenery, sceneryShared, car, descriptor, texturePath, sceneryTexture, carTexture, vehicles, record, setVehicles };
 }

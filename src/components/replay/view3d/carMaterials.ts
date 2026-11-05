@@ -8,7 +8,7 @@ function adjust(config: CarSurface, key: 'Roughness' | 'Metallic'): number | und
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
-/** The albedo texture path (`textures/<sha256>.ktx2`) a recipe uses for an appearance, or undefined for a constant-colour or untextured material. */
+/** The albedo texture path (`textures/<sha256>.ktx2.zst`) a recipe uses for an appearance, or undefined for a constant-colour or untextured material. */
 export function albedoPath(recipe: CarMaterialRecipe, appearance: CarAppearance): string | undefined {
   return recipe.paint ? appearance.albedo : appearance.materialTextures?.[recipe.name] ?? recipe.surface?.maps.albedo?.texture;
 }
@@ -18,7 +18,7 @@ export function albedoPath(recipe: CarMaterialRecipe, appearance: CarAppearance)
  * The albedo is the appearance's paint texture for paint materials, the livery file of the same-named material when the
  * appearance has one, else the recipe's own map. The game's per-shader lighting (carPaint regions, normal and aoSpec maps) is not
  * reconstructed: each shader kind maps to a standard or physical material with the albedo map.
- * `texture` returns a shared KTX2 texture by its `textures/<sha256>.ktx2` path; each material uses its own clone for its UV channel.
+ * `texture` returns a shared KTX2 texture by its `textures/<sha256>.ktx2.zst` path; each material uses its own clone for its UV channel.
  */
 export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppearance, texture: (path: string) => Texture): MeshStandardMaterial {
   const config = recipe.paint ? appearance.paint : recipe.surface;

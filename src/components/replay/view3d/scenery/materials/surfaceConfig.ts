@@ -12,7 +12,7 @@ export const SURFACE_KINDS = [
 export type SurfaceKind = typeof SURFACE_KINDS[number];
 
 export interface SurfaceMap {
-  /** Texture stem; the image is `<stem>__srgb.ktx2` or `<stem>__linear.ktx2` by `srgb`. */
+  /** Texture stem; the image is `<stem>__srgb.ktx2.zst` or `<stem>__linear.ktx2.zst` by `srgb`. */
   texture: string;
   uv: UvSet;
   scale?: [number, number];
@@ -59,7 +59,7 @@ export function readSurfaceConfig(userData: Record<string, unknown>): SurfaceCon
 /** Colour and numeric data may share a game texture name but need different KTX metadata, so the image name carries the role. */
 export function textureAsset(stem: string, srgb: boolean): string {
   if (!stem || stem.includes('/') || stem.includes(String.fromCharCode(92))) throw Error('Invalid source texture stem');
-  return `${stem}__${srgb ? 'srgb' : 'linear'}.ktx2`;
+  return `${stem}__${srgb ? 'srgb' : 'linear'}.ktx2.zst`;
 }
 
 /** Albedo layers of a terrain material: ALBEDOMAPS 1-4 (shader default 3), or null for a variant not handled. */
