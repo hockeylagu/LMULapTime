@@ -34,7 +34,9 @@ export interface FuelRatioInput {
 
 /**
  * Highest paired clean-lap ratio, then the next available setting. No margin beyond the VE reserve. Before three
- * paired laps the game's estimate leads, but never below a lap already measured (its first estimate runs low).
+ * paired laps the game's estimate leads, but never below a lap already measured (its first estimate runs low). A game
+ * estimate above every setting is its start-of-session figure, not the car (Daytona race 2026-11-05: 4.74 L for 4.52 %,
+ * ratio 1.05 against 0.72 at most, 2.95 L actual): the highest setting then, and no fuel bias from that fuel figure.
  */
 export function planFuelRatio(input: FuelRatioInput): LiveFuelRatio | null {
   const measured = input.ratios.filter(value => Number.isFinite(value) && value > 0);
@@ -44,13 +46,18 @@ export function planFuelRatio(input: FuelRatioInput): LiveFuelRatio | null {
   const required = candidates.length > 0 ? Math.max(...candidates) : null;
   if (required === null || !Number.isFinite(required)) return null;
   const rounded = Math.ceil(required * 100 - 1e-9) / 100;
-  const recommended = [...input.options].filter(value => Number.isFinite(value) && value >= rounded).sort((a, b) => a - b)[0] ?? null;
+  const options = input.options.filter(Number.isFinite).sort((a, b) => a - b);
+  const game = measured.length < 3;
+  const highest = options.at(-1);
+  // Only the game's figure beyond every setting: a measured lap beyond them is a real shortfall, not clamped.
+  const beyondGame = game && highest !== undefined && rounded > highest && measured.every(value => value <= highest);
+  const recommended = beyondGame ? highest : options.find(value => value >= rounded) ?? null;
   const setting = input.mfdSetting ?? input.garageSetting;
-  return { recommended, source: measured.length >= 3 ? 'measured' : 'game', pairedLaps: measured.length,
+  return { recommended, source: game ? 'game' : 'measured', pairedLaps: measured.length,
     garageSetting: input.garageSetting, mfdSetting: input.mfdSetting,
     excessLitres: setting !== null && recommended !== null && input.veTarget !== null
       ? round(Math.max(0, setting - recommended) * input.veTarget, 2) : null,
-    fuelBiasLaps: input.fuelNow !== null && input.veNow !== null && input.fuelPerLap !== null && input.vePerLap !== null && input.fuelPerLap > 0 && input.vePerLap > 0
+    fuelBiasLaps: !beyondGame && input.fuelNow !== null && input.veNow !== null && input.fuelPerLap !== null && input.vePerLap !== null && input.fuelPerLap > 0 && input.vePerLap > 0
       ? round(input.fuelNow / input.fuelPerLap - input.veNow / input.vePerLap, 1) : null };
 }
 

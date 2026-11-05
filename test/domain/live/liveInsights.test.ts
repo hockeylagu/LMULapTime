@@ -27,6 +27,13 @@ describe('fuel ratio', () => {
     expect(planFuelRatio({ ...input, options: [] })?.recommended).toBeNull();
     expect(planFuelRatio({ ...input, ratios: [2, 2, 2] })?.recommended).toBeNull();
     expect(planFuelRatio({ ...input, fuelPerLap: null, ratios: [] })).toBeNull();
+    expect(planFuelRatio({ ...input, ratios: [0.9] })?.recommended).toBeNull();
+  });
+  it('takes the highest setting, with no fuel bias, for a game start-of-session estimate beyond every setting', () => {
+    // Daytona race garage 2026-11-05: the game's 4.737 L for 4.516 % (ratio 1.05), settings to 0.72; 2.95 L actual.
+    const options = Array.from({ length: 68 }, (_, index) => (index + 5) / 100);
+    expect(planFuelRatio({ ...input, ratios: [], fuelPerLap: 4.737, vePerLap: 4.516, options, garageSetting: 0.72, fuelNow: 72, veNow: 100 }))
+      .toMatchObject({ recommended: 0.72, source: 'game', fuelBiasLaps: null, excessLitres: 0 });
   });
   it('warns when physical fuel expires before virtual energy', () => {
     expect(planFuelRatio({ ...input, fuelNow: 10 })?.fuelBiasLaps).toBeLessThan(0);
