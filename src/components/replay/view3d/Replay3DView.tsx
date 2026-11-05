@@ -55,7 +55,7 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
     else setInternalExpanded(next);
   };
   const host = useRef<HTMLDivElement>(null);
-  const [mode, setMode] = useState<CameraMode>('follow'), [retry, setRetry] = useState(0);
+  const [mode, setMode] = useState<CameraMode>('chase'), [retry, setRetry] = useState(0);
   const [internalFadedLine, setInternalFadedLine] = useState<'none' | 'primary' | 'baseline'>('none');
   const [isTraceHidden, toggleTrace] = useStoredToggle('lmu-map-trace-collapsed-v1', false);
   const activeFadedLine = fadedLine ?? internalFadedLine;

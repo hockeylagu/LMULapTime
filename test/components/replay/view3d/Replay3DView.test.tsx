@@ -110,14 +110,14 @@ it('binds camera zoom, pan, reset, center and follow, keeping chart arrow/zoom k
   expect(onSelectIndex).not.toHaveBeenCalled(); expect(scene.zoom).not.toHaveBeenCalled();
 });
 
-it('defaults to Follow, keeps it through zoom and center, and hands a pan over to Orbit so the car never drifts off-centre', async () => {
+it('defaults to Chase, keeps it through zoom and center, and hands a pan over to Orbit so the car never drifts off-centre', async () => {
   const {map} = await setup();
-  expect(screen.getByRole('button', {name: '3D camera'})).toHaveTextContent('Follow');
-  expect(scene.mode).toHaveBeenLastCalledWith('follow'); scene.mode.mockClear();
+  expect(screen.getByRole('button', {name: '3D camera'})).toHaveTextContent('Chase');
+  expect(scene.mode).toHaveBeenLastCalledWith('chase'); scene.mode.mockClear();
   for (const key of ['+', '-', 'c']) fireEvent.keyDown(map, {key});
   expect(scene.zoom).toHaveBeenCalledTimes(2); expect(scene.center).toHaveBeenCalledOnce();
   expect(scene.mode).not.toHaveBeenCalled();
-  expect(screen.getByRole('button', {name: '3D camera'})).toHaveTextContent('Follow');
+  expect(screen.getByRole('button', {name: '3D camera'})).toHaveTextContent('Chase');
   for (const key of ['w', 'a']) fireEvent.keyDown(map, {key});
   expect(scene.pan).toHaveBeenCalledTimes(2); expect(scene.mode).toHaveBeenLastCalledWith('orbit');
   expect(screen.getByRole('button', {name: '3D camera'})).toHaveTextContent('Orbit');
