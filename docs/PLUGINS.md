@@ -200,8 +200,8 @@ rigs and rest-vertex error below 1e-5, there is one appearance per alias, every 
 `/cars/files/` serves the car GLB, descriptor and textures. The viewer selects the
 lap's appearance by `vehicleIdentity.vehicleId`, creates one material per native material from the descriptor and animates the four
 wheel rigs (`wheel_`, `steer_` and `spin_` nodes at the rolling hub) and the `steering_wheel` node about its `extras.steeringWheelPivot` and
-`extras.steeringWheelAxis`, by the recorded steering times the wheel range. The Cockpit and Hood views sit on the descriptor's
-`COCKPIT` and `NOSECAM` cameras (position, pitch, vertical FOV, near clip) and show the cockpit mesh variant the camera names. A lap without a vehicle id, or a vehicle without a car, is an
+`extras.steeringWheelAxis`, by the recorded steering times the wheel range. The Cockpit, Hood and Roof views sit on the descriptor's
+`COCKPIT`, `NOSECAM` and `ONBOARD00` cameras (Hood and Roof fall back to `COCKPIT` when a car lacks one; position, pitch, vertical FOV, near clip) and show the cockpit mesh variant the camera names. A lap without a vehicle id, or a vehicle without a car, is an
 error shown with the 2D map as the alternative; there is no estimated car.
 
 Textures are KTX2 with raw GPU block data (no Basis transcoder). Scenery and cars are Meshopt-compressed GLBs decoded by three.js.

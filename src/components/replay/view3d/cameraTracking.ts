@@ -1,4 +1,4 @@
-import { Quaternion, Vector3, type OrthographicCamera, type PerspectiveCamera } from 'three';
+import { Vector3, type OrthographicCamera, type PerspectiveCamera } from 'three';
 import type { ReplayTrajectoryPoint } from '../../../../shared/types/replay.js';
 import { isContinuousPose } from './replayPose.js';
 
@@ -147,45 +147,4 @@ export function createChaseCameraTracker(): ChaseCameraTracker {
       previousAnchor.copy(anchor); previousYaw = targetYaw; previousTime = timeSec;
     },
   };
-}
-
-export interface CockpitPose {
-  eye: Vector3;
-  target: Vector3;
-  up: Vector3;
-}
-
-/**
- * Driver eye position and look-ahead focus target in scene coordinates.
- * Local offsets use native vehicle space (metres: +X left, +Y up, -Z forward),
- * with the driver seated on the left and looking forward down the track.
- * Include the displayed envelope's ground-fit height so the eye stays inside the car.
- */
-export function computeCockpitPose(
-  carPosition: Vector3,
-  orientation?: Quaternion,
-  bodyYaw?: number,
-  modelOffset: Readonly<{x: number; y: number; z: number}> = {x: 0, y: 0, z: 0},
-): CockpitPose {
-  const localEye = new Vector3(modelOffset.x + 0.28, modelOffset.y + 1.00, modelOffset.z - 0.70);
-  const localTarget = new Vector3(modelOffset.x + 0.28, modelOffset.y + 0.90, modelOffset.z - 40.70);
-  const localUp = new Vector3(0, 1, 0);
-
-  if (orientation) {
-    localEye.applyQuaternion(orientation);
-    localTarget.applyQuaternion(orientation);
-    localUp.applyQuaternion(orientation);
-  } else {
-    const yaw = Number.isFinite(bodyYaw) ? bodyYaw! : 0;
-    localEye.applyAxisAngle(UP, yaw);
-    localTarget.applyAxisAngle(UP, yaw);
-    localUp.applyAxisAngle(UP, yaw);
-  }
-
-  // Convert native rotated offsets to scene coordinates by mirroring Z
-  const eye = new Vector3(carPosition.x + localEye.x, carPosition.y + localEye.y, carPosition.z - localEye.z);
-  const target = new Vector3(carPosition.x + localTarget.x, carPosition.y + localTarget.y, carPosition.z - localTarget.z);
-  const up = new Vector3(localUp.x, localUp.y, -localUp.z);
-
-  return { eye, target, up };
 }

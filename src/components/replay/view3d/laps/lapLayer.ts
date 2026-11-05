@@ -85,6 +85,8 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     const root = new Group(); root.add(primary, ghost, primaryLine); if (baselineLine) root.add(baselineLine);
     return {
       root, trajectory, baseline, primary, ghost, primaryWheels, ghostWheels,
+      /** The primary car's game cameras (cockpit, hood and roof views). */
+      cameras: assets.primary.descriptor.cameras.list,
       primaryDistances: getTrajectoryDistances(trajectory.points, trajectory.trackLengthM),
       baselineDistances: baseline ? getDistancesInReferenceFrame(baseline.points, trajectory.points, trajectory.trackLengthM) : [],
       colorLines(next: MapColorMode) {

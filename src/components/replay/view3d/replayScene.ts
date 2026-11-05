@@ -11,7 +11,8 @@ import { createLapLayerLoader, type LapCars, type LapLayer } from './laps/lapLay
 import { disposeObjects } from './laps/disposeObjects.js';
 import { MIN_CAMERA_DISTANCE, MAX_CAMERA_DISTANCE, panCamera, zoomCamera } from './cameraNavigation.js';
 import type { CameraMode } from './cameraModes.js';
-import { computeCockpitPose, createChaseCameraTracker, trackCamera } from './cameraTracking.js';
+import { createChaseCameraTracker, trackCamera } from './cameraTracking.js';
+import { driverCamera, driverPose, isDriverCamera, type DriverPose } from './driverCameras.js';
 import { addSceneEnvironment } from './sceneEnvironment.js';
 import { setCockpitView } from './sceneObjects.js';
 import { CachedKtx2Loader } from './scenery/cachedKtx2Loader.js';
@@ -27,6 +28,7 @@ import { isFreeCameraMode, stationAt, viewMoved } from './scenery/streamView.js'
 const DEFAULT_CHASE_DISTANCE_M = 7.8;
 const DEFAULT_CHASE_HEIGHT_M = 2.2;
 const CHASE_LOOK_ELEVATION_M = 0.5;
+const DEFAULT_FOV_DEG = 48, DEFAULT_NEAR_M = 0.5;
 
 export interface ReplaySceneHandle {
   wheelMotion: string;
@@ -147,7 +149,7 @@ export async function createReplayScene(
   };
   freezeScenery();
   world.add(layer.root);
-  const perspective = new PerspectiveCamera(48, 1, 0.5, 15000);
+  const perspective = new PerspectiveCamera(DEFAULT_FOV_DEG, 1, DEFAULT_NEAR_M, 15000);
   warmTarget = {scene, camera: perspective};
   environment.setCamera(perspective);
   // The first view's chunks loaded before the camera existed: compile and upload them (and the cars) behind the loading screen.
@@ -158,11 +160,21 @@ export async function createReplayScene(
   controls.enableDamping = false; controls.enablePan = false; controls.maxPolarAngle = Math.PI * 0.49; controls.minDistance = MIN_CAMERA_DISTANCE; controls.maxDistance = MAX_CAMERA_DISTANCE;
   // Replay owns Left/Right; WASD camera pan is dispatched through the shared shortcut guard.
   let frame = 0, initialized = false, currentYaw = 0, currentTime = 0;
-  const syncCockpitVisibility = () => {
-    setCockpitView(layer.primary, mode === 'cockpit' ? 'in' : 'out');
+  /** Car-mounted views use the game camera's cockpit mesh variant, vertical FOV and near plane (the dash sits closer than 0.5 m). */
+  const syncDriverCamera = () => {
+    const game = isDriverCamera(mode) ? driverCamera(layer.cameras, mode) : null;
+    setCockpitView(layer.primary, game?.cockpitView ?? 'out');
+    const fov = game?.fov[1] ?? DEFAULT_FOV_DEG, near = game?.clipPlanes[0] ?? DEFAULT_NEAR_M;
+    if (perspective.fov !== fov || perspective.near !== near) { perspective.fov = fov; perspective.near = near; perspective.updateProjectionMatrix(); }
   };
-  syncCockpitVisibility();
-  let currentOrientation: Quaternion | undefined;
+  syncDriverCamera();
+  const driver: DriverPose = {eye: new Vector3(), target: new Vector3(), up: new Vector3()};
+  /** Puts the camera on the posed primary car's game camera. */
+  const placeDriverCamera = () => {
+    if (!isDriverCamera(mode)) return;
+    const {eye, target: focus, up} = driverPose(layer.primary.getObjectByName('body-envelope')!, driverCamera(layer.cameras, mode), driver);
+    camera.position.copy(eye); camera.up.copy(up); controls.target.copy(focus); camera.lookAt(focus);
+  };
   const target = new Vector3(), previousTarget = new Vector3();
   const chaseTracker = createChaseCameraTracker();
   let trackside = createTracksideCameras(trajectory.points, layer.primaryDistances, origin);
@@ -179,7 +191,7 @@ export async function createReplayScene(
     if (disposed) return;
     updateStream();
     desiredEye.copy(camera.position);
-    if (camera === perspective && mode !== 'cockpit') collision.resolve(desiredEye, controls.target, origin, correctedEye);
+    if (camera === perspective && !isDriverCamera(mode)) collision.resolve(desiredEye, controls.target, origin, correctedEye);
     else correctedEye.copy(desiredEye);
     const corrected = !correctedEye.equals(desiredEye);
     if (corrected) {
@@ -214,16 +226,7 @@ export async function createReplayScene(
     if (initialized) draw(); else invalidate();
   };
   const positionCamera = () => {
-    if (mode === 'cockpit') {
-      const modelOffset = layer.primary.getObjectByName('body-envelope')!.position;
-      const { eye, target: focusTarget, up } = computeCockpitPose(target, currentOrientation, currentYaw, modelOffset);
-      camera.position.copy(eye);
-      camera.up.copy(up);
-      controls.target.copy(focusTarget);
-      camera.lookAt(focusTarget);
-      invalidate();
-      return;
-    }
+    if (isDriverCamera(mode)) { placeDriverCamera(); invalidate(); return; }
     controls.target.copy(target); camera.position.copy(target).add(new Vector3(24, mode === 'top' ? 180 : 22, 35));
     if (mode === 'top') camera.position.copy(target).add(new Vector3(0, 180, 0.01));
     if (mode === 'chase') {
@@ -239,7 +242,7 @@ export async function createReplayScene(
   };
   const reset = () => {
     camera.zoom = 1; camera.updateProjectionMatrix();
-    if (mode !== 'cockpit') camera.up.set(0, 1, 0);
+    if (!isDriverCamera(mode)) camera.up.set(0, 1, 0);
     positionCamera();
   };
   const contextLost = (event: Event) => { event.preventDefault(); onFailure('The 3D graphics context was lost. Retry or return to 2D.'); };
@@ -261,7 +264,7 @@ export async function createReplayScene(
       if (disposed || signal?.aborted || request !== lapRequest) { replacement.dispose(); return false; }
       replacement.colorLines(lineMode); replacement.fadeLines(primaryOpacity, baselineOpacity);
       layer.dispose(); layer = replacement; world.add(layer.root);
-      syncCockpitVisibility();
+      syncDriverCamera();
       trackside = createTracksideCameras(next.points, layer.primaryDistances, origin);
       return true;
     },
@@ -274,7 +277,6 @@ export async function createReplayScene(
       if (pose.orientation) primary.quaternion.copy(pose.orientation); else primary.quaternion.identity();
       primaryWheels.update(pose);
       currentYaw = pose.yaw ?? 0;
-      currentOrientation = pose.orientation;
       const sample = trajectory.points[pose.index], nextSample = trajectory.points[pose.index + 1];
       currentTime = (sample.timeSec ?? pose.index / 40) + ((nextSample?.timeSec ?? sample.timeSec ?? 0) - (sample.timeSec ?? 0)) * pose.fraction;
       primary.getObjectByName('body-envelope')!.visible = pose.yaw !== undefined;
@@ -305,37 +307,31 @@ export async function createReplayScene(
         const continuous = initialized && target.distanceTo(previousTarget) <= 15;
         chaseTracker.track(camera, controls.target, target, currentYaw, trajectory.points, index, fraction, continuous);
         controls.update();
-      } else if (mode === 'cockpit') {
-        const modelOffset = primary.getObjectByName('body-envelope')!.position;
-        const { eye, target: focusTarget, up } = computeCockpitPose(target, pose.orientation, currentYaw, modelOffset);
-        camera.position.copy(eye);
-        camera.up.copy(up);
-        controls.target.copy(focusTarget);
-        camera.lookAt(focusTarget);
-      }
+      } else if (isDriverCamera(mode)) placeDriverCamera();
       invalidate();
     },
     mode(next) {
       if (next === mode) return;
-      const wasTop = mode === 'top', wasCockpit = mode === 'cockpit'; mode = next;
+      const wasTop = mode === 'top', wasDriver = isDriverCamera(mode); mode = next;
+      const driverView = isDriverCamera(mode);
       camera = mode === 'top' ? overhead : perspective; controls.object = camera; environment.setCamera(camera);
-      controls.enabled = mode !== 'cockpit';
-      if (wasCockpit && mode !== 'cockpit') camera.up.set(0, 1, 0);
-      syncCockpitVisibility();
+      controls.enabled = !driverView;
+      if (wasDriver && !driverView) camera.up.set(0, 1, 0);
+      syncDriverCamera();
 
-      // Follow, chase, cockpit and trackside stay locked on the car; panning belongs to orbit and overhead.
+      // Follow, chase, the car-mounted game cameras and trackside stay locked on the car; panning belongs to orbit and overhead.
       controls.enablePan = mode === 'orbit' || mode === 'top';
-      controls.enableRotate = mode !== 'top' && mode !== 'trackside' && mode !== 'cockpit';
-      if (mode === 'top' || wasTop || mode === 'chase' || mode === 'cockpit' || wasCockpit) reset();
+      controls.enableRotate = mode !== 'top' && mode !== 'trackside' && !driverView;
+      if (mode === 'top' || wasTop || mode === 'chase' || driverView || wasDriver) reset();
       else if (mode === 'follow') {
         camera.position.add(new Vector3().subVectors(target, controls.target)); controls.target.copy(target);
       }
-      if (mode !== 'cockpit') controls.update();
+      if (!driverView) controls.update();
       invalidate();
     },
     reset,
     center() {
-      if (mode === 'cockpit') { reset(); return; }
+      if (isDriverCamera(mode)) { reset(); return; }
       camera.position.add(new Vector3().subVectors(target, controls.target));
       controls.target.copy(target);
       if (mode === 'chase') {
@@ -345,7 +341,7 @@ export async function createReplayScene(
       controls.update(); invalidate();
     },
     zoom(direction) {
-      if (mode === 'cockpit' && camera instanceof PerspectiveCamera) {
+      if (isDriverCamera(mode) && camera instanceof PerspectiveCamera) {
         const factor = Math.pow(1.2, direction);
         camera.zoom = Math.max(0.6, Math.min(2.5, camera.zoom * factor));
         camera.updateProjectionMatrix();

@@ -318,7 +318,8 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   `sceneEnvironment.ts` owns the Three.js daylight sky, its shared PMREM reflection environment,
   fog, flat horizon ground and car-following shadow sun. Cars come from the `cars` catalog: `carMaterials.ts` builds materials from the
   descriptor, `wheelGeometry.ts` reads the four wheel rigs, `wheelAnimation.ts` fits the model origin to the lap median and drives
-  roll/steer/travel per corner, and `sceneObjects.ts` places the car and styles ghosts. Brake boards are part of the scenery GLBs.
+  roll/steer/travel per corner plus the steering wheel, `driverCameras.ts` places the Cockpit/Hood/Roof views on the descriptor's game
+  cameras, and `sceneObjects.ts` places the car, switches the cockpit mesh variant and styles ghosts. Brake boards are part of the scenery GLBs.
   `racingLine.ts` drapes the 2D-coloured line ribbons and re-drapes them as chunks stream in; `tracksideCameras.ts` places the fixed trackside spots.
   `cameraNavigation.ts` owns projection-aware keyboard pan/zoom. The 3D view shares
   `useGpsMapShortcuts.ts` with 2D; OrbitControls handles pointer input without consuming replay arrows.

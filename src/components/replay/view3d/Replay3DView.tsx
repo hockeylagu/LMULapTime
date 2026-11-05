@@ -21,7 +21,7 @@ import {
 } from '../map/replayMapUtils.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 import { useReplayScene } from './laps/useReplayScene.js';
-import { CameraModeControl, useCameraModeShortcuts, type CameraMode } from './cameraModes.js';
+import { CameraModeControl, carLockedCamera, followsCar, useCameraModeShortcuts, type CameraMode } from './cameraModes.js';
 import { useGpsMapShortcuts } from '../map/useGpsMapShortcuts.js';
 import { ReplayShortcutHelp } from '../ReplayShortcutHelp.js';
 
@@ -87,10 +87,9 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
   useCameraModeShortcuts(map, setMode);
   useGpsMapShortcuts({isExpanded, containerRef: map, points: trajectory.points, currentIndex, onSelectIndex,
     onZoomIn: () => scene.current?.zoom(1), onZoomOut: () => scene.current?.zoom(-1), onResetZoom: () => scene.current?.reset(),
-    // Follow, chase, cockpit and trackside stay locked on the car, so a keyboard pan hands the camera over to free orbit.
-    onPan: (horizontal, vertical) => { if (mode === 'follow' || mode === 'chase' || mode === 'trackside' || mode === 'cockpit') setMode('orbit'); scene.current?.pan(horizontal, vertical); },
+    onPan: (horizontal, vertical) => { if (carLockedCamera(mode)) setMode('orbit'); scene.current?.pan(horizontal, vertical); },
     onCenter: () => scene.current?.center(),
-    onToggleFollow: () => setMode(value => value === 'follow' || value === 'chase' || value === 'cockpit' ? 'orbit' : 'follow'),
+    onToggleFollow: () => setMode(value => followsCar(value) ? 'orbit' : 'follow'),
     onToggleTrace: toggleTrace, onTogglePlay, onToggleExpanded: () => handleToggleExpanded()});
   useEffect(() => { map.current?.focus({preventScroll: true}); }, []);
   // What drives the car and wheels, for the curious: hover the toolbar rather than read it under every frame.
@@ -114,7 +113,7 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
         <GpsCircuitMinimap trackBoundaryPathD={trackBoundaryPathD} layoutPathD={trackBoundaryPathD} currentPos={currentPos} baselineGhostPos={baselineGhostPos} isExpanded={isExpanded}
           className="rounded-xl border border-lmu-border bg-lmu-strip/70 p-2" />
         <MapControlsOverlay onZoomIn={() => scene.current?.zoom(1)} onZoomOut={() => scene.current?.zoom(-1)} onReset={() => scene.current?.reset()}
-          followCar={mode === 'follow' || mode === 'chase' || mode === 'cockpit'} onToggleFollowCar={() => setMode(value => (value === 'follow' || value === 'chase' || value === 'cockpit' ? 'orbit' : 'follow'))}
+          followCar={followsCar(mode)} onToggleFollowCar={() => setMode(value => (followsCar(value) ? 'orbit' : 'follow'))}
           onCenterCar={() => scene.current?.center()} isPlaying={isPlaying} onTogglePlay={onTogglePlay}
           orientation={isExpanded ? 'horizontal' : 'vertical'} className="top-2 right-3 bottom-auto">
           <CameraModeControl mode={mode} onChange={setMode} />

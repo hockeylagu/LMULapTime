@@ -83,7 +83,12 @@ const layout = {
 } as unknown as SceneryLayoutResource;
 const car = {
   resource: {}, bytes: new ArrayBuffer(0), vehicleId: 'veh',
-  descriptor: {appearances: [{alias: 'VEH', albedo: 'textures/a.ktx2', paint: {kind: 'carPaint', maps: {}}}], materials: [{id: 'm1', name: 'body', paint: true}]},
+  descriptor: {appearances: [{alias: 'VEH', albedo: 'textures/a.ktx2', paint: {kind: 'carPaint', maps: {}}}], materials: [{id: 'm1', name: 'body', paint: true}],
+    cameras: {list: [
+      {name: 'COCKPIT', position: [0.28, 1, -0.7], orientation: [-0.1, 0, 0], fov: [89, 49], clipPlanes: [0.13, 700], cockpitView: 'in'},
+      {name: 'NOSECAM', position: [0.28, 0.9, -1.9], orientation: [0, 0, 0], fov: [80, 45], clipPlanes: [0.2, 800], cockpitView: 'out'},
+      {name: 'ONBOARD00', position: [0.28, 1.5, -0.6], orientation: [-0.1, 0, 0], fov: [60, 45], clipPlanes: [0.02, 550], cockpitView: 'out'},
+    ]}},
 } as unknown as LoadedCar;
 const assets = {primary: car, baseline: null}, withGhost = {primary: car, baseline: car};
 let frames: FrameRequestCallback[];
@@ -221,7 +226,7 @@ it('rejects layout, geometry and package mismatches, and discards cancelled or s
   expect(await late).toBe(false); expect(host.childNodes).toHaveLength(0);
 });
 
-it('shows the driver-camera cockpit mesh in cockpit mode, locks the eye to the driver seat and zooms via projection matrix', async () => {
+it('puts the cockpit, hood and roof views on the game cameras of the car with their cockpit mesh, and zooms via projection matrix', async () => {
   const host = document.createElement('div');
   const handle = await createReplayScene(host, layout, lap, null, vi.fn(), assets);
   handle.cursor(0, 0); draw();
@@ -234,7 +239,8 @@ it('shows the driver-camera cockpit mesh in cockpit mode, locks the eye to the d
   // Switching modes must already be correct while paused, before another cursor update.
   expect(camera.position.x).toBeCloseTo(0.28, 2);
   expect(camera.position.y).toBeCloseTo(0.3 + modelOffset.y + 1.00, 2);
-  expect(camera.getWorldDirection(new Vector3()).y).toBeCloseTo(-0.10 / 40, 4);
+  expect(camera.getWorldDirection(new Vector3()).y).toBeCloseTo(Math.sin(-0.1), 4);
+  expect([(camera as PerspectiveCamera).fov, camera.near]).toEqual([49, 0.13]);
   handle.cursor(1, 0); draw();
   expect(cockpit.visible).toBe(true);
 
@@ -248,12 +254,26 @@ it('shows the driver-camera cockpit mesh in cockpit mode, locks the eye to the d
   expect(camera.zoom).toBeGreaterThan(1);
   expect(camera.position).toEqual(eye);
 
-  // Exiting cockpit mode restores the exterior mesh and Y-up vector
+  // The hood camera sits on the bonnet with the exterior cockpit, ahead of the driver's eye.
+  handle.mode('hood'); draw();
+  expect(cockpit.visible).toBe(false);
+  expect(camera.position.y).toBeCloseTo(0.3 + modelOffset.y + 0.9, 2);
+  expect(camera.position.distanceTo(eye)).toBeCloseTo(Math.hypot(0.1, 1.2), 2);
+  expect([(camera as PerspectiveCamera).fov, camera.near]).toEqual([45, 0.2]);
+
+  // The roof camera sits above the roll hoop with the exterior cockpit.
+  handle.mode('roof'); draw();
+  expect(cockpit.visible).toBe(false);
+  expect(camera.position.y).toBeCloseTo(0.3 + modelOffset.y + 1.5, 2);
+  expect([(camera as PerspectiveCamera).fov, camera.near]).toEqual([45, 0.02]);
+
+  // Exiting the car-mounted views restores the exterior mesh, Y-up vector and the default lens
   handle.mode('follow');
   expect(cockpit.visible).toBe(false);
   expect(camera.up.y).toBe(1);
   expect(camera.zoom).toBe(1);
   expect(camera.position.distanceTo(eye)).toBeGreaterThan(10);
+  expect([(camera as PerspectiveCamera).fov, camera.near]).toEqual([48, 0.5]);
   handle.dispose();
 });
 

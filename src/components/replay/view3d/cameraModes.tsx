@@ -3,13 +3,20 @@ import { Camera } from 'lucide-react';
 import { replayShortcutBlocked } from '../../../utils/replayShortcuts.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 import { DROPDOWN_CONTENT_INSET, DROPDOWN_PANEL } from '../../common/dropdown/dropdownStyles.js';
+import { isDriverCamera } from './driverCameras.js';
 
-export type CameraMode = 'follow' | 'chase' | 'cockpit' | 'orbit' | 'trackside' | 'top';
+export type CameraMode = 'follow' | 'chase' | 'cockpit' | 'hood' | 'roof' | 'orbit' | 'trackside' | 'top';
 export const CAMERA_MODES: ReadonlyArray<{value: CameraMode; label: string; shortcut: string}> = [
   {value: 'follow', label: 'Follow', shortcut: '1'}, {value: 'chase', label: 'Chase', shortcut: '2'},
-  {value: 'cockpit', label: 'Cockpit', shortcut: '3'}, {value: 'orbit', label: 'Orbit', shortcut: '4'},
-  {value: 'trackside', label: 'Trackside', shortcut: '5'}, {value: 'top', label: 'Overhead', shortcut: '6'},
+  {value: 'cockpit', label: 'Cockpit', shortcut: '3'}, {value: 'hood', label: 'Hood', shortcut: '4'},
+  {value: 'roof', label: 'Roof', shortcut: '5'}, {value: 'orbit', label: 'Orbit', shortcut: '6'},
+  {value: 'trackside', label: 'Trackside', shortcut: '7'}, {value: 'top', label: 'Overhead', shortcut: '8'},
 ];
+
+/** Cameras that move with the car (the follow toggle turns them off). */
+export const followsCar = (mode: CameraMode): boolean => mode === 'follow' || mode === 'chase' || isDriverCamera(mode);
+/** Cameras locked on the car: a keyboard pan hands them over to free orbit. */
+export const carLockedCamera = (mode: CameraMode): boolean => followsCar(mode) || mode === 'trackside';
 
 /** Mode keys belong to the active 3D map, with the same typing/dialog guards as replay keys. */
 export function useCameraModeShortcuts(map: React.RefObject<HTMLElement | null>, onMode: (mode: CameraMode) => void): void {
