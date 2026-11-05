@@ -243,7 +243,7 @@ Each completed or attempted lap by a driver is recorded as a `<Lap>` element wit
 | `@_fuelUsed` | Float | Liters / kg | Quantity of fuel consumed during this lap. |
 | `@_ve` | Float | `0.000`–`1.000` | Virtual Energy (VE) stint budget fraction remaining (BoP rule). |
 | `@_veUsed` | Float | MegaJoules / % | Virtual Energy consumed during this lap. |
-| `@_pit` | Integer | `0` or `1` | In-lap pit flag: `1` indicates the vehicle entered the pit lane. |
+| `@_pit` | Integer | `0` or `1` | In-lap pit flag: `1` indicates the vehicle entered the pit lane. A timeless lap 1 with `1` is a pit lane start, unless the driver's `<Pitstops>` exceeds the pit flags on later laps: then it is a real stop on lap 1 (parser 2.26; Le Mans 2026-11-05 repair stop, 27 of 112 such drivers in the stored races). |
 | `@_et` | Float | Seconds | Session elapsed time when the lap **starts**, i.e. the previous lap's timing-line crossing (`"--.---"` if incomplete). Every car's lap 1 shares the race start time; lap $n+1$'s `et` ≈ lap $n$'s `et` + lap time, except around a pit stop. The parser compares all cars' crossings to find gaps on the road and overtakes (`shared/domain/raceTraffic.ts`). |
 
 ---

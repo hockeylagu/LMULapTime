@@ -334,6 +334,45 @@ describe('parser server module - stream events and timing timestamps', () => {
       expect(laps[1].isOutLap).toBeUndefined();
     });
 
+    // Le Mans 2026-11-05 race 1: pit lane start, wall hit on lap 1 and a repair stop that ended it.
+    const pitLaneStart = (pitstops: number) => `<?xml version="1.0" encoding="utf-8"?>
+<rFactorXML version="1.0">
+  <RaceResults>
+    <Setting>Race</Setting>
+    <TrackVenue>Circuit de la Sarthe</TrackVenue>
+    <TrackLength>13626.0</TrackLength>
+    <TimeString>2026/11/05 15:24</TimeString>
+    <Driver>
+      <Name>Pit Lane Starter</Name>
+      <CarType>Oreca 07</CarType>
+      <CarClass>LMP2_ELMS</CarClass>
+      <isPlayer>1</isPlayer>
+      <Position>22</Position>
+      <Pitstops>${pitstops}</Pitstops>
+      <Lap num="1" p="47" et="263.000" pit="1">--.----</Lap>
+      <Lap num="2" p="40" et="591.878" s1="33.512" s2="128.020" s3="105.350">266.882</Lap>
+      <Lap num="3" p="38" et="858.760" s1="32.990" s2="82.410" s3="97.546">212.946</Lap>
+    </Driver>
+  </RaceResults>
+</rFactorXML>`;
+
+    it('counts a timeless lap 1 pit as a stop when the declared stops need it', () => {
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(pitLaneStart(1));
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
+      const laps = parser.parseSessionXml('lap1_stop.xml')!.drivers[0].laps;
+      expect(laps[0]).toMatchObject({ isPitStop: true, isInferred: true });
+      expect(laps[1].isOutLap).toBe(true);
+      expect(laps[2].isOutLap).toBeUndefined();
+    });
+
+    it('keeps a timeless lap 1 pit as a pit lane start when no stop is declared for it', () => {
+      vi.spyOn(fs, 'readFileSync').mockReturnValue(pitLaneStart(0));
+      vi.spyOn(fs, 'statSync').mockReturnValue({ mtime: new Date() } as unknown as fs.Stats);
+      const laps = parser.parseSessionXml('pit_lane_start.xml')!.drivers[0].laps;
+      expect(laps[0].isPitStop).toBe(false);
+      expect(laps[1].isOutLap).toBeUndefined();
+    });
+
     it('does not mark lap 2 as an out-lap in Qualifying when lap 1 is start lap, and treats lap 2 as valid', () => {
       const xmlQualiStart = `<?xml version="1.0" encoding="utf-8"?>
 <rFactorXML version="1.0">

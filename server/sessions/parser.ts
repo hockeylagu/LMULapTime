@@ -483,6 +483,11 @@ export class LmuParser {
     const rawLaps = d.Lap || [];
     const lapsList = Array.isArray(rawLaps) ? rawLaps : [rawLaps];
     const laps: LapData[] = lapsList.map((l: RawLapXmlNode, idx: number) => this.parseLap(l, idx + 1));
+    // A timeless lap 1 flagged as a pit is a pit lane start, unless the declared stops count it: then a real stop on
+    // lap 1 (Le Mans 2026-11-05: wall hit, repair stop, Pitstops 1 and no later pit lap; 27 of 112 such drivers).
+    const declaredStops = parseInt(String(d.Pitstops ?? d.PitStops ?? d.NumPitstops ?? ''), 10);
+    const firstFlag = lapsList[0] ? String(lapsList[0]['@_pit']) === '1' || lapsList[0]['@_pit'] === 1 : false;
+    if (laps[0]?.lapNumber === 1 && !laps[0].isPitStop && firstFlag && declaredStops > laps.filter(l => l.isPitStop).length) laps[0].isPitStop = true;
 
     // Best Laps & Sectors - Strictly calculated from valid completed laps (before any inference)
     const validLaps = laps.filter(l => l.isValid && l.lapTime !== null && l.lapTime > 0);
@@ -552,9 +557,8 @@ export class LmuParser {
     const rawFinishTime = parseFloat(String(d.FinishTime ?? ''));
     const finishTime = Number.isFinite(rawFinishTime) && rawFinishTime > 0 ? rawFinishTime : null;
 
-    const rawPitstops = parseInt(String(d.Pitstops ?? d.PitStops ?? d.NumPitstops ?? ''), 10);
-    const declaredPitStopsCount = !isNaN(rawPitstops) && rawPitstops >= 0
-      ? rawPitstops
+    const declaredPitStopsCount = !isNaN(declaredStops) && declaredStops >= 0
+      ? declaredStops
       : laps.filter(l => l.isPitStop).length;
 
     // Laps Led (Laps in P1) and Peak/Lowest positions reached
