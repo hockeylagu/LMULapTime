@@ -1,8 +1,44 @@
-import { RepeatWrapping, SRGBColorSpace, NoColorSpace, type CompressedTexture, type Texture, type WebGLRenderer } from 'three';
+import { RepeatWrapping, SRGBColorSpace, NoColorSpace, TextureSource, type CompressedTexture, type Texture, type WebGLRenderer } from 'three';
 import type { CachedKtx2Loader } from '../cachedKtx2Loader.js';
 import { textureAsset, type SurfaceMap } from './surfaceConfig.js';
 
 const MAX_ANISOTROPY = 8;
+/**
+ * Low mips first: a scenery texture first uploads without its two largest levels (1/16 of the bytes), so a chunk joins the
+ * scene sooner; `sharpenTexture` later uploads the full chain the file already holds. Small textures load whole.
+ */
+const BLURRY_LEVELS_DROPPED = 2, BLURRY_MIN_PX = 512;
+type MipLevels = CompressedTexture['mipmaps'];
+/** The full chain of a texture still showing its reduced levels. */
+const fullLevels = new WeakMap<Texture, {source: CompressedTexture['source']; mipmaps: MipLevels}>();
+
+/** Starts a scenery texture on its reduced levels and remembers the full chain. */
+function startBlurry(texture: CompressedTexture): void {
+  const levels = texture.mipmaps;
+  if (levels.length <= BLURRY_LEVELS_DROPPED || Math.min(texture.image.width, texture.image.height) < BLURRY_MIN_PX) return;
+  fullLevels.set(texture, {source: texture.source, mipmaps: levels});
+  const reduced = levels.slice(BLURRY_LEVELS_DROPPED);
+  // Its own source: the clone shares the loader's cached original, which keeps the full chain for other chunks.
+  texture.source = new TextureSource({width: reduced[0].width, height: reduced[0].height});
+  texture.mipmaps = reduced;
+}
+
+/**
+ * Replaces a texture's reduced levels with its full chain and uploads it now. Returns the bytes uploaded: 0 when it is already
+ * full (or released). Materials keep the same texture object; disposing it frees the reduced GPU copy before the full one is
+ * allocated.
+ */
+export function sharpenTexture(texture: Texture, renderer: WebGLRenderer): number {
+  const full = fullLevels.get(texture);
+  if (!full) return 0;
+  fullLevels.delete(texture);
+  texture.dispose();
+  texture.source = full.source;
+  texture.mipmaps = full.mipmaps;
+  texture.needsUpdate = true;
+  renderer.initTexture(texture);
+  return full.mipmaps.reduce((bytes, level) => bytes + level.data.byteLength, 0);
+}
 
 interface GlbImage { name?: string; uri?: string }
 
@@ -45,6 +81,7 @@ export function createTextureSource(uris: ReadonlyMap<string, string>, ktx2: Cac
           texture.colorSpace = map.srgb ? SRGBColorSpace : NoColorSpace;
           texture.wrapS = texture.wrapT = RepeatWrapping;
           texture.anisotropy = anisotropy;
+          startBlurry(texture);
           texture.needsUpdate = true;
           return texture;
         });
@@ -64,7 +101,7 @@ export function createSurfaceTexturePool(ktx2: CachedKtx2Loader, renderer: WebGL
     entry.owners--;
     if (entry.owners) return;
     if (entries.get(key) === entry) entries.delete(key);
-    void entry.pending.then(texture => texture.dispose(), () => undefined);
+    void entry.pending.then(texture => { fullLevels.delete(texture); texture.dispose(); }, () => undefined);
   };
   return {
     source(uris: ReadonlyMap<string, string>): SurfaceTextureSource & {dispose(): void} {

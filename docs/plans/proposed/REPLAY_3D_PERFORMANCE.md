@@ -91,6 +91,56 @@ Interleaved runs, 40 s each, ms (intervals; callback = main-thread time in anima
 - **Measure the targets on a production build from now on.** The dev server's React overhead hides renderer changes in the tail.
 - Load is unchanged (10.5–12.8 s to the first frame), so step 3 is now the larger win.
 
+### Load: whole-file zstd textures and overlapped stages (2026-11-04)
+
+Package personal-v2 (`.ktx2.zst` served with `Content-Encoding: zstd`), production build, other jobs on the machine (CPU 30–80 %).
+
+| | Fuji first frame | Silverstone first frame |
+|---|---|---|
+| debug-perf baseline (main-thread zstd decode) | 10.5–12 s | 12–13 s |
+| v2 files, before the app changes below | — | 13.2 s (single run) |
+| v2, after the three changes below (suite median of 3) | 8.3 s | 10.9 s |
+| v2, after the four changes after that (3 runs) | 7.2–8.1 s | 10.5–11.0 s |
+
+- Texture decode left the main thread (0 ms, was ~3.3 s); all package files finish by ~3 s.
+- First three changes: KTX2 read with `fetchBinary` (three's FileLoader re-streamed every body chunk through script for
+  progress events, which kept the main thread busy for ~3 s after the files arrived); the sky PMREM built while the files
+  download; the wheel/line height index replaced by the camera BVH (`scenery/sceneryGround.ts`, one tree per chunk built in a
+  worker, triangles tagged by the query they serve).
+- Next four changes: BVHs built in a pool of three workers outside the serialized warm-up chain; car models and textures
+  loading alongside the scenery; behind the loading screen, texture and geometry uploads in 50 ms slices that yield a task
+  instead of waiting for a frame; removal of a chunk's tree only by the load that owns it.
+- Tried and dropped: four meshopt decode workers and six concurrent chunk loads (no gain). `ParallelMeshBVHWorker` needs
+  `SharedArrayBuffer`, so cross-origin isolation headers; not worth it for this.
+- Then: until the first view is resident, only the horizon and the chunks under the view load, all at once (they were
+  queued behind other chunks with three load slots). Silverstone ~9.5–10 s. Fetching a chunk's textures with its GLB made no
+  measurable difference (dropped).
+- What the first frame waits for on Silverstone: the horizon chunk. It is 53 MiB of GLB, 2.0 M triangles and 472 textures
+  (1.18 GB on the GPU, most of the venue's 1.53 GB, 97 of them 2048²) at full resolution. Its download competes with
+  everything else (~4.5 s), its ray tree takes ~1.4 s, and the final warm-up uploads its textures (~3 s).
+- A ground-only BVH (stand-in for HATTarget flags from the exporter) cut Silverstone's tree triangles 5.8 M → 1.0 M and the
+  first frame by ~0.5–1 s; not pursued for now.
+
+### First frame: low mips first, horizon after (2026-11-05)
+
+Client only. Scenery textures of 512 px or more join on their levels 2 and below (the files already hold every level) and a
+background queue uploads the full chains after the first frame, at most 4 MiB per frame (at least one texture). The car's
+textures load whole. The first frame waits only for the chunks under the view; the horizon joins when ready.
+
+| personal-v2, suite median of 3 | Fuji | Silverstone |
+|---|---|---|
+| First frame, before | 8.3 s | 10.9 s |
+| First frame, after | **6.3 s** | **6.8 s** |
+| p50 / p99 during the 40 s played | 2.7 / 5.7 ms | 5.2 / 18.0 ms (runs 16.9–20.8) |
+
+- Simulated first with an exporter-free proof of concept (6.6–6.8 s on Silverstone); the BVH variants on top (HATTarget
+  flag, or a BVH from the exporter) changed nothing once the horizon no longer gates the first frame.
+- Silverstone's p99 sits just above 16 ms. Slow frames: the first ~5 s while ~0.9 GB of full chains upload (a 2048² BC7
+  chain is ~5.6 MB, uploaded whole, so a lower budget cannot shrink those frames), and a dense stretch at ~25 s (draws
+  370 → 580, no uploads) that predates this change. A time budget did not bound the uploads (2 ms slices queued up to
+  27 MiB), hence the byte budget.
+- Silverstone's default trackside camera at the lap start sits inside the Wing structure (camera data, not load-related).
+
 ## The scene (from the package index)
 
 | | Typical | Worst |
@@ -151,8 +201,7 @@ sun map around the car (decided 2026-11-04: only when needed).
 - **Free CPU copies after upload** (texture mips; geometry arrays once a collision/height proxy serves the ground queries).
   Brings the 2.6–3.0 GB heap down to the proxies plus metadata.
 - **Collision/height proxy per sector (exporter):** a small position-only mesh of drivable and ground surfaces; the client
-  builds the BVH and height index from it in a worker (today ~0.5 s of main-thread index building plus a main-thread merge per
-  join). Disk: a few % of the sector.
+  builds the BVH from it in a worker (today a main-thread merge per join; the height index now queries the same BVH). Disk: a few % of the sector.
 - **Byte-budgeted upload queue** checked before each upload, and overlapping warmups instead of the `warming` chain.
 
 ### 4. Horizon and LOD (exporter)

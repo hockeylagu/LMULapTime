@@ -57,6 +57,16 @@ describe('sceneryStream', () => {
     expect(ids()).toEqual(['p0', 's3']);
   });
 
+  it('loads only the first view (all at once), which is ready without the horizon, then the rest of the window', async () => {
+    const stream = createSceneryStream(testLayout(), parent(), deps);
+    stream.update({ kind: 'lap', lapDistanceM: 1000.5 }); // Before the horizon arrives, as on the first load.
+    expect(ids()).toEqual(['horizon', 's1']);
+    const ready = vi.fn(); void stream.whenUnderView().then(ready);
+    await finish('s1');
+    expect(ready).toHaveBeenCalledOnce(); // The horizon is still loading.
+    expect(ids()).toEqual(['horizon', 's2', 's0']);
+  });
+
   it('prepares a root before it joins the scene and reports each change', async () => {
     const group = parent(), stream = createSceneryStream(testLayout(), group, deps);
     await finish('horizon');

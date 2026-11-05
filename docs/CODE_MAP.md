@@ -307,10 +307,10 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   height and available pitch/roll. `sceneFrame.ts` owns native-to-render handedness.
   `scenery/` streams the track: `residency.ts` is the pure resident-set rule (lap-distance window, free-camera radius, hysteresis),
   `sceneryStream.ts` loads and unloads chunks around a view with bounded concurrency and texture reference counts, `chunkLoader.ts`
-  parses chunk GLBs (Meshopt, KTX2 through `cachedKtx2Loader.ts`), `sceneryHeights.ts` answers wheel/line contact height queries over the
-  resident chunks only, and `streamView.ts` turns the replay position and camera mode into a stream view.
-  `scenery/cameraCollision.ts` uses public `three-mesh-bvh` worker and raycast APIs for camera ground/obstruction checks.
-  Its native-coordinate position-only collision geometry is chunk-owned and never exported.
+  parses chunk GLBs (Meshopt, KTX2 through `cachedKtx2Loader.ts`), and `streamView.ts` turns the replay position and camera mode into
+  a stream view. `sceneryGround.ts` builds one `three-mesh-bvh` ray tree per resident chunk (in the library's worker) that answers both
+  wheel/line contact heights and camera ground/obstruction checks, each triangle tagged with the queries it serves. Its
+  native-coordinate position-only geometry is chunk-owned and never exported.
   `laps/useReplayScene.ts` retains the scene for a layout/geometry/package revision; selecting
   either lap replaces only `laps/lapLayer.ts` cars, wheel animation and racing lines, preserving
   the camera and scenery. Cancelled or superseded builds are discarded and retired lap buffers released.
@@ -326,7 +326,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   `cameraModes.ts` owns mode labels/keys and `cameraTracking.ts` provides velocity-blended target
   yaw with rotational/vertical damping for Chase mode while preserving user camera/focus offsets
   during Follow/Chase updates; manual camera movement does not change the selected mode.
-  `surfaceProjection.ts` drapes depth-tested racing lines on the nearby native road layer; measured
+  `racingLine.ts` drapes depth-tested racing lines on the nearby native road layer; measured
   coordinates and analytics stay native. `ReplayMapContainer` switches 2D/3D, and `src/api/sceneryApi.ts` and `src/api/vehicles/carApi.ts`
   load layouts, chunks and cars through the API client. The existing replay cursor owns time in both views.
 - `trackPackage.ts` validates geometry revisions and route lengths within 0.01m. Routes in `dataPluginRoutes.ts` serve geometry and vehicle logos (`/api/data-plugin/vehicles/logos`).

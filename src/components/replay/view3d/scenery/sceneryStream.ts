@@ -20,7 +20,7 @@ export interface SceneryStreamDeps {
 export interface SceneryStream {
   /** Re-plans residency around the view: loads what the resident-set rule wants, unloads what left window plus hysteresis. */
   update(view: StreamView): void;
-  /** Resolves when the horizon and the chunks under the last view are resident; rejects with the first load failure. */
+  /** Resolves when the chunks under the last view are resident (the horizon may join later); rejects with the first load failure. */
   whenUnderView(): Promise<void>;
   residentIds(): string[];
   dispose(): void;
@@ -40,12 +40,17 @@ export function createSceneryStream(layout: SceneryLayout, parent: Group, deps: 
   const entries = new Map<string, Entry>(), references = new Map<string, number>(), failedIds = new Set<string>();
   let queue: string[] = [], keep = new Set<string>(), under: string[] = [], disposed = false, failure: Error | null = null;
   let waiters: Array<{ resolve: () => void; reject: (error: Error) => void }> = [];
+  /** Until the first view is resident, only the horizon and the chunks under the view load. */
+  let firstViewResident = false;
 
   const resident = (id: string) => entries.get(id)?.root != null;
-  const underResident = () => resident(layout.horizon.id) && under.every(resident);
+  // The first frame waits only for the chunks under the view: the horizon (the whole venue's backdrop) joins when it is ready.
+  const underResident = () => under.every(resident);
   const settle = () => {
     if (failure) { const error = failure; waiters.splice(0).forEach(waiter => waiter.reject(error)); return; }
-    if (underResident()) waiters.splice(0).forEach(waiter => waiter.resolve());
+    if (!underResident()) return;
+    waiters.splice(0).forEach(waiter => waiter.resolve());
+    if (!firstViewResident) { firstViewResident = true; pump(); }
   };
   const unload = (id: string) => {
     const entry = entries.get(id);
@@ -83,8 +88,12 @@ export function createSceneryStream(layout: SceneryLayout, parent: Group, deps: 
   const loading = () => [...entries.values()].filter(entry => entry.abort).length;
   const pump = () => {
     if (disposed) return;
-    while (queue.length && loading() < MAX_CONCURRENT_LOADS) {
-      const id = queue.shift()!;
+    const eligible = (id: string) => firstViewResident || id === layout.horizon.id || under.includes(id);
+    // The first view's few chunks all load at once; afterwards streaming keeps to the concurrency bound.
+    while (loading() < (firstViewResident ? MAX_CONCURRENT_LOADS : Infinity)) {
+      const index = queue.findIndex(eligible);
+      if (index < 0) return;
+      const [id] = queue.splice(index, 1);
       if (!entries.has(id) && !failedIds.has(id) && keep.has(id)) start(id);
     }
   };
@@ -96,7 +105,8 @@ export function createSceneryStream(layout: SceneryLayout, parent: Group, deps: 
       const plan = planResidency(layout, view);
       keep = new Set([layout.horizon.id, ...plan.keep]); under = plan.under;
       for (const id of entries.keys()) if (!keep.has(id)) unload(id);
-      queue = [layout.horizon.id, ...plan.wanted].filter(id => !entries.has(id) && !failedIds.has(id));
+      // The chunks under the view load first, then the rest of the wanted set in the residency plan's order.
+      queue = [layout.horizon.id, ...under, ...plan.wanted.filter(id => !under.includes(id))].filter(id => !entries.has(id) && !failedIds.has(id));
       pump(); settle();
     },
     whenUnderView() {

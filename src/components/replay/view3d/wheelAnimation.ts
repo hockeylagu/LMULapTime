@@ -3,7 +3,7 @@ import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
 import { attachWheelRigs, type WheelRig } from './wheelGeometry.js';
 import { createSteerAngle, createSteeringWheelAngle, createWheelTravel } from './wheelMotion.js';
 import { isContinuousPose, sampleRenderPose, type RenderPose } from './replayPose.js';
-import type { SurfaceHeight } from './surfaceProjection.js';
+import type { SurfaceHeight } from './scenery/sceneryGround.js';
 
 export interface WheelAnimation { update(pose: RenderPose): void; refreshHeights(): void; description: string }
 const MAX_TRAVEL_M = 0.15, MAX_FIT_M = 0.75, FIT_SAMPLES = 200;

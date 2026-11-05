@@ -10,7 +10,7 @@ import type { MapColorMode } from '../../map/replayMapUtils.js';
 import { makeCar } from '../sceneObjects.js';
 import { createWheelAnimation } from '../wheelAnimation.js';
 import { BASELINE_LINE, colorRacingLine, makeRacingLine, racingLineColors, refreshRacingLine } from '../racingLine.js';
-import type { SurfaceHeight } from '../surfaceProjection.js';
+import type { SurfaceHeight } from '../scenery/sceneryGround.js';
 import { disposeObjects } from './disposeObjects.js';
 
 export interface LapCars {
@@ -38,8 +38,7 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     }
     return pending;
   };
-  /** A car instance of the lap's livery: the shared geometry with one material per native material, textures preloaded. */
-  const loadModel = async (car: LoadedCar): Promise<Group> => {
+  const loadParts = async (car: LoadedCar) => {
     const template = await loadTemplate(car), key = normalizeVehicleId(car.vehicleId);
     const appearance = car.descriptor.appearances.find(row => normalizeVehicleId(row.alias) === key);
     if (!appearance) throw Error(`The car package has no appearance for ${car.vehicleId}`);
@@ -58,6 +57,22 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
       }
     });
     const textures = new Map(await Promise.all([...paths].map(async path => [path, await loadTexture(path)] as const)));
+    return {template, appearance, recipeOf, textures};
+  };
+  /** A livery's parsed model and loaded textures, shared by every instance of that car (and by `preload`). */
+  const parts = new WeakMap<LoadedCar, ReturnType<typeof loadParts>>();
+  const partsOf = (car: LoadedCar) => {
+    let pending = parts.get(car);
+    if (!pending) {
+      pending = loadParts(car);
+      parts.set(car, pending);
+      pending.catch(() => { if (parts.get(car) === pending) parts.delete(car); });
+    }
+    return pending;
+  };
+  /** A car instance of the lap's livery: the shared geometry with one material per native material, textures preloaded. */
+  const loadModel = async (car: LoadedCar): Promise<Group> => {
+    const {template, appearance, recipeOf, textures} = await partsOf(car);
     const model = template.clone(true), materials = new Map<string, Material>();
     model.traverse(object => {
       if (!(object instanceof Mesh)) return;
@@ -72,7 +87,7 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     });
     return model;
   };
-  return async (trajectory: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null, assets: LapCars, colorBy: MapColorMode) => {
+  const load = async (trajectory: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null, assets: LapCars, colorBy: MapColorMode) => {
     const [primaryModel, baselineModel] = await Promise.all([loadModel(assets.primary), assets.baseline ? loadModel(assets.baseline) : null]);
     const primary = makeCar(trajectory, MAP_COLORS.carBody, false, primaryModel);
     const ghost = baseline && baselineModel ? makeCar(baseline, TELEMETRY_COLORS.baseline, true, baselineModel) : new Group();
@@ -106,6 +121,11 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
       dispose() { root.removeFromParent(); disposeObjects(root); },
     };
   };
+  /** Starts parsing the cars and loading their textures before the ground is ready; a failure surfaces from the later load. */
+  const preload = (assets: LapCars) => {
+    for (const car of [assets.primary, assets.baseline]) if (car) partsOf(car).catch(() => {});
+  };
+  return Object.assign(load, {preload});
 }
 
 export type LapLayer = Awaited<ReturnType<ReturnType<typeof createLapLayerLoader>>>;

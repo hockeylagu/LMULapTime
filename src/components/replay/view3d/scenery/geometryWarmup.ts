@@ -8,7 +8,8 @@ export function createGeometryWarmup(renderer: WebGLRenderer, nextFrame: () => P
   scene.add(probe);
   let disposed = false;
   return {
-    async upload(root: Object3D, camera: Camera, signal: AbortSignal, budgetMs = sliceMs): Promise<void> {
+    /** Uploads `root`'s geometry in `budgetMs` slices, waiting on `pause` (the next frame by default) between them. */
+    async upload(root: Object3D, camera: Camera, signal: AbortSignal, budgetMs = sliceMs, pause = nextFrame): Promise<void> {
       const geometries = new Set<BufferGeometry>();
       root.traverse(object => {
         if (!(object instanceof Mesh) || !object.visible || !(object.geometry instanceof BufferGeometry)) return;
@@ -31,7 +32,7 @@ export function createGeometryWarmup(renderer: WebGLRenderer, nextFrame: () => P
         }
         if (performance.now() >= deadline) {
           // oxlint-disable-next-line no-await-in-loop -- GPU uploads yield between frame-budget slices
-          await nextFrame();
+          await pause();
           deadline = performance.now() + budgetMs;
         }
       }

@@ -7,7 +7,7 @@ import { disposeObjects } from '../laps/disposeObjects.js';
 import { CachedKtx2Loader } from './cachedKtx2Loader.js';
 import { configureSurfaceMaterial } from './materials/configureSurfaceMaterial.js';
 import { createSurfaceTexturePool, imageUriMap } from './materials/textureSource.js';
-import { isSceneryGround } from './sceneryHeights.js';
+import { isSceneryGround } from './sceneryGround.js';
 
 export interface ChunkLoader {
   load(chunk: SceneryChunk, signal: AbortSignal): Promise<Object3D>;

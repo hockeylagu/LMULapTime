@@ -4,7 +4,7 @@ import { computeBaselineDeltaByIdx, computeGainLossByIdx, getHeatmapColor, type 
 import { computeLapComparisons } from '../../../utils/replayComparison.js';
 import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../../utils/lapAlignment.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
-import type { SurfaceHeight } from './surfaceProjection.js';
+import type { SurfaceHeight } from './scenery/sceneryGround.js';
 
 /** Ribbon width: wide enough to read from chase height, narrow enough to show the line through a corner. */
 export const RACING_LINE_WIDTH_M = 0.6;

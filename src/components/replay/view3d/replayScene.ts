@@ -17,9 +17,9 @@ import { addSceneEnvironment } from './sceneEnvironment.js';
 import { setCockpitView } from './sceneObjects.js';
 import { CachedKtx2Loader } from './scenery/cachedKtx2Loader.js';
 import { createChunkLoader } from './scenery/chunkLoader.js';
-import { createSceneryHeights } from './scenery/sceneryHeights.js';
-import {createCameraCollision} from './scenery/cameraCollision.js';
+import { createSceneryGround } from './scenery/sceneryGround.js';
 import { surfaceTextureMaps } from './scenery/materials/configureSurfaceMaterial.js';
+import { sharpenTexture } from './scenery/materials/textureSource.js';
 import type { StreamView } from './scenery/residency.js';
 import { createSceneryStream } from './scenery/sceneryStream.js';
 import { createGeometryWarmup } from './scenery/geometryWarmup.js';
@@ -57,9 +57,9 @@ export async function createReplayScene(
   try { renderer = new WebGLRenderer({antialias: true, alpha: false}); }
   catch { throw Error('WebGL 2 is unavailable. Use the 2D map.'); }
   const {min, max} = layout.horizon.bounds, origin = new Vector3(...min).add(new Vector3(...max)).multiplyScalar(0.5);
-  const loader = createChunkLoader(renderer), carTextures = new CachedKtx2Loader(renderer), heights = createSceneryHeights(() => { scheduleRefresh(); invalidate(); });
-  const {surfaceHeight} = heights;
-  const collision = createCameraCollision();
+  const loader = createChunkLoader(renderer), carTextures = new CachedKtx2Loader(renderer);
+  // Wheel and line contact heights and the camera checks share one ray tree per resident chunk.
+  const ground = createSceneryGround(), {surfaceHeight} = ground;
   // Scenery chunks live in native coordinates under one group, shifted by the scene origin.
   const sceneryRoot = new Group(); sceneryRoot.position.copy(origin).negate();
   let layer: LapLayer, layerReady = false;
@@ -73,8 +73,29 @@ export async function createReplayScene(
   // A chunk compiles its programs and uploads its textures before it joins the scene, a texture per frame, so its first draw does
   // not stall playback. Chunks loaded before the scene exists (the first view) are drawn behind the loading screen anyway.
   let warmTarget: {scene: Scene; camera?: PerspectiveCamera} | null = null;
-  const UPLOAD_SLICE_MS = 1;
+  const UPLOAD_SLICE_MS = 1, LOADING_SLICE_MS = 50;
   const nextFrame = () => new Promise<void>(resolve => { requestAnimationFrame(() => resolve()); });
+  const nextTask = () => new Promise<void>(resolve => { setTimeout(resolve, 0); });
+  // Scenery textures join on their reduced levels; once the first frame is out, their full chains upload a few per frame.
+  // The budget is bytes, not time: an upload call returns before the GPU has copied the data, so time does not bound its cost.
+  const SHARPEN_BYTES_PER_FRAME = 4 * 1024 * 1024, blurry = new Set<Texture>();
+  let sharpening = false, sharpenFrame = 0;
+  const sharpen = () => {
+    sharpenFrame = 0;
+    if (disposed) return;
+    let uploaded = 0;
+    for (const texture of blurry) {
+      blurry.delete(texture);
+      uploaded += sharpenTexture(texture, renderer);
+      if (uploaded >= SHARPEN_BYTES_PER_FRAME) break;
+    }
+    if (uploaded) invalidate();
+    if (blurry.size) sharpenFrame = requestAnimationFrame(sharpen);
+  };
+  const queueSharpen = (textures: Iterable<Texture>) => {
+    for (const texture of textures) blurry.add(texture);
+    if (sharpening && !sharpenFrame && blurry.size) sharpenFrame = requestAnimationFrame(sharpen);
+  };
   const geometryWarmup = createGeometryWarmup(renderer, nextFrame, UPLOAD_SLICE_MS);
   const warmUp = async (root: Object3D, signal: AbortSignal) => {
     const target = warmTarget;
@@ -89,56 +110,60 @@ export async function createReplayScene(
         for (const texture of surfaceTextureMaps.get(material) ?? []) textures.add(texture);
       }
     });
-    // Upload in per-frame slices: a whole chunk at once is the stall this avoids.
-    const uploadBudgetMs = root === target.scene ? 12 : UPLOAD_SLICE_MS;
+    // During playback, upload in per-frame slices: a whole chunk at once is the stall this avoids. Behind the loading screen
+    // (the whole first view) nothing is drawn, so long slices only yield a task now and then to keep the page responsive.
+    const loading = root === target.scene, uploadBudgetMs = loading ? LOADING_SLICE_MS : UPLOAD_SLICE_MS, pause = loading ? nextTask : nextFrame;
     let sliceEnd = performance.now() + uploadBudgetMs;
     for (const texture of textures) {
       signal.throwIfAborted();
       renderer.initTexture(texture);
-      // eslint-disable-next-line no-await-in-loop -- yields a frame between upload slices
-      if (performance.now() >= sliceEnd) { await nextFrame(); sliceEnd = performance.now() + uploadBudgetMs; }
+      // eslint-disable-next-line no-await-in-loop -- yields between upload slices
+      if (performance.now() >= sliceEnd) { await pause(); sliceEnd = performance.now() + uploadBudgetMs; }
     }
-    await geometryWarmup.upload(root, target.camera, signal, uploadBudgetMs);
+    await geometryWarmup.upload(root, target.camera, signal, uploadBudgetMs, pause);
+    queueSharpen(textures);
   };
   let warming = Promise.resolve();
   const stream = createSceneryStream(layout, sceneryRoot, {
     load: async (chunk, signal) => {
       const root = await loader.load(chunk, signal);
-      const ready = warming.then(async () => { signal.throwIfAborted(); await warmUp(root, signal); await collision.add(chunk.id, root); signal.throwIfAborted(); });
-      warming = ready.catch(() => {});
-      try { await ready; return root; }
-      catch (error) { collision.remove(chunk.id); loader.releaseChunk(root); throw error; }
+      // The ray tree builds in a worker while the chunk waits its turn to compile and upload (warm-ups stay one at a time).
+      const grounded = ground.add(chunk.id, root);
+      const warmed = warming.then(async () => { signal.throwIfAborted(); await warmUp(root, signal); });
+      warming = warmed.catch(() => {});
+      try { await Promise.all([warmed, grounded]); signal.throwIfAborted(); return root; }
+      catch (error) { ground.remove(chunk.id, root); loader.releaseChunk(root); throw error; }
     },
-    prepare: (chunk, root) => {
+    prepare: (_chunk, root) => {
       // The filler ground sits just under the road: a car shadow on it would show through from below road level.
       root.traverse(object => { if (object instanceof Mesh) object.receiveShadow = !object.name.startsWith('FILLER_GROUND'); });
-      heights.add(chunk.id, root, chunk.bounds);
     },
-    unload: (chunk, root) => { heights.remove(chunk.id); collision.remove(chunk.id); loader.releaseChunk(root); },
+    unload: (chunk, root) => { ground.remove(chunk.id, root); loader.releaseChunk(root); },
     releaseTexture: asset => loader.releaseTexture(asset),
     changed: () => { freezeScenery(); scheduleRefresh(); invalidate(); },
     failed: (chunk, error) => { if (!disposed) onFailure(`3D scenery chunk ${chunk.id} failed: ${error.message}`); },
   });
   const cleanup = () => {
-    disposed = true; window.clearTimeout(refreshTimer); heights.dispose(); stream.dispose(); loader.dispose(); carTextures.dispose();
-    collision.dispose(); geometryWarmup.dispose(); renderer.dispose(); renderer.forceContextLoss();
+    disposed = true; window.clearTimeout(refreshTimer); cancelAnimationFrame(sharpenFrame); stream.dispose(); loader.dispose(); carTextures.dispose();
+    ground.dispose(); geometryWarmup.dispose(); renderer.dispose(); renderer.forceContextLoss();
   };
   const route = layout.routeLengthM;
   const firstStation = stationAt(trajectory.points, 0, 0, route);
   if (firstStation === undefined) { cleanup(); throw Error('This recording has no track stations. Use the 2D map.'); }
   let currentStation = firstStation, mode: CameraMode = 'follow', streamView: StreamView | null = null;
   const loadLaps = createLapLayerLoader(origin, surfaceHeight, path => carTextures.loadAsync(`${CAR_FILES}${path}`));
+  // The sky's environment map compiles and renders now, while the scenery files download.
+  const scene = new Scene();
+  const environment = addSceneEnvironment(scene, renderer, layout.daylight);
   // The horizon and the chunks under the first pose must be resident before cars and lines are draped on them.
   try {
     streamView = {kind: 'lap', lapDistanceM: currentStation}; stream.update(streamView);
+    loadLaps.preload(cars); // The car models and textures load alongside the scenery; only draping waits for the ground.
     await stream.whenUnderView();
-    await heights.whenReady();
     layer = await loadLaps(trajectory, baseline, cars, colorBy); layerReady = true;
   } catch (error) { cleanup(); throw error; }
   let lineMode = colorBy, primaryOpacity = 1, baselineOpacity = 1, lapRequest = 0;
-  const scene = new Scene();
   warmTarget = {scene};
-  const environment = addSceneEnvironment(scene, renderer, layout.daylight);
   // Convert the native left-handed frame once, including meshes, car bodies and trails.
   // Camera targets/offsets use the same reflection. Mirroring only terrain misaligns poses.
   const world = new Group(); world.scale.z = -1; world.add(sceneryRoot); scene.add(world);
@@ -154,6 +179,7 @@ export async function createReplayScene(
   environment.setCamera(perspective);
   // The first view's chunks loaded before the camera existed: compile and upload them (and the cars) behind the loading screen.
   try { await warmUp(scene, new AbortController().signal); } catch (error) { cleanup(); throw error; }
+  sharpening = true; queueSharpen([]);
   const overhead = new OrthographicCamera(-80, 80, 80, -80, 0.5, 15000);
   let camera: PerspectiveCamera | OrthographicCamera = perspective;
   const controls = new OrbitControls<PerspectiveCamera | OrthographicCamera>(camera, renderer.domElement);
@@ -191,7 +217,7 @@ export async function createReplayScene(
     if (disposed) return;
     updateStream();
     desiredEye.copy(camera.position);
-    if (camera === perspective && !isDriverCamera(mode)) collision.resolve(desiredEye, controls.target, origin, correctedEye);
+    if (camera === perspective && !isDriverCamera(mode)) ground.resolve(desiredEye, controls.target, origin, correctedEye);
     else correctedEye.copy(desiredEye);
     const corrected = !correctedEye.equals(desiredEye);
     if (corrected) {
@@ -361,9 +387,9 @@ export async function createReplayScene(
       invalidate();
     },
     dispose() {
-      disposed = true; cancelAnimationFrame(frame); observer.disconnect(); controls.dispose();
+      disposed = true; cancelAnimationFrame(frame); cancelAnimationFrame(sharpenFrame); observer.disconnect(); controls.dispose();
       renderer.domElement.removeEventListener('webglcontextlost', contextLost);
-      document.removeEventListener('visibilitychange', invalidate); clearTimeout(refreshTimer); heights.dispose(); stream.dispose(); collision.dispose(); disposeObjects(scene, true); loader.dispose(); carTextures.dispose(); environment.dispose(); geometryWarmup.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
+      document.removeEventListener('visibilitychange', invalidate); clearTimeout(refreshTimer); stream.dispose(); ground.dispose(); disposeObjects(scene, true); loader.dispose(); carTextures.dispose(); environment.dispose(); geometryWarmup.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
     },
   };
 }
