@@ -25,6 +25,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "benchmark:endpoints": "tsx --env-file-if-exists=.env.local tools/benchmarks/benchmarkEndpoints.ts",
+    "benchmark:replay3d": "tsx tools/benchmarks/replay3d/run.ts",
     "telemetry:probe": "tsx tools/telemetryRecorder.ts probe",
     "telemetry:record": "tsx tools/telemetryRecorder.ts record",
     "telemetry:dump": "tsx tools/telemetryRecorder.ts dump",
