@@ -34,6 +34,9 @@ export const DEMO_SCENARIOS: readonly Scenario[] = [
   scenario('first-lap', 'Practice · 60 min', 'Practice · no reference yet', (s, t) => { s.session!.kind = 'practice'; s.recentLaps = []; s.sessionBest = null; t.deltaSeconds = null; t.sectors = [null, null, null]; t.sectorDeltas = [null, null, null]; }),
   scenario('practice', 'Practice · 60 min', 'Practice · on track', s => { s.session!.kind = 'practice'; }),
   scenario('invalid-lap', 'Practice · 60 min', 'Practice · invalid last lap', s => { s.session!.kind = 'practice'; s.recentLaps[2].valid = false; }),
+  scenario('garage-practice-qualifying', 'Qualifying · 10 min', 'Practice garage · qualifying load', s => {
+    s.lifecycle = 'garage'; s.session!.kind = 'practice'; s.session!.inRealtime = false;
+  }),
   scenario('garage-qualifying', 'Qualifying · 10 min', 'Qualifying preparation', s => {
     s.lifecycle = 'garage'; s.session!.kind = 'qualifying'; s.session!.inRealtime = false;
   }),
@@ -148,7 +151,7 @@ export function createDemoState(id: string, carClass: string | null = 'GT3', res
   const sprint: DemoSprint = selected.id === 'no-stop' ? 'early' : selected.id === 'sprint' || selected.id === 'garage-sprint' ? 'late' : null;
   // A light load for qualifying runs: practice says how many laps it holds instead of asking for more.
   configureDemoSession(snapshot, timing, sprint, reserveSeconds, sprint || selected.id === 'garage-qualifying-sprint' ? 20 : 60,
-    selected.id === 'garage-practice-light' ? 30 : null);
+    selected.id === 'garage-practice-light' ? 30 : null, selected.id === 'garage-practice-qualifying');
   const reference = snapshot.sessionBest?.lapSeconds;
   timing.lapEstimate = !timing.isOutLap && reference != null && timing.deltaSeconds != null ? {
     seconds: Math.round((reference + timing.deltaSeconds) * 1000) / 1000,

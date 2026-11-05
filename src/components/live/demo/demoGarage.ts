@@ -31,7 +31,7 @@ function player(snapshot: LiveSnapshot, lapSeconds: number): LiveVehicleReading 
  * garage, the race length (event schedule), the fuel ratio settings, the 12 s four-tyre change, and three earlier
  * races here. So the demo shows the real choice of source and the real plans, not figures set by hand.
  */
-export function demoGarageStrategy(snapshot: LiveSnapshot, input: { lapSeconds: number; raceMinutes: number; reserveSeconds: number; setInGarage: number }): LiveStrategy | null {
+export function demoGarageStrategy(snapshot: LiveSnapshot, input: { lapSeconds: number; raceMinutes: number; reserveSeconds: number; setInGarage: number; qualifyingMinutes?: number | null }): LiveStrategy | null {
   const session = snapshot.session;
   if (!session) return null;
   const carClass = snapshot.identity?.carClass ?? session.vehicleClass;
@@ -42,7 +42,7 @@ export function demoGarageStrategy(snapshot: LiveSnapshot, input: { lapSeconds: 
   tracker.applyRest({ type: 'tireManagement', vePerLap: 4.2, fuelPerLap: 3.95, newSets: 3, selected: { compound: 'Medium', used: false, wear: 1 } });
   tracker.applyRest({ type: 'garage', veStart: kind === 've' ? input.setInGarage : null, fuelStart: kind === 'fuel' ? input.setInGarage : null, fuelRatio: 0.9 });
   tracker.applyRest({ type: 'pitMenu', menu: { resourceValue: null, resourceText: null, tyres: null, repair: null, fuelRatioOptions: [0.85, 0.9, 0.95, 1] } });
-  tracker.applyRest({ type: 'schedule', raceMinutes: input.raceMinutes, hasQualifying: true });
+  tracker.applyRest({ type: 'schedule', raceMinutes: input.raceMinutes, hasQualifying: true, qualifyingMinutes: input.qualifyingMinutes ?? null });
   tracker.applyRest({ type: 'pitStopTimes', fixRandom: 0, fuelRandom: 0, tireRandom: 0, veRandom: 0, fuelFillRate: 4, veFillRate: 2.5,
     fuelInsert: 0, veInsert: 0, fourTyreChange: 12 });
   tracker.setRaceHistory(demoRaceHistory(kind));

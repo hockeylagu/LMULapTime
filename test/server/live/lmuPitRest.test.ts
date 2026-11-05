@@ -84,13 +84,16 @@ describe('LMU pit REST parsers', () => {
     // As read in every garage of a weekend, 2026-10-17.
     const session = (name: string, lengthTime: number) => ({ airTemp: 28, lengthTime, name, rainChance: 0 });
     const weekend = [session('PRACTICE', 5), session('QUALIFYING', 10)];
-    expect(parseSchedule({ scheduledSessions: [...weekend, session('RACE', 5)] })).toEqual({ type: 'schedule', raceMinutes: 5, hasQualifying: true });
-    expect(parseSchedule({ scheduledSessions: weekend })).toEqual({ type: 'schedule', raceMinutes: null, hasQualifying: true });
-    expect(parseSchedule({ scheduledSessions: [session('RACE 1', 20), session('RACE 2', 30)] })).toEqual({ type: 'schedule', raceMinutes: null, hasQualifying: false });
-    expect(parseSchedule({ scheduledSessions: [session('PRACTICE', 120)] })).toEqual({ type: 'schedule', raceMinutes: null, hasQualifying: false });
-    expect(parseSchedule({ scheduledSessions: [session('RACE', 20)] })).toEqual({ type: 'schedule', raceMinutes: 20, hasQualifying: false });
-    expect(parseSchedule({ scheduledSessions: [session(' qualify ', 10)] })).toEqual({ type: 'schedule', raceMinutes: null, hasQualifying: true });
-    expect(parseSchedule({ scheduledSessions: [] })).toEqual({ type: 'schedule', raceMinutes: null, hasQualifying: false });
+    expect(parseSchedule({ scheduledSessions: [...weekend, session('RACE', 5)] })).toEqual({ type: 'schedule', raceMinutes: 5, hasQualifying: true, qualifyingMinutes: 10 });
+    expect(parseSchedule({ scheduledSessions: weekend })).toEqual({ type: 'schedule', raceMinutes: null, hasQualifying: true, qualifyingMinutes: 10 });
+    expect(parseSchedule({ scheduledSessions: [session('RACE 1', 20), session('RACE 2', 30)] })).toEqual({ type: 'schedule', raceMinutes: null, hasQualifying: false, qualifyingMinutes: null });
+    expect(parseSchedule({ scheduledSessions: [session('PRACTICE', 120)] })).toEqual({ type: 'schedule', raceMinutes: null, hasQualifying: false, qualifyingMinutes: null });
+    expect(parseSchedule({ scheduledSessions: [session('RACE', 20)] })).toEqual({ type: 'schedule', raceMinutes: 20, hasQualifying: false, qualifyingMinutes: null });
+    expect(parseSchedule({ scheduledSessions: [session(' qualify ', 10)] })).toEqual({ type: 'schedule', raceMinutes: null, hasQualifying: true, qualifyingMinutes: 10 });
+    expect(parseSchedule({ scheduledSessions: [] })).toEqual({ type: 'schedule', raceMinutes: null, hasQualifying: false, qualifyingMinutes: null });
     expect(parseSchedule({})).toBeNull();
+    // Daytona online 2026-11-05: the qualifying length for the practice garage before it.
+    expect(parseSchedule({ scheduledSessions: [session('PRACTICE', 3), session('QUALIFYING', 9), session('RACE', 60)] }))
+      .toEqual({ type: 'schedule', raceMinutes: 60, hasQualifying: true, qualifyingMinutes: 9 });
   });
 });

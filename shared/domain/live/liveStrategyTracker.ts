@@ -40,7 +40,7 @@ export type LiveRestUpdate =
   | { type: 'garage'; veStart: number | null; fuelStart: number | null; fuelRatio?: number | null }
   | { type: 'forecast'; sessions: Record<string, LiveForecastNode[]> }
   /** The actual weekend (`GetSessionsInfoForEvent`); a race needs an unambiguous length in minutes. */
-  | { type: 'schedule'; raceMinutes: number | null; hasQualifying: boolean };
+  | { type: 'schedule'; raceMinutes: number | null; hasQualifying: boolean; qualifyingMinutes?: number | null };
 
 /** What the strategy needs besides the reading: the session details already derived for the snapshot. */
 export interface LiveStrategyContext {
@@ -577,9 +577,12 @@ export class LiveStrategyTracker {
     // race end (`raceClockRunning`), so the race length comes from the event's schedule, unknown until it is read.
     const clockRunning = raceClockRunning(reading.gamePhase, reading.currentEt);
     const raceMinutes = this.schedule?.raceMinutes ?? null;
+    // The practice before qualifying (a few minutes online) is where the qualifying load is set: its garage plans that.
+    const qualifyingMinutes = liveSessionKind(reading.sessionCode) === 'practice' ? this.schedule?.qualifyingMinutes ?? null : null;
     const sessionSeconds = race && !clockRunning
       ? (raceMinutes === null ? null : raceMinutes * 60)
-      : !(reading.endEt > 0 && reading.endEt < 1_000_000) ? null : Math.max(0, reading.endEt - Math.max(0, reading.currentEt));
+      : qualifyingMinutes !== null ? qualifyingMinutes * 60
+        : !(reading.endEt > 0 && reading.endEt < 1_000_000) ? null : Math.max(0, reading.endEt - Math.max(0, reading.currentEt));
     const estimated = reading.player && reading.player.estimatedLapTime > 0 ? reading.player.estimatedLapTime : null;
     const lapSeconds = classLeaderLapSeconds(reading.player, reading.classLeader) ?? median(this.eventLaps) ?? estimated;
     const tyres = this.garageTyres(race && !clockRunning && reading.player?.inPits === false);
@@ -603,7 +606,8 @@ export class LiveStrategyTracker {
     // Planned from any garage before the race; once the race clock runs it is the race plan's job.
     const raceStrategy = race && clockRunning ? null : this.raceStrategy(kind, plan.lapSeconds, leaderLapSeconds, resource, reserveLaps, tyres,
       sessionKind === 'qualifying' || (sessionKind === 'practice' && this.schedule?.hasQualifying === true));
-    return { ...plan, ...(resource.learning ? { learning: resource.learning } : {}), tyres, tyreCoverage: null, raceStrategy };
+    return { ...plan, ...(resource.learning ? { learning: resource.learning } : {}), ...(qualifyingMinutes !== null ? { forQualifying: true } : {}),
+      tyres, tyreCoverage: null, raceStrategy };
   }
 
   /**

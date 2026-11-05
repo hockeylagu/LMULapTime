@@ -149,7 +149,7 @@ describe('offline live dashboard demo', () => {
   it('steps through session preparation, out laps, qualifying results and race start in weekend order', () => {
     render(<LiveDemoPage />);
     for (const [from, next] of [
-      ['garage-practice', 'garage-practice-light'], ['garage-practice-light', 'practice-out-lap'], ['invalid-lap', 'garage-qualifying'],
+      ['garage-practice', 'garage-practice-light'], ['garage-practice-light', 'practice-out-lap'], ['invalid-lap', 'garage-practice-qualifying'], ['garage-practice-qualifying', 'garage-qualifying'],
       ['garage-qualifying', 'garage-qualifying-sprint'], ['garage-qualifying-sprint', 'qualifying-out-lap'], ['positive-delta', 'result-qualifying'],
       ['result-qualifying', 'result-qualifying-settled'], ['start-0', 'start-3'],
       ['start-3', 'start-4'], ['pit-entering', 'pit-stopped'], ['pit-stopped', 'pit-exiting'],

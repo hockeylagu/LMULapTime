@@ -106,7 +106,7 @@ function tyreCheck(tyres: LiveGarageTyres | null, wantNew: boolean): GarageCheck
 /** The garage checklist: the VE or fuel load, the fuel ratio (VE classes) and the tyres the car goes out on. */
 function garageChecks(snapshot: LiveSnapshot, plan: LiveGaragePlan): GarageCheck[] {
   const kind = snapshot.session?.kind;
-  const checks = [resourceCheck(plan, kind === 'practice'), tyreCheck(plan.tyres, kind === 'race' || kind === 'qualifying')];
+  const checks = [resourceCheck(plan, kind === 'practice' && !plan.forQualifying), tyreCheck(plan.tyres, kind === 'race' || kind === 'qualifying')];
   const ratio = snapshot.strategy?.fuelRatio;
   if (plan.kind === 've' && ratio) checks.splice(1, 0, {
     label: 'FUEL RATIO', target: ratio.recommended?.toFixed(2) ?? UNKNOWN, current: ratio.garageSetting?.toFixed(2) ?? UNKNOWN,
@@ -142,7 +142,7 @@ function garageChecks(snapshot: LiveSnapshot, plan: LiveGaragePlan): GarageCheck
 export function garagePreparation(kind: LiveSessionKind | undefined, plan: LiveGaragePlan): NonNullable<LiveScreen['preparation']> {
   // Before the green flag LMU's clock is the countdown to the start: the race length (and its laps) come with it.
   return { laps: kind === 'race' && plan.laps !== null ? Math.max(0, plan.laps - 1) : plan.laps,
-    length: plan.sessionMinutes !== null ? `${plan.sessionMinutes} MIN` : kind === 'race' ? 'LAPS AT THE START' : 'SESSION LENGTH UNKNOWN',
+    length: plan.sessionMinutes !== null ? `${plan.forQualifying ? 'QUALIFYING ' : ''}${plan.sessionMinutes} MIN` : kind === 'race' ? 'LAPS AT THE START' : 'SESSION LENGTH UNKNOWN',
     stopPlan: kind !== 'race' || plan.sessionMinutes === null ? null
       : plan.stops === null ? 'STOPS UNKNOWN' : plan.stops === 0 ? 'NO STOP PLANNED'
         : `${plan.stops} STOP${plan.stops === 1 ? '' : 'S'} PLANNED · ${plan.firstPitLap != null ? `PIT ~LAP ${plan.firstPitLap}` : 'PIT LAP UNKNOWN'}` };

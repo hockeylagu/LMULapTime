@@ -242,6 +242,10 @@ describe('race page with a plan', () => {
     expect(rows()[0]).toHaveAttribute('data-action', 'warn');
     expect(rows()[1]).toHaveTextContent('TYRES98% TREADANYUSED MED');
     expect(rows()[1]).not.toHaveAttribute('data-action');
+    // The practice before qualifying plans the qualifying (Daytona online 2026-11-05): its load is a change to make.
+    send(inGarage('practice', { forQualifying: true, sessionMinutes: 9 }, 4.2));
+    expect(rows()[0]).toHaveTextContent('VE34%30%RAISE +4%');
+    expect(screen.getByTestId('live-preparation-laps').parentElement).toHaveTextContent('QUALIFYING 9 MIN');
     // On the grid the race checklist stays under the start phase, over the pedal trace, until the formation lap.
     const onGrid = (gamePhase: number, sequence: number) => liveSnapshot({ sequence, lifecycle: 'starting', session: liveSession({ kind: 'race', gamePhase }),
       strategy: { ...base, garage: { ...garage, tyres: { ...garage.tyres, used: false, wear: 1 } } } });

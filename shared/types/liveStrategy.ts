@@ -183,6 +183,8 @@ export interface LiveGaragePlan {
   unit: '%' | 'L';
   /** Session length in minutes. */
   sessionMinutes: number | null;
+  /** A practice garage planning the qualifying after it (its length from the event schedule), not the practice itself. */
+  forQualifying?: boolean;
   /** Laps of the session (timed: laps started before the clock ends, plus the out lap). */
   laps: number | null;
   /** The lap time the laps come from. */

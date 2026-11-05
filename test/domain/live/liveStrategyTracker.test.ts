@@ -279,6 +279,24 @@ describe('LiveStrategyTracker', () => {
     expect(context(tracker, racing, { lapsLeft: null })?.garage).toMatchObject({ sessionMinutes: 5, laps: 3 });
   });
 
+  it('plans the qualifying load from the practice garage before it (Daytona online 2026-11-05: 3, 9 and 60 minutes)', () => {
+    const tracker = new LiveStrategyTracker();
+    tracker.applyRest({ type: 'tireManagement', vePerLap: 4.5, fuelPerLap: 2.9, newSets: 8, selected: null });
+    tracker.applyRest({ type: 'garage', veStart: 30, fuelStart: null });
+    const practice = at(30, { sessionCode: 1, inRealtime: false, endEt: 210, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 95 }) });
+    // Without the schedule the practice's own 3 minutes.
+    expect(context(tracker, practice, { lapsLeft: null })?.garage).toMatchObject({ sessionMinutes: 3, laps: 2 });
+    // With it, the qualifying: 9 minutes at 1:35, six laps.
+    tracker.applyRest({ type: 'schedule', raceMinutes: 60, hasQualifying: true, qualifyingMinutes: 9 });
+    const plan = context(tracker, practice, { lapsLeft: null })?.garage;
+    expect(plan).toMatchObject({ sessionMinutes: 9, laps: 6, forQualifying: true });
+    // (6 laps + the reserve) at 4.5 %: 30 %, against the 30 set.
+    expect(plan).toMatchObject({ needed: 30, setInGarage: 30 });
+    // Qualifying itself plans its own time left.
+    const qualifying = at(5, { sessionCode: 5, inRealtime: false, endEt: 545, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 95 }) });
+    expect(context(tracker, qualifying, { lapsLeft: null })?.garage?.forQualifying).toBeUndefined();
+  });
+
   it('plans the race from the qualifying garage, with the schedule and the game tyre change time, until the race runs', () => {
     const tracker = new LiveStrategyTracker();
     tracker.applyRest({ type: 'tireManagement', vePerLap: 2.5, fuelPerLap: 2.1, newSets: 3, selected: { compound: 'Medium', used: false, wear: 1 } });
