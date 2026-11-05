@@ -3,6 +3,53 @@
 Written by the `race-review` skill (`.claude/skills/race-review/SKILL.md`). Newest first. Error = predicted − actual,
 in % of the lap's actual use; negative = underprediction (car runs short).
 
+## 2026-11-05 — LMP2, Le Mans (sarthe_full), two races (Oreca 07)
+
+**Sessions**: qualifying `42Q1`, `07Q1`; race 1 `90R1` (30 min, 38 LMP2, pit lane start), race 2 `44R1` (30 min, 34
+LMP2). Dry, fuel only. First Oreca event at Le Mans; both races on model version 15 (the Daytona fixes live).
+
+**Scorecard** (race 1 / race 2):
+
+| # | Box | Result |
+|---|---|---|
+| 1 | Fuel/VE per lap | OK / OK: median −0.5 % / +1.0 %; race 1 lap 3 from the game estimate (qualifying gave game data only) |
+| 2 | Laps | OK / OK: 8 held steady; 9 planned, 9 run |
+| 3 | Start load | Miss, driving (choice) / same: 9.1 L (1.44 laps) and 9.7 L (1.53 laps) at the flag against 0.21 lap; loaded 66 L (plan 59–60) plus 5 L at the stop, and 67 L (plan 61, which leaves ~0.58 lap) |
+| 4 | Formation lap | n/a (pit lane start) / OK: 0.58 L (0.09 lap) |
+| 5 | Stops | OK / n/a: unplanned repair stop on lap 1 (27 s standing); laps left held at 8 from lane entry to the line (pit-lane fix confirmed) |
+| 6 | Tyre wear | OK / OK: garage projection 0.885, actual 0.881 (race 2 held out); FR slightly under (−0.004) |
+| 7 | Incidents | Race 1: lap 1 post (294 N) and wall (3456 N, suspension) → repair stop; race 2: lap 1 contacts (Delmanson 1044 N), lap 8 Buttier and wall (2907 N, suspension), lap 9 several contacts (225.7 s) |
+| 8 | Weather | n/a / n/a: dry |
+| 9 | Data | Miss, data / Miss, mechanism: recording from 263 s (late pit lane start, realtime only), no race garage; 109 grid checkpoints from unrounded tread (0.9999997), grid forecast "none @64" |
+| 10 | Learning | OK / OK: Oreca Le Mans cohorts insufficient (first event) |
+| 11 | Result | Race 1: pit lane start ~77 s down, P47 after lap 1, class P22 of 38 (13 DNF); race 2: grid P15, P10 lap 1, P13 by lap 7 on pace, P13 of 34 (10 DNF) |
+| 12 | Traffic | OK / OK |
+| 13 | Driving | Clean median 212.46 (14th of 25, field 212.25, +4.2 s on the leader) / 213.38 (16th of 26, +4.3 s, damage after lap 8); best 211.018 / 212.389 against PB 210.434, theoretical 210.83 / 210.48, consistency 99.7 / 99.8; slip 11.8 / 10.8 s, mostly front lockups |
+| 14 | App output | Miss, app / OK: the lap 1 repair stop was hidden (stops 0, lap 2 with the stop read off pace). Session pages not opened |
+| 15 | Deployment | n/a / n/a: LMP2, no battery |
+
+**Changes** (applied, uncommitted):
+- Parser 2.26: a timeless lap 1 pit flag counts as a stop when the declared `<Pitstops>` exceed the later pit flags
+  (27 of 112 such drivers in the stored race XMLs had one stop hidden). Race 1: lap 1 stop (inferred 328.9 s), lap 2 out-lap
+  (`test/server/sessions/parserStream.test.ts`). Needs the reparse the version bump starts.
+- Grid tread rounded to 0.1 % in `garageTyres` (Daytona race 1: 165 checkpoints, Le Mans race 2: 109); the jitter also
+  read a new set as used (`test/domain/live/liveStrategyTracker.test.ts`). Checkpoints only, no model version bump.
+
+**Watch list** (recheck at every review):
+- No race garage recorded after a late pit lane start (race 1; recording starts in realtime only).
+- Start load above plan by choice (+5–6 L both races): check the plan's load before changing anything.
+- History by class, not car (not applied): recheck when a car's first race at a layout follows another car's there.
+- Game crash clears the event meters ('offline' reset); with the history above it fell to the other car's history.
+- Game session-start placeholder estimate feeding the game-forecast learning (Daytona race 1 lap 3, +65 %).
+- Tyres picked in the MFD after service starts are not fitted (Daytona race 2 lap 20, game behaviour); a warning could help.
+- Grid forecast read against the session length before the start ("rain in 47 s" Daytona, "none @64" Le Mans race 2).
+- Wets on forecast rain: forecast term needs several races. Grip 0 and 1 unconfirmed.
+- Deployment: driver changes several laps after the advice (Daytona); check the earlier advice at the next hybrid race.
+- Driving: Le Mans pace ~4 s off the class front; lap 1 and late-race contacts (two suspension hits); Daytona S1 and S3.
+- Carried: start load bias (Silverstone); laps left mid-race 30 vs 29 (Silverstone); race vs qualifying tyre wear;
+  "lowest 2 of 5" meter; race plan from the leader's pace; damage pace after impact.
+- Closed: formation-lap checkpoint flood (rounded); laps left in the pit lane held (Le Mans race 1).
+
 ## 2026-11-05 — Hypercar, Daytona road course, two races (Genesis GMR-001)
 
 **Sessions**: practice `90P1`, `14P1`, qualifying `07Q1`, `43Q1`; race 1 `02R1` (60 min, 53 cars, game crash on lap 2,
