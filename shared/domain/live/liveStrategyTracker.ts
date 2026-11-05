@@ -613,11 +613,13 @@ export class LiveStrategyTracker {
   /**
    * The garage's selected set, or on the grid the set on the car: once the new set is fitted there the selection can
    * still show the used qualifying set (97 % at Portimão 2026-10-29 and 95 % on 10-24, against 100 % on the car).
+   * Rounded to 0.1 %: the raw reading jitters (0.9999997) and read as used, and each jitter saved a settings
+   * checkpoint (109 on the Le Mans grid 2026-11-05, 165 at Daytona).
    */
   private garageTyres(onGrid: boolean): LiveGarageTyres | null {
     const selected = this.usage?.selected ?? null;
     const newSets = this.usage?.newSets ?? null;
-    const tread = this.car?.tread;
+    const tread = this.car?.tread?.map(value => round(value, 3));
     if (onGrid && tread?.length === 4) {
       return { compound: this.car?.compound || selected?.compound || null, used: tread.some(value => value < 1),
         wear: Math.min(...tread), tread: [tread[0], tread[1], tread[2], tread[3]], newSets };

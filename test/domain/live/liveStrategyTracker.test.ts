@@ -325,6 +325,9 @@ describe('LiveStrategyTracker', () => {
     const plan = context(tracker, grid, { lapsLeft: null })?.garage;
     expect(plan?.tyres).toEqual({ compound: 'Medium', used: false, wear: 1, tread: [1, 1, 1, 1], newSets: 0 });
     expect(plan?.raceStrategy?.chosen.tyresStart).toBe('NEW MEDIUM');
+    // The raw tread jitters below 1 on the grid (Le Mans 2026-11-05): still a new set, and the same plan.
+    tracker.applyCar({ ...veCar(0.42), tread: [0.9999997019767761, 0.999999463558197, 1, 1] });
+    expect(context(tracker, grid, { lapsLeft: null })?.garage?.tyres).toEqual(plan?.tyres);
   });
 
   it('uses the actual weekend in practice: no race plan on practice servers, no qualifying set without qualifying', () => {
