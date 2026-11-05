@@ -211,6 +211,18 @@ describe('LiveCaptureController', () => {
     expect(writer.batches().flatMap(batch => batch.observations).some(item => item.kind === 'strategy-prediction')).toBe(false);
   });
 
+  it('keeps the garage plan as the first checkpoint when the recording opens late (pit lane start)', () => {
+    // Le Mans 2026-11-05: in the garage until 263 s, so the race plan was never recorded.
+    const { controller, writer } = makeController();
+    const usage = { fuel: null, ve: null, fuelNowLitres: 66, veNowPercent: null };
+    const inGarage = snapshot('race', 'sarthe:full', 'garage');
+    controller.update(reading(5, { inRealtime: false }), { ...inGarage, session: { ...inGarage.session!, elapsedSeconds: 5 } }, usage);
+    controller.update(reading(263), snapshot(), usage);
+    vi.advanceTimersByTime(1000);
+    const audits = writer.batches().flatMap(batch => batch.observations.filter(item => item.kind === 'strategy-audit-v1'));
+    expect(audits[0]).toMatchObject({ elapsedSeconds: 5, data: { reason: 'start', snapshot: { lifecycle: 'garage' } } });
+  });
+
   it('starts independently of dashboard clients and batches ISO samples with the schema stride and metadata', () => {
     const { controller, writer } = makeController();
     start(controller);

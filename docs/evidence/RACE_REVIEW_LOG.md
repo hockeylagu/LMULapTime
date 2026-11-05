@@ -36,7 +36,6 @@ LMP2). Dry, fuel only. First Oreca event at Le Mans; both races on model version
   read a new set as used (`test/domain/live/liveStrategyTracker.test.ts`). Checkpoints only, no model version bump.
 
 **Watch list** (recheck at every review):
-- No race garage recorded after a late pit lane start (race 1; recording starts in realtime only).
 - Start load above plan by choice (+5–6 L both races): check the plan's load before changing anything.
 - History by class, not car (not applied): recheck when a car's first race at a layout follows another car's there.
 - Game crash clears the event meters ('offline' reset); with the history above it fell to the other car's history.
@@ -48,7 +47,8 @@ LMP2). Dry, fuel only. First Oreca event at Le Mans; both races on model version
 - Driving: Le Mans pace ~4 s off the class front; lap 1 and late-race contacts (two suspension hits); Daytona S1 and S3.
 - Carried: start load bias (Silverstone); laps left mid-race 30 vs 29 (Silverstone); race vs qualifying tyre wear;
   "lowest 2 of 5" meter; race plan from the leader's pace; damage pace after impact.
-- Closed: formation-lap checkpoint flood (rounded); laps left in the pit lane held (Le Mans race 1).
+- Closed: formation-lap checkpoint flood (rounded); laps left in the pit lane held (Le Mans race 1); no race garage on a
+  pit lane start (race 1, driver confirmed; the last garage snapshot is now the recording's first checkpoint).
 
 ## 2026-11-05 — Hypercar, Daytona road course, two races (Genesis GMR-001)
 

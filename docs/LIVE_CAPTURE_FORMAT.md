@@ -13,7 +13,9 @@ Each recording attempt owns one `*.live.duckdb` file with a unique recording ID.
 An attempt opens only once the player is in the car (`inRealtime`): garage menus and a finished
 session's last frames produce no motion samples, so they create no file. A started attempt stays open
 through garage visits. Garage-only REST reads (event schedule, garage data) made before the first drive
-are therefore not in the recording; the live dashboard still uses them.
+are therefore not in the recording; the live dashboard still uses them. The last garage snapshot of the same
+session is kept, though: it becomes the first `strategy-audit-v1` checkpoint (`start`, at its own session time), so
+a pit lane start that opens the file minutes into the race still records the race plan.
 Recording starts immediately even when the exact layout is pending, using an `unresolved_` filename.
 Once a completed attempt has a known layout, its worker checkpoints and closes the recording handle,
 then replaces that prefix with the sanitized layout key. It updates the file's manifest and filename

@@ -62,6 +62,8 @@ export class LiveCaptureController {
   private closeResolve: (() => void) | null = null;
   private closingWorker = false;
   private audit: LiveAuditTracker | null = null;
+  /** The latest garage reading before the recording opens: its plan is the run's first checkpoint (pit lane starts). */
+  private garage: { key: string; reading: LiveScoringReading; snapshot: LiveSnapshot; usage: LiveUsageObservation } | null = null;
   private links = new Map<string, Pick<LiveCaptureManifest, 'recordingId' | 'filename' | 'sessionId' | 'gameVersion'>>();
   private linked = new Map<string, string>();
   private pendingLinks = new Map<string, string>();
@@ -104,7 +106,10 @@ export class LiveCaptureController {
     // Open a recording only once the player is in the car: garage menus and session-over screens produce no motion samples.
     if (!this.manifest && reading.inRealtime) this.begin(reading, snapshot, key);
     const manifest = this.manifest;
-    if (!manifest) return;
+    if (!manifest) {
+      this.garage = usage ? { key, reading, snapshot, usage } : null;
+      return;
+    }
     manifest.updatedAt = Math.max(manifest.updatedAt, this.now());
     manifest.lastElapsedSeconds = Math.max(manifest.lastElapsedSeconds, reading.currentEt);
     manifest.layoutKey ??= snapshot.identity?.layoutKey ?? null;
@@ -301,6 +306,10 @@ export class LiveCaptureController {
       source: 'recorder', kind: 'strategy-audit-v1', elapsedSeconds: record.snapshot.session?.elapsedSeconds ?? null,
       receivedAt: record.recordedAt, data: record,
     }));
+    // A pit lane start opens the recording minutes into the race (Le Mans 2026-11-05: 263 s), after the garage plan.
+    const garage = this.garage;
+    this.garage = null;
+    if (garage?.key === key) this.audit.update(garage.snapshot, garage.reading, garage.usage, now);
     this.error = null;
     this.ensureWorker();
     this.flush(true);
