@@ -12,11 +12,10 @@ vi.mock('three', async importOriginal => {
   }};
 });
 
-it('uses standard sky, PMREM and camera-split directional shadows while preserving material hooks', () => {
+it('uses standard sky, PMREM and one sun shadow without touching shared shader chunks', () => {
   const scene = new Scene(), renderer = {shadowMap: {enabled: false, type: 0}, toneMapping: 0, toneMappingExposure: 0} as unknown as WebGLRenderer;
   const lightChunk = ShaderChunk.lights_fragment_begin, lightPars = ShaderChunk.lights_pars_begin;
-  const material = new MeshStandardMaterial(), onBeforeCompile = vi.fn(); material.onBeforeCompile = onBeforeCompile;
-  const receiver = new Mesh(new BoxGeometry(), material); receiver.receiveShadow = true; scene.add(receiver);
+  const material = new MeshStandardMaterial(), receiver = new Mesh(new BoxGeometry(), material); receiver.receiveShadow = true; scene.add(receiver);
   const environment = addSceneEnvironment(scene, renderer);
   expect(scene.getObjectByName('default-terrain')).toBeUndefined(); expect(scene.children.filter(child => child instanceof Mesh && child.name !== 'sky')).toEqual([receiver]);
   expect(scene.getObjectByName('sky')).toBeDefined();
@@ -24,26 +23,21 @@ it('uses standard sky, PMREM and camera-split directional shadows while preservi
   expect(scene.background).toBeNull(); expect(renderer.shadowMap.enabled).toBe(true);
   expect(renderer.toneMapping).toBe(NeutralToneMapping); expect(renderer.toneMappingExposure).toBe(0.90);
   const camera = new PerspectiveCamera(48, 1.5, 0.5, 15000); camera.position.set(500, 3, -200); camera.updateMatrixWorld();
-  environment.setCamera(camera); environment.update();
+  environment.setCamera(camera); environment.update(new Vector3(500, 0, -210));
   const suns = scene.children.filter((child): child is DirectionalLight => child instanceof DirectionalLight);
-  expect(suns).toHaveLength(3);
-  for (const sun of suns) {
-    expect(sun.castShadow).toBe(true); expect(sun.intensity).toBe(DAYLIGHT.sunIntensity);
-    expect(sun.shadow.mapSize.toArray()).toEqual([2048, 2048]);
-    expect(sun.shadow.intensity).toBe(1); expect(sun.shadow.radius).toBe(1);
-    expect(sun.shadow.bias).toBe(0.000001); expect(sun.shadow.normalBias).toBe(0.01);
-  }
-  expect(suns[0].shadow.camera.right - suns[0].shadow.camera.left).toBeLessThan(suns[1].shadow.camera.right - suns[1].shadow.camera.left);
-  expect(suns[1].shadow.camera.right - suns[1].shadow.camera.left).toBeLessThan(suns[2].shadow.camera.right - suns[2].shadow.camera.left);
-  expect(material.defines).toMatchObject({USE_CSM: 1, CSM_CASCADES: 3});
-  const streamedMaterial = new MeshStandardMaterial(), streamedReceiver = new Mesh(new BoxGeometry(), streamedMaterial);
-  streamedReceiver.receiveShadow = true; environment.prepareObject(streamedReceiver);
-  expect(streamedMaterial.defines).toMatchObject({USE_CSM: 1, CSM_CASCADES: 3});
-  const shader = {uniforms: {}} as Parameters<typeof material.onBeforeCompile>[0];
-  material.onBeforeCompile(shader, renderer); expect(onBeforeCompile).toHaveBeenCalledOnce();
-  expect(ShaderChunk.lights_fragment_begin).not.toBe(lightChunk);
+  expect(suns).toHaveLength(1);
+  const [sun] = suns;
+  expect(sun.castShadow).toBe(true); expect(sun.intensity).toBe(DAYLIGHT.sunIntensity);
+  expect(sun.shadow.mapSize.toArray()).toEqual([4096, 4096]);
+  expect(sun.shadow.camera.right - sun.shadow.camera.left).toBe(160);
+  expect(sun.shadow.intensity).toBe(1); expect(sun.shadow.radius).toBe(1);
+  expect(sun.shadow.bias).toBe(0.000001); expect(sun.shadow.normalBias).toBe(0.01);
+  expect(sun.position.clone().sub(sun.target.position).normalize().toArray().map(v => +v.toFixed(6))).toEqual(SUN_DIRECTION.toArray().map(v => +v.toFixed(6)));
+  // Materials keep their own compile hooks and the shared lighting chunks stay three.js's.
+  expect(material.defines ?? {}).not.toHaveProperty('USE_CSM');
+  expect(ShaderChunk.lights_fragment_begin).toBe(lightChunk); expect(ShaderChunk.lights_pars_begin).toBe(lightPars);
   environment.setCamera(new OrthographicCamera(-80, 80, 80, -80, 0.5, 15000));
-  environment.update(); expect(scene.children.filter(child => child instanceof DirectionalLight)).toHaveLength(3);
+  environment.update(new Vector3()); expect(scene.children.filter(child => child instanceof DirectionalLight)).toHaveLength(1);
   expect(scene.environment).toBeInstanceOf(Texture); expect(scene.environmentIntensity).toBeCloseTo(0.112);
   const sky = scene.getObjectByName('sky') as Sky;
   const reflectedSky = probe.render.mock.calls.at(-1)![0].children.find(child => child instanceof Sky)!;
@@ -54,20 +48,28 @@ it('uses standard sky, PMREM and camera-split directional shadows while preservi
   expect((sky.material.uniforms.sunPosition.value as Vector3).toArray()).toEqual(SUN_DIRECTION.toArray());
   expect(sky.material.fragmentShader).not.toContain('referenceRadianceScale');
   environment.dispose(); expect(scene.environment).toBeNull(); expect(probe.dispose).toHaveBeenCalledOnce();
-  material.onBeforeCompile(shader, renderer); expect(onBeforeCompile).toHaveBeenCalledTimes(2);
-  expect(ShaderChunk.lights_fragment_begin).toBe(lightChunk); expect(ShaderChunk.lights_pars_begin).toBe(lightPars);
+  expect(scene.children.some(child => child instanceof DirectionalLight)).toBe(false);
 });
 
-it('moves the standard shadow window with the selected camera', () => {
+it('centres the shadow window ahead of the focus along the view and snaps it to whole texels', () => {
   const scene = new Scene(), renderer = {shadowMap: {enabled: false, type: 0}} as unknown as WebGLRenderer;
   const environment = addSceneEnvironment(scene, renderer), camera = new PerspectiveCamera(48, 1.5, 0.5, 15000);
-  environment.setCamera(camera);
+  camera.position.set(0, 3, 10); camera.lookAt(0, 0, 0); environment.setCamera(camera);
   try {
-    environment.update();
     const sun = scene.children.find((child): child is DirectionalLight => child instanceof DirectionalLight)!;
-    const focus = sun.position.clone(); camera.position.x += 10; camera.updateMatrixWorld(); environment.update();
-    expect(sun.position.x - focus.x).toBeCloseTo(10, 0);
-    expect(scene.children.filter(child => child instanceof DirectionalLight)).toHaveLength(3);
+    const texel = 160 / 4096, sunAxis = (point: Vector3) => point.clone().projectOnPlane(SUN_DIRECTION);
+    environment.update(new Vector3(0, 0, 0));
+    // The camera looks along -z: the window leads the focus by 50 m that way (within half a texel of snapping).
+    const centre = sunAxis(sun.target.position).sub(sunAxis(new Vector3(0, 0, -50)));
+    expect(centre.length()).toBeLessThanOrEqual(texel);
+    // Wherever the focus goes, the world origin sits on a whole texel of the shadow camera, so texels never slide under the scene.
+    const onGrid = (value: number) => Math.abs(value / texel - Math.round(value / texel)) < 1e-3;
+    for (const x of [0.013, 3.7, 10, 123.456]) {
+      environment.update(new Vector3(x, 0, -x / 3));
+      sun.shadow.updateMatrices(sun);
+      const origin = new Vector3().applyMatrix4(sun.shadow.camera.matrixWorldInverse);
+      expect(onGrid(origin.x) && onGrid(origin.y)).toBe(true);
+    }
   } finally { environment.dispose(); }
 });
 

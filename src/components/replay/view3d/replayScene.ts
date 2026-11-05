@@ -64,7 +64,6 @@ export async function createReplayScene(
   let disposed = false, refreshTimer = 0, invalidate: () => void = () => {};
   // Lines are draped on the road: when the resident chunks change, re-drape them (coalesced).
   let freezeScenery = () => {};
-  let prepareShadows = (_root: Object3D) => {};
   const scheduleRefresh = () => {
     if (refreshTimer || !layerReady) return;
     refreshTimer = window.setTimeout(() => { refreshTimer = 0; if (disposed) return; layer.refreshHeights(); invalidate(); }, 250);
@@ -103,7 +102,7 @@ export async function createReplayScene(
   const stream = createSceneryStream(layout, sceneryRoot, {
     load: async (chunk, signal) => {
       const root = await loader.load(chunk, signal);
-      const ready = warming.then(async () => { signal.throwIfAborted(); prepareShadows(root); await warmUp(root, signal); await collision.add(chunk.id, root); signal.throwIfAborted(); });
+      const ready = warming.then(async () => { signal.throwIfAborted(); await warmUp(root, signal); await collision.add(chunk.id, root); signal.throwIfAborted(); });
       warming = ready.catch(() => {});
       try { await ready; return root; }
       catch (error) { collision.remove(chunk.id); loader.releaseChunk(root); throw error; }
@@ -138,7 +137,6 @@ export async function createReplayScene(
   const scene = new Scene();
   warmTarget = {scene};
   const environment = addSceneEnvironment(scene, renderer, layout.daylight);
-  prepareShadows = root => environment.prepareObject(root);
   // Convert the native left-handed frame once, including meshes, car bodies and trails.
   // Camera targets/offsets use the same reflection. Mirroring only terrain misaligns poses.
   const world = new Group(); world.scale.z = -1; world.add(sceneryRoot); scene.add(world);
@@ -190,7 +188,7 @@ export async function createReplayScene(
       camera.lookAt(controls.target);
     }
     try {
-      environment.update(); renderer.render(scene, camera);
+      environment.update(controls.target); renderer.render(scene, camera);
     } finally {
       if (corrected) {
         camera.position.copy(desiredEye);
@@ -261,7 +259,6 @@ export async function createReplayScene(
       const request = ++lapRequest;
       const replacement = await loadLaps(next, comparison, assets, lineMode);
       if (disposed || signal?.aborted || request !== lapRequest) { replacement.dispose(); return false; }
-      environment.prepareObject(replacement.root);
       replacement.colorLines(lineMode); replacement.fadeLines(primaryOpacity, baselineOpacity);
       layer.dispose(); layer = replacement; world.add(layer.root);
       syncCockpitVisibility();

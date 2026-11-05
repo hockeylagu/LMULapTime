@@ -1,6 +1,5 @@
-import { Color, DoubleSide, FogExp2, MathUtils, Mesh, MeshBasicMaterial, MeshStandardMaterial, NeutralToneMapping, PCFShadowMap, PlaneGeometry, PMREMGenerator, Scene, ShaderChunk, Vector3, type Camera, type Material, type Object3D, type OrthographicCamera, type PerspectiveCamera, type WebGLRenderer } from 'three';
+import { Color, DirectionalLight, DoubleSide, FogExp2, MathUtils, Matrix4, Mesh, MeshBasicMaterial, NeutralToneMapping, PCFShadowMap, PlaneGeometry, PMREMGenerator, Scene, Vector3, type Camera, type OrthographicCamera, type PerspectiveCamera, type WebGLRenderer } from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
-import { CSM } from 'three/addons/csm/CSM.js';
 import { nativeToScene } from './sceneFrame.js';
 import type { SceneryDaylight } from '../../../../shared/types/scenes/scenery.js';
 
@@ -19,21 +18,14 @@ export const DAYLIGHT = Object.freeze({
 const SKY_RADIUS_M = 12000, ENVIRONMENT_GROUND_Y = -0.5;
 /** Mean reflectance of the ground around a circuit (grass, asphalt, concrete) for the bounce light in the environment. */
 const GROUND_ALBEDO = 0.2;
-const SHADOW_MAX_DISTANCE_M = 150, SHADOW_CASCADES = 3, SHADOW_MAP_PX = 2048;
-let activeCsmCount = 0;
-let originalLightingChunks: {begin: string; pars: string} | null = null;
-
-function acquireCsmShaderChunks(): void {
-  if (activeCsmCount === 0) originalLightingChunks = {begin: ShaderChunk.lights_fragment_begin, pars: ShaderChunk.lights_pars_begin};
-  activeCsmCount++;
-}
-
-function releaseCsmShaderChunks(): void {
-  if (--activeCsmCount !== 0 || !originalLightingChunks) return;
-  ShaderChunk.lights_fragment_begin = originalLightingChunks.begin;
-  ShaderChunk.lights_pars_begin = originalLightingChunks.pars;
-  originalLightingChunks = null;
-}
+/**
+ * One sun shadow map over a square around the camera's focus (the car), shifted ahead along the view so the road the camera
+ * looks at is covered: 4096 px over 160 m is ~4 cm per texel. Every shadow pass re-draws each caster it meets, and that per-draw
+ * CPU work is the frame's main cost (docs/plans/proposed/REPLAY_3D_PERFORMANCE.md), so one map replaces the three cascades the
+ * frame used to draw. Nothing beyond the square is shadowed.
+ */
+const SHADOW_HALF_EXTENT_M = 80, SHADOW_LEAD_M = 50, SHADOW_MAP_PX = 4096, SHADOW_LIGHT_DISTANCE_M = 400;
+const SHADOW_TEXEL_M = 2 * SHADOW_HALF_EXTENT_M / SHADOW_MAP_PX;
 const sunToward = (elevationDeg: number) => {
   const a = MathUtils.degToRad(DAYLIGHT.azimuthDeg), e = MathUtils.degToRad(elevationDeg);
   return new Vector3(Math.cos(a) * Math.cos(e), Math.sin(e), Math.sin(a) * Math.cos(e));
@@ -69,11 +61,10 @@ export function sceneLighting(daylight?: SceneryDaylight): SceneLighting {
 }
 
 export interface SceneEnvironment {
-  /** The camera followed by the directional shadow window. */
+  /** The camera whose view direction leads the shadow window. */
   setCamera(camera: PerspectiveCamera | OrthographicCamera): void;
-  /** Applies cascaded shadows to newly loaded receivers before their first compile. */
-  prepareObject(object: Object3D): void;
-  update(): void;
+  /** Moves the shadow window to `focus` (scene coordinates, on the ground: the camera's look target) before a frame renders. */
+  update(focus: Vector3): void;
   dispose(): void;
 }
 
@@ -113,59 +104,38 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, dayli
   renderer.toneMapping = NeutralToneMapping;
   renderer.toneMappingExposure = DAYLIGHT.exposure;
 
-  let cascades: CSM | null = null;
-  let ownsCsmShaderChunks = false;
-  const originalCompile = new Map<Material, Material['onBeforeCompile']>();
-  const prepareMaterial = (material: Material) => {
-    if (!cascades || !(material instanceof MeshStandardMaterial) || originalCompile.has(material)) return;
-    const compile = material.onBeforeCompile.bind(material);
-    cascades.setupMaterial(material);
-    const compileCsm = material.onBeforeCompile.bind(material);
-    material.onBeforeCompile = (shader, compileRenderer) => { compile(shader, compileRenderer); compileCsm(shader, compileRenderer); };
-    originalCompile.set(material, compile);
-  };
-  const prepareObject = (object: Object3D) => {
-    object.traverse(child => {
-      if (!(child instanceof Mesh) || !child.receiveShadow) return;
-      const materials = Array.isArray(child.material) ? child.material : [child.material];
-      materials.forEach(prepareMaterial);
-    });
-  };
+  const sun = new DirectionalLight(new Color(DAYLIGHT.sunColor), DAYLIGHT.sunIntensity);
+  sun.name = 'sun'; sun.castShadow = true;
+  sun.shadow.mapSize.set(SHADOW_MAP_PX, SHADOW_MAP_PX);
+  Object.assign(sun.shadow.camera, {left: -SHADOW_HALF_EXTENT_M, right: SHADOW_HALF_EXTENT_M, top: SHADOW_HALF_EXTENT_M, bottom: -SHADOW_HALF_EXTENT_M,
+    near: 1, far: 2 * SHADOW_LIGHT_DISTANCE_M});
+  sun.shadow.camera.updateProjectionMatrix();
+  sun.shadow.bias = 0.000001; sun.shadow.normalBias = 0.01; sun.shadow.intensity = 1; sun.shadow.radius = 1;
+  scene.add(sun, sun.target);
+  // The window's centre is snapped to whole texels in the sun's frame: a window sliding by fractions of a texel makes shadow edges shimmer.
+  const toSun = lighting.sunDirection.clone().normalize();
+  const sunFrame = new Matrix4().lookAt(new Vector3(), toSun.clone().negate(), Math.abs(toSun.y) > 0.99 ? new Vector3(0, 0, 1) : new Vector3(0, 1, 0));
+  const fromSunFrame = sunFrame.clone().invert(), centre = new Vector3(), ahead = new Vector3();
   let view: PerspectiveCamera | OrthographicCamera | null = null;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = PCFShadowMap;
   scene.add(sky);
   return {
-    setCamera(camera) {
-      view = camera;
-      if (cascades) {
-        cascades.camera = camera;
-        cascades.updateFrustums();
-        return;
+    setCamera(camera) { view = camera; },
+    update(focus) {
+      centre.copy(focus);
+      if (view) {
+        view.updateMatrixWorld();
+        view.getWorldDirection(ahead); ahead.y = 0;
+        if (ahead.lengthSq() > 1e-6) centre.addScaledVector(ahead.normalize(), SHADOW_LEAD_M);
       }
-      acquireCsmShaderChunks(); ownsCsmShaderChunks = true;
-      cascades = new CSM({camera, parent: scene, cascades: SHADOW_CASCADES, maxFar: SHADOW_MAX_DISTANCE_M, shadowMapSize: SHADOW_MAP_PX,
-        shadowBias: 0.000001, lightDirection: lighting.sunDirection.clone().negate(), lightIntensity: DAYLIGHT.sunIntensity, lightNear: 1, lightFar: 500});
-      for (const light of cascades.lights) {
-        light.color.set(DAYLIGHT.sunColor);
-        light.shadow.intensity = 1; light.shadow.radius = 1; light.shadow.normalBias = 0.01;
-      }
-      prepareObject(scene);
-    },
-    prepareObject,
-    update() {
-      if (!view) return;
-      view.updateMatrixWorld();
-      cascades?.update();
+      centre.applyMatrix4(fromSunFrame);
+      centre.x = Math.round(centre.x / SHADOW_TEXEL_M) * SHADOW_TEXEL_M; centre.y = Math.round(centre.y / SHADOW_TEXEL_M) * SHADOW_TEXEL_M;
+      centre.applyMatrix4(sunFrame);
+      sun.target.position.copy(centre); sun.position.copy(centre).addScaledVector(toSun, SHADOW_LIGHT_DISTANCE_M);
+      sun.updateMatrixWorld(); sun.target.updateMatrixWorld();
     },
     dispose() {
-      if (cascades) {
-        const lights = [...cascades.lights];
-        cascades.remove(); cascades.dispose();
-        for (const [material, compile] of originalCompile) material.onBeforeCompile = compile;
-        lights.forEach(light => light.dispose());
-        cascades = null;
-      }
-      if (ownsCsmShaderChunks) releaseCsmShaderChunks();
+      scene.remove(sun, sun.target); sun.dispose();
       scene.environment = null; reflection.dispose(); reflectedGround.geometry.dispose(); reflectedGround.material.dispose();
     },
   };
