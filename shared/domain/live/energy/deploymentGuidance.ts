@@ -79,11 +79,15 @@ export class DeploymentGuidance {
     return change > 0 ? DEPLOYMENT_RANGE[1] : change < 0 ? DEPLOYMENT_RANGE[0] : null;
   }
 
-  /** Seconds until the lap-average charge reaches the edge at the current rate (0 when already past it). */
+  /**
+   * Seconds until the lap-average charge reaches the edge at the current rate (0 when already past it). The average
+   * sits half a lap back, so it is carried forward by half the lap's change: on the lap average alone the advice came
+   * half a lap late (Daytona 2026-11-05: 30 to 40 kW advised with the charge peaking at 91 % in the lap, then 96 %).
+   */
   public get edgeSeconds(): number | null {
     const edge = this.edge;
     if (!this.lap || edge === null || !(this.lap.seconds > 0)) return null;
-    return Math.max(0, (edge - this.lap.level) / (this.lap.change / this.lap.seconds));
+    return Math.max(0, (edge - (this.lap.level + this.lap.change / 2)) / (this.lap.change / this.lap.seconds));
   }
 
   /**

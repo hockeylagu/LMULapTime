@@ -54,6 +54,13 @@ describe('deployment guidance', () => {
     expect(drive({ settings: [0, 5, 10], level: 25, current: 0, rate: () => -10, laps: 2 }).guidance.advice.target).toBe(0);
   });
 
+  it('advises a lap before the edge from the charge now, not from the lap average half a lap behind it', () => {
+    // Daytona race 2026-11-05 on wets: +10 % a lap on 30 kW. The lap average trails the charge by 5 points: on it alone
+    // the change came at 75 %, a lap before 80 % only for an average already 5 points late.
+    const { changes } = drive({ level: 50, current: 40, rate: setting => (setting === 40 ? 10 : -10), laps: 4, follow: true });
+    expect(changes[0]?.level).toBeCloseTo(70, 0);
+  });
+
   it('measures a full lap of track first, then reads through the in-lap swing', () => {
     const half = drive({ level: 50, current: 60, rate: () => 0, swing: 40, laps: 0.9 }).guidance;
     expect(half.advice.target).toBeNull();

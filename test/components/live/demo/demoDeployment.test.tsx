@@ -15,8 +15,8 @@ describe('demo deployment advice', () => {
     render(<LiveDemoPage />);
     const cell = screen.getByTestId('live-race-cell-3');
     expect(cell).toHaveTextContent('DEPLOYMENT');
-    expect(cell).toHaveTextContent('60 kW IN 5:00');
-    expect(cell).toHaveTextContent('BATT 62% · 80% IN 7:00');
+    expect(cell).toHaveTextContent('60 kW IN 4:00');
+    expect(cell).toHaveTextContent('BATT 62% · 80% IN 6:00');
     expect(screen.queryByText('FUEL RATIO')).not.toBeInTheDocument();
     expect(screen.getByTestId('live-race-cell-1')).toHaveTextContent('MFD · RATIO 0.95');
     // Without a battery (any other class) the plan is unchanged.
@@ -24,7 +24,7 @@ describe('demo deployment advice', () => {
   });
 
   it('advises a Hypercar on track in races, practice and qualifying only, through the real readout', () => {
-    expect(deploymentReadout(deployment('race')!)).toMatchObject({ value: 'HOLD', note: '60 kW IN 5:00', detail: 'BATT 62% · 80% IN 7:00' });
+    expect(deploymentReadout(deployment('race')!)).toMatchObject({ value: 'HOLD', note: '60 kW IN 4:00', detail: 'BATT 62% · 80% IN 6:00' });
     expect(deployment('practice')).not.toBeNull();
     expect(deployment('qualifying')).not.toBeNull();
     expect(deployment('race', 'GT3')).toBeNull();
@@ -32,7 +32,7 @@ describe('demo deployment advice', () => {
   });
 
   it('shows the advised change in its own scenario, in kW from the plugin list', () => {
-    expect(deploymentReadout(deployment('deployment-change')!)).toMatchObject({ value: '+20', unit: 'kW', tone: 'warn', note: '40 → 60 kW', detail: 'BATT 64% · 80% IN 1:30' });
+    expect(deploymentReadout(deployment('deployment-change')!)).toMatchObject({ value: '+20', unit: 'kW', tone: 'warn', note: '40 → 60 kW', detail: 'BATT 64% · 80% IN 0:30' });
     expect(deployment('deployment-change', 'GT3')).toBeNull();
   });
 

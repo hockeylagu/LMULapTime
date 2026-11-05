@@ -14,7 +14,7 @@ const charge = (seconds: number) => 50 + 6 * (seconds / LAP_SECONDS) + 15 * Math
 
 /**
  * Every Hypercar demo scenario on track shows this advice, run through the real controller at 5 Hz: two laps hold with
- * the coming change counted down; `change` drives on until the lap average is a lap from full and the step up is advised.
+ * the coming change counted down; `change` drives on until the charge is a lap from full and the step up is advised.
  */
 export function demoDeployment(change = false): LiveDeployment | null {
   const guidance = new DeploymentGuidance(KW);

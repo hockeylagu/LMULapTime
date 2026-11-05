@@ -85,10 +85,10 @@ respected). Inside a lap the charge swings far more than it changes over one (Sp
 6% before the next one), so trend and level always span exactly one lap of track: the rate is the charge now against the
 same track point one lap ago, the level is the time-weighted average over that lap. Its goal is a long edge-to-edge cycle,
 not holding 50%: deplete on one setting until the lap average nears the 20% edge, charge on the next lower one up to the
-80% edge, then switch back (8-30 laps between changes in simulation). The advice comes the moment the lap average is one
-lap from an edge at the current rate, anywhere on the lap, and latches one adjacent target until a change is observed;
+80% edge, then switch back (8-30 laps between changes in simulation). The advice comes the moment the lap average, carried
+forward half a lap to now (it lags the charge by half a lap; Daytona 2026-11-05), is one lap from an edge at the current rate, anywhere on the lap, and latches one adjacent target until a change is observed;
 ignored advice withdraws once the lap average is back inside 30-70% with the edge more than two laps away. The detail line
-shows the time until the edge (`BATT 62% · 80% IN 7:00`), and the note counts down to the next change (`60 kW IN 5:00`, `MAP 3 IN 5:00` without a plugin list,
+shows the time until the edge (`BATT 62% · 80% IN 6:00`), and the note counts down to the next change (`60 kW IN 4:00`, `MAP 3 IN 5:00` without a plugin list,
 the time until it is advised) in the last 3 laps before it (driver chose the clock over laps, 2026-10-27). A changed setting clears the measurement and waits one full lap of track on the new setting.
 Readings that do not move forward (lap distance dips below zero just after the line) are skipped; a jump of half a lap
 and the pit lane start the measurement again. These margins are tuning, not calibrated vehicle limits (driver confirmed
