@@ -110,7 +110,8 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, dayli
   Object.assign(sun.shadow.camera, {left: -SHADOW_HALF_EXTENT_M, right: SHADOW_HALF_EXTENT_M, top: SHADOW_HALF_EXTENT_M, bottom: -SHADOW_HALF_EXTENT_M,
     near: 1, far: 2 * SHADOW_LIGHT_DISTANCE_M});
   sun.shadow.camera.updateProjectionMatrix();
-  sun.shadow.bias = 0.000001; sun.shadow.normalBias = 0.01; sun.shadow.intensity = 1; sun.shadow.radius = 1;
+  // normalBias ~1.3 texels (~4 cm): at 0.01 the road lines and car bodies speckled with self-shadow acne.
+  sun.shadow.bias = 0.000001; sun.shadow.normalBias = 0.05; sun.shadow.intensity = 1; sun.shadow.radius = 1;
   scene.add(sun, sun.target);
   // The window's centre is snapped to whole texels in the sun's frame: a window sliding by fractions of a texel makes shadow edges shimmer.
   const toSun = lighting.sunDirection.clone().normalize();

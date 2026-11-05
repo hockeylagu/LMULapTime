@@ -31,7 +31,7 @@ it('uses standard sky, PMREM and one sun shadow without touching shared shader c
   expect(sun.shadow.mapSize.toArray()).toEqual([4096, 4096]);
   expect(sun.shadow.camera.right - sun.shadow.camera.left).toBe(160);
   expect(sun.shadow.intensity).toBe(1); expect(sun.shadow.radius).toBe(1);
-  expect(sun.shadow.bias).toBe(0.000001); expect(sun.shadow.normalBias).toBe(0.01);
+  expect(sun.shadow.bias).toBe(0.000001); expect(sun.shadow.normalBias).toBe(0.05);
   expect(sun.position.clone().sub(sun.target.position).normalize().toArray().map(v => +v.toFixed(6))).toEqual(SUN_DIRECTION.toArray().map(v => +v.toFixed(6)));
   // Materials keep their own compile hooks and the shared lighting chunks stay three.js's.
   expect(material.defines ?? {}).not.toHaveProperty('USE_CSM');
