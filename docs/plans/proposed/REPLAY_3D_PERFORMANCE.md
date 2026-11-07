@@ -1,6 +1,6 @@
 # 3D replay performance review
 
-Status: in progress (2026-11-04). Baseline measured; step 2 (shadows) done as a single snapped sun map, uncommitted; the
+Status: in progress (2026-11-04). Baseline measured; step 2 (shadows) done as a single snapped sun map; the
 production build meets the frame targets on both reference laps (see "Results"). Load: package files are now served as plain
 static files (`no-store`, no per-request hash); the whole-file zstd textures of step 3 are with the pipeline session for the v2
 export, after which the client loads plain KTX2 (`Content-Encoding: zstd`) and load is re-measured. Stack: `src/components/replay/view3d/` (client),
@@ -140,6 +140,50 @@ textures load whole. The first frame waits only for the chunks under the view; t
   370 → 580, no uploads) that predates this change. A time budget did not bound the uploads (2 ms slices queued up to
   27 MiB), hence the byte budget.
 - Silverstone's default trackside camera at the lap start sits inside the Wing structure (camera data, not load-related).
+
+### Second pass: what the slow Silverstone frames are (2026-11-05)
+
+The scene now renders into the auto-exposure target, so the probe counts draws into multisampled framebuffers as the main
+pass (`probe.ts`); before that fix every scene draw showed as offscreen.
+
+- **Sharpening is the cost.** Same build with sharpening switched off: 2–8 s frames ~8 ms and no frame over 16 ms, against
+  10–14 ms medians with it. The 0–2 s frames and the 26–30 s stretch (new chunks streaming) are slow either way.
+- **What it uploads:** 593 distinct textures, 1.5 GB of full chains in the first 20 s, nothing uploaded twice. BC5 normal
+  maps 374 / 776 MiB, BC7 colour 205 / 491 MiB, uncompressed RGBA8 14 / 245 MiB. The RGBA8 ones are tiling terrain and road
+  textures (grass, gravel, road lines, armco) at 21 MiB each; the game ships them uncompressed (BGRA8/RGBA16 DDS) and the
+  pipeline keeps them as they are.
+- **Tried and dropped:** sharpen only textures used within 150 m of the camera. Scenery meshes are merged per material over
+  100–1,300 m, so every bounding sphere contains the camera (290 textures, 873 MiB in 6 s, all at distance 0). A budget per
+  second instead of per frame (240 MiB/s) was not measurably better; the machine was loaded (other processes ~95 % CPU), so
+  timings from that hour are noisy.
+- **Levers considered:** BC7 for the RGBA8 tiling textures (pipeline, ~4× smaller, lossy re-encode); keep normal maps on
+  their reduced levels (flatter close-up detail); a lower upload rate (longer blur). The user chose full detail, so none of
+  these: the upgrade itself was made cheaper instead.
+- **Done: mip streaming** (`scenery/materials/mipStreaming.ts`). A large texture allocates its full chain once, fills levels
+  2+ and samples from `TEXTURE_BASE_LEVEL` 2; the missing top levels are copied into the same GPU texture in bands of rows
+  (2 MiB per frame) and the base level drops as each level lands. Before, each texture was disposed and re-uploaded whole
+  (a 21 MiB RGBA8 texture in one frame). The cost is the copy (~2.5 ms per MiB on this machine), so bands bound it per frame.
+  Same quiet machine, Silverstone, 3 runs each (old whole-texture build vs streaming):
+
+  | | Old | Streaming |
+  |---|---|---|
+  | p50 | 4.4–4.7 ms | 4.3–4.4 ms |
+  | p99 | 24.8–28.6 ms | 21.0–23.4 ms |
+  | Frames over 16 ms during the upgrade (2–10 s) | 19–53 | 11–17 |
+  | Full detail reached | 9.4 s | 9.4 s |
+
+  The raw RGBA8/R8 textures also got trilinear filtering: three's KTX2 loader gives raw textures nearest filtering.
+- **What sets p99 now:** the first ~1.7 s after the first frame (~55 of ~80 frames over 16 ms, ~900 draws while the rest of
+  the window's chunks join) and the chunk streaming at 26–32 s (~35–45 frames). Both are the same with and without
+  sharpening; they are the next pass.
+- **First 2 s, profiled** (production build, Silverstone, play CPU profile): each frame renders in ~16–20 ms of main thread
+  while the window joins (~900 draws). The spikes on top come from chunks joining: three-mesh-bvh's generic
+  `StaticGeometryGenerator` merge of the ground meshes took 12–31 ms per chunk, glTF setup and program compile a few ms more.
+  The exposure readback (`getBufferSubData`) is ~5 ms per 2 s, not a lever. Changed (225645f7): the merge is a tight
+  position-only copy (`sceneryGround.ts` `mergePositions`), which is all the ray tree needs. Its A/B is still owed: the
+  machine was at 60–70 % CPU from other processes when it ran, and both builds were equally slow (first-2 s p99 100–500 ms).
+  Next levers if the target (first 2 s p99 < 30 ms) is still missed: hold sharpening until the window's chunks have joined,
+  and byte-budget the warm-up uploads instead of the 1 ms slice.
 
 ## The scene (from the package index)
 
