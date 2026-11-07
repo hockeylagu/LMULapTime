@@ -142,7 +142,7 @@ export async function createReplayScene(
     load: async (chunk, signal) => {
       const root = await loader.load(chunk, signal);
       // The ray tree builds in a worker while the chunk waits its turn to compile and upload (warm-ups stay one at a time).
-      const grounded = ground.add(chunk.id, root);
+      const grounded = ground.add(chunk.id, root, chunk.kind === 'horizon');
       const warmed = warming.then(async () => { signal.throwIfAborted(); await warmUp(root, signal); });
       warming = warmed.catch(() => {});
       try { await Promise.all([warmed, grounded]); signal.throwIfAborted(); return root; }

@@ -72,6 +72,17 @@ it('answers the highest opaque surface in reach, picking the right bridge layer 
   } finally { ground.dispose(); }
 });
 
+it('uses a coarse chunk for the camera only, never for wheel and line heights', async () => {
+  const root = new Group(); root.add(triangle('road__OPAQUE', [0, 1, 0, 10, 1, 0, 0, 1, 10], [0, 1, 2]));
+  const eye = new Vector3(), ground = createSceneryGround();
+  try {
+    await ground.add('horizon', root, true);
+    expect(ground.surfaceHeight({x: 2, y: 1.2, z: 2})).toBeNull();
+    // The camera is still kept above it (display frame: native z is negated).
+    expect(ground.resolve(new Vector3(2, 0, -2), new Vector3(3, 1, -3), new Vector3(), eye).y).toBeGreaterThan(1);
+  } finally { ground.dispose(); }
+});
+
 it('applies native transforms to large terrain triangles', async () => {
   const root = new Group(); root.position.y = 2;
   root.add(triangle('terrain__OPAQUE', [-1000, 0, -1000, 1000, 0, -1000, 0, 0, 1000], [0, 1, 2]));

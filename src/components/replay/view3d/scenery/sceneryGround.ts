@@ -56,8 +56,12 @@ function mergePositions(meshes: Mesh[], meshRoles: number[]): {geometry: BufferG
 export interface SceneryGround {
   /** Highest resident opaque scanned surface under a point, excluding the filler ground; null outside the resident chunks. */
   surfaceHeight: SurfaceHeight;
-  /** Builds a chunk's ray tree (in the BVH worker) while the chunk root is still in native coordinates. */
-  add(id: string, root: Object3D): Promise<void>;
+  /**
+   * Builds a chunk's ray tree (in the BVH worker) while the chunk root is still in native coordinates. A coarse chunk (the
+   * horizon's far copy of the venue) serves the camera checks only: its road sits off the detailed road, and a wheel or line
+   * height found on it would be kept after the detailed chunk loads.
+   */
+  add(id: string, root: Object3D, coarse?: boolean): Promise<void>;
   /** Drops a chunk's tree; with `root`, only if that root's load owns it (a newer load of the same chunk may have replaced it). */
   remove(id: string, root?: Object3D): void;
   /** Moves a camera eye (display frame) above the ground and in front of anything between it and `look`. */
@@ -108,14 +112,14 @@ export function createSceneryGround(): SceneryGround {
       const distance = nearestHit(heightRay, WHEEL, 0, SURFACE_ABOVE_M + reach);
       return distance === null ? null : heightRay.origin.y - distance;
     },
-    async add(id, root) {
+    async add(id, root, coarse = false) {
       if (disposed) throw new DOMException('Scenery ground disposed', 'AbortError');
       remove(id);
       const meshes: Mesh[] = [], meshRoles: number[] = [];
       root.updateWorldMatrix(true, true);
       root.traverse(object => {
         if (!(object instanceof Mesh) || !object.visible) return;
-        const role = roleOf(object.name);
+        const role = roleOf(object.name) & (coarse ? CAMERA : WHEEL | CAMERA);
         if (role) { meshes.push(object as Mesh); meshRoles.push(role); }
       });
       if (!meshes.length) return;
