@@ -1,5 +1,5 @@
 import { Quaternion, Vector3, type Group, type Object3D } from 'three';
-import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
+import type { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../../shared/types/replay.js';
 import { attachWheelRigs, type WheelRig } from './wheelGeometry.js';
 import { createSteerAngle, createSteeringWheelAngle, createWheelTravel } from './wheelMotion.js';
 import { isContinuousPose, sampleRenderPose, type RenderPose } from './replayPose.js';
@@ -27,6 +27,17 @@ function median(values: number[]): number | undefined {
   return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
 }
 
+/**
+ * The ride height the display model rests at: the lap's slowest tenth, where aero load barely compresses the car.
+ * Against the lap median it would understate how far the car sinks at speed. Without speeds, the median of the lap.
+ */
+function staticRideHeight(points: ReplayTrajectoryPoint[], corner: number): number | undefined {
+  const samples = points.flatMap(point => Number.isFinite(point.rideHeight?.[corner]) ? [{height: point.rideHeight![corner], speed: point.speedKmh}] : []);
+  if (samples.every(sample => Number.isFinite(sample.speed))) samples.sort((a, b) => a.speed! - b.speed!);
+  else return median(samples.map(sample => sample.height));
+  return median(samples.slice(0, Math.max(1, Math.ceil(samples.length / 10))).map(sample => sample.height));
+}
+
 export function createWheelAnimation(car: Group, lap: ReplayTrajectoryData, surfaceHeight: SurfaceHeight): WheelAnimation {
   const envelope = car.getObjectByName('body-envelope');
   if (!envelope || !('isGroup' in envelope)) throw Error('Car has no body envelope');
@@ -43,20 +54,30 @@ export function createWheelAnimation(car: Group, lap: ReplayTrajectoryData, surf
     inverse.copy(orientation).invert();
     return hub.set(hub.x, ground + rig.radiusM, hub.z).sub(body).applyQuaternion(inverse).sub(envelope.position).y - rig.hub.y;
   };
+  const referenceRideHeights = rigs.map(rig => staticRideHeight(lap.points, rig.corner));
+  const rideDisplacement = (a: ReplayTrajectoryPoint, b: ReplayTrajectoryPoint | undefined, fraction: number, corner: number): number | null => {
+    const reference = referenceRideHeights[corner], heightA = a.rideHeight?.[corner], heightB = b?.rideHeight?.[corner];
+    if (reference === undefined || heightA === undefined || !Number.isFinite(heightA)) return null;
+    const height = heightB !== undefined && Number.isFinite(heightB) ? heightA + (heightB - heightA) * fraction : heightA;
+    return (reference - height) / 1000;
+  };
   // Fit only the display-model origin, as the lap median, so downforce and kerbs average out.
   // Native body poses stay untouched; a single-pose fit left the tyres sunk or floating elsewhere.
   const offsets: number[] = [], step = Math.max(1, Math.floor(lap.points.length / FIT_SAMPLES));
   for (let i = 0; i < lap.points.length; i += step) {
     const pose = sampleRenderPose(lap.points, i, 0);
     if (!pose?.orientation) continue;
-    const corners = rigs.map(rig => roadTravel(rig, pose, pose.orientation!));
+    // Measured suspension already lifts the hub by its own travel, so the fit only has to cover the rest.
+    const corners = rigs.map(rig => {
+      const needed = roadTravel(rig, pose, pose.orientation!);
+      return needed === null ? null : needed - (rideDisplacement(lap.points[i], undefined, 0, rig.corner) ?? 0);
+    });
     if (corners.some(value => value === null)) continue;
     const offset = corners.reduce<number>((sum, value) => sum + value!, 0) / 4;
     if (Math.abs(offset) <= MAX_FIT_M) offsets.push(offset);
   }
   const fit = median(offsets);
   if (fit !== undefined) envelope.position.y += fit;
-  const referenceRideHeights = rigs.map(rig => median(lap.points.map(point => point.rideHeight?.[rig.corner]).filter((value): value is number => Number.isFinite(value))));
   const hasWheelSlip = lap.points.some(point => point.liveWheelSlip !== undefined);
   const hasRideHeight = referenceRideHeights.some(value => value !== undefined);
   const hasSteering = lap.handlingCalibration !== undefined && lap.points.some(point => Number.isFinite(point.steerYaw));
@@ -88,12 +109,8 @@ export function createWheelAnimation(car: Group, lap: ReplayTrajectoryData, surf
       }
       for (const rig of rigs) {
         const corner = rig.corner, reference = referenceRideHeights[corner];
-        const heightA = a.rideHeight?.[corner], heightB = b?.rideHeight?.[corner];
-        let displacement: number | null = null;
-        if (reference !== undefined && heightA !== undefined && Number.isFinite(heightA)) {
-          const height = heightB !== undefined && Number.isFinite(heightB) ? heightA + (heightB - heightA) * pose.fraction : heightA;
-          displacement = (reference - height) / 1000;
-        } else {
+        let displacement = rideDisplacement(a, b, pose.fraction, corner);
+        if (reference === undefined || displacement === null) {
           const current = contactAt(pose.index, corner);
           displacement = current;
           if (pose.fraction > 0 && isContinuousPose(a, b)) {

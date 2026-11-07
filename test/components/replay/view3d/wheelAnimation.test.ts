@@ -34,6 +34,15 @@ it('maps ride-height changes against each corner lap median and bounds the trave
   expect(animation.description).toContain('Ride-height-driven');
 });
 
+it('references the ride height of the slowest samples so the car sinking at speed lifts the wheels', () => {
+  const points = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300].map((speedKmh, i) => ({...lap.points[i % 2], timeSec: i, speedKmh, rideHeight: [60 - speedKmh / 10, 60, 60, 60] as [number, number, number, number]}));
+  const measured: ReplayTrajectoryData = {...lap, pointsCount: points.length, points};
+  const car = makeCar(measured, '#38bdf8', false, rigModel()), animation = createWheelAnimation(car, measured, () => 0);
+  animation.update(sampleRenderPose(measured.points, 9, 0)!);
+  // Static 57 mm (30 km/h), 30 mm at 300 km/h: 27 mm up. The lap median (45 mm) would give only 15 mm.
+  expect(rig('fl', car).pivot.position.y).toBeCloseTo(0.33 + 0.027);
+});
+
 it('steers only the fronts from recorded steering', () => {
   const steered: ReplayTrajectoryData = {...lap, handlingCalibration: {wheelbaseM: 2.8, steeringRatio: 12, steeringWheelRangeDeg: 540, wheelbaseSource: 'plugin', steeringSource: 'plugin-default'},
     points: lap.points.map(point => ({...point, steerYaw: 120}))};
