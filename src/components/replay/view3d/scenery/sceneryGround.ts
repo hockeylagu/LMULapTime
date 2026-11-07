@@ -1,5 +1,5 @@
-import {DoubleSide, Mesh, Ray, Vector3, type BufferGeometry, type Object3D} from 'three';
-import {StaticGeometryGenerator, type MeshBVH} from 'three-mesh-bvh';
+import {BufferAttribute, BufferGeometry, DoubleSide, Mesh, Ray, Vector3, type Object3D} from 'three';
+import type {MeshBVH} from 'three-mesh-bvh';
 import {GenerateMeshBVHWorker} from 'three-mesh-bvh/worker';
 
 interface NativePosition { x: number; y: number; z: number }
@@ -23,6 +23,35 @@ const roleOf = (name: string) => (isOpaqueSurface(name) ? WHEEL : 0) | (isFiller
 const GROUND_CLEARANCE_M = 1.2, OBSTRUCTION_CLEARANCE_M = 0.6, SURFACE_ABOVE_M = 0.15;
 /** BVH workers: one job each at a time, so several chunks build at once (the parallel builder needs cross-origin isolation). */
 const WORKER_COUNT = Math.max(1, Math.min(3, (navigator.hardwareConcurrency || 2) - 1));
+
+/**
+ * The chunk's ground meshes as one position-only geometry in the root's world frame, with each triangle's role. Rays need
+ * nothing else, so this tight copy replaces the generic geometry merge, which cost a frame's worth of main-thread time per chunk.
+ */
+function mergePositions(meshes: Mesh[], meshRoles: number[]): {geometry: BufferGeometry; roles: Uint8Array} {
+  let vertices = 0, indices = 0;
+  for (const {geometry} of meshes) {
+    const count = geometry.getAttribute('position').count;
+    vertices += count; indices += geometry.index?.count ?? count;
+  }
+  const positions = new Float32Array(vertices * 3), index = vertices > 65535 ? new Uint32Array(indices) : new Uint16Array(indices);
+  const roles = new Uint8Array(indices / 3), point = new Vector3();
+  let vertex = 0, at = 0;
+  meshes.forEach((mesh, i) => {
+    const source = mesh.geometry, position = source.getAttribute('position'), start = at;
+    for (let v = 0; v < position.count; v++) {
+      point.fromBufferAttribute(position, v).applyMatrix4(mesh.matrixWorld).toArray(positions, (vertex + v) * 3);
+    }
+    if (source.index) for (let k = 0; k < source.index.count; k++) index[at++] = vertex + source.index.getX(k);
+    else for (let k = 0; k < position.count; k++) index[at++] = vertex + k;
+    roles.fill(meshRoles[i], start / 3, at / 3);
+    vertex += position.count;
+  });
+  const geometry = new BufferGeometry();
+  geometry.setAttribute('position', new BufferAttribute(positions, 3));
+  geometry.setIndex(new BufferAttribute(index, 1));
+  return {geometry, roles};
+}
 
 export interface SceneryGround {
   /** Highest resident opaque scanned surface under a point, excluding the filler ground; null outside the resident chunks. */
@@ -90,17 +119,7 @@ export function createSceneryGround(): SceneryGround {
         if (role) { meshes.push(object as Mesh); meshRoles.push(role); }
       });
       if (!meshes.length) return;
-      const generator = new StaticGeometryGenerator(meshes);
-      generator.attributes = ['position']; generator.useGroups = false;
-      const geometry = generator.generate();
-      // The generator appends the meshes in order, so each mesh's triangles are one run.
-      const roles = new Uint8Array((geometry.index?.count ?? geometry.getAttribute('position').count) / 3);
-      let triangle = 0;
-      meshes.forEach((mesh, i) => {
-        const source = mesh.geometry, count = (source.index?.count ?? source.getAttribute('position').count) / 3;
-        roles.fill(meshRoles[i], triangle, triangle + count); triangle += count;
-      });
-      if (triangle !== roles.length) { geometry.dispose(); throw Error(`Scenery chunk ${id}: merged ${roles.length} triangles, expected ${triangle}`); }
+      const {geometry, roles} = mergePositions(meshes, meshRoles);
       geometry.computeBoundingBox();
       const chunk: Chunk = {root, geometry, roles, tree: null, cancel: () => {}};
       const canceled = new Promise<never>((_resolve, reject) => { chunk.cancel = () => reject(new DOMException('Scenery ground removed', 'AbortError')); });
