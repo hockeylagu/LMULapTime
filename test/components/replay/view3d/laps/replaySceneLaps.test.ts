@@ -208,6 +208,22 @@ it('retains scenery, canvas and camera settings, releases old laps, and draws th
   expect(roadDispose).toHaveBeenCalledOnce(); expect(gpu.dispose).toHaveBeenCalledOnce(); expect(host.childNodes).toHaveLength(0);
 });
 
+it('places the ghost at the same distance, the same lap time, or the same time since marker A', async () => {
+  const handle = await createReplayScene(document.createElement('div'), layout, lap, null, vi.fn(), assets);
+  try {
+    // The baseline drives the same line at half speed.
+    const slower = {...lap, points: lap.points.map(point => ({...point, timeSec: (point.timeSec ?? 0) * 2}))};
+    expect(await handle.updateLaps(lap, slower, withGhost)).toBe(true);
+    handle.cursor(4, 0); draw();
+    const ghost = () => gpu.render.mock.calls.at(-1)![0].getObjectByName('road__OPAQUE')!.parent!.parent!.parent!.children.at(-1)!.children[1];
+    expect(ghost().position.x).toBeCloseTo(4);
+    handle.syncGhost('time', null); handle.cursor(4, 0); draw();
+    expect(ghost().position.x).toBeCloseTo(2);
+    handle.syncGhost('anchored', 3); handle.cursor(4, 0); draw();
+    expect(ghost().position.x).toBeCloseTo(3.5);
+  } finally { handle.dispose(); }
+});
+
 it('rejects layout, geometry and package mismatches, and discards cancelled or superseded lap builds', async () => {
   const host = document.createElement('div');
   const handle = await createReplayScene(host, layout, lap, null, vi.fn(), assets);

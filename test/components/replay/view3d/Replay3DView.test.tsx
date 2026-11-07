@@ -10,7 +10,7 @@ import { replayShortcutBlocked } from '../../../../src/utils/replayShortcuts.js'
 import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
 import { createPlaybackCursor, ReplayPlaybackCursorContext } from '../../../../src/components/replay/inspector/replayPlaybackCursor.js';
 
-const scene = vi.hoisted(() => ({wheelMotion: 'Replay-estimated wheel roll', cursor: vi.fn(), mode: vi.fn(), reset: vi.fn(), center: vi.fn(), zoom: vi.fn(), pan: vi.fn(), dispose: vi.fn(), colorLines: vi.fn(), fadeLines: vi.fn(), updateLaps: vi.fn(async () => true)}));
+const scene = vi.hoisted(() => ({wheelMotion: 'Replay-estimated wheel roll', cursor: vi.fn(), mode: vi.fn(), reset: vi.fn(), center: vi.fn(), zoom: vi.fn(), pan: vi.fn(), dispose: vi.fn(), colorLines: vi.fn(), fadeLines: vi.fn(), syncGhost: vi.fn(), updateLaps: vi.fn(async () => true)}));
 vi.mock('../../../../src/components/replay/view3d/replayScene.js', () => ({createReplayScene: vi.fn(async () => scene)}));
 const layout = vi.hoisted(() => ({sourceGeometryRevision: 'g', packageRevision: 'p'}));
 vi.mock('../../../../src/api/sceneryApi.js', () => ({fetchSceneryLayout: vi.fn(async () => layout)}));

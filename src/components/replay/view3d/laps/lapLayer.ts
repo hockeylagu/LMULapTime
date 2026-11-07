@@ -7,6 +7,7 @@ import { albedoPath, createCarMaterial } from '../carMaterials.js';
 import { MAP_COLORS, TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../../../utils/lapAlignment.js';
 import type { MapColorMode } from '../../map/replayMapUtils.js';
+import { createGhostClock } from '../../map/ghostSync.js';
 import { makeCar } from '../sceneObjects.js';
 import { createWheelAnimation } from '../wheelAnimation.js';
 import { BASELINE_LINE, colorRacingLine, makeRacingLine, racingLineColors, refreshRacingLine } from '../racingLine.js';
@@ -98,12 +99,15 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     const primaryLine = makeRacingLine(trajectory, origin, colors.primary, surfaceHeight);
     const baselineLine = baseline ? makeRacingLine(baseline, origin, colors.baseline, surfaceHeight, BASELINE_LINE.widthM, BASELINE_LINE.liftM) : null;
     const root = new Group(); root.add(primary, ghost, primaryLine); if (baselineLine) root.add(baselineLine);
+    const primaryDistances = getTrajectoryDistances(trajectory.points, trajectory.trackLengthM);
+    const baselineDistances = baseline ? getDistancesInReferenceFrame(baseline.points, trajectory.points, trajectory.trackLengthM) : [];
     return {
       root, trajectory, baseline, primary, ghost, primaryWheels, ghostWheels,
       /** The primary car's game cameras (cockpit, hood and roof views). */
       cameras: assets.primary.descriptor.cameras.list,
-      primaryDistances: getTrajectoryDistances(trajectory.points, trajectory.trackLengthM),
-      baselineDistances: baseline ? getDistancesInReferenceFrame(baseline.points, trajectory.points, trajectory.trackLengthM) : [],
+      primaryDistances, baselineDistances,
+      /** Both laps' elapsed time against distance, for the time-synced ghost. */
+      ghostClock: baseline ? createGhostClock(trajectory.points, primaryDistances, baseline.points, baselineDistances, trajectory.trackLengthM) : null,
       colorLines(next: MapColorMode) {
         colors = racingLineColors(trajectory, baseline, next);
         colorRacingLine(primaryLine, colors.primary); if (baselineLine) colorRacingLine(baselineLine, colors.baseline);

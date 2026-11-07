@@ -5,6 +5,7 @@ import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
 import { CAR_FILES } from '../../../api/vehicles/carApi.js';
 import { createTracksideCameras } from './tracksideCameras.js';
 import type { MapColorMode } from '../map/replayMapUtils.js';
+import { ghostDistanceAt, type GhostSyncMode } from '../map/ghostSync.js';
 import { sampleRenderPose, sampleStationPose } from './replayPose.js';
 import { nativeToScene } from './sceneFrame.js';
 import { createLapLayerLoader, type LapCars, type LapLayer } from './laps/lapLayer.js';
@@ -43,6 +44,8 @@ export interface ReplaySceneHandle {
   colorLines(colorBy: MapColorMode): void;
   /** Fade either racing line (opacity 0–1), as the 2D map fades a line on request. */
   fadeLines(primaryOpacity: number, baselineOpacity: number): void;
+  /** Place the ghost at the same distance, the same lap time, or the same time since marker A (as the 2D map). */
+  syncGhost(mode: GhostSyncMode, anchorDistM: number | null): void;
   dispose(): void;
 }
 
@@ -63,6 +66,7 @@ export async function createReplayScene(
   // Scenery chunks live in native coordinates under one group, shifted by the scene origin.
   const sceneryRoot = new Group(); sceneryRoot.position.copy(origin).negate();
   let layer: LapLayer, layerReady = false;
+  let syncMode: GhostSyncMode = 'distance', anchorDistM: number | null = null;
   let disposed = false, refreshTimer = 0, invalidate: () => void = () => {};
   // Lines are draped on the road: when the resident chunks change, re-drape them (coalesced).
   let freezeScenery = () => {};
@@ -295,7 +299,7 @@ export async function createReplayScene(
       return true;
     },
     cursor(index, fraction) {
-      const {trajectory, baseline, primary, ghost, primaryWheels, ghostWheels, primaryDistances, baselineDistances} = layer;
+      const {trajectory, baseline, primary, ghost, primaryWheels, ghostWheels, primaryDistances, baselineDistances, ghostClock} = layer;
       const pose = sampleRenderPose(trajectory.points, index, fraction);
       primary.visible = pose !== null;
       if (!pose) { invalidate(); return; }
@@ -311,7 +315,8 @@ export async function createReplayScene(
       const lapStation = stationAt(trajectory.points, pose.index, pose.fraction, route);
       if (lapStation !== undefined) currentStation = lapStation;
       const station = (primaryDistances[index] ?? 0) + ((primaryDistances[index + 1] ?? primaryDistances[index] ?? 0) - (primaryDistances[index] ?? 0)) * fraction;
-      const other = baseline ? sampleStationPose(baseline.points, baselineDistances, station) : null;
+      const ghostStation = ghostClock ? ghostDistanceAt(ghostClock, syncMode, station, anchorDistM) : station;
+      const other = baseline ? sampleStationPose(baseline.points, baselineDistances, ghostStation) : null;
       ghost.visible = other !== null;
       if (other) {
         ghost.position.set(other.x - origin.x, other.y - origin.y, other.z - origin.z);
@@ -381,6 +386,9 @@ export async function createReplayScene(
     colorLines(next) {
       lineMode = next; layer.colorLines(next);
       invalidate();
+    },
+    syncGhost(next, anchor) {
+      syncMode = next; anchorDistM = anchor;
     },
     fadeLines(primary, comparison) {
       primaryOpacity = primary; baselineOpacity = comparison; layer.fadeLines(primary, comparison);
