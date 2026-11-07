@@ -90,6 +90,11 @@ describe('shaderParts', () => {
     const parts = shaderParts(surface('digitalFlag', { maps: { on: map('ON', true), off: map('OFF', true) }, parameters: { cbIntensity: { PeriodSeconds: 0.5 } } }));
     expect(parts.declarations).toContain('uniform float surface_flag_elapsed;'); expect(parts.albedo).toContain('3.141592653589793/0.50000000');
   });
+  it('widens the water roughness by the screen-space spread of the wave normal', () => {
+    const water = shaderParts(surface('water', { maps: { albedo: map('A', true), normalA: map('N', false) } }));
+    expect(water.normals).toContain('dFdx(normal)'); expect(water.normals).toContain('roughnessFactor = sqrt(');
+    expect(shaderParts(surface('water', { maps: { albedo: map('A', true) } })).normals).toBe('');
+  });
   it('samples the alpha-composited glass finish and the clearcoat absorption', () => {
     expect(shaderParts(surface('glass', { maps: { albedo: map('A', true) } })).finish).toContain('totalSpecular/clamp(diffuseColor.a+0.001');
     const coat = { Roughness: 0.2, RefractiveIndex: 1.4, Specular: 0.5, NormalStrength: 1, Strength: 1, LacquerThickness: 0.03, LacquerColour: [1, 1, 1] };

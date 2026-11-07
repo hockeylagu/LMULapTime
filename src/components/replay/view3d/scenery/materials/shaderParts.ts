@@ -76,7 +76,11 @@ function waterParts(config: SurfaceConfig, { sample, uv, number, uniforms }: Sha
       surfaceSpecular = 1.0;
     `;
   const ySign = uniforms ? 'surface_normalScale.y' : number(config.normalYSign);
-  const normals = config.maps.normalA ? `normal = surfaceNormal(normal, ${uv('normalA')}, ${sample('normalA')}.rg, 1.0, ${ySign});` : '';
+  // Three's specular anti-aliasing reads only the geometric normal, so a 0.05-roughness mirror over the fine wave normals
+  // glitters as the mips average them. Widen the roughness by the screen-space spread of the perturbed normal (Kaplanyan).
+  const normals = config.maps.normalA ? `normal = surfaceNormal(normal, ${uv('normalA')}, ${sample('normalA')}.rg, 1.0, ${ySign});
+    vec3 waveDx = dFdx(normal), waveDy = dFdy(normal);
+    roughnessFactor = sqrt(min(1.0, roughnessFactor * roughnessFactor + 0.5 * (dot(waveDx, waveDx) + dot(waveDy, waveDy))));` : '';
   return { albedo, normals, emissive: '', physical: 'material.specularColor = vec3(0.04);', occlusion: '' };
 }
 
