@@ -1,10 +1,108 @@
-import { Vector2, Vector3, type IUniform, type WebGLProgramParametersWithUniforms } from 'three';
+import { MeshDepthMaterial, ShaderChunk, Vector2, Vector3, type IUniform, type WebGLProgramParametersWithUniforms } from 'three';
+import { STATIC_NORMAL_BIAS_M, SUN_SHADOW_DEPTH_M, staticShadowUniforms } from '../../sunShadows.js';
 import { digitalFlagClock } from './flagSurface.js';
+import { CROWN_ATTRIBUTE, crownNormalGlsl } from './foliageCrown.js';
 import { glslNumber, list, value } from './shaderContext.js';
+import { shadowEye } from './shadowEye.js';
 import { shaderParts } from './shaderParts.js';
 import type { SurfaceConfig } from './surfaceConfig.js';
 
 const hasTranslucency = (config: SurfaceConfig) => !!config.flags.TRANSLUCENCY && config.flags.TRANSLUCENCY !== '@Undef';
+
+/**
+ * Turns a camera-facing card about its pivot toward `eye` (a world position in GLSL), and its normal with it: the authored normal
+ * belongs to the rest plane and, kept, left whole crowds facing away from the sun. transpose(M) * d is the local normal whose world
+ * normal is d. The shadow pass turns cards toward the viewing camera too (`billboardShadowMaterial`), so a card shades what is seen.
+ */
+export function patchBillboardVertex(shader: WebGLProgramParametersWithUniforms, eye: string, crown = false): void {
+  shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>
+    attribute vec3 _lmu_pivot;
+    attribute vec2 _lmu_corner;
+    ${crown ? `attribute vec2 ${CROWN_ATTRIBUTE};` : ''}
+  `).replace('#include <begin_vertex>', `
+    vec3 pivotWorld = (modelMatrix * vec4(_lmu_pivot, 1.0)).xyz;
+    vec3 directionToCamera = ${eye} - pivotWorld;
+    directionToCamera.y = 0.0;
+    bool facingCamera = length(directionToCamera) > 0.0001;
+    vec3 rightWorld = facingCamera ? normalize(cross(vec3(0.0,1.0,0.0), directionToCamera)) : vec3(1.0,0.0,0.0);
+    vec3 rightLocal = normalize(rightWorld * mat3(modelMatrix));
+    #include <begin_vertex>
+    transformed = _lmu_pivot + rightLocal * _lmu_corner.x + vec3(0.0,_lmu_corner.y,0.0);
+  `);
+  if (shader.vertexShader.includes('#include <beginnormal_vertex>')) shader.vertexShader = shader.vertexShader.replace('#include <beginnormal_vertex>', `
+    #include <beginnormal_vertex>
+    { vec3 toEye = ${eye} - (modelMatrix * vec4(_lmu_pivot, 1.0)).xyz; toEye.y = 0.0;
+      if (length(toEye) > 0.0001) objectNormal = normalize(normalize(toEye) * mat3(modelMatrix));
+      #ifdef USE_TANGENT
+        objectTangent = normalize(normalize(cross(vec3(0.0,1.0,0.0), toEye)) * mat3(modelMatrix));
+      #endif
+    }
+    ${crown ? crownNormalGlsl(eye) : ''}
+  `);
+}
+
+/**
+ * Depth past a card's own plane its shadow lookup skips, per sun shadow map (near, static): about the depth error of a texel
+ * (4 cm, 29 cm) at a grazing sun.
+ */
+const BILLBOARD_SELF_SHADOW_M = [1, 4] as const;
+const SUN_SHADOW = 'getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowIntensity, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] )';
+
+/**
+ * The sun's shadow on a scenery surface: the near map inside its window, fading over the window's outer tenth to the static map
+ * (sunShadows.ts), read with one hardware compare tap as the near one. Outside both maps, and before the first static map, lit.
+ * Without shadows (tests), the near map alone.
+ */
+const STATIC_SHADOW_VERTEX = `
+  #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
+    vStaticShadowCoord = surface_staticShadowMatrix * ( worldPosition + vec4( shadowWorldNormal * ${glslNumber(STATIC_NORMAL_BIAS_M)}, 0.0 ) );
+  #endif`;
+const SUN_SHADOW_BLEND = `
+  #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
+  uniform sampler2DShadow surface_staticShadowMap;
+  uniform float surface_staticShadowReady;
+  varying vec4 vStaticShadowCoord;
+  float surfaceSunShadow( float nearShadow, vec4 nearCoord ) {
+    vec2 window = nearCoord.xy / nearCoord.w;
+    float inside = smoothstep( 0.0, 0.1, min( min( window.x, 1.0 - window.x ), min( window.y, 1.0 - window.y ) ) );
+    if ( inside >= 1.0 || surface_staticShadowReady < 0.5 ) return nearShadow;
+    vec3 coord = vStaticShadowCoord.xyz;
+    bool covered = all( greaterThanEqual( coord, vec3( 0.0 ) ) ) && all( lessThanEqual( coord, vec3( 1.0 ) ) );
+    float farShadow = covered ? texture( surface_staticShadowMap, coord ) : 1.0;
+    return mix( farShadow, nearShadow, inside );
+  }
+  #else
+  float surfaceSunShadow( float nearShadow, vec4 nearCoord ) { return nearShadow; }
+  #endif
+`;
+
+/**
+ * Three's light loop with the sun's shadow from both maps. Leaves light their diffuse and translucency with min(2 * shadow, 1),
+ * as the game's vegetation shader does (L2IBLVEGETATION, review/yebis-camera fixed_cache): partly shadowed foliage reads lit, only
+ * full shade is dark.
+ */
+function sunShadowLights(leaf: boolean): string {
+  const chunk = ShaderChunk.lights_fragment_begin;
+  if (!chunk.includes(SUN_SHADOW)) throw Error('three lights_fragment_begin no longer has the directional shadow term');
+  const shadow = `( UNROLLED_LOOP_INDEX == 0 ? surfaceSunShadow( ${SUN_SHADOW}, vDirectionalShadowCoord[ i ] ) : 1.0 )`;
+  return chunk.replace(SUN_SHADOW, leaf ? `min(2.0 * ${shadow}, 1.0)` : shadow);
+}
+
+let shadowMaterial: MeshDepthMaterial | null = null;
+
+/**
+ * The sun shadow pass's material for every camera-facing card, shared as three shares its default depth material (the pass copies
+ * each card's albedo and alpha test onto it). Cards turn toward the viewing camera, not the light, so a crown's own shadow falls on
+ * the card that is drawn. `trackShadowEye` keeps the eye current.
+ */
+export function billboardShadowMaterial(): MeshDepthMaterial {
+  if (shadowMaterial) return shadowMaterial;
+  const material = new MeshDepthMaterial();
+  material.onBeforeCompile = shader => { shader.uniforms.surface_shadowEye = shadowEye; shader.vertexShader = `uniform vec3 surface_shadowEye;
+${shader.vertexShader}`; patchBillboardVertex(shader, 'surface_shadowEye'); };
+  material.customProgramCacheKey = () => 'billboardShadow';
+  return shadowMaterial = material;
+}
 
 /**
  * Rewrites a `MeshStandardMaterial`/`MeshPhysicalMaterial` program into the native surface: tunables become uniforms (so one program
@@ -50,6 +148,8 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
     surface_coatNormalStrength: { value: value(clearCoat, 'NormalStrength', 1.0) },
     surface_coatLacquerColour: { value: new Vector3(...list(clearCoat, 'LacquerColour', [1, 1, 1]).slice(0, 3) as [number, number, number]) },
     surface_coatLacquerThickness: { value: Math.max(0.001, value(clearCoat, 'LacquerThickness', 0.03)) },
+    surface_staticShadowMap: staticShadowUniforms.map, surface_staticShadowMatrix: staticShadowUniforms.matrix,
+    surface_staticShadowReady: staticShadowUniforms.ready,
   }, mapScaleUniforms, config.kind === 'digitalFlag' ? { surface_flag_elapsed: digitalFlagClock } : {}, uniforms);
 
   const neededUvs = new Set<string>();
@@ -63,27 +163,21 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
     varying vec2 vSurfaceXZ;
     varying float vSurfaceRandom;
     varying vec4 vSurfaceUV01, vSurfaceUV23, vSurfaceColour;
-  `).replace('#include <begin_vertex>', '#include <begin_vertex>\nvSurfaceXZ = position.xz; vSurfaceRandom=fract(abs(position.x+position.z)); vSurfaceUV01 = vec4(uv,uv1); vSurfaceUV23 = vec4(uv2,uv3); vSurfaceColour = _lmu_colour;');
+  `).replace('#include <shadowmap_pars_vertex>', `#include <shadowmap_pars_vertex>
+    #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
+      uniform mat4 surface_staticShadowMatrix;
+      varying vec4 vStaticShadowCoord;
+    #endif
+  `).replace('#include <shadowmap_vertex>', `#include <shadowmap_vertex>${STATIC_SHADOW_VERTEX}`).replace('#include <begin_vertex>', '#include <begin_vertex>\nvSurfaceXZ = position.xz; vSurfaceRandom=fract(abs(position.x+position.z)); vSurfaceUV01 = vec4(uv,uv1); vSurfaceUV23 = vec4(uv2,uv3); vSurfaceColour = _lmu_colour;');
   if (config.billboard) {
-    shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>
-      attribute vec3 _lmu_pivot;
-      attribute vec2 _lmu_corner;
-    `).replace('#include <beginnormal_vertex>', `
-      // The card turns about its pivot to face the camera, and so does its normal: the authored normal belongs to the rest plane
-      // and, kept, left whole crowds facing away from the sun. transpose(M) * d is the local normal whose world normal is d.
-      vec3 pivotWorld = (modelMatrix * vec4(_lmu_pivot, 1.0)).xyz;
-      vec3 directionToCamera = cameraPosition - pivotWorld;
-      directionToCamera.y = 0.0;
-      bool facingCamera = length(directionToCamera) > 0.0001;
-      vec3 rightWorld = facingCamera ? normalize(cross(vec3(0.0,1.0,0.0), directionToCamera)) : vec3(1.0,0.0,0.0);
-      vec3 rightLocal = normalize(rightWorld * mat3(modelMatrix));
-      vec3 objectNormal = facingCamera ? normalize(normalize(directionToCamera) * mat3(modelMatrix)) : normal;
-      #ifdef USE_TANGENT
-        vec3 objectTangent = rightLocal;
-      #endif
-    `).replace('#include <begin_vertex>', `#include <begin_vertex>
-      transformed = _lmu_pivot + rightLocal * _lmu_corner.x + vec3(0.0,_lmu_corner.y,0.0);
-    `);
+    patchBillboardVertex(shader, 'cameraPosition', config.kind === 'vegetation');
+    // A card and its own shadow lie in one plane, so at grazing sun the card shadowed itself whole (black palms). Its lookup moves
+    // toward the sun by BILLBOARD_SELF_SHADOW_M (per map), past its own depth; other objects' shadows still fall on it.
+    shader.vertexShader = shader.vertexShader.replace(STATIC_SHADOW_VERTEX, `${STATIC_SHADOW_VERTEX}
+      #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
+        vDirectionalShadowCoord[ 0 ].z -= ${glslNumber(BILLBOARD_SELF_SHADOW_M[0] / SUN_SHADOW_DEPTH_M[0])} * vDirectionalShadowCoord[ 0 ].w;
+        vStaticShadowCoord.z -= ${glslNumber(BILLBOARD_SELF_SHADOW_M[1] / SUN_SHADOW_DEPTH_M[1])} * vStaticShadowCoord.w;
+      #endif`);
   }
   const occlusion = config.kind === 'clearcoat'
     ? 'reflectedLight.directSpecular*=surfaceSpecularOcclusion;reflectedLight.indirectSpecular*=surfaceSpecularOcclusion;clearcoatSpecularDirect*=surfaceSpecularOcclusion;clearcoatSpecularIndirect*=surfaceSpecularOcclusion;'
@@ -101,17 +195,19 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
   if (code.finish) shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `${code.finish}\n#include <opaque_fragment>`);
   if (code.absorption) shader.fragmentShader = shader.fragmentShader.replace('outgoingLight = outgoingLight * ( 1.0 - material.clearcoat * Fcc )', `outgoingLight = outgoingLight * (${code.absorption}) * ( 1.0 - material.clearcoat * Fcc )`);
   if (code.emissive) shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\ntotalEmissiveRadiance=${code.emissive};`);
+  shader.fragmentShader = shader.fragmentShader.replace('#include <shadowmap_pars_fragment>', `#include <shadowmap_pars_fragment>\n${SUN_SHADOW_BLEND}`)
+    .replace('#include <lights_fragment_begin>', sunShadowLights(config.kind === 'vegetation'));
   if (config.kind === 'vegetation') {
-    if (config.flags.BILLBOARD === 'Pointy') shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_begin>',
-      '#include <normal_fragment_begin>\nnormal = normalize(mat3(viewMatrix) * vec3(0.0,1.0,0.0));');
     if (hasTranslucency(config)) {
-      // Source leaf mask/power/scale; view/light backscatter curve is an approximation.
+      // The game's leaf translucency (L2IBLVEGETATION): pow(saturate(dot(eye-to-point, normalize(N + L))), Power) * leaf mask * Scale,
+      // times the shadowed sun and albedo over pi. Leaves seen against the sun glow; the card keeps its own normal, so fronds facing
+      // away from the sun stay shaded as in the game.
       shader.fragmentShader = shader.fragmentShader.replace('#include <lights_physical_pars_fragment>', `#include <lights_physical_pars_fragment>
         void surfaceLeafDirect(const in IncidentLight light, const in vec3 position, const in vec3 normal,
           const in vec3 viewDir, const in vec3 coatNormal, const in PhysicalMaterial material, inout ReflectedLight reflected) {
           RE_Direct_Physical(light,position,normal,viewDir,coatNormal,material,reflected);
            {
-            float scatter = pow(max(dot(-light.direction,viewDir)*0.6+0.4,0.0),${glslNumber(value(p.Translucency, 'Power', 2))});
+            float scatter = pow(clamp(dot(-viewDir,normalize(normal+light.direction)),0.0,1.0),${glslNumber(value(p.Translucency, 'Power', 2))});
             reflected.directDiffuse += light.color * material.diffuseColor * (surfaceLeafMask * scatter * ${glslNumber(value(p.Translucency, 'Scale', 1))}) * RECIPROCAL_PI;
           }
         }
@@ -126,7 +222,7 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
 export function computeCustomProgramCacheKey(config: SurfaceConfig): string {
   const parts = shaderParts(config, { uniforms: true });
   const hooks = {
-    billboard: !!config.billboard, pointy: config.flags.BILLBOARD === 'Pointy',
+    billboard: !!config.billboard,
     translucency: hasTranslucency(config) ? config.parameters.Translucency : null,
   };
   const code = JSON.stringify({ parts, hooks });

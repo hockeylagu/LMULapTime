@@ -1,7 +1,8 @@
 import { expect, it, vi } from 'vitest';
-import { ShaderChunk, BoxGeometry, DirectionalLight, FogExp2, Mesh, MeshBasicMaterial, MeshStandardMaterial, NoToneMapping, OrthographicCamera, PerspectiveCamera, Scene, Texture, Vector3, type WebGLRenderer } from 'three';
+import { ShaderChunk, BoxGeometry, DirectionalLight, FogExp2, Mesh, MeshBasicMaterial, MeshDepthMaterial, MeshStandardMaterial, NoToneMapping, OrthographicCamera, PerspectiveCamera, Scene, Texture, Vector3, type WebGLRenderer } from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { addSceneEnvironment, DAYLIGHT, sceneLighting, SUN_DIRECTION } from '../../../../src/components/replay/view3d/sceneEnvironment.js';
+import { staticShadowUniforms } from '../../../../src/components/replay/view3d/sunShadows.js';
 
 const probe = vi.hoisted(() => ({render: vi.fn<(scene: Scene) => void>(), dispose: vi.fn()}));
 vi.mock('three', async importOriginal => {
@@ -11,9 +12,10 @@ vi.mock('three', async importOriginal => {
     dispose() {}
   }};
 });
+const fakeRenderer = () => ({render: vi.fn(), clear: vi.fn(), autoClear: true, getRenderTarget: () => null, setRenderTarget: vi.fn()});
 
-it('uses standard sky, PMREM and one sun shadow without touching shared shader chunks', () => {
-  const scene = new Scene(), renderer = {shadowMap: {enabled: false, type: 0}, toneMapping: 0, toneMappingExposure: 0} as unknown as WebGLRenderer;
+it('uses standard sky, PMREM and a near sun shadow without touching shared shader chunks', () => {
+  const scene = new Scene(), renderer = {shadowMap: {enabled: false, type: 0, autoUpdate: true}, toneMapping: 0, toneMappingExposure: 0, ...fakeRenderer()} as unknown as WebGLRenderer;
   const lightChunk = ShaderChunk.lights_fragment_begin, lightPars = ShaderChunk.lights_pars_begin;
   const material = new MeshStandardMaterial(), receiver = new Mesh(new BoxGeometry(), material); receiver.receiveShadow = true; scene.add(receiver);
   const environment = addSceneEnvironment(scene, renderer);
@@ -25,12 +27,13 @@ it('uses standard sky, PMREM and one sun shadow without touching shared shader c
   const camera = new PerspectiveCamera(48, 1.5, 0.5, 15000); camera.position.set(500, 3, -200); camera.updateMatrixWorld();
   environment.setCamera(camera); environment.update(new Vector3(500, 0, -210));
   const suns = scene.children.filter((child): child is DirectionalLight => child instanceof DirectionalLight);
-  expect(suns).toHaveLength(1);
+  // One sun light: the static scenery map is its own pass (sunShadows.ts).
+  expect(suns.map(light => light.name)).toEqual(['sun']);
   const [sun] = suns;
   expect(sun.castShadow).toBe(true); expect(sun.intensity).toBe(DAYLIGHT.sunIntensity);
   expect(sun.shadow.mapSize.toArray()).toEqual([4096, 4096]);
   expect(sun.shadow.camera.right - sun.shadow.camera.left).toBe(160);
-  expect(sun.shadow.intensity).toBe(1); expect(sun.shadow.radius).toBe(1);
+  expect(sun.shadow.intensity).toBe(1); expect(sun.shadow.radius).toBe(0);
   expect(sun.shadow.bias).toBe(0.000001); expect(sun.shadow.normalBias).toBe(0.05);
   expect(sun.position.clone().sub(sun.target.position).normalize().toArray().map(v => +v.toFixed(6))).toEqual(SUN_DIRECTION.toArray().map(v => +v.toFixed(6)));
   // Materials keep their own compile hooks and the shared lighting chunks stay three.js's.
@@ -52,7 +55,7 @@ it('uses standard sky, PMREM and one sun shadow without touching shared shader c
 });
 
 it('centres the shadow window ahead of the focus along the view and snaps it to whole texels', () => {
-  const scene = new Scene(), renderer = {shadowMap: {enabled: false, type: 0}} as unknown as WebGLRenderer;
+  const scene = new Scene(), renderer = {shadowMap: {enabled: false, type: 0, autoUpdate: true}, ...fakeRenderer()} as unknown as WebGLRenderer;
   const environment = addSceneEnvironment(scene, renderer), camera = new PerspectiveCamera(48, 1.5, 0.5, 15000);
   camera.position.set(0, 3, 10); camera.lookAt(0, 0, 0); environment.setCamera(camera);
   try {
@@ -71,6 +74,40 @@ it('centres the shadow window ahead of the focus along the view and snaps it to 
       expect(onGrid(origin.x) && onGrid(origin.y)).toBe(true);
     }
   } finally { environment.dispose(); }
+});
+
+it('draws the static shadow map a quarter per frame without the cars or sub-metre casters, again after 200 m (100 m after a scenery change)', () => {
+  const scene = new Scene(), render = vi.fn<(scene: Scene, camera: OrthographicCamera) => void>();
+  const renderer = {shadowMap: {enabled: false, type: 0, autoUpdate: true}, ...fakeRenderer(), render} as unknown as WebGLRenderer;
+  const environment = addSceneEnvironment(scene, renderer), camera = new PerspectiveCamera(48, 1.5, 0.5, 15000);
+  const car = new Mesh(new BoxGeometry(), new MeshBasicMaterial()); scene.add(car);
+  const bolt = new Mesh(new BoxGeometry(0.2, 0.2, 0.2), new MeshBasicMaterial()), stand = new Mesh(new BoxGeometry(20, 10, 5), new MeshBasicMaterial());
+  const standMaterial = stand.material;
+  bolt.castShadow = true; stand.castShadow = true; scene.add(bolt, stand); scene.updateMatrixWorld();
+  const drawn: {car: boolean; bolt: boolean; standDepth: boolean; nearRedrawn: boolean; width: number}[] = [];
+  render.mockImplementation((_scene, tile) => {
+    drawn.push({car: car.visible, bolt: bolt.visible, standDepth: stand.visible && stand.material instanceof MeshDepthMaterial,
+      nearRedrawn: renderer.shadowMap.autoUpdate, width: tile.right - tile.left});
+  });
+  expect(environment.update(new Vector3())).toBe(false); expect(render).not.toHaveBeenCalled(); // No camera yet.
+  environment.setCamera(camera); environment.setDynamic([car]);
+  try {
+    // The first map draws its four 600 m quarters at once, with depth materials, without the car, the bolt or a near-map redraw.
+    expect(environment.update(new Vector3())).toBe(false); expect(render).toHaveBeenCalledTimes(4);
+    expect(drawn.every(frame => !frame.car && !frame.bolt && frame.standDepth && !frame.nearRedrawn && frame.width === 600)).toBe(true);
+    expect(car.visible && bolt.visible && stand.material === standMaterial && renderer.shadowMap.autoUpdate).toBe(true);
+    const first = staticShadowUniforms.map.value; expect(first).not.toBeNull(); expect(staticShadowUniforms.ready.value).toBe(1);
+    expect(environment.update(new Vector3(150, 0, 0))).toBe(false); expect(render).toHaveBeenCalledTimes(4);
+    // Later maps draw a quarter per frame while the surfaces keep the previous map, then swap.
+    expect([201, 202, 203].map(x => environment.update(new Vector3(x, 0, 0)))).toEqual([true, true, true]);
+    expect(render).toHaveBeenCalledTimes(7); expect(staticShadowUniforms.map.value).toBe(first);
+    expect(environment.update(new Vector3(204, 0, 0))).toBe(false); expect(render).toHaveBeenCalledTimes(8);
+    expect(staticShadowUniforms.map.value).not.toBe(first);
+    // A scenery change redraws once the view has moved 100 m.
+    environment.staticShadowStale(); expect(environment.update(new Vector3(250, 0, 0))).toBe(false); expect(render).toHaveBeenCalledTimes(8);
+    expect(environment.update(new Vector3(302, 0, 0))).toBe(true); expect(render).toHaveBeenCalledTimes(9);
+  } finally { environment.dispose(); }
+  expect(staticShadowUniforms.map.value).toBeNull(); expect(staticShadowUniforms.ready.value).toBe(0);
 });
 
 it('lights a layout from its published daylight: race-start sun height, turbidity from air pollution', () => {

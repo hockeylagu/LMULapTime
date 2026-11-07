@@ -154,7 +154,7 @@ export async function createReplayScene(
     },
     unload: (chunk, root) => { ground.remove(chunk.id, root); loader.releaseChunk(root); },
     releaseTexture: asset => loader.releaseTexture(asset),
-    changed: () => { freezeScenery(); scheduleRefresh(); invalidate(); },
+    changed: () => { freezeScenery(); scheduleRefresh(); environment.staticShadowStale(); invalidate(); },
     failed: (chunk, error) => { if (!disposed) onFailure(`3D scenery chunk ${chunk.id} failed: ${error.message}`); },
   });
   const cleanup = () => {
@@ -187,7 +187,7 @@ export async function createReplayScene(
     sceneryRoot.traverse(object => { object.matrixAutoUpdate = false; object.matrixWorldAutoUpdate = false; });
   };
   freezeScenery();
-  world.add(layer.root);
+  world.add(layer.root); environment.setDynamic([layer.root]);
   const perspective = new PerspectiveCamera(DEFAULT_FOV_DEG, 1, DEFAULT_NEAR_M, 15000);
   warmTarget = {scene, camera: perspective};
   environment.setCamera(perspective);
@@ -240,7 +240,9 @@ export async function createReplayScene(
       camera.lookAt(controls.target);
     }
     try {
-      environment.update(controls.target); exposure.render(scene, camera);
+      // A static shadow map still being drawn (a quarter per frame) asks for the next frame.
+      if (environment.update(controls.target)) invalidate();
+      exposure.render(scene, camera);
     } finally {
       if (corrected) {
         camera.position.copy(desiredEye);
@@ -303,7 +305,7 @@ export async function createReplayScene(
       const replacement = await loadLaps(next, comparison, assets, lineMode);
       if (disposed || signal?.aborted || request !== lapRequest) { replacement.dispose(); return false; }
       replacement.colorLines(lineMode); replacement.fadeLines(primaryOpacity, baselineOpacity);
-      layer.dispose(); layer = replacement; world.add(layer.root);
+      layer.dispose(); layer = replacement; world.add(layer.root); environment.setDynamic([layer.root]);
       syncDriverCamera();
       trackside = createTracksideCameras(next.points, layer.primaryDistances, origin);
       return true;
