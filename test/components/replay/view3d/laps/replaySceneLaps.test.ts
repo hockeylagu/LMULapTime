@@ -163,7 +163,8 @@ it('serializes GPU warm-ups when several new sectors load together', async () =>
 it('caches static scenery matrices after the scene reflection without freezing the moving car', async () => {
   const handle = await createReplayScene(document.createElement('div'), layout, lap, null, vi.fn(), assets);
   try {
-    for (const root of chunks.roots.values()) {
+    // Chunks still loading behind the window join (and freeze) later.
+    for (const root of [...chunks.roots.values()].filter(root => root.parent)) {
       expect(root.matrixWorldAutoUpdate).toBe(false);
       expect(root.matrixWorld.determinant()).toBeCloseTo(-1);
       root.traverse(object => { expect(object.matrixAutoUpdate).toBe(false); });
@@ -315,16 +316,18 @@ it('puts the cockpit, hood and roof views on the game cameras of the car with th
   handle.dispose();
 });
 
-it('streams sectors around the car: loads the window, unloads what left it, and follows a free camera', async () => {
+it('loads the whole circuit, shows the window around the car, hides what left it, and follows a free camera', async () => {
   const host = document.createElement('div'), far = {...lap, points: [...lap.points.slice(0, 6), {...lap.points[6], stationM: 3000}]};
   const handle = await createReplayScene(host, layout, far, null, vi.fn(), assets);
-  // At station 0 the window [-300, 1500] covers s0, s1 and the end of s3, never s2.
-  await vi.waitFor(() => expect([...chunks.roots.keys()].sort()).toEqual(['horizon', 's0', 's1', 's3']));
+  const shown = () => [...chunks.roots].filter(([, root]) => root.parent && root.visible).map(([id]) => id).sort();
+  // Everything loads; at station 0 the window [-300, 1500] covers s0, s1 and the end of s3, never s2.
+  await vi.waitFor(() => expect([...chunks.roots.values()].every(root => root.parent)).toBe(true));
+  expect([...chunks.roots.keys()].sort()).toEqual(['horizon', 's0', 's1', 's2', 's3']);
+  expect(shown()).toEqual(['horizon', 's0', 's1', 's3']);
   handle.cursor(6, 0); draw();
   // At station 3000 the window [2700, 4500) covers s2, s3 and the start of s0; s1 left it plus the hysteresis margin.
-  await vi.waitFor(() => expect(chunks.loads).toContain('s2'));
-  expect(chunks.roots.get('s1')!.parent).toBeNull(); expect(chunks.roots.get('s3')!.parent).not.toBeNull();
-  expect(chunks.roots.get('horizon')!.parent).not.toBeNull();
+  expect(shown()).toEqual(['horizon', 's0', 's2', 's3']);
+  expect(chunks.loads.filter(id => id === 's2')).toHaveLength(1);
   // An orbit camera is planned around its own position, not the lap distance.
   handle.mode('orbit'); draw();
   handle.dispose();
