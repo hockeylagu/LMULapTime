@@ -20,7 +20,7 @@ import { CachedKtx2Loader } from './scenery/cachedKtx2Loader.js';
 import { createChunkLoader } from './scenery/chunkLoader.js';
 import { createSceneryGround } from './scenery/sceneryGround.js';
 import { surfaceTextureMaps } from './scenery/materials/configureSurfaceMaterial.js';
-import { sharpenTexture } from './scenery/materials/textureSource.js';
+import { isStreaming, streamTexture } from './scenery/materials/mipStreaming.js';
 import type { StreamView } from './scenery/residency.js';
 import { createSceneryStream } from './scenery/sceneryStream.js';
 import { createGeometryWarmup } from './scenery/geometryWarmup.js';
@@ -80,24 +80,25 @@ export async function createReplayScene(
   const UPLOAD_SLICE_MS = 1, LOADING_SLICE_MS = 50;
   const nextFrame = () => new Promise<void>(resolve => { requestAnimationFrame(() => resolve()); });
   const nextTask = () => new Promise<void>(resolve => { setTimeout(resolve, 0); });
-  // Scenery textures join on their reduced levels; once the first frame is out, their full chains upload a few per frame.
-  // The budget is bytes, not time: an upload call returns before the GPU has copied the data, so time does not bound its cost.
-  const SHARPEN_BYTES_PER_FRAME = 4 * 1024 * 1024, blurry = new Set<Texture>();
+  // Scenery textures join on their reduced levels; once the first frame is out, their missing top levels stream in, in
+  // bands of rows, one texture after another. The budget is bytes, not time: an upload call returns before the GPU has copied
+  // the data, so time does not bound its cost.
+  const SHARPEN_BYTES_PER_FRAME = 2 * 1024 * 1024, blurry = new Set<Texture>();
   let sharpening = false, sharpenFrame = 0;
   const sharpen = () => {
     sharpenFrame = 0;
     if (disposed) return;
     let uploaded = 0;
     for (const texture of blurry) {
-      blurry.delete(texture);
-      uploaded += sharpenTexture(texture, renderer);
+      uploaded += streamTexture(texture, renderer, SHARPEN_BYTES_PER_FRAME - uploaded);
+      if (!isStreaming(texture)) blurry.delete(texture);
       if (uploaded >= SHARPEN_BYTES_PER_FRAME) break;
     }
     if (uploaded) invalidate();
     if (blurry.size) sharpenFrame = requestAnimationFrame(sharpen);
   };
   const queueSharpen = (textures: Iterable<Texture>) => {
-    for (const texture of textures) blurry.add(texture);
+    for (const texture of textures) if (isStreaming(texture)) blurry.add(texture);
     if (sharpening && !sharpenFrame && blurry.size) sharpenFrame = requestAnimationFrame(sharpen);
   };
   const geometryWarmup = createGeometryWarmup(renderer, nextFrame, UPLOAD_SLICE_MS);
