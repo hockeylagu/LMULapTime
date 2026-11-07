@@ -40,6 +40,10 @@ vi.mock('three/addons/loaders/GLTFLoader.js', async () => {
       const root = rigModel(), cockpit = new Group();
       root.traverse(object => { if (object instanceof Mesh) { const material = object.material as Material; material.userData.nativeMaterialId = 'm1'; material.name = 'body'; } });
       cockpit.name = 'cockpit-in'; cockpit.userData.cockpitView = 'in'; root.add(cockpit);
+      for (const name of ['option_PlateA', 'option_PlateB']) {
+        const material = new MeshBasicMaterial(), plate = new Mesh(new BoxGeometry(), material);
+        material.userData.nativeMaterialId = 'm1'; plate.name = name; root.add(plate);
+      }
       return {scene: root};
     }
   }};
@@ -83,7 +87,7 @@ const layout = {
 } as unknown as SceneryLayoutResource;
 const car = {
   resource: {}, bytes: new ArrayBuffer(0), vehicleId: 'veh',
-  descriptor: {appearances: [{alias: 'VEH', albedo: 'textures/a.ktx2', paint: {kind: 'carPaint', maps: {}}}], materials: [{id: 'm1', name: 'body', paint: true}],
+  descriptor: {optionNodes: ['option_PlateA', 'option_PlateB'], appearances: [{alias: 'VEH', albedo: 'textures/a.ktx2', paint: {kind: 'carPaint', maps: {}}, optionNodes: ['option_PlateA']}], materials: [{id: 'm1', name: 'body', paint: true}],
     cameras: {list: [
       {name: 'COCKPIT', position: [0.28, 1, -0.7], orientation: [-0.1, 0, 0], fov: [89, 49], clipPlanes: [0.13, 700], cockpitView: 'in'},
       {name: 'NOSECAM', position: [0.28, 0.9, -1.9], orientation: [0, 0, 0], fov: [80, 45], clipPlanes: [0.2, 800], cockpitView: 'out'},
@@ -187,6 +191,8 @@ it('retains scenery, canvas and camera settings, releases old laps, and draws th
   const oldLayer = world.children.at(-1)!;
   const oldCar = oldLayer.children[0], oldBody = oldCar.getObjectByName('body-envelope')!.getObjectByName('body') as Mesh<BufferGeometry, Material>;
   expect(oldBody.material.shadowSide).toBe(DoubleSide);
+  // The entry's own option parts only: the other entries' alternatives are left out of its car.
+  expect([oldCar.getObjectByName('option_PlateA'), oldCar.getObjectByName('option_PlateB')].map(Boolean)).toEqual([true, false]);
   const roadDispose = vi.spyOn(road.geometry, 'dispose'), carDispose = vi.spyOn(oldBody.geometry, 'dispose'), materialDispose = vi.spyOn(oldBody.material, 'dispose');
   handle.colorLines('speed'); handle.fadeLines(0.12, 1);
   const next = {...lap, points: lap.points.map(point => ({...point, x: point.x + 5}))};

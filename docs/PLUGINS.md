@@ -135,26 +135,24 @@ as approximate placement. It does not recenter the outline or invent a provider 
 Exact aliases win; ambiguous model matches remain unresolved. Primary and comparison
 vehicles resolve independently. Body direction continues to use replay yaw.
 
-## 3D scenery and textured cars (package manifest schema 3)
+## 3D scenery and textured cars (package manifest schema 5)
 
-The manifest `schemaVersion` is `3`. This app loads schema 3 only: earlier packages are rejected at startup with an invalid
+The manifest `schemaVersion` is `5`. This app loads schema 5 only: earlier packages are rejected at startup with an invalid
 status, and there is no fallback. The pipeline repository's `docs/SCENE_PACKAGE.md` and `docs/VEHICLE_PIPELINE.md` own the file formats;
 this section records what the app reads and checks.
 
 ```json
 {
-  "schemaVersion": 3,
+  "schemaVersion": 5,
   "id": "personal-data",
   "version": "1",
   "tracks": { "catalog": "tracks/index.json" },
   "vehicles": { "catalog": "vehicles/index.json", "logos": "vehicles/logos.json" },
-  "scenery": { "catalog": "scenery/index.json" },
-  "cars": { "catalog": "cars/index.json" }
+  "scenery": { "catalog": "scenery/index.json" }
 }
 ```
 
-`scenery` and `cars` are optional. A manifest key other than these, or `brakeBoardArtwork`, is rejected; `brakeBoardArtwork` is
-known only because v1 packages still carry it. It is never read, validated or served, and the package drops it in v2.
+`scenery` is optional; any other manifest key is rejected. Textured cars come with the vehicle catalog (below).
 
 ### Scenery (`scenery/index.json`)
 
@@ -187,14 +185,20 @@ Camera clearance uses `three-mesh-bvh` raycasts over position-only copies of res
 BVHs are generated in a worker and released when a chunk unloads; they are not exported package assets.
 The renderer's geometry buffers stay available while the worker builds the collision data.
 
-### Cars (`cars/index.json`)
+### Cars (`bodies` of the vehicle records)
 
-One row per car folder (`schemaVersion: 1`): `vehicleFolder`, `vehicleIds` (the installed VEH ids it serves), `descriptor`
-(`cars/<vehicleFolder>.json`) with `descriptorSha256`, `asset` (`cars/<sha256>.glb`), `triangles`, `vertices` and `textures`
-(`cars/textures/<sha256>.ktx2`). When the manifest has a vehicle catalog, every `vehicleIds` entry must be one of its ids; two
-cars may not serve one id. The descriptor is read and validated at startup: its aliases equal the row's, `wheelRig` passed with four
-rigs and rest-vertex error below 1e-5, there is one appearance per alias, every texture it names is declared by the row, and its
-`cameras.list` holds well-formed game cameras including `COCKPIT`.
+Each vehicle record lists its car `bodies`: `folder`, `vehicleIds` (the part of the record's VEH ids this body serves), `descriptor`
+(`vehicles/bodies/<folder>.json`) with `descriptorSha256`, `asset` (`vehicles/<sha256>.glb`), `byteLength`, `triangles`, `vertices`
+and `textures` (`vehicles/textures/<sha256>.ktx2.zst`). Two bodies may not serve one id. The descriptor is read and validated at
+startup: its aliases equal the body's ids, `wheelRig` passed with four rigs and rest-vertex error below 1e-5, there is one appearance
+per alias, every texture it names is declared by the body, and its `cameras.list` holds well-formed game cameras including `COCKPIT`.
+
+Since schema 5 a body carries its entries' part alternatives (the game's GenString choice: number plates, lights, displays, some
+body panels and tyre versions). The descriptor's `optionNodes` lists them, sorted and unique, each a mesh-only GLB node named
+`option_<mesh file stem>` (letters, digits and `_`, so three.js keeps the name; GLB node names are unique); every appearance has its own
+sorted `optionNodes`, a subset of the body's (`[]` for none). The viewer keeps the lap entry's options, leaves the body's other
+options out of that car (no draw, no texture load) and fails if the GLB lacks a listed node. An option node may also carry
+`extras.cockpitView`; the cockpit view rule then applies to it as to any other node.
 
 `GET /api/data-plugin/cars/:identity` (a VEH id with or without `.veh`) returns the row plus `packageRevision`;
 `/cars/files/` serves the car GLB, descriptor and textures. The viewer selects the

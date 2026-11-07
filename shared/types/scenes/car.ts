@@ -60,6 +60,8 @@ export interface CarAppearance {
   paint: CarSurface;
   /** Livery files replacing the albedo of the same-named material. */
   materialTextures?: Record<string, string>;
+  /** The body's option part nodes this entry shows (the game's GenString part choice); the others stay hidden. */
+  optionNodes: string[];
 }
 
 /** A game camera of the car (VEH `Cameras=` LocalCam), in the native car frame of the GLB (+x left, +y up, -z forward). */
@@ -80,6 +82,8 @@ export interface CarDescriptor {
   vehicleFolder: string;
   aliases: string[];
   wheelPivots: Record<CarCorner, Vec3>;
+  /** GLB nodes that are alternatives between entries (number plates, lights, body panels): `option_<mesh stem>`, mesh-only. */
+  optionNodes: string[];
   wheelRig: { passed: true; rigs: 4; maxRestVertexErrorM: number };
   appearances: CarAppearance[];
   materials: CarMaterialRecipe[];

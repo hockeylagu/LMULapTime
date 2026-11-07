@@ -9,6 +9,8 @@ const MAX_GLB_BYTES = 256_000_000, MAX_TEXTURE_BYTES = 64_000_000, MAX_DESCRIPTO
 const CORNERS = ['fl', 'fr', 'rl', 'rr'];
 const TEXTURE_PATH = /^textures\/[a-f0-9]{64}\.ktx2\.zst$/;
 const FOLDER = /^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)*$/;
+/** Option part nodes: unique GLB node names that three.js keeps as they are (no characters it would sanitise). */
+const OPTION_NODE = /^option_[A-Za-z0-9_]+$/;
 
 export const normalizeVehicleId = (id: string): string => id.trim().replace(/\.veh$/i, '').toUpperCase();
 
@@ -36,7 +38,7 @@ function parseBody(value: unknown, what: string): CarBody {
 /** The descriptor fields the viewer reads, checked against the catalog row (docs/VEHICLE_PIPELINE.md: four wheel rigs, zero rest-vertex error). */
 export function validateCarDescriptor(bytes: Buffer, row: CarBody): void {
   const what = `${row.folder} descriptor`, descriptor = record(JSON.parse(bytes.toString('utf8')) as unknown, what);
-  exactKeys(descriptor, ['vehicleFolder', 'aliases', 'wheelPivots', 'wheelRig', 'appearances', 'materials', 'cameras'], what);
+  exactKeys(descriptor, ['vehicleFolder', 'aliases', 'wheelPivots', 'optionNodes', 'wheelRig', 'appearances', 'materials', 'cameras'], what);
   // A further geometry of an installed folder is `<folder>.<hash>`; the descriptor names the installed folder.
   if (typeof descriptor.vehicleFolder !== 'string' || (row.folder !== descriptor.vehicleFolder && !row.folder.startsWith(`${descriptor.vehicleFolder}.`))) throw Error(`${what}: describes another car`);
   const sorted = (ids: string[]) => JSON.stringify([...ids].sort());
@@ -44,6 +46,12 @@ export function validateCarDescriptor(bytes: Buffer, row: CarBody): void {
   const pivots = record(descriptor.wheelPivots, `${what}.wheelPivots`);
   exactKeys(pivots, CORNERS, `${what}.wheelPivots`);
   for (const corner of CORNERS) vec3(pivots[corner], `${what}.wheelPivots.${corner}`, 10);
+  const optionNodes = (value: unknown, at: string) => {
+    const names = array(value, at, 4096).map((name, i) => text(name, `${at}[${i}]`, 200));
+    if (names.some((name, i) => !OPTION_NODE.test(name) || (i > 0 && names[i - 1] >= name))) throw Error(`${at}: expected sorted, unique option_ node names`);
+    return names;
+  };
+  const options = new Set(optionNodes(descriptor.optionNodes, `${what}.optionNodes`));
   const rig = record(descriptor.wheelRig, `${what}.wheelRig`);
   if (rig.passed !== true || rig.rigs !== 4 || !(finite(rig.maxRestVertexErrorM, `${what}.wheelRig.maxRestVertexErrorM`) < 0.00001)) throw Error(`${what}: the wheel rig check did not pass`);
   const aliases = array(descriptor.appearances, `${what}.appearances`, 5000).map((value, i) => {
@@ -52,6 +60,9 @@ export function validateCarDescriptor(bytes: Buffer, row: CarBody): void {
     if (typeof appearance.albedo !== 'string' || !TEXTURE_PATH.test(appearance.albedo)) throw Error(`${what}.appearances[${i}]: invalid albedo`);
     const paint = record(appearance.paint, `${what}.appearances[${i}].paint`);
     text(paint.kind, `${what}.appearances[${i}].paint.kind`); record(paint.maps, `${what}.appearances[${i}].paint.maps`);
+    if (optionNodes(appearance.optionNodes, `${what}.appearances[${i}].optionNodes`).some(name => !options.has(name))) {
+      throw Error(`${what}.appearances[${i}].optionNodes: names a node the body does not list`);
+    }
     if (appearance.materialTextures !== undefined) {
       for (const path of Object.values(record(appearance.materialTextures, `${what}.appearances[${i}].materialTextures`))) {
         if (typeof path !== 'string' || !TEXTURE_PATH.test(path)) throw Error(`${what}.appearances[${i}]: invalid livery texture`);

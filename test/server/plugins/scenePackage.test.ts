@@ -13,7 +13,7 @@ const build = () => { const built = syntheticPackage(); packages.push(built); re
 afterEach(() => { for (const built of packages.splice(0)) fs.rmSync(built.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }); });
 const state = (built: Package) => new DataPlugin(built.dir).status.state;
 
-describe('schema 4 manifest', () => {
+describe('schema 5 manifest', () => {
   it('loads scenery next to tracks, and the car bodies of the vehicle records', () => {
     const built = build(), plugin = new DataPlugin(built.dir);
     expect(plugin.status.state).toBe('ready');
@@ -29,7 +29,7 @@ describe('schema 4 manifest', () => {
     expect(plugin.car('OTHER')).toBeNull();
   });
 
-  it('accepts schema 4 without scenery; the cars come with the vehicles', () => {
+  it('accepts schema 5 without scenery; the cars come with the vehicles', () => {
     const built = build();
     delete built.manifest.scenery; built.commit();
     const plugin = new DataPlugin(built.dir);
@@ -45,7 +45,7 @@ describe('schema 4 manifest', () => {
     expect(plugin.status.cars).toBeUndefined(); expect(plugin.car('TEST_CAR')).toBeNull();
   });
 
-  it.each([1, 2, 3, '4', undefined])('rejects manifest schema %s: only schema 4 is supported', schemaVersion => {
+  it.each([1, 2, 3, 4, '5', undefined])('rejects manifest schema %s: only schema 5 is supported', schemaVersion => {
     const built = build();
     built.manifest.schemaVersion = schemaVersion; built.commit();
     expect(state(built)).toBe('invalid');
@@ -122,6 +122,11 @@ describe('car validation', () => {
     ['a wheel rig that did not pass', (built: Package) => { built.descriptor.wheelRig = { passed: false, rigs: 4, maxRestVertexErrorM: 0 }; }],
     ['a wheel rig with rest-vertex error', (built: Package) => { built.descriptor.wheelRig = { passed: true, rigs: 4, maxRestVertexErrorM: 0.01 }; }],
     ['a missing wheel pivot', (built: Package) => { delete (built.descriptor.wheelPivots as Record<string, unknown>).rr; }],
+    ['no option node list', (built: Package) => { delete built.descriptor.optionNodes; }],
+    ['unsorted option nodes', (built: Package) => { built.descriptor.optionNodes = ['option_NumplateB', 'option_NumplateA']; }],
+    ['an option node three.js would rename', (built: Package) => { built.descriptor.optionNodes = ['option_Numplate.A']; }],
+    ['an entry showing an option the body lacks', (built: Package) => { (built.descriptor.appearances as Array<{ optionNodes: string[] }>)[0].optionNodes = ['option_Spoiler']; }],
+    ['an entry without its option list', (built: Package) => { delete (built.descriptor.appearances as Array<{ optionNodes?: string[] }>)[0].optionNodes; }],
     ['an undeclared texture', (built: Package) => { (built.descriptor.appearances as Array<{ materialTextures?: unknown }>)[0].materialTextures = { body: 'textures/' + '1'.repeat(64) + '.ktx2.zst' }; }],
     ['a descriptor of another car', (built: Package) => { built.descriptor.vehicleFolder = 'Other'; }],
     ['a descriptor schema version', (built: Package) => { built.descriptor.schemaVersion = 1; }],

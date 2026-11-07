@@ -73,8 +73,9 @@ export function syntheticPackage() {
   const descriptor: Record<string, unknown> = {
     vehicleFolder: 'Test_Car', aliases: ['TEST_CAR'],
     wheelPivots: { fl: [0.8, 0.33, -1.4], fr: [-0.8, 0.33, -1.4], rl: [0.8, 0.33, 1.4], rr: [-0.8, 0.33, 1.4] },
+    optionNodes: ['option_NumplateA', 'option_NumplateB'],
     wheelRig: { passed: true, rigs: 4, maxRestVertexErrorM: 0 },
-    appearances: [{ alias: 'TEST_CAR', albedo: texturePath, paint: { kind: 'carPaint', maps: {} } }],
+    appearances: [{ alias: 'TEST_CAR', albedo: texturePath, paint: { kind: 'carPaint', maps: {} }, optionNodes: ['option_NumplateA'] }],
     materials: [{ id: 'm1', name: 'body', paint: true }],
     cameras: { list: [
       { name: 'COCKPIT', position: [0.3, 0.95, 0.3], orientation: [-0.02, 0, 0], fov: [89, 49], clipPlanes: [0.13, 700], cockpitView: 'in' },
@@ -96,10 +97,10 @@ export function syntheticPackage() {
     vehicles.splice(0, vehicles.length, ...specs);
     const ids = specs.flatMap(spec => spec.vehicleIds);
     descriptor.aliases = ids;
-    descriptor.appearances = ids.map(alias => ({ alias, albedo: texturePath, paint: { kind: 'carPaint', maps: {} } }));
+    descriptor.appearances = ids.map(alias => ({ alias, albedo: texturePath, paint: { kind: 'carPaint', maps: {} }, optionNodes: [] }));
   };
   const manifest: Record<string, unknown> = {
-    schemaVersion: 4, id: 'synthetic', version: '1',
+    schemaVersion: 5, id: 'synthetic', version: '1',
     tracks: { catalog: 'tracks/index.json' }, vehicles: { catalog: 'vehicles/index.json' },
     scenery: { catalog: 'scenery/index.json' },
   };

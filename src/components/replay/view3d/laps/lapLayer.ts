@@ -1,5 +1,5 @@
 import { MeshoptDecoder } from 'meshoptimizer/decoder';
-import { BufferGeometry, Group, Mesh, type Material, type Texture, type Vector3 } from 'three';
+import { BufferGeometry, Group, Mesh, type Material, type Object3D, type Texture, type Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import { normalizeVehicleId, type LoadedCar } from '../../../../api/vehicles/carApi.js';
@@ -43,6 +43,14 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     const template = await loadTemplate(car), key = normalizeVehicleId(car.vehicleId);
     const appearance = car.descriptor.appearances.find(row => normalizeVehicleId(row.alias) === key);
     if (!appearance) throw Error(`The car package has no appearance for ${car.vehicleId}`);
+    // Option parts are alternatives between entries (number plates, lights, body panels): this entry shows its own, the rest stay out.
+    const shown = new Set(appearance.optionNodes), hidden = new Set<Object3D>();
+    for (const name of car.descriptor.optionNodes) {
+      const node = template.getObjectByName(name);
+      if (!node) throw Error(`Car ${car.vehicleId} has no option part ${name}`);
+      if (!shown.has(name)) hidden.add(node);
+    }
+    const isHidden = (object: Object3D) => { for (let at: Object3D | null = object; at; at = at.parent) if (hidden.has(at)) return true; return false; };
     const recipes = new Map(car.descriptor.materials.map(recipe => [recipe.id, recipe]));
     const recipeOf = (material: Material) => {
       const id: unknown = material.userData.nativeMaterialId, recipe = typeof id === 'string' ? recipes.get(id) : undefined;
@@ -51,14 +59,14 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     };
     const paths = new Set<string>();
     template.traverse(object => {
-      if (!(object instanceof Mesh)) return;
+      if (!(object instanceof Mesh) || isHidden(object)) return;
       for (const material of Array.isArray(object.material) ? object.material as Material[] : [object.material as Material]) {
         const path = albedoPath(recipeOf(material), appearance);
         if (path) paths.add(path);
       }
     });
     const textures = new Map(await Promise.all([...paths].map(async path => [path, await loadTexture(path)] as const)));
-    return {template, appearance, recipeOf, textures};
+    return {template, appearance, recipeOf, textures, hiddenNames: new Set([...hidden].map(node => node.name))};
   };
   /** A livery's parsed model and loaded textures, shared by every instance of that car (and by `preload`). */
   const parts = new WeakMap<LoadedCar, ReturnType<typeof loadParts>>();
@@ -73,8 +81,9 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
   };
   /** A car instance of the lap's livery: the shared geometry with one material per native material, textures preloaded. */
   const loadModel = async (car: LoadedCar): Promise<Group> => {
-    const {template, appearance, recipeOf, textures} = await partsOf(car);
+    const {template, appearance, recipeOf, textures, hiddenNames} = await partsOf(car);
     const model = template.clone(true), materials = new Map<string, Material>();
+    for (const name of hiddenNames) model.getObjectByName(name)?.removeFromParent();
     model.traverse(object => {
       if (!(object instanceof Mesh)) return;
       const replace = (material: Material) => {
