@@ -3,6 +3,7 @@ import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { BoxGeometry, DoubleSide, Group, Material, Mesh, MeshBasicMaterial, Texture, Vector3, type BufferGeometry, type Object3D, type PerspectiveCamera, type OrthographicCamera, type Scene } from 'three';
 import { createReplayScene } from '../../../../../src/components/replay/view3d/replayScene.js';
 import { disposeObjects } from '../../../../../src/components/replay/view3d/laps/disposeObjects.js';
+import { EXPOSURE_PASS } from '../../../../../src/components/replay/view3d/autoExposure.js';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import type { SceneryChunk, SceneryLayoutResource, ScenerySectorChunk } from '../../../../../shared/types/scenes/scenery.js';
 import type { LoadedCar } from '../../../../../src/api/vehicles/carApi.js';
@@ -30,6 +31,16 @@ vi.mock('three', async importOriginal => {
     compileAsync() { return Promise.resolve(); }
     initTexture() {}
     forceContextLoss() {}
+    getRenderTarget() { return null; }
+    setRenderTarget() {}
+    getDrawingBufferSize(size: {set(x: number, y: number): unknown}) { return size.set(1, 1); }
+    readRenderTargetPixelsAsync() { return Promise.resolve(); }
+    autoClear = true;
+    getClearColor(color: InstanceType<typeof actual.Color>) { return color.set(0); }
+    getClearAlpha() { return 1; }
+    setClearColor() {}
+    setClearAlpha() {}
+    clear() {}
   }};
 });
 vi.mock('three/addons/loaders/GLTFLoader.js', async () => {
@@ -98,6 +109,11 @@ const assets = {primary: car, baseline: null}, withGhost = {primary: car, baseli
 let frames: FrameRequestCallback[];
 let resizeCallbacks: Array<() => void>;
 const draw = () => { frames.splice(0).forEach(callback => callback(0)); };
+/** Renders of the replay scene, without the exposure and metering passes. */
+// Replay frames only: the exposure passes are named scenes and the occlusion passes draw a full-screen mesh, not a scene.
+const isFrame = (scene: Scene) => scene.isScene && scene.name !== EXPOSURE_PASS;
+const sceneRenders = () => gpu.render.mock.calls.filter(([scene]) => isFrame(scene));
+const lastSceneRender = () => sceneRenders().at(-1)!;
 beforeEach(() => {
   vi.resetAllMocks(); frames = []; resizeCallbacks = []; chunks.roots.clear(); chunks.loads.length = 0; chunks.obstacleName = '';
   vi.stubGlobal('ResizeObserver', class implements ResizeObserver {
@@ -117,7 +133,7 @@ it.each([
 ])('uses ground clearance without carrying a camera lift past %s', async (name, expectedHeight) => {
   chunks.obstacleName = name;
   const renderedHeights: number[] = [];
-  gpu.render.mockImplementation((_scene, camera) => { renderedHeights.push(camera.position.y); });
+  gpu.render.mockImplementation((_scene, camera) => { if (!isFrame(_scene)) return; renderedHeights.push(camera.position.y); });
   const handle = await createReplayScene(document.createElement('div'), layout, lap, null, vi.fn(), assets);
   handle.cursor(0, 0); draw();
   expect(renderedHeights.at(-1)).toBeCloseTo(expectedHeight);
@@ -153,7 +169,7 @@ it('caches static scenery matrices after the scene reflection without freezing t
       root.traverse(object => { expect(object.matrixAutoUpdate).toBe(false); });
     }
     handle.cursor(0, 0); draw();
-    const scene = gpu.render.mock.calls.at(-1)![0];
+    const scene = lastSceneRender()[0];
     const primary = scene.getObjectByName('body-envelope')!.parent!;
     const first = primary.position.clone();
     handle.cursor(3, 0); draw();
@@ -168,14 +184,14 @@ it('repaints a resized embedded canvas before paint, skipping notifications with
   Object.defineProperties(host, {clientWidth: {get: () => 460}, clientHeight: {get: () => height}});
   const handle = await createReplayScene(host, layout, lap, null, vi.fn(), assets);
   handle.cursor(0, 0); draw();
-  const camera = gpu.render.mock.calls.at(-1)![1], eye = camera.position.clone();
+  const camera = lastSceneRender()[1], eye = camera.position.clone();
   gpu.render.mockClear(); gpu.setSize.mockClear();
-  resizeCallbacks[0](); expect(gpu.setSize).not.toHaveBeenCalled(); expect(gpu.render).not.toHaveBeenCalled();
+  resizeCallbacks[0](); expect(gpu.setSize).not.toHaveBeenCalled(); expect(sceneRenders()).toHaveLength(0);
   height = 514; resizeCallbacks[0]();
   // No animation callback has run: resizing already cleared the canvas, so it must be repainted now.
-  expect(gpu.setSize).toHaveBeenCalledWith(460, 514, false); expect(gpu.render).toHaveBeenCalledOnce();
+  expect(gpu.setSize).toHaveBeenCalledWith(460, 514, false); expect(sceneRenders()).toHaveLength(1);
   expect(camera.position).toEqual(eye);
-  height = 540; resizeCallbacks[0](); expect(gpu.render).toHaveBeenCalledTimes(2);
+  height = 540; resizeCallbacks[0](); expect(sceneRenders()).toHaveLength(2);
   handle.dispose();
 });
 
@@ -183,7 +199,7 @@ it('retains scenery, canvas and camera settings, releases old laps, and draws th
   const host = document.createElement('div');
   const handle = await createReplayScene(host, layout, lap, null, vi.fn(), assets);
   handle.cursor(2, 0); handle.mode('orbit'); handle.zoom(1); draw();
-  const [scene, camera] = gpu.render.mock.calls.at(-1)!;
+  const [scene, camera] = lastSceneRender();
   const lightingEnvironment = scene.environment;
   const eye = camera.position.clone(), zoom = camera.zoom, canvas = host.firstChild;
   const road = scene.getObjectByName('road__OPAQUE') as Mesh;
@@ -203,7 +219,7 @@ it('retains scenery, canvas and camera settings, releases old laps, and draws th
   // The car geometry is shared with the cached template; only the lap's materials are released.
   expect(roadDispose).not.toHaveBeenCalled(); expect(carDispose).not.toHaveBeenCalled(); expect(materialDispose).toHaveBeenCalled();
   expect(oldLayer.parent).toBeNull();
-  expect(gpu.render.mock.calls.at(-1)![1]).toBe(camera); expect(camera.position).toEqual(eye); expect(camera.zoom).toBe(zoom);
+  expect(lastSceneRender()[1]).toBe(camera); expect(camera.position).toEqual(eye); expect(camera.zoom).toBe(zoom);
   const layer = world.children.at(-1)!;
   expect(layer.children[0].position.x).toBeCloseTo(7); expect(layer.children[1].visible).toBe(true);
   expect((layer.children[2] as Mesh<BufferGeometry, MeshBasicMaterial>).material.opacity).toBe(0.12);
@@ -221,7 +237,7 @@ it('places the ghost at the same distance, the same lap time, or the same time s
     const slower = {...lap, points: lap.points.map(point => ({...point, timeSec: (point.timeSec ?? 0) * 2}))};
     expect(await handle.updateLaps(lap, slower, withGhost)).toBe(true);
     handle.cursor(4, 0); draw();
-    const ghost = () => gpu.render.mock.calls.at(-1)![0].getObjectByName('road__OPAQUE')!.parent!.parent!.parent!.children.at(-1)!.children[1];
+    const ghost = () => lastSceneRender()[0].getObjectByName('road__OPAQUE')!.parent!.parent!.parent!.children.at(-1)!.children[1];
     expect(ghost().position.x).toBeCloseTo(4);
     handle.syncGhost('time', null); handle.cursor(4, 0); draw();
     expect(ghost().position.x).toBeCloseTo(2);
@@ -234,7 +250,7 @@ it('rejects layout, geometry and package mismatches, and discards cancelled or s
   const host = document.createElement('div');
   const handle = await createReplayScene(host, layout, lap, null, vi.fn(), assets);
   handle.cursor(0, 0); draw();
-  const scene = gpu.render.mock.calls.at(-1)![0], road = scene.getObjectByName('road__OPAQUE')!;
+  const scene = lastSceneRender()[0], road = scene.getObjectByName('road__OPAQUE')!;
   const world = road.parent!.parent!.parent!, original = world.children.at(-1);
   for (const invalid of [{...lap, layoutKey: 'spa_wec'}, {...lap, geometryRevision: 'g2'}, {...lap, dataPluginRevision: 'p2'}]) {
     await expect(handle.updateLaps(invalid, null, assets)).rejects.toThrow(/same layout, geometry and package/);
@@ -252,7 +268,7 @@ it('puts the cockpit, hood and roof views on the game cameras of the car with th
   const host = document.createElement('div');
   const handle = await createReplayScene(host, layout, lap, null, vi.fn(), assets);
   handle.cursor(0, 0); draw();
-  const [scene, camera] = gpu.render.mock.calls.at(-1)!;
+  const [scene, camera] = lastSceneRender();
   const cockpit = scene.getObjectByName('cockpit-in')!;
   expect(cockpit.visible).toBe(false);
 

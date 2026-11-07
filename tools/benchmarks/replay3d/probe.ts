@@ -7,9 +7,10 @@
 export interface ProbeFrame {
   /** Time since the previous animation frame (ms). */
   intervalMs: number;
-  /** Draw calls into the default framebuffer (the main pass). */
+  /** Draw calls of the main pass: into the default framebuffer or a multisampled one (the auto-exposure HDR target the scene
+   * renders into; its full-screen output quad onto the canvas counts too). */
   mainDraws: number;
-  /** Draw calls into other framebuffers (shadow maps, warm-up probes, PMREM). */
+  /** Draw calls into other framebuffers (shadow maps, warm-up probes, PMREM, exposure metering). */
   offscreenDraws: number;
   /** Bytes passed to buffer and texture upload calls during the frame. */
   uploadBytes: number;
@@ -30,7 +31,7 @@ export interface ProbeState {
 
 interface ProbeWindow { replay3dProbe: ProbeState }
 
-/** `skipOffscreenDraws` is an experiment switch: draws into other framebuffers (shadow maps, warm-up probes) are dropped, so a
+/** `skipOffscreenDraws` is an experiment switch: draws into other single-sampled framebuffers (shadow maps, warm-up probes) are dropped, so a
  * run with and without it isolates what the shadow passes cost. The picture loses its shadows; never use it for a baseline. */
 export function installProbe(skipOffscreenDraws: boolean): void {
   const state: ProbeState = {recording: false, frames: [], longTasks: [], programLinks: 0};
@@ -45,7 +46,13 @@ export function installProbe(skipOffscreenDraws: boolean): void {
     const original = proto[name];
     proto[name] = function (this: unknown, ...args: unknown[]) { before(args); return original.apply(this, args); };
   };
-  wrap('bindFramebuffer', args => { offscreen = args[1] !== null; });
+  // The scene pass renders into a multisampled target: framebuffers with a multisampled renderbuffer attached count as main.
+  const multisampled = new Set<unknown>(), mainFramebuffers = new Set<unknown>();
+  let renderbuffer: unknown = null, framebuffer: unknown = null;
+  wrap('bindRenderbuffer', args => { renderbuffer = args[1]; });
+  wrap('renderbufferStorageMultisample', args => { if (Number(args[1]) > 0) multisampled.add(renderbuffer); });
+  wrap('framebufferRenderbuffer', args => { if (multisampled.has(args[3])) mainFramebuffers.add(framebuffer); });
+  wrap('bindFramebuffer', args => { framebuffer = args[1]; offscreen = args[1] !== null && !mainFramebuffers.has(args[1]); });
   for (const name of ['drawElements', 'drawArrays', 'drawElementsInstanced', 'drawArraysInstanced', 'drawRangeElements']) {
     const original = proto[name];
     proto[name] = function (this: unknown, ...args: unknown[]) {

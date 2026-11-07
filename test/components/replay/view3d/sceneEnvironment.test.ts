@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { ShaderChunk, BoxGeometry, DirectionalLight, FogExp2, Mesh, MeshBasicMaterial, MeshStandardMaterial, NeutralToneMapping, OrthographicCamera, PerspectiveCamera, Scene, Texture, Vector3, type WebGLRenderer } from 'three';
+import { ShaderChunk, BoxGeometry, DirectionalLight, FogExp2, Mesh, MeshBasicMaterial, MeshStandardMaterial, NoToneMapping, OrthographicCamera, PerspectiveCamera, Scene, Texture, Vector3, type WebGLRenderer } from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { addSceneEnvironment, DAYLIGHT, sceneLighting, SUN_DIRECTION } from '../../../../src/components/replay/view3d/sceneEnvironment.js';
 
@@ -21,7 +21,7 @@ it('uses standard sky, PMREM and one sun shadow without touching shared shader c
   expect(scene.getObjectByName('sky')).toBeDefined();
   expect(scene.fog).toBeInstanceOf(FogExp2); expect((scene.fog as FogExp2).density).toBe(DAYLIGHT.fogDensity);
   expect(scene.background).toBeNull(); expect(renderer.shadowMap.enabled).toBe(true);
-  expect(renderer.toneMapping).toBe(NeutralToneMapping); expect(renderer.toneMappingExposure).toBe(0.90);
+  expect(renderer.toneMapping).toBe(NoToneMapping); // The exposure pass applies the game's tone curve.
   const camera = new PerspectiveCamera(48, 1.5, 0.5, 15000); camera.position.set(500, 3, -200); camera.updateMatrixWorld();
   environment.setCamera(camera); environment.update(new Vector3(500, 0, -210));
   const suns = scene.children.filter((child): child is DirectionalLight => child instanceof DirectionalLight);
@@ -38,7 +38,7 @@ it('uses standard sky, PMREM and one sun shadow without touching shared shader c
   expect(ShaderChunk.lights_fragment_begin).toBe(lightChunk); expect(ShaderChunk.lights_pars_begin).toBe(lightPars);
   environment.setCamera(new OrthographicCamera(-80, 80, 80, -80, 0.5, 15000));
   environment.update(new Vector3()); expect(scene.children.filter(child => child instanceof DirectionalLight)).toHaveLength(1);
-  expect(scene.environment).toBeInstanceOf(Texture); expect(scene.environmentIntensity).toBeCloseTo(0.112);
+  expect(scene.environment).toBeInstanceOf(Texture); expect(scene.environmentIntensity).toBe(1); expect((scene.getObjectByName('sky') as Sky).material.blendColor.r).toBeCloseTo(DAYLIGHT.skyScale);
   const sky = scene.getObjectByName('sky') as Sky;
   const reflectedSky = probe.render.mock.calls.at(-1)![0].children.find(child => child instanceof Sky)!;
   expect(reflectedSky.material).toBe(sky.material);

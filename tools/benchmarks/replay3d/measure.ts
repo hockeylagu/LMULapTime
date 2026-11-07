@@ -168,8 +168,9 @@ export async function measureLap(options: LapOptions) {
     // The whole series, compact: [interval ms, main draws, offscreen draws, upload KiB, program links, callback ms] per frame.
     const series = frames.map(frame => [round(frame.intervalMs, 1), frame.mainDraws, frame.offscreenDraws, Math.round(frame.uploadBytes / 1024), frame.programLinks, round(frame.callbackMs, 2)]);
     fs.writeFileSync(file, JSON.stringify({...result, worstFrames, series}));
-    // The raw load profile opens in DevTools (Performance > Load profile) for a timeline of the load.
+    // The raw profiles open in DevTools (Performance > Load profile) for a timeline of the load and of the played frames.
     if (loadProfile) fs.writeFileSync(file.replace(/\.json$/, '.load.cpuprofile'), JSON.stringify(loadProfile));
+    if (profile) fs.writeFileSync(file.replace(/\.json$/, '.play.cpuprofile'), JSON.stringify(profile));
     return {result, file};
   } finally {
     await browser.close();

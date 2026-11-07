@@ -14,7 +14,8 @@ import { MIN_CAMERA_DISTANCE, MAX_CAMERA_DISTANCE, panCamera, zoomCamera } from 
 import type { CameraMode } from './cameraModes.js';
 import { createChaseCameraTracker, trackCamera } from './cameraTracking.js';
 import { driverCamera, driverPose, isDriverCamera, type DriverPose } from './driverCameras.js';
-import { addSceneEnvironment } from './sceneEnvironment.js';
+import { addSceneEnvironment, sceneLighting } from './sceneEnvironment.js';
+import { createAutoExposure } from './autoExposure.js';
 import { setCockpitView } from './sceneObjects.js';
 import { CachedKtx2Loader } from './scenery/cachedKtx2Loader.js';
 import { createChunkLoader } from './scenery/chunkLoader.js';
@@ -57,10 +58,13 @@ export async function createReplayScene(
   colorBy: MapColorMode = 'default',
 ): Promise<ReplaySceneHandle> {
   let renderer: WebGLRenderer;
-  try { renderer = new WebGLRenderer({antialias: true, alpha: false}); }
+  // No canvas multisampling: the scene renders into the auto-exposure target, which multisamples; the canvas gets one full-screen quad.
+  try { renderer = new WebGLRenderer({antialias: false, alpha: false}); }
   catch { throw Error('WebGL 2 is unavailable. Use the 2D map.'); }
   const {min, max} = layout.horizon.bounds, origin = new Vector3(...min).add(new Vector3(...max)).multiplyScalar(0.5);
   const loader = createChunkLoader(renderer), carTextures = new CachedKtx2Loader(renderer);
+  const sunElevationDeg = Math.asin(sceneLighting(layout.daylight).sunDirection.y) * 180 / Math.PI;
+  const exposure = createAutoExposure(renderer, sunElevationDeg, () => invalidate());
   // Wheel and line contact heights and the camera checks share one ray tree per resident chunk.
   const ground = createSceneryGround(), {surfaceHeight} = ground;
   // Scenery chunks live in native coordinates under one group, shifted by the scene origin.
@@ -105,7 +109,12 @@ export async function createReplayScene(
   const warmUp = async (root: Object3D, signal: AbortSignal) => {
     const target = warmTarget;
     if (!target?.camera) return;
-    await renderer.compileAsync(root, target.camera, target.scene);
+    // Programs depend on the render target (tone mapping, output colour space): compile for the HDR target the frame uses.
+    const previous = renderer.getRenderTarget();
+    renderer.setRenderTarget(exposure.target);
+    const compiled = renderer.compileAsync(root, target.camera, target.scene);
+    renderer.setRenderTarget(previous);
+    await compiled;
     const textures = new Set<Texture>();
     root.traverse(object => {
       if (!(object instanceof Mesh)) return;
@@ -149,7 +158,7 @@ export async function createReplayScene(
     failed: (chunk, error) => { if (!disposed) onFailure(`3D scenery chunk ${chunk.id} failed: ${error.message}`); },
   });
   const cleanup = () => {
-    disposed = true; window.clearTimeout(refreshTimer); cancelAnimationFrame(sharpenFrame); stream.dispose(); loader.dispose(); carTextures.dispose();
+    disposed = true; window.clearTimeout(refreshTimer); cancelAnimationFrame(sharpenFrame); stream.dispose(); loader.dispose(); carTextures.dispose(); exposure.dispose();
     ground.dispose(); geometryWarmup.dispose(); renderer.dispose(); renderer.forceContextLoss();
   };
   const route = layout.routeLengthM;
@@ -231,7 +240,7 @@ export async function createReplayScene(
       camera.lookAt(controls.target);
     }
     try {
-      environment.update(controls.target); renderer.render(scene, camera);
+      environment.update(controls.target); exposure.render(scene, camera);
     } finally {
       if (corrected) {
         camera.position.copy(desiredEye);
@@ -398,7 +407,7 @@ export async function createReplayScene(
     dispose() {
       disposed = true; cancelAnimationFrame(frame); cancelAnimationFrame(sharpenFrame); observer.disconnect(); controls.dispose();
       renderer.domElement.removeEventListener('webglcontextlost', contextLost);
-      document.removeEventListener('visibilitychange', invalidate); clearTimeout(refreshTimer); stream.dispose(); ground.dispose(); disposeObjects(scene, true); loader.dispose(); carTextures.dispose(); environment.dispose(); geometryWarmup.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
+      document.removeEventListener('visibilitychange', invalidate); clearTimeout(refreshTimer); stream.dispose(); ground.dispose(); disposeObjects(scene, true); loader.dispose(); carTextures.dispose(); environment.dispose(); exposure.dispose(); geometryWarmup.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
     },
   };
 }

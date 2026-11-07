@@ -5,6 +5,7 @@ import { computeLapComparisons } from '../../../utils/replayComparison.js';
 import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../../utils/lapAlignment.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 import type { SurfaceHeight } from './scenery/sceneryGround.js';
+import { inverseToneCurve } from './autoExposure.js';
 
 /** Ribbon width: wide enough to read from chase height, narrow enough to show the line through a corner. */
 export const RACING_LINE_WIDTH_M = 0.6;
@@ -70,6 +71,9 @@ export function makeRacingLine(lap: ReplayTrajectoryData, origin: Vector3, color
   const line = new Mesh(geometry, new MeshBasicMaterial({vertexColors: true, side: DoubleSide, transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2}));
   line.name = 'racing-line';
   line.renderOrder = liftM > LIFT_M ? 3 : 2;
+  // Data, not lit scenery: its vertex colours are what the tone curve displays as the 2D map's colours (colorRacingLine), and
+  // exposure is a linear scale before the curve, so dividing it out keeps those pixels whatever auto-exposure picks.
+  line.onBeforeRender = renderer => { line.material.color.setScalar(1 / renderer.toneMappingExposure); };
   lineHeights.set(line, heights);
   colorRacingLine(line, colors);
   return line;
@@ -79,7 +83,8 @@ export function colorRacingLine(line: Mesh<BufferGeometry, MeshBasicMaterial>, c
   const attribute = line.geometry.getAttribute('color') as Float32BufferAttribute, color = new Color();
   for (let i = 0; i < attribute.count / 2; i++) {
     color.set(colors[i] ?? TELEMETRY_COLORS.primary);
-    attribute.setXYZ(i * 2, color.r, color.g, color.b); attribute.setXYZ(i * 2 + 1, color.r, color.g, color.b);
+    const r = inverseToneCurve(color.r), g = inverseToneCurve(color.g), b = inverseToneCurve(color.b);
+    attribute.setXYZ(i * 2, r, g, b); attribute.setXYZ(i * 2 + 1, r, g, b);
   }
   attribute.needsUpdate = true;
 }

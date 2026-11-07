@@ -1,18 +1,20 @@
-import { Color, DirectionalLight, DoubleSide, FogExp2, MathUtils, Matrix4, Mesh, MeshBasicMaterial, NeutralToneMapping, PCFShadowMap, PlaneGeometry, PMREMGenerator, Scene, Vector3, type Camera, type OrthographicCamera, type PerspectiveCamera, type WebGLRenderer } from 'three';
+import { Color, ConstantColorFactor, CustomBlending, DirectionalLight, DoubleSide, FogExp2, MathUtils, Matrix4, Mesh, MeshBasicMaterial, NoToneMapping, PCFShadowMap, PlaneGeometry, PMREMGenerator, Scene, Vector3, ZeroFactor, type Camera, type OrthographicCamera, type PerspectiveCamera, type WebGLRenderer } from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { nativeToScene } from './sceneFrame.js';
 import type { SceneryDaylight } from '../../../../shared/types/scenes/scenery.js';
 
 /**
- * Midday lighting, from the pipeline review viewer's daylight (pipeline/viewer/daylight.js) with two replay changes: neutral
- * tone mapping instead of ACES filmic, which desaturated the game's colours, and exponential haze (about 1% at 300 m, 25% at
- * 1.5 km, 70% at 3 km, matched by eye to the game's hills behind Fuji's main straight) instead of a linear fog. The sun is
- * stronger (4.0, viewer 3.2). Sky fill is calibrated for the unmodified Sky shader through environmentIntensity;
- * exposure controls the displayed sky and scene together, without rewriting the sky shader's radiance.
+ * Midday lighting, from the pipeline review viewer's daylight (pipeline/viewer/daylight.js) with one replay change: exponential
+ * haze (about 1% at 300 m, 25% at 1.5 km, 70% at 3 km, matched by eye to the game's hills behind Fuji's main straight) instead
+ * of a linear fog. The sun is stronger (4.0, viewer 3.2). The Sky shader's radiance is in its own units: `skyScale` brings it
+ * into the sun's (calibrated as the viewer's sky fill), for the displayed sky and its reflection alike, so the sky reads about as
+ * bright as a sunlit surface and the ground's bounce light keeps its sunlit value. Unscaled, the sky was ~35× a sunlit grey
+ * ground: it showed white and pulled the metered exposure down, and scaling only the reflection left shaded faces a tenth of
+ * their ground bounce. The metered exposure (autoExposure.ts) scales the displayed sky and scene together.
  * Neither is authored by the game data; a layout's daylight sets the sun direction and turbidity (`sceneLighting`).
  */
 export const DAYLIGHT = Object.freeze({
-  elevationDeg: 55, azimuthDeg: 45, sunIntensity: 4.0, environmentIntensity: 0.112, exposure: 0.90,
+  elevationDeg: 55, azimuthDeg: 45, sunIntensity: 4.0, skyScale: 0.112,
   turbidity: 2.5, rayleigh: 2.0, mieCoefficient: 0.005, mieDirectionalG: 0.8, horizonColor: '#c8d4e0', fogDensity: 0.00036, sunColor: '#fff8ea',
 });
 const SKY_RADIUS_M = 12000, ENVIRONMENT_GROUND_Y = -0.5;
@@ -81,6 +83,9 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, dayli
   uniforms.mieCoefficient.value = DAYLIGHT.mieCoefficient; uniforms.mieDirectionalG.value = DAYLIGHT.mieDirectionalG;
   uniforms.sunPosition.value = lighting.sunDirection.clone();
   uniforms.showSunDisc.value = false;
+  // A constant blend factor scales the sky shader's output without changing it (standard material blending).
+  Object.assign(sky.material, {blending: CustomBlending, blendSrc: ConstantColorFactor, blendDst: ZeroFactor});
+  sky.material.blendColor.setScalar(DAYLIGHT.skyScale);
   sky.name = 'sky'; sky.frustumCulled = false;
   // The dome travels with the eye so its horizon stays at infinity at every zoom level.
   sky.onBeforeRender = (_renderer, _scene, camera: Camera) => { sky.position.copy(camera.position); sky.updateMatrixWorld(); };
@@ -100,9 +105,8 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, dayli
   const generator = new PMREMGenerator(renderer), reflection = generator.fromScene(environmentScene, 0, 0.1, SKY_RADIUS_M, {size: 256});
   generator.dispose();
   scene.environment = reflection.texture;
-  scene.environmentIntensity = DAYLIGHT.environmentIntensity;
-  renderer.toneMapping = NeutralToneMapping;
-  renderer.toneMappingExposure = DAYLIGHT.exposure;
+  // The exposure pass applies the game's own tone curve (autoExposure.ts): nothing else tone-maps.
+  renderer.toneMapping = NoToneMapping;
 
   const sun = new DirectionalLight(new Color(DAYLIGHT.sunColor), DAYLIGHT.sunIntensity);
   sun.name = 'sun'; sun.castShadow = true;

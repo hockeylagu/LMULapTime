@@ -4,6 +4,7 @@ import { colorRacingLine, makeRacingLine, racingLineColors, RACING_LINE_WIDTH_M 
 import { getHeatmapColor } from '../../../../src/components/replay/map/replayMapUtils.js';
 import { TELEMETRY_COLORS } from '../../../../src/utils/themeColors.js';
 import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
+import { inverseToneCurve, toneCurve } from '../../../../src/components/replay/view3d/autoExposure.js';
 
 it('drapes the racing ribbon just above the ground, breaks it where the road is missing and recolours in place', () => {
   // Road at 1 m over x 0..10, nothing past it.
@@ -17,10 +18,22 @@ it('drapes the racing ribbon just above the ground, breaks it where the road is 
   expect(positions.getY(0)).toBeCloseTo(0.01); expect(positions.getY(3)).toBeCloseTo(0.01);
   expect(Math.abs(positions.getZ(0) - positions.getZ(1))).toBeCloseTo(RACING_LINE_WIDTH_M);
   const colors = line.geometry.getAttribute('color');
-  expect([colors.getX(0), colors.getY(2)]).toEqual([1, 1]);
+  // Stored before the tone curve, so the curve displays the 2D map's colours.
+  const full = inverseToneCurve(1);
+  expect(colors.getX(0)).toBeCloseTo(full, 5); expect(colors.getY(2)).toBeCloseTo(full, 5);
   colorRacingLine(line, ['#0000ff', '#0000ff', '#0000ff']);
-  expect([colors.getX(0), colors.getZ(0)]).toEqual([0, 1]);
+  expect(colors.getX(0)).toBe(0); expect(colors.getZ(0)).toBeCloseTo(full, 5);
+  expect(toneCurve(full)).toBeGreaterThan(0.99);
   expect(lap.points[0].y).toBe(1.32); // Visual projection never rewrites measured pose/analytics.
+});
+
+it('divides auto-exposure out of the line colour, so the line keeps its colours whatever the exposure', () => {
+  const lap: ReplayTrajectoryData = {replayName: 'test', pointsCount: 2, bounds: {minX: 0, maxX: 1, minZ: 0, maxZ: 1, spanX: 1, spanZ: 1}, points: [
+    {x: 0, y: 0, z: 0, timeSec: 0}, {x: 1, y: 0, z: 0, timeSec: 0.1},
+  ]};
+  const line = makeRacingLine(lap, new Vector3(), [], () => 0);
+  line.onBeforeRender({toneMappingExposure: 2} as never, null as never, null as never, null as never, null as never, null as never);
+  expect(line.material.color.r).toBeCloseTo(0.5);
 });
 
 it('colours the ribbon with the 2D map modes', () => {
