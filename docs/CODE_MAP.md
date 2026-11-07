@@ -235,17 +235,18 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
      - Culling view box: `useStableCullViewBox.ts` (`nextCullViewBox` in `replayMapUtils.ts`) skips re-rendering track paths during pan.
      - Marker layout: `scene/markerPlacement.ts` coordinates collision checks across brake boards, START, sectors, turns, APEX, and pedal badges using spatial road index `scene/cornerRibbonClearance.ts`. Start badge placed by `scene/startFinishPlacement.ts`. Turn badges placed by `placeCornerBadges`.
      - Car markers & dynamics: `GpsSceneCarMarkers.tsx` renders primary and ghost with model dimensions or `defaultVehicleSize` (`vehicleDimensions.ts`), replay body yaw (`replayBodyHeading`, native -Z forward). Composes hooks `useGpsSceneProjection.ts`, `useGpsSceneDynamics.ts`, and `useGpsSceneCameraFocus.ts`.
-     - Map controls & layers: `display/mapLayers.ts`, `MapLayersControl.tsx`, brake boards `GpsBrakeMarkers.tsx`, shortcuts `useGpsMapShortcuts.ts` (M toggles fullscreen, T toggles trace, Space toggles play, C centers, F toggles follow).
+     - Ghost sync (`ghostSync.ts`, shared with the 3D scene): Distance (same lap distance), Time (same elapsed lap time; HUD shows the on-track gap in metres) or From A (together up to telemetry marker A, then on time since each passed it; HUD delta counts from A). Mode in the URL (`sync`), toggled in the mode bar or with V; mode and marker A are shared through `inspector/ghostSyncContext.ts`.
+     - Map controls & layers: `display/mapLayers.ts`, `MapLayersControl.tsx`, brake boards `GpsBrakeMarkers.tsx`, shortcuts `useGpsMapShortcuts.ts` (M toggles fullscreen, T toggles trace, Space toggles play, C centers, F toggles follow, V cycles ghost sync).
    - **Fullscreen Telemetry Dock** (`map/telemetry/GpsMapTelemetryDock.tsx`):
      - 112px trace dock, quick Speed, Delta, and Throttle + Brake buttons.
-     - `GpsMapPlaybackStrip.tsx` (playback controls and cursor), `GpsMapTelemetryHud.tsx` (inline readouts and live delta).
+     - `GpsMapPlaybackStrip.tsx` (playback controls and cursor), `GpsMapTelemetryHud.tsx` (inline readouts and live delta; speed difference and line gap in Distance sync, on-track gap in Time / From A).
      - `GpsMapLapTimingPanel.tsx` (recorded lap/sector times, baseline deltas, live sector split via `display/liveSectorSplit.ts`).
      - `GpsMapCompactTrace.tsx` (renders Speed, Pedals, Delta with 56px scale gutter).
    - **Telemetry strip charts** (`telemetry/`):
      - Multi-channel charts, `TelemetryScrubCursor.tsx` (sub-pixel snapping), channel presets (`presets/`).
      - Channel scaling: Gear G1-G7 (`gearTraceY` in `telemetryChartPathBuilders.ts`), steering symmetric lap-wide fit (±25/50/100%).
      - Viewport & gestures: `telemetry/telemetryViewport.ts` (Shift-wheel zoom, Shift-drag range, Alt-drag pan, keyboard navigation via `src/utils/replayShortcuts.ts`).
-     - Measure marker: Alt-click drops marker A (kept as a distance, Esc or double-click clears; double-click resets zoom only without a marker); `TelemetryDeltaMarker.tsx` shows distance, time, baseline time and delta change from A to the cursor on the marker line (pinned to the view edge, with the shaded span, while zoomed past A).
+     - Measure marker: Alt-click drops marker A (kept as a distance, shared by both strips and the map's From A ghost, Esc or double-click clears; double-click resets zoom only without a marker); `TelemetryDeltaMarker.tsx` shows distance, time, baseline time and delta change from A to the cursor on the marker line (pinned to the view edge, with the shaded span, while zoomed past A).
    - **Analysis** (`analysis/`):
      - Corner phase breakdown cards, consistency tab, AI engineer tab (`AIReportTab.tsx`).
      - Steering handling balance: `src/utils/handlingBalance/evidence.ts` (requires sustained response deficit or rear slide, not just Ackermann residual; with baseline, requires ≥0.10s delta growth and sustained speed deficit).
