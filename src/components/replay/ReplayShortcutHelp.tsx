@@ -13,7 +13,7 @@ const shortcuts = [
   ['Shift + ← / →', 'Move cursor by 0.5 seconds'], ['Space', 'Play / pause'],
   ['Home / End', 'Lap start / end'], ['+ / −', 'Zoom around the cursor'],
   ['0 / R / dbl-click', 'Show full lap / reset map view'], ['C', 'Center map on car, keep zoom'],
-  ['F', 'Toggle follow car'], ['G', 'Toggle G-force arrow'], ['Minimap drag', 'Pan camera to circuit sector'],
+  ['F', 'Toggle follow car'], ['G', 'Toggle G-force arrow'], ['V', 'Ghost sync: distance / time / from marker A'], ['Minimap drag', 'Pan camera to circuit sector'],
   ['M', 'Toggle fullscreen map'], ['T', 'Hide / show fullscreen trace'],
   ['W / A / S / D', 'Pan map up / left / down / right'],
   ['Esc', 'Exit fullscreen / cancel gesture / close help'], ['?', 'Show shortcuts'],
@@ -24,7 +24,7 @@ const shortcuts3d = [
   ['← / →', 'Previous / next recorded sample'], ['Shift + ← / →', 'Move cursor by 0.5 seconds'],
   ['Home / End', 'Lap start / end'], ['Space', 'Play / pause'],
   ['W / A / S / D', 'Pan camera up / left / down / right'], ['C', 'Center on car, keep zoom'],
-  ['F', 'Toggle follow car'], ['0 / R', 'Reset camera'], ['M', 'Toggle fullscreen map'],
+  ['F', 'Toggle follow car'], ['V', 'Ghost sync: distance / time / from marker A'], ['0 / R', 'Reset camera'], ['M', 'Toggle fullscreen map'],
   ['Esc', 'Exit fullscreen / close help'], ['?', 'Show shortcuts'],
 ];
 

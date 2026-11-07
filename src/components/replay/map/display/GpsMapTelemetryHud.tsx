@@ -2,6 +2,7 @@ import React from 'react';
 import type { ReplayTrajectoryPoint } from '../../../../../shared/types/index.js';
 import { getSteerPercent } from '../../../../../shared/domain/formatters.js';
 import { TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
+import type { GhostSyncMode } from '../ghostSync.js';
 import { formatGear, formatReading, getStatusLabel, getStatusSubtext, hasReading, totalAcceleration } from './telemetryReadouts.js';
 
 export interface GpsMapTelemetryHudProps {
@@ -9,11 +10,15 @@ export interface GpsMapTelemetryHudProps {
   baselinePoint?: ReplayTrajectoryPoint | null;
   deltaTimeSec?: number | null;
   lineDistanceM?: number | null;
+  /** How the ghost is placed: distance shows the speed difference, time modes the on-track gap. */
+  syncMode?: GhostSyncMode;
+  /** On-track gap in metres; positive: the primary is ahead. */
+  gapM?: number | null;
   className?: string;
 }
 
 export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(({
-  primaryPoint, baselinePoint, deltaTimeSec: rawDelta, lineDistanceM, className = '',
+  primaryPoint, baselinePoint, deltaTimeSec: rawDelta, lineDistanceM, syncMode = 'distance', gapM, className = '',
 }) => {
   if (!primaryPoint) return null;
   const delta = hasReading(rawDelta) ? rawDelta : null;
@@ -25,6 +30,13 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
   const deltaColor = delta === null ? 'text-lmu-muted' : delta < -0.005 ? 'text-lmu-gain'
     : delta > 0.005 ? 'text-lmu-loss' : 'text-lmu-text-soft';
   const deltaState = delta === null ? 'no delta' : delta < -0.005 ? 'ahead' : delta > 0.005 ? 'behind' : 'even';
+  const speedDiff = hasReading(primaryPoint.speedKmh) && hasReading(baselinePoint?.speedKmh)
+    ? Math.round(primaryPoint.speedKmh - baselinePoint.speedKmh) : null;
+  const deltaTitle = syncMode === 'anchored'
+    ? 'Time gained or lost since marker A (both cars start together there); negative is ahead.'
+    : 'Live delta: primary lap time minus baseline lap time at the same track distance; negative is ahead.';
+  const gapText = !hasReading(gapM) ? '--' : Math.abs(gapM) < 0.5 ? 'level'
+    : `${Math.abs(gapM).toFixed(1)} m ${gapM > 0 ? 'ahead' : 'behind'}`;
 
   const renderLap = (point: ReplayTrajectoryPoint, baseline = false) => {
     const steer = point.steerYaw;
@@ -61,15 +73,22 @@ export const GpsMapTelemetryHud: React.FC<GpsMapTelemetryHudProps> = React.memo(
   return <div data-testid="gps-map-telemetry-hud" data-map-control
     onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()}
     className={`relative w-full shrink-0 bg-lmu-strip border-b border-lmu-border text-lmu-text ${className}`}>
-    <div className={`grid min-h-10 items-center gap-3 overflow-x-auto px-4 py-1.5 ${comparing ? 'grid-cols-[minmax(max-content,1fr)_112px_minmax(max-content,1fr)]' : 'grid-cols-1'}`}>
+    <div className={`grid min-h-10 items-center gap-3 overflow-x-auto px-4 py-1.5 ${comparing ? 'grid-cols-[minmax(max-content,1fr)_128px_minmax(max-content,1fr)]' : 'grid-cols-1'}`}>
       {renderLap(primaryPoint)}
       {comparing && <>
         <div className="flex shrink-0 flex-col items-center justify-center gap-0.5 font-mono tabular-nums">
-          <span className={`text-[15px] leading-none font-semibold ${deltaColor}`} title={`Live delta: ${deltaState}. Primary lap time minus baseline lap time at the same track distance; negative is ahead.`}
-            aria-label={`Live delta: ${deltaState}`}>{delta !== null ? `${delta > 0 ? '+' : ''}${delta.toFixed(2)}s` : '--'}</span>
-          <span className="text-[11px] leading-none text-lmu-muted" title="Distance between racing lines at the same track distance, not a race gap.">
-            {hasReading(lineDist) ? lineDist.toFixed(1) : '--'} m line
-          </span>
+          <span className={`text-[15px] leading-none font-semibold ${deltaColor}`} title={deltaTitle}
+            aria-label={`${syncMode === 'anchored' ? 'Delta since marker A' : 'Live delta'}: ${deltaState}`}>{delta !== null ? `${delta > 0 ? '+' : ''}${delta.toFixed(2)}s` : '--'}</span>
+          {syncMode === 'distance'
+            ? <span className="text-[11px] leading-none text-lmu-muted whitespace-nowrap">
+              <span data-testid="hud-speed-diff" title="Primary speed minus baseline speed at the same track distance.">
+                {speedDiff !== null ? `${speedDiff > 0 ? '+' : ''}${speedDiff}` : '--'} km/h</span>
+              {' · '}
+              <span title="Distance between racing lines at the same track distance, not a race gap.">{hasReading(lineDist) ? lineDist.toFixed(1) : '--'} m line</span>
+            </span>
+            : <span data-testid="hud-track-gap" className={`text-[11px] leading-none ${!hasReading(gapM) || Math.abs(gapM) < 0.5 ? 'text-lmu-muted' : gapM > 0 ? 'text-lmu-gain' : 'text-lmu-loss'}`}
+              title={syncMode === 'anchored' ? 'Primary distance ahead of or behind the ghost, both running on time since marker A.'
+                : 'Primary distance ahead of or behind the ghost at the same lap time.'}>{gapText}</span>}
         </div>
         {baselinePoint && <div className="justify-self-end">{renderLap(baselinePoint, true)}</div>}
       </>}

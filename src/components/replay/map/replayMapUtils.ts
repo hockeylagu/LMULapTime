@@ -362,25 +362,20 @@ export function computeTrackBoundaryPathD(
 
 
 /**
- * Where the baseline car is when the primary car is at `currentIndex`: the baseline sampled at
- * the primary's distance, with `baselineDists` already in the primary lap's frame (matched on
- * track station - see getDistancesInReferenceFrame). Both laps start on the line (the server puts
- * them there), so the ghost does too.
+ * The baseline car on the map at `distance` (primary lap frame), with `baselineDists` already in
+ * the primary lap's frame (matched on track station - see getDistancesInReferenceFrame). Which
+ * distance comes from the ghost sync mode (ghostDistanceAt). Both laps start on the line (the
+ * server puts them there), so the ghost does too.
  */
 export function computeGhostPosition(
-  primaryDists: number[],
   baselineDists: number[],
   baselinePoints: ReplayTrajectoryPoint[],
-  currentIndex: number,
+  distance: number,
   bounds: { minX: number; spanX: number; minZ: number; spanZ: number },
   viewBoxSize: number,
   padding: number
 ) {
-  if (
-    !baselinePoints || baselinePoints.length === 0 ||
-    !primaryDists || primaryDists.length === 0 ||
-    !baselineDists || baselineDists.length === 0
-  ) {
+  if (!baselinePoints || baselinePoints.length === 0 || !baselineDists || baselineDists.length === 0) {
     return null;
   }
 
@@ -389,11 +384,6 @@ export function computeGhostPosition(
   const scale = (viewBoxSize - 2 * padding) / maxSpan;
   const offsetX = padding + ((viewBoxSize - 2 * padding) - spanX * scale) / 2;
   const offsetZ = padding + ((viewBoxSize - 2 * padding) - spanZ * scale) / 2;
-
-  const safeIdx = Math.max(0, Math.min(currentIndex, primaryDists.length - 1));
-  const index = Math.floor(safeIdx);
-  const nextDist = primaryDists[Math.min(index + 1, primaryDists.length - 1)];
-  const distance = primaryDists[index] + (nextDist - primaryDists[index]) * (safeIdx - index);
   const ghostPt = interpolatePointAtDistance(baselinePoints, baselineDists, distance);
 
   return {

@@ -1,7 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { updateSearchParams } from '../../utils/urlParams.js';
 import { ReplayInspectorContent } from './inspector/ReplayInspectorContent.js';
+import { GhostSyncContext, type GhostSyncState } from './inspector/ghostSyncContext.js';
+import { parseGhostSyncMode } from './map/ghostSync.js';
 
 export const ReplayInspectorPage: React.FC = () => {
   const navigate = useNavigate();
@@ -10,6 +12,14 @@ export const ReplayInspectorPage: React.FC = () => {
   const fullscreen = searchParams.get('fullscreen') ?? searchParams.get('fullScreen');
   const viewParam = searchParams.get('view');
   const view: '2d' | '3d' = viewParam === '3d' ? '3d' : '2d';
+  const syncMode = parseGhostSyncMode(searchParams.get('sync'));
+  // Marker A is kept as a distance, so it survives a lap or resolution reload.
+  const [markerDistM, setMarkerDistM] = useState<number | null>(null);
+  const ghostSync = useMemo<GhostSyncState>(() => ({
+    mode: syncMode,
+    setMode: mode => updateSearchParams(searchParams, setSearchParams, { sync: mode === 'distance' ? null : mode }),
+    markerDistM, setMarkerDistM,
+  }), [syncMode, markerDistM, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (!sessionId) {
@@ -31,25 +41,27 @@ export const ReplayInspectorPage: React.FC = () => {
   const corner = searchParams.get('corner');
 
   return (
-    <ReplayInspectorContent
-      isOpen
-      onClose={() => void navigate(-1)}
-      sessionId={sessionId}
-      initialDriverOrdinal={Number.isInteger(driverOrdinal) && driverOrdinal >= 0 ? driverOrdinal : 0}
-      initialLapOrdinal={Number.isInteger(lapOrdinal) && lapOrdinal >= 0 ? lapOrdinal : 0}
-      onLocatorChange={(driver, lap) => updateSearchParams(searchParams, setSearchParams, {
-        driverOrdinal: String(driver),
-        lapOrdinal: String(lap),
-      })}
-      initialCompareMode={Boolean(baselineSession)}
-      initialBaselineSessionId={baselineSession}
-      initialBaselineDriverOrdinal={Number.isInteger(baselineDriverOrdinal) && baselineDriverOrdinal >= 0 ? baselineDriverOrdinal : 0}
-      initialBaselineLapOrdinal={Number.isInteger(baselineLapOrdinal) && baselineLapOrdinal >= 0 ? baselineLapOrdinal : undefined}
-      initialCornerNumber={corner ? parseInt(corner, 10) : undefined}
-      isExpanded={fullscreen === 'true' || fullscreen === '1'}
-      onToggleExpanded={(expanded) => updateSearchParams(searchParams, setSearchParams, { fullscreen: expanded })}
-      view={view}
-      onViewChange={(newView) => updateSearchParams(searchParams, setSearchParams, { view: newView })}
-    />
+    <GhostSyncContext.Provider value={ghostSync}>
+      <ReplayInspectorContent
+        isOpen
+        onClose={() => void navigate(-1)}
+        sessionId={sessionId}
+        initialDriverOrdinal={Number.isInteger(driverOrdinal) && driverOrdinal >= 0 ? driverOrdinal : 0}
+        initialLapOrdinal={Number.isInteger(lapOrdinal) && lapOrdinal >= 0 ? lapOrdinal : 0}
+        onLocatorChange={(driver, lap) => updateSearchParams(searchParams, setSearchParams, {
+          driverOrdinal: String(driver),
+          lapOrdinal: String(lap),
+        })}
+        initialCompareMode={Boolean(baselineSession)}
+        initialBaselineSessionId={baselineSession}
+        initialBaselineDriverOrdinal={Number.isInteger(baselineDriverOrdinal) && baselineDriverOrdinal >= 0 ? baselineDriverOrdinal : 0}
+        initialBaselineLapOrdinal={Number.isInteger(baselineLapOrdinal) && baselineLapOrdinal >= 0 ? baselineLapOrdinal : undefined}
+        initialCornerNumber={corner ? parseInt(corner, 10) : undefined}
+        isExpanded={fullscreen === 'true' || fullscreen === '1'}
+        onToggleExpanded={(expanded) => updateSearchParams(searchParams, setSearchParams, { fullscreen: expanded })}
+        view={view}
+        onViewChange={(newView) => updateSearchParams(searchParams, setSearchParams, { view: newView })}
+      />
+    </GhostSyncContext.Provider>
   );
 };

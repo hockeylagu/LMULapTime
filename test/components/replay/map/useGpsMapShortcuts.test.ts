@@ -273,4 +273,15 @@ describe('useGpsMapShortcuts target scoping', () => {
     expect(onToggleExpanded).toHaveBeenCalledTimes(2);
     map.remove(); chart.remove();
   });
+
+  it('cycles the ghost sync with V', () => {
+    const onCycleGhostSync = vi.fn();
+    renderHook(() => useGpsMapShortcuts({
+      isExpanded: true, containerRef: { current: document.createElement('div') }, points: [{ x: 0, y: 0, z: 0 }], currentIndex: 0,
+      onZoomIn: vi.fn(), onZoomOut: vi.fn(), onResetZoom: vi.fn(), onCycleGhostSync,
+    }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'v' }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'V', repeat: true }));
+    expect(onCycleGhostSync).toHaveBeenCalledOnce();
+  });
 });

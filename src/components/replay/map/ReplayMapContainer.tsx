@@ -9,6 +9,7 @@ import { ReplayFrictionCircle } from './ReplayFrictionCircle.js';
 import { TrackCircuitLayout } from '../../track-detail/TrackCircuitLayout.js';
 import { GpsMapModeBar } from './display/GpsMapModeBar.js';
 import { useStoredToggle } from './useStoredToggle.js';
+import { GhostSyncContext, ghostSyncControls, useGhostSync } from '../inspector/ghostSyncContext.js';
 
 const Replay3DView = lazy(() => import('../view3d/Replay3DView.js'));
 
@@ -65,6 +66,8 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
   onToggleExpanded,
 }) => {
   const baselinePoints = isCompareMode && baselineTrajectory ? baselineTrajectory.points : undefined;
+  // The inspector's ghost sync, or one shared by this map's bar, 2D scene and 3D view.
+  const ghostSync = useGhostSync();
 
   // Lets the driver fade out either lap's line on the map to make the delta easier to read.
   const [fadedLine, setFadedLine] = useState<'none' | 'primary' | 'baseline'>('none');
@@ -121,23 +124,24 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
 
   if (!trajectory) return null;
 
-  if (activeView === '3d') return <Suspense fallback={<div role="status" className="p-4 text-lmu-muted">Loading 3D viewer…</div>}>
+  if (activeView === '3d') return <GhostSyncContext.Provider value={ghostSync}><Suspense fallback={<div role="status" className="p-4 text-lmu-muted">Loading 3D viewer…</div>}>
     <Replay3DView trajectory={trajectory} baseline={isCompareMode ? baselineTrajectory ?? null : null}
       currentIndex={currentIndex} onSelectIndex={onSelectIndex} isPlaying={isPlaying} onTogglePlay={onTogglePlay} onReturnTo2D={() => handleToggleView('2d')}
       colorBy={colorBy} onChangeColorBy={onChangeColorBy} currentPoint={currentPoint} fadedLine={fadedLine}
       onToggleFadedLine={line => setFadedLine(f => (f === line ? 'none' : line))} trackGeometry={trackGeometry}
       isExpanded={isExpanded} onToggleExpanded={handleToggleExpanded}
       showFrictionCircle={showFrictionCircle} onToggleFrictionCircle={() => setShowFrictionCircle(value => !value)} />
-  </Suspense>;
+  </Suspense></GhostSyncContext.Provider>;
 
   return (
-    <>
+    <GhostSyncContext.Provider value={ghostSync}>
       {!isExpanded && <div className="flex items-start justify-end px-2 py-1 gap-2 shrink-0 text-xs">
         <GpsMapModeBar embedded className="min-w-0 flex-1" colorBy={colorBy} onChangeColorBy={onChangeColorBy}
           isCompareMode={isCompareMode} hasBaseline={Boolean(baselinePoints)} fadedLine={fadedLine}
           onToggleFadedLine={line => setFadedLine(value => value === line ? 'none' : line)}
           showGForce={showGForce} onToggleGForce={toggleGForce}
-          showFrictionCircle={showFrictionCircle} onToggleFrictionCircle={() => setShowFrictionCircle(value => !value)} />
+          showFrictionCircle={showFrictionCircle} onToggleFrictionCircle={() => setShowFrictionCircle(value => !value)}
+          {...ghostSyncControls(ghostSync)} />
       </div>}
 
       {trajectory.stationSource === 'odometer' && <div className="flex items-center gap-2 px-2 text-xs text-lmu-muted"><TrackCircuitLayout trackName={trackVenue || ''} trackCourse={trackCourse} layoutKey={layoutKey} size="session" /><p>Basic layout and recorded trajectory. Detailed road, kerb, banking and corner analysis need local track data.</p></div>}
@@ -200,6 +204,6 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
         />
       )}
       {!isExpanded && <ReplayTelemetryHud currentPoint={currentPoint ?? trajectory.points[currentIndex]} />}
-    </>
+    </GhostSyncContext.Provider>
   );
 };

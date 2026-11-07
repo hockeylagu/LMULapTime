@@ -114,4 +114,14 @@ describe('GpsMapModeBar', () => {
     rerender(<GpsMapModeBar onToggleFrictionCircle={onToggleFrictionCircle} showFrictionCircle={true} />);
     expect(frictionBtn).toHaveAttribute('aria-pressed', 'true');
   });
+  it('switches the ghost sync with a baseline and explains marker A', () => {
+    const onChangeGhostSync = vi.fn();
+    const { rerender } = render(<GpsMapModeBar hasBaseline ghostSync="time" onChangeGhostSync={onChangeGhostSync} />);
+    expect(screen.getByRole('button', { name: 'Time' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'From A' }).title).toContain('Alt-click');
+    fireEvent.click(screen.getByRole('button', { name: 'From A' }));
+    expect(onChangeGhostSync).toHaveBeenCalledWith('anchored');
+    rerender(<GpsMapModeBar ghostSync="time" onChangeGhostSync={onChangeGhostSync} />);
+    expect(screen.queryByTestId('ghost-sync-toggle')).toBeNull();
+  });
 });

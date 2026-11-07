@@ -2,6 +2,14 @@ import React from 'react';
 import { CircleDot, Compass } from 'lucide-react';
 import type { MapColorMode } from '../replayMapUtils.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
+import { GHOST_SYNC_MODES, type GhostSyncMode } from '../ghostSync.js';
+
+const SYNC_LABELS: Record<GhostSyncMode, string> = { distance: 'Distance', time: 'Time', anchored: 'From A' };
+const syncTitle = (mode: GhostSyncMode, anchorSet: boolean) => mode === 'distance'
+  ? 'Ghost at the same lap distance: compare lines and brake points (V)'
+  : mode === 'time' ? 'Ghost at the same lap time: see the gap on track over the whole lap (V)'
+    : anchorSet ? 'Both cars start together at marker A, then run on time: who carries more speed (V)'
+      : 'Both cars start together at marker A, then run on time (V). Alt-click the telemetry trace to set A; until then it runs from the lap start';
 
 export interface GpsMapModeBarProps {
   colorBy?: MapColorMode;
@@ -14,6 +22,10 @@ export interface GpsMapModeBarProps {
   onToggleGForce?: () => void;
   showFrictionCircle?: boolean;
   onToggleFrictionCircle?: () => void;
+  /** Where the ghost follows the primary car; the toggle shows with a baseline and a handler. */
+  ghostSync?: GhostSyncMode;
+  onChangeGhostSync?: (mode: GhostSyncMode) => void;
+  ghostAnchorSet?: boolean;
   className?: string;
   embedded?: boolean;
 }
@@ -29,6 +41,9 @@ export const GpsMapModeBar: React.FC<GpsMapModeBarProps> = ({
   onToggleGForce,
   showFrictionCircle = false,
   onToggleFrictionCircle,
+  ghostSync = 'distance',
+  onChangeGhostSync,
+  ghostAnchorSet = false,
   className = '',
   embedded = false,
 }) => {
@@ -57,6 +72,20 @@ export const GpsMapModeBar: React.FC<GpsMapModeBarProps> = ({
               } ${FOCUS_RING}`}
             >
               {mode === 'pedal' ? 'Pedal' : mode === 'speed' ? 'Speed' : mode === 'delta' ? 'Delta' : 'Gain / Loss'}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {hasBaseline && onChangeGhostSync && (
+        <div role="group" aria-label="Ghost sync" data-testid="ghost-sync-toggle" className="flex items-center gap-0.5 pl-1 border-l border-lmu-border">
+          {GHOST_SYNC_MODES.map(mode => (
+            <button key={mode} type="button" onClick={() => onChangeGhostSync(mode)} aria-pressed={ghostSync === mode}
+              title={syncTitle(mode, ghostAnchorSet)}
+              className={`px-2 py-1 rounded text-xs font-semibold transition-colors cursor-pointer ${
+                ghostSync === mode ? 'bg-lmu-raised text-lmu-text' : 'text-lmu-muted hover:text-lmu-text'
+              } ${FOCUS_RING}`}>
+              {SYNC_LABELS[mode]}
             </button>
           ))}
         </div>

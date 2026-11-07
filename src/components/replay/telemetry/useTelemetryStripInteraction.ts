@@ -2,6 +2,7 @@ import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } fro
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { getTrajectoryDistances, findIndexAtDistance } from '../../../utils/lapAlignment.js';
 import { replayShortcutBlocked } from '../../../utils/replayShortcuts.js';
+import { useGhostSync } from '../inspector/ghostSyncContext.js';
 import { DistanceWindow, fitDistanceWindow, normalizedWheelDelta, zoomDistanceWindow } from './telemetryViewport.js';
 
 export interface TelemetryDragSelection {
@@ -45,8 +46,8 @@ export function useTelemetryStripInteraction({
   const panRef = useRef<{ x: number; width: number; window: DistanceWindow } | null>(null);
   const keyHandlerRef = useRef<(event: KeyboardEvent) => void>(() => {});
   const altClickXRef = useRef<number | null>(null);
-  // Alt-click marker, kept as a distance so it survives a resolution or lap reload.
-  const [markerDistM, setMarkerDistM] = useState<number | null>(null);
+  // Alt-click marker A, shared with the map's anchored ghost (see useGhostSync).
+  const { markerDistM, setMarkerDistM } = useGhostSync();
   const [internalZoomRange, setInternalZoomRange] = useState<{ start: number; end: number } | null>(null);
   const [interactionMode, setInteractionMode] = useState<'scrub' | 'zoom'>('scrub');
   const [dragSelection, setDragSelection] = useState<TelemetryDragSelection | null>(null);
@@ -301,7 +302,7 @@ export function useTelemetryStripInteraction({
     pctForIndex,
     onStepIndex,
     markerIndex: markerDistM === null || cumDists.length === 0 ? null : findIndexAtDistance(cumDists, markerDistM),
-    clearMarker: useCallback(() => setMarkerDistM(null), []),
+    clearMarker: useCallback(() => setMarkerDistM(null), [setMarkerDistM]),
     // A double-click removes the marker first, then resets the zoom.
     handleDoubleClick: () => (markerDistM !== null ? setMarkerDistM(null) : handleResetZoom()),
     onJumpToDistance: useCallback((distM: number) => {

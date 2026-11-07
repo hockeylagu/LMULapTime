@@ -182,7 +182,7 @@ export function computeMapScene(
   const deltaByIdx = computeLapComparisons(primary, baseline, trackLengthM).map(c => c.deltaTimeSec);
   const baselineDeltaByIdx = computeBaselineDeltaByIdx(deltaByIdx, primaryDists, baselineDists);
   const ghostAt = (index: number) =>
-    computeGhostPosition(primaryDists, baselineDists, effectiveBaseline, index, bounds, MAP_VIEWBOX, MAP_PADDING);
+    computeGhostPosition(baselineDists, effectiveBaseline, primaryDists[index], bounds, MAP_VIEWBOX, MAP_PADDING);
   const pedalMarkerPoints = computePedalMarkerPoints(true, buildPedalMarkers(corners), primaryDists, baselineDists, svgPoints, baselineSvgPoints, effectiveBaseline);
   const cornerMarkers = computeDispersedCornerMarkers(corners, primaryDists, svgPoints, baselineSvgPoints, pedalMarkerPoints);
   return {

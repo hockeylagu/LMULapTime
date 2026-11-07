@@ -29,6 +29,8 @@ import { useStoredToggle } from '../useStoredToggle.js';
 import { useGpsSceneProjection, VIEWBOX_SIZE, PADDING } from './useGpsSceneProjection.js';
 import { useGpsSceneDynamics } from './useGpsSceneDynamics.js';
 import { useGpsSceneCameraFocus } from './useGpsSceneCameraFocus.js';
+import { ghostSyncControls, useGhostSync } from '../../inspector/ghostSyncContext.js';
+import { nextGhostSyncMode } from '../ghostSync.js';
 
 // Stable when Turns is hidden, so marker memos do not recompute on every frame.
 const NO_CORNER_MARKERS: ReturnType<typeof computeDispersedCornerMarkers> = [];
@@ -58,6 +60,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
   const showGForce = props.showGForce ?? localShowGForce;
   const handleToggleGForce = props.onToggleGForce ?? toggleLocalGForce;
   const [isTraceHidden, toggleTrace] = useStoredToggle('lmu-map-trace-collapsed-v1', false);
+  const ghostSync = useGhostSync();
 
   const {
     geometry: effectiveGeometry, effectiveBaselinePoints, effectiveBounds, svgPoints, baselineSvgPoints,
@@ -65,8 +68,9 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
   } = useGpsSceneProjection(props);
   const {
     activeIndex, fraction, currentPos, primaryDists, baselineDists, comparisons, deltaByIdx, currentDeltaTimeSec,
-    currentPrimaryPoint, baselineGhostPos, currentLineDistM, baselineHeadingIndex, baselineHeadingFraction, baselineBodyHeading,
-  } = useGpsSceneDynamics({ points, baselinePoints: effectiveBaselinePoints, svgPoints, bounds: effectiveBounds, currentIndex, trackLengthM });
+    currentPrimaryPoint, baselineGhostPos, currentLineDistM, currentGapM, currentTimeGapSec, baselineHeadingIndex, baselineHeadingFraction, baselineBodyHeading,
+  } = useGpsSceneDynamics({ points, baselinePoints: effectiveBaselinePoints, svgPoints, bounds: effectiveBounds, currentIndex, trackLengthM,
+    syncMode: ghostSync.mode, anchorDistM: ghostSync.markerDistM });
 
   const camera = useGpsMapPanZoom({
     viewBoxSize: VIEWBOX_SIZE,
@@ -87,6 +91,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
     onResetZoom: resetPanZoom,
     onTogglePlay,
     onToggleGForce: handleToggleGForce,
+    onCycleGhostSync: baselinePoints ? () => ghostSync.setMode(nextGhostSyncMode(ghostSync.mode)) : undefined,
     onToggleTrace: toggleTrace,
     onPan: panBy,
     onCenter: camera.centerOnCar,
@@ -227,13 +232,13 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
             colorBy={colorBy} onChangeColorBy={onChangeColorBy}
             isCompareMode={Boolean(baselinePoints)} hasBaseline={Boolean(baselinePoints)} fadedLine={fadedLine}
             onToggleFadedLine={onToggleFadedLine} showGForce={showGForce} onToggleGForce={handleToggleGForce}
-            showFrictionCircle={effectiveShowFriction} onToggleFrictionCircle={handleToggleFriction} />}
+            showFrictionCircle={effectiveShowFriction} onToggleFrictionCircle={handleToggleFriction} {...ghostSyncControls(ghostSync)} />}
       </div>
       {isExpanded && onSelectIndex && <GpsMapTelemetryDock points={points} baselinePoints={baselinePoints} comparisons={comparisons}
         currentIndex={currentIndex} onSelectIndex={onSelectIndex} trackLengthM={trackLengthM} source={props.source} sectors={props.sectors} onTogglePlay={onTogglePlay}
         isPlaying={isPlaying} traceHidden={isTraceHidden} onToggleTrace={toggleTrace}
         hud={<GpsMapTelemetryHud primaryPoint={currentPrimaryPoint} baselinePoint={baselineGhostPos?.point}
-          deltaTimeSec={currentDeltaTimeSec} lineDistanceM={currentLineDistM} />} />}
+          deltaTimeSec={currentTimeGapSec} lineDistanceM={currentLineDistM} syncMode={ghostSync.mode} gapM={currentGapM} />} />}
     </div>
   );
 };

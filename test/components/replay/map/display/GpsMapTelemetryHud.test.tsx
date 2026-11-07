@@ -203,5 +203,15 @@ describe('GpsMapTelemetryHud', () => {
     expect(screen.getByLabelText('ON TRACK, air 0.0°C')).toBeInTheDocument();
     expect(screen.getByText('0.0% C')).toBeInTheDocument();
   });
-});
 
+  it('shows the speed difference at the same distance and the on-track gap in time modes', () => {
+    const { rerender } = render(<GpsMapTelemetryHud primaryPoint={mockPrimary} baselinePoint={mockBaseline} deltaTimeSec={-0.2} />);
+    expect(screen.getByTestId('hud-speed-diff')).toHaveTextContent('+9 km/h');
+    rerender(<GpsMapTelemetryHud primaryPoint={mockPrimary} baselinePoint={mockBaseline} deltaTimeSec={-0.2} syncMode="time" gapM={12.34} />);
+    expect(screen.queryByTestId('hud-speed-diff')).toBeNull();
+    expect(screen.getByTestId('hud-track-gap')).toHaveTextContent('12.3 m ahead');
+    rerender(<GpsMapTelemetryHud primaryPoint={mockPrimary} baselinePoint={mockBaseline} deltaTimeSec={0.1} syncMode="anchored" gapM={-4} />);
+    expect(screen.getByTestId('hud-track-gap')).toHaveTextContent('4.0 m behind');
+    expect(screen.getByLabelText('Delta since marker A: behind')).toHaveTextContent('+0.10s');
+  });
+});

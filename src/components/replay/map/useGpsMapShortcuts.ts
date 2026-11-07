@@ -13,6 +13,8 @@ export interface UseGpsMapShortcutsOptions {
   onResetZoom: () => void;
   onTogglePlay?: () => void;
   onToggleGForce?: () => void;
+  /** With a baseline: cycle the ghost sync (distance, time, from marker A). */
+  onCycleGhostSync?: () => void;
   onPan?: (horizontal: number, vertical: number) => void;
   onToggleExpanded?: () => void;
   /** Fullscreen only: hide or show the telemetry trace under the map. */
@@ -30,6 +32,7 @@ export interface UseGpsMapShortcutsOptions {
  * - 0: Reset zoom to show full track
  * - Space: Toggle playback
  * - G: Toggle G-force arrow
+ * - V: Cycle the ghost sync (distance / time / from marker A)
  * - W/A/S/D: Pan up/left/down/right without changing the scrub cursor
  * - M: Toggle the fullscreen map, also from the telemetry chart
  * - T: Hide / show the fullscreen telemetry trace, also from that trace
@@ -45,6 +48,7 @@ export function useGpsMapShortcuts({
   onResetZoom,
   onTogglePlay,
   onToggleGForce,
+  onCycleGhostSync,
   onPan,
   onToggleExpanded,
   onToggleTrace,
@@ -129,6 +133,9 @@ export function useGpsMapShortcuts({
     } else if (event.key.toLowerCase() === 'g') {
       event.preventDefault();
       onToggleGForce?.();
+    } else if (event.key.toLowerCase() === 'v' && onCycleGhostSync) {
+      event.preventDefault();
+      if (!event.repeat) onCycleGhostSync();
     }
   });
 

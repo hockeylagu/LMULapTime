@@ -152,9 +152,9 @@ describe('replayMapUtils', () => {
   });
 
   describe('computeGhostPosition station-domain matching', () => {
-    it('moves the ghost between recorded samples at the primary interpolated distance', () => {
+    it('moves the ghost between recorded samples at the requested distance', () => {
       const baseline = [0, 10].map(x => ({ x, y: 0, z: 0, speedKmh: 100 }));
-      const ghost = computeGhostPosition([0, 10], [0, 10], baseline, 0.25,
+      const ghost = computeGhostPosition([0, 10], baseline, 2.5,
         { minX: 0, minZ: 0, spanX: 10, spanZ: 10 }, 800, 60);
       expect(ghost?.point.x).toBeCloseTo(2.5);
     });
@@ -173,10 +173,9 @@ describe('replayMapUtils', () => {
 
       const bounds = { minX: -200, maxX: 200, spanX: 400, minZ: -200, maxZ: 200, spanZ: 400 };
       const ghost = computeGhostPosition(
-        getTrajectoryDistances(primary, 5724.1),
         getDistancesInReferenceFrame(baseline, primary, 5724.1),
         baseline,
-        0, // Primary at station 1.36
+        getTrajectoryDistances(primary, 5724.1)[0], // Primary at station 1.36
         bounds,
         800,
         60
