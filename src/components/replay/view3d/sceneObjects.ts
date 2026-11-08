@@ -1,5 +1,4 @@
 import { Group, Mesh, MeshStandardMaterial, SphereGeometry, type BufferGeometry, type Material, type Object3D } from 'three';
-import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
 
 export type CockpitView = 'in' | 'out';
 
@@ -13,10 +12,10 @@ export function setCockpitView(car: Object3D, view: CockpitView): void {
 
 /**
  * One car for a lap: a parsed textured car whose materials the caller already created per native material,
- * placed by the vehicle's replay origin offset, with a pose marker for samples without a heading.
+ * placed at its model origin (the replay pose), with a pose marker for samples without a heading.
  * `model` is a clone that shares its geometry with the parsed template (marked `sharedAsset`).
  */
-export function makeCar(trajectory: ReplayTrajectoryData, color: string, ghost: boolean, model: Group): Group {
+export function makeCar(color: string, ghost: boolean, model: Group): Group {
   const car = new Group(), envelope = model;
   envelope.traverse(object => {
     if (!(object instanceof Mesh)) return;
@@ -25,8 +24,6 @@ export function makeCar(trajectory: ReplayTrajectoryData, color: string, ghost: 
       if (ghost) { material.transparent = true; material.opacity = 0.45; material.depthWrite = false; }
     }
   });
-  const offset = trajectory.vehicleData?.replayOriginOffsetXZ ?? [0, 0];
-  envelope.position.set(offset[0], 0, offset[1]);
   const marker = new Mesh(new SphereGeometry(0.65, 12, 8), new MeshStandardMaterial({ color, transparent: ghost, opacity: ghost ? 0.5 : 1, depthWrite: !ghost, roughness: 0.35 }));
   marker.name = 'pose-marker'; marker.visible = false;
   envelope.name = 'body-envelope'; car.add(envelope, marker);

@@ -14,7 +14,7 @@ const lap: ReplayTrajectoryData = {replayName: 'test', pointsCount: 2, bounds: {
 const rig = (name: string, car: ReturnType<typeof makeCar>) => ({pivot: car.getObjectByName(`wheel_${name}`)!, spin: car.getObjectByName(`spin_${name}`)!, steer: car.getObjectByName(`steer_${name}`)!});
 
 it('fits the floating model to the road and spins every wheel about its axle', () => {
-  const car = makeCar(lap, '#38bdf8', false, rigModel()), animation = createWheelAnimation(car, lap, () => 0);
+  const car = makeCar('#38bdf8', false, rigModel()), animation = createWheelAnimation(car, lap, () => 0);
   expect(car.getObjectByName('body-envelope')!.position.y).toBeCloseTo(-0.33);
   const pose = sampleRenderPose(lap.points, 0, 0.5)!; animation.update(pose);
   for (const name of ['fl', 'fr', 'rl', 'rr']) expect(rig(name, car).spin.rotation.x).not.toBe(0);
@@ -27,7 +27,7 @@ it('maps ride-height changes against each corner lap median and bounds the trave
   const measured: ReplayTrajectoryData = {...lap, points: [
     {...lap.points[0], rideHeight: [40, 40, 60, 60]}, {...lap.points[1], rideHeight: [20, 30, 70, 65]},
   ]};
-  const car = makeCar(measured, '#38bdf8', false, rigModel()), animation = createWheelAnimation(car, measured, () => 0);
+  const car = makeCar('#38bdf8', false, rigModel()), animation = createWheelAnimation(car, measured, () => 0);
   animation.update(sampleRenderPose(measured.points, 1, 0)!);
   expect(rig('fl', car).pivot.position.y).toBeCloseTo(0.33 + 0.01);
   expect(rig('rl', car).pivot.position.y).toBeCloseTo(0.33 - 0.005);
@@ -37,7 +37,7 @@ it('maps ride-height changes against each corner lap median and bounds the trave
 it('references the ride height of the slowest samples so the car sinking at speed lifts the wheels', () => {
   const points = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300].map((speedKmh, i) => ({...lap.points[i % 2], timeSec: i, speedKmh, rideHeight: [60 - speedKmh / 10, 60, 60, 60] as [number, number, number, number]}));
   const measured: ReplayTrajectoryData = {...lap, pointsCount: points.length, points};
-  const car = makeCar(measured, '#38bdf8', false, rigModel()), animation = createWheelAnimation(car, measured, () => 0);
+  const car = makeCar('#38bdf8', false, rigModel()), animation = createWheelAnimation(car, measured, () => 0);
   animation.update(sampleRenderPose(measured.points, 9, 0)!);
   // Static 57 mm (30 km/h), 30 mm at 300 km/h: 27 mm up. The lap median (45 mm) would give only 15 mm.
   expect(rig('fl', car).pivot.position.y).toBeCloseTo(0.33 + 0.027);
@@ -46,7 +46,7 @@ it('references the ride height of the slowest samples so the car sinking at spee
 it('steers only the fronts from recorded steering', () => {
   const steered: ReplayTrajectoryData = {...lap, handlingCalibration: {wheelbaseM: 2.8, steeringRatio: 12, steeringWheelRangeDeg: 540, wheelbaseSource: 'plugin', steeringSource: 'plugin-default'},
     points: lap.points.map(point => ({...point, steerYaw: 120}))};
-  const car = makeCar(steered, '#38bdf8', false, rigModel()), animation = createWheelAnimation(car, steered, () => 0);
+  const car = makeCar('#38bdf8', false, rigModel()), animation = createWheelAnimation(car, steered, () => 0);
   animation.update(sampleRenderPose(steered.points, 0, 0.5)!);
   expect(rig('fl', car).steer.rotation.y).toBeCloseTo(-10 * Math.PI / 180);
   expect(rig('fr', car).steer.rotation.y).toBeCloseTo(-10 * Math.PI / 180);
@@ -60,7 +60,7 @@ it('turns the steering wheel about the descriptor column axis by the recorded wh
   const model = rigModel(), wheel = new Group(), axis = new Vector3(0, 0.2, 1).normalize();
   const pivot = new Vector3(0.3, 0.7, -0.3), hub = new Group(); hub.position.copy(pivot); wheel.add(hub);
   wheel.name = 'steering_wheel'; wheel.userData.steeringWheelAxis = axis.toArray(); wheel.userData.steeringWheelPivot = pivot.toArray(); model.add(wheel);
-  const car = makeCar(steered, '#38bdf8', false, model), animation = createWheelAnimation(car, steered, () => 0);
+  const car = makeCar('#38bdf8', false, model), animation = createWheelAnimation(car, steered, () => 0);
   animation.update(sampleRenderPose(steered.points, 0, 0.5)!);
   // 90 on the ±270 scale of a 540° wheel: a quarter turn left, a negative rotation about the column in the native frame.
   expect(wheel.quaternion.angleTo(new Quaternion().setFromAxisAngle(axis, -Math.PI / 2))).toBeCloseTo(0, 6);
@@ -71,7 +71,7 @@ it('turns the steering wheel about the descriptor column axis by the recorded wh
 });
 
 it('keeps the model where it is without road coverage', () => {
-  const car = makeCar(lap, '#38bdf8', false, rigModel()), animation = createWheelAnimation(car, lap, () => null);
+  const car = makeCar('#38bdf8', false, rigModel()), animation = createWheelAnimation(car, lap, () => null);
   animation.update(sampleRenderPose(lap.points, 0, 0)!);
   expect(car.getObjectByName('body-envelope')!.position.y).toBe(0);
   expect(animation.description).not.toContain('Estimated ground fit');
@@ -88,7 +88,7 @@ it('reads the rolling hub and radius of each rig and throws on a car without a c
 });
 
 it('queries road contact once per sample and interpolates wheel travel without per-frame lookups', () => {
-  const car = makeCar(lap, '#38bdf8', false, rigModel());
+  const car = makeCar('#38bdf8', false, rigModel());
   let height: (point: {z: number}) => number | null = () => 0;
   const surface = vi.fn((point: {z: number}) => height(point));
   const animation = createWheelAnimation(car, lap, surface);
@@ -108,7 +108,7 @@ it('queries road contact once per sample and interpolates wheel travel without p
 });
 
 it('retries missing contact only after a scenery refresh', () => {
-  const car = makeCar(lap, '#38bdf8', false, rigModel());
+  const car = makeCar('#38bdf8', false, rigModel());
   let available = false;
   const surface = vi.fn(() => available ? 0 : null);
   const animation = createWheelAnimation(car, lap, surface);
@@ -127,13 +127,13 @@ it('retries missing contact only after a scenery refresh', () => {
 
 it('does not use road fallback for measured suspension or interpolate contact through a teleport', () => {
   const measured = {...lap, points: lap.points.map(point => ({...point, rideHeight: [40, 40, 60, 60] as [number, number, number, number]}))};
-  const surface = vi.fn(() => 0), car = makeCar(measured, '#38bdf8', false, rigModel());
+  const surface = vi.fn(() => 0), car = makeCar('#38bdf8', false, rigModel());
   const animation = createWheelAnimation(car, measured, surface);
   surface.mockClear();
   animation.update(sampleRenderPose(measured.points, 0, 0.5)!);
   expect(surface).not.toHaveBeenCalled();
   const discontinuous = {...lap, points: [lap.points[0], {...lap.points[1], isTeleport: true}]};
-  const other = createWheelAnimation(makeCar(discontinuous, '#38bdf8', false, rigModel()), discontinuous, surface);
+  const other = createWheelAnimation(makeCar('#38bdf8', false, rigModel()), discontinuous, surface);
   surface.mockClear();
   other.update(sampleRenderPose(discontinuous.points, 0, 0.9)!);
   expect(surface).toHaveBeenCalledTimes(4);

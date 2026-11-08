@@ -100,9 +100,9 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
   };
   const load = async (trajectory: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null, assets: LapCars, colorBy: MapColorMode) => {
     const [primaryModel, baselineModel] = await Promise.all([loadModel(assets.primary), assets.baseline ? loadModel(assets.baseline) : null]);
-    const primary = makeCar(trajectory, MAP_COLORS.carBody, false, primaryModel);
+    const primary = makeCar(MAP_COLORS.carBody, false, primaryModel);
     primaryModel.add(createContactShadow(primaryModel));
-    const ghost = baseline && baselineModel ? makeCar(baseline, TELEMETRY_COLORS.baseline, true, baselineModel) : new Group();
+    const ghost = baseline && baselineModel ? makeCar(TELEMETRY_COLORS.baseline, true, baselineModel) : new Group();
     const primaryWheels = createWheelAnimation(primary, trajectory, surfaceHeight);
     const ghostWheels = baseline ? createWheelAnimation(ghost, baseline, surfaceHeight) : null;
     ghost.traverse(object => { if (object instanceof Mesh) { object.castShadow = false; object.receiveShadow = false; } });
