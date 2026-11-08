@@ -80,7 +80,7 @@ export function validateCarDescriptor(bytes: Buffer, row: CarBody): void {
       text(surface.kind, `${what}.materials[${i}].surface.kind`); record(surface.maps, `${what}.materials[${i}].surface.maps`);
     }
   });
-  const cameras = array(record(descriptor.cameras, `${what}.cameras`).list, `${what}.cameras.list`, 64).map((value, i) => {
+  const cameras = new Set(array(record(descriptor.cameras, `${what}.cameras`).list, `${what}.cameras.list`, 64).map((value, i) => {
     const camera = record(value, `${what}.cameras.list[${i}]`), at = `${what}.cameras.list[${i}]`;
     vec3(camera.position, `${at}.position`, 10); vec3(camera.orientation, `${at}.orientation`, 10);
     const fov = array(camera.fov, `${at}.fov`, 2).map(degrees => finite(degrees, `${at}.fov`));
@@ -89,8 +89,8 @@ export function validateCarDescriptor(bytes: Buffer, row: CarBody): void {
     if (clip.length !== 2 || !(clip[0] > 0 && clip[1] > clip[0])) throw Error(`${at}.clipPlanes: expected near < far`);
     if (camera.cockpitView !== 'in' && camera.cockpitView !== 'out') throw Error(`${at}.cockpitView: expected in or out`);
     return text(camera.name, `${at}.name`, 64);
-  });
-  if (!cameras.includes('COCKPIT')) throw Error(`${what}: no COCKPIT camera`);
+  }));
+  for (const role of ['cockpit', 'hood', 'roof']) if (!cameras.has(role)) throw Error(`${what}: no ${role} camera`);
   const declared = new Set(row.textures.map(texture => texture.asset));
   for (const match of bytes.toString('utf8').match(/textures\/[0-9a-f]{64}\.ktx2\.zst/g) ?? []) if (!declared.has(`vehicles/${match}`)) throw Error(`${what}: uses undeclared texture ${match}`);
 }

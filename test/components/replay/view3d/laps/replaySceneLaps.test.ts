@@ -98,16 +98,16 @@ const layout = {
   layoutKey: 'portimao_wec', sourceGeometryRevision: 'g', packageRevision: 'p', routeLengthM: 4000, pitLaneLengthM: 0, shadowRangeM: 750,
   streaming: {residentBehindM: 300, residentAheadM: 1500, freeCameraRadiusM: 1500},
   camera: {meteringWindow: {x: 0.1, y: 0.1, width: 0.8, height: 0.8}, profiles: [{sunElevationDeg: 0, targetExposure: 0.4, whiteBalanceK: 7000}, {sunElevationDeg: 60, targetExposure: 0.2, whiteBalanceK: 6500}], toneCurve: {a: 2.5, b: 0.6}, glareThreshold: 1.2, ambientOcclusion: {radiusM: 0.4, samples: 8, scale: 2, colour: 0.4}},
-  daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55 },
+  daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9 },
   horizon: {...base, id: 'horizon', kind: 'horizon', asset: 'scenery/h.glb'}, sectors: [0, 1, 2, 3].map(sector), textures: [],
 } as unknown as SceneryLayoutResource;
 const car = {
   resource: {}, bytes: new ArrayBuffer(0), vehicleId: 'veh',
   descriptor: {optionNodes: ['option_PlateA', 'option_PlateB'], appearances: [{alias: 'VEH', albedo: 'textures/a.ktx2', paint: testCarPaint('textures/a.ktx2'), optionNodes: ['option_PlateA']}], materials: [{id: 'm1', name: 'body', paint: true}],
     cameras: {list: [
-      {name: 'COCKPIT', position: [0.28, 1, -0.7], orientation: [-0.1, 0, 0], fov: [89, 49], clipPlanes: [0.13, 700], cockpitView: 'in'},
-      {name: 'NOSECAM', position: [0.28, 0.9, -1.9], orientation: [0, 0, 0], fov: [80, 45], clipPlanes: [0.2, 800], cockpitView: 'out'},
-      {name: 'ONBOARD00', position: [0.28, 1.5, -0.6], orientation: [-0.1, 0, 0], fov: [60, 45], clipPlanes: [0.02, 550], cockpitView: 'out'},
+      {name: 'cockpit', position: [0.28, 1, -0.7], orientation: [-0.1, 0, 0], fov: [89, 49], clipPlanes: [0.13, 700], cockpitView: 'in'},
+      {name: 'hood', position: [0.28, 0.9, -1.9], orientation: [0, 0, 0], fov: [80, 45], clipPlanes: [0.2, 800], cockpitView: 'out'},
+      {name: 'roof', position: [0.28, 1.5, -0.6], orientation: [-0.1, 0, 0], fov: [60, 45], clipPlanes: [0.02, 550], cockpitView: 'out'},
     ]}},
 } as unknown as LoadedCar;
 const assets = {primary: car, baseline: null}, withGhost = {primary: car, baseline: car};

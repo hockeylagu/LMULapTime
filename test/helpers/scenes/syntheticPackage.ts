@@ -70,7 +70,7 @@ export function syntheticPackage() {
   };
   const scenery = {
     layoutKey: 'monza_gp', sourceGeometryRevision: geometry.geometryRevision, routeLengthM: L, pitLaneLengthM: 0, shadowRangeM: 750,
-    daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55 },
+    daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9 },
     horizon: chunk('horizon', 'horizon', { kind: 'horizon' }),
     sectors: [
       chunk('s0', 'sector 0', { kind: 'main', lapStartM: 0, lapEndM: L / 2, prev: 's1', next: 's1' }),
@@ -90,8 +90,9 @@ export function syntheticPackage() {
     appearances: [{ alias: 'TEST_CAR', albedo: texturePath, paint: testCarPaint(texturePath), optionNodes: ['option_NumplateA'] }],
     materials: [{ id: 'm1', name: 'body', paint: true }],
     cameras: { list: [
-      { name: 'COCKPIT', position: [0.3, 0.95, 0.3], orientation: [-0.02, 0, 0], fov: [89, 49], clipPlanes: [0.13, 700], cockpitView: 'in' },
-      { name: 'NOSECAM', position: [0.3, 0.92, -0.96], orientation: [-0.02, 0, 0], fov: [89, 49], clipPlanes: [0.5, 800], cockpitView: 'out' },
+      { name: 'cockpit', position: [0.3, 0.95, 0.3], orientation: [-0.02, 0, 0], fov: [89, 49], clipPlanes: [0.13, 700], cockpitView: 'in' },
+      { name: 'hood', position: [0.3, 0.92, -0.96], orientation: [-0.02, 0, 0], fov: [89, 49], clipPlanes: [0.5, 800], cockpitView: 'out' },
+      { name: 'roof', position: [0.3, 1.5, 0.2], orientation: [-0.1, 0, 0], fov: [60, 45], clipPlanes: [0.02, 550], cockpitView: 'out' },
     ] },
   };
   /** The car body as every record lists it; `vehicleIds` is replaced by each record's own part. */

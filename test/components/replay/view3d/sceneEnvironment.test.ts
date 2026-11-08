@@ -117,14 +117,14 @@ it('draws the static shadow map a quarter per frame without the cars or sub-metr
 it('lights a layout from its published daylight: race-start sun height, turbidity from air pollution', () => {
   const sessions = (race: number, sunBearingDeg?: number) => [{id: 'race' as const, localTime: '11:00', sunElevationDeg: race, sunBearingDeg}, {id: 'qualify' as const, localTime: '15:00', sunElevationDeg: 46.1},
     {id: 'practice1' as const, localTime: '11:00', sunElevationDeg: 51.88}, {id: 'practice2' as const, localTime: '15:30', sunElevationDeg: 40.89}];
-  const fuji = sceneLighting({date: '2023-09-10', sessions: sessions(51.88, 136.26), airPollution: 0.5, hazeBaseScale: 0.55});
+  const fuji = sceneLighting({date: '2023-09-10', sessions: sessions(51.88, 136.26), airPollution: 0.5, hazeBaseScale: 0.55, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9});
   expect(Math.asin(fuji.sunDirection.y) * 180 / Math.PI).toBeCloseTo(51.88, 6);
   expect(fuji.sunDirection.x).toBeCloseTo(0.42680, 5);
   expect(fuji.sunDirection.z).toBeCloseTo(0.44600, 5);
   expect(fuji.sunDirection.length()).toBeCloseTo(1, 9);
   expect(fuji.turbidity).toBeCloseTo(2.75, 9);
   // A race start after sunset is still lit by a low sun.
-  expect(sceneLighting({date: '2023-11-04', sessions: sessions(-3), airPollution: 0.8, hazeBaseScale: 1}).sunDirection.y).toBeGreaterThan(0.15);
+  expect(sceneLighting({date: '2023-11-04', sessions: sessions(-3), airPollution: 0.8, hazeBaseScale: 1, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9}).sunDirection.y).toBeGreaterThan(0.15);
   expect(sceneLighting().sunDirection.toArray()).toEqual(SUN_DIRECTION.toArray());
 });
 
@@ -139,9 +139,8 @@ it("places the sun at the replay's clock: session start plus session time at the
   // Offline, the session's default time, plus the session time.
   expect(height(sceneLighting(located, {session: 'practice1', startMinute: null, sessionTimeSec: 3600})))
     .toBeCloseTo(solarPosition(35.37, 138.93, '2023-09-10', 720, 9).elevationDeg, 6);
-  // Without a location, the session's published sun.
-  const {latitudeDeg: _lat, longitudeDeg: _lon, utcOffsetHours: _utc, ...unlocated} = located;
-  expect(height(sceneLighting(unlocated, {session: 'qualify', startMinute: 1050, sessionTimeSec: 0}))).toBeCloseTo(46.1, 6);
+  // Without a clock, the race session's published sun.
+  expect(height(sceneLighting(located))).toBeCloseTo(50, 6);
 });
 
 it('computes the sun position: overhead at the equator at solar noon on the equinox, east in the morning, west in the afternoon', () => {
@@ -165,7 +164,7 @@ it('dims and reddens a low sun through the air mass and hides it under cloud, ne
 
 it("covers the sky with the replay's cloud cover and lights the haze with the sun that reaches it", () => {
   const scene = new Scene(), renderer = {shadowMap: {enabled: false, type: 0, autoUpdate: true}, toneMapping: 0, toneMappingExposure: 0, ...fakeRenderer()} as unknown as WebGLRenderer;
-  const daylight = {date: '2023-06-10', sessions: [{id: 'qualify' as const, localTime: '20:45', sunElevationDeg: 12, sunBearingDeg: 290}], airPollution: 0.6, hazeBaseScale: 1};
+  const daylight = {date: '2023-06-10', sessions: [{id: 'qualify' as const, localTime: '20:45', sunElevationDeg: 12, sunBearingDeg: 290}], airPollution: 0.6, hazeBaseScale: 1, latitudeDeg: 47.95, longitudeDeg: 0.22, utcOffsetHours: 2};
   const environment = addSceneEnvironment(scene, renderer, daylight, {session: 'qualify', startMinute: null, sessionTimeSec: 0, cloudCover: 0.62});
   expect((scene.getObjectByName('sky') as Sky).material.uniforms.cloudCoverage.value).toBe(0.62);
   const haze = (scene.fog as FogExp2).color, midday = new Color(DAYLIGHT.horizonColor);

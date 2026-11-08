@@ -61,7 +61,7 @@ export function readSurfaceConfig(userData: Record<string, unknown>): SurfaceCon
   return config;
 }
 
-/** Colour and numeric data may share a game texture name but need different KTX metadata, so the image name carries the role. */
+/** Colour and numeric data may share a source texture name but need different KTX metadata, so the image name carries the role. */
 export function textureAsset(stem: string, srgb: boolean): string {
   if (!stem || stem.includes('/') || stem.includes(String.fromCharCode(92))) throw Error('Invalid source texture stem');
   return `${stem}__${srgb ? 'srgb' : 'linear'}.ktx2.zst`;

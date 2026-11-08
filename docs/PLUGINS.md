@@ -191,9 +191,9 @@ Each vehicle record lists its car `bodies`: `folder`, `vehicleIds` (the part of 
 (`vehicles/bodies/<folder>.json`) with `descriptorSha256`, `asset` (`vehicles/<sha256>.glb`), `byteLength`, `triangles`, `vertices`
 and `textures` (`vehicles/textures/<sha256>.ktx2.zst`). Two bodies may not serve one id. The descriptor is read and validated at
 startup: its aliases equal the body's ids, `wheelRig` passed with four rigs and rest-vertex error below 1e-5, there is one appearance
-per alias, every texture it names is declared by the body, and its `cameras.list` holds well-formed game cameras including `COCKPIT`.
+per alias, every texture it names is declared by the body, and its `cameras.list` holds well-formed `cockpit`, `hood` and `roof` cameras.
 
-Since schema 5 a body carries its entries' part alternatives (the game's GenString choice: number plates, lights, displays, some
+Since schema 5 a body carries its entries' part alternatives (number plates, lights, displays, some
 body panels and tyre versions). The descriptor's `optionNodes` lists them, sorted and unique, each a mesh-only GLB node named
 `option_<mesh file stem>` (letters, digits and `_`, so three.js keeps the name; GLB node names are unique); every appearance has its own
 sorted `optionNodes`, a subset of the body's (`[]` for none). The viewer keeps the lap entry's options, leaves the body's other
@@ -205,7 +205,7 @@ options out of that car (no draw, no texture load) and fails if the GLB lacks a 
 lap's appearance by `vehicleIdentity.vehicleId`, creates one material per native material from the descriptor and animates the four
 wheel rigs (`wheel_`, `steer_` and `spin_` nodes at the rolling hub) and the `steering_wheel` node about its `extras.steeringWheelPivot` and
 `extras.steeringWheelAxis`, by the recorded steering times the wheel range. The Cockpit, Hood and Roof views sit on the descriptor's
-`COCKPIT`, `NOSECAM` and `ONBOARD00` cameras (Hood and Roof fall back to `COCKPIT` when a car lacks one; position, pitch, vertical FOV, near clip) and show the cockpit mesh variant the camera names. A lap without a vehicle id, or a vehicle without a car, is an
+`cockpit`, `hood` and `roof` cameras (position, pitch, vertical FOV, near clip) and show the cockpit mesh variant the camera names. A lap without a vehicle id, or a vehicle without a car, is an
 error shown with the 2D map as the alternative; there is no estimated car.
 
 Textures are KTX2 with raw GPU block data (no Basis transcoder). Scenery and cars are Meshopt-compressed GLBs decoded by three.js.

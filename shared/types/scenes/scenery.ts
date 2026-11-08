@@ -26,7 +26,7 @@ export interface SceneryStreaming {
 
 export type ScenerySessionId = 'race' | 'qualify' | 'practice1' | 'practice2';
 
-/** The sun at a session start, from the venue GDB's location, date, timezone, DSTRange and schedule. */
+/** The sun at a session start, from the venue's location, date, timezone, DSTRange and schedule. */
 export interface ScenerySessionDaylight {
   id: ScenerySessionId;
   /** Local clock time, `HH:MM`. */
@@ -46,14 +46,14 @@ export interface SceneryDaylight {
   date: string;
   /** race, qualify, practice1, practice2, in that order. */
   sessions: ScenerySessionDaylight[];
-  /** GDB AirPollution, mapped to sky turbidity by the viewer. */
+  /** Air pollution, mapped to sky turbidity by the viewer. */
   airPollution: number;
-  /** GDB HazeBaseScale, as authored; how the game applies it is not verified (Fuji, 0.55, is visibly hazy in game). */
+  /** Haze scale as authored; its effect is not verified. */
   hazeBaseScale: number;
-  /** The track's location and its local offset from UTC on the race date (daylight saving included), together or absent. */
-  latitudeDeg?: number;
-  longitudeDeg?: number;
-  utcOffsetHours?: number;
+  /** The track's location and its local offset from UTC on the race date (daylight saving included). */
+  latitudeDeg: number;
+  longitudeDeg: number;
+  utcOffsetHours: number;
 }
 
 /**
@@ -135,7 +135,7 @@ export interface SceneryLayout {
   sourceGeometryRevision: string;
   routeLengthM: number;
   pitLaneLengthM: number;
-  /** The game's maximum shadow range for the layout (SCN `MaxShadowRange`), in metres. */
+  /** The layout's maximum shadow range, in metres. */
   shadowRangeM: number;
   /** The catalog's shared parameters, attached to each layout. */
   chunking: SceneryChunkingParameters;

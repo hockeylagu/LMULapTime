@@ -16,7 +16,7 @@ export function testLayout(): SceneryLayout {
     chunking: { sectorLengthM: 1000, minSectorLengthM: 100, maxSectorTriangles: 1, horizonDistanceM: 1, skylineHeightM: 1, skylineMinDistanceM: 1, terrainScaleExtentM: 1, pitBandM: 1 },
     streaming: { residentBehindM: 300, residentAheadM: 1500, freeCameraRadiusM: 1500 },
     camera: { meteringWindow: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 }, profiles: [{ sunElevationDeg: 0, targetExposure: 0.4, whiteBalanceK: 7000 }, { sunElevationDeg: 60, targetExposure: 0.2, whiteBalanceK: 6500 }],      toneCurve: { a: 2.5, b: 0.6 }, glareThreshold: 1.2, ambientOcclusion: { radiusM: 0.4, samples: 8, scale: 2, colour: 0.4 } },
-    daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55 },
+    daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9 },
     horizon, sectors: [0, 1, 2, 3].map(main).concat(pit), textures: [],
     totals: { triangles: 0, vertices: 0, drawCalls: 0, glbBytes: 0, geometryBytes: 0, textureBytes: 0, textureGpuBytes: 0 },
   };

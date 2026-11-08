@@ -59,10 +59,9 @@ export function sunTransmittance(elevationDeg: number, cloudCover = 0): Color {
 
 /**
  * The replay's clock sets the sun: its session start (the track's default time for the session when the replay does not carry
- * one) plus the lap's session time, at the layout's location. A layout without a location uses the session's published sun,
- * and without a clock the race session's. Packages without a bearing use the default scene azimuth.
- * GDB air pollution sets sky turbidity using the review viewer's mapping. The GDB haze scale
- * is not applied: read as "larger is hazier" it cleared Fuji (0.55), which the game shows hazy. Without daylight, the default midday.
+ * one) plus the lap's session time, at the layout's location. Without a clock, the race session's published sun. Packages without a bearing use the default scene azimuth.
+ * The layout's air pollution sets sky turbidity using the review viewer's mapping. The layout's haze scale is not applied: read
+ * as "larger is hazier" it cleared a track the game shows hazy. Without daylight, the default midday.
  */
 export function sceneLighting(daylight?: SceneryDaylight, clock?: ReplayDaylightClock): SceneLighting {
   const cloudCover = MathUtils.clamp(clock?.cloudCover ?? 0, 0, 1);
@@ -70,11 +69,10 @@ export function sceneLighting(daylight?: SceneryDaylight, clock?: ReplayDaylight
   const id = clock?.session ?? 'race', session = daylight.sessions.find(entry => entry.id === id);
   if (!session) throw Error(`Layout daylight has no ${id} session`);
   let sun: {elevationDeg: number; bearingDeg?: number} = {elevationDeg: session.sunElevationDeg, bearingDeg: session.sunBearingDeg};
-  const {latitudeDeg, longitudeDeg, utcOffsetHours} = daylight;
-  if (clock && latitudeDeg !== undefined && longitudeDeg !== undefined && utcOffsetHours !== undefined) {
+  if (clock) {
     const [hours, minutes] = session.localTime.split(':').map(Number);
     const minuteOfDay = (clock.startMinute ?? hours * 60 + minutes) + clock.sessionTimeSec / 60;
-    sun = solarPosition(latitudeDeg, longitudeDeg, daylight.date, minuteOfDay, utcOffsetHours);
+    sun = solarPosition(daylight.latitudeDeg, daylight.longitudeDeg, daylight.date, minuteOfDay, daylight.utcOffsetHours);
   }
   const elevationDeg = Math.max(MIN_SUN_ELEVATION_DEG, sun.elevationDeg);
   let sunDirection = sunToward(elevationDeg);

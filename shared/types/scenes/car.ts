@@ -68,13 +68,13 @@ export interface CarAppearance {
   paint: CarSurface;
   /** Livery files replacing the albedo of the same-named material. */
   materialTextures?: Record<string, string>;
-  /** The body's option part nodes this entry shows (the game's GenString part choice); the others stay hidden. */
+  /** The body's option part nodes this entry shows; the others stay hidden. */
   optionNodes: string[];
 }
 
-/** A game camera of the car (VEH `Cameras=` LocalCam), in the native car frame of the GLB (+x left, +y up, -z forward). */
+/** A camera of the car, named by role (`cockpit` driver's eye, `hood`, `roof`), in the native car frame of the GLB (+x left, +y up, -z forward). */
 export interface CarCamera {
-  /** LocalCam name: `COCKPIT` is the driver's eye, `NOSECAM` the bonnet camera. */
+  /** Role: `cockpit`, `hood` or `roof`. */
   name: string;
   position: Vec3;
   /** Pitch, yaw, roll offsets in radians. */
@@ -82,7 +82,7 @@ export interface CarCamera {
   /** Horizontal and vertical field of view in degrees (the vertical one is used). */
   fov: [number, number];
   clipPlanes: [number, number];
-  /** Which cockpit mesh variant the game shows: `in` for driver-eye cameras. */
+  /** Which cockpit mesh variant this camera shows: `in` for driver-eye cameras. */
   cockpitView: 'in' | 'out';
 }
 
@@ -95,6 +95,6 @@ export interface CarDescriptor {
   wheelRig: { passed: true; rigs: 4; maxRestVertexErrorM: number };
   appearances: CarAppearance[];
   materials: CarMaterialRecipe[];
-  /** The car's game cameras; always includes `COCKPIT`. */
+  /** The car's cockpit, hood and roof cameras. */
   cameras: { list: CarCamera[] };
 }

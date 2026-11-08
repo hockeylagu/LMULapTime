@@ -33,16 +33,10 @@ function numbers(value: unknown, keys: string[], what: string, positive: boolean
 
 function parseDaylight(value: unknown, what: string): SceneryDaylight {
   const row = record(value, what);
-  const LOCATION = ['latitudeDeg', 'longitudeDeg', 'utcOffsetHours'];
-  knownKeys(row, ['date', 'sessions', 'airPollution', 'hazeBaseScale'], LOCATION, what);
-  // The location comes as a whole or not at all.
-  const located = LOCATION.filter(key => row[key] !== undefined).length;
-  if (located !== 0 && located !== LOCATION.length) throw Error(`${what}: latitudeDeg, longitudeDeg and utcOffsetHours come together`);
-  if (located) {
-    if (Math.abs(finite(row.latitudeDeg, `${what}.latitudeDeg`)) > 90) throw Error(`${what}.latitudeDeg: out of range`);
-    if (Math.abs(finite(row.longitudeDeg, `${what}.longitudeDeg`)) > 180) throw Error(`${what}.longitudeDeg: out of range`);
-    if (Math.abs(finite(row.utcOffsetHours, `${what}.utcOffsetHours`)) > 14) throw Error(`${what}.utcOffsetHours: out of range`);
-  }
+  knownKeys(row, ['date', 'sessions', 'airPollution', 'hazeBaseScale', 'latitudeDeg', 'longitudeDeg', 'utcOffsetHours'], [], what);
+  if (Math.abs(finite(row.latitudeDeg, `${what}.latitudeDeg`)) > 90) throw Error(`${what}.latitudeDeg: out of range`);
+  if (Math.abs(finite(row.longitudeDeg, `${what}.longitudeDeg`)) > 180) throw Error(`${what}.longitudeDeg: out of range`);
+  if (Math.abs(finite(row.utcOffsetHours, `${what}.utcOffsetHours`)) > 14) throw Error(`${what}.utcOffsetHours: out of range`);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(text(row.date, `${what}.date`, 10))) throw Error(`${what}.date: expected YYYY-MM-DD`);
   const sessions = array(row.sessions, `${what}.sessions`, SESSIONS.length);
   if (sessions.length !== SESSIONS.length) throw Error(`${what}.sessions: expected ${SESSIONS.join(', ')}`);

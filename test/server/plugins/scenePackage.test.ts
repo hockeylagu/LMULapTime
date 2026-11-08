@@ -96,8 +96,8 @@ describe('scenery validation', () => {
     ['a non-positive shadow range', (built: Package) => { built.scenery.shadowRangeM = 0; }],
     ['more shadow casters than draw calls', (built: Package) => { built.scenery.sectors[0].shadowDrawCalls = built.scenery.sectors[0].drawCalls + 1; }],
     ['a chunk without shadow counts', (built: Package) => { delete (built.scenery.sectors[0] as Partial<typeof built.scenery.sectors[0]>).shadowTriangles; }],
-    ['a daylight location without its UTC offset', (built: Package) => { Object.assign(built.scenery.daylight, {latitudeDeg: 35.37, longitudeDeg: 138.93}); }],
-    ['a daylight latitude past the pole', (built: Package) => { Object.assign(built.scenery.daylight, {latitudeDeg: 91, longitudeDeg: 138.93, utcOffsetHours: 9}); }],
+    ['a daylight without its UTC offset', (built: Package) => { delete (built.scenery.daylight as Partial<NonNullable<typeof built.scenery.daylight>>).utcOffsetHours; }],
+    ['a daylight latitude past the pole', (built: Package) => { Object.assign(built.scenery.daylight, {latitudeDeg: 91}); }],
   ])('rejects %s', (_name, change) => { expect(mutate(change)).toBe('invalid'); });
 
   it('rejects an empty catalog', () => {
@@ -114,7 +114,7 @@ describe('scenery validation', () => {
 
   it('accepts a daylight location', () => {
     const built = build();
-    Object.assign(built.scenery.daylight, {latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9}); built.commit();
+    built.commit();
     expect(new DataPlugin(built.dir).sceneryLayout('monza_gp')?.daylight?.utcOffsetHours).toBe(9);
   });
 
@@ -149,7 +149,7 @@ describe('car validation', () => {
     ['a descriptor of another car', (built: Package) => { built.descriptor.vehicleFolder = 'Other'; }],
     ['a descriptor schema version', (built: Package) => { built.descriptor.schemaVersion = 1; }],
     ['an unknown descriptor field', (built: Package) => { built.descriptor.extra = true; }],
-    ['cameras without the driver camera', (built: Package) => { built.descriptor.cameras = { list: (built.descriptor.cameras as { list: Array<{ name: string }> }).list.filter(camera => camera.name !== 'COCKPIT') }; }],
+    ['cameras without the driver camera', (built: Package) => { built.descriptor.cameras = { list: (built.descriptor.cameras as { list: Array<{ name: string }> }).list.filter(camera => camera.name !== 'cockpit') }; }],
     ['a camera with an inverted clip range', (built: Package) => { (built.descriptor.cameras as { list: Array<{ clipPlanes: number[] }> }).list[0].clipPlanes = [5, 1]; }],
     ['a non-boolean paint flag',(built: Package) => { (built.descriptor.materials as Array<{ paint: unknown }>)[0].paint = 'yes'; }],
     ['an asset that is not content-named', (built: Package) => { built.car.asset = 'vehicles/Test_Car.glb'; }],
