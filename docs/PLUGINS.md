@@ -113,7 +113,7 @@ sessions record. Optional
 `wheelbaseM` and the complete steering trio `steeringRatio`, `defaultSteeringWheelRangeDeg`
 (total lock-to-lock wheel rotation) and `defaultSteeringLockDeg` (one-sided road-wheel lock).
 Wheelbase is the mean of the physics left/right axle distances, independent of collision-body length.
-Steering values describe the base HDV's selected default setting, including its steering fraction;
+Steering values describe the base car's default steering setting, including its steering fraction;
 they do not identify the setup or circuit-specific upgrade selected for a recorded lap.
 The ratio must agree with `defaultSteeringWheelRangeDeg / (2 * defaultSteeringLockDeg)`.
 Partial steering trios, nonfinite/out-of-range values and unknown handling fields invalidate the package.
