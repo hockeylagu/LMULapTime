@@ -41,6 +41,7 @@ export function useReplayScene({host, trajectory, baseline, currentIndex, mode, 
   const [result, setResult] = useState<SceneResult | null>(null);
   const runtime = useRef<{key: string; ready: Promise<Runtime>; loadCar: (lap: ReplayTrajectoryData | null) => Promise<LoadedCar | null>} | null>(null);
   const latest = useEffectEvent(() => ({trajectory, baseline, mode, colorBy, fadedLine, syncMode, anchorDistM}));
+  const tickCursor = useEffectEvent((frameTime: number) => { cursor?.tick(frameTime); });
   const drawCursor = useEffectEvent(() => {
     const position = cursor?.getSnapshot();
     scene.current?.cursor(position?.points === trajectory.points ? position.index : currentIndex, position?.points === trajectory.points ? position.fraction : 0);
@@ -77,7 +78,7 @@ export function useReplayScene({host, trajectory, baseline, currentIndex, mode, 
         message => { if (active) setResult({key, error: message}); },
         {primary: primary!, baseline: comparison}, latest().colorBy);
       if (!active) { handle.dispose(); abort.signal.throwIfAborted(); }
-      created = handle; scene.current = handle; handle.mode(latest().mode);
+      created = handle; scene.current = handle; handle.mode(latest().mode); handle.beforeFrame(frameTime => tickCursor(frameTime));
       return {handle, trajectory: selected.trajectory, baseline: selected.baseline};
     };
     runtime.current = {key, ready: initialize(), loadCar};

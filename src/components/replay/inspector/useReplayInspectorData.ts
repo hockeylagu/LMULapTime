@@ -553,14 +553,15 @@ export function useReplayInspectorData({
       playbackClockRef.current = currentClock;
     }
     let lastUiTime = -Infinity;
-    const loop = (now: number) => {
-      const elapsedMs = now - lastTimeRef.current;
+    const step = (now: number) => {
+      const elapsedMs = Math.max(0, now - lastTimeRef.current);
       lastTimeRef.current = now;
       let clock = playbackClockRef.current;
       // The cursor was moved (scrub, corner jump) while playing: carry on from there.
       if (!clock) clock = playbackClockAt(points, currentIndexRef.current);
       const next = advancePlaybackClock(points, clock, elapsedMs, playbackSpeed);
       if (!next) {
+        playbackCursor.drive(null);
         playbackCursor.clear();
         playbackClockRef.current = null;
         setIsPlaying(false);
@@ -575,10 +576,16 @@ export function useReplayInspectorData({
         currentIndexRef.current = next.index;
         setCurrentIndexState(next.index);
       }
-      animRef.current = requestAnimationFrame(loop);
+    };
+    // The 3D view ticks the cursor too, before it draws (replayPlaybackCursor.ts): each frame advances once, to its own time.
+    playbackCursor.drive(step);
+    const loop = (now: number) => {
+      playbackCursor.tick(now);
+      if (playbackClockRef.current) animRef.current = requestAnimationFrame(loop);
     };
     animRef.current = requestAnimationFrame(loop);
     return () => {
+      playbackCursor.drive(null);
       if (animRef.current) {
         cancelAnimationFrame(animRef.current);
         animRef.current = null;

@@ -185,6 +185,26 @@ pass (`probe.ts`); before that fix every scene draw showed as offscreen.
   Next levers if the target (first 2 s p99 < 30 ms) is still missed: hold sharpening until the window's chunks have joined,
   and byte-budget the warm-up uploads instead of the 1 ms slice.
 
+### Precomputed visibility per lap segment: a possibility, parked (2026-11-07)
+
+The pipeline's prototype lists, per 40 m of lap, the scenery primitives visible from the cockpit, chase and far-chase
+cameras (forward, left, right, up). The app kept only those of the current and next segment in the main view (others on a layer
+the main camera skips, still casting sun shadows; the old lap window when the camera looks more than 60° off the car's heading).
+Production build, personal-v4, vsync off, first 25 s of lap 1 and of the second pass, two runs each:
+
+| | Main draws p50/p99 | Frame p99 (ms) | First 2 s p99 (ms) |
+|---|---|---|---|
+| Daytona, lap window | 400 / 580–611 | 12–33 | 13–35 |
+| Daytona, visibility lists | 298 / 391 | 9–13 | 7–12 |
+| Silverstone International, lap window | 488 / 1015 | 16–33 | ~35 |
+| Silverstone International, visibility lists | 395 / 576 | 9–13 | 9–25 |
+
+Shadow and reflection-probe draws fell about 20 %. Cars, lines, sky and post passes are a constant 66 main draws at Daytona.
+The same paused frame with and without the lists showed holes: at Daytona 400 m a light tower, crane and tents across the
+infield; at 3.6 km the spectator cards behind the catch fence (the see-through fence counted as an occluder); at Silverstone
+only small far details. Parked by the user: a real gain, but the precompute adds 1.5–3 min per layout to the export, too slow
+for now. If taken up: fix the holes (thin and far objects, alpha-tested fences not occluding) and retest.
+
 ## The scene (from the package index)
 
 | | Typical | Worst |

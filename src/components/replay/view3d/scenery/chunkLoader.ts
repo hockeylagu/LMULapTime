@@ -7,7 +7,6 @@ import { disposeObjects } from '../laps/disposeObjects.js';
 import { CachedKtx2Loader } from './cachedKtx2Loader.js';
 import { configureSurfaceMaterial } from './materials/configureSurfaceMaterial.js';
 import { createSurfaceTexturePool, imageUriMap } from './materials/textureSource.js';
-import { isSceneryGround } from './sceneryGround.js';
 
 export interface ChunkLoader {
   load(chunk: SceneryChunk, signal: AbortSignal): Promise<Object3D>;
@@ -17,12 +16,14 @@ export interface ChunkLoader {
   dispose(): void;
 }
 
-/** The review viewer's per-mesh rules: the virtual screen framebuffer never draws; everything but the ground casts shadow. */
+/**
+ * Per-mesh rules: the virtual screen framebuffer never draws; a mesh casts shadow when the package's flag says so (the
+ * node's `extras.lmuCastShadow`, the scene's ShadowCaster: road, terrain and ground never cast). Everything receives.
+ */
 export function prepareSceneryMesh(mesh: Mesh): void {
-  const name = mesh.name.toLowerCase();
   mesh.receiveShadow = true;
-  if (name.includes('screenframebuffer')) mesh.visible = false;
-  mesh.castShadow = !isSceneryGround(name) && !name.includes('__decal');
+  if (mesh.name.toLowerCase().includes('screenframebuffer')) mesh.visible = false;
+  mesh.castShadow = mesh.userData.lmuCastShadow === true;
 }
 
 /**

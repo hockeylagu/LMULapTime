@@ -23,6 +23,17 @@ describe('playback visual cursor', () => {
     expect(result.current).toBeNull();
   });
 
+  it('advances the playing clock once per frame, to that frame, whichever caller ticks first', () => {
+    // The playback loop and the 3D view both tick each frame, in either order: the frame's pose must not depend on it.
+    const cursor = createPlaybackCursor(), advance = vi.fn();
+    cursor.tick(16);
+    cursor.drive(advance);
+    cursor.tick(16); cursor.tick(16); cursor.tick(33); cursor.tick(20);
+    expect(advance.mock.calls).toEqual([[16], [33]]);
+    cursor.drive(null); cursor.tick(50);
+    expect(advance).toHaveBeenCalledTimes(2);
+  });
+
   it('updates between samples and clears on stop, ignoring other laps and stale indices', () => {
     const points = [0, 0.2, 1].map(timeSec => ({ x: 0, y: 0, z: 0, timeSec, speedKmh: 100 }));
     const cursor = createPlaybackCursor();
