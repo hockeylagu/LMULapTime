@@ -2,7 +2,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { parseReplayMetadata } from '../../../../server/replay/decode/replayParser.js';
+import { parseReplayMetadata, replayCloudCover } from '../../../../server/replay/decode/replayParser.js';
 import { extractReplayTrajectory } from '../../../../server/replay/decode/replayTrajectory.js';
 import { createSliceVcrBuffer } from '../../../utils/mockVcr.js';
 
@@ -141,4 +141,19 @@ describe('replayWeather - Class 1 Type 10 meteorology decoding', () => {
     expect(meta.maxRainIntensity).toBe(20);
     expect(meta.weatherCondition).toBe('Wet');
   });
+
+  it('reads the cloud cover from the weather packets: the mean density of the 32 cloud cells, by session time', () => {
+    const filePath = path.join(tempDir, 'cloudy_session.vcr');
+    const half = [...new Array<number>(8).fill(0x00), ...new Array<number>(8).fill(0xff)];
+    fs.writeFileSync(filePath, createSliceVcrBuffer({
+      trackName: 'Spa_Clouds',
+      slices: [
+        { sTime: 5.0, driverSlot: 1, x: 0, y: 0, z: 0, throttle: 100, brake: 0, weather: {} },
+        { sTime: 8.5, driverSlot: 1, x: 5, y: 0, z: 5, throttle: 100, brake: 0, weather: { cloudCells: half } },
+      ],
+    }));
+    expect(parseReplayMetadata(filePath).cloudCover).toEqual([[5, 0], [8.5, 0.5]]);
+    expect(replayCloudCover(Buffer.alloc(16, 0x7f))).toBe(0.27);
+  });
 });
+

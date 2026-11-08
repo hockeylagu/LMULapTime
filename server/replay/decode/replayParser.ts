@@ -89,16 +89,19 @@ export function scanReplayWeather(fd: number, frameStreamEnd: number): {
   weatherCondition: WeatherCondition;
   ambientTemp?: number;
   trackTemp?: number;
+  /** [session time s, cloud cover 0..1] per weather packet found, in time order (replayCloudCover). */
+  cloudCover: Array<[number, number]>;
 } {
   const SAMPLES = 30;
   const WINDOW_SIZE = 65536;
   const streamBytes = Math.max(0, frameStreamEnd - 61);
   if (streamBytes <= 0) {
-    return { hasRain: false, maxRainIntensity: 0, weatherCondition: 'Dry' };
+    return { hasRain: false, maxRainIntensity: 0, weatherCondition: 'Dry', cloudCover: [] };
   }
 
   let maxRain = 0;
   let firstAmbientTemp: number | undefined = undefined;
+  const cloudCover = new Map<number, number>();
 
   // The scan slides byte by byte, so a header match alone is often random data. A real weather
   // packet carries the same rain value in all 9 rain slots.
@@ -114,6 +117,8 @@ export function scanReplayWeather(fd: number, frameStreamEnd: number): {
       const r = buf[p + 5 + ch];
       if (r > maxRain) maxRain = r;
     }
+    const timeSec = buf.readFloatLE(p + 5);
+    if (Number.isFinite(timeSec)) cloudCover.set(Math.round(timeSec * 10) / 10, replayCloudCover(buf.subarray(p + 5 + 18, p + 5 + 34)));
   };
 
   if (streamBytes <= WINDOW_SIZE) {
@@ -161,7 +166,18 @@ export function scanReplayWeather(fd: number, frameStreamEnd: number): {
     maxRainIntensity: maxRain,
     weatherCondition,
     ambientTemp: firstAmbientTemp,
+    cloudCover: [...cloudCover].sort((a, b) => a[0] - b[0]),
   };
+}
+
+/**
+ * Cloud cover (0 clear .. 1 overcast) from a weather packet's 16-byte cloud field: 32 four-bit cells, 15 a clear cell and 0 a
+ * full one; the cover is the mean cell density, to two decimals (docs/VCR_FORMAT.md, Type 10).
+ */
+export function replayCloudCover(cells: Buffer): number {
+  let density = 0;
+  for (const byte of cells) density += 30 - (byte >> 4) - (byte & 15);
+  return Math.round(density / (15 * cells.length * 2) * 100) / 100;
 }
 
 /**
@@ -239,6 +255,12 @@ export function parseReplayMetadata(
     // Decode session info configuration byte (if available right after trackPath)
     let sessionType: string | undefined = undefined;
     let privateSession: boolean | undefined = undefined;
+    // The event's race start, minutes past local midnight (docs/VCR_FORMAT.md §2.2); 0xFFFF in offline sessions.
+    let raceStartMinute: number | null = null;
+    if (off + 4 <= meta.length) {
+      const minute = meta.readUInt16LE(off + 2);
+      raceStartMinute = minute === 0xffff ? null : minute;
+    }
     if (off + 2 <= meta.length) {
       const sessionByte = meta[off + 1];
       const sessionCode = sessionByte & 0x0f;
@@ -444,6 +466,7 @@ export function parseReplayMetadata(
       eventInfo,
       sessionType,
       privateSession,
+      raceStartMinute,
       scn: scn || undefined,
       sceneDesc: scn ? scn.replace(/\.scn$/i, '').trim() : eventScene,
       aiw: aiw || undefined,
@@ -465,6 +488,7 @@ export function parseReplayMetadata(
       maxRainIntensity: weather?.hasRain ? weather.maxRainIntensity : undefined,
       weatherCondition: weather?.weatherCondition,
       ambientTemp: weather?.ambientTemp,
+      cloudCover: weather ? weather.cloudCover : null,
     };
 
     if (options?.verbose) {

@@ -6,7 +6,7 @@ import { DRIVER_DICTIONARY_FIELDS, DRIVER_FIELDS, LAP_FIELDS, RECORDING_FIELDS }
 const driverFields = [...DRIVER_DICTIONARY_FIELDS, ...DRIVER_FIELDS].filter(field =>
   ['name', 'carType', 'carClass', 'bestLapTime', 'isPlayer'].includes(field.prop));
 const lapFields = LAP_FIELDS.filter(field => ['lapNumber', 'lapTime', 's1', 's2', 's3',
-  'isValid', 'isPitStop', 'isOutLap', 'nonRepresentativeReason'].includes(field.prop));
+  'isValid', 'isPitStop', 'isOutLap', 'nonRepresentativeReason', 'elapsedSeconds'].includes(field.prop));
 
 /**
  * Read a replay's session context. Metadata needs every lap's compact timing/ordinal fields;

@@ -50,6 +50,27 @@ export interface SceneryDaylight {
   airPollution: number;
   /** GDB HazeBaseScale, as authored; how the game applies it is not verified (Fuji, 0.55, is visibly hazy in game). */
   hazeBaseScale: number;
+  /** The track's location and its local offset from UTC on the race date (daylight saving included), together or absent. */
+  latitudeDeg?: number;
+  longitudeDeg?: number;
+  utcOffsetHours?: number;
+}
+
+/**
+ * The replay camera's exposure, tone curve, glare and ambient occlusion: the package's catalog `camera` (the pipeline's
+ * `build camera`, its docs/SCENE_PACKAGE.md is the authority).
+ */
+export interface SceneryCamera {
+  /** Metered screen area, as fractions of the frame from the top left. */
+  meteringWindow: { x: number; y: number; width: number; height: number };
+  /** Exposure target and white balance by sun elevation, ascending. */
+  profiles: { sunElevationDeg: number; targetExposure: number; whiteBalanceK: number }[];
+  /** tone = saturate((1 - z)(1 - b·z)²), z = e^(-a·x), per exposed linear component x. */
+  toneCurve: { a: number; b: number };
+  /** Exposed luminance above which glare starts. */
+  glareThreshold: number;
+  /** Sample radius and count, the occlusion's strength scale, and the grey a fully occluded spot darkens to. */
+  ambientOcclusion: { radiusM: number; samples: number; scale: number; colour: number };
 }
 
 interface SceneryChunkBase {
@@ -62,6 +83,9 @@ interface SceneryChunkBase {
   triangles: number;
   vertices: number;
   drawCalls: number;
+  /** The chunk's shadow-casting primitives (nodes with `extras.lmuCastShadow`) and their triangles. */
+  shadowDrawCalls: number;
+  shadowTriangles: number;
   geometryBytes: number;
   meshes: number;
   materials: number;
@@ -111,9 +135,12 @@ export interface SceneryLayout {
   sourceGeometryRevision: string;
   routeLengthM: number;
   pitLaneLengthM: number;
+  /** The game's maximum shadow range for the layout (SCN `MaxShadowRange`), in metres. */
+  shadowRangeM: number;
   /** The catalog's shared parameters, attached to each layout. */
   chunking: SceneryChunkingParameters;
   streaming: SceneryStreaming;
+  camera: SceneryCamera;
   daylight?: SceneryDaylight;
   horizon: SceneryHorizonChunk;
   sectors: ScenerySectorChunk[];

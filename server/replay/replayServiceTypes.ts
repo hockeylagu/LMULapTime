@@ -2,7 +2,7 @@ import { DetailedSession, DriverData, LapData } from '../../shared/types/index.j
 
 /** Official timing fields used by replay metadata and lap validation, without events or passes. */
 export type ReplayTimingLap = Pick<LapData, 'lapNumber' | 'lapTime' | 's1' | 's2' | 's3' |
-  'isValid' | 'isPitStop' | 'isOutLap' | 'nonRepresentativeReason' | 'lapOrdinal'>;
+  'isValid' | 'isPitStop' | 'isOutLap' | 'nonRepresentativeReason' | 'lapOrdinal' | 'elapsedSeconds'>;
 export type ReplayContextDriver = Pick<DriverData, 'name' | 'carType' | 'carClass' |
   'bestLapTime' | 'isPlayer' | 'driverOrdinal'> & { laps: ReplayTimingLap[] };
 export type ReplaySessionContext = Pick<DetailedSession, 'id' | 'trackVenue' | 'trackCourse' |

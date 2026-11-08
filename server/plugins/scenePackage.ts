@@ -1,5 +1,5 @@
 import type { TrackBoundaryGeometry } from '../../shared/types/trackGeometry.js';
-import type { SceneryBounds, SceneryChunk, SceneryDaylight, SceneryLayout, SceneryTexture } from '../../shared/types/scenes/scenery.js';
+import type { SceneryBounds, SceneryCamera, SceneryChunk, SceneryDaylight, SceneryLayout, SceneryTexture } from '../../shared/types/scenes/scenery.js';
 import { registerPackageFile, type PackageFile } from './packageFiles.js';
 import { array, count, exactKeys, finite, knownKeys, nonNegative, record, sha256, text, vec3 } from './strict.js';
 
@@ -10,7 +10,7 @@ const MAX_GLB_BYTES = 128_000_000, MAX_TEXTURE_BYTES = 64_000_000, MAX_CHUNKS = 
 const CHUNKING = ['sectorLengthM', 'minSectorLengthM', 'maxSectorTriangles', 'horizonDistanceM', 'skylineHeightM', 'skylineMinDistanceM', 'terrainScaleExtentM', 'pitBandM'];
 const STREAMING = ['residentBehindM', 'residentAheadM', 'freeCameraRadiusM'];
 const TOTALS = ['triangles', 'vertices', 'drawCalls', 'glbBytes', 'geometryBytes', 'textureBytes', 'textureGpuBytes'];
-const CHUNK_COMMON = ['id', 'kind', 'bounds', 'asset', 'sha256', 'byteLength', 'triangles', 'vertices', 'drawCalls', 'geometryBytes', 'meshes', 'materials', 'textures'];
+const CHUNK_COMMON = ['id', 'kind', 'bounds', 'asset', 'sha256', 'byteLength', 'triangles', 'vertices', 'drawCalls', 'shadowDrawCalls', 'shadowTriangles', 'geometryBytes', 'meshes', 'materials', 'textures'];
 const SESSIONS = ['race', 'qualify', 'practice1', 'practice2'];
 const TEXTURE = ['asset', 'sha256', 'byteLength', 'width', 'height', 'levels', 'format', 'srgb', 'gpuBytes'];
 
@@ -33,7 +33,16 @@ function numbers(value: unknown, keys: string[], what: string, positive: boolean
 
 function parseDaylight(value: unknown, what: string): SceneryDaylight {
   const row = record(value, what);
-  exactKeys(row, ['date', 'sessions', 'airPollution', 'hazeBaseScale'], what);
+  const LOCATION = ['latitudeDeg', 'longitudeDeg', 'utcOffsetHours'];
+  knownKeys(row, ['date', 'sessions', 'airPollution', 'hazeBaseScale'], LOCATION, what);
+  // The location comes as a whole or not at all.
+  const located = LOCATION.filter(key => row[key] !== undefined).length;
+  if (located !== 0 && located !== LOCATION.length) throw Error(`${what}: latitudeDeg, longitudeDeg and utcOffsetHours come together`);
+  if (located) {
+    if (Math.abs(finite(row.latitudeDeg, `${what}.latitudeDeg`)) > 90) throw Error(`${what}.latitudeDeg: out of range`);
+    if (Math.abs(finite(row.longitudeDeg, `${what}.longitudeDeg`)) > 180) throw Error(`${what}.longitudeDeg: out of range`);
+    if (Math.abs(finite(row.utcOffsetHours, `${what}.utcOffsetHours`)) > 14) throw Error(`${what}.utcOffsetHours: out of range`);
+  }
   if (!/^\d{4}-\d{2}-\d{2}$/.test(text(row.date, `${what}.date`, 10))) throw Error(`${what}.date: expected YYYY-MM-DD`);
   const sessions = array(row.sessions, `${what}.sessions`, SESSIONS.length);
   if (sessions.length !== SESSIONS.length) throw Error(`${what}.sessions: expected ${SESSIONS.join(', ')}`);
@@ -53,14 +62,40 @@ function parseDaylight(value: unknown, what: string): SceneryDaylight {
   return structuredClone(row) as unknown as SceneryDaylight;
 }
 
+/** The catalog's camera profile (SceneryCamera): fractions inside the frame, ascending profile elevations, positive values. */
+function parseCamera(value: unknown, what: string): SceneryCamera {
+  const row = record(value, what);
+  exactKeys(row, ['meteringWindow', 'profiles', 'toneCurve', 'glareThreshold', 'ambientOcclusion'], what);
+  const window = record(row.meteringWindow, `${what}.meteringWindow`);
+  numbers(window, ['x', 'y', 'width', 'height'], `${what}.meteringWindow`, false);
+  if ((window.x as number) + (window.width as number) > 1 || (window.y as number) + (window.height as number) > 1 || !window.width || !window.height) throw Error(`${what}.meteringWindow: outside the frame`);
+  const profiles = array(row.profiles, `${what}.profiles`, 32);
+  if (!profiles.length) throw Error(`${what}.profiles: empty`);
+  let previous = -Infinity;
+  profiles.forEach((profile, i) => {
+    const p = record(profile, `${what}.profiles[${i}]`);
+    exactKeys(p, ['sunElevationDeg', 'targetExposure', 'whiteBalanceK'], `${what}.profiles[${i}]`);
+    const elevation = finite(p.sunElevationDeg, `${what}.profiles[${i}].sunElevationDeg`);
+    if (elevation <= previous) throw Error(`${what}.profiles: elevations must ascend`);
+    previous = elevation;
+    numbers({targetExposure: p.targetExposure, whiteBalanceK: p.whiteBalanceK}, ['targetExposure', 'whiteBalanceK'], `${what}.profiles[${i}]`, true);
+  });
+  numbers(row.toneCurve, ['a', 'b'], `${what}.toneCurve`, false);
+  if ((row.toneCurve as {a: number}).a <= 0) throw Error(`${what}.toneCurve.a: must be positive`);
+  if (finite(row.glareThreshold, `${what}.glareThreshold`) <= 0) throw Error(`${what}.glareThreshold: must be positive`);
+  numbers(row.ambientOcclusion, ['radiusM', 'samples', 'scale', 'colour'], `${what}.ambientOcclusion`, false);
+  return structuredClone(row) as unknown as SceneryCamera;
+}
+
 function parseChunk(value: unknown, what: string): SceneryChunk {
   const row = record(value, what), kind = row.kind;
   if (kind !== 'horizon' && kind !== 'main' && kind !== 'pit') throw Error(`${what}: unknown chunk kind`);
   exactKeys(row, [...CHUNK_COMMON, ...(kind === 'horizon' ? [] : kind === 'main' ? ['lapStartM', 'lapEndM', 'prev', 'next'] : ['lapStartM', 'lapEndM', 'pitStartM', 'pitEndM', 'prev', 'next'])], what);
   const hash = sha256(row.sha256, `${what}.sha256`);
   if (row.asset !== `scenery/${hash}.glb`) throw Error(`${what}: asset is not the content-named GLB`);
-  for (const key of ['byteLength', 'triangles', 'vertices', 'drawCalls', 'geometryBytes', 'meshes', 'materials']) count(row[key], `${what}.${key}`);
+  for (const key of ['byteLength', 'triangles', 'vertices', 'drawCalls', 'shadowDrawCalls', 'shadowTriangles', 'geometryBytes', 'meshes', 'materials']) count(row[key], `${what}.${key}`);
   if (!row.byteLength || !row.triangles || !row.drawCalls) throw Error(`${what}: empty chunk`);
+  if ((row.shadowDrawCalls as number) > (row.drawCalls as number) || (row.shadowTriangles as number) > (row.triangles as number)) throw Error(`${what}: more shadow casters than primitives`);
   text(row.id, `${what}.id`, 32); bounds(row.bounds, `${what}.bounds`);
   array(row.textures, `${what}.textures`, MAX_TEXTURES).forEach((asset, i) => text(asset, `${what}.textures[${i}]`, 160));
   if (kind !== 'horizon') {
@@ -100,13 +135,14 @@ function checkSectorOrder(layout: SceneryLayout): void {
   });
 }
 
-/** A layout row; `chunking` and `streaming` are the catalog's shared parameters, attached to every layout the client receives. */
-function parseLayout(value: unknown, what: string, shared: Pick<SceneryLayout, 'chunking' | 'streaming'>): SceneryLayout {
+/** A layout row; `chunking`, `streaming` and `camera` are the catalog's shared parameters, attached to every layout the client receives. */
+function parseLayout(value: unknown, what: string, shared: Pick<SceneryLayout, 'chunking' | 'streaming' | 'camera'>): SceneryLayout {
   const row = record(value, what);
-  knownKeys(row, ['layoutKey', 'sourceGeometryRevision', 'routeLengthM', 'pitLaneLengthM', 'horizon', 'sectors', 'textures', 'totals'], ['daylight'], what);
+  knownKeys(row, ['layoutKey', 'sourceGeometryRevision', 'routeLengthM', 'pitLaneLengthM', 'shadowRangeM', 'horizon', 'sectors', 'textures', 'totals'], ['daylight'], what);
   text(row.layoutKey, `${what}.layoutKey`); text(row.sourceGeometryRevision, `${what}.sourceGeometryRevision`);
   if (finite(row.routeLengthM, `${what}.routeLengthM`) <= 0) throw Error(`${what}: invalid route length`);
   nonNegative(row.pitLaneLengthM, `${what}.pitLaneLengthM`);
+  if (finite(row.shadowRangeM, `${what}.shadowRangeM`) <= 0) throw Error(`${what}: invalid shadow range`);
   if (row.daylight !== undefined) parseDaylight(row.daylight, `${what}.daylight`);
   numbers(row.totals, TOTALS, `${what}.totals`, false);
   const horizon = parseChunk(row.horizon, `${what}.horizon`);
@@ -128,10 +164,10 @@ function parseLayout(value: unknown, what: string, shared: Pick<SceneryLayout, '
 
 export function loadScenePackage(root: string, catalog: unknown, geometry: (key: string) => TrackBoundaryGeometry | null): SceneryStore {
   const index = record(catalog, 'scenery catalog');
-  exactKeys(index, ['chunking', 'streaming', 'layouts'], 'scenery catalog');
+  exactKeys(index, ['chunking', 'streaming', 'camera', 'layouts'], 'scenery catalog');
   numbers(index.chunking, CHUNKING, 'scenery catalog.chunking', true);
   numbers(index.streaming, STREAMING, 'scenery catalog.streaming', true);
-  const shared = { chunking: index.chunking, streaming: index.streaming } as Pick<SceneryLayout, 'chunking' | 'streaming'>;
+  const shared = { chunking: index.chunking, streaming: index.streaming, camera: parseCamera(index.camera, 'scenery catalog.camera') } as Pick<SceneryLayout, 'chunking' | 'streaming' | 'camera'>;
   const rows = array(index.layouts, 'scenery layouts', 100);
   if (!rows.length) throw Error('scenery catalog: empty');
   const layouts = new Map<string, SceneryLayout>(), files = new Map<string, PackageFile>();

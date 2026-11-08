@@ -24,7 +24,8 @@ export class ReplayRecordingService {
     const stat = fs.statSync(filePath);
     const mtimeMs = Math.floor(stat.mtimeMs);
     const cached = this.sessionDb.getReplayMetadataCache(replayName, mtimeMs, stat.size, filePath, playerName);
-    if (cached) return cached;
+    // Metadata cached before the race start and cloud cover were read is read again from the file once (a cheap sampled read).
+    if (cached && cached.cloudCover !== undefined) return cached;
     const metadata = decodeOrThrow(() => parseReplayMetadata(filePath, { playerName }));
     this.sessionDb.upsertReplayMetadataCache(replayName, filePath, mtimeMs, stat.size, metadata);
     return metadata;

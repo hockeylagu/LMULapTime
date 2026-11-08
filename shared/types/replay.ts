@@ -1,6 +1,7 @@
 import type { NonRepresentativeReason } from './session.js';
 import type { VehicleDataRecord, VehicleHandlingCalibration } from './dataPlugin.js';
 import type { TrackKerbType, TrackTimingGates } from './trackGeometry.js';
+import type { ScenerySessionId } from './scenes/scenery.js';
 import type { WeatherCondition } from './session.js';
 import type { LiveCaptureOverlay, LiveDynamicsProvenance, LiveWheelSlip } from './liveEvidence.js';
 
@@ -37,6 +38,10 @@ export interface ReplayMetadata {
   eventInfo?: ReplayEventInfo | null;
   sessionType?: string;
   privateSession?: boolean;
+  /** The event's race start, minutes past local midnight; null offline (the track's default session time). Absent in metadata cached before it was read. */
+  raceStartMinute?: number | null;
+  /** [session time s, cloud cover 0 clear..1 overcast] from the sampled weather packets; null when not scanned, absent in metadata cached before it was read. */
+  cloudCover?: Array<[number, number]> | null;
   scn?: string;
   /** The engine scene (scn without its extension): names the exact layout. */
   sceneDesc?: string;
@@ -272,6 +277,18 @@ export interface ReplayTrajectoryValidation {
  */
 export type LapEndCut = 'line' | 'extrapolated' | 'none';
 
+/** A replay moment's in-game clock, for the sun (shared/domain/scenery/replayDaylightClock.ts). */
+export interface ReplayDaylightClock {
+  /** The session whose default daylight the track publishes. */
+  session: ScenerySessionId;
+  /** Session start, minutes past local midnight; null when the replay does not carry it (the session default applies). */
+  startMinute: number | null;
+  /** Session time of the lap start. */
+  sessionTimeSec: number;
+  /** Cloud cover nearest the lap start, 0 clear..1 overcast; absent when the replay's weather was not read. */
+  cloudCover?: number;
+}
+
 export interface ReplayTrajectoryData {
   /** Attachment hint only; the live-evidence API validates current ownership before use. */
   hasLiveCapture?: boolean;
@@ -298,6 +315,8 @@ export interface ReplayTrajectoryData {
   timeReference?: 'session' | 'lap';
   /** Session timestamp of the selected lap's timing-loop start. */
   lapStartTimeSec?: number;
+  /** The lap start's in-game clock; absent without a session replay. */
+  daylightClock?: ReplayDaylightClock;
   laps?: ReplayLapSummary[];
   sectors?: {
     s1Frame: number;

@@ -62,6 +62,21 @@ Immediately following String 6 (`trackPath`):
     - `9`: Warmup
     - `10` - `13`: Race (R1, R2, R3, R4)
   - `(sessionInfo >> 7) & 0x01`: Private / Dedicated session flag (`true` / `false`).
+- **Bytes 2..3 (`raceStartMinute`, UInt16LE)**: The event's race start as minutes past local midnight, the same in
+  every session of the event (Le Mans `0x04EC` = 21:00, Fuji `0x030C` = 13:00, Daytona `0x0348` = 14:00). `0xFFFF` in
+  offline sessions, which start at the track's default time for that session. The in-game clock at session time
+  `t` (seconds) is the session start plus `t` at 1× time scale; the session starts at:
+
+  | Session | Start of day |
+  | :--- | :--- |
+  | Race | `raceStartMinute` |
+  | Qualifying | `raceStartMinute − 15` |
+  | Practice (online) | `raceStartMinute` |
+  | Any, `0xFFFF` | the track's default time for the session (Daytona practice 10:05, Silverstone practice 11:00) |
+
+  Checked against the native telemetry's `metadata.SessionTime` minus the session time of its first sample on 33
+  recordings (Le Mans, Fuji, Daytona, Silverstone; race, qualifying, online and offline practice): every start
+  agrees to within 2 s, and the clock advances at 1× (no other time scale was observed).
 - **Next 67 bytes**: Session rules and game settings block (mirrors XML results flags):
   - `+8` (4 bytes, UInt32LE): `DamageMult` (e.g. `100` = `0x64`).
   - `+16` (4 bytes, UInt32LE): `FuelMult` (e.g. `1` = `0x01`).
@@ -242,15 +257,37 @@ Emitted periodically at ~0.5 Hz (every 1.5–2 seconds) across all sessions. Bro
 | Offset in Payload | Size | Type | Field Description |
 | :--- | :--- | :--- | :--- |
 | `0..3` | 4 bytes | Float32LE | **Simulation Time**: Game physics clock in seconds (advances in 3.333s / 10/3 intervals). |
-| `6..9` | 4 bytes | Float32LE | Linear ramp with session time (~0.0016 per second). Meaning not established. |
-| `10..13` | 4 bytes | Float32LE | Linear ramp with session time, offset from `6..9`. Meaning not established. |
-| `14..37` | 24 bytes | Binary | Not established. |
+| `6..9` | 4 bytes | Float32LE | Ramp with session time whose rate follows the session's wind speed w (m/s): `dA/dt = (20 + w) / 16500` (0.0016364/s at 7 m/s, the most common rate; 0.0012727/s at 1 m/s), recovering the forecast start wind within 0.0005 m/s in 37 replays matched to saved forecasts, and changing rate when the scheduled wind changes. Replays of different sessions with the same rate hold the same value at the same session time, so it does not depend on the time of day. Probably the drift of the cloud field (`18..33`); not established. |
+| `10..13` | 4 bytes | Float32LE | Second ramp tied to `6..9` at every packet: `B = 25/16 × A − 0.000947 × t − 0.4` (t = session time; within 0.001 in 247/249 Le Mans, 166/167 Fuji, 336/337 Silverstone and 134/134 Daytona packets, including stretches where the rate of `6..9` changes). Its own rate is `(10 + w) / 10560`. Probably cloud drift phases driven by the wind; what they animate is not established. |
+| `14..15` | 2 bytes | Binary | `0x0000` in every replay examined. |
+| `16..17` | 2 bytes | Binary | Constant within an event (`0x1EA2` online, `0x5698` offline), changed once late in a Le Mans race. Not established. |
+| `18..33` | 16 bytes | 4-bit cells | **Cloud field**: 32 cells (two per byte), `15` a clear cell and `0` a fully clouded one. The **cloud cover** is the mean cell density, `Σ(15 − cell) / (15 × 32)`, 0 clear to 1 overcast. Cells change during a session; they fall to `0`–`4` while it rains. |
+| `34` | 1 byte | UInt8 | `0x80` in every replay examined. |
+| `35` | 1 byte | UInt8 | `28` in most replays; rose 8 → 16 in an offline practice whose cloud field was changing, `4` in another offline practice. Not established. |
+| `36..37` | 2 bytes | UInt16LE | `16384` in most replays; fell 16376 → 3874 alongside byte `35`'s rise, `0xBFFF` in the offline practice with `35` = 4. Not established. |
 | `38` | 1 byte | UInt8 | **Ambient Temperature**: `ambientC = byte / 8 + 5.9` (0.125 °C resolution). |
 | `39` | 1 byte | UInt8 | Constant `0x81` (129) in every replay examined. **Not** track temperature. |
 | `40..41` | 2 bytes | Binary | Not established. |
 | `42..77` | 36 bytes | Binary | **Rain / Surface Wetness**: 9 blocks of 4 bytes, each `[w, w, w, 0x00]`. `rain = w / 255` is the simulation's `raining` value (0.0 = dry). In every replay examined, all 9 blocks carry the same value. |
 
-**Track surface temperature is not stored in the replay.** The engine recomputes it during
+The cloud cover matches the game's own weather name for the session. Checked on 159 sessions, each paired with the native
+telemetry recording of the same session (`metadata.WeatherConditions`), at the weather packet nearest the recording's first
+sample:
+
+| Game weather name | Sessions | Cloud cover: min / median / max |
+| :--- | ---: | :--- |
+| Clear | 31 | 0.00 / 0.00 / 0.23 |
+| Light Clouds | 71 | 0.01 / 0.11 / 0.30 |
+| Partially Cloudy | 26 | 0.01 / 0.26 / 0.62 |
+| Mostly Cloudy | 17 | 0.24 / 0.62 / 0.68 |
+| Overcast | 9 | 0.65 / 0.88 / 0.91 |
+| Overcast & Light Rain | 5 | 0.87 / 0.89 / 0.89 |
+
+The ranges overlap, probably because the name describes the sky over the track while the cover averages the whole field (not established).
+
+**The game's live weather reading (`currentWeather.cloudCoverage` from the local REST API, docs/LMU_REST_API.md) follows the cell mean but is not the same value: correlation 0.93 and median difference 0.044 over 1,034 readings paired with 44 replays (COTA Q1 2: live 0.78–0.86, cells 0.60–0.63).
+
+Track surface temperature is not stored in the replay.** The engine recomputes it during
 playback from the stored weather state. Take it from DuckDB (`Track Temperature`) when you
 need it.
 

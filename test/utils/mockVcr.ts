@@ -24,7 +24,8 @@ export interface MockSlice {
   rpmRaw10?: number;
   flag?: { flagState: number; sectorMask: number; driverFlag: number };
   standings?: number[];
-  weather?: { ambientTemp?: number; rainIntensity?: number };
+  /** `cloudCells`: the 16-byte cloud field (two 4-bit cells per byte, 0xff = clear); clear when omitted. */
+  weather?: { ambientTemp?: number; rainIntensity?: number; cloudCells?: number[] };
   // Extra events appended to the slice as-is (raw header class/type/slot + payload).
   rawEvents?: Array<{ evClass: number; evType: number; slot: number; payload: Buffer }>;
 }
@@ -204,6 +205,8 @@ export function createSliceVcrBuffer(options?: {
       const wHdr = Buffer.alloc(4);
       wHdr.writeUInt32LE(((1 << 29) | (10 << 17) | (80 << 8) | 255) >>> 0, 0);
       const wData = Buffer.alloc(80);
+      wData.writeFloatLE(sl.sTime, 0);
+      Buffer.from(sl.weather.cloudCells ?? new Array<number>(16).fill(0xff)).copy(wData, 18);
       const temp = sl.weather.ambientTemp ?? 25.0;
       const rawTemp = Math.round((temp - 5.9) * 8);
       wData[38] = Math.max(0, Math.min(255, rawTemp));

@@ -11,6 +11,9 @@ import { RaceTrafficService } from '../traffic/raceTrafficService.js';
 import { parseBoundedInteger, queryString } from './queryParams.js';
 import { readReplaySessionContext } from '../core/sessionRows/replayContext.js';
 import { hasVerifiedLiveCapture } from '../core/live/dbLiveCaptureStore.js';
+import { replayDaylightClock } from '../../shared/domain/scenery/replayDaylightClock.js';
+import type { ReplayDaylightClock, ReplayMetadata, ReplayTrajectoryData } from '../../shared/types/index.js';
+import type { ReplaySessionContext } from '../replay/replayServiceTypes.js';
 
 export function createReplayRouter(context: ServerContext): Router {
   const router = Router();
@@ -85,6 +88,19 @@ export function createReplayRouter(context: ServerContext): Router {
     }
   });
 
+  /** The lap start's in-game clock, from the session replay's race start and the lap's session start; none without a session replay. */
+  const lapDaylightClock = (session: ReplaySessionContext, driverOrdinal: number, lapOrdinal: number, trajectory: ReplayTrajectoryData): ReplayDaylightClock | undefined => {
+    const replayName = session.matchingReplayFile?.name;
+    if (!replayName) return undefined;
+    let metadata: ReplayMetadata;
+    try {
+      metadata = context.replayRecordings.getMetadata(path.join(context.replaysDir, replayName), replayName, context.currentParser.configuredPlayerName);
+    } catch { return undefined; }
+    const lap = session.drivers.find(driver => driver.driverOrdinal === driverOrdinal)?.laps.find(entry => entry.lapOrdinal === lapOrdinal);
+    const sessionTimeSec = lap?.elapsedSeconds ?? (trajectory.timeReference === 'session' ? trajectory.lapStartTimeSec : undefined) ?? 0;
+    return replayDaylightClock(session.sessionType, metadata.raceStartMinute, sessionTimeSec, metadata.cloudCover);
+  };
+
   router.get('/session/:sessionId/telemetry', async (req, res) => {
     const sessionId = req.params.sessionId;
     if (!context.sessionDb.getDb().prepare('SELECT 1 FROM sessions WHERE id = ?').get(sessionId)) {
@@ -128,8 +144,9 @@ export function createReplayRouter(context: ServerContext): Router {
         pointSpacingM,
         allowDuckDb: queryString(req.query.source)?.toLowerCase() !== 'vcr',
       });
-      res.json(hasVerifiedLiveCapture(context.sessionDb.getDb(), sessionId, driverOrdinal)
-        ? { ...trajectory, hasLiveCapture: true } : trajectory);
+      const daylightClock = lapDaylightClock(trajectorySession, driverOrdinal, lapOrdinal, trajectory);
+      res.json({ ...trajectory, ...(daylightClock ? { daylightClock } : {}),
+        ...(hasVerifiedLiveCapture(context.sessionDb.getDb(), sessionId, driverOrdinal) ? { hasLiveCapture: true } : {}) });
     } catch (error: unknown) {
       if (error instanceof ReplayDriverNotFoundError) return res.status(404).json({ error: error.message });
       res.status(404).json({ error: error instanceof Error ? error.message : 'Session telemetry unavailable' });

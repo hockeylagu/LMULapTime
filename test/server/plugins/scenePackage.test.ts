@@ -13,7 +13,7 @@ const build = () => { const built = syntheticPackage(); packages.push(built); re
 afterEach(() => { for (const built of packages.splice(0)) fs.rmSync(built.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }); });
 const state = (built: Package) => new DataPlugin(built.dir).status.state;
 
-describe('schema 5 manifest', () => {
+describe('schema 6 manifest', () => {
   it('loads scenery next to tracks, and the car bodies of the vehicle records', () => {
     const built = build(), plugin = new DataPlugin(built.dir);
     expect(plugin.status.state).toBe('ready');
@@ -22,6 +22,7 @@ describe('schema 5 manifest', () => {
     expect(layout.packageRevision).toBe(plugin.status.revision);
     expect(layout.sectors.map(sector => sector.id)).toEqual(['s0', 's1']);
     expect(layout.chunking).toEqual(built.sceneryShared.chunking); expect(layout.streaming).toEqual(built.sceneryShared.streaming);
+    expect(layout.camera).toEqual(built.sceneryShared.camera);
     expect(layout).not.toHaveProperty('schemaVersion');
     expect(plugin.sceneryLayout('spa_wec')).toBeNull();
     expect(plugin.car('test_car.veh')?.folder).toBe('Test_Car');
@@ -29,7 +30,7 @@ describe('schema 5 manifest', () => {
     expect(plugin.car('OTHER')).toBeNull();
   });
 
-  it('accepts schema 5 without scenery; the cars come with the vehicles', () => {
+  it('accepts schema 6 without scenery; the cars come with the vehicles', () => {
     const built = build();
     delete built.manifest.scenery; built.commit();
     const plugin = new DataPlugin(built.dir);
@@ -45,7 +46,7 @@ describe('schema 5 manifest', () => {
     expect(plugin.status.cars).toBeUndefined(); expect(plugin.car('TEST_CAR')).toBeNull();
   });
 
-  it.each([1, 2, 3, 4, '5', undefined])('rejects manifest schema %s: only schema 5 is supported', schemaVersion => {
+  it.each([1, 2, 3, 4, 5, '6', undefined])('rejects manifest schema %s: only schema 6 is supported', schemaVersion => {
     const built = build();
     built.manifest.schemaVersion = schemaVersion; built.commit();
     expect(state(built)).toBe('invalid');
@@ -74,6 +75,11 @@ describe('scenery validation', () => {
     ['per-layout streaming', (built: Package) => { (built.scenery as Record<string, unknown>).streaming = built.sceneryShared.streaming; }],
     ['non-positive shared chunking', (built: Package) => { built.sceneryShared.chunking.sectorLengthM = 0; }],
     ['missing shared streaming', (built: Package) => { delete (built.sceneryShared as Partial<typeof built.sceneryShared>).streaming; }],
+    ['a missing camera profile', (built: Package) => { delete (built.sceneryShared as Partial<typeof built.sceneryShared>).camera; }],
+    ['a metering window outside the frame', (built: Package) => { built.sceneryShared.camera.meteringWindow.width = 0.95; }],
+    ['camera profiles out of elevation order', (built: Package) => { built.sceneryShared.camera.profiles.reverse(); }],
+    ['a non-positive exposure target', (built: Package) => { built.sceneryShared.camera.profiles[0].targetExposure = 0; }],
+    ['an unknown camera field', (built: Package) => { (built.sceneryShared.camera as Record<string, unknown>).extra = 1; }],
     ['a stale geometry revision', (built: Package) => { built.scenery.sourceGeometryRevision = 'old'; }],
     ['a chunk asset that is not content-named', (built: Package) => { built.scenery.sectors[0].asset = 'scenery/s0.glb'; }],
     ['a chunk of the wrong size', (built: Package) => { built.scenery.sectors[0].byteLength += 1; }],
@@ -86,6 +92,12 @@ describe('scenery validation', () => {
     ['a texture file of the wrong size', (built: Package) => { built.scenery.textures[0].byteLength += 1; }],
     ['non-finite bounds', (built: Package) => { built.scenery.horizon.bounds.min[0] = Infinity; }],
     ['a layout without track geometry', (built: Package) => { built.scenery.layoutKey = 'spa_wec'; }],
+    ['a missing shadow range', (built: Package) => { delete (built.scenery as Partial<typeof built.scenery>).shadowRangeM; }],
+    ['a non-positive shadow range', (built: Package) => { built.scenery.shadowRangeM = 0; }],
+    ['more shadow casters than draw calls', (built: Package) => { built.scenery.sectors[0].shadowDrawCalls = built.scenery.sectors[0].drawCalls + 1; }],
+    ['a chunk without shadow counts', (built: Package) => { delete (built.scenery.sectors[0] as Partial<typeof built.scenery.sectors[0]>).shadowTriangles; }],
+    ['a daylight location without its UTC offset', (built: Package) => { Object.assign(built.scenery.daylight, {latitudeDeg: 35.37, longitudeDeg: 138.93}); }],
+    ['a daylight latitude past the pole', (built: Package) => { Object.assign(built.scenery.daylight, {latitudeDeg: 91, longitudeDeg: 138.93, utcOffsetHours: 9}); }],
   ])('rejects %s', (_name, change) => { expect(mutate(change)).toBe('invalid'); });
 
   it('rejects an empty catalog', () => {
@@ -98,6 +110,12 @@ describe('scenery validation', () => {
     const built = build();
     built.commit(); built.write('scenery/index.json', [built.scenery]);
     expect(state(built)).toBe('invalid');
+  });
+
+  it('accepts a daylight location', () => {
+    const built = build();
+    Object.assign(built.scenery.daylight, {latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9}); built.commit();
+    expect(new DataPlugin(built.dir).sceneryLayout('monza_gp')?.daylight?.utcOffsetHours).toBe(9);
   });
 
   it('accepts a layout without daylight', () => {
