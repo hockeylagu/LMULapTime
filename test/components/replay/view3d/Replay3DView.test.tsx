@@ -10,7 +10,7 @@ import { replayShortcutBlocked } from '../../../../src/utils/replayShortcuts.js'
 import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
 import { createPlaybackCursor, ReplayPlaybackCursorContext } from '../../../../src/components/replay/inspector/replayPlaybackCursor.js';
 
-const scene = vi.hoisted(() => ({wheelMotion: 'Replay-estimated wheel roll', cursor: vi.fn(), mode: vi.fn(), reset: vi.fn(), center: vi.fn(), zoom: vi.fn(), pan: vi.fn(), dispose: vi.fn(), colorLines: vi.fn(), fadeLines: vi.fn(), syncGhost: vi.fn(), updateLaps: vi.fn(async () => true)}));
+const scene = vi.hoisted(() => ({wheelMotion: 'Replay-estimated wheel roll', cursor: vi.fn(), beforeFrame: vi.fn(), mode: vi.fn(), reset: vi.fn(), center: vi.fn(), zoom: vi.fn(), pan: vi.fn(), dispose: vi.fn(), colorLines: vi.fn(), fadeLines: vi.fn(), syncGhost: vi.fn(), updateLaps: vi.fn(async () => true)}));
 vi.mock('../../../../src/components/replay/view3d/replayScene.js', () => ({createReplayScene: vi.fn(async () => scene)}));
 const layout = vi.hoisted(() => ({sourceGeometryRevision: 'g', packageRevision: 'p'}));
 vi.mock('../../../../src/api/sceneryApi.js', () => ({fetchSceneryLayout: vi.fn(async () => layout)}));
@@ -328,4 +328,8 @@ it('uses the interpolated playhead for the collapsed HUD, fullscreen comparison 
   fireEvent.keyDown(container.querySelector('[data-replay-view="3d"]')!, {key: 'm'});
   expect(within(screen.getByTestId('telemetry-hud-primary')).getByText('175')).toBeInTheDocument();
   expect(within(screen.getByTestId('telemetry-hud-baseline')).getByText('175')).toBeInTheDocument();
+  // Each frame the scene draws first ticks the playing clock to that frame (no pose a frame behind).
+  const advance = vi.fn(); cursor.drive(advance);
+  (scene.beforeFrame.mock.calls.at(-1)![0] as (frameTime: number) => void)(40);
+  expect(advance).toHaveBeenCalledWith(40);
 });

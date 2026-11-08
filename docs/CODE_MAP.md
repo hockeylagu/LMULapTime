@@ -317,8 +317,9 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   the camera and scenery. Cancelled or superseded builds are discarded and retired lap buffers released.
   Canvas resizes repaint before the browser paints, avoiding a black frame when embedded toolbars change height.
   `sceneEnvironment.ts` owns the Three.js daylight sky, its shared PMREM reflection environment,
-  fog, flat horizon ground and car-following shadow sun. Cars come from the `cars` catalog: `carMaterials.ts` builds materials from the
-  descriptor, `wheelGeometry.ts` reads the four wheel rigs, `wheelAnimation.ts` fits the model origin to the lap median and drives
+  fog, flat horizon ground and car-following shadow sun. Cars come from the `cars` catalog: `car/carMaterials.ts` builds materials from the
+  descriptor (surfaces in the app's names, version 4, every value filled: `finish` per material, paint `regions` / `uvScale`; `car/carPaint.ts`: regional car paint from the package's paint description; `car/carContactShadow.ts`: the under-car shadow;
+  `car/carReflection.ts`: the cube-map reflection probe at the car), `autoExposure.ts` meters, white-balances and tone-maps with the scenery catalog's `camera` profile and composites the bloom of `glare.ts`, `wheelGeometry.ts` reads the four wheel rigs, `wheelAnimation.ts` fits the model origin to the lap median and drives
   roll/steer/travel per corner plus the steering wheel, `driverCameras.ts` places the Cockpit/Hood/Roof views on the descriptor's game
   cameras, and `sceneObjects.ts` places the car, switches the cockpit mesh variant and styles ghosts. Brake boards are part of the scenery GLBs.
   `racingLine.ts` drapes the 2D-coloured line ribbons and re-drapes them as chunks stream in; `tracksideCameras.ts` places the fixed trackside spots.

@@ -29,18 +29,26 @@ export type CarCorner = 'fl' | 'fr' | 'rl' | 'rr';
 export interface CarMapRef {
   /** `textures/<sha256>.ktx2.zst`, relative to the vehicles folder; absent for a constant map. */
   texture?: string;
-  uv: string;
+  /** The mesh UV set 0..3 the map samples (glTF TEXCOORD_0..3). */
+  uv: 'uv0' | 'uv1' | 'uv2' | 'uv3';
   scale: [number, number];
   srgb?: boolean;
   constant?: number[];
 }
 
-/** Native shader configuration: a material's `surface`, or an appearance's `paint`. */
+/**
+ * A material's `surface`, or an appearance's `paint` (version 4: the app's names, every value it reads filled). Kinds shared with
+ * the track carry the scenery `parameters` (`adjust.roughness`, ...); car paint carries `regions` (black, red, green, blue, white),
+ * `uvScale`, `clearCoatStrength`, `lacquerThickness`, `carbonFibreAlbedoColour` and `metallicFlakeColour`.
+ */
 export interface CarSurface {
+  version: 4;
   kind: string;
   maps: Record<string, CarMapRef>;
   parameters?: Record<string, unknown>;
   renderState?: { alphaBlend?: boolean; alphaMask?: boolean };
+  /** Roughness and metalness the app renders the material with; every material but paint has one. */
+  finish?: { roughness: number; metalness: number };
 }
 
 export interface CarMaterialRecipe {

@@ -1,4 +1,4 @@
-import { Group, OrthographicCamera, PerspectiveCamera, Quaternion, Scene, Vector3, WebGLRenderer, Mesh, type Material, type Object3D, type Texture } from 'three';
+import { Group, OrthographicCamera, PerspectiveCamera, Quaternion, Scene, Vector3, WebGLRenderer, Mesh, type Material, type Object3D, type Texture, type Color } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { SceneryLayoutResource } from '../../../../shared/types/scenes/scenery.js';
 import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
@@ -16,6 +16,7 @@ import { createChaseCameraTracker, trackCamera } from './cameraTracking.js';
 import { driverCamera, driverPose, isDriverCamera, type DriverPose } from './driverCameras.js';
 import { addSceneEnvironment, sceneLighting } from './sceneEnvironment.js';
 import { createAutoExposure } from './autoExposure.js';
+import { createCarReflection } from './car/carReflection.js';
 import { setCockpitView } from './sceneObjects.js';
 import { CachedKtx2Loader } from './scenery/cachedKtx2Loader.js';
 import { createChunkLoader } from './scenery/chunkLoader.js';
@@ -31,11 +32,16 @@ const DEFAULT_CHASE_DISTANCE_M = 7.8;
 const DEFAULT_CHASE_HEIGHT_M = 2.2;
 const CHASE_LOOK_ELEVATION_M = 0.5;
 const DEFAULT_FOV_DEG = 48, DEFAULT_NEAR_M = 0.5;
+/** The reflection probe sits at about the car body's mid-height above the model origin (the tyre contact plane). */
+const PROBE_HEIGHT_M = 0.5;
 
 export interface ReplaySceneHandle {
   wheelMotion: string;
   updateLaps(trajectory: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null, assets: LapCars, signal?: AbortSignal): Promise<boolean>;
   cursor(index: number, fraction: number): void;
+  /** Runs at the start of each animation frame the scene draws, with the frame's time: playback advances its clock there, so the
+   * pose drawn is always the frame's own (replayPlaybackCursor.ts). */
+  beforeFrame(hook: ((frameTime: number) => void) | null): void;
   mode(mode: CameraMode): void;
   reset(): void;
   center(): void;
@@ -63,8 +69,10 @@ export async function createReplayScene(
   catch { throw Error('WebGL 2 is unavailable. Use the 2D map.'); }
   const {min, max} = layout.horizon.bounds, origin = new Vector3(...min).add(new Vector3(...max)).multiplyScalar(0.5);
   const loader = createChunkLoader(renderer), carTextures = new CachedKtx2Loader(renderer);
-  const sunElevationDeg = Math.asin(sceneLighting(layout.daylight).sunDirection.y) * 180 / Math.PI;
-  const exposure = createAutoExposure(renderer, sunElevationDeg, () => invalidate());
+  const lighting = sceneLighting(layout.daylight, trajectory.daylightClock), sunElevationDeg = Math.asin(lighting.sunDirection.y) * 180 / Math.PI;
+  const cameraProfile = layout.camera;
+  const luminance = ({r, g, b}: Color) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const exposure = createAutoExposure(renderer, cameraProfile, sunElevationDeg, () => invalidate(), luminance(lighting.sunTransmittance));
   // Wheel and line contact heights and the camera checks share one ray tree per resident chunk.
   const ground = createSceneryGround(), {surfaceHeight} = ground;
   // Scenery chunks live in native coordinates under one group, shifted by the scene origin.
@@ -154,7 +162,7 @@ export async function createReplayScene(
     },
     unload: (chunk, root) => { ground.remove(chunk.id, root); loader.releaseChunk(root); },
     releaseTexture: asset => loader.releaseTexture(asset),
-    changed: () => { freezeScenery(); scheduleRefresh(); environment.staticShadowStale(); invalidate(); },
+    changed: () => { freezeScenery(); scheduleRefresh(); environment.staticShadowStale(); reflection.stale(); invalidate(); },
     failed: (chunk, error) => { if (!disposed) onFailure(`3D scenery chunk ${chunk.id} failed: ${error.message}`); },
   });
   const cleanup = () => {
@@ -165,10 +173,10 @@ export async function createReplayScene(
   const firstStation = stationAt(trajectory.points, 0, 0, route);
   if (firstStation === undefined) { cleanup(); throw Error('This recording has no track stations. Use the 2D map.'); }
   let currentStation = firstStation, mode: CameraMode = 'follow', streamView: StreamView | null = null;
-  const loadLaps = createLapLayerLoader(origin, surfaceHeight, path => carTextures.loadAsync(`${CAR_FILES}${path}`));
+  const loadLaps = createLapLayerLoader(origin, surfaceHeight, path => carTextures.loadAsync(`${CAR_FILES}${path}`), cameraProfile.toneCurve);
   // The sky's environment map compiles and renders now, while the scenery files download.
   const scene = new Scene();
-  const environment = addSceneEnvironment(scene, renderer, layout.daylight);
+  const environment = addSceneEnvironment(scene, renderer, layout.daylight, trajectory.daylightClock), reflection = createCarReflection(renderer, scene);
   // The horizon and the chunks under the first pose must be resident before cars and lines are draped on them.
   try {
     streamView = {kind: 'lap', lapDistanceM: currentStation}; stream.update(streamView);
@@ -187,7 +195,7 @@ export async function createReplayScene(
     sceneryRoot.traverse(object => { object.matrixAutoUpdate = false; object.matrixWorldAutoUpdate = false; });
   };
   freezeScenery();
-  world.add(layer.root); environment.setDynamic([layer.root]);
+  world.add(layer.root); environment.setDynamic([layer.root]); reflection.setCar(layer.primary, layer.root);
   const perspective = new PerspectiveCamera(DEFAULT_FOV_DEG, 1, DEFAULT_NEAR_M, 15000);
   warmTarget = {scene, camera: perspective};
   environment.setCamera(perspective);
@@ -226,9 +234,11 @@ export async function createReplayScene(
     if (!viewMoved(streamView, next, route)) return;
     streamView = next; stream.update(next);
   };
-  const eyeRotation = new Quaternion(), desiredEye = new Vector3(), correctedEye = new Vector3();
-  const draw = () => {
+  const eyeRotation = new Quaternion(), desiredEye = new Vector3(), correctedEye = new Vector3(), probeCentre = new Vector3();
+  let frameHook: ((frameTime: number) => void) | null = null;
+  const draw = (frameTime?: number) => {
     if (disposed) return;
+    if (frameTime !== undefined) frameHook?.(frameTime);
     updateStream();
     desiredEye.copy(camera.position);
     if (camera === perspective && !isDriverCamera(mode)) ground.resolve(desiredEye, controls.target, origin, correctedEye);
@@ -243,6 +253,8 @@ export async function createReplayScene(
       // A static shadow map still being drawn (a quarter per frame) asks for the next frame.
       if (environment.update(controls.target)) invalidate();
       exposure.render(scene, camera);
+      // The car's reflection probe renders one face after the frame (car/carReflection.ts), around the body's centre.
+      if (layer.primary.visible && reflection.update(layer.primary.getWorldPosition(probeCentre).setY(probeCentre.y + PROBE_HEIGHT_M))) invalidate();
     } finally {
       if (corrected) {
         camera.position.copy(desiredEye);
@@ -253,7 +265,7 @@ export async function createReplayScene(
   };
   invalidate = () => {
     if (disposed || frame || document.hidden) return;
-    frame = requestAnimationFrame(() => { frame = 0; draw(); });
+    frame = requestAnimationFrame(now => { frame = 0; draw(now); });
   };
   let viewportWidth = 0, viewportHeight = 0;
   const resize = () => {
@@ -305,11 +317,12 @@ export async function createReplayScene(
       const replacement = await loadLaps(next, comparison, assets, lineMode);
       if (disposed || signal?.aborted || request !== lapRequest) { replacement.dispose(); return false; }
       replacement.colorLines(lineMode); replacement.fadeLines(primaryOpacity, baselineOpacity);
-      layer.dispose(); layer = replacement; world.add(layer.root); environment.setDynamic([layer.root]);
+      layer.dispose(); layer = replacement; world.add(layer.root); environment.setDynamic([layer.root]); reflection.setCar(layer.primary, layer.root);
       syncDriverCamera();
       trackside = createTracksideCameras(next.points, layer.primaryDistances, origin);
       return true;
     },
+    beforeFrame(hook) { frameHook = hook; },
     cursor(index, fraction) {
       const {trajectory, baseline, primary, ghost, primaryWheels, ghostWheels, primaryDistances, baselineDistances, ghostClock} = layer;
       const pose = sampleRenderPose(trajectory.points, index, fraction);
@@ -409,7 +422,7 @@ export async function createReplayScene(
     dispose() {
       disposed = true; cancelAnimationFrame(frame); cancelAnimationFrame(sharpenFrame); observer.disconnect(); controls.dispose();
       renderer.domElement.removeEventListener('webglcontextlost', contextLost);
-      document.removeEventListener('visibilitychange', invalidate); clearTimeout(refreshTimer); stream.dispose(); ground.dispose(); disposeObjects(scene, true); loader.dispose(); carTextures.dispose(); environment.dispose(); exposure.dispose(); geometryWarmup.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
+      document.removeEventListener('visibilitychange', invalidate); clearTimeout(refreshTimer); stream.dispose(); ground.dispose(); disposeObjects(scene, true); loader.dispose(); carTextures.dispose(); environment.dispose(); reflection.dispose(); exposure.dispose(); geometryWarmup.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
     },
   };
 }

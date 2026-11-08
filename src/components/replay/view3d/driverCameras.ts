@@ -2,7 +2,7 @@ import { Euler, Vector3, type Object3D } from 'three';
 import type { CarCamera } from '../../../../shared/types/scenes/car.js';
 
 /**
- * Car-mounted game cameras, by their LMU LocalCam: the driver's eye (`COCKPIT`, cockpit mesh `in`), the nose camera (`NOSECAM`:
+ * Car-mounted cameras, by the car descriptor's camera name: the driver's eye (`COCKPIT`, cockpit mesh `in`), the nose camera (`NOSECAM`:
  * over the bonnet on GT cars, ahead of the front axle on prototypes) and the forward roof camera (`ONBOARD00`, above the roll hoop).
  */
 const GAME_CAMERAS = { cockpit: 'COCKPIT', hood: 'NOSECAM', roof: 'ONBOARD00' } as const;

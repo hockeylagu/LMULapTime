@@ -1,12 +1,13 @@
 // @vitest-environment happy-dom
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
-import { BoxGeometry, DoubleSide, Group, Material, Mesh, MeshBasicMaterial, Texture, Vector3, type BufferGeometry, type Object3D, type PerspectiveCamera, type OrthographicCamera, type Scene } from 'three';
+import { BoxGeometry, CubeCamera, DoubleSide, Group, Material, Mesh, MeshBasicMaterial, Texture, Vector3, type BufferGeometry, type Object3D, type PerspectiveCamera, type OrthographicCamera, type Scene } from 'three';
 import { createReplayScene } from '../../../../../src/components/replay/view3d/replayScene.js';
 import { disposeObjects } from '../../../../../src/components/replay/view3d/laps/disposeObjects.js';
 import { EXPOSURE_PASS } from '../../../../../src/components/replay/view3d/autoExposure.js';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import type { SceneryChunk, SceneryLayoutResource, ScenerySectorChunk } from '../../../../../shared/types/scenes/scenery.js';
 import type { LoadedCar } from '../../../../../src/api/vehicles/carApi.js';
+import { testCarPaint } from '../../../../helpers/scenes/syntheticPackage.js';
 
 const gpu = vi.hoisted(() => ({render: vi.fn<(scene: Scene, camera: PerspectiveCamera | OrthographicCamera) => void>(), dispose: vi.fn(), constructed: vi.fn(), setSize: vi.fn(), upload: vi.fn<() => Promise<void>>()}));
 const chunks = vi.hoisted(() => ({roots: new Map<string, Object3D>(), loads: [] as string[], obstacleName: ''}));
@@ -19,10 +20,13 @@ vi.mock('three', async importOriginal => {
   const actual = await importOriginal<typeof import('three')>();
   return {...actual, PMREMGenerator: class {
     fromScene() { return {texture: new actual.Texture(), dispose() {}}; }
+    fromCubemap() { return {texture: new actual.Texture(), dispose() {}}; }
+    compileCubemapShader() {}
     dispose() {}
   }, WebGLRenderer: class {
     domElement = document.createElement('canvas');
     shadowMap = {enabled: false, type: 0};
+    coordinateSystem = actual.WebGLCoordinateSystem;
     render = gpu.render;
     dispose = gpu.dispose;
     constructor() { gpu.constructed(); }
@@ -88,17 +92,18 @@ const lap: ReplayTrajectoryData = {
   points: Array.from({length: 7}, (_, i) => ({x: i, y: 0.3, z: 0, timeSec: i * 0.2, rotY: 0, speedKmh: 30, stationM: i * 10})),
 };
 const box = (min: number, max: number) => ({min: [-100, min, -100] as [number, number, number], max: [100, max, 100] as [number, number, number]});
-const base = {sha256: 'x', byteLength: 1, triangles: 1, vertices: 1, drawCalls: 1, geometryBytes: 1, meshes: 1, materials: 1, textures: [] as string[], bounds: box(0, 0)};
+const base = {sha256: 'x', byteLength: 1, triangles: 1, vertices: 1, drawCalls: 1, shadowDrawCalls: 1, shadowTriangles: 1, geometryBytes: 1, meshes: 1, materials: 1, textures: [] as string[], bounds: box(0, 0)};
 const sector = (index: number): ScenerySectorChunk => ({...base, id: `s${index}`, kind: 'main', asset: `scenery/s${index}.glb`, lapStartM: index * 1000, lapEndM: (index + 1) * 1000, prev: `s${(index + 3) % 4}`, next: `s${(index + 1) % 4}`});
 const layout = {
-  layoutKey: 'portimao_wec', sourceGeometryRevision: 'g', packageRevision: 'p', routeLengthM: 4000, pitLaneLengthM: 0,
+  layoutKey: 'portimao_wec', sourceGeometryRevision: 'g', packageRevision: 'p', routeLengthM: 4000, pitLaneLengthM: 0, shadowRangeM: 750,
   streaming: {residentBehindM: 300, residentAheadM: 1500, freeCameraRadiusM: 1500},
+  camera: {meteringWindow: {x: 0.1, y: 0.1, width: 0.8, height: 0.8}, profiles: [{sunElevationDeg: 0, targetExposure: 0.4, whiteBalanceK: 7000}, {sunElevationDeg: 60, targetExposure: 0.2, whiteBalanceK: 6500}], toneCurve: {a: 2.5, b: 0.6}, glareThreshold: 1.2, ambientOcclusion: {radiusM: 0.4, samples: 8, scale: 2, colour: 0.4}},
   daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55 },
   horizon: {...base, id: 'horizon', kind: 'horizon', asset: 'scenery/h.glb'}, sectors: [0, 1, 2, 3].map(sector), textures: [],
 } as unknown as SceneryLayoutResource;
 const car = {
   resource: {}, bytes: new ArrayBuffer(0), vehicleId: 'veh',
-  descriptor: {optionNodes: ['option_PlateA', 'option_PlateB'], appearances: [{alias: 'VEH', albedo: 'textures/a.ktx2', paint: {kind: 'carPaint', maps: {}}, optionNodes: ['option_PlateA']}], materials: [{id: 'm1', name: 'body', paint: true}],
+  descriptor: {optionNodes: ['option_PlateA', 'option_PlateB'], appearances: [{alias: 'VEH', albedo: 'textures/a.ktx2', paint: testCarPaint('textures/a.ktx2'), optionNodes: ['option_PlateA']}], materials: [{id: 'm1', name: 'body', paint: true}],
     cameras: {list: [
       {name: 'COCKPIT', position: [0.28, 1, -0.7], orientation: [-0.1, 0, 0], fov: [89, 49], clipPlanes: [0.13, 700], cockpitView: 'in'},
       {name: 'NOSECAM', position: [0.28, 0.9, -1.9], orientation: [0, 0, 0], fov: [80, 45], clipPlanes: [0.2, 800], cockpitView: 'out'},
@@ -110,9 +115,10 @@ let frames: FrameRequestCallback[];
 let resizeCallbacks: Array<() => void>;
 const draw = () => { frames.splice(0).forEach(callback => callback(0)); };
 /** Renders of the replay scene, without the exposure and metering passes. */
-// Replay frames only: the exposure passes are named scenes and the occlusion passes draw a full-screen mesh, not a scene.
-const isFrame = (scene: Scene) => scene.isScene && scene.name !== EXPOSURE_PASS;
-const sceneRenders = () => gpu.render.mock.calls.filter(([scene]) => isFrame(scene));
+// Replay frames only: the exposure passes are named scenes, the occlusion passes draw a full-screen mesh, not a scene, and the car's
+// reflection probe renders through its cube camera's face cameras.
+const isFrame = (scene: Scene, camera: Object3D) => scene.isScene && scene.name !== EXPOSURE_PASS && !(camera.parent instanceof CubeCamera);
+const sceneRenders = () => gpu.render.mock.calls.filter(([scene, camera]) => isFrame(scene, camera));
 const lastSceneRender = () => sceneRenders().at(-1)!;
 beforeEach(() => {
   vi.resetAllMocks(); frames = []; resizeCallbacks = []; chunks.roots.clear(); chunks.loads.length = 0; chunks.obstacleName = '';
@@ -133,7 +139,7 @@ it.each([
 ])('uses ground clearance without carrying a camera lift past %s', async (name, expectedHeight) => {
   chunks.obstacleName = name;
   const renderedHeights: number[] = [];
-  gpu.render.mockImplementation((_scene, camera) => { if (!isFrame(_scene)) return; renderedHeights.push(camera.position.y); });
+  gpu.render.mockImplementation((_scene, camera) => { if (!isFrame(_scene, camera)) return; renderedHeights.push(camera.position.y); });
   const handle = await createReplayScene(document.createElement('div'), layout, lap, null, vi.fn(), assets);
   handle.cursor(0, 0); draw();
   expect(renderedHeights.at(-1)).toBeCloseTo(expectedHeight);

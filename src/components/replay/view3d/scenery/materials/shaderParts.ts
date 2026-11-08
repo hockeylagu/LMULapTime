@@ -3,7 +3,7 @@ import { digitalFlagShaderParts, flagShaderParts } from './flagSurface.js';
 import { glassShaderParts } from './glassSurface.js';
 import { roadDecalShaderParts } from './roadDecalSurface.js';
 import { roadShaderParts } from './roadSurface.js';
-import { flatValue, glslNumber, glslVec, HELPERS, list, UNIFORM_DECLARATIONS, value, type ExtendedParts, type ShaderContext } from './shaderContext.js';
+import { glslNumber, glslVec, HELPERS, list, UNIFORM_DECLARATIONS, value, type ExtendedParts, type ShaderContext } from './shaderContext.js';
 import { standardShaderParts } from './standardSurface.js';
 import { TERRAIN_WEIGHTS, terrainLayerCount, type SurfaceConfig } from './surfaceConfig.js';
 import { vegetationShaderParts } from './vegetationSurface.js';
@@ -23,47 +23,46 @@ export interface ShaderParts {
 }
 
 const LAYER_KEYS = ['A', 'B', 'C', 'D'];
-const SAMPLER_UVS: Record<string, string> = { UV_A: 'vSurfaceUV01.xy', UV_B: 'vSurfaceUV01.zw', UV_C: 'vSurfaceUV23.xy', UV_D: 'vSurfaceUV23.zw', WorldPlanar: 'vSurfaceXZ' };
+const SAMPLER_UVS: Record<string, string> = { uv0: 'vSurfaceUV01.xy', uv1: 'vSurfaceUV01.zw', uv2: 'vSurfaceUV23.xy', uv3: 'vSurfaceUV23.zw', worldPlanar: 'vSurfaceXZ' };
 
 function terrainParts(config: SurfaceConfig, context: ShaderContext): ExtendedParts {
   const { maps, parameters: p, flags: f } = config;
   const { sample, uv, number, vec, uniforms } = context;
-  const adjust = p.Material_Adjust, terrain = p.Terrain;
+  const adjust = p.adjust, terrain = p.terrain;
   const num = (v: number, name: string) => uniforms ? name : number(v);
-  const tint = uniforms ? 'diffuse' : vec(list(adjust, 'AlbedoTint', [1, 1, 1]).slice(0, 3));
-  const rough = num(value(adjust, 'Roughness', .5), 'roughness');
-  const mixBias = num(value(terrain, 'MixMapBias', .5), 'surface_mixBias');
-  const bias = f.MIXBIASBLEND === 'VertexAlpha' ? `max(0.01,${mixBias}*vSurfaceColour.a)` : mixBias;
-  const lowScale = p.UV_Scale?.MixSpecularB;
-  const high = sample('mix', 'vec4(0.5)'), low = sample('mix', 'vec4(0.5)', Array.isArray(lowScale) ? lowScale : undefined);
-  const overlayFactor = num(value(terrain, 'SplatterOverlay', 1), 'surface_splatterOverlayFactor');
+  const tint = uniforms ? 'diffuse' : vec(list(adjust, 'tint'));
+  const rough = num(value(adjust, 'roughness'), 'roughness');
+  const mixBias = num(value(terrain, 'mixBias'), 'surface_mixBias');
+  const bias = f.mixBias === 'vertexAlpha' ? `max(0.01,${mixBias}*vSurfaceColour.a)` : mixBias;
+  const high = sample('mix', 'vec4(0.5)'), low = maps.mix ? sample('mix', 'vec4(0.5)', list(p.uvScale, 'mixLow')) : 'vec4(0.5)';
+  const overlayFactor = num(value(terrain, 'splatterOverlay'), 'surface_splatterOverlayFactor');
   const albedo = `
       vec4 splatter = ${sample('splatter')};
       vec4 mixHigh=${high},mixLow=${low};
       vec4 mixData=vec4(mixHigh.r*0.6+mixLow.r*0.4,mixHigh.g*mixLow.g,0.0,1.0);
       vec3 controls = splatter.rgb;
       ${maps.splatterOverlay ? `controls = mix(controls, surfaceOverlay(controls, ${sample('splatterOverlay')}.rgb), ${overlayFactor});` : ''}
-      ${f.SPLATTERVC === 'Detail' ? 'controls += vSurfaceColour.rgb*2.0-1.0;' : f.SPLATTERVC === 'Multiply' ? 'controls *= vSurfaceColour.rgb;' : ''}
+      ${f.splatterVertexColour === 'detail' ? 'controls += vSurfaceColour.rgb*2.0-1.0;' : f.splatterVertexColour === 'multiply' ? 'controls *= vSurfaceColour.rgb;' : ''}
       vec3 blend = vec3(surfaceBlend(controls.r, mixData.r, ${bias}), surfaceBlend(controls.g, mixData.r, ${bias}), surfaceBlend(controls.b, mixData.r, ${bias}));
-      surfaceWeights = ${TERRAIN_WEIGHTS[terrainLayerCount(f) ?? 4]};
+      surfaceWeights = ${TERRAIN_WEIGHTS[terrainLayerCount(f)]};
       vec4 a = ${sample('layerA')}, b = ${sample('layerB')}, c = ${sample('layerC')}, d = ${sample('layerD')};
       vec4 ground = a*surfaceWeights.x + b*surfaceWeights.y + c*surfaceWeights.z + d*surfaceWeights.w;
       ${maps.pattern ? `vec2 pattern = ${sample('pattern')}.rg;
-      float patternValue = mix(pattern.r, pattern.g, ${f.PATTERNBLEND === 'Random' ? 'vSurfaceRandom' : 'vSurfaceColour.a'});
-      float patternStrength = ${f.PATTERNALBEDOBLENDS && f.PATTERNALBEDOBLENDS !== '@Undef' ? `dot(surfaceWeights, ${vec(LAYER_KEYS.map(k => value(terrain, `PatternAlbedo${k}`, 0)))})` : '1.0'} * ${num(value(terrain, 'PatternStrength', 1), 'surface_patternStrength')};
+      float patternValue = mix(pattern.r, pattern.g, ${f.pattern === 'random' ? 'vSurfaceRandom' : 'vSurfaceColour.a'});
+      float patternStrength = ${f.patternLayers ? `dot(surfaceWeights, ${vec(LAYER_KEYS.map(k => value(terrain, `pattern${k}`)))})` : '1.0'} * ${num(value(terrain, 'patternStrength'), 'surface_patternStrength')};
       ground.rgb = surfaceOverlay(ground.rgb,vec3(mix(0.5,patternValue,patternStrength)));` : ''}
       diffuseColor.rgb ${uniforms ? '=' : '*='} ${uniforms ? 'ground.rgb * diffuse' : `ground.rgb * ${tint} * ${tint}`};
       surfaceRoughness = surfaceAdjust(ground.a, ${rough});
-      surfaceSpecular = mixData.g * ${num(value(adjust, 'SpecularLevel', .5), 'surface_specular')};
+      surfaceSpecular = mixData.g * ${num(value(adjust, 'specular'), 'surface_specular')};
       float splatterOcclusion=splatter.a;
       ${maps.splatterOverlay ? `splatterOcclusion*=mix(1.0,${sample('splatterOverlay')}.a,${overlayFactor});` : ''}
       surfaceAO=0.2+0.8*splatterOcclusion;
     `;
-  const nb = vec(LAYER_KEYS.map(k => value(p.Normal_Blends, `Albedo${k}`, 1)));
-  const ni = vec(LAYER_KEYS.map(k => value(p.Normal_Intensity, `Albedo${k}`, 1)));
+  const nb = vec(LAYER_KEYS.map(k => value(p.layerNormalBlend, k)));
+  const ni = vec(LAYER_KEYS.map(k => value(p.layerNormalStrength, k)));
   const encoded = maps.normalA && maps.normalB ? `mix(${sample('normalA')}.rg,${sample('normalB')}.rg,clamp(dot(surfaceWeights,${nb}),0.0,1.0))` : maps.normalA ? `${sample('normalA')}.rg` : null;
-  const normals = encoded ? `normal=surfaceNormal(normal,${uv('normalA')},${encoded},dot(surfaceWeights,${ni})*${num(value(adjust, 'NormalIntensity', 1), 'surface_normalScale.x')},${num(config.normalYSign, 'surface_normalScale.y')});` : '';
-  const physical = `material.specularColor*=0.69444444*mix(vec3(1.0),diffuseColor.rgb,${num(value(adjust, 'SpecularTinting', 0), 'surface_specularTinting')}); material.specularColorBlended=material.specularColor;`;
+  const normals = encoded ? `normal=surfaceNormal(normal,${uv('normalA')},${encoded},dot(surfaceWeights,${ni})*${num(value(adjust, 'normalStrength'), 'surface_normalScale.x')},${num(config.normalYSign, 'surface_normalScale.y')});` : '';
+  const physical = `material.specularColor*=0.69444444*mix(vec3(1.0),diffuseColor.rgb,${num(value(adjust, 'specularTinting'), 'surface_specularTinting')}); material.specularColorBlended=material.specularColor;`;
   return { albedo, normals, emissive: '', physical, occlusion: 'reflectedLight.indirectSpecular*=surfaceAO;' };
 }
 
@@ -101,11 +100,10 @@ function familyParts(config: SurfaceConfig, context: ShaderContext, tint: string
     case 'lowLumEmissive': case 'highLumTrackside': case 'highLumSun':
       return luminousParts(config, context);
     case 'dashboard':
-      // Authored values, else the ps30_dashboard.psh defaults (BaseRoughness 0.2, EmissiveDayIntensity 15).
       return {
-        albedo: `vec4 dash=${sample('albedo')}; diffuseColor*=dash*vSurfaceColour; surfaceRoughness=${number(flatValue(config, 'BaseRoughness', .2))}; surfaceSpecular=0.0;`,
+        albedo: `vec4 dash=${sample('albedo')}; diffuseColor*=dash*vSurfaceColour; surfaceRoughness=${number(value(config.parameters.dashboard, 'roughness'))}; surfaceSpecular=0.0;`,
         normals: '', physical: '', occlusion: '',
-        emissive: `diffuseColor.rgb*${number(flatValue(config, 'EmissiveDayIntensity', 15))}`,
+        emissive: `diffuseColor.rgb*${number(value(config.parameters.dashboard, 'emissiveStrength'))}`,
       };
     case 'diffuse':
       return {
@@ -131,15 +129,14 @@ export function shaderParts(config: SurfaceConfig, options: { uniforms: boolean 
   const useUniforms = options.uniforms;
   const uv = (key: string, alternateScale?: readonly number[]) => {
     const map = maps[key];
-    if (!map) throw Error(`Unsupported shader UV: ${config.name}/${key}`);
+    if (!map) throw Error(`Unsupported shader UV: ${config.name ?? '?'}/${key}`);
     const source = SAMPLER_UVS[map.uv];
     if (useUniforms && !alternateScale) return `(${source} * surface_scale_${key})`;
-    return `(${source} * ${glslVec(alternateScale ?? map.scale ?? [1, 1])})`;
+    return `(${source} * ${glslVec(alternateScale ?? map.scale)})`;
   };
   const sample = (key: string, fallback = 'vec4(1.0)', scale?: readonly number[]) => maps[key] ? `texture2D(surface_${key}, ${uv(key, scale)})` : fallback;
   const context: ShaderContext = { sample, uv, number: glslNumber, vec: glslVec, uniforms: useUniforms };
-  const adjust = config.parameters.Material_Adjust;
-  const tint = useUniforms ? 'diffuse' : glslVec(list(adjust, 'AlbedoTint', [1, 1, 1]).slice(0, 3));
+  const tint = useUniforms ? 'diffuse' : glslVec(list(config.parameters.adjust, 'tint'));
   const parts = familyParts(config, context, tint);
   const mapDeclarations = Object.keys(maps).sort().map(key => `uniform sampler2D surface_${key};${useUniforms ? `\nuniform vec2 surface_scale_${key};` : ''}`).join('\n');
   return {

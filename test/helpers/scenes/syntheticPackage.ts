@@ -7,6 +7,16 @@ import { syntheticTrack } from '../syntheticTrack.js';
 import type { TrackBoundaryGeometry } from '../../../shared/types/trackGeometry.js';
 
 const sha = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
+
+/** A complete car paint (descriptor version 4) over `albedo`: every value the app reads. */
+export function testCarPaint(albedo: string) {
+  const region = { baseCoatRoughness: 0.4, baseCoatRefractiveIndex: 1.6, baseCoatSpecStrength: 1, clearCoatRoughness: 0, clearCoatRefractiveIndex: 1.5,
+    clearCoatSpecStrength: 1, lacquerColour: [1, 1, 1], metallicPaintStrength: 0, carbonFibreStrength: 0 };
+  return { version: 4 as const, kind: 'carPaint', maps: { albedo: { texture: albedo, uv: 'uv0' as const, scale: [1, 1] as [number, number] } }, parameters: {
+    regions: { black: { ...region }, red: { ...region }, green: { ...region }, blue: { ...region }, white: { ...region } },
+    uvScale: { carbonFibre: [1, 1], metallicFlakes: [1, 1], orangePeel: [1, 1] }, clearCoatStrength: 1, lacquerThickness: 0.1,
+    carbonFibreAlbedoColour: [0.11, 0.11, 0.11], metallicFlakeColour: [1, 1, 1] } };
+}
 /** A byte-exact GLB header (magic, version 2, total length) plus a marker: all the app checks of a GLB itself. */
 export const glb = (marker: string) => {
   const body = Buffer.from(marker), out = Buffer.alloc(12 + body.length);
@@ -20,7 +30,7 @@ export interface VehicleSpec { id: string; vehicleIds: string[]; extra?: Record<
 
 export interface ChunkRow {
   id: string; kind: string; bounds: { min: number[]; max: number[] }; asset: string; sha256: string; byteLength: number;
-  triangles: number; vertices: number; drawCalls: number; geometryBytes: number; meshes: number; materials: number; textures: string[];
+  triangles: number; vertices: number; drawCalls: number; shadowDrawCalls: number; shadowTriangles: number; geometryBytes: number; meshes: number; materials: number; textures: string[];
   lapStartM?: number; lapEndM?: number; prev?: string | null; next?: string | null;
 }
 
@@ -50,14 +60,16 @@ export function syntheticPackage() {
   const sceneryTexture = store('scenery/textures', 'ktx2.zst', zstdCompressSync(ktx2('scenery texture')));
   const chunk = (id: string, marker: string, extra: Partial<ChunkRow>): ChunkRow => ({
     id, kind: 'main', ...extra, bounds: { min: [-10, 0, -10], max: [10, 5, 10] }, ...store('scenery', 'glb', glb(marker)),
-    triangles: 10, vertices: 30, drawCalls: 2, geometryBytes: 100, meshes: 2, materials: 1, textures: [sceneryTexture.asset],
+    triangles: 10, vertices: 30, drawCalls: 2, shadowDrawCalls: 1, shadowTriangles: 4, geometryBytes: 100, meshes: 2, materials: 1, textures: [sceneryTexture.asset],
   });
   const sceneryShared = {
     chunking: { sectorLengthM: 1000, minSectorLengthM: 100, maxSectorTriangles: 400000, horizonDistanceM: 2000, skylineHeightM: 30, skylineMinDistanceM: 500, terrainScaleExtentM: 50, pitBandM: 100 },
     streaming: { residentBehindM: 300, residentAheadM: 1500, freeCameraRadiusM: 1500 },
+    camera: { meteringWindow: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 }, profiles: [{ sunElevationDeg: 0, targetExposure: 0.4, whiteBalanceK: 7000 }, { sunElevationDeg: 60, targetExposure: 0.2, whiteBalanceK: 6500 }],
+      toneCurve: { a: 2.5, b: 0.6 }, glareThreshold: 1.2, ambientOcclusion: { radiusM: 0.4, samples: 8, scale: 2, colour: 0.4 } },
   };
   const scenery = {
-    layoutKey: 'monza_gp', sourceGeometryRevision: geometry.geometryRevision, routeLengthM: L, pitLaneLengthM: 0,
+    layoutKey: 'monza_gp', sourceGeometryRevision: geometry.geometryRevision, routeLengthM: L, pitLaneLengthM: 0, shadowRangeM: 750,
     daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55 },
     horizon: chunk('horizon', 'horizon', { kind: 'horizon' }),
     sectors: [
@@ -75,7 +87,7 @@ export function syntheticPackage() {
     wheelPivots: { fl: [0.8, 0.33, -1.4], fr: [-0.8, 0.33, -1.4], rl: [0.8, 0.33, 1.4], rr: [-0.8, 0.33, 1.4] },
     optionNodes: ['option_NumplateA', 'option_NumplateB'],
     wheelRig: { passed: true, rigs: 4, maxRestVertexErrorM: 0 },
-    appearances: [{ alias: 'TEST_CAR', albedo: texturePath, paint: { kind: 'carPaint', maps: {} }, optionNodes: ['option_NumplateA'] }],
+    appearances: [{ alias: 'TEST_CAR', albedo: texturePath, paint: testCarPaint(texturePath), optionNodes: ['option_NumplateA'] }],
     materials: [{ id: 'm1', name: 'body', paint: true }],
     cameras: { list: [
       { name: 'COCKPIT', position: [0.3, 0.95, 0.3], orientation: [-0.02, 0, 0], fov: [89, 49], clipPlanes: [0.13, 700], cockpitView: 'in' },
@@ -97,10 +109,10 @@ export function syntheticPackage() {
     vehicles.splice(0, vehicles.length, ...specs);
     const ids = specs.flatMap(spec => spec.vehicleIds);
     descriptor.aliases = ids;
-    descriptor.appearances = ids.map(alias => ({ alias, albedo: texturePath, paint: { kind: 'carPaint', maps: {} }, optionNodes: [] }));
+    descriptor.appearances = ids.map(alias => ({ alias, albedo: texturePath, paint: testCarPaint(texturePath), optionNodes: [] }));
   };
   const manifest: Record<string, unknown> = {
-    schemaVersion: 5, id: 'synthetic', version: '1',
+    schemaVersion: 6, id: 'synthetic', version: '1',
     tracks: { catalog: 'tracks/index.json' }, vehicles: { catalog: 'vehicles/index.json' },
     scenery: { catalog: 'scenery/index.json' },
   };

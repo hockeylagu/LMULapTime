@@ -3,6 +3,8 @@ import { Sky } from 'three/addons/objects/Sky.js';
 import { nativeToScene } from './sceneFrame.js';
 import { createStaticShadow, NEAR_SHADOW, SHADOW_NEAR_M, shadowWindowCentre } from './sunShadows.js';
 import type { SceneryDaylight } from '../../../../shared/types/scenes/scenery.js';
+import type { ReplayDaylightClock } from '../../../../shared/types/replay.js';
+import { solarPosition } from './solarPosition.js';
 
 /**
  * Midday lighting, from the pipeline review viewer's daylight (pipeline/viewer/daylight.js) with one replay change: exponential
@@ -30,21 +32,54 @@ export const SUN_DIRECTION = sunToward(DAYLIGHT.elevationDeg);
 /** The lowest sun the replay lights with: a session start after sunset is lit as late afternoon, not as night. */
 const MIN_SUN_ELEVATION_DEG = 10;
 
-export interface SceneLighting { sunDirection: Vector3; turbidity: number }
+export interface SceneLighting {
+  sunDirection: Vector3;
+  turbidity: number;
+  /** The sunlight's colour and strength reaching the ground, relative to the calibrated midday sun (`sunTransmittance`). */
+  sunTransmittance: Color;
+  /** The replay's cloud cover at the lap (0 clear to 1 overcast); a clear sky when the replay carries none. */
+  cloudCover: number;
+}
+
+/** Optical depth of a clear sky at the zenith for red, green and blue light (molecular plus a light aerosol load). */
+const OPTICAL_DEPTH = [0.10, 0.16, 0.28] as const;
+/** Kasten and Young's relative air mass: how many atmospheres the sun's ray crosses at an elevation. */
+const airMass = (elevationDeg: number) => 1 / (Math.sin(MathUtils.degToRad(elevationDeg)) + 0.50572 * (elevationDeg + 6.07995) ** -1.6364);
 
 /**
- * The race start sets the sun's direction. Packages without a bearing use the default scene azimuth.
+ * The direct sunlight reaching the ground, relative to the calibrated sun at the default midday elevation in a clear sky: the
+ * atmosphere dims and reddens it along the ray's air mass (Beer-Lambert per colour), and cloud cover `c` lets a share (1 - c) of
+ * it through per atmosphere crossed, so a low sun under light cloud is mostly hidden. Never brighter than the calibrated sun.
+ */
+export function sunTransmittance(elevationDeg: number, cloudCover = 0): Color {
+  const path = airMass(elevationDeg), reference = airMass(DAYLIGHT.elevationDeg), clouds = (1 - MathUtils.clamp(cloudCover, 0, 1)) ** path;
+  const [r, g, b] = OPTICAL_DEPTH.map(depth => Math.min(1, Math.exp(-depth * (path - reference))) * clouds);
+  return new Color(r, g, b);
+}
+
+/**
+ * The replay's clock sets the sun: its session start (the track's default time for the session when the replay does not carry
+ * one) plus the lap's session time, at the layout's location. A layout without a location uses the session's published sun,
+ * and without a clock the race session's. Packages without a bearing use the default scene azimuth.
  * GDB air pollution sets sky turbidity using the review viewer's mapping. The GDB haze scale
  * is not applied: read as "larger is hazier" it cleared Fuji (0.55), which the game shows hazy. Without daylight, the default midday.
  */
-export function sceneLighting(daylight?: SceneryDaylight): SceneLighting {
-  if (!daylight) return {sunDirection: SUN_DIRECTION.clone(), turbidity: DAYLIGHT.turbidity};
-  const race = daylight.sessions.find(session => session.id === 'race');
-  if (!race) throw Error('Layout daylight has no race session');
-  const elevationDeg = Math.max(MIN_SUN_ELEVATION_DEG, race.sunElevationDeg);
+export function sceneLighting(daylight?: SceneryDaylight, clock?: ReplayDaylightClock): SceneLighting {
+  const cloudCover = MathUtils.clamp(clock?.cloudCover ?? 0, 0, 1);
+  if (!daylight) return {sunDirection: SUN_DIRECTION.clone(), turbidity: DAYLIGHT.turbidity, sunTransmittance: sunTransmittance(DAYLIGHT.elevationDeg, cloudCover), cloudCover};
+  const id = clock?.session ?? 'race', session = daylight.sessions.find(entry => entry.id === id);
+  if (!session) throw Error(`Layout daylight has no ${id} session`);
+  let sun: {elevationDeg: number; bearingDeg?: number} = {elevationDeg: session.sunElevationDeg, bearingDeg: session.sunBearingDeg};
+  const {latitudeDeg, longitudeDeg, utcOffsetHours} = daylight;
+  if (clock && latitudeDeg !== undefined && longitudeDeg !== undefined && utcOffsetHours !== undefined) {
+    const [hours, minutes] = session.localTime.split(':').map(Number);
+    const minuteOfDay = (clock.startMinute ?? hours * 60 + minutes) + clock.sessionTimeSec / 60;
+    sun = solarPosition(latitudeDeg, longitudeDeg, daylight.date, minuteOfDay, utcOffsetHours);
+  }
+  const elevationDeg = Math.max(MIN_SUN_ELEVATION_DEG, sun.elevationDeg);
   let sunDirection = sunToward(elevationDeg);
-  if (race.sunBearingDeg !== undefined) {
-    const bearing = MathUtils.degToRad(race.sunBearingDeg), elevation = MathUtils.degToRad(elevationDeg);
+  if (sun.bearingDeg !== undefined) {
+    const bearing = MathUtils.degToRad(sun.bearingDeg), elevation = MathUtils.degToRad(elevationDeg);
     const horizontal = Math.cos(elevation);
     const native = {x: horizontal * Math.sin(bearing), y: Math.sin(elevation), z: horizontal * Math.cos(bearing)};
     sunDirection = new Vector3(...nativeToScene(native, {x: 0, y: 0, z: 0}));
@@ -52,6 +87,8 @@ export function sceneLighting(daylight?: SceneryDaylight): SceneLighting {
   return {
     sunDirection,
     turbidity: 2 + 1.5 * daylight.airPollution,
+    sunTransmittance: sunTransmittance(elevationDeg, cloudCover),
+    cloudCover,
   };
 }
 
@@ -75,8 +112,8 @@ export interface SceneEnvironment {
  * Sky dome, horizon fog, a shadow-casting sun and a sky image-based light, set up as the pipeline viewer does so scenery is
  * lit alike. The scenery supplies its own terrain, filler ground and horizon; nothing here draws ground.
  */
-export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, daylight?: SceneryDaylight): SceneEnvironment {
-  const lighting = sceneLighting(daylight);
+export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, daylight?: SceneryDaylight, clock?: ReplayDaylightClock): SceneEnvironment {
+  const lighting = sceneLighting(daylight, clock);
   const sky = new Sky();
   sky.scale.setScalar(SKY_RADIUS_M);
   const uniforms = sky.material.uniforms;
@@ -84,6 +121,8 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, dayli
   uniforms.mieCoefficient.value = DAYLIGHT.mieCoefficient; uniforms.mieDirectionalG.value = DAYLIGHT.mieDirectionalG;
   uniforms.sunPosition.value = lighting.sunDirection.clone();
   uniforms.showSunDisc.value = false;
+  // The sky shader's own clouds (default 40 %) cover the share of the sky the replay's cloud field covers.
+  uniforms.cloudCoverage.value = lighting.cloudCover;
   // A constant blend factor scales the sky shader's output without changing it (standard material blending).
   Object.assign(sky.material, {blending: CustomBlending, blendSrc: ConstantColorFactor, blendDst: ZeroFactor});
   sky.material.blendColor.setScalar(DAYLIGHT.skyScale);
@@ -91,7 +130,9 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, dayli
   // The dome travels with the eye so its horizon stays at infinity at every zoom level.
   sky.onBeforeRender = (_renderer, _scene, camera: Camera) => { sky.position.copy(camera.position); sky.updateMatrixWorld(); };
   scene.background = null;
-  scene.fog = new FogExp2(new Color(DAYLIGHT.horizonColor), DAYLIGHT.fogDensity);
+  // The haze scatters the sunlight that reaches it: a low or clouded sun dims and warms it as it does the sun (unchanged at the
+  // calibrated midday sun in a clear sky).
+  scene.fog = new FogExp2(new Color(DAYLIGHT.horizonColor).multiply(lighting.sunTransmittance), DAYLIGHT.fogDensity);
 
   // The reflection environment: the sky over a sunlit ground plane, so faces out of the sun get the light the ground bounces up to
   // them. A near-black plane (about 2%) left shaded faces lit by blue sky alone: yellow boards turned olive, stands and bridge
@@ -99,24 +140,25 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, dayli
   const environmentScene = new Scene(), environmentSky = sky.clone();
   environmentSky.material = sky.material;
   const groundRadiance = GROUND_ALBEDO * DAYLIGHT.sunIntensity * Math.max(0, lighting.sunDirection.y) / Math.PI;
-  const groundColour = new Color(DAYLIGHT.sunColor).multiplyScalar(groundRadiance);
+  const sunColour = new Color(DAYLIGHT.sunColor).multiply(lighting.sunTransmittance);
+  const groundColour = sunColour.clone().multiplyScalar(groundRadiance);
   const reflectedGround = new Mesh(new PlaneGeometry(24000, 24000), new MeshBasicMaterial({color: groundColour, side: DoubleSide}));
   reflectedGround.rotation.x = -Math.PI / 2; reflectedGround.position.y = ENVIRONMENT_GROUND_Y;
   environmentScene.add(environmentSky, reflectedGround);
   const generator = new PMREMGenerator(renderer), reflection = generator.fromScene(environmentScene, 0, 0.1, SKY_RADIUS_M, {size: 256});
   generator.dispose();
   scene.environment = reflection.texture;
-  // The exposure pass applies the game's own tone curve (autoExposure.ts): nothing else tone-maps.
+  // The exposure pass applies the camera profile's tone curve (autoExposure.ts): nothing else tone-maps.
   renderer.toneMapping = NoToneMapping;
 
   // The near sun shadow (sunShadows.ts); the static scenery map is drawn by its own pass.
-  const sun = new DirectionalLight(new Color(DAYLIGHT.sunColor), DAYLIGHT.sunIntensity);
+  const sun = new DirectionalLight(sunColour, DAYLIGHT.sunIntensity);
   sun.name = 'sun'; sun.castShadow = true;
   sun.shadow.mapSize.set(NEAR_SHADOW.mapPx, NEAR_SHADOW.mapPx);
   Object.assign(sun.shadow.camera, {left: -NEAR_SHADOW.halfExtentM, right: NEAR_SHADOW.halfExtentM, top: NEAR_SHADOW.halfExtentM,
     bottom: -NEAR_SHADOW.halfExtentM, near: SHADOW_NEAR_M, far: 2 * NEAR_SHADOW.lightDistanceM});
   sun.shadow.camera.updateProjectionMatrix();
-  // Radius 0 is one hardware filtered compare tap, as the game samples its sun shadow (sample_c_lz): the noisy 5-tap disk at
+  // Radius 0 is one hardware filtered compare tap: the noisy 5-tap disk at
   // radius 1 blurred the edges. normalBias 5 cm (~1.3 texels): at 0.01 the road lines and car bodies speckled with self-shadow acne.
   sun.shadow.bias = 0.000001; sun.shadow.normalBias = 0.05; sun.shadow.intensity = 1; sun.shadow.radius = 0;
   scene.add(sun, sun.target);

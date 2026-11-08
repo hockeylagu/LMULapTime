@@ -5,6 +5,7 @@ import { computeLapComparisons } from '../../../utils/replayComparison.js';
 import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../../utils/lapAlignment.js';
 import { TELEMETRY_COLORS } from '../../../utils/themeColors.js';
 import type { SurfaceHeight } from './scenery/sceneryGround.js';
+import type { SceneryCamera } from '../../../../shared/types/scenes/scenery.js';
 import { inverseToneCurve } from './autoExposure.js';
 
 /** Ribbon width: wide enough to read from chase height, narrow enough to show the line through a corner. */
@@ -57,13 +58,15 @@ function racingLineGeometry(lap: ReplayTrajectoryData, origin: Vector3, heights:
 /** Road heights under each lap point. The road does not move: a height once found is kept when its chunk unloads, and only points
  * still without one are looked up again, so a re-drape after streaming costs a few lookups instead of the whole lap. */
 const lineHeights = new WeakMap<Mesh, Array<number | null>>();
+/** The camera's tone curve each line's colours are inverted through. */
+const lineCurves = new WeakMap<Mesh, SceneryCamera['toneCurve']>();
 function fillHeights(heights: Array<number | null>, lap: ReplayTrajectoryData, surfaceHeight: SurfaceHeight): boolean {
   let found = false;
   lap.points.forEach((point, i) => { if (heights[i] === null) { heights[i] = surfaceHeight(point); found ||= heights[i] !== null; } });
   return found;
 }
 
-export function makeRacingLine(lap: ReplayTrajectoryData, origin: Vector3, colors: string[], surfaceHeight: SurfaceHeight, widthM = RACING_LINE_WIDTH_M, liftM = LIFT_M): Mesh<BufferGeometry, MeshBasicMaterial> {
+export function makeRacingLine(lap: ReplayTrajectoryData, origin: Vector3, colors: string[], surfaceHeight: SurfaceHeight, toneCurve: SceneryCamera['toneCurve'], widthM = RACING_LINE_WIDTH_M, liftM = LIFT_M): Mesh<BufferGeometry, MeshBasicMaterial> {
   const heights: Array<number | null> = lap.points.map(() => null);
   fillHeights(heights, lap, surfaceHeight);
   const geometry = racingLineGeometry(lap, origin, heights, widthM, liftM);
@@ -74,16 +77,18 @@ export function makeRacingLine(lap: ReplayTrajectoryData, origin: Vector3, color
   // Data, not lit scenery: its vertex colours are what the tone curve displays as the 2D map's colours (colorRacingLine), and
   // exposure is a linear scale before the curve, so dividing it out keeps those pixels whatever auto-exposure picks.
   line.onBeforeRender = renderer => { line.material.color.setScalar(1 / renderer.toneMappingExposure); };
-  lineHeights.set(line, heights);
+  lineHeights.set(line, heights); lineCurves.set(line, toneCurve);
   colorRacingLine(line, colors);
   return line;
 }
 
 export function colorRacingLine(line: Mesh<BufferGeometry, MeshBasicMaterial>, colors: string[]): void {
+  const curve = lineCurves.get(line);
+  if (!curve) throw Error('Racing line was not built by makeRacingLine');
   const attribute = line.geometry.getAttribute('color') as Float32BufferAttribute, color = new Color();
   for (let i = 0; i < attribute.count / 2; i++) {
     color.set(colors[i] ?? TELEMETRY_COLORS.primary);
-    const r = inverseToneCurve(color.r), g = inverseToneCurve(color.g), b = inverseToneCurve(color.b);
+    const r = inverseToneCurve(curve, color.r), g = inverseToneCurve(curve, color.g), b = inverseToneCurve(curve, color.b);
     attribute.setXYZ(i * 2, r, g, b); attribute.setXYZ(i * 2 + 1, r, g, b);
   }
   attribute.needsUpdate = true;

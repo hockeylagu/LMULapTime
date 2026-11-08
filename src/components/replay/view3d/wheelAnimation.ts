@@ -12,7 +12,7 @@ const vector = (value: unknown): Vector3 | null =>
   Array.isArray(value) && value.length === 3 && value.every(Number.isFinite) ? new Vector3(...(value as number[])) : null;
 
 /**
- * The exporter's `steering_wheel` node rests at the car origin and turns about the game's SteeringWheelAxis (unit) through
+ * The exporter's `steering_wheel` node rests at the car origin and turns about the descriptor's steering axis (unit) through
  * `steeringWheelPivot`, both in the native car frame.
  */
 function steeringWheelRig(envelope: Object3D): {node: Object3D; axis: Vector3; pivot: Vector3} | null {

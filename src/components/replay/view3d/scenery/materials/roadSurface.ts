@@ -1,22 +1,22 @@
 import { value, list, type ShaderContext, type SurfaceParts } from './shaderContext.js';
 import type { SurfaceConfig } from './surfaceConfig.js';
 
-/** Dry road/kerb shader reconstruction. Wetness and RealRoad evolution stay disabled. */
+/** Dry road and kerb surfaces. Wetness and rubbering evolution stay disabled. */
 export function roadShaderParts(config: SurfaceConfig, { sample, uv, number, vec, uniforms }: ShaderContext): SurfaceParts {
   const { maps, parameters: p, flags: f, kind } = config;
-  const adjust = p.Material_Adjust, noOverlay = p.No_Overlay_Base, decalGroup = p.Decal, blendGroup = p.Albedo_Blend;
-  const enabled = (key: string) => !!f[key] && f[key] !== '@Undef';
+  const adjust = p.adjust, noOverlay = p.bare, decalGroup = p.decal, blendGroup = p.kerbBlend;
+  const enabled = (key: string) => !!f[key];
   if (kind !== 'road' && kind !== 'kerb') throw Error(`Unsupported road shader family: ${kind}`);
 
   const num = (v: number, name: string) => uniforms ? name : number(v);
-  const hasOverlay = kind === 'road' && enabled('OVERLAYMAP') && !!maps.overlay;
-  const usesOverlayMask = hasOverlay && enabled('BLENDWETMASK') &&
-    (enabled('USEOVERLAYMASK') || enabled('ROADDETAILSMAP') || enabled('DECALMAP'));
+  const hasOverlay = kind === 'road' && enabled('overlayMap') && !!maps.overlay;
+  const usesOverlayMask = hasOverlay && enabled('blendWetMask') &&
+    (enabled('overlayMask') || enabled('roadDetailsMap') || enabled('decalMap'));
   const detailCoverage = usesOverlayMask ? 'surfaceDetailCoverage' : '1.0';
-  const tint = uniforms ? 'diffuse' : vec(list(adjust, 'AlbedoTint', [1, 1, 1]).slice(0, 3));
-  const roughAdjust = num(value(adjust, 'Roughness', .5), 'roughness');
-  const specAdjust = num(value(adjust, 'SpecularLevel', .5), 'surface_specular');
-  const roughFromAlpha = enabled('ROUGHNESSALBEDOALPHA');
+  const tint = uniforms ? 'diffuse' : vec(list(adjust, 'tint'));
+  const roughAdjust = num(value(adjust, 'roughness'), 'roughness');
+  const specAdjust = num(value(adjust, 'specular'), 'surface_specular');
+  const roughFromAlpha = enabled('roughnessFromAlbedoAlpha');
   const blendWet = sample('blendWet', 'vec4(0.5)');
   const roadDetails = sample('roadDetails', 'vec4(0.0)');
   let albedo = `
@@ -31,28 +31,28 @@ export function roadShaderParts(config: SurfaceConfig, { sample, uv, number, vec
     albedo += `vec4 blendWet=${blendWet};
       vec4 roadDetails=${roadDetails};`;
 
-    // Source DECALRDTMASK scales decal contribution before the decal-specific blend.
-    if (enabled('DECALMAP') && maps.decal) {
-      const decalStrength = num(value(decalGroup, 'Strength', 1), 'surface_decalStrength');
+    // The road-details mask scales the decal contribution before the decal-specific blend.
+    if (enabled('decalMap') && maps.decal) {
+      const decalStrength = num(value(decalGroup, 'strength'), 'surface_decalStrength');
       albedo += `vec4 decalSample=${sample('decal')};
         float decalStrength=${decalStrength};
-        ${enabled('DECALRDTMASK') && enabled('ROADDETAILSMAP') ? 'decalStrength*=roadDetails.b;' : ''}
+        ${enabled('decalRoadDetailsMask') && enabled('roadDetailsMap') ? 'decalStrength*=roadDetails.b;' : ''}
         vec3 decalValue;
       `;
-      if (f.DECALBLEND === 'AlphaBlend') {
+      if (f.decalBlend === 'alpha') {
         albedo += `decalValue=decalSample.rgb;
           decalStrength*=decalSample.a;
           base.rgb=mix(base.rgb,decalValue,decalStrength);
         `;
-      } else if (f.DECALBLEND === 'SdfBlend') {
-        const thickness = num(value(decalGroup, 'Thickness', .5), 'surface_decalThickness');
-        const softness = num(value(decalGroup, 'Softness', .1), 'surface_decalSoftness');
+      } else if (f.decalBlend === 'sdf') {
+        const thickness = num(value(decalGroup, 'thickness'), 'surface_decalThickness');
+        const softness = num(value(decalGroup, 'softness'), 'surface_decalSoftness');
         albedo += `decalValue=decalSample.rgb;
           decalStrength*=clamp((decalSample.a-${thickness})/max(0.00001,${softness}),0.0,1.0);
           base.rgb=mix(base.rgb,decalValue,decalStrength);
         `;
       } else {
-        // This follows the source AddSub branch, including its RGB-derived mask factor.
+        // Add/subtract decal, including its RGB-derived mask factor.
         albedo += `decalValue=decalStrength*(decalSample.rgb-vec3(0.5));
           decalStrength=clamp(2.0*(abs(decalValue.r)+abs(decalValue.g)+abs(decalValue.r)),0.0,1.0);
           base.rgb=max(vec3(0.0),base.rgb+decalValue);
@@ -61,16 +61,16 @@ export function roadShaderParts(config: SurfaceConfig, { sample, uv, number, vec
     }
 
     if (usesOverlayMask) {
-      albedo += `${enabled('USEOVERLAYMASK') ? 'surfaceDetailCoverage*=blendWet.r;' : ''}
-        ${enabled('ROADDETAILSMAP') && enabled('OVERLAYRDTMASK') ? 'surfaceDetailCoverage*=1.0-roadDetails.b;' : ''}
-        ${enabled('DECALMAP') && maps.decal ? `surfaceDetailCoverage*=1.0-${num(value(decalGroup, 'Detail', 0), 'surface_decalDetail')}*decalStrength;` : ''}
+      albedo += `${enabled('overlayMask') ? 'surfaceDetailCoverage*=blendWet.r;' : ''}
+        ${enabled('roadDetailsMap') && enabled('overlayRoadDetailsMask') ? 'surfaceDetailCoverage*=1.0-roadDetails.b;' : ''}
+        ${enabled('decalMap') && maps.decal ? `surfaceDetailCoverage*=1.0-${num(value(decalGroup, 'detail'), 'surface_decalDetail')}*decalStrength;` : ''}
         surfaceDetailCoverage=clamp(surfaceDetailCoverage,0.0,1.0);
       `;
     }
 
     if (hasOverlay) {
-      const noOverlayRough = num(value(noOverlay, 'Roughness', .7), 'surface_noOverlayRoughness');
-      const noOverlaySpec = num(value(noOverlay, 'SpecularLevel', .5), 'surface_noOverlaySpecular');
+      const noOverlayRough = num(value(noOverlay, 'roughness'), 'surface_noOverlayRoughness');
+      const noOverlaySpec = num(value(noOverlay, 'specular'), 'surface_noOverlaySpecular');
       albedo += `vec4 overlay=${sample('overlay', 'vec4(0.5)')};
         vec4 sourceOverlay=mix(vec4(0.5,0.5,0.5,${noOverlayRough}),overlay,${detailCoverage});
         vec3 overlayBase=sqrt(max(base.rgb,vec3(0.0)));
@@ -80,28 +80,28 @@ export function roadShaderParts(config: SurfaceConfig, { sample, uv, number, vec
         sourceSpecular=mix(${noOverlaySpec},${specAdjust},${detailCoverage});
       `;
     } else if (usesOverlayMask) {
-      // Source only consumes No_Overlay_Base for the overlay shader branch.
+      // The bare-road values only apply to the overlay branch.
       albedo += `sourceSpecular=${specAdjust};`;
     }
   } else {
-    // For the dry kerb path, source groove/marbles terms are intentionally omitted.
-    const mixBias = num(value(blendGroup, 'MixBias', .5), 'surface_kerbMixBias');
-    const defaultBlend = num(value(blendGroup, 'Default', 1), 'surface_kerbDefaultBlend');
-    const mixBlend = enabled('BLENDWETMASK') ? 'blendWet.r' : '0.5';
-    const defaultControl = enabled('ROADDETAILSMAP') ? `clamp(roadDetails.b*${defaultBlend},0.0,1.0)` : '0.0';
+    // Dry kerb: groove and marbles terms are intentionally omitted.
+    const mixBias = num(value(blendGroup, 'mixBias'), 'surface_kerbMixBias');
+    const defaultBlend = num(value(blendGroup, 'default'), 'surface_kerbDefaultBlend');
+    const mixBlend = enabled('blendWetMask') ? 'blendWet.r' : '0.5';
+    const defaultControl = enabled('roadDetailsMap') ? `clamp(roadDetails.b*${defaultBlend},0.0,1.0)` : '0.0';
     albedo += `vec4 blendWet=${blendWet};
       vec4 roadDetails=${roadDetails};
       float sourceBlend=clamp((${mixBlend}-${defaultControl})/max(${mixBias},0.00001),0.0,1.0);
       surfaceAltBlend=1.0-sourceBlend;
     `;
-    if (enabled('ALBEDOALTMAP') && maps.alternate)
+    if (enabled('albedoAltMap') && maps.alternate)
       albedo += `base=mix(base,${sample('alternate')},surfaceAltBlend);
         ${roughFromAlpha ? `sourceRoughness=mix(${sample('alternate')}.a,sourceRoughness,sourceBlend);` : ''}
       `;
   }
 
-  const specOcclusionCoverage = kind === 'road' && f.AOSMODE !== 'SceneDetails' && usesOverlayMask ? 'surfaceDetailCoverage' : '1.0';
-  const aoCoverage = kind === 'road' && f.AOSMODE !== 'SceneDetails' && usesOverlayMask ? 'surfaceDetailCoverage' : '1.0';
+  const specOcclusionCoverage = kind === 'road' && f.ambientOcclusion !== 'scene' && usesOverlayMask ? 'surfaceDetailCoverage' : '1.0';
+  const aoCoverage = kind === 'road' && f.ambientOcclusion !== 'scene' && usesOverlayMask ? 'surfaceDetailCoverage' : '1.0';
 
   albedo += `
     diffuseColor.rgb=${uniforms ? 'base.rgb*diffuse' : `base.rgb*${tint}*${tint}`};
@@ -113,13 +113,13 @@ export function roadShaderParts(config: SurfaceConfig, { sample, uv, number, vec
 
   let normals = '';
   if (maps.normal) {
-    const intensity = num(value(adjust, 'NormalIntensity', 1), 'surface_normalScale.x');
+    const intensity = num(value(adjust, 'normalStrength'), 'surface_normalScale.x');
     const ySign = num(config.normalYSign, 'surface_normalScale.y');
     if (kind === 'road') {
       const baseNormal = `surfaceDecodeNormal(${sample('normal')}.rg,${intensity},${ySign})`;
       let combined = baseNormal;
       if (maps.normalAlt) {
-        const altEncoded = enabled('NORMALALTRDTMASK') && enabled('ROADDETAILSMAP')
+        const altEncoded = enabled('normalAltRoadDetailsMask') && enabled('roadDetailsMap')
           ? `mix(vec2(0.5),${sample('normalAlt')}.rg,${roadDetails}.b)` : `${sample('normalAlt')}.rg`;
         const alt = `surfaceDecodeNormal(${altEncoded},${intensity}*0.4,${ySign})`;
         combined = `normalize(vec3((${baseNormal}).xy+(${alt}).xy,(${baseNormal}).z*(${alt}).z))`;
@@ -127,7 +127,7 @@ export function roadShaderParts(config: SurfaceConfig, { sample, uv, number, vec
       normals = `normal=surfaceNormalVector(normal,${uv('normal')},${combined});`;
     } else {
       let encoded = `${sample('normal')}.rg`;
-      if (enabled('BLENDWETMASK')) encoded = `mix(vec2(0.5),${encoded},blendWet.r*0.5)`;
+      if (enabled('blendWetMask')) encoded = `mix(vec2(0.5),${encoded},blendWet.r*0.5)`;
       normals = `normal=surfaceNormalVector(normal,${uv('normal')},surfaceDecodeNormal(${encoded},${intensity},${ySign}));`;
     }
   }

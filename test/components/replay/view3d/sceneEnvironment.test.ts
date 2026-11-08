@@ -1,7 +1,8 @@
 import { expect, it, vi } from 'vitest';
-import { ShaderChunk, BoxGeometry, DirectionalLight, FogExp2, Mesh, MeshBasicMaterial, MeshDepthMaterial, MeshStandardMaterial, NoToneMapping, OrthographicCamera, PerspectiveCamera, Scene, Texture, Vector3, type WebGLRenderer } from 'three';
+import { Color, ShaderChunk, BoxGeometry, DirectionalLight, FogExp2, Mesh, MeshBasicMaterial, MeshDepthMaterial, MeshStandardMaterial, NoToneMapping, OrthographicCamera, PerspectiveCamera, Scene, Texture, Vector3, type WebGLRenderer } from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
-import { addSceneEnvironment, DAYLIGHT, sceneLighting, SUN_DIRECTION } from '../../../../src/components/replay/view3d/sceneEnvironment.js';
+import { addSceneEnvironment, DAYLIGHT, sceneLighting, SUN_DIRECTION, sunTransmittance } from '../../../../src/components/replay/view3d/sceneEnvironment.js';
+import { solarPosition } from '../../../../src/components/replay/view3d/solarPosition.js';
 import { staticShadowUniforms } from '../../../../src/components/replay/view3d/sunShadows.js';
 
 const probe = vi.hoisted(() => ({render: vi.fn<(scene: Scene) => void>(), dispose: vi.fn()}));
@@ -22,8 +23,11 @@ it('uses standard sky, PMREM and a near sun shadow without touching shared shade
   expect(scene.getObjectByName('default-terrain')).toBeUndefined(); expect(scene.children.filter(child => child instanceof Mesh && child.name !== 'sky')).toEqual([receiver]);
   expect(scene.getObjectByName('sky')).toBeDefined();
   expect(scene.fog).toBeInstanceOf(FogExp2); expect((scene.fog as FogExp2).density).toBe(DAYLIGHT.fogDensity);
+  // Without a replay's cloud cover the sky is clear and the haze keeps its midday colour.
+  expect((scene.fog as FogExp2).color.getHexString()).toBe(DAYLIGHT.horizonColor.slice(1));
+  expect((scene.getObjectByName('sky') as Sky).material.uniforms.cloudCoverage.value).toBe(0);
   expect(scene.background).toBeNull(); expect(renderer.shadowMap.enabled).toBe(true);
-  expect(renderer.toneMapping).toBe(NoToneMapping); // The exposure pass applies the game's tone curve.
+  expect(renderer.toneMapping).toBe(NoToneMapping); // The exposure pass applies the camera profile's tone curve.
   const camera = new PerspectiveCamera(48, 1.5, 0.5, 15000); camera.position.set(500, 3, -200); camera.updateMatrixWorld();
   environment.setCamera(camera); environment.update(new Vector3(500, 0, -210));
   const suns = scene.children.filter((child): child is DirectionalLight => child instanceof DirectionalLight);
@@ -32,7 +36,7 @@ it('uses standard sky, PMREM and a near sun shadow without touching shared shade
   const [sun] = suns;
   expect(sun.castShadow).toBe(true); expect(sun.intensity).toBe(DAYLIGHT.sunIntensity);
   expect(sun.shadow.mapSize.toArray()).toEqual([4096, 4096]);
-  expect(sun.shadow.camera.right - sun.shadow.camera.left).toBe(160);
+  expect(sun.shadow.camera.right - sun.shadow.camera.left).toBe(80);
   expect(sun.shadow.intensity).toBe(1); expect(sun.shadow.radius).toBe(0);
   expect(sun.shadow.bias).toBe(0.000001); expect(sun.shadow.normalBias).toBe(0.05);
   expect(sun.position.clone().sub(sun.target.position).normalize().toArray().map(v => +v.toFixed(6))).toEqual(SUN_DIRECTION.toArray().map(v => +v.toFixed(6)));
@@ -60,10 +64,10 @@ it('centres the shadow window ahead of the focus along the view and snaps it to 
   camera.position.set(0, 3, 10); camera.lookAt(0, 0, 0); environment.setCamera(camera);
   try {
     const sun = scene.children.find((child): child is DirectionalLight => child instanceof DirectionalLight)!;
-    const texel = 160 / 4096, sunAxis = (point: Vector3) => point.clone().projectOnPlane(SUN_DIRECTION);
+    const texel = 80 / 4096, sunAxis = (point: Vector3) => point.clone().projectOnPlane(SUN_DIRECTION);
     environment.update(new Vector3(0, 0, 0));
-    // The camera looks along -z: the window leads the focus by 50 m that way (within half a texel of snapping).
-    const centre = sunAxis(sun.target.position).sub(sunAxis(new Vector3(0, 0, -50)));
+    // The camera looks along -z: the window leads the focus by 25 m that way (within half a texel of snapping).
+    const centre = sunAxis(sun.target.position).sub(sunAxis(new Vector3(0, 0, -25)));
     expect(centre.length()).toBeLessThanOrEqual(texel);
     // Wherever the focus goes, the world origin sits on a whole texel of the shadow camera, so texels never slide under the scene.
     const onGrid = (value: number) => Math.abs(value / texel - Math.round(value / texel)) < 1e-3;
@@ -123,3 +127,50 @@ it('lights a layout from its published daylight: race-start sun height, turbidit
   expect(sceneLighting({date: '2023-11-04', sessions: sessions(-3), airPollution: 0.8, hazeBaseScale: 1}).sunDirection.y).toBeGreaterThan(0.15);
   expect(sceneLighting().sunDirection.toArray()).toEqual(SUN_DIRECTION.toArray());
 });
+
+it("places the sun at the replay's clock: session start plus session time at the layout's location", () => {
+  const sessions = [{id: 'race' as const, localTime: '13:00', sunElevationDeg: 50}, {id: 'qualify' as const, localTime: '12:45', sunElevationDeg: 46.1},
+    {id: 'practice1' as const, localTime: '11:00', sunElevationDeg: 51.88}, {id: 'practice2' as const, localTime: '15:30', sunElevationDeg: 40.89}];
+  const located = {date: '2023-09-10', sessions, airPollution: 0.5, hazeBaseScale: 0.55, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9};
+  const height = (lighting: {sunDirection: {y: number}}) => Math.asin(lighting.sunDirection.y) * 180 / Math.PI;
+  // An online event's start (here 15:30 qualifying, 120 s in) wins over the session default.
+  expect(height(sceneLighting(located, {session: 'qualify', startMinute: 930, sessionTimeSec: 120})))
+    .toBeCloseTo(solarPosition(35.37, 138.93, '2023-09-10', 932, 9).elevationDeg, 6);
+  // Offline, the session's default time, plus the session time.
+  expect(height(sceneLighting(located, {session: 'practice1', startMinute: null, sessionTimeSec: 3600})))
+    .toBeCloseTo(solarPosition(35.37, 138.93, '2023-09-10', 720, 9).elevationDeg, 6);
+  // Without a location, the session's published sun.
+  const {latitudeDeg: _lat, longitudeDeg: _lon, utcOffsetHours: _utc, ...unlocated} = located;
+  expect(height(sceneLighting(unlocated, {session: 'qualify', startMinute: 1050, sessionTimeSec: 0}))).toBeCloseTo(46.1, 6);
+});
+
+it('computes the sun position: overhead at the equator at solar noon on the equinox, east in the morning, west in the afternoon', () => {
+  expect(solarPosition(0, 0, '2026-03-20', 12 * 60 + 7, 0).elevationDeg).toBeGreaterThan(89);
+  const morning = solarPosition(48, 0, '2026-06-21', 9 * 60, 0), afternoon = solarPosition(48, 0, '2026-06-21', 15 * 60 + 4, 0);
+  expect(morning.bearingDeg).toBeGreaterThan(90); expect(morning.bearingDeg).toBeLessThan(135);
+  expect(afternoon.bearingDeg).toBeGreaterThan(225); expect(afternoon.bearingDeg).toBeLessThan(270);
+  expect(morning.elevationDeg).toBeCloseTo(afternoon.elevationDeg, 0);
+});
+
+it('dims and reddens a low sun through the air mass and hides it under cloud, never brighter than the calibrated sun', () => {
+  expect(sunTransmittance(DAYLIGHT.elevationDeg).toArray()).toEqual([1, 1, 1]);
+  expect(sunTransmittance(85).toArray()).toEqual([1, 1, 1]);
+  const low = sunTransmittance(12);
+  expect(low.b).toBeLessThan(low.g);
+  expect(low.g).toBeLessThan(low.r);
+  expect(low.r).toBeLessThan(1);
+  expect(sunTransmittance(12, 0.13).r).toBeLessThan(low.r * 0.6);
+  expect(sunTransmittance(DAYLIGHT.elevationDeg, 1).toArray()).toEqual([0, 0, 0]);
+});
+
+it("covers the sky with the replay's cloud cover and lights the haze with the sun that reaches it", () => {
+  const scene = new Scene(), renderer = {shadowMap: {enabled: false, type: 0, autoUpdate: true}, toneMapping: 0, toneMappingExposure: 0, ...fakeRenderer()} as unknown as WebGLRenderer;
+  const daylight = {date: '2023-06-10', sessions: [{id: 'qualify' as const, localTime: '20:45', sunElevationDeg: 12, sunBearingDeg: 290}], airPollution: 0.6, hazeBaseScale: 1};
+  const environment = addSceneEnvironment(scene, renderer, daylight, {session: 'qualify', startMinute: null, sessionTimeSec: 0, cloudCover: 0.62});
+  expect((scene.getObjectByName('sky') as Sky).material.uniforms.cloudCoverage.value).toBe(0.62);
+  const haze = (scene.fog as FogExp2).color, midday = new Color(DAYLIGHT.horizonColor);
+  expect(haze.g).toBeLessThan(midday.g * 0.5);
+  expect(haze.b / haze.r).toBeLessThan(midday.b / midday.r);
+  environment.dispose();
+});
+

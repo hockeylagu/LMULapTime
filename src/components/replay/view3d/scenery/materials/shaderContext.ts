@@ -1,4 +1,4 @@
-import type { ParameterGroup, SurfaceConfig } from './surfaceConfig.js';
+import type { ParameterGroup } from './surfaceConfig.js';
 
 /** GLSL pieces one surface family contributes to the patched `MeshStandardMaterial` program. */
 export interface SurfaceParts {
@@ -34,22 +34,18 @@ export function glslVec(a: readonly number[]): string {
   return `vec${a.length}(${a.map(glslNumber).join(',')})`;
 }
 
-/** A finite number from a parameter group, else the fallback. */
-export function value(group: ParameterGroup | undefined, key: string, fallback: number): number {
+/** A number from a parameter group. The exporter writes every value a surface reads: a missing one is malformed, never defaulted. */
+export function value(group: ParameterGroup | undefined, key: string): number {
   const v = group?.[key];
-  return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+  if (typeof v !== 'number' || !Number.isFinite(v)) throw Error(`Missing surface value: ${key}`);
+  return v;
 }
 
-/** A finite number stored directly under `parameters` (the dashboard keeps its controls flat), else the fallback. */
-export function flatValue(config: SurfaceConfig, key: string, fallback: number): number {
-  const v = (config.parameters as Record<string, unknown>)[key];
-  return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
-}
-
-/** A number list from a parameter group, else the fallback. */
-export function list(group: ParameterGroup | undefined, key: string, fallback: readonly number[]): readonly number[] {
+/** A number list from a parameter group; a missing one is malformed, never defaulted. */
+export function list(group: ParameterGroup | undefined, key: string): readonly number[] {
   const v = group?.[key];
-  return Array.isArray(v) ? v : fallback;
+  if (!Array.isArray(v)) throw Error(`Missing surface value: ${key}`);
+  return v;
 }
 
 export const HELPERS = `

@@ -4,7 +4,7 @@ import { addFoliageCrown } from './foliageCrown.js';
 import { billboardShadowMaterial, computeCustomProgramCacheKey, patchSurfaceShader } from './patchSurfaceShader.js';
 import { trackShadowEye } from './shadowEye.js';
 import { list, value } from './shaderContext.js';
-import { readSurfaceConfig, type ParameterGroup, type SurfaceConfig } from './surfaceConfig.js';
+import { readSurfaceConfig, type SurfaceConfig } from './surfaceConfig.js';
 import type { SurfaceTextureSource } from './textureSource.js';
 
 const START_MS = performance.now();
@@ -17,13 +17,6 @@ function singleMaterial(mesh: Mesh): MeshStandardMaterial | null {
   return mesh.material instanceof MeshStandardMaterial ? mesh.material : null;
 }
 
-/** A clearcoat control the exporter guarantees; a surface without it is malformed. */
-function required(group: ParameterGroup | undefined, key: string, config: SurfaceConfig): number {
-  const v = group?.[key];
-  if (typeof v !== 'number' || !Number.isFinite(v)) throw Error(`Missing clearcoat control: ${config.name}/${key}`);
-  return v;
-}
-
 /** Clearcoat and glass need the physical model; the rest keep a per-mesh clone of the standard material loaded from the GLB. */
 function ownMaterial(source: MeshStandardMaterial, config: SurfaceConfig): MeshStandardMaterial {
   if (config.kind !== 'clearcoat' && config.kind !== 'glass') return source.clone();
@@ -31,10 +24,10 @@ function ownMaterial(source: MeshStandardMaterial, config: SurfaceConfig): MeshS
   MeshStandardMaterial.prototype.copy.call(material, source);
   material.defines = { STANDARD: '', PHYSICAL: '' };
   if (config.kind === 'clearcoat') {
-    const { ClearCoat: coat, BaseCoat: base } = config.parameters;
-    material.clearcoat = required(coat, 'Strength', config);
-    material.clearcoatRoughness = required(coat, 'Roughness', config);
-    material.ior = required(base, 'RefractiveIndex', config);
+    const { clearCoat: coat, baseCoat: base } = config.parameters;
+    material.clearcoat = value(coat, 'strength');
+    material.clearcoatRoughness = value(coat, 'roughness');
+    material.ior = value(base, 'ior');
   } else { material.ior = 1.5; material.roughness = 0; }
   return material;
 }
@@ -51,14 +44,14 @@ export async function configureSurfaceMaterial(mesh: Mesh, textures: SurfaceText
   const config = readSurfaceConfig(original.userData);
   if (!config) return;
   const material = ownMaterial(original, config);
-  if (material.alphaTest > 0 && /^BARRIERS_FENCE[AB]_ALBA$/i.test(config.maps.albedo?.texture ?? '')) {
-    // Filtered wire texels lose alpha as the mesh recedes. Keep more of that coverage and smooth the wire edges with MSAA.
+  if (material.alphaTest > 0 && config.flags.wireCutout) {
+    // Filtered wire texels lose alpha as the mesh recedes: keep more of that coverage.
     material.alphaTest = Math.min(material.alphaTest, 0.2);
-    material.alphaToCoverage = true;
   }
-  // Leaf and crowd cards: a hard alpha cut shimmers and steps at their edges. Alpha to coverage over the 4x MSAA target is the
-  // anti-aliased alpha test (three sharpens alpha by its screen derivative), so cut-outs stay crisp without the stair steps.
-  if (material.alphaTest > 0 && config.billboard) material.alphaToCoverage = true;
+  // Cut-outs (leaf and crowd cards, fences, signs, foliage): a hard alpha cut shimmers and steps at their edges. Alpha to coverage
+  // over the 4x MSAA target is the anti-aliased alpha test (three sharpens alpha by its screen derivative), so cut-outs stay
+  // crisp without the stair steps.
+  if (material.alphaTest > 0) material.alphaToCoverage = true;
   mesh.material = material;
   if (material !== original) original.dispose();
 
@@ -68,20 +61,20 @@ export async function configureSurfaceMaterial(mesh: Mesh, textures: SurfaceText
     const texture = await textures.load(map);
     loaded[key] = texture;
     uniforms[`surface_${key}`] = { value: texture };
-    uniforms[`surface_scale_${key}`] = { value: new Vector2(...(map.scale ?? [1, 1])) };
+    uniforms[`surface_scale_${key}`] = { value: new Vector2(...map.scale) };
   }));
   const placeholder: Texture | undefined = loaded.layerA ?? loaded.albedo ?? loaded.on;
-  if (!placeholder && config.kind !== 'standard' && config.kind !== 'standardBlend') throw Error(`Missing base albedo for ${config.name}`);
+  if (!placeholder && config.kind !== 'standard' && config.kind !== 'standardBlend') throw Error(`Missing base albedo for ${config.name ?? '?'}`);
   material.userData.surfaceTextures = Object.keys(loaded);
   surfaceTextureMaps.set(material, Object.values(loaded));
   if (ownsTextures) material.addEventListener('dispose', () => { for (const texture of Object.values(loaded)) texture.dispose(); });
 
-  const adjust = config.parameters.Material_Adjust, baseMaterial = config.parameters.Base_Material;
-  material.roughness = value(adjust, 'Roughness', value(baseMaterial, 'Roughness', config.kind === 'clearcoat' ? 0 : 0.5));
-  material.metalness = value(adjust, 'Metallic', value(baseMaterial, 'Metallic', 0));
-  const [r, g, b] = list(adjust, 'AlbedoTint', [1, 1, 1]);
+  const adjust = config.parameters.adjust;
+  material.roughness = value(adjust, 'roughness');
+  material.metalness = value(adjust, 'metalness');
+  const [r, g, b] = list(adjust, 'tint');
   material.color.setRGB(r * r, g * g, b * b);
-  const intensity = value(adjust, 'NormalIntensity', 1);
+  const intensity = value(adjust, 'normalStrength');
   material.normalScale = new Vector2(intensity, intensity * config.normalYSign);
 
   // Three retains uniforms per material even when the compiled program is shared. The packed source normals, AO and roughness
@@ -99,7 +92,7 @@ export async function configureSurfaceMaterial(mesh: Mesh, textures: SurfaceText
     const corners = geometry.getAttribute('_lmu_corner');
     let extent = 0;
     for (let i = 0; i < corners.count; i++) extent = Math.max(extent, Math.abs(corners.getX(i)));
-    if (!geometry.boundingSphere) throw Error(`Billboard without bounds: ${config.name}`);
+    if (!geometry.boundingSphere) throw Error(`Billboard without bounds: ${config.name ?? '?'}`);
     geometry.boundingSphere.radius += extent;
     mesh.customDepthMaterial = billboardShadowMaterial();
     mesh.onBeforeShadow = trackShadowEye;

@@ -2,8 +2,10 @@ import { MeshoptDecoder } from 'meshoptimizer/decoder';
 import { BufferGeometry, Group, Mesh, type Material, type Object3D, type Texture, type Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
+import type { SceneryCamera } from '../../../../../shared/types/scenes/scenery.js';
 import { normalizeVehicleId, type LoadedCar } from '../../../../api/vehicles/carApi.js';
-import { albedoPath, createCarMaterial } from '../carMaterials.js';
+import { createCarMaterial, materialTexturePaths } from '../car/carMaterials.js';
+import { createContactShadow } from '../car/carContactShadow.js';
 import { MAP_COLORS, TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../../../utils/lapAlignment.js';
 import type { MapColorMode } from '../../map/replayMapUtils.js';
@@ -23,7 +25,7 @@ export interface LapCars {
 export type CarTextureLoader = (path: string) => Promise<Texture>;
 
 /** Lap objects own their geometry; replacing them cannot release the track's GPU buffers. */
-export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeight, loadTexture: CarTextureLoader) {
+export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeight, loadTexture: CarTextureLoader, toneCurve: SceneryCamera['toneCurve']) {
   // Only buffers retained by the bounded asset cache keep these parsed templates alive.
   const templates = new WeakMap<ArrayBuffer, Promise<Group>>();
   const loadTemplate = (car: LoadedCar): Promise<Group> => {
@@ -61,8 +63,7 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     template.traverse(object => {
       if (!(object instanceof Mesh) || isHidden(object)) return;
       for (const material of Array.isArray(object.material) ? object.material as Material[] : [object.material as Material]) {
-        const path = albedoPath(recipeOf(material), appearance);
-        if (path) paths.add(path);
+        for (const path of materialTexturePaths(recipeOf(material), appearance)) paths.add(path);
       }
     });
     const textures = new Map(await Promise.all([...paths].map(async path => [path, await loadTexture(path)] as const)));
@@ -100,13 +101,14 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
   const load = async (trajectory: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null, assets: LapCars, colorBy: MapColorMode) => {
     const [primaryModel, baselineModel] = await Promise.all([loadModel(assets.primary), assets.baseline ? loadModel(assets.baseline) : null]);
     const primary = makeCar(trajectory, MAP_COLORS.carBody, false, primaryModel);
+    primaryModel.add(createContactShadow(primaryModel));
     const ghost = baseline && baselineModel ? makeCar(baseline, TELEMETRY_COLORS.baseline, true, baselineModel) : new Group();
     const primaryWheels = createWheelAnimation(primary, trajectory, surfaceHeight);
     const ghostWheels = baseline ? createWheelAnimation(ghost, baseline, surfaceHeight) : null;
     ghost.traverse(object => { if (object instanceof Mesh) { object.castShadow = false; object.receiveShadow = false; } });
     let colors = racingLineColors(trajectory, baseline, colorBy);
-    const primaryLine = makeRacingLine(trajectory, origin, colors.primary, surfaceHeight);
-    const baselineLine = baseline ? makeRacingLine(baseline, origin, colors.baseline, surfaceHeight, BASELINE_LINE.widthM, BASELINE_LINE.liftM) : null;
+    const primaryLine = makeRacingLine(trajectory, origin, colors.primary, surfaceHeight, toneCurve);
+    const baselineLine = baseline ? makeRacingLine(baseline, origin, colors.baseline, surfaceHeight, toneCurve, BASELINE_LINE.widthM, BASELINE_LINE.liftM) : null;
     const root = new Group(); root.add(primary, ghost, primaryLine); if (baselineLine) root.add(baselineLine);
     const primaryDistances = getTrajectoryDistances(trajectory.points, trajectory.trackLengthM);
     const baselineDistances = baseline ? getDistancesInReferenceFrame(baseline.points, trajectory.points, trajectory.trackLengthM) : [];

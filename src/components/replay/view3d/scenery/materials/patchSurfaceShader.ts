@@ -5,9 +5,9 @@ import { CROWN_ATTRIBUTE, crownNormalGlsl } from './foliageCrown.js';
 import { glslNumber, list, value } from './shaderContext.js';
 import { shadowEye } from './shadowEye.js';
 import { shaderParts } from './shaderParts.js';
-import type { SurfaceConfig } from './surfaceConfig.js';
+import type { ParameterGroup, SurfaceConfig } from './surfaceConfig.js';
 
-const hasTranslucency = (config: SurfaceConfig) => !!config.flags.TRANSLUCENCY && config.flags.TRANSLUCENCY !== '@Undef';
+const hasTranslucency = (config: SurfaceConfig) => !!config.flags.translucency;
 
 /**
  * Turns a camera-facing card about its pivot toward `eye` (a world position in GLSL), and its normal with it: the authored normal
@@ -78,8 +78,7 @@ const SUN_SHADOW_BLEND = `
 
 /**
  * Three's light loop with the sun's shadow from both maps. Leaves light their diffuse and translucency with min(2 * shadow, 1),
- * as the game's vegetation shader does (L2IBLVEGETATION, review/yebis-camera fixed_cache): partly shadowed foliage reads lit, only
- * full shade is dark.
+ * so partly shadowed foliage reads lit and only full shade is dark.
  */
 function sunShadowLights(leaf: boolean): string {
   const chunk = ShaderChunk.lights_fragment_begin;
@@ -112,49 +111,46 @@ ${shader.vertexShader}`; patchBillboardVertex(shader, 'surface_shadowEye'); };
 export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, config: SurfaceConfig, uniforms: Record<string, IUniform>): void {
   const code = shaderParts(config, { uniforms: true });
   const p = config.parameters;
-  const adjust = p.Material_Adjust, decal = p.Decal, noOverlay = p.No_Overlay_Base, blend = p.Albedo_Blend, terrain = p.Terrain;
-  const single = p.SingleCoat, baseCoat = p.BaseCoat, clearCoat = p.ClearCoat, detail = p.Detail;
-
+  // Each family reads its own groups: a tunable becomes a uniform only where the surface carries its value.
+  const tunables: Record<string, IUniform> = {};
+  const tunable = (name: string, group: ParameterGroup | undefined, key: string) => { if (group?.[key] !== undefined) tunables[name] = { value: value(group, key) }; };
+  tunable('surface_specular', p.adjust, 'specular');
+  tunable('surface_specularTinting', p.adjust, 'specularTinting');
+  tunable('surface_mixBias', p.terrain, 'mixBias');
+  tunable('surface_splatterOverlayFactor', p.terrain, 'splatterOverlay');
+  tunable('surface_patternStrength', p.terrain, 'patternStrength');
+  tunable('surface_decalStrength', p.decal, 'strength');
+  tunable('surface_decalThickness', p.decal, 'thickness');
+  tunable('surface_decalSoftness', p.decal, 'softness');
+  tunable('surface_decalDetail', p.decal, 'detail');
+  tunable('surface_detailStrength', p.detail, 'albedo');
+  tunable('surface_kerbMixBias', p.kerbBlend, 'mixBias');
+  tunable('surface_kerbDefaultBlend', p.kerbBlend, 'default');
+  tunable('surface_noOverlayRoughness', p.bare, 'roughness');
+  tunable('surface_noOverlaySpecular', p.bare, 'specular');
+  for (const [prefix, group] of [['single', p.singleCoat], ['base', p.baseCoat], ['coat', p.clearCoat]] as const) {
+    tunable(`surface_${prefix}Roughness`, group, 'roughness');
+    tunable(`surface_${prefix}IOR`, group, 'ior');
+    tunable(`surface_${prefix}Specular`, group, 'specular');
+    tunable(`surface_${prefix}NormalStrength`, group, 'normalStrength');
+  }
+  tunable('surface_coatStrength', p.clearCoat, 'strength');
+  if (p.clearCoat) {
+    tunables.surface_coatLacquerColour = { value: new Vector3(...list(p.clearCoat, 'lacquerColour') as [number, number, number]) };
+    tunables.surface_coatLacquerThickness = { value: Math.max(0.001, value(p.clearCoat, 'lacquerThickness')) };
+  }
   const mapScaleUniforms: Record<string, IUniform> = {};
-  for (const [key, map] of Object.entries(config.maps)) mapScaleUniforms[`surface_scale_${key}`] = { value: new Vector2(...(map?.scale ?? [1, 1])) };
+  for (const [key, map] of Object.entries(config.maps)) mapScaleUniforms[`surface_scale_${key}`] = { value: new Vector2(...map!.scale) };
 
-  Object.assign(shader.uniforms, {
-    surface_specular: { value: value(adjust, 'SpecularLevel', 0.5) },
-    surface_specularTinting: { value: value(adjust, 'SpecularTinting', 0) },
-    surface_mixBias: { value: value(terrain, 'MixMapBias', 0.5) },
-    surface_splatterOverlayFactor: { value: value(terrain, 'SplatterOverlay', 1.0) },
-    surface_patternStrength: { value: value(terrain, 'PatternStrength', 1.0) },
-    surface_decalStrength: { value: value(decal, 'Strength', 1.0) },
-    surface_decalThickness: { value: value(decal, 'Thickness', 0.5) },
-    surface_decalSoftness: { value: value(decal, 'Softness', 0.1) },
-    surface_decalDetail: { value: value(decal, 'Detail', 0.0) },
-    surface_detailStrength: { value: value(detail, 'Albedo', 1.0) },
-    surface_normalScale: { value: new Vector2(value(adjust, 'NormalIntensity', 1.0), config.normalYSign) },
-    surface_kerbMixBias: { value: value(blend, 'MixBias', 0.5) },
-    surface_kerbDefaultBlend: { value: value(blend, 'Default', 1.0) },
-    surface_noOverlayRoughness: { value: value(noOverlay, 'Roughness', 0.7) },
-    surface_noOverlaySpecular: { value: value(noOverlay, 'SpecularLevel', 0.5) },
-    surface_singleRoughness: { value: value(single, 'Roughness', 0.3) },
-    surface_baseRoughness: { value: value(baseCoat, 'Roughness', 0.35) },
-    surface_coatRoughness: { value: value(clearCoat, 'Roughness', 0.3) },
-    surface_coatStrength: { value: value(clearCoat, 'Strength', 1.0) },
-    surface_singleIOR: { value: value(single, 'RefractiveIndex', 1.3) },
-    surface_baseIOR: { value: value(baseCoat, 'RefractiveIndex', 1.65) },
-    surface_coatIOR: { value: value(clearCoat, 'RefractiveIndex', 1.3) },
-    surface_singleSpecular: { value: value(single, 'Specular', 1.0) },
-    surface_baseSpecular: { value: value(baseCoat, 'Specular', 0.5) },
-    surface_singleNormalStrength: { value: value(single, 'NormalStrength', 1.0) },
-    surface_baseNormalStrength: { value: value(baseCoat, 'NormalStrength', 1.0) },
-    surface_coatNormalStrength: { value: value(clearCoat, 'NormalStrength', 1.0) },
-    surface_coatLacquerColour: { value: new Vector3(...list(clearCoat, 'LacquerColour', [1, 1, 1]).slice(0, 3) as [number, number, number]) },
-    surface_coatLacquerThickness: { value: Math.max(0.001, value(clearCoat, 'LacquerThickness', 0.03)) },
+  Object.assign(shader.uniforms, tunables, {
+    surface_normalScale: { value: new Vector2(value(p.adjust, 'normalStrength'), config.normalYSign) },
     surface_staticShadowMap: staticShadowUniforms.map, surface_staticShadowMatrix: staticShadowUniforms.matrix,
     surface_staticShadowReady: staticShadowUniforms.ready,
   }, mapScaleUniforms, config.kind === 'digitalFlag' ? { surface_flag_elapsed: digitalFlagClock } : {}, uniforms);
 
   const neededUvs = new Set<string>();
   for (const map of Object.values(config.maps)) if (map?.uv) neededUvs.add(map.uv);
-  const hasUv1 = neededUvs.has('UV_B'), hasUv2 = neededUvs.has('UV_C'), hasUv3 = neededUvs.has('UV_D');
+  const hasUv1 = neededUvs.has('uv1'), hasUv2 = neededUvs.has('uv2'), hasUv3 = neededUvs.has('uv3');
   shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>
     ${hasUv1 ? '#ifndef USE_UV1\n    attribute vec2 uv1;\n    #endif' : 'vec2 uv1 = vec2(0.0);'}
     ${hasUv2 ? '#ifndef USE_UV2\n    attribute vec2 uv2;\n    #endif' : 'vec2 uv2 = vec2(0.0);'}
@@ -199,16 +195,16 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
     .replace('#include <lights_fragment_begin>', sunShadowLights(config.kind === 'vegetation'));
   if (config.kind === 'vegetation') {
     if (hasTranslucency(config)) {
-      // The game's leaf translucency (L2IBLVEGETATION): pow(saturate(dot(eye-to-point, normalize(N + L))), Power) * leaf mask * Scale,
-      // times the shadowed sun and albedo over pi. Leaves seen against the sun glow; the card keeps its own normal, so fronds facing
-      // away from the sun stay shaded as in the game.
+      // Leaf translucency from the material's power and scale: pow(saturate(dot(eye-to-point, normalize(N + L))), Power) * leaf mask
+      // * Scale, times the shadowed sun and albedo over pi. Leaves seen against the sun glow; the card keeps its own normal, so fronds
+      // facing away from the sun stay shaded.
       shader.fragmentShader = shader.fragmentShader.replace('#include <lights_physical_pars_fragment>', `#include <lights_physical_pars_fragment>
         void surfaceLeafDirect(const in IncidentLight light, const in vec3 position, const in vec3 normal,
           const in vec3 viewDir, const in vec3 coatNormal, const in PhysicalMaterial material, inout ReflectedLight reflected) {
           RE_Direct_Physical(light,position,normal,viewDir,coatNormal,material,reflected);
            {
-            float scatter = pow(clamp(dot(-viewDir,normalize(normal+light.direction)),0.0,1.0),${glslNumber(value(p.Translucency, 'Power', 2))});
-            reflected.directDiffuse += light.color * material.diffuseColor * (surfaceLeafMask * scatter * ${glslNumber(value(p.Translucency, 'Scale', 1))}) * RECIPROCAL_PI;
+            float scatter = pow(clamp(dot(-viewDir,normalize(normal+light.direction)),0.0,1.0),${glslNumber(value(p.translucency, 'power'))});
+            reflected.directDiffuse += light.color * material.diffuseColor * (surfaceLeafMask * scatter * ${glslNumber(value(p.translucency, 'scale'))}) * RECIPROCAL_PI;
           }
         }
         #undef RE_Direct
@@ -223,7 +219,7 @@ export function computeCustomProgramCacheKey(config: SurfaceConfig): string {
   const parts = shaderParts(config, { uniforms: true });
   const hooks = {
     billboard: !!config.billboard,
-    translucency: hasTranslucency(config) ? config.parameters.Translucency : null,
+    translucency: hasTranslucency(config) ? config.parameters.translucency : null,
   };
   const code = JSON.stringify({ parts, hooks });
   let hash = 0x811c9dc5;

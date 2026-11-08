@@ -54,7 +54,7 @@ it('steers only the fronts from recorded steering', () => {
   expect(animation.description).toContain('Recorded steering');
 });
 
-it('turns the steering wheel about the game column axis by the recorded wheel angle', () => {
+it('turns the steering wheel about the descriptor column axis by the recorded wheel angle', () => {
   const steered: ReplayTrajectoryData = {...lap, handlingCalibration: {wheelbaseM: 2.8, steeringRatio: 12, steeringWheelRangeDeg: 540, wheelbaseSource: 'plugin', steeringSource: 'plugin-default'},
     points: lap.points.map(point => ({...point, steerYaw: 90}))};
   const model = rigModel(), wheel = new Group(), axis = new Vector3(0, 0.2, 1).normalize();

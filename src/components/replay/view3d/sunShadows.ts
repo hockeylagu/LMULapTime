@@ -7,8 +7,8 @@ import { trackShadowEye } from './scenery/materials/shadowEye.js';
 
 /**
  * The sun's two shadow maps. The near one (three's own, on the sun light) is a square around the camera's focus (the car),
- * shifted ahead along the view so the road the camera looks at is covered: 4096 px over 160 m is ~4 cm per texel, drawn every
- * frame with every caster. Every shadow pass re-draws each caster it meets, and that per-draw CPU work is the frame's main cost
+ * shifted ahead along the view so the road the camera looks at is covered: 4096 px over 80 m is ~2 cm per texel, drawn every
+ * frame with every caster. At 160 m (~4 cm, ~8 cm along the ground under a low sun) the car's shadow edges stair-stepped. Every shadow pass re-draws each caster it meets, and that per-draw CPU work is the frame's main cost
  * (docs/plans/proposed/REPLAY_3D_PERFORMANCE.md).
  *
  * The static one is a cached shadow map of the scenery only (no cars), 1.2 km ahead of the view at ~29 cm per texel. Beyond the
@@ -18,7 +18,7 @@ import { trackShadowEye } from './scenery/materials/shadowEye.js';
  * or after 100 m when the resident scenery changed meanwhile. Casters under 1 m across are left out (under ~3 texels).
  */
 export interface ShadowWindow { halfExtentM: number; leadM: number; mapPx: number; lightDistanceM: number }
-export const NEAR_SHADOW: ShadowWindow = {halfExtentM: 80, leadM: 50, mapPx: 4096, lightDistanceM: 400};
+export const NEAR_SHADOW: ShadowWindow = {halfExtentM: 40, leadM: 25, mapPx: 4096, lightDistanceM: 400};
 export const STATIC_SHADOW: ShadowWindow = {halfExtentM: 600, leadM: 350, mapPx: 4096, lightDistanceM: 1000};
 export const SHADOW_NEAR_M = 1;
 const STATIC_REFRESH_M = 200, STATIC_STALE_REFRESH_M = 100, STATIC_MIN_CASTER_M = 1, TILES_PER_SIDE = 2;

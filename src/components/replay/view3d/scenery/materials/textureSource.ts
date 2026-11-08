@@ -46,7 +46,7 @@ export function createTextureSource(uris: ReadonlyMap<string, string>, ktx2: Cac
           texture.colorSpace = map.srgb ? SRGBColorSpace : NoColorSpace;
           texture.wrapS = texture.wrapT = RepeatWrapping;
           texture.anisotropy = anisotropy;
-          // Trilinear like the game: three's KTX2 loader gives raw (RGBA8, R8) textures nearest filtering, which shows texels.
+          // Trilinear: three's KTX2 loader gives raw (RGBA8, R8) textures nearest filtering, which shows texels.
           texture.minFilter = texture.mipmaps.length > 1 ? LinearMipmapLinearFilter : LinearFilter;
           texture.magFilter = LinearFilter;
           startStreaming(texture, renderer);

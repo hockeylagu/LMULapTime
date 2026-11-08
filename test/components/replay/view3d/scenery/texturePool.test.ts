@@ -5,7 +5,7 @@ import { createSurfaceTexturePool } from '../../../../../src/components/replay/v
 import { isStreaming } from '../../../../../src/components/replay/view3d/scenery/materials/mipStreaming.js';
 import type { SurfaceMap } from '../../../../../src/components/replay/view3d/scenery/materials/surfaceConfig.js';
 
-const map: SurfaceMap = {texture: 'ROAD', uv: 'UV_A', srgb: true};
+const map: SurfaceMap = {texture: 'ROAD', uv: 'uv0', scale: [1, 1], srgb: true};
 const uris = new Map([['ROAD__srgb.ktx2.zst', 'textures/road.ktx2.zst']]);
 const renderer = {capabilities: {getMaxAnisotropy: () => 16}} as unknown as WebGLRenderer;
 
