@@ -43,18 +43,6 @@ export function formatSectorTime(seconds: number | null | undefined): string {
   return seconds < 60 ? seconds.toFixed(3) : formatTime(seconds);
 }
 
-/** Index of the sector the lap lost the most in against the session's best sectors; -1 when it lost nowhere. */
-export function worstSectorIndex(lap: LiveLapRecord, bestSectors: readonly (number | null)[]): number {
-  let worst = -1;
-  let worstLoss = 0;
-  lap.sectors.forEach((sector, index) => {
-    const best = bestSectors[index];
-    if (sector == null || best == null) return;
-    const loss = rounded(sector - best);
-    if (loss > worstLoss) { worst = index; worstLoss = loss; }
-  });
-  return worst;
-}
 
 /** The most recent completed lap (the list is oldest first), or null before the first. */
 export function lastLap(laps: readonly LiveLapRecord[]): LiveLapRecord | null {

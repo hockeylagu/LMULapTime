@@ -24,6 +24,11 @@ function rainSpansFor(db: DatabaseType, replayName: string | undefined, cache?: 
   return cache.get(replayName);
 }
 
+/**
+ * Peak rain over a stretch of session time; undefined when the replay has no stored conditions (not
+ * decoded yet, or deleted before its events were stored). Session lap times (the XML's et) and replay
+ * times share one clock: a replay lap starts 0-0.23 s after its et.
+ */
 function rainOverLapFromSpans(spans: ReplayConditionFact[] | undefined): RainOverLap | undefined {
   if (!spans) return undefined;
   return (startSec, endSec) => {
@@ -34,15 +39,6 @@ function rainOverLapFromSpans(spans: ReplayConditionFact[] | undefined): RainOve
     }
     return peak;
   };
-}
-
-/**
- * Peak rain of a replay over a stretch of session time, from its stored conditions; undefined when
- * the replay has none (not decoded yet, or deleted before its events were stored). Session lap times
- * (the XML's et) and replay times share one clock: a replay lap starts 0-0.23 s after its et.
- */
-export function replayRainOverLap(db: DatabaseType, replayName: string | undefined): RainOverLap | undefined {
-  return rainOverLapFromSpans(rainSpansFor(db, replayName));
 }
 
 /**

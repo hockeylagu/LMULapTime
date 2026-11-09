@@ -380,29 +380,3 @@ export interface ReplayTrajectoryData {
   // finalized ReplayTrajectoryData per detected lap of this driver, from a single file scan.
   allLapsData?: ReplayTrajectoryData[];
 }
-
-export interface ReplaySummary {
-  name: string;
-  path: string;
-  fileSizeBytes: number;
-  mtimeMs: number;
-  trackVenue?: string;
-  trackCourse?: string;
-  displayTrack?: string;
-  sessionCode?: string;
-  durationSec?: number;
-  eventTitle?: string;
-  splitNo?: number;
-  eventType?: string;
-  driversCount?: number;
-  matchedSessionId?: string;
-  carClass?: string;
-  carType?: string;
-  carClasses?: string[];
-  duckdbFilename?: string;
-  hasRain?: boolean;
-  maxRainIntensity?: number;
-  weatherCondition?: WeatherCondition;
-  ambientTemp?: number;
-  trackTemp?: number;
-}

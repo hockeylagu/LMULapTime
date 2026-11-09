@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import { SessionDatabase } from '../../../server/core/db.js';
 import { replaceReplayWideFacts } from '../../../server/core/replay/dbReplayLapStore.js';
-import { replayRainOverLap, reclassifyStoredSessions } from '../../../server/core/dbSessionConditions.js';
+import { reclassifyStoredSessions } from '../../../server/core/dbSessionConditions.js';
 import type { DetailedSession, DriverData, LapData, ReplayTrajectoryData } from '../../../shared/types/index.js';
 
 const replayName = 'Sebring International Raceway R1 17.Vcr';
@@ -43,13 +43,6 @@ describe('replay rain on the laps of a linked session', () => {
 
   afterEach(() => {
     db.close();
-  });
-
-  it('reads the peak rain over a stretch of session time, and nothing for a replay without conditions', () => {
-    const rain = replayRainOverLap(rawDb(db), replayName);
-    expect(rain?.(0, 120)).toBe(5);
-    expect(rain?.(360, 480)).toBe(18);
-    expect(replayRainOverLap(rawDb(db), 'Other.Vcr')).toBeUndefined();
   });
 
   it('tags the retained row and leaves an already read detail independent', () => {

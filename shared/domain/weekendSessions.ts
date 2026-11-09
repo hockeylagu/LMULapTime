@@ -37,6 +37,7 @@ interface TrackLayout {
   layoutKey: string;
 }
 
+/** Both sessions run on the same layout (circuitSpecs), or on the same unknown track by name. */
 function sameTrackLayout(a: TrackLayout, b: TrackLayout): boolean {
   if (!a.trackVenue || !b.trackVenue) return false;
   const knownA = Object.prototype.hasOwnProperty.call(CIRCUIT_SPECIFICATIONS, a.layoutKey);
@@ -44,15 +45,6 @@ function sameTrackLayout(a: TrackLayout, b: TrackLayout): boolean {
   return knownA && knownB
     ? a.layoutKey === b.layoutKey
     : !knownA && !knownB && a.trackVenue === b.trackVenue && (a.trackCourse ?? '') === (b.trackCourse ?? '');
-}
-
-/** Both sessions run on the same layout (circuitSpecs), or on the same unknown track by name. */
-export function areSameTrackLayout(venueA?: string, courseA?: string, venueB?: string, courseB?: string): boolean {
-  if (!venueA || !venueB) return false;
-  return sameTrackLayout(
-    { trackVenue: venueA, trackCourse: courseA, layoutKey: getCircuitSpecification(venueA, courseA).layoutKey },
-    { trackVenue: venueB, trackCourse: courseB, layoutKey: getCircuitSpecification(venueB, courseB).layoutKey },
-  );
 }
 
 interface WeekendContext extends TrackLayout {
@@ -90,12 +82,6 @@ function sessionTime(s: CandidateRelatedSession): number {
  * - online: the same event start (the results files of one event share its TimeString);
  * - offline: the same class and event, starting within 3.5 hours.
  */
-export function isSameWeekendSession(current: CandidateRelatedSession, candidate: CandidateRelatedSession): boolean {
-  const currentContext = weekendContext(current);
-  const candidateContext = weekendContext(candidate);
-  return matchesWeekend(currentContext, candidateContext);
-}
-
 function matchesWeekend(current: WeekendContext, candidate: WeekendContext): boolean {
   if (current.id && candidate.id && current.id === candidate.id) return false;
   if (!sameTrackLayout(current, candidate) || current.online !== candidate.online) return false;

@@ -834,7 +834,7 @@ floating-point precision.
 | :--- | :--- | :--- |
 | **Driver Roster** | Implemented (`parseReplayMetadata`) | Deterministic binary `numDrivers` + structured records with `entryTime`/`exitTime`. |
 | **Session Identification** | Implemented (`parseReplayMetadata`) | Session byte parsing, `modUid`, `trackPath`. |
-| **Lap & Sector Timing** | Implemented (`extractReplayLapSummaries`) | Class 6 Type 6 events; matches in-game HUD. |
+| **Lap & Sector Timing** | Implemented (`extractReplayTrajectory` laps) | Class 6 Type 6 events; matches in-game HUD. |
 | **Tire Dynamics & Wear** | **Unverified; removed from parser** | Speculative Type 15 offsets refuted in analyzed multiplayer sessions (§2.7). Open investigation remains for potential inclusion in offline practice / local race weekend sessions. |
 | **Penalties & Incidents** | Implemented (cache v7) | Trajectory `penalties`: class 3 Type 5 issued (`penaltyType`, `penaltySeconds`, reason text from `+2`) and Type 7 served (§2.13 B). Coverage is partial (DQs and start-burst penalties missing, §2.13 G); the XML stays the reference. Before v7 the branch gated on class 2 and never fired. |
 | **3D Car Attitude** | Implemented (`extractReplayTrajectory`) | `rotX`/`rotY`/`rotZ` and `detachablePartState`. |

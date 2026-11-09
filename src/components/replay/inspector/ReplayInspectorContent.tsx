@@ -283,12 +283,3 @@ export const ReplayInspectorContent: React.FC<ReplayInspectorContentProps> = ({
     </ReplayPlaybackCursorContext.Provider>
   );
 };
-
-/** @deprecated Use ReplayInspectorPage through the /telemetry route. */
-export const ReplayInspectorModal: React.FC<ReplayInspectorContentProps> = (props) => (
-  props.isOpen ? (
-    <div role="dialog" aria-modal="true" className="fixed inset-0 z-50">
-      <ReplayInspectorContent {...props} />
-    </div>
-  ) : null
-);

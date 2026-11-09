@@ -7,12 +7,13 @@ import {
 } from '../../../../server/replay/decode/replayParser.js';
 import {
   extractReplayTrajectory,
-  extractReplayLapSummaries,
 } from '../../../../server/replay/decode/replayTrajectory.js';
 import { LmuParser } from '../../../../server/sessions/parser.js';
 import { MockSlice, createSliceVcrBuffer } from '../../../utils/mockVcr.js';
 
 const runRealReplayTests = process.env.RUN_REAL_REPLAY_TESTS === '1';
+const lapSummaries = (file: string, driver: { driverSlot?: number; playerName?: string }) =>
+  extractReplayTrajectory(file, { ...driver, maxPoints: 10 }).laps ?? [];
 
 function structuredDriverRoster(slot = 1): Buffer[] {
   const pascal = (value: string) => {
@@ -442,7 +443,7 @@ describe('replayParser - extended format & pit info', () => {
         });
       }
 
-      it('extracts 100% official lap summaries, sector splits, and lap validity via extractReplayLapSummaries', () => {
+      it('extracts 100% official lap summaries, sector splits, and lap validity from the replay timing events', () => {
         // Build a VCR buffer with 2 full laps:
         // Lap 1: valid flying lap (S1 = 25.0s, S2 cum = 60.0s -> S2 = 35.0s, Finish = 95.0s -> S3 = 35.0s)
         // Lap 2: cut/invalidated lap (splitSec = -1)
@@ -530,7 +531,7 @@ describe('replayParser - extended format & pit info', () => {
         const vcrPath = path.join(tempDir, 'official_laps_test.vcr');
         fs.writeFileSync(vcrPath, createSliceVcrBuffer({ slices }));
 
-        const laps = extractReplayLapSummaries(vcrPath, { driverSlot: 1 });
+        const laps = lapSummaries(vcrPath, { driverSlot: 1 });
         expect(laps.length).toBeGreaterThanOrEqual(2);
 
         // Lap 1: valid flying lap
@@ -555,7 +556,7 @@ describe('replayParser - extended format & pit info', () => {
       if (runRealReplayTests && fs.existsSync(p1_41_File)) {
         it('extracts official lap summaries directly from Class 6 Type 6 events on real Algarve P1 41 replay', () => {
           // Driver slot 2 had 19 timing events in our inspection
-          const laps = extractReplayLapSummaries(p1_41_File, { driverSlot: 2 });
+          const laps = lapSummaries(p1_41_File, { driverSlot: 2 });
           expect(laps.length).toBeGreaterThan(0);
           // Has valid flying lap with lapTimeSec = 106.805s
           const lap17 = laps.find(l => l.lapTimeSec === 106.805 || l.lapNumber === 17);
@@ -570,7 +571,7 @@ describe('replayParser - extended format & pit info', () => {
       const daytonaQ1_File = path.join(steamReplays, 'Daytona International Speedway Road Course Q1 6.Vcr');
       if (runRealReplayTests && fs.existsSync(daytonaQ1_File)) {
         it('extracts official lap summaries and sector splits on Daytona Q1 replay', () => {
-          const laps = extractReplayLapSummaries(daytonaQ1_File, { playerName: 'Samuel' });
+          const laps = lapSummaries(daytonaQ1_File, { playerName: 'Samuel' });
           expect(laps.length).toBeGreaterThanOrEqual(4);
           const best = laps.find(l => l.isBest);
           expect(best).toBeDefined();
@@ -587,7 +588,7 @@ describe('replayParser - extended format & pit info', () => {
         it('extracts official lap summaries and sector splits on Spa R1 race replay', () => {
           const traj = extractReplayTrajectory(spaR1_File, { playerName: 'Samuel' });
           console.log('Spa driverSlot:', traj.driverSlot, 'driverName:', traj.driverName, 'laps:', traj.laps?.length);
-          const laps = extractReplayLapSummaries(spaR1_File, { playerName: 'Samuel' });
+          const laps = lapSummaries(spaR1_File, { playerName: 'Samuel' });
           console.log('Spa extracted summaries:', laps.length);
           expect(laps.length).toBeGreaterThanOrEqual(14);
           expect(laps[0].isOutLap).toBe(true);
@@ -605,7 +606,7 @@ describe('replayParser - extended format & pit info', () => {
       const bahrainR1_File = path.join(steamReplays, 'Bahrain International Circuit R1 1.Vcr');
       if (runRealReplayTests && fs.existsSync(bahrainR1_File)) {
         it('extracts official lap summaries and sector splits on Bahrain International R1 race replay', () => {
-          const laps = extractReplayLapSummaries(bahrainR1_File, { playerName: 'Samuel' });
+          const laps = lapSummaries(bahrainR1_File, { playerName: 'Samuel' });
           expect(laps.length).toBeGreaterThan(0);
           for (const l of laps) {
             expect(l.lapTimeSec).toBeGreaterThan(0);
@@ -619,7 +620,7 @@ describe('replayParser - extended format & pit info', () => {
       const sebringR1_File = path.join(steamReplays, 'Sebring International Raceway R1 13.Vcr');
       if (runRealReplayTests && fs.existsSync(sebringR1_File)) {
         it('extracts official lap summaries and sector splits on Sebring R1 race replay', () => {
-          const laps = extractReplayLapSummaries(sebringR1_File, { playerName: 'Samuel' });
+          const laps = lapSummaries(sebringR1_File, { playerName: 'Samuel' });
           expect(laps.length).toBeGreaterThan(0);
           for (const l of laps) {
             expect(l.lapTimeSec).toBeGreaterThan(0);
@@ -633,7 +634,7 @@ describe('replayParser - extended format & pit info', () => {
       const lagunaR1_File = path.join(steamReplays, 'WeatherTech Raceway Laguna Seca R1 4.Vcr');
       if (runRealReplayTests && fs.existsSync(lagunaR1_File)) {
         it('extracts official lap summaries and sector splits on Laguna Seca R1 race replay', () => {
-          const laps = extractReplayLapSummaries(lagunaR1_File, { playerName: 'Samuel' });
+          const laps = lapSummaries(lagunaR1_File, { playerName: 'Samuel' });
           expect(laps.length).toBeGreaterThan(0);
           for (const l of laps) {
             expect(l.lapTimeSec).toBeGreaterThan(0);
@@ -647,7 +648,7 @@ describe('replayParser - extended format & pit info', () => {
       const imolaR1_File = path.join(steamReplays, 'Autodromo Enzo e Dino Ferrari R1 8.Vcr');
       if (runRealReplayTests && fs.existsSync(imolaR1_File)) {
         it('extracts official lap summaries and sector splits on Imola R1 race replay', () => {
-          const laps = extractReplayLapSummaries(imolaR1_File, { playerName: 'Samuel' });
+          const laps = lapSummaries(imolaR1_File, { playerName: 'Samuel' });
           expect(laps.length).toBeGreaterThanOrEqual(15);
           const best = laps.find(l => l.isBest);
           expect(best).toBeDefined();
@@ -731,7 +732,7 @@ describe('replayParser - extended format & pit info', () => {
 
         if (runRealReplayTests && fs.existsSync(vcrPath) && fs.existsSync(xmlPath)) {
           it(`validates ${tc.name} against official XML simulation log`, () => {
-            const vcrLaps = extractReplayLapSummaries(vcrPath, { playerName: 'Samuel' });
+            const vcrLaps = lapSummaries(vcrPath, { playerName: 'Samuel' });
             expect(vcrLaps.length).toBeGreaterThanOrEqual(tc.minLaps);
 
             const session = lmuParser.parseSessionXml(xmlPath);

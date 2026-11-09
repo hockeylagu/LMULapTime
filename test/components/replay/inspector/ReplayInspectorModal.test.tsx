@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { ReplayInspectorModal } from '../../../../src/components/replay/inspector/ReplayInspectorContent.js';
+import { ReplayInspectorContent } from '../../../../src/components/replay/inspector/ReplayInspectorContent.js';
 import { ConsistencyPanel } from '../../../../src/components/replay/analysis/ConsistencyPanel.js';
 import { chooseValue, openSelect, selectedValue } from '../../../helpers/selectControl.js';
 
@@ -19,7 +19,7 @@ vi.mock('recharts', () => {
   };
 });
 
-describe('ReplayInspectorModal', () => {
+describe('ReplayInspectorContent', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -63,7 +63,7 @@ describe('ReplayInspectorModal', () => {
 
   it('renders nothing when isOpen is false', () => {
     const { container } = render(
-      <ReplayInspectorModal isOpen={false} onClose={vi.fn()} sessionId="session-1" />
+      <ReplayInspectorContent isOpen={false} onClose={vi.fn()} sessionId="session-1" />
     );
     expect(container.firstChild).toBeNull();
   });
@@ -72,7 +72,7 @@ describe('ReplayInspectorModal', () => {
     global.fetch = vi.fn().mockImplementation((url: string) => Promise.resolve({ ok: true,
       json: () => Promise.resolve(url.includes('/metadata') ? mockMeta : url.includes('/telemetry?') ? mockTraj : { laps: [] }),
     }));
-    render(<ReplayInspectorModal isOpen onClose={vi.fn()} sessionId="session-1" />);
+    render(<ReplayInspectorContent isOpen onClose={vi.fn()} sessionId="session-1" />);
     const chart = await screen.findByLabelText('Telemetry charts');
     fireEvent.keyDown(chart, { key: ' ' });
     expect(screen.getByLabelText('Pause')).toHaveRole('button');
@@ -94,7 +94,7 @@ describe('ReplayInspectorModal', () => {
     });
 
     render(
-      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />
+      <ReplayInspectorContent isOpen={true} onClose={vi.fn()} sessionId="session-1" />
     );
 
     await waitFor(() => {
@@ -137,7 +137,7 @@ describe('ReplayInspectorModal', () => {
     });
 
     render(
-      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />
+      <ReplayInspectorContent isOpen={true} onClose={vi.fn()} sessionId="session-1" />
     );
 
     await waitFor(() => {
@@ -175,7 +175,7 @@ describe('ReplayInspectorModal', () => {
     });
 
     render(
-      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />
+      <ReplayInspectorContent isOpen={true} onClose={vi.fn()} sessionId="session-1" />
     );
 
     await waitFor(() => {
@@ -202,7 +202,7 @@ describe('ReplayInspectorModal', () => {
     });
 
     render(
-      <ReplayInspectorModal isOpen={true} onClose={handleClose} sessionId="session-1" />
+      <ReplayInspectorContent isOpen={true} onClose={handleClose} sessionId="session-1" />
     );
 
     await waitFor(() => {
@@ -237,7 +237,7 @@ describe('ReplayInspectorModal', () => {
     });
 
     render(
-      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />
+      <ReplayInspectorContent isOpen={true} onClose={vi.fn()} sessionId="session-1" />
     );
 
     await waitFor(() => {
@@ -280,7 +280,7 @@ describe('ReplayInspectorModal', () => {
     });
 
     render(
-      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />
+      <ReplayInspectorContent isOpen={true} onClose={vi.fn()} sessionId="session-1" />
     );
 
     await waitFor(() => {
@@ -312,7 +312,7 @@ describe('ReplayInspectorModal', () => {
     });
 
     render(
-      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />
+      <ReplayInspectorContent isOpen={true} onClose={vi.fn()} sessionId="session-1" />
     );
 
     const speedSelect = await screen.findByRole('combobox', { name: 'Playback speed' });
@@ -352,7 +352,7 @@ describe('ReplayInspectorModal', () => {
     });
 
     render(
-      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />
+      <ReplayInspectorContent isOpen={true} onClose={vi.fn()} sessionId="session-1" />
     );
 
     await waitFor(() => {
@@ -378,7 +378,7 @@ describe('ReplayInspectorModal', () => {
         : url.includes('/leaderboard') ? { entries: [{ isPlayer: true, bestLap: { sessionId, driverOrdinal: 0, lapOrdinal } }] } : null;
       return data ? Promise.resolve({ ok: true, json: () => Promise.resolve(data) }) : Promise.reject(new Error('Unknown URL'));
     });
-    render(<ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />);
+    render(<ReplayInspectorContent isOpen={true} onClose={vi.fn()} sessionId="session-1" />);
     await waitFor(() => {
       expect(requests.some(url => url.includes('/leaderboard') && url.includes('layout=spa_gp') && url.includes('carClass=GT3'))).toBe(true);
       expect(screen.getByTitle(title)).toHaveClass(color);
@@ -464,7 +464,7 @@ describe('ReplayInspectorModal', () => {
     });
 
     render(
-      <ReplayInspectorModal
+      <ReplayInspectorContent
         isOpen={true}
         onClose={vi.fn()}
         sessionId="session-1"

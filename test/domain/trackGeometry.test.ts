@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   hasCompatibleTrackStations,
-  getTrackRoadEdgeDistances,
   parseTrackBoundaryGeometry,
   sampleTrackSurfaceProfile,
 } from '../../shared/domain/trackGeometry.js';
@@ -72,15 +71,6 @@ describe('native surface sampling', () => {
     expect(sampleTrackSurfaceProfile(geometry, 0.1)?.leftKerbWidthM).toBe(0.8);
   });
 
-  it('reports signed road edge distances with positive lateral offsets to the left (OpenDRIVE t)', () => {
-    expect(getTrackRoadEdgeDistances(native(), 10, 2)).toEqual({ leftDistanceM: 5, rightDistanceM: 7 });
-    expect(getTrackRoadEdgeDistances(native(), 10, 6)).toEqual({ leftDistanceM: 1, rightDistanceM: 11 });
-    expect(getTrackRoadEdgeDistances(native(), 10, -8)).toEqual({ leftDistanceM: 15, rightDistanceM: -3 });
-    const geometry = native();
-    geometry.surfaceProfile!.leftWidthM[1] = null;
-    expect(getTrackRoadEdgeDistances(geometry, 10, 2)).toEqual({ leftDistanceM: null, rightDistanceM: 7 });
-  });
-
   it('takes the nearer station kerb type and reports none for files without the column', () => {
     const geometry = native();
     geometry.surfaceProfile = { ...geometry.surfaceProfile!, leftKerbType: ['flat', 'sawtooth', null], rightKerbType: [null, null, 'other'] };
@@ -93,8 +83,6 @@ describe('native surface sampling', () => {
   it('does not fabricate a native profile for legacy geometry or invalid query inputs', () => {
     expect(sampleTrackSurfaceProfile(legacy(), 0)).toBeNull();
     expect(sampleTrackSurfaceProfile(native(), NaN)).toBeNull();
-    expect(getTrackRoadEdgeDistances(legacy(), 0, 0)).toBeNull();
-    expect(getTrackRoadEdgeDistances(native(), 10, Infinity)).toBeNull();
   });
 });
 

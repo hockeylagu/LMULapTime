@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { act, render, screen, waitFor, fireEvent } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { ReplayInspectorModal } from '../../../../src/components/replay/inspector/ReplayInspectorContent.js';
+import { ReplayInspectorContent } from '../../../../src/components/replay/inspector/ReplayInspectorContent.js';
 import { chooseValue } from '../../../helpers/selectControl.js';
 
 vi.mock('recharts', () => ({
@@ -16,7 +16,7 @@ vi.mock('recharts', () => ({
   ResponsiveContainer: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 
-describe('ReplayInspectorModal - Comparison & Source Modes', () => {
+describe('ReplayInspectorContent - Comparison & Source Modes', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     window.location.hash = '#/compare';
@@ -89,7 +89,7 @@ describe('ReplayInspectorModal - Comparison & Source Modes', () => {
     });
 
     render(
-      <ReplayInspectorModal
+      <ReplayInspectorContent
         isOpen={true}
         onClose={vi.fn()}
         sessionId="session-1"
@@ -125,7 +125,7 @@ describe('ReplayInspectorModal - Comparison & Source Modes', () => {
       return Promise.reject(new Error('Unknown URL'));
     });
 
-    render(<ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" initialCompareMode={true} initialBaselineLapOrdinal={2} />);
+    render(<ReplayInspectorContent isOpen={true} onClose={vi.fn()} sessionId="session-1" initialCompareMode={true} initialBaselineLapOrdinal={2} />);
 
     const retry = await screen.findByRole('button', { name: 'Retry comparison lap' });
     expect(screen.getByTitle(/Comparison lap has no telemetry samples/)).toBeInTheDocument();
@@ -211,7 +211,7 @@ describe('ReplayInspectorModal - Comparison & Source Modes', () => {
     });
 
     render(
-      <ReplayInspectorModal
+      <ReplayInspectorContent
         isOpen={true}
         onClose={vi.fn()}
         sessionId="session-1"
@@ -257,7 +257,7 @@ describe('ReplayInspectorModal - Comparison & Source Modes', () => {
     });
 
     render(
-      <ReplayInspectorModal
+      <ReplayInspectorContent
         isOpen={true}
         onClose={vi.fn()}
         sessionId="Bahrain Outer Circuit R1 11.vcr"
@@ -304,7 +304,7 @@ describe('ReplayInspectorModal - Comparison & Source Modes', () => {
     });
 
     render(
-      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />
+      <ReplayInspectorContent isOpen={true} onClose={vi.fn()} sessionId="session-1" />
     );
 
     await waitFor(() => {
@@ -389,7 +389,7 @@ describe('ReplayInspectorModal - Comparison & Source Modes', () => {
     });
 
     render(
-      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />
+      <ReplayInspectorContent isOpen={true} onClose={vi.fn()} sessionId="session-1" />
     );
 
     await waitFor(() => {
@@ -440,7 +440,7 @@ describe('ReplayInspectorModal - Comparison & Source Modes', () => {
     });
 
     render(
-      <ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1" />
+      <ReplayInspectorContent isOpen={true} onClose={vi.fn()} sessionId="session-1" />
     );
 
     await waitFor(() => {
@@ -499,7 +499,7 @@ describe('ReplayInspectorModal - Comparison & Source Modes', () => {
         lapOrdinal: 6, lapNumber: 9, lapTime: 142, driverName: 'Rival Racer', carType: 'BMW M4 GT3', carClass: 'GT3', isValid: true,
         sessionType: 'Race', matchingReplayFile: 'Reference.vcr' }] }) });
     });
-    render(<ReplayInspectorModal isOpen={true} onClose={vi.fn()} sessionId="session-1"
+    render(<ReplayInspectorContent isOpen={true} onClose={vi.fn()} sessionId="session-1"
       initialCompareMode={true} initialBaselineSessionId="session-2" initialBaselineDriverOrdinal={1} initialBaselineLapOrdinal={2} />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Full screen map' })).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: 'Full screen map' }));

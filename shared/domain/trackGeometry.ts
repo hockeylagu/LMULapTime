@@ -1,7 +1,6 @@
 import type {
   TrackBoundaryGeometry,
   TrackKerbType,
-  TrackRoadEdgeDistances,
   TrackSurfaceProfileColumns,
   TrackSurfaceProfileSample,
 } from '../types/trackGeometry.js';
@@ -223,22 +222,6 @@ export function sampleTrackSurfaceProfile(geometry: TrackBoundaryGeometry, stati
     leftKerbType: kerbType('leftKerbType'), rightKerbType: kerbType('rightKerbType'),
   };
 }
-
-/** Positive lateral offset is LEFT of the centerline (OpenDRIVE t); these are road edges, not legal limits. */
-export function getTrackRoadEdgeDistances(
-  geometry: TrackBoundaryGeometry,
-  stationM: number,
-  lateralOffsetM: number,
-): TrackRoadEdgeDistances | null {
-  if (!Number.isFinite(lateralOffsetM)) return null;
-  const sample = sampleTrackSurfaceProfile(geometry, stationM);
-  if (!sample) return null;
-  return {
-    leftDistanceM: sample.leftWidthM === null ? null : sample.leftWidthM - lateralOffsetM,
-    rightDistanceM: sample.rightWidthM === null ? null : sample.rightWidthM + lateralOffsetM,
-  };
-}
-
 
 /** Recorded odometer stations cannot supply canonical corner windows or a mixed revision comparison. */
 export function hasCompatibleTrackStations(

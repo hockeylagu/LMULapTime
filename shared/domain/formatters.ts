@@ -230,8 +230,6 @@ export function compareSessions(
   return direction === 'desc' ? idB.localeCompare(idA) : idA.localeCompare(idB);
 }
 
-export type SessionSortOption = 'date-desc' | 'date-asc' | 'pos-asc' | 'pace-asc' | 'pace-desc' | 'lap-asc';
-
 export interface SessionSortSelectors<T> {
   getPosition?: (session: T) => number | null | undefined;
   getBestLapTime?: (session: T) => number | null | undefined;

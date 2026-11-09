@@ -38,9 +38,3 @@ export function formatDistPoint(distM: number | null): string {
   return distM === null ? '--' : `${distM}m`;
 }
 
-export function timeDeltaBadgeClass(delta: number): string {
-  if (Math.abs(delta) < 0.02) return 'bg-lmu-raised text-lmu-text-soft border-lmu-rule/60';
-  return delta < 0
-    ? 'bg-lmu-gain-strong/15 text-lmu-gain border-lmu-gain-strong/30'
-    : 'bg-lmu-loss-strong/15 text-lmu-loss border-lmu-loss-strong/30';
-}

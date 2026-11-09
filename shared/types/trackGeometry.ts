@@ -87,13 +87,6 @@ export type TrackSurfaceProfileSample = {
   rightKerbType: TrackKerbType | null;
 } & { [Key in keyof TrackSurfaceProfileColumns]: number | null };
 
-export interface TrackRoadEdgeDistances {
-  /** Signed distance remaining to the left edge; negative means outside the road. */
-  leftDistanceM: number | null;
-  /** Signed distance remaining to the right edge; negative means outside the road. */
-  rightDistanceM: number | null;
-}
-
 export interface TrackBoundaryGeometry {
   layoutKey: string;
   circuitId: string;

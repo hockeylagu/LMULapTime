@@ -30,18 +30,6 @@ export interface VehicleDataRecord {
   /** Hybrid deployment settings in kW as the game's MFD labels them, ascending. */
   deploymentKw?: number[];
 }
-export interface VehicleLogosCatalog {
-  logos: Record<string, string>;
-}
-/** Package manifest schema 7, the only supported schema. */
-export interface DataPluginManifest {
-  schemaVersion: 7;
-  id: string;
-  version: string;
-  tracks?: { catalog: string };
-  vehicles?: { catalog: string; logos?: string };
-  scenery?: { catalog: string };
-}
 export interface DataPluginCounts {
   tracks?: number;
   vehicles?: number;

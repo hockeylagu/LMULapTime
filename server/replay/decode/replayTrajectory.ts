@@ -11,7 +11,6 @@ import {
   ReplayPitEvent,
   ReplayFlagEvent,
   ReplayStandingsSnapshot,
-  ReplayLapSummary,
   ReplayWeatherEvent,
 } from '../../../shared/types/index.js';
 import { detectPlayerName, parseReplayMetadata, resolveReplayPrimarySlot } from './replayParser.js';
@@ -522,25 +521,4 @@ export function* extractReplayDriverTrajectories(
     samples?.close();
     fs.closeSync(fd);
   }
-}
-
-/**
- * Fast direct extractor for 100% official lap summaries and sector splits
- * streaming Class 6 Type 6 simulation timing events.
- */
-export function extractReplayLapSummaries(
-  filePath: string,
-  options: {
-    driverSlot?: number;
-    driverName?: string;
-    playerName?: string;
-  } = {}
-): ReplayLapSummary[] {
-  const traj = extractReplayTrajectory(filePath, {
-    driverSlot: options.driverSlot,
-    driverName: options.driverName,
-    playerName: options.playerName,
-    maxPoints: 10,
-  });
-  return traj.laps || [];
 }

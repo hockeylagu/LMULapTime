@@ -26,8 +26,6 @@ export const LMU_COLORS = {
   deep: '#060910',
 } as const;
 
-export type LmuColorKey = keyof typeof LMU_COLORS;
-
 export const SECTOR_COLORS = {
   s1: LMU_COLORS.gold,
   s2: LMU_COLORS.blue,

@@ -5,7 +5,6 @@ import { TelemetryAccelLonChannel } from '../../../../src/components/replay/tele
 import { TelemetryAccelTotalChannel } from '../../../../src/components/replay/telemetry/channels/dynamics/TelemetryAccelTotalChannel.js';
 import { TelemetrySlipAngleChannel } from '../../../../src/components/replay/telemetry/channels/dynamics/TelemetrySlipAngleChannel.js';
 import { TelemetryUndersteerChannel } from '../../../../src/components/replay/telemetry/channels/dynamics/TelemetryUndersteerChannel.js';
-import { TelemetryTireSlipChannel } from '../../../../src/components/replay/telemetry/channels/tires/TelemetryTireSlipChannel.js';
 import { TelemetryYawRateChannel } from '../../../../src/components/replay/telemetry/channels/dynamics/TelemetryYawRateChannel.js';
 import { TelemetryPresetChannelRow } from '../../../../src/components/replay/telemetry/presets/TelemetryPresetChannelRow.js';
 import { AVAILABLE_TELEMETRY_CHANNELS } from '../../../../src/components/replay/telemetry/presets/telemetryPresets.js';
@@ -125,30 +124,6 @@ describe('Computed Telemetry UI Channels', () => {
     expect(screen.getByText('HANDLING BALANCE')).toBeInTheDocument();
     expect(screen.getByText('COMPUTED')).toBeInTheDocument();
     expect(screen.getAllByText('+2.10° Understeer (Push)').length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('renders TelemetryTireSlipChannel with LOCKUP warning on non-ABS lockup', () => {
-    const lockedPoint: ReplayTrajectoryPoint = {
-      ...mockPoint,
-      brake: 90,
-      tireSlipPct: 94,
-      wheelLockActive: true,
-      absActive: false,
-    };
-
-    render(
-      <TelemetryTireSlipChannel
-        tireSlipPath="M 0 95 L 1000 15"
-        currentPoint={lockedPoint}
-        isCursorInView={true}
-        cursorPct={60}
-      />
-    );
-
-    expect(screen.getByText('TIRE SLIP & LOCKUP')).toBeInTheDocument();
-    expect(screen.getByText('COMPUTED')).toBeInTheDocument();
-    expect(screen.getByText('LOCKUP')).toBeInTheDocument();
-    expect(screen.getAllByText('94% (LOCKUP)').length).toBeGreaterThanOrEqual(1);
   });
 
   it('renders TelemetryYawRateChannel with rotation agility readout', () => {

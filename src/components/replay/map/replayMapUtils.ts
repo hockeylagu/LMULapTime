@@ -686,15 +686,6 @@ export interface GpsStartFinishGateProjection {
   gateRightSvg: { sx: number; sy: number } | null;
 }
 
-export interface TrackSceneBounds {
-  minX: number;
-  maxX: number;
-  minZ: number;
-  maxZ: number;
-  spanX: number;
-  spanZ: number;
-}
-
 /**
  * Projects canonical start/finish gate geometry into SVG coordinates.
  */
