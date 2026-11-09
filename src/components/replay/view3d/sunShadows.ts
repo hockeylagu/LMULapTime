@@ -73,6 +73,10 @@ export function createStaticShadow(renderer: WebGLRenderer, scene: Scene, toSun:
     return new WebGLRenderTarget(size, size, {format: RedFormat, depthTexture: depth, generateMipmaps: false});
   };
   let front = makeTarget(), back = makeTarget();
+  // The surfaces' shadow sampler needs a depth texture bound even before the first map (`ready` 0 leaves it unread): with none,
+  // three binds its empty colour texture and WebGL drops every surface draw on the sampler mismatch, the venue probe's included.
+  renderer.initRenderTarget(front);
+  staticShadowUniforms.map.value = front.depthTexture;
   const frontCentre = new Vector3(), buildCentre = new Vector3();
   const camera = new OrthographicCamera(-half, half, half, -half, SHADOW_NEAR_M, 2 * STATIC_SHADOW.lightDistanceM), tile = camera.clone();
   const up = Math.abs(toSun.y) > 0.99 ? new Vector3(0, 0, 1) : new Vector3(0, 1, 0);
