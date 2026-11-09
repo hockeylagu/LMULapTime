@@ -1,8 +1,10 @@
 import { MeshDepthMaterial, ShaderChunk, Vector2, Vector3, type IUniform, type WebGLProgramParametersWithUniforms } from 'three';
 import { STATIC_NORMAL_BIAS_M, SUN_SHADOW_DEPTH_M, staticShadowUniforms } from '../../sunShadows.js';
 import { digitalFlagClock } from './flagSurface.js';
-import { CROWN_ATTRIBUTE, crownNormalGlsl } from './foliageCrown.js';
+import { patchAmbientLookup } from './ambientLookup.js';
+import { CROWN_SUN_UNIFORM, crownNormalGlsl, crownSun } from './foliageCrown.js';
 import { glslNumber, list, value } from './shaderContext.js';
+import { REFLECTING_KINDS, SCENERY_REFLECTION_GLSL, SCENERY_REFLECTION_INPUTS, sceneryReflectionUniforms } from './sceneryReflection.js';
 import { shadowEye } from './shadowEye.js';
 import { shaderParts } from './shaderParts.js';
 import type { ParameterGroup, SurfaceConfig } from './surfaceConfig.js';
@@ -18,7 +20,7 @@ export function patchBillboardVertex(shader: WebGLProgramParametersWithUniforms,
   shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>
     attribute vec3 _lmu_pivot;
     attribute vec2 _lmu_corner;
-    ${crown ? `attribute vec2 ${CROWN_ATTRIBUTE};` : ''}
+    ${crown ? `uniform vec3 ${CROWN_SUN_UNIFORM};` : ''}
   `).replace('#include <begin_vertex>', `
     vec3 pivotWorld = (modelMatrix * vec4(_lmu_pivot, 1.0)).xyz;
     vec3 directionToCamera = ${eye} - pivotWorld;
@@ -166,7 +168,9 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
     #endif
   `).replace('#include <shadowmap_vertex>', `#include <shadowmap_vertex>${STATIC_SHADOW_VERTEX}`).replace('#include <begin_vertex>', '#include <begin_vertex>\nvSurfaceXZ = position.xz; vSurfaceRandom=fract(abs(position.x+position.z)); vSurfaceUV01 = vec4(uv,uv1); vSurfaceUV23 = vec4(uv2,uv3); vSurfaceColour = _lmu_colour;');
   if (config.billboard) {
-    patchBillboardVertex(shader, 'cameraPosition', config.kind === 'vegetation');
+    const crown = config.kind === 'vegetation';
+    if (crown) shader.uniforms[CROWN_SUN_UNIFORM] = crownSun;
+    patchBillboardVertex(shader, 'cameraPosition', crown);
     // A card and its own shadow lie in one plane, so at grazing sun the card shadowed itself whole (black palms). Its lookup moves
     // toward the sun by BILLBOARD_SELF_SHADOW_M (per map), past its own depth; other objects' shadows still fall on it.
     shader.vertexShader = shader.vertexShader.replace(STATIC_SHADOW_VERTEX, `${STATIC_SHADOW_VERTEX}
@@ -193,6 +197,12 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
   if (code.emissive) shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\ntotalEmissiveRadiance=${code.emissive};`);
   shader.fragmentShader = shader.fragmentShader.replace('#include <shadowmap_pars_fragment>', `#include <shadowmap_pars_fragment>\n${SUN_SHADOW_BLEND}`)
     .replace('#include <lights_fragment_begin>', sunShadowLights(config.kind === 'vegetation'));
+  patchAmbientLookup(shader);
+  if (REFLECTING_KINDS.has(config.kind)) {
+    Object.assign(shader.uniforms, sceneryReflectionUniforms);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <lights_physical_pars_fragment>', `#include <lights_physical_pars_fragment>\n${SCENERY_REFLECTION_GLSL}`)
+      .replace('#include <lights_fragment_begin>', `${SCENERY_REFLECTION_INPUTS}\n#include <lights_fragment_begin>`);
+  }
   if (config.kind === 'vegetation') {
     if (hasTranslucency(config)) {
       // Leaf translucency from the material's power and scale: pow(saturate(dot(eye-to-point, normalize(N + L))), Power) * leaf mask

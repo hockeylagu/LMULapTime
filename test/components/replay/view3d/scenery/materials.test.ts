@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { BufferGeometry, Float32BufferAttribute, Matrix4, PerspectiveCamera, Vector2, Vector3 } from 'three';
-import { addFoliageCrown } from '../../../../../src/components/replay/view3d/scenery/materials/foliageCrown.js';
+import { Matrix4, PerspectiveCamera, Vector2, Vector3 } from 'three';
+import { crownSun } from '../../../../../src/components/replay/view3d/scenery/materials/foliageCrown.js';
 import { billboardShadowMaterial, computeCustomProgramCacheKey, patchSurfaceShader } from '../../../../../src/components/replay/view3d/scenery/materials/patchSurfaceShader.js';
 import { trackShadowEye } from '../../../../../src/components/replay/view3d/scenery/materials/shadowEye.js';
+import { sceneryReflectionUniforms } from '../../../../../src/components/replay/view3d/scenery/materials/sceneryReflection.js';
 import { staticShadowUniforms } from '../../../../../src/components/replay/view3d/sunShadows.js';
 import { shaderParts } from '../../../../../src/components/replay/view3d/scenery/materials/shaderParts.js';
 import { readSurfaceConfig, SURFACE_KINDS, terrainLayerCount, textureAsset, type SurfaceConfig, type SurfaceMap } from '../../../../../src/components/replay/view3d/scenery/materials/surfaceConfig.js';
@@ -142,7 +143,7 @@ describe('computeCustomProgramCacheKey', () => {
 
 describe('patchSurfaceShader', () => {
   const vertex = '#include <common>\n#include <beginnormal_vertex>\n#include <begin_vertex>\n#include <shadowmap_vertex>';
-  const fragment = ['common', 'map_fragment', 'roughnessmap_fragment', 'metalnessmap_fragment', 'normal_fragment_maps', 'lights_physical_fragment', 'aomap_fragment', 'emissivemap_fragment', 'normal_fragment_begin', 'lights_physical_pars_fragment', 'shadowmap_pars_fragment', 'lights_fragment_begin', 'opaque_fragment']
+  const fragment = ['common', 'map_fragment', 'roughnessmap_fragment', 'metalnessmap_fragment', 'normal_fragment_maps', 'lights_physical_fragment', 'aomap_fragment', 'emissivemap_fragment', 'normal_fragment_begin', 'lights_physical_pars_fragment', 'shadowmap_pars_fragment', 'lights_fragment_begin', 'lights_fragment_maps', 'lights_fragment_end', 'opaque_fragment']
     .map(chunk => `#include <${chunk}>`).join('\n');
   const depthVertex = ['common', 'begin_vertex', 'project_vertex'].map(chunk => `#include <${chunk}>`).join('\n');
   const patched = (config: SurfaceConfig) => {
@@ -174,19 +175,26 @@ describe('patchSurfaceShader', () => {
     expect(billboard.vertexShader).toContain('vDirectionalShadowCoord[ 0 ].z -= 0.00125156');
     expect(billboard.vertexShader).toContain('vStaticShadowCoord.z -= 0.00200100');
     expect(patched(tree).vertexShader).not.toContain('vDirectionalShadowCoord');
-    // Leaf cards light with a crown-shaped normal; crowd cards do not.
-    expect(billboard.vertexShader).toContain('attribute vec2 _lmu_crown;'); expect(billboard.vertexShader).toContain('vec3 crownNormal = ');
+    // Leaf cards light with a crown-shaped normal: sideways by the corner's side, up above a metre and less so facing the sun; never down.
+    expect(billboard.vertexShader).toContain('uniform vec3 surface_crownSun;'); expect(billboard.vertexShader).toContain('vec3 crownNormal = facing + across * side + vec3(0.0, up, 0.0);');
+    expect(billboard.vertexShader).toContain('float up = clamp(2.0 * clamp(_lmu_corner.y, 0.0, 1.0) - 1.0, 0.0, 1.0) * clamp(1.0 - dot(facing, surface_crownSun), 0.0, 1.0);');
+    expect((billboard.uniforms as Record<string, unknown>).surface_crownSun).toBe(crownSun);
     // Crowd cards keep the camera-facing normal: lit as seen, not as sunlit tops.
     const crowd = surface('standard', { maps: { albedo: map('A', true) }, billboard: true });
     expect(patched(crowd).fragmentShader).not.toContain('vec3(0.0,1.0,0.0));');
-    expect(patched(crowd).vertexShader).not.toContain('_lmu_crown');
+    expect(patched(crowd).vertexShader).not.toContain('crownNormal'); expect(patched(crowd).uniforms).not.toHaveProperty('surface_crownSun');
   });
-  it('spans each card by the corners sharing its pivot, for the crown normal', () => {
-    const geometry = new BufferGeometry();
-    geometry.setAttribute('_lmu_pivot', new Float32BufferAttribute([0, 0, 0, 0, 0, 0, 5, 0, 0, 5, 0, 0], 3));
-    geometry.setAttribute('_lmu_corner', new Float32BufferAttribute([-1, 0, 1, 6, -2, 1, 2, 3], 2));
-    addFoliageCrown(geometry);
-    expect(Array.from(geometry.getAttribute('_lmu_crown').array)).toEqual([0, 6, 0, 6, 1, 3, 1, 3]);
+  it("takes ambient light with the normal's height halved, and reflects by the package's rule except on glass and clear coat", () => {
+    const shader = patched(surface('standard', { maps: { albedo: map('A', true) } }));
+    expect(shader.fragmentShader).toContain('getIBLIrradiance( normalize( geometryNormal * vec3( 1.0, 0.5, 1.0 ) ) )');
+    expect(shader.fragmentShader).not.toContain('getIBLIrradiance( geometryNormal )');
+    // The venue's convolved cube at lodScale × roughness, the split-sum table at (N·V, roughness), the family's inputs set before the lights.
+    expect(shader.fragmentShader).toContain('#define RE_IndirectSpecular surfaceIndirectSpecular');
+    expect(shader.fragmentShader).toContain('textureLod(surface_reflection, r, surface_reflectionLodScale * roughness)');
+    expect(shader.fragmentShader).toContain('mix(vec3(surfaceReflectionSpecular * (split.y + surface_dielectricF0 * split.x)), mix(surfaceReflectionAlbedo, vec3(1.0), split.y), material.metalness)');
+    expect(shader.fragmentShader.indexOf('surfaceReflectionSpecular=surfaceSpecular;')).toBeLessThan(shader.fragmentShader.indexOf('surfaceSunShadow( getShadow('));
+    expect(shader.uniforms.surface_reflection).toBe(sceneryReflectionUniforms.surface_reflection);
+    for (const kind of ['glass', 'clearcoat'] as const) expect(patched(surface(kind, { maps: { albedo: map('A', true) } })).fragmentShader).not.toContain('surfaceIndirectSpecular');
   });
   it('turns shadow-pass cards toward the viewing camera, so a card shades what is drawn', () => {
     const material = billboardShadowMaterial();

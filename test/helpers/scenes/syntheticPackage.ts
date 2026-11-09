@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { syntheticTrack } from '../syntheticTrack.js';
-import { TEST_HAZE_WEIGHTS, testCamera, testSky } from './sceneryProfiles.js';
+import { catalogSky, TEST_HAZE_WEIGHTS, testCamera, testShading, testSky } from './sceneryProfiles.js';
 import type { TrackBoundaryGeometry } from '../../../shared/types/trackGeometry.js';
 
 const sha = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
@@ -67,7 +67,8 @@ export function syntheticPackage() {
     chunking: { sectorLengthM: 1000, minSectorLengthM: 100, maxSectorTriangles: 400000, horizonDistanceM: 2000, skylineHeightM: 30, skylineMinDistanceM: 500, terrainScaleExtentM: 50, pitBandM: 100 },
     streaming: { residentBehindM: 300, residentAheadM: 1500, freeCameraRadiusM: 1500 },
     camera: testCamera(),
-    sky: testSky(),
+    shading: testShading(),
+    sky: catalogSky(testSky(), ['monza_gp']),
   };
   const scenery = {
     layoutKey: 'monza_gp', sourceGeometryRevision: geometry.geometryRevision, routeLengthM: L, pitLaneLengthM: 0, shadowRangeM: 750, environmentProbe: { position: [10, 2, -20] },

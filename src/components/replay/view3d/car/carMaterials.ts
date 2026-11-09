@@ -1,9 +1,12 @@
 import { DoubleSide, MeshPhysicalMaterial, MeshStandardMaterial, NoColorSpace, RepeatWrapping, SRGBColorSpace, type Texture } from 'three';
 import type { CarAppearance, CarMaterialRecipe, CarSurface } from '../../../../../shared/types/scenes/car.js';
+import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
+import { patchAmbientLookup } from '../scenery/materials/ambientLookup.js';
 import { bindSurfaceProgram } from '../scenery/materials/configureSurfaceMaterial.js';
 import type { SurfaceConfig, SurfaceMap } from '../scenery/materials/surfaceConfig.js';
 import { MAX_ANISOTROPY } from '../scenery/materials/textureSource.js';
 import { configureCarPaint, PAINT_MAPS } from './carPaint.js';
+import { bindCarSurfaceReflection } from './carReflection.js';
 
 const UV_CHANNEL: Record<string, number> = { uv0: 0, uv1: 1, uv2: 2, uv3: 3 };
 
@@ -62,8 +65,9 @@ function mapTexture(texture: (path: string) => Texture, map: SurfaceMap): Textur
  * appearance has one, else the recipe's own map. Car paint is layered paint (carPaint.ts); the other shader kinds
  * map to a standard or physical material with the albedo map.
  * `texture` returns a shared KTX2 texture by its `textures/<sha256>.ktx2.zst` path; each material uses its own clone for its UV channel.
+ * `shading` is the scenery package's shading section, read by the car paint.
  */
-export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppearance, texture: (path: string) => Texture): MeshStandardMaterial {
+export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppearance, texture: (path: string) => Texture, shading: SceneryShading): MeshStandardMaterial {
   const config = recipe.paint ? appearance.paint : recipe.surface;
   if (!config) throw Error(`Car material ${recipe.name} has no shader configuration`);
   const surface = nativeSurface(recipe, appearance);
@@ -93,6 +97,7 @@ export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppe
     const loaded: Record<string, Texture> = {};
     for (const [key, map] of Object.entries(surface.maps)) loaded[key] = mapTexture(texture, map!);
     bindSurfaceProgram(material, surface, loaded);
+    bindCarSurfaceReflection(material);
     material.addEventListener('dispose', () => { for (const map of Object.values(loaded)) map.dispose(); });
   } else if (path) {
     // Every textured car material and paint has an albedo map; a livery file replaces its texture on the same UV set.
@@ -110,7 +115,12 @@ export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppe
   } else if (albedo?.constant) {
     material.color.setRGB(albedo.constant[0], albedo.constant[1], albedo.constant[2]);
   }
-  if (config.kind === 'carPaint' && material.map) configureCarPaint(material as MeshPhysicalMaterial, config, texture);
+  if (config.kind === 'carPaint' && material.map) configureCarPaint(material as MeshPhysicalMaterial, config, texture, shading);
+  else if (!surface) {
+    // Three's own program otherwise: the same ambient lookup as every other surface of the scene.
+    material.onBeforeCompile = shader => { patchAmbientLookup(shader); };
+    material.customProgramCacheKey = () => 'lmu-car-ambient';
+  }
   material.shadowSide = DoubleSide;
   material.name = recipe.name;
   return material;

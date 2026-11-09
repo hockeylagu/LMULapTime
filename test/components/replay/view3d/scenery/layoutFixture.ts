@@ -1,5 +1,5 @@
 import type { SceneryChunk, SceneryLayout, ScenerySectorChunk } from '../../../../../shared/types/scenes/scenery.js';
-import { TEST_HAZE_WEIGHTS, testCamera, testSky } from '../../../../helpers/scenes/sceneryProfiles.js';
+import { TEST_HAZE_WEIGHTS, testCamera, testShading, testSky } from '../../../../helpers/scenes/sceneryProfiles.js';
 
 const base = { sha256: 'x', byteLength: 1, triangles: 1, vertices: 1, drawCalls: 1, shadowDrawCalls: 1, shadowTriangles: 1, geometryBytes: 1, meshes: 1, materials: 1 };
 const box = (x: number, z: number) => ({ min: [x, 0, z] as [number, number, number], max: [x + 100, 10, z + 100] as [number, number, number] });
@@ -17,6 +17,7 @@ export function testLayout(): SceneryLayout {
     chunking: { sectorLengthM: 1000, minSectorLengthM: 100, maxSectorTriangles: 1, horizonDistanceM: 1, skylineHeightM: 1, skylineMinDistanceM: 1, terrainScaleExtentM: 1, pitBandM: 1 },
     streaming: { residentBehindM: 300, residentAheadM: 1500, freeCameraRadiusM: 1500 },
     camera: testCamera(),
+    shading: testShading(),
     sky: testSky(),
     daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55, ...TEST_HAZE_WEIGHTS, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9 },
     horizon, sectors: [0, 1, 2, 3].map(main).concat(pit), textures: [],

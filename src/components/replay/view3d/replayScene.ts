@@ -16,6 +16,7 @@ import { createChaseCameraTracker, trackCamera } from './cameraTracking.js';
 import { driverCamera, driverPose, isDriverCamera, type DriverPose } from './driverCameras.js';
 import { addSceneEnvironment, sceneLighting } from './sceneEnvironment.js';
 import { createAutoExposure } from './autoExposure.js';
+import { sunRadiance } from './atmosphere/sunSamples.js';
 import { createCarReflection } from './car/carReflection.js';
 import { setCockpitView } from './sceneObjects.js';
 import { CachedKtx2Loader } from './scenery/cachedKtx2Loader.js';
@@ -32,8 +33,6 @@ const DEFAULT_CHASE_DISTANCE_M = 7.8;
 const DEFAULT_CHASE_HEIGHT_M = 2.2;
 const CHASE_LOOK_ELEVATION_M = 0.5;
 const DEFAULT_FOV_DEG = 48, DEFAULT_NEAR_M = 0.5;
-/** The reflection probe sits at about the car body's mid-height above the model origin (the tyre contact plane). */
-const PROBE_HEIGHT_M = 0.5;
 
 export interface ReplaySceneHandle {
   wheelMotion: string;
@@ -70,7 +69,8 @@ export async function createReplayScene(
   const {min, max} = layout.horizon.bounds, origin = new Vector3(...min).add(new Vector3(...max)).multiplyScalar(0.5);
   const loader = createChunkLoader(renderer), carTextures = new CachedKtx2Loader(renderer);
   const lighting = sceneLighting(layout.daylight, trajectory.daylightClock), sunElevationDeg = Math.asin(lighting.sunDirection.y) * 180 / Math.PI;
-  const exposure = createAutoExposure(renderer, layout.camera, sunElevationDeg, () => invalidate(), exposureType('follow'));
+  const cloudCover = trajectory.daylightClock?.cloudCover ?? 0, sunRgb = sunRadiance(layout.sky.sun, sunElevationDeg, cloudCover);
+  const exposure = createAutoExposure(renderer, layout.camera, {rgb: sunRgb, elevationDeg: sunElevationDeg}, () => invalidate(), exposureType('follow'), cloudCover);
   // Wheel and line contact heights and the camera checks share one ray tree per resident chunk.
   const ground = createSceneryGround(), {surfaceHeight} = ground;
   // Scenery chunks live in native coordinates under one group, shifted by the scene origin.
@@ -171,10 +171,10 @@ export async function createReplayScene(
   const firstStation = stationAt(trajectory.points, 0, 0, route);
   if (firstStation === undefined) { cleanup(); throw Error('This recording has no track stations. Use the 2D map.'); }
   let currentStation = firstStation, mode: CameraMode = 'follow', streamView: StreamView | null = null;
-  const loadLaps = createLapLayerLoader(origin, surfaceHeight, path => carTextures.loadAsync(`${VEHICLE_FILES}${path}`), () => exposure.display());
+  const loadLaps = createLapLayerLoader(origin, surfaceHeight, path => carTextures.loadAsync(`${VEHICLE_FILES}${path}`), () => exposure.display(), layout.shading);
   // The sky's environment map compiles and renders now, while the scenery files download.
   const scene = new Scene();
-  const environment = addSceneEnvironment(scene, renderer, layout, origin, trajectory.daylightClock), reflection = createCarReflection(renderer, scene);
+  const environment = addSceneEnvironment(scene, renderer, layout, origin, trajectory.daylightClock), reflection = createCarReflection(renderer, scene, layout.shading);
   // The horizon and the chunks under the first pose must be resident before cars and lines are draped on them.
   try {
     streamView = {kind: 'lap', lapDistanceM: currentStation}; stream.update(streamView);
@@ -256,7 +256,7 @@ export async function createReplayScene(
       if (environment.update(focus)) invalidate();
       exposure.render(scene, camera);
       // The car's reflection probe renders one face after the frame (car/carReflection.ts), around the body's centre.
-      if (layer.primary.visible && reflection.update(layer.primary.getWorldPosition(probeCentre).setY(probeCentre.y + PROBE_HEIGHT_M))) invalidate();
+      if (layer.primary.visible && reflection.update(layer.primary.getWorldPosition(probeCentre))) invalidate();
     } finally {
       if (corrected) {
         camera.position.copy(desiredEye);

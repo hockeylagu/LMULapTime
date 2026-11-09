@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
-import { BoxGeometry, CubeCamera, DoubleSide, Group, Material, Mesh, MeshBasicMaterial, Texture, Vector3, type BufferGeometry, type Object3D, type PerspectiveCamera, type OrthographicCamera, type Scene } from 'three';
+import { BoxGeometry, CubeCamera, DoubleSide, Group, Material, Mesh, MeshBasicMaterial, Texture, Vector3, type BufferGeometry, type Object3D, type PerspectiveCamera, OrthographicCamera, type Scene } from 'three';
 import { createReplayScene } from '../../../../../src/components/replay/view3d/replayScene.js';
 import { disposeObjects } from '../../../../../src/components/replay/view3d/laps/disposeObjects.js';
 import { EXPOSURE_PASS } from '../../../../../src/components/replay/view3d/autoExposure.js';
@@ -8,7 +8,7 @@ import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js
 import type { SceneryChunk, SceneryLayoutResource, ScenerySectorChunk } from '../../../../../shared/types/scenes/scenery.js';
 import type { LoadedBody } from '../../../../../src/api/vehicles/bodyApi.js';
 import { testCarPaint } from '../../../../helpers/scenes/syntheticPackage.js';
-import { TEST_HAZE_WEIGHTS, testCamera, testSky } from '../../../../helpers/scenes/sceneryProfiles.js';
+import { TEST_HAZE_WEIGHTS, testCamera, testShading, testSky } from '../../../../helpers/scenes/sceneryProfiles.js';
 
 const gpu = vi.hoisted(() => ({render: vi.fn<(scene: Scene, camera: PerspectiveCamera | OrthographicCamera) => void>(), dispose: vi.fn(), constructed: vi.fn(), setSize: vi.fn(), upload: vi.fn<() => Promise<void>>()}));
 const chunks = vi.hoisted(() => ({roots: new Map<string, Object3D>(), loads: [] as string[], obstacleName: ''}));
@@ -35,6 +35,7 @@ vi.mock('three', async importOriginal => {
     setPixelRatio() {}
     compileAsync() { return Promise.resolve(); }
     initTexture() {}
+    initRenderTarget() {}
     forceContextLoss() {}
     getRenderTarget() { return null; }
     getActiveCubeFace() { return 0; }
@@ -101,7 +102,7 @@ const sector = (index: number): ScenerySectorChunk => ({...base, id: `s${index}`
 const layout = {
   layoutKey: 'portimao_wec', sourceGeometryRevision: 'g', packageRevision: 'p', routeLengthM: 4000, pitLaneLengthM: 0, shadowRangeM: 750,
   streaming: {residentBehindM: 300, residentAheadM: 1500, freeCameraRadiusM: 1500},
-  camera: testCamera(), sky: testSky(), environmentProbe: {position: [0, 0, 0]},
+  camera: testCamera(), sky: testSky(), shading: testShading(), environmentProbe: {position: [0, 0, 0]},
   daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55, ...TEST_HAZE_WEIGHTS, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9 },
   horizon: {...base, id: 'horizon', kind: 'horizon', asset: 'scenery/h.glb'}, sectors: [0, 1, 2, 3].map(sector), textures: [],
 } as unknown as SceneryLayoutResource;
@@ -119,9 +120,9 @@ let frames: FrameRequestCallback[];
 let resizeCallbacks: Array<() => void>;
 const draw = () => { frames.splice(0).forEach(callback => callback(0)); };
 /** Renders of the replay scene, without the exposure and metering passes. */
-// Replay frames only: the exposure passes are named scenes, the occlusion passes draw a full-screen mesh, not a scene, and the car's
-// reflection probe renders through its cube camera's face cameras.
-const isFrame = (scene: Scene, camera: Object3D) => scene.isScene && scene.name !== EXPOSURE_PASS && !(camera.parent instanceof CubeCamera);
+// Replay frames only: the exposure passes are named scenes, the occlusion passes draw a full-screen mesh, not a scene, the car's
+// reflection probe renders through its cube camera's face cameras, and the reflection convolutions draw a quad with an orthographic camera.
+const isFrame = (scene: Scene, camera: Object3D) => scene.isScene && scene.name !== EXPOSURE_PASS && !(camera.parent instanceof CubeCamera) && !(camera instanceof OrthographicCamera);
 const sceneRenders = () => gpu.render.mock.calls.filter(([scene, camera]) => isFrame(scene, camera));
 const lastSceneRender = () => sceneRenders().at(-1)!;
 beforeEach(() => {

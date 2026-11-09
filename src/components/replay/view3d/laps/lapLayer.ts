@@ -1,6 +1,7 @@
 import { MeshoptDecoder } from 'meshoptimizer/decoder';
 import { BufferGeometry, Group, Mesh, type Material, type Object3D, type Texture, type Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import { normalizeVehicleId, type LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import { createCarMaterial, materialTexturePaths } from '../car/carMaterials.js';
@@ -25,7 +26,7 @@ export interface LapCars {
 export type CarTextureLoader = (path: string) => Promise<Texture>;
 
 /** Lap objects own their geometry; replacing them cannot release the track's GPU buffers. */
-export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeight, loadTexture: CarTextureLoader, display: () => DisplayTransform) {
+export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeight, loadTexture: CarTextureLoader, display: () => DisplayTransform, shading: SceneryShading) {
   // Only buffers retained by the bounded asset cache keep these parsed templates alive.
   const templates = new WeakMap<ArrayBuffer, Promise<Group>>();
   const loadTemplate = (car: LoadedBody): Promise<Group> => {
@@ -90,7 +91,7 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
       const replace = (material: Material) => {
         const recipe = recipeOf(material);
         let created = materials.get(recipe.id);
-        if (!created) { created = createCarMaterial(recipe, appearance, path => textures.get(path)!); materials.set(recipe.id, created); }
+        if (!created) { created = createCarMaterial(recipe, appearance, path => textures.get(path)!, shading); materials.set(recipe.id, created); }
         return created;
       };
       object.material = Array.isArray(object.material) ? object.material.map(replace) : replace(object.material as Material);

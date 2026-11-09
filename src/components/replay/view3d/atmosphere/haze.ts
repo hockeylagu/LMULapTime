@@ -1,5 +1,5 @@
 import { ShaderChunk, type Color, type Vector3 } from 'three';
-import type { HeightHaze } from './perezSky.js';
+import type { HeightHaze } from './skyDome.js';
 
 /**
  * The replay's haze in three's fog chunks, for one scene: the fog density and colour stay three's `FogExp2` uniforms, and the
@@ -7,8 +7,8 @@ import type { HeightHaze } from './perezSky.js';
  * terms back (`createHaze`'s apply) before each of its renders and compiles: a scene's programs then compile with its own haze,
  * whichever scene was built last.
  *
- * - Distance: 1 − exp(−density·d), linear in the exponent (not three's squared exponential), the view depth clamped at zero: a
- *   fragment behind the eye gave NaN, which spread through the post-processing as black blocks.
+ * - Distance: 1 − exp(−density·d), linear in the exponent (not three's squared exponential), d the distance from the eye along
+ *   the ray (three's view depth under-hazed the frame's edges, by a tenth at 48° of view and more in wide trackside views).
  * - Height: haze thins with the fragment's height above the native zero, by amount · saturate(y · rate)^exponent of what remains.
  * - Sun: the haze colour turns toward the sun's light by sunward · saturate(sun · ray)², per pixel along the view ray.
  */
@@ -58,10 +58,10 @@ export function createHaze(shape: HazeShape): () => void {
     installed = fragmentPars;
     ShaderChunk.fog_pars_vertex = '#ifdef USE_FOG\n  varying float vFogDepth;\n  varying vec3 vFogWorld;\n#endif\n';
     // World position from the view-space one: the view matrix's rotation is orthonormal, so its transpose undoes it.
-    ShaderChunk.fog_vertex = '#ifdef USE_FOG\n  vFogDepth = - mvPosition.z;\n  vFogWorld = transpose( mat3( viewMatrix ) ) * ( mvPosition.xyz - viewMatrix[ 3 ].xyz );\n#endif\n';
+    ShaderChunk.fog_vertex = '#ifdef USE_FOG\n  vFogDepth = length( mvPosition.xyz );\n  vFogWorld = transpose( mat3( viewMatrix ) ) * ( mvPosition.xyz - viewMatrix[ 3 ].xyz );\n#endif\n';
     ShaderChunk.fog_pars_fragment = fragmentPars;
     ShaderChunk.fog_fragment = `#ifdef USE_FOG
-  float fogFactor = 1.0 - exp( - fogDensity * max( vFogDepth, 0.0 ) );
+  float fogFactor = 1.0 - exp( - fogDensity * vFogDepth );
   fogFactor *= 1.0 - HAZE_HEIGHT_AMOUNT * pow( clamp( ( vFogWorld.y + HAZE_ORIGIN_Y ) * HAZE_HEIGHT_RATE, 0.0, 1.0 ), HAZE_HEIGHT_EXPONENT );
   float hazeSun = clamp( dot( HAZE_SUN_DIRECTION, normalize( vFogWorld - cameraPosition ) ), 0.0, 1.0 );
   vec3 hazeColour = mix( fogColor, HAZE_SUN_RADIANCE, hazeSun * hazeSun * HAZE_SUNWARD );

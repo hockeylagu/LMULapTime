@@ -1,6 +1,5 @@
 import { Mesh, MeshPhysicalMaterial, MeshStandardMaterial, Vector2, type IUniform, type Material, type Texture } from 'three';
 import { digitalFlagClock } from './flagSurface.js';
-import { addFoliageCrown } from './foliageCrown.js';
 import { billboardShadowMaterial, computeCustomProgramCacheKey, patchSurfaceShader } from './patchSurfaceShader.js';
 import { trackShadowEye } from './shadowEye.js';
 import { list, value } from './shaderContext.js';
@@ -103,7 +102,6 @@ export async function configureSurfaceMaterial(mesh: Mesh, textures: SurfaceText
     geometry.boundingSphere.radius += extent;
     mesh.customDepthMaterial = billboardShadowMaterial();
     mesh.onBeforeShadow = trackShadowEye;
-    if (config.kind === 'vegetation') addFoliageCrown(geometry);
   }
   // Digital flags blink on one shared clock, advanced as they draw.
   if (config.kind === 'digitalFlag') mesh.onBeforeRender = () => { digitalFlagClock.value = (performance.now() - START_MS) / 1000; };

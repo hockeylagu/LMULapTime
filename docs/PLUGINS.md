@@ -175,10 +175,13 @@ The catalog's `chunking`, `streaming`, `camera` and `sky` are shared by every la
 `toneCurve`} validated the same way (the package's overcast profile; the viewer does not blend to it yet). The viewer interpolates a profile by sun elevation and holds it past the ends;
 the cockpit view uses `onboard`, trackside `tv`, every other view `external`. `sky` holds five `perezScale` values,
 `perezMultipliers` rows ascending by `sunElevationDeg` (four values each), `pollution`, `turbidity` and `fog.density` (each range
-with `min` ≤ `max`), `airMass`, and the haze's `fog.colour`, `fog.sunInfluence` and `fog.height`; the pipeline's
-docs/SCENE_PACKAGE.md "Sky and atmosphere" has the formulas. Only `atmosphere/perezSky.ts` reads it. The viewer takes the cloud
-cover from the replay at the lap and treats every replay as dry; it uses the clear-day haze density and does not apply `airMass`
-(the sun's colour has its own air mass) or `sceneLuminanceScale` yet.
+with `min` ≤ `max`), `airMass`, the haze's `fog.colour`, `fog.sunInfluence` and `fog.height`, and `sun` {`unit`, ascending
+`sunElevationDeg`, ascending `cloudCoverage` in 0..1, `layouts`}: a grid of positive RGB triples per catalog layout (coverage rows by
+elevation columns), exactly one per layout, which the loader attaches to its layout as `sky.sun.grid`; the pipeline's
+docs/SCENE_PACKAGE.md "Sky and atmosphere" has the formulas. `atmosphere/perezSky.ts` reads the sky and `atmosphere/sunSamples.ts` the sun. The viewer takes the cloud
+cover from the replay at the lap and treats every replay as dry, and reads the sun's colour and strength from `sky.sun` at the sun's
+elevation and that cover (the base coverage the grid is sampled by); it applies the dry haze density (dawn mix, cloud and pollution
+terms, no storm term) and does not apply `airMass` or `sceneLuminanceScale` yet.
 
 Startup checks that each listed file exists and has its catalogued size; it does not hash the scenery (several GB). Package files
 are pregenerated, content-named and published by folder swap, so they are never rewritten in place: the backend serves them as is,

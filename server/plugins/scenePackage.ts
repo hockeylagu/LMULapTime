@@ -1,5 +1,5 @@
 import type { TrackBoundaryGeometry } from '../../shared/types/trackGeometry.js';
-import type { SceneryBounds, SceneryCamera, SceneryChunk, SceneryDaylight, SceneryLayout, ScenerySky, SceneryTexture } from '../../shared/types/scenes/scenery.js';
+import type { SceneryBounds, SceneryCamera, SceneryChunk, SceneryDaylight, SceneryLayout, SceneryShading, ScenerySky, ScenerySun, SceneryTexture } from '../../shared/types/scenes/scenery.js';
 import { registerPackageFile, type PackageFile } from './packageFiles.js';
 import { array, count, exactKeys, finite, knownKeys, nonNegative, record, sha256, text, vec3 } from './strict.js';
 
@@ -64,14 +64,14 @@ function screenWindow(value: unknown, what: string): void {
   if ((window.x as number) + (window.width as number) > 1 || (window.y as number) + (window.height as number) > 1 || !window.width || !window.height) throw Error(`${what}: outside the frame`);
 }
 
-/** Rows ascending by sun elevation, each checked by `row`. */
-function ascending(rows: unknown[], what: string, row: (value: Record<string, unknown>, what: string) => void): void {
+/** Rows ascending by `key` (the sun elevation unless named), each checked by `row`. */
+function ascending(rows: unknown[], what: string, row: (value: Record<string, unknown>, what: string) => void, key = 'sunElevationDeg'): void {
   if (!rows.length) throw Error(`${what}: empty`);
   let previous = -Infinity;
   rows.forEach((value, i) => {
-    const entry = record(value, `${what}[${i}]`), elevation = finite(entry.sunElevationDeg, `${what}[${i}].sunElevationDeg`);
-    if (elevation <= previous) throw Error(`${what}: elevations must ascend`);
-    previous = elevation;
+    const entry = record(value, `${what}[${i}]`), at = finite(entry[key], `${what}[${i}].${key}`);
+    if (at <= previous) throw Error(`${what}: ${key} must ascend`);
+    previous = at;
     row(entry, `${what}[${i}]`);
   });
 }
@@ -93,13 +93,13 @@ function parseCameraType(value: unknown, what: string): void {
   if (finite(row.adaptationScale, `${what}.adaptationScale`) <= 0) throw Error(`${what}.adaptationScale: must be positive`);
   if (finite(row.weatherBlendRate, `${what}.weatherBlendRate`) <= 0) throw Error(`${what}.weatherBlendRate: must be positive`);
   ascending(array(row.profiles, `${what}.profiles`, 32), `${what}.profiles`, (p, at) => {
-    exactKeys(p, ['sunElevationDeg', 'targetExposure', 'whiteBalanceK', 'toneCurve', 'weatherLerpPower', 'overcast'], at);
+    exactKeys(p, ['sunTarget', 'targetExposure', 'whiteBalanceK', 'toneCurve', 'weatherLerpPower', 'overcast'], at);
     exposureLook(p, at);
     if (finite(p.weatherLerpPower, `${at}.weatherLerpPower`) <= 0) throw Error(`${at}.weatherLerpPower: must be positive`);
     const overcast = record(p.overcast, `${at}.overcast`);
     exactKeys(overcast, ['targetExposure', 'whiteBalanceK', 'toneCurve'], `${at}.overcast`);
     exposureLook(overcast, `${at}.overcast`);
-  });
+  }, 'sunTarget');
   numbers(row.ambientOcclusion, ['radiusM', 'samples', 'scale', 'colour'], `${what}.ambientOcclusion`, false);
 }
 
@@ -115,6 +115,61 @@ function parseCamera(value: unknown, what: string): SceneryCamera {
   return structuredClone(row) as unknown as SceneryCamera;
 }
 
+/** The catalog's shading (SceneryShading): positive scales, ordered limits, known LOD modes and non-empty unit-direction kernels. */
+function parseShading(value: unknown, what: string): SceneryShading {
+  const row = record(value, what);
+  exactKeys(row, ['sunGlint', 'smallEdge', 'carPaintReflection', 'convolution', 'sceneryReflection', 'integrationMap'], what);
+  numbers(row.sunGlint, ['cosineThreshold', 'roughnessCutoff', 'smoothSpecularScale'], `${what}.sunGlint`, true);
+  if ((row.sunGlint as Record<string, number>).cosineThreshold > 1) throw Error(`${what}.sunGlint.cosineThreshold: above 1`);
+  numbers(row.smallEdge, ['detectorScale', 'edgeScale', 'limitMin', 'limitMax'], `${what}.smallEdge`, true);
+  const edge = row.smallEdge as Record<string, number>;
+  if (edge.limitMin > edge.limitMax) throw Error(`${what}.smallEdge: limitMin above limitMax`);
+  const paint = record(row.carPaintReflection, `${what}.carPaintReflection`);
+  exactKeys(paint, ['roughnessCutoff', 'lodScale', 'clearCoatLod', 'baseCoatLod'], `${what}.carPaintReflection`);
+  for (const key of ['roughnessCutoff', 'lodScale']) if (finite(paint[key], `${what}.carPaintReflection.${key}`) <= 0) throw Error(`${what}.carPaintReflection.${key}: must be positive`);
+  for (const key of ['clearCoatLod', 'baseCoatLod']) if (paint[key] !== 'bias' && paint[key] !== 'explicit') throw Error(`${what}.carPaintReflection.${key}: expected bias or explicit`);
+  const convolution = record(row.convolution, `${what}.convolution`);
+  exactKeys(convolution, ['kernels'], `${what}.convolution`);
+  const kernels = array(convolution.kernels, `${what}.convolution.kernels`, 16);
+  if (!kernels.length) throw Error(`${what}.convolution.kernels: empty`);
+  kernels.forEach((value, i) => {
+    const at = `${what}.convolution.kernels[${i}]`, kernel = record(value, at);
+    exactKeys(kernel, ['specularPower', 'sourceLod', 'samples'], at);
+    const power = text(kernel.specularPower, `${at}.specularPower`, 16);
+    if (power !== 'INF' && !(Number(power) > 0)) throw Error(`${at}.specularPower: expected INF or a positive number`);
+    count(kernel.sourceLod, `${at}.sourceLod`, 16);
+    const samples = array(kernel.samples, `${at}.samples`, 1024);
+    if (!samples.length) throw Error(`${at}.samples: empty`);
+    samples.forEach((sample, j) => {
+      if (Math.abs(Math.hypot(...vec3(sample, `${at}.samples[${j}]`)) - 1) > 1e-3) throw Error(`${at}.samples[${j}]: not a unit direction`);
+    });
+  });
+  const scenery = record(row.sceneryReflection, `${what}.sceneryReflection`);
+  exactKeys(scenery, ['lodScale', 'lod', 'dielectricF0', 'families'], `${what}.sceneryReflection`);
+  if (finite(scenery.lodScale, `${what}.sceneryReflection.lodScale`) <= 0) throw Error(`${what}.sceneryReflection.lodScale: must be positive`);
+  if (scenery.lod !== 'bias' && scenery.lod !== 'explicit') throw Error(`${what}.sceneryReflection.lod: expected bias or explicit`);
+  const f0 = finite(scenery.dielectricF0, `${what}.sceneryReflection.dielectricF0`);
+  if (f0 < 0 || f0 > 1) throw Error(`${what}.sceneryReflection.dielectricF0: outside 0–1`);
+  const families = array(scenery.families, `${what}.sceneryReflection.families`, 64).map((family, i) => text(family, `${what}.sceneryReflection.families[${i}]`, 64));
+  if (!families.length) throw Error(`${what}.sceneryReflection.families: empty`);
+  parseIntegrationMap(row.integrationMap, `${what}.integrationMap`);
+  return structuredClone(row) as unknown as SceneryShading;
+}
+
+/** The split-sum table: `width` × `height` 8-bit (scale, bias) pairs, row-major, N·V along a row, roughness down the rows. */
+function parseIntegrationMap(value: unknown, what: string): void {
+  const map = record(value, what);
+  exactKeys(map, ['width', 'height', 'encoding', 'scale', 'bias'], what);
+  const width = count(map.width, `${what}.width`, 1024), height = count(map.height, `${what}.height`, 1024);
+  if (!width || !height) throw Error(`${what}: empty`);
+  if (map.encoding !== 'unorm8') throw Error(`${what}.encoding: expected unorm8`);
+  for (const key of ['scale', 'bias']) {
+    const values = array(map[key], `${what}.${key}`, width * height);
+    if (values.length !== width * height) throw Error(`${what}.${key}: expected width × height values`);
+    values.forEach((n, i) => { if (!Number.isInteger(n) || (n as number) < 0 || (n as number) > 255) throw Error(`${what}.${key}[${i}]: expected an integer 0–255`); });
+  }
+}
+
 /** A group of exactly `keys`, all finite and at least zero, with `min` ≤ `max` where both are present. */
 function range(value: unknown, keys: string[], what: string): Record<string, number> {
   numbers(value, keys, what, false);
@@ -124,10 +179,48 @@ function range(value: unknown, keys: string[], what: string): Record<string, num
   return group;
 }
 
-/** The catalog's sky (ScenerySky): five Perez scales, ascending multiplier rows of four, the turbidity, air mass and haze model. */
-function parseSky(value: unknown, what: string): ScenerySky {
+/** Finite numbers ascending within [min, max], at most `limit` of them. */
+function ascendingNumbers(value: unknown, what: string, limit: number, min: number, max: number): number[] {
+  const values = array(value, what, limit).map((n, i) => finite(n, `${what}[${i}]`));
+  if (!values.length) throw Error(`${what}: empty`);
+  values.forEach((n, i) => {
+    if (n < min || n > max) throw Error(`${what}[${i}]: out of range`);
+    if (i && n <= values[i - 1]) throw Error(`${what}: values must ascend`);
+  });
+  return values;
+}
+
+/** The catalog's sun grids: `unit`, the sample axes and one grid per layout of positive RGB triples, coverage rows by elevation columns. */
+function parseSun(value: unknown, what: string): { sun: Omit<ScenerySun, 'grid'>; sunLayouts: Record<string, ScenerySun['grid']> } {
   const row = record(value, what);
-  exactKeys(row, ['perezScale', 'perezMultipliers', 'pollution', 'turbidity', 'airMass', 'fog'], what);
+  exactKeys(row, ['unit', 'sunElevationDeg', 'cloudCoverage', 'layouts'], what);
+  const unit = text(row.unit, `${what}.unit`), sunElevationDeg = ascendingNumbers(row.sunElevationDeg, `${what}.sunElevationDeg`, 64, -90, 90);
+  const cloudCoverage = ascendingNumbers(row.cloudCoverage, `${what}.cloudCoverage`, 16, 0, 1);
+  const layouts = record(row.layouts, `${what}.layouts`), sunLayouts: Record<string, ScenerySun['grid']> = {};
+  for (const [key, grid] of Object.entries(layouts)) {
+    const at = `${what}.layouts.${key}`, rows = array(grid, at, cloudCoverage.length);
+    if (rows.length !== cloudCoverage.length) throw Error(`${at}: expected one row per coverage`);
+    sunLayouts[key] = rows.map((value, i) => {
+      const columns = array(value, `${at}[${i}]`, sunElevationDeg.length);
+      if (columns.length !== sunElevationDeg.length) throw Error(`${at}[${i}]: expected one sample per elevation`);
+      return columns.map((sample, j) => {
+        const rgb = array(sample, `${at}[${i}][${j}]`, 3);
+        if (rgb.length !== 3) throw Error(`${at}[${i}][${j}]: expected an RGB triple`);
+        return rgb.map((n, k) => {
+          if (finite(n, `${at}[${i}][${j}][${k}]`) <= 0) throw Error(`${at}[${i}][${j}][${k}]: must be positive`);
+          return n as number;
+        }) as [number, number, number];
+      });
+    });
+  }
+  return { sun: { unit, sunElevationDeg, cloudCoverage }, sunLayouts };
+}
+
+/** The catalog's sky (ScenerySky): five Perez scales, ascending multiplier rows of four, the turbidity, air mass, haze model, sun grids, the sky model's inputs and its colour profiles. */
+function parseSky(value: unknown, what: string): { sky: Omit<ScenerySky, 'sun'>; layoutAltitudeM: Record<string, number> } & ReturnType<typeof parseSun> {
+  const row = record(value, what);
+  exactKeys(row, ['perezScale', 'perezMultipliers', 'pollution', 'turbidity', 'airMass', 'fog', 'sun', 'hosek', 'haze', 'colourProfiles'], what);
+  const { sun, sunLayouts } = parseSun(row.sun, `${what}.sun`);
   range(row.pollution, ['cloudyDamping'], `${what}.pollution`);
   if (range(row.turbidity, ['base', 'overcast', 'storm', 'pollution', 'min', 'max'], `${what}.turbidity`).min <= 0) throw Error(`${what}.turbidity.min: must be positive`);
   range(row.airMass, ['clear', 'pollution'], `${what}.airMass`);
@@ -161,7 +254,45 @@ function parseSky(value: unknown, what: string): ScenerySky {
     if (abcd.length !== 4) throw Error(`${at}.abcd: expected four numbers`);
     abcd.forEach((n, i) => finite(n, `${at}.abcd[${i}]`));
   });
-  return structuredClone(row) as unknown as ScenerySky;
+  const hosek = record(row.hosek, `${what}.hosek`);
+  exactKeys(hosek, ['albedo', 'scaleHeightM', 'layoutAltitudeM', 'xyzToRgb', 'coefficients', 'radiances'], `${what}.hosek`);
+  const albedo = finite(hosek.albedo, `${what}.hosek.albedo`);
+  if (albedo < 0 || albedo > 1) throw Error(`${what}.hosek.albedo: expected 0 to 1`);
+  if (finite(hosek.scaleHeightM, `${what}.hosek.scaleHeightM`) <= 0) throw Error(`${what}.hosek.scaleHeightM: must be positive`);
+  const matrix = array(hosek.xyzToRgb, `${what}.hosek.xyzToRgb`, 3);
+  if (matrix.length !== 3) throw Error(`${what}.hosek.xyzToRgb: expected three rows`);
+  matrix.forEach((matrixRow, i) => vec3(matrixRow, `${what}.hosek.xyzToRgb[${i}]`));
+  for (const [key, length] of [['coefficients', 1080], ['radiances', 120]] as const) {
+    const channels = array(hosek[key], `${what}.hosek.${key}`, 3);
+    if (channels.length !== 3) throw Error(`${what}.hosek.${key}: expected X, Y and Z`);
+    channels.forEach((channel, i) => {
+      const values = array(channel, `${what}.hosek.${key}[${i}]`, length);
+      if (values.length !== length) throw Error(`${what}.hosek.${key}[${i}]: expected ${length} values`);
+      values.forEach((n, j) => finite(n, `${what}.hosek.${key}[${i}][${j}]`));
+    });
+  }
+  const altitudes = record(hosek.layoutAltitudeM, `${what}.hosek.layoutAltitudeM`), layoutAltitudeM: Record<string, number> = {};
+  for (const [key, value] of Object.entries(altitudes)) layoutAltitudeM[key] = finite(value, `${what}.hosek.layoutAltitudeM.${key}`);
+  const haze = record(row.haze, `${what}.haze`);
+  exactKeys(haze, ['depth', 'intensity', 'luminance'], `${what}.haze`);
+  range(haze.depth, ['base', 'overcast', 'pollution'], `${what}.haze.depth`);
+  range(haze.intensity, ['base', 'dawn', 'overcast'], `${what}.haze.intensity`);
+  range(haze.luminance, ['sunrise', 'base', 'pollution', 'overcast', 'storm'], `${what}.haze.luminance`);
+  const colourProfiles = record(row.colourProfiles, `${what}.colourProfiles`);
+  exactKeys(colourProfiles, ['weatherBlendRate', 'profiles'], `${what}.colourProfiles`);
+  if (finite(colourProfiles.weatherBlendRate, `${what}.colourProfiles.weatherBlendRate`) <= 0) throw Error(`${what}.colourProfiles.weatherBlendRate: must be positive`);
+  ascending(array(colourProfiles.profiles, `${what}.colourProfiles.profiles`, 32), `${what}.colourProfiles.profiles`, (profile, at) => {
+    exactKeys(profile, ['sunTarget', 'weatherLerpPower', 'clear', 'overcast'], at);
+    if (finite(profile.weatherLerpPower, `${at}.weatherLerpPower`) <= 0) throw Error(`${at}.weatherLerpPower: must be positive`);
+    for (const key of ['clear', 'overcast']) {
+      const look = record(profile[key], `${at}.${key}`);
+      exactKeys(look, ['gain', 'sunProximity'], `${at}.${key}`);
+      vec3(look.gain, `${at}.${key}.gain`).forEach((n, i) => nonNegative(n, `${at}.${key}.gain[${i}]`));
+      nonNegative(look.sunProximity, `${at}.${key}.sunProximity`);
+    }
+  }, 'sunTarget');
+  const { sun: _catalogSun, ...sky } = row;
+  return { sky: structuredClone(sky) as unknown as Omit<ScenerySky, 'sun'>, sun, sunLayouts, layoutAltitudeM };
 }
 
 function parseChunk(value: unknown, what: string): SceneryChunk {
@@ -212,9 +343,9 @@ function checkSectorOrder(layout: SceneryLayout): void {
   });
 }
 
-type SharedScenery = Pick<SceneryLayout, 'chunking' | 'streaming' | 'camera' | 'sky'>;
+type SharedScenery = Pick<SceneryLayout, 'chunking' | 'streaming' | 'camera' | 'shading'> & ReturnType<typeof parseSky>;
 
-/** A layout row; `chunking`, `streaming`, `camera` and `sky` are the catalog's shared parameters, attached to every layout the client receives. */
+/** A layout row; `chunking`, `streaming`, `camera`, `sky` and `shading` are the catalog's shared parameters, attached to every layout the client receives, the sky with the layout's own sun grid. */
 function parseLayout(value: unknown, what: string, shared: SharedScenery): SceneryLayout {
   const row = record(value, what);
   knownKeys(row, ['layoutKey', 'sourceGeometryRevision', 'routeLengthM', 'pitLaneLengthM', 'shadowRangeM', 'environmentProbe', 'horizon', 'sectors', 'textures', 'totals'], ['daylight'], what);
@@ -235,7 +366,12 @@ function parseLayout(value: unknown, what: string, shared: SharedScenery): Scene
     return chunk;
   });
   const textures = array(row.textures, `${what}.textures`, MAX_TEXTURES).map((texture, i) => parseTexture(texture, `${what}.textures[${i}]`));
-  const layout = { ...structuredClone(row), ...structuredClone(shared), horizon, sectors, textures } as unknown as SceneryLayout;
+  const grid = shared.sunLayouts[row.layoutKey as string];
+  if (!grid) throw Error(`${what}: no sun grid for ${row.layoutKey as string}`);
+  const altitudeM = shared.layoutAltitudeM[row.layoutKey as string];
+  if (altitudeM === undefined) throw Error(`${what}: no altitude for ${row.layoutKey as string}`);
+  const { chunking, streaming, camera, sky, sun, shading } = shared, { layoutAltitudeM: _altitudes, ...hosek } = sky.hosek as unknown as Record<string, unknown>;
+  const layout = { ...structuredClone(row), ...structuredClone({ chunking, streaming, camera, shading, sky: { ...sky, hosek: { ...hosek, altitudeM }, sun: { ...sun, grid } } }), horizon, sectors, textures } as unknown as SceneryLayout;
   const ids = [horizon.id, ...sectors.map(sector => sector.id)], known = new Set(textures.map(texture => texture.asset));
   if (new Set(ids).size !== ids.length) throw Error(`${what}: duplicate chunk ids`);
   if (known.size !== textures.length) throw Error(`${what}: duplicate textures`);
@@ -246,10 +382,10 @@ function parseLayout(value: unknown, what: string, shared: SharedScenery): Scene
 
 export function loadScenePackage(root: string, catalog: unknown, geometry: (key: string) => TrackBoundaryGeometry | null): SceneryStore {
   const index = record(catalog, 'scenery catalog');
-  exactKeys(index, ['chunking', 'streaming', 'camera', 'sky', 'layouts'], 'scenery catalog');
+  exactKeys(index, ['chunking', 'streaming', 'camera', 'sky', 'shading', 'layouts'], 'scenery catalog');
   numbers(index.chunking, CHUNKING, 'scenery catalog.chunking', true);
   numbers(index.streaming, STREAMING, 'scenery catalog.streaming', true);
-  const shared = { chunking: index.chunking, streaming: index.streaming, camera: parseCamera(index.camera, 'scenery catalog.camera'), sky: parseSky(index.sky, 'scenery catalog.sky') } as SharedScenery;
+  const shared = { chunking: index.chunking, streaming: index.streaming, camera: parseCamera(index.camera, 'scenery catalog.camera'), shading: parseShading(index.shading, 'scenery catalog.shading'), ...parseSky(index.sky, 'scenery catalog.sky') } as SharedScenery;
   const rows = array(index.layouts, 'scenery layouts', 100);
   if (!rows.length) throw Error('scenery catalog: empty');
   const layouts = new Map<string, SceneryLayout>(), files = new Map<string, PackageFile>();
@@ -270,5 +406,7 @@ export function loadScenePackage(root: string, catalog: unknown, geometry: (key:
     for (const texture of layout.textures) register(texture.asset, texture.sha256, texture.byteLength, MAX_TEXTURE_BYTES);
     layouts.set(layout.layoutKey, layout);
   });
+  exactKeys(shared.sunLayouts, [...layouts.keys()], 'scenery catalog.sky.sun.layouts');
+  exactKeys(shared.layoutAltitudeM, [...layouts.keys()], 'scenery catalog.sky.hosek.layoutAltitudeM');
   return { layouts };
 }

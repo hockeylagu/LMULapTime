@@ -75,7 +75,8 @@ export interface SceneryCameraLook {
 
 /** One time-of-day profile of a camera type: the clear look, and the overcast look it blends to with the weather. */
 export interface SceneryCameraProfile extends SceneryCameraLook {
-  sunElevationDeg: number;
+  /** The profile's knot of direct-sun strength (atmosphere/timeOfDay.ts), not a sun elevation. */
+  sunTarget: number;
   /** Exponent of the clear to overcast blend factor. */
   weatherLerpPower: number;
   overcast: SceneryCameraLook;
@@ -125,6 +126,66 @@ export interface ScenerySky {
   /** Air mass multiplier clear + (pollution − clear)·p². */
   airMass: { clear: number; pollution: number };
   fog: SceneryFog;
+  sun: ScenerySun;
+  /** The sky dome's Hosek-Wilkie model; the catalog's `layoutAltitudeM` map, the loader attaches each layout its own `altitudeM`. */
+  hosek: SceneryHosekSky;
+  /** The sky dome's own haze toward the horizon. */
+  haze: ScenerySkyHaze;
+  colourProfiles: ScenerySkyColourProfiles;
+}
+
+/** The Hosek-Wilkie (2012) CIE XYZ sky: its datasets per channel X, Y, Z and the inputs the app cannot derive (atmosphere/hosekSky.ts). */
+export interface SceneryHosekSky {
+  /** Ground albedo the model is cooked at, 0 to 1. */
+  albedo: number;
+  /** Scale height of the isothermal atmosphere: the sky's luminance dims by exp(−altitudeM / scaleHeightM). */
+  scaleHeightM: number;
+  /** The layout's altitude, in metres. */
+  altitudeM: number;
+  /** CIE XYZ to the scene's linear RGB by rows: rgb[i] = Σ xyzToRgb[i][j]·xyz[j]. */
+  xyzToRgb: [Vec3, Vec3, Vec3];
+  /** Per channel: albedo 0 then 1, turbidity 1–10, six Bézier control points, nine coefficients A–I (1080 values). */
+  coefficients: [number[], number[], number[]];
+  /** Per channel: albedo 0 then 1, turbidity 1–10, six Bézier control points (120 values). */
+  radiances: [number[], number[], number[]];
+}
+
+/**
+ * The dome's haze: depth = base + overcast·C + pollution·p; intensity = lerp(dawn·hazeDawnScale, base·hazeBaseScale, D) +
+ * overcast·C·hazeCloudyScale; the haze colour is the fog colour's adjusted horizon colour times
+ * saturate(lerp(sunrise, base, D)·lerp(1, pollution, p)·lerp(1, overcast, C)·lerp(1, storm, S)).
+ */
+export interface ScenerySkyHaze {
+  depth: { base: number; overcast: number; pollution: number };
+  intensity: { base: number; dawn: number; overcast: number };
+  luminance: { sunrise: number; base: number; pollution: number; overcast: number; storm: number };
+}
+
+/** A sky colour look: per-channel gains applied in proportion to the sky's saturation, and the scale of cos γ from the sun. */
+export interface ScenerySkyColourLook { gain: Vec3; sunProximity: number }
+
+/** The sky's time-of-day colour profiles, ascending by `sunTarget` (the camera profiles' knots and position rule). */
+export interface ScenerySkyColourProfiles {
+  weatherBlendRate: number;
+  profiles: { sunTarget: number; weatherLerpPower: number; clear: ScenerySkyColourLook; overcast: ScenerySkyColourLook }[];
+}
+
+/**
+ * The direct sun's radiance before cloud occlusion, sampled by base cloud coverage and sun elevation. The catalog's `sky.sun`
+ * carries `layouts` keyed by layout key; the loader attaches each layout its own `grid`.
+ */
+export interface ScenerySun {
+  /** States the radiance unit once (linear RGB, a midday sun near 100). */
+  unit: string;
+  /** Sample elevations, ascending. */
+  sunElevationDeg: number[];
+  /** Sample base coverages, ascending, 0 to 1. */
+  cloudCoverage: number[];
+  /**
+   * `grid[i][j]` is the RGB at `cloudCoverage[i]` and `sunElevationDeg[j]`, all positive. Between elevations the log of each
+   * channel is linear in the relative air mass, between coverages the RGB is linear; outside the grid the nearest end applies.
+   */
+  grid: [number, number, number][][];
 }
 
 /** The exponential distance haze, its colour from the sky's horizon, its tint toward the sun and its height term. */
@@ -214,6 +275,7 @@ export interface SceneryLayout {
   streaming: SceneryStreaming;
   camera: SceneryCamera;
   sky: ScenerySky;
+  shading: SceneryShading;
   /** Where the venue's environment (reflection and irradiance) is captured, in LMU local metres. */
   environmentProbe: { position: Vec3 };
   daylight?: SceneryDaylight;
@@ -225,4 +287,29 @@ export interface SceneryLayout {
 
 export interface SceneryLayoutResource extends SceneryLayout {
   packageRevision: string;
+}
+
+/** How a reflection cube mip is read: by a LOD bias on the sampled mip, or at an explicit LOD. */
+export type SceneryReflectionLod = 'bias' | 'explicit';
+
+/** One convolved reflection-cube mip: its specular power (a number, or INF for the mirror mip), the source mip it reads and its sample directions. */
+export interface SceneryConvolutionKernel { specularPower: string; sourceLod: number; samples: Vec3[] }
+
+/** The catalog's shading parameters (the pipeline's docs/SCENE_PACKAGE.md "Shading"), shared by every layout. */
+export interface SceneryShading {
+  /** The sun's glint on smooth surfaces: the view-to-reflection cosine it starts at, the roughness it stops at, its specular scale. */
+  sunGlint: { cosineThreshold: number; roughnessCutoff: number; smoothSpecularScale: number };
+  /** Small-edge highlight detection: its detector and edge scales and the limits of the result. */
+  smallEdge: { detectorScale: number; edgeScale: number; limitMin: number; limitMax: number };
+  /** Car paint reflections: the roughness the sharp reflection stops at, the roughness-to-LOD scale, how each coat reads its mip. */
+  carPaintReflection: { roughnessCutoff: number; lodScale: number; clearCoatLod: SceneryReflectionLod; baseCoatLod: SceneryReflectionLod };
+  /** The reflection cube's convolution, one kernel per convolved mip. */
+  convolution: { kernels: SceneryConvolutionKernel[] };
+  /**
+   * Scenery reflections: the convolved cube read at `lodScale` × roughness (no sharp cube), the dielectric F0 of the specular level, and
+   * the shader families that read it.
+   */
+  sceneryReflection: { lodScale: number; lod: SceneryReflectionLod; dielectricF0: number; families: string[] };
+  /** The split-sum table: 8-bit (scale, bias) per texel, row-major, N·V along a row (128 texels), roughness 0 at row 0. */
+  integrationMap: { width: number; height: number; encoding: 'unorm8'; scale: number[]; bias: number[] };
 }

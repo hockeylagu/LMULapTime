@@ -12,5 +12,7 @@ it("writes each scene's own haze terms back before it compiles, whichever scene 
   expect(ShaderChunk.fog_pars_fragment).toContain('HAZE_ORIGIN_Y = -40.0');
   first();
   expect(ShaderChunk.fog_pars_fragment).toContain('HAZE_ORIGIN_Y = 12.0');
-  expect(ShaderChunk.fog_fragment).toContain('max( vFogDepth, 0.0 )');
+  // Haze by the distance along the ray, not the view depth.
+  expect(ShaderChunk.fog_vertex).toContain('vFogDepth = length( mvPosition.xyz );');
+  expect(ShaderChunk.fog_fragment).toContain('1.0 - exp( - fogDensity * vFogDepth )');
 });

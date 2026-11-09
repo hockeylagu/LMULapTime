@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { Vector3 } from 'three';
-import { adaptLogLuminance, EXPOSURE_CALIBRATION, inverseToneCurve, lawExposure, profileAt, toneCurve, whiteBalance } from '../../../../src/components/replay/view3d/autoExposure.js';
+import { Color, Vector3 } from 'three';
+import { adaptLogLuminance, EXPOSURE_GAIN, inverseToneCurve, lawExposure, METER_UNIT, profileAt, toneCurve, whiteBalance } from '../../../../src/components/replay/view3d/autoExposure.js';
 import { testCamera } from '../../../helpers/scenes/sceneryProfiles.js';
 
-/** A synthetic camera type (profiles at 0° and 60°). */
+/** A synthetic camera type (profiles at sun strengths 0 and 60). */
 const TYPE = testCamera().types.external;
+
+/** A direct sun whose strongest channel is `strength`, at an elevation. */
+const sun = (strength: number, elevationDeg: number) => ({rgb: new Color(strength, strength / 2, strength / 4), elevationDeg});
 
 describe('autoExposure', () => {
   it("tone-maps with the profile's curve: dark toe, compressed shoulder, invertible", () => {
@@ -16,18 +19,30 @@ describe('autoExposure', () => {
     for (const y of [0, 0.05, 0.3, 0.7, 0.95]) expect(toneCurve(curve, inverseToneCurve(curve, y))).toBeCloseTo(y, 6);
   });
 
-  it('takes each profile value at a profile elevation, interpolates between and holds past the ends', () => {
-    expect(profileAt(TYPE, 0)).toEqual({targetExposure: 0.4, whiteBalanceK: 7000, toneCurve: {a: 2.5, b: 0.6}});
-    const mid = profileAt(TYPE, 30);
+  it("takes each profile value at its knot of direct-sun strength, interpolates between and holds past the ends", () => {
+    // Knots 0 and 60: a sun whose strongest channel is 30, above 1°, sits half way; at or below the horizon it is profile 0.
+    expect(profileAt(TYPE, sun(30, 0))).toEqual({targetExposure: 0.4, whiteBalanceK: 7000, toneCurve: {a: 2.5, b: 0.6}});
+    const mid = profileAt(TYPE, sun(30, 30));
     expect(mid.targetExposure).toBeCloseTo(0.3); expect(mid.whiteBalanceK).toBeCloseTo(6750);
     expect(mid.toneCurve.a).toBeCloseTo(2.75); expect(mid.toneCurve.b).toBeCloseTo(0.65);
-    expect(profileAt(TYPE, -20).targetExposure).toBe(0.4);
-    expect(profileAt(TYPE, 120).targetExposure).toBe(0.2);
+    expect(profileAt(TYPE, sun(30, -20)).targetExposure).toBe(0.4);
+    expect(profileAt(TYPE, sun(70, 30)).targetExposure).toBe(0.2);
   });
 
-  it('exposes by the law C · T / L^s: brighter scenes get less exposure, by the adaptation scale', () => {
-    expect(lawExposure(0.3, 0.4, 0)).toBeCloseTo(EXPOSURE_CALIBRATION * 0.3, 9);
-    expect(lawExposure(0.3, 0.4, Math.log(4))).toBeCloseTo(EXPOSURE_CALIBRATION * 0.3 / 4 ** 0.4, 9);
+  it('blends each profile toward its overcast look by the cloud cover squared, raised to the profile power', () => {
+    // Full cover: the overcast look (target 1.5x, 7500 K, curve 2 / 0.5).
+    const covered = profileAt(TYPE, sun(30, 0), 1);
+    expect(covered.targetExposure).toBeCloseTo(0.6, 12); expect(covered.whiteBalanceK).toBe(7500); expect(covered.toneCurve).toEqual({a: 2, b: 0.5});
+    // Half cover with power 1: a quarter of the way (the sun is taken as half hidden by half the sky covered).
+    const half = profileAt(TYPE, sun(30, 0), 0.5);
+    expect(half.targetExposure).toBeCloseTo(0.4 + 0.2 * 0.25, 12); expect(half.whiteBalanceK).toBeCloseTo(7125, 9);
+    // Between profiles, each end blends first, then the position interpolates.
+    expect(profileAt(TYPE, sun(30, 30), 1).targetExposure).toBeCloseTo(0.45, 12);
+  });
+
+  it('exposes by the law G · U · T / (U · L)^s: brighter scenes get less exposure, by the adaptation scale', () => {
+    expect(lawExposure(0.3, 0.4, Math.log(1 / METER_UNIT))).toBeCloseTo(EXPOSURE_GAIN * METER_UNIT * 0.3, 9);
+    expect(lawExposure(0.3, 0.4, Math.log(4 / METER_UNIT))).toBeCloseTo(EXPOSURE_GAIN * METER_UNIT * 0.3 / 4 ** 0.4, 9);
     expect(lawExposure(0.3, 0.6, Math.log(4))).toBeLessThan(lawExposure(0.3, 0.4, Math.log(4)));
   });
 

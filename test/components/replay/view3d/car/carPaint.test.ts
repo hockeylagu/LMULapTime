@@ -1,8 +1,9 @@
 import { expect, it } from 'vitest';
-import { MeshPhysicalMaterial, ShaderLib, Texture, type Vector3, type Vector4, type WebGLProgramParametersWithUniforms } from 'three';
-import { configureCarPaint } from '../../../../../src/components/replay/view3d/car/carPaint.js';
+import { CubeTexture, MeshPhysicalMaterial, ShaderLib, Texture, WebGLCubeRenderTarget, type Vector3, type Vector4, type WebGLProgramParametersWithUniforms } from 'three';
+import { configureCarPaint, setPaintReflection } from '../../../../../src/components/replay/view3d/car/carPaint.js';
 import { materialTexturePaths } from '../../../../../src/components/replay/view3d/car/carMaterials.js';
 import type { CarAppearance, CarSurface } from '../../../../../shared/types/scenes/car.js';
+import { testShading } from '../../../../helpers/scenes/sceneryProfiles.js';
 
 const region = (over: Record<string, unknown> = {}) => ({
   baseCoatRoughness: 0.3, baseCoatSpecStrength: 0.5, baseCoatRefractiveIndex: 2.25, clearCoatSpecStrength: 1, clearCoatRoughness: 0,
@@ -25,7 +26,7 @@ function compile(material: MeshPhysicalMaterial): WebGLProgramParametersWithUnif
 
 it("builds regional layered car paint on three's physical model", () => {
   const material = new MeshPhysicalMaterial({map: new Texture()}), textures: string[] = [];
-  configureCarPaint(material, paint({albedo: map('a'), region: map('r'), aoSpec: map('s'), carbon: map('c')}), path => { textures.push(path); return new Texture(); });
+  configureCarPaint(material, paint({albedo: map('a'), region: map('r'), aoSpec: map('s'), carbon: map('c')}), path => { textures.push(path); return new Texture(); }, testShading());
   expect(textures).toEqual(['r', 's', 'c']);
   const shader = compile(material), uniforms = shader.uniforms;
   // Every hook applied: the coat output now carries the lacquer absorption, and both paint maps are sampled.
@@ -34,6 +35,25 @@ it("builds regional layered car paint on three's physical model", () => {
     expect(shader.fragmentShader).toContain(marker);
   }
   expect(shader.fragmentShader).toContain('material.clearcoatF0 = vec3(paintCoatF0)');
+  // Each coat reads the car's own cubes by the package's rule (bias for the clear coat, explicit for the base coat in the fixture).
+  expect(shader.fragmentShader).toContain('clearcoatRadiance += paintReflection( geometryViewDir, geometryClearcoatNormal, paintCoatRoughness, false );');
+  expect(shader.fragmentShader).toContain('vec3 iblRadiance = paintReflection( geometryViewDir, geometryNormal, paintBaseRoughness, true );');
+  expect(shader.fragmentShader).not.toContain('getIBLRadiance( geometryViewDir, geometryClearcoatNormal');
+  expect(uniforms.paint_lodScale.value).toBe(6); expect(uniforms.paint_probe.value).toBe(0);
+  const cubes = {sharp: new Texture(), convolved: new CubeTexture(), levels: 8, target: new WebGLCubeRenderTarget(4), dispose() {}};
+  expect(setPaintReflection(material, cubes)).toBe(true);
+  expect(uniforms.paint_sharp.value).toBe(cubes.sharp); expect(uniforms.paint_convolved.value).toBe(cubes.convolved);
+  expect(uniforms.paint_levels.value).toBe(8); expect(uniforms.paint_probe.value).toBe(1);
+  expect(setPaintReflection(material, null)).toBe(true); expect(uniforms.paint_probe.value).toBe(0); expect(uniforms.paint_sharp.value).toBeNull();
+  expect(setPaintReflection(new MeshPhysicalMaterial(), cubes)).toBe(false);
+  // The sun glint joins both coats' direct specular inside the directional light loop, from the package's shading values.
+  expect(shader.fragmentShader).toContain('clearcoatSpecularDirect = paintGlint(clearcoatSpecularDirect, directLight');
+  expect(shader.fragmentShader).toContain('reflectedLight.directSpecular = paintGlint(reflectedLight.directSpecular, directLight');
+  expect(shader.fragmentShader).not.toContain('#include <lights_fragment_begin>');
+  expect((uniforms.paint_glint.value as Vector3).toArray()).toEqual([0.999, 0.2, 0.4]);
+  expect((uniforms.paint_edge.value as Vector4).toArray()).toEqual([5, 4, 0.5, 100]);
+  expect(uniforms.paint_coatCutoff.value).toBe(0.2);
+  expect(shader.fragmentShader).not.toContain('geometryClearcoatNormal, material.clearcoatRoughness )');
   expect(shader.fragmentShader).toContain('pow(paintLacquer');
   // The metallic layer replaces a share of the base layer with a flake-tinted reflection: never three's albedo-tinted metalness.
   expect(shader.fragmentShader).toContain('metalnessFactor = 0.0;');
@@ -45,13 +65,13 @@ it("builds regional layered car paint on three's physical model", () => {
   expect(base[1].w).toBeCloseTo(0.6); expect(base[0].w).toBe(0);
   expect(coat[2].x).toBe(0); expect(coat[0].z).toBeCloseTo(1.2);
   expect(uniforms.paint_coatStrength.value).toBe(0.5);
-  expect(material.customProgramCacheKey()).toBe('lmu-car-paint-region-ao');
+  expect(material.customProgramCacheKey()).toBe('lmu-car-paint-region-ao-bias-explicit');
 });
 
 it('draws the metallic layer only for paint with a flake map, from the black region', () => {
   const metallic = (maps: CarSurface['maps']) => {
     const material = new MeshPhysicalMaterial({map: new Texture()});
-    configureCarPaint(material, paint(maps), () => new Texture());
+    configureCarPaint(material, paint(maps), () => new Texture(), testShading());
     return (compile(material).uniforms.paint_base.value as Vector4[]).map(base => base.z);
   };
   expect(metallic({albedo: map('a')})).toEqual([0, 0, 0, 0, 0]);
@@ -61,12 +81,12 @@ it('draws the metallic layer only for paint with a flake map, from the black reg
 
 it('treats a paint without a region map as all black region and without carbon', () => {
   const albedo = new Texture(), material = new MeshPhysicalMaterial({map: albedo});
-  configureCarPaint(material, paint({albedo: map('a'), aoSpec: map('s')}), () => new Texture());
+  configureCarPaint(material, paint({albedo: map('a'), aoSpec: map('s')}), () => new Texture(), testShading());
   const shader = compile(material);
   expect(shader.fragmentShader).toContain('vec3 region = vec3(0.0);');
   expect((shader.uniforms.paint_base.value as Vector4[])[1].w).toBe(0);
   expect(shader.uniforms.paint_region.value).toBe(albedo);
-  expect(material.customProgramCacheKey()).toBe('lmu-car-paint-black-ao');
+  expect(material.customProgramCacheKey()).toBe('lmu-car-paint-black-ao-bias-explicit');
 });
 
 it('loads the paint maps with the albedo for paint materials only', () => {
@@ -78,5 +98,5 @@ it('loads the paint maps with the albedo for paint materials only', () => {
 it('refuses a paint value the package does not fill', () => {
   const incomplete = paint({albedo: map('a')});
   delete (incomplete.parameters!.regions as Record<string, Record<string, unknown>>).red.clearCoatRoughness;
-  expect(() => configureCarPaint(new MeshPhysicalMaterial({map: new Texture()}), incomplete, () => new Texture())).toThrow(/no clearCoatRoughness/);
+  expect(() => configureCarPaint(new MeshPhysicalMaterial({map: new Texture()}), incomplete, () => new Texture(), testShading())).toThrow(/no clearCoatRoughness/);
 });
