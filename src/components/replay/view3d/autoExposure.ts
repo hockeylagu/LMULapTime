@@ -239,7 +239,8 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
     target: hdr,
     setType(requested) {
       if (types[requested] === active) return;
-      apply(types[requested]); generation++; metered = null; adapted = null; invalidate();
+      // The adapted level carries over, so the new type's law starts from it instead of an unexposed frame; the next reading moves it.
+      apply(types[requested]); generation++; metered = null; invalidate();
     },
     display: () => active.display,
     render(scene, camera) {
