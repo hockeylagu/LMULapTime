@@ -3,7 +3,8 @@ import type { CachedKtx2Loader } from '../cachedKtx2Loader.js';
 import { textureAsset, type SurfaceMap } from './surfaceConfig.js';
 import { startStreaming, stopStreaming } from './mipStreaming.js';
 
-const MAX_ANISOTROPY = 8;
+/** Anisotropic filtering of scenery and car textures (three caps it at the GPU's maximum): sharp markings and liveries at grazing angles. */
+export const MAX_ANISOTROPY = 16;
 
 interface GlbImage { name?: string; uri?: string }
 

@@ -44,8 +44,14 @@ export interface CarMapRef {
 export interface CarSurface {
   version: 4;
   kind: string;
+  /** The native material name. */
+  name?: string;
+  /** Switches and modes of the kinds shared with the track, as on scenery surfaces. */
+  flags?: Record<string, string | undefined>;
   maps: Record<string, CarMapRef>;
   parameters?: Record<string, unknown>;
+  /** Sign of the normal maps' green channel, as on scenery surfaces. */
+  normalYSign?: number;
   renderState?: { alphaBlend?: boolean; alphaMask?: boolean };
   /** Roughness and metalness the app renders the material with; every material but paint has one. */
   finish?: { roughness: number; metalness: number };

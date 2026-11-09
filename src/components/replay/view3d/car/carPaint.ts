@@ -1,5 +1,6 @@
 import { RepeatWrapping, Vector2, Vector3, Vector4, type IUniform, type MeshPhysicalMaterial, type Texture } from 'three';
 import type { CarSurface } from '../../../../../shared/types/scenes/car.js';
+import { MAX_ANISOTROPY } from '../scenery/materials/textureSource.js';
 
 /** The paint regions, in the order the region map blends them (black is what no channel covers). */
 const REGIONS = ['black', 'red', 'green', 'blue', 'white'] as const;
@@ -21,7 +22,7 @@ const colour = (value: unknown): Vector3 => {
  * Layered car paint on three's physical model, driven by the package's paint description. The region map blends five paint
  * setups (square-rooted channels, saturation split into red/green/blue/white, black for the rest; refractive indices blended as
  * square roots). The base coat sets the roughness, the base-to-coat Fresnel and the metallic share (flakes at half strength, their
- * average; the flake map is not in the package); the clear coat sets
+ * average), only for paint with a flake map: without one the flake colour tinted plain paint (a blue cast on red and grey); the clear coat sets
  * three's coat strength, roughness and air-to-coat Fresnel; the lacquer tints what passes through the coat over its optical
  * depth. The AO/spec mask gives ambient occlusion (green) and specular occlusion (red, times the albedo alpha on the base coat).
  * Carbon fibre (red region only) darkens the albedo toward the carbon colour and multiplies the weave overlay. Not carried:
@@ -32,7 +33,13 @@ const FRAGMENT = {
     uniform sampler2D paint_region, paint_aoSpec, paint_carbon;
     uniform vec4 paint_coat[5], paint_base[5]; uniform vec3 paint_lacquer[5];
     uniform vec3 paint_carbonColour, paint_flakeColour; uniform vec2 paint_carbonScale; uniform float paint_coatStrength, paint_lacquerThickness;
-    float paintCoat, paintCoatRoughness, paintCoatF0, paintBaseF0, paintBaseSpecular, paintBaseRoughness, paintMetallic, paintBounce, paintAO, paintCoatOcclusion, paintBaseOcclusion; vec3 paintLacquer, paintFlake;`,
+    float paintCoat, paintCoatIndex, paintCoatRoughness, paintCoatF0, paintBaseF0, paintBaseSpecular, paintBaseRoughness, paintMetallic, paintBounce, paintAO, paintCoatOcclusion, paintBaseOcclusion; vec3 paintLacquer, paintFlake;
+    // Unpolarized Fresnel reflectance from air into a medium of index n, at incidence cosine c.
+    float paintFresnelAvg(float c, float n) {
+      float t = sqrt(max(1.0 - (1.0 - c * c) / (n * n), 0.0));
+      float s = (c - n * t) / (c + n * t + 1e-6), p = (t - n * c) / (t + n * c + 1e-6);
+      return 0.5 * (s * s + p * p);
+    }`,
   albedo: `
     #include <map_fragment>
     {
@@ -48,7 +55,7 @@ const FRAGMENT = {
       // coat: strength, roughness, sqrt(index), base specular; base: roughness, sqrt(index), metallic (black only), carbon (red only).
       paintCoat = clamp(coat.x * paint_coatStrength, 0.0, 1.0);
       float coatIndex = mix(1.0, max(coat.z * coat.z, 1.0), paintCoat), baseIndex = max(base.y * base.y, 1.0);
-      paintCoatF0 = pow2((coatIndex - 1.0) / (coatIndex + 1.0));
+      paintCoatIndex = coatIndex; paintCoatF0 = pow2((coatIndex - 1.0) / (coatIndex + 1.0));
       paintBaseF0 = pow2((baseIndex - coatIndex) / (baseIndex + coatIndex));
       paintCoatRoughness = coat.y; paintBaseSpecular = coat.w; paintBaseRoughness = base.x; paintMetallic = 0.5 * base.z;
       paintFlake = weight[0] * paint_flakeColour; paintBounce = 1.0 - pow(0.8, (coatIndex - 1.0) * 4.0 + 1.0);
@@ -71,9 +78,25 @@ const FRAGMENT = {
     material.clearcoat = paintCoat; material.clearcoatF0 = vec3(paintCoatF0);
     material.clearcoatRoughness = min(max(paintCoatRoughness, 0.0525) + geometryRoughness, 1.0);`,
   occlusion: `#include <aomap_fragment>
+    // The base coat reflects the environment by its specular strength and Schlick's Fresnel at the view angle.
+    reflectedLight.indirectSpecular = radiance * paintBaseSpecular * (paintBaseF0 + (1.0 - paintBaseF0) * pow(1.0 - saturate(dot(normal, geometryViewDir)), 5.0));
     reflectedLight.indirectDiffuse *= paintAO;
     reflectedLight.directSpecular *= paintBaseOcclusion; reflectedLight.indirectSpecular *= paintBaseOcclusion;
-    clearcoatSpecularDirect *= paintCoatOcclusion; clearcoatSpecularIndirect *= paintCoatOcclusion;`,
+    clearcoatSpecularDirect *= paintCoatOcclusion; clearcoatSpecularIndirect *= paintCoatOcclusion;
+    #if NUM_DIR_LIGHTS > 0
+    {
+      // The sun's diffuse light loses what the clear coat and the base coat reflect at its incidence.
+      float sunCos = saturate(dot(normal, directionalLights[0].direction)), coatReflects = paintFresnelAvg(sunCos, paintCoatIndex);
+      reflectedLight.directDiffuse *= 1.0 - coatReflects - (paintBaseF0 + (1.0 - paintBaseF0) * pow(1.0 - sunCos, 5.0)) * (1.0 - coatReflects);
+    }
+    #endif
+    {
+      // Ambient light loses the base coat's hemispherical reflection (0.16 of the way from none to all, by its Fresnel), and part of
+      // the light inside the coat is reflected back onto the paint (the share beyond the coat's critical angle), tinted by it again.
+      float inside = 2.0 * acos(1.0 / paintCoatIndex) / PI;
+      reflectedLight.indirectDiffuse = (1.0 - mix(0.16, 1.0, paintBaseF0)) * mix(reflectedLight.indirectDiffuse,
+        (reflectedLight.indirectDiffuse + reflectedLight.directDiffuse) * material.diffuseColor, inside);
+    }`,
   // The metallic layer replaces that share of the base layer: the base coat's reflection through the lacquer, faded off
   // the facing angle, mixed with light bounced inside the coat, tinted by the flake colour. The flakes' sun sparkle needs the flake
   // map's normals and is not carried.
@@ -90,7 +113,7 @@ const FRAGMENT = {
 function paintMap(texture: (path: string) => Texture, path: string | undefined, fallback: Texture): Texture {
   if (!path) return fallback;
   const map = texture(path).clone();
-  map.wrapS = RepeatWrapping; map.wrapT = RepeatWrapping; map.needsUpdate = true;
+  map.wrapS = RepeatWrapping; map.wrapT = RepeatWrapping; map.anisotropy = MAX_ANISOTROPY; map.needsUpdate = true;
   return map;
 }
 
@@ -111,7 +134,7 @@ export function configureCarPaint(material: MeshPhysicalMaterial, paint: CarSurf
   const regions = REGIONS.map(name => group(group(parameters, 'regions'), name));
   const coat = regions.map(r => new Vector4(number(r, 'clearCoatSpecStrength'), number(r, 'clearCoatRoughness'), Math.sqrt(number(r, 'clearCoatRefractiveIndex')), number(r, 'baseCoatSpecStrength')));
   const base = regions.map((r, i) => new Vector4(number(r, 'baseCoatRoughness'), Math.sqrt(number(r, 'baseCoatRefractiveIndex')),
-    i === 0 ? number(r, 'metallicPaintStrength') : 0, i === 1 && paint.maps.carbon?.texture ? number(r, 'carbonFibreStrength') : 0));
+    i === 0 && paint.maps.metallicFlakes?.texture ? number(r, 'metallicPaintStrength') : 0, i === 1 && paint.maps.carbon?.texture ? number(r, 'carbonFibreStrength') : 0));
   const lacquer = regions.map(r => colour(r.lacquerColour));
   const carbonScale = group(parameters, 'uvScale').carbonFibre;
   if (!Array.isArray(carbonScale) || carbonScale.length !== 2 || !carbonScale.every(Number.isFinite)) throw Error('Car paint has no uvScale.carbonFibre');

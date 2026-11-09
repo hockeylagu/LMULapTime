@@ -41,11 +41,22 @@ it("builds regional layered car paint on three's physical model", () => {
   expect((uniforms.paint_flakeColour.value as Vector3).toArray()).toEqual([1, 1, 1]);
   // Indices are blended as square roots; metallic comes from the black region only, carbon from the red region only.
   const base = uniforms.paint_base.value as Vector4[], coat = uniforms.paint_coat.value as Vector4[];
-  expect(base[0].y).toBeCloseTo(1.5); expect(base[0].z).toBeCloseTo(0.8); expect(base[1].z).toBe(0);
+  expect(base[0].y).toBeCloseTo(1.5); expect(base[0].z).toBe(0); expect(base[1].z).toBe(0);
   expect(base[1].w).toBeCloseTo(0.6); expect(base[0].w).toBe(0);
   expect(coat[2].x).toBe(0); expect(coat[0].z).toBeCloseTo(1.2);
   expect(uniforms.paint_coatStrength.value).toBe(0.5);
   expect(material.customProgramCacheKey()).toBe('lmu-car-paint-region-ao');
+});
+
+it('draws the metallic layer only for paint with a flake map, from the black region', () => {
+  const metallic = (maps: CarSurface['maps']) => {
+    const material = new MeshPhysicalMaterial({map: new Texture()});
+    configureCarPaint(material, paint(maps), () => new Texture());
+    return (compile(material).uniforms.paint_base.value as Vector4[]).map(base => base.z);
+  };
+  expect(metallic({albedo: map('a')})).toEqual([0, 0, 0, 0, 0]);
+  const flaked = metallic({albedo: map('a'), metallicFlakes: map('f')});
+  expect(flaked[0]).toBeCloseTo(0.8); expect(flaked.slice(1)).toEqual([0, 0, 0, 0]);
 });
 
 it('treats a paint without a region map as all black region and without carbon', () => {
