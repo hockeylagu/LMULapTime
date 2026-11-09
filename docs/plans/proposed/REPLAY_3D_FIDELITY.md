@@ -10,10 +10,42 @@ shadow level per track) and may calibrate what the game files cannot give, such 
 the game's exposure units. Values still come from the game files where they exist; a constant fitted to the screenshots is
 named as such, with the shots and the measurement it came from.
 
+## Where we are
+
+Score against the 62 reference frames (`docs/local/replay-3d-reference`, `inputs/score.py` / `compare.py`): f is the game's
+brightness over the app's (1 = equal; band 0.8–1.25), dE the mean colour difference. The app's own baseline frames score f 1.01,
+54/62 in band, dE 10.2.
+
+| Run | Date | Change | f median | In band | dE | Cockpit f | Chase f | TV f |
+|---|---|---|---|---|---|---|---|---|
+| after4 | 2026-11-08 | Before the v8 package | 1.08 | 52/62 | 9.78 | 1.23 | 1.04 | 1.07 |
+| after6 | 2026-11-09 | v8: package sky dome, profiles by sun strength, no 10° sun floor, AO at package scale | 0.89 | 34/62 | 10.78 | 1.59 | 1.17 | 0.81 |
+| after7 | 2026-11-09 | Camera AO removed (the frames have none at the reference settings) | 0.89 | 34/62 | 10.60 | 1.44 | 1.15 | 0.80 |
+| after8 | 2026-11-09 | Scenery reflection by the package rule, 128 px venue cubes | 0.87 | 33/62 | 11.16 | 1.50 | 1.12 | 0.80 |
+
+Open, in order:
+1. **Camera types split since v8:** cockpit views are now too dark (f 1.44) and TV views too bright (f 0.80), where after4
+   had both near 1. AO was not the cause. The suspect is where each type's profile lands on its `sunTarget` knots (the sun
+   strength's unit against the knots'); check before touching the exposure calibration (4.06).
+2. **Sun shadow beyond the near square:** the reference frames use six view-fitted cascades (four near ones, then two far
+   ones out to about 1.5 km), split between logarithmic and uniform spacing. The app has one 80 m near square, then the cached
+   1.2 km static map at ~29 cm per texel. Between them, a low sun makes the static map shade surfaces that are really lit:
+   the Le Mans overpass lettering at 8.6° (2026-11-05 qualifying replay), depending on which scenery was loaded when the
+   static map was last drawn. The game draws the overpass from a 4–7 cm cascade. The split values come from the package
+   before the app adopts cascades.
+3. **Venue probe ground bounce:** one probe per venue lights shade from below about 1.3× too much.
+
+Done since v8: **scenery reflection** (package `shading.sceneryReflection`, `integrationMap`): the convolved venue cube read
+at lodScale × roughness with the split-sum Fresnel, except on glass and clear coat. The Le Mans overpass no longer mirrors its
+surroundings; its remaining dark band is the shadow issue in item 2.
+
+Replaced by game data in v8 (assumptions removed): the Perez sky and its grey overcast blend, the 10° minimum sun, the ×0.25
+occlusion scale and then the camera occlusion pass itself, profile placement by sun elevation.
+
 ## Step 1 trial: metered auto-exposure (2026-11-05, committed 7f0fbab1)
 
 `src/components/replay/view3d/autoExposure.ts`. The scene renders into a 4× multisampled half-float target. A 16 × 16 pass
-averages log luminance over the camera profile's metering window (16 taps per cell), and the GPU reads it back asynchronously
+averages luminance (arithmetic mean since 2026-11-09, item 11b) over the camera profile's metering window (16 taps per cell), and the GPU reads it back asynchronously
 every 4 frames. Exposure adapts in log space (rate 2/s, the first reading taken as is) toward target ÷ metered average, with the
 target from the camera profile by sun elevation. The canvas gets one tone-mapped quad, and the canvas itself no longer
 multisamples. Exposure is relative (target ÷ metered luminance), so the app's light units do not matter once it meters.
@@ -22,8 +54,8 @@ multisamples. Exposure is relative (target ÷ metered luminance), so the app's l
   shadows). The frames before the first reading use exposure 1. The racing line is data, not scenery, so it keeps the fixed
   daylight exposure: exposure is set before the scene pass and the line divides it out of its colour as it draws (exposure is
   linear before tone mapping, so its pixels match the fixed-exposure look exactly, edges and blending included).
-- **Calibration:** at the profile's targets the replay reads "a little too bright" (user), with Neutral and again with the
-  profile's curve, so every target is scaled by 0.8 (`TARGET_SCALE`, the app's own calibration).
+- **Calibration:** the law's fitted gain (`EXPOSURE_GAIN`, 1.24) and the camera's luminance scale (2.2) come from the frame
+  captures (item 11b).
 - **Cost, same machine and session:**
 
   | | Fuji p50 / p99 / >16 ms | Silverstone p50 / p99 / >16 ms |
@@ -42,9 +74,9 @@ All in the exposure pass (`autoExposure.ts`), in linear light before the curve:
   2D map's colours.
 - **White balance:** the profile's Kelvin by sun elevation as a Bradford adaptation to 6500 K; identity at 6500 K, warmer under
   a bluer profile white (low sun).
-- **Ambient occlusion:** three's `GTAOPass` on the scene's resolved depth (no extra scene draw) with the profile's radius,
-  samples, scale and occlusion colour, faded out from 50 to 150 m where depth precision speckled distant hills. Same-window A/B
-  on Silverstone: no measurable cost (the frame is CPU-bound).
+- **Ambient occlusion:** removed 2026-11-09. Frame captures at the reference settings have no screen-space occlusion pass (no
+  pass reads the scene depth into an occlusion target, in 12 of 14 captures), so the replay draws none; the package's camera
+  occlusion values are not used. Material occlusion maps stay.
 - **Sky:** the package's analytic sky (`perezSky.ts`, package schema 7), replacing three's sky shader.
 - **Sky in the sun's units:** HDR probe at Daytona (into the sun): sky overhead 3.8 / 7.7 / 10.6 against sunlit asphalt
   ~0.2, about 35× (real daylight: about 1×), so the sky showed white and pulled exposure down; the environment's 0.112 scale
@@ -55,17 +87,19 @@ All in the exposure pass (`autoExposure.ts`), in linear light before the curve:
   cockpit filled the metering window with its dark interior and raised exposure 2.8 stops (Daytona: 18.6 vs ~1 in the
   chase view), burning out the track outside; with the floor it is 1.65. Sunlit views meter above the floor. Replaced with
   package schema 7: per-type profiles and the exposure law `C · T / L^s` with the onboard type's own window, and pixels nearer
-  than 4 m left out of the meter on every perspective view.
+  than 4 m left out of the meter on every perspective view (the near mask went on 2026-11-09, item 11b: the reference meters
+  the cockpit too).
 
 Package schema 7 (2026-11-08) carries a profile per camera type (external, onboard, TV), each with its own tone curve, metering
 window and adaptation scale, plus the output encode, the analytic sky and the venue's probe position. The app reproduces the
-frozen 62-shot reference set from them. Still open: weather blending, light shafts.
+frozen 62-shot reference set from them. Still open: light shafts. Weather blending of the camera profiles and the sky is done
+(2026-11-08, below); the sun comes from the package's sampled sun grid, dimmed under cloud (item 9).
 
 ## Critique log (user, by eye)
 
 | # | Date | Where | Critique | Status |
 |---|---|---|---|---|
-| 1 | 2026-11-05 | Fuji main straight | Black under and between far trees too visible | Screenshot (overhead, forest left of the pit straight): `.cache/replay-3d-look/fuji-dark-trees.webp`; split off |
+| 1 | 2026-11-05 | Fuji main straight | Black under and between far trees too visible | Screenshot (overhead, forest left of the pit straight): `.cache/replay-3d-look/fuji-dark-trees.webp`; split off. 2026-11-08: ambient read with the normal's height halved (render audit item 1), to check by eye |
 | 2 | 2026-11-05 | All | Tone curve at the profile targets a little too bright | Done: targets × 0.8 |
 | 3 | 2026-11-05 | Daytona cockpit | Way too bright | Done: exposure floor |
 | 4 | 2026-11-05 | Daytona | White areas: scenery not loaded (lap-window residency: on a circular venue, parts far along the lap are near in a straight line; the overhead view has none) | Distance loading measured (Daytona draws p95 516→854, +0.8 GB) and rejected; user chose coarse sector ground in the horizon chunk (exporter, requested from the pipeline) |
@@ -76,7 +110,7 @@ frozen 62-shot reference set from them. Still open: weather blending, light shaf
 | 9 | 2026-11-05 | All | Playback a little jittery | Fixed (uncommitted): the playback loop and the 3D view each ran their own animation-frame callback, and their order changed from frame to frame, so a frame showed the pose for its own time or the previous frame's. The car moved by 0.4–1.9× its speed per frame (production, per-frame position log), worst where frames alternate between 7 and 14 ms (Silverstone). Now the clock advances once per frame, to that frame's time, by whichever callback ticks first (`replayPlaybackCursor.ts` `tick`, the scene's `beforeFrame`): per-frame motion within 1 % of its local average on Daytona and Silverstone; frame cost unchanged. Validated by eye (2026-11-07) |
 | 10 | 2026-11-05 | Daytona cockpit | Ripple (acne?) in the white line | Done (848920ac): shadow normalBias 0.01 → 0.05 (~1.3 texels); checked by eye |
 | 11 | 2026-11-05 | Daytona | Slow to load | Open |
-| 13 | 2026-11-05 | Daytona palms, crowd | Too bright, then too dark; not crisp, light not bouncing right. Use known techniques | Done (eb507224): shadow pass faces the view camera (no rest-plane wedges), a card skips its own plane (1 m) in the sun shadow lookup (was self-shadowing black), single hardware-filtered shadow tap (radius 1 blurred), alpha to coverage on cards (anti-aliased alpha test), leaf translucency from the material's parameters and min(2s,1) leaf shadow. World-up leaf normal replaced by spherical crown normals (standard billboard-foliage technique; per-card height span computed at load, foliageCrown.ts). Validated by eye at Daytona |
+| 13 | 2026-11-05 | Daytona palms, crowd | Too bright, then too dark; not crisp, light not bouncing right. Use known techniques | Done (eb507224): shadow pass faces the view camera (no rest-plane wedges), a card skips its own plane (1 m) in the sun shadow lookup (was self-shadowing black), single hardware-filtered shadow tap (radius 1 blurred), alpha to coverage on cards (anti-aliased alpha test), leaf translucency from the material's parameters and min(2s,1) leaf shadow. World-up leaf normal replaced by spherical crown normals (standard billboard-foliage technique; per-card height span computed at load, foliageCrown.ts). Validated by eye at Daytona. 2026-11-08: crown normals replaced by corner-tilted card normals (render audit item 4) |
 | 12 | 2026-11-05 | Daytona | The sun shadow window (160 m square, 30 m behind to 130 m ahead) moves with the car: shadows appear at its edge. Only the car's shadow should move | Done (eb507224, sunShadows.ts): cached static scenery map (1.2 km, ~29 cm texels, no cars, casters ≥ 1 m), double buffered and drawn a quarter per frame, redrawn after 200 m (100 m after a scenery change); near 160 m map unchanged, surfaces fade to the static map over its outer tenth. Spread at runtime chosen (2026-11-07). Production A/B: no cost (Daytona p99 8.9/9.8 vs 10.5/7.6 ms off; one-frame redraw was 12.8). Validated by eye (2026-11-07) |
 | 14 | 2026-11-07 | Le Mans (La Sarthe) start/finish, chase view, LMP2 #9, session `2026_11_05_16_23_26-44R1` driver 17 lap 5 | Car sits in the ground (wheels sunk into the road) | Fixed (0944fca9): the horizon chunk's coarse far copy of the road (16 cm under the detailed road on the Mulsanne) answered the wheel and racing-line height lookups first; the ground fit and both height caches kept those heights after the detailed chunk loaded, so the car sat low and the line (missing on the Mulsanne, reported 2026-11-07) was draped under the road. The coarse chunk now serves the camera checks only. Checked headless at the start line and the Mulsanne; validated by eye (2026-11-07) |
 | 15 | 2026-11-07 | Daytona, orbit around Genesis #17 (session `2026_11_05_12_14_39-32R1` driver 9 lap 13) | Red paint too mirror-like and low quality on the front and side; car shadow low quality | Paint: the metallic share is not a metal: it replaces the base layer with the lacquered base-coat reflection, faded off the facing angle and tinted by the flake colour, where three's `metalness` had tinted the reflection with the albedo (orange chrome). The remaining rear sheen is the livery's own base coat (index ~2.5, ~18 % reflection; blue flake colour), to compare against the game. Shadow: near window 160 → 80 m (~2 cm texels) halves the edge stair-steps; the light bars in it are the rear wing's real gaps. Awaiting eye check |
@@ -90,7 +124,7 @@ the v5 lap visibility and LOD A/B.
 The frame against standard practice, mesh to screen. Already standard and checked: HDR half-float target with 4x MSAA, sRGB
 albedo / linear data textures, linear lighting with sRGB output last, metered auto-exposure, the profile's tone curve and white
 balance, near + cached static sun shadows (one hardware-filtered tap, normal offset), camera-facing foliage with crown normals
-and alpha to coverage, distance-faded GTAO, compressed mip-chained textures with 8x anisotropy, PBR with sky image lighting.
+and alpha to coverage, compressed mip-chained textures with 8x anisotropy, PBR with sky image lighting.
 
 To improve, cheapest first:
 
@@ -117,10 +151,137 @@ To improve, cheapest first:
 Known limits, left as they are: MSAA resolves before the tone map (hard edges between very bright and dark; a tone-mapped
 resolve needs multisampled textures WebGL lacks); AO multiplies the whole image, not only ambient light; no temporal AA.
 
+## Render audit against the reference frames (2026-11-08)
+
+A second pass, this time comparing each stage of the app's lighting with what the reference frames show (tone, colour, cloud,
+reflections, trees). Applied, uncommitted, then re-captured over the 62 reference shots (`docs/local/replay-3d-reference/after*`,
+scored by `inputs/score.py` against the frozen game frames):
+
+1. **Ambient light from a halved normal height** (`scenery/materials/ambientLookup.ts`, every lit scenery and car material).
+   The sky image was read along the surface normal, so upward faces took the whole sky dome and every vertical face only half of
+   it: tree tops and roofs too bright against their sides, and the undersides of foliage black (critique #1). The lookup now reads
+   the sky with the normal's height halved, which pulls every surface's ambient toward the horizon band.
+2. **Indirect specular at a fixed facing reflectance** (same module). Standard materials reflected the environment by their
+   direct Fresnel term (index 1.4, 2.8 % facing), roads 5.8 %. Environment reflections now use 8 % per unit of specular level
+   with the direct term unchanged, so far scenery and wet-looking roads pick up more sky without brightening the sun highlight.
+3. **Terrain baked shadow** (`shaderParts.ts`, `patchSurfaceShader.ts`). The terrain's splat alpha carries a baked shadow map
+   the app ignored; it now also cuts the direct sun (`min(shadow, baked)`), so tree lines and buildings darken the ground beside
+   them beyond the 1.2 km cached shadow map.
+4. **Foliage card normals** (`foliageCrown.ts`, replaces the spherical crown of critique #13). A card's normal is the view
+   direction tilted sideways by its corner (left edge away, right edge toward) and upward above its middle, the upward tilt fading
+   as the card faces the sun; never downward. The crown-height attribute and its per-geometry pass at load are gone.
+5. **Haze by ray distance** (`atmosphere/haze.ts`): `exp(−density · |view position|)` instead of the view depth, so the fog no
+   longer thins toward the frame's edges.
+6. **Sky dome from the package** (`atmosphere/skyDome.ts`, `hosekSky.ts`, `timeOfDay.ts`, 2026-11-09). The dome is the
+   Hosek-Wilkie sky cooked from the package's datasets, with the package's colour looks, altitude dimming and its own haze
+   (sky haze depth and colour). It replaces the earlier assumed sky (Perez with a grey overcast blend by cover², the scene fog
+   over a 100 m path): frame captures show the game never blends toward an overcast sky. Removed with it, as assumptions the
+   package now supersedes: the 10° minimum sun (a sun below the horizon is now held on it) and the camera occlusion pass.
+7. **Camera profiles under cloud** (`autoExposure.ts`). Each camera type's look blends toward its package `overcast` look by the
+   cloud cover squared, raised to the profile's `weatherLerpPower`, before the profiles are placed by the direct sun's strength
+   (`sunTarget` knots, `timeOfDay.ts`).
+8. **Half the low-sun dimming; the warm sun stays** (`sceneEnvironment.ts`, 2026-11-09). The sun's air-mass dimming and
+   reddening now use half the former optical depths, lifting the low-sun Le Mans frames (subset: F0 dE 9.1 → 8.6, cockpit F1
+   11.8 → 11.4, f 1.24 → 1.12) without touching the high-sun circuits. A white sun reddened from the zenith (the package's sun
+   is not a fixed colour) was measured too: on the 10-shot subset it scored best (dE 13.27 → 13.05 against a same-morning
+   control, whose run-to-run noise is about 0.15), but over all 62 shots it is a loss (`after2`: dE 10.21 → 10.46, b* −0.9 →
+   −2.3): Daytona gains a full dE (12.4 → 11.4, its warm cast gone) while Fuji, Le Mans and Silverstone all turn bluer. The
+   subset over-represents Daytona; the warm tint stays. Measured and left alone in the same runs: turbidity fixed at 3.25 (dE
+   13.20, within noise) and the haze colour sampled at 2° instead of the package's 10° (13.27 against 13.12: worse), so the
+   package values stay.
+9. **The sun from the package** (`sceneEnvironment.ts`, `atmosphere/sunSamples.ts`, 2026-11-09). Frame captures of the game
+   put its sun at 0.35 / 0.72 / 0.88 / 1.07 of the 56° sun at 9.6° / 28° / 37° / 60°, greener than red above 37° and far redder
+   below 10°, where the app's fixed warm colour with air-mass dimming gave 0.65 / 0.87 / 0.90 / 0.94 and a red bias. Package
+   schema 8 carries each layout's direct sun as a grid by sun elevation (3–90°) and base cloud coverage (0–1); the app
+   interpolates it (log-linear in relative air mass between elevations, linear in coverage) and converts with one unit factor
+   (`SUN_UNIT`, 4.0 at the ~100 midday sun). The fixed sun colour, optical depths and transmittance are gone; the sun is now
+   dimmed under cloud, with the replay's cover standing in for the base coverage. Known gap stated by the pipeline: clouded
+   captures run 2–20 % brighter than the grid. Re-scored with item 10 (`after4.json`, 62 shots): dE 10.17 → 9.64, the red
+   bias gone (a* +1.69 → +0.36), b* −1.14 → −1.38, band 54 → 52. Every circuit improves (Daytona 12.25 → 11.07, its warm cast
+   b* 4.7 → 3.7). The low-sun Le Mans shots (9.6°) are darker (F0–F3 f 1.14 → 1.40–1.52): the sampled sun is 0.35 of midday
+   there against the former 0.65, which is right, so the darkness now points at the exposure (the app exposes 2–4× less than
+   the game at low sun; next item).
+10. **The full dry haze density** (`atmosphere/perezSky.ts`, 2026-11-09). The density was the clear-day value alone; frame
+   captures showed Daytona's haze thicker than the app's. The package's dry formula now applies: the base term mixes from the
+   dawn density to the day density along the fog colour's sun ramp (0.21 of the way at Daytona's 28°), the cloud cover adds
+   its term and the damped pollution its own; the storm term stays off (every replay is dry). The pipeline checked the
+   formula against seven captures within 0.1 %.
+11. **Exposure from the captures, measured and parked** (`autoExposure.ts`, 2026-11-09). The frame captures fix the game's
+   displayed multiplier exactly: the tone pass multiplies by the frame's exposure over the package's `sceneLuminanceScale`, which
+   in the scene's sun units is 1.44–1.77× the app's exposure for the same four views (9.6°–60°), so the law's constant C would be
+   4.06 instead of 2.59. Applied over the 62 shots (`after5.json`) it did what the per-shot arithmetic predicted (Le Mans cockpit
+   f 2.34 → 1.47, Silverstone cockpit 1.50 → 0.99) and made the set too bright wherever the sky shows (55 of 62 below the band,
+   dE 9.64 → 15.1): with the exposure right, the residual is the scene, 1.2–1.9× the game's in sky-dominated views (the sky is
+   2–2.6× too bright, item 2 of the capture findings) and 0.69× in the Le Mans cockpit. C stays 2.59 until the sky luminance is
+   on the game's curve (Hosek–Wilkie, decoded by the pipeline session, not yet published); then 4.06 takes over and the cockpit
+   darkness is what remains.
+11b. **Exposure law from the HDR frame dumps** (`autoExposure.ts`, 2026-11-09 evening, uncommitted). The tone pass input of 22
+   captured frames gives the reference's metering directly: the displayed multiplier follows `G · T / (L / 2.2)^s` with L the
+   arithmetic mean luminance of the type's metering window, every pixel counted (the cockpit interior too), T and s the package's
+   target and adaptation scale. G fits at 1.24 over 20 frames, the three camera types and a 150-fold range of L (11 % scatter);
+   the log average the app used scatters 23 %, and a near mask makes the onboard frames worse. The app now meters the mean
+   without the 4 m mask and exposes by `1.24 · U · T / (U · L)^s`, U = 1 / (SUN_UNIT · 2.2), replacing C = 4.06. A fitted
+   constant, named as one. The reference also caps exposure at a per-profile maximum (never reached in the captures, so
+   nothing to match by day); the package does not carry it, open for dusk and night. Over the 62 shots (`after9.json` against
+   `after8.json`): in band 33 → 49, f median 0.868 → 0.893, mean dE 11.04 → 10.42; cockpit f 1.50 → 0.97 (dE 9.3 → 7.9), TV
+   0.82 → 0.89, chase 1.13 → 0.87, reverse 1.23 → 0.78. What remains bright is the scene, not the exposure: a pixel trace of one
+   Daytona frame puts the app's sunlit road at 1.2× the reference's (the wall beside it equal), which is the chase and reverse
+   residual. Daytona stays at f 0.75 (5 of 12 in band): its screenshots show soft or no car shadows, the sun dimmed by cloud at
+   those moments, which the replay data does not carry; the captured Daytona frame with the sun out matches.
+12. **Car reflection probe from the frame captures** (`car/carReflection.ts`, `car/carPaint.ts`, 2026-11-09). The captures
+   show the reference reflection as a live cube rendered from the car's roof (0.72 m over the bounding-box centre), 0.1–150 m,
+   the car itself never drawn into it, read sharp by any clear coat of roughness 0.1 or less and from a convolved chain above
+   that. The app's probe now sits at that eye (it was 0.5 m over the origin), sees 0.1–150 m (was 0.5–300, half the scenery
+   per face), and the coat lookup reads the sharpest prefiltered level at or below the package's cutoff
+   (`shading.carPaintReflection.roughnessCutoff`). The sun glint on smooth paint now comes from the package's `shading`
+   section (`sunGlint`, `smallEdge`): a coat under the glint's roughness cutoff adds a disc of the cosine threshold to its
+   direct sun specular, the whole term scaled, limited by the small-edge detector (limit squared, in the package's light units,
+   so × SUN_UNIT), for the clear coat and for the base coat under it (roughness base + coat × coat strength), inside three's
+   directional-light loop where the shadowed sun is at hand. The probe now matches the reference's 1024 px faces, three a
+   frame (a probe every two frames; chosen by the user before its cost was measured, to optimise after). Not carried: the
+   rough-coat convolution chain (`shading.convolution` stays unread; next, read from the package-convolved cube). Cost measured
+   (production build, headless, 40 s played, one run each; 256 px one face → 1024 px three faces): Silverstone p50 6.2 → 9.7 ms,
+   p99 25 → 40, frames over 16 ms 113 → 367 of ~5600/3500; Daytona p50 6.3 → 9.3, p99 33 → 31, over 16 ms 242 → 172. Offscreen
+   draws a frame double (311 → 649 median): the three faces' draw calls on the CPU-bound frame, not the pixels. Kept at the
+   user's word (optimise after). after6 shows the paint shader compiled with the glint in; its views have no sun-facing paint,
+   so the glint is not yet seen. The game's paint shows a bright sky reflection along the body edges (Genesis roof view) that
+   the app's did not. Done next (2026-11-09 pm): the car paint reads the car's own reflection cubes as the package rules
+   (`shading.carPaintReflection`): the probe keeps its mips (regenerated after the last face only), `reflectionCube.ts`
+   convolves it with the package kernels after the sixth face, each coat samples the sharp cube at or under the roughness
+   cutoff and the convolved cube above it at (r − cutoff)/(1 − cutoff) × lodScale, as the level itself (base coat, `explicit`)
+   or added to the hardware level (clear coat, `bias`), clamped to the last kernel level; three's sky environment stands in
+   before the first probe; the car's other lit materials keep three's prefiltered probe. Renders without errors on the Genesis
+   lap; the look is to be judged on the next 62-view run and by eye. Cost not yet measured; the convolution reuses its cube
+   across probes.
+
+Full 62-shot re-score (`after3.json` with item 8, `after.json` without; same metrics as `reference.json`, frozen renders re-scored
+beside): f median 1.01 → 1.07, within ±20 % 54 → 54, mean dE 10.1 → 10.2, b* −0.1 → −1.1 (a touch bluer); reverse views 0.82 →
+1.06 (dE 13.7 → 11.2) and Daytona 0.85 → 0.92 (8 → 10 in band) improve, Le Mans sits a little darker (f 1.08, 14 of 15 in
+band) and Silverstone at 1.14. The frame means are level with the frozen reference; judged by eye in the triptychs on 2026-11-09,
+the new renders read as better than the frozen ones (trees, skyline, hazed distance, low sun). Cockpits remain the darkest group (f 1.23): the near mask and the onboard
+law are the remaining levers, both measured as regressions before.
+
+Measured on the subset, the ambient lookup (1), the indirect reflectance (2) and the baked terrain shadow (3) move the frame
+means by under 0.01 in f and 0.1 in dE: they change where light falls (tree crowns, shaded ground) rather than how much, so they
+are judged by eye in the pairs, not by the scores.
+
+Left as they are, with the reason: the exposure clamps per camera type (the reference exposures sit inside them, so they cannot
+explain the Daytona chase brightness); the billboard shadow pass facing the sun (critique #13 chose the view camera on purpose);
+the road groove mask (the exporter strips it); the
+turbidity and haze-colour calibration (measured in item 8: neither alternative scores better than the package values).
+
 ## Still open
 
 - **Sky model.** Done with package schema 7: the package's turbidity and Perez scales, the multipliers at the sun's height (linear between
   rows), the table as the package ships it.
 - **Reflections beyond the car probe.** Screen-space or per-area reflections for glass and wet track.
+- **Car lamps.** The most visible car difference in the chase views (2026-11-09, six reference pairs): the reference cars'
+  tail lights, rear LED strips and identification lights glow; the app draws them as dim lit surfaces. The package's self-lit
+  effect materials (about 225 across the car bodies) are drawn as ordinary lit materials at the first frame of their texture
+  strip (the unlit state where the strip has two or three frames). Needed from the package before the app can draw them: each
+  lamp's role (always on, brake, rain, pit limiter, brake disc), the texture frame per state and the luminance of each self-lit
+  kind. The app side is then small: an unlit material at that luminance, shown by role from the lap's brake channel.
+  Measured in the same pairs: the car's darkest parts are as dark as the reference's (2nd percentile luminance 0.0003 to
+  0.0014 against 0.0007 to 0.0015), so the car's shading contrast is not a gap. Since 2026-11-09 the car parts drawn by the surface program (lamp housings and covers, wheels, trim) reflect the car's own convolved probe by the scenery reflection rule, not the venue's cube (`car/carReflection.ts` `bindCarSurfaceReflection`): the lamp covers lost their pale sky wash and read dark red, unlit (checked on N1, N12, N18).
 
 Each step is judged by eye against the game and re-runs `npm run benchmark:replay3d:suite` (p99 must stay < 16 ms).
