@@ -5,7 +5,7 @@ import type { SceneryDaylight, SceneryLayout } from '../../../../shared/types/sc
 import type { ReplayDaylightClock } from '../../../../shared/types/replay.js';
 import { solarPosition } from './solarPosition.js';
 import { createPerezSkyMaterial, hazeColour, hazeDensity, heightHaze, skyConditions, sunwardHaze } from './atmosphere/perezSky.js';
-import { installHaze } from './atmosphere/haze.js';
+import { createHaze } from './atmosphere/haze.js';
 
 /**
  * Midday lighting, from the pipeline review viewer's daylight (pipeline/viewer/daylight.js): the sun direction without a layout's
@@ -86,6 +86,8 @@ export interface SceneEnvironment {
    * then one lit by the first, so shaded faces get the light the venue bounces. Call once the scenery around it is resident.
    */
   captureVenue(): void;
+  /** Writes this scene's haze into the shader chunks: call before compiling its materials outside a render. */
+  applyHaze(): void;
   /**
    * Moves the near shadow window to `focus` (scene coordinates, on the ground: the camera's look target) before a frame renders,
    * colours the haze toward the view, and draws the next quarter of the static map when one is due (sunShadows.ts). True while a
@@ -124,8 +126,10 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
   const environmentScene = new Scene(), environmentSky = sky.clone();
   const groundRadiance = GROUND_ALBEDO * DAYLIGHT.sunIntensity * Math.max(0, lighting.sunDirection.y) / Math.PI;
   const sunColour = new Color(DAYLIGHT.sunColor).multiply(lighting.sunTransmittance);
-  installHaze({originY: origin.y, height: heightHaze(venue.sky, venue.daylight, weather), sunDirection: lighting.sunDirection.clone().normalize(),
+  const applyHaze = createHaze({originY: origin.y, height: heightHaze(venue.sky, venue.daylight, weather), sunDirection: lighting.sunDirection.clone().normalize(),
     sunRadiance: sunColour.clone().multiplyScalar(DAYLIGHT.sunIntensity), sunward: sunwardHaze(venue.sky, weather)});
+  // Programs compile on a scene's render (and the warm-up's compile, `applyHaze`): each writes this scene's haze terms back first.
+  applyHaze(); scene.onBeforeRender = applyHaze;
   const reflectedGround = new Mesh(new PlaneGeometry(24000, 24000), new MeshBasicMaterial({color: sunColour.clone().multiplyScalar(groundRadiance), side: DoubleSide}));
   reflectedGround.rotation.x = -Math.PI / 2; reflectedGround.position.y = ENVIRONMENT_GROUND_Y;
   environmentScene.add(environmentSky, reflectedGround);
@@ -160,6 +164,7 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
     setCamera(camera) { view = camera; },
     setDynamic(objects) { dynamic = objects; },
     staticShadowStale() { staticShadow.stale(); },
+    applyHaze,
     captureVenue() {
       const cube = new WebGLCubeRenderTarget(VENUE_PROBE_PX, {type: HalfFloatType, generateMipmaps: false}), camera = new CubeCamera(0.5, VENUE_PROBE_FAR_M, cube);
       if (camera.coordinateSystem !== renderer.coordinateSystem) { camera.coordinateSystem = renderer.coordinateSystem; camera.updateCoordinateSystem(); }

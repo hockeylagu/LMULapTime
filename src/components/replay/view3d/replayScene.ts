@@ -117,7 +117,7 @@ export async function createReplayScene(
     if (!target?.camera) return;
     // Programs depend on the render target (tone mapping, output colour space): compile for the HDR target the frame uses.
     const previous = renderer.getRenderTarget();
-    renderer.setRenderTarget(exposure.target);
+    renderer.setRenderTarget(exposure.target); environment.applyHaze();
     const compiled = renderer.compileAsync(root, target.camera, target.scene);
     renderer.setRenderTarget(previous);
     await compiled;
