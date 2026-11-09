@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SessionDatabase } from '../../../../server/core/db.js';
 import type { DetailedSession } from '../../../../shared/types/index.js';
-import { canonicalSession } from '../../../../server/core/sessionRows/canonical.js';
+import { canonicalSession } from './canonical.js';
 import { readSessionCards } from '../../../../server/core/sessionSummaries/cards.js';
 import { restoreStoredSessionLinks } from '../../../../server/core/dbSessionStore.js';
 import { getTelemetrySessionCandidatesStartingBetween } from '../../../../server/core/dbReconciliationStore.js';

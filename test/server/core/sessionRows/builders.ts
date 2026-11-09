@@ -2,9 +2,8 @@ import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import type { DetailedSession, DriverData, LapData } from '../../../../shared/types/index.js';
 import { initDbSchema } from '../../../../server/core/dbSchema.js';
-import { canonicalSession, diffValues } from '../../../../server/core/sessionRows/canonical.js';
+import { canonicalSession, diffValues } from './canonical.js';
 import { readSession } from '../../../../server/core/sessionRows/reader.js';
-import { insertSessionRow } from '../../../../server/core/sessionRows/stub.js';
 import { writeSessionRows } from '../../../../server/core/sessionRows/writer.js';
 
 export function memoryDb(): DatabaseType {
@@ -35,6 +34,15 @@ export function session(drivers: DriverData[], overrides: Partial<DetailedSessio
     trackEvent: 'Spa 6h', trackLengthMeters: 7004, timeString: '2026-05-28 12:00', timestamp: 1_780_000_000_000, sessionType: 'Race',
     sessionName: 'R1', driversCount: drivers.length, drivers, ...(player ? { playerDriver: player } : {}), ...overrides,
   };
+}
+
+/** Inserts the `sessions` row a session's rows hang from, with no JSON; ingestion creates it in upsertSession. */
+function insertSessionRow(db: DatabaseType, session: DetailedSession): void {
+  db.prepare(`INSERT OR REPLACE INTO sessions (id, filename, file_path, file_mtime_ms, file_size_bytes, timestamp, track_venue, track_course,
+    session_type, session_name, drivers_count, updated_at)
+    VALUES (@id, @filename, @filePath, 0, 0, @timestamp, @trackVenue, @trackCourse, @sessionType, @sessionName, @driversCount, 0)`)
+    .run({ id: session.id, filename: session.filename, filePath: session.filePath, timestamp: session.timestamp, trackVenue: session.trackVenue,
+      trackCourse: session.trackCourse, sessionType: session.sessionType, sessionName: session.sessionName, driversCount: session.driversCount });
 }
 
 /** Writes a session into a fresh database and returns what was read back with its canonical form. */

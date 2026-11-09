@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SessionDatabase } from '../../../../server/core/db.js';
 import type { DetailedSession, ReplayMetadata } from '../../../../shared/types/index.js';
-import { canonicalSession, diffValues } from '../../../../server/core/sessionRows/canonical.js';
+import { canonicalSession, diffValues } from './canonical.js';
 import { readSessionCards } from '../../../../server/core/sessionSummaries/cards.js';
 import { isReplayLinkWithdrawn } from '../../../../server/core/replay/dbReplayLinkStore.js';
 import { archiveReplacedRecording } from '../../../../server/core/replay/dbReplayIdentity.js';

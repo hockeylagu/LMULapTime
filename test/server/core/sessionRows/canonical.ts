@@ -1,9 +1,15 @@
-import type { DetailedSession } from '../../../shared/types/index.js';
-import type { Field, Row } from './fields.js';
+import type { DetailedSession } from '../../../../shared/types/index.js';
+import type { Field, Row } from '../../../../server/core/sessionRows/fields.js';
 import {
-  BEST_SESSION_LAP_FIELDS, CONDITION_FIELDS, DRIVER_ALL_FIELDS, EVENT_LISTS, LAP_FIELDS, READ_TIME_DRIVER_PROPS, READ_TIME_LAP_PROPS,
+  BEST_SESSION_LAP_FIELDS, CONDITION_FIELDS, DRIVER_DICTIONARY_FIELDS, DRIVER_FIELDS, EVENT_LISTS, LAP_FIELDS,
   RECORDING_FIELDS, SESSION_FIELDS, SETTINGS_FIELDS, TIRE_WEAR_FIELDS, WEATHER_FIELDS,
-} from './specs.js';
+} from '../../../../server/core/sessionRows/specs.js';
+
+/** Every scalar of a driver, for the canonical form. */
+const DRIVER_ALL_FIELDS: readonly Field[] = [...DRIVER_DICTIONARY_FIELDS, ...DRIVER_FIELDS];
+/** Properties of a lap and of a driver that are not stored: filled at read time. */
+const READ_TIME_LAP_PROPS = ['paceCategory', 'pacePercentage', 'target100Sec', 'pitService'] as const;
+const READ_TIME_DRIVER_PROPS = ['bestLapPaceCategory', 'bestLapPacePercentage'] as const;
 
 /**
  * An optional property holds a value or is absent: an explicit null reads back as absent. A text

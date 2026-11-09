@@ -125,8 +125,7 @@ because active recordings can be exclusively locked on Windows.
   - `reader.ts` (`readSession`, `sessionScalars`, `driverScalars`, `recordingLink`): assembles `DetailedSession` from normalized rows.
   - `access.ts`: exposes `loadSessions` (ordered reads), `readStoredLinkState` (link and DuckDB file), and `sameReplayLink`.
   - `targeted.ts`: granular updates for replay links, names, telemetry, and conditions.
-  - `canonical.ts`: defines round-trip expectations for regression tests and attachment helpers (`sessionTelemetry`, `withSessionTelemetry`).
-  - `stub.ts`: bare session fixture generator for tests and tools.
+  - Round-trip expectations (`canonicalSession`) and the bare `sessions` row fixture live with the tests in `test/server/core/sessionRows/`.
 - **Dictionaries**: `drivers` (keyed by exact name; player/human flags belong to session driver row), `vehicles` (raw XML car type and class), `teams` (name). Emptied with session cache; never pruned.
 - **Derived columns**: stored on `session_drivers` (`is_human`, `driver_class`, `clean_laps_count`, `driving_time_seconds`, `max_top_speed`, `best_lap_ordinal`, `top3_average`, `consistency_score`, etc.) and `session_laps` (`condition_group`, clean/representative/human/leaderboard flags). Raw columns retain original XML values (`lap_number`, `is_pit_stop`).
 

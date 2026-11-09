@@ -2,7 +2,7 @@ import { lapEvents } from '../../../../shared/domain/lapComparison.js';
 import { describe, expect, it } from 'vitest';
 import path from 'node:path';
 import type { DetailedSession, LapData } from '../../../../shared/types/index.js';
-import { canonicalSession } from '../../../../server/core/sessionRows/canonical.js';
+import { canonicalSession } from './canonical.js';
 import { readSession } from '../../../../server/core/sessionRows/reader.js';
 import { playerDriverOrdinal, writeSessionRows } from '../../../../server/core/sessionRows/writer.js';
 import { LmuParser } from '../../../../server/sessions/parser.js';

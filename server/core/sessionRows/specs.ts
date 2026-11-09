@@ -100,9 +100,6 @@ export const DRIVER_FIELDS: readonly Field[] = [
   real('finishTime', 'finish_time'),
 ];
 
-/** Every scalar of a driver, for the canonical form. */
-export const DRIVER_ALL_FIELDS: readonly Field[] = [...DRIVER_DICTIONARY_FIELDS, ...DRIVER_FIELDS];
-
 export const TIRE_WEAR_FIELDS: readonly Field[] = [
   real('fl', 'tire_wear_fl'),
   real('fr', 'tire_wear_fr'),
@@ -143,10 +140,6 @@ export const LAP_FIELDS: readonly Field[] = [
   bool('isValid', 'is_valid'),
   bool('isInferred', 'is_inferred'),
 ];
-
-/** Properties of a lap and of a driver that are not stored: filled at read time. */
-export const READ_TIME_LAP_PROPS = ['paceCategory', 'pacePercentage', 'target100Sec', 'pitService'] as const;
-export const READ_TIME_DRIVER_PROPS = ['bestLapPaceCategory', 'bestLapPacePercentage'] as const;
 
 export type EventKind = 'incident' | 'trackLimit' | 'penalty';
 export interface EventListSpec { kind: EventKind; prop: 'incidents' | 'trackLimits' | 'penalties'; bit: number; fields: readonly Field[] }
