@@ -11,7 +11,7 @@ import type { MapColorMode } from '../../map/replayMapUtils.js';
 import { createGhostClock } from '../../map/ghostSync.js';
 import { makeCar } from '../sceneObjects.js';
 import { createWheelAnimation } from '../wheelAnimation.js';
-import { BASELINE_LINE, colorRacingLine, makeRacingLine, racingLineColors, refreshRacingLine } from '../racingLine.js';
+import { BASELINE_LINE, colorRacingLine, makeRacingLine, racingLineColors, refreshRacingLine, syncRacingLine } from '../racingLine.js';
 import type { SurfaceHeight } from '../scenery/sceneryGround.js';
 import type { DisplayTransform } from '../autoExposure.js';
 import { disposeObjects } from './disposeObjects.js';
@@ -123,6 +123,8 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
         colors = racingLineColors(trajectory, baseline, next);
         colorRacingLine(primaryLine, colors.primary); if (baselineLine) colorRacingLine(baselineLine, colors.baseline);
       },
+      /** The camera type changed: re-bake the line colours for its display transform. */
+      syncLines() { syncRacingLine(primaryLine); if (baselineLine) syncRacingLine(baselineLine); },
       fadeLines(primaryOpacity: number, baselineOpacity: number) {
         primaryLine.material.opacity = primaryOpacity;
         if (baselineLine) baselineLine.material.opacity = baselineOpacity;

@@ -372,7 +372,7 @@ export async function createReplayScene(
       if (next === mode) return;
       const wasTop = mode === 'top', wasDriver = isDriverCamera(mode); mode = next;
       const driverView = isDriverCamera(mode);
-      camera = mode === 'top' ? overhead : perspective; controls.object = camera; environment.setCamera(camera); exposure.setType(exposureType(mode));
+      camera = mode === 'top' ? overhead : perspective; controls.object = camera; environment.setCamera(camera); exposure.setType(exposureType(mode)); layer.syncLines();
       controls.enabled = !driverView;
       if (wasDriver && !driverView) camera.up.set(0, 1, 0);
       syncDriverCamera();

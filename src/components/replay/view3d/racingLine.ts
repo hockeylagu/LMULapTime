@@ -75,12 +75,8 @@ export function makeRacingLine(lap: ReplayTrajectoryData, origin: Vector3, color
   line.renderOrder = liftM > LIFT_M ? 3 : 2;
   // Data, not lit scenery: its vertex colours are what the display transform shows as the 2D map's colours (colorRacingLine), and
   // exposure is a linear scale before the curve, so dividing it out keeps those pixels whatever auto-exposure picks. A camera
-  // type with another curve re-bakes the colours before the line draws.
-  line.onBeforeRender = renderer => {
-    line.material.color.setScalar(1 / renderer.toneMappingExposure);
-    const state = lineColours.get(line);
-    if (state && state.baked !== state.display()) bakeColours(line, state);
-  };
+  // type with another curve re-bakes the colours (syncRacingLine).
+  line.onBeforeRender = renderer => { line.material.color.setScalar(1 / renderer.toneMappingExposure); };
   lineHeights.set(line, heights); lineColours.set(line, {display, colors, baked: null});
   colorRacingLine(line, colors);
   return line;
@@ -107,6 +103,16 @@ export function colorRacingLine(line: Mesh<BufferGeometry, MeshBasicMaterial>, c
   if (!state) throw Error('Racing line was not built by makeRacingLine');
   state.colors = colors;
   bakeColours(line, state);
+}
+
+/**
+ * Re-bakes the colours when the display transform changed (another camera type). Call before the frame renders: three uploads
+ * the vertex colours before `onBeforeRender`, so a bake there would show one frame late.
+ */
+export function syncRacingLine(line: Mesh<BufferGeometry, MeshBasicMaterial>): void {
+  const state = lineColours.get(line);
+  if (!state) throw Error('Racing line was not built by makeRacingLine');
+  if (state.baked !== state.display()) bakeColours(line, state);
 }
 
 /** Re-drapes the ribbon on the road now resident (scenery streams in after the line was built), keeping its colours. */

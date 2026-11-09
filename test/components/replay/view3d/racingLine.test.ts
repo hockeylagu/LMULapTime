@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { Vector3 } from 'three';
-import { colorRacingLine, makeRacingLine, racingLineColors, RACING_LINE_WIDTH_M } from '../../../../src/components/replay/view3d/racingLine.js';
+import { colorRacingLine, makeRacingLine, racingLineColors, RACING_LINE_WIDTH_M, syncRacingLine } from '../../../../src/components/replay/view3d/racingLine.js';
 import { getHeatmapColor } from '../../../../src/components/replay/map/replayMapUtils.js';
 import { TELEMETRY_COLORS } from '../../../../src/utils/themeColors.js';
 import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
@@ -55,7 +55,7 @@ it('re-bakes the line colours through the output encode when the camera type cha
   const line = makeRacingLine(lap, new Vector3(), ['#808080', '#808080'], () => 0, () => current), colors = line.geometry.getAttribute('color');
   expect(colors.getX(0)).toBeCloseTo(inverseToneCurve(curve, 128 / 255), 5);
   current = {toneCurve: curve, outputGamma: 2.2};
-  line.onBeforeRender({toneMappingExposure: 1} as never, null as never, null as never, null as never, null as never, null as never);
+  syncRacingLine(line);
   // The displayed value is the encoded one: decode it, then invert the curve.
   expect(colors.getX(0)).toBeCloseTo(inverseToneCurve(curve, (128 / 255) ** 2.2), 5);
 });
