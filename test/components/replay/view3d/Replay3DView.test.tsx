@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import Replay3DView from '../../../../src/components/replay/view3d/Replay3DView.js';
 import { createReplayScene } from '../../../../src/components/replay/view3d/replayScene.js';
 import { fetchSceneryLayout } from '../../../../src/api/sceneryApi.js';
-import { fetchCar } from '../../../../src/api/vehicles/carApi.js';
+import { fetchBody } from '../../../../src/api/vehicles/bodyApi.js';
 import { CAMERA_MODES } from '../../../../src/components/replay/view3d/cameraModes.js';
 import { ReplayShortcutHelp } from '../../../../src/components/replay/ReplayShortcutHelp.js';
 import { replayShortcutBlocked } from '../../../../src/utils/replayShortcuts.js';
@@ -14,7 +14,7 @@ const scene = vi.hoisted(() => ({wheelMotion: 'Replay-estimated wheel roll', cur
 vi.mock('../../../../src/components/replay/view3d/replayScene.js', () => ({createReplayScene: vi.fn(async () => scene)}));
 const layout = vi.hoisted(() => ({sourceGeometryRevision: 'g', packageRevision: 'p'}));
 vi.mock('../../../../src/api/sceneryApi.js', () => ({fetchSceneryLayout: vi.fn(async () => layout)}));
-vi.mock('../../../../src/api/vehicles/carApi.js', () => ({fetchCar: vi.fn(async (vehicleId: string) => ({vehicleId}))}));
+vi.mock('../../../../src/api/vehicles/bodyApi.js', () => ({fetchBody: vi.fn(async (vehicleId: string) => ({vehicleId}))}));
 
 const trajectory: ReplayTrajectoryData = {replayName: 'test', pointsCount: 7, layoutKey: 'portimao_wec', geometryRevision: 'g', vehicleIdentity: {vehicleId: 'CAR_VEH'},
   bounds: {minX: 0, maxX: 6, minZ: 0, maxZ: 0, spanX: 6, spanZ: 0},
@@ -38,7 +38,7 @@ it('keeps the track and camera when changing either lap, removing comparison, or
   await act(async () => rerender(view(next, otherComparison)));
   await act(async () => rerender(view(next, null)));
   expect(scene.updateLaps.mock.calls.map(call => call.slice(0, 2))).toEqual([[lap, comparison], [lap, otherComparison], [next, otherComparison], [next, null]]);
-  expect(createReplayScene).toHaveBeenCalledOnce(); expect(fetchSceneryLayout).toHaveBeenCalledOnce(); expect(fetchCar).toHaveBeenCalledOnce();
+  expect(createReplayScene).toHaveBeenCalledOnce(); expect(fetchSceneryLayout).toHaveBeenCalledOnce(); expect(fetchBody).toHaveBeenCalledOnce();
   expect(scene.mode).not.toHaveBeenCalled(); expect(scene.reset).not.toHaveBeenCalled(); expect(scene.dispose).not.toHaveBeenCalled();
   unmount(); expect(scene.dispose).toHaveBeenCalledOnce();
 });

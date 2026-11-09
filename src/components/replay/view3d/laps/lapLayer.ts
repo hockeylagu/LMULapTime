@@ -3,7 +3,7 @@ import { BufferGeometry, Group, Mesh, type Material, type Object3D, type Texture
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import type { SceneryCamera } from '../../../../../shared/types/scenes/scenery.js';
-import { normalizeVehicleId, type LoadedCar } from '../../../../api/vehicles/carApi.js';
+import { normalizeVehicleId, type LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import { createCarMaterial, materialTexturePaths } from '../car/carMaterials.js';
 import { createContactShadow } from '../car/carContactShadow.js';
 import { MAP_COLORS, TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
@@ -17,8 +17,8 @@ import type { SurfaceHeight } from '../scenery/sceneryGround.js';
 import { disposeObjects } from './disposeObjects.js';
 
 export interface LapCars {
-  primary: LoadedCar;
-  baseline: LoadedCar | null;
+  primary: LoadedBody;
+  baseline: LoadedBody | null;
 }
 
 /** Loads a shared car texture by its `textures/<sha256>.ktx2.zst` path under the cars folder. */
@@ -28,7 +28,7 @@ export type CarTextureLoader = (path: string) => Promise<Texture>;
 export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeight, loadTexture: CarTextureLoader, toneCurve: SceneryCamera['toneCurve']) {
   // Only buffers retained by the bounded asset cache keep these parsed templates alive.
   const templates = new WeakMap<ArrayBuffer, Promise<Group>>();
-  const loadTemplate = (car: LoadedCar): Promise<Group> => {
+  const loadTemplate = (car: LoadedBody): Promise<Group> => {
     let pending = templates.get(car.bytes);
     if (!pending) {
       pending = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(car.bytes, '').then(result => {
@@ -41,7 +41,7 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     }
     return pending;
   };
-  const loadParts = async (car: LoadedCar) => {
+  const loadParts = async (car: LoadedBody) => {
     const template = await loadTemplate(car), key = normalizeVehicleId(car.vehicleId);
     const appearance = car.descriptor.appearances.find(row => normalizeVehicleId(row.alias) === key);
     if (!appearance) throw Error(`The car package has no appearance for ${car.vehicleId}`);
@@ -70,8 +70,8 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     return {template, appearance, recipeOf, textures, hiddenNames: new Set([...hidden].map(node => node.name))};
   };
   /** A livery's parsed model and loaded textures, shared by every instance of that car (and by `preload`). */
-  const parts = new WeakMap<LoadedCar, ReturnType<typeof loadParts>>();
-  const partsOf = (car: LoadedCar) => {
+  const parts = new WeakMap<LoadedBody, ReturnType<typeof loadParts>>();
+  const partsOf = (car: LoadedBody) => {
     let pending = parts.get(car);
     if (!pending) {
       pending = loadParts(car);
@@ -81,7 +81,7 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     return pending;
   };
   /** A car instance of the lap's livery: the shared geometry with one material per native material, textures preloaded. */
-  const loadModel = async (car: LoadedCar): Promise<Group> => {
+  const loadModel = async (car: LoadedBody): Promise<Group> => {
     const {template, appearance, recipeOf, textures, hiddenNames} = await partsOf(car);
     const model = template.clone(true), materials = new Map<string, Material>();
     for (const name of hiddenNames) model.getObjectByName(name)?.removeFromParent();

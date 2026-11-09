@@ -6,9 +6,9 @@ import type { TrackBoundaryGeometry } from '../../shared/types/trackGeometry.js'
 import type { DataPluginStatus, VehicleDataRecord } from '../../shared/types/dataPlugin.js';
 import { validateTrackPackage } from './trackPackage.js';
 import { loadScenePackage, type SceneryStore } from './scenePackage.js';
-import { loadCarPackage, normalizeVehicleId, type CarStore } from './carPackage.js';
+import { loadBodyPackage, normalizeVehicleId, type BodyStore } from './bodyPackage.js';
 import type { SceneryLayoutResource } from '../../shared/types/scenes/scenery.js';
-import type { CarResource } from '../../shared/types/scenes/car.js';
+import type { BodyResource } from '../../shared/types/scenes/car.js';
 
 function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('Expected object');
@@ -27,7 +27,7 @@ function pair(value: unknown): [number, number] {
   if (typeof x !== 'number' || typeof z !== 'number' || !Number.isFinite(x) || !Number.isFinite(z) || Math.abs(x) >= 10 || Math.abs(z) >= 10) throw Error('Invalid local coordinate');
   return [x, z];
 }
-/** The vehicle records; their `bodies` are validated by `loadCarPackage`, which receives the same raw rows. */
+/** The vehicle records; their `bodies` are validated by `loadBodyPackage`, which receives the same raw rows. */
 export function parseVehicleCatalog(value: unknown): VehicleDataRecord[] {
   const catalog = object(value);
   keys(catalog, ['vehicles']);
@@ -128,14 +128,14 @@ function freezeGeometry(value: unknown): void {
   Object.freeze(value);
 }
 
-/** A fully validated startup snapshot. Scenery and car files are served as is from `filesRoot()`. */
+/** A fully validated startup snapshot. Scenery and body files are served as is from `filesRoot()`. */
 export class DataPlugin {
   public readonly status: DataPluginStatus;
   private readonly tracks = new Map<string, {geometry:TrackBoundaryGeometry}>();
   private readonly records: VehicleDataRecord[] = [];
   private readonly logoRecords = new Map<string, string>();
   private scenery: SceneryStore | null = null;
-  private cars: CarStore | null = null;
+  private bodies: BodyStore | null = null;
   private root = '';
   public constructor(root?: string) {
     this.status = {state:root?'invalid':'absent',revision:'none',tracks:false,vehicles:false};
@@ -177,7 +177,7 @@ export class DataPlugin {
         const resource=object(manifest.vehicles); keys(resource,['catalog','logos']);
         const vehicleCatalog=read(text(resource.catalog));
         this.records.push(...parseVehicleCatalog(vehicleCatalog));
-        this.cars = loadCarPackage(base, object(vehicleCatalog).vehicles as unknown[]);
+        this.bodies = loadBodyPackage(base, object(vehicleCatalog).vehicles as unknown[]);
         if (resource.logos !== undefined) {
           // A bad logos file never invalidates tracks or vehicles; a path escaping the package still does.
           let logoFile: unknown = null;
@@ -198,16 +198,16 @@ export class DataPlugin {
         vehicles: !!manifest.vehicles,
         ...(this.logoRecords.size > 0 ? { logos: true } : {}),
         ...(this.scenery ? { scenery: true } : {}),
-        ...(this.cars ? { cars: true } : {}),
+        ...(this.bodies ? { bodies: true } : {}),
         counts: {
           tracks: this.tracks.size,
           vehicles: this.records.length,
           ...(this.logoRecords.size > 0 ? { logos: this.logoRecords.size } : {}),
           ...(this.scenery ? { scenery: this.scenery.layouts.size } : {}),
-          ...(this.cars ? { cars: this.cars.folders.size } : {}),
+          ...(this.bodies ? { bodies: this.bodies.folders.size } : {}),
         },
       };
-    } catch {this.tracks.clear(); this.records.length=0; this.logoRecords.clear(); this.scenery = null; this.cars = null; /* Generic status never discloses local paths. */}
+    } catch {this.tracks.clear(); this.records.length=0; this.logoRecords.clear(); this.scenery = null; this.bodies = null; /* Generic status never discloses local paths. */}
   }
   /** The layout index of a layout's scenery; chunk and texture bytes come from `sceneryFile`. */
   public sceneryLayout(key: string): SceneryLayoutResource | null {
@@ -215,12 +215,12 @@ export class DataPlugin {
     return layout ? { ...structuredClone(layout), packageRevision: this.status.revision } : null;
   }
   /**
-   * The package folder that scenery (`scenery/`) and car (`vehicles/`) files are served from, or null without a valid package.
+   * The package folder that scenery (`scenery/`) and vehicle body (`vehicles/`) files are served from, or null without a valid package.
    * They are pregenerated, content-named and published by folder swap, so they are served as is: no hash or change check.
    */
   public filesRoot(): string | null { return this.status.state === 'ready' ? this.root : null; }
-  public car(identity: string): CarResource | null {
-    const row = this.cars?.rows.get(normalizeVehicleId(identity));
+  public body(identity: string): BodyResource | null {
+    const row = this.bodies?.rows.get(normalizeVehicleId(identity));
     return row ? { ...structuredClone(row), packageRevision: this.status.revision } : null;
   }
   public track(key:string) {const row=this.tracks.get(key);return row?structuredClone(row):null;}
@@ -264,7 +264,7 @@ export function formatPluginStatusLog(status: DataPluginStatus): string {
       vehicleDetail,
       ...(status.logos ? [`logos: ${counts?.logos !== undefined ? counts.logos : 'yes'}`] : []),
       ...(status.scenery ? [`scenery: ${counts?.scenery !== undefined ? counts.scenery : 'yes'}`] : []),
-      ...(status.cars ? [`cars: ${counts?.cars !== undefined ? counts.cars : 'yes'}`] : []),
+      ...(status.bodies ? [`bodies: ${counts?.bodies !== undefined ? counts.bodies : 'yes'}`] : []),
       `revision: ${status.revision.slice(0, 8)}`,
     ].join(', ');
     return `[Data Plugin] Plugins loaded: yes (${details})`;

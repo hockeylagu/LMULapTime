@@ -2,7 +2,7 @@ import { Group, OrthographicCamera, PerspectiveCamera, Quaternion, Scene, Vector
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { SceneryLayoutResource } from '../../../../shared/types/scenes/scenery.js';
 import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
-import { CAR_FILES } from '../../../api/vehicles/carApi.js';
+import { VEHICLE_FILES } from '../../../api/vehicles/bodyApi.js';
 import { createTracksideCameras } from './tracksideCameras.js';
 import type { MapColorMode } from '../map/replayMapUtils.js';
 import { ghostDistanceAt, type GhostSyncMode } from '../map/ghostSync.js';
@@ -173,7 +173,7 @@ export async function createReplayScene(
   const firstStation = stationAt(trajectory.points, 0, 0, route);
   if (firstStation === undefined) { cleanup(); throw Error('This recording has no track stations. Use the 2D map.'); }
   let currentStation = firstStation, mode: CameraMode = 'follow', streamView: StreamView | null = null;
-  const loadLaps = createLapLayerLoader(origin, surfaceHeight, path => carTextures.loadAsync(`${CAR_FILES}${path}`), cameraProfile.toneCurve);
+  const loadLaps = createLapLayerLoader(origin, surfaceHeight, path => carTextures.loadAsync(`${VEHICLE_FILES}${path}`), cameraProfile.toneCurve);
   // The sky's environment map compiles and renders now, while the scenery files download.
   const scene = new Scene();
   const environment = addSceneEnvironment(scene, renderer, layout.daylight, trajectory.daylightClock), reflection = createCarReflection(renderer, scene);

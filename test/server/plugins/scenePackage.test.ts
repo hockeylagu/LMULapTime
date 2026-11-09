@@ -17,7 +17,7 @@ describe('schema 6 manifest', () => {
   it('loads scenery next to tracks, and the car bodies of the vehicle records', () => {
     const built = build(), plugin = new DataPlugin(built.dir);
     expect(plugin.status.state).toBe('ready');
-    expect(plugin.status).toMatchObject({ scenery: true, cars: true, counts: { tracks: 1, vehicles: 1, scenery: 1, cars: 1 } });
+    expect(plugin.status).toMatchObject({ scenery: true, bodies: true, counts: { tracks: 1, vehicles: 1, scenery: 1, bodies: 1 } });
     const layout = plugin.sceneryLayout('monza_gp')!;
     expect(layout.packageRevision).toBe(plugin.status.revision);
     expect(layout.sectors.map(sector => sector.id)).toEqual(['s0', 's1']);
@@ -25,25 +25,25 @@ describe('schema 6 manifest', () => {
     expect(layout.camera).toEqual(built.sceneryShared.camera);
     expect(layout).not.toHaveProperty('schemaVersion');
     expect(plugin.sceneryLayout('spa_wec')).toBeNull();
-    expect(plugin.car('test_car.veh')?.folder).toBe('Test_Car');
-    expect(plugin.car('TEST_CAR')?.packageRevision).toBe(plugin.status.revision);
-    expect(plugin.car('OTHER')).toBeNull();
+    expect(plugin.body('test_car.veh')?.folder).toBe('Test_Car');
+    expect(plugin.body('TEST_CAR')?.packageRevision).toBe(plugin.status.revision);
+    expect(plugin.body('OTHER')).toBeNull();
   });
 
-  it('accepts schema 6 without scenery; the cars come with the vehicles', () => {
+  it('accepts a package without scenery; the bodies come with the vehicles', () => {
     const built = build();
     delete built.manifest.scenery; built.commit();
     const plugin = new DataPlugin(built.dir);
     expect(plugin.status.state).toBe('ready');
-    expect(plugin.sceneryLayout('monza_gp')).toBeNull(); expect(plugin.car('TEST_CAR')).not.toBeNull();
+    expect(plugin.sceneryLayout('monza_gp')).toBeNull(); expect(plugin.body('TEST_CAR')).not.toBeNull();
   });
 
-  it('has no cars without vehicles', () => {
+  it('has no bodies without vehicles', () => {
     const built = build();
     delete built.manifest.vehicles; built.commit();
     const plugin = new DataPlugin(built.dir);
     expect(plugin.status.state).toBe('ready');
-    expect(plugin.status.cars).toBeUndefined(); expect(plugin.car('TEST_CAR')).toBeNull();
+    expect(plugin.status.bodies).toBeUndefined(); expect(plugin.body('TEST_CAR')).toBeNull();
   });
 
   it.each([1, 2, 3, 4, 5, '6', undefined])('rejects manifest schema %s: only schema 6 is supported', schemaVersion => {
@@ -146,7 +146,7 @@ describe('car validation', () => {
     ['an entry showing an option the body lacks', (built: Package) => { (built.descriptor.appearances as Array<{ optionNodes: string[] }>)[0].optionNodes = ['option_Spoiler']; }],
     ['an entry without its option list', (built: Package) => { delete (built.descriptor.appearances as Array<{ optionNodes?: string[] }>)[0].optionNodes; }],
     ['an undeclared texture', (built: Package) => { (built.descriptor.appearances as Array<{ materialTextures?: unknown }>)[0].materialTextures = { body: 'textures/' + '1'.repeat(64) + '.ktx2.zst' }; }],
-    ['a descriptor of another car', (built: Package) => { built.descriptor.vehicleFolder = 'Other'; }],
+    ['a descriptor of another vehicle', (built: Package) => { built.descriptor.vehicleFolder = 'Other'; }],
     ['a descriptor schema version', (built: Package) => { built.descriptor.schemaVersion = 1; }],
     ['an unknown descriptor field', (built: Package) => { built.descriptor.extra = true; }],
     ['cameras without the driver camera', (built: Package) => { built.descriptor.cameras = { list: (built.descriptor.cameras as { list: Array<{ name: string }> }).list.filter(camera => camera.name !== 'cockpit') }; }],
@@ -171,9 +171,9 @@ describe('car validation', () => {
     built.setVehicles([{ id: 'base', vehicleIds: ['TEST_CAR'] }, { id: 'evo', vehicleIds: ['TEST_CAR_EVO'] }]); built.commit();
     const plugin = new DataPlugin(built.dir);
     expect(plugin.status.state).toBe('ready');
-    expect(plugin.status.counts).toMatchObject({ vehicles: 2, cars: 1 });
-    expect(plugin.car('TEST_CAR_EVO')).toMatchObject({ folder: 'Test_Car', vehicleIds: ['TEST_CAR', 'TEST_CAR_EVO'] });
-    expect(plugin.car('test_car.veh')?.sha256).toBe(plugin.car('TEST_CAR_EVO')?.sha256);
+    expect(plugin.status.counts).toMatchObject({ vehicles: 2, bodies: 1 });
+    expect(plugin.body('TEST_CAR_EVO')).toMatchObject({ folder: 'Test_Car', vehicleIds: ['TEST_CAR', 'TEST_CAR_EVO'] });
+    expect(plugin.body('test_car.veh')?.sha256).toBe(plugin.body('TEST_CAR_EVO')?.sha256);
   });
 
   it('rejects a shared body whose two listings point at different files', () => {
@@ -189,7 +189,7 @@ describe('car validation', () => {
     built.car.folder = 'Test_Car.0a1b2c3d'; built.car.descriptor = 'vehicles/bodies/Test_Car.0a1b2c3d.json'; built.commit();
     const plugin = new DataPlugin(built.dir);
     expect(plugin.status.state).toBe('ready');
-    expect(plugin.car('TEST_CAR')?.folder).toBe('Test_Car.0a1b2c3d');
+    expect(plugin.body('TEST_CAR')?.folder).toBe('Test_Car.0a1b2c3d');
   });
 });
 
@@ -210,13 +210,13 @@ describe('scenery and car routes', () => {
     expect((await request(app).get('/api/data-plugin/scenery/files/' + '0'.repeat(64) + '.glb')).status).toBe(404);
     expect((await request(app).get('/api/data-plugin/scenery/files/..%2Fmanifest.json')).status).toBe(404);
 
-    const car = await request(app).get('/api/data-plugin/cars/test_car.veh');
+    const car = await request(app).get('/api/data-plugin/vehicles/test_car.veh/body');
     expect(car.status).toBe(200); expect(car.body).toMatchObject({ folder: 'Test_Car', vehicleIds: ['TEST_CAR'], sha256: built.car.sha256 });
-    expect((await request(app).get('/api/data-plugin/cars/unknown')).status).toBe(404);
-    expect((await request(app).get('/api/data-plugin/cars/files/bodies/Test_Car.json')).body).toHaveProperty('vehicleFolder', 'Test_Car');
-    expect((await request(app).get('/api/data-plugin/cars/files/Test_Car.json')).status).toBe(404);
-    expect((await request(app).get('/api/data-plugin/cars/files/' + path.basename(built.car.asset))).headers['content-type']).toContain('model/gltf-binary');
-    expect((await request(app).get('/api/data-plugin/cars/files/textures/' + path.basename(built.carTexture.asset))).status).toBe(200);
-    expect((await request(app).get('/api/data-plugin/cars/files/textures/' + '0'.repeat(64) + '.ktx2.zst')).status).toBe(404);
+    expect((await request(app).get('/api/data-plugin/vehicles/unknown/body')).status).toBe(404);
+    expect((await request(app).get('/api/data-plugin/vehicles/files/bodies/Test_Car.json')).body).toHaveProperty('vehicleFolder', 'Test_Car');
+    expect((await request(app).get('/api/data-plugin/vehicles/files/Test_Car.json')).status).toBe(404);
+    expect((await request(app).get('/api/data-plugin/vehicles/files/' + path.basename(built.car.asset))).headers['content-type']).toContain('model/gltf-binary');
+    expect((await request(app).get('/api/data-plugin/vehicles/files/textures/' + path.basename(built.carTexture.asset))).status).toBe(200);
+    expect((await request(app).get('/api/data-plugin/vehicles/files/textures/' + '0'.repeat(64) + '.ktx2.zst')).status).toBe(404);
   });
 });

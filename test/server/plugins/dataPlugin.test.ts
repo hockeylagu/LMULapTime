@@ -55,23 +55,23 @@ describe('local data plugin snapshot',()=>{
       vehicles: true,
       logos: true,
       scenery: true,
-      cars: true,
+      bodies: true,
       counts: {
         tracks: 32,
         vehicles: 80,
         logos: 25,
         scenery: 32,
-        cars: 12,
+        bodies: 12,
       },
-    })).toBe('[Data Plugin] Plugins loaded: yes (tracks: 32, vehicles: 80, logos: 25, scenery: 32, cars: 12, revision: 01234567)');
+    })).toBe('[Data Plugin] Plugins loaded: yes (tracks: 32, vehicles: 80, logos: 25, scenery: 32, bodies: 12, revision: 01234567)');
     const { dir } = fixture('both');
     const plugin = new DataPlugin(dir);
     expect(plugin.status.packageId).toBe('synthetic');
     expect(plugin.status.packageVersion).toBe('1');
-    expect(plugin.status.counts).toEqual({ tracks: 1, vehicles: 1, cars: 1 });
+    expect(plugin.status.counts).toEqual({ tracks: 1, vehicles: 1, bodies: 1 });
     expect(plugin.trackKeys()).toEqual(['monza_gp']);
     expect(formatPluginStatusLog(plugin.status)).toBe(
-      `[Data Plugin] Plugins loaded: yes (tracks: 1, vehicles: 1, cars: 1, revision: ${plugin.status.revision.slice(0, 8)})`
+      `[Data Plugin] Plugins loaded: yes (tracks: 1, vehicles: 1, bodies: 1, revision: ${plugin.status.revision.slice(0, 8)})`
     );
   });
   it.each(['vehicles','tracks','both'] as const)('loads %s capabilities independently',kind=>{const {dir}=fixture(kind);const p=new DataPlugin(dir);expect(p.status.state).toBe('ready');expect(p.status.vehicles).toBe(kind!=='tracks');expect(p.status.tracks).toBe(kind!=='vehicles');});

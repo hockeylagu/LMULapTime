@@ -1,7 +1,7 @@
 import { useContext, useEffect, useEffectEvent, useRef, useState, type RefObject } from 'react';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import { fetchSceneryLayout } from '../../../../api/sceneryApi.js';
-import { fetchCar, type LoadedCar } from '../../../../api/vehicles/carApi.js';
+import { fetchBody, type LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import { apiErrorMessage, isAbortError } from '../../../../api/apiClient.js';
 import { ReplayPlaybackCursorContext } from '../../inspector/replayPlaybackCursor.js';
 import { createReplayScene, type ReplaySceneHandle } from '../replayScene.js';
@@ -39,7 +39,7 @@ export function useReplayScene({host, trajectory, baseline, currentIndex, mode, 
   const cursor = useContext(ReplayPlaybackCursorContext);
   const key = `${trajectory.layoutKey ?? ''}:${trajectory.geometryRevision ?? ''}:${trajectory.dataPluginRevision ?? ''}:${retry}`;
   const [result, setResult] = useState<SceneResult | null>(null);
-  const runtime = useRef<{key: string; ready: Promise<Runtime>; loadCar: (lap: ReplayTrajectoryData | null) => Promise<LoadedCar | null>} | null>(null);
+  const runtime = useRef<{key: string; ready: Promise<Runtime>; loadCar: (lap: ReplayTrajectoryData | null) => Promise<LoadedBody | null>} | null>(null);
   const latest = useEffectEvent(() => ({trajectory, baseline, mode, colorBy, fadedLine, syncMode, anchorDistM}));
   const tickCursor = useEffectEvent((frameTime: number) => { cursor?.tick(frameTime); });
   const drawCursor = useEffectEvent(() => {
@@ -51,14 +51,14 @@ export function useReplayScene({host, trajectory, baseline, currentIndex, mode, 
     if (!container) return;
     const abort = new AbortController();
     let active = true, created: ReplaySceneHandle | null = null;
-    const requests = new Map<string, Promise<LoadedCar>>();
-    const loadCar = async (lap: ReplayTrajectoryData | null): Promise<LoadedCar | null> => {
+    const requests = new Map<string, Promise<LoadedBody>>();
+    const loadCar = async (lap: ReplayTrajectoryData | null): Promise<LoadedBody | null> => {
       if (!lap) return null;
       const vehicleId = lap.vehicleIdentity?.vehicleId;
       if (!vehicleId) throw Error('This recording does not name its vehicle, so its car cannot be shown in 3D. Use the 2D map.');
       const requestKey = `${vehicleId}:${lap.dataPluginRevision ?? ''}`;
       let pending = requests.get(requestKey);
-      if (!pending) pending = fetchCar(vehicleId, lap.dataPluginRevision, abort.signal);
+      if (!pending) pending = fetchBody(vehicleId, lap.dataPluginRevision, abort.signal);
       requests.delete(requestKey); requests.set(requestKey, pending);
       const oldest = requests.keys().next().value;
       if (requests.size > 4 && oldest !== undefined) requests.delete(oldest);
@@ -108,7 +108,7 @@ export function useReplayScene({host, trajectory, baseline, currentIndex, mode, 
         current.handle.fadeLines(settings.fadedLine === 'primary' ? 0.12 : 1, settings.fadedLine === 'baseline' ? 0.12 : 1);
         current.handle.syncGhost(settings.syncMode, settings.anchorDistM);
         drawCursor();
-        const label = (car: LoadedCar) => `Textured car ${car.vehicleId}`;
+        const label = (car: LoadedBody) => `Textured car ${car.vehicleId}`;
         setResult({key, ready: true, cars: `${label(primary!)}${comparison ? ` · Ghost: ${label(comparison)}` : ''}`, wheelMotion: current.handle.wheelMotion});
       } catch (error) {
         if (!abort.signal.aborted && !isAbortError(error)) setResult({key, error: apiErrorMessage(error, 'Unable to load 3D scene')});

@@ -47,7 +47,7 @@ export interface DataPluginCounts {
   vehicles?: number;
   logos?: number;
   scenery?: number;
-  cars?: number;
+  bodies?: number;
 }
 
 export interface DataPluginStatus {
@@ -57,7 +57,7 @@ export interface DataPluginStatus {
   vehicles: boolean;
   logos?: boolean;
   scenery?: boolean;
-  cars?: boolean;
+  bodies?: boolean;
   packageId?: string;
   packageVersion?: string;
   counts?: DataPluginCounts;

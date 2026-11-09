@@ -74,7 +74,7 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
   add('track-geometry', '/api/data-plugin/tracks/:layoutKey', geometry ? `/api/data-plugin/tracks/${geometry.layout}` : undefined, 'No metric geometry for the fixed cohort.');
   const scenery = cohort.boards.map(board => dataPlugin.sceneryLayout(board.layout)).find(value => value !== null);
   add('track-scenery', '/api/data-plugin/scenery/:layoutKey', scenery ? `/api/data-plugin/scenery/${scenery.layoutKey}` : undefined, 'No 3D scenery for the fixed cohort; synthetic scenery routes are tested.');
-  add('car', '/api/data-plugin/cars/:identity', undefined, 'Optional private textured car capability; exact identity is covered by synthetic route tests.');
+  add('vehicle-body', '/api/data-plugin/vehicles/:identity/body', undefined, 'Optional private 3D body capability; exact identity is covered by synthetic route tests.');
   for (const [index, board] of cohort.boards.entries()) {
     const query = new URLSearchParams(board).toString();
     const track = encodeURIComponent(board.layout);

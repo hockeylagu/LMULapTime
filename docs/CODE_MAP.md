@@ -299,10 +299,10 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
 
 ### Local Data Packages (`server/plugins/`)
 - `dataPlugin.ts` loads external track geometry, physical profiles, and manufacturer assets from backend-only `LMU_PLUGIN_ROOT`.
-- Manifest schema 3 is the only supported package format ([contract](PLUGINS.md#3d-scenery-and-textured-cars-package-manifest-schema-3)); `strict.ts` holds the exact-key readers
+- Manifest schema 3 is the only supported package format ([contract](PLUGINS.md#3d-scenery-and-vehicle-bodies-package-manifest-schema-5)); `strict.ts` holds the exact-key readers
   every package parser uses and `packageFiles.ts` the contained, size-checked, hash-on-read file registry. `scenePackage.ts` validates the
-  scenery layout index and `carPackage.ts` the car catalog and descriptors; `dataPlugin.ts` accepts `brakeBoardArtwork` as an orphaned v1 key
-  and never reads it. `dataPluginRoutes.ts` serves `/scenery/:layoutKey`, `/scenery/files/...`, `/cars/:identity` and `/cars/files/...`.
+  scenery layout index and `bodyPackage.ts` the vehicle bodies and their descriptors; `dataPlugin.ts` accepts `brakeBoardArtwork` as an orphaned v1 key
+  and never reads it. `dataPluginRoutes.ts` serves `/scenery/:layoutKey`, `/scenery/files/...`, `/vehicles/:identity/body` and `/vehicles/files/...`.
   `src/components/replay/view3d/` owns the lazy Three.js viewer, cameras and
   discontinuity-safe XYZ/quaternion attitude sampling in `replayPose.ts`, preserving recorded body
   height and available pitch/roll. `sceneFrame.ts` owns native-to-render handedness.
@@ -329,7 +329,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   yaw with rotational/vertical damping for Chase mode while preserving user camera/focus offsets
   during Follow/Chase updates; manual camera movement does not change the selected mode.
   `racingLine.ts` drapes depth-tested racing lines on the nearby native road layer; measured
-  coordinates and analytics stay native. `ReplayMapContainer` switches 2D/3D, and `src/api/sceneryApi.ts` and `src/api/vehicles/carApi.ts`
+  coordinates and analytics stay native. `ReplayMapContainer` switches 2D/3D, and `src/api/sceneryApi.ts` and `src/api/vehicles/bodyApi.ts`
   load layouts, chunks and cars through the API client. The existing replay cursor owns time in both views.
 - `trackPackage.ts` validates geometry revisions and route lengths within 0.01m. Routes in `dataPluginRoutes.ts` serve geometry and vehicle logos (`/api/data-plugin/vehicles/logos`).
 - Geometry validation: `hasCompatibleTrackStations` (`shared/domain/trackGeometry.ts`) requires matching geometry revisions before computing geometry-dependent corner analysis; missing geometry leaves recorded-channel analysis available.

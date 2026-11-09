@@ -6,7 +6,7 @@ import { disposeObjects } from '../../../../../src/components/replay/view3d/laps
 import { EXPOSURE_PASS } from '../../../../../src/components/replay/view3d/autoExposure.js';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import type { SceneryChunk, SceneryLayoutResource, ScenerySectorChunk } from '../../../../../shared/types/scenes/scenery.js';
-import type { LoadedCar } from '../../../../../src/api/vehicles/carApi.js';
+import type { LoadedBody } from '../../../../../src/api/vehicles/bodyApi.js';
 import { testCarPaint } from '../../../../helpers/scenes/syntheticPackage.js';
 
 const gpu = vi.hoisted(() => ({render: vi.fn<(scene: Scene, camera: PerspectiveCamera | OrthographicCamera) => void>(), dispose: vi.fn(), constructed: vi.fn(), setSize: vi.fn(), upload: vi.fn<() => Promise<void>>()}));
@@ -109,7 +109,7 @@ const car = {
       {name: 'hood', position: [0.28, 0.9, -1.9], orientation: [0, 0, 0], fov: [80, 45], clipPlanes: [0.2, 800], cockpitView: 'out'},
       {name: 'roof', position: [0.28, 1.5, -0.6], orientation: [-0.1, 0, 0], fov: [60, 45], clipPlanes: [0.02, 550], cockpitView: 'out'},
     ]}},
-} as unknown as LoadedCar;
+} as unknown as LoadedBody;
 const assets = {primary: car, baseline: null}, withGhost = {primary: car, baseline: car};
 let frames: FrameRequestCallback[];
 let resizeCallbacks: Array<() => void>;

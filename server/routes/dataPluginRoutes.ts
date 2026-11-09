@@ -19,7 +19,7 @@ export function createDataPluginRouter(provider:DataPlugin=dataPlugin):Router {
     if (!layout) { res.status(404).json({error: '3D scenery unavailable for this layout'}); return; }
     res.json(layout);
   });
-  // Scenery and car files are served as is from the package folder (see `DataPlugin.filesRoot`), uncached like every response here.
+  // Scenery and vehicle body files are served as is from the package folder (see `DataPlugin.filesRoot`), uncached like every response here.
   // A texture is a KTX2 compressed as one zstd file: the browser undoes the encoding while downloading, off the main thread.
   const root = provider.filesRoot();
   const setHeaders = (res: Response, file: string) => {
@@ -30,11 +30,11 @@ export function createDataPluginRouter(provider:DataPlugin=dataPlugin):Router {
     router.use(route, (_req, res) => { res.status(404).json({error: `${label} unavailable`}); });
   };
   files('/scenery/files', 'scenery', '3D scenery file');
-  files('/cars/files', 'vehicles', '3D car file');
-  router.get('/cars/:identity', (req, res) => {
-    const car = provider.car(req.params.identity);
-    if (!car) { res.status(404).json({error: 'Textured car unavailable for this vehicle'}); return; }
-    res.json(car);
+  files('/vehicles/files', 'vehicles', '3D vehicle file');
+  router.get('/vehicles/:identity/body', (req, res) => {
+    const body = provider.body(req.params.identity);
+    if (!body) { res.status(404).json({error: '3D body unavailable for this vehicle'}); return; }
+    res.json(body);
   });
   return router;
 }

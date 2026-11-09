@@ -1,0 +1,30 @@
+import type { BodyDescriptor, BodyResource } from '../../../shared/types/scenes/car.js';
+import { fetchBinary, fetchJson } from '../apiClient.js';
+
+/** Content-named body files of the package's `vehicles/` folder: the GLB at `<sha256>.glb`, the descriptor at `bodies/<folder>.json`, textures at `textures/<sha256>.ktx2.zst`. */
+export const VEHICLE_FILES = '/api/data-plugin/vehicles/files/';
+
+export interface LoadedBody {
+  resource: BodyResource;
+  bytes: ArrayBuffer;
+  descriptor: BodyDescriptor;
+  /** The lap's installed VEH id, selecting the appearance (livery) of the shared model. */
+  vehicleId: string;
+}
+
+/** The 3D body serving a VEH id. A vehicle without one is an error: the package covers every catalogued vehicle. */
+export async function fetchBody(vehicleId: string, packageRevision: string | undefined, signal: AbortSignal): Promise<LoadedBody> {
+  const resource = await fetchJson<BodyResource>(`/api/data-plugin/vehicles/${encodeURIComponent(vehicleId)}/body`, { signal });
+  if (packageRevision && resource.packageRevision !== packageRevision) throw Error('Body package revision differs from the selected lap');
+  const [bytes, descriptor] = await Promise.all([
+    fetchBinary(`${VEHICLE_FILES}${resource.sha256}.glb`, { signal, cache: 'default' }),
+    fetchJson<BodyDescriptor>(`${VEHICLE_FILES}bodies/${resource.folder}.json`, { signal }),
+  ]);
+  if (bytes.byteLength !== resource.byteLength) throw Error('Incomplete 3D body');
+  return { resource, bytes, descriptor, vehicleId };
+}
+
+/** The key a VEH id is matched by: without a `.veh` suffix, upper-case (as the package catalogs it). */
+export function normalizeVehicleId(id: string): string {
+  return id.trim().replace(/\.veh$/i, '').toUpperCase();
+}

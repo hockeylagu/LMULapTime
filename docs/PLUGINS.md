@@ -135,7 +135,7 @@ as approximate placement. It does not recenter the outline or invent a provider 
 Exact aliases win; ambiguous model matches remain unresolved. Primary and comparison
 vehicles resolve independently. Body direction continues to use replay yaw.
 
-## 3D scenery and textured cars (package manifest schema 5)
+## 3D scenery and vehicle bodies (package manifest schema 5)
 
 The manifest `schemaVersion` is `5`. This app loads schema 5 only: earlier packages are rejected at startup with an invalid
 status, and there is no fallback. The pipeline repository's `docs/SCENE_PACKAGE.md` and `docs/VEHICLE_PIPELINE.md` own the file formats;
@@ -152,7 +152,9 @@ this section records what the app reads and checks.
 }
 ```
 
-`scenery` is optional; any other manifest key is rejected. Textured cars come with the vehicle catalog (below).
+`scenery` is optional; any other manifest key is rejected. The 3D vehicle bodies come with the vehicle catalog (below).
+In the package, the API and the code, a *vehicle* is a catalog record (model, class, VEH ids, handling) and a *body* is the
+3D model a record lists; a record can be resolved without one.
 
 ### Scenery (`scenery/index.json`)
 
@@ -169,7 +171,7 @@ are pregenerated, content-named and published by folder swap, so they are never 
 with no hash or change check. A hash check can come back if a real failure ever needs one.
 
 `GET /api/data-plugin/scenery/:layoutKey` returns the layout row plus `packageRevision`. `/api/data-plugin/scenery/files/` serves the
-package's `scenery/` folder and `/api/data-plugin/cars/files/` its `vehicles/` folder as static files with `Cache-Control: no-store`
+package's `scenery/` folder and `/api/data-plugin/vehicles/files/` its `vehicles/` folder as static files with `Cache-Control: no-store`
 (a local server: a browser cache would only duplicate the package on disk); a missing file is a 404. A `.ktx2.zst` texture goes out
 as `Content-Type: image/ktx2` with `Content-Encoding: zstd`, so the browser decompresses it while downloading, off the main thread.
 
@@ -185,9 +187,9 @@ Camera clearance uses `three-mesh-bvh` raycasts over position-only copies of res
 BVHs are generated in a worker and released when a chunk unloads; they are not exported package assets.
 The renderer's geometry buffers stay available while the worker builds the collision data.
 
-### Cars (`bodies` of the vehicle records)
+### Bodies (`bodies` of the vehicle records)
 
-Each vehicle record lists its car `bodies`: `folder`, `vehicleIds` (the part of the record's VEH ids this body serves), `descriptor`
+Each vehicle record lists its `bodies`: `folder`, `vehicleIds` (the part of the record's VEH ids this body serves), `descriptor`
 (`vehicles/bodies/<folder>.json`) with `descriptorSha256`, `asset` (`vehicles/<sha256>.glb`), `byteLength`, `triangles`, `vertices`
 and `textures` (`vehicles/textures/<sha256>.ktx2.zst`). Two bodies may not serve one id. The descriptor is read and validated at
 startup: its aliases equal the body's ids, `wheelRig` passed with four rigs and rest-vertex error below 1e-5, there is one appearance
@@ -197,18 +199,18 @@ Since schema 5 a body carries its entries' part alternatives (number plates, lig
 body panels and tyre versions). The descriptor's `optionNodes` lists them, sorted and unique, each a mesh-only GLB node named
 `option_<mesh file stem>` (letters, digits and `_`, so three.js keeps the name; GLB node names are unique); every appearance has its own
 sorted `optionNodes`, a subset of the body's (`[]` for none). The viewer keeps the lap entry's options, leaves the body's other
-options out of that car (no draw, no texture load) and fails if the GLB lacks a listed node. An option node may also carry
+options out of that body (no draw, no texture load) and fails if the GLB lacks a listed node. An option node may also carry
 `extras.cockpitView`; the cockpit view rule then applies to it as to any other node.
 
-`GET /api/data-plugin/cars/:identity` (a VEH id with or without `.veh`) returns the row plus `packageRevision`;
-`/cars/files/` serves the car GLB, descriptor and textures. The viewer selects the
+`GET /api/data-plugin/vehicles/:identity/body` (a VEH id with or without `.veh`) returns the body row plus `packageRevision`;
+`/vehicles/files/` serves the body GLB, descriptor and textures. The viewer selects the
 lap's appearance by `vehicleIdentity.vehicleId`, creates one material per native material from the descriptor and animates the four
 wheel rigs (`wheel_`, `steer_` and `spin_` nodes at the rolling hub) and the `steering_wheel` node about its `extras.steeringWheelPivot` and
 `extras.steeringWheelAxis`, by the recorded steering times the wheel range. The Cockpit, Hood and Roof views sit on the descriptor's
-`cockpit`, `hood` and `roof` cameras (position, pitch, vertical FOV, near clip) and show the cockpit mesh variant the camera names. A lap without a vehicle id, or a vehicle without a car, is an
-error shown with the 2D map as the alternative; there is no estimated car.
+`cockpit`, `hood` and `roof` cameras (position, pitch, vertical FOV, near clip) and show the cockpit mesh variant the camera names. A lap without a vehicle id, or a vehicle without a body, is an
+error shown with the 2D map as the alternative; there is no estimated body.
 
-Textures are KTX2 with raw GPU block data (no Basis transcoder). Scenery and cars are Meshopt-compressed GLBs decoded by three.js.
+Textures are KTX2 with raw GPU block data (no Basis transcoder). Scenery and vehicle bodies are Meshopt-compressed GLBs decoded by three.js.
 The viewer's materials are approximate: carPaint region shading and normal or ambient-occlusion maps are not reconstructed.
 
 ## Behavior without detailed data

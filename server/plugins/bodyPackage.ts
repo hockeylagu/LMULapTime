@@ -1,9 +1,9 @@
-import type { CarBody } from '../../shared/types/scenes/car.js';
+import type { VehicleBody } from '../../shared/types/scenes/car.js';
 import { readPackageFile, registerPackageFile, type PackageFile } from './packageFiles.js';
 import { array, count, exactKeys, finite, record, sha256, text, vec3 } from './strict.js';
 
-/** Validated textured car bodies of a package: by upper-case VEH id and by folder, and every file by package-relative path. */
-export interface CarStore { rows: Map<string, CarBody>; folders: Map<string, CarBody> }
+/** Validated 3D vehicle bodies of a package: by upper-case VEH id and by folder, and every file by package-relative path. */
+export interface BodyStore { rows: Map<string, VehicleBody>; folders: Map<string, VehicleBody> }
 
 const MAX_GLB_BYTES = 256_000_000, MAX_TEXTURE_BYTES = 64_000_000, MAX_DESCRIPTOR_BYTES = 8_000_000;
 const CORNERS = ['fl', 'fr', 'rl', 'rr'];
@@ -15,7 +15,7 @@ const OPTION_NODE = /^option_[A-Za-z0-9_]+$/;
 export const normalizeVehicleId = (id: string): string => id.trim().replace(/\.veh$/i, '').toUpperCase();
 
 /** One body as a vehicle record lists it: `vehicleIds` is the part of the record's ids this body serves. */
-function parseBody(value: unknown, what: string): CarBody {
+function parseBody(value: unknown, what: string): VehicleBody {
   const row = record(value, what);
   exactKeys(row, ['folder', 'vehicleIds', 'descriptor', 'descriptorSha256', 'asset', 'sha256', 'byteLength', 'triangles', 'vertices', 'textures'], what);
   const folder = text(row.folder, `${what}.folder`, 120);
@@ -32,15 +32,15 @@ function parseBody(value: unknown, what: string): CarBody {
     if (texture.asset !== `vehicles/textures/${sha256(texture.sha256, `${what}.textures[${i}].sha256`)}.ktx2.zst`) throw Error(`${what}.textures[${i}]: asset is not the content-named KTX2`);
     if (count(texture.byteLength, `${what}.textures[${i}].byteLength`) === 0) throw Error(`${what}.textures[${i}]: empty texture`);
   });
-  return { ...structuredClone(row), vehicleIds: ids } as unknown as CarBody;
+  return { ...structuredClone(row), vehicleIds: ids } as unknown as VehicleBody;
 }
 
 /** The descriptor fields the viewer reads, checked against the catalog row (docs/VEHICLE_PIPELINE.md: four wheel rigs, zero rest-vertex error). */
-export function validateCarDescriptor(bytes: Buffer, row: CarBody): void {
+export function validateBodyDescriptor(bytes: Buffer, row: VehicleBody): void {
   const what = `${row.folder} descriptor`, descriptor = record(JSON.parse(bytes.toString('utf8')) as unknown, what);
   exactKeys(descriptor, ['vehicleFolder', 'aliases', 'wheelPivots', 'optionNodes', 'wheelRig', 'appearances', 'materials', 'cameras'], what);
   // A further geometry of an installed folder is `<folder>.<hash>`; the descriptor names the installed folder.
-  if (typeof descriptor.vehicleFolder !== 'string' || (row.folder !== descriptor.vehicleFolder && !row.folder.startsWith(`${descriptor.vehicleFolder}.`))) throw Error(`${what}: describes another car`);
+  if (typeof descriptor.vehicleFolder !== 'string' || (row.folder !== descriptor.vehicleFolder && !row.folder.startsWith(`${descriptor.vehicleFolder}.`))) throw Error(`${what}: describes another vehicle`);
   const sorted = (ids: string[]) => JSON.stringify([...ids].sort());
   if (!Array.isArray(descriptor.aliases) || sorted(descriptor.aliases as string[]) !== sorted(row.vehicleIds)) throw Error(`${what}: aliases differ from the vehicle catalog`);
   const pivots = record(descriptor.wheelPivots, `${what}.wheelPivots`);
@@ -97,15 +97,15 @@ export function validateCarDescriptor(bytes: Buffer, row: CarBody): void {
 
 /**
  * Loads the bodies of the vehicle records (the raw `vehicles` rows of the catalog, already validated as records).
- * A body listed under several records (one car folder serving two models) loads once, with the union of its ids; every record id
+ * A body listed under several records (one vehicle folder serving two models) loads once, with the union of its ids; every record id
  * belongs to exactly one body of its record, and no id to two bodies.
  */
-export function loadCarPackage(root: string, vehicles: unknown[]): CarStore {
-  const rows = new Map<string, CarBody>(), folders = new Map<string, CarBody>(), files = new Map<string, PackageFile>();
+export function loadBodyPackage(root: string, vehicles: unknown[]): BodyStore {
+  const rows = new Map<string, VehicleBody>(), folders = new Map<string, VehicleBody>(), files = new Map<string, PackageFile>();
   const register = (asset: string, hash: string, byteLength: number | null, max: number) => {
     const known = files.get(asset);
     if (known) {
-      if (known.sha256 !== hash || (byteLength !== null && known.byteLength !== byteLength)) throw Error(`Conflicting car file ${asset}`);
+      if (known.sha256 !== hash || (byteLength !== null && known.byteLength !== byteLength)) throw Error(`Conflicting body file ${asset}`);
       return;
     }
     files.set(asset, registerPackageFile(root, asset, hash, byteLength, max));
@@ -114,26 +114,26 @@ export function loadCarPackage(root: string, vehicles: unknown[]): CarStore {
     const what = `vehicles[${i}]`, vehicle = record(value, what);
     const recordIds = array(vehicle.vehicleIds, `${what}.vehicleIds`, 5000).map(id => normalizeVehicleId(text(id, `${what}.vehicleIds`, 160)));
     const bodies = array(vehicle.bodies, `${what}.bodies`, 256).map((body, j) => parseBody(body, `${what}.bodies[${j}]`));
-    if (!bodies.length) throw Error(`${what}: no car bodies`);
+    if (!bodies.length) throw Error(`${what}: no bodies`);
     const listed = bodies.flatMap(body => body.vehicleIds);
     if (listed.length !== recordIds.length || new Set(listed).size !== listed.length || listed.some(id => !recordIds.includes(id))) throw Error(`${what}: bodies do not partition the vehicle ids`);
     for (const body of bodies) {
       const known = folders.get(body.folder);
       if (!known) { folders.set(body.folder, body); continue; }
-      const same = (a: CarBody, b: CarBody) => JSON.stringify({ ...a, vehicleIds: 0 }) === JSON.stringify({ ...b, vehicleIds: 0 });
+      const same = (a: VehicleBody, b: VehicleBody) => JSON.stringify({ ...a, vehicleIds: 0 }) === JSON.stringify({ ...b, vehicleIds: 0 });
       if (!same(known, body)) throw Error(`${body.folder}: listed with different files`);
       known.vehicleIds.push(...body.vehicleIds);
     }
   });
   for (const body of folders.values()) {
     for (const id of body.vehicleIds) {
-      if (rows.has(id)) throw Error(`${id}: vehicle id served by two car bodies`);
+      if (rows.has(id)) throw Error(`${id}: vehicle id served by two bodies`);
       rows.set(id, body);
     }
     register(body.asset, body.sha256, body.byteLength, MAX_GLB_BYTES);
     for (const texture of body.textures) register(texture.asset, texture.sha256, texture.byteLength, MAX_TEXTURE_BYTES);
     register(body.descriptor, body.descriptorSha256, null, MAX_DESCRIPTOR_BYTES);
-    validateCarDescriptor(readPackageFile(root, files.get(body.descriptor)!), body);
+    validateBodyDescriptor(readPackageFile(root, files.get(body.descriptor)!), body);
   }
   return { rows, folders };
 }

@@ -1,11 +1,11 @@
-/** Textured car of package schema 4: a GLB with four wheel rigs, a descriptor JSON and KTX2 textures. */
+/** 3D vehicle bodies of the package: a GLB with four wheel rigs, a descriptor JSON and KTX2 textures each. */
 import type { Vec3 } from './scenery.js';
 
-export interface CarTextureRef { asset: string; sha256: string; byteLength: number }
+export interface BodyTextureRef { asset: string; sha256: string; byteLength: number }
 
-/** A textured car body: the union of the VEH ids it serves across the vehicle records that list it. */
-export interface CarBody {
-  /** The installed car folder, or `<folder>.<hash>` for a further geometry of that folder. */
+/** A 3D vehicle body: the union of the VEH ids it serves across the vehicle records that list it. */
+export interface VehicleBody {
+  /** The installed vehicle folder, or `<folder>.<hash>` for a further geometry of that folder. */
   folder: string;
   /** Upper-case VEH ids this body serves. */
   vehicleIds: string[];
@@ -18,10 +18,10 @@ export interface CarBody {
   byteLength: number;
   triangles: number;
   vertices: number;
-  textures: CarTextureRef[];
+  textures: BodyTextureRef[];
 }
 
-export interface CarResource extends CarBody { packageRevision: string }
+export interface BodyResource extends VehicleBody { packageRevision: string }
 
 export type CarCorner = 'fl' | 'fr' | 'rl' | 'rr';
 
@@ -86,7 +86,7 @@ export interface CarCamera {
   cockpitView: 'in' | 'out';
 }
 
-export interface CarDescriptor {
+export interface BodyDescriptor {
   vehicleFolder: string;
   aliases: string[];
   wheelPivots: Record<CarCorner, Vec3>;
