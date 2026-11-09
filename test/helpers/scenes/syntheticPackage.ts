@@ -89,6 +89,7 @@ export function syntheticPackage() {
     wheelPivots: { fl: [0.8, 0.33, -1.4], fr: [-0.8, 0.33, -1.4], rl: [0.8, 0.33, 1.4], rr: [-0.8, 0.33, 1.4] },
     optionNodes: ['option_NumplateA', 'option_NumplateB'],
     wheelRig: { passed: true, rigs: 4, maxRestVertexErrorM: 0 },
+    lamps: [], glowMaterialIds: [],
     appearances: [{ alias: 'TEST_CAR', albedo: texturePath, paint: testCarPaint(texturePath), optionNodes: ['option_NumplateA'] }],
     materials: [{ id: 'm1', name: 'body', paint: true }],
     cameras: { list: [

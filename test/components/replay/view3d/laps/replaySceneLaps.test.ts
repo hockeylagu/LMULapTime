@@ -64,6 +64,8 @@ vi.mock('three/addons/loaders/GLTFLoader.js', async () => {
         const material = new MeshBasicMaterial(), plate = new Mesh(new BoxGeometry(), material);
         material.userData.nativeMaterialId = 'm1'; plate.name = name; root.add(plate);
       }
+      const glowMaterial = new MeshBasicMaterial(), glow = new Mesh(new BoxGeometry(), glowMaterial);
+      glowMaterial.userData.nativeMaterialId = 'glow'; glow.name = 'lampGlow'; root.add(glow);
       return {scene: root};
     }
   }};
@@ -108,7 +110,7 @@ const layout = {
 } as unknown as SceneryLayoutResource;
 const car = {
   resource: {}, bytes: new ArrayBuffer(0), vehicleId: 'veh',
-  descriptor: {optionNodes: ['option_PlateA', 'option_PlateB'], appearances: [{alias: 'VEH', albedo: 'textures/a.ktx2', paint: testCarPaint('textures/a.ktx2'), optionNodes: ['option_PlateA']}], materials: [{id: 'm1', name: 'body', paint: true}],
+  descriptor: {optionNodes: ['option_PlateA', 'option_PlateB'], appearances: [{alias: 'VEH', albedo: 'textures/a.ktx2', paint: testCarPaint('textures/a.ktx2'), optionNodes: ['option_PlateA']}], materials: [{id: 'm1', name: 'body', paint: true}, {id: 'glow', name: 'glow', paint: true}], glowMaterialIds: ['glow'],
     cameras: {list: [
       {name: 'cockpit', position: [0.28, 1, -0.7], orientation: [-0.1, 0, 0], fov: [89, 49], clipPlanes: [0.13, 700], cockpitView: 'in'},
       {name: 'hood', position: [0.28, 0.9, -1.9], orientation: [0, 0, 0], fov: [80, 45], clipPlanes: [0.2, 800], cockpitView: 'out'},
@@ -221,6 +223,8 @@ it('retains scenery, canvas and camera settings, releases old laps, and draws th
   expect(oldBody.material.shadowSide).toBe(DoubleSide);
   // The entry's own option parts only: the other entries' alternatives are left out of its car.
   expect([oldCar.getObjectByName('option_PlateA'), oldCar.getObjectByName('option_PlateB')].map(Boolean)).toEqual([true, false]);
+  // Lamps are unlit: their glow-only meshes are left out.
+  expect(oldCar.getObjectByName('lampGlow')).toBeUndefined();
   const roadDispose = vi.spyOn(road.geometry, 'dispose'), carDispose = vi.spyOn(oldBody.geometry, 'dispose'), materialDispose = vi.spyOn(oldBody.material, 'dispose');
   handle.colorLines('speed'); handle.fadeLines(0.12, 1);
   const next = {...lap, points: lap.points.map(point => ({...point, x: point.x + 5}))};

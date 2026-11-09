@@ -219,6 +219,11 @@ sorted `optionNodes`, a subset of the body's (`[]` for none). The viewer keeps t
 options out of that body (no draw, no texture load) and fails if the GLB lacks a listed node. An option node may also carry
 `extras.cockpitView`; the cockpit view rule then applies to it as to any other node.
 
+Schema 7 adds the car lamps: the descriptor's required `lamps` list (roles, nodes, frames, animation, emission, blend; `states` and
+`defaultLit` null) and `glowMaterialIds`, the sorted native material ids drawn only while a lamp is lit (glow meshes and brake disc
+glow), each one the body's `materials` list. Lamps are drawn unlit for now: the viewer leaves out every mesh whose materials are all
+glow-only (no draw, no texture load) and draws the other lamp materials as it did before.
+
 `GET /api/data-plugin/vehicles/:identity/body` (a VEH id with or without `.veh`) returns the body row plus `packageRevision`;
 `/vehicles/files/` serves the body GLB, descriptor and textures. The viewer selects the
 lap's appearance by `vehicleIdentity.vehicleId`, creates one material per native material from the descriptor and animates the four

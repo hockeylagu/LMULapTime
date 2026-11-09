@@ -60,15 +60,22 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
       if (!recipe) throw Error(`Car material ${material.name} has no descriptor recipe`);
       return recipe;
     };
+    // Glow-only materials (lamp glow meshes, brake disc glow) are not drawn while lamps are unlit.
+    const glow = new Set(car.descriptor.glowMaterialIds);
+    const isGlow = (object: Object3D) => {
+      if (!(object instanceof Mesh)) return false;
+      const list: Material[] = Array.isArray(object.material) ? object.material as Material[] : [object.material as Material];
+      return list.every(material => glow.has(recipeOf(material).id));
+    };
     const paths = new Set<string>();
     template.traverse(object => {
-      if (!(object instanceof Mesh) || isHidden(object)) return;
+      if (!(object instanceof Mesh) || isHidden(object) || isGlow(object)) return;
       for (const material of Array.isArray(object.material) ? object.material as Material[] : [object.material as Material]) {
         for (const path of materialTexturePaths(recipeOf(material), appearance)) paths.add(path);
       }
     });
     const textures = new Map(await Promise.all([...paths].map(async path => [path, await loadTexture(path)] as const)));
-    return {template, appearance, recipeOf, textures, hiddenNames: new Set([...hidden].map(node => node.name))};
+    return {template, appearance, recipeOf, isGlow, textures, hiddenNames: new Set([...hidden].map(node => node.name))};
   };
   /** A livery's parsed model and loaded textures, shared by every instance of that car (and by `preload`). */
   const parts = new WeakMap<LoadedBody, ReturnType<typeof loadParts>>();
@@ -83,9 +90,11 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
   };
   /** A car instance of the lap's livery: the shared geometry with one material per native material, textures preloaded. */
   const loadModel = async (car: LoadedBody): Promise<Group> => {
-    const {template, appearance, recipeOf, textures, hiddenNames} = await partsOf(car);
-    const model = template.clone(true), materials = new Map<string, Material>();
+    const {template, appearance, recipeOf, isGlow, textures, hiddenNames} = await partsOf(car);
+    const model = template.clone(true), materials = new Map<string, Material>(), glowMeshes: Object3D[] = [];
     for (const name of hiddenNames) model.getObjectByName(name)?.removeFromParent();
+    model.traverse(object => { if (isGlow(object)) glowMeshes.push(object); });
+    for (const mesh of glowMeshes) mesh.removeFromParent();
     model.traverse(object => {
       if (!(object instanceof Mesh)) return;
       const replace = (material: Material) => {

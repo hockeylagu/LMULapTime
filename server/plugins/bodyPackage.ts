@@ -38,7 +38,7 @@ function parseBody(value: unknown, what: string): VehicleBody {
 /** The descriptor fields the viewer reads, checked against the catalog row (docs/VEHICLE_PIPELINE.md: four wheel rigs, zero rest-vertex error). */
 export function validateBodyDescriptor(bytes: Buffer, row: VehicleBody): void {
   const what = `${row.folder} descriptor`, descriptor = record(JSON.parse(bytes.toString('utf8')) as unknown, what);
-  exactKeys(descriptor, ['vehicleFolder', 'aliases', 'wheelPivots', 'optionNodes', 'wheelRig', 'appearances', 'materials', 'cameras'], what);
+  exactKeys(descriptor, ['vehicleFolder', 'aliases', 'wheelPivots', 'optionNodes', 'wheelRig', 'lamps', 'glowMaterialIds', 'appearances', 'materials', 'cameras'], what);
   // A further geometry of an installed folder is `<folder>.<hash>`; the descriptor names the installed folder.
   if (typeof descriptor.vehicleFolder !== 'string' || (row.folder !== descriptor.vehicleFolder && !row.folder.startsWith(`${descriptor.vehicleFolder}.`))) throw Error(`${what}: describes another vehicle`);
   const sorted = (ids: string[]) => JSON.stringify([...ids].sort());
@@ -71,15 +71,21 @@ export function validateBodyDescriptor(bytes: Buffer, row: VehicleBody): void {
     return alias;
   });
   if (sorted(aliases) !== sorted(row.vehicleIds)) throw Error(`${what}: appearances do not cover exactly the body's vehicle ids`);
+  // Lamps are drawn unlit until the package says which frame each state shows; only the glow-only materials are read (to hide them).
+  array(descriptor.lamps, `${what}.lamps`, 4096).forEach((value, i) => record(value, `${what}.lamps[${i}]`));
+  const glow = array(descriptor.glowMaterialIds, `${what}.glowMaterialIds`, 4096).map((id, i) => text(id, `${what}.glowMaterialIds[${i}]`, 200));
+  if (glow.some((id, i) => i > 0 && glow[i - 1] >= id)) throw Error(`${what}.glowMaterialIds: expected sorted, unique ids`);
+  const materialIds = new Set<string>();
   array(descriptor.materials, `${what}.materials`, 4096).forEach((value, i) => {
     const material = record(value, `${what}.materials[${i}]`);
-    text(material.id, `${what}.materials[${i}].id`, 200); text(material.name, `${what}.materials[${i}].name`, 200);
+    materialIds.add(text(material.id, `${what}.materials[${i}].id`, 200)); text(material.name, `${what}.materials[${i}].name`, 200);
     if (typeof material.paint !== 'boolean') throw Error(`${what}.materials[${i}].paint: expected a boolean`);
     if (!material.paint) {
       const surface = record(material.surface, `${what}.materials[${i}].surface`);
       text(surface.kind, `${what}.materials[${i}].surface.kind`); record(surface.maps, `${what}.materials[${i}].surface.maps`);
     }
   });
+  if (glow.some(id => !materialIds.has(id))) throw Error(`${what}.glowMaterialIds: names a material the body does not list`);
   const cameras = new Set(array(record(descriptor.cameras, `${what}.cameras`).list, `${what}.cameras.list`, 64).map((value, i) => {
     const camera = record(value, `${what}.cameras.list[${i}]`), at = `${what}.cameras.list[${i}]`;
     vec3(camera.position, `${at}.position`, 10); vec3(camera.orientation, `${at}.orientation`, 10);

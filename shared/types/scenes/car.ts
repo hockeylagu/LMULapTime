@@ -99,6 +99,8 @@ export interface BodyDescriptor {
   /** GLB nodes that are alternatives between entries (number plates, lights, body panels): `option_<mesh stem>`, mesh-only. */
   optionNodes: string[];
   wheelRig: { passed: true; rigs: 4; maxRestVertexErrorM: number };
+  /** Native material ids drawn only while a lamp is lit (glow meshes, brake disc glow): hidden while lamps are unlit. */
+  glowMaterialIds: string[];
   appearances: CarAppearance[];
   materials: CarMaterialRecipe[];
   /** The car's cockpit, hood and roof cameras. */
