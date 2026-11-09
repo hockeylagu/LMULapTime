@@ -8,6 +8,7 @@ import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js
 import type { SceneryChunk, SceneryLayoutResource, ScenerySectorChunk } from '../../../../../shared/types/scenes/scenery.js';
 import type { LoadedBody } from '../../../../../src/api/vehicles/bodyApi.js';
 import { testCarPaint } from '../../../../helpers/scenes/syntheticPackage.js';
+import { TEST_HAZE_WEIGHTS, testCamera, testSky } from '../../../../helpers/scenes/sceneryProfiles.js';
 
 const gpu = vi.hoisted(() => ({render: vi.fn<(scene: Scene, camera: PerspectiveCamera | OrthographicCamera) => void>(), dispose: vi.fn(), constructed: vi.fn(), setSize: vi.fn(), upload: vi.fn<() => Promise<void>>()}));
 const chunks = vi.hoisted(() => ({roots: new Map<string, Object3D>(), loads: [] as string[], obstacleName: ''}));
@@ -36,6 +37,9 @@ vi.mock('three', async importOriginal => {
     initTexture() {}
     forceContextLoss() {}
     getRenderTarget() { return null; }
+    getActiveCubeFace() { return 0; }
+    getActiveMipmapLevel() { return 0; }
+    xr = {enabled: false};
     setRenderTarget() {}
     getDrawingBufferSize(size: {set(x: number, y: number): unknown}) { return size.set(1, 1); }
     readRenderTargetPixelsAsync() { return Promise.resolve(); }
@@ -97,8 +101,8 @@ const sector = (index: number): ScenerySectorChunk => ({...base, id: `s${index}`
 const layout = {
   layoutKey: 'portimao_wec', sourceGeometryRevision: 'g', packageRevision: 'p', routeLengthM: 4000, pitLaneLengthM: 0, shadowRangeM: 750,
   streaming: {residentBehindM: 300, residentAheadM: 1500, freeCameraRadiusM: 1500},
-  camera: {meteringWindow: {x: 0.1, y: 0.1, width: 0.8, height: 0.8}, profiles: [{sunElevationDeg: 0, targetExposure: 0.4, whiteBalanceK: 7000}, {sunElevationDeg: 60, targetExposure: 0.2, whiteBalanceK: 6500}], toneCurve: {a: 2.5, b: 0.6}, glareThreshold: 1.2, ambientOcclusion: {radiusM: 0.4, samples: 8, scale: 2, colour: 0.4}},
-  daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9 },
+  camera: testCamera(), sky: testSky(), environmentProbe: {position: [0, 0, 0]},
+  daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55, ...TEST_HAZE_WEIGHTS, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9 },
   horizon: {...base, id: 'horizon', kind: 'horizon', asset: 'scenery/h.glb'}, sectors: [0, 1, 2, 3].map(sector), textures: [],
 } as unknown as SceneryLayoutResource;
 const car = {

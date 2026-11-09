@@ -33,9 +33,9 @@ export interface VehicleDataRecord {
 export interface VehicleLogosCatalog {
   logos: Record<string, string>;
 }
-/** Package manifest schema 6, the only supported schema. */
+/** Package manifest schema 7, the only supported schema. */
 export interface DataPluginManifest {
-  schemaVersion: 6;
+  schemaVersion: 7;
   id: string;
   version: string;
   tracks?: { catalog: string };

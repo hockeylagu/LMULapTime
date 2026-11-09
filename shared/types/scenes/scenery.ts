@@ -1,5 +1,5 @@
 /**
- * Scenery layout of package schema 4 (one catalog row per layout plus the catalog's shared chunking and streaming; the pipeline's docs/SCENE_PACKAGE.md is the authority).
+ * Scenery layout of package schema 7 (one catalog row per layout plus the catalog's shared chunking and streaming; the pipeline's docs/SCENE_PACKAGE.md is the authority).
  * The horizon chunk is always resident; sector chunks are loaded by lap distance around the replay car.
  */
 export type Vec3 = [number, number, number];
@@ -46,31 +46,94 @@ export interface SceneryDaylight {
   date: string;
   /** race, qualify, practice1, practice2, in that order. */
   sessions: ScenerySessionDaylight[];
-  /** Air pollution, mapped to sky turbidity by the viewer. */
+  /** Air pollution: raises the sky's turbidity, the haze and its warm tint (the catalog `sky`). */
   airPollution: number;
-  /** Haze scale as authored; its effect is not verified. */
+  /** Weights of the haze density terms: clear day, overcast, storm and dawn. */
   hazeBaseScale: number;
+  hazeCloudyScale: number;
+  hazeStormScale: number;
+  hazeDawnScale: number;
+  /** Scales of the height haze's altitude rate and exponent. */
+  fogHeightAltitudeScalar: number;
+  fogHeightExponentScalar: number;
   /** The track's location and its local offset from UTC on the race date (daylight saving included). */
   latitudeDeg: number;
   longitudeDeg: number;
   utcOffsetHours: number;
 }
 
-/**
- * The replay camera's exposure, tone curve, glare and ambient occlusion: the package's catalog `camera` (the pipeline's
- * `build camera`, its docs/SCENE_PACKAGE.md is the authority).
- */
-export interface SceneryCamera {
+/** tone = saturate((1 - z)(1 - b·z)²), z = e^(-a·x), per exposed linear component x. */
+export interface SceneryToneCurve { a: number; b: number }
+
+/** One time-of-day profile of a camera type. */
+export interface SceneryCameraProfile {
+  sunElevationDeg: number;
+  /** T of the exposure law: exposure = C · T / L^adaptationScale, L the metered luminance. */
+  targetExposure: number;
+  whiteBalanceK: number;
+  toneCurve: SceneryToneCurve;
+}
+
+/** external: car-mounted views outside the cockpit; onboard: the cockpit; tv: trackside cameras. */
+export type SceneryCameraType = 'external' | 'onboard' | 'tv';
+
+/** The post-processing of one camera type. */
+export interface SceneryCameraTypeProfile {
   /** Metered screen area, as fractions of the frame from the top left. */
   meteringWindow: { x: number; y: number; width: number; height: number };
-  /** Exposure target and white balance by sun elevation, ascending. */
-  profiles: { sunElevationDeg: number; targetExposure: number; whiteBalanceK: number }[];
-  /** tone = saturate((1 - z)(1 - b·z)²), z = e^(-a·x), per exposed linear component x. */
-  toneCurve: { a: number; b: number };
-  /** Exposed luminance above which glare starts. */
-  glareThreshold: number;
+  /** The exponent s of the metered luminance in the exposure law. */
+  adaptationScale: number;
+  /** By sun elevation, ascending. */
+  profiles: SceneryCameraProfile[];
   /** Sample radius and count, the occlusion's strength scale, and the grey a fully occluded spot darkens to. */
   ambientOcclusion: { radiusM: number; samples: number; scale: number; colour: number };
+}
+
+/**
+ * The replay camera's exposure, white balance, tone curve and ambient occlusion per camera type, and the output encode: the
+ * package's catalog `camera` (the pipeline's docs/SCENE_PACKAGE.md is the authority).
+ */
+export interface SceneryCamera {
+  /** Output encode rgb^(1 / outputGamma). */
+  outputGamma: number;
+  /** The scene luminance the exposure is divided by in the tone pass. */
+  sceneLuminanceScale: number;
+  types: Record<SceneryCameraType, SceneryCameraTypeProfile>;
+}
+
+/**
+ * The analytic sky and the haze: the package's catalog `sky` (the pipeline's docs/SCENE_PACKAGE.md "Sky and atmosphere" has the
+ * formulas). C is the cloud cover, S the precipitation term and p = airPollution·(1 − cloudyDamping·C) the effective pollution.
+ */
+export interface ScenerySky {
+  /** Scales of the Perez coefficients a, b, c, d, e. */
+  perezScale: [number, number, number, number, number];
+  /** Multipliers of the a–d scales by sun elevation, ascending. */
+  perezMultipliers: { sunElevationDeg: number; abcd: [number, number, number, number] }[];
+  pollution: { cloudyDamping: number };
+  /** clamp(base + (overcast + storm)·C + pollution·p², min, max). */
+  turbidity: { base: number; overcast: number; storm: number; pollution: number; min: number; max: number };
+  /** Air mass multiplier clear + (pollution − clear)·p². */
+  airMass: { clear: number; pollution: number };
+  fog: SceneryFog;
+}
+
+/** The exponential distance haze, its colour from the sky's horizon, its tint toward the sun and its height term. */
+export interface SceneryFog {
+  /** Clear day: clamp(base·hazeBaseScale + pollution·airPollution, min, max), per metre. */
+  density: { base: number; overcast: number; storm: number; sunrise: number; pollution: number; min: number; max: number };
+  colour: {
+    horizonSampleElevationDeg: number;
+    horizonSampleCount: number;
+    horizonFovDeg: number;
+    pollutionOffset: [number, number, number];
+    override: { base: number; overcast: number; storm: number };
+    luminance: { base: number; sunrise: number; overcast: number; storm: number };
+    sunElevationRampDeg: number;
+    sunElevationRampOffset: number;
+  };
+  sunInfluence: number;
+  height: { max: number; scalar: number; exponent: number; scalarMin: number; scalarMax: number; exponentMin: number };
 }
 
 interface SceneryChunkBase {
@@ -141,6 +204,9 @@ export interface SceneryLayout {
   chunking: SceneryChunkingParameters;
   streaming: SceneryStreaming;
   camera: SceneryCamera;
+  sky: ScenerySky;
+  /** Where the venue's environment (reflection and irradiance) is captured, in LMU local metres. */
+  environmentProbe: { position: Vec3 };
   daylight?: SceneryDaylight;
   horizon: SceneryHorizonChunk;
   sectors: ScenerySectorChunk[];

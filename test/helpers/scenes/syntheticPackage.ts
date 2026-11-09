@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { syntheticTrack } from '../syntheticTrack.js';
+import { TEST_HAZE_WEIGHTS, testCamera, testSky } from './sceneryProfiles.js';
 import type { TrackBoundaryGeometry } from '../../../shared/types/trackGeometry.js';
 
 const sha = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
@@ -65,12 +66,12 @@ export function syntheticPackage() {
   const sceneryShared = {
     chunking: { sectorLengthM: 1000, minSectorLengthM: 100, maxSectorTriangles: 400000, horizonDistanceM: 2000, skylineHeightM: 30, skylineMinDistanceM: 500, terrainScaleExtentM: 50, pitBandM: 100 },
     streaming: { residentBehindM: 300, residentAheadM: 1500, freeCameraRadiusM: 1500 },
-    camera: { meteringWindow: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 }, profiles: [{ sunElevationDeg: 0, targetExposure: 0.4, whiteBalanceK: 7000 }, { sunElevationDeg: 60, targetExposure: 0.2, whiteBalanceK: 6500 }],
-      toneCurve: { a: 2.5, b: 0.6 }, glareThreshold: 1.2, ambientOcclusion: { radiusM: 0.4, samples: 8, scale: 2, colour: 0.4 } },
+    camera: testCamera(),
+    sky: testSky(),
   };
   const scenery = {
-    layoutKey: 'monza_gp', sourceGeometryRevision: geometry.geometryRevision, routeLengthM: L, pitLaneLengthM: 0, shadowRangeM: 750,
-    daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9 },
+    layoutKey: 'monza_gp', sourceGeometryRevision: geometry.geometryRevision, routeLengthM: L, pitLaneLengthM: 0, shadowRangeM: 750, environmentProbe: { position: [10, 2, -20] },
+    daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55, ...TEST_HAZE_WEIGHTS, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9 },
     horizon: chunk('horizon', 'horizon', { kind: 'horizon' }),
     sectors: [
       chunk('s0', 'sector 0', { kind: 'main', lapStartM: 0, lapEndM: L / 2, prev: 's1', next: 's1' }),
@@ -113,7 +114,7 @@ export function syntheticPackage() {
     descriptor.appearances = ids.map(alias => ({ alias, albedo: texturePath, paint: testCarPaint(texturePath), optionNodes: [] }));
   };
   const manifest: Record<string, unknown> = {
-    schemaVersion: 6, id: 'synthetic', version: '1',
+    schemaVersion: 7, id: 'synthetic', version: '1',
     tracks: { catalog: 'tracks/index.json' }, vehicles: { catalog: 'vehicles/index.json' },
     scenery: { catalog: 'scenery/index.json' },
   };

@@ -1,28 +1,22 @@
-import { Color, ConstantColorFactor, CustomBlending, DirectionalLight, type Object3D, DoubleSide, FogExp2, MathUtils, Matrix4, Mesh, MeshBasicMaterial, NoToneMapping, PCFShadowMap, PlaneGeometry, PMREMGenerator, Scene, Vector3, ZeroFactor, type Camera, type OrthographicCamera, type PerspectiveCamera, type WebGLRenderer } from 'three';
-import { Sky } from 'three/addons/objects/Sky.js';
+import { BoxGeometry, Color, CubeCamera, DirectionalLight, DoubleSide, FogExp2, HalfFloatType, MathUtils, Matrix4, Mesh, MeshBasicMaterial, NoToneMapping, PCFShadowMap, PlaneGeometry, PMREMGenerator, Scene, Vector3, WebGLCubeRenderTarget, type Camera, type Object3D, type OrthographicCamera, type PerspectiveCamera, type WebGLRenderTarget, type WebGLRenderer } from 'three';
 import { nativeToScene } from './sceneFrame.js';
 import { createStaticShadow, NEAR_SHADOW, SHADOW_NEAR_M, shadowWindowCentre } from './sunShadows.js';
-import type { SceneryDaylight } from '../../../../shared/types/scenes/scenery.js';
+import type { SceneryDaylight, SceneryLayout } from '../../../../shared/types/scenes/scenery.js';
 import type { ReplayDaylightClock } from '../../../../shared/types/replay.js';
 import { solarPosition } from './solarPosition.js';
+import { createPerezSkyMaterial, hazeColour, hazeDensity, heightHaze, skyConditions, sunwardHaze } from './atmosphere/perezSky.js';
+import { installHaze } from './atmosphere/haze.js';
 
 /**
- * Midday lighting, from the pipeline review viewer's daylight (pipeline/viewer/daylight.js) with one replay change: exponential
- * haze (about 1% at 300 m, 25% at 1.5 km, 70% at 3 km, matched by eye to the game's hills behind Fuji's main straight) instead
- * of a linear fog. The sun is stronger (4.0, viewer 3.2). The Sky shader's radiance is in its own units: `skyScale` brings it
- * into the sun's (calibrated as the viewer's sky fill), for the displayed sky and its reflection alike, so the sky reads about as
- * bright as a sunlit surface and the ground's bounce light keeps its sunlit value. Unscaled, the sky was ~35× a sunlit grey
- * ground: it showed white and pulled the metered exposure down, and scaling only the reflection left shaded faces a tenth of
- * their ground bounce. The metered exposure (autoExposure.ts) scales the displayed sky and scene together.
- * Neither is authored by the game data; a layout's daylight sets the sun direction and turbidity (`sceneLighting`).
+ * Midday lighting, from the pipeline review viewer's daylight (pipeline/viewer/daylight.js): the sun direction without a layout's
+ * daylight, its strength (4.0, viewer 3.2) and colour. The sky is the package's analytic sky (perezSky.ts).
  */
-export const DAYLIGHT = Object.freeze({
-  elevationDeg: 55, azimuthDeg: 45, sunIntensity: 4.0, skyScale: 0.112,
-  turbidity: 2.5, rayleigh: 2.0, mieCoefficient: 0.005, mieDirectionalG: 0.8, horizonColor: '#c8d4e0', fogDensity: 0.00036, sunColor: '#fff8ea',
-});
+export const DAYLIGHT = Object.freeze({elevationDeg: 55, azimuthDeg: 45, sunIntensity: 4.0, sunColor: '#fff8ea'});
 const SKY_RADIUS_M = 12000, ENVIRONMENT_GROUND_Y = -0.5;
-/** Mean reflectance of the ground around a circuit (grass, asphalt, concrete) for the bounce light in the environment. */
+/** Mean reflectance of the ground around a circuit (grass, asphalt, concrete) for the bounce light of the first environment. */
 const GROUND_ALBEDO = 0.2;
+/** The venue capture: cube face size and how far it sees. */
+const VENUE_PROBE_PX = 256, VENUE_PROBE_FAR_M = 3000;
 const sunToward = (elevationDeg: number) => {
   const a = MathUtils.degToRad(DAYLIGHT.azimuthDeg), e = MathUtils.degToRad(elevationDeg);
   return new Vector3(Math.cos(a) * Math.cos(e), Math.sin(e), Math.sin(a) * Math.cos(e));
@@ -34,11 +28,8 @@ const MIN_SUN_ELEVATION_DEG = 10;
 
 export interface SceneLighting {
   sunDirection: Vector3;
-  turbidity: number;
   /** The sunlight's colour and strength reaching the ground, relative to the calibrated midday sun (`sunTransmittance`). */
   sunTransmittance: Color;
-  /** The replay's cloud cover at the lap (0 clear to 1 overcast); a clear sky when the replay carries none. */
-  cloudCover: number;
 }
 
 /** Optical depth of a clear sky at the zenith for red, green and blue light (molecular plus a light aerosol load). */
@@ -47,25 +38,23 @@ const OPTICAL_DEPTH = [0.10, 0.16, 0.28] as const;
 const airMass = (elevationDeg: number) => 1 / (Math.sin(MathUtils.degToRad(elevationDeg)) + 0.50572 * (elevationDeg + 6.07995) ** -1.6364);
 
 /**
- * The direct sunlight reaching the ground, relative to the calibrated sun at the default midday elevation in a clear sky: the
- * atmosphere dims and reddens it along the ray's air mass (Beer-Lambert per colour), and cloud cover `c` lets a share (1 - c) of
- * it through per atmosphere crossed, so a low sun under light cloud is mostly hidden. Never brighter than the calibrated sun.
+ * The direct sunlight reaching the ground, relative to the calibrated sun at the default midday elevation: the atmosphere dims and
+ * reddens it along the ray's air mass (Beer-Lambert per colour). Never brighter than the calibrated sun. Cloud cover does not dim
+ * it: the sky stays clear.
  */
-export function sunTransmittance(elevationDeg: number, cloudCover = 0): Color {
-  const path = airMass(elevationDeg), reference = airMass(DAYLIGHT.elevationDeg), clouds = (1 - MathUtils.clamp(cloudCover, 0, 1)) ** path;
-  const [r, g, b] = OPTICAL_DEPTH.map(depth => Math.min(1, Math.exp(-depth * (path - reference))) * clouds);
+export function sunTransmittance(elevationDeg: number): Color {
+  const path = airMass(elevationDeg), reference = airMass(DAYLIGHT.elevationDeg);
+  const [r, g, b] = OPTICAL_DEPTH.map(depth => Math.min(1, Math.exp(-depth * (path - reference))));
   return new Color(r, g, b);
 }
 
 /**
  * The replay's clock sets the sun: its session start (the track's default time for the session when the replay does not carry
- * one) plus the lap's session time, at the layout's location. Without a clock, the race session's published sun. Packages without a bearing use the default scene azimuth.
- * The layout's air pollution sets sky turbidity using the review viewer's mapping. The layout's haze scale is not applied: read
- * as "larger is hazier" it cleared a track the game shows hazy. Without daylight, the default midday.
+ * one) plus the lap's session time, at the layout's location. Without a clock, the race session's published sun. Packages without
+ * a bearing use the default scene azimuth. Without daylight, the default midday.
  */
 export function sceneLighting(daylight?: SceneryDaylight, clock?: ReplayDaylightClock): SceneLighting {
-  const cloudCover = MathUtils.clamp(clock?.cloudCover ?? 0, 0, 1);
-  if (!daylight) return {sunDirection: SUN_DIRECTION.clone(), turbidity: DAYLIGHT.turbidity, sunTransmittance: sunTransmittance(DAYLIGHT.elevationDeg, cloudCover), cloudCover};
+  if (!daylight) return {sunDirection: SUN_DIRECTION.clone(), sunTransmittance: sunTransmittance(DAYLIGHT.elevationDeg)};
   const id = clock?.session ?? 'race', session = daylight.sessions.find(entry => entry.id === id);
   if (!session) throw Error(`Layout daylight has no ${id} session`);
   let sun: {elevationDeg: number; bearingDeg?: number} = {elevationDeg: session.sunElevationDeg, bearingDeg: session.sunBearingDeg};
@@ -82,70 +71,68 @@ export function sceneLighting(daylight?: SceneryDaylight, clock?: ReplayDaylight
     const native = {x: horizontal * Math.sin(bearing), y: Math.sin(elevation), z: horizontal * Math.cos(bearing)};
     sunDirection = new Vector3(...nativeToScene(native, {x: 0, y: 0, z: 0}));
   }
-  return {
-    sunDirection,
-    turbidity: 2 + 1.5 * daylight.airPollution,
-    sunTransmittance: sunTransmittance(elevationDeg, cloudCover),
-    cloudCover,
-  };
+  return {sunDirection, sunTransmittance: sunTransmittance(elevationDeg)};
 }
 
 export interface SceneEnvironment {
-  /** The camera whose view direction leads the shadow window. */
+  /** The camera whose view direction leads the shadow window and turns the haze toward its horizon colour. */
   setCamera(camera: PerspectiveCamera | OrthographicCamera): void;
-  /** Objects that move (the cars): the static shadow map is drawn without them. */
+  /** Objects that move (the cars): the static shadow map and the venue capture are drawn without them. */
   setDynamic(objects: readonly Object3D[]): void;
   /** The resident scenery changed: redraw the static shadow map once the view has moved 100 m. */
   staticShadowStale(): void;
   /**
+   * Captures the loaded scenery at the venue's probe (cars hidden) as the scene's environment: a first capture lit by the sun,
+   * then one lit by the first, so shaded faces get the light the venue bounces. Call once the scenery around it is resident.
+   */
+  captureVenue(): void;
+  /**
    * Moves the near shadow window to `focus` (scene coordinates, on the ground: the camera's look target) before a frame renders,
-   * and draws the next quarter of the static map when one is due (sunShadows.ts). True while a static map is still being drawn:
-   * the caller renders another frame.
+   * colours the haze toward the view, and draws the next quarter of the static map when one is due (sunShadows.ts). True while a
+   * static map is still being drawn: the caller renders another frame.
    */
   update(focus: Vector3): boolean;
   dispose(): void;
 }
 
+/** The layout values the environment reads: its daylight, the package's sky and where the venue's environment is captured. */
+export type SceneVenue = Pick<SceneryLayout, 'daylight' | 'sky' | 'environmentProbe'>;
+
 /**
- * Sky dome, horizon fog, a shadow-casting sun and a sky image-based light, set up as the pipeline viewer does so scenery is
- * lit alike. The scenery supplies its own terrain, filler ground and horizon; nothing here draws ground.
+ * Sky dome, horizon haze, a shadow-casting sun and an image-based light: first the sky over a sunlit ground, then the venue's own
+ * capture. The scenery supplies its own terrain, filler ground and horizon; nothing here draws ground. `origin` is the scene
+ * origin in LMU local metres.
  */
-export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, daylight?: SceneryDaylight, clock?: ReplayDaylightClock): SceneEnvironment {
-  const lighting = sceneLighting(daylight, clock);
-  const sky = new Sky();
+export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue: SceneVenue, origin: Vector3, clock?: ReplayDaylightClock): SceneEnvironment {
+  const lighting = sceneLighting(venue.daylight, clock);
+  // The replay's cloud cover at the lap sets the weather; the sun stays undimmed by it.
+  const weather = skyConditions(venue.daylight, clock?.cloudCover ?? 0);
+  const sky = new Mesh(new BoxGeometry(1, 1, 1), createPerezSkyMaterial(lighting.sunDirection, venue.sky, weather));
   sky.scale.setScalar(SKY_RADIUS_M);
-  const uniforms = sky.material.uniforms;
-  uniforms.turbidity.value = lighting.turbidity; uniforms.rayleigh.value = DAYLIGHT.rayleigh;
-  uniforms.mieCoefficient.value = DAYLIGHT.mieCoefficient; uniforms.mieDirectionalG.value = DAYLIGHT.mieDirectionalG;
-  uniforms.sunPosition.value = lighting.sunDirection.clone();
-  uniforms.showSunDisc.value = false;
-  // The sky shader's own clouds (default 40 %) cover the share of the sky the replay's cloud field covers.
-  uniforms.cloudCoverage.value = lighting.cloudCover;
-  // A constant blend factor scales the sky shader's output without changing it (standard material blending).
-  Object.assign(sky.material, {blending: CustomBlending, blendSrc: ConstantColorFactor, blendDst: ZeroFactor});
-  sky.material.blendColor.setScalar(DAYLIGHT.skyScale);
   sky.name = 'sky'; sky.frustumCulled = false;
   // The dome travels with the eye so its horizon stays at infinity at every zoom level.
   sky.onBeforeRender = (_renderer, _scene, camera: Camera) => { sky.position.copy(camera.position); sky.updateMatrixWorld(); };
   scene.background = null;
-  // The haze scatters the sunlight that reaches it: a low or clouded sun dims and warms it as it does the sun (unchanged at the
-  // calibrated midday sun in a clear sky).
-  scene.fog = new FogExp2(new Color(DAYLIGHT.horizonColor).multiply(lighting.sunTransmittance), DAYLIGHT.fogDensity);
+  // The haze takes its colour from the sky just above the horizon toward the view (update); the sun's light, the height term and
+  // the distance shape are in the fog chunks (haze.ts).
+  const haze = hazeColour(venue.sky, lighting.sunDirection, weather), heading = new Vector3();
+  const fog = new FogExp2(haze(0, new Color()), hazeDensity(venue.sky, venue.daylight));
+  scene.fog = fog;
 
-  // The reflection environment: the sky over a sunlit ground plane, so faces out of the sun get the light the ground bounces up to
-  // them. A near-black plane (about 2%) left shaded faces lit by blue sky alone: yellow boards turned olive, stands and bridge
-  // undersides dark. Ground radiance is a lambertian ground of GROUND_ALBEDO under the sun: albedo * sun intensity * sin(elevation) / pi.
+  // The first environment: the sky over a sunlit ground plane, so faces out of the sun get the light the ground bounces up to them
+  // until the venue is captured. Ground radiance is a lambertian ground of GROUND_ALBEDO under the sun: albedo · sun · sin(elevation) / π.
   const environmentScene = new Scene(), environmentSky = sky.clone();
-  environmentSky.material = sky.material;
   const groundRadiance = GROUND_ALBEDO * DAYLIGHT.sunIntensity * Math.max(0, lighting.sunDirection.y) / Math.PI;
   const sunColour = new Color(DAYLIGHT.sunColor).multiply(lighting.sunTransmittance);
-  const groundColour = sunColour.clone().multiplyScalar(groundRadiance);
-  const reflectedGround = new Mesh(new PlaneGeometry(24000, 24000), new MeshBasicMaterial({color: groundColour, side: DoubleSide}));
+  installHaze({originY: origin.y, height: heightHaze(venue.sky, venue.daylight, weather), sunDirection: lighting.sunDirection.clone().normalize(),
+    sunRadiance: sunColour.clone().multiplyScalar(DAYLIGHT.sunIntensity), sunward: sunwardHaze(venue.sky, weather)});
+  const reflectedGround = new Mesh(new PlaneGeometry(24000, 24000), new MeshBasicMaterial({color: sunColour.clone().multiplyScalar(groundRadiance), side: DoubleSide}));
   reflectedGround.rotation.x = -Math.PI / 2; reflectedGround.position.y = ENVIRONMENT_GROUND_Y;
   environmentScene.add(environmentSky, reflectedGround);
   const generator = new PMREMGenerator(renderer), reflection = generator.fromScene(environmentScene, 0, 0.1, SKY_RADIUS_M, {size: 256});
   generator.dispose();
   scene.environment = reflection.texture;
+  let venueProbe: WebGLRenderTarget | null = null;
   // The exposure pass applies the camera profile's tone curve (autoExposure.ts): nothing else tone-maps.
   renderer.toneMapping = NoToneMapping;
 
@@ -167,19 +154,42 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, dayli
   let view: PerspectiveCamera | OrthographicCamera | null = null, dynamic: readonly Object3D[] = [];
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = PCFShadowMap;
   scene.add(sky);
+  const [probeX, probeY, probeZ] = venue.environmentProbe.position;
+  const probeAt = new Vector3(...nativeToScene({x: probeX, y: probeY, z: probeZ}, origin));
   return {
     setCamera(camera) { view = camera; },
     setDynamic(objects) { dynamic = objects; },
     staticShadowStale() { staticShadow.stale(); },
+    captureVenue() {
+      const cube = new WebGLCubeRenderTarget(VENUE_PROBE_PX, {type: HalfFloatType, generateMipmaps: false}), camera = new CubeCamera(0.5, VENUE_PROBE_FAR_M, cube);
+      if (camera.coordinateSystem !== renderer.coordinateSystem) { camera.coordinateSystem = renderer.coordinateSystem; camera.updateCoordinateSystem(); }
+      camera.position.copy(probeAt); camera.updateMatrixWorld();
+      const shown = dynamic.map(object => object.visible), autoShadow = renderer.shadowMap.autoUpdate, prefilter = new PMREMGenerator(renderer);
+      try {
+        dynamic.forEach(object => { object.visible = false; }); renderer.shadowMap.autoUpdate = false;
+        // The first capture is lit by the sun alone; the second adds the light of the first.
+        scene.environment = null;
+        for (let pass = 0; pass < 2; pass++) {
+          camera.update(renderer, scene);
+          const next = prefilter.fromCubemap(cube.texture);
+          scene.environment = next.texture; venueProbe?.dispose(); venueProbe = next;
+        }
+      } finally {
+        dynamic.forEach((object, i) => { object.visible = shown[i]; }); renderer.shadowMap.autoUpdate = autoShadow;
+        cube.dispose(); prefilter.dispose();
+      }
+    },
     update(focus) {
       shadowWindowCentre(focus, view, NEAR_SHADOW, sunFrame, fromSunFrame, centre);
       sun.target.position.copy(centre); sun.position.copy(centre).addScaledVector(toSun, NEAR_SHADOW.lightDistanceM);
       sun.updateMatrixWorld(); sun.target.updateMatrixWorld();
+      if (view) { view.getWorldDirection(heading); haze(Math.atan2(heading.z, heading.x), fog.color); }
       return view ? staticShadow.update(view, focus, dynamic) : false;
     },
     dispose() {
       scene.remove(sun, sun.target); sun.dispose(); staticShadow.dispose();
-      scene.environment = null; reflection.dispose(); reflectedGround.geometry.dispose(); reflectedGround.material.dispose();
+      scene.environment = null; reflection.dispose(); venueProbe?.dispose(); reflectedGround.geometry.dispose(); reflectedGround.material.dispose();
+      sky.geometry.dispose(); sky.material.dispose();
     },
   };
 }

@@ -153,7 +153,7 @@ export class DataPlugin {
         const buffer=fs.readFileSync(file); digest.update(relative).update(buffer); return JSON.parse(buffer.toString('utf8'));
       };
       const manifest=object(read('manifest.json',64_000));
-      if (manifest.schemaVersion !== 6) throw Error('Unsupported schema: only package manifest schema 6 is supported');
+      if (manifest.schemaVersion !== 7) throw Error('Unsupported schema: only package manifest schema 7 is supported');
       keys(manifest,['schemaVersion','id','version','tracks','vehicles','scenery']);
       const packageId = text(manifest.id), packageVersion = text(manifest.version);
       for (const capability of ['tracks','vehicles']) if (manifest[capability] !== undefined) object(manifest[capability]);

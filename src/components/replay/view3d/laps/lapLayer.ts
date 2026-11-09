@@ -2,7 +2,6 @@ import { MeshoptDecoder } from 'meshoptimizer/decoder';
 import { BufferGeometry, Group, Mesh, type Material, type Object3D, type Texture, type Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
-import type { SceneryCamera } from '../../../../../shared/types/scenes/scenery.js';
 import { normalizeVehicleId, type LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import { createCarMaterial, materialTexturePaths } from '../car/carMaterials.js';
 import { createContactShadow } from '../car/carContactShadow.js';
@@ -14,6 +13,7 @@ import { makeCar } from '../sceneObjects.js';
 import { createWheelAnimation } from '../wheelAnimation.js';
 import { BASELINE_LINE, colorRacingLine, makeRacingLine, racingLineColors, refreshRacingLine } from '../racingLine.js';
 import type { SurfaceHeight } from '../scenery/sceneryGround.js';
+import type { DisplayTransform } from '../autoExposure.js';
 import { disposeObjects } from './disposeObjects.js';
 
 export interface LapCars {
@@ -25,7 +25,7 @@ export interface LapCars {
 export type CarTextureLoader = (path: string) => Promise<Texture>;
 
 /** Lap objects own their geometry; replacing them cannot release the track's GPU buffers. */
-export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeight, loadTexture: CarTextureLoader, toneCurve: SceneryCamera['toneCurve']) {
+export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeight, loadTexture: CarTextureLoader, display: () => DisplayTransform) {
   // Only buffers retained by the bounded asset cache keep these parsed templates alive.
   const templates = new WeakMap<ArrayBuffer, Promise<Group>>();
   const loadTemplate = (car: LoadedBody): Promise<Group> => {
@@ -107,8 +107,8 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     const ghostWheels = baseline ? createWheelAnimation(ghost, baseline, surfaceHeight) : null;
     ghost.traverse(object => { if (object instanceof Mesh) { object.castShadow = false; object.receiveShadow = false; } });
     let colors = racingLineColors(trajectory, baseline, colorBy);
-    const primaryLine = makeRacingLine(trajectory, origin, colors.primary, surfaceHeight, toneCurve);
-    const baselineLine = baseline ? makeRacingLine(baseline, origin, colors.baseline, surfaceHeight, toneCurve, BASELINE_LINE.widthM, BASELINE_LINE.liftM) : null;
+    const primaryLine = makeRacingLine(trajectory, origin, colors.primary, surfaceHeight, display);
+    const baselineLine = baseline ? makeRacingLine(baseline, origin, colors.baseline, surfaceHeight, display, BASELINE_LINE.widthM, BASELINE_LINE.liftM) : null;
     const root = new Group(); root.add(primary, ghost, primaryLine); if (baselineLine) root.add(baselineLine);
     const primaryDistances = getTrajectoryDistances(trajectory.points, trajectory.trackLengthM);
     const baselineDistances = baseline ? getDistancesInReferenceFrame(baseline.points, trajectory.points, trajectory.trackLengthM) : [];

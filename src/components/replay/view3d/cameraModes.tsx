@@ -4,6 +4,7 @@ import { replayShortcutBlocked } from '../../../utils/replayShortcuts.js';
 import { FOCUS_RING } from '../../common/buttonStyles.js';
 import { DROPDOWN_CONTENT_INSET, DROPDOWN_PANEL } from '../../common/dropdown/dropdownStyles.js';
 import { isDriverCamera } from './driverCameras.js';
+import type { SceneryCameraType } from '../../../../shared/types/scenes/scenery.js';
 
 export type CameraMode = 'follow' | 'chase' | 'cockpit' | 'hood' | 'roof' | 'orbit' | 'trackside' | 'top';
 export const CAMERA_MODES: ReadonlyArray<{value: CameraMode; label: string; shortcut: string}> = [
@@ -17,6 +18,15 @@ export const CAMERA_MODES: ReadonlyArray<{value: CameraMode; label: string; shor
 export const followsCar = (mode: CameraMode): boolean => mode === 'follow' || mode === 'chase' || isDriverCamera(mode);
 /** Cameras locked on the car: a keyboard pan hands them over to free orbit. */
 export const carLockedCamera = (mode: CameraMode): boolean => followsCar(mode) || mode === 'trackside';
+
+/** The package camera type whose exposure and tone a view uses: the cockpit is onboard, trackside is TV, every other view external. */
+export function exposureType(mode: CameraMode): SceneryCameraType {
+  switch (mode) {
+    case 'cockpit': return 'onboard';
+    case 'trackside': return 'tv';
+    case 'follow': case 'chase': case 'hood': case 'roof': case 'orbit': case 'top': return 'external';
+  }
+}
 
 /** Mode keys belong to the active 3D map, with the same typing/dialog guards as replay keys. */
 export function useCameraModeShortcuts(map: React.RefObject<HTMLElement | null>, onMode: (mode: CameraMode) => void): void {

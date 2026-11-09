@@ -115,6 +115,8 @@ describe('shaderParts', () => {
   it('enters road, kerb and standard through their own families', () => {
     expect(shaderParts(surface('road', { maps: { albedo: map('A', true) } })).physical).toContain('0.05'); // F0 of IOR 1.635
     expect(shaderParts(surface('kerb', { maps: { albedo: map('A', true) } })).albedo).toContain('surfaceAltBlend=1.0-sourceBlend');
+    // The overlay's colour blends at full strength (pulling it halfway to grey halved the road's grain contrast).
+    expect(shaderParts(surface('road', { maps: { albedo: map('A', true), overlay: map('O') }, flags: { decalBlend: 'addSub', ambientOcclusion: 'local', overlayMap: 'on' } })).albedo).toContain('surfaceOverlay(overlayBase,sourceOverlay.rgb)');
     expect(shaderParts(surface('standard', { maps: { albedo: map('A', true) } })).occlusion).toBe('');
     expect(shaderParts(surface('standard', { maps: { albedo: map('A', true), aoSpec: map('AO') } })).occlusion).toBe('reflectedLight.indirectSpecular*=aoSpec.r;');
   });

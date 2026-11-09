@@ -33,6 +33,35 @@ function ownMaterial(source: MeshStandardMaterial, config: SurfaceConfig): MeshS
 }
 
 /**
+ * Draws `material` with the native surface program of `config`, sampling `loaded` (one texture per map key, its UV scale from the
+ * map). The material's own tint, roughness, metalness and normal scale come from the surface's `adjust` group.
+ */
+export function bindSurfaceProgram(material: MeshStandardMaterial, config: SurfaceConfig, loaded: Record<string, Texture>): void {
+  const uniforms: Record<string, IUniform> = {};
+  for (const [key, texture] of Object.entries(loaded)) {
+    uniforms[`surface_${key}`] = { value: texture };
+    uniforms[`surface_scale_${key}`] = { value: new Vector2(...config.maps[key]!.scale) };
+  }
+  material.userData.surfaceTextures = Object.keys(loaded);
+  surfaceTextureMaps.set(material, Object.values(loaded));
+  const adjust = config.parameters.adjust;
+  material.roughness = value(adjust, 'roughness');
+  material.metalness = value(adjust, 'metalness');
+  const [r, g, b] = list(adjust, 'tint');
+  material.color.setRGB(r * r, g * g, b * b);
+  const intensity = value(adjust, 'normalStrength');
+  material.normalScale = new Vector2(intensity, intensity * config.normalYSign);
+  // Three retains uniforms per material even when the compiled program is shared. The packed source normals, AO and roughness
+  // are decoded by the patched shader exactly once, so the glTF maps are dropped.
+  material.normalMap = null; material.aoMap = null; material.roughnessMap = null; material.metalnessMap = null; material.emissiveMap = null;
+  material.onBeforeCompile = shader => { patchSurfaceShader(shader, config, uniforms); };
+  const programKey = computeCustomProgramCacheKey(config);
+  material.customProgramCacheKey = () => programKey;
+  material.map = loaded.layerA ?? loaded.albedo ?? loaded.on ?? null;
+  material.needsUpdate = true;
+}
+
+/**
  * Rebuilds a scenery mesh's native material from its GLB surface description (`extras.lmuSurface`): loads every map through
  * `textures`, then patches the standard program with the family's GLSL. A mesh without a surface description keeps its glTF
  * material. The material owns its textures and frees them when disposed. An unknown surface, or a map the chunk does not
@@ -55,35 +84,13 @@ export async function configureSurfaceMaterial(mesh: Mesh, textures: SurfaceText
   mesh.material = material;
   if (material !== original) original.dispose();
 
-  const uniforms: Record<string, IUniform> = {}, loaded: Record<string, Texture> = {};
-  await Promise.all(Object.entries(config.maps).map(async ([key, map]) => {
-    if (!map) return;
-    const texture = await textures.load(map);
-    loaded[key] = texture;
-    uniforms[`surface_${key}`] = { value: texture };
-    uniforms[`surface_scale_${key}`] = { value: new Vector2(...map.scale) };
-  }));
+  const loaded: Record<string, Texture> = {};
+  await Promise.all(Object.entries(config.maps).map(async ([key, map]) => { if (map) loaded[key] = await textures.load(map); }));
   const placeholder: Texture | undefined = loaded.layerA ?? loaded.albedo ?? loaded.on;
   if (!placeholder && config.kind !== 'standard' && config.kind !== 'standardBlend') throw Error(`Missing base albedo for ${config.name ?? '?'}`);
-  material.userData.surfaceTextures = Object.keys(loaded);
-  surfaceTextureMaps.set(material, Object.values(loaded));
   if (ownsTextures) material.addEventListener('dispose', () => { for (const texture of Object.values(loaded)) texture.dispose(); });
+  bindSurfaceProgram(material, config, loaded);
 
-  const adjust = config.parameters.adjust;
-  material.roughness = value(adjust, 'roughness');
-  material.metalness = value(adjust, 'metalness');
-  const [r, g, b] = list(adjust, 'tint');
-  material.color.setRGB(r * r, g * g, b * b);
-  const intensity = value(adjust, 'normalStrength');
-  material.normalScale = new Vector2(intensity, intensity * config.normalYSign);
-
-  // Three retains uniforms per material even when the compiled program is shared. The packed source normals, AO and roughness
-  // are decoded by the patched shader exactly once, so the glTF maps are dropped.
-  material.normalMap = null; material.aoMap = null; material.roughnessMap = null; material.metalnessMap = null; material.emissiveMap = null;
-  material.onBeforeCompile = shader => { patchSurfaceShader(shader, config, uniforms); };
-  const programKey = computeCustomProgramCacheKey(config);
-  material.customProgramCacheKey = () => programKey;
-  material.map = placeholder ?? null;
   material.userData.surfaceConfigured = true;
   if (config.billboard) {
     // Vertex yaw can move corners outside the rest plane; keep a conservative culling sphere.

@@ -74,7 +74,7 @@ export function roadShaderParts(config: SurfaceConfig, { sample, uv, number, vec
       albedo += `vec4 overlay=${sample('overlay', 'vec4(0.5)')};
         vec4 sourceOverlay=mix(vec4(0.5,0.5,0.5,${noOverlayRough}),overlay,${detailCoverage});
         vec3 overlayBase=sqrt(max(base.rgb,vec3(0.0)));
-        base.rgb=clamp(surfaceOverlay(overlayBase,mix(vec3(0.5),sourceOverlay.rgb,0.5)),vec3(0.0),vec3(1.0));
+        base.rgb=clamp(surfaceOverlay(overlayBase,sourceOverlay.rgb),vec3(0.0),vec3(1.0));
         base.rgb*=base.rgb;
         sourceRoughness=surfaceOverlay1(sourceRoughness,sourceOverlay.a);
         sourceSpecular=mix(${noOverlaySpec},${specAdjust},${detailCoverage});

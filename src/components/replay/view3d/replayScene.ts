@@ -1,4 +1,4 @@
-import { Group, OrthographicCamera, PerspectiveCamera, Quaternion, Scene, Vector3, WebGLRenderer, Mesh, type Material, type Object3D, type Texture, type Color } from 'three';
+import { Group, OrthographicCamera, PerspectiveCamera, Quaternion, Scene, Vector3, WebGLRenderer, Mesh, type Material, type Object3D, type Texture } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { SceneryLayoutResource } from '../../../../shared/types/scenes/scenery.js';
 import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
@@ -11,7 +11,7 @@ import { nativeToScene } from './sceneFrame.js';
 import { createLapLayerLoader, type LapCars, type LapLayer } from './laps/lapLayer.js';
 import { disposeObjects } from './laps/disposeObjects.js';
 import { MIN_CAMERA_DISTANCE, MAX_CAMERA_DISTANCE, panCamera, zoomCamera } from './cameraNavigation.js';
-import type { CameraMode } from './cameraModes.js';
+import { exposureType, type CameraMode } from './cameraModes.js';
 import { createChaseCameraTracker, trackCamera } from './cameraTracking.js';
 import { driverCamera, driverPose, isDriverCamera, type DriverPose } from './driverCameras.js';
 import { addSceneEnvironment, sceneLighting } from './sceneEnvironment.js';
@@ -70,9 +70,7 @@ export async function createReplayScene(
   const {min, max} = layout.horizon.bounds, origin = new Vector3(...min).add(new Vector3(...max)).multiplyScalar(0.5);
   const loader = createChunkLoader(renderer), carTextures = new CachedKtx2Loader(renderer);
   const lighting = sceneLighting(layout.daylight, trajectory.daylightClock), sunElevationDeg = Math.asin(lighting.sunDirection.y) * 180 / Math.PI;
-  const cameraProfile = layout.camera;
-  const luminance = ({r, g, b}: Color) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  const exposure = createAutoExposure(renderer, cameraProfile, sunElevationDeg, () => invalidate(), luminance(lighting.sunTransmittance));
+  const exposure = createAutoExposure(renderer, layout.camera, sunElevationDeg, () => invalidate(), exposureType('follow'));
   // Wheel and line contact heights and the camera checks share one ray tree per resident chunk.
   const ground = createSceneryGround(), {surfaceHeight} = ground;
   // Scenery chunks live in native coordinates under one group, shifted by the scene origin.
@@ -173,10 +171,10 @@ export async function createReplayScene(
   const firstStation = stationAt(trajectory.points, 0, 0, route);
   if (firstStation === undefined) { cleanup(); throw Error('This recording has no track stations. Use the 2D map.'); }
   let currentStation = firstStation, mode: CameraMode = 'follow', streamView: StreamView | null = null;
-  const loadLaps = createLapLayerLoader(origin, surfaceHeight, path => carTextures.loadAsync(`${VEHICLE_FILES}${path}`), cameraProfile.toneCurve);
+  const loadLaps = createLapLayerLoader(origin, surfaceHeight, path => carTextures.loadAsync(`${VEHICLE_FILES}${path}`), () => exposure.display());
   // The sky's environment map compiles and renders now, while the scenery files download.
   const scene = new Scene();
-  const environment = addSceneEnvironment(scene, renderer, layout.daylight, trajectory.daylightClock), reflection = createCarReflection(renderer, scene);
+  const environment = addSceneEnvironment(scene, renderer, layout, origin, trajectory.daylightClock), reflection = createCarReflection(renderer, scene);
   // The horizon and the chunks under the first pose must be resident before cars and lines are draped on them.
   try {
     streamView = {kind: 'lap', lapDistanceM: currentStation}; stream.update(streamView);
@@ -201,6 +199,8 @@ export async function createReplayScene(
   environment.setCamera(perspective);
   // The first view's chunks loaded before the camera existed: compile and upload them (and the cars) behind the loading screen.
   try { await warmUp(scene, new AbortController().signal); } catch (error) { cleanup(); throw error; }
+  // The scenery around the first pose is resident and compiled: capture the venue's light for the scene's environment.
+  environment.captureVenue();
   sharpening = true; queueSharpen([]);
   const overhead = new OrthographicCamera(-80, 80, 80, -80, 0.5, 15000);
   let camera: PerspectiveCamera | OrthographicCamera = perspective;
@@ -234,7 +234,7 @@ export async function createReplayScene(
     if (!viewMoved(streamView, next, route)) return;
     streamView = next; stream.update(next);
   };
-  const eyeRotation = new Quaternion(), desiredEye = new Vector3(), correctedEye = new Vector3(), probeCentre = new Vector3();
+  const eyeRotation = new Quaternion(), desiredEye = new Vector3(), correctedEye = new Vector3(), probeCentre = new Vector3(), shadowFocus = new Vector3();
   let frameHook: ((frameTime: number) => void) | null = null;
   const draw = (frameTime?: number) => {
     if (disposed) return;
@@ -250,8 +250,10 @@ export async function createReplayScene(
       camera.lookAt(controls.target);
     }
     try {
-      // A static shadow map still being drawn (a quarter per frame) asks for the next frame.
-      if (environment.update(controls.target)) invalidate();
+      // A static shadow map still being drawn (a quarter per frame) asks for the next frame. Car cameras look at a point 40 m
+      // ahead of the eye, which would leave the car itself outside the near shadow square: their shadows centre on the car.
+      const focus = isDriverCamera(mode) ? layer.primary.getWorldPosition(shadowFocus) : controls.target;
+      if (environment.update(focus)) invalidate();
       exposure.render(scene, camera);
       // The car's reflection probe renders one face after the frame (car/carReflection.ts), around the body's centre.
       if (layer.primary.visible && reflection.update(layer.primary.getWorldPosition(probeCentre).setY(probeCentre.y + PROBE_HEIGHT_M))) invalidate();
@@ -370,7 +372,7 @@ export async function createReplayScene(
       if (next === mode) return;
       const wasTop = mode === 'top', wasDriver = isDriverCamera(mode); mode = next;
       const driverView = isDriverCamera(mode);
-      camera = mode === 'top' ? overhead : perspective; controls.object = camera; environment.setCamera(camera);
+      camera = mode === 'top' ? overhead : perspective; controls.object = camera; environment.setCamera(camera); exposure.setType(exposureType(mode));
       controls.enabled = !driverView;
       if (wasDriver && !driverView) camera.up.set(0, 1, 0);
       syncDriverCamera();
