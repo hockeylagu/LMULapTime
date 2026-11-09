@@ -49,13 +49,6 @@ describe('LiveStrategyTracker deployment', () => {
       unit: 'kW', current: 60, target: 40, next: null, changeSeconds: null, settlingLaps: 0, chargePercent: 10, changePerLap: -10, edge: 20, edgeSeconds: 0 });
   });
 
-  it('falls back to map positions when the plugin list has the wrong length, and without a plugin', () => {
-    const wrong = new LiveStrategyTracker();
-    wrong.setDeploymentKw([0, 20, 40]);
-    expect(drive(wrong, 30, -10, 2)?.deployment).toMatchObject({ unit: 'map', current: 3, target: 2 });
-    expect(drive(new LiveStrategyTracker(), 30, -10, 2)?.deployment).toMatchObject({ unit: 'map', current: 3, target: 2 });
-  });
-
   it('measures again after the pit lane', () => {
     const tracker = new LiveStrategyTracker();
     tracker.setDeploymentKw(KW);

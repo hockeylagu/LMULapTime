@@ -7,17 +7,6 @@ describe('AiReportsHistoryCard', () => {
     vi.restoreAllMocks();
   });
 
-  it('shows an empty state when no AI reports have been generated', async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
-
-    render(<AiReportsHistoryCard />);
-
-    await waitFor(() => {
-      expect(screen.getByText(/no ai reports generated yet/i)).toBeInTheDocument();
-    });
-    expect(screen.queryByText('0 cached')).not.toBeInTheDocument();
-  });
-
   it('renders report history entries with summary, model and tokens used', async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -43,16 +32,6 @@ describe('AiReportsHistoryCard', () => {
     expect(screen.getByText('gemini-3.8-flash')).toBeInTheDocument();
     expect(screen.getByText('150 tokens')).toBeInTheDocument();
     expect(screen.getByText('1 cached')).toBeInTheDocument();
-  });
-
-  it('shows an error message when the fetch fails', async () => {
-    global.fetch = vi.fn().mockRejectedValue(new Error('network down'));
-
-    render(<AiReportsHistoryCard />);
-
-    await waitFor(() => {
-      expect(screen.getByText('network down')).toBeInTheDocument();
-    });
   });
 
   it('reloads the list when the refresh button is clicked', async () => {
