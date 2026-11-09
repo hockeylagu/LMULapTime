@@ -3,10 +3,10 @@ import type { SceneryCamera, SceneryCameraTypeProfile, ScenerySky } from '../../
 /** A synthetic camera type: two time-of-day profiles with different curves, so interpolation shows. */
 function cameraType(window: SceneryCameraTypeProfile['meteringWindow'], adaptationScale: number, targets: [number, number]): SceneryCameraTypeProfile {
   return {
-    meteringWindow: window, adaptationScale,
+    meteringWindow: window, adaptationScale, weatherBlendRate: 0.25,
     profiles: [
-      { sunElevationDeg: 0, targetExposure: targets[0], whiteBalanceK: 7000, toneCurve: { a: 2.5, b: 0.6 } },
-      { sunElevationDeg: 60, targetExposure: targets[1], whiteBalanceK: 6500, toneCurve: { a: 3, b: 0.7 } },
+      { sunElevationDeg: 0, targetExposure: targets[0], whiteBalanceK: 7000, toneCurve: { a: 2.5, b: 0.6 }, weatherLerpPower: 1, overcast: { targetExposure: targets[0] * 1.5, whiteBalanceK: 7500, toneCurve: { a: 2, b: 0.5 } } },
+      { sunElevationDeg: 60, targetExposure: targets[1], whiteBalanceK: 6500, toneCurve: { a: 3, b: 0.7 }, weatherLerpPower: 1, overcast: { targetExposure: targets[1] * 1.5, whiteBalanceK: 7200, toneCurve: { a: 2.4, b: 0.6 } } },
     ],
     ambientOcclusion: { radiusM: 0.4, samples: 8, scale: 2, colour: 0.4 },
   };

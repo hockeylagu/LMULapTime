@@ -169,8 +169,10 @@ and textures `scenery/textures/<sha256>.ktx2.zst` (a KTX2 without supercompressi
 The catalog's `chunking`, `streaming`, `camera` and `sky` are shared by every layout and attached to each layout the client gets.
 `camera` holds a positive `outputGamma` (the display encode), a positive `sceneLuminanceScale` and `types` with exactly `external`, `onboard` and `tv`; each type has a
 `meteringWindow` inside the frame (fractions from the top left), a positive `adaptationScale` (s of the exposure law
-`C · T / L^s`), `ambientOcclusion` and `profiles` ascending by `sunElevationDeg`, each with a positive `targetExposure` (T),
-`whiteBalanceK` and a `toneCurve` {`a` > 0, `b`}. The viewer interpolates a profile by sun elevation and holds it past the ends;
+`C · T / L^s`), a positive `weatherBlendRate` (per second, the rate of the clear to overcast profile blend), `ambientOcclusion` and
+`profiles` ascending by `sunElevationDeg`, each with a positive `targetExposure` (T), `whiteBalanceK` and a `toneCurve`
+{`a` > 0, `b`} (the clear values), a positive `weatherLerpPower` and an `overcast` {`targetExposure`, `whiteBalanceK`,
+`toneCurve`} validated the same way (the package's overcast profile; the viewer does not blend to it yet). The viewer interpolates a profile by sun elevation and holds it past the ends;
 the cockpit view uses `onboard`, trackside `tv`, every other view `external`. `sky` holds five `perezScale` values,
 `perezMultipliers` rows ascending by `sunElevationDeg` (four values each), `pollution`, `turbidity` and `fog.density` (each range
 with `min` ≤ `max`), `airMass`, and the haze's `fog.colour`, `fog.sunInfluence` and `fog.height`; the pipeline's

@@ -65,13 +65,20 @@ export interface SceneryDaylight {
 /** tone = saturate((1 - z)(1 - b·z)²), z = e^(-a·x), per exposed linear component x. */
 export interface SceneryToneCurve { a: number; b: number }
 
-/** One time-of-day profile of a camera type. */
-export interface SceneryCameraProfile {
-  sunElevationDeg: number;
+/** The exposure target, white balance and tone curve of one weather state. */
+export interface SceneryCameraLook {
   /** T of the exposure law: exposure = C · T / L^adaptationScale, L the metered luminance. */
   targetExposure: number;
   whiteBalanceK: number;
   toneCurve: SceneryToneCurve;
+}
+
+/** One time-of-day profile of a camera type: the clear look, and the overcast look it blends to with the weather. */
+export interface SceneryCameraProfile extends SceneryCameraLook {
+  sunElevationDeg: number;
+  /** Exponent of the clear to overcast blend factor. */
+  weatherLerpPower: number;
+  overcast: SceneryCameraLook;
 }
 
 /** external: car-mounted views outside the cockpit; onboard: the cockpit; tv: trackside cameras. */
@@ -83,6 +90,8 @@ export interface SceneryCameraTypeProfile {
   meteringWindow: { x: number; y: number; width: number; height: number };
   /** The exponent s of the metered luminance in the exposure law. */
   adaptationScale: number;
+  /** Rate per second of the clear to overcast profile blend. */
+  weatherBlendRate: number;
   /** By sun elevation, ascending. */
   profiles: SceneryCameraProfile[];
   /** Sample radius and count, the occlusion's strength scale, and the grey a fully occluded spot darkens to. */

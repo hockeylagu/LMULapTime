@@ -78,17 +78,27 @@ function ascending(rows: unknown[], what: string, row: (value: Record<string, un
 
 const CAMERA_TYPES = ['external', 'onboard', 'tv'] as const;
 
-/** One camera type's post-processing: a window inside the frame, a positive adaptation scale, ascending positive profiles. */
+/** A look's exposure target, white balance and tone curve (a > 0); the clear values and the overcast ones share this shape. */
+function exposureLook(look: Record<string, unknown>, at: string): void {
+  numbers({targetExposure: look.targetExposure, whiteBalanceK: look.whiteBalanceK}, ['targetExposure', 'whiteBalanceK'], at, true);
+  numbers(look.toneCurve, ['a', 'b'], `${at}.toneCurve`, false);
+  if ((look.toneCurve as {a: number}).a <= 0) throw Error(`${at}.toneCurve.a: must be positive`);
+}
+
+/** One camera type's post-processing: a window inside the frame, a positive adaptation scale and weather blend rate, ascending profiles with clear and overcast looks. */
 function parseCameraType(value: unknown, what: string): void {
   const row = record(value, what);
-  exactKeys(row, ['meteringWindow', 'adaptationScale', 'profiles', 'ambientOcclusion'], what);
+  exactKeys(row, ['meteringWindow', 'adaptationScale', 'weatherBlendRate', 'profiles', 'ambientOcclusion'], what);
   screenWindow(row.meteringWindow, `${what}.meteringWindow`);
   if (finite(row.adaptationScale, `${what}.adaptationScale`) <= 0) throw Error(`${what}.adaptationScale: must be positive`);
+  if (finite(row.weatherBlendRate, `${what}.weatherBlendRate`) <= 0) throw Error(`${what}.weatherBlendRate: must be positive`);
   ascending(array(row.profiles, `${what}.profiles`, 32), `${what}.profiles`, (p, at) => {
-    exactKeys(p, ['sunElevationDeg', 'targetExposure', 'whiteBalanceK', 'toneCurve'], at);
-    numbers({targetExposure: p.targetExposure, whiteBalanceK: p.whiteBalanceK}, ['targetExposure', 'whiteBalanceK'], at, true);
-    numbers(p.toneCurve, ['a', 'b'], `${at}.toneCurve`, false);
-    if ((p.toneCurve as {a: number}).a <= 0) throw Error(`${at}.toneCurve.a: must be positive`);
+    exactKeys(p, ['sunElevationDeg', 'targetExposure', 'whiteBalanceK', 'toneCurve', 'weatherLerpPower', 'overcast'], at);
+    exposureLook(p, at);
+    if (finite(p.weatherLerpPower, `${at}.weatherLerpPower`) <= 0) throw Error(`${at}.weatherLerpPower: must be positive`);
+    const overcast = record(p.overcast, `${at}.overcast`);
+    exactKeys(overcast, ['targetExposure', 'whiteBalanceK', 'toneCurve'], `${at}.overcast`);
+    exposureLook(overcast, `${at}.overcast`);
   });
   numbers(row.ambientOcclusion, ['radiusM', 'samples', 'scale', 'colour'], `${what}.ambientOcclusion`, false);
 }
