@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LivePage } from '../../../src/components/live/LivePage.js';
 import { racePlanView } from '../../../src/components/live/race/raceAction.js';
 import type { LiveSnapshot } from '../../../shared/types/live.js';
-import type { LiveRacePlan, LiveStrategy } from '../../../shared/types/liveStrategy.js';
+import type { LiveGaragePlan, LiveRacePlan, LiveStrategy } from '../../../shared/types/liveStrategy.js';
 import type { LiveTyreCoverage } from '../../../shared/types/liveInsights.js';
 import { FakeEventSource } from '../../helpers/fakeEventSource.js';
 import { liveSession, liveSnapshot, liveStrategy, liveTiming } from '../../helpers/liveSnapshot.js';
@@ -213,7 +213,7 @@ describe('race page with a plan', () => {
       tyres: { compound: 'Medium', used: true, wear: 0.98, newSets: 55 },
       tyreCoverage: null as LiveTyreCoverage | null,
     };
-    const inGarage = (kind: 'qualifying' | 'race' | 'practice', patch: Partial<typeof garage>, sequence: number) => liveSnapshot({
+    const inGarage = (kind: 'qualifying' | 'race' | 'practice', patch: Partial<LiveGaragePlan>, sequence: number) => liveSnapshot({
       sequence, lifecycle: 'garage', session: liveSession({ kind, inRealtime: false }), strategy: { ...base, resource: null, pit: null, garage: { ...garage, ...patch } },
     });
     const rows = () => screen.getAllByTestId('live-garage-check');
