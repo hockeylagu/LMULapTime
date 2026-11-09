@@ -80,13 +80,14 @@ const SUN_SHADOW_BLEND = `
 
 /**
  * Three's light loop with the sun's shadow from both maps. Leaves light their diffuse and translucency with min(2 * shadow, 1),
- * so partly shadowed foliage reads lit and only full shade is dark.
+ * so partly shadowed foliage reads lit and only full shade is dark. Terrain also takes its baked shadow (the splatter's alpha,
+ * shaderParts.ts) on the sun: the shade under trees and beside walls is painted into the ground, and lights it as shade.
  */
-function sunShadowLights(leaf: boolean): string {
+function sunShadowLights(kind: SurfaceConfig['kind']): string {
   const chunk = ShaderChunk.lights_fragment_begin;
   if (!chunk.includes(SUN_SHADOW)) throw Error('three lights_fragment_begin no longer has the directional shadow term');
   const shadow = `( UNROLLED_LOOP_INDEX == 0 ? surfaceSunShadow( ${SUN_SHADOW}, vDirectionalShadowCoord[ i ] ) : 1.0 )`;
-  return chunk.replace(SUN_SHADOW, leaf ? `min(2.0 * ${shadow}, 1.0)` : shadow);
+  return chunk.replace(SUN_SHADOW, kind === 'vegetation' ? `min(2.0 * ${shadow}, 1.0)` : kind === 'terrain' ? `min(${shadow}, surfaceBakedShadow)` : shadow);
 }
 
 let shadowMaterial: MeshDepthMaterial | null = null;
@@ -196,7 +197,7 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
   if (code.absorption) shader.fragmentShader = shader.fragmentShader.replace('outgoingLight = outgoingLight * ( 1.0 - material.clearcoat * Fcc )', `outgoingLight = outgoingLight * (${code.absorption}) * ( 1.0 - material.clearcoat * Fcc )`);
   if (code.emissive) shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\ntotalEmissiveRadiance=${code.emissive};`);
   shader.fragmentShader = shader.fragmentShader.replace('#include <shadowmap_pars_fragment>', `#include <shadowmap_pars_fragment>\n${SUN_SHADOW_BLEND}`)
-    .replace('#include <lights_fragment_begin>', sunShadowLights(config.kind === 'vegetation'));
+    .replace('#include <lights_fragment_begin>', sunShadowLights(config.kind));
   patchAmbientLookup(shader);
   if (REFLECTING_KINDS.has(config.kind)) {
     Object.assign(shader.uniforms, sceneryReflectionUniforms);

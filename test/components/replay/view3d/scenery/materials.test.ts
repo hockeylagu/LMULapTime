@@ -196,6 +196,13 @@ describe('patchSurfaceShader', () => {
     expect(shader.uniforms.surface_reflection).toBe(sceneryReflectionUniforms.surface_reflection);
     for (const kind of ['glass', 'clearcoat'] as const) expect(patched(surface(kind, { maps: { albedo: map('A', true) } })).fragmentShader).not.toContain('surfaceIndirectSpecular');
   });
+  it('shades terrain by its baked shadow on the sun as well as the ambient', () => {
+    const terrain = patched(surface('terrain', { maps: { layerA: map('A', true), splatter: map('S') }, flags: { layers: '1' } }));
+    expect(terrain.fragmentShader).toContain('surfaceBakedShadow=splatter.a;');
+    expect(terrain.fragmentShader).toContain('min(( UNROLLED_LOOP_INDEX == 0 ? surfaceSunShadow(');
+    expect(terrain.fragmentShader).toContain(', surfaceBakedShadow)');
+    expect(patched(surface('standard', { maps: { albedo: map('A', true) } })).fragmentShader).not.toContain(', surfaceBakedShadow)');
+  });
   it('turns shadow-pass cards toward the viewing camera, so a card shades what is drawn', () => {
     const material = billboardShadowMaterial();
     expect(billboardShadowMaterial()).toBe(material);

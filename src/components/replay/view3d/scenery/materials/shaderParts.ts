@@ -57,6 +57,7 @@ function terrainParts(config: SurfaceConfig, context: ShaderContext): ExtendedPa
       float splatterOcclusion=splatter.a;
       ${maps.splatterOverlay ? `splatterOcclusion*=mix(1.0,${sample('splatterOverlay')}.a,${overlayFactor});` : ''}
       surfaceAO=0.2+0.8*splatterOcclusion;
+      surfaceBakedShadow=splatter.a;
     `;
   const nb = vec(LAYER_KEYS.map(k => value(p.layerNormalBlend, k)));
   const ni = vec(LAYER_KEYS.map(k => value(p.layerNormalStrength, k)));

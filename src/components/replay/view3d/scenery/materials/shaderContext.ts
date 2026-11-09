@@ -53,6 +53,7 @@ varying vec2 vSurfaceXZ;
 varying float vSurfaceRandom;
 varying vec4 vSurfaceUV01, vSurfaceUV23, vSurfaceColour;
 float surfaceLeafMask = 0.0;
+float surfaceBakedShadow = 1.0;
 vec3 surfaceOverlay(vec3 base, vec3 detail) {
   return mix(2.0 * base * detail, 1.0 - 2.0 * (1.0 - base) * (1.0 - detail), step(vec3(0.5), base));
 }
