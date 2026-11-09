@@ -4,7 +4,11 @@ Status: in progress (2026-11-04 onward). Goal: make the replay's 3D view look cl
 only through the data package: the pipeline reads them from the installed game and exports them (the scenery catalog's
 `camera` profile, `LMUTrackPipeline/docs/SCENE_PACKAGE.md`; materials and their parameters in the chunk and car files). The app
 holds only its own rendering code. How the game's files were read and what they hold is pipeline research
-(`LMUTrackPipeline/docs/research/`), not repeated here. No picture matching (user decision 2026-11-04).
+(`LMUTrackPipeline/docs/research/`), not repeated here. Picture matching against the 24 in-game screenshots is allowed (user
+decision 2026-11-08, replacing "no picture matching" of 2026-11-04): they measure the look (exposure in stops, colour balance,
+shadow level per track) and may calibrate what the game files cannot give, such as the conversion from the app's light units to
+the game's exposure units. Values still come from the game files where they exist; a constant fitted to the screenshots is
+named as such, with the shots and the measurement it came from.
 
 ## Step 1 trial: metered auto-exposure (2026-11-05, committed 7f0fbab1)
 
@@ -41,7 +45,7 @@ All in the exposure pass (`autoExposure.ts`), in linear light before the curve:
 - **Ambient occlusion:** three's `GTAOPass` on the scene's resolved depth (no extra scene draw) with the profile's radius,
   samples, scale and occlusion colour, faded out from 50 to 150 m where depth precision speckled distant hills. Same-window A/B
   on Silverstone: no measurable cost (the frame is CPU-bound).
-- **Sky:** kept (three's Preetham sky, turbidity from the layout daylight).
+- **Sky:** the package's analytic sky (`perezSky.ts`, package schema 7), replacing three's sky shader.
 - **Sky in the sun's units:** HDR probe at Daytona (into the sun): sky overhead 3.8 / 7.7 / 10.6 against sunlit asphalt
   ~0.2, about 35× (real daylight: about 1×), so the sky showed white and pulled exposure down; the environment's 0.112 scale
   also cut the sunlit ground's bounce light to a tenth, darkening shaded stands and car sides. Now the sky material itself is
@@ -49,10 +53,13 @@ All in the exposure pass (`autoExposure.ts`), in linear light before the curve:
   sky 0.42 / 0.86 / 1.19, blue, with the ground bounce at its sunlit value.
 - **Exposure floor:** the metered log luminance never goes below a sunlit 18 % grey ground (`darkestMeteredLog`). The
   cockpit filled the metering window with its dark interior and raised exposure 2.8 stops (Daytona: 18.6 vs ~1 in the
-  chase view), burning out the track outside; with the floor it is 1.65. Sunlit views meter above the floor.
+  chase view), burning out the track outside; with the floor it is 1.65. Sunlit views meter above the floor. Replaced with
+  package schema 7: per-type profiles and the exposure law `C · T / L^s` with the onboard type's own window, and pixels nearer
+  than 4 m left out of the meter on every perspective view.
 
-Still open: per-camera profiles (the package carries the chase-view profile, applied to every camera), weather blending, light
-shafts.
+Package schema 7 (2026-11-08) carries a profile per camera type (external, onboard, TV), each with its own tone curve, metering
+window and adaptation scale, plus the output encode, the analytic sky and the venue's probe position. The app reproduces the
+frozen 62-shot reference set from them. Still open: weather blending, light shafts.
 
 ## Critique log (user, by eye)
 
@@ -98,7 +105,8 @@ To improve, cheapest first:
 3. **Bloom / glare.** Sun on chrome, white lines and the sky edge looked flat. A bloom pass from the profile's glare threshold,
    merged into the exposure pass. Done (uncommitted, `glare.ts`): threshold in exposed luminance, half-resolution chain of 5
    levels, composited after the tone curve (tone + (1 − tone)·glare); strength set by eye (gain 0.5); no star streaks.
-   Production pass at Silverstone: no cost. Validated by eye (2026-11-07).
+   Production pass at Silverstone: no cost. Validated by eye (2026-11-07). Removed with package schema 7: the reference shots
+   matched without it.
 4. **Car reflections and contact shadow.** Car paint reflected only the sky and a flat ground. A reflection probe near the car
    refreshed now and then, plus a contact shadow (ties to #8). Done (uncommitted): `car/carContactShadow.ts`, a soft
    rounded-footprint quad under the car (strength 0.6, 0.5 m spread); `car/carReflection.ts`, a 256 px cube probe at the car
@@ -111,7 +119,8 @@ resolve needs multisampled textures WebGL lacks); AO multiplies the whole image,
 
 ## Still open
 
-- **Sky model.** Preetham with the layout daylight's turbidity; a different sky model only if the look needs it.
+- **Sky model.** Done with package schema 7: the package's turbidity and Perez scales, the multipliers at the sun's height (linear between
+  rows), the table as the package ships it.
 - **Reflections beyond the car probe.** Screen-space or per-area reflections for glass and wet track.
 
 Each step is judged by eye against the game and re-runs `npm run benchmark:replay3d:suite` (p99 must stay < 16 ms).

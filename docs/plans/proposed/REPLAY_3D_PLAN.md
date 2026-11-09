@@ -19,7 +19,7 @@ yaw direction. At 99 mesh intersections the body origin sits 0.306–0.386 m abo
 that establishes registration for this recording, not calibrated wheel contact or every track.
 The viewer renders recorded XYZ and available yaw/pitch/roll, labels approximate body placement, uses the existing
 playhead and offers orbit/follow/chase/fixed/top cameras. A station-aligned ghost is implemented;
-full comparison and lifecycle acceptance remains. See [the package contract](../../PLUGINS.md#3d-scenery-and-vehicle-bodies-package-manifest-schema-5).
+full comparison and lifecycle acceptance remains. See [the package contract](../../PLUGINS.md#3d-scenery-and-vehicle-bodies-package-manifest-schema-7).
 
 The Duqueine D09 P3 now has an exact-record optional render mesh with native body, chassis,
 exterior, wing, glass, four tyres and four rims. The 2 MB private export uses one exterior LOD;

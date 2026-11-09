@@ -299,10 +299,10 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
 
 ### Local Data Packages (`server/plugins/`)
 - `dataPlugin.ts` loads external track geometry, physical profiles, and manufacturer assets from backend-only `LMU_PLUGIN_ROOT`.
-- Manifest schema 3 is the only supported package format ([contract](PLUGINS.md#3d-scenery-and-vehicle-bodies-package-manifest-schema-5)); `strict.ts` holds the exact-key readers
+- Manifest schema 7 is the only supported package format ([contract](PLUGINS.md#3d-scenery-and-vehicle-bodies-package-manifest-schema-7)); `strict.ts` holds the exact-key readers
   every package parser uses and `packageFiles.ts` the contained, size-checked, hash-on-read file registry. `scenePackage.ts` validates the
-  scenery layout index and `bodyPackage.ts` the vehicle bodies and their descriptors; `dataPlugin.ts` accepts `brakeBoardArtwork` as an orphaned v1 key
-  and never reads it. `dataPluginRoutes.ts` serves `/scenery/:layoutKey`, `/scenery/files/...`, `/vehicles/:identity/body` and `/vehicles/files/...`.
+  scenery layout index and `bodyPackage.ts` the vehicle bodies and their descriptors; `dataPlugin.ts` rejects any other manifest key,
+  including the removed `cars` and `brakeBoardArtwork`. `dataPluginRoutes.ts` serves `/scenery/:layoutKey`, `/scenery/files/...`, `/vehicles/:identity/body` and `/vehicles/files/...`.
   `src/components/replay/view3d/` owns the lazy Three.js viewer, cameras and
   discontinuity-safe XYZ/quaternion attitude sampling in `replayPose.ts`, preserving recorded body
   height and available pitch/roll. `sceneFrame.ts` owns native-to-render handedness.
@@ -316,10 +316,12 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   either lap replaces only `laps/lapLayer.ts` cars, wheel animation and racing lines, preserving
   the camera and scenery. Cancelled or superseded builds are discarded and retired lap buffers released.
   Canvas resizes repaint before the browser paints, avoiding a black frame when embedded toolbars change height.
-  `sceneEnvironment.ts` owns the Three.js daylight sky, its shared PMREM reflection environment,
-  fog, flat horizon ground and car-following shadow sun. Cars come from the `cars` catalog: `car/carMaterials.ts` builds materials from the
+  `sceneEnvironment.ts` owns the sky dome (`atmosphere/perezSky.ts`: the package's analytic sky, turbidity and haze model, the only
+  reader of `sky`), the haze (`atmosphere/haze.ts`: three's fog chunks with the scene's height and sun terms; its colour from the
+  sky above the horizon toward the view), the first PMREM environment, the venue capture at the layout's
+  `environmentProbe` that replaces it, and the car-following shadow sun. Cars come from the `cars` catalog: `car/carMaterials.ts` builds materials from the
   descriptor (surfaces in the app's names, version 4, every value filled: `finish` per material, paint `regions` / `uvScale`; `car/carPaint.ts`: regional car paint from the package's paint description; `car/carContactShadow.ts`: the under-car shadow;
-  `car/carReflection.ts`: the cube-map reflection probe at the car), `autoExposure.ts` meters, white-balances and tone-maps with the scenery catalog's `camera` profile and composites the bloom of `glare.ts`, `wheelGeometry.ts` reads the four wheel rigs, `wheelAnimation.ts` fits the model origin to the lap median and drives
+  `car/carReflection.ts`: the cube-map reflection probe at the car), `autoExposure.ts` meters, white-balances, tone-maps and encodes with the scenery catalog's `camera` type for the view (`cameraModes.tsx` `exposureType`), `wheelGeometry.ts` reads the four wheel rigs, `wheelAnimation.ts` fits the model origin to the lap median and drives
   roll/steer/travel per corner plus the steering wheel, `driverCameras.ts` places the Cockpit/Hood/Roof views on the descriptor's game
   cameras, and `sceneObjects.ts` places the car, switches the cockpit mesh variant and styles ghosts. Brake boards are part of the scenery GLBs.
   `racingLine.ts` drapes the 2D-coloured line ribbons and re-drapes them as chunks stream in; `tracksideCameras.ts` places the fixed trackside spots.

@@ -135,15 +135,15 @@ as approximate placement. It does not recenter the outline or invent a provider 
 Exact aliases win; ambiguous model matches remain unresolved. Primary and comparison
 vehicles resolve independently. Body direction continues to use replay yaw.
 
-## 3D scenery and vehicle bodies (package manifest schema 5)
+## 3D scenery and vehicle bodies (package manifest schema 7)
 
-The manifest `schemaVersion` is `5`. This app loads schema 5 only: earlier packages are rejected at startup with an invalid
+The manifest `schemaVersion` is `7`. This app loads schema 7 only: earlier packages are rejected at startup with an invalid
 status, and there is no fallback. The pipeline repository's `docs/SCENE_PACKAGE.md` and `docs/VEHICLE_PIPELINE.md` own the file formats;
 this section records what the app reads and checks.
 
 ```json
 {
-  "schemaVersion": 5,
+  "schemaVersion": 7,
   "id": "personal-data",
   "version": "1",
   "tracks": { "catalog": "tracks/index.json" },
@@ -160,11 +160,23 @@ In the package, the API and the code, a *vehicle* is a catalog record (model, cl
 
 One row per layout (`schemaVersion: 2`): `layoutKey`, `sourceGeometryRevision`, `routeLengthM`, `pitLaneLengthM`, `chunking`,
 `streaming` (`residentBehindM`, `residentAheadM`, `freeCameraRadiusM`), `daylight` (`date`, `sessions` race, qualify, practice1 and
-practice2 in that order with `localTime` `HH:MM`, `sunElevationDeg` and optional `sunBearingDeg` (degrees clockwise from true north in [0, 360)), `airPollution`, `hazeBaseScale`), one `horizon` chunk, `sectors` (main chunks ordered by lap
+practice2 in that order with `localTime` `HH:MM`, `sunElevationDeg` and optional `sunBearingDeg` (degrees clockwise from true north in [0, 360)), `airPollution`, `hazeBaseScale`, `hazeCloudyScale`, `hazeStormScale`, `hazeDawnScale`, `fogHeightAltitudeScalar`, `fogHeightExponentScalar`), `environmentProbe` (`position`: where the venue's light is captured, LMU local metres), one `horizon` chunk, `sectors` (main chunks ordered by lap
 range, then pit chunks), the layout's `textures` and `totals`. Rows and chunks have exactly the documented keys. The layout must
 exist in the track catalog and its `sourceGeometryRevision` must equal that geometry's revision. Chunk GLBs are `scenery/<sha256>.glb`
 and textures `scenery/textures/<sha256>.ktx2.zst` (a KTX2 without supercompression, compressed as one zstd file); main sector lap ranges are ordered, inside the route and linked circularly by
 `prev`/`next`; pit chunks chain in pit-lane order; every chunk texture is in the layout's texture list.
+
+The catalog's `chunking`, `streaming`, `camera` and `sky` are shared by every layout and attached to each layout the client gets.
+`camera` holds a positive `outputGamma` (the display encode), a positive `sceneLuminanceScale` and `types` with exactly `external`, `onboard` and `tv`; each type has a
+`meteringWindow` inside the frame (fractions from the top left), a positive `adaptationScale` (s of the exposure law
+`C · T / L^s`), `ambientOcclusion` and `profiles` ascending by `sunElevationDeg`, each with a positive `targetExposure` (T),
+`whiteBalanceK` and a `toneCurve` {`a` > 0, `b`}. The viewer interpolates a profile by sun elevation and holds it past the ends;
+the cockpit view uses `onboard`, trackside `tv`, every other view `external`. `sky` holds five `perezScale` values,
+`perezMultipliers` rows ascending by `sunElevationDeg` (four values each), `pollution`, `turbidity` and `fog.density` (each range
+with `min` ≤ `max`), `airMass`, and the haze's `fog.colour`, `fog.sunInfluence` and `fog.height`; the pipeline's
+docs/SCENE_PACKAGE.md "Sky and atmosphere" has the formulas. Only `atmosphere/perezSky.ts` reads it. The viewer takes the cloud
+cover from the replay at the lap and treats every replay as dry; it uses the clear-day haze density and does not apply `airMass`
+(the sun's colour has its own air mass) or `sceneLuminanceScale` yet.
 
 Startup checks that each listed file exists and has its catalogued size; it does not hash the scenery (several GB). Package files
 are pregenerated, content-named and published by folder swap, so they are never rewritten in place: the backend serves them as is,
