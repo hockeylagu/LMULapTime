@@ -34,6 +34,20 @@ export function testShading(): SceneryShading {
     sceneryReflection: { lodScale: 7, lod: 'explicit', dielectricF0: 0.08, families: ['ROAD', 'STANDARD'] },
     // 2 × 2: scale rises with N·V, bias falls with roughness.
     integrationMap: { width: 2, height: 2, encoding: 'unorm8', scale: [10, 200, 20, 150], bias: [250, 40, 100, 20] },
+    shadows: {
+      atlas: { count: 2, sizePx: 64, tilePx: 32, cascadeTiles: [[0, 0, 0], [0, 32, 0], [1, 0, 0]] },
+      select: { method: 'firstContainingTile', halfExtent: 0.49 },
+      filter: { hardwarePcf: true, texelSize: 1 / 64, scale: 0.25, taps: [{ offset: [-0.5, 0.5], weight: 2 }, { offset: [0.5, -0.5], weight: 2 }] },
+      normalOffset: { scale: 0.05, by: 'normalShadowInfluence' },
+      texelSnap: true,
+      fit: { shape: 'square', widthPerSplit: 1.1 },
+      fade: { endsAtFar: true, lengthOfLastSpan: 0.75 },
+      cameras: {
+        chase: { nearM: 0.1, farM: 300, splitRatio: 0.9, count: 3, splitsM: [20, 80, 300] },
+        cockpit: { nearM: 0.01, farM: 200, splitRatio: 0.9, count: 2, splitsM: [30, 200] },
+        tv: { nearM: 1, farM: 500, splitRatio: null, count: null, splitsM: null },
+      },
+    },
   };
 }
 

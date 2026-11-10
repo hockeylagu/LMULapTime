@@ -183,6 +183,12 @@ cover from the replay at the lap and treats every replay as dry, and reads the s
 elevation and that cover (the base coverage the grid is sampled by); it applies the dry haze density (dawn mix, cloud and pollution
 terms, no storm term) and does not apply `airMass` or `sceneLuminanceScale` yet.
 
+The catalog's `shading.shadows` (the pipeline's docs/SCENE_PACKAGE.md "Shadows") is the cascaded sun shadow: `atlas` (tiles inside
+their atlas, one per cascade), `select`, `filter` (taps whose weights times `scale` sum to 1), `normalOffset`, `texelSnap`, `fit`, `fade`
+and `cameras` with exactly `chase`, `cockpit` and `tv`. Each camera set has `nearM` < `farM` and either a `splitRatio` in 0..1, a `count`
+no larger than the tile count and that many ascending `splitsM` ending at `farM`, or all three null (no published set). The viewer does
+not use it yet.
+
 Startup checks that each listed file exists and has its catalogued size; it does not hash the scenery (several GB). Package files
 are pregenerated, content-named and published by folder swap, so they are never rewritten in place: the backend serves them as is,
 with no hash or change check. A hash check can come back if a real failure ever needs one.

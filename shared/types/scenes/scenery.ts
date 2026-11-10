@@ -312,4 +312,35 @@ export interface SceneryShading {
   sceneryReflection: { lodScale: number; lod: SceneryReflectionLod; dielectricF0: number; families: string[] };
   /** The split-sum table: 8-bit (scale, bias) per texel, row-major, N·V along a row (128 texels), roughness 0 at row 0. */
   integrationMap: { width: number; height: number; encoding: 'unorm8'; scale: number[]; bias: number[] };
+  /** The cascaded sun shadow: atlas layout, cascade choice, filter, normal offset, fit, fade and the split planes per camera type. */
+  shadows: SceneryShadows;
+}
+
+/** The split planes of one camera type; `splitRatio`, `count` and `splitsM` are null together where the package has no set. */
+export interface SceneryShadowCamera {
+  nearM: number;
+  farM: number;
+  splitRatio: number | null;
+  count: number | null;
+  /** The far edge of each cascade, metres, ascending; the last is `farM`. */
+  splitsM: number[] | null;
+}
+
+/** The pipeline's docs/SCENE_PACKAGE.md "Shadows". */
+export interface SceneryShadows {
+  /** `cascadeTiles[i]` is [atlas, x, y] of cascade i, in texels. */
+  atlas: { count: number; sizePx: number; tilePx: number; cascadeTiles: Array<[number, number, number]> };
+  /** The first cascade whose tile holds the point: max(|u − 0.5|) ≤ halfExtent. */
+  select: { method: 'firstContainingTile'; halfExtent: number };
+  /** shadow = Σ weight · compare(uv + offset · texelSize) · scale. */
+  filter: { hardwarePcf: boolean; texelSize: number; scale: number; taps: Array<{ offset: [number, number]; weight: number }> };
+  /** The position moves along the normal by `scale` times the material's normal shadow influence. */
+  normalOffset: { scale: number; by: 'normalShadowInfluence' };
+  /** Cascade origins land on texel k + 0.5. */
+  texelSnap: boolean;
+  /** Cascade i is a square of side widthPerSplit · split_i; the last is widthPerSplit · (far − split_N−2). */
+  fit: { shape: 'square'; widthPerSplit: number };
+  /** fade = saturate(viewDepth · w − z) with 1 / w = lengthOfLastSpan · (far − split_N−2), reaching zero at far. */
+  fade: { endsAtFar: boolean; lengthOfLastSpan: number };
+  cameras: { chase: SceneryShadowCamera; cockpit: SceneryShadowCamera; tv: SceneryShadowCamera };
 }

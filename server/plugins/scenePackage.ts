@@ -118,7 +118,7 @@ function parseCamera(value: unknown, what: string): SceneryCamera {
 /** The catalog's shading (SceneryShading): positive scales, ordered limits, known LOD modes and non-empty unit-direction kernels. */
 function parseShading(value: unknown, what: string): SceneryShading {
   const row = record(value, what);
-  exactKeys(row, ['sunGlint', 'smallEdge', 'carPaintReflection', 'convolution', 'sceneryReflection', 'integrationMap'], what);
+  exactKeys(row, ['sunGlint', 'smallEdge', 'carPaintReflection', 'convolution', 'sceneryReflection', 'integrationMap', 'shadows'], what);
   numbers(row.sunGlint, ['cosineThreshold', 'roughnessCutoff', 'smoothSpecularScale'], `${what}.sunGlint`, true);
   if ((row.sunGlint as Record<string, number>).cosineThreshold > 1) throw Error(`${what}.sunGlint.cosineThreshold: above 1`);
   numbers(row.smallEdge, ['detectorScale', 'edgeScale', 'limitMin', 'limitMax'], `${what}.smallEdge`, true);
@@ -153,7 +153,90 @@ function parseShading(value: unknown, what: string): SceneryShading {
   const families = array(scenery.families, `${what}.sceneryReflection.families`, 64).map((family, i) => text(family, `${what}.sceneryReflection.families[${i}]`, 64));
   if (!families.length) throw Error(`${what}.sceneryReflection.families: empty`);
   parseIntegrationMap(row.integrationMap, `${what}.integrationMap`);
+  parseShadows(row.shadows, `${what}.shadows`);
   return structuredClone(row) as unknown as SceneryShading;
+}
+
+function positive(value: unknown, what: string): number {
+  const n = finite(value, what);
+  if (n <= 0) throw Error(`${what}: must be positive`);
+  return n;
+}
+
+function flag(value: unknown, what: string): void {
+  if (typeof value !== 'boolean') throw Error(`${what}: expected true or false`);
+}
+
+/** The cascaded sun shadow (the pipeline's docs/SCENE_PACKAGE.md "Shadows"). */
+function parseShadows(value: unknown, what: string): void {
+  const row = record(value, what);
+  exactKeys(row, ['atlas', 'select', 'filter', 'normalOffset', 'texelSnap', 'fit', 'fade', 'cameras'], what);
+  const atlas = record(row.atlas, `${what}.atlas`);
+  exactKeys(atlas, ['count', 'sizePx', 'tilePx', 'cascadeTiles'], `${what}.atlas`);
+  const atlases = count(atlas.count, `${what}.atlas.count`, 8), size = count(atlas.sizePx, `${what}.atlas.sizePx`, 16384), tile = count(atlas.tilePx, `${what}.atlas.tilePx`, 16384);
+  if (!atlases || !tile || tile > size) throw Error(`${what}.atlas: expected atlases with tiles no larger than the atlas`);
+  const tiles = array(atlas.cascadeTiles, `${what}.atlas.cascadeTiles`, 16);
+  if (!tiles.length) throw Error(`${what}.atlas.cascadeTiles: empty`);
+  tiles.forEach((value, i) => {
+    const at = `${what}.atlas.cascadeTiles[${i}]`, cell = array(value, at, 3);
+    if (cell.length !== 3) throw Error(`${at}: expected [atlas, x, y]`);
+    const [index, x, y] = cell.map((n, j) => count(n, `${at}[${j}]`, size));
+    if (index >= atlases || x + tile > size || y + tile > size) throw Error(`${at}: not inside the atlas`);
+  });
+  const select = record(row.select, `${what}.select`);
+  exactKeys(select, ['method', 'halfExtent'], `${what}.select`);
+  if (select.method !== 'firstContainingTile') throw Error(`${what}.select.method: expected firstContainingTile`);
+  if (positive(select.halfExtent, `${what}.select.halfExtent`) > 0.5) throw Error(`${what}.select.halfExtent: above 0.5`);
+  const filter = record(row.filter, `${what}.filter`);
+  exactKeys(filter, ['hardwarePcf', 'texelSize', 'scale', 'taps'], `${what}.filter`);
+  flag(filter.hardwarePcf, `${what}.filter.hardwarePcf`);
+  positive(filter.texelSize, `${what}.filter.texelSize`);
+  const scale = positive(filter.scale, `${what}.filter.scale`);
+  const taps = array(filter.taps, `${what}.filter.taps`, 64);
+  if (!taps.length) throw Error(`${what}.filter.taps: empty`);
+  const total = taps.reduce<number>((sum, value, i) => {
+    const at = `${what}.filter.taps[${i}]`, tap = record(value, at);
+    exactKeys(tap, ['offset', 'weight'], at);
+    const offset = array(tap.offset, `${at}.offset`, 2);
+    if (offset.length !== 2) throw Error(`${at}.offset: expected [x, y]`);
+    offset.forEach((n, j) => finite(n, `${at}.offset[${j}]`));
+    return sum + positive(tap.weight, `${at}.weight`);
+  }, 0);
+  if (Math.abs(total * scale - 1) > 1e-9) throw Error(`${what}.filter: weights times scale are ${total * scale}, not 1`);
+  const normal = record(row.normalOffset, `${what}.normalOffset`);
+  exactKeys(normal, ['scale', 'by'], `${what}.normalOffset`);
+  nonNegative(normal.scale, `${what}.normalOffset.scale`);
+  if (normal.by !== 'normalShadowInfluence') throw Error(`${what}.normalOffset.by: expected normalShadowInfluence`);
+  flag(row.texelSnap, `${what}.texelSnap`);
+  const fit = record(row.fit, `${what}.fit`);
+  exactKeys(fit, ['shape', 'widthPerSplit'], `${what}.fit`);
+  if (fit.shape !== 'square') throw Error(`${what}.fit.shape: expected square`);
+  positive(fit.widthPerSplit, `${what}.fit.widthPerSplit`);
+  const fade = record(row.fade, `${what}.fade`);
+  exactKeys(fade, ['endsAtFar', 'lengthOfLastSpan'], `${what}.fade`);
+  flag(fade.endsAtFar, `${what}.fade.endsAtFar`);
+  positive(fade.lengthOfLastSpan, `${what}.fade.lengthOfLastSpan`);
+  const cameras = record(row.cameras, `${what}.cameras`);
+  exactKeys(cameras, ['chase', 'cockpit', 'tv'], `${what}.cameras`);
+  for (const name of ['chase', 'cockpit', 'tv']) parseShadowCamera(cameras[name], `${what}.cameras.${name}`, tiles.length);
+}
+
+/** One camera type's split planes: near and far, then either no set (all null) or a ratio, a count and that many ascending splits ending at far. */
+function parseShadowCamera(value: unknown, what: string, maxCascades: number): void {
+  const row = record(value, what);
+  exactKeys(row, ['nearM', 'farM', 'splitRatio', 'count', 'splitsM'], what);
+  const near = positive(row.nearM, `${what}.nearM`), far = finite(row.farM, `${what}.farM`);
+  if (far <= near) throw Error(`${what}: farM not beyond nearM`);
+  if (row.splitsM === null) {
+    if (row.splitRatio !== null || row.count !== null) throw Error(`${what}: splitsM is null but splitRatio or count is not`);
+    return;
+  }
+  const ratio = finite(row.splitRatio, `${what}.splitRatio`);
+  if (ratio < 0 || ratio > 1) throw Error(`${what}.splitRatio: outside 0–1`);
+  const cascades = count(row.count, `${what}.count`, maxCascades);
+  const splits = ascendingNumbers(row.splitsM, `${what}.splitsM`, maxCascades, near, far);
+  if (!cascades || splits.length !== cascades) throw Error(`${what}.splitsM: expected count splits`);
+  if (splits[cascades - 1] !== far) throw Error(`${what}.splitsM: the last split is not farM`);
 }
 
 /** The split-sum table: `width` × `height` 8-bit (scale, bias) pairs, row-major, N·V along a row, roughness down the rows. */
