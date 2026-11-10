@@ -1,4 +1,4 @@
-# VCR Format — Analysis, Provenance & Future Work
+# VCR Format — Analysis & Provenance
 
 Companion to [VCR_FORMAT.md](../VCR_FORMAT.md).
 
@@ -7,7 +7,7 @@ Companion to [VCR_FORMAT.md](../VCR_FORMAT.md).
 - **VCR_FORMAT.md** states *what is where* — byte offsets, bit masks, payload layouts. Only
   facts that are established go there, with no hedging, evidence or history.
 - **This document** records *how we know*, *how confident we are*, what has been ruled out, and
-  what to try next. Anything speculative, superseded, or in progress belongs here.
+  what is still open (§3). Anything speculative, superseded, or in progress belongs here.
 
 When a hypothesis in this document graduates to established fact, move the bare statement into
 VCR_FORMAT.md and leave the evidence trail here.
@@ -164,12 +164,10 @@ needs a different car with a known, different rev limiter on the limiter.
 transition — consistent with the authentic clutch-disengagement dip. There are no
 forward-gear-to-forward-gear errors.
 
-### 2.3 Open leads
+### 2.3 Acceleration leads — settled
 
-| Channel | Best candidate | r (controlled) | Notes |
-|---|---|---|---|
-| lateral acceleration / lateral G (`LocalAccel.X`) | `i8 @14` | −0.76 to −0.97 | Strong lead from the two valid Algarve captures. `Algarve International Circuit P1 45.Vcr` paired with `Algarve-International-Circuit_20260906-175519.jsonl` gives r = −0.7646 overall; `P1 47.Vcr` paired with `Algarve-International-Circuit_20260906-182704.jsonl` gives r = −0.9060 overall, −0.9522 above 80 km/h, and −0.9664 below 80 km/h. Controls rediscovered throttle/brake/steering/RPM in the same `P1 47` run. Treat as a lead, not ground truth, until the sign/scale and axis naming are confirmed with a purpose-built left/right slalom capture. In rF2 local coordinates, X is expected to be lateral, so G would be `LocalAccel.X / 9.80665`. |
-| longitudinal acceleration / longitudinal G (`LocalAccel.Z`) | unresolved; brake-region aliases around `bits@33..36` | 0.69 to 0.90 in one valid capture | Not enough to promote. The best rows overlap the known brake payload byte (`@36`), and the high-speed window where `LocalAccel.Z` reaches r = 0.9025 is also where the brake control scores r = 0.9992 on the same bit region. This currently looks like brake/deceleration confounding, not an independent longitudinal-G field. |
+The lateral G lead at pose `i8 @14` and the unresolved longitudinal G (§1 captures) are settled by the pose
+survey: acceleration x and z are signed 12-bit fields at bytes 34–35 and byte 3 (§2.14, VCR_FORMAT §4.1).
 
 ### 2.4 Known artifacts — do not pursue
 
@@ -500,9 +498,8 @@ checks for new layouts before any laps have been driven, plus a pit-lane polylin
 frozen during playback, it can't validate them against the VCR. Candidates not yet located in
 the replay stream: `veFraction` (virtual energy), `fuelFraction` (compare with Class 0 Type 51,
 §2.8 C), `headlights`, `penalties` count, `pitState`, `upgradePack`, and `lapDistance` /
-`pathLateral` / `trackEdge` (§3 derives these from geometry today). Validating any of them
-still needs a driven shared-memory capture (§1) or a way to refresh `standings` in replay mode
-(see §7 item 6).
+`pathLateral` / `trackEdge` (the app derives these from geometry). Validating any of them
+still needs a driven shared-memory capture (§1): a timeline seek does not refresh `standings`.
 
 #### E. Hazard: garage endpoints can crash LMU in replay mode
 
@@ -1174,26 +1171,6 @@ R1 11's recording starts at 578 s, so only R1 12 carries these one-off events.
   lap 1 start time (177.4825 for every car). Sent 0.45 s before that time: the race start
   time, announced ahead.
 
-#### J. Still open after this pass
-
-- **Opcode 211 (1 byte, global):** bit 1 is set at 217.2 s in R1 12, about 40 s after the
-  green, and stays set. Bit 0 toggles, on about 80 % of the time, in 226 intervals (median
-  5.6 s). It does not follow the player's DuckDB sector flags or cars within 30–200 m of the
-  player.
-- **Opcode 366 (1 byte, one per car at 0 s):** 0 for all 61 cars in R1 12. R1 11 has a single
-  one, `0x10`, when the recording starts. Possibly the same flag as the opcode 372 triples.
-- **Opcode 200 (variable, every 4 s):** byte 0, then (slot, status) pairs. The status is mostly
-  `0x60`/`0x61`, sometimes `0x01`, `0x02` or `0x10`–`0x12`. An empty keyframe `00` comes every
-  4 s.
-- **Opcode 68 (50 bytes every 12 s):** constant. float32 2000.0, then 16 ASCII strings `01`,
-  `02` or `03`.
-- **Opcode 64 (no payload, player only):** 183 events in R1 12, about five per lap. They fall
-  at fixed lap distances in the player's DuckDB (`Lap Dist`): about 280, 837, 1614, 2056 and
-  3720 m, plus occasional extras near 400, 920 and 3860 m. Some are on full throttle and some
-  in braking zones, so the trigger is a track position, not a driver input. Its meaning is
-  open.
-- **Opcode 1:** no channel with a named XML contact yet.
-
 ### 2.17 Full opcode pass: evidence for the 2026-11-10 VCR_FORMAT rewrite
 
 Source: Daytona R1 12 (online race, 62 entries, player slot 18) against its results XML and the player's DuckDB.
@@ -1269,7 +1246,7 @@ engine speed at bits 50..63, which is why it saturated at 11,170 rpm. The old wh
 #### G. Smaller events
 
 - **Opcode 64:** 183 of 183 within 0.05 s of an opcode 75 downshift (index 55); 642 downshifts in all. The fixed lap
-  distances of §2.16 J are the braking zones.
+  distances found in the R1 12 pass are the braking zones.
 - **Opcode 74:** start lights `1` from 66.03 s (formation), `6` at 177.53 s (green), `0` at 187.5 s; pit exit light
   `2` until 217.5 s; pit official 0 `2` from 219.8 to 224.3 s, while the pit lane start was released. Opcode 211 bit 1
   is set at 217.2 s, as the pit exit light goes to `0`.
@@ -1279,14 +1256,6 @@ engine speed at bits 50..63, which is why it saturated at 11,170 rpm. The old wh
 - **Opcode 366:** `00` for all 61 cars (front and rear compound 0).
 - **Opcode 202:** one event at 177.03 s: phase 3, 177.48 s, start ≈ 0. The phase stays 3 at the green in this rolling
   start; check a standing start.
-
-#### H. Still open
-
-Opcode 64's effect, 134 vs 133, 161, 164, the opcode 207 float, 241, 321 vs 320, the opcode 322 high nibble beyond
-"2 = racing", opcode 143 byte 24, bytes 33..34 and the 6-bit levels, the opcode 200 flag and mode names, pose bits
-22..23 and 42, byte 36 bit 7, byte 38 bits 3..5, and the cell value of opcode 89. Not seen in R1 12, so stated from
-their layout only: 197, 209/210, 215..219, 221, 235/236, 327..337.
-
 
 ### 2.18 Second opcode pass: corpus census and the remaining fields (2026-11-10)
 
@@ -1349,10 +1318,6 @@ The following were read from the way the session uses them, with no data channel
 engine effect levels in opcode 143, the opcode 64 trigger (downshift under braking above half the maximum engine
 speed, at most every 2.5 s), the opcode 200 flag codes (1 yellow, 6 ahead of certain cars, 3 chequered), the
 difference between opcodes 320 and 321, and the opcode 241 reason codes that never occur in replays.
-
-#### F. Still open
-
-Settled in §2.19 and §2.20; what remains is listed in §2.20 I.
 
 ### 2.19 Wheels and tyres against DuckDB (2026-11-10)
 
@@ -1489,13 +1454,28 @@ R1 12: every car switches to `2` at the green; retired cars read `0`. In practic
 - **Pose bit 42**: never set; DuckDB's `AntiStall Activated` and `LaunchControlActive` are never on in R1 12 either.
 - **Pose bit 18**: never set; no replay on disk has a driver swap.
 
-#### I. Still open
+## 3. Still open
 
-Weather bytes 4..5 (flag effect) and 34; weather bytes 6..17 (ramps and constant); opcode 161's quantity; opcode 200
-flags 2, 5 and 7..10 and modes 3..5; the opcode 143 per-wheel levels at UInt64 `16` bits 0..23 (always 0); which
-driving aid pose bit 42 is; the non-hybrid engine value in pose byte 37 (always 0); why the pose tyre temperature
-(byte 40) reads below DuckDB's tread temperatures (§2.19 B); opcode 194 channel 1 (the meaning of the loose-material
-value `255`).
+The one current list; each pass's evidence stays in §2.
+
+**Format fields not established** (VCR_FORMAT marks each one):
+- Weather (opcode 138): what the two flags at bytes 4–5 (set about every 600 s) do; the constant at bytes 16–17
+  (`0x1EA2` online, `0x5698` offline); byte 34 (`128` in every replay).
+- Opcode 64: what the timed engine effect shows (every one sits within 0.05 s of a downshift sound, §2.17 G).
+- Opcode 75: sound index `97`.
+- Opcode 74: the names of the start light, pit exit light and pit official values.
+- Opcode 143: the per-wheel levels at UInt64 `16` bits 0..23 (`0` in every replay).
+- Opcode 161: the quantity of the per-car level (consistent with screen dirt, §2.16 G).
+- Opcode 200: flags `2`, `5`, `7..10` and modes `3..5`.
+- Opcode 324 (pit stop summary): byte 4 bits 0..1.
+- Pose: which driving aid bit 42 is; the non-hybrid engine value in byte 37 (always `0`); why the tyre temperature
+  at byte 40 reads below DuckDB's tread temperatures (§2.19 B).
+- Opcode 194 channel 1: what the loose-material value `255` means.
+- Opcodes the game defines but no replay holds (VCR_FORMAT §3.3): their layouts are unchecked.
+
+**Decoded but not read by the app:** the pose packet's hybrid mode and regen level, clutch, TC level, ABS, puncture,
+wipers / rain light and yaw rate. Map one when a feature needs it, all together in one cache version with a one-time
+offline rewrite of the replays whose files are gone.
 
 ---
 
@@ -1522,128 +1502,11 @@ floating-point precision.
 
 ---
 
-## 5. Implementation status
-
-| Feature Area | Status | Notes |
-| :--- | :--- | :--- |
-| **Driver Roster** | Implemented (`parseReplayMetadata`) | Deterministic binary `numDrivers` + structured records with `entryTime`/`exitTime`. |
-| **Session Identification** | Implemented (`parseReplayMetadata`) | Session byte parsing, `modUid`, `trackPath`. |
-| **Lap & Sector Timing** | Implemented (`extractReplayTrajectory` laps) | Class 6 Type 6 events; matches in-game HUD. |
-| **Tire Dynamics & Wear** | **Unverified; removed from parser** | Speculative Type 15 offsets refuted in analyzed multiplayer sessions (§2.7). Open investigation remains for potential inclusion in offline practice / local race weekend sessions. |
-| **Penalties & Incidents** | Implemented (cache v7) | Trajectory `penalties`: class 3 Type 5 issued (`penaltyType`, `penaltySeconds`, reason text from `+2`) and Type 7 served (§2.13 B). Coverage is partial (DQs and start-burst penalties missing, §2.13 G); the XML stays the reference. Before v7 the branch gated on class 2 and never fired. |
-| **3D Car Attitude** | Implemented (`extractReplayTrajectory`) | `rotX`/`rotY`/`rotZ` and `detachablePartState`. |
-| **Gear** | Implemented (`extractReplayTrajectory`) | Header `eventType - 8`, all cars including AI. |
-| **Engine RPM** | Implemented (`extractReplayTrajectory`) | Bits 53-62 (§2.1), scale 10.9228, saturation guard at raw10 === 1023. |
-| **Pit Events & Strategy** | Implemented (`extractReplayTrajectory`) | Class 0/1/5 Type 2 and Class 2/7 Type 49. Structured `fuelAddedLiters` added on top of the existing `details` string. Exposed via the trajectory's `pitEvents` field. |
-| **Garage state (`inGarage`)** | Implemented, recomputed on read | From codes `21` → `16` only, split into parked (garage) and the drive out (pit lane), ending at 100 km/h (VCR_FORMAT §Pit Stop & Garage Workflow). Before, type 49 counted as a garage return (17% of race cars flagged in the garage while racing after their first stop, dropping out of the traffic index) and the drive to the pit exit was flagged as garage. On 90 sampled replays: moving points flagged garage 12.4 M → 0. Applied by `withGarageState` on every read, including the traffic reader; drop it only once every row, deleted replays included, is rewritten. |
-| **Track Flags & Safety Car** | Implemented (`extractReplayTrajectory`), partially confirmed | Class **3** (not 2) Type 10, always 3 bytes. `flagState` confirmed (§2.6); other 2 bytes decoded but unconfirmed. |
-| **Live Standings** | Implemented (`extractReplayTrajectory`) | Class 7 Type 48. Dynamic grid size (`eventSize = 21 + count`), count + slot array in exact running order (§2.6, §2.9). |
-| **Weather & Track Meteorology** | Implemented (`parseReplayMetadata`, `extractReplayTrajectory`) | Class 1 Type 10 (80 bytes, driverSlot 255). Ambient `byte38 / 8 + 5.9` °C, rain `byte42 / 255` (§2.12 B). The app dropped the track-temperature estimate from byte 39. The RealRoad thermal field is separate (§2.15 D). |
-| **Virtual Energy (1/51)** | Implemented (`extractReplayTrajectory`) | Point field `virtualEnergy` = `byte0 / 2.55` (§2.12 A). Before cache v6 it was stored as `fuel`. |
-| **Contact events (1/17)** | Implemented (`extractReplayTrajectory`) | Trajectory `contacts`: slot, `sTime`, impact magnitude, other car slot or object name (§2.11 B, §2.12). All session types since cache v7 (class read as `h >>> 30`, §2.13 A). |
-| **Tyre compound per wheel (1/16)** | Implemented (`extractReplayTrajectory`) | Point field `tireCompoundIndices` and trajectory `tireCompounds` `[FL, FR, RL, RR]`, raw indices (§2.11 C). All session types since cache v7. |
-| **Cache v6 compatibility** | Implemented (`replayTrajectoryCodec.ts`) | v3–v5 rows are corrected on read (`fuel` → `virtualEnergy`, ambient rescaled from the recovered raw byte, `trackTemp` dropped, `rainPercent` = raw / 255). Stored blobs are never rewritten. v6 rows are served as written (race rows match v7 apart from penalties). On-disk replays are re-decoded at v7 by the background upgrade runner; deleted replays keep their rows and gain no contacts or compounds. |
-| **Class grouping across session types** | Implemented (cache v7) | `extractReplayTrajectory` groups by `h >>> 30` for weather, tyres, contacts, VE and flags. v6 rows of practice/qualifying replays lack them until re-decoded. The app still uses historical type labels (§2.15 B). |
-| **Track limits (7/28)** | Not parsed (by decision) | Warning/current points, lap, resolution per verdict; 0 mismatches on 32k XML rows (§2.13 B). A field-for-field copy of the XML `<TrackLimits>` rows, which the stewards log already reads; only useful for a replay whose XML is gone. |
-| **Damage & sector bests (1/23, 1/26, 1/29–31)** | Not parsed (by decision) | One packet per XML `<Sector>` row with an all-zero payload: the car, the time and the kind (engine damage, suspension damage, best S1/S2/S3), nothing about how much damage or where. Duplicates the XML. |
-| **Damage & sector bests (1/23, 1/26, 1/29–31)** | Not implemented | Engine / suspension damage reports and sector-best markers (§2.13 B). |
-| **Player gear shifts (3/11)** | Not parsed (by decision) | Exact upshift / downshift / limiter instants for the player car (§2.13 C). Same information as the pose `gear` channel, only timed to the frame, and DuckDB already gives the player 100 Hz gear. Documented, not decoded. |
-| **Player tyre radius (3/24 `u16@6`)** | Not implemented | Per wheel, radius-like, grows with wheel speed² (§2.13 D). Low value for the app. |
-
-**Unrelated defect noticed:** ~20 of 45 drivers in the Imola race replay have `carClass`
-unresolved (`?`), falling back to raw vehicleId strings like `99_25_AO_E58B41E50`. This will
-affect any per-class feature.
-
----
-
-## 6. Catalog of untapped data
-
-Specification-ready material not yet surfaced in the app.
-
-### 6.1 4-wheel thermal, pressure & degradation dynamics (Class 0 Type 15)
-> **Investigation Note:** The offsets below represent the earlier speculative hypothesis. Empirical analysis on multiplayer replays demonstrated that these fields are not present in online sessions (§2.7). Investigation is ongoing to determine whether offline/local practice sessions retain these fields.
-
-- **12-point tire tread temperatures (°C)**: inner / centre / outer zones across all 4 corners,
-  enabling thermal camber optimisation and overheating analysis.
-- **Dynamic hot inflation pressures** (kPa / PSI) for all 4 tires.
-- **Corner-by-corner wear degradation (0–100%)**, enabling true degradation curves over a stint
-  instead of end-of-session approximations.
-- **Brake rotor temperatures (°C)** at offsets `+24..31` when `eventSize === 37`.
-
-### 6.2 Track meteorology, precipitation & wetness (Class 1 Type 10) [ESTABLISHED]
-> **Resolution Note:** The earlier hypothesis that dynamic track meteorology was stored in the metadata 67-byte session block was superseded; that block stores static session rule multipliers (Damage, Fuel, Tire, Session Length). Dynamic track meteorology, precipitation, and sector surface wetness are fully established in **Class 1 Type 10 (`eventSize === 80`)**, detailed in §2.9 and [VCR_FORMAT.md](../VCR_FORMAT.md) §4.
-- **Ambient temperature** at byte 38: `°C = byte / 8 + 5.9` (§2.12 B).
-- **9 sector track wetness / precipitation intensity channels** at bytes 42..77 (zero when dry, positive integers `0x01` to `0x18+` scaling with rainfall rate).
-- Enables real-time rain timeline charts and automatic wet-session classification in Replay Studio.
-
-### 6.3 Live race control, flags & safety car (Class 2 Type 10, Class 1 Type 10)
-Track condition flags (green through checkered, including FCY/SC/VSC), the sector hazard mask,
-driver-targeted flags (blue / black / meatball), and the start-lights countdown phase.
-
-### 6.4 Live leaderboard matrix & gaps (Class 6 Type 48)
-Real-time running order from P1 to Pn at every timestamp, enabling lap charts, overtake
-detection and pit-shuffle visualisation without post-hoc reconstruction.
-
-### 6.5 Pit stop strategy & service detail
-Fuel added in litres, tire compound fitted per corner, air-jack duration, penalty compliance
-ordering, and pit lane speed enforcement beacons.
-
-### 6.6 Aerodynamic damage & detachable bodywork (`info2 & 0x3FF`)
-*Refuted 2026-11-09 (§2.14): these are the `steer10` bits, not damage.* Former hypothesis: 10-bit bitfield covering front wing endplates, rear wing main plane, diffuser, front splitter,
-doors, and engine cowl / rear deck.
-
-### 6.7 Balance of Performance & driver session timings (metadata 24-byte tail)
-Success ballast (kg), intake restrictor ratio, and per-driver `entryTime` / `exitTime`.
-
-### 6.8 Pose packet fields found in the bit survey (§2.14)
-Every car, ~50 Hz, not decoded yet. Map one when a feature needs it, all together in one cache
-version with a one-time offline migration (and drop the stored `detachablePartState`, which is the
-steering bits, in the same pass):
-- wheel rotation speed per wheel: lockup / wheelspin for any car, not only live captures;
-- suspension travel per wheel (per-car scale): kerb use, bottoming, ride;
-- hybrid mode and regen level: deployment and regen review per lap;
-- clutch pedal, TC level, ABS: driver aids and starts;
-- puncture flag: incidents and stop reasons in the debrief and race review;
-- wipers / rain light (probable): wet session timeline;
-- yaw rate (probable): handling balance without deriving it from heading.
-
----
-
-## 7. Suggested next experiments
-
-1. **Pin down the RPM scale.** Capture two cars with precisely known, *different* rev limiters,
-   each held on the limiter, and solve for the constant exactly (§2.1).
-2. **Isolate fuel.** A long constant-pace stint, so fuel drift is large relative to noise and
-   separable from other monotonic channels (§2.4).
-3. **Confirm the ride-height lead** at `i16 @18` with a purpose-built capture — e.g. heavy
-  braking and kerb strikes to validate unknown corner-state fields (§2.3).
-4. **Extend the track model** to more circuits: 2 edge laps each, per §3.
-5. **Test Local Single-Player vs. Multiplayer Replay Telemetry Fidelity.** **[COMPLETED]** Verified via paired capture on Bahrain P1 19 (§2.7, §2.8). Proved that dynamic rubber wear counters and 12-point tire carcass/tread temperatures are universally omitted across both multiplayer and offline practice replays. Simultaneously confirmed individual brake line pressures ($r = 0.930$) in Class 1 Type 24 and brake rotor disc temperature ($r = 1.000$) in Class 2 Type 15.
-6. **Does a timeline seek refresh `/rest/watch/standings`?** **[COMPLETED: no]** After a manual
-   scrub to 5:00 of Sebring R1 15, all 20 cars were byte-identical to the formation snapshot. The
-   API has no per-car ground truth in replay mode; use DuckDB pairs (§2.12) instead.
-7. **Per-sector wetness.** Find a replay whose 9 Class 1 Type 10 wetness blocks ever differ.
-   If none do, collapse them to a single `rain = byte / 255` value (§2.10 B).
-8. **Locate the HUD track temperature.** Compare the HUD and REST readings with the RealRoad
-   temperature field and its spatial aggregation (§2.15 D).
-9. **Map the remaining RealRoad channels.** Match decoded opcode 137 indices to track geometry
-   and compare channels 0–2 with rubber, marbles and wetness through a wet-to-dry run (§2.15 D).
-10. **Wire up the confirmed events:** contacts (1/17) as map markers and a replay incident
-    ledger, and tyre compound per wheel (1/16) in stint and pit views (§2.11 B–C).
-    **[DONE in the parser]**, including bit-29 gating and the penalty branch (cache v7).
-    Track limits (7/28), damage and sector bests (1/23, 1/26, 1/29–31) and player shift
-    instants (3/11) stay documented but unparsed: they duplicate the XML or the gear channel (§5).
-11. **Identify 7/33** (per-car 5 % steps every ~2.4 laps, remote cars only, §2.13 E). Compare
-    against an AI or remote car's own DuckDB in a session where that car is the player, or
-    against the API's `veFraction` / `fuelFraction` in a live (not replay) session.
-
----
-
-## 8. Comparative Telemetry Accuracy & Signal Loss: VCR vs. DuckDB vs. Shared-Memory Recorder (`npm run telemetry:record`)
+## 5. Comparative Telemetry Accuracy & Signal Loss: VCR vs. DuckDB vs. Shared-Memory Recorder (`npm run telemetry:record`)
 
 This section quantifies the empirical accuracy loss, bandwidth decimation, and signal degradation across the three available telemetry ingestion paths in LMU.
 
-### 8.1 Comparison Matrix
+### 5.1 Comparison Matrix
 
 | Metric / Channel | Native DuckDB Telemetry (`UserData/Telemetry/*.duckdb`) | Custom Shared-Memory Recorder (`npm run telemetry:record`) | Binary VCR Replay (`UserData/Replays/*.Vcr`) | Accuracy Loss & Signal Degradation in VCR |
 |---|---|---|---|---|
@@ -1658,7 +1521,7 @@ This section quantifies the empirical accuracy loss, bandwidth decimation, and s
 | **Grid Scope** | **Main driver only** | **Main driver only** | **All drivers & AI grid** | VCR remains indispensable for head-to-head opponent comparisons and alien reference overlays. |
 | **Setup & Friction** | Background native game exporter | Requires external C# console app running live | Automatic game recording | DuckDB and VCR require no secondary tools running while driving. |
 
-### 8.2 Primary Error Modes in VCR Telemetry
+### 5.2 Primary Error Modes in VCR Telemetry
 
 1. **Temporal Aliasing & Braking Point Drift**:
    At 300 km/h (83.3 m/s), a 20 Hz replay slice spans **4.16 meters** of track per sample (and up to 8.3 m at 10 Hz). A 100 Hz DuckDB stream measures position every **0.83 meters**. Consequently, braking initiation points extracted purely from VCR files carry an inherent positional uncertainty of $\pm 2$ to $\pm 4$ meters.
@@ -1672,7 +1535,7 @@ This section quantifies the empirical accuracy loss, bandwidth decimation, and s
 4. **Wheel Slip & Lockup Masking**:
    Micro-lockups lasting 20–40 ms (frequent in non-ABS Hypercar/LMP2 braking zones) are completely invisible in VCR replays because frame rates are too coarse to resolve the wheel deceleration transient, and per-wheel speeds are stripped from the replay stream. DuckDB's 100 Hz `Wheel Speed` channels (FL, FR, RL, RR) reliably expose every micro-lockup event.
 
-### 8.3 Recommended Architecture: Fused Telemetry
+### 5.3 Recommended Architecture: Fused Telemetry
 
 To achieve zero-compromise analytics:
 - **Ground Truth Driving Telemetry**: Use **DuckDB** for the main driver whenever available (exact 100 Hz pedals, speed, RPM, gear, wheel speeds, ride height).
