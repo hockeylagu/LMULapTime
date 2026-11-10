@@ -42,6 +42,8 @@ export function testShading(): SceneryShading {
       texelSnap: true,
       fit: { shape: 'square', widthPerSplit: 1.1 },
       fade: { endsAtFar: true, lengthOfLastSpan: 0.75 },
+      centre: { along: 'viewForward', at: 'sliceMidpoint', firstSliceStartsAt: 'nearM' },
+      orientation: { followsView: false, u: 'horizontalAcrossSun', v: 'sunVerticalPlane' },
       cameras: {
         chase: { nearM: 0.1, farM: 300, splitRatio: 0.9, count: 3, splitsM: [20, 80, 300] },
         cockpit: { nearM: 0.01, farM: 200, splitRatio: 0.9, count: 2, splitsM: [30, 200] },

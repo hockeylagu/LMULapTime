@@ -184,8 +184,9 @@ elevation and that cover (the base coverage the grid is sampled by); it applies 
 terms, no storm term) and does not apply `airMass` or `sceneLuminanceScale` yet.
 
 The catalog's `shading.shadows` (the pipeline's docs/SCENE_PACKAGE.md "Shadows") is the cascaded sun shadow: `atlas` (tiles inside
-their atlas, one per cascade), `select`, `filter` (taps whose weights times `scale` sum to 1), `normalOffset`, `texelSnap`, `fit`, `fade`
-and `cameras` with exactly `chase`, `cockpit` and `tv`. Each camera set has `nearM` < `farM` and either a `splitRatio` in 0..1, a `count`
+their atlas, one per cascade), `select`, `filter` (taps whose weights times `scale` sum to 1), `normalOffset`, `texelSnap`, `fit`, `fade`,
+`centre` and `orientation` (each exactly the one rule the viewer accepts: squares centred at the middle of their view slice, axes
+fixed to the sun) and `cameras` with exactly `chase`, `cockpit` and `tv`. Each camera set has `nearM` < `farM` and either a `splitRatio` in 0..1, a `count`
 no larger than the tile count and that many ascending `splitsM` ending at `farM`, or all three null (no published set). The viewer does
 not use it yet.
 

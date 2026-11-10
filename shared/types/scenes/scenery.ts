@@ -342,5 +342,12 @@ export interface SceneryShadows {
   fit: { shape: 'square'; widthPerSplit: number };
   /** fade = saturate(viewDepth · w − z) with 1 / w = lengthOfLastSpan · (far − split_N−2), reaching zero at far. */
   fade: { endsAtFar: boolean; lengthOfLastSpan: number };
+  /** Cascade i is centred at eye + forward · (split_i−1 + split_i) / 2: forward unflattened, split_−1 the camera set's `nearM`. */
+  centre: { along: 'viewForward'; at: 'sliceMidpoint'; firstSliceStartsAt: 'nearM' };
+  /**
+   * The squares' axes are the same for every cascade and do not turn with the view: u = −normalize(L × up), L the light's travel
+   * direction; v = u × L (its sign is not established). The position along the light is not constrained.
+   */
+  orientation: { followsView: false; u: 'horizontalAcrossSun'; v: 'sunVerticalPlane' };
   cameras: { chase: SceneryShadowCamera; cockpit: SceneryShadowCamera; tv: SceneryShadowCamera };
 }

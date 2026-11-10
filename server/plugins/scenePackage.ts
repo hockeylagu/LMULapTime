@@ -170,7 +170,7 @@ function flag(value: unknown, what: string): void {
 /** The cascaded sun shadow (the pipeline's docs/SCENE_PACKAGE.md "Shadows"). */
 function parseShadows(value: unknown, what: string): void {
   const row = record(value, what);
-  exactKeys(row, ['atlas', 'select', 'filter', 'normalOffset', 'texelSnap', 'fit', 'fade', 'cameras'], what);
+  exactKeys(row, ['atlas', 'select', 'filter', 'normalOffset', 'texelSnap', 'fit', 'fade', 'centre', 'orientation', 'cameras'], what);
   const atlas = record(row.atlas, `${what}.atlas`);
   exactKeys(atlas, ['count', 'sizePx', 'tilePx', 'cascadeTiles'], `${what}.atlas`);
   const atlases = count(atlas.count, `${what}.atlas.count`, 8), size = count(atlas.sizePx, `${what}.atlas.sizePx`, 16384), tile = count(atlas.tilePx, `${what}.atlas.tilePx`, 16384);
@@ -216,9 +216,18 @@ function parseShadows(value: unknown, what: string): void {
   exactKeys(fade, ['endsAtFar', 'lengthOfLastSpan'], `${what}.fade`);
   flag(fade.endsAtFar, `${what}.fade.endsAtFar`);
   positive(fade.lengthOfLastSpan, `${what}.fade.lengthOfLastSpan`);
+  exactRecord(row.centre, {along: 'viewForward', at: 'sliceMidpoint', firstSliceStartsAt: 'nearM'}, `${what}.centre`);
+  exactRecord(row.orientation, {followsView: false, u: 'horizontalAcrossSun', v: 'sunVerticalPlane'}, `${what}.orientation`);
   const cameras = record(row.cameras, `${what}.cameras`);
   exactKeys(cameras, ['chase', 'cockpit', 'tv'], `${what}.cameras`);
   for (const name of ['chase', 'cockpit', 'tv']) parseShadowCamera(cameras[name], `${what}.cameras.${name}`, tiles.length);
+}
+
+/** A record of exactly these keys and values: a rule the viewer implements, with no other variant. */
+function exactRecord(value: unknown, expected: Record<string, string | boolean>, what: string): void {
+  const row = record(value, what);
+  exactKeys(row, Object.keys(expected), what);
+  for (const [key, want] of Object.entries(expected)) if (row[key] !== want) throw Error(`${what}.${key}: expected ${String(want)}`);
 }
 
 /** One camera type's split planes: near and far, then either no set (all null) or a ratio, a count and that many ascending splits ending at far. */
