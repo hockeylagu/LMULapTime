@@ -2,7 +2,7 @@ import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } fro
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import { getTrajectoryDistances, findIndexAtDistance } from '../../../utils/lapAlignment.js';
 import { replayShortcutBlocked } from '../../../utils/replayShortcuts.js';
-import { useGhostSync } from '../inspector/ghostSyncContext.js';
+import { placeGhostMarker, toggleGhostMarker, useGhostSync } from '../inspector/ghostSyncContext.js';
 import { DistanceWindow, fitDistanceWindow, normalizedWheelDelta, zoomDistanceWindow } from './telemetryViewport.js';
 
 export interface TelemetryDragSelection {
@@ -46,8 +46,9 @@ export function useTelemetryStripInteraction({
   const panRef = useRef<{ x: number; width: number; window: DistanceWindow } | null>(null);
   const keyHandlerRef = useRef<(event: KeyboardEvent) => void>(() => {});
   const altClickXRef = useRef<number | null>(null);
-  // Alt-click marker A, shared with the map's anchored ghost (see useGhostSync).
-  const { markerDistM, setMarkerDistM } = useGhostSync();
+  // Marker A (X or Alt-click), shared with the map's From A ghost (see placeGhostMarker).
+  const ghostSync = useGhostSync();
+  const { markerDistM } = ghostSync;
   const [internalZoomRange, setInternalZoomRange] = useState<{ start: number; end: number } | null>(null);
   const [interactionMode, setInteractionMode] = useState<'scrub' | 'zoom'>('scrub');
   const [dragSelection, setDragSelection] = useState<TelemetryDragSelection | null>(null);
@@ -199,7 +200,7 @@ export function useTelemetryStripInteraction({
     if (altClickX !== null && Math.abs((e.clientX ?? altClickX) - altClickX) < 4 && containerRef.current) {
       const rect = rectRef.current || containerRef.current.getBoundingClientRect();
       const ratio = rect.width > 0 ? Math.max(0, Math.min(1, (altClickX - rect.left) / rect.width)) : 0;
-      setMarkerDistM(cumDists[indexAtRatio(ratio)] ?? null);
+      placeGhostMarker(ghostSync, cumDists[indexAtRatio(ratio)] ?? null);
     }
     if (rafIdRef.current !== null) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; }
     if (pendingIndexRef.current !== null) { onSelectIndex(pendingIndexRef.current); pendingIndexRef.current = null; }
@@ -280,7 +281,9 @@ export function useTelemetryStripInteraction({
       } else if (e.key === 'Escape' && (isDraggingRef.current || dragSelection || panRef.current)) {
         e.preventDefault(); handlePointerCancel();
       } else if (e.key === 'Escape' && markerDistM !== null) {
-        e.preventDefault(); setMarkerDistM(null);
+        e.preventDefault(); placeGhostMarker(ghostSync, null);
+      } else if (e.key.toLowerCase() === 'x' && !e.repeat && cumDists.length > 0) {
+        e.preventDefault(); toggleGhostMarker(ghostSync, cumDists[safeIndex] ?? 0);
       }
     };
   useEffect(() => {
@@ -302,9 +305,11 @@ export function useTelemetryStripInteraction({
     pctForIndex,
     onStepIndex,
     markerIndex: markerDistM === null || cumDists.length === 0 ? null : findIndexAtDistance(cumDists, markerDistM),
-    clearMarker: useCallback(() => setMarkerDistM(null), [setMarkerDistM]),
+    markerDistM,
+    clearMarker: () => placeGhostMarker(ghostSync, null),
+    toggleMarkerAtCursor: () => { if (cumDists.length > 0) toggleGhostMarker(ghostSync, cumDists[safeIndex] ?? 0); },
     // A double-click removes the marker first, then resets the zoom.
-    handleDoubleClick: () => (markerDistM !== null ? setMarkerDistM(null) : handleResetZoom()),
+    handleDoubleClick: () => (markerDistM !== null ? placeGhostMarker(ghostSync, null) : handleResetZoom()),
     onJumpToDistance: useCallback((distM: number) => {
       if (cumDists.length === 0) return;
       onSelectIndex(findIndexAtDistance(cumDists, distM));

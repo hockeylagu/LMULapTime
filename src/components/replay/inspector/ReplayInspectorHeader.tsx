@@ -248,6 +248,7 @@ export const ReplayInspectorHeader: React.FC<ReplayInspectorHeaderProps> = React
 
         <Select<number>
           aria-label="Playback speed"
+          title="Playback speed: , slower, . faster"
           value={playbackSpeed}
           onChange={onSelectPlaybackSpeed}
           options={PLAYBACK_SPEEDS.map(speed => ({ value: speed, label: `${speed}×` }))}

@@ -19,17 +19,13 @@ export function totalAcceleration(point?: ReplayTrajectoryPoint | null): number 
     ? Math.hypot(point.accelLatG, point.accelLonG) : undefined;
 }
 
-export function getStatusLabel(point?: ReplayTrajectoryPoint | null): string {
+/** A state worth showing (limiter, wet, pit lane), or null on track or without the flags. */
+export function getStatusLabel(point?: ReplayTrajectoryPoint | null): string | null {
   if (point?.pitLimiter) return 'LIMITER';
   if (hasReading(point?.rainIntensity) && point.rainIntensity > 0) return `WET (${formatRain(point.rainIntensity)})`;
-  if (point?.inPit) return 'PIT LANE';
-  return point?.inPit === false ? 'ON TRACK' : 'UNKNOWN';
+  return point?.inPit ? 'PIT LANE' : null;
 }
 
-export function getStatusSubtext(point?: ReplayTrajectoryPoint | null): string {
-  if (point?.pitLimiter) return 'enabled';
-  if (hasReading(point?.ambientTemp)) return `air ${point.ambientTemp.toFixed(1)}°C`;
-  if (hasReading(point?.rainIntensity) && point.rainIntensity > 0) return 'wet';
-  if (point?.inPit) return 'in pits';
-  return getStatusLabel(point) === 'ON TRACK' ? 'air --' : 'unavailable';
+export function getStatusSubtext(point?: ReplayTrajectoryPoint | null): string | undefined {
+  return hasReading(point?.ambientTemp) ? `air ${point.ambientTemp.toFixed(1)}°C` : undefined;
 }

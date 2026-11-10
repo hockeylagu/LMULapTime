@@ -12,8 +12,8 @@ import { TelemetryResolution } from './telemetryResolution.js';
 import { LoadingState } from '../../common/LoadingState.js';
 import { usePlaybackPosition } from '../inspector/replayPlaybackCursor.js';
 import { TelemetryScrubCursor } from './TelemetryScrubCursor.js';
-import { FOCUS_RING } from '../../common/buttonStyles.js';
-import { TelemetryDeltaMarker, measureMarkerSpan } from './TelemetryDeltaMarker.js';
+import { SURFACE_FOCUS_RING } from '../../common/buttonStyles.js';
+import { MarkerAButton, TelemetryDeltaMarker, measureMarkerSpan } from './TelemetryDeltaMarker.js';
 
 export interface SelectedCornerMarkers {
   cornerNumber: number;
@@ -74,6 +74,8 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
     onStepIndex,
     markerIndex,
     clearMarker,
+    markerDistM,
+    toggleMarkerAtCursor,
     handleDoubleClick,
     onJumpToDistance,
     handleResetZoom,
@@ -172,7 +174,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
       onDoubleClick={handleDoubleClick}
-      className={`relative select-none flex flex-col justify-between h-full bg-lmu-strip overflow-hidden cursor-crosshair ${className} ${FOCUS_RING}`}
+      className={`relative select-none flex flex-col justify-between h-full bg-lmu-strip overflow-hidden cursor-crosshair ${className} ${SURFACE_FOCUS_RING}`}
     >
       {sectors && sectors.s1Frame > 0 && sectors.s2Frame > 0 && (
         <div className="absolute top-0 left-0 right-0 h-3.5 z-20 pointer-events-none flex text-[10px] sm:text-[10px] font-mono font-bold tracking-wider overflow-hidden">
@@ -228,6 +230,7 @@ export const TelemetryStripCharts: React.FC<TelemetryStripChartsProps> = ({
         totalFrames={points.length}
         headerContent={headerContent}
         markerOverlay={markerOverlay}
+        markerButton={<MarkerAButton markerDistM={markerDistM} cursorDistM={cumDists[safeIndex]} onToggle={toggleMarkerAtCursor} className="py-0.5 text-[10px] font-mono" />}
         dragSelection={dragSelection}
         markerPcts={metrics} activeChannels={activePreset?.channels}
         presets={presets} activePresetId={activePresetId} onSelectPreset={handleSelectPreset}

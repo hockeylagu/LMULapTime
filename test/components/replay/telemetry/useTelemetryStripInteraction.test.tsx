@@ -176,6 +176,19 @@ describe('useTelemetryStripInteraction', () => {
     expect(result.current.markerIndex).toBeNull();
   });
 
+  it('sets marker A at the cursor with X and clears it with X on the same spot', () => {
+    const { result } = renderHook(() => useTelemetryStripInteraction({ points: makePoints(20), currentIndex: 6, onSelectIndex: vi.fn() }));
+    const container = document.createElement('div');
+    result.current.containerRef.current = container;
+    document.body.appendChild(container);
+    const press = () => act(() => { container.dispatchEvent(new KeyboardEvent('keydown', { key: 'x', bubbles: true })); });
+    press();
+    expect(result.current.markerIndex).toBe(6);
+    press();
+    expect(result.current.markerIndex).toBeNull();
+    container.remove();
+  });
+
   it('removes the marker on double-click before resetting the zoom', () => {
     const onZoomRangeChange = vi.fn();
     const { result } = renderHook(() => useTelemetryStripInteraction({

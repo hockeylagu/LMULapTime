@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { ReplayInspectorContent } from '../../../../src/components/replay/inspector/ReplayInspectorContent.js';
+import { GhostSyncContext } from '../../../../src/components/replay/inspector/ghostSyncContext.js';
+import type { GhostSyncMode } from '../../../../src/components/replay/map/ghostSync.js';
 import { ConsistencyPanel } from '../../../../src/components/replay/analysis/ConsistencyPanel.js';
 import { chooseValue, openSelect, selectedValue } from '../../../helpers/selectControl.js';
 
@@ -80,6 +82,28 @@ describe('ReplayInspectorContent', () => {
     expect(screen.getByLabelText('Play')).toHaveRole('button');
     fireEvent.keyDown(screen.getByLabelText('Select Driver'), { key: ' ' });
     expect(screen.getByLabelText('Play')).toHaveRole('button');
+  });
+
+  it('replays from marker A with Backspace, and does nothing without a marker', async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => Promise.resolve({ ok: true,
+      json: () => Promise.resolve(url.includes('/metadata') ? mockMeta : url.includes('/telemetry?') ? mockTraj : { laps: [] }),
+    }));
+    // Marker A is shared through the page's provider, as in the app.
+    function Shared({ children }: { children: ReactNode }) {
+      const [mode, setMode] = useState<GhostSyncMode>('distance');
+      const [markerDistM, setMarkerDistM] = useState<number | null>(null);
+      const value = useMemo(() => ({ mode, setMode, markerDistM, setMarkerDistM }), [mode, markerDistM]);
+      return <GhostSyncContext.Provider value={value}>{children}</GhostSyncContext.Provider>;
+    }
+    render(<Shared><ReplayInspectorContent isOpen onClose={vi.fn()} sessionId="session-1" /></Shared>);
+    const chart = await screen.findByLabelText('Telemetry charts');
+    fireEvent.keyDown(chart, { key: 'Backspace' });
+    expect(screen.getByLabelText('Play')).toHaveRole('button');
+    fireEvent.keyDown(chart, { key: 'ArrowRight' });
+    fireEvent.keyDown(chart, { key: 'x' });
+    fireEvent.keyDown(chart, { key: 'End' });
+    fireEvent.keyDown(chart, { key: 'Backspace' });
+    expect(screen.getByLabelText('Pause')).toHaveRole('button');
   });
 
   it('fetches and displays metadata and telemetry when open', async () => {

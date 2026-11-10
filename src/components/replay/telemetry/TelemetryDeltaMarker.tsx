@@ -74,3 +74,28 @@ export function TelemetryDeltaMarker({ span, markerPct, offscreen, cursorPct, on
     </>
   );
 }
+
+export interface MarkerAButtonProps {
+  /** Marker A's distance, or null without a marker. */
+  markerDistM: number | null;
+  cursorDistM: number | undefined;
+  onToggle: () => void;
+  className?: string;
+}
+
+/** The visible way to X: set A at the cursor, move it there, or clear it when the cursor is on A. */
+export function MarkerAButton({ markerDistM, cursorDistM, onToggle, className = '' }: MarkerAButtonProps) {
+  const atCursor = markerDistM !== null && cursorDistM !== undefined && Math.abs(markerDistM - cursorDistM) < 0.5;
+  const label = markerDistM === null ? 'Set A' : atCursor ? 'Clear A' : 'Move A';
+  return (
+    <button type="button" onClick={event => { event.stopPropagation(); onToggle(); }} aria-pressed={markerDistM !== null}
+      aria-keyshortcuts="X"
+      title={atCursor ? 'Clear marker A and go back to Distance sync (X)'
+        : 'Marker A at the cursor (X or Alt-click): time and delta from A, and the ghost runs from A; Backspace replays from A'}
+      className={`inline-flex items-center gap-1 rounded px-2 font-semibold transition-colors ${
+        markerDistM !== null ? 'bg-lmu-gold/15 text-lmu-gold hover:bg-lmu-gold/25' : 'text-lmu-muted hover:text-lmu-text'
+      } ${FOCUS_RING} ${className}`}>
+      {label}
+    </button>
+  );
+}

@@ -46,8 +46,10 @@ export interface TelemetryStripViewProps {
   currentTimeSec?: number;
   totalFrames?: number;
   headerContent?: React.ReactNode;
-  /** Alt-click marker line and its readout, drawn over the charts. */
+  /** Marker A line and its readout, drawn over the charts. */
   markerOverlay?: React.ReactNode;
+  /** Set / move / clear marker A, shown in the toolbar. */
+  markerButton?: React.ReactNode;
   dragSelection?: { startPct: number; currentPct: number; startX: number; currentX: number } | null;
   markerPcts: {
     s1Pct: number | null;
@@ -75,7 +77,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
   currentComparison, pointComparisons, paths, sectors, cornerSegments, initialStraight,
   selectedCornerNumber, onSelectCorner, onJumpToDistance, cumDists, currentDistM,
   selectedCornerMarkers, interactionMode, setInteractionMode, isZoomed, onResetZoom,
-  onStepIndex, hasBaseline, telemetryResolution, onChangeResolution, isFullResolution, currentTimeSec, totalFrames, headerContent, markerOverlay, dragSelection, markerPcts,
+  onStepIndex, hasBaseline, telemetryResolution, onChangeResolution, isFullResolution, currentTimeSec, totalFrames, headerContent, markerOverlay, markerButton, dragSelection, markerPcts,
   vcrRawPointsCount, vcrRawSampleRateHz, duckdbRawPointsCount, duckdbRawSampleRateHz,
   activeChannels = DEFAULT_CHANNELS,
   presets, activePresetId, onSelectPreset, onOpenManageModal, source, duckdbFilename,
@@ -106,6 +108,7 @@ export const TelemetryStripView: React.FC<TelemetryStripViewProps> = ({
         currentFrame={safeIndex + 1}
         totalFrames={totalFrames}
         headerContent={headerContent}
+        markerButton={markerButton}
         presets={presets}
         activePresetId={activePresetId}
         onSelectPreset={onSelectPreset}

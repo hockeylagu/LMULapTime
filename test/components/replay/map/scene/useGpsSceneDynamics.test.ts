@@ -27,7 +27,6 @@ describe('useGpsSceneDynamics', () => {
     expect(result.current.comparisons).toHaveLength(points.length);
     expect(result.current.currentDeltaTimeSec).toBeLessThan(0);
     expect(result.current.baselineGhostPos?.point.x).toBeCloseTo(100);
-    expect(result.current.currentLineDistM).toBeCloseTo(0);
     expect(result.current.baselineHeadingIndex).toBe(5);
   });
 
@@ -36,12 +35,9 @@ describe('useGpsSceneDynamics', () => {
     const timed = renderHook(() => useGpsSceneDynamics({ points, baselinePoints: slower, svgPoints, bounds, currentIndex: 6, syncMode: 'time' }));
     // 6 s in, the half-speed baseline has covered 60 m of the primary's 120 m.
     expect(timed.result.current.baselineGhostPos?.point.x).toBeCloseTo(60);
-    expect(timed.result.current.currentGapM).toBeCloseTo(60);
     const anchored = renderHook(() => useGpsSceneDynamics({
       points, baselinePoints: slower, svgPoints, bounds, currentIndex: 4, syncMode: 'anchored', anchorDistM: 80,
     }));
     expect(anchored.result.current.baselineGhostPos?.point.x).toBeCloseTo(80);
-    expect(anchored.result.current.currentGapM).toBeCloseTo(0);
-    expect(anchored.result.current.currentTimeGapSec).toBe(0);
   });
 });

@@ -16,8 +16,10 @@ export function parseGhostSyncMode(value: string | null | undefined): GhostSyncM
   return value === 'time' || value === 'anchored' ? value : 'distance';
 }
 
-export function nextGhostSyncMode(mode: GhostSyncMode): GhostSyncMode {
-  return GHOST_SYNC_MODES[(GHOST_SYNC_MODES.indexOf(mode) + 1) % GHOST_SYNC_MODES.length];
+/** The next mode for V or the sync chip; From A only while marker A is set (X sets it and switches there). */
+export function nextGhostSyncMode(mode: GhostSyncMode, anchorSet: boolean): GhostSyncMode {
+  const modes = anchorSet ? GHOST_SYNC_MODES : GHOST_SYNC_MODES.filter(option => option !== 'anchored');
+  return modes[(modes.indexOf(mode) + 1) % modes.length];
 }
 
 /** Both laps' elapsed time against distance, in the primary lap's distance frame. */
@@ -66,17 +68,4 @@ export function ghostDistanceAt(
   const sinceAnchor = primaryTime - interpolateScalarAtDistance(primaryClock, primaryDists, anchorDistM);
   const baselineAtAnchor = interpolateScalarAtDistance(baselineClock, baselineDists, anchorDistM);
   return interpolateScalarAtDistance(baselineDists, baselineClock, baselineAtAnchor + sinceAnchor);
-}
-
-/**
- * The time gap shown for a mode: the live delta, or in anchored mode the time gained or lost
- * since marker A (zero up to it). Negative: the primary is ahead.
- */
-export function ghostTimeGap(
-  mode: GhostSyncMode, deltaTimeSec: number | null, primaryDistance: number,
-  anchorDistM: number | null, deltaByIdx: number[] | null, primaryDists: number[],
-): number | null {
-  if (deltaTimeSec === null || mode !== 'anchored' || anchorDistM === null || !deltaByIdx) return deltaTimeSec;
-  if (primaryDistance <= anchorDistM) return 0;
-  return deltaTimeSec - interpolateScalarAtDistance(deltaByIdx, primaryDists, anchorDistM);
 }

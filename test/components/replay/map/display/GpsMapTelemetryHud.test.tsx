@@ -43,7 +43,7 @@ describe('GpsMapTelemetryHud', () => {
     expect(screen.getByText('GEAR 5')).toBeInTheDocument();
     expect(screen.getByText('100%')).toBeInTheDocument();
     expect(screen.getByText('0%')).toBeInTheDocument();
-    expect(screen.getByText('ON TRACK')).toBeInTheDocument();
+    expect(screen.queryByText('ON TRACK')).not.toBeInTheDocument();
 
     expect(screen.getByTestId('telemetry-hud-primary')).toBeInTheDocument();
     expect(screen.queryByTestId('telemetry-hud-baseline')).toBeNull();
@@ -78,7 +78,6 @@ describe('GpsMapTelemetryHud', () => {
     expect(screen.getByText('Baseline')).toBeInTheDocument();
     expect(screen.queryByText('ME')).not.toBeInTheDocument();
     expect(screen.queryByText('RIVAL')).not.toBeInTheDocument();
-    expect(screen.getByText('5.4 m line')).toHaveAttribute('title', 'Distance between racing lines at the same track distance, not a race gap.');
 
     // Primary speed
     expect(screen.getByText('227')).toBeInTheDocument();
@@ -114,18 +113,10 @@ describe('GpsMapTelemetryHud', () => {
   });
 
 
-  it('renders line separation distance between cars when comparing laps', () => {
-    render(
-      <GpsMapTelemetryHud
-        primaryPoint={mockPrimary}
-        baselinePoint={mockBaseline}
-        deltaTimeSec={0.53}
-      />
-    );
-
-    // Header
-    expect(screen.getByText('5.4 m line')).toBeInTheDocument();
-    // Computed hypot(100 - 105, 200 - 198) = hypot(-5, 2) = sqrt(29) ≈ 5.4m
+  it('shows only the lap delta between the laps; the trace shows the other differences', () => {
+    render(<GpsMapTelemetryHud primaryPoint={mockPrimary} baselinePoint={mockBaseline} deltaTimeSec={0.53} />);
+    expect(screen.queryByText(/m line/)).not.toBeInTheDocument();
+    expect(screen.queryByText('+9 km/h')).not.toBeInTheDocument();
   });
 
 
@@ -166,16 +157,13 @@ describe('GpsMapTelemetryHud', () => {
     // Lateral and longitudinal breakdown, ISO 8855: positive lateral G is a left turn
     expect(screen.getByLabelText('G-force: 1.8L · 0.7B')).toBeInTheDocument();
 
-    // STATUS remains clean (not polluted with G-force)
-    expect(screen.getByText('ON TRACK')).toBeInTheDocument();
-    expect(screen.getByLabelText('ON TRACK, air --')).toBeInTheDocument();
   });
 
   it('keeps missing and non-finite channels unavailable', () => {
     render(<GpsMapTelemetryHud primaryPoint={{ x: 0, y: 0, z: 0, speedKmh: NaN, throttle: Infinity }} />);
     const row = screen.getByTestId('telemetry-hud-primary');
     expect(row).toHaveTextContent('GEAR --');
-    expect(row).toHaveTextContent('UNKNOWN');
+    expect(row).not.toHaveTextContent('UNKNOWN');
     expect(row).not.toHaveTextContent('0.00G');
     expect(row).not.toHaveTextContent('NaN');
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
@@ -186,9 +174,14 @@ describe('GpsMapTelemetryHud', () => {
     expect(screen.getByText(`GEAR ${label}`)).toBeInTheDocument();
   });
 
+  it('shows the pit lane with the air temperature, nothing on track', () => {
+    render(<GpsMapTelemetryHud primaryPoint={{ ...mockPrimary, inPit: true, ambientTemp: 0 }} />);
+    expect(screen.getByText('PIT LANE')).toHaveAttribute('title', 'air 0.0°C');
+  });
+
   it('does not invent a pit speed or penalty validity from status flags', () => {
     render(<GpsMapTelemetryHud primaryPoint={{ ...mockPrimary, pitLimiter: true }} />);
-    expect(screen.getByLabelText('LIMITER, enabled')).toBeInTheDocument();
+    expect(screen.getByText('LIMITER')).toBeInTheDocument();
     expect(screen.queryByText('60 km/h')).not.toBeInTheDocument();
   });
 
@@ -196,18 +189,6 @@ describe('GpsMapTelemetryHud', () => {
     render(<GpsMapTelemetryHud primaryPoint={{ ...mockPrimary, ambientTemp: 0, gear: 0,
       speedKmh: 0, throttle: 0, brake: 0, steerYaw: 0, accelLatG: 0, accelLonG: 0 }} />);
     expect(screen.getByText('0.00G')).toBeInTheDocument();
-    expect(screen.getByLabelText('ON TRACK, air 0.0°C')).toBeInTheDocument();
     expect(screen.getByText('0.0% C')).toBeInTheDocument();
-  });
-
-  it('shows the speed difference at the same distance and the on-track gap in time modes', () => {
-    const { rerender } = render(<GpsMapTelemetryHud primaryPoint={mockPrimary} baselinePoint={mockBaseline} deltaTimeSec={-0.2} />);
-    expect(screen.getByTestId('hud-speed-diff')).toHaveTextContent('+9 km/h');
-    rerender(<GpsMapTelemetryHud primaryPoint={mockPrimary} baselinePoint={mockBaseline} deltaTimeSec={-0.2} syncMode="time" gapM={12.34} />);
-    expect(screen.queryByTestId('hud-speed-diff')).toBeNull();
-    expect(screen.getByTestId('hud-track-gap')).toHaveTextContent('12.3 m ahead');
-    rerender(<GpsMapTelemetryHud primaryPoint={mockPrimary} baselinePoint={mockBaseline} deltaTimeSec={0.1} syncMode="anchored" gapM={-4} />);
-    expect(screen.getByTestId('hud-track-gap')).toHaveTextContent('4.0 m behind');
-    expect(screen.getByLabelText('Delta since marker A: behind')).toHaveTextContent('+0.10s');
   });
 });

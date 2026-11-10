@@ -284,4 +284,21 @@ describe('useGpsMapShortcuts target scoping', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'V', repeat: true }));
     expect(onCycleGhostSync).toHaveBeenCalledOnce();
   });
+
+  it('switches 2D / 3D with E from the chart or map, and drops marker A with X on the map', () => {
+    const map = document.createElement('div'); map.dataset.replaySurface = 'map';
+    const chart = document.createElement('div'); chart.dataset.replaySurface = 'chart';
+    document.body.append(map, chart);
+    const onToggleView = vi.fn(); const onToggleMarker = vi.fn();
+    renderHook(() => useGpsMapShortcuts({ isExpanded: false, containerRef: { current: map }, points: pts, currentIndex: 1,
+      onZoomIn: vi.fn(), onZoomOut: vi.fn(), onResetZoom: vi.fn(), onToggleView, onToggleMarker }));
+    const key = (el: Element, init: KeyboardEventInit) => el.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init }));
+    key(chart, { key: 'e' }); key(map, { key: 'E' }); key(map, { key: 'e', repeat: true }); key(document.body, { key: 'e' });
+    expect(onToggleView).toHaveBeenCalledTimes(2);
+    key(chart, { key: 'x' });
+    expect(onToggleMarker).not.toHaveBeenCalled();
+    key(map, { key: 'x' });
+    expect(onToggleMarker).toHaveBeenCalledOnce();
+    map.remove(); chart.remove();
+  });
 });

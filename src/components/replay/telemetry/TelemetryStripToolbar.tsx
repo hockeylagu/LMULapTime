@@ -29,6 +29,7 @@ export interface TelemetryStripToolbarProps {
   currentFrame?: number;
   totalFrames?: number;
   headerContent?: React.ReactNode;
+  markerButton?: React.ReactNode;
   presets?: TelemetryPreset[];
   activePresetId?: string;
   onSelectPreset?: (presetId: string) => void;
@@ -61,6 +62,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
   currentFrame,
   totalFrames,
   headerContent,
+  markerButton,
   presets,
   activePresetId,
   onSelectPreset,
@@ -128,7 +130,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
                 : 'text-lmu-muted hover:text-white'
             } ${FOCUS_RING}`}
             aria-pressed={interactionMode === 'scrub'}
-            title="Drag to move the cursor. Shift + wheel zooms, Shift + drag selects a range, Alt + drag pans, Alt + click drops a marker to measure time and delta to the cursor, double-click removes it."
+            title="Drag to move the cursor. Shift + wheel zooms, Shift + drag selects a range, Alt + drag pans, X or Alt + click drops marker A to measure time and delta to the cursor, double-click removes it."
           >
             <MousePointer2 className="w-3 h-3" />
             Move cursor
@@ -158,6 +160,7 @@ export const TelemetryStripToolbar: React.FC<TelemetryStripToolbarProps> = React
           </button>
         </div>
 
+        {markerButton}
         <ReplayShortcutHelp />
         {onChangeResolution && (
           <div ref={resolutionRef} className="relative z-[70]" onKeyDown={(event) => {

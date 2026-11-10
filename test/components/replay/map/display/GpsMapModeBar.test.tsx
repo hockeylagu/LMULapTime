@@ -117,10 +117,14 @@ describe('GpsMapModeBar', () => {
   it('switches the ghost sync with a baseline and explains marker A', () => {
     const onChangeGhostSync = vi.fn();
     const { rerender } = render(<GpsMapModeBar hasBaseline ghostSync="time" onChangeGhostSync={onChangeGhostSync} />);
-    expect(screen.getByRole('button', { name: 'Time' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'From A' }).title).toContain('Alt-click');
-    fireEvent.click(screen.getByRole('button', { name: 'From A' }));
-    expect(onChangeGhostSync).toHaveBeenCalledWith('anchored');
+    const chip = screen.getByRole('button', { name: 'Ghost sync: Time' });
+    expect(chip.title).toContain('V for Distance');
+    expect(chip.title).toContain('Press X');
+    fireEvent.click(chip);
+    expect(onChangeGhostSync).toHaveBeenLastCalledWith('distance');
+    rerender(<GpsMapModeBar hasBaseline ghostSync="time" ghostAnchorSet onChangeGhostSync={onChangeGhostSync} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Ghost sync: Time' }));
+    expect(onChangeGhostSync).toHaveBeenLastCalledWith('anchored');
     rerender(<GpsMapModeBar ghostSync="time" onChangeGhostSync={onChangeGhostSync} />);
     expect(screen.queryByTestId('ghost-sync-toggle')).toBeNull();
   });

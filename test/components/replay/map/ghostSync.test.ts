@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 import {
-  createGhostClock, ghostDistanceAt, ghostTimeGap, nextGhostSyncMode, parseGhostSyncMode,
+  createGhostClock, ghostDistanceAt, nextGhostSyncMode, parseGhostSyncMode,
 } from '../../../../src/components/replay/map/ghostSync.js';
 
 const lap = (timeAt: (distM: number) => number): ReplayTrajectoryPoint[] =>
@@ -37,21 +37,6 @@ describe('ghostDistanceAt', () => {
   });
 });
 
-describe('ghostTimeGap', () => {
-  const deltas = primary.map((p, i) => (p.timeSec! - baseline[i].timeSec!));
-
-  it('is the live delta outside anchored mode', () => {
-    expect(ghostTimeGap('time', 2.5, 70, 50, deltas, dists)).toBe(2.5);
-    expect(ghostTimeGap('distance', 1, 70, 50, deltas, dists)).toBe(1);
-  });
-
-  it('counts only the time gained or lost since marker A', () => {
-    expect(ghostTimeGap('anchored', 2.5, 70, 50, deltas, dists)).toBeCloseTo(0);
-    expect(ghostTimeGap('anchored', 1, 30, 50, deltas, dists)).toBe(0);
-    expect(ghostTimeGap('anchored', 1.5, 30, 20, deltas, dists)).toBeCloseTo(0.5);
-  });
-});
-
 describe('ghost sync modes', () => {
   it('reads the URL value, defaulting to distance', () => {
     expect(parseGhostSyncMode('time')).toBe('time');
@@ -60,10 +45,11 @@ describe('ghost sync modes', () => {
     expect(parseGhostSyncMode(null)).toBe('distance');
   });
 
-  it('cycles distance, time, anchored', () => {
-    expect(nextGhostSyncMode('distance')).toBe('time');
-    expect(nextGhostSyncMode('time')).toBe('anchored');
-    expect(nextGhostSyncMode('anchored')).toBe('distance');
+  it('cycles distance, time, anchored, skipping anchored without marker A', () => {
+    expect(nextGhostSyncMode('distance', true)).toBe('time');
+    expect(nextGhostSyncMode('time', true)).toBe('anchored');
+    expect(nextGhostSyncMode('anchored', true)).toBe('distance');
+    expect(nextGhostSyncMode('time', false)).toBe('distance');
   });
 
   it('needs both laps', () => {

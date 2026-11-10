@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import {
   resolveCarAcceleration,
   interpolatePrimaryPoint,
-  computeLineSeparation,
   interpolateDeltaTime,
 } from '../../../../../src/components/replay/map/scene/gpsCarDynamicsHelpers.js';
 import type { ReplayTrajectoryPoint } from '../../../../../shared/types/index.js';
@@ -105,21 +104,6 @@ describe('interpolatePrimaryPoint', () => {
 
   it('handles boundary index at end of array', () => {
     expect(interpolatePrimaryPoint([p0, p1], 1, 0.5)).toEqual(p1);
-  });
-});
-
-describe('computeLineSeparation', () => {
-  it('computes Euclidean distance in meters between two points at the same station', () => {
-    const pt1 = { x: 10, z: 20 };
-    const pt2 = { x: 13, z: 24 };
-    // hypot(3, 4) = 5.0
-    expect(computeLineSeparation(pt1, pt2)).toBe(5);
-  });
-
-  it('returns null if either point is missing coordinates', () => {
-    expect(computeLineSeparation(null, { x: 10, z: 20 })).toBeNull();
-    expect(computeLineSeparation({ x: 10, z: 20 }, undefined)).toBeNull();
-    expect(computeLineSeparation({ x: 10 }, { x: 10, z: 20 })).toBeNull();
   });
 });
 

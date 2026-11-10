@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { advancePlaybackClock, playbackClockAt, playbackSampleFraction } from '../../../../src/components/replay/inspector/replayPlaybackClock.js';
+import { steppedPlaybackSpeed } from '../../../../src/components/replay/inspector/replayFullscreenControls.js';
 import { ReplayTrajectoryPoint } from '../../../../shared/types/index.js';
 
 const at = (timeSec: number): ReplayTrajectoryPoint => ({ x: 0, y: 0, z: 0, speedKmh: 100, timeSec });
@@ -59,5 +60,16 @@ describe('replay playback clock', () => {
   it('steps samples evenly when the lap has no timestamps', () => {
     const untimed = Array.from({ length: 41 }, () => ({ x: 0, y: 0, z: 0, speedKmh: 100 }));
     expect(play(untimed, 1).wallSec).toBeCloseTo(1, 1);
+  });
+});
+
+describe('playback speed shortcuts', () => {
+  it('steps through the speeds with , and . and stops at either end', () => {
+    expect(steppedPlaybackSpeed('.', 1)).toBe(2);
+    expect(steppedPlaybackSpeed('>', 0.5)).toBe(1);
+    expect(steppedPlaybackSpeed(',', 0.5)).toBe(0.25);
+    expect(steppedPlaybackSpeed('<', 0.25)).toBeNull();
+    expect(steppedPlaybackSpeed('.', 2)).toBeNull();
+    expect(steppedPlaybackSpeed('x', 1)).toBeNull();
   });
 });

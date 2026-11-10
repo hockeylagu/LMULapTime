@@ -24,7 +24,7 @@ import { useReplayScene } from './laps/useReplayScene.js';
 import { CameraModeControl, carLockedCamera, followsCar, useCameraModeShortcuts, type CameraMode } from './cameraModes.js';
 import { useGpsMapShortcuts } from '../map/useGpsMapShortcuts.js';
 import { ReplayShortcutHelp } from '../ReplayShortcutHelp.js';
-import { ghostSyncControls, useGhostSync } from '../inspector/ghostSyncContext.js';
+import { ghostSyncControls, toggleGhostMarker, useGhostSync } from '../inspector/ghostSyncContext.js';
 import { nextGhostSyncMode } from '../map/ghostSync.js';
 
 interface Props {
@@ -71,7 +71,7 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
   const handleToggleFriction = onToggleFrictionCircle ?? (() => toggleLocalFriction(value => !value));
   const baselinePoints = useMemo(() => baseline?.points ?? [], [baseline]);
   const svgPoints = useMemo(() => projectTrajectoryPoints(trajectory.points, trajectory.bounds, 800, 60), [trajectory.points, trajectory.bounds]);
-  const { activeIndex, currentPos, baselineGhostPos, comparisons, currentPrimaryPoint, currentDeltaTimeSec, currentLineDistM, currentGapM, currentTimeGapSec } = useGpsSceneDynamics({
+  const { activeIndex, primaryDists, currentPos, baselineGhostPos, comparisons, currentPrimaryPoint, currentDeltaTimeSec } = useGpsSceneDynamics({
     points: trajectory.points, baselinePoints, svgPoints, bounds: trajectory.bounds, currentIndex, trackLengthM: trajectory.trackLengthM,
     syncMode: ghostSync.mode, anchorDistM: ghostSync.markerDistM,
   });
@@ -95,8 +95,9 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
     onPan: (horizontal, vertical) => { if (carLockedCamera(mode)) setMode('orbit'); scene.current?.pan(horizontal, vertical); },
     onCenter: () => scene.current?.center(),
     onToggleFollow: () => setMode(value => followsCar(value) ? 'orbit' : 'follow'),
-    onCycleGhostSync: baseline ? () => ghostSync.setMode(nextGhostSyncMode(ghostSync.mode)) : undefined,
-    onToggleTrace: toggleTrace, onTogglePlay, onToggleExpanded: () => handleToggleExpanded()});
+    onCycleGhostSync: baseline ? () => ghostSync.setMode(nextGhostSyncMode(ghostSync.mode, ghostSync.markerDistM !== null)) : undefined,
+    onToggleMarker: () => toggleGhostMarker(ghostSync, primaryDists[activeIndex] ?? 0),
+    onToggleTrace: toggleTrace, onTogglePlay, onToggleExpanded: () => handleToggleExpanded(), onToggleView: onReturnTo2D});
   useEffect(() => { map.current?.focus({preventScroll: true}); }, []);
   // What drives the car and wheels, for the curious: hover the toolbar rather than read it under every frame.
   const sources = state?.ready ? [state.cars, state.wheelMotion, baseline ? {distance: 'Same-station ghost', time: 'Same-time ghost', anchored: 'Ghost on time from marker A'}[ghostSync.mode] : ''].filter(Boolean).join(' · ') : undefined;
@@ -144,8 +145,7 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
         <GpsMapTelemetryDock points={trajectory.points} baselinePoints={baseline?.points} comparisons={comparisons} currentIndex={currentIndex}
           onSelectIndex={onSelectIndex} trackLengthM={trajectory.trackLengthM} source={trajectory.source} sectors={trajectory.sectors}
           isPlaying={isPlaying} onTogglePlay={onTogglePlay} traceHidden={isTraceHidden} onToggleTrace={toggleTrace}
-          hud={<GpsMapTelemetryHud primaryPoint={activePrimaryPoint} baselinePoint={baselineGhostPos?.point} deltaTimeSec={currentTimeGapSec} lineDistanceM={currentLineDistM}
-            syncMode={ghostSync.mode} gapM={currentGapM} />} />
+          hud={<GpsMapTelemetryHud primaryPoint={activePrimaryPoint} baselinePoint={baselineGhostPos?.point} deltaTimeSec={currentDeltaTimeSec} />} />
       ) : (
         <div className="shrink-0 bg-lmu-deep">
           {effectiveShowFriction && <ReplayFrictionCircle points={trajectory.points} currentIndex={activeIndex}

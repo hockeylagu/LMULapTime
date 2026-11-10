@@ -22,14 +22,14 @@ import { useMapLayers } from '../display/useMapLayers.js';
 import { useGpsMapShortcuts } from '../useGpsMapShortcuts.js';
 import { useStableCullViewBox } from '../useStableCullViewBox.js';
 import type { GpsTrackMapProps } from '../gpsTrackMapTypes.js';
-import { FOCUS_RING } from '../../../common/buttonStyles.js';
+import { SURFACE_FOCUS_RING } from '../../../common/buttonStyles.js';
 import { GpsMapTelemetryDock } from '../telemetry/GpsMapTelemetryDock.js';
 import { GpsMapTelemetryHud } from '../display/GpsMapTelemetryHud.js';
 import { useStoredToggle } from '../useStoredToggle.js';
 import { useGpsSceneProjection, VIEWBOX_SIZE, PADDING } from './useGpsSceneProjection.js';
 import { useGpsSceneDynamics } from './useGpsSceneDynamics.js';
 import { useGpsSceneCameraFocus } from './useGpsSceneCameraFocus.js';
-import { ghostSyncControls, useGhostSync } from '../../inspector/ghostSyncContext.js';
+import { ghostSyncControls, toggleGhostMarker, useGhostSync } from '../../inspector/ghostSyncContext.js';
 import { nextGhostSyncMode } from '../ghostSync.js';
 
 // Stable when Turns is hidden, so marker memos do not recompute on every frame.
@@ -68,7 +68,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
   } = useGpsSceneProjection(props);
   const {
     activeIndex, fraction, currentPos, primaryDists, baselineDists, comparisons, deltaByIdx, currentDeltaTimeSec,
-    currentPrimaryPoint, baselineGhostPos, currentLineDistM, currentGapM, currentTimeGapSec, baselineHeadingIndex, baselineHeadingFraction, baselineBodyHeading,
+    currentPrimaryPoint, baselineGhostPos, baselineHeadingIndex, baselineHeadingFraction, baselineBodyHeading,
   } = useGpsSceneDynamics({ points, baselinePoints: effectiveBaselinePoints, svgPoints, bounds: effectiveBounds, currentIndex, trackLengthM,
     syncMode: ghostSync.mode, anchorDistM: ghostSync.markerDistM });
 
@@ -91,12 +91,14 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
     onResetZoom: resetPanZoom,
     onTogglePlay,
     onToggleGForce: handleToggleGForce,
-    onCycleGhostSync: baselinePoints ? () => ghostSync.setMode(nextGhostSyncMode(ghostSync.mode)) : undefined,
+    onCycleGhostSync: baselinePoints ? () => ghostSync.setMode(nextGhostSyncMode(ghostSync.mode, ghostSync.markerDistM !== null)) : undefined,
+    onToggleMarker: () => toggleGhostMarker(ghostSync, primaryDists[activeIndex] ?? 0),
     onToggleTrace: toggleTrace,
     onPan: panBy,
     onCenter: camera.centerOnCar,
     onToggleFollow: () => camera.setFollowCar(value => !value),
     onToggleExpanded: () => handleToggleExpanded(),
+    onToggleView: props.onToggleView,
   });
   const cullViewBox = useStableCullViewBox(currentViewBox, zoomLevel >= 2.5);
 
@@ -154,7 +156,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
       ref={containerRef} tabIndex={0} data-replay-surface="map" data-map-expanded={isExpanded ? '' : undefined}
       aria-label="Track map" onPointerDown={handlePointerDown} onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp} onDoubleClick={handleDoubleClick}
-      className={`relative flex flex-col items-center select-none overflow-hidden overscroll-contain touch-none cursor-grab active:cursor-grabbing [&[data-map-expanded]]:fixed [&[data-map-expanded]]:inset-0 [&[data-map-expanded]]:z-[1000] [&[data-map-expanded]]:w-screen [&[data-map-expanded]]:h-screen [&[data-map-expanded]]:bg-lmu-bg ${className} ${FOCUS_RING}`}
+      className={`relative flex flex-col items-center select-none overflow-hidden overscroll-contain touch-none cursor-grab active:cursor-grabbing [&[data-map-expanded]]:fixed [&[data-map-expanded]]:inset-0 [&[data-map-expanded]]:z-[1000] [&[data-map-expanded]]:w-screen [&[data-map-expanded]]:h-screen [&[data-map-expanded]]:bg-lmu-bg ${className} ${SURFACE_FOCUS_RING}`}
     >
       <div ref={viewportRef} className="relative w-full flex-1 min-h-0 overflow-hidden">
       {showControls && (
@@ -238,7 +240,7 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
         currentIndex={currentIndex} onSelectIndex={onSelectIndex} trackLengthM={trackLengthM} source={props.source} sectors={props.sectors} onTogglePlay={onTogglePlay}
         isPlaying={isPlaying} traceHidden={isTraceHidden} onToggleTrace={toggleTrace}
         hud={<GpsMapTelemetryHud primaryPoint={currentPrimaryPoint} baselinePoint={baselineGhostPos?.point}
-          deltaTimeSec={currentTimeGapSec} lineDistanceM={currentLineDistM} syncMode={ghostSync.mode} gapM={currentGapM} />} />}
+          deltaTimeSec={currentDeltaTimeSec} />} />}
     </div>
   );
 };

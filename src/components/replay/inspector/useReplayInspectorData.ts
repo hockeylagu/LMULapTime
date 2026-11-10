@@ -14,8 +14,9 @@ import { replayCompareScope } from './compare/compareLapsQuery.js';
 import { DEFAULT_COMPARE_CONTROLS, type CompareLapControls } from './compare/compareLapControls.js';
 import { advancePlaybackClock, PlaybackClock, playbackClockAt } from './replayPlaybackClock.js';
 import { createPlaybackCursor } from './replayPlaybackCursor.js';
-import { PLAYBACK_SPEEDS, type ReplayFullscreenControls } from './replayFullscreenControls.js';
+import { PLAYBACK_SPEEDS, steppedPlaybackSpeed, type ReplayFullscreenControls } from './replayFullscreenControls.js';
 import { DEFAULT_TELEMETRY_RESOLUTION, TelemetryResolution, trajectoryResolutionQuery } from '../telemetry/telemetryResolution.js';
+import { useGhostSync } from './ghostSyncContext.js';
 
 export interface UseReplayInspectorDataProps {
   isOpen: boolean;
@@ -83,15 +84,30 @@ export function useReplayInspectorData({
     currentIndexRef.current = index;
     setCurrentIndexState(index);
   }, [playbackCursor]);
+  const markerDistRef = useRef<number | null>(null);
+  markerDistRef.current = useGhostSync().markerDistM;
+  const markerDistances = useMemo(() => (trajectory ? getTrajectoryDistances(trajectory.points, trajectory.trackLengthM) : []), [trajectory]);
   useEffect(() => {
     if (!isOpen || !trajectory?.points.length) return;
     const handle = (event: KeyboardEvent) => {
-      if (event.key !== ' ' || event.repeat || replayShortcutBlocked(event) || !isReplaySurfaceTarget(event)) return;
-      event.preventDefault(); setIsPlaying(playing => !playing);
+      if (event.repeat || replayShortcutBlocked(event) || !isReplaySurfaceTarget(event)) return;
+      if (event.key === ' ') { event.preventDefault(); setIsPlaying(playing => !playing); return; }
+      // Backspace: both cars back to marker A and play again (watch the same corner twice).
+      if (event.key === 'Backspace') {
+        if (markerDistRef.current === null || !markerDistances.length) return;
+        event.preventDefault();
+        setCurrentIndex(findIndexAtDistance(markerDistances, markerDistRef.current));
+        setIsPlaying(true);
+        return;
+      }
+      // , / . step the playback speed (also < / > with Shift), playing or paused.
+      if (event.key.length !== 1 || !',.<>'.includes(event.key)) return;
+      event.preventDefault();
+      setPlaybackSpeed(speed => steppedPlaybackSpeed(event.key, speed) ?? speed);
     };
     window.addEventListener('keydown', handle);
     return () => window.removeEventListener('keydown', handle);
-  }, [isOpen, trajectory]);
+  }, [isOpen, trajectory, markerDistances, setCurrentIndex]);
   const trajectoryRequestIdRef = useRef(0);
   const trajectoryControllerRef = useRef<AbortController | null>(null);
   const lastTrajectoryRequestRef = useRef<{ lap: number; slot: number | null; resolution: TelemetryResolution; source: 'duckdb' | 'vcr' } | null>(null);

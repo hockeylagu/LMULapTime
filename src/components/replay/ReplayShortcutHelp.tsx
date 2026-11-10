@@ -8,13 +8,14 @@ import { CAMERA_MODES } from './view3d/cameraModes.js';
 
 const shortcuts = [
   ['Shift + wheel', 'Zoom around the mouse'], ['Shift + drag', 'Zoom into a range'],
-  ['Alt + drag', 'Pan the zoomed chart'], ['Alt + click', 'Drop marker A: time and delta to the cursor'],
-  ['Esc / dbl-click', 'Remove marker A'], ['← / →', 'Previous / next recorded sample'],
+  ['Alt + drag', 'Pan the zoomed chart'], ['X', 'Marker A at the cursor: delta to it, ghost runs from A (again: clear)'],
+  ['Alt + click', 'Marker A where you click'], ['Backspace', 'Back to marker A and play'], ['Esc / dbl-click', 'Remove marker A'], ['← / →', 'Previous / next recorded sample'],
   ['Shift + ← / →', 'Move cursor by 0.5 seconds'], ['Space', 'Play / pause'],
+  [', / .', 'Slower / faster playback (0.25× to 2×)'],
   ['Home / End', 'Lap start / end'], ['+ / −', 'Zoom around the cursor'],
   ['0 / R / dbl-click', 'Show full lap / reset map view'], ['C', 'Center map on car, keep zoom'],
-  ['F', 'Toggle follow car'], ['G', 'Toggle G-force arrow'], ['V', 'Ghost sync: distance / time / from marker A'], ['Minimap drag', 'Pan camera to circuit sector'],
-  ['M', 'Toggle fullscreen map'], ['T', 'Hide / show fullscreen trace'],
+  ['F', 'Toggle follow car'], ['G', 'Toggle G-force arrow'], ['V', 'Ghost sync: distance / time (/ from A with a marker)'], ['Minimap drag', 'Pan camera to circuit sector'],
+  ['M', 'Toggle fullscreen map'], ['E', 'Switch to the 3D view'], ['T', 'Hide / show fullscreen trace'],
   ['W / A / S / D', 'Pan map up / left / down / right'],
   ['Esc', 'Exit fullscreen / cancel gesture / close help'], ['?', 'Show shortcuts'],
 ];
@@ -22,9 +23,10 @@ const shortcuts3d = [
   ...CAMERA_MODES.map(option => [option.shortcut, `${option.label} camera`]),
   ['Drag / right drag', 'Orbit / pan camera'], ['Wheel / + / −', 'Zoom camera'],
   ['← / →', 'Previous / next recorded sample'], ['Shift + ← / →', 'Move cursor by 0.5 seconds'],
-  ['Home / End', 'Lap start / end'], ['Space', 'Play / pause'],
+  ['Home / End', 'Lap start / end'], ['Space', 'Play / pause'], [', / .', 'Slower / faster playback (0.25× to 2×)'],
   ['W / A / S / D', 'Pan camera up / left / down / right'], ['C', 'Center on car, keep zoom'],
-  ['F', 'Toggle follow car'], ['V', 'Ghost sync: distance / time / from marker A'], ['0 / R', 'Reset camera'], ['M', 'Toggle fullscreen map'],
+  ['F', 'Toggle follow car'], ['V', 'Ghost sync: distance / time (/ from A with a marker)'],
+  ['X', 'Marker A at the car: ghost runs from A (again: clear)'], ['Backspace', 'Back to marker A and play'], ['0 / R', 'Reset camera'], ['M', 'Toggle fullscreen map'], ['E', 'Back to the 2D map'],
   ['Esc', 'Exit fullscreen / close help'], ['?', 'Show shortcuts'],
 ];
 

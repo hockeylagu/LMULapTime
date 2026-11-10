@@ -128,26 +128,6 @@ export function interpolatePrimaryPoint<T extends ReplayTrajectoryPoint>(
 }
 
 /**
- * Computes lateral separation distance between primary and baseline racing lines in meters.
- * Both points must be evaluated at the same station progression.
- */
-export function computeLineSeparation(
-  primaryPoint?: { x?: number; z?: number } | null,
-  baselinePoint?: { x?: number; z?: number } | null
-): number | null {
-  if (
-    primaryPoint?.x === undefined ||
-    primaryPoint?.z === undefined ||
-    baselinePoint?.x === undefined ||
-    baselinePoint?.z === undefined
-  ) {
-    return null;
-  }
-  const dist = Math.hypot(primaryPoint.x - baselinePoint.x, primaryPoint.z - baselinePoint.z);
-  return Number.isFinite(dist) ? Number(dist.toFixed(2)) : null;
-}
-
-/**
  * Linearly interpolates delta time (seconds) between consecutive comparison samples
  * so the gap display ticks smoothly without jumping.
  */

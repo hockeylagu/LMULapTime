@@ -28,3 +28,18 @@ export function useGhostSync(): GhostSyncState {
 export function ghostSyncControls({ mode, setMode, markerDistM }: GhostSyncState) {
   return { ghostSync: mode, onChangeGhostSync: setMode, ghostAnchorSet: markerDistM !== null };
 }
+
+/**
+ * Drops marker A (X, Alt-click or the A button) and runs the ghost from it, or clears it and
+ * goes back to Distance: scrub on distance, mark before a corner, then play both cars from there.
+ */
+export function placeGhostMarker({ mode, setMode, setMarkerDistM }: GhostSyncState, distM: number | null): void {
+  setMarkerDistM(distM);
+  if (distM !== null) { if (mode !== 'anchored') setMode('anchored'); }
+  else if (mode === 'anchored') setMode('distance');
+}
+
+/** X: marker A at this distance, or no marker when A is already here (within half a metre). */
+export function toggleGhostMarker(state: GhostSyncState, distM: number): void {
+  placeGhostMarker(state, state.markerDistM !== null && Math.abs(state.markerDistM - distM) < 0.5 ? null : distM);
+}

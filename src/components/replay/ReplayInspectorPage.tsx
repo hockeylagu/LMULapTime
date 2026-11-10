@@ -12,9 +12,11 @@ export const ReplayInspectorPage: React.FC = () => {
   const fullscreen = searchParams.get('fullscreen') ?? searchParams.get('fullScreen');
   const viewParam = searchParams.get('view');
   const view: '2d' | '3d' = viewParam === '3d' ? '3d' : '2d';
-  const syncMode = parseGhostSyncMode(searchParams.get('sync'));
   // Marker A is kept as a distance, so it survives a lap or resolution reload.
   const [markerDistM, setMarkerDistM] = useState<number | null>(null);
+  // From A needs marker A (a reload keeps the URL mode but not the marker): without it, Distance.
+  const urlSyncMode = parseGhostSyncMode(searchParams.get('sync'));
+  const syncMode = urlSyncMode === 'anchored' && markerDistM === null ? 'distance' : urlSyncMode;
   const ghostSync = useMemo<GhostSyncState>(() => ({
     mode: syncMode,
     setMode: mode => updateSearchParams(searchParams, setSearchParams, { sync: mode === 'distance' ? null : mode }),

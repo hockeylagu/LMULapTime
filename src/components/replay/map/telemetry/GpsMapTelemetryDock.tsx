@@ -7,10 +7,12 @@ import { usePlaybackPosition } from '../../inspector/replayPlaybackCursor.js';
 import { computeTelemetryChartPaths } from '../../telemetry/telemetryChartPaths.js';
 import { TelemetryChannelRenderer } from '../../telemetry/TelemetryChannelRenderer.js';
 import { TelemetryScrubCursor } from '../../telemetry/TelemetryScrubCursor.js';
+import { MarkerAButton, TelemetryDeltaMarker, measureMarkerSpan } from '../../telemetry/TelemetryDeltaMarker.js';
 import { useTelemetryStripInteraction } from '../../telemetry/useTelemetryStripInteraction.js';
 import { AVAILABLE_TELEMETRY_CHANNELS, type TelemetryChannelId } from '../../telemetry/presets/telemetryPresets.js';
 import { GpsMapCompactTrace } from './GpsMapCompactTrace.js';
 import { GpsMapPlaybackStrip } from './GpsMapPlaybackStrip.js';
+import { GpsMapTraceCursorChips } from './GpsMapTraceCursorChips.js';
 import { TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 import { Select } from '../../../common/dropdown/Select.js';
 
@@ -55,6 +57,7 @@ export function GpsMapTelemetryDock({ points, baselinePoints, comparisons: scene
   const {
     viewStart, viewEnd, cumDists, safeIndex, pctForIndex, containerRef, dragSelection, interactionMode, isZoomed,
     setInteractionMode, handlePointerDown, handlePointerMove, handlePointerUp, handlePointerCancel, handleResetZoom,
+    markerIndex, markerDistM, clearMarker, toggleMarkerAtCursor, handleDoubleClick,
   } = useTelemetryStripInteraction({ points, currentIndex, onSelectIndex, trackLengthM, enabled: !collapsed });
   const playback = usePlaybackPosition(points, currentIndex);
   const index = playback?.index ?? safeIndex;
@@ -115,6 +118,7 @@ export function GpsMapTelemetryDock({ points, baselinePoints, comparisons: scene
         </button>
         {isZoomed && <button type="button" className={buttonClass}
           onClick={handleResetZoom}>Full lap</button>}
+        <MarkerAButton markerDistM={markerDistM} cursorDistM={cumDists[safeIndex]} onToggle={toggleMarkerAtCursor} className="h-7 text-xs" />
         {activeChannel === 'pedals' && <span className="flex gap-3 text-[11px] text-lmu-muted">
           <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="w-3 border-t-2" style={{ borderColor: TELEMETRY_COLORS.throttle }} />Throttle</span>
           <span className="inline-flex items-center gap-1.5"><span aria-hidden="true" className="w-3 border-t-2" style={{ borderColor: TELEMETRY_COLORS.brake }} />Brake</span>
@@ -134,13 +138,13 @@ export function GpsMapTelemetryDock({ points, baselinePoints, comparisons: scene
       aria-label="Fullscreen telemetry chart" className={`group/trace relative flex h-28 flex-col cursor-crosshair outline-none ${compactChannel ? 'ml-14 mr-4' : 'overflow-hidden'}`}
       onPointerDown={handlePointerDown} onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel}
-      onDoubleClick={handleResetZoom}
+      onDoubleClick={handleDoubleClick}
       onKeyDown={event => {
         if (event.key === ' ') { event.preventDefault(); onTogglePlay?.(); }
       }}>
-      {/* Inset keyboard-focus corners stay visible at the screen edge without framing the data. */}
-      <span aria-hidden="true" className="pointer-events-none absolute left-0 top-0 z-20 hidden h-3 w-3 border-l-2 border-t-2 border-lmu-accent-text group-focus-visible/trace:block" />
-      <span aria-hidden="true" className="pointer-events-none absolute right-0 top-0 z-20 hidden h-3 w-3 border-r-2 border-t-2 border-lmu-accent-text group-focus-visible/trace:block" />
+      {/* Inset keyboard-focus corners stay visible at the screen edge without framing the data; not after a click (keys pressed then make Chrome report :focus-visible). */}
+      <span aria-hidden="true" className="pointer-events-none absolute left-0 top-0 z-20 hidden h-3 w-3 border-l-2 border-t-2 border-lmu-accent-text group-[:focus-visible:not([data-pointer-focus])]/trace:block" />
+      <span aria-hidden="true" className="pointer-events-none absolute right-0 top-0 z-20 hidden h-3 w-3 border-r-2 border-t-2 border-lmu-accent-text group-[:focus-visible:not([data-pointer-focus])]/trace:block" />
       {activeChannel === 'speed' || activeChannel === 'pedals' || activeChannel === 'delta'
         ? <GpsMapCompactTrace channel={activeChannel} paths={paths} /> : <TelemetryChannelRenderer channelId={activeChannel} paths={paths} points={points} source={source}
         currentPoint={points[index]} currentComparison={comparisons[index]} pointComparisons={comparisons}
@@ -150,6 +154,11 @@ export function GpsMapTelemetryDock({ points, baselinePoints, comparisons: scene
         <span className={`absolute top-1 left-1 rounded px-1 py-0.5 font-mono text-[11px] font-bold ${sector.tag}`}>{sector.label}</span>
       </div>)}
       {isCursorInView && <TelemetryScrubCursor cursorPct={cursorPct} />}
+      {isCursorInView && (activeChannel === 'speed' || activeChannel === 'pedals' || activeChannel === 'delta')
+        && <GpsMapTraceCursorChips channel={activeChannel} point={points[index]} comparison={comparisons[index]} cursorPct={cursorPct} />}
+      {markerIndex !== null && <TelemetryDeltaMarker span={measureMarkerSpan(points, cumDists, comparisons, markerIndex, index)}
+        markerPct={pctForIndex(markerIndex)} offscreen={markerIndex < viewStart ? 'left' : markerIndex > viewEnd ? 'right' : null}
+        cursorPct={cursorPct} onClear={clearMarker} />}
       {dragSelection && <div className="absolute inset-y-0 bg-lmu-info-strong/25 border-x border-lmu-info pointer-events-none"
         style={{ left: `${Math.min(dragSelection.startPct, dragSelection.currentPct)}%`,
           width: `${Math.abs(dragSelection.currentPct - dragSelection.startPct)}%` }} />}

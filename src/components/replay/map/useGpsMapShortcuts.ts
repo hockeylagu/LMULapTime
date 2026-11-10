@@ -15,8 +15,12 @@ export interface UseGpsMapShortcutsOptions {
   onToggleGForce?: () => void;
   /** With a baseline: cycle the ghost sync (distance, time, from marker A). */
   onCycleGhostSync?: () => void;
+  /** X: drop marker A at the car and run the ghost from it, or clear it when A is already there. */
+  onToggleMarker?: () => void;
   onPan?: (horizontal: number, vertical: number) => void;
   onToggleExpanded?: () => void;
+  /** E: switch between the 2D map and the 3D view. */
+  onToggleView?: () => void;
   /** Fullscreen only: hide or show the telemetry trace under the map. */
   onToggleTrace?: () => void;
   onCenter?: () => void;
@@ -33,8 +37,10 @@ export interface UseGpsMapShortcutsOptions {
  * - Space: Toggle playback
  * - G: Toggle G-force arrow
  * - V: Cycle the ghost sync (distance / time / from marker A)
+ * - X: Drop marker A at the car (From A sync) or clear it (back to Distance)
  * - W/A/S/D: Pan up/left/down/right without changing the scrub cursor
  * - M: Toggle the fullscreen map, also from the telemetry chart
+ * - E: Switch between the 2D map and the 3D view, also from the telemetry chart
  * - T: Hide / show the fullscreen telemetry trace, also from that trace
  */
 export function useGpsMapShortcuts({
@@ -49,8 +55,10 @@ export function useGpsMapShortcuts({
   onTogglePlay,
   onToggleGForce,
   onCycleGhostSync,
+  onToggleMarker,
   onPan,
   onToggleExpanded,
+  onToggleView,
   onToggleTrace,
   onCenter,
   onToggleFollow,
@@ -64,13 +72,14 @@ export function useGpsMapShortcuts({
       if (event.repeat || !container || container.closest('[inert]') || !isReplaySurfaceTarget(event) || expandedMap && expandedMap !== container) return;
       event.preventDefault(); cameraAction(); return;
     }
-    if (event.key.toLowerCase() === 'm' && onToggleExpanded) {
-      // M works from any replay surface, but only for this live map and never while another map is expanded.
+    const mapAction = event.key.toLowerCase() === 'm' ? onToggleExpanded : event.key.toLowerCase() === 'e' ? onToggleView : undefined;
+    if (mapAction) {
+      // M and E work from any replay surface, but only for this live map and never while another map is expanded.
       if (event.repeat || !container || container.closest('[inert]') || !isReplaySurfaceTarget(event)) return;
       const expandedMap = document.querySelector('[data-map-expanded]');
       if (expandedMap && expandedMap !== container) return;
       event.preventDefault();
-      onToggleExpanded();
+      mapAction();
       return;
     }
     if (event.key.toLowerCase() === 't' && isExpanded && onToggleTrace) {
@@ -136,6 +145,9 @@ export function useGpsMapShortcuts({
     } else if (event.key.toLowerCase() === 'v' && onCycleGhostSync) {
       event.preventDefault();
       if (!event.repeat) onCycleGhostSync();
+    } else if (event.key.toLowerCase() === 'x' && onToggleMarker) {
+      event.preventDefault();
+      if (!event.repeat) onToggleMarker();
     }
   });
 

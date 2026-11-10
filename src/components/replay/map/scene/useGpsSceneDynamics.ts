@@ -4,10 +4,10 @@ import { computeLapComparisons } from '../../../../utils/replayComparison.js';
 import { getTrajectoryDistances, getDistancesInReferenceFrame, findIndexAtDistance } from '../../../../utils/lapAlignment.js';
 import { computeGhostPosition, type ProjectedPoint } from '../replayMapUtils.js';
 import { usePlaybackPosition } from '../../inspector/replayPlaybackCursor.js';
-import { interpolatePrimaryPoint, computeLineSeparation, interpolateDeltaTime } from './gpsCarDynamicsHelpers.js';
+import { interpolatePrimaryPoint, interpolateDeltaTime } from './gpsCarDynamicsHelpers.js';
 import { replayBodyHeading } from './GpsSceneCarMarkers.js';
 import { VIEWBOX_SIZE, PADDING } from './useGpsSceneProjection.js';
-import { createGhostClock, ghostDistanceAt, ghostTimeGap, type GhostSyncMode } from '../ghostSync.js';
+import { createGhostClock, ghostDistanceAt, type GhostSyncMode } from '../ghostSync.js';
 
 interface Options {
   points: ReplayTrajectoryPoint[];
@@ -61,11 +61,6 @@ export function useGpsSceneDynamics({
   const baselineGhostPos = useMemo(() => computeGhostPosition(
     baselineDists, baselinePoints, ghostDistance, bounds, VIEWBOX_SIZE, PADDING,
   ), [baselineDists, baselinePoints, ghostDistance, bounds]);
-  const currentLineDistM = useMemo(() => computeLineSeparation(currentPrimaryPoint, baselineGhostPos?.point),
-    [currentPrimaryPoint, baselineGhostPos?.point]);
-  /** On-track gap in metres in the primary's frame; positive: the primary is ahead. */
-  const currentGapM = baselineGhostPos ? primaryDistance - ghostDistance : null;
-  const currentTimeGapSec = ghostTimeGap(syncMode, currentDeltaTimeSec, primaryDistance, anchorDistM, deltaByIdx, primaryDists);
 
   let baselineHeadingIndex = findIndexAtDistance(baselineDists, ghostDistance);
   if (baselineHeadingIndex > 0 && baselineDists[baselineHeadingIndex] > ghostDistance) baselineHeadingIndex--;
@@ -75,7 +70,7 @@ export function useGpsSceneDynamics({
 
   return {
     activeIndex, fraction, currentPos, primaryDists, baselineDists, comparisons, deltaByIdx,
-    currentDeltaTimeSec, currentPrimaryPoint, baselineGhostPos, currentLineDistM, currentGapM, currentTimeGapSec,
+    currentDeltaTimeSec, currentPrimaryPoint, baselineGhostPos,
     baselineHeadingIndex, baselineHeadingFraction,
     baselineBodyHeading: replayBodyHeading(baselinePoints, baselineHeadingIndex, baselineHeadingFraction),
   };

@@ -21,7 +21,7 @@ export function GpsMapPlaybackStrip({ isPlaying = false, onTogglePlay, elapsedSe
       className={`inline-flex h-7 w-7 items-center justify-center rounded bg-lmu-raised text-lmu-text hover:bg-lmu-raised/80 ${FOCUS_RING}`}>
       {isPlaying ? <Pause size={13} /> : <Play size={13} />}
     </button>}
-    {playback && <Select<number> aria-label="Playback speed" value={playback.speed} onChange={playback.onChangeSpeed} mono
+    {playback && <Select<number> aria-label="Playback speed" title="Playback speed: , slower, . faster" value={playback.speed} onChange={playback.onChangeSpeed} mono
       options={playback.speeds.map(speed => ({ value: speed, label: `${speed}×` }))} />}
     <span className="font-mono text-[13px] tabular-nums text-lmu-text" title="Lap time at the cursor">
       {elapsedSec > 0 ? formatTime(elapsedSec) : '0:00.000'}
