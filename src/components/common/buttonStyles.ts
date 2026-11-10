@@ -3,6 +3,13 @@ export const FOCUS_RING =
   'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-lmu-accent-text';
 
 /**
+ * The ring for a replay chart or map: keyboard focus only. Once a key is pressed Chrome reports
+ * :focus-visible after a click as well; replayShortcuts.ts marks clicked surfaces data-pointer-focus.
+ */
+export const SURFACE_FOCUS_RING = 'focus:outline-none [&:focus-visible:not([data-pointer-focus])]:outline-solid [&:focus-visible:not([data-pointer-focus])]:outline-2 '
+  + '[&:focus-visible:not([data-pointer-focus])]:outline-offset-2 [&:focus-visible:not([data-pointer-focus])]:outline-lmu-accent-text';
+
+/**
  * Primary button (DESIGN.md): red fill, 12px radius, bold uppercase tracked label, 10px x 20px.
  * Disabled turns neutral rather than fading the red; a running action sets `data-busy="true"` and keeps full strength.
  */
