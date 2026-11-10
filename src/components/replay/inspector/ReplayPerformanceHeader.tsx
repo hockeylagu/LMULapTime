@@ -66,7 +66,7 @@ export const ReplayPerformanceHeader: React.FC<ReplayPerformanceHeaderProps> = R
           <div className="flex items-center gap-1.5 px-2 py-0.5  text-[11px] font-mono">
             {lapDeltas?.lapDelta !== null && lapDeltas?.lapDelta !== undefined ? (
               <span className={`font-black ${lapDeltas.lapDelta <= 0 ? 'text-lmu-gain' : 'text-lmu-loss'}`}>
-                Δ {lapDeltas.lapDelta <= 0 ? '' : '+'}{lapDeltas.lapDelta.toFixed(3)}s ({lapDeltas.lapDelta <= 0 ? 'Faster' : 'Slower'})
+                Δ {lapDeltas.lapDelta <= 0 ? '' : '+'}{lapDeltas.lapDelta.toFixed(3)}s
               </span>
             ) : (
               <span className="text-lmu-muted">--</span>
