@@ -138,9 +138,8 @@ describe('handling events worth reviewing', () => {
     expect(detectHandlingBalanceEvents(sparse)).toEqual([]);
   });
 
-  it('excludes off-track events and incomplete dynamics', () => {
+  it('excludes incomplete dynamics', () => {
     const points = corner();
-    expect(detectHandlingBalanceEvents(points.map(p => ({ ...p, isOffTrack: true })))).toEqual([]);
     expect(detectHandlingBalanceEvents(points.map(p => ({ ...p, yawRateDeg: undefined })))).toEqual([]);
   });
 

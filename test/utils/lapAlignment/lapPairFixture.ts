@@ -71,7 +71,7 @@ export interface LoadedLapPair {
   officialDeltaSec: number;
 }
 
-const BOOLEAN_FIELDS = new Set(['absActive', 'tcActive', 'isOffTrack', 'isTeleport']);
+const BOOLEAN_FIELDS = new Set(['absActive', 'tcActive', 'isTeleport']);
 
 function decodeLap(lap: FixtureLap): LoadedLap {
   const fields = Object.keys(lap.columns);

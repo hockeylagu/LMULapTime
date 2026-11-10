@@ -28,7 +28,7 @@ function getGripState(point?: ReplayTrajectoryPoint) {
   const utilization = Math.round(Math.hypot(longitudinalRatio, lateralRatio) * 100);
   const slip = point?.tireSlipPct ?? 0;
 
-  if (point?.wheelLockActive || point?.isOffTrack || slip >= 92) {
+  if (point?.wheelLockActive || slip >= 92) {
     return { label: 'LOST GRIP', detail: 'Reduce demand', color: MAP_COLORS.gripLost, utilization };
   }
   if (utilization > 100 || slip >= 80) {

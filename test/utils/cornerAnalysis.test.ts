@@ -618,41 +618,6 @@ describe('computeLapSegmentComparisons', () => {
     expect(corner.primaryTrackUsage?.exitSpaceLeftM).toBe(1.2);
   });
 
-  it('correctly reports negative space left on off-track corner cuts without inflating boundary', () => {
-    // 12m wide track (nominal half-width 6.0m).
-    // Clean Lap: hugs curb at 5.8m (0.2m space left).
-    // Off-track Lap: cuts inside curb at 7.2m with isOffTrack flag set.
-    const speeds = [190, 140, 90, 65, 65, 95, 140, 185];
-    const buildLap = (apexOffset: number, isOffTrack: boolean): ReplayTrajectoryPoint[] =>
-      speeds.map((speedKmh, i) => ({
-        x: i * 12,
-        y: 0,
-        z: i * 6,
-        speedKmh,
-        throttle: i >= 4 ? 90 : 0,
-        brake: i < 3 ? 70 : 0,
-        steerYaw: i >= 2 && i <= 5 ? -18 : 0,
-        lateralOffsetM: i <= 1 ? 4.5 : i === 3 || i === 4 ? apexOffset : i === 6 ? 5.0 : 0,
-        isOffTrack: (i === 3 || i === 4) && isOffTrack,
-        timeSec: i * 0.45,
-      }));
-
-    const cleanLap = buildLap(-5.8, false);
-    const cutLap = buildLap(-7.2, true);
-
-    const segments = computeLapSegmentComparisons(cutLap, cleanLap, 10, 180, 12.0);
-    const corner = segments.find(s => s.type === 'corner');
-    if (!corner || corner.type !== 'corner') throw new Error('expected corner');
-
-    // Clean baseline: 6.0 - 5.8 = 0.2m space left
-    expect(corner.baselineTrackUsage?.apexSpaceLeftM).toBe(0.2);
-    // Off-track cut: should NOT expand boundary to 7.5m (which would hide the cut as 0.3m left).
-    // It must strictly preserve nominal 6.0m boundary, yielding 6.0 - 7.2 = -1.2m
-    expect(corner.primaryTrackUsage?.apexSpaceLeftM).toBe(-1.2);
-    // Delta: -1.2 - 0.2 = -1.4m
-    expect(corner.apexSpaceDeltaM).toBe(-1.4);
-  });
-
   it('accurately computes head-to-head phase space deltas in comparison mode', () => {
     // Both laps on 14m track (nominal half-width 7.0m).
     // Lap A maximizes track usage across all three phases:

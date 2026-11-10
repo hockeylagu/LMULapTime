@@ -111,7 +111,6 @@ export interface ReplayTrajectoryPoint {
   tcActive?: boolean;
   absActive?: boolean;
   pitLimiter?: boolean;
-  isOffTrack?: boolean;
   detachablePartState?: number;
   tireTemps?: [number, number, number, number];
   tireWear?: [number, number, number, number];

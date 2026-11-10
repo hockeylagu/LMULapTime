@@ -98,7 +98,7 @@ export function evaluateHandlingEvidence(points: ReplayTrajectoryPoint[], start:
   const scrubDrag = sustainedSeconds(points, start, end, i => {
     const p = points[i];
     return (p.throttle ?? 0) >= 40 && (p.brake ?? 0) <= 2 && (p.accelLonG ?? 0) < -0.15 &&
-      Math.abs(p.accelLatG ?? 0) >= 0.8 && steer(i) >= 30 && !p.isOffTrack && !p.tcActive;
+      Math.abs(p.accelLatG ?? 0) >= 0.8 && steer(i) >= 30 && !p.tcActive;
   }) >= MIN_EVIDENCE_SEC;
 
   const excessSteering = sustainedSeconds(points, start, end, i => {

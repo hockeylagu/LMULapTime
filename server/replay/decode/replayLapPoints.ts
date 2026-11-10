@@ -61,7 +61,6 @@ export function buildTrajectoryPoints(
       steerYaw: cur.steerYaw ?? 0,
       gear: cur.gearRaw,
       inPit,
-      isOffTrack: cur.isOffTrack,
       inGarage: false,
       isTeleport: false,
       timeSec: roundFixed(cur.sTime, 4),

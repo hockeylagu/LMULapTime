@@ -336,11 +336,6 @@ export function computeTireSlipAndLockup(
       slip = Math.max(slip, 75);
     }
 
-    // Off-track gravel / grass grip loss
-    if (p.isOffTrack) {
-      slip = Math.max(slip, 75);
-    }
-
     slipPct[i] = Math.round(Math.max(0, Math.min(100, slip)));
     lockActive[i] = isLocked;
   }

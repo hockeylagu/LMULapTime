@@ -15,7 +15,6 @@ export interface RawTrajectoryPoint {
   absActive?: boolean;
   pitLimiter?: boolean;
   inPit?: boolean;
-  isOffTrack?: boolean;
   gearRaw?: number;
   speedKmhRaw?: number;
   detachablePartState?: number;

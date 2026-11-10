@@ -45,7 +45,6 @@ export interface InterpolatedPoint {
   virtualEnergy?: number;
   soc?: number;
   regenRate?: number;
-  isOffTrack?: boolean;
 }
 
 export interface PointComparison {
@@ -218,7 +217,6 @@ function blendTelemetryPoints(
     virtualEnergy,
     soc,
     regenRate,
-    isOffTrack: Boolean(p0.isOffTrack || p1.isOffTrack),
   };
 }
 

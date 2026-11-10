@@ -66,7 +66,7 @@ function classifyPointBalance(p: ReplayTrajectoryPoint): {
 } {
   const spd = p.speedKmh ?? 0;
   if (spd < MIN_SPEED_KMH || !Number.isFinite(spd) || !Number.isFinite(p.timeSec) ||
-      !Number.isFinite(p.steerYaw) || !Number.isFinite(p.yawRateDeg) || p.isOffTrack) {
+      !Number.isFinite(p.steerYaw) || !Number.isFinite(p.yawRateDeg)) {
     return { type: null, balanceDeg: 0, isCountersteer: false };
   }
 
@@ -273,7 +273,7 @@ export function detectHandlingBalanceEvents(
       const gapSec = (points[ev.startIdx].timeSec ?? 0) - (points[last.endIdx].timeSec ?? 0);
       const sameTurn = (points[last.endIdx].steerYaw ?? 0) * (points[ev.startIdx].steerYaw ?? 0) > 0;
       const uninterrupted = points.slice(last.endIdx + 1, ev.startIdx).every(p =>
-        !p.isOffTrack && Number.isFinite(p.timeSec) &&
+        Number.isFinite(p.timeSec) &&
         [null, ev.type].includes(classifyPointBalance(p).type));
       if (gapSec >= 0 && gapSec <= MERGE_GAP_DURATION_SEC && sameTurn && uninterrupted) {
         last.endIdx = ev.endIdx;

@@ -21,15 +21,13 @@ export function totalAcceleration(point?: ReplayTrajectoryPoint | null): number 
 
 export function getStatusLabel(point?: ReplayTrajectoryPoint | null): string {
   if (point?.pitLimiter) return 'LIMITER';
-  if (point?.isOffTrack) return 'OFF TRACK';
   if (hasReading(point?.rainIntensity) && point.rainIntensity > 0) return `WET (${formatRain(point.rainIntensity)})`;
   if (point?.inPit) return 'PIT LANE';
-  return point?.inPit === false && point.isOffTrack === false ? 'ON TRACK' : 'UNKNOWN';
+  return point?.inPit === false ? 'ON TRACK' : 'UNKNOWN';
 }
 
 export function getStatusSubtext(point?: ReplayTrajectoryPoint | null): string {
   if (point?.pitLimiter) return 'enabled';
-  if (point?.isOffTrack) return 'outside road';
   if (hasReading(point?.ambientTemp)) return `air ${point.ambientTemp.toFixed(1)}°C`;
   if (hasReading(point?.rainIntensity) && point.rainIntensity > 0) return 'wet';
   if (point?.inPit) return 'in pits';

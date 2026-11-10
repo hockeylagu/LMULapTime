@@ -452,7 +452,7 @@ measurable things, all read at the corner map's stations.
 flag stays the authority for leaving the track. The inside is the side the corner turns to (track geometry).
 
 **Precision first, per layout, automatic.** The edges are of mixed quality (§3.2) and their error is not known
-yet. `isOffTrack` is a status bit recorded in the replay (source data), so it can measure it: on every lap of a
+yet. **2026-11-09: the replay bit read as `isOffTrack` turned out to be engine stopped / clutch open (VCR_FORMAT.md bit survey) and the app dropped it, so this calibration has no source until off-track is found elsewhere.** The plan was that `isOffTrack`, a status bit recorded in the replay, would measure it: on every lap of a
 layout, where the flag switches on is compared with the edge plus the car half-width (1.0 m per class to start).
 The spread of that gap, per corner, gives the real noise of edge-based metrics and calibrates the half-width. A
 layout passes when the spread is under the "more track" threshold (0.5 m) in its corners; it is then `measured`,

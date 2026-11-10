@@ -70,8 +70,6 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
       <div className={`px-2 py-1.5 flex flex-col items-center justify-center transition-colors ${
         currentPoint?.pitLimiter
           ? 'border-lmu-purple-strong/70 bg-lmu-purple-strong/15'
-          : currentPoint?.isOffTrack
-          ? 'border-lmu-warn-strong/70 bg-lmu-warn-strong/15'
           : (currentPoint?.rainIntensity ?? 0) > 0
           ? 'border-lmu-azure-strong/70 bg-lmu-azure-strong/15'
           : currentPoint?.inPit
@@ -82,8 +80,6 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
         <span className={`text-[11px] font-black font-mono truncate ${
           currentPoint?.pitLimiter
             ? 'text-lmu-purple-soft'
-            : currentPoint?.isOffTrack
-            ? 'text-lmu-warn-soft'
             : (currentPoint?.rainIntensity ?? 0) > 0
             ? 'text-lmu-azure-soft'
             : currentPoint?.inPit
@@ -92,8 +88,6 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
         }`}>
           {currentPoint?.pitLimiter
             ? 'LIMITER'
-            : currentPoint?.isOffTrack
-            ? 'OFF TRACK'
             : (currentPoint?.rainIntensity ?? 0) > 0
             ? `WET (${formatRain(currentPoint?.rainIntensity ?? 0)})`
             : currentPoint?.inPit
@@ -103,8 +97,6 @@ export const ReplayTelemetryHud: React.FC<ReplayTelemetryHudProps> = React.memo(
         <span className="text-[10px] text-lmu-muted">
           {currentPoint?.pitLimiter
             ? '60 km/h'
-            : currentPoint?.isOffTrack
-            ? 'limits cut'
             : (currentPoint?.rainIntensity ?? 0) > 0
             ? `${currentPoint?.ambientTemp ? `${currentPoint.ambientTemp.toFixed(1)}°C` : 'wet'}${currentPoint?.trackTemp ? ` / ${currentPoint.trackTemp.toFixed(1)}°C` : ''}`
             : currentPoint?.inPit

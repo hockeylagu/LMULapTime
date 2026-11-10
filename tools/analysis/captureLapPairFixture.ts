@@ -32,7 +32,7 @@ import { areComparableCarClasses, resolveDriverCarClass } from '../../shared/dom
 const API = 'http://localhost:3001/api/replays';
 const FIELDS: Array<keyof ReplayTrajectoryPoint> = [
   'x', 'y', 'z', 'timeSec', 'distM', 'stationM', 'lateralOffsetM', 'speedKmh', 'throttle', 'brake',
-  'steerYaw', 'gear', 'rotY', 'accelLatG', 'accelLonG', 'accelTotalG', 'absActive', 'tcActive', 'isOffTrack', 'isTeleport',
+  'steerYaw', 'gear', 'rotY', 'accelLatG', 'accelLonG', 'accelTotalG', 'absActive', 'tcActive', 'isTeleport',
 ];
 
 interface LapRequest {

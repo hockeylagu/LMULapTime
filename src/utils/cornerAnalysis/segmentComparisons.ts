@@ -433,7 +433,7 @@ export function computeLapSegmentComparisons(
     const nominalHalfWidthM = (nominalWidthM ?? 12.0) / 2;
     const legacyEntryHalfWidthM = Math.max(
       nominalHalfWidthM,
-      primaryAtEntry.isOffTrack ? 0 : Number((Math.ceil(Math.abs(primaryAtEntry.lateralOffsetM ?? 0) * 2) / 2).toFixed(1))
+      Number((Math.ceil(Math.abs(primaryAtEntry.lateralOffsetM ?? 0) * 2) / 2).toFixed(1))
     );
     const legacyEntrySpace = (point: InterpolatedPoint) => point.lateralOffsetM === undefined
       ? undefined
@@ -452,7 +452,7 @@ export function computeLapSegmentComparisons(
 
     const legacyApexHalfWidthM = Math.max(
       nominalHalfWidthM,
-      primaryAtMin.isOffTrack ? 0 : Number((Math.ceil(Math.abs(primaryAtMin.lateralOffsetM ?? 0) * 2) / 2).toFixed(1))
+      Number((Math.ceil(Math.abs(primaryAtMin.lateralOffsetM ?? 0) * 2) / 2).toFixed(1))
     );
     const legacyApexSpace = (point: InterpolatedPoint) => point.lateralOffsetM === undefined
       ? undefined
@@ -469,7 +469,7 @@ export function computeLapSegmentComparisons(
 
     const legacyExitHalfWidthM = Math.max(
       nominalHalfWidthM,
-      primaryAtExit.isOffTrack ? 0 : Number((Math.ceil(Math.abs(primaryTrackOutOffsetM ?? 0) * 2) / 2).toFixed(1))
+      Number((Math.ceil(Math.abs(primaryTrackOutOffsetM ?? 0) * 2) / 2).toFixed(1))
     );
     const legacyExitSpace = (offset: number | undefined) => offset === undefined
       ? undefined

@@ -10,7 +10,6 @@ export interface MockSlice {
   brake?: number;
   tc?: boolean;
   abs?: boolean;
-  offTrack?: boolean;
   pitLimiter?: boolean;
   gear?: number;
   poseType?: number;
@@ -155,7 +154,6 @@ export function createSliceVcrBuffer(options?: {
 
     // Status at byte 38: bit 0 off-track (0x01), bit 2 pit limiter (0x04)
     let stByte = 0;
-    if (sl.offTrack) stByte |= 0x01;
     if (sl.pitLimiter) stByte |= 0x04;
     evData[38] = stByte;
 

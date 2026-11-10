@@ -16,7 +16,6 @@ describe('GpsMapTelemetryHud', () => {
     steerYaw: 0.3,
     timeSec: 42.5,
     inPit: false,
-    isOffTrack: false,
   };
 
   const mockBaseline: ReplayTrajectoryPoint = {
@@ -188,12 +187,9 @@ describe('GpsMapTelemetryHud', () => {
   });
 
   it('does not invent a pit speed or penalty validity from status flags', () => {
-    const { rerender } = render(<GpsMapTelemetryHud primaryPoint={{ ...mockPrimary, pitLimiter: true }} />);
+    render(<GpsMapTelemetryHud primaryPoint={{ ...mockPrimary, pitLimiter: true }} />);
     expect(screen.getByLabelText('LIMITER, enabled')).toBeInTheDocument();
     expect(screen.queryByText('60 km/h')).not.toBeInTheDocument();
-    rerender(<GpsMapTelemetryHud primaryPoint={{ ...mockPrimary, isOffTrack: true }} />);
-    expect(screen.getByLabelText('OFF TRACK, outside road')).toBeInTheDocument();
-    expect(screen.queryByText('limits cut')).not.toBeInTheDocument();
   });
 
   it('retains real zero channels and zero ambient temperature', () => {

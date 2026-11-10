@@ -23,11 +23,11 @@ describe('telemetryFusion', () => {
       replayName: 'Status.Vcr', timeReference: 'session', lapStartTimeSec: 10, pointsCount: 3,
       bounds: { minX: 0, maxX: 20, minZ: 0, maxZ: 0, spanX: 20, spanZ: 0 },
       points: [
-        { x: 0, y: 0, z: 0, timeSec: 10, inPit: false, isOffTrack: false, pitLimiter: false,
+        { x: 0, y: 0, z: 0, timeSec: 10, inPit: false, pitLimiter: false,
           tcActive: false, absActive: false, rainIntensity: 0, ambientTemp: 0, trackTemp: 25 },
-        { x: 10, y: 0, z: 0, timeSec: 11, inPit: false, isOffTrack: true, pitLimiter: false,
+        { x: 10, y: 0, z: 0, timeSec: 11, inPit: false, pitLimiter: false,
           tcActive: true, absActive: true, rainIntensity: 0.5, ambientTemp: 10, trackTemp: 20 },
-        { x: 20, y: 0, z: 0, timeSec: 12, inPit: true, isOffTrack: false, pitLimiter: true,
+        { x: 20, y: 0, z: 0, timeSec: 12, inPit: true, pitLimiter: true,
           inGarage: true, isTeleport: true },
       ],
     };
@@ -37,14 +37,14 @@ describe('telemetryFusion', () => {
     const snapshot = structuredClone({ vcr, duck });
     const fused = fuseDuckDbWithVcrTrajectory(duck, vcr);
     for (const index of [0, 1, 2]) {
-      expect(fused.points[index]).toMatchObject({ inPit: false, isOffTrack: false, pitLimiter: false,
+      expect(fused.points[index]).toMatchObject({ inPit: false, pitLimiter: false,
         tcActive: false, absActive: false, rainIntensity: 0, ambientTemp: 0, trackTemp: 25 });
     }
     for (const index of [3, 4]) {
-      expect(fused.points[index]).toMatchObject({ inPit: false, isOffTrack: true, pitLimiter: false,
+      expect(fused.points[index]).toMatchObject({ inPit: false, pitLimiter: false,
         tcActive: true, absActive: true, rainIntensity: 0.5, ambientTemp: 10, trackTemp: 20 });
     }
-    expect(fused.points[5]).toMatchObject({ inPit: true, isOffTrack: false, pitLimiter: true,
+    expect(fused.points[5]).toMatchObject({ inPit: true, pitLimiter: true,
       inGarage: true, isTeleport: true });
     expect({ vcr, duck }).toEqual(snapshot);
   });
@@ -53,14 +53,14 @@ describe('telemetryFusion', () => {
     const vcr: ReplayTrajectoryData = {
       replayName: 'Status.Vcr', pointsCount: 1,
       bounds: { minX: 0, maxX: 0, minZ: 0, maxZ: 0, spanX: 0, spanZ: 0 },
-      points: [{ x: 0, y: 0, z: 0, timeSec: 0, inPit: true, isOffTrack: true, pitLimiter: true,
+      points: [{ x: 0, y: 0, z: 0, timeSec: 0, inPit: true, pitLimiter: true,
         tcActive: true, absActive: true, rainIntensity: 1, ambientTemp: 20, trackTemp: 30 }],
     };
     const duck: DuckDbLapTelemetry = { lapNumber: 1, lapTimeSec: 1, pointsCount: 1, sampleRateHz: 100,
-      points: [{ x: 0, y: 0, z: 0, timeSec: 0, inPit: false, isOffTrack: false, pitLimiter: false,
+      points: [{ x: 0, y: 0, z: 0, timeSec: 0, inPit: false, pitLimiter: false,
         tcActive: false, absActive: false, rainIntensity: 0, ambientTemp: 0, trackTemp: 0 }] };
     expect(fuseDuckDbWithVcrTrajectory(duck, vcr).points[0]).toMatchObject({ inPit: false,
-      isOffTrack: false, pitLimiter: false, tcActive: false, absActive: false,
+      pitLimiter: false, tcActive: false, absActive: false,
       rainIntensity: 0, ambientTemp: 0, trackTemp: 0 });
   });
 
@@ -71,7 +71,7 @@ describe('telemetryFusion', () => {
     const duck: DuckDbLapTelemetry = { lapNumber: 1, lapTimeSec: 1, pointsCount: 1,
       sampleRateHz: 100, points: [point] };
     const fused = fuseDuckDbWithVcrTrajectory(duck, vcr).points[0];
-    for (const key of ['inPit', 'isOffTrack', 'pitLimiter', 'tcActive', 'absActive',
+    for (const key of ['inPit', 'pitLimiter', 'tcActive', 'absActive',
       'rainIntensity', 'ambientTemp', 'trackTemp'] as const) expect(fused[key]).toBeUndefined();
   });
 

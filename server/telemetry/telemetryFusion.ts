@@ -135,7 +135,6 @@ export function fuseDuckDbWithVcrTrajectory(
       inPit: dp.inPit ?? statePoint.inPit,
       inGarage: dp.inGarage ?? statePoint.inGarage,
       isTeleport: dp.isTeleport ?? statePoint.isTeleport,
-      isOffTrack: dp.isOffTrack ?? statePoint.isOffTrack,
       pitLimiter: dp.pitLimiter ?? statePoint.pitLimiter,
       tcActive: dp.tcActive ?? statePoint.tcActive,
       absActive: dp.absActive ?? statePoint.absActive,
