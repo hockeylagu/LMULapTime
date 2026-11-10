@@ -11,6 +11,7 @@ export interface MockSlice {
   tc?: boolean;
   abs?: boolean;
   pitLimiter?: boolean;
+  headlights?: boolean;
   gear?: number;
   poseType?: number;
   speedBytes?: [number, number, number, number, number];
@@ -139,6 +140,9 @@ export function createSliceVcrBuffer(options?: {
     if (sl.speedBytes) {
       Buffer.from(sl.speedBytes).copy(evData, 8);
     }
+    // Headlights at byte 2, bit 4 (0x10)
+    if (sl.headlights) evData[2] |= 0x10;
+
     // Steer at byte 4
     evData.writeUInt16LE(512, 4);
 

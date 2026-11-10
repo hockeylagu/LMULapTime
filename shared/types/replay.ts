@@ -111,6 +111,8 @@ export interface ReplayTrajectoryPoint {
   tcActive?: boolean;
   absActive?: boolean;
   pitLimiter?: boolean;
+  /** The car's headlights are lit, flashes included (a flash is a train of short toggles). */
+  headlights?: boolean;
   detachablePartState?: number;
   tireTemps?: [number, number, number, number];
   tireWear?: [number, number, number, number];

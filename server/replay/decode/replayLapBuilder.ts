@@ -14,6 +14,7 @@ export interface RawTrajectoryPoint {
   tcActive?: boolean;
   absActive?: boolean;
   pitLimiter?: boolean;
+  headlights?: boolean;
   inPit?: boolean;
   gearRaw?: number;
   speedKmhRaw?: number;

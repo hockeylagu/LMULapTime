@@ -67,6 +67,7 @@ export function buildTrajectoryPoints(
       tcActive: cur.tcActive,
       absActive: cur.absActive,
       pitLimiter: cur.pitLimiter,
+      headlights: cur.headlights,
       detachablePartState: cur.detachablePartState,
       engineRpm: cur.engineRpm,
       wheelSpeeds: cur.wheelSpeeds,

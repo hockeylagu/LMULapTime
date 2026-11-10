@@ -73,7 +73,7 @@ describe('replayParser - trajectory & timing', () => {
       expect(player?.isPlayer).toBe(true);
     });
 
-    it('decodes telemetry flags (tcActive, absActive, pitLimiter) and pedal inputs', () => {
+    it('decodes telemetry flags (tcActive, absActive, pitLimiter, headlights) and pedal inputs', () => {
       const sliceVcrPath = path.join(tempDir, 'telemetry_flags.vcr');
       const buf = createSliceVcrBuffer({
         slices: [
@@ -81,8 +81,8 @@ describe('replayParser - trajectory & timing', () => {
           { sTime: 1.0, driverSlot: 1, x: 10, y: 0, z: 10, throttle: 100, brake: 0, tc: true, abs: false },
           // Slice 1: mid brake, absActive
           { sTime: 1.1, driverSlot: 1, x: 20, y: 0, z: 20, throttle: 0, brake: 60, tc: false, abs: true },
-          // Slice 2: pitLimiter
-          { sTime: 1.2, driverSlot: 1, x: 30, y: 0, z: 30, throttle: 20, brake: 0, pitLimiter: true },
+          // Slice 2: pitLimiter and headlights
+          { sTime: 1.2, driverSlot: 1, x: 30, y: 0, z: 30, throttle: 20, brake: 0, pitLimiter: true, headlights: true },
           // Slice 3: clean running
           { sTime: 1.3, driverSlot: 1, x: 40, y: 0, z: 40, throttle: 80, brake: 0 },
         ],
@@ -104,11 +104,14 @@ describe('replayParser - trajectory & timing', () => {
 
       // Verify slice 2 status flags
       expect(traj.points[2].pitLimiter).toBe(true);
+      expect(traj.points[2].headlights).toBe(true);
+      expect(traj.points[2].inPit).toBe(false);
 
       // Verify slice 3 clean flags
       expect(traj.points[3].tcActive).toBe(false);
       expect(traj.points[3].absActive).toBe(false);
       expect(traj.points[3].pitLimiter).toBe(false);
+      expect(traj.points[3].headlights).toBe(false);
 
     });
 
