@@ -154,12 +154,12 @@ because active recordings can be exclusively locked on Windows.
   - Startup XML discovery reads the directory asynchronously. Parser upgrades reclassify retained sessions in transactions of ten and yield through the scan pump; the parser version advances only after all batches commit. Main-thread loops over cached work (replay discovery and cache checks, telemetry links and owners, the DuckDB catalog) give the event loop a turn once a 5 ms slice is used up (`server/core/yieldSlice.ts`).
   - Live XML reconciliation checks the compact capture index in one synchronous pass and publishes the one-to-one links in a transaction. File discovery and DuckDB reads remain in the recording worker. Withdrawal counting uses a map rather than repeatedly searching the capture list.
   - `src/api/useRequest.ts` loads data for a request and stores the answer with it: data, error and loading always belong to the current request (compared as JSON), so a changed request never shows another's answer. Fetch hooks build the request and call it instead of keying loading state by hand.
-  - `src/api/useAppData.ts` coordinates client polling during active scans and upgrades. `/scan/status` exposes monotonic `dataRevision`. `/status` includes server instance identity and plugin revision.
+  - `src/api/useAppData.ts` coordinates client polling during active scans. `/scan/status` exposes monotonic `dataRevision`. `/status` includes server instance identity and plugin revision.
   - Ingestion worker: `server/core/ingest/fileIngestWorker*.ts` parses XML and replay metadata in worker threads, returning unrated facts.
   - Worker port safety: every worker client checks messages with `isWorkerMessage` (`server/core/workerThreads.ts`) to ignore dev-mode watcher traffic (`watch:import`).
   - Result XML write-once: completed XMLs skipped unless forced or parser version bumped.
   - Replay decode queue & errors: `dbReplayIngestStore.ts`, `failed` vs `interrupted`, settles after `MAX_DECODE_ATTEMPTS`.
-  - `ServerContext` (`server/core/serverContext.ts`) manages background scan jobs (`backgroundScan.ts`), telemetry catalog, replay links (`SessionReplayLinks`), and upgrade runner (`ReplayUpgradeRunner`).
+  - `ServerContext` (`server/core/serverContext.ts`) manages background scan jobs (`backgroundScan.ts`), telemetry catalog, replay links (`SessionReplayLinks`).
 
 ---
 
@@ -263,7 +263,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
 | Lap comparison | `/api/compare/laps` (`comparisonQueries.ts`, `comparisonLapRows.ts`) | `lapComparison.ts`, `compareLapScope.ts` | `components/leaderboard/`, `src/utils/telemetryCompareLink.ts` |
 | Benchmarks | `referenceRoutes.ts`, `server/benchmarks/` (`referenceLaptimes.ts`, `benchmarkImpact.ts`), `dbReferenceLaptimeStore.ts` | `paceCategory.ts` | `src/api/referenceApi.ts`, `common/BenchmarkLadder.tsx`, `settings/ReferenceChangesList.tsx` |
 | AI engineer | `aiRoutes.ts`, `server/ai/aiReport.ts`, `dbAiReportStore.ts` | `shared/types/aiReport.ts` | `src/utils/aiReportPayload.ts`, `replay/analysis/AIReportTab.tsx` |
-| Settings & scans | `systemRoutes.ts`, `/replays/cache`, `/replays/upgrade` | `shared/domain/folderPath.ts` | `components/settings/` (`SettingsPanel.tsx`, `OverviewCard.tsx`, `replays/`) |
+| Settings & scans | `systemRoutes.ts`, `/replays/cache` | `shared/domain/folderPath.ts` | `components/settings/` (`SettingsPanel.tsx`, `OverviewCard.tsx`, `replays/`) |
 
 ### Cross-Cutting Architecture
 - **Baseline identity**: The replay comparison picker identifies the selected baseline by session ID, driver ordinal, and lap ordinal; display lap numbers and optional driver names do not determine baseline status.
@@ -345,7 +345,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
 | `DB_PARSER_VERSION` | `server/core/dbSessionSync.ts` | XML parser or lap classification rules change | Every stored session is reparsed from XML |
 | `SESSION_SUMMARY_PROJECTION_VERSION` | `shared/types/sessionSummaries.ts` | Persisted summary facts or derived column rules change | Bounded rebuild from stored rows without XML rereads |
 | `REPLAY_MATCHING_PROJECTION_VERSION` | `server/core/replay/dbReplayMatchingStore.ts` | Replay matching criteria change | One-time rebuild from retained metadata |
-| `REPLAY_CACHE_VERSION` | `server/core/dbCache.ts` | Replay decoding or trajectory blob format changes | Replays re-decoded in background (deleted files preserved) |
+| `REPLAY_CACHE_VERSION` | `server/core/dbCache.ts` | Replay decoding or trajectory blob format changes | One-time offline migration: re-decode on-disk replays, rewrite or relabel rows of deleted ones |
 | `DUCKDB_TELEMETRY_CACHE_VERSION` | `server/core/dbCache.ts` | DuckDB lap cache schema changes | DuckDB lap cache rebuilt |
 | `RACE_POSITIONS_VERSION` | `server/traffic/racePositions.ts` | Race positions indexing algorithm changes | Index rebuilt on demand |
 | `TELEMETRY_LINK_RULE` | `server/telemetry/telemetryLinks.ts` | DuckDB-to-session linking logic changes | Session-to-DuckDB links re-evaluated |

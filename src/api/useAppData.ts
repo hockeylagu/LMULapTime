@@ -33,8 +33,7 @@ export function serverRetryDelay(failures: number): number {
 // metadata and rain updates inside a replay, before the whole library finishes processing.
 function snapshotKey(scan: ScanStatus): string {
   return JSON.stringify([scan.dataRevision, scan.finishedAt, scan.sessionScan?.finishedAt,
-    scan.telemetryScan?.finishedAt, scan.replayUpgrade?.finishedAt,
-    scan.replayUpgrade?.driversDone, scan.referenceLaptimes?.completedAt, scan.sessionProjectionBackfill?.finishedAt]);
+    scan.telemetryScan?.finishedAt, scan.referenceLaptimes?.completedAt, scan.sessionProjectionBackfill?.finishedAt]);
 }
 
 /** `onGameStarted`: LMU started and the auto-open setting asks for the live dashboard. */
@@ -116,7 +115,7 @@ export function useAppData({ onGameStarted }: { onGameStarted?: () => void } = {
           if (success) loadedKey.current = key;
           else retry = true;
         }
-        const running = scan.running || scan.sessionScan?.running || scan.telemetryScan?.running || scan.replayUpgrade?.running ||
+        const running = scan.running || scan.sessionScan?.running || scan.telemetryScan?.running ||
           scan.sessionProjectionBackfill?.running || (reference?.started && !reference.checked);
         // Work held for a game session waits for its end, which the server announces (scan-started): no polling meanwhile.
         const active = running || (!scan.heldForLiveSession && (scan.refreshQueued || scan.allComplete === false));

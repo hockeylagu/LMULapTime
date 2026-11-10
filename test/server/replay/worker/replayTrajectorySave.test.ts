@@ -380,7 +380,7 @@ describe('worker SQLite persistence', () => {
     expect(db.getReplayDriverIngest(filename, -1)?.status).toBe('stored');
   });
 
-  it('uses worker saves during background ingestion and upgrades', async () => {
+  it('uses worker saves during background ingestion', async () => {
     fs.writeFileSync(filePath, createSliceVcrBuffer({
       drivers: [{ name: 'Test Driver', vehicleId: '21_26_AFCO95641716', team: 'A', carNumber: '21' }],
       slices: [
@@ -397,36 +397,5 @@ describe('worker SQLite persistence', () => {
     while (!synced.done) synced = await sync.next();
     expect(db.getReplayDriverIngest(filename, -1)?.status).toBe('stored');
     expect(mainSave).not.toHaveBeenCalled();
-
-    db.getDb().exec("UPDATE replay_trajectories SET parser_version = 'v4' WHERE driver_slot = 1; DELETE FROM replay_ingest_drivers WHERE driver_slot = 1;");
-    const upgrade = db.upgradeReplaysAsyncIterator(directory, { playerName: 'Test Driver' });
-    let upgraded = await upgrade.next();
-    while (!upgraded.done) upgraded = await upgrade.next();
-    expect(upgraded.value).toMatchObject({ failed: 0, upgraded: 1 });
-    expect(db.getReplayDriverIngest(filename, 1)?.parserVersion).toBe(REPLAY_CACHE_VERSION);
-    expect(mainSave).not.toHaveBeenCalled();
-  });
-
-  it('preserves the stored default during a file-backed upgrade with a different player', async () => {
-    fs.writeFileSync(filePath, createSliceVcrBuffer({
-      drivers: [
-        { name: 'Original Player', vehicleId: '21_26_AFCO95641716', team: 'A', carNumber: '21' },
-        { name: 'New Player', vehicleId: '21_26_AFCO95641716', team: 'B', carNumber: '22' },
-      ],
-      slices: [1, 2].flatMap(driverSlot => [
-        { sTime: 0, driverSlot, x: 0, y: 0, z: 0 },
-        { sTime: 1, driverSlot, x: 10, y: 0, z: 10 },
-      ]),
-    }));
-    const sync = db.syncReplaysAsyncIterator(directory, { playerName: 'Original Player' });
-    let synced = await sync.next();
-    while (!synced.done) synced = await sync.next();
-    expect(db.getStoredReplayTrajectory(filename, -1, -1)?.driverSlot).toBe(1);
-    db.getDb().exec("UPDATE replay_trajectories SET parser_version = 'v4'; DELETE FROM replay_ingest_drivers;");
-    const upgrade = db.upgradeReplaysAsyncIterator(directory, { playerName: 'New Player' });
-    let upgraded = await upgrade.next();
-    while (!upgraded.done) upgraded = await upgrade.next();
-    expect(upgraded.value).toMatchObject({ upgraded: 2, failed: 0 });
-    expect(db.getStoredReplayTrajectory(filename, -1, -1)?.driverSlot).toBe(1);
   });
 });

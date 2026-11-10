@@ -196,9 +196,8 @@ describe('app scan freshness', () => {
     expect(result.current.error).toBe('refresh data error');
   });
 
-  it('keeps polling during replay upgrades and cancels scheduled work on unmount', async () => {
-    scan.replayUpgrade = { enabled: true, running: true, processed: 0, total: 1, currentFile: 'x.Vcr', currentStage: null,
-      filePercent: 25, driversDone: 0, driversTotal: 1, startedAt: 'start', finishedAt: null, result: null, error: null };
+  it('keeps polling during a projection backfill and cancels scheduled work on unmount', async () => {
+    scan.sessionProjectionBackfill = { running: true, processed: 0, failed: 0, total: 1, currentSessionId: null, startedAt: 'start', finishedAt: null, error: null };
     const { unmount } = await mount();
     await poll(); expect(fetchMock.mock.calls.filter(([url]) => url === '/api/scan/status')).toHaveLength(2);
     unmount(); const calls = fetchMock.mock.calls.length; await poll(); expect(fetchMock).toHaveBeenCalledTimes(calls);

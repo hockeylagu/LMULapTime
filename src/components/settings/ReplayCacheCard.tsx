@@ -13,7 +13,6 @@ import {
   parseSort,
   ReplayShow,
   ReplaySortKey,
-  versionStatus,
   visibleReplays,
 } from './replays/replayModel.js';
 import { ReplayCacheState } from './replays/useReplayCache.js';
@@ -39,15 +38,15 @@ const Readout: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 /** Every replay in the cache, on disk or archived after LMU deleted the file, with its filters, sort and progress. */
 export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replay: cache, replayScanStatus, rowsPerPage = REPLAY_ROWS_PAGE }) => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { replays, counts, currentVersion } = cache;
+  const { replays, counts } = cache;
 
   const text = searchParams.get(REPLAY_PARAMS.filter) ?? '';
   const show = parseShow(searchParams.get(REPLAY_PARAMS.view));
   const sort = parseSort(searchParams.get(REPLAY_PARAMS.sort));
 
   const rows = useMemo(
-    () => (replays ? visibleReplays(replays, { text, show, sort, currentVersion }) : []),
-    [replays, text, show, sort, currentVersion]
+    () => (replays ? visibleReplays(replays, { text, show, sort }) : []),
+    [replays, text, show, sort]
   );
 
   const setText = (value: string) => updateSearchParams(searchParams, setSearchParams, { [REPLAY_PARAMS.filter]: value });
@@ -96,17 +95,13 @@ export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replay: cache,
         </p>
       )}
 
-      {versionStatus(counts, currentVersion) && (
-        <p className="text-xs text-lmu-muted" data-testid="replay-version-status">{versionStatus(counts, currentVersion)}</p>
-      )}
-
       <p className="text-xs text-lmu-muted leading-relaxed">
         Replay metadata, drivers, laps and full-resolution telemetry are parsed once and cached in
         SQLite (brotli-compressed) during each session scan. Replays LMU has deleted are never touched
         and stay fully usable from the cache.
       </p>
 
-      <ReplayProgress replayScanStatus={replayScanStatus} activeUpgrade={cache.activeUpgrade} upgradeError={cache.upgradeError} pendingUpgrade={cache.pendingUpgrade} />
+      <ReplayProgress replayScanStatus={replayScanStatus} />
 
       {cache.error && (
         <div role="alert" className="flex flex-wrap items-center gap-3 text-xs">
@@ -139,7 +134,7 @@ export const ReplayCacheCard: React.FC<ReplayCacheCardProps> = ({ replay: cache,
           />
           {rows.length > 0 ? (
             <>
-              <ReplayCacheTable rows={shownRows} sort={sort} onSort={toggleSort} currentVersion={currentVersion} />
+              <ReplayCacheTable rows={shownRows} sort={sort} onSort={toggleSort} />
               {rows.length > shownRows.length && (
                 <div className="flex flex-wrap items-center gap-3 text-xs text-lmu-muted">
                   <span className="font-mono">Showing {formatNumber(shownRows.length)} of {formatNumber(rows.length)}</span>

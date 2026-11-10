@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatDuration, countReplays, versionStatus } from '../../../src/components/settings/replays/replayModel.js';
+import { formatDuration } from '../../../src/components/settings/replays/replayModel.js';
 
 describe('formatDuration', () => {
   it('rounds the total before splitting so seconds never read 60', () => {
@@ -21,28 +21,6 @@ describe('formatDuration', () => {
   });
 });
 
-describe('versionStatus', () => {
-  const r = (isOnDisk: boolean, replayVersion: string) => ({ filename: `${replayVersion}${isOnDisk}.Vcr`, isOnDisk, replayVersion }) as never;
-
-  it('names archived replays kept at older versions next to current on-disk ones', () => {
-    const counts = countReplays([r(true, 'v7'), r(false, 'v3'), r(false, 'v3'), r(false, 'v7')], 'v7');
-    expect(counts.outdated).toBe(0);
-    expect(counts.archivedBehind).toBe(2);
-    expect(versionStatus(counts, 'v7')).toBe('All on-disk replays are at v7 · 2 archived kept at older versions');
-  });
-
-  it('counts on-disk replays waiting for the upgrade', () => {
-    const counts = countReplays([r(true, 'v5'), r(true, 'v6')], 'v7');
-    expect(versionStatus(counts, 'v7')).toBe('2 on-disk replays are behind v7 and will be upgraded in the background');
-  });
-
-  it('claims nothing when the current version is unknown', () => {
-    const counts = countReplays([r(true, 'v5'), r(false, 'v3')], null);
-    expect(counts.outdated).toBe(0);
-    expect(versionStatus(counts, null)).toBeNull();
-  });
-});
-
 describe('visibleReplays error search', () => {
   it('finds a replay by the text of its error', async () => {
     const { visibleReplays, DEFAULT_REPLAY_SORT } = await import('../../../src/components/settings/replays/replayModel.js');
@@ -50,7 +28,7 @@ describe('visibleReplays error search', () => {
       { filename: 'Good.Vcr', error: null } as never,
       { filename: 'Bad.Vcr', error: 'Truncated stream' } as never,
     ];
-    const filtered = visibleReplays(list, { text: 'truncated', show: 'all', sort: DEFAULT_REPLAY_SORT, currentVersion: 'v7' });
+    const filtered = visibleReplays(list, { text: 'truncated', show: 'all', sort: DEFAULT_REPLAY_SORT });
     expect(filtered).toHaveLength(1);
     expect(filtered[0].filename).toBe('Bad.Vcr');
   });
@@ -63,7 +41,7 @@ describe('countReplays', () => {
       { filename: 'Cached.Vcr', replayVersion: 'v7', isOnDisk: true, fileSizeBytes: 10, compressedSizeBytes: 5 } as never,
       { filename: 'Broken.Vcr', error: 'invalid header', replayVersion: 'v7', isOnDisk: true, fileSizeBytes: 10, compressedSizeBytes: 5 } as never,
       { filename: 'Unread.Vcr', error: 'not a replay', isOnDisk: true, fileSizeBytes: 99, compressedSizeBytes: 0 } as never,
-    ], 'v7');
+    ]);
     expect(counts).toMatchObject({ total: 2, onDisk: 2, fileSizeBytes: 20 });
   });
 });

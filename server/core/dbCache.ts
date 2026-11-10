@@ -1,9 +1,9 @@
 import zlib from 'zlib';
 
-// Bumping REPLAY_CACHE_VERSION makes every replay on disk be decoded again (once per driver),
-// and replays LMU has since deleted can never be: their rows are the only copy left. Only bump
-// it when stored rows can no longer be read; a version whose rows the current code still reads
-// correctly belongs in COMPATIBLE_REPLAY_CACHE_VERSIONS instead.
+// Bumping REPLAY_CACHE_VERSION needs a one-time offline migration: re-decode the on-disk replays
+// with the server stopped, and rewrite or relabel the rows of replays LMU has deleted, whose rows
+// are the only copy left. Only bump it when stored rows can no longer be read; a version whose rows
+// the current code still reads correctly belongs in COMPATIBLE_REPLAY_CACHE_VERSIONS instead.
 // v6: calibrated ambient temp formula, Virtual Energy (1/51), contact events (1/17), tyre compounds (1/16), removal of fake trackTemp
 // v7: event classes read without the race-session bit (29), so practice / qualifying replays get
 //     weather, tyre compounds, contacts, Virtual Energy and flags; penalties decoded from class 3.
@@ -14,8 +14,6 @@ import zlib from 'zlib';
 export const REPLAY_CACHE_VERSION = 'v8';
 export const COMPATIBLE_REPLAY_CACHE_VERSIONS: ReadonlySet<string> = new Set([
   REPLAY_CACHE_VERSION,
-  // v8 without headlights.
-  'v7',
   // Race replays match v7 except penalties; practice / qualifying rows lack the events above.
   'v6',
   'v5',

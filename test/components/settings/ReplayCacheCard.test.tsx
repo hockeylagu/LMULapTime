@@ -11,8 +11,6 @@ const Harness: React.FC<{ scan?: ScanStatus | ReplayScanStatus | null }> = ({ sc
   return <ReplayCacheCard replay={replay} replayScanStatus={scan} />;
 };
 
-const idleUpgrade = { enabled: true, running: false, processed: 0, total: 0, driversDone: 0, driversTotal: 0, currentFile: null, currentStage: null, filePercent: null, startedAt: null, finishedAt: null, result: null, error: null };
-
 const replay = (filename: string, extra: Record<string, unknown> = {}) => ({
   filename,
   fileSizeBytes: 1024 * 1024,
@@ -29,16 +27,11 @@ const replay = (filename: string, extra: Record<string, unknown> = {}) => ({
 
 interface Api {
   replays?: unknown[];
-  upgrade?: Record<string, unknown>;
-  currentVersion?: string;
   cacheFailure?: string;
 }
 
-function mockApi({ replays = [], upgrade = idleUpgrade, currentVersion = 'v7', cacheFailure }: Api = {}) {
-  const fetchMock = vi.fn().mockImplementation((url: string) => {
-    if (url.includes('/api/replays/upgrade')) {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ status: upgrade, currentVersion, pendingReplays: 0, pendingDrivers: 0 }) });
-    }
+function mockApi({ replays = [], cacheFailure }: Api = {}) {
+  const fetchMock = vi.fn().mockImplementation(() => {
     if (cacheFailure) {
       return Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({ error: cacheFailure }) });
     }
@@ -84,7 +77,6 @@ describe('ReplayCacheCard', () => {
     const replayDateMs = new Date('2026-01-15T12:00:00Z').getTime();
     mockApi({
       replays: [replay('Spa_R1.Vcr', { fileSizeBytes: 2 * 1024 * 1024, compressedSizeBytes: 512 * 1024, replayDateMs, driversCount: 24, durationSec: 125, trajectoriesCached: 3, replayVersion: 'v5' })],
-      currentVersion: 'v5',
     });
     render(<Harness />);
     await screen.findByText('Spa_R1.Vcr');
@@ -137,7 +129,7 @@ describe('ReplayCacheCard', () => {
     expect(tail.parentElement).toHaveAttribute('title', name);
   });
 
-  it('warns about a behind version only for replays still on disk', async () => {
+  it('shows each stored replay version without a behind or kept label', async () => {
     mockApi({
       replays: [
         replay('Ondisk R1 1.Vcr', { replayVersion: 'v5' }),
@@ -148,18 +140,8 @@ describe('ReplayCacheCard', () => {
     render(<Harness />);
     await screen.findByText('Ondisk');
     const versions = screen.getAllByTestId('replay-version');
-    expect(versions.map((v) => v.textContent).sort()).toEqual(['v5 behind', 'v5 · kept', 'v7']);
-    const behind = versions.find((v) => v.textContent === 'v5 behind');
-    expect(behind).toHaveClass('text-lmu-warn');
-    versions.filter((v) => v !== behind).forEach((v) => expect(v).toHaveClass('text-lmu-muted'));
-  });
-
-  it('does not warn when the server has not reported its version', async () => {
-    mockApi({ replays: [replay('Old R1 1.Vcr', { replayVersion: 'v1' })], currentVersion: '' });
-    render(<Harness />);
-    await screen.findByText('Old');
-    expect(screen.getByTestId('replay-version')).toHaveTextContent('v1');
-    expect(screen.getByTestId('replay-version')).not.toHaveClass('text-lmu-warn');
+    expect(versions.map((v) => v.textContent).sort()).toEqual(['v5', 'v5', 'v7']);
+    versions.forEach((v) => expect(v).toHaveClass('text-lmu-muted'));
   });
 
   it('renders the Archived label in green for replays kept after deletion', async () => {
@@ -176,47 +158,13 @@ describe('ReplayCacheCard', () => {
     expect(within(table).getByText('On disk')).toHaveClass('text-lmu-muted');
   });
 
-  it('states the version status and marks archived replays below it as kept, not behind', async () => {
+  it('describes the sortable columns to screen readers', async () => {
     mockApi({ replays: [replay('Spa R1 1.Vcr'), replay('Old R1 2.Vcr', { isOnDisk: false, replayVersion: 'v3' })] });
     render(<Harness />);
     await screen.findByText('Old');
-    await waitFor(() => expect(screen.getByTestId('replay-version-status')).toHaveTextContent('All on-disk replays are at v7 · 1 archived kept at older versions'));
-    const versions = screen.getAllByTestId('replay-version').map((el) => el.textContent);
-    expect(versions).toEqual(expect.arrayContaining(['v7', 'v3 · kept']));
-    const kept = screen.getByText('v3 · kept');
-    expect(kept).toHaveAttribute('aria-description', expect.stringMatching(/file is gone.*cannot be decoded again/));
-    expect(kept).not.toHaveClass('text-lmu-warn');
-    expect(screen.getByText('Replay upgrade: nothing to do.')).toBeInTheDocument();
     const table = screen.getByRole('region', { name: 'Cached replays' });
     const header = within(table).getByRole('button', { name: /^Stored size/ });
     expect(header).toHaveAccessibleDescription(/Space the cache uses/);
-    const outdated = within(screen.getByRole('group', { name: 'Show replays' })).getByRole('button', { name: /^Outdated/ });
-    expect(outdated).toHaveAttribute('aria-description', expect.stringMatching(/background replay upgrade/));
-  });
-
-  it('tells how many on-disk replays the upgrade will take, and keeps the old behind label', async () => {
-    mockApi({ replays: [replay('Spa R1 1.Vcr', { replayVersion: 'v5' })] });
-    render(<Harness />);
-    await screen.findByText('Spa');
-    await screen.findByText('v5 behind');
-    expect(screen.getByTestId('replay-version-status')).toHaveTextContent('1 on-disk replay is behind v7');
-  });
-
-  it('shows no version comparison when the server sent no currentVersion', async () => {
-    const fetchMock = vi.fn().mockImplementation((url: string) =>
-      Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve(url.includes('/api/replays/upgrade')
-          ? { status: idleUpgrade, pendingReplays: 0, pendingDrivers: 0 }
-          : [replay('Old R1 2.Vcr', { isOnDisk: false, replayVersion: 'v3' }), replay('Spa R1 1.Vcr', { replayVersion: 'v5' })]),
-      }));
-    global.fetch = fetchMock;
-    render(<Harness />);
-    await screen.findByText('Old');
-    expect(screen.queryByTestId('replay-version-status')).not.toBeInTheDocument();
-    expect(screen.queryByText(/kept$/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/behind$/)).not.toBeInTheDocument();
-    expect(screen.getByText('v3')).toBeInTheDocument();
   });
 
   describe('filters, sort and the URL', () => {
@@ -237,14 +185,13 @@ describe('ReplayCacheCard', () => {
       expect(within(group).getByRole('button', { name: /^All\s*3$/ })).toBeInTheDocument();
       expect(within(group).getByRole('button', { name: /^On disk\s*1$/ })).toBeInTheDocument();
       expect(within(group).getByRole('button', { name: /^Archived\s*2$/ })).toBeInTheDocument();
-      expect(within(group).getByRole('button', { name: /^Outdated\s*1$/ })).toBeInTheDocument();
 
       fireEvent.click(within(group).getByRole('button', { name: /^Archived/ }));
       expect(rowNames()).toEqual(['Alpha R1 1.Vcr', 'Spa R1 3.Vcr']);
       expect(screen.getByText('2 of 3 replays')).toBeInTheDocument();
       await waitFor(() => expect(window.location.hash).toContain('replayView=archived'));
 
-      fireEvent.click(within(group).getByRole('button', { name: /^Outdated/ }));
+      fireEvent.click(within(group).getByRole('button', { name: /^On disk/ }));
       expect(rowNames()).toEqual(['Monza R1 2.Vcr']);
 
       fireEvent.click(within(group).getByRole('button', { name: /^All/ }));
@@ -341,36 +288,6 @@ describe('ReplayCacheCard', () => {
       await waitFor(() => expect(cacheCalls(fetchMock)).toHaveLength(1));
       rerender(<Harness scan={{ ...running, running: false }} />);
       await waitFor(() => expect(cacheCalls(fetchMock)).toHaveLength(2));
-    });
-
-    it('shows the upgrade progress while it runs, with no switch', async () => {
-      mockApi({
-        upgrade: { ...idleUpgrade, running: true, processed: 2, total: 8, driversDone: 30, driversTotal: 120, currentFile: 'LeMans_P2.Vcr', currentStage: 'Driver 3: Decoding telemetry', filePercent: 45 },
-      });
-      render(<Harness />);
-      expect(await screen.findByTestId('replay-upgrade-running')).toBeInTheDocument();
-      expect(screen.getByText('30 / 120 Drivers')).toBeInTheDocument();
-      expect(screen.getByText('Replay 3 of 8')).toBeInTheDocument();
-      expect(screen.getByText('LeMans_P2.Vcr')).toBeInTheDocument();
-      expect(screen.queryByRole('switch')).not.toBeInTheDocument();
-    });
-
-    it('shows nothing about the upgrade while it is idle', async () => {
-      mockApi();
-      render(<Harness />);
-      await screen.findByText(/no replays cached yet/i);
-      expect(screen.queryByTestId('replay-upgrade-running')).not.toBeInTheDocument();
-      expect(screen.queryByText('Upgrading Replay Telemetry')).not.toBeInTheDocument();
-    });
-
-    it('does not turn an aborted upgrade poll into an error', async () => {
-      global.fetch = vi.fn().mockImplementation((url: string) => {
-        if (url.includes('/api/replays/upgrade')) return Promise.reject(new DOMException('aborted', 'AbortError'));
-        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
-      });
-      render(<Harness />);
-      await screen.findByText(/no replays cached yet/i);
-      expect(screen.queryByText(/status unavailable/i)).not.toBeInTheDocument();
     });
   });
 });

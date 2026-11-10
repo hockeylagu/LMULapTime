@@ -14,7 +14,6 @@ import { requestBody } from '../../fixtures/requestUrl.js';
 
 const json = (body: unknown) => Promise.resolve({ ok: true, json: () => Promise.resolve(body) });
 const apiFailure = (code: number, body: unknown) => Promise.resolve({ ok: false, status: code, json: () => Promise.resolve(body) });
-const idle = { enabled: true, running: false, processed: 0, total: 0, driversDone: 0, driversTotal: 0, currentFile: null, currentStage: null, filePercent: null, startedAt: null, finishedAt: null, result: null, error: null };
 
 const KEY = 'AIzaSyD-secret-key-0123456789';
 
@@ -208,10 +207,7 @@ describe('Cached replays at scale', { timeout: 20000 }, () => {
   afterEach(() => vi.restoreAllMocks());
 
   function mockReplays(list: unknown[]) {
-    global.fetch = vi.fn().mockImplementation((url: string) =>
-      url.includes('/api/replays/upgrade')
-        ? json({ status: idle, currentVersion: 'v7', pendingReplays: 0, pendingDrivers: 0 })
-        : json(list));
+    global.fetch = vi.fn().mockImplementation(() => json(list));
   }
 
   it('draws one page of 2,000 rows and grows by one page, with separators on the totals', async () => {
@@ -260,14 +256,12 @@ describe('Cached replays at scale', { timeout: 20000 }, () => {
 
 describe('Replay cache requests', () => {
   afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
-  const Harness: React.FC = () => <ReplayCacheCard replay={useReplayCache(null)} replayScanStatus={null} />;
   const replayRow = (name: string) => ({ filename: name, fileSizeBytes: 1, compressedSizeBytes: 1, replayDateMs: Date.UTC(2026, 0, 1), driversCount: 1, durationSec: 60, trajectoriesCached: 1, replayVersion: 'v7', isOnDisk: true });
 
   it('drops a slow earlier answer when a newer request has already been answered', async () => {
     const answers: Array<(value: unknown) => void> = [];
     let cacheCalls = 0;
-    global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/api/replays/upgrade')) return json({ status: idle, currentVersion: 'v7', pendingReplays: 0, pendingDrivers: 0 });
+    global.fetch = vi.fn().mockImplementation(() => {
       cacheCalls += 1;
       if (cacheCalls === 1) return new Promise((resolve) => { answers.push(resolve); });
       return json([replayRow('New Track R1 1.Vcr')]);
@@ -282,30 +276,5 @@ describe('Replay cache requests', () => {
     });
     expect(result.current.replays?.map((r) => r.filename)).toEqual(['New Track R1 1.Vcr']);
     expect(result.current.isLoading).toBe(false);
-  });
-
-  it('removes a stuck upgrade bar and stops polling when the server stops answering', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    let upgradeCalls = 0;
-    global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/api/replays/upgrade')) {
-        upgradeCalls += 1;
-        if (upgradeCalls === 1) {
-          return json({ status: { ...idle, running: true, processed: 1, total: 4, driversDone: 5, driversTotal: 20, currentFile: 'a.Vcr' }, currentVersion: 'v7', pendingReplays: 1, pendingDrivers: 1 });
-        }
-        return Promise.reject(new TypeError('Failed to fetch'));
-      }
-      return json([]);
-    });
-    render(<Harness />);
-    expect(await screen.findByTestId('replay-upgrade-running')).toBeInTheDocument();
-
-    await act(async () => { await vi.advanceTimersByTimeAsync(3100); });
-    await waitFor(() => expect(screen.queryByTestId('replay-upgrade-running')).not.toBeInTheDocument());
-    expect(screen.getByText(/Replay upgrade status unavailable: Failed to fetch/)).toBeInTheDocument();
-
-    const callsAfterFailure = upgradeCalls;
-    await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
-    expect(upgradeCalls).toBe(callsAfterFailure);
   });
 });

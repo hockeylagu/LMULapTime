@@ -6,8 +6,6 @@ import { FOCUS_RING } from '../../common/buttonStyles.js';
 import {
   formatDuration,
   isArchived,
-  isArchivedBehind,
-  isOutdated,
   isUnread,
   ReplaySort,
   ReplaySortKey,
@@ -26,7 +24,7 @@ interface Column {
 const COLUMNS: Column[] = [
   { key: 'name', label: 'Replay', align: 'left' },
   { key: 'source', label: 'Disk', align: 'left', hint: 'Whether LMU still has the replay file, or the cache holds the only copy' },
-  { key: 'version', label: 'Version', align: 'center', hint: 'The version of the replay decoder the replay was last decoded with. On-disk replays behind the current version are decoded again in the background.' },
+  { key: 'version', label: 'Version', align: 'center', hint: 'The version of the replay decoder the replay was last decoded with.' },
   { key: 'drivers', label: 'Drivers', align: 'right', hint: 'Cars in the replay' },
   { key: 'duration', label: 'Duration', align: 'right' },
   { key: 'size', label: 'File size', align: 'right', hint: 'Size of the original replay file LMU wrote' },
@@ -34,9 +32,6 @@ const COLUMNS: Column[] = [
   { key: 'date', label: 'Date', align: 'right' },
   { key: 'decoded', label: 'Telemetry', align: 'right', hint: 'Cars whose full telemetry is decoded and stored in the cache' },
 ];
-
-const ARCHIVED_VERSION_HINT =
-  'The original replay file is gone, so this replay cannot be decoded again. It was decoded with an older version of the app and is still fully usable.';
 
 const TEXT_ALIGN = { left: 'text-left', center: 'text-center', right: 'text-right' } as const;
 const JUSTIFY = { left: 'justify-start', center: 'justify-center', right: 'justify-end' } as const;
@@ -65,14 +60,13 @@ export interface ReplayCacheTableProps {
   rows: ReplayCacheSummary[];
   sort: ReplaySort;
   onSort: (key: ReplaySortKey) => void;
-  currentVersion: string | null;
 }
 
 /**
  * One row per cached replay in a capped-height scroll box with a sticky header. The box has no tab stop of
  * its own: the sort buttons inside it are focusable, so the keyboard can scroll it.
  */
-export const ReplayCacheTable: React.FC<ReplayCacheTableProps> = ({ rows, sort, onSort, currentVersion }) => (
+export const ReplayCacheTable: React.FC<ReplayCacheTableProps> = ({ rows, sort, onSort }) => (
   <div role="region" aria-label="Cached replays" className="max-h-[28rem] overflow-auto border-y border-lmu-border">
   <table className="w-full text-xs">
     <thead>
@@ -106,12 +100,7 @@ export const ReplayCacheTable: React.FC<ReplayCacheTableProps> = ({ rows, sort, 
     <tbody>
       {rows.map((r) => {
         const version = versionOf(r);
-        const outdated = isOutdated(r, currentVersion);
         const archived = isArchived(r);
-        const kept = isArchivedBehind(r, currentVersion);
-        const versionHint = outdated
-          ? `Behind the current ${currentVersion}; it is decoded again in the background`
-          : kept ? ARCHIVED_VERSION_HINT : undefined;
         return (
           <tr key={r.filename} className="border-b border-lmu-border/50 hover:bg-lmu-card-hover/60">
             <td className="w-full max-w-0 px-3 py-2 text-lmu-text font-medium">
@@ -126,11 +115,9 @@ export const ReplayCacheTable: React.FC<ReplayCacheTableProps> = ({ rows, sort, 
             <td className="px-3 py-2 text-center font-mono whitespace-nowrap">
               <span
                 data-testid="replay-version"
-                className={`text-[11px] ${outdated ? 'text-lmu-warn font-semibold' : 'text-lmu-muted'}`}
-                title={versionHint}
-                aria-description={versionHint}
+                className="text-[11px] text-lmu-muted"
               >
-                {outdated ? `${version} behind` : kept ? `${version} · kept` : (version || '—')}
+                {version || '—'}
               </span>
             </td>
             <td className="px-3 py-2 text-right font-mono whitespace-nowrap text-lmu-text">{formatNumber(r.driversCount)}</td>

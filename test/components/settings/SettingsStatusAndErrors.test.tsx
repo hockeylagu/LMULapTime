@@ -28,9 +28,6 @@ describe('Settings overview card', () => {
     window.location.hash = '#/settings';
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
     global.fetch = vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/api/replays/upgrade')) {
-        return json({ pendingReplays: 0, pendingDrivers: 0, currentVersion: 'v7', status: { running: false, enabled: true } });
-      }
       if (url.includes('/api/replays/cache')) {
         return json([
           { filename: 'A R1 1.Vcr', isOnDisk: true, replayVersion: 'v7', fileSizeBytes: 1, compressedSizeBytes: 1 },
@@ -85,9 +82,9 @@ describe('Settings overview card', () => {
     ]);
   });
 
-  it('offers upgrade, but not migration, as a replay search term', () => {
+  it('does not offer migration or upgrade as a replay search term', () => {
     const replay = SETTINGS_SECTIONS.find((s) => s.id === 'replay-cache');
-    expect(replay?.keywords).toContain('upgrade');
+    expect(replay?.keywords).not.toContain('upgrade');
     expect(replay?.keywords).not.toContain('migration');
   });
 

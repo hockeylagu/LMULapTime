@@ -19,12 +19,11 @@ function countFor(show: ReplayShow, counts: ReplayCounts | null): number | null 
   switch (show) {
     case 'disk': return counts.onDisk;
     case 'archived': return counts.archived;
-    case 'outdated': return counts.outdated;
     case 'all': return counts.total;
   }
 }
 
-/** The name filter and the All / On disk / Archived / Outdated segments, with a count on each. */
+/** The name filter and the All / On disk / Archived segments, with a count on each. */
 export const ReplayCacheFilters: React.FC<ReplayCacheFiltersProps> = ({ text, onTextChange, show, onShowChange, counts, resultText }) => (
   <div className="flex flex-wrap items-center justify-between gap-3">
     <div className="flex flex-wrap items-center gap-3">

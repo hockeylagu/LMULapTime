@@ -130,8 +130,6 @@ describe('ServerContext background session sync', () => {
     expect(context.getScanStatus().sessionReplayJobs).toEqual([
       { sessionId: 'session-42', status: 'processing', playable: true, stage: 'Decoding', filePercent: 40 },
     ]);
-    Object.assign(context, { replayUpgradeRunner: { getStatus: () => ({ running: true, currentFile: 'linked.Vcr', currentStage: 'Upgrading', filePercent: 75 }) } });
-    expect(context.getScanStatus().sessionReplayJobs?.[0]).toMatchObject({ sessionId: 'session-42', stage: 'Upgrading', filePercent: 75 });
   });
 
   beforeEach(() => {

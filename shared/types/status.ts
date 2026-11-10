@@ -80,24 +80,6 @@ export interface ReferenceLaptimeRefreshStatus {
   error: string | null;
 }
 
-/** Background re-decode of on-disk replays whose stored rows are behind the current parser version. */
-export interface ReplayUpgradeStatus {
-  enabled: boolean;
-  running: boolean;
-  processed: number;
-  total: number;
-  currentFile: string | null;
-  currentStage: string | null;
-  filePercent: number | null;
-  /** Drivers decoded (stored or failed) in this run, of the drivers in the backlog it started with. */
-  driversDone: number;
-  driversTotal: number;
-  startedAt: string | null;
-  finishedAt: string | null;
-  result: { replays: number; upgraded: number; failed: number; interrupted: boolean } | null;
-  error: string | null;
-}
-
 export interface ReplayIngestJob {
   name: string;
   status: 'queued' | 'processing' | 'ready' | 'failed';
@@ -117,13 +99,12 @@ export interface ScanStatus extends ReplayScanStatus {
   sessionReplayJobs?: SessionReplayJob[];
   replayJobs?: ReplayIngestJob[];
   refreshQueued?: boolean;
-  /** A game session is loaded (live dashboard): scans and the replay upgrade wait until it ends. */
+  /** A game session is loaded (live dashboard): scans wait until it ends. */
   heldForLiveSession?: boolean;
   /** Changes when session data, replay metadata or telemetry links change, including on restart. */
   dataRevision?: string;
   sessionScan: SessionScanStatus;
   sessionProjectionBackfill?: { running: boolean; processed: number; failed: number; total: number; currentSessionId: string | null; startedAt: string | null; finishedAt: string | null; error: string | null };
-  replayUpgrade?: ReplayUpgradeStatus;
   telemetryScan?: TelemetryScanStatus;
   referenceLaptimes: ReferenceLaptimeRefreshStatus;
   allComplete?: boolean;

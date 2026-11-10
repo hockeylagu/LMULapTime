@@ -31,9 +31,6 @@ describe('Settings navigation', () => {
       if (url.includes('/api/scan') && options?.method === 'POST') {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ success: false }) });
       }
-      if (url.includes('/api/replays/upgrade')) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ pendingReplays: 0, pendingDrivers: 0, status: { running: false, enabled: false } }) });
-      }
       if (url.includes('/api/ai/settings')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ configured: false, model: 'gemini-3.8-flash', keySource: null }) });
       }

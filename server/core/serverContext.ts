@@ -18,7 +18,6 @@ import type { TelemetrySessionCandidate } from '../telemetry/telemetryMatcher.js
 import type { TelemetryLink } from './dbTelemetryStore.js';
 import { TelemetryCatalog } from '../telemetry/telemetryCatalog.js';
 import { ReplayRecordingService } from '../replay/replayRecordingService.js';
-import { ReplayUpgradeRunner } from '../replay/replayUpgradeRunner.js';
 import { pumpScanInBackground, startedScanStatus } from './backgroundScan.js';
 import { TypedEmitter } from './typedEmitter.js';
 import { replaceCachedLastUpdateDiff } from '../benchmarks/referenceLaptimes.js';
@@ -71,7 +70,6 @@ export class ServerContext {
   /** `scan-started` when any file scan starts; `scan-finished` when none is left (GET /api/events). */
   public readonly events = new TypedEmitter<{ 'scan-started': []; 'scan-finished': [] }>();
 
-  private replayUpgradeRunner: ReplayUpgradeRunner | null = null;
   private readonly replayLinks: SessionReplayLinks;
   private replayScanStatus: ReplayScanStatus = {
     running: false,
@@ -126,41 +124,22 @@ export class ServerContext {
   public get telemetryDir(): string { return this.currentTelemetryDir; }
   public get currentParser(): LmuParser { return this.parser; }
 
-  /** Null when the database cannot run the upgrade (test doubles). */
-  public get replayUpgrade(): ReplayUpgradeRunner | null {
-    if (!this.replayUpgradeRunner && typeof this.sessionDb.upgradeReplaysAsyncIterator === 'function') {
-      this.replayUpgradeRunner = new ReplayUpgradeRunner(this.sessionDb, () => this.publishScanActivity());
-    }
-    return this.replayUpgradeRunner;
-  }
-
-  // The upgrade is the lowest-priority work: it runs only once no scan is running.
-  public startReplayUpgradeWhenIdle(): boolean {
-    if (this.liveSessionLoaded) {
-      this.replayUpgrade?.stop();
-      return false;
-    }
-    if (this.hasActiveFileScan() || this.pendingSessionRefresh) return false;
-    return this.replayUpgrade?.start(this.currentReplaysDir, this.parser.configuredPlayerName) ?? false;
-  }
-
   /**
-   * While a game session is loaded no scan starts and a running replay upgrade stops: what was asked
+   * While a game session is loaded no scan starts: what was asked
    * for is queued by kind (`holdForLiveSession`) and runs when the session has ended (`runHeldScans`).
    * Held work is not published as scan activity, so pages do not poll for it during the session.
    */
   public setLiveSessionLoaded(loaded: boolean): void {
     if (this.liveSessionLoaded === loaded) return;
     this.liveSessionLoaded = loaded;
-    if (loaded) this.replayUpgrade?.stop();
-    else this.runHeldScans();
+    if (!loaded) this.runHeldScans();
     this.publishScanActivity();
   }
 
   private isScanBusy(): boolean {
     // Work held for a game session is not activity: nothing runs until the session ends.
     const queued = !this.liveSessionLoaded && this.pendingSessionRefresh;
-    return this.hasActiveFileScan() || queued || (this.replayUpgradeRunner?.getStatus().running ?? false);
+    return this.hasActiveFileScan() || queued;
   }
 
   /** Emits `scan-started` / `scan-finished` when the app goes from idle to busy and back. Called wherever that can change. */
@@ -174,7 +153,6 @@ export class ServerContext {
 
   public configureDirectories(values: { resultsDir?: unknown; replaysDir?: unknown; telemetryDir?: unknown; playerName?: unknown }): boolean {
     if (this.hasActiveFileScan()) return false;
-    this.replayUpgrade?.stop();
 
     if (typeof values.resultsDir === 'string' && fs.existsSync(values.resultsDir)) this.currentResultsDir = values.resultsDir;
     if (typeof values.replaysDir === 'string' && fs.existsSync(values.replaysDir)) this.currentReplaysDir = values.replaysDir;
@@ -375,7 +353,6 @@ export class ServerContext {
     }
     const retryFailed = this.retryFailedReplays;
     this.retryFailedReplays = false;
-    this.replayUpgrade?.stop();
     this.replayScanStatus = startedScanStatus();
     const replaysDir = this.currentReplaysDir;
     this.replayJobs.clear();
@@ -401,7 +378,6 @@ export class ServerContext {
           console.warn('[SQLite Cache] Replay sync warning:', outcome.error);
         }
         this.runPendingSessionRefresh();
-        this.startReplayUpgradeWhenIdle();
         this.publishScanActivity();
       })();
     });
@@ -438,7 +414,6 @@ export class ServerContext {
     }
     if (replay) this.runReplaySyncInBackground();
     if (telemetry) this.runTelemetryScanInBackground();
-    this.startReplayUpgradeWhenIdle();
   }
 
   private runPendingSessionRefresh(): boolean {
@@ -466,7 +441,6 @@ export class ServerContext {
     if (retryFailedReplays) this.retryFailedReplays = true;
     if (this.liveSessionLoaded) return this.holdForLiveSession('session', forceReparse);
     if (this.hasActiveFileScan()) return false;
-    this.replayUpgrade?.stop();
     const status: SessionScanStatus = startedScanStatus();
     this.sessionScanStatus = status;
     const resultsDir = this.currentResultsDir;
@@ -517,7 +491,6 @@ export class ServerContext {
       console.warn('[SQLite Cache] Telemetry scan warning:', error);
     }).finally(() => {
       this.runPendingSessionRefresh();
-      this.startReplayUpgradeWhenIdle();
       this.publishScanActivity();
     });
     this.publishScanActivity();
@@ -652,17 +625,15 @@ export class ServerContext {
       (this.sessionScanStatus.result?.added === 0 && this.sessionScanStatus.result?.updated === 0)
     );
 
-    const replayUpgrade = this.replayUpgrade?.getStatus();
     const jobs = new Map(this.replayJobs);
-    const activeFile = replayUpgrade?.running ? replayUpgrade.currentFile : this.replayScanStatus.running ? this.replayScanStatus.currentFile : null;
+    const activeFile = this.replayScanStatus.running ? this.replayScanStatus.currentFile : null;
     if (activeFile) jobs.set(activeFile, { ...jobs.get(activeFile), name: activeFile, status: 'processing' });
     const owners = this.sessionDb.getRecordingOwners?.([...jobs.keys()]) ?? new Map<string, string>();
     const sessionReplayJobs = [...jobs.values()].flatMap(({ name, ...job }) => {
       const sessionId = owners.get(name);
       if (!sessionId) return [];
-      const progress = replayUpgrade?.running && replayUpgrade.currentFile === name ? replayUpgrade : this.replayScanStatus;
-      return [{ ...job, sessionId, stage: progress.currentFile === name ? progress.currentStage : null,
-        filePercent: progress.currentFile === name ? progress.filePercent : null }];
+      return [{ ...job, sessionId, stage: this.replayScanStatus.currentFile === name ? this.replayScanStatus.currentStage : null,
+        filePercent: this.replayScanStatus.currentFile === name ? this.replayScanStatus.filePercent : null }];
     });
 
     return {
@@ -677,7 +648,6 @@ export class ServerContext {
       heldForLiveSession: this.liveSessionLoaded,
       sessionScan: this.sessionScanStatus,
       sessionProjectionBackfill: this.sessionProjectionBackfill,
-      replayUpgrade,
       telemetryScan,
       referenceLaptimes: this.referenceLaptimeRefreshStatus,
       allComplete,

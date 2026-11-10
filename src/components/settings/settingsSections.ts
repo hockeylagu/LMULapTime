@@ -56,7 +56,7 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     title: 'Cached Replays',
     icon: Film,
     description: 'Decoded binary VCR replays, archived replays LMU has deleted, and the replay files list',
-    keywords: ['replay', 'replays', 'vcr', 'cache', 'trajectories', 'coordinates', 'telemetry', 'files', 'scan replays', 'playback', 'binary', 'archive', 'archived', 'deleted', 'outdated', 'version', 'upgrade'],
+    keywords: ['replay', 'replays', 'vcr', 'cache', 'trajectories', 'coordinates', 'telemetry', 'files', 'scan replays', 'playback', 'binary', 'archive', 'archived', 'deleted', 'version'],
   },
   {
     id: 'folder-paths',

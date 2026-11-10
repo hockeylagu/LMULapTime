@@ -1,6 +1,5 @@
 import path from 'path';
 import { Router } from 'express';
-import { REPLAY_CACHE_VERSION } from '../core/dbCache.js';
 import { ServerContext } from '../core/serverContext.js';
 import { composeReplayMetadata } from '../replay/replayMetadataService.js';
 import { ReplayTelemetryService } from '../replay/replayTelemetryService.js';
@@ -33,21 +32,6 @@ export function createReplayRouter(context: ServerContext): Router {
       console.error('Failed to list cached replays:', error);
       res.status(500).json({ error: error instanceof Error ? error.message : 'Failed to list cached replays' });
     }
-  });
-
-  // The on-disk replays still to be decoded again at the current parser version, and the job doing it.
-  router.get('/replays/upgrade', (_req, res) => {
-    const upgrade = context.replayUpgrade;
-    if (!upgrade) return res.status(503).json({ error: 'Replay upgrade unavailable' });
-    const backlog = upgrade.getBacklog(context.replaysDir);
-    res.json({
-      status: upgrade.getStatus(),
-      // The version an on-disk replay must be at; below it the replay is outdated and waits for the upgrade.
-      currentVersion: REPLAY_CACHE_VERSION,
-      pendingReplays: backlog.length,
-      pendingDrivers: backlog.reduce((sum, replay) => sum + replay.driverSlots.length, 0),
-      backlog: backlog.map(({ filename, metadataOutdated, driverSlots }) => ({ filename, metadataOutdated, driverSlots })),
-    });
   });
 
   router.get('/session/:sessionId/telemetry/metadata', (req, res) => {

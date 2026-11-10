@@ -67,8 +67,6 @@ describe('session telemetry routes', () => {
       telemetryCatalog: new TelemetryCatalog(db),
       replayRecordings: new ReplayRecordingService(db),
       currentParser: { configuredPlayerName: 'Route Driver' },
-      replayUpgrade: undefined,
-      startReplayUpgradeWhenIdle: vi.fn(),
       loadSessions: vi.fn(() => [session]),
     } as unknown as ServerContext;
 
@@ -158,12 +156,10 @@ describe('session telemetry routes', () => {
     expect((await request(app).get(url)).body).not.toHaveProperty('hasLiveCapture');
   });
 
-  it('keeps replay cache and upgrade controls available for maintenance', async () => {
+  it('keeps the replay cache available for maintenance', async () => {
     const cache = await request(app).get('/api/replays/cache');
-    const upgrade = await request(app).get('/api/replays/upgrade');
 
     expect(cache.status).toBe(200);
     expect(Array.isArray(cache.body)).toBe(true);
-    expect(upgrade.status).toBe(503);
   });
 });

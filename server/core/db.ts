@@ -144,14 +144,6 @@ import {
 import type { SessionCard, SessionProjectionState } from '../../shared/types/sessionSummaries.js';
 import { getDisplayTrackName } from '../../shared/domain/formatters.js';
 import {
-  listReplayUpgradeBacklog,
-  upgradeReplaysAsyncIterator as runUpgradeReplaysAsyncIterator,
-  ReplayUpgradeCandidate,
-  ReplayUpgradeHost,
-  ReplayUpgradeProgress,
-  ReplayUpgradeResult,
-} from './replay/dbReplayUpgrade.js';
-import {
   SessionXmlSyncParser,
   SessionSyncHost,
   syncSessionsIterator as runSyncSessionsIterator,
@@ -169,12 +161,9 @@ export type {
   IngestErrorEntry,
   TelemetryMetadataRecord,
   TelemetryLink,
-  ReplayUpgradeCandidate,
-  ReplayUpgradeProgress,
-  ReplayUpgradeResult,
 };
 
-export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayUpgradeHost {
+export class SessionDatabase implements ReplaySyncHost, SessionSyncHost {
   private db: DatabaseType;
   private dbPath: string;
 
@@ -388,18 +377,6 @@ export class SessionDatabase implements ReplaySyncHost, SessionSyncHost, ReplayU
 
   public recordReplayDriverIngest(filename: string, driverSlot: number, mtimeMs: number, fileSizeBytes: number, status: ReplayDriverIngestStatus, error?: string | null): void {
     recordReplayDriverIngest(this.db, filename, driverSlot, mtimeMs, fileSizeBytes, status, error);
-  }
-
-  /** On-disk replays whose stored rows are behind the current parser version (see dbReplayUpgrade). */
-  public listReplayUpgradeBacklog(replaysDir: string): ReplayUpgradeCandidate[] {
-    return listReplayUpgradeBacklog(this.db, replaysDir);
-  }
-
-  public upgradeReplaysAsyncIterator(
-    replaysDir: string,
-    options: { playerName?: string; shouldStop?: () => boolean } = {}
-  ): AsyncGenerator<ReplayUpgradeProgress, ReplayUpgradeResult, void> {
-    return runUpgradeReplaysAsyncIterator(this, replaysDir, options);
   }
 
   public getReplaysCount(): number {

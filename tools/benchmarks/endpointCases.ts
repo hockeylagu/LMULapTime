@@ -60,7 +60,7 @@ export function benchmarkCases(cohort: BenchmarkCohort, store: SessionDatabase):
     'sessions-page-1': '/api/sessions?page=1&pageSize=25&hideEmpty=true', 'sessions-page-2': '/api/sessions?page=2&pageSize=25&hideEmpty=true',
     dashboard: '/api/dashboard?page=1&pageSize=25&hideEmpty=true', tracks: '/api/tracks',
     'leaderboard-layouts': '/api/leaderboard/layouts',
-    'replay-cache': '/api/replays/cache', 'replay-upgrade-status': '/api/replays/upgrade',
+    'replay-cache': '/api/replays/cache',
     'live-settings': '/api/live/settings',
     'live-learning': '/api/live/learning',
     'live-capture': '/api/live/capture',

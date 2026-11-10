@@ -37,11 +37,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   const isScanRunning = Boolean(
     replayScanStatus?.running ||
     ('sessionScan' in (replayScanStatus || {}) && (replayScanStatus as ScanStatus)?.sessionScan?.running) ||
-    ('telemetryScan' in (replayScanStatus || {}) && (replayScanStatus as ScanStatus)?.telemetryScan?.running) ||
-    ('replayUpgrade' in (replayScanStatus || {}) && (replayScanStatus as ScanStatus)?.replayUpgrade?.running)
+    ('telemetryScan' in (replayScanStatus || {}) && (replayScanStatus as ScanStatus)?.telemetryScan?.running)
   );
 
-  const fullScan = replayScanStatus && ('sessionScan' in replayScanStatus || 'telemetryScan' in replayScanStatus || 'replayUpgrade' in replayScanStatus) ? replayScanStatus as ScanStatus : null;
+  const fullScan = replayScanStatus && ('sessionScan' in replayScanStatus || 'telemetryScan' in replayScanStatus) ? replayScanStatus as ScanStatus : null;
 
   const scanStatusText = (() => {
     if (!replayScanStatus) return status?.replaysCount != null ? `${status.replaysCount} Replays` : 'Replays';
@@ -68,8 +67,6 @@ export const Navbar: React.FC<NavbarProps> = ({
       return t > 0 ? `Syncing Telemetry… ${p}/${t}` : 'Syncing Telemetry…';
     }
 
-    if (fullStatus?.replayUpgrade?.running) return `Updating Replays… ${fullStatus.replayUpgrade.processed}/${fullStatus.replayUpgrade.total}`;
-
     const totalReplays = replayScanStatus.result?.total ?? status?.replaysCount ?? 0;
     return `${totalReplays} Replays`;
   })();
@@ -89,7 +86,6 @@ export const Navbar: React.FC<NavbarProps> = ({
       return `Syncing Session: ${fullStatus.sessionScan.currentFile}${stage}`;
     }
     if (fullStatus?.telemetryScan?.currentFile) return `Syncing Telemetry: ${fullStatus.telemetryScan.currentFile}`;
-    if (fullStatus?.replayUpgrade?.running) return `Updating Replay: ${fullStatus.replayUpgrade.currentFile || 'Preparing'}`;
     if (replayScanStatus.error || fullStatus?.sessionScan?.error || fullStatus?.telemetryScan?.error || fullStatus?.replayJobs?.some(job => job.status === 'failed')) return 'Scan failed. See Settings for details.';
     if (fullStatus?.allComplete || fullStatus?.allCached) return 'All sessions, replays, and telemetry are synchronized';
     return 'View Replays in Settings';

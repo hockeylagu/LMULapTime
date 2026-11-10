@@ -46,7 +46,6 @@ describe('ServerContext while a game session is loaded', () => {
     expect(context.runSessionSyncInBackground()).toBe(false);
     expect(context.runReplaySyncInBackground()).toBe(false);
     context.runTelemetryScanInBackground();
-    expect(context.startReplayUpgradeWhenIdle()).toBe(false);
     await vi.runAllTimersAsync();
 
     expect(sessionDb.syncSessionsAsyncIterator).not.toHaveBeenCalled();
@@ -99,16 +98,6 @@ describe('ServerContext while a game session is loaded', () => {
     context.setLiveSessionLoaded(false);
     await vi.runAllTimersAsync();
     expect(sessionDb.syncSessionsAsyncIterator).toHaveBeenCalledWith('', expect.anything(), true);
-  });
-
-  it('stops a running replay upgrade and starts it again when the session ends with nothing queued', () => {
-    const { context } = createContext();
-    const upgrade = { stop: vi.fn(), start: vi.fn(() => true), getStatus: () => ({ running: false }) };
-    Object.assign(context, { replayUpgradeRunner: upgrade });
-    context.setLiveSessionLoaded(true);
-    expect(upgrade.stop).toHaveBeenCalled();
-    context.setLiveSessionLoaded(false);
-    expect(upgrade.start).toHaveBeenCalledTimes(1);
   });
 
   it('publishes scan-started and scan-finished once around a scan', async () => {

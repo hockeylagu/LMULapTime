@@ -2,27 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ReplayCacheSummary,
   ReplayScanStatus,
-  ReplayUpgradeStatus,
   ScanStatus,
 } from '../../../../shared/types/index.js';
 import { apiErrorMessage, fetchJson, isAbortError } from '../../../api/apiClient.js';
 import { countReplays, ReplayCounts } from './replayModel.js';
-
-export interface ReplayUpgradeOverview {
-  status: ReplayUpgradeStatus;
-  pendingReplays: number;
-  pendingDrivers: number;
-  /** The replay cache version an on-disk replay must be at (absent from older servers). */
-  currentVersion?: string;
-}
-
-function isUpgradeOverview(value: unknown): value is ReplayUpgradeOverview {
-  if (!value || typeof value !== 'object') return false;
-  const candidate = value as Partial<ReplayUpgradeOverview>;
-  return typeof candidate.pendingReplays === 'number' && typeof candidate.pendingDrivers === 'number' && !!candidate.status;
-}
-
-const UPGRADE_POLL_MS = 3000;
 
 export interface ReplayCacheState {
   /** null until the first load finishes (or fails). */
@@ -31,29 +14,19 @@ export interface ReplayCacheState {
   isLoading: boolean;
   error: string | null;
   reload: () => void;
-  /** The version an on-disk replay should be at; null until the server has said. */
-  currentVersion: string | null;
-  /** The replay upgrade while it runs, from the scan status or the polled endpoint. */
-  activeUpgrade: ReplayUpgradeStatus | null;
-  upgradeError: string | null;
-  /** On-disk replays the upgrade still has to decode; null until the server has said. */
-  pendingUpgrade: number | null;
   isScanRunning: boolean;
 }
 
-/** Loads the cached replay list and the upgrade status, and reloads both when a scan or upgrade ends. */
+/** Loads the cached replay list and reloads it when a scan ends. */
 export function useReplayCache(replayScanStatus?: ScanStatus | ReplayScanStatus | null): ReplayCacheState {
   const [replays, setReplays] = useState<ReplayCacheSummary[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [upgradeOverview, setUpgradeOverview] = useState<ReplayUpgradeOverview | null>(null);
-  const [upgradeError, setUpgradeError] = useState<string | null>(null);
   const lifetime = useRef<AbortController | null>(null);
-  // Only the newest request of each kind may write state: a slow older answer is dropped.
+  // Only the newest request may write state: a slow older answer is dropped.
   const replaysRequest = useRef(0);
-  const upgradeRequest = useRef(0);
 
-  // The first load starts in the loading state and reload enters it; refreshes after a scan or upgrade stay quiet.
+  // The first load starts in the loading state and reload enters it; refreshes after a scan stay quiet.
   const loadReplays = useCallback(() => {
     const id = ++replaysRequest.current;
     const isCurrent = () => id === replaysRequest.current && !lifetime.current?.signal.aborted;
@@ -72,82 +45,29 @@ export function useReplayCache(replayScanStatus?: ScanStatus | ReplayScanStatus 
       });
   }, []);
 
-  const loadUpgrade = useCallback(() => {
-    const id = ++upgradeRequest.current;
-    const isCurrent = () => id === upgradeRequest.current && !lifetime.current?.signal.aborted;
-    fetchJson<unknown>('/api/replays/upgrade', { signal: lifetime.current?.signal })
-      .then((data) => {
-        if (!isCurrent() || !isUpgradeOverview(data)) return;
-        setUpgradeError(null);
-        setUpgradeOverview(data);
-      })
-      .catch((err: unknown) => {
-        if (isAbortError(err) || !isCurrent()) return;
-        // Polling stops with the server out of reach, and the bar for an upgrade we can no longer see goes too.
-        setUpgradeOverview((previous) => (previous ? { ...previous, status: { ...previous.status, running: false } } : previous));
-        setUpgradeError(apiErrorMessage(err, 'Upgrade status unavailable.'));
-      });
-  }, []);
-
   const reload = useCallback(() => {
     setIsLoading(true);
     setError(null);
     loadReplays();
-    loadUpgrade();
-  }, [loadReplays, loadUpgrade]);
+  }, [loadReplays]);
 
   useEffect(() => {
     const controller = new AbortController();
     lifetime.current = controller;
     loadReplays();
-    loadUpgrade();
     return () => {
       controller.abort();
     };
-  }, [loadReplays, loadUpgrade]);
-
-  // Polls while an upgrade runs: each new overview arms the next request.
-  useEffect(() => {
-    if (!upgradeOverview?.status.running) return;
-    const timer = setTimeout(loadUpgrade, UPGRADE_POLL_MS);
-    return () => clearTimeout(timer);
-  }, [upgradeOverview, loadUpgrade]);
+  }, [loadReplays]);
 
   const isScanRunning = !!replayScanStatus?.running;
   const wasScanRunning = useRef(isScanRunning);
   useEffect(() => {
-    if (wasScanRunning.current && !isScanRunning) {
-      loadReplays();
-      loadUpgrade();
-    }
+    if (wasScanRunning.current && !isScanRunning) loadReplays();
     wasScanRunning.current = isScanRunning;
-  }, [isScanRunning, loadReplays, loadUpgrade]);
+  }, [isScanRunning, loadReplays]);
 
-  const scanUpgrade = replayScanStatus && 'replayUpgrade' in replayScanStatus ? replayScanStatus.replayUpgrade : null;
-  const activeUpgrade =
-    (scanUpgrade?.running ? scanUpgrade : null) ??
-    (upgradeOverview?.status?.running ? upgradeOverview.status : null);
-  const isUpgradeRunning = !!activeUpgrade?.running;
+  const counts = useMemo(() => (replays ? countReplays(replays) : null), [replays]);
 
-  const wasUpgradeRunning = useRef(isUpgradeRunning);
-  useEffect(() => {
-    if (wasUpgradeRunning.current && !isUpgradeRunning) loadReplays();
-    wasUpgradeRunning.current = isUpgradeRunning;
-  }, [isUpgradeRunning, loadReplays]);
-
-  const currentVersion = upgradeOverview?.currentVersion ?? null;
-  const counts = useMemo(() => (replays ? countReplays(replays, currentVersion) : null), [replays, currentVersion]);
-
-  return {
-    replays,
-    counts,
-    isLoading,
-    error,
-    reload,
-    currentVersion,
-    activeUpgrade,
-    upgradeError,
-    pendingUpgrade: upgradeOverview?.pendingReplays ?? null,
-    isScanRunning,
-  };
+  return { replays, counts, isLoading, error, reload, isScanRunning };
 }

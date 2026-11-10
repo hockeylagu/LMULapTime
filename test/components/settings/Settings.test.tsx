@@ -35,12 +35,6 @@ describe('Settings component', () => {
       if (url.includes('/api/replays/cache')) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve([]) });
       }
-      if (url.includes('/api/replays/upgrade')) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ pendingReplays: 0, pendingDrivers: 0, status: { running: false, enabled: false } }),
-        });
-      }
       if (url.includes('/api/ai/settings')) {
         return Promise.resolve({
           ok: true,

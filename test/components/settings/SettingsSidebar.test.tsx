@@ -83,8 +83,8 @@ describe('SettingsSidebar component', () => {
   });
 });
 
-describe('settings search for the replay upgrade', () => {
-  it.each(['upgrade', 'version', 'outdated', 'archived', 'decode'])('finds Cached Replays by "%s"', (word) => {
+describe('settings search for the replay cache', () => {
+  it.each(['version', 'archived', 'decode'])('finds Cached Replays by "%s"', (word) => {
     const section = SETTINGS_SECTIONS.find((candidate) => candidate.id === 'replay-cache');
     expect(section && matchesSettingsSection(section, word)).toBe(true);
   });
