@@ -301,7 +301,7 @@ Present at 100 Hz (**44,361 packets** across the session for the player car), st
      - Byte 6 remains near-constant throughout: `119..124` (`0x77..0x7c`) on the front axle, and `174..180` (`0xae..0xb4`) on the rear axle.
      - As a 16-bit word, `0x0577` (1399) and `0x05ae` (1454) represent static vehicle track width / axle geometry datum in millimeters.
      - Over a 15-minute stint, this value drifted by only 5 ticks (from 119 to 124) due to tire thermal expansion / ride height settling. In a naive regression, this slow monotonic drift alias-correlated with stint-length channels — a classic demonstration of the nuisance artifact documented in §1.3 and §2.4.
-     - **Ground Truth**: Native `.Vcr` binary replay files do **not** record instantaneous wheel angular velocities or wheel spin/lockup RPMs. True wheel speeds reside exclusively in DuckDB (`Wheel Speed`).
+     - **Ground Truth**: Native `.Vcr` binary replay files do **not** record instantaneous wheel angular velocities or wheel spin/lockup RPMs. True wheel speeds reside exclusively in DuckDB (`Wheel Speed`). *Superseded 2026-11-09: the pose packet carries every car's wheel rotation speeds at 50 Hz (VCR_FORMAT.md, pose bytes 16..31); the statement holds for this per-wheel block only.*
 2. **4-Wheel Brake Line Pressures**:
    - Bytes 2..3 (UInt16LE) and byte 9 correlate with individual corner hydraulic braking pressure:
      - **FL**: $r = 0.929$
@@ -803,6 +803,63 @@ A separate pass with its own scripts over all 229 replays and 69 XML-paired race
 
 Not re-checked: 1/6, 1/0, 7/33, 7/15, 0/19.
 
+### 2.14 Pose packet bit survey (Daytona + Bahrain, 20261109)
+
+The player's 65-byte pose packets (class 0, types 7..15) of seven replays were resampled onto
+every native DuckDB channel and event of the same sessions and swept byte by byte and bit field
+by bit field: Daytona Hypercar R11, R12, P27, Q11, Q12; Bahrain GT3 P30, Q12. Pose time and the
+telemetry clock agree with a 0.00 s offset in all seven pairs (speed cross-correlation r 1.0000).
+Scripts and raw results stayed in the session scratchpad (`sweep.mjs`, `results.json`).
+
+Native telemetry caveats found on the way: the "G Force Lat" table is longitudinal (r -0.994 with
+d(speed)/dt) and "G Force Long" lateral, as `server/telemetry/duckdbReader.ts` already handles;
+"Wheel Speed" and "Tyres Wear" repeat in pairs ([1]=[3], [2]=[4]), so they hold left/right values,
+not four wheels.
+
+**Headlights (byte 2 `0x10`).** Against the `Headlights State` event of the Daytona race
+(2026-11-05, 63 cars): all 129 player toggles have a transition of this bit within 0.02 s in the
+same direction, flash trains included, and the bit agrees with the lamp state over the whole
+session (including 847 s lit without a break). An exhaustive search of every bit and byte found no
+other candidate above 8 % of the toggles. About 40 other cars switch the same bit on within a
+minute of the player. The same match holds in P27, Q11, Q12, BP30 and BQ12.
+
+**Corrections to earlier entries of VCR_FORMAT.md:**
+- byte 38 bits 0..1 were documented as off-track. In R12 `0x01` is set on 200 of 173,304 packets
+  above 60 km/h and on 138 of 65,797 fast packets on a non-road surface (SurfaceTypes ≠ 0); BQ12
+  0 of 1,701. The pair is the clutch pedal: r 0.987 / 0.997 (R11), 0.934 / 0.984 (R12) against
+  `Clutch Pos`; 100 % clutch maps to state 3 in 9,330 of 10,284 samples (R12), 60–80 % always to 2.
+  The app dropped its `isOffTrack` flag (477afbd3);
+- byte 2 `0x02` (bit 17, read as `inPit`) is never set; byte 38 `0x80` (documented as pit lane) is
+  never set on the player;
+- the first word's bits 0..6 (steering) and 11..16 (throttle) were wrong: byte 1 is 0 on every car;
+- `info2 & 0x3ff` (`detachablePartState`, §6.6) is the same ten bits as `steer10`;
+- byte 14 (r 0.71 with "longitudinal G") was the lateral channel, see the caveat above.
+
+**Findings:**
+
+| Field | Verdict | Evidence |
+|---|---|---|
+| b0 `0x20` puncture | confirmed (2 events) | R12 set 2364–2521 s, right-side wear and pressure drop to 0 at 2364 s; R11 3004–3313 s, Tyres Wear[4] = 0 on 12,243 of 15,421 set packets. Never set in P/Q/Bahrain; other byte 0 bits untested (no left-side event) |
+| b2 `0x20` active | strong | Clears on retire / finish |
+| b2 `0x40` wipers / rain light | strong | Never set in 5 dry sessions; R11 / R12 one transition each (2776 s / 2796 s), 246–279 s after Minimum Path Wetness reached 5; all 19 Hypercar slots of R12 switch on within 2734–2797 s; wet tyre change at 2438 s. No wiper or lamp channel to separate the two |
+| b2 `0x80` | unknown | Never on the player; 34.7 % of other cars' packets in R12, never with `0x40`; flickers ~4,000 times on slots 10–18 and 104 in BQ12 |
+| b13 bit 5..b14 bit 6, signed | strong | r 0.9995 (BQ12), 0.973 (R12, BP30) with the left–right wheel speed difference (yaw × track width), 0.00326 m/s per count; r 0.92 with lateral G |
+| words 16/20/24/28 bits 0..12 wheel speed | confirmed | r 0.985–0.999 in six driving sessions, ~0.0219 m/s per count |
+| same words bits 13..15 | partial | 7 normally, 0 stationary / dropped out; 1..6 on ~1.5 % of R12 |
+| Int16 at 18/22/26/30 suspension | confirmed | r 0.972–0.999 with `Susp Pos[1..4]`; ~9e-5 m/count GT3 front, 1.05e-4 rear; Hypercar 6.7e-5 front, 5.5e-5 rear |
+| b36 `0x40` ABS | confirmed | BP30 100.00 %, MCC 1.000, 950/950 transitions, lag 0; BQ12 97.5 %, MCC 0.77, recall 0.91 (event jitter ±30 ms); never set on the Hypercar (no ABS) |
+| b37 bits 0..1 hybrid mode | confirmed | Regen Rate exactly 0 in mode 1; mode 3 is 75 % of samples, mean -25.8 kW (deploy) |
+| b37 bits 2..4 regen level | confirmed, scale approximate | Mode 2 mean by level 5.7, 22.0, 43.0, 64.8, 88.2, 110.1, 133.2, 156.0 kW; r 0.914 with Regen Rate (R12); level 7 saturates. Bits 5..7 always 0; deploy follows throttle (r -0.81) |
+| b38 `0x20` | unknown | Race only: player 48 runs (R11), 2 (R12); on 41/54 and 42/63 cars, peaking laps 3–5; only with fuel < 50 L and VE 10–60 %; best \|r\| 0.29 (mixture); no flag, launch, anti-stall or TC link |
+| b38 `0x40` garage | partial | Only at the start or end of the telemetry window (R12 0–5.2 s; Q12 0–81 s); not set in race pit stalls with the engine off |
+| b39 bits 0..1 TC level | strong | R12: level 0 means TC false in 100 % of 160k packets; mean throttle at levels 1/2/3 ≈ 15 / 38 / 70 % |
+| b39 bits 3..4 | unknown | Always set together on the GT3; best \|r\| 0.25 |
+| b40 | unknown | Slow (lag-1 autocorrelation 0.999); r 0.72–0.78 with tyre temperatures in R11/R12, 0.1–0.6 elsewhere |
+| b3, b15, b32..35 | unknown | b3 no channel above \|r\| 0.2; b15 r 0.36–0.49 with ride height rate; Int16 at 34 r 0.48–0.56 with longitude, not heading |
+| b1 | constant | 0 on every car |
+
+Not re-checked: b36 bits 0..5, b5, b6..7 (brake, throttle, RPM: known layout).
+
 ---
 
 ## 4. Cross-validation suites
@@ -895,11 +952,23 @@ Fuel added in litres, tire compound fitted per corner, air-jack duration, penalt
 ordering, and pit lane speed enforcement beacons.
 
 ### 6.6 Aerodynamic damage & detachable bodywork (`info2 & 0x3FF`)
-10-bit bitfield covering front wing endplates, rear wing main plane, diffuser, front splitter,
+*Refuted 2026-11-09 (§2.14): these are the `steer10` bits, not damage.* Former hypothesis: 10-bit bitfield covering front wing endplates, rear wing main plane, diffuser, front splitter,
 doors, and engine cowl / rear deck.
 
 ### 6.7 Balance of Performance & driver session timings (metadata 24-byte tail)
 Success ballast (kg), intake restrictor ratio, and per-driver `entryTime` / `exitTime`.
+
+### 6.8 Pose packet fields found in the bit survey (§2.14)
+Every car, ~50 Hz, not decoded yet. Map one when a feature needs it, all together in one cache
+version with a one-time offline migration (and drop the stored `detachablePartState`, which is the
+steering bits, in the same pass):
+- wheel rotation speed per wheel: lockup / wheelspin for any car, not only live captures;
+- suspension travel per wheel (per-car scale): kerb use, bottoming, ride;
+- hybrid mode and regen level: deployment and regen review per lap;
+- clutch pedal, TC level, ABS: driver aids and starts;
+- puncture flag: incidents and stop reasons in the debrief and race review;
+- wipers / rain light (probable): wet session timeline;
+- yaw rate (probable): handling balance without deriving it from heading.
 
 ---
 

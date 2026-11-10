@@ -196,47 +196,29 @@ const rpm   = 10.9228 * raw10;   // scale is absolute, not normalised per car
 
 The field saturates at 1023, i.e. ~11,170 rpm, and would wrap silently above that.
 
-**Headlights** (byte 2 bit 4, `payload[2] & 0x10`) were confirmed against the game's own telemetry
-`Headlights State` event for the player car of a Daytona race (2026-11-05, 63 cars):
-- all 129 recorded toggles have a transition of this bit within 0.02 s, in the same direction, flash trains
-  included, and the bit agrees with the lamp state over the whole session (including 847 s lit
-  without a break);
-- an exhaustive search of every bit and byte of the player's packets found no other candidate above
-  8 % of the toggles;
-- other cars toggle the same bit, about 40 of them switching on within a minute of the player.
-
-The same match holds in practice and qualifying (Daytona P27, Q11, Q12; Bahrain P30, Q12).
-
-**Bit survey (2026-11-09).** The player's pose packets of seven replays (Daytona R11, R12, P27,
-Q11, Q12; Bahrain P30, Q12) were compared with the native telemetry of the same sessions. Earlier
-entries of this table were never checked this way, and two were wrong:
-- byte 38 `0x01` is **not** off-track: in the Daytona race it is set on 200 of 173,304 packets
-  above 60 km/h, and on 138 of 65,797 fast packets on a non-road surface (Bahrain Q12: 0 of 1,701);
-  it follows a stopped engine / open clutch (r 0.99 against the clutch channel);
-- byte 2 `0x02` (bit 17, `inPit`) is never set, and byte 38 `0x80` practically never.
-
-Confirmed (exact or near-exact match with a telemetry channel): headlights (byte 2 `0x10`), pit
-limiter (byte 38 `0x04`), fuel mixture (byte 39 `>> 5`), TC active (byte 36 `0x80`).
-Strong patterns (consistent but no one-to-one channel): byte 2 `0x20` set while the car is in the
-session and cleared once it retires or finishes; byte 2 `0x40` set once rain sets in (wipers or rain
-light); byte 36 `0x40` ABS active; byte 37 bits 0..4 hybrid regen / deploy (r 0.94); byte 38 `0x40`
-in the garage or stopped with the engine off; byte 14 tracks longitudinal G (r 0.71).
-Unknown: byte 2 `0x80` (alternates on a block of slots), byte 38 `0x20` (race-only pulses), byte 39
-bits 0..4, bytes 0, 1, 3, 40, and the per-wheel looking bytes 17/21/25/29 and 19/23/27/31.
+Fields marked *probable* follow a consistent pattern but have no one-to-one game channel to check
+against; *not established* means the meaning is unknown. The evidence behind each field is in
+`docs/analysis/VCR_ANALYSIS.md` §2.14.
 
 | Offset in Payload | Size | Type | Field & Bitfield Description |
 | :--- | :--- | :--- | :--- |
-| `0` | 4 bytes | UInt32LE | **`info1`**: <br>• Bits 0..6: `steerYaw` (Steering angle / 127) <br>• Bits 11..16: `throttle` (Throttle level 0..63) <br>• Bit 17 (byte 2, `0x02`): read by the decoder as `inPit`, but never set in the seven replays of the 2026-11-09 bit survey (below); the pit state comes from the pit events. <br>• Bit 20 (byte 2, `0x10`): `headlights` (1 = lit; a flash is a train of toggles about 0.19 s apart). Every car, every pose packet. <br>• Bit 21 (byte 2, `0x20`): car active in the session (strong pattern, see below). <br>• Bit 22 (byte 2, `0x40`): rain-related (strong pattern, see below). <br>• Bits 18, 19, 23..31: unidentified (**not** RPM) |
-| `4` | 4 bytes | UInt32LE | **`info2`**: <br>• Bits 0..9: `detachablePartState` (Bitmask of detached / damaged aero body parts) |
-| `4` | 2 bytes | UInt16LE | **`steer10`**: Steering wheel position: `(raw16 & 0x3FF)`, angle = `((steer10 - 512) / 512) * 270` deg (540° lock-to-lock range, ±270°) |
+| `0` | 1 byte | Bitfield | • Bit 5 (`0x20`): puncture / tyre lost; clears when the car leaves its box after the tyre change <br>• Other bits: not established |
+| `1` | 1 byte | UInt8 | Always `0` |
+| `2` | 1 byte | Bitfield | • Bits 0..3: always `0` (bit 1 is **not** a pit flag) <br>• Bit 4 (`0x10`): **`headlights`**, 1 = lit; a flash is a train of toggles about 0.19 s apart <br>• Bit 5 (`0x20`): car active in the session; clears once it retires or finishes (*probable*) <br>• Bit 6 (`0x40`): wipers or rain light on (*probable*; set once the track is wet, not tied to wet tyres) <br>• Bit 7 (`0x80`): not established; never set together with bit 6 |
+| `3` | 1 byte | UInt8 | Not established (**not** RPM) |
+| `4..5` | 10 bits | Bitfield | **`steer10`**: Steering wheel position: `(readUInt16LE(4) & 0x3FF)`, angle = `((steer10 - 512) / 512) * 270` deg (540° lock-to-lock range, ±270°). These bits are not body damage. |
 | `5` | 1 byte | UInt8 | **`rawThrottle`**: 8-bit throttle pedal position (1 = 0%, 249 = 100%) |
 | `6..7` | 10 bits | Bitfield | **`engineRpm`**: `(readUInt16LE(6) >>> 5) & 0x3FF`, rpm = `raw * 10.9228` |
 | `8..12` | 5 bytes | Binary | Speed / velocity vector info |
-| `13..35` | 23 bytes | Binary | Vehicle dynamics; individual fields are not established |
-| `36` | 1 byte | UInt8 | **`rawBrake`** & Systems: <br>• Bits 0..5: Analog brake pressure (0 to 63 = 0% to 100%) <br>• Bit 6 (`0x40`): ABS Active flag <br>• Bit 7 (`0x80`): Traction Control (TC) Active flag |
-| `37` | 1 byte | Bits 0..4 | Electric motor regen / deploy level on hybrid cars (strong pattern, see below) |
-| `38` | 1 byte | UInt8 | **`vehicleStatus`**: <br>• Bits 0 and 1 (`0x01`, `0x02`): engine stopped or clutch open (strong pattern, see below). **Not** off-track: the app reads neither bit. <br>• Bit 2 (`0x04`): Pit limiter engaged (holding 60 km/h), confirmed against telemetry <br>• Bit 5 (`0x20`): unknown, race sessions only <br>• Bit 6 (`0x40`): in the garage stall, or stopped with the engine off at a session boundary (strong pattern) <br>• Bits 3, 4, 7: practically never set; bit 7 is **not** a pit lane flag |
-| `39` | 1 byte | Bits 5..7 | Fuel mixture / engine map (`byte >> 5`), confirmed against telemetry. Bits 0..4 unknown |
+| `13..14` | 10 bits | Bitfield | `(readUInt16LE(13) >>> 5) & 0x3FF` as a signed 10-bit value: yaw rate, about 0.00326 m/s of left–right wheel speed difference per count (*probable*). Bit 7 of byte 14: not established |
+| `15` | 1 byte | UInt8 | Not established |
+| `16`, `20`, `24`, `28` | 4 × UInt32LE | Bitfield | One word per wheel (front-left, front-right, rear-left, rear-right): <br>• Bits 0..12: **wheel rotation speed**, about 0.0219 m/s per count <br>• Bits 13..15: `7` while running, `0` when stationary or retired; `1..6` not established <br>• Bits 16..31 (Int16LE at 18, 22, 26, 30): **suspension travel**; the metres-per-count scale differs per car and axle (about 5.5e-5 to 1.05e-4) |
+| `32..35` | 4 bytes | Binary | Not established |
+| `36` | 1 byte | Bitfield | **`rawBrake`** & Systems: <br>• Bits 0..5: Analog brake pressure (0 to 63 = 0% to 100%) <br>• Bit 6 (`0x40`): ABS active (never set on a car without ABS) <br>• Bit 7 (`0x80`): Traction Control (TC) active |
+| `37` | 1 byte | Bitfield | Hybrid system: <br>• Bits 0..1: mode, `0` off, `1` coast (0 kW), `2` regen, `3` deploy <br>• Bits 2..4: regen level `0..7`, about 22 kW per step (level 7 saturates) <br>• Bits 5..7: always `0`; the deploy power is not in this byte |
+| `38` | 1 byte | Bitfield | **`vehicleStatus`**: <br>• Bits 0..1: clutch pedal, quantised to `0..3` (**not** off-track) <br>• Bit 2 (`0x04`): pit limiter engaged (holding 60 km/h) <br>• Bits 3, 4, 7: practically never set (bit 7 is **not** a pit lane flag) <br>• Bit 5 (`0x20`): not established; race sessions only <br>• Bit 6 (`0x40`): car not in the world (garage) at the start or end of a session (*probable*; not set during a pit stop) |
+| `39` | 1 byte | Bitfield | • Bits 0..1: TC level `0..3`, `0` = off (*probable*) <br>• Bits 2..4: not established <br>• Bits 5..7: fuel mixture / engine map (`byte >> 5`) |
+| `40` | 1 byte | UInt8 | Not established (a slow, thermal-like signal) |
 | `41` | 4 bytes | Float32LE | **`x`**: World coordinates X (lateral position in meters) |
 | `45` | 4 bytes | Float32LE | **`y`**: World coordinates Y (elevation in meters) |
 | `49` | 4 bytes | Float32LE | **`z`**: World coordinates Z (longitudinal position in meters) |
