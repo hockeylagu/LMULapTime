@@ -56,27 +56,30 @@ function sameValue(left: LapValue | null, right: LapValue | null): boolean {
   return Object.is(left, right);
 }
 
+function sameColumn(left: LapColumn, right: LapColumn): boolean {
+  for (let i = 0; i < left.length; i++) if (!sameValue(left[i], right[i])) return false;
+  return true;
+}
+
 const zigzag = (r: number) => (r >= 0 ? 2 * r : -2 * r - 1);
 const unzigzag = (z: number) => (z % 2 === 0 ? z / 2 : -(z + 1) / 2);
 const bytesFor = (z: number) => (z < 0x100 ? 1 : z < 0x10000 ? 2 : z < 0x1000000 ? 3 : 4);
 
 /** Unsigned values below 2^32 as `width` planes (all first bytes, then all second bytes...): small values compress best. */
-function toPlanes(values: readonly number[], width: number): Buffer {
+function toPlanes(values: Float64Array, width: number): Buffer {
   const n = values.length;
   const out = Buffer.alloc(n * width);
   for (let i = 0; i < n; i++) {
-    let v = values[i];
-    for (let plane = 0; plane < width; plane++) {
-      out[plane * n + i] = v & 0xff;
-      v = Math.floor(v / 0x100);
-    }
+    // Below 2^32, so exact as an unsigned 32-bit integer.
+    const v = values[i] >>> 0;
+    for (let plane = 0; plane < width; plane++) out[plane * n + i] = (v >>> (8 * plane)) & 0xff;
   }
   return out;
 }
 
-function fromPlanes(planes: Buffer, width: number): number[] {
+function fromPlanes(planes: Buffer, width: number): Float64Array {
   const n = planes.length / width;
-  const out = new Array<number>(n).fill(0);
+  const out = new Float64Array(n);
   for (let plane = width - 1; plane >= 0; plane--) {
     const offset = plane * n;
     for (let i = 0; i < n; i++) out[i] = out[i] * 0x100 + planes[offset + i];
@@ -84,21 +87,32 @@ function fromPlanes(planes: Buffer, width: number): number[] {
   return out;
 }
 
-/** The residuals of the order (0-3) whose zigzagged values need the fewest bits; order 0 always fits. */
-function smallestResiduals(units: readonly number[]): { order: number; values: number[] } {
-  let best = { order: 0, values: units.map(zigzag), bits: Infinity };
-  let residual = [...units];
-  for (let order = 0; order <= MAX_ORDER; order++) {
-    if (order > 0) residual = residual.map((v, i) => (i === 0 ? v : v - residual[i - 1]));
-    const values = residual.map(zigzag);
-    if (values.some(z => z >= MAX_ZIGZAG)) continue;
-    const bits = values.reduce((sum, z) => sum + Math.log2(1 + z), 0);
-    if (bits < best.bits) best = { order, values, bits };
-  }
-  return best;
+/** Differences `values` in place, last sample first, so it needs no second array. */
+function difference(values: Float64Array): void {
+  for (let i = values.length - 1; i > 0; i--) values[i] -= values[i - 1];
 }
 
-function integrate(values: number[], order: number): number[] {
+/** The zigzagged residuals of the order (0-3) that need the fewest bits; order 0 always fits. */
+function smallestResiduals(units: Float64Array): { order: number; values: Float64Array } {
+  const residual = Float64Array.from(units);
+  let bestOrder = 0;
+  let bestBits = Infinity;
+  for (let order = 0; order <= MAX_ORDER; order++) {
+    if (order > 0) difference(residual);
+    let bits = 0;
+    for (let i = 0; i < residual.length && bits < Infinity; i++) {
+      const z = zigzag(residual[i]);
+      bits = z >= MAX_ZIGZAG ? Infinity : bits + Math.log2(1 + z);
+    }
+    if (bits < bestBits) { bestOrder = order; bestBits = bits; }
+  }
+  const values = Float64Array.from(units);
+  for (let order = 0; order < bestOrder; order++) difference(values);
+  for (let i = 0; i < values.length; i++) values[i] = zigzag(values[i]);
+  return { order: bestOrder, values };
+}
+
+function integrate(values: Float64Array, order: number): Float64Array {
   for (let k = 0; k < order; k++) for (let i = 1; i < values.length; i++) values[i] += values[i - 1];
   return values;
 }
@@ -113,11 +127,17 @@ function numberKind(values: ReadonlyArray<number | null>): NumberKind {
   for (let bits = 1; bits <= MAX_BINARY_BITS; bits++) forms.push({ decimals: bits, binary: true });
   for (const form of forms) {
     const factor = scale(form);
-    if (values.every(v => v === null || (Math.abs(v * factor) < MAX_SCALED && Object.is(Math.round(v * factor) / factor + 0, v)))) {
-      return { kind: 'scaled', ...form };
+    let fits = true;
+    for (const v of values) {
+      if (v !== null && !(Math.abs(v * factor) < MAX_SCALED && Object.is(Math.round(v * factor) / factor + 0, v))) {
+        fits = false;
+        break;
+      }
     }
+    if (fits) return { kind: 'scaled', ...form };
   }
-  return values.every(v => v === null || Object.is(Math.fround(v), v)) ? { kind: 'f32' } : { kind: 'f64' };
+  for (const v of values) if (v !== null && !Object.is(Math.fround(v), v)) return { kind: 'f64' };
+  return { kind: 'f32' };
 }
 
 function nullMask(values: ReadonlyArray<unknown>): Buffer | null {
@@ -130,14 +150,25 @@ function encodeNumbers(values: ReadonlyArray<number | null>, kind: NumberKind): 
   let form: NumberDescriptor;
   if (kind.kind === 'scaled') {
     const factor = scale(kind);
-    const scaled = values.map(v => (v === null ? null : Math.round(v * factor)));
-    // Values on a coarser grid (wheel speed in 1/16 steps, load in 1000s) store their step count.
-    const step = scaled.reduce<number>((g, v) => (v === null ? g : gcd(g, Math.abs(v))), 0) || 1;
     // A null keeps the previous count, so it adds nothing to the residuals.
+    const units = new Float64Array(values.length);
+    // Values on a coarser grid (wheel speed in 1/16 steps, load in 1000s) store their step count.
+    let step = 0;
     let previous = 0;
-    const units = scaled.map(v => (previous = v === null ? previous : v / step));
+    for (let i = 0; i < values.length; i++) {
+      const v = values[i];
+      if (v !== null) {
+        previous = Math.round(v * factor);
+        if (step !== 1) step = gcd(step, Math.abs(previous));
+      }
+      units[i] = previous;
+    }
+    step ||= 1;
+    if (step > 1) for (let i = 0; i < units.length; i++) units[i] /= step;
     const { order, values: residuals } = smallestResiduals(units);
-    const width = residuals.reduce((most, z) => Math.max(most, bytesFor(z)), 1);
+    let largest = 0;
+    for (const z of residuals) largest = Math.max(largest, z);
+    const width = bytesFor(largest);
     form = { ...kind, ...(step > 1 ? { step } : {}), order, width };
     data = toPlanes(residuals, width);
   } else {
@@ -176,7 +207,7 @@ function encodeColumn(values: LapColumn): Encoded {
     let at = 0;
     const take = () => encoded.parts[at++];
     const decoded = decodeColumn(encoded.descriptor, values.length, take);
-    if (decoded.length === values.length && decoded.every((v, i) => sameValue(v, values[i]))) return encoded;
+    if (decoded.length === values.length && sameColumn(decoded, values)) return encoded;
   }
   const part = Buffer.from(JSON.stringify(values), 'utf8');
   const fallback: Encoded = { descriptor: { kind: 'json', parts: [part.length] }, parts: [part] };
@@ -190,7 +221,9 @@ function decodeNumbers(descriptor: NumberDescriptor & { nullable: boolean }, len
   const data = take();
   const out = new Array<number | null>(length);
   if (descriptor.kind === 'scaled') {
-    const units = integrate(fromPlanes(data, descriptor.width).map(unzigzag), descriptor.order);
+    const units = fromPlanes(data, descriptor.width);
+    for (let i = 0; i < units.length; i++) units[i] = unzigzag(units[i]);
+    integrate(units, descriptor.order);
     const factor = scale(descriptor);
     const step = descriptor.step ?? 1;
     for (let i = 0; i < length; i++) out[i] = mask && mask[i] ? null : (units[i] * step) / factor + 0;
