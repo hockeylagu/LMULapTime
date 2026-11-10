@@ -5,8 +5,9 @@ import zlib from 'node:zlib';
  *
  * Layout, Brotli-compressed: magic `LMTB`, one byte encoding version, a u32 header length, the header JSON (the lap
  * without its columns, plus one descriptor per column), then each column's parts. Each column takes the smallest
- * exact form: whole numbers with 0-4 decimals as Int32 deltas in byte planes, else float32, else float64; booleans
- * as bytes; four-wheel tuples as four numeric columns. The encoder reads every column back and falls back to a wider
+ * exact form: numbers with 0-4 decimals (or a power-of-two fraction) as whole step counts, differenced 0-3 times,
+ * zigzagged and stored in as many byte planes as they need; else float32, else float64; booleans as bytes;
+ * four-wheel tuples as four numeric columns. The encoder reads every column back and falls back to a wider
  * form on any difference, so storage never changes a value.
  */
 
@@ -19,16 +20,26 @@ export interface StoredLapColumns {
 }
 
 const MAGIC = Buffer.from('LMTB', 'latin1');
-const ENCODING_VERSION = 1;
+const ENCODING_VERSION = 2;
 const PREFIX_BYTES = MAGIC.length + 1 + 4;
 const MAX_DECIMALS = 4;
-/** Scaled values stay below this, so the delta of two of them fits an Int32. */
+/** Scaled values stay below this, so their residuals stay exact in a double. */
 const MAX_SCALED = 2 ** 30;
+/** Difference orders tried per column: 0 for held values, 1 for most channels, 2-3 for smooth ones (time, position). */
+const MAX_ORDER = 3;
+/** A zigzagged residual must fit four byte planes. */
+const MAX_ZIGZAG = 2 ** 32;
 const BROTLI_QUALITY = 9;
 
-type NumberKind = { kind: 'scaled'; decimals: number } | { kind: 'f32' } | { kind: 'f64' };
+/**
+ * `scaled`: value = n × step / factor, factor 10^decimals, or 2^decimals when `binary`; step defaults to 1. The step
+ * counts n are differenced `order` times, zigzagged and stored in `width` byte planes.
+ */
+type ScaledForm = { kind: 'scaled'; decimals: number; binary?: true };
+type NumberKind = ScaledForm | { kind: 'f32' } | { kind: 'f64' };
+type NumberDescriptor = { kind: 'f32' | 'f64' } | (ScaledForm & { step?: number; order: number; width: number });
 type Descriptor =
-  | (NumberKind & { nullable: boolean; parts: number[] })
+  | (NumberDescriptor & { nullable: boolean; parts: number[] })
   | { kind: 'bool'; parts: number[] }
   | { kind: 'tuple4'; nullable: boolean; items: Descriptor[]; parts: number[] }
   | { kind: 'json'; parts: number[] };
@@ -45,41 +56,65 @@ function sameValue(left: LapValue | null, right: LapValue | null): boolean {
   return Object.is(left, right);
 }
 
-/** The bytes of a typed array as 4 planes (all first bytes, then all second bytes...): smooth deltas compress far better. */
-function toPlanes(values: Int32Array): Buffer {
-  const bytes = new Uint8Array(values.buffer, values.byteOffset, values.byteLength);
-  const out = Buffer.allocUnsafe(bytes.length);
+const zigzag = (r: number) => (r >= 0 ? 2 * r : -2 * r - 1);
+const unzigzag = (z: number) => (z % 2 === 0 ? z / 2 : -(z + 1) / 2);
+const bytesFor = (z: number) => (z < 0x100 ? 1 : z < 0x10000 ? 2 : z < 0x1000000 ? 3 : 4);
+
+/** Unsigned values below 2^32 as `width` planes (all first bytes, then all second bytes...): small values compress best. */
+function toPlanes(values: readonly number[], width: number): Buffer {
   const n = values.length;
+  const out = Buffer.alloc(n * width);
   for (let i = 0; i < n; i++) {
-    const offset = i * 4;
-    out[i] = bytes[offset];
-    out[n + i] = bytes[offset + 1];
-    out[2 * n + i] = bytes[offset + 2];
-    out[3 * n + i] = bytes[offset + 3];
+    let v = values[i];
+    for (let plane = 0; plane < width; plane++) {
+      out[plane * n + i] = v & 0xff;
+      v = Math.floor(v / 0x100);
+    }
   }
   return out;
 }
 
-function fromPlanes(planes: Buffer): Int32Array {
-  const n = planes.length / 4;
-  const bytes = new Uint8Array(planes.length);
-  for (let i = 0; i < n; i++) {
-    const offset = i * 4;
-    bytes[offset] = planes[i];
-    bytes[offset + 1] = planes[n + i];
-    bytes[offset + 2] = planes[2 * n + i];
-    bytes[offset + 3] = planes[3 * n + i];
+function fromPlanes(planes: Buffer, width: number): number[] {
+  const n = planes.length / width;
+  const out = new Array<number>(n).fill(0);
+  for (let plane = width - 1; plane >= 0; plane--) {
+    const offset = plane * n;
+    for (let i = 0; i < n; i++) out[i] = out[i] * 0x100 + planes[offset + i];
   }
-  return new Int32Array(bytes.buffer);
+  return out;
 }
 
-const scale = (decimals: number) => 10 ** decimals;
+/** The residuals of the order (0-3) whose zigzagged values need the fewest bits; order 0 always fits. */
+function smallestResiduals(units: readonly number[]): { order: number; values: number[] } {
+  let best = { order: 0, values: units.map(zigzag), bits: Infinity };
+  let residual = [...units];
+  for (let order = 0; order <= MAX_ORDER; order++) {
+    if (order > 0) residual = residual.map((v, i) => (i === 0 ? v : v - residual[i - 1]));
+    const values = residual.map(zigzag);
+    if (values.some(z => z >= MAX_ZIGZAG)) continue;
+    const bits = values.reduce((sum, z) => sum + Math.log2(1 + z), 0);
+    if (bits < best.bits) best = { order, values, bits };
+  }
+  return best;
+}
+
+function integrate(values: number[], order: number): number[] {
+  for (let k = 0; k < order; k++) for (let i = 1; i < values.length; i++) values[i] += values[i - 1];
+  return values;
+}
+
+const MAX_BINARY_BITS = 16;
+const scale = (kind: { decimals: number; binary?: true }) => (kind.binary ? 2 ** kind.decimals : 10 ** kind.decimals);
+const gcd = (a: number, b: number): number => { while (b) [a, b] = [b, a % b]; return a; };
 
 function numberKind(values: ReadonlyArray<number | null>): NumberKind {
-  for (let decimals = 0; decimals <= MAX_DECIMALS; decimals++) {
-    const factor = scale(decimals);
+  const forms: Array<{ decimals: number; binary?: true }> = [];
+  for (let decimals = 0; decimals <= MAX_DECIMALS; decimals++) forms.push({ decimals });
+  for (let bits = 1; bits <= MAX_BINARY_BITS; bits++) forms.push({ decimals: bits, binary: true });
+  for (const form of forms) {
+    const factor = scale(form);
     if (values.every(v => v === null || (Math.abs(v * factor) < MAX_SCALED && Object.is(Math.round(v * factor) / factor + 0, v)))) {
-      return { kind: 'scaled', decimals };
+      return { kind: 'scaled', ...form };
     }
   }
   return values.every(v => v === null || Object.is(Math.fround(v), v)) ? { kind: 'f32' } : { kind: 'f64' };
@@ -92,22 +127,26 @@ function nullMask(values: ReadonlyArray<unknown>): Buffer | null {
 function encodeNumbers(values: ReadonlyArray<number | null>, kind: NumberKind): Encoded {
   const mask = nullMask(values);
   let data: Buffer;
+  let form: NumberDescriptor;
   if (kind.kind === 'scaled') {
-    const factor = scale(kind.decimals);
-    const deltas = new Int32Array(values.length);
+    const factor = scale(kind);
+    const scaled = values.map(v => (v === null ? null : Math.round(v * factor)));
+    // Values on a coarser grid (wheel speed in 1/16 steps, load in 1000s) store their step count.
+    const step = scaled.reduce<number>((g, v) => (v === null ? g : gcd(g, Math.abs(v))), 0) || 1;
+    // A null keeps the previous count, so it adds nothing to the residuals.
     let previous = 0;
-    values.forEach((v, i) => {
-      const scaled = v === null ? previous : Math.round(v * factor);
-      deltas[i] = scaled - previous;
-      previous = scaled;
-    });
-    data = toPlanes(deltas);
+    const units = scaled.map(v => (previous = v === null ? previous : v / step));
+    const { order, values: residuals } = smallestResiduals(units);
+    const width = residuals.reduce((most, z) => Math.max(most, bytesFor(z)), 1);
+    form = { ...kind, ...(step > 1 ? { step } : {}), order, width };
+    data = toPlanes(residuals, width);
   } else {
+    form = kind;
     const array = kind.kind === 'f32' ? Float32Array.from(values, v => v ?? 0) : Float64Array.from(values, v => v ?? 0);
     data = Buffer.from(array.buffer);
   }
   const parts = mask ? [mask, data] : [data];
-  return { descriptor: { ...kind, nullable: mask !== null, parts: parts.map(p => p.length) }, parts };
+  return { descriptor: { ...form, nullable: mask !== null, parts: parts.map(p => p.length) }, parts };
 }
 
 function encodeCandidate(values: LapColumn, numberForm?: NumberKind): Encoded {
@@ -146,18 +185,15 @@ function encodeColumn(values: LapColumn): Encoded {
   return fallback;
 }
 
-function decodeNumbers(descriptor: NumberKind & { nullable: boolean }, length: number, take: () => Buffer): Array<number | null> {
+function decodeNumbers(descriptor: NumberDescriptor & { nullable: boolean }, length: number, take: () => Buffer): Array<number | null> {
   const mask = descriptor.nullable ? take() : null;
   const data = take();
   const out = new Array<number | null>(length);
   if (descriptor.kind === 'scaled') {
-    const deltas = fromPlanes(data);
-    const factor = scale(descriptor.decimals);
-    let scaled = 0;
-    for (let i = 0; i < length; i++) {
-      scaled += deltas[i];
-      out[i] = mask && mask[i] ? null : scaled / factor + 0;
-    }
+    const units = integrate(fromPlanes(data, descriptor.width).map(unzigzag), descriptor.order);
+    const factor = scale(descriptor);
+    const step = descriptor.step ?? 1;
+    for (let i = 0; i < length; i++) out[i] = mask && mask[i] ? null : (units[i] * step) / factor + 0;
   } else {
     const copy = new Uint8Array(data);
     const array = descriptor.kind === 'f32' ? new Float32Array(copy.buffer) : new Float64Array(copy.buffer);

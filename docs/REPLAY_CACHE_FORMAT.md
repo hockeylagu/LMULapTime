@@ -12,9 +12,10 @@ No historical migration, benchmark or private recording was rerun for this revie
 `replay_trajectories.trajectory_br`. SQLite row ownership and worker ingestion are described in
 [CODE_MAP](CODE_MAP.md).
 
-Encoding version **1** is inside each blob. The row's `parser_version` identifies decoder semantics,
+Encoding version **2** is inside each blob. The row's `parser_version` identifies decoder semantics,
 not the binary encoding. The reader rejects missing magic and unknown encoding versions; it has
-no legacy JSON decoding branch. The 2026-10-22 offline rewrite is completed; its execution checklist
+no legacy JSON or encoding 1 branch. The 2026-10-22 binary rewrite and the 2026-11-10 encoding 2
+rewrite are completed; its execution checklist
 is not a current recovery procedure and local backup availability is not established here.
 Future compatibility changes need a documented supported migration/rebuild path that
 preserves retained rows whose original VCR files have been deleted.
@@ -26,19 +27,23 @@ The entire uncompressed payload is compressed with Brotli, quality 9 on write.
 | Uncompressed offset | Representation | Meaning |
 |---|---|---|
 | 0–3 | ASCII `LMTB` | Magic |
-| 4 | Unsigned byte | Encoding version, currently 1 |
+| 4 | Unsigned byte | Encoding version, currently 2 |
 | 5–8 | UInt32 little endian | UTF-8 header length in bytes |
 | 9 onward | UTF-8 JSON, then binary parts | Header followed by columns in descriptor order |
 
 Header shape: `{lap, columns: [{key, column}]}`. `lap` contains the stored object excluding
 `columns`, including `pointsLength`, metadata and constant channels. A column descriptor records
 its kind and ordered part byte lengths; numeric descriptors also carry nullability and scaled
-descriptors carry decimal count. Tuple descriptors contain their four child descriptors.
+descriptors carry decimal count, step, difference order and byte width. Tuple descriptors contain their four child descriptors.
 
 ## Columns and exactness
 
-- `scaled`: numeric values exactly representable with 0–4 decimal places; scaled integers have
-  absolute value below `2^30`, are delta encoded as Int32, and stored as four byte planes.
+- `scaled`: numeric values exactly representable with 0–4 decimal places, or else as a fraction of
+  `2^1`–`2^16` (`binary`, `decimals` then holds the power); scaled integers have absolute value below
+  `2^30`. They are divided by their greatest common divisor (`step`, omitted when 1), a null repeats
+  the previous integer, and the integers are differenced `order` times (0–3, the order whose zigzag
+  residuals need the fewest bits). Residuals are zigzag mapped and stored as `width` byte planes
+  (1–4, the widest residual). Value = `n × step / 10^decimals` (or `/ 2^decimals`).
 - `f32` / `f64`: numeric arrays, float32 only when every value is exactly representable there.
 - `bool`: bytes 0 = false, 1 = true, 2 = null.
 - `tuple4`: four numeric subcolumns and, when needed, an outer null mask; wheel arrays retain

@@ -39,6 +39,31 @@ describe('binary lap columns', () => {
     });
   });
 
+  it('stores values on a coarser grid by their step count, including power-of-two fractions', () => {
+    const n = 400;
+    const stored = lap({
+      // 1/16 rad/s steps, 1 kN steps, n / 2048 m (no exact decimal form), and a column of zeros.
+      wheelSpeed: Array.from({ length: n }, (_, i) => (i * 37 % 4000) / 16 - 100),
+      load: Array.from({ length: n }, (_, i) => (i % 15) * 1000),
+      suspension: Array.from({ length: n }, (_, i) => (i % 200 - 100) / 2048),
+      zero: Array.from({ length: n }, () => 0),
+      gaps: Array.from({ length: n }, (_, i) => (i % 9 === 0 ? null : (i % 5) * 2.5)),
+    });
+    const buffer = encodeLapColumns(stored);
+    expect(decodeLapColumns<TestLap>(buffer)).toStrictEqual(stored);
+    const raw = zlib.brotliDecompressSync(buffer);
+    const header = JSON.parse(raw.subarray(9, 9 + raw.readUInt32LE(5)).toString('utf8')) as
+      { columns: Array<{ key: string; column: { kind: string; decimals: number; binary?: true; step?: number } }> };
+    const forms = Object.fromEntries(header.columns.map(({ key, column }) => [key, [column.kind, column.decimals, column.binary ?? false, column.step ?? 1]]));
+    expect(forms).toEqual({
+      wheelSpeed: ['scaled', 4, false, 625],
+      load: ['scaled', 0, false, 1000],
+      suspension: ['scaled', 11, true, 1],
+      zero: ['scaled', 0, false, 1],
+      gaps: ['scaled', 1, false, 25],
+    });
+  });
+
   it('keeps values JSON cannot hold: signed zero, NaN and infinities', () => {
     const stored = lap({ v: [0, -0, Number.NaN, Number.POSITIVE_INFINITY, 1.5] });
     const decoded = decodeLapColumns<TestLap>(encodeLapColumns(stored)).columns.v;
@@ -66,6 +91,15 @@ describe('binary lap columns', () => {
 
   it('stores a four-wheel tuple with a missing wheel without changing it', () => {
     const stored = lap({ w: [[1, 2, 3, 4], [1, null, 3, 4] as unknown as [number, number, number, number]] });
+    expect(decodeLapColumns<TestLap>(encodeLapColumns(stored))).toStrictEqual(stored);
+  });
+
+  it('stores a whole-session row (over an hour at 50 Hz) column by column', () => {
+    const n = 200_000;
+    const stored = lap({
+      timeSec: Array.from({ length: n }, (_, i) => Number((i * 0.02).toFixed(4))),
+      x: Array.from({ length: n }, (_, i) => Number((Math.sin(i / 900) * 800).toFixed(4))),
+    });
     expect(decodeLapColumns<TestLap>(encodeLapColumns(stored))).toStrictEqual(stored);
   });
 
