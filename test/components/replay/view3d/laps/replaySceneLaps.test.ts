@@ -71,7 +71,7 @@ vi.mock('three/addons/loaders/GLTFLoader.js', async () => {
   }};
 });
 vi.mock('../../../../../src/components/replay/view3d/scenery/chunkLoader.js', () => ({createChunkLoader: () => ({
-  async load(chunk: SceneryChunk) {
+  async load(chunk: SceneryChunk, _signal: AbortSignal, onParsed?: (root: Object3D) => void) {
     chunks.loads.push(chunk.id);
     const root = new Group(), mesh = new Mesh(new BoxGeometry(200, 1, 200), new MeshBasicMaterial());
     mesh.name = chunk.kind === 'horizon' ? 'FILLER_GROUND__OPAQUE' : 'road__OPAQUE'; mesh.position.y = chunk.kind === 'horizon' ? -5.5 : -0.5;
@@ -83,6 +83,7 @@ vi.mock('../../../../../src/components/replay/view3d/scenery/chunkLoader.js', ()
       root.add(obstacle);
     }
     chunks.roots.set(chunk.id, root);
+    onParsed?.(root); // As the loader: the parsed root is handed over before its textures load.
     return root;
   },
   releaseChunk: (root: Object3D) => disposeObjects(root, true), releaseTexture() {}, dispose() {},

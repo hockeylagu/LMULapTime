@@ -84,9 +84,11 @@ export async function createReplayScene(
     if (refreshTimer || !layerReady) return;
     refreshTimer = window.setTimeout(() => { refreshTimer = 0; if (disposed) return; layer.refreshHeights(); invalidate(); }, 250);
   };
-  // A chunk compiles its programs and uploads its textures before it joins the scene, a texture per frame, so its first draw does
-  // not stall playback. Chunks loaded before the scene exists (the first view) are drawn behind the loading screen anyway.
-  let warmTarget: {scene: Scene; camera?: PerspectiveCamera} | null = null;
+  // A chunk compiles its programs and uploads its textures before it joins the scene, so its first draw does not stall playback:
+  // a texture per frame while the scene shows, in long slices behind the loading screen. The scene and its camera exist from the
+  // start, so the first view's chunks warm up as each arrives, while the others still load.
+  const scene = new Scene(), perspective = new PerspectiveCamera(DEFAULT_FOV_DEG, 1, DEFAULT_NEAR_M, 15000);
+  let shown = false;
   const UPLOAD_SLICE_MS = 1, LOADING_SLICE_MS = 50;
   const nextFrame = () => new Promise<void>(resolve => { requestAnimationFrame(() => resolve()); });
   const nextTask = () => new Promise<void>(resolve => { setTimeout(resolve, 0); });
@@ -113,12 +115,10 @@ export async function createReplayScene(
   };
   const geometryWarmup = createGeometryWarmup(renderer, nextFrame, UPLOAD_SLICE_MS);
   const warmUp = async (root: Object3D, signal: AbortSignal) => {
-    const target = warmTarget;
-    if (!target?.camera) return;
     // Programs depend on the render target (tone mapping, output colour space): compile for the HDR target the frame uses.
     const previous = renderer.getRenderTarget();
     renderer.setRenderTarget(exposure.target); environment.applyHaze();
-    const compiled = renderer.compileAsync(root, target.camera, target.scene);
+    const compiled = renderer.compileAsync(root, perspective, scene);
     renderer.setRenderTarget(previous);
     await compiled;
     const textures = new Set<Texture>();
@@ -131,8 +131,8 @@ export async function createReplayScene(
       }
     });
     // During playback, upload in per-frame slices: a whole chunk at once is the stall this avoids. Behind the loading screen
-    // (the whole first view) nothing is drawn, so long slices only yield a task now and then to keep the page responsive.
-    const loading = root === target.scene, uploadBudgetMs = loading ? LOADING_SLICE_MS : UPLOAD_SLICE_MS, pause = loading ? nextTask : nextFrame;
+    // nothing is drawn, so long slices only yield a task now and then to keep the page responsive.
+    const uploadBudgetMs = shown ? UPLOAD_SLICE_MS : LOADING_SLICE_MS, pause = shown ? nextFrame : nextTask;
     let sliceEnd = performance.now() + uploadBudgetMs;
     for (const texture of textures) {
       signal.throwIfAborted();
@@ -140,19 +140,29 @@ export async function createReplayScene(
       // eslint-disable-next-line no-await-in-loop -- yields between upload slices
       if (performance.now() >= sliceEnd) { await pause(); sliceEnd = performance.now() + uploadBudgetMs; }
     }
-    await geometryWarmup.upload(root, target.camera, signal, uploadBudgetMs, pause);
+    await geometryWarmup.upload(root, perspective, signal, uploadBudgetMs, pause);
     queueSharpen(textures);
   };
   let warming = Promise.resolve();
   const stream = createSceneryStream(layout, sceneryRoot, {
     load: async (chunk, signal) => {
-      const root = await loader.load(chunk, signal);
-      // The ray tree builds in a worker while the chunk waits its turn to compile and upload (warm-ups stay one at a time).
-      const grounded = ground.add(chunk.id, root, chunk.kind === 'horizon');
-      const warmed = warming.then(async () => { signal.throwIfAborted(); await warmUp(root, signal); });
-      warming = warmed.catch(() => {});
-      try { await Promise.all([warmed, grounded]); signal.throwIfAborted(); return root; }
-      catch (error) { ground.remove(chunk.id, root); loader.releaseChunk(root); throw error; }
+      // The ray tree needs only the geometry: it builds in a worker from the parsed chunk, while its textures download and the
+      // chunk waits its turn to compile and upload (warm-ups stay one at a time).
+      const built: {parsed: Object3D | null; grounded: Promise<void>; root: Object3D | null} = {parsed: null, grounded: Promise.resolve(), root: null};
+      try {
+        const root = built.root = await loader.load(chunk, signal, parsed => {
+          built.parsed = parsed; built.grounded = ground.add(chunk.id, parsed, chunk.kind === 'horizon');
+          built.grounded.catch(() => {}); // Awaited below; a texture failure may reject the load first.
+        });
+        const warmed = warming.then(async () => { signal.throwIfAborted(); await warmUp(root, signal); });
+        warming = warmed.catch(() => {});
+        await Promise.all([warmed, built.grounded]); signal.throwIfAborted(); return root;
+      } catch (error) {
+        // The loader releases a chunk whose own load failed; one that failed after it is released here.
+        if (built.parsed) ground.remove(chunk.id, built.parsed);
+        if (built.root) loader.releaseChunk(built.root);
+        throw error;
+      }
     },
     prepare: (_chunk, root) => {
       // The filler ground sits just under the road: a car shadow on it would show through from below road level.
@@ -172,18 +182,18 @@ export async function createReplayScene(
   if (firstStation === undefined) { cleanup(); throw Error('This recording has no track stations. Use the 2D map.'); }
   let currentStation = firstStation, mode: CameraMode = 'follow', streamView: StreamView | null = null;
   const loadLaps = createLapLayerLoader(origin, surfaceHeight, path => carTextures.loadAsync(`${VEHICLE_FILES}${path}`), () => exposure.display(), layout.shading);
-  // The sky's environment map compiles and renders now, while the scenery files download.
-  const scene = new Scene();
-  const environment = addSceneEnvironment(scene, renderer, layout, origin, trajectory.daylightClock), reflection = createCarReflection(renderer, scene, layout.shading);
-  // The horizon and the chunks under the first pose must be resident before cars and lines are draped on them.
+  // The first view's chunks and the car are requested first: the sky's environment and the car's reflection link their programs
+  // on the main thread, which the downloads then overlap.
+  streamView = {kind: 'lap', lapDistanceM: currentStation}; stream.update(streamView);
+  loadLaps.preload(cars); // The car models and textures load alongside the scenery; only draping waits for the ground.
+  let environment: ReturnType<typeof addSceneEnvironment>, reflection: ReturnType<typeof createCarReflection>;
+  // The chunks under the first pose must be resident before cars and lines are draped on them.
   try {
-    streamView = {kind: 'lap', lapDistanceM: currentStation}; stream.update(streamView);
-    loadLaps.preload(cars); // The car models and textures load alongside the scenery; only draping waits for the ground.
+    environment = addSceneEnvironment(scene, renderer, layout, origin, trajectory.daylightClock); reflection = createCarReflection(renderer, scene, layout.shading);
     await stream.whenUnderView();
     layer = await loadLaps(trajectory, baseline, cars, colorBy); layerReady = true;
   } catch (error) { cleanup(); throw error; }
   let lineMode = colorBy, primaryOpacity = 1, baselineOpacity = 1, lapRequest = 0;
-  warmTarget = {scene};
   // Convert the native left-handed frame once, including meshes, car bodies and trails.
   // Camera targets/offsets use the same reflection. Mirroring only terrain misaligns poses.
   const world = new Group(); world.scale.z = -1; world.add(sceneryRoot); scene.add(world);
@@ -194,14 +204,12 @@ export async function createReplayScene(
   };
   freezeScenery();
   world.add(layer.root); environment.setDynamic([layer.root]); reflection.setCar(layer.primary, layer.root);
-  const perspective = new PerspectiveCamera(DEFAULT_FOV_DEG, 1, DEFAULT_NEAR_M, 15000);
-  warmTarget = {scene, camera: perspective};
   environment.setCamera(perspective);
-  // The first view's chunks loaded before the camera existed: compile and upload them (and the cars) behind the loading screen.
+  // The first view's chunks are warm: this compiles and uploads the cars and lines, behind the loading screen.
   try { await warmUp(scene, new AbortController().signal); } catch (error) { cleanup(); throw error; }
   // The scenery around the first pose is resident and compiled: capture the venue's light for the scene's environment.
   environment.captureVenue();
-  sharpening = true; queueSharpen([]);
+  shown = true; sharpening = true; queueSharpen([]);
   const overhead = new OrthographicCamera(-80, 80, 80, -80, 0.5, 15000);
   let camera: PerspectiveCamera | OrthographicCamera = perspective;
   const controls = new OrbitControls<PerspectiveCamera | OrthographicCamera>(camera, renderer.domElement);
@@ -254,6 +262,11 @@ export async function createReplayScene(
       // ahead of the eye, which would leave the car itself outside the near shadow square: their shadows centre on the car.
       const focus = isDriverCamera(mode) ? layer.primary.getWorldPosition(shadowFocus) : controls.target;
       if (environment.update(focus)) invalidate();
+      // The first probe completes before the first frame that shows the car, whose materials read it from their first draw.
+      if (!probed && layer.primary.visible) {
+        probed = true; layer.primary.getWorldPosition(probeCentre);
+        for (let pass = 0; pass < 6 && reflection.update(probeCentre); pass++);
+      }
       exposure.render(scene, camera);
       // The car's reflection probe renders one face after the frame (car/carReflection.ts), around the body's centre.
       if (layer.primary.visible && reflection.update(layer.primary.getWorldPosition(probeCentre))) invalidate();
@@ -262,11 +275,6 @@ export async function createReplayScene(
         camera.position.copy(desiredEye);
         camera.quaternion.copy(eyeRotation);
         camera.updateMatrixWorld();
-      // The first probe completes before the first frame that shows the car, whose materials read it from their first draw.
-      if (!probed && layer.primary.visible) {
-        probed = true; layer.primary.getWorldPosition(probeCentre);
-        for (let pass = 0; pass < 6 && reflection.update(probeCentre); pass++);
-      }
       }
     }
   };

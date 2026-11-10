@@ -9,7 +9,8 @@ import { configureSurfaceMaterial } from './materials/configureSurfaceMaterial.j
 import { createSurfaceTexturePool, imageUriMap } from './materials/textureSource.js';
 
 export interface ChunkLoader {
-  load(chunk: SceneryChunk, signal: AbortSignal): Promise<Object3D>;
+  /** `onParsed` gets the root once its meshes exist, before their textures load: work that needs only geometry starts there. */
+  load(chunk: SceneryChunk, signal: AbortSignal, onParsed?: (root: Object3D) => void): Promise<Object3D>;
   releaseChunk(root: Object3D): void;
   /** Frees the cached texture file of a package-relative KTX2 path (its last chunk unloaded). */
   releaseTexture(asset: string): void;
@@ -50,7 +51,7 @@ export function createChunkLoader(renderer: WebGLRenderer): ChunkLoader {
     sources.delete(root);
   };
   return {
-    async load(chunk, signal) {
+    async load(chunk, signal, onParsed) {
       const bytes = await fetchSceneryChunk(chunk, signal);
       signal.throwIfAborted();
       const parsed = await gltf.parseAsync(bytes, SCENERY_FILES), root = parsed.scene;
@@ -59,6 +60,7 @@ export function createChunkLoader(renderer: WebGLRenderer): ChunkLoader {
         sources.set(root, source);
         const meshes: Mesh[] = [];
         root.traverse(object => { if (object instanceof Mesh) { const mesh = object as Mesh; prepareSceneryMesh(mesh); meshes.push(mesh); } });
+        onParsed?.(root);
         await Promise.all(meshes.map(mesh => configureSurfaceMaterial(mesh, source, false)));
         signal.throwIfAborted();
       } catch (error) { releaseChunk(root); throw error; }
