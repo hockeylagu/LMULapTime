@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ReplayFlagEvent, ReplayTrajectoryData, ReplayWeatherEvent } from '../../../../shared/types/index.js';
+import type { ReplayTrajectoryData, ReplayWeatherEvent } from '../../../../shared/types/index.js';
 import {
   conditionsFrom,
   driverEventsFrom,
@@ -12,7 +12,6 @@ import {
 } from '../../../../server/replay/decode/replayFacts.js';
 
 const wx = (timeSec: number, rainIntensity: number, ambientTemp = 20): ReplayWeatherEvent => ({ timeSec, rainIntensity, ambientTemp });
-const flag = (timeSec: number, flagState: number, sectorMask = 33): ReplayFlagEvent => ({ timeSec, flagState, flagName: 'x', sectorMask, driverSlot: 255, driverFlag: 0 });
 
 describe('replay facts', () => {
   describe('stored lap rows', () => {
@@ -22,7 +21,6 @@ describe('replay facts', () => {
       points: [{ x: 0, y: 0, z: 0, timeSec: 10 }],
       laps: [{ lapNumber: 2, lapTimeSec: 90, s1Sec: 30, s2Sec: 30, s3Sec: 30 }],
       weatherEvents: [wx(0, 0)],
-      flagEvents: [flag(0, 0)],
       pitEvents: [{ driverSlot: 3, timeSec: 5, code: 34, action: 'Pit entry' }, { driverSlot: 4, timeSec: 6, code: 34, action: 'Pit entry' }],
       contacts: [{ driverSlot: 3, timeSec: 7, impactMagnitude: 2, otherParty: 4 }],
       penalties: [{ driverSlot: 4, timeSec: 8, penaltyText: 'x', action: 'given' }],
@@ -55,28 +53,25 @@ describe('replay facts', () => {
   });
 
   describe('conditions', () => {
-    it('keeps one row per change of the weather or the flags, the last running to the end', () => {
-      const rows = conditionsFrom([wx(0, 0), wx(3, 0), wx(6, 40), wx(9, 40)], [flag(0, 0), flag(3, 0), flag(7, 3)], 20);
+    it('keeps one row per change of the weather, the last running to the end', () => {
+      const rows = conditionsFrom([wx(0, 0), wx(3, 0), wx(6, 40), wx(9, 40), wx(12, 40, 21)], 20);
 
-      expect(rows.map(r => [r.startSec, r.endSec, r.rain, r.flagState])).toEqual([
-        [0, 6, 0, 0],
-        [6, 7, 40, 0],
-        [7, 20, 40, 3],
+      expect(rows.map(r => [r.startSec, r.endSec, r.rain, r.ambientC])).toEqual([
+        [0, 6, 0, 20],
+        [6, 12, 40, 20],
+        [12, 20, 40, 21],
       ]);
     });
 
     it('lets the later of two packets at the same time hold, and merges back into an equal row', () => {
-      const rows = conditionsFrom([], [flag(0, 1), flag(0, 0), flag(3, 1), flag(3, 0)], 5);
+      const rows = conditionsFrom([wx(0, 1), wx(0, 0), wx(3, 1), wx(3, 0)], 5);
 
-      expect(rows.map(r => [r.startSec, r.endSec, r.flagState])).toEqual([[0, 5, 0]]);
+      expect(rows.map(r => [r.startSec, r.endSec, r.rain])).toEqual([[0, 5, 0]]);
     });
 
-    it('leaves what was not recorded yet as null', () => {
-      const [first, second] = conditionsFrom([wx(4, 10)], [flag(0, 0)], 10);
-
-      expect(first).toMatchObject({ startSec: 0, rain: null, ambientC: null, flagState: 0 });
-      expect(second).toMatchObject({ startSec: 4, rain: 10, ambientC: 20, flagState: 0 });
-      expect(conditionsFrom([], [], 10)).toEqual([]);
+    it('has no row before the first weather packet', () => {
+      expect(conditionsFrom([wx(4, 10)], 10)).toEqual([{ startSec: 4, endSec: 10, rain: 10, ambientC: 20 }]);
+      expect(conditionsFrom([], 10)).toEqual([]);
     });
   });
 
@@ -84,7 +79,7 @@ describe('replay facts', () => {
     const trajectory: Pick<ReplayTrajectoryData, 'pitEvents' | 'contacts' | 'penalties'> = {
       pitEvents: [
         { driverSlot: 3, driverName: 'A', timeSec: 10, code: 34, action: 'Pit entry' },
-        { driverSlot: 1, timeSec: 10, code: 21, action: 'Garage', isGarage: true, durationSec: 12.5, fuelAddedLiters: 20 },
+        { driverSlot: 1, timeSec: 10, code: 21, action: 'Garage', isGarage: true, durationSec: 12.5 },
       ],
       contacts: [{ driverSlot: 2, timeSec: 5, impactMagnitude: 800, otherParty: 4, otherPartyName: 'B' }, { driverSlot: 2, timeSec: 6, impactMagnitude: 50 }],
       penalties: [
@@ -99,7 +94,7 @@ describe('replay facts', () => {
 
       expect(facts.find(f => f.kind === 'pit' && f.seq === 1)).toEqual({
         kind: 'pit', seq: 1, driverSlot: 1, timeSec: 10, code: 21, value: 12.5, otherSlot: null,
-        detail: { action: 'Garage', isGarage: true, fuelAddedLiters: 20 },
+        detail: { action: 'Garage', isGarage: true },
       });
       expect(facts.filter(f => f.kind.startsWith('penalty')).map(f => f.kind)).toEqual(['penalty_given', 'penalty_served', 'penalty_given']);
     });

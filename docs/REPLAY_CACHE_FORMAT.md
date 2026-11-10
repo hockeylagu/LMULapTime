@@ -66,6 +66,12 @@ calibrated ambient representation. The historical rewrite applied former read-ti
 the current reader does not reapply them based on parser age. A semantic change must describe how
 retained rows are upgraded rather than silently introducing competing representations.
 
+Parser `v9` (2026-11-10) adds the per-wheel `wheelAngularSpeeds` (rad/s), `suspensionDeflections` (m),
+`wheelLoads` (N) and `tireSlideSpeeds` (m/s) and stores all four brake temperatures (°C). The app reads `v9`
+rows only. Replays whose VCR is gone were relabelled `v9` by the one-time migration, which rewrote their throttle
+from the 5 bits older decoders kept (an estimate of the sixth) and removed the fields it could not rebuild (brake
+temperatures, detached part state, the v3 tyre and suspension guesses); they have no per-wheel channels.
+
 `test/server/core/replay/lapColumnsCodec.test.ts` covers codec behavior; trajectory and traffic
 tests cover consumers. The [rejected-candidate summary](plans/proposed/REPLAY_STORAGE_DESIGN.md#prior-results) explains
 why the tested plain Float64/prepared-view candidates were rejected; it is not the current codec.

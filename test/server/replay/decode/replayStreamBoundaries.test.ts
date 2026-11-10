@@ -43,11 +43,10 @@ const source = createSliceVcrBuffer({
   slices: [
     {
       sTime: 1, driverSlot: 1, x: 10, y: 0, z: 20,
-      wheel: { tireTemps: [80, 80, 80, 80], brakeTemps: [300, 300, 200, 200] },
+      wheel: { brakeTemps: [300, 300, 200, 200], loadSteps: [4, 4, 3, 3], slideSteps: [1, 2, 3, 4] },
       timing: { splitSec: 1, sector: 1, lapIdx: 0 },
-      flag: { flagState: 1, sectorMask: 1, driverFlag: 0 },
       weather: { rainIntensity: 45 },
-      rawEvents: [{ evClass: 0, evType: 51, slot: 1, payload: Buffer.from([153, 0, 0]) }],
+      rawEvents: [{ opcode: 51, slot: 1, payload: Buffer.from([153, 0, 0]) }],
     },
     { sTime: 1.1, driverSlot: 1, x: 15, y: 0, z: 25 },
   ],
@@ -77,7 +76,7 @@ describe('replay stream slice boundaries', () => {
     const complete = createSliceVcrBuffer({ slices: [{ sTime: 1, driverSlot: 1, x: 10, y: 0, z: 20 }] });
     const withIncomplete = createSliceVcrBuffer({ slices: [
       { sTime: 1, driverSlot: 1, x: 10, y: 0, z: 20 },
-      { sTime: 2, driverSlot: 1, x: 15, y: 0, z: 25, flag: { flagState: 1, sectorMask: 1, driverFlag: 0 } },
+      { sTime: 2, driverSlot: 1, x: 15, y: 0, z: 25, rawEvents: [{ opcode: 51, slot: 1, payload: Buffer.from([153, 0, 0]) }] },
     ] });
     const truncated = withIncomplete.subarray(57, withIncomplete.readUInt32LE(53) - 1);
     expect(extract(withStream(withIncomplete, truncated))).toEqual(extract(complete));

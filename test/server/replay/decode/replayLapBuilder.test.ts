@@ -32,8 +32,8 @@ describe('detectLapsFromTelemetry: the lap still running when the replay ends', 
     expect(computeLapConsistencyStats(result.lapsSummary).lapCount).toBe(0);
   });
 
-  it('uses recorded pit state without events and identifies an out-lap with the limiter off', () => {
-    const result = detectLapsFromTelemetry(drive(290, sTime => ({ inPit: sTime >= 150 && sTime <= 205 })),
+  it('uses the recorded pit limiter without events and identifies the out-lap', () => {
+    const result = detectLapsFromTelemetry(drive(290, sTime => ({ pitLimiter: sTime >= 150 && sTime <= 205 })),
       [...twoLaps, finish(2, 290, 100)], SLOT, [], 2000);
     expect(result.lapsSummary[1].isPitStop).toBe(true);
     expect(result.lapsSummary[2].isOutLap).toBe(true);
@@ -67,7 +67,7 @@ describe('detectLapsFromTelemetry: the lap still running when the replay ends', 
   });
 
   it('is an out-lap when it started in the pit lane', () => {
-    const [, , partial] = detect(drive(230, sTime => ({ inPit: sTime >= 188 && sTime <= 192 })), twoLaps);
+    const [, , partial] = detect(drive(230, sTime => ({ pitLimiter: sTime >= 188 && sTime <= 192 })), twoLaps);
     expect(partial.isOutLap).toBe(true);
   });
 

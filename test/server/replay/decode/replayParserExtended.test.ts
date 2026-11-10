@@ -196,7 +196,7 @@ describe('replayParser - extended format & pit info', () => {
         verBuf.writeUInt32LE(0x80000008, 0);
         const streamPrefix = Buffer.alloc(4);
 
-        // Build 10 trajectory slices with pitch (rotX), roll (rotZ), and damage
+        // Build 10 trajectory slices with pitch (rotX) and roll (rotZ)
         const sliceBufs: Buffer[] = [];
         for (let i = 0; i < 10; i++) {
           const sBuf = Buffer.alloc(6);
@@ -208,9 +208,6 @@ describe('replayParser - extended format & pit info', () => {
           const evPad = Buffer.from([0]);
 
           const evData = Buffer.alloc(65);
-          // info2 at offset 4: detachablePartState = 42
-          evData.writeUInt32LE(42, 4);
-
           // Position
           evData.writeFloatLE(100.0 + i * 10, 41);
           evData.writeFloatLE(5.0, 45);
@@ -264,7 +261,6 @@ describe('replayParser - extended format & pit info', () => {
         const pt = traj.points[0];
         expect(pt.rotX).toBe(-0.05);
         expect(pt.rotZ).toBe(0.02);
-        expect(pt.detachablePartState).toBe(42);
       });
 
       it('extracts penalties and pit lane events from slice streams', () => {
@@ -289,17 +285,17 @@ describe('replayParser - extended format & pit info', () => {
         evData1.writeFloatLE(0, 45);
         evData1.writeFloatLE(200, 49);
 
-        // Event 2: Class 3 Type 5 Penalty Given: "Cut track warning" (raw class 7 = class 3 + race bit 29)
+        // Event 2: opcode 133 penalty given: "Cut track warning" (session code 10, race 1)
         const penaltyText = Buffer.from('Cut track warning', 'utf8');
         const penaltySize = 2 + penaltyText.length;
         const evHdr2 = Buffer.alloc(4);
-        const hVal = (7 << 29) | (5 << 17) | (penaltySize << 8) | 1;
+        const hVal = (10 << 26) | (133 << 17) | (penaltySize << 8) | 1;
         evHdr2.writeUInt32LE(hVal >>> 0, 0);
         const evData2 = Buffer.concat([Buffer.from([1, 0]), penaltyText]); // penalty type, seconds / 2, then text
 
         sliceBufs.push(sBuf1, evHdr1, Buffer.from([0]), evData1, evHdr2, Buffer.from([0]), evData2);
 
-        // Slice 2: Motion + Class 0 Type 2 Pit Event (code 34 = entered pit lane)
+        // Slice 2: pose + opcode 322 pit state (34 = racing, entering the pit lane)
         const sBuf2 = Buffer.alloc(6);
         sBuf2.writeFloatLE(30.0, 0);
         sBuf2.writeUInt16LE(2, 4);
@@ -312,8 +308,7 @@ describe('replayParser - extended format & pit info', () => {
         evData3.writeFloatLE(220, 49);
 
         const evHdr4 = Buffer.alloc(4);
-        // raw class 1 (class 0 + race bit 29), type = 2 (2 << 17), size = 1, drv = 1
-        const pitVal = ((1 << 29) | (2 << 17) | (1 << 8) | 1) >>> 0;
+        const pitVal = ((10 << 26) | (322 << 17) | (1 << 8) | 1) >>> 0;
         evHdr4.writeUInt32LE(pitVal, 0);
         const evData4 = Buffer.from([34]); // code 34: entered pit lane
 
@@ -362,7 +357,7 @@ describe('replayParser - extended format & pit info', () => {
         expect(traj.pitEvents?.[0].action).toBe('entered pit lane');
       });
 
-      it('extracts structured fuelAddedLiters from a service-complete pit event (code 37)', () => {
+      it('names the 6-byte released pit state (37) and reads no fuel from it', () => {
         const headerText = '//[[gMb1.002f (c)2016    ]] [[            ]]\n';
         const headerBuf = Buffer.from(headerText, 'ascii');
         const irsrBuf = Buffer.from('IRSR', 'ascii');
@@ -374,9 +369,9 @@ describe('replayParser - extended format & pit info', () => {
         sBuf.writeFloatLE(45.0, 0);
         sBuf.writeUInt16LE(1, 4);
 
-        // Class 0 Type 2, code 37 (service complete): +1 status byte, +2..5 fuelAddedLiters (Float32LE)
+        // Opcode 322, state 37 (racing, released): bytes 1..5 are energy and tyre wear, not fuel.
         const evHdr = Buffer.alloc(4);
-        const pitVal = ((1 << 29) | (2 << 17) | (6 << 8) | 1) >>> 0;
+        const pitVal = ((322 << 17) | (6 << 8) | 1) >>> 0;
         evHdr.writeUInt32LE(pitVal, 0);
         const evData = Buffer.alloc(6);
         evData[0] = 37;
@@ -418,8 +413,8 @@ describe('replayParser - extended format & pit info', () => {
         expect(traj.pitEvents).toBeDefined();
         expect(traj.pitEvents?.length).toBe(1);
         expect(traj.pitEvents?.[0].code).toBe(37);
-        expect(traj.pitEvents?.[0].fuelAddedLiters).toBeCloseTo(62.5, 1);
-        expect(traj.pitEvents?.[0].details).toBe('Fuel: 62.5L');
+        expect(traj.pitEvents?.[0]).toMatchObject({ action: 'released', isGarage: false });
+        expect(Object.keys(traj.pitEvents![0])).not.toContain('fuelAddedLiters');
       });
 
       const steamReplays = 'C:\\Program Files (x86)\\Steam\\steamapps\\common\\Le Mans Ultimate\\UserData\\Replays';

@@ -264,17 +264,13 @@ export function initDbSchema(db: DatabaseType): void {
     CREATE INDEX IF NOT EXISTS idx_replay_laps_time ON replay_laps(filename, start_sec);
 
     -- Replay-wide conditions over time, one row per change: weather (rain 0-255 as decoded, ambient
-    -- °C) and the track flag packet (slot 255, the same for every car). Null = not recorded yet.
+    -- °C). Null = not recorded yet.
     CREATE TABLE IF NOT EXISTS replay_conditions (
       filename TEXT NOT NULL,
       start_sec REAL NOT NULL,
       end_sec REAL NOT NULL,
       rain INTEGER,
       ambient_c REAL,
-      flag_state INTEGER,
-      -- Raw bytes 1 and 2 of the flag packet, meaning unconfirmed (docs/analysis/VCR_ANALYSIS.md 2.6).
-      sector_mask INTEGER,
-      driver_flag INTEGER,
       PRIMARY KEY (filename, start_sec)
     );
 
@@ -313,8 +309,7 @@ export function initDbSchema(db: DatabaseType): void {
            (SELECT c2.rain FROM replay_conditions c2
              WHERE c2.filename = l.filename AND c2.start_sec <= l.start_sec
              ORDER BY c2.start_sec DESC LIMIT 1) AS rain_at_start,
-           MIN(c.ambient_c) AS min_ambient_c,
-           MAX(CASE WHEN c.flag_state IN (3, 4, 5, 6) THEN 1 ELSE 0 END) AS full_course_yellow
+           MIN(c.ambient_c) AS min_ambient_c
     FROM replay_laps l
     JOIN replay_conditions c
       ON c.filename = l.filename

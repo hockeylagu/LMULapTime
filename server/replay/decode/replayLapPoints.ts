@@ -44,7 +44,7 @@ export function buildTrajectoryPoints(
     }
     const packetSpeed = cur.speedKmhRaw;
     const rawSpeed = packetSpeed !== undefined && packetSpeed <= MAX_PLAUSIBLE_SPEED_KMH ? packetSpeed : derivedSpeed;
-    const inPit = Boolean(cur.inPit) || isTimeInIntervals(cur.sTime, pitIntervals);
+    const inPit = isTimeInIntervals(cur.sTime, pitIntervals);
 
     return {
       x: roundFixed(cur.x, 4),
@@ -68,10 +68,12 @@ export function buildTrajectoryPoints(
       absActive: cur.absActive,
       pitLimiter: cur.pitLimiter,
       headlights: cur.headlights,
-      detachablePartState: cur.detachablePartState,
       engineRpm: cur.engineRpm,
-      wheelSpeeds: cur.wheelSpeeds,
+      wheelAngularSpeeds: cur.wheelAngularSpeeds,
+      suspensionDeflections: cur.suspensionDeflections,
       brakeTemps: cur.brakeTemps,
+      wheelLoads: cur.wheelLoads,
+      tireSlideSpeeds: cur.tireSlideSpeeds,
       virtualEnergy: cur.virtualEnergy,
       rainIntensity: cur.rainIntensity,
       ambientTemp: cur.ambientTemp,

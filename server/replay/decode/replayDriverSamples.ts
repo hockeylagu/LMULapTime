@@ -11,7 +11,8 @@ interface DriverBuffer { records: Buffer; length: number; states: ReplayPoseStat
 interface SampleChunk { records: Buffer; states: ReplayPoseState[] }
 
 function sameState(left: ReplayPoseState, right: ReplayPoseState): boolean {
-  return left.wheelSpeeds === right.wheelSpeeds && left.brakeTemps === right.brakeTemps
+  return left.brakeTemps === right.brakeTemps && left.wheelLoads === right.wheelLoads
+    && left.tireSlideSpeeds === right.tireSlideSpeeds
     && left.virtualEnergy === right.virtualEnergy && left.rainIntensity === right.rainIntensity
     && left.ambientTemp === right.ambientTemp && left.tireCompoundIndices === right.tireCompoundIndices;
 }

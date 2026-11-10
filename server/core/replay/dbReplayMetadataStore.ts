@@ -5,7 +5,7 @@ import { Database as DatabaseType } from 'better-sqlite3';
 import { ReplayMetadata, ReplayCacheSummary } from '../../../shared/types/index.js';
 import { ReplayDriverIngestStatus, settledReplayFailure } from './dbReplayIngestStore.js';
 import { resolveRosterVehicles } from '../../../shared/domain/vehicleMapping.js';
-import { REPLAY_CACHE_VERSION, compressJson, decompressJson, isCompatibleReplayCacheVersion } from '../dbCache.js';
+import { REPLAY_CACHE_VERSION, compressJson, decompressJson } from '../dbCache.js';
 import { writeReplayMatchingFacts } from './dbReplayMatchingStore.js';
 import { getMetadata, setMetadata } from '../dbMetadataStore.js';
 import { writeReplayDriverRoster } from './replayLapAvailability.js';
@@ -66,7 +66,7 @@ export function getReplayMetadataCache(db: DatabaseType, filename: string, mtime
   const row = db.prepare(
     'SELECT file_path, file_mtime_ms, file_size_bytes, parser_version, metadata_br FROM replay_metadata WHERE filename = ?'
   ).get(filename) as { file_path: string; file_mtime_ms: number; file_size_bytes: number; parser_version: string; metadata_br: Buffer } | undefined;
-  if (!row || row.file_mtime_ms !== mtimeMs || row.file_size_bytes !== fileSizeBytes || !isCompatibleReplayCacheVersion(row.parser_version) || (filePath && row.file_path !== filePath)) {
+  if (!row || row.file_mtime_ms !== mtimeMs || row.file_size_bytes !== fileSizeBytes || row.parser_version !== REPLAY_CACHE_VERSION || (filePath && row.file_path !== filePath)) {
     return null;
   }
   const { metadata, ownershipChanged } = readMetadataRow(row, playerName);

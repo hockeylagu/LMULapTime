@@ -3,13 +3,13 @@ import fs from 'fs';
 import path from 'path';
 import { ReplayDriverSamples } from './replayDriverSamples.js';
 import { decodeReplayPose } from './replayPose.js';
+import { pitCodeAction } from './replayPitCodes.js';
 import { finalizeReplayDriver } from './replayTrajectoryFinalizer.js';
 import {
   ReplayTrajectoryData,
   ReplayPenaltyEvent,
   ReplayContactEvent,
   ReplayPitEvent,
-  ReplayFlagEvent,
   ReplayStandingsSnapshot,
   ReplayWeatherEvent,
 } from '../../../shared/types/index.js';
@@ -22,7 +22,46 @@ import {
   ReplayProgressTracker,
 } from '../replayProgress.js';
 
-// Class 0 Type 17 contact, byte +32: values below ~105 are the other car's slot, these are objects.
+// Opcodes of the events the app reads (docs/VCR_FORMAT.md §3.3).
+const OP_VIRTUAL_ENERGY = 51;
+const OP_PENALTY_GIVEN = 133;
+const OP_PENALTY_SERVED = 135;
+const OP_WEATHER = 138;
+const OP_CAR_VISUAL_STATE = 143;
+const OP_TYRE_COMPOUNDS = 144;
+const OP_CONTACT = 145;
+const OP_TIMING = 198;
+const OP_STANDINGS = 240;
+const OP_CAR_STATUS = 241;
+const OP_PIT_STATE = 322;
+/** Car status reason 3: entered the pit lane (§4.19), kept as pit event code 49. */
+const CAR_STATUS_ENTERED_PIT = 3;
+const CAR_STATUS_PIT_CODE = 49;
+
+const isPose = (opcode: number, size: number) => size === 65 && opcode >= 7 && opcode <= 17;
+
+/** Opcode 143 (§4.11): per-wheel load (N) and tyre sliding speed (m/s), and the four brake temperatures (°C). */
+function carVisualState(payload: Buffer, offset: number): Pick<RawTrajectoryPoint, 'brakeTemps' | 'wheelLoads' | 'tireSlideSpeeds'> {
+  const wheelLoads: [number, number, number, number] = [0, 0, 0, 0];
+  const tireSlideSpeeds: [number, number, number, number] = [0, 0, 0, 0];
+  for (let wheel = 0; wheel < 4; wheel++) {
+    const state = payload.readUInt32LE(offset + wheel * 4);
+    wheelLoads[wheel] = ((state >>> 16) & 15) * 1000;
+    const slide = (state >>> 20) & 63;
+    tireSlideSpeeds[wheel] = Number((slide * slide * 0.0252).toFixed(4));
+  }
+  const low = payload.readUInt32LE(offset + 16), high = payload.readUInt32LE(offset + 20);
+  const celsius = (n: number) => Math.round(n * 1500 / 1023 - 273.15);
+  const brakeTemps: [number, number, number, number] = [
+    celsius((high >>> 22) & 0x3ff),
+    celsius((high >>> 12) & 0x3ff),
+    celsius((high >>> 2) & 0x3ff),
+    celsius((low >>> 24) | ((high & 3) << 8)),
+  ];
+  return { brakeTemps, wheelLoads, tireSlideSpeeds };
+}
+
+// Opcode 145 contact, byte +32: values below 105 are the other car's slot, these are objects.
 const CONTACT_OBJECT_NAMES: Record<number, string> = {
   105: 'Cone',
   106: 'Post',
@@ -32,7 +71,7 @@ const CONTACT_OBJECT_NAMES: Record<number, string> = {
   112: 'Immovable',
 };
 
-// Class 3 Types 5 / 7 penalty issued / served, byte +0.
+// Opcodes 133 / 135 penalty issued / served, byte +0.
 const PENALTY_TYPE_NAMES: Record<number, string> = {
   0: 'Stop/Go',
   1: 'Drive Thru',
@@ -175,16 +214,12 @@ export function* extractReplayDriverTrajectories(
     const replayPenalties: ReplayPenaltyEvent[] = [];
     const replayContacts: ReplayContactEvent[] = [];
     const replayPitEvents: ReplayPitEvent[] = [];
-    const replayFlagEvents: ReplayFlagEvent[] = [];
     const standingsHistory: ReplayStandingsSnapshot[] = [];
     const replayWeatherEvents: ReplayWeatherEvent[] = [];
     let currentAmbientTemp: number | undefined = undefined;
     let currentRainIntensity: number | undefined = undefined;
     let maxSessionRain = 0;
-    const driverWheelTelemetry = new Map<number, {
-      wheelSpeeds?: [number, number, number, number];
-      brakeTemps?: [number, number, number, number];
-    }>();
+    const driverWheelTelemetry = new Map<number, ReturnType<typeof carVisualState>>();
     const driverVirtualEnergy = new Map<number, number>();
     const driverTireCompounds = new Map<number, [number, number, number, number]>();
 
@@ -213,7 +248,7 @@ export function* extractReplayDriverTrajectories(
       const activeLen = carryoverLen + bytesToRead;
       filePos += bytesToRead;
 
-      let sp = isFirstChunk ? 4 : 0;
+      let sp: number = isFirstChunk ? 4 : 0;
       isFirstChunk = false;
 
       while (true) {
@@ -245,42 +280,41 @@ export function* extractReplayDriverTrajectories(
 
         slicesFound++;
         lastSTime = sTime;
-        let eventSp = sp + 6;
+        let eventSp: number = sp + 6;
         for (let e = 0; e < nEvents; e++) {
           const h = buf.readUInt32LE(eventSp);
           const sz = (h >>> 8) & 0x1ff;
           const drv = h & 0xff;
-          // Bit 29 only flags a race replay: practice / qualifying send the same packets with it clear.
-          const evClass = (h >>> 30);
-          const rawClass = (h >>> 29);
-          const evType = (h >>> 17) & 0x3f;
+          const op = (h >>> 17) & 0x1ff;
+          const p = eventSp + 5;
+          // The byte after the header is the event's time offset in its slice, n / 4000 s (§3.2).
+          const at = sTime + buf[eventSp + 4] / 4000;
+          const timeSec = Number(at.toFixed(4));
 
           // Only the chosen driver's pose and channel state feed its trajectories.
           // Scoring, weather, contacts and other replay-wide events remain unfiltered.
           if ((requestedSlots ? !requestedSlots.has(drv) : targetSlot !== undefined && drv !== targetSlot) && (
-            (sz === 65 && evType >= 7 && evType <= 15)
-            || (evType === 15 && (sz === 24 || sz === 37))
-            || (evClass === 0 && evType === 51 && sz === 3)
-            || (evClass === 0 && evType === 16 && sz === 4)
+            isPose(op, sz)
+            || op === OP_CAR_VISUAL_STATE
+            || op === OP_VIRTUAL_ENERGY
+            || op === OP_TYRE_COMPOUNDS
           )) {
             eventSp += 4 + 1 + sz;
             continue;
           }
 
-          if (sz === 65 && evType >= 7 && evType <= 15) {
-            const latestWheel = driverWheelTelemetry.get(drv);
+          if (isPose(op, sz)) {
             const state = {
-              wheelSpeeds: latestWheel?.wheelSpeeds,
-              brakeTemps: latestWheel?.brakeTemps,
+              ...driverWheelTelemetry.get(drv),
               virtualEnergy: driverVirtualEnergy.get(drv),
               rainIntensity: currentRainIntensity,
               ambientTemp: currentAmbientTemp,
               tireCompoundIndices: driverTireCompounds.get(drv),
             };
             if (samples) {
-              samples.append(drv, sTime, evType, buf, eventSp + 5, state);
+              samples.append(drv, sTime, op, buf, p, state);
             } else {
-              const point = decodeReplayPose(buf, eventSp + 5, sTime, evType, state);
+              const point = decodeReplayPose(buf, p, sTime, op, state);
               if (point && targetSlot !== undefined) rawPts.push(point);
               else if (point) {
                 let points = driverPoints.get(drv);
@@ -288,23 +322,22 @@ export function* extractReplayDriverTrajectories(
                 points.push(point);
               }
             }
-          } else if (evClass === 3 && evType === 6 &&
-                     (sz === 18 || sz === 21) && eventSp + 5 + 9 <= activeLen) {
-            const splitSec = buf.readFloatLE(eventSp + 5);
-            const sec = buf[eventSp + 5 + 8] & 3;
-            const lapIdx = buf[eventSp + 5 + 8] >> 2;
-            vcrTimingEvents.push({ sTime, drv, splitSec, sector: sec, lapIdx });
-          } else if (evClass === 3 && ((evType === 5 && sz >= 2) || (evType === 7 && sz === 1)) && eventSp + 5 + sz <= activeLen) {
-            // Type 5 issued: +0 penalty type, +1 seconds / 2, reason text from +2. Type 7 served: +0 type.
+          } else if (op === OP_TIMING && (sz === 18 || sz === 21)) {
+            const splitSec = buf.readFloatLE(p);
+            const sec = buf[p + 8] & 3;
+            const lapIdx = buf[p + 8] >> 2;
+            vcrTimingEvents.push({ sTime: at, drv, splitSec, sector: sec, lapIdx });
+          } else if ((op === OP_PENALTY_GIVEN && sz >= 2) || (op === OP_PENALTY_SERVED && sz === 1)) {
+            // Issued: +0 penalty type, +1 seconds / 2, reason text from +2. Served: +0 type.
             // Penalties handed out in a burst at the start and disqualifications are not in the replay.
-            const pType = PENALTY_TYPE_NAMES[buf[eventSp + 5]] ?? `Type ${buf[eventSp + 5]}`;
-            if (evType === 5) {
-              const pSeconds = buf[eventSp + 5 + 1] * 2;
-              const pText = buf.subarray(eventSp + 5 + 2, eventSp + 5 + sz).toString('utf8').replace(/\0.*$/, '').trim();
+            const pType = PENALTY_TYPE_NAMES[buf[p]] ?? `Type ${buf[p]}`;
+            if (op === OP_PENALTY_GIVEN) {
+              const pSeconds = buf[p + 1] * 2;
+              const pText = buf.subarray(p + 2, p + sz).toString('utf8').replace(/\0.*$/, '').trim();
               replayPenalties.push({
                 driverSlot: drv,
                 driverName: driverNameMap.get(drv),
-                timeSec: Number(sTime.toFixed(4)),
+                timeSec,
                 penaltyText: pText || 'Penalty',
                 penaltyType: pType,
                 penaltySeconds: pSeconds > 0 ? pSeconds : undefined,
@@ -314,43 +347,27 @@ export function* extractReplayDriverTrajectories(
               replayPenalties.push({
                 driverSlot: drv,
                 driverName: driverNameMap.get(drv),
-                timeSec: Number(sTime.toFixed(4)),
+                timeSec,
                 penaltyText: `Served ${pType}`,
                 penaltyType: pType,
                 action: 'served',
               });
             }
-          } else if (evClass === 1 && evType === 10 && sz === 3 && eventSp + 5 + sz <= activeLen) {
-            const FLAG_NAMES: Record<number, string> = {
-              0: 'Green', 1: 'Local Yellow', 2: 'Double Yellow', 3: 'Full Course Yellow',
-              4: 'Safety Car', 5: 'Safety Car In This Lap', 6: 'Virtual Safety Car', 7: 'Red', 8: 'Checkered',
-            };
-            const flagState = buf[eventSp + 5];
-            const sectorMask = buf[eventSp + 5 + 1];
-            const driverFlag = buf[eventSp + 5 + 2];
-            replayFlagEvents.push({
-              timeSec: Number(sTime.toFixed(4)),
-              flagState,
-              flagName: FLAG_NAMES[flagState] || `Unknown (${flagState})`,
-              sectorMask,
-              driverSlot: drv,
-              driverFlag,
-            });
-          } else if (evType === 48 && evClass === 3 && sz >= 22 && eventSp + 5 + sz <= activeLen) {
-            const count = buf[eventSp + 5];
+          } else if (op === OP_STANDINGS && sz >= 22) {
+            const count = buf[p];
             if (count > 0 && 21 + count <= sz) {
               const order: number[] = [];
               for (let i = 0; i < count; i++) {
-                order.push(buf[eventSp + 5 + 21 + i]);
+                order.push(buf[p + 21 + i]);
               }
-              standingsHistory.push({ timeSec: Number(sTime.toFixed(4)), order });
+              standingsHistory.push({ timeSec, order });
             }
-          } else if (evClass === 0 && evType === 10 && sz === 80 && eventSp + 5 + 78 <= activeLen) {
-            const rawTemp = buf[eventSp + 5 + 38];
+          } else if (op === OP_WEATHER && sz === 80) {
+            const rawTemp = buf[p + 38];
             const ambientTempC = Number((rawTemp / 8 + 5.9).toFixed(1));
             let maxRainChannel = 0;
             for (let ch = 42; ch < 78; ch += 4) {
-              const r = buf[eventSp + 5 + ch];
+              const r = buf[p + ch];
               if (r > maxRainChannel) maxRainChannel = r;
             }
             currentAmbientTemp = ambientTempC;
@@ -359,107 +376,50 @@ export function* extractReplayDriverTrajectories(
               maxSessionRain = maxRainChannel;
             }
             replayWeatherEvents.push({
-              timeSec: Number(sTime.toFixed(4)),
+              timeSec,
               ambientTemp: ambientTempC,
               rainIntensity: maxRainChannel,
               rainPercent: Math.round((maxRainChannel / 255) * 100),
             });
-          } else if (evClass === 0 && evType === 16 && sz === 4 && eventSp + 5 + 4 <= activeLen) {
-            driverTireCompounds.set(drv, [
-              buf[eventSp + 5],
-              buf[eventSp + 5 + 1],
-              buf[eventSp + 5 + 2],
-              buf[eventSp + 5 + 3],
-            ]);
-          } else if (evClass === 0 && evType === 17 && sz === 33 && eventSp + 5 + 33 <= activeLen) {
-            const impactMagnitude = buf.readFloatLE(eventSp + 5 + 8);
-            const otherParty = buf[eventSp + 5 + 32];
+          } else if (op === OP_TYRE_COMPOUNDS && sz === 4) {
+            driverTireCompounds.set(drv, [buf[p], buf[p + 1], buf[p + 2], buf[p + 3]]);
+          } else if (op === OP_CONTACT && sz === 33) {
+            const impactMagnitude = buf.readFloatLE(p + 8);
+            const otherParty = buf[p + 32];
             const otherPartyName = CONTACT_OBJECT_NAMES[otherParty] ?? driverNameMap.get(otherParty);
             replayContacts.push({
               driverSlot: drv,
               driverName: driverNameMap.get(drv),
-              timeSec: Number(sTime.toFixed(4)),
+              timeSec,
               impactMagnitude: Number(impactMagnitude.toFixed(2)),
               otherParty,
               otherPartyName,
             });
-          } else if (((evType === 2 && evClass === 0) && sz >= 1 && sz <= 16 && eventSp + 5 + sz <= activeLen) ||
-                     (evType === 49 && (rawClass === 2 || rawClass === 7) && sz === 1 && eventSp + 5 + sz <= activeLen)) {
-            const pCode = buf[eventSp + 5];
-            const drvName = driverNameMap.get(drv);
-            const PIT_CODE_MAP: Record<number, { action: string; isGarage?: boolean }> = {
-              16: { action: 'exited garage', isGarage: true },
-              18: { action: 'stopped in pit stall', isGarage: false },
-              20: { action: 'service started', isGarage: false },
-              21: { action: 'returned to garage', isGarage: true },
-              32: { action: 'exited pit lane', isGarage: false },
-              33: { action: 'requested pit', isGarage: false },
-              34: { action: 'entered pit lane', isGarage: false },
-              35: { action: 'on jacks', isGarage: false },
-              36: { action: 'on jacks', isGarage: false },
-              37: { action: 'service complete', isGarage: false },
-            };
-
-            if (evType === 49) {
-              if (pCode === 3) {
-                replayPitEvents.push({
-                  driverSlot: drv,
-                  driverName: drvName,
-                  timeSec: Number(sTime.toFixed(4)),
-                  code: 49,
-                  action: 'entered pit / garage',
-                  isGarage: true,
-                });
-              }
-            } else {
-              const pitCodeEntry = PIT_CODE_MAP[pCode];
-              if (pitCodeEntry) {
-                let details: string | undefined;
-                let fuelAddedLiters: number | undefined;
-                if (pCode === 37 && sz >= 6) {
-                  const candidateFuel = buf.readFloatLE(eventSp + 5 + 2);
-                  if (isFinite(candidateFuel) && candidateFuel > 0 && candidateFuel < 150) {
-                    details = `Fuel: ${candidateFuel.toFixed(1)}L`;
-                    fuelAddedLiters = Number(candidateFuel.toFixed(1));
-                  }
-                }
-                replayPitEvents.push({
-                  driverSlot: drv,
-                  driverName: drvName,
-                  timeSec: Number(sTime.toFixed(4)),
-                  code: pCode,
-                  action: pitCodeEntry.action,
-                  isGarage: pitCodeEntry.isGarage,
-                  details,
-                  fuelAddedLiters,
-                });
-              } else {
-                replayPitEvents.push({
-                  driverSlot: drv,
-                  driverName: drvName,
-                  timeSec: Number(sTime.toFixed(4)),
-                  code: pCode,
-                  action: `pit action ${pCode}`,
-                });
-              }
-            }
-          } else if (evType === 15 && (sz === 24 || sz === 37) && eventSp + 5 + 24 <= activeLen) {
-            const rawBrakeTemp = buf[eventSp + 5 + 23];
-            const brakeTempC = Math.round(Math.max(20, (rawBrakeTemp - 51) * 5.86 + 29));
-            let wheelState = driverWheelTelemetry.get(drv);
-            if (!wheelState) {
-              wheelState = {};
-              driverWheelTelemetry.set(drv, wheelState);
-            }
-            wheelState.brakeTemps = [
-              brakeTempC,
-              brakeTempC,
-              Math.round(brakeTempC * 0.88),
-              Math.round(brakeTempC * 0.88),
-            ];
-          } else if (evClass === 0 && evType === 51 && sz === 3 && eventSp + 5 + sz <= activeLen) {
-            const b0 = buf[eventSp + 5];
-            const b1 = buf[eventSp + 5 + 1];
+          } else if (op === OP_PIT_STATE && (sz === 1 || sz === 6)) {
+            const code = buf[p];
+            const named = pitCodeAction(code);
+            replayPitEvents.push({
+              driverSlot: drv,
+              driverName: driverNameMap.get(drv),
+              timeSec,
+              code,
+              action: named?.action ?? `pit action ${code}`,
+              isGarage: named?.isGarage,
+            });
+          } else if (op === OP_CAR_STATUS && sz === 1 && buf[p] === CAR_STATUS_ENTERED_PIT) {
+            replayPitEvents.push({
+              driverSlot: drv,
+              driverName: driverNameMap.get(drv),
+              timeSec,
+              code: CAR_STATUS_PIT_CODE,
+              action: 'entered pit / garage',
+              isGarage: true,
+            });
+          } else if (op === OP_CAR_VISUAL_STATE && (sz === 24 || sz === 37)) {
+            driverWheelTelemetry.set(drv, carVisualState(buf, p));
+          } else if (op === OP_VIRTUAL_ENERGY && sz === 3) {
+            const b0 = buf[p];
+            const b1 = buf[p + 1];
             // Cars without a Virtual Energy system (e.g. GTE) send this packet as all zeros for the
             // whole session: a car only has VE once it has reported a non-zero value (VE starts full).
             if (b0 > 0 || (b1 === 0 && driverVirtualEnergy.has(drv))) {
@@ -506,7 +466,7 @@ export function* extractReplayDriverTrajectories(
         const context = {
           filename, driverSlot: targetSlot, driverName, timings: vcrTimingEvents,
           events: { penalties: replayPenalties, contacts: replayContacts, pitEvents: replayPitEvents,
-            flagEvents: replayFlagEvents, standingsHistory, weatherEvents: replayWeatherEvents },
+            standingsHistory, weatherEvents: replayWeatherEvents },
           maxSessionRain, currentAmbientTemp, tireCompounds: targetSlot !== undefined ? driverTireCompounds.get(targetSlot) : undefined,
         };
         const result = finalizeReplayDriver(samples ? samples.read(targetSlot) : rawPts, context, options, options.onLapResult);

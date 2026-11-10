@@ -210,7 +210,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
 
 1. **Decode pipeline** (`server/replay/decode/`):
    - `replayParser.ts`: reads header, driver index, and slice markers (`docs/VCR_FORMAT.md`).
-   - `replayTrajectory.ts` (`extractReplayTrajectory`, `extractReplayDriverTrajectories`): extracts trajectory points via `replayPose.ts` and `replayTrajectoryFinalizer.ts`.
+   - `replayTrajectory.ts` (`extractReplayTrajectory`, `extractReplayDriverTrajectories`): matches events by opcode (`docs/VCR_FORMAT.md` §3.3) and extracts trajectory points via `replayPose.ts` and `replayTrajectoryFinalizer.ts`; `replayPitCodes.ts` names the pit state codes.
    - `replayLapBuilder.ts` / `replayLapPoints.ts`: slices samples into discrete laps; `garageState.ts` handles pit and garage transitions.
    - Pit flag recovery: `replayLapClassification.ts`; clean replay lap validation: `isCleanReplayLap` (`shared/domain/lapComparison.ts`). Missed laps return `ReplayLapNotRecordedError` (404).
 2. **Worker ingestion**:

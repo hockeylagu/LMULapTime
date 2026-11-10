@@ -15,13 +15,19 @@ export interface RawTrajectoryPoint {
   absActive?: boolean;
   pitLimiter?: boolean;
   headlights?: boolean;
-  inPit?: boolean;
   gearRaw?: number;
   speedKmhRaw?: number;
-  detachablePartState?: number;
   engineRpm?: number;
-  wheelSpeeds?: [number, number, number, number];
+  /** Wheel angular speed, rad/s, negative when turning backwards (FL, FR, RL, RR). */
+  wheelAngularSpeeds?: [number, number, number, number];
+  /** Suspension deflection, metres (FL, FR, RL, RR). */
+  suspensionDeflections?: [number, number, number, number];
+  /** Brake temperatures, °C (FL, FR, RL, RR). */
   brakeTemps?: [number, number, number, number];
+  /** Vertical wheel load, N, in 1 kN steps (FL, FR, RL, RR). */
+  wheelLoads?: [number, number, number, number];
+  /** Tyre sliding speed over the road, m/s (FL, FR, RL, RR). */
+  tireSlideSpeeds?: [number, number, number, number];
   virtualEnergy?: number;
   rainIntensity?: number;
   ambientTemp?: number;
@@ -187,10 +193,10 @@ export function detectLapsFromTelemetry(
       }
 
       const isValid = ft.splitSec > 0;
-      const isOutLap = i === 0 || Boolean(rawPts[startIdx]?.pitLimiter || rawPts[startIdx]?.inPit)
+      const isOutLap = i === 0 || Boolean(rawPts[startIdx]?.pitLimiter)
         || isTimeInIntervals(startTime, pitIntervals);
       const isPitStop = targetPitEvents.some(event => event.code === 34 && event.timeSec >= startTime && event.timeSec < finishTime)
-        || rawPts.slice(startIdx, endIdx + 1).some(point => point.inPit || point.pitLimiter);
+        || rawPts.slice(startIdx, endIdx + 1).some(point => point.pitLimiter);
 
       detectedLaps.push({
         lapNumber,
@@ -267,7 +273,7 @@ export function detectLapsFromTelemetry(
           s3Sec,
           s1Idx,
           s2Idx,
-          isOutLap: Boolean(rawPts[lastStartIdx]?.pitLimiter || rawPts[lastStartIdx]?.inPit),
+          isOutLap: Boolean(rawPts[lastStartIdx]?.pitLimiter),
           isBest: false,
           isValid: false,
         });

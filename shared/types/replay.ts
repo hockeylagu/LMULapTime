@@ -113,7 +113,6 @@ export interface ReplayTrajectoryPoint {
   pitLimiter?: boolean;
   /** The car's headlights are lit, flashes included (a flash is a train of short toggles). */
   headlights?: boolean;
-  detachablePartState?: number;
   tireTemps?: [number, number, number, number];
   tireWear?: [number, number, number, number];
   tirePressures?: [number, number, number, number];
@@ -121,7 +120,16 @@ export interface ReplayTrajectoryPoint {
   rideHeight?: [number, number, number, number];
   /** Measured FL/FR/RL/RR linear tyre speeds in km/h. Finite zero is valid (including lockup). */
   wheelSpeeds?: [number, number, number, number];
+  /** FL/FR/RL/RR brake temperatures, °C. */
   brakeTemps?: [number, number, number, number];
+  /** Replay FL/FR/RL/RR wheel angular speed in rad/s, negative when the wheel turns backwards. */
+  wheelAngularSpeeds?: [number, number, number, number];
+  /** Replay FL/FR/RL/RR suspension deflection in metres. */
+  suspensionDeflections?: [number, number, number, number];
+  /** Replay FL/FR/RL/RR vertical wheel load in newtons (1 kN steps). */
+  wheelLoads?: [number, number, number, number];
+  /** Replay FL/FR/RL/RR tyre sliding speed over the road in m/s. */
+  tireSlideSpeeds?: [number, number, number, number];
   engineRpm?: number;
   distM?: number;
   stationM?: number;
@@ -200,17 +208,6 @@ export interface ReplayPitEvent {
   action: string;
   isGarage?: boolean;
   durationSec?: number;
-  details?: string;
-  fuelAddedLiters?: number;
-}
-
-export interface ReplayFlagEvent {
-  timeSec: number;
-  flagState: number;
-  flagName: string;
-  sectorMask?: number;
-  driverSlot?: number;
-  driverFlag?: number;
 }
 
 export interface ReplayWeatherEvent {
@@ -345,7 +342,6 @@ export interface ReplayTrajectoryData {
   contacts?: ReplayContactEvent[];
   pitEvents?: ReplayPitEvent[];
   sessionRunningOrder?: number[];
-  flagEvents?: ReplayFlagEvent[];
   weatherEvents?: ReplayWeatherEvent[];
   weatherCondition?: WeatherCondition;
   maxRainIntensity?: number;

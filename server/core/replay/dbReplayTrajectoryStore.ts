@@ -1,6 +1,6 @@
 import { Database as DatabaseType } from 'better-sqlite3';
 import { ReplayTrajectoryData } from '../../../shared/types/index.js';
-import { REPLAY_CACHE_VERSION, isCompatibleReplayCacheVersion } from '../dbCache.js';
+import { REPLAY_CACHE_VERSION } from '../dbCache.js';
 import {
   compressTrajectory,
   decompressTrajectory,
@@ -128,7 +128,7 @@ function selectResolvedRow(db: DatabaseType, filename: string, driverSlot: numbe
 function isRowValid(row: TrajectoryRow, mtimeMs: number, fileSizeBytes: number, filePath?: string): boolean {
   return row.file_mtime_ms === mtimeMs &&
     row.file_size_bytes === fileSizeBytes &&
-    isCompatibleReplayCacheVersion(row.parser_version) &&
+    row.parser_version === REPLAY_CACHE_VERSION &&
     (!filePath || !row.source_path || row.source_path === filePath);
 }
 

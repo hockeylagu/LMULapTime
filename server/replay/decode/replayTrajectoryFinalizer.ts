@@ -11,7 +11,7 @@ export interface ReplayFinalizeContext {
   driverSlot?: number;
   driverName?: string;
   timings: VcrTimingEvent[];
-  events: Pick<ReplayTrajectoryData, 'penalties' | 'contacts' | 'pitEvents' | 'flagEvents' | 'standingsHistory' | 'weatherEvents'>;
+  events: Pick<ReplayTrajectoryData, 'penalties' | 'contacts' | 'pitEvents' | 'standingsHistory' | 'weatherEvents'>;
   maxSessionRain: number;
   currentAmbientTemp?: number;
   tireCompounds?: [number, number, number, number];
@@ -23,7 +23,7 @@ export function finalizeReplayDriver(
 ): ReplayTrajectoryData | undefined {
   const { filename, driverSlot: targetSlot, driverName, timings: vcrTimingEvents, maxSessionRain, currentAmbientTemp } = context;
   const { penalties: replayPenalties = [], contacts: replayContacts = [], pitEvents: replayPitEvents = [],
-    flagEvents: replayFlagEvents = [], standingsHistory = [], weatherEvents: replayWeatherEvents = [] } = context.events;
+    standingsHistory = [], weatherEvents: replayWeatherEvents = [] } = context.events;
   const startTimeMs = Date.now();
   const tracker = new ReplayProgressTracker(0, options.onProgress, options);
   const maxPoints = options.maxPoints !== undefined ? options.maxPoints : 1200;
@@ -109,10 +109,9 @@ export function finalizeReplayDriver(
       penalties: replayPenalties.length > 0 ? replayPenalties : undefined,
       contacts: replayContacts.length > 0 ? replayContacts : undefined,
       pitEvents: replayPitEvents.length > 0 ? replayPitEvents : undefined,
-      flagEvents: replayFlagEvents.length > 0 ? replayFlagEvents : undefined,
       standingsHistory: standingsHistory.length > 0 ? standingsHistory : undefined,
       sessionRunningOrder: standingsHistory.length > 0 ? standingsHistory[standingsHistory.length - 1].order : undefined,
-      wheelTelemetryAvailable: Boolean(finalPoints.some(p => p.wheelSpeeds !== undefined || p.brakeTemps !== undefined)),
+      wheelTelemetryAvailable: Boolean(finalPoints.some(p => p.brakeTemps !== undefined)),
       energyTelemetryAvailable: Boolean(finalPoints.some(p => p.virtualEnergy !== undefined)),
       weatherEvents: replayWeatherEvents.length > 0 ? replayWeatherEvents : undefined,
       weatherCondition: replayWeatherCondition(maxSessionRain),

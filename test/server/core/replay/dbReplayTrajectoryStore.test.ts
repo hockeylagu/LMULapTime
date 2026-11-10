@@ -66,21 +66,13 @@ describe('dbReplayTrajectoryStore', () => {
   });
 
   describe('cache versions', () => {
-    it('keeps rows of a compatible version valid, so the replay is not decoded again', () => {
+    it('reads rows of the current version only', () => {
       upsertReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000, lap(4));
-      setVersion('v4');
-      expect(hasValidReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000)).toBe(true);
       expect(getReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000)?.currentLap).toBe(4);
 
-      setVersion('v3');
-      expect(hasValidReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000)).toBe(true);
-      expect(getReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000)?.currentLap).toBe(4);
-    });
-
-    it('treats rows of an unknown version as stale', () => {
-      upsertReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000, lap(4));
-      setVersion('v2');
+      setVersion('v8');
       expect(hasValidReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000)).toBe(false);
+      expect(getReplayTrajectoryCache(db, 'Spa_R1.Vcr', 3, 4, 1000, 5000)).toBeNull();
     });
 
     it('writes the current version', () => {

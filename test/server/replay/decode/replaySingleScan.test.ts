@@ -37,7 +37,7 @@ describe('single replay stream traversal', () => {
         slices.push({ sTime: time, driverSlot: slot, x: time * 40, y: slot, z: slot * 10,
           timing: finish ? { sector: 0, lapIdx: time / 90 - 1, splitSec: 90 } : undefined,
           weather: time === 200 ? { ambientTemp: 19, rainIntensity: 40 } : undefined,
-          rawEvents: time === 150 || time === 195 ? [{ evClass: 0, evType: 2, slot, payload: Buffer.from([time === 150 ? 34 : 32]) }] : undefined,
+          rawEvents: time === 150 || time === 195 ? [{ opcode: 322, slot, payload: Buffer.from([time === 150 ? 34 : 32]) }] : undefined,
         });
       }
     }

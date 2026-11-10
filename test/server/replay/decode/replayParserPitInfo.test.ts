@@ -101,50 +101,72 @@ describe('replayParser - pit info', () => {
       expect(sampleBrake[0]).toBeLessThanOrEqual(1000);
     });
 
-    it('decodes engine RPM from the 10-bit pose packet field (byte 6 bit 5 through byte 7 bit 6)', () => {
+    it('decodes engine speed (pose bits 50..63, rpm = n × 60 / 14π) and the 6-bit throttle (bits 43..48)', () => {
       fs.mkdirSync(tempDir, { recursive: true });
-      const rpmVcrPath = path.join(tempDir, 'synthetic_rpm.vcr');
-      // raw10 = round(rpm / 10.9228); 5000rpm -> raw 458, 8000rpm -> raw 733
-      const buf = createSliceVcrBuffer({
+      const vcrPath = path.join(tempDir, 'synthetic_rpm.vcr');
+      fs.writeFileSync(vcrPath, createSliceVcrBuffer({
         slices: [
-          { sTime: 1.0, driverSlot: 1, x: 10, y: 0, z: 10, rpmRaw10: 458 },
-          { sTime: 1.1, driverSlot: 1, x: 20, y: 0, z: 20, rpmRaw10: 733 },
-          // Saturated field (0x3ff) must be treated as unknown, not a real rpm value
-          { sTime: 1.2, driverSlot: 1, x: 30, y: 0, z: 30, rpmRaw10: 1023 },
+          { sTime: 1.0, driverSlot: 1, x: 10, y: 0, z: 10, engineSpeedRaw: 3665, throttle: 0 },
+          // n = 32: the top bit the old decoder dropped.
+          { sTime: 1.1, driverSlot: 1, x: 20, y: 0, z: 20, engineSpeedRaw: 12000, throttle: 50.8 },
+          { sTime: 1.2, driverSlot: 1, x: 30, y: 0, z: 30, engineSpeedRaw: 0x3fff, throttle: 100 },
         ],
-      });
-      fs.writeFileSync(rpmVcrPath, buf);
+      }));
 
-      const traj = extractReplayTrajectory(rpmVcrPath, { driverSlot: 1, maxPoints: 10 });
-      expect(traj.points.length).toBe(3);
-      expect(traj.points[0].engineRpm).toBeCloseTo(5002, -1);
-      expect(traj.points[1].engineRpm).toBeCloseTo(8006, -1);
-      expect(traj.points[2].engineRpm).toBeUndefined();
-
+      const traj = extractReplayTrajectory(vcrPath, { driverSlot: 1, maxPoints: 0 });
+      expect(traj.points.map(p => p.engineRpm)).toEqual([5000, 16370, 22349]);
+      expect(traj.points.map(p => p.throttle)).toEqual([0, 51, 100]);
     });
 
-    it('decodes track flag status events (Class 3 Type 10)', () => {
+    it('decodes the pose wheels (angular speed, suspension) and the opcode 143 brake temperatures, loads and slide speeds', () => {
       fs.mkdirSync(tempDir, { recursive: true });
-      const flagVcrPath = path.join(tempDir, 'synthetic_flags.vcr');
-      const buf = createSliceVcrBuffer({
+      const vcrPath = path.join(tempDir, 'synthetic_wheels.vcr');
+      const slow = (radPerSec: number) => (radPerSec * 16) << 13;
+      const fast = (radPerSec: number) => (255 << 13) | (radPerSec * 16);
+      fs.writeFileSync(vcrPath, createSliceVcrBuffer({
         slices: [
-          { sTime: 0.0, driverSlot: 1, x: 10, y: 0, z: 10, flag: { flagState: 1, sectorMask: 33, driverFlag: 0 } },
-          { sTime: 66.0, driverSlot: 1, x: 20, y: 0, z: 20, flag: { flagState: 0, sectorMask: 33, driverFlag: 0 } },
-          { sTime: 1400.0, driverSlot: 1, x: 30, y: 0, z: 30, flag: { flagState: 8, sectorMask: 1, driverFlag: 0 } },
+          {
+            sTime: 1.0, driverSlot: 1, x: 10, y: 0, z: 10,
+            wheel: { brakeTemps: [500, 480, 300, 290], loadSteps: [5, 5, 4, 3], slideSteps: [10, 0, 0, 63] },
+            poseWheels: [
+              { speed: slow(10), deflection: -41 },
+              { speed: slow(10) | (1 << 21), deflection: 0 },
+              { speed: fast(200), deflection: 100 },
+              { speed: fast(200) | (1 << 21), deflection: -8192 },
+            ],
+          },
+          { sTime: 1.1, driverSlot: 1, x: 20, y: 0, z: 20 },
         ],
-      });
-      fs.writeFileSync(flagVcrPath, buf);
+      }));
 
-      const traj = extractReplayTrajectory(flagVcrPath, { driverSlot: 1, maxPoints: 10 });
-      expect(traj.flagEvents).toBeDefined();
-      expect(traj.flagEvents?.length).toBe(3);
-      expect(traj.flagEvents?.[0]).toMatchObject({ flagState: 1, flagName: 'Local Yellow', sectorMask: 33 });
-      expect(traj.flagEvents?.[1]).toMatchObject({ flagState: 0, flagName: 'Green' });
-      expect(traj.flagEvents?.[2]).toMatchObject({ flagState: 8, flagName: 'Checkered' });
-
+      const [first, second] = extractReplayTrajectory(vcrPath, { driverSlot: 1, maxPoints: 0 }).points;
+      expect(first.wheelAngularSpeeds).toEqual([10, -10, 200, -200]);
+      expect(first.suspensionDeflections).toEqual([-41 / 2048, 0, 100 / 2048, -4]);
+      // 10-bit kelvin steps of 1.47 K: 480 °C comes back as 481.
+      expect(first.brakeTemps).toEqual([500, 481, 300, 290]);
+      expect(first.wheelLoads).toEqual([5000, 5000, 4000, 3000]);
+      expect(first.tireSlideSpeeds).toEqual([2.52, 0, 0, 100.0188]);
+      // Held until the car's next opcode 143.
+      expect(second.brakeTemps).toEqual(first.brakeTemps);
     });
 
-    it('decodes live standings snapshots (Type 48) into running-order history', () => {
+    it('times events by their slice time plus the header time offset (n / 4000 s)', () => {
+      fs.mkdirSync(tempDir, { recursive: true });
+      const vcrPath = path.join(tempDir, 'synthetic_offset.vcr');
+      const contact = Buffer.alloc(33);
+      contact.writeFloatLE(50, 8);
+      fs.writeFileSync(vcrPath, createSliceVcrBuffer({
+        slices: [
+          { sTime: 2.0, driverSlot: 1, x: 10, y: 0, z: 10, rawEvents: [{ opcode: 145, slot: 1, payload: contact, timeOffset: 40 }] },
+          { sTime: 2.02, driverSlot: 1, x: 20, y: 0, z: 20 },
+        ],
+      }));
+
+      const traj = extractReplayTrajectory(vcrPath, { driverSlot: 1, maxPoints: 0 });
+      expect(traj.contacts?.[0].timeSec).toBe(2.01);
+    });
+
+    it('decodes live standings snapshots (opcode 240) into running-order history', () => {
       fs.mkdirSync(tempDir, { recursive: true });
       const standingsVcrPath = path.join(tempDir, 'synthetic_standings.vcr');
       const buf = createSliceVcrBuffer({

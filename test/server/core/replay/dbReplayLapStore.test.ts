@@ -25,7 +25,6 @@ const decoded = (driverSlot: number, pitCode = 34): ReplayTrajectoryData => {
     points: [{ x: 0, y: 0, z: 0, timeSec: currentLap * 100 }, { x: 0, y: 0, z: 0, timeSec: currentLap * 100 + 99 }],
     laps: [1, 2].map(n => ({ lapNumber: n, lapTimeSec: 99, s1Sec: 33, s2Sec: 33, s3Sec: 33 })),
     weatherEvents: [{ timeSec: 0, rainIntensity: 0, ambientTemp: 20 }, { timeSec: 250, rainIntensity: 120, ambientTemp: 19 }],
-    flagEvents: [{ timeSec: 0, flagState: 0, flagName: 'Green', driverSlot: 255 }, { timeSec: 120, flagState: 3, flagName: 'FCY', driverSlot: 255 }],
     pitEvents: [{ driverSlot: 1, timeSec: 150, code: pitCode, action: 'Pit entry' }],
     standingsHistory: [{ timeSec: 0, order: [1, 2] }],
   });
@@ -50,7 +49,7 @@ describe('normalized replay facts store', () => {
 
       expect(getReplayLaps(raw, name).map(l => [l.driverSlot, l.lapNumber, l.startSec, l.endSec, l.lapTimeSec])).toEqual([[1, 1, 100, 199, 99], [1, 2, 200, 299, 99]]);
       expect(getReplayFactsVersion(raw, name)).toBe(REPLAY_CACHE_VERSION);
-      expect(getReplayConditions(raw, name).map(c => [c.startSec, c.endSec, c.rain, c.flagState])).toEqual([[0, 120, 0, 0], [120, 250, 0, 3], [250, 299, 120, 3]]);
+      expect(getReplayConditions(raw, name).map(c => [c.startSec, c.endSec, c.rain, c.ambientC])).toEqual([[0, 250, 0, 20], [250, 299, 120, 19]]);
       expect(getDriverEvents(raw, name).map(e => [e.kind, e.driverSlot, e.code])).toEqual([['pit', 1, 34]]);
       expect(getRunningOrder(raw, name)).toEqual([{ timeSec: 0, order: [1, 2] }]);
     });
@@ -81,8 +80,8 @@ describe('normalized replay facts store', () => {
     db.replaceReplayDriverLaps(name, 'C:\\r\\' + name, 1, 1, 1, decoded(1), true);
 
     expect(getLapConditions(db.getDb(), name)).toEqual([
-      { driverSlot: 1, lapNumber: 1, maxRain: 0, rainAtStart: 0, minAmbientC: 20, fullCourseYellow: true },
-      { driverSlot: 1, lapNumber: 2, maxRain: 120, rainAtStart: 0, minAmbientC: 19, fullCourseYellow: true },
+      { driverSlot: 1, lapNumber: 1, maxRain: 0, rainAtStart: 0, minAmbientC: 20 },
+      { driverSlot: 1, lapNumber: 2, maxRain: 120, rainAtStart: 0, minAmbientC: 19 },
     ]);
   });
 
@@ -90,7 +89,7 @@ describe('normalized replay facts store', () => {
     const raw = db.getDb();
     replaceReplayWideFacts(raw, name, {
       endSec: 10, sessionRunningOrder: null, runningOrder: [], driverEvents: [],
-      conditions: [{ startSec: 0, endSec: 10, rain: 5, ambientC: null, flagState: 0, sectorMask: null, driverFlag: null }],
+      conditions: [{ startSec: 0, endSec: 10, rain: 5, ambientC: null }],
     }, 'v7');
     replaceReplayDriverLapFacts(raw, name, 1, [emptyLapFact(1), emptyLapFact(2, { startSec: 20, endSec: 30 }), emptyLapFact(3, { startSec: 2, endSec: 4 })], 'v7');
 
@@ -118,6 +117,6 @@ describe('normalized replay facts store', () => {
     expect(getReplayFactsVersion(raw, name)).toBeNull();
     expect(getReplayLaps(raw, 'Archived.Vcr')).toHaveLength(2);
     expect(getDriverEvents(raw, 'Archived.Vcr')).toHaveLength(1);
-    expect(getReplayConditions(raw, 'Archived.Vcr')).toHaveLength(3);
+    expect(getReplayConditions(raw, 'Archived.Vcr')).toHaveLength(2);
   });
 });

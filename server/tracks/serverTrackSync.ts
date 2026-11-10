@@ -14,7 +14,8 @@ const POINT_ARRAY_CHANNELS: {
   [Key in keyof ReplayTrajectoryPoint as NonNullable<ReplayTrajectoryPoint[Key]> extends readonly unknown[] ? Key : never]-?: true
 } = {
   tireTemps: true, tireWear: true, tirePressures: true, rideHeight: true,
-  wheelSpeeds: true, brakeTemps: true, tireCompoundIndices: true,
+  wheelSpeeds: true, brakeTemps: true, wheelAngularSpeeds: true, suspensionDeflections: true,
+  wheelLoads: true, tireSlideSpeeds: true, tireCompoundIndices: true,
 };
 const pointArrayKeys = Object.keys(POINT_ARRAY_CHANNELS) as Array<keyof typeof POINT_ARRAY_CHANNELS>;
 

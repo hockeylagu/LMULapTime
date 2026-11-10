@@ -415,7 +415,7 @@ describe('replayParser - trajectory & timing', () => {
 
     });
 
-    it('sets inPit from info1 bit 17, not the status byte bit 7', () => {
+    it('sets inPit from the pit events only, never from pose bits', () => {
       const pitPath = path.join(tempDir, 'in_pit.vcr');
       const slices = [
         { sTime: 1.0, driverSlot: 1, x: 10, y: 0, z: 10, throttle: 40, brake: 0 },
@@ -423,7 +423,7 @@ describe('replayParser - trajectory & timing', () => {
       ];
       const buf = createSliceVcrBuffer({ slices });
 
-      // Set the unrelated status bit on the first packet; it must not imply pit lane.
+      // Status bit 7, part bit 17 and the pit lane bit 49 (byte 6 bit 1): none of them sets inPit.
       // Each slice structure: 6 (sTime+nEvents) + 4 (evHdr) + 1 (evPad) + 65 (evData) = 76 bytes
       // Stream starts at byte 57 of file, first 4 bytes are streamPrefix
       // Event data starts at: 57 + 4 + 6 + 4 + 1 = 72 for slice 0's evData
@@ -433,15 +433,15 @@ describe('replayParser - trajectory & timing', () => {
       const slice0EvDataStart = 57 + 4 + 6 + 4 + 1;
       const slice1EvDataStart = 57 + 4 + sliceSize + 6 + 4 + 1; // 57+4+76+6+4+1 = 148
       buf[slice0EvDataStart + 38] = 0x80;
-      // The authoritative pit-lane bit is info1 bit 17 at the payload start.
       buf.writeUInt32LE(1 << 17, slice1EvDataStart);
+      buf[slice1EvDataStart + 6] |= 0x02;
 
       fs.writeFileSync(pitPath, buf);
 
       const traj = extractReplayTrajectory(pitPath, { driverSlot: 1, maxPoints: 0 });
       expect(traj.pointsCount).toBe(2);
       expect(traj.points[0].inPit).toBeFalsy();
-      expect(traj.points[1].inPit).toBe(true);
+      expect(traj.points[1].inPit).toBeFalsy();
 
     });
   });

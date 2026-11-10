@@ -60,10 +60,10 @@ export function replaceReplayWideFacts(db: DatabaseType, filename: string, facts
   db.prepare('INSERT INTO replay_facts (filename, source_version, end_sec, session_running_order, updated_at) VALUES (?, ?, ?, ?, ?)')
     .run(filename, sourceVersion, facts.endSec, facts.sessionRunningOrder ? JSON.stringify(facts.sessionRunningOrder) : null, Date.now());
   const condition = db.prepare(`
-    INSERT INTO replay_conditions (filename, start_sec, end_sec, rain, ambient_c, flag_state, sector_mask, driver_flag)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO replay_conditions (filename, start_sec, end_sec, rain, ambient_c)
+    VALUES (?, ?, ?, ?, ?)
   `);
-  for (const c of facts.conditions) condition.run(filename, c.startSec, c.endSec, c.rain, c.ambientC, c.flagState, c.sectorMask, c.driverFlag);
+  for (const c of facts.conditions) condition.run(filename, c.startSec, c.endSec, c.rain, c.ambientC);
   const event = db.prepare(`
     INSERT INTO replay_driver_events (filename, kind, seq, driver_slot, time_sec, code, value, other_slot, detail)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -110,10 +110,10 @@ export function getReplayLaps(db: DatabaseType, filename: string, driverSlot?: n
 
 export function getReplayConditions(db: DatabaseType, filename: string): ReplayConditionFact[] {
   const rows = db.prepare('SELECT * FROM replay_conditions WHERE filename = ? ORDER BY start_sec').all(filename) as Array<{
-    start_sec: number; end_sec: number; rain: number | null; ambient_c: number | null; flag_state: number | null; sector_mask: number | null; driver_flag: number | null;
+    start_sec: number; end_sec: number; rain: number | null; ambient_c: number | null;
   }>;
   return rows.map(r => ({
-    startSec: r.start_sec, endSec: r.end_sec, rain: r.rain, ambientC: r.ambient_c, flagState: r.flag_state, sectorMask: r.sector_mask, driverFlag: r.driver_flag,
+    startSec: r.start_sec, endSec: r.end_sec, rain: r.rain, ambientC: r.ambient_c,
   }));
 }
 
@@ -123,17 +123,16 @@ export interface ReplayLapConditions {
   maxRain: number | null;
   rainAtStart: number | null;
   minAmbientC: number | null;
-  fullCourseYellow: boolean;
 }
 
 /** Each lap's conditions over its time span (the replay_lap_conditions view). */
 export function getLapConditions(db: DatabaseType, filename: string): ReplayLapConditions[] {
   const rows = db.prepare('SELECT * FROM replay_lap_conditions WHERE filename = ? ORDER BY driver_slot, lap_number').all(filename) as Array<{
-    driver_slot: number; lap_number: number; max_rain: number | null; rain_at_start: number | null; min_ambient_c: number | null; full_course_yellow: number;
+    driver_slot: number; lap_number: number; max_rain: number | null; rain_at_start: number | null; min_ambient_c: number | null;
   }>;
   return rows.map(r => ({
     driverSlot: r.driver_slot, lapNumber: r.lap_number, maxRain: r.max_rain, rainAtStart: r.rain_at_start,
-    minAmbientC: r.min_ambient_c, fullCourseYellow: r.full_course_yellow === 1,
+    minAmbientC: r.min_ambient_c,
   }));
 }
 

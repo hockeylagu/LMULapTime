@@ -35,8 +35,8 @@ describe('replay rain on the laps of a linked session', () => {
     replaceReplayWideFacts(rawDb(db), replayName, {
       endSec: 800, sessionRunningOrder: null, driverEvents: [], runningOrder: [],
       conditions: [
-        { startSec: 0, endSec: 400, rain: 5, ambientC: 25, flagState: null, sectorMask: null, driverFlag: null },
-        { startSec: 400, endSec: 800, rain: 18, ambientC: 24, flagState: null, sectorMask: null, driverFlag: null },
+        { startSec: 0, endSec: 400, rain: 5, ambientC: 25 },
+        { startSec: 400, endSec: 800, rain: 18, ambientC: 24 },
       ],
     }, 'v7');
   });
@@ -104,7 +104,7 @@ describe('replay rain on the laps of a linked session', () => {
     db.updateSessionMatchingReplay(session.id, { ...replayLink, name: 'Later.Vcr' });
     replaceReplayWideFacts(rawDb(db), 'Later.Vcr', {
       endSec: 800, sessionRunningOrder: null, driverEvents: [], runningOrder: [],
-      conditions: [{ startSec: 0, endSec: 800, rain: 20, ambientC: 24, flagState: null, sectorMask: null, driverFlag: null }],
+      conditions: [{ startSec: 0, endSec: 800, rain: 20, ambientC: 24 }],
     }, 'v7');
 
     db.reclassifyStoredSessions({ replayName: 'Later.Vcr' });

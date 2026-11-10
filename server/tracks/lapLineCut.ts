@@ -16,7 +16,7 @@ export const MAX_LINE_EXTRAPOLATION_M = 25;
 
 const ANGLE_FIELDS = new Set(['rotX', 'rotY', 'rotZ']);
 // Numeric channels that hold a state, not a measurement: never blended between two samples.
-const DISCRETE_FIELDS = new Set(['gear', 'detachablePartState']);
+const DISCRETE_FIELDS = new Set(['gear']);
 
 export interface LapLineCut {
   /** The lap from line to line, with stationM and lateralOffsetM set (distM is not). */

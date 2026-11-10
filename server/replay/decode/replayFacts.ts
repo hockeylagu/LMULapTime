@@ -1,5 +1,4 @@
 import {
-  ReplayFlagEvent,
   ReplayLapSummary,
   ReplayStandingsSnapshot,
   ReplayTrajectoryData,
@@ -9,7 +8,7 @@ import {
 
 // Turns a decoded trajectory into the rows of the normalized replay tables (dbSchema.ts): each
 // fact once, at its own level. Every lap blob of a replay holds the same replay-wide arrays (the
-// events of all drivers, the weather, the flags and the running order), so any one of them gives
+// events of all drivers, the weather and the running order), so any one of them gives
 // the replay's facts; the lap list belongs to the driver and the lap times to each lap's own row.
 
 export interface ReplayLapFact {
@@ -33,9 +32,6 @@ export interface ReplayConditionFact {
   endSec: number;
   rain: number | null;
   ambientC: number | null;
-  flagState: number | null;
-  sectorMask: number | null;
-  driverFlag: number | null;
 }
 
 export type ReplayDriverEventKind = 'pit' | 'contact' | 'penalty_given' | 'penalty_served';
@@ -137,23 +133,19 @@ export function lapSummariesFrom(facts: ReadonlyArray<ReplayLapFact>): ReplayLap
 type ConditionState = Omit<ReplayConditionFact, 'startSec' | 'endSec'>;
 
 const sameCondition = (a: ConditionState, b: ConditionState): boolean =>
-  a.rain === b.rain && a.ambientC === b.ambientC && a.flagState === b.flagState && a.sectorMask === b.sectorMask && a.driverFlag === b.driverFlag;
+  a.rain === b.rain && a.ambientC === b.ambientC;
 
 /**
- * The replay's conditions as one row per change of the weather or the flag packet, both of which
- * are broadcast every few seconds whether they changed or not. Of two packets at the same time,
+ * The replay's conditions as one row per change of the weather packet, which is broadcast every
+ * few seconds whether it changed or not. Of two packets at the same time,
  * the later one in the recording holds. The last row runs to `endSec`.
  */
-export function conditionsFrom(weather: ReadonlyArray<ReplayWeatherEvent>, flags: ReadonlyArray<ReplayFlagEvent>, endSec: number): ReplayConditionFact[] {
+export function conditionsFrom(weather: ReadonlyArray<ReplayWeatherEvent>, endSec: number): ReplayConditionFact[] {
   type Change = { timeSec: number; order: number; apply: (state: ConditionState) => void };
-  const changes: Change[] = [
-    ...weather.map((e, i): Change => ({ timeSec: e.timeSec, order: i, apply: (s) => { s.rain = e.rainIntensity; s.ambientC = orNull(e.ambientTemp); } })),
-    ...flags.map((e, i): Change => ({ timeSec: e.timeSec, order: weather.length + i, apply: (s) => {
-      s.flagState = e.flagState; s.sectorMask = orNull(e.sectorMask); s.driverFlag = orNull(e.driverFlag);
-    } })),
-  ].sort((a, b) => a.timeSec - b.timeSec || a.order - b.order);
+  const changes = weather.map((e, i): Change => ({ timeSec: e.timeSec, order: i, apply: (s) => { s.rain = e.rainIntensity; s.ambientC = orNull(e.ambientTemp); } }))
+    .sort((a, b) => a.timeSec - b.timeSec || a.order - b.order);
 
-  const state: ConditionState = { rain: null, ambientC: null, flagState: null, sectorMask: null, driverFlag: null };
+  const state: ConditionState = { rain: null, ambientC: null };
   const rows: ReplayConditionFact[] = [];
   for (const change of changes) {
     change.apply(state);
@@ -227,7 +219,6 @@ export function factsDriverSlot(driverSlotKey: number, trajectory: Pick<ReplayTr
 export function withoutReplayFacts(lap: ReplayTrajectoryData, factsSlot: number | null): ReplayTrajectoryData {
   const stripped: ReplayTrajectoryData = { ...lap };
   delete stripped.weatherEvents;
-  delete stripped.flagEvents;
   delete stripped.contacts;
   delete stripped.penalties;
   delete stripped.standingsHistory;
@@ -247,14 +238,14 @@ export function replayWideFactsFrom(trajectory: ReplayTrajectoryData, endSec = 0
   const times = [
     endSec,
     lapSpanFrom(trajectory.points ?? [])?.endSec ?? 0,
-    ...[trajectory.weatherEvents, trajectory.flagEvents, trajectory.standingsHistory, trajectory.pitEvents, trajectory.contacts, trajectory.penalties]
+    ...[trajectory.weatherEvents, trajectory.standingsHistory, trajectory.pitEvents, trajectory.contacts, trajectory.penalties]
       .map(events => (events && events.length > 0 ? Math.max(...events.map(e => e.timeSec)) : 0)),
   ];
   const end = Math.max(...times);
   return {
     endSec: end,
     sessionRunningOrder: trajectory.sessionRunningOrder ?? null,
-    conditions: conditionsFrom(trajectory.weatherEvents ?? [], trajectory.flagEvents ?? [], end),
+    conditions: conditionsFrom(trajectory.weatherEvents ?? [], end),
     driverEvents: driverEventsFrom(trajectory),
     runningOrder: runningOrderFrom(trajectory.standingsHistory ?? []),
   };
