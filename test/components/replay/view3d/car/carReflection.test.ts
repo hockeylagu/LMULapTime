@@ -28,7 +28,7 @@ function stubRenderer() {
   let target: unknown = null, face = 0;
   const renderer = {
     coordinateSystem: WebGLCoordinateSystem, shadowMap: {autoUpdate: true},
-    getRenderTarget: () => target,
+    getRenderTarget: () => target, initRenderTarget() {},
     setRenderTarget(next: unknown, activeFace = 0) { target = next; face = activeFace; },
     render(_scene: Scene, camera: PerspectiveCamera) {
       faces.push({face, carShown: cars.visible, shadowUpdate: renderer.shadowMap.autoUpdate, mips: (target as {texture: {generateMipmaps: boolean}}).texture.generateMipmaps});
@@ -57,7 +57,11 @@ it('renders the probe three faces a frame from the roof without the cars, then g
   const car = new Group().add(body);
   cars.add(car);
   const reflection = createCarReflection(renderer, new Scene(), testShading()), centre = new Vector3(10, 0.5, 20);
+  // The prefiltered target is converted once from the empty cube, and the car's lit materials take it at once: its size is a
+  // program define, so they compile a single time.
+  expect(pmrem.conversions).toBe(1);
   reflection.setCar(car, cars);
+  expect(glass.envMap).not.toBeNull(); expect(paintUniforms().paint_probe.value).toBe(0);
   for (let i = 0; i < 2; i++) expect(reflection.update(centre)).toBe(true);
   // The cube's mips regenerate after the last face only: the kernels read them.
   expect(faces).toEqual([0, 1, 2, 3, 4, 5].map(face => ({face, carShown: false, shadowUpdate: false, mips: face === 5})));
@@ -67,7 +71,7 @@ it('renders the probe three faces a frame from the roof without the cars, then g
   expect(cars.visible).toBe(true); expect(renderer.shadowMap.autoUpdate).toBe(true); expect(target()).toBeNull();
   // Only after the sixth face: an incomplete cube would reflect black. The paint takes the convolved cubes, the other lit
   // materials three's prefiltered one, the unlit nothing.
-  expect(pmrem.conversions).toBe(1); expect(pmrem.convolutions).toBe(1); expect(glass.envMap).not.toBeNull(); expect(unlit.envMap).toBeNull();
+  expect(pmrem.conversions).toBe(2); expect(pmrem.convolutions).toBe(1); expect(glass.envMap).not.toBeNull(); expect(unlit.envMap).toBeNull();
   expect(paint.envMap).toBeNull(); expect(paintUniforms().paint_probe.value).toBe(1); expect(paintUniforms().paint_levels.value).toBe(2);
   // The surface program's material reads the car's convolved cube in place of the venue's, even before the venue has one.
   expect(lampUniforms().surface_reflection.value).toEqual({kernels: testShading().convolution.kernels});
@@ -79,7 +83,7 @@ it('renders the probe three faces a frame from the roof without the cars, then g
   reflection.update(centre);
   expect(reflection.update(centre)).toBe(false);
   expect(reflection.update(new Vector3(11, 0.5, 20))).toBe(true);
-  expect(faces).toHaveLength(15); expect(pmrem.conversions).toBe(2); expect(pmrem.convolutions).toBe(2); expect(pmrem.reused).toBe(1); expect(pmrem.disposed).toBe(0);
+  expect(faces).toHaveLength(15); expect(pmrem.conversions).toBe(3); expect(pmrem.convolutions).toBe(2); expect(pmrem.reused).toBe(1); expect(pmrem.disposed).toBe(0);
 
   reflection.dispose();
   expect(glass.envMap).toBeNull(); expect(paintUniforms().paint_probe.value).toBe(0); expect(pmrem.disposed).toBe(1);

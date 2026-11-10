@@ -6,8 +6,7 @@ import { setPaintReflection } from './carPaint.js';
 
 /**
  * Face size and renewal, as the reference frames' reflections (2026-11-09): 1024 px a face, three faces a frame, so a probe
- * renews every two frames. The car programs compile once more than at the sky environment's 256 px (the prefiltered size is a
- * program define). How far each face sees: beyond 150 m the sky shows, the range the reference reflections reach. Each face
+ * renews every two frames. How far each face sees: beyond 150 m the sky shows, the range the reference reflections reach. Each face
  * draws its share of the scenery, so the reach is the probe's cost: at 1.5 km Silverstone's frames doubled (p50 7 → 14 ms,
  * production pass); at 300 m they matched the frame without the probe. Chosen before measuring the cost (user, 2026-11-09).
  */
@@ -18,7 +17,8 @@ const MOVED_M = 0.5;
 const EYE_ABOVE_CENTRE_M = 0.72;
 
 export interface CarReflection {
-  /** The car that takes the reflection: its materials sample the probe once the first one is complete. Hidden while faces render. */
+  /** The car that takes the reflection: its materials sample the probe, which is empty until the first one is complete (the scene
+   * completes it before the first frame). Hidden while faces render. */
   setCar(car: Object3D, hidden: Object3D): void;
   /** The resident scenery changed: render a new probe even if the car has not moved. */
   stale(): void;
@@ -66,15 +66,17 @@ function setSurfaceReflection(material: Material, cubes: ReflectionCubes | null)
 export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shading: SceneryShading): CarReflection {
   const target = new WebGLCubeRenderTarget(FACE_PX, {type: HalfFloatType, generateMipmaps: false, minFilter: LinearMipmapLinearFilter});
   const camera = new CubeCamera(NEAR_M, FAR_M, target);
-  // Compiled now, while the scene loads, so the first probe does not stall a frame.
-  const generator = new PMREMGenerator(renderer); generator.compileCubemapShader();
-  let materials: MeshStandardMaterial[] = [], hidden: Object3D | null = null, face = 0, stale = true, prefiltered: WebGLRenderTarget | null = null;
+  // The prefiltered target exists from the start, converted from the empty cube: its size is a program define, so a car's
+  // materials take it when the car is set and compile once, with the scene's warm-up, instead of again at the first probe.
+  const generator = new PMREMGenerator(renderer); renderer.initRenderTarget(target);
+  const prefiltered: WebGLRenderTarget = generator.fromCubemap(target.texture);
+  let materials: MeshStandardMaterial[] = [], hidden: Object3D | null = null, face = 0, stale = true;
   let cubes: ReflectionCubes | null = null, eyeAbove = EYE_ABOVE_CENTRE_M;
   const at = new Vector3(), probed = new Vector3(), box = new Box3(), measure = new Vector3();
-  const takeReflection = (texture: Texture) => {
+  const takeReflection = () => {
     for (const material of materials) {
       setSurfaceReflection(material, cubes);
-      if (!setPaintReflection(material, cubes) && material.envMap === null) material.envMap = texture;
+      if (!setPaintReflection(material, cubes) && material.envMap === null) material.envMap = prefiltered.texture;
     }
   };
   return {
@@ -89,12 +91,12 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
       // The eye sits over the car's bounding-box centre, wherever the car's origin is within it.
       car.updateWorldMatrix(true, true); box.setFromObject(car);
       eyeAbove = EYE_ABOVE_CENTRE_M + (box.isEmpty() ? 0 : box.getCenter(measure).y - car.getWorldPosition(measure).y);
-      if (prefiltered) takeReflection(prefiltered.texture);
+      takeReflection();
     },
     stale() { stale = true; },
     update(car) {
       if (face === 0) {
-        if (!stale && prefiltered && probed.distanceToSquared(car) < MOVED_M * MOVED_M) return false;
+        if (!stale && cubes && probed.distanceToSquared(car) < MOVED_M * MOVED_M) return false;
         at.copy(car); stale = false;
       }
       if (camera.coordinateSystem !== renderer.coordinateSystem) { camera.coordinateSystem = renderer.coordinateSystem; camera.updateCoordinateSystem(); }
@@ -115,18 +117,18 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
       face %= 6;
       if (face > 0) return true;
       probed.copy(at);
-      const first = !prefiltered;
-      prefiltered = generator.fromCubemap(target.texture, prefiltered);
+      const first = !cubes;
+      generator.fromCubemap(target.texture, prefiltered);
       cubes = convolveReflection(renderer, target, shading.convolution.kernels, cubes ?? undefined); // Reuses its cube after the first probe.
-      if (first) takeReflection(prefiltered.texture);
+      if (first) takeReflection();
       return true; // The next frame shows the new probe.
     },
     dispose() {
       for (const material of materials) {
         setSurfaceReflection(material, null);
-        if (!setPaintReflection(material, null) && material.envMap === prefiltered?.texture) material.envMap = null;
+        if (!setPaintReflection(material, null) && material.envMap === prefiltered.texture) material.envMap = null;
       }
-      target.dispose(); prefiltered?.dispose(); cubes?.dispose(); generator.dispose();
+      target.dispose(); prefiltered.dispose(); cubes?.dispose(); generator.dispose();
     },
   };
 }

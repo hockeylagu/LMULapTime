@@ -200,9 +200,9 @@ it("thickens the haze with the layout's haze scale and air pollution and colours
 it("captures the venue at the package's probe without the cars, twice, and lights the scene with the second capture", () => {
   const render = vi.fn<(scene: Scene, camera: Camera) => void>(), scene = new Scene(), renderer = {shadowMap: {enabled: false, type: 0, autoUpdate: true}, toneMapping: 0, toneMappingExposure: 0, ...fakeRenderer(), render} as unknown as WebGLRenderer;
   const car = new Mesh(new BoxGeometry(), new MeshBasicMaterial()); scene.add(car);
-  const seen: {at: number[]; car: boolean; lit: boolean}[] = [];
+  const seen: {at: number[]; car: boolean; lit: boolean; environment: Texture | null}[] = [];
   render.mockImplementation((_scene, camera) => {
-    if (camera.parent instanceof CubeCamera) seen.push({at: camera.parent.position.toArray(), car: car.visible, lit: scene.environment !== null});
+    if (camera.parent instanceof CubeCamera) seen.push({at: camera.parent.position.toArray(), car: car.visible, lit: scene.environmentIntensity > 0, environment: scene.environment});
   });
   const environment = addSceneEnvironment(scene, renderer, venue(undefined, [110, 7, -40]), new Vector3(100, 5, 20));
   environment.setDynamic([car]);
@@ -213,6 +213,8 @@ it("captures the venue at the package's probe without the cars, twice, and light
     // LMU local (110, 7, -40) against the origin (100, 5, 20): scene x right, y up, z mirrored.
     expect(seen.every(face => face.at.join() === '10,2,60' && !face.car)).toBe(true);
     expect(seen.slice(0, 6).every(face => !face.lit) && seen.slice(6).every(face => face.lit)).toBe(true);
+    // The sun-only pass keeps the first environment bound (at zero intensity), so no material needs a second program.
+    expect(seen.slice(0, 6).every(face => face.environment === first)).toBe(true); expect(scene.environmentIntensity).toBe(1);
     expect(car.visible).toBe(true); expect(scene.environment).not.toBe(first); expect(scene.environment).toBeInstanceOf(Texture);
   } finally { environment.dispose(); }
   expect(scene.environment).toBeNull();

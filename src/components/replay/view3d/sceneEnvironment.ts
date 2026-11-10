@@ -124,8 +124,8 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
   const reflectedGround = new Mesh(new PlaneGeometry(24000, 24000), new MeshBasicMaterial({color: sunRgb.clone().multiplyScalar(groundRadiance), side: DoubleSide}));
   reflectedGround.rotation.x = -Math.PI / 2; reflectedGround.position.y = ENVIRONMENT_GROUND_Y;
   environmentScene.add(environmentSky, reflectedGround);
-  const generator = new PMREMGenerator(renderer), firstEnvironment = generator.fromScene(environmentScene, 0, 0.1, SKY_RADIUS_M, {size: 256});
-  generator.dispose();
+  // One generator for this environment and the venue's captures: a new one links its prefilter programs again.
+  const generator = new PMREMGenerator(renderer), firstEnvironment = generator.fromScene(environmentScene, 0, 0.1, SKY_RADIUS_M, {size: VENUE_PROBE_PX});
   scene.environment = firstEnvironment.texture;
   let venueProbe: WebGLRenderTarget | null = null, venueCube: WebGLCubeRenderTarget | null = null, reflection: ReflectionCubes | null = null;
   const integration = integrationTexture(venue.shading.integrationMap);
@@ -164,18 +164,20 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
       const cube = new WebGLCubeRenderTarget(VENUE_PROBE_PX, {type: HalfFloatType, generateMipmaps: true, minFilter: LinearMipmapLinearFilter}), camera = new CubeCamera(0.5, VENUE_PROBE_FAR_M, cube);
       if (camera.coordinateSystem !== renderer.coordinateSystem) { camera.coordinateSystem = renderer.coordinateSystem; camera.updateCoordinateSystem(); }
       camera.position.copy(probeAt); camera.updateMatrixWorld();
-      const shown = dynamic.map(object => object.visible), autoShadow = renderer.shadowMap.autoUpdate, prefilter = new PMREMGenerator(renderer);
+      const shown = dynamic.map(object => object.visible), autoShadow = renderer.shadowMap.autoUpdate;
       try {
         dynamic.forEach(object => { object.visible = false; }); renderer.shadowMap.autoUpdate = false;
         // Before the first frame the sun has no shadow map yet: WebGL drops every draw whose shadow sampler has none, so the
         // capture draws it once (its window has not moved to the view yet; the probe sees only its edge).
         if (!sun.shadow.map) renderer.shadowMap.needsUpdate = true;
-        // The first capture is lit by the sun alone; the second adds the light of the first.
-        scene.environment = null;
+        // The first capture is lit by the sun alone; the second adds the light of the first. The environment stays set at zero
+        // intensity, and the first environment has the probe's size: an unset or differently sized one is another program variant
+        // of every material, compiled on the main thread here instead of by the warm-up.
+        scene.environmentIntensity = 0;
         for (let pass = 0; pass < 2; pass++) {
           camera.update(renderer, scene);
-          const next = prefilter.fromCubemap(cube.texture);
-          scene.environment = next.texture; venueProbe?.dispose(); venueProbe = next;
+          const next = generator.fromCubemap(cube.texture);
+          scene.environment = next.texture; scene.environmentIntensity = 1; venueProbe?.dispose(); venueProbe = next;
         }
         reflection?.dispose(); venueCube?.dispose();
         reflection = convolveReflection(renderer, cube, venue.shading.convolution.kernels); venueCube = cube;
@@ -183,7 +185,6 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
       } finally {
         dynamic.forEach((object, i) => { object.visible = shown[i]; }); renderer.shadowMap.autoUpdate = autoShadow;
         if (venueCube !== cube) cube.dispose();
-        prefilter.dispose();
       }
     },
     reflection: () => reflection,
@@ -196,7 +197,7 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
     },
     dispose() {
       scene.remove(sun, sun.target); sun.dispose(); staticShadow.dispose();
-      scene.environment = null; firstEnvironment.dispose(); venueProbe?.dispose(); reflection?.dispose(); venueCube?.dispose();
+      scene.environment = null; generator.dispose(); firstEnvironment.dispose(); venueProbe?.dispose(); reflection?.dispose(); venueCube?.dispose();
       setSceneryReflection(venue.shading, null, integration); integration.dispose(); reflectedGround.geometry.dispose(); reflectedGround.material.dispose();
       sky.geometry.dispose(); sky.material.dispose();
     },

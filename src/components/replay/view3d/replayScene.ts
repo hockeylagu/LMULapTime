@@ -235,7 +235,7 @@ export async function createReplayScene(
     streamView = next; stream.update(next);
   };
   const eyeRotation = new Quaternion(), desiredEye = new Vector3(), correctedEye = new Vector3(), probeCentre = new Vector3(), shadowFocus = new Vector3();
-  let frameHook: ((frameTime: number) => void) | null = null;
+  let frameHook: ((frameTime: number) => void) | null = null, probed = false;
   const draw = (frameTime?: number) => {
     if (disposed) return;
     if (frameTime !== undefined) frameHook?.(frameTime);
@@ -262,6 +262,11 @@ export async function createReplayScene(
         camera.position.copy(desiredEye);
         camera.quaternion.copy(eyeRotation);
         camera.updateMatrixWorld();
+      // The first probe completes before the first frame that shows the car, whose materials read it from their first draw.
+      if (!probed && layer.primary.visible) {
+        probed = true; layer.primary.getWorldPosition(probeCentre);
+        for (let pass = 0; pass < 6 && reflection.update(probeCentre); pass++);
+      }
       }
     }
   };
