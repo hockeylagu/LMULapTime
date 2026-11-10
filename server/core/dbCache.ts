@@ -10,10 +10,12 @@ import zlib from 'zlib';
 // v9: events matched by opcode (docs/VCR_FORMAT.md §3), timed with their header offset; the full
 //     6-bit throttle, four brake temperatures, wheel angular speed, suspension deflection, wheel load
 //     and tyre slide speed; pit state names, no fuel; no detached part state or track lights as flags.
-// Stored rows hold what the app serves (garage state, ISO 8855 steering, Virtual
+// v10: measured longitudinal and lateral G, yaw rate and car-frame velocity from every pose (ISO 8855).
+//     Replays whose file is gone keep their v9 rows, relabelled v10.
+// Stored rows hold what the app serves (garage state, ISO 8855 steering and motion, Virtual
 // Energy, calibrated ambient): a rule change rewrites the rows offline instead of adding a
 // read-time adapter. The current storage contract is docs/REPLAY_CACHE_FORMAT.md.
-export const REPLAY_CACHE_VERSION = 'v9';
+export const REPLAY_CACHE_VERSION = 'v10';
 
 // v10: pedals and tyre wear are scaled to percent once per channel, not per sample (v9 turned a
 // pedal passing through 0-1 % into a 0-100 % spike).

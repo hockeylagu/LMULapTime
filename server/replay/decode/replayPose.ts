@@ -13,7 +13,8 @@ function signed(low: number, high: number): number {
   return value & 0x8000 ? value - 0x10000 : value;
 }
 
-function packetSpeed(payload: Buffer, offset: number): number | undefined {
+/** World-frame velocity (pose bits 64..103), m/s: x, y (vertical), z; undefined when all five bytes are zero. */
+function poseVelocity(payload: Buffer, offset: number): [number, number, number] | undefined {
   const b0 = payload[offset], b1 = payload[offset + 1], b2 = payload[offset + 2], b3 = payload[offset + 3], b4 = payload[offset + 4];
   if ((b0 | b1 | b2 | b3 | b4) === 0) return undefined;
   const high1 = (b1 & 0x20) ? (b1 & 0x3f) + 192 : b1 & 0x3f;
@@ -21,8 +22,32 @@ function packetSpeed(payload: Buffer, offset: number): number | undefined {
   const high2 = (b2 >> 6) + ((b3 & 1) << 2) + ((b3 & 2) ? 248 : 0);
   const low3 = ((b3 & 0xfc) >> 2) + ((b4 & 3) << 6);
   const high3 = (b4 & 0x80) ? (b4 >> 2) + 192 : b4 >> 2;
-  const speed = Math.hypot(3.6 * signed(b0, high1) / 32, 3.6 * signed(low2, high2) / 20, 3.6 * signed(low3, high3) / 32);
-  return isFinite(speed) ? speed : undefined;
+  return [signed(b0, high1) / 32, signed(low2, high2) / 20, signed(low3, high3) / 32];
+}
+
+const G = 9.80665;
+const signed12 = (value: number): number => (value << 20) >> 20;
+
+/**
+ * The pose's motion in ISO 8855 vehicle axes (x forward, y left; docs/VCR_FORMAT.md §4.1). Acceleration and velocity
+ * are recorded in the world frame; the car's forward is (−sin rotY, −cos rotY) and its left (cos rotY, −sin rotY) in
+ * world x, z. The game's yaw axis turns the other way, so the yaw rate is negated. Rounded below the recorded step:
+ * the recorded values come back exactly by rotating back with the stored rotY (docs/REPLAY_CACHE_FORMAT.md).
+ */
+function poseMotion(payload: Buffer, offset: number, rotY: number, velocity: [number, number, number] | undefined) {
+  const forwardX = -Math.sin(rotY), forwardZ = -Math.cos(rotY);
+  const leftX = Math.cos(rotY), leftZ = -Math.sin(rotY);
+  const accelX = signed12(payload.readUInt16LE(offset + 34) >> 4) / 32;
+  const accelZ = signed12(payload[offset + 3] | ((payload[offset + 34] & 15) << 8)) / 32;
+  const yawField = payload.readUInt16LE(offset + 14) & 0x1ff;
+  const angularVelocityY = (yawField >= 256 ? yawField - 512 : yawField) / 64;
+  return {
+    accelLonG: roundFixed((accelX * forwardX + accelZ * forwardZ) / G, 3) + 0,
+    accelLatG: roundFixed((accelX * leftX + accelZ * leftZ) / G, 3) + 0,
+    yawRateDeg: roundFixed((-angularVelocityY * 180) / Math.PI, 2) + 0,
+    velocityLon: velocity ? roundFixed(velocity[0] * forwardX + velocity[2] * forwardZ, 3) + 0 : undefined,
+    velocityLat: velocity ? roundFixed(velocity[0] * leftX + velocity[2] * leftZ, 3) + 0 : undefined,
+  };
 }
 
 /**
@@ -53,16 +78,20 @@ export function decodeReplayPose(payload: Buffer, offset: number, sTime: number,
   const brake = payload[offset + 36], status = payload[offset + 38];
   const engineSpeed = payload.readUInt16LE(offset + 6) >> 2;
   const wheels = poseWheels(payload, offset);
+  const rotY = payload.readFloatLE(offset + 57);
+  const velocity = poseVelocity(payload, offset + 8);
+  const speed = velocity ? Math.hypot(velocity[0], velocity[1], velocity[2]) * 3.6 : undefined;
   return {
     sTime, x, y, z,
-    rotX: payload.readFloatLE(offset + 53), rotY: payload.readFloatLE(offset + 57), rotZ: payload.readFloatLE(offset + 61),
+    rotX: payload.readFloatLE(offset + 53), rotY, rotZ: payload.readFloatLE(offset + 61),
     steerYaw: roundFixed((512 - steer10) / 512, 4),
     rawThrottle: Math.round((throttle / 63) * 100),
     rawBrake: Math.min(100, Math.round(((brake & 0x3f) / 63) * 100)),
     tcActive: Boolean(brake & 0x80), absActive: Boolean(brake & 0x40), pitLimiter: Boolean(status & 0x04),
     headlights: Boolean(payload[offset + 2] & 0x10),
     gearRaw: opcode >= 7 && opcode <= 17 ? opcode - 8 : undefined,
-    speedKmhRaw: packetSpeed(payload, offset + 8),
+    speedKmhRaw: speed !== undefined && isFinite(speed) ? speed : undefined,
+    ...poseMotion(payload, offset, rotY, velocity),
     engineRpm: Math.round(engineSpeed * RPM_PER_UNIT),
     wheelAngularSpeeds: wheels.speeds,
     suspensionDeflections: wheels.deflections,

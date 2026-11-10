@@ -222,7 +222,7 @@ non-zero gear.
 | bit `21` | Car active in the session; clears once it retires or finishes |
 | bit `22` | **Rain light** on: the track's rain is above the car's own threshold, so cars switch on a few seconds apart; not tied to wet tyres |
 | bit `23` | Not written; holds leftover buffer content (it toggles on every car at once). Ignore it. |
-| byte `3` + bits `272..275` | **Acceleration z** (longitudinal): signed 12-bit, low 8 bits in byte 3, high 4 bits in the low nibble of byte 34; m/s² = `n / 32` (±63.97) |
+| byte `3` + bits `272..275` | **Acceleration z**, world frame like the velocity: signed 12-bit, low 8 bits in byte 3, high 4 bits in the low nibble of byte 34; m/s² = `n / 32` (±63.97) |
 | bits `32..41` | **Steering input**: `n = round(s × 511) + 512`, `s` = −1..1 of full lock. The app reads it as `(n − 512) / 512 × 270°`. |
 | bit `42` | A driving-aid flag, sent with the ABS and traction control flags; never set in the replays examined |
 | bits `43..48` | **Throttle**: `n / 63` |
@@ -235,7 +235,7 @@ non-zero gear.
 | bits `112..120` | **Angular velocity y** (yaw rate): signed 9-bit, rad/s = `n / 64` (±3.98) |
 | bits `121..127` | **Angular velocity x** (pitch): signed 7-bit, rad/s = `n / 64` (±0.98) |
 | bytes `16..31` + bytes `32..33` | **Wheels**, one UInt32LE per wheel at 16, 20, 24, 28 (front-left, front-right, rear-left, rear-right) plus one nibble per wheel of UInt16LE at 32 (wheel `w` in bits `4w..4w+3`); below |
-| byte `34` high nibble + byte `35` | **Acceleration x** (lateral): signed 12-bit = `UInt16LE(34) >> 4`; m/s² = `n / 32` |
+| byte `34` high nibble + byte `35` | **Acceleration x**, world frame: signed 12-bit = `UInt16LE(34) >> 4`; m/s² = `n / 32`. The car's own longitudinal and lateral acceleration come from x and z turned by the heading `rotY` (no vertical acceleration is recorded) |
 | byte `36` | bits `0..5`: **brake pedal** `n / 63`; bit 6: **ABS active**; bit 7: **traction control active** |
 | byte `37` | Hybrid cars: bits `0..1` **mode** (`0` off, `1` coast, `2` regen, `3` deploy), bits `2..4` **regen level** `n / 7` of the maximum, bits `5..7` not written, leftover buffer content (ignore). Other cars: the whole byte is an engine value `n / 255 × 21677`, `0` in every replay examined. |
 | byte `38` | bits `0..1`: **clutch** `n / 3`; bit 2: **pit limiter** on; bits 3, 4: **front / rear flap activated** (active aero; never set in the replays examined); bit 5: the car flag that makes the marshal posts just ahead of the car show flag `6` (§4.17; race sessions only); bit 6: **car not collidable** (in the garage at the start or end of a session; not set during a pit stop); bit 7: `0` |

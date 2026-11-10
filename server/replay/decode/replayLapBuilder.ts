@@ -17,6 +17,12 @@ export interface RawTrajectoryPoint {
   headlights?: boolean;
   gearRaw?: number;
   speedKmhRaw?: number;
+  /** Measured motion in ISO 8855 vehicle axes (replayPose.ts poseMotion). */
+  accelLonG?: number;
+  accelLatG?: number;
+  yawRateDeg?: number;
+  velocityLon?: number;
+  velocityLat?: number;
   engineRpm?: number;
   /** Wheel angular speed, rad/s, negative when turning backwards (FL, FR, RL, RR). */
   wheelAngularSpeeds?: [number, number, number, number];

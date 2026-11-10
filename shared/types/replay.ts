@@ -166,6 +166,10 @@ export interface ReplayTrajectoryPoint {
   liveDynamics?: LiveDynamicsProvenance;
   liveWheelSlip?: LiveWheelSlip;
   /** ISO sideslip beta in degrees: positive velocity left of the nose. */
+  /** Replay: measured velocity along the car's ISO x axis (forward), m/s. */
+  velocityLon?: number;
+  /** Replay: measured velocity along the car's ISO y axis (left), m/s. */
+  velocityLat?: number;
   slipAngleDeg?: number;
   understeerDeg?: number;
   tireSlipPct?: number;

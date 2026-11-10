@@ -72,10 +72,16 @@ the current reader does not reapply them based on parser age. A semantic change 
 retained rows are upgraded rather than silently introducing competing representations.
 
 Parser `v9` (2026-11-10) adds the per-wheel `wheelAngularSpeeds` (rad/s), `suspensionDeflections` (m),
-`wheelLoads` (N) and `tireSlideSpeeds` (m/s) and stores all four brake temperatures (°C). The app reads `v9`
-rows only. Replays whose VCR is gone were relabelled `v9` by the one-time migration, which rewrote their throttle
+`wheelLoads` (N) and `tireSlideSpeeds` (m/s) and stores all four brake temperatures (°C). Replays whose VCR is gone were
+relabelled `v9` by the one-time migration, which rewrote their throttle
 from the 5 bits older decoders kept (an estimate of the sixth) and removed the fields it could not rebuild (brake
 temperatures, detached part state, the v3 tyre and suspension guesses); they have no per-wheel channels.
+
+Parser `v10` (2026-11-10) adds every car's measured motion from the pose, turned to ISO 8855 vehicle axes in the
+decoder (`replayPose.ts`): `accelLonG` and `accelLatG` (G, 3 decimals), `yawRateDeg` (deg/s, positive left, 2 decimals),
+`velocityLon` and `velocityLat` (m/s, 3 decimals). With `rotY` at 4 decimals, turning them back gives every recorded
+pose code exactly, so a later format change can rebuild the file values from the rows. The app reads `v10` rows only;
+replays whose VCR is gone keep their `v9` content, relabelled `v10`, and have none of the five channels.
 
 `test/server/core/replay/lapColumnsCodec.test.ts` covers codec behavior; trajectory and traffic
 tests cover consumers. The [rejected-candidate summary](plans/proposed/REPLAY_STORAGE_DESIGN.md#prior-results) explains
