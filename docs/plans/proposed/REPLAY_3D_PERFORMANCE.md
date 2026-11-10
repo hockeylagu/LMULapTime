@@ -205,6 +205,37 @@ infield; at 3.6 km the spectator cards behind the catch fence (the see-through f
 only small far details. Parked by the user: a real gain, but the precompute adds 1.5–3 min per layout to the export, too slow
 for now. If taken up: fix the holes (thin and far objects, alpha-tested fences not occluding) and retest.
 
+### Load: every material compiled once, by the warm-up (2026-11-09)
+
+A load profile after the fidelity work (Silverstone, dev server, cold browser shader cache, busy machine): 37 s to the first
+frame, 24 s of it in three's first-use link check (`onFirstUse`), which blocks the main thread one program at a time. Files
+were done at ~3.7 s. The warm-up compiled every material in the background, but for an environment no frame used: the size
+of the prefiltered environment is a program define, and an unset environment is another variant.
+
+| Where the main thread waited on links | Before | After |
+|---|---|---|
+| Venue capture (no environment, then a 128 px one; warm-up had 256 px) | 17.9 s | ~0.7 s |
+| First frame and the frames after (the car's own 1024 px probe arrived on frame 2) | 5.3 s | ~0.1 s |
+| First frame, same run conditions | 37 s | 10–11 s |
+
+- The first environment is built at the venue probe's size, and the sun-only capture pass keeps it bound at zero intensity.
+- The car's prefiltered target exists from the start, so its materials compile once, with the scene's warm-up. The scene
+  completes the first probe before the first frame that shows the car (before, the car showed the venue for two frames).
+- The environment keeps one prefilter generator for its captures (a new one links its programs again).
+- What is left: ~0.5 s each for the two prefilter generators' programs (sky, car), while files download; and 10–160 ms the
+  first time a frame uses a chunk's program after its warm-up (three reads its logs and uniforms then). Not pursued.
+- Then three stages were overlapped: the first view's chunks and the car are requested before the sky and the car
+  reflection link their programs (a 1.2 s main-thread block); a chunk's ray tree builds from the parsed chunk, while its
+  textures download (it started at ~3.7 s instead of ~8.6 s); the scene and camera exist from the start, so each first-view
+  chunk compiles and uploads as it arrives (from ~6.5 s instead of ~10.6 s). The first frame moved by 1–2 s at most
+  (11–13 s), inside the run-to-run spread of a busy machine: owed a production suite on a quiet one.
+- What bounds the load now: the first view's ~180 textures (~290 MiB) take until ~6 s to arrive, and only then do its
+  materials exist to compile (~3 s of compile and upload for three chunks), so the two cannot overlap. Starting every
+  chunk's compile on arrival instead of in turn was tried and gave nothing measurable. Turning off three's shader error
+  check moved first-use time from the first frame to the venue capture, no net gain.
+- Method for this kind of stall: wrap `linkProgram` and `getProgramInfoLog` in an init script, record the shader name, the
+  time and the calling phase; two programs with the same body and different `#define` lines are one material compiled twice.
+
 ## The scene (from the package index)
 
 | | Typical | Worst |
