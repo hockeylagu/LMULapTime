@@ -1,10 +1,12 @@
 import { MeshoptDecoder } from 'meshoptimizer/decoder';
-import { BufferGeometry, Group, Mesh, type Material, type Object3D, type Texture, type Vector3 } from 'three';
+import { BufferGeometry, Group, Mesh, MeshBasicMaterial, PropertyBinding, type Material, type Object3D, type Texture, type Vector3 } from 'three';
+import type { CarLamp } from '../../../../../shared/types/scenes/car.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import { normalizeVehicleId, type LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import { createCarMaterial, materialTexturePaths } from '../car/carMaterials.js';
+import { createLampMaterial, unlitFrame } from '../car/carLamps.js';
 import { createContactShadow } from '../car/carContactShadow.js';
 import { MAP_COLORS, TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../../../utils/lapAlignment.js';
@@ -24,6 +26,28 @@ export interface LapCars {
 
 /** Loads a shared car texture by its `textures/<sha256>.ktx2.zst` path under the cars folder. */
 export type CarTextureLoader = (path: string) => Promise<Texture>;
+
+/**
+ * Gives a glow mesh its lamps' materials: each material slot a drawn lamp covers (one of the lamp's nodes is the mesh or holds it, and
+ * the slot is the lamp's GLB material) takes that lamp's material, the other slots draw nothing. False when no slot is drawn. A mesh of
+ * a lamp the player's own car leaves out in the cockpit is marked for the outside view only.
+ */
+function lightGlowMesh(mesh: Mesh<BufferGeometry, Material | Material[]>, drawn: CarLamp[], material: (lamp: CarLamp) => Material): boolean {
+  const unseen = new MeshBasicMaterial({ visible: false }), names = new Set<string>();
+  for (let at: Object3D | null = mesh; at; at = at.parent) names.add(at.name);
+  const covering = drawn.filter(lamp => lamp.nodes.some(name => names.has(PropertyBinding.sanitizeNodeName(name))));
+  let lit = false, hidden = false;
+  const slot = (current: Material) => {
+    const lamp = covering.find(row => row.material === current.name);
+    if (!lamp) return unseen;
+    lit = true; hidden ||= lamp.hiddenInOwnCockpit === true;
+    return material(lamp);
+  };
+  mesh.material = Array.isArray(mesh.material) ? mesh.material.map(slot) : slot(mesh.material);
+  mesh.castShadow = false; mesh.receiveShadow = false;
+  if (hidden) mesh.userData.cockpitView = 'out';
+  return lit;
+}
 
 /** Lap objects own their geometry; replacing them cannot release the track's GPU buffers. */
 export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeight, loadTexture: CarTextureLoader, display: () => DisplayTransform, shading: SceneryShading) {
@@ -60,8 +84,11 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
       if (!recipe) throw Error(`Car material ${material.name} has no descriptor recipe`);
       return recipe;
     };
-    // Glow-only materials (lamp glow meshes, brake disc glow) are not drawn while lamps are unlit.
+    // Glow materials (lamp glow meshes, brake disc glow) are drawn only through a lamp whose unlit frame is known.
     const glow = new Set(car.descriptor.glowMaterialIds);
+    const drawn = car.descriptor.lamps.filter(lamp => unlitFrame(lamp) !== null);
+    // The GLB loader drops `.`, `:`, `/`, `[` and `]` from node names; lamp nodes are the GLB's own names.
+    for (const lamp of drawn) for (const name of lamp.nodes) if (!template.getObjectByName(PropertyBinding.sanitizeNodeName(name))) throw Error(`Car ${car.vehicleId} has no lamp node ${name}`);
     const isGlow = (object: Object3D) => {
       if (!(object instanceof Mesh)) return false;
       const list: Material[] = Array.isArray(object.material) ? object.material as Material[] : [object.material as Material];
@@ -74,8 +101,9 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
         for (const path of materialTexturePaths(recipeOf(material), appearance)) paths.add(path);
       }
     });
+    for (const lamp of drawn) paths.add(unlitFrame(lamp)!);
     const textures = new Map(await Promise.all([...paths].map(async path => [path, await loadTexture(path)] as const)));
-    return {template, appearance, recipeOf, isGlow, textures, hiddenNames: new Set([...hidden].map(node => node.name))};
+    return {template, appearance, recipeOf, isGlow, drawn, textures, hiddenNames: new Set([...hidden].map(node => node.name))};
   };
   /** A livery's parsed model and loaded textures, shared by every instance of that car (and by `preload`). */
   const parts = new WeakMap<LoadedBody, ReturnType<typeof loadParts>>();
@@ -90,13 +118,18 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
   };
   /** A car instance of the lap's livery: the shared geometry with one material per native material, textures preloaded. */
   const loadModel = async (car: LoadedBody): Promise<Group> => {
-    const {template, appearance, recipeOf, isGlow, textures, hiddenNames} = await partsOf(car);
+    const {template, appearance, recipeOf, isGlow, drawn, textures, hiddenNames} = await partsOf(car);
     const model = template.clone(true), materials = new Map<string, Material>(), glowMeshes: Object3D[] = [];
     for (const name of hiddenNames) model.getObjectByName(name)?.removeFromParent();
     model.traverse(object => { if (isGlow(object)) glowMeshes.push(object); });
-    for (const mesh of glowMeshes) mesh.removeFromParent();
+    const lampMaterials = new Map<CarLamp, Material>();
+    for (const mesh of glowMeshes) if (!lightGlowMesh(mesh as Mesh<BufferGeometry, Material | Material[]>, drawn, lamp => {
+      let created = lampMaterials.get(lamp);
+      if (!created) { created = createLampMaterial(lamp, textures.get(unlitFrame(lamp)!)!); lampMaterials.set(lamp, created); }
+      return created;
+    })) mesh.removeFromParent();
     model.traverse(object => {
-      if (!(object instanceof Mesh)) return;
+      if (!(object instanceof Mesh) || glowMeshes.includes(object)) return;
       const replace = (material: Material) => {
         const recipe = recipeOf(material);
         let created = materials.get(recipe.id);

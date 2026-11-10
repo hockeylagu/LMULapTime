@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
-import { BoxGeometry, CubeCamera, DoubleSide, Group, Material, Mesh, MeshBasicMaterial, Texture, Vector3, type BufferGeometry, type Object3D, type PerspectiveCamera, OrthographicCamera, type Scene } from 'three';
+import { BoxGeometry, CubeCamera, DoubleSide, Group, Material, Mesh, MeshBasicMaterial, Texture, Vector3, type BufferGeometry, type Object3D, type PerspectiveCamera, OrthographicCamera, type Scene, type ShaderMaterial } from 'three';
 import { createReplayScene } from '../../../../../src/components/replay/view3d/replayScene.js';
 import { disposeObjects } from '../../../../../src/components/replay/view3d/laps/disposeObjects.js';
 import { EXPOSURE_PASS } from '../../../../../src/components/replay/view3d/autoExposure.js';
+import { SUN_UNIT } from '../../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import type { SceneryChunk, SceneryLayoutResource, ScenerySectorChunk } from '../../../../../shared/types/scenes/scenery.js';
 import type { LoadedBody } from '../../../../../src/api/vehicles/bodyApi.js';
@@ -64,8 +65,11 @@ vi.mock('three/addons/loaders/GLTFLoader.js', async () => {
         const material = new MeshBasicMaterial(), plate = new Mesh(new BoxGeometry(), material);
         material.userData.nativeMaterialId = 'm1'; plate.name = name; root.add(plate);
       }
-      const glowMaterial = new MeshBasicMaterial(), glow = new Mesh(new BoxGeometry(), glowMaterial);
-      glowMaterial.userData.nativeMaterialId = 'glow'; glow.name = 'lampGlow'; root.add(glow);
+      // A headlight glow (drawn with its unlit frame; its GLB node `lamp.Glow` loads as `lampGlow`), a brake glow (no texture for its frame) and a disc glow (no known frame): the last two left out.
+      for (const name of ['lampGlow', 'brakeGlow', 'discGlow']) {
+        const glowMaterial = new MeshBasicMaterial(), glow = new Mesh(new BoxGeometry(), glowMaterial);
+        glowMaterial.userData.nativeMaterialId = 'glow'; glowMaterial.name = `${name}Material`; glow.name = name; root.add(glow);
+      }
       return {scene: root};
     }
   }};
@@ -112,6 +116,17 @@ const layout = {
 const car = {
   resource: {}, bytes: new ArrayBuffer(0), vehicleId: 'veh',
   descriptor: {optionNodes: ['option_PlateA', 'option_PlateB'], appearances: [{alias: 'VEH', albedo: 'textures/a.ktx2', paint: testCarPaint('textures/a.ktx2'), optionNodes: ['option_PlateA']}], materials: [{id: 'm1', name: 'body', paint: true}, {id: 'glow', name: 'glow', paint: true}], glowMaterialIds: ['glow'],
+    lamps: [
+      {role: 'headlight', nodes: ['lamp.Glow'], material: 'lampGlowMaterial', frames: ['textures/off.ktx2', 'textures/on.ktx2'], animation: {method: null, rate: null, sequence: null},
+        emission: {scale: 500, vertexColour: false, viewBoost: {gain: 2, power: 64}, ambientScaled: false, vertexAlpha: false}, blend: 'alpha',
+        states: {off: 0, on: null, brake: null}, defaultLit: false, hiddenInOwnCockpit: true},
+      {role: 'brake', nodes: ['brakeGlow'], material: 'brakeGlowMaterial', frames: [null], animation: {method: null, rate: null, sequence: null},
+        emission: {scale: 500, vertexColour: false, viewBoost: null, ambientScaled: false, vertexAlpha: false}, blend: 'alpha',
+        states: {off: 0, on: null, brake: null}, defaultLit: false, hiddenInOwnCockpit: true},
+      {role: 'discGlow', nodes: ['discGlow'], material: 'discGlowMaterial', frames: ['textures/disc.ktx2'], animation: {method: null, rate: null, sequence: null},
+        emission: {scale: 10, vertexColour: false, viewBoost: null, ambientScaled: true, vertexAlpha: true}, blend: 'alpha',
+        states: null, defaultLit: false, hiddenInOwnCockpit: null, brakeGlowRange: [640, 950]},
+    ],
     cameras: {list: [
       {name: 'cockpit', position: [0.28, 1, -0.7], orientation: [-0.1, 0, 0], fov: [89, 49], clipPlanes: [0.13, 700], cockpitView: 'in'},
       {name: 'hood', position: [0.28, 0.9, -1.9], orientation: [0, 0, 0], fov: [80, 45], clipPlanes: [0.2, 800], cockpitView: 'out'},
@@ -224,8 +239,11 @@ it('retains scenery, canvas and camera settings, releases old laps, and draws th
   expect(oldBody.material.shadowSide).toBe(DoubleSide);
   // The entry's own option parts only: the other entries' alternatives are left out of its car.
   expect([oldCar.getObjectByName('option_PlateA'), oldCar.getObjectByName('option_PlateB')].map(Boolean)).toEqual([true, false]);
-  // Lamps are unlit: their glow-only meshes are left out.
-  expect(oldCar.getObjectByName('lampGlow')).toBeUndefined();
+  // A glow is drawn only through a lamp with a known unlit frame that has a texture, with that lamp's own material.
+  const headlight = oldCar.getObjectByName('lampGlow') as Mesh<BufferGeometry, ShaderMaterial>;
+  expect(headlight.material.name).toBe('lamp-lampGlowMaterial');
+  expect([headlight.material.uniforms.scale.value, headlight.castShadow, headlight.userData.cockpitView]).toEqual([500 * SUN_UNIT, false, 'out']);
+  expect([oldCar.getObjectByName('brakeGlow'), oldCar.getObjectByName('discGlow')]).toEqual([undefined, undefined]);
   const roadDispose = vi.spyOn(road.geometry, 'dispose'), carDispose = vi.spyOn(oldBody.geometry, 'dispose'), materialDispose = vi.spyOn(oldBody.material, 'dispose');
   handle.colorLines('speed'); handle.fadeLines(0.12, 1);
   const next = {...lap, points: lap.points.map(point => ({...point, x: point.x + 5}))};
@@ -286,8 +304,8 @@ it('puts the cockpit, hood and roof views on the game cameras of the car with th
   const handle = await createReplayScene(host, layout, lap, null, vi.fn(), assets);
   handle.cursor(0, 0); draw();
   const [scene, camera] = lastSceneRender();
-  const cockpit = scene.getObjectByName('cockpit-in')!;
-  expect(cockpit.visible).toBe(false);
+  const cockpit = scene.getObjectByName('cockpit-in')!, headlight = scene.getObjectByName('lampGlow')!;
+  expect([cockpit.visible, headlight.visible]).toEqual([false, true]);
 
   handle.mode('cockpit'); draw();
   const modelOffset = scene.getObjectByName('body-envelope')!.position;
@@ -297,7 +315,8 @@ it('puts the cockpit, hood and roof views on the game cameras of the car with th
   expect(camera.getWorldDirection(new Vector3()).y).toBeCloseTo(Math.sin(-0.1), 4);
   expect([(camera as PerspectiveCamera).fov, camera.near]).toEqual([49, 0.13]);
   handle.cursor(1, 0); draw();
-  expect(cockpit.visible).toBe(true);
+  // The own car leaves its headlight glow out in the cockpit view.
+  expect([cockpit.visible, headlight.visible]).toEqual([true, false]);
 
   // Driver eye position in cockpit mode: near car position + 0.28m lateral, +1.00m height
   const eye = camera.position.clone();

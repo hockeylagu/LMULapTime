@@ -225,10 +225,17 @@ sorted `optionNodes`, a subset of the body's (`[]` for none). The viewer keeps t
 options out of that body (no draw, no texture load) and fails if the GLB lacks a listed node. An option node may also carry
 `extras.cockpitView`; the cockpit view rule then applies to it as to any other node.
 
-Schema 7 adds the car lamps: the descriptor's required `lamps` list (roles, nodes, frames, animation, emission, blend; `states` and
-`defaultLit` null) and `glowMaterialIds`, the sorted native material ids drawn only while a lamp is lit (glow meshes and brake disc
-glow), each one the body's `materials` list. Lamps are drawn unlit for now: the viewer leaves out every mesh whose materials are all
-glow-only (no draw, no texture load) and draws the other lamp materials as it did before.
+Schema 7 adds the car lamps: the descriptor's required `lamps` list and `glowMaterialIds`, the sorted native material ids of the glow
+meshes and brake disc glow slots, each one in the body's `materials` list. Each lamp is checked: a known `role`, non-empty `nodes` (GLB
+node names; the loader drops `.`, `:`, `/`, `[` and `]` from them, so they are matched the same way), a `material`, `frames` that are
+texture paths or null (no texture shipped for that frame), an `animation` (all null, or a known method, a rate and frame indexes), an
+`emission` {`scale` ≥ 0, `vertexColour`, `viewBoost` null or {`gain`, `power` > 0}, `ambientScaled`, `vertexAlpha`}, a `blend` of `alpha`
+or `opaque`, `states` null or {`off`, `on`, `brake`} each a frame index or null, `defaultLit` and `hiddenInOwnCockpit` true, false or
+null, and `brakeGlowRange` [low, high] on a disc glow only. A glow mesh is drawn only through a lamp with a known `states.off` whose frame
+has a texture (headlight and brake glow): the slot that is the lamp's GLB `material`, under one of its `nodes`, renders that frame unlit
+with the emission formula (`car/carLamps.ts`, in the sun's light unit), casts no shadow, and is hidden on the lap's own car in the in-cockpit view when
+`hiddenInOwnCockpit`. Other glow slots and meshes are not drawn. No lamp switches on yet (no lit frame is known); the other lamp
+materials are drawn as ordinary materials.
 
 `GET /api/data-plugin/vehicles/:identity/body` (a VEH id with or without `.veh`) returns the body row plus `packageRevision`;
 `/vehicles/files/` serves the body GLB, descriptor and textures. The viewer selects the

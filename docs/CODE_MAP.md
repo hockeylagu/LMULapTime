@@ -320,7 +320,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   sky above the horizon toward the view), the first PMREM environment, the venue capture at the layout's
   `environmentProbe` that replaces it, and the car-following shadow sun. Cars come from the `cars` catalog: `car/carMaterials.ts` builds materials from the
   descriptor (surfaces in the app's names, version 4, every value filled: `finish` per material, paint `regions` / `uvScale`; `car/carPaint.ts`: regional car paint from the package's paint description; `car/carContactShadow.ts`: the under-car shadow;
-  `car/carReflection.ts`: the cube-map reflection probe at the car), `autoExposure.ts` meters, white-balances, tone-maps and encodes with the scenery catalog's `camera` type for the view (`cameraModes.tsx` `exposureType`), `wheelGeometry.ts` reads the four wheel rigs, `wheelAnimation.ts` fits the model origin to the lap median and drives
+  `car/carReflection.ts`: the cube-map reflection probe at the car; `car/carLamps.ts`: the unlit glow of headlight and brake lamps), `autoExposure.ts` meters, white-balances, tone-maps and encodes with the scenery catalog's `camera` type for the view (`cameraModes.tsx` `exposureType`), `wheelGeometry.ts` reads the four wheel rigs, `wheelAnimation.ts` fits the model origin to the lap median and drives
   roll/steer/travel per corner plus the steering wheel, `driverCameras.ts` places the Cockpit/Hood/Roof views on the descriptor's game
   cameras, and `sceneObjects.ts` places the car, switches the cockpit mesh variant and styles ghosts. Brake boards are part of the scenery GLBs.
   `racingLine.ts` drapes the 2D-coloured line ribbons and re-drapes them as chunks stream in; `tracksideCameras.ts` places the fixed trackside spots.

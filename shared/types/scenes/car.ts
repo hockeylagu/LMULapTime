@@ -92,6 +92,31 @@ export interface CarCamera {
   cockpitView: 'in' | 'out';
 }
 
+export type CarLampRole = 'headlight' | 'brake' | 'tail' | 'rain' | 'pit' | 'reverse' | 'warning' | 'idLight' | 'ledStrip' | 'interior' | 'discGlow' | 'position' | 'unclassified';
+
+/**
+ * One lamp material. It renders unlit `rgb = tex.rgb · scale · tex.a · (1 + gain · (N·V)^power)` in the package's light unit
+ * (`viewBoost` null: no boost). `states` are indexes into `frames` (the game frame numbers), null where no capture shows them.
+ */
+export interface CarLamp {
+  role: CarLampRole;
+  /** GLB node names whose meshes draw this lamp. */
+  nodes: string[];
+  /** The GLB material name. */
+  material: string;
+  /** Texture paths relative to `vehicles/`, one per frame; null where the game ships no texture (nothing to draw). */
+  frames: Array<string | null>;
+  animation: { method: string | null; rate: number | null; sequence: number[] | null };
+  emission: { scale: number; vertexColour: boolean; viewBoost: { gain: number; power: number } | null; ambientScaled: boolean; vertexAlpha: boolean };
+  blend: 'alpha' | 'opaque';
+  states: { off: number | null; on: number | null; brake: number | null } | null;
+  /** Drawn lit by day with no input from the car; null where not observed. */
+  defaultLit: boolean | null;
+  /** The player's own car leaves it out in the cockpit views; null where not observed. */
+  hiddenInOwnCockpit: boolean | null;
+  brakeGlowRange?: [number, number] | null;
+}
+
 export interface BodyDescriptor {
   vehicleFolder: string;
   aliases: string[];
@@ -99,7 +124,9 @@ export interface BodyDescriptor {
   /** GLB nodes that are alternatives between entries (number plates, lights, body panels): `option_<mesh stem>`, mesh-only. */
   optionNodes: string[];
   wheelRig: { passed: true; rigs: 4; maxRestVertexErrorM: number };
-  /** Native material ids drawn only while a lamp is lit (glow meshes, brake disc glow): hidden while lamps are unlit. */
+  /** The body's lamps (the pipeline's docs/PACKAGE_FORMAT.md "Lamps"). */
+  lamps: CarLamp[];
+  /** Native material ids of the glow meshes and brake disc glow slots: drawn only through their lamp entry, never as ordinary materials. */
   glowMaterialIds: string[];
   appearances: CarAppearance[];
   materials: CarMaterialRecipe[];

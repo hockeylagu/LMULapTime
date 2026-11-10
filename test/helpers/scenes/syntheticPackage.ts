@@ -89,7 +89,17 @@ export function syntheticPackage() {
     wheelPivots: { fl: [0.8, 0.33, -1.4], fr: [-0.8, 0.33, -1.4], rl: [0.8, 0.33, 1.4], rr: [-0.8, 0.33, 1.4] },
     optionNodes: ['option_NumplateA', 'option_NumplateB'],
     wheelRig: { passed: true, rigs: 4, maxRestVertexErrorM: 0 },
-    lamps: [], glowMaterialIds: [],
+    lamps: [{
+      role: 'headlight', nodes: ['option_NumplateA'], material: 'body', frames: [texturePath], animation: { method: 'random', rate: 1, sequence: [0] },
+      emission: { scale: 500, vertexColour: false, viewBoost: { gain: 2, power: 64 }, ambientScaled: false, vertexAlpha: false }, blend: 'alpha',
+      states: { off: 0, on: null, brake: null }, defaultLit: false, hiddenInOwnCockpit: true,
+    }, {
+      // No texture shipped for its frame: accepted, never drawn.
+      role: 'brake', nodes: ['option_NumplateA'], material: 'body', frames: [null], animation: { method: null, rate: null, sequence: null },
+      emission: { scale: 500, vertexColour: false, viewBoost: null, ambientScaled: false, vertexAlpha: false }, blend: 'alpha',
+      states: { off: 0, on: null, brake: null }, defaultLit: false, hiddenInOwnCockpit: true,
+    }],
+    glowMaterialIds: [],
     appearances: [{ alias: 'TEST_CAR', albedo: texturePath, paint: testCarPaint(texturePath), optionNodes: ['option_NumplateA'] }],
     materials: [{ id: 'm1', name: 'body', paint: true }],
     cameras: { list: [

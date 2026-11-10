@@ -35,6 +35,58 @@ function parseBody(value: unknown, what: string): VehicleBody {
   return { ...structuredClone(row), vehicleIds: ids } as unknown as VehicleBody;
 }
 
+const LAMP_ROLES = new Set(['headlight', 'brake', 'tail', 'rain', 'pit', 'reverse', 'warning', 'idLight', 'ledStrip', 'interior', 'discGlow', 'position', 'unclassified']);
+const ANIMATIONS = new Set(['noanim', 'cycle', 'oneshot', 'pendulum', 'transient', 'random', 'manual', 'video']);
+
+function nullableFlag(value: unknown, what: string): void {
+  if (value !== null && typeof value !== 'boolean') throw Error(`${what}: expected true, false or null`);
+}
+
+/** One lamp (the pipeline's docs/PACKAGE_FORMAT.md "Lamps"): its nodes, frame textures, emission and the captured states. */
+function parseLamp(value: unknown, what: string): void {
+  const lamp = record(value, what);
+  exactKeys(lamp, ['role', 'nodes', 'material', 'frames', 'animation', 'emission', 'blend', 'states', 'defaultLit', 'hiddenInOwnCockpit', ...('brakeGlowRange' in lamp ? ['brakeGlowRange'] : [])], what);
+  if (!LAMP_ROLES.has(text(lamp.role, `${what}.role`, 32))) throw Error(`${what}.role: unknown lamp role`);
+  if (!array(lamp.nodes, `${what}.nodes`, 64).map((node, i) => text(node, `${what}.nodes[${i}]`, 200)).length) throw Error(`${what}.nodes: empty`);
+  text(lamp.material, `${what}.material`, 200);
+  const frames = array(lamp.frames, `${what}.frames`, 256);
+  // A null frame: the game ships no texture for it, so there is nothing to draw.
+  if (!frames.length || frames.some(path => path !== null && (typeof path !== 'string' || !TEXTURE_PATH.test(path)))) throw Error(`${what}.frames: expected texture paths or null`);
+  const frame = (index: unknown, at: string) => { if (index !== null && count(index, at, frames.length - 1) >= frames.length) throw Error(`${at}: no such frame`); };
+  const animation = record(lamp.animation, `${what}.animation`);
+  exactKeys(animation, ['method', 'rate', 'sequence'], `${what}.animation`);
+  if (animation.method === null) {
+    if (animation.rate !== null || animation.sequence !== null) throw Error(`${what}.animation: method is null but rate or sequence is not`);
+  } else {
+    if (!ANIMATIONS.has(text(animation.method, `${what}.animation.method`, 32))) throw Error(`${what}.animation.method: unknown`);
+    finite(animation.rate, `${what}.animation.rate`);
+    array(animation.sequence, `${what}.animation.sequence`, 1024).forEach((index, j) => frame(index, `${what}.animation.sequence[${j}]`));
+  }
+  const emission = record(lamp.emission, `${what}.emission`);
+  exactKeys(emission, ['scale', 'vertexColour', 'viewBoost', 'ambientScaled', 'vertexAlpha'], `${what}.emission`);
+  if (finite(emission.scale, `${what}.emission.scale`) < 0) throw Error(`${what}.emission.scale: negative`);
+  for (const key of ['vertexColour', 'ambientScaled', 'vertexAlpha']) if (typeof emission[key] !== 'boolean') throw Error(`${what}.emission.${key}: expected true or false`);
+  if (emission.viewBoost !== null) {
+    const boost = record(emission.viewBoost, `${what}.emission.viewBoost`);
+    exactKeys(boost, ['gain', 'power'], `${what}.emission.viewBoost`);
+    finite(boost.gain, `${what}.emission.viewBoost.gain`);
+    if (finite(boost.power, `${what}.emission.viewBoost.power`) <= 0) throw Error(`${what}.emission.viewBoost.power: must be positive`);
+  }
+  if (lamp.blend !== 'alpha' && lamp.blend !== 'opaque') throw Error(`${what}.blend: expected alpha or opaque`);
+  if (lamp.states !== null) {
+    const states = record(lamp.states, `${what}.states`);
+    exactKeys(states, ['off', 'on', 'brake'], `${what}.states`);
+    for (const key of ['off', 'on', 'brake']) frame(states[key], `${what}.states.${key}`);
+  }
+  nullableFlag(lamp.defaultLit, `${what}.defaultLit`);
+  nullableFlag(lamp.hiddenInOwnCockpit, `${what}.hiddenInOwnCockpit`);
+  if ('brakeGlowRange' in lamp && lamp.brakeGlowRange !== null) {
+    if (lamp.role !== 'discGlow') throw Error(`${what}.brakeGlowRange: only a disc glow has one`);
+    const range = array(lamp.brakeGlowRange, `${what}.brakeGlowRange`, 2).map((n, j) => finite(n, `${what}.brakeGlowRange[${j}]`));
+    if (range.length !== 2 || range[0] > range[1]) throw Error(`${what}.brakeGlowRange: expected [low, high]`);
+  }
+}
+
 /** The descriptor fields the viewer reads, checked against the catalog row (docs/VEHICLE_PIPELINE.md: four wheel rigs, zero rest-vertex error). */
 export function validateBodyDescriptor(bytes: Buffer, row: VehicleBody): void {
   const what = `${row.folder} descriptor`, descriptor = record(JSON.parse(bytes.toString('utf8')) as unknown, what);
@@ -71,8 +123,7 @@ export function validateBodyDescriptor(bytes: Buffer, row: VehicleBody): void {
     return alias;
   });
   if (sorted(aliases) !== sorted(row.vehicleIds)) throw Error(`${what}: appearances do not cover exactly the body's vehicle ids`);
-  // Lamps are drawn unlit until the package says which frame each state shows; only the glow-only materials are read (to hide them).
-  array(descriptor.lamps, `${what}.lamps`, 4096).forEach((value, i) => record(value, `${what}.lamps[${i}]`));
+  array(descriptor.lamps, `${what}.lamps`, 4096).forEach((value, i) => parseLamp(value, `${what}.lamps[${i}]`));
   const glow = array(descriptor.glowMaterialIds, `${what}.glowMaterialIds`, 4096).map((id, i) => text(id, `${what}.glowMaterialIds[${i}]`, 200));
   if (glow.some((id, i) => i > 0 && glow[i - 1] >= id)) throw Error(`${what}.glowMaterialIds: expected sorted, unique ids`);
   const materialIds = new Set<string>();
