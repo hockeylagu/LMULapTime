@@ -10,6 +10,7 @@ import { solarPosition } from './solarPosition.js';
 import { createSkyDomeMaterial, hazeColour, hazeDensity, heightHaze, skyConditions, sunwardHaze } from './atmosphere/skyDome.js';
 import { createHaze } from './atmosphere/haze.js';
 import { cloudCoverage, cloudSheets, sunVisibility, type CloudSheet } from './atmosphere/clouds.js';
+import { createCloudLayer } from './atmosphere/cloudLayer.js';
 import { SUN_UNIT, sunRadiance } from './atmosphere/sunSamples.js';
 import { crownSun } from './scenery/materials/foliageCrown.js';
 import { convolveReflection, type ReflectionCubes } from './reflectionCube.js';
@@ -177,6 +178,9 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
   let cascades: {set: ShadowCascadeSet; layout: ShadowCascadeLayout; pass: CascadeShadows; sampled: boolean} | null = null;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = PCFShadowMap;
   scene.add(sky);
+  // The clouds are lit by the sun before they dim it. The first environment and the venue capture are taken without them.
+  const cloudLayer = clouds.sheets ? createCloudLayer(venue.sky.clouds, clouds.sheets, {sunDirection: toSun, sunGreen: clearSun.g, cloudCover: weather.cloudCover}) : null;
+  if (cloudLayer) scene.add(cloudLayer.group);
   const [probeX, probeY, probeZ] = venue.environmentProbe.position;
   const probeAt = new Vector3(...nativeToScene({x: probeX, y: probeY, z: probeZ}, origin));
   return {
@@ -202,6 +206,7 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
       const shown = dynamic.map(object => object.visible), autoShadow = renderer.shadowMap.autoUpdate;
       try {
         dynamic.forEach(object => { object.visible = false; }); renderer.shadowMap.autoUpdate = false;
+        if (cloudLayer) cloudLayer.group.visible = false;
         // Before the first frame the sun has no shadow map yet: WebGL drops every draw whose shadow sampler has none, so the
         // capture draws it once (its window has not moved to the view yet; the probe sees only its edge).
         if (!sun.shadow.map) renderer.shadowMap.needsUpdate = true;
@@ -219,6 +224,7 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
         setSceneryReflection(venue.shading, reflection.convolved, integration);
       } finally {
         dynamic.forEach((object, i) => { object.visible = shown[i]; }); renderer.shadowMap.autoUpdate = autoShadow;
+        if (cloudLayer) cloudLayer.group.visible = true;
         if (venueCube !== cube) cube.dispose();
       }
     },
@@ -241,6 +247,7 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
       scene.environment = null; generator.dispose(); firstEnvironment.dispose(); venueProbe?.dispose(); reflection?.dispose(); venueCube?.dispose();
       setSceneryReflection(venue.shading, null, integration); integration.dispose(); reflectedGround.geometry.dispose(); reflectedGround.material.dispose();
       sky.geometry.dispose(); sky.material.dispose();
+      if (cloudLayer) { scene.remove(cloudLayer.group); cloudLayer.dispose(); }
     },
   };
 }

@@ -196,6 +196,10 @@ clouds hide the sun: `occlusion` (`bias`, `curve` exactly `sqrt`, `dryMax`, `wet
 cells and computes the sun visibility once per lap moment: it sums the sheets' opacity over the view's rays on the processor, adding
 overlapping sheets, reads the first map level and ignores the view's far limit. The visibility scales the sun's
 light and feeds the weather weight and the exposure; a replay without a cloud field keeps the plain cloud cover and an undimmed sun.
+`atmosphere/cloudLayer.ts` draws the same sheets: one mesh per sheet with the first of its materials, lit by the package's formula
+(the sun before the clouds dim it, the scene's environment as ambient light, half the haze distance), behind everything, far to
+near, following the camera like the sky. The sheets are placed once per lap moment and do not drift during it; a cloud's two
+randoms are the package's averages. The venue capture is taken without them.
 
 The catalog's `shading.shadows` (the pipeline's docs/SCENE_PACKAGE.md "Shadows") is the cascaded sun shadow: `atlas` (tiles inside
 their atlas, one per cascade), `select`, `filter` (taps whose weights times `scale` sum to 1), `normalOffset`, `texelSnap`, `fit`, `fade`,
