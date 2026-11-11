@@ -7,15 +7,11 @@ vi.mock('../../../server/plugins/dataPlugin.js', async (importOriginal) => {
     vehicle:()=>null,vehicles:()=>[]}};
 });
 import { vi } from 'vitest';
-import { describe, it, expect, beforeEach } from 'vitest';
-import { enrichTrajectoryWithTrackGeometry, clearTrackDefinitionCache, getTrackDefinition } from '../../../server/tracks/serverTrackSync.js';
+import { describe, it, expect } from 'vitest';
+import { enrichTrajectoryWithTrackGeometry, getTrackDefinition } from '../../../server/tracks/serverTrackSync.js';
 import { ReplayTrajectoryData, ReplayTrajectoryPoint } from '../../../shared/types/index.js';
 
 describe('serverTrackSync', () => {
-  beforeEach(() => {
-    clearTrackDefinitionCache();
-  });
-
   it('loads a synthetic provider definition and caches it in memory', () => {
     const def = getTrackDefinition('monza_gp');
     expect(def).not.toBeNull();

@@ -272,8 +272,3 @@ function applyOdometerFallback(trajectory: ReplayTrajectoryData): void {
     },
   };
 }
-
-/** Clear cache (useful for testing or hot reloads) */
-export function clearTrackDefinitionCache(): void {
-  trackStore.clear();
-}
