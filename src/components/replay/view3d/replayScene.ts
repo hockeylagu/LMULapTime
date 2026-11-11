@@ -1,38 +1,26 @@
-import { Group, OrthographicCamera, PerspectiveCamera, Quaternion, Scene, Vector3, WebGLRenderer, Mesh, type Material, type Object3D, type Texture } from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { Group, Quaternion, Scene, Vector3, WebGLRenderer, Mesh, type Object3D } from 'three';
 import type { SceneryLayoutResource } from '../../../../shared/types/scenes/scenery.js';
 import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
 import { VEHICLE_FILES } from '../../../api/vehicles/bodyApi.js';
-import { createTracksideCameras } from './tracksideCameras.js';
 import type { MapColorMode } from '../map/replayMapUtils.js';
 import { ghostDistanceAt, type GhostSyncMode } from '../map/ghostSync.js';
 import { sampleRenderPose, sampleStationPose } from './replayPose.js';
 import { nativeToScene } from './sceneFrame.js';
 import { createLapLayerLoader, type LapCars, type LapLayer } from './laps/lapLayer.js';
 import { disposeObjects } from './laps/disposeObjects.js';
-import { MIN_CAMERA_DISTANCE, MAX_CAMERA_DISTANCE, panCamera, zoomCamera } from './cameraNavigation.js';
 import { exposureType, shadowCascadeSet, type CameraMode } from './cameraModes.js';
-import { createChaseCameraTracker, trackCamera } from './cameraTracking.js';
-import { driverCamera, driverPose, isDriverCamera, type DriverPose } from './driverCameras.js';
+import { createCameraRig } from './cameraRig.js';
 import { addSceneEnvironment, sceneClouds, sceneLighting } from './sceneEnvironment.js';
 import { createAutoExposure } from './autoExposure.js';
 import { sunRadiance } from './atmosphere/sunSamples.js';
 import { createCarReflection } from './car/carReflection.js';
-import { setCockpitView } from './sceneObjects.js';
 import { CachedKtx2Loader } from './scenery/cachedKtx2Loader.js';
 import { createChunkLoader } from './scenery/chunkLoader.js';
 import { createSceneryGround } from './scenery/sceneryGround.js';
-import { surfaceTextureMaps } from './scenery/materials/configureSurfaceMaterial.js';
-import { isStreaming, streamTexture } from './scenery/materials/mipStreaming.js';
 import type { StreamView } from './scenery/residency.js';
 import { createSceneryStream } from './scenery/sceneryStream.js';
-import { createGeometryWarmup } from './scenery/geometryWarmup.js';
+import { createSceneWarmup } from './scenery/sceneWarmup.js';
 import { isFreeCameraMode, stationAt, viewMoved } from './scenery/streamView.js';
-
-const DEFAULT_CHASE_DISTANCE_M = 7.8;
-const DEFAULT_CHASE_HEIGHT_M = 2.2;
-const CHASE_LOOK_ELEVATION_M = 0.5;
-const DEFAULT_FOV_DEG = 48, DEFAULT_NEAR_M = 0.5;
 
 export interface ReplaySceneHandle {
   wheelMotion: string;
@@ -84,66 +72,10 @@ export async function createReplayScene(
     if (refreshTimer || !layerReady) return;
     refreshTimer = window.setTimeout(() => { refreshTimer = 0; if (disposed) return; layer.refreshHeights(); invalidate(); }, 250);
   };
-  // A chunk compiles its programs and uploads its textures before it joins the scene, so its first draw does not stall playback:
-  // a texture per frame while the scene shows, in long slices behind the loading screen. The scene and its camera exist from the
-  // start, so the first view's chunks warm up as each arrives, while the others still load.
-  const scene = new Scene(), perspective = new PerspectiveCamera(DEFAULT_FOV_DEG, 1, DEFAULT_NEAR_M, 15000);
-  let shown = false;
-  const UPLOAD_SLICE_MS = 1, LOADING_SLICE_MS = 50;
-  const nextFrame = () => new Promise<void>(resolve => { requestAnimationFrame(() => resolve()); });
-  const nextTask = () => new Promise<void>(resolve => { setTimeout(resolve, 0); });
-  // Scenery textures join on their reduced levels; once the first frame is out, their missing top levels stream in, in
-  // bands of rows, one texture after another. The budget is bytes, not time: an upload call returns before the GPU has copied
-  // the data, so time does not bound its cost.
-  const SHARPEN_BYTES_PER_FRAME = 2 * 1024 * 1024, blurry = new Set<Texture>();
-  let sharpening = false, sharpenFrame = 0;
-  const sharpen = () => {
-    sharpenFrame = 0;
-    if (disposed) return;
-    let uploaded = 0;
-    for (const texture of blurry) {
-      uploaded += streamTexture(texture, renderer, SHARPEN_BYTES_PER_FRAME - uploaded);
-      if (!isStreaming(texture)) blurry.delete(texture);
-      if (uploaded >= SHARPEN_BYTES_PER_FRAME) break;
-    }
-    if (uploaded) invalidate();
-    if (blurry.size) sharpenFrame = requestAnimationFrame(sharpen);
-  };
-  const queueSharpen = (textures: Iterable<Texture>) => {
-    for (const texture of textures) if (isStreaming(texture)) blurry.add(texture);
-    if (sharpening && !sharpenFrame && blurry.size) sharpenFrame = requestAnimationFrame(sharpen);
-  };
-  const geometryWarmup = createGeometryWarmup(renderer, nextFrame, UPLOAD_SLICE_MS);
-  const warmUp = async (root: Object3D, signal: AbortSignal) => {
-    // Programs depend on the render target (tone mapping, output colour space): compile for the HDR target the frame uses.
-    const previous = renderer.getRenderTarget();
-    renderer.setRenderTarget(exposure.target); environment.applyHaze();
-    const compiled = renderer.compileAsync(root, perspective, scene);
-    renderer.setRenderTarget(previous);
-    await compiled;
-    const textures = new Set<Texture>();
-    root.traverse(object => {
-      if (!(object instanceof Mesh)) return;
-      const own = (object as Mesh).material, materials: Material[] = Array.isArray(own) ? own : [own];
-      for (const material of materials) {
-        for (const value of Object.values(material as unknown as Record<string, unknown>)) if (value && (value as Texture).isTexture) textures.add(value as Texture);
-        for (const texture of surfaceTextureMaps.get(material) ?? []) textures.add(texture);
-      }
-    });
-    // During playback, upload in per-frame slices: a whole chunk at once is the stall this avoids. Behind the loading screen
-    // nothing is drawn, so long slices only yield a task now and then to keep the page responsive.
-    const uploadBudgetMs = shown ? UPLOAD_SLICE_MS : LOADING_SLICE_MS, pause = shown ? nextFrame : nextTask;
-    let sliceEnd = performance.now() + uploadBudgetMs;
-    for (const texture of textures) {
-      signal.throwIfAborted();
-      renderer.initTexture(texture);
-      // eslint-disable-next-line no-await-in-loop -- yields between upload slices
-      if (performance.now() >= sliceEnd) { await pause(); sliceEnd = performance.now() + uploadBudgetMs; }
-    }
-    await geometryWarmup.upload(root, perspective, signal, uploadBudgetMs, pause);
-    queueSharpen(textures);
-  };
-  let warming = Promise.resolve();
+  // The scene and its cameras exist from the start, so the first view's chunks warm up as each arrives, while the others still load.
+  const scene = new Scene(), rig = createCameraRig(renderer.domElement, origin, () => invalidate());
+  const warmup = createSceneWarmup(renderer, scene, rig.perspective,
+    () => { renderer.setRenderTarget(exposure.target); environment.applyHaze(); }, () => invalidate());
   const stream = createSceneryStream(layout, sceneryRoot, {
     load: async (chunk, signal) => {
       // The ray tree needs only the geometry: it builds in a worker from the parsed chunk, while its textures download and the
@@ -154,9 +86,7 @@ export async function createReplayScene(
           built.parsed = parsed; built.grounded = ground.add(chunk.id, parsed, chunk.kind === 'horizon');
           built.grounded.catch(() => {}); // Awaited below; a texture failure may reject the load first.
         });
-        const warmed = warming.then(async () => { signal.throwIfAborted(); await warmUp(root, signal); });
-        warming = warmed.catch(() => {});
-        await Promise.all([warmed, built.grounded]); signal.throwIfAborted(); return root;
+        await Promise.all([warmup.queue(root, signal), built.grounded]); signal.throwIfAborted(); return root;
       } catch (error) {
         // The loader releases a chunk whose own load failed; one that failed after it is released here.
         if (built.parsed) ground.remove(chunk.id, built.parsed);
@@ -174,13 +104,13 @@ export async function createReplayScene(
     failed: (chunk, error) => { if (!disposed) onFailure(`3D scenery chunk ${chunk.id} failed: ${error.message}`); },
   });
   const cleanup = () => {
-    disposed = true; window.clearTimeout(refreshTimer); cancelAnimationFrame(sharpenFrame); stream.dispose(); loader.dispose(); carTextures.dispose(); exposure.dispose();
-    ground.dispose(); geometryWarmup.dispose(); renderer.dispose(); renderer.forceContextLoss();
+    disposed = true; window.clearTimeout(refreshTimer); stream.dispose(); loader.dispose(); carTextures.dispose(); exposure.dispose();
+    ground.dispose(); warmup.dispose(); rig.dispose(); renderer.dispose(); renderer.forceContextLoss();
   };
   const route = layout.routeLengthM;
   const firstStation = stationAt(trajectory.points, 0, 0, route);
   if (firstStation === undefined) { cleanup(); throw Error('This recording has no track stations. Use the 2D map.'); }
-  let currentStation = firstStation, mode: CameraMode = 'follow', streamView: StreamView | null = null;
+  let currentStation = firstStation, streamView: StreamView | null = null;
   const loadLaps = createLapLayerLoader(origin, surfaceHeight, path => carTextures.loadAsync(`${VEHICLE_FILES}${path}`), () => exposure.display(), layout.shading);
   // The first view's chunks and the car are requested first: the sky's environment and the car's reflection link their programs
   // on the main thread, which the downloads then overlap.
@@ -189,7 +119,8 @@ export async function createReplayScene(
   let environment: ReturnType<typeof addSceneEnvironment>, reflection: ReturnType<typeof createCarReflection>;
   // The chunks under the first pose must be resident before cars and lines are draped on them.
   try {
-    environment = addSceneEnvironment(scene, renderer, layout, origin, shadowCascadeSet(mode), trajectory.daylightClock); reflection = createCarReflection(renderer, scene, layout.shading);
+    environment = addSceneEnvironment(scene, renderer, layout, origin, shadowCascadeSet(rig.mode), trajectory.daylightClock);
+    reflection = createCarReflection(renderer, scene, layout.shading);
     await stream.whenUnderView();
     layer = await loadLaps(trajectory, baseline, cars, colorBy); layerReady = true;
   } catch (error) { cleanup(); throw error; }
@@ -203,59 +134,37 @@ export async function createReplayScene(
     sceneryRoot.traverse(object => { object.matrixAutoUpdate = false; object.matrixWorldAutoUpdate = false; });
   };
   freezeScenery();
-  world.add(layer.root); environment.setDynamic([layer.root]); reflection.setCar(layer.primary, layer.root);
-  environment.setCamera(perspective);
+  const showLayer = () => { world.add(layer.root); environment.setDynamic([layer.root]); reflection.setCar(layer.primary, layer.root); rig.setLayer(layer); };
+  showLayer(); environment.setCamera(rig.camera);
   // The first view's chunks are warm: this compiles and uploads the cars and lines, behind the loading screen.
-  try { await warmUp(scene, new AbortController().signal); } catch (error) { cleanup(); throw error; }
+  try { await warmup.warm(scene, new AbortController().signal); } catch (error) { cleanup(); throw error; }
   // The scenery around the first pose is resident and compiled: capture the venue's light for the scene's environment.
   environment.captureVenue();
-  shown = true; sharpening = true; queueSharpen([]);
-  const overhead = new OrthographicCamera(-80, 80, 80, -80, 0.5, 15000);
-  let camera: PerspectiveCamera | OrthographicCamera = perspective;
-  const controls = new OrbitControls<PerspectiveCamera | OrthographicCamera>(camera, renderer.domElement);
-  controls.enableDamping = false; controls.enablePan = false; controls.maxPolarAngle = Math.PI * 0.49; controls.minDistance = MIN_CAMERA_DISTANCE; controls.maxDistance = MAX_CAMERA_DISTANCE;
-  // Replay owns Left/Right; WASD camera pan is dispatched through the shared shortcut guard.
-  let frame = 0, initialized = false, currentYaw = 0, currentTime = 0;
-  /** Car-mounted views use the game camera's cockpit mesh variant, vertical FOV and near plane (the dash sits closer than 0.5 m). */
-  const syncDriverCamera = () => {
-    const game = isDriverCamera(mode) ? driverCamera(layer.cameras, mode) : null;
-    setCockpitView(layer.primary, game?.cockpitView ?? 'out');
-    const fov = game?.fov[1] ?? DEFAULT_FOV_DEG, near = game?.clipPlanes[0] ?? DEFAULT_NEAR_M;
-    if (perspective.fov !== fov || perspective.near !== near) { perspective.fov = fov; perspective.near = near; perspective.updateProjectionMatrix(); }
-  };
-  syncDriverCamera();
-  const driver: DriverPose = {eye: new Vector3(), target: new Vector3(), up: new Vector3()};
-  /** Puts the camera on the posed primary car's game camera. */
-  const placeDriverCamera = () => {
-    if (!isDriverCamera(mode)) return;
-    const {eye, target: focus, up} = driverPose(layer.primary.getObjectByName('body-envelope')!, driverCamera(layer.cameras, mode), driver);
-    camera.position.copy(eye); camera.up.copy(up); controls.target.copy(focus); camera.lookAt(focus);
-  };
-  const target = new Vector3(), previousTarget = new Vector3();
-  const chaseTracker = createChaseCameraTracker();
-  let trackside = createTracksideCameras(trajectory.points, layer.primaryDistances, origin);
+  warmup.shown();
   /** Stream scenery around the car (lap distance, plus what is near the camera) or, for the panned orbit and overhead cameras, around the camera. */
   const updateStream = () => {
-    const next: StreamView = isFreeCameraMode(mode)
-      ? {kind: 'free', x: camera.position.x + origin.x, z: origin.z - camera.position.z}
-      : {kind: 'lap', lapDistanceM: currentStation, x: camera.position.x + origin.x, z: origin.z - camera.position.z};
+    const {x, z} = rig.camera.position;
+    const next: StreamView = isFreeCameraMode(rig.mode)
+      ? {kind: 'free', x: x + origin.x, z: origin.z - z}
+      : {kind: 'lap', lapDistanceM: currentStation, x: x + origin.x, z: origin.z - z};
     if (!viewMoved(streamView, next, route)) return;
     streamView = next; stream.update(next);
   };
-  const eyeRotation = new Quaternion(), desiredEye = new Vector3(), correctedEye = new Vector3(), probeCentre = new Vector3();
-  let frameHook: ((frameTime: number) => void) | null = null, probed = false;
+  const eyeRotation = new Quaternion(), desiredEye = new Vector3(), correctedEye = new Vector3(), probeCentre = new Vector3(), target = new Vector3();
+  let frame = 0, frameHook: ((frameTime: number) => void) | null = null, probed = false;
   const draw = (frameTime?: number) => {
     if (disposed) return;
     if (frameTime !== undefined) frameHook?.(frameTime);
     updateStream();
+    const camera = rig.camera;
     desiredEye.copy(camera.position);
-    if (camera === perspective && !isDriverCamera(mode)) ground.resolve(desiredEye, controls.target, origin, correctedEye);
+    if (rig.checksGround) ground.resolve(desiredEye, rig.focus, origin, correctedEye);
     else correctedEye.copy(desiredEye);
     const corrected = !correctedEye.equals(desiredEye);
     if (corrected) {
       eyeRotation.copy(camera.quaternion);
       camera.position.copy(correctedEye);
-      camera.lookAt(controls.target);
+      camera.lookAt(rig.focus);
     }
     try {
       // Cached shadow cascades still due ask for the next frame.
@@ -283,37 +192,15 @@ export async function createReplayScene(
   let viewportWidth = 0, viewportHeight = 0;
   const resize = () => {
     if (disposed) return;
-    const width = Math.max(1, host.clientWidth), height = Math.max(1, host.clientHeight), aspect = width / height;
+    const width = Math.max(1, host.clientWidth), height = Math.max(1, host.clientHeight);
     if (width === viewportWidth && height === viewportHeight) return;
     viewportWidth = width; viewportHeight = height;
-    renderer.setSize(width, height, false); perspective.aspect = aspect; perspective.updateProjectionMatrix();
-    overhead.left = -80 * aspect; overhead.right = 80 * aspect; overhead.updateProjectionMatrix();
+    renderer.setSize(width, height, false); rig.resize(width / height);
     // ResizeObserver runs after animation callbacks, before paint. A canvas resize clears its pixels:
     // draw now, or the embedded map flashes black until next frame when a toolbar changes height.
-    if (initialized) draw(); else invalidate();
-  };
-  const positionCamera = () => {
-    if (isDriverCamera(mode)) { placeDriverCamera(); invalidate(); return; }
-    controls.target.copy(target); camera.position.copy(target).add(new Vector3(24, mode === 'top' ? 180 : 22, 35));
-    if (mode === 'top') camera.position.copy(target).add(new Vector3(0, 180, 0.01));
-    if (mode === 'chase') {
-      chaseTracker.reset(target, currentYaw, currentTime);
-      controls.target.copy(target).add(new Vector3(0, CHASE_LOOK_ELEVATION_M, 0));
-      camera.position.copy(target).add(new Vector3(
-        DEFAULT_CHASE_DISTANCE_M * Math.sin(currentYaw),
-        DEFAULT_CHASE_HEIGHT_M,
-        -DEFAULT_CHASE_DISTANCE_M * Math.cos(currentYaw),
-      ));
-    }
-    camera.lookAt(target); controls.update(); invalidate();
-  };
-  const reset = () => {
-    camera.zoom = 1; camera.updateProjectionMatrix();
-    if (!isDriverCamera(mode)) camera.up.set(0, 1, 0);
-    positionCamera();
+    if (rig.placed) draw(); else invalidate();
   };
   const contextLost = (event: Event) => { event.preventDefault(); onFailure('The 3D graphics context was lost. Retry or return to 2D.'); };
-  controls.addEventListener('change', invalidate);
   renderer.domElement.addEventListener('webglcontextlost', contextLost);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); renderer.domElement.className = 'h-full w-full';
   host.append(renderer.domElement);
@@ -330,9 +217,7 @@ export async function createReplayScene(
       const replacement = await loadLaps(next, comparison, assets, lineMode);
       if (disposed || signal?.aborted || request !== lapRequest) { replacement.dispose(); return false; }
       replacement.colorLines(lineMode); replacement.fadeLines(primaryOpacity, baselineOpacity);
-      layer.dispose(); layer = replacement; world.add(layer.root); environment.setDynamic([layer.root]); reflection.setCar(layer.primary, layer.root);
-      syncDriverCamera();
-      trackside = createTracksideCameras(next.points, layer.primaryDistances, origin);
+      layer.dispose(); layer = replacement; showLayer();
       return true;
     },
     beforeFrame(hook) { frameHook = hook; },
@@ -344,9 +229,8 @@ export async function createReplayScene(
       primary.position.set(pose.x - origin.x, pose.y - origin.y, pose.z - origin.z);
       if (pose.orientation) primary.quaternion.copy(pose.orientation); else primary.quaternion.identity();
       primaryWheels.update(pose);
-      currentYaw = pose.yaw ?? 0;
       const sample = trajectory.points[pose.index], nextSample = trajectory.points[pose.index + 1];
-      currentTime = (sample.timeSec ?? pose.index / 40) + ((nextSample?.timeSec ?? sample.timeSec ?? 0) - (sample.timeSec ?? 0)) * pose.fraction;
+      const timeSec = (sample.timeSec ?? pose.index / 40) + ((nextSample?.timeSec ?? sample.timeSec ?? 0) - (sample.timeSec ?? 0)) * pose.fraction;
       primary.getObjectByName('body-envelope')!.visible = pose.yaw !== undefined;
       primary.getObjectByName('pose-marker')!.visible = pose.yaw === undefined;
 
@@ -363,65 +247,19 @@ export async function createReplayScene(
         ghost.getObjectByName('body-envelope')!.visible = other.yaw !== undefined;
         ghost.getObjectByName('pose-marker')!.visible = other.yaw === undefined;
       }
-      previousTarget.copy(target); target.set(...nativeToScene(pose, origin));
-      // The first pose places the camera; tracking from the zero previous target would shift it by the car's whole offset.
-      if (!initialized) { initialized = true; reset(); }
-      else if (mode === 'trackside') {
-        const spot = trackside(station);
-        if (spot) { camera.position.copy(spot); controls.target.copy(target); camera.lookAt(target); controls.update(); }
-      } else if (mode === 'follow' || mode === 'top') {
-        trackCamera(camera, controls.target, previousTarget, target, 0);
-        controls.update();
-      } else if (mode === 'chase') {
-        const continuous = initialized && target.distanceTo(previousTarget) <= 15;
-        chaseTracker.track(camera, controls.target, target, currentYaw, trajectory.points, index, fraction, continuous);
-        controls.update();
-      } else if (isDriverCamera(mode)) placeDriverCamera();
+      rig.follow({target: target.set(...nativeToScene(pose, origin)), yaw: pose.yaw ?? 0, timeSec, stationM: station, index, fraction});
       invalidate();
     },
     mode(next) {
-      if (next === mode) return;
-      const wasTop = mode === 'top', wasDriver = isDriverCamera(mode); mode = next;
-      const driverView = isDriverCamera(mode);
-      camera = mode === 'top' ? overhead : perspective; controls.object = camera; environment.setCamera(camera); environment.setShadowCascades(shadowCascadeSet(mode));
-      exposure.setType(exposureType(mode)); layer.syncLines();
-      controls.enabled = !driverView;
-      if (wasDriver && !driverView) camera.up.set(0, 1, 0);
-      syncDriverCamera();
-
-      // Follow, chase, the car-mounted game cameras and trackside stay locked on the car; panning belongs to orbit and overhead.
-      controls.enablePan = mode === 'orbit' || mode === 'top';
-      controls.enableRotate = mode !== 'top' && mode !== 'trackside' && !driverView;
-      if (mode === 'top' || wasTop || mode === 'chase' || driverView || wasDriver) reset();
-      else if (mode === 'follow') {
-        camera.position.add(new Vector3().subVectors(target, controls.target)); controls.target.copy(target);
-      }
-      if (!driverView) controls.update();
+      if (!rig.setMode(next)) return;
+      environment.setCamera(rig.camera); environment.setShadowCascades(shadowCascadeSet(next));
+      exposure.setType(exposureType(next)); layer.syncLines();
       invalidate();
     },
-    reset,
-    center() {
-      if (isDriverCamera(mode)) { reset(); return; }
-      camera.position.add(new Vector3().subVectors(target, controls.target));
-      controls.target.copy(target);
-      if (mode === 'chase') {
-        controls.target.add(new Vector3(0, CHASE_LOOK_ELEVATION_M, 0));
-        chaseTracker.reset(target, currentYaw, currentTime);
-      }
-      controls.update(); invalidate();
-    },
-    zoom(direction) {
-      if (isDriverCamera(mode) && camera instanceof PerspectiveCamera) {
-        const factor = Math.pow(1.2, direction);
-        camera.zoom = Math.max(0.6, Math.min(2.5, camera.zoom * factor));
-        camera.updateProjectionMatrix();
-      } else {
-        zoomCamera(camera, controls.target, direction);
-        controls.update();
-      }
-      invalidate();
-    },
-    pan(horizontal, vertical) { panCamera(camera, controls.target, horizontal, vertical); controls.update(); invalidate(); },
+    reset: () => rig.reset(),
+    center: () => rig.center(),
+    zoom: direction => rig.zoom(direction),
+    pan: (horizontal, vertical) => rig.pan(horizontal, vertical),
     colorLines(next) {
       lineMode = next; layer.colorLines(next);
       invalidate();
@@ -434,9 +272,9 @@ export async function createReplayScene(
       invalidate();
     },
     dispose() {
-      disposed = true; cancelAnimationFrame(frame); cancelAnimationFrame(sharpenFrame); observer.disconnect(); controls.dispose();
+      disposed = true; cancelAnimationFrame(frame); observer.disconnect(); rig.dispose();
       renderer.domElement.removeEventListener('webglcontextlost', contextLost);
-      document.removeEventListener('visibilitychange', invalidate); clearTimeout(refreshTimer); stream.dispose(); ground.dispose(); disposeObjects(scene, true); loader.dispose(); carTextures.dispose(); environment.dispose(); reflection.dispose(); exposure.dispose(); geometryWarmup.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
+      document.removeEventListener('visibilitychange', invalidate); clearTimeout(refreshTimer); stream.dispose(); ground.dispose(); disposeObjects(scene, true); loader.dispose(); carTextures.dispose(); environment.dispose(); reflection.dispose(); exposure.dispose(); warmup.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
     },
   };
 }

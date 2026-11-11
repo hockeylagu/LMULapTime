@@ -311,6 +311,8 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   a stream view. `sceneryGround.ts` builds one `three-mesh-bvh` ray tree per resident chunk (in the library's worker) that answers both
   wheel/line contact heights and camera ground/obstruction checks, each triangle tagged with the queries it serves. Its
   native-coordinate position-only geometry is chunk-owned and never exported.
+  `replayScene.ts` wires the scene: `cameraRig.ts` owns the cameras, OrbitControls and how each mode follows the car, and
+  `scenery/sceneWarmup.ts` compiles and uploads each chunk before it joins, then sharpens reduced scenery textures.
   `laps/useReplayScene.ts` retains the scene for a layout/geometry/package revision; selecting
   either lap replaces only `laps/lapLayer.ts` cars, wheel animation and racing lines, preserving
   the camera and scenery. Cancelled or superseded builds are discarded and retired lap buffers released.
