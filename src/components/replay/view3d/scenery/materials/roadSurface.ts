@@ -1,7 +1,14 @@
 import { value, list, type ShaderContext, type SurfaceParts } from './shaderContext.js';
 import type { SurfaceConfig } from './surfaceConfig.js';
 
-/** Dry road and kerb surfaces. Wetness and rubbering evolution stay disabled. */
+/**
+ * How much rubber is taken as laid on the racing line, 0 (a green track, the road-details map alone) to 1 (fully rubbered). The
+ * real level grows through a session and is in neither the package nor the replay; this is an assumed base level, near what two
+ * points of one captured practice frame held (0.18 and 0.24).
+ */
+export const ASSUMED_RUBBER = 0.2;
+
+/** Dry road and kerb surfaces, the road with an assumed base level of rubber. Wetness and marbles stay disabled. */
 export function roadShaderParts(config: SurfaceConfig, { sample, uv, number, vec, uniforms }: ShaderContext): SurfaceParts {
   const { maps, parameters: p, flags: f, kind } = config;
   const adjust = p.adjust, noOverlay = p.bare, decalGroup = p.decal, blendGroup = p.kerbBlend;
@@ -110,6 +117,21 @@ export function roadShaderParts(config: SurfaceConfig, { sample, uv, number, vec
     surfaceSpecular=sourceSpecular;
     surfaceAO=mix(1.0,aoSpec.g,${aoCoverage});
   `;
+
+  // The rubber groove: the mask's two weights against the laid level mix the finished road toward the groove's own colour
+  // (squared, as the tint is), roughness and specular level, and lift its occlusion.
+  if (kind === 'road' && enabled('grooveMap') && maps.groove) {
+    const groove = p.groove;
+    albedo += `vec2 grooveMask=${sample('groove')}.rg;
+      float grooveLaid=mix(roadDetails.g,1.0,${number(ASSUMED_RUBBER)});
+      float surfaceGroove=max(2.0*max(grooveLaid-0.5,0.0)*grooveMask.g,grooveMask.r*min(1.5*grooveLaid,1.0));
+      vec3 grooveAlbedo=${uniforms ? 'surface_grooveAlbedo' : vec(list(groove, 'albedo'))};
+      diffuseColor.rgb=mix(diffuseColor.rgb,grooveAlbedo*grooveAlbedo,surfaceGroove);
+      surfaceRoughness=mix(surfaceRoughness,${num(value(groove, 'roughness'), 'surface_grooveRoughness')},surfaceGroove);
+      surfaceSpecular=mix(surfaceSpecular,${num(value(groove, 'specular'), 'surface_grooveSpecular')},surfaceGroove);
+      surfaceAO=mix(surfaceAO,1.0,surfaceGroove);
+    `;
+  }
 
   let normals = '';
   if (maps.normal) {

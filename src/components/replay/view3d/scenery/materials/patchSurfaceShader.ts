@@ -138,6 +138,9 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
   tunable('surface_kerbDefaultBlend', p.kerbBlend, 'default');
   tunable('surface_noOverlayRoughness', p.bare, 'roughness');
   tunable('surface_noOverlaySpecular', p.bare, 'specular');
+  tunable('surface_grooveRoughness', p.groove, 'roughness');
+  tunable('surface_grooveSpecular', p.groove, 'specular');
+  if (p.groove) tunables.surface_grooveAlbedo = { value: new Vector3(...list(p.groove, 'albedo') as [number, number, number]) };
   for (const [prefix, group] of [['single', p.singleCoat], ['base', p.baseCoat], ['coat', p.clearCoat]] as const) {
     tunable(`surface_${prefix}Roughness`, group, 'roughness');
     tunable(`surface_${prefix}IOR`, group, 'ior');

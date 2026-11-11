@@ -5,6 +5,7 @@ import { billboardShadowMaterial, computeCustomProgramCacheKey, patchSurfaceShad
 import { trackShadowEye } from '../../../../../src/components/replay/view3d/scenery/materials/shadowEye.js';
 import { sceneryReflectionUniforms } from '../../../../../src/components/replay/view3d/scenery/materials/sceneryReflection.js';
 import { staticShadowUniforms } from '../../../../../src/components/replay/view3d/sunShadows.js';
+import { ASSUMED_RUBBER } from '../../../../../src/components/replay/view3d/scenery/materials/roadSurface.js';
 import { surfaceAlphaCut } from '../../../../../src/components/replay/view3d/scenery/materials/shaderContext.js';
 import { shaderParts } from '../../../../../src/components/replay/view3d/scenery/materials/shaderParts.js';
 import { readSurfaceConfig, SURFACE_KINDS, terrainLayerCount, textureAsset, type SurfaceConfig, type SurfaceMap } from '../../../../../src/components/replay/view3d/scenery/materials/surfaceConfig.js';
@@ -114,6 +115,21 @@ describe('shaderParts', () => {
     expect(() => shaderParts(surface('roadDecal'))).toThrow('Road decal albedo atlas is required');
     expect(() => shaderParts(surface('clearcoat', { maps: { albedo: map('A', true), detail: map('D') }, flags: { detailAlbedo: 'overlay' } }))).toThrow('Unimplemented clearcoat detail blend');
   });
+  it('mixes a rubbered road toward its groove by the mask and the assumed rubber level', () => {
+    const road = surface('road', { maps: { albedo: map('A', true), groove: map('G') }, flags: { decalBlend: 'addSub', ambientOcclusion: 'local', grooveMap: 'on' } });
+    road.parameters.groove = { albedo: [0.1, 0.11, 0.14], roughness: 0.6, specular: 0.5 };
+    const albedo = shaderParts(road).albedo;
+    expect(albedo).toContain(`float grooveLaid=mix(roadDetails.g,1.0,${ASSUMED_RUBBER.toFixed(8)});`);
+    expect(albedo).toContain('max(2.0*max(grooveLaid-0.5,0.0)*grooveMask.g,grooveMask.r*min(1.5*grooveLaid,1.0))');
+    expect(albedo).toContain('diffuseColor.rgb=mix(diffuseColor.rgb,grooveAlbedo*grooveAlbedo,surfaceGroove)');
+    expect(albedo).toContain('surfaceRoughness=mix(surfaceRoughness,surface_grooveRoughness,surfaceGroove)');
+    // The mix comes after the tint and the roughness adjustment, on the finished road.
+    expect(albedo.indexOf('surfaceGroove=')).toBeGreaterThan(albedo.indexOf('surfaceAO=mix(1.0,aoSpec.g'));
+    // No groove without the switch, and a rubbered road without its values is malformed.
+    expect(shaderParts(surface('road', { maps: { albedo: map('A', true), groove: map('G') } })).albedo).not.toContain('surfaceGroove');
+    delete road.parameters.groove;
+    expect(() => shaderParts(road)).toThrow('Missing surface value: roughness');
+  });
   it('enters road, kerb and standard through their own families', () => {
     expect(shaderParts(surface('road', { maps: { albedo: map('A', true) } })).physical).toContain('0.05'); // F0 of IOR 1.635
     expect(shaderParts(surface('kerb', { maps: { albedo: map('A', true) } })).albedo).toContain('surfaceAltBlend=1.0-sourceBlend');
@@ -170,6 +186,14 @@ describe('patchSurfaceShader', () => {
     expect(shader.fragmentShader).toContain('uniform float surface_alphaCut;');
     expect((shader.uniforms as Record<string, unknown>).surface_alphaCut).toBe(surfaceAlphaCut);
     expect(surfaceAlphaCut.value).toBe(1);
+  });
+  it('carries the groove values of a rubbered road as uniforms', () => {
+    const road = surface('road', { maps: { albedo: map('A', true), groove: map('G', false, 'uv2') }, flags: { decalBlend: 'addSub', ambientOcclusion: 'local', grooveMap: 'on' } });
+    road.parameters.groove = { albedo: [0.1, 0.11, 0.14], roughness: 0.6, specular: 0.5 };
+    const shader = patched(road);
+    expect((shader.uniforms.surface_grooveAlbedo.value as Vector3).toArray()).toEqual([0.1, 0.11, 0.14]);
+    expect(shader.uniforms.surface_grooveRoughness.value).toBe(0.6);
+    expect(shader.fragmentShader).toContain('uniform vec3 surface_grooveAlbedo;');
   });
   it('makes billboards camera-facing in the vertex stage only when the config says so', () => {
     const tree = surface('vegetation', { maps: { albedo: map('A', true) } });

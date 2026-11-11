@@ -288,7 +288,7 @@ are judged by eye in the pairs, not by the scores.
 
 Left as they are, with the reason: the exposure clamps per camera type (the reference exposures sit inside them, so they cannot
 explain the Daytona chase brightness); the billboard shadow pass facing the sun (critique #13 chose the view camera on purpose);
-the road groove mask (the exporter strips it); the
+the
 turbidity and haze-colour calibration (measured in item 8: neither alternative scores better than the package values).
 
 ## Still open
