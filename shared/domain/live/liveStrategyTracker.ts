@@ -585,9 +585,15 @@ export class LiveStrategyTracker {
       : qualifyingMinutes !== null ? qualifyingMinutes * 60
         : !(reading.endEt > 0 && reading.endEt < 1_000_000) ? null : Math.max(0, reading.endEt - Math.max(0, reading.currentEt));
     const estimated = reading.player && reading.player.estimatedLapTime > 0 ? reading.player.estimatedLapTime : null;
-    const lapSeconds = classLeaderLapSeconds(reading.player, reading.classLeader) ?? median(this.eventLaps) ?? estimated;
+    // The game's estimates are dry pace. On a wet track the event's own laps lead (kept since the last wet/dry change),
+    // and the leader's estimate is slowed by the same factor (Le Mans 2026-11-11: 218.7 s planned 18 laps, the wet
+    // qualifying lap of 236.5 s gives the 16 run; with a fuel cap above 75 L the garage asked 15 L too many).
+    const ownLaps = median(this.eventLaps);
+    const wetPace = this.wet === true && ownLaps !== null;
+    const lapSeconds = (wetPace ? ownLaps : null) ?? classLeaderLapSeconds(reading.player, reading.classLeader) ?? ownLaps ?? estimated;
     const tyres = this.garageTyres(race && !clockRunning && reading.player?.inPits === false);
-    const leaderLapSeconds = race ? reading.leader?.estimatedLapTime ?? null : null;
+    const leaderEstimate = race ? reading.leader?.estimatedLapTime ?? null : null;
+    const leaderLapSeconds = leaderEstimate !== null && wetPace && estimated !== null ? leaderEstimate * ownLaps / estimated : leaderEstimate;
     const plan = planGarage({
       kind,
       sessionSeconds,

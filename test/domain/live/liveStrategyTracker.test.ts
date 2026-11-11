@@ -297,6 +297,23 @@ describe('LiveStrategyTracker', () => {
     expect(context(tracker, qualifying, { lapsLeft: null })?.garage?.forQualifying).toBeUndefined();
   });
 
+  it('plans a wet race garage from the event wet laps, not the dry estimates (Le Mans 2026-11-11: 18 planned, 16 run)', () => {
+    const garageLaps = (track: Partial<LiveScoringReading>) => {
+      const tracker = new LiveStrategyTracker();
+      tracker.applyRest({ type: 'schedule', raceMinutes: 60, hasQualifying: true });
+      const cars = (totalLaps: number) => ({ player: vehicleReading({ totalLaps, estimatedLapTime: 218.7, vehicleClass: 'GT3' }),
+        classLeader: vehicleReading({ id: 4, estimatedLapTime: 218.7, vehicleClass: 'GT3' }), leader: vehicleReading({ id: 3, estimatedLapTime: 217.3 }) });
+      // The wet qualifying lap of 236.5 s, then the race garage on the same track.
+      const latestLap = { lapNumber: 3, lapSeconds: 236.5, sectors: [null, null, null] as [null, null, null], valid: true };
+      context(tracker, at(700, { ...track, sessionCode: 5, endEt: 900, ...cars(3) }), { latestLap, lapsLeft: null });
+      return context(tracker, at(35, { ...track, sessionCode: 10, inRealtime: false, gamePhase: 0, ...cars(0) }), { lapsLeft: null })?.garage;
+    };
+    // Dry: the class leader's estimate, 17 racing laps and the formation lap.
+    expect(garageLaps({})).toMatchObject({ lapSeconds: 218.7, laps: 18 });
+    // Wet: the event's own lap, the leader slowed by the same factor: 16 racing laps.
+    expect(garageLaps({ raining: 0.15, avgPathWetness: 0.4 })).toMatchObject({ lapSeconds: 236.5, laps: 17 });
+  });
+
   it('plans the race from the qualifying garage, with the schedule and the game tyre change time, until the race runs', () => {
     const tracker = new LiveStrategyTracker();
     tracker.applyRest({ type: 'tireManagement', vePerLap: 2.5, fuelPerLap: 2.1, newSets: 3, selected: { compound: 'Medium', used: false, wear: 1 } });
