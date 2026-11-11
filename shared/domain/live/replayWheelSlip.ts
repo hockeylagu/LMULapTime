@@ -32,7 +32,9 @@ function rollingRadii(points: readonly ReplayTrajectoryPoint[]): Array<number | 
  * Wheel slip for a replay lap from each wheel's angular speed and the car's measured forward speed:
  * ratio = (ω × r − v) / v, SAE sign as the live ratio. Lockup and wheelspin use the live event rule. A lap that
  * already has slip (from a live capture, which measures the contact patch) or has no wheel speeds is returned as is.
- * Validated against a live capture over a 16-lap race: 47 of 53 live events found, the misses at 15–19 %.
+ * Validated against a live capture over a 16-lap race: 47 of 53 live events found, the misses at 15–19 %. The ratio reads
+ * about 2 % less braking slip at the front wheels than the contact patch (1 % at the rears), so a borderline front lockup
+ * can be missed; accepted as a known limit rather than modelling the loaded tyre radius.
  */
 export function withReplayWheelSlip(points: ReplayTrajectoryPoint[]): ReplayTrajectoryPoint[] {
   if (points.some(p => p.wheelSlip !== undefined)) return points;
