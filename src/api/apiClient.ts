@@ -52,34 +52,6 @@ export async function fetchBinary(path: string, init?: RequestInit): Promise<Arr
   return response.arrayBuffer();
 }
 
-/**
- * Reads the start of a binary resource. `needed` is asked, as bytes arrive, how many the caller wants (undefined while it cannot
- * tell yet, Infinity for the whole file); once that many are in, the rest of the response is dropped. Returns the bytes read,
- * which may run past the count asked for.
- */
-export async function fetchBinaryStart(path: string, needed: (received: Uint8Array) => number | undefined): Promise<Uint8Array> {
-  const response = await fetch(path, { cache: 'no-store' });
-  if (!response.ok) throw await toApiError(response, path);
-  if (!response.body) return new Uint8Array(await response.arrayBuffer());
-  const reader = response.body.getReader();
-  let received = new Uint8Array(0), length = 0;
-  for (;;) {
-    // eslint-disable-next-line no-await-in-loop -- body chunks arrive in order
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (length + value.length > received.length) {
-      const grown = new Uint8Array(Math.max(received.length * 2, length + value.length));
-      grown.set(received.subarray(0, length));
-      received = grown;
-    }
-    received.set(value, length);
-    length += value.length;
-    const wanted = needed(received.subarray(0, length));
-    if (wanted !== undefined && length >= wanted) { void reader.cancel(); break; }
-  }
-  return received.subarray(0, length);
-}
-
 /** True for the rejection of a request its AbortController cancelled: not an error to show. */
 export function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'AbortError';

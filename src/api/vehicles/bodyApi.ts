@@ -7,6 +7,8 @@ export const VEHICLE_FILES = '/api/data-plugin/vehicles/files/';
 export interface LoadedBody {
   resource: BodyResource;
   bytes: ArrayBuffer;
+  /** The body's interior GLB (the parts only the driver cameras draw); null for a body without one. */
+  interiorBytes: ArrayBuffer | null;
   descriptor: BodyDescriptor;
   /** The lap's installed VEH id, selecting the appearance (livery) of the shared model. */
   vehicleId: string;
@@ -16,12 +18,14 @@ export interface LoadedBody {
 export async function fetchBody(vehicleId: string, packageRevision: string | undefined, signal: AbortSignal): Promise<LoadedBody> {
   const resource = await fetchJson<BodyResource>(`/api/data-plugin/vehicles/${encodeURIComponent(vehicleId)}/body`, { signal });
   if (packageRevision && resource.packageRevision !== packageRevision) throw Error('Body package revision differs from the selected lap');
-  const [bytes, descriptor] = await Promise.all([
+  const {interior} = resource;
+  const [bytes, interiorBytes, descriptor] = await Promise.all([
     fetchBinary(`${VEHICLE_FILES}${resource.sha256}.glb`, { signal, cache: 'default' }),
+    interior ? fetchBinary(`${VEHICLE_FILES}${interior.sha256}.glb`, { signal, cache: 'default' }) : null,
     fetchJson<BodyDescriptor>(`${VEHICLE_FILES}bodies/${resource.folder}.json`, { signal }),
   ]);
-  if (bytes.byteLength !== resource.byteLength) throw Error('Incomplete 3D body');
-  return { resource, bytes, descriptor, vehicleId };
+  if (bytes.byteLength !== resource.byteLength || (interior && interiorBytes?.byteLength !== interior.byteLength)) throw Error('Incomplete 3D body');
+  return { resource, bytes, interiorBytes, descriptor, vehicleId };
 }
 
 /** The key a VEH id is matched by: without a `.veh` suffix, upper-case (as the package catalogs it). */

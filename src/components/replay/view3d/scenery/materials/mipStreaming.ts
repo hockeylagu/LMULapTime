@@ -7,19 +7,19 @@ import { CompressedTexture, TextureSource, WebGLUtils, type Texture, type TypedA
  * lowers the base level as each level completes. No second allocation and no upload bigger than the budget, whatever the size.
  * Small textures load whole.
  *
- * A texture whose loader read only its reduced levels (`detail` given) allocates the full chain all the same, and fetches the
- * levels above when its turn to sharpen comes.
+ * A texture read from its start file (`detail` given) allocates the full chain all the same, and fetches the levels above
+ * when its turn to sharpen comes.
  */
 export const STREAMED_LEVELS = 2;
-export const STREAMED_MIN_PX = 512;
+const STREAMED_MIN_PX = 512;
 /** Every compressed format the package holds (BCn) is in 4×4 blocks: a band starts and ends on a block row. */
 const BLOCK_ROWS = 4;
 
 export interface MipLevel { data: TypedArray; width: number; height: number }
-/** Fetches the levels above `STREAMED_LEVELS` of a texture that was read without them, largest first. */
-export type DetailLoader = () => Promise<MipLevel[]>;
-/** `level` is the level being filled (counting down to 0) and `row` its next pixel row; `detail` is set until the missing levels are requested, `waiting` until they arrive, `failed` when they could not be read. */
-interface Stream { levels: MipLevel[]; level: number; row: number; detail?: DetailLoader; waiting?: boolean; failed?: boolean }
+/** The `missing` levels above those a texture was read with; `load` fetches them, largest first. */
+export interface DetailLoader { missing: number; load(): Promise<MipLevel[]> }
+/** `missing` is how many top levels the texture starts without; `level` is the level being filled (counting down to 0) and `row` its next pixel row; `detail` is set until the missing levels are requested, `waiting` until they arrive, `failed` when they could not be read. */
+interface Stream { levels: MipLevel[]; missing: number; level: number; row: number; detail?: DetailLoader; waiting?: boolean; failed?: boolean }
 /** Detail requests in flight at once: enough to keep the per-frame budget fed without holding every file in memory ahead of its turn. */
 const DETAIL_REQUESTS = 8;
 let detailRequests = 0;
@@ -32,10 +32,11 @@ const formats = new WeakMap<WebGLRenderer, WebGLUtils>();
  */
 export function startStreaming(texture: Texture, renderer: WebGLRenderer, detail?: DetailLoader): void {
   let levels = texture.mipmaps as MipLevel[];
+  const missing = detail?.missing ?? STREAMED_LEVELS;
   if (detail) {
     // Empty places for the missing levels, so the storage three allocates is the full texture's.
-    const missing = Array.from({length: STREAMED_LEVELS}, (_, level) => ({data: new Uint8Array(0), width: levels[0].width << (STREAMED_LEVELS - level), height: levels[0].height << (STREAMED_LEVELS - level)}));
-    levels = [...missing, ...levels];
+    const places = Array.from({length: missing}, (_, level) => ({data: new Uint8Array(0), width: levels[0].width << (missing - level), height: levels[0].height << (missing - level)}));
+    levels = [...places, ...levels];
     texture.mipmaps = levels;
   } else if (levels.length <= STREAMED_LEVELS || Math.min(levels[0].width, levels[0].height) < STREAMED_MIN_PX) return;
   // Its own source: the texture is a clone sharing the loader's cached original, whose data other chunks still upload from.
@@ -43,13 +44,13 @@ export function startStreaming(texture: Texture, renderer: WebGLRenderer, detail
   const source = new TextureSource({width: levels[0].width, height: levels[0].height});
   source.dataReady = false;
   texture.source = source;
-  const stream: Stream = {levels, level: STREAMED_LEVELS - 1, row: 0, detail};
+  const stream: Stream = {levels, missing, level: missing - 1, row: 0, detail};
   streams.set(texture, stream);
   // Runs right after each allocation, with the texture bound: refill the reduced levels and sample only those, or every level
   // once the texture had finished streaming (a later allocation would otherwise leave its storage empty).
   texture.onUpdate = () => {
-    const from = streams.has(texture) ? STREAMED_LEVELS : 0;
-    stream.level = STREAMED_LEVELS - 1; stream.row = 0;
+    const from = streams.has(texture) ? missing : 0;
+    stream.level = missing - 1; stream.row = 0;
     const gl = renderer.getContext() as WebGL2RenderingContext;
     for (let level = from; level < levels.length; level++) uploadRows(texture, renderer, levels[level], level, 0, levels[level].height);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_BASE_LEVEL, from);
@@ -78,8 +79,8 @@ export function streamTexture(texture: Texture, renderer: WebGLRenderer, budgetB
   if (stream.detail && detailRequests < DETAIL_REQUESTS) {
     const load = stream.detail;
     stream.detail = undefined; stream.waiting = true; detailRequests++;
-    void load().then(detail => {
-      if (detail.length !== STREAMED_LEVELS || detail[0].width !== stream.levels[0].width || detail[0].height !== stream.levels[0].height) throw Error('A texture file does not hold the levels above its reduced ones');
+    void load.load().then(detail => {
+      if (detail.length !== stream.missing || detail[0].width !== stream.levels[0].width || detail[0].height !== stream.levels[0].height) throw Error('A texture file does not hold the levels above its start file');
       detail.forEach((level, index) => { stream.levels[index] = level; });
       stream.waiting = false;
     }).catch((error: unknown) => {

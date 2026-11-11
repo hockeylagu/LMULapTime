@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, apiErrorMessage, fetchBinaryStart, fetchJson, isAbortError, postJson } from '../../src/api/apiClient.js';
+import { ApiError, apiErrorMessage, fetchJson, isAbortError, postJson } from '../../src/api/apiClient.js';
 import { sessionTelemetryPath } from '../../src/api/replayApi.js';
 import { invalidateReferenceLaptimes, loadReferenceLaptimes, peekReferenceLaptimes } from '../../src/api/referenceApi.js';
 
@@ -96,21 +96,5 @@ describe('referenceApi', () => {
     await expect(loadReferenceLaptimes()).rejects.toThrow('down');
     await expect(loadReferenceLaptimes()).resolves.toMatchObject({ entriesCount: 0 });
     expect(fetchMock).toHaveBeenCalledTimes(2);
-  });
-
-  it('reads a binary file only as far as the caller needs', async () => {
-    let pulled = 0, cancelled = false;
-    const body = () => new ReadableStream<Uint8Array>({
-      pull(controller) { pulled++; if (pulled > 10) controller.close(); else controller.enqueue(new Uint8Array(100).fill(pulled)); },
-      cancel() { cancelled = true; },
-    }, {highWaterMark: 0});
-    stubFetch().mockImplementation(async () => new Response(body()));
-    // The first bytes say how many are needed; the read stops at the chunk that covers them.
-    const start = await fetchBinaryStart('/api/file', received => (received.length < 150 ? undefined : 250));
-    expect([start.length, start[0], start[299], pulled, cancelled]).toEqual([300, 1, 3, 3, true]);
-    pulled = 0;
-    expect(await fetchBinaryStart('/api/file', () => Infinity)).toHaveLength(1000);
-    stubFetch().mockResolvedValue(jsonResponse({ error: 'gone' }, 404));
-    await expect(fetchBinaryStart('/api/file', () => 1)).rejects.toThrow('gone');
   });
 });

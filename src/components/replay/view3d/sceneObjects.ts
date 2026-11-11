@@ -2,12 +2,33 @@ import { Group, Mesh, MeshStandardMaterial, SphereGeometry, type BufferGeometry,
 
 export type CockpitView = 'in' | 'out';
 
+/** A part's distance range (`extras.lod`), in metres from the camera to the car's origin: drawn within [inM, outM), to any distance when `outM` is null. */
+interface PartRange { inM: number; outM: number | null }
+
+const shownParts = new WeakMap<Object3D, {view: CockpitView; distanceM: number}>();
+function showParts(car: Object3D, change: {view?: CockpitView; distanceM?: number}): void {
+  const state = {...(shownParts.get(car) ?? {view: 'out' as const, distanceM: 0}), ...change};
+  shownParts.set(car, state);
+  car.traverse(object => {
+    const marked: unknown = object.userData.cockpitView, range = object.userData.lod as PartRange | undefined;
+    const variant = marked === 'in' || marked === 'out';
+    if (!variant && !range) return;
+    object.visible = (!variant || marked === state.view)
+      && (!range || (state.distanceM >= range.inM && (range.outM === null || state.distanceM < range.outM)));
+  });
+}
+
 /** Driver-camera (`in`) and exterior (`out`) cockpit meshes are alternatives: the GLB marks them with `extras.cockpitView`. */
 export function setCockpitView(car: Object3D, view: CockpitView): void {
-  car.traverse(object => {
-    const marked: unknown = object.userData.cockpitView;
-    if (marked === 'in' || marked === 'out') object.visible = marked === view;
-  });
+  showParts(car, {view});
+}
+
+/**
+ * Shows the parts of the car whose distance range holds the camera's distance to the car's origin: a part's simpler level takes
+ * over from its full one, and small parts end at their own distance. A car starts at distance 0, every part at its full level.
+ */
+export function setCameraDistance(car: Object3D, distanceM: number): void {
+  showParts(car, {distanceM});
 }
 
 /**

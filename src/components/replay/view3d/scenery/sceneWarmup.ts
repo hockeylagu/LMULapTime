@@ -17,10 +17,12 @@ export interface SceneWarmup {
    * textures then queue to sharpen. `prepare` runs before the compile (the frame's render target and haze).
    */
   warm(root: Object3D, signal: AbortSignal): Promise<void>;
-  /** As `warm`, one root after another: chunks that arrive together warm up in turn. */
+  /** As `warm`, with the uploads one root after another: chunks that arrive together compile together and upload in turn. */
   queue(root: Object3D, signal: AbortSignal): Promise<void>;
   /** The first frame is out: warm-ups upload in per-frame slices from now on, and the reduced textures start sharpening. */
   shown(): void;
+  /** Queues a streamed texture to sharpen, whichever material holds it. */
+  sharpen(texture: Texture): void;
   /** Keeps a streamed texture on its reduced levels until `sharpenHeld`. */
   hold(texture: Texture): void;
   /** Sharpens the held textures from now on, ahead of the rest. */
@@ -54,12 +56,15 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
     if (blurry.size) sharpenFrame = requestAnimationFrame(sharpen);
   };
   const startSharpen = () => { if (shown && !sharpenFrame && blurry.size) sharpenFrame = requestAnimationFrame(sharpen); };
-  const warm = async (root: Object3D, signal: AbortSignal) => {
+  const compile = (root: Object3D) => {
     // Programs depend on the render target (tone mapping, output colour space): compile for the HDR target the frame uses.
     const previous = renderer.getRenderTarget();
     prepare();
     const compiled = renderer.compileAsync(root, camera, scene);
     renderer.setRenderTarget(previous);
+    return compiled;
+  };
+  const warm = async (root: Object3D, signal: AbortSignal, compiled: Promise<unknown> = compile(root)) => {
     await compiled;
     const textures = new Set<Texture>();
     root.traverse(object => {
@@ -87,11 +92,15 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
   return {
     warm,
     queue(root, signal) {
-      const warmed = warming.then(async () => { signal.throwIfAborted(); await warm(root, signal); });
+      // Programs compile off the main thread: a chunk's start as it arrives, while the chunks before it compile and upload.
+      const compiled = compile(root);
+      compiled.catch(() => {});
+      const warmed = warming.then(async () => { signal.throwIfAborted(); await warm(root, signal, compiled); });
       warming = warmed.catch(() => {});
       return warmed;
     },
     shown() { shown = true; startSharpen(); },
+    sharpen(texture) { blurry.add(texture); startSharpen(); },
     hold(texture) { held.add(texture); },
     sharpenHeld() {
       // A held texture not yet on the GPU waits there: `streamTexture` copies nothing until its first upload.

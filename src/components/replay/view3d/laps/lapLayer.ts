@@ -6,7 +6,6 @@ import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import { normalizeVehicleId, type LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import { createCarMaterial, materialTexturePaths } from '../car/carMaterials.js';
-import { surfaceTextureMaps } from '../scenery/materials/configureSurfaceMaterial.js';
 import { createLampMaterial, unlitFrame } from '../car/carLamps.js';
 import { createContactShadow } from '../car/carContactShadow.js';
 import { MAP_COLORS, TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
@@ -26,13 +25,19 @@ export interface LapCars {
 }
 
 /**
- * The scene's car textures. `load` reads a shared texture by its `textures/<sha256>.ktx2.zst` path under the cars folder;
- * `interior` says only the car's interior uses it. `copied` is told of each material's own copy of an interior texture.
+ * The scene's car textures. `load` reads a shared texture by its `textures/<sha256>.ktx2.zst` path under the cars folder, from
+ * its start file at `start` when the body lists one; `interior` says only the car's interior uses it. `copied` is told of
+ * each map's own copy of a texture.
  */
 export interface CarTextures {
-  load(path: string, interior: boolean): Promise<Texture>;
-  copied(copy: Texture, original: Texture): void;
+  load(path: string, interior: boolean, start: string | undefined): Promise<Texture>;
+  copied(copy: Texture, original: Texture, interior: boolean): void;
 }
+
+/** The model node the car body's fixed parts hang under, in the body's file and in its interior's. */
+const CHASSIS = 'chassis';
+/** Body texture rows name their files from the package root; descriptors and loaders from the cars folder. */
+const CARS_FOLDER = 'vehicles/';
 
 /**
  * Gives a glow mesh its lamps' materials: each material slot a drawn lamp covers (one of the lamp's nodes is the mesh or holds it, and
@@ -63,11 +68,19 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
   const loadTemplate = (car: LoadedBody): Promise<Group> => {
     let pending = templates.get(car.bytes);
     if (!pending) {
-      pending = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(car.bytes, '').then(result => {
-        result.scene.traverse(object => {
+      const parse = (bytes: ArrayBuffer) => new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(bytes, '').then(result => result.scene);
+      pending = Promise.all([parse(car.bytes), car.interiorBytes ? parse(car.interiorBytes) : null]).then(([body, interior]) => {
+        // The interior's parts hang under its chassis node and join the body's: one model, whose driver-camera parts the
+        // cockpit view switches.
+        if (interior) {
+          const chassis = body.getObjectByName(CHASSIS), parts = interior.getObjectByName(CHASSIS);
+          if (!chassis || !parts) throw Error(`Car ${car.vehicleId} has no chassis node for its interior`);
+          chassis.add(...parts.children);
+        }
+        body.traverse(object => {
           if (object instanceof Mesh && object.geometry instanceof BufferGeometry) object.geometry.userData.sharedAsset = true;
         });
-        return result.scene;
+        return body;
       });
       templates.set(car.bytes, pending);
     }
@@ -111,10 +124,13 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
         for (const path of materialTexturePaths(recipeOf(material), appearance)) paths.set(path, interior && paths.get(path) !== false);
       }
     });
-    for (const lamp of drawn) paths.set(unlitFrame(lamp)!, false);
-    const textures = new Map(await Promise.all([...paths].map(async ([path, interior]) => [path, await carTextures.load(path, interior)] as const)));
-    const interiorSources = new Map([...paths].filter(([, interior]) => interior).map(([path]) => [textures.get(path)!.source, textures.get(path)!] as const));
-    return {template, appearance, recipeOf, isGlow, drawn, textures, interiorSources, hiddenNames: new Set([...hidden].map(node => node.name))};
+    // A lamp draws its frame's texture as loaded, so a frame loads from its own file, never from a start file.
+    const frames = new Set(drawn.map(lamp => unlitFrame(lamp)!));
+    for (const frame of frames) paths.set(frame, false);
+    const starts = new Map(car.resource.textures.flatMap(row => row.start ? [[row.asset.slice(CARS_FOLDER.length), row.start.asset.slice(CARS_FOLDER.length)] as const] : []));
+    const textures = new Map(await Promise.all([...paths].map(async ([path, interior]) =>
+      [path, await carTextures.load(path, interior, frames.has(path) ? undefined : starts.get(path))] as const)));
+    return {template, appearance, recipeOf, isGlow, drawn, textures, interiorPaths: paths, hiddenNames: new Set([...hidden].map(node => node.name))};
   };
   /** A livery's parsed model and loaded textures, shared by every instance of that car (and by `preload`). */
   const parts = new WeakMap<LoadedBody, ReturnType<typeof loadParts>>();
@@ -129,7 +145,12 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
   };
   /** A car instance of the lap's livery: the shared geometry with one material per native material, textures preloaded. */
   const loadModel = async (car: LoadedBody): Promise<Group> => {
-    const {template, appearance, recipeOf, isGlow, drawn, textures, interiorSources, hiddenNames} = await partsOf(car);
+    const {template, appearance, recipeOf, isGlow, drawn, textures, interiorPaths, hiddenNames} = await partsOf(car);
+    const copyOf = (path: string) => {
+      const original = textures.get(path)!, copy = original.clone();
+      carTextures.copied(copy, original, interiorPaths.get(path) === true);
+      return copy;
+    };
     const model = template.clone(true), materials = new Map<string, Material>(), glowMeshes: Object3D[] = [];
     for (const name of hiddenNames) model.getObjectByName(name)?.removeFromParent();
     model.traverse(object => { if (isGlow(object)) glowMeshes.push(object); });
@@ -144,13 +165,7 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
       const replace = (material: Material) => {
         const recipe = recipeOf(material);
         let created = materials.get(recipe.id);
-        if (!created) {
-          created = createCarMaterial(recipe, appearance, path => textures.get(path)!, shading); materials.set(recipe.id, created);
-          for (const copy of [...Object.values(created as unknown as Record<string, unknown>), ...(surfaceTextureMaps.get(created) ?? [])]) {
-            const original = copy && (copy as Texture).isTexture ? interiorSources.get((copy as Texture).source) : undefined;
-            if (original) carTextures.copied(copy as Texture, original);
-          }
-        }
+        if (!created) { created = createCarMaterial(recipe, appearance, copyOf, shading); materials.set(recipe.id, created); }
         return created;
       };
       object.material = Array.isArray(object.material) ? object.material.map(replace) : replace(object.material as Material);

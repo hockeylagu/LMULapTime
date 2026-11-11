@@ -1,6 +1,6 @@
 import { CompressedTexture, RGBA_BPTC_Format, type WebGLRenderer } from 'three';
 import { afterEach, expect, it, vi } from 'vitest';
-import { CachedKtx2Loader, firstReadEnd, skippedLevels, type TextureDetail } from '../../../../../src/components/replay/view3d/scenery/cachedKtx2Loader.js';
+import { CachedKtx2Loader, withoutLevelsAbove, type TextureDetail } from '../../../../../src/components/replay/view3d/scenery/cachedKtx2Loader.js';
 
 afterEach(() => { vi.unstubAllGlobals(); });
 
@@ -23,24 +23,16 @@ function ktx2File(size: number, smallestFirst = true): Uint8Array {
   return file;
 }
 
-/** Serves `file` in 64 KiB body chunks; `served()` is how many bytes were pulled over all requests. */
-function serve(file: Uint8Array) {
-  let served = 0;
-  const fetchMock = vi.fn<typeof fetch>(async () => {
-    let at = 0;
-    return new Response(new ReadableStream<Uint8Array>({
-      pull(controller) {
-        if (at >= file.length) { controller.close(); return; }
-        const chunk = file.slice(at, at + 65536);
-        at += chunk.length; served += chunk.length;
-        controller.enqueue(chunk);
-      },
-    }, {highWaterMark: 0}));
-  });
+/** Serves each URL its file; without workers, so background reads run on the main thread. */
+function serve(files: Record<string, Uint8Array>) {
+  const fetchMock = vi.fn<typeof fetch>(async url => new Response(files[url as string].slice()));
   vi.stubGlobal('fetch', fetchMock);
   vi.stubGlobal('Worker', undefined);
-  return {fetchMock, served: () => served};
+  return fetchMock;
 }
+
+/** The start file of a texture: the same texture from its third level down, as a file of its own. */
+const startFile = (size: number) => ktx2File(size / 4);
 
 /** A loader whose parser reads the container the way the test file is laid out. */
 function loader(detail?: TextureDetail): CachedKtx2Loader {
@@ -56,70 +48,47 @@ function loader(detail?: TextureDetail): CachedKtx2Loader {
   return ktx2;
 }
 
-const INDEX_END = INDEX + 12 * ENTRY;
-/** Bytes of a 2048 file up to and including the level whose side is the given size. */
-const through = (px: number) => INDEX_END + Array.from({length: Math.log2(px) + 1}, (_, i) => Math.ceil((px >> i) / 4) ** 2).reduce((a, b) => a + b);
-
-it('finds how much of a file its first read needs, once the level index has arrived', () => {
-  const file = ktx2File(2048);
-  expect(firstReadEnd(file.subarray(0, 79), undefined, true)).toBeUndefined();
-  expect(firstReadEnd(file.subarray(0, INDEX_END - 1), undefined, true)).toBeUndefined();
-  // Streamed: up to level 2. Capped at 1024: up to level 1. Both: the capped texture's own reduced levels, level 3.
-  expect([firstReadEnd(file, undefined, true), firstReadEnd(file, 1024, false), firstReadEnd(file, 1024, true)]).toEqual([through(512), through(1024), through(256)]);
-  // Whole: nothing to leave out, or not stored smallest first.
-  expect([firstReadEnd(ktx2File(256), undefined, true), firstReadEnd(file, 2048, false), firstReadEnd(ktx2File(2048, false), 1024, true)]).toEqual([Infinity, Infinity, Infinity]);
+it('cuts a file to the levels no larger than a given size, and leaves alone what it cannot or need not cut', () => {
+  const file = ktx2File(2048).buffer as ArrayBuffer, cut = new DataView(withoutLevelsAbove(file, 1024));
+  expect([cut.getUint32(20, true), cut.getUint32(24, true), cut.getUint32(40, true)]).toEqual([1024, 1024, 11]);
+  // The first level left is the file's second: its bytes hold their level number.
+  expect(new Uint8Array(cut.buffer)[Number(cut.getBigUint64(INDEX, true))]).toBe(1);
+  expect([withoutLevelsAbove(file, undefined), withoutLevelsAbove(file, 2048)]).toEqual([file, file]);
+  const largestFirst = ktx2File(2048, false).buffer as ArrayBuffer;
+  expect(withoutLevelsAbove(largestFirst, 1024)).toBe(largestFirst);
 });
 
-it('leaves out the levels above the given size for good, then the streamed ones of what is still large', () => {
-  expect(skippedLevels(2048, 2048, 12, undefined, true)).toEqual({dropped: 0, later: 2});
-  expect(skippedLevels(2048, 2048, 12, 1024, true)).toEqual({dropped: 1, later: 2});
-  // Sized by the longer side; under the streamed size once capped, so nothing comes later.
-  expect(skippedLevels(4096, 512, 13, 1024, true)).toEqual({dropped: 2, later: 0});
-  expect(skippedLevels(2048, 2048, 12, 512, true)).toEqual({dropped: 2, later: 2});
-  expect(skippedLevels(2048, 2048, 1, 512, false)).toEqual({dropped: 0, later: 0});
-});
-
-it('reads a large texture as far as its reduced levels, then its largest levels from one whole read', async () => {
-  const file = ktx2File(2048), {fetchMock, served} = serve(file), ktx2 = loader({streamed: true});
-  const texture = await ktx2.loadAsync('/scenery/textures/road.ktx2.zst');
-  expect(await ktx2.loadAsync('/scenery/textures/road.ktx2.zst')).toBe(texture);
-  expect(fetchMock).toHaveBeenCalledOnce();
-  expect(served()).toBeLessThan(file.length / 2);
-  // A complete texture of levels 2…11: a quarter of the size, each level holding its own bytes.
+it('loads a texture from its start file, then its largest levels from one background read of the full file', async () => {
+  const fetchMock = serve({'/t/road.ktx2.zst': ktx2File(2048), '/t/road-start.ktx2.zst': startFile(2048)});
+  const ktx2 = loader({start: url => url.replace('.ktx2', '-start.ktx2')});
+  const texture = await ktx2.loadAsync('/t/road.ktx2.zst');
+  expect(await ktx2.loadAsync('/t/road.ktx2.zst')).toBe(texture);
+  expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/t/road-start.ktx2.zst']);
   expect([texture.image.width, texture.mipmaps.length]).toEqual([512, 10]);
-  expect(texture.mipmaps.map(level => [level.width, level.data.length, level.data[0]]).slice(0, 2)).toEqual([[512, 128 * 128, 2], [256, 64 * 64, 3]]);
-  expect(texture.mipmaps.at(-1)?.data[0]).toBe(11);
   const detail = ktx2.detail(texture);
-  const [first, again] = await Promise.all([detail?.(), detail?.()]);
+  expect(detail?.missing).toBe(2);
+  const [first, again] = await Promise.all([detail?.load(), detail?.load()]);
   expect(again).toBe(first);
   expect(fetchMock).toHaveBeenCalledTimes(2);
   expect(first?.map(level => [level.width, level.data.length, level.data[0]])).toEqual([[2048, 512 * 512, 0], [1024, 256 * 256, 1]]);
 });
 
-it('never reads the levels above a texture\'s given size, on the first read or when it sharpens', async () => {
-  const file = ktx2File(2048), {served} = serve(file);
-  const ktx2 = loader({streamed: true, maxPx: url => (url.endsWith('stand.ktx2.zst') ? 1024 : undefined)});
-  const texture = await ktx2.loadAsync('/scenery/textures/stand.ktx2.zst');
-  // The 1024 texture's reduced levels (file levels 3…11), then file levels 1 and 2 from a read that stops before level 0.
-  expect([texture.image.width, texture.mipmaps.length, texture.mipmaps[0].data[0]]).toEqual([256, 9, 3]);
-  const levels = await ktx2.detail(texture)?.();
-  expect(levels?.map(level => [level.width, level.data[0]])).toEqual([[1024, 1], [512, 2]]);
-  // Both reads together stay well short of the file: its largest level is most of it.
-  expect(served()).toBeLessThan(file.length * 0.6);
+it('sharpens a texture no further than its given size', async () => {
+  serve({'/t/stand.ktx2.zst': ktx2File(2048), '/t/stand-start.ktx2.zst': startFile(2048), '/t/far.ktx2.zst': ktx2File(2048), '/t/far-start.ktx2.zst': startFile(2048)});
+  const ktx2 = loader({start: url => url.replace('.ktx2', '-start.ktx2'), maxPx: url => (url.includes('stand') ? 1024 : 256)});
+  const stand = await ktx2.loadAsync('/t/stand.ktx2.zst'), detail = ktx2.detail(stand);
+  expect([stand.image.width, detail?.missing]).toEqual([512, 1]);
+  expect((await detail?.load())?.map(level => [level.width, level.data[0]])).toEqual([[1024, 1]]);
+  // A size under the start file's: the start file itself is cut, and nothing comes later.
+  const far = await ktx2.loadAsync('/t/far.ktx2.zst');
+  expect([far.image.width, far.mipmaps.length, ktx2.detail(far)]).toEqual([256, 9, undefined]);
 });
 
-it('reads small textures, and every texture of a loader given no detail rule, whole', async () => {
-  serve(ktx2File(256));
-  const small = loader({streamed: true}), texture = await small.loadAsync('/scenery/textures/sign.ktx2.zst');
-  expect([texture.mipmaps.length, small.detail(texture)]).toEqual([9, undefined]);
-  const {served} = serve(ktx2File(2048)), whole = loader(), car = await whole.loadAsync('/vehicles/textures/body.ktx2.zst');
-  expect([car.image.width, car.mipmaps.length, whole.detail(car), served()]).toEqual([2048, 12, undefined, ktx2File(2048).length]);
-});
-
-it('reads a capped texture no larger than the cap and never fetches the rest', async () => {
-  const file = ktx2File(2048), {fetchMock, served} = serve(file), ktx2 = loader({maxPx: () => 1024});
-  const texture = await ktx2.loadAsync('/vehicles/textures/body.ktx2.zst');
-  expect([texture.image.width, texture.mipmaps.length, texture.mipmaps[0].data[0], ktx2.detail(texture)]).toEqual([1024, 11, 1, undefined]);
-  expect(served()).toBeLessThan(file.length / 2);
-  expect(fetchMock).toHaveBeenCalledOnce();
+it('reads a texture without a start file whole, cut to its given size', async () => {
+  const fetchMock = serve({'/t/sign.ktx2.zst': ktx2File(256), '/t/body.ktx2.zst': ktx2File(2048)});
+  const ktx2 = loader({start: () => undefined, maxPx: url => (url.includes('body') ? 1024 : undefined)});
+  const sign = await ktx2.loadAsync('/t/sign.ktx2.zst'), body = await ktx2.loadAsync('/t/body.ktx2.zst');
+  expect([sign.mipmaps.length, ktx2.detail(sign)]).toEqual([9, undefined]);
+  expect([body.image.width, body.mipmaps.length, body.mipmaps[0].data[0], ktx2.detail(body)]).toEqual([1024, 11, 1, undefined]);
+  expect(fetchMock).toHaveBeenCalledTimes(2);
 });

@@ -35,13 +35,3 @@ it('reads on the main thread where workers do not exist', async () => {
   const {fetchBinaryInBackground} = await import('../../src/api/backgroundBinary.js');
   expect(await fetchBinaryInBackground('/api/a')).toBe(bytes);
 });
-
-it('asks for only the start of a file when given where to stop', async () => {
-  stubWorkers(url => ({bytes: new TextEncoder().encode(url).buffer}));
-  const {fetchBinaryInBackground} = await import('../../src/api/backgroundBinary.js');
-  expect(new TextDecoder().decode(await fetchBinaryInBackground('/api/a', 300))).toBe('http://localhost:5173/api/a#300');
-  // Without workers: the same read on the main thread, cut to the bytes asked for.
-  vi.stubGlobal('Worker', undefined);
-  vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array(1000).fill(7))));
-  expect(new Uint8Array(await fetchBinaryInBackground('/api/a', 300))).toEqual(new Uint8Array(300).fill(7));
-});

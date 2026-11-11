@@ -53,7 +53,7 @@ export function materialTexturePaths(recipe: CarMaterialRecipe, appearance: CarA
 
 /** The map's own copy of a shared texture: repeat-wrapped (car UVs keep their native range) and decoded by the map's colour role. */
 function mapTexture(texture: (path: string) => Texture, map: SurfaceMap): Texture {
-  const copy = texture(map.texture).clone();
+  const copy = texture(map.texture);
   copy.wrapS = RepeatWrapping; copy.wrapT = RepeatWrapping; copy.anisotropy = MAX_ANISOTROPY;
   copy.colorSpace = map.srgb ? SRGBColorSpace : NoColorSpace;
   copy.needsUpdate = true;
@@ -66,7 +66,7 @@ function mapTexture(texture: (path: string) => Texture, map: SurfaceMap): Textur
  * The albedo is the appearance's paint texture for paint materials, the livery file of the same-named material when the
  * appearance has one, else the recipe's own map. Car paint is layered paint (carPaint.ts); the other shader kinds
  * map to a standard or physical material with the albedo map.
- * `texture` returns a shared KTX2 texture by its `textures/<sha256>.ktx2.zst` path; each material uses its own clone for its UV channel.
+ * `texture` returns a copy of the KTX2 texture at a `textures/<sha256>.ktx2.zst` path, the caller's to set up: each map has its own for its UV channel.
  * `shading` is the scenery package's shading section, read by the car paint.
  */
 export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppearance, texture: (path: string) => Texture, shading: SceneryShading): MeshStandardMaterial {
@@ -107,7 +107,7 @@ export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppe
     if (channel === undefined) throw Error(`Car material ${recipe.name}: no albedo UV set (${albedo?.uv})`);
     // Car UVs keep the package's native range (V in [-1, 0]), which relies on the glTF default REPEAT sampler; the KTX2 loader's
     // clamp default pinned every lookup to the texture edge (a black car).
-    const map = texture(path).clone();
+    const map = texture(path);
     map.wrapS = RepeatWrapping; map.wrapT = RepeatWrapping; map.anisotropy = MAX_ANISOTROPY;
     // The map's UV scale tiles the texture (a [0,0] or missing scale is 1); three folds `repeat` into the map's UV transform.
     const [scaleU, scaleV] = albedo?.scale ?? [];

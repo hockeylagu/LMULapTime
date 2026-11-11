@@ -72,10 +72,10 @@ it('copies at least one row of a raw texture with a clean unpack state, and wait
   expect([gpu.baseLevels(), isStreaming(texture)]).toEqual([[1, 0], false]);
 });
 
-it('allocates the full chain of a texture read on its reduced levels and fetches the levels above when it sharpens', async () => {
+it('allocates the full chain of a texture read from its start file and fetches the levels above when it sharpens', async () => {
   const gpu = fakeRenderer(), texture = bc7(512), full = bc7(2048).mipmaps as MipLevel[];
-  const detail = vi.fn(async () => full.slice(0, STREAMED_LEVELS));
-  startStreaming(texture, gpu.renderer, detail);
+  const detail = vi.fn(async () => full.slice(0, 2));
+  startStreaming(texture, gpu.renderer, {missing: 2, load: detail});
   expect(texture.mipmaps.map(level => level.width).slice(0, 3)).toEqual([2048, 1024, 512]);
   texture.onUpdate?.(texture);
   expect(gpu.compressed().map(([level]) => level)).toEqual(Array.from({length: 10}, (_, i) => i + STREAMED_LEVELS));
@@ -92,15 +92,25 @@ it('keeps a texture on its reduced levels and reports the error when the levels 
   try {
     const gpu = fakeRenderer();
     const unreadable = async (): Promise<MipLevel[]> => Promise.reject(Error('Request failed (404)'));
-    const wrongSize = async () => (bc7(1024).mipmaps as MipLevel[]).slice(0, STREAMED_LEVELS);
+    const wrongSize = async () => (bc7(1024).mipmaps as MipLevel[]).slice(0, 2);
     const kept = await Promise.all([unreadable, wrongSize].map(async detail => {
       const texture = bc7(512);
-      startStreaming(texture, gpu.renderer, detail);
+      startStreaming(texture, gpu.renderer, {missing: 2, load: detail});
       expect(streamTexture(texture, gpu.renderer, MiB)).toBe(0);
       await vi.waitFor(() => { expect(isStreaming(texture)).toBe(false); });
       return streamTexture(texture, gpu.renderer, MiB);
     }));
     expect(kept).toEqual([0, 0]);
-    expect(reported.mock.calls.map(([error]) => (error as Error).message).sort()).toEqual(['A texture file does not hold the levels above its reduced ones', 'Request failed (404)']);
+    expect(reported.mock.calls.map(([error]) => (error as Error).message).sort()).toEqual(['A texture file does not hold the levels above its start file', 'Request failed (404)']);
   } finally { vi.unstubAllGlobals(); }
+});
+
+it('sharpens by one level a texture whose given size is one level above its start file', async () => {
+  const gpu = fakeRenderer(), texture = bc7(512), full = bc7(1024).mipmaps as MipLevel[];
+  startStreaming(texture, gpu.renderer, {missing: 1, load: async () => full.slice(0, 1)});
+  expect(texture.mipmaps.map(level => level.width).slice(0, 2)).toEqual([1024, 512]);
+  texture.onUpdate?.(texture);
+  expect(streamTexture(texture, gpu.renderer, MiB)).toBe(0);
+  await vi.waitFor(() => { expect(streamTexture(texture, gpu.renderer, 8 * MiB)).toBe(MiB); });
+  expect([gpu.baseLevels(), isStreaming(texture)]).toEqual([[1, 0], false]);
 });

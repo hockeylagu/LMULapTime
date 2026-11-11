@@ -182,7 +182,7 @@ const FRAGMENT = {
 /** A paint map's own texture, sampled on the albedo's UVs with repeat. */
 function paintMap(texture: (path: string) => Texture, path: string | undefined, fallback: Texture): Texture {
   if (!path) return fallback;
-  const map = texture(path).clone();
+  const map = texture(path);
   map.wrapS = RepeatWrapping; map.wrapT = RepeatWrapping; map.anisotropy = MAX_ANISOTROPY; map.needsUpdate = true;
   return map;
 }

@@ -8,6 +8,7 @@ import { sampleRenderPose, sampleStationPose, type RenderPose } from './replayPo
 import { nativeToScene } from './sceneFrame.js';
 import { createLapLayerLoader, type LapCars, type LapLayer } from './laps/lapLayer.js';
 import { disposeObjects } from './laps/disposeObjects.js';
+import { setCameraDistance } from './sceneObjects.js';
 import { exposureType, shadowCascadeSet, type CameraMode } from './cameraModes.js';
 import { createCameraRig } from './cameraRig.js';
 import { addSceneEnvironment, sceneSun } from './sceneEnvironment.js';
@@ -47,8 +48,8 @@ export interface ReplaySceneHandle {
 
 /**
  * Car textures load no larger than this on their longer side. On a 1080p view from outside the car the picture is the same as
- * with the package's full size (2048), for a third of the data. The interior's own textures are not capped: they start on
- * their reduced levels and reach their full size in the driver cameras.
+ * with a larger file, for a third of the data. The interior's own textures are not capped: they stay on their start files
+ * and reach their full size in the driver cameras.
  */
 const CAR_TEXTURE_MAX_PX = 1024;
 
@@ -64,7 +65,8 @@ export async function createReplayScene(
   try { renderer = new WebGLRenderer({antialias: false, alpha: false, reversedDepthBuffer: true}); }
   catch { throw Error('WebGL 2 is unavailable. Use the 2D map.'); }
   const {min, max} = layout.horizon.bounds, origin = new Vector3(...min).add(new Vector3(...max)).multiplyScalar(0.5);
-  const loader = createChunkLoader(renderer, layout.textures), carTextures = new CachedKtx2Loader(renderer, {maxPx: () => CAR_TEXTURE_MAX_PX}), interiorTextures = new CachedKtx2Loader(renderer, {streamed: true});
+  const loader = createChunkLoader(renderer, layout.textures), carStarts = new Map<string, string>(), startOf = (url: string) => carStarts.get(url);
+  const carTextures = new CachedKtx2Loader(renderer, {maxPx: () => CAR_TEXTURE_MAX_PX, start: startOf}), interiorTextures = new CachedKtx2Loader(renderer, {start: startOf});
   const sun = sceneSun(layout, origin.y, trajectory.daylightClock);
   const exposure = createAutoExposure(renderer, layout.camera, {rgb: sun.radiance.clone(), elevationDeg: sun.sunElevationDeg}, () => invalidate(), exposureType('follow'),
     sun.weather.cloudCover, sun.weather.sunVisibility);
@@ -123,12 +125,16 @@ export async function createReplayScene(
   // Interior textures stay on their reduced levels until a driver camera is used: only there is their full size seen.
   let driverCameraUsed = false;
   const loadLaps = createLapLayerLoader(origin, surfaceHeight, {
-    load: (path, interior) => (interior ? interiorTextures : carTextures).loadAsync(`${VEHICLE_FILES}${path}`),
-    copied(copy, original) {
-      const detail = interiorTextures.detail(original);
+    load(path, interior, start) {
+      const url = `${VEHICLE_FILES}${path}`;
+      if (start) carStarts.set(url, `${VEHICLE_FILES}${start}`);
+      return (interior ? interiorTextures : carTextures).loadAsync(url);
+    },
+    copied(copy, original, interior) {
+      const detail = (interior ? interiorTextures : carTextures).detail(original);
       if (!detail) return;
       startStreaming(copy, renderer, detail);
-      if (!driverCameraUsed) warmup.hold(copy);
+      if (interior && !driverCameraUsed) warmup.hold(copy); else warmup.sharpen(copy);
     },
   }, () => exposure.display(), layout.shading);
   // The first view's chunks and the car are requested first: the sky's environment and the car's reflection link their programs
@@ -169,7 +175,7 @@ export async function createReplayScene(
     if (!viewMoved(streamView, next, route)) return;
     streamView = next; stream.update(next);
   };
-  const eyeRotation = new Quaternion(), desiredEye = new Vector3(), correctedEye = new Vector3(), probeCentre = new Vector3(), target = new Vector3();
+  const eyeRotation = new Quaternion(), desiredEye = new Vector3(), correctedEye = new Vector3(), probeCentre = new Vector3(), ghostCentre = new Vector3(), target = new Vector3();
   let frame = 0, frameHook: ((frameTime: number) => void) | null = null, probed = false;
   const draw = (frameTime?: number) => {
     if (disposed) return;
@@ -193,6 +199,9 @@ export async function createReplayScene(
         probed = true; layer.primary.getWorldPosition(probeCentre);
         for (let pass = 0; pass < 6 && reflection.update(probeCentre); pass++);
       }
+      // The car the cameras follow keeps every part at its full level, however far a zoomed camera stands; the other car's
+      // parts follow the camera's distance.
+      if (layer.ghost.visible) setCameraDistance(layer.ghost, camera.position.distanceTo(layer.ghost.getWorldPosition(ghostCentre)));
       exposure.render(scene, camera);
       // The car's reflection probe renders one face after the frame (car/carReflection.ts), around the body's centre.
       if (layer.primary.visible && reflection.update(layer.primary.getWorldPosition(probeCentre))) invalidate();

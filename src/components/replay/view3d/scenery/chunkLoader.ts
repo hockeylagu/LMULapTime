@@ -63,8 +63,9 @@ export function skipSurfaceTextures(parser: GLTFParser): GLTFLoaderPlugin {
 /** `textures` is the layout's texture list: a texture loads no larger than the size the package gives it there (`maxPx`). */
 export function createChunkLoader(renderer: WebGLRenderer, textures: readonly SceneryTexture[]): ChunkLoader {
   startDecoderWorkers();
-  const maxPx = new Map(textures.map(texture => [`${SCENERY_FILES}textures/${texture.sha256}.ktx2.zst`, texture.maxPx]));
-  const ktx2 = new CachedKtx2Loader(renderer, {maxPx: url => maxPx.get(url), streamed: true});
+  const file = (sha256: string) => `${SCENERY_FILES}textures/${sha256}.ktx2.zst`;
+  const rows = new Map(textures.map(texture => [file(texture.sha256), texture]));
+  const ktx2 = new CachedKtx2Loader(renderer, {maxPx: url => rows.get(url)?.maxPx, start: url => { const start = rows.get(url)?.start; return start && file(start.sha256); }});
   const gltf = new GLTFLoader().setKTX2Loader(ktx2).setMeshoptDecoder(MeshoptDecoder).register(skipSurfaceTextures);
   const pool = createSurfaceTexturePool(ktx2, renderer, SCENERY_FILES);
   const sources = new WeakMap<Object3D, ReturnType<typeof pool.source>>(), materials = createSharedSurfaceMaterials();

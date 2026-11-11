@@ -43,12 +43,6 @@ it('keeps an unscaled, zero or missing scale at one repeat', () => {
   expect(build().repeat.toArray()).toEqual([1, 1]);
 });
 
-it('does not change the shared source texture', () => {
-  const source = new Texture();
-  createCarMaterial(recipe([50, 50]), appearance, () => source, testShading());
-  expect(source.repeat.toArray()).toEqual([1, 1]);
-});
-
 it('loads every map of a standard material, with the livery albedo in place of its own', () => {
   expect(materialTexturePaths(standard, appearance)).toEqual(['textures/albedo', 'textures/mr', 'textures/ao', 'textures/normal']);
   const livery = { ...appearance, materialTextures: { CARBON: 'textures/livery' } } as CarAppearance;
