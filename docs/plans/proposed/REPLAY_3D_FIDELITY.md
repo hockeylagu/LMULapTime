@@ -263,7 +263,8 @@ scored by `inputs/score.py` against the frozen game frames):
    (production build, headless, 40 s played, one run each; 256 px one face → 1024 px three faces): Silverstone p50 6.2 → 9.7 ms,
    p99 25 → 40, frames over 16 ms 113 → 367 of ~5600/3500; Daytona p50 6.3 → 9.3, p99 33 → 31, over 16 ms 242 → 172. Offscreen
    draws a frame double (311 → 649 median): the three faces' draw calls on the CPU-bound frame, not the pixels. Kept at the
-   user's word (optimise after). after6 shows the paint shader compiled with the glint in; its views have no sun-facing paint,
+   user's word (optimise after). Optimised 2026-11-11 (the user's choice, after the first freeze): one face a frame, so a probe
+   renews every six frames; the faces stay 1024 px. after6 shows the paint shader compiled with the glint in; its views have no sun-facing paint,
    so the glint is not yet seen. The game's paint shows a bright sky reflection along the body edges (Genesis roof view) that
    the app's did not. Done next (2026-11-09 pm): the car paint reads the car's own reflection cubes as the package rules
    (`shading.carPaintReflection`): the probe keeps its mips (regenerated after the last face only), `reflectionCube.ts`

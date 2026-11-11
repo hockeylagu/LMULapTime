@@ -39,7 +39,7 @@ function stubRenderer() {
   return {renderer: renderer as unknown as WebGLRenderer, faces, eyes, ranges, cars, target: () => target};
 }
 
-it('renders the probe three faces a frame from the roof without the cars, then gives the car its reflection', () => {
+it('renders the probe one face a frame from the roof without the cars, then gives the car its reflection', () => {
   const {renderer, faces, eyes, ranges, cars, target} = stubRenderer();
   const glass = new MeshPhysicalMaterial(), unlit = new MeshBasicMaterial({envMap: null}), paint = new MeshPhysicalMaterial({map: new Texture()});
   configureCarPaint(paint, carPaint(), () => new Texture(), testShading());
@@ -62,7 +62,7 @@ it('renders the probe three faces a frame from the roof without the cars, then g
   expect(pmrem.conversions).toBe(1);
   reflection.setCar(car, cars);
   expect(glass.envMap).not.toBeNull(); expect(paintUniforms().paint_probe.value).toBe(0);
-  for (let i = 0; i < 2; i++) expect(reflection.update(centre)).toBe(true);
+  for (let i = 0; i < 6; i++) expect(reflection.update(centre)).toBe(true);
   // The cube's mips regenerate after the last face only: the kernels read them.
   expect(faces).toEqual([0, 1, 2, 3, 4, 5].map(face => ({face, carShown: false, mips: face === 5})));
   // The eye sits 0.72 m over the box centre (roof height) and each face sees from 0.1 m to 150 m.
@@ -79,11 +79,11 @@ it('renders the probe three faces a frame from the roof without the cars, then g
 
   // A paused car keeps its probe; moving the car or new scenery starts another.
   expect(reflection.update(centre)).toBe(false);
-  reflection.stale(); expect(reflection.update(centre)).toBe(true);
-  reflection.update(centre);
+  reflection.stale();
+  for (let i = 0; i < 6; i++) expect(reflection.update(centre)).toBe(true);
   expect(reflection.update(centre)).toBe(false);
   expect(reflection.update(new Vector3(11, 0.5, 20))).toBe(true);
-  expect(faces).toHaveLength(15); expect(pmrem.conversions).toBe(3); expect(pmrem.convolutions).toBe(2); expect(pmrem.reused).toBe(1); expect(pmrem.disposed).toBe(0);
+  expect(faces).toHaveLength(13); expect(pmrem.conversions).toBe(3); expect(pmrem.convolutions).toBe(2); expect(pmrem.reused).toBe(1); expect(pmrem.disposed).toBe(0);
 
   reflection.dispose();
   expect(glass.envMap).toBeNull(); expect(paintUniforms().paint_probe.value).toBe(0); expect(pmrem.disposed).toBe(1);

@@ -5,12 +5,13 @@ import { sceneryReflectionUniforms } from '../scenery/materials/sceneryReflectio
 import { setPaintReflection } from './carPaint.js';
 
 /**
- * Face size and renewal, as the reference frames' reflections (2026-11-09): 1024 px a face, three faces a frame, so a probe
- * renews every two frames. How far each face sees: beyond 150 m the sky shows, the range the reference reflections reach. Each face
- * draws its share of the scenery, so the reach is the probe's cost: at 1.5 km Silverstone's frames doubled (p50 7 → 14 ms,
- * production pass); at 300 m they matched the frame without the probe. Chosen before measuring the cost (user, 2026-11-09).
+ * Face size as the reference frames' reflections (2026-11-09): 1024 px a face. One face a frame, so a probe renews every six
+ * frames: each face is a full scenery pass, and three a frame cost ~5 ms of a Silverstone frame (user, 2026-11-11). How far each
+ * face sees: beyond 150 m the sky shows, the range the reference reflections reach. Each face draws its share of the scenery, so
+ * the reach is the probe's cost: at 1.5 km Silverstone's frames doubled (p50 7 → 14 ms, production pass); at 300 m they matched
+ * the frame without the probe.
  */
-const FACE_PX = 1024, FACES_PER_FRAME = 3, NEAR_M = 0.1, FAR_M = 150;
+const FACE_PX = 1024, FACES_PER_FRAME = 1, NEAR_M = 0.1, FAR_M = 150;
 /** A paused view keeps its finished probe until the car or the scenery moves. */
 const MOVED_M = 0.5;
 /** The probe's eye above the centre of the car's bounding box: roof height, as the reference frames place it (0.72 m on a GT3). */
@@ -23,7 +24,7 @@ export interface CarReflection {
   /** The resident scenery changed: render a new probe even if the car has not moved. */
   stale(): void;
   /**
-   * Renders the next cube faces from the car's roof, given the car's position in scene coordinates, three faces a frame so no
+   * Renders the next cube face from the car's roof, given the car's position in scene coordinates, one face a frame so no
    * frame pays for all six. True until the frame that shows a finished probe: the caller renders another frame.
    */
   update(car: Vector3): boolean;
