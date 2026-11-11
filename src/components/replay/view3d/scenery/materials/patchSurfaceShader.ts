@@ -16,7 +16,7 @@ const hasTranslucency = (config: SurfaceConfig) => !!config.flags.translucency;
  * belongs to the rest plane and, kept, left whole crowds facing away from the sun. transpose(M) * d is the local normal whose world
  * normal is d. The shadow pass turns cards toward the viewing camera too (`billboardShadowMaterial`), so a card shades what is seen.
  */
-export function patchBillboardVertex(shader: WebGLProgramParametersWithUniforms, eye: string, crown = false): void {
+function patchBillboardVertex(shader: WebGLProgramParametersWithUniforms, eye: string, crown = false): void {
   shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>
     attribute vec3 _lmu_pivot;
     attribute vec2 _lmu_corner;

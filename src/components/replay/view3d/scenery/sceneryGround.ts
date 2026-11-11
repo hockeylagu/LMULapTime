@@ -12,7 +12,7 @@ const isFillerGround = (name: string) => name.startsWith('FILLER_GROUND');
 const isOpaqueSurface = (name: string) => !isFillerGround(name) && /__OPAQUE(?:__|$)/.test(name);
 const GROUND_NAMES = ['terrain', 'road', 'kerb', 'panorama', 'grass'];
 
-export function isSceneryGround(name: string): boolean {
+function isSceneryGround(name: string): boolean {
   const lowerName = name.toLowerCase();
   return GROUND_NAMES.some(ground => lowerName.includes(ground));
 }

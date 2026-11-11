@@ -11,7 +11,7 @@ import { cascadeCentres, sunSquareAxes, type ShadowCascadeLayout, type SunSquare
  * the cars, again once their centre has moved an eighth of their side, at most one per frame (a redraw of a 1 km square is ~1,000
  * draws). Every shadow pass re-draws each caster it meets, the frame's main cost (docs/plans/proposed/REPLAY_3D_PERFORMANCE.md).
  */
-export const LIVE_CASCADE_SPLIT_M = 100;
+const LIVE_CASCADE_SPLIT_M = 100;
 const CACHED_REDRAW_SIDE_FRACTION = 1 / 8;
 /** A cached cascade leaves out casters under this many of its texels across (they would draw to under ~3 texels). */
 const CACHED_MIN_CASTER_TEXELS = 3;

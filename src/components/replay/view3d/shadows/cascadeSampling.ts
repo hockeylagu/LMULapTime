@@ -4,7 +4,7 @@ import { cascadeDepthRangeM, type CascadeShadowState } from './cascadeShadows.js
 import type { ShadowCascadeLayout } from './shadowCascades.js';
 
 /** What the surface shaders are compiled for: a package with more cascades or filter taps throws. */
-export const MAX_SHADOW_CASCADES = 8;
+const MAX_SHADOW_CASCADES = 8;
 const MAX_SHADOW_TAPS = 16;
 
 /**

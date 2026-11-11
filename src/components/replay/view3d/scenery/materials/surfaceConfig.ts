@@ -42,7 +42,7 @@ export interface SurfaceConfig {
   billboard?: true;
 }
 
-export function isSurfaceKind(kind: unknown): kind is SurfaceKind {
+function isSurfaceKind(kind: unknown): kind is SurfaceKind {
   return (SURFACE_KINDS as readonly unknown[]).includes(kind);
 }
 
