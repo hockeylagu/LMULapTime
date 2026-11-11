@@ -11,7 +11,7 @@ import { nativeToScene } from './sceneFrame.js';
 import { createLapLayerLoader, type LapCars, type LapLayer } from './laps/lapLayer.js';
 import { disposeObjects } from './laps/disposeObjects.js';
 import { MIN_CAMERA_DISTANCE, MAX_CAMERA_DISTANCE, panCamera, zoomCamera } from './cameraNavigation.js';
-import { exposureType, type CameraMode } from './cameraModes.js';
+import { exposureType, shadowCascadeSet, type CameraMode } from './cameraModes.js';
 import { createChaseCameraTracker, trackCamera } from './cameraTracking.js';
 import { driverCamera, driverPose, isDriverCamera, type DriverPose } from './driverCameras.js';
 import { addSceneEnvironment, sceneLighting } from './sceneEnvironment.js';
@@ -204,7 +204,7 @@ export async function createReplayScene(
   };
   freezeScenery();
   world.add(layer.root); environment.setDynamic([layer.root]); reflection.setCar(layer.primary, layer.root);
-  environment.setCamera(perspective);
+  environment.setCamera(perspective); environment.setShadowCascades(shadowCascadeSet(mode));
   // The first view's chunks are warm: this compiles and uploads the cars and lines, behind the loading screen.
   try { await warmUp(scene, new AbortController().signal); } catch (error) { cleanup(); throw error; }
   // The scenery around the first pose is resident and compiled: capture the venue's light for the scene's environment.
@@ -385,7 +385,8 @@ export async function createReplayScene(
       if (next === mode) return;
       const wasTop = mode === 'top', wasDriver = isDriverCamera(mode); mode = next;
       const driverView = isDriverCamera(mode);
-      camera = mode === 'top' ? overhead : perspective; controls.object = camera; environment.setCamera(camera); exposure.setType(exposureType(mode)); layer.syncLines();
+      camera = mode === 'top' ? overhead : perspective; controls.object = camera; environment.setCamera(camera); environment.setShadowCascades(shadowCascadeSet(mode));
+      exposure.setType(exposureType(mode)); layer.syncLines();
       controls.enabled = !driverView;
       if (wasDriver && !driverView) camera.up.set(0, 1, 0);
       syncDriverCamera();

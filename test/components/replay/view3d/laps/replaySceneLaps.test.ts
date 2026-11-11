@@ -27,7 +27,7 @@ vi.mock('three', async importOriginal => {
     dispose() {}
   }, WebGLRenderer: class {
     domElement = document.createElement('canvas');
-    shadowMap = {enabled: false, type: 0};
+    shadowMap = {enabled: false, type: 0}; capabilities = {maxTextureSize: 16384};
     coordinateSystem = actual.WebGLCoordinateSystem;
     render = gpu.render;
     dispose = gpu.dispose;

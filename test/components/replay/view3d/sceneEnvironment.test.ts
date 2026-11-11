@@ -6,6 +6,7 @@ import { SUN_UNIT } from '../../../../src/components/replay/view3d/atmosphere/su
 import { TEST_HAZE_WEIGHTS, testShading, testSky, testSun } from '../../../helpers/scenes/sceneryProfiles.js';
 import { solarPosition } from '../../../../src/components/replay/view3d/solarPosition.js';
 import { staticShadowUniforms } from '../../../../src/components/replay/view3d/sunShadows.js';
+import { cascadeShadowUniforms } from '../../../../src/components/replay/view3d/shadows/cascadeSampling.js';
 import { crownSun } from '../../../../src/components/replay/view3d/scenery/materials/foliageCrown.js';
 
 const probe = vi.hoisted(() => ({render: vi.fn<(scene: Scene) => void>(), dispose: vi.fn(), cubemaps: 0}));
@@ -17,7 +18,7 @@ vi.mock('three', async importOriginal => {
     dispose() {}
   }};
 });
-const fakeRenderer = () => ({render: vi.fn(), clear: vi.fn(), autoClear: true, getRenderTarget: () => null, setRenderTarget: vi.fn(), initRenderTarget: vi.fn(), getActiveCubeFace: () => 0, getActiveMipmapLevel: () => 0, xr: {enabled: false}, coordinateSystem: WebGLCoordinateSystem});
+const fakeRenderer = () => ({capabilities: {maxTextureSize: 16384}, render: vi.fn(), clear: vi.fn(), autoClear: true, getRenderTarget: () => null, setRenderTarget: vi.fn(), initRenderTarget: vi.fn(), getActiveCubeFace: () => 0, getActiveMipmapLevel: () => 0, xr: {enabled: false}, coordinateSystem: WebGLCoordinateSystem});
 /** A venue without daylight: the default midday sun, the synthetic sky, the probe at the scene origin. */
 const venue = (daylight?: SceneVenue['daylight'], position: [number, number, number] = [0, 0, 0]): SceneVenue => ({daylight, sky: testSky(), environmentProbe: {position}, shading: testShading()});
 const skyMaterial = (scene: Scene) => (scene.getObjectByName('sky') as Mesh<BoxGeometry, ShaderMaterial>).material;
@@ -218,4 +219,32 @@ it("captures the venue at the package's probe without the cars, twice, and light
     expect(car.visible).toBe(true); expect(scene.environment).not.toBe(first); expect(scene.environment).toBeInstanceOf(Texture);
   } finally { environment.dispose(); }
   expect(scene.environment).toBeNull();
+});
+
+it("samples the package's cascade set while one is chosen, from its first draw, and goes back to the near and static maps without one", () => {
+  const scene = new Scene(), render = vi.fn<(scene: Scene, camera: OrthographicCamera) => void>();
+  const renderer = {shadowMap: {enabled: false, type: 0, autoUpdate: true}, ...fakeRenderer(), render} as unknown as WebGLRenderer;
+  const environment = addSceneEnvironment(scene, renderer, venue(), new Vector3()), camera = new PerspectiveCamera(48, 1.5, 0.5, 15000);
+  environment.setCamera(camera);
+  try {
+    const staticMap = staticShadowUniforms.map.value;
+    environment.setShadowCascades('chase');
+    expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(0);
+    // The first frame draws the test chase set's three cascades, then the surfaces sample them through the static map's sampler;
+    // the static map is not drawn meanwhile.
+    environment.update(new Vector3()); expect(render).toHaveBeenCalledTimes(3);
+    expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(3); expect(staticShadowUniforms.map.value).not.toBe(staticMap);
+    // Nothing reads three's near map meanwhile: it is not redrawn.
+    expect(renderer.shadowMap.autoUpdate).toBe(false);
+    // The cockpit set (two cascades) replaces it; trackside has none.
+    environment.setShadowCascades('cockpit'); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(0);
+    environment.update(new Vector3()); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(2);
+    // Without a set the static map gets its sampler back and is drawn (its four quarters).
+    render.mockClear(); environment.setShadowCascades(null); expect(staticShadowUniforms.map.value).toBe(staticMap);
+    expect(renderer.shadowMap.autoUpdate).toBe(true);
+    environment.update(new Vector3()); expect(render).toHaveBeenCalledTimes(4);
+    expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(0);
+    environment.setShadowCascades('chase'); environment.update(new Vector3());
+  } finally { environment.dispose(); }
+  expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(0);
 });

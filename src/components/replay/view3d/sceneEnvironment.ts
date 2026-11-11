@@ -1,5 +1,8 @@
 import { BoxGeometry, Color, CubeCamera, DirectionalLight, DoubleSide, FogExp2, HalfFloatType, LinearMipmapLinearFilter, MathUtils, Matrix4, Mesh, MeshBasicMaterial, NoToneMapping, PCFShadowMap, PlaneGeometry, PMREMGenerator, Scene, Vector3, WebGLCubeRenderTarget, type Camera, type Object3D, type OrthographicCamera, type PerspectiveCamera, type WebGLRenderTarget, type WebGLRenderer } from 'three';
 import { nativeToScene } from './sceneFrame.js';
+import { createCascadeShadows, type CascadeShadows } from './shadows/cascadeShadows.js';
+import { stopCascadeShadows, sampleCascadeShadows } from './shadows/cascadeSampling.js';
+import { shadowCascadeLayout, type ShadowCascadeLayout, type ShadowCascadeSet } from './shadows/shadowCascades.js';
 import { createStaticShadow, NEAR_SHADOW, SHADOW_NEAR_M, shadowWindowCentre } from './sunShadows.js';
 import type { SceneryDaylight, SceneryLayout, ScenerySun } from '../../../../shared/types/scenes/scenery.js';
 import type { ReplayDaylightClock } from '../../../../shared/types/replay.js';
@@ -71,6 +74,11 @@ export interface SceneEnvironment {
   setDynamic(objects: readonly Object3D[]): void;
   /** The resident scenery changed: redraw the static shadow map once the view has moved 100 m. */
   staticShadowStale(): void;
+  /**
+   * The package cascade set the scenery's sun shadow comes from (shadows/), or null for the near and static maps. The cascades follow
+   * the perspective camera given to `setCamera` and replace the static and near maps while in use (neither is redrawn meanwhile).
+   */
+  setShadowCascades(set: ShadowCascadeSet | null): void;
   /**
    * Captures the loaded scenery at the venue's probe (cars hidden) as the scene's environment: a first capture lit by the sun,
    * then one lit by the first, so shaded faces get the light the venue bounces. Call once the scenery around it is resident.
@@ -150,6 +158,8 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
   const fromSunFrame = sunFrame.clone().invert(), centre = new Vector3();
   const staticShadow = createStaticShadow(renderer, scene, toSun, sunFrame, fromSunFrame);
   let view: PerspectiveCamera | OrthographicCamera | null = null, dynamic: readonly Object3D[] = [];
+  // The surfaces sample a set only after its first draw.
+  let cascades: {set: ShadowCascadeSet; layout: ShadowCascadeLayout; pass: CascadeShadows; sampled: boolean} | null = null;
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = PCFShadowMap;
   scene.add(sky);
   const [probeX, probeY, probeZ] = venue.environmentProbe.position;
@@ -158,6 +168,16 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
     setCamera(camera) { view = camera; },
     setDynamic(objects) { dynamic = objects; },
     staticShadowStale() { staticShadow.stale(); },
+    setShadowCascades(set) {
+      if ((cascades?.set ?? null) === set) return;
+      stopCascadeShadows(); cascades?.pass.dispose(); cascades = null;
+      // Every sun shadow receiver samples a set while one is in use (the scenery program and the cars' patchCascadeShadow): the near
+      // map is not redrawn meanwhile.
+      renderer.shadowMap.autoUpdate = !set;
+      if (!set) return;
+      const {shadows} = venue.shading, layout = shadowCascadeLayout(shadows, shadows.cameras[set]);
+      cascades = {set, layout, pass: createCascadeShadows(renderer, scene, shadows, layout, toSun.clone().negate()), sampled: false};
+    },
     applyHaze,
     captureVenue() {
       // The cube keeps its mips: the reflection convolution reads them.
@@ -193,9 +213,15 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
       sun.target.position.copy(centre); sun.position.copy(centre).addScaledVector(toSun, NEAR_SHADOW.lightDistanceM);
       sun.updateMatrixWorld(); sun.target.updateMatrixWorld();
       if (view) { view.getWorldDirection(heading); haze(Math.atan2(heading.z, heading.x), fog.color, skyHaze); }
-      return view ? staticShadow.update(view, focus, dynamic) : false;
+      if (!view) return false;
+      // A cascade set takes the static map's sampler (shadows/cascadeSampling.ts): the static map waits meanwhile.
+      if (!cascades || !('isPerspectiveCamera' in view)) return staticShadow.update(view, focus, dynamic);
+      const drawing = cascades.pass.update(view, dynamic);
+      if (!cascades.sampled) { sampleCascadeShadows(venue.shading.shadows, cascades.layout, cascades.pass.state); cascades.sampled = true; }
+      return drawing;
     },
     dispose() {
+      stopCascadeShadows(); cascades?.pass.dispose(); cascades = null;
       scene.remove(sun, sun.target); sun.dispose(); staticShadow.dispose();
       scene.environment = null; generator.dispose(); firstEnvironment.dispose(); venueProbe?.dispose(); reflection?.dispose(); venueCube?.dispose();
       setSceneryReflection(venue.shading, null, integration); integration.dispose(); reflectedGround.geometry.dispose(); reflectedGround.material.dispose();

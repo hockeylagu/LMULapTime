@@ -5,6 +5,7 @@ import { FOCUS_RING } from '../../common/buttonStyles.js';
 import { DROPDOWN_CONTENT_INSET, DROPDOWN_PANEL } from '../../common/dropdown/dropdownStyles.js';
 import { isDriverCamera } from './driverCameras.js';
 import type { SceneryCameraType } from '../../../../shared/types/scenes/scenery.js';
+import type { ShadowCascadeSet } from './shadows/shadowCascades.js';
 
 export type CameraMode = 'follow' | 'chase' | 'cockpit' | 'hood' | 'roof' | 'orbit' | 'trackside' | 'top';
 export const CAMERA_MODES: ReadonlyArray<{value: CameraMode; label: string; shortcut: string}> = [
@@ -25,6 +26,19 @@ export function exposureType(mode: CameraMode): SceneryCameraType {
     case 'cockpit': return 'onboard';
     case 'trackside': return 'tv';
     case 'follow': case 'chase': case 'hood': case 'roof': case 'orbit': case 'top': return 'external';
+  }
+}
+
+/**
+ * The package's sun shadow cascade set a view samples: the chase set for the external views that move with the car, the cockpit set
+ * onboard. The others keep the near and static maps: the package has no set for trackside, hood or roof, and the free views are not
+ * game cameras.
+ */
+export function shadowCascadeSet(mode: CameraMode): ShadowCascadeSet | null {
+  switch (mode) {
+    case 'follow': case 'chase': return 'chase';
+    case 'cockpit': return 'cockpit';
+    case 'hood': case 'roof': case 'orbit': case 'trackside': case 'top': return null;
   }
 }
 
