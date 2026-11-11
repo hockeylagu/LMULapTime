@@ -3,6 +3,56 @@
 Written by the `race-review` skill (`.claude/skills/race-review/SKILL.md`). Newest first. Error = predicted − actual,
 in % of the lap's actual use; negative = underprediction (car runs short).
 
+## 2026-11-11 — LMP2, Le Mans (sarthe_full), wet start drying (Oreca 07)
+
+**Sessions**: practice `80P1`, qualifying `19Q1` (wet, 236.5 s, P4), race `17R1` (60 min, rain to ~1410 s, path
+wetness 0.4 → 0.6 → 0.05). Fuel only, one stop, wets all race. Model version 16 (pit-lane load fix live).
+
+**Scorecard**:
+
+| # | Box | Result |
+|---|---|---|
+| 1 | Fuel/VE per lap | OK: median +0.2 %; lap 7 −3.0 % alone (traffic) |
+| 2 | Laps | Miss, weather: garage 18 laps from the dry estimate (218.7 s), 16 run; second race (11-10 too). The 75 L cap is the event's setting: without it the garage asked ~15 L too many |
+| 3 | Start load | OK: 2.26 L (0.37 lap) at the flag against 0.19 |
+| 4 | Formation lap | OK: 0.71 L (0.12 lap) |
+| 5 | Stops | OK: lap 11 as planned, stationary 16.2 s for 15.6 estimated; load needed held at 33 L from entry over the line to the box (fix confirmed), driver set 33 |
+| 6 | Tyre wear | n/a: wets |
+| 7 | Incidents | Lap 4 contact (1216 N, ~3.5 s), lap 5 wall (≤588 N, +13 s), lap 12 out-lap contact (1136 N), laps 14–15 +7 s in S1 each (199 N contact, post), lap 16 wall 6128 N with suspension damage (+27 s, P7 → P9) |
+| 8 | Weather | OK: forecast "dry @1420" for rain gone by 1411; no slicks advice, right: late laps on wets 230.1 s against 235.3 s on Mediums |
+| 9 | Data | OK: 21 settings checkpoints (tread rounding held), native telemetry and recording linked, 6 of 12 forecasts eligible |
+| 10 | Learning | OK: Oreca wet cohort here not calibrated yet (two races) |
+| 11 | Result | Grid P4 → P5 lap 1 → P4 laps 2–3 → P5 (lap 4 contact) → P6 (lap 5 wall) → P7 (lap 7 traffic) → P8 after the stop → P6 lap 13 → P7 (lap 14 off) → P9 (lap 16 crash) |
+| 12 | Traffic | OK: laps 2 and 7 flagged |
+| 13 | Driving | Clean median laps 8–10 234.6 s, 5th of 16, +3.9 s on the fastest, mostly S3 (106.5 against 103.0); best 228.535 (class 224.77); consistency 98.6; slip 34.6 s, double 11-10 (front lockups FR 34, FL 28) |
+| 14 | App output | OK: the live plan agreed with the race. Session page not opened |
+| 15 | Deployment | n/a: no battery |
+
+**Change** (applied, uncommitted; `LIVE_MODEL_VERSION` 17): on a wet track the garage plans from the event's own laps
+(kept since the last wet/dry change), and slows the leader's estimate by the same factor; the game's estimates are dry
+pace (`liveStrategyTracker.ts` `garagePlan`). 11-11: 236.5 s from the wet qualifying lap, 17 laps with the formation
+(16 run) for 18 (`test/domain/live/liveStrategyTracker.test.ts`). 11-10 had no wet qualifying lap, so it would still
+have used the dry estimate.
+
+**Watch list** (recheck at every review):
+- Wet garage with no wet lap in the event (11-10): still the dry estimate; layout wet history would cover it.
+- Fuel use rising as the track dries: the meter lags it (11-10: +2 % on the last stint, below the reserve; 11-11 held).
+- Late pit request toggles on laps 14–15 (11-10 and 11-11): asked the driver whether deliberate.
+- Start load above plan by choice (Le Mans 11-05: +5–6 L both races).
+- History by class, not car (not applied): recheck when a car's first race at a layout follows another car's there.
+- Game crash clears the event meters ('offline' reset); with the history above it fell to the other car's history.
+- Game session-start placeholder estimate feeding the game-forecast learning (Daytona race 1 lap 3, +65 %).
+- Tyres picked in the MFD after service starts are not fitted (Daytona race 2 lap 20, game behaviour); a warning could help.
+- Grid forecast read against the session length before the start ("rain in 47 s" Daytona, "none @64" Le Mans 11-05).
+- Wets on forecast rain: forecast term needs several races. Grip 0 and 1 unconfirmed.
+- Deployment: driver changes several laps after the advice (Daytona); check the earlier advice at the next hybrid race.
+- Driving: Le Mans pace ~4 s off the class front (S2 on 11-10, S3 on 11-11); incident laps (11-05, 11-11 last-lap wall);
+  front lockups doubled on 11-11.
+- Carried: start load bias (Silverstone); laps left mid-race 30 vs 29 (Silverstone); race vs qualifying tyre wear;
+  "lowest 2 of 5" meter; race plan from the leader's pace; damage pace after impact.
+- Closed: pit-lane load after a line ahead of the box (held at 33 L on 11-11); wet garage from a dry estimate when the
+  event has a wet lap (fixed).
+
 ## 2026-11-10 — LMP2, Le Mans (sarthe_full), wet start drying (Oreca 07)
 
 **Sessions**: qualifying `08Q1` (no time), race `83R1` (60 min, 25 LMP2, rain to ~1430 s, path wetness 0.4 → 0.6 →

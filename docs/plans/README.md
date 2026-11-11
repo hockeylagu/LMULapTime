@@ -158,6 +158,9 @@ data package; car models for every record, camera/comparison acceptance and perf
 
 - [Live voice calls](proposed/LIVE_VOICE_CALLS.md): call catalogue, anti-distraction rules and iterations;
   driver decisions first (Crew Chief overlap, voice, naming).
+- [Live wetness projection](proposed/LIVE_WETNESS_PROJECTION.md): when the track will reach the next wetness step,
+  wetting from rain intensity and drying after it stops, timed from the steps; tyre crossover timing first, then
+  pace and fuel. Starts by recording the rain unrounded.
 - [Debrief corner tracking](proposed/DEBRIEF_CORNER_TRACKING.md): each debrief corner against the driver's own
   previous session at the layout (corner time and cues), to see whether a habit is being corrected.
 - [Further replay preparation](proposed/REPLAY_STORAGE_DESIGN.md): storage size takes priority; measure
