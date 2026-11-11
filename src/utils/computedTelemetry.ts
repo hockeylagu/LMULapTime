@@ -210,6 +210,19 @@ export function computeSlipAngle(
   return smoothed.map(b => Number(Math.max(-25, Math.min(25, b)).toFixed(2)) || 0);
 }
 
+/** Minimum forward speed for a measured sideslip, m/s: below it the angle is noise. */
+const MEASURED_SIDESLIP_MIN_SPEED_MS = 5;
+
+/**
+ * ISO 8855 sideslip (degrees) from the replay's measured car-frame velocity, clamped like the estimate; undefined
+ * without it or below MEASURED_SIDESLIP_MIN_SPEED_MS.
+ */
+function measuredSideslip(p: ReplayTrajectoryPoint): number | undefined {
+  if (!Number.isFinite(p.velocityLon) || !Number.isFinite(p.velocityLat) || p.velocityLon! < MEASURED_SIDESLIP_MIN_SPEED_MS) return undefined;
+  const beta = (Math.atan2(p.velocityLat!, p.velocityLon!) * 180) / Math.PI;
+  return Number(Math.max(-25, Math.min(25, beta)).toFixed(2)) || 0;
+}
+
 /**
  * Computes dynamic understeer (+) vs oversteer (-) handling balance angle in degrees. Steering
  * and yaw rate are both ISO 8855 (positive left), so the sign of the balance does not depend
@@ -355,13 +368,19 @@ export function computeVehicleDynamics(points: ReplayTrajectoryPoint[], calibrat
   const derivedLonG = computeLongitudinalG(points);
   const lonG = derivedLonG.map((value, index) =>
     Number.isFinite(points[index].accelLonG) ? points[index].accelLonG! : value);
-  const yawRates = computeYawRate(points).map((value, index) =>
-    points[index].liveDynamics?.yawRate && Number.isFinite(points[index].yawRateDeg) ? points[index].yawRateDeg! : value);
+  // Replay laps carry measured yaw rate and car-frame velocity (cache v10); live laps flag theirs. The estimates fill in.
+  const yawRates = computeYawRate(points).map((value, index) => {
+    const p = points[index];
+    return (p.liveDynamics?.yawRate || Number.isFinite(p.velocityLon)) && Number.isFinite(p.yawRateDeg) ? p.yawRateDeg! : value;
+  });
   const derivedLatG = computeLateralG(points, yawRates);
   const latG = derivedLatG.map((value, index) =>
     Number.isFinite(points[index].accelLatG) ? points[index].accelLatG! : value);
-  const slipAngles = computeSlipAngle(points, latG).map((value, index) =>
-    points[index].liveDynamics?.slipAngle && Number.isFinite(points[index].slipAngleDeg) ? points[index].slipAngleDeg! : value);
+  const slipAngles = computeSlipAngle(points, latG).map((value, index) => {
+    const p = points[index];
+    if (p.liveDynamics?.slipAngle && Number.isFinite(p.slipAngleDeg)) return p.slipAngleDeg!;
+    return measuredSideslip(p) ?? value;
+  });
   const underOversteer = computeUnderOversteer(points, yawRates, calibration);
   const { tireSlipPct, wheelLockActive } = computeTireSlipAndLockup(
     points,

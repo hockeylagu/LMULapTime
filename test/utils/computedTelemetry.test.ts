@@ -312,6 +312,23 @@ describe('computedTelemetry physics engine', () => {
       expect(computeVehicleDynamics(points.map(p => ({ ...p, accelLatG: Infinity })))[5].accelerationProvenance?.lateral).toBe('derived');
     });
 
+    it('uses the replay measured yaw rate and sideslip, and the estimates without them', () => {
+      // A straight run north whose stored motion says the car is turning left and sliding right.
+      const points = Array.from({ length: 11 }, (_, i) => makePoint({
+        timeSec: i * 0.1, z: i * 3, speedKmh: 108, yawRateDeg: 12.5, velocityLon: 30, velocityLat: -3,
+      }));
+      const enriched = computeVehicleDynamics(points);
+      expect(enriched[5].yawRateDeg).toBe(12.5);
+      expect(enriched[5].slipAngleDeg).toBe(-5.71);
+      expect(computeVehicleDynamics(enriched)[5].slipAngleDeg).toBe(-5.71);
+
+      const estimated = computeVehicleDynamics(points.map(p => ({ ...p, velocityLon: undefined, velocityLat: undefined })));
+      expect(estimated[5].yawRateDeg).toBe(0);
+      expect(estimated[5].slipAngleDeg).toBe(0);
+      // Below 5 m/s forward the measured angle is noise: the estimate is used.
+      expect(computeVehicleDynamics(points.map(p => ({ ...p, velocityLon: 4 })))[5].slipAngleDeg).toBe(0);
+    });
+
     it('enriches points with all computed telemetry fields', () => {
       const points = [
         makePoint({ timeSec: 0.0, speedKmh: 150, steerYaw: 10, rotY: 0.0, x: 0, z: 0 }),
