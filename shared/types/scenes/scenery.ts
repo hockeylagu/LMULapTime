@@ -142,6 +142,11 @@ export interface SceneryHosekSky {
   scaleHeightM: number;
   /** The layout's altitude, in metres. */
   altitudeM: number;
+  /**
+   * The sky is a cube of `size` around the eye, moved by `yOffset` along y; each point is coloured for its direction from the
+   * cube's own centre. Only the ratio of the two matters.
+   */
+  box: { size: number; yOffset: number };
   /** CIE XYZ to the scene's linear RGB by rows: rgb[i] = Σ xyzToRgb[i][j]·xyz[j]. */
   xyzToRgb: [Vec3, Vec3, Vec3];
   /** Per channel: albedo 0 then 1, turbidity 1–10, six Bézier control points, nine coefficients A–I (1080 values). */

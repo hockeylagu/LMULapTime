@@ -114,6 +114,8 @@ describe('scenery validation', () => {
     ['a sky dataset short of a value', (built: Package) => { built.sceneryShared.sky.hosek.coefficients[1].pop(); }],
     ['a sky radiance dataset short of a value', (built: Package) => { built.sceneryShared.sky.hosek.radiances[2].pop(); }],
     ['a zero scale height', (built: Package) => { built.sceneryShared.sky.hosek.scaleHeightM = 0; }],
+    ['a sky box offset outside the box', (built: Package) => { built.sceneryShared.sky.hosek.box.yOffset = -500; }],
+    ['a sky box without a size', (built: Package) => { built.sceneryShared.sky.hosek.box.size = 0; }],
     ['a layout without its altitude', (built: Package) => { delete built.sceneryShared.sky.hosek.layoutAltitudeM.monza_gp; }],
     ['an altitude for a layout the catalog does not list', (built: Package) => { built.sceneryShared.sky.hosek.layoutAltitudeM.spa_wec = 0; }],
     ['a missing shading', (built: Package) => { delete (built.sceneryShared as Partial<typeof built.sceneryShared>).shading; }],

@@ -347,7 +347,12 @@ function parseSky(value: unknown, what: string): { sky: Omit<ScenerySky, 'sun'>;
     abcd.forEach((n, i) => finite(n, `${at}.abcd[${i}]`));
   });
   const hosek = record(row.hosek, `${what}.hosek`);
-  exactKeys(hosek, ['albedo', 'scaleHeightM', 'layoutAltitudeM', 'xyzToRgb', 'coefficients', 'radiances'], `${what}.hosek`);
+  exactKeys(hosek, ['albedo', 'scaleHeightM', 'box', 'layoutAltitudeM', 'xyzToRgb', 'coefficients', 'radiances'], `${what}.hosek`);
+  const box = record(hosek.box, `${what}.hosek.box`);
+  exactKeys(box, ['size', 'yOffset'], `${what}.hosek.box`);
+  // The eye stays inside the moved cube.
+  const boxSize = finite(box.size, `${what}.hosek.box.size`);
+  if (!(boxSize > 0) || Math.abs(finite(box.yOffset, `${what}.hosek.box.yOffset`)) >= boxSize / 2) throw Error(`${what}.hosek.box: the offset does not fit the size`);
   const albedo = finite(hosek.albedo, `${what}.hosek.albedo`);
   if (albedo < 0 || albedo > 1) throw Error(`${what}.hosek.albedo: expected 0 to 1`);
   if (finite(hosek.scaleHeightM, `${what}.hosek.scaleHeightM`) <= 0) throw Error(`${what}.hosek.scaleHeightM: must be positive`);

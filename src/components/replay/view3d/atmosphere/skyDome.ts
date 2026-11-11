@@ -1,4 +1,4 @@
-import { BackSide, Color, MathUtils, Matrix3, ShaderMaterial, Vector3 } from 'three';
+import { BackSide, Color, MathUtils, Matrix3, ShaderMaterial, Vector2, Vector3 } from 'three';
 import type { SceneryDaylight, ScenerySky, ScenerySkyColourProfiles } from '../../../../../shared/types/scenes/scenery.js';
 import { HOSEK_GLSL, hosekSkyState, hosekXyz, type HosekSkyState } from './hosekSky.js';
 import { SUN_UNIT, sunRadiance } from './sunSamples.js';
@@ -125,8 +125,26 @@ const SKY_RGB_GLSL = `${HOSEK_GLSL}
       }`;
 
 /**
- * The sky dome's material: radiance toward each view direction, drawn at infinity, hazed toward `hazeColour` (the sky haze colour
- * toward the view, sceneEnvironment.ts keeps it current; black until then) by exp(−depth / cos θ).
+ * The direction the sky is coloured for along a view direction. The sky is a cube of `size` around the eye, moved by `yOffset`
+ * along y, and each of its points has the colour of its direction from the cube's own centre: with the cube hanging below the eye,
+ * the eye's horizon gets the colour of a direction a little above the model's horizon.
+ */
+export function skyBoxDirection(box: ScenerySky['hosek']['box'], view: Vector3, target = new Vector3()): Vector3 {
+  const half = box.size / 2, t = Math.min(half / Math.abs(view.x), half / Math.abs(view.z), (view.y > 0 ? half + box.yOffset : half - box.yOffset) / Math.abs(view.y));
+  return target.copy(view).multiplyScalar(t).setY(view.y * t - box.yOffset).normalize();
+}
+
+const SKY_BOX_GLSL = `
+      vec3 skyBoxDirection(vec3 view) {
+        vec3 size = abs(view);
+        float reach = 0.5 * skyBox.x, t = min(min(reach / max(size.x, 1e-6), reach / max(size.z, 1e-6)), (view.y > 0.0 ? reach + skyBox.y : reach - skyBox.y) / max(size.y, 1e-6));
+        return normalize(view * t - vec3(0.0, skyBox.y, 0.0));
+      }`;
+
+/**
+ * The sky dome's material: radiance toward each view direction as the sky box turns it (`skyBoxDirection`), drawn at infinity,
+ * hazed toward `hazeColour` (the sky haze colour toward the view, sceneEnvironment.ts keeps it current; black until then) by
+ * exp(−depth / cos θ).
  */
 export function createSkyDomeMaterial(sunDirection: Vector3, sky: ScenerySky, daylight: SceneryDaylight | undefined, weather: SkyConditions): ShaderMaterial {
   const model = skyModel(sky, sunDirection, weather), [kx, ky, kz] = model.state.coefficients;
@@ -134,6 +152,7 @@ export function createSkyDomeMaterial(sunDirection: Vector3, sky: ScenerySky, da
     name: 'sky-dome',
     uniforms: {
       hazeColour: {value: new Color(0, 0, 0)}, hazeDepth: {value: skyHazeDepth(sky, daylight, weather, model.sunElevationDeg)},
+      skyBox: {value: new Vector2(sky.hosek.box.size, sky.hosek.box.yOffset)},
       sunDirection: {value: model.sun}, coefficientsX: {value: kx}, coefficientsY: {value: ky}, coefficientsZ: {value: kz},
       radiances: {value: new Vector3(...model.state.radiances)}, isothermal: {value: model.isothermal},
       sunProximity: {value: model.look.sunProximity}, gain: {value: new Vector3(...model.look.gain)},
@@ -144,10 +163,10 @@ export function createSkyDomeMaterial(sunDirection: Vector3, sky: ScenerySky, da
       void main() { vec4 w = modelMatrix * vec4(position, 1.0); vWorld = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; gl_Position.z = gl_Position.w; }`,
     fragmentShader: `
       uniform vec3 sunDirection, radiances, gain, hazeColour; uniform float isothermal, sunProximity, hazeDepth;
-      uniform float coefficientsX[9], coefficientsY[9], coefficientsZ[9]; uniform mat3 xyzToRgb;
-      varying vec3 vWorld;${SKY_RGB_GLSL}
+      uniform float coefficientsX[9], coefficientsY[9], coefficientsZ[9]; uniform mat3 xyzToRgb; uniform vec2 skyBox;
+      varying vec3 vWorld;${SKY_RGB_GLSL}${SKY_BOX_GLSL}
       void main() {
-        vec3 dir = normalize(vWorld - cameraPosition);
+        vec3 dir = skyBoxDirection(normalize(vWorld - cameraPosition));
         gl_FragColor = vec4(mix(hazeColour, skyRgb(dir), exp(-hazeDepth / (max(dir.y, 0.0) + 0.001))), 1.0);
       }`,
     side: BackSide, depthWrite: false,

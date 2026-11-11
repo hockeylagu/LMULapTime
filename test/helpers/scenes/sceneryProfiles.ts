@@ -73,7 +73,7 @@ export function testSky(): ScenerySky {
     sun: testSun(),
     // Linear sRGB primaries (D65), a fifth albedo, a 8 km scale height at sea level; one bluish sky distribution at every turbidity.
     hosek: {
-      albedo: 0.2, scaleHeightM: 8000, altitudeM: 0,
+      albedo: 0.2, scaleHeightM: 8000, altitudeM: 0, box: { size: 1000, yOffset: -20 },
       xyzToRgb: [[3.2406, -1.5372, -0.4986], [-0.9689, 1.8758, 0.0415], [0.0557, -0.2040, 1.0570]],
       ...testHosekDatasets([TEST_HOSEK_DISTRIBUTION, TEST_HOSEK_DISTRIBUTION, TEST_HOSEK_DISTRIBUTION], [9, 10, 13]),
     },

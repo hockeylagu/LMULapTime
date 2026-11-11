@@ -316,7 +316,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   the camera and scenery. Cancelled or superseded builds are discarded and retired lap buffers released.
   Canvas resizes repaint before the browser paints, avoiding a black frame when embedded toolbars change height.
   `sceneEnvironment.ts` owns the sky dome (`atmosphere/skyDome.ts`: the package's Hosek-Wilkie sky cooked by `atmosphere/hosekSky.ts`, its colour looks
-  by sun strength (`atmosphere/timeOfDay.ts`, shared with the exposure profiles), turbidity and haze model, the only reader of `sky`), the haze (`atmosphere/haze.ts`: three's fog chunks with the scene's height and sun terms; its colour from the
+  by sun strength (`atmosphere/timeOfDay.ts`, shared with the exposure profiles), turbidity and haze model, each view direction turned by the package's sky box, the only reader of `sky`), the haze (`atmosphere/haze.ts`: three's fog chunks with the scene's height and sun terms; its colour from the
   sky above the horizon toward the view), the first PMREM environment, the venue capture at the layout's
   `environmentProbe` that replaces it, and the car-following shadow sun. Cars come from the `cars` catalog: `car/carMaterials.ts` builds materials from the
   descriptor (surfaces in the app's names, version 4, every value filled: `finish` per material, paint `regions` / `uvScale`; `car/carPaint.ts`: regional car paint from the package's paint description; `car/carContactShadow.ts`: the under-car shadow;

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { Color, type Matrix3, Vector3 } from 'three';
-import { createSkyDomeMaterial, hazeColour, hazeDensity, heightHaze, skyColourLook, skyConditions, skyHazeDepth, skyRadiance, skyTurbidity, sunwardHaze } from '../../../../../src/components/replay/view3d/atmosphere/skyDome.js';
+import { createSkyDomeMaterial, hazeColour, hazeDensity, heightHaze, skyBoxDirection, skyColourLook, skyConditions, skyHazeDepth, skyRadiance, skyTurbidity, sunwardHaze } from '../../../../../src/components/replay/view3d/atmosphere/skyDome.js';
 import { hosekSkyState, hosekXyz } from '../../../../../src/components/replay/view3d/atmosphere/hosekSky.js';
 import { SUN_UNIT, sunRadiance } from '../../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
 import { TEST_HAZE_WEIGHTS, testSky } from '../../../../helpers/scenes/sceneryProfiles.js';
@@ -109,4 +109,21 @@ it('colours both hazes with the mean horizon sky, pulled toward a pollution-tint
   for (const [i, v] of [skyTarget.r, skyTarget.g, skyTarget.b].entries()) expect(v / (adjusted[i] * skyDim)).toBeCloseTo(1, 9);
   // Away from the sun the haze is darker.
   expect(haze(Math.PI, new Color()).r).toBeLessThan(got.r);
+});
+
+it("colours the sky for the direction from the sky box's own centre, which lifts the eye's horizon", () => {
+  const box = {size: 1000, yOffset: -15};
+  // Facing a side at the eye's horizon: the cube's wall is 500 away and its centre 15 below, so cos θ = 15 / hypot(500, 15).
+  expect(skyBoxDirection(box, new Vector3(1, 0, 0)).y).toBeCloseTo(15 / Math.hypot(500, 15), 12);
+  // Toward a corner, at 33.77° of elevation (a vertex of a reference capture: 0.5679).
+  const e = 33.77 * Math.PI / 180, corner = skyBoxDirection(box, new Vector3(-Math.cos(e) * Math.SQRT1_2, Math.sin(e), -Math.cos(e) * Math.SQRT1_2));
+  expect(corner.y).toBeCloseTo(0.5679, 3); expect(corner.x).toBeCloseTo(corner.z, 12);
+  // Straight up and straight down stay; the top is 485 away, the bottom 515.
+  expect(skyBoxDirection(box, new Vector3(0, 1, 0)).toArray()).toEqual([0, 1, 0]);
+  expect(skyBoxDirection(box, new Vector3(0, -1, 0)).toArray()).toEqual([0, -1, 0]);
+  // A cube centred on the eye changes nothing.
+  expect(skyBoxDirection({size: 1000, yOffset: 0}, new Vector3(0.6, 0.48, 0.64)).toArray().map(v => +v.toFixed(12))).toEqual([0.6, 0.48, 0.64]);
+  const material = createSkyDomeMaterial(sun, testSky(), undefined, clear);
+  expect((material.uniforms.skyBox.value as {x: number; y: number})).toMatchObject({x: 1000, y: -20});
+  expect(material.fragmentShader).toContain('vec3 dir = skyBoxDirection(normalize(vWorld - cameraPosition));');
 });
