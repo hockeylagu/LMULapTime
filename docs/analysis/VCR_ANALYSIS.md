@@ -1251,7 +1251,8 @@ engine speed at bits 50..63, which is why it saturated at 11,170 rpm. The old wh
   `2` until 217.5 s; pit official 0 `2` from 219.8 to 224.3 s, while the pit lane start was released. Opcode 211 bit 1
   is set at 217.2 s, as the pit exit light goes to `0`.
 - **Opcodes 71 / 70:** dent sets at 2.97, 21.48 and 3834.35 s; four dents at 2364.1–2364.3 s, each at an XML contact of
-  the player.
+  the player. Bytes 6..9 of those four opcode 70 payloads read 2364.14, 2364.16, 2364.28 and 2364.38 as Float32LE: the
+  dent's session time (checked 2026-11-10).
 - **Opcode 147:** `"Race"` five times.
 - **Opcode 366:** `00` for all 61 cars (front and rear compound 0).
 - **Opcode 202:** one event at 177.03 s: phase 3, 177.48 s, start ≈ 0. The phase stays 3 at the green in this rolling

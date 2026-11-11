@@ -287,7 +287,7 @@ sent when the replay starts, when the car is first set up, at the end, and after
 | :--- | :--- | :--- | :--- |
 | `0..2` | 3 | 3 × Int8 | Dent point in the car frame: `n / 127 × (lo + hi) − lo` with the car's body extents `lo`, `hi` |
 | `3..5` | 3 | 3 × Int8 | Deformation vector: `n / 127 × s`, `s` the car's deformation scale |
-| `6..9` | 4 | Float32LE | Ramp whose rate follows the wind speed `w` (m/s): `dA/dt = (20 + w) / 16500`; same value at the same session time for the same rate. Probably the cloud field's drift (not established). |
+| `6..9` | 4 | Float32LE | Session time of the dent |
 
 ### 4.6 Track Lights (opcode 74, 3 bytes, slot 255)
 Six 4-bit light states, sent when one changes:
