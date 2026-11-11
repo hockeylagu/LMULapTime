@@ -423,7 +423,8 @@ export class LiveStrategyTracker {
     const lapFraction = player && reading.trackLength > 0 ? Math.min(Math.max(player.lapDist / reading.trackLength, 0), 1) : 0;
     const lapsLeft = context.lapsLeft?.laps ?? null;
     const race = state.session?.kind === 'race' && amount !== null && perLap !== null && perLap > 0 && lapsLeft !== null && player
-      ? planRace({ amount, perLap, reserveLaps, capacity, lapsLeft, lapFraction, lapNumber: player.totalLaps + 1 })
+      ? planRace({ amount, perLap, reserveLaps, capacity, lapsLeft, lapFraction, lapNumber: player.totalLaps + 1,
+        inPitLane: this.pitState === 'entering' || this.pitState === 'stopped' })
       : null;
     return {
       kind,

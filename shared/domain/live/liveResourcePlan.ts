@@ -35,6 +35,8 @@ export interface RacePlanInput {
   lapFraction: number;
   /** The racing lap in progress. */
   lapNumber: number;
+  /** In the pit lane for a stop: the stop loads for the laps still to drive, wherever the line falls in the lane. */
+  inPitLane?: boolean;
 }
 
 /**
@@ -48,9 +50,11 @@ export interface RacePlanInput {
  *   after the stop covers the laps after it plus the reserve, capped at a full tank; a cap means more stops.
  * - Either way, the amount needed after a stop at the end of this lap covers the laps after this one plus the
  *   reserve: what an unplanned stop (damage, an early stop) must load, more than the planned stop when it is later.
+ * - In the pit lane the stop is this one: it loads for the laps still to drive. Counting from the line lost a lap where
+ *   the line comes before the box (Le Mans 2026-11-05 and 11-10: 52 then 45 L, 26 then 20 L between entry and box).
  */
 export function planRace(input: RacePlanInput): LiveRacePlan {
-  const { amount, perLap, reserveLaps, capacity, lapsLeft, lapFraction, lapNumber } = input;
+  const { amount, perLap, reserveLaps, capacity, lapsLeft, lapFraction, lapNumber, inPitLane = false } = input;
   const fraction = Math.min(Math.max(lapFraction, 0), 1);
   const usable = amount - reserveLaps * perLap;
   const toFinish = Math.max(lapsLeft - fraction, 0);
@@ -58,7 +62,7 @@ export function planRace(input: RacePlanInput): LiveRacePlan {
     const need = (lapsAfter + reserveLaps) * perLap;
     return settable(capacity !== null ? Math.min(need, capacity) : need);
   };
-  const neededStopNow = neededFor(Math.max(lapsLeft - 1, 0));
+  const neededStopNow = neededFor(inPitLane ? toFinish : Math.max(lapsLeft - 1, 0));
   if (amount >= toFinish * perLap) {
     return {
       finishReachable: true,
@@ -72,7 +76,7 @@ export function planRace(input: RacePlanInput): LiveRacePlan {
     };
   }
   const crossings = Math.floor(fraction + usable / perLap);
-  const pitInLaps = Math.max(0, crossings - 1);
+  const pitInLaps = inPitLane ? 0 : Math.max(0, crossings - 1);
   const toPit = pitInLaps + 1 - fraction;
   const lapsAfter = Math.max(lapsLeft - (pitInLaps + 1), 0);
   const fullTankLaps = capacity !== null ? (capacity - reserveLaps * perLap) / perLap : null;
@@ -82,7 +86,7 @@ export function planRace(input: RacePlanInput): LiveRacePlan {
     pitInLaps,
     pitLap: lapNumber + pitInLaps,
     sparePerLap: toPit > 0 ? round(usable / toPit - perLap, 2) : null,
-    neededAfterStop: neededFor(lapsAfter),
+    neededAfterStop: inPitLane ? neededStopNow : neededFor(lapsAfter),
     neededStopNow,
     stopsAfterNext: fullTankLaps !== null && fullTankLaps > 0 ? Math.max(0, Math.ceil(lapsAfter / fullTankLaps) - 1) : 0,
   };

@@ -31,6 +31,16 @@ describe('planRace', () => {
     expect(race({ amount: 1, lapFraction: 0.2 })).toMatchObject({ pitInLaps: 0, sparePerLap: -5.25 });
   });
 
+  it('loads for the laps still to drive in the pit lane, before and after a line ahead of the box (Le Mans 2026-11-10)', () => {
+    const stop = { perLap: 6.1, reserveLaps: 0.21, capacity: 75, inPitLane: true };
+    // Lane entry on lap 12 with 5 laps left, then lap 13 begun in the lane before the box: 26 L both times (was 20).
+    expect(race({ ...stop, amount: 2.34, lapsLeft: 5, lapFraction: 0.97, lapNumber: 12 }))
+      .toMatchObject({ pitInLaps: 0, pitLap: 12, neededStopNow: 26, neededAfterStop: 26 });
+    expect(race({ ...stop, amount: 2.31, lapsLeft: 4, lapFraction: 0.01, lapNumber: 13 }))
+      .toMatchObject({ pitInLaps: 0, pitLap: 13, neededStopNow: 26, neededAfterStop: 26 });
+    expect(race({ ...stop, amount: 2.31, lapsLeft: 4, lapFraction: 0.01, lapNumber: 13, inPitLane: false }).neededStopNow).toBe(20);
+  });
+
   it('reports spare per lap and the amount at the finish when the finish is reachable (no pit stop)', () => {
     expect(race({ amount: 30, lapsLeft: 6, lapFraction: 0.5 })).toEqual({
       finishReachable: true, atFinish: 8, pitInLaps: null, pitLap: null,
