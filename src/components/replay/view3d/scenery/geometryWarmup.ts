@@ -1,4 +1,4 @@
-import { BufferGeometry, Mesh, MeshBasicMaterial, Scene, WebGLRenderTarget, type Camera, type Object3D, type WebGLRenderer } from 'three';
+import { BufferAttribute, BufferGeometry, Camera, Mesh, MeshBasicMaterial, Scene, WebGLRenderTarget, type Object3D, type WebGLRenderer } from 'three';
 
 export function createGeometryWarmup(renderer: WebGLRenderer, nextFrame: () => Promise<void>, sliceMs: number) {
   const target = new WebGLRenderTarget(1, 1), material = new MeshBasicMaterial({colorWrite: false, depthWrite: false});
@@ -7,6 +7,13 @@ export function createGeometryWarmup(renderer: WebGLRenderer, nextFrame: () => P
   probe.frustumCulled = false;
   scene.add(probe);
   let disposed = false;
+  // The probe's program links now, while nothing else compiles: linked on its first draw, it waits on the main thread behind
+  // the programs of the chunks that arrived with it. A program is shared by geometry with the same kinds of attributes.
+  const typical = new BufferGeometry().setAttribute('position', new BufferAttribute(new Float32Array(9), 3)).setAttribute('normal', new BufferAttribute(new Float32Array(9), 3));
+  const before = renderer.getRenderTarget();
+  probe.geometry = typical; renderer.setRenderTarget(target);
+  renderer.compile(scene, new Camera());
+  probe.geometry = empty; renderer.setRenderTarget(before); typical.dispose();
   return {
     /** Uploads `root`'s geometry in `budgetMs` slices, waiting on `pause` (the next frame by default) between them. */
     async upload(root: Object3D, camera: Camera, signal: AbortSignal, budgetMs = sliceMs, pause = nextFrame): Promise<void> {

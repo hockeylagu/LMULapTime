@@ -7,10 +7,11 @@ afterEach(() => vi.restoreAllMocks());
 function fixture() {
   let target: WebGLRenderTarget | null = null;
   const render = vi.fn<(scene: Scene) => void>(), setRenderTarget = vi.fn((next: WebGLRenderTarget | null) => { target = next; });
-  const renderer = {getRenderTarget: () => target, setRenderTarget, render} as unknown as WebGLRenderer;
+  const compile = vi.fn((scene: Scene) => ({target, attributes: Object.keys((scene.children[0] as Mesh).geometry.attributes)}));
+  const renderer = {getRenderTarget: () => target, setRenderTarget, render, compile} as unknown as WebGLRenderer;
   const root = new Group(), first = new BoxGeometry(), second = new BoxGeometry();
   root.add(new Mesh(first), new Mesh(first), new Mesh(second));
-  return {renderer, root, render, setRenderTarget, first, second};
+  return {renderer, root, render, setRenderTarget, compile, first, second};
 }
 
 it('uploads each shared geometry once offscreen, yielding slices and restoring the render target', async () => {
@@ -24,11 +25,20 @@ it('uploads each shared geometry once offscreen, yielding slices and restoring t
     await warmup.upload(root, new PerspectiveCamera(), new AbortController().signal);
     expect(geometries).toEqual([first, second]);
     expect(nextFrame).toHaveBeenCalledTimes(2);
-    expect(setRenderTarget.mock.calls[0][0]?.width).toBe(1);
-    expect(setRenderTarget.mock.calls[0][0]?.height).toBe(1);
+    expect(setRenderTarget.mock.calls[2][0]?.width).toBe(1);
+    expect(setRenderTarget.mock.calls[2][0]?.height).toBe(1);
     expect(renderer.getRenderTarget()).toBeNull();
     await warmup.upload(root, new PerspectiveCamera(), new AbortController().signal);
     expect(render).toHaveBeenCalledTimes(2);
+  } finally { warmup.dispose(); }
+});
+
+it('links its program when created, for its own target and for geometry with positions and normals', () => {
+  const {renderer, compile} = fixture(), warmup = createGeometryWarmup(renderer, async () => {}, 1);
+  try {
+    expect(compile).toHaveBeenCalledOnce();
+    const linked = compile.mock.results[0].value as {target: WebGLRenderTarget | null; attributes: string[]};
+    expect([linked.target?.width, linked.attributes, renderer.getRenderTarget()]).toEqual([1, ['position', 'normal'], null]);
   } finally { warmup.dispose(); }
 });
 

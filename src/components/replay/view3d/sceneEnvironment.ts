@@ -21,7 +21,8 @@ const SKY_RADIUS_M = 12000, ENVIRONMENT_GROUND_Y = -0.5;
 /** Mean reflectance of the ground around a circuit (grass, asphalt, concrete) for the bounce light of the first environment. */
 const GROUND_ALBEDO = 0.2;
 /** The venue capture: cube face size (the size of the venue cubes in the reference frame captures; no game file sets it) and how far it sees. */
-const VENUE_PROBE_PX = 128, VENUE_PROBE_FAR_M = 3000;
+export const VENUE_PROBE_PX = 128;
+const VENUE_PROBE_FAR_M = 3000;
 const sunToward = (elevationDeg: number) => {
   const a = MathUtils.degToRad(DAYLIGHT.azimuthDeg), e = MathUtils.degToRad(elevationDeg);
   return new Vector3(Math.cos(a) * Math.cos(e), Math.sin(e), Math.sin(a) * Math.cos(e));

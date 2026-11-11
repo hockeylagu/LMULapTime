@@ -173,14 +173,22 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     });
     return model;
   };
-  const load = async (trajectory: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null, assets: LapCars, colorBy: MapColorMode) => {
+  const buildCars = async (assets: LapCars) => {
     const [primaryModel, baselineModel] = await Promise.all([loadModel(assets.primary), assets.baseline ? loadModel(assets.baseline) : null]);
     const primary = makeCar(MAP_COLORS.carBody, false, primaryModel);
     primaryModel.add(createContactShadow(primaryModel));
-    const ghost = baseline && baselineModel ? makeCar(TELEMETRY_COLORS.baseline, true, baselineModel) : new Group();
+    const ghost = baselineModel ? makeCar(TELEMETRY_COLORS.baseline, true, baselineModel) : null;
+    ghost?.traverse(object => { if (object instanceof Mesh) { object.castShadow = false; object.receiveShadow = false; } });
+    return {primary, ghost};
+  };
+  /** The cars `preload` built for the next load of the same `assets`: a load takes them, so no two layers share a car. */
+  const preloaded = new WeakMap<LapCars, ReturnType<typeof buildCars>>();
+  const load = async (trajectory: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null, assets: LapCars, colorBy: MapColorMode) => {
+    const built = preloaded.get(assets) ?? buildCars(assets);
+    preloaded.delete(assets);
+    const cars = await built, primary = cars.primary, ghost = baseline && cars.ghost ? cars.ghost : new Group();
     const primaryWheels = createWheelAnimation(primary, trajectory, surfaceHeight);
     const ghostWheels = baseline ? createWheelAnimation(ghost, baseline, surfaceHeight) : null;
-    ghost.traverse(object => { if (object instanceof Mesh) { object.castShadow = false; object.receiveShadow = false; } });
     let colors = racingLineColors(trajectory, baseline, colorBy);
     const primaryLine = makeRacingLine(trajectory, origin, colors.primary, surfaceHeight, display);
     const baselineLine = baseline ? makeRacingLine(baseline, origin, colors.baseline, surfaceHeight, display, BASELINE_LINE.widthM, BASELINE_LINE.liftM) : null;
@@ -213,9 +221,14 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
       dispose() { root.removeFromParent(); disposeObjects(root); },
     };
   };
-  /** Starts parsing the cars and loading their textures before the ground is ready; a failure surfaces from the later load. */
+  /**
+   * Builds the lap's cars before the ground is ready: they need none, so the caller can compile and upload them while the scenery
+   * loads. The next load of the same `assets` takes them; a failure surfaces from that load too.
+   */
   const preload = (assets: LapCars) => {
-    for (const car of [assets.primary, assets.baseline]) if (car) partsOf(car).catch(() => {});
+    const built = buildCars(assets);
+    preloaded.set(assets, built);
+    return built;
   };
   return Object.assign(load, {preload});
 }

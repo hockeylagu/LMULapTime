@@ -11,9 +11,10 @@ import { disposeObjects } from './laps/disposeObjects.js';
 import { setCameraDistance } from './sceneObjects.js';
 import { exposureType, shadowCascadeSet, type CameraMode } from './cameraModes.js';
 import { createCameraRig } from './cameraRig.js';
-import { addSceneEnvironment, sceneSun } from './sceneEnvironment.js';
+import { addSceneEnvironment, sceneSun, VENUE_PROBE_PX } from './sceneEnvironment.js';
+import { linkPrefilters } from './prefilterLink.js';
 import { createAutoExposure } from './autoExposure.js';
-import { createCarReflection } from './car/carReflection.js';
+import { CAR_REFLECTION_PX, createCarReflection } from './car/carReflection.js';
 import { CachedKtx2Loader } from './scenery/cachedKtx2Loader.js';
 import { createChunkLoader } from './scenery/chunkLoader.js';
 import { createSceneryGround } from './scenery/sceneryGround.js';
@@ -77,6 +78,8 @@ export async function createReplayScene(
   let layer: LapLayer, layerReady = false;
   let syncMode: GhostSyncMode = 'distance', anchorDistM: number | null = null;
   let disposed = false, refreshTimer = 0, invalidate: () => void = () => {};
+  /** Resolves once the scene has its environment and the car's reflection: programs compiled before that would compile again. */
+  let lit: Promise<void> = Promise.resolve();
   // Lines are draped on the road: when the resident chunks change, re-drape them (coalesced).
   let freezeScenery = () => {};
   const scheduleRefresh = () => {
@@ -97,6 +100,7 @@ export async function createReplayScene(
           built.parsed = parsed; built.grounded = ground.add(chunk.id, parsed, chunk.kind === 'horizon');
           built.grounded.catch(() => {}); // Awaited below; a texture failure may reject the load first.
         });
+        await lit; // A chunk's programs depend on the scene's environment.
         await Promise.all([warmup.queue(root, signal), built.grounded]); signal.throwIfAborted(); return root;
       } catch (error) {
         // The loader releases a chunk whose own load failed; one that failed after it is released here.
@@ -140,12 +144,27 @@ export async function createReplayScene(
   // The first view's chunks and the car are requested first: the sky's environment and the car's reflection link their programs
   // on the main thread, which the downloads then overlap.
   streamView = {kind: 'lap', lapDistanceM: currentStation}; stream.update(streamView);
-  loadLaps.preload(cars); // The car models and textures load alongside the scenery; only draping waits for the ground.
-  let environment: ReturnType<typeof addSceneEnvironment>, reflection: ReturnType<typeof createCarReflection>;
-  // The chunks under the first pose must be resident before cars and lines are draped on them.
-  try {
+  const carsBuilt = loadLaps.preload(cars); // The cars load and build alongside the scenery; only draping waits for the ground.
+  carsBuilt.catch(() => {}); // Surfaces from the load below.
+  // Both exist once `lit` resolves; nothing below reads them before.
+  let environment!: ReturnType<typeof addSceneEnvironment>, reflection!: ReturnType<typeof createCarReflection>;
+  // The environment and the car's reflection prefilter on creation: their programs link first, off the main thread.
+  const prefilters = linkPrefilters(renderer, rig.perspective, [VENUE_PROBE_PX, CAR_REFLECTION_PX]);
+  lit = prefilters.ready.then(() => {
     environment = addSceneEnvironment(scene, renderer, layout, origin, shadowCascadeSet(rig.mode), sun);
     reflection = createCarReflection(renderer, scene, layout.shading);
+  }).finally(() => { prefilters.dispose(); });
+  lit.catch(() => {}); // Awaited below.
+  // The cars compile and upload in turn with the chunks, lit as they will be drawn: the first car by its own reflection.
+  const carsWarm = Promise.all([carsBuilt, lit]).then(async ([built]) => {
+    const signal = new AbortController().signal;
+    reflection.setCar(built.primary, built.primary);
+    await Promise.all([built.primary, built.ghost].flatMap(car => car ? [warmup.queue(car, signal)] : []));
+  });
+  carsWarm.catch(() => {}); // A failure here surfaces from the load or the scene's warm-up below.
+  // The chunks under the first pose must be resident before cars and lines are draped on them.
+  try {
+    await lit;
     await stream.whenUnderView();
     layer = await loadLaps(trajectory, baseline, cars, colorBy); layerReady = true;
   } catch (error) { cleanup(); throw error; }

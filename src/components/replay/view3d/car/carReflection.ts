@@ -11,7 +11,8 @@ import { setPaintReflection } from './carPaint.js';
  * the reach is the probe's cost: at 1.5 km Silverstone's frames doubled (p50 7 → 14 ms, production pass); at 300 m they matched
  * the frame without the probe.
  */
-const FACE_PX = 1024, FACES_PER_FRAME = 1, NEAR_M = 0.1, FAR_M = 150;
+export const CAR_REFLECTION_PX = 1024;
+const FACES_PER_FRAME = 1, NEAR_M = 0.1, FAR_M = 150;
 /** A paused view keeps its finished probe until the car or the scenery moves. */
 const MOVED_M = 0.5;
 /** The probe's eye above the centre of the car's bounding box: roof height, as the reference frames place it (0.72 m on a GT3). */
@@ -65,7 +66,7 @@ function setSurfaceReflection(material: Material, cubes: ReflectionCubes | null)
  * GPU's 16. The cube's mips, which the kernels read, regenerate after the last face only.
  */
 export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shading: SceneryShading): CarReflection {
-  const target = new WebGLCubeRenderTarget(FACE_PX, {type: HalfFloatType, generateMipmaps: false, minFilter: LinearMipmapLinearFilter});
+  const target = new WebGLCubeRenderTarget(CAR_REFLECTION_PX, {type: HalfFloatType, generateMipmaps: false, minFilter: LinearMipmapLinearFilter});
   const camera = new CubeCamera(NEAR_M, FAR_M, target);
   // The prefiltered target exists from the start, converted from the empty cube: its size is a program define, so a car's
   // materials take it when the car is set and compile once, with the scene's warm-up, instead of again at the first probe.
