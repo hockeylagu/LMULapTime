@@ -4,7 +4,7 @@ import { SUN_UNIT } from '../atmosphere/sunSamples.js';
 
 /**
  * The frame a glow lamp shows by day, or null when it is not drawn: only lamps whose `states.off` is known (headlight and
- * brake glow) are, and not when the game ships no texture for that frame. A lit state is not drawn yet.
+ * brake glow) are, and not when the package has no texture for that frame. A lit state is not drawn yet.
  */
 export function unlitFrame(lamp: CarLamp): string | null {
   const index = lamp.states?.off;

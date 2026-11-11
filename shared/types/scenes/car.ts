@@ -106,7 +106,7 @@ export interface CarLamp {
   nodes: string[];
   /** The GLB material name. */
   material: string;
-  /** Texture paths relative to `vehicles/`, one per frame; null where the game ships no texture (nothing to draw). */
+  /** Texture paths relative to `vehicles/`, one per frame; null where the package has no texture (nothing to draw). */
   frames: Array<string | null>;
   animation: { method: string | null; rate: number | null; sequence: number[] | null };
   emission: { scale: number; vertexColour: boolean; viewBoost: { gain: number; power: number } | null; ambientScaled: boolean; vertexAlpha: boolean };

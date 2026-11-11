@@ -5,8 +5,8 @@ import { profilesAt, timeOfDayPosition, weatherWeight } from './atmosphere/timeO
 import type { SceneryCamera, SceneryCameraLook, SceneryCameraProfile, SceneryCameraType, SceneryCameraTypeProfile, SceneryToneCurve } from '../../../../shared/types/scenes/scenery.js';
 
 // Exposure, white balance, tone curve and the output encode come from the package's camera (SceneryCamera), one profile per camera
-// type; the constants below are the app's own calibration. No screen-space occlusion is drawn: the reference frames, taken at the
-// game's settings, have none (docs/local/replay-3d-reference/renderdoc, 2026-11-09).
+// type; the constants below are the app's own calibration. No screen-space occlusion is drawn: the reference frames have none
+// (2026-11-09).
 
 /** A GLSL float literal (always with a decimal point). */
 const glslFloat = (n: number) => Number.isInteger(n) ? `${n}.0` : String(n);
@@ -18,7 +18,7 @@ const NEUTRAL_KELVIN = 6500;
  * min and max its limits, s the type's adaptation scale (all from the package), L the mean luminance of the type's metering window
  * (everything in it, the cockpit included) and U what one unit of the scene's light measures on the camera's own scale. No constant
  * of the app's: twenty captured reference frames across the three camera types and a 150-fold range of L sit 9 % over this law
- * (9.5 % scatter; docs/local/replay-3d-reference/renderdoc/FINDINGS.md 4f, 2026-11-09).
+ * (9.5 % scatter, 2026-11-09).
  */
 /** U: what one unit of the scene's light measures on a camera of the package's luminance scale. */
 export const meterUnit = (sceneLuminanceScale: number): number => 1 / (SUN_UNIT * sceneLuminanceScale);

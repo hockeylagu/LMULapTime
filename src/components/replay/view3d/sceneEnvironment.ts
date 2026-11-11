@@ -37,7 +37,7 @@ export interface SceneLighting { sunDirection: Vector3 }
 /**
  * The direct sun's radiance in scene units at a sun elevation, from the layout's sampled sun under the replay's cloud cover: dimmer
  * and redder as the sun gets low, dimmer under cover. The replay's cover stands in for the base coverage the grid is sampled by.
- * Known gap (pipeline, 2026-11-09): clouded captures of the game come out 2–20 % brighter than the grid; not worked around here.
+ * Known gap (pipeline, 2026-11-09): clouded reference frames come out 2–20 % brighter than the grid; not worked around here.
  */
 export function sunColour(sun: ScenerySun, sunElevationDeg: number, cloudCover: number): Color {
   return sunRadiance(sun, sunElevationDeg, cloudCover).multiplyScalar(SUN_UNIT);

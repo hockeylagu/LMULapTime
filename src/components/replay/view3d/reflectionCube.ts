@@ -2,7 +2,7 @@ import { BufferGeometry, DataTexture, Float32BufferAttribute, FloatType, GLSL3, 
 import type { SceneryConvolutionKernel } from '../../../../shared/types/scenes/scenery.js';
 
 /**
- * A reflection cube as the game's lighting reads it (the pipeline's docs/SCENE_PACKAGE.md "Shading"): the sharp cube, and the
+ * A reflection cube as the package's shading reads it (the pipeline's docs/SCENE_PACKAGE.md "Shading"): the sharp cube, and the
  * convolved cube built from it, one package kernel per mip from mip 0. Mip i of the convolved cube is the equal-weight mean of the
  * sharp cube read at the kernel's source LOD along each of its sample directions, turned from the kernel's frame into the frame
  * (t, d, t × d) of the texel's direction d, with t = normalize((0, 1, 0) × d).
