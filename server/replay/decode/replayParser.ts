@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import {
+  ReplayCloudFieldSample,
   ReplayMetadata,
   ReplayDriverEntry,
   ReplayEventInfo,
@@ -91,17 +92,31 @@ export function scanReplayWeather(fd: number, frameStreamEnd: number): {
   trackTemp?: number;
   /** [session time s, cloud cover 0..1] per weather packet found, in time order (replayCloudCover). */
   cloudCover: Array<[number, number]>;
+  /** [session time s, upper layer drift, lower layer drift, the 32 cell codes] per weather packet found, in time order (replayCloudCells). */
+  cloudField: ReplayCloudFieldSample[];
+  /** The variant id of each cloud cell code 0..14 from the first sky setup packet found (replayCloudVariants); null without one. */
+  cloudVariants: string[] | null;
 } {
   const SAMPLES = 30;
   const WINDOW_SIZE = 65536;
   const streamBytes = Math.max(0, frameStreamEnd - 61);
   if (streamBytes <= 0) {
-    return { hasRain: false, maxRainIntensity: 0, weatherCondition: 'Dry', cloudCover: [] };
+    return { hasRain: false, maxRainIntensity: 0, weatherCondition: 'Dry', cloudCover: [], cloudField: [], cloudVariants: null };
   }
 
   let maxRain = 0;
   let firstAmbientTemp: number | undefined = undefined;
   const cloudCover = new Map<number, number>();
+  const cloudField = new Map<number, ReplayCloudFieldSample>();
+  let cloudVariants: string[] | null = null;
+  // A sky setup packet (opcode 68, slot 255) or a weather packet (opcode 138, size 80, slot 255) at p.
+  const inspectPacket = (buf: Buffer, p: number) => {
+    const h = buf.readUInt32LE(p), sz = (h >>> 8) & 0x1ff;
+    if ((h & 0xff) !== 255) return;
+    if (((h >>> 17) & 0x1ff) === 68 && !cloudVariants && p + 5 + sz <= buf.length) cloudVariants = replayCloudVariants(buf.subarray(p + 5, p + 5 + sz));
+    // Bit 29 only flags a race replay, so the weather packet is matched on its low opcode bits and route.
+    if (sz === 80 && ((h >>> 17) & 0x3f) === 10 && (h >>> 30) === 0) inspectWeatherPacket(buf, p);
+  };
 
   // The scan slides byte by byte, so a header match alone is often random data. A real weather
   // packet carries the same rain value in all 9 rain slots.
@@ -118,22 +133,17 @@ export function scanReplayWeather(fd: number, frameStreamEnd: number): {
       if (r > maxRain) maxRain = r;
     }
     const timeSec = buf.readFloatLE(p + 5);
-    if (Number.isFinite(timeSec)) cloudCover.set(Math.round(timeSec * 10) / 10, replayCloudCover(buf.subarray(p + 5 + 18, p + 5 + 34)));
+    if (!Number.isFinite(timeSec)) return;
+    const at = Math.round(timeSec * 10) / 10, cells = buf.subarray(p + 5 + 18, p + 5 + 34);
+    cloudCover.set(at, replayCloudCover(cells));
+    cloudField.set(at, [at, buf.readFloatLE(p + 5 + 6), buf.readFloatLE(p + 5 + 10), replayCloudCells(cells)]);
   };
 
   if (streamBytes <= WINDOW_SIZE) {
     const buf = Buffer.alloc(streamBytes);
     try {
       fs.readSync(fd, buf, 0, streamBytes, 61);
-      for (let p = 0; p <= buf.length - 85; p++) {
-        const h = buf.readUInt32LE(p);
-        const sz = (h >>> 8) & 0x1ff;
-        const evType = (h >>> 17) & 0x3f;
-        const evClass = (h >>> 30); // bit 29 only flags a race replay; weather is sent on slot 255
-        if (sz === 80 && evType === 10 && evClass === 0 && (h & 0xff) === 255) {
-          inspectWeatherPacket(buf, p);
-        }
-      }
+      for (let p = 0; p <= buf.length - 85; p++) inspectPacket(buf, p);
     } catch {
       // Ignore read errors
     }
@@ -143,15 +153,7 @@ export function scanReplayWeather(fd: number, frameStreamEnd: number): {
       const seekPos = Math.floor(61 + (i / SAMPLES) * Math.max(0, streamBytes - WINDOW_SIZE));
       try {
         fs.readSync(fd, buf, 0, WINDOW_SIZE, seekPos);
-        for (let p = 0; p <= buf.length - 85; p++) {
-          const h = buf.readUInt32LE(p);
-          const sz = (h >>> 8) & 0x1ff;
-          const evType = (h >>> 17) & 0x3f;
-          const evClass = (h >>> 30); // bit 29 only flags a race replay; weather is sent on slot 255
-          if (sz === 80 && evType === 10 && evClass === 0 && (h & 0xff) === 255) {
-            inspectWeatherPacket(buf, p);
-          }
-        }
+        for (let p = 0; p <= buf.length - 85; p++) inspectPacket(buf, p);
       } catch {
         // Continue sampling
       }
@@ -167,6 +169,8 @@ export function scanReplayWeather(fd: number, frameStreamEnd: number): {
     weatherCondition,
     ambientTemp: firstAmbientTemp,
     cloudCover: [...cloudCover].sort((a, b) => a[0] - b[0]),
+    cloudField: [...cloudField.values()].sort((a, b) => a[0] - b[0]),
+    cloudVariants,
   };
 }
 
@@ -174,6 +178,25 @@ export function scanReplayWeather(fd: number, frameStreamEnd: number): {
  * Cloud cover (0 clear .. 1 overcast) from a weather packet's 16-byte cloud field: 32 four-bit cells, 15 a clear cell and 0 a
  * full one; the cover is the mean cell density, to two decimals (docs/VCR_FORMAT.md, Type 10).
  */
+/**
+ * The 15 cloud variant ids of a sky setup payload (docs/VCR_FORMAT.md, opcode 68): after the mode byte and the transition time,
+ * one NUL-terminated two-digit id per cloud cell code 0..14. Null when the payload is not that (the scan matches headers in raw bytes).
+ */
+export function replayCloudVariants(payload: Buffer): string[] | null {
+  const ids = payload.subarray(5).toString('latin1').split('\0').slice(0, 15);
+  return ids.length === 15 && ids.every(id => /^\d\d$/.test(id)) ? ids : null;
+}
+
+/**
+ * The 32 cloud cell codes of a weather packet's 16-byte cloud field as 32 hex digits, in cell order: each byte holds two
+ * cells, the low four bits first (docs/VCR_FORMAT.md, Type 10).
+ */
+export function replayCloudCells(cells: Buffer): string {
+  let codes = '';
+  for (const byte of cells) codes += (byte & 15).toString(16) + (byte >> 4).toString(16);
+  return codes;
+}
+
 export function replayCloudCover(cells: Buffer): number {
   let density = 0;
   for (const byte of cells) density += 30 - (byte >> 4) - (byte & 15);
@@ -489,6 +512,8 @@ export function parseReplayMetadata(
       weatherCondition: weather?.weatherCondition,
       ambientTemp: weather?.ambientTemp,
       cloudCover: weather ? weather.cloudCover : null,
+      cloudField: weather ? weather.cloudField : null,
+      cloudVariants: weather ? weather.cloudVariants : null,
     };
 
     if (options?.verbose) {

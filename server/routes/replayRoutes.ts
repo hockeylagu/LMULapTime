@@ -82,7 +82,7 @@ export function createReplayRouter(context: ServerContext): Router {
     } catch { return undefined; }
     const lap = session.drivers.find(driver => driver.driverOrdinal === driverOrdinal)?.laps.find(entry => entry.lapOrdinal === lapOrdinal);
     const sessionTimeSec = lap?.elapsedSeconds ?? (trajectory.timeReference === 'session' ? trajectory.lapStartTimeSec : undefined) ?? 0;
-    return replayDaylightClock(session.sessionType, metadata.raceStartMinute, sessionTimeSec, metadata.cloudCover);
+    return replayDaylightClock(session.sessionType, metadata.raceStartMinute, sessionTimeSec, metadata.cloudCover, metadata.cloudField, metadata.cloudVariants);
   };
 
   router.get('/session/:sessionId/telemetry', async (req, res) => {

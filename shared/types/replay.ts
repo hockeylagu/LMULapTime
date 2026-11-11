@@ -42,6 +42,10 @@ export interface ReplayMetadata {
   raceStartMinute?: number | null;
   /** [session time s, cloud cover 0 clear..1 overcast] from the sampled weather packets; null when not scanned, absent in metadata cached before it was read. */
   cloudCover?: Array<[number, number]> | null;
+  /** The cloud field of the sampled weather packets, in time order; null when not scanned, absent in metadata cached before it was read. */
+  cloudField?: ReplayCloudFieldSample[] | null;
+  /** The variant id ("01".."03") of each cloud cell code 0..14; null when not scanned or not found, absent in metadata cached before it was read. */
+  cloudVariants?: string[] | null;
   scn?: string;
   /** The engine scene (scn without its extension): names the exact layout. */
   sceneDesc?: string;
@@ -279,6 +283,12 @@ export interface ReplayTrajectoryValidation {
  */
 export type LapEndCut = 'line' | 'extrapolated' | 'none';
 
+/**
+ * One weather packet's cloud field: [session time s, upper layer drift, lower layer drift, cells]. The drifts are in cells and
+ * grow with the wind; `cells` is 32 hex digits, one cloud cell code each (15 a clear cell), in cell order.
+ */
+export type ReplayCloudFieldSample = [number, number, number, string];
+
 /** A replay moment's in-game clock, for the sun (shared/domain/scenery/replayDaylightClock.ts). */
 export interface ReplayDaylightClock {
   /** The session whose default daylight the track publishes. */
@@ -289,6 +299,12 @@ export interface ReplayDaylightClock {
   sessionTimeSec: number;
   /** Cloud cover nearest the lap start, 0 clear..1 overcast; absent when the replay's weather was not read. */
   cloudCover?: number;
+  /**
+   * The cloud field at the lap start: the nearest sample's cells and the drifts interpolated to the moment, with the drifts of the
+   * replay's first sample (a cloud's age counts from them); absent like `cloudCover`. `variants` is the replay's variant id per
+   * cell code 0..14, absent when the replay has none.
+   */
+  cloudField?: { cells: string; upperDrift: number; lowerDrift: number; startUpperDrift: number; startLowerDrift: number; variants?: string[] };
 }
 
 export interface ReplayTrajectoryData {

@@ -276,7 +276,8 @@ downshift sound event (opcode 75 index `55`, §4.7).
 
 ### 4.4 Sky Setup (opcode 68, 50 bytes)
 `u8` mode, Float32LE transition time (s), then 15 NUL-terminated two-digit variant ids (`"01"`..`"03"`), one per
-sky layer.
+cloud cell code `0`..`14` of the weather packet's cloud field (§4.10): the id is the end of the name of the cloud material every
+cloud of that code uses.
 
 ### 4.5 Dents (opcodes 71 and 70)
 **Opcode 71** (4 bytes, Float32LE time) starts a car's dent set; one **opcode 70** per dent follows. A set is
@@ -354,11 +355,11 @@ About every 1.5–2 s in every session.
 | :--- | :--- | :--- | :--- |
 | `0..3` | 4 | Float32LE | Weather simulation time, s (advances in steps of 10/3 s) |
 | `4`, `5` | 1 each | UInt8 | Two weather flags, `0` or `255`; set briefly about every 600 s. Their effect is not established. |
-| `6..9` | 4 | Float32LE | Ramp whose rate follows the wind speed `w` (m/s): `dA/dt = (20 + w) / 16500`; same value at the same session time for the same rate. Probably the cloud field's drift (not established). |
-| `10..13` | 4 | Float32LE | Second ramp: `B = 25/16 × A − 0.000947 × t − 0.4` (t = session time), rate `(10 + w) / 10560`. Not established. |
+| `6..9` | 4 | Float32LE | **Upper cloud layer drift**, in cells: grows at `(20 + w) / 16500` per second, `w` the wind speed in m/s. |
+| `10..13` | 4 | Float32LE | **Lower cloud layer drift**, in cells: grows at `(10 + w) / 10560` per second. |
 | `14..15` | 2 | Binary | `0` |
 | `16..17` | 2 | Binary | Constant within an event (`0x1EA2` online, `0x5698` offline). Not established. |
-| `18..33` | 16 | 4-bit cells | **Cloud field**: 32 cells, `15` clear, `0` fully clouded. **Cloud cover** = `Σ(15 − cell) / (15 × 32)`. Cells fall to `0..4` while it rains. |
+| `18..33` | 16 | 4-bit cells | **Cloud field**: 32 cells, the low four bits of each byte first. Cells 0–24 are the lower layer (a 5 × 5 grid), 25–31 the upper layer. A cell holds a cloud type code: `0–2` heavy rain cloud, `3–5` light rain cloud, `6–7` thick low cloud, `8–10` thin low cloud, `11–12` thick high cloud, `13–14` thin high cloud, `15` clear. The app's **cloud cover** figure is `Σ(15 − cell) / (15 × 32)`. |
 | `34` | 1 | UInt8 | A fraction `n / 255`; `128` in every replay. Not established. |
 | `35` | 1 | UInt8 | **Wind speed**: m/s = `n / 4` |
 | `36..37` | 2 | UInt16LE | **Wind direction**: radians = `n × 2π / 65535` |

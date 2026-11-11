@@ -1542,3 +1542,9 @@ To achieve zero-compromise analytics:
 - **Spatial Track Position**: Use **VCR Replay** for world coordinates $(x, z)$, yaw heading, and track map display (interpolating the VCR trajectory onto the DuckDB timeline).
 - **Opponent Overlays**: Use **VCR Replay** for multi-car telemetry traces and benchmark ghost comparisons.
 - **Offline Development & Deep Reverse Engineering**: Use **`npm run telemetry:record`** (`tools/telemetryRecorder.ts`) for live memory-mapped calibration sweeps and unknown byte validation.
+
+### Weather packet: cloud field and drift (2026-11-10)
+
+- The 32 four-bit cells are cloud type codes, not densities, read low half first. Evidence: a static read of the game's code (cell code to cloud type, 25 lower and 7 upper cells), and the game's own cloud coverage number recomputed from a Daytona practice replay (0.1886 near 410 s) against the value in a frame capture of that session (0.1886386); the density sum gives 0.152 there.
+- Bytes 6..9 and 10..13 are the two layers' drift in cells; the rates measured earlier, `(20 + w) / 16500` and `(10 + w) / 10560`, are the constants in the game's code.
+- The app's cloud cover figure still uses the density sum; switching it to the game's coverage needs the per-type weights from the data package.

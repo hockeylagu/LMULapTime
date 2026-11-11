@@ -2,7 +2,7 @@ import { describe, it, expect, afterAll } from 'vitest';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { parseReplayMetadata, replayCloudCover } from '../../../../server/replay/decode/replayParser.js';
+import { parseReplayMetadata, replayCloudCells, replayCloudCover, replayCloudVariants } from '../../../../server/replay/decode/replayParser.js';
 import { extractReplayTrajectory } from '../../../../server/replay/decode/replayTrajectory.js';
 import { createSliceVcrBuffer } from '../../../utils/mockVcr.js';
 
@@ -154,6 +154,32 @@ describe('replayWeather - Class 1 Type 10 meteorology decoding', () => {
     }));
     expect(parseReplayMetadata(filePath).cloudCover).toEqual([[5, 0], [8.5, 0.5]]);
     expect(replayCloudCover(Buffer.alloc(16, 0x7f))).toBe(0.27);
+  });
+
+  it('reads the cloud field from the weather packets: both layer drifts and the 32 cell codes, the low half of each byte first', () => {
+    const filePath = path.join(tempDir, 'cloud_field_session.vcr');
+    const cells = [0x8a, ...new Array<number>(14).fill(0xff), 0xde];
+    fs.writeFileSync(filePath, createSliceVcrBuffer({
+      trackName: 'Spa_Cloud_Field',
+      slices: [
+        { sTime: 5.0, driverSlot: 1, x: 0, y: 0, z: 0, throttle: 100, brake: 0, weather: {} },
+        { sTime: 8.5, driverSlot: 1, x: 5, y: 0, z: 5, throttle: 100, brake: 0, weather: { cloudCells: cells, cloudDrift: [0.5, -0.25] } },
+      ],
+    }));
+    expect(parseReplayMetadata(filePath).cloudField).toEqual([[5, 0, 0, 'f'.repeat(32)], [8.5, 0.5, -0.25, 'a8' + 'f'.repeat(28) + 'ed']]);
+    expect(replayCloudCells(Buffer.from([0x01, 0xf7]))).toBe('107f');
+  });
+
+  it('reads the cloud variant of each cell code from the sky setup packet, and none from a replay without one', () => {
+    const variants = ['01', '01', '01', '01', '01', '01', '02', '01', '01', '03', '02', '03', '02', '01', '02'];
+    const write = (name: string, cloudVariants?: string[]) => {
+      const filePath = path.join(tempDir, name);
+      fs.writeFileSync(filePath, createSliceVcrBuffer({ trackName: 'Spa_Cloud_Variants', slices: [{ sTime: 5.0, driverSlot: 1, x: 0, y: 0, z: 0, throttle: 100, brake: 0, weather: { cloudVariants } }] }));
+      return parseReplayMetadata(filePath).cloudVariants;
+    };
+    expect(write('cloud_variants.vcr', variants)).toEqual(variants);
+    expect(write('cloud_no_variants.vcr')).toBeNull();
+    expect(replayCloudVariants(Buffer.concat([Buffer.alloc(5), Buffer.from('01\0x2\0'.repeat(8), 'latin1')]))).toBeNull();
   });
 });
 

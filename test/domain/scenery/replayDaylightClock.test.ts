@@ -20,4 +20,15 @@ describe('replayDaylightClock', () => {
     expect(replayDaylightClock('Race', 840, 500, cover).cloudCover).toBe(0.8);
     expect(replayDaylightClock('Race', 840, 80, []).cloudCover).toBeUndefined();
   });
+
+  it("takes the nearest cloud cells, interpolates the two drifts to the lap's session time (held outside the samples) and keeps the first sample's drifts", () => {
+    const field: Array<[number, number, number, string]> = [[0, 1, 2, 'a'], [100, 2, 4, 'b']], start = {startUpperDrift: 1, startLowerDrift: 2};
+    expect(replayDaylightClock('Race', 840, 25, null, field).cloudField).toEqual({cells: 'a', upperDrift: 1.25, lowerDrift: 2.5, ...start});
+    expect(replayDaylightClock('Race', 840, 75, null, field).cloudField).toEqual({cells: 'b', upperDrift: 1.75, lowerDrift: 3.5, ...start});
+    expect(replayDaylightClock('Race', 840, 500, null, field).cloudField).toEqual({cells: 'b', upperDrift: 2, lowerDrift: 4, ...start});
+    expect(replayDaylightClock('Race', 840, -5, null, field).cloudField).toEqual({cells: 'a', upperDrift: 1, lowerDrift: 2, ...start});
+    expect(replayDaylightClock('Race', 840, 25, null, [field[0]]).cloudField).toEqual({cells: 'a', upperDrift: 1, lowerDrift: 2, ...start});
+    expect(replayDaylightClock('Race', 840, 25, null, []).cloudField).toBeUndefined();
+    expect(replayDaylightClock('Race', 840, 25, null, [field[0]], ['01', '03']).cloudField?.variants).toEqual(['01', '03']);
+  });
 });

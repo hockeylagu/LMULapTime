@@ -28,7 +28,7 @@ export interface MockSlice {
   poseWheels?: Array<{ speed: number; deflection: number }>;
   standings?: number[];
   /** `cloudCells`: the 16-byte cloud field (two 4-bit cells per byte, 0xff = clear); clear when omitted. */
-  weather?: { ambientTemp?: number; rainIntensity?: number; cloudCells?: number[] };
+  weather?: { ambientTemp?: number; rainIntensity?: number; cloudCells?: number[]; cloudDrift?: [number, number]; cloudVariants?: string[] };
   // Extra events appended to the slice as-is (opcode, slot, payload, time offset byte, session code).
   rawEvents?: Array<{ opcode: number; slot: number; payload: Buffer; timeOffset?: number; sessionCode?: number }>;
 }
@@ -190,11 +190,17 @@ export function createSliceVcrBuffer(options?: {
       sliceBufs.push(stHdr, Buffer.from([0]), stData);
     }
 
+    if (sl.weather?.cloudVariants) {
+      // Opcode 68, slot 255: mode byte, transition time, then one NUL-terminated id per cloud cell code.
+      const ids = Buffer.from(sl.weather.cloudVariants.map(id => `${id}\0`).join(''), 'latin1');
+      sliceBufs.push(vcrEventHeader(68, 5 + ids.length, 255), Buffer.from([0]), Buffer.alloc(5), ids);
+    }
     if (sl.weather) {
       // Opcode 138, size 80, slot 255
       const wHdr = vcrEventHeader(138, 80, 255);
       const wData = Buffer.alloc(80);
       wData.writeFloatLE(sl.sTime, 0);
+      wData.writeFloatLE(sl.weather.cloudDrift?.[0] ?? 0, 6); wData.writeFloatLE(sl.weather.cloudDrift?.[1] ?? 0, 10);
       Buffer.from(sl.weather.cloudCells ?? new Array<number>(16).fill(0xff)).copy(wData, 18);
       const temp = sl.weather.ambientTemp ?? 25.0;
       const rawTemp = Math.round((temp - 5.9) * 8);
