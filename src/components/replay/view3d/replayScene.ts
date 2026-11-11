@@ -4,7 +4,7 @@ import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
 import { VEHICLE_FILES } from '../../../api/vehicles/bodyApi.js';
 import type { MapColorMode } from '../map/replayMapUtils.js';
 import { ghostDistanceAt, type GhostSyncMode } from '../map/ghostSync.js';
-import { sampleRenderPose, sampleStationPose } from './replayPose.js';
+import { sampleRenderPose, sampleStationPose, type RenderPose } from './replayPose.js';
 import { nativeToScene } from './sceneFrame.js';
 import { createLapLayerLoader, type LapCars, type LapLayer } from './laps/lapLayer.js';
 import { disposeObjects } from './laps/disposeObjects.js';
@@ -17,6 +17,7 @@ import { CachedKtx2Loader } from './scenery/cachedKtx2Loader.js';
 import { createChunkLoader } from './scenery/chunkLoader.js';
 import { createSceneryGround } from './scenery/sceneryGround.js';
 import type { StreamView } from './scenery/residency.js';
+import type { WheelAnimation } from './wheelAnimation.js';
 import { createSceneryStream } from './scenery/sceneryStream.js';
 import { createSceneWarmup } from './scenery/sceneWarmup.js';
 import { isFreeCameraMode, stationAt, viewMoved } from './scenery/streamView.js';
@@ -101,6 +102,7 @@ export async function createReplayScene(
     changed: () => { freezeScenery(); scheduleRefresh(); reflection.stale(); invalidate(); },
     failed: (chunk, error) => { if (!disposed) onFailure(`3D scenery chunk ${chunk.id} failed: ${error.message}`); },
   });
+  /** Frees what exists from the start; `dispose` adds what the finished scene owns. */
   const cleanup = () => {
     disposed = true; window.clearTimeout(refreshTimer); stream.dispose(); loader.dispose(); carTextures.dispose(); exposure.dispose();
     ground.dispose(); warmup.dispose(); rig.dispose(); renderer.dispose(); renderer.forceContextLoss();
@@ -187,6 +189,14 @@ export async function createReplayScene(
     if (disposed || frame || document.hidden) return;
     frame = requestAnimationFrame(now => { frame = 0; draw(now); });
   };
+  /** Puts a car on a sampled pose: the body when the pose has a heading, else the plain pose marker. */
+  const placeCar = (car: Object3D, pose: RenderPose, wheels: WheelAnimation | null) => {
+    car.position.set(pose.x - origin.x, pose.y - origin.y, pose.z - origin.z);
+    if (pose.orientation) car.quaternion.copy(pose.orientation); else car.quaternion.identity();
+    wheels?.update(pose);
+    car.getObjectByName('body-envelope')!.visible = pose.yaw !== undefined;
+    car.getObjectByName('pose-marker')!.visible = pose.yaw === undefined;
+  };
   let viewportWidth = 0, viewportHeight = 0;
   const resize = () => {
     if (disposed) return;
@@ -224,13 +234,9 @@ export async function createReplayScene(
       const pose = sampleRenderPose(trajectory.points, index, fraction);
       primary.visible = pose !== null;
       if (!pose) { invalidate(); return; }
-      primary.position.set(pose.x - origin.x, pose.y - origin.y, pose.z - origin.z);
-      if (pose.orientation) primary.quaternion.copy(pose.orientation); else primary.quaternion.identity();
-      primaryWheels.update(pose);
+      placeCar(primary, pose, primaryWheels);
       const sample = trajectory.points[pose.index], nextSample = trajectory.points[pose.index + 1];
       const timeSec = (sample.timeSec ?? pose.index / 40) + ((nextSample?.timeSec ?? sample.timeSec ?? 0) - (sample.timeSec ?? 0)) * pose.fraction;
-      primary.getObjectByName('body-envelope')!.visible = pose.yaw !== undefined;
-      primary.getObjectByName('pose-marker')!.visible = pose.yaw === undefined;
 
       const lapStation = stationAt(trajectory.points, pose.index, pose.fraction, route);
       if (lapStation !== undefined) currentStation = lapStation;
@@ -238,13 +244,7 @@ export async function createReplayScene(
       const ghostStation = ghostClock ? ghostDistanceAt(ghostClock, syncMode, station, anchorDistM) : station;
       const other = baseline ? sampleStationPose(baseline.points, baselineDistances, ghostStation) : null;
       ghost.visible = other !== null;
-      if (other) {
-        ghost.position.set(other.x - origin.x, other.y - origin.y, other.z - origin.z);
-        if (other.orientation) ghost.quaternion.copy(other.orientation); else ghost.quaternion.identity();
-        ghostWheels?.update(other);
-        ghost.getObjectByName('body-envelope')!.visible = other.yaw !== undefined;
-        ghost.getObjectByName('pose-marker')!.visible = other.yaw === undefined;
-      }
+      if (other) placeCar(ghost, other, ghostWheels);
       rig.follow({target: target.set(...nativeToScene(pose, origin)), yaw: pose.yaw ?? 0, timeSec, stationM: station, index, fraction});
       invalidate();
     },
@@ -270,9 +270,11 @@ export async function createReplayScene(
       invalidate();
     },
     dispose() {
-      disposed = true; cancelAnimationFrame(frame); observer.disconnect(); rig.dispose();
-      renderer.domElement.removeEventListener('webglcontextlost', contextLost);
-      document.removeEventListener('visibilitychange', invalidate); clearTimeout(refreshTimer); stream.dispose(); ground.dispose(); disposeObjects(scene, true); loader.dispose(); carTextures.dispose(); environment.dispose(); reflection.dispose(); exposure.dispose(); warmup.dispose(); renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
+      disposed = true; cancelAnimationFrame(frame); observer.disconnect();
+      renderer.domElement.removeEventListener('webglcontextlost', contextLost); document.removeEventListener('visibilitychange', invalidate);
+      // The stream takes its chunks out first (the chunk loader frees them), then the cars, lines and sky go with the scene.
+      stream.dispose(); disposeObjects(scene, true); environment.dispose(); reflection.dispose();
+      cleanup(); renderer.domElement.remove();
     },
   };
 }
