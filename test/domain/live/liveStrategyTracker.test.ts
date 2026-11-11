@@ -297,6 +297,20 @@ describe('LiveStrategyTracker', () => {
     expect(context(tracker, qualifying, { lapsLeft: null })?.garage?.forQualifying).toBeUndefined();
   });
 
+  it('caps the garage load at the session fuel cap from the pit screen before the car reading (Le Mans 2026-11-11)', () => {
+    const tracker = new LiveStrategyTracker();
+    tracker.applyRest({ type: 'schedule', raceMinutes: 60, hasQualifying: true });
+    tracker.applyRest({ type: 'tireManagement', vePerLap: null, fuelPerLap: 6.23, newSets: 2, selected: null });
+    const garage = at(35, { sessionCode: 10, inRealtime: false, gamePhase: 0, player: vehicleReading({ totalLaps: 0, estimatedLapTime: 217.3 }),
+      leader: vehicleReading({ id: 3, estimatedLapTime: 217.3 }) });
+    const plan = () => context(tracker, garage, { carClass: 'LMP2', lapsLeft: null })?.garage;
+    // Without a cap the 18 laps ask more than the tank holds (115 L in the race, 109 L with this test's reserve).
+    expect(plan()).toMatchObject({ needed: 109 });
+    tracker.applyRest({ type: 'pitStopTimes', fixRandom: 0, fuelRandom: 0, tireRandom: 0, veRandom: 0, fuelFillRate: 4, veFillRate: 0,
+      fuelInsert: 0, veInsert: 0, maxFuel: 75 });
+    expect(plan()).toMatchObject({ needed: 75, stops: 1 });
+  });
+
   it('plans a wet race garage from the event wet laps, not the dry estimates (Le Mans 2026-11-11: 18 planned, 16 run)', () => {
     const garageLaps = (track: Partial<LiveScoringReading>) => {
       const tracker = new LiveStrategyTracker();

@@ -33,7 +33,9 @@ export type LiveRestUpdate =
   | { type: 'pitStopTimes'; fixRandom: number; fuelRandom: number; tireRandom: number; veRandom: number;
     fuelFillRate: number; veFillRate: number; fuelInsert: number; veInsert: number;
     /** Seconds to change four tyres (`FourTireChange`, 12 at Le Mans 2026-10-22); added to the refuel, null when absent. */
-    fourTyreChange?: number | null }
+    fourTyreChange?: number | null;
+    /** The session's fuel cap in litres (`fuelInfo.maxFuel`); null when absent. */
+    maxFuel?: number | null }
   | { type: 'pitMenu'; menu: LivePitMenu }
   | { type: 'condition'; condition: LiveVehicleCondition }
   | { type: 'tireManagement'; vePerLap: number | null; fuelPerLap: number | null; newSets: number | null; selected: LiveSelectedTyres | null }
@@ -365,7 +367,7 @@ export class LiveStrategyTracker {
 
   private capacity(kind: LiveResourceKind): number | null {
     if (kind === 've') return 100;
-    return this.car && this.car.fuelCapacityLiters > 0 ? this.car.fuelCapacityLiters : null;
+    return this.car && this.car.fuelCapacityLiters > 0 ? this.car.fuelCapacityLiters : this.delays?.maxFuel ?? null;
   }
 
   /** The game's per-lap estimate: this session's tyre screen, else the event's last one. */

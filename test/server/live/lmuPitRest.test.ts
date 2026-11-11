@@ -14,7 +14,9 @@ describe('LMU pit REST parsers', () => {
     expect(parseEstimate({ damage: 1 })).toBeNull();
     expect(parsePitStopTimes({ pitStopTimes: { times: { FixRandomDelay: 5, FuelRandomDelay: 2, RandomTireDelay: 1, virtualEnergyRandomDelay: 0,
       FuelFillRate: 4, FuelInsert: 1, virtualEnergyFillRate: 0.025, virtualEnergyInsert: 0, FourTireChange: 12 } } }))
-      .toEqual({ type: 'pitStopTimes', fixRandom: 5, fuelRandom: 2, tireRandom: 1, veRandom: 0, fuelFillRate: 4, veFillRate: 2.5, fuelInsert: 1, veInsert: 0, fourTyreChange: 12 });
+      .toEqual({ type: 'pitStopTimes', fixRandom: 5, fuelRandom: 2, tireRandom: 1, veRandom: 0, fuelFillRate: 4, veFillRate: 2.5, fuelInsert: 1, veInsert: 0, fourTyreChange: 12, maxFuel: null });
+    // The session's fuel cap (Le Mans 2026-11-11: 75 L).
+    expect(parsePitStopTimes({ pitStopTimes: { times: {} }, fuelInfo: { maxFuel: 75, maxBattery: 0 } })?.maxFuel).toBe(75);
   });
 
   it('reads the MFD: the VE line (target after the stop), tyres and repair, each at its current setting', () => {

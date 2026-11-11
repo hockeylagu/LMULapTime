@@ -41,6 +41,7 @@ type Json = Record<string, unknown>;
 const record = (value: unknown): Json | null =>
   typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Json : null;
 const num = (value: unknown): number | null => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+const positiveNum = (value: unknown): number | null => { const n = num(value); return n !== null && n > 0 ? n : null; };
 const numbers = (value: unknown): number[] | null =>
   Array.isArray(value) && value.every(item => num(item) !== null) ? value as number[] : null;
 /** The leading number of a game text such as `50% (20.1 laps)`, `43.0L` or `50% 20 laps`. */
@@ -75,6 +76,9 @@ export function parsePitStopTimes(body: unknown): Extract<LiveRestUpdate, { type
     fuelInsert: delay('FuelInsert'),
     veInsert: delay('virtualEnergyInsert'),
     fourTyreChange: num(times.FourTireChange),
+    // The session's fuel cap, which shared memory gives only once the car is out (Le Mans race garage 2026-11-11: 115 L
+    // needed with no cap known, against the event's 75 L).
+    maxFuel: positiveNum(record(record(body)?.fuelInfo)?.maxFuel),
   };
 }
 

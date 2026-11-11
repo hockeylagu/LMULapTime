@@ -91,7 +91,7 @@ const READS: PitRead[] = [
     path: '/rest/garage/UIScreen/TireManagement', every: { track: 60_000, garage: 20_000 }, trigger: 'tireManagement',
     crashesInReplay: false, parse: parseTireManagement,
   },
-  { path: '/rest/garage/UIScreen/RepairAndRefuel', every: { track: 120_000 }, once: true, crashesInReplay: false, parse: parsePitStopTimes },
+  { path: '/rest/garage/UIScreen/RepairAndRefuel', every: { track: 120_000, garage: 120_000 }, once: true, crashesInReplay: false, parse: parsePitStopTimes },
   { path: '/rest/garage/getPlayerGarageData', every: { garage: 5000 }, crashesInReplay: false, parse: parseGarageData },
   { path: '/rest/sessions/weather', every: { track: 60_000, garage: 60_000 }, crashesInReplay: false, parse: parseForecast },
   // The race length for the garage before the start; it does not change during the event. Never read in a replay
