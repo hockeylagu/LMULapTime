@@ -29,13 +29,14 @@ export function startStreaming(texture: Texture, renderer: WebGLRenderer): void 
   texture.source = source;
   const stream: Stream = {levels, level: STREAMED_LEVELS - 1, row: 0};
   streams.set(texture, stream);
-  // Runs right after each allocation, with the texture bound: (re)fill the reduced levels and sample only those.
+  // Runs right after each allocation, with the texture bound: refill the reduced levels and sample only those, or every level
+  // once the texture had finished streaming (a later allocation would otherwise leave its storage empty).
   texture.onUpdate = () => {
-    if (!streams.has(texture)) return; // Released before its first upload.
+    const from = streams.has(texture) ? STREAMED_LEVELS : 0;
     stream.level = STREAMED_LEVELS - 1; stream.row = 0;
     const gl = renderer.getContext() as WebGL2RenderingContext;
-    for (let level = STREAMED_LEVELS; level < levels.length; level++) uploadRows(texture, renderer, levels[level], level, 0, levels[level].height);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_BASE_LEVEL, STREAMED_LEVELS);
+    for (let level = from; level < levels.length; level++) uploadRows(texture, renderer, levels[level], level, 0, levels[level].height);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_BASE_LEVEL, from);
   };
 }
 
@@ -44,9 +45,10 @@ export function isStreaming(texture: Texture): boolean {
   return streams.has(texture);
 }
 
-/** Forgets a texture's missing levels (its chunks released it). */
+/** Forgets a texture's missing levels and stops refilling it (its chunks released it). */
 export function stopStreaming(texture: Texture): void {
   streams.delete(texture);
+  texture.onUpdate = null;
 }
 
 /**
