@@ -1,6 +1,6 @@
 import { MeshoptDecoder } from 'meshoptimizer/decoder';
 import { Mesh, type Object3D, type WebGLRenderer } from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { GLTFLoader, type GLTFLoaderPlugin, type GLTFParser } from 'three/addons/loaders/GLTFLoader.js';
 import type { SceneryChunk } from '../../../../../shared/types/scenes/scenery.js';
 import { fetchSceneryChunk, SCENERY_FILES } from '../../../../api/sceneryApi.js';
 import { disposeObjects } from '../laps/disposeObjects.js';
@@ -40,9 +40,32 @@ function startDecoderWorkers(): void {
   MeshoptDecoder.useWorkers(2);
 }
 
+interface GlbMaterial { extras?: { lmuSurface?: unknown }; pbrMetallicRoughness?: Record<string, unknown>; [slot: string]: unknown }
+const TEXTURE_SLOTS = ['normalTexture', 'occlusionTexture', 'emissiveTexture'] as const;
+
+/**
+ * A material with a surface description samples the maps the surface program loads (configureSurfaceMaterial), never its glTF
+ * texture slots: the loader skips those, so parsing a chunk does not wait for its albedo files and makes no unused clones.
+ * Materials without one keep their glTF textures.
+ */
+export function skipSurfaceTextures(parser: GLTFParser): GLTFLoaderPlugin {
+  return {
+    name: 'lmu_surface_textures',
+    beforeRoot() {
+      for (const material of (parser.json as { materials?: GlbMaterial[] }).materials ?? []) {
+        if (!material.extras?.lmuSurface) continue;
+        for (const slot of TEXTURE_SLOTS) delete material[slot];
+        delete material.pbrMetallicRoughness?.baseColorTexture; delete material.pbrMetallicRoughness?.metallicRoughnessTexture;
+      }
+      return null;
+    },
+  };
+}
+
 export function createChunkLoader(renderer: WebGLRenderer): ChunkLoader {
   startDecoderWorkers();
-  const ktx2 = new CachedKtx2Loader(renderer), gltf = new GLTFLoader().setKTX2Loader(ktx2).setMeshoptDecoder(MeshoptDecoder);
+  const ktx2 = new CachedKtx2Loader(renderer);
+  const gltf = new GLTFLoader().setKTX2Loader(ktx2).setMeshoptDecoder(MeshoptDecoder).register(skipSurfaceTextures);
   const textures = createSurfaceTexturePool(ktx2, renderer, SCENERY_FILES);
   const sources = new WeakMap<Object3D, ReturnType<typeof textures.source>>();
   const releaseChunk = (root: Object3D) => {
