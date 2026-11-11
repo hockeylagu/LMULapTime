@@ -24,7 +24,7 @@ describe('cloud layer', () => {
     expect(meshes[0].geometry.getAttribute('position').getY(0)).toBeCloseTo(4000, 6); expect(meshes[1].geometry.getAttribute('position').getY(0)).toBeCloseTo(2000, 6);
     expect(meshes[0].renderOrder).toBeLessThan(meshes[1].renderOrder); expect(meshes[1].renderOrder).toBeLessThan(0);
     const material = meshes[0].material as MeshStandardMaterial;
-    expect(material.transparent).toBe(true); expect(material.depthWrite).toBe(false); expect(meshes[0].frustumCulled).toBe(false);
+    expect(material.transparent).toBe(true); expect(material.depthWrite).toBe(false); expect(material.forceSinglePass).toBe(true); expect(meshes[0].frustumCulled).toBe(false);
     // Both sheets have the same cloud material: one material, one set of textures.
     expect(meshes[1].material).toBe(material);
     layer.dispose();

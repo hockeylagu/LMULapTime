@@ -181,7 +181,8 @@ export function createCloudLayer(clouds: SceneryClouds, sheets: CloudSheet[], li
     let made = materials.get(cloud.name);
     if (made) return made;
     const uniforms = cloudUniforms(clouds, cloud, light, texture);
-    made = new MeshStandardMaterial({ transparent: true, depthWrite: false, side: DoubleSide });
+    // One pass for both sides: a sheet never overlaps itself, and three's two-pass path looks the program up again before each pass.
+    made = new MeshStandardMaterial({ transparent: true, depthWrite: false, side: DoubleSide, forceSinglePass: true });
     made.onBeforeCompile = shader => { Object.assign(shader.uniforms, uniforms); patchCloudShader(shader); };
     made.customProgramCacheKey = () => 'cloud-sheet';
     materials.set(cloud.name, made);
