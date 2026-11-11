@@ -39,7 +39,7 @@ const paintUniforms = new WeakMap<Material, Record<string, IUniform>>();
  * Gives a car paint material the car's reflection cubes (null: back to three's sky environment until the next probe). False for
  * a material that is not car paint.
  */
-export function setPaintReflection(material: Material, cubes: ReflectionCubes | null): boolean {
+export function setPaintReflection(material: Material, cubes: Pick<ReflectionCubes, 'sharp' | 'convolved' | 'levels'> | null): boolean {
   const uniforms = paintUniforms.get(material);
   if (!uniforms) return false;
   uniforms.paint_sharp.value = cubes?.sharp ?? null; uniforms.paint_convolved.value = cubes?.convolved ?? null;

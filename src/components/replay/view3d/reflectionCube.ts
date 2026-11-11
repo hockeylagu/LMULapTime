@@ -16,7 +16,12 @@ export interface ReflectionCubes {
   target: WebGLCubeRenderTarget;
   levels: number;
   dispose(): void;
+  /** The convolution pass, kept so a later capture into these cubes links no program and uploads no kernel. */
+  pass: ConvolutionPass;
 }
+
+/** The full-screen pass that convolves one cube: its material, quad and one sample texture per kernel. */
+interface ConvolutionPass { material: RawShaderMaterial; scene: Scene; camera: OrthographicCamera; samples: DataTexture[]; dispose(): void }
 
 /** A kernel's sample directions as a float texture, one texel per sample (xyz). */
 function sampleTexture(kernel: SceneryConvolutionKernel): DataTexture {
@@ -58,10 +63,21 @@ void main() {
   colour = vec4(sum / float(count), 1.0);
 }`;
 
+function convolutionPass(kernels: readonly SceneryConvolutionKernel[]): ConvolutionPass {
+  const material = new RawShaderMaterial({
+    glslVersion: GLSL3, vertexShader: VERTEX, fragmentShader: FRAGMENT, depthTest: false, depthWrite: false,
+    uniforms: {source: {value: null}, samples: {value: null}, face: {value: 0}, count: {value: 0}, size: {value: 0}, sourceLod: {value: 0}},
+  });
+  const geometry = new BufferGeometry().setAttribute('position', new Float32BufferAttribute([-1, -1, 0, 3, -1, 0, -1, 3, 0], 3));
+  const scene = new Scene(), camera = new OrthographicCamera(), quad = new Mesh(geometry, material), samples = kernels.map(sampleTexture);
+  quad.frustumCulled = false; scene.add(quad);
+  return {material, scene, camera, samples, dispose: () => { material.dispose(); geometry.dispose(); for (const texture of samples) texture.dispose(); }};
+}
+
 /**
  * Convolves a cube render target (any size; its texture must keep mips, as the kernels read it at their source LOD) with the
  * package's kernels into a new cube of the same size and type, or into `into` (an earlier result for a source of the same size, type
- * and kernels), which it returns. Runs once per source capture, outside the frame.
+ * and kernels), which it returns, reusing its convolution pass. Runs once per source capture, outside the frame.
  */
 export function convolveReflection(renderer: WebGLRenderer, source: WebGLCubeRenderTarget, kernels: readonly SceneryConvolutionKernel[], into?: ReflectionCubes): ReflectionCubes {
   const size = source.width, levels = kernels.length;
@@ -70,32 +86,25 @@ export function convolveReflection(renderer: WebGLRenderer, source: WebGLCubeRen
   if (into && (into.target.width !== size || into.levels !== levels || into.target.texture.type !== source.texture.type)) throw Error('The reflection cubes to reuse differ in size, type or kernels');
   // Mip storage comes with generateMipmaps; three regenerates the chain only after a mip 0 render, so every mip 0 face is drawn first.
   const target = into?.target ?? new WebGLCubeRenderTarget(size, {type: source.texture.type, generateMipmaps: true, minFilter: LinearMipmapLinearFilter, magFilter: LinearFilter});
-  const material = new RawShaderMaterial({
-    glslVersion: GLSL3, vertexShader: VERTEX, fragmentShader: FRAGMENT, depthTest: false, depthWrite: false,
-    uniforms: {source: {value: source.texture}, samples: {value: null}, face: {value: 0}, count: {value: 0}, size: {value: size}, sourceLod: {value: 0}},
-  });
-  const geometry = new BufferGeometry().setAttribute('position', new Float32BufferAttribute([-1, -1, 0, 3, -1, 0, -1, 3, 0], 3));
-  const scene = new Scene(), camera = new OrthographicCamera(), quad = new Mesh(geometry, material);
-  quad.frustumCulled = false; scene.add(quad);
+  const pass = into?.pass ?? convolutionPass(kernels), {material, scene, camera} = pass;
+  material.uniforms.source.value = source.texture;
   const previous = {target: renderer.getRenderTarget(), face: renderer.getActiveCubeFace(), level: renderer.getActiveMipmapLevel(), autoClear: renderer.autoClear};
   try {
     renderer.autoClear = false;
     kernels.forEach((kernel, level) => {
-      const samples = sampleTexture(kernel), u = material.uniforms;
-      u.samples.value = samples; u.count.value = kernel.samples.length; u.size.value = size >> level; u.sourceLod.value = kernel.sourceLod;
+      const u = material.uniforms;
+      u.samples.value = pass.samples[level]; u.count.value = kernel.samples.length; u.size.value = size >> level; u.sourceLod.value = kernel.sourceLod;
       for (let face = 0; face < 6; face++) {
         u.face.value = face;
         renderer.setRenderTarget(target, face, level);
         renderer.render(scene, camera);
       }
-      samples.dispose();
     });
   } finally {
     renderer.setRenderTarget(previous.target, previous.face, previous.level); renderer.autoClear = previous.autoClear;
-    material.dispose(); geometry.dispose();
   }
   // Only the kernels' mips are defined: reads stop at the last one.
   target.texture.generateMipmaps = false;
   if (into) { into.sharp = source.texture; return into; }
-  return {sharp: source.texture, convolved: target.texture, target, levels, dispose: () => target.dispose()};
+  return {sharp: source.texture, convolved: target.texture, target, levels, pass, dispose: () => { target.dispose(); pass.dispose(); }};
 }
