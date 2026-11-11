@@ -90,7 +90,7 @@ export function syntheticPackage() {
     optionNodes: ['option_NumplateA', 'option_NumplateB'],
     wheelRig: { passed: true, rigs: 4, maxRestVertexErrorM: 0 },
     lamps: [{
-      role: 'headlight', nodes: ['option_NumplateA'], material: 'body', frames: [texturePath], animation: { method: 'random', rate: 1, sequence: [0] },
+      role: 'headlight', nodes: ['option_NumplateA'], material: 'body', frames: [texturePath], animation: { method: 'loop', rate: 1, sequence: [0] },
       emission: { scale: 500, vertexColour: false, viewBoost: { gain: 2, power: 64 }, ambientScaled: false, vertexAlpha: false }, blend: 'alpha',
       states: { off: 0, on: null, brake: null }, defaultLit: false, hiddenInOwnCockpit: true,
     }, {

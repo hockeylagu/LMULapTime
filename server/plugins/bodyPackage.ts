@@ -36,7 +36,6 @@ function parseBody(value: unknown, what: string): VehicleBody {
 }
 
 const LAMP_ROLES = new Set(['headlight', 'brake', 'tail', 'rain', 'pit', 'reverse', 'warning', 'idLight', 'ledStrip', 'interior', 'discGlow', 'position', 'unclassified']);
-const ANIMATIONS = new Set(['noanim', 'cycle', 'oneshot', 'pendulum', 'transient', 'random', 'manual', 'video']);
 
 function nullableFlag(value: unknown, what: string): void {
   if (value !== null && typeof value !== 'boolean') throw Error(`${what}: expected true, false or null`);
@@ -50,7 +49,7 @@ function parseLamp(value: unknown, what: string): void {
   if (!array(lamp.nodes, `${what}.nodes`, 64).map((node, i) => text(node, `${what}.nodes[${i}]`, 200)).length) throw Error(`${what}.nodes: empty`);
   text(lamp.material, `${what}.material`, 200);
   const frames = array(lamp.frames, `${what}.frames`, 256);
-  // A null frame: the game ships no texture for it, so there is nothing to draw.
+  // A null frame: the package has no texture for it, so there is nothing to draw.
   if (!frames.length || frames.some(path => path !== null && (typeof path !== 'string' || !TEXTURE_PATH.test(path)))) throw Error(`${what}.frames: expected texture paths or null`);
   const frame = (index: unknown, at: string) => { if (index !== null && count(index, at, frames.length - 1) >= frames.length) throw Error(`${at}: no such frame`); };
   const animation = record(lamp.animation, `${what}.animation`);
@@ -58,7 +57,8 @@ function parseLamp(value: unknown, what: string): void {
   if (animation.method === null) {
     if (animation.rate !== null || animation.sequence !== null) throw Error(`${what}.animation: method is null but rate or sequence is not`);
   } else {
-    if (!ANIMATIONS.has(text(animation.method, `${what}.animation.method`, 32))) throw Error(`${what}.animation.method: unknown`);
+    // The app does not animate lamps yet: the method is the package's word, checked only as text.
+    text(animation.method, `${what}.animation.method`, 32);
     finite(animation.rate, `${what}.animation.rate`);
     array(animation.sequence, `${what}.animation.sequence`, 1024).forEach((index, j) => frame(index, `${what}.animation.sequence[${j}]`));
   }

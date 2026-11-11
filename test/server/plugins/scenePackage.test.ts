@@ -251,7 +251,7 @@ describe('car validation', () => {
     ['an unknown lamp role', (built: Package) => { (built.descriptor.lamps as Array<Record<string, unknown>>)[0].role = 'fog'; }],
     ['a lamp frame that is neither a texture path nor null', (built: Package) => { (built.descriptor.lamps as Array<Record<string, unknown>>)[0].frames = ['lamp.png']; }],
     ['a lamp state past its frames', (built: Package) => { (built.descriptor.lamps as Array<Record<string, unknown>>)[0].states = { off: 1, on: null, brake: null }; }],
-    ['a lamp animation frame past its frames', (built: Package) => { (built.descriptor.lamps as Array<Record<string, unknown>>)[0].animation = { method: 'random', rate: 1, sequence: [0, 3] }; }],
+    ['a lamp animation frame past its frames', (built: Package) => { (built.descriptor.lamps as Array<Record<string, unknown>>)[0].animation = { method: 'loop', rate: 1, sequence: [0, 3] }; }],
     ['a lamp without its cockpit reading', (built: Package) => { delete (built.descriptor.lamps as Array<Record<string, unknown>>)[0].hiddenInOwnCockpit; }],
     ['an unknown lamp blend', (built: Package) => { (built.descriptor.lamps as Array<Record<string, unknown>>)[0].blend = 'additive'; }],
     ['a brake glow range on a headlight', (built: Package) => { (built.descriptor.lamps as Array<Record<string, unknown>>)[0].brakeGlowRange = [640, 950]; }],
