@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { AiReportsHistoryCard } from '../../../src/components/settings/AiReportsHistoryCard.js';
+import { AiReportsHistorySection } from '../../../src/components/settings/AiReportsHistoryCard.js';
 
 describe('AiReportsHistoryCard', () => {
   beforeEach(() => {
@@ -23,7 +23,7 @@ describe('AiReportsHistoryCard', () => {
       ]),
     });
 
-    render(<AiReportsHistoryCard />);
+    render(<AiReportsHistorySection defaultOpen />);
 
     await waitFor(() => {
       expect(screen.getByText(/spa-session · Lap 5/)).toBeInTheDocument();
@@ -38,7 +38,7 @@ describe('AiReportsHistoryCard', () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
     global.fetch = fetchMock;
 
-    render(<AiReportsHistoryCard />);
+    render(<AiReportsHistorySection defaultOpen />);
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
     fireEvent.click(screen.getByLabelText(/refresh ai report history/i));
@@ -61,7 +61,7 @@ describe('AiReportsHistoryCard', () => {
       ]),
     });
 
-    render(<AiReportsHistoryCard defaultOpen={false} />);
+    render(<AiReportsHistorySection />);
     const toggle = screen.getByRole('button', { name: /^report history$/i });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText('Brake later into Eau Rouge.')).not.toBeInTheDocument();

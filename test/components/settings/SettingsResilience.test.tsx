@@ -2,7 +2,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, renderHook, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { AISettingsCard } from '../../../src/components/settings/AISettingsCard.js';
-import { AiReportsHistoryCard } from '../../../src/components/settings/AiReportsHistoryCard.js';
+import { AiReportsHistorySection } from '../../../src/components/settings/AiReportsHistoryCard.js';
 import { ReferenceChangesList } from '../../../src/components/settings/ReferenceChangesList.js';
 import { describeBenchmarkUpdate } from '../../../src/components/settings/ReferenceLaptimesCard.js';
 import { ReplayCacheCard } from '../../../src/components/settings/ReplayCacheCard.js';
@@ -149,7 +149,7 @@ describe('AI report history', () => {
   it('offers Retry on a failed load and explains an empty history in one line', async () => {
     let healthy = false;
     global.fetch = vi.fn().mockImplementation(() => healthy ? json([]) : apiFailure(500, { error: 'Report store offline' }));
-    render(<AiReportsHistoryCard />);
+    render(<AiReportsHistorySection defaultOpen />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Report store offline');
     healthy = true;
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
@@ -164,7 +164,7 @@ describe('AI report history', () => {
       { ...base, cacheKey: 'b', generatedAt: 0, tokensUsed: { total: 1500 } },
       { ...base, cacheKey: 'c', generatedAt: 1000, tokensUsed: {} },
     ]));
-    render(<AiReportsHistoryCard />);
+    render(<AiReportsHistorySection defaultOpen />);
     expect(await screen.findByText('1 token')).toBeInTheDocument();
     expect(screen.getByText('1,500 tokens')).toBeInTheDocument();
     expect(document.body.textContent).not.toMatch(/Invalid Date|1970|NaN|undefined/);

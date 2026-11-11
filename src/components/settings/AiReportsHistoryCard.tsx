@@ -126,7 +126,3 @@ export const AiReportsHistorySection: React.FC<AiReportsHistorySectionProps> = (
     </div>
   );
 };
-
-export const AiReportsHistoryCard: React.FC<AiReportsHistorySectionProps> = (props) => (
-  <AiReportsHistorySection defaultOpen={true} {...props} />
-);

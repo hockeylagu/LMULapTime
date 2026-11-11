@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { Settings } from '../../../src/components/settings/Settings.js';
 import { ReferenceLaptimesCard } from '../../../src/components/settings/ReferenceLaptimesCard.js';
-import { AiReportsHistoryCard } from '../../../src/components/settings/AiReportsHistoryCard.js';
+import { AiReportsHistorySection } from '../../../src/components/settings/AiReportsHistoryCard.js';
 import { SETTINGS_SECTIONS } from '../../../src/components/settings/settingsSections.js';
 import type { AppStatus, BenchmarkDiffSummary } from '../../../shared/types/index.js';
 import { chooseValue, openSelect } from '../../helpers/selectControl.js';
@@ -147,7 +147,7 @@ describe('Error surfacing', () => {
 
   it('shows the server message when the AI report history cannot load', async () => {
     global.fetch = vi.fn().mockImplementation(() => fail('Report store offline'));
-    render(<AiReportsHistoryCard />);
+    render(<AiReportsHistorySection defaultOpen />);
     expect(await screen.findByText('Report store offline')).toHaveClass('text-lmu-loss');
     expect(screen.queryByText(/\d+ Cached/)).not.toBeInTheDocument();
   });
@@ -157,7 +157,7 @@ describe('Error surfacing', () => {
       cacheKey: `k${i}`, replayName: `Replay ${i}`, lapNumber: i + 1, model: 'gemini-3.8-flash', generatedAt: 1,
     }));
     global.fetch = vi.fn().mockImplementation(() => json(reports));
-    render(<AiReportsHistoryCard />);
+    render(<AiReportsHistorySection defaultOpen />);
     expect(screen.queryByText(/cached$/)).not.toBeInTheDocument();
     expect(await screen.findByText('8 cached')).toBeInTheDocument();
     expect(screen.getAllByRole('listitem')).toHaveLength(5);
