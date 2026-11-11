@@ -310,7 +310,7 @@ Per layout, class and **major patch**:
 
 1. Take the **fastest** clean flying laps of that class (dry, no traffic spell, no tow on a run, no off track) from **human drivers
    only**: the 40 fastest, at most 5 per driver, from at least 5 drivers, so one quick driver does not set every
-   reference. Human is decided by `isHumanDriver` (`shared/domain/leaderboard.ts`: the player, or anyone in an online
+   reference. Human is the session summary's `is_human` (`shared/domain/sessionSummaries/buildSessionSummaryProjection.ts`: the player, or anyone in an online
    session), which needs the replay's linked session. A driver in a replay without a linked session counts as
    unknown and is left out.
 2. Per corner, the medians of those laps' own events: `quickBrakeM` (brake or lift onset), `quickTurnInM`,

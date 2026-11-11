@@ -1,11 +1,24 @@
 /** Test-only parity oracle for the paged progression and comparable-lap queries. */
-import type { DetailedSession, ComparableLap, SessionProgressionPoint } from '../../shared/types/index.js';
+import type { DetailedSession, ComparableLap, DriverData, LapData, SessionProgressionPoint } from '../../shared/types/index.js';
 import { compareSessions, computeTheoreticalGap, getDisplayTrackName } from '../../shared/domain/formatters.js';
 import { computeTopNLapAverage, computeConsistencyRating, selectCleanLapCandidates } from '../../shared/domain/lapComparison.js';
 import { matchesTrack } from '../../shared/domain/paceCategory.js';
-import { isHumanDriver, selectLeaderboardLaps } from '../../shared/domain/leaderboard.js';
+import { isOnlineSession } from '../../shared/domain/leaderboard.js';
+import { lapConditionGroup } from '../../shared/domain/lapConditions.js';
 import { computeAverageLapTime, toComparableLap } from '../../server/sessions/sessionAnalytics.js';
 import type { ComparableLapsResult } from '../../server/sessions/sessionAnalytics.js';
+
+/** A real person: the player, or anyone in an online session. Other drivers offline are AI. */
+function isHumanDriver(session: DetailedSession, driver: DriverData): boolean {
+  return isOnlineSession(session) || Boolean(driver.isPlayer || (session.playerDriver && session.playerDriver.name === driver.name));
+}
+
+/** Valid, dry, clean flying laps: the laps a leaderboard counts. */
+function selectLeaderboardLaps(laps: LapData[]): LapData[] {
+  return selectCleanLapCandidates(laps).filter(
+    (lap) => lap.isValid && lap.lapTime !== null && lap.lapTime > 0 && lapConditionGroup(lap) === 'dry'
+  );
+}
 
 /**
  * Computes chronological session-over-session improvement points for a driver or overall.
