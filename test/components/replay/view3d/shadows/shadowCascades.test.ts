@@ -1,6 +1,6 @@
 import { Vector3 } from 'three';
 import { describe, expect, it } from 'vitest';
-import { cascadeCentres, selectCascade, shadowCascadeLayout, shadowFadeOut, snapCascadeCentre, sunSquareAxes } from '../../../../../src/components/replay/view3d/shadows/shadowCascades.js';
+import { cascadeCentres, shadowCascadeLayout, snapCascadeCentre, sunSquareAxes } from '../../../../../src/components/replay/view3d/shadows/shadowCascades.js';
 import { testShading } from '../../../../helpers/scenes/sceneryProfiles.js';
 
 const {shadows} = testShading();
@@ -15,12 +15,6 @@ describe('shadow cascades', () => {
     });
     expect(chase.cascades.map(cascade => cascade.tile)).toEqual([[0, 0, 0], [0, 32, 0], [1, 0, 0]]);
     expect(shadowCascadeLayout(shadows, shadows.cameras.cockpit).cascades.map(cascade => cascade.splitM)).toEqual([30, 200]);
-  });
-
-  it('fades out over its share of the last span, gone at far', () => {
-    expect(chase.fadeStartM).toBeCloseTo(300 - 0.75 * 220, 9);
-    expect([0, chase.fadeStartM, 300, 900].map(depth => shadowFadeOut(chase, depth))).toEqual([0, 0, 1, 1]);
-    expect(shadowFadeOut(chase, (chase.fadeStartM + 300) / 2)).toBeCloseTo(0.5, 9);
   });
 
   it('puts a centre on the middle of a texel of its cascade', () => {
@@ -49,13 +43,6 @@ describe('shadow cascades', () => {
     // Turning the view does not turn the squares: looking along x moves the centres along v only (u stays at the eye's).
     const across = cascadeCentres(chase, new Vector3(0, 1, 0), new Vector3(1, 0, 0), axes);
     chase.cascades.forEach((cascade, i) => expect(across[i][0]).toBeCloseTo(snapCascadeCentre(0, cascade), 9));
-  });
-
-  it('shades a point from the first cascade whose tile holds it', () => {
-    expect(selectCascade([[0.5, 0.5], [0.5, 0.5]], 0.49)).toBe(0);
-    expect(selectCascade([[0.995, 0.5], [0.6, 0.4]], 0.49)).toBe(1);
-    expect(selectCascade([[0.5, 0.005], [0.5, 0.995], [0.5, 0.5]], 0.49)).toBe(2);
-    expect(selectCascade([[2, 0.5], [1.5, 0.5]], 0.49)).toBe(-1);
   });
 
   it('has no cascades for a camera type the package publishes no set for', () => {

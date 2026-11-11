@@ -72,16 +72,3 @@ export function cascadeCentres(layout: ShadowCascadeLayout, eye: Vector3, forwar
 export function snapCascadeCentre(centreM: number, cascade: ShadowCascade): number {
   return (Math.floor(centreM / cascade.texelM) + 0.5) * cascade.texelM;
 }
-
-/**
- * The cascade that shades a point: the first whose tile holds it, the point's position in each tile being `uv` (0..1 across the
- * square, from the cascade's sun view). -1 when none does.
- */
-export function selectCascade(uv: ReadonlyArray<readonly [number, number]>, halfExtent: number): number {
-  return uv.findIndex(([u, v]) => Math.max(Math.abs(u - 0.5), Math.abs(v - 0.5)) <= halfExtent);
-}
-
-/** How much of the sun shadow is faded out at a view depth: 0 before the fade starts, 1 at far and beyond. */
-export function shadowFadeOut(layout: ShadowCascadeLayout, viewDepthM: number): number {
-  return Math.min(Math.max((viewDepthM - layout.fadeStartM) / (layout.farM - layout.fadeStartM), 0), 1);
-}
