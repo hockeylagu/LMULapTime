@@ -3,7 +3,7 @@ import type { SceneryChunk, SceneryLayout, ScenerySectorChunk } from '../../../.
 /** What the stream is centred on: a car at a lap distance (with the camera's native x/z position once there is one), or a free camera at a native x/z position. */
 export type StreamView = { kind: 'lap'; lapDistanceM: number; x?: number; z?: number } | { kind: 'free'; x: number; z: number };
 
-/** A chunk leaves only when it is this far outside the resident window, so a camera oscillating at the edge does not thrash. */
+/** A chunk is hidden only when it is this far outside the resident window, so a camera oscillating at the edge does not flicker it. */
 export const HYSTERESIS_M = 250;
 
 export interface ResidencyPlan {
@@ -11,7 +11,7 @@ export interface ResidencyPlan {
   wanted: string[];
   /** The wanted chunks that contain the camera (lap) or are nearest (free); the first things to show. */
   under: string[];
-  /** Everything that may stay loaded: the wanted chunks plus those within the hysteresis margin. */
+  /** Everything that may stay drawn: the wanted chunks plus those within the hysteresis margin. */
   keep: Set<string>;
 }
 
