@@ -1,9 +1,8 @@
 import {
-  BackSide, DepthTexture, DoubleSide, FrontSide, LessEqualCompare, LinearFilter, Line, Matrix4, Mesh, MeshDepthMaterial, OrthographicCamera, Points,
-  RedFormat, Sprite, UnsignedIntType, Vector3, WebGLRenderTarget, type BufferGeometry, type IUniform, type Material, type Object3D,
-  type PerspectiveCamera, type Scene, type Side, type Texture, type WebGLRenderer,
+  DepthTexture, LessEqualCompare, LinearFilter, Matrix4, OrthographicCamera, RedFormat, UnsignedIntType, Vector3, Vector4, WebGLRenderTarget,
+  type IUniform, type Object3D, type PerspectiveCamera, type Scene, type Texture, type WebGLRenderer,
 } from 'three';
-import { trackShadowEye } from './scenery/materials/shadowEye.js';
+import { createShadowCasterPass } from './shadows/shadowCasterPass.js';
 
 /**
  * The sun's two shadow maps. The near one (three's own, on the sun light) is a square around the camera's focus (the car),
@@ -51,7 +50,6 @@ export function shadowWindowCentre(focus: Vector3, view: PerspectiveCamera | Ort
   return out.applyMatrix4(sunFrame);
 }
 
-const SHADOW_SIDE: Record<Side, Side> = { [FrontSide]: BackSide, [BackSide]: FrontSide, [DoubleSide]: DoubleSide };
 const BIAS = new Matrix4().set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1);
 
 export interface StaticShadow {
@@ -82,58 +80,13 @@ export function createStaticShadow(renderer: WebGLRenderer, scene: Scene, toSun:
   const up = Math.abs(toSun.y) > 0.99 ? new Vector3(0, 0, 1) : new Vector3(0, 1, 0);
   camera.up.copy(up); tile.up.copy(up);
   let hasFront = false, building = -1, staleScenery = false;
-  const depthMaterials = new WeakMap<Material, MeshDepthMaterial>();
-  const depthOf = (mesh: Mesh, material: Material): MeshDepthMaterial => {
-    let depth = depthMaterials.get(material);
-    if (depth) return depth;
-    depth = new MeshDepthMaterial();
-    // Camera-facing cards keep their shadow-pass turn (patchSurfaceShader's billboard depth material).
-    const custom = mesh.customDepthMaterial;
-    if (custom) {
-      depth.onBeforeCompile = (shader, renderer) => custom.onBeforeCompile(shader, renderer);
-      depth.customProgramCacheKey = () => custom.customProgramCacheKey();
-    }
-    const source = material as Material & {map?: Texture | null; alphaMap?: Texture | null};
-    depth.alphaTest = material.alphaToCoverage ? 0.5 : material.alphaTest;
-    if (depth.alphaTest > 0) { depth.map = source.map ?? null; depth.alphaMap = source.alphaMap ?? null; }
-    depth.side = material.shadowSide ?? SHADOW_SIDE[material.side];
-    depthMaterials.set(material, depth);
-    material.addEventListener('dispose', () => { depth.dispose(); depthMaterials.delete(material); });
-    return depth;
-  };
+  const casters = createShadowCasterPass(renderer, scene), viewport = new Vector4();
   const drawTile = (index: number, view: PerspectiveCamera | OrthographicCamera, dynamic: readonly Object3D[]) => {
     const column = index % TILES_PER_SIDE, row = Math.floor(index / TILES_PER_SIDE), span = 2 * half / TILES_PER_SIDE, px = size / TILES_PER_SIDE;
     Object.assign(tile, {left: -half + column * span, right: -half + (column + 1) * span, bottom: -half + row * span, top: -half + (row + 1) * span});
     tile.position.copy(camera.position); tile.quaternion.copy(camera.quaternion);
     tile.updateProjectionMatrix(); tile.updateMatrixWorld(true);
-    // The pass draws only shadow casters, each with its depth material; everything else is hidden for it, then restored.
-    const hidden: Object3D[] = [], swapped: [Mesh, Material | Material[]][] = [];
-    for (const object of dynamic) if (object.visible) { object.visible = false; hidden.push(object); }
-    scene.traverseVisible(object => {
-      if (object instanceof Mesh) {
-        const mesh = object as Mesh<BufferGeometry, Material | Material[]>, geometry = mesh.geometry;
-        if (mesh.castShadow && !geometry.boundingSphere) geometry.computeBoundingSphere();
-        if (mesh.castShadow && 2 * geometry.boundingSphere!.radius * mesh.matrixWorld.getMaxScaleOnAxis() >= STATIC_MIN_CASTER_M) {
-          swapped.push([mesh, mesh.material]);
-          mesh.material = Array.isArray(mesh.material) ? mesh.material.map(material => depthOf(mesh, material)) : depthOf(mesh, mesh.material);
-          return;
-        }
-        hidden.push(mesh);
-      } else if (object instanceof Line || object instanceof Points || object instanceof Sprite) hidden.push(object);
-    });
-    for (const object of hidden) object.visible = false;
-    trackShadowEye(null, null, view);
-    const previous = renderer.getRenderTarget(), autoClear = renderer.autoClear, shadowUpdate = renderer.shadowMap.autoUpdate;
-    try {
-      back.viewport.set(column * px, row * px, px, px); back.scissor.copy(back.viewport); back.scissorTest = true;
-      renderer.autoClear = false; renderer.shadowMap.autoUpdate = false;
-      renderer.setRenderTarget(back); renderer.clear(false, true, false);
-      renderer.render(scene, tile);
-    } finally {
-      renderer.setRenderTarget(previous); renderer.autoClear = autoClear; renderer.shadowMap.autoUpdate = shadowUpdate;
-      for (const [mesh, material] of swapped) mesh.material = material;
-      for (const object of hidden) object.visible = true;
-    }
+    casters.draw(back, viewport.set(column * px, row * px, px, px), tile, view, dynamic, STATIC_MIN_CASTER_M);
   };
   return {
     stale() { staleScenery = true; },
