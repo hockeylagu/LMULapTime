@@ -5,7 +5,6 @@ import {
   ReplayDriverEventFact,
   ReplayDriverEventKind,
   ReplayLapFact,
-  ReplayRunningOrderFact,
   ReplayWideFacts,
   LapSpan,
   emptyLapFact,
@@ -117,25 +116,6 @@ export function getReplayConditions(db: DatabaseType, filename: string): ReplayC
   }));
 }
 
-export interface ReplayLapConditions {
-  driverSlot: number;
-  lapNumber: number;
-  maxRain: number | null;
-  rainAtStart: number | null;
-  minAmbientC: number | null;
-}
-
-/** Each lap's conditions over its time span (the replay_lap_conditions view). */
-export function getLapConditions(db: DatabaseType, filename: string): ReplayLapConditions[] {
-  const rows = db.prepare('SELECT * FROM replay_lap_conditions WHERE filename = ? ORDER BY driver_slot, lap_number').all(filename) as Array<{
-    driver_slot: number; lap_number: number; max_rain: number | null; rain_at_start: number | null; min_ambient_c: number | null;
-  }>;
-  return rows.map(r => ({
-    driverSlot: r.driver_slot, lapNumber: r.lap_number, maxRain: r.max_rain, rainAtStart: r.rain_at_start,
-    minAmbientC: r.min_ambient_c,
-  }));
-}
-
 /** A replay's driver events, optionally one driver's and within [fromSec, toSec], in time order. */
 export function getDriverEvents(db: DatabaseType, filename: string, options: { driverSlot?: number; fromSec?: number; toSec?: number } = {}): ReplayDriverEventFact[] {
   const rows = db.prepare(`
@@ -152,11 +132,6 @@ export function getDriverEvents(db: DatabaseType, filename: string, options: { d
     kind: r.kind, seq: r.seq, driverSlot: r.driver_slot, timeSec: r.time_sec, code: r.code, value: r.value, otherSlot: r.other_slot,
     detail: r.detail ? JSON.parse(r.detail) as Record<string, unknown> : null,
   }));
-}
-
-export function getRunningOrder(db: DatabaseType, filename: string): ReplayRunningOrderFact[] {
-  return (db.prepare('SELECT time_sec, order_json FROM replay_running_order WHERE filename = ? ORDER BY time_sec').all(filename) as Array<{ time_sec: number; order_json: string }>)
-    .map(r => ({ timeSec: r.time_sec, order: JSON.parse(r.order_json) as number[] }));
 }
 
 /** Drops one driver's lap facts (the replay-wide facts belong to every driver and stay). */

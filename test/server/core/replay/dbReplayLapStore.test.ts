@@ -4,11 +4,9 @@ import { REPLAY_CACHE_VERSION } from '../../../../server/core/dbCache.js';
 import type { ReplayTrajectoryData } from '../../../../shared/types/index.js';
 import {
   getDriverEvents,
-  getLapConditions,
   getReplayConditions,
   getReplayFactsVersion,
   getReplayLaps,
-  getRunningOrder,
   renameReplayFacts,
   replaceReplayDriverLapFacts,
   replaceReplayWideFacts,
@@ -51,7 +49,7 @@ describe('normalized replay facts store', () => {
       expect(getReplayFactsVersion(raw, name)).toBe(REPLAY_CACHE_VERSION);
       expect(getReplayConditions(raw, name).map(c => [c.startSec, c.endSec, c.rain, c.ambientC])).toEqual([[0, 250, 0, 20], [250, 299, 120, 19]]);
       expect(getDriverEvents(raw, name).map(e => [e.kind, e.driverSlot, e.code])).toEqual([['pit', 1, 34]]);
-      expect(getRunningOrder(raw, name)).toEqual([{ timeSec: 0, order: [1, 2] }]);
+      expect(raw.prepare('SELECT time_sec, order_json FROM replay_running_order WHERE filename = ?').all(name)).toEqual([{ time_sec: 0, order_json: '[1,2]' }]);
     });
 
     it('keeps the replay-wide facts of the first decode at this version, and each driver\'s own laps', () => {
@@ -74,26 +72,6 @@ describe('normalized replay facts store', () => {
       expect(getDriverEvents(raw, name)).toHaveLength(1);
       expect(getReplayLaps(raw, name).map(l => l.lapNumber)).toEqual([1, 2]);
     });
-  });
-
-  it('gives each lap the conditions over its own time span', () => {
-    db.replaceReplayDriverLaps(name, 'C:\\r\\' + name, 1, 1, 1, decoded(1), true);
-
-    expect(getLapConditions(db.getDb(), name)).toEqual([
-      { driverSlot: 1, lapNumber: 1, maxRain: 0, rainAtStart: 0, minAmbientC: 20 },
-      { driverSlot: 1, lapNumber: 2, maxRain: 120, rainAtStart: 0, minAmbientC: 19 },
-    ]);
-  });
-
-  it('leaves a lap without stored points out of the conditions', () => {
-    const raw = db.getDb();
-    replaceReplayWideFacts(raw, name, {
-      endSec: 10, sessionRunningOrder: null, runningOrder: [], driverEvents: [],
-      conditions: [{ startSec: 0, endSec: 10, rain: 5, ambientC: null }],
-    }, 'v7');
-    replaceReplayDriverLapFacts(raw, name, 1, [emptyLapFact(1), emptyLapFact(2, { startSec: 20, endSec: 30 }), emptyLapFact(3, { startSec: 2, endSec: 4 })], 'v7');
-
-    expect(getLapConditions(raw, name).map(c => c.lapNumber)).toEqual([3]);
   });
 
   it('filters driver events by driver and time', () => {

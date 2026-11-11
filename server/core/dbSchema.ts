@@ -299,24 +299,6 @@ export function initDbSchema(db: DatabaseType): void {
       PRIMARY KEY (filename, time_sec)
     );
 
-    -- Recreated on every start so a changed definition reaches existing databases. The lower bound
-    -- (the row holding at the lap's start) keeps the join an index range: without it every lap
-    -- scans all earlier rows, 0.7 s on a 6,000-row replay.
-    DROP VIEW IF EXISTS replay_lap_conditions;
-    CREATE VIEW replay_lap_conditions AS
-    SELECT l.filename, l.driver_slot, l.lap_number,
-           MAX(c.rain) AS max_rain,
-           (SELECT c2.rain FROM replay_conditions c2
-             WHERE c2.filename = l.filename AND c2.start_sec <= l.start_sec
-             ORDER BY c2.start_sec DESC LIMIT 1) AS rain_at_start,
-           MIN(c.ambient_c) AS min_ambient_c
-    FROM replay_laps l
-    JOIN replay_conditions c
-      ON c.filename = l.filename
-     AND c.start_sec >= COALESCE((SELECT MAX(c3.start_sec) FROM replay_conditions c3
-                                   WHERE c3.filename = l.filename AND c3.start_sec <= l.start_sec), l.start_sec)
-     AND c.start_sec < l.end_sec AND c.end_sec > l.start_sec
-    GROUP BY l.filename, l.driver_slot, l.lap_number;
 
     -- Every car's low-rate track position through a replay, built from its stored laps (the
     -- signature says which), to find who was close to whom and where.
