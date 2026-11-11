@@ -61,12 +61,14 @@ const SUN_SHADOW = SUN_SHADOW_TERM;
 const STATIC_SHADOW_VERTEX = `
   #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
     vStaticShadowCoord = surface_staticShadowMatrix * ( worldPosition + vec4( shadowWorldNormal * ${glslNumber(STATIC_NORMAL_BIAS_M)}, 0.0 ) );
+    ${CASCADE_SHADOW_VERTEX}
   #endif`;
 const SUN_SHADOW_BLEND = `
   #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
   uniform sampler2DShadow surface_staticShadowMap;
   uniform float surface_staticShadowReady;
   varying vec4 vStaticShadowCoord;
+  ${CASCADE_SHADOW_FRAGMENT_PARS}
   float surfaceSunShadow( float nearShadow, vec4 nearCoord ) {
     if ( surface_cascadeCount > 0 ) return surfaceCascadeShadow( - vViewPosition.z );
     vec2 window = nearCoord.xy / nearCoord.w;
@@ -171,6 +173,7 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
     #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
       uniform mat4 surface_staticShadowMatrix;
       varying vec4 vStaticShadowCoord;
+      ${CASCADE_SHADOW_VERTEX_PARS}
     #endif
   `).replace('#include <shadowmap_vertex>', `#include <shadowmap_vertex>${STATIC_SHADOW_VERTEX}`).replace('#include <begin_vertex>', '#include <begin_vertex>\nvSurfaceXZ = position.xz; vSurfaceRandom=fract(abs(position.x+position.z)); vSurfaceUV01 = vec4(uv,uv1); vSurfaceUV23 = vec4(uv2,uv3); vSurfaceColour = _lmu_colour;');
   if (config.billboard) {
