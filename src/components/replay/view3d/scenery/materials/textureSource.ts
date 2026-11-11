@@ -26,41 +26,32 @@ export function resolveMapUri(map: SurfaceMap, uris: ReadonlyMap<string, string>
   return uri;
 }
 
-/** Loads the textures of the surface maps of one chunk. Each texture is a chunk-owned clone; the compressed data is cached by URL. */
+/** Loads the textures of the surface maps of one chunk. Each texture is a pool-owned clone; the compressed data is cached by URL. */
 export interface SurfaceTextureSource {
   load(map: SurfaceMap): Promise<Texture>;
 }
 
-/** `base` is the folder the chunk's `textures/...` URIs are relative to. */
-export function createTextureSource(uris: ReadonlyMap<string, string>, ktx2: CachedKtx2Loader, renderer: WebGLRenderer, base: string): SurfaceTextureSource {
-  const loaded = new Map<string, Promise<Texture>>();
-  const anisotropy = Math.min(MAX_ANISOTROPY, renderer.capabilities.getMaxAnisotropy());
-  return {
-    load(map) {
-      const uri = resolveMapUri(map, uris), key = `${uri}|${map.srgb}`;
-      let pending = loaded.get(key);
-      if (!pending) {
-        pending = ktx2.loadAsync(`${base}${uri}`).then((original: CompressedTexture) => {
-          // The loader shares one object per URL; colour interpretation is local to this role.
-          const texture = original.clone();
-          texture.flipY = false;
-          texture.colorSpace = map.srgb ? SRGBColorSpace : NoColorSpace;
-          texture.wrapS = texture.wrapT = RepeatWrapping;
-          texture.anisotropy = anisotropy;
-          // Trilinear: three's KTX2 loader gives raw (RGBA8, R8) textures nearest filtering, which shows texels.
-          texture.minFilter = texture.mipmaps.length > 1 ? LinearMipmapLinearFilter : LinearFilter;
-          texture.magFilter = LinearFilter;
-          startStreaming(texture, renderer);
-          texture.needsUpdate = true;
-          return texture;
-        });
-        loaded.set(key, pending);
-      }
-      return pending;
-    },
-  };
+/** A pool-owned clone of a cached KTX2 file, set up for one colour role and started on its reduced levels. */
+async function loadSurfaceTexture(ktx2: CachedKtx2Loader, renderer: WebGLRenderer, url: string, srgb: boolean): Promise<Texture> {
+  const original: CompressedTexture = await ktx2.loadAsync(url);
+  // The loader shares one object per URL; colour interpretation is local to this role.
+  const texture = original.clone();
+  texture.flipY = false;
+  texture.colorSpace = srgb ? SRGBColorSpace : NoColorSpace;
+  texture.wrapS = texture.wrapT = RepeatWrapping;
+  texture.anisotropy = Math.min(MAX_ANISOTROPY, renderer.capabilities.getMaxAnisotropy());
+  // Trilinear: three's KTX2 loader gives raw (RGBA8, R8) textures nearest filtering, which shows texels.
+  texture.minFilter = texture.mipmaps.length > 1 ? LinearMipmapLinearFilter : LinearFilter;
+  texture.magFilter = LinearFilter;
+  startStreaming(texture, renderer);
+  texture.needsUpdate = true;
+  return texture;
 }
 
+/**
+ * The scenery's surface textures, one per file and colour role, counted by the chunks that use them. `base` is the folder the
+ * chunks' `textures/...` URIs are relative to.
+ */
 export function createSurfaceTexturePool(ktx2: CachedKtx2Loader, renderer: WebGLRenderer, base: string) {
   type Entry = {pending: Promise<Texture>; owners: number};
   const entries = new Map<string, Entry>();
@@ -74,18 +65,18 @@ export function createSurfaceTexturePool(ktx2: CachedKtx2Loader, renderer: WebGL
   };
   return {
     source(uris: ReadonlyMap<string, string>): SurfaceTextureSource & {dispose(): void} {
-      const local = createTextureSource(uris, ktx2, renderer, base), owned = new Map<string, Entry>();
+      const owned = new Map<string, Entry>();
       let released = false;
       return {
         load(map) {
           if (disposed || released) return Promise.reject(Error('Scenery texture source was disposed'));
-          const key = `${resolveMapUri(map, uris)}|${map.srgb}`;
+          const uri = resolveMapUri(map, uris), key = `${uri}|${map.srgb}`;
           let entry = owned.get(key);
           if (entry) return entry.pending;
           entry = entries.get(key);
           if (entry) entry.owners++;
           else {
-            entry = {pending: local.load(map), owners: 1};
+            entry = {pending: loadSurfaceTexture(ktx2, renderer, `${base}${uri}`, map.srgb), owners: 1};
             entries.set(key, entry);
             const created = entry;
             void entry.pending.catch(() => { if (entries.get(key) === created) entries.delete(key); });
