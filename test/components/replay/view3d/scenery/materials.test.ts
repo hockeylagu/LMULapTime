@@ -202,6 +202,7 @@ describe('patchSurfaceShader', () => {
     expect(shader.fragmentShader).toContain('#define RE_IndirectSpecular surfaceIndirectSpecular');
     expect(shader.fragmentShader).toContain('textureLod(surface_reflection, r, surface_reflectionLodScale * roughness)');
     expect(shader.fragmentShader).toContain('mix(vec3(surfaceReflectionSpecular * (split.y + surface_dielectricF0 * split.x)), mix(surfaceReflectionAlbedo, vec3(1.0), split.y), material.metalness)');
+    expect(shader.fragmentShader).toContain('surfaceReflectionSpecular=surfaceSpecular;');
     expect(shader.fragmentShader.indexOf('surfaceReflectionSpecular=surfaceSpecular;')).toBeLessThan(shader.fragmentShader.indexOf('surfaceSunShadow( getShadow('));
     expect(shader.uniforms.surface_reflection).toBe(sceneryReflectionUniforms.surface_reflection);
     for (const kind of ['glass', 'clearcoat'] as const) expect(patched(surface(kind, { maps: { albedo: map('A', true) } })).fragmentShader).not.toContain('surfaceIndirectSpecular');

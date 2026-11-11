@@ -217,12 +217,12 @@ ${shader.fragmentShader}`;
   if (code.absorption) shader.fragmentShader = shader.fragmentShader.replace('outgoingLight = outgoingLight * ( 1.0 - material.clearcoat * Fcc )', `outgoingLight = outgoingLight * (${code.absorption}) * ( 1.0 - material.clearcoat * Fcc )`);
   if (code.emissive) shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\ntotalEmissiveRadiance=${code.emissive};`);
   shader.fragmentShader = shader.fragmentShader.replace('#include <shadowmap_pars_fragment>', `#include <shadowmap_pars_fragment>\n${SUN_SHADOW_BLEND}`)
-    .replace('#include <lights_fragment_begin>', sunShadowLights(config.kind));
+    // The light loop takes the place of the include, so the reflection inputs go in with it.
+    .replace('#include <lights_fragment_begin>', `${REFLECTING_KINDS.has(config.kind) ? `${SCENERY_REFLECTION_INPUTS}\n` : ''}${sunShadowLights(config.kind)}`);
   patchAmbientLookup(shader);
   if (REFLECTING_KINDS.has(config.kind)) {
     Object.assign(shader.uniforms, sceneryReflectionUniforms);
-    shader.fragmentShader = shader.fragmentShader.replace('#include <lights_physical_pars_fragment>', `#include <lights_physical_pars_fragment>\n${SCENERY_REFLECTION_GLSL}`)
-      .replace('#include <lights_fragment_begin>', `${SCENERY_REFLECTION_INPUTS}\n#include <lights_fragment_begin>`);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <lights_physical_pars_fragment>', `#include <lights_physical_pars_fragment>\n${SCENERY_REFLECTION_GLSL}`);
   }
   if (config.kind === 'vegetation') {
     if (hasTranslucency(config)) {
