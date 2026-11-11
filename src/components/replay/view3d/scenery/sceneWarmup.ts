@@ -1,7 +1,7 @@
 import { Mesh, type Material, type Object3D, type PerspectiveCamera, type Scene, type Texture, type WebGLRenderer } from 'three';
 import { createGeometryWarmup } from './geometryWarmup.js';
 import { surfaceTextureMaps } from './materials/configureSurfaceMaterial.js';
-import { isStreaming, streamTexture } from './materials/mipStreaming.js';
+import { isStreaming, streamTexture, whenUploaded } from './materials/mipStreaming.js';
 
 /** Upload slice while the scene shows (a frame each), and behind the loading screen (a task each). */
 const UPLOAD_SLICE_MS = 1, LOADING_SLICE_MS = 50;
@@ -100,13 +100,14 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
       return warmed;
     },
     shown() { shown = true; startSharpen(); },
-    sharpen(texture) { blurry.add(texture); startSharpen(); },
+    // A texture nothing has drawn yet is not on the GPU: it joins the queue at its first upload, so the queue can empty.
+    sharpen(texture) { whenUploaded(texture, renderer, () => { blurry.add(texture); startSharpen(); }); },
     hold(texture) { held.add(texture); },
     sharpenHeld() {
-      // A held texture not yet on the GPU waits there: `streamTexture` copies nothing until its first upload.
-      blurry = new Set([...[...held].filter(isStreaming), ...blurry]);
+      // Those on the GPU go ahead of the queue now; the others as each is first drawn.
+      const released = [...held];
       held.clear();
-      startSharpen();
+      for (const texture of released) whenUploaded(texture, renderer, () => { blurry = new Set([texture, ...blurry]); startSharpen(); });
     },
     dispose() { disposed = true; cancelAnimationFrame(sharpenFrame); geometryWarmup.dispose(); },
   };

@@ -19,7 +19,7 @@ export interface MipLevel { data: TypedArray; width: number; height: number }
 /** The `missing` levels above those a texture was read with; `load` fetches them, largest first. */
 export interface DetailLoader { missing: number; load(): Promise<MipLevel[]> }
 /** `missing` is how many top levels the texture starts without; `level` is the level being filled (counting down to 0) and `row` its next pixel row; `detail` is set until the missing levels are requested, `waiting` until they arrive, `failed` when they could not be read. */
-interface Stream { levels: MipLevel[]; missing: number; level: number; row: number; detail?: DetailLoader; waiting?: boolean; failed?: boolean }
+interface Stream { levels: MipLevel[]; missing: number; level: number; row: number; detail?: DetailLoader; waiting?: boolean; failed?: boolean; uploaded?: () => void }
 /** Detail requests in flight at once: enough to keep the per-frame budget fed without holding every file in memory ahead of its turn. */
 const DETAIL_REQUESTS = 8;
 let detailRequests = 0;
@@ -54,7 +54,24 @@ export function startStreaming(texture: Texture, renderer: WebGLRenderer, detail
     const gl = renderer.getContext() as WebGL2RenderingContext;
     for (let level = from; level < levels.length; level++) uploadRows(texture, renderer, levels[level], level, 0, levels[level].height);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_BASE_LEVEL, from);
+    const run = stream.uploaded;
+    stream.uploaded = undefined;
+    run?.();
   };
+}
+
+/**
+ * Runs `run` once a streaming texture is on the GPU: now if it is, else right after its first upload. Its missing levels can
+ * only be copied from then on, and a texture nothing draws is never uploaded.
+ */
+export function whenUploaded(texture: Texture, renderer: WebGLRenderer, run: () => void): void {
+  const stream = streams.get(texture);
+  if (!stream) return;
+  if (onGpu(texture, renderer)) run(); else stream.uploaded = run;
+}
+
+function onGpu(texture: Texture, renderer: WebGLRenderer): WebGLTexture | undefined {
+  return renderer.properties.has(texture) ? (renderer.properties.get(texture) as {__webglTexture?: WebGLTexture}).__webglTexture : undefined;
 }
 
 /** True while a texture still samples from a reduced level. */
@@ -74,7 +91,7 @@ export function stopStreaming(texture: Texture): void {
  * full, released, not on the GPU yet or waiting for its missing levels. A level joins the sampled range when its last band lands.
  */
 export function streamTexture(texture: Texture, renderer: WebGLRenderer, budgetBytes: number): number {
-  const stream = streams.get(texture), gpu = renderer.properties.has(texture) ? (renderer.properties.get(texture) as {__webglTexture?: WebGLTexture}).__webglTexture : undefined;
+  const stream = streams.get(texture), gpu = onGpu(texture, renderer);
   if (!stream || !gpu) return 0;
   if (stream.detail && detailRequests < DETAIL_REQUESTS) {
     const load = stream.detail;
