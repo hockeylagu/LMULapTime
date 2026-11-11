@@ -3,10 +3,10 @@ import { nativeToScene } from './sceneFrame.js';
 import { createCascadeShadows, type CascadeShadows } from './shadows/cascadeShadows.js';
 import { holdCascadeShadows, sampleCascadeShadows } from './shadows/cascadeSampling.js';
 import { shadowCascadeLayout, type ShadowCascadeLayout, type ShadowCascadeSet } from './shadows/shadowCascades.js';
-import type { SceneryDaylight, SceneryLayout, ScenerySun } from '../../../../shared/types/scenes/scenery.js';
+import type { SceneryDaylight, SceneryLayout } from '../../../../shared/types/scenes/scenery.js';
 import type { ReplayDaylightClock } from '../../../../shared/types/replay.js';
 import { solarPosition } from './solarPosition.js';
-import { createSkyDomeMaterial, hazeColour, hazeDensity, heightHaze, skyConditions, sunwardHaze } from './atmosphere/skyDome.js';
+import { createSkyDomeMaterial, hazeColour, hazeDensity, heightHaze, skyConditions, sunwardHaze, type SkyConditions } from './atmosphere/skyDome.js';
 import { createHaze } from './atmosphere/haze.js';
 import { cloudCoverage, cloudSheets, sunVisibility, type CloudSheet } from './atmosphere/clouds.js';
 import { createCloudLayer } from './atmosphere/cloudLayer.js';
@@ -16,7 +16,7 @@ import { convolveReflection, type ReflectionCubes } from './reflectionCube.js';
 import { integrationTexture, setSceneryReflection } from './scenery/materials/sceneryReflection.js';
 
 /** The sun direction without a layout's daylight: midday, from the pipeline review viewer's daylight (pipeline/viewer/daylight.js). */
-export const DAYLIGHT = Object.freeze({elevationDeg: 55, azimuthDeg: 45});
+const DAYLIGHT = Object.freeze({elevationDeg: 55, azimuthDeg: 45});
 const SKY_RADIUS_M = 12000, ENVIRONMENT_GROUND_Y = -0.5;
 /** Mean reflectance of the ground around a circuit (grass, asphalt, concrete) for the bounce light of the first environment. */
 const GROUND_ALBEDO = 0.2;
@@ -32,15 +32,6 @@ export const SUN_DIRECTION = sunToward(DAYLIGHT.elevationDeg);
 const MIN_SUN_ELEVATION_DEG = 0;
 
 export interface SceneLighting { sunDirection: Vector3 }
-
-/**
- * The direct sun's radiance in scene units at a sun elevation, from the layout's sampled sun under the replay's cloud cover: dimmer
- * and redder as the sun gets low, dimmer under cover. The replay's cover stands in for the base coverage the grid is sampled by.
- * Known gap (pipeline, 2026-11-09): clouded reference frames come out 2–20 % brighter than the grid; not worked around here.
- */
-export function sunColour(sun: ScenerySun, sunElevationDeg: number, cloudCover: number): Color {
-  return sunRadiance(sun, sunElevationDeg, cloudCover).multiplyScalar(SUN_UNIT);
-}
 
 /**
  * The replay's clock sets the sun: its session start (the track's default time for the session when the replay does not carry
@@ -80,8 +71,6 @@ export interface SceneEnvironment {
    * then one lit by the first, so shaded faces get the light the venue bounces. Call once the scenery around it is resident.
    */
   captureVenue(): void;
-  /** The venue capture's reflection cubes (sharp and convolved by the package's kernels), once captured. */
-  reflection(): ReflectionCubes | null;
   /** Writes this scene's haze into the shader chunks: call before compiling its materials outside a render. */
   applyHaze(): void;
   /**
@@ -108,17 +97,39 @@ export function sceneClouds(venue: Pick<SceneVenue, 'sky' | 'shading'>, lighting
   return {cloudCover: cloudCoverage(venue.sky.clouds, field), sunVisibility: sunVisibility(venue.shading.sunVisibility, venue.sky.clouds, sheets, [x, y, -z]), sheets};
 }
 
+/** The replay moment's sun and weather, worked out once for the environment and the exposure. */
+export interface SceneSun {
+  lighting: SceneLighting;
+  sunElevationDeg: number;
+  clouds: {cloudCover: number; sunVisibility?: number; sheets?: CloudSheet[]};
+  weather: SkyConditions;
+  /**
+   * The direct sun's radiance in the package's light unit, before the clouds toward the sun dim it (sunSamples.ts): the layout's
+   * sampled sun under the replay's cloud cover, dimmer and redder as the sun gets low. The replay's cover stands in for the base
+   * coverage the grid is sampled by. Known gap (pipeline, 2026-11-09): clouded reference frames come out 2–20 % brighter than the grid.
+   */
+  radiance: Color;
+}
+
+/**
+ * The sun from the replay's clock (sceneLighting) and the weather at the lap (sceneClouds): the replay's cloud cover sets the
+ * weather and dims the sun. `originY` is the scene origin's height in LMU local metres.
+ */
+export function sceneSun(venue: Pick<SceneVenue, 'daylight' | 'sky' | 'shading'>, originY: number, clock?: ReplayDaylightClock): SceneSun {
+  const lighting = sceneLighting(venue.daylight, clock), sunElevationDeg = MathUtils.radToDeg(Math.asin(MathUtils.clamp(lighting.sunDirection.y, -1, 1)));
+  const clouds = sceneClouds(venue, lighting, originY, clock), weather = skyConditions(venue.daylight, clouds.cloudCover, clouds.sunVisibility);
+  return {lighting, sunElevationDeg, clouds, weather, radiance: sunRadiance(venue.sky.sun, sunElevationDeg, weather.cloudCover)};
+}
+
 /**
  * Sky dome, horizon haze, a shadow-casting sun and an image-based light: first the sky over a sunlit ground, then the venue's own
  * capture. The scenery supplies its own terrain, filler ground and horizon; nothing here draws ground. `origin` is the scene
  * origin in LMU local metres.
  */
 export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue: SceneVenue, origin: Vector3, shadowSet: ShadowCascadeSet,
-  clock?: ReplayDaylightClock): SceneEnvironment {
-  const lighting = sceneLighting(venue.daylight, clock), sunElevationDeg = MathUtils.radToDeg(Math.asin(MathUtils.clamp(lighting.sunDirection.y, -1, 1)));
-  // The replay's cloud cover at the lap sets the weather, dims the sun and thickens the haze; its clouds toward the sun dim the sun's light further.
-  const clouds = sceneClouds(venue, lighting, origin.y, clock), weather = skyConditions(venue.daylight, clouds.cloudCover, clouds.sunVisibility);
-  const clearSun = sunColour(venue.sky.sun, sunElevationDeg, weather.cloudCover), sunRgb = clearSun.clone().multiplyScalar(clouds.sunVisibility ?? 1);
+  {lighting, sunElevationDeg, clouds, weather, radiance}: SceneSun = sceneSun(venue, origin.y)): SceneEnvironment {
+  // The weather thickens the haze; the clouds toward the sun dim the sun's light further.
+  const clearSun = radiance.clone().multiplyScalar(SUN_UNIT), sunRgb = clearSun.clone().multiplyScalar(clouds.sunVisibility ?? 1);
   const sky = new Mesh(new BoxGeometry(1, 1, 1), createSkyDomeMaterial(lighting.sunDirection, venue.sky, venue.daylight, weather));
   sky.scale.setScalar(SKY_RADIUS_M);
   sky.name = 'sky'; sky.frustumCulled = false;
@@ -207,7 +218,6 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
         if (venueCube !== cube) cube.dispose();
       }
     },
-    reflection: () => reflection,
     update() {
       if (!view) return false;
       view.getWorldDirection(heading); haze(Math.atan2(heading.z, heading.x), fog.color, skyHaze);

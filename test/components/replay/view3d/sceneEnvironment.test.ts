@@ -1,12 +1,15 @@
 import { expect, it, vi } from 'vitest';
 import { Color, CubeCamera, WebGLCoordinateSystem, ShaderChunk, BoxGeometry, DirectionalLight, FogExp2, Mesh, MeshBasicMaterial, MeshStandardMaterial, NoToneMapping, OrthographicCamera, PerspectiveCamera, Scene, Texture, Vector3, type Camera, type ShaderMaterial, type WebGLRenderer } from 'three';
-import { addSceneEnvironment, sceneLighting, SUN_DIRECTION, sunColour, type SceneVenue } from '../../../../src/components/replay/view3d/sceneEnvironment.js';
+import { addSceneEnvironment, sceneLighting, sceneSun, SUN_DIRECTION, type SceneVenue } from '../../../../src/components/replay/view3d/sceneEnvironment.js';
 import { hazeColour, hazeDensity, skyConditions } from '../../../../src/components/replay/view3d/atmosphere/skyDome.js';
-import { SUN_UNIT } from '../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
+import { SUN_UNIT, sunRadiance } from '../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
 import { TEST_HAZE_WEIGHTS, testShading, testSky, testSun } from '../../../helpers/scenes/sceneryProfiles.js';
 import { solarPosition } from '../../../../src/components/replay/view3d/solarPosition.js';
 import { cascadeShadowUniforms } from '../../../../src/components/replay/view3d/shadows/cascadeSampling.js';
 import { crownSun } from '../../../../src/components/replay/view3d/scenery/materials/foliageCrown.js';
+
+/** The sun's light in scene units, as the environment's sun carries it. */
+const sunColour = (sun: Parameters<typeof sunRadiance>[0], elevationDeg: number, cloudCover: number) => sunRadiance(sun, elevationDeg, cloudCover).multiplyScalar(SUN_UNIT);
 
 const probe = vi.hoisted(() => ({render: vi.fn<(scene: Scene) => void>(), dispose: vi.fn(), cubemaps: 0}));
 vi.mock('three', async importOriginal => {
@@ -116,7 +119,7 @@ it("thickens the haze with the layout's haze scale and air pollution and colours
   const daylight = {date: '2023-06-10', sessions: [{id: 'qualify' as const, localTime: '20:45', sunElevationDeg: 12, sunBearingDeg: 290}], airPollution: 0.6, hazeBaseScale: 1, ...TEST_HAZE_WEIGHTS, latitudeDeg: 47.95, longitudeDeg: 0.22, utcOffsetHours: 2};
   // The replay's cloud cover sets the weather, dims the sun and thickens the haze.
   const clock = {session: 'qualify' as const, startMinute: null, sessionTimeSec: 0, cloudCover: 0.62};
-  const environment = addSceneEnvironment(scene, renderer, venue(daylight), new Vector3(), 'chase', clock), fog = scene.fog as FogExp2;
+  const environment = addSceneEnvironment(scene, renderer, venue(daylight), new Vector3(), 'chase', sceneSun(venue(daylight), 0, clock)), fog = scene.fog as FogExp2;
   try {
     const sun = sceneLighting(daylight, clock).sunDirection, sunElevationDeg = Math.asin(sun.y) * 180 / Math.PI, weather = skyConditions(daylight, 0.62);
     expect(fog.density).toBeCloseTo(hazeDensity(testSky(), daylight, weather, sunElevationDeg), 12);

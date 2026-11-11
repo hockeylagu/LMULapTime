@@ -10,9 +10,8 @@ import { createLapLayerLoader, type LapCars, type LapLayer } from './laps/lapLay
 import { disposeObjects } from './laps/disposeObjects.js';
 import { exposureType, shadowCascadeSet, type CameraMode } from './cameraModes.js';
 import { createCameraRig } from './cameraRig.js';
-import { addSceneEnvironment, sceneClouds, sceneLighting } from './sceneEnvironment.js';
+import { addSceneEnvironment, sceneSun } from './sceneEnvironment.js';
 import { createAutoExposure } from './autoExposure.js';
-import { sunRadiance } from './atmosphere/sunSamples.js';
 import { createCarReflection } from './car/carReflection.js';
 import { CachedKtx2Loader } from './scenery/cachedKtx2Loader.js';
 import { createChunkLoader } from './scenery/chunkLoader.js';
@@ -56,9 +55,9 @@ export async function createReplayScene(
   catch { throw Error('WebGL 2 is unavailable. Use the 2D map.'); }
   const {min, max} = layout.horizon.bounds, origin = new Vector3(...min).add(new Vector3(...max)).multiplyScalar(0.5);
   const loader = createChunkLoader(renderer), carTextures = new CachedKtx2Loader(renderer);
-  const lighting = sceneLighting(layout.daylight, trajectory.daylightClock), sunElevationDeg = Math.asin(lighting.sunDirection.y) * 180 / Math.PI;
-  const {cloudCover, sunVisibility} = sceneClouds(layout, lighting, origin.y, trajectory.daylightClock), sunRgb = sunRadiance(layout.sky.sun, sunElevationDeg, cloudCover);
-  const exposure = createAutoExposure(renderer, layout.camera, {rgb: sunRgb, elevationDeg: sunElevationDeg}, () => invalidate(), exposureType('follow'), cloudCover, sunVisibility);
+  const sun = sceneSun(layout, origin.y, trajectory.daylightClock);
+  const exposure = createAutoExposure(renderer, layout.camera, {rgb: sun.radiance.clone(), elevationDeg: sun.sunElevationDeg}, () => invalidate(), exposureType('follow'),
+    sun.weather.cloudCover, sun.weather.sunVisibility);
   // Wheel and line contact heights and the camera checks share one ray tree per resident chunk.
   const ground = createSceneryGround(), {surfaceHeight} = ground;
   // Scenery chunks live in native coordinates under one group, shifted by the scene origin.
@@ -118,7 +117,7 @@ export async function createReplayScene(
   let environment: ReturnType<typeof addSceneEnvironment>, reflection: ReturnType<typeof createCarReflection>;
   // The chunks under the first pose must be resident before cars and lines are draped on them.
   try {
-    environment = addSceneEnvironment(scene, renderer, layout, origin, shadowCascadeSet(rig.mode), trajectory.daylightClock);
+    environment = addSceneEnvironment(scene, renderer, layout, origin, shadowCascadeSet(rig.mode), sun);
     reflection = createCarReflection(renderer, scene, layout.shading);
     await stream.whenUnderView();
     layer = await loadLaps(trajectory, baseline, cars, colorBy); layerReady = true;
