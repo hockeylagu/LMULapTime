@@ -22,13 +22,13 @@ it('rolls backward in reverse and stays still during vertical heave', () => {
 it('rolls each tyre at road speed times one plus its measured slip ratio: locked tyres stop, spinning ones overrun', () => {
   const slip = (ratios: [number | null, number | null, number | null, number | null]) => ({ratios, lockup: [], wheelspin: []});
   const speeds: [number, number, number, number] = [36, 36, 36, 36];
-  const travel = createWheelTravel([{...a, wheelSpeeds: speeds, liveWheelSlip: slip([-1, -0.2, 0.5, null])}, {...b, wheelSpeeds: speeds, liveWheelSlip: slip([-1, -0.2, 0.5, null])}]);
+  const travel = createWheelTravel([{...a, wheelSpeeds: speeds, wheelSlip: slip([-1, -0.2, 0.5, null])}, {...b, wheelSpeeds: speeds, wheelSlip: slip([-1, -0.2, 0.5, null])}]);
   expect(travel(1, 0, 0)).toBe(0); expect(travel(1, 0, 1)).toBeCloseTo(8); expect(travel(1, 0, 2)).toBeCloseTo(15); expect(travel(1, 0, 3)).toBeCloseTo(10);
   // Replay-only laps scale the travelled distance the same way, ramping between samples.
-  const replay = createWheelTravel([{...a, liveWheelSlip: slip([0, 0, 0, 0])}, {...b, liveWheelSlip: slip([-1, -1.5, 1, 0])}]);
+  const replay = createWheelTravel([{...a, wheelSlip: slip([0, 0, 0, 0])}, {...b, wheelSlip: slip([-1, -1.5, 1, 0])}]);
   expect(replay(1, 0, 0)).toBeCloseTo(5); expect(replay(1, 0, 1)).toBeCloseTo(5); expect(replay(1, 0, 2)).toBeCloseTo(15);
   // A sample without a ratio holds its neighbour's: a locked tyre stays locked through the gap.
-  const gap = createWheelTravel([{...a, wheelSpeeds: speeds, liveWheelSlip: slip([-1, null, null, null])}, {...b, wheelSpeeds: speeds, liveWheelSlip: slip([null, -1, null, null])}]);
+  const gap = createWheelTravel([{...a, wheelSpeeds: speeds, wheelSlip: slip([-1, null, null, null])}, {...b, wheelSpeeds: speeds, wheelSlip: slip([null, -1, null, null])}]);
   expect(gap(1, 0, 0)).toBe(0); expect(gap(1, 0, 1)).toBe(0); expect(gap(1, 0, 2)).toBeCloseTo(10);
 });
 

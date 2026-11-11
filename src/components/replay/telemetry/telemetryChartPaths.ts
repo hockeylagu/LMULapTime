@@ -125,7 +125,7 @@ export function computeTelemetryChartPaths(
     maxWheelSpeed: cornerExtrema.maxWheelSpeed,
     wheelSlipPaths: wsl,
     baselineWheelSlipPaths: bWsl,
-    hasWheelSlip: points.some(p => p.liveWheelSlip !== undefined),
+    hasWheelSlip: points.some(p => p.wheelSlip !== undefined),
     tirePressuresPaths: tp,
     baselineTirePressuresPaths: bTp,
     hasTirePressures: cornerExtrema.hasTirePressures,

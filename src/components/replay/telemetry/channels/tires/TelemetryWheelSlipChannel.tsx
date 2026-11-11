@@ -48,7 +48,7 @@ export const TelemetryWheelSlipChannel: React.FC<TelemetryWheelSlipChannelProps>
     <TelemetryWheelTrace paths={wheelSlipPaths} baselinePaths={baselineWheelSlipPaths} guides={guides} />
   ), [wheelSlipPaths, baselineWheelSlipPaths]);
 
-  const slip = currentPoint?.liveWheelSlip;
+  const slip = currentPoint?.wheelSlip;
 
   return (
     <div className="relative flex-1 basis-0 min-h-[72px] border-b border-lmu-border/40 group bg-lmu-loss-deep/20">

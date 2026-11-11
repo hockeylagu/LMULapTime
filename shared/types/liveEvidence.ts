@@ -96,7 +96,7 @@ export interface WheelSlipEvent {
 }
 
 /** Measured per-point wheel slip and the wheels inside a detected event at that point. */
-export interface LiveWheelSlip {
+export interface WheelSlip {
   ratios: WheelSlipRatios;
   lockup: WheelPosition[];
   wheelspin: WheelPosition[];

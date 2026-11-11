@@ -244,7 +244,10 @@ Chart fusion gives each trajectory point the nearest verified sample within 50 m
 rule, so it holds at any capture rate; replay and live clock anchors must still agree within 25 ms), without interpolating
 across missing samples. Measured yaw and body slip use the capture; computed fallbacks retain the
 `COMPUTED` label. Coverage/provenance remains in response metadata; the telemetry header has no capture-coverage indicator. Supplied native telemetry G values, including zero,
-are preserved; replay-derived G remains a computed fallback.
+are preserved; replay laps carry measured G, yaw rate and car-frame velocity (cache v10), computed only as a fallback.
+
+A lap without live wheel slip gets it from the replay's wheel speeds instead (`replayWheelSlip.ts`): each wheel's
+free-rolling radius in the lap, then `(ω × r − v) / v`, with the same event rule.
 
 Wheel slip (`shared/domain/live/wheelSlip.ts`) is the longitudinal slip ratio `-patch / ground` per
 wheel, SAE sign: negative braking/lockup, positive wheelspin. It is NULL below 5 m/s ground velocity

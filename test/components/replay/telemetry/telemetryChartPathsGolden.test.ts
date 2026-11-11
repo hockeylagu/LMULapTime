@@ -65,7 +65,7 @@ describe('computeTelemetryChartPaths - whole lap golden output', () => {
   });
 
   it('draws measured wheel slip on a ±30 % scale and breaks the line where a ratio is unavailable', () => {
-    const slipPoints = points.slice(0, 4).map((point, i) => ({ ...point, liveWheelSlip: {
+    const slipPoints = points.slice(0, 4).map((point, i) => ({ ...point, wheelSlip: {
       ratios: [-0.15, i === 2 ? null : 0.3, 0, 0.6] as [number | null, number | null, number | null, number | null], lockup: [], wheelspin: [] } }));
     const result = computeTelemetryChartPaths(slipPoints, [], 0, 3, getTrajectoryDistances(slipPoints));
     expect(result.hasWheelSlip).toBe(true);

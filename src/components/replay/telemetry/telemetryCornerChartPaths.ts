@@ -194,7 +194,7 @@ export function appendCornerPoint(
   }
 
   // Measured wheel slip: -30 % (lockup) to +30 % (wheelspin) -> 95 to 10 in SVG Y, 0 % centred
-  const ratios = p.liveWheelSlip?.ratios;
+  const ratios = p.wheelSlip?.ratios;
   WHEELS.forEach((corner, index) => {
     const ratio = ratios?.[index];
     if (ratio === null || ratio === undefined) { wslOpen[index] = false; return; }

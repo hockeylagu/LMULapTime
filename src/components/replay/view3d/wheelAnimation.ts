@@ -78,7 +78,7 @@ export function createWheelAnimation(car: Group, lap: ReplayTrajectoryData, surf
   }
   const fit = median(offsets);
   if (fit !== undefined) envelope.position.y += fit;
-  const hasWheelSlip = lap.points.some(point => point.liveWheelSlip !== undefined);
+  const hasWheelSlip = lap.points.some(point => point.wheelSlip !== undefined);
   const hasRideHeight = referenceRideHeights.some(value => value !== undefined);
   const hasSteering = lap.handlingCalibration !== undefined && lap.points.some(point => Number.isFinite(point.steerYaw));
   const contacts = new Map<number, Array<number | null>>();

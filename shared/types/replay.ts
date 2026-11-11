@@ -3,7 +3,7 @@ import type { VehicleDataRecord, VehicleHandlingCalibration } from './dataPlugin
 import type { TrackKerbType, TrackTimingGates } from './trackGeometry.js';
 import type { ScenerySessionId } from './scenes/scenery.js';
 import type { WeatherCondition } from './session.js';
-import type { LiveCaptureOverlay, LiveDynamicsProvenance, LiveWheelSlip } from './liveEvidence.js';
+import type { LiveCaptureOverlay, LiveDynamicsProvenance, WheelSlip } from './liveEvidence.js';
 
 export interface ReplayEventInfo {
   eventId?: string;
@@ -162,10 +162,6 @@ export interface ReplayTrajectoryPoint {
   };
   /** ISO yaw rate in degrees/s: positive left about the upward axis. */
   yawRateDeg?: number;
-  /** Source sample retained when supplemental live dynamics replace computed estimates. */
-  liveDynamics?: LiveDynamicsProvenance;
-  liveWheelSlip?: LiveWheelSlip;
-  /** ISO sideslip beta in degrees: positive velocity left of the nose. */
   /** Replay: measured velocity along the car's ISO x axis (forward), m/s. */
   velocityLon?: number;
   /** Replay: measured velocity along the car's ISO y axis (left), m/s. */
@@ -174,6 +170,10 @@ export interface ReplayTrajectoryPoint {
   understeerDeg?: number;
   tireSlipPct?: number;
   wheelLockActive?: boolean;
+  /** Source sample retained when supplemental live dynamics replace computed estimates. */
+  liveDynamics?: LiveDynamicsProvenance;
+  wheelSlip?: WheelSlip;
+  /** ISO sideslip beta in degrees: positive velocity left of the nose. */
   fuel?: number;
   virtualEnergy?: number;
   soc?: number;

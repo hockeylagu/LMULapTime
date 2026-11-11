@@ -81,7 +81,7 @@ export function fuseLiveTelemetry(trajectory: ReplayTrajectoryData, response: Li
     return { ...point, ...(hasYaw ? { yawRateDeg: yaw * RAD_TO_DEG } : {}),
       ...(hasSlip ? { slipAngleDeg: Math.atan2(left, forward) * RAD_TO_DEG } : {}),
       // Event membership uses the live sample's clock, the same clock the events were detected on.
-      ...(hasWheelSlip ? { liveWheelSlip: { ratios, lockup: eventWheels('lockup', sample.lapSeconds),
+      ...(hasWheelSlip ? { wheelSlip: { ratios, lockup: eventWheels('lockup', sample.lapSeconds),
         wheelspin: eventWheels('wheelspin', sample.lapSeconds) } } : {}),
       liveDynamics: { recordingId: evidence.recordingId, sampleIndex: sample.sampleIndex, offsetSeconds,
         yawRate: hasYaw, slipAngle: hasSlip, wheelSlip: hasWheelSlip } };

@@ -6,7 +6,7 @@ import { isContinuousPose } from './replayPose.js';
  * Native `Wheel Speed` follows ground speed within ±4 % even under braking, so it never shows a lockup.
  */
 function rollFactor(point: ReplayTrajectoryPoint, corner: number): number | undefined {
-  const ratio = point.liveWheelSlip?.ratios[corner];
+  const ratio = point.wheelSlip?.ratios[corner];
   return ratio === null || ratio === undefined || !Number.isFinite(ratio) ? undefined : Math.max(0, 1 + ratio);
 }
 

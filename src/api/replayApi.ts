@@ -2,6 +2,7 @@ import type { ReplayMetadata, ReplayTrafficResponse, ReplayTrajectoryData } from
 import { apiErrorMessage, fetchJson, isAbortError } from './apiClient.js';
 import { fetchLiveLapEvidence } from './liveEvidenceApi.js';
 import { fuseLiveTelemetry } from '../../shared/domain/live/liveTelemetryFusion.js';
+import { withReplayWheelSlip } from '../../shared/domain/live/replayWheelSlip.js';
 
 export type TelemetrySource = 'duckdb' | 'vcr';
 
@@ -27,7 +28,13 @@ export function fetchSessionTelemetryMetadata(sessionId: string, init?: RequestI
   return fetchJson<ReplayMetadata>(`/api/session/${encodeURIComponent(sessionId)}/telemetry/metadata`, init);
 }
 
+/** The lap with its live capture fused in when it has one; wheel slip from the replay's wheel speeds otherwise. */
 export async function fetchSessionTelemetry(sessionId: string, request: SessionTelemetryRequest, init?: RequestInit): Promise<ReplayTrajectoryData> {
+  const trajectory = await fetchLiveFusedTelemetry(sessionId, request, init);
+  return { ...trajectory, points: withReplayWheelSlip(trajectory.points) };
+}
+
+async function fetchLiveFusedTelemetry(sessionId: string, request: SessionTelemetryRequest, init?: RequestInit): Promise<ReplayTrajectoryData> {
   const trajectory = await fetchJson<ReplayTrajectoryData>(sessionTelemetryPath(sessionId, request), init);
   if (!trajectory.hasLiveCapture) return trajectory;
   try {
