@@ -298,7 +298,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
 
 ### Local Data Packages (`server/plugins/`)
 - `dataPlugin.ts` loads external track geometry, physical profiles, and manufacturer assets from backend-only `LMU_PLUGIN_ROOT`.
-- Manifest schema 7 is the only supported package format ([contract](PLUGINS.md#3d-scenery-and-vehicle-bodies-package-manifest-schema-7)); `strict.ts` holds the exact-key readers
+- Manifest schema 8 is the only supported package format ([contract](PLUGINS.md#3d-scenery-and-vehicle-bodies-package-manifest-schema-8)); `strict.ts` holds the exact-key readers
   every package parser uses and `packageFiles.ts` the contained, size-checked, hash-on-read file registry. `scenePackage.ts` validates the
   scenery layout index and `bodyPackage.ts` the vehicle bodies and their descriptors; `dataPlugin.ts` rejects any other manifest key,
   including the removed `cars` and `brakeBoardArtwork`. `dataPluginRoutes.ts` serves `/scenery/:layoutKey`, `/scenery/files/...`, `/vehicles/:identity/body` and `/vehicles/files/...`.

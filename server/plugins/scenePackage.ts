@@ -2,7 +2,7 @@ import type { TrackBoundaryGeometry } from '../../shared/types/trackGeometry.js'
 import type { SceneryBounds, SceneryCamera, SceneryChunk, SceneryDaylight, SceneryLayout, SceneryShading, ScenerySky, ScenerySun, SceneryTexture } from '../../shared/types/scenes/scenery.js';
 import { registerPackageFile, type PackageFile } from './packageFiles.js';
 import { parseClouds, parseSunVisibility } from './cloudPackage.js';
-import { array, count, exactKeys, finite, knownKeys, nonNegative, record, sha256, text, vec3 } from './strict.js';
+import { array, count, exactKeys, finite, knownKeys, nonNegative, record, sha256, text, vec3, textureStart } from './strict.js';
 
 /** Validated scenery of a package: layout indexes by layout key, and every chunk and texture file by package-relative path. */
 export interface SceneryStore { layouts: Map<string, SceneryLayout> }
@@ -425,7 +425,7 @@ function parseChunk(value: unknown, what: string): SceneryChunk {
 
 function parseTexture(value: unknown, what: string): SceneryTexture {
   const row = record(value, what);
-  knownKeys(row, TEXTURE, ['maxPx'], what);
+  knownKeys(row, TEXTURE, ['maxPx', 'start'], what);
   const hash = sha256(row.sha256, `${what}.sha256`);
   if (row.asset !== `scenery/textures/${hash}.ktx2.zst`) throw Error(`${what}: asset is not the content-named KTX2`);
   for (const key of ['byteLength', 'width', 'height', 'levels', 'gpuBytes']) if (count(row[key], `${what}.${key}`) === 0) throw Error(`${what}.${key}: must be positive`);
@@ -435,6 +435,7 @@ function parseTexture(value: unknown, what: string): SceneryTexture {
     if (!maxPx || maxPx > full || !Number.isInteger(Math.log2(full / maxPx))) throw Error(`${what}.maxPx: not the size of one of the texture's levels`);
   }
   if (typeof row.srgb !== 'boolean') throw Error(`${what}.srgb: expected a boolean`);
+  if (row.start !== undefined) textureStart(row.start, 'scenery', row as { width: number; height: number; levels: number }, `${what}.start`);
   return structuredClone(row) as unknown as SceneryTexture;
 }
 
@@ -513,7 +514,10 @@ export function loadScenePackage(root: string, catalog: unknown, geometry: (key:
     if (!track || track.geometryRevision !== layout.sourceGeometryRevision) throw Error(`${layout.layoutKey}: scenery does not match the track geometry`);
     if (layouts.has(layout.layoutKey)) throw Error(`${layout.layoutKey}: scenery listed twice`);
     for (const chunk of [layout.horizon, ...layout.sectors]) register(chunk.asset, chunk.sha256, chunk.byteLength, MAX_GLB_BYTES);
-    for (const texture of layout.textures) register(texture.asset, texture.sha256, texture.byteLength, MAX_TEXTURE_BYTES);
+    for (const texture of layout.textures) {
+      register(texture.asset, texture.sha256, texture.byteLength, MAX_TEXTURE_BYTES);
+      if (texture.start) register(texture.start.asset, texture.start.sha256, texture.start.byteLength, MAX_TEXTURE_BYTES);
+    }
     layouts.set(layout.layoutKey, layout);
   });
   exactKeys(shared.sunLayouts, [...layouts.keys()], 'scenery catalog.sky.sun.layouts');

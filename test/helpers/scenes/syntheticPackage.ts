@@ -111,7 +111,7 @@ export function syntheticPackage() {
   /** The car body as every record lists it; `vehicleIds` is replaced by each record's own part. */
   const car = {
     folder: 'Test_Car', vehicleIds: ['TEST_CAR'], descriptor: 'vehicles/bodies/Test_Car.json', descriptorSha256: '',
-    ...store('vehicles', 'glb', glb('car')), triangles: 100, vertices: 300, textures: [carTexture],
+    ...store('vehicles', 'glb', glb('car')), triangles: 100, vertices: 300, interior: null, textures: [carTexture],
   };
   const vehicles: VehicleSpec[] = [{ id: 'synthetic', vehicleIds: ['TEST_CAR'] }];
   const record = (spec: VehicleSpec, body: object = { ...car, vehicleIds: spec.vehicleIds }) => ({
@@ -126,7 +126,7 @@ export function syntheticPackage() {
     descriptor.appearances = ids.map(alias => ({ alias, albedo: texturePath, paint: testCarPaint(texturePath), optionNodes: [] }));
   };
   const manifest: Record<string, unknown> = {
-    schemaVersion: 7, id: 'synthetic', version: '1',
+    schemaVersion: 8, id: 'synthetic', version: '1',
     tracks: { catalog: 'tracks/index.json' }, vehicles: { catalog: 'vehicles/index.json' },
     scenery: { catalog: 'scenery/index.json' },
   };

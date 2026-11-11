@@ -135,15 +135,15 @@ as approximate placement. It does not recenter the outline or invent a provider 
 Exact aliases win; ambiguous model matches remain unresolved. Primary and comparison
 vehicles resolve independently. Body direction continues to use replay yaw.
 
-## 3D scenery and vehicle bodies (package manifest schema 7)
+## 3D scenery and vehicle bodies (package manifest schema 8)
 
-The manifest `schemaVersion` is `7`. This app loads schema 7 only: earlier packages are rejected at startup with an invalid
+The manifest `schemaVersion` is `8`. This app loads schema 8 only: earlier packages are rejected at startup with an invalid
 status, and there is no fallback. The pipeline repository's `docs/SCENE_PACKAGE.md` and `docs/VEHICLE_PIPELINE.md` own the file formats;
 this section records what the app reads and checks.
 
 ```json
 {
-  "schemaVersion": 7,
+  "schemaVersion": 8,
   "id": "personal-data",
   "version": "1",
   "tracks": { "catalog": "tracks/index.json" },
@@ -257,8 +257,26 @@ with the emission formula (`car/carLamps.ts`, in the sun's light unit), casts no
 `hiddenInOwnCockpit`. Other glow slots and meshes are not drawn. No lamp switches on yet (no lit frame is known); the other lamp
 materials are drawn as ordinary materials.
 
+Schema 8 splits a body by where it is seen from and adds texture start files:
+
+- `interior` is required on every body row: null, or `asset` (`vehicles/<sha256>.glb`), `sha256`, `byteLength`, `triangles` and
+  `vertices` of a second GLB that holds only the parts the driver cameras draw (`extras.cockpitView: 'in'`), under one `chassis`
+  node at the car origin. Node names are unique across both files. The viewer loads both and puts those parts under the body's
+  `chassis` node (`laps/lapLayer.ts`); a body with an interior and no `chassis` node fails to load.
+- A mesh node in either GLB may carry `extras.lod` {`inM`, `outM`}: it is drawn while `inM` <= camera distance < `outM` (`outM`
+  null = no limit). The followed car is always at distance 0, the comparison car at its distance from the camera
+  (`sceneObjects.ts`, `setCameraDistance`).
+- A body texture row may carry `interiorOnly: true` (no outside part uses it; the viewer reads it at full size, the rest of the
+  car up to its size limit) and `start`.
+- A scenery or body texture row may carry `start`: `asset` (a content-named KTX2 in the same textures folder), `sha256`,
+  `byteLength`, `width`, `height`, `levels` and `gpuBytes` of the texture's start file, a complete texture that is the row's
+  texture from its third level down. Only a texture with more than two levels and a smaller side of at least 512 px has one; on
+  a scenery row the server checks the size and level count against the row. The viewer draws from the start file first and reads
+  the whole file later for the two levels above it (`scenery/cachedKtx2Loader.ts`, `scenery/materials/mipStreaming.ts`); a row
+  without one is read whole.
+
 `GET /api/data-plugin/vehicles/:identity/body` (a VEH id with or without `.veh`) returns the body row plus `packageRevision`;
-`/vehicles/files/` serves the body GLB, descriptor and textures. The viewer selects the
+`/vehicles/files/` serves the body and interior GLBs, descriptor, textures and their start files. The viewer selects the
 lap's appearance by `vehicleIdentity.vehicleId`, creates one material per native material from the descriptor and animates the four
 wheel rigs (`wheel_`, `steer_` and `spin_` nodes at the rolling hub) and the `steering_wheel` node about its `extras.steeringWheelPivot` and
 `extras.steeringWheelAxis`, by the recorded steering times the wheel range. The Cockpit, Hood and Roof views sit on the descriptor's

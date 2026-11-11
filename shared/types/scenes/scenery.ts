@@ -1,5 +1,5 @@
 /**
- * Scenery layout of package schema 7 (one catalog row per layout plus the catalog's shared chunking and streaming; the pipeline's docs/SCENE_PACKAGE.md is the authority).
+ * Scenery layout of package schema 8 (one catalog row per layout plus the catalog's shared chunking and streaming; the pipeline's docs/SCENE_PACKAGE.md is the authority).
  * The horizon chunk is always resident; sector chunks are loaded by lap distance around the replay car.
  */
 import type { SceneryClouds, ScenerySunVisibility } from './clouds.js';
@@ -269,7 +269,15 @@ export interface SceneryTexture {
   gpuBytes: number;
   /** The largest size worth loading at this layout (the longer side, a level of the file); absent = the full size. */
   maxPx?: number;
+  /** The texture's start file, for a large texture: absent = the texture loads from its own file. */
+  start?: TextureStart;
 }
+
+/**
+ * A texture's start file: the same texture from its third level down (a quarter of the width and height), as a complete
+ * content-named KTX2 of its own. Its levels are the last levels of the full file, byte for byte.
+ */
+export interface TextureStart { asset: string; sha256: string; byteLength: number; width: number; height: number; levels: number; gpuBytes: number }
 
 export interface SceneryTotals {
   triangles: number;

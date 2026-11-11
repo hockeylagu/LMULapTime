@@ -13,6 +13,9 @@ const packages: Package[] = [];
 const build = () => { const built = syntheticPackage(); packages.push(built); return built; };
 afterEach(() => { for (const built of packages.splice(0)) fs.rmSync(built.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }); });
 const state = (built: Package) => new DataPlugin(built.dir).status.state;
+/** A stored start file's row: a texture of the given size and level count in a package folder. */
+const startFile = (built: Package, folder: 'scenery' | 'vehicles', size: number, levels: number) =>
+  ({...built.store(`${folder}/textures`, 'ktx2.zst', Buffer.from(`start ${folder} ${size}`)), width: size, height: size, levels, gpuBytes: size * size});
 
 describe('schema 6 manifest', () => {
   it('loads scenery next to tracks, and the car bodies of the vehicle records', () => {
@@ -198,6 +201,13 @@ describe('scenery validation', () => {
     ['a negative height haze scalar', (built: Package) => { Object.assign(built.scenery.daylight, {fogHeightAltitudeScalar: -1}); }],
     ['a texture size above its full size', (built: Package) => { Object.assign(built.scenery.textures[0], {maxPx: 32}); }],
     ['a texture size that is not one of its levels', (built: Package) => { Object.assign(built.scenery.textures[0], {maxPx: 6}); }],
+    ['a start file on a texture too small for one', (built: Package) => { Object.assign(built.scenery.textures[0], {start: startFile(built, 'scenery', 4, 3)}); }],
+    ['a start file the package does not hold', (built: Package) => {
+      Object.assign(built.scenery.textures[0], {width: 2048, height: 2048, levels: 12, start: {...startFile(built, 'scenery', 512, 10), asset: `scenery/textures/${'2'.repeat(64)}.ktx2.zst`, sha256: '2'.repeat(64)}});
+    }],
+    ['a start file that is not the texture from its third level down', (built: Package) => {
+      Object.assign(built.scenery.textures[0], {width: 2048, height: 2048, levels: 12, start: startFile(built, 'scenery', 1024, 11)});
+    }],
   ])('rejects %s', (_name, change) => { expect(mutate(change)).toBe('invalid'); });
 
   it('rejects an empty catalog', () => {
@@ -216,6 +226,13 @@ describe('scenery validation', () => {
     const built = build();
     built.commit();
     expect(new DataPlugin(built.dir).sceneryLayout('monza_gp')?.daylight?.utcOffsetHours).toBe(9);
+  });
+
+  it('accepts a texture start file', () => {
+    const built = build(), start = startFile(built, 'scenery', 512, 10);
+    Object.assign(built.scenery.textures[0], {width: 2048, height: 2048, levels: 12, start}); built.commit();
+    const plugin = new DataPlugin(built.dir);
+    expect(plugin.sceneryLayout('monza_gp')?.textures[0].start).toEqual(start);
   });
 
   it('accepts the largest size worth loading on a texture', () => {
@@ -239,6 +256,21 @@ describe('scenery validation', () => {
 
 describe('car validation', () => {
   const mutate = (change: (built: Package) => void) => { const built = build(); change(built); built.commit(); return state(built); };
+
+  it('accepts an interior file and texture start files on a body', () => {
+    const built = build(), interior = {...built.store('vehicles', 'glb', Buffer.from('interior')), triangles: 10, vertices: 30};
+    const start = startFile(built, 'vehicles', 512, 10);
+    Object.assign(built.car, {interior, textures: [{...built.carTexture, interiorOnly: true, start}]}); built.commit();
+    const plugin = new DataPlugin(built.dir), body = plugin.body('TEST_CAR');
+    expect([body?.interior, body?.textures[0].start]).toEqual([interior, start]);
+  });
+
+  it.each([
+    ['a body without its interior field', (built: Package) => { delete (built.car as Partial<typeof built.car>).interior; }],
+    ['an interior that is not a content-named GLB', (built: Package) => { Object.assign(built.car, {interior: {asset: 'vehicles/interior.glb', sha256: '1'.repeat(64), byteLength: 1, triangles: 1, vertices: 3}}); }],
+    ['an interior-only mark that is not true', (built: Package) => { Object.assign(built.car, {textures: [{...built.carTexture, interiorOnly: false}]}); }],
+    ['a texture start file outside the cars folder', (built: Package) => { Object.assign(built.car, {textures: [{...built.carTexture, start: startFile(built, 'scenery', 512, 10)}]}); }],
+  ])('rejects %s', (_name, change) => { expect(mutate(change)).toBe('invalid'); });
   /** Replaces the catalog written by `commit()` with raw records. */
   const rewrite = (change: (built: Package, vehicle: Record<string, unknown>) => unknown[]) => {
     const built = build(); built.commit();

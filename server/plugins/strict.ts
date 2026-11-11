@@ -53,3 +53,18 @@ export function vec3(value: unknown, what: string, limit = 100_000): [number, nu
   if (result.some(n => Math.abs(n) > limit)) throw Error(`${what}: coordinate out of range`);
   return result as [number, number, number];
 }
+
+/**
+ * A texture row's `start`: the texture's start file, a content-named KTX2 in the same `folder` (`scenery` or `vehicles`). `full`
+ * is the row's own size where the row states it: a start file is that texture from its third level down, and only a texture
+ * with more than two levels and a smaller side of at least 512 px has one.
+ */
+export function textureStart(value: unknown, folder: string, full: { width: number; height: number; levels: number } | null, what: string): void {
+  const start = record(value, what);
+  exactKeys(start, ['asset', 'sha256', 'byteLength', 'width', 'height', 'levels', 'gpuBytes'], what);
+  if (start.asset !== `${folder}/textures/${sha256(start.sha256, `${what}.sha256`)}.ktx2.zst`) throw Error(`${what}: asset is not the content-named KTX2`);
+  for (const key of ['byteLength', 'width', 'height', 'levels', 'gpuBytes']) if (count(start[key], `${what}.${key}`) === 0) throw Error(`${what}.${key}: must be positive`);
+  if (!full) return;
+  if (full.levels <= 2 || Math.min(full.width, full.height) < 512) throw Error(`${what}: the texture is too small for a start file`);
+  if (start.width !== full.width >> 2 || start.height !== full.height >> 2 || start.levels !== full.levels - 2) throw Error(`${what}: not the texture from its third level down`);
+}

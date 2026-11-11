@@ -1,7 +1,16 @@
 /** 3D vehicle bodies of the package: a GLB with four wheel rigs, a descriptor JSON and KTX2 textures each. */
-import type { Vec3 } from './scenery.js';
+import type { TextureStart, Vec3 } from './scenery.js';
 
-export interface BodyTextureRef { asset: string; sha256: string; byteLength: number }
+export interface BodyTextureRef {
+  asset: string; sha256: string; byteLength: number;
+  /** Present (true) when only the interior file uses the texture. */
+  interiorOnly?: true;
+  /** The texture's start file, for a large texture. */
+  start?: TextureStart;
+}
+
+/** A content-named GLB of a body with its size and counts. */
+export interface BodyModelRef { asset: string; sha256: string; byteLength: number; triangles: number; vertices: number }
 
 /** A 3D vehicle body: the union of the VEH ids it serves across the vehicle records that list it. */
 export interface VehicleBody {
@@ -18,6 +27,11 @@ export interface VehicleBody {
   byteLength: number;
   triangles: number;
   vertices: number;
+  /**
+   * The parts only the driver cameras draw (`extras.cockpitView: 'in'`), as their own GLB under one `chassis` node at the car
+   * origin; null for a body without any. They join the `chassis` node of `asset`.
+   */
+  interior: BodyModelRef | null;
   textures: BodyTextureRef[];
 }
 

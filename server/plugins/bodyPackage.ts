@@ -1,6 +1,6 @@
 import type { VehicleBody } from '../../shared/types/scenes/car.js';
 import { readPackageFile, registerPackageFile, type PackageFile } from './packageFiles.js';
-import { array, count, exactKeys, finite, record, sha256, text, vec3 } from './strict.js';
+import { array, count, exactKeys, finite, knownKeys, record, sha256, text, textureStart, vec3 } from './strict.js';
 
 /** Validated 3D vehicle bodies of a package: by upper-case VEH id and by folder, and every file by package-relative path. */
 export interface BodyStore { rows: Map<string, VehicleBody>; folders: Map<string, VehicleBody> }
@@ -17,18 +17,26 @@ export const normalizeVehicleId = (id: string): string => id.trim().replace(/\.v
 /** One body as a vehicle record lists it: `vehicleIds` is the part of the record's ids this body serves. */
 function parseBody(value: unknown, what: string): VehicleBody {
   const row = record(value, what);
-  exactKeys(row, ['folder', 'vehicleIds', 'descriptor', 'descriptorSha256', 'asset', 'sha256', 'byteLength', 'triangles', 'vertices', 'textures'], what);
+  exactKeys(row, ['folder', 'vehicleIds', 'descriptor', 'descriptorSha256', 'asset', 'sha256', 'byteLength', 'triangles', 'vertices', 'interior', 'textures'], what);
   const folder = text(row.folder, `${what}.folder`, 120);
   if (!FOLDER.test(folder)) throw Error(`${what}: invalid body folder`);
   if (row.descriptor !== `vehicles/bodies/${folder}.json`) throw Error(`${what}: descriptor is not vehicles/bodies/<folder>.json`);
   sha256(row.descriptorSha256, `${what}.descriptorSha256`);
   if (row.asset !== `vehicles/${sha256(row.sha256, `${what}.sha256`)}.glb`) throw Error(`${what}: asset is not the content-named GLB`);
   for (const key of ['byteLength', 'triangles', 'vertices']) if (count(row[key], `${what}.${key}`) === 0) throw Error(`${what}.${key}: must be positive`);
+  if (row.interior !== null) {
+    const at = `${what}.interior`, interior = record(row.interior, at);
+    exactKeys(interior, ['asset', 'sha256', 'byteLength', 'triangles', 'vertices'], at);
+    if (interior.asset !== `vehicles/${sha256(interior.sha256, `${at}.sha256`)}.glb`) throw Error(`${at}: asset is not the content-named GLB`);
+    for (const key of ['byteLength', 'triangles', 'vertices']) if (count(interior[key], `${at}.${key}`) === 0) throw Error(`${at}.${key}: must be positive`);
+  }
   const ids = array(row.vehicleIds, `${what}.vehicleIds`, 5000).map((id, i) => normalizeVehicleId(text(id, `${what}.vehicleIds[${i}]`, 160)));
   if (!ids.length || ids.some(id => !/^[A-Z0-9_-]+$/.test(id)) || new Set(ids).size !== ids.length) throw Error(`${what}: invalid vehicle ids`);
   array(row.textures, `${what}.textures`, 4096).forEach((value, i) => {
     const texture = record(value, `${what}.textures[${i}]`);
-    exactKeys(texture, ['asset', 'sha256', 'byteLength'], `${what}.textures[${i}]`);
+    knownKeys(texture, ['asset', 'sha256', 'byteLength'], ['interiorOnly', 'start'], `${what}.textures[${i}]`);
+    if (texture.interiorOnly !== undefined && texture.interiorOnly !== true) throw Error(`${what}.textures[${i}].interiorOnly: expected true`);
+    if (texture.start !== undefined) textureStart(texture.start, 'vehicles', null, `${what}.textures[${i}].start`);
     if (texture.asset !== `vehicles/textures/${sha256(texture.sha256, `${what}.textures[${i}].sha256`)}.ktx2.zst`) throw Error(`${what}.textures[${i}]: asset is not the content-named KTX2`);
     if (count(texture.byteLength, `${what}.textures[${i}].byteLength`) === 0) throw Error(`${what}.textures[${i}]: empty texture`);
   });
@@ -188,7 +196,11 @@ export function loadBodyPackage(root: string, vehicles: unknown[]): BodyStore {
       rows.set(id, body);
     }
     register(body.asset, body.sha256, body.byteLength, MAX_GLB_BYTES);
-    for (const texture of body.textures) register(texture.asset, texture.sha256, texture.byteLength, MAX_TEXTURE_BYTES);
+    if (body.interior) register(body.interior.asset, body.interior.sha256, body.interior.byteLength, MAX_GLB_BYTES);
+    for (const texture of body.textures) {
+      register(texture.asset, texture.sha256, texture.byteLength, MAX_TEXTURE_BYTES);
+      if (texture.start) register(texture.start.asset, texture.start.sha256, texture.start.byteLength, MAX_TEXTURE_BYTES);
+    }
     register(body.descriptor, body.descriptorSha256, null, MAX_DESCRIPTOR_BYTES);
     validateBodyDescriptor(readPackageFile(root, files.get(body.descriptor)!), body);
   }
