@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ReplayTrajectoryPoint } from '../../../shared/types/index.js';
 import { applyTelemetryPostProcessing } from '../../../src/utils/telemetryPostProcessing.js';
-import { downsampleTrajectoryPoints } from '../../../server/replay/decode/trajectoryDownsampler.js';
+import { selectFeatureSamples } from '../../../server/replay/decode/trajectoryDownsampler.js';
 import {
   computeLapComparisons,
   interpolatePointAtDistance,
@@ -152,7 +152,7 @@ if (process.env.LMU_PERSONAL_FIXTURES) describe.each(PAIRS)('lap comparison inva
 
   invariant(name, 'I5', 'halving the telemetry resolution keeps pedal points within one sample', () => {
     // Halved the way the server reduces a lap to the requested resolution.
-    const half = (lap: ReplayTrajectoryPoint[]) => applyTelemetryPostProcessing(downsampleTrajectoryPoints(lap, Math.ceil(lap.length / 2)));
+    const half = (lap: ReplayTrajectoryPoint[]) => applyTelemetryPostProcessing(selectFeatureSamples(lap, Math.ceil(lap.length / 2)).map(i => lap[i]));
     const halfP = half(pair.primary.rawPoints);
     const halfB = half(pair.baseline.rawPoints);
     const halfCorners = computePairSegments(halfP, halfB, L, pair.primary.layoutKey).filter(isCorner);

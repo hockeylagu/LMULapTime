@@ -148,8 +148,3 @@ export function pointBudgetForSpacing(points: ReplayTrajectoryPoint[], trackLeng
   }
   return Math.max(2, Math.ceil(lengthM / spacingM));
 }
-
-/** The samples chosen by selectFeatureSamples. */
-export function downsampleTrajectoryPoints(points: ReplayTrajectoryPoint[], maxPoints: number): ReplayTrajectoryPoint[] {
-  return selectFeatureSamples(points, maxPoints).map(i => points[i]);
-}
