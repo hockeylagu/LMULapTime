@@ -57,7 +57,7 @@ it('loads every map of a standard material, with the livery albedo in place of i
 
 it('draws a standard material with its metal/roughness, AO/specular and normal maps at their own scales', () => {
   const material = createCarMaterial(standard, appearance, () => new Texture(), testShading());
-  const shader = { uniforms: {} as Record<string, IUniform>, vertexShader: '#include <common>\n#include <begin_vertex>', fragmentShader: '#include <common>\n#include <map_fragment>\n#include <normal_fragment_maps>\n#include <aomap_fragment>' };
+  const shader = { uniforms: {} as Record<string, IUniform>, vertexShader: '#include <common>\n#include <begin_vertex>\n#include <worldpos_vertex>', fragmentShader: '#include <common>\n#include <map_fragment>\n#include <normal_fragment_maps>\n#include <aomap_fragment>\n#include <shadowmap_pars_fragment>\n#include <lights_fragment_begin>' };
   material.onBeforeCompile(shader as never, undefined as never);
   expect(Object.keys(shader.uniforms)).toEqual(expect.arrayContaining(['surface_albedo', 'surface_metalRough', 'surface_aoSpec', 'surface_normal']));
   expect((shader.uniforms.surface_scale_metalRough.value as Vector2).toArray()).toEqual([2, 2]);

@@ -30,16 +30,11 @@ export function exposureType(mode: CameraMode): SceneryCameraType {
 }
 
 /**
- * The package's sun shadow cascade set a view samples: the chase set for the external views that move with the car, the cockpit set
- * onboard. The others keep the near and static maps: the package has no set for trackside, hood or roof, and the free views are not
- * game cameras.
+ * The package's sun shadow cascade set a view samples: the cockpit set onboard, the chase set for every other view (the package
+ * publishes no splits for the TV cameras, and the free views are not game cameras).
  */
-export function shadowCascadeSet(mode: CameraMode): ShadowCascadeSet | null {
-  switch (mode) {
-    case 'follow': case 'chase': return 'chase';
-    case 'cockpit': return 'cockpit';
-    case 'hood': case 'roof': case 'orbit': case 'trackside': case 'top': return null;
-  }
+export function shadowCascadeSet(mode: CameraMode): ShadowCascadeSet {
+  return mode === 'cockpit' ? 'cockpit' : 'chase';
 }
 
 /** Mode keys belong to the active 3D map, with the same typing/dialog guards as replay keys. */

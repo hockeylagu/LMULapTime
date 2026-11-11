@@ -1,8 +1,5 @@
 import { MeshDepthMaterial, ShaderChunk, Vector2, Vector3, type IUniform, type WebGLProgramParametersWithUniforms } from 'three';
-import {
-  CASCADE_SHADOW_FRAGMENT_PARS, CASCADE_SHADOW_VERTEX, CASCADE_SHADOW_VERTEX_PARS, cascadeShadowUniforms, SUN_SHADOW_TERM,
-} from '../../shadows/cascadeSampling.js';
-import { STATIC_NORMAL_BIAS_M, SUN_SHADOW_DEPTH_M, staticShadowUniforms } from '../../sunShadows.js';
+import { patchCascadeShadow } from '../../shadows/cascadeSampling.js';
 import { digitalFlagClock } from './flagSurface.js';
 import { patchAmbientLookup } from './ambientLookup.js';
 import { CROWN_SUN_UNIFORM, crownNormalGlsl, crownSun } from './foliageCrown.js';
@@ -47,53 +44,14 @@ export function patchBillboardVertex(shader: WebGLProgramParametersWithUniforms,
 }
 
 /**
- * Depth past a card's own plane its shadow lookup skips, per sun shadow map (near, static): about the depth error of a texel
- * (4 cm, 29 cm) at a grazing sun.
+ * How a family takes the sun's shadow: leaves light their diffuse and translucency with min(2 * shadow, 1), so partly shadowed
+ * foliage reads lit and only full shade is dark. Terrain also takes its baked shadow (the splatter's alpha, shaderParts.ts) on the
+ * sun: the shade under trees and beside walls is painted into the ground, and lights it as shade.
  */
-const BILLBOARD_SELF_SHADOW_M = [1, 4] as const;
-const SUN_SHADOW = SUN_SHADOW_TERM;
-
-/**
- * The sun's shadow on a scenery surface: the near map inside its window, fading over the window's outer tenth to the static map
- * (sunShadows.ts), read with one hardware compare tap as the near one. Outside both maps, and before the first static map, lit.
- * While a cascade set is in use (shadows/cascadeSampling.ts), the cascades instead. Without shadows (tests), the near map alone.
- */
-const STATIC_SHADOW_VERTEX = `
-  #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
-    vStaticShadowCoord = surface_staticShadowMatrix * ( worldPosition + vec4( shadowWorldNormal * ${glslNumber(STATIC_NORMAL_BIAS_M)}, 0.0 ) );
-    ${CASCADE_SHADOW_VERTEX}
-  #endif`;
-const SUN_SHADOW_BLEND = `
-  #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
-  uniform sampler2DShadow surface_staticShadowMap;
-  uniform float surface_staticShadowReady;
-  varying vec4 vStaticShadowCoord;
-  ${CASCADE_SHADOW_FRAGMENT_PARS}
-  float surfaceSunShadow( float nearShadow, vec4 nearCoord ) {
-    if ( surface_cascadeCount > 0 ) return surfaceCascadeShadow( - vViewPosition.z );
-    vec2 window = nearCoord.xy / nearCoord.w;
-    float inside = smoothstep( 0.0, 0.1, min( min( window.x, 1.0 - window.x ), min( window.y, 1.0 - window.y ) ) );
-    if ( inside >= 1.0 || surface_staticShadowReady < 0.5 ) return nearShadow;
-    vec3 coord = vStaticShadowCoord.xyz;
-    bool covered = all( greaterThanEqual( coord, vec3( 0.0 ) ) ) && all( lessThanEqual( coord, vec3( 1.0 ) ) );
-    float farShadow = covered ? texture( surface_staticShadowMap, coord ) : 1.0;
-    return mix( farShadow, nearShadow, inside );
-  }
-  #else
-  float surfaceSunShadow( float nearShadow, vec4 nearCoord ) { return nearShadow; }
-  #endif
-`;
-
-/**
- * Three's light loop with the sun's shadow from both maps. Leaves light their diffuse and translucency with min(2 * shadow, 1),
- * so partly shadowed foliage reads lit and only full shade is dark. Terrain also takes its baked shadow (the splatter's alpha,
- * shaderParts.ts) on the sun: the shade under trees and beside walls is painted into the ground, and lights it as shade.
- */
-function sunShadowLights(kind: SurfaceConfig['kind']): string {
-  const chunk = ShaderChunk.lights_fragment_begin;
-  if (!chunk.includes(SUN_SHADOW)) throw Error('three lights_fragment_begin no longer has the directional shadow term');
-  const shadow = `( UNROLLED_LOOP_INDEX == 0 ? surfaceSunShadow( ${SUN_SHADOW}, vDirectionalShadowCoord[ i ] ) : 1.0 )`;
-  return chunk.replace(SUN_SHADOW, kind === 'vegetation' ? `min(2.0 * ${shadow}, 1.0)` : kind === 'terrain' ? `min(${shadow}, surfaceBakedShadow)` : shadow);
+function sunShade(kind: SurfaceConfig['kind']): (shadow: string) => string {
+  if (kind === 'vegetation') return shadow => `min(2.0 * ${shadow}, 1.0)`;
+  if (kind === 'terrain') return shadow => `min(${shadow}, surfaceBakedShadow)`;
+  return shadow => shadow;
 }
 
 let shadowMaterial: MeshDepthMaterial | null = null;
@@ -101,7 +59,7 @@ let shadowMaterial: MeshDepthMaterial | null = null;
 /**
  * The sun shadow pass's material for every camera-facing card, shared as three shares its default depth material (the pass copies
  * each card's albedo and alpha test onto it). Cards turn toward the viewing camera, not the light, so a crown's own shadow falls on
- * the card that is drawn. `trackShadowEye` keeps the eye current.
+ * the card that is drawn. The shadow pass keeps the eye current (`trackShadowEye`).
  */
 export function billboardShadowMaterial(): MeshDepthMaterial {
   if (shadowMaterial) return shadowMaterial;
@@ -125,7 +83,6 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
   const tunable = (name: string, group: ParameterGroup | undefined, key: string) => { if (group?.[key] !== undefined) tunables[name] = { value: value(group, key) }; };
   tunable('surface_specular', p.adjust, 'specular');
   tunable('surface_specularTinting', p.adjust, 'specularTinting');
-  tunables.surface_normalShadowInfluence = { value: config.normalShadowInfluence };
   tunable('surface_mixBias', p.terrain, 'mixBias');
   tunable('surface_splatterOverlayFactor', p.terrain, 'splatterOverlay');
   tunable('surface_patternStrength', p.terrain, 'patternStrength');
@@ -158,8 +115,6 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
   Object.assign(shader.uniforms, tunables, {
     surface_alphaCut: surfaceAlphaCut,
     surface_normalScale: { value: new Vector2(value(p.adjust, 'normalStrength'), config.normalYSign) },
-    surface_staticShadowMap: staticShadowUniforms.map, surface_staticShadowMatrix: staticShadowUniforms.matrix,
-    surface_staticShadowReady: staticShadowUniforms.ready, ...cascadeShadowUniforms,
   }, mapScaleUniforms, config.kind === 'digitalFlag' ? { surface_flag_elapsed: digitalFlagClock } : {}, uniforms);
 
   const neededUvs = new Set<string>();
@@ -173,31 +128,14 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
     varying vec2 vSurfaceXZ;
     varying float vSurfaceRandom;
     varying vec4 vSurfaceUV01, vSurfaceUV23, vSurfaceColour;
-  `).replace('#include <shadowmap_pars_vertex>', `#include <shadowmap_pars_vertex>
-    #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
-      uniform mat4 surface_staticShadowMatrix;
-      varying vec4 vStaticShadowCoord;
-      ${CASCADE_SHADOW_VERTEX_PARS}
-    #endif
-  `).replace('#include <shadowmap_vertex>', `#include <shadowmap_vertex>${STATIC_SHADOW_VERTEX}`).replace('#include <begin_vertex>', '#include <begin_vertex>\nvSurfaceXZ = position.xz; vSurfaceRandom=fract(abs(position.x+position.z)); vSurfaceUV01 = vec4(uv,uv1); vSurfaceUV23 = vec4(uv2,uv3); vSurfaceColour = _lmu_colour;');
+  `).replace('#include <begin_vertex>', '#include <begin_vertex>\nvSurfaceXZ = position.xz; vSurfaceRandom=fract(abs(position.x+position.z)); vSurfaceUV01 = vec4(uv,uv1); vSurfaceUV23 = vec4(uv2,uv3); vSurfaceColour = _lmu_colour;');
   if (config.billboard) {
     const crown = config.kind === 'vegetation';
     if (crown) shader.uniforms[CROWN_SUN_UNIFORM] = crownSun;
     patchBillboardVertex(shader, 'cameraPosition', crown);
+    // A card and its own shadow lie in one plane: its cascade lookup skips its own depth (shadows/cascadeSampling.ts).
     shader.fragmentShader = `#define SURFACE_CARD
 ${shader.fragmentShader}`;
-    // A card and its own shadow lie in one plane, so at grazing sun the card shadowed itself whole (black palms). Its lookup moves
-    // toward the sun by BILLBOARD_SELF_SHADOW_M (per map), past its own depth; other objects' shadows still fall on it.
-    shader.vertexShader = shader.vertexShader.replace(STATIC_SHADOW_VERTEX, `${STATIC_SHADOW_VERTEX}
-      #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
-        // The near map is three's own, so it follows the scene's depth range: reversed, nearer the sun is a larger depth.
-        #ifdef USE_REVERSED_DEPTH_BUFFER
-          vDirectionalShadowCoord[ 0 ].z += ${glslNumber(BILLBOARD_SELF_SHADOW_M[0] / SUN_SHADOW_DEPTH_M[0])} * vDirectionalShadowCoord[ 0 ].w;
-        #else
-          vDirectionalShadowCoord[ 0 ].z -= ${glslNumber(BILLBOARD_SELF_SHADOW_M[0] / SUN_SHADOW_DEPTH_M[0])} * vDirectionalShadowCoord[ 0 ].w;
-        #endif
-        vStaticShadowCoord.z -= ${glslNumber(BILLBOARD_SELF_SHADOW_M[1] / SUN_SHADOW_DEPTH_M[1])} * vStaticShadowCoord.w;
-      #endif`);
   }
   const occlusion = config.kind === 'clearcoat'
     ? 'reflectedLight.directSpecular*=surfaceSpecularOcclusion;reflectedLight.indirectSpecular*=surfaceSpecularOcclusion;clearcoatSpecularDirect*=surfaceSpecularOcclusion;clearcoatSpecularIndirect*=surfaceSpecularOcclusion;'
@@ -219,9 +157,10 @@ ${shader.fragmentShader}`;
   if (code.finish) shader.fragmentShader = shader.fragmentShader.replace('#include <opaque_fragment>', `${code.finish}\n#include <opaque_fragment>`);
   if (code.absorption) shader.fragmentShader = shader.fragmentShader.replace('outgoingLight = outgoingLight * ( 1.0 - material.clearcoat * Fcc )', `outgoingLight = outgoingLight * (${code.absorption}) * ( 1.0 - material.clearcoat * Fcc )`);
   if (code.emissive) shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\ntotalEmissiveRadiance=${code.emissive};`);
-  shader.fragmentShader = shader.fragmentShader.replace('#include <shadowmap_pars_fragment>', `#include <shadowmap_pars_fragment>\n${SUN_SHADOW_BLEND}`)
-    // The light loop takes the place of the include, so the reflection inputs go in with it.
-    .replace('#include <lights_fragment_begin>', `${REFLECTING_KINDS.has(config.kind) ? `${SCENERY_REFLECTION_INPUTS}\n` : ''}${sunShadowLights(config.kind)}`);
+  // The light loop takes the place of the include, so the reflection inputs go in with it.
+  shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_begin>',
+    `${REFLECTING_KINDS.has(config.kind) ? `${SCENERY_REFLECTION_INPUTS}\n` : ''}${ShaderChunk.lights_fragment_begin}`);
+  patchCascadeShadow(shader, config.normalShadowInfluence, sunShade(config.kind));
   patchAmbientLookup(shader);
   if (REFLECTING_KINDS.has(config.kind)) {
     Object.assign(shader.uniforms, sceneryReflectionUniforms);

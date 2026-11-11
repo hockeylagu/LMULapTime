@@ -1,7 +1,6 @@
 import { Mesh, MeshPhysicalMaterial, MeshStandardMaterial, Vector2, type IUniform, type Material, type Texture } from 'three';
 import { digitalFlagClock } from './flagSurface.js';
 import { billboardShadowMaterial, computeCustomProgramCacheKey, patchSurfaceShader } from './patchSurfaceShader.js';
-import { trackShadowEye } from './shadowEye.js';
 import { list, value } from './shaderContext.js';
 import { readSurfaceConfig, type SurfaceConfig } from './surfaceConfig.js';
 import type { SurfaceTextureSource } from './textureSource.js';
@@ -96,7 +95,6 @@ export async function configureSurfaceMaterial(mesh: Mesh, textures: SurfaceText
     if (!geometry.boundingSphere) throw Error(`Billboard without bounds: ${config.name ?? '?'}`);
     geometry.boundingSphere.radius += extent;
     mesh.customDepthMaterial = billboardShadowMaterial();
-    mesh.onBeforeShadow = trackShadowEye;
   }
   // Digital flags blink on one shared clock, advanced as they draw.
   if (config.kind === 'digitalFlag') mesh.onBeforeRender = () => { digitalFlagClock.value = (performance.now() - START_MS) / 1000; };

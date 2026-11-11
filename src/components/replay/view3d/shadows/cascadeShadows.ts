@@ -35,7 +35,7 @@ export interface CascadeShadows {
   /** The sun moved: every cascade is redrawn from the new direction. `lightTravel` is unit, from the sun toward the ground. */
   setLight(lightTravel: Vector3): void;
   /** Before a frame: redraws the live cascades and the cached cascade most due. True while cached ones are still due. */
-  update(view: PerspectiveCamera, dynamic: readonly Object3D[]): boolean;
+  update(view: PerspectiveCamera | OrthographicCamera, dynamic: readonly Object3D[]): boolean;
   dispose(): void;
 }
 
@@ -81,7 +81,7 @@ export function createCascadeShadows(renderer: WebGLRenderer, scene: Scene, shad
   };
   const casters = createShadowCasterPass(renderer, scene), light = lightTravel.clone(), eye = new Vector3(), forward = new Vector3();
   let axes = sunSquareAxes(light);
-  const draw = (i: number, centre: [number, number], view: PerspectiveCamera, dynamic: readonly Object3D[]) => {
+  const draw = (i: number, centre: [number, number], view: PerspectiveCamera | OrthographicCamera, dynamic: readonly Object3D[]) => {
     const {cascade, camera, live, viewport} = cascades[i];
     const sliceStartM = i === 0 ? layout.nearM : layout.cascades[i - 1].splitM;
     const alongLightM = eye.clone().addScaledVector(forward, (sliceStartM + cascade.splitM) / 2).dot(light);

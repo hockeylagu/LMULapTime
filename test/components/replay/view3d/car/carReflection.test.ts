@@ -24,14 +24,14 @@ import { testShading } from '../../../../helpers/scenes/sceneryProfiles.js';
 import type { CarSurface } from '../../../../../shared/types/scenes/car.js';
 
 function stubRenderer() {
-  const faces: Array<{face: number; carShown: boolean; shadowUpdate: boolean; mips: boolean}> = [], eyes: Vector3[] = [], ranges: [number, number][] = [];
+  const faces: Array<{face: number; carShown: boolean; mips: boolean}> = [], eyes: Vector3[] = [], ranges: [number, number][] = [];
   let target: unknown = null, face = 0;
   const renderer = {
-    coordinateSystem: WebGLCoordinateSystem, state: {buffers: {depth: {getReversed: () => false, setReversed() {}}}}, shadowMap: {autoUpdate: true},
+    coordinateSystem: WebGLCoordinateSystem, state: {buffers: {depth: {getReversed: () => false, setReversed() {}}}},
     getRenderTarget: () => target, initRenderTarget() {},
     setRenderTarget(next: unknown, activeFace = 0) { target = next; face = activeFace; },
     render(_scene: Scene, camera: PerspectiveCamera) {
-      faces.push({face, carShown: cars.visible, shadowUpdate: renderer.shadowMap.autoUpdate, mips: (target as {texture: {generateMipmaps: boolean}}).texture.generateMipmaps});
+      faces.push({face, carShown: cars.visible, mips: (target as {texture: {generateMipmaps: boolean}}).texture.generateMipmaps});
       eyes.push(camera.getWorldPosition(new Vector3())); ranges.push([camera.near, camera.far]);
     },
   };
@@ -64,11 +64,11 @@ it('renders the probe three faces a frame from the roof without the cars, then g
   expect(glass.envMap).not.toBeNull(); expect(paintUniforms().paint_probe.value).toBe(0);
   for (let i = 0; i < 2; i++) expect(reflection.update(centre)).toBe(true);
   // The cube's mips regenerate after the last face only: the kernels read them.
-  expect(faces).toEqual([0, 1, 2, 3, 4, 5].map(face => ({face, carShown: false, shadowUpdate: false, mips: face === 5})));
+  expect(faces).toEqual([0, 1, 2, 3, 4, 5].map(face => ({face, carShown: false, mips: face === 5})));
   // The eye sits 0.72 m over the box centre (roof height) and each face sees from 0.1 m to 150 m.
   for (const eye of eyes) expect(eye.toArray().map(v => +v.toFixed(6))).toEqual([10, 2.22, 20]);
   expect(ranges[0]).toEqual([0.1, 150]);
-  expect(cars.visible).toBe(true); expect(renderer.shadowMap.autoUpdate).toBe(true); expect(target()).toBeNull();
+  expect(cars.visible).toBe(true); expect(target()).toBeNull();
   // Only after the sixth face: an incomplete cube would reflect black. The paint takes the convolved cubes, the other lit
   // materials three's prefiltered one, the unlit nothing.
   expect(pmrem.conversions).toBe(2); expect(pmrem.convolutions).toBe(1); expect(glass.envMap).not.toBeNull(); expect(unlit.envMap).toBeNull();

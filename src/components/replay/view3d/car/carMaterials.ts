@@ -124,7 +124,7 @@ export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppe
     material.customProgramCacheKey = () => 'lmu-car-ambient';
   }
   if (!surface) {
-    // Paint and the materials on three's light loop take the sun's shadow from the cascades too (the surface program has its own).
+    // Paint and the materials on three's light loop take the sun's shadow from the cascades too (the surface program patches itself).
     const influence = config.normalShadowInfluence, own = material.onBeforeCompile.bind(material);
     if (typeof influence !== 'number' || influence < 0) throw Error(`Car material ${recipe.name} has no normal shadow influence`);
     material.onBeforeCompile = (shader, renderer) => { own(shader, renderer); patchCascadeShadow(shader, influence); };

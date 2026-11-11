@@ -1,6 +1,5 @@
-import { Matrix4, ShaderChunk, Vector2, Vector3, Vector4, type IUniform, type Texture, type WebGLProgramParametersWithUniforms } from 'three';
+import { Matrix4, ShaderChunk, Vector2, Vector3, Vector4, type DepthTexture, type IUniform, type WebGLProgramParametersWithUniforms } from 'three';
 import type { SceneryShadows } from '../../../../../shared/types/scenes/scenery.js';
-import { staticShadowUniforms } from '../sunShadows.js';
 import { cascadeDepthRangeM, type CascadeShadowState } from './cascadeShadows.js';
 import type { ShadowCascadeLayout } from './shadowCascades.js';
 
@@ -16,11 +15,12 @@ const CARD_SELF_SHADOW_M = 1;
 const CARD_SELF_SHADOW_TEXELS = 14;
 
 /**
- * The cascade shadow inputs every surface program shares; `surface_cascadeCount` 0 leaves the surfaces on the near and static maps.
- * The atlas has no sampler of its own: while a set is in use it takes the static map's (`surface_staticShadowMap`), which is then not
- * read. The road and terrain programs already use all 16 texture units.
+ * The sun shadow inputs every lit program shares (scenery and cars); `surface_cascadeCount` 0 leaves everything lit. The atlas
+ * sampler must hold a depth texture from the first draw: with none, three binds its empty colour texture and WebGL drops the draw on
+ * the sampler mismatch.
  */
 export const cascadeShadowUniforms = {
+  surface_cascadeAtlas: { value: null as DepthTexture | null },
   surface_cascadeCount: { value: 0 },
   surface_cascadeMatrices: { value: Array.from({ length: MAX_SHADOW_CASCADES }, () => new Matrix4()) },
   surface_cascadeTiles: { value: Array.from({ length: MAX_SHADOW_CASCADES }, () => new Vector4()) },
@@ -36,9 +36,6 @@ export const cascadeShadowUniforms = {
   surface_cascadeNormalOffset: { value: 0 },
 } satisfies Record<string, IUniform>;
 
-/** The static map the shared sampler held before a cascade set took it. */
-let staticMap: Texture | null | undefined;
-
 /**
  * Points the surfaces at a cascade set: its atlases and matrices (shared, so the per-frame redraws reach the shaders without a
  * copy) and the package's filter, select, fade and normal offset.
@@ -48,8 +45,7 @@ export function sampleCascadeShadows(shadows: SceneryShadows, layout: ShadowCasc
   if (cascades.length > MAX_SHADOW_CASCADES) throw Error(`The surfaces sample at most ${MAX_SHADOW_CASCADES} shadow cascades, not ${cascades.length}`);
   if (taps.length > MAX_SHADOW_TAPS) throw Error(`The surfaces sample at most ${MAX_SHADOW_TAPS} shadow filter taps, not ${taps.length}`);
   const u = cascadeShadowUniforms;
-  if (staticMap === undefined) staticMap = staticShadowUniforms.map.value;
-  staticShadowUniforms.map.value = state.atlas;
+  u.surface_cascadeAtlas.value = state.atlas;
   cascades.forEach((cascade, i) => {
     u.surface_cascadeMatrices.value[i] = state.matrices[i];
     u.surface_cascadeTiles.value[i] = state.tiles[i];
@@ -66,33 +62,43 @@ export function sampleCascadeShadows(shadows: SceneryShadows, layout: ShadowCasc
   u.surface_cascadeCount.value = cascades.length;
 }
 
-/** Back to the near and static maps (a camera type without a cascade set): the shared sampler gets the static map back. */
-export function stopCascadeShadows(): void {
+/** Holds the surfaces lit, on `atlas` (a set's atlas before its first draw, or null once the scene is gone). */
+export function holdCascadeShadows(atlas: DepthTexture | null): void {
   cascadeShadowUniforms.surface_cascadeCount.value = 0;
-  if (staticMap !== undefined) staticShadowUniforms.map.value = staticMap;
-  staticMap = undefined;
+  cascadeShadowUniforms.surface_cascadeAtlas.value = atlas;
 }
 
 /**
- * Vertex part: the shadow lookup position, the world position moved along the normal by the package's offset scale times the
- * material's `surface_normalShadowInfluence`. Needs three's `worldPosition` and `shadowWorldNormal` (inside its shadow-map block).
+ * Vertex part: the shadow lookup position, the world position moved along the world normal by the package's offset scale times the
+ * material's `surface_normalShadowInfluence`. Goes after three's `worldpos_vertex` (it needs `transformed` and `transformedNormal`).
  */
-export const CASCADE_SHADOW_VERTEX_PARS = `
+const CASCADE_SHADOW_VERTEX_PARS = `
   uniform float surface_cascadeNormalOffset;
   uniform float surface_normalShadowInfluence;
   varying vec3 vCascadePosition;
 `;
-export const CASCADE_SHADOW_VERTEX = `
-  vCascadePosition = worldPosition.xyz + shadowWorldNormal * ( surface_cascadeNormalOffset * surface_normalShadowInfluence );
+const CASCADE_SHADOW_VERTEX = `
+  {
+    vec4 cascadeWorld = vec4( transformed, 1.0 );
+    #ifdef USE_BATCHING
+      cascadeWorld = batchingMatrix * cascadeWorld;
+    #endif
+    #ifdef USE_INSTANCING
+      cascadeWorld = instanceMatrix * cascadeWorld;
+    #endif
+    cascadeWorld = modelMatrix * cascadeWorld;
+    vec3 cascadeNormal = transformNormalByInverseViewMatrix( transformedNormal, viewMatrix );
+    vCascadePosition = cascadeWorld.xyz + cascadeNormal * ( surface_cascadeNormalOffset * surface_normalShadowInfluence );
+  }
 `;
 
 /**
  * Fragment part: `surfaceCascadeShadow(viewDepth)`, the sun's light fraction (1 lit) from the first cascade whose tile holds the
  * point (max(|uv − 0.5|) ≤ halfExtent), filtered by the package's hardware-compare taps (Σ weight · compare · scale), faded out toward
- * far. A point outside every cascade is lit. With `SURFACE_CARD` defined, a camera-facing card skips its own depth. Reads the atlas
- * through `surface_staticShadowMap`, declared before it.
+ * far. A point outside every cascade is lit. With `SURFACE_CARD` defined, a camera-facing card skips its own depth.
  */
-export const CASCADE_SHADOW_FRAGMENT_PARS = `
+const CASCADE_SHADOW_FRAGMENT_PARS = `
+  uniform sampler2DShadow surface_cascadeAtlas;
   uniform int surface_cascadeCount;
   uniform mat4 surface_cascadeMatrices[ ${MAX_SHADOW_CASCADES} ];
   uniform vec4 surface_cascadeTiles[ ${MAX_SHADOW_CASCADES} ];
@@ -119,7 +125,7 @@ export const CASCADE_SHADOW_FRAGMENT_PARS = `
       for ( int t = 0; t < ${MAX_SHADOW_TAPS}; t ++ ) {
         if ( t >= surface_cascadeTapCount ) break;
         vec3 tap = surface_cascadeTaps[ t ];
-        lit += tap.z * texture( surface_staticShadowMap, vec3( uv + tap.xy * surface_cascadeTexel, coord.z ) );
+        lit += tap.z * texture( surface_cascadeAtlas, vec3( uv + tap.xy * surface_cascadeTexel, coord.z ) );
       }
       float fadeOut = clamp( ( viewDepth - surface_cascadeFade.x ) / ( surface_cascadeFade.y - surface_cascadeFade.x ), 0.0, 1.0 );
       return mix( lit * surface_cascadeFilter.x, 1.0, fadeOut );
@@ -128,32 +134,30 @@ export const CASCADE_SHADOW_FRAGMENT_PARS = `
   }
 `;
 
-/** Three's directional shadow term in its light loop (`lights_fragment_begin`). */
-export const SUN_SHADOW_TERM = 'getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowIntensity, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] )';
-const SHADOW_GATE = '#if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0';
+/** Where three's light loop has the sun's light (the only directional light) for a fragment, before applying it. */
+const SUN_LIGHT_INFO = 'getDirectionalLightInfo( directionalLight, directLight );';
 
 /**
- * Lets a material on three's own light loop (the cars' materials outside the scenery program) take the sun's shadow from the cascades
- * while a set is in use, and from three's near map otherwise. `influence` is the material's normal shadow influence. Its light
- * chunk may already be inlined (car paint's); a program without three's shadow term throws.
+ * Gives a lit program the sun's shadow from the cascades: in three's light loop, the sun's light is multiplied by `shade` of the
+ * cascade term where the object receives shadows. `influence` is the material's normal shadow influence. The light chunk may already
+ * be inlined (car paint's, the scenery's); a program without the sun's light throws.
  */
-export function patchCascadeShadow(shader: WebGLProgramParametersWithUniforms, influence: number): void {
+export function patchCascadeShadow(shader: WebGLProgramParametersWithUniforms, influence: number, shade = (shadow: string) => shadow): void {
   const replace = (source: string, from: string, to: string) => {
     if (!source.includes(from)) throw Error(`The shader has no ${from.slice(0, 40)} to take the cascade shadow`);
     return source.replace(from, to);
   };
-  let vertex = replace(shader.vertexShader, '#include <shadowmap_pars_vertex>', `#include <shadowmap_pars_vertex>\n${SHADOW_GATE}\n${CASCADE_SHADOW_VERTEX_PARS}\n#endif`);
-  vertex = replace(vertex, '#include <shadowmap_vertex>', `#include <shadowmap_vertex>\n${SHADOW_GATE}\n${CASCADE_SHADOW_VERTEX}\n#endif`);
+  let vertex = replace(shader.vertexShader, '#include <common>', `#include <common>
+${CASCADE_SHADOW_VERTEX_PARS}`);
+  vertex = replace(vertex, '#include <worldpos_vertex>', `#include <worldpos_vertex>
+${CASCADE_SHADOW_VERTEX}`);
   let fragment = shader.fragmentShader.replace('#include <lights_fragment_begin>', ShaderChunk.lights_fragment_begin);
   fragment = replace(fragment, '#include <shadowmap_pars_fragment>', `#include <shadowmap_pars_fragment>
-${SHADOW_GATE}
-  uniform sampler2DShadow surface_staticShadowMap;
-  ${CASCADE_SHADOW_FRAGMENT_PARS}
-#endif`);
-  fragment = replace(fragment, SUN_SHADOW_TERM,
-    `( UNROLLED_LOOP_INDEX == 0 && surface_cascadeCount > 0 ? surfaceCascadeShadow( - vViewPosition.z ) : ${SUN_SHADOW_TERM} )`);
+${CASCADE_SHADOW_FRAGMENT_PARS}`);
+  fragment = replace(fragment, SUN_LIGHT_INFO, `${SUN_LIGHT_INFO}
+    #if UNROLLED_LOOP_INDEX == 0
+      directLight.color *= receiveShadow ? ${shade('surfaceCascadeShadow( - vViewPosition.z )')} : 1.0;
+    #endif`);
   shader.vertexShader = vertex; shader.fragmentShader = fragment;
-  Object.assign(shader.uniforms, cascadeShadowUniforms, {
-    surface_staticShadowMap: staticShadowUniforms.map, surface_normalShadowInfluence: { value: influence },
-  });
+  Object.assign(shader.uniforms, cascadeShadowUniforms, { surface_normalShadowInfluence: { value: influence } });
 }

@@ -11,7 +11,7 @@ it('draws opaque surfaces and cut-outs into the shadow, but not blended glass, t
   scene.updateMatrixWorld(true);
   const seen: Record<string, Material> = {};
   const renderer = {
-    autoClear: true, state: {buffers: {depth: {getReversed: () => false, setReversed() {}}}}, shadowMap: {autoUpdate: true}, clear() {}, getRenderTarget: () => null, setRenderTarget() {},
+    autoClear: true, state: {buffers: {depth: {getReversed: () => false, setReversed() {}}}}, clear() {}, getRenderTarget: () => null, setRenderTarget() {},
     render() { Object.assign(seen, {body: body.material, glass: glass.material, grille: grille.material}); },
   } as unknown as WebGLRenderer;
   const originals = [body.material, glass.material, grille.material];
@@ -25,7 +25,7 @@ it('draws opaque surfaces and cut-outs into the shadow, but not blended glass, t
 it('draws the shadow in plain depth while the scene uses a reversed depth range, then goes back to it', () => {
   const calls: Array<boolean | string> = [];
   const renderer = {
-    autoClear: true, state: {buffers: {depth: {getReversed: () => true, setReversed(value: boolean) { calls.push(value); }}}}, shadowMap: {autoUpdate: true},
+    autoClear: true, state: {buffers: {depth: {getReversed: () => true, setReversed(value: boolean) { calls.push(value); }}}},
     clear() { calls.push('clear'); }, getRenderTarget: () => null, setRenderTarget() {}, render() { calls.push('render'); },
   } as unknown as WebGLRenderer;
   createShadowCasterPass(renderer, new Scene()).draw(new WebGLRenderTarget(4, 4), new Vector4(0, 0, 4, 4), new OrthographicCamera(), new PerspectiveCamera(), [], 0);

@@ -3,8 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { patchSurfaceShader } from '../../../../../src/components/replay/view3d/scenery/materials/patchSurfaceShader.js';
 import { readSurfaceConfig, type SurfaceConfig } from '../../../../../src/components/replay/view3d/scenery/materials/surfaceConfig.js';
 import { cascadeDepthRangeM } from '../../../../../src/components/replay/view3d/shadows/cascadeShadows.js';
-import { cascadeShadowUniforms, patchCascadeShadow, stopCascadeShadows, sampleCascadeShadows, SUN_SHADOW_TERM } from '../../../../../src/components/replay/view3d/shadows/cascadeSampling.js';
-import { staticShadowUniforms } from '../../../../../src/components/replay/view3d/sunShadows.js';
+import { cascadeShadowUniforms, holdCascadeShadows, patchCascadeShadow, sampleCascadeShadows } from '../../../../../src/components/replay/view3d/shadows/cascadeSampling.js';
 import { shadowCascadeLayout } from '../../../../../src/components/replay/view3d/shadows/shadowCascades.js';
 import { testShading } from '../../../../helpers/scenes/sceneryProfiles.js';
 import { surface } from '../scenery/surfaceFixture.js';
@@ -18,7 +17,7 @@ const state = () => ({
   tiles: layout.cascades.map((_, i) => new Vector4(i, 0, 0, 0.5)),
 });
 
-const VERTEX = ['common', 'beginnormal_vertex', 'begin_vertex', 'shadowmap_pars_vertex', 'shadowmap_vertex'].map(chunk => `#include <${chunk}>`).join('\n');
+const VERTEX = ['common', 'beginnormal_vertex', 'begin_vertex', 'worldpos_vertex'].map(chunk => `#include <${chunk}>`).join('\n');
 const FRAGMENT = ['common', 'map_fragment', 'roughnessmap_fragment', 'metalnessmap_fragment', 'normal_fragment_maps', 'lights_physical_fragment',
   'aomap_fragment', 'emissivemap_fragment', 'lights_physical_pars_fragment', 'shadowmap_pars_fragment', 'lights_fragment_begin', 'opaque_fragment']
   .map(chunk => `#include <${chunk}>`).join('\n');
@@ -28,7 +27,7 @@ function patched(config: SurfaceConfig) {
   return shader;
 }
 
-afterEach(stopCascadeShadows);
+afterEach(() => holdCascadeShadows(null));
 
 describe('cascade shadow sampling', () => {
   it('shares the cascade set with every surface: its atlas and live matrices, and the package filter, select, fade and offset', () => {
@@ -36,8 +35,7 @@ describe('cascade shadow sampling', () => {
     sampleCascadeShadows(shadows, layout, set);
     const u = cascadeShadowUniforms;
     expect(u.surface_cascadeCount.value).toBe(3);
-    // The atlas takes the static map's sampler: the road and terrain programs have no texture unit to spare.
-    expect(staticShadowUniforms.map.value).toBe(set.atlas);
+    expect(u.surface_cascadeAtlas.value).toBe(set.atlas);
     // The same objects the atlas pass rewrites each frame.
     set.matrices.forEach((matrix, i) => expect(u.surface_cascadeMatrices.value[i]).toBe(matrix));
     set.tiles.forEach((tile, i) => expect(u.surface_cascadeTiles.value[i]).toBe(tile));
@@ -57,26 +55,22 @@ describe('cascade shadow sampling', () => {
       .toBeCloseTo(Math.max(1, 14 * cascade.texelM) / cascadeDepthRangeM(cascade.sideM), 12));
   });
 
-  it('throws for more cascades than the surfaces sample, and gives the static map its sampler back when stopped', () => {
+  it('throws for more cascades than the surfaces sample, and holds the surfaces lit on a given atlas', () => {
     const many = {...layout, cascades: Array.from({length: 9}, () => layout.cascades[0])};
     expect(() => sampleCascadeShadows(shadows, many, state())).toThrow(/at most 8 shadow cascades/);
-    const staticMap = new DepthTexture(1, 1);
-    staticShadowUniforms.map.value = staticMap;
-    try {
-      // A second set replacing the first still hands back the static map, not the first set's atlas.
-      sampleCascadeShadows(shadows, layout, state()); sampleCascadeShadows(shadows, layout, state());
-      stopCascadeShadows();
-      expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(0);
-      expect(staticShadowUniforms.map.value).toBe(staticMap);
-    } finally { staticShadowUniforms.map.value = null; }
+    sampleCascadeShadows(shadows, layout, state());
+    const next = new DepthTexture(1, 1);
+    holdCascadeShadows(next);
+    expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(0);
+    expect(cascadeShadowUniforms.surface_cascadeAtlas.value).toBe(next);
   });
 
-  it('samples the cascades in the scenery shader while a set is in use, the lookup moved along the normal by the material influence', () => {
+  it('samples the cascades in the scenery shader, the lookup moved along the normal by the material influence', () => {
     const shader = patched({...surface('standard'), normalShadowInfluence: 0.75});
     expect(shader.uniforms.surface_normalShadowInfluence.value).toBe(0.75);
     expect(shader.uniforms.surface_cascadeCount).toBe(cascadeShadowUniforms.surface_cascadeCount);
-    expect(shader.vertexShader).toContain('shadowWorldNormal * ( surface_cascadeNormalOffset * surface_normalShadowInfluence )');
-    expect(shader.fragmentShader).toContain('if ( surface_cascadeCount > 0 ) return surfaceCascadeShadow( - vViewPosition.z );');
+    expect(shader.vertexShader).toContain('cascadeNormal * ( surface_cascadeNormalOffset * surface_normalShadowInfluence )');
+    expect(shader.fragmentShader).toContain('directLight.color *= receiveShadow ? surfaceCascadeShadow( - vViewPosition.z ) : 1.0;');
     expect(shader.fragmentShader).not.toContain('#define SURFACE_CARD');
     expect(patched({...surface('vegetation'), billboard: true}).fragmentShader.startsWith('#define SURFACE_CARD\n')).toBe(true);
   });
@@ -87,14 +81,16 @@ describe('cascade shadow sampling', () => {
     expect(() => readSurfaceConfig({lmuSurface: {...surface('standard'), normalShadowInfluence: -1}})).toThrow('Missing normal shadow influence');
   });
 
-  it("lets a material on three's light loop take the sun shadow from the cascades while a set is in use, else from the near map", () => {
+  it("gives a material on three's light loop the sun's shadow from the cascades, on the sun only, where it receives shadows", () => {
     const shader = {uniforms: {}, vertexShader: ShaderLib.physical.vertexShader, fragmentShader: ShaderLib.physical.fragmentShader} as unknown as Parameters<typeof patchCascadeShadow>[0];
     patchCascadeShadow(shader, 0.5);
-    expect(shader.fragmentShader).toContain(`( UNROLLED_LOOP_INDEX == 0 && surface_cascadeCount > 0 ? surfaceCascadeShadow( - vViewPosition.z ) : ${SUN_SHADOW_TERM} )`);
-    expect(shader.vertexShader).toContain('vCascadePosition = worldPosition.xyz');
+    expect(shader.fragmentShader).toContain(`getDirectionalLightInfo( directionalLight, directLight );
+    #if UNROLLED_LOOP_INDEX == 0
+      directLight.color *= receiveShadow ? surfaceCascadeShadow( - vViewPosition.z ) : 1.0;`);
+    expect(shader.fragmentShader).toContain('uniform sampler2DShadow surface_cascadeAtlas;');
+    expect(shader.vertexShader.indexOf('vCascadePosition = cascadeWorld.xyz')).toBeGreaterThan(shader.vertexShader.indexOf('#include <worldpos_vertex>'));
     expect(shader.uniforms.surface_normalShadowInfluence.value).toBe(0.5);
-    // The atlas comes through the static map's sampler.
-    expect(shader.uniforms.surface_staticShadowMap).toBe(staticShadowUniforms.map);
+    expect(shader.uniforms.surface_cascadeAtlas).toBe(cascadeShadowUniforms.surface_cascadeAtlas);
     expect(shader.uniforms.surface_cascadeCount).toBe(cascadeShadowUniforms.surface_cascadeCount);
     const bare = {uniforms: {}, vertexShader: '', fragmentShader: ''} as unknown as Parameters<typeof patchCascadeShadow>[0];
     expect(() => patchCascadeShadow(bare, 0.5)).toThrow(/to take the cascade shadow/);

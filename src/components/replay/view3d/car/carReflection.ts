@@ -59,7 +59,7 @@ function setSurfaceReflection(material: Material, cubes: ReflectionCubes | null)
  * Reflects the scenery in the cars, in place of the sky environment the scenery uses: a cube camera at the car, rendering the scene
  * without the cars. When the sixth face completes, the cube is convolved with the package's kernels for the car paint (which reads
  * the sharp cube and the convolved one by its own rule) and prefiltered by three (PMREM) for the car's other lit materials. Faces
- * render after the frame, against its current shadow map. Both conversions run here, between frames: given the cube itself,
+ * render after the frame, against its current shadow cascades. Both conversions run here, between frames: given the cube itself,
  * three converts it in the middle of drawing the car, and that nested render left the car's material one texture unit over the
  * GPU's 16. The cube's mips, which the kernels read, regenerate after the last face only.
  */
@@ -101,10 +101,9 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
       }
       if (camera.coordinateSystem !== renderer.coordinateSystem) { camera.coordinateSystem = renderer.coordinateSystem; camera.updateCoordinateSystem(); }
       camera.position.copy(at); camera.position.y += eyeAbove; camera.updateMatrixWorld();
-      const previous = renderer.getRenderTarget(), shadowUpdate = renderer.shadowMap.autoUpdate, shown = hidden?.visible ?? false;
+      const previous = renderer.getRenderTarget(), shown = hidden?.visible ?? false;
       try {
         if (hidden) hidden.visible = false;
-        renderer.shadowMap.autoUpdate = false;
         for (const last = face + FACES_PER_FRAME; face < last; face++) {
           target.texture.generateMipmaps = face === 5;
           renderer.setRenderTarget(target, face);
@@ -112,7 +111,7 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
         }
       } finally {
         if (hidden) hidden.visible = shown;
-        renderer.shadowMap.autoUpdate = shadowUpdate; renderer.setRenderTarget(previous);
+        renderer.setRenderTarget(previous);
       }
       face %= 6;
       if (face > 0) return true;

@@ -1,9 +1,8 @@
-import { BoxGeometry, Color, CubeCamera, DirectionalLight, DoubleSide, FogExp2, HalfFloatType, LinearMipmapLinearFilter, MathUtils, Matrix4, Mesh, MeshBasicMaterial, NoToneMapping, PCFShadowMap, PlaneGeometry, PMREMGenerator, Scene, Vector3, WebGLCubeRenderTarget, type Camera, type Object3D, type OrthographicCamera, type PerspectiveCamera, type WebGLRenderTarget, type WebGLRenderer } from 'three';
+import { BoxGeometry, Color, CubeCamera, DirectionalLight, DoubleSide, FogExp2, HalfFloatType, LinearMipmapLinearFilter, MathUtils, Mesh, MeshBasicMaterial, NoToneMapping, PlaneGeometry, PMREMGenerator, Scene, Vector3, WebGLCubeRenderTarget, type Camera, type Object3D, type OrthographicCamera, type PerspectiveCamera, type WebGLRenderTarget, type WebGLRenderer } from 'three';
 import { nativeToScene } from './sceneFrame.js';
 import { createCascadeShadows, type CascadeShadows } from './shadows/cascadeShadows.js';
-import { stopCascadeShadows, sampleCascadeShadows } from './shadows/cascadeSampling.js';
+import { holdCascadeShadows, sampleCascadeShadows } from './shadows/cascadeSampling.js';
 import { shadowCascadeLayout, type ShadowCascadeLayout, type ShadowCascadeSet } from './shadows/shadowCascades.js';
-import { createStaticShadow, NEAR_SHADOW, SHADOW_NEAR_M, shadowWindowCentre } from './sunShadows.js';
 import type { SceneryDaylight, SceneryLayout, ScenerySun } from '../../../../shared/types/scenes/scenery.js';
 import type { ReplayDaylightClock } from '../../../../shared/types/replay.js';
 import { solarPosition } from './solarPosition.js';
@@ -70,17 +69,12 @@ export function sceneLighting(daylight?: SceneryDaylight, clock?: ReplayDaylight
 }
 
 export interface SceneEnvironment {
-  /** The camera whose view direction leads the shadow window and turns the haze toward its horizon colour. */
+  /** The camera the shadow cascades follow and whose view direction turns the haze toward its horizon colour. */
   setCamera(camera: PerspectiveCamera | OrthographicCamera): void;
-  /** Objects that move (the cars): the static shadow map and the venue capture are drawn without them. */
+  /** Objects that move (the cars): the cached cascades and the venue capture are drawn without them. */
   setDynamic(objects: readonly Object3D[]): void;
-  /** The resident scenery changed: redraw the static shadow map once the view has moved 100 m. */
-  staticShadowStale(): void;
-  /**
-   * The package cascade set the scenery's sun shadow comes from (shadows/), or null for the near and static maps. The cascades follow
-   * the perspective camera given to `setCamera` and replace the static and near maps while in use (neither is redrawn meanwhile).
-   */
-  setShadowCascades(set: ShadowCascadeSet | null): void;
+  /** The package cascade set the sun's shadow comes from (shadows/). */
+  setShadowCascades(set: ShadowCascadeSet): void;
   /**
    * Captures the loaded scenery at the venue's probe (cars hidden) as the scene's environment: a first capture lit by the sun,
    * then one lit by the first, so shaded faces get the light the venue bounces. Call once the scenery around it is resident.
@@ -91,11 +85,10 @@ export interface SceneEnvironment {
   /** Writes this scene's haze into the shader chunks: call before compiling its materials outside a render. */
   applyHaze(): void;
   /**
-   * Moves the near shadow window to `focus` (scene coordinates, on the ground: the camera's look target) before a frame renders,
-   * colours the haze toward the view, and draws the next quarter of the static map when one is due (sunShadows.ts). True while a
-   * static map is still being drawn: the caller renders another frame.
+   * Before a frame renders: colours the haze toward the view and draws the shadow cascades that are due. True while cached
+   * cascades are still due: the caller renders another frame.
    */
-  update(focus: Vector3): boolean;
+  update(): boolean;
   dispose(): void;
 }
 
@@ -120,7 +113,8 @@ export function sceneClouds(venue: Pick<SceneVenue, 'sky' | 'shading'>, lighting
  * capture. The scenery supplies its own terrain, filler ground and horizon; nothing here draws ground. `origin` is the scene
  * origin in LMU local metres.
  */
-export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue: SceneVenue, origin: Vector3, clock?: ReplayDaylightClock): SceneEnvironment {
+export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue: SceneVenue, origin: Vector3, shadowSet: ShadowCascadeSet,
+  clock?: ReplayDaylightClock): SceneEnvironment {
   const lighting = sceneLighting(venue.daylight, clock), sunElevationDeg = MathUtils.radToDeg(Math.asin(MathUtils.clamp(lighting.sunDirection.y, -1, 1)));
   // The replay's cloud cover at the lap sets the weather, dims the sun and thickens the haze; its clouds toward the sun dim the sun's light further.
   const clouds = sceneClouds(venue, lighting, origin.y, clock), weather = skyConditions(venue.daylight, clouds.cloudCover, clouds.sunVisibility);
@@ -157,26 +151,20 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
   // The exposure pass applies the camera profile's tone curve (autoExposure.ts): nothing else tone-maps.
   renderer.toneMapping = NoToneMapping;
 
-  // The near sun shadow (sunShadows.ts); the static scenery map is drawn by its own pass. The colour carries the strength.
-  const sun = new DirectionalLight(sunRgb, 1);
-  sun.name = 'sun'; sun.castShadow = true;
-  sun.shadow.mapSize.set(NEAR_SHADOW.mapPx, NEAR_SHADOW.mapPx);
-  Object.assign(sun.shadow.camera, {left: -NEAR_SHADOW.halfExtentM, right: NEAR_SHADOW.halfExtentM, top: NEAR_SHADOW.halfExtentM,
-    bottom: -NEAR_SHADOW.halfExtentM, near: SHADOW_NEAR_M, far: 2 * NEAR_SHADOW.lightDistanceM});
-  sun.shadow.camera.updateProjectionMatrix();
-  // Radius 0 is one hardware filtered compare tap: the noisy 5-tap disk at
-  // radius 1 blurred the edges. normalBias 5 cm (~1.3 texels): at 0.01 the road lines and car bodies speckled with self-shadow acne.
-  sun.shadow.bias = 0.000001; sun.shadow.normalBias = 0.05; sun.shadow.intensity = 1; sun.shadow.radius = 0;
+  // The sun lights the scene from its direction; its shadow comes from the package's cascades (shadows/). The colour carries the strength.
+  const sun = new DirectionalLight(sunRgb, 1), toSun = lighting.sunDirection.clone().normalize();
+  sun.name = 'sun'; sun.position.copy(toSun);
   scene.add(sun, sun.target);
-  const toSun = lighting.sunDirection.clone().normalize();
   crownSun.value.copy(toSun); // Foliage cards tilt their lighting normal up less as they come to face the sun.
-  const sunFrame = new Matrix4().lookAt(new Vector3(), toSun.clone().negate(), Math.abs(toSun.y) > 0.99 ? new Vector3(0, 0, 1) : new Vector3(0, 1, 0));
-  const fromSunFrame = sunFrame.clone().invert(), centre = new Vector3();
-  const staticShadow = createStaticShadow(renderer, scene, toSun, sunFrame, fromSunFrame);
   let view: PerspectiveCamera | OrthographicCamera | null = null, dynamic: readonly Object3D[] = [];
-  // The surfaces sample a set only after its first draw.
-  let cascades: {set: ShadowCascadeSet; layout: ShadowCascadeLayout; pass: CascadeShadows; sampled: boolean} | null = null;
-  renderer.shadowMap.enabled = true; renderer.shadowMap.type = PCFShadowMap;
+  // The surfaces sample a set only after its first draw; until then they are held lit on its atlas.
+  const startCascades = (set: ShadowCascadeSet) => {
+    const {shadows} = venue.shading, layout = shadowCascadeLayout(shadows, shadows.cameras[set]);
+    const pass = createCascadeShadows(renderer, scene, shadows, layout, toSun.clone().negate());
+    holdCascadeShadows(pass.state.atlas);
+    return {set, layout, pass, sampled: false};
+  };
+  let cascades: {set: ShadowCascadeSet; layout: ShadowCascadeLayout; pass: CascadeShadows; sampled: boolean} = startCascades(shadowSet);
   scene.add(sky);
   // The clouds are lit by the sun before they dim it. The first environment and the venue capture are taken without them.
   const cloudLayer = clouds.sheets ? createCloudLayer(venue.sky.clouds, clouds.sheets, {sunDirection: toSun, sunGreen: clearSun.g, cloudCover: weather.cloudCover}) : null;
@@ -186,16 +174,10 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
   return {
     setCamera(camera) { view = camera; },
     setDynamic(objects) { dynamic = objects; },
-    staticShadowStale() { staticShadow.stale(); },
     setShadowCascades(set) {
-      if ((cascades?.set ?? null) === set) return;
-      stopCascadeShadows(); cascades?.pass.dispose(); cascades = null;
-      // Every sun shadow receiver samples a set while one is in use (the scenery program and the cars' patchCascadeShadow): the near
-      // map is not redrawn meanwhile.
-      renderer.shadowMap.autoUpdate = !set;
-      if (!set) return;
-      const {shadows} = venue.shading, layout = shadowCascadeLayout(shadows, shadows.cameras[set]);
-      cascades = {set, layout, pass: createCascadeShadows(renderer, scene, shadows, layout, toSun.clone().negate()), sampled: false};
+      if (cascades.set === set) return;
+      const previous = cascades.pass;
+      cascades = startCascades(set); previous.dispose();
     },
     applyHaze,
     captureVenue() {
@@ -203,13 +185,10 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
       const cube = new WebGLCubeRenderTarget(VENUE_PROBE_PX, {type: HalfFloatType, generateMipmaps: true, minFilter: LinearMipmapLinearFilter}), camera = new CubeCamera(0.5, VENUE_PROBE_FAR_M, cube);
       if (camera.coordinateSystem !== renderer.coordinateSystem) { camera.coordinateSystem = renderer.coordinateSystem; camera.updateCoordinateSystem(); }
       camera.position.copy(probeAt); camera.updateMatrixWorld();
-      const shown = dynamic.map(object => object.visible), autoShadow = renderer.shadowMap.autoUpdate;
+      const shown = dynamic.map(object => object.visible);
       try {
-        dynamic.forEach(object => { object.visible = false; }); renderer.shadowMap.autoUpdate = false;
+        dynamic.forEach(object => { object.visible = false; });
         if (cloudLayer) cloudLayer.group.visible = false;
-        // Before the first frame the sun has no shadow map yet: WebGL drops every draw whose shadow sampler has none, so the
-        // capture draws it once (its window has not moved to the view yet; the probe sees only its edge).
-        if (!sun.shadow.map) renderer.shadowMap.needsUpdate = true;
         // The first capture is lit by the sun alone; the second adds the light of the first. The environment stays set at zero
         // intensity, and the first environment has the probe's size: an unset or differently sized one is another program variant
         // of every material, compiled on the main thread here instead of by the warm-up.
@@ -223,27 +202,22 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
         reflection = convolveReflection(renderer, cube, venue.shading.convolution.kernels); venueCube = cube;
         setSceneryReflection(venue.shading, reflection.convolved, integration);
       } finally {
-        dynamic.forEach((object, i) => { object.visible = shown[i]; }); renderer.shadowMap.autoUpdate = autoShadow;
+        dynamic.forEach((object, i) => { object.visible = shown[i]; });
         if (cloudLayer) cloudLayer.group.visible = true;
         if (venueCube !== cube) cube.dispose();
       }
     },
     reflection: () => reflection,
-    update(focus) {
-      shadowWindowCentre(focus, view, NEAR_SHADOW, sunFrame, fromSunFrame, centre);
-      sun.target.position.copy(centre); sun.position.copy(centre).addScaledVector(toSun, NEAR_SHADOW.lightDistanceM);
-      sun.updateMatrixWorld(); sun.target.updateMatrixWorld();
-      if (view) { view.getWorldDirection(heading); haze(Math.atan2(heading.z, heading.x), fog.color, skyHaze); }
+    update() {
       if (!view) return false;
-      // A cascade set takes the static map's sampler (shadows/cascadeSampling.ts): the static map waits meanwhile.
-      if (!cascades || !('isPerspectiveCamera' in view)) return staticShadow.update(view, focus, dynamic);
+      view.getWorldDirection(heading); haze(Math.atan2(heading.z, heading.x), fog.color, skyHaze);
       const drawing = cascades.pass.update(view, dynamic);
       if (!cascades.sampled) { sampleCascadeShadows(venue.shading.shadows, cascades.layout, cascades.pass.state); cascades.sampled = true; }
       return drawing;
     },
     dispose() {
-      stopCascadeShadows(); cascades?.pass.dispose(); cascades = null;
-      scene.remove(sun, sun.target); sun.dispose(); staticShadow.dispose();
+      holdCascadeShadows(null); cascades.pass.dispose();
+      scene.remove(sun, sun.target); sun.dispose();
       scene.environment = null; generator.dispose(); firstEnvironment.dispose(); venueProbe?.dispose(); reflection?.dispose(); venueCube?.dispose();
       setSceneryReflection(venue.shading, null, integration); integration.dispose(); reflectedGround.geometry.dispose(); reflectedGround.material.dispose();
       sky.geometry.dispose(); sky.material.dispose();

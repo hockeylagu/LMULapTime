@@ -1,11 +1,10 @@
 import { expect, it, vi } from 'vitest';
-import { Color, CubeCamera, WebGLCoordinateSystem, ShaderChunk, BoxGeometry, DirectionalLight, FogExp2, Mesh, MeshBasicMaterial, MeshDepthMaterial, MeshStandardMaterial, NoToneMapping, OrthographicCamera, PerspectiveCamera, Scene, Texture, Vector3, type Camera, type ShaderMaterial, type WebGLRenderer } from 'three';
+import { Color, CubeCamera, WebGLCoordinateSystem, ShaderChunk, BoxGeometry, DirectionalLight, FogExp2, Mesh, MeshBasicMaterial, MeshStandardMaterial, NoToneMapping, OrthographicCamera, PerspectiveCamera, Scene, Texture, Vector3, type Camera, type ShaderMaterial, type WebGLRenderer } from 'three';
 import { addSceneEnvironment, sceneLighting, SUN_DIRECTION, sunColour, type SceneVenue } from '../../../../src/components/replay/view3d/sceneEnvironment.js';
 import { hazeColour, hazeDensity, skyConditions } from '../../../../src/components/replay/view3d/atmosphere/skyDome.js';
 import { SUN_UNIT } from '../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
 import { TEST_HAZE_WEIGHTS, testShading, testSky, testSun } from '../../../helpers/scenes/sceneryProfiles.js';
 import { solarPosition } from '../../../../src/components/replay/view3d/solarPosition.js';
-import { staticShadowUniforms } from '../../../../src/components/replay/view3d/sunShadows.js';
 import { cascadeShadowUniforms } from '../../../../src/components/replay/view3d/shadows/cascadeSampling.js';
 import { crownSun } from '../../../../src/components/replay/view3d/scenery/materials/foliageCrown.js';
 
@@ -23,11 +22,11 @@ const fakeRenderer = () => ({capabilities: {maxTextureSize: 16384}, state: {buff
 const venue = (daylight?: SceneVenue['daylight'], position: [number, number, number] = [0, 0, 0]): SceneVenue => ({daylight, sky: testSky(), environmentProbe: {position}, shading: testShading()});
 const skyMaterial = (scene: Scene) => (scene.getObjectByName('sky') as Mesh<BoxGeometry, ShaderMaterial>).material;
 
-it('uses the analytic sky, PMREM and a near sun shadow, keeping the shared lighting chunks', () => {
-  const scene = new Scene(), renderer = {shadowMap: {enabled: false, type: 0, autoUpdate: true}, toneMapping: 0, toneMappingExposure: 0, ...fakeRenderer()} as unknown as WebGLRenderer;
+it('uses the analytic sky, PMREM and a sun light without three shadow maps, keeping the shared lighting chunks', () => {
+  const scene = new Scene(), renderer = {toneMapping: 0, toneMappingExposure: 0, ...fakeRenderer()} as unknown as WebGLRenderer;
   const lightChunk = ShaderChunk.lights_fragment_begin, lightPars = ShaderChunk.lights_pars_begin;
   const material = new MeshStandardMaterial(), receiver = new Mesh(new BoxGeometry(), material); receiver.receiveShadow = true; scene.add(receiver);
-  const environment = addSceneEnvironment(scene, renderer, venue(), new Vector3());
+  const environment = addSceneEnvironment(scene, renderer, venue(), new Vector3(), 'chase');
   expect(scene.getObjectByName('default-terrain')).toBeUndefined(); expect(scene.children.filter(child => child instanceof Mesh && child.name !== 'sky')).toEqual([receiver]);
   expect(scene.getObjectByName('sky')).toBeDefined();
   // Without daylight there is no haze to thicken the fog; the fog is exponential in the distance along the ray.
@@ -37,27 +36,23 @@ it('uses the analytic sky, PMREM and a near sun shadow, keeping the shared light
   expect(skyMaterial(scene).name).toBe('sky-dome');
   // The dome hazes toward its own haze colour (set with the fog's, not three's fog).
   expect(skyMaterial(scene).fog).toBe(false); expect((skyMaterial(scene).uniforms.hazeColour.value as Color).r).toBeGreaterThan(0);
-  expect(scene.background).toBeNull(); expect(renderer.shadowMap.enabled).toBe(true);
+  expect(scene.background).toBeNull();
   expect(renderer.toneMapping).toBe(NoToneMapping); // The exposure pass applies the camera profile's tone curve.
   const camera = new PerspectiveCamera(48, 1.5, 0.5, 15000); camera.position.set(500, 3, -200); camera.updateMatrixWorld();
-  environment.setCamera(camera); environment.update(new Vector3(500, 0, -210));
+  environment.setCamera(camera); environment.update();
   const suns = scene.children.filter((child): child is DirectionalLight => child instanceof DirectionalLight);
-  // One sun light: the static scenery map is its own pass (sunShadows.ts).
+  // One sun light; its shadow comes from the package's cascades (shadows/), not a three shadow map.
   expect(suns.map(light => light.name)).toEqual(['sun']);
   const [sun] = suns;
-  expect(sun.castShadow).toBe(true); expect(sun.intensity).toBe(1);
+  expect(sun.castShadow).toBe(false); expect(sun.intensity).toBe(1);
   expect(sun.color.toArray()).toEqual(sunColour(testSun(), Math.asin(SUN_DIRECTION.y) * 180 / Math.PI, 0).toArray());
-  expect(sun.shadow.mapSize.toArray()).toEqual([4096, 4096]);
-  expect(sun.shadow.camera.right - sun.shadow.camera.left).toBe(80);
-  expect(sun.shadow.intensity).toBe(1); expect(sun.shadow.radius).toBe(0);
-  expect(sun.shadow.bias).toBe(0.000001); expect(sun.shadow.normalBias).toBe(0.05);
   expect(sun.position.clone().sub(sun.target.position).normalize().toArray().map(v => +v.toFixed(6))).toEqual(SUN_DIRECTION.toArray().map(v => +v.toFixed(6)));
   expect(crownSun.value.distanceTo(SUN_DIRECTION)).toBeLessThan(1e-9); // Foliage cards read the same sun.
   // Materials keep their own compile hooks and the shared lighting chunks stay three.js's.
   expect(material.defines ?? {}).not.toHaveProperty('USE_CSM');
   expect(ShaderChunk.lights_fragment_begin).toBe(lightChunk); expect(ShaderChunk.lights_pars_begin).toBe(lightPars);
   environment.setCamera(new OrthographicCamera(-80, 80, 80, -80, 0.5, 15000));
-  environment.update(new Vector3()); expect(scene.children.filter(child => child instanceof DirectionalLight)).toHaveLength(1);
+  environment.update(); expect(scene.children.filter(child => child instanceof DirectionalLight)).toHaveLength(1);
   expect(scene.environment).toBeInstanceOf(Texture); expect(scene.environmentIntensity).toBe(1);
   const sky = scene.getObjectByName('sky') as Mesh<BoxGeometry, ShaderMaterial>;
   const reflectedSky = probe.render.mock.calls.at(-1)![0].getObjectByName('sky') as Mesh;
@@ -68,64 +63,6 @@ it('uses the analytic sky, PMREM and a near sun shadow, keeping the shared light
   expect((sky.material.uniforms.sunDirection.value as Vector3).distanceTo(SUN_DIRECTION)).toBeLessThan(1e-12);
   environment.dispose(); expect(scene.environment).toBeNull(); expect(probe.dispose).toHaveBeenCalledOnce();
   expect(scene.children.some(child => child instanceof DirectionalLight)).toBe(false);
-});
-
-it('centres the shadow window ahead of the focus along the view and snaps it to whole texels', () => {
-  const scene = new Scene(), renderer = {shadowMap: {enabled: false, type: 0, autoUpdate: true}, ...fakeRenderer()} as unknown as WebGLRenderer;
-  const environment = addSceneEnvironment(scene, renderer, venue(), new Vector3()), camera = new PerspectiveCamera(48, 1.5, 0.5, 15000);
-  camera.position.set(0, 3, 10); camera.lookAt(0, 0, 0); environment.setCamera(camera);
-  try {
-    const sun = scene.children.find((child): child is DirectionalLight => child instanceof DirectionalLight)!;
-    const texel = 80 / 4096, sunAxis = (point: Vector3) => point.clone().projectOnPlane(SUN_DIRECTION);
-    environment.update(new Vector3(0, 0, 0));
-    // The camera looks along -z: the window leads the focus by 25 m that way (within half a texel of snapping).
-    const centre = sunAxis(sun.target.position).sub(sunAxis(new Vector3(0, 0, -25)));
-    expect(centre.length()).toBeLessThanOrEqual(texel);
-    // Wherever the focus goes, the world origin sits on a whole texel of the shadow camera, so texels never slide under the scene.
-    const onGrid = (value: number) => Math.abs(value / texel - Math.round(value / texel)) < 1e-3;
-    for (const x of [0.013, 3.7, 10, 123.456]) {
-      environment.update(new Vector3(x, 0, -x / 3));
-      sun.shadow.updateMatrices(sun);
-      const origin = new Vector3().applyMatrix4(sun.shadow.camera.matrixWorldInverse);
-      expect(onGrid(origin.x) && onGrid(origin.y)).toBe(true);
-    }
-  } finally { environment.dispose(); }
-});
-
-it('draws the static shadow map a quarter per frame without the cars or sub-metre casters, again after 200 m (100 m after a scenery change)', () => {
-  const scene = new Scene(), render = vi.fn<(scene: Scene, camera: OrthographicCamera) => void>();
-  const renderer = {shadowMap: {enabled: false, type: 0, autoUpdate: true}, ...fakeRenderer(), render} as unknown as WebGLRenderer;
-  const environment = addSceneEnvironment(scene, renderer, venue(), new Vector3()), camera = new PerspectiveCamera(48, 1.5, 0.5, 15000);
-  const car = new Mesh(new BoxGeometry(), new MeshBasicMaterial()); scene.add(car);
-  const bolt = new Mesh(new BoxGeometry(0.2, 0.2, 0.2), new MeshBasicMaterial()), stand = new Mesh(new BoxGeometry(20, 10, 5), new MeshBasicMaterial());
-  const standMaterial = stand.material;
-  bolt.castShadow = true; stand.castShadow = true; scene.add(bolt, stand); scene.updateMatrixWorld();
-  const drawn: {car: boolean; bolt: boolean; standDepth: boolean; nearRedrawn: boolean; width: number}[] = [];
-  render.mockImplementation((_scene, tile) => {
-    drawn.push({car: car.visible, bolt: bolt.visible, standDepth: stand.visible && stand.material instanceof MeshDepthMaterial,
-      nearRedrawn: renderer.shadowMap.autoUpdate, width: tile.right - tile.left});
-  });
-  expect(environment.update(new Vector3())).toBe(false); expect(render).not.toHaveBeenCalled(); // No camera yet.
-  // Before the first map the surfaces sample an allocated depth texture, unread: WebGL drops draws whose shadow sampler has none.
-  expect((staticShadowUniforms.map.value as {isDepthTexture?: boolean} | null)?.isDepthTexture).toBe(true); expect(staticShadowUniforms.ready.value).toBe(0);
-  environment.setCamera(camera); environment.setDynamic([car]);
-  try {
-    // The first map draws its four 600 m quarters at once, with depth materials, without the car, the bolt or a near-map redraw.
-    expect(environment.update(new Vector3())).toBe(false); expect(render).toHaveBeenCalledTimes(4);
-    expect(drawn.every(frame => !frame.car && !frame.bolt && frame.standDepth && !frame.nearRedrawn && frame.width === 600)).toBe(true);
-    expect(car.visible && bolt.visible && stand.material === standMaterial && renderer.shadowMap.autoUpdate).toBe(true);
-    const first = staticShadowUniforms.map.value; expect(first).not.toBeNull(); expect(staticShadowUniforms.ready.value).toBe(1);
-    expect(environment.update(new Vector3(150, 0, 0))).toBe(false); expect(render).toHaveBeenCalledTimes(4);
-    // Later maps draw a quarter per frame while the surfaces keep the previous map, then swap.
-    expect([201, 202, 203].map(x => environment.update(new Vector3(x, 0, 0)))).toEqual([true, true, true]);
-    expect(render).toHaveBeenCalledTimes(7); expect(staticShadowUniforms.map.value).toBe(first);
-    expect(environment.update(new Vector3(204, 0, 0))).toBe(false); expect(render).toHaveBeenCalledTimes(8);
-    expect(staticShadowUniforms.map.value).not.toBe(first);
-    // A scenery change redraws once the view has moved 100 m.
-    environment.staticShadowStale(); expect(environment.update(new Vector3(250, 0, 0))).toBe(false); expect(render).toHaveBeenCalledTimes(8);
-    expect(environment.update(new Vector3(302, 0, 0))).toBe(true); expect(render).toHaveBeenCalledTimes(9);
-  } finally { environment.dispose(); }
-  expect(staticShadowUniforms.map.value).toBeNull(); expect(staticShadowUniforms.ready.value).toBe(0);
 });
 
 it('lights a layout from its published daylight: race-start sun height and bearing', () => {
@@ -175,17 +112,17 @@ it("takes the sun's colour and strength from the layout's sun grid in scene unit
 });
 
 it("thickens the haze with the layout's haze scale and air pollution and colours it with the sky above the horizon toward the view", () => {
-  const scene = new Scene(), renderer = {shadowMap: {enabled: false, type: 0, autoUpdate: true}, toneMapping: 0, toneMappingExposure: 0, ...fakeRenderer()} as unknown as WebGLRenderer;
+  const scene = new Scene(), renderer = {toneMapping: 0, toneMappingExposure: 0, ...fakeRenderer()} as unknown as WebGLRenderer;
   const daylight = {date: '2023-06-10', sessions: [{id: 'qualify' as const, localTime: '20:45', sunElevationDeg: 12, sunBearingDeg: 290}], airPollution: 0.6, hazeBaseScale: 1, ...TEST_HAZE_WEIGHTS, latitudeDeg: 47.95, longitudeDeg: 0.22, utcOffsetHours: 2};
   // The replay's cloud cover sets the weather, dims the sun and thickens the haze.
   const clock = {session: 'qualify' as const, startMinute: null, sessionTimeSec: 0, cloudCover: 0.62};
-  const environment = addSceneEnvironment(scene, renderer, venue(daylight), new Vector3(), clock), fog = scene.fog as FogExp2;
+  const environment = addSceneEnvironment(scene, renderer, venue(daylight), new Vector3(), 'chase', clock), fog = scene.fog as FogExp2;
   try {
     const sun = sceneLighting(daylight, clock).sunDirection, sunElevationDeg = Math.asin(sun.y) * 180 / Math.PI, weather = skyConditions(daylight, 0.62);
     expect(fog.density).toBeCloseTo(hazeDensity(testSky(), daylight, weather, sunElevationDeg), 12);
     const horizon = hazeColour(testSky(), sun, weather);
     expect((scene.getObjectByName('sun') as DirectionalLight).color.toArray()).toEqual(sunColour(testSun(), sunElevationDeg, 0.62).toArray());
-    const camera = new PerspectiveCamera(48, 1.5, 0.5, 15000), toward = (x: number, z: number) => { camera.lookAt(x, 0, z); camera.updateMatrixWorld(); environment.update(new Vector3()); return fog.color.clone(); };
+    const camera = new PerspectiveCamera(48, 1.5, 0.5, 15000), toward = (x: number, z: number) => { camera.lookAt(x, 0, z); camera.updateMatrixWorld(); environment.update(); return fog.color.clone(); };
     environment.setCamera(camera);
     const sunward = toward(sun.x * 100, sun.z * 100), away = toward(-sun.x * 100, -sun.z * 100);
     const heading = Math.atan2(-sun.z, -sun.x), expected = horizon(heading, new Color());
@@ -199,13 +136,13 @@ it("thickens the haze with the layout's haze scale and air pollution and colours
 });
 
 it("captures the venue at the package's probe without the cars, twice, and lights the scene with the second capture", () => {
-  const render = vi.fn<(scene: Scene, camera: Camera) => void>(), scene = new Scene(), renderer = {shadowMap: {enabled: false, type: 0, autoUpdate: true}, toneMapping: 0, toneMappingExposure: 0, ...fakeRenderer(), render} as unknown as WebGLRenderer;
+  const render = vi.fn<(scene: Scene, camera: Camera) => void>(), scene = new Scene(), renderer = {toneMapping: 0, toneMappingExposure: 0, ...fakeRenderer(), render} as unknown as WebGLRenderer;
   const car = new Mesh(new BoxGeometry(), new MeshBasicMaterial()); scene.add(car);
   const seen: {at: number[]; car: boolean; lit: boolean; environment: Texture | null}[] = [];
   render.mockImplementation((_scene, camera) => {
     if (camera.parent instanceof CubeCamera) seen.push({at: camera.parent.position.toArray(), car: car.visible, lit: scene.environmentIntensity > 0, environment: scene.environment});
   });
-  const environment = addSceneEnvironment(scene, renderer, venue(undefined, [110, 7, -40]), new Vector3(100, 5, 20));
+  const environment = addSceneEnvironment(scene, renderer, venue(undefined, [110, 7, -40]), new Vector3(100, 5, 20), 'chase');
   environment.setDynamic([car]);
   try {
     const first = scene.environment, cubemaps = probe.cubemaps;
@@ -221,30 +158,25 @@ it("captures the venue at the package's probe without the cars, twice, and light
   expect(scene.environment).toBeNull();
 });
 
-it("samples the package's cascade set while one is chosen, from its first draw, and goes back to the near and static maps without one", () => {
+it("samples the package's cascade set from its first draw, for any camera, and holds the surfaces lit on the next set's atlas", () => {
   const scene = new Scene(), render = vi.fn<(scene: Scene, camera: OrthographicCamera) => void>();
-  const renderer = {shadowMap: {enabled: false, type: 0, autoUpdate: true}, ...fakeRenderer(), render} as unknown as WebGLRenderer;
-  const environment = addSceneEnvironment(scene, renderer, venue(), new Vector3()), camera = new PerspectiveCamera(48, 1.5, 0.5, 15000);
-  environment.setCamera(camera);
+  const renderer = {...fakeRenderer(), render} as unknown as WebGLRenderer;
+  const environment = addSceneEnvironment(scene, renderer, venue(), new Vector3(), 'chase');
+  // From the start the surfaces sample an allocated depth texture, unread: WebGL drops draws whose shadow sampler has none.
+  const chaseAtlas = cascadeShadowUniforms.surface_cascadeAtlas.value;
+  expect(chaseAtlas?.isDepthTexture).toBe(true); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(0);
   try {
-    const staticMap = staticShadowUniforms.map.value;
-    environment.setShadowCascades('chase');
-    expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(0);
-    // The first frame draws the test chase set's three cascades, then the surfaces sample them through the static map's sampler;
-    // the static map is not drawn meanwhile.
-    environment.update(new Vector3()); expect(render).toHaveBeenCalledTimes(3);
-    expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(3); expect(staticShadowUniforms.map.value).not.toBe(staticMap);
-    // Nothing reads three's near map meanwhile: it is not redrawn.
-    expect(renderer.shadowMap.autoUpdate).toBe(false);
-    // The cockpit set (two cascades) replaces it; trackside has none.
+    expect(environment.update()).toBe(false); expect(render).not.toHaveBeenCalled(); // No camera yet.
+    environment.setCamera(new PerspectiveCamera(48, 1.5, 0.5, 15000));
+    // The first frame draws the test chase set's three cascades, then the surfaces sample them.
+    environment.update(); expect(render).toHaveBeenCalledTimes(3); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(3);
+    // The cockpit set (two cascades) replaces it: lit on its own atlas until its first draw.
     environment.setShadowCascades('cockpit'); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(0);
-    environment.update(new Vector3()); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(2);
-    // Without a set the static map gets its sampler back and is drawn (its four quarters).
-    render.mockClear(); environment.setShadowCascades(null); expect(staticShadowUniforms.map.value).toBe(staticMap);
-    expect(renderer.shadowMap.autoUpdate).toBe(true);
-    environment.update(new Vector3()); expect(render).toHaveBeenCalledTimes(4);
-    expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(0);
-    environment.setShadowCascades('chase'); environment.update(new Vector3());
+    expect(cascadeShadowUniforms.surface_cascadeAtlas.value).not.toBe(chaseAtlas);
+    environment.update(); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(2);
+    // The overhead camera is orthographic: the cascades follow it as well.
+    render.mockClear(); environment.setShadowCascades('chase'); environment.setCamera(new OrthographicCamera(-80, 80, 80, -80, 0.5, 15000));
+    environment.update(); expect(render).toHaveBeenCalledTimes(3); expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(3);
   } finally { environment.dispose(); }
-  expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(0);
+  expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(0); expect(cascadeShadowUniforms.surface_cascadeAtlas.value).toBeNull();
 });

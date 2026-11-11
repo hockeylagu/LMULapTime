@@ -64,19 +64,19 @@ export function createShadowCasterPass(renderer: WebGLRenderer, scene: Scene): S
         } else if (object instanceof Line || object instanceof Points || object instanceof Sprite) hidden.push(object);
       });
       for (const object of hidden) object.visible = false;
-      trackShadowEye(null, null, view);
+      trackShadowEye(view);
       const depth = renderer.state.buffers.depth, reversed = depth.getReversed();
-      const previous = renderer.getRenderTarget(), autoClear = renderer.autoClear, shadowUpdate = renderer.shadowMap.autoUpdate;
+      const previous = renderer.getRenderTarget(), autoClear = renderer.autoClear;
       try {
         target.viewport.copy(viewport); target.scissor.copy(viewport); target.scissorTest = true;
-        renderer.autoClear = false; renderer.shadowMap.autoUpdate = false;
+        renderer.autoClear = false;
         // The shadow lookups compare plain depth (near 0, far 1), so this pass leaves the scene's reversed depth range.
         depth.setReversed(false);
         renderer.setRenderTarget(target); renderer.clear(false, true, false);
         renderer.render(scene, light);
       } finally {
         depth.setReversed(reversed);
-        renderer.setRenderTarget(previous); renderer.autoClear = autoClear; renderer.shadowMap.autoUpdate = shadowUpdate;
+        renderer.setRenderTarget(previous); renderer.autoClear = autoClear;
         for (const [mesh, material] of swapped) mesh.material = material;
         for (const object of hidden) object.visible = true;
       }

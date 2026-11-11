@@ -27,12 +27,11 @@ Open, in order:
 1. **Camera types split since v8:** cockpit views are now too dark (f 1.44) and TV views too bright (f 0.80), where after4
    had both near 1. AO was not the cause. The suspect is where each type's profile lands on its `sunTarget` knots (the sun
    strength's unit against the knots'); check before touching the exposure calibration (4.06).
-2. **Sun shadow beyond the near square:** the reference frames use six view-fitted cascades (four near ones, then two far
-   ones out to about 1.5 km), split between logarithmic and uniform spacing. The app has one 80 m near square, then the cached
-   1.2 km static map at ~29 cm per texel. Between them, a low sun makes the static map shade surfaces that are really lit:
-   the Le Mans overpass lettering at 8.6° (2026-11-05 qualifying replay), depending on which scenery was loaded when the
-   static map was last drawn. The game draws the overpass from a 4–7 cm cascade. The split values come from the package
-   before the app adopts cascades.
+2. **Sun shadow beyond the near square:** done 2026-11-11. Every view takes the sun's shadow from the package's cascades
+   (cockpit set onboard, chase set elsewhere; the package publishes no TV splits), so the 80 m near square and the 29 cm
+   static map are gone, and with them the picture's dependence on what had loaded when the static map was drawn. Small set
+   against the same tree before: dE 10.46 → 10.77, a little darker where finer shadows now land (trackside guardrails,
+   Silverstone stands).
 3. **Venue probe ground bounce:** one probe per venue lights shade from below about 1.3× too much.
 
 Done since v8: **scenery reflection** (package `shading.sceneryReflection`, `integrationMap`): the convolved venue cube read

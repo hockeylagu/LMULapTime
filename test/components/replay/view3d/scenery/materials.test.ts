@@ -4,7 +4,6 @@ import { crownSun } from '../../../../../src/components/replay/view3d/scenery/ma
 import { billboardShadowMaterial, computeCustomProgramCacheKey, patchSurfaceShader } from '../../../../../src/components/replay/view3d/scenery/materials/patchSurfaceShader.js';
 import { trackShadowEye } from '../../../../../src/components/replay/view3d/scenery/materials/shadowEye.js';
 import { sceneryReflectionUniforms } from '../../../../../src/components/replay/view3d/scenery/materials/sceneryReflection.js';
-import { staticShadowUniforms } from '../../../../../src/components/replay/view3d/sunShadows.js';
 import { ASSUMED_RUBBER } from '../../../../../src/components/replay/view3d/scenery/materials/roadSurface.js';
 import { surfaceAlphaCut } from '../../../../../src/components/replay/view3d/scenery/materials/shaderContext.js';
 import { shaderParts } from '../../../../../src/components/replay/view3d/scenery/materials/shaderParts.js';
@@ -159,7 +158,7 @@ describe('computeCustomProgramCacheKey', () => {
 });
 
 describe('patchSurfaceShader', () => {
-  const vertex = '#include <common>\n#include <beginnormal_vertex>\n#include <begin_vertex>\n#include <shadowmap_vertex>';
+  const vertex = '#include <common>\n#include <beginnormal_vertex>\n#include <begin_vertex>\n#include <worldpos_vertex>';
   const fragment = ['common', 'map_fragment', 'roughnessmap_fragment', 'metalnessmap_fragment', 'normal_fragment_maps', 'lights_physical_fragment', 'aomap_fragment', 'emissivemap_fragment', 'normal_fragment_begin', 'lights_physical_pars_fragment', 'shadowmap_pars_fragment', 'lights_fragment_begin', 'lights_fragment_maps', 'lights_fragment_end', 'opaque_fragment']
     .map(chunk => `#include <${chunk}>`).join('\n');
   const depthVertex = ['common', 'begin_vertex', 'project_vertex'].map(chunk => `#include <${chunk}>`).join('\n');
@@ -204,11 +203,8 @@ describe('patchSurfaceShader', () => {
     expect(billboard.vertexShader).toContain('objectNormal = normalize(normalize(toEye) * mat3(modelMatrix));');
     // Leaves keep the card's own normal (fronds facing away from the sun stay shaded), not a world-up normal.
     expect(billboard.fragmentShader).not.toContain('vec3(0.0,1.0,0.0));');
-    // A card skips its own plane in both sun shadow lookups (1 m of the near map's 799 m depth, 4 m of the static map's 1,999 m);
-    // other cards and objects still shade it.
-    expect(billboard.vertexShader).toContain('vDirectionalShadowCoord[ 0 ].z -= 0.00125156');
-    expect(billboard.vertexShader).toContain('vStaticShadowCoord.z -= 0.00200100');
-    expect(patched(tree).vertexShader).not.toContain('vDirectionalShadowCoord');
+    // A card skips its own plane in the cascade lookup (shadows/cascadeSampling.ts); other cards and objects still shade it.
+    expect(billboard.fragmentShader.startsWith('#define SURFACE_CARD\n')).toBe(true);
     // Leaf cards light with a crown-shaped normal: sideways by the corner's side, up above a metre and less so facing the sun; never down.
     expect(billboard.vertexShader).toContain('uniform vec3 surface_crownSun;'); expect(billboard.vertexShader).toContain('vec3 crownNormal = facing + across * side + vec3(0.0, up, 0.0);');
     expect(billboard.vertexShader).toContain('float up = clamp(2.0 * clamp(_lmu_corner.y, 0.0, 1.0) - 1.0, 0.0, 1.0) * clamp(1.0 - dot(facing, surface_crownSun), 0.0, 1.0);');
@@ -227,15 +223,14 @@ describe('patchSurfaceShader', () => {
     expect(shader.fragmentShader).toContain('textureLod(surface_reflection, r, surface_reflectionLodScale * roughness)');
     expect(shader.fragmentShader).toContain('mix(vec3(surfaceReflectionSpecular * (split.y + surface_dielectricF0 * split.x)), mix(surfaceReflectionAlbedo, vec3(1.0), split.y), material.metalness)');
     expect(shader.fragmentShader).toContain('surfaceReflectionSpecular=surfaceSpecular;');
-    expect(shader.fragmentShader.indexOf('surfaceReflectionSpecular=surfaceSpecular;')).toBeLessThan(shader.fragmentShader.indexOf('surfaceSunShadow( getShadow('));
+    expect(shader.fragmentShader.indexOf('surfaceReflectionSpecular=surfaceSpecular;')).toBeLessThan(shader.fragmentShader.indexOf('surfaceCascadeShadow( - vViewPosition.z )'));
     expect(shader.uniforms.surface_reflection).toBe(sceneryReflectionUniforms.surface_reflection);
     for (const kind of ['glass', 'clearcoat'] as const) expect(patched(surface(kind, { maps: { albedo: map('A', true) } })).fragmentShader).not.toContain('surfaceIndirectSpecular');
   });
   it('shades terrain by its baked shadow on the sun as well as the ambient', () => {
     const terrain = patched(surface('terrain', { maps: { layerA: map('A', true), splatter: map('S') }, flags: { layers: '1' } }));
     expect(terrain.fragmentShader).toContain('surfaceBakedShadow=splatter.a;');
-    expect(terrain.fragmentShader).toContain('min(( UNROLLED_LOOP_INDEX == 0 ? surfaceSunShadow(');
-    expect(terrain.fragmentShader).toContain(', surfaceBakedShadow)');
+    expect(terrain.fragmentShader).toContain('directLight.color *= receiveShadow ? min(surfaceCascadeShadow( - vViewPosition.z ), surfaceBakedShadow) : 1.0;');
     expect(patched(surface('standard', { maps: { albedo: map('A', true) } })).fragmentShader).not.toContain(', surfaceBakedShadow)');
   });
   it('turns shadow-pass cards toward the viewing camera, so a card shades what is drawn', () => {
@@ -244,7 +239,7 @@ describe('patchSurfaceShader', () => {
     const shader = { uniforms: {}, vertexShader: depthVertex, fragmentShader: '' } as unknown as Parameters<typeof patchSurfaceShader>[0];
     material.onBeforeCompile(shader, undefined as never);
     expect(shader.vertexShader).toContain('vec3 directionToCamera = surface_shadowEye - pivotWorld;');
-    trackShadowEye(null, null, Object.assign(new PerspectiveCamera(), { matrixWorld: new Matrix4().makeTranslation(3, 4, 5) }));
+    trackShadowEye(Object.assign(new PerspectiveCamera(), { matrixWorld: new Matrix4().makeTranslation(3, 4, 5) }));
     expect((shader.uniforms as Record<string, { value: Vector3 }>).surface_shadowEye.value.toArray()).toEqual([3, 4, 5]);
   });
   it('declares only the extra UV attributes its maps need', () => {
@@ -259,20 +254,14 @@ describe('patchSurfaceShader', () => {
   });
   it('doubles the sun shadow term on leaves', () => {
     const tree = surface('vegetation', { maps: { albedo: map('A', true) } });
-    expect(patched(tree).fragmentShader).toContain('min(2.0 * ( UNROLLED_LOOP_INDEX == 0 ? surfaceSunShadow( getShadow( directionalShadowMap[ i ]');
-    // Every surface reads the sun's shadow from the near map, fading to the static map at the near window's edge.
+    expect(patched(tree).fragmentShader).toContain('directLight.color *= receiveShadow ? min(2.0 * surfaceCascadeShadow( - vViewPosition.z ), 1.0) : 1.0;');
+    // Every other surface reads the sun's shadow from the cascades as it is.
     const road = patched(surface('standard', { maps: { albedo: map('A', true) } })).fragmentShader;
-    expect(road).toContain('( UNROLLED_LOOP_INDEX == 0 ? surfaceSunShadow( getShadow('); expect(road).not.toContain('min(2.0 *');
-    expect(road).toContain('float surfaceSunShadow( float nearShadow, vec4 nearCoord )');
-    expect(road).toContain('texture( surface_staticShadowMap, coord )');
-    // Every surface reads the one static map through shared uniforms, its coordinate offset along the normal by ~1.3 texels.
-    const roadShader = patched(surface('standard', { maps: { albedo: map('A', true) } }));
-    expect(roadShader.uniforms.surface_staticShadowMap).toBe(staticShadowUniforms.map);
-    expect(roadShader.uniforms.surface_staticShadowMatrix).toBe(staticShadowUniforms.matrix);
-    expect(roadShader.vertexShader).toContain('vStaticShadowCoord = surface_staticShadowMatrix * ( worldPosition + vec4( shadowWorldNormal * 0.38085938');
+    expect(road).toContain('directLight.color *= receiveShadow ? surfaceCascadeShadow( - vViewPosition.z ) : 1.0;'); expect(road).not.toContain('min(2.0 *');
   });
   it('shares the digital flag clock uniform object', () => {
     const shader = patched(surface('digitalFlag', { maps: { on: map('ON', true), off: map('OFF', true) } }));
     expect(shader.uniforms).toHaveProperty('surface_flag_elapsed');
   });
 });
+

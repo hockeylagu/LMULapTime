@@ -170,7 +170,7 @@ export async function createReplayScene(
     },
     unload: (chunk, root) => { ground.remove(chunk.id, root); loader.releaseChunk(root); },
     releaseTexture: asset => loader.releaseTexture(asset),
-    changed: () => { freezeScenery(); scheduleRefresh(); environment.staticShadowStale(); reflection.stale(); invalidate(); },
+    changed: () => { freezeScenery(); scheduleRefresh(); reflection.stale(); invalidate(); },
     failed: (chunk, error) => { if (!disposed) onFailure(`3D scenery chunk ${chunk.id} failed: ${error.message}`); },
   });
   const cleanup = () => {
@@ -189,7 +189,7 @@ export async function createReplayScene(
   let environment: ReturnType<typeof addSceneEnvironment>, reflection: ReturnType<typeof createCarReflection>;
   // The chunks under the first pose must be resident before cars and lines are draped on them.
   try {
-    environment = addSceneEnvironment(scene, renderer, layout, origin, trajectory.daylightClock); reflection = createCarReflection(renderer, scene, layout.shading);
+    environment = addSceneEnvironment(scene, renderer, layout, origin, shadowCascadeSet(mode), trajectory.daylightClock); reflection = createCarReflection(renderer, scene, layout.shading);
     await stream.whenUnderView();
     layer = await loadLaps(trajectory, baseline, cars, colorBy); layerReady = true;
   } catch (error) { cleanup(); throw error; }
@@ -204,7 +204,7 @@ export async function createReplayScene(
   };
   freezeScenery();
   world.add(layer.root); environment.setDynamic([layer.root]); reflection.setCar(layer.primary, layer.root);
-  environment.setCamera(perspective); environment.setShadowCascades(shadowCascadeSet(mode));
+  environment.setCamera(perspective);
   // The first view's chunks are warm: this compiles and uploads the cars and lines, behind the loading screen.
   try { await warmUp(scene, new AbortController().signal); } catch (error) { cleanup(); throw error; }
   // The scenery around the first pose is resident and compiled: capture the venue's light for the scene's environment.
@@ -242,7 +242,7 @@ export async function createReplayScene(
     if (!viewMoved(streamView, next, route)) return;
     streamView = next; stream.update(next);
   };
-  const eyeRotation = new Quaternion(), desiredEye = new Vector3(), correctedEye = new Vector3(), probeCentre = new Vector3(), shadowFocus = new Vector3();
+  const eyeRotation = new Quaternion(), desiredEye = new Vector3(), correctedEye = new Vector3(), probeCentre = new Vector3();
   let frameHook: ((frameTime: number) => void) | null = null, probed = false;
   const draw = (frameTime?: number) => {
     if (disposed) return;
@@ -258,10 +258,8 @@ export async function createReplayScene(
       camera.lookAt(controls.target);
     }
     try {
-      // A static shadow map still being drawn (a quarter per frame) asks for the next frame. Car cameras look at a point 40 m
-      // ahead of the eye, which would leave the car itself outside the near shadow square: their shadows centre on the car.
-      const focus = isDriverCamera(mode) ? layer.primary.getWorldPosition(shadowFocus) : controls.target;
-      if (environment.update(focus)) invalidate();
+      // Cached shadow cascades still due ask for the next frame.
+      if (environment.update()) invalidate();
       // The first probe completes before the first frame that shows the car, whose materials read it from their first draw.
       if (!probed && layer.primary.visible) {
         probed = true; layer.primary.getWorldPosition(probeCentre);
