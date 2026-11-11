@@ -425,11 +425,15 @@ function parseChunk(value: unknown, what: string): SceneryChunk {
 
 function parseTexture(value: unknown, what: string): SceneryTexture {
   const row = record(value, what);
-  exactKeys(row, TEXTURE, what);
+  knownKeys(row, TEXTURE, ['maxPx'], what);
   const hash = sha256(row.sha256, `${what}.sha256`);
   if (row.asset !== `scenery/textures/${hash}.ktx2.zst`) throw Error(`${what}: asset is not the content-named KTX2`);
   for (const key of ['byteLength', 'width', 'height', 'levels', 'gpuBytes']) if (count(row[key], `${what}.${key}`) === 0) throw Error(`${what}.${key}: must be positive`);
   text(row.format, `${what}.format`, 64);
+  if (row.maxPx !== undefined) {
+    const full = Math.max(row.width as number, row.height as number), maxPx = count(row.maxPx, `${what}.maxPx`);
+    if (!maxPx || maxPx > full || !Number.isInteger(Math.log2(full / maxPx))) throw Error(`${what}.maxPx: not the size of one of the texture's levels`);
+  }
   if (typeof row.srgb !== 'boolean') throw Error(`${what}.srgb: expected a boolean`);
   return structuredClone(row) as unknown as SceneryTexture;
 }
@@ -439,8 +443,9 @@ function checkSectorOrder(layout: SceneryLayout): void {
   const main = layout.sectors.filter(sector => sector.kind === 'main'), pit = layout.sectors.filter(sector => sector.kind === 'pit');
   if (!main.length) throw Error(`${layout.layoutKey}: no main sectors`);
   main.forEach((sector, i) => {
-    if (sector.lapEndM > layout.routeLengthM + 1e-6) throw Error(`${sector.id}: lap range exceeds the route`);
-    if (i && sector.lapStartM < main[i - 1].lapEndM) throw Error(`${sector.id}: overlaps ${main[i - 1].id}`);
+    // A chunk shared by a venue's layouts covers its own stretch of this route: it may overlap other chunks and wrap past the line.
+    if (sector.lapStartM >= layout.routeLengthM || sector.lapEndM > sector.lapStartM + layout.routeLengthM + 1e-6) throw Error(`${sector.id}: lap range exceeds the route`);
+    if (i && sector.lapStartM < main[i - 1].lapStartM) throw Error(`${sector.id}: starts before ${main[i - 1].id}`);
     if (sector.prev !== main[(i + main.length - 1) % main.length].id || sector.next !== main[(i + 1) % main.length].id) throw Error(`${sector.id}: prev/next do not follow the lap order`);
   });
   pit.forEach((sector, i) => {

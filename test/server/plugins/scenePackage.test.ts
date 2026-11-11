@@ -180,7 +180,9 @@ describe('scenery validation', () => {
     ['a missing chunk file', (built: Package) => { fs.rmSync(path.join(built.dir, built.scenery.sectors[1].asset)); }],
     ['sectors out of lap order', (built: Package) => { built.scenery.sectors.reverse(); }],
     ['broken prev/next links', (built: Package) => { built.scenery.sectors[0].next = 's0'; }],
-    ['a sector beyond the route', (built: Package) => { built.scenery.sectors[1].lapEndM = built.scenery.routeLengthM + 10; }],
+    ['a sector longer than the route', (built: Package) => { built.scenery.sectors[1].lapEndM = built.scenery.routeLengthM * 1.5 + 10; }],
+    ['a sector starting beyond the route', (built: Package) => { Object.assign(built.scenery.sectors[1], {lapStartM: built.scenery.routeLengthM, lapEndM: built.scenery.routeLengthM + 10}); }],
+    ['sectors out of lap order', (built: Package) => { Object.assign(built.scenery.sectors[0], {lapStartM: built.scenery.routeLengthM / 2 + 1, lapEndM: built.scenery.routeLengthM}); }],
     ['duplicate chunk ids', (built: Package) => { built.scenery.sectors[1].id = 's0'; }],
     ['a texture missing from the layout list', (built: Package) => { built.scenery.sectors[0].textures = ['scenery/textures/' + '0'.repeat(64) + '.ktx2.zst']; }],
     ['a texture file of the wrong size', (built: Package) => { built.scenery.textures[0].byteLength += 1; }],
@@ -194,6 +196,8 @@ describe('scenery validation', () => {
     ['a daylight latitude past the pole', (built: Package) => { Object.assign(built.scenery.daylight, {latitudeDeg: 91}); }],
     ['a daylight without its dawn haze weight', (built: Package) => { delete (built.scenery.daylight as Partial<NonNullable<typeof built.scenery.daylight>>).hazeDawnScale; }],
     ['a negative height haze scalar', (built: Package) => { Object.assign(built.scenery.daylight, {fogHeightAltitudeScalar: -1}); }],
+    ['a texture size above its full size', (built: Package) => { Object.assign(built.scenery.textures[0], {maxPx: 32}); }],
+    ['a texture size that is not one of its levels', (built: Package) => { Object.assign(built.scenery.textures[0], {maxPx: 6}); }],
   ])('rejects %s', (_name, change) => { expect(mutate(change)).toBe('invalid'); });
 
   it('rejects an empty catalog', () => {
@@ -212,6 +216,18 @@ describe('scenery validation', () => {
     const built = build();
     built.commit();
     expect(new DataPlugin(built.dir).sceneryLayout('monza_gp')?.daylight?.utcOffsetHours).toBe(9);
+  });
+
+  it('accepts the largest size worth loading on a texture', () => {
+    const built = build();
+    Object.assign(built.scenery.textures[0], {maxPx: 8}); built.commit();
+    expect(new DataPlugin(built.dir).sceneryLayout('monza_gp')?.textures[0].maxPx).toBe(8);
+  });
+
+  it('accepts a venue-shared chunk that overlaps the first sector and wraps past the line', () => {
+    const built = build();
+    built.scenery.sectors[1].lapEndM = built.scenery.routeLengthM + 10; built.commit();
+    expect(new DataPlugin(built.dir).sceneryLayout('monza_gp')?.sectors[1].lapEndM).toBe(built.scenery.routeLengthM + 10);
   });
 
   it('accepts a layout without daylight', () => {

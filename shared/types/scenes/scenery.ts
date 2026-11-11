@@ -267,6 +267,8 @@ export interface SceneryTexture {
   format: string;
   srgb: boolean;
   gpuBytes: number;
+  /** The largest size worth loading at this layout (the longer side, a level of the file); absent = the full size. */
+  maxPx?: number;
 }
 
 export interface SceneryTotals {
