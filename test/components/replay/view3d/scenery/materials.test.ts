@@ -5,6 +5,7 @@ import { billboardShadowMaterial, computeCustomProgramCacheKey, patchSurfaceShad
 import { trackShadowEye } from '../../../../../src/components/replay/view3d/scenery/materials/shadowEye.js';
 import { sceneryReflectionUniforms } from '../../../../../src/components/replay/view3d/scenery/materials/sceneryReflection.js';
 import { staticShadowUniforms } from '../../../../../src/components/replay/view3d/sunShadows.js';
+import { surfaceAlphaCut } from '../../../../../src/components/replay/view3d/scenery/materials/shaderContext.js';
 import { shaderParts } from '../../../../../src/components/replay/view3d/scenery/materials/shaderParts.js';
 import { readSurfaceConfig, SURFACE_KINDS, terrainLayerCount, textureAsset, type SurfaceConfig, type SurfaceMap } from '../../../../../src/components/replay/view3d/scenery/materials/surfaceConfig.js';
 import { imageUriMap, resolveMapUri } from '../../../../../src/components/replay/view3d/scenery/materials/textureSource.js';
@@ -160,6 +161,15 @@ describe('patchSurfaceShader', () => {
     expect((shader.uniforms as Record<string, { value: Vector2 }>).surface_scale_albedo.value.toArray()).toEqual([2, 3]);
     expect((shader.uniforms as Record<string, { value: Vector2 }>).surface_normalScale.value.toArray()).toEqual([0.5, -1]);
     expect(shader.vertexShader).toContain('vSurfaceColour = _lmu_colour;');
+  });
+  it('cuts a cut-out by the shared alpha cut scale, so the multisampled scene pass can leave the cut to coverage', () => {
+    const shader = { uniforms: {}, vertexShader: vertex, fragmentShader: `#include <alphatest_pars_fragment>\n${fragment}\n#include <alphatest_fragment>` } as unknown as Parameters<typeof patchSurfaceShader>[0];
+    patchSurfaceShader(shader, surface('standard', { maps: { albedo: map('A', true) } }), {});
+    expect(shader.fragmentShader).not.toContain('#include <alphatest_fragment>');
+    expect(shader.fragmentShader).toContain('if (diffuseColor.a < alphaTest * surface_alphaCut || diffuseColor.a == 0.0) discard;');
+    expect(shader.fragmentShader).toContain('uniform float surface_alphaCut;');
+    expect((shader.uniforms as Record<string, unknown>).surface_alphaCut).toBe(surfaceAlphaCut);
+    expect(surfaceAlphaCut.value).toBe(1);
   });
   it('makes billboards camera-facing in the vertex stage only when the config says so', () => {
     const tree = surface('vegetation', { maps: { albedo: map('A', true) } });

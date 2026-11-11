@@ -25,6 +25,12 @@ export interface ShaderContext {
   uniforms: boolean;
 }
 
+/**
+ * Scales every scenery cut-out's alpha test: 1 cuts at the material's threshold; 0, set around the multisampled scene pass, leaves
+ * the cut to alpha to coverage.
+ */
+export const surfaceAlphaCut = { value: 1 };
+
 export function glslNumber(n: number): string {
   if (!Number.isFinite(n)) throw Error('Invalid shader constant');
   return Number(n).toFixed(8);

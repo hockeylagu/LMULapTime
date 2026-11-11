@@ -134,7 +134,9 @@ To improve, cheapest first:
 2. **Alpha to coverage on every cut-out material.** Today only billboard cards and two fence textures matched by name
    (`BARRIERS_FENCE[AB]_ALBA`) get it; other fences, nets, grilles and car alpha-mask parts keep the hard cut and shimmer (Fuji
    catch fence reads dotted). Standard: every alpha-tested material under MSAA, with coverage kept in the far mips. Done
-   (uncommitted): every alpha-tested scenery material and car alpha-mask part (fences keep their lowered 0.2 cut); validated by eye
+   (uncommitted): every alpha-tested scenery material and car alpha-mask part; validated by eye. Since 2026-11-10 a scenery
+   cut-out's own alpha is its coverage in the multisampled scene pass (no sharpening, no lowered cut), so wire thinner than a
+   pixel still veils what is behind it; passes without multisampling keep the hard cut. Earlier state: validated by eye
    (2026-11-07).
 3. **Bloom / glare.** Sun on chrome, white lines and the sky edge looked flat. A bloom pass from the profile's glare threshold,
    merged into the exposure pass. Done (uncommitted, `glare.ts`): threshold in exposed luminance, half-resolution chain of 5

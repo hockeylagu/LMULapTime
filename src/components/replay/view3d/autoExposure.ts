@@ -1,5 +1,6 @@
 import { type Color, DataUtils, HalfFloatType, Matrix3, Mesh, OrthographicCamera, PlaneGeometry, Scene, ShaderMaterial, Vector2, Vector3, WebGLRenderTarget, type Camera, type Object3D, type WebGLRenderer } from 'three';
 import { SUN_UNIT } from './atmosphere/sunSamples.js';
+import { surfaceAlphaCut } from './scenery/materials/shaderContext.js';
 import { profilesAt, timeOfDayPosition, weatherWeight } from './atmosphere/timeOfDay.js';
 import type { SceneryCamera, SceneryCameraLook, SceneryCameraProfile, SceneryCameraType, SceneryCameraTypeProfile, SceneryToneCurve } from '../../../../shared/types/scenes/scenery.js';
 
@@ -241,7 +242,8 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
       // Set on the renderer before the scene pass, so overlays that must not follow exposure (the racing line) can divide it out as they draw.
       renderer.toneMappingExposure = adapted === null ? 1 : lawExposure(active.targetExposure, active.adaptationScale, adapted);
       outputMaterial.uniforms.exposure.value = renderer.toneMappingExposure;
-      renderer.setRenderTarget(hdr); renderer.render(scene, camera);
+      renderer.setRenderTarget(hdr);
+      surfaceAlphaCut.value = 0; renderer.render(scene, camera); surfaceAlphaCut.value = 1;
       renderer.setRenderTarget(null);
       renderer.render(output, quadCamera);
       if (!reading && frames++ % METER_EVERY_FRAMES === 0) {

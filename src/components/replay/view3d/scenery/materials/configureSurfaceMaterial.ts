@@ -72,13 +72,8 @@ export async function configureSurfaceMaterial(mesh: Mesh, textures: SurfaceText
   const config = readSurfaceConfig(original.userData);
   if (!config) return;
   const material = ownMaterial(original, config);
-  if (material.alphaTest > 0 && config.flags.wireCutout) {
-    // Filtered wire texels lose alpha as the mesh recedes: keep more of that coverage.
-    material.alphaTest = Math.min(material.alphaTest, 0.2);
-  }
-  // Cut-outs (leaf and crowd cards, fences, signs, foliage): a hard alpha cut shimmers and steps at their edges. Alpha to coverage
-  // over the 4x MSAA target is the anti-aliased alpha test (three sharpens alpha by its screen derivative), so cut-outs stay
-  // crisp without the stair steps.
+  // Cut-outs (leaf and crowd cards, fences, signs, foliage): a hard alpha cut shimmers, steps at the edges and drops filtered wire
+  // as the mesh recedes. In the multisampled scene pass their alpha is their coverage instead (patchSurfaceShader.ts).
   if (material.alphaTest > 0) material.alphaToCoverage = true;
   mesh.material = material;
   if (material !== original) original.dispose();

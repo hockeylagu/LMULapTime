@@ -6,7 +6,7 @@ import { STATIC_NORMAL_BIAS_M, SUN_SHADOW_DEPTH_M, staticShadowUniforms } from '
 import { digitalFlagClock } from './flagSurface.js';
 import { patchAmbientLookup } from './ambientLookup.js';
 import { CROWN_SUN_UNIFORM, crownNormalGlsl, crownSun } from './foliageCrown.js';
-import { glslNumber, list, value } from './shaderContext.js';
+import { glslNumber, list, surfaceAlphaCut, value } from './shaderContext.js';
 import { REFLECTING_KINDS, SCENERY_REFLECTION_GLSL, SCENERY_REFLECTION_INPUTS, sceneryReflectionUniforms } from './sceneryReflection.js';
 import { shadowEye } from './shadowEye.js';
 import { shaderParts } from './shaderParts.js';
@@ -153,6 +153,7 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
   for (const [key, map] of Object.entries(config.maps)) mapScaleUniforms[`surface_scale_${key}`] = { value: new Vector2(...map!.scale) };
 
   Object.assign(shader.uniforms, tunables, {
+    surface_alphaCut: surfaceAlphaCut,
     surface_normalScale: { value: new Vector2(value(p.adjust, 'normalStrength'), config.normalYSign) },
     surface_staticShadowMap: staticShadowUniforms.map, surface_staticShadowMatrix: staticShadowUniforms.matrix,
     surface_staticShadowReady: staticShadowUniforms.ready, ...cascadeShadowUniforms,
@@ -195,6 +196,10 @@ ${shader.fragmentShader}`;
     : code.occlusion;
   shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>\n${code.declarations}`)
     .replace('#include <map_fragment>', code.albedo)
+    // A cut-out's own alpha is its coverage in the multisampled scene pass, so wire thinner than a pixel still dims what is behind
+    // it; passes without multisampling cut at the threshold.
+    .replace('#include <alphatest_fragment>', '#ifdef USE_ALPHATEST\n if (diffuseColor.a < alphaTest * surface_alphaCut || diffuseColor.a == 0.0) discard;\n#endif')
+    .replace('#include <alphatest_pars_fragment>', '#include <alphatest_pars_fragment>\nuniform float surface_alphaCut;')
     .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n roughnessFactor = clamp(surfaceRoughness,0.045,1.0);')
     .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n metalnessFactor = clamp(surfaceMetallic,0.0,1.0);')
     .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n { ${code.normals} }`)
