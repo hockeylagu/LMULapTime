@@ -60,31 +60,84 @@ export function bindSurfaceProgram(material: MeshStandardMaterial, config: Surfa
 }
 
 /**
- * Rebuilds a scenery mesh's native material from its GLB surface description (`extras.lmuSurface`): loads every map through
- * `textures`, then patches the standard program with the family's GLSL. A mesh without a surface description keeps its glTF
- * material. The material owns its textures and frees them when disposed. An unknown surface, or a map the chunk does not
- * declare, rejects.
+ * Configured scenery materials shared between meshes: every mesh of a surface with the same textures and GLB material state draws
+ * with one material, so consecutive draws need no material switch (each switch uploads the material's uniforms again). A material
+ * is disposed when the last mesh that took it is released.
  */
-export async function configureSurfaceMaterial(mesh: Mesh, textures: SurfaceTextureSource, ownsTextures = true): Promise<void> {
-  const original = singleMaterial(mesh);
-  if (!original || original.userData.surfaceConfigured === true) return;
-  const config = readSurfaceConfig(original.userData);
-  if (!config) return;
+export interface SharedSurfaceMaterials {
+  /** The material for `key`, built by `build` the first time; each call counts one user. */
+  take(key: string, build: () => MeshStandardMaterial): MeshStandardMaterial;
+  /** Gives back one user of `material`; false for a material this registry did not hand out. */
+  release(material: Material): boolean;
+  /** Whether this registry handed `material` out (its disposal is the registry's). */
+  owns(material: Material): boolean;
+}
+
+export function createSharedSurfaceMaterials(): SharedSurfaceMaterials {
+  const entries = new Map<string, { material: MeshStandardMaterial; users: number }>(), keys = new WeakMap<Material, string>();
+  return {
+    take(key, build) {
+      let entry = entries.get(key);
+      if (!entry) { entry = { material: build(), users: 0 }; entries.set(key, entry); keys.set(entry.material, key); }
+      entry.users++;
+      return entry.material;
+    },
+    release(material) {
+      const key = keys.get(material);
+      if (key === undefined) return false;
+      const entry = entries.get(key);
+      if (entry && --entry.users === 0) { entries.delete(key); material.dispose(); }
+      return true;
+    },
+    owns: material => keys.has(material),
+  };
+}
+
+/** What makes two meshes' configured materials the same: the surface, the texture objects and the GLB material's own state. */
+function sharedKey(original: MeshStandardMaterial, config: SurfaceConfig, loaded: Record<string, Texture>): string {
+  const { transparent, opacity, side, alphaTest, depthWrite, depthTest, vertexColors, blending, emissiveIntensity, flatShading } = original;
+  const textures = Object.entries(loaded).map(([key, texture]) => `${key}:${texture.id}`).sort();
+  return JSON.stringify([config, textures, transparent, opacity, side, alphaTest, depthWrite, depthTest, vertexColors, blending,
+    original.emissive.getHex(), emissiveIntensity, flatShading]);
+}
+
+/** The configured material for a surface: the GLB material's own state, the family's program and the loaded maps. */
+function buildMaterial(original: MeshStandardMaterial, config: SurfaceConfig, loaded: Record<string, Texture>, ownsTextures: boolean): MeshStandardMaterial {
   const material = ownMaterial(original, config);
   // Cut-outs (leaf and crowd cards, fences, signs, foliage): a hard alpha cut shimmers, steps at the edges and drops filtered wire
   // as the mesh recedes. In the multisampled scene pass their alpha is their coverage instead (patchSurfaceShader.ts).
   if (material.alphaTest > 0) material.alphaToCoverage = true;
-  mesh.material = material;
-  if (material !== original) original.dispose();
+  // A blended two-sided surface (road lines, skid marks, water) draws once with both sides. Three otherwise draws it twice, back
+  // faces then front, and marks the material changed before each, so every draw looks its program up again. Glass keeps the two
+  // passes: its panes overlap within one mesh, and the far ones must blend first.
+  material.forceSinglePass = config.kind !== 'glass';
+  if (ownsTextures) material.addEventListener('dispose', () => { for (const texture of Object.values(loaded)) texture.dispose(); });
+  bindSurfaceProgram(material, config, loaded);
+  material.userData.surfaceConfigured = true;
+  return material;
+}
 
+/**
+ * Rebuilds a scenery mesh's native material from its GLB surface description (`extras.lmuSurface`): loads every map through
+ * `textures`, then patches the standard program with the family's GLSL. A mesh without a surface description keeps its glTF
+ * material. Without `shared` the material is the mesh's own and frees its textures when disposed (unless `ownsTextures` is false);
+ * with it, meshes of the same surface, textures and GLB state share one, which `shared` disposes. An unknown surface, or a map the
+ * chunk does not declare, rejects.
+ */
+export async function configureSurfaceMaterial(mesh: Mesh, textures: SurfaceTextureSource, ownsTextures = true, shared?: SharedSurfaceMaterials): Promise<void> {
+  const original = singleMaterial(mesh);
+  if (!original || original.userData.surfaceConfigured === true) return;
+  const config = readSurfaceConfig(original.userData);
+  if (!config) return;
   const loaded: Record<string, Texture> = {};
   await Promise.all(Object.entries(config.maps).map(async ([key, map]) => { if (map) loaded[key] = await textures.load(map); }));
   const placeholder: Texture | undefined = loaded.layerA ?? loaded.albedo ?? loaded.on;
   if (!placeholder && config.kind !== 'standard' && config.kind !== 'standardBlend') throw Error(`Missing base albedo for ${config.name ?? '?'}`);
-  if (ownsTextures) material.addEventListener('dispose', () => { for (const texture of Object.values(loaded)) texture.dispose(); });
-  bindSurfaceProgram(material, config, loaded);
+  const build = () => buildMaterial(original, config, loaded, ownsTextures);
+  const material = shared ? shared.take(sharedKey(original, config, loaded), build) : build();
+  mesh.material = material;
+  original.dispose();
 
-  material.userData.surfaceConfigured = true;
   if (config.billboard) {
     // Vertex yaw can move corners outside the rest plane; keep a conservative culling sphere.
     const geometry = mesh.geometry;
@@ -98,5 +151,4 @@ export async function configureSurfaceMaterial(mesh: Mesh, textures: SurfaceText
   }
   // Digital flags blink on one shared clock, advanced as they draw.
   if (config.kind === 'digitalFlag') mesh.onBeforeRender = () => { digitalFlagClock.value = (performance.now() - START_MS) / 1000; };
-  material.needsUpdate = true;
 }

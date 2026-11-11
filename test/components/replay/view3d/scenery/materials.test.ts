@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Matrix4, PerspectiveCamera, Vector2, Vector3 } from 'three';
+import { BufferGeometry, DoubleSide, Matrix4, Mesh, MeshStandardMaterial, PerspectiveCamera, Texture, Vector2, Vector3 } from 'three';
+import { configureSurfaceMaterial, createSharedSurfaceMaterials } from '../../../../../src/components/replay/view3d/scenery/materials/configureSurfaceMaterial.js';
 import { crownSun } from '../../../../../src/components/replay/view3d/scenery/materials/foliageCrown.js';
 import { billboardShadowMaterial, computeCustomProgramCacheKey, patchSurfaceShader } from '../../../../../src/components/replay/view3d/scenery/materials/patchSurfaceShader.js';
 import { trackShadowEye } from '../../../../../src/components/replay/view3d/scenery/materials/shadowEye.js';
@@ -265,3 +266,37 @@ describe('patchSurfaceShader', () => {
   });
 });
 
+it('draws a blended two-sided surface once, both sides in one pass, but glass back faces first', async () => {
+  const configured = async (config: SurfaceConfig) => {
+    const material = new MeshStandardMaterial({transparent: true, depthWrite: false, side: DoubleSide});
+    material.userData = holder(config);
+    const mesh = new Mesh(new BufferGeometry(), material);
+    await configureSurfaceMaterial(mesh, {load: () => Promise.resolve(new Texture())});
+    expect(mesh.material).not.toBe(material);
+    return mesh.material;
+  };
+  const lines = await configured(surface('standard'));
+  expect([lines.transparent, lines.side, lines.forceSinglePass]).toEqual([true, DoubleSide, true]);
+  // Panes overlap within one glass mesh, so the far ones blend first: three's back-then-front passes stay.
+  const glass = await configured(surface('glass', {maps: {albedo: map('glass')}}));
+  expect([glass.transparent, glass.side, glass.forceSinglePass]).toEqual([true, DoubleSide, false]);
+});
+
+it('shares one configured material among meshes of the same surface, textures and GLB state, disposed with its last user', async () => {
+  const shared = createSharedSurfaceMaterials(), grass = new Texture(), gravel = new Texture();
+  const configured = async (texture: Texture, glb: Partial<MeshStandardMaterial> = {}) => {
+    const material = Object.assign(new MeshStandardMaterial(), glb);
+    material.userData = holder(surface('standard', {maps: {albedo: map('ground')}}));
+    const mesh = new Mesh(new BufferGeometry(), material);
+    await configureSurfaceMaterial(mesh, {load: () => Promise.resolve(texture)}, false, shared);
+    return mesh.material;
+  };
+  const [a, b, other, blended] = [await configured(grass), await configured(grass), await configured(gravel), await configured(grass, {transparent: true})];
+  expect(a).toBe(b); expect(other).not.toBe(a); expect(blended).not.toBe(a);
+  expect(shared.owns(a)).toBe(true); expect(shared.release(new MeshStandardMaterial())).toBe(false);
+  let disposed = 0, texturesFreed = 0; a.addEventListener('dispose', () => { disposed++; }); grass.addEventListener('dispose', () => { texturesFreed++; });
+  expect(shared.release(a)).toBe(true); expect(disposed).toBe(0);
+  expect(shared.release(b)).toBe(true); expect(disposed).toBe(1);
+  // The textures belong to the pool, not the shared material.
+  expect(texturesFreed).toBe(0);
+});

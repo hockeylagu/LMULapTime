@@ -1,11 +1,11 @@
 import { MeshoptDecoder } from 'meshoptimizer/decoder';
-import { Mesh, type Object3D, type WebGLRenderer } from 'three';
+import { Mesh, type Material, type Object3D, type WebGLRenderer } from 'three';
 import { GLTFLoader, type GLTFLoaderPlugin, type GLTFParser } from 'three/addons/loaders/GLTFLoader.js';
 import type { SceneryChunk } from '../../../../../shared/types/scenes/scenery.js';
 import { fetchSceneryChunk, SCENERY_FILES } from '../../../../api/sceneryApi.js';
 import { disposeObjects } from '../laps/disposeObjects.js';
 import { CachedKtx2Loader } from './cachedKtx2Loader.js';
-import { configureSurfaceMaterial } from './materials/configureSurfaceMaterial.js';
+import { configureSurfaceMaterial, createSharedSurfaceMaterials } from './materials/configureSurfaceMaterial.js';
 import { createSurfaceTexturePool, imageUriMap } from './materials/textureSource.js';
 
 export interface ChunkLoader {
@@ -67,9 +67,11 @@ export function createChunkLoader(renderer: WebGLRenderer): ChunkLoader {
   const ktx2 = new CachedKtx2Loader(renderer);
   const gltf = new GLTFLoader().setKTX2Loader(ktx2).setMeshoptDecoder(MeshoptDecoder).register(skipSurfaceTextures);
   const textures = createSurfaceTexturePool(ktx2, renderer, SCENERY_FILES);
-  const sources = new WeakMap<Object3D, ReturnType<typeof textures.source>>();
+  const sources = new WeakMap<Object3D, ReturnType<typeof textures.source>>(), materials = createSharedSurfaceMaterials();
   const releaseChunk = (root: Object3D) => {
-    disposeObjects(root, true, false);
+    // Each mesh gives back its use of a shared material; the registry disposes one when no chunk uses it.
+    root.traverse(object => { if (object instanceof Mesh) materials.release(object.material as Material); });
+    disposeObjects(root, true, false, material => materials.owns(material));
     sources.get(root)?.dispose();
     sources.delete(root);
   };
@@ -84,7 +86,7 @@ export function createChunkLoader(renderer: WebGLRenderer): ChunkLoader {
         const meshes: Mesh[] = [];
         root.traverse(object => { if (object instanceof Mesh) { const mesh = object as Mesh; prepareSceneryMesh(mesh); meshes.push(mesh); } });
         onParsed?.(root);
-        await Promise.all(meshes.map(mesh => configureSurfaceMaterial(mesh, source, false)));
+        await Promise.all(meshes.map(mesh => configureSurfaceMaterial(mesh, source, false, materials)));
         signal.throwIfAborted();
       } catch (error) { releaseChunk(root); throw error; }
       return root;
