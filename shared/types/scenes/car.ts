@@ -52,6 +52,8 @@ export interface CarSurface {
   parameters?: Record<string, unknown>;
   /** Sign of the normal maps' green channel, as on scenery surfaces. */
   normalYSign?: number;
+  /** How far the sun shadow lookup moves along the normal, as a factor of the scene package's `shading.shadows.normalOffset.scale`. */
+  normalShadowInfluence?: number;
   renderState?: { alphaBlend?: boolean; alphaMask?: boolean };
   /** Roughness and metalness the app renders the material with; every material but paint has one. */
   finish?: { roughness: number; metalness: number };

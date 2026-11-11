@@ -49,7 +49,7 @@ export function surface(kind: SurfaceKind, over: Over = {}): SurfaceConfig {
   parameters.adjust.tint = [1, 1, 1];
   for (const [group, values] of Object.entries(over.parameters ?? {})) parameters[group] = { ...parameters[group], ...values };
   return {
-    version: 4, kind, name: `test_${kind}`, maps: {}, normalYSign: -1, ...over,
+    version: 4, kind, name: `test_${kind}`, maps: {}, normalYSign: -1, normalShadowInfluence: 0.5, ...over,
     flags: { ...FLAGS[kind], ...over.flags }, parameters,
   };
 }

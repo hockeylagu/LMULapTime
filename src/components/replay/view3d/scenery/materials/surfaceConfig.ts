@@ -34,6 +34,8 @@ export interface SurfaceConfig {
   parameters: Record<string, ParameterGroup | undefined>;
   maps: Record<string, SurfaceMap | undefined>;
   normalYSign: number;
+  /** How far the sun shadow lookup moves along the normal, as a factor of the package's `shading.shadows.normalOffset.scale`. */
+  normalShadowInfluence: number;
   /** False for the diffuse shader that ignores vertex colour. */
   vertexColour?: false;
   /** Camera-facing billboard geometry (`_lmu_pivot` and `_lmu_corner` attributes). */
@@ -53,6 +55,7 @@ export function readSurfaceConfig(userData: Record<string, unknown>): SurfaceCon
   if (!isSurfaceKind(given.kind)) throw Error(`Unsupported source shader family: ${String(given.kind)}`);
   const name = typeof given.name === 'string' ? given.name : '?';
   if (!given.flags || !given.parameters || !given.maps || !Number.isFinite(given.normalYSign)) throw Error(`Incomplete surface material: ${name}`);
+  if (typeof given.normalShadowInfluence !== 'number' || !(given.normalShadowInfluence >= 0)) throw Error(`Missing normal shadow influence: ${name}`);
   const config = given as SurfaceConfig;
   for (const [key, map] of Object.entries(config.maps)) {
     if (!map || typeof map.texture !== 'string' || !UV_SETS.has(map.uv)) throw Error(`Unsupported shader UV: ${name}/${key}`);

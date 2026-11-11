@@ -96,7 +96,7 @@ const region = {
   clearCoatRefractiveIndex: 1.44, lacquerColour: [1, 1, 1, 1], metallicPaintStrength: 0.8, metallicFlakeStrength: 0, carbonFibreStrength: 0.6, orangePeelStrength: 1,
 };
 const carPaint = (): CarSurface => ({
-  version: 4, kind: 'carPaint', maps: {albedo: {texture: 'a', uv: 'uv0', scale: [1, 1]}},
+  version: 4, kind: 'carPaint', normalShadowInfluence: 0.5, maps: {albedo: {texture: 'a', uv: 'uv0', scale: [1, 1]}},
   parameters: {regions: {black: region, red: region, green: region, blue: region, white: region}, clearCoatStrength: 0.5, lacquerThickness: 0.3,
     carbonFibreAlbedoColour: [0.43, 0.43, 0.43, 0], metallicFlakeColour: [1, 1, 1], uvScale: {carbonFibre: [125, 125], metallicFlakes: [1, 1], orangePeel: [1, 1]}},
 });

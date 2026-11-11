@@ -13,7 +13,7 @@ const sha = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 export function testCarPaint(albedo: string) {
   const region = { baseCoatRoughness: 0.4, baseCoatRefractiveIndex: 1.6, baseCoatSpecStrength: 1, clearCoatRoughness: 0, clearCoatRefractiveIndex: 1.5,
     clearCoatSpecStrength: 1, lacquerColour: [1, 1, 1], metallicPaintStrength: 0, carbonFibreStrength: 0 };
-  return { version: 4 as const, kind: 'carPaint', maps: { albedo: { texture: albedo, uv: 'uv0' as const, scale: [1, 1] as [number, number] } }, parameters: {
+  return { version: 4 as const, kind: 'carPaint', normalShadowInfluence: 0.5, maps: { albedo: { texture: albedo, uv: 'uv0' as const, scale: [1, 1] as [number, number] } }, parameters: {
     regions: { black: { ...region }, red: { ...region }, green: { ...region }, blue: { ...region }, white: { ...region } },
     uvScale: { carbonFibre: [1, 1], metallicFlakes: [1, 1], orangePeel: [1, 1] }, clearCoatStrength: 1, lacquerThickness: 0.1,
     carbonFibreAlbedoColour: [0.11, 0.11, 0.11], metallicFlakeColour: [1, 1, 1] } };

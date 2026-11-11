@@ -8,12 +8,12 @@ import { testShading } from '../../../../helpers/scenes/sceneryProfiles.js';
 const appearance = { alias: 'a', albedo: 'paint', optionNodes: [] } as unknown as CarAppearance;
 const recipe = (scale?: [number, number]): CarMaterialRecipe => ({
   id: 'm', name: 'GRID', paint: false,
-  surface: { version: 4, kind: 'diffuse', finish: { roughness: 0.5, metalness: 0 }, maps: { albedo: { texture: 'a', uv: 'uv0', scale: scale as [number, number] } } },
+  surface: { version: 4, kind: 'diffuse', normalShadowInfluence: 1, finish: { roughness: 0.5, metalness: 0 }, maps: { albedo: { texture: 'a', uv: 'uv0', scale: scale as [number, number] } } },
 });
 const build = (scale?: [number, number]) => createCarMaterial(recipe(scale), appearance, () => new Texture(), testShading()).map!;
 
 const standardSurface: CarSurface = {
-  version: 4, kind: 'standard', name: 'CARBON', flags: {}, normalYSign: -1, finish: { roughness: 0.5, metalness: 0.5 },
+  version: 4, kind: 'standard', name: 'CARBON', flags: {}, normalYSign: -1, normalShadowInfluence: 0.5, finish: { roughness: 0.5, metalness: 0.5 },
   parameters: {
     adjust: { tint: [1, 1, 1], normalStrength: 0.8, roughness: 0.4, metalness: 0.6, specular: 0.5 },
     base: { albedo: [1, 1, 1, 1], albedoAlt: [1, 1, 1, 1], metalness: 0, roughness: 0.5, metalnessAlt: 0, roughnessAlt: 0.5 },

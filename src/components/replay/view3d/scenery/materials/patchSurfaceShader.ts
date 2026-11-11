@@ -1,4 +1,7 @@
 import { MeshDepthMaterial, ShaderChunk, Vector2, Vector3, type IUniform, type WebGLProgramParametersWithUniforms } from 'three';
+import {
+  CASCADE_SHADOW_FRAGMENT_PARS, CASCADE_SHADOW_VERTEX, CASCADE_SHADOW_VERTEX_PARS, cascadeShadowUniforms, SUN_SHADOW_TERM,
+} from '../../shadows/cascadeSampling.js';
 import { STATIC_NORMAL_BIAS_M, SUN_SHADOW_DEPTH_M, staticShadowUniforms } from '../../sunShadows.js';
 import { digitalFlagClock } from './flagSurface.js';
 import { patchAmbientLookup } from './ambientLookup.js';
@@ -48,12 +51,12 @@ export function patchBillboardVertex(shader: WebGLProgramParametersWithUniforms,
  * (4 cm, 29 cm) at a grazing sun.
  */
 const BILLBOARD_SELF_SHADOW_M = [1, 4] as const;
-const SUN_SHADOW = 'getShadow( directionalShadowMap[ i ], directionalLightShadow.shadowMapSize, directionalLightShadow.shadowIntensity, directionalLightShadow.shadowBias, directionalLightShadow.shadowRadius, vDirectionalShadowCoord[ i ] )';
+const SUN_SHADOW = SUN_SHADOW_TERM;
 
 /**
  * The sun's shadow on a scenery surface: the near map inside its window, fading over the window's outer tenth to the static map
  * (sunShadows.ts), read with one hardware compare tap as the near one. Outside both maps, and before the first static map, lit.
- * Without shadows (tests), the near map alone.
+ * While a cascade set is in use (shadows/cascadeSampling.ts), the cascades instead. Without shadows (tests), the near map alone.
  */
 const STATIC_SHADOW_VERTEX = `
   #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
@@ -65,6 +68,7 @@ const SUN_SHADOW_BLEND = `
   uniform float surface_staticShadowReady;
   varying vec4 vStaticShadowCoord;
   float surfaceSunShadow( float nearShadow, vec4 nearCoord ) {
+    if ( surface_cascadeCount > 0 ) return surfaceCascadeShadow( - vViewPosition.z );
     vec2 window = nearCoord.xy / nearCoord.w;
     float inside = smoothstep( 0.0, 0.1, min( min( window.x, 1.0 - window.x ), min( window.y, 1.0 - window.y ) ) );
     if ( inside >= 1.0 || surface_staticShadowReady < 0.5 ) return nearShadow;
@@ -119,6 +123,7 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
   const tunable = (name: string, group: ParameterGroup | undefined, key: string) => { if (group?.[key] !== undefined) tunables[name] = { value: value(group, key) }; };
   tunable('surface_specular', p.adjust, 'specular');
   tunable('surface_specularTinting', p.adjust, 'specularTinting');
+  tunables.surface_normalShadowInfluence = { value: config.normalShadowInfluence };
   tunable('surface_mixBias', p.terrain, 'mixBias');
   tunable('surface_splatterOverlayFactor', p.terrain, 'splatterOverlay');
   tunable('surface_patternStrength', p.terrain, 'patternStrength');
@@ -148,7 +153,7 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
   Object.assign(shader.uniforms, tunables, {
     surface_normalScale: { value: new Vector2(value(p.adjust, 'normalStrength'), config.normalYSign) },
     surface_staticShadowMap: staticShadowUniforms.map, surface_staticShadowMatrix: staticShadowUniforms.matrix,
-    surface_staticShadowReady: staticShadowUniforms.ready,
+    surface_staticShadowReady: staticShadowUniforms.ready, ...cascadeShadowUniforms,
   }, mapScaleUniforms, config.kind === 'digitalFlag' ? { surface_flag_elapsed: digitalFlagClock } : {}, uniforms);
 
   const neededUvs = new Set<string>();
@@ -172,6 +177,8 @@ export function patchSurfaceShader(shader: WebGLProgramParametersWithUniforms, c
     const crown = config.kind === 'vegetation';
     if (crown) shader.uniforms[CROWN_SUN_UNIFORM] = crownSun;
     patchBillboardVertex(shader, 'cameraPosition', crown);
+    shader.fragmentShader = `#define SURFACE_CARD
+${shader.fragmentShader}`;
     // A card and its own shadow lie in one plane, so at grazing sun the card shadowed itself whole (black palms). Its lookup moves
     // toward the sun by BILLBOARD_SELF_SHADOW_M (per map), past its own depth; other objects' shadows still fall on it.
     shader.vertexShader = shader.vertexShader.replace(STATIC_SHADOW_VERTEX, `${STATIC_SHADOW_VERTEX}

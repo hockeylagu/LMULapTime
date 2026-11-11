@@ -12,7 +12,7 @@ const region = (over: Record<string, unknown> = {}) => ({
 });
 const map = (texture: string) => ({texture, uv: 'uv0' as const, scale: [1, 1] as [number, number]});
 const paint = (maps: CarSurface['maps']): CarSurface => ({
-  version: 4, kind: 'carPaint', maps,
+  version: 4, kind: 'carPaint', normalShadowInfluence: 0.5, maps,
   parameters: {regions: {black: region(), red: region(), green: region({clearCoatSpecStrength: 0}), blue: region(), white: region()},
     clearCoatStrength: 0.5, lacquerThickness: 0.3, carbonFibreAlbedoColour: [0.43, 0.43, 0.43, 0], metallicFlakeColour: [1, 1, 1],
     uvScale: {carbonFibre: [125, 125], metallicFlakes: [1, 1], orangePeel: [1, 1]}},

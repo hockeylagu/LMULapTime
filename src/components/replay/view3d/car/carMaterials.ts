@@ -5,6 +5,7 @@ import { patchAmbientLookup } from '../scenery/materials/ambientLookup.js';
 import { bindSurfaceProgram } from '../scenery/materials/configureSurfaceMaterial.js';
 import type { SurfaceConfig, SurfaceMap } from '../scenery/materials/surfaceConfig.js';
 import { MAX_ANISOTROPY } from '../scenery/materials/textureSource.js';
+import { patchCascadeShadow } from '../shadows/cascadeSampling.js';
 import { configureCarPaint, PAINT_MAPS } from './carPaint.js';
 import { bindCarSurfaceReflection } from './carReflection.js';
 
@@ -29,7 +30,7 @@ function albedoPath(recipe: CarMaterialRecipe, appearance: CarAppearance): strin
 function nativeSurface(recipe: CarMaterialRecipe, appearance: CarAppearance): SurfaceConfig | null {
   const surface = recipe.surface;
   if (recipe.paint || !surface || (surface.kind !== 'standard' && surface.kind !== 'standardBlend')) return null;
-  if (!surface.flags || !surface.parameters || !Number.isFinite(surface.normalYSign)) throw Error(`Car material ${recipe.name} has no surface description`);
+  if (!surface.flags || !surface.parameters || !Number.isFinite(surface.normalYSign) || typeof surface.normalShadowInfluence !== 'number' || surface.normalShadowInfluence < 0) throw Error(`Car material ${recipe.name} has no surface description`);
   const maps: Record<string, SurfaceMap> = {};
   for (const [key, map] of Object.entries(surface.maps)) {
     const texture = key === 'albedo' ? albedoPath(recipe, appearance) : map.texture;
@@ -37,6 +38,7 @@ function nativeSurface(recipe: CarMaterialRecipe, appearance: CarAppearance): Su
   }
   return {
     version: 4, kind: surface.kind, name: recipe.name, flags: surface.flags, maps, normalYSign: surface.normalYSign!,
+    normalShadowInfluence: surface.normalShadowInfluence,
     parameters: surface.parameters as SurfaceConfig['parameters'],
   };
 }
@@ -120,6 +122,12 @@ export function createCarMaterial(recipe: CarMaterialRecipe, appearance: CarAppe
     // Three's own program otherwise: the same ambient lookup as every other surface of the scene.
     material.onBeforeCompile = shader => { patchAmbientLookup(shader); };
     material.customProgramCacheKey = () => 'lmu-car-ambient';
+  }
+  if (!surface) {
+    // Paint and the materials on three's light loop take the sun's shadow from the cascades too (the surface program has its own).
+    const influence = config.normalShadowInfluence, own = material.onBeforeCompile.bind(material);
+    if (typeof influence !== 'number' || influence < 0) throw Error(`Car material ${recipe.name} has no normal shadow influence`);
+    material.onBeforeCompile = (shader, renderer) => { own(shader, renderer); patchCascadeShadow(shader, influence); };
   }
   material.shadowSide = DoubleSide;
   material.name = recipe.name;
