@@ -234,11 +234,11 @@ export async function createReplayScene(
   const target = new Vector3(), previousTarget = new Vector3();
   const chaseTracker = createChaseCameraTracker();
   let trackside = createTracksideCameras(trajectory.points, layer.primaryDistances, origin);
-  /** Stream scenery around the car (lap distance) or, for the panned orbit and overhead cameras, around the camera. */
+  /** Stream scenery around the car (lap distance, plus what is near the camera) or, for the panned orbit and overhead cameras, around the camera. */
   const updateStream = () => {
     const next: StreamView = isFreeCameraMode(mode)
       ? {kind: 'free', x: camera.position.x + origin.x, z: origin.z - camera.position.z}
-      : {kind: 'lap', lapDistanceM: currentStation};
+      : {kind: 'lap', lapDistanceM: currentStation, x: camera.position.x + origin.x, z: origin.z - camera.position.z};
     if (!viewMoved(streamView, next, route)) return;
     streamView = next; stream.update(next);
   };

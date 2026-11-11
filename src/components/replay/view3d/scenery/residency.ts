@@ -1,7 +1,7 @@
 import type { SceneryChunk, SceneryLayout, ScenerySectorChunk } from '../../../../../shared/types/scenes/scenery.js';
 
-/** What the stream is centred on: a car at a lap distance, or a free camera at a native x/z position. */
-export type StreamView = { kind: 'lap'; lapDistanceM: number } | { kind: 'free'; x: number; z: number };
+/** What the stream is centred on: a car at a lap distance (with the camera's native x/z position once there is one), or a free camera at a native x/z position. */
+export type StreamView = { kind: 'lap'; lapDistanceM: number; x?: number; z?: number } | { kind: 'free'; x: number; z: number };
 
 /** A chunk leaves only when it is this far outside the resident window, so a camera oscillating at the edge does not thrash. */
 export const HYSTERESIS_M = 250;
@@ -35,8 +35,9 @@ function contains(chunk: ScenerySectorChunk, lap: number, route: number): boolea
 
 /**
  * The resident set of docs/SCENE_PACKAGE.md. At lap distance L a main sector is resident when its lap range meets
- * `[L - residentBehindM, L + residentAheadM]` (circular); pit chunks use their main lap range. A free camera keeps every chunk whose
- * xz bounds are within `freeCameraRadiusM`. The horizon is always resident and not part of the plan.
+ * `[L - residentBehindM, L + residentAheadM]` (circular); pit chunks use their main lap range. So is a sector whose xz bounds are
+ * within `residentAheadM` of the camera in a straight line: a circuit that folds back on itself shows sectors far along the lap
+ * from close by (they load last, nearest first). A free camera keeps every chunk whose xz bounds are within `freeCameraRadiusM`. The horizon is always resident and not part of the plan.
  */
 export function planResidency(layout: SceneryLayout, view: StreamView, hysteresisM = HYSTERESIS_M): ResidencyPlan {
   const { residentBehindM, residentAheadM, freeCameraRadiusM } = layout.streaming, route = layout.routeLengthM;
@@ -54,8 +55,12 @@ export function planResidency(layout: SceneryLayout, view: StreamView, hysteresi
   const lap = mod(view.lapDistanceM, route);
   for (const chunk of layout.sectors) {
     const inside = overlapsCircular(chunk.lapStartM, chunk.lapEndM, lap - residentBehindM, lap + residentAheadM, route);
-    if (overlapsCircular(chunk.lapStartM, chunk.lapEndM, lap - residentBehindM - hysteresisM, lap + residentAheadM + hysteresisM, route)) keep.add(chunk.id);
-    if (!inside) continue;
+    const distance = view.x === undefined || view.z === undefined ? Infinity : boundsDistanceXZ(chunk, view.x, view.z);
+    if (distance < residentAheadM + hysteresisM || overlapsCircular(chunk.lapStartM, chunk.lapEndM, lap - residentBehindM - hysteresisM, lap + residentAheadM + hysteresisM, route)) keep.add(chunk.id);
+    if (!inside) {
+      if (distance < residentAheadM) wanted.push({ id: chunk.id, rank: 3, key: distance, pit: chunk.kind === 'pit' });
+      continue;
+    }
     if (contains(chunk, lap, route)) { wanted.push({ id: chunk.id, rank: 0, key: 0, pit: chunk.kind === 'pit' }); continue; }
     const ahead = mod(chunk.lapStartM - lap, route), behind = mod(lap - chunk.lapEndM, route);
     const pit = chunk.kind === 'pit';

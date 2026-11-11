@@ -353,7 +353,9 @@ it('puts the cockpit, hood and roof views on the game cameras of the car with th
 
 it('loads the whole circuit, shows the window around the car, hides what left it, and follows a free camera', async () => {
   const host = document.createElement('div'), far = {...lap, points: [...lap.points.slice(0, 6), {...lap.points[6], stationM: 3000}]};
-  const handle = await createReplayScene(host, layout, far, null, vi.fn(), assets);
+  // s1 lies 5 km from the car's path, so only its lap range can bring it in (the other sectors are also near in a straight line).
+  const away = {min: [5000, 0, -100], max: [5200, 0, 100]}, spread = {...layout, sectors: layout.sectors.map(chunk => chunk.id === 's1' ? {...chunk, bounds: away} : chunk)} as SceneryLayoutResource;
+  const handle = await createReplayScene(host, spread, far, null, vi.fn(), assets);
   const shown = () => [...chunks.roots].filter(([, root]) => root.parent && root.visible).map(([id]) => id).sort();
   // Everything loads; at station 0 the window [-300, 1500] covers s0, s1 and the end of s3, never s2.
   await vi.waitFor(() => expect([...chunks.roots.values()].every(root => root.parent)).toBe(true));

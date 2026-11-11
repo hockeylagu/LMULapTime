@@ -40,6 +40,16 @@ describe('lap residency', () => {
     for (const id of p.wanted) expect(p.keep.has(id)).toBe(true);
   });
 
+  it('also wants the sectors near the camera in a straight line, after the lap window, and keeps them up to the margin', () => {
+    const at = (x: number) => planResidency(layout, { kind: 'lap', lapDistanceM: 2600, x, z: 50 });
+    // From lap 2600 the window [2300, 4100] leaves s1 (ended 600 m behind) out; a camera 50 m from its bounds brings it in, last.
+    expect(plan(2600).wanted).toEqual(['s2', 's3', 's0', 'p0']); expect(plan(2600).keep.has('s1')).toBe(false);
+    expect(at(1150).wanted).toEqual(['s2', 's3', 's0', 'p0', 's1']); expect(at(1150).under).toEqual(['s2']);
+    // 1600 m from s1: outside the 1500 m reach, inside the margin.
+    expect(at(2700).wanted).not.toContain('s1'); expect(at(2700).keep.has('s1')).toBe(true);
+    expect(at(2900).keep.has('s1')).toBe(false);
+  });
+
   it('never plans the horizon, which is always resident', () => {
     expect(plan(0).wanted).not.toContain('horizon'); expect(plan(0).keep.has('horizon')).toBe(false);
   });

@@ -219,8 +219,9 @@ as `Content-Type: image/ktx2` with `Content-Encoding: zstd`, so the browser deco
 
 The viewer always keeps the horizon chunk loaded and streams the sector chunks by the resident-set rule: at lap distance `L`, a main
 sector is resident while its lap range meets `[L - residentBehindM, L + residentAheadM]` (circular; a pit chunk uses its main lap
-range). The orbit and overhead cameras use the camera position instead and keep chunks whose xz bounds are within
-`freeCameraRadiusM`. Loading goes under the camera first, then ahead nearest first, then behind; a chunk unloads only after it is 250 m
+range), and so is a sector whose xz bounds are within `residentAheadM` of the camera in a straight line (a circuit that folds back on
+itself shows sectors far along the lap from close by). The orbit and overhead cameras use the camera position instead and keep chunks whose xz bounds are within
+`freeCameraRadiusM`. Loading goes under the camera first, then ahead nearest first, then behind, then the straight-line ones; a chunk unloads only after it is 250 m
 outside the window. Each loaded chunk holds one reference on every texture it uses and a texture is released with its last chunk.
 A chunk that fails to load is reported and not retried. Road and ground heights (racing line, track limits, wheels, camera
 clearance) come from the resident chunks only.
