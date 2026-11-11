@@ -170,14 +170,14 @@ export interface ReplayTrajectoryPoint {
   velocityLon?: number;
   /** Replay: measured velocity along the car's ISO y axis (left), m/s. */
   velocityLat?: number;
-  slipAngleDeg?: number;
-  understeerDeg?: number;
-  tireSlipPct?: number;
-  wheelLockActive?: boolean;
   /** Source sample retained when supplemental live dynamics replace computed estimates. */
   liveDynamics?: LiveDynamicsProvenance;
   wheelSlip?: WheelSlip;
   /** ISO sideslip beta in degrees: positive velocity left of the nose. */
+  slipAngleDeg?: number;
+  understeerDeg?: number;
+  tireSlipPct?: number;
+  wheelLockActive?: boolean;
   fuel?: number;
   virtualEnergy?: number;
   soc?: number;
