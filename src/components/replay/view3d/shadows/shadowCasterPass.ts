@@ -26,24 +26,29 @@ const castsShadow = (material: Material) => !material.transparent || material.al
 const NO_SHADOW = new MeshDepthMaterial({ visible: false });
 
 export function createShadowCasterPass(renderer: WebGLRenderer, scene: Scene): ShadowCasterPass {
-  const depthMaterials = new WeakMap<Material, MeshDepthMaterial>();
+  // Casters that draw the same way share one depth material, so the pass draws them one after another without switching material
+  // (every switch uploads the material's uniforms again): keyed by the card turn, side, alpha cut and the textures the cut reads.
+  const depthMaterials = new Map<string, MeshDepthMaterial>();
+  let byMaterial = new WeakMap<Material, MeshDepthMaterial>(); // The key's result per scene material, so the key is built once.
   const depthOf = (mesh: Mesh, material: Material): MeshDepthMaterial => {
     if (!castsShadow(material)) return NO_SHADOW;
-    let depth = depthMaterials.get(material);
-    if (depth) return depth;
-    depth = new MeshDepthMaterial();
+    const known = byMaterial.get(material);
+    if (known) return known;
+    const custom = mesh.customDepthMaterial ?? null, side = material.shadowSide ?? SHADOW_SIDE[material.side];
+    const alphaTest = material.alphaToCoverage ? 0.5 : material.alphaTest, source = material as Material & {map?: Texture | null; alphaMap?: Texture | null};
+    const [map, alphaMap] = alphaTest > 0 ? [source.map ?? null, source.alphaMap ?? null] : [null, null];
+    const key = `${custom?.uuid ?? ''}|${side}|${alphaTest}|${map?.id ?? ''}|${alphaMap?.id ?? ''}`;
+    let depth = depthMaterials.get(key);
+    if (depth) { byMaterial.set(material, depth); return depth; }
+    depth = new MeshDepthMaterial({side, alphaTest, map, alphaMap});
     // Camera-facing cards keep their shadow-pass turn (patchSurfaceShader's billboard depth material).
-    const custom = mesh.customDepthMaterial;
     if (custom) {
       depth.onBeforeCompile = (shader, renderer) => custom.onBeforeCompile(shader, renderer);
       depth.customProgramCacheKey = () => custom.customProgramCacheKey();
     }
-    const source = material as Material & {map?: Texture | null; alphaMap?: Texture | null};
-    depth.alphaTest = material.alphaToCoverage ? 0.5 : material.alphaTest;
-    if (depth.alphaTest > 0) { depth.map = source.map ?? null; depth.alphaMap = source.alphaMap ?? null; }
-    depth.side = material.shadowSide ?? SHADOW_SIDE[material.side];
-    depthMaterials.set(material, depth);
-    material.addEventListener('dispose', () => { depth.dispose(); depthMaterials.delete(material); });
+    depthMaterials.set(key, depth); byMaterial.set(material, depth);
+    // A depth material that cuts by a texture goes with it.
+    for (const texture of [map, alphaMap]) texture?.addEventListener('dispose', () => { depth.dispose(); depthMaterials.delete(key); byMaterial = new WeakMap(); });
     return depth;
   };
   return {
