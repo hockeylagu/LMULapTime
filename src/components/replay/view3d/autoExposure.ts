@@ -1,4 +1,4 @@
-import { type Color, DataUtils, HalfFloatType, Matrix3, Mesh, OrthographicCamera, PlaneGeometry, Scene, ShaderMaterial, Vector2, Vector3, WebGLRenderTarget, type Camera, type Object3D, type WebGLRenderer } from 'three';
+import { type Color, DataUtils, DepthTexture, FloatType, HalfFloatType, Matrix3, Mesh, OrthographicCamera, PlaneGeometry, Scene, ShaderMaterial, Vector2, Vector3, WebGLRenderTarget, type Camera, type Object3D, type WebGLRenderer } from 'three';
 import { SUN_UNIT } from './atmosphere/sunSamples.js';
 import { surfaceAlphaCut } from './scenery/materials/shaderContext.js';
 import { profilesAt, timeOfDayPosition, weatherWeight } from './atmosphere/timeOfDay.js';
@@ -176,7 +176,7 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
   } satisfies Record<SceneryCameraType, ResolvedType>;
   let active = types[type];
   const size = new Vector2();
-  const hdr = new WebGLRenderTarget(1, 1, {type: HalfFloatType, samples: 4});
+  const hdr = new WebGLRenderTarget(1, 1, {type: HalfFloatType, samples: 4, depthTexture: new DepthTexture(1, 1, FloatType)});
   const meter = new WebGLRenderTarget(METER_PX, METER_PX, {type: HalfFloatType, depthBuffer: false});
   const quad = new PlaneGeometry(2, 2), quadCamera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
   const output = new Scene(), meterScene = new Scene();

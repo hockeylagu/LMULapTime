@@ -18,7 +18,7 @@ vi.mock('three', async importOriginal => {
     dispose() {}
   }};
 });
-const fakeRenderer = () => ({capabilities: {maxTextureSize: 16384}, render: vi.fn(), clear: vi.fn(), autoClear: true, getRenderTarget: () => null, setRenderTarget: vi.fn(), initRenderTarget: vi.fn(), getActiveCubeFace: () => 0, getActiveMipmapLevel: () => 0, xr: {enabled: false}, coordinateSystem: WebGLCoordinateSystem});
+const fakeRenderer = () => ({capabilities: {maxTextureSize: 16384}, state: {buffers: {depth: {getReversed: () => false, setReversed() {}}}}, render: vi.fn(), clear: vi.fn(), autoClear: true, getRenderTarget: () => null, setRenderTarget: vi.fn(), initRenderTarget: vi.fn(), getActiveCubeFace: () => 0, getActiveMipmapLevel: () => 0, xr: {enabled: false}, coordinateSystem: WebGLCoordinateSystem});
 /** A venue without daylight: the default midday sun, the synthetic sky, the probe at the scene origin. */
 const venue = (daylight?: SceneVenue['daylight'], position: [number, number, number] = [0, 0, 0]): SceneVenue => ({daylight, sky: testSky(), environmentProbe: {position}, shading: testShading()});
 const skyMaterial = (scene: Scene) => (scene.getObjectByName('sky') as Mesh<BoxGeometry, ShaderMaterial>).material;

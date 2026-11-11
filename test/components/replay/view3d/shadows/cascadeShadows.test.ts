@@ -13,7 +13,7 @@ function recordingRenderer(car: Mesh) {
   const draws: Array<{viewport: Vector4; car: boolean}> = [];
   let target: unknown = null;
   const renderer = {
-    autoClear: true, shadowMap: {autoUpdate: true}, capabilities: {maxTextureSize: 16384},
+    autoClear: true, state: {buffers: {depth: {getReversed: () => false, setReversed() {}}}}, shadowMap: {autoUpdate: true}, capabilities: {maxTextureSize: 16384},
     initRenderTarget() {}, clear() {},
     getRenderTarget: () => target, setRenderTarget(next: unknown) { target = next; },
     render() { draws.push({viewport: (target as {viewport: Vector4}).viewport.clone(), car: car.visible}); },

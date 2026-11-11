@@ -187,7 +187,12 @@ ${shader.fragmentShader}`;
     // toward the sun by BILLBOARD_SELF_SHADOW_M (per map), past its own depth; other objects' shadows still fall on it.
     shader.vertexShader = shader.vertexShader.replace(STATIC_SHADOW_VERTEX, `${STATIC_SHADOW_VERTEX}
       #if defined( USE_SHADOWMAP ) && NUM_DIR_LIGHT_SHADOWS > 0
-        vDirectionalShadowCoord[ 0 ].z -= ${glslNumber(BILLBOARD_SELF_SHADOW_M[0] / SUN_SHADOW_DEPTH_M[0])} * vDirectionalShadowCoord[ 0 ].w;
+        // The near map is three's own, so it follows the scene's depth range: reversed, nearer the sun is a larger depth.
+        #ifdef USE_REVERSED_DEPTH_BUFFER
+          vDirectionalShadowCoord[ 0 ].z += ${glslNumber(BILLBOARD_SELF_SHADOW_M[0] / SUN_SHADOW_DEPTH_M[0])} * vDirectionalShadowCoord[ 0 ].w;
+        #else
+          vDirectionalShadowCoord[ 0 ].z -= ${glslNumber(BILLBOARD_SELF_SHADOW_M[0] / SUN_SHADOW_DEPTH_M[0])} * vDirectionalShadowCoord[ 0 ].w;
+        #endif
         vStaticShadowCoord.z -= ${glslNumber(BILLBOARD_SELF_SHADOW_M[1] / SUN_SHADOW_DEPTH_M[1])} * vStaticShadowCoord.w;
       #endif`);
   }

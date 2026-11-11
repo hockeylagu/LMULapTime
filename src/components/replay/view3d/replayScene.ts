@@ -64,7 +64,7 @@ export async function createReplayScene(
 ): Promise<ReplaySceneHandle> {
   let renderer: WebGLRenderer;
   // No canvas multisampling: the scene renders into the auto-exposure target, which multisamples; the canvas gets one full-screen quad.
-  try { renderer = new WebGLRenderer({antialias: false, alpha: false}); }
+  try { renderer = new WebGLRenderer({antialias: false, alpha: false, reversedDepthBuffer: true}); }
   catch { throw Error('WebGL 2 is unavailable. Use the 2D map.'); }
   const {min, max} = layout.horizon.bounds, origin = new Vector3(...min).add(new Vector3(...max)).multiplyScalar(0.5);
   const loader = createChunkLoader(renderer), carTextures = new CachedKtx2Loader(renderer);

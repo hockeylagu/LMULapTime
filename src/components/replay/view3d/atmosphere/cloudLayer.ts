@@ -44,7 +44,11 @@ varying float vCloudFade;
 const CLOUD_VERTEX = `
 vCloudUv = uv; vCloudTangent = cloudTangent; vCloudBinormal = cloudBinormal; vCloudNormal = cloudNormal; vCloudFade = cloudFade;
 vCloudRay = vec3( position.x, position.y, - position.z );
+#ifdef USE_REVERSED_DEPTH_BUFFER
+gl_Position.z = 0.0;
+#else
 gl_Position.z = gl_Position.w;
+#endif
 `;
 const CLOUD_FRAGMENT_PARS = `
 uniform sampler2D cloudAlphaMap;

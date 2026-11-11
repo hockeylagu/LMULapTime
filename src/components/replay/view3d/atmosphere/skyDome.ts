@@ -160,7 +160,7 @@ export function createSkyDomeMaterial(sunDirection: Vector3, sky: ScenerySky, da
     },
     vertexShader: `
       varying vec3 vWorld;
-      void main() { vec4 w = modelMatrix * vec4(position, 1.0); vWorld = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; gl_Position.z = gl_Position.w; }`,
+      void main() { vec4 w = modelMatrix * vec4(position, 1.0); vWorld = w.xyz; gl_Position = projectionMatrix * viewMatrix * w;\n#ifdef USE_REVERSED_DEPTH_BUFFER\ngl_Position.z = 0.0;\n#else\ngl_Position.z = gl_Position.w;\n#endif\n}`,
     fragmentShader: `
       uniform vec3 sunDirection, radiances, gain, hazeColour; uniform float isothermal, sunProximity, hazeDepth;
       uniform float coefficientsX[9], coefficientsY[9], coefficientsZ[9]; uniform mat3 xyzToRgb; uniform vec2 skyBox;

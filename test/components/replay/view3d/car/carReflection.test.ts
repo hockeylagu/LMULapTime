@@ -27,7 +27,7 @@ function stubRenderer() {
   const faces: Array<{face: number; carShown: boolean; shadowUpdate: boolean; mips: boolean}> = [], eyes: Vector3[] = [], ranges: [number, number][] = [];
   let target: unknown = null, face = 0;
   const renderer = {
-    coordinateSystem: WebGLCoordinateSystem, shadowMap: {autoUpdate: true},
+    coordinateSystem: WebGLCoordinateSystem, state: {buffers: {depth: {getReversed: () => false, setReversed() {}}}}, shadowMap: {autoUpdate: true},
     getRenderTarget: () => target, initRenderTarget() {},
     setRenderTarget(next: unknown, activeFace = 0) { target = next; face = activeFace; },
     render(_scene: Scene, camera: PerspectiveCamera) {
