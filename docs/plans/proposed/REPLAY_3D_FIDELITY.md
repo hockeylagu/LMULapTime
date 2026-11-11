@@ -54,8 +54,7 @@ multisamples. Exposure is relative (target ÷ metered luminance), so the app's l
   shadows). The frames before the first reading use exposure 1. The racing line is data, not scenery, so it keeps the fixed
   daylight exposure: exposure is set before the scene pass and the line divides it out of its colour as it draws (exposure is
   linear before tone mapping, so its pixels match the fixed-exposure look exactly, edges and blending included).
-- **Calibration:** the law's fitted gain (`EXPOSURE_GAIN`, 1.24) and the camera's luminance scale (2.2) come from the frame
-  captures (item 11b).
+- **Calibration:** none of the app's own; the law's border, limits and luminance scale come from the package (item 11b-2).
 - **Cost, same machine and session:**
 
   | | Fuji p50 / p99 / >16 ms | Silverstone p50 / p99 / >16 ms |
@@ -223,13 +222,32 @@ scored by `inputs/score.py` against the frozen game frames):
    target and adaptation scale. G fits at 1.24 over 20 frames, the three camera types and a 150-fold range of L (11 % scatter);
    the log average the app used scatters 23 %, and a near mask makes the onboard frames worse. The app now meters the mean
    without the 4 m mask and exposes by `1.24 · U · T / (U · L)^s`, U = 1 / (SUN_UNIT · 2.2), replacing C = 4.06. A fitted
-   constant, named as one. The reference also caps exposure at a per-profile maximum (never reached in the captures, so
-   nothing to match by day); the package does not carry it, open for dusk and night. Over the 62 shots (`after9.json` against
+   constant, named as one (replaced in item 11b-2). The reference also caps exposure at a per-profile maximum (never reached
+   in the captures); carried since item 11b-2. Over the 62 shots (`after9.json` against
    `after8.json`): in band 33 → 49, f median 0.868 → 0.893, mean dE 11.04 → 10.42; cockpit f 1.50 → 0.97 (dE 9.3 → 7.9), TV
    0.82 → 0.89, chase 1.13 → 0.87, reverse 1.23 → 0.78. What remains bright is the scene, not the exposure: a pixel trace of one
    Daytona frame puts the app's sunlit road at 1.2× the reference's (the wall beside it equal), which is the chase and reverse
    residual. Daytona stays at f 0.75 (5 of 12 in band): its screenshots show soft or no car shadows, the sun dimmed by cloud at
    those moments, which the replay data does not carry; the captured Daytona frame with the sun out matches.
+11b-2. **Exposure law without a fitted constant** (`autoExposure.ts`, 2026-11-09 late, uncommitted; needs a package with the
+   new fields). The package now gives each time-of-day look its light/dark border B and its exposure limits
+   (`lightDarkBorder`, `minExposure`, `maxExposure`, clear and overcast), and the app exposes by
+   `U · clamp(T · B^(1 − s) / (U · L)^s, min, max)`, U from the package's `sceneLuminanceScale`. The fitted G = 1.24 is gone:
+   it was mostly B^(1 − s), about 1.15 by day. The 20 reference frames sit 9 % over this law (9.5 % scatter), so the app
+   now exposes about 8 % lower than under item 11b. Not carried: the reference's dark-scene adaptation set, its glare
+   influence on the target and its adaptation speed limit. Not yet scored on the 62 shots.
+11c. **Road rubber groove at an assumed level** (`scenery/materials/roadSurface.ts`, 2026-11-09 night, uncommitted; needs a
+   package that carries the groove). The sunlit road at 1.2× was the rubber laid on the racing line, which the app did not
+   draw. The package now gives each rubbered road its groove map (`flags.grooveMap`, `maps.groove`) and the groove's albedo,
+   roughness and specular level (`parameters.groove`); the road mixes toward them after its tint by
+   `max(2 · max(m − 0.5, 0) · mask.g, mask.r · min(1.5 · m, 1))`, `m = mix(details.g, 1, R)`, and ambient occlusion goes to 1
+   where the groove lies. R, the rubber laid, is session state the replay does not carry: `ASSUMED_RUBBER` = 0.2 for every
+   session (0.18 and 0.24 read in one captured practice frame), an assumption named as one, chosen by the user over leaving
+   the road bare. Not carried: the groove's shift of the index of refraction. Over the 62 shots on a debug package
+   (`after10.json` against `after9.json`): in band 49 → 53, f median 0.893 → 0.948, mean dE 10.42 → 9.68, b* 1.13 → 0.66;
+   chase f 0.87 → 0.94 (dE 11.0 → 9.6), reverse 0.78 → 0.85, TV 0.89 → 0.94, cockpit 0.97 → 1.04; Daytona 0.75 → 0.80. The
+   lamps, the baked terrain shadow and the v8 sky landed between the two runs, so not all of the difference is the groove.
+   Out of band still: F1, F2 (bright), F4, F5, F9, N12, N13, N17, N23 (dark).
 12. **Car reflection probe from the frame captures** (`car/carReflection.ts`, `car/carPaint.ts`, 2026-11-09). The captures
    show the reference reflection as a live cube rendered from the car's roof (0.72 m over the bounding-box centre), 0.1–150 m,
    the car itself never drawn into it, read sharp by any clear coat of roughness 0.1 or less and from a convolved chain above

@@ -5,8 +5,10 @@ function cameraType(window: SceneryCameraTypeProfile['meteringWindow'], adaptati
   return {
     meteringWindow: window, adaptationScale, weatherBlendRate: 0.25,
     profiles: [
-      { sunTarget: 0, targetExposure: targets[0], whiteBalanceK: 7000, toneCurve: { a: 2.5, b: 0.6 }, weatherLerpPower: 1, overcast: { targetExposure: targets[0] * 1.5, whiteBalanceK: 7500, toneCurve: { a: 2, b: 0.5 } } },
-      { sunTarget: 60, targetExposure: targets[1], whiteBalanceK: 6500, toneCurve: { a: 3, b: 0.7 }, weatherLerpPower: 1, overcast: { targetExposure: targets[1] * 1.5, whiteBalanceK: 7200, toneCurve: { a: 2.4, b: 0.6 } } },
+      { sunTarget: 0, targetExposure: targets[0], lightDarkBorder: 1.5, minExposure: 0, maxExposure: 4, whiteBalanceK: 7000, toneCurve: { a: 2.5, b: 0.6 }, weatherLerpPower: 1,
+        overcast: { targetExposure: targets[0] * 1.5, lightDarkBorder: 2, minExposure: 0.1, maxExposure: 5, whiteBalanceK: 7500, toneCurve: { a: 2, b: 0.5 } } },
+      { sunTarget: 60, targetExposure: targets[1], lightDarkBorder: 1.25, minExposure: 0, maxExposure: 1, whiteBalanceK: 6500, toneCurve: { a: 3, b: 0.7 }, weatherLerpPower: 1,
+        overcast: { targetExposure: targets[1] * 1.5, lightDarkBorder: 2, minExposure: 0.1, maxExposure: 2, whiteBalanceK: 7200, toneCurve: { a: 2.4, b: 0.6 } } },
     ],
     ambientOcclusion: { radiusM: 0.4, samples: 8, scale: 2, colour: 0.4 },
   };

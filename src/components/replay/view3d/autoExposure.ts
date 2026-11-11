@@ -14,15 +14,14 @@ const glslFloat = (n: number) => Number.isInteger(n) ? `${n}.0` : String(n);
 /** The white balance that leaves colours unchanged (D65's temperature). */
 const NEUTRAL_KELVIN = 6500;
 /**
- * The exposure law, exposure = G · U · T / (U · L)^s: T the profile's target, s the type's adaptation scale, L the mean luminance
- * of the type's metering window (everything in it, the cockpit included) and U what one unit of the scene's light measures on the
- * camera's own scale. Twenty captured reference frames across the three camera types and a 150-fold range of L put the displayed
- * multiplier on this law with G fitted at 1.24 (11 % scatter) and the camera's luminance scale at 2.2
- * (docs/local/replay-3d-reference/renderdoc/FINDINGS.md 4c, 2026-11-09).
+ * The exposure law, exposure = U · clamp(T · B^(1 - s) / (U · L)^s, min, max): T the profile's target, B its light/dark border,
+ * min and max its limits, s the type's adaptation scale (all from the package), L the mean luminance of the type's metering window
+ * (everything in it, the cockpit included) and U what one unit of the scene's light measures on the camera's own scale. No constant
+ * of the app's: twenty captured reference frames across the three camera types and a 150-fold range of L sit 9 % over this law
+ * (9.5 % scatter; docs/local/replay-3d-reference/renderdoc/FINDINGS.md 4f, 2026-11-09).
  */
-export const EXPOSURE_GAIN = 1.24;
-const CAMERA_LUMINANCE_SCALE = 2.2;
-export const METER_UNIT = 1 / (SUN_UNIT * CAMERA_LUMINANCE_SCALE);
+/** U: what one unit of the scene's light measures on a camera of the package's luminance scale. */
+export const meterUnit = (sceneLuminanceScale: number): number => 1 / (SUN_UNIT * sceneLuminanceScale);
 
 /** The camera's tone curve for one exposed linear component. */
 export function toneCurve(curve: SceneryToneCurve, x: number): number {
@@ -51,26 +50,33 @@ const ADAPT_PER_S = 2.0, SETTLED_LOG = 0.01;
  * A camera type's time-of-day profile for the direct sun: the two profiles around the sun's position along their knots
  * (atmosphere/timeOfDay.ts), each blended from its clear look toward its overcast one by the weather, then mixed.
  */
-export interface CameraTimeOfDay { targetExposure: number; whiteBalanceK: number; toneCurve: SceneryToneCurve }
+export type CameraTimeOfDay = SceneryCameraLook;
 /** The direct sun the profiles are chosen by: its RGB in the package's light unit and its elevation. */
 export interface ProfileSun { rgb: Color; elevationDeg: number }
 export function profileAt(type: SceneryCameraTypeProfile, sun: ProfileSun, cloudCover = 0): CameraTimeOfDay {
   const look = (p: SceneryCameraProfile): SceneryCameraLook => {
-    const w = weatherWeight(cloudCover, p.weatherLerpPower), mix = (a: number, b: number) => a + (b - a) * w;
-    return {targetExposure: mix(p.targetExposure, p.overcast.targetExposure), whiteBalanceK: mix(p.whiteBalanceK, p.overcast.whiteBalanceK),
-      toneCurve: {a: mix(p.toneCurve.a, p.overcast.toneCurve.a), b: mix(p.toneCurve.b, p.overcast.toneCurve.b)}};
+    return mixLooks(p, p.overcast, weatherWeight(cloudCover, p.weatherLerpPower));
   };
   const position = timeOfDayPosition(type.profiles.map(profile => profile.sunTarget), sun.rgb, sun.elevationDeg);
-  const [low, high, t] = profilesAt(type.profiles, position), p0 = look(low), p1 = look(high), mix = (a: number, b: number) => a + (b - a) * t;
+  const [low, high, t] = profilesAt(type.profiles, position);
+  return mixLooks(look(low), look(high), t);
+}
+
+/** Every value of a look, a toward b by t. */
+function mixLooks(a: SceneryCameraLook, b: SceneryCameraLook, t: number): SceneryCameraLook {
+  const mix = (x: number, y: number) => x + (y - x) * t;
   return {
-    targetExposure: mix(p0.targetExposure, p1.targetExposure), whiteBalanceK: mix(p0.whiteBalanceK, p1.whiteBalanceK),
-    toneCurve: {a: mix(p0.toneCurve.a, p1.toneCurve.a), b: mix(p0.toneCurve.b, p1.toneCurve.b)},
+    targetExposure: mix(a.targetExposure, b.targetExposure), lightDarkBorder: mix(a.lightDarkBorder, b.lightDarkBorder),
+    minExposure: mix(a.minExposure, b.minExposure), maxExposure: mix(a.maxExposure, b.maxExposure),
+    whiteBalanceK: mix(a.whiteBalanceK, b.whiteBalanceK),
+    toneCurve: {a: mix(a.toneCurve.a, b.toneCurve.a), b: mix(a.toneCurve.b, b.toneCurve.b)},
   };
 }
 
 /** The exposure law, with the metered mean luminance given as its natural log. */
-export function lawExposure(targetExposure: number, adaptationScale: number, meteredLog: number): number {
-  return EXPOSURE_GAIN * METER_UNIT ** (1 - adaptationScale) * targetExposure / Math.exp(adaptationScale * meteredLog);
+export function lawExposure(look: SceneryCameraLook, adaptationScale: number, meteredLog: number, unit: number): number {
+  const free = look.targetExposure * look.lightDarkBorder ** (1 - adaptationScale) / (unit * Math.exp(meteredLog)) ** adaptationScale;
+  return unit * Math.min(look.maxExposure, Math.max(look.minExposure, free));
 }
 
 /** CIE daylight locus chromaticity (x, y) of a correlated colour temperature, 4000–25000 K. */
@@ -162,6 +168,7 @@ const METER_FLOOR = 1e-4;
  * type's profile toward its overcast look.
  */
 export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamera, sun: ProfileSun, invalidate: () => void, type: SceneryCameraType = 'external', cloudCover = 0): AutoExposure {
+  const unit = meterUnit(camera.sceneLuminanceScale);
   const types = {
     external: resolveType(camera.types.external, sun, cloudCover, camera.outputGamma),
     onboard: resolveType(camera.types.onboard, sun, cloudCover, camera.outputGamma),
@@ -240,7 +247,7 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
       }
       last = now;
       // Set on the renderer before the scene pass, so overlays that must not follow exposure (the racing line) can divide it out as they draw.
-      renderer.toneMappingExposure = adapted === null ? 1 : lawExposure(active.targetExposure, active.adaptationScale, adapted);
+      renderer.toneMappingExposure = adapted === null ? 1 : lawExposure(active, active.adaptationScale, adapted, unit);
       outputMaterial.uniforms.exposure.value = renderer.toneMappingExposure;
       renderer.setRenderTarget(hdr);
       surfaceAlphaCut.value = 0; renderer.render(scene, camera); surfaceAlphaCut.value = 1;

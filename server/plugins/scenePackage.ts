@@ -78,9 +78,14 @@ function ascending(rows: unknown[], what: string, row: (value: Record<string, un
 
 const CAMERA_TYPES = ['external', 'onboard', 'tv'] as const;
 
-/** A look's exposure target, white balance and tone curve (a > 0); the clear values and the overcast ones share this shape. */
+const LOOK_KEYS = ['targetExposure', 'lightDarkBorder', 'minExposure', 'maxExposure', 'whiteBalanceK', 'toneCurve'];
+
+/** A look's exposure target, border and limits (0 ≤ min ≤ max, max > 0), white balance and tone curve (a > 0); the clear values and the overcast ones share this shape. */
 function exposureLook(look: Record<string, unknown>, at: string): void {
-  numbers({targetExposure: look.targetExposure, whiteBalanceK: look.whiteBalanceK}, ['targetExposure', 'whiteBalanceK'], at, true);
+  numbers({targetExposure: look.targetExposure, lightDarkBorder: look.lightDarkBorder, maxExposure: look.maxExposure, whiteBalanceK: look.whiteBalanceK},
+    ['targetExposure', 'lightDarkBorder', 'maxExposure', 'whiteBalanceK'], at, true);
+  const min = finite(look.minExposure, `${at}.minExposure`);
+  if (min < 0 || min > (look.maxExposure as number)) throw Error(`${at}.minExposure: must be between 0 and maxExposure`);
   numbers(look.toneCurve, ['a', 'b'], `${at}.toneCurve`, false);
   if ((look.toneCurve as {a: number}).a <= 0) throw Error(`${at}.toneCurve.a: must be positive`);
 }
@@ -93,11 +98,11 @@ function parseCameraType(value: unknown, what: string): void {
   if (finite(row.adaptationScale, `${what}.adaptationScale`) <= 0) throw Error(`${what}.adaptationScale: must be positive`);
   if (finite(row.weatherBlendRate, `${what}.weatherBlendRate`) <= 0) throw Error(`${what}.weatherBlendRate: must be positive`);
   ascending(array(row.profiles, `${what}.profiles`, 32), `${what}.profiles`, (p, at) => {
-    exactKeys(p, ['sunTarget', 'targetExposure', 'whiteBalanceK', 'toneCurve', 'weatherLerpPower', 'overcast'], at);
+    exactKeys(p, ['sunTarget', ...LOOK_KEYS, 'weatherLerpPower', 'overcast'], at);
     exposureLook(p, at);
     if (finite(p.weatherLerpPower, `${at}.weatherLerpPower`) <= 0) throw Error(`${at}.weatherLerpPower: must be positive`);
     const overcast = record(p.overcast, `${at}.overcast`);
-    exactKeys(overcast, ['targetExposure', 'whiteBalanceK', 'toneCurve'], `${at}.overcast`);
+    exactKeys(overcast, LOOK_KEYS, `${at}.overcast`);
     exposureLook(overcast, `${at}.overcast`);
   }, 'sunTarget');
   numbers(row.ambientOcclusion, ['radiusM', 'samples', 'scale', 'colour'], `${what}.ambientOcclusion`, false);

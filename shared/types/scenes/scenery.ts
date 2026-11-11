@@ -65,10 +65,17 @@ export interface SceneryDaylight {
 /** tone = saturate((1 - z)(1 - b·z)²), z = e^(-a·x), per exposed linear component x. */
 export interface SceneryToneCurve { a: number; b: number }
 
-/** The exposure target, white balance and tone curve of one weather state. */
+/** The exposure values, white balance and tone curve of one weather state. */
 export interface SceneryCameraLook {
-  /** T of the exposure law: exposure = C · T / L^adaptationScale, L the metered luminance. */
+  /**
+   * T of the exposure law: exposure = T · B^(1 - s) / L^s kept inside [minExposure, maxExposure], s the type's adaptationScale and
+   * L the metered mean luminance on the camera's scale (the scene's over sceneLuminanceScale).
+   */
   targetExposure: number;
+  /** B of the exposure law: the light/dark border, as a multiple of the target. */
+  lightDarkBorder: number;
+  minExposure: number;
+  maxExposure: number;
   whiteBalanceK: number;
   toneCurve: SceneryToneCurve;
 }
