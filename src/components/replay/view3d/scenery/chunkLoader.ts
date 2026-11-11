@@ -12,8 +12,6 @@ export interface ChunkLoader {
   /** `onParsed` gets the root once its meshes exist, before their textures load: work that needs only geometry starts there. */
   load(chunk: SceneryChunk, signal: AbortSignal, onParsed?: (root: Object3D) => void): Promise<Object3D>;
   releaseChunk(root: Object3D): void;
-  /** Frees the cached texture file of a package-relative KTX2 path (its last chunk unloaded). */
-  releaseTexture(asset: string): void;
   dispose(): void;
 }
 
@@ -92,7 +90,6 @@ export function createChunkLoader(renderer: WebGLRenderer): ChunkLoader {
       return root;
     },
     releaseChunk,
-    releaseTexture: asset => ktx2.release(`${SCENERY_FILES}${asset.replace(/^scenery\//, '')}`),
     dispose: () => { textures.dispose(); ktx2.dispose(); },
   };
 }

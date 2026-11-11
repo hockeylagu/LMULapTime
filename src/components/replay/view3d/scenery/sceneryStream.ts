@@ -9,8 +9,6 @@ export interface SceneryStreamDeps {
   prepare(chunk: SceneryChunk, root: Object3D): void;
   /** A root leaves the scene (or never joined it): free its GPU resources. */
   unload(chunk: SceneryChunk, root: Object3D): void;
-  /** No chunk uses this texture (package-relative KTX2 path) any more: the stream was disposed. */
-  releaseTexture(asset: string): void;
   /** The drawn scenery changed (a chunk joined the scene, or chunks were shown or hidden). */
   changed(): void;
   /** A chunk failed to load; it is not retried. */
@@ -22,7 +20,6 @@ export interface SceneryStream {
   update(view: StreamView): void;
   /** Resolves when the chunks under the last view are resident (the horizon may join later); rejects with the first load failure. */
   whenUnderView(): Promise<void>;
-  residentIds(): string[];
   dispose(): void;
 }
 
@@ -34,12 +31,12 @@ const MAX_CONCURRENT_LOADS = 3;
  * Loads the whole circuit and keeps it: the chunks under the view first, then the resident-set rule's window
  * (docs/SCENE_PACKAGE.md), then the rest of the lap ahead. Chunking only orders the load. Only the horizon and the window (plus
  * its hysteresis margin) are drawn; the other loaded chunks are hidden, so going back along the lap reloads nothing and the
- * frame draws what streaming drew. Textures are released when the stream is disposed. A load failure is reported and never
+ * frame draws what streaming drew. The loader frees the textures when it is disposed. A load failure is reported and never
  * retried.
  */
 export function createSceneryStream(layout: SceneryLayout, parent: Group, deps: SceneryStreamDeps): SceneryStream {
   const chunks = new Map<string, SceneryChunk>([[layout.horizon.id, layout.horizon], ...layout.sectors.map(sector => [sector.id, sector] as const)]);
-  const entries = new Map<string, Entry>(), textures = new Set<string>(), failedIds = new Set<string>();
+  const entries = new Map<string, Entry>(), failedIds = new Set<string>();
   let queue: string[] = [], shown = new Set<string>([layout.horizon.id]), under: string[] = [], disposed = false, failure: Error | null = null;
   let waiters: Array<{ resolve: () => void; reject: (error: Error) => void }> = [];
   /** Until the first view is resident, only the horizon and the chunks under the view load. */
@@ -64,7 +61,6 @@ export function createSceneryStream(layout: SceneryLayout, parent: Group, deps: 
       deps.prepare(chunk, root);
       root.visible = shown.has(id);
       entry.root = root; parent.add(root);
-      for (const asset of chunk.textures) textures.add(asset);
       deps.changed();
     }, (error: unknown) => {
       if (entries.get(id) === entry) entries.delete(id);
@@ -112,7 +108,6 @@ export function createSceneryStream(layout: SceneryLayout, parent: Group, deps: 
       if (underResident()) return Promise.resolve();
       return new Promise<void>((resolve, reject) => { waiters.push({ resolve, reject }); });
     },
-    residentIds: () => [...entries.entries()].filter(([, entry]) => entry.root).map(([id]) => id),
     dispose() {
       if (disposed) return;
       disposed = true;
@@ -120,9 +115,7 @@ export function createSceneryStream(layout: SceneryLayout, parent: Group, deps: 
         if (abort) abort.abort();
         if (root) { root.removeFromParent(); deps.unload(chunk, root); }
       }
-      entries.clear();
-      for (const asset of textures) deps.releaseTexture(asset);
-      textures.clear(); waiters = [];
+      entries.clear(); waiters = [];
     },
   };
 }

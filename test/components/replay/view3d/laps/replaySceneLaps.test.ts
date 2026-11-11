@@ -90,7 +90,7 @@ vi.mock('../../../../../src/components/replay/view3d/scenery/chunkLoader.js', ()
     onParsed?.(root); // As the loader: the parsed root is handed over before its textures load.
     return root;
   },
-  releaseChunk: (root: Object3D) => disposeObjects(root, true), releaseTexture() {}, dispose() {},
+  releaseChunk: (root: Object3D) => disposeObjects(root, true), dispose() {},
 })}));
 vi.mock('../../../../../src/components/replay/view3d/scenery/cachedKtx2Loader.js', () => ({CachedKtx2Loader: class {
   async loadAsync() { return new Texture(); }

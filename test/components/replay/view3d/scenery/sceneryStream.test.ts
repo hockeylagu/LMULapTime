@@ -11,6 +11,8 @@ let deps: { [K in keyof SceneryStreamDeps]: Mock<SceneryStreamDeps[K]> };
 const parent = () => new Group();
 const settle = () => new Promise<void>(resolve => setTimeout(resolve, 0));
 const ids = () => pending.map(entry => entry.chunk.id);
+/** The chunk roots in the scene, by id. */
+const joined = (group: Group) => group.children.map(child => child.name).sort();
 /** Resolves every request waiting for this chunk id with a fresh root. */
 async function finish(...chunkIds: string[]): Promise<void> {
   for (const id of chunkIds) {
@@ -29,7 +31,7 @@ beforeEach(() => {
       const entry = { chunk, signal, resolve, reject }; pending.push(entry);
       signal.addEventListener('abort', () => { pending.splice(pending.indexOf(entry), 1); reject(signal.reason as Error); });
     })),
-    prepare: vi.fn(), unload: vi.fn(), releaseTexture: vi.fn(), changed: vi.fn(), failed: vi.fn(),
+    prepare: vi.fn(), unload: vi.fn(), changed: vi.fn(), failed: vi.fn(),
   };
 });
 
@@ -40,11 +42,11 @@ describe('sceneryStream', () => {
     await finish('horizon');
     expect(group.getObjectByName('horizon')).toBeDefined();
     stream.update({ kind: 'lap', lapDistanceM: 2500 }); stream.update({ kind: 'free', x: 99999, z: 99999 });
-    expect(stream.residentIds()).toEqual(['horizon']);
+    expect(joined(group)).toEqual(['horizon']);
   });
 
   it('loads under the camera first, then the window, then the rest of the circuit ahead, at most three at once', async () => {
-    const stream = createSceneryStream(testLayout(), parent(), deps);
+    const group = parent(), stream = createSceneryStream(testLayout(), group, deps);
     await finish('horizon');
     stream.update({ kind: 'lap', lapDistanceM: 1000.5 });
     expect(ids()).toEqual(['s1', 's2', 's0']); // Window [700, 2500].
@@ -55,7 +57,7 @@ describe('sceneryStream', () => {
     await finish('s2', 's0');
     expect(ids()).toEqual(['s3', 'p0']);
     await finish('s3', 'p0');
-    expect(stream.residentIds().sort()).toEqual(['horizon', 'p0', 's0', 's1', 's2', 's3']);
+    expect(joined(group)).toEqual(['horizon', 'p0', 's0', 's1', 's2', 's3']);
     stream.update({ kind: 'lap', lapDistanceM: 100 });
     expect(ids()).toEqual([]); // Everything is loaded: nothing is fetched again.
   });
@@ -91,23 +93,13 @@ describe('sceneryStream', () => {
     deps.changed.mockClear();
     stream.update({ kind: 'lap', lapDistanceM: 1600 });
     expect(s0.visible).toBe(false); expect(s0.parent).toBe(group); expect(deps.changed).toHaveBeenCalledOnce();
-    expect(stream.residentIds()).toContain('s0'); expect(deps.unload).not.toHaveBeenCalled();
+    expect(joined(group)).toContain('s0'); expect(deps.unload).not.toHaveBeenCalled();
     deps.changed.mockClear();
     stream.update({ kind: 'lap', lapDistanceM: 1600 });
     expect(deps.changed).not.toHaveBeenCalled(); // Nothing toggled.
     stream.update({ kind: 'lap', lapDistanceM: 1000.5 });
     expect(s0.visible).toBe(true); expect(deps.load.mock.calls.filter(call => call[0].id === 's0')).toHaveLength(1);
     expect(group.getObjectByName('horizon')!.visible).toBe(true);
-  });
-
-  it('keeps every texture until dispose, then releases each once', async () => {
-    const stream = createSceneryStream(testLayout(), parent(), deps);
-    await finish('horizon');
-    stream.update({ kind: 'lap', lapDistanceM: 1000.5 }); await finish('s1', 's2', 's0');
-    stream.update({ kind: 'free', x: 99999, z: 99999 }); await settle(); // Everything but the horizon is hidden.
-    expect(deps.releaseTexture).not.toHaveBeenCalled();
-    stream.dispose();
-    expect(deps.releaseTexture.mock.calls.map(call => call[0]).sort()).toEqual(['shared', 't0', 't1']);
   });
 
   it('adds a chunk that left the window while loading as hidden, and discards one that finishes after dispose', async () => {
@@ -143,7 +135,7 @@ describe('sceneryStream', () => {
     stream.update({ kind: 'lap', lapDistanceM: 1000.5 }); await finish('s1');
     const late = pending.find(entry => entry.chunk.id === 's2')!;
     stream.dispose();
-    expect(group.children).toHaveLength(0); expect(stream.residentIds()).toEqual([]);
+    expect(group.children).toHaveLength(0);
     expect(deps.unload).toHaveBeenCalledTimes(2); expect(late.signal.aborted).toBe(true);
     const calls = deps.load.mock.calls.length;
     stream.update({ kind: 'lap', lapDistanceM: 3000 }); expect(deps.load.mock.calls).toHaveLength(calls);

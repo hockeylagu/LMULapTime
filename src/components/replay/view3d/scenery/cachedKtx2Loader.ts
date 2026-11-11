@@ -7,7 +7,7 @@ import { fetchBinary } from '../../../../api/apiClient.js';
  * loader uploads directly, so no Basis transcoder is configured: a Basis-compressed file would fail loudly. Each file is
  * compressed as a whole (`.ktx2.zst`, served with `Content-Encoding: zstd`), so the browser decompresses it while downloading
  * and the KTX2 itself has no supercompression to decode on the main thread.
- * Chunks and cars share textures; GLTFLoader clones what it gets, so the cached original is only the source of mip data.
+ * The cached original is only the source of mip data: every user draws its own clone.
  * Files are read with `fetchBinary` straight into an ArrayBuffer: three's FileLoader re-streams every body chunk through script to
  * report progress, which kept the main thread busy for seconds after the last texture had arrived.
  */
@@ -30,16 +30,10 @@ export class CachedKtx2Loader extends KTX2Loader {
     void pending.then(onLoad, onError);
   }
 
-  /** Forgets a URL and frees the cached original's mip data. */
-  release(url: string): void {
-    const pending = this.cache.get(url);
-    if (!pending) return;
-    this.cache.delete(url);
-    pending.then(texture => texture.dispose(), () => undefined);
-  }
-
+  /** Frees every cached original's mip data. */
   override dispose(): void {
-    for (const url of this.cache.keys()) this.release(url);
+    for (const pending of this.cache.values()) pending.then(texture => texture.dispose(), () => undefined);
+    this.cache.clear();
     super.dispose();
   }
 }

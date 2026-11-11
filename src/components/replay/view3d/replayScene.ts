@@ -99,7 +99,6 @@ export async function createReplayScene(
       root.traverse(object => { if (object instanceof Mesh) object.receiveShadow = !object.name.startsWith('FILLER_GROUND'); });
     },
     unload: (chunk, root) => { ground.remove(chunk.id, root); loader.releaseChunk(root); },
-    releaseTexture: asset => loader.releaseTexture(asset),
     changed: () => { freezeScenery(); scheduleRefresh(); reflection.stale(); invalidate(); },
     failed: (chunk, error) => { if (!disposed) onFailure(`3D scenery chunk ${chunk.id} failed: ${error.message}`); },
   });
