@@ -9,6 +9,7 @@ import type { ReplayDaylightClock } from '../../../../shared/types/replay.js';
 import { solarPosition } from './solarPosition.js';
 import { createSkyDomeMaterial, hazeColour, hazeDensity, heightHaze, skyConditions, sunwardHaze } from './atmosphere/skyDome.js';
 import { createHaze } from './atmosphere/haze.js';
+import { cloudCoverage, cloudSheets, sunVisibility, type CloudSheet } from './atmosphere/clouds.js';
 import { SUN_UNIT, sunRadiance } from './atmosphere/sunSamples.js';
 import { crownSun } from './scenery/materials/foliageCrown.js';
 import { convolveReflection, type ReflectionCubes } from './reflectionCube.js';
@@ -101,14 +102,28 @@ export interface SceneEnvironment {
 export type SceneVenue = Pick<SceneryLayout, 'daylight' | 'sky' | 'environmentProbe' | 'shading'>;
 
 /**
+ * The weather of a replay moment: the cloud coverage and how much of the sun's light passes the clouds, from the replay's cloud
+ * field placed around an eye at the scene origin's height, with the placed sheets. A replay without a cloud field keeps its cloud
+ * cover figure and has no sun visibility or sheets of its own.
+ */
+export function sceneClouds(venue: Pick<SceneVenue, 'sky' | 'shading'>, lighting: SceneLighting, originY: number, clock?: ReplayDaylightClock): {cloudCover: number; sunVisibility?: number; sheets?: CloudSheet[]} {
+  const field = clock?.cloudField;
+  if (!field) return {cloudCover: clock?.cloudCover ?? 0};
+  // The cloud field is laid out in LMU local axes: the scene's z is the opposite one.
+  const {x, y, z} = lighting.sunDirection, sheets = cloudSheets(venue.sky.clouds, field, originY);
+  return {cloudCover: cloudCoverage(venue.sky.clouds, field), sunVisibility: sunVisibility(venue.shading.sunVisibility, venue.sky.clouds, sheets, [x, y, -z]), sheets};
+}
+
+/**
  * Sky dome, horizon haze, a shadow-casting sun and an image-based light: first the sky over a sunlit ground, then the venue's own
  * capture. The scenery supplies its own terrain, filler ground and horizon; nothing here draws ground. `origin` is the scene
  * origin in LMU local metres.
  */
 export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue: SceneVenue, origin: Vector3, clock?: ReplayDaylightClock): SceneEnvironment {
   const lighting = sceneLighting(venue.daylight, clock), sunElevationDeg = MathUtils.radToDeg(Math.asin(MathUtils.clamp(lighting.sunDirection.y, -1, 1)));
-  // The replay's cloud cover at the lap sets the weather, dims the sun and thickens the haze.
-  const weather = skyConditions(venue.daylight, clock?.cloudCover ?? 0), sunRgb = sunColour(venue.sky.sun, sunElevationDeg, weather.cloudCover);
+  // The replay's cloud cover at the lap sets the weather, dims the sun and thickens the haze; its clouds toward the sun dim the sun's light further.
+  const clouds = sceneClouds(venue, lighting, origin.y, clock), weather = skyConditions(venue.daylight, clouds.cloudCover, clouds.sunVisibility);
+  const clearSun = sunColour(venue.sky.sun, sunElevationDeg, weather.cloudCover), sunRgb = clearSun.clone().multiplyScalar(clouds.sunVisibility ?? 1);
   const sky = new Mesh(new BoxGeometry(1, 1, 1), createSkyDomeMaterial(lighting.sunDirection, venue.sky, venue.daylight, weather));
   sky.scale.setScalar(SKY_RADIUS_M);
   sky.name = 'sky'; sky.frustumCulled = false;

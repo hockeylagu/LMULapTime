@@ -2,6 +2,8 @@
  * Scenery layout of package schema 7 (one catalog row per layout plus the catalog's shared chunking and streaming; the pipeline's docs/SCENE_PACKAGE.md is the authority).
  * The horizon chunk is always resident; sector chunks are loaded by lap distance around the replay car.
  */
+import type { SceneryClouds, ScenerySunVisibility } from './clouds.js';
+
 export type Vec3 = [number, number, number];
 
 export interface SceneryBounds { min: Vec3; max: Vec3 }
@@ -139,6 +141,8 @@ export interface ScenerySky {
   /** The sky dome's own haze toward the horizon. */
   haze: ScenerySkyHaze;
   colourProfiles: ScenerySkyColourProfiles;
+  /** The cloud field the replay's cloud cells and drifts place. */
+  clouds: SceneryClouds;
 }
 
 /** The Hosek-Wilkie (2012) CIE XYZ sky: its datasets per channel X, Y, Z and the inputs the app cannot derive (atmosphere/hosekSky.ts). */
@@ -326,6 +330,8 @@ export interface SceneryShading {
   integrationMap: { width: number; height: number; encoding: 'unorm8'; scale: number[]; bias: number[] };
   /** The cascaded sun shadow: atlas layout, cascade choice, filter, normal offset, fit, fade and the split planes per camera type. */
   shadows: SceneryShadows;
+  /** How the clouds toward the sun dim its light. */
+  sunVisibility: ScenerySunVisibility;
 }
 
 /** The split planes of one camera type; `splitRatio`, `count` and `splitsM` are null together where the package has no set. */

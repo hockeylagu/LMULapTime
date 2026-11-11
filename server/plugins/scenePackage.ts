@@ -1,6 +1,7 @@
 import type { TrackBoundaryGeometry } from '../../shared/types/trackGeometry.js';
 import type { SceneryBounds, SceneryCamera, SceneryChunk, SceneryDaylight, SceneryLayout, SceneryShading, ScenerySky, ScenerySun, SceneryTexture } from '../../shared/types/scenes/scenery.js';
 import { registerPackageFile, type PackageFile } from './packageFiles.js';
+import { parseClouds, parseSunVisibility } from './cloudPackage.js';
 import { array, count, exactKeys, finite, knownKeys, nonNegative, record, sha256, text, vec3 } from './strict.js';
 
 /** Validated scenery of a package: layout indexes by layout key, and every chunk and texture file by package-relative path. */
@@ -123,7 +124,7 @@ function parseCamera(value: unknown, what: string): SceneryCamera {
 /** The catalog's shading (SceneryShading): positive scales, ordered limits, known LOD modes and non-empty unit-direction kernels. */
 function parseShading(value: unknown, what: string): SceneryShading {
   const row = record(value, what);
-  exactKeys(row, ['sunGlint', 'smallEdge', 'carPaintReflection', 'convolution', 'sceneryReflection', 'integrationMap', 'shadows'], what);
+  exactKeys(row, ['sunGlint', 'smallEdge', 'carPaintReflection', 'convolution', 'sceneryReflection', 'integrationMap', 'shadows', 'sunVisibility'], what);
   numbers(row.sunGlint, ['cosineThreshold', 'roughnessCutoff', 'smoothSpecularScale'], `${what}.sunGlint`, true);
   if ((row.sunGlint as Record<string, number>).cosineThreshold > 1) throw Error(`${what}.sunGlint.cosineThreshold: above 1`);
   numbers(row.smallEdge, ['detectorScale', 'edgeScale', 'limitMin', 'limitMax'], `${what}.smallEdge`, true);
@@ -159,6 +160,7 @@ function parseShading(value: unknown, what: string): SceneryShading {
   if (!families.length) throw Error(`${what}.sceneryReflection.families: empty`);
   parseIntegrationMap(row.integrationMap, `${what}.integrationMap`);
   parseShadows(row.shadows, `${what}.shadows`);
+  parseSunVisibility(row.sunVisibility, `${what}.sunVisibility`);
   return structuredClone(row) as unknown as SceneryShading;
 }
 
@@ -316,7 +318,7 @@ function parseSun(value: unknown, what: string): { sun: Omit<ScenerySun, 'grid'>
 /** The catalog's sky (ScenerySky): five Perez scales, ascending multiplier rows of four, the turbidity, air mass, haze model, sun grids, the sky model's inputs and its colour profiles. */
 function parseSky(value: unknown, what: string): { sky: Omit<ScenerySky, 'sun'>; layoutAltitudeM: Record<string, number> } & ReturnType<typeof parseSun> {
   const row = record(value, what);
-  exactKeys(row, ['perezScale', 'perezMultipliers', 'pollution', 'turbidity', 'airMass', 'fog', 'sun', 'hosek', 'haze', 'colourProfiles'], what);
+  exactKeys(row, ['perezScale', 'perezMultipliers', 'pollution', 'turbidity', 'airMass', 'fog', 'sun', 'hosek', 'haze', 'colourProfiles', 'clouds'], what);
   const { sun, sunLayouts } = parseSun(row.sun, `${what}.sun`);
   range(row.pollution, ['cloudyDamping'], `${what}.pollution`);
   if (range(row.turbidity, ['base', 'overcast', 'storm', 'pollution', 'min', 'max'], `${what}.turbidity`).min <= 0) throw Error(`${what}.turbidity.min: must be positive`);
@@ -393,6 +395,7 @@ function parseSky(value: unknown, what: string): { sky: Omit<ScenerySky, 'sun'>;
       nonNegative(look.sunProximity, `${at}.${key}.sunProximity`);
     }
   }, 'sunTarget');
+  parseClouds(row.clouds, `${what}.clouds`);
   const { sun: _catalogSun, ...sky } = row;
   return { sky: structuredClone(sky) as unknown as Omit<ScenerySky, 'sun'>, sun, sunLayouts, layoutAltitudeM };
 }

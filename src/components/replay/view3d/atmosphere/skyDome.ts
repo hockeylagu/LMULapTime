@@ -17,11 +17,11 @@ import { profilesAt, timeOfDayPosition, weatherWeight } from './timeOfDay.js';
  */
 
 /** The weather the sky is drawn for: the layout's air pollution, the cloud cover C and the precipitation term S (0 to 1). */
-export interface SkyConditions { airPollution: number; cloudCover: number; precipitation: number }
+export interface SkyConditions { airPollution: number; cloudCover: number; precipitation: number; /** How much of the sun passes the clouds, 0 to 1; absent without a cloud field. */ sunVisibility?: number }
 
 /** A layout's weather: its air pollution (none without daylight), the replay's cloud cover, dry. */
-export function skyConditions(daylight: SceneryDaylight | undefined, cloudCover: number): SkyConditions {
-  return {airPollution: daylight?.airPollution ?? 0, cloudCover: MathUtils.clamp(cloudCover, 0, 1), precipitation: 0};
+export function skyConditions(daylight: SceneryDaylight | undefined, cloudCover: number, sunVisibility?: number): SkyConditions {
+  return {airPollution: daylight?.airPollution ?? 0, cloudCover: MathUtils.clamp(cloudCover, 0, 1), precipitation: 0, sunVisibility};
 }
 
 /** p: the air pollution, damped by cloud cover. */
@@ -73,7 +73,7 @@ export interface SkyColourLook { gain: [number, number, number]; sunProximity: n
 export function skyColourLook(sky: ScenerySky, sun: Color, sunElevationDeg: number, weather: SkyConditions): SkyColourLook {
   const {profiles} = sky.colourProfiles;
   const look = (profile: ScenerySkyColourProfiles['profiles'][number]): SkyColourLook => {
-    const w = weatherWeight(weather.cloudCover, profile.weatherLerpPower), {clear, overcast} = profile;
+    const w = weatherWeight(weather.cloudCover, profile.weatherLerpPower, weather.sunVisibility), {clear, overcast} = profile;
     return {gain: [0, 1, 2].map(i => MathUtils.lerp(clear.gain[i], overcast.gain[i], w)) as [number, number, number], sunProximity: MathUtils.lerp(clear.sunProximity, overcast.sunProximity, w)};
   };
   const [low, high, t] = profilesAt(profiles, timeOfDayPosition(profiles.map(profile => profile.sunTarget), sun, sunElevationDeg));

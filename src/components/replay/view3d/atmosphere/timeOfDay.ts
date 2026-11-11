@@ -22,7 +22,8 @@ export function profilesAt<T>(profiles: readonly T[], position: number): [T, T, 
 }
 
 /**
- * The clear-to-overcast weight of a profile under the replay's cloud cover: pow((1 − sun visibility)·C, weatherLerpPower), with a
- * cover C hiding the sun by C (the replay has no sun occlusion of its own), so pow(C², weatherLerpPower).
+ * The clear-to-overcast weight of a profile under the replay's cloud cover: pow((1 − sun visibility)·C, weatherLerpPower). Without
+ * a sun visibility (a replay with no cloud field) a cover C hides the sun by C, so pow(C², weatherLerpPower).
  */
-export const weatherWeight = (cloudCover: number, weatherLerpPower: number): number => (cloudCover * cloudCover) ** weatherLerpPower;
+export const weatherWeight = (cloudCover: number, weatherLerpPower: number, sunVisibility = 1 - cloudCover): number =>
+  (Math.min(1, Math.max(0, 1 - sunVisibility)) * cloudCover) ** weatherLerpPower;

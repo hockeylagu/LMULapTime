@@ -14,7 +14,7 @@ import { MIN_CAMERA_DISTANCE, MAX_CAMERA_DISTANCE, panCamera, zoomCamera } from 
 import { exposureType, shadowCascadeSet, type CameraMode } from './cameraModes.js';
 import { createChaseCameraTracker, trackCamera } from './cameraTracking.js';
 import { driverCamera, driverPose, isDriverCamera, type DriverPose } from './driverCameras.js';
-import { addSceneEnvironment, sceneLighting } from './sceneEnvironment.js';
+import { addSceneEnvironment, sceneClouds, sceneLighting } from './sceneEnvironment.js';
 import { createAutoExposure } from './autoExposure.js';
 import { sunRadiance } from './atmosphere/sunSamples.js';
 import { createCarReflection } from './car/carReflection.js';
@@ -69,8 +69,8 @@ export async function createReplayScene(
   const {min, max} = layout.horizon.bounds, origin = new Vector3(...min).add(new Vector3(...max)).multiplyScalar(0.5);
   const loader = createChunkLoader(renderer), carTextures = new CachedKtx2Loader(renderer);
   const lighting = sceneLighting(layout.daylight, trajectory.daylightClock), sunElevationDeg = Math.asin(lighting.sunDirection.y) * 180 / Math.PI;
-  const cloudCover = trajectory.daylightClock?.cloudCover ?? 0, sunRgb = sunRadiance(layout.sky.sun, sunElevationDeg, cloudCover);
-  const exposure = createAutoExposure(renderer, layout.camera, {rgb: sunRgb, elevationDeg: sunElevationDeg}, () => invalidate(), exposureType('follow'), cloudCover);
+  const {cloudCover, sunVisibility} = sceneClouds(layout, lighting, origin.y, trajectory.daylightClock), sunRgb = sunRadiance(layout.sky.sun, sunElevationDeg, cloudCover);
+  const exposure = createAutoExposure(renderer, layout.camera, {rgb: sunRgb, elevationDeg: sunElevationDeg}, () => invalidate(), exposureType('follow'), cloudCover, sunVisibility);
   // Wheel and line contact heights and the camera checks share one ray tree per resident chunk.
   const ground = createSceneryGround(), {surfaceHeight} = ground;
   // Scenery chunks live in native coordinates under one group, shifted by the scene origin.

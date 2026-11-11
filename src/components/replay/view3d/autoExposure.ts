@@ -53,9 +53,9 @@ const ADAPT_PER_S = 2.0, SETTLED_LOG = 0.01;
 export type CameraTimeOfDay = SceneryCameraLook;
 /** The direct sun the profiles are chosen by: its RGB in the package's light unit and its elevation. */
 export interface ProfileSun { rgb: Color; elevationDeg: number }
-export function profileAt(type: SceneryCameraTypeProfile, sun: ProfileSun, cloudCover = 0): CameraTimeOfDay {
+export function profileAt(type: SceneryCameraTypeProfile, sun: ProfileSun, cloudCover = 0, sunVisibility?: number): CameraTimeOfDay {
   const look = (p: SceneryCameraProfile): SceneryCameraLook => {
-    return mixLooks(p, p.overcast, weatherWeight(cloudCover, p.weatherLerpPower));
+    return mixLooks(p, p.overcast, weatherWeight(cloudCover, p.weatherLerpPower, sunVisibility));
   };
   const position = timeOfDayPosition(type.profiles.map(profile => profile.sunTarget), sun.rgb, sun.elevationDeg);
   const [low, high, t] = profilesAt(type.profiles, position);
@@ -138,8 +138,8 @@ interface ResolvedType extends CameraTimeOfDay {
   display: DisplayTransform;
 }
 
-function resolveType(profile: SceneryCameraTypeProfile, sun: ProfileSun, cloudCover: number, outputGamma: number): ResolvedType {
-  const time = profileAt(profile, sun, cloudCover), w = profile.meteringWindow;
+function resolveType(profile: SceneryCameraTypeProfile, sun: ProfileSun, weather: {cloudCover: number; sunVisibility?: number}, outputGamma: number): ResolvedType {
+  const time = profileAt(profile, sun, weather.cloudCover, weather.sunVisibility), w = profile.meteringWindow;
   return {
     ...time, window: [w.x, 1 - w.y - w.height, w.width, w.height], adaptationScale: profile.adaptationScale,
     balance: whiteBalance(time.whiteBalanceK), display: {toneCurve: time.toneCurve, outputGamma},
@@ -165,14 +165,14 @@ const METER_FLOOR = 1e-4;
  * Metered auto-exposure: the frame renders to a half-float target, a small pass averages the luminance of the active camera
  * type's metering window, the GPU reads it back asynchronously every few frames, and the exposure adapts toward the law's value.
  * Rendering is on demand, so `invalidate` keeps frames coming until the exposure settles. `cloudCover` (0 to 1) blends each
- * type's profile toward its overcast look.
+ * type's profile toward its overcast look, by how much of the sun the clouds hide (`sunVisibility`, when the replay has a cloud field).
  */
-export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamera, sun: ProfileSun, invalidate: () => void, type: SceneryCameraType = 'external', cloudCover = 0): AutoExposure {
-  const unit = meterUnit(camera.sceneLuminanceScale);
+export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamera, sun: ProfileSun, invalidate: () => void, type: SceneryCameraType = 'external', cloudCover = 0, sunVisibility?: number): AutoExposure {
+  const unit = meterUnit(camera.sceneLuminanceScale), weather = {cloudCover, sunVisibility};
   const types = {
-    external: resolveType(camera.types.external, sun, cloudCover, camera.outputGamma),
-    onboard: resolveType(camera.types.onboard, sun, cloudCover, camera.outputGamma),
-    tv: resolveType(camera.types.tv, sun, cloudCover, camera.outputGamma),
+    external: resolveType(camera.types.external, sun, weather, camera.outputGamma),
+    onboard: resolveType(camera.types.onboard, sun, weather, camera.outputGamma),
+    tv: resolveType(camera.types.tv, sun, weather, camera.outputGamma),
   } satisfies Record<SceneryCameraType, ResolvedType>;
   let active = types[type];
   const size = new Vector2();

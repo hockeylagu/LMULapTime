@@ -6,6 +6,7 @@ import request from 'supertest';
 import { DataPlugin } from '../../../server/plugins/dataPlugin.js';
 import { createDataPluginRouter } from '../../../server/routes/dataPluginRoutes.js';
 import { glb, syntheticPackage } from '../../helpers/scenes/syntheticPackage.js';
+import type { SceneryCloudLight } from '../../../shared/types/scenes/clouds.js';
 
 type Package = ReturnType<typeof syntheticPackage>;
 const packages: Package[] = [];
@@ -134,6 +135,26 @@ describe('scenery validation', () => {
     ['an integration map short of texels', (built: Package) => { built.sceneryShared.shading.integrationMap.bias.pop(); }],
     ['an integration texel above 255', (built: Package) => { built.sceneryShared.shading.integrationMap.scale[0] = 256; }],
     ['an integration map in another encoding', (built: Package) => { (built.sceneryShared.shading.integrationMap as { encoding: string }).encoding = 'float'; }],
+    ['a missing cloud field', (built: Package) => { delete (built.sceneryShared.sky as Partial<typeof built.sceneryShared.sky>).clouds; }],
+    ['cloud layers that do not add up to the cells', (built: Package) => { built.sceneryShared.sky.clouds.cells.pop(); }],
+    ['fifteen cloud codes', (built: Package) => { built.sceneryShared.sky.clouds.codes.pop(); }],
+    ['a cloud code naming no type', (built: Package) => { built.sceneryShared.sky.clouds.codes[0] = 'unknown'; }],
+    ['a cloud type naming no mesh', (built: Package) => { built.sceneryShared.sky.clouds.meshes = {}; }],
+    ['a cloud material naming no map', (built: Package) => { built.sceneryShared.sky.clouds.maps = {}; }],
+    ['a cloud mesh with a vertex out of range', (built: Package) => { Object.values(built.sceneryShared.sky.clouds.meshes)[0].triangles[0] = 999; }],
+    ['a cloud map short of bytes', (built: Package) => { Object.values(built.sceneryShared.sky.clouds.maps)[0].width += 1; }],
+    ['a cloud material naming no light map', (built: Package) => { built.sceneryShared.sky.clouds.lightMaps = {}; }],
+    ['a cloud side map of one channel', (built: Package) => { built.sceneryShared.sky.clouds.lightMaps.side = built.sceneryShared.sky.clouds.lightMaps.full; }],
+    ['a cloud light map short of bytes', (built: Package) => { Object.values(built.sceneryShared.sky.clouds.lightMaps)[0].width += 1; }],
+    ['a cloud mesh frame short of a vertex', (built: Package) => { Object.values(built.sceneryShared.sky.clouds.meshes)[0].tangents.pop(); }],
+    ['a cloud light without its backlight', (built: Package) => { delete (Object.values(built.sceneryShared.sky.clouds.types)[0].materials[0].light as Partial<SceneryCloudLight>).backlight; }],
+    ['a cloud albedo of two channels', (built: Package) => { Object.values(built.sceneryShared.sky.clouds.types)[0].materials[0].light.albedo.max.pop(); }],
+    ['a cloud darkness above 1', (built: Package) => { Object.values(built.sceneryShared.sky.clouds.types)[0].darkness = 1.5; }],
+    ['an unknown cloud averaging', (built: Package) => { (built.sceneryShared.sky.clouds.averagedInputs as { variant: string }).variant = 'first'; }],
+    ['a missing sun visibility rule', (built: Package) => { delete (built.sceneryShared.shading as Partial<typeof built.sceneryShared.shading>).sunVisibility; }],
+    ['an unknown sun occlusion curve', (built: Package) => { (built.sceneryShared.shading.sunVisibility.occlusion as { curve: string }).curve = 'linear'; }],
+    ['a sun view with near beyond far', (built: Package) => { built.sceneryShared.shading.sunVisibility.view.near = 2000; }],
+    ['a sun view without resolution', (built: Package) => { built.sceneryShared.shading.sunVisibility.view.resolution = 0; }],
     ['a missing shadow profile', (built: Package) => { delete (built.sceneryShared.shading as Partial<typeof built.sceneryShared.shading>).shadows; }],
     ['a cascade tile outside the atlas', (built: Package) => { built.sceneryShared.shading.shadows.atlas.cascadeTiles[1] = [0, 48, 0]; }],
     ['a cascade tile in an atlas that does not exist', (built: Package) => { built.sceneryShared.shading.shadows.atlas.cascadeTiles[2] = [2, 0, 0]; }],

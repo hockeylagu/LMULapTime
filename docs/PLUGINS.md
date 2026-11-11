@@ -183,6 +183,20 @@ cover from the replay at the lap and treats every replay as dry, and reads the s
 elevation and that cover (the base coverage the grid is sampled by); it applies the dry haze density (dawn mix, cloud and pollution
 terms, no storm term) and does not apply `airMass` or `sceneLuminanceScale` yet.
 
+`sky.clouds` (the pipeline's docs/SCENE_PACKAGE.md "Clouds") is the cloud field: two `layers` (`lower`, `upper`) whose `instances`
+add up to the `cells` table (`lowerCells` first), sixteen `codes` each naming one of `types` (a shown type has meshes and materials
+that exist in `meshes` and `maps`, a clear one has none), `height`, `placement`, `coverage`, `alpha`, `averagedInputs` (the values a
+replay does not carry, as averages) and opacity `maps` whose first level has width × height bytes. A mesh carries its unit vertex
+frame (`normals`, `tangents`, `binormals`, one vector per vertex). A material carries how it is lit: a `light` block (`uv`,
+`albedo`, `ambient`, `backlight`, `diffuse`) and the keys of its three `lightMaps` (`cloudMap` with 1 channel, `sideMap` and
+`endMap` with 3; every level has width × height × channels bytes). `shading.sunVisibility` is how the
+clouds hide the sun: `occlusion` (`bias`, `curve` exactly `sqrt`, `dryMax`, `wetMax`), a square `view` toward the sun (`fovRad`,
+`near` < `far`, `resolution`) and the `horizon` ramp. The replay gives each cell's code and both layer drifts
+(docs/VCR_FORMAT.md, Type 10). `atmosphere/clouds.ts` places the sheets around the scene origin, takes the cloud coverage from the
+cells and computes the sun visibility once per lap moment: it sums the sheets' opacity over the view's rays on the processor, adding
+overlapping sheets, reads the first map level and ignores the view's far limit. The visibility scales the sun's
+light and feeds the weather weight and the exposure; a replay without a cloud field keeps the plain cloud cover and an undimmed sun.
+
 The catalog's `shading.shadows` (the pipeline's docs/SCENE_PACKAGE.md "Shadows") is the cascaded sun shadow: `atlas` (tiles inside
 their atlas, one per cascade), `select`, `filter` (taps whose weights times `scale` sum to 1), `normalOffset`, `texelSnap`, `fit`, `fade`,
 `centre` and `orientation` (each exactly the one rule the viewer accepts: squares centred at the middle of their view slice, axes

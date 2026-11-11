@@ -1,3 +1,4 @@
+import type { SceneryClouds } from '../../../shared/types/scenes/clouds.js';
 import type { SceneryCamera, SceneryCameraTypeProfile, SceneryHosekSky, SceneryShading, ScenerySky, ScenerySun } from '../../../shared/types/scenes/scenery.js';
 
 /** A synthetic camera type: two time-of-day profiles with different curves, so interpolation shows. */
@@ -52,6 +53,48 @@ export function testShading(): SceneryShading {
         tv: { nearM: 1, farM: 500, splitRatio: null, count: null, splitsM: null },
       },
     },
+    sunVisibility: { occlusion: { bias: 0.01, curve: 'sqrt', dryMax: 1, wetMax: 0.5 }, view: { fovRad: 0.4, near: 1, far: 1000, resolution: 8, refreshFrames: 10, readFrame: 5 }, horizon: { limit: 0, gain: 5 } },
+  };
+}
+
+/**
+ * A synthetic cloud field: a 2 × 2 lower layer and one upper cell, a `thick` type (a flat 2 km sheet, one opaque material) on codes
+ * 0 to 7, a `thin` one (two materials, one half as opaque) on 8 to 14, and a clear code 15. The opacity map is a 2 × 2 texture of full value.
+ */
+export function testClouds(): SceneryClouds {
+  const frame = (x: number, y: number, z: number) => [x, y, z, x, y, z, x, y, z, x, y, z];
+  const flat = { positions: [-1000, 0, -1000, 1000, 0, -1000, 1000, 0, 1000, -1000, 0, 1000], uvs: [0, 0, 1, 0, 1, 1, 0, 1],
+    normals: frame(0, -1, 0), tangents: frame(1, 0, 0), binormals: frame(0, 0, 1), triangles: [0, 1, 2, 2, 3, 0] };
+  const light: SceneryClouds['types'][string]['materials'][number]['light'] = { uv: { scale: [1, 1], offset: [0, 0] },
+    albedo: { max: [1, 1, 1], min: [0.8, 0.85, 0.9], randomMax: 0, randomMin: 0.2 }, ambient: { scalar: 2, occlusion: 1 },
+    backlight: { narrowScalar: 4, narrowPower: 2048, wideScalar: 2, widePower: 8, base: 0.1 }, diffuse: { clear: 2, overcast: 1, depthScale: 1 } };
+  const material = (name: string, scalar: number) => ({ name, opacity: { scalar, visibility: 1, randomRange: 0 }, cloudMap: 'full', light, sideMap: 'side', endMap: 'end' });
+  const level = (bytes: number[]) => Buffer.from(bytes).toString('base64');
+  return {
+    layers: {
+      lower: { cells: 2, instances: 4, spacingM: 1000, heightM: 2000, jitter: 0, drift: { windOffsetMs: 10, divisorM: 10000 } },
+      upper: { cells: 2, instances: 1, spacingM: 2000, heightM: 4000, jitter: 0, drift: { windOffsetMs: 20, divisorM: 20000 } },
+    },
+    cells: [[0, -1, -1, 1], [0, -0.5, -1.5, 0], [1, -1, -1, 1], [1, -1.5, -0.5, 0], [0, -1, -1, 0]],
+    lowerCells: 4,
+    codes: [...new Array<string>(8).fill('thick'), ...new Array<string>(7).fill('thin'), 'clear'],
+    types: {
+      thick: { darkness: 1, sideMesh: 'flat', centreLineMesh: 'flat', pushNearCentre: false, heightOffsetM: 0, materials: [material('thick', 1)] },
+      thin: { darkness: 0.5, sideMesh: 'flat', centreLineMesh: 'flat', pushNearCentre: true, heightOffsetM: 0, materials: [material('thinA', 1), material('thinB', 0.5)] },
+      clear: { darkness: 0, sideMesh: null, centreLineMesh: null, pushNearCentre: false, heightOffsetM: 0, materials: [] },
+    },
+    height: { perCellM: 0, perCodeM: 0 },
+    placement: { gridScale: 1, endMargin: 0.1, fadeGain: 10, pushRadius: 0, push: 0, edgePitchRad: 0, edgeDrop: 0, riseDrop: 0.5, centreLineYawRad: 0, centreLinePitchRad: 0, centreLineRollRad: 0 },
+    coverage: { falloff: 0.5, approachPerS: 0.1 },
+    alpha: { gain: 2, powerFrom: 4, powerTo: 1 },
+    averagedInputs: { variant: 'mean', red: 0.5, green: 0.5, jitter: 0, startAgeCells: 0.1 },
+    meshes: { flat },
+    maps: { full: { width: 2, height: 2, mips: [Buffer.from([255, 255, 255, 255]).toString('base64'), Buffer.from([255]).toString('base64')] } },
+    lightMaps: {
+      full: { width: 1, height: 1, channels: 1, mips: [level([255])] },
+      side: { width: 1, height: 1, channels: 3, mips: [level([255, 128, 64])] },
+      end: { width: 1, height: 1, channels: 3, mips: [level([32, 128, 255])] },
+    },
   };
 }
 
@@ -91,6 +134,7 @@ export function testSky(): ScenerySky {
         { sunTarget: 200, weatherLerpPower: 1, clear: { gain: [1, 0.8, 0.6], sunProximity: 1 }, overcast: { gain: [0.9, 0.9, 0.9], sunProximity: 1 } },
       ],
     },
+    clouds: testClouds(),
   };
 }
 
