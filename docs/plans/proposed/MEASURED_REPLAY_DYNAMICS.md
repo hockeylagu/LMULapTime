@@ -1,4 +1,4 @@
-# Measured replay dynamics (step 1 done, steps 2-3 proposed)
+# Measured replay dynamics (steps 1-3 done)
 
 Agreed with the driver on 2026-11-10. Replay laps use the pose packet's measured acceleration, yaw rate and velocity
 (every car, up to 50 Hz) and the measured wheel speeds instead of the values `src/utils/computedTelemetry.ts`
@@ -60,7 +60,7 @@ Slip ratio needs each car's rolling radius, which the replay does not hold for o
 Estimate it per wheel and lap from free-rolling samples (no brake, low yaw rate, above 20 m/s), then
 `ratio = (ω × r − v_forward) / v_forward`, from the stored `wheelAngularSpeeds` and the lap's speed. This is
 analysis on a whole lap, so it lives in `shared/domain` beside the live `wheelSlip.ts` and uses its event rule (15 %,
-two samples). The served field becomes source-neutral (`wheelSlip`, today `liveWheelSlip`); a live capture, where
+two samples). The served field is source-neutral (`wheelSlip`); a live capture, where
 present, still takes precedence (it measures the contact patch directly).
 
 Validation before wiring: compare the replay ratios with live-capture ratios on the same laps (any race with a live
@@ -77,8 +77,14 @@ field), fed with the measured yaw rate. Provenance marks replay-measured values 
 1. **Replay (cache v10), done 2026-11-10.** The decoder stores the five channels for every car; the deleted
    replays were relabelled offline (backup in lmu-offline). Stored laps grew about 25 % (4.4 B per sample on the
    Daytona race).
-2. **App fallback rule** for yaw rate and sideslip.
-3. **Measured slip.** Radius estimate and ratios in `shared/domain`, validated as above, then wired.
+2. **App fallback rule, done 2026-11-10.** `computeVehicleDynamics` takes the replay's measured yaw rate, and
+   sideslip = atan2(velocityLat, velocityLon) from 5 m/s forward; the estimates fill in elsewhere. On Daytona laps
+   the estimates agree (yaw r 0.99, sideslip r 0.82-0.93).
+3. **Measured slip, done 2026-11-10.** `shared/domain/live/replayWheelSlip.ts`, applied to every lap the app
+   loads (`replayApi.ts`). Validated on the Le Mans race of 2026-11-10 (16 laps, live capture): the radius stays within
+   0.2-0.4 % per wheel; 47 of the 53 live lockup/wheelspin events found, the 6 missed peaking at 15-19 %; 19
+   replay-only events, mostly around two incidents. Replay ratios read about 2 % less braking slip at the fronts
+   (1 % at the rears) than the patch, so borderline front lockups can be missed.
 
 Each step lands as its own commits with tests, lint and build clean.
 

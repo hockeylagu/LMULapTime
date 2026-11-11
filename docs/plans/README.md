@@ -162,5 +162,5 @@ data package; car models for every record, camera/comparison acceptance and perf
   previous session at the layout (corner time and cues), to see whether a habit is being corrected.
 - [Further replay preparation](proposed/REPLAY_STORAGE_DESIGN.md): storage size takes priority; measure
   before revisiting prepared views or grouped columns.
-- [Measured replay dynamics](proposed/MEASURED_REPLAY_DYNAMICS.md): step 1 (cache v10) done; replay laps use every car's measured
+- [Measured replay dynamics](proposed/MEASURED_REPLAY_DYNAMICS.md): steps 1-3 (cache v10, app fallback, replay wheel slip) done; replay laps use every car's measured
   acceleration, yaw rate, sideslip and wheel slip (converted to ISO 8855 in the decoder), the estimates as fallback.
