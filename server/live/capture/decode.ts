@@ -29,25 +29,19 @@ export function writeLiveCaptureRow(slot: Buffer, rows: Float64Array, offset: nu
   rows[offset + 2] = Number.isFinite(lapStart) && lapStart >= 0 ? lapStart : Number.NaN;
   const values = offset + 3;
 
-  // The producer defines left/up/back in a left-handed frame; ISO is forward/left/up.
-  rows[values] = finiteOrNaN(-slot.readDoubleLE(at.localVel + 2 * 8));
-  rows[values + 1] = finiteOrNaN(slot.readDoubleLE(at.localVel));
-  // Axial vectors also change handedness: raw +Y yaws right.
-  rows[values + 2] = finiteOrNaN(-slot.readDoubleLE(at.localRot + 8));
-
   for (let corner = 0; corner < 4; corner++) {
     const wheel = at.wheels + corner * WHEEL.size;
     // Wheel longitudinal is back-positive and must be negated.
-    rows[values + 3 + corner] = finiteOrNaN(-slot.readDoubleLE(wheel + WHEEL.offsets.longitudinalPatchVel));
-    rows[values + 7 + corner] = finiteOrNaN(-slot.readDoubleLE(wheel + WHEEL.offsets.longitudinalGroundVel));
+    rows[values + corner] = finiteOrNaN(-slot.readDoubleLE(wheel + WHEEL.offsets.longitudinalPatchVel));
+    rows[values + 4 + corner] = finiteOrNaN(-slot.readDoubleLE(wheel + WHEEL.offsets.longitudinalGroundVel));
   }
-  // Raw hybrid values (catalog version 4), in the channel order of channels.ts; not interpreted here.
-  rows[values + 11] = finiteOrNaN(slot.readDoubleLE(at.batteryChargeFraction));
-  rows[values + 12] = finiteOrNaN(slot.readFloatLE(at.soc));
-  rows[values + 13] = slot.readUInt8(at.motorMap);
-  rows[values + 14] = slot.readUInt8(at.motorMapMax);
-  rows[values + 15] = slot.readUInt8(at.electricBoostMotorState);
-  rows[values + 16] = finiteOrNaN(slot.readFloatLE(at.regen));
+  // Raw hybrid values (catalog version 4 on), in the channel order of channels.ts; not interpreted here.
+  rows[values + 8] = finiteOrNaN(slot.readDoubleLE(at.batteryChargeFraction));
+  rows[values + 9] = finiteOrNaN(slot.readFloatLE(at.soc));
+  rows[values + 10] = slot.readUInt8(at.motorMap);
+  rows[values + 11] = slot.readUInt8(at.motorMapMax);
+  rows[values + 12] = slot.readUInt8(at.electricBoostMotorState);
+  rows[values + 13] = finiteOrNaN(slot.readFloatLE(at.regen));
   return true;
 }
 

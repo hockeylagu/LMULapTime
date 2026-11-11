@@ -106,6 +106,20 @@ describe('supplemental live telemetry fusion', () => {
     expect(result.points[2].wheelSlip).toBeUndefined();
   });
 
+  it('fuses only wheel slip from a recording without vehicle motion channels (version 5), keeping the replay yaw', () => {
+    const trajectory = liveTrajectoryFixture();
+    const response = liveEvidenceFixture();
+    const wheels = ['fl', 'fr', 'rl', 'rr'];
+    response.evidence.channels = ['patch', 'ground'].flatMap(kind => wheels.map(wheel => ({
+      name: `${wheel}_${kind}_longitudinal_mps`, unit: 'm/s', frame: 'iso8855-wheel' as const, sourceField: kind })));
+    response.evidence.points = [0.02, 0.04].map((lapSeconds, index) => ({ sampleIndex: index, elapsedSeconds: 100 + lapSeconds,
+      lapSeconds, values: [0, 0, 0, 0, 40, 40, 40, 40] }));
+    response.evidence.coverage.gaps = [];
+    const result = fuseLiveTelemetry(trajectory, response);
+    expect(result.liveCaptureOverlay).toMatchObject({ state: 'applied', yawPoints: 0, slipPoints: 0, wheelSlipPoints: 2 });
+    expect(result.points[0]).toMatchObject({ yawRateDeg: -99, slipAngleDeg: -9, liveDynamics: { yawRate: false, slipAngle: false, wheelSlip: true } });
+  });
+
   it('lets a measured lockup decide the lockup flag instead of the inferred one', () => {
     const trajectory = liveTrajectoryFixture();
     trajectory.points = trajectory.points.map(point => ({ ...point, absActive: true,

@@ -20,22 +20,22 @@ function decodeRow(slot: Buffer) {
 }
 
 describe('writeLiveCaptureRow', () => {
-  it('maps cardinal vehicle vectors to ISO forward and left velocity and yaw rate', () => {
+  it('records the clock and no vehicle velocity or yaw rate (version 5: the replay measures them)', () => {
     const slot = vehicleSlot();
     writeDouble(slot, 'elapsedTime', 42.125);
     slot.writeInt32LE(3, VEHICLE_TELEMETRY.offsets.lapNumber);
     writeDouble(slot, 'lapStartET', 12.5);
     writeDouble(slot, 'localVel', 2, 0);
-    writeDouble(slot, 'localVel', 3, 1);
-    writeDouble(slot, 'localVel', -4, 2);
-    writeDouble(slot, 'localRot', -5, 0);
     writeDouble(slot, 'localRot', 6, 1);
-    writeDouble(slot, 'localRot', 7, 2);
 
     const sample = decodeRow(slot);
-    expect(sample).not.toBeNull();
     expect(sample).toMatchObject({ elapsedSeconds: 42.125, lapNumber: 3, lapStartSeconds: 12.5 });
-    expect(Array.from(sample!.values.slice(0, 3))).toEqual([4, 2, -6]);
+    expect(sample!.values.every((value: number) => value === 0)).toBe(true);
+    expect(LIVE_CAPTURE_CHANNELS.some(channel => channel.frame === 'iso8855-vehicle')).toBe(false);
+    // Older recordings keep the motion channels they captured.
+    for (const version of [1, 2, 3, 4]) {
+      expect(liveCaptureChannels(version).slice(0, 3).map(channel => channel.name)).toEqual(['velocity_forward_mps', 'velocity_left_mps', 'yaw_rate_radps']);
+    }
   });
 
   it('preserves negative values and the exact float64 input precision', () => {
@@ -43,15 +43,13 @@ describe('writeLiveCaptureRow', () => {
     writeDouble(slot, 'elapsedTime', 0.10000000000000002);
     slot.writeInt32LE(-1, VEHICLE_TELEMETRY.offsets.lapNumber);
     writeDouble(slot, 'lapStartET', -1);
-    writeDouble(slot, 'localVel', -0.10000000000000002, 0);
-    writeDouble(slot, 'localVel', -0.25, 1);
-    writeDouble(slot, 'localVel', 0.5, 2);
+    slot.writeDoubleLE(0.10000000000000002, VEHICLE_TELEMETRY.offsets.wheels + WHEEL.offsets.longitudinalPatchVel);
 
     const sample = decodeRow(slot);
     expect(sample?.elapsedSeconds).toBe(0.10000000000000002);
     expect(sample?.lapNumber).toBe(-1);
     expect(sample?.lapStartSeconds).toBeNull();
-    expect(Array.from(sample!.values.slice(0, 2))).toEqual([-0.5, -0.10000000000000002]);
+    expect(sample!.values[0]).toBe(-0.10000000000000002);
   });
 
   it('uses NaN for nonfinite inputs without converting missing wheel values to measured zero', () => {
@@ -59,10 +57,6 @@ describe('writeLiveCaptureRow', () => {
     writeDouble(slot, 'elapsedTime', 1);
     slot.writeInt32LE(0, VEHICLE_TELEMETRY.offsets.lapNumber);
     writeDouble(slot, 'lapStartET', Number.NaN);
-    writeDouble(slot, 'localVel', Number.NaN, 0);
-    writeDouble(slot, 'localVel', Number.POSITIVE_INFINITY, 1);
-    writeDouble(slot, 'localVel', Number.NEGATIVE_INFINITY, 2);
-    writeDouble(slot, 'localRot', 0.3, 1);
     for (let corner = 0; corner < 4; corner++) for (const field of ['longitudinalPatchVel', 'longitudinalGroundVel']) {
       slot.writeDoubleLE(corner % 2 === 0 ? Number.NaN : Number.POSITIVE_INFINITY,
         VEHICLE_TELEMETRY.offsets.wheels + corner * WHEEL.size + WHEEL.offsets[field]);
@@ -70,12 +64,10 @@ describe('writeLiveCaptureRow', () => {
 
     const sample = decodeRow(slot);
     expect(sample?.lapStartSeconds).toBeNull();
-    expect(Number.isNaN(sample!.values[0])).toBe(true);
-    expect(Number.isNaN(sample!.values[1])).toBe(true);
-    expect(sample!.values[2]).toBe(-0.3);
-    expect(sample!.values).toHaveLength(17);
-    expect(sample!.values.slice(3, 11).every(Number.isNaN)).toBe(true);
-    expect(LIVE_CAPTURE_CHANNELS).toHaveLength(17);
+    expect(sample!.values).toHaveLength(14);
+    expect(sample!.values.slice(0, 8).every(Number.isNaN)).toBe(true);
+    expect(LIVE_CAPTURE_CHANNELS).toHaveLength(14);
+    expect(liveCaptureChannels(4)).toHaveLength(17);
     expect(liveCaptureChannels(3)).toHaveLength(11);
   });
 
@@ -88,8 +80,8 @@ describe('writeLiveCaptureRow', () => {
       }
     }
     const values = decodeRow(slot)!.values;
-    expect(Array.from(values.slice(3, 7))).toEqual([10, 11, 12, 13]);
-    expect(Array.from(values.slice(7, 11))).toEqual([-30, -31, -32, -33]);
+    expect(Array.from(values.slice(0, 4))).toEqual([10, 11, 12, 13]);
+    expect(Array.from(values.slice(4, 8))).toEqual([-30, -31, -32, -33]);
     // A valid stationary zero is available, unlike nonfinite input.
     expect(decodeRow(vehicleSlot())!.values.every((value: number) => value === 0)).toBe(true);
     expect(LIVE_CAPTURE_CHANNELS.every(channel => channel.verified)).toBe(true);
@@ -103,8 +95,8 @@ describe('writeLiveCaptureRow', () => {
     slot.writeDoubleLE(0.625, at.batteryChargeFraction); slot.writeFloatLE(0.5, at.soc);
     slot.writeUInt8(4, at.motorMap); slot.writeUInt8(10, at.motorMapMax);
     slot.writeUInt8(2, at.electricBoostMotorState); slot.writeFloatLE(0.25, at.regen);
-    expect(Array.from(decodeRow(slot)!.values.slice(11))).toEqual([0.625, 0.5, 4, 10, 2, 0.25]);
-    expect(LIVE_CAPTURE_CHANNELS.slice(11).map(channel => [channel.name, channel.sourceField, channel.frame])).toEqual([
+    expect(Array.from(decodeRow(slot)!.values.slice(8))).toEqual([0.625, 0.5, 4, 10, 2, 0.25]);
+    expect(LIVE_CAPTURE_CHANNELS.slice(8).map(channel => [channel.name, channel.sourceField, channel.frame])).toEqual([
       ['battery_charge_fraction', 'batteryChargeFraction', 'raw'], ['soc_raw', 'soc', 'raw'], ['motor_map', 'motorMap', 'raw'],
       ['motor_map_max', 'motorMapMax', 'raw'], ['electric_motor_state', 'electricBoostMotorState', 'raw'], ['regen_raw', 'regen', 'raw'],
     ]);

@@ -89,7 +89,7 @@ it('persists recorded memory values through service, real worker, rediscovery an
         };
       } finally { connection.closeSync(); }
     } finally { instance.closeSync(); }
-    const expected = [24.0998, 0.0003, 0.14548, 1.8818, 1.6297, 0.7526, 1.1636, 23.9723, 24.224, 23.9834, 24.2205, 0, 0, 0, 0, 0, 0];
+    const expected = [1.8818, 1.6297, 0.7526, 1.1636, 23.9723, 24.224, 23.9834, 24.2205, 0, 0, 0, 0, 0, 0];
     expect(readback.samples).toEqual([Object.fromEntries(LIVE_CAPTURE_CHANNELS.map((channel, index) => [channel.name, expected[index]]))]);
     expect(indexed[0].manifest.normalizationVersion).toBe(LIVE_CAPTURE_NORMALIZATION_VERSION);
     const stored = readback.observations;

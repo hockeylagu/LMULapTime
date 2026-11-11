@@ -39,7 +39,7 @@ async function createWriter(directory: string) {
 }
 
 const READBACK_SQL = `SELECT (SELECT count(*) FROM capture_samples) AS samples, (SELECT count(*) FROM capture_observations) AS observations,
-  velocity_forward_mps AS velocity, fl_patch_longitudinal_mps IS NULL AND fr_patch_longitudinal_mps IS NULL AS "wheelNull",
+  fl_patch_longitudinal_mps AS velocity, fl_patch_longitudinal_mps IS NULL AND fr_patch_longitudinal_mps IS NULL AS "wheelNull",
   (SELECT CAST(manifest_json AS VARCHAR) FROM capture_manifest WHERE singleton = TRUE) AS manifest
   FROM capture_samples ORDER BY sample_index LIMIT 1`;
 

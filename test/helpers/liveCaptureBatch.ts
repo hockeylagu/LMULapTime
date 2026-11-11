@@ -41,7 +41,7 @@ export function sampleRows(...times: number[]): Float64Array {
     result[offset] = time;
     result[offset + 1] = 1;
     result[offset + 2] = 0;
-    for (let channel = 0; channel < LIVE_CAPTURE_CHANNELS.length; channel++) result[offset + 3 + channel] = channel === 6 ? Number.NaN : row + channel / 10;
+    for (let channel = 0; channel < LIVE_CAPTURE_CHANNELS.length; channel++) result[offset + 3 + channel] = channel === 3 ? Number.NaN : row + channel / 10;
   }
   return result;
 }

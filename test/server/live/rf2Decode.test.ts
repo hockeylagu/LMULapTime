@@ -271,7 +271,7 @@ describe('rF2 pedal decode', () => {
     const rows = new LiveCaptureRows();
     const first = readPedalFrame(mapping, 12, null, 1, rows, false);
     current = telemetryBuffer(5, [{ ...slots[1], et: 400, throttle: 0.25 }]);
-    current.writeDoubleLE(-88, TELEMETRY.vehicles + VEHICLE_TELEMETRY.offsets.localVel + 16);
+    current.writeDoubleLE(-88, TELEMETRY.vehicles + VEHICLE_TELEMETRY.offsets.wheels + WHEEL.offsets.longitudinalPatchVel);
     const second = readPedalFrame(mapping, 12, 4, 1, rows, true);
     expect(first).toMatchObject({ value: { sample: { t: 321.25, throttle: 0.75 }, car: null } });
     expect(second).toMatchObject({ value: { sample: { t: 400, throttle: 0.25 }, car: { fuelLiters: 0 } } });

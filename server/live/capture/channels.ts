@@ -22,6 +22,16 @@ const HYBRID_CHANNELS: readonly LiveCaptureChannel[] = [
   { name: 'regen_raw', unit: 'raw', sourceField: 'regen', frame: 'raw', verified: true },
 ];
 
+/**
+ * Vehicle velocity and yaw rate, recorded up to version 4. Version 5 drops them: the replay measures the same values for
+ * every car (2026-11-10 Le Mans race: r >= 0.9995 against the capture).
+ */
+const MOTION_CHANNELS: readonly LiveCaptureChannel[] = [
+  { name: 'velocity_forward_mps', unit: 'm/s', sourceField: 'localVel.z', frame: 'iso8855-vehicle', verified: true },
+  { name: 'velocity_left_mps', unit: 'm/s', sourceField: 'localVel.x', frame: 'iso8855-vehicle', verified: true },
+  { name: 'yaw_rate_radps', unit: 'rad/s', sourceField: 'localRot.y', frame: 'iso8855-vehicle', verified: true },
+];
+
 /** Per-recording catalog: old recordings must not acquire verification for values they never captured. */
 export function liveCaptureChannels(normalizationVersion: number): readonly LiveCaptureChannel[] {
   if (!Number.isInteger(normalizationVersion) || normalizationVersion < 1 || normalizationVersion > LIVE_CAPTURE_NORMALIZATION_VERSION) {
@@ -30,9 +40,7 @@ export function liveCaptureChannels(normalizationVersion: number): readonly Live
   const wheelsVerified = normalizationVersion >= 2;
   // Only channels the app reads; dropped source fields and their conventions are listed in docs/LIVE_CAPTURE_FORMAT.md.
   return [
-    { name: 'velocity_forward_mps', unit: 'm/s', sourceField: 'localVel.z', frame: 'iso8855-vehicle', verified: true },
-    { name: 'velocity_left_mps', unit: 'm/s', sourceField: 'localVel.x', frame: 'iso8855-vehicle', verified: true },
-    { name: 'yaw_rate_radps', unit: 'rad/s', sourceField: 'localRot.y', frame: 'iso8855-vehicle', verified: true },
+    ...(normalizationVersion < 5 ? MOTION_CHANNELS : []),
     ...(['patch', 'ground'] as const).flatMap(kind => ['fl', 'fr', 'rl', 'rr'].map(corner => ({
       name: `${corner}_${kind}_longitudinal_mps`, unit: 'm/s', sourceField: `longitudinal${kind === 'patch' ? 'Patch' : 'Ground'}Vel`,
       frame: 'iso8855-wheel' as const, verified: wheelsVerified,

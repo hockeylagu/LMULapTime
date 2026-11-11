@@ -127,19 +127,25 @@ its published tenth before calling the React state setter. Pedal samples remain 
 
 ## Channels and clocks
 
-The recorder keeps only the channels the app reads, 11 dynamics channels plus six raw hybrid values (below): ISO forward and left velocity (m/s) and yaw
-rate (rad/s) for body slip, plus FL/FR/RL/RR patch and ground longitudinal velocity (m/s) for wheel slip.
-The producer's left-handed local axes are left/up/back: forward velocity is `-z`, left velocity is `x`
-and yaw rate is the axial `-y`. Wheel longitudinal is back-positive in the source and negated to
+The recorder keeps only the channels the app reads: FL/FR/RL/RR patch and ground longitudinal velocity (m/s) for wheel
+slip, plus six raw hybrid values (below). Recordings of version 4 and older also hold ISO forward and left velocity
+(m/s) and yaw rate (rad/s) for body slip: the producer's left-handed local axes are left/up/back, so forward velocity
+is `-z`, left velocity is `x` and yaw rate is the axial `-y`. Wheel longitudinal is back-positive in the source and negated to
 forward-positive. Patch velocity is not relabelled as wheel speed; the slip ratio is derived on read
 (below). Nonfinite input becomes SQL NULL; valid finite zero remains zero. Batch rows have three
-clocks/counters followed by the 17 values (20 float64 entries; 14 entries and 11 values in recordings of version 3 and older).
+clocks/counters followed by the 14 values (17 float64 entries; 20 entries and 17 values in version 4 recordings, 14
+entries and 11 values in version 3 and older).
 
 Version 1 had incorrect lateral/yaw signs: evidence reads correct those signs once without rewriting
 the source and disclose `sourceNormalizationVersion: 1` alongside response normalization version 3.
 Its wheel catalog stays unverified and its wheel columns unavailable. Versions 2 and 3 share the
-verified catalog. Older versions remain readable; new attempts use version 4 and do not resume an
+verified catalog. Older versions remain readable; new attempts use the current version and do not resume an
 older-version file. On 2026-10-21 every existing recording was rewritten offline to the version 3 catalog.
+
+Version 5 (2026-11-10) drops the three vehicle channels: replay laps carry the same measured velocity and yaw rate for
+every car (cache v10; on the 2026-11-10 Le Mans race r >= 0.9995 against the capture, the yaw gap within the replay's
+1/64 rad/s step). Version 4 and older recordings keep them, and fusion still applies them there; a version 5 lap
+fuses wheel slip only. New attempts use version 5.
 
 Version 4 (2026-10-27) appends six raw hybrid channels, kept for validating the live deployment advice
 (`strategy.deployment`, [checklist](plans/README.md#live-dashboard-and-learning)). They are stored as the
