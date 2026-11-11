@@ -21,6 +21,10 @@ export interface SceneWarmup {
   queue(root: Object3D, signal: AbortSignal): Promise<void>;
   /** The first frame is out: warm-ups upload in per-frame slices from now on, and the reduced textures start sharpening. */
   shown(): void;
+  /** Keeps a streamed texture on its reduced levels until `sharpenHeld`. */
+  hold(texture: Texture): void;
+  /** Sharpens the held textures from now on, ahead of the rest. */
+  sharpenHeld(): void;
   dispose(): void;
 }
 
@@ -34,7 +38,8 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
   const nextFrame = () => new Promise<void>(resolve => { requestAnimationFrame(() => resolve()); });
   const nextTask = () => new Promise<void>(resolve => { setTimeout(resolve, 0); });
   const geometryWarmup = createGeometryWarmup(renderer, nextFrame, UPLOAD_SLICE_MS);
-  const blurry = new Set<Texture>();
+  const held = new Set<Texture>();
+  let blurry = new Set<Texture>();
   let shown = false, disposed = false, sharpenFrame = 0, warming = Promise.resolve();
   const sharpen = () => {
     sharpenFrame = 0;
@@ -76,7 +81,7 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
       if (performance.now() >= sliceEnd) { await pause(); sliceEnd = performance.now() + budgetMs; }
     }
     await geometryWarmup.upload(root, camera, signal, budgetMs, pause);
-    for (const texture of textures) if (isStreaming(texture)) blurry.add(texture);
+    for (const texture of textures) if (isStreaming(texture) && !held.has(texture)) blurry.add(texture);
     startSharpen();
   };
   return {
@@ -87,6 +92,13 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
       return warmed;
     },
     shown() { shown = true; startSharpen(); },
+    hold(texture) { held.add(texture); },
+    sharpenHeld() {
+      // A held texture not yet on the GPU waits there: `streamTexture` copies nothing until its first upload.
+      blurry = new Set([...[...held].filter(isStreaming), ...blurry]);
+      held.clear();
+      startSharpen();
+    },
     dispose() { disposed = true; cancelAnimationFrame(sharpenFrame); geometryWarmup.dispose(); },
   };
 }

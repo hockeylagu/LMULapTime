@@ -4,6 +4,7 @@ import { BoxGeometry, CubeCamera, DoubleSide, Group, Material, Mesh, MeshBasicMa
 import { createReplayScene } from '../../../../../src/components/replay/view3d/replayScene.js';
 import { disposeObjects } from '../../../../../src/components/replay/view3d/laps/disposeObjects.js';
 import { EXPOSURE_PASS } from '../../../../../src/components/replay/view3d/autoExposure.js';
+import { isStreaming } from '../../../../../src/components/replay/view3d/scenery/materials/mipStreaming.js';
 import { SUN_UNIT } from '../../../../../src/components/replay/view3d/atmosphere/sunSamples.js';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import type { SceneryChunk, SceneryLayoutResource, ScenerySectorChunk } from '../../../../../shared/types/scenes/scenery.js';
@@ -13,6 +14,8 @@ import { TEST_HAZE_WEIGHTS, testCamera, testShading, testSky } from '../../../..
 
 const gpu = vi.hoisted(() => ({render: vi.fn<(scene: Scene, camera: PerspectiveCamera | OrthographicCamera) => void>(), dispose: vi.fn(), constructed: vi.fn(), setSize: vi.fn(), upload: vi.fn<() => Promise<void>>()}));
 const chunks = vi.hoisted(() => ({roots: new Map<string, Object3D>(), loads: [] as string[], obstacleName: ''}));
+/** Car texture reads, as `streamed` or `capped` by the loader that made them, and the textures the streamed loader returned. */
+const carTextureLoads = vi.hoisted(() => ({paths: [] as string[], streamed: new WeakSet<object>()}));
 vi.mock('three-mesh-bvh/worker', async () => {
   const {MeshBVH} = await import('three-mesh-bvh');
   return {GenerateMeshBVHWorker: class {async generate(geometry: BufferGeometry) { return new MeshBVH(geometry, {indirect: true}); } dispose() {}}};
@@ -36,6 +39,7 @@ vi.mock('three', async importOriginal => {
     setPixelRatio() {}
     compileAsync() { return Promise.resolve(); }
     initTexture() {}
+    properties = {has: () => false};
     initRenderTarget() {}
     forceContextLoss() {}
     getRenderTarget() { return null; }
@@ -61,6 +65,12 @@ vi.mock('three/addons/loaders/GLTFLoader.js', async () => {
       const root = rigModel(), cockpit = new Group();
       root.traverse(object => { if (object instanceof Mesh) { const material = object.material as Material; material.userData.nativeMaterialId = 'm1'; material.name = 'body'; } });
       cockpit.name = 'cockpit-in'; cockpit.userData.cockpitView = 'in'; root.add(cockpit);
+      // An interior part (the package marks its node) with its own material, and the same material's texture kept for the outside by a second, unmarked one.
+      const interior = new Group(); interior.userData.interior = true; root.add(interior);
+      for (const [name, id, parent] of [['seat', 'seat', interior], ['dash', 'trim', interior], ['sill', 'trim', root]] as const) {
+        const material = new MeshBasicMaterial(), part = new Mesh(new BoxGeometry(), material);
+        material.userData.nativeMaterialId = id; part.name = name; parent.add(part);
+      }
       for (const name of ['option_PlateA', 'option_PlateB']) {
         const material = new MeshBasicMaterial(), plate = new Mesh(new BoxGeometry(), material);
         material.userData.nativeMaterialId = 'm1'; plate.name = name; root.add(plate);
@@ -93,7 +103,14 @@ vi.mock('../../../../../src/components/replay/view3d/scenery/chunkLoader.js', ()
   releaseChunk: (root: Object3D) => disposeObjects(root, true), dispose() {},
 })}));
 vi.mock('../../../../../src/components/replay/view3d/scenery/cachedKtx2Loader.js', () => ({CachedKtx2Loader: class {
-  async loadAsync() { return new Texture(); }
+  constructor(_renderer: unknown, private readonly textureDetail?: {streamed?: boolean}) {}
+  async loadAsync(url: string) {
+    const texture = new Texture(), streamed = this.textureDetail?.streamed === true;
+    carTextureLoads.paths.push(`${streamed ? 'streamed' : 'capped'} ${url.split('/').at(-1)!}`);
+    if (streamed) { texture.mipmaps = [{data: new Uint8Array(4), width: 512, height: 512}]; carTextureLoads.streamed.add(texture); }
+    return texture;
+  }
+  detail(texture: Texture) { return carTextureLoads.streamed.has(texture) ? async () => [] : undefined; }
   release() {}
   dispose() {}
 }}));
@@ -115,7 +132,8 @@ const layout = {
 } as unknown as SceneryLayoutResource;
 const car = {
   resource: {}, bytes: new ArrayBuffer(0), vehicleId: 'veh',
-  descriptor: {optionNodes: ['option_PlateA', 'option_PlateB'], appearances: [{alias: 'VEH', albedo: 'textures/a.ktx2', paint: testCarPaint('textures/a.ktx2'), optionNodes: ['option_PlateA']}], materials: [{id: 'm1', name: 'body', paint: true}, {id: 'glow', name: 'glow', paint: true}], glowMaterialIds: ['glow'],
+  descriptor: {optionNodes: ['option_PlateA', 'option_PlateB'], appearances: [{alias: 'VEH', albedo: 'textures/a.ktx2', paint: testCarPaint('textures/a.ktx2'), optionNodes: ['option_PlateA']}], materials: [{id: 'm1', name: 'body', paint: true}, {id: 'glow', name: 'glow', paint: true},
+      ...['seat', 'trim'].map(name => ({id: name, name, paint: false, surface: {kind: 'diffuse', maps: {albedo: {texture: `textures/${name}.ktx2`, uv: 'uv0', scale: [1, 1]}}, finish: {roughness: 0.6, metalness: 0}, normalShadowInfluence: 0}}))], glowMaterialIds: ['glow'],
     lamps: [
       {role: 'headlight', nodes: ['lamp.Glow'], material: 'lampGlowMaterial', frames: ['textures/off.ktx2', 'textures/on.ktx2'], animation: {method: null, rate: null, sequence: null},
         emission: {scale: 500, vertexColour: false, viewBoost: {gain: 2, power: 64}, ambientScaled: false, vertexAlpha: false}, blend: 'alpha',
@@ -144,7 +162,7 @@ const isFrame = (scene: Scene, camera: Object3D) => scene.isScene && scene.name 
 const sceneRenders = () => gpu.render.mock.calls.filter(([scene, camera]) => isFrame(scene, camera));
 const lastSceneRender = () => sceneRenders().at(-1)!;
 beforeEach(() => {
-  vi.resetAllMocks(); frames = []; resizeCallbacks = []; chunks.roots.clear(); chunks.loads.length = 0; chunks.obstacleName = '';
+  vi.resetAllMocks(); frames = []; resizeCallbacks = []; carTextureLoads.paths.length = 0; chunks.roots.clear(); chunks.loads.length = 0; chunks.obstacleName = '';
   vi.stubGlobal('ResizeObserver', class implements ResizeObserver {
     constructor(callback: ResizeObserverCallback) { resizeCallbacks.push(() => callback([], this)); }
     observe() {}
@@ -348,6 +366,20 @@ it('puts the cockpit, hood and roof views on the game cameras of the car with th
   expect(camera.zoom).toBe(1);
   expect(camera.position.distanceTo(eye)).toBeGreaterThan(10);
   expect([(camera as PerspectiveCamera).fov, camera.near]).toEqual([48, 0.5]);
+  handle.dispose();
+});
+
+it('reads the textures only the interior uses on their reduced levels, and the rest of the car capped', async () => {
+  const handle = await createReplayScene(document.createElement('div'), layout, lap, null, vi.fn(), assets);
+  handle.cursor(0, 0); draw();
+  // The seat is interior only; the trim is also on an outside part, so it loads like the body.
+  expect(carTextureLoads.paths.filter(path => path.startsWith('streamed'))).toEqual(['streamed seat.ktx2']);
+  expect(carTextureLoads.paths).toEqual(expect.arrayContaining(['capped trim.ktx2', 'capped a.ktx2']));
+  const [scene] = lastSceneRender(), map = (name: string) => (scene.getObjectByName(name) as Mesh<BufferGeometry, MeshBasicMaterial>).material.map!;
+  // The seat material's own copy allocates the full texture (two levels above the 512 it holds) and waits to sharpen.
+  expect([isStreaming(map('seat')), map('seat').mipmaps.map(level => level.width), isStreaming(map('dash'))]).toEqual([true, [2048, 1024, 512], false]);
+  handle.mode('cockpit'); draw();
+  expect(isStreaming(map('seat'))).toBe(true); // Not on the GPU in this double: nothing to copy yet.
   handle.dispose();
 });
 

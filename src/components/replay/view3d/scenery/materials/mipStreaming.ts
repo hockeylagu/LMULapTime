@@ -6,28 +6,44 @@ import { CompressedTexture, TextureSource, WebGLUtils, type Texture, type TypedA
  * then copies the missing top levels into that same GPU texture, a band of rows at a time within a per-frame byte budget, and
  * lowers the base level as each level completes. No second allocation and no upload bigger than the budget, whatever the size.
  * Small textures load whole.
+ *
+ * A texture whose loader read only its reduced levels (`detail` given) allocates the full chain all the same, and fetches the
+ * levels above when its turn to sharpen comes.
  */
 export const STREAMED_LEVELS = 2;
-const STREAMED_MIN_PX = 512;
+export const STREAMED_MIN_PX = 512;
 /** Every compressed format the package holds (BCn) is in 4×4 blocks: a band starts and ends on a block row. */
 const BLOCK_ROWS = 4;
 
-interface MipLevel { data: TypedArray; width: number; height: number }
-/** `level` is the level being filled (counting down to 0) and `row` its next pixel row. */
-interface Stream { levels: MipLevel[]; level: number; row: number }
+export interface MipLevel { data: TypedArray; width: number; height: number }
+/** Fetches the levels above `STREAMED_LEVELS` of a texture that was read without them, largest first. */
+export type DetailLoader = () => Promise<MipLevel[]>;
+/** `level` is the level being filled (counting down to 0) and `row` its next pixel row; `detail` is set until the missing levels are requested, `waiting` until they arrive, `failed` when they could not be read. */
+interface Stream { levels: MipLevel[]; level: number; row: number; detail?: DetailLoader; waiting?: boolean; failed?: boolean }
+/** Detail requests in flight at once: enough to keep the per-frame budget fed without holding every file in memory ahead of its turn. */
+const DETAIL_REQUESTS = 8;
+let detailRequests = 0;
 const streams = new WeakMap<Texture, Stream>();
 const formats = new WeakMap<WebGLRenderer, WebGLUtils>();
 
-/** Makes a large texture start on its reduced levels; three allocates the full chain on its first upload. */
-export function startStreaming(texture: Texture, renderer: WebGLRenderer): void {
-  const levels = texture.mipmaps as MipLevel[];
-  if (levels.length <= STREAMED_LEVELS || Math.min(levels[0].width, levels[0].height) < STREAMED_MIN_PX) return;
+/**
+ * Makes a large texture start on its reduced levels; three allocates the full chain on its first upload. With `detail`, the
+ * texture holds only those reduced levels and the ones above are fetched later.
+ */
+export function startStreaming(texture: Texture, renderer: WebGLRenderer, detail?: DetailLoader): void {
+  let levels = texture.mipmaps as MipLevel[];
+  if (detail) {
+    // Empty places for the missing levels, so the storage three allocates is the full texture's.
+    const missing = Array.from({length: STREAMED_LEVELS}, (_, level) => ({data: new Uint8Array(0), width: levels[0].width << (STREAMED_LEVELS - level), height: levels[0].height << (STREAMED_LEVELS - level)}));
+    levels = [...missing, ...levels];
+    texture.mipmaps = levels;
+  } else if (levels.length <= STREAMED_LEVELS || Math.min(levels[0].width, levels[0].height) < STREAMED_MIN_PX) return;
   // Its own source: the texture is a clone sharing the loader's cached original, whose data other chunks still upload from.
   // Without data, three only allocates storage for every level in `mipmaps`.
   const source = new TextureSource({width: levels[0].width, height: levels[0].height});
   source.dataReady = false;
   texture.source = source;
-  const stream: Stream = {levels, level: STREAMED_LEVELS - 1, row: 0};
+  const stream: Stream = {levels, level: STREAMED_LEVELS - 1, row: 0, detail};
   streams.set(texture, stream);
   // Runs right after each allocation, with the texture bound: refill the reduced levels and sample only those, or every level
   // once the texture had finished streaming (a later allocation would otherwise leave its storage empty).
@@ -42,7 +58,8 @@ export function startStreaming(texture: Texture, renderer: WebGLRenderer): void 
 
 /** True while a texture still samples from a reduced level. */
 export function isStreaming(texture: Texture): boolean {
-  return streams.has(texture);
+  const stream = streams.get(texture);
+  return stream !== undefined && !stream.failed;
 }
 
 /** Forgets a texture's missing levels and stops refilling it (its chunks released it). */
@@ -53,11 +70,25 @@ export function stopStreaming(texture: Texture): void {
 
 /**
  * Copies up to `budgetBytes` of a texture's missing levels (at least one band) and returns the bytes copied: 0 when it is
- * full, released or not on the GPU yet. A level joins the sampled range when its last band lands.
+ * full, released, not on the GPU yet or waiting for its missing levels. A level joins the sampled range when its last band lands.
  */
 export function streamTexture(texture: Texture, renderer: WebGLRenderer, budgetBytes: number): number {
   const stream = streams.get(texture), gpu = renderer.properties.has(texture) ? (renderer.properties.get(texture) as {__webglTexture?: WebGLTexture}).__webglTexture : undefined;
   if (!stream || !gpu) return 0;
+  if (stream.detail && detailRequests < DETAIL_REQUESTS) {
+    const load = stream.detail;
+    stream.detail = undefined; stream.waiting = true; detailRequests++;
+    void load().then(detail => {
+      if (detail.length !== STREAMED_LEVELS || detail[0].width !== stream.levels[0].width || detail[0].height !== stream.levels[0].height) throw Error('A texture file does not hold the levels above its reduced ones');
+      detail.forEach((level, index) => { stream.levels[index] = level; });
+      stream.waiting = false;
+    }).catch((error: unknown) => {
+      // The texture stays on its reduced levels; the failed read is reported, not hidden.
+      stream.failed = true;
+      reportError(error);
+    }).finally(() => { detailRequests--; });
+  }
+  if (stream.detail || stream.waiting || stream.failed) return 0;
   const gl = renderer.getContext() as WebGL2RenderingContext, unit = texture instanceof CompressedTexture ? BLOCK_ROWS : 1;
   renderer.state.bindTexture(gl.TEXTURE_2D, gpu);
   let copied = 0;

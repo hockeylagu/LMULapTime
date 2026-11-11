@@ -20,6 +20,8 @@ import type { StreamView } from './scenery/residency.js';
 import type { WheelAnimation } from './wheelAnimation.js';
 import { createSceneryStream } from './scenery/sceneryStream.js';
 import { createSceneWarmup } from './scenery/sceneWarmup.js';
+import { startStreaming } from './scenery/materials/mipStreaming.js';
+import { isDriverCamera } from './driverCameras.js';
 import { isFreeCameraMode, stationAt, viewMoved } from './scenery/streamView.js';
 
 export interface ReplaySceneHandle {
@@ -43,6 +45,13 @@ export interface ReplaySceneHandle {
   dispose(): void;
 }
 
+/**
+ * Car textures load no larger than this on their longer side. On a 1080p view from outside the car the picture is the same as
+ * with the package's full size (2048), for a third of the data. The interior's own textures are not capped: they start on
+ * their reduced levels and reach their full size in the driver cameras.
+ */
+const CAR_TEXTURE_MAX_PX = 1024;
+
 export async function createReplayScene(
   host: HTMLDivElement, layout: SceneryLayoutResource,
   trajectory: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null,
@@ -55,7 +64,7 @@ export async function createReplayScene(
   try { renderer = new WebGLRenderer({antialias: false, alpha: false, reversedDepthBuffer: true}); }
   catch { throw Error('WebGL 2 is unavailable. Use the 2D map.'); }
   const {min, max} = layout.horizon.bounds, origin = new Vector3(...min).add(new Vector3(...max)).multiplyScalar(0.5);
-  const loader = createChunkLoader(renderer), carTextures = new CachedKtx2Loader(renderer);
+  const loader = createChunkLoader(renderer, layout.textures), carTextures = new CachedKtx2Loader(renderer, {maxPx: () => CAR_TEXTURE_MAX_PX}), interiorTextures = new CachedKtx2Loader(renderer, {streamed: true});
   const sun = sceneSun(layout, origin.y, trajectory.daylightClock);
   const exposure = createAutoExposure(renderer, layout.camera, {rgb: sun.radiance.clone(), elevationDeg: sun.sunElevationDeg}, () => invalidate(), exposureType('follow'),
     sun.weather.cloudCover, sun.weather.sunVisibility);
@@ -104,14 +113,24 @@ export async function createReplayScene(
   });
   /** Frees what exists from the start; `dispose` adds what the finished scene owns. */
   const cleanup = () => {
-    disposed = true; window.clearTimeout(refreshTimer); stream.dispose(); loader.dispose(); carTextures.dispose(); exposure.dispose();
+    disposed = true; window.clearTimeout(refreshTimer); stream.dispose(); loader.dispose(); carTextures.dispose(); interiorTextures.dispose(); exposure.dispose();
     ground.dispose(); warmup.dispose(); rig.dispose(); renderer.dispose(); renderer.forceContextLoss();
   };
   const route = layout.routeLengthM;
   const firstStation = stationAt(trajectory.points, 0, 0, route);
   if (firstStation === undefined) { cleanup(); throw Error('This recording has no track stations. Use the 2D map.'); }
   let currentStation = firstStation, streamView: StreamView | null = null;
-  const loadLaps = createLapLayerLoader(origin, surfaceHeight, path => carTextures.loadAsync(`${VEHICLE_FILES}${path}`), () => exposure.display(), layout.shading);
+  // Interior textures stay on their reduced levels until a driver camera is used: only there is their full size seen.
+  let driverCameraUsed = false;
+  const loadLaps = createLapLayerLoader(origin, surfaceHeight, {
+    load: (path, interior) => (interior ? interiorTextures : carTextures).loadAsync(`${VEHICLE_FILES}${path}`),
+    copied(copy, original) {
+      const detail = interiorTextures.detail(original);
+      if (!detail) return;
+      startStreaming(copy, renderer, detail);
+      if (!driverCameraUsed) warmup.hold(copy);
+    },
+  }, () => exposure.display(), layout.shading);
   // The first view's chunks and the car are requested first: the sky's environment and the car's reflection link their programs
   // on the main thread, which the downloads then overlap.
   streamView = {kind: 'lap', lapDistanceM: currentStation}; stream.update(streamView);
@@ -250,6 +269,7 @@ export async function createReplayScene(
     },
     mode(next) {
       if (!rig.setMode(next)) return;
+      if (isDriverCamera(next) && !driverCameraUsed) { driverCameraUsed = true; warmup.sharpenHeld(); }
       environment.setCamera(rig.camera); environment.setShadowCascades(shadowCascadeSet(next));
       exposure.setType(exposureType(next)); layer.syncLines();
       invalidate();

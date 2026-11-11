@@ -11,7 +11,7 @@ const renderer = {capabilities: {getMaxAnisotropy: () => 16}} as unknown as WebG
 
 it('shares a GPU texture across chunks and retains it until its final chunk unloads', async () => {
   const loadAsync = vi.fn(async () => new CompressedTexture([], 1, 1));
-  const pool = createSurfaceTexturePool({loadAsync} as unknown as CachedKtx2Loader, renderer, '/scenery/');
+  const pool = createSurfaceTexturePool({loadAsync, detail: () => undefined} as unknown as CachedKtx2Loader, renderer, '/scenery/');
   const first = pool.source(uris), second = pool.source(uris);
   try {
     const [texture, other] = await Promise.all([first.load(map), second.load(map)]);
@@ -33,7 +33,7 @@ it('shares a GPU texture across chunks and retains it until its final chunk unlo
 
 it('keeps content identities distinct and rejects loads after release', async () => {
   const loadAsync = vi.fn(async () => new CompressedTexture([], 1, 1));
-  const pool = createSurfaceTexturePool({loadAsync} as unknown as CachedKtx2Loader, renderer, '/scenery/');
+  const pool = createSurfaceTexturePool({loadAsync, detail: () => undefined} as unknown as CachedKtx2Loader, renderer, '/scenery/');
   const first = pool.source(uris), other = pool.source(new Map([['ROAD__srgb.ktx2.zst', 'textures/other.ktx2.zst']]));
   try {
     const texture = await first.load(map), different = await other.load(map);
@@ -53,7 +53,7 @@ it('gives raw textures trilinear filtering and starts large ones on their reduce
   const original = new DataTexture(null, 2048, 2048), small = new CompressedTexture(levels(256), 256, 256);
   original.mipmaps = levels(2048);
   const loadAsync = vi.fn(async (url: string) => (url.includes('small') ? small : original));
-  const pool = createSurfaceTexturePool({loadAsync} as unknown as CachedKtx2Loader, renderer, '/scenery/');
+  const pool = createSurfaceTexturePool({loadAsync, detail: () => undefined} as unknown as CachedKtx2Loader, renderer, '/scenery/');
   const source = pool.source(new Map([['ROAD__srgb.ktx2.zst', 'textures/road.ktx2.zst'], ['ROAD__linear.ktx2.zst', 'textures/small.ktx2.zst']]));
   try {
     const texture = await source.load(map), whole = await source.load({...map, srgb: false});
@@ -67,7 +67,7 @@ it('gives raw textures trilinear filtering and starts large ones on their reduce
 it('stops streaming a texture whose last chunk released it', async () => {
   const levels = Array.from({length: 12}, (_, i) => ({data: new Uint8Array(1), width: 2048 >> i, height: 2048 >> i}));
   const loadAsync = vi.fn(async () => new CompressedTexture(levels, 2048, 2048));
-  const pool = createSurfaceTexturePool({loadAsync} as unknown as CachedKtx2Loader, renderer, '/scenery/'), source = pool.source(uris);
+  const pool = createSurfaceTexturePool({loadAsync, detail: () => undefined} as unknown as CachedKtx2Loader, renderer, '/scenery/'), source = pool.source(uris);
   const texture = await source.load(map);
   expect(isStreaming(texture)).toBe(true);
   source.dispose(); await Promise.resolve();

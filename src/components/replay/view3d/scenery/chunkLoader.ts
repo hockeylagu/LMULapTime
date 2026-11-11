@@ -1,7 +1,7 @@
 import { MeshoptDecoder } from 'meshoptimizer/decoder';
 import { Mesh, type Material, type Object3D, type WebGLRenderer } from 'three';
 import { GLTFLoader, type GLTFLoaderPlugin, type GLTFParser } from 'three/addons/loaders/GLTFLoader.js';
-import type { SceneryChunk } from '../../../../../shared/types/scenes/scenery.js';
+import type { SceneryChunk, SceneryTexture } from '../../../../../shared/types/scenes/scenery.js';
 import { fetchSceneryChunk, SCENERY_FILES } from '../../../../api/sceneryApi.js';
 import { disposeObjects } from '../laps/disposeObjects.js';
 import { CachedKtx2Loader } from './cachedKtx2Loader.js';
@@ -60,12 +60,14 @@ export function skipSurfaceTextures(parser: GLTFParser): GLTFLoaderPlugin {
   };
 }
 
-export function createChunkLoader(renderer: WebGLRenderer): ChunkLoader {
+/** `textures` is the layout's texture list: a texture loads no larger than the size the package gives it there (`maxPx`). */
+export function createChunkLoader(renderer: WebGLRenderer, textures: readonly SceneryTexture[]): ChunkLoader {
   startDecoderWorkers();
-  const ktx2 = new CachedKtx2Loader(renderer);
+  const maxPx = new Map(textures.map(texture => [`${SCENERY_FILES}textures/${texture.sha256}.ktx2.zst`, texture.maxPx]));
+  const ktx2 = new CachedKtx2Loader(renderer, {maxPx: url => maxPx.get(url), streamed: true});
   const gltf = new GLTFLoader().setKTX2Loader(ktx2).setMeshoptDecoder(MeshoptDecoder).register(skipSurfaceTextures);
-  const textures = createSurfaceTexturePool(ktx2, renderer, SCENERY_FILES);
-  const sources = new WeakMap<Object3D, ReturnType<typeof textures.source>>(), materials = createSharedSurfaceMaterials();
+  const pool = createSurfaceTexturePool(ktx2, renderer, SCENERY_FILES);
+  const sources = new WeakMap<Object3D, ReturnType<typeof pool.source>>(), materials = createSharedSurfaceMaterials();
   const releaseChunk = (root: Object3D) => {
     // Each mesh gives back its use of a shared material; the registry disposes one when no chunk uses it.
     root.traverse(object => { if (object instanceof Mesh) materials.release(object.material as Material); });
@@ -79,7 +81,7 @@ export function createChunkLoader(renderer: WebGLRenderer): ChunkLoader {
       signal.throwIfAborted();
       const parsed = await gltf.parseAsync(bytes, SCENERY_FILES), root = parsed.scene;
       try {
-        const source = textures.source(imageUriMap(parsed.parser.json as Parameters<typeof imageUriMap>[0]));
+        const source = pool.source(imageUriMap(parsed.parser.json as Parameters<typeof imageUriMap>[0]));
         sources.set(root, source);
         const meshes: Mesh[] = [];
         root.traverse(object => { if (object instanceof Mesh) { const mesh = object as Mesh; prepareSceneryMesh(mesh); meshes.push(mesh); } });
@@ -90,6 +92,6 @@ export function createChunkLoader(renderer: WebGLRenderer): ChunkLoader {
       return root;
     },
     releaseChunk,
-    dispose: () => { textures.dispose(); ktx2.dispose(); },
+    dispose: () => { pool.dispose(); ktx2.dispose(); },
   };
 }

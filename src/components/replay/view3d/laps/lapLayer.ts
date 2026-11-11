@@ -6,6 +6,7 @@ import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import { normalizeVehicleId, type LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import { createCarMaterial, materialTexturePaths } from '../car/carMaterials.js';
+import { surfaceTextureMaps } from '../scenery/materials/configureSurfaceMaterial.js';
 import { createLampMaterial, unlitFrame } from '../car/carLamps.js';
 import { createContactShadow } from '../car/carContactShadow.js';
 import { MAP_COLORS, TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
@@ -24,8 +25,14 @@ export interface LapCars {
   baseline: LoadedBody | null;
 }
 
-/** Loads a shared car texture by its `textures/<sha256>.ktx2.zst` path under the cars folder. */
-export type CarTextureLoader = (path: string) => Promise<Texture>;
+/**
+ * The scene's car textures. `load` reads a shared texture by its `textures/<sha256>.ktx2.zst` path under the cars folder;
+ * `interior` says only the car's interior uses it. `copied` is told of each material's own copy of an interior texture.
+ */
+export interface CarTextures {
+  load(path: string, interior: boolean): Promise<Texture>;
+  copied(copy: Texture, original: Texture): void;
+}
 
 /**
  * Gives a glow mesh its lamps' materials: each material slot a drawn lamp covers (one of the lamp's nodes is the mesh or holds it, and
@@ -50,7 +57,7 @@ function lightGlowMesh(mesh: Mesh<BufferGeometry, Material | Material[]>, drawn:
 }
 
 /** Lap objects own their geometry; replacing them cannot release the track's GPU buffers. */
-export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeight, loadTexture: CarTextureLoader, display: () => DisplayTransform, shading: SceneryShading) {
+export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeight, carTextures: CarTextures, display: () => DisplayTransform, shading: SceneryShading) {
   // Only buffers retained by the bounded asset cache keep these parsed templates alive.
   const templates = new WeakMap<ArrayBuffer, Promise<Group>>();
   const loadTemplate = (car: LoadedBody): Promise<Group> => {
@@ -94,16 +101,20 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
       const list: Material[] = Array.isArray(object.material) ? object.material as Material[] : [object.material as Material];
       return list.every(material => glow.has(recipeOf(material).id));
     };
-    const paths = new Set<string>();
+    // A texture is the interior's when every mesh that uses it carries the package's interior mark (its own or a parent's).
+    const isInterior = (object: Object3D) => { for (let at: Object3D | null = object; at; at = at.parent) if (at.userData.interior === true) return true; return false; };
+    const paths = new Map<string, boolean>();
     template.traverse(object => {
       if (!(object instanceof Mesh) || isHidden(object) || isGlow(object)) return;
+      const interior = isInterior(object);
       for (const material of Array.isArray(object.material) ? object.material as Material[] : [object.material as Material]) {
-        for (const path of materialTexturePaths(recipeOf(material), appearance)) paths.add(path);
+        for (const path of materialTexturePaths(recipeOf(material), appearance)) paths.set(path, interior && paths.get(path) !== false);
       }
     });
-    for (const lamp of drawn) paths.add(unlitFrame(lamp)!);
-    const textures = new Map(await Promise.all([...paths].map(async path => [path, await loadTexture(path)] as const)));
-    return {template, appearance, recipeOf, isGlow, drawn, textures, hiddenNames: new Set([...hidden].map(node => node.name))};
+    for (const lamp of drawn) paths.set(unlitFrame(lamp)!, false);
+    const textures = new Map(await Promise.all([...paths].map(async ([path, interior]) => [path, await carTextures.load(path, interior)] as const)));
+    const interiorSources = new Map([...paths].filter(([, interior]) => interior).map(([path]) => [textures.get(path)!.source, textures.get(path)!] as const));
+    return {template, appearance, recipeOf, isGlow, drawn, textures, interiorSources, hiddenNames: new Set([...hidden].map(node => node.name))};
   };
   /** A livery's parsed model and loaded textures, shared by every instance of that car (and by `preload`). */
   const parts = new WeakMap<LoadedBody, ReturnType<typeof loadParts>>();
@@ -118,7 +129,7 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
   };
   /** A car instance of the lap's livery: the shared geometry with one material per native material, textures preloaded. */
   const loadModel = async (car: LoadedBody): Promise<Group> => {
-    const {template, appearance, recipeOf, isGlow, drawn, textures, hiddenNames} = await partsOf(car);
+    const {template, appearance, recipeOf, isGlow, drawn, textures, interiorSources, hiddenNames} = await partsOf(car);
     const model = template.clone(true), materials = new Map<string, Material>(), glowMeshes: Object3D[] = [];
     for (const name of hiddenNames) model.getObjectByName(name)?.removeFromParent();
     model.traverse(object => { if (isGlow(object)) glowMeshes.push(object); });
@@ -133,7 +144,13 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
       const replace = (material: Material) => {
         const recipe = recipeOf(material);
         let created = materials.get(recipe.id);
-        if (!created) { created = createCarMaterial(recipe, appearance, path => textures.get(path)!, shading); materials.set(recipe.id, created); }
+        if (!created) {
+          created = createCarMaterial(recipe, appearance, path => textures.get(path)!, shading); materials.set(recipe.id, created);
+          for (const copy of [...Object.values(created as unknown as Record<string, unknown>), ...(surfaceTextureMaps.get(created) ?? [])]) {
+            const original = copy && (copy as Texture).isTexture ? interiorSources.get((copy as Texture).source) : undefined;
+            if (original) carTextures.copied(copy as Texture, original);
+          }
+        }
         return created;
       };
       object.material = Array.isArray(object.material) ? object.material.map(replace) : replace(object.material as Material);
