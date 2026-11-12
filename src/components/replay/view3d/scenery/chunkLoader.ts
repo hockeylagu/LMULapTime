@@ -17,12 +17,17 @@ export interface ChunkLoader {
 
 /**
  * Per-mesh rules: the virtual screen framebuffer never draws; a mesh casts shadow when the package's flag says so (the
- * node's `extras.lmuCastShadow`, the scene's ShadowCaster: road, terrain and ground never cast). Everything receives.
+ * node's `extras.lmuCastShadow`, the scene's ShadowCaster: road, terrain and ground never cast). Everything receives but the
+ * filler ground: it sits just under the road, so a car shadow on it would show through from below road level. The mesh keeps its
+ * GLB material's package key (`extras.lmuMaterial`): materials that draw alike share one configured material, which keeps the key of
+ * the first, and the batches go by each mesh's own key.
  */
 export function prepareSceneryMesh(mesh: Mesh): void {
-  mesh.receiveShadow = true;
+  mesh.receiveShadow = !mesh.name.startsWith('FILLER_GROUND');
   if (mesh.name.toLowerCase().includes('screenframebuffer')) mesh.visible = false;
   mesh.castShadow = mesh.userData.lmuCastShadow === true;
+  const packageKey: unknown = Array.isArray(mesh.material) ? undefined : mesh.material.userData.lmuMaterial;
+  if (typeof packageKey === 'string') mesh.userData.lmuMaterial = packageKey;
 }
 
 /**
@@ -65,7 +70,7 @@ export function createChunkLoader(renderer: WebGLRenderer, textures: readonly Sc
   startDecoderWorkers();
   const file = (sha256: string) => `${SCENERY_FILES}textures/${sha256}.ktx2.zst`;
   const rows = new Map(textures.map(texture => [file(texture.sha256), texture]));
-  const ktx2 = new CachedKtx2Loader(renderer, {maxPx: url => rows.get(url)?.maxPx, start: url => { const start = rows.get(url)?.start; return start && file(start.sha256); }});
+  const ktx2 = new CachedKtx2Loader(renderer, {maxPx: url => rows.get(url)?.maxPx, start: url => { const row = rows.get(url); return row?.start && {url: file(row.start.sha256), skip: row.levels - row.start.levels}; }});
   const gltf = new GLTFLoader().setKTX2Loader(ktx2).setMeshoptDecoder(MeshoptDecoder).register(skipSurfaceTextures);
   const pool = createSurfaceTexturePool(ktx2, renderer, SCENERY_FILES);
   const sources = new WeakMap<Object3D, ReturnType<typeof pool.source>>(), materials = createSharedSurfaceMaterials();

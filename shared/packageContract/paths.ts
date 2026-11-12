@@ -5,7 +5,7 @@
  */
 
 /** The only package schema the tools and the app read. */
-export const PACKAGE_SCHEMA = 9;
+export const PACKAGE_SCHEMA = 11;
 
 /** The catalog files of every package, release or debug. These paths are constants of the schema: the manifest names none. */
 export const PACKAGE_FILES = {tracks: 'tracks/index.json', vehicles: 'vehicles/index.json', logos: 'vehicles/logos.json', scenery: 'scenery/index.json', rendering: 'rendering/index.json'} as const;

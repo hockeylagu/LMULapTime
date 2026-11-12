@@ -1,4 +1,4 @@
-import { Mesh, type Material, type Object3D, type PerspectiveCamera, type Scene, type Texture, type WebGLRenderer } from 'three';
+import { Mesh, Object3D, type Material, type PerspectiveCamera, type Scene, type Texture, type WebGLRenderer } from 'three';
 import { createGeometryWarmup } from './geometryWarmup.js';
 import { surfaceTextureMaps } from './materials/configureSurfaceMaterial.js';
 import { isStreaming, streamTexture, whenUploaded } from './materials/mipStreaming.js';
@@ -13,12 +13,15 @@ const SHARPEN_BYTES_PER_FRAME = 2 * 1024 * 1024;
 
 export interface SceneWarmup {
   /**
-   * Compiles `root`'s programs and uploads its textures and geometry, so its first draw does not stall playback; its streamed
-   * textures then queue to sharpen. `prepare` runs before the compile (the frame's render target and haze).
+   * Compiles the programs of `roots` and uploads their textures and geometry, so their first draw does not stall playback; their
+   * streamed textures then queue to sharpen. `prepare` runs before the compile (the frame's render target and haze).
    */
-  warm(root: Object3D, signal: AbortSignal): Promise<void>;
-  /** As `warm`, with the uploads one root after another: chunks that arrive together compile together and upload in turn. */
-  queue(root: Object3D, signal: AbortSignal): Promise<void>;
+  warm(roots: Object3D | readonly Object3D[], signal: AbortSignal): Promise<void>;
+  /**
+   * As `warm`, with the uploads one call after another: chunks that arrive together compile together and upload in turn. A chunk
+   * comes with the scenery batches it created, which draw outside its root.
+   */
+  queue(roots: Object3D | readonly Object3D[], signal: AbortSignal): Promise<void>;
   /** The first frame is out: warm-ups upload in per-frame slices from now on, and the reduced textures start sharpening. */
   shown(): void;
   /** Queues a streamed texture to sharpen, whichever material holds it. */
@@ -56,18 +59,19 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
     if (blurry.size) sharpenFrame = requestAnimationFrame(sharpen);
   };
   const startSharpen = () => { if (shown && !sharpenFrame && blurry.size) sharpenFrame = requestAnimationFrame(sharpen); };
-  const compile = (root: Object3D) => {
+  const list = (roots: Object3D | readonly Object3D[]): readonly Object3D[] => (roots instanceof Object3D ? [roots] : roots);
+  const compile = (roots: readonly Object3D[]) => {
     // Programs depend on the render target (tone mapping, output colour space): compile for the HDR target the frame uses.
     const previous = renderer.getRenderTarget();
     prepare();
-    const compiled = renderer.compileAsync(root, camera, scene);
+    const compiled = Promise.all(roots.map(root => renderer.compileAsync(root, camera, scene)));
     renderer.setRenderTarget(previous);
     return compiled;
   };
-  const warm = async (root: Object3D, signal: AbortSignal, compiled: Promise<unknown> = compile(root)) => {
+  const warm = async (roots: readonly Object3D[], signal: AbortSignal, compiled: Promise<unknown> = compile(roots)) => {
     await compiled;
     const textures = new Set<Texture>();
-    root.traverse(object => {
+    for (const root of roots) root.traverse(object => {
       if (!(object instanceof Mesh)) return;
       const own = (object as Mesh).material, materials: Material[] = Array.isArray(own) ? own : [own];
       for (const material of materials) {
@@ -85,30 +89,39 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
       // eslint-disable-next-line no-await-in-loop -- yields between upload slices
       if (performance.now() >= sliceEnd) { await pause(); sliceEnd = performance.now() + budgetMs; }
     }
-    await geometryWarmup.upload(root, camera, signal, budgetMs, pause);
+    // oxlint-disable-next-line no-await-in-loop -- one root's geometry after another, in the same slices
+    for (const root of roots) await geometryWarmup.upload(root, camera, signal, budgetMs, pause);
     for (const texture of textures) if (isStreaming(texture) && !held.has(texture)) blurry.add(texture);
     startSharpen();
   };
   return {
-    warm,
-    queue(root, signal) {
+    warm: (roots, signal) => warm(list(roots), signal),
+    queue(roots, signal) {
       // Programs compile off the main thread: a chunk's start as it arrives, while the chunks before it compile and upload.
-      const compiled = compile(root);
+      const all = list(roots), compiled = compile(all);
       compiled.catch(() => {});
-      const warmed = warming.then(async () => { signal.throwIfAborted(); await warm(root, signal, compiled); });
+      const warmed = warming.then(async () => { signal.throwIfAborted(); await warm(all, signal, compiled); });
       warming = warmed.catch(() => {});
       return warmed;
     },
     shown() { shown = true; startSharpen(); },
     // A texture nothing has drawn yet is not on the GPU: it joins the queue at its first upload, so the queue can empty.
     sharpen(texture) { whenUploaded(texture, renderer, () => { blurry.add(texture); startSharpen(); }); },
-    hold(texture) { held.add(texture); },
+    hold(texture) {
+      held.add(texture);
+      const release = () => {
+        held.delete(texture);
+        blurry.delete(texture);
+        texture.removeEventListener('dispose', release);
+      };
+      texture.addEventListener('dispose', release);
+    },
     sharpenHeld() {
       // Those on the GPU go ahead of the queue now; the others as each is first drawn.
       const released = [...held];
       held.clear();
       for (const texture of released) whenUploaded(texture, renderer, () => { blurry = new Set([texture, ...blurry]); startSharpen(); });
     },
-    dispose() { disposed = true; cancelAnimationFrame(sharpenFrame); geometryWarmup.dispose(); },
+    dispose() { disposed = true; cancelAnimationFrame(sharpenFrame); held.clear(); blurry.clear(); geometryWarmup.dispose(); },
   };
 }

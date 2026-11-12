@@ -1,4 +1,4 @@
-import { Group, Quaternion, Scene, Vector3, WebGLRenderer, Mesh, type Object3D } from 'three';
+import { Group, Quaternion, Scene, Vector3, WebGLRenderer, type Object3D } from 'three';
 import type { SceneryLayoutResource } from '../../../../shared/types/scenes/scenery.js';
 import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
 import { VEHICLE_FILES } from '../../../api/vehicles/bodyApi.js';
@@ -16,8 +16,9 @@ import { linkPrefilters } from './prefilterLink.js';
 import { linkConvolution } from './reflectionCube.js';
 import { createAutoExposure } from './autoExposure.js';
 import { CAR_REFLECTION_PX, createCarReflection } from './car/carReflection.js';
-import { CachedKtx2Loader } from './scenery/cachedKtx2Loader.js';
+import { CachedKtx2Loader, type TextureStartFile } from './scenery/cachedKtx2Loader.js';
 import { createChunkLoader } from './scenery/chunkLoader.js';
+import { createSceneryBatches } from './scenery/sceneryBatches.js';
 import { createSceneryGround } from './scenery/sceneryGround.js';
 import type { StreamView } from './scenery/residency.js';
 import type { WheelAnimation } from './wheelAnimation.js';
@@ -69,7 +70,7 @@ export async function createReplayScene(
   // Reading a program's error log waits for its link to finish: about 10 ms a program at the first frame. Production builds skip it.
   renderer.debug.checkShaderErrors = import.meta.env.DEV;
   const {min, max} = layout.horizon.bounds, origin = new Vector3(...min).add(new Vector3(...max)).multiplyScalar(0.5);
-  const loader = createChunkLoader(renderer, layout.textures), carStarts = new Map<string, string>(), startOf = (url: string) => carStarts.get(url);
+  const loader = createChunkLoader(renderer, layout.textures), carStarts = new Map<string, TextureStartFile>(), startOf = (url: string) => carStarts.get(url);
   const carTextures = new CachedKtx2Loader(renderer, {maxPx: () => CAR_TEXTURE_MAX_PX, start: startOf}), interiorTextures = new CachedKtx2Loader(renderer, {start: startOf});
   const sun = sceneSun(layout, origin.y, trajectory.daylightClock);
   const exposure = createAutoExposure(renderer, layout.camera, {rgb: sun.radiance.clone(), elevationDeg: sun.sunElevationDeg}, () => invalidate(), exposureType('follow'),
@@ -78,6 +79,8 @@ export async function createReplayScene(
   const ground = createSceneryGround(), {surfaceHeight} = ground;
   // Scenery chunks live in native coordinates under one group, shifted by the scene origin.
   const sceneryRoot = new Group(); sceneryRoot.position.copy(origin).negate();
+  // Each scenery material draws once across the chunks, sized from the layout's totals; a chunk's instances show while the chunk does.
+  const batches = createSceneryBatches(sceneryRoot, layout.materials);
   let layer: LapLayer, layerReady = false;
   let syncMode: GhostSyncMode = 'distance', anchorDistM: number | null = null;
   let disposed = false, refreshTimer = 0, invalidate: () => void = () => {};
@@ -103,27 +106,24 @@ export async function createReplayScene(
           built.parsed = parsed; built.grounded = ground.add(chunk.id, parsed, chunk.kind === 'horizon');
           built.grounded.catch(() => {}); // Awaited below; a texture failure may reject the load first.
         });
+        const created = batches.add(root);
         await lit; // A chunk's programs depend on the scene's environment.
-        await Promise.all([warmup.queue(root, signal), built.grounded]); signal.throwIfAborted(); return root;
+        await Promise.all([warmup.queue([root, ...created], signal), built.grounded]); signal.throwIfAborted(); return root;
       } catch (error) {
         // The loader releases a chunk whose own load failed; one that failed after it is released here.
         if (built.parsed) ground.remove(chunk.id, built.parsed);
-        if (built.root) loader.releaseChunk(built.root);
+        if (built.root) { batches.remove(built.root); loader.releaseChunk(built.root); }
         throw error;
       }
     },
-    prepare: (_chunk, root) => {
-      // The filler ground sits just under the road: a car shadow on it would show through from below road level.
-      root.traverse(object => { if (object instanceof Mesh) object.receiveShadow = !object.name.startsWith('FILLER_GROUND'); });
-    },
-    unload: (chunk, root) => { ground.remove(chunk.id, root); loader.releaseChunk(root); },
-    changed: () => { freezeScenery(); scheduleRefresh(); reflection.stale(); invalidate(); },
+    unload: (chunk, root) => { ground.remove(chunk.id, root); batches.remove(root); loader.releaseChunk(root); },
+    changed: () => { batches.sync(); freezeScenery(); scheduleRefresh(); reflection.stale(); invalidate(); },
     failed: (chunk, error) => { if (!disposed) onFailure(`3D scenery chunk ${chunk.id} failed: ${error.message}`); },
   });
   /** Frees what exists from the start; `dispose` adds what the finished scene owns. */
   const cleanup = () => {
     disposed = true; window.clearTimeout(refreshTimer); stream.dispose(); loader.dispose(); carTextures.dispose(); interiorTextures.dispose(); exposure.dispose();
-    ground.dispose(); warmup.dispose(); rig.dispose(); renderer.dispose(); renderer.forceContextLoss();
+    ground.dispose(); batches.dispose(); warmup.dispose(); rig.dispose(); renderer.dispose(); renderer.forceContextLoss();
   };
   const route = layout.routeLengthM;
   const firstStation = stationAt(trajectory.points, 0, 0, route);
@@ -134,7 +134,7 @@ export async function createReplayScene(
   const loadLaps = createLapLayerLoader(origin, surfaceHeight, {
     load(path, interior, start) {
       const url = `${VEHICLE_FILES}${path}`;
-      if (start) carStarts.set(url, `${VEHICLE_FILES}${start}`);
+      if (start) carStarts.set(url, {url: `${VEHICLE_FILES}${start.path}`, skip: start.skip});
       return (interior ? interiorTextures : carTextures).loadAsync(url);
     },
     copied(copy, original, interior) {
@@ -325,8 +325,8 @@ export async function createReplayScene(
     dispose() {
       disposed = true; cancelAnimationFrame(frame); observer.disconnect();
       renderer.domElement.removeEventListener('webglcontextlost', contextLost); document.removeEventListener('visibilitychange', invalidate);
-      // The stream takes its chunks out first (the chunk loader frees them), then the cars, lines and sky go with the scene.
-      stream.dispose(); disposeObjects(scene, true); environment.dispose(); reflection.dispose(); convolution.dispose();
+      // The stream takes its chunks out first (the chunk loader frees them) with their batches, then the cars, lines and sky go with the scene.
+      stream.dispose(); batches.dispose(); disposeObjects(scene, true); environment.dispose(); reflection.dispose(); convolution.dispose();
       cleanup(); renderer.domElement.remove();
     },
   };

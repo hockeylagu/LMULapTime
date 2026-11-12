@@ -85,6 +85,8 @@ export function syntheticPackage() {
       chunk('s1', 'sector 1', { kind: 'main', lapStartM: L / 2, lapEndM: L }),
     ],
     textures: [{ texture: 0 }] as Array<Record<string, unknown>>,
+    // One material over the three chunks: 2 draw calls, 30 vertices and 10 triangles each.
+    materials: [{ key: '0123456789abcdef', vertices: 90, indices: 90, primitives: 6, draws: 6 }] as Array<Record<string, unknown>>,
   };
 
   /** The rendering profiles as `rendering/index.json` states them: the sky per layout, the cloud maps as files. */

@@ -32,7 +32,7 @@ export interface LapCars {
  * each map's own copy of a texture.
  */
 export interface CarTextures {
-  load(path: string, interior: boolean, start: string | undefined): Promise<Texture>;
+  load(path: string, interior: boolean, start: {path: string; skip: number} | undefined): Promise<Texture>;
   copied(copy: Texture, original: Texture, interior: boolean): void;
 }
 
@@ -143,7 +143,9 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     // A lamp draws its frames' textures as loaded, so a frame loads from its own file, never from a start file.
     const frames = new Set(drawn.flatMap(lamp => lampTexturePaths(lamp, rainFlashes, glows.get(lamp)!)));
     for (const frame of frames) paths.set(frame, false);
-    const starts = new Map(car.resource.textures.flatMap(row => row.start ? [[descriptorTexturePath(row.sha256), descriptorTexturePath(row.start.sha256)] as const] : []));
+    // A start file leaves out the full file's levels above its own (the row states both level counts).
+    const starts = new Map(car.resource.textures.flatMap(row => row.start && row.levels !== undefined
+      ? [[descriptorTexturePath(row.sha256), {path: descriptorTexturePath(row.start.sha256), skip: row.levels - row.start.levels}] as const] : []));
     const textures = new Map(await Promise.all([...paths].map(async ([path, interior]) =>
       [path, await carTextures.load(path, interior, frames.has(path) ? undefined : starts.get(path))] as const)));
     return {template, appearance, recipeOf, isGlow, drawn, glows, surfaces, rainFlashes, textures, interiorPaths: paths, hiddenNames: new Set([...hidden].map(node => node.name))};

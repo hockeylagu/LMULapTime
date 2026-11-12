@@ -75,6 +75,14 @@ export interface SceneryTextureFile {
   start?: TextureStart;
 }
 
+/**
+ * The geometry of one material over a layout's chunks (venue-shared ones included). `key` is the `extras.lmuMaterial` of the chunk GLB materials: one
+ * key is one material (textures, parameters, surface) in every chunk of the venue, and all its primitives share one vertex layout (attribute names,
+ * types, component types, normalization) and are indexed triangles. `vertices` and `indices` count each primitive once; `primitives` counts them and
+ * `draws` counts the node uses that draw them. Facts only: which materials the app draws together is the app's choice.
+ */
+export interface SceneryMaterialTotals {key: string; vertices: number; indices: number; primitives: number; draws: number}
+
 /** A layout's reference to a table entry; `maxPx` is present only when the layout draws the file below its full size. */
 export interface SceneryTextureRef {texture: number; maxPx?: number}
 
@@ -112,6 +120,8 @@ export interface CompactLayoutRow {
   horizon: CompactHorizonChunk;
   sectors: CompactSectorChunk[];
   textures: SceneryTextureRef[];
+  /** Sorted by key. */
+  materials: SceneryMaterialTotals[];
 }
 
 /** The package file. */
@@ -134,8 +144,10 @@ export const STREAMING_KEYS = ['residentBehindM', 'residentAheadM', 'freeCameraR
 const SESSIONS = ['race', 'qualify', 'practice1', 'practice2'];
 const TEXTURE_KEYS = ['sha256', 'byteLength', 'width', 'height', 'levels', 'format', 'srgb', 'gpuBytes'];
 const CHUNK_COMMON = ['id', 'kind', 'bounds', 'sha256', 'byteLength', 'triangles', 'vertices', 'drawCalls', 'shadowDrawCalls', 'shadowTriangles', 'geometryBytes', 'meshes', 'materials', 'textures'];
-const ROW_KEYS = ['layoutKey', 'sourceGeometryRevision', 'routeLengthM', 'pitLaneLengthM', 'shadowRangeM', 'environmentProbe', 'daylight', 'horizon', 'sectors', 'textures'];
-const MAX_LAYOUTS = 100, MAX_CHUNKS = 4096, MAX_TEXTURES = 8192;
+const ROW_KEYS = ['layoutKey', 'sourceGeometryRevision', 'routeLengthM', 'pitLaneLengthM', 'shadowRangeM', 'environmentProbe', 'daylight', 'horizon', 'sectors', 'textures', 'materials'];
+const MATERIAL_KEYS = ['key', 'vertices', 'indices', 'primitives', 'draws'];
+export const MATERIAL_KEY = /^[0-9a-f]{16}$/;
+const MAX_LAYOUTS = 100, MAX_CHUNKS = 4096, MAX_TEXTURES = 8192, MAX_MATERIALS = 8192;
 
 /** A venue-shared chunk (vNNN) is written once and used by several layouts of the venue. */
 const isSharedChunk = (chunk: {id: string}) => /^v\d+$/.test(chunk.id);
@@ -168,12 +180,39 @@ export function layoutRowProblems(row: any, {links = true}: {links?: boolean} = 
     if (i && sector.lapStartM < main[i - 1].lapStartM) problems.push(`${sector.id}: main chunks are not ordered by lap start`);
     if (links && (sector.prev !== main[(i + main.length - 1) % main.length].id || sector.next !== main[(i + 1) % main.length].id)) problems.push(`${sector.id}: prev/next do not follow the lap order`);
   });
+  problems.push(...materialSumProblems(row));
   pit.forEach((sector: any, i: number) => {
     if (links && (sector.prev !== (i ? pit[i - 1].id : null) || sector.next !== (i + 1 < pit.length ? pit[i + 1].id : null))) problems.push(`${sector.id}: prev/next do not follow the pit lane order`);
     if (!(sector.pitStartM < sector.pitEndM)) problems.push(`${sector.id}: invalid pit range`);
     if (i && sector.pitStartM < pit[i - 1].pitStartM) problems.push(`${sector.id}: pit chunks are not ordered by pit start`);
   });
   return problems;
+}
+
+/** The `materials` list sums to the chunks: its primitives are the draw calls, its vertices the vertices, its indices three per triangle. */
+function materialSumProblems(row: any): string[] {
+  if (!Array.isArray(row.materials) || !row.horizon) return ['no materials list'];
+  const chunks = [row.horizon, ...row.sectors], sum = (list: any[], key: string) => list.reduce((total, item) => total + item[key], 0);
+  const problems: string[] = [];
+  if (sum(row.materials, 'primitives') !== sum(chunks, 'drawCalls')) problems.push('materials: primitives do not sum to the chunk draw calls');
+  if (sum(row.materials, 'vertices') !== sum(chunks, 'vertices')) problems.push('materials: vertices do not sum to the chunk vertices');
+  if (sum(row.materials, 'indices') !== 3 * sum(chunks, 'triangles')) problems.push('materials: indices are not three per chunk triangle');
+  return problems;
+}
+
+function parseMaterials(value: unknown, what: string): SceneryMaterialTotals[] {
+  const list = array(value, what, MAX_MATERIALS);
+  if (!list.length) throw Error(`${what}: empty`);
+  list.forEach((item, i) => {
+    const at = `${what}[${i}]`, entry = record(item, at);
+    exactKeys(entry, MATERIAL_KEYS, at);
+    if (typeof entry.key !== 'string' || !MATERIAL_KEY.test(entry.key)) throw Error(`${at}.key: expected 16 hex digits`);
+    for (const key of ['vertices', 'indices', 'primitives', 'draws']) positiveCount(entry[key], `${at}.${key}`);
+    if ((entry.indices as number) % 3) throw Error(`${at}.indices: not whole triangles`);
+    if ((entry.draws as number) < (entry.primitives as number)) throw Error(`${at}: fewer draws than primitives`);
+    if (i > 0 && !((list[i - 1] as Obj).key as string < entry.key)) throw Error(`${what}: not sorted by key without duplicates at entry ${i}`);
+  });
+  return value as SceneryMaterialTotals[];
 }
 
 function bounds(value: unknown, what: string): SceneryBounds {
@@ -223,7 +262,7 @@ function parseTextureEntry(value: unknown, what: string): SceneryTextureFile {
   for (const key of ['byteLength', 'width', 'height', 'levels', 'gpuBytes']) positiveCount(row[key], `${what}.${key}`);
   text(row.format, `${what}.format`, 64);
   if (typeof row.srgb !== 'boolean') throw Error(`${what}.srgb: expected a boolean`);
-  if (row.start !== undefined) parseTextureStart(row.start, `${what}.start`, row as {width: number; height: number; levels: number} & Obj);
+  if (row.start !== undefined) parseTextureStart(row.start, `${what}.start`, row as {width: number; height: number; levels: number; format: string} & Obj);
   return value as SceneryTextureFile;
 }
 
@@ -296,6 +335,7 @@ function parseLayoutRow(value: unknown, what: string, table: SceneryTextureFile[
     if (chunk.kind === 'horizon') throw Error(`${what}.sectors[${i}]: a sector cannot be the horizon`);
     return chunk;
   });
+  parseMaterials(row.materials, `${what}.materials`);
   const problems = layoutRowProblems({...row, horizon, sectors}, {links: false});
   if (problems.length) throw Error(`${what}: layout index is inconsistent: ${problems.slice(0, 5).join('; ')}`);
   const inChunks = new Set<number>([...horizon.textures, ...sectors.flatMap(sector => sector.textures)]);
@@ -305,7 +345,7 @@ function parseLayoutRow(value: unknown, what: string, table: SceneryTextureFile[
 
 /**
  * The compact catalog as the package stores it: keys and order, the shared chunking and streaming numbers, the texture table (sorted by sha256, no `asset`,
- * start files that are the third level down, every entry used), layouts sorted by key with their chunks, texture references (`maxPx` a level below the full
+ * start files that are the texture from `textureStartDrop` levels down, every entry used), layouts sorted by key with their chunks, texture references (`maxPx` a level below the full
  * size), shadow range, environment probe, daylight and the lap/pit ordering. Whether the files exist and match their hashes is not checked here.
  */
 export function parseSceneryCatalog(value: unknown): SceneryCatalog {

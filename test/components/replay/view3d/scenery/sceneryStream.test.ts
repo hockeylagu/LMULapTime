@@ -31,7 +31,7 @@ beforeEach(() => {
       const entry = { chunk, signal, resolve, reject }; pending.push(entry);
       signal.addEventListener('abort', () => { pending.splice(pending.indexOf(entry), 1); reject(signal.reason as Error); });
     })),
-    prepare: vi.fn(), unload: vi.fn(), changed: vi.fn(), failed: vi.fn(),
+    unload: vi.fn(), changed: vi.fn(), failed: vi.fn(),
   };
 });
 
@@ -72,12 +72,10 @@ describe('sceneryStream', () => {
     expect(ids()).toEqual(['horizon', 's2', 's0']);
   });
 
-  it('prepares a root before it joins the scene and reports each change', async () => {
+  it('adds a loaded root to the scene and reports each change', async () => {
     const group = parent(), stream = createSceneryStream(testLayout(), group, deps);
     await finish('horizon');
-    expect(deps.prepare).toHaveBeenCalledOnce();
-    const [chunk, root] = deps.prepare.mock.calls[0];
-    expect(chunk.id).toBe('horizon'); expect(root.parent).toBe(group); // Added right after prepare returned.
+    expect(group.getObjectByName('horizon')?.parent).toBe(group);
     expect(deps.changed).toHaveBeenCalledOnce();
     stream.update({ kind: 'lap', lapDistanceM: 0 });
   });

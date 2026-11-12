@@ -9,14 +9,14 @@ const WIDTH = 20, HEIGHT = 24, LEVEL_COUNT = 40, INDEX = 80, ENTRY = 24;
 
 /**
  * How much of each texture a loader reads. `maxPx` is the largest size worth loading for a file (its longer side; undefined =
- * its full size). `start` gives the URL of a file's start file where the package has one: the same texture from its third
- * level down, as a small file of its own. The texture loads from that, and the scene fetches the levels above when it
- * sharpens the texture (`detail`).
+ * its full size). `start` gives a file's start file where the package has one: the same texture from `skip` levels down (the
+ * row's levels less the start's), as a small file of its own at `url`. The texture loads from that, and the scene fetches the
+ * levels above when it sharpens the texture (`detail`).
  */
-export interface TextureDetail { maxPx?: (url: string) => number | undefined; start?: (url: string) => string | undefined }
+export interface TextureDetail { maxPx?: (url: string) => number | undefined; start?: (url: string) => TextureStartFile | undefined }
 
-/** A start file leaves out its texture's two largest levels. */
-const START_SKIPS = 2;
+/** A texture's start file and how many of the texture's largest levels it leaves out. */
+export interface TextureStartFile { url: string; skip: number }
 
 /**
  * A KTX2 file without its levels larger than `maxPx`, as a complete, smaller texture. The file stores its levels smallest
@@ -61,10 +61,10 @@ export class CachedKtx2Loader extends KTX2Loader {
     if (!pending) {
       const file = this.manager.resolveURL(this.path + url), maxPx = this.textureDetail?.maxPx?.(url), start = this.textureDetail?.start?.(url);
       const parse = (buffer: ArrayBuffer) => new Promise<CompressedTexture>((resolve, reject) => { this.parse(withoutLevelsAbove(buffer, maxPx), resolve, reject); });
-      pending = start === undefined ? fetchBinary(file).then(parse) : fetchBinary(this.manager.resolveURL(this.path + start)).then(parse).then(texture => {
+      pending = start === undefined ? fetchBinary(file).then(parse) : fetchBinary(this.manager.resolveURL(this.path + start.url)).then(parse).then(texture => {
         // The levels the start file leaves out, as far as `maxPx` allows: they are the full file's largest ones.
         const top = texture.mipmaps[0], longest = Math.max(top.width, top.height);
-        const missing = Array.from({length: START_SKIPS}, (_, level) => longest << (START_SKIPS - level)).filter(px => maxPx === undefined || px <= maxPx).length;
+        const missing = Array.from({length: start.skip}, (_, level) => longest << (start.skip - level)).filter(px => maxPx === undefined || px <= maxPx).length;
         let levels: Promise<MipLevel[]> | undefined;
         if (missing) this.details.set(texture, {missing, load: () => levels ??= fetchBinaryInBackground(file).then(parse).then(full => (full.mipmaps as MipLevel[]).slice(0, missing))});
         return texture;

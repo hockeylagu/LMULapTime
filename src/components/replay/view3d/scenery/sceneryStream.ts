@@ -5,8 +5,6 @@ import { planResidency, type StreamView } from './residency.js';
 export interface SceneryStreamDeps {
   /** Fetches and parses one chunk into a native-coordinate root. Must reject with the signal's reason when aborted. */
   load(chunk: SceneryChunk, signal: AbortSignal): Promise<Object3D>;
-  /** Called with a loaded root before it joins the scene. */
-  prepare(chunk: SceneryChunk, root: Object3D): void;
   /** A root leaves the scene (or never joined it): free its GPU resources. */
   unload(chunk: SceneryChunk, root: Object3D): void;
   /** The drawn scenery changed (a chunk joined the scene, or chunks were shown or hidden). */
@@ -58,7 +56,6 @@ export function createSceneryStream(layout: SceneryLayout, parent: Group, deps: 
       entry.abort = null;
       // Disposed while loading: the parsed root never joins the scene.
       if (disposed || entries.get(id) !== entry) { deps.unload(chunk, root); return; }
-      deps.prepare(chunk, root);
       root.visible = shown.has(id);
       entry.root = root; parent.add(root);
       deps.changed();

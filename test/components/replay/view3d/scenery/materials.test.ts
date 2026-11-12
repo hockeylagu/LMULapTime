@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BufferGeometry, DoubleSide, Matrix4, Mesh, MeshStandardMaterial, PerspectiveCamera, Texture, Vector2, Vector3 } from 'three';
 import { configureSurfaceMaterial, createSharedSurfaceMaterials } from '../../../../../src/components/replay/view3d/scenery/materials/configureSurfaceMaterial.js';
+import { prepareSceneryMesh } from '../../../../../src/components/replay/view3d/scenery/chunkLoader.js';
 import { crownSun } from '../../../../../src/components/replay/view3d/scenery/materials/foliageCrown.js';
 import { billboardShadowMaterial, computeCustomProgramCacheKey, patchSurfaceShader } from '../../../../../src/components/replay/view3d/scenery/materials/patchSurfaceShader.js';
 import { trackShadowEye } from '../../../../../src/components/replay/view3d/scenery/materials/shadowEye.js';
@@ -284,15 +285,22 @@ it('draws a blended two-sided surface once, both sides in one pass, but glass ba
 
 it('shares one configured material among meshes of the same surface, textures and GLB state, disposed with its last user', async () => {
   const shared = createSharedSurfaceMaterials(), grass = new Texture(), gravel = new Texture();
-  const configured = async (texture: Texture, glb: Partial<MeshStandardMaterial> = {}) => {
+  const configured = async (texture: Texture, glb: Partial<MeshStandardMaterial> = {}, packageKey = 'fb81305939eff0a5') => {
     const material = Object.assign(new MeshStandardMaterial(), glb);
-    material.userData = holder(surface('standard', {maps: {albedo: map('ground')}}));
+    material.userData = {...holder(surface('standard', {maps: {albedo: map('ground')}})), lmuMaterial: packageKey};
     const mesh = new Mesh(new BufferGeometry(), material);
+    prepareSceneryMesh(mesh);
     await configureSurfaceMaterial(mesh, {load: () => Promise.resolve(texture)}, false, shared);
-    return mesh.material;
+    return mesh;
   };
-  const [a, b, other, blended] = [await configured(grass), await configured(grass), await configured(gravel), await configured(grass, {transparent: true})];
+  const [first, second, differentTexture, differentBlend] = [await configured(grass), await configured(grass), await configured(gravel), await configured(grass, {transparent: true})];
+  const {material: a} = first, {material: b} = second, {material: other} = differentTexture, {material: blended} = differentBlend;
   expect(a).toBe(b); expect(other).not.toBe(a); expect(blended).not.toBe(a);
+  const otherBatch = await configured(grass, {}, '1b81305939eff0a5');
+  expect(otherBatch.material).toBe(a);
+  expect(first.userData.lmuMaterial).toBe('fb81305939eff0a5');
+  expect(otherBatch.userData.lmuMaterial).toBe('1b81305939eff0a5');
+  shared.release(otherBatch.material);
   expect(shared.owns(a)).toBe(true); expect(shared.release(new MeshStandardMaterial())).toBe(false);
   let disposed = 0, texturesFreed = 0; a.addEventListener('dispose', () => { disposed++; }); grass.addEventListener('dispose', () => { texturesFreed++; });
   expect(shared.release(a)).toBe(true); expect(disposed).toBe(0);

@@ -20,6 +20,6 @@ export function testLayout(): SceneryLayout {
     shading: testShading(),
     sky: testSky(),
     daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55, ...TEST_HAZE_WEIGHTS, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9 },
-    horizon, sectors: [0, 1, 2, 3].map(main).concat(pit), textures: [],
+    horizon, sectors: [0, 1, 2, 3].map(main).concat(pit), textures: [], materials: [],
   };
 }

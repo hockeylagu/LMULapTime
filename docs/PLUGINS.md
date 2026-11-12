@@ -82,12 +82,12 @@ The backend listens on loopback. Plugin endpoints use the same server access beh
 ## Contract
 
 ```json
-{ "schemaVersion": 9, "id": "personal-data", "version": "1" }
+{ "schemaVersion": 11, "id": "personal-data", "version": "1" }
 ```
 
 The manifest is exactly these three keys; the catalogs sit at fixed paths (`tracks/index.json`, `vehicles/index.json`,
-`vehicles/logos.json`, `scenery/index.json`, `rendering/index.json`) and all five are required. Schema 9 is the only supported
-format: any other `schemaVersion` (including 8) invalidates the package, with no fallback. The file shapes, path rules and
+`vehicles/logos.json`, `scenery/index.json`, `rendering/index.json`) and all five are required. Schema 11 is the only supported
+format: any other `schemaVersion` (including 8 and 10) invalidates the package, with no fallback. The file shapes, path rules and
 parsers are the pipeline's contract module (its `shared/contract/`), copied here verbatim as `shared/packageContract/` by the
 pipeline's `npm run package -- sync-contract` (never edited here; `sync-contract --check` there verifies the copy). The app's
 loader adds only what needs this machine: contained, size-checked file reads and the hash checks below. The whole package is
@@ -131,9 +131,9 @@ as approximate placement. It does not recenter the outline or invent a provider 
 Exact aliases win; ambiguous model matches remain unresolved. Primary and comparison
 vehicles resolve independently. Body direction continues to use replay yaw.
 
-## 3D scenery and vehicle bodies (package schema 9)
+## 3D scenery and vehicle bodies (package schema 11)
 
-This app loads schema 9 only (see Contract above). The pipeline repository's `docs/PACKAGE_FORMAT.md`, `docs/SCENE_PACKAGE.md` and
+This app loads schema 11 only (see Contract above). The pipeline repository's `docs/PACKAGE_FORMAT.md`, `docs/SCENE_PACKAGE.md` and
 `docs/VEHICLE_PIPELINE.md` own the file formats; this section records what the app reads and checks. In the package, the API and
 the code, a *vehicle* is a catalog record (model, class, VEH ids, handling) and a *body* is a 3D model of the top-level `bodies`
 list of the vehicle catalog; every record id has exactly one body.
@@ -146,8 +146,11 @@ The scenery catalog is `{ chunking, streaming, textures, layouts }`. `chunking` 
 `routeLengthM`, `pitLaneLengthM`, `shadowRangeM`, `environmentProbe` (`position`: where the venue's light is captured, LMU local
 metres), `daylight` (required: `date`, `sessions` race, qualify, practice1 and practice2 in that order with `localTime` `HH:MM`,
 `sunElevationDeg` and optional `sunBearingDeg`, `airPollution`, the haze weights and height scalars, location), one `horizon` chunk,
-`sectors` (main chunks ordered by lap range, then pit chunks) and `textures`, references (`texture` index, optional `maxPx`) into the
-table. A chunk has no path, neighbours or totals: its file is `scenery/<sha256>.glb`, a texture is `scenery/textures/<sha256>.ktx2.zst`
+`sectors` (main chunks ordered by lap range, then pit chunks), `textures`, references (`texture` index, optional `maxPx`) into the
+table, and `materials`: per material key, its `vertices`, `indices`, `primitives` and `draws` summed over the layout's chunks. A chunk
+GLB material carries its key as `extras.lmuMaterial` (a hash of its content: one key is one material in every chunk of the venue,
+and all its primitives share one vertex layout). The app draws each opaque material once across chunks from those totals
+(`src/components/replay/view3d/scenery/sceneryBatches.ts`); which materials draw together is the app's choice. A chunk has no path, neighbours or totals: its file is `scenery/<sha256>.glb`, a texture is `scenery/textures/<sha256>.ktx2.zst`
 (a KTX2 without supercompression, compressed as one zstd file), and a chunk's `textures` are indices into its layout's reference list.
 The loader (`server/plugins/scenePackage.ts`) expands each row (`expandSceneryCatalog` of the contract) into the layout the client
 gets: `asset` paths rebuilt, chunk texture lists as paths, the shared parameters and the rendering profiles attached. The layout must
@@ -271,13 +274,15 @@ A body is split by where it is seen from and has texture start files:
   null = no limit). The followed car is always at distance 0, the comparison car at its distance from the camera
   (`sceneObjects.ts`, `setCameraDistance`).
 - A body texture row may carry `interiorOnly: true` (no outside part uses it; the viewer reads it at full size, the rest of the
-  car up to its size limit) and `start`.
+  car up to its size limit) and `start`, with the full file's `width`, `height`, `levels` and `format` stated exactly when it has
+  a `start`.
 - A scenery or body texture row may carry `start`: `sha256` (a content-named KTX2 in the same textures folder),
   `byteLength`, `width`, `height`, `levels` and `gpuBytes` of the texture's start file, a complete texture that is the row's
-  texture from its third level down. Only a texture with more than two levels and a smaller side of at least 512 px has one; on
-  a scenery row the server checks the size and level count against the row. The viewer draws from the start file first and reads
-  the whole file later for the two levels above it (`scenery/cachedKtx2Loader.ts`, `scenery/materials/mipStreaming.ts`); a row
-  without one is read whole.
+  texture from at least two levels down, down to 256 px on its longer side (128 px for BC5 normal maps; the contract's
+  `textureStartDrop`). Only a texture with more than two levels and a smaller side of at least 512 px has one; the server checks
+  the start against the row's full size. The viewer draws from the start file first and reads the whole file later for the
+  levels above it, as many as the row's `levels` less the start's (`scenery/cachedKtx2Loader.ts`,
+  `scenery/materials/mipStreaming.ts`); a row without one is read whole.
 
 `GET /api/data-plugin/vehicles/:identity/body` (a VEH id with or without `.veh`) returns the body row plus `packageRevision`;
 `/vehicles/files/` serves the body and interior GLBs, descriptor, textures and their start files. The viewer selects the

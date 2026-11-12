@@ -9,6 +9,9 @@ import type {TextureStart} from './textures.js';
 import {parseTextureStart} from './textures.js';
 import {array, exactKeys, finite, knownKeys, orderedKeys, positiveCount, record, sha256, sortedUnique, text} from './strict.js';
 
+/** The full-size fields of a body texture row, present exactly when it has a start file. */
+const FULL_SIZE_KEYS = ['width', 'height', 'levels', 'format'] as const;
+
 /** Base physics defaults, not the setup or upgrade selected for a recorded lap. */
 export interface VehicleHandlingData {
   wheelbaseM?: number;
@@ -39,6 +42,11 @@ export interface VehicleBodyModel {sha256: string; byteLength: number; triangles
 export interface VehicleBodyTexture {
   sha256: string;
   byteLength: number;
+  /** The full file's size, level count and KTX format name: stated exactly when the texture has a start file, so a reader knows how many levels the start leaves out. */
+  width?: number;
+  height?: number;
+  levels?: number;
+  format?: string;
   /** True when only the interior GLB's materials use the texture. */
   interiorOnly?: true;
   start?: TextureStart;
@@ -90,11 +98,18 @@ function parseBody(value: unknown, what: string): VehicleBody {
   if (body.interior !== null) parseModel(body.interior, `${what}.interior`, ['sha256', 'byteLength', 'triangles', 'vertices']);
   const textures = array(body.textures, `${what}.textures`, MAX_TEXTURES).map((item, i) => {
     const at = `${what}.textures[${i}]`, texture = record(item, at);
-    knownKeys(texture, ['sha256', 'byteLength'], ['interiorOnly', 'start'], at);
+    knownKeys(texture, ['sha256', 'byteLength'], ['width', 'height', 'levels', 'format', 'interiorOnly', 'start'], at);
     sha256(texture.sha256, `${at}.sha256`);
     positiveCount(texture.byteLength, `${at}.byteLength`);
     if (texture.interiorOnly !== undefined && texture.interiorOnly !== true) throw Error(`${at}.interiorOnly: expected true`);
-    if (texture.start !== undefined) parseTextureStart(texture.start, `${at}.start`);
+    if (texture.start === undefined) {
+      for (const key of FULL_SIZE_KEYS) if (texture[key] !== undefined) throw Error(`${at}.${key}: stated only beside a start file`);
+    } else {
+      for (const key of FULL_SIZE_KEYS) if (texture[key] === undefined) throw Error(`${at}: a texture with a start file states its ${key}`);
+      for (const key of ['width', 'height', 'levels']) positiveCount(texture[key], `${at}.${key}`);
+      text(texture.format, `${at}.format`, 64);
+      parseTextureStart(texture.start, `${at}.start`, texture as {width: number; height: number; levels: number; format: string} & Obj);
+    }
     return texture.sha256 as string;
   });
   sortedUnique(textures, `${what}.textures (by sha256)`);

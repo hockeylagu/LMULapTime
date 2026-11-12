@@ -20,6 +20,17 @@ it("casts shadow only where the package's node flag says so; every mesh receives
   const ground = mesh('coarse-ground', {});
   prepareSceneryMesh(ground);
   expect(ground.castShadow).toBe(false);
+
+  // The filler ground under the road receives no shadow: one there would show through the road.
+  const filler = mesh('FILLER_GROUND_7', {});
+  prepareSceneryMesh(filler);
+  expect(filler.receiveShadow).toBe(false);
+});
+
+it("keeps the GLB material's package key on the mesh", () => {
+  const floor = new Mesh(new BufferGeometry(), Object.assign(new MeshBasicMaterial(), {userData: {lmuMaterial: '00b9c0040da09bea'}}));
+  prepareSceneryMesh(floor);
+  expect(floor.userData.lmuMaterial).toBe('00b9c0040da09bea');
 });
 
 it('hides the virtual screen framebuffer', () => {

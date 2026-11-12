@@ -93,15 +93,18 @@ vi.mock('three/addons/loaders/GLTFLoader.js', async () => {
     }
   }};
 });
+/** One shared material per package material key, as the loader shares them. */
+const keyed = new Map<string, MeshBasicMaterial>();
+const materialOf = (key: string) => { let made = keyed.get(key); if (!made) { made = new MeshBasicMaterial(); made.userData = {lmuMaterial: key, surfaceConfigured: true}; keyed.set(key, made); } return made; };
 vi.mock('../../../../../src/components/replay/view3d/scenery/chunkLoader.js', () => ({createChunkLoader: () => ({
   async load(chunk: SceneryChunk, _signal: AbortSignal, onParsed?: (root: Object3D) => void) {
     chunks.loads.push(chunk.id);
-    const root = new Group(), mesh = new Mesh(new BoxGeometry(200, 1, 200), new MeshBasicMaterial());
-    mesh.name = chunk.kind === 'horizon' ? 'FILLER_GROUND__OPAQUE' : 'road__OPAQUE'; mesh.position.y = chunk.kind === 'horizon' ? -5.5 : -0.5;
+    const horizon = chunk.kind === 'horizon', root = new Group(), mesh = new Mesh(new BoxGeometry(200, 1, 200), materialOf(horizon ? 'ground' : 'road'));
+    mesh.userData.lmuMaterial = horizon ? 'ground' : 'road'; mesh.name = horizon ? 'FILLER_GROUND__OPAQUE' : 'road__OPAQUE'; mesh.position.y = horizon ? -5.5 : -0.5;
     root.add(mesh);
-    if (chunk.kind !== 'horizon' && chunks.obstacleName) {
-      const obstacle = new Mesh(new BoxGeometry(2, 1, 8), new MeshBasicMaterial());
-      obstacle.name = chunks.obstacleName;
+    if (!horizon && chunks.obstacleName) {
+      const obstacle = new Mesh(new BoxGeometry(2, 1, 8), materialOf('obstacle'));
+      obstacle.name = chunks.obstacleName; obstacle.userData.lmuMaterial = 'obstacle';
       obstacle.position.set(24, 25.5, -35);
       root.add(obstacle);
     }
@@ -112,10 +115,10 @@ vi.mock('../../../../../src/components/replay/view3d/scenery/chunkLoader.js', ()
   releaseChunk: (root: Object3D) => disposeObjects(root, true), dispose() {},
 })}));
 vi.mock('../../../../../src/components/replay/view3d/scenery/cachedKtx2Loader.js', () => ({CachedKtx2Loader: class {
-  constructor(_renderer: unknown, private readonly textureDetail?: {maxPx?: unknown; start?: (url: string) => string | undefined}) {}
+  constructor(_renderer: unknown, private readonly textureDetail?: {maxPx?: unknown; start?: (url: string) => {url: string; skip: number} | undefined}) {}
   async loadAsync(url: string) {
     const texture = new Texture(), start = this.textureDetail?.start?.(url), name = (path: string) => path.split('/').at(-1)!;
-    carTextureLoads.paths.push(`${this.textureDetail?.maxPx ? 'capped' : 'full'} ${name(url)}${start ? ` from ${name(start)}` : ''}`);
+    carTextureLoads.paths.push(`${this.textureDetail?.maxPx ? 'capped' : 'full'} ${name(url)}${start ? ` from ${name(start.url)}` : ''}`);
     if (start) { texture.mipmaps = [{data: new Uint8Array(4), width: 512, height: 512}]; carTextureLoads.started.add(texture); }
     return texture;
   }
@@ -138,11 +141,13 @@ const layout = {
   camera: testCamera(), sky: testSky(), shading: testShading(), environmentProbe: {position: [0, 0, 0]},
   daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55, ...TEST_HAZE_WEIGHTS, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9 },
   horizon: {...base, id: 'horizon', kind: 'horizon', asset: 'scenery/h.glb'}, sectors: [0, 1, 2, 3].map(sector), textures: [],
+  // A box has 24 vertices and 36 indices: the horizon's ground, and a road and an obstacle in each sector (up to eight).
+  materials: [['ground', 1], ['road', 8], ['obstacle', 8]].map(([key, count]) => ({key, vertices: 24 * +count, indices: 36 * +count, primitives: +count, draws: +count})),
 } as unknown as SceneryLayoutResource;
 /** A texture file's content hash as a body row states it: a name in hex, so the paths the app derives from it stay readable in the loads. */
 const hashOf = (name: string) => Buffer.from(name).toString('hex').padEnd(64, '0');
 const car = {
-  resource: {textures: ['seat', 'trim'].map(name => ({sha256: hashOf(name), start: {sha256: hashOf(`${name}-start`)}}))}, bytes: new ArrayBuffer(0), vehicleId: 'veh',
+  resource: {textures: ['seat', 'trim'].map(name => ({sha256: hashOf(name), levels: 12, start: {sha256: hashOf(`${name}-start`), levels: 10}}))}, bytes: new ArrayBuffer(0), vehicleId: 'veh',
   descriptor: {optionNodes: ['option_PlateA', 'option_PlateB'], appearances: [{alias: 'VEH', albedo: 'textures/a.ktx2', paint: testCarPaint('textures/a.ktx2'), optionNodes: ['option_PlateA']}], materials: [{id: 'm1', name: 'body', paint: true}, {id: 'glow', name: 'glow', paint: true},
       ...['seat', 'trim'].map(name => ({id: name, name, paint: false, surface: {kind: 'diffuse', maps: {albedo: {texture: descriptorTexturePath(hashOf(name)), uv: 'uv0', scale: [1, 1]}}, finish: {roughness: 0.6, metalness: 0}, normalShadowInfluence: 0}}))], glowMaterialIds: ['glow'],
     lamps: [
@@ -273,7 +278,9 @@ it('retains scenery, canvas and camera settings, releases old laps, and draws th
   expect(headlight.material.name).toBe('lamp-lampGlowMaterial');
   expect([headlight.material.uniforms.scale.value, headlight.castShadow, headlight.userData.cockpitView]).toEqual([500 * SUN_UNIT, false, 'out']);
   expect([oldCar.getObjectByName('brakeGlow'), oldCar.getObjectByName('discGlow')]).toEqual([undefined, undefined]);
-  const roadDispose = vi.spyOn(road.geometry, 'dispose'), carDispose = vi.spyOn(oldBody.geometry, 'dispose'), materialDispose = vi.spyOn(oldBody.material, 'dispose');
+  // The road draws from its material's batch, which holds its geometry.
+  const roadBatch = world.getObjectsByProperty('isBatchedMesh', true).find(batch => (batch as Mesh).material === road.material) as Mesh;
+  const roadDispose = vi.spyOn(roadBatch.geometry, 'dispose'), carDispose = vi.spyOn(oldBody.geometry, 'dispose'), materialDispose = vi.spyOn(oldBody.material, 'dispose');
   handle.colorLines('speed'); handle.fadeLines(0.12, 1);
   const next = {...lap, points: lap.points.map(point => ({...point, x: point.x + 5}))};
   expect(await handle.updateLaps(next, lap, withGhost)).toBe(true);

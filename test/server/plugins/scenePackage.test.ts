@@ -16,11 +16,13 @@ const packages: Package[] = [];
 const build = () => { const built = syntheticPackage(); packages.push(built); return built; };
 afterEach(() => { for (const built of packages.splice(0)) fs.rmSync(built.dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 }); });
 const state = (built: Package) => new DataPlugin(built.dir).status.state;
+/** A body texture row's full size, stated beside its start file. */
+const FULL_2048 = {width: 2048, height: 2048, levels: 12, format: 'BC7_SRGB_BLOCK'};
 /** A stored start file's row: a texture of the given size and level count in a package folder. */
 const startFile = (built: Package, folder: 'scenery' | 'vehicles', size: number, levels: number) =>
   ({...built.store(folder === 'scenery' ? sceneryTexturePath : bodyTexturePath, Buffer.from(`start ${folder} ${size}`)), width: size, height: size, levels, gpuBytes: size * size});
 
-describe('schema 9 manifest and files', () => {
+describe('schema 10 manifest and files', () => {
   it('loads scenery next to tracks, rendering profiles and the car bodies of the vehicle records', () => {
     const built = build(), plugin = new DataPlugin(built.dir);
     expect(plugin.status.state).toBe('ready');
@@ -59,7 +61,7 @@ describe('schema 9 manifest and files', () => {
     expect(plugin.body('TEST_CAR')?.sha256).toBe(built.car.sha256);
   });
 
-  it.each([1, 2, 3, 4, 5, 6, 7, 8, '9', undefined, 10])('rejects manifest schema %s: only schema 9 is supported', schemaVersion => {
+  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, '11', undefined, 12])('rejects manifest schema %s: only schema 11 is supported', schemaVersion => {
     const built = build();
     built.manifest.schemaVersion = schemaVersion; built.commit();
     expect(state(built)).toBe('invalid');
@@ -223,7 +225,7 @@ describe('scenery validation', () => {
     ['a start file the package does not hold', (built: Package) => {
       Object.assign(built.sceneryShared.textures[0], {width: 2048, height: 2048, levels: 12, start: {...built.rowOf(startFile(built, 'scenery', 512, 10)), sha256: '2'.repeat(64)}});
     }],
-    ['a start file that is not the texture from its third level down', (built: Package) => {
+    ['a start file that is not the texture from its start level down', (built: Package) => {
       Object.assign(built.sceneryShared.textures[0], {width: 2048, height: 2048, levels: 12, start: built.rowOf(startFile(built, 'scenery', 1024, 11))});
     }],
   ])('rejects %s', (_name, change) => { expect(mutate(change)).toBe('invalid'); });
@@ -246,8 +248,8 @@ describe('scenery validation', () => {
     expect(new DataPlugin(built.dir).sceneryLayout('monza_gp')?.daylight.utcOffsetHours).toBe(9);
   });
 
-  it('accepts a texture start file', () => {
-    const built = build(), start = startFile(built, 'scenery', 512, 10);
+  it('accepts a texture start file: a 2048 px texture starts at 256 px, three levels down', () => {
+    const built = build(), start = startFile(built, 'scenery', 256, 9);
     Object.assign(built.sceneryShared.textures[0], {width: 2048, height: 2048, levels: 12, start: built.rowOf(start)}); built.commit();
     const plugin = new DataPlugin(built.dir);
     expect(plugin.sceneryLayout('monza_gp')?.textures[0].start).toEqual(start);
@@ -277,8 +279,8 @@ describe('car validation', () => {
 
   it('accepts an interior file and texture start files on a body', () => {
     const built = build(), interior = {...built.rowOf(built.store(bodyGlbPath, Buffer.from('interior'))), triangles: 10, vertices: 30};
-    const start = built.rowOf(startFile(built, 'vehicles', 512, 10));
-    Object.assign(built.car, {interior, textures: [{...built.rowOf(built.carTexture), interiorOnly: true, start}]}); built.commit();
+    const start = built.rowOf(startFile(built, 'vehicles', 256, 9));
+    Object.assign(built.car, {interior, textures: [{...built.rowOf(built.carTexture), ...FULL_2048, interiorOnly: true, start}]}); built.commit();
     const plugin = new DataPlugin(built.dir), body = plugin.body('TEST_CAR');
     expect([body?.interior, body?.textures[0].start]).toEqual([interior, start]);
   });
@@ -287,7 +289,10 @@ describe('car validation', () => {
     ['a body without its interior field', (built: Package) => { delete (built.car as Partial<typeof built.car>).interior; }],
     ['an interior file the package does not hold', (built: Package) => { Object.assign(built.car, {interior: {sha256: '1'.repeat(64), byteLength: 1, triangles: 1, vertices: 3}}); }],
     ['an interior-only mark that is not true', (built: Package) => { Object.assign(built.car, {textures: [{...built.rowOf(built.carTexture), interiorOnly: false}]}); }],
-    ['a texture start file the package does not hold', (built: Package) => { Object.assign(built.car, {textures: [{...built.rowOf(built.carTexture), start: {...built.rowOf(startFile(built, 'vehicles', 512, 10)), sha256: '3'.repeat(64)}}]}); }],
+    ['a texture start file the package does not hold', (built: Package) => { Object.assign(built.car, {textures: [{...built.rowOf(built.carTexture), ...FULL_2048, start: {...built.rowOf(startFile(built, 'vehicles', 256, 9)), sha256: '3'.repeat(64)}}]}); }],
+    ['a texture start file without the full size beside it', (built: Package) => { Object.assign(built.car, {textures: [{...built.rowOf(built.carTexture), start: built.rowOf(startFile(built, 'vehicles', 256, 9))}]}); }],
+    ['a full size without a start file', (built: Package) => { Object.assign(built.car, {textures: [{...built.rowOf(built.carTexture), ...FULL_2048}]}); }],
+    ['a start file at the wrong level for its full size', (built: Package) => { Object.assign(built.car, {textures: [{...built.rowOf(built.carTexture), ...FULL_2048, start: built.rowOf(startFile(built, 'vehicles', 512, 10))}]}); }],
     ['a body that states its path (derived from the hash)', (built: Package) => { Object.assign(built.car, {asset: bodyGlbPath(built.car.sha256)}); }],
     ['a body that states its descriptor path', (built: Package) => { Object.assign(built.car, {descriptor: bodyDescriptorPath(built.car.folder)}); }],
     ['a body hash that is not a hash', (built: Package) => { built.car.sha256 = 'GLB'; }],

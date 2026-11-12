@@ -1,5 +1,5 @@
 import {
-  BackSide, DoubleSide, FrontSide, Line, Mesh, MeshDepthMaterial, Points, Sprite, type BufferGeometry, type Material, type Object3D,
+  BackSide, BatchedMesh, DoubleSide, FrontSide, Line, Mesh, MeshDepthMaterial, Points, Sprite, type BufferGeometry, type Material, type Object3D,
   type OrthographicCamera, type PerspectiveCamera, type Scene, type Side, type Texture, type Vector4, type WebGLRenderer, type WebGLRenderTarget,
 } from 'three';
 import { trackShadowEye } from '../scenery/materials/shadowEye.js';
@@ -59,8 +59,10 @@ export function createShadowCasterPass(renderer: WebGLRenderer, scene: Scene): S
       scene.traverseVisible(object => {
         if (object instanceof Mesh) {
           const mesh = object as Mesh<BufferGeometry, Material | Material[]>, geometry = mesh.geometry;
-          if (mesh.castShadow && !geometry.boundingSphere) geometry.computeBoundingSphere();
-          if (mesh.castShadow && 2 * geometry.boundingSphere!.radius * mesh.matrixWorld.getMaxScaleOnAxis() >= minCasterM) {
+          // A batch's own bounds cover its instances; its geometry is the whole reserved buffer, unused space included.
+          const bounds = mesh instanceof BatchedMesh ? mesh : geometry;
+          if (mesh.castShadow && !bounds.boundingSphere) bounds.computeBoundingSphere();
+          if (mesh.castShadow && 2 * bounds.boundingSphere!.radius * mesh.matrixWorld.getMaxScaleOnAxis() >= minCasterM) {
             swapped.push([mesh, mesh.material]);
             mesh.material = Array.isArray(mesh.material) ? mesh.material.map(material => depthOf(mesh, material)) : depthOf(mesh, mesh.material);
             return;

@@ -31,7 +31,7 @@ function serve(files: Record<string, Uint8Array>) {
   return fetchMock;
 }
 
-/** The start file of a texture: the same texture from its third level down, as a file of its own. */
+/** The start file of a texture from its third level down, as a file of its own (the skip the tests give with it). */
 const startFile = (size: number) => ktx2File(size / 4);
 
 /** A loader whose parser reads the container the way the test file is laid out. */
@@ -60,7 +60,7 @@ it('cuts a file to the levels no larger than a given size, and leaves alone what
 
 it('loads a texture from its start file, then its largest levels from one background read of the full file', async () => {
   const fetchMock = serve({'/t/road.ktx2.zst': ktx2File(2048), '/t/road-start.ktx2.zst': startFile(2048)});
-  const ktx2 = loader({start: url => url.replace('.ktx2', '-start.ktx2')});
+  const ktx2 = loader({start: url => ({url: url.replace('.ktx2', '-start.ktx2'), skip: 2})});
   const texture = await ktx2.loadAsync('/t/road.ktx2.zst');
   expect(await ktx2.loadAsync('/t/road.ktx2.zst')).toBe(texture);
   expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/t/road-start.ktx2.zst']);
@@ -73,9 +73,17 @@ it('loads a texture from its start file, then its largest levels from one backgr
   expect(first?.map(level => [level.width, level.data.length, level.data[0]])).toEqual([[2048, 512 * 512, 0], [1024, 256 * 256, 1]]);
 });
 
+it('takes how many levels a start file leaves out from the texture, not a fixed count', async () => {
+  serve({'/t/wall.ktx2.zst': ktx2File(2048), '/t/wall-start.ktx2.zst': ktx2File(256)});
+  const ktx2 = loader({start: url => ({url: url.replace('.ktx2', '-start.ktx2'), skip: 3})});
+  const texture = await ktx2.loadAsync('/t/wall.ktx2.zst'), detail = ktx2.detail(texture);
+  expect([texture.image.width, detail?.missing]).toEqual([256, 3]);
+  expect((await detail?.load())?.map(level => level.width)).toEqual([2048, 1024, 512]);
+});
+
 it('sharpens a texture no further than its given size', async () => {
   serve({'/t/stand.ktx2.zst': ktx2File(2048), '/t/stand-start.ktx2.zst': startFile(2048), '/t/far.ktx2.zst': ktx2File(2048), '/t/far-start.ktx2.zst': startFile(2048)});
-  const ktx2 = loader({start: url => url.replace('.ktx2', '-start.ktx2'), maxPx: url => (url.includes('stand') ? 1024 : 256)});
+  const ktx2 = loader({start: url => ({url: url.replace('.ktx2', '-start.ktx2'), skip: 2}), maxPx: url => (url.includes('stand') ? 1024 : 256)});
   const stand = await ktx2.loadAsync('/t/stand.ktx2.zst'), detail = ktx2.detail(stand);
   expect([stand.image.width, detail?.missing]).toEqual([512, 1]);
   expect((await detail?.load())?.map(level => [level.width, level.data[0]])).toEqual([[1024, 1]]);

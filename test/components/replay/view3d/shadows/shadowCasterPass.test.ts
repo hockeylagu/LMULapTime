@@ -1,4 +1,4 @@
-import { BackSide, BoxGeometry, DoubleSide, Mesh, MeshDepthMaterial, MeshStandardMaterial, OrthographicCamera, PerspectiveCamera, Scene, Texture, Vector4, WebGLRenderTarget, type Material, type WebGLRenderer } from 'three';
+import { BackSide, BatchedMesh, BoxGeometry, DoubleSide, Mesh, MeshDepthMaterial, MeshStandardMaterial, OrthographicCamera, PerspectiveCamera, Scene, Texture, Vector4, WebGLRenderTarget, type Material, type WebGLRenderer } from 'three';
 import { expect, it } from 'vitest';
 import { createShadowCasterPass } from '../../../../../src/components/replay/view3d/shadows/shadowCasterPass.js';
 
@@ -53,4 +53,18 @@ it('draws the shadow in plain depth while the scene uses a reversed depth range,
   } as unknown as WebGLRenderer;
   createShadowCasterPass(renderer, new Scene()).draw(new WebGLRenderTarget(4, 4), new Vector4(0, 0, 4, 4), new OrthographicCamera(), new PerspectiveCamera(), [], 0);
   expect(calls).toEqual([false, 'clear', 'render', true]);
+});
+
+it("sizes a batch by its instances' bounds, not by its reserved buffer", () => {
+  const scene = new Scene(), batch = new BatchedMesh(2, 1000, 3000, new MeshStandardMaterial());
+  // A 0.1 m box in a batch whose buffer has room for much more: a cached cascade leaves it out like any small caster.
+  batch.addInstance(batch.addGeometry(new BoxGeometry(0.1, 0.1, 0.1)));
+  batch.castShadow = true; scene.add(batch); scene.updateMatrixWorld(true);
+  let drawn: boolean | undefined;
+  const renderer = {
+    autoClear: true, state: {buffers: {depth: {getReversed: () => false, setReversed() {}}}}, clear() {}, getRenderTarget: () => null, setRenderTarget() {},
+    render() { drawn = batch.visible; },
+  } as unknown as WebGLRenderer;
+  createShadowCasterPass(renderer, scene).draw(new WebGLRenderTarget(4, 4), new Vector4(0, 0, 4, 4), new OrthographicCamera(), new PerspectiveCamera(), [], 1);
+  expect([drawn, batch.geometry.boundingSphere]).toEqual([false, null]);
 });

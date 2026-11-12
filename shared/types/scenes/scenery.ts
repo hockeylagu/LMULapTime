@@ -1,5 +1,5 @@
 /**
- * Scenery layout of package schema 9: the layout row of `scenery/index.json` expanded (asset paths rebuilt, chunk textures as paths) with the catalog's shared
+ * Scenery layout of package schema 11: the layout row of `scenery/index.json` expanded (asset paths rebuilt, chunk textures as paths) with the catalog's shared
  * chunking and streaming and the rendering profiles (camera, sky, shading) attached; the pipeline's docs/SCENE_PACKAGE.md is the authority.
  * The horizon chunk is always resident; sector chunks are loaded by lap distance around the replay car.
  */

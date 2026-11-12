@@ -19,7 +19,7 @@ function freezeGeometry(value: unknown): void {
   Object.freeze(value);
 }
 
-/** A fully validated startup snapshot of a schema 9 package. Scenery, body and cloud map files are served as is from `filesRoot()`. */
+/** A fully validated startup snapshot of a schema 11 package. Scenery, body and cloud map files are served as is from `filesRoot()`. */
 export class DataPlugin {
   public readonly status: DataPluginStatus;
   private readonly tracks = new Map<string, {geometry:TrackBoundaryGeometry}>();
