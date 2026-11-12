@@ -13,6 +13,7 @@ import { exposureType, shadowCascadeSet, type CameraMode } from './cameraModes.j
 import { createCameraRig } from './cameraRig.js';
 import { addSceneEnvironment, sceneSun, VENUE_PROBE_PX } from './sceneEnvironment.js';
 import { linkPrefilters } from './prefilterLink.js';
+import { linkConvolution } from './reflectionCube.js';
 import { createAutoExposure } from './autoExposure.js';
 import { CAR_REFLECTION_PX, createCarReflection } from './car/carReflection.js';
 import { CachedKtx2Loader } from './scenery/cachedKtx2Loader.js';
@@ -65,6 +66,8 @@ export async function createReplayScene(
   // No canvas multisampling: the scene renders into the auto-exposure target, which multisamples; the canvas gets one full-screen quad.
   try { renderer = new WebGLRenderer({antialias: false, alpha: false, reversedDepthBuffer: true}); }
   catch { throw Error('WebGL 2 is unavailable. Use the 2D map.'); }
+  // Reading a program's error log waits for its link to finish: about 10 ms a program at the first frame. Production builds skip it.
+  renderer.debug.checkShaderErrors = import.meta.env.DEV;
   const {min, max} = layout.horizon.bounds, origin = new Vector3(...min).add(new Vector3(...max)).multiplyScalar(0.5);
   const loader = createChunkLoader(renderer, layout.textures), carStarts = new Map<string, string>(), startOf = (url: string) => carStarts.get(url);
   const carTextures = new CachedKtx2Loader(renderer, {maxPx: () => CAR_TEXTURE_MAX_PX, start: startOf}), interiorTextures = new CachedKtx2Loader(renderer, {start: startOf});
@@ -150,6 +153,7 @@ export async function createReplayScene(
   let environment!: ReturnType<typeof addSceneEnvironment>, reflection!: ReturnType<typeof createCarReflection>;
   // The environment and the car's reflection prefilter on creation: their programs link first, off the main thread.
   const prefilters = linkPrefilters(renderer, rig.perspective, [VENUE_PROBE_PX, CAR_REFLECTION_PX]);
+  const convolution = linkConvolution(renderer, layout.shading.convolution.kernels);
   lit = prefilters.ready.then(() => {
     environment = addSceneEnvironment(scene, renderer, layout, origin, shadowCascadeSet(rig.mode), sun);
     reflection = createCarReflection(renderer, scene, layout.shading);
@@ -181,7 +185,8 @@ export async function createReplayScene(
   const showLayer = () => { world.add(layer.root); environment.setDynamic([layer.root]); reflection.setCar(layer.primary, layer.root); rig.setLayer(layer); };
   showLayer(); environment.setCamera(rig.camera);
   // The first view's chunks are warm: this compiles and uploads the cars and lines, behind the loading screen.
-  try { await warmup.warm(scene, new AbortController().signal); } catch (error) { cleanup(); throw error; }
+  // The exposure passes and the reflection convolution link meanwhile: each would otherwise link at its first draw.
+  try { await Promise.all([warmup.warm(scene, new AbortController().signal), exposure.link(), convolution.ready]); } catch (error) { cleanup(); throw error; }
   // The scenery around the first pose is resident and compiled: capture the venue's light for the scene's environment.
   environment.captureVenue();
   warmup.shown();
@@ -321,7 +326,7 @@ export async function createReplayScene(
       disposed = true; cancelAnimationFrame(frame); observer.disconnect();
       renderer.domElement.removeEventListener('webglcontextlost', contextLost); document.removeEventListener('visibilitychange', invalidate);
       // The stream takes its chunks out first (the chunk loader frees them), then the cars, lines and sky go with the scene.
-      stream.dispose(); disposeObjects(scene, true); environment.dispose(); reflection.dispose();
+      stream.dispose(); disposeObjects(scene, true); environment.dispose(); reflection.dispose(); convolution.dispose();
       cleanup(); renderer.domElement.remove();
     },
   };

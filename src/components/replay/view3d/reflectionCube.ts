@@ -1,4 +1,4 @@
-import { BufferGeometry, DataTexture, Float32BufferAttribute, FloatType, GLSL3, LinearFilter, LinearMipmapLinearFilter, Mesh, NearestFilter, OrthographicCamera, RawShaderMaterial, RGBAFormat, Scene, WebGLCubeRenderTarget, type Texture, type WebGLRenderer } from 'three';
+import { BufferGeometry, DataTexture, Float32BufferAttribute, FloatType, GLSL3, LinearFilter, LinearMipmapLinearFilter, Mesh, NearestFilter, OrthographicCamera, RawShaderMaterial, RGBAFormat, Scene, WebGLCubeRenderTarget, WebGLRenderTarget, type Texture, type WebGLRenderer } from 'three';
 import type { SceneryConvolutionKernel } from '../../../../shared/types/scenes/scenery.js';
 
 /**
@@ -72,6 +72,20 @@ function convolutionPass(kernels: readonly SceneryConvolutionKernel[]): Convolut
   const scene = new Scene(), camera = new OrthographicCamera(), quad = new Mesh(geometry, material), samples = kernels.map(sampleTexture);
   quad.frustumCulled = false; scene.add(quad);
   return {material, scene, camera, samples, dispose: () => { material.dispose(); geometry.dispose(); for (const texture of samples) texture.dispose(); }};
+}
+
+/**
+ * three links a pass's program on its first draw, on the main thread: a few hundred milliseconds for the convolution's. This
+ * links the convolution program for `kernels` off the main thread; a convolution run while this is held finds it linked. Dispose
+ * it with the scene.
+ */
+export function linkConvolution(renderer: WebGLRenderer, kernels: readonly SceneryConvolutionKernel[]): { ready: Promise<void>; dispose(): void } {
+  const pass = convolutionPass(kernels), target = new WebGLRenderTarget(1, 1), previous = renderer.getRenderTarget();
+  // A program for a render target differs from the canvas's (linear output): the convolution draws to cube targets.
+  renderer.setRenderTarget(target);
+  const ready = renderer.compileAsync(pass.scene, pass.camera).then(() => {});
+  renderer.setRenderTarget(previous);
+  return {ready, dispose() { pass.dispose(); target.dispose(); }};
 }
 
 /**

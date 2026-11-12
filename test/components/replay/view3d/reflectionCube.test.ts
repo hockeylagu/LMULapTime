@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest';
-import { HalfFloatType, LinearMipmapLinearFilter, WebGLCubeRenderTarget, type RawShaderMaterial, type Scene, type WebGLRenderer } from 'three';
-import { convolveReflection } from '../../../../src/components/replay/view3d/reflectionCube.js';
+import { HalfFloatType, LinearMipmapLinearFilter, WebGLCubeRenderTarget, WebGLRenderTarget, type Mesh, type RawShaderMaterial, type Scene, type WebGLRenderer } from 'three';
+import { convolveReflection, linkConvolution } from '../../../../src/components/replay/view3d/reflectionCube.js';
 import { testShading } from '../../../helpers/scenes/sceneryProfiles.js';
 
 /** A renderer that records each draw's target, face, mip and the convolution uniforms at that moment. */
@@ -53,4 +53,25 @@ it('renders into an earlier result for the same size, type and kernels with the 
   expect(() => convolveReflection(renderer, second, kernels.slice(0, 1), cubes)).toThrow('differ');
   cubes.dispose(); first.dispose(); second.dispose();
   expect(disposed).toHaveBeenCalledOnce();
+});
+
+it('links the convolution program for a render target ahead of its first draw, holding it until disposed', async () => {
+  const before = new WebGLRenderTarget(4, 4), compiled: {material: RawShaderMaterial; target: unknown}[] = [];
+  let current: unknown = before;
+  const renderer = {
+    getRenderTarget: () => current, setRenderTarget: (target: unknown) => { current = target; },
+    compileAsync: vi.fn(async (scene: Scene) => { compiled.push({material: (scene.children[0] as Mesh<never, RawShaderMaterial>).material, target: current}); }),
+  } as unknown as WebGLRenderer;
+  const link = linkConvolution(renderer, testShading().convolution.kernels);
+  await link.ready;
+  expect(current).toBe(before);
+  expect(compiled).toHaveLength(1); expect(compiled[0].target).toBeInstanceOf(WebGLRenderTarget); expect(compiled[0].target).not.toBe(before);
+  // The same shaders as a convolution's own pass, so its program is the linked one.
+  const {draws, renderer: drawing} = recordingRenderer(), source = new WebGLCubeRenderTarget(64, {type: HalfFloatType, generateMipmaps: true, minFilter: LinearMipmapLinearFilter});
+  convolveReflection(drawing, source, testShading().convolution.kernels).dispose();
+  expect([draws[0].material.vertexShader, draws[0].material.fragmentShader]).toEqual([compiled[0].material.vertexShader, compiled[0].material.fragmentShader]);
+  const disposed = vi.fn(); compiled[0].material.addEventListener('dispose', disposed);
+  link.dispose();
+  expect(disposed).toHaveBeenCalledOnce();
+  source.dispose();
 });

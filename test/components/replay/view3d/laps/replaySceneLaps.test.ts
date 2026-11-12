@@ -31,7 +31,7 @@ vi.mock('three', async importOriginal => {
     dispose() {}
   }, WebGLRenderer: class {
     domElement = document.createElement('canvas');
-    capabilities = {maxTextureSize: 16384}; state = {buffers: {depth: {getReversed: () => false, setReversed() {}}}};
+    capabilities = {maxTextureSize: 16384}; debug = {checkShaderErrors: true}; state = {buffers: {depth: {getReversed: () => false, setReversed() {}}}};
     coordinateSystem = actual.WebGLCoordinateSystem;
     render = gpu.render;
     dispose = gpu.dispose;

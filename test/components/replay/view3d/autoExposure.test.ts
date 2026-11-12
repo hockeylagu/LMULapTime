@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { Color, Vector3 } from 'three';
-import { adaptLogLuminance, inverseToneCurve, lawExposure, meterUnit, profileAt, toneCurve, whiteBalance } from '../../../../src/components/replay/view3d/autoExposure.js';
+import { describe, expect, it, vi } from 'vitest';
+import { Color, Vector3, WebGLRenderTarget, type Object3D, type WebGLRenderer } from 'three';
+import { adaptLogLuminance, createAutoExposure, inverseToneCurve, lawExposure, meterUnit, profileAt, toneCurve, whiteBalance } from '../../../../src/components/replay/view3d/autoExposure.js';
 import { testCamera } from '../../../helpers/scenes/sceneryProfiles.js';
 
 /** A synthetic camera type (profiles at sun strengths 0 and 60). */
@@ -66,5 +66,23 @@ describe('autoExposure', () => {
     const next = adaptLogLuminance(0, 1, 0.5);
     expect(next).toBeGreaterThan(0); expect(next).toBeLessThan(1);
     expect(adaptLogLuminance(0, 1, 0)).toBe(0);
+  });
+
+  it('links the canvas pass for the canvas and the metering pass for its own target, and leaves the renderer as it was', async () => {
+    const before = new WebGLRenderTarget(4, 4), compiled: {pass: Object3D; target: WebGLRenderTarget | null}[] = [];
+    let current: WebGLRenderTarget | null = before;
+    const renderer = {
+      getRenderTarget: () => current, setRenderTarget: (target: WebGLRenderTarget | null) => { current = target; },
+      compileAsync: vi.fn(async (pass: Object3D) => { compiled.push({pass, target: current}); }),
+    } as unknown as WebGLRenderer;
+    const exposure = createAutoExposure(renderer, testCamera(), sun(30, 40), () => {});
+    expect(exposure.target).toMatchObject({samples: 4, depthBuffer: true, resolveDepthBuffer: false});
+    await exposure.link();
+    expect(current).toBe(before);
+    // The canvas pass draws to the canvas; the metering pass to its small target, neither the HDR target nor the one set before.
+    expect(compiled[0].target).toBeNull();
+    expect(compiled[1].target).toBeInstanceOf(WebGLRenderTarget);
+    expect([exposure.target, before]).not.toContain(compiled[1].target);
+    exposure.dispose();
   });
 });

@@ -122,6 +122,11 @@ export interface AutoExposure {
   readonly target: WebGLRenderTarget;
   /** Renders `scene` into the HDR target, then exposes and tone-maps it onto the canvas (renderer.toneMappingExposure carries the exposure). */
   render(scene: Object3D, camera: Camera): void;
+  /**
+   * Links the canvas and metering programs off the main thread, for their own targets: otherwise each links on its first draw,
+   * a few hundred milliseconds of the first frame. Call once the renderer's tone mapping is set (a program depends on it).
+   */
+  link(): Promise<void>;
   /** Switches to a camera type's metering, exposure law, white balance and curve; exposure re-adapts from the next reading. */
   setType(type: SceneryCameraType): void;
   /** The active type's display transform; the same object until the type changes. */
@@ -176,7 +181,10 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
   } satisfies Record<SceneryCameraType, ResolvedType>;
   let active = types[type];
   const size = new Vector2();
-  const hdr = new WebGLRenderTarget(1, 1, {type: HalfFloatType, samples: 4, depthTexture: new DepthTexture(1, 1, FloatType)});
+  // Depth testing still uses the float attachment. The display and meter only sample the resolved colour.
+  const hdr = new WebGLRenderTarget(1, 1, {
+    type: HalfFloatType, samples: 4, depthTexture: new DepthTexture(1, 1, FloatType), resolveDepthBuffer: false,
+  });
   const meter = new WebGLRenderTarget(METER_PX, METER_PX, {type: HalfFloatType, depthBuffer: false});
   const quad = new PlaneGeometry(2, 2), quadCamera = new OrthographicCamera(-1, 1, 1, -1, 0, 1);
   const output = new Scene(), meterScene = new Scene();
@@ -237,6 +245,13 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
       apply(types[next]); generation++; metered = null; invalidate();
     },
     display: () => active.display,
+    link() {
+      const previous = renderer.getRenderTarget();
+      renderer.setRenderTarget(null); const canvas = renderer.compileAsync(output, quadCamera);
+      renderer.setRenderTarget(meter); const metering = renderer.compileAsync(meterScene, quadCamera);
+      renderer.setRenderTarget(previous);
+      return Promise.all([canvas, metering]).then(() => {});
+    },
     render(scene, camera) {
       renderer.getDrawingBufferSize(size);
       if (size.x !== hdr.width || size.y !== hdr.height) { hdr.setSize(size.x, size.y); }
