@@ -1,3 +1,4 @@
+import { classResult } from '../../../shared/domain/classResult.js';
 import type { TrackBoundaryGeometry } from '../../../shared/types/trackGeometry.js';
 import React from 'react';
 import { Link } from 'react-router';
@@ -116,7 +117,7 @@ export const TrackDetail: React.FC<TrackDetailProps> = ({
   }, null);
   const averagePosition = (kind: string) => {
     const positions = classTrackSessions.filter(session => session.sessionType === kind)
-      .map(session => session.playerDriver?.position).filter((position): position is number => typeof position === 'number' && position > 0);
+      .map(session => session.playerDriver ? classResult(session.playerDriver).position : null).filter((position): position is number => typeof position === 'number' && position > 0);
     return positions.length ? positions.reduce((sum, position) => sum + position, 0) / positions.length : null;
   };
   const trackProgression = (data.progression ?? []).map((point) => {

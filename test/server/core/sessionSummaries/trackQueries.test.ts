@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { DetailedSession, LapData } from '../../../../shared/types/index.js';
 import { initDbSchema } from '../../../../server/core/dbSchema.js';
 import { upsertSession } from '../../../../server/core/dbSessionStore.js';
-import { queryTrackDetailFilters, queryTrackDetailSummary, queryTrackSummaries } from '../../../../server/core/sessionSummaries/trackQueries.js';
+import { queryTrackDetailFilters, queryTrackDetailSummary, queryTrackPositionAverages, queryTrackSummaries } from '../../../../server/core/sessionSummaries/trackQueries.js';
 import { aggregateTrackSummaries } from '../../../../shared/domain/trackSummaryUtils.js';
 
 function makeSession(id: string, time: number, carType: string, carClass: string, lapTime: number): DetailedSession {
@@ -18,6 +18,22 @@ function makeSession(id: string, time: number, carType: string, carClass: string
 }
 
 describe('track detail summary queries', () => {
+  it('averages the qualifying and finish positions within the class', () => {
+    const db = new Database(':memory:');
+    initDbSchema(db);
+    const placed = (id: string, time: number, position: number, classPosition: number): DetailedSession => {
+      const base = makeSession(id, time, 'Ginetta G61-LT-P325 Evo', 'LMP3', 96);
+      const driver = { ...base.drivers[0], position, classPosition };
+      return { ...base, sessionType: time % 2 ? 'Race' : 'Qualifying', playerDriver: driver, drivers: [driver] };
+    };
+    upsertSession(db, placed('race-a', 1, 19, 4), 'race-a.xml', 1, 10);
+    upsertSession(db, placed('race-b', 3, 22, 6), 'race-b.xml', 3, 10);
+    upsertSession(db, placed('quali', 2, 37, 13), 'quali.xml', 2, 10);
+    expect(queryTrackPositionAverages(db, 'Monza', 'LMP3', undefined, 'GP'))
+      .toEqual({ qualifyingAveragePosition: 13, finishAveragePosition: 5 });
+    db.close();
+  });
+
   it('aggregates the selected class and car across history and returns scoped option counts', () => {
     const db = new Database(':memory:');
     initDbSchema(db);

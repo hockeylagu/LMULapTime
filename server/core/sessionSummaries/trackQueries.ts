@@ -155,10 +155,12 @@ export function queryTrackLatestSessionContext(db: Database, trackName: string, 
     carClass: row.car_class ?? undefined, carType: row.car_type ?? undefined } : {};
 }
 
+/** The player's average qualifying and finish positions at a track, each within their class. */
 export function queryTrackPositionAverages(db: Database, trackName: string, carClass?: string, carType?: string, trackCourse = ''): TrackPositionAverages {
   const scope = aggregateScopeSql(trackName, trackCourse, carClass, carType);
-  const row = db.prepare(`SELECT avg(CASE WHEN s.session_kind='qualifying' AND d.position>0 THEN d.position END) qualifying_average,
-      avg(CASE WHEN s.session_kind='race' AND d.position>0 THEN d.position END) finish_average
+  const place = 'coalesce(nullif(d.class_position,0),d.position)';
+  const row = db.prepare(`SELECT avg(CASE WHEN s.session_kind='qualifying' AND ${place}>0 THEN ${place} END) qualifying_average,
+      avg(CASE WHEN s.session_kind='race' AND ${place}>0 THEN ${place} END) finish_average
     FROM sessions s LEFT JOIN session_drivers d ON d.session_id=s.id AND d.driver_ordinal=s.primary_driver_ordinal
     WHERE s.player_driver_name IS NOT NULL AND ${scope.sql}`).get(...scope.values) as
     { qualifying_average: number | null; finish_average: number | null };
