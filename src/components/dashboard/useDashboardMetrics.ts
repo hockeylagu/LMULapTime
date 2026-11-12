@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { driverLapsCount, isSessionEmpty, getDisplayTrackName, compareSessionsBySortOption } from '../../../shared/domain/formatters.js';
 import { averageQualifiedBenchmarkPace, matchesTrack, getPaceCategoryFromPercentage, type BenchmarkPaceGroup } from '../../../shared/domain/paceCategory.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
+import { classResult } from '../../../shared/domain/classResult.js';
 import { matchesSessionCarClass } from '../../../shared/domain/vehicleMapping.js';
 import { selectCleanLapCandidates } from '../../../shared/domain/lapComparison.js';
 import { DetailedSession } from '../../../shared/types/index.js';
@@ -99,10 +100,11 @@ export function useDashboardMetrics({
     for (const s of sessions) {
       if (s.sessionType === 'Race') {
         raceSessionsCount++;
-        if (s.playerDriver?.position === 1) {
+        const finish = s.playerDriver ? classResult(s.playerDriver).position : 0;
+        if (finish === 1) {
           raceWinsCount++;
         }
-        if (s.playerDriver?.position && s.playerDriver.position <= 3 && s.playerDriver.position > 0) {
+        if (finish <= 3 && finish > 0) {
           racePodiumsCount++;
         }
       } else if (s.sessionType === 'Qualifying') {

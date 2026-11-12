@@ -3,6 +3,7 @@ import { AlertCircle } from 'lucide-react';
 import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
 import type { DetailedSession } from '../../../shared/types/session.js';
 import { getSessionTypeStyle } from '../common/sessionTypeStyles.js';
+import { classResult } from '../../../shared/domain/classResult.js';
 
 /**
  * Session name (R1, Q1, P2) in its session type's hue (`SESSION_TYPE_STYLES`), at a fixed minimum
@@ -24,10 +25,11 @@ export const SessionTypeChip: React.FC<{ session: { sessionType: string; session
 
 const isQualifying = (s: Pick<SessionCard, 'sessionType' | 'sessionName'>) => s.sessionType === 'Qualifying' || Boolean(s.sessionName?.toLowerCase().includes('quali'));
 
-/** Race finish (with places gained or lost) or qualifying position; P1 in gold, the one best there is. */
+/** Race finish (with places gained or lost) or qualifying position, in the driver's class; P1 in gold, the one best there is. */
 export const FinishPosition: React.FC<{ session: SessionCard | DetailedSession; label?: boolean }> = ({ session: s, label = false }) => {
-  const p = s.playerDriver;
-  if (!p?.position) return null;
+  if (!s.playerDriver) return null;
+  const p = classResult(s.playerDriver);
+  if (!p.position) return null;
   const isRace = s.sessionType === 'Race';
   if (!isRace && !isQualifying(s)) return null;
 

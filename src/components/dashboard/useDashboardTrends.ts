@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { driverLapsCount, getDisplayTrackName, isSessionEmpty, getBestLapNumber } from '../../../shared/domain/formatters.js';
 import { computeConsistencyRating } from '../../../shared/domain/lapComparison.js';
+import { classResult } from '../../../shared/domain/classResult.js';
 import type { SessionCard } from '../../../shared/types/sessionSummaries.js';
 import type { DetailedSession } from '../../../shared/types/session.js';
 import type { DashboardLatestOuting, DashboardRecentPacePoint, DashboardTrends } from '../../../shared/types/dashboard.js';
@@ -136,9 +137,7 @@ export function useDashboardTrends(sessions: (SessionCard | DetailedSession)[]):
         pacePercentage: p.bestLapPacePercentage,
         paceCategory: p.bestLapPaceCategory,
         bestLapWet: p.bestLapWet,
-        position: p.position,
-        gridPosition: 'gridPosition' in p ? p.gridPosition : null,
-        positionGain: 'positionGain' in p ? p.positionGain : null,
+        ...classResult(p),
         lapsCount: driverLapsCount(p),
         hasReplay: Boolean(latestRaw.matchingReplayFile),
         hasDuckDbTelemetry: Boolean(latestRaw.duckdbFilename),
@@ -226,8 +225,8 @@ export function useDashboardTrends(sessions: (SessionCard | DetailedSession)[]):
           consistencyScores.push(rating.consistencyScore);
         }
       }
-      const gain = s.playerDriver && 'positionGain' in s.playerDriver ? s.playerDriver.positionGain : null;
-      if (gain !== null && gain !== undefined) {
+      const gain = s.playerDriver ? classResult(s.playerDriver).positionGain : null;
+      if (gain !== null) {
         recentNetPositions += gain;
       }
     }

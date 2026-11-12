@@ -99,7 +99,7 @@ export function querySessionPage(db: Database, options: SessionQuery) {
   const positionJoin = options.sort === 'pos-asc' ? 'LEFT JOIN session_drivers player_row ON player_row.session_id=s.id AND player_row.driver_ordinal=s.player_driver_ordinal' : '';
   const paceExpr = "CASE WHEN coalesce(pace_driver.best_lap_wet,0)=0 AND pace_driver.best_lap_time>0 AND bt.alien_sec>0 THEN pace_driver.best_lap_time*100.0/bt.alien_sec END";
   const order = options.sort === 'date-asc' ? 's.timestamp ASC,s.id ASC' : options.sort === 'pos-asc'
-    ? "coalesce(player_row.position,9999) ASC,s.timestamp DESC,s.id DESC"
+    ? "coalesce(nullif(player_row.class_position,0),player_row.position,9999) ASC,s.timestamp DESC,s.id DESC"
     : options.sort === 'lap-asc' ? "coalesce(s.player_best_lap_time,999999999) ASC,s.timestamp DESC,s.id DESC" : 's.timestamp DESC,s.id DESC';
   const finalOrder = paceSort ? `${paceExpr} IS NULL ASC,${paceExpr} ${options.sort === 'pace-asc' ? 'ASC' : 'DESC'},s.timestamp DESC,s.id DESC` : order;
   return db.transaction(() => {

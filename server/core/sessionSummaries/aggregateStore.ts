@@ -1,8 +1,9 @@
 import type { Database } from 'better-sqlite3';
 import type { DetailedSession } from '../../../shared/types/index.js';
+import { classResult } from '../../../shared/domain/classResult.js';
 import type { SessionSummaryProjection } from '../../../shared/types/sessionSummaries.js';
 
-/** Compact one-row-per-session facts keep history scans away from source/card JSON. */
+/** Compact one-row-per-session facts keep history scans away from source/card JSON. Position and gain are in the player's class. */
 export function initSessionAggregateSchema(db: Database): void {
   db.exec(`CREATE TABLE IF NOT EXISTS session_summary_facts (
     session_id TEXT PRIMARY KEY, timestamp REAL NOT NULL, event_timestamp REAL NOT NULL,
@@ -28,13 +29,14 @@ export function initSessionAggregateSchema(db: Database): void {
 export function persistSessionAggregate(db: Database, session: DetailedSession, projection: SessionSummaryProjection): void {
   const facts = projection.aggregate;
   const player = projection.drivers.find(driver => driver.isPlayer);
+  const source = player ? session.drivers[player.driverOrdinal] : undefined;
   const values = {
     session_id: session.id, timestamp: session.timestamp, event_timestamp: facts.eventTimestamp,
     track_venue: session.trackVenue, track_course: session.trackCourse, layout_key: projection.layoutKey,
     track_length: session.trackLengthMeters ?? null, session_type: session.sessionType, session_name: session.sessionName,
     session_kind: projection.sessionKind, time_string: session.timeString ?? '', session_day: facts.sessionDay,
     is_empty: Number(projection.isEmpty), has_player: Number(Boolean(player)), driver_name: player?.driverName ?? '',
-    car_type: player?.carType ?? '', car_class: (player?.carClass ?? ''), position: player?.position ?? null,
+    car_type: player?.carType ?? '', car_class: (player?.carClass ?? ''), position: source ? classResult(source).position : null,
     position_gain: facts.positionGain, laps_count: player?.lapsCount ?? 0, declared_laps_count: player?.declaredLapsCount ?? 0,
     clean_laps_count: player?.cleanLapsCount ?? 0, driving_time_seconds: player?.drivingTimeSeconds ?? 0,
     pit_stops_count: player?.pitStopsCount ?? 0, distance_km: facts.distanceKm, activity_distance_km: facts.activityDistanceKm,

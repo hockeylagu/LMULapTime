@@ -59,3 +59,14 @@ describe('SessionGridCard links', () => {
     expect(onSelectSession).not.toHaveBeenCalled();
   });
 });
+
+describe('SessionGridCard finish', () => {
+  it('shows the finish and places gained within the class, not overall', () => {
+    const multiClass = makeSessionCard({
+      ...session,
+      playerDriver: { ...session.playerDriver, position: 19, gridPosition: 37, positionGain: 18, classPosition: 4, classGridPosition: 9, classPositionGain: 5 },
+    });
+    render(<SessionGridCard session={multiClass} onSelectSession={vi.fn()} onOpenReplay={vi.fn()} />);
+    expect(screen.getByTitle('Started P9, finished P4')).toHaveTextContent('FinishP4+5');
+  });
+});

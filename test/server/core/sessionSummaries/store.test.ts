@@ -136,7 +136,7 @@ describe('session summary persistence', () => {
     try {
       initDbSchema(db);
       upsertSession(db, session, 'one.xml', 1, 1);
-      const changed = { ...session, trackLengthMeters: 6000, drivers: [{ ...session.drivers[0], positionGain: 2 }] };
+      const changed = { ...session, trackLengthMeters: 6000, drivers: [{ ...session.drivers[0], positionGain: 6, classGridPosition: 3, classPositionGain: 2 }] };
       upsertSession(db, changed, 'one.xml', 2, 1);
       expect(db.prepare('SELECT count(*) n,sum(distance_km) km,sum(position_gain) gain FROM session_summary_facts').get())
         .toEqual({ n: 1, km: 6, gain: 2 });

@@ -7,6 +7,7 @@ import { averageQualifiedBenchmarkPace, calculateBenchmarkPace, createBenchmarkL
 import { createPaceCalculator } from '../../benchmarks/referenceLaptimes.js';
 import { findLayoutBenchmark } from '../../../shared/domain/leaderboard.js';
 import { getCircuitSpecification } from '../../../shared/domain/circuitSpecs.js';
+import { classResult } from '../../../shared/domain/classResult.js';
 import { querySessionPage, type SessionQuery } from './pageQueries.js';
 import { rateSessionCard } from './readTimePace.js';
 import { readSessionCards } from './cards.js';
@@ -170,7 +171,7 @@ function dashboardTrends(db: DatabaseType, entries: Record<string, ReferenceLapt
     sessionType: latest.sessionType, timeString: latest.timeString, carType: player.carType, carClass: player.carClass,
     bestLapTime: player.bestLapTime,
     bestLapNumber: player.bestLapNumber, pacePercentage: player.bestLapPacePercentage, paceCategory: player.bestLapPaceCategory,
-    bestLapWet: player.bestLapWet, position: player.position, gridPosition: player.gridPosition, positionGain: player.positionGain,
+    bestLapWet: player.bestLapWet, ...classResult(player),
     driverOrdinal: player.driverOrdinal, bestLapOrdinal: player.bestLapOrdinal,
     lapsCount: player.lapsCount, hasReplay: Boolean(latest.matchingReplayFile),
     hasDuckDbTelemetry: Boolean(latest.duckdbFilename),

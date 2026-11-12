@@ -1,3 +1,5 @@
+import { classResult } from './classResult.js';
+
 export function formatTime(seconds: number | string | null | undefined): string {
   if (seconds === null || seconds === undefined || seconds === '') return '--:--.---';
   const num = typeof seconds === 'number' ? seconds : parseFloat(String(seconds));
@@ -230,6 +232,12 @@ export function compareSessions(
   return direction === 'desc' ? idB.localeCompare(idA) : idA.localeCompare(idB);
 }
 
+/** The player's finish within their class, as the session cards show it. */
+function classFinish(session: unknown): number | undefined {
+  const player = (session as { playerDriver?: Parameters<typeof classResult>[0] }).playerDriver;
+  return player ? classResult(player).position : undefined;
+}
+
 export interface SessionSortSelectors<T> {
   getPosition?: (session: T) => number | null | undefined;
   getBestLapTime?: (session: T) => number | null | undefined;
@@ -257,10 +265,10 @@ export function compareSessionsBySortOption<T extends SessionComparable>(
 
     const rawPosA = selectors?.getPosition
       ? selectors.getPosition(a)
-      : (a as { playerDriver?: { position?: number | null } }).playerDriver?.position;
+      : classFinish(a);
     const rawPosB = selectors?.getPosition
       ? selectors.getPosition(b)
-      : (b as { playerDriver?: { position?: number | null } }).playerDriver?.position;
+      : classFinish(b);
 
     const posA = rawPosA && rawPosA > 0 ? rawPosA : 9999;
     const posB = rawPosB && rawPosB > 0 ? rawPosB : 9999;

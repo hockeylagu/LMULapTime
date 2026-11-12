@@ -139,7 +139,7 @@ because active recordings can be exclusively locked on Windows.
   - Compare page (`useCompareLapsData.ts`): `playerBestLap` (clean dry PB) and `overallTrackBestLap` come strictly from exact server bests.
   - Replay inspector reference suggestion: `useReferenceLapSuggestion.ts` (`pageSize=1`, `carType`, `driverExact=true`, `excludeLap`).
   - Replay session context: `server/core/sessionRows/replayContext.ts` reads roster, replay link, and official timing (`ReplaySessionContext`, `ReplayContextDriver`, `ReplayTimingLap` in `replayServiceTypes.ts`).
-- **Session summary facts**: `server/core/sessionSummaries/store.ts` and `aggregateStore.ts` maintain `session_summary_facts` and `session_driver_condition_summaries` transactionally with ingestion. Cards are constructed directly from columns by `cards.ts` (`readSessionCards`).
+- **Session summary facts**: `server/core/sessionSummaries/store.ts` and `aggregateStore.ts` maintain `session_summary_facts` and `session_driver_condition_summaries` transactionally with ingestion. Cards are constructed directly from columns by `cards.ts` (`readSessionCards`). The dashboard and session list show the finish, grid and places gained within the player's class (`shared/domain/classResult.ts`); the facts' `position` and `position_gain` hold the same class figures.
 - **Aggregation engine**: `buildSessionSummaryProjection.ts` selects clean laps once per driver, reuses selections for consistency and top-N metrics, and checks membership with a Set.
 - **Summary readiness gate**: `server/routes/summaryReadiness.ts` returns 503 on history endpoints while summaries rebuild (`isSessionSummaryReady` checks covering index `idx_sessions_ready`).
 

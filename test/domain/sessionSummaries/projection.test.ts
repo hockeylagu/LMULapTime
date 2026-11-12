@@ -63,7 +63,7 @@ describe('session summary projection', () => {
   });
 
   it('uses the selected player contribution and keeps non-player laps out of session totals', () => {
-    const player = { ...session.drivers[0], positionGain: 3 };
+    const player = { ...session.drivers[0], positionGain: 7, classGridPosition: 4, classPositionGain: 3 };
     const projected = buildSessionSummaryProjection({ ...session, playerDriver: player, drivers: [
       { ...player, name: 'AI', isPlayer: false, declaredLapsCount: 100, laps: [lap(1, 10)] }, player,
     ] }, 1);

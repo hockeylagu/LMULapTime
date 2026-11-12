@@ -22,7 +22,7 @@ function paceCategory(value: string | null | undefined): NonNullable<NonNullable
 export function makeSessionCard(overrides: SessionCardOverrides = {}): SessionCard {
   const playerDriver: NonNullable<SessionCard['playerDriver']> = {
     name: 'Driver', carType: 'Car', carClass: 'GT3', carNumber: '1', teamName: 'Team',
-    isPlayer: true, position: 1, classPosition: 1, bestLapTime: 100, 
+    isPlayer: true, position: 1, classPosition: 0, bestLapTime: 100, 
     bestS1: 30, bestS2: 35, bestS3: 35, theoreticalBest: 100, 
     declaredLapsCount: 1, lapsLedCount: 0,
     bestLapOrdinal: null, lapsCount: 1, cleanLapsCount: 1, drivingTimeSeconds: 100,
@@ -58,7 +58,7 @@ function makeLapData(overrides: Partial<LapData>): LapData {
 export function makeDetailedSession(overrides: DetailedSessionOverrides = {}): DetailedSession {
   const playerDriver: DriverData = {
     name: 'Driver', carType: 'Car', carClass: 'GT3', carNumber: '1', teamName: 'Team', isPlayer: true,
-    position: 1, classPosition: 1, bestLapTime: 100, 
+    position: 1, classPosition: 0, bestLapTime: 100, 
     bestS1: 30, bestS2: 35, bestS3: 35, theoreticalBest: 100, 
     declaredLapsCount: 1, laps: [],
   };
