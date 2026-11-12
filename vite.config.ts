@@ -1,3 +1,4 @@
+import { Agent } from 'node:http';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -46,8 +47,11 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: `http://localhost:${process.env.LMU_API_PORT || 3001}`,
+        target: `http://127.0.0.1:${process.env.LMU_API_PORT || 3001}`,
         changeOrigin: true,
+        // A 3D replay's first view makes ~750 package requests: reuse connections to the API (which listens on 127.0.0.1 only)
+        // instead of opening one per request.
+        agent: new Agent({keepAlive: true}),
       },
     },
   },
