@@ -19,11 +19,12 @@ export function createDataPluginRouter(provider:DataPlugin=dataPlugin):Router {
     if (!layout) { res.status(404).json({error: '3D scenery unavailable for this layout'}); return; }
     res.json(layout);
   });
-  // Scenery and vehicle body files are served as is from the package folder (see `DataPlugin.filesRoot`), uncached like every response here.
+  // Scenery, vehicle body and cloud map files are served as is from the package folder (see `DataPlugin.filesRoot`), uncached like every response here.
   // A texture is a KTX2 compressed as one zstd file: the browser undoes the encoding while downloading, off the main thread.
   const root = provider.filesRoot();
   const setHeaders = (res: Response, file: string) => {
     if (file.endsWith('.ktx2.zst')) { res.setHeader('Content-Type', 'image/ktx2'); res.setHeader('Content-Encoding', 'zstd'); }
+    else if (file.endsWith('.bin')) res.setHeader('Content-Type', 'application/octet-stream');
   };
   const files = (route: string, folder: string, label: string) => {
     if (root) router.use(route, serveStatic(path.join(root, folder), {index: false, etag: false, lastModified: false, cacheControl: false, acceptRanges: false, setHeaders}));
@@ -31,6 +32,8 @@ export function createDataPluginRouter(provider:DataPlugin=dataPlugin):Router {
   };
   files('/scenery/files', 'scenery', '3D scenery file');
   files('/vehicles/files', 'vehicles', '3D vehicle file');
+  // The decoded mip levels of the sky's cloud maps, `<sha256>.bin` (application/octet-stream), sliced by the client from the layout's `mipByteLengths`.
+  files('/rendering/files', 'rendering', 'Rendering file');
   router.get('/vehicles/:identity/body', (req, res) => {
     const body = provider.body(req.params.identity);
     if (!body) { res.status(404).json({error: '3D body unavailable for this vehicle'}); return; }

@@ -2,7 +2,10 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["eslint", "typescript", "unicorn", "oxc", "react", "import"],
   "categories": { "correctness": "error", "perf": "error" },
-  "ignorePatterns": ["dist/**", "coverage/**", "public/track-outlines/**"],
+  "ignorePatterns": [
+    "dist/**", "coverage/**", "public/track-outlines/**",
+    "shared/packageContract/**" // Verbatim copy of the pipeline's contract module (npm run package -- sync-contract there; the pipeline checks the copy against its source): fix it there, not here.
+  ],
   "rules": {
     "typescript/no-explicit-any": "error",
     "typescript/no-unnecessary-type-assertion": "error",

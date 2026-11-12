@@ -1,12 +1,9 @@
+import type { VehicleHandlingData, VehicleRecord } from '../packageContract/index.js';
 import type { TrackBoundaryGeometry } from './trackGeometry.js';
 
-/** Base physics defaults, not the setup or upgrade selected for a recorded lap. */
-export interface VehicleHandlingData {
-  wheelbaseM?: number;
-  steeringRatio?: number;
-  defaultSteeringWheelRangeDeg?: number;
-  defaultSteeringLockDeg?: number;
-}
+// The vehicle record is the package's (docs/PACKAGE_FORMAT.md, Vehicles).
+export type { VehicleHandlingData };
+export type VehicleDataRecord = VehicleRecord;
 
 export interface VehicleHandlingCalibration {
   wheelbaseM: number;
@@ -16,20 +13,6 @@ export interface VehicleHandlingCalibration {
   steeringSource: 'plugin-default' | 'fallback';
 }
 
-export interface VehicleDataRecord {
-  id: string;
-  model: string;
-  carClass: string;
-  vehicleIds: string[];
-  dimensions?: { lengthM: number; widthM: number; heightM?: number };
-  handling?: VehicleHandlingData;
-  /** Metres in vehicle-local X/Z; native forward is -Z. Origin is never recentered. */
-  outlineXZ?: Array<[number, number]>;
-  /** Translation from mesh-local to replay pose origin, established by the data provider. */
-  replayOriginOffsetXZ?: [number, number];
-  /** Hybrid deployment settings in kW as the game's MFD labels them, ascending. */
-  deploymentKw?: number[];
-}
 export interface DataPluginCounts {
   tracks?: number;
   vehicles?: number;

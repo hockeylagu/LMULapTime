@@ -8,9 +8,9 @@ const box = (x: number, z: number) => ({ min: [x, 0, z] as [number, number, numb
 export function testLayout(): SceneryLayout {
   const main = (index: number): ScenerySectorChunk => ({
     ...base, id: `s${index}`, kind: 'main', asset: `scenery/s${index}.glb`, bounds: box(index * 1000, 0), textures: [`t${index % 2}`, 'shared'],
-    lapStartM: index * 1000, lapEndM: (index + 1) * 1000, prev: `s${(index + 3) % 4}`, next: `s${(index + 1) % 4}`,
+    lapStartM: index * 1000, lapEndM: (index + 1) * 1000
   });
-  const pit: ScenerySectorChunk = { ...base, id: 'p0', kind: 'pit', asset: 'scenery/p0.glb', bounds: box(0, 500), textures: ['shared'], lapStartM: 0, lapEndM: 500, pitStartM: 0, pitEndM: 400, prev: null, next: null };
+  const pit: ScenerySectorChunk = { ...base, id: 'p0', kind: 'pit', asset: 'scenery/p0.glb', bounds: box(0, 500), textures: ['shared'], lapStartM: 0, lapEndM: 500, pitStartM: 0, pitEndM: 400 };
   const horizon: SceneryChunk = { ...base, id: 'horizon', kind: 'horizon', asset: 'scenery/h.glb', bounds: box(-5000, -5000), textures: [] };
   return {
     layoutKey: 'test', sourceGeometryRevision: 'g', routeLengthM: 4000, pitLaneLengthM: 400, shadowRangeM: 750, environmentProbe: { position: [0, 0, 0] },
@@ -21,6 +21,5 @@ export function testLayout(): SceneryLayout {
     sky: testSky(),
     daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55, ...TEST_HAZE_WEIGHTS, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9 },
     horizon, sectors: [0, 1, 2, 3].map(main).concat(pit), textures: [],
-    totals: { triangles: 0, vertices: 0, drawCalls: 0, glbBytes: 0, geometryBytes: 0, textureBytes: 0, textureGpuBytes: 0 },
   };
 }

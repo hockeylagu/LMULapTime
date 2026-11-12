@@ -2,124 +2,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { CIRCUIT_SPECIFICATIONS } from '../../shared/domain/circuitDefinitions.js';
+import { MANIFEST_FILE, PACKAGE_FILES, normalizeVehicleId, parseLogos, parseManifest, parseTrackCatalog, parseVehicleCatalog, trackLayoutPath } from '../../shared/packageContract/index.js';
 import type { TrackBoundaryGeometry } from '../../shared/types/trackGeometry.js';
 import type { DataPluginStatus, VehicleDataRecord } from '../../shared/types/dataPlugin.js';
 import { validateTrackPackage } from './trackPackage.js';
 import { loadScenePackage, type SceneryStore } from './scenePackage.js';
-import { loadBodyPackage, normalizeVehicleId, type BodyStore } from './bodyPackage.js';
-import type { SceneryLayoutResource } from '../../shared/types/scenes/scenery.js';
+import { loadBodyPackage, type BodyStore } from './bodyPackage.js';
+import { loadRenderingPackage } from './renderingPackage.js';
+import type { SceneryLayoutPayload } from '../../shared/types/scenes/scenery.js';
 import type { BodyResource } from '../../shared/types/scenes/car.js';
-
-function object(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw Error('Expected object');
-  return value as Record<string, unknown>;
-}
-function keys(value: Record<string, unknown>, allowed: string[]) {
-  if (Object.keys(value).some(k => !allowed.includes(k))) throw Error('Unsupported field');
-}
-function text(value: unknown): string {
-  if (typeof value !== 'string' || !value.trim() || value.length > 160) throw Error('Invalid identity');
-  return value;
-}
-function pair(value: unknown): [number, number] {
-  if (!Array.isArray(value) || value.length !== 2) throw Error('Invalid local coordinate');
-  const x: unknown = value[0], z: unknown = value[1];
-  if (typeof x !== 'number' || typeof z !== 'number' || !Number.isFinite(x) || !Number.isFinite(z) || Math.abs(x) >= 10 || Math.abs(z) >= 10) throw Error('Invalid local coordinate');
-  return [x, z];
-}
-/** The vehicle records; their `bodies` are validated by `loadBodyPackage`, which receives the same raw rows. */
-export function parseVehicleCatalog(value: unknown): VehicleDataRecord[] {
-  const catalog = object(value);
-  keys(catalog, ['vehicles']);
-  if (!Array.isArray(catalog.vehicles) || catalog.vehicles.length > 2000) throw Error('Invalid vehicle catalog');
-  const aliases = new Set<string>(), ids = new Set<string>();
-  return catalog.vehicles.map(item => {
-    const row = object(item);
-    keys(row, ['id', 'model', 'carClass', 'vehicleIds', 'dimensions', 'handling', 'outlineXZ', 'replayOriginOffsetXZ', 'deploymentKw', 'bodies']);
-    const id = text(row.id), model = text(row.model), carClass = text(row.carClass);
-    if (!/^[a-zA-Z0-9_-]+$/.test(id) || ids.has(id) || !Array.isArray(row.vehicleIds) || row.vehicleIds.length > 5000) throw Error('Invalid vehicle record');
-    ids.add(id);
-    const vehicleIds = row.vehicleIds.map(alias => {
-      const normalized = text(alias).replace(/\.veh$/i, '').toUpperCase();
-      if (!/^[A-Z0-9_-]+$/.test(normalized) || aliases.has(normalized)) throw Error('Conflicting vehicle alias');
-      aliases.add(normalized); return normalized;
-    });
-    const result: VehicleDataRecord = {id, model, carClass, vehicleIds};
-    if (row.dimensions !== undefined) {
-      const d = object(row.dimensions); keys(d, ['lengthM', 'widthM', 'heightM']);
-      if (typeof d.lengthM !== 'number' || d.lengthM < 3 || d.lengthM > 7 || typeof d.widthM !== 'number' || d.widthM < 1 || d.widthM > 3 || (d.heightM !== undefined && (typeof d.heightM !== 'number' || !Number.isFinite(d.heightM) || d.heightM < .3 || d.heightM > 3)) || !Number.isFinite(d.lengthM) || !Number.isFinite(d.widthM)) throw Error('Invalid dimensions');
-      result.dimensions = {lengthM:d.lengthM, widthM:d.widthM, ...(d.heightM !== undefined ? {heightM:d.heightM} : {})};
-    }
-    if (row.handling !== undefined) {
-      const h = object(row.handling);
-      keys(h, ['wheelbaseM', 'steeringRatio', 'defaultSteeringWheelRangeDeg', 'defaultSteeringLockDeg']);
-      const bounds: Record<string, [number, number]> = {
-        wheelbaseM: [1.5, 4], steeringRatio: [3, 40],
-        defaultSteeringWheelRangeDeg: [90, 1440], defaultSteeringLockDeg: [2, 60],
-      };
-      if (!Object.keys(h).length) throw Error('Empty handling data');
-      for (const [name, value] of Object.entries(h)) {
-        const [low, high] = bounds[name];
-        if (typeof value !== 'number' || !Number.isFinite(value) || value < low || value > high) throw Error('Invalid handling data');
-      }
-      const { steeringRatio, defaultSteeringWheelRangeDeg, defaultSteeringLockDeg } = h;
-      const steering = [steeringRatio, defaultSteeringWheelRangeDeg, defaultSteeringLockDeg];
-      if (steering.some(v => v !== undefined) && !steering.every(v => typeof v === 'number')) throw Error('Incomplete steering data');
-      if (typeof steeringRatio === 'number' && typeof defaultSteeringWheelRangeDeg === 'number' && typeof defaultSteeringLockDeg === 'number' &&
-          Math.abs(defaultSteeringWheelRangeDeg / (2 * defaultSteeringLockDeg) - steeringRatio) > 0.01) throw Error('Inconsistent steering data');
-      result.handling = { ...h };
-    }
-    if (row.replayOriginOffsetXZ !== undefined) result.replayOriginOffsetXZ = pair(row.replayOriginOffsetXZ);
-    if (row.deploymentKw !== undefined) {
-      const kw = row.deploymentKw;
-      if (!Array.isArray(kw) || kw.length < 2 || kw.length > 40 || !kw.every((v, i) => typeof v === 'number' && Number.isFinite(v)
-        && v >= 0 && v <= 500 && (i === 0 || v > (kw[i - 1] as number)))) throw Error('Invalid deployment settings');
-      result.deploymentKw = kw as number[];
-    }
-    if (row.outlineXZ !== undefined) {
-      if (!result.dimensions || !Array.isArray(row.outlineXZ) || row.outlineXZ.length < 3 || row.outlineXZ.length > 256) throw Error('Invalid outline');
-      const outline = row.outlineXZ.map(pair);
-      if (outline.length > 3 && outline[0][0] === outline[outline.length-1][0] && outline[0][1] === outline[outline.length-1][1]) outline.pop();
-      const xs = outline.map(p => p[0]), zs = outline.map(p => p[1]);
-      if (Math.abs(Math.max(...xs)-Math.min(...xs)-result.dimensions.widthM) > .02 || Math.abs(Math.max(...zs)-Math.min(...zs)-result.dimensions.lengthM) > .02) throw Error('Outline dimensions disagree');
-      let sign = 0;
-      // Version 1 accepts convex collision envelopes, preventing crossing/degenerate polygons.
-      for (let i=0;i<outline.length;i++) {
-        const a=outline[i], b=outline[(i+1)%outline.length], c=outline[(i+2)%outline.length];
-        const cross=(b[0]-a[0])*(c[1]-b[1])-(b[1]-a[1])*(c[0]-b[0]);
-        if (Math.abs(cross)>1e-8) {if (sign && Math.sign(cross)!==sign) throw Error('Outline must be convex'); sign=Math.sign(cross);}
-      }
-      if (!sign || new Set(outline.map(p=>p.join(','))).size !== outline.length) throw Error('Degenerate outline');
-      for (let i=0;i<outline.length;i++) {
-        const a=outline[i], b=outline[(i+1)%outline.length];
-        for (const c of outline) {
-          const cross=(b[0]-a[0])*(c[1]-a[1])-(b[1]-a[1])*(c[0]-a[0]);
-          if (Math.abs(cross)>1e-8 && Math.sign(cross)!==sign) throw Error('Crossing outline');
-        }
-      }
-      result.outlineXZ = outline;
-    }
-    return result;
-  });
-}
-
-/**
- * Logos are cosmetic: a malformed file yields no logos and an invalid entry is skipped, never thrown.
- * Only brand keys and SVG content are judged here; the file itself is read through the package's path checks.
- */
-export function parseVehicleLogos(value: unknown): Record<string, string> {
-  const result: Record<string, string> = {};
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return result;
-  const catalog = value as Record<string, unknown>;
-  if (!catalog.logos || typeof catalog.logos !== 'object' || Array.isArray(catalog.logos)) return result;
-  for (const [key, svg] of Object.entries(catalog.logos as Record<string, unknown>)) {
-    if (!/^[a-zA-Z0-9_ -]+$/.test(key) || typeof svg !== 'string') continue;
-    const trimmed = svg.trim();
-    if (!trimmed.startsWith('<svg') || !trimmed.endsWith('</svg>') || !trimmed.includes('viewBox') || trimmed.length > 2_000_000) continue;
-    result[key] = trimmed;
-  }
-  return result;
-}
 
 /** Shared internal geometry is immutable at every nested array/object boundary. */
 function freezeGeometry(value: unknown): void {
@@ -128,7 +19,7 @@ function freezeGeometry(value: unknown): void {
   Object.freeze(value);
 }
 
-/** A fully validated startup snapshot. Scenery and body files are served as is from `filesRoot()`. */
+/** A fully validated startup snapshot of a schema 9 package. Scenery, body and cloud map files are served as is from `filesRoot()`. */
 export class DataPlugin {
   public readonly status: DataPluginStatus;
   private readonly tracks = new Map<string, {geometry:TrackBoundaryGeometry}>();
@@ -152,71 +43,56 @@ export class DataPlugin {
         if (!stat.isFile() || stat.size>max || bytes>256_000_000) throw Error('Oversized resource');
         const buffer=fs.readFileSync(file); digest.update(relative).update(buffer); return JSON.parse(buffer.toString('utf8'));
       };
-      const manifest=object(read('manifest.json',64_000));
-      if (manifest.schemaVersion !== 8) throw Error('Unsupported schema: only package manifest schema 8 is supported');
-      keys(manifest,['schemaVersion','id','version','tracks','vehicles','scenery']);
-      const packageId = text(manifest.id), packageVersion = text(manifest.version);
-      for (const capability of ['tracks','vehicles']) if (manifest[capability] !== undefined) object(manifest[capability]);
-      if (!manifest.tracks && !manifest.vehicles) throw Error('Empty package');
-      if (manifest.tracks) {
-        const resource=object(manifest.tracks); keys(resource,['catalog']);
-        const catalogPath=text(resource.catalog), catalog=read(catalogPath);
-        if (!Array.isArray(catalog) || !catalog.length || catalog.length>100) throw Error('Invalid track catalog');
-        for (const entry of catalog) {
-          const row=object(entry); keys(row,['layoutKey','circuitId','layoutId','trackVenue','trackCourse','hasElevation','hasPitLane']);
-          const key=text(row.layoutKey);
-          if (!/^[a-z0-9_]+$/.test(key) || !CIRCUIT_SPECIFICATIONS[key] || this.tracks.has(key)) throw Error('Invalid layout identity');
-          const raw=object(read(path.posix.join(path.posix.dirname(catalogPath), key+'.json')));
-          const geometry=validateTrackPackage(raw,key), spec=CIRCUIT_SPECIFICATIONS[key];
-          if (geometry.circuitId!==spec.circuitId || ![spec.layoutId, ({daytona_road_course:'road_course',portimao_wec:'wec',laguna_seca:'full'} as Record<string,string>)[key]].includes(geometry.layoutId) || row.circuitId!==spec.circuitId || row.layoutId!==geometry.layoutId || !geometry.geometryRevision || !geometry.projectionRevision) throw Error('Layout/catalog mismatch');
-          freezeGeometry(geometry);
-          this.tracks.set(key,{geometry});
-        }
+      const manifest=parseManifest(read(MANIFEST_FILE,64_000));
+      const catalog=parseTrackCatalog(read(PACKAGE_FILES.tracks));
+      for (const row of catalog) {
+        const key=row.layoutKey, spec=CIRCUIT_SPECIFICATIONS[key];
+        if (!spec) throw Error('Invalid layout identity');
+        const raw=read(trackLayoutPath(key));
+        if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw Error('Expected object');
+        const geometry=validateTrackPackage(raw as Record<string,unknown>,key);
+        if (geometry.circuitId!==spec.circuitId || ![spec.layoutId, ({daytona_road_course:'road_course',portimao_wec:'wec',laguna_seca:'full'} as Record<string,string>)[key]].includes(geometry.layoutId) || row.circuitId!==spec.circuitId || row.layoutId!==geometry.layoutId) throw Error('Layout/catalog mismatch');
+        freezeGeometry(geometry);
+        this.tracks.set(key,{geometry});
       }
-      if (manifest.vehicles) {
-        const resource=object(manifest.vehicles); keys(resource,['catalog','logos']);
-        const vehicleCatalog=read(text(resource.catalog));
-        this.records.push(...parseVehicleCatalog(vehicleCatalog));
-        this.bodies = loadBodyPackage(base, object(vehicleCatalog).vehicles as unknown[]);
-        if (resource.logos !== undefined) {
-          // A bad logos file never invalidates tracks or vehicles; a path escaping the package still does.
-          let logoFile: unknown = null;
-          try { logoFile = read(text(resource.logos)); } catch (error) { if (error instanceof Error && /resource path|Escaping/.test(error.message)) throw error; }
-          for (const [k, v] of Object.entries(parseVehicleLogos(logoFile))) this.logoRecords.set(k, v);
-        }
-      }
-      if (manifest.scenery !== undefined) {
-        const scenery = object(manifest.scenery); keys(scenery, ['catalog']);
-        this.scenery = loadScenePackage(base, read(text(scenery.catalog), 32_000_000), key => this.trackGeometry(key));
-      }
+      const vehicleCatalog=parseVehicleCatalog(read(PACKAGE_FILES.vehicles));
+      this.records.push(...vehicleCatalog.vehicles);
+      this.bodies = loadBodyPackage(base, vehicleCatalog.bodies);
+      for (const [k, v] of Object.entries(parseLogos(read(PACKAGE_FILES.logos)).logos)) this.logoRecords.set(k, v);
+      const trackKeys=catalog.map(row=>row.layoutKey);
+      const rendering=loadRenderingPackage(base, read(PACKAGE_FILES.rendering), trackKeys);
+      this.scenery = loadScenePackage(base, read(PACKAGE_FILES.scenery, 32_000_000), rendering, key => this.trackGeometry(key));
+      // Every track has current scenery (docs/PACKAGE_FORMAT.md, Manifest).
+      if ([...this.scenery.layouts.keys()].join() !== trackKeys.join()) throw Error('Scenery layouts differ from the track layouts');
       this.status = {
         state: 'ready',
         revision: digest.digest('hex'),
-        packageId,
-        packageVersion,
-        tracks: !!manifest.tracks,
-        vehicles: !!manifest.vehicles,
+        packageId: manifest.id,
+        packageVersion: manifest.version,
+        tracks: true,
+        vehicles: true,
         ...(this.logoRecords.size > 0 ? { logos: true } : {}),
-        ...(this.scenery ? { scenery: true } : {}),
-        ...(this.bodies ? { bodies: true } : {}),
+        scenery: true,
+        bodies: true,
         counts: {
           tracks: this.tracks.size,
           vehicles: this.records.length,
           ...(this.logoRecords.size > 0 ? { logos: this.logoRecords.size } : {}),
-          ...(this.scenery ? { scenery: this.scenery.layouts.size } : {}),
-          ...(this.bodies ? { bodies: this.bodies.folders.size } : {}),
+          scenery: this.scenery.layouts.size,
+          bodies: this.bodies.folders.size,
         },
       };
     } catch {this.tracks.clear(); this.records.length=0; this.logoRecords.clear(); this.scenery = null; this.bodies = null; /* Generic status never discloses local paths. */}
   }
-  /** The layout index of a layout's scenery; chunk and texture bytes come from `sceneryFile`. */
-  public sceneryLayout(key: string): SceneryLayoutResource | null {
+  /** The layout index of a layout's scenery; chunk and texture bytes come from the files route, the cloud map bytes from the `rendering/` files. */
+  public sceneryLayout(key: string): SceneryLayoutPayload | null {
     const layout = this.scenery?.layouts.get(key);
     return layout ? { ...structuredClone(layout), packageRevision: this.status.revision } : null;
   }
   /**
-   * The package folder that scenery (`scenery/`) and vehicle body (`vehicles/`) files are served from, or null without a valid package.
-   * They are pregenerated, content-named and published by folder swap, so they are served as is: no hash or change check.
+   * The package folder that scenery (`scenery/`), vehicle body (`vehicles/`) and cloud map (`rendering/`) files are served from, or null without a valid package.
+   * They are pregenerated, content-named and published by folder swap, so they are served as is: no hash or change check (the cloud maps' hashes are
+   * checked once at load, `loadRenderingPackage`).
    */
   public filesRoot(): string | null { return this.status.state === 'ready' ? this.root : null; }
   public body(identity: string): BodyResource | null {

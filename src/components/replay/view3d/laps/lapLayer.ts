@@ -4,7 +4,8 @@ import type { CarLamp } from '../../../../../shared/types/scenes/car.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.js';
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
-import { normalizeVehicleId, type LoadedBody } from '../../../../api/vehicles/bodyApi.js';
+import type { LoadedBody } from '../../../../api/vehicles/bodyApi.js';
+import { descriptorTexturePath, normalizeVehicleId } from '../../../../../shared/packageContract/index.js';
 import { createCarMaterial, materialTexturePaths } from '../car/carMaterials.js';
 import { createLampMaterial, lampFrame, lampTexturePaths } from '../car/carLamps.js';
 import { createLampStates, lampStateFrames, switches } from '../car/lampStates.js';
@@ -37,8 +38,6 @@ export interface CarTextures {
 
 /** The model node the car body's fixed parts hang under, in the body's file and in its interior's. */
 const CHASSIS = 'chassis';
-/** Body texture rows name their files from the package root; descriptors and loaders from the cars folder. */
-const CARS_FOLDER = 'vehicles/';
 
 /**
  * Gives a glow mesh its lamps' materials: each material slot a drawn lamp covers (one of the lamp's nodes is the mesh or holds it, and
@@ -129,7 +128,7 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     // A lamp draws its frames' textures as loaded, so a frame loads from its own file, never from a start file.
     const frames = new Set(drawn.flatMap(lampTexturePaths));
     for (const frame of frames) paths.set(frame, false);
-    const starts = new Map(car.resource.textures.flatMap(row => row.start ? [[row.asset.slice(CARS_FOLDER.length), row.start.asset.slice(CARS_FOLDER.length)] as const] : []));
+    const starts = new Map(car.resource.textures.flatMap(row => row.start ? [[descriptorTexturePath(row.sha256), descriptorTexturePath(row.start.sha256)] as const] : []));
     const textures = new Map(await Promise.all([...paths].map(async ([path, interior]) =>
       [path, await carTextures.load(path, interior, frames.has(path) ? undefined : starts.get(path))] as const)));
     return {template, appearance, recipeOf, isGlow, drawn, textures, interiorPaths: paths, hiddenNames: new Set([...hidden].map(node => node.name))};

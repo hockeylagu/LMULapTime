@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
+import { descriptorTexturePath } from '../../../../../shared/packageContract/index.js';
 import { BoxGeometry, CubeCamera, DoubleSide, Group, Material, Mesh, MeshBasicMaterial, Texture, Vector3, type BufferGeometry, type Object3D, type PerspectiveCamera, OrthographicCamera, type Scene, type ShaderMaterial } from 'three';
 import { createReplayScene } from '../../../../../src/components/replay/view3d/replayScene.js';
 import { disposeObjects } from '../../../../../src/components/replay/view3d/laps/disposeObjects.js';
@@ -130,7 +131,7 @@ const lap: ReplayTrajectoryData = {
 };
 const box = (min: number, max: number) => ({min: [-100, min, -100] as [number, number, number], max: [100, max, 100] as [number, number, number]});
 const base = {sha256: 'x', byteLength: 1, triangles: 1, vertices: 1, drawCalls: 1, shadowDrawCalls: 1, shadowTriangles: 1, geometryBytes: 1, meshes: 1, materials: 1, textures: [] as string[], bounds: box(0, 0)};
-const sector = (index: number): ScenerySectorChunk => ({...base, id: `s${index}`, kind: 'main', asset: `scenery/s${index}.glb`, lapStartM: index * 1000, lapEndM: (index + 1) * 1000, prev: `s${(index + 3) % 4}`, next: `s${(index + 1) % 4}`});
+const sector = (index: number): ScenerySectorChunk => ({...base, id: `s${index}`, kind: 'main', asset: `scenery/s${index}.glb`, lapStartM: index * 1000, lapEndM: (index + 1) * 1000});
 const layout = {
   layoutKey: 'portimao_wec', sourceGeometryRevision: 'g', packageRevision: 'p', routeLengthM: 4000, pitLaneLengthM: 0, shadowRangeM: 750,
   streaming: {residentBehindM: 300, residentAheadM: 1500, freeCameraRadiusM: 1500},
@@ -138,10 +139,12 @@ const layout = {
   daylight: { date: '2023-09-10', sessions: [{ id: 'race', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'qualify', localTime: '15:00', sunElevationDeg: 46.1 }, { id: 'practice1', localTime: '11:00', sunElevationDeg: 51.88 }, { id: 'practice2', localTime: '15:30', sunElevationDeg: 40.89 }], airPollution: 0.5, hazeBaseScale: 0.55, ...TEST_HAZE_WEIGHTS, latitudeDeg: 35.37, longitudeDeg: 138.93, utcOffsetHours: 9 },
   horizon: {...base, id: 'horizon', kind: 'horizon', asset: 'scenery/h.glb'}, sectors: [0, 1, 2, 3].map(sector), textures: [],
 } as unknown as SceneryLayoutResource;
+/** A texture file's content hash as a body row states it: a name in hex, so the paths the app derives from it stay readable in the loads. */
+const hashOf = (name: string) => Buffer.from(name).toString('hex').padEnd(64, '0');
 const car = {
-  resource: {textures: ['seat', 'trim'].map(name => ({asset: `vehicles/textures/${name}.ktx2`, start: {asset: `vehicles/textures/${name}-start.ktx2`}}))}, bytes: new ArrayBuffer(0), vehicleId: 'veh',
+  resource: {textures: ['seat', 'trim'].map(name => ({sha256: hashOf(name), start: {sha256: hashOf(`${name}-start`)}}))}, bytes: new ArrayBuffer(0), vehicleId: 'veh',
   descriptor: {optionNodes: ['option_PlateA', 'option_PlateB'], appearances: [{alias: 'VEH', albedo: 'textures/a.ktx2', paint: testCarPaint('textures/a.ktx2'), optionNodes: ['option_PlateA']}], materials: [{id: 'm1', name: 'body', paint: true}, {id: 'glow', name: 'glow', paint: true},
-      ...['seat', 'trim'].map(name => ({id: name, name, paint: false, surface: {kind: 'diffuse', maps: {albedo: {texture: `textures/${name}.ktx2`, uv: 'uv0', scale: [1, 1]}}, finish: {roughness: 0.6, metalness: 0}, normalShadowInfluence: 0}}))], glowMaterialIds: ['glow'],
+      ...['seat', 'trim'].map(name => ({id: name, name, paint: false, surface: {kind: 'diffuse', maps: {albedo: {texture: descriptorTexturePath(hashOf(name)), uv: 'uv0', scale: [1, 1]}}, finish: {roughness: 0.6, metalness: 0}, normalShadowInfluence: 0}}))], glowMaterialIds: ['glow'],
     lamps: [
       {role: 'headlight', nodes: ['lamp.Glow'], material: 'lampGlowMaterial', frames: ['textures/off.ktx2', 'textures/on.ktx2'], animation: {method: null, rate: null, sequence: null},
         emission: {scale: 500, vertexColour: false, viewBoost: {gain: 2, power: 64}, ambientScaled: false, vertexAlpha: false}, blend: 'alpha',
@@ -392,8 +395,8 @@ it('reads car textures from their start files, the ones only the interior uses a
   const handle = await createReplayScene(document.createElement('div'), layout, lap, null, vi.fn(), assets);
   handle.cursor(0, 0); draw();
   // The seat is interior only; the trim is also on an outside part, so it loads like the body. The paint has no start file.
-  expect(carTextureLoads.paths.filter(path => path.startsWith('full'))).toEqual(['full seat.ktx2 from seat-start.ktx2']);
-  expect(carTextureLoads.paths).toEqual(expect.arrayContaining(['capped trim.ktx2 from trim-start.ktx2', 'capped a.ktx2']));
+  expect(carTextureLoads.paths.filter(path => path.startsWith('full'))).toEqual([`full ${hashOf('seat')}.ktx2.zst from ${hashOf('seat-start')}.ktx2.zst`]);
+  expect(carTextureLoads.paths).toEqual(expect.arrayContaining([`capped ${hashOf('trim')}.ktx2.zst from ${hashOf('trim-start')}.ktx2.zst`, 'capped a.ktx2']));
   const [scene] = lastSceneRender(), map = (name: string) => (scene.getObjectByName(name) as Mesh<BufferGeometry, MeshBasicMaterial>).material.map!;
   // Each map's own copy allocates the full texture (two levels above the 512 it holds) and waits to sharpen.
   expect([isStreaming(map('seat')), map('seat').mipmaps.map(level => level.width), isStreaming(map('dash'))]).toEqual([true, [2048, 1024, 512], true]);

@@ -1,4 +1,6 @@
-import type { SceneryClouds } from '../../../shared/types/scenes/clouds.js';
+import { createHash } from 'node:crypto';
+import { resolveShadowSplits } from '../../../shared/packageContract/index.js';
+import type { SceneryClouds, SceneryCloudsFile } from '../../../shared/types/scenes/clouds.js';
 import type { SceneryCamera, SceneryCameraTypeProfile, SceneryHosekSky, SceneryShading, ScenerySky, ScenerySun } from '../../../shared/types/scenes/scenery.js';
 
 /** A synthetic camera type: two time-of-day profiles with different curves, so interpolation shows. */
@@ -69,7 +71,7 @@ export function testClouds(): SceneryClouds {
     albedo: { max: [1, 1, 1], min: [0.8, 0.85, 0.9], randomMax: 0, randomMin: 0.2 }, ambient: { scalar: 2, occlusion: 1 },
     backlight: { narrowScalar: 4, narrowPower: 2048, wideScalar: 2, widePower: 8, base: 0.1 }, diffuse: { clear: 2, overcast: 1, depthScale: 1 } };
   const material = (name: string, scalar: number) => ({ name, opacity: { scalar, visibility: 1, randomRange: 0 }, cloudMap: 'full', light, sideMap: 'side', endMap: 'end' });
-  const level = (bytes: number[]) => Buffer.from(bytes).toString('base64');
+  const level = (bytes: number[]) => Uint8Array.from(bytes);
   return {
     layers: {
       lower: { cells: 2, instances: 4, spacingM: 1000, heightM: 2000, jitter: 0, drift: { windOffsetMs: 10, divisorM: 10000 } },
@@ -89,7 +91,7 @@ export function testClouds(): SceneryClouds {
     alpha: { gain: 2, powerFrom: 4, powerTo: 1 },
     averagedInputs: { variant: 'mean', red: 0.5, green: 0.5, jitter: 0, startAgeCells: 0.1 },
     meshes: { flat },
-    maps: { full: { width: 2, height: 2, mips: [Buffer.from([255, 255, 255, 255]).toString('base64'), Buffer.from([255]).toString('base64')] } },
+    maps: { full: { width: 2, height: 2, mips: [level([255, 255, 255, 255]), level([255])] } },
     lightMaps: {
       full: { width: 1, height: 1, channels: 1, mips: [level([255])] },
       side: { width: 1, height: 1, channels: 3, mips: [level([255, 128, 64])] },
@@ -171,3 +173,28 @@ export function catalogSky(sky: ScenerySky, layoutKeys: string[]) {
 
 /** The daylight's haze weights and height scalars, for daylight fixtures. */
 export const TEST_HAZE_WEIGHTS = { hazeCloudyScale: 1, hazeStormScale: 1, hazeDawnScale: 1, fogHeightAltitudeScalar: 1, fogHeightExponentScalar: 1 };
+
+/**
+ * The cascaded shadow block the package contract accepts (six cascade tiles, splits that follow the split scheme), for the package files: `testShading().shadows`
+ * is shaped for the viewer tests and is not a valid published block.
+ */
+export function packageShadows(): SceneryShading['shadows'] {
+  const shadows = testShading().shadows, camera = (nearM: number, farM: number, splitRatio: number, count: number) => ({ nearM, farM, splitRatio, count, splitsM: resolveShadowSplits(nearM, farM, splitRatio, count) });
+  return { ...shadows, atlas: { ...shadows.atlas, cascadeTiles: [[0, 0, 0], [0, 32, 0], [1, 0, 0], [1, 32, 0], [0, 0, 32], [0, 32, 32]] },
+    cameras: { chase: camera(0.1, 300, 0.9, 3), cockpit: camera(0.01, 200, 0.9, 2), tv: shadows.cameras.tv } };
+}
+
+/** The cloud field in the package's form: each map names the file `rendering/<sha256>.bin` of its mips (largest first, concatenated), whose bytes are returned by hash. */
+export function packageClouds(clouds: SceneryClouds): { clouds: SceneryCloudsFile; files: Map<string, Buffer> } {
+  const files = new Map<string, Buffer>();
+  const file = (mips: Uint8Array[]) => {
+    const bytes = Buffer.concat(mips), sha256 = createHash('sha256').update(bytes).digest('hex');
+    files.set(sha256, bytes);
+    return { sha256, byteLength: bytes.length, mipByteLengths: mips.map(mip => mip.length) };
+  };
+  return { files, clouds: {
+    ...clouds,
+    maps: Object.fromEntries(Object.entries(clouds.maps).map(([key, map]) => [key, { width: map.width, height: map.height, ...file(map.mips) }])),
+    lightMaps: Object.fromEntries(Object.entries(clouds.lightMaps).map(([key, map]) => [key, { width: map.width, height: map.height, channels: map.channels, ...file(map.mips) }])),
+  } };
+}

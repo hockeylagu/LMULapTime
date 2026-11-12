@@ -1,5 +1,5 @@
 import { BufferAttribute, BufferGeometry, DataTexture, DoubleSide, Group, LinearFilter, LinearMipmapLinearFilter, Mesh, MeshStandardMaterial, RedFormat, RepeatWrapping, RGBAFormat, ShaderChunk, Vector2, Vector3, type Camera, type Texture } from 'three';
-import type { SceneryClouds, SceneryCloudMaterial } from '../../../../../shared/types/scenes/clouds.js';
+import type { CloudMapLevels, SceneryClouds, SceneryCloudMaterial } from '../../../../../shared/types/scenes/clouds.js';
 import type { CloudSheet } from './clouds.js';
 
 /**
@@ -104,13 +104,10 @@ const CLOUD_FRAGMENT = `
 }
 `;
 
-/** Base64 bytes. */
-const bytes = (text: string) => Uint8Array.from(atob(text), c => c.charCodeAt(0));
-
 /** A package map as a wrapping, trilinear texture with the package's own levels; three channels are padded to four. */
-function mapTexture(map: { width: number; height: number; channels?: 1 | 3; mips: string[] }): DataTexture {
-  const levels = map.mips.map((mip, i) => {
-    const width = Math.max(1, map.width >> i), height = Math.max(1, map.height >> i), source = bytes(mip);
+function mapTexture(map: CloudMapLevels & { channels?: 1 | 3 }): DataTexture {
+  const levels = map.mips.map((source, i) => {
+    const width = Math.max(1, map.width >> i), height = Math.max(1, map.height >> i);
     if (map.channels !== 3) return { data: source, width, height };
     const data = new Uint8Array(width * height * 4).fill(255);
     for (let texel = 0; texel < width * height; texel++) data.set(source.subarray(texel * 3, texel * 3 + 3), texel * 4);

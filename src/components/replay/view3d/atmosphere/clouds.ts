@@ -1,4 +1,4 @@
-import type { SceneryClouds, SceneryCloudMaterial, ScenerySunVisibility } from '../../../../../shared/types/scenes/clouds.js';
+import type { CloudMapLevels, SceneryClouds, SceneryCloudMaterial, ScenerySunVisibility } from '../../../../../shared/types/scenes/clouds.js';
 
 /** The replay's cloud field at a moment (ReplayDaylightClock.cloudField). */
 export interface CloudMoment { cells: string; upperDrift: number; lowerDrift: number; startUpperDrift: number; startLowerDrift: number; variants?: string[] }
@@ -91,8 +91,8 @@ export function cloudSheets(clouds: SceneryClouds, moment: CloudMoment, eyeY: nu
 type MapSampler = (u: number, v: number) => number;
 
 /** A wrapping bilinear reader (0 to 1) of an opacity map's first level. */
-function mapSampler(map: { width: number; height: number; mips: string[] }): MapSampler {
-  const { width, height } = map, bytes = Uint8Array.from(atob(map.mips[0]), c => c.charCodeAt(0));
+function mapSampler(map: CloudMapLevels): MapSampler {
+  const { width, height } = map, bytes = map.mips[0];
   const at = (x: number, y: number) => bytes[((y % height + height) % height) * width + (x % width + width) % width] / 255;
   return (u, v) => {
     const x = u * width - 0.5, y = v * height - 0.5, x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0;

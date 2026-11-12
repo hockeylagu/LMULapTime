@@ -82,28 +82,24 @@ The backend listens on loopback. Plugin endpoints use the same server access beh
 ## Contract
 
 ```json
-{
-  "schemaVersion": 3,
-  "id": "personal-data",
-  "version": "1",
-  "tracks": { "catalog": "tracks/index.json" },
-  "vehicles": { "catalog": "vehicles/index.json" }
-}
+{ "schemaVersion": 9, "id": "personal-data", "version": "1" }
 ```
 
-Tracks and vehicles are independently optional; at least one must be declared. Catalog
-paths are package-relative JSON files. Absolute paths, traversal and symlink/junction
-escapes are rejected. The whole package is validated before activation.
+The manifest is exactly these three keys; the catalogs sit at fixed paths (`tracks/index.json`, `vehicles/index.json`,
+`vehicles/logos.json`, `scenery/index.json`, `rendering/index.json`) and all five are required. Schema 9 is the only supported
+format: any other `schemaVersion` (including 8) invalidates the package, with no fallback. The file shapes, path rules and
+parsers are the pipeline's contract module (its `shared/contract/`), copied here verbatim as `shared/packageContract/` by the
+pipeline's `npm run package -- sync-contract` (never edited here; `sync-contract --check` there verifies the copy). The app's
+loader adds only what needs this machine: contained, size-checked file reads and the hash checks below. The whole package is
+validated before activation.
 
 Track catalogs use the existing canonical layout identities. Geometry files sit beside
-the catalog as `<layoutKey>.json`; optional display files are
-`tracks-display/<layoutKey>.json`. Geometry and projection revisions must match their
-contents; a display's `sourceRevision` must match its geometry revision. Display brake markers may carry `baseY`, the native height of the board bottom where the game bounds are measured. The same
+the catalog as `<layoutKey>.json` (keys in the contract's order, map `surfaces` and `brakeMarkers` included). Geometry and projection
+revisions must match their contents (`TRACK_GEOMETRY_KEYS` of the contract names the keys the geometry revision covers). The same
 provider supplies backend projection, profiles and frontend geometry. Null samples
 remain unavailable, including measured widths, kerb profiles and banking.
 
-Vehicle catalogs contain `schemaVersion: 1`,
-`coordinates: "local-xz-metres-forward-minus-z"`, and a `vehicles` array.
+Vehicle catalogs are `{ vehicles, bodies }`: the records, and the car bodies (below) that serve their VEH ids.
 Each record has `id`, `model`, `carClass`, `vehicleIds`. `carClass` must be one of the app's
 canonical classes (`Hyper`, `GT3`, `GTE`, `LMP2`, `LMP2_ELMS`, `LMP3`, `SafetyCar`), not LMU's VEH
 labels such as `LMGT3`: the app reads it as published and uses it as the replay driver's class.
@@ -123,7 +119,7 @@ get deployment advice as the game's map position instead of kW. The track pipeli
 electric motor file (`ElectricMotorMapSpecial` labels, from personal-v18: 0–200 kW in 20 kW steps for the LMH hybrids,
 0–50 kW in 10 kW steps for the LMDh cars). Live advice looks it up by model and class; variants of one model
 (the Peugeot 9x8's two generations) share the list only when they agree.
-Geometry-only version-1 catalogs remain supported. Missing wheelbase or steering data independently
+Missing wheelbase or steering data independently
 uses the historical approximate fallback (2.7 m, 11:1, 540° lock-to-lock); no other model is substituted.
 The client exposes the applied `handlingCalibration` and its plugin/default/fallback sources.
 Both DuckDB and VCR handling calculations use this calibration while the steering chart retains
@@ -135,38 +131,36 @@ as approximate placement. It does not recenter the outline or invent a provider 
 Exact aliases win; ambiguous model matches remain unresolved. Primary and comparison
 vehicles resolve independently. Body direction continues to use replay yaw.
 
-## 3D scenery and vehicle bodies (package manifest schema 8)
+## 3D scenery and vehicle bodies (package schema 9)
 
-The manifest `schemaVersion` is `8`. This app loads schema 8 only: earlier packages are rejected at startup with an invalid
-status, and there is no fallback. The pipeline repository's `docs/SCENE_PACKAGE.md` and `docs/VEHICLE_PIPELINE.md` own the file formats;
-this section records what the app reads and checks.
+This app loads schema 9 only (see Contract above). The pipeline repository's `docs/PACKAGE_FORMAT.md`, `docs/SCENE_PACKAGE.md` and
+`docs/VEHICLE_PIPELINE.md` own the file formats; this section records what the app reads and checks. In the package, the API and
+the code, a *vehicle* is a catalog record (model, class, VEH ids, handling) and a *body* is a 3D model of the top-level `bodies`
+list of the vehicle catalog; every record id has exactly one body.
 
-```json
-{
-  "schemaVersion": 8,
-  "id": "personal-data",
-  "version": "1",
-  "tracks": { "catalog": "tracks/index.json" },
-  "vehicles": { "catalog": "vehicles/index.json", "logos": "vehicles/logos.json" },
-  "scenery": { "catalog": "scenery/index.json" }
-}
-```
+### Scenery (`scenery/index.json`) and rendering (`rendering/index.json`)
 
-`scenery` is optional; any other manifest key is rejected. The 3D vehicle bodies come with the vehicle catalog (below).
-In the package, the API and the code, a *vehicle* is a catalog record (model, class, VEH ids, handling) and a *body* is the
-3D model a record lists; a record can be resolved without one.
+The scenery catalog is `{ chunking, streaming, textures, layouts }`. `chunking` and `streaming` (`residentBehindM`, `residentAheadM`,
+`freeCameraRadiusM`) are shared by every layout; `textures` is the table of distinct texture files (`sha256`, `byteLength`, `width`,
+`height`, `levels`, `format`, `srgb`, `gpuBytes`, optional `start`). A layout row holds `layoutKey`, `sourceGeometryRevision`,
+`routeLengthM`, `pitLaneLengthM`, `shadowRangeM`, `environmentProbe` (`position`: where the venue's light is captured, LMU local
+metres), `daylight` (required: `date`, `sessions` race, qualify, practice1 and practice2 in that order with `localTime` `HH:MM`,
+`sunElevationDeg` and optional `sunBearingDeg`, `airPollution`, the haze weights and height scalars, location), one `horizon` chunk,
+`sectors` (main chunks ordered by lap range, then pit chunks) and `textures`, references (`texture` index, optional `maxPx`) into the
+table. A chunk has no path, neighbours or totals: its file is `scenery/<sha256>.glb`, a texture is `scenery/textures/<sha256>.ktx2.zst`
+(a KTX2 without supercompression, compressed as one zstd file), and a chunk's `textures` are indices into its layout's reference list.
+The loader (`server/plugins/scenePackage.ts`) expands each row (`expandSceneryCatalog` of the contract) into the layout the client
+gets: `asset` paths rebuilt, chunk texture lists as paths, the shared parameters and the rendering profiles attached. The layout must
+exist in the track catalog (every track has scenery) and its `sourceGeometryRevision` must equal that geometry's revision; main sector
+lap ranges are ordered and inside the route (a venue-shared `v...` chunk may overlap them and wrap past the line); every file exists
+with its catalogued size.
 
-### Scenery (`scenery/index.json`)
+`rendering/index.json` holds `camera`, `sky` and `shading`, shared by every layout and attached to each layout the client gets (the
+parsers are the contract's; `server/plugins/renderingPackage.ts` loads the cloud map files). In the sky, `sun.layouts` and
+`hosek.layoutAltitudeM` are keyed by layout key, exactly one per catalog layout; the loader narrows them to the layout's own `sky.sun.grid`
+and `sky.hosek.altitudeM`.
 
-One row per layout (`schemaVersion: 2`): `layoutKey`, `sourceGeometryRevision`, `routeLengthM`, `pitLaneLengthM`, `chunking`,
-`streaming` (`residentBehindM`, `residentAheadM`, `freeCameraRadiusM`), `daylight` (`date`, `sessions` race, qualify, practice1 and
-practice2 in that order with `localTime` `HH:MM`, `sunElevationDeg` and optional `sunBearingDeg` (degrees clockwise from true north in [0, 360)), `airPollution`, `hazeBaseScale`, `hazeCloudyScale`, `hazeStormScale`, `hazeDawnScale`, `fogHeightAltitudeScalar`, `fogHeightExponentScalar`), `environmentProbe` (`position`: where the venue's light is captured, LMU local metres), one `horizon` chunk, `sectors` (main chunks ordered by lap
-range, then pit chunks), the layout's `textures` and `totals`. Rows and chunks have exactly the documented keys. The layout must
-exist in the track catalog and its `sourceGeometryRevision` must equal that geometry's revision. Chunk GLBs are `scenery/<sha256>.glb`
-and textures `scenery/textures/<sha256>.ktx2.zst` (a KTX2 without supercompression, compressed as one zstd file); main sector lap ranges are ordered, inside the route and linked circularly by
-`prev`/`next`; pit chunks chain in pit-lane order; every chunk texture is in the layout's texture list.
-
-The catalog's `chunking`, `streaming`, `camera` and `sky` are shared by every layout and attached to each layout the client gets.
+What `rendering/index.json` holds:
 `camera` holds a positive `outputGamma` (the display encode), a positive `sceneLuminanceScale` and `types` with exactly `external`, `onboard` and `tv`; each type has a
 `meteringWindow` inside the frame (fractions from the top left), a positive `adaptationScale` (s of the exposure law
 `T · B^(1 - s) / L^s` kept inside the look's limits, L the metered mean luminance over `sceneLuminanceScale`), a positive `weatherBlendRate` (per second, the rate of the clear to overcast profile blend), `ambientOcclusion` and
@@ -183,7 +177,12 @@ cover from the replay at the lap and treats every replay as dry, and reads the s
 elevation and that cover (the base coverage the grid is sampled by); it applies the dry haze density (dawn mix, cloud and pollution
 terms, no storm term) and does not apply `airMass` or `sceneLuminanceScale` yet.
 
-`sky.clouds` (the pipeline's docs/SCENE_PACKAGE.md "Clouds") is the cloud field: two `layers` (`lower`, `upper`) whose `instances`
+`sky.clouds` (the pipeline's docs/SCENE_PACKAGE.md "Clouds") is the cloud field. Its maps are not inline: each map entry (`maps`, `lightMaps`) is
+`{ width, height, channels?, sha256, byteLength, mipByteLengths }` naming the file `rendering/<sha256>.bin`, the 8-bit mip levels concatenated,
+largest first, row-major, channels interleaved. The server hash-checks every such file at startup; `GET /api/data-plugin/scenery/:layoutKey`
+returns the entries as is, `/api/data-plugin/rendering/files/<sha256>.bin` serves the bytes (`application/octet-stream`), and the client
+(`fetchSceneryLayout` in `src/api/sceneryApi.ts`, `shared/domain/scenery/cloudMaps.ts`) fetches each distinct file once and slices it by
+`mipByteLengths` into the mip arrays the viewer reads. The field: two `layers` (`lower`, `upper`) whose `instances`
 add up to the `cells` table (`lowerCells` first), sixteen `codes` each naming one of `types` (a shown type has meshes and materials
 that exist in `meshes` and `maps`, a clear one has none), `height`, `placement`, `coverage`, `alpha`, `averagedInputs` (the values a
 replay does not carry, as averages) and opacity `maps` whose first level has width × height bytes. A mesh carries its unit vertex
@@ -201,19 +200,20 @@ light and feeds the weather weight and the exposure; a replay without a cloud fi
 near, following the camera like the sky. The sheets are placed once per lap moment and do not drift during it; a cloud's two
 randoms are the package's averages. The venue capture is taken without them.
 
-The catalog's `shading.shadows` (the pipeline's docs/SCENE_PACKAGE.md "Shadows") is the cascaded sun shadow: `atlas` (tiles inside
+`shading.shadows` (the pipeline's docs/SCENE_PACKAGE.md "Shadows") is the cascaded sun shadow: `atlas` (tiles inside
 their atlas, one per cascade), `select`, `filter` (taps whose weights times `scale` sum to 1), `normalOffset`, `texelSnap`, `fit`, `fade`,
 `centre` and `orientation` (each exactly the one rule the viewer accepts: squares centred at the middle of their view slice, axes
 fixed to the sun) and `cameras` with exactly `chase`, `cockpit` and `tv`. Each camera set has `nearM` < `farM` and either a `splitRatio` in 0..1, a `count`
 no larger than the tile count and that many ascending `splitsM` ending at `farM`, or all three null (no published set). The viewer does
 not use it yet.
 
-Startup checks that each listed file exists and has its catalogued size; it does not hash the scenery (several GB). Package files
+Startup checks that each listed file exists and has its catalogued size; it does not hash the scenery (several GB). Only the small cloud
+map files are hashed, once at load. Package files
 are pregenerated, content-named and published by folder swap, so they are never rewritten in place: the backend serves them as is,
 with no hash or change check. A hash check can come back if a real failure ever needs one.
 
-`GET /api/data-plugin/scenery/:layoutKey` returns the layout row plus `packageRevision`. `/api/data-plugin/scenery/files/` serves the
-package's `scenery/` folder and `/api/data-plugin/vehicles/files/` its `vehicles/` folder as static files with `Cache-Control: no-store`
+`GET /api/data-plugin/scenery/:layoutKey` returns the expanded layout plus `packageRevision`. `/api/data-plugin/scenery/files/` serves the
+package's `scenery/` folder, `/api/data-plugin/vehicles/files/` its `vehicles/` folder and `/api/data-plugin/rendering/files/` its `rendering/` folder as static files with `Cache-Control: no-store`
 (a local server: a browser cache would only duplicate the package on disk); a missing file is a 404. A `.ktx2.zst` texture goes out
 as `Content-Type: image/ktx2` with `Content-Encoding: zstd`, so the browser decompresses it while downloading, off the main thread.
 
@@ -230,26 +230,30 @@ Camera clearance uses `three-mesh-bvh` raycasts over position-only copies of res
 BVHs are generated in a worker and released when a chunk unloads; they are not exported package assets.
 The renderer's geometry buffers stay available while the worker builds the collision data.
 
-### Bodies (`bodies` of the vehicle records)
+### Bodies (`bodies` of `vehicles/index.json`)
 
-Each vehicle record lists its `bodies`: `folder`, `vehicleIds` (the part of the record's VEH ids this body serves), `descriptor`
-(`vehicles/bodies/<folder>.json`) with `descriptorSha256`, `asset` (`vehicles/<sha256>.glb`), `byteLength`, `triangles`, `vertices`
-and `textures` (`vehicles/textures/<sha256>.ktx2.zst`). Two bodies may not serve one id. The descriptor is read and validated at
-startup: its aliases equal the body's ids, `wheelRig` passed with four rigs and rest-vertex error below 1e-5, there is one appearance
-per alias, every texture it names is declared by the body, and its `cameras.list` holds well-formed `cockpit`, `hood` and `roof` cameras.
+Each body row lists `folder`, `vehicleIds` (every VEH id it serves, sorted, upper case, the ids of one or several records),
+`descriptorSha256`, `sha256`/`byteLength`/`triangles`/`vertices` of its GLB (`vehicles/<sha256>.glb`), `interior` and `textures`
+(`vehicles/textures/<sha256>.ktx2.zst`). The descriptor is at `vehicles/bodies/<folder>.json`; paths are derived, never stated.
+Bodies are sorted by folder and no id is in two. `GET /api/data-plugin/vehicles/:identity/body` looks the body up by VEH id through
+that list (`normalizeVehicleId` of the contract: any case, with or without `.veh`). The descriptor is read and its hash checked at
+startup and validated against the body's row (`parseBodyDescriptor`): there is one appearance per vehicle id, every texture it names
+is declared by the body, and its `cameras` hold a `frame` and `cockpitViewRule` statement and well-formed `cockpit`, `hood` and `roof`
+cameras. Whether the GLB holds the nodes it names, the wheel rig and the lamp state rules are the pipeline's file-content checks, not
+the app's startup.
 
-Since schema 5 a body carries its entries' part alternatives (number plates, lights, displays, some
+A body carries its entries' part alternatives (number plates, lights, displays, some
 body panels and tyre versions). The descriptor's `optionNodes` lists them, sorted and unique, each a mesh-only GLB node named
 `option_<mesh file stem>` (letters, digits and `_`, so three.js keeps the name; GLB node names are unique); every appearance has its own
 sorted `optionNodes`, a subset of the body's (`[]` for none). The viewer keeps the lap entry's options, leaves the body's other
 options out of that body (no draw, no texture load) and fails if the GLB lacks a listed node. An option node may also carry
 `extras.cockpitView`; the cockpit view rule then applies to it as to any other node.
 
-Schema 7 adds the car lamps: the descriptor's required `lamps` list and `glowMaterialIds`, the sorted native material ids of the glow
+The descriptor's required `lamps` list and `glowMaterialIds`, the sorted native material ids of the glow
 meshes and brake disc glow slots, each one in the body's `materials` list. Each lamp is checked: a known `role`, non-empty `nodes` (GLB
 node names; the loader drops `.`, `:`, `/`, `[` and `]` from them, so they are matched the same way), a `material`, `frames` that are
 texture paths or null (no texture shipped for that frame), an `animation` (all null, or a known method, a rate and frame indexes), an
-`emission` {`scale` ≥ 0, `vertexColour`, `viewBoost` null or {`gain`, `power` > 0}, `ambientScaled`, `vertexAlpha`}, a `blend` of `alpha`
+`emission` null (a lamp the game draws with a lit shader: nothing to draw) or {`scale` ≥ 0, `vertexColour`, `viewBoost` null or {`gain`, `power` > 0}, `ambientScaled`, `vertexAlpha`}, a `blend` of `alpha`
 or `opaque`, `states` null or {`off`, `on`, `brake`} each a frame index or null, `defaultLit` and `hiddenInOwnCockpit` true, false or
 null, and `brakeGlowRange` [low, high] on a disc glow only. A glow mesh is drawn only through a lamp with a known `states.off` whose frame
 has a texture (headlight and brake glow): the slot that is the lamp's GLB `material`, under one of its `nodes`, renders that frame unlit
@@ -257,9 +261,9 @@ with the emission formula (`car/carLamps.ts`, in the sun's light unit), casts no
 `hiddenInOwnCockpit`. Other glow slots and meshes are not drawn. No lamp switches on yet (no lit frame is known); the other lamp
 materials are drawn as ordinary materials.
 
-Schema 8 splits a body by where it is seen from and adds texture start files:
+A body is split by where it is seen from and has texture start files:
 
-- `interior` is required on every body row: null, or `asset` (`vehicles/<sha256>.glb`), `sha256`, `byteLength`, `triangles` and
+- `interior` is required on every body row: null, or `sha256` (`vehicles/<sha256>.glb`), `byteLength`, `triangles` and
   `vertices` of a second GLB that holds only the parts the driver cameras draw (`extras.cockpitView: 'in'`), under one `chassis`
   node at the car origin. Node names are unique across both files. The viewer loads both and puts those parts under the body's
   `chassis` node (`laps/lapLayer.ts`); a body with an interior and no `chassis` node fails to load.
@@ -268,7 +272,7 @@ Schema 8 splits a body by where it is seen from and adds texture start files:
   (`sceneObjects.ts`, `setCameraDistance`).
 - A body texture row may carry `interiorOnly: true` (no outside part uses it; the viewer reads it at full size, the rest of the
   car up to its size limit) and `start`.
-- A scenery or body texture row may carry `start`: `asset` (a content-named KTX2 in the same textures folder), `sha256`,
+- A scenery or body texture row may carry `start`: `sha256` (a content-named KTX2 in the same textures folder),
   `byteLength`, `width`, `height`, `levels` and `gpuBytes` of the texture's start file, a complete texture that is the row's
   texture from its third level down. Only a texture with more than two levels and a smaller side of at least 512 px has one; on
   a scenery row the server checks the size and level count against the row. The viewer draws from the start file first and reads

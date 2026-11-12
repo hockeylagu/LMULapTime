@@ -27,8 +27,3 @@ export async function fetchBody(vehicleId: string, packageRevision: string | und
   if (bytes.byteLength !== resource.byteLength || (interior && interiorBytes?.byteLength !== interior.byteLength)) throw Error('Incomplete 3D body');
   return { resource, bytes, interiorBytes, descriptor, vehicleId };
 }
-
-/** The key a VEH id is matched by: without a `.veh` suffix, upper-case (as the package catalogs it). */
-export function normalizeVehicleId(id: string): string {
-  return id.trim().replace(/\.veh$/i, '').toUpperCase();
-}
