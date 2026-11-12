@@ -32,6 +32,18 @@ describe('laps left', () => {
       .toEqual({ laps: 5, estimated: true });
     expect(computeLapsLeft({ ...session, elapsedSeconds: 3100 }, player, overall, classLeader, own({ lapSeconds: 210 }))).toEqual({ laps: 6, estimated: true });
   });
+  it('times the leader by its last lap when slower than its estimate', () => {
+    // Barcelona race 2026-11-12 at 1930.4 s, the player's lap 19 from 1930.35 at 97.6 s; the LMP2 leader on its lap 21
+    // from 1850.3 s, estimate 88.6 s, last lap 89.6 s. The clock ended at 1944, the flag fell at 2029.4 and the player
+    // crossed at 2028.3: 2 laps left. The estimate put the flag at 2027.5, before the crossing, and read 1.
+    const session = { kind: 'race' as const, endSeconds: 1944, elapsedSeconds: 1930.4, gamePhase: 5 };
+    const leader = vehicleReading({ id: 1, vehicleClass: 'LMP2', lapStartEt: 1850.3, estimatedLapTime: 88.6, lastLapTime: 89.6 });
+    const player = vehicleReading({ id: 7, vehicleClass: 'LMP3', lapStartEt: 1930.35, estimatedLapTime: 96 });
+    const own: LiveOwnPace = { lapSeconds: 97.6, stopSeconds: 0, stopCostSeconds: 0, lapFraction: 0 };
+    expect(computeLapsLeft(session, player, leader, null, own)).toEqual({ laps: 2, estimated: true });
+    // A slow last lap (start, pit or incident) is not its pace: the estimate stands.
+    expect(computeLapsLeft(session, player, { ...leader, lastLapTime: 120 }, null, own)).toEqual({ laps: 1, estimated: true });
+  });
   it('delays the flag by the stop the leader still makes', () => {
     // Le Mans race 2026-10-23 on lap 11: the leader on lap 12 from 2501 s at 209.4 s, no stop yet; everyone ran 17.
     const session = { kind: 'race' as const, endSeconds: 3789, elapsedSeconds: 2520, gamePhase: 5 };

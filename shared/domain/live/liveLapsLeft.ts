@@ -18,6 +18,21 @@ export function raceClockRunning(gamePhase: number, elapsedSeconds: number): boo
 
 const positive = (value: number): boolean => Number.isFinite(value) && value > 0;
 
+/** A last lap more than this much slower than the estimate is a pit, incident or start lap, not the leader's pace. */
+const LEADER_LAST_LAP_MAX_RATIO = 1.1;
+
+/**
+ * The leader's lap time for the flag: its last lap when slower than the game's estimate, which follows its best laps
+ * (Barcelona race 2026-11-12: estimate about 88.6 s, last laps 89.6 s; two laps at the estimate put the flag 2 s early,
+ * ahead of the player's crossing, and laps left read one short all race). A last lap slower by more than
+ * `LEADER_LAST_LAP_MAX_RATIO` is not its pace.
+ */
+function leaderLapSeconds(leader: LiveVehicleReading): number {
+  const estimate = leader.estimatedLapTime;
+  const last = leader.lastLapTime;
+  return positive(estimate) && positive(last) && last > estimate && last <= estimate * LEADER_LAST_LAP_MAX_RATIO ? last : estimate;
+}
+
 /** The class leader's estimated lap time when it races in the player's (known) class, else null. */
 export function classLeaderLapSeconds(player: LiveVehicleReading | null, classLeader: LiveVehicleReading | null | undefined): number | null {
   const playerClass = knownCarClass(player?.vehicleClass);
@@ -63,7 +78,7 @@ export interface LiveOwnPace {
 /**
  * Race laps left, counting the lap in progress. LMU races are always timed, so the clock is converted to laps:
  * the leader gets the flag at the first line crossing after the clock ends. With `L` its lap start
- *   time, `e` its estimated lap time and `E` the end time, it still has `ceil((E - L) / e)` laps counting the
+ *   time, `e` its lap time (`leaderLapSeconds`) and `E` the end time, it still has `ceil((E - L) / e)` laps counting the
  *   one in progress (the laps it still starts before the clock ends, plus the one it finishes: the lap in
  *   progress is the last when `L + e >= E`), so it takes the flag at `F = L + n * e`. Every other car gets the
  *   flag at its first line crossing from `F`. With `p` its own measured pace (else the same-class leader's, else its
@@ -103,7 +118,7 @@ export function computeLapsLeft(
   }
   const leaderStops = (leader.pitStops ?? 0) < (player.pitStops ?? 0) + (stop > 0 ? 1 : 0);
   const leaderStop = leaderStops && Number.isFinite(own.stopCostSeconds) ? Math.max(0, own.stopCostSeconds) : 0;
-  const flag = projectRaceFlagSeconds(session.endSeconds, leader.lapStartEt, leader.estimatedLapTime, leaderStop);
+  const flag = projectRaceFlagSeconds(session.endSeconds, leader.lapStartEt, leaderLapSeconds(leader), leaderStop);
   if (flag === null) return null;
   const pace = ownPace ?? classLeaderLapSeconds(player, classLeader) ?? player.estimatedLapTime;
   if (!(player.lapStartEt >= 0) || !positive(pace)) return null;
