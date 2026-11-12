@@ -8,7 +8,7 @@ import type { LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import { descriptorTexturePath, normalizeVehicleId } from '../../../../../shared/packageContract/index.js';
 import { createCarMaterial, materialTexturePaths } from '../car/carMaterials.js';
 import { createLampMaterial, lampFrame, lampTexturePaths } from '../car/carLamps.js';
-import { createLampStates, lampStateFrames, switches } from '../car/lampStates.js';
+import { createLampStates, flashes, lampStateFrames, rainLampsFlash, switches } from '../car/lampStates.js';
 import { createContactShadow } from '../car/carContactShadow.js';
 import { MAP_COLORS, TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../../../utils/lapAlignment.js';
@@ -42,16 +42,16 @@ const CHASSIS = 'chassis';
 /**
  * Gives a glow mesh its lamps' materials: each material slot a drawn lamp covers (one of the lamp's nodes is the mesh or holds it, and
  * the slot is the lamp's GLB material) takes that lamp's material, the other slots draw nothing. False when no slot is drawn. A mesh of
- * a lamp the player's own car leaves out in the cockpit is marked for the outside view only.
+ * a lamp the player's own car leaves out in the cockpit is marked for the outside view only. `rainFlashes`: see `rainLampsFlash`.
  */
-function lightGlowMesh(mesh: Mesh<BufferGeometry, Material | Material[]>, drawn: CarLamp[], material: (lamp: CarLamp) => Material): boolean {
+function lightGlowMesh(mesh: Mesh<BufferGeometry, Material | Material[]>, drawn: CarLamp[], rainFlashes: boolean, material: (lamp: CarLamp) => Material): boolean {
   const unseen = new MeshBasicMaterial({ visible: false }), names = new Set<string>();
   for (let at: Object3D | null = mesh; at; at = at.parent) names.add(at.name);
   const covering = drawn.filter(lamp => lamp.nodes.some(name => names.has(PropertyBinding.sanitizeNodeName(name))));
   let lit = false, hidden = false;
   const slot = (current: Material) => {
     // A mesh both a rain and a pit lamp list (a shared rear light) follows the one that switches: only the pit lamp lights.
-    const matching = covering.filter(row => row.material === current.name), lamp = matching.find(switches) ?? matching[0];
+    const matching = covering.filter(row => row.material === current.name), lamp = matching.find(row => switches(row, rainFlashes)) ?? matching[0];
     if (!lamp) return unseen;
     lit = true; hidden ||= lamp.hiddenInOwnCockpit === true;
     return material(lamp);
@@ -107,7 +107,8 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     };
     // Glow materials (lamp glow meshes, brake disc glow) are drawn only through a lamp whose frame is known.
     const glow = new Set(car.descriptor.glowMaterialIds);
-    const drawn = car.descriptor.lamps.filter(lamp => lampFrame(lamp) !== null);
+    const rainFlashes = rainLampsFlash(car.descriptor.lamps);
+    const drawn = car.descriptor.lamps.filter(lamp => lampFrame(lamp, rainFlashes) !== null);
     // The GLB loader drops `.`, `:`, `/`, `[` and `]` from node names; lamp nodes are the GLB's own names.
     for (const lamp of drawn) for (const name of lamp.nodes) if (!template.getObjectByName(PropertyBinding.sanitizeNodeName(name))) throw Error(`Car ${car.vehicleId} has no lamp node ${name}`);
     const isGlow = (object: Object3D) => {
@@ -126,12 +127,12 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
       }
     });
     // A lamp draws its frames' textures as loaded, so a frame loads from its own file, never from a start file.
-    const frames = new Set(drawn.flatMap(lampTexturePaths));
+    const frames = new Set(drawn.flatMap(lamp => lampTexturePaths(lamp, rainFlashes)));
     for (const frame of frames) paths.set(frame, false);
     const starts = new Map(car.resource.textures.flatMap(row => row.start ? [[descriptorTexturePath(row.sha256), descriptorTexturePath(row.start.sha256)] as const] : []));
     const textures = new Map(await Promise.all([...paths].map(async ([path, interior]) =>
       [path, await carTextures.load(path, interior, frames.has(path) ? undefined : starts.get(path))] as const)));
-    return {template, appearance, recipeOf, isGlow, drawn, textures, interiorPaths: paths, hiddenNames: new Set([...hidden].map(node => node.name))};
+    return {template, appearance, recipeOf, isGlow, drawn, rainFlashes, textures, interiorPaths: paths, hiddenNames: new Set([...hidden].map(node => node.name))};
   };
   /** A livery's parsed model and loaded textures, shared by every instance of that car (and by `preload`). */
   const parts = new WeakMap<LoadedBody, ReturnType<typeof loadParts>>();
@@ -146,7 +147,7 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
   };
   /** A car instance of the lap's livery: the shared geometry with one material per native material, textures preloaded. */
   const loadModel = async (car: LoadedBody): Promise<Group> => {
-    const {template, appearance, recipeOf, isGlow, drawn, textures, interiorPaths, hiddenNames} = await partsOf(car);
+    const {template, appearance, recipeOf, isGlow, drawn, rainFlashes, textures, interiorPaths, hiddenNames} = await partsOf(car);
     const copyOf = (path: string) => {
       const original = textures.get(path)!, copy = original.clone();
       carTextures.copied(copy, original, interiorPaths.get(path) === true);
@@ -157,15 +158,15 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     model.traverse(object => { if (isGlow(object)) glowMeshes.push(object); });
     // One material per lamp.
     const lampMaterials = new Map<CarLamp, Material>();
-    for (const mesh of glowMeshes) if (!lightGlowMesh(mesh as Mesh<BufferGeometry, Material | Material[]>, drawn, lamp => {
+    for (const mesh of glowMeshes) if (!lightGlowMesh(mesh as Mesh<BufferGeometry, Material | Material[]>, drawn, rainFlashes, lamp => {
       let created = lampMaterials.get(lamp);
       if (created) return created;
       // A lamp with states switches between its own copies of each state's frame; it starts on its off frame.
-      const switching = switches(lamp) ? {role: lamp.role, states: lamp.states, maps: new Map(lampStateFrames(lamp.states).flatMap(index => {
+      const switching = switches(lamp, rainFlashes) ? {flashes: flashes(lamp, rainFlashes), states: lamp.states, maps: new Map(lampStateFrames(lamp.states).flatMap(index => {
         const frame = lamp.frames[index];
         return frame === null ? [] : [[index, copyOf(frame)] as const];
       }))} : undefined;
-      created = createLampMaterial(lamp, switching?.maps.get(lamp.states!.off ?? lamp.states!.on!) ?? copyOf(lampFrame(lamp)!), switching);
+      created = createLampMaterial(lamp, switching?.maps.get(lamp.states!.off ?? lamp.states!.on!) ?? copyOf(lampFrame(lamp, rainFlashes)!), switching);
       lampMaterials.set(lamp, created);
       return created;
     })) mesh.removeFromParent();

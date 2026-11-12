@@ -5,8 +5,8 @@ import type { RenderPose } from '../replayPose.js';
 
 type LampStatesRow = NonNullable<CarLamp['states']>;
 
-/** A switching lamp's role and states, and its own texture copy per frame index that has a texture. */
-export interface LampSwitch { role: CarLamp['role']; states: LampStatesRow; maps: Map<number, Texture> }
+/** A switching lamp's states, whether it flashes in the pit lane, and its own texture copy per frame index that has a texture. */
+export interface LampSwitch { flashes: boolean; states: LampStatesRow; maps: Map<number, Texture> }
 
 /**
  * App assumption, not package data (the user's choice, 2026-11-11): a pit lamp flashes at 4 Hz, lit then dark for equal halves,
@@ -31,12 +31,27 @@ export function lampStateFrame(states: LampStatesRow, headlights: boolean, braki
 }
 
 /**
- * Whether a lamp switches with its car: headlight and brake lamps with the headlights and brake pedal, a pit lamp with a lit frame
- * flashing with the pit limiter. Rain lamps have lit frames too, but nothing says what lights them, so they stay on their off frame.
+ * Whether a lamp with a lit frame flashes with the pit limiter: a pit lamp, or a rain lamp when `rainFlashes` (its body has no pit
+ * lamp). App assumption, not package data (the user's choice, 2026-11-12): no car file says which light flashes in the pit lane;
+ * a car without a pit light flashes its rain light, as seen on the Oreca 07, and a body with a pit lamp leaves its rain light alone.
  */
-export function switches(lamp: CarLamp): lamp is CarLamp & {states: LampStatesRow} {
+export function flashes(lamp: CarLamp, rainFlashes: boolean): lamp is CarLamp & {states: LampStatesRow} {
+  if (lamp.states === null || lamp.states.on === null) return false;
+  return lamp.role === 'pit' || (lamp.role === 'rain' && rainFlashes);
+}
+
+/** Whether a body's rain lamps take the pit-lane flash: it has no pit lamp. */
+export function rainLampsFlash(lamps: readonly CarLamp[]): boolean {
+  return !lamps.some(lamp => lamp.role === 'pit');
+}
+
+/**
+ * Whether a lamp switches with its car: headlight and brake lamps with the headlights and brake pedal, a flashing lamp (`flashes`)
+ * with the pit limiter. Other rain lamps have lit frames too, but nothing says what lights them, so they stay on their off frame.
+ */
+export function switches(lamp: CarLamp, rainFlashes: boolean): lamp is CarLamp & {states: LampStatesRow} {
   if (lamp.states === null) return false;
-  return lamp.role === 'headlight' || lamp.role === 'brake' || (lamp.role === 'pit' && lamp.states.on !== null);
+  return lamp.role === 'headlight' || lamp.role === 'brake' || flashes(lamp, rainFlashes);
 }
 
 /** Every frame index a lamp can show: the ones whose texture the car loads. */
@@ -47,7 +62,7 @@ export function lampStateFrames(states: LampStatesRow): number[] {
 export interface LampStates { update(pose: RenderPose): void }
 
 /**
- * Switches a car's lamps with its lap: headlights from the lap's headlight flag, brake lamps on any brake pedal, pit lamps flashing
+ * Switches a car's lamps with its lap: headlights from the lap's headlight flag, brake lamps on any brake pedal, flashing lamps
  * while the pit limiter is on (dark: their off frame, or nothing when they have none). A frame without a texture draws nothing. Null
  * when no lamp of the car can switch.
  */
@@ -69,7 +84,7 @@ export function createLampStates(car: Object3D, points: ReplayTrajectoryPoint[])
       const timeSec = (point?.timeSec ?? 0) + ((next?.timeSec ?? 0) - (point?.timeSec ?? 0)) * pose.fraction;
       const flash = pitFlashLit(point?.pitLimiter === true, timeSec);
       for (const {material, lamp} of lamps) {
-        const index = lamp.role === 'pit' ? (flash ? lamp.states.on : lamp.states.off) : lampStateFrame(lamp.states, headlights, braking), map = index === null ? undefined : lamp.maps.get(index);
+        const index = lamp.flashes ? (flash ? lamp.states.on : lamp.states.off) : lampStateFrame(lamp.states, headlights, braking), map = index === null ? undefined : lamp.maps.get(index);
         material.visible = map !== undefined;
         if (map) (material.uniforms.map as {value: Texture}).value = map;
       }

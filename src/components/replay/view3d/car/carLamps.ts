@@ -1,21 +1,22 @@
 import { NormalBlending, RepeatWrapping, ShaderMaterial, type Texture } from 'three';
 import type { CarLamp } from '../../../../../shared/types/scenes/car.js';
 import { SUN_UNIT } from '../atmosphere/sunSamples.js';
-import { lampStateFrames, switches, type LampSwitch } from './lampStates.js';
+import { flashes, lampStateFrames, switches, type LampSwitch } from './lampStates.js';
 
 /**
- * The frame a lamp draws by default, or null when it is not drawn: only lamps whose `states.off` is known (or a flashing pit lamp's
- * lit frame) are, and not when the package has no texture for that frame or the game draws the lamp with a lit shader (no emission).
+ * The frame a lamp draws by default, or null when it is not drawn: only lamps whose `states.off` is known (or a flashing lamp's lit
+ * frame) are, and not when the package has no texture for that frame or the game draws the lamp with a lit shader (no emission).
+ * `rainFlashes`: the body's rain lamps take the pit-lane flash (`rainLampsFlash`).
  */
-export function lampFrame(lamp: CarLamp): string | null {
-  // A flashing pit lamp without a dark frame is drawn from its lit frame and hidden while dark.
-  const index = lamp.role === 'pit' && switches(lamp) ? lamp.states.off ?? lamp.states.on : lamp.states?.off;
+export function lampFrame(lamp: CarLamp, rainFlashes: boolean): string | null {
+  // A flashing lamp without a dark frame is drawn from its lit frame and hidden while dark.
+  const index = flashes(lamp, rainFlashes) ? lamp.states.off ?? lamp.states.on : lamp.states?.off;
   return !lamp.emission || index === null || index === undefined ? null : lamp.frames[index];
 }
 
 /** The texture files a drawn lamp loads: every state's frame that has a texture for a switching lamp, else the one frame it shows. */
-export function lampTexturePaths(lamp: CarLamp): string[] {
-  if (!switches(lamp)) return [lampFrame(lamp)!];
+export function lampTexturePaths(lamp: CarLamp, rainFlashes: boolean): string[] {
+  if (!switches(lamp, rainFlashes)) return [lampFrame(lamp, rainFlashes)!];
   return lampStateFrames(lamp.states).flatMap(index => lamp.frames[index] ?? []);
 }
 

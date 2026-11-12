@@ -3,7 +3,7 @@ import { BoxGeometry, Group, Mesh, RepeatWrapping, Texture } from 'three';
 import type { CarLamp } from '../../../../../shared/types/scenes/car.js';
 import type { ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
 import { createLampMaterial, lampFrame, lampTexturePaths } from '../../../../../src/components/replay/view3d/car/carLamps.js';
-import { createLampStates, lampStateFrame, lampStateFrames, pitFlashLit, switches } from '../../../../../src/components/replay/view3d/car/lampStates.js';
+import { createLampStates, lampStateFrame, lampStateFrames, pitFlashLit, rainLampsFlash, switches } from '../../../../../src/components/replay/view3d/car/lampStates.js';
 
 const lamp = (states: CarLamp['states'], frames: Array<string | null> = ['off', 'on', 'brake']): CarLamp => ({
   role: 'brake', nodes: ['lamp'], material: 'BLGLO', frames, animation: {method: 'random', rate: null, sequence: null},
@@ -22,14 +22,14 @@ it('shows the brake frame while braking, the on frame with headlights, else off,
 });
 
 it('loads each state frame that has a texture', () => {
-  expect(lampTexturePaths(lamp({off: 0, on: 1, brake: 2}))).toEqual(['off', 'on', 'brake']);
-  expect(lampTexturePaths(lamp({off: 0, on: 1, brake: null}, ['off', null]))).toEqual(['off']);
+  expect(lampTexturePaths(lamp({off: 0, on: 1, brake: 2}), false)).toEqual(['off', 'on', 'brake']);
+  expect(lampTexturePaths(lamp({off: 0, on: 1, brake: null}, ['off', null]), false)).toEqual(['off']);
 });
 
 it('switches a car lamp with the lap headlights and brake, hiding a frame without a texture', () => {
   const maps = new Map([[0, new Texture()], [2, new Texture()]]);
   const states = {off: 0, on: 1, brake: 2};
-  const material = createLampMaterial(lamp(states, ['off', null, 'brake']), maps.get(0)!, {role: 'brake', states, maps});
+  const material = createLampMaterial(lamp(states, ['off', null, 'brake']), maps.get(0)!, {flashes: false, states, maps});
   expect(maps.get(2)!.wrapT).toBe(RepeatWrapping);
   const car = new Group(); car.add(new Mesh(new BoxGeometry(), material));
   const points = [{brake: 0.4}, {headlights: true, brake: 0}, {}] as ReplayTrajectoryPoint[];
@@ -42,26 +42,34 @@ it('switches a car lamp with the lap headlights and brake, hiding a frame withou
 
 it('leaves a car whose lamps cannot switch alone', () => {
   const states = {off: 0, on: null, brake: null}, maps = new Map([[0, new Texture()]]);
-  const car = new Group(); car.add(new Mesh(new BoxGeometry(), createLampMaterial(lamp(states), maps.get(0)!, {role: 'brake', states, maps})));
+  const car = new Group(); car.add(new Mesh(new BoxGeometry(), createLampMaterial(lamp(states), maps.get(0)!, {flashes: false, states, maps})));
   expect(createLampStates(car, [])).toBeNull();
 });
 
 it('switches headlight, brake and pit lamps; a rain lamp shows its off frame, and a lit-shader lamp is not drawn', () => {
   const rain = {...lamp({off: 0, on: 1, brake: null}), role: 'rain' as const};
-  expect(switches(lamp({off: 0, on: 1, brake: 2}))).toBe(true);
-  expect(switches(rain)).toBe(false);
-  expect(lampTexturePaths(rain)).toEqual(['off']);
-  expect(lampFrame({...rain, states: {off: null, on: 0, brake: null}})).toBeNull(); // No dark frame: not drawn while off.
-  expect(lampFrame({...lamp({off: 0, on: 1, brake: 2}), emission: null})).toBeNull();
+  expect(switches(lamp({off: 0, on: 1, brake: 2}), false)).toBe(true);
+  expect(switches(rain, false)).toBe(false);
+  expect(lampTexturePaths(rain, false)).toEqual(['off']);
+  expect(lampFrame({...rain, states: {off: null, on: 0, brake: null}}, false)).toBeNull(); // No dark frame: not drawn while off.
+  expect(lampFrame({...lamp({off: 0, on: 1, brake: 2}), emission: null}, false)).toBeNull();
   // An always-lit pit light is drawn from its lit frame.
-  expect(lampFrame({...lamp({off: null, on: 0, brake: null}, ['lit']), role: 'pit'})).toBe('lit');
+  expect(lampFrame({...lamp({off: null, on: 0, brake: null}, ['lit']), role: 'pit'}, false)).toBe('lit');
+});
+
+it('flashes the rain lamps of a body without a pit lamp, from their lit frame when they have no dark one', () => {
+  const rain = {...lamp({off: null, on: 0, brake: null}, ['lit']), role: 'rain' as const}, pit = {...rain, role: 'pit' as const};
+  expect([rainLampsFlash([rain]), rainLampsFlash([rain, pit])]).toEqual([true, false]);
+  expect([switches(rain, true), lampFrame(rain, true), lampTexturePaths(rain, true)]).toEqual([true, 'lit', ['lit']]);
+  // A body with a pit lamp leaves its rain light alone: no dark frame, so not drawn.
+  expect([switches(rain, false), lampFrame(rain, false)]).toEqual([false, null]);
 });
 
 it('flashes a pit lamp at 4 Hz while the pit limiter is on, hidden in the dark half when it has no dark frame', () => {
   expect([0, 0.1, 0.13, 0.25].map(t => pitFlashLit(true, t))).toEqual([true, true, false, true]);
   expect(pitFlashLit(false, 0)).toBe(false);
   const states = {off: null, on: 0, brake: null}, maps = new Map([[0, new Texture()]]);
-  const material = createLampMaterial({...lamp(states, ['lit']), role: 'pit'}, maps.get(0)!, {role: 'pit', states, maps});
+  const material = createLampMaterial({...lamp(states, ['lit']), role: 'pit'}, maps.get(0)!, {flashes: true, states, maps});
   const car = new Group(); car.add(new Mesh(new BoxGeometry(), material));
   const points = [{timeSec: 10, pitLimiter: true, headlights: true, brake: 1}, {timeSec: 10.2, pitLimiter: true}, {timeSec: 11}] as ReplayTrajectoryPoint[];
   const lights = createLampStates(car, points)!;
