@@ -15,6 +15,8 @@ import zlib from 'zlib';
 // Stored rows hold what the app serves (garage state, ISO 8855 steering and motion, Virtual
 // Energy, calibrated ambient): a rule change rewrites the rows offline instead of adding a
 // read-time adapter. The current storage contract is docs/REPLAY_CACHE_FORMAT.md.
+// Pending for the next bump (batched by the user's choice, 2026-11-12): per-sample rainLight (pose byte 2, 0x40). Until
+// then only replays decoded after it was added carry the field; older v10 rows read as rain light off.
 export const REPLAY_CACHE_VERSION = 'v10';
 
 // v10: pedals and tyre wear are scaled to percent once per channel, not per sample (v9 turned a

@@ -68,6 +68,7 @@ export function buildTrajectoryPoints(
       absActive: cur.absActive,
       pitLimiter: cur.pitLimiter,
       headlights: cur.headlights,
+      rainLight: cur.rainLight,
       engineRpm: cur.engineRpm,
       accelLonG: cur.accelLonG,
       accelLatG: cur.accelLatG,

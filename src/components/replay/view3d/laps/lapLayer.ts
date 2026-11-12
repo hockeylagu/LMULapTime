@@ -44,14 +44,21 @@ const CHASSIS = 'chassis';
  * the slot is the lamp's GLB material) takes that lamp's material, the other slots draw nothing. False when no slot is drawn. A mesh of
  * a lamp the player's own car leaves out in the cockpit is marked for the outside view only. `rainFlashes`: see `rainLampsFlash`.
  */
+/** Whether a lamp lights with the rain light: a rain lamp, or a pit lamp whose light a rain lamp also lists (same material and a node). */
+function lightsWithRain(lamp: CarLamp, lamps: readonly CarLamp[]): boolean {
+  if (lamp.role === 'rain') return true;
+  return lamp.role === 'pit' && lamps.some(row => row.role === 'rain' && row.material === lamp.material && row.nodes.some(name => lamp.nodes.includes(name)));
+}
+
 function lightGlowMesh(mesh: Mesh<BufferGeometry, Material | Material[]>, drawn: CarLamp[], rainFlashes: boolean, material: (lamp: CarLamp) => Material): boolean {
   const unseen = new MeshBasicMaterial({ visible: false }), names = new Set<string>();
   for (let at: Object3D | null = mesh; at; at = at.parent) names.add(at.name);
   const covering = drawn.filter(lamp => lamp.nodes.some(name => names.has(PropertyBinding.sanitizeNodeName(name))));
   let lit = false, hidden = false;
   const slot = (current: Material) => {
-    // A mesh both a rain and a pit lamp list (a shared rear light) follows the one that switches: only the pit lamp lights.
-    const matching = covering.filter(row => row.material === current.name), lamp = matching.find(row => switches(row, rainFlashes)) ?? matching[0];
+    // A mesh both a rain and a pit lamp list (a shared rear light) takes the pit lamp's material, which also lights with the rain light.
+    const matching = covering.filter(row => row.material === current.name);
+    const lamp = matching.find(row => flashes(row, rainFlashes)) ?? matching.find(row => switches(row, rainFlashes)) ?? matching[0];
     if (!lamp) return unseen;
     lit = true; hidden ||= lamp.hiddenInOwnCockpit === true;
     return material(lamp);
@@ -162,7 +169,7 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
       let created = lampMaterials.get(lamp);
       if (created) return created;
       // A lamp with states switches between its own copies of each state's frame; it starts on its off frame.
-      const switching = switches(lamp, rainFlashes) ? {flashes: flashes(lamp, rainFlashes), states: lamp.states, maps: new Map(lampStateFrames(lamp.states).flatMap(index => {
+      const switching = switches(lamp, rainFlashes) ? {flashes: flashes(lamp, rainFlashes), rain: lightsWithRain(lamp, drawn), states: lamp.states, maps: new Map(lampStateFrames(lamp.states).flatMap(index => {
         const frame = lamp.frames[index];
         return frame === null ? [] : [[index, copyOf(frame)] as const];
       }))} : undefined;

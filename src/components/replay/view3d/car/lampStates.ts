@@ -5,8 +5,11 @@ import type { RenderPose } from '../replayPose.js';
 
 type LampStatesRow = NonNullable<CarLamp['states']>;
 
-/** A switching lamp's states, whether it flashes in the pit lane, and its own texture copy per frame index that has a texture. */
-export interface LampSwitch { flashes: boolean; states: LampStatesRow; maps: Map<number, Texture> }
+/**
+ * A switching lamp's states, whether it flashes in the pit lane and whether it lights with the rain light (a rain lamp, or a pit lamp
+ * on the same light), and its own texture copy per frame index that has a texture.
+ */
+export interface LampSwitch { flashes: boolean; rain: boolean; states: LampStatesRow; maps: Map<number, Texture> }
 
 /**
  * App assumption, not package data (the user's choice, 2026-11-11): a pit lamp flashes at 4 Hz, lit then dark for equal halves,
@@ -46,12 +49,20 @@ export function rainLampsFlash(lamps: readonly CarLamp[]): boolean {
 }
 
 /**
- * Whether a lamp switches with its car: headlight and brake lamps with the headlights and brake pedal, a flashing lamp (`flashes`)
- * with the pit limiter. Other rain lamps have lit frames too, but nothing says what lights them, so they stay on their off frame.
+ * Whether a lamp is lit by an event rather than shown by default: a flashing lamp (`flashes`), or a rain lamp with a lit frame (lit
+ * while the lap's rain light flag is on). Such a lamp shows its off frame when dark, or nothing when it has none.
+ */
+export function litByEvent(lamp: CarLamp, rainFlashes: boolean): lamp is CarLamp & {states: LampStatesRow} {
+  return flashes(lamp, rainFlashes) || (lamp.role === 'rain' && lamp.states !== null && lamp.states.on !== null);
+}
+
+/**
+ * Whether a lamp switches with its car: headlight and brake lamps with the headlights and brake pedal, flashing lamps with the pit
+ * limiter and rain lamps with the rain light (`litByEvent`).
  */
 export function switches(lamp: CarLamp, rainFlashes: boolean): lamp is CarLamp & {states: LampStatesRow} {
   if (lamp.states === null) return false;
-  return lamp.role === 'headlight' || lamp.role === 'brake' || flashes(lamp, rainFlashes);
+  return lamp.role === 'headlight' || lamp.role === 'brake' || litByEvent(lamp, rainFlashes);
 }
 
 /** Every frame index a lamp can show: the ones whose texture the car loads. */
@@ -63,8 +74,9 @@ export interface LampStates { update(pose: RenderPose): void }
 
 /**
  * Switches a car's lamps with its lap: headlights from the lap's headlight flag, brake lamps on any brake pedal, flashing lamps
- * while the pit limiter is on (dark: their off frame, or nothing when they have none). A frame without a texture draws nothing. Null
- * when no lamp of the car can switch.
+ * while the pit limiter is on, and rain lamps (or a pit lamp on the same light) while the rain light flag is on and the limiter
+ * is off. Dark: their off frame, or nothing when they have none. A frame without a texture draws nothing. Null when no lamp of the
+ * car can switch.
  */
 export function createLampStates(car: Object3D, points: ReplayTrajectoryPoint[]): LampStates | null {
   const lamps: Array<{material: ShaderMaterial; lamp: LampSwitch}> = [];
@@ -82,9 +94,14 @@ export function createLampStates(car: Object3D, points: ReplayTrajectoryPoint[])
       const point = points[pose.index], next = points[pose.index + 1] ?? point;
       const headlights = point?.headlights === true, braking = (point?.brake ?? 0) > 0;
       const timeSec = (point?.timeSec ?? 0) + ((next?.timeSec ?? 0) - (point?.timeSec ?? 0)) * pose.fraction;
-      const flash = pitFlashLit(point?.pitLimiter === true, timeSec);
+      const limiter = point?.pitLimiter === true, rainLit = point?.rainLight === true, flash = pitFlashLit(limiter, timeSec);
+      const frameOf = ({flashes, rain, states}: LampSwitch) => {
+        if (flashes && limiter) return flash ? states.on : states.off;
+        if (flashes || rain) return rain && rainLit ? states.on : states.off;
+        return lampStateFrame(states, headlights, braking);
+      };
       for (const {material, lamp} of lamps) {
-        const index = lamp.flashes ? (flash ? lamp.states.on : lamp.states.off) : lampStateFrame(lamp.states, headlights, braking), map = index === null ? undefined : lamp.maps.get(index);
+        const index = frameOf(lamp), map = index === null ? undefined : lamp.maps.get(index);
         material.visible = map !== undefined;
         if (map) (material.uniforms.map as {value: Texture}).value = map;
       }

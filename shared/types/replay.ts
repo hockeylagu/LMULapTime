@@ -117,6 +117,8 @@ export interface ReplayTrajectoryPoint {
   pitLimiter?: boolean;
   /** The car's headlights are lit, flashes included (a flash is a train of short toggles). */
   headlights?: boolean;
+  /** The car's rain light is on: the track's rain is above the car's own threshold (not tied to wet tyres). */
+  rainLight?: boolean;
   tireTemps?: [number, number, number, number];
   tireWear?: [number, number, number, number];
   tirePressures?: [number, number, number, number];

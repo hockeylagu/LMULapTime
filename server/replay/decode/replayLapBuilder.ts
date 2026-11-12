@@ -15,6 +15,7 @@ export interface RawTrajectoryPoint {
   absActive?: boolean;
   pitLimiter?: boolean;
   headlights?: boolean;
+  rainLight?: boolean;
   gearRaw?: number;
   speedKmhRaw?: number;
   /** Measured motion in ISO 8855 vehicle axes (replayPose.ts poseMotion). */
