@@ -78,6 +78,14 @@ describe('SessionRaceStandings', () => {
       expect(row).toHaveAccessibleName(expect.stringContaining(`P${driver.classPosition} in ${driver.carClass}`));
     }
   });
+  it('shows the places gained within the class beside a class position', () => {
+    render(<SessionRaceStandings session={makeSession([
+      makeDriver({ name: 'Hypercar driver', carClass: 'Hyper', position: 2, classPosition: 2, positionGain: 1, classPositionGain: 1 }),
+      makeDriver({ name: 'GT3 driver', carClass: 'GT3', position: 19, classPosition: 4, positionGain: 18, classPositionGain: 9 }),
+    ])} selectedDriverOrdinal={1} setSelectedDriverOrdinal={vi.fn()} isMultiClass />);
+    const gain = within(screen.getByText('GT3 driver').closest('tr')!).getAllByRole('cell')[1];
+    expect(gain).toHaveTextContent('+9');
+  });
   it('uses the site accent at 15% opacity for the selected driver row', () => {
     const selectedDriver = makeDriver({ name: 'Selected Driver', carNumber: '50' });
     const otherDriver = makeDriver({ name: 'Other Driver', position: 2, classPosition: 2, carNumber: '5' });

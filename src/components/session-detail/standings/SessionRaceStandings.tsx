@@ -19,9 +19,9 @@ function getBestLap(driver: DriverData) {
   return driver.laps.find((lap) => lap.lapNumber === driver.bestLapNumber) || driver.laps.find((lap) => lap.lapTime === driver.bestLapTime);
 }
 
-function getSortValue(driver: DriverData, column: SortableColumn): number | null {
+function getSortValue(driver: DriverData, column: SortableColumn, isMultiClass: boolean): number | null {
   if (column === 'position') return driver.position > 0 ? driver.position : null;
-  if (column === 'gain') return driver.positionGain ?? null;
+  if (column === 'gain') return (isMultiClass && driver.classPosition > 0 ? driver.classPositionGain : driver.positionGain) ?? null;
   if (column === 'number') {
     const carNumber = Number.parseInt(driver.carNumber, 10);
     return Number.isNaN(carNumber) ? null : carNumber;
@@ -70,8 +70,8 @@ export const SessionRaceStandings: React.FC<SessionRaceStandingsProps> = ({
     return (firstDriver.position || Number.MAX_SAFE_INTEGER) - (secondDriver.position || Number.MAX_SAFE_INTEGER);
   });
   const displayDrivers = [...sortedDrivers].sort((firstDriver, secondDriver) => {
-    const firstValue = getSortValue(firstDriver, sortColumn);
-    const secondValue = getSortValue(secondDriver, sortColumn);
+    const firstValue = getSortValue(firstDriver, sortColumn, isMultiClass);
+    const secondValue = getSortValue(secondDriver, sortColumn, isMultiClass);
     if (firstValue === null && secondValue === null) return 0;
     if (firstValue === null) return 1;
     if (secondValue === null) return -1;

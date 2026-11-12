@@ -147,7 +147,7 @@ const DriverPerformanceContent: React.FC<DriverPerformancePanelProps & { selecte
             drivers={session.drivers ?? []}
             averages={{ s1: avgS1, s2: avgS2, s3: avgS3, lap: avgLapTime }}
           />
-          {isRaceSession && <DriverRaceStandingsRow selectedDriver={selectedDriver} isMultiClass={isMultiClass} />}
+          {isRaceSession && <DriverRaceStandingsRow session={session} selectedDriver={selectedDriver} isMultiClass={isMultiClass} />}
         </div>
       </div>
     </section>

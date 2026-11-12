@@ -48,6 +48,8 @@ export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = (
   const overallPosition = d.position > 0 ? `P${d.position}` : '-';
   const hasClassPosition = isMultiClass && d.classPosition > 0;
   const primaryPosition = hasClassPosition ? `P${d.classPosition}` : overallPosition;
+  // The gain follows the position shown: within the class when that is the primary figure.
+  const gain = (hasClassPosition ? d.classPositionGain : d.positionGain) ?? null;
   const finish = raceFinishSeconds(d, finishFromXml);
   const raceTime = finish !== null ? formatElapsedSeconds(finish) : '-';
   const finishStatus = d.finishStatus || (d.position > 0 ? 'Finished' : 'Unknown');
@@ -88,8 +90,8 @@ export const SessionRaceStandingsRow: React.FC<SessionRaceStandingsRowProps> = (
       </td>
       {isRace && (
         <td className="px-3.5 py-2.5 text-center font-mono font-bold">
-          <span className={d.positionGain && d.positionGain > 0 ? 'text-lmu-gain' : d.positionGain && d.positionGain < 0 ? 'text-lmu-loss' : 'text-lmu-text-soft'}>
-            {d.positionGain === null || d.positionGain === undefined ? '-' : d.positionGain > 0 ? `+${d.positionGain}` : d.positionGain}
+          <span className={gain !== null && gain > 0 ? 'text-lmu-gain' : gain !== null && gain < 0 ? 'text-lmu-loss' : 'text-lmu-text-soft'}>
+            {gain === null ? '-' : gain > 0 ? `+${gain}` : gain}
           </span>
         </td>
       )}
