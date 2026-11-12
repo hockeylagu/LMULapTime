@@ -7,7 +7,7 @@ import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js
 import type { LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import { descriptorTexturePath, normalizeVehicleId } from '../../../../../shared/packageContract/index.js';
 import { createCarMaterial, materialTexturePaths } from '../car/carMaterials.js';
-import { createLampMaterial, lampFrame, lampTexturePaths } from '../car/carLamps.js';
+import { createLampMaterial, lampFrame, lampGlow, lampTexturePaths, surfaceLamp } from '../car/carLamps.js';
 import { createLampStates, flashes, lampStateFrames, rainLampsFlash, switches } from '../car/lampStates.js';
 import { createContactShadow } from '../car/carContactShadow.js';
 import { MAP_COLORS, TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
@@ -39,18 +39,19 @@ export interface CarTextures {
 /** The model node the car body's fixed parts hang under, in the body's file and in its interior's. */
 const CHASSIS = 'chassis';
 
-/**
- * Gives a glow mesh its lamps' materials: each material slot a drawn lamp covers (one of the lamp's nodes is the mesh or holds it, and
- * the slot is the lamp's GLB material) takes that lamp's material, the other slots draw nothing. False when no slot is drawn. A mesh of
- * a lamp the player's own car leaves out in the cockpit is marked for the outside view only. `rainFlashes`: see `rainLampsFlash`.
- */
 /** Whether a lamp lights with the rain light: a rain lamp, or a pit lamp whose light a rain lamp also lists (same material and a node). */
 function lightsWithRain(lamp: CarLamp, lamps: readonly CarLamp[]): boolean {
   if (lamp.role === 'rain') return true;
   return lamp.role === 'pit' && lamps.some(row => row.role === 'rain' && row.material === lamp.material && row.nodes.some(name => lamp.nodes.includes(name)));
 }
 
-function lightGlowMesh(mesh: Mesh<BufferGeometry, Material | Material[]>, drawn: CarLamp[], rainFlashes: boolean, material: (lamp: CarLamp) => Material): boolean {
+/**
+ * Gives a glow mesh its lamps' materials: each material slot a drawn lamp covers (one of the lamp's nodes is the mesh or holds it, and
+ * the slot is the lamp's GLB material) takes `material(lamp, slot)` (a lamp material, or a surface lamp's car material), the other
+ * slots draw nothing. False when no slot is drawn. A mesh of a lamp the player's own car leaves out in the cockpit is marked for the
+ * outside view only. `rainFlashes`: see `rainLampsFlash`.
+ */
+function lightGlowMesh(mesh: Mesh<BufferGeometry, Material | Material[]>, drawn: CarLamp[], rainFlashes: boolean, material: (lamp: CarLamp, current: Material) => Material): boolean {
   const unseen = new MeshBasicMaterial({ visible: false }), names = new Set<string>();
   for (let at: Object3D | null = mesh; at; at = at.parent) names.add(at.name);
   const covering = drawn.filter(lamp => lamp.nodes.some(name => names.has(PropertyBinding.sanitizeNodeName(name))));
@@ -61,7 +62,7 @@ function lightGlowMesh(mesh: Mesh<BufferGeometry, Material | Material[]>, drawn:
     const lamp = matching.find(row => flashes(row, rainFlashes)) ?? matching.find(row => switches(row, rainFlashes)) ?? matching[0];
     if (!lamp) return unseen;
     lit = true; hidden ||= lamp.hiddenInOwnCockpit === true;
-    return material(lamp);
+    return material(lamp, current);
   };
   mesh.material = Array.isArray(mesh.material) ? mesh.material.map(slot) : slot(mesh.material);
   mesh.castShadow = false; mesh.receiveShadow = false;
@@ -112,12 +113,15 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
       if (!recipe) throw Error(`Car material ${material.name} has no descriptor recipe`);
       return recipe;
     };
-    // Glow materials (lamp glow meshes, brake disc glow) are drawn only through a lamp whose frame is known.
+    // Glow materials (lamp glow meshes, brake disc glow) are drawn only through a lamp whose frame is known, or a surface lamp's
+    // own material (`surfaceLamp`).
     const glow = new Set(car.descriptor.glowMaterialIds);
+    const surfaces = car.descriptor.lamps.filter(lamp => surfaceLamp(lamp, car.descriptor.materials));
     const rainFlashes = rainLampsFlash(car.descriptor.lamps);
-    const drawn = car.descriptor.lamps.filter(lamp => lampFrame(lamp, rainFlashes) !== null);
+    const glows = new Map(car.descriptor.lamps.map(lamp => [lamp, lampGlow(lamp, car.descriptor.materials)] as const));
+    const drawn = car.descriptor.lamps.filter(lamp => lampFrame(lamp, rainFlashes, glows.get(lamp)!) !== null);
     // The GLB loader drops `.`, `:`, `/`, `[` and `]` from node names; lamp nodes are the GLB's own names.
-    for (const lamp of drawn) for (const name of lamp.nodes) if (!template.getObjectByName(PropertyBinding.sanitizeNodeName(name))) throw Error(`Car ${car.vehicleId} has no lamp node ${name}`);
+    for (const lamp of [...drawn, ...surfaces]) for (const name of lamp.nodes) if (!template.getObjectByName(PropertyBinding.sanitizeNodeName(name))) throw Error(`Car ${car.vehicleId} has no lamp node ${name}`);
     const isGlow = (object: Object3D) => {
       if (!(object instanceof Mesh)) return false;
       const list: Material[] = Array.isArray(object.material) ? object.material as Material[] : [object.material as Material];
@@ -133,13 +137,16 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
         for (const path of materialTexturePaths(recipeOf(material), appearance)) paths.set(path, interior && paths.get(path) !== false);
       }
     });
+    // A surface lamp's slot is a car part on a glow mesh: its material's textures load like the other parts'.
+    const surfaceNames = new Set(surfaces.map(lamp => lamp.material));
+    for (const recipe of car.descriptor.materials) if (surfaceNames.has(recipe.name)) for (const path of materialTexturePaths(recipe, appearance)) paths.set(path, false);
     // A lamp draws its frames' textures as loaded, so a frame loads from its own file, never from a start file.
-    const frames = new Set(drawn.flatMap(lamp => lampTexturePaths(lamp, rainFlashes)));
+    const frames = new Set(drawn.flatMap(lamp => lampTexturePaths(lamp, rainFlashes, glows.get(lamp)!)));
     for (const frame of frames) paths.set(frame, false);
     const starts = new Map(car.resource.textures.flatMap(row => row.start ? [[descriptorTexturePath(row.sha256), descriptorTexturePath(row.start.sha256)] as const] : []));
     const textures = new Map(await Promise.all([...paths].map(async ([path, interior]) =>
       [path, await carTextures.load(path, interior, frames.has(path) ? undefined : starts.get(path))] as const)));
-    return {template, appearance, recipeOf, isGlow, drawn, rainFlashes, textures, interiorPaths: paths, hiddenNames: new Set([...hidden].map(node => node.name))};
+    return {template, appearance, recipeOf, isGlow, drawn, glows, surfaces, rainFlashes, textures, interiorPaths: paths, hiddenNames: new Set([...hidden].map(node => node.name))};
   };
   /** A livery's parsed model and loaded textures, shared by every instance of that car (and by `preload`). */
   const parts = new WeakMap<LoadedBody, ReturnType<typeof loadParts>>();
@@ -154,18 +161,25 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
   };
   /** A car instance of the lap's livery: the shared geometry with one material per native material, textures preloaded. */
   const loadModel = async (car: LoadedBody): Promise<Group> => {
-    const {template, appearance, recipeOf, isGlow, drawn, rainFlashes, textures, interiorPaths, hiddenNames} = await partsOf(car);
+    const {template, appearance, recipeOf, isGlow, drawn, glows, surfaces, rainFlashes, textures, interiorPaths, hiddenNames} = await partsOf(car);
     const copyOf = (path: string) => {
       const original = textures.get(path)!, copy = original.clone();
       carTextures.copied(copy, original, interiorPaths.get(path) === true);
       return copy;
     };
-    const model = template.clone(true), materials = new Map<string, Material>(), glowMeshes: Object3D[] = [];
+    const model = template.clone(true), glowMeshes: Object3D[] = [];
     for (const name of hiddenNames) model.getObjectByName(name)?.removeFromParent();
     model.traverse(object => { if (isGlow(object)) glowMeshes.push(object); });
     // One material per lamp.
-    const lampMaterials = new Map<CarLamp, Material>();
-    for (const mesh of glowMeshes) if (!lightGlowMesh(mesh as Mesh<BufferGeometry, Material | Material[]>, drawn, rainFlashes, lamp => {
+    const lampMaterials = new Map<CarLamp, Material>(), materials = new Map<string, Material>();
+    const replace = (material: Material) => {
+      const recipe = recipeOf(material);
+      let created = materials.get(recipe.id);
+      if (!created) { created = createCarMaterial(recipe, appearance, copyOf, shading); materials.set(recipe.id, created); }
+      return created;
+    };
+    for (const mesh of glowMeshes) if (!lightGlowMesh(mesh as Mesh<BufferGeometry, Material | Material[]>, [...drawn, ...surfaces], rainFlashes, (lamp, current) => {
+      if (surfaces.includes(lamp)) return replace(current);
       let created = lampMaterials.get(lamp);
       if (created) return created;
       // A lamp with states switches between its own copies of each state's frame; it starts on its off frame.
@@ -173,18 +187,13 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
         const frame = lamp.frames[index];
         return frame === null ? [] : [[index, copyOf(frame)] as const];
       }))} : undefined;
-      created = createLampMaterial(lamp, switching?.maps.get(lamp.states!.off ?? lamp.states!.on!) ?? copyOf(lampFrame(lamp, rainFlashes)!), switching);
+      const glow = glows.get(lamp)!;
+      created = createLampMaterial(lamp, glow, switching?.maps.get(lamp.states!.off ?? lamp.states!.on!) ?? copyOf(lampFrame(lamp, rainFlashes, glow)!), switching);
       lampMaterials.set(lamp, created);
       return created;
     })) mesh.removeFromParent();
     model.traverse(object => {
       if (!(object instanceof Mesh) || glowMeshes.includes(object)) return;
-      const replace = (material: Material) => {
-        const recipe = recipeOf(material);
-        let created = materials.get(recipe.id);
-        if (!created) { created = createCarMaterial(recipe, appearance, copyOf, shading); materials.set(recipe.id, created); }
-        return created;
-      };
       object.material = Array.isArray(object.material) ? object.material.map(replace) : replace(object.material as Material);
       object.castShadow = true; object.receiveShadow = true;
     });
