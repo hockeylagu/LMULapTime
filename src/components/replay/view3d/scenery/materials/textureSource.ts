@@ -1,7 +1,7 @@
 import { LinearFilter, LinearMipmapLinearFilter, RepeatWrapping, SRGBColorSpace, NoColorSpace, type CompressedTexture, type Texture, type WebGLRenderer } from 'three';
 import type { CachedKtx2Loader } from '../cachedKtx2Loader.js';
 import { textureAsset, type SurfaceMap } from './surfaceConfig.js';
-import { startStreaming, stopStreaming } from './mipStreaming.js';
+import { startStreaming } from './mipStreaming.js';
 
 /** Anisotropic filtering of scenery and car textures (three caps it at the GPU's maximum): sharp markings and liveries at grazing angles. */
 export const MAX_ANISOTROPY = 16;
@@ -61,7 +61,7 @@ export function createSurfaceTexturePool(ktx2: CachedKtx2Loader, renderer: WebGL
     entry.owners--;
     if (entry.owners) return;
     if (entries.get(key) === entry) entries.delete(key);
-    void entry.pending.then(texture => { stopStreaming(texture); texture.dispose(); }, () => undefined);
+    void entry.pending.then(texture => texture.dispose(), () => undefined);
   };
   return {
     source(uris: ReadonlyMap<string, string>): SurfaceTextureSource & {dispose(): void} {

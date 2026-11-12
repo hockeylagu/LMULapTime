@@ -1,6 +1,6 @@
 import { CompressedTexture, DataTexture, RGBA_BPTC_Format, SRGBColorSpace, type Texture, type WebGLRenderer } from 'three';
 import { expect, it, vi } from 'vitest';
-import { isStreaming, startStreaming, stopStreaming, STREAMED_LEVELS, streamTexture, type MipLevel } from '../../../../../src/components/replay/view3d/scenery/materials/mipStreaming.js';
+import { isStreaming, startStreaming, STREAMED_LEVELS, streamTexture, type MipLevel } from '../../../../../src/components/replay/view3d/scenery/materials/mipStreaming.js';
 
 const MiB = 1024 * 1024;
 const GL = {TEXTURE_2D: 0xde1, TEXTURE_BASE_LEVEL: 0x813c, UNPACK_FLIP_Y_WEBGL: 0x9240, UNPACK_PREMULTIPLY_ALPHA_WEBGL: 0x9241, UNPACK_ALIGNMENT: 0xcf5, RGBA: 0x1908, UNSIGNED_BYTE: 0x1401};
@@ -53,8 +53,21 @@ it('fills the reduced levels on allocation, then streams the top levels in budge
   texture.onUpdate?.(texture);
   expect(gpu.compressed().slice(before + 5).map(([level]) => level)).toEqual(Array.from({length: 12}, (_, i) => i));
   expect(gpu.baseLevels().at(-1)).toBe(0);
-  stopStreaming(texture);
+  texture.dispose();
   expect(texture.onUpdate).toBeNull();
+});
+
+it('drops detail that finishes after the texture is disposed', async () => {
+  const gpu = fakeRenderer(), texture = bc7(512);
+  let finish!: (levels: MipLevel[]) => void;
+  const detail = new Promise<MipLevel[]>(resolve => { finish = resolve; });
+  startStreaming(texture, gpu.renderer, {missing: 1, load: () => detail});
+  expect(streamTexture(texture, gpu.renderer, MiB)).toBe(0);
+  texture.dispose();
+  finish((bc7(1024).mipmaps as MipLevel[]).slice(0, 1));
+  await detail;
+  expect([isStreaming(texture), texture.onUpdate, texture.mipmaps[0].data.byteLength]).toEqual([false, null, 0]);
+  expect(streamTexture(texture, gpu.renderer, MiB)).toBe(0);
 });
 
 it('copies at least one row of a raw texture with a clean unpack state, and waits for the texture to be on the GPU', () => {

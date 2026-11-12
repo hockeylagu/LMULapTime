@@ -46,6 +46,12 @@ export function startStreaming(texture: Texture, renderer: WebGLRenderer, detail
   texture.source = source;
   const stream: Stream = {levels, missing, level: missing - 1, row: 0, detail};
   streams.set(texture, stream);
+  const release = () => {
+    streams.delete(texture);
+    texture.onUpdate = null;
+    texture.removeEventListener('dispose', release);
+  };
+  texture.addEventListener('dispose', release);
   // Runs right after each allocation, with the texture bound: refill the reduced levels and sample only those, or every level
   // once the texture had finished streaming (a later allocation would otherwise leave its storage empty).
   texture.onUpdate = () => {
@@ -80,12 +86,6 @@ export function isStreaming(texture: Texture): boolean {
   return stream !== undefined && !stream.failed;
 }
 
-/** Forgets a texture's missing levels and stops refilling it (its chunks released it). */
-export function stopStreaming(texture: Texture): void {
-  streams.delete(texture);
-  texture.onUpdate = null;
-}
-
 /**
  * Copies up to `budgetBytes` of a texture's missing levels (at least one band) and returns the bytes copied: 0 when it is
  * full, released, not on the GPU yet or waiting for its missing levels. A level joins the sampled range when its last band lands.
@@ -97,10 +97,12 @@ export function streamTexture(texture: Texture, renderer: WebGLRenderer, budgetB
     const load = stream.detail;
     stream.detail = undefined; stream.waiting = true; detailRequests++;
     void load.load().then(detail => {
+      if (streams.get(texture) !== stream) return;
       if (detail.length !== stream.missing || detail[0].width !== stream.levels[0].width || detail[0].height !== stream.levels[0].height) throw Error('A texture file does not hold the levels above its start file');
       detail.forEach((level, index) => { stream.levels[index] = level; });
       stream.waiting = false;
     }).catch((error: unknown) => {
+      if (streams.get(texture) !== stream) return;
       // The texture stays on its reduced levels; the failed read is reported, not hidden.
       stream.failed = true;
       reportError(error);
