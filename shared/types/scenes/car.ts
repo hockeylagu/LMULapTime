@@ -123,7 +123,8 @@ export interface CarLamp {
   /** Texture paths relative to `vehicles/`, one per frame; null where the package has no texture (nothing to draw). */
   frames: Array<string | null>;
   animation: { method: string | null; rate: number | null; sequence: number[] | null };
-  emission: { scale: number; vertexColour: boolean; viewBoost: { gain: number; power: number } | null; ambientScaled: boolean; vertexAlpha: boolean };
+  /** Null for a lamp the game draws with a lit shader rather than a lamp shader (not drawn). */
+  emission: { scale: number; vertexColour: boolean; viewBoost: { gain: number; power: number } | null; ambientScaled: boolean; vertexAlpha: boolean } | null;
   blend: 'alpha' | 'opaque';
   states: { off: number | null; on: number | null; brake: number | null } | null;
   /** Drawn lit by day with no input from the car; null where not observed. */

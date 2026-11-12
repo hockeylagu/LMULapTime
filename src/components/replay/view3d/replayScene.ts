@@ -236,11 +236,11 @@ export async function createReplayScene(
     if (disposed || frame || document.hidden) return;
     frame = requestAnimationFrame(now => { frame = 0; draw(now); });
   };
-  /** Puts a car on a sampled pose: the body when the pose has a heading, else the plain pose marker. */
-  const placeCar = (car: Object3D, pose: RenderPose, wheels: WheelAnimation | null) => {
+  /** Puts a car on a sampled pose: the body when the pose has a heading, else the plain pose marker; wheels and lights follow it. */
+  const placeCar = (car: Object3D, pose: RenderPose, wheels: WheelAnimation | null, lights: Array<{update(pose: RenderPose): void}>) => {
     car.position.set(pose.x - origin.x, pose.y - origin.y, pose.z - origin.z);
     if (pose.orientation) car.quaternion.copy(pose.orientation); else car.quaternion.identity();
-    wheels?.update(pose);
+    wheels?.update(pose); for (const light of lights) light.update(pose);
     car.getObjectByName('body-envelope')!.visible = pose.yaw !== undefined;
     car.getObjectByName('pose-marker')!.visible = pose.yaw === undefined;
   };
@@ -277,11 +277,11 @@ export async function createReplayScene(
     },
     beforeFrame(hook) { frameHook = hook; },
     cursor(index, fraction) {
-      const {trajectory, baseline, primary, ghost, primaryWheels, ghostWheels, primaryDistances, baselineDistances, ghostClock} = layer;
+      const {trajectory, baseline, primary, ghost, primaryWheels, ghostWheels, primaryLights, ghostLights, primaryDistances, baselineDistances, ghostClock} = layer;
       const pose = sampleRenderPose(trajectory.points, index, fraction);
       primary.visible = pose !== null;
       if (!pose) { invalidate(); return; }
-      placeCar(primary, pose, primaryWheels);
+      placeCar(primary, pose, primaryWheels, primaryLights);
       const sample = trajectory.points[pose.index], nextSample = trajectory.points[pose.index + 1];
       const timeSec = (sample.timeSec ?? pose.index / 40) + ((nextSample?.timeSec ?? sample.timeSec ?? 0) - (sample.timeSec ?? 0)) * pose.fraction;
 
@@ -291,7 +291,7 @@ export async function createReplayScene(
       const ghostStation = ghostClock ? ghostDistanceAt(ghostClock, syncMode, station, anchorDistM) : station;
       const other = baseline ? sampleStationPose(baseline.points, baselineDistances, ghostStation) : null;
       ghost.visible = other !== null;
-      if (other) placeCar(ghost, other, ghostWheels);
+      if (other) placeCar(ghost, other, ghostWheels, ghostLights);
       rig.follow({target: target.set(...nativeToScene(pose, origin)), yaw: pose.yaw ?? 0, timeSec, stationM: station, index, fraction});
       invalidate();
     },

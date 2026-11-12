@@ -1,24 +1,37 @@
-import { NormalBlending, ShaderMaterial, type Texture } from 'three';
+import { NormalBlending, RepeatWrapping, ShaderMaterial, type Texture } from 'three';
 import type { CarLamp } from '../../../../../shared/types/scenes/car.js';
 import { SUN_UNIT } from '../atmosphere/sunSamples.js';
+import { lampStateFrames, switches, type LampSwitch } from './lampStates.js';
 
 /**
- * The frame a glow lamp shows by day, or null when it is not drawn: only lamps whose `states.off` is known (headlight and
- * brake glow) are, and not when the package has no texture for that frame. A lit state is not drawn yet.
+ * The frame a lamp draws by default, or null when it is not drawn: only lamps whose `states.off` is known (or a flashing pit lamp's
+ * lit frame) are, and not when the package has no texture for that frame or the game draws the lamp with a lit shader (no emission).
  */
-export function unlitFrame(lamp: CarLamp): string | null {
-  const index = lamp.states?.off;
-  return index === null || index === undefined ? null : lamp.frames[index];
+export function lampFrame(lamp: CarLamp): string | null {
+  // A flashing pit lamp without a dark frame is drawn from its lit frame and hidden while dark.
+  const index = lamp.role === 'pit' && switches(lamp) ? lamp.states.off ?? lamp.states.on : lamp.states?.off;
+  return !lamp.emission || index === null || index === undefined ? null : lamp.frames[index];
+}
+
+/** The texture files a drawn lamp loads: every state's frame that has a texture for a switching lamp, else the one frame it shows. */
+export function lampTexturePaths(lamp: CarLamp): string[] {
+  if (!switches(lamp)) return [lampFrame(lamp)!];
+  return lampStateFrames(lamp.states).flatMap(index => lamp.frames[index] ?? []);
 }
 
 /**
  * A lamp's glow, unlit: rgb = tex.rgb · scale · tex.a · (1 + gain · (N·V)^power) in the package's light unit, blended with the
- * texture's alpha when `blend` is alpha. Vertex colour and ambient scaling are not supported yet, so a lamp asking for them throws.
+ * texture's alpha when `blend` is alpha. A lamp with states takes `switching`, its own texture per frame, which its car swaps in.
+ * Vertex colour and ambient scaling are not supported yet, so a lamp asking for them throws.
  */
-export function createLampMaterial(lamp: CarLamp, texture: Texture): ShaderMaterial {
+export function createLampMaterial(lamp: CarLamp, texture: Texture, switching?: LampSwitch): ShaderMaterial {
+  if (!lamp.emission) throw Error(`Lamp ${lamp.material} has no lamp emission`);
   const {scale, vertexColour, viewBoost, ambientScaled, vertexAlpha} = lamp.emission;
   if (vertexColour || ambientScaled || vertexAlpha) throw Error(`Lamp ${lamp.material}: vertex colour and ambient scaled emission are not supported`);
   const alpha = lamp.blend === 'alpha';
+  // `texture` is this material's own copy. Lamp UVs run outside 0..1 (a glow quad's v from 0 to -1), so the texture repeats as
+  // car textures do; clamped, the whole glow would sample the texture's transparent edge.
+  for (const map of [texture, ...switching?.maps.values() ?? []]) { map.wrapS = RepeatWrapping; map.wrapT = RepeatWrapping; }
   const material = new ShaderMaterial({
     name: `lamp-${lamp.material}`,
     uniforms: {
@@ -44,5 +57,6 @@ export function createLampMaterial(lamp: CarLamp, texture: Texture): ShaderMater
       }`,
     transparent: alpha, blending: NormalBlending, depthWrite: !alpha,
   });
+  if (switching) material.userData.lampSwitch = switching;
   return material;
 }

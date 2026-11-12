@@ -6,7 +6,8 @@ import type { SceneryShading } from '../../../../../shared/types/scenes/scenery.
 import type { ReplayTrajectoryData } from '../../../../../shared/types/replay.js';
 import { normalizeVehicleId, type LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import { createCarMaterial, materialTexturePaths } from '../car/carMaterials.js';
-import { createLampMaterial, unlitFrame } from '../car/carLamps.js';
+import { createLampMaterial, lampFrame, lampTexturePaths } from '../car/carLamps.js';
+import { createLampStates, lampStateFrames, switches } from '../car/lampStates.js';
 import { createContactShadow } from '../car/carContactShadow.js';
 import { MAP_COLORS, TELEMETRY_COLORS } from '../../../../utils/themeColors.js';
 import { getDistancesInReferenceFrame, getTrajectoryDistances } from '../../../../utils/lapAlignment.js';
@@ -50,7 +51,8 @@ function lightGlowMesh(mesh: Mesh<BufferGeometry, Material | Material[]>, drawn:
   const covering = drawn.filter(lamp => lamp.nodes.some(name => names.has(PropertyBinding.sanitizeNodeName(name))));
   let lit = false, hidden = false;
   const slot = (current: Material) => {
-    const lamp = covering.find(row => row.material === current.name);
+    // A mesh both a rain and a pit lamp list (a shared rear light) follows the one that switches: only the pit lamp lights.
+    const matching = covering.filter(row => row.material === current.name), lamp = matching.find(switches) ?? matching[0];
     if (!lamp) return unseen;
     lit = true; hidden ||= lamp.hiddenInOwnCockpit === true;
     return material(lamp);
@@ -104,9 +106,9 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
       if (!recipe) throw Error(`Car material ${material.name} has no descriptor recipe`);
       return recipe;
     };
-    // Glow materials (lamp glow meshes, brake disc glow) are drawn only through a lamp whose unlit frame is known.
+    // Glow materials (lamp glow meshes, brake disc glow) are drawn only through a lamp whose frame is known.
     const glow = new Set(car.descriptor.glowMaterialIds);
-    const drawn = car.descriptor.lamps.filter(lamp => unlitFrame(lamp) !== null);
+    const drawn = car.descriptor.lamps.filter(lamp => lampFrame(lamp) !== null);
     // The GLB loader drops `.`, `:`, `/`, `[` and `]` from node names; lamp nodes are the GLB's own names.
     for (const lamp of drawn) for (const name of lamp.nodes) if (!template.getObjectByName(PropertyBinding.sanitizeNodeName(name))) throw Error(`Car ${car.vehicleId} has no lamp node ${name}`);
     const isGlow = (object: Object3D) => {
@@ -124,8 +126,8 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
         for (const path of materialTexturePaths(recipeOf(material), appearance)) paths.set(path, interior && paths.get(path) !== false);
       }
     });
-    // A lamp draws its frame's texture as loaded, so a frame loads from its own file, never from a start file.
-    const frames = new Set(drawn.map(lamp => unlitFrame(lamp)!));
+    // A lamp draws its frames' textures as loaded, so a frame loads from its own file, never from a start file.
+    const frames = new Set(drawn.flatMap(lampTexturePaths));
     for (const frame of frames) paths.set(frame, false);
     const starts = new Map(car.resource.textures.flatMap(row => row.start ? [[row.asset.slice(CARS_FOLDER.length), row.start.asset.slice(CARS_FOLDER.length)] as const] : []));
     const textures = new Map(await Promise.all([...paths].map(async ([path, interior]) =>
@@ -154,10 +156,18 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     const model = template.clone(true), materials = new Map<string, Material>(), glowMeshes: Object3D[] = [];
     for (const name of hiddenNames) model.getObjectByName(name)?.removeFromParent();
     model.traverse(object => { if (isGlow(object)) glowMeshes.push(object); });
+    // One material per lamp.
     const lampMaterials = new Map<CarLamp, Material>();
     for (const mesh of glowMeshes) if (!lightGlowMesh(mesh as Mesh<BufferGeometry, Material | Material[]>, drawn, lamp => {
       let created = lampMaterials.get(lamp);
-      if (!created) { created = createLampMaterial(lamp, textures.get(unlitFrame(lamp)!)!); lampMaterials.set(lamp, created); }
+      if (created) return created;
+      // A lamp with states switches between its own copies of each state's frame; it starts on its off frame.
+      const switching = switches(lamp) ? {role: lamp.role, states: lamp.states, maps: new Map(lampStateFrames(lamp.states).flatMap(index => {
+        const frame = lamp.frames[index];
+        return frame === null ? [] : [[index, copyOf(frame)] as const];
+      }))} : undefined;
+      created = createLampMaterial(lamp, switching?.maps.get(lamp.states!.off ?? lamp.states!.on!) ?? copyOf(lampFrame(lamp)!), switching);
+      lampMaterials.set(lamp, created);
       return created;
     })) mesh.removeFromParent();
     model.traverse(object => {
@@ -189,6 +199,8 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     const cars = await built, primary = cars.primary, ghost = baseline && cars.ghost ? cars.ghost : new Group();
     const primaryWheels = createWheelAnimation(primary, trajectory, surfaceHeight);
     const ghostWheels = baseline ? createWheelAnimation(ghost, baseline, surfaceHeight) : null;
+    const lights = (car: Group, points: ReplayTrajectoryData['points']) => [createLampStates(car, points)].filter(light => light !== null);
+    const primaryLights = lights(primary, trajectory.points), ghostLights = baseline ? lights(ghost, baseline.points) : [];
     let colors = racingLineColors(trajectory, baseline, colorBy);
     const primaryLine = makeRacingLine(trajectory, origin, colors.primary, surfaceHeight, display);
     const baselineLine = baseline ? makeRacingLine(baseline, origin, colors.baseline, surfaceHeight, display, BASELINE_LINE.widthM, BASELINE_LINE.liftM) : null;
@@ -196,7 +208,7 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
     const primaryDistances = getTrajectoryDistances(trajectory.points, trajectory.trackLengthM);
     const baselineDistances = baseline ? getDistancesInReferenceFrame(baseline.points, trajectory.points, trajectory.trackLengthM) : [];
     return {
-      root, trajectory, baseline, primary, ghost, primaryWheels, ghostWheels,
+      root, trajectory, baseline, primary, ghost, primaryWheels, ghostWheels, primaryLights, ghostLights,
       /** The primary car's game cameras (cockpit, hood and roof views). */
       cameras: assets.primary.descriptor.cameras.list,
       primaryDistances, baselineDistances,
