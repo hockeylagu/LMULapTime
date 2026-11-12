@@ -36,6 +36,8 @@ interface ProbeWindow { replay3dProbe: ProbeState }
 export function installProbe(skipOffscreenDraws: boolean): void {
   const state: ProbeState = {recording: false, frames: [], longTasks: [], programLinks: 0};
   (window as unknown as ProbeWindow).replay3dProbe = state;
+  // The default buffer keeps 250 resource entries: a first view fetches several hundred package files, so the rest would go uncounted.
+  performance.setResourceTimingBufferSize(10_000);
   new PerformanceObserver(list => {
     for (const entry of list.getEntries()) state.longTasks.push({startMs: entry.startTime, durationMs: entry.duration});
   }).observe({type: 'longtask', buffered: true});

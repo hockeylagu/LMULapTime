@@ -109,10 +109,11 @@ export async function measureLap(options: LapOptions) {
     const failure = await page.evaluate<string | null>(`document.querySelector('[data-replay-view="3d"] [role="alert"]')?.textContent ?? null`);
     if (failure) throw Error(`3D view failed: ${failure}`);
     const loadState = await page.evaluate<ProbeState>('window.replay3dProbe');
-    // Package file requests until the first frame: how long the server took to answer (TTFB) and when the last one finished.
-    const network = await page.evaluate<{startMs: number; ttfbMs: number; endMs: number; bytes: number}[]>(`performance.getEntriesByType('resource')
+    // Package file requests until the first frame: how long each waited for a connection (queued), how long the server took to
+    // answer (TTFB) and when the last one finished.
+    const network = await page.evaluate<{startMs: number; queuedMs: number; ttfbMs: number; endMs: number; bytes: number}[]>(`performance.getEntriesByType('resource')
       .filter(entry => entry.name.includes('/api/data-plugin/'))
-      .map(entry => ({startMs: entry.startTime, ttfbMs: entry.responseStart - entry.requestStart, endMs: entry.responseEnd, bytes: entry.encodedBodySize}))`);
+      .map(entry => ({startMs: entry.startTime, queuedMs: entry.requestStart - entry.startTime, ttfbMs: entry.responseStart - entry.requestStart, endMs: entry.responseEnd, bytes: entry.encodedBodySize}))`);
     const loadProfile = profileLoad ? await stopProfile() : null;
 
     // Let the first view's deferred work drain, then record the lap playing.
@@ -144,7 +145,7 @@ export async function measureLap(options: LapOptions) {
         readyMs, longTasks: longTaskSummary(loadState.longTasks),
         packageFiles: {
           count: network.length, MiB: round(network.reduce((sum, entry) => sum + entry.bytes, 0) / 1048576, 1),
-          ttfbMs: distribution(network.map(entry => entry.ttfbMs)),
+          queuedMs: distribution(network.map(entry => entry.queuedMs)), ttfbMs: distribution(network.map(entry => entry.ttfbMs)),
           firstStartMs: round(Math.min(...network.map(entry => entry.startMs)), 0), lastEndMs: round(Math.max(0, ...network.map(entry => entry.endMs)), 0),
         },
         ...(loadProfile ? {mainThreadWasmMs: wasmMs(loadProfile)} : {}),
