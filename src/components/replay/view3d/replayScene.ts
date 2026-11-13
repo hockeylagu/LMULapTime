@@ -15,7 +15,7 @@ import { addSceneEnvironment, sceneSun, VENUE_PROBE_PX } from './sceneEnvironmen
 import { linkPrefilters } from './prefilterLink.js';
 import { linkConvolution } from './reflectionCube.js';
 import { createAutoExposure } from './autoExposure.js';
-import { CAR_REFLECTION_PX, createCarReflection } from './car/carReflection.js';
+import { CAR_REFLECTION_PX, CAR_REFLECTION_STEPS, createCarReflection } from './car/carReflection.js';
 import { CachedKtx2Loader, type TextureStartFile } from './scenery/cachedKtx2Loader.js';
 import { createChunkLoader } from './scenery/chunkLoader.js';
 import { createSceneryBatches } from './scenery/sceneryBatches.js';
@@ -236,7 +236,7 @@ export async function createReplayScene(
       // The first probe completes before the first frame that shows the car, whose materials read it from their first draw.
       if (!probed && layer.primary.visible) {
         probed = true; layer.primary.getWorldPosition(probeCentre);
-        for (let pass = 0; pass < 6 && reflection.update(probeCentre); pass++);
+        for (let pass = 0; pass < CAR_REFLECTION_STEPS && reflection.update(probeCentre); pass++);
       }
       // The car the cameras follow keeps every part at its full level, however far a zoomed camera stands; the other car's
       // parts follow the camera's distance.

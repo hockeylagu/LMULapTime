@@ -5,14 +5,19 @@ import { sceneryReflectionUniforms } from '../scenery/materials/sceneryReflectio
 import { setPaintReflection } from './carPaint.js';
 
 /**
- * Face size as the reference frames' reflections (2026-11-09): 1024 px a face. One face a frame, so a probe renews every six
- * frames: each face is a full scenery pass, and three a frame cost ~5 ms of a Silverstone frame (user, 2026-11-11). How far each
+ * Face size as the reference frames' reflections (2026-11-09): 1024 px a face. One face a frame, so a probe renews every eight
+ * frames (six faces, then its two conversions): each face is a full scenery pass, and three a frame cost ~5 ms of a Silverstone frame (user, 2026-11-11). How far each
  * face sees: beyond 150 m the sky shows, the range the reference reflections reach. Each face draws its share of the scenery, so
  * the reach is the probe's cost: at 1.5 km Silverstone's frames doubled (p50 7 → 14 ms, production pass); at 300 m they matched
  * the frame without the probe.
  */
 export const CAR_REFLECTION_PX = 1024;
 const FACES_PER_FRAME = 1, NEAR_M = 0.1, FAR_M = 150;
+/**
+ * Updates a probe takes: its faces, then three's prefilter and the paint's convolution, each in a frame of its own (together with
+ * the last face they made every sixth frame the slowest of a playing lap, 2026-11-12).
+ */
+export const CAR_REFLECTION_STEPS = 6 / FACES_PER_FRAME + 2;
 /** A paused view keeps its finished probe until the car or the scenery moves. */
 const MOVED_M = 0.5;
 /** The probe's eye above the centre of the car's bounding box: roof height, as the reference frames place it (0.72 m on a GT3). */
@@ -26,7 +31,7 @@ export interface CarReflection {
   stale(): void;
   /**
    * Renders the next cube face from the car's roof, given the car's position in scene coordinates, one face a frame so no
-   * frame pays for all six. True until the frame that shows a finished probe: the caller renders another frame.
+   * frame pays for all six; the two frames after the last face convert the cube. True until the frame that shows a finished probe: the caller renders another frame.
    */
   update(car: Vector3): boolean;
   dispose(): void;
@@ -73,6 +78,8 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
   const generator = new PMREMGenerator(renderer); renderer.initRenderTarget(target);
   const prefiltered: WebGLRenderTarget = generator.fromCubemap(target.texture);
   let materials: MeshStandardMaterial[] = [], hidden: Object3D | null = null, face = 0, stale = true;
+  /** What the next update does once the faces are drawn: prefilter them for three's materials, then convolve them for the paint. */
+  let pending: 'prefilter' | 'convolve' | null = null;
   let cubes: ReflectionCubes | null = null, eyeAbove = EYE_ABOVE_CENTRE_M;
   const at = new Vector3(), probed = new Vector3(), box = new Box3(), measure = new Vector3();
   const takeReflection = () => {
@@ -97,6 +104,18 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
     },
     stale() { stale = true; },
     update(car) {
+      if (pending === 'prefilter') {
+        generator.fromCubemap(target.texture, prefiltered);
+        pending = 'convolve';
+        return true;
+      }
+      if (pending === 'convolve') {
+        pending = null;
+        const first = !cubes;
+        cubes = convolveReflection(renderer, target, shading.convolution.kernels, cubes ?? undefined); // Reuses its cube after the first probe.
+        if (first) takeReflection();
+        return true; // The next frame shows the new probe.
+      }
       if (face === 0) {
         if (!stale && cubes && probed.distanceToSquared(car) < MOVED_M * MOVED_M) return false;
         at.copy(car); stale = false;
@@ -116,13 +135,8 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
         renderer.setRenderTarget(previous);
       }
       face %= 6;
-      if (face > 0) return true;
-      probed.copy(at);
-      const first = !cubes;
-      generator.fromCubemap(target.texture, prefiltered);
-      cubes = convolveReflection(renderer, target, shading.convolution.kernels, cubes ?? undefined); // Reuses its cube after the first probe.
-      if (first) takeReflection();
-      return true; // The next frame shows the new probe.
+      if (face === 0) { probed.copy(at); pending = 'prefilter'; }
+      return true;
     },
     dispose() {
       for (const material of materials) {

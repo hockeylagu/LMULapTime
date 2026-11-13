@@ -256,6 +256,18 @@ Fuji ADESS lap, production builds, 30 s of playback, two interleaved runs each (
 The calls fell by about 180 a frame, but frame time did not move beyond run-to-run spread: one car is not what bounds this
 lap. The gain is for many cars, where the same batches can take every car of a model as instances.
 
+**The reflection probe's conversions in their own frames.** The followed car's reflection cube renders one face a frame;
+the frame of the sixth face also ran both conversions (PMREM prefilter and the paint's convolution), about one frame in
+five with over 120 offscreen draws. Each conversion now has a frame of its own after the sixth face, so the probe renews
+every eight frames (`CAR_REFLECTION_STEPS`). Same lap and builds, batching-only against staged, three interleaved runs each:
+
+| Build | Frames in 30 s | Frames over 120 offscreen draws | Frame p50 | p95 | p99 | Callback p50 |
+|---|---|---|---|---|---|---|
+| Conversions with the sixth face | 4063–4233 | 19 % | 6.5–6.7 | 10.9–11.5 | 20.4–25.2 | 6.0–6.2 |
+| Conversions staged | 4461–4550 | 2 % | 5.9–6.1 | 10.4–10.9 | 16.6–24.0 | 5.5–5.6 |
+
+About 8 % more frames and half a millisecond off the median callback; the reflection lags by two more frames, which shows nowhere.
+
 ## The scene (from the package index)
 
 | | Typical | Worst |
