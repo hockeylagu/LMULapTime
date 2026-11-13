@@ -1,10 +1,11 @@
-import { OrthographicCamera, PerspectiveCamera, Vector3 } from 'three';
+import { OrthographicCamera, PerspectiveCamera, Vector3, type Object3D } from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { MIN_CAMERA_DISTANCE, MAX_CAMERA_DISTANCE, panCamera, zoomCamera } from './cameraNavigation.js';
 import type { CameraMode } from './cameraModes.js';
 import { createChaseCameraTracker, trackCamera } from './cameraTracking.js';
 import { driverCamera, driverPose, isDriverCamera, type DriverPose } from './driverCameras.js';
-import type { LapLayer } from './laps/lapLayer.js';
+import type { ReplayTrajectoryPoint } from '../../../../shared/types/replay.js';
+import type { LoadedBody } from '../../../api/vehicles/bodyApi.js';
 import { setCockpitView } from './sceneObjects.js';
 import { createTracksideCameras } from './tracksideCameras.js';
 
@@ -26,6 +27,17 @@ export interface RigPose {
   fraction: number;
 }
 
+/**
+ * The car the cameras follow: its model (the game cameras ride on its body), its game cameras, and the samples around its pose
+ * (the chase camera's look-ahead) with their lap distances (trackside spots; none leaves trackside where it stands).
+ */
+export interface RigCar {
+  readonly primary: Object3D;
+  readonly cameras: LoadedBody['descriptor']['cameras']['list'];
+  readonly trajectory: {readonly points: ReplayTrajectoryPoint[]};
+  readonly primaryDistances: number[];
+}
+
 /** The cameras of the 3D view and how each mode moves them with the car. */
 export interface CameraRig {
   /** The perspective camera: exists from the start, so the scenery warms up for it before the rig follows a car. */
@@ -40,7 +52,7 @@ export interface CameraRig {
   /** Free views (not on a car) keep the eye above the ground and out of walls; car-mounted and overhead views do not. */
   readonly checksGround: boolean;
   /** The lap's cars: trackside spots along its line, and the game cameras and cockpit mesh of its primary car. */
-  setLayer(layer: LapLayer): void;
+  setLayer(layer: RigCar): void;
   /** Moves the camera with the primary car's pose by the mode's rule (the first pose places it). */
   follow(pose: RigPose): void;
   /** Switches the mode; false when it is the current one. */
@@ -60,7 +72,7 @@ export interface CameraRig {
 export function createCameraRig(element: HTMLElement, origin: Vector3, changed: () => void): CameraRig {
   const perspective = new PerspectiveCamera(DEFAULT_FOV_DEG, 1, DEFAULT_NEAR_M, FAR_M);
   const overhead = new OrthographicCamera(-OVERHEAD_HALF_M, OVERHEAD_HALF_M, OVERHEAD_HALF_M, -OVERHEAD_HALF_M, 0.5, FAR_M);
-  let camera: PerspectiveCamera | OrthographicCamera = perspective, mode: CameraMode = 'follow', layer: LapLayer | null = null;
+  let camera: PerspectiveCamera | OrthographicCamera = perspective, mode: CameraMode = 'follow', layer: RigCar | null = null;
   const controls = new OrbitControls<PerspectiveCamera | OrthographicCamera>(camera, element);
   controls.enableDamping = false; controls.enablePan = false; controls.maxPolarAngle = Math.PI * 0.49; controls.minDistance = MIN_CAMERA_DISTANCE; controls.maxDistance = MAX_CAMERA_DISTANCE;
   controls.addEventListener('change', changed);

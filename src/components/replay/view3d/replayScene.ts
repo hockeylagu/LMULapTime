@@ -1,33 +1,16 @@
-import { Box3, Group, Quaternion, Scene, Vector3, WebGLRenderer, type Object3D } from 'three';
-import type { SceneryBounds, SceneryLayoutResource } from '../../../../shared/types/scenes/scenery.js';
+import { Vector3, type OrthographicCamera, type PerspectiveCamera } from 'three';
+import type { SceneryLayoutResource } from '../../../../shared/types/scenes/scenery.js';
 import type { ReplayTrajectoryData } from '../../../../shared/types/replay.js';
-import { VEHICLE_FILES } from '../../../api/vehicles/bodyApi.js';
 import type { MapColorMode } from '../map/replayMapUtils.js';
 import { ghostDistanceAt, type GhostSyncMode } from '../map/ghostSync.js';
-import { sampleRenderPose, sampleStationPose, type RenderPose } from './replayPose.js';
+import { sampleRenderPose, sampleStationPose } from './replayPose.js';
 import { nativeToScene } from './sceneFrame.js';
 import { createLapLayerLoader, type LapCars, type LapLayer } from './laps/lapLayer.js';
-import { disposeObjects } from './laps/disposeObjects.js';
 import { setCameraDistance } from './sceneObjects.js';
-import { exposureType, shadowCascadeSet, type CameraMode } from './cameraModes.js';
-import { createCameraRig } from './cameraRig.js';
-import { addSceneEnvironment, sceneSun, VENUE_PROBE_PX } from './sceneEnvironment.js';
-import { linkPrefilters } from './prefilterLink.js';
-import { linkConvolution } from './reflectionCube.js';
-import { createAutoExposure } from './autoExposure.js';
-import { CAR_REFLECTION_PX, CAR_REFLECTION_STEPS, createCarReflection } from './car/carReflection.js';
-import { CachedKtx2Loader, type TextureStartFile } from './scenery/cachedKtx2Loader.js';
-import { createChunkLoader } from './scenery/chunkLoader.js';
-import { createSceneryBatches } from './scenery/sceneryBatches.js';
-import { NO_LOAD_PROGRESS, type SceneLoadProgress } from './laps/loadProgress.js';
-import { createSceneryGround } from './scenery/sceneryGround.js';
-import type { StreamView } from './scenery/residency.js';
-import type { WheelAnimation } from './wheelAnimation.js';
-import { createSceneryStream } from './scenery/sceneryStream.js';
-import { createSceneWarmup } from './scenery/sceneWarmup.js';
-import { startStreaming } from './scenery/materials/mipStreaming.js';
-import { isDriverCamera } from './driverCameras.js';
-import { isFreeCameraMode, stationAt, viewMoved } from './scenery/streamView.js';
+import type { CameraMode } from './cameraModes.js';
+import type { SceneLoadProgress } from './laps/loadProgress.js';
+import { stationAt } from './scenery/streamView.js';
+import { createSceneShell, type SceneContent } from './scene/sceneShell.js';
 
 export interface ReplaySceneHandle {
   wheelMotion: string;
@@ -50,6 +33,7 @@ export interface ReplaySceneHandle {
   dispose(): void;
 }
 
+/** The lap view's 3D scene: the scene shell with two laps' cars and racing lines. */
 export async function createReplayScene(
   host: HTMLDivElement, layout: SceneryLayoutResource,
   trajectory: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null,
@@ -58,245 +42,48 @@ export async function createReplayScene(
   colorBy: MapColorMode = 'default',
   onProgress: (progress: SceneLoadProgress) => void = () => {},
 ): Promise<ReplaySceneHandle> {
-  let renderer: WebGLRenderer;
-  // No canvas multisampling: the scene renders into the auto-exposure target, which multisamples; the canvas gets one full-screen quad.
-  try { renderer = new WebGLRenderer({antialias: false, alpha: false, reversedDepthBuffer: true}); }
-  catch { throw Error('WebGL 2 is unavailable. Use the 2D map.'); }
-  // Reading a program's error log waits for its link to finish: about 10 ms a program at the first frame. Production builds skip it.
-  renderer.debug.checkShaderErrors = import.meta.env.DEV;
-  // Texture units are numbered across both shader stages, but three checks them against the fragment stage's own limit (16 here)
-  // and warns once a draw per frame for a batched terrain whose two vertex-stage batch textures take it to 17. The link already
-  // holds each stage to its limit; the top unit stays three's upload slot.
-  const gl = renderer.getContext();
-  renderer.capabilities.maxTextures = (gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS) as number) - 1;
-  const {min, max} = layout.horizon.bounds, origin = new Vector3(...min).add(new Vector3(...max)).multiplyScalar(0.5);
-  const loader = createChunkLoader(renderer, layout.textures), carStarts = new Map<string, TextureStartFile>(), startOf = (url: string) => carStarts.get(url);
-  // Car textures load at the package's size (it stores outside-only parts small and the liveries larger). The interior's own
-  // textures stay on their start files until a driver camera is used.
-  const carTextures = new CachedKtx2Loader(renderer, {start: startOf}), interiorTextures = new CachedKtx2Loader(renderer, {start: startOf});
-  const sun = sceneSun(layout, origin.y, trajectory.daylightClock);
-  const exposure = createAutoExposure(renderer, layout.camera, {rgb: sun.radiance.clone(), elevationDeg: sun.sunElevationDeg}, () => invalidate(), exposureType('follow'),
-    sun.weather.cloudCover, sun.weather.sunVisibility);
-  // Wheel and line contact heights and the camera checks share one ray tree per resident chunk.
-  const ground = createSceneryGround(), {surfaceHeight} = ground;
-  // Scenery chunks live in native coordinates under one group, shifted by the scene origin.
-  const sceneryRoot = new Group(); sceneryRoot.position.copy(origin).negate();
-  /** A chunk's box in the scene: native coordinates less the origin, z mirrored as the world group draws them. */
-  const worldBox = ({min, max}: SceneryBounds) => new Box3(new Vector3(min[0], min[1], -max[2]), new Vector3(max[0], max[1], -min[2]))
-    .translate(new Vector3(-origin.x, -origin.y, origin.z));
-  // Each scenery material draws once across the chunks, sized from the layout's totals; a chunk's instances show while the chunk does.
-  const batches = createSceneryBatches(sceneryRoot, layout.materials);
-  let layer: LapLayer, layerReady = false;
-  let syncMode: GhostSyncMode = 'distance', anchorDistM: number | null = null;
-  let disposed = false, refreshTimer = 0, invalidate: () => void = () => {};
-  /** Resolves once the scene has its environment and the car's reflection: programs compiled before that would compile again. */
-  let lit: Promise<void> = Promise.resolve();
-  // Lines are draped on the road: when the resident chunks change, re-drape them (coalesced).
-  let freezeScenery = () => {};
-  const scheduleRefresh = () => {
-    if (refreshTimer || !layerReady) return;
-    refreshTimer = window.setTimeout(() => { refreshTimer = 0; if (disposed) return; layer.refreshHeights(); invalidate(); }, 250);
-  };
-  // The scene and its cameras exist from the start, so the first view's chunks warm up as each arrives, while the others still load.
-  const scene = new Scene(), rig = createCameraRig(renderer.domElement, origin, () => invalidate());
-  const warmup = createSceneWarmup(renderer, scene, rig.perspective,
-    () => { renderer.setRenderTarget(exposure.target); environment.applyHaze(); }, () => invalidate());
-  // The loading screen's progress (the layout and cars were fetched before this ran), then the scenery still streaming in.
-  const progress: SceneLoadProgress = {...NO_LOAD_PROGRESS, track: 1};
-  let loading = true;
-  const texturesChanged = () => {
-    const {sharp, total} = warmup.sharpening();
-    return sharp !== progress.textures.sharp || total !== progress.textures.total;
-  };
-  const report = (change: Partial<SceneLoadProgress> = {}) => {
-    if (disposed) return;
-    const circuit = stream.circuit(), textures = warmup.sharpening();
-    // After the first frame only the streaming counts change; a chunk shown or hidden as the car moves reports nothing.
-    if (!loading && circuit.resident === progress.circuit.resident && circuit.total === progress.circuit.total && !texturesChanged()) return;
-    Object.assign(progress, change, loading ? {scenery: stream.underView()} : {}, {circuit, textures});
-    onProgress({...progress});
-  };
-  const stream = createSceneryStream(layout, sceneryRoot, {
-    load: async (chunk, signal) => {
-      // The ray tree needs only the geometry: it builds in a worker from the parsed chunk, while its textures download and the
-      // chunk waits its turn to compile and upload (warm-ups stay one at a time).
-      const built: {parsed: Object3D | null; grounded: Promise<void>; root: Object3D | null} = {parsed: null, grounded: Promise.resolve(), root: null};
-      try {
-        const root = built.root = await loader.load(chunk, signal, parsed => {
-          built.parsed = parsed; built.grounded = ground.add(chunk.id, parsed, chunk.kind === 'horizon');
-          built.grounded.catch(() => {}); // Awaited below; a texture failure may reject the load first.
-        });
-        const created = batches.add(root);
-        await lit; // A chunk's programs depend on the scene's environment.
-        await Promise.all([warmup.queue([root, ...created], signal, worldBox(chunk.bounds)), built.grounded]); signal.throwIfAborted(); return root;
-      } catch (error) {
-        // The loader releases a chunk whose own load failed; one that failed after it is released here.
-        if (built.parsed) ground.remove(chunk.id, built.parsed);
-        if (built.root) { batches.remove(built.root); loader.releaseChunk(built.root); }
-        throw error;
-      }
-    },
-    unload: (chunk, root) => { ground.remove(chunk.id, root); batches.remove(root); loader.releaseChunk(root); },
-    changed: () => { batches.sync(); freezeScenery(); scheduleRefresh(); reflection.stale(); invalidate(); report(); },
-    failed: (chunk, error) => { if (!disposed) onFailure(`3D scenery chunk ${chunk.id} failed: ${error.message}`); },
-  });
-  /** Frees what exists from the start; `dispose` adds what the finished scene owns. */
-  const cleanup = () => {
-    disposed = true; window.clearTimeout(refreshTimer); stream.dispose(); loader.dispose(); carTextures.dispose(); interiorTextures.dispose(); exposure.dispose();
-    ground.dispose(); batches.dispose(); warmup.dispose(); rig.dispose(); renderer.dispose(); renderer.forceContextLoss();
-  };
   const route = layout.routeLengthM;
   const firstStation = stationAt(trajectory.points, 0, 0, route);
-  if (firstStation === undefined) { cleanup(); throw Error('This recording has no track stations. Use the 2D map.'); }
-  let currentStation = firstStation, streamView: StreamView | null = null;
-  // Interior textures stay on their reduced levels until a driver camera is used: only there is their full size seen.
-  let driverCameraUsed = false;
-  const loadLaps = createLapLayerLoader(origin, surfaceHeight, {
-    load(path, interior, start) {
-      const url = `${VEHICLE_FILES}${path}`;
-      if (start) carStarts.set(url, {url: `${VEHICLE_FILES}${start.path}`, skip: start.skip});
-      return (interior ? interiorTextures : carTextures).loadAsync(url);
-    },
-    copied(copy, original, interior) {
-      const detail = (interior ? interiorTextures : carTextures).detail(original);
-      if (!detail) return;
-      startStreaming(copy, renderer, detail);
-      if (interior && !driverCameraUsed) warmup.hold(copy); else warmup.sharpen(copy);
-    },
-  }, () => exposure.display(), layout.shading);
+  if (firstStation === undefined) throw Error('This recording has no track stations. Use the 2D map.');
   // The first view's chunks and the car are requested first: the sky's environment and the car's reflection link their programs
   // on the main thread, which the downloads then overlap.
-  streamView = {kind: 'lap', lapDistanceM: currentStation}; stream.update(streamView); report();
+  const shell = createSceneShell(host, layout, {daylightClock: trajectory.daylightClock, onFailure, onProgress, firstView: {kind: 'lap', lapDistanceM: firstStation}});
+  const {rig, origin} = shell;
+  shell.station = firstStation;
+  const loadLaps = createLapLayerLoader(origin, shell.surfaceHeight, shell.carTextures, () => shell.exposureDisplay(), layout.shading);
   const carsBuilt = loadLaps.preload(cars); // The cars load and build alongside the scenery; only draping waits for the ground.
-  carsBuilt.then(() => report({cars: 1}), () => {}); // A failure surfaces from the load below.
-  // Both exist once `lit` resolves; nothing below reads them before.
-  let environment!: ReturnType<typeof addSceneEnvironment>, reflection!: ReturnType<typeof createCarReflection>;
-  // The environment and the car's reflection prefilter on creation: their programs link first, off the main thread.
-  const prefilters = linkPrefilters(renderer, rig.perspective, [VENUE_PROBE_PX, CAR_REFLECTION_PX]);
-  const convolution = linkConvolution(renderer, layout.shading.convolution.kernels);
-  lit = prefilters.ready.then(() => {
-    environment = addSceneEnvironment(scene, renderer, layout, origin, shadowCascadeSet(rig.mode), sun);
-    reflection = createCarReflection(renderer, scene, layout.shading);
-  }).finally(() => { prefilters.dispose(); });
-  lit.then(() => report({lighting: 1}), () => {}); // Awaited below.
+  carsBuilt.then(() => shell.report({cars: 1}), () => {}); // A failure surfaces from the load below.
   // The cars compile and upload in turn with the chunks, lit as they will be drawn: the first car by its own reflection.
-  const carsWarm = Promise.all([carsBuilt, lit]).then(async ([built]) => {
-    const signal = new AbortController().signal;
-    reflection.setCar(built.primary, built.primary);
-    await Promise.all([built.primary, built.ghost].flatMap(car => car ? [warmup.queue(car, signal)] : []));
+  const carsWarm = Promise.all([carsBuilt, shell.lit]).then(async ([built]) => {
+    shell.reflectCar(built.primary);
+    await Promise.all([built.primary, built.ghost].flatMap(car => car ? [shell.warm(car)] : []));
   });
   carsWarm.catch(() => {}); // A failure here surfaces from the load or the scene's warm-up below.
-  // The chunks under the first pose must be resident before cars and lines are draped on them.
-  try {
-    await lit;
-    await stream.whenUnderView();
-    layer = await loadLaps(trajectory, baseline, cars, colorBy); layerReady = true;
-  } catch (error) { cleanup(); throw error; }
-  let lineMode = colorBy, primaryOpacity = 1, baselineOpacity = 1, lapRequest = 0;
-  // Convert the native left-handed frame once, including meshes, car bodies and trails.
-  // Camera targets/offsets use the same reflection. Mirroring only terrain misaligns poses.
-  const world = new Group(); world.scale.z = -1; world.add(sceneryRoot); scene.add(world);
-  // Nothing under the scenery moves: a chunk's root or a batch freezes once, when it first joins (a batch that leaves and returns
-  // keeps its matrices).
-  const frozen = new WeakSet<Object3D>(), freeze = (object: Object3D) => { object.matrixAutoUpdate = false; object.matrixWorldAutoUpdate = false; };
-  sceneryRoot.updateWorldMatrix(true, false); freeze(sceneryRoot);
-  freezeScenery = () => {
-    for (const joined of sceneryRoot.children) {
-      if (frozen.has(joined)) continue;
-      frozen.add(joined); joined.updateWorldMatrix(false, true); joined.traverse(freeze);
-    }
-  };
-  freezeScenery();
-  const showLayer = () => { world.add(layer.root); environment.setDynamic([layer.root]); reflection.setCar(layer.primary, layer.root); rig.setLayer(layer); };
-  showLayer(); environment.setCamera(rig.camera);
-  // The first view's chunks are warm: this compiles and uploads the cars and lines, behind the loading screen.
-  // The exposure passes and the reflection convolution link meanwhile: each would otherwise link at its first draw.
-  try { await Promise.all([warmup.warm(scene, new AbortController().signal), exposure.link(), convolution.ready]); } catch (error) { cleanup(); throw error; }
-  report({shaders: 1}); loading = false;
-  // The scenery around the first pose is resident and compiled: capture the venue's light for the scene's environment.
-  environment.captureVenue();
-  warmup.shown();
-  /** Stream scenery around the car (lap distance, plus what is near the camera) or, for the panned orbit and overhead cameras, around the camera. */
-  const updateStream = () => {
-    const {x, z} = rig.camera.position;
-    const next: StreamView = isFreeCameraMode(rig.mode)
-      ? {kind: 'free', x: x + origin.x, z: origin.z - z}
-      : {kind: 'lap', lapDistanceM: currentStation, x: x + origin.x, z: origin.z - z};
-    if (!viewMoved(streamView, next, route)) return;
-    streamView = next; stream.update(next);
-  };
-  const eyeRotation = new Quaternion(), desiredEye = new Vector3(), correctedEye = new Vector3(), probeCentre = new Vector3(), ghostCentre = new Vector3(), target = new Vector3();
-  let frame = 0, frameHook: ((frameTime: number) => void) | null = null, probed = false;
-  const draw = (frameTime?: number) => {
-    if (disposed) return;
-    if (frameTime !== undefined) frameHook?.(frameTime);
-    updateStream();
-    if (texturesChanged()) report(); // Textures sharpen a band per frame, each frame asking for the next.
-    const camera = rig.camera;
-    desiredEye.copy(camera.position);
-    if (rig.checksGround) ground.resolve(desiredEye, rig.focus, origin, correctedEye);
-    else correctedEye.copy(desiredEye);
-    const corrected = !correctedEye.equals(desiredEye);
-    if (corrected) {
-      eyeRotation.copy(camera.quaternion);
-      camera.position.copy(correctedEye);
-      camera.lookAt(rig.focus);
-    }
-    try {
-      layer.syncParts();
-      // Cached shadow cascades still due ask for the next frame.
-      if (environment.update()) invalidate();
-      // The first probe completes before the first frame that shows the car, whose materials read it from their first draw.
-      if (!probed && layer.primary.visible) {
-        probed = true; layer.primary.getWorldPosition(probeCentre);
-        for (let pass = 0; pass < CAR_REFLECTION_STEPS && reflection.update(probeCentre); pass++);
-      }
+  const ghostCentre = new Vector3();
+  /** The shell's content for a lap layer: the cars and lines, with the ghost's parts following the camera's distance. */
+  const contentOf = (lap: LapLayer): SceneContent => ({
+    root: lap.root, reflected: lap.primary,
+    beforeDraw(camera: PerspectiveCamera | OrthographicCamera) {
+      lap.syncParts();
       // The car the cameras follow keeps every part at its full level, however far a zoomed camera stands; the other car's
       // parts follow the camera's distance.
-      if (layer.ghost.visible) setCameraDistance(layer.ghost, camera.position.distanceTo(layer.ghost.getWorldPosition(ghostCentre)));
-      exposure.render(scene, camera);
-      // The car's reflection probe renders one face after the frame (car/carReflection.ts), around the body's centre.
-      if (layer.primary.visible && reflection.update(layer.primary.getWorldPosition(probeCentre))) invalidate();
-    } finally {
-      if (corrected) {
-        camera.position.copy(desiredEye);
-        camera.quaternion.copy(eyeRotation);
-        camera.updateMatrixWorld();
-      }
-    }
-  };
-  /** Kept loaded behind the 2D map. */
-  const hidden = () => host.closest('[hidden]') !== null;
-  invalidate = () => {
-    // Nor while kept hidden behind the 2D map: showing it again resizes, which draws.
-    if (disposed || frame || document.hidden || hidden()) return;
-    frame = requestAnimationFrame(now => { frame = 0; draw(now); });
-  };
-  /** Puts a car on a sampled pose: the body when the pose has a heading, else the plain pose marker; wheels and lights follow it. */
-  const placeCar = (car: Object3D, pose: RenderPose, wheels: WheelAnimation | null, lights: Array<{update(pose: RenderPose): void}>) => {
-    car.position.set(pose.x - origin.x, pose.y - origin.y, pose.z - origin.z);
-    if (pose.orientation) car.quaternion.copy(pose.orientation); else car.quaternion.identity();
-    wheels?.update(pose); for (const light of lights) light.update(pose);
-    car.getObjectByName('body-envelope')!.visible = pose.yaw !== undefined;
-    car.getObjectByName('pose-marker')!.visible = pose.yaw === undefined;
-  };
-  let viewportWidth = 0, viewportHeight = 0;
-  const resize = () => {
-    if (disposed || hidden()) return; // Keep the size it had.
-    const width = Math.max(1, host.clientWidth), height = Math.max(1, host.clientHeight);
-    if (width === viewportWidth && height === viewportHeight) { invalidate(); return; } // Shown again at the same size.
-    viewportWidth = width; viewportHeight = height;
-    renderer.setSize(width, height, false); rig.resize(width / height);
-    // ResizeObserver runs after animation callbacks, before paint. A canvas resize clears its pixels:
-    // draw now, or the embedded map flashes black until next frame when a toolbar changes height.
-    if (rig.placed) draw(); else invalidate();
-  };
-  const contextLost = (event: Event) => { event.preventDefault(); onFailure('The 3D graphics context was lost. Retry or return to 2D.'); };
-  renderer.domElement.addEventListener('webglcontextlost', contextLost);
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); renderer.domElement.className = 'h-full w-full';
-  host.append(renderer.domElement);
-  const observer = new ResizeObserver(resize); observer.observe(host);
-  document.addEventListener('visibilitychange', invalidate); resize();
+      if (lap.ghost.visible) setCameraDistance(lap.ghost, camera.position.distanceTo(lap.ghost.getWorldPosition(ghostCentre)));
+    },
+    refreshHeights: () => lap.refreshHeights(),
+    dispose: () => lap.dispose(),
+  });
+  let layer: LapLayer;
+  // The chunks under the first pose must be resident before cars and lines are draped on them.
+  try {
+    await shell.lit;
+    await shell.underView();
+    layer = await loadLaps(trajectory, baseline, cars, colorBy);
+    rig.setLayer(layer);
+    await shell.start(contentOf(layer));
+  } catch (error) { shell.abort(); throw error; }
+  let syncMode: GhostSyncMode = 'distance', anchorDistM: number | null = null, disposed = false;
+  let lineMode = colorBy, primaryOpacity = 1, baselineOpacity = 1, lapRequest = 0;
+  const target = new Vector3();
   return {
     get wheelMotion() { return layer.primaryWheels.description; },
     async updateLaps(next, comparison, assets, signal) {
@@ -308,35 +95,33 @@ export async function createReplayScene(
       const replacement = await loadLaps(next, comparison, assets, lineMode);
       if (disposed || signal?.aborted || request !== lapRequest) { replacement.dispose(); return false; }
       replacement.colorLines(lineMode); replacement.fadeLines(primaryOpacity, baselineOpacity);
-      layer.dispose(); layer = replacement; showLayer();
+      layer.dispose(); layer = replacement; shell.show(contentOf(layer)); rig.setLayer(layer);
       return true;
     },
-    beforeFrame(hook) { frameHook = hook; },
+    beforeFrame: hook => shell.beforeFrame(hook),
     cursor(index, fraction) {
       const {trajectory, baseline, primary, ghost, primaryWheels, ghostWheels, primaryLights, ghostLights, primaryDistances, baselineDistances, ghostClock} = layer;
       const pose = sampleRenderPose(trajectory.points, index, fraction);
       primary.visible = pose !== null;
-      if (!pose) { invalidate(); return; }
-      placeCar(primary, pose, primaryWheels, primaryLights);
+      if (!pose) { shell.invalidate(); return; }
+      shell.placeCar(primary, pose, primaryWheels, primaryLights);
       const sample = trajectory.points[pose.index], nextSample = trajectory.points[pose.index + 1];
       const timeSec = (sample.timeSec ?? pose.index / 40) + ((nextSample?.timeSec ?? sample.timeSec ?? 0) - (sample.timeSec ?? 0)) * pose.fraction;
 
       const lapStation = stationAt(trajectory.points, pose.index, pose.fraction, route);
-      if (lapStation !== undefined) currentStation = lapStation;
+      if (lapStation !== undefined) shell.station = lapStation;
       const station = (primaryDistances[index] ?? 0) + ((primaryDistances[index + 1] ?? primaryDistances[index] ?? 0) - (primaryDistances[index] ?? 0)) * fraction;
       const ghostStation = ghostClock ? ghostDistanceAt(ghostClock, syncMode, station, anchorDistM) : station;
       const other = baseline ? sampleStationPose(baseline.points, baselineDistances, ghostStation) : null;
       ghost.visible = other !== null;
-      if (other) placeCar(ghost, other, ghostWheels, ghostLights);
+      if (other) shell.placeCar(ghost, other, ghostWheels, ghostLights);
       rig.follow({target: target.set(...nativeToScene(pose, origin)), yaw: pose.yaw ?? 0, timeSec, stationM: station, index, fraction});
-      invalidate();
+      shell.invalidate();
     },
     mode(next) {
-      if (!rig.setMode(next)) return;
-      if (isDriverCamera(next) && !driverCameraUsed) { driverCameraUsed = true; warmup.sharpenHeld(); }
-      environment.setCamera(rig.camera); environment.setShadowCascades(shadowCascadeSet(next));
-      exposure.setType(exposureType(next)); layer.syncLines();
-      invalidate();
+      if (!shell.setMode(next)) return;
+      layer.syncLines();
+      shell.invalidate();
     },
     reset: () => rig.reset(),
     center: () => rig.center(),
@@ -344,21 +129,15 @@ export async function createReplayScene(
     pan: (horizontal, vertical) => rig.pan(horizontal, vertical),
     colorLines(next) {
       lineMode = next; layer.colorLines(next);
-      invalidate();
+      shell.invalidate();
     },
     syncGhost(next, anchor) {
       syncMode = next; anchorDistM = anchor;
     },
     fadeLines(primary, comparison) {
       primaryOpacity = primary; baselineOpacity = comparison; layer.fadeLines(primary, comparison);
-      invalidate();
+      shell.invalidate();
     },
-    dispose() {
-      disposed = true; cancelAnimationFrame(frame); observer.disconnect();
-      renderer.domElement.removeEventListener('webglcontextlost', contextLost); document.removeEventListener('visibilitychange', invalidate);
-      // The stream takes its chunks out first (the chunk loader frees them) with their batches, then the cars, lines and sky go with the scene.
-      stream.dispose(); batches.dispose(); disposeObjects(scene, true); environment.dispose(); reflection.dispose(); convolution.dispose();
-      cleanup(); renderer.domElement.remove();
-    },
+    dispose() { disposed = true; shell.dispose(); },
   };
 }
