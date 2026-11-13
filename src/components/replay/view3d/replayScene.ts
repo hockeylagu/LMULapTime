@@ -19,6 +19,7 @@ import { CAR_REFLECTION_PX, createCarReflection } from './car/carReflection.js';
 import { CachedKtx2Loader, type TextureStartFile } from './scenery/cachedKtx2Loader.js';
 import { createChunkLoader } from './scenery/chunkLoader.js';
 import { createSceneryBatches } from './scenery/sceneryBatches.js';
+import { NO_LOAD_PROGRESS, type SceneLoadProgress } from './laps/loadProgress.js';
 import { createSceneryGround } from './scenery/sceneryGround.js';
 import type { StreamView } from './scenery/residency.js';
 import type { WheelAnimation } from './wheelAnimation.js';
@@ -55,6 +56,7 @@ export async function createReplayScene(
   onFailure: (message: string) => void,
   cars: LapCars,
   colorBy: MapColorMode = 'default',
+  onProgress: (progress: SceneLoadProgress) => void = () => {},
 ): Promise<ReplaySceneHandle> {
   let renderer: WebGLRenderer;
   // No canvas multisampling: the scene renders into the auto-exposure target, which multisamples; the canvas gets one full-screen quad.
@@ -91,6 +93,21 @@ export async function createReplayScene(
   const scene = new Scene(), rig = createCameraRig(renderer.domElement, origin, () => invalidate());
   const warmup = createSceneWarmup(renderer, scene, rig.perspective,
     () => { renderer.setRenderTarget(exposure.target); environment.applyHaze(); }, () => invalidate());
+  // The loading screen's progress (the layout and cars were fetched before this ran), then the scenery still streaming in.
+  const progress: SceneLoadProgress = {...NO_LOAD_PROGRESS, track: 1};
+  let loading = true;
+  const texturesChanged = () => {
+    const {sharp, total} = warmup.sharpening();
+    return sharp !== progress.textures.sharp || total !== progress.textures.total;
+  };
+  const report = (change: Partial<SceneLoadProgress> = {}) => {
+    if (disposed) return;
+    const circuit = stream.circuit(), textures = warmup.sharpening();
+    // After the first frame only the streaming counts change; a chunk shown or hidden as the car moves reports nothing.
+    if (!loading && circuit.resident === progress.circuit.resident && circuit.total === progress.circuit.total && !texturesChanged()) return;
+    Object.assign(progress, change, loading ? {scenery: stream.underView()} : {}, {circuit, textures});
+    onProgress({...progress});
+  };
   const stream = createSceneryStream(layout, sceneryRoot, {
     load: async (chunk, signal) => {
       // The ray tree needs only the geometry: it builds in a worker from the parsed chunk, while its textures download and the
@@ -112,7 +129,7 @@ export async function createReplayScene(
       }
     },
     unload: (chunk, root) => { ground.remove(chunk.id, root); batches.remove(root); loader.releaseChunk(root); },
-    changed: () => { batches.sync(); freezeScenery(); scheduleRefresh(); reflection.stale(); invalidate(); },
+    changed: () => { batches.sync(); freezeScenery(); scheduleRefresh(); reflection.stale(); invalidate(); report(); },
     failed: (chunk, error) => { if (!disposed) onFailure(`3D scenery chunk ${chunk.id} failed: ${error.message}`); },
   });
   /** Frees what exists from the start; `dispose` adds what the finished scene owns. */
@@ -141,9 +158,9 @@ export async function createReplayScene(
   }, () => exposure.display(), layout.shading);
   // The first view's chunks and the car are requested first: the sky's environment and the car's reflection link their programs
   // on the main thread, which the downloads then overlap.
-  streamView = {kind: 'lap', lapDistanceM: currentStation}; stream.update(streamView);
+  streamView = {kind: 'lap', lapDistanceM: currentStation}; stream.update(streamView); report();
   const carsBuilt = loadLaps.preload(cars); // The cars load and build alongside the scenery; only draping waits for the ground.
-  carsBuilt.catch(() => {}); // Surfaces from the load below.
+  carsBuilt.then(() => report({cars: 1}), () => {}); // A failure surfaces from the load below.
   // Both exist once `lit` resolves; nothing below reads them before.
   let environment!: ReturnType<typeof addSceneEnvironment>, reflection!: ReturnType<typeof createCarReflection>;
   // The environment and the car's reflection prefilter on creation: their programs link first, off the main thread.
@@ -153,7 +170,7 @@ export async function createReplayScene(
     environment = addSceneEnvironment(scene, renderer, layout, origin, shadowCascadeSet(rig.mode), sun);
     reflection = createCarReflection(renderer, scene, layout.shading);
   }).finally(() => { prefilters.dispose(); });
-  lit.catch(() => {}); // Awaited below.
+  lit.then(() => report({lighting: 1}), () => {}); // Awaited below.
   // The cars compile and upload in turn with the chunks, lit as they will be drawn: the first car by its own reflection.
   const carsWarm = Promise.all([carsBuilt, lit]).then(async ([built]) => {
     const signal = new AbortController().signal;
@@ -182,6 +199,7 @@ export async function createReplayScene(
   // The first view's chunks are warm: this compiles and uploads the cars and lines, behind the loading screen.
   // The exposure passes and the reflection convolution link meanwhile: each would otherwise link at its first draw.
   try { await Promise.all([warmup.warm(scene, new AbortController().signal), exposure.link(), convolution.ready]); } catch (error) { cleanup(); throw error; }
+  report({shaders: 1}); loading = false;
   // The scenery around the first pose is resident and compiled: capture the venue's light for the scene's environment.
   environment.captureVenue();
   warmup.shown();
@@ -200,6 +218,7 @@ export async function createReplayScene(
     if (disposed) return;
     if (frameTime !== undefined) frameHook?.(frameTime);
     updateStream();
+    if (texturesChanged()) report(); // Textures sharpen a band per frame, each frame asking for the next.
     const camera = rig.camera;
     desiredEye.copy(camera.position);
     if (rig.checksGround) ground.resolve(desiredEye, rig.focus, origin, correctedEye);

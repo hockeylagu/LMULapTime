@@ -72,6 +72,26 @@ describe('sceneryStream', () => {
     expect(ids()).toEqual(['horizon', 's2', 's0']);
   });
 
+  it('counts the chunks under the view that are resident, for the loading bar', async () => {
+    const stream = createSceneryStream(testLayout(), parent(), deps);
+    expect(stream.underView()).toEqual({resident: 0, total: 0});
+    stream.update({ kind: 'lap', lapDistanceM: 1000.5 });
+    expect(stream.underView()).toEqual({resident: 0, total: 1});
+    await finish('s1');
+    expect(stream.underView()).toEqual({resident: 1, total: 1});
+  });
+
+  it('counts the whole circuit done, a failed chunk included, for the streaming note', async () => {
+    const stream = createSceneryStream(testLayout(), parent(), deps);
+    const total = stream.circuit().total;
+    expect(stream.circuit()).toEqual({resident: 0, total});
+    await finish('horizon');
+    stream.update({ kind: 'lap', lapDistanceM: 1000.5 });
+    pending.find(entry => entry.chunk.id === 's1')!.reject(Error('broken'));
+    await settle();
+    expect(stream.circuit()).toEqual({resident: 2, total});
+  });
+
   it('adds a loaded root to the scene and reports each change', async () => {
     const group = parent(), stream = createSceneryStream(testLayout(), group, deps);
     await finish('horizon');

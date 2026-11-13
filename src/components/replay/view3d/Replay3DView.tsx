@@ -19,8 +19,8 @@ import {
   projectTrajectoryPoints, projectBoundaryPoints, computeTrackBoundaryPathD, buildContinuousSvgPath,
   type MapColorMode,
 } from '../map/replayMapUtils.js';
-import { FOCUS_RING } from '../../common/buttonStyles.js';
 import { useReplayScene } from './laps/useReplayScene.js';
+import { Replay3DLoading, Replay3DStreaming } from './laps/Replay3DLoading.js';
 import { CameraModeControl, carLockedCamera, followsCar, useCameraModeShortcuts, type CameraMode } from './cameraModes.js';
 import { useGpsMapShortcuts } from '../map/useGpsMapShortcuts.js';
 import { ReplayShortcutHelp } from '../ReplayShortcutHelp.js';
@@ -136,10 +136,8 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
           colorBy={colorBy} onChangeColorBy={onChangeColorBy} isCompareMode={Boolean(baseline)} hasBaseline={Boolean(baseline)}
           fadedLine={activeFadedLine} onToggleFadedLine={handleToggleFadedLine}
           showFrictionCircle={effectiveShowFriction} onToggleFrictionCircle={handleToggleFriction} {...syncControls} />}
-        {!state?.ready && <div className="absolute inset-x-0 top-1/3 px-8 text-center text-sm text-lmu-text-soft pointer-events-auto" role={state?.error ? 'alert' : 'status'}>
-          <p>{state?.error ?? 'Loading 3D track surfaces…'}</p>
-          {state?.error && <button type="button" onClick={() => setRetry(value => value + 1)} className={`mt-3 px-3 py-1.5 rounded bg-lmu-raised ${FOCUS_RING}`}>Retry 3D scene</button>}
-        </div>}
+        {state?.ready && <Replay3DStreaming progress={state.progress} className={isExpanded && effectiveShowFriction ? 'bottom-48' : 'bottom-2'} />}
+        {!state?.ready && <Replay3DLoading progress={state?.progress} error={state?.error} onRetry={() => setRetry(value => value + 1)} />}
       </div>
       {isExpanded && onSelectIndex ? (
         <GpsMapTelemetryDock points={trajectory.points} baselinePoints={baseline?.points} comparisons={comparisons} currentIndex={currentIndex}

@@ -41,10 +41,13 @@ it('sharpens a queued texture once it is on the GPU, and asks for no frame while
   try {
     warmup.sharpen(undrawn); warmup.shown();
     expect([frames.length, isStreaming(undrawn)]).toEqual([0, true]); // Nothing to copy yet: the queue is empty, no frame loop runs.
+    expect(warmup.sharpening()).toEqual({sharp: 0, total: 0}); // Not queued until it is on the GPU.
     upload(undrawn);
+    expect(warmup.sharpening()).toEqual({sharp: 0, total: 1});
     expect(frames).toHaveLength(1);
     expect(drain()).toBeGreaterThan(0);
     expect([isStreaming(undrawn), frames.length, changed.mock.calls.length > 0]).toEqual([false, 0, true]); // Sharp, and the loop ended.
+    expect(warmup.sharpening()).toEqual({sharp: 1, total: 1});
   } finally { warmup.dispose(); }
 });
 

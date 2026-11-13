@@ -18,6 +18,10 @@ export interface SceneryStream {
   update(view: StreamView): void;
   /** Resolves when the chunks under the last view are resident (the horizon may join later); rejects with the first load failure. */
   whenUnderView(): Promise<void>;
+  /** How many of the chunks under the last view are resident (the loading screen's progress). */
+  underView(): {resident: number; total: number};
+  /** How many of the circuit's chunks are done (resident, or failed and never retried): the streaming indicator's progress. */
+  circuit(): {resident: number; total: number};
   dispose(): void;
 }
 
@@ -105,6 +109,8 @@ export function createSceneryStream(layout: SceneryLayout, parent: Group, deps: 
       if (underResident()) return Promise.resolve();
       return new Promise<void>((resolve, reject) => { waiters.push({ resolve, reject }); });
     },
+    underView: () => ({resident: under.filter(resident).length, total: under.length}),
+    circuit: () => ({resident: [...chunks.keys()].filter(id => resident(id) || failedIds.has(id)).length, total: chunks.size}),
     dispose() {
       if (disposed) return;
       disposed = true;

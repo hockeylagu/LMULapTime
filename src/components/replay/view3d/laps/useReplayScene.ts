@@ -8,6 +8,7 @@ import { createReplayScene, type ReplaySceneHandle } from '../replayScene.js';
 import type { MapColorMode } from '../../map/replayMapUtils.js';
 import type { CameraMode } from '../cameraModes.js';
 import type { GhostSyncMode } from '../../map/ghostSync.js';
+import { NO_LOAD_PROGRESS, type SceneLoadProgress } from './loadProgress.js';
 
 interface Options {
   host: RefObject<HTMLDivElement | null>;
@@ -21,7 +22,7 @@ interface Options {
   syncMode?: GhostSyncMode;
   anchorDistM?: number | null;
 }
-interface SceneResult {key: string; error?: string; ready?: boolean; cars?: string; wheelMotion?: string}
+interface SceneResult {key: string; error?: string; ready?: boolean; cars?: string; wheelMotion?: string; progress?: SceneLoadProgress}
 interface Runtime {handle: ReplaySceneHandle; trajectory: ReplayTrajectoryData; baseline: ReplayTrajectoryData | null}
 
 function validateLaps(lap: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null) {
@@ -68,6 +69,8 @@ export function useReplayScene({host, trajectory, baseline, currentIndex, mode, 
       const selected = latest();
       validateLaps(selected.trajectory, selected.baseline);
       const layoutKey = selected.trajectory.layoutKey!;
+      const showProgress = (progress: SceneLoadProgress) => { if (active) setResult(current => current?.error ? current : {...(current?.key === key ? current : {key}), progress}); };
+      showProgress(NO_LOAD_PROGRESS);
       const [layout, primary, comparison] = await Promise.all([
         fetchSceneryLayout(layoutKey, abort.signal), loadCar(selected.trajectory), loadCar(selected.baseline),
       ]);
@@ -76,7 +79,7 @@ export function useReplayScene({host, trajectory, baseline, currentIndex, mode, 
       abort.signal.throwIfAborted();
       const handle = await createReplayScene(container, layout, selected.trajectory, selected.baseline,
         message => { if (active) setResult({key, error: message}); },
-        {primary: primary!, baseline: comparison}, latest().colorBy);
+        {primary: primary!, baseline: comparison}, latest().colorBy, showProgress);
       if (!active) { handle.dispose(); abort.signal.throwIfAborted(); }
       created = handle; scene.current = handle; handle.mode(latest().mode); handle.beforeFrame(frameTime => tickCursor(frameTime));
       return {handle, trajectory: selected.trajectory, baseline: selected.baseline};
@@ -109,7 +112,8 @@ export function useReplayScene({host, trajectory, baseline, currentIndex, mode, 
         current.handle.syncGhost(settings.syncMode, settings.anchorDistM);
         drawCursor();
         const label = (car: LoadedBody) => `Textured car ${car.vehicleId}`;
-        setResult({key, ready: true, cars: `${label(primary!)}${comparison ? ` · Ghost: ${label(comparison)}` : ''}`, wheelMotion: current.handle.wheelMotion});
+        const cars = `${label(primary!)}${comparison ? ` · Ghost: ${label(comparison)}` : ''}`;
+        setResult(previous => ({key, ready: true, cars, wheelMotion: current.handle.wheelMotion, progress: previous?.key === key ? previous.progress : undefined}));
       } catch (error) {
         if (!abort.signal.aborted && !isAbortError(error)) setResult({key, error: apiErrorMessage(error, 'Unable to load 3D scene')});
       }

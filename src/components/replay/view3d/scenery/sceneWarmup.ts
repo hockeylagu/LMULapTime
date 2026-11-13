@@ -30,6 +30,8 @@ export interface SceneWarmup {
   hold(texture: Texture): void;
   /** Sharpens the held textures from now on, ahead of the rest. */
   sharpenHeld(): void;
+  /** How many queued textures have their full detail (or failed to get it): the streaming indicator's progress. */
+  sharpening(): {sharp: number; total: number};
   dispose(): void;
 }
 
@@ -45,14 +47,14 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
   const geometryWarmup = createGeometryWarmup(renderer, nextFrame, UPLOAD_SLICE_MS);
   const held = new Set<Texture>();
   let blurry = new Set<Texture>();
-  let shown = false, disposed = false, sharpenFrame = 0, warming = Promise.resolve();
+  let shown = false, disposed = false, sharpenFrame = 0, warming = Promise.resolve(), sharp = 0;
   const sharpen = () => {
     sharpenFrame = 0;
     if (disposed) return;
     let uploaded = 0;
     for (const texture of blurry) {
       uploaded += streamTexture(texture, renderer, SHARPEN_BYTES_PER_FRAME - uploaded);
-      if (!isStreaming(texture)) blurry.delete(texture);
+      if (!isStreaming(texture)) { blurry.delete(texture); sharp++; }
       if (uploaded >= SHARPEN_BYTES_PER_FRAME) break;
     }
     if (uploaded) changed();
@@ -122,6 +124,7 @@ export function createSceneWarmup(renderer: WebGLRenderer, scene: Scene, camera:
       held.clear();
       for (const texture of released) whenUploaded(texture, renderer, () => { blurry = new Set([texture, ...blurry]); startSharpen(); });
     },
+    sharpening: () => ({sharp, total: sharp + blurry.size}),
     dispose() { disposed = true; cancelAnimationFrame(sharpenFrame); held.clear(); blurry.clear(); geometryWarmup.dispose(); },
   };
 }

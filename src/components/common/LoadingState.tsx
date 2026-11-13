@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, type ReactNode } from 'react';
 import { Radio } from 'lucide-react';
 import { getRandomLoadingQuote } from './loadingQuotes.js';
 
@@ -49,6 +49,10 @@ export interface LoadingStateProps {
    * Explicit override for the container border. Defaults to `card`.
    */
   border?: boolean;
+  /** Tilts the spinner's rings back in perspective, for the 3D views. Defaults to false. */
+  tilted?: boolean;
+  /** Shown under the subtitle, above the quote: a progress bar, say. */
+  children?: ReactNode;
 }
 
 export const LoadingState: React.FC<LoadingStateProps> = ({
@@ -62,6 +66,8 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
   card = true,
   rounded,
   border,
+  tilted = false,
+  children,
 }) => {
   // Stable quote selection for the lifecycle of this loading mount
   const activeQuote = useMemo(() => explicitQuote || getRandomLoadingQuote(), [explicitQuote]);
@@ -83,14 +89,19 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
         isPage ? 'py-16 sm:py-24 px-6 min-h-[300px]' : 'py-8 sm:py-12 px-4 min-h-[160px]'
       } ${className}`}
     >
-      {/* Motorsport Dual-Ring Tachometer Spinner */}
-      <div className="relative mb-5 flex items-center justify-center">
-        {/* Outer Rotating Track Accent Ring */}
-        <div
-          className={`border-4 border-lmu-accent/20 border-t-lmu-accent rounded-full animate-spin ${
-            isPage ? 'w-12 h-12' : 'w-9 h-9'
-          }`}
-        />
+      {/* Motorsport Dual-Ring Tachometer Spinner; tilted, a wheel turning on its side with a second ring riding above it */}
+      <div className={`relative mb-5 flex items-center justify-center ${tilted ? '[perspective:220px]' : ''}`}>
+        <div className={`relative flex items-center justify-center ${tilted ? '[transform-style:preserve-3d] [transform:rotateX(55deg)]' : ''}`}>
+          {/* Outer Rotating Track Accent Ring */}
+          <div
+            className={`border-4 border-lmu-accent/20 border-t-lmu-accent rounded-full animate-spin motion-reduce:animate-none ${
+              isPage || tilted ? 'w-12 h-12' : 'w-9 h-9'
+            }`}
+          />
+          {tilted && (
+            <div className="absolute w-6 h-6 rounded-full border-2 border-lmu-accent/25 border-b-lmu-accent animate-[spin_1.6s_linear_infinite_reverse] motion-reduce:animate-none [transform:translateZ(10px)]" />
+          )}
+        </div>
 
         {/* Inner Tachometer Center Point */}
         <div className="absolute w-2 h-2 rounded-full bg-lmu-accent" />
@@ -112,11 +123,13 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
         </p>
       )}
 
+      {children}
+
       {/* Pit Wall Team Radio Funny Quote */}
       {showQuote && activeQuote && (
         <div
           data-testid="loading-quote-badge"
-          className="mt-4 sm:mt-5 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-lmu-strip/90 border border-white/10 text-[11px] sm:text-xs font-mono text-lmu-info-soft/90 max-w-xl max-w-[calc(100%-2rem)] whitespace-nowrap animate-fade-in"
+          className="mt-4 sm:mt-5 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-lmu-strip/90 border border-white/10 text-[11px] sm:text-xs font-mono text-lmu-info-soft/90 max-w-[min(36rem,calc(100%-2rem))] whitespace-nowrap animate-fade-in"
         >
           <Radio className="w-3.5 h-3.5 text-lmu-accent-text shrink-0 animate-pulse" />
           <span className="text-lmu-muted font-sans font-semibold tracking-wide uppercase text-[10px] shrink-0 whitespace-nowrap">

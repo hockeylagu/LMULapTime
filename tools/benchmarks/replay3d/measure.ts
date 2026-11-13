@@ -104,7 +104,7 @@ export async function measureLap(options: LapOptions) {
     await page.goto(`${base}/#/telemetry?${query.toString()}`);
     // The renderer's canvas joins the page only once the first view is resident and warmed; a failed scene shows an alert instead.
     await page.waitForFunction(`document.querySelector('[data-replay-view="3d"] [role="alert"]')
-      || (document.querySelector('[data-replay-view="3d"] canvas') && !document.body.innerText.includes('Loading 3D track surfaces'))`, null, {timeout: 600_000, polling: 100});
+      || (document.querySelector('[data-replay-view="3d"] canvas') && !document.querySelector('[data-testid="replay-3d-loading"]'))`, null, {timeout: 600_000, polling: 100});
     const readyMs = Date.now() - started;
     const failure = await page.evaluate<string | null>(`document.querySelector('[data-replay-view="3d"] [role="alert"]')?.textContent ?? null`);
     if (failure) throw Error(`3D view failed: ${failure}`);

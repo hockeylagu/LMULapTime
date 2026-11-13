@@ -10,6 +10,7 @@ import { TrackCircuitLayout } from '../../track-detail/TrackCircuitLayout.js';
 import { GpsMapModeBar } from './display/GpsMapModeBar.js';
 import { useStoredToggle } from './useStoredToggle.js';
 import { GhostSyncContext, ghostSyncControls, useGhostSync } from '../inspector/ghostSyncContext.js';
+import { Replay3DLoading } from '../view3d/laps/Replay3DLoading.js';
 
 const Replay3DView = lazy(() => import('../view3d/Replay3DView.js'));
 
@@ -124,7 +125,7 @@ export const ReplayMapContainer: React.FC<ReplayMapContainerProps> = ({
 
   if (!trajectory) return null;
 
-  if (activeView === '3d') return <GhostSyncContext.Provider value={ghostSync}><Suspense fallback={<div role="status" className="p-4 text-lmu-muted">Loading 3D viewer…</div>}>
+  if (activeView === '3d') return <GhostSyncContext.Provider value={ghostSync}><Suspense fallback={<div className="relative h-full min-h-[360px] w-full bg-lmu-deep"><Replay3DLoading onRetry={() => {}} /></div>}>
     <Replay3DView trajectory={trajectory} baseline={isCompareMode ? baselineTrajectory ?? null : null}
       currentIndex={currentIndex} onSelectIndex={onSelectIndex} isPlaying={isPlaying} onTogglePlay={onTogglePlay} onReturnTo2D={() => handleToggleView('2d')}
       colorBy={colorBy} onChangeColorBy={onChangeColorBy} currentPoint={currentPoint} fadedLine={fadedLine}
