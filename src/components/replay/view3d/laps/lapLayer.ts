@@ -239,8 +239,9 @@ export function createLapLayerLoader(origin: Vector3, surfaceHeight: SurfaceHeig
       /** The camera type changed: re-bake the line colours for its display transform. */
       syncLines() { syncRacingLine(primaryLine); if (baselineLine) syncRacingLine(baselineLine); },
       fadeLines(primaryOpacity: number, baselineOpacity: number) {
-        primaryLine.material.opacity = primaryOpacity;
-        if (baselineLine) baselineLine.material.opacity = baselineOpacity;
+        // Opacity 0 hides a line: nothing to draw, and nothing for its transparent pass to sort.
+        primaryLine.material.opacity = primaryOpacity; primaryLine.visible = primaryOpacity > 0;
+        if (baselineLine) { baselineLine.material.opacity = baselineOpacity; baselineLine.visible = baselineOpacity > 0; }
       },
       /** Scenery streams in after the lines were draped: re-drape them on the road that is resident now. */
       refreshHeights() {

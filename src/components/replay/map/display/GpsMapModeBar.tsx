@@ -1,8 +1,12 @@
 import React from 'react';
-import { CircleDot, Compass } from 'lucide-react';
+import { CircleDot, Compass, Route } from 'lucide-react';
 import type { MapColorMode } from '../replayMapUtils.js';
 import { FOCUS_RING } from '../../../common/buttonStyles.js';
+import { Select } from '../../../common/dropdown/Select.js';
 import { nextGhostSyncMode, type GhostSyncMode } from '../ghostSync.js';
+
+const MODE_LABELS = { pedal: 'Pedal', speed: 'Speed', delta: 'Delta', gainLoss: 'Gain / Loss' } as const;
+type LineChoice = 'off' | 'default' | keyof typeof MODE_LABELS;
 
 const SYNC_LABELS: Record<GhostSyncMode, string> = { distance: 'Distance', time: 'Time', anchored: 'From A' };
 const syncTitle = (mode: GhostSyncMode, anchorSet: boolean) => (mode === 'distance'
@@ -22,6 +26,9 @@ export interface GpsMapModeBarProps {
   onToggleGForce?: () => void;
   showFrictionCircle?: boolean;
   onToggleFrictionCircle?: () => void;
+  /** The 3D view's racing lines: with a handler, one Line menu holds Off, Plain and the colour modes in place of the buttons. */
+  showRacingLines?: boolean;
+  onToggleRacingLines?: () => void;
   /** Where the ghost follows the primary car; the toggle shows with a baseline and a handler. */
   ghostSync?: GhostSyncMode;
   onChangeGhostSync?: (mode: GhostSyncMode) => void;
@@ -41,6 +48,8 @@ export const GpsMapModeBar: React.FC<GpsMapModeBarProps> = ({
   onToggleGForce,
   showFrictionCircle = false,
   onToggleFrictionCircle,
+  showRacingLines = true,
+  onToggleRacingLines,
   ghostSync = 'distance',
   onChangeGhostSync,
   ghostAnchorSet = false,
@@ -48,6 +57,10 @@ export const GpsMapModeBar: React.FC<GpsMapModeBarProps> = ({
   embedded = false,
 }) => {
   const modes = ['pedal', 'speed', ...(isCompareMode && hasBaseline ? (['delta', 'gainLoss'] as const) : [])] as const;
+  const chooseLine = (choice: LineChoice) => {
+    if ((choice === 'off') === showRacingLines) onToggleRacingLines?.();
+    if (choice !== 'off') onChangeColorBy?.(choice);
+  };
 
   return (
     <div
@@ -57,7 +70,12 @@ export const GpsMapModeBar: React.FC<GpsMapModeBarProps> = ({
       onDoubleClick={e => e.stopPropagation()}
       className={`relative z-30 flex w-max max-w-full flex-wrap items-center justify-center gap-1.5 select-none pointer-events-auto ${embedded ? '' : 'px-2 py-1 rounded-xl bg-lmu-strip/95 border border-lmu-border backdrop-blur-md shadow-xl'} ${className}`}
     >
-      {onChangeColorBy && (
+      {onChangeColorBy && onToggleRacingLines && (
+        <Select<LineChoice> aria-label="Racing line" title="Show the racing line plain or coloured, or hide it" size="compact"
+          icon={<Route className="w-3.5 h-3.5" />} caption="Line:" value={showRacingLines ? colorBy : 'off'} onChange={chooseLine}
+          options={[{value: 'off', label: 'Off'}, {value: 'default', label: 'Plain'}, ...modes.map(mode => ({value: mode, label: MODE_LABELS[mode]}))]} />
+      )}
+      {onChangeColorBy && !onToggleRacingLines && (
         <div className="flex items-center gap-1">
           {modes.map(mode => (
             <button
@@ -71,7 +89,7 @@ export const GpsMapModeBar: React.FC<GpsMapModeBarProps> = ({
                 colorBy === mode ? 'bg-lmu-raised text-lmu-text' : 'text-lmu-muted hover:text-lmu-text'
               } ${FOCUS_RING}`}
             >
-              {mode === 'pedal' ? 'Pedal' : mode === 'speed' ? 'Speed' : mode === 'delta' ? 'Delta' : 'Gain / Loss'}
+              {MODE_LABELS[mode]}
             </button>
           ))}
         </div>
@@ -121,6 +139,7 @@ export const GpsMapModeBar: React.FC<GpsMapModeBarProps> = ({
           <span>Friction</span>
         </button>
       )}
+
 
       {hasBaseline && onToggleFadedLine && (
         <div className="flex items-center gap-1 pl-1 border-l border-lmu-border">

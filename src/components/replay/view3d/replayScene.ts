@@ -43,7 +43,7 @@ export interface ReplaySceneHandle {
   pan(horizontal: number, vertical: number): void;
   /** Recolour both racing lines with a 2D map heat-map mode. */
   colorLines(colorBy: MapColorMode): void;
-  /** Fade either racing line (opacity 0–1), as the 2D map fades a line on request. */
+  /** Fade either racing line (opacity 0–1, 0 hides it), as the 2D map fades a line on request. */
   fadeLines(primaryOpacity: number, baselineOpacity: number): void;
   /** Place the ghost at the same distance, the same lap time, or the same time since marker A (as the 2D map). */
   syncGhost(mode: GhostSyncMode, anchorDistM: number | null): void;

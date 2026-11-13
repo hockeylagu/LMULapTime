@@ -18,6 +18,8 @@ interface Options {
   mode: CameraMode;
   colorBy: MapColorMode;
   fadedLine: 'none' | 'primary' | 'baseline';
+  /** False hides the racing lines (the cars stay). */
+  showLines?: boolean;
   retry: number;
   syncMode?: GhostSyncMode;
   anchorDistM?: number | null;
@@ -34,14 +36,20 @@ function validateLaps(lap: ReplayTrajectoryData, baseline: ReplayTrajectoryData 
   }
 }
 
+/** Each line's opacity: faded to a trace, or hidden. */
+function lineOpacities(fadedLine: Options['fadedLine'], showLines: boolean): [number, number] {
+  if (!showLines) return [0, 0];
+  return [fadedLine === 'primary' ? 0.12 : 1, fadedLine === 'baseline' ? 0.12 : 1];
+}
+
 /** Track resources live for a layout/revision; lap objects live for the selected laps. */
-export function useReplayScene({host, trajectory, baseline, currentIndex, mode, colorBy, fadedLine, retry, syncMode = 'distance', anchorDistM = null}: Options) {
+export function useReplayScene({host, trajectory, baseline, currentIndex, mode, colorBy, fadedLine, showLines = true, retry, syncMode = 'distance', anchorDistM = null}: Options) {
   const scene = useRef<ReplaySceneHandle | null>(null);
   const cursor = useContext(ReplayPlaybackCursorContext);
   const key = `${trajectory.layoutKey ?? ''}:${trajectory.geometryRevision ?? ''}:${trajectory.dataPluginRevision ?? ''}:${retry}`;
   const [result, setResult] = useState<SceneResult | null>(null);
   const runtime = useRef<{key: string; ready: Promise<Runtime>; loadCar: (lap: ReplayTrajectoryData | null) => Promise<LoadedBody | null>} | null>(null);
-  const latest = useEffectEvent(() => ({trajectory, baseline, mode, colorBy, fadedLine, syncMode, anchorDistM}));
+  const latest = useEffectEvent(() => ({trajectory, baseline, mode, colorBy, fadedLine, showLines, syncMode, anchorDistM}));
   const tickCursor = useEffectEvent((frameTime: number) => { cursor?.tick(frameTime); });
   const drawCursor = useEffectEvent(() => {
     const position = cursor?.getSnapshot();
@@ -108,7 +116,7 @@ export function useReplayScene({host, trajectory, baseline, currentIndex, mode, 
         if (abort.signal.aborted) return;
         const settings = latest();
         current.handle.colorLines(settings.colorBy);
-        current.handle.fadeLines(settings.fadedLine === 'primary' ? 0.12 : 1, settings.fadedLine === 'baseline' ? 0.12 : 1);
+        current.handle.fadeLines(...lineOpacities(settings.fadedLine, settings.showLines));
         current.handle.syncGhost(settings.syncMode, settings.anchorDistM);
         drawCursor();
         const label = (car: LoadedBody) => `Textured car ${car.vehicleId}`;
@@ -125,6 +133,6 @@ export function useReplayScene({host, trajectory, baseline, currentIndex, mode, 
   useEffect(() => { scene.current?.mode(mode); drawCursor(); }, [mode, scene]);
   useEffect(() => { scene.current?.colorLines(colorBy); }, [colorBy, scene]);
   useEffect(() => { scene.current?.syncGhost(syncMode, anchorDistM); drawCursor(); }, [syncMode, anchorDistM, scene]);
-  useEffect(() => { scene.current?.fadeLines(fadedLine === 'primary' ? 0.12 : 1, fadedLine === 'baseline' ? 0.12 : 1); }, [fadedLine, scene]);
+  useEffect(() => { scene.current?.fadeLines(...lineOpacities(fadedLine, showLines)); }, [fadedLine, showLines, scene]);
   return {scene, state: result?.key === key ? result : null};
 }

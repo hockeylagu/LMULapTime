@@ -233,14 +233,12 @@ it('supports top control buttons (return to 2D, color modes, primary/baseline li
   fireEvent.click(screen.getByRole('button', {name: 'Switch to 2D view'}));
   expect(onReturnTo2D).toHaveBeenCalledOnce();
 
-  expect(screen.getByRole('button', {name: 'Pedal'})).toBeInTheDocument();
-  const speedBtn = screen.getByRole('button', {name: 'Speed'});
-  expect(speedBtn).toHaveAttribute('aria-pressed', 'true');
-  fireEvent.click(speedBtn);
+  const line = screen.getByRole('combobox', {name: 'Racing line'});
+  expect(line).toHaveTextContent('Speed');
+  fireEvent.click(line);
+  expect(screen.getAllByRole('option').map(option => option.textContent)).toEqual(['Off', 'Plain', 'Pedal', 'Speed', 'Delta', 'Gain / Loss']);
+  fireEvent.click(screen.getByRole('option', {name: 'Plain'}));
   expect(onChangeColorBy).toHaveBeenCalledWith('default');
-
-  expect(screen.getByRole('button', {name: 'Delta'})).toBeInTheDocument();
-  expect(screen.getByRole('button', {name: 'Gain / Loss'})).toBeInTheDocument();
 
   const primaryBtn = screen.getByRole('button', {name: 'Fade primary line'});
   fireEvent.click(primaryBtn);
@@ -270,8 +268,7 @@ it('renders the minimap at the top, collapsed HUD in regular view, and full scre
   expect(screen.getByTestId('gps-map-telemetry-hud')).toBeInTheDocument();
   expect(screen.getByTestId('gps-circuit-minimap')).toBeInTheDocument();
   const modeBar = within(screen.getByTestId('gps-map-mode-bar'));
-  expect(modeBar.getByRole('button', {name: 'Pedal'})).toBeInTheDocument();
-  expect(modeBar.getByRole('button', {name: 'Speed'})).toBeInTheDocument();
+  expect(modeBar.getByRole('combobox', {name: 'Racing line'})).toBeInTheDocument();
   expect(screen.getByLabelText('Lap and sector timing')).toBeInTheDocument();
   expect(screen.getByText('Lap')).toBeInTheDocument();
   expect(screen.getByText('S1')).toBeInTheDocument();

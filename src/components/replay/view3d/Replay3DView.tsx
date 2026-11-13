@@ -60,9 +60,10 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
   const [mode, setMode] = useState<CameraMode>('chase'), [retry, setRetry] = useState(0);
   const [internalFadedLine, setInternalFadedLine] = useState<'none' | 'primary' | 'baseline'>('none');
   const [isTraceHidden, toggleTrace] = useStoredToggle('lmu-map-trace-collapsed-v1', false);
+  const [showLines, toggleLines] = useStoredToggle('lmu-3d-racing-lines-v1', true);
   const activeFadedLine = fadedLine ?? internalFadedLine;
   const ghostSync = useGhostSync(), syncControls = ghostSyncControls(ghostSync);
-  const {scene, state} = useReplayScene({host, trajectory, baseline, currentIndex, mode, colorBy, fadedLine: activeFadedLine, retry,
+  const {scene, state} = useReplayScene({host, trajectory, baseline, currentIndex, mode, colorBy, fadedLine: activeFadedLine, showLines, retry,
     syncMode: ghostSync.mode, anchorDistM: ghostSync.markerDistM});
   const handleToggleFadedLine = onToggleFadedLine ?? ((line: 'primary' | 'baseline') => setInternalFadedLine(f => (f === line ? 'none' : line)));
 
@@ -110,7 +111,8 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
 
           <GpsMapModeBar embedded className="min-w-0 flex-1" colorBy={colorBy} onChangeColorBy={onChangeColorBy} hasBaseline={Boolean(baseline)}
             isCompareMode={Boolean(baseline)} fadedLine={activeFadedLine} onToggleFadedLine={handleToggleFadedLine}
-            showFrictionCircle={effectiveShowFriction} onToggleFrictionCircle={handleToggleFriction} {...syncControls} />
+            showFrictionCircle={effectiveShowFriction} onToggleFrictionCircle={handleToggleFriction}
+            showRacingLines={showLines} onToggleRacingLines={toggleLines} {...syncControls} />
         </div>
       )}
       <div className="relative flex-1 min-h-0 overflow-hidden">
@@ -135,7 +137,8 @@ export default function Replay3DView({trajectory, baseline, currentIndex, onSele
           baselinePoint={baselineGhostPos?.point ?? null} baselinePoints={baselinePoints}
           colorBy={colorBy} onChangeColorBy={onChangeColorBy} isCompareMode={Boolean(baseline)} hasBaseline={Boolean(baseline)}
           fadedLine={activeFadedLine} onToggleFadedLine={handleToggleFadedLine}
-          showFrictionCircle={effectiveShowFriction} onToggleFrictionCircle={handleToggleFriction} {...syncControls} />}
+          showFrictionCircle={effectiveShowFriction} onToggleFrictionCircle={handleToggleFriction}
+          showRacingLines={showLines} onToggleRacingLines={toggleLines} {...syncControls} />}
         {state?.ready && <Replay3DStreaming progress={state.progress} className={isExpanded && effectiveShowFriction ? 'bottom-48' : 'bottom-2'} />}
         {!state?.ready && <Replay3DLoading progress={state?.progress} error={state?.error} onRetry={() => setRetry(value => value + 1)} />}
       </div>

@@ -322,6 +322,9 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   `laps/useReplayScene.ts` retains the scene for a layout/geometry/package revision; selecting
   either lap replaces only `laps/lapLayer.ts` cars, wheel animation and racing lines, preserving
   the camera and scenery. Cancelled or superseded builds are discarded and retired lap buffers released.
+  `laps/loadProgress.ts` weighs the load steps `replayScene.ts` reports for `laps/Replay3DLoading.tsx`: the loading card (the shared
+  `LoadingState` with its rings tilted) and, after the first frame, the corner note counting scenery chunks and textures still sharpening.
+  The 3D toolbar's Line menu (`GpsMapModeBar.tsx`) hides the racing lines or picks their colouring.
   Canvas resizes repaint before the browser paints, avoiding a black frame when embedded toolbars change height.
   `sceneEnvironment.ts` owns the sky dome (`atmosphere/skyDome.ts`: the package's Hosek-Wilkie sky cooked by `atmosphere/hosekSky.ts`, its colour looks
   by sun strength (`atmosphere/timeOfDay.ts`, shared with the exposure profiles), turbidity and haze model, each view direction turned by the package's sky box, the only reader of `sky`), the haze (`atmosphere/haze.ts`: three's fog chunks with the scene's height and sun terms; its colour from the

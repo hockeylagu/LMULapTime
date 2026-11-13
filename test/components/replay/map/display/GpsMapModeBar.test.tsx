@@ -114,6 +114,20 @@ describe('GpsMapModeBar', () => {
     rerender(<GpsMapModeBar onToggleFrictionCircle={onToggleFrictionCircle} showFrictionCircle={true} />);
     expect(frictionBtn).toHaveAttribute('aria-pressed', 'true');
   });
+  it('puts the 3D racing line in one Line menu: off, plain and the colour modes', () => {
+    const onToggleRacingLines = vi.fn(), onChangeColorBy = vi.fn();
+    const { rerender } = render(<GpsMapModeBar colorBy="speed" onChangeColorBy={onChangeColorBy} onToggleRacingLines={onToggleRacingLines} />);
+    expect(screen.queryByRole('button', { name: 'Pedal' })).not.toBeInTheDocument(); // No colour buttons beside the menu.
+    const menu = screen.getByRole('combobox', { name: 'Racing line' });
+    expect(menu).toHaveTextContent('Speed');
+    fireEvent.click(menu); fireEvent.click(screen.getByRole('option', { name: 'Off' }));
+    expect([onToggleRacingLines.mock.calls.length, onChangeColorBy.mock.calls.length]).toEqual([1, 0]);
+    rerender(<GpsMapModeBar colorBy="speed" onChangeColorBy={onChangeColorBy} onToggleRacingLines={onToggleRacingLines} showRacingLines={false} />);
+    expect(screen.getByRole('combobox', { name: 'Racing line' })).toHaveTextContent('Off');
+    fireEvent.click(screen.getByRole('combobox', { name: 'Racing line' })); fireEvent.click(screen.getByRole('option', { name: 'Pedal' }));
+    expect(onToggleRacingLines).toHaveBeenCalledTimes(2); // Shown again,
+    expect(onChangeColorBy).toHaveBeenCalledWith('pedal'); // coloured by pedal.
+  });
   it('switches the ghost sync with a baseline and explains marker A', () => {
     const onChangeGhostSync = vi.fn();
     const { rerender } = render(<GpsMapModeBar hasBaseline ghostSync="time" onChangeGhostSync={onChangeGhostSync} />);
