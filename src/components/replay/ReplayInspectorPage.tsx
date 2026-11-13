@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
-import { updateSearchParams } from '../../utils/urlParams.js';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router';
+import { applySearchParamUpdates, updateSearchParams } from '../../utils/urlParams.js';
 import { ReplayInspectorContent } from './inspector/ReplayInspectorContent.js';
 import { GhostSyncContext, type GhostSyncState } from './inspector/ghostSyncContext.js';
 import { parseGhostSyncMode } from './map/ghostSync.js';
@@ -14,6 +14,7 @@ const numberParam = (value: string | null): number | null => {
 };
 
 export const ReplayInspectorPage: React.FC = () => {
+  const { pathname } = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const sessionId = searchParams.get('sessionId');
@@ -31,13 +32,53 @@ export const ReplayInspectorPage: React.FC = () => {
     markerDistM, setMarkerDistM,
   }), [syncMode, markerDistM, searchParams, setSearchParams]);
   const isRace = searchParams.get('mode') === 'race';
+  const readHistoryIdx = (): number | null => {
+    const state = window.history.state as { idx?: unknown } | null;
+    return typeof state?.idx === 'number' ? state.idx : null;
+  };
+  const [entryHistoryIdx] = useState<number | null>(() => readHistoryIdx());
+  const internalDepthRef = useRef(0);
   // Leaving the race replay, the lap view comes back on the lap it showed instead of loading it again.
   const [fromRace, setFromRace] = useState(false);
-  const openRace = useCallback((slot: number | null, lapNumber: number | null) => updateSearchParams(searchParams, setSearchParams, {
-    mode: 'race', car: slot === null ? null : String(slot), lap: lapNumber === null ? null : String(lapNumber), t: null,
-  }), [searchParams, setSearchParams]);
+  const openRace = useCallback((slot: number | null, lapNumber: number | null) => {
+    internalDepthRef.current += 1;
+    setSearchParams(
+      (prev) => applySearchParamUpdates(prev || searchParams, {
+        mode: 'race', car: slot === null ? null : String(slot), lap: lapNumber === null ? null : String(lapNumber), t: null,
+      }),
+    );
+  }, [searchParams, setSearchParams]);
+
+  const closeRace = useCallback(() => {
+    setFromRace(true);
+    const currentIdx = readHistoryIdx();
+    const canPopToLap = (currentIdx !== null && entryHistoryIdx !== null && currentIdx > entryHistoryIdx)
+      || internalDepthRef.current > 0;
+    if (canPopToLap) {
+      internalDepthRef.current = Math.max(0, internalDepthRef.current - 1);
+      void navigate(-1);
+      return;
+    }
+    updateSearchParams(searchParams, setSearchParams, { mode: null, t: null, car: null, lap: null });
+  }, [entryHistoryIdx, navigate, searchParams, setSearchParams]);
+
+  const closeTelemetry = useCallback(() => {
+    if (!sessionId) return;
+    const currentIdx = readHistoryIdx();
+    if (currentIdx !== null && entryHistoryIdx !== null) {
+      const stepsBack = Math.max(1, currentIdx - entryHistoryIdx + 1);
+      if (currentIdx < stepsBack) {
+        void navigate(`/session/${encodeURIComponent(sessionId)}`, { replace: true });
+        return;
+      }
+      void navigate(-stepsBack);
+      return;
+    }
+    void navigate(-(1 + internalDepthRef.current));
+  }, [entryHistoryIdx, navigate, sessionId]);
 
   useEffect(() => {
+    if (pathname !== '/telemetry' && pathname !== '/replay') return;
     if (!sessionId) {
       void navigate('/dashboard', { replace: true });
       return;
@@ -45,7 +86,7 @@ export const ReplayInspectorPage: React.FC = () => {
     if (viewParam !== '2d' && viewParam !== '3d') {
       updateSearchParams(searchParams, setSearchParams, { view: '2d' });
     }
-  }, [navigate, sessionId, viewParam, searchParams, setSearchParams]);
+  }, [navigate, pathname, sessionId, viewParam, searchParams, setSearchParams]);
 
   if (!sessionId) return null;
 
@@ -56,11 +97,7 @@ export const ReplayInspectorPage: React.FC = () => {
         initialTimeSec={numberParam(searchParams.get('t'))}
         initialSlot={numberParam(searchParams.get('car'))}
         initialLapNumber={numberParam(searchParams.get('lap'))}
-        // Race mode replaced the lap view's history entry: Back returns to that lap view.
-        onClose={() => {
-          setFromRace(true);
-          updateSearchParams(searchParams, setSearchParams, { mode: null, t: null, car: null, lap: null });
-        }}
+        onClose={closeRace}
         onOpenLap={(driver, lap) => {
           setFromRace(true);
           updateSearchParams(searchParams, setSearchParams, {
@@ -87,7 +124,7 @@ export const ReplayInspectorPage: React.FC = () => {
     <GhostSyncContext.Provider value={ghostSync}>
       <ReplayInspectorContent
         isOpen
-        onClose={() => void navigate(-1)}
+        onClose={closeTelemetry}
         sessionId={sessionId}
         initialDriverOrdinal={Number.isInteger(driverOrdinal) && driverOrdinal >= 0 ? driverOrdinal : 0}
         initialLapOrdinal={Number.isInteger(lapOrdinal) && lapOrdinal >= 0 ? lapOrdinal : 0}

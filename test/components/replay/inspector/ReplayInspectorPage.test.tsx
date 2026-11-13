@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { useContext, type ReactNode } from 'react';
 import { ReplayInspectorPage } from '../../../../src/components/replay/ReplayInspectorPage.js';
+import { RaceModeContext } from '../../../../src/components/replay/race/raceModeContext.js';
 
 interface MockInspectorProps {
   sessionId: string;
@@ -21,23 +22,36 @@ interface MockInspectorProps {
 }
 
 vi.mock('../../../../src/components/replay/inspector/ReplayInspectorContent.js', () => ({
-  ReplayInspectorContent: (props: MockInspectorProps): ReactNode => (
-    <div data-testid="mock-inspector">
-      <span data-testid="session-id">{props.sessionId}</span>
-      <span data-testid="driver-ordinal">{props.initialDriverOrdinal}</span>
-      <span data-testid="lap-ordinal">{props.initialLapOrdinal}</span>
-      <span data-testid="compare-mode">{String(props.initialCompareMode)}</span>
-      <span data-testid="baseline-session">{props.initialBaselineSessionId ?? 'none'}</span>
-      <span data-testid="baseline-driver">{props.initialBaselineDriverOrdinal}</span>
-      <span data-testid="baseline-lap">{props.initialBaselineLapOrdinal ?? 'none'}</span>
-      <span data-testid="corner">{props.initialCornerNumber ?? 'none'}</span>
-      <span data-testid="view-mode">{props.view ?? 'none'}</span>
-      <button type="button" aria-pressed={props.isExpanded}
-        onClick={() => props.onToggleExpanded?.(!props.isExpanded)}>Fullscreen</button>
-      <button type="button" onClick={() => props.onLocatorChange(2, 8)}>Change locator</button>
-      <button type="button" onClick={() => props.onViewChange?.('3d')}>Switch to 3D</button>
-      <button type="button" onClick={() => props.onViewChange?.('2d')}>Switch to 2D</button>
-      <button type="button" onClick={props.onClose}>Close</button>
+  ReplayInspectorContent: (props: MockInspectorProps): ReactNode => {
+    const openRace = useContext(RaceModeContext);
+    return (
+      <div data-testid="mock-inspector">
+        <span data-testid="session-id">{props.sessionId}</span>
+        <span data-testid="driver-ordinal">{props.initialDriverOrdinal}</span>
+        <span data-testid="lap-ordinal">{props.initialLapOrdinal}</span>
+        <span data-testid="compare-mode">{String(props.initialCompareMode)}</span>
+        <span data-testid="baseline-session">{props.initialBaselineSessionId ?? 'none'}</span>
+        <span data-testid="baseline-driver">{props.initialBaselineDriverOrdinal}</span>
+        <span data-testid="baseline-lap">{props.initialBaselineLapOrdinal ?? 'none'}</span>
+        <span data-testid="corner">{props.initialCornerNumber ?? 'none'}</span>
+        <span data-testid="view-mode">{props.view ?? 'none'}</span>
+        <button type="button" aria-pressed={props.isExpanded}
+          onClick={() => props.onToggleExpanded?.(!props.isExpanded)}>Fullscreen</button>
+        <button type="button" onClick={() => props.onLocatorChange(2, 8)}>Change locator</button>
+        <button type="button" onClick={() => props.onViewChange?.('3d')}>Switch to 3D</button>
+        <button type="button" onClick={() => props.onViewChange?.('2d')}>Switch to 2D</button>
+        <button type="button" onClick={() => openRace?.(3, 7)}>Open Race</button>
+        <button type="button" onClick={props.onClose}>Close</button>
+      </div>
+    );
+  },
+}));
+
+vi.mock('../../../../src/components/replay/race/RaceReplayView.js', () => ({
+  RaceReplayView: (props: { onClose: () => void; onOpenLap: (driver: number, lap: number) => void }): ReactNode => (
+    <div data-testid="mock-race">
+      <button type="button" onClick={props.onClose}>Race Back</button>
+      <button type="button" onClick={() => props.onOpenLap(4, 9)}>Open Lap</button>
     </div>
   ),
 }));
@@ -135,5 +149,37 @@ describe('ReplayInspectorPage', () => {
     render(<ReplayInspectorPage />);
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     await waitFor(() => expect(window.location.hash).toContain('/'));
+  });
+
+  it('returns from race view to lap view on Race Back, and clears mode=race when opened directly', async () => {
+    window.location.hash = '#/telemetry?sessionId=session-1&view=2d';
+    render(<ReplayInspectorPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Race' }));
+    await waitFor(() => expect(screen.getByTestId('mock-race')).toBeInTheDocument());
+    expect(window.location.hash).toContain('mode=race');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Race Back' }));
+    await waitFor(() => expect(screen.getByTestId('mock-inspector')).toBeInTheDocument());
+    expect(window.location.hash).not.toContain('mode=race');
+
+    window.location.hash = '#/telemetry?sessionId=session-1&view=2d&mode=race';
+    render(<ReplayInspectorPage />);
+    fireEvent.click(screen.getByRole('button', { name: 'Race Back' }));
+    await waitFor(() => expect(screen.getAllByTestId('mock-inspector').length).toBeGreaterThan(0));
+    expect(window.location.hash).not.toContain('mode=race');
+  });
+
+  it('falls back to the session page when Telemetry is opened with no prior history', async () => {
+    const previousState = window.history.state as unknown;
+    window.location.hash = '#/telemetry?sessionId=session%2F1&view=2d';
+    window.history.replaceState({ idx: 0 }, '');
+    try {
+      render(<ReplayInspectorPage />);
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+      await waitFor(() => expect(window.location.hash).toContain('/session/session%2F1'));
+    } finally {
+      window.history.replaceState(previousState, '');
+    }
   });
 });
