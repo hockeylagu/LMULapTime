@@ -1,4 +1,4 @@
-import { Box3, Group, Quaternion, Scene, Vector3, WebGLRenderer, type Object3D, type OrthographicCamera, type PerspectiveCamera } from 'three';
+import { Box3, Group, MathUtils, Quaternion, Scene, Vector3, WebGLRenderer, type Object3D, type OrthographicCamera, type PerspectiveCamera } from 'three';
 import type { SceneryBounds, SceneryLayoutResource } from '../../../../../shared/types/scenes/scenery.js';
 import type { ReplayDaylightClock } from '../../../../../shared/types/replay.js';
 import { VEHICLE_FILES } from '../../../../api/vehicles/bodyApi.js';
@@ -105,10 +105,21 @@ export interface SceneShell {
   placeCar(car: Object3D, pose: RenderPose, motion: CarMotion | null): void;
   /** Switches the camera mode with its environment, shadows and exposure; false when it is the current one. */
   setMode(next: CameraMode): boolean;
+  /**
+   * Lights the scene by the sun and weather of `clock`'s moment (the session's published sun without one): the sky, haze, sun light
+   * and shadow, clouds, venue capture and exposure. A sun within SUN_STEP_DEG of the shown one, under the same cloud, changes
+   * nothing: each change redraws every shadow cascade and captures the venue again (a frame of a few tens of milliseconds).
+   */
+  setDaylight(clock: ReplayDaylightClock | undefined): void;
   beforeFrame(hook: ((frameTime: number) => void) | null): void;
   invalidate(): void;
   dispose(): void;
 }
+
+/** How far the sun moves before `setDaylight` lights the scene again, degrees: a quarter of a degree is a minute of the day. */
+export const SUN_STEP_DEG = 0.25;
+/** How far the cloud cover or the sun's visibility through the clouds moves before `setDaylight` lights the scene again. */
+const WEATHER_STEP = 0.01;
 
 /** Each car's body and pose marker, which `placeCar` switches by whether the pose has a heading. */
 const poseShapes = new WeakMap<Object3D, {body: Object3D; marker: Object3D}>();
@@ -129,7 +140,7 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
   // Car textures load at the package's size (it stores outside-only parts small and the liveries larger). The interior's own
   // textures stay on their start files until a driver camera is used.
   const carTextureLoader = new CachedKtx2Loader(renderer, {start: startOf}), interiorTextures = new CachedKtx2Loader(renderer, {start: startOf});
-  const sun = sceneSun(layout, origin.y, daylightClock);
+  let sun = sceneSun(layout, origin.y, daylightClock);
   const exposure = createAutoExposure(renderer, layout.camera, {rgb: sun.radiance.clone(), elevationDeg: sun.sunElevationDeg}, () => invalidate(), exposureType('follow'),
     sun.weather.cloudCover, sun.weather.sunVisibility);
   // Wheel and line contact heights read the package's road height grid; off it, and for the camera checks, one ray tree per resident chunk.
@@ -377,6 +388,16 @@ export function createSceneShell(layout: SceneryLayoutResource, {daylightClock, 
       environment.setCamera(rig.camera); environment.setShadowCascades(shadowCascadeSet(next));
       exposure.setType(exposureType(next));
       return true;
+    },
+    setDaylight(clock) {
+      const next = sceneSun(layout, origin.y, clock), weather = (at: typeof sun) => [at.weather.cloudCover, at.clouds.sunVisibility ?? 1];
+      const turnedDeg = MathUtils.radToDeg(next.lighting.sunDirection.angleTo(sun.lighting.sunDirection));
+      const [cover, seen] = weather(next), [shownCover, shownSeen] = weather(sun);
+      if (turnedDeg < SUN_STEP_DEG && Math.abs(cover - shownCover) < WEATHER_STEP && Math.abs(seen - shownSeen) < WEATHER_STEP) return;
+      sun = next;
+      exposure.setSun({rgb: sun.radiance.clone(), elevationDeg: sun.sunElevationDeg}, sun.weather.cloudCover, sun.weather.sunVisibility);
+      // Before the environment exists, it is made from this sun.
+      if (environment) { environment.setSun(sun); invalidate(); }
     },
     beforeFrame(hook) { frameHook = hook; },
     invalidate: () => invalidate(),

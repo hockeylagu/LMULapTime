@@ -129,7 +129,9 @@ export interface AutoExposure {
   link(): Promise<void>;
   /** Switches to a camera type's metering, exposure law, white balance and curve; exposure re-adapts from the next reading. */
   setType(type: SceneryCameraType): void;
-  /** The active type's display transform; the same object until the type changes. */
+  /** Chooses every type's profile by another moment's sun and weather; the adapted level carries over. */
+  setSun(sun: ProfileSun, cloudCover: number, sunVisibility?: number): void;
+  /** The active type's display transform; the same object until the type or the sun changes. */
   display(): DisplayTransform;
   dispose(): void;
 }
@@ -173,13 +175,13 @@ const METER_FLOOR = 1e-4;
  * type's profile toward its overcast look, by how much of the sun the clouds hide (`sunVisibility`, when the replay has a cloud field).
  */
 export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamera, sun: ProfileSun, invalidate: () => void, type: SceneryCameraType = 'external', cloudCover = 0, sunVisibility?: number): AutoExposure {
-  const unit = meterUnit(camera.sceneLuminanceScale), weather = {cloudCover, sunVisibility};
-  const types = {
-    external: resolveType(camera.types.external, sun, weather, camera.outputGamma),
-    onboard: resolveType(camera.types.onboard, sun, weather, camera.outputGamma),
-    tv: resolveType(camera.types.tv, sun, weather, camera.outputGamma),
-  } satisfies Record<SceneryCameraType, ResolvedType>;
-  let active = types[type];
+  const unit = meterUnit(camera.sceneLuminanceScale);
+  const resolve = (at: ProfileSun, weather: {cloudCover: number; sunVisibility?: number}): Record<SceneryCameraType, ResolvedType> => ({
+    external: resolveType(camera.types.external, at, weather, camera.outputGamma),
+    onboard: resolveType(camera.types.onboard, at, weather, camera.outputGamma),
+    tv: resolveType(camera.types.tv, at, weather, camera.outputGamma),
+  });
+  let types = resolve(sun, {cloudCover, sunVisibility}), activeType = type, active = types[type];
   const size = new Vector2();
   // Depth testing still uses the float attachment. The display and meter only sample the resolved colour.
   const hdr = new WebGLRenderTarget(1, 1, {
@@ -274,9 +276,12 @@ export function createAutoExposure(renderer: WebGLRenderer, camera: SceneryCamer
     target: hdr,
     setType(requested) {
       const next = requested;
-      if (types[next] === active) return;
+      if (next === activeType) return;
       // The adapted level carries over, so the new type's law starts from it instead of an unexposed frame; the next reading moves it.
-      apply(types[next]); generation++; metered = null; invalidate();
+      activeType = next; apply(types[next]); generation++; metered = null; invalidate();
+    },
+    setSun(at, cover, visibility) {
+      types = resolve(at, {cloudCover: cover, sunVisibility: visibility}); apply(types[activeType]); invalidate();
     },
     display: () => active.display,
     link() {

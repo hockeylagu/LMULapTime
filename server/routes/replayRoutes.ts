@@ -172,6 +172,10 @@ export function createReplayRouter(context: ServerContext): Router {
         trackVenue: metadata.trackName,
         trackCourse: metadata.trackCourse,
         sceneDesc: metadata.sceneDesc,
+        daylight: {
+          raceStartMinute: metadata.raceStartMinute ?? null, cloudCover: metadata.cloudCover ?? null,
+          cloudField: metadata.cloudField ?? null, cloudVariants: metadata.cloudVariants ?? null,
+        },
         // The pace car runs in the replay but is no competitor.
         cars: composed.drivers.flatMap(driver => typeof driver.slot === 'number' && driver.carClass !== SAFETY_CAR_CLASS ? [{
           slot: driver.slot, name: driver.name, carClass: driver.carClass, carNumber: driver.carNumber, team: driver.team,

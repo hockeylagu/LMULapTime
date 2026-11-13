@@ -1,4 +1,4 @@
-import type { RaceReplayCar, RaceReplayLap, RaceReplayOverview, RaceRunningOrder } from '../../shared/types/index.js';
+import type { RaceReplayCar, RaceReplayDaylight, RaceReplayLap, RaceReplayOverview, RaceRunningOrder } from '../../shared/types/index.js';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { buildRaceEvents, type StoredDriverEvent } from '../../shared/domain/raceReplay/raceEvents.js';
 import { encodeRacePoseWindow } from '../../shared/domain/raceReplay/poseWindow.js';
@@ -23,6 +23,7 @@ export interface RaceOverviewRequest {
   trackCourse?: string;
   sceneDesc?: string;
   cars: RaceReplayCar[];
+  daylight: RaceReplayDaylight;
 }
 
 type Resample = (laps: Array<{ key: string; blob: Uint8Array }>, hz: number) => Promise<KeyedLapPoses[]>;
@@ -77,6 +78,7 @@ export class RaceReplayService {
       runningOrder: this.store.getReplayRunningOrder(request.replayName)
         .map(snapshot => ({ ...snapshot, order: snapshot.order.filter(slot => slots.has(slot)) })),
       events: buildRaceEvents(this.store.getReplayDriverEvents(request.replayName), slots),
+      daylight: request.daylight,
     };
   }
 

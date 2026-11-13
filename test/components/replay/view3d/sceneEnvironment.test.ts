@@ -186,3 +186,34 @@ it("samples the package's cascade set from its first draw, for any camera, and h
   } finally { environment.dispose(); }
   expect(cascadeShadowUniforms.surface_cascadeCount.value).toBe(0); expect(cascadeShadowUniforms.surface_cascadeAtlas.value).toBeNull();
 });
+
+it("lights the scene by another moment's sun: sky, haze, light, foliage and shadow, and captures the venue again once captured", () => {
+  const scene = new Scene(), render = vi.fn<(scene: Scene, camera: Camera) => void>();
+  const renderer = {toneMapping: 0, toneMappingExposure: 0, ...fakeRenderer(), render} as unknown as WebGLRenderer;
+  const daylight = {date: '2023-06-10', sessions: [{id: 'race' as const, localTime: '15:00', sunElevationDeg: 50, sunBearingDeg: 200}], airPollution: 0.6, hazeBaseScale: 1, ...TEST_HAZE_WEIGHTS, latitudeDeg: 47.95, longitudeDeg: 0.22, utcOffsetHours: 2};
+  const at = (sessionTimeSec: number, cloudCover: number) => sceneSun(venue(daylight), 0, {session: 'race', startMinute: null, sessionTimeSec, cloudCover});
+  const environment = addSceneEnvironment(scene, renderer, venue(daylight), new Vector3(), 'chase', at(0, 0));
+  const sunLight = scene.getObjectByName('sun') as DirectionalLight, fog = scene.fog as FogExp2;
+  try {
+    // Before the venue is captured, a new sun makes a new first environment from the new sky.
+    const firstSky = skyMaterial(scene), renders = probe.render.mock.calls.length, evening = at(5 * 3600, 0.4);
+    environment.setSun(evening);
+    expect(probe.render.mock.calls.length).toBe(renders + 1);
+    expect((probe.render.mock.calls.at(-1)![0].getObjectByName('sky') as Mesh).material).toBe(skyMaterial(scene));
+    expect(skyMaterial(scene)).not.toBe(firstSky);
+    const toSun = evening.lighting.sunDirection.clone().normalize();
+    expect((skyMaterial(scene).uniforms.sunDirection.value as Vector3).distanceTo(toSun)).toBeLessThan(1e-9);
+    expect(sunLight.position.distanceTo(toSun)).toBeLessThan(1e-9); expect(crownSun.value.distanceTo(toSun)).toBeLessThan(1e-9);
+    expect(sunLight.color.toArray()).toEqual(sunColour(testSun(), evening.sunElevationDeg, 0.4).toArray());
+    expect(fog.density).toBeCloseTo(hazeDensity(testSky(), daylight, evening.weather, evening.sunElevationDeg), 12);
+    // Once captured, a new sun captures the venue again (twice), and the next frame draws every cascade from the new direction.
+    environment.setCamera(new PerspectiveCamera(48, 1.5, 0.5, 15000));
+    environment.captureVenue(); environment.update();
+    const cubemaps = probe.cubemaps, firstEnvironments = probe.render.mock.calls.length;
+    render.mockClear(); environment.update(); const settled = render.mock.calls.length;
+    environment.setSun(at(6 * 3600, 0.4));
+    expect(probe.cubemaps - cubemaps).toBe(2); expect(probe.render.mock.calls.length).toBe(firstEnvironments);
+    render.mockClear(); environment.update();
+    expect(settled).toBe(0); expect(render.mock.calls.filter(([, camera]) => camera instanceof OrthographicCamera)).toHaveLength(3);
+  } finally { environment.dispose(); }
+});

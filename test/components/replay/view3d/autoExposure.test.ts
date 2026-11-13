@@ -86,6 +86,17 @@ describe('autoExposure', () => {
     exposure.dispose();
   });
 
+  it("chooses the active type's profile by a new sun and weather, keeping the type", () => {
+    const invalidate = vi.fn(), exposure = createAutoExposure({} as WebGLRenderer, testCamera(), sun(30, 0), invalidate);
+    exposure.setType('onboard'); invalidate.mockClear();
+    const before = exposure.display();
+    exposure.setSun(sun(70, 30), 1);
+    expect(exposure.display()).not.toBe(before);
+    expect(exposure.display().toneCurve).toEqual(profileAt(testCamera().types.onboard, sun(70, 30), 1).toneCurve);
+    expect(invalidate).toHaveBeenCalled();
+    exposure.dispose();
+  });
+
   it('reads the metering target into one reused pack buffer, once its fence has signalled, and adapts to the reading', async () => {
     const frames: Array<() => void> = [], flush = () => frames.splice(0).forEach(callback => callback());
     vi.stubGlobal('requestAnimationFrame', (callback: () => void) => frames.push(callback));

@@ -56,6 +56,8 @@ export async function createReplayScene(
   const route = layout.routeLengthM;
   const firstStation = lapFirstStation(trajectory, layout);
   shell.attach(host, {onFailure, onProgress});
+  // A shell the race view left keeps the race's sun: the lap's own moment lights it (nothing changes on the shell it made).
+  shell.setDaylight(trajectory.daylightClock);
   const {rig, origin} = shell;
   shell.station = firstStation;
   const loadLaps = createLapLayerLoader(origin, shell.surfaceHeight, createCarSets(shell.carTemplates, shell.carTextures, layout.shading, shell.surfaceHeight), () => shell.exposureDisplay());
@@ -116,6 +118,7 @@ export async function createReplayScene(
       if (disposed || signal?.aborted || request !== lapRequest) { replacement.dispose(); return false; }
       replacement.ready(); replacement.colorLines(lineMode); replacement.fadeLines(primaryOpacity, baselineOpacity);
       layer.dispose(); layer = replacement; shell.show(contentOf(layer)); rig.setLayer(layer);
+      shell.setDaylight(next.daylightClock);
       return true;
     },
     beforeFrame: hook => shell.beforeFrame(hook),

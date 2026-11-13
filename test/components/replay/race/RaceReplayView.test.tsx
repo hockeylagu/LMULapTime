@@ -17,7 +17,7 @@ vi.mock('../../../../src/components/replay/race/Race3DView.js', () => ({
 vi.mock('../../../../src/api/trackGeometryApi.js', () => ({ loadTrackBoundaryGeometry: vi.fn(() => Promise.resolve(null)) }));
 
 const overview: RaceReplayOverview = {
-  replayName: 'R1.Vcr', sessionType: 'Race', startSec: 0, endSec: 200, poseHz: 10, windowSec: 60, trackVenue: 'Nowhere',
+  replayName: 'R1.Vcr', sessionType: 'Race', daylight: { raceStartMinute: null, cloudCover: null, cloudField: null, cloudVariants: null }, startSec: 0, endSec: 200, poseHz: 10, windowSec: 60, trackVenue: 'Nowhere',
   cars: [
     { slot: 1, name: 'Ann', carClass: 'Hyper', carNumber: '7', isPlayer: true, sessionDriverOrdinal: 3, sessionLapOrdinals: { '1': 0, '2': 1 } },
     { slot: 2, name: 'Bea', carClass: 'GT3' },

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useEffectEvent, useRef, type RefObject } from 'react';
-import type { RaceReplayOverview, RaceReplayProgress } from '../../../../../shared/types/replay.js';
+import type { RaceReplayOverview, RaceReplayProgress, ReplayDaylightClock } from '../../../../../shared/types/replay.js';
+import { replayDaylightClock } from '../../../../../shared/domain/scenery/replayDaylightClock.js';
 import { RACE_POSE_CHANNEL_COUNT, sampleRacePose, type RacePoseWindow } from '../../../../../shared/domain/raceReplay/poseWindow.js';
 import { fetchSceneryLayout } from '../../../../api/sceneryApi.js';
 import type { LoadedBody } from '../../../../api/vehicles/bodyApi.js';
@@ -47,6 +48,15 @@ export function trackStation(progress: RaceReplayProgress | null, slot: number |
   return ((distance % length) + length) % length;
 }
 
+/** The in-game clock at replay time `timeSec` (replay time is session time). */
+export function raceDaylightClock(overview: RaceReplayOverview, timeSec: number): ReplayDaylightClock {
+  const {raceStartMinute, cloudCover, cloudField, cloudVariants} = overview.daylight;
+  return replayDaylightClock(overview.sessionType, raceStartMinute, timeSec, cloudCover, cloudField, cloudVariants);
+}
+
+/** How often the sun follows the session clock, ms of wall time: a light change redraws every shadow cascade. */
+const DAYLIGHT_MS = 1000;
+
 /** Draws the session clock's moment: every car's pose, and the track station the scenery streams towards. */
 function drawScene(handle: RaceSceneHandle, clock: RaceClock, poses: RacePoseCache, progress: RaceReplayProgress | null, followSlot: number | null) {
   const {timeSec} = clock.getState();
@@ -86,9 +96,10 @@ export function useRaceScene({host, overview, clock, poses, followSlot, progress
     signal.throwIfAborted();
     revision.current = layout.packageRevision;
     if (body && body.resource.packageRevision !== layout.packageRevision) throw Error('Body package revision differs from the 3D scene');
-    const shell = shells.acquire(layout, {firstView: {kind: 'free', x: place.x, z: place.z}});
+    const daylight = raceDaylightClock(overview, clock.getState().timeSec);
+    const shell = shells.acquire(layout, {daylightClock: daylight, firstView: {kind: 'free', x: place.x, z: place.z}});
     try {
-      return await createRaceScene(shell, container, layout, overview.cars, {slot: followSlot, body}, slot => bodyOf(slot),
+      return await createRaceScene(shell, container, layout, overview.cars, {slot: followSlot, body, daylight}, slot => bodyOf(slot),
         (slot, timeSec) => poses.nextPose(slot, timeSec), fail, showProgress);
     } catch (error) { shell.detach(container); shells.discardUnstarted(shell); throw error; }
   };
@@ -98,7 +109,29 @@ export function useRaceScene({host, overview, clock, poses, followSlot, progress
       handle.mode(mode); drawScene(handle, clock, poses, progress, followSlot);
       setState(current => ({key, ready: true, progress: current?.key === key ? current.progress : undefined}));
     }});
-  const drawAt = useEffectEvent(() => { if (scene.current) drawScene(scene.current, clock, poses, progress, followSlot); });
+  /** When the sun last followed the clock, and the pending catch-up (a paused seek inside the interval still moves the sun). */
+  const daylight = useRef<{at: number; timer: ReturnType<typeof setTimeout> | undefined}>({at: -Infinity, timer: undefined});
+  const applyDaylight = useEffectEvent(() => {
+    const handle = scene.current;
+    if (!handle) return;
+    daylight.current.at = performance.now();
+    handle.daylight(raceDaylightClock(overview, clock.getState().timeSec));
+  });
+  const followDaylight = useEffectEvent(() => {
+    const state = daylight.current, wait = state.at + DAYLIGHT_MS - performance.now();
+    if (state.timer) return;
+    if (wait > 0) state.timer = globalThis.setTimeout(() => { state.timer = undefined; applyDaylight(); }, wait);
+    else applyDaylight();
+  });
+  useEffect(() => {
+    const state = daylight.current;
+    return () => globalThis.clearTimeout(state.timer);
+  }, []);
+  const drawAt = useEffectEvent(() => {
+    if (!scene.current) return;
+    drawScene(scene.current, clock, poses, progress, followSlot);
+    followDaylight();
+  });
   // A newly followed car loads its body; the scene shows its box until then.
   useEffect(() => {
     const handle = scene.current;

@@ -489,4 +489,14 @@ export interface RaceReplayOverview {
   runningOrder: RaceRunningOrder[];
   /** Pit stops, contacts and penalties in time order. */
   events: RaceReplayEvent[];
+  /** What the in-game clock at any replay time is built from (`replayDaylightClock`: replay time is session time). */
+  daylight: RaceReplayDaylight;
+}
+
+/** The replay's race start and sampled weather, null where the replay's metadata does not carry them. */
+export interface RaceReplayDaylight {
+  raceStartMinute: number | null;
+  cloudCover: Array<[number, number]> | null;
+  cloudField: ReplayCloudFieldSample[] | null;
+  cloudVariants: string[] | null;
 }

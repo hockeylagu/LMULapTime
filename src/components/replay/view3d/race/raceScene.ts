@@ -1,6 +1,6 @@
 import { BoxGeometry, Color, Euler, Group, InstancedMesh, Matrix4, MeshStandardMaterial, Quaternion, Vector3, type OrthographicCamera, type PerspectiveCamera } from 'three';
 import type { SceneryLayoutResource } from '../../../../../shared/types/scenes/scenery.js';
-import type { RaceReplayCar, ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
+import type { RaceReplayCar, ReplayDaylightClock, ReplayTrajectoryPoint } from '../../../../../shared/types/replay.js';
 import { RACE_POSE_CHANNEL_COUNT, sampleRacePose, type RacePoseWindow } from '../../../../../shared/domain/raceReplay/poseWindow.js';
 import type { LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import type { NextPose } from '../../race/racePoseCache.js';
@@ -35,6 +35,8 @@ export interface RaceSceneHandle {
   center(): void;
   zoom(direction: number): void;
   pan(horizontal: number, vertical: number): void;
+  /** Lights the scene by the in-game clock (`SceneShell.setDaylight`: a small move of the sun changes nothing). */
+  daylight(clock: ReplayDaylightClock | undefined): void;
   dispose(): void;
 }
 
@@ -69,11 +71,13 @@ function renderPose(pose: Float32Array, index: number, fraction: number, orienta
  */
 export async function createRaceScene(
   shell: SceneShell, host: HTMLDivElement, layout: SceneryLayoutResource, cars: readonly RaceReplayCar[],
-  first: {slot: number | null; body: LoadedBody | null}, bodyOf: (slot: number) => Promise<LoadedBody | null>,
+  first: {slot: number | null; body: LoadedBody | null; daylight: ReplayDaylightClock | undefined}, bodyOf: (slot: number) => Promise<LoadedBody | null>,
   nextPose: (slot: number, timeSec: number) => Promise<NextPose | null>,
   onFailure: (message: string) => void, onProgress: (progress: SceneLoadProgress) => void,
 ): Promise<RaceSceneHandle> {
   shell.attach(host, {onFailure, onProgress});
+  // A shell the lap view left keeps the lap's sun: the race's moment lights it (nothing changes on the shell it made).
+  shell.setDaylight(first.daylight);
   const {rig, origin} = shell;
   const handlingOf = new Map(cars.map(car => [car.slot, car.handling]));
   const sets = createCarSets(shell.carTemplates, shell.carTextures, layout.shading, shell.surfaceHeight);
@@ -252,6 +256,7 @@ export async function createRaceScene(
     center: () => rig.center(),
     zoom: direction => rig.zoom(direction),
     pan: (horizontal, vertical) => rig.pan(horizontal, vertical),
+    daylight: clock => shell.setDaylight(clock),
     dispose() {
       disposed = true;
       shell.detach(host); content().dispose();

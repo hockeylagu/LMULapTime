@@ -72,6 +72,11 @@ export interface SceneEnvironment {
    * then one lit by the first, so shaded faces get the light the venue bounces. Call once the scenery around it is resident.
    */
   captureVenue(): void;
+  /**
+   * Lights the scene by another moment's sun and weather: the sky, the haze, the sun's light and its shadow (every cascade is drawn
+   * again), the foliage and the clouds; the venue is captured again when it was captured already. Not during a render.
+   */
+  setSun(sun: SceneSun): void;
   /** Writes this scene's haze terms into the uniforms hazed materials read; each of the scene's renders does it too. */
   applyHaze(): void;
   /**
@@ -128,46 +133,32 @@ export function sceneSun(venue: Pick<SceneVenue, 'daylight' | 'sky' | 'shading'>
  * origin in LMU local metres.
  */
 export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue: SceneVenue, origin: Vector3, shadowSet: ShadowCascadeSet,
-  {lighting, sunElevationDeg, clouds, weather, radiance}: SceneSun = sceneSun(venue, origin.y)): SceneEnvironment {
-  // The weather thickens the haze; the clouds toward the sun dim the sun's light further.
-  const clearSun = radiance.clone().multiplyScalar(SUN_UNIT), sunRgb = clearSun.clone().multiplyScalar(clouds.sunVisibility ?? 1);
-  const sky = new Mesh(new BoxGeometry(1, 1, 1), createSkyDomeMaterial(lighting.sunDirection, venue.sky, venue.daylight, weather));
+  initial: SceneSun = sceneSun(venue, origin.y)): SceneEnvironment {
+  const sky = new Mesh(new BoxGeometry(1, 1, 1), createSkyDomeMaterial(initial.lighting.sunDirection, venue.sky, venue.daylight, initial.weather));
   sky.scale.setScalar(SKY_RADIUS_M);
   sky.name = 'sky'; sky.frustumCulled = false;
   // The dome travels with the eye so its horizon stays at infinity at every zoom level.
   sky.onBeforeRender = (_renderer, _scene, camera: Camera) => { sky.position.copy(camera.position); sky.updateMatrixWorld(); };
   scene.background = null;
-  // The haze takes its colour from the sky just above the horizon toward the view (update); the sun's light, the height term and
-  // the distance shape are in the hazed materials' programs (haze.ts).
-  const haze = hazeColour(venue.sky, lighting.sunDirection, weather), heading = new Vector3(), skyHaze = sky.material.uniforms.hazeColour.value as Color;
-  const fog = new FogExp2(haze(0, new Color(), skyHaze), hazeDensity(venue.sky, venue.daylight, weather, sunElevationDeg));
+  const fog = new FogExp2(new Color(), 0);
   scene.fog = fog;
-
   // The first environment: the sky over a sunlit ground plane, so faces out of the sun get the light the ground bounces up to them
-  // until the venue is captured. Ground radiance is a lambertian ground of GROUND_ALBEDO under the sun: albedo · sun · sin(elevation) / π.
+  // until the venue is captured.
   const environmentScene = new Scene(), environmentSky = sky.clone();
-  const groundRadiance = GROUND_ALBEDO * Math.max(0, lighting.sunDirection.y) / Math.PI;
-  const applyHaze = createHaze({originY: origin.y, height: heightHaze(venue.sky, venue.daylight, weather), sunDirection: lighting.sunDirection.clone().normalize(),
-    sunRadiance: sunRgb.clone(), sunward: sunwardHaze(venue.sky, weather)});
-  // Hazed materials read the terms of the scene that rendered last: each scene writes its own before it renders.
-  applyHaze(); scene.onBeforeRender = applyHaze;
-  const reflectedGround = new Mesh(new PlaneGeometry(24000, 24000), new MeshBasicMaterial({color: sunRgb.clone().multiplyScalar(groundRadiance), side: DoubleSide}));
+  const reflectedGround = new Mesh(new PlaneGeometry(24000, 24000), new MeshBasicMaterial({side: DoubleSide}));
   reflectedGround.rotation.x = -Math.PI / 2; reflectedGround.position.y = ENVIRONMENT_GROUND_Y;
   environmentScene.add(environmentSky, reflectedGround);
   // One generator for this environment and the venue's captures: a new one links its prefilter programs again.
-  const generator = new PMREMGenerator(renderer), firstEnvironment = generator.fromScene(environmentScene, 0, 0.1, SKY_RADIUS_M, {size: VENUE_PROBE_PX});
-  scene.environment = firstEnvironment.texture;
-  let venueProbe: WebGLRenderTarget | null = null, venueCube: WebGLCubeRenderTarget | null = null, reflection: ReflectionCubes | null = null;
+  const generator = new PMREMGenerator(renderer);
+  let firstEnvironment: WebGLRenderTarget | null = null, venueProbe: WebGLRenderTarget | null = null, venueCube: WebGLCubeRenderTarget | null = null, reflection: ReflectionCubes | null = null;
   const integration = integrationTexture(venue.shading.integrationMap);
   setSceneryReflection(venue.shading, null, integration);
   // The exposure pass applies the camera profile's tone curve (autoExposure.ts): nothing else tone-maps.
   renderer.toneMapping = NoToneMapping;
-
   // The sun lights the scene from its direction; its shadow comes from the package's cascades (shadows/). The colour carries the strength.
-  const sun = new DirectionalLight(sunRgb, 1), toSun = lighting.sunDirection.clone().normalize();
-  sun.name = 'sun'; sun.position.copy(toSun);
+  const sun = new DirectionalLight(new Color(), 1), toSun = initial.lighting.sunDirection.clone().normalize();
+  sun.name = 'sun';
   scene.add(sun, sun.target);
-  crownSun.value.copy(toSun); // Foliage cards tilt their lighting normal up less as they come to face the sun.
   let view: PerspectiveCamera | OrthographicCamera | null = null, dynamic: readonly Object3D[] = [];
   // The surfaces sample a set only after its first draw; until then they are held lit on its atlas.
   const startCascades = (set: ShadowCascadeSet) => {
@@ -176,13 +167,82 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
     holdCascadeShadows(pass.state.atlas);
     return {set, layout, pass, sampled: false};
   };
-  let cascades: {set: ShadowCascadeSet; layout: ShadowCascadeLayout; pass: CascadeShadows; sampled: boolean} = startCascades(shadowSet);
+  let cascades: {set: ShadowCascadeSet; layout: ShadowCascadeLayout; pass: CascadeShadows; sampled: boolean} = startCascades(shadowSet), lit = false;
   scene.add(sky);
-  // The clouds are lit by the sun before they dim it. The first environment and the venue capture are taken without them.
-  const cloudLayer = clouds.sheets ? createCloudLayer(venue.sky.clouds, clouds.sheets, {sunDirection: toSun, sunGreen: clearSun.g, cloudCover: weather.cloudCover}) : null;
-  if (cloudLayer) scene.add(cloudLayer.group);
+  /** The haze colour toward a view heading (and the sky's, just above the horizon), and the haze terms hazed materials read. */
+  let haze: ReturnType<typeof hazeColour> = () => fog.color, applyHaze: () => void = () => {}, cloudLayer: ReturnType<typeof createCloudLayer> | null = null;
+  const heading = new Vector3();
+  const skyHaze = () => sky.material.uniforms.hazeColour.value as Color;
+  /** Everything the sun and the weather set. */
+  const light = ({lighting, sunElevationDeg, clouds, weather, radiance}: SceneSun) => {
+    // The weather thickens the haze; the clouds toward the sun dim the sun's light further.
+    const clearSun = radiance.clone().multiplyScalar(SUN_UNIT), sunRgb = clearSun.clone().multiplyScalar(clouds.sunVisibility ?? 1);
+    toSun.copy(lighting.sunDirection).normalize();
+    if (lit) {
+      // The same program: only its uniforms change.
+      const previous = sky.material;
+      sky.material = environmentSky.material = createSkyDomeMaterial(lighting.sunDirection, venue.sky, venue.daylight, weather);
+      previous.dispose();
+    }
+    // The haze takes its colour from the sky just above the horizon toward the view (update); the sun's light, the height term and
+    // the distance shape are in the hazed materials' programs (haze.ts).
+    haze = hazeColour(venue.sky, lighting.sunDirection, weather);
+    haze(view ? Math.atan2(view.getWorldDirection(heading).z, heading.x) : 0, fog.color, skyHaze());
+    fog.density = hazeDensity(venue.sky, venue.daylight, weather, sunElevationDeg);
+    applyHaze = createHaze({originY: origin.y, height: heightHaze(venue.sky, venue.daylight, weather), sunDirection: toSun.clone(),
+      sunRadiance: sunRgb.clone(), sunward: sunwardHaze(venue.sky, weather)});
+    applyHaze();
+    // Ground radiance is a lambertian ground of GROUND_ALBEDO under the sun: albedo · sun · sin(elevation) / π.
+    reflectedGround.material.color.copy(sunRgb).multiplyScalar(GROUND_ALBEDO * Math.max(0, toSun.y) / Math.PI);
+    sun.color.copy(sunRgb); sun.position.copy(toSun);
+    crownSun.value.copy(toSun); // Foliage cards tilt their lighting normal up less as they come to face the sun.
+    if (lit) cascades.pass.setLight(toSun.clone().negate());
+    // The clouds are lit by the sun before they dim it. The first environment and the venue capture are taken without them.
+    if (cloudLayer) { scene.remove(cloudLayer.group); cloudLayer.dispose(); }
+    cloudLayer = clouds.sheets ? createCloudLayer(venue.sky.clouds, clouds.sheets, {sunDirection: toSun.clone(), sunGreen: clearSun.g, cloudCover: weather.cloudCover}) : null;
+    if (cloudLayer) scene.add(cloudLayer.group);
+    if (!venueProbe) {
+      firstEnvironment?.dispose();
+      firstEnvironment = generator.fromScene(environmentScene, 0, 0.1, SKY_RADIUS_M, {size: VENUE_PROBE_PX});
+      scene.environment = firstEnvironment.texture;
+    }
+    lit = true;
+  };
+  light(initial);
+  // Hazed materials read the terms of the scene that rendered last: each scene writes its own before it renders.
+  scene.onBeforeRender = () => applyHaze();
   const [probeX, probeY, probeZ] = venue.environmentProbe.position;
   const probeAt = new Vector3(...nativeToScene({x: probeX, y: probeY, z: probeZ}, origin));
+  const captureVenue = () => {
+    // The cube keeps its mips: the reflection convolution reads them.
+    const cube = new WebGLCubeRenderTarget(VENUE_PROBE_PX, {type: HalfFloatType, generateMipmaps: true, minFilter: LinearMipmapLinearFilter}), camera = new CubeCamera(0.5, VENUE_PROBE_FAR_M, cube);
+    if (camera.coordinateSystem !== renderer.coordinateSystem) { camera.coordinateSystem = renderer.coordinateSystem; camera.updateCoordinateSystem(); }
+    camera.position.copy(probeAt); camera.updateMatrixWorld();
+    // The scene's world matrices update once per frame, not per render (sceneShell), and the capture may come before the first
+    // frame: without this, the sun's light has no direction yet and the probe sees the venue unlit by it.
+    scene.updateMatrixWorld();
+    const shown = dynamic.map(object => object.visible);
+    try {
+      dynamic.forEach(object => { object.visible = false; });
+      if (cloudLayer) cloudLayer.group.visible = false;
+      // The first capture is lit by the sun alone; the second adds the light of the first. The environment stays set at zero
+      // intensity, and the first environment has the probe's size: an unset or differently sized one is another program variant
+      // of every material, compiled on the main thread here instead of by the warm-up.
+      scene.environmentIntensity = 0;
+      for (let pass = 0; pass < 2; pass++) {
+        camera.update(renderer, scene);
+        const next = generator.fromCubemap(cube.texture);
+        scene.environment = next.texture; scene.environmentIntensity = 1; venueProbe?.dispose(); venueProbe = next;
+      }
+      reflection?.dispose(); venueCube?.dispose();
+      reflection = convolveReflection(renderer, cube, venue.shading.convolution.kernels); venueCube = cube;
+      setSceneryReflection(venue.shading, reflection.convolved, integration);
+    } finally {
+      dynamic.forEach((object, i) => { object.visible = shown[i]; });
+      if (cloudLayer) cloudLayer.group.visible = true;
+      if (venueCube !== cube) cube.dispose();
+    }
+  };
   return {
     setCamera(camera) { view = camera; },
     setDynamic(objects) { dynamic = objects; },
@@ -191,48 +251,23 @@ export function addSceneEnvironment(scene: Scene, renderer: WebGLRenderer, venue
       const previous = cascades.pass;
       cascades = startCascades(set); previous.dispose();
     },
-    applyHaze,
-    captureVenue() {
-      // The cube keeps its mips: the reflection convolution reads them.
-      const cube = new WebGLCubeRenderTarget(VENUE_PROBE_PX, {type: HalfFloatType, generateMipmaps: true, minFilter: LinearMipmapLinearFilter}), camera = new CubeCamera(0.5, VENUE_PROBE_FAR_M, cube);
-      if (camera.coordinateSystem !== renderer.coordinateSystem) { camera.coordinateSystem = renderer.coordinateSystem; camera.updateCoordinateSystem(); }
-      camera.position.copy(probeAt); camera.updateMatrixWorld();
-      // The scene's world matrices update once per frame, not per render (sceneShell), and the capture may come before the first
-      // frame: without this, the sun's light has no direction yet and the probe sees the venue unlit by it.
-      scene.updateMatrixWorld();
-      const shown = dynamic.map(object => object.visible);
-      try {
-        dynamic.forEach(object => { object.visible = false; });
-        if (cloudLayer) cloudLayer.group.visible = false;
-        // The first capture is lit by the sun alone; the second adds the light of the first. The environment stays set at zero
-        // intensity, and the first environment has the probe's size: an unset or differently sized one is another program variant
-        // of every material, compiled on the main thread here instead of by the warm-up.
-        scene.environmentIntensity = 0;
-        for (let pass = 0; pass < 2; pass++) {
-          camera.update(renderer, scene);
-          const next = generator.fromCubemap(cube.texture);
-          scene.environment = next.texture; scene.environmentIntensity = 1; venueProbe?.dispose(); venueProbe = next;
-        }
-        reflection?.dispose(); venueCube?.dispose();
-        reflection = convolveReflection(renderer, cube, venue.shading.convolution.kernels); venueCube = cube;
-        setSceneryReflection(venue.shading, reflection.convolved, integration);
-      } finally {
-        dynamic.forEach((object, i) => { object.visible = shown[i]; });
-        if (cloudLayer) cloudLayer.group.visible = true;
-        if (venueCube !== cube) cube.dispose();
-      }
+    applyHaze: () => applyHaze(),
+    captureVenue,
+    setSun(next) {
+      light(next);
+      if (venueProbe) captureVenue();
     },
     update() {
       if (!view) return false;
-      view.getWorldDirection(heading); haze(Math.atan2(heading.z, heading.x), fog.color, skyHaze);
-      const drawing = cascades.pass.update(view, dynamic);
-      if (!cascades.sampled) { sampleCascadeShadows(venue.shading.shadows, cascades.layout, cascades.pass.state); cascades.sampled = true; }
+      view.getWorldDirection(heading); haze(Math.atan2(heading.z, heading.x), fog.color, skyHaze());
+      const set = cascades, drawing = set.pass.update(view, dynamic);
+      if (!set.sampled) { sampleCascadeShadows(venue.shading.shadows, set.layout, set.pass.state); set.sampled = true; }
       return drawing;
     },
     dispose() {
       holdCascadeShadows(null); cascades.pass.dispose();
       scene.remove(sun, sun.target); sun.dispose();
-      scene.environment = null; generator.dispose(); firstEnvironment.dispose(); venueProbe?.dispose(); reflection?.dispose(); venueCube?.dispose();
+      scene.environment = null; generator.dispose(); firstEnvironment?.dispose(); venueProbe?.dispose(); reflection?.dispose(); venueCube?.dispose();
       setSceneryReflection(venue.shading, null, integration); integration.dispose(); reflectedGround.geometry.dispose(); reflectedGround.material.dispose();
       sky.geometry.dispose(); sky.material.dispose();
       if (cloudLayer) { scene.remove(cloudLayer.group); cloudLayer.dispose(); }

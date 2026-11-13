@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { descriptorTexturePath } from '../../../../../shared/packageContract/index.js';
-import { BoxGeometry, CubeCamera, DoubleSide, Group, Material, Mesh, MeshBasicMaterial, Texture, Vector3, type BufferGeometry, type Object3D, type PerspectiveCamera, OrthographicCamera, type Scene, type ShaderMaterial } from 'three';
+import { BoxGeometry, CubeCamera, DirectionalLight, DoubleSide, Group, Material, Mesh, MeshBasicMaterial, Texture, Vector3, type BufferGeometry, type Object3D, type PerspectiveCamera, OrthographicCamera, type Scene, type ShaderMaterial } from 'three';
 import { createReplayScene, lapFirstStation } from '../../../../../src/components/replay/view3d/laps/replayScene.js';
 import { createSceneShell, type SceneShell } from '../../../../../src/components/replay/view3d/scene/sceneShell.js';
+import { sceneSun } from '../../../../../src/components/replay/view3d/sceneEnvironment.js';
 import { disposeObjects } from '../../../../../src/components/replay/view3d/scene/disposeObjects.js';
 import { EXPOSURE_PASS } from '../../../../../src/components/replay/view3d/autoExposure.js';
 import { isStreaming } from '../../../../../src/components/replay/view3d/scenery/materials/mipStreaming.js';
@@ -475,4 +476,33 @@ it('hands its shell to the next view: one renderer, the canvas moving to its ele
   expect(canvas.parentElement).toBe(second);
   expect(shell.scene.getObjectsByProperty('name', 'body-envelope').length).toBeGreaterThan(0);
   after.dispose();
+});
+
+it("lights the scene by the clock's moment, once the sun has moved a quarter of a degree", async () => {
+  const clock = {session: 'race' as const, startMinute: null, sessionTimeSec: 0, cloudCover: 0};
+  const shell = createSceneShell(layout, {daylightClock: clock, firstView: {kind: 'lap', lapDistanceM: lapFirstStation(lap, layout)}});
+  shells.push(shell);
+  const scene = await openScene(document.createElement('div'), layout, {...lap, daylightClock: clock}, null, vi.fn(), assets, shell);
+  const sun = shell.scene.getObjectsByProperty('name', 'sun').find(object => object instanceof DirectionalLight)!, start = sun.position.clone();
+  const toward = (sessionTimeSec: number) => sceneSun(layout, shell.origin.y, {...clock, sessionTimeSec}).lighting.sunDirection.clone().normalize();
+  // 30 s of the day moves the sun about an eighth of a degree: nothing changes.
+  shell.setDaylight({...clock, sessionTimeSec: 30});
+  expect(sun.position.equals(start)).toBe(true);
+  // Ten minutes, about two and a half degrees: the sun light points at the new sun.
+  shell.setDaylight({...clock, sessionTimeSec: 600});
+  expect(sun.position.distanceTo(toward(600))).toBeLessThan(1e-9);
+  scene.dispose();
+});
+
+it("lights a shell another view made by the lap's own moment, and a new lap's", async () => {
+  const shell = createSceneShell(layout, {firstView: {kind: 'lap', lapDistanceM: lapFirstStation(lap, layout)}});
+  shells.push(shell);
+  const daylight = vi.spyOn(shell, 'setDaylight');
+  const clock = {session: 'race' as const, startMinute: 600, sessionTimeSec: 120, cloudCover: 0};
+  const scene = await openScene(document.createElement('div'), layout, {...lap, daylightClock: clock}, null, vi.fn(), assets, shell);
+  expect(daylight).toHaveBeenLastCalledWith(clock);
+  const later = {...clock, sessionTimeSec: 900};
+  expect(await scene.updateLaps({...lap, daylightClock: later}, null, assets)).toBe(true);
+  expect(daylight).toHaveBeenLastCalledWith(later);
+  scene.dispose();
 });
