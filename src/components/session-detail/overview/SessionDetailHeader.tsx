@@ -123,11 +123,11 @@ export const SessionDetailHeader: React.FC<SessionDetailHeaderProps> = ({
                 <Link
                   to={raceReplayPath}
                   onClick={linkClickHandler(() => { void navigate(raceReplayPath); })}
-                  title="Race replay: every car of the session on one clock"
+                  title="Session replay: every car of the session on one clock"
                   className={`${JUMP_BUTTON} ${FOCUS_RING}`}
                 >
                   <ListOrdered aria-hidden="true" className="w-3.5 h-3.5 text-lmu-accent-text" />
-                  <span>Race replay</span>
+                  <span>Session replay</span>
                 </Link>
               )}
             </>

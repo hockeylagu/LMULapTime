@@ -311,7 +311,7 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
     expect(lapPaceBtn).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('links to the race replay directly when the session has a matching replay', async () => {
+  it('links to the session replay directly when the session has a matching replay', async () => {
     (global.fetch as Mock).mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ ...mockDetailedSession, matchingReplayFile: 'race.Vcr' }),
@@ -319,10 +319,10 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
 
     render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
 
-    const raceLink = await screen.findByRole('link', { name: /race replay/i });
-    expect(raceLink).toHaveAttribute('href', expect.stringContaining('/telemetry?'));
-    expect(raceLink).toHaveAttribute('href', expect.stringContaining('sessionId=sess123'));
-    expect(raceLink).toHaveAttribute('href', expect.stringContaining('mode=race'));
+    const replayLink = await screen.findByRole('link', { name: /session replay/i });
+    expect(replayLink).toHaveAttribute('href', expect.stringContaining('/telemetry?'));
+    expect(replayLink).toHaveAttribute('href', expect.stringContaining('sessionId=sess123'));
+    expect(replayLink).toHaveAttribute('href', expect.stringContaining('mode=race'));
   });
 
 });
