@@ -18,6 +18,12 @@ const FACES_PER_FRAME = 1, NEAR_M = 0.1, FAR_M = 150;
  * the last face they made every sixth frame the slowest of a playing lap, 2026-11-12).
  */
 export const CAR_REFLECTION_STEPS = 6 / FACES_PER_FRAME + 2;
+/**
+ * Once the car has a probe, a face renders every other frame (the frames between ask for the next): the probe renews every
+ * 14 frames instead of 8 and costs half as much a frame (a face is ~2.4 ms of GPU at the Le Mans start, 2026-11-13). The first
+ * probe still renders a face a call, so the scene completes it before its first frame.
+ */
+const FRAMES_PER_FACE = 2;
 /** A paused view keeps its finished probe until the car or the scenery moves. */
 const MOVED_M = 0.5;
 /** The probe's eye above the centre of the car's bounding box: roof height, as the reference frames place it (0.72 m on a GT3). */
@@ -82,7 +88,7 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
   // materials take it when the car is set and compile once, with the scene's warm-up, instead of again at the first probe.
   const generator = new PMREMGenerator(renderer); renderer.initRenderTarget(target);
   const prefiltered: WebGLCubeRenderTarget = generator.fromCubemap(target.texture);
-  let materials: MeshStandardMaterial[] = [], hidden: Object3D | null = null, face = 0, stale = true;
+  let materials: MeshStandardMaterial[] = [], hidden: Object3D | null = null, face = 0, stale = true, rested = 0;
   /** What the next update does once the faces are drawn: prefilter them for three's materials, then convolve them for the paint. */
   let pending: 'prefilter' | 'convolve' | null = null;
   let cubes: ReflectionCubes | null = null, eyeAbove = EYE_ABOVE_CENTRE_M;
@@ -121,10 +127,9 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
         target = targets[target === targets[0] ? 1 : 0];
         return true; // The next frame shows the new probe.
       }
-      if (face === 0) {
-        if (!stale && cubes && probed.distanceToSquared(car) < MOVED_M * MOVED_M) return false;
-        stale = false;
-      }
+      if (face === 0 && !stale && cubes && probed.distanceToSquared(car) < MOVED_M * MOVED_M) return false;
+      if (cubes && ++rested % FRAMES_PER_FACE !== 0) return true;
+      if (face === 0) stale = false;
       // Each face from where the car is now, not where the probe began: the faces render against the frame's shadows, so a face
       // drawn from a place the car has left saw sunlit road where its own shadow had been, and the cockpit roof, which reflects
       // the road below, lit up while the car moved.

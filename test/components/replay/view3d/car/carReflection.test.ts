@@ -81,11 +81,14 @@ it('renders the probe one face a frame from the roof without the cars, then give
   expect(lampUniforms().surface_reflection.value).toEqual({kernels: testShading().convolution.kernels});
   sceneryReflectionUniforms.surface_reflectionReady.value = 0; expect(lampUniforms().surface_reflectionReady.value).toBe(1);
 
-  // A paused car keeps its probe; moving the car or new scenery starts another.
+  // A paused car keeps its probe; moving the car or new scenery starts another. Now that the car has a probe, a face renders
+  // every other frame (the frames between ask for the next): six faces and two conversions over 14 frames.
   expect(reflection.update(centre)).toBe(false);
   reflection.stale();
-  for (let i = 0; i < CAR_REFLECTION_STEPS; i++) expect(reflection.update(centre)).toBe(true);
+  for (let i = 0; i < 14; i++) expect(reflection.update(centre)).toBe(true);
+  expect(faces).toHaveLength(12);
   expect(reflection.update(centre)).toBe(false);
+  expect(reflection.update(new Vector3(11, 0.5, 20))).toBe(true); expect(faces).toHaveLength(12);
   expect(reflection.update(new Vector3(11, 0.5, 20))).toBe(true);
   expect(faces).toHaveLength(13); expect(pmrem.conversions).toBe(3); expect(pmrem.convolutions).toBe(2); expect(pmrem.reused).toBe(1); expect(pmrem.disposed).toBe(0);
   // The second probe drew into the other cube while the car showed the first; the paint now reads the one just drawn.
@@ -93,7 +96,7 @@ it('renders the probe one face a frame from the roof without the cars, then give
   expect(drawnSecond).not.toBe(shownFirst); expect(paintUniforms().paint_sharp.value).toBe(drawnSecond.texture);
   // A moving car: each face looks from where the car is at its frame, not where the probe began, so no face sees the road the
   // car has left (sunlit where its shadow had been).
-  reflection.update(new Vector3(13, 0.5, 20));
+  reflection.update(new Vector3(12, 0.5, 20)); reflection.update(new Vector3(13, 0.5, 20));
   expect(eyes.slice(-2).map(eye => eye.x)).toEqual([11, 13]);
 
   reflection.dispose();
