@@ -28,9 +28,8 @@ export const RaceLapTiming: React.FC<Props> = ({ clock, car, laps, totalLaps, cl
   return (
     <GpsMapLapTimingPanel primaryLapSummary={timing?.summary} liveSplit={timing?.sector ? { sector: timing.sector, deltaSec: null } : null}
       heading={<div className="flex items-baseline justify-between gap-3 px-3 py-2 text-xs text-lmu-muted" data-testid="race-lap-heading">
-        <span>Session <span className="font-mono font-semibold text-lmu-text">{formatElapsedSeconds(Math.max(0, timeSec - clock.startSec))}</span></span>
-        <span>Lap <span className="font-mono font-semibold text-lmu-text">{lapNumber ?? '—'}</span>
-          <span className="font-mono"> / {totalLaps || '—'}</span></span>
+        <span className="inline-flex items-baseline gap-2">Session <span className="font-mono tabular-nums font-semibold text-lmu-text">{formatElapsedSeconds(Math.max(0, timeSec - clock.startSec))}</span></span>
+        <span className="inline-flex items-baseline gap-2 tabular-nums">Lap <span><span className="font-mono font-semibold text-lmu-text">{lapNumber ?? '—'}</span><span className="font-mono"> / {totalLaps || '—'}</span></span></span>
       </div>}
       className={className} />
   );

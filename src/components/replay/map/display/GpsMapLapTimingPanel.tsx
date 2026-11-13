@@ -32,9 +32,10 @@ export function GpsMapLapTimingPanel({ primaryLapSummary: primary, baselineLapSu
     { label: 'S3', value: primary?.s3Sec, baseline: baseline?.s3Sec },
   ];
   const currentLabel = liveSplit ? `S${liveSplit.sector}` : null;
+  const singleColumnHeading = Boolean(heading && !baseline);
   return <aside aria-label="Lap and sector timing" data-map-control
     onPointerDown={event => event.stopPropagation()} onDoubleClick={event => event.stopPropagation()}
-    className={`pointer-events-auto w-[340px] max-w-full rounded-xl bg-lmu-strip/95 border border-lmu-border ${className ?? '2xl:absolute 2xl:right-0 2xl:top-13'}`}>
+    className={`pointer-events-auto ${singleColumnHeading ? 'w-[260px]' : 'w-[340px]'} max-w-full rounded-xl bg-lmu-strip/95 border border-lmu-border ${className ?? '2xl:absolute 2xl:right-0 2xl:top-13'}`}>
     {/* One header line: the collapse toggle fills the row-label column, the lap selectors sit over their times (or the heading). */}
     {heading ?? <GpsMapLapSelectors primaryLapNumber={primary?.lapNumber} baselineLapNumber={baseline?.lapNumber}
       toggle={<button type="button" aria-label="Timing" title={collapsed ? 'Show timing' : 'Hide timing'}
@@ -50,9 +51,9 @@ export function GpsMapLapTimingPanel({ primaryLapSummary: primary, baselineLapSu
         const delta = hasValue && hasBaseline ? row.value! - row.baseline! : null;
         const isCurrent = row.label === currentLabel;
         return <div key={row.label} data-current-sector={isCurrent ? '' : undefined}
-          className={`-mx-1.5 grid items-baseline gap-2 rounded border-t border-lmu-border px-1.5 py-2 ${isCurrent ? 'bg-lmu-raised/60' : ''} ${lapTimingColumns(Boolean(baseline))}`}>
+          className={`-mx-1.5 grid items-baseline gap-2 rounded border-t border-lmu-border px-1.5 py-2 ${isCurrent ? 'bg-lmu-raised/60' : ''} ${singleColumnHeading ? 'grid-cols-[28px_1fr]' : lapTimingColumns(Boolean(baseline))}`}>
           <span className={`text-[11px] ${isCurrent ? 'font-semibold text-lmu-text' : 'text-lmu-muted'}`} title={isCurrent ? 'The sector the cursor is in' : undefined}>{row.label}</span>
-            <span className="font-mono text-xs font-semibold text-lmu-text" title="Primary replay GPS timing">
+            <span className={`font-mono tabular-nums text-xs font-semibold text-lmu-text ${singleColumnHeading ? 'text-right' : ''}`} title="Primary replay GPS timing">
               {hasValue ? row.label === 'Lap' ? formatTime(row.value) : `${row.value!.toFixed(3)}s` : '--'}
             </span>
             {baseline && <span className="font-mono text-xs font-semibold text-lmu-text-soft" title="Baseline replay GPS timing">
