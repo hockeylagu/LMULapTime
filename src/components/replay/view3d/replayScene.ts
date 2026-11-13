@@ -49,13 +49,6 @@ export interface ReplaySceneHandle {
   dispose(): void;
 }
 
-/**
- * Car textures load no larger than this on their longer side. On a 1080p view from outside the car the picture is the same as
- * with a larger file, for a third of the data. The interior's own textures are not capped: they stay on their start files
- * and reach their full size in the driver cameras.
- */
-const CAR_TEXTURE_MAX_PX = 1024;
-
 export async function createReplayScene(
   host: HTMLDivElement, layout: SceneryLayoutResource,
   trajectory: ReplayTrajectoryData, baseline: ReplayTrajectoryData | null,
@@ -71,7 +64,9 @@ export async function createReplayScene(
   renderer.debug.checkShaderErrors = import.meta.env.DEV;
   const {min, max} = layout.horizon.bounds, origin = new Vector3(...min).add(new Vector3(...max)).multiplyScalar(0.5);
   const loader = createChunkLoader(renderer, layout.textures), carStarts = new Map<string, TextureStartFile>(), startOf = (url: string) => carStarts.get(url);
-  const carTextures = new CachedKtx2Loader(renderer, {maxPx: () => CAR_TEXTURE_MAX_PX, start: startOf}), interiorTextures = new CachedKtx2Loader(renderer, {start: startOf});
+  // Car textures load at the package's size (it stores outside-only parts small and the liveries larger). The interior's own
+  // textures stay on their start files until a driver camera is used.
+  const carTextures = new CachedKtx2Loader(renderer, {start: startOf}), interiorTextures = new CachedKtx2Loader(renderer, {start: startOf});
   const sun = sceneSun(layout, origin.y, trajectory.daylightClock);
   const exposure = createAutoExposure(renderer, layout.camera, {rgb: sun.radiance.clone(), elevationDeg: sun.sunElevationDeg}, () => invalidate(), exposureType('follow'),
     sun.weather.cloudCover, sun.weather.sunVisibility);

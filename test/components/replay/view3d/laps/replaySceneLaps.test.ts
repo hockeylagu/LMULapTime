@@ -15,7 +15,7 @@ import { TEST_HAZE_WEIGHTS, testCamera, testShading, testSky } from '../../../..
 
 const gpu = vi.hoisted(() => ({render: vi.fn<(scene: Scene, camera: PerspectiveCamera | OrthographicCamera) => void>(), dispose: vi.fn(), constructed: vi.fn(), setSize: vi.fn(), upload: vi.fn<() => Promise<void>>()}));
 const chunks = vi.hoisted(() => ({roots: new Map<string, Object3D>(), loads: [] as string[], obstacleName: ''}));
-/** Car texture reads, as `capped` or `full` by the loader that made them and the start file each was read from, and the textures read from one. */
+/** Car texture reads, as `car` or `interior` by the loader that made them and the start file each was read from, and the textures read from one. */
 const carTextureLoads = vi.hoisted(() => ({paths: [] as string[], started: new WeakSet<object>()}));
 vi.mock('three-mesh-bvh/worker', async () => {
   const {MeshBVH} = await import('three-mesh-bvh');
@@ -114,11 +114,16 @@ vi.mock('../../../../../src/components/replay/view3d/scenery/chunkLoader.js', ()
   },
   releaseChunk: (root: Object3D) => disposeObjects(root, true), dispose() {},
 })}));
-vi.mock('../../../../../src/components/replay/view3d/scenery/cachedKtx2Loader.js', () => ({CachedKtx2Loader: class {
+vi.mock('../../../../../src/components/replay/view3d/scenery/cachedKtx2Loader.js', () => ({CachedKtx2Loader: class Loader {
+  /** A scene makes its car loader, then its interior loader. */
+  static made = 0;
+  private readonly role = Loader.made++ % 2 ? 'interior' : 'car';
   constructor(_renderer: unknown, private readonly textureDetail?: {maxPx?: unknown; start?: (url: string) => {url: string; skip: number} | undefined}) {}
   async loadAsync(url: string) {
     const texture = new Texture(), start = this.textureDetail?.start?.(url), name = (path: string) => path.split('/').at(-1)!;
-    carTextureLoads.paths.push(`${this.textureDetail?.maxPx ? 'capped' : 'full'} ${name(url)}${start ? ` from ${name(start.url)}` : ''}`);
+    // Neither loader cuts levels: the package sizes car textures.
+    if (this.textureDetail?.maxPx) throw Error('car textures load at the package size');
+    carTextureLoads.paths.push(`${this.role} ${name(url)}${start ? ` from ${name(start.url)}` : ''}`);
     if (start) { texture.mipmaps = [{data: new Uint8Array(4), width: 512, height: 512}]; carTextureLoads.started.add(texture); }
     return texture;
   }
@@ -398,12 +403,12 @@ it('joins the interior file to the body under its chassis node, drawn in the dri
   handle.dispose();
 });
 
-it('reads car textures from their start files, the ones only the interior uses at full size and the rest capped', async () => {
+it('reads car textures from their start files, the ones only the interior uses through the interior loader', async () => {
   const handle = await createReplayScene(document.createElement('div'), layout, lap, null, vi.fn(), assets);
   handle.cursor(0, 0); draw();
   // The seat is interior only; the trim is also on an outside part, so it loads like the body. The paint has no start file.
-  expect(carTextureLoads.paths.filter(path => path.startsWith('full'))).toEqual([`full ${hashOf('seat')}.ktx2.zst from ${hashOf('seat-start')}.ktx2.zst`]);
-  expect(carTextureLoads.paths).toEqual(expect.arrayContaining([`capped ${hashOf('trim')}.ktx2.zst from ${hashOf('trim-start')}.ktx2.zst`, 'capped a.ktx2']));
+  expect(carTextureLoads.paths.filter(path => path.startsWith('interior'))).toEqual([`interior ${hashOf('seat')}.ktx2.zst from ${hashOf('seat-start')}.ktx2.zst`]);
+  expect(carTextureLoads.paths).toEqual(expect.arrayContaining([`car ${hashOf('trim')}.ktx2.zst from ${hashOf('trim-start')}.ktx2.zst`, 'car a.ktx2']));
   const [scene] = lastSceneRender(), map = (name: string) => (scene.getObjectByName(name) as Mesh<BufferGeometry, MeshBasicMaterial>).material.map!;
   // Each map's own copy allocates the full texture (two levels above the 512 it holds) and waits to sharpen.
   expect([isStreaming(map('seat')), map('seat').mipmaps.map(level => level.width), isStreaming(map('dash'))]).toEqual([true, [2048, 1024, 512], true]);
