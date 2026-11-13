@@ -336,7 +336,7 @@ Binary .Vcr ──> Worker Decode ──> Normalized Facts & Trajectory Blobs (S
   wheels, lamps and shadows, interior parts dropped; a body's full models are built together (one body at a time) the first time
   one of its cars turns near, batched with the others of the body, and kept (driving back through the grid builds nothing); far as the body's far model
   (`cars/farCars.ts`: one parse per far file, each livery's paint and retextured materials from the textures' start files, only the
-  triangles of the option parts its appearance shows), batched with every other car of the body (glass and blended pieces too, sorted in their batch), still and without shadows; out of
+  triangles of the option parts its appearance shows), batched with every other car of the body (glass and blended pieces too, sorted in their batch), still and without shadows, its brake and head lamps lit for the 16 nearest in view within 300 m (`cars/farGlows.ts`: the exterior model's lamp glow meshes, one instanced draw per lamp mesh and lit frame of a body, textures from their start files, never sharpened); out of
   view hidden; every car of a body loads its far model at once (two bodies at a time, nearest the followed car first); a
   class-coloured box (one instanced draw) only while a body loads or for a car without one; the lap layer loader parses each body
   once per scene and loader (keyed by folder and file hashes) for all its liveries; `race/raceTrack.ts` gives a car's samples of a

@@ -75,8 +75,13 @@ export function createLampMaterial(lamp: CarLamp, glow: LampGlow, texture: Textu
       ${display ? 'attribute vec4 _lmu_colour; varying vec4 vColour;' : ''}
       varying vec2 vUv; varying vec3 vNormal, vView;
       void main() {
-        vec4 world = modelMatrix * vec4(position, 1.0);
-        vUv = uv; vNormal = normalize(mat3(modelMatrix) * normal); vView = normalize(cameraPosition - world.xyz);
+        // An instanced lamp (a far car's glow, \`farGlows\`) places each car's copy by its instance matrix.
+        vec4 local = vec4(position, 1.0); vec3 facing = normal;
+        #ifdef USE_INSTANCING
+        local = instanceMatrix * local; facing = mat3(instanceMatrix) * facing;
+        #endif
+        vec4 world = modelMatrix * local;
+        vUv = uv; vNormal = normalize(mat3(modelMatrix) * facing); vView = normalize(cameraPosition - world.xyz);
         ${display ? 'vColour = _lmu_colour;' : ''}
         gl_Position = projectionMatrix * viewMatrix * world;
       }`,

@@ -1,7 +1,7 @@
 import { Frustum, Group, Matrix4, Mesh, Quaternion, Sphere, Vector3, type Object3D, type OrthographicCamera, type PerspectiveCamera } from 'three';
 import { normalizeVehicleId } from '../../../../../shared/packageContract/index.js';
 import type { RaceReplayCar } from '../../../../../shared/types/replay.js';
-import { RACE_POSE_CHANNEL_COUNT, type RacePoseWindow } from '../../../../../shared/domain/raceReplay/poseWindow.js';
+import { RACE_LAMP, RACE_POSE_CHANNEL_COUNT, RACE_POSE_CHANNELS, type RacePoseWindow } from '../../../../../shared/domain/raceReplay/poseWindow.js';
 import type { LoadedBody } from '../../../../api/vehicles/bodyApi.js';
 import { MAP_COLORS } from '../../../../utils/themeColors.js';
 import { disposeObjects } from '../scene/disposeObjects.js';
@@ -12,6 +12,7 @@ import { buildCarParts, setCameraDistance, type CarParts } from '../cars/carPart
 import { batchCars, type CarBatchSet } from '../cars/carBatching.js';
 import type { CarSets, DrawnCar, DrawnCars } from '../cars/drawnCar.js';
 import { createFarCarLoader } from '../cars/farCars.js';
+import { createFarGlows, FAR_GLOW_MAX, type FarGlowCar } from '../cars/farGlows.js';
 import { attachWheelRigs } from '../cars/wheelGeometry.js';
 import { windowPoints } from './raceTrack.js';
 
@@ -28,6 +29,9 @@ const NEAR_ENTER = 0.85;
 const CAR_RADIUS_M = 4;
 /** Poses of a window a far car's road fit samples, and the largest fit taken (as the full models' wheels do). */
 const FIT_SAMPLES = 32, MAX_FIT_M = 0.75;
+/** How far from the camera a far car's headlights and brake lights glow (`farGlows`, the nearest `FAR_GLOW_MAX`). */
+const FAR_GLOW_M = 300;
+const BRAKE = RACE_POSE_CHANNELS.indexOf('brake'), LAMPS = RACE_POSE_CHANNELS.indexOf('lamps');
 
 /** A body's cars: their full models, built together the first time one of them turns near, then kept. */
 interface FieldBody {
@@ -56,6 +60,8 @@ interface FieldCar {
   orientation: Quaternion;
   window: RacePoseWindow | null;
   carIndex: number;
+  /** Its far model's body frame (`FarGlowCar.frame`), while its lamps glow. */
+  glowFrame: Matrix4;
 }
 
 export interface RaceField {
@@ -75,8 +81,8 @@ export interface RaceField {
  * The race's other cars, by distance from the camera: near (the nearest `NEAR_MAX` inside their body's far distance) as full
  * models with wheels, lamps and shadows; far as the body's far model, still and without shadows; out of view hidden. The cars of a
  * body share their batches in each tier. Every car of a body loads its far model at once, and its full model with the others of
- * the body the first time one of them turns near; both stay. `sets` builds the full models, `root` is the cars' parent; `changed` asks for a
- * redraw.
+ * the body the first time one of them turns near; both stay. The nearest far cars' headlights and brake lights glow (`farGlows`).
+ * `sets` builds the full models, `root` is the cars' parent; `changed` asks for a redraw.
  */
 export function createRaceField(
   shell: SceneShell, sets: CarSets, root: Group, cars: readonly RaceReplayCar[],
@@ -89,6 +95,16 @@ export function createRaceField(
   const farSets: CarBatchSet[] = [], nearSets: DrawnCars[] = [], bodies = new Set<string>(), fieldBodies: FieldBody[] = [];
   let bodyLoads = 0, nearLoads = 0, disposed = false;
   const view = new Frustum(), viewMatrix = new Matrix4(), bounds = new Sphere(), centre = new Vector3();
+  const glows = createFarGlows(root, shell.carTemplates, shell.carTextures, object => shell.warm(object), changed), glowing: FarGlowCar[] = [];
+  /** A far car's lamps at its pose: braking on any brake pedal, headlights from the lamp flags (the full models' lamps read the same). */
+  const glowOf = (car: FieldCar): FarGlowCar => {
+    const window = car.window!, base = (car.carIndex * window.count + car.pose!.index) * RACE_POSE_CHANNEL_COUNT;
+    car.far.car.updateMatrix(); car.fit.envelope.updateMatrix();
+    return {
+      body: car.body, frame: car.glowFrame.multiplyMatrices(car.far.car.matrix, car.fit.envelope.matrix),
+      braking: window.data[base + BRAKE] > 0, headlights: (window.data[base + LAMPS] & RACE_LAMP.headlights) !== 0,
+    };
+  };
   /** The median, over the car's poses in its window, of how far its far model's lowest point is above the road under it. */
   const fitFar = (car: FieldCar) => {
     const {window, carIndex, fit} = car, data = window!.data, offsets: number[] = [];
@@ -159,7 +175,7 @@ export function createRaceField(
         const car: FieldCar = {
           body: entry.livery, of, far: {car: entry.car, parts: tables[present.indexOf(entry)]}, near: null,
           fit: {envelope: entry.car.getObjectByName('body-envelope')!, bottomY: bottoms[present.indexOf(entry)], y: 0, window: null},
-          tier: 'far', pose: null, orientation: new Quaternion(), window: null, carIndex: 0,
+          tier: 'far', pose: null, orientation: new Quaternion(), window: null, carIndex: 0, glowFrame: new Matrix4(),
         };
         of.cars.push(car); field.set(slots[index], car);
       });
@@ -232,6 +248,7 @@ export function createRaceField(
       }
       inView.sort((a, b) => a.metres - b.metres);
       let near = 0;
+      glowing.length = 0;
       for (const {car, metres} of inView) {
         const reach = car.body.resource.far.fromM * (car.tier === 'near' ? 1 : NEAR_ENTER);
         car.tier = near < NEAR_MAX && metres < reach ? 'near' : 'far';
@@ -248,7 +265,9 @@ export function createRaceField(
         shell.placeCar(shown.car, car.pose!, motion);
         setCameraDistance(shown.car, metres);
         shown.parts.sync();
+        if (shown === car.far && metres < FAR_GLOW_M && glowing.length < FAR_GLOW_MAX) glowing.push(glowOf(car));
       }
+      glows.draw(glowing);
       for (const body of fieldBodies) if (body.held && !body.cars.some(car => car.tier === 'near')) { shell.carTemplates.release(body.cars[0].body); body.held = false; }
     },
     refreshHeights() {
@@ -256,6 +275,7 @@ export function createRaceField(
     },
     dispose() {
       disposed = true;
+      glows.dispose();
       for (const set of [...farSets, ...nearSets]) set.dispose();
       for (const car of field.values()) {
         if (!car || car === 'none') continue;
