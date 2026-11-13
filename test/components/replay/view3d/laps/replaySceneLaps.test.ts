@@ -31,13 +31,14 @@ vi.mock('three', async importOriginal => {
     dispose() {}
   }, WebGLRenderer: class {
     domElement = document.createElement('canvas');
-    capabilities = {maxTextureSize: 16384}; debug = {checkShaderErrors: true}; state = {buffers: {depth: {getReversed: () => false, setReversed() {}}}};
+    capabilities = {maxTextureSize: 16384, maxTextures: 16}; debug = {checkShaderErrors: true}; state = {buffers: {depth: {getReversed: () => false, setReversed() {}}}};
     coordinateSystem = actual.WebGLCoordinateSystem;
     render = gpu.render;
     dispose = gpu.dispose;
     constructor() { gpu.constructed(); }
     setSize = gpu.setSize;
     setPixelRatio() {}
+    getContext() { return {MAX_COMBINED_TEXTURE_IMAGE_UNITS: 0x8b4d, getParameter: () => 32}; }
     compileAsync() { return Promise.resolve(); }
     initTexture() {}
     properties = {has: () => false};

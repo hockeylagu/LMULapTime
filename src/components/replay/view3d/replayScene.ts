@@ -64,6 +64,11 @@ export async function createReplayScene(
   catch { throw Error('WebGL 2 is unavailable. Use the 2D map.'); }
   // Reading a program's error log waits for its link to finish: about 10 ms a program at the first frame. Production builds skip it.
   renderer.debug.checkShaderErrors = import.meta.env.DEV;
+  // Texture units are numbered across both shader stages, but three checks them against the fragment stage's own limit (16 here)
+  // and warns once a draw per frame for a batched terrain whose two vertex-stage batch textures take it to 17. The link already
+  // holds each stage to its limit; the top unit stays three's upload slot.
+  const gl = renderer.getContext();
+  renderer.capabilities.maxTextures = (gl.getParameter(gl.MAX_COMBINED_TEXTURE_IMAGE_UNITS) as number) - 1;
   const {min, max} = layout.horizon.bounds, origin = new Vector3(...min).add(new Vector3(...max)).multiplyScalar(0.5);
   const loader = createChunkLoader(renderer, layout.textures), carStarts = new Map<string, TextureStartFile>(), startOf = (url: string) => carStarts.get(url);
   // Car textures load at the package's size (it stores outside-only parts small and the liveries larger). The interior's own
