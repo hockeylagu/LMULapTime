@@ -131,9 +131,9 @@ as approximate placement. It does not recenter the outline or invent a provider 
 Exact aliases win; ambiguous model matches remain unresolved. Primary and comparison
 vehicles resolve independently. Body direction continues to use replay yaw.
 
-## 3D scenery and vehicle bodies (package schema 11)
+## 3D scenery and vehicle bodies (package schema 12)
 
-This app loads schema 11 only (see Contract above). The pipeline repository's `docs/PACKAGE_FORMAT.md`, `docs/SCENE_PACKAGE.md` and
+This app loads schema 12 only (see Contract above). The pipeline repository's `docs/PACKAGE_FORMAT.md`, `docs/SCENE_PACKAGE.md` and
 `docs/VEHICLE_PIPELINE.md` own the file formats; this section records what the app reads and checks. In the package, the API and
 the code, a *vehicle* is a catalog record (model, class, VEH ids, handling) and a *body* is a 3D model of the top-level `bodies`
 list of the vehicle catalog; every record id has exactly one body.

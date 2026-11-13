@@ -52,6 +52,12 @@ export interface VehicleBodyTexture {
   start?: TextureStart;
 }
 
+/**
+ * A cockpit volume of a body (docs/PACKAGE_FORMAT.md, Vehicles): `width * height * depth` unsigned bytes, x fastest, then y, then z, no header. Each byte
+ * is a signed distance stored as `d = byte / 255 * 2 - 1` (see the descriptor's material `reflectionOcclusion`).
+ */
+export interface VehicleBodyVolume {sha256: string; byteLength: number; width: number; height: number; depth: number}
+
 /** One 3D body of the catalog. */
 export interface VehicleBody extends VehicleBodyModel {
   /** The installed vehicle folder, or `<folder>.<hash>` for a further geometry of that folder. Unique. */
@@ -64,6 +70,8 @@ export interface VehicleBody extends VehicleBodyModel {
   interior: VehicleBodyModel | null;
   /** Every texture the body uses, sorted by `sha256`. */
   textures: VehicleBodyTexture[];
+  /** Every cockpit volume the body's materials use, sorted by `sha256`; empty when none does. */
+  volumes: VehicleBodyVolume[];
 }
 
 /** `vehicles/index.json`. */
@@ -73,8 +81,8 @@ export interface VehicleBuildCatalog {vehicles: VehicleRecord[]; bodies?: Vehicl
 
 export const VEHICLE_CATALOG_KEYS = ['vehicles', 'bodies'] as const;
 const RECORD_KEYS = ['id', 'model', 'carClass', 'vehicleIds', 'dimensions', 'handling', 'deploymentKw', 'outlineXZ', 'replayOriginOffsetXZ'];
-const BODY_KEYS = ['folder', 'vehicleIds', 'descriptorSha256', 'sha256', 'byteLength', 'triangles', 'vertices', 'interior', 'textures'];
-const MAX_RECORDS = 2000, MAX_BODIES = 256, MAX_IDS = 5000, MAX_TEXTURES = 4096;
+const BODY_KEYS = ['folder', 'vehicleIds', 'descriptorSha256', 'sha256', 'byteLength', 'triangles', 'vertices', 'interior', 'textures', 'volumes'];
+const MAX_RECORDS = 2000, MAX_BODIES = 256, MAX_IDS = 5000, MAX_TEXTURES = 4096, MAX_VOLUMES = 64, MAX_VOLUME_SIDE = 512;
 
 /** A VEH id as the records and the game write it: any case, with or without `.veh`; the canonical form is upper case without it. */
 export const normalizeVehicleId = (id: string): string => id.trim().replace(/\.veh$/i, '').toUpperCase();
@@ -113,6 +121,15 @@ function parseBody(value: unknown, what: string): VehicleBody {
     return texture.sha256 as string;
   });
   sortedUnique(textures, `${what}.textures (by sha256)`);
+  const volumes = array(body.volumes, `${what}.volumes`, MAX_VOLUMES).map((item, i) => {
+    const at = `${what}.volumes[${i}]`, volume = record(item, at);
+    exactKeys(volume, ['sha256', 'byteLength', 'width', 'height', 'depth'], at);
+    sha256(volume.sha256, `${at}.sha256`);
+    const [width, height, depth] = ['width', 'height', 'depth'].map(key => positiveCount(volume[key], `${at}.${key}`, MAX_VOLUME_SIDE));
+    if (positiveCount(volume.byteLength, `${at}.byteLength`) !== width * height * depth) throw Error(`${at}.byteLength: expected width * height * depth bytes`);
+    return volume.sha256 as string;
+  });
+  sortedUnique(volumes, `${what}.volumes (by sha256)`);
   return value as VehicleBody;
 }
 

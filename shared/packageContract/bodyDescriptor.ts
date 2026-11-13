@@ -9,7 +9,7 @@
  */
 import type {Vec3} from './strict.js';
 import {array, count, exactKeys, finite, knownKeys, orderedKeys, record, sortedUnique, text, vec3} from './strict.js';
-import {descriptorTexturePath, DESCRIPTOR_TEXTURE_PATH} from './paths.js';
+import {descriptorTexturePath, descriptorVolumePath, DESCRIPTOR_TEXTURE_PATH, DESCRIPTOR_VOLUME_PATH} from './paths.js';
 
 export type CarCorner = 'fl' | 'fr' | 'rl' | 'rr';
 
@@ -39,6 +39,19 @@ export interface CarSurface {
   [key: string]: unknown;
 }
 
+/**
+ * Cockpit reflection occlusion of a material (docs/VEHICLE_PIPELINE.md, Cockpit reflection occlusion): the volume it marches and where the volume sits in the
+ * object space of the mesh node that draws the material (the GLB POSITION values as stored, before the node's own transform).
+ */
+export interface CarReflectionOcclusion {
+  /** `volumes/<sha256>.bin`, relative to the vehicles folder: one of the body's `volumes`. */
+  volume: string;
+  /** Edge lengths in metres of the box the volume fills, along object x, y and z (texture u, v, w). */
+  size: Vec3;
+  /** The box centre in object space, metres. */
+  offset: Vec3;
+}
+
 export interface CarMaterialRecipe {
   /** Equals the GLB material's `extras.nativeMaterialId`. */
   id: string;
@@ -47,6 +60,8 @@ export interface CarMaterialRecipe {
   paint: boolean;
   /** Absent for paint materials: the appearance supplies the shader. */
   surface?: CarSurface;
+  /** Present only on materials whose reflections the cockpit volume occludes. */
+  reflectionOcclusion?: CarReflectionOcclusion;
   [key: string]: unknown;
 }
 
@@ -117,9 +132,23 @@ const APPEARANCE_KEYS = ['alias', 'number', 'albedo', 'paint', 'optionNodes'];
 const OPTION_NODE = /^option_[A-Za-z0-9_]+$/;
 /** Every texture path the descriptor text mentions. */
 const ANY_TEXTURE_PATH = /textures\/[0-9A-Za-z_.-]+\.ktx2\.zst/g;
+/** Every volume path the descriptor text mentions. */
+const ANY_VOLUME_PATH = /volumes\/[0-9A-Za-z_.-]+\.bin/g;
 
 /** What a descriptor is checked against: the catalog row of its body. */
-export interface DescriptorBody {folder: string; vehicleIds: readonly string[]; textures: ReadonlyArray<{sha256: string}>}
+export interface DescriptorBody {folder: string; vehicleIds: readonly string[]; textures: ReadonlyArray<{sha256: string}>; volumes: ReadonlyArray<{sha256: string}>}
+
+/** A material's `reflectionOcclusion`: exact keys, a declared volume, a positive box size and a finite offset. @returns the volume path */
+function parseReflectionOcclusion(value: unknown, what: string, volumes: ReadonlySet<string>): string {
+  const occlusion = record(value, what);
+  orderedKeys(occlusion, ['volume', 'size', 'offset'], what);
+  const volume = text(occlusion.volume, `${what}.volume`, 128);
+  if (!DESCRIPTOR_VOLUME_PATH.test(volume)) throw Error(`${what}.volume: expected volumes/<sha256>.bin`);
+  if (!volumes.has(volume)) throw Error(`${what}.volume: ${volume} is not a volume of the body`);
+  if (vec3(occlusion.size, `${what}.size`, 20).some(metres => !(metres > 0))) throw Error(`${what}.size: expected positive edge lengths`);
+  vec3(occlusion.offset, `${what}.offset`, 20);
+  return volume;
+}
 
 function nullableFlag(value: unknown, what: string): void {
   if (value !== null && typeof value !== 'boolean') throw Error(`${what}: expected true, false or null`);
@@ -190,6 +219,7 @@ export function parseBodyDescriptor(value: unknown, row: DescriptorBody): BodyDe
   const what = `${row.folder} descriptor`, descriptor = record(value, what);
   orderedKeys(descriptor, BODY_DESCRIPTOR_KEYS, what);
   const declared = new Set<string>(row.textures.map(texture => descriptorTexturePath(texture.sha256)));
+  const declaredVolumes = new Set<string>(row.volumes.map(volume => descriptorVolumePath(volume.sha256))), usedVolumes = new Set<string>();
   const options = new Set(optionNodes(descriptor.optionNodes, `${what}.optionNodes`));
   const aliases = array(descriptor.appearances, `${what}.appearances`, 5000).map((item, i) => {
     const at = `${what}.appearances[${i}]`, appearance = record(item, at);
@@ -217,6 +247,10 @@ export function parseBodyDescriptor(value: unknown, row: DescriptorBody): BodyDe
     materialIds.add(text(material.id, `${at}.id`, 200));
     text(material.name, `${at}.name`, 200);
     if (typeof material.paint !== 'boolean') throw Error(`${at}.paint: expected a boolean`);
+    if (material.reflectionOcclusion !== undefined) {
+      if (material.paint) throw Error(`${at}.reflectionOcclusion: a paint material has none`);
+      usedVolumes.add(parseReflectionOcclusion(material.reflectionOcclusion, `${at}.reflectionOcclusion`, declaredVolumes));
+    }
     if (!material.paint) {
       const surface = record(material.surface, `${at}.surface`);
       text(surface.kind, `${at}.surface.kind`);
@@ -242,5 +276,7 @@ export function parseBodyDescriptor(value: unknown, row: DescriptorBody): BodyDe
   });
   if (!sameList(names, ['cockpit', 'hood', 'roof'])) throw Error(`${what}.cameras.list: expected exactly the cockpit, hood and roof cameras`);
   for (const path of JSON.stringify(descriptor).match(ANY_TEXTURE_PATH) ?? []) if (!declared.has(path)) throw Error(`${row.folder}: descriptor uses undeclared texture vehicles/${path}`);
+  for (const path of JSON.stringify(descriptor).match(ANY_VOLUME_PATH) ?? []) if (!declaredVolumes.has(path)) throw Error(`${row.folder}: descriptor uses undeclared volume vehicles/${path}`);
+  for (const path of declaredVolumes) if (!usedVolumes.has(path)) throw Error(`${row.folder}: volume vehicles/${path} is declared but no material uses it`);
   return value as BodyDescriptor;
 }

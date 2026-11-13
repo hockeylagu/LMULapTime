@@ -5,7 +5,7 @@
  */
 
 /** The only package schema the tools and the app read. */
-export const PACKAGE_SCHEMA = 11;
+export const PACKAGE_SCHEMA = 12;
 
 /** The catalog files of every package, release or debug. These paths are constants of the schema: the manifest names none. */
 export const PACKAGE_FILES = {tracks: 'tracks/index.json', vehicles: 'vehicles/index.json', logos: 'vehicles/logos.json', scenery: 'scenery/index.json', rendering: 'rendering/index.json'} as const;
@@ -26,6 +26,11 @@ export const bodyDescriptorPath = (folder: string): string => `vehicles/bodies/$
 export const descriptorTexturePath = (sha256: string): string => `textures/${sha256}.ktx2.zst`;
 /** Matches a descriptor-relative texture path. */
 export const DESCRIPTOR_TEXTURE_PATH = /^textures\/[0-9a-f]{64}\.ktx2\.zst$/;
+/** Vehicle body cockpit volume (raw 8-bit voxels) of a content hash, and the same path as the body descriptor writes it (relative to `vehicles/`). */
+export const bodyVolumePath = (sha256: string): string => `vehicles/volumes/${sha256}.bin`;
+export const descriptorVolumePath = (sha256: string): string => `volumes/${sha256}.bin`;
+/** Matches a descriptor-relative volume path. */
+export const DESCRIPTOR_VOLUME_PATH = /^volumes\/[0-9a-f]{64}\.bin$/;
 
 /** One cloud map's decoded mips of the rendering profiles. */
 export const RENDERING_FOLDER = 'rendering';
