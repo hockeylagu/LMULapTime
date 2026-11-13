@@ -68,10 +68,15 @@ function setSurfaceReflection(material: Material, cubes: ReflectionCubes | null)
  * the sharp cube and the convolved one by its own rule) and prefiltered by three (PMREM) for the car's other lit materials. Faces
  * render after the frame, against its current shadow cascades. Both conversions run here, between frames: given the cube itself,
  * three converts it in the middle of drawing the car, and that nested render left the car's material one texture unit over the
- * GPU's 16. The cube's mips, which the kernels read, regenerate after the last face only.
+ * GPU's 16. The cube's mips, which the kernels read, regenerate after the last face only. The faces draw into a second cube while
+ * the car shows the finished one (the paint reads the sharp cube itself): read while drawn, the paint mixed faces of two probes
+ * with the mips of the older one, and popped at every eighth frame. The two cubes swap once a probe is converted.
  */
 export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shading: SceneryShading): CarReflection {
-  const target = new WebGLCubeRenderTarget(CAR_REFLECTION_PX, {type: HalfFloatType, generateMipmaps: false, minFilter: LinearMipmapLinearFilter});
+  const cube = () => new WebGLCubeRenderTarget(CAR_REFLECTION_PX, {type: HalfFloatType, generateMipmaps: false, minFilter: LinearMipmapLinearFilter});
+  const targets = [cube(), cube()];
+  /** The cube the faces draw into; the other one is shown. */
+  let target = targets[0];
   const camera = new CubeCamera(NEAR_M, FAR_M, target);
   // The prefiltered target exists from the start, converted from the empty cube: its size is a program define, so a car's
   // materials take it when the car is set and compile once, with the scene's warm-up, instead of again at the first probe.
@@ -111,15 +116,19 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
       }
       if (pending === 'convolve') {
         pending = null;
-        const first = !cubes;
         cubes = convolveReflection(renderer, target, shading.convolution.kernels, cubes ?? undefined); // Reuses its cube after the first probe.
-        if (first) takeReflection();
+        takeReflection(); // The paint's sharp cube is now the one just drawn.
+        target = targets[target === targets[0] ? 1 : 0];
         return true; // The next frame shows the new probe.
       }
       if (face === 0) {
         if (!stale && cubes && probed.distanceToSquared(car) < MOVED_M * MOVED_M) return false;
-        at.copy(car); stale = false;
+        stale = false;
       }
+      // Each face from where the car is now, not where the probe began: the faces render against the frame's shadows, so a face
+      // drawn from a place the car has left saw sunlit road where its own shadow had been, and the cockpit roof, which reflects
+      // the road below, lit up while the car moved.
+      at.copy(car);
       if (camera.coordinateSystem !== renderer.coordinateSystem) { camera.coordinateSystem = renderer.coordinateSystem; camera.updateCoordinateSystem(); }
       camera.position.copy(at); camera.position.y += eyeAbove; camera.updateMatrixWorld();
       const previous = renderer.getRenderTarget(), shown = hidden?.visible ?? false;
@@ -143,7 +152,8 @@ export function createCarReflection(renderer: WebGLRenderer, scene: Scene, shadi
         setSurfaceReflection(material, null);
         if (!setPaintReflection(material, null) && material.envMap === prefiltered.texture) material.envMap = null;
       }
-      target.dispose(); prefiltered.dispose(); cubes?.dispose(); generator.dispose();
+      for (const each of targets) each.dispose();
+      prefiltered.dispose(); cubes?.dispose(); generator.dispose();
     },
   };
 }
