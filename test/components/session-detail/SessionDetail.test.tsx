@@ -311,4 +311,18 @@ describe('SessionDetail component - overview, telemetry & settings', () => {
     expect(lapPaceBtn).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('links to the race replay directly when the session has a matching replay', async () => {
+    (global.fetch as Mock).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ ...mockDetailedSession, matchingReplayFile: 'race.Vcr' }),
+    });
+
+    render(<SessionDetail sessionId="sess123" onBack={vi.fn()} />);
+
+    const raceLink = await screen.findByRole('link', { name: /race replay/i });
+    expect(raceLink).toHaveAttribute('href', expect.stringContaining('/telemetry?'));
+    expect(raceLink).toHaveAttribute('href', expect.stringContaining('sessionId=sess123'));
+    expect(raceLink).toHaveAttribute('href', expect.stringContaining('mode=race'));
+  });
+
 });

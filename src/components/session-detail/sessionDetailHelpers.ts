@@ -26,6 +26,22 @@ export function sessionTelemetryPath(
   return buildTelemetryComparePath(current, { sessionId: session.id, driverOrdinal, lapOrdinal, driverName: driver.name }, null);
 }
 
+/**
+ * The /telemetry path that opens the session's race replay directly, preserving the selected driver's
+ * best lap as the fallback lap if the user switches back to the lap view.
+ */
+export function sessionRaceReplayPath(
+  current: URLSearchParams,
+  session: DetailedSession,
+  driver: DriverData | undefined,
+  lap: LapData | number,
+): string {
+  const base = sessionTelemetryPath(current, session, driver, lap);
+  if (base) return `${base}&mode=race`;
+  const params = new URLSearchParams({ sessionId: session.id, mode: 'race', view: '2d' });
+  return `/telemetry?${params.toString()}`;
+}
+
 function sourceDriverOrdinal(session: { drivers?: DriverData[] }, driver: Partial<DriverData>): number {
   const drivers = session.drivers ?? [];
   const exact = drivers.indexOf(driver as DriverData);
