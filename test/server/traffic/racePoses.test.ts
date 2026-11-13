@@ -33,10 +33,18 @@ describe('resampleLapPoses', () => {
     expect(Math.abs(Math.cos(value(lap, 10, 4)))).toBeGreaterThan(0.99);
   });
 
+  it('flags the samples in the pit lane', () => {
+    const lap = resampleLapPoses(compressTrajectory(storedLap(0, 2, (point, time) => { point.inPit = time >= 1; })));
+    expect(value(lap, 5, 7)).toBe(0);
+    expect(value(lap, 15, 7)).toBe(1);
+  });
+
   it('leaves the garage and recording gaps empty', () => {
     const garage = resampleLapPoses(compressTrajectory(storedLap(0, 2, (point, time) => { point.inGarage = time < 1; })));
     expect(Number.isNaN(value(garage, 5, 0))).toBe(true);
     expect(value(garage, 15, 0)).toBeCloseTo(75);
+    // A car in its box is still in the pits, though not drawn.
+    expect([value(garage, 5, 7), value(garage, 15, 7)]).toEqual([1, 0]);
 
     const gap = storedLap(0, 4);
     gap.points = gap.points.filter(point => point.timeSec! < 1 || point.timeSec! > 3);

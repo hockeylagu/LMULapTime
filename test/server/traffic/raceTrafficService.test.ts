@@ -63,6 +63,23 @@ describe('RaceTrafficService', () => {
     expect(first.laps[0].spells).toMatchObject([{ driverName: 'Rival', carClass: 'Hyper', kind: 'battle', direction: 'ahead' }]);
   });
 
+  it('gives each car distance along the track once a second from the same stored index', async () => {
+    const traffic = service();
+    await traffic.getDriverTraffic(request);
+    const progress = await traffic.getRaceProgress(REPLAY, { trackVenue: session.trackVenue, trackCourse: session.trackCourse });
+    expect(build).toHaveBeenCalledTimes(1);
+    if ('reason' in progress) throw Error(progress.reason);
+    expect(progress).toMatchObject({ fromSec: 0, hz: 1 });
+    expect(progress.cars.map(car => car.slot)).toEqual([0, 1]);
+    const [me, rival] = progress.cars.map(car => car.distances);
+    expect(me).toHaveLength(41);
+    // 50 m/s, the rival 30 m up the road.
+    expect(me[11]! - me[10]!).toBeCloseTo(50, 0);
+    expect(rival[10]! - me[10]!).toBeCloseTo(30, 0);
+    const none = await new RaceTrafficService(db, build, () => null).getRaceProgress(REPLAY, {});
+    expect('reason' in none && none.reason).toBe('This layout has no track centreline to place the cars on.');
+  });
+
   it('rebuilds the index when the replay laps it came from change', async () => {
     await service().getDriverTraffic(request);
     db.upsertReplayTrajectoryCache(REPLAY, 1, 3, 1, 1, lap(3, 30));

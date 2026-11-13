@@ -3,7 +3,8 @@
  * what the race replay draws. The server builds windows from the stored laps, the client
  * interpolates between samples.
  */
-export const RACE_POSE_CHANNELS = ['x', 'y', 'z', 'rotX', 'rotY', 'rotZ', 'speedKmh'] as const;
+/** `inPit` is 1 in the pit lane or the garage, else 0; it is set even where the car has no pose (stopped in its box). */
+export const RACE_POSE_CHANNELS = ['x', 'y', 'z', 'rotX', 'rotY', 'rotZ', 'speedKmh', 'inPit'] as const;
 export type RacePoseChannel = typeof RACE_POSE_CHANNELS[number];
 export const RACE_POSE_CHANNEL_COUNT = RACE_POSE_CHANNELS.length;
 const ANGLE_CHANNELS = new Set<number>([3, 4, 5]);
@@ -15,12 +16,12 @@ export interface RacePoseWindow {
   /** Samples per car: the window's seconds × hz, plus the next window's first sample. */
   count: number;
   slots: number[];
-  /** Car, then sample, then channel; NaN where a car is not on the track (garage, recording gap). */
+  /** Car, then sample, then channel; NaN where a car is not on the track (garage, recording gap), but for `inPit`. */
   data: Float32Array;
 }
 
 const MAGIC = 0x50524d4c; // "LMRP" little endian
-const VERSION = 1;
+const VERSION = 2;
 const HEADER_BYTES = 28;
 
 export function encodeRacePoseWindow(window: RacePoseWindow): Uint8Array {
@@ -55,6 +56,19 @@ export function decodeRacePoseWindow(buffer: ArrayBuffer): RacePoseWindow {
     slots,
     data: new Float32Array(buffer, dataOffset, length),
   };
+}
+
+const IN_PIT = RACE_POSE_CHANNELS.indexOf('inPit');
+
+/** The cars in the pit lane or the garage at `timeSec` (at the nearest sample), drawn or not. */
+export function racePitSlots(window: RacePoseWindow | null, timeSec: number): Set<number> {
+  const slots = new Set<number>();
+  const sample = window ? Math.round((timeSec - window.fromSec) * window.hz) : -1;
+  if (!window || sample < 0 || sample >= window.count) return slots;
+  window.slots.forEach((slot, car) => {
+    if (window.data[(car * window.count + sample) * RACE_POSE_CHANNEL_COUNT + IN_PIT] === 1) slots.add(slot);
+  });
+  return slots;
 }
 
 const lerpAngle = (a: number, b: number, f: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) * f;

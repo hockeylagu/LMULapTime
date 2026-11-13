@@ -1,4 +1,4 @@
-import type { DetailedSession, DriverData, ReplayTrafficResponse } from '../../shared/types/index.js';
+import type { DetailedSession, DriverData, RaceReplayProgress, ReplayTrafficResponse } from '../../shared/types/index.js';
 import { getCircuitSpecification } from '../../shared/domain/circuitSpecs.js';
 import { isNonRaceSession } from '../../shared/domain/raceTraffic.js';
 import { getTrackDefinition } from '../tracks/serverTrackSync.js';
@@ -7,6 +7,7 @@ import type { ReplayLapRow } from '../core/replay/dbRacePositionStore.js';
 import { RACE_POSITIONS_VERSION, RacePositions } from './racePositions.js';
 import { buildRacePositionsInWorker } from './racePositionsWorkerClient.js';
 import { findTrafficSpells, TrafficCarInfo } from './trafficSpells.js';
+import { raceProgressGrid } from './raceProgress.js';
 import type { StoredLapBlob } from './lapSamples.js';
 
 export interface RaceTrafficStore {
@@ -28,6 +29,9 @@ export interface RaceTrafficRequest {
   trackVenue?: string;
   trackCourse?: string;
 }
+
+/** The layout a replay was driven on, as its session and replay name it. */
+export interface TrackRequest { trackVenue?: string; trackCourse?: string; sceneDesc?: string; trackLengthMeters?: number | null }
 
 type BuildPositions = (laps: StoredLapBlob[], centerline: Array<[number, number]>) => Promise<RacePositions>;
 type ProjectionGeometry = { centerline: Array<[number, number]>; projectionRevision: string };
@@ -51,19 +55,12 @@ export class RaceTrafficService {
 
   public async getDriverTraffic(request: RaceTrafficRequest): Promise<ReplayTrafficResponse> {
     if (isNonRaceSession(request.session?.sessionType)) return { available: true, laps: [] };
-    const venue = request.session?.trackVenue || request.trackVenue;
-    const course = request.session?.trackCourse || request.trackCourse;
-    const spec = getCircuitSpecification(venue, course, request.sceneDesc, request.replayName, null, request.session?.trackLengthMeters);
-    const geometry = spec.layoutKey !== 'unknown' ? this.loadCenterline(spec.layoutKey) : null;
-    if (!geometry) return unavailable('This layout has no track centreline to place the cars on.');
-    const centerline = Array.isArray(geometry) ? geometry : geometry.centerline;
-    const projectionRevision = Array.isArray(geometry) ? centerlineProjectionRevision(centerline) : geometry.projectionRevision;
-
-    const lapSignature = this.store.getReplayLapSignature(request.replayName);
-    if (!lapSignature) return unavailable('The replay has no stored laps yet.');
-    const signature = `${lapSignature}|${RACE_POSITIONS_VERSION}|${spec.layoutKey}|${projectionRevision}`;
-    const positions = await this.getPositions(request.replayName, signature, centerline);
-    if (!positions) return unavailable('The retained replay samples cannot rebuild traffic in this track revision.');
+    const found = await this.resolvePositions(request.replayName, {
+      trackVenue: request.session?.trackVenue || request.trackVenue, trackCourse: request.session?.trackCourse || request.trackCourse,
+      sceneDesc: request.sceneDesc, trackLengthMeters: request.session?.trackLengthMeters,
+    });
+    if ('reason' in found) return unavailable(found.reason);
+    const { positions, projectionRevision } = found;
 
     const driver = positions.drivers.find((d) => d.slot === request.driverSlot);
     if (!driver) return unavailable('The driver has no stored laps in this replay.');
@@ -77,6 +74,28 @@ export class RaceTrafficService {
         spells: findTrafficSpells(positions, request.driverSlot, lap.startSec, lap.endSec, cars),
       })),
     };
+  }
+
+  /** Every car's distance along the track once a second, from the same index (the race replay's live gaps). */
+  public async getRaceProgress(replayName: string, track: TrackRequest): Promise<RaceReplayProgress | { reason: string }> {
+    const found = await this.resolvePositions(replayName, track);
+    return 'reason' in found ? found : raceProgressGrid(found.positions);
+  }
+
+  /** The replay's race positions index for its layout's centreline, built and stored on first use. */
+  private async resolvePositions(replayName: string, track: TrackRequest): Promise<{ positions: RacePositions; projectionRevision: string } | { reason: string }> {
+    const spec = getCircuitSpecification(track.trackVenue, track.trackCourse, track.sceneDesc, replayName, null, track.trackLengthMeters);
+    const geometry = spec.layoutKey !== 'unknown' ? this.loadCenterline(spec.layoutKey) : null;
+    if (!geometry) return { reason: 'This layout has no track centreline to place the cars on.' };
+    const centerline = Array.isArray(geometry) ? geometry : geometry.centerline;
+    const projectionRevision = Array.isArray(geometry) ? centerlineProjectionRevision(centerline) : geometry.projectionRevision;
+
+    const lapSignature = this.store.getReplayLapSignature(replayName);
+    if (!lapSignature) return { reason: 'The replay has no stored laps yet.' };
+    const signature = `${lapSignature}|${RACE_POSITIONS_VERSION}|${spec.layoutKey}|${projectionRevision}`;
+    const positions = await this.getPositions(replayName, signature, centerline);
+    if (!positions) return { reason: 'The retained replay samples cannot rebuild traffic in this track revision.' };
+    return { positions, projectionRevision };
   }
 
   private getPositions(replayName: string, signature: string, centerline: Array<[number, number]>): Promise<RacePositions | null> {

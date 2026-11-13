@@ -1,16 +1,16 @@
 import { describe, it, expect } from 'vitest';
 import {
-  decodeRacePoseWindow, encodeRacePoseWindow, RACE_POSE_CHANNEL_COUNT, sampleRacePose, type RacePoseWindow,
+  decodeRacePoseWindow, encodeRacePoseWindow, RACE_POSE_CHANNEL_COUNT, racePitSlots, sampleRacePose, type RacePoseWindow,
 } from '../../../shared/domain/raceReplay/poseWindow.js';
 
-/** Two cars, three samples at 10 Hz from 60 s; car 7 leaves the track after its first sample. */
+/** Two cars, three samples at 10 Hz from 60 s; car 3 enters the pit lane at its second, car 7 leaves the track after its first. */
 function window(): RacePoseWindow {
   const data = new Float32Array(2 * 3 * RACE_POSE_CHANNEL_COUNT).fill(NaN);
   const put = (car: number, sample: number, values: number[]) => data.set(values, (car * 3 + sample) * RACE_POSE_CHANNEL_COUNT);
-  put(0, 0, [0, 1, 0, 0, 3.1, 0, 100]);
-  put(0, 1, [10, 1, 20, 0, -3.1, 0, 200]);
-  put(0, 2, [20, 1, 40, 0, -3.0, 0, 200]);
-  put(1, 0, [5, 0, 5, 0, 0, 0, 50]);
+  put(0, 0, [0, 1, 0, 0, 3.1, 0, 100, 0]);
+  put(0, 1, [10, 1, 20, 0, -3.1, 0, 200, 1]);
+  put(0, 2, [20, 1, 40, 0, -3.0, 0, 200, 1]);
+  put(1, 0, [5, 0, 5, 0, 0, 0, 50, 0]);
   return { fromSec: 60, hz: 10, count: 3, slots: [3, 7], data };
 }
 
@@ -23,8 +23,14 @@ describe('race pose windows', () => {
     expect(decoded.hz).toBe(10);
     expect(decoded.count).toBe(3);
     expect(decoded.slots).toEqual([3, 7]);
-    expect(Array.from(decoded.data.slice(0, 7))).toEqual(Array.from(window().data.slice(0, 7)));
+    expect(Array.from(decoded.data.slice(0, 8))).toEqual(Array.from(window().data.slice(0, 8)));
     expect(Number.isNaN(decoded.data[3 * RACE_POSE_CHANNEL_COUNT + RACE_POSE_CHANNEL_COUNT])).toBe(true);
+  });
+
+  it('knows the cars in the pit lane, from half way to the first pit sample', () => {
+    expect([...racePitSlots(window(), 60.02)]).toEqual([]);
+    expect([...racePitSlots(window(), 60.06)]).toEqual([3]);
+    expect([...racePitSlots(null, 60)]).toEqual([]);
   });
 
   it('rejects what is not a window', () => {

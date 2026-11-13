@@ -47,8 +47,9 @@ describe('RaceReplayService', () => {
 
     expect(overview).toMatchObject({ startSec: 0, endSec: 100, poseHz: 10, windowSec: 60, sessionType: 'Race', cars: [{ slot: 1, name: 'A' }] });
     expect(overview.layoutKey).toBe('sarthe_full');
-    expect(overview.laps).toHaveLength(3);
-    expect(overview.runningOrder).toEqual([{ timeSec: 0, order: [2, 1] }]);
+    // Car 2 is not asked for (as the pace car is left out): neither its laps nor its place come with the race.
+    expect(overview.laps.map(lap => lap.slot)).toEqual([1, 1]);
+    expect(overview.runningOrder).toEqual([{ timeSec: 0, order: [1] }]);
   });
 
   it('builds a window from the laps it overlaps and reuses them for the next window', async () => {

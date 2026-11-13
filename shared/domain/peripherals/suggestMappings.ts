@@ -1,10 +1,10 @@
-import { VEHICLE_MODELS } from '../vehicleMapping.js';
+import { SAFETY_CAR_CLASS, VEHICLE_MODELS } from '../vehicleMapping.js';
 import type { MappingCar, MappingSuggestion, PeripheralPreset, PresetMapping } from '../../types/peripherals/peripherals.js';
 
 const tokens = (name: string): string[] => name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/);
 export const MAPPING_CARS: MappingCar[] = [];
 for (const car of VEHICLE_MODELS) {
-  if (car.carClass === 'Safety Car') continue;
+  if (car.carClass === SAFETY_CAR_CLASS) continue;
   const existing = MAPPING_CARS.find(item => item.model === car.model && item.carClass === car.carClass);
   const aliases = [car.carName, ...(car.names ?? []), ...(car.presetNames ?? [])];
   if (existing) existing.aliases = [...new Set([...existing.aliases, ...aliases])];

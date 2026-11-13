@@ -17,6 +17,8 @@ import { hasVerifiedLiveCapture } from '../core/live/dbLiveCaptureStore.js';
 import { replayDaylightClock } from '../../shared/domain/scenery/replayDaylightClock.js';
 import type { ReplayDaylightClock, ReplayMetadata, ReplayTrajectoryData } from '../../shared/types/index.js';
 import type { ReplaySessionContext } from '../replay/replayServiceTypes.js';
+import { SAFETY_CAR_CLASS } from '../../shared/domain/vehicleMapping.js';
+import { nonFinishStatus } from '../../shared/domain/raceReplay/nonFinishStatus.js';
 
 export function createReplayRouter(context: ServerContext): Router {
   const router = Router();
@@ -78,7 +80,7 @@ export function createReplayRouter(context: ServerContext): Router {
       });
       driver.sessionLapOrdinals = sessionLapOrdinals;
     }
-    return { replayName, metadata, composed };
+    return { replayName, metadata, composed, session };
   };
 
   router.get('/session/:sessionId/telemetry/metadata', (req, res) => {
@@ -160,21 +162,41 @@ export function createReplayRouter(context: ServerContext): Router {
     try {
       const replay = sessionReplayMetadata(req.params.sessionId);
       if (!replay) return res.status(404).json({ error: 'Session replay is unavailable' });
-      const { composed, metadata, replayName } = replay;
+      const { composed, metadata, replayName, session } = replay;
+      const finishStatus = (ordinal?: number) => session.drivers.find(driver => driver.driverOrdinal === ordinal)?.finishStatus;
       res.json(raceService.getOverview({
         replayName,
         sessionType: composed.sessionType ?? metadata.sessionType,
         trackVenue: metadata.trackName,
         trackCourse: metadata.trackCourse,
         sceneDesc: metadata.sceneDesc,
-        cars: composed.drivers.flatMap(driver => typeof driver.slot === 'number' ? [{
+        // The pace car runs in the replay but is no competitor.
+        cars: composed.drivers.flatMap(driver => typeof driver.slot === 'number' && driver.carClass !== SAFETY_CAR_CLASS ? [{
           slot: driver.slot, name: driver.name, carClass: driver.carClass, carNumber: driver.carNumber, team: driver.team,
           vehicleId: driver.vehicleId, isPlayer: driver.isPlayer,
           sessionDriverOrdinal: driver.sessionDriverOrdinal, sessionLapOrdinals: driver.sessionLapOrdinals,
+          retired: nonFinishStatus(finishStatus(driver.sessionDriverOrdinal)),
         }] : []),
       }));
     } catch (error: unknown) {
       res.status(404).json({ error: error instanceof Error ? error.message : 'Session race replay unavailable' });
+    }
+  });
+
+  router.get('/session/:sessionId/race/progress', async (req, res) => {
+    try {
+      const replay = sessionReplayMetadata(req.params.sessionId);
+      if (!replay) return res.status(404).json({ error: 'Session replay is unavailable' });
+      const { metadata, replayName, session } = replay;
+      // The layout as the traffic route resolves it, so both read the same stored index.
+      const progress = await trafficService.getRaceProgress(replayName, {
+        trackVenue: session.trackVenue || metadata.trackName, trackCourse: session.trackCourse || metadata.trackCourse,
+        sceneDesc: metadata.sceneDesc, trackLengthMeters: session.trackLengthMeters,
+      });
+      if ('reason' in progress) return res.status(404).json({ error: progress.reason });
+      res.json(progress);
+    } catch (error: unknown) {
+      res.status(404).json({ error: error instanceof Error ? error.message : 'Race progress unavailable' });
     }
   });
 

@@ -22,6 +22,7 @@ interface StoredLap extends StoredLapColumns {
 
 const KEYS = ['timeSec', ...RACE_POSE_CHANNELS, 'inGarage', 'isTeleport'];
 const ANGLE = new Set(['rotX', 'rotY', 'rotZ']);
+const IN_PIT = RACE_POSE_CHANNELS.indexOf('inPit');
 
 function channel(stored: StoredLap, key: string): LapColumn {
   return stored.columns[key] ?? new Array<LapValue | null>(stored.pointsLength).fill(stored.constants?.[key] ?? null);
@@ -55,9 +56,13 @@ export function resampleLapPoses(blob: Uint8Array, hz = RACE_POSE_HZ): LapPoses 
     const j = Math.min(i + 1, last);
     const t0 = time[i] as number;
     const t1 = finite(time[j]) ? time[j] : t0;
+    // In the pits, the garage (a car stopped in its box) included: flagged even where no pose is drawn.
+    const nearest = t1 > t0 && (t - t0) / (t1 - t0) >= 0.5 ? j : i;
+    data[k * RACE_POSE_CHANNEL_COUNT + IN_PIT] = values[IN_PIT][nearest] === true || garage[nearest] === true ? 1 : 0;
     if (!usable(i) || (j !== i && (!usable(j) || t1 - t0 > MAX_SAMPLE_GAP_SEC))) continue;
     const f = t1 > t0 ? Math.max(0, Math.min(1, (t - t0) / (t1 - t0))) : 0;
     RACE_POSE_CHANNELS.forEach((key, c) => {
+      if (c === IN_PIT) return;
       const a = values[c][i];
       const b = values[c][j];
       if (!finite(a)) return;

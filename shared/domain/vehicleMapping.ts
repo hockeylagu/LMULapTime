@@ -72,6 +72,9 @@ interface VehicleModel {
 }
 
 // One row per class and car name; the merged pairs (296 Evo, TR010) are 2026 updates of the same car.
+/** The pace car's class: it runs in the session but is no competitor. */
+export const SAFETY_CAR_CLASS = 'Safety Car';
+
 export const VEHICLE_MODELS: readonly VehicleModel[] = [
   { carName: 'AMR_LMGT3', carClass: 'GT3', model: 'Aston Martin Vantage AMR LMGT3' },
   { carName: 'BMW_M4_LMGT3', carClass: 'GT3', model: 'BMW M4 LMGT3' },
@@ -107,7 +110,7 @@ export const VEHICLE_MODELS: readonly VehicleModel[] = [
   { carName: 'Duqueine_D09_P3', carClass: 'LMP3', model: 'Duqueine D09 P3' },
   { carName: 'Ginetta_G61LTP3_Evo', carClass: 'LMP3', model: 'Ginetta G61-LT-P325 Evo' },
   { carName: 'Ligier_JS_P325', carClass: 'LMP3', model: 'Ligier JS P325' },
-  { carName: '992S_PC', carClass: 'Safety Car', model: 'Porsche 992S Pace Car' },
+  { carName: '992S_PC', carClass: SAFETY_CAR_CLASS, model: 'Porsche 992S Pace Car' },
 ];
 
 /** A car the game named: its public model, and its class when the name fixes one. */

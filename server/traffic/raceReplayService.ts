@@ -51,7 +51,9 @@ export class RaceReplayService {
   ) {}
 
   public getOverview(request: RaceOverviewRequest): RaceReplayOverview {
-    const laps: RaceReplayLap[] = timedLaps(this.store.getReplayLaps(request.replayName)).map(lap => ({
+    // Only the asked cars: the replay also holds cars that are left out (the pace car).
+    const slots = new Set(request.cars.map(car => car.slot));
+    const laps: RaceReplayLap[] = timedLaps(this.store.getReplayLaps(request.replayName)).filter(lap => slots.has(lap.driverSlot)).map(lap => ({
       slot: lap.driverSlot, lapNumber: lap.lapNumber, startSec: lap.startSec, endSec: lap.endSec,
       lapTimeSec: lap.lapTimeSec ?? null, isValid: lap.isValid === true,
     }));
@@ -71,8 +73,9 @@ export class RaceReplayService {
       sceneDesc: request.sceneDesc,
       cars: request.cars,
       laps,
-      runningOrder: this.store.getReplayRunningOrder(request.replayName),
-      events: buildRaceEvents(this.store.getReplayDriverEvents(request.replayName), new Set(request.cars.map(car => car.slot))),
+      runningOrder: this.store.getReplayRunningOrder(request.replayName)
+        .map(snapshot => ({ ...snapshot, order: snapshot.order.filter(slot => slots.has(slot)) })),
+      events: buildRaceEvents(this.store.getReplayDriverEvents(request.replayName), slots),
     };
   }
 

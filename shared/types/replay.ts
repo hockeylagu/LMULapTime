@@ -412,6 +412,8 @@ export interface RaceReplayCar {
   /** The session driver this car is, when the name matches one; opens its laps in the lap view. */
   sessionDriverOrdinal?: number;
   sessionLapOrdinals?: Record<string, number>;
+  /** The results' status when the car did not finish (DNF, DQ, DNS): it is out from the end of its last lap. */
+  retired?: string;
 }
 
 /** One lap of one car on the replay clock. */
@@ -447,6 +449,18 @@ export interface RaceReplayEvent {
   /** Pit: seconds from pit entry to exit (null when the car never left the lane), and stopped for service. */
   pitLaneSec?: number | null;
   serviceSec?: number | null;
+}
+
+/**
+ * Every car's distance along the track on one clock grid, for the race replay's live gaps: distance `k` of a car is at
+ * `fromSec + k / hz`.
+ */
+export interface RaceReplayProgress {
+  fromSec: number;
+  hz: number;
+  trackLengthM: number;
+  /** Metres along the centreline, unwrapped across laps from each car's own zero; null off the track (pits, garage, gaps). */
+  cars: Array<{ slot: number; distances: Array<number | null> }>;
 }
 
 /** Everything the race replay needs besides the car poses, which come in time windows. */

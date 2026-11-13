@@ -127,10 +127,19 @@ describe('session telemetry routes', () => {
   });
 
   it('serves the race replay overview with the session drivers, and its pose windows as binary', async () => {
+    // The pace car runs in the replay but is no competitor; the results' DNF comes with the car.
+    fs.writeFileSync(replayPath, createSliceVcrBuffer({
+      drivers: [{ name: 'Route Driver', vehicleId: '21_26_AFCO95641716', team: 'Test Team', carNumber: '21' },
+        { name: 'Pace Driver', vehicleId: '992S_PC', team: 'Safety', carNumber: '0' }],
+      slices: [{ sTime: 0, driverSlot: 1, x: 10, y: 0, z: 20 }, { sTime: 1, driverSlot: 2, x: 11, y: 0, z: 21 }],
+    }));
+    db.getDb().prepare("UPDATE session_drivers SET finish_status='DNF' WHERE session_id=?").run('session-1');
     const overview = await request(app).get('/api/session/session-1/race');
     expect(overview.status).toBe(200);
     expect(overview.body).toMatchObject({ replayName: 'Route_Test_P1.Vcr', poseHz: 10, windowSec: 60, laps: [], runningOrder: [] });
-    expect((overview.body as RaceReplayOverview).cars[0]).toMatchObject({ name: 'Route Driver', carNumber: '21', sessionDriverOrdinal: 0, sessionLapOrdinals: { '1': 0 } });
+    const cars = (overview.body as RaceReplayOverview).cars;
+    expect(cars.map(car => car.name)).toEqual(['Route Driver']);
+    expect(cars[0]).toMatchObject({ name: 'Route Driver', carNumber: '21', sessionDriverOrdinal: 0, sessionLapOrdinals: { '1': 0 }, retired: 'DNF' });
 
     const getPoseWindow = vi.spyOn(RaceReplayService.prototype, 'getPoseWindow').mockResolvedValue(new Uint8Array(36).fill(7));
     const poses = await request(app).get('/api/session/session-1/race/poses?window=3').buffer(true).parse((res, done) => {
@@ -147,6 +156,21 @@ describe('session telemetry routes', () => {
     expect((await request(app).get('/api/session/session-1/race/poses?window=-1')).status).toBe(400);
     expect((await request(app).get('/api/session/missing/race')).status).toBe(404);
     expect((await request(app).get('/api/session/missing/race/poses?window=0')).status).toBe(404);
+  });
+
+  it('serves the race progress for live gaps, or says why there is none', async () => {
+    const progress = { fromSec: 0, hz: 1, trackLengthM: 1000, cars: [{ slot: 0, distances: [0, 50, null] }] };
+    const getRaceProgress = vi.spyOn(RaceTrafficService.prototype, 'getRaceProgress').mockResolvedValueOnce(progress);
+    const served = await request(app).get('/api/session/session-1/race/progress');
+    expect(served.status).toBe(200);
+    expect(served.body).toEqual(progress);
+    expect(getRaceProgress.mock.calls[0][0]).toBe('Route_Test_P1.Vcr');
+
+    getRaceProgress.mockResolvedValueOnce({ reason: 'This layout has no track centreline to place the cars on.' });
+    const none = await request(app).get('/api/session/session-1/race/progress');
+    expect(none.status).toBe(404);
+    expect(none.body).toEqual({ error: 'This layout has no track centreline to place the cars on.' });
+    expect((await request(app).get('/api/session/missing/race/progress')).status).toBe(404);
   });
 
   it('does not expose replay-name telemetry routes', async () => {
