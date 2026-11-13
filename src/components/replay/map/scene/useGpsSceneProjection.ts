@@ -6,7 +6,7 @@ import {
 import { activeTrackBounds } from '../display/mapLayers.js';
 import { useTrackBoundaryGeometry } from '../useTrackBoundaryGeometry.js';
 import type { GpsTrackMapProps } from '../gpsTrackMapTypes.js';
-import type { SectorMapMarker } from './GpsSectorMarkers.js';
+import { projectSectorMarkers } from '../display/useTrackMarkerPlacement.js';
 
 export const VIEWBOX_SIZE = 800;
 export const PADDING = 60;
@@ -50,23 +50,8 @@ export function useGpsSceneProjection({ points, baselinePoints, bounds, trackGeo
     [geometry, effectiveBounds],
   );
   const pathD = useMemo(() => buildContinuousSvgPath(svgPoints), [svgPoints]);
-  const sectorMarkers = useMemo(() => {
-    const markers: SectorMapMarker[] = [];
-    for (const key of ['s1', 's2'] as const) {
-      const gate = geometry?.timingGates?.[key === 's1' ? 'sector1' : 'sector2'];
-      if (gate && [...gate.left, ...gate.right].every(Number.isFinite)
-        && (gate.left[0] !== gate.right[0] || gate.left[1] !== gate.right[1])) {
-        const [left, right] = projectBoundaryPoints([gate.left, gate.right], effectiveBounds, VIEWBOX_SIZE, PADDING);
-        markers.push({ key, left, right });
-        continue;
-      }
-      const frame = sectors?.[key === 's1' ? 's1Frame' : 's2Frame'];
-      if (frame === undefined || !Number.isInteger(frame) || frame <= 0 || frame >= svgPoints.length - 1) continue;
-      const point = svgPoints[frame];
-      if (Number.isFinite(point.sx) && Number.isFinite(point.sy)) markers.push({ key, point });
-    }
-    return markers;
-  }, [geometry, effectiveBounds, sectors, svgPoints]);
+  const sectorMarkers = useMemo(() => projectSectorMarkers(geometry, effectiveBounds, VIEWBOX_SIZE, PADDING, sectors, svgPoints),
+    [geometry, effectiveBounds, sectors, svgPoints]);
   return {
     geometry, effectiveBaselinePoints, effectiveBounds, svgPoints, baselineSvgPoints,
     leftSvgPoints, rightSvgPoints, centerlineSvgPoints, trackBoundaryPathD, gateLeftSvg, gateRightSvg, pathD, sectorMarkers,

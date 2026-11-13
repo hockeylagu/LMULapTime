@@ -9,12 +9,11 @@ import { useGpsMapPanZoom } from '../useGpsMapPanZoom.js';
 import { GpsCircuitMinimap } from '../GpsCircuitMinimap.js';
 import { GpsTrackSegments } from './GpsTrackSegments.js';
 import { GpsStartFinishLine } from './GpsStartFinishLine.js';
-import { placeStartFinish } from './startFinishPlacement.js';
 import { buildRibbonIndex } from './cornerRibbonClearance.js';
-import { GpsSectorMarkers, placeSectorMarkers } from './GpsSectorMarkers.js';
+import { GpsSectorMarkers } from './GpsSectorMarkers.js';
 import { GpsMapBackground } from '../display/GpsMapBackground.js';
 import { GpsBrakeMarkers } from '../display/GpsBrakeMarkers.js';
-import { placeBrakeMarkers, showsFullBrakeBoards } from '../display/placeBrakeMarkers.js';
+import { useTrackMarkerPlacement } from '../display/useTrackMarkerPlacement.js';
 import { GpsMapControls } from '../display/GpsMapControls.js';
 import { GpsMapExpandedOverlays } from '../display/GpsMapExpandedOverlays.js';
 import { MapScaleBar } from '../display/MapScaleBar.js';
@@ -119,34 +118,11 @@ export const GpsTrackMapScene: React.FC<GpsTrackMapProps> = (props) => {
   const markerTrajectories = useMemo(() => [svgPoints, baselineSvgPoints], [svgPoints, baselineSvgPoints]);
   const ribbonIndex = useMemo(() => buildRibbonIndex(leftSvgPoints, rightSvgPoints, markerTrajectories),
     [leftSvgPoints, rightSvgPoints, markerTrajectories]);
-  const placedBrakes = useMemo(() => layers.brakeMarkers ? placeBrakeMarkers({ markers: effectiveGeometry?.brakeMarkers ?? [],
-    bounds: effectiveBounds, viewBoxSize: VIEWBOX_SIZE, padding: PADDING, markerScale, ribbon: ribbonIndex,
-    showDistance: layers.brakeDistance, showAds: layers.brakeAds, showDigi: layers.brakeDigi }) : [],
-  [layers.brakeMarkers, layers.brakeDistance, layers.brakeAds, layers.brakeDigi, effectiveGeometry?.brakeMarkers, effectiveBounds, markerScale, ribbonIndex]);
-  const brakeBoxes = useMemo(() => showsFullBrakeBoards(markerScale) ? placedBrakes.map(board => ({
-    x: board.posX, y: board.posY, hw: (board.width / 2 + 0.7) * markerScale, hh: (board.height / 2 + 0.7) * markerScale,
-  })) : [], [placedBrakes, markerScale]);
-  const placedStart = useMemo(() => layers.startFinish ? placeStartFinish({ svgPoints, zoomLevel, markerScale,
-    gateLeftSvg, gateRightSvg, obstacles: brakeBoxes, ribbon: ribbonIndex }) : null,
-  [layers.startFinish, svgPoints, zoomLevel, markerScale, gateLeftSvg, gateRightSvg, brakeBoxes, ribbonIndex]);
-  const timingObstacles = useMemo(() => [...brakeBoxes, ...(placedStart ? [placedStart.box] : [])], [brakeBoxes, placedStart]);
-  const placedSectors = useMemo(() => layers.sectors ? placeSectorMarkers(sectorMarkers, markerScale, zoomLevel,
-    timingObstacles, ribbonIndex) : [], [layers.sectors, sectorMarkers, markerScale, zoomLevel, timingObstacles, ribbonIndex]);
-  // Keeps badges off the gate itself; pedal lines may still cross it.
-  const gateReservation = useMemo(() => layers.startFinish && svgPoints.length ? [{ x: svgPoints[0].sx, y: svgPoints[0].sy,
-    hw: 13 * markerScale, hh: 13 * markerScale }] : [], [layers.startFinish, svgPoints, markerScale]);
-  const badgeObstacles = useMemo(() => [...timingObstacles,
-    ...placedSectors.map(marker => ({ x: marker.x, y: marker.y, hw: marker.hw, hh: marker.hh }))],
-  [timingObstacles, placedSectors]);
-  const markerObstacles = useMemo(() => [...badgeObstacles, ...gateReservation], [badgeObstacles, gateReservation]);
+  const { placedBrakes, placedStart, placedSectors, sectorGates, gateReservation, markerObstacles, sceneMarkerObstacles } = useTrackMarkerPlacement({
+    layers, brakeMarkers: effectiveGeometry?.brakeMarkers, bounds: effectiveBounds, viewBoxSize: VIEWBOX_SIZE, padding: PADDING,
+    markerScale, zoomLevel, ribbon: ribbonIndex, svgPoints, gateLeftSvg, gateRightSvg, sectorMarkers,
+  });
   const visibleCornerMarkers = layers.turns ? cornerMarkers : NO_CORNER_MARKERS;
-  const sectorGates = useMemo(() => placedSectors.flatMap(marker => marker.left ? [{ left: marker.left, right: marker.right }] : []), [placedSectors]);
-  const sceneMarkerObstacles = useMemo(() => [...badgeObstacles, ...placedBrakes.map(board => {
-    const x2 = showsFullBrakeBoards(markerScale) ? board.lineEndX : board.point.sx + board.ux * 7 * markerScale;
-    const y2 = showsFullBrakeBoards(markerScale) ? board.lineEndY : board.point.sy + board.uy * 7 * markerScale;
-    return { x: (board.point.sx + x2) / 2, y: (board.point.sy + y2) / 2,
-      hw: Math.abs(x2 - board.point.sx) / 2 + 2 * markerScale, hh: Math.abs(y2 - board.point.sy) / 2 + 2 * markerScale };
-  })], [badgeObstacles, placedBrakes, markerScale]);
   if (points.length === 0) {
     return <div className={`flex items-center justify-center h-64 text-lmu-muted text-sm ${className}`}>No GPS trajectory data available for this replay recording.</div>;
   }
